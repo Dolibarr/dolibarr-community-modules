@@ -541,6 +541,8 @@ foreach ($myTmpObjects as $myTmpObjectKey => $myTmpObjectArray) {
 	}
 }
 
+print '<br>';
+
 $titlebutton = $langs->trans('TestConnectionHelloasso');
 if ((float) DOL_VERSION >= 21) {
 	if (getDolGlobalString('HELLOASSO_LIVE')) {
