@@ -440,7 +440,7 @@ class modHelloAsso extends DolibarrModules
 	 */
 	public function init($options = '')
 	{
-		global $conf, $mysoc;
+		global $conf, $mysoc, $user;
 
 		// Create bank account HelloAsso if not exists
 		if (!getDolGlobalInt('HELLOASSO_BANK_ACCOUNT_FOR_PAYMENTS')) {
