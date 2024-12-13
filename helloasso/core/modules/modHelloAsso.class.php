@@ -445,23 +445,22 @@ class modHelloAsso extends DolibarrModules
 		// Create bank account HelloAsso if not exists
 		if (!getDolGlobalInt('HELLOASSO_BANK_ACCOUNT_FOR_PAYMENTS')) {
 			require_once DOL_DOCUMENT_ROOT.'/compta/bank/class/account.class.php';
-			$cashaccount = new Account($this->db);
-			$searchaccountid = $cashaccount->fetch(0, "CASH-POS");
+			$bankaccount = new Account($this->db);
+			$searchaccountid = $bankaccount->fetch(0, "CASH-POS");
 			if ($searchaccountid == 0) {
-				$cashaccount->ref = "HelloAsso";
-				$cashaccount->label = 'HelloAsso';
-				$cashaccount->courant = Account::TYPE_CURRENT; // deprecated
-				$cashaccount->type = Account::TYPE_CURRENT;
-				$cashaccount->country_id = $mysoc->country_id ? $mysoc->country_id : 1;
-				$cashaccount->date_solde = dol_now();
+				$bankaccount->ref = "HelloAsso";
+				$bankaccount->label = 'HelloAsso';
+				$bankaccount->type = Account::TYPE_CURRENT;
+				$bankaccount->country_id = $mysoc->country_id ? $mysoc->country_id : 1;
+				$bankaccount->date_solde = dol_now();
 				$idjournal = dol_getIdFromCode($this->db, 'BQ', 'accounting_journal', 'code', 'rowid');
-				$cashaccount->fk_accountancy_journal = (int) $idjournal;
-				$searchaccountid = $cashaccount->create($user);
+				$bankaccount->fk_accountancy_journal = (int) $idjournal;
+				$searchaccountid = $bankaccount->create($user);
 			}
 			if ($searchaccountid > 0) {
 				dolibarr_set_const($this->db, "HELLOASSO_BANK_ACCOUNT_FOR_PAYMENTS", $searchaccountid, 'chaine', 0, '', $conf->entity);
 			} else {
-				setEventMessages($cashaccount->error, $cashaccount->errors, 'errors');
+				setEventMessages($bankaccount->error, $bankaccount->errors, 'errors');
 			}
 		}
 
