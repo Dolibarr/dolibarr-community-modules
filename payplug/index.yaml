@@ -1,0 +1,13 @@
+# This is the YAML file to describe the location of a module
+
+packages:
+    - modulename: 'payplug'
+      label:
+        fr: 'PayPlug'
+        en: 'PayPlug'
+      git: 'https://github.com/DoliCloud/DoliMods/tree/master/htdocs/payplugdolicloud'
+      dolibarrmin: ''
+      dolibarrmax: ''
+      phpmin: ''  
+      phpmax: ''	  
+      dolistore-availability: auto

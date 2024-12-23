@@ -1,0 +1,13 @@
+# This is the YAML file to describe the location of a module
+
+packages:
+    - modulename: 'helloasso'
+      label:
+        fr: 'HelloAsso'
+        en: 'HelloAsso'
+      git: 'https://inligit.fr/cap-rel/dolibarr/plugin-peppol.git'
+      dolibarrmin: ''
+      dolibarrmax: ''
+      phpmin: ''  
+      phpmax: ''	  
+      dolistore-availability: auto
