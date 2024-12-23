@@ -1,4 +1,4 @@
-# This is the YAML file to describe the location of a module
+# This is the YAML file to describe the location modules
 
 packages:
     - modulename: 'payplug'

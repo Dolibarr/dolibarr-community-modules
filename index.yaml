@@ -1,0 +1,35 @@
+# This is the YAML file to describe the location modules
+
+packages:
+    - modulename: 'helloasso'
+      label:
+        fr: 'HelloAsso'
+        en: 'HelloAsso'
+      git: 'https://inligit.fr/cap-rel/dolibarr/plugin-peppol.git'
+      dolibarrmin: ''
+      dolibarrmax: ''
+      phpmin: ''  
+      phpmax: ''	  
+      dolistore-availability: auto
+
+    - modulename: 'payplug'
+      label:
+        fr: 'PayPlug'
+        en: 'PayPlug'
+      git: 'https://github.com/DoliCloud/DoliMods/tree/master/htdocs/payplugdolicloud'
+      dolibarrmin: ''
+      dolibarrmax: ''
+      phpmin: ''  
+      phpmax: ''	  
+      dolistore-availability: auto
+
+    - modulename: 'peppol'
+      label:
+        fr: 'Peppol'
+        en: 'Peppol'
+      git: 'https://inligit.fr/cap-rel/dolibarr/plugin-peppol.git'
+      dolibarrmin: ''
+      dolibarrmax: ''
+      phpmin: ''  
+      phpmax: ''	  
+      dolistore-availability: manual
