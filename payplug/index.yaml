@@ -10,4 +10,5 @@ packages:
       dolibarrmax: ''
       phpmin: ''  
       phpmax: ''	  
-      dolistore-availability: auto
+      direct-download: yes
+      dolistore-upload: auto

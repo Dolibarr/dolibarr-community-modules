@@ -32,4 +32,5 @@ packages:
       dolibarrmax: ''
       phpmin: ''  
       phpmax: ''	  
-      dolistore-availability: manual
+      direct-download: no  
+      dolistore-upload: manual
