@@ -5,7 +5,7 @@ packages:
       label:
         fr: 'HelloAsso'
         en: 'HelloAsso'
-      git: 'https://inligit.fr/cap-rel/dolibarr/plugin-peppol.git'
+      git: 'https://github.com/Dolibarr/dolibarr-community-modules/tree/main/helloasso'
       dolibarrmin: ''
       dolibarrmax: ''
       phpmin: ''  

@@ -9,5 +9,6 @@ packages:
       dolibarrmin: ''
       dolibarrmax: ''
       phpmin: ''  
-      phpmax: ''	  
+      phpmax: ''
+      direct-availability: no  
       dolistore-availability: manual
