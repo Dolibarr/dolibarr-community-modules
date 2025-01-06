@@ -403,7 +403,8 @@ class ActionsHelloAsso extends CommonHookActions
 
 		if (!$error) {
 			$this->resprints = $resprints;
-			return 0; // or return 1 to replace standard code
+			//return 0; // or return 1 to replace standard code
+			return 1; // or return 1 to replace standard code
 		} else {
 			$this->errors[] = $error;
 			return -1;
