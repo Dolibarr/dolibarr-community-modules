@@ -16,6 +16,10 @@ In order to allow the broadest adoption by any size of companies, and in order t
 
 This module is available on DoliStore : https://www.dolistore.com/product.php?id=954
 
+## Git dedicated repository for that module
+
+The dedicated repository is here : https://inligit.fr/cap-rel/dolibarr/plugin-facturx.git
+
 ## Features
 
 With that plugin your dolibarr could produce FacturX invoices !
