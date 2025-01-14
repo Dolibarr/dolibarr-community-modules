@@ -12,6 +12,10 @@ The goal of the project was to solve interoperability issues in electronic publi
 
 After the project ended the OpenPEPPOL Association was founded in Belgium to continue the work on the framework.
 
+## DoliStore
+
+This module is available on DoliStore : https://www.dolistore.com/product.php?id=884
+
 ## Features
 
 With that plugin your dolibarr could produce PEPPOL invoices !
