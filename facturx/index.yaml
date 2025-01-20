@@ -1,0 +1,16 @@
+# This is the YAML file to describe the location modules
+
+packages:
+    - modulename: 'facturx'
+      label:
+        fr: 'Factur-X'
+        en: 'Factur-X'
+        de: 'ZUGFeRD'
+      git: 'https://inligit.fr/cap-rel/dolibarr/plugin-facturx.git'
+      dolistore: 'https://www.dolistore.com/product.php?id=954'
+      dolibarrmin: ''
+      dolibarrmax: ''
+      phpmin: ''
+      phpmax: ''
+      direct-download: no
+      dolistore-upload: manual

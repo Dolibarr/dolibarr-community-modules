@@ -6,9 +6,10 @@ packages:
         fr: 'Peppol'
         en: 'Peppol'
       git: 'https://inligit.fr/cap-rel/dolibarr/plugin-peppol.git'
+      dolistore: 'https://www.dolistore.com/product.php?id=884'
       dolibarrmin: ''
       dolibarrmax: ''
-      phpmin: ''  
+      phpmin: ''
       phpmax: ''
-      direct-download: no  
+      direct-download: no
       dolistore-upload: manual
