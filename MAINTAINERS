@@ -1,0 +1,15 @@
+HELLOASSO MODULE
+M:	Lucas Marcouiller <lmarcouiller@dolicloud.com>
+S:	Maintained
+F:	helloasso/
+
+PAYPLUG MODULE
+M:	Lucas Marcouiller <lmarcouiller@dolicloud.com>
+S:	Maintained
+F:	payplug/
+
+PEPPOL MODULE
+M:	Eric Seigne
+S:	Maintained
+F:	payplug/
+T:	https://inligit.fr/cap-rel/dolibarr/plugin-peppol.git
