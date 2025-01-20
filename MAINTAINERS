@@ -7,6 +7,10 @@ You can find here the name of main maintainers of each module of this repository
 Submission of patchs for code must be done using a PR at the repository system provided in the T entry in
 the list Maintener list lower.
 
+Note that this is only list of a few modules validated by the Dolibarr foundation. Most modules are completely
+under control of their maintainers outside of this repository. See https://www.dolistore.com for a complete list
+of external modules.
+
 
 Descriptions of section entries and preferred order
 ---------------------------------------------------
