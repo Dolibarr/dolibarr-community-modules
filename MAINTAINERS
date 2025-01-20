@@ -55,7 +55,7 @@ PAYPLUG MODULE
 M:	Lucas Marcouiller <lmarcouiller@dolicloud.com>
 S:	Maintained
 F:	payplug/
-T:	https://github.com/Dolibarr/dolibarr-community-modules.git
+T:	https://github.com/DoliCloud/DoliMods/tree/master/htdocs/payplugdolicloud
 
 PEPPOL MODULE
 M:	Eric Seigne
