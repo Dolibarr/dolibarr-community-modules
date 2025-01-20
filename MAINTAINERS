@@ -62,3 +62,9 @@ M:	Eric Seigne
 S:	Maintained
 F:	payplug/
 T:	https://inligit.fr/cap-rel/dolibarr/plugin-peppol.git
+
+FACTURX MODULE
+M:	Eric Seigne
+S:	Maintained
+F:	payplug/
+T:	https://inligit.fr/cap-rel/dolibarr/plugin-facturx.git
