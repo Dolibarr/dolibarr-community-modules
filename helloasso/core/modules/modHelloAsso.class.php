@@ -119,6 +119,8 @@ class modHelloAsso extends DolibarrModules
 				      'newpayment',
 					  'subscription',
 					  'globalcard',
+					  'paymentmethod',
+                      'validpaymentmethod',
 				  ),
 			),
 			// Set this to 1 if features of module are opened to external users
