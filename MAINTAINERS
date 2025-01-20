@@ -1,12 +1,57 @@
+List of maintainers and how to submit kernel changes
+====================================================
+
+This file is using the stnadard format for MAINTAINERS files.
+You can find here the name of main maintainers of each module of this repository.
+
+Submission of patchs for code must be done using a PR at the repository system provided in the T entry in
+the list Maintener list lower.
+
+
+Descriptions of section entries and preferred order
+---------------------------------------------------
+
+	M: Name or Mailof main maintainer
+	S: *Status*, one of the following:
+	   Supported:	Someone is actually paid to look after this.
+	   Maintained:	Someone actually looks after it.
+	   Odd Fixes:	It has a maintainer but they don't have time to do
+			much other than throw the odd patch in. See below..
+	   Orphan:	No current maintainer [but maybe you could take the
+			role as you write your new code].
+	   Obsolete:	Old code. Something tagged obsolete generally means
+			it has been replaced by a better system and you
+			should be using that.
+	W: *Web-page* with status/info
+	T: *SCM* tree type and location.
+	   Type is one of: git, hg, quilt, stgit, topgit
+	F: *Files* and directories wildcard patterns.
+	   A trailing slash includes all files and subdirectory files.
+	   F:	moduleabc/dir/	all files in and below moduleabc/dir
+	   F:	*/dir/*		all files in "any top level directory"/dir
+	   One pattern per line.  Multiple F: lines acceptable.
+	X: *Excluded* files and directories that are NOT maintained, same
+	   rules as F:. Files exclusions are tested before file matches.
+	   Can be useful for excluding a specific subdirectory, for instance:
+	   F:	moduleabc/
+	   X:	moduleabc/subdir/
+	   matches all files in and below net excluding net/ipv6/
+
+
+Maintainers List
+----------------
+
 HELLOASSO MODULE
 M:	Lucas Marcouiller <lmarcouiller@dolicloud.com>
 S:	Maintained
 F:	helloasso/
+T:	https://github.com/Dolibarr/dolibarr-community-modules.git
 
 PAYPLUG MODULE
 M:	Lucas Marcouiller <lmarcouiller@dolicloud.com>
 S:	Maintained
 F:	payplug/
+T:	https://github.com/Dolibarr/dolibarr-community-modules.git
 
 PEPPOL MODULE
 M:	Eric Seigne
