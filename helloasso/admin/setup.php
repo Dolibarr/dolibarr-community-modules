@@ -93,6 +93,9 @@ $formSetup = new FormSetup($db);
 
 // Enter here all parameters in your setup page
 
+$item = $formSetup->newItem('HELLOASSO_BANK_ACCOUNT_FOR_PAYMENTS')->setAsSelectBankAccount();
+$item->fieldParams['isMandatory'] = 1;
+
 $item = $formSetup->newItem('HELLOASSO_LIVE')->setAsYesNo();
 $item->fieldParams['forcereload'] = 'forcereload';
 
@@ -117,9 +120,6 @@ $item->helpText = $langs->transnoentities('HELLOASSO_CLIENT_ID_HELP');
 $item = $formSetup->newItem('HELLOASSO_CLIENT_SECRET');
 $item->cssClass = 'minwidth500';
 $item->helpText = $langs->transnoentities('HELLOASSO_SECRET_HELP');
-
-
-$item = $formSetup->newItem('HELLOASSO_BANK_ACCOUNT_FOR_PAYMENTS')->setAsSelectBankAccount();
 
 $setupnotempty += count($formSetup->items);
 
