@@ -6,6 +6,7 @@ packages:
         fr: 'HelloAsso'
         en: 'HelloAsso'
       git: 'https://github.com/Dolibarr/dolibarr-community-modules/tree/main/helloasso'
+      current_version: 'auto'
       dolibarrmin: 'auto''
       dolibarrmax: 'auto''
       phpmin: 'auto''
