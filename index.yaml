@@ -16,7 +16,7 @@ packages:
       cover: 'https://raw.githubusercontent.com/Dolibarr/dolibarr-community-modules/main/helloasso/cover.png'
       current_version: '1.0.0'
       dolibarrmin: '21.0'
-      dolibarrmax: '21.*'
+      dolibarrmax: '22.*'
       phpmin: '7.1'
       phpmax: '8.4'
       # direct-download is yes if we can download the module to install it in application
@@ -33,7 +33,7 @@ packages:
       git: 'https://github.com/DoliCloud/DoliMods/tree/master/htdocs/payplugdolicloud'
       current_version: '1.0.0'
       dolibarrmin: '21.0'
-      dolibarrmax: '21.*'
+      dolibarrmax: '22.*'
       phpmin: '7.1'  
       phpmax: '8.4'	  
       # direct-download is yes if we can download the module to install it in application
