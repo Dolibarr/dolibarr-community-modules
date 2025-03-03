@@ -6,10 +6,11 @@ packages:
         fr: 'PayPlug'
         en: 'PayPlug'
       git: 'https://github.com/DoliCloud/DoliMods/tree/master/htdocs/payplugdolicloud'
+      current_version: 'auto'
       dolibarrmin: 'auto'
       dolibarrmax: 'auto'
-      phpmin: 'auto'  
-      phpmax: 'auto'	  
+      phpmin: 'auto'
+      phpmax: 'auto'  
       # direct-download is yes if we can download the module to install it in application
       direct-download: no
       # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically

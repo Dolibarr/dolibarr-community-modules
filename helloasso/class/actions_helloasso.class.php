@@ -379,6 +379,9 @@ class ActionsHelloAsso extends CommonHookActions
 		$error = "";
 
 		if (array_key_exists("paymentmethod", $parameters) && (empty($parameters["paymentmethod"]) || $parameters["paymentmethod"] == 'helloasso') && isModEnabled('helloasso')) {
+			if (!getDolGlobalString('HELLOASSO_LIVE')) {
+				dol_htmloutput_mesg($langs->trans('YouAreCurrentlyInSandboxMode', 'HelloAsso'), [], 'warning');
+			}
 			$resprints .= '<div class="button buttonpayment" id="div_dopayment_helloasso"><span class="fa fa-credit-card"></span> <input class="" type="submit" id="dopayment_helloasso" name="dopayment_helloasso" value="'.$langs->trans("HelloAssoDoPayment").'">';
 			$resprints .= '<input type="hidden" name="noidempotency" value="'.GETPOST('noidempotency', 'int').'">';
 			$resprints .= '<input type="hidden" name="s" value="'.(GETPOST('s', 'alpha') ? GETPOST('s', 'alpha') : GETPOST('source', 'alpha')).'">';
