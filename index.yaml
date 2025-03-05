@@ -4,8 +4,8 @@ packages:
     - modulename: 'helloasso'
       author: 'Dolicloud'
       label:
-        fr: "HelloAsso"
-        en: "HelloAsso"
+        fr: "HelloAsso (by DoliCloud)"
+        en: "HelloAsso (by DoliCloud)"
       description:
         fr: "Offre une solution pour réaliser un paiement en ligne pour toute cotisation d'adhésion, don, facture client ou commande client via l'API HelloAsso."
         en: "Provides a way to make an online checkout of any membership dues, donation, customer invoice or customer order with the HelloAsso API."

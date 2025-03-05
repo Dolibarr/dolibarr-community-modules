@@ -1,10 +1,10 @@
 # This is the YAML file to describe the location modules
 
 packages:
-    - modulename: 'payplug'
+    - modulename: 'payplugdolicloud'
       label:
-        fr: 'PayPlug'
-        en: 'PayPlug'
+        fr: 'PayPlug (by DoliCloud)'
+        en: 'PayPlug (by DoliCloud)'
       git: 'https://github.com/DoliCloud/DoliMods/tree/master/htdocs/payplugdolicloud'
       current_version: 'auto'
       dolibarrmin: 'auto'
