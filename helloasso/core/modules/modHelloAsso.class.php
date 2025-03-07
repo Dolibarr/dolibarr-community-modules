@@ -3,7 +3,8 @@
  * Copyright (C) 2018-2019  Nicolas ZABOURI         <info@inovea-conseil.com>
  * Copyright (C) 2019-2020  Frédéric France         <frederic.france@netlogic.fr>
  * Copyright (C) 2024       Lucas Marcouiller       <lmarcouiller@dolicloud.com>
- *
+ * Copyright (C) 2025 	   Pablo Lagrave           <contact@devlandes.com>
+ * 
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 3 of the License, or
@@ -107,7 +108,7 @@ class modHelloAsso extends DolibarrModules
 			'theme' => 0,
 			// Set this to relative path of css file if module has its own css file
 			'css' => array(
-				//    '/helloasso/css/helloasso.css.php',
+				'/helloasso/css/helloasso.css.php',
 			),
 			// Set this to relative path of js file if module must load a js on all pages
 			'js' => array(
