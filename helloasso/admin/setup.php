@@ -1,6 +1,7 @@
 <?php
 /* Copyright (C) 2024 Laurent Destailleur  <eldy@users.sourceforge.net>
- *
+ * Copyright (C) 2025 	   Pablo Lagrave           <contact@devlandes.com>
+ * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -120,6 +121,10 @@ $item->helpText = $langs->transnoentities('HELLOASSO_CLIENT_ID_HELP');
 $item = $formSetup->newItem('HELLOASSO_CLIENT_SECRET');
 $item->cssClass = 'minwidth500';
 $item->helpText = $langs->transnoentities('HELLOASSO_SECRET_HELP');
+
+$item = $formSetup->newItem('HELLOASSO_STANDAR_BTN')->setAsYesNo();
+$item->fieldParams['forcereload'] = 'forcereload';
+$item->helpText = $langs->transnoentities('HELLOASSO_STANDAR_BTN_HELP');
 
 $setupnotempty += count($formSetup->items);
 

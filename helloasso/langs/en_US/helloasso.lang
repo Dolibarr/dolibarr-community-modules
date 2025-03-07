@@ -1,4 +1,5 @@
 # Copyright (C) 2023 Alice Adminson 
+# Copyright (C) 2025 	   Pablo Lagrave           <contact@devlandes.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -43,6 +44,8 @@ HELLOASSO_CLIENT_ORGANISATION=Client organisation live
 HELLOASSO_CLIENT_ORGANISATION_HELP=The name of the organization for production mode. Must match the name defined into the HelloAsso account
 HELLOASSO_BANK_ACCOUNT_FOR_PAYMENTS=Bank account for payments
 HELLOASSO_SHOW_ONLINE_PAYMENTS=Show online payment page
+HELLOASSO_STANDAR_BTN = Enable the HelloAsso graphical style for the payment button
+HELLOASSO_STANDAR_BTN_HELP = Enable this option to load the HelloAsso CSS file, which replaces Dolibarr’s default style with a design that is harmonized with the HelloAsso visual identity (buttons, colors, etc.).
 
 ExampleOfTestCreditCardHelloAsso=Example of credit card can be found at this URL:<br> %s 
 TestConnectionHelloasso=Test Connection
