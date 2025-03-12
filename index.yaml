@@ -1,6 +1,24 @@
 # This is the YAML file to describe the location modules
 
 packages:
+    - modulename: 'facturx'
+      label:
+        fr: 'Factur-X'
+        en: 'Factur-X'
+        de: 'ZUGFeRD'
+      git: 'https://inligit.fr/cap-rel/dolibarr/plugin-facturx.git'
+      current_version: '1.0.0'
+      dolibarrmin: 'auto'
+      dolibarrmax: 'auto'
+      phpmin: 'auto'
+      phpmax: 'auto'
+      # direct-download is yes if we can download the module to install it in application
+      direct-download: no
+      # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
+      dolistore-upload: 'manual'
+      # dolistore-upload is yes if module can also be found on dolistore.com, auto, if sync automatically
+      dolistore-download: 'https://www.dolistore.com/product.php?id=954'
+
     - modulename: 'helloasso'
       author: 'Dolicloud'
       label:
@@ -26,16 +44,16 @@ packages:
       # dolistore-upload is yes if module can also be found on dolistore.com, auto, if sync automatically
       dolistore-download: https://www.dolistore.com/product.php?id=2332
 
-    - modulename: 'payplug'
+    - modulename: 'payplugdolicloud'
       label:
-        fr: 'PayPlug'
-        en: 'PayPlug'
+        fr: 'PayPlug (by DoliCloud)'
+        en: 'PayPlug (by DoliCloud)'
       git: 'https://github.com/DoliCloud/DoliMods/tree/master/htdocs/payplugdolicloud'
       current_version: '1.0.0'
       dolibarrmin: '21.0'
       dolibarrmax: '22.*'
-      phpmin: '7.1'  
-      phpmax: '8.4'	  
+      phpmin: '7.1'
+      phpmax: '8.4'
       # direct-download is yes if we can download the module to install it in application
       direct-download: no
       # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
@@ -48,14 +66,15 @@ packages:
         fr: 'Peppol'
         en: 'Peppol'
       git: 'https://inligit.fr/cap-rel/dolibarr/plugin-peppol.git'
-      current_version: ''
-      dolibarrmin: ''
-      dolibarrmax: ''
-      phpmin: ''  
-      phpmax: ''	  
+      current_version: 'auto'
+      dolibarrmin: 'auto'
+      dolibarrmax: 'auto'
+      phpmin: 'auto'
+      phpmax: 'auto'
       # direct-download is yes if we can download the module to install it in application
       direct-download: no
       # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
       dolistore-upload: 'manual'
       # dolistore-upload is yes if module can also be found on dolistore.com, auto, if sync automatically
       dolistore-download: 'https://www.dolistore.com/product.php?id=884'
+
