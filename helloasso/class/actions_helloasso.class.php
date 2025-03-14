@@ -643,6 +643,8 @@ class ActionsHelloAsso extends CommonHookActions
 							$result2 = $ret2["content"];
 							$json2 = json_decode($result2);
 
+							$_SESSION["HelloAssoPaymentId"] = $json2->id;
+
 							dol_syslog("Send redirect to ".$json2->redirectUrl);
 
 							header("Location: ".$json2->redirectUrl);
@@ -698,23 +700,132 @@ class ActionsHelloAsso extends CommonHookActions
 	 */
 	public function isPaymentOK($parameters, &$object, &$action, $hookmanager)
 	{
-		global $conf, $user, $langs,$db;
+		global $conf, $user, $langs, $db;
+		require_once DOL_DOCUMENT_ROOT.'/core/lib/functions.lib.php';
+		dol_include_once('helloasso/lib/helloasso.lib.php');
 
 		$error = 0; // Error counter
 		$ispaymentok = true;
+		$FULLTAG = GETPOST("fulltag", 'alpha'); // fulltag is tag with more informations
+		$tmptag = dolExplodeIntoArray($FULLTAG, '.', '=');
 
 		if (in_array($parameters['paymentmethod'], array('helloasso'))){
+			$db->begin();
 			$code = GETPOST("code");
 			if ($code == "refused") {
 				$ispaymentok = false;
 				$error ++;
 			}
+
+			if (!$error) {
+				if (empty($_SESSION["HelloAssoPaymentId"])) {
+					$error++;
+					$ispaymentok = false;
+				} else {
+					if (getDolGlobalInt("HELLOASSO_LIVE")) {
+						$client_organisation = getDolGlobalString("HELLOASSO_CLIENT_ORGANISATION");
+						$helloassourl = "api.helloasso.com";
+					} else {
+						$client_organisation = getDolGlobalString("HELLOASSO_TEST_CLIENT_ORGANISATION");
+						$helloassourl = "api.helloasso-sandbox.com";
+					}
+					$assoslug = str_replace('_', '-', dol_string_nospecial(strtolower(dol_string_unaccent($client_organisation)), '-'));
+
+					$result = helloassoDoConnection();
+					if ($result <= 0) {
+						$error++;
+						$ispaymentok = false;
+					}
+					if (!$error) {
+						$paymentid = $_SESSION["HelloAssoPaymentId"];
+						$headers = array();
+						$headers[] = "Authorization: ".ucfirst($result["token_type"])." ".$result["access_token"];
+						$headers[] = "Accept: text/plain";
+
+						$urlforcheckout = "https://".urlencode($helloassourl)."/v5/organizations/".urlencode($assoslug)."/checkout-intents/".$paymentid;
+						dol_syslog("Send GET to url=".$urlforcheckout, LOG_DEBUG);
+						$ret = getURLContent($urlforcheckout, 'GET', '', 1, $headers);
+						if ($ret["http_code"] == 200) {
+							//Add payer data to Dolibarr -> contact + test if paymentdone id test 47257
+							$json = json_decode($ret["content"]);
+							if ($json->id == $_SESSION["HelloAssoPaymentId"] && $json->order->payments[0]->state == "Authorized") {
+								if (!empty($json->order->payer)) {
+									$payer = $json->order->payer;
+									$found = 0;
+									$countryid = 0;
+
+									$sql = "SELECT cc.rowid as id";
+									$sql .= " FROM ".MAIN_DB_PREFIX."c_country as cc";
+									$sql .= " WHERE cc.code_iso = '".$db->escape($payer->country)."'";
+									$sql .= " AND cc.active = 1";
+									$resql = $db->query($sql);
+									if ($resql) {
+										$objcount = $db->fetch_object($resql);
+										if ($objcount) {
+											$countryid = $objcount->id;
+										}
+									} else {
+										$error ++;
+										$ispaymentok = false;
+									}
+									if ($countryid != 0) {
+										$sql = "SELECT COUNT(s.rowid) as nb";
+										$sql .= " FROM ".MAIN_DB_PREFIX."socpeople as s";
+										$sql .= " WHERE s.fk_soc = ".((int) $tmptag["CUS"]);
+										$sql .= " AND s.entity = ".$conf->entity;
+										$sql .= " AND s.firstname = '".$db->escape($payer->firstName)."'";
+										$sql .= " AND s.lastname = '".$db->escape($payer->lastName)."'";
+										$sql .= " AND s.email = '".$db->escape($payer->email)."'";
+										$sql .= " AND s.address = '".$db->escape($payer->address)."'";
+										$sql .= " AND s.zip = '".$db->escape($payer->zipCode)."'";
+										$sql .= " AND s.town = '".$db->escape($payer->city)."'";
+										$sql .= " AND s.fk_pays = ".(int) $countryid;
+										$resqlcount = $db->query($sql);
+										if ($resqlcount) {
+											$objcount = $db->fetch_object($resqlcount);
+											if ($objcount) {
+												$found = $objcount->nb;
+											}
+										} else {
+											$error ++;
+											$ispaymentok = false;
+										}
+									}
+									if (!$found && $countryid != 0) {
+										//Make contact SQL
+										$sql = "INSERT INTO ".MAIN_DB_PREFIX."socpeople (";
+										$sql .= "entity, fk_soc, firstname, lastname, email, address, zip, town, fk_pays, fk_user_creat";
+										$sql .= ") VALUES (";
+										$sql .= ((int) $conf->entity).", ".((int) $tmptag["CUS"]).", '".$db->escape($payer->firstName)."', '".$db->escape($payer->lastName)."', '".$db->escape($payer->email)."', '".$db->escape($payer->address)."', '".$db->escape($payer->zipCode)."', '".$db->escape($payer->city)."', ".((int) $countryid).', null';
+										$sql .= ")";
+
+										$resqlinsert= $db->query($sql);
+										if (!$resqlinsert) {
+											$error ++;
+											$ispaymentok = false;
+										}
+									}
+								}
+							} else {
+								$error++;
+								$ispaymentok = false;
+							}
+						} else {
+							$error++;
+							$ispaymentok = false;
+						}
+					}
+
+				}
+			}
 		}
 
 		if (!$error) {
+			$db->commit();
 			$this->results["ispaymentok"] = $ispaymentok;
 			return 1;
 		} else {
+			$db->rollback();
 			$this->errors[] = $langs->trans("PaymentRefused");
 			return -1;
 		}
