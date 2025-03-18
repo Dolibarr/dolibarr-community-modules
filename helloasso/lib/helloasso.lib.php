@@ -126,7 +126,7 @@ function helloassoDoConnection()
 	$result = array();
 
 	dol_syslog('HelloAsso::helloassoDoConnection');
-
+	
 	$helloassourl = "api.helloasso-sandbox.com";
 	$service = "Helloasso-Test";
 
@@ -153,11 +153,12 @@ function helloassoDoConnection()
 		}
 		$result = array("token_type" => $tokenobj->getExtraParams()["token_type"], "access_token" => $tokenobj->getAccessToken());
 	} catch (Exception $e) {
-		//var_dump($url.' - '.$client_id.' - '.$client_id_secret);
+		// var_dump($url.' <br> '.$client_id.' <br> '.$client_id_secret.' <br> '.$service.' <br> ');
 		$ret = getURLContent($url, 'POST', 'grant_type=client_credentials&client_id='.urlencode($client_id).'&client_secret='.urlencode($client_id_secret), 1, array('content-type: application/x-www-form-urlencoded'));
-		//var_dump($ret);
+		// var_dump($ret);
 
 		if ($ret["http_code"] == 200) {
+			
 			$jsondata = $ret["content"];
 			$json = json_decode($jsondata);
 			$result = array("token_type" => $json->token_type, "access_token" => $json->access_token);
@@ -173,6 +174,7 @@ function helloassoDoConnection()
 
 			$storage->storeAccessToken($service, $tokenobj);
 		} else {
+			echo "KO";
 			$jsondata = $ret["content"];
 			$json = json_decode($jsondata);
 			dol_syslog('Error: getURLContent http_code='.$ret["http_code"].' message='.$json->error_description);
