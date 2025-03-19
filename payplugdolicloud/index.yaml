@@ -8,7 +8,7 @@ packages:
       git: 'https://github.com/DoliCloud/DoliMods/tree/master/htdocs/payplugdolicloud'
       current_version: '1.0.0'
       dolibarrmin: '21.0'
-      dolibarrmax: '22.*'
+      dolibarrmax: '22.0'
       phpmin: '7.1'
       phpmax: '8.4'
       # direct-download is yes if we can download the module to install it in application
