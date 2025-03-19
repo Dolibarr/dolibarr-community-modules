@@ -1,0 +1,23 @@
+name: Run Script on Merge
+
+on:
+  pull_request:
+    types:
+      - closed
+
+jobs:
+  run-php-script:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+
+      - name: Run PHP script
+        run: php dev/build/makeindexyaml.php
