@@ -24,14 +24,17 @@ jobs:
       - name: Run PHP script
         run: php dev/build/makeindexyaml.php
 
+      - name: Set branch name
+        run: echo "BRANCH_NAME=auto-update-$(date +%Y%m%d-%H%M%S)" >> $GITHUB_ENV
+
       - name: Commit changes
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -b auto-update-$(date +%Y%m%d-%H%M%S)
+          git checkout -b $BRANCH_NAME
           git add .
           git commit -m "Automated changes from script"
-          git push origin HEAD
+          git push origin $BRANCH_NAME
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5
@@ -39,4 +42,4 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           title: "Automated Update from Script"
           body: "This PR contains automated changes made by the script."
-          branch: auto-update-$(date +%Y%m%d-%H%M%S)
+          branch: ${{ env.BRANCH_NAME }}
