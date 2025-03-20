@@ -94,8 +94,12 @@ function completAutoTags($content, $modulePath) {
         return ": '" . str_replace("'", "’", $matches[1]) . "'";
     }, $content);
 
+    print "Processing module path: $modulePath\n";
+    print "Core class file path: $coreClassFile\n";
+
     if (file_exists($coreClassFile)) {
         $coreClassContent = file_get_contents($coreClassFile);
+        print "Core class file content:\n$coreClassContent\n";
 
         foreach ($tags as $tag => $property) {
             $value = '';
@@ -105,21 +109,27 @@ function completAutoTags($content, $modulePath) {
                 $value = trim($matches[1]);
                 $value = preg_replace('/\s+/', '', $value); // Remove spaces
                 $value = str_replace(',', '.', $value); // Replace commas with dots
+                print "Found array value for $property: $value\n";
             }
 
             // Case where the value is a simple string
             elseif (preg_match('/\$this->' . preg_quote($property) . '\s*=\s*[\'"]([^\'"]+)[\'"]/', $coreClassContent, $matches)) {
                 $value = trim($matches[1]);
+                print "Found string value for $property: $value\n";
             }
 
             if (!empty($value)) {
                 // Replace "auto" with the found value
                 $content = preg_replace('/(' . preg_quote($tag) . ':\s*)["\']?auto["\']?/', "$1\"$value\"", $content);
+                print "Replaced auto for $tag with value: $value\n";
             } else {
                 // Remove "auto" if no value is found
                 $content = preg_replace('/(' . preg_quote($tag) . ':\s*)["\']?auto["\']?/', "$1\"\"", $content);
+                print "No value found for $tag, replaced auto with empty string.\n";
             }
         }
+    } else {
+        print "Core class file does not exist: $coreClassFile\n";
     }
 
     return $content;
@@ -138,5 +148,6 @@ $yamlFiles = array_filter($yamlFiles, function($file) use ($outputFile) {
 
 combineYamlFiles($yamlFiles, $outputFile);
 
+print "Combined index.yaml file created at: " . $outputFile;
 syslog(LOG_INFO, "Combined index.yaml file created at: " . $outputFile);
 
