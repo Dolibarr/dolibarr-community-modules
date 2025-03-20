@@ -1,0 +1,47 @@
+name: Update index.yaml After Merge
+
+on:
+  pull_request:
+    types:
+      - closed
+
+jobs:
+  update-index:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Configure Git to Ignore Case
+        run: git config --global core.ignorecase true
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+
+      - name: Run Script to Generate index.yaml
+        run: php dev/build/makeindexyaml.php
+
+      - name: Check for Changes
+        id: check-changes
+        run: |
+          if [[ -n $(git status --porcelain) ]]; then
+            echo "CHANGED=true" >> $GITHUB_ENV
+          else
+            echo "CHANGED=false" >> $GITHUB_ENV
+          fi
+
+      - name: Commit and Push Changes
+        if: env.CHANGED == 'true'
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add index.yaml
+          git commit -m "Update index.yaml after PR merge"
+          git push origin HEAD:main
