@@ -1,7 +1,7 @@
 # This is the YAML file to describe the location of a module
 
 packages:
-    - modulename: 'helloasso'
+    - modulename: 'HelloAsso'
       author: 'Dolicloud'
       label:
         fr: "HelloAsso (by DoliCloud)"
@@ -9,6 +9,7 @@ packages:
       description:
         fr: "Offre une solution pour réaliser un paiement en ligne pour toute cotisation d'adhésion, don, facture client ou commande client via l'API HelloAsso."
         en: "Provides a way to make an online checkout of any membership dues, donation, customer invoice or customer order with the HelloAsso API."
+      status: 'enabled'		
       created_at: '2024-12-10'
       last_updated_at: '2025-02-06'
       category: '68, 67'

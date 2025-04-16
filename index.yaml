@@ -1,17 +1,16 @@
-# This is the YAML file to describe the location modules
 
 packages:
-    - modulename: 'facturx'
+    - modulename: 'FacturX'
       label:
         fr: 'Factur-X'
         en: 'Factur-X'
         de: 'ZUGFeRD'
       git: 'https://inligit.fr/cap-rel/dolibarr/plugin-facturx.git'
       current_version: '1.0.0'
-      dolibarrmin: 'auto'
-      dolibarrmax: 'auto'
-      phpmin: 'auto'
-      phpmax: 'auto'
+      dolibarrmin: ""
+      dolibarrmax: "22.0"
+      phpmin: ""
+      phpmax: ""
       # direct-download is yes if we can download the module to install it in application
       direct-download: no
       # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
@@ -19,7 +18,7 @@ packages:
       # dolistore-upload is yes if module can also be found on dolistore.com, auto, if sync automatically
       dolistore-download: 'https://www.dolistore.com/product.php?id=954'
 
-    - modulename: 'helloasso'
+    - modulename: 'HelloAsso'
       author: 'Dolicloud'
       label:
         fr: 'HelloAsso (by DoliCloud)'
@@ -33,8 +32,8 @@ packages:
       git: 'https://github.com/Dolibarr/dolibarr-community-modules/tree/main/helloasso'
       cover: 'https://raw.githubusercontent.com/Dolibarr/dolibarr-community-modules/main/helloasso/cover.png'
       current_version: "1.0"
-      dolibarrmin: "21.0.-4"
-      dolibarrmax: ""
+      dolibarrmin: "21.0"
+      dolibarrmax: "22.0"
       phpmin: "7.1"
       phpmax: "8.4"
       # direct-download is yes if we can download the module to install it in application
@@ -44,7 +43,7 @@ packages:
       # dolistore-upload is yes if module can also be found on dolistore.com, auto, if sync automatically
       dolistore-download: https://www.dolistore.com/product.php?id=2332
 
-    - modulename: 'payplugdolicloud'
+    - modulename: 'PayplugDolicloud'
       label:
         fr: 'PayPlug (by DoliCloud)'
         en: 'PayPlug (by DoliCloud)'
@@ -61,16 +60,16 @@ packages:
       # dolistore-upload is yes if module can also be found on dolistore.com, auto, if sync automatically
       dolistore-download: 'https://www.dolistore.com/product.php?id=884'
 
-    - modulename: 'peppol'
+    - modulename: 'Peppol'
       label:
         fr: 'Peppol'
         en: 'Peppol'
       git: 'https://inligit.fr/cap-rel/dolibarr/plugin-peppol.git'
-      current_version: 'auto'
-      dolibarrmin: 'auto'
-      dolibarrmax: 'auto'
-      phpmin: 'auto'
-      phpmax: 'auto'
+      current_version: ""
+      dolibarrmin: ""
+      dolibarrmax: "22.0"
+      phpmin: ""
+      phpmax: ""
       # direct-download is yes if we can download the module to install it in application
       direct-download: no
       # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically

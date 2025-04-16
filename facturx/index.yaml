@@ -1,11 +1,12 @@
 # This is the YAML file to describe the location modules
 
 packages:
-    - modulename: 'facturx'
+    - modulename: 'FacturX'
       label:
         fr: 'Factur-X'
         en: 'Factur-X'
         de: 'ZUGFeRD'
+      status: 'disabled'		
       git: 'https://inligit.fr/cap-rel/dolibarr/plugin-facturx.git'
       current_version: '1.0.0'
       dolibarrmin: 'auto'

@@ -1,11 +1,12 @@
 # This is the YAML file to describe the location modules
 
 packages:
-    - modulename: 'peppol'
+    - modulename: 'Peppol'
       label:
         fr: 'Peppol'
         en: 'Peppol'
       git: 'https://inligit.fr/cap-rel/dolibarr/plugin-peppol.git'
+      status: 'enabled'	
       current_version: 'auto'
       dolibarrmin: 'auto'
       dolibarrmax: 'auto'
