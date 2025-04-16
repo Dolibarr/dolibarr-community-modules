@@ -11,7 +11,7 @@ packages:
         en: "Provides a way to make an online checkout of any membership dues, donation, customer invoice or customer order with the HelloAsso API."
       status: 'enabled'		
       created_at: '2024-12-10'
-      last_updated_at: '2025-02-06'
+      last_updated_at: 'auto'
       category: '68, 67'
       git: 'https://github.com/Dolibarr/dolibarr-community-modules/tree/main/helloasso'
       cover: 'https://raw.githubusercontent.com/Dolibarr/dolibarr-community-modules/main/helloasso/cover.png'

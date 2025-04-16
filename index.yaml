@@ -5,6 +5,7 @@ packages:
         fr: 'Factur-X'
         en: 'Factur-X'
         de: 'ZUGFeRD'
+      status: 'disabled'		
       git: 'https://inligit.fr/cap-rel/dolibarr/plugin-facturx.git'
       current_version: '1.0.0'
       dolibarrmin: ""
@@ -26,8 +27,9 @@ packages:
       description:
         fr: 'Offre une solution pour réaliser un paiement en ligne pour toute cotisation d’adhésion, don, facture client ou commande client via l’API HelloAsso.'
         en: 'Provides a way to make an online checkout of any membership dues, donation, customer invoice or customer order with the HelloAsso API.'
+      status: 'enabled'		
       created_at: '2024-12-10'
-      last_updated_at: '2025-02-06'
+      last_updated_at: ""
       category: '68, 67'
       git: 'https://github.com/Dolibarr/dolibarr-community-modules/tree/main/helloasso'
       cover: 'https://raw.githubusercontent.com/Dolibarr/dolibarr-community-modules/main/helloasso/cover.png'
@@ -47,12 +49,14 @@ packages:
       label:
         fr: 'PayPlug (by DoliCloud)'
         en: 'PayPlug (by DoliCloud)'
+      status: 'enabled'	
       git: 'https://github.com/DoliCloud/DoliMods/tree/master/htdocs/payplugdolicloud'
       current_version: '1.0.0'
       dolibarrmin: '21.0'
-      dolibarrmax: '22.*'
+      dolibarrmax: "22.0"
       phpmin: '7.1'
       phpmax: '8.4'
+      last_updated_at: ""
       # direct-download is yes if we can download the module to install it in application
       direct-download: no
       # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
@@ -65,6 +69,7 @@ packages:
         fr: 'Peppol'
         en: 'Peppol'
       git: 'https://inligit.fr/cap-rel/dolibarr/plugin-peppol.git'
+      status: 'enabled'	
       current_version: ""
       dolibarrmin: ""
       dolibarrmax: "22.0"

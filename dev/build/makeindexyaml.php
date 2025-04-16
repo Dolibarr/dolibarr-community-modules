@@ -103,7 +103,7 @@ function completAutoTags($content, $modulePath) {
         'dolibarrmin'       => 'need_dolibarr_version',
         'dolibarrmax'       => 'max_dolibarr_version',
         'phpmin'            => 'phpmin',
-        'phpmax'            => 'phpmax'
+        'phpmax'            => 'phpmax',
     );
 
 	$modulename = '';
@@ -164,46 +164,57 @@ function completAutoTags($content, $modulePath) {
     }
 
     if ($coreClassContent) {
+    	// Update tags with a corresponding value into the descriptor file
         foreach ($tags as $tag => $property) {
-            $value = '';
+        	if (preg_match('/(' . preg_quote($tag) . ':\s*)["\']?auto["\']?/', $content)) {	// If the key: is 'auto'
+	            $value = '';
 
-            // Case where the value is an array
-            $matches = array();
-            if (preg_match('/\$this->' . preg_quote($property) . '\s*=\s*array\(([^)]+)\)/', $coreClassContent, $matches)) {
-                $value = trim($matches[1]);
-                $value = preg_replace('/\s+/', '', $value); // Remove spaces
-                $value = str_replace(',', '.', $value); // Replace commas with dots
+	            // Case where the value is an array
+	            $matches = array();
+	            if (preg_match('/\$this->' . preg_quote($property) . '\s*=\s*array\(([^)]+)\)/', $coreClassContent, $matches)) {
+	                $value = trim($matches[1]);
+	                $value = preg_replace('/\s+/', '', $value); // Remove spaces
+	                $value = str_replace(',', '.', $value); // Replace commas with dots
+	                print "Found array value for '$property': $value\n";
+	            }
+
+	            // Case where the value is a simple string
+	            elseif (preg_match('/\$this->' . preg_quote($property) . '\s*=\s*[\'"]([^\'"]+)[\'"]/', $coreClassContent, $matches)) {
+	                $value = trim($matches[1]);
+	                print "Found string value for '$property': $value\n";
+	            }
+
                 // Clean version x.y.z into x.y
-                if (preg_match('/^(\d+\.\d+)\.[\-\d]+$/', $value, $reg)) {
+                if (preg_match('/^(\d+\.\d+)\.[\-\d\*]+$/', $value, $reg)) {
                 	$value = $reg[1];
                 }
-                print "Found array value for '$property': $value\n";
-            }
 
-            // Case where the value is a simple string
-            elseif (preg_match('/\$this->' . preg_quote($property) . '\s*=\s*[\'"]([^\'"]+)[\'"]/', $coreClassContent, $matches)) {
-                $value = trim($matches[1]);
-                // Clean version x.y.z into x.y
-                if (preg_match('/^(\d+\.\d+)\.[\-\d]+$/', $value, $reg)) {
-                	$value = $reg[1];
-                }
-                print "Found string value for '$property': $value\n";
-            }
+	            if (!empty($value)) {
+	                // Replace "auto" with the found value
+	                $content = preg_replace('/(' . preg_quote($tag) . ':\s*)["\']?auto["\']?/', "$1\"$value\"", $content);
+	                print "Replaced auto for '$tag' with value: $value\n";
+	            } else {
+	                // Remove "auto" if no value is found
+	                if ($tag == 'dolibarrmax') {
+	                	$content = preg_replace('/(' . preg_quote($tag) . ':\s*)["\']?auto["\']?/', "$1\"".$DOLIBARRMAXBYDEFAULT."\"", $content);
+	                	print "No value found for '$tag', replaced auto with ".$DOLIBARRMAXBYDEFAULT."\n";
+	                } else {
+	                	$content = preg_replace('/(' . preg_quote($tag) . ':\s*)["\']?auto["\']?/', "$1\"\"", $content);
+	                	print "No value found for '$tag', replaced auto with empty string.\n";
+	                }
+	            }
+        	} else {
+        		// Nothing done, we keep value as in source file
+        	}
+        }
 
-            if (!empty($value)) {
-                // Replace "auto" with the found value
-                $content = preg_replace('/(' . preg_quote($tag) . ':\s*)["\']?auto["\']?/', "$1\"$value\"", $content);
-                print "Replaced auto for '$tag' with value: $value\n";
-            } else {
-                // Remove "auto" if no value is found
-                if ($tag == 'dolibarrmax') {
-                	$content = preg_replace('/(' . preg_quote($tag) . ':\s*)["\']?auto["\']?/', "$1\"".$DOLIBARRMAXBYDEFAULT."\"", $content);
-                	print "No value found for '$tag', replaced auto with ".$DOLIBARRMAXBYDEFAULT.".\n";
-                } else {
-                	$content = preg_replace('/(' . preg_quote($tag) . ':\s*)["\']?auto["\']?/', "$1\"\"", $content);
-                	print "No value found for '$tag', replaced auto with empty string.\n";
-                }
-            }
+        // Now udate the last_updated_at
+        $tag = 'last_updated_at';
+        if (preg_match('/(' . preg_quote($tag) . ':\s*)["\']?auto["\']?/', $content)) {	// If the key: is 'auto'
+	    	print "Update the last_updated_at\n";
+	    	$value = "";
+	    	// TODO Try to guess value from git sources
+    	    $content = preg_replace('/(' . preg_quote($tag) . ':\s*)["\']?auto["\']?/', "$1\"$value\"", $content);
         }
     } else {
         print "Core class file does not exist: $coreClassFile\n";
