@@ -69,7 +69,7 @@ packages:
         fr: 'Peppol'
         en: 'Peppol'
       git: 'https://inligit.fr/cap-rel/dolibarr/plugin-peppol.git'
-      status: 'enabled'	
+      status: 'disabled'	
       current_version: ""
       dolibarrmin: ""
       dolibarrmax: "22.0"
