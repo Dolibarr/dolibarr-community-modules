@@ -88,7 +88,6 @@ class ActionsHelloAsso extends CommonHookActions
 	 */
 	public function getNomUrl($parameters, &$object, &$action)
 	{
-		global $db, $langs, $conf, $user;
 		$this->resprints = '';
 		return 0;
 	}
@@ -104,8 +103,6 @@ class ActionsHelloAsso extends CommonHookActions
 	 */
 	public function doActions($parameters, &$object, &$action, $hookmanager)
 	{
-		global $conf, $user, $langs;
-
 		$error = 0; // Error counter
 
 		/* print_r($parameters); print_r($object); echo "action: " . $action; */
@@ -139,8 +136,6 @@ class ActionsHelloAsso extends CommonHookActions
 	 */
 	public function doMassActions($parameters, &$object, &$action, $hookmanager)
 	{
-		global $conf, $user, $langs;
-
 		$error = 0; // Error counter
 
 		/* print_r($parameters); print_r($object); echo "action: " . $action; */
@@ -209,7 +204,8 @@ class ActionsHelloAsso extends CommonHookActions
 		dol_syslog(get_class($this).'::executeHooks action='.$action);
 
 		/* print_r($parameters); print_r($object); echo "action: " . $action; */
-		if (in_array($parameters['currentcontext'], array('somecontext1', 'somecontext2'))) {		// do something only for the context 'somecontext1' or 'somecontext2'
+		if (in_array($parameters['currentcontext'], array('somecontext1', 'somecontext2'))) {
+			// do something only for the context 'somecontext1' or 'somecontext2'
 		}
 
 		return $ret;
@@ -250,7 +246,7 @@ class ActionsHelloAsso extends CommonHookActions
 	 */
 	public function loadDataForCustomReports($parameters, &$action, $hookmanager)
 	{
-		global $user, $langs;
+		global $langs;
 
 		$langs->load("helloasso@helloasso");
 
@@ -320,7 +316,7 @@ class ActionsHelloAsso extends CommonHookActions
 	 */
 	public function completeTabsHead(&$parameters, &$object, &$action, $hookmanager)
 	{
-		global $langs, $user;
+		global $langs;
 
 		if (!isset($parameters['object']->element)) {
 			return 0;
@@ -373,7 +369,7 @@ class ActionsHelloAsso extends CommonHookActions
 	 */
 	public function doAddButton($parameters, &$object, &$action, $hookmanager)
 	{
-		global $user, $langs;
+		global $langs;
 
 		$error = 0; // Error counter
 		$resprints = "";
@@ -405,7 +401,7 @@ class ActionsHelloAsso extends CommonHookActions
 							</script>
 				';
 			}else{
-				
+
 				// Bouton au format standard HelloAsso (avec logo) https://dev.helloasso.com/docs/bouton-payer-avec-helloasso
 				$resprints .= '<div class="HaPay" id="div_dopayment_helloasso">';
 				$resprints .= '  <button type="submit" class="HaPayButton" id="dopayment_helloasso" name="dopayment_helloasso" value="'.$langs->trans("HelloAssoDoPayment").'">';
@@ -469,11 +465,11 @@ class ActionsHelloAsso extends CommonHookActions
 				$resprints .= '<input type="hidden" name="noidempotency" value="'.GETPOST('noidempotency', 'int').'">';
 				$resprints .= '<input type="hidden" name="s" value="'.(GETPOST('s', 'alpha') ? GETPOST('s', 'alpha') : GETPOST('source', 'alpha')).'">';
 				$resprints .= '<input type="hidden" name="ref" value="'.GETPOST('ref').'">';
-				
-			}
-			
 
-		
+			}
+
+
+
 
 		if (!$error) {
 			$this->resprints = $resprints;
@@ -505,7 +501,11 @@ class ActionsHelloAsso extends CommonHookActions
 
 		if (array_key_exists("paymentmethod", $parameters) && (empty($parameters["paymentmethod"]) || $parameters["paymentmethod"] == 'helloasso') && isModEnabled('helloasso')) {
 			$langs->load("helloasso");
-			$validpaymentmethod['helloasso'] = 'valid';
+			if (!empty($parameters['mode'])) {
+				$validpaymentmethod['helloasso'] = array('label' => 'HelloAsso', 'status' => 'valid');
+			} else {
+				$validpaymentmethod['helloasso'] = 'valid';
+			}
 		}
 
 		if (!$error) {
@@ -528,7 +528,7 @@ class ActionsHelloAsso extends CommonHookActions
 	 */
 	public function doPayment($parameters, &$object, &$action, $hookmanager)
 	{
-		global $conf, $user, $langs, $db;
+		global $conf, $langs;
 
 		dol_include_once('helloasso/lib/helloasso.lib.php');
 
@@ -545,8 +545,12 @@ class ActionsHelloAsso extends CommonHookActions
 		$FULLTAG = GETPOST("fulltag", 'alpha'); // fulltag is tag with more informations
 		$SECUREKEY = GETPOST("securekey"); // Secure key
 		$source = GETPOST('s', 'alpha') ? GETPOST('s', 'alpha') : GETPOST('source', 'alpha');
-		$object = null;
+		$suffix = GETPOST('suffix'); 	// ???
+		$entity = GETPOST('entity');
+		$getpostlang = GETPOST('lang');
 		$amount = price2num(GETPOST("amount", 'alpha'));
+
+		$object = null;
 
 		if ($action == "returnDoPaymentHelloAsso") {
 			dol_syslog("Data after redirect from helloasso payment page with session FinalPaymentAmt = ".$_SESSION["FinalPaymentAmt"]." currencycodeType = ".$_SESSION["currencyCodeType"], LOG_DEBUG);
@@ -617,14 +621,12 @@ class ActionsHelloAsso extends CommonHookActions
 			if (!empty($SECUREKEY)) {
 				$urlback .= 'securekey='.urlencode($SECUREKEY).'&';
 			}
-			/*
 			if (!empty($entity)) {
 				$urlback .= 'e='.urlencode($entity).'&';
 			}
 			if (!empty($getpostlang)) {
 				$urlback .= 'lang='.urlencode($getpostlang).'&';
 			}
-			*/
 			$urlback .= 'action=returnDoPaymentHelloAsso';
 
 			$result = helloassoDoConnection();
@@ -640,7 +642,6 @@ class ActionsHelloAsso extends CommonHookActions
 				$payerarray = array();
 				helloassoGetDataFromObjects($source, $ref, 'payer', $payerarray);
 
-				$fulltag = $FULLTAG;
 				$FinalPaymentAmt = $_SESSION["FinalPaymentAmt"];
 				$amounttotest = $amount;
 				if (!$error) {
@@ -773,7 +774,7 @@ class ActionsHelloAsso extends CommonHookActions
 	 */
 	public function isPaymentOK($parameters, &$object, &$action, $hookmanager)
 	{
-		global $conf, $user, $langs, $db;
+		global $conf, $langs, $db;
 		require_once DOL_DOCUMENT_ROOT.'/core/lib/functions.lib.php';
 		dol_include_once('helloasso/lib/helloasso.lib.php');
 
@@ -915,8 +916,6 @@ class ActionsHelloAsso extends CommonHookActions
 	 */
 	public function getBankAccountPaymentMethod($parameters, &$object, &$action, $hookmanager)
 	{
-		global $langs;
-
 		$error = 0; // Error counter
 
 		$bankaccountid = 0;
