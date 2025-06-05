@@ -51,6 +51,7 @@ packages:
         en: 'PayPlug (by DoliCloud)'
       status: 'enabled'	
       git: 'https://github.com/DoliCloud/DoliMods/tree/master/htdocs/payplugdolicloud'
+      cover: 'https://github.com/DoliCloud/DoliMods/blob/master/htdocs/payplugdolicloud/img/object_payplugdolicloud.png'
       current_version: '1.0.0'
       dolibarrmin: '21.0'
       dolibarrmax: "22.0"
