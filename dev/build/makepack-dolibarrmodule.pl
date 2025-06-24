@@ -279,7 +279,6 @@ foreach my $PROJECT (@PROJECTLIST) {
 			    	}
 				}	
 				close IN;
-				
 		    }
 		    print "Clean $BUILDROOT\n";
 		    $ret=`rm -fr $BUILDROOT/$PROJECTLC/.cache`;
