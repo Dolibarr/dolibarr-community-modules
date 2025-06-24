@@ -266,21 +266,20 @@ foreach my $PROJECT (@PROJECTLIST) {
 			    	{
 			    	    print "Copy $SOURCE/$entry into $BUILDROOT/$PROJECTLC/$entry\n";
 		    		    $ret=`cp -pr "$SOURCE/$entry" "$BUILDROOT/$PROJECTLC/$entry"`;
-		    		    if ($? != 0) { die "Failed to make copy of a file declared into makepack-".$PROJECT.".conf file (Fails on line ".$entry.")\n"; } 
+		    		    if ($? != 0) { die "Failed to make copy of a file declared into makepack-".$PROJECT.".conf file (Fails on line ".$entry.")\n"; }
+		    		    
+						@timearray=localtime(time());
+						$fulldate=($timearray[5]+1900).'-'.($timearray[4]+1).'-'.$timearray[3].' '.$timearray[2].':'.$timearray[1];
+						open(VF,">$BUILDROOT/$PROJECTLC/$entry/version-".$PROJECTLC.".txt");
+				
+						print "Create version file $BUILDROOT/$PROJECTLC/$entry/version-".$PROJECTLC.".txt with date ".$fulldate."\n";
+						print VF "Version: ".$MAJOR.".".$MINOR.($BUILD ne ''?".$BUILD":"")."\n";
+						print VF "Build  : ".$fulldate."\n";
+						close VF;
 			    	}
-			    	
 				}	
 				close IN;
 				
-				@timearray=localtime(time());
-				$fulldate=($timearray[5]+1900).'-'.($timearray[4]+1).'-'.$timearray[3].' '.$timearray[2].':'.$timearray[1];
-				open(VF,">$BUILDROOT/$PROJECTLC/dev/build/version-".$PROJECTLC.".txt");
-		
-				print "Create version file $BUILDROOT/$PROJECTLC/dev/build/version-".$PROJECTLC.".txt with date ".$fulldate."\n";
-				$ret=`mkdir -p "$BUILDROOT/$PROJECTLC/dev/build"`;
-				print VF "Version: ".$MAJOR.".".$MINOR.($BUILD ne ''?".$BUILD":"")."\n";
-				print VF "Build  : ".$fulldate."\n";
-				close VF;
 		    }
 		    print "Clean $BUILDROOT\n";
 		    $ret=`rm -fr $BUILDROOT/$PROJECTLC/.cache`;
