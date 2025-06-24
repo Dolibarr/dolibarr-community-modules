@@ -234,11 +234,12 @@ $yamlFiles = array_filter($yamlFiles, function($file) use ($outputFile) {
     return $file != $outputFile;
 });
 
-print "Found ".count($yamlFiles)." files to process.\n";
+print "Found ".count($yamlFiles)." yaml files to merge into the main index.yaml file.\n";
 
 combineYamlFiles($yamlFiles, $outputFile);
 
-print "Combined index.yaml file created at: " . $outputFile;
-syslog(LOG_INFO, "Combined index.yaml file created at: " . $outputFile);
+print "\n";
+print "The combined index.yaml file was created at: " . $outputFile;
+syslog(LOG_INFO, "The combined index.yaml file was created at: " . $outputFile);
 
 print "\n";
