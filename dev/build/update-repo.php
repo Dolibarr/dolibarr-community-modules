@@ -224,22 +224,54 @@ function completAutoTags($content, $modulePath) {
 }
 
 
-$directoryToSearch = realpath(__DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . '..');
-$outputFile = $directoryToSearch . DIRECTORY_SEPARATOR . 'index.yaml';
+// Main
 
-$yamlFiles = findIndexYamlFiles($directoryToSearch, 2);
+$sapi_type = php_sapi_name();
+$script_file = basename(__FILE__);
+$path = dirname(__FILE__).'/';
 
-// Exclude the output file from the list of files to combine
-$yamlFiles = array_filter($yamlFiles, function($file) use ($outputFile) {
-    return $file != $outputFile;
-});
+print "----- ".$script_file." -----\n";
 
-print "Found ".count($yamlFiles)." yaml files to merge into the main index.yaml file.\n";
+// Test if batch mode
+if (substr($sapi_type, 0, 3) == 'cgi') {
+	echo "Error: You are using PHP for CGI. To execute ".$script_file." from command line, you must use PHP for CLI mode.\n";
+	exit(1);
+}
 
-combineYamlFiles($yamlFiles, $outputFile);
+if (empty($argv[1])) {
+	print "Usage:   ".$script_file." index|dolistore\n";
+	print "Example: ".$script_file." index      to rebuild the index.yaml file (used by Dolibarr to scan community modules)\n";
+	print "Example: ".$script_file." dolistore  to regenerate zip of packages and publish them on dolistore\n";
+	exit(1);
+}
 
-print "\n";
-print "The combined index.yaml file was created at: " . $outputFile;
-syslog(LOG_INFO, "The combined index.yaml file was created at: " . $outputFile);
+
+if ($argv[1] == 'index') {
+	$directoryToSearch = realpath(__DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . '..');
+	$outputFile = $directoryToSearch . DIRECTORY_SEPARATOR . 'index.yaml';
+
+	$yamlFiles = findIndexYamlFiles($directoryToSearch, 2);
+
+	// Exclude the output file from the list of files to combine
+	$yamlFiles = array_filter($yamlFiles, function($file) use ($outputFile) {
+	    return $file != $outputFile;
+	});
+
+	print "Found ".count($yamlFiles)." yaml files to merge into the main index.yaml file.\n";
+
+	combineYamlFiles($yamlFiles, $outputFile);
+
+	print "\n";
+	print "The combined index.yaml file was created at: " . $outputFile;
+	syslog(LOG_INFO, "The combined index.yaml file was created at: " . $outputFile);
+	print "\n";
+}
+
+if ($argv[1] == 'dolistore') {
+	// TODO Ask the api key
+
+	// Scan all modules, for each one, call the makepack.pl to regenerate the zip file then publish the file using the api key.
+
+}
 
 print "\n";
