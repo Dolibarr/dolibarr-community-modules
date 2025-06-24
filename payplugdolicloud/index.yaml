@@ -19,4 +19,5 @@ packages:
       # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
       dolistore-upload: 'manual'
       # dolistore-download is url of product page for download if module can also be found on dolistore.com
-      dolistore-download: 'https://www.dolistore.com/product.php?id=884'
+      # Example: https://www.dolistore.com/product.php?id=xxx
+      dolistore-download: ''
