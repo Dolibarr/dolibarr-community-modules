@@ -1,7 +1,7 @@
 <?php
 /* Copyright (C) 2024 Laurent Destailleur  <eldy@users.sourceforge.net>
  * Copyright (C) 2025 	   Pablo Lagrave           <contact@devlandes.com>
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -100,6 +100,13 @@ $item->fieldParams['isMandatory'] = 1;
 $item = $formSetup->newItem('HELLOASSO_LIVE')->setAsYesNo();
 $item->fieldParams['forcereload'] = 'forcereload';
 
+$item = $formSetup->newItem('HELLOASSO_STANDAR_BTN')->setAsYesNo();
+$item->fieldParams['forcereload'] = 'forcereload';
+$item->helpText = $langs->transnoentities('HELLOASSO_STANDAR_BTN_HELP');
+
+
+// Credentials
+
 $item = $formSetup->newItem('HELLOASSO_TEST_CLIENT_ORGANISATION');
 $item->helpText = $langs->transnoentities('HELLOASSO_TEST_CLIENT_ORGANISATION_HELP');
 
@@ -121,10 +128,6 @@ $item->helpText = $langs->transnoentities('HELLOASSO_CLIENT_ID_HELP');
 $item = $formSetup->newItem('HELLOASSO_CLIENT_SECRET');
 $item->cssClass = 'minwidth500';
 $item->helpText = $langs->transnoentities('HELLOASSO_SECRET_HELP');
-
-$item = $formSetup->newItem('HELLOASSO_STANDAR_BTN')->setAsYesNo();
-$item->fieldParams['forcereload'] = 'forcereload';
-$item->helpText = $langs->transnoentities('HELLOASSO_STANDAR_BTN_HELP');
 
 $setupnotempty += count($formSetup->items);
 
@@ -268,7 +271,11 @@ print dol_get_fiche_head($head, 'settings', $langs->trans($page_name), -1, "");
 
 // Setup page goes here
 echo '<span class="opacitymedium">'.$langs->trans("ModuleHelloAssoDesc").'</span><br><br>';
-echo '<div class="info">'.$langs->trans("HelloAssoExplanatoryText").'</div><br><br>';
+echo '<div class="info">';
+echo $langs->trans("HelloAssoExplanatoryText");
+echo '<br>'.$langs->trans("HelloAssoExplanatoryText2");
+echo '<br>'.$langs->trans("HelloAssoExplanatoryText3");
+echo '</div><br><br>';
 
 
 if ($action == 'edit') {
@@ -566,7 +573,7 @@ if (empty($setupnotempty)) {
 
 print '<br><br>';
 
-print info_admin($langs->trans("ExampleOfTestCreditCardHelloAsso", "https://docs.sips.worldline-solutions.com/fr/cartes-de-test.html"));
+print info_admin($langs->trans("ExampleOfTestCreditCardHelloAsso").'<a href="https://docs.sips.worldline-solutions.com/fr/cartes-de-test.html">https://docs.sips.worldline-solutions.com/fr/cartes-de-test.html</a>');
 
 
 // Page end
