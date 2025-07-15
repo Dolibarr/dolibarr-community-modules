@@ -23,6 +23,7 @@
 
 use OAuth\Common\Storage\DoliStorage;
 use OAuth\OAuth2\Token\StdOAuth2Token;
+
 /**
  * Prepare admin pages header
  *
@@ -126,7 +127,7 @@ function helloassoDoConnection()
 	$result = array();
 
 	dol_syslog('HelloAsso::helloassoDoConnection');
-	
+
 	$helloassourl = "api.helloasso-sandbox.com";
 	$service = "Helloasso-Test";
 
@@ -146,6 +147,8 @@ function helloassoDoConnection()
 	// Dolibarr storage
 	$storage = new DoliStorage($db, $conf);
 	try {
+		dol_syslog("Call retrieveAccessToken");
+
 		$tokenobj = $storage->retrieveAccessToken($service);
 		$ttl = $tokenobj->getEndOfLife();
 		if ($ttl <= dol_now()) {
@@ -158,7 +161,7 @@ function helloassoDoConnection()
 		// var_dump($ret);
 
 		if ($ret["http_code"] == 200) {
-			
+
 			$jsondata = $ret["content"];
 			$json = json_decode($jsondata);
 			$result = array("token_type" => $json->token_type, "access_token" => $json->access_token);
