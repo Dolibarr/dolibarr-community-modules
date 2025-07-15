@@ -22,6 +22,8 @@
  * \brief   HelloAsso setup page.
  */
 
+use OAuth\Common\Storage\DoliStorage;
+
 // Load Dolibarr environment
 $res = 0;
 // Try main.inc.php into web root known defined into CONTEXT_DOCUMENT_ROOT (not always defined)
@@ -57,6 +59,10 @@ global $langs, $user;
 require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
 require_once DOL_DOCUMENT_ROOT."/core/lib/geturl.lib.php";
 require_once '../lib/helloasso.lib.php';
+require_once DOL_DOCUMENT_ROOT.'/includes/OAuth/bootstrap.php';
+include_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php';
+include_once DOL_DOCUMENT_ROOT.'/core/lib/security.lib.php';
+
 
 // Translations
 $langs->loadLangs(array("admin", "helloasso@helloasso"));
@@ -242,9 +248,20 @@ if ($action == 'updateMask') {
 	if ($res <= 0) {
 		setEventMessages("", $langs->trans("ErrorBadClientIdOrSecret"), 'errors');
 	} else {
+		// TODO Call an API to test completely the connection
+
+
 		setEventMessages("", $langs->trans("SuccessfullyConnected"));
 	}
+} elseif ($action == 'deletetoken') {
+	$res = helloassoDeleteToken();
+	if ($res <= 0) {
+		setEventMessages("", $langs->trans("ErrorBadClientIdOrSecret"), 'errors');
+	} else {
+		setEventMessages("", $langs->trans("TokenDeleted"));
+	}
 }
+
 
 $action = 'edit';
 
@@ -555,6 +572,24 @@ foreach ($myTmpObjects as $myTmpObjectKey => $myTmpObjectArray) {
 
 print '<br>';
 
+
+// Show info on connection
+$helloassourl = "api.helloasso-sandbox.com";
+$service = "Helloasso-Test";
+
+// Verify if Helloasso module is in test mode
+if (getDolGlobalInt("HELLOASSO_LIVE")) {
+	$client_id = getDolGlobalString("HELLOASSO_CLIENT_ID");
+	$client_id_secret = getDolGlobalString("HELLOASSO_CLIENT_SECRET");
+	$helloassourl = "api.helloasso.com";
+	$service = "Helloasso-Live";
+} else{
+	$client_id = getDolGlobalString("HELLOASSO_TEST_CLIENT_ID");
+	$client_id_secret = getDolGlobalString("HELLOASSO_TEST_CLIENT_SECRET");
+}
+
+
+
 $titlebutton = $langs->trans('TestConnectionHelloasso');
 if ((float) DOL_VERSION >= 21) {
 	if (getDolGlobalString('HELLOASSO_LIVE')) {
@@ -567,8 +602,30 @@ if ((float) DOL_VERSION >= 21) {
 print dolGetButtonAction('', $titlebutton, 'default', $_SERVER["PHP_SELF"].'?action=testconnect', '', 1, array('attr' => array('class' => 'reposition')));
 
 
-if (empty($setupnotempty)) {
-	print '<br>'.$langs->trans("NothingToSetup");
+$storage = new DoliStorage($db, $conf);
+try {
+	dol_syslog("Call retrieveAccessToken");
+
+	$tokenobj = $storage->retrieveAccessToken($service);
+	$ttl = $tokenobj->getEndOfLife();
+
+	print '<br><br><br>';
+	print $langs->trans("Connected").'<br>';
+	print $langs->trans('LastRecordedToken');
+
+	print '<br>';
+
+	print '<textarea class="small quatrevingtpercent" rows="5">';
+	print var_export($tokenobj, true);
+	print '</textarea>';
+	print '<br>';
+	print $langs->trans("TTL").': '.dol_print_date($ttl, 'dayhour')." UTC<br>";
+
+	print '<a class="reposition" href="'.$_SERVER["PHP_SELF"].'?action=deletetoken&token='.newToken().'">'.img_picto('', 'delete').'</a>';
+} catch(Exception $e) {
+	print '<br><br>'.$e->getMessage();
+	print ' Run a connection test to validate a first connexion';
+
 }
 
 print '<br><br>';

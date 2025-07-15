@@ -84,8 +84,7 @@ function helloassoAdminPrepareHead()
  * @throws Exception
  * @return TokenInterface|int	Token if OK
  */
-
- function helloassoRefreshToken($storage, $service, $tokenobj, $client_id, $urltocall) {
+function helloassoRefreshToken($storage, $service, $tokenobj, $client_id, $urltocall) {
 	include_once DOL_DOCUMENT_ROOT.'/core/lib/geturl.lib.php';
 	dol_syslog('HelloAsso::helloassoRefreshToken clientid='.$client_id.', service='.$service);
 
@@ -109,7 +108,53 @@ function helloassoAdminPrepareHead()
 		throw new Exception("Refresh token expires", 1);
 	}
 	return $storage->retrieveAccessToken($service);
- }
+}
+
+/**
+ * Delete connection token
+ *
+ * @throws Exception
+ * @return int			Return <0 if KO, >0 if OK
+ */
+function helloassoDeleteToken() {
+	require_once DOL_DOCUMENT_ROOT.'/includes/OAuth/bootstrap.php';
+	include_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php';
+	include_once DOL_DOCUMENT_ROOT.'/core/lib/security.lib.php';
+	include_once DOL_DOCUMENT_ROOT.'/core/lib/geturl.lib.php';
+
+	global $db, $conf;
+	$result = array();
+
+	dol_syslog('HelloAsso::helloassoDoConnection');
+
+	$helloassourl = "api.helloasso-sandbox.com";
+	$service = "Helloasso-Test";
+
+	// Verify if Helloasso module is in test mode
+	if (getDolGlobalInt("HELLOASSO_LIVE")) {
+		$client_id = getDolGlobalString("HELLOASSO_CLIENT_ID");
+		$client_id_secret = getDolGlobalString("HELLOASSO_CLIENT_SECRET");
+		$helloassourl = "api.helloasso.com";
+		$service = "Helloasso-Live";
+	} else{
+		$client_id = getDolGlobalString("HELLOASSO_TEST_CLIENT_ID");
+		$client_id_secret = getDolGlobalString("HELLOASSO_TEST_CLIENT_SECRET");
+	}
+
+	$url = "https://".urlencode($helloassourl)."/oauth2/token";
+
+	// Dolibarr storage
+	$storage = new DoliStorage($db, $conf);
+	try {
+		$storage->clearToken($service);
+
+	} catch (Exception $e) {
+		// Error
+	}
+
+	return 1;
+}
+
 
 /**
  * Connect to helloasso database
