@@ -248,10 +248,49 @@ if ($action == 'updateMask') {
 	if ($res <= 0) {
 		setEventMessages("", $langs->trans("ErrorBadClientIdOrSecret"), 'errors');
 	} else {
-		// TODO Call an API to test completely the connection
+		include_once DOL_DOCUMENT_ROOT.'/core/lib/geturl.lib.php';
 
+		//Verify if Helloasso module is in test mode
+		if (getDolGlobalInt("HELLOASSO_LIVE")) {
+			$assoslug = getDolGlobalString("HELLOASSO_CLIENT_ORGANISATION");
+			$helloassourl = "api.helloasso.com";
+		} else {
+			$assoslug = getDolGlobalString("HELLOASSO_TEST_CLIENT_ORGANISATION");
+			$helloassourl = "api.helloasso-sandbox.com";
+		}
 
-		setEventMessages("", $langs->trans("SuccessfullyConnected"));
+		$headers = array();
+		$headers[] = "Authorization: ".ucfirst($res["token_type"])." ".$res["access_token"];
+		$headers[] = "Accept: application/json";
+		$headers[] = "Content-Type: application/json";
+
+		$url = "https://".urlencode($helloassourl)."/v5/organizations/".urlencode($assoslug);
+		$ret2 = getURLContent($url, 'GET', '', 1, $headers);
+		if ($ret2["http_code"] == 200) {
+			setEventMessages("", $langs->trans("SuccessfullyConnected"));
+		} else {
+			$errors = array();
+			$arrayofmessage = array();
+			if (!empty($ret2['content'])) {
+				$arrayofmessage = json_decode($ret2['content'], true);
+			}
+			if (!empty($arrayofmessage['message'])) {
+				$errors[] = $arrayofmessage['message'];
+			} else {
+				if (!empty($arrayofmessage['errors']) && is_array($arrayofmessage['errors'])) {
+					foreach($arrayofmessage['errors'] as $tmpkey => $tmpmessage) {
+						if (!empty($tmpmessage['message'])) {
+							$errors[] = $langs->trans("Error").' - '.$tmpmessage['message'];
+						} else {
+							$errors[] = $langs->trans("UnkownError").' - HTTP code = '.$ret2["http_code"];
+						}
+					}
+				} else {
+					$errors[] = $langs->trans("UnkownError").' - HTTP code = '.$ret2["http_code"];
+				}
+			}
+			setEventMessages("", $errors, 'errors');
+		}
 	}
 } elseif ($action == 'deletetoken') {
 	$res = helloassoDeleteToken();
