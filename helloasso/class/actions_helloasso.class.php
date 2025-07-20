@@ -816,7 +816,7 @@ class ActionsHelloAsso extends CommonHookActions
 						$headers[] = "Authorization: ".ucfirst($result["token_type"])." ".$result["access_token"];
 						$headers[] = "Accept: text/plain";
 
-						$urlforcheckout = "https://".urlencode($helloassourl)."/v5/organizations/".urlencode($assoslug)."/checkout-intents/".$paymentid;
+						$urlforcheckout = "https://".urlencode($helloassourl)."/v5/organizations/".urlencode($assoslug)."/checkout-intents/".urlencode($paymentid);
 						dol_syslog("Send GET to url=".$urlforcheckout, LOG_DEBUG);
 						$ret = getURLContent($urlforcheckout, 'GET', '', 1, $headers);
 						if ($ret["http_code"] == 200) {

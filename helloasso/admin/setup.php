@@ -244,13 +244,13 @@ if ($action == 'updateMask') {
 		dolibarr_del_const($db, $constforval, $conf->entity);
 	}
 } elseif ($action == 'testconnect') {
-	$res = helloassoDoConnection();
+	$res = helloassoDoConnection();	// Name of association is not used here, only client_id and client_secret.
 	if ($res <= 0) {
 		setEventMessages("", $langs->trans("ErrorBadClientIdOrSecret"), 'errors');
 	} else {
 		include_once DOL_DOCUMENT_ROOT.'/core/lib/geturl.lib.php';
 
-		//Verify if Helloasso module is in test mode
+		// Verify if Helloasso module is in test mode
 		if (getDolGlobalInt("HELLOASSO_LIVE")) {
 			$assoslug = getDolGlobalString("HELLOASSO_CLIENT_ORGANISATION");
 			$helloassourl = "api.helloasso.com";
@@ -263,6 +263,8 @@ if ($action == 'updateMask') {
 		$headers[] = "Authorization: ".ucfirst($res["token_type"])." ".$res["access_token"];
 		$headers[] = "Accept: application/json";
 		$headers[] = "Content-Type: application/json";
+
+		$assoslug = str_replace('_', '-', dol_string_nospecial(strtolower(dol_string_unaccent($assoslug)), '-'));
 
 		$url = "https://".urlencode($helloassourl)."/v5/organizations/".urlencode($assoslug);
 		$ret2 = getURLContent($url, 'GET', '', 1, $headers);
