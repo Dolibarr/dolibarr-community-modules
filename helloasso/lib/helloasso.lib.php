@@ -206,7 +206,6 @@ function helloassoDoConnection()
 		// var_dump($ret);
 
 		if ($ret["http_code"] == 200) {
-
 			$jsondata = $ret["content"];
 			$json = json_decode($jsondata);
 			$result = array("token_type" => $json->token_type, "access_token" => $json->access_token);
@@ -222,13 +221,14 @@ function helloassoDoConnection()
 
 			$storage->storeAccessToken($service, $tokenobj);
 		} else {
-			echo "KO";
 			$jsondata = $ret["content"];
 			$json = json_decode($jsondata);
+
 			dol_syslog('Error: getURLContent http_code='.$ret["http_code"].' message='.$json->error_description);
 			$result = -1;
 		}
 	}
+
 	return $result;
 }
 
