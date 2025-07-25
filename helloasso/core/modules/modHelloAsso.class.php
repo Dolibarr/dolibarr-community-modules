@@ -4,7 +4,7 @@
  * Copyright (C) 2019-2020  Frédéric France         <frederic.france@netlogic.fr>
  * Copyright (C) 2024       Lucas Marcouiller       <lmarcouiller@dolicloud.com>
  * Copyright (C) 2025 	   Pablo Lagrave           <contact@devlandes.com>
- * 
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 3 of the License, or
@@ -42,6 +42,7 @@ class modHelloAsso extends DolibarrModules
 	public function __construct($db)
 	{
 		global $conf;
+
 		$this->db = $db;
 
 		// Id for module (must be unique).
@@ -53,7 +54,7 @@ class modHelloAsso extends DolibarrModules
 
 		// Family can be 'base' (core modules),'crm','financial','hr','projects','products','ecm','technic' (transverse modules),'interface' (link with external tools),'other','...'
 		// It is used to group modules by family in module setup page
-		$this->family = "other";
+		$this->family = "interface";
 
 		// Module position in the family on 2 digits ('01', '10', '20', ...)
 		$this->module_position = '90';
