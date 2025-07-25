@@ -379,7 +379,7 @@ class ActionsHelloAsso extends CommonHookActions
 			if (!getDolGlobalString('HELLOASSO_LIVE')) {
 				dol_htmloutput_mesg($langs->trans('YouAreCurrentlyInSandboxMode', 'HelloAsso'), [], 'warning');
 			}
-			if(!getDolGlobalBool('HELLOASSO_STANDAR_BTN')) {
+			if (!getDolGlobalBool('HELLOASSO_STANDAR_BTN')) {
 				$resprints .= '<div class="button buttonpayment" id="div_dopayment_helloasso"><span class="fa fa-credit-card"></span> <input class="" type="submit" id="dopayment_helloasso" name="dopayment_helloasso" value="'.$langs->trans("HelloAssoDoPayment").'">';
 				$resprints .= '<input type="hidden" name="noidempotency" value="'.GETPOST('noidempotency', 'int').'">';
 				$resprints .= '<input type="hidden" name="s" value="'.(GETPOST('s', 'alpha') ? GETPOST('s', 'alpha') : GETPOST('source', 'alpha')).'">';
@@ -400,8 +400,7 @@ class ActionsHelloAsso extends CommonHookActions
 								});
 							</script>
 				';
-			}else{
-
+			} else {
 				// Bouton au format standard HelloAsso (avec logo) https://dev.helloasso.com/docs/bouton-payer-avec-helloasso
 				$resprints .= '<div class="HaPay" id="div_dopayment_helloasso">';
 				$resprints .= '  <button type="submit" class="HaPayButton" id="dopayment_helloasso" name="dopayment_helloasso" value="'.$langs->trans("HelloAssoDoPayment").'">';
@@ -468,18 +467,16 @@ class ActionsHelloAsso extends CommonHookActions
 
 			}
 
-
-
-
-		if (!$error) {
-			$this->resprints = $resprints;
-			return 0; // or return 1 to replace standard code
-		} else {
-			$this->errors[] = $error;
-			return -1;
+			if (!$error) {
+				$this->resprints = $resprints;
+				return 0; // or return 1 to replace standard code
+			} else {
+				$this->errors[] = $error;
+				return -1;
+			}
 		}
-	}
 
+		return 0;
 	}
 
 	/* Add here any other hooked methods... */
