@@ -493,8 +493,8 @@ class ActionsHelloAsso extends CommonHookActions
 	{
 		global $langs;
 
-		$error = 0; // Error counter
 		$error = "";
+		$validpaymentmethod = array();
 
 		if (array_key_exists("paymentmethod", $parameters) && (empty($parameters["paymentmethod"]) || $parameters["paymentmethod"] == 'helloasso') && isModEnabled('helloasso')) {
 			$langs->load("helloasso");
@@ -506,7 +506,9 @@ class ActionsHelloAsso extends CommonHookActions
 		}
 
 		if (!$error) {
-			$this->results["validpaymentmethod"] = $validpaymentmethod;
+			if (!empty($validpaymentmethod)) {
+				$this->results["validpaymentmethod"] = $validpaymentmethod;
+			}
 			return 0;
 		} else {
 			$this->errors[] = $error;
