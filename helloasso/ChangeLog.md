@@ -4,8 +4,11 @@
 ## To release
 
 NEW HelloAsspo add call to API when testing connection
+
 NEW Can delete the token
+
 NEW Better log for debug
+
 NEW Better tooltip on setup page
 
 
