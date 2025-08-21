@@ -118,7 +118,7 @@ $dirmodels = array_merge(array('/'), (array) $conf->modules_parts['models']);
  */
 
 include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php';
-//TODO: Modify key(doli > Hello) for member_types
+
 if ($action == 'test') {
 	$helloassomemberutils->helloassoSyncMembersToDolibarr();	
 } elseif ($action == 'addmembertype'){
