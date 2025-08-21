@@ -32,7 +32,8 @@ class HelloAssoMemberUtils
     public $helloasso_url;
     public $organization_slug;
     public $form_slug;
-    public $helloasso_members_array;
+    public $helloasso_members;
+    public $helloasso_member_types;
 
     public $customfield_array;
 
@@ -134,15 +135,15 @@ class HelloAssoMemberUtils
         }
         $result = $ret["content"];
         $json = json_decode($result);
-        $this->helloasso_members_array = $json->data;
+        $this->helloasso_members = $json->data;
 
         return 0;
     }
 
-    public function helloassoPostMembersToDolibarr($helloasso_members_array) {
-        $helloasso_members_array = $this->helloasso_members_array;
+    public function helloassoPostMembersToDolibarr() {
+        $helloasso_members = $this->helloasso_members;
 
-        foreach ($helloasso_members_array as $key => $newmember) {
+        foreach ($helloasso_members as $key => $newmember) {
             $member = new Adherent($this->db);
         }
         return 0;

@@ -118,7 +118,7 @@ $dirmodels = array_merge(array('/'), (array) $conf->modules_parts['models']);
  */
 
 include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php';
-
+//TODO: Modify key(doli > Hello) for member_types
 if ($action == 'test') {
 	$helloassomemberutils->helloassoSyncMembersToDolibarr();	
 } elseif ($action == 'addmembertype'){
@@ -137,12 +137,12 @@ if ($action == 'test') {
 		$mappingstr = "[]";
 	}
 	$mapping = json_decode($mappingstr,true);
-	if (!empty($mapping[$dolibarrmembertype])) {
+	if (!empty($mapping[$helloassomembertype])) {
 		$error++;
 		setEventMessages($langs->trans("ErrorHelloAssoMemberTypeAlreadyUsed"), null, 'errors');
 	}
 	if (!$error) {
-		$mapping[$dolibarrmembertype] = $helloassomembertype;
+		$mapping[$helloassomembertype] = $dolibarrmembertype;
 		$mappingstr = json_encode($mapping);
 		$res = dolibarr_set_const($db, 'HELLOASSO_TYPE_MEMBER_MAPPING', $mappingstr, 'chaine', 0, '', $conf->entity);
 		if ($res <= 0) {
@@ -158,8 +158,8 @@ if ($action == 'test') {
 		$db->rollback();
 	}
 } elseif ($action == 'delmembertype'){
-	$dolibarrmembertype = GETPOST("dolibarrmembertype", 'int');
-	if (empty($dolibarrmembertype)) {
+	$helloassomembertype = GETPOST("helloassomembertype", 'int');
+	if (empty($helloassomembertype)) {
 		setEventMessages($langs->transnoentities("ErrorHelloAssoRemovingMemberType"), null, 'errors');
 		$error++;
 	}
@@ -171,11 +171,11 @@ if ($action == 'test') {
 		}
 		if (!$error) {
 			$mapping = json_decode($mappingstr,true);
-			if (empty($mapping[$dolibarrmembertype])) {
+			if (empty($mapping[$helloassomembertype])) {
 				$error++;
 				setEventMessages($langs->trans("NothingToDo"), null, 'warning');
 			} else {
-				unset($mapping[$dolibarrmembertype]);
+				unset($mapping[$helloassomembertype]);
 				$mappingstr = json_encode($mapping);
 				$res = dolibarr_set_const($db, 'HELLOASSO_TYPE_MEMBER_MAPPING', $mappingstr, 'chaine', 0, '', $conf->entity);
 				if ($res <= 0) {
@@ -254,10 +254,10 @@ if (!empty($mappingstr)) {
 	print '<br>';
 	print '<ul>';
 	$mapping = json_decode($mappingstr,true);
-	foreach ($mapping as $dolibarrmembertype => $helloassomembertype) {
+	foreach ($mapping as $helloassomembertype => $dolibarrmembertype) {
 		$membertype = new AdherentType($db);
 		$membertype->fetch($dolibarrmembertype);
-		print '<li><span>'.$membertype->label.'</span> : <span>'.$helloassomembertype.'</span>&nbsp;<a href="'.$_SERVER["PHP_SELF"].'?action=delmembertype&dolibarrmembertype='.$dolibarrmembertype.'&token='.newToken().'">'.img_delete().'</a></li>';
+		print '<li><span>'.$membertype->label.'</span> : <span>'.$helloassomembertype.'</span>&nbsp;<a href="'.$_SERVER["PHP_SELF"].'?action=delmembertype&helloassomembertype='.$helloassomembertype.'&token='.newToken().'">'.img_delete().'</a></li>';
 	}
 	print '</ul>';
 }
