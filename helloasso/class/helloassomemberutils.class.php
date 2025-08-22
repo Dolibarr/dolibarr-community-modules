@@ -33,9 +33,9 @@ class HelloAssoMemberUtils
     public $organization_slug;
     public $form_slug;
     public $helloasso_members;
-    public $helloasso_member_types;
+    public $helloasso_member_types = array();
 
-    public $customfield_array;
+    public $customfields = array("email" => "5760");
 
     public $error;
     public $errors = array();
@@ -61,6 +61,11 @@ class HelloAssoMemberUtils
             $this->helloasso_url = "api.helloasso-sandbox.com";
         }
 
+        $mappingstr = getDolGlobalString("HELLOASSO_TYPE_MEMBER_MAPPING");
+        if (!empty($mappingstr)) {
+            $this->helloasso_member_types = json_decode($mappingstr,true);   
+		}
+
 		return 1;
 	}
 
@@ -78,7 +83,7 @@ class HelloAssoMemberUtils
         if ($res != 0) {
             return $res;
         }
-
+        $this->helloassoPostMembersToDolibarr();
 
         return 0;
     }
@@ -144,7 +149,48 @@ class HelloAssoMemberUtils
         $helloasso_members = $this->helloasso_members;
 
         foreach ($helloasso_members as $key => $newmember) {
+            $member_type = 0;
             $member = new Adherent($this->db);
+            $amount = $newmember->initialAmount / 100;
+            $date_start_subscription = ""; 
+            $date_end_subscription = ""; 
+            if (empty($this->helloasso_member_types[$newmember->tierId])) {
+                //TODO: Make new Membertype
+            }
+            $member_type = $this->helloasso_member_types[$newmember->tierId];
+            $sql = "SELECT rowid as id";
+            $sql .= " FROM ".MAIN_DB_PREFIX."adherent as a";
+            $sql .= " WHERE a.firstname = '".$this->db->escape($newmember->user->firstName)."'";
+            $sql .= " AND a.lastname = '".$this->db->escape($newmember->user->lastName)."'";
+            if (!empty($this->customfields['email'])) {
+                $email = "";
+                foreach ($newmember->customFields as $key => $field) {
+                    if ($field->id == $this->customfields['email']) {
+                        $email = $field->answer;
+                        break;
+                    }
+                }
+                $sql .= " AND a.email = '".$this->db->escape($email)."'";
+            }
+
+            $resql = $this->db->query($sql);
+		    if ($resql) {
+                $num_rows = $this->db->num_rows($resql);
+                if ($num_rows == 1) {
+                    $obj = $this->db->fetch_object($resql);
+                    $member->fetch($obj->id);
+                    //TODO: Verif same member_type if diff then modify
+
+                } elseif ($num_rows > 1) {
+                    //TODO: Find good one
+                } else {
+                    //TODO: Create new member
+                }
+            } else {
+                $this->error[] = $this->db->lasterror();
+            }
+            $member->subscription($date_start_subscription, $amount, 0, '', '', '', '', '', $date_end_subscription, $member_type);
+            //TODO: error management
         }
         return 0;
     }

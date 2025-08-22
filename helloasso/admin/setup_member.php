@@ -247,13 +247,12 @@ print '<input name="input_mapdolibarrhelloassomember" id="input_mapdolibarrhello
 print '<input type="submit" id="btn_mapdolibarrhelloassomember" name="btn_mapdolibarrhelloassomember" class="butAction small smallpaddingimp" value="'.$langs->trans("Add").'" disabled="">';
 print '<br><br>';
 
-$mappingstr = getDolGlobalString("HELLOASSO_TYPE_MEMBER_MAPPING");
 print '<div class="div-table-responsive-no-min">';
-if (!empty($mappingstr)) {
+if (!empty($helloassomemberutils->helloasso_member_types)) {
 	print img_picto('', 'graph', 'class="pictofixedwidth"').$langs->trans("HierarchicView").'<br>';
 	print '<br>';
 	print '<ul>';
-	$mapping = json_decode($mappingstr,true);
+	$mapping = $helloassomemberutils->helloasso_member_types;
 	foreach ($mapping as $helloassomembertype => $dolibarrmembertype) {
 		$membertype = new AdherentType($db);
 		$membertype->fetch($dolibarrmembertype);
