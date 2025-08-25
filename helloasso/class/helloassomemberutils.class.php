@@ -146,8 +146,10 @@ class HelloAssoMemberUtils
     }
 
     public function helloassoPostMembersToDolibarr() {
+        global $user;
+        $error = 0;
         $helloasso_members = $this->helloasso_members;
-
+        $this->db->begin();
         foreach ($helloasso_members as $key => $newmember) {
             $member_type = 0;
             $member = new Adherent($this->db);
@@ -155,7 +157,7 @@ class HelloAssoMemberUtils
             $date_start_subscription = ""; 
             $date_end_subscription = ""; 
             if (empty($this->helloasso_member_types[$newmember->tierId])) {
-                //TODO: Make new Membertype
+                //TODO: Verif membertype + Make new Membertype
             }
             $member_type = $this->helloasso_member_types[$newmember->tierId];
             $sql = "SELECT rowid as id";
@@ -179,19 +181,39 @@ class HelloAssoMemberUtils
                 if ($num_rows == 1) {
                     $obj = $this->db->fetch_object($resql);
                     $member->fetch($obj->id);
-                    //TODO: Verif same member_type if diff then modify
-
+                    if ($member->typeid != $member_type) {
+                        $member->typeid = $member_type;
+                        $result = $member->update($user);
+                        if ($result <= 0) {
+                            $this->error = $member->error;
+                            $this->errors = array_merge($this->errors, $member->errors);
+                            $error++;
+                        }
+                    }
                 } elseif ($num_rows > 1) {
                     //TODO: Find good one
                 } else {
                     //TODO: Create new member
                 }
+                if (!$error) {
+                    $result = $member->subscription($date_start_subscription, $amount, 0, '', '', '', '', '', $date_end_subscription, $member_type);
+                    if ($result <= 0) {
+                        $this->error = $member->error;
+                        $this->errors = array_merge($this->errors, $member->errors);
+                        $error++;
+                    }
+                }
             } else {
-                $this->error[] = $this->db->lasterror();
+                $this->errors[] = $this->db->lasterror();
+                $error++;
             }
-            $member->subscription($date_start_subscription, $amount, 0, '', '', '', '', '', $date_end_subscription, $member_type);
-            //TODO: error management
         }
-        return 0;
+        if (!$error) {
+            $this->db->commit();
+            return 0;
+        } else {
+            $this->db->rollback();
+            return 1;
+        }
     }
 }
