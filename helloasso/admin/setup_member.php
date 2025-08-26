@@ -132,19 +132,8 @@ if ($action == 'test') {
 		setEventMessages($langs->transnoentities("ErrorHelloAssoAddingMemberType"), null, 'errors');
 		$error++;
 	}
-	$mappingstr = getDolGlobalString("HELLOASSO_TYPE_MEMBER_MAPPING");
-	if (empty($mappingstr)) {
-		$mappingstr = "[]";
-	}
-	$mapping = json_decode($mappingstr,true);
-	if (!empty($mapping[$helloassomembertype])) {
-		$error++;
-		setEventMessages($langs->trans("ErrorHelloAssoMemberTypeAlreadyUsed"), null, 'errors');
-	}
 	if (!$error) {
-		$mapping[$helloassomembertype] = $dolibarrmembertype;
-		$mappingstr = json_encode($mapping);
-		$res = dolibarr_set_const($db, 'HELLOASSO_TYPE_MEMBER_MAPPING', $mappingstr, 'chaine', 0, '', $conf->entity);
+		$res = $helloassomemberutils->setHelloAssoTypeMemberMapping($dolibarrmembertype, $helloassomembertype);
 		if ($res <= 0) {
 			$error++;
 			setEventMessages($langs->transnoentities("ErrorHelloAssoAddingMemberType"), null, 'errors');
@@ -152,7 +141,7 @@ if ($action == 'test') {
 	}
 	if (!$error) {
 		$db->commit();
-		setEventMessages($langs->trans("HelloAssoMemberTypeMappingSavedSucesfully"), null, 'mesgs');
+		setEventMessages($langs->trans("HelloAssoMemberTypeMappingAddedSucesfully"), null, 'mesgs');
 		header("Location: ".$_SERVER["PHP_SELF"]);
 	} else {
 		$db->rollback();
