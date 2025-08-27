@@ -23,6 +23,7 @@
 
 require_once DOL_DOCUMENT_ROOT.'/core/lib/functions.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/geturl.lib.php';
+require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
 require_once DOL_DOCUMENT_ROOT.'/adherents/class/adherent.class.php';
 require_once DOL_DOCUMENT_ROOT.'/adherents/class/adherent_type.class.php';
 dol_include_once('helloasso/lib/helloasso.lib.php');
@@ -41,6 +42,8 @@ class HelloAssoMemberUtils
 
     public $error;
     public $errors = array();
+    public $nbPosts = 0;
+    private $helloasso_tokens = array();
 
     /**
 	 *  Constructor
@@ -67,6 +70,7 @@ class HelloAssoMemberUtils
         if (!empty($mappingstr)) {
             $this->helloasso_member_types = json_decode($mappingstr,true);   
 		}
+        $this->helloasso_tokens = helloassoDoConnection();
 
 		return 1;
 	}
@@ -76,31 +80,44 @@ class HelloAssoMemberUtils
      */
 
     public function helloassoSyncMembersToDolibarr() {
-        
+        $db = $this->db;
+        $error = 0;
+        $db->begin();
         $helloasso_date_last_fetch = "";
+        $dryrun = 0;
 
-        $helloasso_tokens = helloassoDoConnection();
-
-        $res = $this->helloassoGetMembers($helloasso_tokens, $helloasso_date_last_fetch);
-        if ($res != 1) {
-            return $res;
+        if ($helloasso_date_last_fetch == "") {
+            $dryrun = 1;
         }
-        $this->helloassoPostMembersToDolibarr();
+        $res = $this->helloassoGetMembers($helloasso_date_last_fetch);
+        if ($res != 0) {
+            $error++;
+        }
+        if (!$error) {
+            $this->helloassoPostMembersToDolibarr();
+        }
 
+        if (!$error && $dryrun == 0) {
+		    $db->commit();
+        } else {
+            $db->rollback();
+            if ($error) {
+                return 1;
+            }
+        }
         return 0;
     }
 
     /**
-     * @param array         $helloasso_tokens               Tokens to connect to HelloAsso API
      * @param string        $helloasso_date_last_fetch      Date of last member fetch
      * 
      * @return int          1 if OK, <> 1 if KO
      */
 
-    public function helloassoGetMembers($helloasso_tokens, $helloasso_date_last_fetch = "") {
+    public function helloassoGetMembers($helloasso_date_last_fetch = "") {
 
         global $langs;
-        $headers[] = "Authorization: ".ucfirst($helloasso_tokens["token_type"])." ".$helloasso_tokens["access_token"];
+        $headers[] = "Authorization: ".ucfirst($this->helloasso_tokens["token_type"])." ".$this->helloasso_tokens["access_token"];
         $headers[] = "Accept: application/json";
         $headers[] = "Content-Type: application/json";
 
@@ -144,7 +161,7 @@ class HelloAssoMemberUtils
         $json = json_decode($result);
         $this->helloasso_members = $json->data;
 
-        return 1;
+        return 0;
     }
 
     public function helloassoPostMembersToDolibarr() {
@@ -155,29 +172,28 @@ class HelloAssoMemberUtils
         foreach ($helloasso_members as $key => $newmember) {
             $member_type = 0;
             $member = new Adherent($db);
+            $staticmembertype = new AdherentType($db);
             $amount = $newmember->initialAmount / 100;
             $date_start_subscription = ""; 
             $date_end_subscription = "";
 
-            // Verify if member_type mapping
+            // Verify if member_type mapping contain HelloAsso memberId
             if (empty($this->helloasso_member_types[$newmember->tierId])) {
                 $dolibarrmembertype = 0;
-                $newref = "HELLOASSO_MEMBERTYPE_".((int) $newmember->tierId);
+                $newlabel = "HELLOASSO_MEMBERTYPE_".((int) $newmember->tierId);
                 $sql = "SELECT rowid as id";
                 $sql .= " FROM ".MAIN_DB_PREFIX."adherent_type as at";
-                $sql .= " WHERE ref = '".$db->escape($newref)."'";
-                $sql .= " AND amount = ".((float) $amount);
+                $sql .= " WHERE libelle = '".$db->escape($newlabel)."'";
                 $sql .= " AND statut = 1";
+                $sql .= " AND entity IN (".getEntity($staticmembertype->element).")";
                 $resql = $db->query($sql);
                 if ($resql) {
                     $num_rows = $db->num_rows($resql);
-                    if ($num_rows >= 0) {
+                    if ($num_rows > 0) {
                         $objm = $db->fetch_object($resql);
                         $dolibarrmembertype = $objm->id;
                     } else {
-                        //TODO: Make new Membertype
-                        $newmembertype = new AdherentType($db);
-
+                        $dolibarrmembertype = $this->createHelloAssoTypeMember($newlabel);
                     }
                     $res = $this->setHelloAssoTypeMemberMapping($dolibarrmembertype, $newmember->tierId);
                     if ($res <= 0) {
@@ -240,11 +256,13 @@ class HelloAssoMemberUtils
                 $this->errors[] = $db->lasterror();
                 return -4;
             }
+            $this->nbPosts++;
         }
-        return 1;
+        return 0;
     }
 
     public function setHelloAssoTypeMemberMapping($dolibarrmembertype, $helloassomembertype) {
+        global $langs;
         $mappingstr = getDolGlobalString("HELLOASSO_TYPE_MEMBER_MAPPING");
         if (empty($mappingstr)) {
             $mappingstr = "[]";
@@ -257,13 +275,89 @@ class HelloAssoMemberUtils
         }
         $mapping[$helloassomembertype] = $dolibarrmembertype;
         $mappingstr = json_encode($mapping);
-        $res = dolibarr_set_const($db, 'HELLOASSO_TYPE_MEMBER_MAPPING', $mappingstr, 'chaine', 0, '', $conf->entity);
+        $res = dolibarr_set_const($this->db, 'HELLOASSO_TYPE_MEMBER_MAPPING', $mappingstr, 'chaine', 0, '', $conf->entity);
         if ($res <= 0) {
             $this->error = $langs->trans("ErrorHelloAssoAddingMemberType");
             $this->errors[] = $langs->trans("ErrorHelloAssoAddingMemberType");
             return -2;
         }
+        $this->helloasso_member_types = $mapping;
         return 1;
+    }
+
+    public function createHelloAssoTypeMember($label) {
+        global $user;
+        $db = $this->db;
+        $newmembertype = new AdherentType($db);
+
+        $headers[] = "Authorization: ".ucfirst($this->helloasso_tokens["token_type"])." ".$this->helloasso_tokens["access_token"];
+        $headers[] = "Accept: application/json";
+        $headers[] = "Content-Type: application/json";
+
+        $assoslug = str_replace('_', '-', dol_string_nospecial(strtolower(dol_string_unaccent($this->organization_slug)), '-'));
+        $formslug = str_replace('_', '-', dol_string_nospecial(strtolower(dol_string_unaccent($this->form_slug)), '-'));
+        $urlforform = "https://".urlencode($this->helloasso_url)."/v5/organizations/".urlencode($assoslug)."/forms/Membership/".urlencode($formslug).'/public';
+        dol_syslog("Send Get to url=".$urlforform.", to get HelloAsso Member type informations", LOG_DEBUG);
+
+        $ret = getURLContent($urlforform, 'GET', "", 1, $headers);
+        if ($ret["http_code"] != 200) {
+            $arrayofmessage = array();
+            if (!empty($ret2['content'])) {
+                $arrayofmessage = json_decode($ret['content'], true);
+            }
+            if (!empty($arrayofmessage['message'])) {
+                $this->error = $arrayofmessage['message'];
+                $this->errors[] = $this->error;
+            } else {
+                if (!empty($arrayofmessage['errors']) && is_array($arrayofmessage['errors'])) {
+                    foreach($arrayofmessage['errors'] as $tmpkey => $tmpmessage) {
+                        if (!empty($tmpmessage['message'])) {
+                            $this->error = $langs->trans("Error").' - '.$tmpmessage['message'];
+                            $this->errors[] = $this->error;
+                        } else {
+                            $this->error = $langs->trans("UnkownError").' - HTTP code = '.$ret["http_code"];
+                            $this->errors[] = $this->error;
+                        }
+                    }
+                } else {
+                    $this->error = $langs->trans("UnkownError").' - HTTP code = '.$ret["http_code"];
+                    $this->errors[] = $this->error;
+                }
+            }
+            return -1;
+        }
+
+        $result = $ret["content"];
+        $json = json_decode($result);
+        $validitytype = $json->validityType;
+        $duration_value = "1";
+        $duration_unit = "y";
+        switch ($validitytype) {
+            case 'MovingYear':
+                $validitytype = "1y";
+                break;
+
+            case 'Custom':
+                $validitytype = "1y";
+                break;
+            
+            default:
+                $validitytype = "";
+                break;
+        }
+        $amount = $json->tiers[0]->price / 100;
+
+        $newmembertype->amount = $amount;
+        $newmembertype->duration_value = $duration_value;
+        $newmembertype->duration_unit = $duration_unit;
+        $newmembertype->label = $label;
+        $newmembertype->statut = 1;
+        $res = $newmembertype->create($user);
+        if ($res <= 0) {
+            $this->errors = array_merge($this->errors, $newmembertype->errors);
+            return -2;
+        }
+        return $res;
     }
 }
 
