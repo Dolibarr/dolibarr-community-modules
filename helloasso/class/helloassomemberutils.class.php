@@ -24,6 +24,7 @@
 require_once DOL_DOCUMENT_ROOT.'/core/lib/functions.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/geturl.lib.php';
 require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
+include_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/adherents/class/adherent.class.php';
 require_once DOL_DOCUMENT_ROOT.'/adherents/class/adherent_type.class.php';
 dol_include_once('helloasso/lib/helloasso.lib.php');
@@ -79,16 +80,12 @@ class HelloAssoMemberUtils
      * @return int          0 if OK, <> 0 if KO (this function is used also by cron so only 0 is OK)
      */
 
-    public function helloassoSyncMembersToDolibarr() {
+    public function helloassoSyncMembersToDolibarr($dryrun = 0) {
         $db = $this->db;
         $error = 0;
         $db->begin();
         $helloasso_date_last_fetch = "";
-        $dryrun = 0;
 
-        if ($helloasso_date_last_fetch == "") {
-            $dryrun = 1;
-        }
         $res = $this->helloassoGetMembers($helloasso_date_last_fetch);
         if ($res != 0) {
             $error++;
@@ -172,10 +169,9 @@ class HelloAssoMemberUtils
         foreach ($helloasso_members as $key => $newmember) {
             $member_type = 0;
             $member = new Adherent($db);
-            $staticmembertype = new AdherentType($db);
+            $membertype = new AdherentType($db);
             $amount = $newmember->initialAmount / 100;
-            $date_start_subscription = ""; 
-            $date_end_subscription = "";
+            $date_start_subscription = dol_stringtotime($newmember->order->meta->createdAt); 
 
             // Verify if member_type mapping contain HelloAsso memberId
             if (empty($this->helloasso_member_types[$newmember->tierId])) {
@@ -185,7 +181,7 @@ class HelloAssoMemberUtils
                 $sql .= " FROM ".MAIN_DB_PREFIX."adherent_type as at";
                 $sql .= " WHERE libelle = '".$db->escape($newlabel)."'";
                 $sql .= " AND statut = 1";
-                $sql .= " AND entity IN (".getEntity($staticmembertype->element).")";
+                $sql .= " AND entity IN (".getEntity($membertype->element).")";
                 $resql = $db->query($sql);
                 if ($resql) {
                     $num_rows = $db->num_rows($resql);
@@ -201,10 +197,12 @@ class HelloAssoMemberUtils
                     }
                 } else {
                     $this->errors[] = $db->lasterror();
-                    return -1;
+                    return -2;
                 }
 
             }
+            $membertype->fetch($this->helloasso_member_types[$newmember->tierId]);
+            $date_end_subscription = dol_time_plus_duree($date_start_subscription, $membertype->duration_value, $membertype->duration_unit);
 
             // Try to find dolibarr member linked to HelloAsso member
             $member_type = $this->helloasso_member_types[$newmember->tierId];
@@ -236,11 +234,19 @@ class HelloAssoMemberUtils
                         if ($result <= 0) {
                             $this->error = $member->error;
                             $this->errors = array_merge($this->errors, $member->errors);
-                            return -2;
+                            return -3;
                         }
                     }
                 } else {
-                    //TODO: Create new member
+                    $memberid = $this->createHelloAssoMember($newmember, $dolibarrmembertype);
+                    if ($memberid <= 0) {
+                       return -4;
+                    }
+                    $res = $member->fetch($memberid);
+                    if ($res <= 0) {
+                        $this->errors = array_merge($this->errors, $member->errors);
+                        return -5;
+                    }
                 }
 
                 // Create new subscription
@@ -249,12 +255,12 @@ class HelloAssoMemberUtils
                     if ($result <= 0) {
                         $this->error = $member->error;
                         $this->errors = array_merge($this->errors, $member->errors);
-                        return -3;
+                        return -6;
                     }
                 }
             } else {
                 $this->errors[] = $db->lasterror();
-                return -4;
+                return -7;
             }
             $this->nbPosts++;
         }
@@ -262,7 +268,7 @@ class HelloAssoMemberUtils
     }
 
     public function setHelloAssoTypeMemberMapping($dolibarrmembertype, $helloassomembertype) {
-        global $langs;
+        global $langs, $conf;
         $mappingstr = getDolGlobalString("HELLOASSO_TYPE_MEMBER_MAPPING");
         if (empty($mappingstr)) {
             $mappingstr = "[]";
@@ -332,22 +338,30 @@ class HelloAssoMemberUtils
         $validitytype = $json->validityType;
         $duration_value = "1";
         $duration_unit = "y";
+        $subscription = 1;
         switch ($validitytype) {
-            case 'MovingYear':
-                $validitytype = "1y";
+            case 'Custom':
+                //TODO: Custom calcul for duration
+                $duration_value = "1";
+                $duration_unit = "y";
                 break;
 
-            case 'Custom':
-                $validitytype = "1y";
+            case 'Illimited':
+                $duration_value = "";
+                $duration_unit = "";
+                $subscription = 0;
                 break;
             
             default:
-                $validitytype = "";
+                $duration_value = "1";
+                $duration_unit = "y";
+                $subscription = 1;
                 break;
         }
         $amount = $json->tiers[0]->price / 100;
 
         $newmembertype->amount = $amount;
+        $newmembertype->subscription = $subscription;
         $newmembertype->duration_value = $duration_value;
         $newmembertype->duration_unit = $duration_unit;
         $newmembertype->label = $label;
@@ -358,6 +372,58 @@ class HelloAssoMemberUtils
             return -2;
         }
         return $res;
+    }
+
+    public function createHelloAssoMember($newmember, $membertype) {
+        global $user;
+        $db = $this->db;
+        $customfields = array_flip($this->customfields);
+        $craetemember = new Adherent($db);
+
+        $craetemember->firstname = $newmember->user->firstName;
+        $craetemember->lastname = $newmember->user->lastName;
+        $craetemember->typeid = $membertype;
+        if (!empty($newmember->customFields) && !empty($this->customfields)) {
+            foreach ($newmember->customFields as $key => $field) {
+                if (!empty($customfields[$field->id])) {
+                    $dolibarkey = $customfields[$field->id];
+                    $craetemember->$dolibarkey = $field->answer;
+                }
+            }
+        }
+        // Login creation for member
+        if (empty($craetemember->login)) {
+            $login = strtolower($newmember->user->firstName).strtolower($newmember->user->lastName);
+            $sql = "SELECT COUNT(rowid) as nbmembers";
+            $sql .= " FROM ".MAIN_DB_PREFIX."adherent";
+            $sql .= " WHERE entity IN (".((int) getEntity($craetemember->element)).")";
+            $sql .= " AND login LIKE '".$db->escape($login)."%'";
+            $resql = $db->query($sql);
+            if ($resql) {
+                $num_rows = $db->num_rows($resql);
+                if ($num_rows > 0) {
+                    $obja = $db->fetch_object($resql);
+                    if ($obja->nbmembers > 0) {
+                        $login = $login.((string)($obja->nbmembers + 1));
+                    }
+                }
+            } else {
+                $this->errors[] = $db->lasterror();
+                return -1;
+            }
+            $craetemember->login = $login;
+        }
+        $res = $craetemember->create($user);
+        if ($res <= 0) {
+            $this->errors = array_merge($this->errors, $craetemember->errors);
+            return -2;
+        }
+        $res = $craetemember->validate($user);
+        if ($res <= 0) {
+            $this->errors = array_merge($this->errors, $craetemember->errors);
+            return -3;
+        }
+        return $craetemember->id;
     }
 }
 
