@@ -419,8 +419,9 @@ class HelloAssoMemberUtils
         $newmembertype->statut = 1;
         $res = $newmembertype->create($user);
         if ($res <= 0) {
+            $this->error = $newmembertype->error;
             $this->errors = array_merge($this->errors, $newmembertype->errors);
-            return -2;
+            return -1;
         }
         return $res;
     }
@@ -466,11 +467,13 @@ class HelloAssoMemberUtils
         }
         $res = $createmember->create($user);
         if ($res <= 0) {
+            $this->error = $createmember->error;
             $this->errors = array_merge($this->errors, $createmember->errors);
             return -2;
         }
         $res = $createmember->validate($user);
         if ($res <= 0) {
+            $this->error = $createmember->error;
             $this->errors = array_merge($this->errors, $createmember->errors);
             return -3;
         }
