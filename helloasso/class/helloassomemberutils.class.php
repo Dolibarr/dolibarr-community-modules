@@ -429,25 +429,25 @@ class HelloAssoMemberUtils
         global $user;
         $db = $this->db;
         $customfields = array_flip($this->customfields);
-        $craetemember = new Adherent($db);
+        $createmember = new Adherent($db);
 
-        $craetemember->firstname = $newmember->user->firstName;
-        $craetemember->lastname = $newmember->user->lastName;
-        $craetemember->typeid = $membertype;
+        $createmember->firstname = $newmember->user->firstName;
+        $createmember->lastname = $newmember->user->lastName;
+        $createmember->typeid = $membertype;
         if (!empty($newmember->customFields) && !empty($this->customfields)) {
             foreach ($newmember->customFields as $key => $field) {
                 if (!empty($customfields[$field->name])) {
                     $dolibarkey = $customfields[$field->name];
-                    $craetemember->$dolibarkey = $field->answer;
+                    $createmember->$dolibarkey = $field->answer;
                 }
             }
         }
         // Login creation for member
-        if (empty($craetemember->login)) {
+        if (empty($createmember->login)) {
             $login = strtolower($newmember->user->firstName).strtolower($newmember->user->lastName);
             $sql = "SELECT COUNT(rowid) as nbmembers";
             $sql .= " FROM ".MAIN_DB_PREFIX."adherent";
-            $sql .= " WHERE entity IN (".((int) getEntity($craetemember->element)).")";
+            $sql .= " WHERE entity IN (".((int) getEntity($createmember->element)).")";
             $sql .= " AND login LIKE '".$db->escape($login)."%'";
             $resql = $db->query($sql);
             if ($resql) {
@@ -462,19 +462,19 @@ class HelloAssoMemberUtils
                 $this->errors[] = $db->lasterror();
                 return -1;
             }
-            $craetemember->login = $login;
+            $createmember->login = $login;
         }
-        $res = $craetemember->create($user);
+        $res = $createmember->create($user);
         if ($res <= 0) {
-            $this->errors = array_merge($this->errors, $craetemember->errors);
+            $this->errors = array_merge($this->errors, $createmember->errors);
             return -2;
         }
-        $res = $craetemember->validate($user);
+        $res = $createmember->validate($user);
         if ($res <= 0) {
-            $this->errors = array_merge($this->errors, $craetemember->errors);
+            $this->errors = array_merge($this->errors, $createmember->errors);
             return -3;
         }
-        return $craetemember->id;
+        return $createmember->id;
     }
 }
 
