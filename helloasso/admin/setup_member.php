@@ -156,14 +156,14 @@ if ($action == 'test') {
 	if (!$error) {
 		$mappingstr = getDolGlobalString("HELLOASSO_TYPE_MEMBER_MAPPING");
 		if (empty($mappingstr)) {
-			setEventMessages($langs->transnoentities("NothingToDo"), null, 'warning');
+			setEventMessages($langs->transnoentities("NothingToDo"), null, 'warnings');
 			$error++;
 		}
 		if (!$error) {
-			$mapping = json_decode($mappingstr,true);
+			$mapping = json_decode($mappingstr, true);
 			if (empty($mapping[$helloassomembertype])) {
 				$error++;
-				setEventMessages($langs->trans("NothingToDo"), null, 'warning');
+				setEventMessages($langs->trans("NothingToDo"), null, 'warnings');
 			} else {
 				unset($mapping[$helloassomembertype]);
 				$mappingstr = json_encode($mapping);
@@ -171,6 +171,66 @@ if ($action == 'test') {
 				if ($res <= 0) {
 					$error++;
 					setEventMessages($langs->transnoentities("ErrorHelloAssoRemovingMemberType"), null, 'errors');
+				}
+			}
+		}
+	}
+	if (!$error) {
+		$db->commit();
+		setEventMessages($langs->trans("HelloAssoMemberTypeMappingRemovedSucesfully"), null, 'mesgs');
+		header("Location: ".$_SERVER["PHP_SELF"]);
+	} else {
+		$db->rollback();
+	}
+} elseif ($action == 'addcustomfield'){
+	$dolibarrfield = GETPOST("select_mapcutomfield");
+	if (empty($dolibarrfield)) {
+		setEventMessages($langs->transnoentities("ErrorHelloAssoAddingMemberType"), null, 'errors');
+		$error++;
+	}
+	$helloassofield = GETPOST("input_mapcutomfield");
+	if (empty($helloassofield)) {
+		setEventMessages($langs->transnoentities("ErrorHelloAssoAddingMemberType"), null, 'errors');
+		$error++;
+	}
+	if (!$error) {
+		$res = $helloassomemberutils->setHelloAssoCustomFieldMapping($dolibarrfield, $helloassofield);
+		if ($res <= 0) {
+			$error++;
+			setEventMessages($helloassomemberutils->error, $helloassomemberutils->errors, 'errors');
+		}
+	}
+	if (!$error) {
+		$db->commit();
+		setEventMessages($langs->trans("HelloAssoCustomFieldMappingAddedSucesfully"), null, 'mesgs');
+		header("Location: ".$_SERVER["PHP_SELF"]);
+	} else {
+		$db->rollback();
+	}
+} elseif ($action == 'delcustomfield'){
+	$dolibarrfield = GETPOST("dolibarrfield");
+	if (empty($dolibarrfield)) {
+		setEventMessages($langs->transnoentities("ErrorHelloAssoRemovingCustomField"), null, 'errors');
+		$error++;
+	}
+	if (!$error) {
+		$mappingstr = getDolGlobalString("HELLOASSO_CUSTOM_FIELD_MAPPING");
+		if (empty($mappingstr)) {
+			setEventMessages($langs->transnoentities("NothingToDo"), null, 'warnings');
+			$error++;
+		}
+		if (!$error) {
+			$mapping = json_decode($mappingstr, true);
+			if (empty($mapping[$dolibarrfield])) {
+				$error++;
+				setEventMessages($langs->trans("NothingToDo"), null, 'warnings');
+			} else {
+				unset($mapping[$dolibarrfield]);
+				$mappingstr = json_encode($mapping);
+				$res = dolibarr_set_const($db, 'HELLOASSO_CUSTOM_FIELD_MAPPING', $mappingstr, 'chaine', 0, '', $conf->entity);
+				if ($res <= 0) {
+					$error++;
+					setEventMessages($langs->transnoentities("ErrorHelloAssoRemovingCustomField"), null, 'errors');
 				}
 			}
 		}
@@ -218,9 +278,6 @@ echo '</div><br><br>';
 print $formSetup->generateOutput(true);
 print '<br>';
 
-print '<form name="formmembertype" action="'.$_SERVER["PHP_SELF"].'" method="POST">';
-print '<input type="hidden" name="token" value="'.newToken().'">';
-print '<input type="hidden" name="action" value="addmembertype">';
 
 print '<div class="div-table-responsive-no-min">';
 print '<table class="noborder centpercent">';
@@ -231,11 +288,24 @@ print '</tr>';
 print '<tr class="oddeven nohover">';
 print '<td class="col-setup-title">'.$langs->trans("HelloAssoMemberMapping").'</td>';
 print '<td>';
+
+print '<form name="formmembertype" action="'.$_SERVER["PHP_SELF"].'" method="POST">';
+print '<input type="hidden" name="token" value="'.newToken().'">';
+print '<input type="hidden" name="action" value="addmembertype">';
 $membertypes = $staticmembertype->liste_array(1);
-print $form->selectarray("select_mapdolibarrhelloassomember", $membertypes, GETPOST("select_mapdolibarrhelloassomember", 'int'), 1, 0, 0, '', 0, 0, 0, '', 'minwidth300');
+print '<select id="select_mapdolibarrhelloassomember" class="flat minwidth300" name="select_mapdolibarrhelloassomember">';
+print '<option value="-1">&nbsp;</option>';
+foreach ($membertypes as $key => $membertype) {
+	$disabled = in_array($key, $helloassomemberutils->helloasso_member_types) ? true : false;
+	$selected = GETPOST("select_mapdolibarrhelloassomember", 'int') == $key;
+	print '<option value="'.$key.'" '.($disabled ? 'disabled="disabled"' : '').' '.($selected ? "selected" : "").'>'.$membertype.'</option>';
+}
+print '</select>';
+print ajax_combobox("select_mapdolibarrhelloassomember");
 print '<input name="input_mapdolibarrhelloassomember" id="input_mapdolibarrhelloassomember" pattern="^[0-9]+$" title="'.$langs->trans("HelloAssoInputId").'" value="'.GETPOST("input_mapdolibarrhelloassomember", "int").'">';
 print '<input type="submit" id="btn_mapdolibarrhelloassomember" name="btn_mapdolibarrhelloassomember" class="butAction small smallpaddingimp" value="'.$langs->trans("Add").'" disabled="">';
-print '<br><br>';
+print '</form>';
+print '<br>';
 
 print '<div class="div-table-responsive-no-min">';
 if (!empty($helloassomemberutils->helloasso_member_types)) {
@@ -253,9 +323,41 @@ if (!empty($helloassomemberutils->helloasso_member_types)) {
 print '</div>';
 print '</td>';
 print '</tr>';
+
+print '<tr class="oddeven nohover">';
+print '<td class="col-setup-title">'.$langs->trans("HelloAssoMemberCustomFieldMapping").'</td>';
+print '<td>';
+print '<form name="formcustomfield" action="'.$_SERVER["PHP_SELF"].'" method="POST">';
+print '<input type="hidden" name="token" value="'.newToken().'">';
+print '<input type="hidden" name="action" value="addcustomfield">';
+print '<select id="select_mapcutomfield" class="flat minwidth300" name="select_mapcutomfield">';
+print '<option value="-1">&nbsp;</option>';
+foreach ($helloassomemberutils->memberfields as $key => $field) {
+	$disabled = !empty($helloassomemberutils->customfields[$field]);
+	$selected = GETPOST("select_mapcutomfield") == $field;
+	print '<option value="'.$field.'" '.($disabled ? 'disabled="disabled"' : '').' '.($selected ? "selected" : "").'>'.$field.'</option>';
+}
+print '</select>';
+print ajax_combobox("select_mapcutomfield");
+print '<input name="input_mapcutomfield" id="input_mapcutomfield" title="'.$langs->trans("HelloAssoCustomFieldInput").'" value="'.GETPOST("input_mapcutomfield").'">';
+print '<input type="submit" id="btn_mapcutomfield" name="btn_mmapcutomfield" class="butAction small smallpaddingimp" value="'.$langs->trans("Add").'" disabled="">';
+print '</form>';
+print '<br>';
+print '<div class="div-table-responsive-no-min">';
+if (!empty($helloassomemberutils->customfields)) {
+	print img_picto('', 'graph', 'class="pictofixedwidth"').$langs->trans("HierarchicView").'<br>';
+	print '<br>';
+	print '<ul>';
+	$mapping = $helloassomemberutils->customfields;
+	foreach ($mapping as $dolibarrfield => $hellofield) {
+		print '<li><span>'.$dolibarrfield.'</span> : <span>'.$hellofield.'</span>&nbsp;<a href="'.$_SERVER["PHP_SELF"].'?action=delcustomfield&dolibarrfield='.$dolibarrfield.'&token='.newToken().'">'.img_delete().'</a></li>';
+	}
+	print '</ul>';
+}
+print '</td>';
+print '</tr>';
 print '</table>';
 print '</div>';
-print '</form>';
 print '<script>
 $(document).ready(function() {
 	$("#select_mapdolibarrhelloassomember").on("change", function(){
@@ -273,272 +375,24 @@ $(document).ready(function() {
 			$("#btn_mapdolibarrhelloassomember").prop("disabled",true);
 		}
 	});
+
+	$("#select_mapcutomfield").on("change", function(){
+		if($("#input_mapcutomfield").val() != "" && $(this).find(":selected").val() != -1){
+			$("#btn_mapcutomfield").prop("disabled",false);
+		} else {
+			$("#btn_mapcutomfield").prop("disabled",true);
+		}
+	});
+
+	$("#input_mapcutomfield").on("change keyup", function(){
+		if($(this).val() != "" && $("#select_mapcutomfield").find(":selected").val() != -1){
+			$("#btn_mapcutomfield").prop("disabled",false);
+		} else {
+			$("#btn_mapcutomfield").prop("disabled",true);
+		}
+	});
 });
 </script>';
-
-$moduledir = 'helloasso';
-$myTmpObjects = array();
-// TODO Scan list of objects
-$myTmpObjects['myobject'] = array('label'=>'MyObject', 'includerefgeneration'=>0, 'includedocgeneration'=>0, 'class'=>'MyObject');
-
-
-foreach ($myTmpObjects as $myTmpObjectKey => $myTmpObjectArray) {
-	if ($myTmpObjectArray['includerefgeneration']) {
-		/*
-		 * Orders Numbering model
-		 */
-		$setupnotempty++;
-
-		print load_fiche_titre($langs->trans("NumberingModules", $myTmpObjectArray['label']), '', '');
-
-		print '<table class="noborder centpercent">';
-		print '<tr class="liste_titre">';
-		print '<td>'.$langs->trans("Name").'</td>';
-		print '<td>'.$langs->trans("Description").'</td>';
-		print '<td class="nowrap">'.$langs->trans("Example").'</td>';
-		print '<td class="center" width="60">'.$langs->trans("Status").'</td>';
-		print '<td class="center" width="16">'.$langs->trans("ShortInfo").'</td>';
-		print '</tr>'."\n";
-
-		clearstatcache();
-
-		foreach ($dirmodels as $reldir) {
-			$dir = dol_buildpath($reldir."core/modules/".$moduledir);
-
-			if (is_dir($dir)) {
-				$handle = opendir($dir);
-				if (is_resource($handle)) {
-					while (($file = readdir($handle)) !== false) {
-						if (strpos($file, 'mod_'.strtolower($myTmpObjectKey).'_') === 0 && substr($file, dol_strlen($file) - 3, 3) == 'php') {
-							$file = substr($file, 0, dol_strlen($file) - 4);
-
-							require_once $dir.'/'.$file.'.php';
-
-							$module = new $file($db);
-
-							// Show modules according to features level
-							if ($module->version == 'development' && getDolGlobalInt('MAIN_FEATURES_LEVEL') < 2) {
-								continue;
-							}
-							if ($module->version == 'experimental' && getDolGlobalInt('MAIN_FEATURES_LEVEL') < 1) {
-								continue;
-							}
-
-							if ($module->isEnabled()) {
-								dol_include_once('/'.$moduledir.'/class/'.strtolower($myTmpObjectKey).'.class.php');
-
-								print '<tr class="oddeven"><td>'.$module->name."</td><td>\n";
-								print $module->info($langs);
-								print '</td>';
-
-								// Show example of numbering model
-								print '<td class="nowrap">';
-								$tmp = $module->getExample();
-								if (preg_match('/^Error/', $tmp)) {
-									$langs->load("errors");
-									print '<div class="error">'.$langs->trans($tmp).'</div>';
-								} elseif ($tmp == 'NotConfigured') {
-									print $langs->trans($tmp);
-								} else {
-									print $tmp;
-								}
-								print '</td>'."\n";
-
-								print '<td class="center">';
-								$constforvar = 'HELLOASSO_'.strtoupper($myTmpObjectKey).'_ADDON';
-								if (getDolGlobalString($constforvar) == $file) {
-									print img_picto($langs->trans("Activated"), 'switch_on');
-								} else {
-									print '<a href="'.$_SERVER["PHP_SELF"].'?action=setmod&token='.newToken().'&object='.strtolower($myTmpObjectKey).'&value='.urlencode($file).'">';
-									print img_picto($langs->trans("Disabled"), 'switch_off');
-									print '</a>';
-								}
-								print '</td>';
-
-								$nameofclass = $myTmpObjectArray['class'];
-								$mytmpinstance = new $nameofclass($db);
-								$mytmpinstance->initAsSpecimen();
-
-								// Info
-								$htmltooltip = '';
-								$htmltooltip .= ''.$langs->trans("Version").': <b>'.$module->getVersion().'</b><br>';
-
-								$nextval = $module->getNextValue($mytmpinstance);
-								if ("$nextval" != $langs->trans("NotAvailable")) {  // Keep " on nextval
-									$htmltooltip .= ''.$langs->trans("NextValue").': ';
-									if ($nextval) {
-										if (preg_match('/^Error/', $nextval) || $nextval == 'NotConfigured') {
-											$nextval = $langs->trans($nextval);
-										}
-										$htmltooltip .= $nextval.'<br>';
-									} else {
-										$htmltooltip .= $langs->trans($module->error).'<br>';
-									}
-								}
-
-								print '<td class="center">';
-								print $form->textwithpicto('', $htmltooltip, 1, 0);
-								print '</td>';
-
-								print "</tr>\n";
-							}
-						}
-					}
-					closedir($handle);
-				}
-			}
-		}
-		print "</table><br>\n";
-	}
-
-	if ($myTmpObjectArray['includedocgeneration']) {
-		/*
-		 * Document templates generators
-		 */
-		$setupnotempty++;
-		$type = strtolower($myTmpObjectKey);
-
-		print load_fiche_titre($langs->trans("DocumentModules", $myTmpObjectKey), '', '');
-
-		// Load array def with activated templates
-		$def = array();
-		$sql = "SELECT nom";
-		$sql .= " FROM ".MAIN_DB_PREFIX."document_model";
-		$sql .= " WHERE type = '".$db->escape($type)."'";
-		$sql .= " AND entity = ".$conf->entity;
-		$resql = $db->query($sql);
-		if ($resql) {
-			$i = 0;
-			$num_rows = $db->num_rows($resql);
-			while ($i < $num_rows) {
-				$array = $db->fetch_array($resql);
-				array_push($def, $array[0]);
-				$i++;
-			}
-		} else {
-			dol_print_error($db);
-		}
-
-		print '<table class="noborder centpercent">'."\n";
-		print '<tr class="liste_titre">'."\n";
-		print '<td>'.$langs->trans("Name").'</td>';
-		print '<td>'.$langs->trans("Description").'</td>';
-		print '<td class="center" width="60">'.$langs->trans("Status")."</td>\n";
-		print '<td class="center" width="60">'.$langs->trans("Default")."</td>\n";
-		print '<td class="center" width="38">'.$langs->trans("ShortInfo").'</td>';
-		print '<td class="center" width="38">'.$langs->trans("Preview").'</td>';
-		print "</tr>\n";
-
-		clearstatcache();
-
-		foreach ($dirmodels as $reldir) {
-			foreach (array('', '/doc') as $valdir) {
-				$realpath = $reldir."core/modules/".$moduledir.$valdir;
-				$dir = dol_buildpath($realpath);
-
-				if (is_dir($dir)) {
-					$handle = opendir($dir);
-					if (is_resource($handle)) {
-						while (($file = readdir($handle)) !== false) {
-							$filelist[] = $file;
-						}
-						closedir($handle);
-						arsort($filelist);
-
-						foreach ($filelist as $file) {
-							if (preg_match('/\.modules\.php$/i', $file) && preg_match('/^(pdf_|doc_)/', $file)) {
-								if (file_exists($dir.'/'.$file)) {
-									$name = substr($file, 4, dol_strlen($file) - 16);
-									$classname = substr($file, 0, dol_strlen($file) - 12);
-
-									require_once $dir.'/'.$file;
-									$module = new $classname($db);
-
-									$modulequalified = 1;
-									if ($module->version == 'development' && getDolGlobalInt('MAIN_FEATURES_LEVEL') < 2) {
-										$modulequalified = 0;
-									}
-									if ($module->version == 'experimental' && getDolGlobalInt('MAIN_FEATURES_LEVEL') < 1) {
-										$modulequalified = 0;
-									}
-
-									if ($modulequalified) {
-										print '<tr class="oddeven"><td width="100">';
-										print(empty($module->name) ? $name : $module->name);
-										print "</td><td>\n";
-										if (method_exists($module, 'info')) {
-											print $module->info($langs);
-										} else {
-											print $module->description;
-										}
-										print '</td>';
-
-										// Active
-										if (in_array($name, $def)) {
-											print '<td class="center">'."\n";
-											print '<a href="'.$_SERVER["PHP_SELF"].'?action=del&token='.newToken().'&value='.urlencode($name).'">';
-											print img_picto($langs->trans("Enabled"), 'switch_on');
-											print '</a>';
-											print '</td>';
-										} else {
-											print '<td class="center">'."\n";
-											print '<a href="'.$_SERVER["PHP_SELF"].'?action=set&token='.newToken().'&value='.urlencode($name).'&scan_dir='.urlencode($module->scandir).'&label='.urlencode($module->name).'">'.img_picto($langs->trans("Disabled"), 'switch_off').'</a>';
-											print "</td>";
-										}
-
-										// Default
-										print '<td class="center">';
-										$constforvar = 'HELLOASSO_'.strtoupper($myTmpObjectKey).'_ADDON_PDF';
-										if (getDolGlobalString($constforvar) == $name) {
-											//print img_picto($langs->trans("Default"), 'on');
-											// Even if choice is the default value, we allow to disable it. Replace this with previous line if you need to disable unset
-											print '<a href="'.$_SERVER["PHP_SELF"].'?action=unsetdoc&token='.newToken().'&object='.urlencode(strtolower($myTmpObjectKey)).'&value='.urlencode($name).'&scan_dir='.urlencode($module->scandir).'&label='.urlencode($module->name).'&amp;type='.urlencode($type).'" alt="'.$langs->trans("Disable").'">'.img_picto($langs->trans("Enabled"), 'on').'</a>';
-										} else {
-											print '<a href="'.$_SERVER["PHP_SELF"].'?action=setdoc&token='.newToken().'&object='.urlencode(strtolower($myTmpObjectKey)).'&value='.urlencode($name).'&scan_dir='.urlencode($module->scandir).'&label='.urlencode($module->name).'" alt="'.$langs->trans("Default").'">'.img_picto($langs->trans("Disabled"), 'off').'</a>';
-										}
-										print '</td>';
-
-										// Info
-										$htmltooltip = ''.$langs->trans("Name").': '.$module->name;
-										$htmltooltip .= '<br>'.$langs->trans("Type").': '.($module->type ? $module->type : $langs->trans("Unknown"));
-										if ($module->type == 'pdf') {
-											$htmltooltip .= '<br>'.$langs->trans("Width").'/'.$langs->trans("Height").': '.$module->page_largeur.'/'.$module->page_hauteur;
-										}
-										$htmltooltip .= '<br>'.$langs->trans("Path").': '.preg_replace('/^\//', '', $realpath).'/'.$file;
-
-										$htmltooltip .= '<br><br><u>'.$langs->trans("FeaturesSupported").':</u>';
-										$htmltooltip .= '<br>'.$langs->trans("Logo").': '.yn($module->option_logo, 1, 1);
-										$htmltooltip .= '<br>'.$langs->trans("MultiLanguage").': '.yn($module->option_multilang, 1, 1);
-
-										print '<td class="center">';
-										print $form->textwithpicto('', $htmltooltip, 1, 0);
-										print '</td>';
-
-										// Preview
-										print '<td class="center">';
-										if ($module->type == 'pdf') {
-											$newname = preg_replace('/_'.preg_quote(strtolower($myTmpObjectKey), '/').'/', '', $name);
-											print '<a href="'.$_SERVER["PHP_SELF"].'?action=specimen&module='.urlencode($newname).'&object='.urlencode($myTmpObjectKey).'">'.img_object($langs->trans("Preview"), 'pdf').'</a>';
-										} else {
-											print img_object($langs->transnoentitiesnoconv("PreviewNotAvailable"), 'generic');
-										}
-										print '</td>';
-
-										print "</tr>\n";
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-
-		print '</table>';
-	}
-}
-print '<br>';
-
 
 // Show info on connection
 $titlebutton = $langs->trans('TestGetMembersHelloasso');
