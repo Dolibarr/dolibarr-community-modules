@@ -133,7 +133,7 @@ class HelloAssoMemberUtils
         return 0;
     }
 
-        public function helloassoPostMembersToDolibarr() {
+    public function helloassoPostMembersToDolibarr() {
         global $user;
         $db = $this->db;
         $error = 0;
