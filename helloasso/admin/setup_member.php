@@ -125,24 +125,24 @@ if ($action == 'test') {
 } elseif ($action == 'addmembertype'){
 	$dolibarrmembertype = GETPOST("select_mapdolibarrhelloassomember", 'int');
 	if (empty($dolibarrmembertype)) {
-		setEventMessages($langs->transnoentities("ErrorHelloAssoAddingMemberType"), null, 'errors');
+		setEventMessages($langs->transnoentities("ErrorHelloAssoBadParameter", $langs->transnoentities("HelloAssoDolibarrMemberTypeID")), null, 'errors');
 		$error++;
 	}
 	$helloassomembertype = GETPOST("input_mapdolibarrhelloassomember", 'int');
 	if (empty($helloassomembertype)) {
-		setEventMessages($langs->transnoentities("ErrorHelloAssoAddingMemberType"), null, 'errors');
+		setEventMessages($langs->transnoentities("ErrorHelloAssoBadParameter", $langs->transnoentities("HelloAssoMemberTypeID")), null, 'errors');
 		$error++;
 	}
 	if (!$error) {
 		$res = $helloassomemberutils->setHelloAssoTypeMemberMapping($dolibarrmembertype, $helloassomembertype);
 		if ($res <= 0) {
 			$error++;
-			setEventMessages($langs->transnoentities("ErrorHelloAssoAddingMemberType"), null, 'errors');
+			setEventMessages($helloassomemberutils->error, $helloassomemberutils->errors, 'errors');
 		}
 	}
 	if (!$error) {
 		$db->commit();
-		setEventMessages($langs->trans("HelloAssoMemberTypeMappingAddedSucesfully"), null, 'mesgs');
+		setEventMessages($langs->trans("HelloAssoMemberTypeDictionaryAddedSucesfully"), null, 'mesgs');
 		header("Location: ".$_SERVER["PHP_SELF"]);
 	} else {
 		$db->rollback();
@@ -150,20 +150,20 @@ if ($action == 'test') {
 } elseif ($action == 'delmembertype'){
 	$helloassomembertype = GETPOST("helloassomembertype", 'int');
 	if (empty($helloassomembertype)) {
-		setEventMessages($langs->transnoentities("ErrorHelloAssoRemovingMemberType"), null, 'errors');
+		setEventMessages($langs->transnoentities("ErrorHelloAssoBadParameter", $langs->transnoentities("HelloAssoMemberTypeID")), null, 'errors');
 		$error++;
 	}
 	if (!$error) {
 		$mappingstr = getDolGlobalString("HELLOASSO_TYPE_MEMBER_MAPPING");
 		if (empty($mappingstr)) {
-			setEventMessages($langs->transnoentities("NothingToDo"), null, 'warnings');
+			setEventMessages($langs->transnoentities("HelloAssoRecordNotFound"), null, 'warnings');
 			$error++;
 		}
 		if (!$error) {
 			$mapping = json_decode($mappingstr, true);
 			if (empty($mapping[$helloassomembertype])) {
 				$error++;
-				setEventMessages($langs->trans("NothingToDo"), null, 'warnings');
+				setEventMessages($langs->trans("HelloAssoRecordNotFound"), null, 'warnings');
 			} else {
 				unset($mapping[$helloassomembertype]);
 				$mappingstr = json_encode($mapping);
@@ -177,7 +177,7 @@ if ($action == 'test') {
 	}
 	if (!$error) {
 		$db->commit();
-		setEventMessages($langs->trans("HelloAssoMemberTypeMappingRemovedSucesfully"), null, 'mesgs');
+		setEventMessages($langs->trans("HelloAssoMemberTypeDictionaryRemovedSucesfully"), null, 'mesgs');
 		header("Location: ".$_SERVER["PHP_SELF"]);
 	} else {
 		$db->rollback();
@@ -185,12 +185,12 @@ if ($action == 'test') {
 } elseif ($action == 'addcustomfield'){
 	$dolibarrfield = GETPOST("select_mapcutomfield");
 	if (empty($dolibarrfield)) {
-		setEventMessages($langs->transnoentities("ErrorHelloAssoAddingMemberType"), null, 'errors');
+		setEventMessages($langs->transnoentities("ErrorHelloAssoBadParameter", $langs->transnoentities("HelloAssoDolibarrMemberTypeID")), null, 'errors');
 		$error++;
 	}
 	$helloassofield = GETPOST("input_mapcutomfield");
 	if (empty($helloassofield)) {
-		setEventMessages($langs->transnoentities("ErrorHelloAssoAddingMemberType"), null, 'errors');
+		setEventMessages($langs->transnoentities("ErrorHelloAssoBadParameter", $langs->transnoentities("HelloAssoMemberTypeID")), null, 'errors');
 		$error++;
 	}
 	if (!$error) {
@@ -202,7 +202,7 @@ if ($action == 'test') {
 	}
 	if (!$error) {
 		$db->commit();
-		setEventMessages($langs->trans("HelloAssoCustomFieldMappingAddedSucesfully"), null, 'mesgs');
+		setEventMessages($langs->trans("HelloAssoCustomFieldDictionaryAddedSucesfully"), null, 'mesgs');
 		header("Location: ".$_SERVER["PHP_SELF"]);
 	} else {
 		$db->rollback();
@@ -210,20 +210,20 @@ if ($action == 'test') {
 } elseif ($action == 'delcustomfield'){
 	$dolibarrfield = GETPOST("dolibarrfield");
 	if (empty($dolibarrfield)) {
-		setEventMessages($langs->transnoentities("ErrorHelloAssoRemovingCustomField"), null, 'errors');
+		setEventMessages($langs->transnoentities("ErrorHelloAssoBadParameter", $langs->transnoentities("HelloAssoDolibarrMemberTypeID")), null, 'errors');
 		$error++;
 	}
 	if (!$error) {
 		$mappingstr = getDolGlobalString("HELLOASSO_CUSTOM_FIELD_MAPPING");
 		if (empty($mappingstr)) {
-			setEventMessages($langs->transnoentities("NothingToDo"), null, 'warnings');
+			setEventMessages($langs->transnoentities("HelloAssoRecordNotFound"), null, 'warnings');
 			$error++;
 		}
 		if (!$error) {
 			$mapping = json_decode($mappingstr, true);
 			if (empty($mapping[$dolibarrfield])) {
 				$error++;
-				setEventMessages($langs->trans("NothingToDo"), null, 'warnings');
+				setEventMessages($langs->trans("HelloAssoRecordNotFound"), null, 'warnings');
 			} else {
 				unset($mapping[$dolibarrfield]);
 				$mappingstr = json_encode($mapping);
@@ -237,7 +237,7 @@ if ($action == 'test') {
 	}
 	if (!$error) {
 		$db->commit();
-		setEventMessages($langs->trans("HelloAssoMemberTypeMappingRemovedSucesfully"), null, 'mesgs');
+		setEventMessages($langs->trans("HelloAssoCustomFieldDictionaryRemovedSucesfully"), null, 'mesgs');
 		header("Location: ".$_SERVER["PHP_SELF"]);
 	} else {
 		$db->rollback();
@@ -286,7 +286,7 @@ print '<td>'.$langs->trans("Parameter").'</td>';
 print '<td class="right"></td>';
 print '</tr>';
 print '<tr class="oddeven nohover">';
-print '<td class="col-setup-title">'.$langs->trans("HelloAssoMemberMapping").'</td>';
+print '<td class="col-setup-title">'.$langs->trans("HelloAssoMemberTypeDictionary").'</td>';
 print '<td>';
 
 print '<form name="formmembertype" action="'.$_SERVER["PHP_SELF"].'" method="POST">';
@@ -325,7 +325,7 @@ print '</td>';
 print '</tr>';
 
 print '<tr class="oddeven nohover">';
-print '<td class="col-setup-title">'.$langs->trans("HelloAssoMemberCustomFieldMapping").'</td>';
+print '<td class="col-setup-title">'.$langs->trans("HelloAssoMemberCustomFieldDictionary").'</td>';
 print '<td>';
 print '<form name="formcustomfield" action="'.$_SERVER["PHP_SELF"].'" method="POST">';
 print '<input type="hidden" name="token" value="'.newToken().'">';
