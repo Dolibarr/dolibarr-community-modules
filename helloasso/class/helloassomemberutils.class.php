@@ -38,7 +38,7 @@ class HelloAssoMemberUtils
     public $form_slug;
     public $helloasso_members;
     public $helloasso_member_types = array();
-
+    public $helloasso_date_last_fetch = "";
     
     public $error;
     public $errors = array();
@@ -106,10 +106,18 @@ class HelloAssoMemberUtils
      * @return int          0 if OK, <> 0 if KO (this function is used also by cron so only 0 is OK)
      */
 
-    public function helloassoSyncMembersToDolibarr($dryrun = 0, $helloasso_date_last_fetch = "") {
+    public function helloassoSyncMembersToDolibarr($dryrun = 0) {
+        global $conf;
+
         $db = $this->db;
+        $helloasso_date_last_fetch = "";
         $error = 0;
         $db->begin();
+
+
+        if ($dryrun > 0) {
+            $helloasso_date_last_fetch = $this->helloasso_date_last_fetch;
+        }
 
         $res = $this->helloassoGetMembers($helloasso_date_last_fetch);
         if ($res != 0) {
@@ -118,6 +126,15 @@ class HelloAssoMemberUtils
         if (!$error) {
             $res = $this->helloassoPostMembersToDolibarr();
             if ($res != 0) {
+                $error++;
+            }
+        }
+
+        if (!$error) {
+            $now = dol_now();
+            $datenow = dol_print_date($now, "%d/%m/%Y %H:%M:%S");
+			$res = dolibarr_set_const($db, 'HELLOASSO_DATE_LAST_MEMBER_FETCH', $datenow, 'chaine', 0, '', $conf->entity);
+            if ($res <= 0) {
                 $error++;
             }
         }
@@ -216,7 +233,7 @@ class HelloAssoMemberUtils
             $date_end_subscription = dol_time_plus_duree($date_start_subscription, $membertype->duration_value, $membertype->duration_unit);
 
             // Try to find dolibarr member linked to HelloAsso member
-            $member_type = $this->helloasso_member_types[$newmember->tierId];
+            $dolibarrmembertype = $this->helloasso_member_types[$newmember->tierId];
             $sql = "SELECT rowid as id";
             $sql .= " FROM ".MAIN_DB_PREFIX."adherent as a";
             $sql .= " WHERE a.firstname = '".$db->escape($newmember->user->firstName)."'";
@@ -239,8 +256,8 @@ class HelloAssoMemberUtils
                 if ($num_rows == 1) {
                     $obj = $db->fetch_object($resql);
                     $member->fetch($obj->id);
-                    if ($member->typeid != $member_type) {
-                        $member->typeid = $member_type;
+                    if ($member->typeid != $dolibarrmembertype) {
+                        $member->typeid = $dolibarrmembertype;
                         $result = $member->update($user);
                         if ($result <= 0) {
                             $this->error = $member->error;
@@ -262,7 +279,7 @@ class HelloAssoMemberUtils
 
                 // Create new subscription
                 if (!$error) {
-                    $result = $member->subscription($date_start_subscription, $amount, 0, '', '', '', '', '', $date_end_subscription, $member_type);
+                    $result = $member->subscription($date_start_subscription, $amount, 0, '', '', '', '', '', $date_end_subscription, $dolibarrmembertype);
                     if ($result <= 0) {
                         $this->error = $member->error;
                         $this->errors = array_merge($this->errors, $member->errors);
