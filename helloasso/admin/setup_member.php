@@ -120,7 +120,7 @@ $dirmodels = array_merge(array('/'), (array) $conf->modules_parts['models']);
 include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php';
 
 if ($action == 'test') {
-	$helloassomemberutils->helloassoSyncMembersToDolibarr(1);
+	$helloassomemberutils->helloassoSyncMembersToDolibarr(1, "test");
 	header("Location: ".$_SERVER["PHP_SELF"]);
 } elseif ($action == 'addmembertype'){
 	$dolibarrmembertype = GETPOST("select_mapdolibarrhelloassomember", 'int');

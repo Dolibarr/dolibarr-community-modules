@@ -80,6 +80,9 @@ HelloAssoCustomFieldDictionaryRemovedSucesfully=Custom Field removed successfull
 
 HelloAssoRecordNotFound=Record not found
 
+HelloAssoMembersNothingDone=%s Member(s) processed but nothing was done (Dry run)
+HelloAssoMembersAddedSucessfully=%s Member(s) have been added successfully
+
 # About page
 #
 About = About

@@ -43,6 +43,7 @@ class HelloAssoMemberUtils
     public $error;
     public $errors = array();
     public $nbPosts = 0;
+    public $output = "";
     private $helloasso_tokens = array();
     
     public $memberfields = array(
@@ -97,6 +98,8 @@ class HelloAssoMemberUtils
             $this->customfields = json_decode($mappingcustomfieldsstr, true);   
 		}
 
+        $this->helloasso_date_last_fetch = getDolGlobalString("HELLOASSO_DATE_LAST_MEMBER_FETCH");
+
         $this->helloasso_tokens = helloassoDoConnection();
 
 		return 1;
@@ -106,8 +109,8 @@ class HelloAssoMemberUtils
      * @return int          0 if OK, <> 0 if KO (this function is used also by cron so only 0 is OK)
      */
 
-    public function helloassoSyncMembersToDolibarr($dryrun = 0) {
-        global $conf;
+    public function helloassoSyncMembersToDolibarr($dryrun = 0, $mode = "cron") {
+        global $conf, $langs;
 
         $db = $this->db;
         $helloasso_date_last_fetch = "";
@@ -115,7 +118,7 @@ class HelloAssoMemberUtils
         $db->begin();
 
 
-        if ($dryrun > 0) {
+        if ($dryrun == 0) {
             $helloasso_date_last_fetch = $this->helloasso_date_last_fetch;
         }
 
@@ -140,11 +143,27 @@ class HelloAssoMemberUtils
         }
 
         if (!$error && $dryrun == 0) {
-		    $db->commit();
+            $mesg = $langs->transnoentities("HelloAssoMembersAddedSucessfully", $this->nbPosts);
+            $db->commit();
+            if ($mode != "cron") {
+		        setEventMessages($mesg, null, 'mesgs');
+            } else {
+                $this->output = $mesg;
+            }
         } else {
             $db->rollback();
             if ($error) {
+				$errmsg = (implode(', ', $this->errors));
+                if ($mode != "cron") {
+		            setEventMessages($errmsg, null, 'errors');
+                }
                 return 1;
+            }
+            $mesg = $langs->transnoentities("HelloAssoMembersNothingDone", $this->nbPosts);
+            if ($mode != "cron") {
+		        setEventMessages($mesg, null, 'warnings');
+            } else {
+                $this->output = $mesg;
             }
         }
         return 0;
@@ -312,7 +331,7 @@ class HelloAssoMemberUtils
         $formslug = str_replace('_', '-', dol_string_nospecial(strtolower(dol_string_unaccent($this->form_slug)), '-'));
         $param = '?pageSize=100&pageIndex=1&withDetails=true';
         if ($helloasso_date_last_fetch) {
-            $param .= "&from=".$helloasso_date_last_fetch;
+            $param .= "&from=".urlencode($helloasso_date_last_fetch);
         }
         $urlformemebers = "https://".urlencode($this->helloasso_url)."/v5/organizations/".urlencode($assoslug)."/forms/Membership/".urlencode($formslug).'/items'.$param;
         dol_syslog("Send Get to url=".$urlformemebers.", to get member list", LOG_DEBUG);
