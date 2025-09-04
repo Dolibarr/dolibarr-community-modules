@@ -134,9 +134,8 @@ class HelloAssoMemberUtils
         }
 
         if (!$error) {
-            $now = dol_now();
-            $datenow = dol_print_date($now, "%d/%m/%Y %H:%M:%S");
-			$res = dolibarr_set_const($db, 'HELLOASSO_DATE_LAST_MEMBER_FETCH', $datenow, 'chaine', 0, '', $conf->entity);
+            $now = $db->idate(dol_now());
+			$res = dolibarr_set_const($db, 'HELLOASSO_DATE_LAST_MEMBER_FETCH', $now, 'chaine', 0, '', $conf->entity);
             if ($res <= 0) {
                 $error++;
             }
