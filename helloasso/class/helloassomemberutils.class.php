@@ -106,10 +106,16 @@ class HelloAssoMemberUtils
 	}
 
     /**
-     * @return int          0 if OK, <> 0 if KO (this function is used also by cron so only 0 is OK)
+     * Sync Members form HelloAsso to Dolibarr
+     * 
+     * @param   int        $dryrun    0 for normal run, 1 for dry run
+     * @param   string     $mode      If set to "cron" disable SetEventMessage
+     * 
+     * @return  int              0 if OK, <> 0 if KO (this function is used also by cron so only 0 is OK)
      */
 
-    public function helloassoSyncMembersToDolibarr($dryrun = 0, $mode = "cron") {
+    public function helloassoSyncMembersToDolibarr($dryrun = 0, $mode = "cron")
+    {
         global $langs;
 
         $db = $this->db;
@@ -160,7 +166,14 @@ class HelloAssoMemberUtils
         return 0;
     }
 
-    public function helloassoPostMembersToDolibarr() {
+    /**
+     * Post array $this->helloasso_members of HelloAsso Members to Dolibarr
+     * 
+     * @return int >0 if OK, 0 if nothing to do, <0 if KO
+     */
+
+    public function helloassoPostMembersToDolibarr()
+    {
         global $user, $conf;
         $db = $this->db;
         $error = 0;
@@ -275,6 +288,7 @@ class HelloAssoMemberUtils
                         }
                     }
                 } else {
+                    // Create in Dolibarr an HelloAsso member
                     $memberid = $this->createHelloAssoMember($newmember, $dolibarrmembertype);
                     if ($memberid <= 0) {
                        return -4;
@@ -323,16 +337,19 @@ class HelloAssoMemberUtils
                 }
             }
         }
-        return 0;
+        return $this->nbPosts;
     }
 
     /**
+     * Get Members from HelloAsso API and set $this->helloasso_members
+     * 
      * @param string        $helloasso_date_last_fetch      Date of last member fetch
      * 
-     * @return int          1 if OK, <> 1 if KO
+     * @return int          >0 if OK, 0 if noting to do, <0 if KO
      */
 
-    public function helloassoGetMembers($helloasso_date_last_fetch = "") {
+    public function helloassoGetMembers($helloasso_date_last_fetch = "")
+    {
 
         global $langs;
         $headers[] = "Authorization: ".ucfirst($this->helloasso_tokens["token_type"])." ".$this->helloasso_tokens["access_token"];
@@ -378,10 +395,19 @@ class HelloAssoMemberUtils
         $result = $ret["content"];
         $json = json_decode($result);
         $this->helloasso_members = $json->data;
-        return 0;
+        return count($this->helloasso_members);
     }
 
-    public function setHelloAssoTypeMemberMapping($dolibarrmembertype, $helloassomembertype) {
+    /**
+     * Set array of correspondance between HelloAsso and Dolibarr member type
+     * 
+     * @param   int   $dolibarrmembertype     Id of member type in Dolibarr
+     * @param   int   $helloassomembertype    Id of member type in HelloAsso
+     * 
+     * @return  int   >0 if Ok, <0 if Ko
+     */
+    public function setHelloAssoTypeMemberMapping($dolibarrmembertype, $helloassomembertype)
+    {
         global $langs, $conf;
         $mappingstr = getDolGlobalString("HELLOASSO_TYPE_MEMBER_MAPPING");
         if (empty($mappingstr)) {
@@ -404,8 +430,17 @@ class HelloAssoMemberUtils
         $this->helloasso_member_types = $mapping;
         return 1;
     }
-    
-    public function setHelloAssoCustomFieldMapping($dolibarrfield, $helloassofield) {
+
+     /**
+     * Set array of correspondance between HelloAsso custom fields and Dolibarr fields
+     * 
+     * @param   string   $dolibarrfield          Dolibar field of member object
+     * @param   string   $helloassomembertype    HelloAsso custom field name
+     * 
+     * @return  int   >0 if Ok, <0 if Ko
+     */
+    public function setHelloAssoCustomFieldMapping($dolibarrfield, $helloassofield)
+    {
         global $langs, $conf;
         $mappingstr = getDolGlobalString("HELLOASSO_CUSTOM_FIELD_MAPPING");
         if (empty($mappingstr)) {
@@ -429,7 +464,16 @@ class HelloAssoMemberUtils
         return 1;
     }
 
-    public function createHelloAssoTypeMember($object, $label) {
+    /**
+     * Create HelloAsso member type in Dolibarr database
+     * 
+     * @param   stdClass    $object     Object with HelloAsso member type data
+     * @param   string      $label      Label of new member type in Dolibarr
+     * 
+     * @return  int   >0 if Ok, <0 if Ko
+     */
+    public function createHelloAssoTypeMember($object, $label)
+    {
         global $user;
         $db = $this->db;
         $newmembertype = new AdherentType($db);
@@ -474,7 +518,16 @@ class HelloAssoMemberUtils
         return $res;
     }
 
-    public function createHelloAssoMember($newmember, $membertype) {
+    /**
+     * Create HelloAsso member in Dolibarr database
+     * 
+     * @param   stdClass    $newmember     Object with HelloAsso member data
+     * @param   int         $membertype    Id of member type in Dolibarr to set to new Dolibarr member
+     * 
+     * @return  int   >0 if Ok, <0 if Ko
+     */
+    public function createHelloAssoMember($newmember, $membertype)
+    {
         global $user;
         $db = $this->db;
         $customfields = array_flip($this->customfields);
