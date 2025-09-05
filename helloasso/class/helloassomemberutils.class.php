@@ -110,7 +110,7 @@ class HelloAssoMemberUtils
      */
 
     public function helloassoSyncMembersToDolibarr($dryrun = 0, $mode = "cron") {
-        global $conf, $langs;
+        global $langs;
 
         $db = $this->db;
         $helloasso_date_last_fetch = "";
@@ -129,14 +129,6 @@ class HelloAssoMemberUtils
         if (!$error) {
             $res = $this->helloassoPostMembersToDolibarr();
             if ($res != 0) {
-                $error++;
-            }
-        }
-
-        if (!$error) {
-            $now = $db->idate(dol_now());
-			$res = dolibarr_set_const($db, 'HELLOASSO_DATE_LAST_MEMBER_FETCH', $now, 'chaine', 0, '', $conf->entity);
-            if ($res <= 0) {
                 $error++;
             }
         }
@@ -169,7 +161,7 @@ class HelloAssoMemberUtils
     }
 
     public function helloassoPostMembersToDolibarr() {
-        global $user;
+        global $user, $conf;
         $db = $this->db;
         $error = 0;
         $helloasso_members = $this->helloasso_members;
@@ -261,7 +253,7 @@ class HelloAssoMemberUtils
             if (!empty($this->customfields['email'])) {
                 $email = "";
                 foreach ($newmember->customFields as $key => $field) {
-                    if ($field->id == $this->customfields['email']) {
+                    if ($field->name == $this->customfields['email']) {
                         $email = $field->answer;
                         break;
                     }
@@ -309,6 +301,15 @@ class HelloAssoMemberUtils
                 return -7;
             }
             $this->nbPosts++;
+
+            if (!$error && count($helloasso_members) == $this->nbPosts) {
+                $datelastfetch = dol_stringtotime($newmember->order->meta->updatedAt);
+                $datetime = $db->idate($datelastfetch, "gmt");
+                $res = dolibarr_set_const($db, 'HELLOASSO_DATE_LAST_MEMBER_FETCH', $datetime, 'chaine', 0, '', $conf->entity);
+                if ($res <= 0) {
+                    $error++;
+                }
+            }
         }
         return 0;
     }
