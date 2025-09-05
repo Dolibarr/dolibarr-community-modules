@@ -164,13 +164,13 @@ class HelloAssoMemberUtils
         global $user, $conf;
         $db = $this->db;
         $error = 0;
+        $datelastfetch = 0;
         $helloasso_members = $this->helloasso_members;
         foreach ($helloasso_members as $key => $newmember) {
             $member_type = 0;
             $member = new Adherent($db);
             $membertype = new AdherentType($db);
             $amount = $newmember->initialAmount / 100;
-            $date_start_subscription = dol_stringtotime($newmember->order->meta->createdAt); 
 
             // Verify if member_type mapping contain HelloAsso memberId
             if (empty($this->helloasso_member_types[$newmember->tierId])) {
@@ -240,7 +240,6 @@ class HelloAssoMemberUtils
 
             }
             $membertype->fetch($this->helloasso_member_types[$newmember->tierId]);
-            $date_end_subscription = dol_time_plus_duree($date_start_subscription, $membertype->duration_value, $membertype->duration_unit);
 
             // Try to find dolibarr member linked to HelloAsso member
             $dolibarrmembertype = $this->helloasso_member_types[$newmember->tierId];
@@ -289,6 +288,19 @@ class HelloAssoMemberUtils
 
                 // Create new subscription
                 if (!$error) {
+                    $date_start_subscription = dol_stringtotime($newmember->order->meta->createdAt); 
+                    $date_end_subscription = dol_time_plus_duree($date_start_subscription, $membertype->duration_value, $membertype->duration_unit);
+
+                    $result = $member->fetch_subscriptions();
+                    if ($result <= 0) {
+                        $this->error = $member->error;
+                        $this->errors = array_merge($this->errors, $member->errors);
+                        return -6;
+                    }
+                    if (!empty($member->last_subscription_date_end)) {
+                        $date_start_subscription = $member->last_subscription_date_end; 
+                        $date_end_subscription = dol_time_plus_duree($date_start_subscription, $membertype->duration_value, $membertype->duration_unit);
+                    }
                     $result = $member->subscription($date_start_subscription, $amount, 0, '', '', '', '', '', $date_end_subscription, $dolibarrmembertype);
                     if ($result <= 0) {
                         $this->error = $member->error;
@@ -301,9 +313,9 @@ class HelloAssoMemberUtils
                 return -7;
             }
             $this->nbPosts++;
+            $datelastfetch = max(dol_stringtotime($newmember->order->meta->createdAt), $datelastfetch);
 
             if (!$error && count($helloasso_members) == $this->nbPosts) {
-                $datelastfetch = dol_stringtotime($newmember->order->meta->updatedAt);
                 $datetime = $db->idate($datelastfetch, "gmt");
                 $res = dolibarr_set_const($db, 'HELLOASSO_DATE_LAST_MEMBER_FETCH', $datetime, 'chaine', 0, '', $conf->entity);
                 if ($res <= 0) {
@@ -471,6 +483,7 @@ class HelloAssoMemberUtils
         $createmember->firstname = $newmember->user->firstName;
         $createmember->lastname = $newmember->user->lastName;
         $createmember->typeid = $membertype;
+        $createmember->morphy = "phy";
         if (!empty($newmember->customFields) && !empty($this->customfields)) {
             foreach ($newmember->customFields as $key => $field) {
                 if (!empty($customfields[$field->name])) {
