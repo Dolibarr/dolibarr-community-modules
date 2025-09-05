@@ -401,7 +401,7 @@ print dolGetButtonAction('', $titlebutton, 'default', $_SERVER["PHP_SELF"].'?act
 
 print '<br><br>';
 
-print info_admin($langs->trans("ExampleOfTestCreditCardHelloAsso").'<a href="https://docs.sips.worldline-solutions.com/fr/cartes-de-test.html">https://docs.sips.worldline-solutions.com/fr/cartes-de-test.html</a>');
+print info_admin($langs->trans("ExampleOfTestCreditCardHelloAsso").'<a href="https://docs.stripe.com/testing?numbers-or-method-or-token=card-numbers">https://docs.stripe.com/testing?numbers-or-method-or-token=card-numbers</a>');
 
 
 // Page end
