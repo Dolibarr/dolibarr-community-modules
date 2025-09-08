@@ -109,7 +109,7 @@ class HelloAssoMemberUtils
      * Sync Members form HelloAsso to Dolibarr
      * 
      * @param   int        $dryrun    0 for normal run, 1 for dry run
-     * @param   string     $mode      If set to "cron" disable SetEventMessage
+     * @param   string     $mode      If set to "cron" disable SetEventMessages
      * 
      * @return  int              0 if OK, <> 0 if KO (this function is used also by cron so only 0 is OK)
      */
@@ -134,17 +134,24 @@ class HelloAssoMemberUtils
         }
         if (!$error) {
             $res = $this->helloassoPostMembersToDolibarr();
-            if ($res <= 0) {
+            if ($res < 0) {
                 $error++;
             }
         }
 
         if (!$error && $dryrun == 0) {
-            $mesg = $langs->transnoentities("HelloAssoMembersAddedSucessfully", $this->nbPosts);
             $db->commit();
             if ($mode != "cron") {
+                $mesg = $langs->transnoentities("HelloAssoMembersAddedSucessfully", $this->nbPosts);
+                if ($this->nbPosts == 0) {
+                    $mesg = $langs->transnoentities("HelloAssoMembersNoNewMembers");
+                }
 		        setEventMessages($mesg, null, 'mesgs');
             } else {
+                $mesg = $this->nbPosts." Member(s) have been added successfully";
+                if ($this->nbPosts == 0) {
+                    $mesg = "0 Member where added, no new members on HelloAsso";
+                }
                 $this->output = $mesg;
             }
         } else {
@@ -160,7 +167,7 @@ class HelloAssoMemberUtils
             if ($mode != "cron") {
 		        setEventMessages($mesg, null, 'warnings');
             } else {
-                $this->output = $mesg;
+                $this->output = "Nothing done (Dry mode)";
             }
         }
         return 0;
@@ -333,10 +340,8 @@ class HelloAssoMemberUtils
                 return -7;
             }
             $this->nbPosts++;
-            $newdatelastfetch = $newmember->order->date;
-            if ($newmember->payments[0]->type == "Offline") {
-                $newdatelastfetch = $newmember->order->meta->updatedAt;
-            }
+            $newdatelastfetch = $newmember->order->meta->updatedAt;
+            
             $datelastfetch = max(dol_stringtotime($newdatelastfetch), $datelastfetch);
 
             if (!$error && count($helloasso_members) == $this->nbPosts) {

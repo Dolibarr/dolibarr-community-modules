@@ -120,6 +120,7 @@ $dirmodels = array_merge(array('/'), (array) $conf->modules_parts['models']);
 include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php';
 
 if ($action == 'test') {
+	//Try to sync members on HelloAsso to Dolibarr (Dry mode)
 	$helloassomemberutils->helloassoSyncMembersToDolibarr(1, "test");
 	header("Location: ".$_SERVER["PHP_SELF"]);
 } elseif ($action == 'addmembertype'){
