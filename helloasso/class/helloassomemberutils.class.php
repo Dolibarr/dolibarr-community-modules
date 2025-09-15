@@ -94,7 +94,7 @@ class HelloAssoMemberUtils
             $this->helloasso_member_types = json_decode($mappingstr, true);   
 		}
         $mappingcustomfieldsstr = getDolGlobalString("HELLOASSO_CUSTOM_FIELD_MAPPING");
-        if (!empty($mappingstr)) {
+        if (!empty($mappingcustomfieldsstr)) {
             $this->customfields = json_decode($mappingcustomfieldsstr, true);   
 		}
 
