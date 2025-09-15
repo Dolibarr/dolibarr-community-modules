@@ -103,10 +103,10 @@ $formSetup = new FormSetup($db);
 
 // Enter here all parameters in your setup page
 
-$item = $formSetup->newItem('HELLOASSO_FORM_MEMBERSHIP_SLUG');
-$item->helpText = $langs->transnoentities('HELLOASSO_FORM_MEMBERSHIP_SLUG_HELP');
 $item = $formSetup->newItem('HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG');
 $item->helpText = $langs->transnoentities('HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG_HELP');
+$item = $formSetup->newItem('HELLOASSO_FORM_MEMBERSHIP_SLUG');
+$item->helpText = $langs->transnoentities('HELLOASSO_FORM_MEMBERSHIP_SLUG_HELP');
 
 $setupnotempty += count($formSetup->items);
 
