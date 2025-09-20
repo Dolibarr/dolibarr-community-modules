@@ -28,6 +28,8 @@ ModuleHelloAssoDesc = Proposez à vos clients une page de paiement en ligne Hell
 #
 HelloAssoSetup = Paramètres HelloAsso
 Settings = Paramètres
+SettingsMember=Paramètre d'adhésion
+
 HELLOASSO_LIVE = Helloasso live activé (otherwise test/sandbox mode)
 HELLOASSO_TEST_CLIENT_ID=Client id clé de test
 HELLOASSO_TEST_CLIENT_ID_HELP=La clé d'identification du client de test de votre configuration API Helloasso
@@ -49,6 +51,34 @@ HELLOASSO_STANDAR_BTN_HELP = Activez cette option pour charger le fichier CSS He
 
 ExampleOfTestCreditCardHelloAsso=Un exemple de carte de crédit peut être trouvé à cette URL :<br> %s 
 TestConnectionHelloasso=Tester la connexion
+
+TestGetMembersHelloasso=Tester l'obtention des adherent HelloAsso
+
+HELLOASSO_FORM_MEMBERSHIP_SLUG=URL du formulaire d'adhésion de production
+HELLOASSO_FORM_MEMBERSHIP_SLUG_HELP=L'URL de production du formulaire d'adhésion à partir duquel obtenir les informations. Elle doit correspondre à l'adresse Web de votre formulaire dans le compte HelloAsso.
+HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG=URL du formulaire d'adhésion de test
+HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG_HELP=URL de test du formulaire d'adhésion à partir duquel obtenir les informations. Doit correspondre à l'adresse Web de votre formulaire dans le compte HelloAsso.
+
+HelloAssoMemberTypeDictionary=Dictionnaire de correspondance des types de membres entre HelloAsso et Dolibarr
+HelloAssoMemberCustomFieldDictionary=Dictionnaire des correspondance des champs personnalisés d'HelloAsso et de Dolibarr
+
+HelloAssoDolibarrMemberTypeID=ID du type de membre Dolibarr
+HelloAssoMemberTypeID=ID du type de membre HelloAsso
+ErrorHelloAssoBadParameter=Mauvais paramètre %s
+
+ErrorHelloAssoMemberTypeAlreadySet=Type de membre déjà défini
+ErrorHelloAssoAddingMemberType=Erreur lors de l'ajout d'un type de membre
+ErrorHelloAssoRemovingMemberType=Erreur lors de la suppression du type de membre
+HelloAssoMemberTypeDictionaryAddedSucesfully=Type de membre ajouté avec succès
+HelloAssoMemberTypeDictionaryRemovedSucesfully=Type de membre supprimé avec succès
+
+ErrorHelloAssoCustomFieldAlreadySet=Champ personnalisé déjà défini
+ErrorHelloAssoAddingCustomField=Erreur lors de l'ajout d'un champ personnalisé
+ErrorHelloAssoRemovingCustomField=Erreur lors de la suppression d'un champ personnalisé
+HelloAssoCustomFieldDictionaryAddedSucesfully=Champ personnalisé ajouté avec succès
+HelloAssoCustomFieldDictionaryRemovedSucesfully=Champ personnalisé supprimé avec succès
+
+HelloAssoRecordNotFound=Enregistrement introuvable
 
 # About page
 #

@@ -28,6 +28,8 @@ ModuleHelloAssoDesc = Offer customers a HelloAsso online payment page (credit/de
 #
 HelloAssoSetup = HelloAsso setup
 Settings = Settings
+SettingsMember=Membership settings
+
 HELLOASSO_LIVE = Helloasso live enabled (otherwise test/sandbox mode)
 HELLOASSO_TEST_CLIENT_ID=Client id test key
 HELLOASSO_TEST_CLIENT_ID_HELP=The test client ID key from your Helloasso API configuration
@@ -50,6 +52,36 @@ HELLOASSO_STANDAR_BTN_HELP = Enable this option to load the HelloAsso CSS file, 
 ExampleOfTestCreditCardHelloAsso=Example of credit card can be found at this URL: 
 TestConnectionHelloasso=Test Connection
 SuccessfullyConnected=Connection successful
+TestGetMembersHelloasso=Test getting helloasso membership
+
+HELLOASSO_FORM_MEMBERSHIP_SLUG=Live Membership form url
+HELLOASSO_FORM_MEMBERSHIP_SLUG_HELP=The live url of membership form to get information from. Must match Web address of your form in the HelloAsso account
+HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG=Test Membership form url
+HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG_HELP=The test url of membership form to get information from. Must match Web address of your form in the HelloAsso account
+
+HelloAssoMemberTypeDictionary=Dictionary of HelloAsso and Dolibarr member type correspondence
+HelloAssoMemberCustomFieldDictionary=Dictionary of HelloAsso custom fields and Dolibarr field correspondence
+
+HelloAssoDolibarrMemberTypeID=Dolibarr member type id
+HelloAssoMemberTypeID=HelloAsso member type id
+ErrorHelloAssoBadParameter=Bad parameter %s
+
+ErrorHelloAssoMemberTypeAlreadySet=Member type already set
+ErrorHelloAssoAddingMemberType=Error when trying to add member type 
+ErrorHelloAssoRemovingMemberType=Error when trying to remove member type 
+HelloAssoMemberTypeDictionaryAddedSucesfully=Member type added successfully
+HelloAssoMemberTypeDictionaryRemovedSucesfully=Member type removed successfully
+
+ErrorHelloAssoCustomFieldAlreadySet=Custom field already set
+ErrorHelloAssoAddingCustomField=Error when trying to add custom field
+ErrorHelloAssoRemovingCustomField=Error when trying to remove custom field
+HelloAssoCustomFieldDictionaryAddedSucesfully=Custom field added successfully
+HelloAssoCustomFieldDictionaryRemovedSucesfully=Custom Field removed successfully
+
+HelloAssoRecordNotFound=Record not found
+
+HelloAssoMembersNothingDone=%s Member(s) processed but nothing was done (Dry run)
+HelloAssoMembersAddedSucessfully=%s Member(s) have been added successfully
 
 # About page
 #

@@ -47,6 +47,11 @@ function helloassoAdminPrepareHead()
 	$head[$h][2] = 'settings';
 	$h++;
 
+	$head[$h][0] = dol_buildpath("/helloasso/admin/setup_member.php", 1);
+	$head[$h][1] = $langs->trans("SettingsMember");
+	$head[$h][2] = 'member';
+	$h++;
+
 	/*
 	$head[$h][0] = dol_buildpath("/helloasso/admin/myobject_extrafields.php", 1);
 	$head[$h][1] = $langs->trans("ExtraFields");
