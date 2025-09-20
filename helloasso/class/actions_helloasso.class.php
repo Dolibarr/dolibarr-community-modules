@@ -822,7 +822,7 @@ class ActionsHelloAsso extends CommonHookActions
 							//Add payer data to Dolibarr -> contact + test if paymentdone id test 47257
 							$json = json_decode($ret["content"]);
 							if ($json->id == $_SESSION["HelloAssoPaymentId"] && $json->order->payments[0]->state == "Authorized") {
-								if (!empty($json->order->payer)) {
+								if (!empty($json->order->payer) && !empty($tmptag["CUS"])) {
 									$payer = $json->order->payer;
 									$found = 0;
 									$countryid = 0;
