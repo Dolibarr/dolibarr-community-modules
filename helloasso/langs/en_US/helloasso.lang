@@ -54,10 +54,10 @@ TestConnectionHelloasso=Test Connection
 SuccessfullyConnected=Connection successful
 TestGetMembersHelloasso=Test getting helloasso membership
 
-HELLOASSO_FORM_MEMBERSHIP_SLUG=Live Membership form url
-HELLOASSO_FORM_MEMBERSHIP_SLUG_HELP=The live url of membership form to get information from. Must match Web address of your form in the HelloAsso account
-HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG=Test Membership form url
-HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG_HELP=The test url of membership form to get information from. Must match Web address of your form in the HelloAsso account
+HELLOASSO_FORM_MEMBERSHIP_SLUG=Live Membership form name
+HELLOASSO_FORM_MEMBERSHIP_SLUG_HELP=The name of live membership form to get information from. Must match Web address of your form in the HelloAsso account
+HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG=Test Membership form name
+HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG_HELP=The name of test membership form to get information from. Must match Web address of your form in the HelloAsso account
 
 HelloAssoMemberTypeDictionary=Dictionary of HelloAsso and Dolibarr member type correspondence
 HelloAssoMemberCustomFieldDictionary=Dictionary of HelloAsso custom fields and Dolibarr field correspondence
@@ -82,6 +82,17 @@ HelloAssoRecordNotFound=Record not found
 
 HelloAssoMembersNothingDone=%s Member(s) processed but nothing was done (Dry run)
 HelloAssoMembersAddedSucessfully=%s Member(s) have been added successfully
+HelloAssoDolibarrCorrespondenceParameters=Correspondence parameters between HelloAsso and Dolibarr
+HelloAssoFormParameters=HelloAsso from parameters
+HelloAssoMemberTypeIdTitle=Id of corresponding member type in HelloAsso
+HelloAssoMemberTypeId=HelloAsso member type ID
+HelloAssoCustomField=HelloAsso custom field slug
+HelloAssoCustomFieldTitle=Slug of corresponding custom field in HelloAsso
+HelloAssoSelectMemberType=Select a dolibarr member type
+HelloAssoSelectMemberField=Select a dolibarr member field
+HelloAssoMemberTypeDictionaryHelp=Dictionary of HelloAsso and Dolibarr member type correspondence. If the dictionary remains empty, a new member type will be created in Dolibarr. To find the HelloAsso member identifiant, you can follow the process explained in the HelloAsso module wiki.
+HelloAssoMemberCustomFieldDictionaryHelp=Dictionary of HelloAsso custom fields and Dolibarr field correspondence.<br>To configure a new custom field. Select a field of Dolibarr member object and set the name of the corresponding HelloAsso field inside the input field.
+ModuleHelloAssoMemberSyncDesc=Synchronise HelloAsso members in the Dolibarr database by creating members and subscriptions.
 
 # About page
 #
