@@ -88,6 +88,7 @@ HelloAssoSelectMemberField=Sélectionnez un champ de l'objet adherent de Dolibar
 HelloAssoMemberTypeDictionaryHelp=Dictionnaire de correspondance entre les types de membres HelloAsso et Dolibarr. Si le dictionnaire reste vide, un nouveau type de membre sera créé dans Dolibarr. Pour trouver l'identifiant HelloAsso d'un membre, vous pouvez suivre la procédure expliquée dans le wiki du module HelloAsso.
 HelloAssoMemberCustomFieldDictionaryHelp=Dictionnaire des champs personnalisés HelloAsso et correspondance avec les champs Dolibarr.<br>Pour configurer un nouveau champ personnalisé. Sélectionnez un champ de l'objet membre Dolibarr et définissez le nom du champ HelloAsso correspondant dans le champ de saisie.
 ModuleHelloAssoMemberSyncDesc=Synchronisez les membres HelloAsso dans la base de données Dolibarr en créant des membres et des abonnements.
+HelloAssoSyncButtonDesc=Testez la synchronisation de vos membres avec votre application sans modifier vos données. <br>Une fois la configuration validée, vous pouvez automatiser la synchronisation dans le module Tâches planifiées avec la tâche HelloAssoGetNewMembers.
 
 HelloAssoRecordNotFound=Enregistrement introuvable
 
