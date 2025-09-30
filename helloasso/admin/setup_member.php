@@ -405,6 +405,7 @@ if ((float) DOL_VERSION >= 21) {
 		dol_htmloutput_mesg($langs->trans('YouAreCurrentlyInSandboxMode', 'HelloAsso'), [], 'warning');
 	}
 }
+echo '<br><span class="">'.$langs->trans("HelloAssoSyncButtonDesc").'</span><br><br>';
 print dolGetButtonAction('', $titlebutton, 'default', $_SERVER["PHP_SELF"].'?action=test', '', 1, array('attr' => array('class' => 'reposition')));
 
 
