@@ -128,7 +128,7 @@ class HelloAssoMemberUtils
             $helloasso_date_last_fetch = $this->helloasso_date_last_fetch;
         }
 
-        $res = $this->helloassoGetMembers($helloasso_date_last_fetch);
+        $res = $this->helloassoGetMembers($helloasso_date_last_fetch, $dryrun);
         if ($res < 0) {
             $error++;
         }
@@ -340,9 +340,12 @@ class HelloAssoMemberUtils
                 return -7;
             }
             $this->nbPosts++;
-            $newdatelastfetch = $newmember->order->meta->updatedAt;
-            
-            $datelastfetch = max(dol_stringtotime($newdatelastfetch), $datelastfetch);
+            $newdatelastfetch = dol_stringtotime($newmember->order->date);
+            if ($newdatelastfetch == dol_get_first_hour($newdatelastfetch)) {
+                // Prevent Offline payment to be imported another time
+                $newdatelastfetch = dol_time_plus_duree($newdatelastfetch, 1, 's');
+            }
+            $datelastfetch = max($newdatelastfetch, $datelastfetch);
 
             if (!$error && count($helloasso_members) == $this->nbPosts) {
                 $datetime = $db->idate($datelastfetch, "gmt");
@@ -359,57 +362,98 @@ class HelloAssoMemberUtils
      * Get Members from HelloAsso API and set $this->helloasso_members
      * 
      * @param string        $helloasso_date_last_fetch      Date of last member fetch
+     * @param int           $dryrun                         if !=0 dryrun, if 0 normal run
      * 
      * @return int          >0 if OK, 0 if noting to do, <0 if KO
      */
 
-    public function helloassoGetMembers($helloasso_date_last_fetch = "")
+    public function helloassoGetMembers($helloasso_date_last_fetch = "", $dryrun = 0)
     {
-
         global $langs;
+
+        $maxmemberpages = getDolGlobalInt("HELLOASSO_MAX_FORM_PAGINATION_PAGES", 100);
+        $pagesize = getDolGlobalInt("HELLOASSO_FORM_PAGINATION_PAGES_SIZE", 20);
+
         $headers[] = "Authorization: ".ucfirst($this->helloasso_tokens["token_type"])." ".$this->helloasso_tokens["access_token"];
         $headers[] = "Accept: application/json";
         $headers[] = "Content-Type: application/json";
 
         $assoslug = str_replace('_', '-', dol_string_nospecial(strtolower(dol_string_unaccent($this->organization_slug)), '-'));
         $formslug = str_replace('_', '-', dol_string_nospecial(strtolower(dol_string_unaccent($this->form_slug)), '-'));
-        $param = '?pageSize=100&pageIndex=1&withDetails=true';
-        if ($helloasso_date_last_fetch) {
-            $param .= "&from=".urlencode($helloasso_date_last_fetch);
+        $parambase = '?pageSize='.urlencode($pagesize).'&pageIndex=1&withDetails=true';
+        if ($helloasso_date_last_fetch != "") {
+            $helloasso_date_last_fetch_tms = dol_stringtotime($helloasso_date_last_fetch);
+            $datefromtimestamp = dol_get_first_hour($helloasso_date_last_fetch_tms);
+            $datefrom = dol_print_date($datefromtimestamp, '%Y-%m-%d %H:%M:%S');
+            $paramfrom .= "&from=".urlencode($datefrom);
         }
-        $urlformemebers = "https://".urlencode($this->helloasso_url)."/v5/organizations/".urlencode($assoslug)."/forms/Membership/".urlencode($formslug).'/items'.$param;
-        dol_syslog("Send Get to url=".$urlformemebers.", to get member list", LOG_DEBUG);
+        $param = $parambase.$paramfrom;
+        $nbpages = 0;
+        $arraymembers = array();
+        // Loop to have all pages
+        while($nbpages < $maxmemberpages) {
+            $urlformemebers = "https://".urlencode($this->helloasso_url)."/v5/organizations/".urlencode($assoslug)."/forms/Membership/".urlencode($formslug).'/items'.$param;
+            dol_syslog("Send Get to url=".$urlformemebers.", to get member list, page=".$nbpages+1, LOG_DEBUG);
 
-        $ret = getURLContent($urlformemebers, 'GET', "", 1, $headers);
-        if ($ret["http_code"] != 200) {
-            $arrayofmessage = array();
-            if (!empty($ret2['content'])) {
-                $arrayofmessage = json_decode($ret['content'], true);
-            }
-            if (!empty($arrayofmessage['message'])) {
-                $this->error = $arrayofmessage['message'];
-                $this->errors[] = $this->error;
-            } else {
-                if (!empty($arrayofmessage['errors']) && is_array($arrayofmessage['errors'])) {
-                    foreach($arrayofmessage['errors'] as $tmpkey => $tmpmessage) {
-                        if (!empty($tmpmessage['message'])) {
-                            $this->error = $langs->trans("Error").' - '.$tmpmessage['message'];
-                            $this->errors[] = $this->error;
-                        } else {
-                            $this->error = $langs->trans("UnkownError").' - HTTP code = '.$ret["http_code"];
-                            $this->errors[] = $this->error;
-                        }
-                    }
-                } else {
-                    $this->error = $langs->trans("UnkownError").' - HTTP code = '.$ret["http_code"];
+            $ret = getURLContent($urlformemebers, 'GET', "", 1, $headers);
+            if ($ret["http_code"] != 200) {
+                $arrayofmessage = array();
+                if (!empty($ret2['content'])) {
+                    $arrayofmessage = json_decode($ret['content'], true);
+                }
+                if (!empty($arrayofmessage['message'])) {
+                    $this->error = $arrayofmessage['message'];
                     $this->errors[] = $this->error;
+                } else {
+                    if (!empty($arrayofmessage['errors']) && is_array($arrayofmessage['errors'])) {
+                        foreach($arrayofmessage['errors'] as $tmpkey => $tmpmessage) {
+                            if (!empty($tmpmessage['message'])) {
+                                $this->error = $langs->trans("Error").' - '.$tmpmessage['message'];
+                                $this->errors[] = $this->error;
+                            } else {
+                                $this->error = $langs->trans("UnkownError").' - HTTP code = '.$ret["http_code"];
+                                $this->errors[] = $this->error;
+                            }
+                        }
+                    } else {
+                        $this->error = $langs->trans("UnkownError").' - HTTP code = '.$ret["http_code"];
+                        $this->errors[] = $this->error;
+                    }
+                }
+                return -1;
+            }
+            $result = $ret["content"];
+            $json = json_decode($result);
+            if (empty($json->data)) {
+                break;
+            }
+            foreach ($json->data as $key => $member) {
+                if ($helloasso_date_last_fetch == "") {
+                    $arraymembers[] = $member;
+                    continue;
+                }
+                $date_pay_tms = dol_stringtotime($member->order->date);
+                if ($date_pay_tms > $helloasso_date_last_fetch_tms) {
+                    $arraymembers[] = $member;
+                    continue;
+                }
+                if ($member->payments[0]->type == "Offline") {
+                    $memeberdate = dol_stringtotime($member->order->date);
+                    $updatedtime = dol_stringtotime($member->order->meta->updatedAt);
+                    if ($memeberdate == dol_get_first_hour($updatedtime) && $updatedtime > $helloasso_date_last_fetch_tms) {
+                        $arraymembers[] = $member;
+                        continue;
+                    }
                 }
             }
-            return -1;
+            // No pagination for dryrun
+            if (empty($json->pagination->continuationToken) || $dryrun) {
+                break;
+            }
+            $param .= "&continuationToken=".urlencode($json->pagination->continuationToken);
+            $nbpages++;
         }
-        $result = $ret["content"];
-        $json = json_decode($result);
-        $this->helloasso_members = $json->data;
+        $this->helloasso_members = $arraymembers;
         return count($this->helloasso_members);
     }
 

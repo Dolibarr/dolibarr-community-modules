@@ -107,7 +107,12 @@ $item = $formSetup->newItem('HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG');
 $item->helpText = $langs->transnoentities('HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG_HELP');
 $item = $formSetup->newItem('HELLOASSO_FORM_MEMBERSHIP_SLUG');
 $item->helpText = $langs->transnoentities('HELLOASSO_FORM_MEMBERSHIP_SLUG_HELP');
-
+$item = $formSetup->newItem('HELLOASSO_FORM_PAGINATION_PAGES_SIZE');
+$item->helpText = $langs->transnoentities('HELLOASSO_FORM_PAGINATION_PAGES_SIZE_HELP');
+$item->defaultFieldValue = 20;
+$item = $formSetup->newItem('HELLOASSO_MAX_FORM_PAGINATION_PAGES');
+$item->helpText = $langs->transnoentities('HELLOASSO_MAX_FORM_PAGINATION_PAGES_HELP');
+$item->defaultFieldValue = 100;
 $setupnotempty += count($formSetup->items);
 
 $dirmodels = array_merge(array('/'), (array) $conf->modules_parts['models']);

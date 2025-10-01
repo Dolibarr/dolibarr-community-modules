@@ -58,6 +58,10 @@ HELLOASSO_FORM_MEMBERSHIP_SLUG=Live Membership form url
 HELLOASSO_FORM_MEMBERSHIP_SLUG_HELP=The live url of membership form to get information from. Must match Web address of your form in the HelloAsso account
 HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG=Test Membership form url
 HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG_HELP=The test url of membership form to get information from. Must match Web address of your form in the HelloAsso account
+HELLOASSO_FORM_PAGINATION_PAGES_SIZE=Maximum number of members fetched by pages
+HELLOASSO_FORM_PAGINATION_PAGES_SIZE_HELP=The maximum number of members fetched by pages when importing members from HelloAsso.
+HELLOASSO_FORM_PAGINATION_PAGES_SIZE=Maximum number of member pages to fetch
+HELLOASSO_FORM_PAGINATION_PAGES_SIZE_HELP=The maximum number of pages to fetch when importing members from HelloAsso.
 
 HelloAssoMemberTypeDictionary=Dictionary of HelloAsso and Dolibarr member type correspondence
 HelloAssoMemberCustomFieldDictionary=Dictionary of HelloAsso custom fields and Dolibarr field correspondence

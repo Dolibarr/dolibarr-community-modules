@@ -58,6 +58,10 @@ HELLOASSO_FORM_MEMBERSHIP_SLUG=URL du formulaire d'adhésion de production
 HELLOASSO_FORM_MEMBERSHIP_SLUG_HELP=L'URL de production du formulaire d'adhésion à partir duquel obtenir les informations. Elle doit correspondre à l'adresse Web de votre formulaire dans le compte HelloAsso.
 HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG=URL du formulaire d'adhésion de test
 HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG_HELP=URL de test du formulaire d'adhésion à partir duquel obtenir les informations. Doit correspondre à l'adresse Web de votre formulaire dans le compte HelloAsso.
+HELLOASSO_FORM_PAGINATION_PAGES_SIZE=Nombre maximal d'adherent récupérés par page
+HELLOASSO_FORM_PAGINATION_PAGES_SIZE_HELP=Nombre maximal d'adherents récupérés par les pages lors de l'importation d'adherent depuis HelloAsso.
+HELLOASSO_MAX_FORM_PAGINATION_PAGES=Nombre maximal de pages d'adherents à récupérer
+HELLOASSO_MAX_FORM_PAGINATION_PAGES_HELP=Nombre maximal de pages à récupérer lors de l'importation d'adherents depuis HelloAsso
 
 HelloAssoMemberTypeDictionary=Dictionnaire de correspondance des types de membres entre HelloAsso et Dolibarr
 HelloAssoMemberCustomFieldDictionary=Dictionnaire des correspondance des champs personnalisés d'HelloAsso et de Dolibarr
