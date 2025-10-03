@@ -120,3 +120,4 @@ HelloAssoExplanatoryText2=You don't have an account on HelloAsso, <a href="https
 HelloAssoExplanatoryText3=To get a HelloAsso test account, you must <a href="https://auth.helloasso.com/inscription" target="_blank">create another account here</a>
 Connected=Connected.
 LastRecordedToken=Last recorded token 
+HelloAssoMemberPaymentLabel=HelloAsso subscription payment n°%s
