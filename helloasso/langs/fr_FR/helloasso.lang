@@ -54,10 +54,10 @@ TestConnectionHelloasso=Tester la connexion
 
 TestGetMembersHelloasso=Tester l'obtention des adherent HelloAsso
 
-HELLOASSO_FORM_MEMBERSHIP_SLUG=URL du formulaire d'adhésion de production
-HELLOASSO_FORM_MEMBERSHIP_SLUG_HELP=L'URL de production du formulaire d'adhésion à partir duquel obtenir les informations. Elle doit correspondre à l'adresse Web de votre formulaire dans le compte HelloAsso.
-HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG=URL du formulaire d'adhésion de test
-HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG_HELP=URL de test du formulaire d'adhésion à partir duquel obtenir les informations. Doit correspondre à l'adresse Web de votre formulaire dans le compte HelloAsso.
+HELLOASSO_FORM_MEMBERSHIP_SLUG=Nom du formulaire d'adhésion de production
+HELLOASSO_FORM_MEMBERSHIP_SLUG_HELP=Nom du formulaire d'adhésion de production à partir duquel obtenir les informations. Elle doit correspondre à l'adresse Web de votre formulaire dans le compte HelloAsso.
+HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG=Nom du formulaire d'adhésion de test
+HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG_HELP=Nom du formulaire d'adhésion de test à partir duquel obtenir les informations. Doit correspondre à l'adresse Web de votre formulaire dans le compte HelloAsso.
 
 HelloAssoMemberTypeDictionary=Dictionnaire de correspondance des types de membres entre HelloAsso et Dolibarr
 HelloAssoMemberCustomFieldDictionary=Dictionnaire des correspondance des champs personnalisés d'HelloAsso et de Dolibarr
@@ -77,6 +77,18 @@ ErrorHelloAssoAddingCustomField=Erreur lors de l'ajout d'un champ personnalisé
 ErrorHelloAssoRemovingCustomField=Erreur lors de la suppression d'un champ personnalisé
 HelloAssoCustomFieldDictionaryAddedSucesfully=Champ personnalisé ajouté avec succès
 HelloAssoCustomFieldDictionaryRemovedSucesfully=Champ personnalisé supprimé avec succès
+HelloAssoDolibarrCorrespondenceParameters=Paramètres de correspondance entre HelloAsso et Dolibarr
+HelloAssoFormParameters=Paramètre du formulaire d'HelloAsso
+HelloAssoMemberTypeIdTitle=Identifiant du type d'adherent correspondant dans HelloAsso
+HelloAssoMemberTypeId=Identifiant du type d'adherent HelloAsso
+HelloAssoCustomField=Nom du champ personnalisé HelloAsso
+HelloAssoCustomFieldTitle=Nom du champ personnalisé correspondant dans HelloAsso
+HelloAssoSelectMemberType=Sélectionnez un type d'adherent Dolibarr
+HelloAssoSelectMemberField=Sélectionnez un champ de l'objet adherent de Dolibarr
+HelloAssoMemberTypeDictionaryHelp=Dictionnaire de correspondance entre les types de membres HelloAsso et Dolibarr. Si le dictionnaire reste vide, un nouveau type de membre sera créé dans Dolibarr. Pour trouver l'identifiant HelloAsso d'un membre, vous pouvez suivre la procédure expliquée dans le wiki du module HelloAsso.
+HelloAssoMemberCustomFieldDictionaryHelp=Dictionnaire des champs personnalisés HelloAsso et correspondance avec les champs Dolibarr.<br>Pour configurer un nouveau champ personnalisé. Sélectionnez un champ de l'objet membre Dolibarr et définissez le nom du champ HelloAsso correspondant dans le champ de saisie.
+ModuleHelloAssoMemberSyncDesc=Synchronisez les membres HelloAsso dans la base de données Dolibarr en créant des membres et des abonnements.
+HelloAssoSyncButtonDesc=Testez la synchronisation de vos membres avec votre application sans modifier vos données. <br>Une fois la configuration validée, vous pouvez automatiser la synchronisation dans le module Tâches planifiées avec la tâche HelloAssoGetNewMembers.
 
 HelloAssoRecordNotFound=Enregistrement introuvable
 

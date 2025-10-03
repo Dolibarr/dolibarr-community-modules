@@ -95,6 +95,10 @@ $setupnotempty = 0;
 // Set this to 1 to use the factory to manage constants. Warning, the generated module will be compatible with version v15+ only
 $useFormSetup = 1;
 
+if (!class_exists('Form')) {
+	require_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
+}
+$form = new Form($db);
 if (!class_exists('FormSetup')) {
 	require_once DOL_DOCUMENT_ROOT.'/core/class/html.formsetup.class.php';
 }
@@ -269,25 +273,23 @@ $head = helloassoAdminPrepareHead();
 print dol_get_fiche_head($head, 'member', $langs->trans($page_name), -1, "");
 
 // Setup page goes here
-echo '<span class="opacitymedium">'.$langs->trans("ModuleHelloAssoDesc").'</span><br><br>';
+echo '<span class="opacitymedium">'.$langs->trans("ModuleHelloAssoMemberSyncDesc").'</span><br><br>';
 echo '<div class="info">';
 echo $langs->trans("HelloAssoExplanatoryText");
 echo '<br>'.$langs->trans("HelloAssoExplanatoryText2");
 echo '<br>'.$langs->trans("HelloAssoExplanatoryText3");
 echo '</div><br><br>';
 
-print $formSetup->generateOutput(true);
+print load_fiche_titre($langs->trans("HelloAssoFormParameters"), '', '');
+print $formSetup->generateOutput(true, true);
 print '<br>';
 
+print load_fiche_titre($langs->trans("HelloAssoDolibarrCorrespondenceParameters"), '', '');
 
 print '<div class="div-table-responsive-no-min">';
 print '<table class="noborder centpercent">';
-print '<tr class="liste_titre">';
-print '<td>'.$langs->trans("Parameter").'</td>';
-print '<td class="right"></td>';
-print '</tr>';
 print '<tr class="oddeven nohover">';
-print '<td class="col-setup-title">'.$langs->trans("HelloAssoMemberTypeDictionary").'</td>';
+print '<td class="col-setup-title">'.$form->textwithpicto($langs->trans("HelloAssoMemberTypeDictionary"), $langs->trans("HelloAssoMemberTypeDictionaryHelp"), 1, 'help', 'valignmiddle', 0, 3, 'tooltipsselect_mapdolibarrhelloassomember').'</td>';
 print '<td>';
 
 print '<form name="formmembertype" action="'.$_SERVER["PHP_SELF"].'" method="POST">';
@@ -295,7 +297,7 @@ print '<input type="hidden" name="token" value="'.newToken().'">';
 print '<input type="hidden" name="action" value="addmembertype">';
 $membertypes = $staticmembertype->liste_array(1);
 print '<select id="select_mapdolibarrhelloassomember" class="flat minwidth300" name="select_mapdolibarrhelloassomember">';
-print '<option value="-1">&nbsp;</option>';
+print '<option value="-1">'.$langs->trans("HelloAssoSelectMemberType").'</option>';
 foreach ($membertypes as $key => $membertype) {
 	$disabled = in_array($key, $helloassomemberutils->helloasso_member_types) ? true : false;
 	$selected = GETPOST("select_mapdolibarrhelloassomember", 'int') == $key;
@@ -303,14 +305,13 @@ foreach ($membertypes as $key => $membertype) {
 }
 print '</select>';
 print ajax_combobox("select_mapdolibarrhelloassomember");
-print '<input name="input_mapdolibarrhelloassomember" id="input_mapdolibarrhelloassomember" pattern="^[0-9]+$" title="'.$langs->trans("HelloAssoInputId").'" value="'.GETPOST("input_mapdolibarrhelloassomember", "int").'">';
+print '<input name="input_mapdolibarrhelloassomember" id="input_mapdolibarrhelloassomember" placeholder="'.$langs->trans("HelloAssoMemberTypeId").'" pattern="^[0-9]+$" title="'.$langs->trans("HelloAssoMemberTypeIdTitle").'" value="'.GETPOST("input_mapdolibarrhelloassomember", "int").'">';
 print '<input type="submit" id="btn_mapdolibarrhelloassomember" name="btn_mapdolibarrhelloassomember" class="butAction small smallpaddingimp" value="'.$langs->trans("Add").'" disabled="">';
 print '</form>';
 print '<br>';
 
 print '<div class="div-table-responsive-no-min">';
 if (!empty($helloassomemberutils->helloasso_member_types)) {
-	print img_picto('', 'graph', 'class="pictofixedwidth"').$langs->trans("HierarchicView").'<br>';
 	print '<br>';
 	print '<ul>';
 	$mapping = $helloassomemberutils->helloasso_member_types;
@@ -326,13 +327,13 @@ print '</td>';
 print '</tr>';
 
 print '<tr class="oddeven nohover">';
-print '<td class="col-setup-title">'.$langs->trans("HelloAssoMemberCustomFieldDictionary").'</td>';
+print '<td class="col-setup-title">'.$form->textwithpicto($langs->trans("HelloAssoMemberCustomFieldDictionary"), $langs->trans("HelloAssoMemberCustomFieldDictionaryHelp"), 1, 'help', 'valignmiddle', 0, 3, 'tooltips_select_mapcutomfield').'</td>';
 print '<td>';
 print '<form name="formcustomfield" action="'.$_SERVER["PHP_SELF"].'" method="POST">';
 print '<input type="hidden" name="token" value="'.newToken().'">';
 print '<input type="hidden" name="action" value="addcustomfield">';
 print '<select id="select_mapcutomfield" class="flat minwidth300" name="select_mapcutomfield">';
-print '<option value="-1">&nbsp;</option>';
+print '<option value="-1">'.$langs->trans("HelloAssoSelectMemberField").'</option>';
 foreach ($helloassomemberutils->memberfields as $key => $field) {
 	$disabled = !empty($helloassomemberutils->customfields[$field]);
 	$selected = GETPOST("select_mapcutomfield") == $field;
@@ -340,13 +341,12 @@ foreach ($helloassomemberutils->memberfields as $key => $field) {
 }
 print '</select>';
 print ajax_combobox("select_mapcutomfield");
-print '<input name="input_mapcutomfield" id="input_mapcutomfield" title="'.$langs->trans("HelloAssoCustomFieldInput").'" value="'.GETPOST("input_mapcutomfield").'">';
+print '<input name="input_mapcutomfield" id="input_mapcutomfield" placeholder="'.$langs->trans("HelloAssoCustomField").'" title="'.$langs->trans("HelloAssoCustomFieldTitle").'" value="'.GETPOST("input_mapcutomfield").'">';
 print '<input type="submit" id="btn_mapcutomfield" name="btn_mmapcutomfield" class="butAction small smallpaddingimp" value="'.$langs->trans("Add").'" disabled="">';
 print '</form>';
 print '<br>';
 print '<div class="div-table-responsive-no-min">';
 if (!empty($helloassomemberutils->customfields)) {
-	print img_picto('', 'graph', 'class="pictofixedwidth"').$langs->trans("HierarchicView").'<br>';
 	print '<br>';
 	print '<ul>';
 	$mapping = $helloassomemberutils->customfields;
@@ -397,6 +397,15 @@ $(document).ready(function() {
 
 // Show info on connection
 $titlebutton = $langs->trans('TestGetMembersHelloasso');
+if ((float) DOL_VERSION >= 21) {
+	if (getDolGlobalString('HELLOASSO_LIVE')) {
+		$titlebutton .= ' (Live)';
+	} else {
+		$titlebutton .= ' (Test)';
+		dol_htmloutput_mesg($langs->trans('YouAreCurrentlyInSandboxMode', 'HelloAsso'), [], 'warning');
+	}
+}
+echo '<br><span class="">'.$langs->trans("HelloAssoSyncButtonDesc").'</span><br><br>';
 print dolGetButtonAction('', $titlebutton, 'default', $_SERVER["PHP_SELF"].'?action=test', '', 1, array('attr' => array('class' => 'reposition')));
 
 
