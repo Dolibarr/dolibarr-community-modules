@@ -3,15 +3,16 @@
 packages:
     - modulename: 'FacturX'
       label:
-        fr: 'Factur-X'
-        en: 'Factur-X'
-        de: 'ZUGFeRD'
-      status: 'disabled'		
+        fr: 'Factur-X (by CAP-REL)'
+        en: 'Factur-X (by CAP-REL)'
+        de: 'ZUGFeRD (by CAP-REL)'
+      status: 'enabled'
       git: 'https://inligit.fr/cap-rel/dolibarr/plugin-facturx.git'
-      current_version: '1.0.0'
-      dolibarrmin: 'auto'
+      cover: 'https://www.dolistore.com/wrapper.php?hashp=KOkM9ktPixXZY62rjv7J4oKjKV86704r'
+      current_version: '1.6.78'
+      dolibarrmin: '14.0'
       dolibarrmax: 'auto'
-      phpmin: 'auto'
+      phpmin: '7.3'
       phpmax: 'auto'
       # direct-download is yes if we can download the module to install it in application
       direct-download: no
