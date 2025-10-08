@@ -1,16 +1,22 @@
 
 packages:
     - modulename: 'FacturX'
+      author: 'CAP-REL'
       label:
-        fr: 'Factur-X'
-        en: 'Factur-X'
-        de: 'ZUGFeRD'
-      status: 'disabled'		
+        fr: 'Factur-X (by CAP-REL)'
+        en: 'Factur-X (by CAP-REL)'
+        de: 'ZUGFeRD (by CAP-REL)'
+      description:
+        fr: 'Ajoute à dolibarr la capacité de générer des factures au format FacturX (Facture électronique) : le fichier PDF est enrichi d’un fichier XML intégré.'
+        en: 'Adds to dolibarr the ability to generate invoices in FacturX format (Electronic Invoice): the PDF file is enriched with an integrated XML file.'
+        de: 'Fügt dolibarr die Fähigkeit hinzu, Rechnungen im Format XRechnung (Elektronische Rechnung) zu erstellen: Die PDF-Datei wird um eine eingebettete XML-Datei erweitert.'
+      status: 'enabled'
       git: 'https://inligit.fr/cap-rel/dolibarr/plugin-facturx.git'
-      current_version: '1.0.0'
-      dolibarrmin: ""
+      cover: 'https://www.dolistore.com/wrapper.php?hashp=KOkM9ktPixXZY62rjv7J4oKjKV86704r'
+      current_version: '1.6.78'
+      dolibarrmin: '14.0'
       dolibarrmax: "22.0"
-      phpmin: ""
+      phpmin: '7.3'
       phpmax: ""
       # direct-download is yes if we can download the module to install it in application
       direct-download: no
@@ -33,7 +39,7 @@ packages:
       category: '68, 67'
       git: 'https://github.com/Dolibarr/dolibarr-community-modules/tree/main/helloasso'
       cover: 'https://raw.githubusercontent.com/Dolibarr/dolibarr-community-modules/main/helloasso/cover.png'
-      current_version: "1.0"
+      current_version: "1.1"
       dolibarrmin: "21.0"
       dolibarrmax: "22.0"
       phpmin: "7.1"
