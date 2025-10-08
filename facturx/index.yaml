@@ -2,10 +2,15 @@
 
 packages:
     - modulename: 'FacturX'
+      author: 'CAP-REL'
       label:
         fr: 'Factur-X (by CAP-REL)'
         en: 'Factur-X (by CAP-REL)'
         de: 'ZUGFeRD (by CAP-REL)'
+      description:
+        fr: "Ajoute à dolibarr la capacité de générer des factures au format FacturX (Facture électronique) : le fichier PDF est enrichi d'un fichier XML intégré."
+        en: "Adds to dolibarr the ability to generate invoices in FacturX format (Electronic Invoice): the PDF file is enriched with an integrated XML file."
+        de: "Fügt dolibarr die Fähigkeit hinzu, Rechnungen im Format XRechnung (Elektronische Rechnung) zu erstellen: Die PDF-Datei wird um eine eingebettete XML-Datei erweitert."
       status: 'enabled'
       git: 'https://inligit.fr/cap-rel/dolibarr/plugin-facturx.git'
       cover: 'https://www.dolistore.com/wrapper.php?hashp=KOkM9ktPixXZY62rjv7J4oKjKV86704r'
