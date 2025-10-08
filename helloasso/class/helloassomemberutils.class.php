@@ -631,6 +631,8 @@ class HelloAssoMemberUtils
         if (getDolGlobalInt("HELLOASSO_FORM_CREATE_THIRDPARTY")) {
             $newthirdparty = new Societe($db);
             $newthirdparty->name = $newmember->user->firstName ." ". $newmember->user->lastName;
+            $newthirdparty->client = 1;
+            $newthirdparty->code_client = -1;
             $newthirdpartyid = $newthirdparty->create($user);
             if ($newthirdpartyid <= 0) {
                 $this->error = $newthirdparty->error;
