@@ -60,11 +60,11 @@ T:	https://github.com/DoliCloud/DoliMods/tree/master/htdocs/payplugdolicloud
 PEPPOL MODULE
 M:	Eric Seigne
 S:	Maintained
-F:	payplug/
+F:	peppol/
 T:	https://inligit.fr/cap-rel/dolibarr/plugin-peppol.git
 
 FACTURX MODULE
 M:	Eric Seigne
 S:	Maintained
-F:	payplug/
+F:	facturx/
 T:	https://inligit.fr/cap-rel/dolibarr/plugin-facturx.git
