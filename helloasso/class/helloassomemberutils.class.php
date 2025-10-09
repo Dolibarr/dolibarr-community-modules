@@ -292,7 +292,7 @@ class HelloAssoMemberUtils
                         $member->typeid = $dolibarrmembertype;
                         $result = $member->update($user);
                         if ($result <= 0) {
-                            $this->error = $membebr->error;
+                            $this->error = $member->error;
                             $this->errors = array_merge($this->errors, $member->errors);
                             return -3;
                         }
