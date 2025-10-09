@@ -1,15 +1,15 @@
-List of maintainers and how to submit kernel changes
+List of maintainers and how to submit module changes
 ====================================================
 
-This file is using the stnadard format for MAINTAINERS files.
+This file is using the standard format for MAINTAINERS files.
 You can find here the name of main maintainers of each module of this repository.
 
 Submission of patchs for code must be done using a PR at the repository system provided in the T entry in
-the list Maintener list lower.
+the list of Maintener at bottom of this file.
 
-Note that this is only list of a few modules validated by the Dolibarr foundation. Most modules are completely
-under control of their maintainers outside of this repository. See https://www.dolistore.com for a complete list
-of external modules.
+Note that this list is only a list of few modules qualified to be available as community modules. Most of 
+existing Dolibarr modules are not referenced here and completely under control of their maintainers, outside of
+this repository. See https://www.dolistore.com for a complete list of all Dolibarr external modules.
 
 
 Descriptions of section entries and preferred order
@@ -60,11 +60,11 @@ T:	https://github.com/DoliCloud/DoliMods/tree/master/htdocs/payplugdolicloud
 PEPPOL MODULE
 M:	Eric Seigne
 S:	Maintained
-F:	payplug/
+F:	peppol/
 T:	https://inligit.fr/cap-rel/dolibarr/plugin-peppol.git
 
 FACTURX MODULE
 M:	Eric Seigne
 S:	Maintained
-F:	payplug/
+F:	facturx/
 T:	https://inligit.fr/cap-rel/dolibarr/plugin-facturx.git

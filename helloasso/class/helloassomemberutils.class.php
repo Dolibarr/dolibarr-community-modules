@@ -27,6 +27,7 @@ require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
 include_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/adherents/class/adherent.class.php';
 require_once DOL_DOCUMENT_ROOT.'/adherents/class/adherent_type.class.php';
+require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
 dol_include_once('helloasso/lib/helloasso.lib.php');
 
 class HelloAssoMemberUtils
@@ -157,6 +158,9 @@ class HelloAssoMemberUtils
         } else {
             $db->rollback();
             if ($error) {
+                if (!empty($this->error)) {
+                    $this->errors[] = $this->error;
+                }
 				$errmsg = (implode(', ', $this->errors));
                 if ($mode != "cron") {
 		            setEventMessages($errmsg, null, 'errors');
@@ -328,11 +332,41 @@ class HelloAssoMemberUtils
                             $date_end_subscription = dol_time_plus_duree($date_start_subscription, $membertype->duration_value, $membertype->duration_unit);
                         }
                     }
-                    $result = $member->subscription($date_start_subscription, $amount, 0, '', '', '', '', '', $date_end_subscription, $dolibarrmembertype);
-                    if ($result <= 0) {
+                    $subscriptionid = $member->subscription($date_start_subscription, $amount, 0, '', '', '', '', '', $date_end_subscription, $dolibarrmembertype);
+                    if ($subscriptionid <= 0) {
                         $this->error = $member->error;
                         $this->errors = array_merge($this->errors, $member->errors);
                         return -6;
+                    }
+
+                    // Create new bank payment
+                    $bankaccountid = getDolGlobalInt('HELLOASSO_BANK_ACCOUNT_FOR_PAYMENTS');
+                    foreach ($newmember->payments as $key => $payment) {
+                        $paymentmethod = "";
+                        switch ($payment->paymentMeans) {
+                            case 'BankTransfer':
+                                $paymentmethod = "VIR";
+                                break;
+
+                            case 'Check':
+                                $paymentmethod = "CHQ";
+                                break;
+
+                            case 'Cash':
+                                $paymentmethod = "LIQ";
+                                break;
+
+                            default:
+                                $paymentmethod = "CB";
+                                break;
+                        }
+                        $label = $langs->transnoentitiesnoconv("HelloAssoMemberPaymentLabel", $payment->id);
+                        $result = $member->subscriptionComplementaryActions($subscriptionid, 'bankdirect', $bankaccountid, $date_start_subscription, $payment->date, $paymentmethod, $label, $payment->amount, '');
+                        if ($result <= 0) {
+                            $this->error = $member->error;
+                            $this->errors = array_merge($this->errors, $member->errors);
+                            return -6;
+                        }
                     }
                 }
             } else {
@@ -626,6 +660,21 @@ class HelloAssoMemberUtils
             }
             $createmember->login = $login;
         }
+
+        if (getDolGlobalInt("HELLOASSO_FORM_CREATE_THIRDPARTY")) {
+            $newthirdparty = new Societe($db);
+            $newthirdparty->name = $newmember->user->firstName ." ". $newmember->user->lastName;
+            $newthirdparty->client = 1;
+            $newthirdparty->code_client = -1;
+            $newthirdpartyid = $newthirdparty->create($user);
+            if ($newthirdpartyid <= 0) {
+                $this->error = $newthirdparty->error;
+                $this->errors = array_merge($this->errors, $newthirdparty->errors);
+                return -1;
+            }
+            $createmember->socid = $newthirdpartyid;
+        }
+
         $res = $createmember->create($user);
         if ($res <= 0) {
             $this->error = $createmember->error;

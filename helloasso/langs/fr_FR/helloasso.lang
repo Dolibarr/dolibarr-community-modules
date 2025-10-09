@@ -62,6 +62,8 @@ HELLOASSO_FORM_PAGINATION_PAGES_SIZE=Nombre maximal d'adherent récupérés par 
 HELLOASSO_FORM_PAGINATION_PAGES_SIZE_HELP=Nombre maximal d'adherents récupérés par les pages lors de l'importation d'adherent depuis HelloAsso.
 HELLOASSO_MAX_FORM_PAGINATION_PAGES=Nombre maximal de pages d'adherents à récupérer
 HELLOASSO_MAX_FORM_PAGINATION_PAGES_HELP=Nombre maximal de pages à récupérer lors de l'importation d'adherents depuis HelloAsso
+HELLOASSO_FORM_CREATE_THIRDPARTY=Activer la création du tiers lors de la synchronisation
+HELLOASSO_FORM_CREATE_THIRDPARTY_HELP=Active la création et la liaison d'un tiers lorsqu'un nouveau membre est synchronisé.
 
 HelloAssoMemberTypeDictionary=Dictionnaire de correspondance des types de membres entre HelloAsso et Dolibarr
 HelloAssoMemberCustomFieldDictionary=Dictionnaire des correspondance des champs personnalisés d'HelloAsso et de Dolibarr
@@ -123,4 +125,4 @@ HelloAssoExplanatoryText=Adhérer à HelloAsso, c'est adhérer à un système so
 HelloAssoExplanatoryText2=Vous n'avez pas de compte sur HelloAsso, <b><a href="https://auth.helloasso.com/inscription" target="_blank">créez votre compte en quelques minutes ici.</a></b><br><i>Si vous rencontrez des problèmes, n'hésitez pas à consulter <a href="https://centredaide.helloasso.com/s/" target="_blank">notre centre d'aide</a> ou à <a href="https://www.helloasso.com/contactez-nous" target="_blank">contactez-nous</a> directement.</i>
 HelloAssoExplanatoryText3=Pour créer un compte HelloAsso de test, vous devez <b><a href="https://auth.helloasso-sandbox.com/inscription" target="_blank">créer un autre compte ici</a></b>
 HelloAssoMembershipStatus=Statut de membre
-
+HelloAssoMemberPaymentLabel=Paiement d'adhésion HelloAsso n°%s

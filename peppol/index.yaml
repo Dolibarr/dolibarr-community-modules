@@ -2,6 +2,7 @@
 
 packages:
     - modulename: 'Peppol'
+      author: 'CAP-REL'
       label:
         fr: 'Peppol'
         en: 'Peppol'
