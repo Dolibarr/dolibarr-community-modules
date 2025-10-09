@@ -107,15 +107,7 @@ class ActionsHelloAsso extends CommonHookActions
 
 		/* print_r($parameters); print_r($object); echo "action: " . $action; */
 		if (in_array($parameters['currentcontext'], array('thirdpartylist'))) {		// do something only for the context 'somecontext1' or 'somecontext2'
-			$arrayfields = $parameters["arrayfields"];
-			if (!$error) {
-				$this->results = array('myreturn' => 999);
-				$this->resprints = 'A text to show';
-				return 0; // or return 1 to replace standard code
-			} else {
-				$this->errors[] = 'Error message';
-				return -1;
-			}
+			$parameters["arrayfields"]["hmember.status"] = array('label' => 'HelloAssoMembershipStatus', 'checked' => 1);
 		}
 
 		return 0;
@@ -960,7 +952,7 @@ class ActionsHelloAsso extends CommonHookActions
 	 */
 	public function printFieldListSelect($parameters, &$object, &$action, $hookmanager){
 		if (isModEnabled('helloasso') && $parameters["currentcontext"] == "thirdpartylist") {
-			$this->resprints = ", helloassoa.rowid as member_id";
+			$this->resprints = ", hmember.rowid as member_id, hmember.statut as member_status";
 		}
 		return 1;
 	}
@@ -976,7 +968,50 @@ class ActionsHelloAsso extends CommonHookActions
 	 */
 	public function printFieldListFrom($parameters, &$object, &$action, $hookmanager){
 		if (isModEnabled('helloasso') && $parameters["currentcontext"] == "thirdpartylist") {
-			$this->resprints = " LEFT JOIN ".MAIN_DB_PREFIX."adherent as helloassoa on (helloassoa.fk_soc = s.rowid)";
+			$this->resprints = " LEFT JOIN ".MAIN_DB_PREFIX."adherent as hmember on (hmember.fk_soc = s.rowid)";
+		}
+		return 1;
+	}
+
+	/**
+	 * Overloading the printFieldListOption function : replacing the parent's function with the one below
+	 *
+	 * @param   array           $parameters     Hook metadatas (context, etc...)
+	 * @param   CommonObject    $object         The object to process (an invoice if you are in invoice module, a propale in propale's module, etc...)
+	 * @param   string          $action         Current action (if set). Generally create or edit or null
+	 * @param   HookManager     $hookmanager    Hook manager propagated to allow calling another hook
+	 * @return  int                             Return integer < 0 on error, 0 on success, 1 to replace standard code
+	 */
+	public function printFieldListOption($parameters, &$object, &$action, $hookmanager){
+		if (isModEnabled('helloasso') && $parameters["currentcontext"] == "thirdpartylist") {
+			$arrayfields = $parameters["arrayfields"];
+			if (!empty($arrayfields["hmember.status"]['checked'])) {
+				$this->resprints = '<td class="liste_titre">';
+				$this->resprints .= '</td>';
+			}
+		}
+		return 1;
+	}
+
+	/**
+	 * Overloading the printFieldListOption function : replacing the parent's function with the one below
+	 *
+	 * @param   array           $parameters     Hook metadatas (context, etc...)
+	 * @param   CommonObject    $object         The object to process (an invoice if you are in invoice module, a propale in propale's module, etc...)
+	 * @param   string          $action         Current action (if set). Generally create or edit or null
+	 * @param   HookManager     $hookmanager    Hook manager propagated to allow calling another hook
+	 * @return  int                             Return integer < 0 on error, 0 on success, 1 to replace standard code
+	 */
+	public function printFieldListTitle($parameters, &$object, &$action, $hookmanager){
+ 		if (isModEnabled('helloasso') && $parameters["currentcontext"] == "thirdpartylist") {
+			$arrayfields = $parameters["arrayfields"];
+			$param = $parameters["param"];
+			$sortfield = $parameters["sortfield"];
+			$sortorder = $parameters["sortorder"];
+			if (!empty($arrayfields["hmember.status"]['checked'])) {
+				$this->resprints = getTitleFieldOfList($arrayfields['hmember.status']['label'], 0, $_SERVER["PHP_SELF"], 'hmember.statut', '', $param, '',$sortfield, $sortorder);
+				$parameters["totalarray"]['nbfield']++;
+			}
 		}
 		return 1;
 	}
@@ -992,20 +1027,23 @@ class ActionsHelloAsso extends CommonHookActions
 	 */
 	public function printFieldListValue($parameters, &$object, &$action, $hookmanager){
 		if (isModEnabled('helloasso') && $parameters["currentcontext"] == "thirdpartylist") {
-			require_once DOL_DOCUMENT_ROOT.'/adherents/class/adherent.class.php';
-        	$member = new Adherent($this->db);
-			$member_id = $parameters["obj"]->member_id;
-			if (!empty($member_id)) {
-				$res = $member->fetch($member_id);
-				if ($res <= 0) {
-					return -1;
+			$arrayfields = $parameters["arrayfields"];
+			if (!empty($arrayfields["hmember.status"]['checked'])) {
+				require_once DOL_DOCUMENT_ROOT.'/adherents/class/adherent.class.php';
+				$member = new Adherent($this->db);
+				$member_id = $parameters["obj"]->member_id;
+				if (!empty($member_id)) {
+					$res = $member->fetch($member_id);
+					if ($res <= 0) {
+						return -1;
+					}
+					$this->resprints = '<td class="center nowraponall">';
+					$this->resprints .= $member->getLibStatut(5);
+					$this->resprints .= '</td>';
+				} else {
+					$this->resprints = '<td class="center nowraponall">';
+					$this->resprints .= '</td>';
 				}
-				$this->resprints = '<td class="center nowraponall">';
-				$this->resprints .= $member->getLibStatut(5);
-				$this->resprints .= '</td>';
-			} else {
-				$this->resprints = '<td class="center nowraponall">';
-				$this->resprints .= '</td>';
 			}
 		}
 		return 1;
