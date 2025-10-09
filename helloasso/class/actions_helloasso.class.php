@@ -106,11 +106,8 @@ class ActionsHelloAsso extends CommonHookActions
 		$error = 0; // Error counter
 
 		/* print_r($parameters); print_r($object); echo "action: " . $action; */
-		if (in_array($parameters['currentcontext'], array('somecontext1', 'somecontext2'))) {		// do something only for the context 'somecontext1' or 'somecontext2'
-			foreach ($parameters['toselect'] as $objectid) {
-				// Do action on each object id
-			}
-
+		if (in_array($parameters['currentcontext'], array('thirdpartylist'))) {		// do something only for the context 'somecontext1' or 'somecontext2'
+			$arrayfields = $parameters["arrayfields"];
 			if (!$error) {
 				$this->results = array('myreturn' => 999);
 				$this->resprints = 'A text to show';
@@ -948,6 +945,68 @@ class ActionsHelloAsso extends CommonHookActions
 			$this->results['showonlinepaymenturl'] = isModEnabled('helloasso');
 		}else {
 			return -1;
+		}
+		return 1;
+	}
+
+	/**
+	 * Overloading the printFieldListSelect function : replacing the parent's function with the one below
+	 *
+	 * @param   array           $parameters     Hook metadatas (context, etc...)
+	 * @param   CommonObject    $object         The object to process (an invoice if you are in invoice module, a propale in propale's module, etc...)
+	 * @param   string          $action         Current action (if set). Generally create or edit or null
+	 * @param   HookManager     $hookmanager    Hook manager propagated to allow calling another hook
+	 * @return  int                             Return integer < 0 on error, 0 on success, 1 to replace standard code
+	 */
+	public function printFieldListSelect($parameters, &$object, &$action, $hookmanager){
+		if (isModEnabled('helloasso') && $parameters["currentcontext"] == "thirdpartylist") {
+			$this->resprints = ", helloassoa.rowid as member_id";
+		}
+		return 1;
+	}
+
+	/**
+	 * Overloading the printFieldListFrom function : replacing the parent's function with the one below
+	 *
+	 * @param   array           $parameters     Hook metadatas (context, etc...)
+	 * @param   CommonObject    $object         The object to process (an invoice if you are in invoice module, a propale in propale's module, etc...)
+	 * @param   string          $action         Current action (if set). Generally create or edit or null
+	 * @param   HookManager     $hookmanager    Hook manager propagated to allow calling another hook
+	 * @return  int                             Return integer < 0 on error, 0 on success, 1 to replace standard code
+	 */
+	public function printFieldListFrom($parameters, &$object, &$action, $hookmanager){
+		if (isModEnabled('helloasso') && $parameters["currentcontext"] == "thirdpartylist") {
+			$this->resprints = " LEFT JOIN ".MAIN_DB_PREFIX."adherent as helloassoa on (helloassoa.fk_soc = s.rowid)";
+		}
+		return 1;
+	}
+
+	/**
+	 * Overloading the printFieldListValue function : replacing the parent's function with the one below
+	 *
+	 * @param   array           $parameters     Hook metadatas (context, etc...)
+	 * @param   CommonObject    $object         The object to process (an invoice if you are in invoice module, a propale in propale's module, etc...)
+	 * @param   string          $action         Current action (if set). Generally create or edit or null
+	 * @param   HookManager     $hookmanager    Hook manager propagated to allow calling another hook
+	 * @return  int                             Return integer < 0 on error, 0 on success, 1 to replace standard code
+	 */
+	public function printFieldListValue($parameters, &$object, &$action, $hookmanager){
+		if (isModEnabled('helloasso') && $parameters["currentcontext"] == "thirdpartylist") {
+			require_once DOL_DOCUMENT_ROOT.'/adherents/class/adherent.class.php';
+        	$member = new Adherent($this->db);
+			$member_id = $parameters["obj"]->member_id;
+			if (!empty($member_id)) {
+				$res = $member->fetch($member_id);
+				if ($res <= 0) {
+					return -1;
+				}
+				$this->resprints = '<td class="center nowraponall">';
+				$this->resprints .= $member->getLibStatut(5);
+				$this->resprints .= '</td>';
+			} else {
+				$this->resprints = '<td class="center nowraponall">';
+				$this->resprints .= '</td>';
+			}
 		}
 		return 1;
 	}
