@@ -60,8 +60,10 @@ HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG=Test Membership form name
 HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG_HELP=The name of test membership form to get information from. Must match Web address of your form in the HelloAsso account
 HELLOASSO_FORM_PAGINATION_PAGES_SIZE=Maximum number of members fetched by pages
 HELLOASSO_FORM_PAGINATION_PAGES_SIZE_HELP=The maximum number of members fetched by pages when importing members from HelloAsso.
-HELLOASSO_FORM_PAGINATION_PAGES_SIZE=Maximum number of member pages to fetch
-HELLOASSO_FORM_PAGINATION_PAGES_SIZE_HELP=The maximum number of pages to fetch when importing members from HelloAsso.
+HELLOASSO_MAX_FORM_PAGINATION_PAGES=Maximum number of member pages to fetch
+HELLOASSO_MAX_FORM_PAGINATION_PAGES_HELP=The maximum number of pages to fetch when importing members from HelloAsso.
+HELLOASSO_FORM_CREATE_THIRDPARTY=Create and link a thirdparty to new member
+HELLOASSO_FORM_CREATE_THIRDPARTY_HELP=When a new member is synchronize, create a new thirdparty for this member and link it. 
 
 HelloAssoMemberTypeDictionary=Dictionary of HelloAsso and Dolibarr member type correspondence
 HelloAssoMemberCustomFieldDictionary=Dictionary of HelloAsso custom fields and Dolibarr field correspondence

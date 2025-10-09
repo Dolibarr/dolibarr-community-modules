@@ -27,6 +27,7 @@ require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
 include_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/adherents/class/adherent.class.php';
 require_once DOL_DOCUMENT_ROOT.'/adherents/class/adherent_type.class.php';
+require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
 dol_include_once('helloasso/lib/helloasso.lib.php');
 
 class HelloAssoMemberUtils
@@ -659,6 +660,21 @@ class HelloAssoMemberUtils
             }
             $createmember->login = $login;
         }
+
+        if (getDolGlobalInt("HELLOASSO_FORM_CREATE_THIRDPARTY")) {
+            $newthirdparty = new Societe($db);
+            $newthirdparty->name = $newmember->user->firstName ." ". $newmember->user->lastName;
+            $newthirdparty->client = 1;
+            $newthirdparty->code_client = -1;
+            $newthirdpartyid = $newthirdparty->create($user);
+            if ($newthirdpartyid <= 0) {
+                $this->error = $newthirdparty->error;
+                $this->errors = array_merge($this->errors, $newthirdparty->errors);
+                return -1;
+            }
+            $createmember->socid = $newthirdpartyid;
+        }
+
         $res = $createmember->create($user);
         if ($res <= 0) {
             $this->error = $createmember->error;

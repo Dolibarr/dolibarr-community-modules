@@ -117,6 +117,8 @@ $item->defaultFieldValue = 20;
 $item = $formSetup->newItem('HELLOASSO_MAX_FORM_PAGINATION_PAGES');
 $item->helpText = $langs->transnoentities('HELLOASSO_MAX_FORM_PAGINATION_PAGES_HELP');
 $item->defaultFieldValue = 100;
+$item = $formSetup->newItem('HELLOASSO_FORM_CREATE_THIRDPARTY')->setAsYesNo();
+$item->helpText = $langs->transnoentities('HELLOASSO_FORM_CREATE_THIRDPARTY_HELP');
 $setupnotempty += count($formSetup->items);
 
 $dirmodels = array_merge(array('/'), (array) $conf->modules_parts['models']);
