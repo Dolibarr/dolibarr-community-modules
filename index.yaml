@@ -1,6 +1,7 @@
 
 packages:
-    - modulename: 'Facturx'			# Must match the value in file name of the descriptor of the module
+    # modulename must match the value in file name of the descriptor of the module
+    - modulename: 'Facturx'
       author: 'CAP-REL'
       author_url: 'https://cap-rel.fr'
       label:
