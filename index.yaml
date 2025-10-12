@@ -53,6 +53,7 @@ packages:
       dolibarrmax: "22.0"
       phpmin: "7.1"
       phpmax: "8.4"
+      price: 0
       # direct-download is yes if we can download the module to install it in application
       direct-download: yes
       # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
@@ -76,6 +77,7 @@ packages:
       dolibarrmax: "22.0"
       phpmin: '7.1'
       phpmax: '8.4'
+      price: 0
       created_at: '2025-03-05'
       last_updated_at: "2025-10-10"
       # direct-download is yes if we can download the module to install it in application

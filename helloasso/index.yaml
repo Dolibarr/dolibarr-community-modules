@@ -23,6 +23,7 @@ packages:
       dolibarrmax: 'auto'
       phpmin: 'auto'
       phpmax: 'auto'
+      price: 0
       # direct-download is yes if we can download the module to install it in application
       direct-download: yes
       # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
