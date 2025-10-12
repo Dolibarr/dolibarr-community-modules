@@ -1,7 +1,8 @@
 
 packages:
-    - modulename: 'FacturX'
+    - modulename: 'Facturx'			# Must match the value in file name of the descriptor of the module
       author: 'CAP-REL'
+      author_url: 'https://cap-rel.fr'
       label:
         fr: 'Factur-X (by CAP-REL)'
         en: 'Factur-X (by CAP-REL)'
@@ -11,12 +12,17 @@ packages:
         en: 'Adds to dolibarr the ability to generate invoices in FacturX format (Electronic Invoice): the PDF file is enriched with an integrated XML file.'
         de: 'Fügt dolibarr die Fähigkeit hinzu, Rechnungen im Format XRechnung (Elektronische Rechnung) zu erstellen: Die PDF-Datei wird um eine eingebettete XML-Datei erweitert.'
       status: 'enabled'
+      created_at: '2024-12-10'
+      last_updated_at: "2025-09-29"
+      # The git url, stable branch and system to get the sources and guess all auto value
       git: 'https://inligit.fr/cap-rel/dolibarr/plugin-facturx.git'
+      git-branch: 'master'
+      git-system: 'gitlab'
       cover: 'https://www.dolistore.com/wrapper.php?hashp=KOkM9ktPixXZY62rjv7J4oKjKV86704r'
-      current_version: '1.6.78'
-      dolibarrmin: '14.0'
+      current_version: "1.6.78"
+      dolibarrmin: "10.0"
       dolibarrmax: "22.0"
-      phpmin: '7.3'
+      phpmin: "7.3"
       phpmax: ""
       # direct-download is yes if we can download the module to install it in application
       direct-download: no
@@ -27,6 +33,7 @@ packages:
 
     - modulename: 'HelloAsso'
       author: 'Dolicloud'
+      author_url: 'https://www.dolicloud.com'
       label:
         fr: 'HelloAsso (by DoliCloud)'
         en: 'HelloAsso (by DoliCloud)'
@@ -35,9 +42,11 @@ packages:
         en: 'Provides a way to make an online checkout of any membership dues, donation, customer invoice or customer order with the HelloAsso API.'
       status: 'enabled'		
       created_at: '2024-12-10'
-      last_updated_at: ""
+      last_updated_at: "2025-10-10"
       category: '68, 67'
       git: 'https://github.com/Dolibarr/dolibarr-community-modules/tree/main/helloasso'
+      git-branch: 'main'
+      git-system: 'github'
       cover: 'https://raw.githubusercontent.com/Dolibarr/dolibarr-community-modules/main/helloasso/cover.png'
       current_version: "1.1"
       dolibarrmin: "21.0"
@@ -52,18 +61,23 @@ packages:
       dolistore-download: https://www.dolistore.com/product.php?id=2332
 
     - modulename: 'PayplugDolicloud'
+      author: 'Dolicloud'
+      author_url: 'https://www.dolicloud.com'
       label:
         fr: 'PayPlug (by DoliCloud)'
         en: 'PayPlug (by DoliCloud)'
       status: 'enabled'	
       git: 'https://github.com/DoliCloud/DoliMods/tree/master/htdocs/payplugdolicloud'
+      git-branch: 'master'
+      git-system: 'github'
       cover: 'https://raw.githubusercontent.com/DoliCloud/DoliMods/refs/heads/master/htdocs/payplugdolicloud/img/object_payplugdolicloud.png'
       current_version: '1.0.0'
       dolibarrmin: '21.0'
       dolibarrmax: "22.0"
       phpmin: '7.1'
       phpmax: '8.4'
-      last_updated_at: ""
+      created_at: '2025-03-05'
+      last_updated_at: "2025-10-10"
       # direct-download is yes if we can download the module to install it in application
       direct-download: no
       # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
@@ -73,17 +87,21 @@ packages:
       dolistore-download: ''
 
     - modulename: 'Peppol'
-      author: 'CAP-REL'	
+      author: 'CAP-REL'
+      author_url: 'https://cap-rel.fr' 
       label:
         fr: 'Peppol'
         en: 'Peppol'
       git: 'https://inligit.fr/cap-rel/dolibarr/plugin-peppol.git'
+      git-branch: 'master'
+      git-system: 'gitlab'	  
       status: 'disabled'	
-      current_version: ""
-      dolibarrmin: ""
+      current_version: "1.2.27"
+      dolibarrmin: "10.0"
       dolibarrmax: "22.0"
-      phpmin: ""
+      phpmin: "7.1"
       phpmax: ""
+      last_updated_at: "2025-10-11"
       # direct-download is yes if we can download the module to install it in application
       direct-download: no
       # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically

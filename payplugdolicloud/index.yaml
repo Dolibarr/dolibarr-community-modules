@@ -3,11 +3,14 @@
 packages:
     - modulename: 'PayplugDolicloud'
       author: 'Dolicloud'
+      author_url: 'https://www.dolicloud.com'
       label:
         fr: 'PayPlug (by DoliCloud)'
         en: 'PayPlug (by DoliCloud)'
       status: 'enabled'	
       git: 'https://github.com/DoliCloud/DoliMods/tree/master/htdocs/payplugdolicloud'
+      git-branch: 'master'
+      git-system: 'github'
       cover: 'https://raw.githubusercontent.com/DoliCloud/DoliMods/refs/heads/master/htdocs/payplugdolicloud/img/object_payplugdolicloud.png'
       current_version: '1.0.0'
       dolibarrmin: '21.0'

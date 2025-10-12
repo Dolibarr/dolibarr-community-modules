@@ -98,7 +98,7 @@ function completAutoTags($content, $modulePath) {
     // Look for missing auto tags in the module's core class file
 	$DOLIBARRMAXBYDEFAULT = '22.0';
 
-    $tags = array(
+    $tagsToExtractFromDescriptor = array(
         'current_version'   => 'version',
         'dolibarrmin'       => 'need_dolibarr_version',
         'dolibarrmax'       => 'max_dolibarr_version',
@@ -116,7 +116,7 @@ function completAutoTags($content, $modulePath) {
 		return -1;
 	}
 
-	// Set the name of the descriptor module file
+	// Set the name of the local descriptor module file
     $coreClassFile = $modulePath . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'modules' . DIRECTORY_SEPARATOR . 'mod' . $modulename . '.class.php';
 
     /**
@@ -135,6 +135,26 @@ function completAutoTags($content, $modulePath) {
 
     print "Process module path: ".$modulePath."\n";
 
+    $git = '';
+    $gitbranch = '';
+	$gitsystem = '';
+
+   	// We extract data fro mthe YAML file
+   	$reg = array();
+	if (preg_match('/git:\s*[\'"]([^\'"]+)[\'"]/', $content, $reg)) {
+		$git = $reg[1];
+	}
+	if (empty($git)) {
+		print "Can't extract git url from yaml file\n";
+		return -1;
+	}
+	if (preg_match('/git-branch:\s*[\'"]([^\'"]+)[\'"]/', $content, $reg)) {
+   		$gitbranch = $reg[1];
+	}
+	if (preg_match('/git-system:\s*[\'"]([^\'"]+)[\'"]/', $content, $reg)) {
+   		$gitsystem = $reg[1];
+	}
+
     $coreClassContent = '';
     if (file_exists($coreClassFile)) {
     	print "Try to get local content of descriptor file ".$coreClassFile."\n";
@@ -142,30 +162,32 @@ function completAutoTags($content, $modulePath) {
         //print "Core class file content:\n$coreClassContent\n";
     } else {
     	// Try do get remote content.
-    	$git = '';
-		$reg = array();
-		if (preg_match('/git:\s*[\'"]([^\'"]+)[\'"]/', $content, $reg)) {
-			$git = $reg[1];
-		}
-		if (empty($git)) {
-			print "Can't extract git url from yaml file\n";
-			return -1;
+		// Define the URL to get the descriptor file.
+		// For github sources
+		if (empty($gitsystem) || $gitsystem == 'github') {
+	    	$urltoget = preg_replace('/https:\/\/github.com/', 'https://raw.githubusercontent.com', $git);
+    		$urltoget = preg_replace('/\/tree\//', '/refs/heads/', $urltoget);
+    		$urltoget .= '/core/modules/mod'.$modulename.'.class.php';
+		} elseif ($gitsystem == 'gitlab') {
+			$urltoget = preg_replace('/\.git$/', '/-/raw/'.$gitbranch, $git);
+    		$urltoget .= '/core/modules/mod'.$modulename.'.class.php';
+    		$urltoget .= '?inline=false';
+    		// Example: 'https://mydomain.com/accoun/project/repo/-/blob/master/core/modules/modFacturx.class.php?ref_type=heads'
 		}
 
-    	$urltoget = preg_replace('/https:\/\/github.com/', 'https://raw.githubusercontent.com', $git);
-    	$urltoget = preg_replace('/\/tree\//', '/refs/heads/', $urltoget);
-    	$urltoget .= '/core/modules/mod'.$modulename.'.class.php';
-    	print "Try to get remote content of descriptor file ".$urltoget."\n";
+    	print "Try to get remote content of descriptor file ".$urltoget." (url guessed from ".$git.")\n";
 		$coreClassContent = file_get_contents($urltoget);
 		if (empty($coreClassContent)) {
-			print "Failed to get remote content\n";
+			print "Failed to get remote content descriptor file.\n";
 			return -1;
+		} else {
+			print "Success in getting remote content descriptor file.\n";
 		}
     }
 
     if ($coreClassContent) {
-    	// Update tags with a corresponding value into the descriptor file
-        foreach ($tags as $tag => $property) {
+    	// Update tags with a corresponding value found into the descriptor file
+        foreach ($tagsToExtractFromDescriptor as $tag => $property) {
         	if (preg_match('/(' . preg_quote($tag) . ':\s*)["\']?auto["\']?/', $content)) {	// If the key: is 'auto'
 	            $value = '';
 
@@ -185,9 +207,15 @@ function completAutoTags($content, $modulePath) {
 	            }
 
                 // Clean version x.y.z into x.y
-                if (preg_match('/^(\d+\.\d+)\.[\-\d\*]+$/', $value, $reg)) {
-                	$value = $reg[1];
-                }
+	            if (in_array($tag, array('dolibarrmin', 'dolibarrmax', 'phpmin', 'phpmax'))) {
+	                if (preg_match('/^(\d+\.\d+)\.[\-\d\*]+$/', $value, $reg)) {
+	                	$value = $reg[1];
+	                }
+	                // Clean version x.-y into x.0
+	                if (preg_match('/^(\d+)\.\-\d+.*$/', $value, $reg)) {
+	                	$value = $reg[1].'.0';
+	                }
+	            }
 
 	            if (!empty($value)) {
 	                // Replace "auto" with the found value
@@ -208,13 +236,58 @@ function completAutoTags($content, $modulePath) {
         	}
         }
 
+        // Now udate the created_at
+
         // Now udate the last_updated_at
         $tag = 'last_updated_at';
         if (preg_match('/(' . preg_quote($tag) . ':\s*)["\']?auto["\']?/', $content)) {	// If the key: is 'auto'
-	    	print "Update the last_updated_at\n";
 	    	$value = "";
+			$urltoget = "";
+
 	    	// TODO Try to guess value from git sources
-    	    $content = preg_replace('/(' . preg_quote($tag) . ':\s*)["\']?auto["\']?/', "$1\"$value\"", $content);
+	    	if (empty($gitsystem) || $gitsystem == 'github') {
+		    	$urltoget = preg_replace('/https:\/\/github.com/', 'https://api.github.com/repos', $git);
+	    		$urltoget = preg_replace('/\/tree\/.*$/', '/commits?per_page=1&sha='.$gitbranch, $urltoget);
+			} elseif ($gitsystem == 'gitlab') {
+				$urltoget = preg_replace('/\.git$/', '/-/commits/'.$gitbranch.'?format=atom', $git);
+				//$urltoget = ' https://inligit.fr/cap-rel/dolibarr/plugin-peppol/-/raw/master/core/modules/modPeppol.class.php?inline=false https://gitlab.com/api/v4/projects/cap-rel/repository/commits?per_page=1&ref_name=$branch";
+	    		// Example: 'https://mydomain.com/accoun/project/repo/-/blob/master/core/modules/modFacturx.class.php?ref_type=heads'
+			}
+
+			$commitContent = '';
+	    	if ($urltoget) {
+		    	print "Try to get remote commit list from ".$urltoget." (url guessed from ".$git.")\n";
+
+		    	$options = [
+				    "http" => [
+        				"header" => "User-Agent: Update-Repo script\r\n\r\n"
+    					]
+					];
+				$context = stream_context_create($options);
+
+				$commitContent = file_get_contents($urltoget, false, $context);
+				if (empty($commitContent)) {
+					print "Failed to get remote commit list.\n";
+					return -1;
+				} else {
+					print "Success in getting remote commit list.\n";
+
+		    	    if (empty($gitsystem) || $gitsystem == 'github') {
+		    	    	$commitContentarray = json_decode($commitContent);
+		    	    	$datestring = $commitContentarray[0]->commit->committer->date;
+					} elseif ($gitsystem == 'gitlab') {
+						$xml = simplexml_load_string($commitContent);
+						if ($xml) {
+							$datestring = $xml->entry[0]->updated;
+						}
+					}
+					$datestring = preg_replace('/T.*$/', '', $datestring);
+					print "Replaced auto for '".$tag."' with value: ".$datestring."\n";
+
+					// Replace "auto" with the found value
+					$content = preg_replace('/(' . preg_quote($tag) . ':\s*)["\']?auto["\']?/', "$1\"".$datestring."\"", $content);
+				}
+	    	}
         }
     } else {
         print "Core class file does not exist: $coreClassFile\n";

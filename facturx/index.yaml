@@ -1,8 +1,9 @@
 # This is the YAML file to describe the location modules
 
 packages:
-    - modulename: 'FacturX'
+    - modulename: 'Facturx'			# Must match the value in file name of the descriptor of the module
       author: 'CAP-REL'
+      author_url: 'https://cap-rel.fr'
       label:
         fr: 'Factur-X (by CAP-REL)'
         en: 'Factur-X (by CAP-REL)'
@@ -12,12 +13,17 @@ packages:
         en: "Adds to dolibarr the ability to generate invoices in FacturX format (Electronic Invoice): the PDF file is enriched with an integrated XML file."
         de: "Fügt dolibarr die Fähigkeit hinzu, Rechnungen im Format XRechnung (Elektronische Rechnung) zu erstellen: Die PDF-Datei wird um eine eingebettete XML-Datei erweitert."
       status: 'enabled'
+      created_at: '2024-12-10'
+      last_updated_at: 'auto'
+      # The git url, stable branch and system to get the sources and guess all auto value
       git: 'https://inligit.fr/cap-rel/dolibarr/plugin-facturx.git'
+      git-branch: 'master'
+      git-system: 'gitlab'
       cover: 'https://www.dolistore.com/wrapper.php?hashp=KOkM9ktPixXZY62rjv7J4oKjKV86704r'
-      current_version: '1.6.78'
-      dolibarrmin: '14.0'
+      current_version: 'auto'
+      dolibarrmin: 'auto'
       dolibarrmax: 'auto'
-      phpmin: '7.3'
+      phpmin: 'auto'
       phpmax: 'auto'
       # direct-download is yes if we can download the module to install it in application
       direct-download: no
