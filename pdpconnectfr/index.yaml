@@ -2,21 +2,21 @@
 
 packages:
     - modulename: 'PDPConnectFR'
-      author: 'Dolicloud'
-      author_url: 'https://www.dolicloud.com'
+      author: 'Dolibarr foundation'
+      author_url: 'https://www.dolibarr.org'
       label:
         fr: 'PDP Connect (France)'
         en: 'PDP Connect (France)'
       description:
-        fr: "Offre une solution pour réaliser un paiement en ligne pour toute cotisation d'adhésion, don, facture client ou commande client via l'API HelloAsso."
-        en: "Provides a way to make an online checkout of any membership dues, donation, customer invoice or customer order with the HelloAsso API."
+        fr: "Offre une solution pour connecter votre Dolibarr à une Plateforme de Dématérialisé Partenaire (aussi appelé Plateforme Agréée) afin d''envoyer et recevoir les factures au format Electronique. Inclut la lecture et génération de factures au format FacturX."
+        en: "Offers a solution to connect your Dolibarr to a Partner Dematerialized Platform (also called Approved Platform) in order to send and receive invoices in electronic format. Includes reading and generation of invoices in FacturX format."
       status: 'soon'	
       git: 'https://github.com/Dolibarr/dolibarr-community-modules/tree/master/htdocs/pdpconnectfr'
       git-branch: 'main'
       git-system: 'github'
       cover: 'https://raw.githubusercontent.com/Dolibarr/dolibarr-community-modules/refs/heads/master/htdocs/pdpconnectfr/img/object_pdpconnectfr.png'
       current_version: '0.0.1'
-      dolibarrmin: '22.0'
+      dolibarrmin: 'auto'
       dolibarrmax: 'auto'
       phpmin: 'auto'
       phpmax: 'auto'

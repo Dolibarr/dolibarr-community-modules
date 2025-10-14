@@ -5,7 +5,7 @@ packages:
       author: 'Dolicloud'
       author_url: 'https://www.dolicloud.com'
       label:
-        fr: "HelloAsso (by DoliCloud)"
+        fr: "HelloAsso (par DoliCloud)"
         en: "HelloAsso (by DoliCloud)"
       description:
         fr: "Offre une solution pour réaliser un paiement en ligne pour toute cotisation d'adhésion, don, facture client ou commande client via l'API HelloAsso."

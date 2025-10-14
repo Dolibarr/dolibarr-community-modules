@@ -6,7 +6,7 @@ packages:
       author: 'CAP-REL'
       author_url: 'https://cap-rel.fr'
       label:
-        fr: 'Factur-X (by CAP-REL)'
+        fr: 'Factur-X (par CAP-REL)'
         en: 'Factur-X (by CAP-REL)'
         de: 'ZUGFeRD (by CAP-REL)'
       description:

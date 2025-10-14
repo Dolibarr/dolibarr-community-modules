@@ -5,7 +5,7 @@ packages:
       author: 'CAP-REL'
       author_url: 'https://cap-rel.fr'
       label:
-        fr: 'Factur-X (by CAP-REL)'
+        fr: 'Factur-X (par CAP-REL)'
         en: 'Factur-X (by CAP-REL)'
         de: 'ZUGFeRD (by CAP-REL)'
       description:
@@ -36,20 +36,20 @@ packages:
       author: 'Dolicloud'
       author_url: 'https://www.dolicloud.com'
       label:
-        fr: 'HelloAsso (by DoliCloud)'
+        fr: 'HelloAsso (par DoliCloud)'
         en: 'HelloAsso (by DoliCloud)'
       description:
         fr: 'Offre une solution pour réaliser un paiement en ligne pour toute cotisation d’adhésion, don, facture client ou commande client via l’API HelloAsso.'
         en: 'Provides a way to make an online checkout of any membership dues, donation, customer invoice or customer order with the HelloAsso API.'
       status: 'enabled'		
       created_at: '2024-12-10'
-      last_updated_at: "2025-10-12"
+      last_updated_at: "2025-10-14"
       category: '68, 67'
       git: 'https://github.com/Dolibarr/dolibarr-community-modules/tree/main/helloasso'
       git-branch: 'main'
       git-system: 'github'
       cover: 'https://raw.githubusercontent.com/Dolibarr/dolibarr-community-modules/main/helloasso/cover.png'
-      current_version: "1.1"
+      current_version: "2.0"
       dolibarrmin: "21.0"
       dolibarrmax: "22.0"
       phpmin: "7.1"
@@ -66,7 +66,7 @@ packages:
       author: 'Dolicloud'
       author_url: 'https://www.dolicloud.com'
       label:
-        fr: 'PayPlug (by DoliCloud)'
+        fr: 'PayPlug (par DoliCloud)'
         en: 'PayPlug (by DoliCloud)'
       status: 'enabled'	
       git: 'https://github.com/DoliCloud/DoliMods/tree/master/htdocs/payplugdolicloud'
@@ -80,7 +80,37 @@ packages:
       phpmax: '8.4'
       price: 0
       created_at: '2025-03-05'
-      last_updated_at: "2025-10-10"
+      last_updated_at: "2025-10-13"
+      # direct-download is yes if we can download the module to install it in application
+      direct-download: no
+      # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
+      dolistore-upload: 'manual'
+      # dolistore-download is url of product page for download if module can also be found on dolistore.com
+      # Example: https://www.dolistore.com/product.php?id=xxx
+      dolistore-download: ''
+
+    - modulename: 'PDPConnectFR'
+      author: 'Dolibarr foundation'
+      author_url: 'https://www.dolibarr.org'
+      label:
+        fr: 'PDP Connect (France)'
+        en: 'PDP Connect (France)'
+      description:
+        fr: 'Offre une solution pour connecter votre Dolibarr à une Plateforme de Dématérialisé Partenaire (aussi appelé Plateforme Agréée) afin d’’envoyer et recevoir les factures au format Electronique. Inclut la lecture et génération de factures au format FacturX.'
+        en: 'Offers a solution to connect your Dolibarr to a Partner Dematerialized Platform (also called Approved Platform) in order to send and receive invoices in electronic format. Includes reading and generation of invoices in FacturX format.'
+      status: 'soon'	
+      git: 'https://github.com/Dolibarr/dolibarr-community-modules/tree/master/htdocs/pdpconnectfr'
+      git-branch: 'main'
+      git-system: 'github'
+      cover: 'https://raw.githubusercontent.com/Dolibarr/dolibarr-community-modules/refs/heads/master/htdocs/pdpconnectfr/img/object_pdpconnectfr.png'
+      current_version: '0.0.1'
+      dolibarrmin: "19.0"
+      dolibarrmax: "22.0"
+      phpmin: "7.1"
+      phpmax: ""
+      price: 0
+      created_at: '2025-10-10'
+      last_updated_at: "2025-10-14"
       # direct-download is yes if we can download the module to install it in application
       direct-download: no
       # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
@@ -104,7 +134,7 @@ packages:
       dolibarrmax: "22.0"
       phpmin: "7.1"
       phpmax: ""
-      last_updated_at: "2025-10-11"
+      last_updated_at: "2025-10-14"
       # direct-download is yes if we can download the module to install it in application
       direct-download: no
       # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically

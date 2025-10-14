@@ -185,6 +185,9 @@ function completAutoTags($content, $modulePath) {
 		}
     }
 
+	$coreClassContent = preg_replace('/^\s*\/\/.*$/m', '', $coreClassContent);
+
+
     if ($coreClassContent) {
     	// Update tags with a corresponding value found into the descriptor file
         foreach ($tagsToExtractFromDescriptor as $tag => $property) {
@@ -313,7 +316,7 @@ if (substr($sapi_type, 0, 3) == 'cgi') {
 
 if (empty($argv[1])) {
 	print "Usage:   ".$script_file." index|dolistore\n";
-	print "Example: ".$script_file." index      to rebuild the index.yaml file (used by Dolibarr to scan community modules)\n";
+	print "Example: ".$script_file." index      to rebuild the index.yaml file (used by Dolibarr to retreive list of community modules)\n";
 	print "Example: ".$script_file." dolistore  to regenerate zip of packages and publish them on dolistore\n";
 	exit(1);
 }

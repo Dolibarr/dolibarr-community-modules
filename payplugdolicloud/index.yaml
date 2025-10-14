@@ -5,7 +5,7 @@ packages:
       author: 'Dolicloud'
       author_url: 'https://www.dolicloud.com'
       label:
-        fr: 'PayPlug (by DoliCloud)'
+        fr: 'PayPlug (par DoliCloud)'
         en: 'PayPlug (by DoliCloud)'
       status: 'enabled'	
       git: 'https://github.com/DoliCloud/DoliMods/tree/master/htdocs/payplugdolicloud'
