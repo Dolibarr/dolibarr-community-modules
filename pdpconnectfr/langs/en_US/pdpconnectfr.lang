@@ -1,0 +1,49 @@
+# Translation file
+
+#
+# Generic
+#
+
+# Module label 'ModulePDPConnectFRName'
+ModulePDPConnectFRName = PDPConnectFR
+# Module description 'ModulePDPConnectFRDesc'
+ModulePDPConnectFRDesc = PDPConnectFR description
+
+#
+# Admin page
+#
+PDPConnectFRSetup = PDPConnectFR setup
+Settings = Settings
+PDPConnectFRSetupPage = PDPConnectFR setup page
+NewSection=New section
+PDPCONNECTFR_MYPARAM1 = My param 1
+PDPCONNECTFR_MYPARAM1Tooltip = My param 1 tooltip
+PDPCONNECTFR_MYPARAM2=My param 2
+PDPCONNECTFR_MYPARAM2Tooltip=My param 2 tooltip
+
+
+#
+# About page
+#
+About = About
+PDPConnectFRAbout = About PDPConnectFR
+PDPConnectFRAboutPage = PDPConnectFR about page
+
+#
+# Sample page
+#
+PDPConnectFRArea = Home PDPConnectFR
+MyPageName = My page name
+
+#
+# Sample widget
+#
+MyWidget = My widget
+MyWidgetDescription = My widget description
+
+PDPCONNECTFR_LIVE=Live mode enabled (otherwise test/sandbox mode)
+PDPCONNECTFR_PDP=Select your PDP provider
+PDPCONNECTFR_USERNAME=API username
+PDPCONNECTFR_PASSWORD=API password
+PDPCONNECTFR_TOKEN=Access token
+tokenForcedValue=Generate a token and test the connection
