@@ -99,10 +99,10 @@ packages:
         fr: 'Offre une solution pour connecter votre Dolibarr à une Plateforme de Dématérialisé Partenaire (aussi appelé Plateforme Agréée) afin d’’envoyer et recevoir les factures au format Electronique. Inclut la lecture et génération de factures au format FacturX.'
         en: 'Offers a solution to connect your Dolibarr to a Partner Dematerialized Platform (also called Approved Platform) in order to send and receive invoices in electronic format. Includes reading and generation of invoices in FacturX format.'
       status: 'soon'	
-      git: 'https://github.com/Dolibarr/dolibarr-community-modules/tree/master/htdocs/pdpconnectfr'
+      git: 'https://github.com/Dolibarr/dolibarr-community-modules/tree/main/pdpconnectfr'
       git-branch: 'main'
       git-system: 'github'
-      cover: 'https://raw.githubusercontent.com/Dolibarr/dolibarr-community-modules/refs/heads/master/htdocs/pdpconnectfr/img/object_pdpconnectfr.png'
+      cover: 'https://raw.githubusercontent.com/Dolibarr/dolibarr-community-modules/refs/heads/main/pdpconnectfr/img/object_pdpconnectfr.png'
       current_version: '0.0.1'
       dolibarrmin: "19.0"
       dolibarrmax: "22.0"
