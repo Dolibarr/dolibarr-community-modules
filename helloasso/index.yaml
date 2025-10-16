@@ -8,8 +8,8 @@ packages:
         fr: "HelloAsso (par DoliCloud)"
         en: "HelloAsso (by DoliCloud)"
       description:
-        fr: "Offre une solution pour réaliser un paiement en ligne pour toute cotisation d'adhésion, don, facture client ou commande client via l'API HelloAsso."
-        en: "Provides a way to make an online checkout of any membership dues, donation, customer invoice or customer order with the HelloAsso API."
+        fr: "Offre une solution pour réaliser un paiement en ligne pour toute cotisation d'adhésion à une association, don, facture client ou commande client via l'API HelloAsso. Offre aussi une possibilité de synchroniser les adhérents."
+        en: "Provides a way to make an online checkout of any membership dues, donation, customer invoice or customer order with the HelloAsso API. Also offer an option to synchronize membership."
       status: 'enabled'		
       created_at: '2024-12-10'
       last_updated_at: 'auto'
