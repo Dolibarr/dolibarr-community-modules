@@ -64,7 +64,7 @@ if (!$res) {
 // Libraries
 require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
 require_once '../lib/pdpconnectfr.lib.php';
-//require_once "../class/myclass.class.php";
+require_once "../class/PDPProviderManager.class.php";
 
 /**
  * @var Conf $conf
@@ -193,25 +193,104 @@ $item->cssClass = 'minwidth500';
 
 //$item = $formSetup->newItem('PDPCONNECTFR_MYPARAM13')->setAsDate();	// Not yet implemented
 */
+
+// Setup conf for selection of the PDP provider
+if ($action == 'update') {
+	dolibarr_set_const($db, 'PDPCONNECTFR_PDP', GETPOST('PDPCONNECTFR_PDP'), 'chaine', 0, '', $conf->entity);
+}
+
+$PDPManager = new PDPProviderManager($db);
+$providersConfig = $PDPManager->getAllProviders();
+
 $formSetup->newItem('PDPCONNECTFR_LIVE')->setAsYesNo();
 
-$TField = array(
-	'PDP_01' => $langs->trans('PDP_01')
-);
+$TField = array('' => '');
+foreach ($providersConfig as $key => $pconfig) {
+	if ($pconfig['is_enabled'] == 0) {
+		continue;
+	}
+	$TField[$key] = $pconfig['provider_name'];
+}
 
 // Setup conf for a simple combo list
 $item = $formSetup->newItem('PDPCONNECTFR_PDP')->setAsSelect($TField);
+$item->helpText = $langs->transnoentities('PDPCONNECTFR_PDP_HELP');
 $item->cssClass = 'minwidth500';
 
-$item = $formSetup->newItem('PDPCONNECTFR_USERNAME');
-$item->cssClass = 'minwidth500';
+// If a PDP is selected, show parameters for this PDP
+if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_PDP') === "ESALINK") {
 
-$item = $formSetup->newItem('PDPCONNECTFR_PASSWORD');
-$item->cssClass = 'minwidth500';
+	$prefix = $providersConfig['ESALINK']['dol_prefix'];
+	$provider = $PDPManager->getProvider('ESALINK');
 
-$item = $formSetup->newItem('PDPCONNECTFR_TOKEN');
-$item->fieldOverride = "<a href='#' target='_blank'>Generate your token and test connection <i class='fa fa-key'></i></a>";
-$item->cssClass = 'minwidth500';
+	if (preg_match('/set'.$prefix.'TOKEN/i', $action, $reg)) {
+		// Generate token
+		$token = $provider->getAccessToken();
+		if ($token) {
+			setEventMessages("Token generated successfully", null, 'mesgs');
+			header("Location: ".$_SERVER["PHP_SELF"]);
+			exit;
+		} else {
+			setEventMessages(implode('<br/>', array_map('htmlspecialchars', $provider->errors)), null, 'errors');
+		}
+	}
+
+	if (preg_match('/call'.$prefix.'HEALTHCHECK/i', $action, $reg)) {
+		$statusPDP = $provider->checkHealth();
+		if ($statusPDP['status_code'] == 200) {
+			setEventMessages($statusPDP['message'], null, 'mesgs');
+		} else {
+			setEventMessages(implode('<br/>', array_map('htmlspecialchars', $provider->errors)), null, 'errors');
+		}
+
+	}
+
+	// Username
+	$item = $formSetup->newItem($prefix . 'USERNAME');
+	$item->cssClass = 'minwidth500';
+
+	// Password
+	$item = $formSetup->newItem($prefix . 'PASSWORD');
+	$item->cssClass = 'minwidth500';
+
+	// API_KEY
+	$item = $formSetup->newItem($prefix . 'API_KEY');
+	$item->cssClass = 'minwidth500';
+
+	// Token
+	$item = $formSetup->newItem($prefix . 'TOKEN');
+	$item->cssClass = 'maxwidth500 ';
+	if (getDolGlobalString($prefix . 'TOKEN')) {
+		$item->fieldOverride = "<span class='opacitymedium hideonsmartphone'>" . htmlspecialchars('**************' . substr(getDolGlobalString($prefix . 'TOKEN'), -4)) . "</span>";
+	}
+	if (!getDolGlobalString($prefix . 'TOKEN')) {
+		$item->fieldOverride = "-";
+	}
+
+	// Actions
+	$item = $formSetup->newItem($prefix . 'ACTIONS');
+	$item->fieldOverride = "";
+	if (!getDolGlobalString($prefix . 'TOKEN')) {
+		$item->fieldOverride .= "
+			<a 
+			href='".$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken()."'
+			>" . $langs->trans('generateAccessToken') . " <i class='fa fa-key'></i></a><br/>
+		";
+	}
+	if (getDolGlobalString($prefix . 'TOKEN')) {
+		$item->fieldOverride .= "
+			<a 
+			href='".$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken()."'
+			>" . $langs->trans('reGenerateAccessToken') . " <i class='fa fa-key'></i></a><br/>
+		";
+	}
+	$item->fieldOverride .= "
+		<a 
+			href='".$_SERVER["PHP_SELF"]."?action=call".$prefix."HEALTHCHECK&token=".newToken()."'
+		>" . $langs->trans('testConnection') . " (Healthcheck) <i class='fa fa-check'></i></a><br/>
+	";
+	$item->cssClass = 'minwidth500';
+}
 
 // End of definition of parameters
 
@@ -242,6 +321,7 @@ if (versioncompare(explode('.', DOL_VERSION), array(15)) < 0 && $action == 'upda
 }
 
 include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php';
+//print getDolGlobalString('PDPCONNECTFR_PDP');
 
 if ($action == 'updateMask') {
 	$maskconst = GETPOST('maskconst', 'aZ09');
@@ -381,6 +461,19 @@ if (!empty($formSetup->items)) {
 	print $formSetup->generateOutput(true);
 	print '<br>';
 }
+
+// on change PDPCONNECTFR_PDP reload page to show specific configuration of selected PDP
+print '<script>
+$(document).ready(function() {
+	var pdpSelect = $("select[name=\'PDPCONNECTFR_PDP\']");
+	if (pdpSelect.length) {
+		pdpSelect.on("change", function() {
+			console.log("PDP changed, submit form to reload page");
+			$(this).closest("form").submit();
+		});
+	}
+});
+</script>';
 
 
 foreach ($myTmpObjects as $myTmpObjectKey => $myTmpObjectArray) {
