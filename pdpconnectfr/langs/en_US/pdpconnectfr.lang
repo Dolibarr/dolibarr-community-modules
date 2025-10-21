@@ -12,14 +12,10 @@ ModulePDPConnectFRDesc = PDPConnectFR description
 #
 # Admin page
 #
-PDPConnectFRSetup = PDPConnectFR setup
+PDPConnectFRSetup = Setup of module PDPConnect (France)
 Settings = Settings
 PDPConnectFRSetupPage = General settings for PDPConnectFR module
 NewSection=New section
-PDPCONNECTFR_MYPARAM1 = My param 1
-PDPCONNECTFR_MYPARAM1Tooltip = My param 1 tooltip
-PDPCONNECTFR_MYPARAM2=My param 2
-PDPCONNECTFR_MYPARAM2Tooltip=My param 2 tooltip
 
 
 #
