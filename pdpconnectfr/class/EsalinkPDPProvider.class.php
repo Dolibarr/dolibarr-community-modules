@@ -84,10 +84,16 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$body = $response['response'];
 
         if ($status_code == 200 && isset($body['access_token']) && isset($body['refresh_token']) && isset($body['expires_in'])) {
+        	// TODO Move token info into table llx_oauth_token with
+        	// service = $this->config['dol_prefix']
+        	// tokenstring = $this->config['dol_prefix'] . '_TOKEN'
+        	// tokenstring_refesh = $this->config['dol_prefix'] . '_REFRESH_TOKEN'
+        	// expired_at = $this->config['dol_prefix'] . '_TOKEN_EXPIRES_AT'
+
             // Save tokens in Dolibarr constants
-            dolibarr_set_const($db, $this->config['dol_prefix'] . 'TOKEN', $body['access_token'], 'chaine', 0, '', $conf->entity);
-            dolibarr_set_const($db, $this->config['dol_prefix'] . 'REFRESH_TOKEN', $body['refresh_token'], 'chaine', 0, '', $conf->entity);
-            dolibarr_set_const($db, $this->config['dol_prefix'] . 'TOKEN_EXPIRES_AT', dol_now() + $body['expires_in'], 'chaine', 0, '', $conf->entity);
+            dolibarr_set_const($db, $this->config['dol_prefix'] . '_TOKEN', $body['access_token'], 'chaine', 0, '', $conf->entity);
+            dolibarr_set_const($db, $this->config['dol_prefix'] . '_REFRESH_TOKEN', $body['refresh_token'], 'chaine', 0, '', $conf->entity);
+            dolibarr_set_const($db, $this->config['dol_prefix'] . '_TOKEN_EXPIRES_AT', dol_now() + $body['expires_in'], 'chaine', 0, '', $conf->entity);
 
             // Update config array
             $this->config['token'] = $body['access_token'];

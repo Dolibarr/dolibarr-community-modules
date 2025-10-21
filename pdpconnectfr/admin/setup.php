@@ -60,12 +60,6 @@ if (!$res && file_exists("../../../../../main.inc.php")) {
 if (!$res) {
 	die("Include of main fails");
 }
-
-// Libraries
-require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
-require_once '../lib/pdpconnectfr.lib.php';
-require_once "../class/PDPProviderManager.class.php";
-
 /**
  * @var Conf $conf
  * @var DoliDB $db
@@ -73,6 +67,11 @@ require_once "../class/PDPProviderManager.class.php";
  * @var Translate $langs
  * @var User $user
  */
+// Libraries
+require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
+require_once '../lib/pdpconnectfr.lib.php';
+require_once "../class/PDPProviderManager.class.php";
+
 
 // Translations
 $langs->loadLangs(array("admin", "pdpconnectfr@pdpconnectfr"));
@@ -194,11 +193,6 @@ $item->cssClass = 'minwidth500';
 //$item = $formSetup->newItem('PDPCONNECTFR_MYPARAM13')->setAsDate();	// Not yet implemented
 */
 
-// Setup conf for selection of the PDP provider
-if ($action == 'update') {
-	dolibarr_set_const($db, 'PDPCONNECTFR_PDP', GETPOST('PDPCONNECTFR_PDP'), 'chaine', 0, '', $conf->entity);
-}
-
 $PDPManager = new PDPProviderManager($db);
 $providersConfig = $PDPManager->getAllProviders();
 
@@ -212,39 +206,66 @@ foreach ($providersConfig as $key => $pconfig) {
 	$TField[$key] = $pconfig['provider_name'];
 }
 
+$reg = array();
+$prefix = '';
+
+// If a PDP is selected, show parameters for this PDP
+if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_PDP') === "ESALINK") {
+	$prefix = $providersConfig['ESALINK']['dol_prefix'].'_';
+	$provider = $PDPManager->getProvider('ESALINK');
+}
+
+
 // Setup conf for a simple combo list
 $item = $formSetup->newItem('PDPCONNECTFR_PDP')->setAsSelect($TField);
 $item->helpText = $langs->transnoentities('PDPCONNECTFR_PDP_HELP');
 $item->cssClass = 'minwidth500';
 
-// If a PDP is selected, show parameters for this PDP
+// End of definition of parameters
+
+
+$setupnotempty += count($formSetup->items);
+
+
+//$dirmodels = array_merge(array('/'), (array) $conf->modules_parts['models']);
+//$moduledir = 'pdpconnectfr';
+
+$reg = array();
+
+
+/*
+ * Actions
+ */
+
+// Setup conf for selection of the PDP provider
+if ($action == 'update' && GETPOST('PDPCONNECTFR_PDP') != getDolGlobalString('PDPCONNECTFR_PDP')) {
+	dolibarr_set_const($db, 'PDPCONNECTFR_PDP', GETPOST('PDPCONNECTFR_PDP'), 'chaine', 0, '', $conf->entity);
+	header("Location: ".$_SERVER["PHP_SELF"]);
+	exit;
+}
+
+if (preg_match('/set'.$prefix.'TOKEN/i', $action, $reg)) {
+	// Generate token
+	$token = $provider->getAccessToken();
+	if ($token) {
+		setEventMessages("Token generated successfully", null, 'mesgs');
+		header("Location: ".$_SERVER["PHP_SELF"]);
+		exit;
+	} else {
+		setEventMessages('', $provider->errors, 'errors');
+	}
+}
+
+if (preg_match('/call'.$prefix.'HEALTHCHECK/i', $action, $reg)) {
+	$statusPDP = $provider->checkHealth();
+	if ($statusPDP['status_code'] == 200) {
+		setEventMessages($statusPDP['message'], null, 'mesgs');
+	} else {
+		setEventMessages('', $provider->errors, 'errors');
+	}
+}
+
 if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_PDP') === "ESALINK") {
-
-	$prefix = $providersConfig['ESALINK']['dol_prefix'];
-	$provider = $PDPManager->getProvider('ESALINK');
-
-	if (preg_match('/set'.$prefix.'TOKEN/i', $action, $reg)) {
-		// Generate token
-		$token = $provider->getAccessToken();
-		if ($token) {
-			setEventMessages("Token generated successfully", null, 'mesgs');
-			header("Location: ".$_SERVER["PHP_SELF"]);
-			exit;
-		} else {
-			setEventMessages(implode('<br/>', array_map('htmlspecialchars', $provider->errors)), null, 'errors');
-		}
-	}
-
-	if (preg_match('/call'.$prefix.'HEALTHCHECK/i', $action, $reg)) {
-		$statusPDP = $provider->checkHealth();
-		if ($statusPDP['status_code'] == 200) {
-			setEventMessages($statusPDP['message'], null, 'mesgs');
-		} else {
-			setEventMessages(implode('<br/>', array_map('htmlspecialchars', $provider->errors)), null, 'errors');
-		}
-
-	}
-
 	// Username
 	$item = $formSetup->newItem($prefix . 'USERNAME');
 	$item->cssClass = 'minwidth500';
@@ -272,160 +293,37 @@ if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_P
 	$item->fieldOverride = "";
 	if (!getDolGlobalString($prefix . 'TOKEN')) {
 		$item->fieldOverride .= "
-			<a 
+			<a
 			href='".$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken()."'
 			>" . $langs->trans('generateAccessToken') . " <i class='fa fa-key'></i></a><br/>
 		";
 	}
 	if (getDolGlobalString($prefix . 'TOKEN')) {
 		$item->fieldOverride .= "
-			<a 
+			<a
 			href='".$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken()."'
 			>" . $langs->trans('reGenerateAccessToken') . " <i class='fa fa-key'></i></a><br/>
 		";
 	}
 	$item->fieldOverride .= "
-		<a 
+		<a
 			href='".$_SERVER["PHP_SELF"]."?action=call".$prefix."HEALTHCHECK&token=".newToken()."'
 		>" . $langs->trans('testConnection') . " (Healthcheck) <i class='fa fa-check'></i></a><br/>
 	";
 	$item->cssClass = 'minwidth500';
 }
 
-// End of definition of parameters
-
-
-$setupnotempty += count($formSetup->items);
-
-
-$dirmodels = array_merge(array('/'), (array) $conf->modules_parts['models']);
-
-$moduledir = 'pdpconnectfr';
-$myTmpObjects = array();
-// TODO Scan list of objects to fill this array
-$myTmpObjects['myobject'] = array('label' => 'MyObject', 'includerefgeneration' => 0, 'includedocgeneration' => 0, 'class' => 'MyObject');
-
-$tmpobjectkey = GETPOST('object', 'aZ09');
-if ($tmpobjectkey && !array_key_exists($tmpobjectkey, $myTmpObjects)) {
-	accessforbidden('Bad value for object. Hack attempt ?');
-}
-
-
-/*
- * Actions
- */
-
-// For retrocompatibility Dolibarr < 15.0
-if (versioncompare(explode('.', DOL_VERSION), array(15)) < 0 && $action == 'update' && !empty($user->admin)) {
-	$formSetup->saveConfFromPost();
-}
 
 include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php';
 //print getDolGlobalString('PDPCONNECTFR_PDP');
 
-if ($action == 'updateMask') {
-	$maskconst = GETPOST('maskconst', 'aZ09');
-	$maskvalue = GETPOST('maskvalue', 'alpha');
-
-	if ($maskconst && preg_match('/_MASK$/', $maskconst)) {
-		$res = dolibarr_set_const($db, $maskconst, $maskvalue, 'chaine', 0, '', $conf->entity);
-		if (!($res > 0)) {
-			$error++;
-		}
-	}
-
-	if (!$error) {
-		setEventMessages($langs->trans("SetupSaved"), null, 'mesgs');
-	} else {
-		setEventMessages($langs->trans("Error"), null, 'errors');
-	}
-} elseif ($action == 'specimen' && $tmpobjectkey) {
-	$modele = GETPOST('module', 'alpha');
-
-	$className = $myTmpObjects[$tmpobjectkey]['class'];
-	$tmpobject = new $className($db);
-	'@phan-var-force MyObject $tmpobject';
-	$tmpobject->initAsSpecimen();
-
-	// Search template files
-	$file = '';
-	$className = '';
-	$dirmodels = array_merge(array('/'), (array) $conf->modules_parts['models']);
-	foreach ($dirmodels as $reldir) {
-		$file = dol_buildpath($reldir."core/modules/pdpconnectfr/doc/pdf_".$modele."_".strtolower($tmpobjectkey).".modules.php", 0);
-		if (file_exists($file)) {
-			$className = "pdf_".$modele."_".strtolower($tmpobjectkey);
-			break;
-		}
-	}
-
-	if ($className !== '') {
-		require_once $file;
-
-		$module = new $className($db);
-		'@phan-var-force ModelePDFMyObject $module';
-
-		'@phan-var-force ModelePDFMyObject $module';
-
-		if ($module->write_file($tmpobject, $langs) > 0) {
-			header("Location: ".DOL_URL_ROOT."/document.php?modulepart=pdpconnectfr-".strtolower($tmpobjectkey)."&file=SPECIMEN.pdf");
-			return;
-		} else {
-			setEventMessages($module->error, null, 'errors');
-			dol_syslog($module->error, LOG_ERR);
-		}
-	} else {
-		setEventMessages($langs->trans("ErrorModuleNotFound"), null, 'errors');
-		dol_syslog($langs->trans("ErrorModuleNotFound"), LOG_ERR);
-	}
-} elseif ($action == 'setmod') {
-	// TODO Check if numbering module chosen can be activated by calling method canBeActivated
-	if (!empty($tmpobjectkey)) {
-		$constforval = 'PDPCONNECTFR_'.strtoupper($tmpobjectkey)."_ADDON";
-		dolibarr_set_const($db, $constforval, $value, 'chaine', 0, '', $conf->entity);
-	}
-} elseif ($action == 'set') {
-	// Activate a model
-	$ret = addDocumentModel($value, $type, $label, $scandir);
-} elseif ($action == 'del') {
-	$ret = delDocumentModel($value, $type);
-	if ($ret > 0) {
-		if (!empty($tmpobjectkey)) {
-			$constforval = 'PDPCONNECTFR_'.strtoupper($tmpobjectkey).'_ADDON_PDF';
-			if (getDolGlobalString($constforval) == "$value") {
-				dolibarr_del_const($db, $constforval, $conf->entity);
-			}
-		}
-	}
-} elseif ($action == 'setdoc') {
-	// Set or unset default model
-	if (!empty($tmpobjectkey)) {
-		$constforval = 'PDPCONNECTFR_'.strtoupper($tmpobjectkey).'_ADDON_PDF';
-		if (dolibarr_set_const($db, $constforval, $value, 'chaine', 0, '', $conf->entity)) {
-			// The constant that was read before the new set
-			// We therefore requires a variable to have a coherent view
-			$conf->global->{$constforval} = $value;
-		}
-
-		// We disable/enable the document template (into llx_document_model table)
-		$ret = delDocumentModel($value, $type);
-		if ($ret > 0) {
-			$ret = addDocumentModel($value, $type, $label, $scandir);
-		}
-	}
-} elseif ($action == 'unsetdoc') {
-	if (!empty($tmpobjectkey)) {
-		$constforval = 'PDPCONNECTFR_'.strtoupper($tmpobjectkey).'_ADDON_PDF';
-		dolibarr_del_const($db, $constforval, $conf->entity);
-	}
-}
-
-$action = 'edit';
 
 
 /*
  * View
  */
+
+$action = 'edit';
 
 $form = new Form($db);
 
@@ -474,269 +372,6 @@ $(document).ready(function() {
 	}
 });
 </script>';
-
-
-foreach ($myTmpObjects as $myTmpObjectKey => $myTmpObjectArray) {
-	if (!empty($myTmpObjectArray['includerefgeneration'])) {
-		// Numbering models
-
-		$setupnotempty++;
-
-		print load_fiche_titre($langs->trans("NumberingModules", $myTmpObjectArray['label']), '', '');
-
-		print '<table class="noborder centpercent">';
-		print '<tr class="liste_titre">';
-		print '<td>'.$langs->trans("Name").'</td>';
-		print '<td>'.$langs->trans("Description").'</td>';
-		print '<td class="nowrap">'.$langs->trans("Example").'</td>';
-		print '<td class="center" width="60">'.$langs->trans("Status").'</td>';
-		print '<td class="center" width="16">'.$langs->trans("ShortInfo").'</td>';
-		print '</tr>'."\n";
-
-		clearstatcache();
-
-		foreach ($dirmodels as $reldir) {
-			$dir = dol_buildpath($reldir."core/modules/".$moduledir);
-
-			if (is_dir($dir)) {
-				$handle = opendir($dir);
-				if (is_resource($handle)) {
-					while (($file = readdir($handle)) !== false) {
-						if (strpos($file, 'mod_'.strtolower($myTmpObjectKey).'_') === 0 && substr($file, dol_strlen($file) - 3, 3) == 'php') {
-							$file = substr($file, 0, dol_strlen($file) - 4);
-
-							require_once $dir.'/'.$file.'.php';
-
-							$module = new $file($db);
-							'@phan-var-force ModeleNumRefMyObject $module';
-
-							// Show modules according to features level
-							if ($module->version == 'development' && getDolGlobalInt('MAIN_FEATURES_LEVEL') < 2) {
-								continue;
-							}
-							if ($module->version == 'experimental' && getDolGlobalInt('MAIN_FEATURES_LEVEL') < 1) {
-								continue;
-							}
-
-							if ($module->isEnabled()) {
-								dol_include_once('/'.$moduledir.'/class/'.strtolower($myTmpObjectKey).'.class.php');
-
-								print '<tr class="oddeven"><td>'.$module->getName($langs)."</td><td>\n";
-								print $module->info($langs);
-								print '</td>';
-
-								// Show example of numbering model
-								print '<td class="nowrap">';
-								$tmp = $module->getExample();
-								if (preg_match('/^Error/', $tmp)) {
-									$langs->load("errors");
-									print '<div class="error">'.$langs->trans($tmp).'</div>';
-								} elseif ($tmp == 'NotConfigured') {
-									print $langs->trans($tmp);
-								} else {
-									print $tmp;
-								}
-								print '</td>'."\n";
-
-								print '<td class="center">';
-								$constforvar = 'PDPCONNECTFR_'.strtoupper($myTmpObjectKey).'_ADDON';
-								$defaultifnotset = 'thevaluetousebydefault';
-								$activenumberingmodel = getDolGlobalString($constforvar, $defaultifnotset);
-								if ($activenumberingmodel == $file) {
-									print img_picto($langs->trans("Activated"), 'switch_on');
-								} else {
-									print '<a href="'.$_SERVER["PHP_SELF"].'?action=setmod&token='.newToken().'&object='.strtolower($myTmpObjectKey).'&value='.urlencode($file).'">';
-									print img_picto($langs->trans("Disabled"), 'switch_off');
-									print '</a>';
-								}
-								print '</td>';
-
-								$className = $myTmpObjectArray['class'];
-								$mytmpinstance = new $className($db);
-								'@phan-var-force MyObject $mytmpinstance';
-								$mytmpinstance->initAsSpecimen();
-
-								// Info
-								$htmltooltip = '';
-								$htmltooltip .= ''.$langs->trans("Version").': <b>'.$module->getVersion().'</b><br>';
-
-								$nextval = $module->getNextValue($mytmpinstance);
-								if ("$nextval" != $langs->trans("NotAvailable")) {  // Keep " on nextval
-									$htmltooltip .= ''.$langs->trans("NextValue").': ';
-									if ($nextval) {
-										if (preg_match('/^Error/', $nextval) || $nextval == 'NotConfigured') {
-											$nextval = $langs->trans($nextval);
-										}
-										$htmltooltip .= $nextval.'<br>';
-									} else {
-										$htmltooltip .= $langs->trans($module->error).'<br>';
-									}
-								}
-
-								print '<td class="center">';
-								print $form->textwithpicto('', $htmltooltip, 1, 'info');
-								print '</td>';
-
-								print "</tr>\n";
-							}
-						}
-					}
-					closedir($handle);
-				}
-			}
-		}
-		print "</table><br>\n";
-	}
-
-	if (!empty($myTmpObjectArray['includedocgeneration'])) {
-		/*
-		 * Document templates generators
-		 */
-		$setupnotempty++;
-		$type = strtolower($myTmpObjectKey);
-
-		print load_fiche_titre($langs->trans("DocumentModules", $myTmpObjectKey), '', '');
-
-		// Load array def with activated templates
-		$def = array();
-		// TODO Replace with $def = getListOfModels($db, $type);
-		$sql = "SELECT nom";
-		$sql .= " FROM ".$db->prefix()."document_model";
-		$sql .= " WHERE type = '".$db->escape($type)."'";
-		$sql .= " AND entity = ".$conf->entity;
-		$resql = $db->query($sql);
-		if ($resql) {
-			$i = 0;
-			$num_rows = $db->num_rows($resql);
-			while ($i < $num_rows) {
-				$array = $db->fetch_array($resql);
-				array_push($def, $array[0]);
-				$i++;
-			}
-		} else {
-			dol_print_error($db);
-		}
-
-		print '<table class="noborder centpercent">'."\n";
-		print '<tr class="liste_titre">'."\n";
-		print '<td>'.$langs->trans("Name").'</td>';
-		print '<td>'.$langs->trans("Description").'</td>';
-		print '<td class="center" width="60">'.$langs->trans("Status")."</td>\n";
-		print '<td class="center" width="60">'.$langs->trans("Default")."</td>\n";
-		print '<td class="center" width="38">'.$langs->trans("ShortInfo").'</td>';
-		print '<td class="center" width="38">'.$langs->trans("Preview").'</td>';
-		print "</tr>\n";
-
-		clearstatcache();
-
-		foreach ($dirmodels as $reldir) {
-			foreach (array('', '/doc') as $valdir) {
-				$realpath = $reldir."core/modules/".$moduledir.$valdir;
-				$dir = dol_buildpath($realpath);
-
-				if (is_dir($dir)) {
-					$handle = opendir($dir);
-					if (is_resource($handle)) {
-						$filelist = array();
-						while (($file = readdir($handle)) !== false) {
-							$filelist[] = $file;
-						}
-						closedir($handle);
-						arsort($filelist);
-
-						foreach ($filelist as $file) {
-							if (preg_match('/\.modules\.php$/i', $file) && preg_match('/^(pdf_|doc_)/', $file)) {
-								if (file_exists($dir.'/'.$file)) {
-									$name = substr($file, 4, dol_strlen($file) - 16);
-									$className = substr($file, 0, dol_strlen($file) - 12);
-
-									require_once $dir.'/'.$file;
-									$module = new $className($db);
-									'@phan-var-force ModelePDFMyObject $module';
-
-									$modulequalified = 1;
-									if ($module->version == 'development' && getDolGlobalInt('MAIN_FEATURES_LEVEL') < 2) {
-										$modulequalified = 0;
-									}
-									if ($module->version == 'experimental' && getDolGlobalInt('MAIN_FEATURES_LEVEL') < 1) {
-										$modulequalified = 0;
-									}
-
-									if ($modulequalified) {
-										print '<tr class="oddeven"><td width="100">';
-										print(empty($module->name) ? $name : $module->name);
-										print "</td><td>\n";
-										if (method_exists($module, 'info')) {
-											print $module->info($langs);  // @phan-suppress-current-line PhanUndeclaredMethod
-										} else {
-											print $module->description;
-										}
-										print '</td>';
-
-										// Active
-										if (in_array($name, $def)) {
-											print '<td class="center">'."\n";
-											print '<a href="'.$_SERVER["PHP_SELF"].'?action=del&token='.newToken().'&value='.urlencode($name).'">';
-											print img_picto($langs->trans("Enabled"), 'switch_on');
-											print '</a>';
-											print '</td>';
-										} else {
-											print '<td class="center">'."\n";
-											print '<a href="'.$_SERVER["PHP_SELF"].'?action=set&token='.newToken().'&value='.urlencode($name).'&scan_dir='.urlencode($module->scandir).'&label='.urlencode($module->name).'">'.img_picto($langs->trans("Disabled"), 'switch_off').'</a>';
-											print "</td>";
-										}
-
-										// Default
-										print '<td class="center">';
-										$constforvar = 'PDPCONNECTFR_'.strtoupper($myTmpObjectKey).'_ADDON_PDF';
-										if (getDolGlobalString($constforvar) == $name) {
-											//print img_picto($langs->trans("Default"), 'on');
-											// Even if choice is the default value, we allow to disable it. Replace this with previous line if you need to disable unset
-											print '<a href="'.$_SERVER["PHP_SELF"].'?action=unsetdoc&token='.newToken().'&object='.urlencode(strtolower($myTmpObjectKey)).'&value='.urlencode($name).'&scan_dir='.urlencode($module->scandir).'&label='.urlencode($module->name).'&amp;type='.urlencode($type).'" alt="'.$langs->trans("Disable").'">'.img_picto($langs->trans("Enabled"), 'on').'</a>';
-										} else {
-											print '<a href="'.$_SERVER["PHP_SELF"].'?action=setdoc&token='.newToken().'&object='.urlencode(strtolower($myTmpObjectKey)).'&value='.urlencode($name).'&scan_dir='.urlencode($module->scandir).'&label='.urlencode($module->name).'" alt="'.$langs->trans("Default").'">'.img_picto($langs->trans("Disabled"), 'off').'</a>';
-										}
-										print '</td>';
-
-										// Info
-										$htmltooltip = ''.$langs->trans("Name").': '.$module->name;
-										$htmltooltip .= '<br>'.$langs->trans("Type").': '.($module->type ? $module->type : $langs->trans("Unknown"));
-										if ($module->type == 'pdf') {
-											$htmltooltip .= '<br>'.$langs->trans("Width").'/'.$langs->trans("Height").': '.$module->page_largeur.'/'.$module->page_hauteur;
-										}
-										$htmltooltip .= '<br>'.$langs->trans("Path").': '.preg_replace('/^\//', '', $realpath).'/'.$file;
-
-										$htmltooltip .= '<br><br><u>'.$langs->trans("FeaturesSupported").':</u>';
-										$htmltooltip .= '<br>'.$langs->trans("Logo").': '.yn($module->option_logo, 1, 1);
-										$htmltooltip .= '<br>'.$langs->trans("MultiLanguage").': '.yn($module->option_multilang, 1, 1);
-
-										print '<td class="center">';
-										print $form->textwithpicto('', $htmltooltip, 1, 'info');
-										print '</td>';
-
-										// Preview
-										print '<td class="center">';
-										if ($module->type == 'pdf') {
-											$newname = preg_replace('/_'.preg_quote(strtolower($myTmpObjectKey), '/').'/', '', $name);
-											print '<a href="'.$_SERVER["PHP_SELF"].'?action=specimen&module='.urlencode($newname).'&object='.urlencode($myTmpObjectKey).'">'.img_object($langs->trans("Preview"), 'pdf').'</a>';
-										} else {
-											print img_object($langs->transnoentitiesnoconv("PreviewNotAvailable"), 'generic');
-										}
-										print '</td>';
-
-										print "</tr>\n";
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-
-		print '</table>';
-	}
-}
 
 if (empty($setupnotempty)) {
 	print '<br>'.$langs->trans("NothingToSetup");

@@ -40,6 +40,8 @@ class PDPProviderManager
     public function __construct($db)
     {
         // Esalink Provider configuration
+        // May be we can keep only the provider name and description in the array of available providers.
+        // Rest of data could be into the XXXPDPPRovider.class.php file.
         $this->providersConfig = array (
             'ESALINK' => array(
                 'provider_name' => 'ESALINK',
@@ -54,7 +56,7 @@ class PDPProviderManager
                 'token' => getDolGlobalString('PDPCONNECTFR_ESALINK_TOKEN', ''),
                 'refresh_token' => getDolGlobalString('PDPCONNECTFR_ESALINK_REFRESH_TOKEN', ''),
                 'token_expires_at' => getDolGlobalString('PDPCONNECTFR_ESALINK_TOKEN_EXPIRES_AT', ''),
-                'dol_prefix' => 'PDPCONNECTFR_ESALINK_',
+                'dol_prefix' => 'PDPCONNECTFR_ESALINK',
                 'is_enabled' => 1
             ),
             'TESTPDP' => array(
@@ -70,7 +72,7 @@ class PDPProviderManager
                 'token' => getDolGlobalString('PDPCONNECTFR_TESTPDP_TOKEN', ''),
                 'refresh_token' => getDolGlobalString('PDPCONNECTFR_TESTPDP_REFRESH_TOKEN', ''),
                 'token_expires_at' => getDolGlobalString('PDPCONNECTFR_TESTPDP_TOKEN_EXPIRES_AT', ''),
-                'dol_prefix' => 'PDPCONNECTFR_TESTPDP_',
+                'dol_prefix' => 'PDPCONNECTFR_TESTPDP',
                 'is_enabled' => 0
             )
         );
