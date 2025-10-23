@@ -29,10 +29,7 @@ class PDPProviderManager
 {
     public $db;
 
-    private $providersConfig;
-
-    /** @var AbstractPDPProvider[] */
-    private $providers = [];
+    private $providersList;
 
     /**
      * Initialize available PDP providers.
@@ -42,43 +39,18 @@ class PDPProviderManager
         // Esalink Provider configuration
         // May be we can keep only the provider name and description in the array of available providers.
         // Rest of data could be into the XXXPDPPRovider.class.php file.
-        $this->providersConfig = array (
+        $this->providersList = array (
             'ESALINK' => array(
                 'provider_name' => 'ESALINK',
                 'description' => 'Esalink PDP Integration',
-                'provider_url' => 'https://ppd.hubtimize.fr',
-                'prod_api_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/', // TODO: Replace the URL once known
-                'test_api_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/',
-                'username' => getDolGlobalString('PDPCONNECTFR_ESALINK_USERNAME', ''),
-                'password' => getDolGlobalString('PDPCONNECTFR_ESALINK_PASSWORD', ''),
-                'api_key' => getDolGlobalString('PDPCONNECTFR_ESALINK_API_KEY', ''),
-                'api_secret' => getDolGlobalString('PDPCONNECTFR_ESALINK_API_SECRET', ''),
-                'token' => getDolGlobalString('PDPCONNECTFR_ESALINK_TOKEN', ''),
-                'refresh_token' => getDolGlobalString('PDPCONNECTFR_ESALINK_REFRESH_TOKEN', ''),
-                'token_expires_at' => getDolGlobalString('PDPCONNECTFR_ESALINK_TOKEN_EXPIRES_AT', ''),
-                'dol_prefix' => 'PDPCONNECTFR_ESALINK',
                 'is_enabled' => 1
             ),
             'TESTPDP' => array(
                 'provider_name' => 'TESTPDP',
                 'description' => 'Another TESTPDP Integration',
-                'provider_url' => 'https://www.example.com',
-                'prod_api_url' => 'https://api.example.com/v1/',
-                'test_api_url' => 'https://sandbox.api.example.com/v1/',
-                'username' => getDolGlobalString('PDPCONNECTFR_TESTPDP_USERNAME', ''),
-                'password' => getDolGlobalString('PDPCONNECTFR_TESTPDP_PASSWORD', ''),
-                'api_key' => getDolGlobalString('PDPCONNECTFR_TESTPDP_API_KEY', ''),
-                'api_secret' => getDolGlobalString('PDPCONNECTFR_TESTPDP_API_SECRET', ''),
-                'token' => getDolGlobalString('PDPCONNECTFR_TESTPDP_TOKEN', ''),
-                'refresh_token' => getDolGlobalString('PDPCONNECTFR_TESTPDP_REFRESH_TOKEN', ''),
-                'token_expires_at' => getDolGlobalString('PDPCONNECTFR_TESTPDP_TOKEN_EXPIRES_AT', ''),
-                'dol_prefix' => 'PDPCONNECTFR_TESTPDP',
                 'is_enabled' => 0
             )
         );
-
-        $this->providers['ESALINK'] = new EsalinkPDPProvider($this->providersConfig['ESALINK']);
-        //$this->providers['TESTPDP'] = new TESTPDPProvider($providersConfig['TESTPDP']);
     }
 
     /**
@@ -88,7 +60,7 @@ class PDPProviderManager
      */
     public function getAllProviders()
     {
-        return $this->providersConfig;
+        return $this->providersList;
     }
 
     /**
@@ -99,7 +71,23 @@ class PDPProviderManager
      */
     public function getProvider($name)
     {
-        return $this->providers[$name] ?? null;
+        // Check if provider exists and is enabled in providersList
+        if (!isset($this->providersList[$name]) || !$this->providersList[$name]['is_enabled']) {
+            return null;
+        }
+
+        // Initialize provider based on name
+        switch ($name) {
+            case 'ESALINK':
+                $provider = new EsalinkPDPProvider();
+                break;
+            case 'TESTPDP':
+                //$provider = new TESTPDPProvider();
+                break;
+            default:
+                return null;
+        }
+        return $provider;
     }
 
 }

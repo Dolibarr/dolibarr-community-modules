@@ -34,10 +34,22 @@ class EsalinkPDPProvider extends AbstractPDPProvider
     /**
      * Constructor
      *
-     * @param array $config Configuration array
      */
-    public function __construct($config = []) {
-        $this->config = $config;
+    public function __construct() {
+        $this->config = array(
+            'provider_url' => 'https://ppd.hubtimize.fr',
+            'prod_api_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/', // TODO: Replace the URL once known
+            'test_api_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/',
+            'username' => getDolGlobalString('PDPCONNECTFR_ESALINK_USERNAME', ''),
+            'password' => getDolGlobalString('PDPCONNECTFR_ESALINK_PASSWORD', ''),
+            'api_key' => getDolGlobalString('PDPCONNECTFR_ESALINK_API_KEY', ''),
+            'api_secret' => getDolGlobalString('PDPCONNECTFR_ESALINK_API_SECRET', ''),
+            'dol_prefix' => 'PDPCONNECTFR_ESALINK',
+            'live' => getDolGlobalInt('PDPCONNECTFR_LIVE', 0)
+        );
+
+        // Retrieve and complete the OAuth token information from the database
+        $this->tokenData = $this->fetchOAuthTokenDB ();
     }
 
     /**
@@ -84,21 +96,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$body = $response['response'];
 
         if ($status_code == 200 && isset($body['access_token']) && isset($body['refresh_token']) && isset($body['expires_in'])) {
-        	// TODO Move token info into table llx_oauth_token with
-        	// service = $this->config['dol_prefix']
-        	// tokenstring = $this->config['dol_prefix'] . '_TOKEN'
-        	// tokenstring_refesh = $this->config['dol_prefix'] . '_REFRESH_TOKEN'
-        	// expired_at = $this->config['dol_prefix'] . '_TOKEN_EXPIRES_AT'
-
-            // Save tokens in Dolibarr constants
-            dolibarr_set_const($db, $this->config['dol_prefix'] . '_TOKEN', $body['access_token'], 'chaine', 0, '', $conf->entity);
-            dolibarr_set_const($db, $this->config['dol_prefix'] . '_REFRESH_TOKEN', $body['refresh_token'], 'chaine', 0, '', $conf->entity);
-            dolibarr_set_const($db, $this->config['dol_prefix'] . '_TOKEN_EXPIRES_AT', dol_now() + $body['expires_in'], 'chaine', 0, '', $conf->entity);
-
-            // Update config array
-            $this->config['token'] = $body['access_token'];
-            $this->config['token_expires_at'] = dol_now() + $body['expires_in'];
-            $this->config['refresh_token'] = $body['refresh_token'];
+            $this->saveOAuthTokenDB($body['access_token'], $body['refresh_token'], $body['expires_in']);
 
             return $body['access_token'];
         } else {
@@ -167,19 +165,19 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
         // check or get access token
         if ($resource != 'token') {
-            if ($this->config['token']) {
-                $tokenexpiresat = $this->config['token_expires_at'] ?? 0;
+            if ($this->tokenData['token']) {
+                $tokenexpiresat = $this->tokenData['token_expires_at'] ?? 0;
                 if ($tokenexpiresat < dol_now()) {
-                    $this->refreshAccessToken(); // This will fill again $this->config['token']
+                    $this->refreshAccessToken(); // This will fill again $this->tokenData['token']
                 }
             } else {
-                $this->getAccessToken(); // This will fill again $this->config['token']
+                $this->getAccessToken(); // This will fill again $this->tokenData['token']
             }
         }
 
         // Add Authorization header if we have a token
-        if ($this->config['token'] && $resource != 'token') {
-            $httpheader[] = 'Authorization: Bearer ' . $this->config['token'];
+        if ($this->tokenData['token'] && $resource != 'token') {
+            $httpheader[] = 'Authorization: Bearer ' . $this->tokenData['token'];
         }
 
 		/*if ($params) {

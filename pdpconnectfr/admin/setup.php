@@ -211,8 +211,9 @@ $prefix = '';
 
 // If a PDP is selected, show parameters for this PDP
 if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_PDP') === "ESALINK") {
-	$prefix = $providersConfig['ESALINK']['dol_prefix'].'_';
 	$provider = $PDPManager->getProvider('ESALINK');
+	$prefix = $provider->getConf()['dol_prefix'].'_';
+	$tokenData = $provider->getTokenData();
 }
 
 
@@ -281,24 +282,24 @@ if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_P
 	// Token
 	$item = $formSetup->newItem($prefix . 'TOKEN');
 	$item->cssClass = 'maxwidth500 ';
-	if (getDolGlobalString($prefix . 'TOKEN')) {
-		$item->fieldOverride = "<span class='opacitymedium hideonsmartphone'>" . htmlspecialchars('**************' . substr(getDolGlobalString($prefix . 'TOKEN'), -4)) . "</span>";
+	if ($tokenData['token']) {
+		$item->fieldOverride = "<span class='opacitymedium hideonsmartphone'>" . htmlspecialchars('**************' . substr($tokenData['token'], -4)) . "</span>";
 	}
-	if (!getDolGlobalString($prefix . 'TOKEN')) {
+	if (!$tokenData['token']) {
 		$item->fieldOverride = "-";
 	}
 
 	// Actions
 	$item = $formSetup->newItem($prefix . 'ACTIONS');
 	$item->fieldOverride = "";
-	if (!getDolGlobalString($prefix . 'TOKEN')) {
+	if (!$tokenData['token']) {
 		$item->fieldOverride .= "
 			<a
 			href='".$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken()."'
 			>" . $langs->trans('generateAccessToken') . " <i class='fa fa-key'></i></a><br/>
 		";
 	}
-	if (getDolGlobalString($prefix . 'TOKEN')) {
+	if ($tokenData['token']) {
 		$item->fieldOverride .= "
 			<a
 			href='".$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken()."'
