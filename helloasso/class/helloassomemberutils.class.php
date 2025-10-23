@@ -415,11 +415,12 @@ class HelloAssoMemberUtils
         $assoslug = str_replace('_', '-', dol_string_nospecial(strtolower(dol_string_unaccent($this->organization_slug)), '-'));
         $formslug = str_replace('_', '-', dol_string_nospecial(strtolower(dol_string_unaccent($this->form_slug)), '-'));
         $parambase = '?pageSize='.urlencode($pagesize).'&pageIndex=1&withDetails=true';
+        $paramfrom = "";
         if ($helloasso_date_last_fetch != "") {
             $helloasso_date_last_fetch_tms = dol_stringtotime($helloasso_date_last_fetch);
             $datefromtimestamp = dol_get_first_hour($helloasso_date_last_fetch_tms);
             $datefrom = dol_print_date($datefromtimestamp, '%Y-%m-%d %H:%M:%S');
-            $paramfrom .= "&from=".urlencode($datefrom);
+            $paramfrom = "&from=".urlencode($datefrom);
         }
         $param = $parambase.$paramfrom;
         $nbpages = 0;
