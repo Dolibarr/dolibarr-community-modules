@@ -485,6 +485,7 @@ class HelloAssoMemberUtils
             if (empty($json->pagination->continuationToken) || $dryrun) {
                 break;
             }
+            $param = $parambase.$paramfrom;
             $param .= "&continuationToken=".urlencode($json->pagination->continuationToken);
             $nbpages++;
         }
