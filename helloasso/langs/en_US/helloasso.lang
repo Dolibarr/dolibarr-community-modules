@@ -100,6 +100,8 @@ HelloAssoMemberTypeDictionaryHelp=Dictionary of HelloAsso and Dolibarr member ty
 HelloAssoMemberCustomFieldDictionaryHelp=Dictionary of HelloAsso custom fields and Dolibarr field correspondence.<br>To configure a new custom field. Select a field of Dolibarr member object and set the name of the corresponding HelloAsso field inside the input field.
 ModuleHelloAssoMemberSyncDesc=Synchronise HelloAsso members in the Dolibarr database by creating members and subscriptions.
 HelloAssoSyncButtonDesc=Test to synchronize your members to your application without modifying your data. <br>Once the configuration is ok, you can automate the synchronisation in the Scheduled jobs module with HelloAssoGetNewMembers job.
+HELLOASSO_SUBSCRIPTION_COMPLEMENTARYACTIONS=Complementary action on member synchronization
+HELLOASSO_SUBSCRIPTION_COMPLEMENTARYACTIONS_HELP=Complementary action on member synchronization. <br>More complementary actions can be set if thirdparty creation is enabled on synchronization.
 
 # About page
 #

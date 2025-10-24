@@ -97,6 +97,8 @@ ModuleHelloAssoMemberSyncDesc=Synchronisez les membres HelloAsso dans la base de
 HelloAssoSyncButtonDesc=Testez la synchronisation de vos membres avec votre application sans modifier vos données. <br>Une fois la configuration validée, vous pouvez automatiser la synchronisation dans le module Tâches planifiées avec la tâche HelloAssoGetNewMembers.
 
 HelloAssoRecordNotFound=Enregistrement introuvable
+HELLOASSO_SUBSCRIPTION_COMPLEMENTARYACTIONS=Action complémentaire lors de la synchronisation des membres
+HELLOASSO_SUBSCRIPTION_COMPLEMENTARYACTIONS_HELP=Action complémentaire lors de la synchronisation des membres. <br>D'autres actions complémentaires peuvent être définies si la création par un tiers est activée lors de la synchronisation.
 
 # About page
 #
