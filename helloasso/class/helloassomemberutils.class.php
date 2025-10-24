@@ -361,7 +361,8 @@ class HelloAssoMemberUtils
                                 break;
                         }
                         $label = $langs->transnoentitiesnoconv("HelloAssoMemberPaymentLabel", $payment->id);
-                        $result = $member->subscriptionComplementaryActions($subscriptionid, 'bankdirect', $bankaccountid, $date_start_subscription, $payment->date, $paymentmethod, $label, $payment->amount, '');
+                        $paymentamount = $payment->amount /100;
+                        $result = $member->subscriptionComplementaryActions($subscriptionid, 'bankdirect', $bankaccountid, $date_start_subscription, $payment->date, $paymentmethod, $label, $paymentamount, '');
                         if ($result <= 0) {
                             $this->error = $member->error;
                             $this->errors = array_merge($this->errors, $member->errors);
