@@ -17,13 +17,13 @@
  */
 
 /**
- * \file    pdpconnectfr/class/PDPProviderManager.class.php
+ * \file    pdpconnectfr/class/providers/PDPProviderManager.class.php
  * \ingroup pdpconnectfr
  * \brief   Manage multiple PDP providers and provide a unified access layer.
  */
 
 
-require_once DOL_DOCUMENT_ROOT . '/custom/pdpconnectfr/class/EsalinkPDPProvider.class.php';
+require_once DOL_DOCUMENT_ROOT . '/custom/pdpconnectfr/class/providers/EsalinkPDPProvider.class.php';
 
 class PDPProviderManager
 {
@@ -71,6 +71,7 @@ class PDPProviderManager
      */
     public function getProvider($name)
     {
+        global $db;
         // Check if provider exists and is enabled in providersList
         if (!isset($this->providersList[$name]) || !$this->providersList[$name]['is_enabled']) {
             return null;
@@ -79,7 +80,7 @@ class PDPProviderManager
         // Initialize provider based on name
         switch ($name) {
             case 'ESALINK':
-                $provider = new EsalinkPDPProvider();
+                $provider = new EsalinkPDPProvider($db);
                 break;
             case 'TESTPDP':
                 //$provider = new TESTPDPProvider();
