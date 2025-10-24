@@ -19,12 +19,12 @@
 
 
 /**
- * \file    pdpconnectfr/class/EsalinkPDPProvider.class.php
+ * \file    pdpconnectfr/class/providers/EsalinkPDPProvider.class.php
  * \ingroup pdpconnectfr
  * \brief   Esalink PDP provider integration class
  */
 
-require_once DOL_DOCUMENT_ROOT . '/custom/pdpconnectfr/class/AbstractPDPProvider.class.php';
+require_once DOL_DOCUMENT_ROOT . '/custom/pdpconnectfr/class/providers/AbstractPDPProvider.class.php';
 
 /**
  * Class to manage Esalink PDP provider integration.
@@ -35,7 +35,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
      * Constructor
      *
      */
-    public function __construct() {
+    public function __construct($db) {
+        parent::__construct($db);
         $this->config = array(
             'provider_url' => 'https://ppd.hubtimize.fr',
             'prod_api_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/', // TODO: Replace the URL once known
@@ -135,6 +136,21 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         }
 
         return $returnarray;
+    }
+
+
+    /**
+     * Send a sample electronic invoice for testing purposes.
+     *
+     * This function generates a sample invoice and sends it to PDP
+     *
+     * @return bool True if the invoice was successfully sent, false otherwise.
+     */
+    public function sendSampleInvoice()
+    {
+        $invoice = $this->exchangeProtocol->generateSampleInvoice();
+
+        return $invoice;
     }
 
     /**

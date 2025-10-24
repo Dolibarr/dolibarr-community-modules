@@ -19,11 +19,12 @@
 
 
 /**
- * \file    pdpconnectfr/class/AbstractPDPProvider.class.php
+ * \file    pdpconnectfr/class/providers/AbstractPDPProvider.class.php
  * \ingroup pdpconnectfr
  * \brief   Base class for all PDP provider integrations.
  */
 
+require_once DOL_DOCUMENT_ROOT . '/custom/pdpconnectfr/class/protocols/ProtocolManager.class.php';
 abstract class AbstractPDPProvider
 {
     /** @var DoliDB Database handler */
@@ -38,15 +39,21 @@ abstract class AbstractPDPProvider
     /** @var array OAuth token information */
     protected $tokenData = [];
 
+    /** @var AbstractProtocol Exchange protocol */
+    public $exchangeProtocol;
+
     /**
      * Constructor
      *
      * @param DoliDB $db Database handler
      */
-    public function __construct()
+    public function __construct($db)
     {
         $this->config = [];
         $this->tokenData = [];
+        $exchangeProtocolConf = getDolGlobalString('PDPCONNECTFR_PROTOCOL');
+        $ProtocolManager = new ProtocolManager($db);
+        $this->exchangeProtocol = $ProtocolManager->getprotocol($exchangeProtocolConf);
     }
 
     /**
@@ -99,7 +106,16 @@ abstract class AbstractPDPProvider
         return $this->tokenData;
     }
 
-    
+    /**
+     * Send a sample electronic invoice for testing purposes.
+     *
+     * This function generates a sample invoice and sends it to PDP
+     *
+     * @return bool True if the invoice was successfully sent, false otherwise.
+     */
+    abstract public function sendSampleInvoice();
+
+
     /**
 	 * Call the provider API.
 	 *
