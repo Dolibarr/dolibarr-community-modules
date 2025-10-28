@@ -1,0 +1,12 @@
+parameters:
+    paths:
+        - ../src
+        - ../tests
+    level: 3
+    treatPhpDocTypesAsCertain: false
+    excludePaths:
+        - ../src/entities/*
+        - ../src/codelistsenum/*
+        - ../tests/testcases/issues/Issue32Test.php
+        - ../src/quick/ZugferdQuickDescriptor.php
+        - ../tests/traits/HandlesXmlTests.php

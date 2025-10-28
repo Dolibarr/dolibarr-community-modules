@@ -1,0 +1,132 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+    paths-ignore:
+      - "**.md"
+      - ".github/**"
+      - "examples/**"
+
+env:
+  PHPDOCUMENTORURL: https://phpdoc.org/phpDocumentor.phar
+  PHPDOCUMENTORFILENAME: phpDocumentor.phar
+
+jobs:
+  build:
+    permissions: write-all
+    runs-on: "ubuntu-24.04"
+
+    steps:
+      - name: Checkout Sources
+        uses: actions/checkout@v4
+
+      - name: Setup PHP with PECL extension
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, bcmath, intl, gd, exif, iconv, imagick, json, xdebug
+          coverage: xdebug
+
+      - name: Get Composer Cache Directory
+        id: composer-cache
+        run: |
+          echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-8.3-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-8.3-composer-
+
+      - name: Install composer dependencies
+        run: |
+          composer config -g github-oauth.github.com ${{ secrets.GITHUB_TOKEN }}
+          composer install
+
+      - name: Prepare Directories
+        run: |
+          mkdir build/builddoc
+          mkdir build/doc
+          mkdir build/coverage
+          mkdir build/coverage-html
+          mkdir build/logs
+          mkdir build/pdepend
+          mkdir build/dist
+          mkdir build/phpdoc
+
+      - name: Run Lint
+        run: |
+          for afile in $(find . -type f -name '*.php' -path './src*/*' -print); do
+             php -l $afile
+          done
+          for afile in $(find . -type f -name '*.php' -path './tests*/*' -print); do
+             php -l $afile
+          done
+
+      - name: Run PHPLOC
+        continue-on-error: true
+        run: |
+          vendor/bin/phploc --count-tests --log-csv build/logs/phploc.csv --log-xml build/logs/phploc.xml src tests
+
+      - name: Run PDEPEND
+        continue-on-error: true
+        run: |
+          vendor/bin/pdepend --jdepend-xml=build/logs/jdepend.xml --jdepend-chart=build/pdepend/dependencies.svg --overview-pyramid=build/pdepend/overview-pyramid.svg src
+
+      - name: Run PHPMD
+        continue-on-error: true
+        run: |
+          vendor/bin/phpmd src xml build/phpmd.xml --reportfile build/logs/pmd.xml --exclude src/entities/
+          vendor/bin/phpmd src github build/phpmd.xml --exclude src/entities/
+
+      - name: Run PHPCS
+        continue-on-error: true
+        run: |
+          vendor/bin/phpcs --report=checkstyle --report-file=build/logs/checkstyle.xml --standard=build/phpcsrules.xml --extensions=php --ignore=autoload.php src tests
+
+      - name: Run PHPSTAN
+        continue-on-error: true
+        run: |
+          vendor/bin/phpstan analyze -c build/phpstan.neon --autoload-file=vendor/autoload.php --no-interaction --no-progress --error-format=checkstyle > build/logs/checkstyle_phpstan.xml
+
+      - name: Run PHPCPD
+        continue-on-error: true
+        run: |
+          vendor/bin/phpcpd --log-pmd build/logs/pmd-cpd.xml --exclude src/entities/ src
+
+      - name: Run Tests (PHPUnit)
+        run: |
+          vendor/bin/phpunit --stop-on-failure --configuration build/phpunit.xml
+        env:
+          XDEBUG_MODE: coverage
+
+      - name: Documentation
+        continue-on-error: true
+        run: |
+          wget $PHPDOCUMENTORURL -O $PHPDOCUMENTORFILENAME
+          chmod +x $PHPDOCUMENTORFILENAME
+          cd build
+          php ../$PHPDOCUMENTORFILENAME
+          cd ..
+          rm -f $PHPDOCUMENTORFILENAME
+
+      - name: Deploy
+        continue-on-error: true
+        run: |
+          zip -r build/dist/doc.zip build/doc
+
+      - name: Publish Unit Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          files: "build/logs/junit.xml"
+
+      - name: Make Release
+        uses: "marvinpinto/action-automatic-releases@latest"
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          prerelease: false
+          files: |
+            build/dist/doc.zip

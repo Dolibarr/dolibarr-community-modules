@@ -1,0 +1,67 @@
+name: Update ChangeLog
+
+on:
+  workflow_run:
+    workflows:
+      - Release
+    types:
+      - completed
+  workflow_dispatch:
+
+env:
+  GH_PAT: ${{ secrets.UPDATEWIKITOKEN }}
+
+jobs:
+  updatechangelog:
+    permissions: write-all
+    runs-on: "ubuntu-24.04"
+
+    steps:
+      - name: Checkout Sources
+        uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.UPDATEWIKITOKEN }}
+          fetch-depth: 0
+          fetch-tags: true
+          ref: ${{ github.head_ref }}
+
+      - name: Setup PHP with PECL extension
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, bcmath, intl, gd, exif, iconv, imagick, json, xdebug
+          coverage: xdebug
+
+      - name: Get Composer Cache Directory
+        id: composer-cache
+        run: |
+          echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-8.4-composer-${{ hashFiles('**/composer.json') }}
+          restore-keys: |
+            ${{ runner.os }}-8.4-composer-${{ hashFiles('**/composer.json') }}
+            ${{ runner.os }}-8.4-composer-
+
+      - name: Install composer dependencies
+        run: |
+          composer config -g github-oauth.github.com ${{ secrets.GITHUB_TOKEN }}
+          composer update --no-interaction --prefer-dist
+
+      - name: Update ChangeLog
+        continue-on-error: true
+        run: |
+          php -f make/genchangelog.php all
+          rm -f CHANGELOG.md
+          mv -f make/CHANGELOG.md .
+          git config user.name "HorstOeko"
+          git config user.email "horstoeko@erling.com.de"
+          if [ -n "$(git status --porcelain)" ]; then
+            git add ./CHANGELOG.md
+            git commit -m "[DOC] Updated CHANGELOG.md"
+            git push
+          else
+            echo "No changes found. Skipping."
+          fi

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/9.3/phpunit.xsd" bootstrap="../vendor/autoload.php">
+    <testsuites>
+        <testsuite name="Basic">
+            <file>../tests/testcases/BasicTest.php</file>
+            <file>../tests/testcases/MimeDbTest.php</file>
+        </testsuite>
+    </testsuites>
+    <coverage processUncoveredFiles="true">
+        <include>
+            <directory suffix=".php">../src</directory>
+        </include>
+        <exclude>
+        </exclude>
+        <report>
+            <xml outputDirectory="coverage"/>
+            <html outputDirectory="coverage-html"/>
+            <clover outputFile="logs/clover.xml"/>
+            <crap4j outputFile="logs/crap4j.xml" threshold="50"/>
+        </report>
+    </coverage>
+    <logging>
+        <junit outputFile="logs/junit.xml"/>
+        <testdoxHtml outputFile="logs/testdox.html"/>
+    </logging>
+</phpunit>

@@ -1,0 +1,35 @@
+horstoeko\zugferd\entities\basic\ram\HeaderTradeDeliveryType:
+    properties:
+        shipToTradeParty:
+            expose: true
+            access_type: public_method
+            serialized_name: ShipToTradeParty
+            xml_element:
+                cdata: false
+                namespace: 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100'
+            accessor:
+                getter: getShipToTradeParty
+                setter: setShipToTradeParty
+            type: horstoeko\zugferd\entities\basic\ram\TradePartyType
+        actualDeliverySupplyChainEvent:
+            expose: true
+            access_type: public_method
+            serialized_name: ActualDeliverySupplyChainEvent
+            xml_element:
+                cdata: false
+                namespace: 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100'
+            accessor:
+                getter: getActualDeliverySupplyChainEvent
+                setter: setActualDeliverySupplyChainEvent
+            type: horstoeko\zugferd\entities\basic\ram\SupplyChainEventType
+        despatchAdviceReferencedDocument:
+            expose: true
+            access_type: public_method
+            serialized_name: DespatchAdviceReferencedDocument
+            xml_element:
+                cdata: false
+                namespace: 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100'
+            accessor:
+                getter: getDespatchAdviceReferencedDocument
+                setter: setDespatchAdviceReferencedDocument
+            type: horstoeko\zugferd\entities\basic\ram\ReferencedDocumentType
