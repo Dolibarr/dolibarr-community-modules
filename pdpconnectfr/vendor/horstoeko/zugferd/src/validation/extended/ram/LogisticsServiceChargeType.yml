@@ -1,0 +1,19 @@
+horstoeko\zugferd\entities\extended\ram\LogisticsServiceChargeType:
+    properties:
+        description:
+            -
+                NotNull:
+                    groups:
+                        - xsd_rules
+        appliedAmount:
+            -
+                NotNull:
+                    groups:
+                        - xsd_rules
+        appliedTradeTax:
+            -
+                NotNull:
+                    groups:
+                        - xsd_rules
+            -
+                Valid: null

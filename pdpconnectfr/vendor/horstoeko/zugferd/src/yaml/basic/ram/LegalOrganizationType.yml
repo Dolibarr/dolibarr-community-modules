@@ -1,0 +1,24 @@
+horstoeko\zugferd\entities\basic\ram\LegalOrganizationType:
+    properties:
+        iD:
+            expose: true
+            access_type: public_method
+            serialized_name: ID
+            xml_element:
+                cdata: false
+                namespace: 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100'
+            accessor:
+                getter: getID
+                setter: setID
+            type: horstoeko\zugferd\entities\basic\udt\IDType
+        tradingBusinessName:
+            expose: true
+            access_type: public_method
+            serialized_name: TradingBusinessName
+            xml_element:
+                cdata: false
+                namespace: 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100'
+            accessor:
+                getter: getTradingBusinessName
+                setter: setTradingBusinessName
+            type: horstoeko\zugferd\entities\basic\udt\TextType

@@ -1,0 +1,35 @@
+horstoeko\zugferd\entities\basic\ram\TradeSettlementPaymentMeansType:
+    properties:
+        typeCode:
+            expose: true
+            access_type: public_method
+            serialized_name: TypeCode
+            xml_element:
+                cdata: false
+                namespace: 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100'
+            accessor:
+                getter: getTypeCode
+                setter: setTypeCode
+            type: horstoeko\zugferd\entities\basic\qdt\PaymentMeansCodeType
+        payerPartyDebtorFinancialAccount:
+            expose: true
+            access_type: public_method
+            serialized_name: PayerPartyDebtorFinancialAccount
+            xml_element:
+                cdata: false
+                namespace: 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100'
+            accessor:
+                getter: getPayerPartyDebtorFinancialAccount
+                setter: setPayerPartyDebtorFinancialAccount
+            type: horstoeko\zugferd\entities\basic\ram\DebtorFinancialAccountType
+        payeePartyCreditorFinancialAccount:
+            expose: true
+            access_type: public_method
+            serialized_name: PayeePartyCreditorFinancialAccount
+            xml_element:
+                cdata: false
+                namespace: 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100'
+            accessor:
+                getter: getPayeePartyCreditorFinancialAccount
+                setter: setPayeePartyCreditorFinancialAccount
+            type: horstoeko\zugferd\entities\basic\ram\CreditorFinancialAccountType
