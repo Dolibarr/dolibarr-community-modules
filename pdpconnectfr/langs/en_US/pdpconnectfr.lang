@@ -57,4 +57,4 @@ EsalinkPdpApiReachable=Connection successful: Esalink PDP API is reachable.
 EsalinkPdpApiNotReachable=Connection failed: Esalink PDP API is not reachable.
 PDPCONNECTFR_PROTOCOL=Select the exchange protocol
 PDPCONNECTFR_PROTOCOL_HELP=Available protocols are listed here.
-generateSendSampleInvoice=Generate and send sample invoice
+generateSendSampleInvoice=Generate, send, and retrieve a sample invoice

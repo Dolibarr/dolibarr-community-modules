@@ -144,24 +144,92 @@ class EsalinkPDPProvider extends AbstractPDPProvider
      *
      * This function generates a sample invoice and sends it to PDP
      *
-     * @return bool True if the invoice was successfully sent, false otherwise.
+     * @return array|string True if the invoice was successfully sent, false otherwise.
      */
     public function sendSampleInvoice()
     {
-        $invoice = $this->exchangeProtocol->generateSampleInvoice();
+        $outputLog = array(); // Feedback to display
+        // Generate sample invoice
+        $invoice_path = $this->exchangeProtocol->generateSampleInvoice();
+        if ($invoice_path) {
+            $outputLog[] = "Sample invoice generated successfully.";
+        }
+        $file_info = pathinfo($invoice_path);
+        $uuid = $this->generateUuidV4(); // UUID used to correlate logs between Dolibarr and PDP
 
-        return $invoice;
+        // Format PDP resource Url
+        $resource = 'flows';
+        $urlparams = array(
+            'Request-Id' => $uuid,
+        );
+		$resource .= '?' . http_build_query($urlparams);
+
+        // Extra headers
+        $extraHeaders = [
+            'Content-Type' => 'multipart/form-data'
+        ];
+
+        // Params
+        $params = [
+            'flowInfo' => json_encode([
+                "trackingId" => "INV-2025-001",
+                "name" => "Invoice_2025_001",
+                "flowSyntax" => "FACTUR_X",
+                "flowProfile" => "Basic",
+                "sha256" => hash_file('sha256', $invoice_path)
+            ]),
+            'file' => new CURLFile($invoice_path, 'application/pdf', basename($invoice_path))
+        ];
+
+
+
+        $response = $this->callApi("flows", "POSTALREADYFORMATED", $params, $extraHeaders);
+
+        if ($response['status_code'] == 200 || $response['status_code'] == 202) {
+
+            $flowId = $response['response']['flowId'];
+            $outputLog[] = "Sample invoice sent successfully.";
+
+            // Try to retrive flow using callback information
+            $resource = 'flows/' . $flowId;
+            $urlparams = array(
+                'docType' => 'Original',
+            );
+            $resource .= '?' . http_build_query($urlparams);
+            $response = $this->callApi(
+                $resource,
+                "GET",
+                false,
+                ['Accept' => 'application/octet-stream']
+            );
+
+            if ($response['status_code'] == 200 || $response['status_code'] == 202) {
+                $output_path = __DIR__ . '/../../assets/retrived_invoice.pdf';
+                file_put_contents($output_path, $response['response']);
+
+                $outputLog[] = "Sample invoice retrived successfully.";
+
+                return $outputLog;
+            } else {
+                $this->errors[] = "Failed to retrive sample invoice.";
+                return 0;
+            }
+        } else {
+            $this->errors[] = "Failed to send sample invoice.";
+            return 0;
+        }
     }
 
     /**
 	 * Call the provider API.
 	 *
-	 * @param string 						$resource 	Resource relative URL ('Flows', 'healthcheck' or others)
-     * @param string                        $method     HTTP method ('GET', 'POST', etc.)
-	 * @param array<string, mixed>|false 	$params 	Options for the request
+	 * @param string 						$resource 	    Resource relative URL ('Flows', 'healthcheck' or others)
+     * @param string                        $method         HTTP method ('GET', 'POST', etc.)
+	 * @param array<string, mixed>|false 	$params 	    Options for the request
+     * @param array<string, string>         $extraHeaders   Optional additional headers
 	 * @return array{status_code:int,response:null|string|array<string,mixed>}
 	 */
-	public function callApi($resource, $method, $params = false)
+	public function callApi($resource, $method, $params = false, $extraHeaders = [])
 	{
         // Validate configuration
         if (!$this->validateConfiguration()) {
@@ -174,10 +242,17 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$url = $this->getApiUrl() . $resource;
 
         $httpheader = array(
-            'hubtimize-api-key: '. $this->config['api_key'],
-            'Content-Type: application/json',
-            'Accept: application/json'
+            'hubtimize-api-key: '. $this->config['api_key']
         );
+
+        if (!isset($extraHeaders['Content-Type'])) {
+            $httpheader[] = 'Content-Type: application/json';
+            $httpheader[] = 'Accept: application/json';
+        }
+
+        foreach ($extraHeaders as $key => $value) {
+            $httpheader[] = $key . ': ' . $value;
+        }
 
         // check or get access token
         if ($resource != 'token') {
@@ -205,9 +280,11 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$status_code = $response['http_code'];
 		$body = 'Error';
 
-		if ($status_code == 200) {
+		if ($status_code == 200 || $status_code == 202) {
 			$body = $response['content'];
-			$body = json_decode($body, true);
+            if (!isset($extraHeaders['Accept'])) { // Json if default format
+                $body = json_decode($body, true);
+            }
 			$returnarray = array(
 				'status_code' => $status_code,
 				'response' => $body

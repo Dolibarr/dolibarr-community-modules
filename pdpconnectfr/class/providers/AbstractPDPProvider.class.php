@@ -92,6 +92,30 @@ abstract class AbstractPDPProvider
 		return $url;
     }
 
+
+    /**
+     * Generate a UUID used to correlate logs between Dolibarr and PDP.
+     *
+     * This function creates a random UUID.
+     * It can be used as a Request-Id header to trace requests
+     * and unify logs across distributed systems (Dolibarr and PDP).
+     *
+     * @return string A random UUID v4 string, e.g. "550e8400-e29b-41d4-a716-446655440000"
+     */
+    public function generateUuidV4(): string
+    {
+        // Generate 16 random bytes (128 bits)
+        $data = random_bytes(16);
+
+        // Set version to 0100 (UUID v4)
+        $data[6] = chr((ord($data[6]) & 0x0f) | 0x40);
+        // Set variant to 10xxxxxx (RFC 4122)
+        $data[8] = chr((ord($data[8]) & 0x3f) | 0x80);
+
+        // Convert to standard UUID format
+        return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
+    }
+
     /**
      * Get the base API URL for Esalink PDP
      *
@@ -111,7 +135,7 @@ abstract class AbstractPDPProvider
      *
      * This function generates a sample invoice and sends it to PDP
      *
-     * @return bool True if the invoice was successfully sent, false otherwise.
+     * @return array|string True if the invoice was successfully sent, false otherwise.
      */
     abstract public function sendSampleInvoice();
 

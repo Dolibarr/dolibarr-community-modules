@@ -286,11 +286,11 @@ if (preg_match('/set'.$prefix.'TOKEN/i', $action, $reg)) {
 
 if (preg_match('/make'.$prefix.'sampleinvoice/i', $action, $reg)) {
 	$result = $provider->sendSampleInvoice();
-	/*if ($statusPDP['status_code'] == 200) {
-		setEventMessages($statusPDP['message'], null, 'mesgs');
+	if ($result) {
+		setEventMessages('', $result, 'warnings');
 	} else {
 		setEventMessages('', $provider->errors, 'errors');
-	}*/
+	}
 }
 
 if (preg_match('/call'.$prefix.'HEALTHCHECK/i', $action, $reg)) {
