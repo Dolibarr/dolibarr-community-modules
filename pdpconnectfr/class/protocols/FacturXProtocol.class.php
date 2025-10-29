@@ -39,7 +39,7 @@ use horstoeko\zugferd\ZugferdDocumentPdfBuilderAbstract;
 
 require __DIR__ . "/../../vendor/autoload.php";
 
-require_once DOL_DOCUMENT_ROOT . '/custom/pdpconnectfr/class/protocols/AbstractProtocol.class.php';
+dol_include_once('custom/pdpconnectfr/class/protocols/AbstractProtocol.class.php');
 
 /**
  * Class to manage Factur-X Protocol integration.
@@ -283,7 +283,7 @@ class FacturXProtocol extends AbstractProtocol
         $zugferdDocumentPdfBuilder->setMetaInformationCallback(null);
         $zugferdDocumentPdfBuilder->generateDocument();
         $zugferdDocumentPdfBuilder->saveDocument($newPdfFilename);
-        
+
         return $newPdfFilename;
     }
 

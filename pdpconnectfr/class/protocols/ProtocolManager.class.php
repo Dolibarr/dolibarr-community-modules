@@ -23,7 +23,7 @@
  */
 
 
-require_once DOL_DOCUMENT_ROOT . '/custom/pdpconnectfr/class/protocols/FacturXProtocol.class.php';
+dol_include_once('pdpconnectfr/class/protocols/FacturXProtocol.class.php');
 
 class ProtocolManager
 {

@@ -22,8 +22,7 @@
  * \brief   Manage multiple PDP providers and provide a unified access layer.
  */
 
-
-require_once DOL_DOCUMENT_ROOT . '/custom/pdpconnectfr/class/providers/EsalinkPDPProvider.class.php';
+dol_include_once('pdpconnectfr/class/providers/EsalinkPDPProvider.class.php');
 
 class PDPProviderManager
 {
