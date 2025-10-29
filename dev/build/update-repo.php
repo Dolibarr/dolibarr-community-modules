@@ -315,9 +315,10 @@ if (substr($sapi_type, 0, 3) == 'cgi') {
 }
 
 if (empty($argv[1])) {
-	print "Usage:   ".$script_file." index|dolistore\n";
-	print "Example: ".$script_file." index      to rebuild the index.yaml file (used by Dolibarr to retreive list of community modules)\n";
-	print "Example: ".$script_file." dolistore  to regenerate zip of packages and publish them on dolistore\n";
+	print "Usage:   ".$script_file." index|pushdolistore\n";
+	print "Example: ".$script_file." index      	to rebuild the index.yaml file (used by Dolibarr to retreive list of community modules)\n";
+	print "Example: ".$script_file." pushdolistore  to regenerate zip of packages and publish them on dolistore (TODO)\n";
+	print "\n";
 	exit(1);
 }
 

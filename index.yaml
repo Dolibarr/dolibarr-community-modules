@@ -14,7 +14,7 @@ packages:
         de: 'Fügt dolibarr die Fähigkeit hinzu, Rechnungen im Format XRechnung (Elektronische Rechnung) zu erstellen: Die PDF-Datei wird um eine eingebettete XML-Datei erweitert.'
       status: 'enabled'
       created_at: '2024-12-10'
-      last_updated_at: "2025-09-29"
+      last_updated_at: "2025-10-19"
       # The git url, stable branch and system to get the sources and guess all auto value
       git: 'https://inligit.fr/cap-rel/dolibarr/plugin-facturx.git'
       git-branch: 'master'
@@ -39,11 +39,11 @@ packages:
         fr: 'HelloAsso (par DoliCloud)'
         en: 'HelloAsso (by DoliCloud)'
       description:
-        fr: 'Offre une solution pour réaliser un paiement en ligne pour toute cotisation d’adhésion, don, facture client ou commande client via l’API HelloAsso.'
-        en: 'Provides a way to make an online checkout of any membership dues, donation, customer invoice or customer order with the HelloAsso API.'
+        fr: 'Offre une solution pour réaliser un paiement en ligne pour toute cotisation d’adhésion à une association, don, facture client ou commande client via l’API HelloAsso. Offre aussi une possibilité de synchroniser les adhérents.'
+        en: 'Provides a way to make an online checkout of any membership dues, donation, customer invoice or customer order with the HelloAsso API. Also offer an option to synchronize membership.'
       status: 'enabled'		
       created_at: '2024-12-10'
-      last_updated_at: "2025-10-14"
+      last_updated_at: "2025-10-29"
       category: '68, 67'
       git: 'https://github.com/Dolibarr/dolibarr-community-modules/tree/main/helloasso'
       git-branch: 'main'
@@ -68,6 +68,9 @@ packages:
       label:
         fr: 'PayPlug (par DoliCloud)'
         en: 'PayPlug (by DoliCloud)'
+      description:
+        fr: 'Intègre le mode de paiement Payplug dans Dolibarr. Permet d’utiliser un compte Payplug pour régler les cotisations, les dons, les factures et les commandes clients via l’API Payplug.'
+        en: 'Integrates the Payplug payment mode inside Dolibarr. Allow to use a Payplug account to pay any membership dues, donation, customer invoice or customer order with the PayPlug API.'
       status: 'enabled'	
       git: 'https://github.com/DoliCloud/DoliMods/tree/master/htdocs/payplugdolicloud'
       git-branch: 'master'
@@ -80,14 +83,14 @@ packages:
       phpmax: '8.4'
       price: 0
       created_at: '2025-03-05'
-      last_updated_at: "2025-10-13"
+      last_updated_at: "2025-10-29"
       # direct-download is yes if we can download the module to install it in application
       direct-download: no
       # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
       dolistore-upload: 'manual'
       # dolistore-download is url of product page for download if module can also be found on dolistore.com
       # Example: https://www.dolistore.com/product.php?id=xxx
-      dolistore-download: ''
+      dolistore-download: 'https://www.dolistore.com/product.php?id=2552'
 
     - modulename: 'PDPConnectFR'
       author: 'Dolibarr foundation'
@@ -110,7 +113,7 @@ packages:
       phpmax: ""
       price: 0
       created_at: '2025-10-10'
-      last_updated_at: "2025-10-14"
+      last_updated_at: "2025-10-29"
       # direct-download is yes if we can download the module to install it in application
       direct-download: no
       # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
@@ -129,12 +132,12 @@ packages:
       git-branch: 'master'
       git-system: 'gitlab'	  
       status: 'disabled'	
-      current_version: "1.2.27"
+      current_version: "1.2.32"
       dolibarrmin: "10.0"
       dolibarrmax: "22.0"
       phpmin: "7.1"
       phpmax: ""
-      last_updated_at: "2025-10-14"
+      last_updated_at: "2025-10-22"
       # direct-download is yes if we can download the module to install it in application
       direct-download: no
       # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
