@@ -70,7 +70,8 @@ if (!$res) {
 // Libraries
 require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
 require_once '../lib/pdpconnectfr.lib.php';
-require_once "../class/PDPProviderManager.class.php";
+require_once "../class/providers/PDPProviderManager.class.php";
+require_once "../class/protocols/ProtocolManager.class.php";
 
 
 // Translations
@@ -196,14 +197,27 @@ $item->cssClass = 'minwidth500';
 $PDPManager = new PDPProviderManager($db);
 $providersConfig = $PDPManager->getAllProviders();
 
+$ProtocolManager = new ProtocolManager($db);
+$protocolsList = $ProtocolManager->getProtocolsList();
+
 $formSetup->newItem('PDPCONNECTFR_LIVE')->setAsYesNo();
 
-$TField = array('' => '');
+// PDP providers list
+$TFieldProviders = array('' => '');
 foreach ($providersConfig as $key => $pconfig) {
 	if ($pconfig['is_enabled'] == 0) {
 		continue;
 	}
-	$TField[$key] = $pconfig['provider_name'];
+	$TFieldProviders[$key] = $pconfig['provider_name'];
+}
+
+// Protocols list
+$TFieldProtocols = array();
+foreach ($protocolsList as $key => $pconfig) {
+	if ($pconfig['is_enabled'] == 0) {
+		continue;
+	}
+	$TFieldProtocols[$key] = $pconfig['protocol_name'];
 }
 
 $reg = array();
@@ -211,14 +225,21 @@ $prefix = '';
 
 // If a PDP is selected, show parameters for this PDP
 if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_PDP') === "ESALINK") {
-	$prefix = $providersConfig['ESALINK']['dol_prefix'].'_';
 	$provider = $PDPManager->getProvider('ESALINK');
+	$prefix = $provider->getConf()['dol_prefix'].'_';
+	$tokenData = $provider->getTokenData();
 }
 
 
-// Setup conf for a simple combo list
-$item = $formSetup->newItem('PDPCONNECTFR_PDP')->setAsSelect($TField);
+// Setup conf to choose a PDP
+$item = $formSetup->newItem('PDPCONNECTFR_PDP')->setAsSelect($TFieldProviders);
 $item->helpText = $langs->transnoentities('PDPCONNECTFR_PDP_HELP');
+$item->cssClass = 'minwidth500';
+
+// Setup conf to choose a protocol of exchange
+$item = $formSetup->newItem('PDPCONNECTFR_PROTOCOL')->setAsSelect($TFieldProtocols);
+$item->helpText = $langs->transnoentities('PDPCONNECTFR_PROTOCOL_HELP');
+$item->defaultFieldValue = 'FACTURX';
 $item->cssClass = 'minwidth500';
 
 // End of definition of parameters
@@ -244,6 +265,13 @@ if ($action == 'update' && GETPOST('PDPCONNECTFR_PDP') != getDolGlobalString('PD
 	exit;
 }
 
+// Set FACTURX as the default protocol when no default value is specified
+if (!getDolGlobalString('PDPCONNECTFR_PROTOCOL')) {
+	dolibarr_set_const($db, 'PDPCONNECTFR_PROTOCOL', 'FACTURX', 'chaine', 0, '', $conf->entity);
+	header("Location: ".$_SERVER["PHP_SELF"]);
+	exit;
+}
+
 if (preg_match('/set'.$prefix.'TOKEN/i', $action, $reg)) {
 	// Generate token
 	$token = $provider->getAccessToken();
@@ -251,6 +279,15 @@ if (preg_match('/set'.$prefix.'TOKEN/i', $action, $reg)) {
 		setEventMessages("Token generated successfully", null, 'mesgs');
 		header("Location: ".$_SERVER["PHP_SELF"]);
 		exit;
+	} else {
+		setEventMessages('', $provider->errors, 'errors');
+	}
+}
+
+if (preg_match('/make'.$prefix.'sampleinvoice/i', $action, $reg)) {
+	$result = $provider->sendSampleInvoice();
+	if ($result) {
+		setEventMessages('', $result, 'warnings');
 	} else {
 		setEventMessages('', $provider->errors, 'errors');
 	}
@@ -281,36 +318,45 @@ if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_P
 	// Token
 	$item = $formSetup->newItem($prefix . 'TOKEN');
 	$item->cssClass = 'maxwidth500 ';
-	if (getDolGlobalString($prefix . 'TOKEN')) {
-		$item->fieldOverride = "<span class='opacitymedium hideonsmartphone'>" . htmlspecialchars('**************' . substr(getDolGlobalString($prefix . 'TOKEN'), -4)) . "</span>";
+	if ($tokenData['token']) {
+		$item->fieldOverride = "<span class='opacitymedium hideonsmartphone'>" . htmlspecialchars('**************' . substr($tokenData['token'], -4)) . "</span>";
 	}
-	if (!getDolGlobalString($prefix . 'TOKEN')) {
+	if (!$tokenData['token']) {
 		$item->fieldOverride = "-";
 	}
 
 	// Actions
 	$item = $formSetup->newItem($prefix . 'ACTIONS');
 	$item->fieldOverride = "";
-	if (!getDolGlobalString($prefix . 'TOKEN')) {
+	if (!$tokenData['token']) {
 		$item->fieldOverride .= "
 			<a
 			href='".$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken()."'
 			>" . $langs->trans('generateAccessToken') . " <i class='fa fa-key'></i></a><br/>
 		";
 	}
-	if (getDolGlobalString($prefix . 'TOKEN')) {
+	if ($tokenData['token']) {
 		$item->fieldOverride .= "
 			<a
 			href='".$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken()."'
 			>" . $langs->trans('reGenerateAccessToken') . " <i class='fa fa-key'></i></a><br/>
 		";
 	}
+
 	$item->fieldOverride .= "
 		<a
 			href='".$_SERVER["PHP_SELF"]."?action=call".$prefix."HEALTHCHECK&token=".newToken()."'
 		>" . $langs->trans('testConnection') . " (Healthcheck) <i class='fa fa-check'></i></a><br/>
 	";
 	$item->cssClass = 'minwidth500';
+
+	if ($tokenData['token'] && getDolGlobalString('PDPCONNECTFR_PROTOCOL') && getDolGlobalString('PDPCONNECTFR_PROTOCOL') === 'FACTURX') {
+		$item->fieldOverride .= "
+			<a
+			href='".$_SERVER["PHP_SELF"]."?action=make".$prefix."sampleinvoice&token=".newToken()."'
+			>" . $langs->trans('generateSendSampleInvoice') . " <i class='fa fa-file'></i></a><br/>
+		";
+	}
 }
 
 

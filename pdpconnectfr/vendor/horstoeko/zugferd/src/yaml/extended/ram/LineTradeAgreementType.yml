@@ -1,0 +1,98 @@
+horstoeko\zugferd\entities\extended\ram\LineTradeAgreementType:
+    properties:
+        sellerOrderReferencedDocument:
+            expose: true
+            access_type: public_method
+            serialized_name: SellerOrderReferencedDocument
+            xml_element:
+                cdata: false
+                namespace: 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100'
+            accessor:
+                getter: getSellerOrderReferencedDocument
+                setter: setSellerOrderReferencedDocument
+            type: horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType
+        buyerOrderReferencedDocument:
+            expose: true
+            access_type: public_method
+            serialized_name: BuyerOrderReferencedDocument
+            xml_element:
+                cdata: false
+                namespace: 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100'
+            accessor:
+                getter: getBuyerOrderReferencedDocument
+                setter: setBuyerOrderReferencedDocument
+            type: horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType
+        quotationReferencedDocument:
+            expose: true
+            access_type: public_method
+            serialized_name: QuotationReferencedDocument
+            xml_element:
+                cdata: false
+                namespace: 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100'
+            accessor:
+                getter: getQuotationReferencedDocument
+                setter: setQuotationReferencedDocument
+            type: horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType
+        contractReferencedDocument:
+            expose: true
+            access_type: public_method
+            serialized_name: ContractReferencedDocument
+            xml_element:
+                cdata: false
+                namespace: 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100'
+            accessor:
+                getter: getContractReferencedDocument
+                setter: setContractReferencedDocument
+            type: horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType
+        additionalReferencedDocument:
+            expose: true
+            access_type: public_method
+            serialized_name: AdditionalReferencedDocument
+            xml_element:
+                cdata: false
+                namespace: 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100'
+            accessor:
+                getter: getAdditionalReferencedDocument
+                setter: setAdditionalReferencedDocument
+            xml_list:
+                inline: true
+                entry_name: AdditionalReferencedDocument
+                namespace: 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100'
+            type: array<horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType>
+        grossPriceProductTradePrice:
+            expose: true
+            access_type: public_method
+            serialized_name: GrossPriceProductTradePrice
+            xml_element:
+                cdata: false
+                namespace: 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100'
+            accessor:
+                getter: getGrossPriceProductTradePrice
+                setter: setGrossPriceProductTradePrice
+            type: horstoeko\zugferd\entities\extended\ram\TradePriceType
+        netPriceProductTradePrice:
+            expose: true
+            access_type: public_method
+            serialized_name: NetPriceProductTradePrice
+            xml_element:
+                cdata: false
+                namespace: 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100'
+            accessor:
+                getter: getNetPriceProductTradePrice
+                setter: setNetPriceProductTradePrice
+            type: horstoeko\zugferd\entities\extended\ram\TradePriceType
+        ultimateCustomerOrderReferencedDocument:
+            expose: true
+            access_type: public_method
+            serialized_name: UltimateCustomerOrderReferencedDocument
+            xml_element:
+                cdata: false
+                namespace: 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100'
+            accessor:
+                getter: getUltimateCustomerOrderReferencedDocument
+                setter: setUltimateCustomerOrderReferencedDocument
+            xml_list:
+                inline: true
+                entry_name: UltimateCustomerOrderReferencedDocument
+                namespace: 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100'
+            type: array<horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType>

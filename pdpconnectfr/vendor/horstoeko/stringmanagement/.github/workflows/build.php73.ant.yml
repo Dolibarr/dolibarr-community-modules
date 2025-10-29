@@ -1,0 +1,32 @@
+name: CI (Ant, PHP 7.3)
+
+on:
+  push:
+    tags-ignore:
+      - '**'
+    branches:
+      - '**'
+    paths-ignore:
+      - '**.md'
+      - '.github/**'
+
+jobs:
+  build:
+    permissions: write-all
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup PHP with PECL extension
+        uses: shivammathur/setup-php@v2
+        with:
+            php-version: '7.3'
+            extensions: imagick, swoole      
+            coverage: xdebug
+      - name: Build with Ant
+        run: ant -noinput -buildfile build.ant.xml
+      - name: Publish Unit Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v1
+        if: always()
+        with:
+            files: "./build/logs/junit.xml"
