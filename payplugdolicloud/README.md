@@ -2,4 +2,5 @@
 
 ## Features
 
-Provides a way to make an online checkout of any membership dues, donation, customer invoice or customer order with the PayPlug API.
+Integrates the Payplug payment mode inside Dolibarr. 
+Allow to use a Payplug account to pay any membership dues, donation, customer invoice or customer order with the PayPlug API.
