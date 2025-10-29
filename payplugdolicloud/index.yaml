@@ -20,7 +20,7 @@ packages:
       dolibarrmax: 'auto'
       phpmin: '7.1'
       phpmax: '8.4'
-      price: 0
+      price: ""
       created_at: '2025-03-05'
       last_updated_at: 'auto'
       # direct-download is yes if we can download the module to install it in application
