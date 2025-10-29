@@ -24,7 +24,9 @@
  * \brief   Base class for all PDP provider integrations.
  */
 
-require_once DOL_DOCUMENT_ROOT . '/custom/pdpconnectfr/class/protocols/ProtocolManager.class.php';
+dol_include_once('/pdpconnectfr/class/protocols/ProtocolManager.class.php');
+
+
 abstract class AbstractPDPProvider
 {
     /** @var DoliDB Database handler */
