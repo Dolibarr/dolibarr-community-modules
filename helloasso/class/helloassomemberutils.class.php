@@ -341,31 +341,49 @@ class HelloAssoMemberUtils
 
                     // Create new bank payment
                     $bankaccountid = getDolGlobalInt('HELLOASSO_BANK_ACCOUNT_FOR_PAYMENTS');
-                    foreach ($newmember->payments as $key => $payment) {
-                        $paymentmethod = "";
-                        switch ($payment->paymentMeans) {
-                            case 'BankTransfer':
-                                $paymentmethod = "VIR";
+                    $subscriptioncomplementaryaction = getDolGlobalInt('HELLOASSO_SUBSCRIPTION_COMPLEMENTARYACTIONS');
+                    if (isModEnabled('bank') || isModEnabled('invoice')) {
+                        switch ($subscriptioncomplementaryaction) {
+                            case 1:
+                                $subscriptioncomplementaryaction = "bankdirect";
                                 break;
-
-                            case 'Check':
-                                $paymentmethod = "CHQ";
+                             case 2:
+                                $subscriptioncomplementaryaction = (getDolGlobalInt("HELLOASSO_FORM_CREATE_THIRDPARTY") ? "invoiceonly" : "none");
                                 break;
-
-                            case 'Cash':
-                                $paymentmethod = "LIQ";
+                             case 3:
+                                $subscriptioncomplementaryaction = (getDolGlobalInt("HELLOASSO_FORM_CREATE_THIRDPARTY") ? "bankviainvoice" : "none");
                                 break;
-
                             default:
-                                $paymentmethod = "CB";
+                                $subscriptioncomplementaryaction = "none";
                                 break;
                         }
-                        $label = $langs->transnoentitiesnoconv("HelloAssoMemberPaymentLabel", $payment->id);
-                        $result = $member->subscriptionComplementaryActions($subscriptionid, 'bankdirect', $bankaccountid, $date_start_subscription, $payment->date, $paymentmethod, $label, $payment->amount, '');
-                        if ($result <= 0) {
-                            $this->error = $member->error;
-                            $this->errors = array_merge($this->errors, $member->errors);
-                            return -6;
+                        foreach ($newmember->payments as $key => $payment) {
+                            $paymentmethod = "";
+                            switch ($payment->paymentMeans) {
+                                case 'BankTransfer':
+                                    $paymentmethod = "VIR";
+                                    break;
+
+                                case 'Check':
+                                    $paymentmethod = "CHQ";
+                                    break;
+
+                                case 'Cash':
+                                    $paymentmethod = "LIQ";
+                                    break;
+
+                                default:
+                                    $paymentmethod = "CB";
+                                    break;
+                            }
+                            $label = $langs->transnoentitiesnoconv("HelloAssoMemberPaymentLabel", $payment->id);
+                            $paymentamount = $payment->amount /100;
+                            $result = $member->subscriptionComplementaryActions($subscriptionid, $subscriptioncomplementaryaction, $bankaccountid, $date_start_subscription, $payment->date, $paymentmethod, $label, $paymentamount, '');
+                            if ($result <= 0) {
+                                $this->error = $member->error;
+                                $this->errors = array_merge($this->errors, $member->errors);
+                                return -6;
+                            }
                         }
                     }
                 }

@@ -66,7 +66,7 @@ dol_include_once('helloasso/class/helloassomemberutils.class.php');
 
 
 // Translations
-$langs->loadLangs(array("admin", "helloasso@helloasso"));
+$langs->loadLangs(array("admin", "helloasso@helloasso", "members"));
 
 // Initialize technical object to manage hooks of page. Note that conf->hooks_modules contains array of hook context
 $hookmanager->initHooks(array('helloassosetup', 'globalsetup'));
@@ -119,6 +119,19 @@ $item->helpText = $langs->transnoentities('HELLOASSO_MAX_FORM_PAGINATION_PAGES_H
 $item->defaultFieldValue = 100;
 $item = $formSetup->newItem('HELLOASSO_FORM_CREATE_THIRDPARTY')->setAsYesNo();
 $item->helpText = $langs->transnoentities('HELLOASSO_FORM_CREATE_THIRDPARTY_HELP');
+$item->fieldParams['forcereload'] = "1";
+
+$complementaryarray = array(
+	array("id" => "none", "label" => $langs->trans("None")),
+	array("id" => "bankdirect", "label" => $langs->trans("MoreActionBankDirect"))
+);
+if (getDolGlobalInt("HELLOASSO_FORM_CREATE_THIRDPARTY")) {
+	$complementaryarray[] = array("id" => "invoiceonly", "label" => $langs->trans("MoreActionInvoiceOnly"));
+	$complementaryarray[] = array("id" => "bankviainvoice", "label" => $langs->trans("MoreActionBankViaInvoice"));
+}
+$item = $formSetup->newItem('HELLOASSO_SUBSCRIPTION_COMPLEMENTARYACTIONS')->setAsSelect($complementaryarray);
+$item->helpText = $langs->transnoentities('HELLOASSO_SUBSCRIPTION_COMPLEMENTARYACTIONS_HELP');
+$item->defaultFieldValue = 0;
 $setupnotempty += count($formSetup->items);
 
 $dirmodels = array_merge(array('/'), (array) $conf->modules_parts['models']);
