@@ -213,11 +213,17 @@ foreach ($providersConfig as $key => $pconfig) {
 
 // Protocols list
 $TFieldProtocols = array();
-foreach ($protocolsList as $key => $pconfig) {
-	if ($pconfig['is_enabled'] == 0) {
+foreach ($protocolsList as $key => $protocolconfig) {
+	if ($protocolconfig['is_enabled'] == 0) {
 		continue;
 	}
-	$TFieldProtocols[$key] = $pconfig['protocol_name'];
+	$TFieldProtocols[$key] = $protocolconfig['protocol_name'];
+}
+
+// Available Profiles
+$TFieldProfiles = array('EN16931' => 'EN16931');
+foreach ($TFieldProfiles as $key => $profileconfig) {
+	$TFieldProfiles[$key] = $profileconfig;
 }
 
 $reg = array();
@@ -240,6 +246,17 @@ $item->cssClass = 'minwidth500';
 $item = $formSetup->newItem('PDPCONNECTFR_PROTOCOL')->setAsSelect($TFieldProtocols);
 $item->helpText = $langs->transnoentities('PDPCONNECTFR_PROTOCOL_HELP');
 $item->defaultFieldValue = 'FACTURX';
+$item->cssClass = 'minwidth500';
+
+// Setup conf to choose a profil of exchange
+$item = $formSetup->newItem('PDPCONNECTFR_PROFILE')->setAsSelect($TFieldProfiles);
+$item->helpText = $langs->transnoentities('PDPCONNECTFR_PROFILE_HELP');
+$item->defaultFieldValue = 'EN16931';
+$item->cssClass = 'minwidth500';
+
+// Setup conf to choose to use Chorus or not
+$item = $formSetup->newItem('PDPCONNECTFR_USE_CHORUS')->setAsYesNo();
+$item->helpText = $langs->transnoentities('PDPCONNECTFR_USE_CHORUS_HELP');
 $item->cssClass = 'minwidth500';
 
 // End of definition of parameters
@@ -302,6 +319,18 @@ if (preg_match('/call'.$prefix.'HEALTHCHECK/i', $action, $reg)) {
 	}
 }
 
+// To remove
+if (preg_match('/makeInvoice/i', $action, $reg)) {
+	$protocol = $ProtocolManager->getprotocol('FACTURX');
+
+	$result = $protocol->generateInvoice('288');
+	if ($result) {
+		setEventMessages('Result : ' . $result, null, 'warnings');
+	} else {
+		setEventMessages('', $protocol->errors, 'errors');
+	}
+}
+
 if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_PDP') === "ESALINK") {
 	// Username
 	$item = $formSetup->newItem($prefix . 'USERNAME');
@@ -355,6 +384,15 @@ if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_P
 			<a
 			href='".$_SERVER["PHP_SELF"]."?action=make".$prefix."sampleinvoice&token=".newToken()."'
 			>" . $langs->trans('generateSendSampleInvoice') . " <i class='fa fa-file'></i></a><br/>
+		";
+	}
+
+	// To remove 
+	if ($tokenData['token'] && getDolGlobalString('PDPCONNECTFR_PROTOCOL') && getDolGlobalString('PDPCONNECTFR_PROTOCOL') === 'FACTURX' && getDolGlobalString('PDPCONNECTFR_PROFILE') === 'EN16931') {
+		$item->fieldOverride .= "
+			<a
+			href='".$_SERVER["PHP_SELF"]."?action=makeInvoice&token=".newToken()."'
+			> Generate Invoice <i class='fa fa-file'></i></a><br/>
 		";
 	}
 }
