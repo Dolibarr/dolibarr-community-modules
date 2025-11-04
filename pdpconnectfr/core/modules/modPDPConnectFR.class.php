@@ -119,13 +119,9 @@ class modPDPConnectFR extends DolibarrModules
 			),
 			// Set here all hooks context managed by module. To find available hook context, make a "grep -r '>initHooks(' *" on source code. You can also set hook context to 'all'
 			/* BEGIN MODULEBUILDER HOOKSCONTEXTS */
-			'hooks' => array(
-				//   'data' => array(
-				//       'hookcontext1',
-				//       'hookcontext2',
-				//   ),
-				//   'entity' => '0',
-			),
+			'hooks' => [
+                'all'
+            ],
 			/* END MODULEBUILDER HOOKSCONTEXTS */
 			// Set this to 1 if features of module are opened to external users
 			'moduleforexternal' => 0,
@@ -478,8 +474,58 @@ class modPDPConnectFR extends DolibarrModules
 		}
 
 		// Create extrafields during init
-		//include_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
-		//$extrafields = new ExtraFields($this->db);
+		include_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
+		$extrafields = new ExtraFields($this->db);
+		$param = array('options' => array(1 => 0));
+		$sql = array();
+
+		// Invoice extrafields
+		$result = $extrafields->addExtraField('d4d_separator', $langs->trans('ChorusSeparator'), 'separate', 112001, '', 'facture', 0, 1, '', $param, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', '$conf->global->PDPCONNECTFR_USE_CHORUS');
+        $result = $extrafields->addExtraField('d4d_service_code', $langs->trans('ChorusServiceCode'), 'varchar', 112002, 100, 'facture', 0, 0, '', null, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', '$conf->global->PDPCONNECTFR_USE_CHORUS', 0, 2);
+        $result = $extrafields->addExtraField('d4d_contract_number', $langs->trans('ChorusContractNumber'), 'varchar', 112003, 50, 'facture', 0, 0, '', null, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', '$conf->global->PDPCONNECTFR_USE_CHORUS', 0, 2);
+        $result = $extrafields->addExtraField('d4d_promise_code', $langs->trans('ChorusPromiseCode'), 'varchar', 112004, 50, 'facture', 0, 0, '', null, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', '$conf->global->PDPCONNECTFR_USE_CHORUS', 0, 2);
+        $result = $extrafields->addExtraField('d4d_chorus_id', $langs->trans('ChorusId'), 'varchar', 112005, 36, 'facture', 0, 0, '', null, 1, '', 1, 0, '$object->array_options["options_chorus_id"]', '', 'pdpconnectfr@pdpconnectfr', '$conf->global->PDPCONNECTFR_USE_CHORUS', 0, 1);
+
+		// Same fields for orders
+        $result = $extrafields->addExtraField('d4d_separator', $langs->trans('ChorusSeparator'), 'separate', 112001, '', 'commande', 0, 1, '', $param, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', '$conf->global->PDPCONNECTFR_USE_CHORUS');
+        $result = $extrafields->addExtraField('d4d_service_code', $langs->trans('ChorusServiceCode'), 'varchar', 112002, 100, 'commande', 0, 0, '', null, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', '$conf->global->PDPCONNECTFR_USE_CHORUS', 0, 2);
+        $result = $extrafields->addExtraField('d4d_contract_number', $langs->trans('ChorusContractNumber'), 'varchar', 112003, 50, 'commande', 0, 0, '', null, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', '$conf->global->PDPCONNECTFR_USE_CHORUS', 0, 2);
+        $result = $extrafields->addExtraField('d4d_promise_code', $langs->trans('ChorusPromiseCode'), 'varchar', 112004, 50, 'commande', 0, 0, '', null, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', '$conf->global->PDPCONNECTFR_USE_CHORUS', 0, 2);
+
+		// Update display field for old installations
+        $sql = array_merge(
+            $sql,
+            array(
+                "UPDATE " . MAIN_DB_PREFIX . "extrafields SET enabled='\$conf->global->PDPCONNECTFR_USE_CHORUS' WHERE enabled = '\$conf->pdpconnectfr->enabled'",
+                "UPDATE " . MAIN_DB_PREFIX . "extrafields SET enabled='\$conf->global->PDPCONNECTFR_USE_CHORUS' WHERE enabled = '\$conf->global->PDPCONNECTFR_USE_CHORUS'"
+            )
+        );
+
+		// Update extrafield par rapport au module openDSI, il faut pouvoir éditer le champ ChorusId
+        $result = $extrafields->update(
+            'd4d_chorus_id', //$attrname
+            $langs->trans('ChorusId'), //$label
+            'varchar', //$type
+            36, //$length
+            'facture', //$elementtype
+            0, //$unique
+            0, //$required
+            1112, //$pos
+            null, //$param
+            1, //$alwayseditable
+            '', //$perms
+            1, //$list
+            0, //$help
+            '', //$default
+            '', //$computerd
+            '', //$entity
+            'pdpconnectfr@pdpconnectfr', //$langfile
+            '$conf->global->PDPCONNECTFR_USE_CHORUS', //$enabled
+            0, //$totalizable
+            0, //$printable
+            array() //$moreparams
+        );
+
 		//$result0=$extrafields->addExtraField('pdpconnectfr_separator1', "Separator 1", 'separator', 1,  0, 'thirdparty',   0, 0, '', array('options'=>array(1=>1)), 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', 'isModEnabled("pdpconnectfr")');
 		//$result1=$extrafields->addExtraField('pdpconnectfr_myattr1', "New Attr 1 label", 'boolean', 1,  3, 'thirdparty',   0, 0, '', '', 1, '', -1, 0, '', '', 'pdpconnectfr@pdpconnectfr', 'isModEnabled("pdpconnectfr")');
 		//$result2=$extrafields->addExtraField('pdpconnectfr_myattr2', "New Attr 2 label", 'varchar', 1, 10, 'project',      0, 0, '', '', 1, '', -1, 0, '', '', 'pdpconnectfr@pdpconnectfr', 'isModEnabled("pdpconnectfr")');
@@ -490,38 +536,37 @@ class modPDPConnectFR extends DolibarrModules
 		// Permissions
 		$this->remove($options);
 
-		$sql = array();
 
 		// Document templates
-		$moduledir = dol_sanitizeFileName('pdpconnectfr');
-		$myTmpObjects = array();
-		$myTmpObjects['MyObject'] = array('includerefgeneration' => 0, 'includedocgeneration' => 0);
+		// $moduledir = dol_sanitizeFileName('pdpconnectfr');
+		// $myTmpObjects = array();
+		// $myTmpObjects['MyObject'] = array('includerefgeneration' => 0, 'includedocgeneration' => 0);
 
-		foreach ($myTmpObjects as $myTmpObjectKey => $myTmpObjectArray) {
-			if ($myTmpObjectArray['includerefgeneration']) {
-				$src = DOL_DOCUMENT_ROOT.'/install/doctemplates/'.$moduledir.'/template_myobjects.odt';
-				$dirodt = DOL_DATA_ROOT.($conf->entity > 1 ? '/'.$conf->entity : '').'/doctemplates/'.$moduledir;
-				$dest = $dirodt.'/template_myobjects.odt';
+		// foreach ($myTmpObjects as $myTmpObjectKey => $myTmpObjectArray) {
+		// 	if ($myTmpObjectArray['includerefgeneration']) {
+		// 		$src = DOL_DOCUMENT_ROOT.'/install/doctemplates/'.$moduledir.'/template_myobjects.odt';
+		// 		$dirodt = DOL_DATA_ROOT.($conf->entity > 1 ? '/'.$conf->entity : '').'/doctemplates/'.$moduledir;
+		// 		$dest = $dirodt.'/template_myobjects.odt';
 
-				if (file_exists($src) && !file_exists($dest)) {
-					require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
-					dol_mkdir($dirodt);
-					$result = dol_copy($src, $dest, '0', 0);
-					if ($result < 0) {
-						$langs->load("errors");
-						$this->error = $langs->trans('ErrorFailToCopyFile', $src, $dest);
-						return 0;
-					}
-				}
+		// 		if (file_exists($src) && !file_exists($dest)) {
+		// 			require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+		// 			dol_mkdir($dirodt);
+		// 			$result = dol_copy($src, $dest, '0', 0);
+		// 			if ($result < 0) {
+		// 				$langs->load("errors");
+		// 				$this->error = $langs->trans('ErrorFailToCopyFile', $src, $dest);
+		// 				return 0;
+		// 			}
+		// 		}
 
-				$sql = array_merge($sql, array(
-					"DELETE FROM ".$this->db->prefix()."document_model WHERE nom = 'standard_".strtolower($myTmpObjectKey)."' AND type = '".$this->db->escape(strtolower($myTmpObjectKey))."' AND entity = ".((int) $conf->entity),
-					"INSERT INTO ".$this->db->prefix()."document_model (nom, type, entity) VALUES('standard_".strtolower($myTmpObjectKey)."', '".$this->db->escape(strtolower($myTmpObjectKey))."', ".((int) $conf->entity).")",
-					"DELETE FROM ".$this->db->prefix()."document_model WHERE nom = 'generic_".strtolower($myTmpObjectKey)."_odt' AND type = '".$this->db->escape(strtolower($myTmpObjectKey))."' AND entity = ".((int) $conf->entity),
-					"INSERT INTO ".$this->db->prefix()."document_model (nom, type, entity) VALUES('generic_".strtolower($myTmpObjectKey)."_odt', '".$this->db->escape(strtolower($myTmpObjectKey))."', ".((int) $conf->entity).")"
-				));
-			}
-		}
+		// 		$sql = array_merge($sql, array(
+		// 			"DELETE FROM ".$this->db->prefix()."document_model WHERE nom = 'standard_".strtolower($myTmpObjectKey)."' AND type = '".$this->db->escape(strtolower($myTmpObjectKey))."' AND entity = ".((int) $conf->entity),
+		// 			"INSERT INTO ".$this->db->prefix()."document_model (nom, type, entity) VALUES('standard_".strtolower($myTmpObjectKey)."', '".$this->db->escape(strtolower($myTmpObjectKey))."', ".((int) $conf->entity).")",
+		// 			"DELETE FROM ".$this->db->prefix()."document_model WHERE nom = 'generic_".strtolower($myTmpObjectKey)."_odt' AND type = '".$this->db->escape(strtolower($myTmpObjectKey))."' AND entity = ".((int) $conf->entity),
+		// 			"INSERT INTO ".$this->db->prefix()."document_model (nom, type, entity) VALUES('generic_".strtolower($myTmpObjectKey)."_odt', '".$this->db->escape(strtolower($myTmpObjectKey))."', ".((int) $conf->entity).")"
+		// 		));
+		// 	}
+		// }
 
 		return $this->_init($sql, $options);
 	}
