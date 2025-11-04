@@ -52,7 +52,17 @@ require __DIR__ . "/../../vendor/autoload.php";
 dol_include_once('custom/pdpconnectfr/class/protocols/AbstractProtocol.class.php');
 
 /**
- * Class to manage Factur-X Protocol integration.
+ * FacturX Protocol Class
+ *
+ * This class handles the FacturX protocol implementation for generating
+ * and managing electronic invoices according to the FacturX standard.
+ *
+ * @note    This implementation is based on FacturX plugin developed by CAP REL.
+ *          It has been adapted and integrated into the PDPConnectFR module to provide
+ *          electronic invoicing capabilities compliant with the French Factur-X standard.
+ *
+ * @see     https://inligit.fr/cap-rel/dolibarr/plugin-facturx plugin repository
+ * @author  Eric Seigne <eric.seigne@cap-rel.fr> - Original author
  */
 class FacturXProtocol extends AbstractProtocol
 {
