@@ -78,6 +78,7 @@ FxCheckErrorCustomerName = Your customer does not have a name
 FxCheckErrorCustomerTown = Your customer does not have an associated city
 FxCheckErrorCustomerVAT = Your customer does not have a VAT number
 FxCheckErrorCustomerZIP = Your customer's postal code is missing
+FxCheckErrorCustomerEmail = Your customer does not have an email
 FxCheckError = FacturX compliance errors:
 FxCheckErrorTown = Your company city is empty
 FxCheckErrorVATnumber = Your VAT number is empty

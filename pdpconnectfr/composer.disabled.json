@@ -1,5 +1,8 @@
 {
-    "require": {
-        "horstoeko/zugferd": "^1.0"
-    }
+  "name": "pdpconnectfr/pdpconnectfr",
+  "description": "Module Dolibarr pour la synchronisation avec les PDP/PA",
+  "type": "project",
+  "require": {
+    "horstoeko/zugferd": "^1.0"
+  }
 }

@@ -45,6 +45,7 @@ use horstoeko\zugferd\ZugferdDocumentBuilder;
 use horstoeko\zugferd\ZugferdProfiles;
 use horstoeko\zugferd\ZugferdDocumentPdfBuilder;
 use horstoeko\zugferd\ZugferdDocumentPdfBuilderAbstract;
+use horstoeko\zugferd\ZugferdDocumentValidator;
 
 require __DIR__ . "/../../vendor/autoload.php";
 
@@ -89,7 +90,49 @@ class FacturXProtocol extends AbstractProtocol
         require_once DOL_DOCUMENT_ROOT."/compta/facture/class/facture.class.php";
 
         $invoice = new Facture($db);
-	    $invoiceObject = $invoice->fetch('288');
+	    $invoiceObject = $invoice->fetch((int) $invoice_id);
+
+
+
+        $filename = dol_sanitizeFileName($invoice->ref);
+		$filedir = $conf->invoice->multidir_output[$invoice->entity ?? $conf->entity].'/'.dol_sanitizeFileName($invoice->ref);
+
+
+        $orig_pdf = $filedir.'/'.$filename.'.pdf';
+        // Make a copy of the original PDF file
+        $pathfacturxpdf = $filedir.'/'.$filename.'_facturx.pdf';
+        if (copy($orig_pdf, $pathfacturxpdf)) {
+            dol_syslog(get_class($this) . "::executeHooks copied original PDF to " . $pathfacturxpdf);
+            $orig_pdf = $pathfacturxpdf;
+        } else {
+            dol_syslog(get_class($this) . "::executeHooks failed to copy original PDF to " . $pathfacturxpdf, LOG_ERR);
+            return -1;
+        }
+
+
+        // Initial PDF File Pre-check ---
+        $precheck = false;
+        if (file_exists($orig_pdf) && is_readable($orig_pdf)) {
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            if (finfo_file($finfo, $orig_pdf) == 'application/pdf') {
+                $precheck = true;
+            }
+        }
+
+        // Check if the source PDF is valid, log error and exit if not.
+        if ($precheck == false) {
+            dol_syslog(get_class($this) . "::executeHooks orig pdf file does not exists, can't create facturX");
+            return -1;
+        }
+
+        // Load PDPConnectFR specific translations
+        $outputlangs = $langs;
+        $langs->loadLangs(array("admin", "pdpconnectfr@pdpconnectfr"));
+
+        // migrating code from dolibarr
+        dol_syslog('PDPConnectFR::generateInvoice');
+        clearstatcache(true);
+
 
         $this->sourceinvoice = $invoice;
 
@@ -99,6 +142,9 @@ class FacturXProtocol extends AbstractProtocol
         $billing_period = [];
         $deltemp = array();
         $object = $invoice;
+        if (!is_object($invoice->thirdparty)) {
+            $invoice->fetch_thirdparty();
+        }
 
         // Prepare Invoice Data for XML Generation
         $facture_number = $object->ref;
@@ -128,6 +174,9 @@ class FacturXProtocol extends AbstractProtocol
         if (isset($object->contact)) {
             $contact = $object->contact;
         }
+
+        // Customer Email
+        $buyerEmail = $this->extractBuyerMail($contact, $object->thirdparty);
 
         // Get customer order references and delivery dates
         $customerOrderReferenceList = [];
@@ -232,6 +281,9 @@ class FacturXProtocol extends AbstractProtocol
                 $baseErrors[] = $langs->trans("FxCheckErrorCustomerVAT");
             }
         }
+        if (!$buyerEmail) {
+            $baseErrors[] = $langs->trans("FxCheckErrorCustomerEmail");
+        }
 
         // Display base data warnings
         if (count($baseErrors) > 0) {
@@ -332,174 +384,54 @@ class FacturXProtocol extends AbstractProtocol
             }
         }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        // XML generation part ==================================================================
-
-
-        $filename = dol_sanitizeFileName($invoice->ref);
-		$filedir = $conf->invoice->multidir_output[$invoice->entity ?? $conf->entity].'/'.dol_sanitizeFileName($invoice->ref);
-        //$object_type = 'facture';
-
-
-        $orig_pdf = $filedir.'/'.$filename.'.pdf';
-
-        // Initial PDF File Pre-check ---
-        $precheck = \false;
-        if (\file_exists($orig_pdf) && \is_readable($orig_pdf)) {
-            $finfo = \finfo_open(\FILEINFO_MIME_TYPE);
-            if (\finfo_file($finfo, $orig_pdf) == 'application/pdf') {
-                $precheck = \true;
-            }
-        }
-
-        // Check if the source PDF is valid, log error and exit if not.
-        if ($precheck == \false) {
-            dol_syslog(\get_class($this) . "::executeHooks orig pdf file does not exists, can't create facturX");
-            return -1;
-        }
-
-        // Load PDPConnectFR specific translations
-        $outputlangs = $langs;
-        $langs->loadLangs(array("admin", "pdpconnectfr@pdpconnectfr"));
-
-        // migrating code from dolibarr
-        dol_syslog('PDPConnectFR::generateInvoice');
-        \clearstatcache(\true);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-
-        // --- 9. Set Trade Contact details ---
+        // Set Trade Contact details --- TODO: Check logic
         $contacts = $object->getIdContact('internal', 'SALESREPFOLL');
         $object->user = null;
-
-        if (empty(getDolGlobalString('FACTURX_GLOBAL_TRADECONTACT_DISABLE', ''))) {
-            if (!empty($contacts) && $object->fetch_user($contacts[0]) > 0) {
-                $name = $object->user->getFullName($outputlangs);
-                $office_phone = $object->user->office_phone;
-                $office_fax = $object->user->office_fax;
-                $email = $object->user->email;
-            } else {
-                // Fallback to current user if no sales representative found
-                $name = $user->getFullName($outputlangs);
-                $office_phone = $user->office_phone;
-                $office_fax = $user->office_fax;
-                $email = $user->email;
-            }
-
-            // Fallback to company details if user details are missing
-            if (empty($office_phone)) {
-                $office_phone = $mysoc->phone;
-            }
-            if (empty($office_fax)) {
-                $office_fax = $mysoc->fax;
-            }
-            if (empty($email)) {
-                $email = $mysoc->email;
-            }
-
-            $facturxpdf->setDocumentSellerContact($name, "", $office_phone, $office_fax, $email);
-            $facturxpdf->setDocumentSellerCommunication("EM", $email);
-        }
-
-        // --- 10. Set Buyer Reference (Service Code for Chorus) and Contract References ---
-        // trigger hook for buyer reference
-        $parameters = array('invoice' => $object);
-        $reshook = $hookmanager->executeHooks('calculateBuyerReference', $parameters);
-
-        // Note that $action and $object may have been
-        if ($reshook < 0) {
-            setEventMessages($hookmanager->error, $hookmanager->errors, 'errors');
-        } elseif ($reshook > 0 && !empty($hookmanager->resPrint)) {
-            $facturxpdf->setDocumentBuyerReference($hookmanager->resPrint);
+        if (!empty($contacts) && $object->fetch_user($contacts[0]) > 0) {
+            $name = $object->user->getFullName($outputlangs);
+            $office_phone = $object->user->office_phone;
+            $office_fax = $object->user->office_fax;
+            $email = $object->user->email;
         } else {
-            if (!empty($object->array_options['options_d4d_service_code'])) {
-                // CHORUS Debtor. Service Code
-                $facturxpdf->setDocumentBuyerReference($object->array_options['options_d4d_service_code']);
-            }
+            // Fallback to current user if no sales representative found
+            $name = $user->getFullName($outputlangs);
+            $office_phone = $user->office_phone;
+            $office_fax = $user->office_fax;
+            $email = $user->email;
+        }
+        // Fallback to company details if user details are missing
+        if (empty($office_phone)) {
+            $office_phone = $mysoc->phone;
+        }
+        if (empty($office_fax)) {
+            $office_fax = $mysoc->fax;
+        }
+        if (empty($email)) {
+            $email = $mysoc->email;
+        }
+        $facturxpdf->setDocumentSellerContact($name, "", $office_phone, $office_fax, $email);
+        $facturxpdf->setDocumentSellerCommunication("EM", $email);
+
+
+        // Set Buyer Reference (Service Code for Chorus) and Contract References
+        if (!empty($object->array_options['options_d4d_service_code'])) {
+            // CHORUS Debtor. Service Code
+            $facturxpdf->setDocumentBuyerReference($object->array_options['options_d4d_service_code']);
         }
 
+        // CHORUS Commitment. Contract Number
         if (!empty($object->array_options['options_d4d_contract_number'])) {
-            // CHORUS Commitment. Contract Number
             $facturxpdf->setDocumentContractReferencedDocument($object->array_options['options_d4d_contract_number']);
         }
+
+        // CHORUS Commitment. Commitment Number / Client Ref
         if (!empty($promise_code)) {
-            // CHORUS Commitment. Commitment Number / Client Ref
             $facturxpdf->setDocumentBuyerOrderReferencedDocument($promise_code);
         }
 
-        // moved after lines to get prepaid amount data
-        // $facturxpdf->setDocumentSummation($object->total_ttc, $object->total_ttc, $object->total_ht, 0.0, 0.0, $object->total_ht, $object->total_tva, null, $prepaidAmount)
-        //  ->addDocumentPaymentTerm($langs->transnoentitiesnoconv("PaymentConditions").": ".$langs->transnoentitiesnoconv("PaymentCondition".$object->cond_reglement_code), $ladatepaiement)
-        //  ->addDocumentPaymentMean($this->get_paymentMean_number($object), $langs->transnoentitiesnoconv("PaymentType".$object->mode_reglement_code), null, null, null, null, $this->_remove_spaces($account->iban), $account_proprio, $this->_remove_spaces($account->number), $this->_remove_spaces($account->bic));
-
         // Set Business Process (A1/A2 for Chorus)
-        if (empty(getDolGlobalString('FACTURX_DISABLE_CHORUS_EXTRAFIELDS', ''))) {
-            dol_syslog("FacturX::Chorus add DocumentBusinessProcess data");
+        if (getDolGlobalString('PDPCONNECTFR_USE_CHORUS')) {
+            dol_syslog("PDPConnectFR::Chorus add DocumentBusinessProcess data");
             if ($object->paye) {
                 $facturxpdf->setDocumentBusinessProcess("A2");
             } else {
@@ -508,6 +440,7 @@ class FacturXProtocol extends AbstractProtocol
         } else {
             dol_syslog("FacturX::Chorus disabled, then DocumentBusinessProcess disabled too");
         }
+
 
         // --- 11. Process Invoice Lines ---
         // is there multi VAT informatins ? in case we need to collect all data to be able to join it at the end
@@ -532,11 +465,11 @@ class FacturXProtocol extends AbstractProtocol
             $newlang = GETPOST('lang_id', 'alphanohtml');
         }
         if (!empty($newlang)) {
-            $outputlangs = new \Translate("", $conf);
+            $outputlangs = new Translate("", $conf);
             $outputlangs->setDefaultLang($newlang);
         }
 
-        // add invoice lines
+        // Add invoice lines
         $numligne = 1;
         foreach ($object->lines as $line) {
             // Skip subtotal lines
@@ -548,23 +481,23 @@ class FacturXProtocol extends AbstractProtocol
             // Handle deposit/prepayment lines (treated as a global allowance/charge)
             if ($line->desc == '(DEPOSIT)') {
                 $origFactRef = "";
-                $origFactDate = new \DateTime();
-                $discount = new \DiscountAbsolute($this->db);
+                $origFactDate = new DateTime();
+                $discount = new DiscountAbsolute($this->db);
                 $resdiscount = $discount->fetch($line->fk_remise_except);
                 print "<p>Fetch discount " . $line->fk_remise_except . ", res={$resdiscount}</p>";
                 if ($resdiscount > 0) {
-                    $origFact = new \Facture($this->db);
+                    $origFact = new Facture($this->db);
                     $resOrigFact = $origFact->fetch($discount->fk_facture_source);
                     print "<p>Fetch origFact " . $discount->fk_facture_source . ", res={$resOrigFact}</p>";
                     if ($resOrigFact > 0) {
                         $origFactRef = $origFact->ref;
-                        $origFactDate = new \DateTime(dol_print_date($origFact->date, 'dayrfc'));
+                        $origFactDate = new DateTime(dol_print_date($origFact->date, 'dayrfc'));
                     }
                 }
-                $prepaidAmount += \abs($line->total_ttc);
-                $facturxpdf->addDocumentAllowanceCharge(\abs($line->total_ttc), \false, "S", "VAT", $line->tva_tx, null, null, null, null, null, "Prepayment invoice (386)", $origFactRef);
-                print "<p>Set setDocumentBuyerOrderReferencedDocument : " . \json_encode($origFactRef) . " :: " . \json_encode($origFactDate) . "</p>";
-                $facturxpdf->setDocumentInvoiceReferencedDocument($origFactRef, $origFactDate);
+                $prepaidAmount += abs($line->total_ttc);
+                $facturxpdf->addDocumentAllowanceCharge(\abs($line->total_ttc), false, "S", "VAT", $line->tva_tx, null, null, null, null, null, "Prepayment invoice (386)", $origFactRef);
+                print "<p>Set setDocumentBuyerOrderReferencedDocument : " . json_encode($origFactRef) . " :: " . json_encode($origFactDate) . "</p>";
+                $facturxpdf->setDocumentInvoiceReferencedDocument($origFactRef, $origFactDate->format('Y-m-d'));
                 continue;
             }
 
@@ -572,16 +505,16 @@ class FacturXProtocol extends AbstractProtocol
             $libelle = $description = "";
             if ($newlang != "") {
                 if (!isset($line->multilangs)) {
-                    $tmpproduct = new \Product($db);
+                    $tmpproduct = new Product($db);
                     $resproduct = $tmpproduct->fetch($line->fk_product);
                     if ($resproduct > 0) {
                         $getm = $tmpproduct->getMultiLangs();
                         if ($getm < 0) {
-                            dol_syslog("facturx error fetching multilang for product error is " . $tmpproduct->error, \LOG_DEBUG);
+                            dol_syslog("PDPConnectFR error fetching multilang for product error is " . $tmpproduct->error, LOG_DEBUG);
                         }
                         $line->multilangs = $tmpproduct->multilangs;
                     } else {
-                        dol_syslog("facturx error fetching product", \LOG_DEBUG);
+                        dol_syslog("PDPConnectFR error fetching product", LOG_DEBUG);
                     }
                 }
                 if (isset($line->multilangs)) {
@@ -590,16 +523,22 @@ class FacturXProtocol extends AbstractProtocol
                 }
             }
             if (empty($libelle)) {
-                $libelle = $line->product_label ? $line->libelle : "libre";
+                $libelle = $line->product_label ? $line->product_label : "libre";
             }
             if (empty($description)) {
                 $description = $line->desc ? $line->desc : "";
             }
-            $lineref = $line->ref ? $line->ref : "0000";
+            $lineref = $line->product_ref ? $line->product_ref : "0000";
             $lineproductref = $line->product_ref ? $line->product_ref : "0000";
 
             // Add the line item to the XML
-            $facturxpdf->addNewPosition($numligne)->setDocumentPositionProductDetails($libelle, $description, $lineproductref)->setDocumentPositionGrossPrice($line->subprice)->setDocumentPositionNetPrice($line->subprice)->setDocumentPositionQuantity($line->qty, "H87")->setDocumentPositionLineSummation($line->total_ht);
+            $facturxpdf
+                ->addNewPosition($numligne)
+                ->setDocumentPositionProductDetails($libelle, $description, $lineproductref)
+                ->setDocumentPositionGrossPrice($line->subprice)
+                ->setDocumentPositionNetPrice($line->subprice)
+                ->setDocumentPositionQuantity($line->qty, "H87")
+                ->setDocumentPositionLineSummation($line->total_ht);
 
             // Set billing period for the line
             if (!empty($line->date_start)) {
@@ -616,10 +555,10 @@ class FacturXProtocol extends AbstractProtocol
             // please read 3 types of discount available
             // https://github.com/horstoeko/zugferd/wiki/Creating-XML-Documents#working-with-discounts-and-charges
             if ($line->subprice < 0) {
-                dol_syslog("facturx : there is negative line, convert as a global discount", \LOG_INFO);
+                dol_syslog("PDPConnectFR : there is negative line, convert as a global discount", \LOG_INFO);
                 // setEventMessages($langs->transnoentitiesnoconv('FxNegativeLine'), [], 'warnings');
                 // print json_encode($line);exit;
-                $facturxpdf->addDocumentPositionGrossPriceAllowanceCharge(\abs($line->subprice) * $line->qty, \false, null, null, "Discount");
+                $facturxpdf->addDocumentPositionGrossPriceAllowanceCharge(abs($line->subprice) * $line->qty, false, null, null, "Discount");
                 //other ideas
                 // $facturxpdf->addDocumentPositionAllowanceCharge(abs($remise_amount), true, null, null, null, "Discount");
                 // $facturxpdf->addDocumentAllowanceCharge(abs($line->subprice) * $line->qty, false, "S","VAT", $line->tva_tx,null, null, null, null, null, null, "Discount");
@@ -635,8 +574,8 @@ class FacturXProtocol extends AbstractProtocol
             // Discount percentage on a line
             if (isset($line->remise_percent) && $line->remise_percent > 0) {
                 $remise_amount = $line->total_ht - $line->subprice * $line->qty;
-                dol_syslog("facturx : there is a discount on that line : " . $line->remise_percent . ", amount is " . $remise_amount);
-                $facturxpdf->addDocumentPositionAllowanceCharge(\abs($remise_amount), \false, $line->remise_percent, $line->subprice * $line->qty, null, "Discount");
+                dol_syslog("PDPConnectFR : there is a discount on that line : " . $line->remise_percent . ", amount is " . $remise_amount);
+                $facturxpdf->addDocumentPositionAllowanceCharge(abs($remise_amount), false, $line->remise_percent, $line->subprice * $line->qty, null, "Discount");
             }
 
             // Aggregate VAT totals for document summary
@@ -660,7 +599,7 @@ class FacturXProtocol extends AbstractProtocol
             $numligne++;
         }
 
-        // --- 12. Final Document Summation and Payment Means ---
+        // Final Document Summation and Payment Means
 
         // Multi VAT (Document Tax Summary)
         foreach ($tabTVA as $k => $v) {
@@ -672,34 +611,101 @@ class FacturXProtocol extends AbstractProtocol
         }
 
         // Set final summation details (totals, payable amount, prepaid amount)
-        $facturxpdf->setDocumentSummation($grand_total_ttc, $grand_total_ttc - $prepaidAmount, $grand_total_ht, 0.0, 0.0, $grand_total_ht, $grand_total_tva, null, $prepaidAmount)->addDocumentPaymentTerm($langs->transnoentitiesnoconv("PaymentConditions") . ": " . $langs->transnoentitiesnoconv("PaymentCondition" . $object->cond_reglement_code), $ladatepaiement)->addDocumentPaymentMean($this->_get_paymentMean_number($object), $langs->transnoentitiesnoconv("PaymentType" . $object->mode_reglement_code), null, null, null, null, $this->_remove_spaces($account->iban), $account_proprio, $this->_remove_spaces($account->number), $this->_remove_spaces($account->bic));
+        $facturxpdf
+            ->setDocumentSummation(
+                $grand_total_ttc,
+                $grand_total_ttc - $prepaidAmount,
+                $grand_total_ht,
+                0.0,
+                0.0,
+                $grand_total_ht,
+                $grand_total_tva,
+                null,
+                $prepaidAmount
+            )
+            ->addDocumentPaymentTerm(
+                $langs->transnoentitiesnoconv("PaymentConditions") . ": " . $langs->transnoentitiesnoconv("PaymentCondition" . $object->cond_reglement_code),
+                $ladatepaiement
+            )
+            ->addDocumentPaymentMean(
+                $this->_get_paymentMean_number($object),
+                $langs->transnoentitiesnoconv("PaymentType" . $object->mode_reglement_code),
+                null,
+                null,
+                null,
+                null,
+                $this->_remove_spaces($account->iban),
+                $account_proprio,
+                $this->_remove_spaces($account->number),
+                $this->_remove_spaces($account->bic)
+            );
 
         // is there a billing period for that invoice ?
         //setDocumentBillingPeriod
 
-        // --- 13. Finalization, Validation, and Saving ---
-
-        // Create XML file for debug if enabled
-        if (getDolGlobalString('FACTURX_XML_STANDALONE')) {
-            $xmlfile = \str_replace('.pdf', '_facturx.xml', $orig_pdf);
-            $facturxpdf->writeFile($xmlfile);
-        }
-
         // Validate the generated XML document
-        dol_syslog(\get_class($this) . '::executeHooks try to validate XML');
+        dol_syslog(get_class($this) . '::executeHooks try to validate XML');
         $pdfCheck = new ZugferdDocumentValidator($facturxpdf);
         $res = $pdfCheck->validateDocument();
-        if (\count($res) > 0) {
-            $allErrors = $this->_getAllMessages($res);
+        if (count($res) > 0) {
+            $allErrors = "";
+            foreach ($res as $error) {
+                if (is_array($error)) {
+                    $allErrors .= json_encode($error) . "\n";
+                } else {
+                    $allErrors .= $error . "\n";
+                }
+            }
             // if (empty(getDolGlobalString('FACTURX_USE_TRIGGER',''))) {
             setEventMessages($allErrors, [], 'errors');
             // }
             // $this->errors[] = json_encode($res);
-            dol_syslog(\get_class($this) . '::executeHooks  (1) : ' . $allErrors, \LOG_ERR);
+            dol_syslog(get_class($this) . '::executeHooks  (1) : ' . $allErrors, LOG_ERR);
         }
 
-        // Embed XML into PDF and save
-        $pdfBuilder = new ZugferdDocumentPdfBuilder($facturxpdf, $orig_pdf);
+
+        // --- Fusionner le PDF original et ajouter le XML comme attachment
+        require_once DOL_DOCUMENT_ROOT.'/core/lib/pdf.lib.php';
+        require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+
+        // Générer le fichier XML Factur-X
+        $xmlfile = dirname($orig_pdf) . '/factur-x.xml';
+        $facturxpdf->writeFile($xmlfile);
+
+        $pdf = pdf_getInstance();
+        $pagecount = $pdf->setSourceFile($orig_pdf);
+
+        // Importer toutes les pages du PDF original
+        for ($i = 1; $i <= $pagecount; $i++) {
+            $tpl = $pdf->importPage($i);
+            $pdf->addPage();
+            $pdf->useTemplate($tpl);
+        }
+
+        // Ajouter le XML comme attachment
+        if (file_exists($xmlfile)) {
+            $pdf->Annotation(0, 0, 0, 0, '', array(
+                'Subtype' => 'FileAttachment',
+                'Name' => 'PushPin',
+                'FS' => $xmlfile
+            ));
+        }
+
+        // Enregistrer le PDF final avec le XML embarqué
+        $pdf->Output($orig_pdf, 'F');
+
+        // Nettoyer le fichier XML temporaire
+        if (file_exists($xmlfile)) {
+            unlink($xmlfile);
+            dol_syslog(get_class($this) . '::generateInvoice cleaned up temporary XML file: ' . $xmlfile);
+        }
+
+        return 1;
+
+
+        // Saving ---
+        // Embed XML into PDF and save using horstoeko method
+        /*$pdfBuilder = new ZugferdDocumentPdfBuilder($facturxpdf, $orig_pdf);
         $pdfBuilder->generateDocument();
 
         $new_pdf = $orig_pdf;
@@ -719,7 +725,7 @@ class FacturXProtocol extends AbstractProtocol
         \clearstatcache(\true);
 
         // dol_syslog(get_class($this) . '::executeHooks end action=' . $action . ', file saved as ' . $new_pdf);
-        return $ret;
+        return $ret;*/
     }
 
     /**
@@ -1028,7 +1034,7 @@ class FacturXProtocol extends AbstractProtocol
      * @return  string|null code of invoice type
      */
     private function _getTypeOfInvoice($object)
-    {
+    { // TODO: move this function to class utils
         $map = [
             CommonInvoice::TYPE_STANDARD        => ZugferdInvoiceType::INVOICE,
             CommonInvoice::TYPE_REPLACEMENT     => ZugferdInvoiceType::CORRECTION,
@@ -1046,7 +1052,7 @@ class FacturXProtocol extends AbstractProtocol
      * @return  string return siret siren or locale prod if
      */
     private function idprof($thirdpart)
-    {
+    { // TODO: move this function to class utils
         $retour = "";
         switch ($thirdpart->country_code) {
             case 'BE':
@@ -1081,7 +1087,7 @@ class FacturXProtocol extends AbstractProtocol
      * @return  string  cleaned up string
      */
     private function _remove_spaces($str)
-    {
+    { // TODO: move this function to class utils
         return preg_replace('/\\s+/', '', $str);
     }
 
@@ -1091,7 +1097,7 @@ class FacturXProtocol extends AbstractProtocol
      * @return  string idprof
      */
     private function thirdpartyidprof($object)
-    {
+    { // TODO: move this function to class utils
         return $this->idprof($object->thirdparty);
     }
 
@@ -1104,7 +1110,7 @@ class FacturXProtocol extends AbstractProtocol
      * @return  string email of buyer
      */
     private function extractBuyerMail($contact, $thirdpart)
-    {
+    { // TODO: move this function to class utils
         dol_syslog("pdpconnectfr extractBuyerMail : contact=" . $contact->email . " | soc=" . $thirdpart->email);
         if (!empty($contact->email)) {
             return $contact->email;
@@ -1120,7 +1126,7 @@ class FacturXProtocol extends AbstractProtocol
      * @return string code
      */
     private function IEC_6523_code($country_code)
-    {
+    { // TODO: move this function to class utils
         $retour = "";
         switch ($country_code) {
             case 'BE':
@@ -1135,6 +1141,112 @@ class FacturXProtocol extends AbstractProtocol
             default:
         }
         return $retour;
+    }
+
+    /************************************************
+     *    Check line type from external module ?
+     *
+     * @param  object $line       line we work on
+     * @param  string $element    line object element (for special case like shipping)
+     * @param  string $searchName module name we look for
+     * @return boolean                        true if the line is a special one and was created by the module we ask for
+     ************************************************/
+    private function _isLineFromExternalModule($line, $element, $searchName)
+    { // TODO: move this function to class utils
+        global $db;
+        if ($element == 'shipping' || $element == 'delivery') {
+            $fk_origin_line = $line->fk_origin_line;
+            $line = new OrderLine($db);
+            $line->fetch($fk_origin_line);
+        }
+        if ($line->product_type == 9 && $line->special_code == $this->_get_mod_number($searchName)) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+    /************************************************
+     *    Find module number
+     *
+     * @param  string $searchName module name we look for
+     * @return integer                        -1 if KO, 0 not found or module number if Ok
+     ************************************************/
+    private function _get_mod_number($modName)
+    { // TODO: move this function to class utils
+        global $db;
+        if (class_exists($modName)) {
+            $objMod = new $modName($db);
+            return $objMod->numero;
+        }
+        return 0;
+    }
+
+    /**
+     * Get a timestamp and return a php DateTime object
+     *
+     * @param   $ts  timestamp
+     *
+     * @return \DateTime|null DateTime object or null if $ts is empty
+     */
+    private function _tsToDateTime($ts)
+    {
+        dol_syslog("facturx call _tsToDateTime for {$ts} ...");
+        if (empty($ts)) {
+            return null;
+        }
+        $dt = new \DateTime();
+        $dt->setTimestamp($ts);
+        return $dt;
+    }
+
+    /************************************************
+     *    Find paymentMean number
+     *
+     * @param  object $invoice object name we look for
+     * @return integer                        paymentMeanId for HorstOeko libs
+     ************************************************/
+    private function _get_paymentMean_number($invoice)
+    {
+        $paymentMeanId = 97;
+        //"Must be defined between trading parties" for empty values
+        switch ($invoice->mode_reglement_code) {
+            case 'CB':
+                $paymentMeanId = 54;
+                break;
+            //Credit Card
+            case 'CHQ':
+                $paymentMeanId = 20;
+                break;
+            //Check
+            case 'FAC':
+                $paymentMeanId = 1;
+                break;
+            //Local payment method
+            case 'LIQ':
+                $paymentMeanId = 10;
+                break;
+            //Cash
+            case 'PRE':
+                $paymentMeanId = 59;
+                break;
+            //SEPA direct debit
+            case 'TIP':
+                $paymentMeanId = 45;
+                break;
+            //Bank Transfer with document
+            case 'TRA':
+                $paymentMeanId = 23;
+                break;
+            //Check
+            case 'VAD':
+                $paymentMeanId = 68;
+                break;
+            //Online Payment
+            case 'VIR':
+                $paymentMeanId = 30;
+                break;
+        }
+        return $paymentMeanId;
     }
 
 }
