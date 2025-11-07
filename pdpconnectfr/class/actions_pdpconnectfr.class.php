@@ -40,4 +40,72 @@ class ActionsPdpconnectfr
 
         return 0;
     }
+
+
+    /**
+     * Hook to add buttons on invoice card
+     */
+    function addMoreActionsButtons($parameters, &$object, &$action, $hookmanager)
+    {
+        global $langs, $user, $conf;
+
+        if (in_array($object->element, ['facture'])) {
+            $langs->load("pdpconnectfr@pdpconnectfr");
+
+            // Action to send invoice to PDP
+            if ($action == 'send_to_pdp') {
+                require_once DOL_DOCUMENT_ROOT . '/custom/pdpconnectfr/class/providers/EsalinkPDPProvider.class.php';
+
+                $provider = new EsalinkPDPProvider($db);
+
+                // Exécution de la fonction d’envoi
+                $result = $provider->sendInvoice($object);
+
+                if ($result) {
+                    $messages = array();
+                    $messages[] = $langs->trans("InvoiceSuccessfullySentToPDP");
+                    $messages[] = $langs->trans("FlowId") . ": " . $result;
+                    setEventMessages('', $messages, 'warnings');
+                } else {
+                    setEventMessages("", $provider->errors, 'errors');
+                }
+            }
+
+            $url_button = array();
+            $url_button[] = array(
+                'lang' => 'pdpconnectfr',
+                'enabled' => (isModEnabled('pdpconnectfr')),
+                'perm' => (bool) $user->rights->facture->creer,
+                'label' => $langs->trans('checkInvoiceData') . (' TODO'),
+                'url' => '/facture/card.php?id=' . $object->id . '&action=validate_invoice&token=' . newToken()
+            );
+
+            $url_button[] = array(
+                'lang' => 'pdpconnectfr',
+                'enabled' => (isModEnabled('pdpconnectfr')),
+                'perm' => (bool) $user->rights->facture->creer,
+                'label' => $langs->trans('checkCustomerData') . (' TODO'),
+                'url' => '/facture/card.php?id=' . $object->id . '&action=validate_invoice&token=' . newToken()
+            );
+
+            $url_button[] = array(
+                'lang' => 'pdpconnectfr',
+                'enabled' => (isModEnabled('pdpconnectfr') /*&& $parameters['object']->status == Facture::STATUS_VALIDATED*/),
+                'perm' => (bool) $user->rights->facture->creer,
+                'label' => $langs->trans('sendToPDP'),
+                'url' => '/compta/facture/card.php?id=' . $object->id . '&action=send_to_pdp&token=' . newToken()
+            );
+
+            print dolGetButtonAction('', $langs->trans('pdpBottom'), 'default', $url_button, '', true);
+
+
+            /*print '<div class="inline-block">';
+            print '<a class="butAction" href="'.dol_buildpath('/pdpconnectfr/script1.php', 1).'?facid='.$object->id.'">'.$langs->trans("MonBouton1").'</a>';
+            print '<a class="butAction" href="'.dol_buildpath('/pdpconnectfr/script2.php', 1).'?facid='.$object->id.'">'.$langs->trans("MonBouton2").'</a>';
+            print '<a class="butActionRefused" href="#">'.$langs->trans("BoutonDésactivé").'</a>';
+            print '</div>';*/
+        }
+
+        return 0;
+    }
 }
