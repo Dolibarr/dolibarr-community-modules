@@ -97,15 +97,8 @@ class ActionsPdpconnectfr
             );
 
             print dolGetButtonAction('', $langs->trans('pdpBottom'), 'default', $url_button, '', true);
-
-
-            /*print '<div class="inline-block">';
-            print '<a class="butAction" href="'.dol_buildpath('/pdpconnectfr/script1.php', 1).'?facid='.$object->id.'">'.$langs->trans("MonBouton1").'</a>';
-            print '<a class="butAction" href="'.dol_buildpath('/pdpconnectfr/script2.php', 1).'?facid='.$object->id.'">'.$langs->trans("MonBouton2").'</a>';
-            print '<a class="butActionRefused" href="#">'.$langs->trans("BoutonDésactivé").'</a>';
-            print '</div>';*/
         }
 
         return 0;
-    }
+    }s
 }
