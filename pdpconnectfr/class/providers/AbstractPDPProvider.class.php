@@ -51,11 +51,9 @@ abstract class AbstractPDPProvider
      */
     public function __construct($db)
     {
+    	$this->db = $db;
         $this->config = [];
         $this->tokenData = [];
-        $exchangeProtocolConf = getDolGlobalString('PDPCONNECTFR_PROTOCOL');
-        $ProtocolManager = new ProtocolManager($db);
-        $this->exchangeProtocol = $ProtocolManager->getprotocol($exchangeProtocolConf);
     }
 
     /**

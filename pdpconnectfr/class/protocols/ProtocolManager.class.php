@@ -23,8 +23,6 @@
  */
 
 
-dol_include_once('pdpconnectfr/class/protocols/FacturXProtocol.class.php');
-
 class ProtocolManager
 {
     public $db;
@@ -36,22 +34,25 @@ class ProtocolManager
      */
     public function __construct($db)
     {
+		$facturexIsOk = 1;	// TODO Check version of PHP To allow or not
+		$ciiIsOk = 0;
+		$ublIsOk = 0;
 
         $this->protocolsList = array(
             'FACTURX' => array(
                 'protocol_name' => 'Factur-X',
                 'description' => 'Factur-X is a French-German hybrid e-invoicing format combining a readable PDF invoice with embedded XML data for seamless automated processing.',
-                'is_enabled' => 1
+                'is_enabled' => $facturexIsOk
             ),
             'CII' => array(
                 'protocol_name' => 'CII',
                 'description' => 'CII (Cross Industry Invoice) is an international XML-based standard developed by UN/CEFACT to enable structured electronic invoicing and data exchange between businesses.',
-                'is_enabled' => 0
+                'is_enabled' => $ciiIsOk
             ),
             'UBL' => array(
                 'protocol_name' => 'UBL',
                 'description' => 'UBL (Universal Business Language) is an open XML standard designed to facilitate electronic business documents exchange, including invoices, purchase orders, and more.',
-                'is_enabled' => 0
+                'is_enabled' => $ublIsOk
             )
         );
 
@@ -83,6 +84,8 @@ class ProtocolManager
         // Initialize protocol based on name
         switch ($name) {
             case 'FACTURX':
+				dol_include_once('pdpconnectfr/class/protocols/FacturXProtocol.class.php');
+
                 $protocol = new FacturXProtocol();
                 break;
             case 'CII':

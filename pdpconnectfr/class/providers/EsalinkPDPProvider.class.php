@@ -25,6 +25,8 @@
  */
 
 dol_include_once('custom/pdpconnectfr/class/providers/AbstractPDPProvider.class.php');
+
+
 /**
  * Class to manage Esalink PDP provider integration.
  */
@@ -35,7 +37,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
      *
      */
     public function __construct($db) {
-        parent::__construct($db);
+    	parent::__construct($db);
+
         $this->config = array(
             'provider_url' => 'https://ppd.hubtimize.fr',
             'prod_api_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/', // TODO: Replace the URL once known
@@ -49,7 +52,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         );
 
         // Retrieve and complete the OAuth token information from the database
-        $this->tokenData = $this->fetchOAuthTokenDB ();
+       	$this->tokenData = $this->fetchOAuthTokenDB();
     }
 
     /**
@@ -211,6 +214,11 @@ class EsalinkPDPProvider extends AbstractPDPProvider
     public function sendSampleInvoice()
     {
         $outputLog = array(); // Feedback to display
+
+        $exchangeProtocolConf = getDolGlobalString('PDPCONNECTFR_PROTOCOL');
+        $ProtocolManager = new ProtocolManager($this->db);
+        $this->exchangeProtocol = $ProtocolManager->getprotocol($exchangeProtocolConf);
+
         // Generate sample invoice
         $invoice_path = $this->exchangeProtocol->generateSampleInvoice();
         if ($invoice_path) {
