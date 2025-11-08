@@ -100,5 +100,5 @@ class ActionsPdpconnectfr
         }
 
         return 0;
-    }s
+    }
 }
