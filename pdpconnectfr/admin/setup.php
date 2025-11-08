@@ -337,7 +337,7 @@ if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_P
 	$item->cssClass = 'minwidth500';
 
 	// Password
-	$item = $formSetup->newItem($prefix . 'PASSWORD');
+	$item = $formSetup->newItem($prefix . 'PASSWORD')->setAsPassword();
 	$item->cssClass = 'minwidth500';
 
 	// API_KEY
@@ -387,7 +387,7 @@ if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_P
 		";
 	}
 
-	// To remove 
+	// To remove
 	if ($tokenData['token'] && getDolGlobalString('PDPCONNECTFR_PROTOCOL') && getDolGlobalString('PDPCONNECTFR_PROTOCOL') === 'FACTURX' && getDolGlobalString('PDPCONNECTFR_PROFILE') === 'EN16931') {
 		$item->fieldOverride .= "
 			<a
