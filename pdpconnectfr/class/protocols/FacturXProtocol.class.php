@@ -752,10 +752,14 @@ class FacturXProtocol extends AbstractProtocol
      */
     public function generateSampleInvoice()
     {
+    	global $conf;
+
+		dol_mkdir($conf->pdpconnectfr->dir_temp);
+
         require __DIR__ . "/ExampleHelpers.php";
 
         $existingPdfFilename = __DIR__ . "/../../assets/00_ZugferdDocumentPdfBuilder_PrintLayout.pdf";
-        $newPdfFilename = __DIR__ . "/../../tmp/02_ZugferdDocumentPdfBuilder_PrintLayout_Merged.pdf";
+        $newPdfFilename = $conf->pdpconnectfr->dir_temp."/02_ZugferdDocumentPdfBuilder_PrintLayout_Merged.pdf";
         $AdditionalDocument = __DIR__ . "/../../assets/00_AdditionalDocument.csv";
 
         // First we create a new valid document in EN16931-Profile (== COMFORT-Profile)
