@@ -1,4 +1,5 @@
 {
+	"_comment": "We force use of PHP 7.3 lib to be compatible with PHP 7.3 and more. But with minor fixes, libs seems to work correctly with PHP 7.2",
 	"config" : {
 		"platform" : {
 			"php" : "7.3.0"
