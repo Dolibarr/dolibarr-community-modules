@@ -17,7 +17,6 @@
  */
 
 
-
 /**
  * \file    pdpconnectfr/class/protocols/AbstractProtocol.class.php
  * \ingroup pdpconnectfr
@@ -30,7 +29,7 @@ abstract class AbstractProtocol
      * Invoice object
      * @var Facture
      */
-    public \Facture $sourceinvoice;
+    public $sourceinvoice;
 
     /** @var array Error messages */
     public $errors = [];
