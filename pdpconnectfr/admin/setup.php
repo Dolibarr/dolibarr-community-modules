@@ -200,7 +200,8 @@ $providersConfig = $PDPManager->getAllProviders();
 $ProtocolManager = new ProtocolManager($db);
 $protocolsList = $ProtocolManager->getProtocolsList();
 
-$formSetup->newItem('PDPCONNECTFR_LIVE')->setAsYesNo();
+$itemlivemode = $formSetup->newItem('PDPCONNECTFR_LIVE')->setAsYesNo();
+$itemlivemode->fieldParams['forcereload'] = 1;
 
 // PDP providers list
 $TFieldProviders = array('' => '');
@@ -423,7 +424,7 @@ print load_fiche_titre($langs->trans($title), $linkback, 'title_setup');
 
 // Configuration header
 $head = pdpconnectfrAdminPrepareHead();
-print dol_get_fiche_head($head, 'settings', $langs->trans($title), -1, "pdpconnectfr@pdpconnectfr");
+print dol_get_fiche_head($head, 'settings', $langs->trans($title), -1, "pdpconnectfr.png@pdpconnectfr");
 
 // Setup page goes here
 echo '<span class="opacitymedium">'.$langs->trans("PDPConnectFRSetupPage").'</span><br><br>';
