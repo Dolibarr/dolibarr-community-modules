@@ -41,7 +41,7 @@ class modPDPConnectFR extends DolibarrModules
 	 */
 	public function __construct($db)
 	{
-		global $conf, $langs;
+		global $conf;
 
 		$this->db = $db;
 
