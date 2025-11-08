@@ -139,6 +139,69 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 
     /**
+     * Send an electronic invoice.
+     *
+     * This function send an invoice to PDP
+     *
+     * $object Invoice object
+     * @return string   flowId if the invoice was successfully sent, false otherwise.
+     */
+    public function sendInvoice($object)
+    {
+        global $conf;
+
+        $outputLog = array(); // Feedback to display
+
+        $filename = dol_sanitizeFileName($object->ref);
+		$filedir = $conf->invoice->multidir_output[$object->entity ?? $conf->entity].'/'.dol_sanitizeFileName($object->ref);
+        $invoice_path = $filedir.'/'.$filename.'_facturx.pdf';
+
+        if (!file_exists($invoice_path)) {
+            $this->errors[] = "Electronic Invoice file not found";
+            return false;
+        }
+
+        $file_info = pathinfo($invoice_path);
+        $uuid = $this->generateUuidV4(); // UUID used to correlate logs between Dolibarr and PDP TODO : Store it somewhere
+
+        // Format PDP resource Url
+        $resource = 'flows';
+        $urlparams = array(
+            'Request-Id' => $uuid,
+        );
+		$resource .= '?' . http_build_query($urlparams);
+
+        // Extra headers
+        $extraHeaders = [
+            'Content-Type' => 'multipart/form-data'
+        ];
+
+        // Params
+        $params = [
+            'flowInfo' => json_encode([
+                "trackingId" => $object->ref,
+                "name" => "Invoice_" . $object->ref,
+                "flowSyntax" => "FACTUR_X",
+                "flowProfile" => "Basic",
+                "sha256" => hash_file('sha256', $invoice_path)
+            ]),
+            'file' => new CURLFile($invoice_path, 'application/pdf', basename($invoice_path))
+        ];
+
+
+
+        $response = $this->callApi("flows", "POSTALREADYFORMATED", $params, $extraHeaders);
+
+        if ($response['status_code'] == 200 || $response['status_code'] == 202) {
+            $flowId = $response['response']['flowId'];
+            return $flowId;
+        } else {
+            $this->errors[] = "Failed to send electronic invoice.";
+            return 0;
+        }
+    }
+
+    /**
      * Send a sample electronic invoice for testing purposes.
      *
      * This function generates a sample invoice and sends it to PDP
@@ -174,7 +237,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                 "trackingId" => "INV-2025-001",
                 "name" => "Invoice_2025_001",
                 "flowSyntax" => "FACTUR_X",
-                "flowProfile" => "Basic",
+                "flowProfile" => "CIUS",
                 "sha256" => hash_file('sha256', $invoice_path)
             ]),
             'file' => new CURLFile($invoice_path, 'application/pdf', basename($invoice_path))
@@ -256,7 +319,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         // check or get access token
         if ($resource != 'token') {
             if ($this->tokenData['token']) {
-                $tokenexpiresat = $this->tokenData['token_expires_at'] ?? 0;
+                $tokenexpiresat = strtotime($this->tokenData['token_expires_at'] ?? 0);
                 if ($tokenexpiresat < dol_now()) {
                     $this->refreshAccessToken(); // This will fill again $this->tokenData['token']
                 }
