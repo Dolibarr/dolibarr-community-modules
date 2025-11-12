@@ -80,6 +80,7 @@ class PDPProviderManager
         switch ($name) {
             case 'ESALINK':
                 $provider = new EsalinkPDPProvider($db);
+                $provider->providerName = 'ESALINK';
                 break;
             case 'TESTPDP':
                 //$provider = new TESTPDPProvider();

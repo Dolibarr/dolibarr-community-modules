@@ -375,4 +375,70 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		return $returnarray;
 	}
 
+    /**
+     * Synchronize flows with EsaLink since the last synchronization date.
+     *
+     * @return bool                 True on success, false on failure
+     */
+    public function syncFlows()
+    {
+        global $conf, $db;
+
+        $LastSyncDate = null;
+
+        // Get last sync date
+        $LastSyncDateSql = "SELECT MAX(t.date_creation) as last_sync_date
+            FROM ".MAIN_DB_PREFIX."pdpconnectfr_call as t
+            WHERE t.provider = '".$this->db->escape($this->providerName)."' 
+            AND t.call_type = 'sync_flow' 
+            AND T.status = 'SUCCESS'";
+            if ($conf->entity && $conf->entity > 1) {
+                $LastSyncDateSql .= " AND t.entity = ".((int) $conf->entity);
+            }
+            $LastSyncDateSql .= ";";
+        $resql = $db->query($LastSyncDateSql);
+        
+        if ($resql) {
+            $obj = $db->fetch_object($resql);
+            $LastSyncDate = $obj->last_sync_date  ? strtotime($obj->last_sync_date) : null;
+        } else {
+            dol_syslog(__METHOD__ . " SQL warning: Failed to get last sync date: we try to sync all flows from today", LOG_WARNING);
+        }
+
+        if ($LastSyncDate === null) {
+            // If no last sync date, set to epoch start
+            $LastSyncDate = strtotime('1970-01-01 00:00:00');
+        }
+
+        $params = array(
+            'limit' => 20,
+            'where' => array(
+                'updatedAfter' => dol_print_date($LastSyncDate, '%Y-%m-%dT%H:%M:%S.000Z', 'gmt')
+            )
+        );
+
+        $resource = 'flows/search';
+        $uuid = $this->generateUuidV4(); // UUID used to correlate logs between Dolibarr and PDP TODO : Store it somewhere
+        $urlparams = array(
+            'Request-Id' => $uuid,
+        );
+		$resource .= '?' . http_build_query($urlparams);
+
+        $response = $this->callApi($resource, "POST", json_encode($params));
+
+        return true;
+    }
+
+    /**
+     * Store flow data.
+     *
+     * @param array<string, mixed> $data Flow data to store
+     * @return bool                 True on success, false on failure
+     */
+    public function storeFlow($data)
+    {
+        return true;
+    }
+
+
 }

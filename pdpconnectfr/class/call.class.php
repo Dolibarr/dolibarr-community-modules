@@ -140,7 +140,8 @@ class Call extends CommonObject
 		"endpoint" => array("type" => "varchar(255)", "label" => "endpoint", "enabled" => "1", 'position' => 0, 'notnull' => 1, "visible" => "1", "comment" => "-- URL or endpoint called"),
 		"request_body" => array("type" => "text", "label" => "request_body", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "1", "comment" => "Request body (JSON)"),
 		"response" => array("type" => "text", "label" => "response", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "1", "comment" => "Full response body (JSON)"),
-		"fk_provider" => array("type" => "integer", "label" => "fk_provider", "enabled" => "1", 'position' => 0, 'notnull' => 1, "visible" => "1", "comment" => "PDP ID"),
+		"fk_provider" => array("type" => "varchar(50)", "label" => "provider", "enabled" => "1", 'position' => 0, 'notnull' => 1, "visible" => "1", "comment" => "PDP Name"),
+		"entity" => array("type" => "varchar(50)", "label" => "entity", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "0", "comment" => "Multi-entity support"),
 	);
 	public $rowid;
 	public $date_creation;
@@ -154,6 +155,7 @@ class Call extends CommonObject
 	public $request_body;
 	public $response;
 	public $fk_provider;
+	public $entity;
 	// END MODULEBUILDER PROPERTIES
 
 

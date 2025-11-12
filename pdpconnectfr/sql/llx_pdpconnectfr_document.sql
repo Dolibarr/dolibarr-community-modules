@@ -34,6 +34,10 @@ CREATE TABLE llx_pdpconnectfr_document(
 	ack_info text, 
 	document_body text, 
 	fk_element_id integer, 
-	fk_element_type varchar(100)
+	fk_element_type varchar(100), 
+	submittedat datetime NOT NULL, 
+	updatedat datetime, 
+	fk_provider varchar(50) NOT NULL, 
+	entity integer DEFAULT 1
 	-- END MODULEBUILDER FIELDS
 ) ENGINE=innodb;
