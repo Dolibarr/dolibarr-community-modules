@@ -89,3 +89,7 @@ checkInvoiceData= Check Invoice
 pdpBottom=PDP
 InvoiceSuccessfullySentToPDP=Invoice successfully sent to PDP.
 ErrorSendingInvoiceToPDP=An error occurred while sending the invoice to the PDP.
+pdpExchange=PDP Connect France
+pdpDocuments=Documents Exchanged
+pdpSocieties=Customers & Suppliers Sync
+pdpFeedback=Calls & Sync Feedback
