@@ -148,6 +148,10 @@ class Document extends CommonObject
 		"document_body" => array("type" => "text", "label" => "document_body", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "1", "comment" => "Full document content XML"),
 		"fk_element_id" => array("type" => "integer", "label" => "fk_element_id", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "1",),
 		"fk_element_type" => array("type" => "varchar(100)", "label" => "fk_element_type", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "1",),
+		"submittedat" => array("type" => "datetime", "label" => "submittedAt", "enabled" => "1", 'position' => 0, 'notnull' => 1, "visible" => "1", "comment" => "submittedAt (PDP Date)"),
+		"updatedat" => array("type" => "datetime", "label" => "updatedAt", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "1", "comment" => "updatedAt (PDP Date)"),
+		"fk_provider" => array("type" => "varchar(50)", "label" => "provider", "enabled" => "1", 'position' => 0, 'notnull' => 1, "visible" => "1", "comment" => "PDP"),
+		"entity" => array("type" => "integer", "label" => "entity", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "0", "comment" => "Multi-entity support"),
 	);
 	public $rowid;
 	public $date_creation;
@@ -168,6 +172,10 @@ class Document extends CommonObject
 	public $document_body;
 	public $fk_element_id;
 	public $fk_element_type;
+	public $submittedat;
+	public $updatedat;
+	public $fk_provider;
+	public $entity;
 	// END MODULEBUILDER PROPERTIES
 
 

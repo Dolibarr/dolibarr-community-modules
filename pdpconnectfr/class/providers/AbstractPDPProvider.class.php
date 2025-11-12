@@ -44,6 +44,9 @@ abstract class AbstractPDPProvider
     /** @var AbstractProtocol Exchange protocol */
     public $exchangeProtocol;
 
+    /** @var string Provider name */
+    public $providerName;
+
     /**
      * Constructor
      *
@@ -54,6 +57,7 @@ abstract class AbstractPDPProvider
     	$this->db = $db;
         $this->config = [];
         $this->tokenData = [];
+        $this->providerName = null;
     }
 
     /**
@@ -149,6 +153,21 @@ abstract class AbstractPDPProvider
 	 * @return array{status_code:int,response:null|string|array<string,mixed>}
 	 */
     abstract public function callApi($resource, $method, $options = false);
+
+    /**
+     * Synchronize flows with PDP since the last synchronization date.
+     *
+     * @return bool                 True on success, false on failure
+     */
+    abstract public function syncFlows();
+
+    /**
+     * Store a flow data into the database.
+     *
+     * @param  array $data      Flow data to store
+     * @return bool             True on success, false on failure
+     */
+    abstract public function storeFlow($data);
 
     /**
      * Insert or update OAuth token for the given PDP.

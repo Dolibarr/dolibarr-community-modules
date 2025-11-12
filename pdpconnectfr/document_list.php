@@ -93,6 +93,8 @@ if (!$res) {
 include_once DOL_DOCUMENT_ROOT.'/core/class/html.formcompany.class.php';
 include_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php';
 include_once DOL_DOCUMENT_ROOT.'/core/lib/company.lib.php';
+include_once __DIR__.'/class/providers/PDPProviderManager.class.php';
+
 // load module libraries
 include_once __DIR__.'/class/document.class.php';
 // for other modules
@@ -289,6 +291,22 @@ if (empty($reshook)) {
 }
 
 
+if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_PDP') === "ESALINK") {
+	$providerManager = new PDPProviderManager($db);
+	$provider = $providerManager->getProvider(getDolGlobalString('PDPCONNECTFR_PDP'));
+}
+
+if ($action == 'sync' && getDolGlobalString('PDPCONNECTFR_PDP')) {
+	if (isset($provider)) {
+		$result = $provider->syncFlows();
+		if ($result >= 0) {
+			setEventMessages($langs->trans("DocumentsSyncedSuccessfully"), null, 'mesgs');
+		} else {
+			setEventMessages($langs->trans("FailedToSyncDocuments"), null, 'errors');
+		}
+	}
+}
+
 
 /*
  * View
@@ -298,7 +316,8 @@ $form = new Form($db);
 
 $now = dol_now();
 
-$title = $langs->trans("Documents");
+$title = $langs->trans("PDPConnectFRArea");
+$title .= ' <a href="'.$_SERVER["PHP_SELF"].'?action=sync" class="butAction">'.img_picto('', 'refresh', 'class="pictofixedwidth"').'</a>';
 //$help_url = "EN:Module_Document|FR:Module_Document_FR|ES:Módulo_Document";
 $help_url = '';
 $morejs = array();
