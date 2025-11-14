@@ -648,7 +648,7 @@ class HelloAssoMemberUtils
 
         $createmember->firstname = $newmember->user->firstName;
         $createmember->lastname = $newmember->user->lastName;
-        if (getDolGlobalString('ADHERENT_MAIL_REQUIRED') && !isValidEmail((string) $newmember->payer->email)) {
+        if (getDolGlobalString('ADHERENT_MAIL_REQUIRED') && isValidEmail((string) $newmember->payer->email)) {
         	$createmember->email = $newmember->payer->email;
         }
         $createmember->typeid = $membertype;
