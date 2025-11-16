@@ -24,7 +24,7 @@
  * \brief   Esalink PDP provider integration class
  */
 
-dol_include_once('custom/pdpconnectfr/class/providers/AbstractPDPProvider.class.php');
+dol_include_once('/pdpconnectfr/class/providers/AbstractPDPProvider.class.php');
 
 
 /**

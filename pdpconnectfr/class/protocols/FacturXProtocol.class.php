@@ -49,7 +49,7 @@ use horstoeko\zugferd\ZugferdDocumentValidator;
 
 require __DIR__ . "/../../vendor/autoload.php";
 
-dol_include_once('custom/pdpconnectfr/class/protocols/AbstractProtocol.class.php');
+dol_include_once('/pdpconnectfr/class/protocols/AbstractProtocol.class.php');
 
 /**
  * FacturX Protocol Class
