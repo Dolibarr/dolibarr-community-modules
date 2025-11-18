@@ -136,7 +136,7 @@ class Document extends CommonObject
 		"fk_user_modif" => array("type" => "integer:User:user/class/user.class.php", "label" => "UserModif", "picto" => "user", "enabled" => "1", 'position' => 511, 'notnull' => -1, "visible" => "-2", "csslist" => "tdoverflowmax150",),
 		"status" => array("type" => "integer", "label" => "Status", "enabled" => "1", 'position' => 2000, 'notnull' => 1, "visible" => "1", "index" => "1", "arrayofkeyval" => array("0" => "Brouillon", "1" => "Valid&eacute;", "9" => "Annul&eacute;"), "validate" => "1",),
 		"fk_call" => array("type" => "integer", "label" => "fk_call", "enabled" => "1", 'position' => 201, 'notnull' => 0, "visible" => "1", "comment" => "Reference to the original call"),
-		"flow_id" => array("type" => "integer", "label" => "flow_id", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "1", "comment" => "PDP flow UUID"),
+		"flow_id" => array("type" => "varchar(255)", "label" => "flow_id", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "1", "comment" => "PDP flow UUID"),
 		"tracking_id" => array("type" => "integer", "label" => "tracking_id", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "1", "comment" => "Document tracking identifier"),
 		"flow_type" => array("type" => "varchar(255)", "label" => "flow_type", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "1", "comment" => "Flow type (CustomerInvoice, etc.)"),
 		"flow_direction" => array("type" => "varchar(10)", "label" => "flow_direction", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "1", "comment" => "In or Out"),
@@ -150,8 +150,9 @@ class Document extends CommonObject
 		"fk_element_type" => array("type" => "varchar(100)", "label" => "fk_element_type", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "1",),
 		"submittedat" => array("type" => "datetime", "label" => "submittedAt", "enabled" => "1", 'position' => 0, 'notnull' => 1, "visible" => "1", "comment" => "submittedAt (PDP Date)"),
 		"updatedat" => array("type" => "datetime", "label" => "updatedAt", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "1", "comment" => "updatedAt (PDP Date)"),
-		"fk_provider" => array("type" => "varchar(50)", "label" => "provider", "enabled" => "1", 'position' => 0, 'notnull' => 1, "visible" => "1", "comment" => "PDP"),
+		"provider" => array("type" => "varchar(50)", "label" => "provider", "enabled" => "1", 'position' => 0, 'notnull' => 1, "visible" => "1", "comment" => "PDP"),
 		"entity" => array("type" => "integer", "label" => "entity", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "0", "comment" => "Multi-entity support"),
+		"flow_uiid" => array("type" => "varchar(255)", "label" => "flow_uiid", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "1",),
 	);
 	public $rowid;
 	public $date_creation;
@@ -174,8 +175,9 @@ class Document extends CommonObject
 	public $fk_element_type;
 	public $submittedat;
 	public $updatedat;
-	public $fk_provider;
+	public $provider;
 	public $entity;
+	public $flow_uiid;
 	// END MODULEBUILDER PROPERTIES
 
 
