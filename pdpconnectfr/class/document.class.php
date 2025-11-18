@@ -137,7 +137,7 @@ class Document extends CommonObject
 		"status" => array("type" => "integer", "label" => "Status", "enabled" => "1", 'position' => 2000, 'notnull' => 1, "visible" => "1", "index" => "1", "arrayofkeyval" => array("0" => "Brouillon", "1" => "Valid&eacute;", "9" => "Annul&eacute;"), "validate" => "1",),
 		"fk_call" => array("type" => "integer", "label" => "fk_call", "enabled" => "1", 'position' => 201, 'notnull' => 0, "visible" => "1", "comment" => "Reference to the original call"),
 		"flow_id" => array("type" => "varchar(255)", "label" => "flow_id", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "1", "comment" => "PDP flow UUID"),
-		"tracking_id" => array("type" => "integer", "label" => "tracking_id", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "1", "comment" => "Document tracking identifier"),
+		"tracking_idref" => array("type" => "varchar(50)", "label" => "tracking_idref", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "1", "comment" => "Document tracking identifier"),
 		"flow_type" => array("type" => "varchar(255)", "label" => "flow_type", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "1", "comment" => "Flow type (CustomerInvoice, etc.)"),
 		"flow_direction" => array("type" => "varchar(10)", "label" => "flow_direction", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "1", "comment" => "In or Out"),
 		"flow_syntax" => array("type" => "varchar(50)", "label" => "flow_syntax", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "1", "comment" => "Document syntax (FACTUR-X, etc.)"),
@@ -162,7 +162,7 @@ class Document extends CommonObject
 	public $status;
 	public $fk_call;
 	public $flow_id;
-	public $tracking_id;
+	public $tracking_idref;
 	public $flow_type;
 	public $flow_direction;
 	public $flow_syntax;

@@ -294,7 +294,7 @@ abstract class AbstractPDPProvider
         $LastSyncDate = null;
 
         // Get last sync date
-        $LastSyncDateSql = "SELECT MAX(t.date_creation) as last_sync_date
+        /*$LastSyncDateSql = "SELECT MAX(t.date_creation) as last_sync_date
             FROM ".MAIN_DB_PREFIX."pdpconnectfr_call as t
             WHERE t.provider = '".$this->db->escape($this->providerName)."' 
             AND t.call_type = 'sync_flow' 
@@ -302,7 +302,21 @@ abstract class AbstractPDPProvider
             if ($conf->entity && $conf->entity > 1) {
                 $LastSyncDateSql .= " AND t.entity = ".((int) $conf->entity);
             }
-            $LastSyncDateSql .= ";";
+        $LastSyncDateSql .= ";";*/
+
+        // Retrieve the last synchronization timestamp from the database
+        // Note: The PDP API does not support per-document synchronization yet.
+        // We perform a global sync for all flows and track the last modification
+        // timestamp (tms) from the pdpconnectfr_document table to determine
+        // which flows need to be synchronized since the last successful sync.
+        //
+        // Future enhancement: Individual document sync may be possible when
+        // the PDP provider API supports it.
+        $LastSyncDateSql = "SELECT MAX(t.tms) as last_sync_date
+            FROM ".MAIN_DB_PREFIX."pdpconnectfr_document as t
+            WHERE t.provider = '".$this->db->escape($this->providerName)."' ";
+        
+        
         $resql = $db->query($LastSyncDateSql);
 
         if ($resql) {
