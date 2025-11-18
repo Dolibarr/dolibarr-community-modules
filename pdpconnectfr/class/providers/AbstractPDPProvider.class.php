@@ -157,17 +157,17 @@ abstract class AbstractPDPProvider
     /**
      * Synchronize flows with PDP since the last synchronization date.
      *
-     * @return bool                 True on success, false on failure
+     * @return bool|array{res:int, messages:array<string>} True on success, false on failure along with messages.
      */
     abstract public function syncFlows();
 
     /**
-     * Store a flow data into the database.
+     * Store a flow data.
      *
-     * @param  array $data      Flow data to store
-     * @return bool             True on success, false on failure
+     * @param  string $flowId       FlowId
+     * @return bool                 True on success, false on failure
      */
-    abstract public function storeFlow($data);
+    abstract public function syncFlow($flowId);
 
     /**
      * Insert or update OAuth token for the given PDP.
@@ -278,5 +278,44 @@ abstract class AbstractPDPProvider
             'refresh_token' => $obj->tokenstring_refresh,
             'token_expires_at'     => $obj->expire_at
         ];
+    }
+
+    /**
+    * Get the last synchronization date with the PDP provider.
+    *
+    * Retrieves the timestamp of the most recent successful flow synchronization
+    * for this provider. If no sync has occurred yet, returns Unix epoch (1970-01-01).
+     *
+     * @return int Timestamp of the last synchronization date
+     */
+    public function getLastSyncDate() {
+        global $conf, $db;
+
+        $LastSyncDate = null;
+
+        // Get last sync date
+        $LastSyncDateSql = "SELECT MAX(t.date_creation) as last_sync_date
+            FROM ".MAIN_DB_PREFIX."pdpconnectfr_call as t
+            WHERE t.provider = '".$this->db->escape($this->providerName)."' 
+            AND t.call_type = 'sync_flow' 
+            AND T.status = 'SUCCESS'";
+            if ($conf->entity && $conf->entity > 1) {
+                $LastSyncDateSql .= " AND t.entity = ".((int) $conf->entity);
+            }
+            $LastSyncDateSql .= ";";
+        $resql = $db->query($LastSyncDateSql);
+
+        if ($resql) {
+            $obj = $db->fetch_object($resql);
+            $LastSyncDate = $obj->last_sync_date  ? strtotime($obj->last_sync_date) : null;
+        } else {
+            dol_syslog(__METHOD__ . " SQL warning: Failed to get last sync date: we try to sync all flows from today", LOG_WARNING);
+        }
+
+        if ($LastSyncDate === null) {
+            // If no last sync date, set to epoch start
+            $LastSyncDate = strtotime('1970-01-01 00:00:00');
+        }
+        return $LastSyncDate;
     }
 }

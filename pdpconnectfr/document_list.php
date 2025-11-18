@@ -93,6 +93,7 @@ if (!$res) {
 include_once DOL_DOCUMENT_ROOT.'/core/class/html.formcompany.class.php';
 include_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php';
 include_once DOL_DOCUMENT_ROOT.'/core/lib/company.lib.php';
+include_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
 include_once __DIR__.'/class/providers/PDPProviderManager.class.php';
 
 // load module libraries
@@ -118,6 +119,7 @@ $groupby = GETPOST('groupby', 'aZ09');	// Example: $groupby = 'p.fk_opp_status' 
 
 $id = GETPOSTINT('id');
 $ref = GETPOST('ref', 'alpha');
+$sync_result = '';
 
 // Load variable for pagination
 $limit = GETPOSTINT('limit') ? GETPOSTINT('limit') : $conf->liste_limit;
@@ -296,14 +298,16 @@ if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_P
 	$provider = $providerManager->getProvider(getDolGlobalString('PDPCONNECTFR_PDP'));
 }
 
-if ($action == 'sync' && getDolGlobalString('PDPCONNECTFR_PDP')) {
+if ($action == 'sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $confirm == 'yes') {
 	if (isset($provider)) {
-		$result = $provider->syncFlows();
-		if ($result >= 0) {
+		$sync_result = $provider->syncFlows();
+		if ($sync_result['res'] > 0) {
 			setEventMessages($langs->trans("DocumentsSyncedSuccessfully"), null, 'mesgs');
 		} else {
 			setEventMessages($langs->trans("FailedToSyncDocuments"), null, 'errors');
 		}
+	} else {
+		setEventMessages($langs->trans("NoPDPProviderConfigured"), null, 'errors');
 	}
 }
 
@@ -317,7 +321,7 @@ $form = new Form($db);
 $now = dol_now();
 
 $title = $langs->trans("PDPConnectFRArea");
-$title .= ' <a href="'.$_SERVER["PHP_SELF"].'?action=sync" class="butAction">'.img_picto('', 'refresh', 'class="pictofixedwidth"').'</a>';
+$title .= ' <a href="'.$_SERVER["PHP_SELF"].'?action=confirm_sync&token='.newToken().'" class="butAction">'.img_picto('', 'refresh', 'class="pictofixedwidth"').'</a>';
 //$help_url = "EN:Module_Document|FR:Module_Document_FR|ES:Módulo_Document";
 $help_url = '';
 $morejs = array();
@@ -660,6 +664,28 @@ $varpage = empty($contextpage) ? $_SERVER["PHP_SELF"] : $contextpage;
 $htmlofselectarray = $form->multiSelectArrayWithCheckbox('selectedfields', $arrayfields, $varpage, $conf->main_checkbox_left_column);  // This also change content of $arrayfields with user setup
 $selectedfields = (($mode != 'kanban' && $mode != 'kanbangroupby') ? $htmlofselectarray : '');
 $selectedfields .= (count($arrayofmassactions) ? $form->showCheckAddButtons('checkforselect', 1) : '');
+
+
+// Confirmation dialog
+if ($action == 'confirm_sync') {
+	$formconfirm = $form->formconfirm($_SERVER["PHP_SELF"], $langs->trans("ConfirmSyncDocuments"), '', 'sync');
+	print $formconfirm;
+}
+
+// sync results
+if ($action == 'sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $confirm == 'yes' && !empty($sync_result)) {
+	if (isset($provider)) {
+		$cssclass = ($sync_result['res'] > 0) ? 'info' : 'error';
+		print '<div class="wordbreak '.$cssclass.' clearboth">';
+		print '<strong><u>'.$langs->trans("SyncResults").'</u></strong></br>';
+		if ($sync_result['messages'] && is_array($sync_result['messages'])) {
+			foreach ($sync_result['messages'] as $message) {
+				print $message . '<br>';
+			}
+		}
+		print '</div>';
+	}
+}
 
 print '<div class="div-table-responsive">'; // You can use div-table-responsive-no-min if you don't need reserved height for your table
 print '<table class="tagtable nobottomiftotal noborder liste'.($moreforfilter ? " listwithfilterbefore" : "").'">'."\n";
