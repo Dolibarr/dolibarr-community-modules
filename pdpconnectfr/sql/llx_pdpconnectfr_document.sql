@@ -23,7 +23,7 @@ CREATE TABLE llx_pdpconnectfr_document(
 	fk_user_modif integer, 
 	status integer NOT NULL, 
 	fk_call integer, 
-	flow_id integer, 
+	flow_id varchar(255) NOT NULL, 
 	tracking_id integer, 
 	flow_type varchar(255), 
 	flow_direction varchar(10), 
@@ -37,7 +37,8 @@ CREATE TABLE llx_pdpconnectfr_document(
 	fk_element_type varchar(100), 
 	submittedat datetime NOT NULL, 
 	updatedat datetime, 
-	fk_provider varchar(50) NOT NULL, 
-	entity integer DEFAULT 1
+	provider varchar(50) NOT NULL, 
+	entity integer DEFAULT 1, 
+	flow_uiid varchar(255)
 	-- END MODULEBUILDER FIELDS
 ) ENGINE=innodb;

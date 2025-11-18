@@ -24,7 +24,9 @@
  * \brief   Esalink PDP provider integration class
  */
 
-dol_include_once('/pdpconnectfr/class/providers/AbstractPDPProvider.class.php');
+use Luracast\Restler\Data\Arr;
+
+dol_include_once('custom/pdpconnectfr/class/providers/AbstractPDPProvider.class.php');
 
 
 /**
@@ -185,7 +187,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                 "trackingId" => $object->ref,
                 "name" => "Invoice_" . $object->ref,
                 "flowSyntax" => "FACTUR_X",
-                "flowProfile" => "Basic",
+                "flowProfile" => "CIUS",
                 "sha256" => hash_file('sha256', $invoice_path)
             ]),
             'file' => new CURLFile($invoice_path, 'application/pdf', basename($invoice_path))
@@ -378,66 +380,140 @@ class EsalinkPDPProvider extends AbstractPDPProvider
     /**
      * Synchronize flows with EsaLink since the last synchronization date.
      *
-     * @return bool                 True on success, false on failure
+     * @return bool|array{res:int, messages:array<string>} True on success, false on failure along with messages.
      */
     public function syncFlows()
     {
-        global $conf, $db;
-
-        $LastSyncDate = null;
-
-        // Get last sync date
-        $LastSyncDateSql = "SELECT MAX(t.date_creation) as last_sync_date
-            FROM ".MAIN_DB_PREFIX."pdpconnectfr_call as t
-            WHERE t.provider = '".$this->db->escape($this->providerName)."' 
-            AND t.call_type = 'sync_flow' 
-            AND T.status = 'SUCCESS'";
-            if ($conf->entity && $conf->entity > 1) {
-                $LastSyncDateSql .= " AND t.entity = ".((int) $conf->entity);
-            }
-            $LastSyncDateSql .= ";";
-        $resql = $db->query($LastSyncDateSql);
-        
-        if ($resql) {
-            $obj = $db->fetch_object($resql);
-            $LastSyncDate = $obj->last_sync_date  ? strtotime($obj->last_sync_date) : null;
-        } else {
-            dol_syslog(__METHOD__ . " SQL warning: Failed to get last sync date: we try to sync all flows from today", LOG_WARNING);
-        }
-
-        if ($LastSyncDate === null) {
-            // If no last sync date, set to epoch start
-            $LastSyncDate = strtotime('1970-01-01 00:00:00');
-        }
-
-        $params = array(
-            'limit' => 20,
-            'where' => array(
-                'updatedAfter' => dol_print_date($LastSyncDate, '%Y-%m-%dT%H:%M:%S.000Z', 'gmt')
-            )
-        );
+        $results_messages = array();
+        $uuid = $this->generateUuidV4(); // UUID used to correlate logs between Dolibarr and PDP TODO : Store it somewhere
 
         $resource = 'flows/search';
-        $uuid = $this->generateUuidV4(); // UUID used to correlate logs between Dolibarr and PDP TODO : Store it somewhere
         $urlparams = array(
             'Request-Id' => $uuid,
         );
-		$resource .= '?' . http_build_query($urlparams);
+            $resource .= '?' . http_build_query($urlparams);
 
+        // First call to get a total count of flows to sync
+        $params = array(
+            'limit' => 1,
+            'where' => array(
+            'updatedAfter' => dol_print_date($this->getLastSyncDate(), '%Y-%m-%dT%H:%M:%S.000Z', 'gmt')
+            )
+        );
         $response = $this->callApi($resource, "POST", json_encode($params));
 
-        return true;
+        $totalFlows = 0;
+        if ($response['status_code'] != 200) {
+            $this->errors[] = "Failed to retrieve flows for synchronization.";
+            $results_messages[] = "Failed to retrieve flows for synchronization.";
+            return array('res' => 0, 'messages' => $results_messages);
+        }
+
+        $totalFlows = $response['response']['total'] ?? 0;
+
+        if ($totalFlows == 0) {
+            dol_syslog(__METHOD__ . " No flows to synchronize.", LOG_DEBUG);
+            $results_messages[] = "No flows to synchronize.";
+            return array('res' => 1, 'messages' => $results_messages);
+        } else {
+            dol_syslog(__METHOD__ . " Total flows to synchronize: " . $totalFlows, LOG_DEBUG);
+            // Make a second call to get all flows
+            $params['limit'] = $totalFlows;
+            $response = $this->callApi($resource, "POST", json_encode($params));
+
+            if ($response['status_code'] != 200) {
+                $this->errors[] = "Failed to retrieve flows for synchronization.";
+                $results_messages[] = "Failed to retrieve flows for synchronization.";
+                return array('res' => 0, 'messages' => $results_messages);
+            }
+
+            $documents = array();
+            $cdars = array();
+            foreach ($response['response']['results'] as $flow) {
+                switch ($flow["flowSyntax"]) {
+                    case "CDAR":
+                        $cdars[] = $flow;
+                        break;
+                    case "FACTUR_X":
+                        $documents[] = $flow;
+                        break;
+                    default:
+                        $documents[] = $flow;
+                        break;
+                }
+            }
+
+            // Process documents
+            foreach ($documents as $flow) {
+                $res = $this->syncFlow($flow['flowId']);
+                if ($res['res'] != '1') {
+                    $results_messages[] = "Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'];
+                }
+            }
+        }
+
+        $results_messages[] = "Total flows to synchronize: " . $totalFlows;
+        return array('res' => 1, 'messages' => $results_messages);
     }
 
     /**
-     * Store flow data.
+     * sync flow data.
      *
-     * @param array<string, mixed> $data Flow data to store
-     * @return bool                 True on success, false on failure
+     * @param string $flowId        FlowId
+     * @return array{res:int, message:string} Returns array with 'res' (1 on success, -1 on failure) and 'message' if error
      */
-    public function storeFlow($data)
+    public function syncFlow($flowId)
     {
-        return true;
+        global $conf, $user;
+        dol_include_once('custom/pdpconnectfr/class/document.class.php');
+
+        // call API to get flow details
+        $flowResource = 'flows/' . $flowId;
+        $flowUrlparams = array(
+            'docType' => 'Metadata', // docType can be 'Metadata', 'Original', 'Converted' or 'ReadableView'
+        );
+        $flowResource .= '?' . http_build_query($flowUrlparams);
+        $flowResponse = $this->callApi(
+            $flowResource,
+            "GET",
+            false,
+            ['Accept' => 'application/octet-stream']
+        );
+
+        if ($flowResponse['status_code'] != 200) {
+            return array('res' => '-1', 'message' => "Failed to retrieve flow details for flowId: " . $flowId);
+        }
+
+        // Process flow data
+        $flowData = json_decode($flowResponse['response'], true);
+        $document = new Document($this->db);
+        $document->date_creation        = dol_now();
+        $document->fk_user_creat        = $user->id;
+        $document->fk_call              = null; // TODO
+        $document->flow_id              = $flowId;
+        $document->tracking_id          = $flowData['trackingId'] ?? null;
+        $document->flow_type            = $flowData['type'] ?? null;
+        $document->flow_direction       = $flowData['direction'] ?? null;
+        $document->flow_syntax          = $flowData['syntax'] ?? null;
+        $document->flow_profile         = $flowData['profile'] ?? null;
+        $document->ack_status           = $flowData['acknowledgement']['status'] ?? null;
+        $document->ack_reason_code      = $flowData['acknowledgement']['reasonCode'] ?? null;
+        $document->ack_info             = $flowData['acknowledgement']['additionalInformation'] ?? null;
+        $document->document_body        = null;
+        $document->fk_element_id        = null;
+        $document->fk_element_type      = null;
+        $document->submittedat          = $flowData['createDate'] ?? null;
+        $document->updatedat            = $flowData['updateDate'] ?? null;
+        $document->provider             = getDolGlobalString('PDPCONNECTFR_PDP') ?? null;
+        $document->entity               = $conf->entity;
+        $document->flow_uiid            = $flowData['uuid'] ?? null;
+
+        $res = $document->create($user);
+        if ($res < 0) {
+            return array('res' => '-1', 'message' => "Failed to store flow data for flowId: " . $flowId);
+        }
+
+        return array('res' => '1', 'message' => '');
     }
 
 
