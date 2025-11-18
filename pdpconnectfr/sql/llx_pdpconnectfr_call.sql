@@ -27,7 +27,7 @@ CREATE TABLE llx_pdpconnectfr_call(
 	endpoint varchar(255) NOT NULL, 
 	request_body text, 
 	response text, 
-	fk_provider varchar(50) NOT NULL, 
+	provider varchar(50) NOT NULL, 
 	entity varchar(50) DEFAULT 1
 	-- END MODULEBUILDER FIELDS
 ) ENGINE=innodb;

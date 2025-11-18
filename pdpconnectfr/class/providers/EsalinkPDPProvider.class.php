@@ -186,7 +186,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
             'flowInfo' => json_encode([
                 "trackingId" => $object->ref,
                 "name" => "Invoice_" . $object->ref,
-                "flowSyntax" => "FACTUR_X",
+                "flowSyntax" => "FACTUR-X",
                 "flowProfile" => "CIUS",
                 "sha256" => hash_file('sha256', $invoice_path)
             ]),
@@ -434,7 +434,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                     case "CDAR":
                         $cdars[] = $flow;
                         break;
-                    case "FACTUR_X":
+                    case "FACTUR-X":
                         $documents[] = $flow;
                         break;
                     default:
@@ -443,8 +443,16 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                 }
             }
 
-            // Process documents
+            // Process documents first
             foreach ($documents as $flow) {
+                $res = $this->syncFlow($flow['flowId']);
+                if ($res['res'] != '1') {
+                    $results_messages[] = "Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'];
+                }
+            }
+
+            // Then process CDARs
+            foreach ($cdars as $flow) {
                 $res = $this->syncFlow($flow['flowId']);
                 if ($res['res'] != '1') {
                     $results_messages[] = "Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'];
@@ -491,7 +499,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         $document->fk_user_creat        = $user->id;
         $document->fk_call              = null; // TODO
         $document->flow_id              = $flowId;
-        $document->tracking_id          = $flowData['trackingId'] ?? null;
+        $document->tracking_idref       = $flowData['trackingId'] ?? null;
         $document->flow_type            = $flowData['type'] ?? null;
         $document->flow_direction       = $flowData['direction'] ?? null;
         $document->flow_syntax          = $flowData['syntax'] ?? null;
@@ -507,6 +515,65 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         $document->provider             = getDolGlobalString('PDPCONNECTFR_PDP') ?? null;
         $document->entity               = $conf->entity;
         $document->flow_uiid            = $flowData['uuid'] ?? null;
+
+        switch ($document->flow_type) {
+            // CustomerInvoice
+            case "CustomerInvoice":
+                // 1. link flow to customer invoice
+                require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
+                $document->fk_element_type = Facture::class;
+                $factureObj = new Facture($this->db);
+                $res = $factureObj->fetch(0, $document->tracking_idref);
+                if ($res < 0) {
+                    return array('res' => '-1', 'message' => "Failed to fetch customer invoice for flowId: " . $flowId);
+                }
+                $document->fk_element_id = $factureObj->id;
+                // 2. save received document
+                break;
+
+            // SupplierInvoice
+            case "SupplierInvoice":
+                // 2. link flow document to supplier invoice
+                // 3. save received documents (original and xml)
+                break;
+
+            // Customer Invoice LC (life cycle)
+            case "CustomerInvoiceLC":
+                // 1. link flow document to customer invoice
+                require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
+                $document->fk_element_type = Facture::class;
+                $factureObj = new Facture($this->db);
+                $res = $factureObj->fetch(0, $document->tracking_idref);
+                if ($res < 0) {
+                    return array('res' => '-1', 'message' => "Failed to fetch customer invoice for flowId: " . $flowId);
+                }
+                $document->fk_element_id = $factureObj->id;
+
+                // 2. Read CDAR and update status of linked customer invoice
+                $flowResource = 'flows/' . $flowId;
+                $flowUrlparams = array(
+                    'docType' => 'Original', // docType can be 'Metadata', 'Original', 'Converted' or 'ReadableView'
+                );
+                $flowResource .= '?' . http_build_query($flowUrlparams);
+                $flowResponse = $this->callApi(
+                    $flowResource,
+                    "GET",
+                    false,
+                    ['Accept' => 'application/octet-stream']
+                );
+
+                if ($flowResponse['status_code'] != 200) {
+                    return array('res' => '-1', 'message' => "Failed to retrieve flow details for flowId: " . $flowId);
+                }
+                $cdarXml = $flowResponse['response'];
+
+                break;
+
+            // Supplier Invoice LC (life cycle)
+            case "SupplierInvoiceLC":
+                $document->document_type = 'INVOICE';
+                break;
+        }
 
         $res = $document->create($user);
         if ($res < 0) {
