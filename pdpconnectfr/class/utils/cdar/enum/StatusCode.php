@@ -1,0 +1,112 @@
+<?php
+enum StatusCode: string
+{
+    case ACCEPTED = '1';
+    case ACCOMPANYING_GOODS = '2';
+    case CONDITIONALLY_ACCEPTED = '3';
+    case TO_ARRIVE_BY_SEPARATE_EDI = '4';
+    case INFORMATION_ONLY = '5';
+    case TO_ARRIVE_BY_MANUAL_MEANS = '6';
+    case TO_BE_RAISED_AND_SENT = '7';
+    case REJECTED = '8';
+    case TO_BE_PRINTED = '9';
+    case DOCUMENT_CURRENTLY_VALID = '10';
+    case DOCUMENT_NOT_AVAILABLE = '11';
+    case DOCUMENT_EXHAUSTED_ATTACHED = '12';
+    case DOCUMENT_NOT_EXHAUSTED_ATTACHED = '13';
+    case DOCUMENT_EXHAUSTED_LODGED = '14';
+    case DOCUMENT_NOT_EXHAUSTED_LODGED = '15';
+    case DOCUMENT_NOT_ATTACHED = '16';
+    case DOCUMENT_WITH_GOODS = '17';
+    case DOCUMENT_ATTACHED_TO_RETURN = '18';
+    case DOCUMENT_APPLIED_FOR = '19';
+    case RECEIVED_FOR_SHIPMENT = '20';
+    case SHIPPED_ON_BOARD = '21';
+    case STATUS_0 = '22';
+    case STATUS_1 = '23';
+    case STATUS_2 = '24';
+    case MESSAGE_UNDER_DEVELOPMENT = '25';
+    case DOCUMENT_NOT_FREIGHTED = '26';
+    case DOCUMENT_FREIGHTED = '27';
+    case ARCHIVED = '28';
+    case PROVISIONAL = '29';
+    case DOCUMENTS_FIRST_TRANSMISSION = '30';
+    case DOCUMENTS_SECOND_TRANSMISSION = '31';
+    case DOCUMENT_NOT_REQUIRED_WAIVER = '32';
+    case ALREADY_ON_FILE = '33';
+    case RETAINED_BY_SENDER = '34';
+    case DOCUMENT_INCOMPLETE = '35';
+    case DOCUMENT_PREVIOUSLY_SUBMITTED = '36';
+    case DOCUMENT_COMPLETE = '37';
+    case FINAL = '38';
+    case ON_HOLD = '39';
+    case VALIDITY_SUSPENDED = '40';
+    case VALIDITY_REVOKED = '41';
+    case IN_ERROR = '42';
+    case RECEIVED = '43';
+    case ACCEPTED_WITH_WARNINGS = '44';
+    case IN_PROCESS = '45';
+    case UNDER_QUERY = '46';
+    case PAID = '47';
+    case ACKNOWLEDGED = '48';
+    case CONDITIONALLY_ACCEPTED_2 = '49';
+    case REJECTED_NO_FURTHER = '50';
+    case TO_ARRIVE_BY_ELECTRONIC = '51';
+
+    public function getLabel(): string
+    {
+        return match($this) {
+            self::ACCEPTED => 'Accepted',
+            self::ACCOMPANYING_GOODS => 'Accompanying goods',
+            self::CONDITIONALLY_ACCEPTED => 'Conditionally accepted',
+            self::TO_ARRIVE_BY_SEPARATE_EDI => 'To arrive by separate EDI message',
+            self::INFORMATION_ONLY => 'Information only',
+            self::TO_ARRIVE_BY_MANUAL_MEANS => 'To arrive by manual means',
+            self::TO_BE_RAISED_AND_SENT => 'To be raised and sent',
+            self::REJECTED => 'Rejected',
+            self::TO_BE_PRINTED => 'To be printed',
+            self::DOCUMENT_CURRENTLY_VALID => 'Document currently valid',
+            self::DOCUMENT_NOT_AVAILABLE => 'Document not available',
+            self::DOCUMENT_EXHAUSTED_ATTACHED => 'Document exhausted by declaration and attached',
+            self::DOCUMENT_NOT_EXHAUSTED_ATTACHED => 'Document not exhausted by declaration and attached',
+            self::DOCUMENT_EXHAUSTED_LODGED => 'Document exhausted by declaration and previously lodged',
+            self::DOCUMENT_NOT_EXHAUSTED_LODGED => 'Document not exhausted by declaration and previously lodged',
+            self::DOCUMENT_NOT_ATTACHED => 'Document not attached',
+            self::DOCUMENT_WITH_GOODS => 'Document with the goods',
+            self::DOCUMENT_ATTACHED_TO_RETURN => 'Document attached, to be returned after endorsement',
+            self::DOCUMENT_APPLIED_FOR => 'Document applied for',
+            self::RECEIVED_FOR_SHIPMENT => 'Received for shipment',
+            self::SHIPPED_ON_BOARD => 'Shipped on board',
+            self::STATUS_0 => 'Status 0',
+            self::STATUS_1 => 'Status 1',
+            self::STATUS_2 => 'Status 2',
+            self::MESSAGE_UNDER_DEVELOPMENT => 'Message under development',
+            self::DOCUMENT_NOT_FREIGHTED => 'Document not freighted',
+            self::DOCUMENT_FREIGHTED => 'Document freighted',
+            self::ARCHIVED => 'Archived',
+            self::PROVISIONAL => 'Provisional',
+            self::DOCUMENTS_FIRST_TRANSMISSION => 'Documents enclosed in the first transmission',
+            self::DOCUMENTS_SECOND_TRANSMISSION => 'Documents enclosed in the second transmission',
+            self::DOCUMENT_NOT_REQUIRED_WAIVER => 'Document not required, waiver issued',
+            self::ALREADY_ON_FILE => 'Already on file with receiver of this message',
+            self::RETAINED_BY_SENDER => 'Retained by sender of this message',
+            self::DOCUMENT_INCOMPLETE => 'Document incomplete',
+            self::DOCUMENT_PREVIOUSLY_SUBMITTED => 'Document previously submitted',
+            self::DOCUMENT_COMPLETE => 'Document complete',
+            self::FINAL => 'Final',
+            self::ON_HOLD => 'On hold',
+            self::VALIDITY_SUSPENDED => 'Validity suspended',
+            self::VALIDITY_REVOKED => 'Validity revoked',
+            self::IN_ERROR => 'In error',
+            self::RECEIVED => 'Received',
+            self::ACCEPTED_WITH_WARNINGS => 'Accepted with warnings',
+            self::IN_PROCESS => 'In process',
+            self::UNDER_QUERY => 'Under query',
+            self::PAID => 'Paid',
+            self::ACKNOWLEDGED => 'Acknowledged',
+            self::CONDITIONALLY_ACCEPTED_2 => 'Conditionally accepted',
+            self::REJECTED_NO_FURTHER => 'Rejected, no further processing',
+            self::TO_ARRIVE_BY_ELECTRONIC => 'To arrive by electronic means',
+        };
+    }
+}

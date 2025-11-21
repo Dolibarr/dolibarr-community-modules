@@ -153,6 +153,11 @@ class Document extends CommonObject
 		"provider" => array("type" => "varchar(50)", "label" => "provider", "enabled" => "1", 'position' => 0, 'notnull' => 1, "visible" => "1", "comment" => "PDP"),
 		"entity" => array("type" => "integer", "label" => "entity", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "0", "comment" => "Multi-entity support"),
 		"flow_uiid" => array("type" => "varchar(255)", "label" => "flow_uiid", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "1",),
+		"cdar_lifecycle_code" => array("type" => "varchar(50)", "label" => "cdar_lifecycle_code", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "1",),
+		"cdar_lifecycle_label" => array("type" => "varchar(255)", "label" => "cdar_lifecycle_label", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "1",),
+		"cdar_reason_code" => array("type" => "varchar(50)", "label" => "cdar_reason_code", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "1",),
+		"cdar_reason_desc" => array("type" => "varchar(255)", "label" => "cdar_reason_desc", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "1",),
+		"cdar_reason_detail" => array("type" => "text", "label" => "cdar_reason_detail", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "1",),
 	);
 	public $rowid;
 	public $date_creation;
@@ -178,6 +183,11 @@ class Document extends CommonObject
 	public $provider;
 	public $entity;
 	public $flow_uiid;
+	public $cdar_lifecycle_code;
+	public $cdar_lifecycle_label;
+	public $cdar_reason_code;
+	public $cdar_reason_desc;
+	public $cdar_reason_detail;
 	// END MODULEBUILDER PROPERTIES
 
 
