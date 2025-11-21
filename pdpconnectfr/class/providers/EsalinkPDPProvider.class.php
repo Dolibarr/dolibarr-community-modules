@@ -529,6 +529,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                 }
                 $document->fk_element_id = $factureObj->id;
                 // 2. save received document
+                // TODO
                 break;
 
             // SupplierInvoice
@@ -566,6 +567,32 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                     return array('res' => '-1', 'message' => "Failed to retrieve flow details for flowId: " . $flowId);
                 }
                 $cdarXml = $flowResponse['response'];
+
+                dol_include_once('custom/pdpconnectfr/class/utils/cdar/CdarManager.class.php');
+                $cdarManager = new CdarManager();
+                $cdarDocument = $cdarManager->readFromString($cdarXml);
+                if ($cdarDocument === null) {
+                    return array('res' => '-1', 'message' => "Failed to parse CDAR document for flowId: " . $flowId);
+                }
+
+                require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
+                $document->fk_element_type = Facture::class;
+                $factureObj = new Facture($this->db);
+                $res = $factureObj->fetch(0, $cdarDocument->AcknowledgementDocument->ReferenceReferencedDocument->IssuerAssignedID);
+                if ($res < 0) {
+                    return array('res' => '-1', 'message' => "Failed to fetch customer invoice for flowId: " . $flowId . " using CDAR tracking ID: " . $cdarDocument->AcknowledgementDocument->ReferenceReferencedDocument->IssuerAssignedID);
+                }
+                $document->fk_element_id = $factureObj->id;
+
+                // Fill CDAR information in document
+                $document->cdar_lifecycle_code = $cdarDocument->AcknowledgementDocument->ReferenceReferencedDocument->ProcessConditionCode->value;
+                $document->cdar_lifecycle_label = $cdarDocument->AcknowledgementDocument->ReferenceReferencedDocument->ProcessCondition;
+                $document->cdar_reason_code = $cdarDocument->AcknowledgementDocument->ReferenceReferencedDocument->StatusReasonCode;
+                $document->cdar_reason_desc = $cdarDocument->AcknowledgementDocument->ReferenceReferencedDocument->StatusReason;
+                $document->cdar_reason_detail = $cdarDocument->AcknowledgementDocument->ReferenceReferencedDocument->StatusIncludedNoteContent;
+
+                // Update customer invoice status based on CDAR lifecycle code
+                // TODO: Map lifecycle codes to Dolibarr invoice statuses
 
                 break;
 

@@ -39,6 +39,11 @@ CREATE TABLE llx_pdpconnectfr_document(
 	updatedat datetime, 
 	provider varchar(50) NOT NULL, 
 	entity integer DEFAULT 1, 
-	flow_uiid varchar(255)
+	flow_uiid varchar(255), 
+	cdar_lifecycle_code varchar(50), 
+	cdar_lifecycle_label varchar(255), 
+	cdar_reason_code varchar(50), 
+	cdar_reason_desc varchar(255), 
+	cdar_reason_detail varchar(255)
 	-- END MODULEBUILDER FIELDS
 ) ENGINE=innodb;
