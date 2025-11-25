@@ -321,7 +321,7 @@ if (preg_match('/call'.$prefix.'HEALTHCHECK/i', $action, $reg)) {
 }
 
 // To remove
-if (preg_match('/makeInvoice/i', $action, $reg)) {
+/*if (preg_match('/makeInvoice/i', $action, $reg)) {
 	$protocol = $ProtocolManager->getprotocol('FACTURX');
 
 	$result = $protocol->generateInvoice('288');
@@ -330,7 +330,7 @@ if (preg_match('/makeInvoice/i', $action, $reg)) {
 	} else {
 		setEventMessages('', $protocol->errors, 'errors');
 	}
-}
+}*/
 
 if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_PDP') === "ESALINK") {
 	// Username
@@ -389,13 +389,13 @@ if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_P
 	}
 
 	// To remove
-	if ($tokenData['token'] && getDolGlobalString('PDPCONNECTFR_PROTOCOL') && getDolGlobalString('PDPCONNECTFR_PROTOCOL') === 'FACTURX' && getDolGlobalString('PDPCONNECTFR_PROFILE') === 'EN16931') {
+	/*if ($tokenData['token'] && getDolGlobalString('PDPCONNECTFR_PROTOCOL') && getDolGlobalString('PDPCONNECTFR_PROTOCOL') === 'FACTURX' && getDolGlobalString('PDPCONNECTFR_PROFILE') === 'EN16931') {
 		$item->fieldOverride .= "
 			<a
 			href='".$_SERVER["PHP_SELF"]."?action=makeInvoice&token=".newToken()."'
 			> Generate Invoice <i class='fa fa-file'></i></a><br/>
 		";
-	}
+	}*/
 }
 
 

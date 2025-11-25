@@ -27,6 +27,7 @@
 use Luracast\Restler\Data\Arr;
 
 dol_include_once('custom/pdpconnectfr/class/providers/AbstractPDPProvider.class.php');
+dol_include_once('custom/pdpconnectfr/class/protocols/ProtocolManager.class.php');
 
 
 /**
@@ -55,6 +56,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
         // Retrieve and complete the OAuth token information from the database
        	$this->tokenData = $this->fetchOAuthTokenDB();
+
+        $exchangeProtocolConf = getDolGlobalString('PDPCONNECTFR_PROTOCOL');
+        $ProtocolManager = new ProtocolManager($this->db);
+        $this->exchangeProtocol = $ProtocolManager->getprotocol($exchangeProtocolConf);
     }
 
     /**
@@ -217,10 +222,6 @@ class EsalinkPDPProvider extends AbstractPDPProvider
     {
         $outputLog = array(); // Feedback to display
 
-        $exchangeProtocolConf = getDolGlobalString('PDPCONNECTFR_PROTOCOL');
-        $ProtocolManager = new ProtocolManager($this->db);
-        $this->exchangeProtocol = $ProtocolManager->getprotocol($exchangeProtocolConf);
-
         // Generate sample invoice
         $invoice_path = $this->exchangeProtocol->generateSampleInvoice();
         if ($invoice_path) {
@@ -246,7 +247,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
             'flowInfo' => json_encode([
                 "trackingId" => "INV-2025-001",
                 "name" => "Invoice_2025_001",
-                "flowSyntax" => "FACTUR_X",
+                "flowSyntax" => "FACTUR-X",
                 "flowProfile" => "CIUS",
                 "sha256" => hash_file('sha256', $invoice_path)
             ]),
@@ -528,14 +529,34 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                     return array('res' => '-1', 'message' => "Failed to fetch customer invoice for flowId: " . $flowId);
                 }
                 $document->fk_element_id = $factureObj->id;
-                // 2. save received document
+                // 2. save received converted document
                 // TODO
                 break;
 
             // SupplierInvoice
             case "SupplierInvoice":
-                // 2. link flow document to supplier invoice
-                // 3. save received documents (original and xml)
+                // --- Fetch received documents (FacturX PDF)
+                $flowResource = 'flows/' . $flowId;
+                $flowUrlparams = array(
+                    'docType' => 'Converted', // docType can be 'Metadata', 'Original', 'Converted' or 'ReadableView'
+                );
+                $flowResource .= '?' . http_build_query($flowUrlparams);
+                $flowResponse = $this->callApi(
+                    $flowResource,
+                    "GET",
+                    false,
+                    ['Accept' => 'application/octet-stream']
+                );
+
+                if ($flowResponse['status_code'] != 200) {
+                    return array('res' => -1, 'message' => "Failed to retrieve converted document for SupplierInvoice flow (flowId: $flowId)");
+                }
+                $receivedFile = $flowResponse['response'];
+
+                $res = $this->exchangeProtocol->createSupplierInvoiceFromFacturX($receivedFile);
+                if ($res['res'] != '1') {
+                    return array('res' => -1, 'message' => "Failed to create supplier invoice from FacturX for flowId: " . $flowId . ". Error: " . $res['message']);
+                }
                 break;
 
             // Customer Invoice LC (life cycle)

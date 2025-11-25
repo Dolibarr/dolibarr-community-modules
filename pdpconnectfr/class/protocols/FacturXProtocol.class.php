@@ -46,6 +46,7 @@ use horstoeko\zugferd\ZugferdProfiles;
 use horstoeko\zugferd\ZugferdDocumentPdfBuilder;
 use horstoeko\zugferd\ZugferdDocumentPdfBuilderAbstract;
 use horstoeko\zugferd\ZugferdDocumentValidator;
+use horstoeko\zugferd\ZugferdDocumentPdfReader;
 
 require __DIR__ . "/../../vendor/autoload.php";
 
@@ -954,6 +955,49 @@ class FacturXProtocol extends AbstractProtocol
         $zugferdDocumentPdfBuilder->saveDocument($newPdfFilename);
 
         return $newPdfFilename;
+    }
+
+
+    /**
+     * Create a supplier invoice from a Factur-X file.
+     *
+     * @param  string $file                     Factur-X file.
+     * @return array{res:int, message:string}   Returns array with 'res' (1 on success, -1 on failure) and 'message' if error
+     */
+    public function createSupplierInvoiceFromFacturX($file)
+    {
+        global $conf, $db;
+
+
+        // Save uploaded file to temporary directory
+        $tempDir = $conf->pdpconnectfr->dir_temp;
+        if (!dol_is_dir($tempDir)) {
+            dol_mkdir($tempDir);
+        }
+
+        $tempFile = $tempDir . '/' . uniqid('facturx_') . '.pdf';
+
+        if (!move_uploaded_file($file, $tempFile)) {
+            return ['res' => -1, 'message' => 'Failed to move uploaded file to temporary location' ];
+        }
+
+        // --- Read the Factur-X file
+        $document = ZugferdDocumentPdfReader::readAndGuessFromFile($tempFile);
+        $document->getDocumentInformation($documentno, $documenttypecode, $documentdate, $invoiceCurrency, $taxCurrency, $documentname, $documentlanguage, $effectiveSpecifiedPeriod);
+
+        print "Profile:               {$document->getProfileDefinitionParameter("name")}\r\n";
+        print "Profile:               {$document->getProfileDefinitionParameter("altname")}\r\n";
+
+        // --- Create Supplier Invoice object
+        require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
+        $supplierInvoice = new FactureFournisseur($db);
+
+
+        // TODO : Save receivedFile in supplier invoice attachments
+
+        // TODO : Link flow document to supplier invoice
+
+        return ['res' => 1, 'message' => 'Not implemented yet' ];
     }
 
 
