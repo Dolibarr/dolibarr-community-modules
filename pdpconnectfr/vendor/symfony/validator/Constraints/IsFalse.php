@@ -11,11 +11,11 @@
 
 namespace Symfony\Component\Validator\Constraints;
 
-use Symfony\Component\Validator\Attribute\HasNamedArguments;
 use Symfony\Component\Validator\Constraint;
 
 /**
- * Validates that a value is false.
+ * @Annotation
+ * @Target({"PROPERTY", "METHOD", "ANNOTATION"})
  *
  * @author Bernhard Schussek <bschussek@gmail.com>
  */
@@ -24,23 +24,14 @@ class IsFalse extends Constraint
 {
     public const NOT_FALSE_ERROR = 'd53a91b0-def3-426a-83d7-269da7ab4200';
 
-    protected const ERROR_NAMES = [
+    protected static $errorNames = [
         self::NOT_FALSE_ERROR => 'NOT_FALSE_ERROR',
     ];
 
-    public string $message = 'This value should be false.';
+    public $message = 'This value should be false.';
 
-    /**
-     * @param array<string,mixed>|null $options
-     * @param string[]|null            $groups
-     */
-    #[HasNamedArguments]
-    public function __construct(?array $options = null, ?string $message = null, ?array $groups = null, mixed $payload = null)
+    public function __construct(?array $options = null, ?string $message = null, ?array $groups = null, $payload = null)
     {
-        if (\is_array($options)) {
-            trigger_deprecation('symfony/validator', '7.3', 'Passing an array of options to configure the "%s" constraint is deprecated, use named arguments instead.', static::class);
-        }
-
         parent::__construct($options ?? [], $groups, $payload);
 
         $this->message = $message ?? $this->message;

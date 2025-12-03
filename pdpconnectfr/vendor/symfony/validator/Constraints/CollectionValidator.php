@@ -21,7 +21,10 @@ use Symfony\Component\Validator\Exception\UnexpectedValueException;
  */
 class CollectionValidator extends ConstraintValidator
 {
-    public function validate(mixed $value, Constraint $constraint): void
+    /**
+     * {@inheritdoc}
+     */
+    public function validate($value, Constraint $constraint)
     {
         if (!$constraint instanceof Collection) {
             throw new UnexpectedTypeException($constraint, Collection::class);
@@ -47,6 +50,7 @@ class CollectionValidator extends ConstraintValidator
         $context = $this->context;
 
         foreach ($constraint->fields as $field => $fieldConstraint) {
+            // bug fix issue #2779
             $existsInArray = \is_array($value) && \array_key_exists($field, $value);
             $existsInArrayAccess = $value instanceof \ArrayAccess && $value->offsetExists($field);
 

@@ -22,9 +22,25 @@ use Symfony\Component\DependencyInjection\Reference;
  */
 class AddAutoMappingConfigurationPass implements CompilerPassInterface
 {
-    public function process(ContainerBuilder $container): void
+    private $validatorBuilderService;
+    private $tag;
+
+    public function __construct(string $validatorBuilderService = 'validator.builder', string $tag = 'validator.auto_mapper')
     {
-        if (!$container->hasParameter('validator.auto_mapping') || !$container->hasDefinition('validator.builder')) {
+        if (0 < \func_num_args()) {
+            trigger_deprecation('symfony/validator', '5.3', 'Configuring "%s" is deprecated.', __CLASS__);
+        }
+
+        $this->validatorBuilderService = $validatorBuilderService;
+        $this->tag = $tag;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function process(ContainerBuilder $container)
+    {
+        if (!$container->hasParameter('validator.auto_mapping') || !$container->hasDefinition($this->validatorBuilderService)) {
             return;
         }
 
@@ -44,8 +60,8 @@ class AddAutoMappingConfigurationPass implements CompilerPassInterface
             }
         }
 
-        $validatorBuilder = $container->getDefinition('validator.builder');
-        foreach ($container->findTaggedServiceIds('validator.auto_mapper') as $id => $tags) {
+        $validatorBuilder = $container->getDefinition($this->validatorBuilderService);
+        foreach ($container->findTaggedServiceIds($this->tag) as $id => $tags) {
             $regexp = $this->getRegexp(array_merge($globalNamespaces, $servicesToNamespaces[$id] ?? []));
             $validatorBuilder->addMethodCall('addLoader', [new Reference($id)]);
             $container->getDefinition($id)->setArgument('$classValidatorRegexp', $regexp);
@@ -79,6 +95,6 @@ class AddAutoMappingConfigurationPass implements CompilerPassInterface
             $regexps[] = '^'.$regex;
         }
 
-        return \sprintf('{%s}', implode('|', $regexps));
+        return sprintf('{%s}', implode('|', $regexps));
     }
 }

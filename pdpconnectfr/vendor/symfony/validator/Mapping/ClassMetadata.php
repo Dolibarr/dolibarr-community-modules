@@ -19,7 +19,6 @@ use Symfony\Component\Validator\Constraints\Traverse;
 use Symfony\Component\Validator\Constraints\Valid;
 use Symfony\Component\Validator\Exception\ConstraintDefinitionException;
 use Symfony\Component\Validator\Exception\GroupDefinitionException;
-use Symfony\Component\Validator\GroupSequenceProviderInterface;
 
 /**
  * Default implementation of {@link ClassMetadataInterface}.
@@ -32,18 +31,22 @@ use Symfony\Component\Validator\GroupSequenceProviderInterface;
 class ClassMetadata extends GenericMetadata implements ClassMetadataInterface
 {
     /**
+     * @var string
+     *
      * @internal This property is public in order to reduce the size of the
      *           class' serialized representation. Do not access it. Use
      *           {@link getClassName()} instead.
      */
-    public string $name;
+    public $name;
 
     /**
+     * @var string
+     *
      * @internal This property is public in order to reduce the size of the
      *           class' serialized representation. Do not access it. Use
      *           {@link getDefaultGroup()} instead.
      */
-    public string $defaultGroup;
+    public $defaultGroup;
 
     /**
      * @var MemberMetadata[][]
@@ -52,7 +55,7 @@ class ClassMetadata extends GenericMetadata implements ClassMetadataInterface
      *           class' serialized representation. Do not access it. Use
      *           {@link getPropertyMetadata()} instead.
      */
-    public array $members = [];
+    public $members = [];
 
     /**
      * @var PropertyMetadata[]
@@ -61,7 +64,7 @@ class ClassMetadata extends GenericMetadata implements ClassMetadataInterface
      *           class' serialized representation. Do not access it. Use
      *           {@link getPropertyMetadata()} instead.
      */
-    public array $properties = [];
+    public $properties = [];
 
     /**
      * @var GetterMetadata[]
@@ -70,43 +73,43 @@ class ClassMetadata extends GenericMetadata implements ClassMetadataInterface
      *           class' serialized representation. Do not access it. Use
      *           {@link getPropertyMetadata()} instead.
      */
-    public array $getters = [];
+    public $getters = [];
 
     /**
+     * @var array
+     *
      * @internal This property is public in order to reduce the size of the
      *           class' serialized representation. Do not access it. Use
      *           {@link getGroupSequence()} instead.
      */
-    public ?GroupSequence $groupSequence = null;
+    public $groupSequence = [];
 
     /**
+     * @var bool
+     *
      * @internal This property is public in order to reduce the size of the
      *           class' serialized representation. Do not access it. Use
      *           {@link isGroupSequenceProvider()} instead.
      */
-    public bool $groupSequenceProvider = false;
-
-    /**
-     * @internal This property is public in order to reduce the size of the
-     *           class' serialized representation. Do not access it. Use
-     *           {@link getGroupProvider()} instead.
-     */
-    public ?string $groupProvider = null;
+    public $groupSequenceProvider = false;
 
     /**
      * The strategy for traversing traversable objects.
      *
      * By default, only instances of {@link \Traversable} are traversed.
      *
-     * @var TraversalStrategy::*
+     * @var int
      *
      * @internal This property is public in order to reduce the size of the
      *           class' serialized representation. Do not access it. Use
      *           {@link getTraversalStrategy()} instead.
      */
-    public int $traversalStrategy = TraversalStrategy::IMPLICIT;
+    public $traversalStrategy = TraversalStrategy::IMPLICIT;
 
-    private \ReflectionClass $reflClass;
+    /**
+     * @var \ReflectionClass
+     */
+    private $reflClass;
 
     public function __construct(string $class)
     {
@@ -119,7 +122,10 @@ class ClassMetadata extends GenericMetadata implements ClassMetadataInterface
         }
     }
 
-    public function __sleep(): array
+    /**
+     * {@inheritdoc}
+     */
+    public function __sleep()
     {
         $parentProperties = parent::__sleep();
 
@@ -130,7 +136,6 @@ class ClassMetadata extends GenericMetadata implements ClassMetadataInterface
             'getters',
             'groupSequence',
             'groupSequenceProvider',
-            'groupProvider',
             'members',
             'name',
             'properties',
@@ -138,7 +143,10 @@ class ClassMetadata extends GenericMetadata implements ClassMetadataInterface
         ]);
     }
 
-    public function getClassName(): string
+    /**
+     * {@inheritdoc}
+     */
+    public function getClassName()
     {
         return $this->name;
     }
@@ -155,13 +163,17 @@ class ClassMetadata extends GenericMetadata implements ClassMetadataInterface
      * If a class defines a group sequence, validating the class in "Default"
      * will validate the group sequence. The constraints assigned to "Default"
      * can still be validated by validating the class in "<ClassName>".
+     *
+     * @return string
      */
-    public function getDefaultGroup(): string
+    public function getDefaultGroup()
     {
         return $this->defaultGroup;
     }
 
     /**
+     * {@inheritdoc}
+     *
      * If the constraint {@link Cascade} is added, the cascading strategy will be
      * changed to {@link CascadingStrategy::CASCADE}.
      *
@@ -173,7 +185,7 @@ class ClassMetadata extends GenericMetadata implements ClassMetadataInterface
      *  - {@link TraversalStrategy::NONE} if $traverse is disabled
      *  - {@link TraversalStrategy::TRAVERSE} if $traverse is enabled
      */
-    public function addConstraint(Constraint $constraint): static
+    public function addConstraint(Constraint $constraint)
     {
         $this->checkConstraint($constraint);
 
@@ -191,13 +203,13 @@ class ClassMetadata extends GenericMetadata implements ClassMetadataInterface
         }
 
         if ($constraint instanceof Cascade) {
+            if (\PHP_VERSION_ID < 70400) {
+                throw new ConstraintDefinitionException(sprintf('The constraint "%s" requires PHP 7.4.', Cascade::class));
+            }
+
             $this->cascadingStrategy = CascadingStrategy::CASCADE;
 
             foreach ($this->getReflectionClass()->getProperties() as $property) {
-                if (isset($constraint->exclude[$property->getName()])) {
-                    continue;
-                }
-
                 if ($this->canCascade($property->getType())) {
                     $this->addPropertyConstraint($property->getName(), new Valid());
                 }
@@ -219,7 +231,7 @@ class ClassMetadata extends GenericMetadata implements ClassMetadataInterface
      *
      * @return $this
      */
-    public function addPropertyConstraint(string $property, Constraint $constraint): static
+    public function addPropertyConstraint(string $property, Constraint $constraint)
     {
         if (!isset($this->properties[$property])) {
             $this->properties[$property] = new PropertyMetadata($this->getClassName(), $property);
@@ -239,7 +251,7 @@ class ClassMetadata extends GenericMetadata implements ClassMetadataInterface
      *
      * @return $this
      */
-    public function addPropertyConstraints(string $property, array $constraints): static
+    public function addPropertyConstraints(string $property, array $constraints)
     {
         foreach ($constraints as $constraint) {
             $this->addPropertyConstraint($property, $constraint);
@@ -256,7 +268,7 @@ class ClassMetadata extends GenericMetadata implements ClassMetadataInterface
      *
      * @return $this
      */
-    public function addGetterConstraint(string $property, Constraint $constraint): static
+    public function addGetterConstraint(string $property, Constraint $constraint)
     {
         if (!isset($this->getters[$property])) {
             $this->getters[$property] = new GetterMetadata($this->getClassName(), $property);
@@ -276,7 +288,7 @@ class ClassMetadata extends GenericMetadata implements ClassMetadataInterface
      *
      * @return $this
      */
-    public function addGetterMethodConstraint(string $property, string $method, Constraint $constraint): static
+    public function addGetterMethodConstraint(string $property, string $method, Constraint $constraint)
     {
         if (!isset($this->getters[$property])) {
             $this->getters[$property] = new GetterMetadata($this->getClassName(), $property, $method);
@@ -296,7 +308,7 @@ class ClassMetadata extends GenericMetadata implements ClassMetadataInterface
      *
      * @return $this
      */
-    public function addGetterConstraints(string $property, array $constraints): static
+    public function addGetterConstraints(string $property, array $constraints)
     {
         foreach ($constraints as $constraint) {
             $this->addGetterConstraint($property, $constraint);
@@ -310,7 +322,7 @@ class ClassMetadata extends GenericMetadata implements ClassMetadataInterface
      *
      * @return $this
      */
-    public function addGetterMethodConstraints(string $property, string $method, array $constraints): static
+    public function addGetterMethodConstraints(string $property, string $method, array $constraints)
     {
         foreach ($constraints as $constraint) {
             $this->addGetterMethodConstraint($property, $method, $constraint);
@@ -322,10 +334,9 @@ class ClassMetadata extends GenericMetadata implements ClassMetadataInterface
     /**
      * Merges the constraints of the given metadata into this object.
      */
-    public function mergeConstraints(self $source): void
+    public function mergeConstraints(self $source)
     {
         if ($source->isGroupSequenceProvider()) {
-            $this->setGroupProvider($source->getGroupProvider());
             $this->setGroupSequenceProvider(true);
         }
 
@@ -361,17 +372,26 @@ class ClassMetadata extends GenericMetadata implements ClassMetadataInterface
         }
     }
 
-    public function hasPropertyMetadata(string $property): bool
+    /**
+     * {@inheritdoc}
+     */
+    public function hasPropertyMetadata(string $property)
     {
         return \array_key_exists($property, $this->members);
     }
 
-    public function getPropertyMetadata(string $property): array
+    /**
+     * {@inheritdoc}
+     */
+    public function getPropertyMetadata(string $property)
     {
         return $this->members[$property] ?? [];
     }
 
-    public function getConstrainedProperties(): array
+    /**
+     * {@inheritdoc}
+     */
+    public function getConstrainedProperties()
     {
         return array_keys($this->members);
     }
@@ -385,7 +405,7 @@ class ClassMetadata extends GenericMetadata implements ClassMetadataInterface
      *
      * @throws GroupDefinitionException
      */
-    public function setGroupSequence(array|GroupSequence $groupSequence): static
+    public function setGroupSequence($groupSequence)
     {
         if ($this->isGroupSequenceProvider()) {
             throw new GroupDefinitionException('Defining a static group sequence is not allowed with a group sequence provider.');
@@ -396,11 +416,11 @@ class ClassMetadata extends GenericMetadata implements ClassMetadataInterface
         }
 
         if (\in_array(Constraint::DEFAULT_GROUP, $groupSequence->groups, true)) {
-            throw new GroupDefinitionException(\sprintf('The group "%s" is not allowed in group sequences.', Constraint::DEFAULT_GROUP));
+            throw new GroupDefinitionException(sprintf('The group "%s" is not allowed in group sequences.', Constraint::DEFAULT_GROUP));
         }
 
         if (!\in_array($this->getDefaultGroup(), $groupSequence->groups, true)) {
-            throw new GroupDefinitionException(\sprintf('The group "%s" is missing in the group sequence.', $this->getDefaultGroup()));
+            throw new GroupDefinitionException(sprintf('The group "%s" is missing in the group sequence.', $this->getDefaultGroup()));
         }
 
         $this->groupSequence = $groupSequence;
@@ -408,22 +428,34 @@ class ClassMetadata extends GenericMetadata implements ClassMetadataInterface
         return $this;
     }
 
-    public function hasGroupSequence(): bool
+    /**
+     * {@inheritdoc}
+     */
+    public function hasGroupSequence()
     {
-        return isset($this->groupSequence) && \count($this->groupSequence->groups) > 0;
+        return $this->groupSequence && \count($this->groupSequence->groups) > 0;
     }
 
-    public function getGroupSequence(): ?GroupSequence
+    /**
+     * {@inheritdoc}
+     */
+    public function getGroupSequence()
     {
         return $this->groupSequence;
     }
 
     /**
      * Returns a ReflectionClass instance for this class.
+     *
+     * @return \ReflectionClass
      */
-    public function getReflectionClass(): \ReflectionClass
+    public function getReflectionClass()
     {
-        return $this->reflClass ??= new \ReflectionClass($this->getClassName());
+        if (!$this->reflClass) {
+            $this->reflClass = new \ReflectionClass($this->getClassName());
+        }
+
+        return $this->reflClass;
     }
 
     /**
@@ -431,50 +463,46 @@ class ClassMetadata extends GenericMetadata implements ClassMetadataInterface
      *
      * @throws GroupDefinitionException
      */
-    public function setGroupSequenceProvider(bool $active): void
+    public function setGroupSequenceProvider(bool $active)
     {
         if ($this->hasGroupSequence()) {
             throw new GroupDefinitionException('Defining a group sequence provider is not allowed with a static group sequence.');
         }
 
-        if (null === $this->groupProvider && !$this->getReflectionClass()->implementsInterface(GroupSequenceProviderInterface::class)) {
-            throw new GroupDefinitionException(\sprintf('Class "%s" must implement GroupSequenceProviderInterface.', $this->name));
+        if (!$this->getReflectionClass()->implementsInterface('Symfony\Component\Validator\GroupSequenceProviderInterface')) {
+            throw new GroupDefinitionException(sprintf('Class "%s" must implement GroupSequenceProviderInterface.', $this->name));
         }
 
         $this->groupSequenceProvider = $active;
     }
 
-    public function isGroupSequenceProvider(): bool
+    /**
+     * {@inheritdoc}
+     */
+    public function isGroupSequenceProvider()
     {
         return $this->groupSequenceProvider;
     }
 
-    public function setGroupProvider(?string $provider): void
-    {
-        $this->groupProvider = $provider;
-    }
-
-    public function getGroupProvider(): ?string
-    {
-        return $this->groupProvider;
-    }
-
-    public function getCascadingStrategy(): int
+    /**
+     * {@inheritdoc}
+     */
+    public function getCascadingStrategy()
     {
         return $this->cascadingStrategy;
     }
 
-    private function addPropertyMetadata(PropertyMetadataInterface $metadata): void
+    private function addPropertyMetadata(PropertyMetadataInterface $metadata)
     {
         $property = $metadata->getPropertyName();
 
         $this->members[$property][] = $metadata;
     }
 
-    private function checkConstraint(Constraint $constraint): void
+    private function checkConstraint(Constraint $constraint)
     {
         if (!\in_array(Constraint::CLASS_CONSTRAINT, (array) $constraint->getTargets(), true)) {
-            throw new ConstraintDefinitionException(\sprintf('The constraint "%s" cannot be put on classes.', get_debug_type($constraint)));
+            throw new ConstraintDefinitionException(sprintf('The constraint "%s" cannot be put on classes.', get_debug_type($constraint)));
         }
 
         if ($constraint instanceof Composite) {

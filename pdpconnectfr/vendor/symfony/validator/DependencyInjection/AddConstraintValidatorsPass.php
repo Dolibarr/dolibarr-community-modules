@@ -22,14 +22,27 @@ use Symfony\Component\DependencyInjection\Reference;
  */
 class AddConstraintValidatorsPass implements CompilerPassInterface
 {
-    public function process(ContainerBuilder $container): void
+    private $validatorFactoryServiceId;
+    private $constraintValidatorTag;
+
+    public function __construct(string $validatorFactoryServiceId = 'validator.validator_factory', string $constraintValidatorTag = 'validator.constraint_validator')
     {
-        if (!$container->hasDefinition('validator.validator_factory')) {
+        if (0 < \func_num_args()) {
+            trigger_deprecation('symfony/validator', '5.3', 'Configuring "%s" is deprecated.', __CLASS__);
+        }
+
+        $this->validatorFactoryServiceId = $validatorFactoryServiceId;
+        $this->constraintValidatorTag = $constraintValidatorTag;
+    }
+
+    public function process(ContainerBuilder $container)
+    {
+        if (!$container->hasDefinition($this->validatorFactoryServiceId)) {
             return;
         }
 
         $validators = [];
-        foreach ($container->findTaggedServiceIds('validator.constraint_validator', true) as $id => $attributes) {
+        foreach ($container->findTaggedServiceIds($this->constraintValidatorTag, true) as $id => $attributes) {
             $definition = $container->getDefinition($id);
 
             if (isset($attributes[0]['alias'])) {
@@ -40,7 +53,7 @@ class AddConstraintValidatorsPass implements CompilerPassInterface
         }
 
         $container
-            ->getDefinition('validator.validator_factory')
+            ->getDefinition($this->validatorFactoryServiceId)
             ->replaceArgument(0, ServiceLocatorTagPass::register($container, $validators))
         ;
     }

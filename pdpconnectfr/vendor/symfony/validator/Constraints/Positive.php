@@ -12,7 +12,8 @@
 namespace Symfony\Component\Validator\Constraints;
 
 /**
- * Validates that a value is a positive number.
+ * @Annotation
+ * @Target({"PROPERTY", "METHOD", "ANNOTATION"})
  *
  * @author Jan Schädlich <jan.schaedlich@sensiolabs.de>
  */
@@ -21,5 +22,5 @@ class Positive extends GreaterThan
 {
     use ZeroComparisonConstraintTrait;
 
-    public string $message = 'This value should be positive.';
+    public $message = 'This value should be positive.';
 }

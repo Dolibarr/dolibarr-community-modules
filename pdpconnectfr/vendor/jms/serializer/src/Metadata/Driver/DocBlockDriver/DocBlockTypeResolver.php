@@ -7,8 +7,6 @@ namespace JMS\Serializer\Metadata\Driver\DocBlockDriver;
 use PHPStan\PhpDocParser\Ast\PhpDoc\ParamTagValueNode;
 use PHPStan\PhpDocParser\Ast\PhpDoc\PhpDocTagNode;
 use PHPStan\PhpDocParser\Ast\PhpDoc\ReturnTagValueNode;
-use PHPStan\PhpDocParser\Ast\PhpDoc\TypeAliasImportTagValueNode;
-use PHPStan\PhpDocParser\Ast\PhpDoc\TypeAliasTagValueNode;
 use PHPStan\PhpDocParser\Ast\PhpDoc\VarTagValueNode;
 use PHPStan\PhpDocParser\Ast\Type\ArrayTypeNode;
 use PHPStan\PhpDocParser\Ast\Type\GenericTypeNode;
@@ -20,7 +18,6 @@ use PHPStan\PhpDocParser\Parser\ConstExprParser;
 use PHPStan\PhpDocParser\Parser\PhpDocParser;
 use PHPStan\PhpDocParser\Parser\TokenIterator;
 use PHPStan\PhpDocParser\Parser\TypeParser;
-use PHPStan\PhpDocParser\ParserConfig;
 
 /**
  * @internal
@@ -48,25 +45,11 @@ final class DocBlockTypeResolver
 
     public function __construct()
     {
-        // PHPStan PHPDoc Parser 2
-        if (class_exists(ParserConfig::class)) {
-            $config = new ParserConfig(['lines' => true, 'indexes' => true]);
+        $constExprParser = new ConstExprParser();
+        $typeParser = new TypeParser($constExprParser);
 
-            $constExprParser = new ConstExprParser($config);
-            $typeParser = new TypeParser($config, $constExprParser);
-
-            $this->phpDocParser = new PhpDocParser($config, $typeParser, $constExprParser);
-            $this->lexer = new Lexer($config);
-        } else {
-            // @phpstan-ignore arguments.count
-            $constExprParser = new ConstExprParser();
-            // @phpstan-ignore arguments.count
-            $typeParser = new TypeParser($constExprParser);
-            // @phpstan-ignore arguments.count
-            $this->phpDocParser = new PhpDocParser($typeParser, $constExprParser);
-            // @phpstan-ignore arguments.count
-            $this->lexer = new Lexer();
-        }
+        $this->phpDocParser = new PhpDocParser($typeParser, $constExprParser);
+        $this->lexer = new Lexer();
     }
 
     /**
@@ -132,15 +115,19 @@ final class DocBlockTypeResolver
         // Generic array syntax: array<Product> | array<\Foo\Bar\Product> | array<int,Product>
         if ($type instanceof GenericTypeNode) {
             if ($this->isSimpleType($type->type, 'array')) {
-                $resolvedTypes = array_map(fn (TypeNode $node) => $this->resolveTypeFromTypeNode($node, $reflector), $type->genericTypes);
+                $resolvedTypes = array_map(function (TypeNode $node) use ($reflector) {
+                    return $this->resolveTypeFromTypeNode($node, $reflector);
+                }, $type->genericTypes);
 
                 return 'array<' . implode(',', $resolvedTypes) . '>';
             }
 
             if ($this->isSimpleType($type->type, 'list')) {
-                $resolvedTypes = array_map(fn (TypeNode $node) => $this->resolveTypeFromTypeNode($node, $reflector), $type->genericTypes);
+                $resolvedTypes = array_map(function (TypeNode $node) use ($reflector) {
+                    return $this->resolveTypeFromTypeNode($node, $reflector);
+                }, $type->genericTypes);
 
-                return 'list<' . implode(',', $resolvedTypes) . '>';
+                return 'array<int, ' . implode(',', $resolvedTypes) . '>';
             }
 
             throw new \InvalidArgumentException(sprintf("Can't use non-array generic type %s for collection in %s:%s", (string) $type->type, $reflector->getDeclaringClass()->getName(), $reflector->getName()));
@@ -207,7 +194,9 @@ final class DocBlockTypeResolver
      */
     private function filterNullFromTypes(array $types): array
     {
-        return array_values(array_filter(array_map(fn (TypeNode $node) => $this->isNullType($node) ? null : $node, $types)));
+        return array_values(array_filter(array_map(function (TypeNode $node) {
+            return $this->isNullType($node) ? null : $node;
+        }, $types)));
     }
 
     /**
@@ -282,7 +271,7 @@ final class DocBlockTypeResolver
         }
 
         if ($declaringClass->getDocComment()) {
-            $phpstanArrayType = $this->getPhpstanArrayType($declaringClass, $typeHint, $reflector);
+            $phpstanArrayType = $this->getPhpstanType($declaringClass, $typeHint, $reflector);
 
             if ($phpstanArrayType) {
                 return $phpstanArrayType;
@@ -418,41 +407,31 @@ final class DocBlockTypeResolver
     /**
      * @param \ReflectionMethod|\ReflectionProperty $reflector
      */
-    private function getPhpstanArrayType(\ReflectionClass $declaringClass, string $typeHint, $reflector): ?string
+    private function getPhpstanType(\ReflectionClass $declaringClass, string $typeHint, $reflector): ?string
     {
         $tokens = $this->lexer->tokenize($declaringClass->getDocComment());
         $phpDocNode = $this->phpDocParser->parse(new TokenIterator($tokens));
         $self = $this;
 
         foreach ($phpDocNode->children as $node) {
-            if (
-                $node instanceof PhpDocTagNode
-                && $node->value instanceof TypeAliasTagValueNode
-                && $node->value->alias === $typeHint
-            ) {
-                $phpstanType = $node->value->__toString();
-                preg_match(self::PHPSTAN_ARRAY_SHAPE, $phpstanType, $foundPhpstanArray);
-                if (isset($foundPhpstanArray[0])) {
+            if ($node instanceof PhpDocTagNode && '@phpstan-type' === $node->name) {
+                $phpstanType = (string) $node->value;
+                preg_match_all(self::PHPSTAN_ARRAY_SHAPE, $phpstanType, $foundPhpstanArray);
+                if (isset($foundPhpstanArray[1][0]) && $foundPhpstanArray[1][0] === $typeHint) {
                     return 'array';
                 }
 
-                preg_match(self::PHPSTAN_ARRAY_TYPE, $phpstanType, $foundPhpstanArray);
-                if (isset($foundPhpstanArray[0])) {
-                    $types = explode(',', $foundPhpstanArray[2]);
+                preg_match_all(self::PHPSTAN_ARRAY_TYPE, $phpstanType, $foundPhpstanArray);
+                if (isset($foundPhpstanArray[2][0]) && $foundPhpstanArray[1][0] === $typeHint) {
+                    $types = explode(',', $foundPhpstanArray[2][0]);
 
                     return sprintf('array<%s>', implode(
                         ',',
-                        array_map(static fn (string $type) => $self->resolveType(trim($type), $reflector), $types),
+                        array_map(static function (string $type) use ($reflector, $self) {
+                            return $self->resolveType(trim($type), $reflector);
+                        }, $types)
                     ));
                 }
-            } elseif ($node instanceof PhpDocTagNode && $node->value instanceof TypeAliasImportTagValueNode) {
-                $importedFromFqn = $this->resolveType($node->value->importedFrom->name, $reflector);
-
-                return $this->getPhpstanArrayType(
-                    new \ReflectionClass($importedFromFqn),
-                    $node->value->importedAlias,
-                    $reflector,
-                );
             }
         }
 

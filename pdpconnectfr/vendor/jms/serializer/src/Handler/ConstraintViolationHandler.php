@@ -6,15 +6,11 @@ namespace JMS\Serializer\Handler;
 
 use JMS\Serializer\GraphNavigatorInterface;
 use JMS\Serializer\SerializationContext;
-use JMS\Serializer\Type\Type;
 use JMS\Serializer\Visitor\SerializationVisitorInterface;
 use JMS\Serializer\XmlSerializationVisitor;
 use Symfony\Component\Validator\ConstraintViolation;
 use Symfony\Component\Validator\ConstraintViolationList;
 
-/**
- * @phpstan-import-type TypeArray from Type
- */
 final class ConstraintViolationHandler implements SubscribingHandlerInterface
 {
     /**
@@ -40,7 +36,7 @@ final class ConstraintViolationHandler implements SubscribingHandlerInterface
         return $methods;
     }
 
-    public function serializeListToXml(XmlSerializationVisitor $visitor, ConstraintViolationList $list): void
+    public function serializeListToXml(XmlSerializationVisitor $visitor, ConstraintViolationList $list, array $type): void
     {
         $currentNode = $visitor->getCurrentNode();
         if (!$currentNode) {
@@ -53,8 +49,6 @@ final class ConstraintViolationHandler implements SubscribingHandlerInterface
     }
 
     /**
-     * @param TypeArray $type
-     *
      * @return array|\ArrayObject
      */
     public function serializeListToJson(SerializationVisitorInterface $visitor, ConstraintViolationList $list, array $type, SerializationContext $context)
@@ -62,7 +56,7 @@ final class ConstraintViolationHandler implements SubscribingHandlerInterface
         return $visitor->visitArray(iterator_to_array($list), $type);
     }
 
-    public function serializeViolationToXml(XmlSerializationVisitor $visitor, ConstraintViolation $violation): void
+    public function serializeViolationToXml(XmlSerializationVisitor $visitor, ConstraintViolation $violation, ?array $type = null): void
     {
         $violationNode = $visitor->getDocument()->createElement('violation');
 
@@ -79,7 +73,7 @@ final class ConstraintViolationHandler implements SubscribingHandlerInterface
         $messageNode->appendChild($visitor->getDocument()->createCDATASection($violation->getMessage()));
     }
 
-    public function serializeViolationToJson(SerializationVisitorInterface $visitor, ConstraintViolation $violation): array
+    public function serializeViolationToJson(SerializationVisitorInterface $visitor, ConstraintViolation $violation, ?array $type = null): array
     {
         return [
             'property_path' => $violation->getPropertyPath(),

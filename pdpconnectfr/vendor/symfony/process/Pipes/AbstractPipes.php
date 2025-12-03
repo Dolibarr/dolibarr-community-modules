@@ -20,27 +20,31 @@ use Symfony\Component\Process\Exception\InvalidArgumentException;
  */
 abstract class AbstractPipes implements PipesInterface
 {
-    public array $pipes = [];
+    public $pipes = [];
 
-    private string $inputBuffer = '';
-    /** @var resource|string|\Iterator */
+    private $inputBuffer = '';
     private $input;
-    private bool $blocked = true;
-    private ?string $lastError = null;
+    private $blocked = true;
+    private $lastError;
 
     /**
-     * @param resource|string|\Iterator $input
+     * @param resource|string|int|float|bool|\Iterator|null $input
      */
     public function __construct($input)
     {
         if (\is_resource($input) || $input instanceof \Iterator) {
             $this->input = $input;
+        } elseif (\is_string($input)) {
+            $this->inputBuffer = $input;
         } else {
             $this->inputBuffer = (string) $input;
         }
     }
 
-    public function close(): void
+    /**
+     * {@inheritdoc}
+     */
+    public function close()
     {
         foreach ($this->pipes as $pipe) {
             if (\is_resource($pipe)) {
@@ -52,42 +56,30 @@ abstract class AbstractPipes implements PipesInterface
 
     /**
      * Returns true if a system call has been interrupted.
-     *
-     * stream_select() returns false when the `select` system call is interrupted by an incoming signal.
      */
     protected function hasSystemCallBeenInterrupted(): bool
     {
         $lastError = $this->lastError;
         $this->lastError = null;
 
-        if (null === $lastError) {
-            return false;
-        }
-
-        if (false !== stripos($lastError, 'interrupted system call')) {
-            return true;
-        }
-
-        // on applications with a different locale than english, the message above is not found because
-        // it's translated. So we also check for the SOCKET_EINTR constant which is defined under
-        // Windows and UNIX-like platforms (if available on the platform).
-        return \defined('SOCKET_EINTR') && str_starts_with($lastError, 'stream_select(): Unable to select ['.\SOCKET_EINTR.']');
+        // stream_select returns false when the `select` system call is interrupted by an incoming signal
+        return null !== $lastError && false !== stripos($lastError, 'interrupted system call');
     }
 
     /**
      * Unblocks streams.
      */
-    protected function unblock(): void
+    protected function unblock()
     {
         if (!$this->blocked) {
             return;
         }
 
         foreach ($this->pipes as $pipe) {
-            stream_set_blocking($pipe, false);
+            stream_set_blocking($pipe, 0);
         }
         if (\is_resource($this->input)) {
-            stream_set_blocking($this->input, false);
+            stream_set_blocking($this->input, 0);
         }
 
         $this->blocked = false;
@@ -109,11 +101,11 @@ abstract class AbstractPipes implements PipesInterface
             if (!$input->valid()) {
                 $input = null;
             } elseif (\is_resource($input = $input->current())) {
-                stream_set_blocking($input, false);
+                stream_set_blocking($input, 0);
             } elseif (!isset($this->inputBuffer[0])) {
                 if (!\is_string($input)) {
                     if (!\is_scalar($input)) {
-                        throw new InvalidArgumentException(\sprintf('"%s" yielded a value of type "%s", but only scalars and stream resources are supported.', get_debug_type($this->input), get_debug_type($input)));
+                        throw new InvalidArgumentException(sprintf('"%s" yielded a value of type "%s", but only scalars and stream resources are supported.', get_debug_type($this->input), get_debug_type($input)));
                     }
                     $input = (string) $input;
                 }
@@ -181,7 +173,7 @@ abstract class AbstractPipes implements PipesInterface
     /**
      * @internal
      */
-    public function handleError(int $type, string $msg): void
+    public function handleError(int $type, string $msg)
     {
         $this->lastError = $msg;
     }

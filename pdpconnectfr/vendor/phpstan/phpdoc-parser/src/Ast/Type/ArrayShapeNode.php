@@ -16,49 +16,32 @@ class ArrayShapeNode implements TypeNode
 	use NodeAttributes;
 
 	/** @var ArrayShapeItemNode[] */
-	public array $items;
+	public $items;
 
-	public bool $sealed;
+	/** @var bool */
+	public $sealed;
 
 	/** @var self::KIND_* */
 	public $kind;
 
-	public ?ArrayShapeUnsealedTypeNode $unsealedType = null;
+	/** @var ArrayShapeUnsealedTypeNode|null */
+	public $unsealedType;
 
 	/**
 	 * @param ArrayShapeItemNode[] $items
 	 * @param self::KIND_* $kind
 	 */
-	private function __construct(
+	public function __construct(
 		array $items,
 		bool $sealed = true,
-		?ArrayShapeUnsealedTypeNode $unsealedType = null,
-		string $kind = self::KIND_ARRAY
+		string $kind = self::KIND_ARRAY,
+		?ArrayShapeUnsealedTypeNode $unsealedType = null
 	)
 	{
 		$this->items = $items;
 		$this->sealed = $sealed;
-		$this->unsealedType = $unsealedType;
 		$this->kind = $kind;
-	}
-
-
-	/**
-	 * @param ArrayShapeItemNode[] $items
-	 * @param self::KIND_* $kind
-	 */
-	public static function createSealed(array $items, string $kind = self::KIND_ARRAY): self
-	{
-		return new self($items, true, null, $kind);
-	}
-
-	/**
-	 * @param ArrayShapeItemNode[] $items
-	 * @param self::KIND_* $kind
-	 */
-	public static function createUnsealed(array $items, ?ArrayShapeUnsealedTypeNode $unsealedType, string $kind = self::KIND_ARRAY): self
-	{
-		return new self($items, false, $unsealedType, $kind);
+		$this->unsealedType = $unsealedType;
 	}
 
 

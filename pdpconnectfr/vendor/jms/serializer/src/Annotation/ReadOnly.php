@@ -2,6 +2,4 @@
 
 declare(strict_types=1);
 
-use JMS\Serializer\Annotation\DeprecatedReadOnly;
-
-class_alias(DeprecatedReadOnly::class, 'JMS\Serializer\Annotation\ReadOnly');
+class_alias('JMS\Serializer\Annotation\DeprecatedReadOnly', 'JMS\Serializer\Annotation\ReadOnly');

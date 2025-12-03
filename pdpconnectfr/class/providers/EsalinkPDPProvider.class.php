@@ -501,18 +501,20 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         $document->fk_call              = null; // TODO
         $document->flow_id              = $flowId;
         $document->tracking_idref       = $flowData['trackingId'] ?? null;
-        $document->flow_type            = $flowData['type'] ?? null;
-        $document->flow_direction       = $flowData['direction'] ?? null;
-        $document->flow_syntax          = $flowData['syntax'] ?? null;
-        $document->flow_profile         = $flowData['profile'] ?? null;
+        $document->flow_type            = $flowData['flowType'] ?? null;
+        $document->flow_direction       = $flowData['flowDirection'] ?? null;
+        $document->flow_syntax          = $flowData['flowSyntax'] ?? null;
+        $document->flow_profile         = $flowData['flowProfile'] ?? null;
         $document->ack_status           = $flowData['acknowledgement']['status'] ?? null;
+        // Change this fields to fit with the new api response =========================================
         $document->ack_reason_code      = $flowData['acknowledgement']['reasonCode'] ?? null;
         $document->ack_info             = $flowData['acknowledgement']['additionalInformation'] ?? null;
+        /*=============================================================================================*/
         $document->document_body        = null;
         $document->fk_element_id        = null;
         $document->fk_element_type      = null;
-        $document->submittedat          = $flowData['createDate'] ?? null;
-        $document->updatedat            = $flowData['updateDate'] ?? null;
+        $document->submittedat          = $flowData['submittedAt'] ?? null;
+        $document->updatedat            = $flowData['updatedAt'] ?? null;
         $document->provider             = getDolGlobalString('PDPCONNECTFR_PDP') ?? null;
         $document->entity               = $conf->entity;
         $document->flow_uiid            = $flowData['uuid'] ?? null;
@@ -625,7 +627,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
         $res = $document->create($user);
         if ($res < 0) {
-            return array('res' => '-1', 'message' => "Failed to store flow data for flowId: " . $flowId);
+            //print_r($document->errors);
+            return array('res' => '-1', 'message' => "Failed to store flow data for flowId: " . $flowId . ". Errors: " . implode(", ", $document->errors));
         }
 
         return array('res' => '1', 'message' => '');

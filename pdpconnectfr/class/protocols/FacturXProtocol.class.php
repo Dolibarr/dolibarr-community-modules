@@ -32,6 +32,7 @@ require_once DOL_DOCUMENT_ROOT . '/commande/class/commande.class.php';
 include_once DOL_DOCUMENT_ROOT . '/core/class/translate.class.php';
 include_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
 include_once DOL_DOCUMENT_ROOT . '/core/class/discount.class.php';
+require_once DOL_DOCUMENT_ROOT . '/core/lib/files.lib.php';
 
 use horstoeko\zugferd\codelists\ZugferdCountryCodes;
 use horstoeko\zugferd\codelists\ZugferdCurrencyCodes;
@@ -977,20 +978,188 @@ class FacturXProtocol extends AbstractProtocol
 
         $tempFile = $tempDir . '/' . uniqid('facturx_') . '.pdf';
 
-        if (!move_uploaded_file($file, $tempFile)) {
-            return ['res' => -1, 'message' => 'Failed to move uploaded file to temporary location' ];
+        if (file_put_contents($tempFile, $file) === false) {
+            return ['res' => -1, 'message' => 'Failed to save file to temporary location' ];
         }
+
+        return ['res' => 1, 'message' => 'bypass' ];
+
+        // --- Create Supplier Invoice object
+        require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
+        $supplierInvoice = new FactureFournisseur($db);
+
 
         // --- Read the Factur-X file
         $document = ZugferdDocumentPdfReader::readAndGuessFromFile($tempFile);
         $document->getDocumentInformation($documentno, $documenttypecode, $documentdate, $invoiceCurrency, $taxCurrency, $documentname, $documentlanguage, $effectiveSpecifiedPeriod);
 
-        print "Profile:               {$document->getProfileDefinitionParameter("name")}\r\n";
-        print "Profile:               {$document->getProfileDefinitionParameter("altname")}\r\n";
+        $document->getDocumentSupplyChainEvent(
+            $documentDeliveryDate
+        );
 
-        // --- Create Supplier Invoice object
-        require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
-        $supplierInvoice = new FactureFournisseur($db);
+        // Get seller information (supplier)
+        $document->getDocumentSeller($sellername, $sellerids, $sellerdescription);
+        // Get seller address
+        $document->getDocumentSellerAddress(
+            $sellerlineone,
+            $sellerlinetwo,
+            $sellerlinethree,
+            $sellerpostcode,
+            $sellercity,
+            $sellercountry,
+            $sellersubdivision
+        );
+
+        // Get seller contact
+        $document->getDocumentSellerContact(
+            $sellercontactpersonname,
+            $sellercontactdepartmentname,
+            $sellercontactphoneno,
+            $sellercontactfaxno,
+            $sellercontactemailaddr
+        );
+
+        $document->getDocumentSellerCommunication(
+            $sellerCommunicationUriScheme,
+            $sellerCommunicationUri
+        );
+
+        // Get document summation
+        $document->getDocumentSummation($grandTotalAmount, $duePayableAmount, $lineTotalAmount, $chargeTotalAmount, $allowanceTotalAmount, $taxBasisTotalAmount, $taxTotalAmount, $roundingAmount, $totalPrepaidAmount);
+
+        $document->getDocumentSellerGlobalId(
+            $sellerGlobalIds
+        );
+
+        $document->getDocumentSellerTaxRegistration(
+            $sellerTaxRegistations
+        );
+
+        // Debug: print all retrieved variables
+        $parsed = array(
+            'documentno' => $documentno ?? null,
+            'documenttypecode' => $documenttypecode ?? null,
+            'documentdate' => isset($documentdate) && $documentdate instanceof DateTime ? $documentdate->format('Y-m-d') : ($documentdate ?? null),
+            'invoiceCurrency' => $invoiceCurrency ?? null,
+            'taxCurrency' => $taxCurrency ?? null,
+            'documentname' => $documentname ?? null,
+            'documentlanguage' => $documentlanguage ?? null,
+            'effectiveSpecifiedPeriod' => $effectiveSpecifiedPeriod ?? null,
+            'documentDeliveryDate' => isset($documentDeliveryDate) && $documentDeliveryDate instanceof DateTime ? $documentDeliveryDate->format('Y-m-d') : ($documentDeliveryDate ?? null),
+
+            // Seller
+            'sellername' => $sellername ?? null,
+            'sellerids' => $sellerids ?? null,
+            'sellerdescription' => $sellerdescription ?? null,
+
+            // Seller Address
+            'sellerlineone' => $sellerlineone ?? null,
+            'sellerlinetwo' => $sellerlinetwo ?? null,
+            'sellerlinethree' => $sellerlinethree ?? null,
+            'sellerpostcode' => $sellerpostcode ?? null,
+            'sellercity' => $sellercity ?? null,
+            'sellercountry' => $sellercountry ?? null,
+            'sellersubdivision' => $sellersubdivision ?? null,
+
+            // Seller Contact
+            'sellercontactpersonname' => $sellercontactpersonname ?? null,
+            'sellercontactdepartmentname' => $sellercontactdepartmentname ?? null,
+            'sellercontactphoneno' => $sellercontactphoneno ?? null,
+            'sellercontactfaxno' => $sellercontactfaxno ?? null,
+            'sellercontactemailaddr' => $sellercontactemailaddr ?? null,
+
+            // Seller Communication (may be unset due to reader var name)
+            'sellerCommunicationUriScheme' => $sellerCommunicationUriScheme ?? null,
+            'sellerCommunicationUri' => $sellerCommunicationUri ?? null,
+
+            // Summation
+            'grandTotalAmount' => $grandTotalAmount ?? null,
+            'duePayableAmount' => $duePayableAmount ?? null,
+            'lineTotalAmount' => $lineTotalAmount ?? null,
+            'chargeTotalAmount' => $chargeTotalAmount ?? null,
+            'allowanceTotalAmount' => $allowanceTotalAmount ?? null,
+            'taxBasisTotalAmount' => $taxBasisTotalAmount ?? null,
+            'taxTotalAmount' => $taxTotalAmount ?? null,
+            'roundingAmount' => $roundingAmount ?? null,
+            'totalPrepaidAmount' => $totalPrepaidAmount ?? null,
+
+            // Seller Global Ids and Tax Registrations (may be unset due to reader var name)
+            'sellerGlobalIds' => $sellerGlobalIds ?? null,
+            'sellerTaxRegistations' => $sellerTaxRegistations ?? null,
+        );
+
+        print "<pre>";
+        print_r($parsed);
+        print "</pre>";
+        dol_syslog(get_class($this) . '::createSupplierInvoiceFromFacturX parsed: ' . json_encode($parsed));
+
+        return ['res' => 1, 'message' => 'bypass' ];
+
+        // Find or create supplier (thirdparty)
+        require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.class.php';
+        $supplier = new Fournisseur($db);
+        // Try to find supplier by name or ID
+        $supplier->name = $sellername;
+        // TODO: Implement supplier search/creation logic based on seller information
+
+        // Set basic invoice information
+        $supplierInvoice->ref_ext = $documentno;
+        $supplierInvoice->type = $this->_getDolibarrInvoiceType($documenttypecode);
+        if ($supplierInvoice->type === '-1') {
+            return ['res' => -1, 'message' => 'Unfounded dolibarr corresponding Invoice code for document type code: ' . $documenttypecode ];
+        }
+        $supplierInvoice->date = $documentdate;
+
+        // Set supplier reference
+        $supplierInvoice->socid = $supplier->id;
+
+        // Set currency
+        $supplierInvoice->multicurrency_code = $invoiceCurrency;
+
+        // Add invoice lines
+        if ($document->firstDocumentPosition()) {
+            do {
+                $document->getDocumentPositionGenerals($lineid, $linestatuscode, $linestatusreasoncode);
+                $document->getDocumentPositionProductDetails($prodname, $proddesc, $prodsellerid, $prodbuyerid, $prodglobalidtype, $prodglobalid);
+                $document->getDocumentPositionGrossPrice($grosspriceamount, $grosspricebasisquantity, $grosspricebasisquantityunitcode);
+                $document->getDocumentPositionNetPrice($netpriceamount, $netpricebasisquantity, $netpricebasisquantityunitcode);
+                $document->getDocumentPositionLineSummation($lineTotalAmount, $totalAllowanceChargeAmount);
+                $document->getDocumentPositionQuantity($billedquantity, $billedquantityunitcode, $chargeFreeQuantity, $chargeFreeQuantityunitcode, $packageQuantity, $packageQuantityunitcode);
+
+                // Get tax information for the line
+                $vatRate = 0;
+                if ($document->firstDocumentPositionTax()) {
+                    $document->getDocumentPositionTax($categoryCode, $typeCode, $rateApplicablePercent, $calculatedAmount, $exemptionReason, $exemptionReasonCode);
+                    $vatRate = $rateApplicablePercent;
+                }
+
+                // Add line to invoice
+                $line = new SupplierInvoiceLine($db);
+                $line->desc = $prodname . (!empty($proddesc) ? "\n" . $proddesc : '');
+                $line->qty = $billedquantity;
+                $line->subprice = $netpriceamount;
+                $line->tva_tx = $vatRate;
+                $line->total_ht = $lineTotalAmount;
+                $line->total_tva = $calculatedAmount ?? 0;
+                $line->total_ttc = $lineTotalAmount + ($calculatedAmount ?? 0);
+                
+                $supplierInvoice->lines[] = $line;
+                
+            } while ($document->nextDocumentPosition());
+        }
+
+        // Set invoice totals
+        $supplierInvoice->total_ht = $taxBasisTotalAmount;
+        $supplierInvoice->total_tva = $taxTotalAmount;
+        $supplierInvoice->total_ttc = $grandTotalAmount;
+
+        // Create the invoice
+        $result = $supplierInvoice->create($user);
+
+        if ($result < 0) {
+            return ['res' => -1, 'message' => $supplierInvoice->error];
+        }
+
 
 
         // TODO : Save receivedFile in supplier invoice attachments
@@ -1353,5 +1522,55 @@ class FacturXProtocol extends AbstractProtocol
             default:
                 return 'B1';
         }
+    }
+
+    /**
+     * Map Factur-X document type code to Dolibarr invoice type
+     *
+     * @param string $documenttypecode Factur-X document type code
+     * @return int|string Dolibarr invoice type or '-1' if unknown
+     */
+    public function _getDolibarrInvoiceType($documenttypecode)
+    {
+
+        /**
+         * Codes UNTDID 1001 utilisés par EN16931 pour le type de facture (InvoiceTypeCode BT-3).
+         * 325 – Facture pro-forma
+         * 211 – Demande de paiement intermédiaire (une facture de situation?)
+         * 210 – Facture d’acompte
+         * 380 – Note de crédit
+         * 384 – Facture corrective
+         * 380 – Facture standard
+         * 
+         * 80  – Note de débit (biens ou services) --- Not used in Dolibarr
+         * 82  – Facture de services mesurés (ex : gaz, électricité) --- Not used in Dolibarr
+         * 84  – Note de débit (ajustements financiers) --- Not used in Dolibarr
+         * 130 – Feuille de données de facturation --- Not used in Dolibarr
+         * 202 – Valorisation de paiement direct --- Not used in Dolibarr
+         * 203 – Valorisation de paiement provisoire --- Not used in Dolibarr
+         * 204 – Valorisation de paiement --- Not used in Dolibarr
+         * 218 – Demande de paiement finale après achèvement des travaux --- Not used in Dolibarr
+         * 219 – Demande de paiement pour unités terminées --- Not used in Dolibarr
+         * 295 – Facture de variation de prix --- Not used in Dolibarr
+
+         * 326 – Facture partielle --- Not used in Dolibarr
+         */
+
+        $map = [
+            ZugferdInvoiceType::INVOICE                         => CommonInvoice::TYPE_STANDARD,
+            ZugferdInvoiceType::CORRECTION                      => CommonInvoice::TYPE_REPLACEMENT,
+            ZugferdInvoiceType::CREDITNOTE                      => CommonInvoice::TYPE_CREDIT_NOTE,
+            ZugferdInvoiceType::PREPAYMENTINVOICE               => CommonInvoice::TYPE_DEPOSIT,
+            ZugferdInvoiceType::INTERIMAPPLICATIONFORPAYMENT    => CommonInvoice::TYPE_SITUATION,
+            ZugferdInvoiceType::PROFORMAINVOICE                 => CommonInvoice::TYPE_PROFORMA,
+        ];
+
+
+        if (!isset($map[$documenttypecode])) {
+            dol_syslog(get_class($this) . '::_getDolibarrInvoiceType Unknown document type code: ' . $documenttypecode, LOG_WARNING);
+            return '-1';
+        }
+
+        return $map[$documenttypecode];
     }
 }

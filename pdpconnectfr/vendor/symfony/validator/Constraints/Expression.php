@@ -13,14 +13,12 @@ namespace Symfony\Component\Validator\Constraints;
 
 use Symfony\Component\ExpressionLanguage\Expression as ExpressionObject;
 use Symfony\Component\ExpressionLanguage\ExpressionLanguage;
-use Symfony\Component\Validator\Attribute\HasNamedArguments;
 use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\Exception\LogicException;
 
 /**
- * Validates a value using an expression from the Expression Language component.
- *
- * @see https://symfony.com/doc/current/components/expression_language.html
+ * @Annotation
+ * @Target({"CLASS", "PROPERTY", "METHOD", "ANNOTATION"})
  *
  * @author Fabien Potencier <fabien@symfony.com>
  * @author Bernhard Schussek <bschussek@gmail.com>
@@ -30,75 +28,73 @@ class Expression extends Constraint
 {
     public const EXPRESSION_FAILED_ERROR = '6b3befbc-2f01-4ddf-be21-b57898905284';
 
-    protected const ERROR_NAMES = [
+    protected static $errorNames = [
         self::EXPRESSION_FAILED_ERROR => 'EXPRESSION_FAILED_ERROR',
     ];
 
-    public string $message = 'This value is not valid.';
-    public string|ExpressionObject|null $expression = null;
-    public array $values = [];
-    public bool $negate = true;
+    public $message = 'This value is not valid.';
+    public $expression;
+    public $values = [];
 
     /**
-     * @param string|ExpressionObject|array<string,mixed>|null $expression The expression to evaluate
-     * @param array<string,mixed>|null                         $values     The values of the custom variables used in the expression (defaults to an empty array)
-     * @param string[]|null                                    $groups
-     * @param array<string,mixed>|null                         $options
-     * @param bool|null                                        $negate     When set to true, if the expression returns true, the validation will pass (defaults to true)
+     * {@inheritdoc}
+     *
+     * @param string|ExpressionObject|array $expression The expression to evaluate or an array of options
      */
-    #[HasNamedArguments]
     public function __construct(
-        string|ExpressionObject|array|null $expression,
+        $expression,
         ?string $message = null,
         ?array $values = null,
         ?array $groups = null,
-        mixed $payload = null,
-        ?array $options = null,
-        ?bool $negate = null,
+        $payload = null,
+        array $options = []
     ) {
         if (!class_exists(ExpressionLanguage::class)) {
-            throw new LogicException(\sprintf('The "symfony/expression-language" component is required to use the "%s" constraint. Try running "composer require symfony/expression-language".', __CLASS__));
+            throw new LogicException(sprintf('The "symfony/expression-language" component is required to use the "%s" constraint.', __CLASS__));
         }
 
         if (\is_array($expression)) {
-            trigger_deprecation('symfony/validator', '7.3', 'Passing an array of options to configure the "%s" constraint is deprecated, use named arguments instead.', static::class);
-
-            $options = array_merge($expression, $options ?? []);
+            $options = array_merge($expression, $options);
+        } elseif (!\is_string($expression) && !$expression instanceof ExpressionObject) {
+            throw new \TypeError(sprintf('"%s": Expected argument $expression to be either a string, an instance of "%s" or an array, got "%s".', __METHOD__, ExpressionObject::class, get_debug_type($expression)));
         } else {
-            if (\is_array($options)) {
-                trigger_deprecation('symfony/validator', '7.3', 'Passing an array of options to configure the "%s" constraint is deprecated, use named arguments instead.', static::class);
-            } else {
-                $options = [];
-            }
-
-            if (null !== $expression) {
-                $options['value'] = $expression;
-            }
+            $options['value'] = $expression;
         }
 
         parent::__construct($options, $groups, $payload);
 
         $this->message = $message ?? $this->message;
         $this->values = $values ?? $this->values;
-        $this->negate = $negate ?? $this->negate;
     }
 
-    public function getDefaultOption(): ?string
+    /**
+     * {@inheritdoc}
+     */
+    public function getDefaultOption()
     {
         return 'expression';
     }
 
-    public function getRequiredOptions(): array
+    /**
+     * {@inheritdoc}
+     */
+    public function getRequiredOptions()
     {
         return ['expression'];
     }
 
-    public function getTargets(): string|array
+    /**
+     * {@inheritdoc}
+     */
+    public function getTargets()
     {
         return [self::CLASS_CONSTRAINT, self::PROPERTY_CONSTRAINT];
     }
 
-    public function validatedBy(): string
+    /**
+     * {@inheritdoc}
+     */
+    public function validatedBy()
     {
         return 'validator.expression';
     }

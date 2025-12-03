@@ -69,7 +69,7 @@ class IbanValidator extends ConstraintValidator
         'DK' => 'DK\d{2}\d{4}\d{9}\d{1}', // Denmark
         'DO' => 'DO\d{2}[\dA-Z]{4}\d{20}', // Dominican Republic
         'DZ' => 'DZ\d{2}\d{22}', // Algeria
-        'EE' => 'EE\d{2}\d{2}\d{14}', // Estonia
+        'EE' => 'EE\d{2}\d{2}\d{2}\d{11}\d{1}', // Estonia
         'EG' => 'EG\d{2}\d{4}\d{4}\d{17}', // Egypt
         'ES' => 'ES\d{2}\d{4}\d{4}\d{1}\d{1}\d{10}', // Spain
         'FI' => 'FI\d{2}\d{3}\d{11}', // Finland
@@ -126,7 +126,7 @@ class IbanValidator extends ConstraintValidator
         'MZ' => 'MZ\d{2}\d{21}', // Mozambique
         'NC' => 'FR\d{2}\d{5}\d{5}[\dA-Z]{11}\d{2}', // France
         'NE' => 'NE\d{2}[A-Z]{2}\d{22}', // Niger
-        'NI' => 'NI\d{2}[A-Z]{4}\d{20}', // Nicaragua
+        'NI' => 'NI\d{2}[A-Z]{4}\d{24}', // Nicaragua
         'NL' => 'NL\d{2}[A-Z]{4}\d{10}', // Netherlands (The)
         'NO' => 'NO\d{2}\d{4}\d{6}\d{1}', // Norway
         'OM' => 'OM\d{2}\d{3}[\dA-Z]{16}', // Oman
@@ -150,7 +150,7 @@ class IbanValidator extends ConstraintValidator
         'SM' => 'SM\d{2}[A-Z]{1}\d{5}\d{5}[\dA-Z]{12}', // San Marino
         'SN' => 'SN\d{2}[A-Z]{2}\d{22}', // Senegal
         'SO' => 'SO\d{2}\d{4}\d{3}\d{12}', // Somalia
-        'ST' => 'ST\d{2}\d{8}\d{11}\d{2}', // Sao Tome and Principe
+        'ST' => 'ST\d{2}\d{4}\d{4}\d{11}\d{2}', // Sao Tome and Principe
         'SV' => 'SV\d{2}[A-Z]{4}\d{20}', // El Salvador
         'TD' => 'TD\d{2}\d{23}', // Chad
         'TF' => 'FR\d{2}\d{5}\d{5}[\dA-Z]{11}\d{2}', // France
@@ -167,7 +167,10 @@ class IbanValidator extends ConstraintValidator
         'YT' => 'FR\d{2}\d{5}\d{5}[\dA-Z]{11}\d{2}', // France
     ];
 
-    public function validate(mixed $value, Constraint $constraint): void
+    /**
+     * {@inheritdoc}
+     */
+    public function validate($value, Constraint $constraint)
     {
         if (!$constraint instanceof Iban) {
             throw new UnexpectedTypeException($constraint, Iban::class);
@@ -177,14 +180,14 @@ class IbanValidator extends ConstraintValidator
             return;
         }
 
-        if (!\is_scalar($value) && !$value instanceof \Stringable) {
+        if (!\is_scalar($value) && !(\is_object($value) && method_exists($value, '__toString'))) {
             throw new UnexpectedValueException($value, 'string');
         }
 
         $value = (string) $value;
 
-        // Remove spaces (regular, non-breaking, and narrow non-breaking) and convert to uppercase
-        $canonicalized = str_replace([' ', "\xc2\xa0", "\xe2\x80\xaf"], '', strtoupper($value));
+        // Remove spaces and convert to uppercase
+        $canonicalized = str_replace(' ', '', strtoupper($value));
 
         // The IBAN must contain only digits and characters...
         if (!ctype_alnum($canonicalized)) {

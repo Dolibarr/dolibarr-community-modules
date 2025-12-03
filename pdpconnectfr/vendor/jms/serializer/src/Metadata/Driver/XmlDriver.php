@@ -155,7 +155,7 @@ class XmlDriver extends AbstractFileDriver
                 $virtualPropertyMetadata = new ExpressionPropertyMetadata(
                     $name,
                     (string) $method->attributes()->name,
-                    $this->parseExpression((string) $method->attributes()->expression),
+                    $this->parseExpression((string) $method->attributes()->expression)
                 );
             } else {
                 if (!isset($method->attributes()->method)) {
@@ -321,26 +321,12 @@ class XmlDriver extends AbstractFileDriver
                         $pMetadata->readOnly = $pMetadata->readOnly || $readOnlyClass;
                     }
 
-                    if (isset($pElem->{'union-discriminator'})) {
-                        $colConfig = $pElem->{'union-discriminator'};
-
-                        $map = [];
-                        foreach ($pElem->xpath('./union-discriminator/map/class') as $entry) {
-                            $map[(string) $entry->attributes()->key] = (string) $entry;
-                        }
-
-                        $pMetadata->setType([
-                            'name' => 'union',
-                            'params' => [null, (string) $colConfig->attributes()->field, $map],
-                        ]);
-                    }
-
                     $getter = $pElem->attributes()->{'accessor-getter'};
                     $setter = $pElem->attributes()->{'accessor-setter'};
                     $pMetadata->setAccessor(
                         (string) ($pElem->attributes()->{'access-type'} ?: $classAccessType),
                         $getter ? (string) $getter : null,
-                        $setter ? (string) $setter : null,
+                        $setter ? (string) $setter : null
                     );
 
                     if (null !== $inline = $pElem->attributes()->inline) {

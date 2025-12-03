@@ -22,7 +22,6 @@ use Symfony\Component\Validator\Exception\UnexpectedValueException;
 class TimeValidator extends ConstraintValidator
 {
     public const PATTERN = '/^(\d{2}):(\d{2}):(\d{2})$/D';
-    public const PATTERN_WITHOUT_SECONDS = '/^(\d{2}):(\d{2})$/D';
 
     /**
      * Checks whether a time is valid.
@@ -34,7 +33,10 @@ class TimeValidator extends ConstraintValidator
         return $hour >= 0 && $hour < 24 && $minute >= 0 && $minute < 60 && $second >= 0 && $second < 60;
     }
 
-    public function validate(mixed $value, Constraint $constraint): void
+    /**
+     * {@inheritdoc}
+     */
+    public function validate($value, Constraint $constraint)
     {
         if (!$constraint instanceof Time) {
             throw new UnexpectedTypeException($constraint, Time::class);
@@ -44,13 +46,13 @@ class TimeValidator extends ConstraintValidator
             return;
         }
 
-        if (!\is_scalar($value) && !$value instanceof \Stringable) {
+        if (!\is_scalar($value) && !(\is_object($value) && method_exists($value, '__toString'))) {
             throw new UnexpectedValueException($value, 'string');
         }
 
         $value = (string) $value;
 
-        if (!preg_match($constraint->withSeconds ? static::PATTERN : static::PATTERN_WITHOUT_SECONDS, $value, $matches)) {
+        if (!preg_match(static::PATTERN, $value, $matches)) {
             $this->context->buildViolation($constraint->message)
                 ->setParameter('{{ value }}', $this->formatValue($value))
                 ->setCode(Time::INVALID_FORMAT_ERROR)
@@ -59,7 +61,7 @@ class TimeValidator extends ConstraintValidator
             return;
         }
 
-        if (!self::checkTime($matches[1], $matches[2], $constraint->withSeconds ? $matches[3] : 0)) {
+        if (!self::checkTime($matches[1], $matches[2], $matches[3])) {
             $this->context->buildViolation($constraint->message)
                 ->setParameter('{{ value }}', $this->formatValue($value))
                 ->setCode(Time::INVALID_TIME_ERROR)

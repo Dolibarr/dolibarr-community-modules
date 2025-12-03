@@ -23,7 +23,6 @@ use JMS\Serializer\GraphNavigatorInterface;
 use JMS\Serializer\Handler\HandlerRegistryInterface;
 use JMS\Serializer\Metadata\ClassMetadata;
 use JMS\Serializer\NullAwareVisitorInterface;
-use JMS\Serializer\Type\Type;
 use JMS\Serializer\Visitor\DeserializationVisitorInterface;
 use Metadata\MetadataFactoryInterface;
 
@@ -34,8 +33,6 @@ use Metadata\MetadataFactoryInterface;
  * on visitors, or custom handlers to process its nodes.
  *
  * @author Johannes M. Schmitt <schmittjoh@gmail.com>
- *
- * @phpstan-import-type TypeArray from Type
  */
 final class DeserializationGraphNavigator extends GraphNavigator implements GraphNavigatorInterface
 {
@@ -100,7 +97,7 @@ final class DeserializationGraphNavigator extends GraphNavigator implements Grap
      * Called for each node of the graph that is being traversed.
      *
      * @param mixed $data the data depends on the direction, and type of visitor
-     * @param TypeArray|null $type array has the format ["name" => string, "params" => array]
+     * @param array|null $type array has the format ["name" => string, "params" => array]
      *
      * @return mixed the return value depends on the direction, and type of visitor
      */
@@ -131,8 +128,6 @@ final class DeserializationGraphNavigator extends GraphNavigator implements Grap
 
             case 'bool':
             case 'boolean':
-            case 'false':
-            case 'true':
                 return $this->visitor->visitBoolean($data, $type);
 
             case 'double':
@@ -248,16 +243,13 @@ final class DeserializationGraphNavigator extends GraphNavigator implements Grap
                 'The type value "%s" does not exist in the discriminator map of class "%s". Available types: %s',
                 $typeValue,
                 $metadata->name,
-                implode(', ', array_keys($metadata->discriminatorMap)),
+                implode(', ', array_keys($metadata->discriminatorMap))
             ));
         }
 
         return $this->metadataFactory->getMetadataForClass($metadata->discriminatorMap[$typeValue]);
     }
 
-    /**
-     * @param TypeArray $type
-     */
     private function afterVisitingObject(ClassMetadata $metadata, object $object, array $type): void
     {
         $this->context->decreaseDepth();

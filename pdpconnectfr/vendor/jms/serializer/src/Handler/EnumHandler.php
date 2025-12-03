@@ -8,13 +8,9 @@ use JMS\Serializer\Exception\InvalidMetadataException;
 use JMS\Serializer\Exception\RuntimeException;
 use JMS\Serializer\GraphNavigatorInterface;
 use JMS\Serializer\SerializationContext;
-use JMS\Serializer\Type\Type;
 use JMS\Serializer\Visitor\DeserializationVisitorInterface;
 use JMS\Serializer\Visitor\SerializationVisitorInterface;
 
-/**
- * @phpstan-import-type TypeArray from Type
- */
 final class EnumHandler implements SubscribingHandlerInterface
 {
     /**
@@ -42,16 +38,13 @@ final class EnumHandler implements SubscribingHandlerInterface
         return $methods;
     }
 
-    /**
-     * @param TypeArray $type
-     */
     public function serializeEnum(
         SerializationVisitorInterface $visitor,
         \UnitEnum $enum,
         array $type,
         SerializationContext $context
     ) {
-        if ((isset($type['params'][1]) && 'value' === $type['params'][1]) || (!isset($type['params'][1]) && $enum instanceof \BackedEnum)) {
+        if (isset($type['params'][1]) && 'value' === $type['params'][1]) {
             if (!$enum instanceof \BackedEnum) {
                 throw new InvalidMetadataException(sprintf('The type "%s" is not a backed enum, thus you can not use "value" as serialization mode for its value.', get_class($enum)));
             }
@@ -66,17 +59,11 @@ final class EnumHandler implements SubscribingHandlerInterface
 
     /**
      * @param int|string|\SimpleXMLElement $data
-     * @param TypeArray $type
+     * @param array $type
      */
     public function deserializeEnum(DeserializationVisitorInterface $visitor, $data, array $type): ?\UnitEnum
     {
         $enumType = $type['params'][0];
-        if (isset($enumType['name'])) {
-            $enumType = $enumType['name'];
-        } else {
-            trigger_deprecation('jms/serializer', '3.31', "Using enum<'Type'> or similar is deprecated, use enum<Type> instead.");
-        }
-
         $caseValue = (string) $data;
 
         $ref = new \ReflectionEnum($enumType);

@@ -17,10 +17,13 @@ namespace Symfony\Component\Yaml\Tag;
  */
 final class TaggedValue
 {
-    public function __construct(
-        private string $tag,
-        private mixed $value,
-    ) {
+    private $tag;
+    private $value;
+
+    public function __construct(string $tag, $value)
+    {
+        $this->tag = $tag;
+        $this->value = $value;
     }
 
     public function getTag(): string
@@ -28,7 +31,7 @@ final class TaggedValue
         return $this->tag;
     }
 
-    public function getValue(): mixed
+    public function getValue()
     {
         return $this->value;
     }

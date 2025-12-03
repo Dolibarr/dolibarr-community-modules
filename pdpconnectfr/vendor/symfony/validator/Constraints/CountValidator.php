@@ -21,7 +21,10 @@ use Symfony\Component\Validator\Exception\UnexpectedValueException;
  */
 class CountValidator extends ConstraintValidator
 {
-    public function validate(mixed $value, Constraint $constraint): void
+    /**
+     * {@inheritdoc}
+     */
+    public function validate($value, Constraint $constraint)
     {
         if (!$constraint instanceof Count) {
             throw new UnexpectedTypeException($constraint, Count::class);
@@ -44,7 +47,7 @@ class CountValidator extends ConstraintValidator
                 ->setParameter('{{ count }}', $count)
                 ->setParameter('{{ limit }}', $constraint->max)
                 ->setInvalidValue($value)
-                ->setPlural($constraint->max)
+                ->setPlural((int) $constraint->max)
                 ->setCode($exactlyOptionEnabled ? Count::NOT_EQUAL_COUNT_ERROR : Count::TOO_MANY_ERROR)
                 ->addViolation();
 
@@ -58,7 +61,7 @@ class CountValidator extends ConstraintValidator
                 ->setParameter('{{ count }}', $count)
                 ->setParameter('{{ limit }}', $constraint->min)
                 ->setInvalidValue($value)
-                ->setPlural($constraint->min)
+                ->setPlural((int) $constraint->min)
                 ->setCode($exactlyOptionEnabled ? Count::NOT_EQUAL_COUNT_ERROR : Count::TOO_FEW_ERROR)
                 ->addViolation();
 
@@ -70,10 +73,10 @@ class CountValidator extends ConstraintValidator
                 ->getValidator()
                 ->inContext($this->context)
                 ->validate($count, [
-                    new DivisibleBy(
-                        value: $constraint->divisibleBy,
-                        message: $constraint->divisibleByMessage,
-                    ),
+                    new DivisibleBy([
+                        'value' => $constraint->divisibleBy,
+                        'message' => $constraint->divisibleByMessage,
+                    ]),
                 ], $this->context->getGroup());
         }
     }

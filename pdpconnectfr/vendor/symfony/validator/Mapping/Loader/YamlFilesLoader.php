@@ -21,7 +21,10 @@ namespace Symfony\Component\Validator\Mapping\Loader;
  */
 class YamlFilesLoader extends FilesLoader
 {
-    public function getFileLoaderInstance(string $file): LoaderInterface
+    /**
+     * {@inheritdoc}
+     */
+    public function getFileLoaderInstance(string $file)
     {
         return new YamlFileLoader($file);
     }
