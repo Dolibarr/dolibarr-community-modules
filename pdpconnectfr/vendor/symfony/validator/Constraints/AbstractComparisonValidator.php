@@ -28,11 +28,17 @@ use Symfony\Component\Validator\Exception\UnexpectedTypeException;
  */
 abstract class AbstractComparisonValidator extends ConstraintValidator
 {
-    public function __construct(private ?PropertyAccessorInterface $propertyAccessor = null)
+    private $propertyAccessor;
+
+    public function __construct(?PropertyAccessorInterface $propertyAccessor = null)
     {
+        $this->propertyAccessor = $propertyAccessor;
     }
 
-    public function validate(mixed $value, Constraint $constraint): void
+    /**
+     * {@inheritdoc}
+     */
+    public function validate($value, Constraint $constraint)
     {
         if (!$constraint instanceof AbstractComparison) {
             throw new UnexpectedTypeException($constraint, AbstractComparison::class);
@@ -50,22 +56,26 @@ abstract class AbstractComparisonValidator extends ConstraintValidator
             try {
                 $comparedValue = $this->getPropertyAccessor()->getValue($object, $path);
             } catch (NoSuchPropertyException $e) {
-                throw new ConstraintDefinitionException(\sprintf('Invalid property path "%s" provided to "%s" constraint: ', $path, get_debug_type($constraint)).$e->getMessage(), 0, $e);
-            } catch (UninitializedPropertyException) {
+                throw new ConstraintDefinitionException(sprintf('Invalid property path "%s" provided to "%s" constraint: ', $path, get_debug_type($constraint)).$e->getMessage(), 0, $e);
+            } catch (UninitializedPropertyException $e) {
                 $comparedValue = null;
             }
         } else {
             $comparedValue = $constraint->value;
         }
 
-        // Convert strings to date-time objects if comparing to another date-time object
-        // This allows to compare with any date/time value supported by date-time constructors:
+        // Convert strings to DateTimes if comparing another DateTime
+        // This allows to compare with any date/time value supported by
+        // the DateTime constructor:
         // https://php.net/datetime.formats
         if (\is_string($comparedValue) && $value instanceof \DateTimeInterface) {
+            // If $value is immutable, convert the compared value to a DateTimeImmutable too, otherwise use DateTime
+            $dateTimeClass = $value instanceof \DateTimeImmutable ? \DateTimeImmutable::class : \DateTime::class;
+
             try {
-                $comparedValue = new $value($comparedValue);
-            } catch (\Exception) {
-                throw new ConstraintDefinitionException(\sprintf('The compared value "%s" could not be converted to a "%s" instance in the "%s" constraint.', $comparedValue, get_debug_type($value), get_debug_type($constraint)));
+                $comparedValue = new $dateTimeClass($comparedValue);
+            } catch (\Exception $e) {
+                throw new ConstraintDefinitionException(sprintf('The compared value "%s" could not be converted to a "%s" instance in the "%s" constraint.', $comparedValue, $dateTimeClass, get_debug_type($constraint)));
             }
         }
 
@@ -86,18 +96,29 @@ abstract class AbstractComparisonValidator extends ConstraintValidator
 
     private function getPropertyAccessor(): PropertyAccessorInterface
     {
-        return $this->propertyAccessor ??= PropertyAccess::createPropertyAccessor();
+        if (null === $this->propertyAccessor) {
+            $this->propertyAccessor = PropertyAccess::createPropertyAccessor();
+        }
+
+        return $this->propertyAccessor;
     }
 
     /**
      * Compares the two given values to find if their relationship is valid.
+     *
+     * @param mixed $value1 The first value to compare
+     * @param mixed $value2 The second value to compare
+     *
+     * @return bool
      */
-    abstract protected function compareValues(mixed $value1, mixed $value2): bool;
+    abstract protected function compareValues($value1, $value2);
 
     /**
      * Returns the error code used if the comparison fails.
+     *
+     * @return string|null
      */
-    protected function getErrorCode(): ?string
+    protected function getErrorCode()
     {
         return null;
     }

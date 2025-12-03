@@ -5,11 +5,7 @@ declare(strict_types=1);
 namespace JMS\Serializer;
 
 use JMS\Serializer\Exception\NotAcceptableException;
-use JMS\Serializer\Type\Type;
 
-/**
- * @phpstan-import-type TypeArray from Type
- */
 interface GraphNavigatorInterface
 {
     public const DIRECTION_SERIALIZATION = 1;
@@ -25,7 +21,7 @@ interface GraphNavigatorInterface
      * Called for each node of the graph that is being traversed.
      *
      * @param mixed $data the data depends on the direction, and type of visitor
-     * @param TypeArray|null $type array has the format ["name" => string, "params" => array]
+     * @param array|null $type array has the format ["name" => string, "params" => array]
      *
      * @return mixed the return value depends on the direction, and type of visitor
      *

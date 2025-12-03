@@ -21,17 +21,20 @@ use Symfony\Component\Validator\Exception\UnexpectedValueException;
  */
 class LengthValidator extends ConstraintValidator
 {
-    public function validate(mixed $value, Constraint $constraint): void
+    /**
+     * {@inheritdoc}
+     */
+    public function validate($value, Constraint $constraint)
     {
         if (!$constraint instanceof Length) {
             throw new UnexpectedTypeException($constraint, Length::class);
         }
 
-        if (null === $value) {
+        if (null === $value || ('' === $value && $constraint->allowEmptyString)) {
             return;
         }
 
-        if (!\is_scalar($value) && !$value instanceof \Stringable) {
+        if (!\is_scalar($value) && !(\is_object($value) && method_exists($value, '__toString'))) {
             throw new UnexpectedValueException($value, 'string');
         }
 
@@ -51,13 +54,7 @@ class LengthValidator extends ConstraintValidator
             $invalidCharset = true;
         }
 
-        $length = $invalidCharset ? 0 : match ($constraint->countUnit) {
-            Length::COUNT_BYTES => \strlen($stringValue),
-            Length::COUNT_CODEPOINTS => mb_strlen($stringValue, $constraint->charset),
-            Length::COUNT_GRAPHEMES => grapheme_strlen($stringValue),
-        };
-
-        if ($invalidCharset || false === ($length ?? false)) {
+        if ($invalidCharset) {
             $this->context->buildViolation($constraint->charsetMessage)
                 ->setParameter('{{ value }}', $this->formatValue($stringValue))
                 ->setParameter('{{ charset }}', $constraint->charset)
@@ -68,15 +65,16 @@ class LengthValidator extends ConstraintValidator
             return;
         }
 
+        $length = mb_strlen($stringValue, $constraint->charset);
+
         if (null !== $constraint->max && $length > $constraint->max) {
             $exactlyOptionEnabled = $constraint->min == $constraint->max;
 
             $this->context->buildViolation($exactlyOptionEnabled ? $constraint->exactMessage : $constraint->maxMessage)
                 ->setParameter('{{ value }}', $this->formatValue($stringValue))
                 ->setParameter('{{ limit }}', $constraint->max)
-                ->setParameter('{{ value_length }}', $length)
                 ->setInvalidValue($value)
-                ->setPlural($constraint->max)
+                ->setPlural((int) $constraint->max)
                 ->setCode($exactlyOptionEnabled ? Length::NOT_EQUAL_LENGTH_ERROR : Length::TOO_LONG_ERROR)
                 ->addViolation();
 
@@ -89,9 +87,8 @@ class LengthValidator extends ConstraintValidator
             $this->context->buildViolation($exactlyOptionEnabled ? $constraint->exactMessage : $constraint->minMessage)
                 ->setParameter('{{ value }}', $this->formatValue($stringValue))
                 ->setParameter('{{ limit }}', $constraint->min)
-                ->setParameter('{{ value_length }}', $length)
                 ->setInvalidValue($value)
-                ->setPlural($constraint->min)
+                ->setPlural((int) $constraint->min)
                 ->setCode($exactlyOptionEnabled ? Length::NOT_EQUAL_LENGTH_ERROR : Length::TOO_SHORT_ERROR)
                 ->addViolation();
         }

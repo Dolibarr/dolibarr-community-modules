@@ -12,7 +12,8 @@
 namespace Symfony\Component\Validator\Constraints;
 
 /**
- * Validates that a value is divisible by another value.
+ * @Annotation
+ * @Target({"PROPERTY", "METHOD", "ANNOTATION"})
  *
  * @author Colin O'Dell <colinodell@gmail.com>
  */
@@ -21,9 +22,9 @@ class DivisibleBy extends AbstractComparison
 {
     public const NOT_DIVISIBLE_BY = '6d99d6c3-1464-4ccf-bdc7-14d083cf455c';
 
-    protected const ERROR_NAMES = [
+    protected static $errorNames = [
         self::NOT_DIVISIBLE_BY => 'NOT_DIVISIBLE_BY',
     ];
 
-    public string $message = 'This value should be a multiple of {{ compared_value }}.';
+    public $message = 'This value should be a multiple of {{ compared_value }}.';
 }

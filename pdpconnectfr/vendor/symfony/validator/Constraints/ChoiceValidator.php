@@ -14,7 +14,6 @@ namespace Symfony\Component\Validator\Constraints;
 use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
 use Symfony\Component\Validator\Exception\ConstraintDefinitionException;
-use Symfony\Component\Validator\Exception\RuntimeException;
 use Symfony\Component\Validator\Exception\UnexpectedTypeException;
 use Symfony\Component\Validator\Exception\UnexpectedValueException;
 
@@ -27,7 +26,10 @@ use Symfony\Component\Validator\Exception\UnexpectedValueException;
  */
 class ChoiceValidator extends ConstraintValidator
 {
-    public function validate(mixed $value, Constraint $constraint): void
+    /**
+     * {@inheritdoc}
+     */
+    public function validate($value, Constraint $constraint)
     {
         if (!$constraint instanceof Choice) {
             throw new UnexpectedTypeException($constraint, Choice::class);
@@ -53,20 +55,20 @@ class ChoiceValidator extends ConstraintValidator
                 throw new ConstraintDefinitionException('The Choice constraint expects a valid callback.');
             }
             $choices = $choices();
-            if (!\is_array($choices)) {
-                throw new ConstraintDefinitionException(\sprintf('The Choice constraint callback "%s" is expected to return an array, but returned "%s".', trim($this->formatValue($constraint->callback), '"'), get_debug_type($choices)));
+            if (!is_array($choices)) {
+                throw new ConstraintDefinitionException(sprintf('The Choice constraint callback "%s" is expected to return an array, but returned "%s".', trim($this->formatValue($constraint->callback), '"'), get_debug_type($choices)));
             }
         } else {
             $choices = $constraint->choices;
         }
 
         if (true !== $constraint->strict) {
-            throw new RuntimeException('The "strict" option of the Choice constraint should not be used.');
+            throw new \RuntimeException('The "strict" option of the Choice constraint should not be used.');
         }
 
         if ($constraint->multiple) {
             foreach ($value as $_value) {
-                if ($constraint->match xor \in_array($_value, $choices, true)) {
+                if (!\in_array($_value, $choices, true)) {
                     $this->context->buildViolation($constraint->multipleMessage)
                         ->setParameter('{{ value }}', $this->formatValue($_value))
                         ->setParameter('{{ choices }}', $this->formatValues($choices))
@@ -83,7 +85,7 @@ class ChoiceValidator extends ConstraintValidator
             if (null !== $constraint->min && $count < $constraint->min) {
                 $this->context->buildViolation($constraint->minMessage)
                     ->setParameter('{{ limit }}', $constraint->min)
-                    ->setPlural($constraint->min)
+                    ->setPlural((int) $constraint->min)
                     ->setCode(Choice::TOO_FEW_ERROR)
                     ->addViolation();
 
@@ -93,11 +95,13 @@ class ChoiceValidator extends ConstraintValidator
             if (null !== $constraint->max && $count > $constraint->max) {
                 $this->context->buildViolation($constraint->maxMessage)
                     ->setParameter('{{ limit }}', $constraint->max)
-                    ->setPlural($constraint->max)
+                    ->setPlural((int) $constraint->max)
                     ->setCode(Choice::TOO_MANY_ERROR)
                     ->addViolation();
+
+                return;
             }
-        } elseif ($constraint->match xor \in_array($value, $choices, true)) {
+        } elseif (!\in_array($value, $choices, true)) {
             $this->context->buildViolation($constraint->message)
                 ->setParameter('{{ value }}', $this->formatValue($value))
                 ->setParameter('{{ choices }}', $this->formatValues($choices))

@@ -38,7 +38,10 @@ class FileValidator extends ConstraintValidator
         self::MIB_BYTES => 'MiB',
     ];
 
-    public function validate(mixed $value, Constraint $constraint): void
+    /**
+     * {@inheritdoc}
+     */
+    public function validate($value, Constraint $constraint)
     {
         if (!$constraint instanceof File) {
             throw new UnexpectedTypeException($constraint, File::class);
@@ -113,7 +116,7 @@ class FileValidator extends ConstraintValidator
             }
         }
 
-        if (!\is_scalar($value) && !$value instanceof FileObject && !$value instanceof \Stringable) {
+        if (!\is_scalar($value) && !$value instanceof FileObject && !(\is_object($value) && method_exists($value, '__toString'))) {
             throw new UnexpectedValueException($value, 'string');
         }
 
@@ -137,46 +140,10 @@ class FileValidator extends ConstraintValidator
             return;
         }
 
+        $sizeInBytes = filesize($path);
         $basename = $value instanceof UploadedFile ? $value->getClientOriginalName() : basename($path);
-        $filenameCharset = $constraint->filenameCharset ?? (File::FILENAME_COUNT_BYTES !== $constraint->filenameCountUnit ? 'UTF-8' : null);
 
-        if ($invalidFilenameCharset = null !== $filenameCharset) {
-            try {
-                $invalidFilenameCharset = !@mb_check_encoding($basename, $constraint->filenameCharset);
-            } catch (\ValueError $e) {
-                if (!str_starts_with($e->getMessage(), 'mb_check_encoding(): Argument #2 ($encoding) must be a valid encoding')) {
-                    throw $e;
-                }
-            }
-        }
-
-        $filenameLength = $invalidFilenameCharset ? 0 : match ($constraint->filenameCountUnit) {
-            File::FILENAME_COUNT_BYTES => \strlen($basename),
-            File::FILENAME_COUNT_CODEPOINTS => mb_strlen($basename, $filenameCharset),
-            File::FILENAME_COUNT_GRAPHEMES => grapheme_strlen($basename),
-        };
-
-        if ($invalidFilenameCharset || false === ($filenameLength ?? false)) {
-            $this->context->buildViolation($constraint->filenameCharsetMessage)
-                ->setParameter('{{ name }}', $this->formatValue($basename))
-                ->setParameter('{{ charset }}', $filenameCharset)
-                ->setCode(File::FILENAME_INVALID_CHARACTERS)
-                ->addViolation();
-
-            return;
-        }
-
-        if ($constraint->filenameMaxLength && $constraint->filenameMaxLength < $filenameLength) {
-            $this->context->buildViolation($constraint->filenameTooLongMessage)
-                ->setParameter('{{ filename_max_length }}', $this->formatValue($constraint->filenameMaxLength))
-                ->setCode(File::FILENAME_TOO_LONG)
-                ->setPlural($constraint->filenameMaxLength)
-                ->addViolation();
-
-            return;
-        }
-
-        if (!$sizeInBytes = filesize($path)) {
+        if (0 === $sizeInBytes) {
             $this->context->buildViolation($constraint->disallowEmptyMessage)
                 ->setParameter('{{ file }}', $this->formatValue($path))
                 ->setParameter('{{ name }}', $this->formatValue($basename))
@@ -204,60 +171,18 @@ class FileValidator extends ConstraintValidator
             }
         }
 
-        $mimeTypes = (array) $constraint->mimeTypes;
-
-        if ($constraint->extensions) {
-            $fileExtension = strtolower(pathinfo($basename, \PATHINFO_EXTENSION));
-
-            $found = false;
-            $normalizedExtensions = [];
-            foreach ((array) $constraint->extensions as $k => $v) {
-                if (!\is_string($k)) {
-                    $k = $v;
-                    $v = null;
-                }
-
-                $normalizedExtensions[] = $k;
-
-                if ($fileExtension !== $k) {
-                    continue;
-                }
-
-                $found = true;
-                if (null === $v) {
-                    if (!class_exists(MimeTypes::class)) {
-                        throw new LogicException('You cannot validate the mime-type of files as the Mime component is not installed. Try running "composer require symfony/mime".');
-                    }
-
-                    $mimeTypesHelper = MimeTypes::getDefault();
-                    $v = $mimeTypesHelper->getMimeTypes($k);
-                }
-
-                $mimeTypes = $mimeTypes ? array_intersect($v, $mimeTypes) : (array) $v;
-                break;
-            }
-
-            if (!$found) {
-                $this->context->buildViolation($constraint->extensionsMessage)
-                    ->setParameter('{{ file }}', $this->formatValue($path))
-                    ->setParameter('{{ extension }}', $this->formatValue($fileExtension))
-                    ->setParameter('{{ extensions }}', $this->formatValues($normalizedExtensions))
-                    ->setParameter('{{ name }}', $this->formatValue($basename))
-                    ->setCode(File::INVALID_EXTENSION_ERROR)
-                    ->addViolation();
-            }
-        }
-
-        if ($mimeTypes) {
+        if ($constraint->mimeTypes) {
             if ($value instanceof FileObject) {
                 $mime = $value->getMimeType();
-            } elseif (isset($mimeTypesHelper) || class_exists(MimeTypes::class)) {
-                $mime = ($mimeTypesHelper ?? MimeTypes::getDefault())->guessMimeType($path);
+            } elseif (class_exists(MimeTypes::class)) {
+                $mime = MimeTypes::getDefault()->guessMimeType($path);
             } elseif (!class_exists(FileObject::class)) {
                 throw new LogicException('You cannot validate the mime-type of files as the Mime component is not installed. Try running "composer require symfony/mime".');
             } else {
                 $mime = (new FileObject($value))->getMimeType();
             }
+
+            $mimeTypes = (array) $constraint->mimeTypes;
 
             foreach ($mimeTypes as $mimeType) {
                 if ($mimeType === $mime) {
@@ -289,8 +214,10 @@ class FileValidator extends ConstraintValidator
     /**
      * Convert the limit to the smallest possible number
      * (i.e. try "MB", then "kB", then "bytes").
+     *
+     * @param int|float $limit
      */
-    private function factorizeSizes(int $size, int|float $limit, bool $binaryFormat): array
+    private function factorizeSizes(int $size, $limit, bool $binaryFormat): array
     {
         if ($binaryFormat) {
             $coef = self::MIB_BYTES;
@@ -298,13 +225,6 @@ class FileValidator extends ConstraintValidator
         } else {
             $coef = self::MB_BYTES;
             $coefFactor = self::KB_BYTES;
-        }
-
-        // If $limit < $coef, $limitAsString could be < 1 with less than 3 decimals.
-        // In this case, we would end up displaying an allowed size < 1 (eg: 0.1 MB).
-        // It looks better to keep on factorizing (to display 100 kB for example).
-        while ($limit < $coef) {
-            $coef /= $coefFactor;
         }
 
         $limitAsString = (string) ($limit / $coef);

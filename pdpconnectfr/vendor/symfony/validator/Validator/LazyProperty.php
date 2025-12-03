@@ -18,12 +18,14 @@ namespace Symfony\Component\Validator\Validator;
  */
 class LazyProperty
 {
-    public function __construct(
-        private \Closure $propertyValueCallback,
-    ) {
+    private $propertyValueCallback;
+
+    public function __construct(\Closure $propertyValueCallback)
+    {
+        $this->propertyValueCallback = $propertyValueCallback;
     }
 
-    public function getPropertyValue(): mixed
+    public function getPropertyValue()
     {
         return ($this->propertyValueCallback)();
     }

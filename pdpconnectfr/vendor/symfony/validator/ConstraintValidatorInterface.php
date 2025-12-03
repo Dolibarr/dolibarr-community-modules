@@ -20,15 +20,13 @@ interface ConstraintValidatorInterface
 {
     /**
      * Initializes the constraint validator.
-     *
-     * @return void
      */
     public function initialize(ExecutionContextInterface $context);
 
     /**
      * Checks if the passed value is valid.
      *
-     * @return void
+     * @param mixed $value The value that should be validated
      */
-    public function validate(mixed $value, Constraint $constraint);
+    public function validate($value, Constraint $constraint);
 }

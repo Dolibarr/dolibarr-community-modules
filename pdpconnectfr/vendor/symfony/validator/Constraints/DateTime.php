@@ -11,13 +11,11 @@
 
 namespace Symfony\Component\Validator\Constraints;
 
-use Symfony\Component\Validator\Attribute\HasNamedArguments;
 use Symfony\Component\Validator\Constraint;
 
 /**
- * Validates that a value is a valid "datetime" according to a given format.
- *
- * @see https://www.php.net/manual/en/datetime.format.php
+ * @Annotation
+ * @Target({"PROPERTY", "METHOD", "ANNOTATION"})
  *
  * @author Bernhard Schussek <bschussek@gmail.com>
  */
@@ -28,34 +26,25 @@ class DateTime extends Constraint
     public const INVALID_DATE_ERROR = 'd52afa47-620d-4d99-9f08-f4d85b36e33c';
     public const INVALID_TIME_ERROR = '5e797c9d-74f7-4098-baa3-94390c447b27';
 
-    protected const ERROR_NAMES = [
+    protected static $errorNames = [
         self::INVALID_FORMAT_ERROR => 'INVALID_FORMAT_ERROR',
         self::INVALID_DATE_ERROR => 'INVALID_DATE_ERROR',
         self::INVALID_TIME_ERROR => 'INVALID_TIME_ERROR',
     ];
 
-    public string $format = 'Y-m-d H:i:s';
-    public string $message = 'This value is not a valid datetime.';
+    public $format = 'Y-m-d H:i:s';
+    public $message = 'This value is not a valid datetime.';
 
     /**
-     * @param non-empty-string|array<string,mixed>|null $format  The datetime format to match (defaults to 'Y-m-d H:i:s')
-     * @param string[]|null                             $groups
-     * @param array<string,mixed>|null                  $options
+     * {@inheritdoc}
+     *
+     * @param string|array|null $format
      */
-    #[HasNamedArguments]
-    public function __construct(string|array|null $format = null, ?string $message = null, ?array $groups = null, mixed $payload = null, ?array $options = null)
+    public function __construct($format = null, ?string $message = null, ?array $groups = null, $payload = null, array $options = [])
     {
         if (\is_array($format)) {
-            trigger_deprecation('symfony/validator', '7.3', 'Passing an array of options to configure the "%s" constraint is deprecated, use named arguments instead.', static::class);
-
-            $options = array_merge($format, $options ?? []);
+            $options = array_merge($format, $options);
         } elseif (null !== $format) {
-            if (\is_array($options)) {
-                trigger_deprecation('symfony/validator', '7.3', 'Passing an array of options to configure the "%s" constraint is deprecated, use named arguments instead.', static::class);
-            } else {
-                $options = [];
-            }
-
             $options['value'] = $format;
         }
 
@@ -64,7 +53,7 @@ class DateTime extends Constraint
         $this->message = $message ?? $this->message;
     }
 
-    public function getDefaultOption(): ?string
+    public function getDefaultOption()
     {
         return 'format';
     }

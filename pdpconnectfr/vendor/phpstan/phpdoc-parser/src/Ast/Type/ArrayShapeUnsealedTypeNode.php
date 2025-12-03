@@ -11,9 +11,11 @@ class ArrayShapeUnsealedTypeNode implements Node
 
 	use NodeAttributes;
 
-	public TypeNode $valueType;
+	/** @var TypeNode */
+	public $valueType;
 
-	public ?TypeNode $keyType = null;
+	/** @var TypeNode|null */
+	public $keyType;
 
 	public function __construct(TypeNode $valueType, ?TypeNode $keyType)
 	{

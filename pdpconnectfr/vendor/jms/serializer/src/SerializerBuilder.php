@@ -38,7 +38,6 @@ use JMS\Serializer\Handler\HandlerRegistry;
 use JMS\Serializer\Handler\HandlerRegistryInterface;
 use JMS\Serializer\Handler\IteratorHandler;
 use JMS\Serializer\Handler\StdClassHandler;
-use JMS\Serializer\Handler\UnionHandler;
 use JMS\Serializer\Naming\CamelCaseNamingStrategy;
 use JMS\Serializer\Naming\PropertyNamingStrategyInterface;
 use JMS\Serializer\Naming\SerializedNameAnnotationStrategy;
@@ -284,10 +283,6 @@ final class SerializerBuilder
             $this->handlerRegistry->registerSubscribingHandler(new EnumHandler());
         }
 
-        if (PHP_VERSION_ID >= 80000) {
-            $this->handlerRegistry->registerSubscribingHandler(new UnionHandler());
-        }
-
         return $this;
     }
 
@@ -502,7 +497,7 @@ final class SerializerBuilder
             $this->serializationContextFactory = $serializationContextFactory;
         } elseif (is_callable($serializationContextFactory)) {
             $this->serializationContextFactory = new CallableSerializationContextFactory(
-                $serializationContextFactory,
+                $serializationContextFactory
             );
         } else {
             throw new InvalidArgumentException('expected SerializationContextFactoryInterface or callable.');
@@ -520,7 +515,7 @@ final class SerializerBuilder
             $this->deserializationContextFactory = $deserializationContextFactory;
         } elseif (is_callable($deserializationContextFactory)) {
             $this->deserializationContextFactory = new CallableDeserializationContextFactory(
-                $deserializationContextFactory,
+                $deserializationContextFactory
             );
         } else {
             throw new InvalidArgumentException('expected DeserializationContextFactoryInterface or callable.');
@@ -557,8 +552,9 @@ final class SerializerBuilder
     public function build(): Serializer
     {
         $annotationReader = $this->annotationReader;
-        if (null === $annotationReader && class_exists(AnnotationReader::class)) {
-            $annotationReader = $this->decorateAnnotationReader(new AnnotationReader());
+        if (null === $annotationReader) {
+            $annotationReader = new AnnotationReader();
+            $annotationReader = $this->decorateAnnotationReader($annotationReader);
         }
 
         if (null === $this->driverFactory) {
@@ -566,7 +562,7 @@ final class SerializerBuilder
             $this->driverFactory = new DefaultDriverFactory(
                 $this->propertyNamingStrategy,
                 $this->typeParser,
-                $this->expressionEvaluator instanceof CompilableExpressionEvaluatorInterface ? $this->expressionEvaluator : null,
+                $this->expressionEvaluator instanceof CompilableExpressionEvaluatorInterface ? $this->expressionEvaluator : null
             );
             $this->driverFactory->enableEnumSupport($this->enableEnumSupport);
         }
@@ -615,7 +611,7 @@ final class SerializerBuilder
             $this->deserializationVisitors,
             $this->serializationContextFactory,
             $this->deserializationContextFactory,
-            $this->typeParser,
+            $this->typeParser
         );
     }
 
@@ -626,7 +622,7 @@ final class SerializerBuilder
             $this->handlerRegistry,
             $this->getAccessorStrategy(),
             $this->eventDispatcher,
-            $this->expressionEvaluator,
+            $this->expressionEvaluator
         );
     }
 
@@ -638,7 +634,7 @@ final class SerializerBuilder
             $this->objectConstructor ?: new UnserializeObjectConstructor(),
             $this->getAccessorStrategy(),
             $this->eventDispatcher,
-            $this->expressionEvaluator,
+            $this->expressionEvaluator
         );
     }
 

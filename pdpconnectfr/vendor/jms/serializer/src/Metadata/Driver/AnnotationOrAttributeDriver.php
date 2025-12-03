@@ -24,7 +24,6 @@ use JMS\Serializer\Annotation\SerializerAttribute;
 use JMS\Serializer\Annotation\Since;
 use JMS\Serializer\Annotation\SkipWhenEmpty;
 use JMS\Serializer\Annotation\Type;
-use JMS\Serializer\Annotation\UnionDiscriminator;
 use JMS\Serializer\Annotation\Until;
 use JMS\Serializer\Annotation\VirtualProperty;
 use JMS\Serializer\Annotation\XmlAttribute;
@@ -133,7 +132,7 @@ class AnnotationOrAttributeDriver implements DriverInterface
                 $virtualPropertyMetadata = new ExpressionPropertyMetadata(
                     $name,
                     $annot->name,
-                    $this->parseExpression($annot->exp),
+                    $this->parseExpression($annot->exp)
                 );
                 $propertiesMetadata[] = $virtualPropertyMetadata;
                 $propertiesAnnotations[] = $annot->options;
@@ -249,7 +248,7 @@ class AnnotationOrAttributeDriver implements DriverInterface
                                 throw new InvalidMetadataException(sprintf(
                                     'Invalid group name "%s" on "%s", did you mean to create multiple groups?',
                                     implode(', ', $propertyMetadata->groups),
-                                    $propertyMetadata->class . '->' . $propertyMetadata->name,
+                                    $propertyMetadata->class . '->' . $propertyMetadata->name
                                 ));
                             }
                         }
@@ -259,11 +258,6 @@ class AnnotationOrAttributeDriver implements DriverInterface
                         $propertyMetadata->xmlAttributeMap = true;
                     } elseif ($annot instanceof MaxDepth) {
                         $propertyMetadata->maxDepth = $annot->depth;
-                    } elseif ($annot instanceof UnionDiscriminator) {
-                        $propertyMetadata->setType([
-                            'name' => 'union',
-                            'params' => [null, $annot->field, $annot->map],
-                        ]);
                     }
                 }
 
@@ -296,10 +290,10 @@ class AnnotationOrAttributeDriver implements DriverInterface
             }
         }
 
-        // if (!$configured) {
+        if (!$configured) {
             // return null;
             // uncomment the above line afetr a couple of months
-        // }
+        }
 
         return $classMetadata;
     }
@@ -313,8 +307,10 @@ class AnnotationOrAttributeDriver implements DriverInterface
 
         if (PHP_VERSION_ID >= 80000) {
             $annotations = array_map(
-                static fn (\ReflectionAttribute $attribute): object => $attribute->newInstance(),
-                $class->getAttributes(SerializerAttribute::class, \ReflectionAttribute::IS_INSTANCEOF),
+                static function (\ReflectionAttribute $attribute): object {
+                    return $attribute->newInstance();
+                },
+                $class->getAttributes(SerializerAttribute::class, \ReflectionAttribute::IS_INSTANCEOF)
             );
         }
 
@@ -334,8 +330,10 @@ class AnnotationOrAttributeDriver implements DriverInterface
 
         if (PHP_VERSION_ID >= 80000) {
             $annotations = array_map(
-                static fn (\ReflectionAttribute $attribute): object => $attribute->newInstance(),
-                $method->getAttributes(SerializerAttribute::class, \ReflectionAttribute::IS_INSTANCEOF),
+                static function (\ReflectionAttribute $attribute): object {
+                    return $attribute->newInstance();
+                },
+                $method->getAttributes(SerializerAttribute::class, \ReflectionAttribute::IS_INSTANCEOF)
             );
         }
 
@@ -355,8 +353,10 @@ class AnnotationOrAttributeDriver implements DriverInterface
 
         if (PHP_VERSION_ID >= 80000) {
             $annotations = array_map(
-                static fn (\ReflectionAttribute $attribute): object => $attribute->newInstance(),
-                $property->getAttributes(SerializerAttribute::class, \ReflectionAttribute::IS_INSTANCEOF),
+                static function (\ReflectionAttribute $attribute): object {
+                    return $attribute->newInstance();
+                },
+                $property->getAttributes(SerializerAttribute::class, \ReflectionAttribute::IS_INSTANCEOF)
             );
         }
 

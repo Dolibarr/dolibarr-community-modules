@@ -21,13 +21,14 @@ use Symfony\Component\Validator\Exception\UnexpectedValueException;
  */
 class UniqueValidator extends ConstraintValidator
 {
-    public function validate(mixed $value, Constraint $constraint): void
+    /**
+     * {@inheritdoc}
+     */
+    public function validate($value, Constraint $constraint)
     {
         if (!$constraint instanceof Unique) {
             throw new UnexpectedTypeException($constraint, Unique::class);
         }
-
-        $fields = (array) $constraint->fields;
 
         if (null === $value) {
             return;
@@ -39,51 +40,29 @@ class UniqueValidator extends ConstraintValidator
 
         $collectionElements = [];
         $normalizer = $this->getNormalizer($constraint);
-        foreach ($value as $index => $element) {
+        foreach ($value as $element) {
             $element = $normalizer($element);
 
-            if ($fields && !$element = $this->reduceElementKeys($fields, $element)) {
-                continue;
-            }
+            if (\in_array($element, $collectionElements, true)) {
+                $this->context->buildViolation($constraint->message)
+                    ->setParameter('{{ value }}', $this->formatValue($element))
+                    ->setCode(Unique::IS_NOT_UNIQUE)
+                    ->addViolation();
 
-            if (!\in_array($element, $collectionElements, true)) {
-                $collectionElements[] = $element;
-                continue;
-            }
-
-            $violationBuilder = $this->context->buildViolation($constraint->message)
-                ->setParameter('{{ value }}', $this->formatValue($element))
-                ->setCode(Unique::IS_NOT_UNIQUE);
-
-            if (!$constraint->stopOnFirstError || null !== $constraint->errorPath) {
-                $violationBuilder->atPath("[$index]".(null !== $constraint->errorPath ? ".{$constraint->errorPath}" : ''));
-            }
-
-            $violationBuilder->addViolation();
-
-            if ($constraint->stopOnFirstError) {
                 return;
             }
+            $collectionElements[] = $element;
         }
     }
 
     private function getNormalizer(Unique $unique): callable
     {
-        return $unique->normalizer ?? static fn ($value) => $value;
-    }
-
-    private function reduceElementKeys(array $fields, array $element): array
-    {
-        $output = [];
-        foreach ($fields as $field) {
-            if (!\is_string($field)) {
-                throw new UnexpectedTypeException($field, 'string');
-            }
-            if (\array_key_exists($field, $element)) {
-                $output[$field] = $element[$field];
-            }
+        if (null === $unique->normalizer) {
+            return static function ($value) {
+                return $value;
+            };
         }
 
-        return $output;
+        return $unique->normalizer;
     }
 }

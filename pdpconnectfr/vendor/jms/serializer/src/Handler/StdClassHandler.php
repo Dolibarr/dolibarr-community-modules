@@ -7,13 +7,10 @@ namespace JMS\Serializer\Handler;
 use JMS\Serializer\GraphNavigatorInterface;
 use JMS\Serializer\Metadata\StaticPropertyMetadata;
 use JMS\Serializer\SerializationContext;
-use JMS\Serializer\Type\Type;
 use JMS\Serializer\Visitor\SerializationVisitorInterface;
 
 /**
  * @author Asmir Mustafic <goetas@gmail.com>
- *
- * @phpstan-import-type TypeArray from Type
  */
 final class StdClassHandler implements SubscribingHandlerInterface
 {
@@ -38,8 +35,6 @@ final class StdClassHandler implements SubscribingHandlerInterface
     }
 
     /**
-     * @param TypeArray $type
-     *
      * @return mixed
      */
     public function serializeStdClass(SerializationVisitorInterface $visitor, \stdClass $stdClass, array $type, SerializationContext $context)

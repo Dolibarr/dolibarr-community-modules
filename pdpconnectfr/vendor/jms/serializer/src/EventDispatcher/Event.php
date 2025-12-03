@@ -5,12 +5,8 @@ declare(strict_types=1);
 namespace JMS\Serializer\EventDispatcher;
 
 use JMS\Serializer\Context;
-use JMS\Serializer\Type\Type;
 use JMS\Serializer\VisitorInterface;
 
-/**
- * @phpstan-import-type TypeArray from Type
- */
 class Event
 {
     /**
@@ -19,7 +15,7 @@ class Event
     private $propagationStopped = false;
 
     /**
-     * @var TypeArray
+     * @var array
      */
     protected $type;
 
@@ -28,9 +24,6 @@ class Event
      */
     private $context;
 
-    /**
-     * @param TypeArray $type
-     */
     public function __construct(Context $context, array $type)
     {
         $this->context = $context;

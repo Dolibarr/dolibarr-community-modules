@@ -10,10 +10,11 @@ class PureUnlessCallableIsImpureTagValueNode implements PhpDocTagValueNode
 
 	use NodeAttributes;
 
-	public string $parameterName;
+	/** @var string */
+	public $parameterName;
 
 	/** @var string (may be empty) */
-	public string $description;
+	public $description;
 
 	public function __construct(string $parameterName, string $description)
 	{

@@ -12,14 +12,12 @@
 namespace Symfony\Component\Validator\Constraints;
 
 use Symfony\Component\Intl\Countries;
-use Symfony\Component\Validator\Attribute\HasNamedArguments;
 use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\Exception\LogicException;
 
 /**
- * Validates a value is a valid ISO 3166-1 alpha-2 country code.
- *
- * @see https://en.wikipedia.org/wiki/ISO_3166-1#Current_codes
+ * @Annotation
+ * @Target({"PROPERTY", "METHOD", "ANNOTATION"})
  *
  * @author Bernhard Schussek <bschussek@gmail.com>
  */
@@ -28,34 +26,22 @@ class Country extends Constraint
 {
     public const NO_SUCH_COUNTRY_ERROR = '8f900c12-61bd-455d-9398-996cd040f7f0';
 
-    protected const ERROR_NAMES = [
+    protected static $errorNames = [
         self::NO_SUCH_COUNTRY_ERROR => 'NO_SUCH_COUNTRY_ERROR',
     ];
 
-    public string $message = 'This value is not a valid country.';
-    public bool $alpha3 = false;
+    public $message = 'This value is not a valid country.';
+    public $alpha3 = false;
 
-    /**
-     * @param array<string,mixed>|null $options
-     * @param bool|null                $alpha3  Whether to check for alpha-3 codes instead of alpha-2 (defaults to false)
-     * @param string[]|null            $groups
-     *
-     * @see https://en.wikipedia.org/wiki/ISO_3166-1_alpha-3#Current_codes
-     */
-    #[HasNamedArguments]
     public function __construct(
         ?array $options = null,
         ?string $message = null,
         ?bool $alpha3 = null,
         ?array $groups = null,
-        mixed $payload = null,
+        $payload = null
     ) {
         if (!class_exists(Countries::class)) {
             throw new LogicException('The Intl component is required to use the Country constraint. Try running "composer require symfony/intl".');
-        }
-
-        if (\is_array($options)) {
-            trigger_deprecation('symfony/validator', '7.3', 'Passing an array of options to configure the "%s" constraint is deprecated, use named arguments instead.', static::class);
         }
 
         parent::__construct($options, $groups, $payload);
