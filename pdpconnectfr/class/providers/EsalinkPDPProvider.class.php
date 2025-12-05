@@ -557,7 +557,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
                 $res = $this->exchangeProtocol->createSupplierInvoiceFromFacturX($receivedFile);
                 if ($res['res'] != '1') {
-                    return array('res' => -1, 'message' => "Failed to create supplier invoice from FacturX for flowId: " . $flowId . ". Error: " . $res['message']);
+                    return array('res' => -1, 'message' => "Failed to create supplier invoice from FacturX document for flowId: " . $flowId . ". " . $res['message']);
                 }
                 break;
 
@@ -591,31 +591,97 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                 }
                 $cdarXml = $flowResponse['response'];
 
-                dol_include_once('custom/pdpconnectfr/class/utils/cdar/CdarManager.class.php');
-                $cdarManager = new CdarManager();
-                $cdarDocument = $cdarManager->readFromString($cdarXml);
-                if ($cdarDocument === null) {
-                    return array('res' => '-1', 'message' => "Failed to parse CDAR document for flowId: " . $flowId);
+                dol_include_once('custom/pdpconnectfr/class/utils/CdarHandler.class.php');
+
+                $cdarHandler = new CdarHandler();
+
+                try {
+                    // Parse the CDAR document (returns an array)
+                    $cdarDocument = $cdarHandler->readFromString($cdarXml);
+
+                    // Check if parsing was successful
+                    if (empty($cdarDocument) || !isset($cdarDocument['AcknowledgementDocument'])) {
+                        return array('res' => '-1', 'message' => "Failed to parse CDAR document for flowId: " . $flowId);
+                    }
+
+                    require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
+
+                    $document->fk_element_type = Facture::class;
+                    $factureObj = new Facture($this->db);
+
+                    // Get Invoice Reference from CDAR
+                    $issuerAssignedID = $cdarDocument['AcknowledgementDocument']['ReferenceReferencedDocument']['IssuerAssignedID'];
+
+                    $res = $factureObj->fetch(0, $issuerAssignedID);
+                    if ($res < 0) {
+                        return array(
+                            'res' => '-1',
+                            'message' => "Failed to fetch customer invoice for flowId: " . $flowId . 
+                                        " using CDAR tracking ID: " . $issuerAssignedID
+                        );
+                    }
+
+                    $document->fk_element_id = $factureObj->id;
+
+                    // Retrieve reference data
+                    $refDoc = $cdarDocument['AcknowledgementDocument']['ReferenceReferencedDocument'];
+
+                    // Fill CDAR information in the document
+                    $document->cdar_lifecycle_code = $refDoc['ProcessConditionCode'];
+                    $document->cdar_lifecycle_label = $refDoc['ProcessCondition'];
+                    $document->cdar_reason_code = isset($refDoc['StatusReasonCode']) ? $refDoc['StatusReasonCode'] : '';
+                    $document->cdar_reason_desc = isset($refDoc['StatusReason']) ? $refDoc['StatusReason'] : '';
+                    $document->cdar_reason_detail = isset($refDoc['StatusIncludedNoteContent']) ? $refDoc['StatusIncludedNoteContent'] : '';
+
+                    // Update customer invoice status based on CDAR lifecycle code
+                    // Mapping of lifecycle codes to Dolibarr invoice statuses
+                    $lifecycleCode = $refDoc['ProcessConditionCode'];
+
+                    switch ($lifecycleCode) {
+                        case CdarHandler::PROC_DEPOSITED:  // 200 - Deposited
+                        case CdarHandler::PROC_ISSUED:     // 201 - Issued
+                            break;
+
+                        case CdarHandler::PROC_RECEIVED:   // 202 - Received
+                        case CdarHandler::PROC_AVAILABLE:  // 203 - Available
+                            break;
+
+                        case CdarHandler::PROC_TAKEN_OVER: // 204 - Taken over
+                            break;
+
+                        case CdarHandler::PROC_APPROVED:   // 205 - Approved
+                        case CdarHandler::PROC_PARTIALLY_APPROVED: // 206 - Partially approved
+                            break;
+
+                        case CdarHandler::PROC_DISPUTED:   // 207 - Disputed
+                        case CdarHandler::PROC_SUSPENDED:  // 208 - Suspended
+                            break;
+
+                        case CdarHandler::PROC_COMPLETED:  // 209 - Completed
+                            break;
+
+                        case CdarHandler::PROC_REFUSED:    // 210 - Refused
+                        case CdarHandler::PROC_REJECTED:   // 213 - Rejected
+                            break;
+
+                        case CdarHandler::PROC_PAYMENT_TRANSMITTED: // 211 - Payment transmitted
+                            break;
+
+                        case CdarHandler::PROC_PAID:       // 212 - Paid
+                            break;
+
+                        default:
+                            // Unknown lifecycle code
+                            dol_syslog("Unknown CDAR lifecycle code: " . $lifecycleCode, LOG_WARNING);
+                            break;
+                    }
+
+                } catch (Exception $e) {
+                    return array(
+                        'res' => '-1',
+                        'message' => "Error processing CDAR document for flowId: " . $flowId . " - " . $e->getMessage()
+                    );
                 }
-
-                require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
-                $document->fk_element_type = Facture::class;
-                $factureObj = new Facture($this->db);
-                $res = $factureObj->fetch(0, $cdarDocument->AcknowledgementDocument->ReferenceReferencedDocument->IssuerAssignedID);
-                if ($res < 0) {
-                    return array('res' => '-1', 'message' => "Failed to fetch customer invoice for flowId: " . $flowId . " using CDAR tracking ID: " . $cdarDocument->AcknowledgementDocument->ReferenceReferencedDocument->IssuerAssignedID);
-                }
-                $document->fk_element_id = $factureObj->id;
-
-                // Fill CDAR information in document
-                $document->cdar_lifecycle_code = $cdarDocument->AcknowledgementDocument->ReferenceReferencedDocument->ProcessConditionCode->value;
-                $document->cdar_lifecycle_label = $cdarDocument->AcknowledgementDocument->ReferenceReferencedDocument->ProcessCondition;
-                $document->cdar_reason_code = $cdarDocument->AcknowledgementDocument->ReferenceReferencedDocument->StatusReasonCode;
-                $document->cdar_reason_desc = $cdarDocument->AcknowledgementDocument->ReferenceReferencedDocument->StatusReason;
-                $document->cdar_reason_detail = $cdarDocument->AcknowledgementDocument->ReferenceReferencedDocument->StatusIncludedNoteContent;
-
-                // Update customer invoice status based on CDAR lifecycle code
-                // TODO: Map lifecycle codes to Dolibarr invoice statuses
 
                 break;
 

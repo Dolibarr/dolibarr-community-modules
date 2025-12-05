@@ -475,7 +475,7 @@ class FacturXProtocol extends AbstractProtocol
                 ->setDocumentPositionProductDetails($libelle, $description, $lineproductref)
                 ->setDocumentPositionGrossPrice($line->subprice)
                 ->setDocumentPositionNetPrice($line->subprice)
-                ->setDocumentPositionQuantity($line->qty, "H87")
+                ->setDocumentPositionQuantity($line->qty, "H87") // H87 = Pieces (TODO: customize unit code, required from 09/2027) https://unece.org/trade/documents/2021/06/uncefact-rec20-0
                 ->setDocumentPositionLineSummation($line->total_ht);
 
             // Set billing period for the line
@@ -963,12 +963,12 @@ class FacturXProtocol extends AbstractProtocol
      * Create a supplier invoice from a Factur-X file.
      *
      * @param  string $file                     Factur-X file.
-     * @return array{res:int, message:string}   Returns array with 'res' (1 on success, -1 on failure) and 'message' if error
+     * @return array{res:int, message:string}   Returns array with 'res' (1 on success, -1 on failure) and info 'message'
      */
     public function createSupplierInvoiceFromFacturX($file)
     {
         global $conf, $db;
-
+        $return_messages = array();
 
         // Save uploaded file to temporary directory
         $tempDir = $conf->pdpconnectfr->dir_temp;
@@ -982,7 +982,7 @@ class FacturXProtocol extends AbstractProtocol
             return ['res' => -1, 'message' => 'Failed to save file to temporary location' ];
         }
 
-        return ['res' => 1, 'message' => 'bypass' ];
+        //return ['res' => 1, 'message' => 'bypass' ];
 
         // --- Create Supplier Invoice object
         require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
@@ -1036,7 +1036,7 @@ class FacturXProtocol extends AbstractProtocol
         );
 
         // Debug: print all retrieved variables
-        $parsed = array(
+        $parsedData = array(
             'documentno' => $documentno ?? null,
             'documenttypecode' => $documenttypecode ?? null,
             'documentdate' => isset($documentdate) && $documentdate instanceof DateTime ? $documentdate->format('Y-m-d') : ($documentdate ?? null),
@@ -1088,19 +1088,25 @@ class FacturXProtocol extends AbstractProtocol
             'sellerTaxRegistations' => $sellerTaxRegistations ?? null,
         );
 
-        print "<pre>";
-        print_r($parsed);
-        print "</pre>";
-        dol_syslog(get_class($this) . '::createSupplierInvoiceFromFacturX parsed: ' . json_encode($parsed));
+        /*print "<pre>";
+        print_r($parsedData);
+        print "</pre>";*/
+        dol_syslog(get_class($this) . '::createSupplierInvoiceFromFacturX parsedData: ' . json_encode($parsedData));
 
-        return ['res' => 1, 'message' => 'bypass' ];
+        // Sync or create supplier based on seller info
+        $syncSocRes = $this->_syncOrCreateThirdpartyFromFacturXSeller($parsedData);
+        $socId = $syncSocRes['res'];
+        $return_messages[] = $syncSocRes['message'];
+        if ($socId < 0) {
+            return ['res' => -1, 'message' => 'Thirdparty sync or creation error: ' . implode("\n", $return_messages) ];
+        }
 
-        // Find or create supplier (thirdparty)
+        // Load supplier (thirdparty)
         require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.class.php';
         $supplier = new Fournisseur($db);
-        // Try to find supplier by name or ID
-        $supplier->name = $sellername;
-        // TODO: Implement supplier search/creation logic based on seller information
+        if ($supplier->fetch($socId) < 0) {
+            return ['res' => -1, 'message' => 'Failed to load supplier id ' . $socId];
+        }
 
         // Set basic invoice information
         $supplierInvoice->ref_ext = $documentno;
@@ -1119,6 +1125,7 @@ class FacturXProtocol extends AbstractProtocol
         // Add invoice lines
         if ($document->firstDocumentPosition()) {
             do {
+                // Get line information
                 $document->getDocumentPositionGenerals($lineid, $linestatuscode, $linestatusreasoncode);
                 $document->getDocumentPositionProductDetails($prodname, $proddesc, $prodsellerid, $prodbuyerid, $prodglobalidtype, $prodglobalid);
                 $document->getDocumentPositionGrossPrice($grosspriceamount, $grosspricebasisquantity, $grosspricebasisquantityunitcode);
@@ -1133,6 +1140,47 @@ class FacturXProtocol extends AbstractProtocol
                     $vatRate = $rateApplicablePercent;
                 }
 
+                $productRetrievedData = array(
+                    'lineid' => $lineid ?? null,
+                    'linestatuscode' => $linestatuscode ?? null,
+                    'linestatusreasoncode' => $linestatusreasoncode ?? null,
+                    'prodname' => $prodname ?? null,
+                    'proddesc' => $proddesc ?? null,
+                    'prodsellerid' => $prodsellerid ?? null,
+                    'prodbuyerid' => $prodbuyerid ?? null,
+                    'prodglobalidtype' => $prodglobalidtype ?? null,
+                    'prodglobalid' => $prodglobalid ?? null,
+                    'grosspriceamount' => $grosspriceamount ?? null,
+                    'grosspricebasisquantity' => $grosspricebasisquantity ?? null,
+                    'grosspricebasisquantityunitcode' => $grosspricebasisquantityunitcode ?? null,
+                    'netpriceamount' => $netpriceamount ?? null,
+                    'netpricebasisquantity' => $netpricebasisquantity ?? null,
+                    'netpricebasisquantityunitcode' => $netpricebasisquantityunitcode ?? null,
+                    'lineTotalAmount' => $lineTotalAmount ?? null,
+                    'totalAllowanceChargeAmount' => $totalAllowanceChargeAmount ?? null,
+                    'billedquantity' => $billedquantity ?? null,
+                    'billedquantityunitcode' => $billedquantityunitcode ?? null,
+                    'chargeFreeQuantity' => $chargeFreeQuantity ?? null,
+                    'chargeFreeQuantityunitcode' => $chargeFreeQuantityunitcode ?? null,
+                    'packageQuantity' => $packageQuantity ?? null,
+                    'packageQuantityunitcode' => $packageQuantityunitcode ?? null,
+                    // Tax
+                    'categoryCode' => $categoryCode ?? null,
+                    'typeCode' => $typeCode ?? null,
+                    'rateApplicablePercent' => $rateApplicablePercent ?? null,
+                    'calculatedAmount' => $calculatedAmount ?? null,
+                    'exemptionReason' => $exemptionReason ?? null,
+                    'exemptionReasonCode' => $exemptionReasonCode ?? null,
+                );
+
+
+
+                /*print "<pre>";
+                print_r($productRetrievedData);
+                print "</pre>";*/
+                dol_syslog(get_class($this) . '::createSupplierInvoiceFromFacturX productRetrievedData: ' . json_encode($productRetrievedData));
+                continue;
+
                 // Add line to invoice
                 $line = new SupplierInvoiceLine($db);
                 $line->desc = $prodname . (!empty($proddesc) ? "\n" . $proddesc : '');
@@ -1142,11 +1190,13 @@ class FacturXProtocol extends AbstractProtocol
                 $line->total_ht = $lineTotalAmount;
                 $line->total_tva = $calculatedAmount ?? 0;
                 $line->total_ttc = $lineTotalAmount + ($calculatedAmount ?? 0);
-                
+
                 $supplierInvoice->lines[] = $line;
-                
+
             } while ($document->nextDocumentPosition());
         }
+
+        return ['res' => 1, 'message' => 'Not implemented yet' ];
 
         // Set invoice totals
         $supplierInvoice->total_ht = $taxBasisTotalAmount;
@@ -1157,7 +1207,7 @@ class FacturXProtocol extends AbstractProtocol
         $result = $supplierInvoice->create($user);
 
         if ($result < 0) {
-            return ['res' => -1, 'message' => $supplierInvoice->error];
+            return ['res' => -1, 'message' => 'Invoice creation error: ' . $supplierInvoice->error];
         }
 
 
@@ -1541,7 +1591,7 @@ class FacturXProtocol extends AbstractProtocol
          * 380 – Note de crédit
          * 384 – Facture corrective
          * 380 – Facture standard
-         * 
+         *
          * 80  – Note de débit (biens ou services) --- Not used in Dolibarr
          * 82  – Facture de services mesurés (ex : gaz, électricité) --- Not used in Dolibarr
          * 84  – Note de débit (ajustements financiers) --- Not used in Dolibarr
@@ -1552,7 +1602,7 @@ class FacturXProtocol extends AbstractProtocol
          * 218 – Demande de paiement finale après achèvement des travaux --- Not used in Dolibarr
          * 219 – Demande de paiement pour unités terminées --- Not used in Dolibarr
          * 295 – Facture de variation de prix --- Not used in Dolibarr
-
+         *
          * 326 – Facture partielle --- Not used in Dolibarr
          */
 
@@ -1573,4 +1623,309 @@ class FacturXProtocol extends AbstractProtocol
 
         return $map[$documenttypecode];
     }
+
+    /**
+     * Synchronize or create a Dolibarr thirdparty based on Factur-X seller information
+     * @param array     $sellerInfo Array containing seller information extracted from Factur-X
+     * @param string    $priority Fill priority ('dolibarr' or 'pdp'). If both data are available, which one to prefer
+     *
+     * @return array{res:int, message:string}   Returns array with 'res' (ID of the synchronized or created thirdparty, -1 on error) and info 'message'
+     */
+    private function _syncOrCreateThirdpartyFromFacturXSeller($sellerInfo, $priority = 'dolibarr')
+    {
+        /**
+         * Scenario to find or create a thirdparty based on Factur-X seller information:
+         *
+         * 1. Try to find thirdparty by global IDs (SIREN, VAT number ...)
+         * 1.1 If found, update thirdparty information with provided data
+         *
+         * 2. If not found, try to find thirdparty by closest match (findNearest)
+         * 2.1 If found one match, update thirdparty information with provided data
+         * 2.2 If found multiple matches, log warning and return error
+         *
+         * 3. If still not found, create new thirdparty with provided data
+         */
+        global $db, $langs, $user;
+        require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
+
+        $thirdparty = new Societe($db);
+        $thirdpartyId = -1;
+
+        // Step 1: Try to find thirdparty by global IDs
+        if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
+            foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
+                if (!empty($globalId)) {
+                    // Map scheme to idprof field (0002 = SIREN)
+                    $idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme);
+                    if (!empty($idprofField)) {
+                        $result = 0;
+                        // Fetch thirdparty by corresponding idprof field
+                        if ($idprofField === 'idprof1') { // SIREN
+                            $result = $thirdparty->fetch(0, '', '', '', $globalId);
+                        }
+                        // TODO: Add more idprof fields mapping if needed
+
+                        if ($result > 0) {
+                            $thirdpartyId = $thirdparty->id;
+                            dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromFacturXSeller Found thirdparty by ' . $idScheme . ': ' . $thirdpartyId);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        if ($thirdpartyId < 0) {
+            // Try to find by VAT number if provided
+            if (!empty($sellerInfo['sellerTaxRegistations']['VA'])) {
+                $sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "societe WHERE REPLACE(tva_intra, ' ', '') = '" . $db->escape($this->_remove_spaces($sellerInfo['sellerTaxRegistations']['VA'])) . "'";
+                $resql = $db->query($sql);
+                if ($resql) {
+                    if ($db->num_rows($resql) > 1) {
+                        dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromFacturXSeller Error: Multiple thirdparties found for VAT number: ' . $sellerInfo['sellerTaxRegistations']['VA'], LOG_ERR);
+                        return array('res' => -1, 'message' => 'Multiple thirdparties found for VAT number: ' . $sellerInfo['sellerTaxRegistations']['VA']);
+                    } elseif ($db->num_rows($resql) === 1) {
+                        $obj = $db->fetch_object($resql);
+                        $result = $thirdparty->fetch($obj->rowid);
+                        if ($result > 0) {
+                            $thirdpartyId = $thirdparty->id;
+                            dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromFacturXSeller Found thirdparty by VAT number: ' . $thirdpartyId);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Step 2: If not found, try to find by findNearest function
+        if ($thirdpartyId < 0) {
+            $result = $thirdparty->findNearest(
+                0,
+                $sellerInfo['sellername'] ?? '',
+                $sellerInfo['sellername'] ?? '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                $sellerInfo['sellercontactemailaddr'] ?? '',
+                $sellerInfo['sellername'] ?? ''
+            ); // TODO: we can add phone, address and vat number to improve matching
+            if ($result > 0) {
+                $thirdpartyId = $thirdparty->id;
+                dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromFacturXSeller Found thirdparty by findNearest: ' . $thirdpartyId);
+            }
+        }
+
+        // Step 3: Create or update thirdparty
+
+        // if found, update information
+        if ($thirdpartyId > 0) {
+            dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromFacturXSeller Updating existing thirdparty: ' . $thirdpartyId);
+
+            $thirdparty = new Societe($db);
+            $thirdparty->fetch($thirdpartyId);
+
+            // Update thirdparty information based on priority
+            if ($priority === 'pdp') { // Ecrase dolibarr data with pdp data
+                $thirdparty->name = $sellerInfo['sellername'] ?? $thirdparty->name;
+                $thirdparty->address = $sellerInfo['sellerlineone'] ?? $thirdparty->address;
+                if (!empty($sellerInfo['sellerlinetwo'])) {
+                    $thirdparty->address .= "\n" . $sellerInfo['sellerlinetwo'];
+                }
+                if (!empty($sellerInfo['sellerlinethree'])) {
+                    $thirdparty->address .= "\n" . $sellerInfo['sellerlinethree'];
+                }
+                $thirdparty->zip = $sellerInfo['sellerpostcode'] ?? $thirdparty->zip;
+                $thirdparty->town = $sellerInfo['sellercity'] ?? $thirdparty->town;
+                $thirdparty->country_code = $sellerInfo['sellercountry'] ?? $thirdparty->country_code;
+                $thirdparty->email = $sellerInfo['sellercontactemailaddr'] ?? $thirdparty->email;
+                $thirdparty->phone = $sellerInfo['sellercontactphoneno'] ?? $thirdparty->phone;
+                $thirdparty->fax = $sellerInfo['sellercontactfaxno'] ?? $thirdparty->fax;
+
+                // Set identification numbers
+                if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
+                    foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
+                        if (!empty($globalId)) {
+                            $idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme);
+                            if (!empty($idprofField)) {
+                                $thirdparty->$idprofField = $this->_remove_spaces($globalId);
+                            }
+                        }
+                    }
+                }
+                if (!empty($sellerInfo['sellerTaxRegistations']['VA'])) {
+                    $thirdparty->tva_intra = $this->_remove_spaces($sellerInfo['sellerTaxRegistations']['VA']);
+                    $thirdparty->tva_assuj = 1;
+                }
+            } elseif ($priority === 'dolibarr') { // Fill only empty fields from pdp data
+                // If priority is dolibarr and thirdparty found, do not update anything
+                dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromFacturXSeller Keeping existing thirdparty data and fill only empty fields as priority is dolibarr: ' . $thirdpartyId);
+
+                if (empty($thirdparty->name) && !empty($sellerInfo['sellername'])) {
+                    $thirdparty->name = $sellerInfo['sellername'];
+                }
+                if (empty($thirdparty->address) && !empty($sellerInfo['sellerlineone'])) {
+                    $thirdparty->address = $sellerInfo['sellerlineone'];
+                    if (!empty($sellerInfo['sellerlinetwo'])) {
+                        $thirdparty->address .= "\n" . $sellerInfo['sellerlinetwo'];
+                    }
+                    if (!empty($sellerInfo['sellerlinethree'])) {
+                        $thirdparty->address .= "\n" . $sellerInfo['sellerlinethree'];
+                    }
+                }
+                if (empty($thirdparty->zip) && !empty($sellerInfo['sellerpostcode'])) {
+                    $thirdparty->zip = $sellerInfo['sellerpostcode'];
+                }
+                if (empty($thirdparty->town) && !empty($sellerInfo['sellercity'])) {
+                    $thirdparty->town = $sellerInfo['sellercity'];
+                }
+                if (empty($thirdparty->country_code) && !empty($sellerInfo['sellercountry'])) {
+                    $thirdparty->country_code = $sellerInfo['sellercountry'];
+                }
+                if (empty($thirdparty->email) && !empty($sellerInfo['sellercontactemailaddr'])) {
+                    $thirdparty->email = $sellerInfo['sellercontactemailaddr'];
+                }
+                if (empty($thirdparty->phone) && !empty($sellerInfo['sellercontactphoneno'])) {
+                    $thirdparty->phone = $sellerInfo['sellercontactphoneno'];
+                }
+                if (empty($thirdparty->fax) && !empty($sellerInfo['sellercontactfaxno'])) {
+                    $thirdparty->fax = $sellerInfo['sellercontactfaxno'];
+                }
+                // Set identification numbers if empty
+                if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
+                    foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
+                        if (!empty($globalId)) {
+                            $idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme);
+                            if (!empty($idprofField) && empty($thirdparty->$idprofField)) {
+                                $thirdparty->$idprofField = $this->_remove_spaces($globalId);
+                            }
+                        }
+                    }
+                }
+                if (!empty($sellerInfo['sellerTaxRegistations']['VA']) && empty($thirdparty->tva_intra)) {
+                    $thirdparty->tva_intra = $this->_remove_spaces($sellerInfo['sellerTaxRegistations']['VA']);
+                    $thirdparty->tva_assuj = 1;
+                }
+            }
+            $result = $thirdparty->update($thirdpartyId, $user);
+            if ($result < 0) {
+                dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromFacturXSeller Error updating thirdparty: ' . $thirdparty->error, LOG_ERR);
+                return array('res' => -1, 'message' => 'Thirdparty update error: ' . $thirdparty->error);
+            } else {
+                dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromFacturXSeller Updated thirdparty: ' . $thirdpartyId);
+                return array('res' => $thirdpartyId, 'message' => 'Thirdparty ' . $thirdparty->name . ' updated successfully');
+            }
+        }
+
+        // if not found, create new thirdparty
+        if ($thirdpartyId < 0) {
+            dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromFacturXSeller Creating new thirdparty: ' . $sellerInfo['sellername']);
+
+            $thirdparty = new Societe($db);
+
+            $thirdparty->name = $sellerInfo['sellername'] ?? 'Unknown Supplier name';
+            $thirdparty->address = $sellerInfo['sellerlineone'] ?? '';
+            if (!empty($sellerInfo['sellerlinetwo'])) {
+                $thirdparty->address .= "\n" . $sellerInfo['sellerlinetwo'];
+            }
+            if (!empty($sellerInfo['sellerlinethree'])) {
+                $thirdparty->address .= "\n" . $sellerInfo['sellerlinethree'];
+            }
+            $thirdparty->zip = $sellerInfo['sellerpostcode'] ?? '';
+            $thirdparty->town = $sellerInfo['sellercity'] ?? '';
+            $thirdparty->country_code = $sellerInfo['sellercountry'] ?? '';
+            $thirdparty->email = $sellerInfo['sellercontactemailaddr'] ?? '';
+            $thirdparty->phone = $sellerInfo['sellercontactphoneno'] ?? '';
+            $thirdparty->fax = $sellerInfo['sellercontactfaxno'] ?? '';
+
+            // Set identification numbers
+            if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
+                foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
+                    if (!empty($globalId)) {
+                        $idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme);
+                        if (!empty($idprofField)) {
+                            $thirdparty->$idprofField = $this->_remove_spaces($globalId);
+                        }
+                    }
+                }
+            }
+
+            if (!empty($sellerInfo['sellerTaxRegistations']['VA'])) {
+                $thirdparty->tva_intra = $this->_remove_spaces($sellerInfo['sellerTaxRegistations']['VA']);
+                $thirdparty->tva_assuj = 1;
+            }
+
+            // Set as supplier
+            $thirdparty->fournisseur = 1;
+            $thirdparty->code_fournisseur = 'auto';
+
+            $result = $thirdparty->create($user);
+            if ($result > 0) {
+                $thirdpartyId = $thirdparty->id;
+                dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromFacturXSeller Created new thirdparty: ' . $thirdpartyId);
+                return array('res' => $thirdpartyId, 'message' => 'Thirdparty ' . $thirdparty->name . ' created successfully');
+            } else {
+                dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromFacturXSeller Error creating thirdparty: ' . $thirdparty->error, LOG_ERR);
+                return array('res' => -1, 'message' => 'Thirdparty creation error: ' . implode("\n", $thirdparty->errors));
+            }
+        }
+        return array('res' => -1, 'message' => 'Unknown error in _syncOrCreateThirdpartyFromFacturXSeller');
+    }
+
+    /**
+     * Find or create a Dolibarr product based on Factur-X invoice line data
+     * @param array $lineData Array containing invoice line data extracted from Factur-X
+     *
+     * @return array{res:int, message:string}   Returns array with 'res' (ID of the found or created product, -1 on error) and info 'message' 
+     */
+    private function _findOrCreateProductFromFacturXLine($lineData)
+    {
+        /*
+        * PRODUCT MATCHING FOR SUPPLIER INVOICE (Factur-X)
+        *
+        * This matching strategy attempts to find or create a product based on
+        * Factur-X invoice line data, following a priority-based approach.
+        *
+        * 1. Search in product supplier prices table using prodsellerid
+        *    - Ok if match found
+        *    - ko, continue to step 2
+        *
+        * 2. Global ID (prodglobalid + prodglobalidtype) and prodglobalidtype = '0160' search by barcode
+        *    - ok if match found
+        *    - KO if Other schemes or no match, continue to step 3
+        *
+        * 3. if Buyer Reference (prodbuyerid) is available search prodbuyerid = internal product reference
+        *    - ok if match found
+        *    - ko, continue to step 4
+        *
+        * 4. Text Search usssing prodname and proddesc (100% match on prodname or partial match on proddesc)
+        *    - ok if match found
+        *    - ko if multiple matches or no match, continue to create product
+        *
+        * 5. If no match found after all steps:
+        *    - Automatic product creation (with extrafield source=facturx and to be verified tag)
+        *    - Use this product for supplier invoice line (with extrafield to be verified tag)
+        *    - Add supplier price information (if not added automatically by Dolibarr)
+        */
+
+        return array('res' => -1, 'message' => 'Not implemented yet');
+
+    }
+
+    /**
+     * Map Factur-X global ID scheme to Dolibarr idprof field
+     * 
+     * @param string $scheme Global ID scheme code
+     * @return string Corresponding idprof field name
+     */
+    private function _mapGlobalIdSchemeToIdprof($scheme)
+    {
+        $map = [
+            '0002' => 'idprof1', // SIREN
+        ];
+        
+        return $map[$scheme] ?? '';
+    }
+
 }
