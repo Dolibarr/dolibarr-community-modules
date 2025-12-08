@@ -548,18 +548,149 @@ class modPDPConnectFR extends DolibarrModules
 		$param = array('options' => array(1 => 0));
 		$sql = array();
 
+		// Product extrafields
+		// Product extrafields
+		$result = $extrafields->addExtraField(
+			'pdpconnectfr_product_separator',
+			$langs->trans('PdpConnectFRProductSeparator'),
+			'separate',
+			112008,
+			'',
+			'product',
+			0,
+			1,
+			'',
+			$param,
+			1,
+			'',
+			1,
+			0,
+			'',
+			'',
+			'pdpconnectfr@pdpconnectfr',
+			'isModEnabled("pdpconnectfr")'
+		);
+		$result = $extrafields->addExtraField(
+			'pdpconnectfr_source',
+			$langs->trans('PdpConnectFRProductSource'),
+			'varchar',
+			112009,
+			100,
+			'product',
+			0,
+			0,
+			'',
+			null,
+			1,
+			'',
+			1,
+			0,
+			'',
+			'',
+			'pdpconnectfr@pdpconnectfr',
+			'isModEnabled("pdpconnectfr")',
+			0,
+			1
+		);
+
 		// Invoice extrafields
-		$result = $extrafields->addExtraField('d4d_separator', $langs->trans('ChorusSeparator'), 'separate', 112001, '', 'facture', 0, 1, '', $param, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', '$conf->global->PDPCONNECTFR_USE_CHORUS');
-        $result = $extrafields->addExtraField('d4d_service_code', $langs->trans('ChorusServiceCode'), 'varchar', 112002, 100, 'facture', 0, 0, '', null, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', '$conf->global->PDPCONNECTFR_USE_CHORUS', 0, 2);
-        $result = $extrafields->addExtraField('d4d_contract_number', $langs->trans('ChorusContractNumber'), 'varchar', 112003, 50, 'facture', 0, 0, '', null, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', '$conf->global->PDPCONNECTFR_USE_CHORUS', 0, 2);
-        $result = $extrafields->addExtraField('d4d_promise_code', $langs->trans('ChorusPromiseCode'), 'varchar', 112004, 50, 'facture', 0, 0, '', null, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', '$conf->global->PDPCONNECTFR_USE_CHORUS', 0, 2);
-        $result = $extrafields->addExtraField('d4d_chorus_id', $langs->trans('ChorusId'), 'varchar', 112005, 36, 'facture', 0, 0, '', null, 1, '', 1, 0, '$object->array_options["options_chorus_id"]', '', 'pdpconnectfr@pdpconnectfr', '$conf->global->PDPCONNECTFR_USE_CHORUS', 0, 1);
+		// Chorus fields
+		$result = $extrafields->addExtraField('d4d_separator', $langs->trans('ChorusSeparator'), 'separate', 112001, '', 'facture', 0, 1, '', $param, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', 'getDolGlobalInt("PDPCONNECTFR_USE_CHORUS")');
+        $result = $extrafields->addExtraField('d4d_service_code', $langs->trans('ChorusServiceCode'), 'varchar', 112002, 100, 'facture', 0, 0, '', null, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', 'getDolGlobalInt("PDPCONNECTFR_USE_CHORUS")', 0, 1);
+        $result = $extrafields->addExtraField('d4d_contract_number', $langs->trans('ChorusContractNumber'), 'varchar', 112003, 50, 'facture', 0, 0, '', null, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', 'getDolGlobalInt("PDPCONNECTFR_USE_CHORUS")', 0, 1);
+        $result = $extrafields->addExtraField('d4d_promise_code', $langs->trans('ChorusPromiseCode'), 'varchar', 112004, 50, 'facture', 0, 0, '', null, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', 'getDolGlobalInt("PDPCONNECTFR_USE_CHORUS")', 0, 1);
+        $result = $extrafields->addExtraField('d4d_chorus_id', $langs->trans('ChorusId'), 'varchar', 112005, 36, 'facture', 0, 0, '', null, 1, '', 1, 0, '$object->array_options["options_chorus_id"]', '', 'pdpconnectfr@pdpconnectfr', 'getDolGlobalInt("PDPCONNECTFR_USE_CHORUS")', 0, 1);
+		// FacturX and PDP/PA fields
+		$result = $extrafields->addExtraField(
+			'pdpconnectfr_facturx_separator',
+			$langs->trans('FacturXSeparator'),
+			'separate',
+			112006,
+			'',
+			'facture',
+			0,
+			1,
+			'',
+			$param,
+			1,
+			'',
+			1,
+			0,
+			'',
+			'',
+			'pdpconnectfr@pdpconnectfr',
+			'isModEnabled("pdpconnectfr")'
+		);
+
+		$result = $extrafields->addExtraField(
+			'pdpconnectfr_incoice_status',
+			$langs->trans('PdpInvoiceStatus'),
+			'select',
+			112007,
+			50,
+			'facture',
+			0,
+			0,
+			0,
+			array(
+				'options' => array(
+					'0' => 'Not yet sent',
+					'200' => 'Deposited',
+					'201' => 'Issued',
+					'202' => 'Received',
+					'203' => 'Available',
+					'204' => 'Taken over',
+					'205' => 'Approved',
+					'206' => 'Partially approved',
+					'207' => 'Disputed',
+					'208' => 'Suspended',
+					'209' => 'Completed',
+					'210' => 'Refused',
+					'211' => 'Payment transmitted',
+					'212' => 'Paid',
+					'213' => 'Rejected'
+				)
+			),
+			1,
+			'',
+			1,
+			0,
+			'',
+			'',
+			'pdpconnectfr@pdpconnectfr',
+			'isModEnabled("pdpconnectfr")',
+			0,
+			1
+		);
+
+		$result = $extrafields->addExtraField(
+			'pdpconnectfr_society_status',
+			$langs->trans('PdpSocietyStatus'),
+			'varchar',
+			112008,
+			50,
+			'facture',
+			0,
+			0,
+			'',
+			null,
+			1,
+			'',
+			1,
+			0,
+			'1',
+			'',
+			'pdpconnectfr@pdpconnectfr',
+			'isModEnabled("pdpconnectfr")',
+			0,
+			1
+		);
 
 		// Same fields for orders
-        $result = $extrafields->addExtraField('d4d_separator', $langs->trans('ChorusSeparator'), 'separate', 112001, '', 'commande', 0, 1, '', $param, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', '$conf->global->PDPCONNECTFR_USE_CHORUS');
-        $result = $extrafields->addExtraField('d4d_service_code', $langs->trans('ChorusServiceCode'), 'varchar', 112002, 100, 'commande', 0, 0, '', null, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', '$conf->global->PDPCONNECTFR_USE_CHORUS', 0, 2);
-        $result = $extrafields->addExtraField('d4d_contract_number', $langs->trans('ChorusContractNumber'), 'varchar', 112003, 50, 'commande', 0, 0, '', null, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', '$conf->global->PDPCONNECTFR_USE_CHORUS', 0, 2);
-        $result = $extrafields->addExtraField('d4d_promise_code', $langs->trans('ChorusPromiseCode'), 'varchar', 112004, 50, 'commande', 0, 0, '', null, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', '$conf->global->PDPCONNECTFR_USE_CHORUS', 0, 2);
+        $result = $extrafields->addExtraField('d4d_separator', $langs->trans('ChorusSeparator'), 'separate', 112001, '', 'commande', 0, 1, '', $param, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', 'getDolGlobalInt("PDPCONNECTFR_USE_CHORUS")');
+        $result = $extrafields->addExtraField('d4d_service_code', $langs->trans('ChorusServiceCode'), 'varchar', 112002, 100, 'commande', 0, 0, '', null, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', 'getDolGlobalInt("PDPCONNECTFR_USE_CHORUS")', 0, 1);
+        $result = $extrafields->addExtraField('d4d_contract_number', $langs->trans('ChorusContractNumber'), 'varchar', 112003, 50, 'commande', 0, 0, '', null, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', 'getDolGlobalInt("PDPCONNECTFR_USE_CHORUS")', 0, 1);
+        $result = $extrafields->addExtraField('d4d_promise_code', $langs->trans('ChorusPromiseCode'), 'varchar', 112004, 50, 'commande', 0, 0, '', null, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', 'getDolGlobalInt("PDPCONNECTFR_USE_CHORUS")', 0, 1);
 
 		// Update display field for old installations
         $sql = array_merge(
@@ -589,14 +720,13 @@ class modPDPConnectFR extends DolibarrModules
             '', //$computerd
             '', //$entity
             'pdpconnectfr@pdpconnectfr', //$langfile
-            '$conf->global->PDPCONNECTFR_USE_CHORUS', //$enabled
+			'getDolGlobalInt("PDPCONNECTFR_USE_CHORUS")',
             0, //$totalizable
             0, //$printable
             array() //$moreparams
         );
 
 			/*
-			
 			CREATE TABLE llx_pdpconnectfr_call(
 				-- BEGIN MODULEBUILDER FIELDS
 				rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL,

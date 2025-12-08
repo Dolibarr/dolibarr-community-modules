@@ -28,6 +28,7 @@ use Luracast\Restler\Data\Arr;
 
 dol_include_once('custom/pdpconnectfr/class/providers/AbstractPDPProvider.class.php');
 dol_include_once('custom/pdpconnectfr/class/protocols/ProtocolManager.class.php');
+require_once DOL_DOCUMENT_ROOT . '/core/lib/admin.lib.php';
 
 
 /**
@@ -387,6 +388,9 @@ class EsalinkPDPProvider extends AbstractPDPProvider
     {
         $results_messages = array();
         $uuid = $this->generateUuidV4(); // UUID used to correlate logs between Dolibarr and PDP TODO : Store it somewhere
+
+        global $conf;
+        dolibarr_set_const($this->db, 'PDPCONNECTFR_LAST_IMPORT_KEY', $uuid, 'chaine', 0, '', $conf->entity);
 
         $resource = 'flows/search';
         $urlparams = array(

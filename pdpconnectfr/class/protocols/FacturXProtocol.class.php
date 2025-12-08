@@ -1171,6 +1171,8 @@ class FacturXProtocol extends AbstractProtocol
                     'calculatedAmount' => $calculatedAmount ?? null,
                     'exemptionReason' => $exemptionReason ?? null,
                     'exemptionReasonCode' => $exemptionReasonCode ?? null,
+                    // Parent invoice ref
+                    'parentDocumentNo' => $documentno ?? null,
                 );
 
 
@@ -1179,7 +1181,22 @@ class FacturXProtocol extends AbstractProtocol
                 print_r($productRetrievedData);
                 print "</pre>";*/
                 dol_syslog(get_class($this) . '::createSupplierInvoiceFromFacturX productRetrievedData: ' . json_encode($productRetrievedData));
+
+                // TODO : Add a parameter to choose between sync or create invoice with a free text line (no product)
+                // Sync or create product
+                $res = $this->_findOrCreateProductFromFacturXLine($productRetrievedData);
+                if ($res['res'] < 0) {
+                    return ['res' => -1, 'message' => 'Product sync or creation error: ' . $res['message'] ];
+                }
+
+                /*print "<pre>";
+                print_r($res);
+                print "</pre>";*/
+
+
+                $productId = $res['res'];
                 continue;
+
 
                 // Add line to invoice
                 $line = new SupplierInvoiceLine($db);
@@ -1899,7 +1916,7 @@ class FacturXProtocol extends AbstractProtocol
         *    - ok if match found
         *    - ko, continue to step 4
         *
-        * 4. Text Search usssing prodname and proddesc (100% match on prodname or partial match on proddesc)
+        * 4. Text Search using prodname
         *    - ok if match found
         *    - ko if multiple matches or no match, continue to create product
         *
@@ -1908,14 +1925,105 @@ class FacturXProtocol extends AbstractProtocol
         *    - Use this product for supplier invoice line (with extrafield to be verified tag)
         *    - Add supplier price information (if not added automatically by Dolibarr)
         */
+        global $db, $user;
 
-        return array('res' => -1, 'message' => 'Not implemented yet');
+        // 1. Search in product supplier prices table using prodsellerid
+        $sql = "SELECT p.rowid ";
+        $sql .= " FROM " . MAIN_DB_PREFIX . "product as p ";
+        $sql .= " INNER JOIN " . MAIN_DB_PREFIX . "product_fournisseur_price as pfp ON pfp.fk_product = p.rowid ";
+        $sql .= " WHERE pfp.product_supplier_id = '" . $db->escape($lineData['prodsellerid']) . "' ";
+        $sql .= " AND pfp.fk_soc = " . intval($lineData['supplierId']) . " ";
+        $sql .= " LIMIT 1";
+        $resql = $db->query($sql);
+        if ($resql && $db->num_rows($resql) > 0) {
+            $obj = $db->fetch_object($resql);
+            dol_syslog(get_class($this) . '::_findOrCreateProductFromFacturXLine Found product by prodsellerid: ' . $obj->rowid);
+            return array('res' => $obj->rowid, 'message' => 'Product found by prodsellerid');
+            // No match found, continue to next step
+        }
+
+        // 2. Global ID (prodglobalid + prodglobalidtype) and prodglobalidtype = '0160' search by barcode
+        // TODO
+
+        // 3. if Buyer Reference (prodbuyerid) is available search prodbuyerid = internal product reference
+        if (!empty($lineData['prodbuyerid'])) {
+            $sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product ";
+            $sql .= " WHERE ref = '" . $db->escape($lineData['prodbuyerid']) . "' OR rowid = '" . $db->escape($lineData['prodbuyerid']) . "' ";
+            $sql .= " LIMIT 1";
+            $resql = $db->query($sql);
+            if ($resql && $db->num_rows($resql) > 0) {
+                $obj = $db->fetch_object($resql);
+                dol_syslog(get_class($this) . '::_findOrCreateProductFromFacturXLine Found product by prodbuyerid: ' . $obj->rowid);
+                return array('res' => $obj->rowid, 'message' => 'Product found by prodbuyerid');
+            }
+        }
+
+        // 4. Text Search using prodname
+        $sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product ";
+        $sql .= " WHERE label = '" . $db->escape($lineData['prodname']) . "' ";
+        $resql = $db->query($sql);
+        if ($resql) {
+            if ($db->num_rows($resql) === 1) {
+                $obj = $db->fetch_object($resql);
+                dol_syslog(get_class($this) . '::_findOrCreateProductFromFacturXLine Found product by text search: ' . $obj->rowid);
+                return array('res' => $obj->rowid, 'message' => 'Product found by text search');
+            }
+        }
+
+        // 5. If no match found after all steps: Create new product
+        $product = new Product($db);
+        $product->type        = $this->_detectProductTypeFromFacturx($lineData);
+        $product->ref = 'FACTURX-' . dol_sanitizeFileName(!empty($lineData['prodsellerid']) ? $lineData['prodsellerid'] : time());
+        $product->ref_ext     = trim($lineData['prodsellerid'] ?? '');
+        $product->label       = !empty($lineData['prodname'])
+            ? $lineData['prodname']
+            : 'Imported product from supplier invoice (Ref: ' . $lineData['parentDocumentNo'] . ')';
+        $product->description = trim($lineData['proddesc'] ?? '');
+        $product->tva_tx      = (float) ($lineData['rateApplicablePercent'] ?? 0);
+        $product->status      = 1; // Active
+        $product->note_private = 'Product created automatically from Factur-X import.';
+        $product->import_key  = getDolGlobalString('PDPCONNECTFR_LAST_IMPORT_KEY', '');
+        $product->array_options['pdpconnectfr_source'] = '1';
+        // Set barcode if global ID is provided and is a GTIN/EAN type
+        if (!empty($lineData['prodglobalid']) && !empty($lineData['prodglobalidtype']) && in_array($lineData['prodglobalidtype'], ['0160', '0011'])) {
+            $product->barcode = $lineData['prodglobalid'];
+            $product->barcode_type = getDolGlobalInt('PRODUIT_DEFAULT_BARCODE_TYPE', 0);
+        } else {
+            $product->barcode = 'auto';
+        }
+        // Validate before creation
+        $resCheck = $product->check();
+        if ($resCheck < 0) {
+            dol_syslog(__METHOD__ . ' Product check failed: ' . $product->error, LOG_ERR);
+            return [
+                'res'     => -1,
+                'message' => 'Product check failed: ' . implode("\n", $product->errors),
+            ];
+        }
+
+        // Create product
+        $resCreate = $product->create($user);
+        if ($resCreate > 0) {
+            $productId = $product->id;
+            dol_syslog(__METHOD__ . ' New product created (ID: ' . $productId . ')');
+            return [
+                'res'     => $productId,
+                'message' => 'Product successfully created from Factur-X import',
+            ];
+        }
+
+        // Error on creation
+        dol_syslog(__METHOD__ . ' Product creation error: ' . $product->error, LOG_ERR);
+        return [
+            'res'     => -1,
+            'message' => 'Product creation error: ' . implode("\n", $product->errors),
+        ];
 
     }
 
     /**
      * Map Factur-X global ID scheme to Dolibarr idprof field
-     * 
+     *
      * @param string $scheme Global ID scheme code
      * @return string Corresponding idprof field name
      */
@@ -1924,8 +2032,53 @@ class FacturXProtocol extends AbstractProtocol
         $map = [
             '0002' => 'idprof1', // SIREN
         ];
-        
+
         return $map[$scheme] ?? '';
     }
+
+    /**
+     * Determine if a Factur-X line corresponds to a product (0) or a service (1)
+     *
+     * @param array $line Factur-X line data
+     * @return int 0 = product / 1 = service
+     */
+    private function _detectProductTypeFromFacturx(array $line): int
+    {
+        $globalId     = trim($line['prodglobalid'] ?? '');
+        $globalIdType = trim($line['prodglobalidtype'] ?? '');
+        $sellerId     = trim($line['prodsellerid'] ?? '');
+        $unitCode     = strtoupper(trim($line['billedquantityunitcode'] ?? ''));
+        $name         = strtolower($line['prodname'] ?? '');
+        $desc         = strtolower($line['proddesc'] ?? '');
+
+        // A. Global ID known => product
+        $productGlobalIdTypes = ['0160', '0011', '0002', '0023', '0004', '0001', '0088']; // GTIN/UPC/EAN/GLN...
+        if ($globalId !== '' && in_array($globalIdType, $productGlobalIdTypes, true)) {
+            return 0;
+        }
+
+        // B. Units typical for services
+        $serviceUnits = ['HUR', 'HRS', 'DAY', 'MON', 'ANN', 'MIN', 'WEE', 'E48']; // hours, days, months...
+        if (in_array($unitCode, $serviceUnits, true)) {
+            return 1;
+        }
+
+        // C. Piece but no seller reference => likely service
+        if ($sellerId === '' || $sellerId === '0000') {
+            return 1;
+        }
+
+        // D. Keywords indicating service
+        $keywordsService = ['service', 'prestation', 'maintenance', 'installation', 'abonnement', 'support', 'forfait', 'consult'];
+        foreach ($keywordsService as $kw) {
+            if (stripos($name, $kw) !== false || stripos($desc, $kw) !== false) {
+                return 1;
+            }
+        }
+
+        // Fallback = service
+        return 0;
+    }
+
 
 }
