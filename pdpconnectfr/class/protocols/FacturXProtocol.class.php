@@ -967,7 +967,7 @@ class FacturXProtocol extends AbstractProtocol
      */
     public function createSupplierInvoiceFromFacturX($file)
     {
-        global $conf, $db;
+        global $conf, $db, $user;
         $return_messages = array();
 
         // Save uploaded file to temporary directory
@@ -1088,6 +1088,18 @@ class FacturXProtocol extends AbstractProtocol
             'sellerTaxRegistations' => $sellerTaxRegistations ?? null,
         );
 
+        // Check if this invoice has already been imported
+        $sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "facture_fourn";
+        $sql .= " WHERE ref_supplier = '" . $db->escape($documentno) . "'";
+        $resql = $db->query($sql);
+        if ($resql) {
+            if ($db->num_rows($resql) > 0) {
+                return ['res' => 1, 'message' => 'Supplier Invoice with reference ' . $documentno . ' already exists' ];
+            }
+        } else {
+            return ['res' => -1, 'message' => 'Database error while checking existing supplier invoice: ' . $db->lasterror() ];
+        }
+
         /*print "<pre>";
         print_r($parsedData);
         print "</pre>";*/
@@ -1108,19 +1120,23 @@ class FacturXProtocol extends AbstractProtocol
             return ['res' => -1, 'message' => 'Failed to load supplier id ' . $socId];
         }
 
+        // Set supplier reference
+        $supplierInvoice->socid = $socId;
+
         // Set basic invoice information
-        $supplierInvoice->ref_ext = $documentno;
+        $supplierInvoice->ref_supplier = $documentno;
         $supplierInvoice->type = $this->_getDolibarrInvoiceType($documenttypecode);
         if ($supplierInvoice->type === '-1') {
             return ['res' => -1, 'message' => 'Unfounded dolibarr corresponding Invoice code for document type code: ' . $documenttypecode ];
         }
-        $supplierInvoice->date = $documentdate;
+        $supplierInvoice->date = isset($documentdate) && $documentdate instanceof DateTime ? $documentdate->format('Y-m-d') : null;
 
-        // Set supplier reference
-        $supplierInvoice->socid = $supplier->id;
 
         // Set currency
         $supplierInvoice->multicurrency_code = $invoiceCurrency;
+
+        // Set import_key
+        $supplierInvoice->import_key = AbstractPDPProvider::$PDPCONNECTFR_LAST_IMPORT_KEY;
 
         // Add invoice lines
         if ($document->firstDocumentPosition()) {
@@ -1188,19 +1204,16 @@ class FacturXProtocol extends AbstractProtocol
                 if ($res['res'] < 0) {
                     return ['res' => -1, 'message' => 'Product sync or creation error: ' . $res['message'] ];
                 }
-
                 /*print "<pre>";
                 print_r($res);
                 print "</pre>";*/
-
-
                 $productId = $res['res'];
-                continue;
 
 
                 // Add line to invoice
                 $line = new SupplierInvoiceLine($db);
-                $line->desc = $prodname . (!empty($proddesc) ? "\n" . $proddesc : '');
+                //$line->desc = $prodname . (!empty($proddesc) ? "\n" . $proddesc : '');
+                $line->fk_product = $productId;
                 $line->qty = $billedquantity;
                 $line->subprice = $netpriceamount;
                 $line->tva_tx = $vatRate;
@@ -1213,7 +1226,7 @@ class FacturXProtocol extends AbstractProtocol
             } while ($document->nextDocumentPosition());
         }
 
-        return ['res' => 1, 'message' => 'Not implemented yet' ];
+        //return ['res' => 1, 'message' => 'Not implemented yet' ];
 
         // Set invoice totals
         $supplierInvoice->total_ht = $taxBasisTotalAmount;
@@ -1225,15 +1238,13 @@ class FacturXProtocol extends AbstractProtocol
 
         if ($result < 0) {
             return ['res' => -1, 'message' => 'Invoice creation error: ' . $supplierInvoice->error];
+        } else {
+            $return_messages[] = 'Supplier Invoice created with ID: ' . $result;
+
+            // TODO : Save receivedFile in supplier invoice attachments
+            // TODO : Save PDP converted invoice in supplier invoice attachments
+            return ['res' => $result, 'message' => implode("\n", $return_messages) ];
         }
-
-
-
-        // TODO : Save receivedFile in supplier invoice attachments
-
-        // TODO : Link flow document to supplier invoice
-
-        return ['res' => 1, 'message' => 'Not implemented yet' ];
     }
 
 
@@ -1739,6 +1750,7 @@ class FacturXProtocol extends AbstractProtocol
         // if found, update information
         if ($thirdpartyId > 0) {
             dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromFacturXSeller Updating existing thirdparty: ' . $thirdpartyId);
+            // TODO: MAYBE we should call PDP to retrieve more information
 
             $thirdparty = new Societe($db);
             $thirdparty->fetch($thirdpartyId);
@@ -1982,7 +1994,7 @@ class FacturXProtocol extends AbstractProtocol
         $product->tva_tx      = (float) ($lineData['rateApplicablePercent'] ?? 0);
         $product->status      = 1; // Active
         $product->note_private = 'Product created automatically from Factur-X import.';
-        $product->import_key  = getDolGlobalString('PDPCONNECTFR_LAST_IMPORT_KEY', '');
+        $product->import_key  = AbstractPDPProvider::$PDPCONNECTFR_LAST_IMPORT_KEY; // It does not work here, so we will update it after creation
         $product->array_options['pdpconnectfr_source'] = '1';
         // Set barcode if global ID is provided and is a GTIN/EAN type
         if (!empty($lineData['prodglobalid']) && !empty($lineData['prodglobalidtype']) && in_array($lineData['prodglobalidtype'], ['0160', '0011'])) {
@@ -2005,6 +2017,11 @@ class FacturXProtocol extends AbstractProtocol
         $resCreate = $product->create($user);
         if ($resCreate > 0) {
             $productId = $product->id;
+
+            // Set import_key
+            $sql = 'UPDATE '.MAIN_DB_PREFIX."product SET import_key = '".$db->escape($product->import_key)."' WHERE rowid = ".((int) $productId);
+			$db->query($sql);
+
             dol_syslog(__METHOD__ . ' New product created (ID: ' . $productId . ')');
             return [
                 'res'     => $productId,
