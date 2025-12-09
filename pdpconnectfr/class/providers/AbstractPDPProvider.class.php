@@ -47,6 +47,8 @@ abstract class AbstractPDPProvider
     /** @var string Provider name */
     public $providerName;
 
+    public static $PDPCONNECTFR_LAST_IMPORT_KEY;
+
     /**
      * Constructor
      *

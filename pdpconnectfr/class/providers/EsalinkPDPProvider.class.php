@@ -386,11 +386,11 @@ class EsalinkPDPProvider extends AbstractPDPProvider
      */
     public function syncFlows()
     {
+        global $conf;
         $results_messages = array();
         $uuid = $this->generateUuidV4(); // UUID used to correlate logs between Dolibarr and PDP TODO : Store it somewhere
 
-        global $conf;
-        dolibarr_set_const($this->db, 'PDPCONNECTFR_LAST_IMPORT_KEY', $uuid, 'chaine', 0, '', $conf->entity);
+        self::$PDPCONNECTFR_LAST_IMPORT_KEY = $uuid;
 
         $resource = 'flows/search';
         $urlparams = array(
