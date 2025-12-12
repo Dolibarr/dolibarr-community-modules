@@ -348,7 +348,7 @@ if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_P
 	// Token
 	$item = $formSetup->newItem($prefix . 'TOKEN');
 	$item->cssClass = 'maxwidth500 ';
-	if ($tokenData['token']) {
+	if (!empty($tokenData['token'])) {
 		$item->fieldOverride = "<span class='opacitymedium hideonsmartphone'>" . htmlspecialchars('**************' . substr($tokenData['token'], -4)) . "</span>";
 	}
 	if (!$tokenData['token']) {

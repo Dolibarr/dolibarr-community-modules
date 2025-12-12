@@ -962,10 +962,11 @@ class FacturXProtocol extends AbstractProtocol
     /**
      * Create a supplier invoice from a Factur-X file.
      *
-     * @param  string $file                     Factur-X file.
-     * @return array{res:int, message:string}   Returns array with 'res' (1 on success, -1 on failure) and info 'message'
+     * @param  string $file                         Factur-X file.
+     * @param  string|null $ReadableViewFile        Readable view file. (PDP Generated readable PDF)
+     * @return array{res:int, message:string}       Returns array with 'res' (1 on success, -1 on failure) and info 'message'
      */
-    public function createSupplierInvoiceFromFacturX($file)
+    public function createSupplierInvoiceFromFacturX($file, $ReadableViewFile = null)
     {
         global $conf, $db, $user;
         $return_messages = array();
@@ -977,9 +978,15 @@ class FacturXProtocol extends AbstractProtocol
         }
 
         $tempFile = $tempDir . '/' . uniqid('facturx_') . '.pdf';
-
         if (file_put_contents($tempFile, $file) === false) {
-            return ['res' => -1, 'message' => 'Failed to save file to temporary location' ];
+            return ['res' => -1, 'message' => 'Failed to save Factur-X file to temporary location' ];
+        }
+
+        if ($ReadableViewFile) {
+            $tempFileReadableView = $tempDir . '/' . uniqid('facturx_readable_') . '.pdf';
+            if (file_put_contents($tempFileReadableView, $ReadableViewFile) === false) {
+                return ['res' => -1, 'message' => 'Failed to save readable view file to temporary location' ];
+            }
         }
 
         //return ['res' => 1, 'message' => 'bypass' ];
@@ -1094,7 +1101,7 @@ class FacturXProtocol extends AbstractProtocol
         $resql = $db->query($sql);
         if ($resql) {
             if ($db->num_rows($resql) > 0) {
-                return ['res' => 1, 'message' => 'Supplier Invoice with reference ' . $documentno . ' already exists' ];
+                return ['res' => -1, 'message' => 'Supplier Invoice with reference ' . $documentno . ' already exists' ];
             }
         } else {
             return ['res' => -1, 'message' => 'Database error while checking existing supplier invoice: ' . $db->lasterror() ];
@@ -1239,10 +1246,42 @@ class FacturXProtocol extends AbstractProtocol
         if ($result < 0) {
             return ['res' => -1, 'message' => 'Invoice creation error: ' . $supplierInvoice->error];
         } else {
+
+            // Set import_key
+            $sql = 'UPDATE '.MAIN_DB_PREFIX."facture_fourn SET import_key = '".$db->escape($supplierInvoice->import_key)."' WHERE rowid = ".((int) $result);
+			$db->query($sql);
+
+            dol_syslog(__METHOD__ . ' New supplier invoice created (ID: ' . $result . ')');
+
             $return_messages[] = 'Supplier Invoice created with ID: ' . $result;
 
+            // Save original invoice in supplier invoice attachments
+            if ($tempFile && file_exists($tempFile)) {
+                $res = $this->_saveFacturXFileToSupplierInvoiceAttachment($supplierInvoice, $tempFile);
+
+                if ($res['res'] < 0) {
+                    $return_messages[] = 'Failed to save Factur-X file as attachment: ' . $res['message'];
+                } else {
+                    $return_messages[] = 'Factur-X file saved as attachment';
+                }
+            } else {
+                dol_syslog("Temporary file not found for attachment", LOG_ERR);
+            }
+
+            // Save readable view file in supplier invoice attachments
+            if ($ReadableViewFile && $tempFileReadableView && file_exists($tempFileReadableView)) {
+                $res = $this->_saveFacturXFileToSupplierInvoiceAttachment($supplierInvoice, $tempFileReadableView, 'PDP');
+
+                if ($res['res'] < 0) {
+                    $return_messages[] = 'Failed to save readable view file as attachment: ' . $res['message'];
+                } else {
+                    $return_messages[] = 'Readable view file saved as attachment';
+                }
+            } else {
+                dol_syslog("Temporary file not found for attachment", LOG_ERR);
+            }
+
             // TODO : Save receivedFile in supplier invoice attachments
-            // TODO : Save PDP converted invoice in supplier invoice attachments
             return ['res' => $result, 'message' => implode("\n", $return_messages) ];
         }
     }
@@ -2095,6 +2134,80 @@ class FacturXProtocol extends AbstractProtocol
 
         // Fallback = service
         return 0;
+    }
+
+    /**
+     * Save Factur-X file to dolibarr supplier invoice attachment.
+     * @param FactureFournisseur    $supplierInvoice Supplier invoice object
+     * @param string                $filePath        Path to the Factur-X file to save
+     * @param string                $prefix          Optional prefix for the saved file name
+     *
+     * @return array{res:int, message:string}   Returns array with 'res' (1 on success, -1 on error) and info 'message'
+     */
+    private function _saveFacturXFileToSupplierInvoiceAttachment($supplierInvoice, $filePath, $prefix = '')
+    {
+        global $conf, $langs;
+
+        // Ensure upload directory exists
+        $folder_part   = get_exdir(0, 0, 0, 0, $supplierInvoice);
+        $relative_path = 'fournisseur/facture/' . $folder_part . dol_sanitizeFileName($supplierInvoice->ref);
+        $upload_dir    = $conf->fournisseur->dir_output . '/facture/' . $folder_part . dol_sanitizeFileName($supplierInvoice->ref);
+
+        if (!file_exists($upload_dir)) {
+            if (!dol_mkdir($upload_dir)) {
+                dol_syslog(__METHOD__ . " Failed to create upload directory: $upload_dir", LOG_ERR);
+                return array('res' => -1, 'message' => 'Failed to create upload directory');
+            }
+        }
+
+        // Prepare destination filename with optional prefix
+        $filename  = dol_sanitizeFileName($supplierInvoice->ref_supplier . '.pdf');
+        if (!empty($prefix)) {
+            $filename = dol_sanitizeFileName($prefix . '_' . $filename);
+        }
+
+        $dest_path = $upload_dir . '/' . $filename;
+
+        // Copy file to destination
+        if (!copy($filePath, $dest_path)) {
+            dol_syslog(__METHOD__ . " Failed to copy file from $filePath to $dest_path", LOG_ERR);
+            return array('res' => -1, 'message' => 'Failed to save attachment file');
+        }
+
+        // Verify file was copied successfully
+        if (!file_exists($dest_path) || filesize($dest_path) === 0) {
+            dol_syslog(__METHOD__ . " File verification failed: $dest_path", LOG_ERR);
+            return array('res' => -1, 'message' => 'File verification failed after copy');
+        }
+
+        // Set proper file permissions
+        chmod($dest_path, 0660);
+        dol_syslog(__METHOD__ . " File saved successfully to: $dest_path", LOG_DEBUG);
+
+        // Register file in database index
+        $res = addFileIntoDatabaseIndex(
+            $relative_path,
+            $filename,
+            $filename,
+            'generated',
+            0,
+            $supplierInvoice
+        );
+
+        if ($res > 0) {
+            dol_syslog(__METHOD__ . " File attachment registered in database: $dest_path", LOG_DEBUG);
+        } else {
+            dol_syslog(__METHOD__ . " Error registering file attachment in database: $dest_path", LOG_ERR);
+            // File exists but not indexed - not a critical error, continue
+        }
+
+        // Clean up temporary file
+        if (file_exists($filePath)) {
+            unlink($filePath);
+            dol_syslog(__METHOD__ . " Temporary file deleted: $filePath", LOG_DEBUG);
+        }
+
+        return array('res' => 1, 'message' => 'Attachment saved successfully ' . $dest_path);
     }
 
 
