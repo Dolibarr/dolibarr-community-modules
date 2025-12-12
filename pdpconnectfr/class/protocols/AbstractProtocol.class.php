@@ -52,10 +52,11 @@ abstract class AbstractProtocol
      * This function parses the provided Factur-X XML content
      * and generates a corresponding supplier invoice within Dolibarr.
      *
-     * @param array $file Factur-X file.
-     * @return array{res:int, message:string} Returns array with 'res' (1 on success, -1 on failure) and 'message' if error
+     * @param array $file                       Factur-X file.
+     * @param string|null $ReadableViewFile     Readable view file. (PDP Generated readable PDF)
+     * @return array{res:int, message:string}   Returns array with 'res' (1 on success, -1 on failure) and 'message' if error
      */
-    abstract public function createSupplierInvoiceFromFacturX($file);
+    abstract public function createSupplierInvoiceFromFacturX($file, $ReadableViewFile = null);
 
     /**
      * Generate a complete Factur-X invoice file by embedding the XML
