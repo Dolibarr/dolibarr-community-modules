@@ -331,6 +331,10 @@ class FacturXProtocol extends AbstractProtocol
             }
         }
 
+        // use customer language
+        $outputlangs = $langs;
+        $newlang = '';
+
         // Set Trade Contact details --- TODO: Check logic
         $contacts = $object->getIdContact('internal', 'SALESREPFOLL');
         $object->user = null;
@@ -387,9 +391,6 @@ class FacturXProtocol extends AbstractProtocol
         $grand_total_ht = $grand_total_tva = $grand_total_ttc = 0;
 
         // Determine customer language for line labels
-        // use customer language
-        $outputlangs = $langs;
-        $newlang = '';
         if (isset($object->thirdparty->default_lang)) {
             $newlang = $object->thirdparty->default_lang;
             // for proposal, order, invoice, ...
@@ -715,6 +716,10 @@ class FacturXProtocol extends AbstractProtocol
             unlink($xmlfile);
             dol_syslog(get_class($this) . '::generateInvoice cleaned up temporary XML file: ' . $xmlfile);
         }
+
+        // Update invoice PDP  status field
+        $invoice->array_options['options_pdpconnectfr_invoice_status'] = 1;
+        $invoice->insertExtraFields();
 
         return 1;
 

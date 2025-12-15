@@ -39,10 +39,20 @@ class ActionsPdpconnectfr
         if (get_class($invoiceObject) === 'Facture') {
             // Call function to create Factur-X document
             require __DIR__ . "/protocols/ProtocolManager.class.php";
+            require __DIR__ . "/pdpconnectfr.php";
 
             $usedProtocols = getDolGlobalString('PDPCONNECTFR_PROTOCOL');
             $ProtocolManager = new ProtocolManager($db);
             $protocol = $ProtocolManager->getprotocol($usedProtocols);
+
+            // Check configuration
+            $result = checkRequiredinformations($invoiceObject->thirdparty);
+            if ($result['res'] < 0) {
+                $message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
+                setEventMessages($message, [], 'errors');
+                return -1;
+            }
+
 
             $result = $protocol->generateInvoice($invoiceObject->id);
             if ($result) {
@@ -86,25 +96,25 @@ class ActionsPdpconnectfr
             }
 
             $url_button = array();
-            $url_button[] = array(
-                'lang' => 'pdpconnectfr',
-                'enabled' => (isModEnabled('pdpconnectfr')),
-                'perm' => (bool) $user->rights->facture->creer,
-                'label' => $langs->trans('checkInvoiceData') . (' TODO'),
-                'url' => '/facture/card.php?id=' . $object->id . '&action=validate_invoice&token=' . newToken()
-            );
+            // $url_button[] = array(
+            //     'lang' => 'pdpconnectfr',
+            //     'enabled' => (isModEnabled('pdpconnectfr')),
+            //     'perm' => (bool) $user->rights->facture->creer,
+            //     'label' => $langs->trans('checkInvoiceData') . (' TODO'),
+            //     'url' => '/facture/card.php?id=' . $object->id . '&action=validate_invoice&token=' . newToken()
+            // );
+
+            // $url_button[] = array(
+            //     'lang' => 'pdpconnectfr',
+            //     'enabled' => (isModEnabled('pdpconnectfr')),
+            //     'perm' => (bool) $user->rights->facture->creer,
+            //     'label' => $langs->trans('checkCustomerData') . (' TODO'),
+            //     'url' => '/facture/card.php?id=' . $object->id . '&action=validate_invoice&token=' . newToken()
+            // );
 
             $url_button[] = array(
                 'lang' => 'pdpconnectfr',
-                'enabled' => (isModEnabled('pdpconnectfr')),
-                'perm' => (bool) $user->rights->facture->creer,
-                'label' => $langs->trans('checkCustomerData') . (' TODO'),
-                'url' => '/facture/card.php?id=' . $object->id . '&action=validate_invoice&token=' . newToken()
-            );
-
-            $url_button[] = array(
-                'lang' => 'pdpconnectfr',
-                'enabled' => (isModEnabled('pdpconnectfr') /*&& $parameters['object']->status == Facture::STATUS_VALIDATED*/),
+                'enabled' => (isModEnabled('pdpconnectfr') && $object->status == Facture::STATUS_VALIDATED),
                 'perm' => (bool) $user->rights->facture->creer,
                 'label' => $langs->trans('sendToPDP'),
                 'url' => '/compta/facture/card.php?id=' . $object->id . '&action=send_to_pdp&token=' . newToken()

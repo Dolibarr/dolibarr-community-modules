@@ -72,6 +72,7 @@ require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
 require_once '../lib/pdpconnectfr.lib.php';
 require_once "../class/providers/PDPProviderManager.class.php";
 require_once "../class/protocols/ProtocolManager.class.php";
+require_once "../class/pdpconnectfr.php";
 
 
 // Translations
@@ -428,6 +429,20 @@ print dol_get_fiche_head($head, 'settings', $langs->trans($title), -1, "pdpconne
 
 // Setup page goes here
 echo '<span class="opacitymedium">'.$langs->trans("PDPConnectFRSetupPage").'</span><br><br>';
+
+// Alert mysoc configuration is not complete
+$mysocCheck = validateMyCompanyConfiguration();
+if ($mysocCheck['res'] < 0) {
+	print '<div class="error">';
+	print '<strong>' . $langs->trans("MyCompanyConfigurationError") . ':</strong><br><br>';
+	print $mysocCheck['message'];
+	print '<br><br>';
+	print '<a class="button" href="' . DOL_URL_ROOT . '/admin/company.php">';
+	print $langs->trans("ModifyCompanyInformation") . ' <i class="fas fa-tools"></i>';
+	print '</a>';
+	print '</div>';
+	print '<br>';
+}
 
 
 /*if ($action == 'edit') {

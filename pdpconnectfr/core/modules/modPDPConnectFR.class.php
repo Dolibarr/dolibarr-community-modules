@@ -549,7 +549,6 @@ class modPDPConnectFR extends DolibarrModules
 		$sql = array();
 
 		// Product extrafields
-		// Product extrafields
 		$result = $extrafields->addExtraField(
 			'pdpconnectfr_product_separator',
 			$langs->trans('PdpConnectFRProductSeparator'),
@@ -602,8 +601,8 @@ class modPDPConnectFR extends DolibarrModules
         $result = $extrafields->addExtraField('d4d_chorus_id', $langs->trans('ChorusId'), 'varchar', 112005, 36, 'facture', 0, 0, '', null, 1, '', 1, 0, '$object->array_options["options_chorus_id"]', '', 'pdpconnectfr@pdpconnectfr', 'getDolGlobalInt("PDPCONNECTFR_USE_CHORUS")', 0, 1);
 		// FacturX and PDP/PA fields
 		$result = $extrafields->addExtraField(
-			'pdpconnectfr_facturx_separator',
-			$langs->trans('FacturXSeparator'),
+			'pdpconnectfr_invoice_separator',
+			$langs->trans('pdpconnectfrInvoiceSeparator'),
 			'separate',
 			112006,
 			'',
@@ -623,8 +622,8 @@ class modPDPConnectFR extends DolibarrModules
 		);
 
 		$result = $extrafields->addExtraField(
-			'pdpconnectfr_incoice_status',
-			$langs->trans('PdpInvoiceStatus'),
+			'pdpconnectfr_invoice_status',
+			$langs->trans('pdpconnectfrInvoiceStatus'),
 			'select',
 			112007,
 			50,
@@ -634,7 +633,11 @@ class modPDPConnectFR extends DolibarrModules
 			0,
 			array(
 				'options' => array(
-					'0' => 'Not yet sent',
+					// Status Interne Dolibarr
+					'0' => 'Not generated',
+					'1' => 'Generated (ready to send)',
+					'2' => 'Sent (awaiting acknowledgment)',
+					// Status normés PDP/PA
 					'200' => 'Deposited',
 					'201' => 'Issued',
 					'202' => 'Received',
@@ -663,18 +666,18 @@ class modPDPConnectFR extends DolibarrModules
 			1
 		);
 
-		$result = $extrafields->addExtraField(
-			'pdpconnectfr_society_status',
-			$langs->trans('PdpSocietyStatus'),
-			'varchar',
+		/*$result = $extrafields->addExtraField(
+			'pdpconnectfr_invoice_status',
+			$langs->trans('pdpconnectfrInvoiceStatus'),
+			'text',
 			112008,
 			50,
 			'facture',
 			0,
 			0,
-			'',
+			'ready',
 			null,
-			1,
+			0,
 			'',
 			1,
 			0,
@@ -684,7 +687,7 @@ class modPDPConnectFR extends DolibarrModules
 			'isModEnabled("pdpconnectfr")',
 			0,
 			1
-		);
+		);*/
 
 		// Same fields for orders
         $result = $extrafields->addExtraField('d4d_separator', $langs->trans('ChorusSeparator'), 'separate', 112001, '', 'commande', 0, 1, '', $param, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', 'getDolGlobalInt("PDPCONNECTFR_USE_CHORUS")');
