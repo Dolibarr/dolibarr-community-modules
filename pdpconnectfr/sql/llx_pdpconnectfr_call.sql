@@ -17,6 +17,9 @@
 CREATE TABLE llx_pdpconnectfr_call(
 	-- BEGIN MODULEBUILDER FIELDS
 	rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL, 
+	call_id varchar(50) NOT NULL, 
+	totalflow integer NOT NULL DEFAULT 1, 
+	successflow integer NOT NULL DEFAULT 1, 
 	date_creation datetime NOT NULL, 
 	tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, 
 	fk_user_creat integer NOT NULL, 

@@ -62,7 +62,7 @@ class Call extends CommonObject
 	/**
 	 * @var string 		String with name of icon for call. Must be a 'fa-xxx' fontawesome code (or 'fa-xxx_fa_color_size') or 'call@pdpconnectfr' if picto is file 'img/object_call.png'.
 	 */
-	public $picto = 'fa-file';
+	public $picto = 'fa-exchange-alt';
 
 	/**
 	 * @var int<0,1>	Does object support extrafields ? 0=No, 1=Yes
@@ -76,8 +76,8 @@ class Call extends CommonObject
 	public $ismultientitymanaged = 0;
 
 
-	const STATUS_DRAFT = 0;
-	const STATUS_VALIDATED = 1;
+	const STATUS_FAILED = 0;
+	const STATUS_SUCCESS = 1;
 	const STATUS_CANCELED = 9;
 
 	/**
@@ -130,6 +130,9 @@ class Call extends CommonObject
 	 */
 	public $fields = array(
 		"rowid" => array("type" => "integer", "label" => "TechnicalID", "enabled" => "1", 'position' => 1, 'notnull' => 1, "visible" => "0", "noteditable" => "1", "index" => "1", "css" => "left", "comment" => "Id"),
+		"call_id" => array("type" => "varchar(50)", "label" => "Ref", "enabled" => "1", 'position' => 0, 'notnull' => 1, "visible" => "1", "index" => "1", "csslist" => "tdoverflowmax150"),
+		"totalflow" => array("type" => "integer", "label" => "totalFlow", "enabled" => "1", 'position' => 0, 'notnull' => 1, "visible" => "1", "comment" => "Total flows handled during the API call"),
+		"successflow" => array("type" => "integer", "label" => "successFlow", "enabled" => "1", 'position' => 0, 'notnull' => 1, "visible" => "1", "comment" => "Successfully completed flows during the API call"),
 		"date_creation" => array("type" => "datetime", "label" => "DateCreation", "enabled" => "1", 'position' => 500, 'notnull' => 1, "visible" => "-2",),
 		"tms" => array("type" => "timestamp", "label" => "DateModification", "enabled" => "1", 'position' => 501, 'notnull' => 0, "visible" => "-2",),
 		"fk_user_creat" => array("type" => "integer:User:user/class/user.class.php", "label" => "UserAuthor", "picto" => "user", "enabled" => "1", 'position' => 510, 'notnull' => 1, "visible" => "-2", "csslist" => "tdoverflowmax150",),
@@ -144,6 +147,9 @@ class Call extends CommonObject
 		"entity" => array("type" => "varchar(50)", "label" => "entity", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "0", "comment" => "Multi-entity support"),
 	);
 	public $rowid;
+	public $call_id;
+	public $totalFlow;
+	public $successFlow;
 	public $date_creation;
 	public $tms;
 	public $fk_user_creat;
@@ -301,7 +307,7 @@ class Call extends CommonObject
 			$object->label = empty($this->fields['label']['default']) ? $langs->trans("CopyOf")." ".$object->label : $this->fields['label']['default'];
 		}
 		if (property_exists($object, 'status')) {
-			$object->status = self::STATUS_DRAFT;
+			$object->status = self::STATUS_FAILED;
 		}
 		if (property_exists($object, 'date_creation')) {
 			$object->date_creation = dol_now();
@@ -533,7 +539,7 @@ class Call extends CommonObject
 		$error = 0;
 
 		// Protection
-		if ($this->status == self::STATUS_VALIDATED) {
+		if ($this->status == self::STATUS_SUCCESS) {
 			dol_syslog(get_class($this)."::validate action abandoned: already validated", LOG_WARNING);
 			return 0;
 		}
@@ -565,7 +571,7 @@ class Call extends CommonObject
 			if (!empty($this->fields['ref'])) {
 				$sql .= " ref = '".$this->db->escape($num)."',";
 			}
-			$sql .= " status = ".self::STATUS_VALIDATED;
+			$sql .= " status = ".self::STATUS_SUCCESS;
 			if (!empty($this->fields['date_validation'])) {
 				$sql .= ", date_validation = '".$this->db->idate($now)."'";
 			}
@@ -640,7 +646,7 @@ class Call extends CommonObject
 		// Set new ref and current status
 		if (!$error) {
 			$this->ref = $num;
-			$this->status = self::STATUS_VALIDATED;
+			$this->status = self::STATUS_SUCCESS;
 		}
 
 		if (!$error) {
@@ -663,7 +669,7 @@ class Call extends CommonObject
 	public function setDraft($user, $notrigger = 0)
 	{
 		// Protection
-		if ($this->status <= self::STATUS_DRAFT) {
+		if ($this->status <= self::STATUS_FAILED) {
 			return 0;
 		}
 
@@ -674,7 +680,7 @@ class Call extends CommonObject
 		 return -1;
 		 }*/
 
-		return $this->setStatusCommon($user, self::STATUS_DRAFT, $notrigger, 'PDPCONNECTFR_MYOBJECT_UNVALIDATE');
+		return $this->setStatusCommon($user, self::STATUS_FAILED, $notrigger, 'PDPCONNECTFR_MYOBJECT_UNVALIDATE');
 	}
 
 	/**
@@ -687,7 +693,7 @@ class Call extends CommonObject
 	public function cancel($user, $notrigger = 0)
 	{
 		// Protection
-		if ($this->status != self::STATUS_VALIDATED) {
+		if ($this->status != self::STATUS_SUCCESS) {
 			return 0;
 		}
 
@@ -711,7 +717,7 @@ class Call extends CommonObject
 	public function reopen($user, $notrigger = 0)
 	{
 		// Protection
-		if ($this->status == self::STATUS_VALIDATED) {
+		if ($this->status == self::STATUS_SUCCESS) {
 			return 0;
 		}
 
@@ -722,7 +728,7 @@ class Call extends CommonObject
 		 return -1;
 		 }*/
 
-		return $this->setStatusCommon($user, self::STATUS_VALIDATED, $notrigger, 'PDPCONNECTFR_MYOBJECT_REOPEN');
+		return $this->setStatusCommon($user, self::STATUS_SUCCESS, $notrigger, 'PDPCONNECTFR_MYOBJECT_REOPEN');
 	}
 
 	/**
@@ -967,18 +973,24 @@ class Call extends CommonObject
 		if (empty($this->labelStatus) || empty($this->labelStatusShort)) {
 			global $langs;
 			//$langs->load("pdpconnectfr@pdpconnectfr");
-			$this->labelStatus[self::STATUS_DRAFT] = $langs->transnoentitiesnoconv('Draft');
-			$this->labelStatus[self::STATUS_VALIDATED] = $langs->transnoentitiesnoconv('Enabled');
+			$this->labelStatus[self::STATUS_FAILED] = $langs->transnoentitiesnoconv('Failed');
+			$this->labelStatus[self::STATUS_SUCCESS] = $langs->transnoentitiesnoconv('Success');
 			$this->labelStatus[self::STATUS_CANCELED] = $langs->transnoentitiesnoconv('Disabled');
-			$this->labelStatusShort[self::STATUS_DRAFT] = $langs->transnoentitiesnoconv('Draft');
-			$this->labelStatusShort[self::STATUS_VALIDATED] = $langs->transnoentitiesnoconv('Enabled');
+			$this->labelStatusShort[self::STATUS_FAILED] = $langs->transnoentitiesnoconv('Failed');
+			$this->labelStatusShort[self::STATUS_SUCCESS] = $langs->transnoentitiesnoconv('Success');
 			$this->labelStatusShort[self::STATUS_CANCELED] = $langs->transnoentitiesnoconv('Disabled');
 		}
 
 		$statusType = 'status'.$status;
-		//if ($status == self::STATUS_VALIDATED) $statusType = 'status1';
+		//if ($status == self::STATUS_SUCCESS) $statusType = 'status1';
 		if ($status == self::STATUS_CANCELED) {
 			$statusType = 'status6';
+		}
+		if ($status == self::STATUS_FAILED) {
+			$statusType = 'status8';
+		}
+		if ($status == self::STATUS_SUCCESS) {
+			$statusType = 'status4';
 		}
 
 		return dolGetStatus($this->labelStatus[$status], $this->labelStatusShort[$status], '', $statusType, $mode, '', $paramsBadge);
@@ -1222,6 +1234,33 @@ class Call extends CommonObject
 
 		return $error;
 	}
+
+	/**
+	 *  Returns the reference to the following non used object with 'call' prefix.
+	 *
+	 *  @return	string      		Object free reference
+	 */
+	public function getNextCallId()
+	{
+		global $db;
+
+		$prefix = 'Call-';
+
+		$sql = "SELECT MAX(CAST(SUBSTRING(call_id, ".(strlen($prefix) + 1).") AS UNSIGNED)) AS maxref";
+		$sql .= " FROM ".MAIN_DB_PREFIX.$this->table_element;
+		$sql .= " WHERE call_id LIKE '".$db->escape($prefix)."%'";
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			return null;
+		}
+
+		$obj = $db->fetch_object($resql);
+		$next = ((int) $obj->maxref) + 1;
+
+		return $prefix.sprintf('%06d', $next);
+	}
+
 }
 
 

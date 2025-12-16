@@ -385,24 +385,24 @@ class modPDPConnectFR extends DolibarrModules
 		);
 		/* END MODULEBUILDER LEFTMENU PDPDOCUMENTS */
 		/* BEGIN MODULEBUILDER LEFTMENU PDPSOCIETIES */
-		$this->menu[$r++] = array(
-			'fk_menu' => 'fk_mainmenu=billing,fk_leftmenu=pdpconnectfr_billing',
-			'type' => 'left',
-			'titre' => 'pdpSocieties',
-			'mainmenu' => 'billing',
-			'leftmenu' => 'pdpconnectfr_societies',
-			'url' => '/pdpconnectfr/pdpconnectfrindex.php',
-			'langs' => 'pdpconnectfr@pdpconnectfr',
-			'position' => 1002,
-			'enabled' => 'isModEnabled(\'pdpconnectfr\')',
-			'perms' => '$user->hasRight(\'facture\', \'lire\')',
-			'target' => '',
-			'user' => 2,
-			'object' => '',
-		);
+		// $this->menu[$r++] = array(
+		// 	'fk_menu' => 'fk_mainmenu=billing,fk_leftmenu=pdpconnectfr_billing',
+		// 	'type' => 'left',
+		// 	'titre' => 'pdpSocieties',
+		// 	'mainmenu' => 'billing',
+		// 	'leftmenu' => 'pdpconnectfr_societies',
+		// 	'url' => '/pdpconnectfr/pdpconnectfrindex.php',
+		// 	'langs' => 'pdpconnectfr@pdpconnectfr',
+		// 	'position' => 1002,
+		// 	'enabled' => 'isModEnabled(\'pdpconnectfr\')',
+		// 	'perms' => '$user->hasRight(\'facture\', \'lire\')',
+		// 	'target' => '',
+		// 	'user' => 2,
+		// 	'object' => '',
+		// );
 		/* END MODULEBUILDER LEFTMENU PDPSOCIETIES */
 		/* BEGIN MODULEBUILDER LEFTMENU PDPFEEDBACK */
-		$this->menu[$r++] = array(
+		$this->menu[$r++] = array( // TODO : we can move this page into the administration menu or module configuration page
 			'fk_menu' => 'fk_mainmenu=billing,fk_leftmenu=pdpconnectfr_billing',
 			'type' => 'left',
 			'titre' => 'pdpFeedback',

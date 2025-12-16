@@ -867,7 +867,7 @@ while ($i < $imaxinloop) {
 				}
 				print '>';
 				if ($key == 'status') {
-					print $object->getLibStatut(5);
+					print $object->getLibStatut(6);
 				} elseif ($key == 'rowid') {
 					print $object->showOutputField($val, $key, (string) $object->id, '');
 				} else {

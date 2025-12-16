@@ -28,6 +28,7 @@ use Luracast\Restler\Data\Arr;
 
 dol_include_once('custom/pdpconnectfr/class/providers/AbstractPDPProvider.class.php');
 dol_include_once('custom/pdpconnectfr/class/protocols/ProtocolManager.class.php');
+dol_include_once('custom/pdpconnectfr/class/call.class.php');
 require_once DOL_DOCUMENT_ROOT . '/core/lib/admin.lib.php';
 
 
@@ -136,7 +137,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
     {
         global $langs;
 
-        $response = $this->callApi("healthcheck", "GET");
+        $response = $this->callApi("healthcheck", "GET", false, [], 'Healthcheck');
 
         if ($response['status_code'] === 200) {
             $returnarray['status_code'] = true;
@@ -201,7 +202,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 
 
-        $response = $this->callApi("flows", "POSTALREADYFORMATED", $params, $extraHeaders);
+        $response = $this->callApi("flows", "POSTALREADYFORMATED", $params, $extraHeaders, 'Send Invoice');
 
         if ($response['status_code'] == 200 || $response['status_code'] == 202) {
             $flowId = $response['response']['flowId'];
@@ -257,7 +258,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 
 
-        $response = $this->callApi("flows", "POSTALREADYFORMATED", $params, $extraHeaders);
+        $response = $this->callApi("flows", "POSTALREADYFORMATED", $params, $extraHeaders, 'Send Sample Invoice');
 
         if ($response['status_code'] == 200 || $response['status_code'] == 202) {
 
@@ -274,7 +275,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                 $resource,
                 "GET",
                 false,
-                ['Accept' => 'application/octet-stream']
+                ['Accept' => 'application/octet-stream'],
+                'Retrive Sample Invoice'
             );
 
             if ($response['status_code'] == 200 || $response['status_code'] == 202) {
@@ -301,17 +303,20 @@ class EsalinkPDPProvider extends AbstractPDPProvider
      * @param string                        $method         HTTP method ('GET', 'POST', etc.)
 	 * @param array<string, mixed>|false 	$params 	    Options for the request
      * @param array<string, string>         $extraHeaders   Optional additional headers
-	 * @return array{status_code:int,response:null|string|array<string,mixed>}
+     * @param string|null                   $callType       Functional type of the API call for logging purposes (e.g., 'sync_flows', 'send_invoice')
+     *
+	 * @return array{status_code:int,response:null|string|array<string,mixed>,call_id:null|string}
 	 */
-	public function callApi($resource, $method, $params = false, $extraHeaders = [])
+	public function callApi($resource, $method, $params = false, $extraHeaders = [], $callType = '')
 	{
+        global $conf, $user;
+
         // Validate configuration
         if (!$this->validateConfiguration()) {
             return array('status_code' => 400, 'response' => $this->errors);
         }
 
         require_once DOL_DOCUMENT_ROOT . '/core/lib/geturl.lib.php';
-        //$otherCurlOptions = [];
 
 		$url = $this->getApiUrl() . $resource;
 
@@ -376,6 +381,27 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			}
 		}
 
+        // Log the API call if we have the fonctional type
+        if (!empty($callType)) {
+            $call = new Call($this->db);
+            $call->call_id = $call->getNextCallId();
+            $call->call_type = $callType ?: '';
+            $call->method = $method;
+            $call->endpoint = '/' . $resource;
+            $call->request_body = is_array($params) ? json_encode($params) : $params;
+            $call->response = is_array($returnarray['response']) ? json_encode($returnarray['response']) : $returnarray['response'];
+            $call->provider = 'Esalink';
+            $call->entity = $conf->entity;
+            $call->status = ($returnarray['status_code'] == 200 || $returnarray['status_code'] == 202) ? 1 : 0;
+
+            $result = $call->create($user);
+            if ($result > 0) {
+                $returnarray['call_id'] = $call->call_id;
+            } else {
+                dol_syslog(__METHOD__ . " Failed to log API call to Esalink PDP provider", LOG_ERR);
+            }
+        }
+
 		return $returnarray;
 	}
 
@@ -425,7 +451,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
             dol_syslog(__METHOD__ . " Total flows to synchronize: " . $totalFlows, LOG_DEBUG);
             // Make a second call to get all flows
             $params['limit'] = $totalFlows;
-            $response = $this->callApi($resource, "POST", json_encode($params));
+            $response = $this->callApi($resource, "POST", json_encode($params), [], "Synchronization");
 
             if ($response['status_code'] != 200) {
                 $this->errors[] = "Failed to retrieve flows for synchronization.";
@@ -433,6 +459,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                 return array('res' => 0, 'messages' => $results_messages);
             }
 
+            $call_id = $response['call_id'] ?? null;
             $documents = array();
             $cdars = array();
             foreach ($response['response']['results'] as $flow) {
@@ -451,7 +478,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
             // Process documents first
             foreach ($documents as $flow) {
-                $res = $this->syncFlow($flow['flowId']);
+                $res = $this->syncFlow($flow['flowId'], $call_id);
                 if ($res['res'] != '1') {
                     $results_messages[] = "Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'];
                 }
@@ -459,7 +486,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
             // Then process CDARs
             foreach ($cdars as $flow) {
-                $res = $this->syncFlow($flow['flowId']);
+                $res = $this->syncFlow($flow['flowId'], $call_id);
                 if ($res['res'] != '1') {
                     $results_messages[] = "Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'];
                 }
@@ -474,9 +501,11 @@ class EsalinkPDPProvider extends AbstractPDPProvider
      * sync flow data.
      *
      * @param string $flowId        FlowId
+     * @param string|null $call_id  Call ID for logging purposes
+     *
      * @return array{res:int, message:string} Returns array with 'res' (1 on success, -1 on failure) and 'message' if error
      */
-    public function syncFlow($flowId)
+    public function syncFlow($flowId, $call_id = null)
     {
         global $conf, $user;
         dol_include_once('custom/pdpconnectfr/class/document.class.php');
@@ -715,6 +744,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                 break;
         }
 
+        $document->call_id = $call_id;
         $res = $document->create($user);
         if ($res < 0) {
             //print_r($document->errors);

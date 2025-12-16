@@ -62,7 +62,7 @@ class Document extends CommonObject
 	/**
 	 * @var string 		String with name of icon for document. Must be a 'fa-xxx' fontawesome code (or 'fa-xxx_fa_color_size') or 'document@pdpconnectfr' if picto is file 'img/object_document.png'.
 	 */
-	public $picto = 'fa-file';
+	public $picto = 'fa-file-alt';
 
 	/**
 	 * @var int<0,1>	Does object support extrafields ? 0=No, 1=Yes
@@ -135,7 +135,7 @@ class Document extends CommonObject
 		"fk_user_creat" => array("type" => "integer:User:user/class/user.class.php", "label" => "UserAuthor", "picto" => "user", "enabled" => "1", 'position' => 510, 'notnull' => 1, "visible" => "-2", "csslist" => "tdoverflowmax150",),
 		"fk_user_modif" => array("type" => "integer:User:user/class/user.class.php", "label" => "UserModif", "picto" => "user", "enabled" => "1", 'position' => 511, 'notnull' => -1, "visible" => "-2", "csslist" => "tdoverflowmax150",),
 		"status" => array("type" => "integer", "label" => "Status", "enabled" => "1", 'position' => 2000, 'notnull' => 1, "visible" => "1", "index" => "1", "arrayofkeyval" => array("0" => "Brouillon", "1" => "Valid&eacute;", "9" => "Annul&eacute;"), "validate" => "1",),
-		"fk_call" => array("type" => "integer", "label" => "fk_call", "enabled" => "1", 'position' => 10, 'notnull' => 0, "visible" => "1", "comment" => "Reference to the original call"),
+		"call_id" => array("type" => "varchar(50)", "label" => "call_id", "enabled" => "1", 'position' => 10, 'notnull' => 0, "visible" => "1", "comment" => "Reference to the original call"),
 		"flow_id" => array("type" => "varchar(255)", "label" => "flow_id", "enabled" => "1", 'position' => 20, 'notnull' => 0, "visible" => "1", "comment" => "PDP flow UUID"),
 		"tracking_idref" => array("type" => "varchar(50)", "label" => "tracking_idref", "enabled" => "1", 'position' => 30, 'notnull' => 0, "visible" => "1", "comment" => "Document tracking identifier"),
 		"flow_type" => array("type" => "varchar(255)", "label" => "flow_type", "enabled" => "1", 'position' => 40, 'notnull' => 0, "visible" => "1", "comment" => "Flow type (CustomerInvoice, etc.)"),
@@ -165,7 +165,7 @@ class Document extends CommonObject
 	public $fk_user_creat;
 	public $fk_user_modif;
 	public $status;
-	public $fk_call;
+	public $call_id;
 	public $flow_id;
 	public $tracking_idref;
 	public $flow_type;

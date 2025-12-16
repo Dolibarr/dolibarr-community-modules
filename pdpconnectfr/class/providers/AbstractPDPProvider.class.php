@@ -149,13 +149,15 @@ abstract class AbstractPDPProvider
     /**
 	 * Call the provider API.
 	 *
-	 * @param string 						$resource 	Resource relative URL ('Flows', 'healthcheck' or others)
-     * @param string                        $method     HTTP method ('GET', 'POST', etc.)
-	 * @param array<string, mixed>|false 	$options 	Options for the request
-	 * @return array{status_code:int,response:null|string|array<string,mixed>}
+	 * @param string 						$resource 	    Resource relative URL ('Flows', 'healthcheck' or others)
+     * @param string                        $method         HTTP method ('GET', 'POST', etc.)
+	 * @param array<string, mixed>|false 	$options 	    Options for the request
+     * @param array<string, string>         $extraHeaders   Optional additional headers
+     * @param string|null                   $callType       Functional type of the API call for logging purposes (e.g., 'sync_flows', 'send_invoice')
+     *
+	 * @return array{status_code:int,response:null|string|array<string,mixed>,call_id:null|string}
 	 */
-    abstract public function callApi($resource, $method, $options = false);
-
+    abstract public function callApi($resource, $method, $options = false, $extraHeaders = [], $callType = '');
     /**
      * Synchronize flows with PDP since the last synchronization date.
      *
