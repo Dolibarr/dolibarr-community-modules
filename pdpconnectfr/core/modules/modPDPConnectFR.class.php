@@ -71,8 +71,8 @@ class modPDPConnectFR extends DolibarrModules
 		$this->descriptionlong = "PDPConnectFRDescription";
 
 		// Author
-		$this->editor_name = '';
-		$this->editor_url = '';		// Must be an external online web site
+		$this->editor_name = 'Dolibarr Association';
+		$this->editor_url = 'https://www.dolibarr.org';		// Must be an external online web site
 		$this->editor_squarred_logo = '';					// Must be image filename into the module/img directory followed with @modulename. Example: 'myimage.png@pdpconnectfr'
 
 		// Possible values for version are: 'development', 'experimental', 'dolibarr', 'dolibarr_deprecated', 'experimental_deprecated' or a version string like 'x.y.z'
