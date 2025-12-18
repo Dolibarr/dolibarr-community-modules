@@ -72,6 +72,7 @@ require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
 require_once '../lib/pdpconnectfr.lib.php';
 require_once "../class/providers/PDPProviderManager.class.php";
 require_once "../class/protocols/ProtocolManager.class.php";
+require_once "../class/pdpconnectfr.php";
 
 
 // Translations
@@ -321,7 +322,7 @@ if (preg_match('/call'.$prefix.'HEALTHCHECK/i', $action, $reg)) {
 }
 
 // To remove
-if (preg_match('/makeInvoice/i', $action, $reg)) {
+/*if (preg_match('/makeInvoice/i', $action, $reg)) {
 	$protocol = $ProtocolManager->getprotocol('FACTURX');
 
 	$result = $protocol->generateInvoice('288');
@@ -330,7 +331,7 @@ if (preg_match('/makeInvoice/i', $action, $reg)) {
 	} else {
 		setEventMessages('', $protocol->errors, 'errors');
 	}
-}
+}*/
 
 if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_PDP') === "ESALINK") {
 	// Username
@@ -348,7 +349,7 @@ if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_P
 	// Token
 	$item = $formSetup->newItem($prefix . 'TOKEN');
 	$item->cssClass = 'maxwidth500 ';
-	if ($tokenData['token']) {
+	if (!empty($tokenData['token'])) {
 		$item->fieldOverride = "<span class='opacitymedium hideonsmartphone'>" . htmlspecialchars('**************' . substr($tokenData['token'], -4)) . "</span>";
 	}
 	if (!$tokenData['token']) {
@@ -389,13 +390,13 @@ if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_P
 	}
 
 	// To remove
-	if ($tokenData['token'] && getDolGlobalString('PDPCONNECTFR_PROTOCOL') && getDolGlobalString('PDPCONNECTFR_PROTOCOL') === 'FACTURX' && getDolGlobalString('PDPCONNECTFR_PROFILE') === 'EN16931') {
+	/*if ($tokenData['token'] && getDolGlobalString('PDPCONNECTFR_PROTOCOL') && getDolGlobalString('PDPCONNECTFR_PROTOCOL') === 'FACTURX' && getDolGlobalString('PDPCONNECTFR_PROFILE') === 'EN16931') {
 		$item->fieldOverride .= "
 			<a
 			href='".$_SERVER["PHP_SELF"]."?action=makeInvoice&token=".newToken()."'
 			> Generate Invoice <i class='fa fa-file'></i></a><br/>
 		";
-	}
+	}*/
 }
 
 
@@ -428,6 +429,20 @@ print dol_get_fiche_head($head, 'settings', $langs->trans($title), -1, "pdpconne
 
 // Setup page goes here
 echo '<span class="opacitymedium">'.$langs->trans("PDPConnectFRSetupPage").'</span><br><br>';
+
+// Alert mysoc configuration is not complete
+$mysocCheck = validateMyCompanyConfiguration();
+if ($mysocCheck['res'] < 0) {
+	print '<div class="error">';
+	print '<strong>' . $langs->trans("MyCompanyConfigurationError") . ':</strong><br><br>';
+	print $mysocCheck['message'];
+	print '<br><br>';
+	print '<a class="button" href="' . DOL_URL_ROOT . '/admin/company.php">';
+	print $langs->trans("ModifyCompanyInformation") . ' <i class="fas fa-tools"></i>';
+	print '</a>';
+	print '</div>';
+	print '<br>';
+}
 
 
 /*if ($action == 'edit') {

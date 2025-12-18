@@ -31,9 +31,15 @@ abstract class ConstraintValidator implements ConstraintValidatorInterface
      */
     public const OBJECT_TO_STRING = 2;
 
-    protected ExecutionContextInterface $context;
+    /**
+     * @var ExecutionContextInterface
+     */
+    protected $context;
 
-    public function initialize(ExecutionContextInterface $context): void
+    /**
+     * {@inheritdoc}
+     */
+    public function initialize(ExecutionContextInterface $context)
     {
         $this->context = $context;
     }
@@ -45,8 +51,12 @@ abstract class ConstraintValidator implements ConstraintValidatorInterface
      * message parameter to a constraint violation. Note that such
      * parameters should usually not be included in messages aimed at
      * non-technical people.
+     *
+     * @param mixed $value The value to return the type of
+     *
+     * @return string
      */
-    protected function formatTypeOf(mixed $value): string
+    protected function formatTypeOf($value)
     {
         return get_debug_type($value);
     }
@@ -68,15 +78,19 @@ abstract class ConstraintValidator implements ConstraintValidatorInterface
      * won't know what an "object", "array" or "resource" is and will be
      * confused by the violation message.
      *
-     * @param int $format A bitwise combination of the format constants in this class
+     * @param mixed $value  The value to format as string
+     * @param int   $format A bitwise combination of the format
+     *                      constants in this class
+     *
+     * @return string
      */
-    protected function formatValue(mixed $value, int $format = 0): string
+    protected function formatValue($value, int $format = 0)
     {
         if (($format & self::PRETTY_DATE) && $value instanceof \DateTimeInterface) {
             if (class_exists(\IntlDateFormatter::class)) {
                 $formatter = new \IntlDateFormatter(\Locale::getDefault(), \IntlDateFormatter::MEDIUM, \IntlDateFormatter::SHORT, 'UTC');
 
-                return $formatter->format(new \DateTimeImmutable(
+                return $formatter->format(new \DateTime(
                     $value->format('Y-m-d H:i:s.u'),
                     new \DateTimeZone('UTC')
                 ));
@@ -90,7 +104,7 @@ abstract class ConstraintValidator implements ConstraintValidatorInterface
         }
 
         if (\is_object($value)) {
-            if (($format & self::OBJECT_TO_STRING) && $value instanceof \Stringable) {
+            if (($format & self::OBJECT_TO_STRING) && method_exists($value, '__toString')) {
                 return $value->__toString();
             }
 
@@ -121,10 +135,6 @@ abstract class ConstraintValidator implements ConstraintValidatorInterface
             return 'true';
         }
 
-        if (is_nan($value)) {
-            return 'NAN';
-        }
-
         return (string) $value;
     }
 
@@ -138,9 +148,11 @@ abstract class ConstraintValidator implements ConstraintValidatorInterface
      * @param int   $format A bitwise combination of the format
      *                      constants in this class
      *
+     * @return string
+     *
      * @see formatValue()
      */
-    protected function formatValues(array $values, int $format = 0): string
+    protected function formatValues(array $values, int $format = 0)
     {
         foreach ($values as $key => $value) {
             $values[$key] = $this->formatValue($value, $format);

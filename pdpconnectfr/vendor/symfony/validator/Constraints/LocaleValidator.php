@@ -24,7 +24,10 @@ use Symfony\Component\Validator\Exception\UnexpectedValueException;
  */
 class LocaleValidator extends ConstraintValidator
 {
-    public function validate(mixed $value, Constraint $constraint): void
+    /**
+     * {@inheritdoc}
+     */
+    public function validate($value, Constraint $constraint)
     {
         if (!$constraint instanceof Locale) {
             throw new UnexpectedTypeException($constraint, Locale::class);
@@ -34,7 +37,7 @@ class LocaleValidator extends ConstraintValidator
             return;
         }
 
-        if (!\is_scalar($value) && !$value instanceof \Stringable) {
+        if (!\is_scalar($value) && !(\is_object($value) && method_exists($value, '__toString'))) {
             throw new UnexpectedValueException($value, 'string');
         }
 
@@ -44,7 +47,7 @@ class LocaleValidator extends ConstraintValidator
             $value = \Locale::canonicalize($value);
         }
 
-        if (null === $value || !Locales::exists($value)) {
+        if (!Locales::exists($value)) {
             $this->context->buildViolation($constraint->message)
                 ->setParameter('{{ value }}', $this->formatValue($inputValue))
                 ->setCode(Locale::NO_SUCH_LOCALE_ERROR)

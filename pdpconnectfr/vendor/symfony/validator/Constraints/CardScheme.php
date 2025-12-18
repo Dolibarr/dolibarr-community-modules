@@ -11,11 +11,13 @@
 
 namespace Symfony\Component\Validator\Constraints;
 
-use Symfony\Component\Validator\Attribute\HasNamedArguments;
 use Symfony\Component\Validator\Constraint;
 
 /**
- * Validates a credit card number for a given credit card company.
+ * Metadata for the CardSchemeValidator.
+ *
+ * @Annotation
+ * @Target({"PROPERTY", "METHOD", "ANNOTATION"})
  *
  * @author Tim Nagel <t.nagel@infinite.net.au>
  * @author Bernhard Schussek <bschussek@gmail.com>
@@ -39,36 +41,25 @@ class CardScheme extends Constraint
     public const NOT_NUMERIC_ERROR = 'a2ad9231-e827-485f-8a1e-ef4d9a6d5c2e';
     public const INVALID_FORMAT_ERROR = 'a8faedbf-1c2f-4695-8d22-55783be8efed';
 
-    protected const ERROR_NAMES = [
+    protected static $errorNames = [
         self::NOT_NUMERIC_ERROR => 'NOT_NUMERIC_ERROR',
         self::INVALID_FORMAT_ERROR => 'INVALID_FORMAT_ERROR',
     ];
 
-    public string $message = 'Unsupported card type or invalid card number.';
-    public array|string|null $schemes = null;
+    public $message = 'Unsupported card type or invalid card number.';
+    public $schemes;
 
     /**
-     * @param non-empty-string|non-empty-string[]|array<string,mixed>|null $schemes Name(s) of the number scheme(s) used to validate the credit card number
-     * @param string[]|null                                                $groups
-     * @param array<string,mixed>|null                                     $options
+     * {@inheritdoc}
+     *
+     * @param array|string $schemes The schemes to validate against or a set of options
      */
-    #[HasNamedArguments]
-    public function __construct(array|string|null $schemes, ?string $message = null, ?array $groups = null, mixed $payload = null, ?array $options = null)
+    public function __construct($schemes, ?string $message = null, ?array $groups = null, $payload = null, array $options = [])
     {
         if (\is_array($schemes) && \is_string(key($schemes))) {
-            trigger_deprecation('symfony/validator', '7.3', 'Passing an array of options to configure the "%s" constraint is deprecated, use named arguments instead.', static::class);
-
-            $options = array_merge($schemes, $options ?? []);
+            $options = array_merge($schemes, $options);
         } else {
-            if (\is_array($options)) {
-                trigger_deprecation('symfony/validator', '7.3', 'Passing an array of options to configure the "%s" constraint is deprecated, use named arguments instead.', static::class);
-            } else {
-                $options = [];
-            }
-
-            if (null !== $schemes) {
-                $options['value'] = $schemes;
-            }
+            $options['value'] = $schemes;
         }
 
         parent::__construct($options, $groups, $payload);
@@ -76,12 +67,12 @@ class CardScheme extends Constraint
         $this->message = $message ?? $this->message;
     }
 
-    public function getDefaultOption(): ?string
+    public function getDefaultOption()
     {
         return 'schemes';
     }
 
-    public function getRequiredOptions(): array
+    public function getRequiredOptions()
     {
         return ['schemes'];
     }

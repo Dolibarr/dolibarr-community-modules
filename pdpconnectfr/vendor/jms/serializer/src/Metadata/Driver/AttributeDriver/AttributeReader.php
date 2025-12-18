@@ -67,10 +67,7 @@ class AttributeReader implements Reader
         return $this->reader->getClassAnnotation($property, $annotationName) ?? $this->buildAnnotation($attributes);
     }
 
-    /**
-     * @param list<\ReflectionAttribute<SerializerAttribute>> $attributes
-     */
-    private function buildAnnotation(array $attributes): ?SerializerAttribute
+    private function buildAnnotation(array $attributes): ?object
     {
         if (!isset($attributes[0])) {
             return null;
@@ -85,8 +82,10 @@ class AttributeReader implements Reader
     private function buildAnnotations(array $attributes): array
     {
         return array_map(
-            static fn (\ReflectionAttribute $attribute): object => $attribute->newInstance(),
-            $attributes,
+            static function (\ReflectionAttribute $attribute): object {
+                return $attribute->newInstance();
+            },
+            $attributes
         );
     }
 }

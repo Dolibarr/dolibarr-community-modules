@@ -44,6 +44,11 @@ abstract class AbstractPDPProvider
     /** @var AbstractProtocol Exchange protocol */
     public $exchangeProtocol;
 
+    /** @var string Provider name */
+    public $providerName;
+
+    public static $PDPCONNECTFR_LAST_IMPORT_KEY;
+
     /**
      * Constructor
      *
@@ -54,6 +59,7 @@ abstract class AbstractPDPProvider
     	$this->db = $db;
         $this->config = [];
         $this->tokenData = [];
+        $this->providerName = null;
     }
 
     /**
@@ -143,12 +149,29 @@ abstract class AbstractPDPProvider
     /**
 	 * Call the provider API.
 	 *
-	 * @param string 						$resource 	Resource relative URL ('Flows', 'healthcheck' or others)
-     * @param string                        $method     HTTP method ('GET', 'POST', etc.)
-	 * @param array<string, mixed>|false 	$options 	Options for the request
-	 * @return array{status_code:int,response:null|string|array<string,mixed>}
+	 * @param string 						$resource 	    Resource relative URL ('Flows', 'healthcheck' or others)
+     * @param string                        $method         HTTP method ('GET', 'POST', etc.)
+	 * @param array<string, mixed>|false 	$options 	    Options for the request
+     * @param array<string, string>         $extraHeaders   Optional additional headers
+     * @param string|null                   $callType       Functional type of the API call for logging purposes (e.g., 'sync_flows', 'send_invoice')
+     *
+	 * @return array{status_code:int,response:null|string|array<string,mixed>,call_id:null|string}
 	 */
-    abstract public function callApi($resource, $method, $options = false);
+    abstract public function callApi($resource, $method, $options = false, $extraHeaders = [], $callType = '');
+    /**
+     * Synchronize flows with PDP since the last synchronization date.
+     *
+     * @return bool|array{res:int, messages:array<string>} True on success, false on failure along with messages.
+     */
+    abstract public function syncFlows();
+
+    /**
+     * Store a flow data.
+     *
+     * @param  string $flowId       FlowId
+     * @return bool                 True on success, false on failure
+     */
+    abstract public function syncFlow($flowId);
 
     /**
      * Insert or update OAuth token for the given PDP.
@@ -259,5 +282,58 @@ abstract class AbstractPDPProvider
             'refresh_token' => $obj->tokenstring_refresh,
             'token_expires_at'     => $obj->expire_at
         ];
+    }
+
+    /**
+    * Get the last synchronization date with the PDP provider.
+    *
+    * Retrieves the timestamp of the most recent successful flow synchronization
+    * for this provider. If no sync has occurred yet, returns Unix epoch (1970-01-01).
+     *
+     * @return int Timestamp of the last synchronization date
+     */
+    public function getLastSyncDate() {
+        global $conf, $db;
+
+        $LastSyncDate = null;
+
+        // Get last sync date
+        /*$LastSyncDateSql = "SELECT MAX(t.date_creation) as last_sync_date
+            FROM ".MAIN_DB_PREFIX."pdpconnectfr_call as t
+            WHERE t.provider = '".$this->db->escape($this->providerName)."' 
+            AND t.call_type = 'sync_flow' 
+            AND T.status = 'SUCCESS'";
+            if ($conf->entity && $conf->entity > 1) {
+                $LastSyncDateSql .= " AND t.entity = ".((int) $conf->entity);
+            }
+        $LastSyncDateSql .= ";";*/
+
+        // Retrieve the last synchronization timestamp from the database
+        // Note: The PDP API does not support per-document synchronization yet.
+        // We perform a global sync for all flows and track the last modification
+        // timestamp (tms) from the pdpconnectfr_document table to determine
+        // which flows need to be synchronized since the last successful sync.
+        //
+        // Future enhancement: Individual document sync may be possible when
+        // the PDP provider API supports it.
+        $LastSyncDateSql = "SELECT MAX(t.tms) as last_sync_date
+            FROM ".MAIN_DB_PREFIX."pdpconnectfr_document as t
+            WHERE t.provider = '".$this->db->escape($this->providerName)."' ";
+        
+        
+        $resql = $db->query($LastSyncDateSql);
+
+        if ($resql) {
+            $obj = $db->fetch_object($resql);
+            $LastSyncDate = $obj->last_sync_date  ? strtotime($obj->last_sync_date) : null;
+        } else {
+            dol_syslog(__METHOD__ . " SQL warning: Failed to get last sync date: we try to sync all flows from today", LOG_WARNING);
+        }
+
+        if ($LastSyncDate === null) {
+            // If no last sync date, set to epoch start
+            $LastSyncDate = strtotime('1970-01-01 00:00:00');
+        }
+        return $LastSyncDate;
     }
 }

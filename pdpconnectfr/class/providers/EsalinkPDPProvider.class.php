@@ -24,7 +24,12 @@
  * \brief   Esalink PDP provider integration class
  */
 
+use Luracast\Restler\Data\Arr;
+
 dol_include_once('custom/pdpconnectfr/class/providers/AbstractPDPProvider.class.php');
+dol_include_once('custom/pdpconnectfr/class/protocols/ProtocolManager.class.php');
+dol_include_once('custom/pdpconnectfr/class/call.class.php');
+require_once DOL_DOCUMENT_ROOT . '/core/lib/admin.lib.php';
 
 
 /**
@@ -53,6 +58,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
         // Retrieve and complete the OAuth token information from the database
        	$this->tokenData = $this->fetchOAuthTokenDB();
+
+        $exchangeProtocolConf = getDolGlobalString('PDPCONNECTFR_PROTOCOL');
+        $ProtocolManager = new ProtocolManager($this->db);
+        $this->exchangeProtocol = $ProtocolManager->getprotocol($exchangeProtocolConf);
     }
 
     /**
@@ -128,7 +137,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
     {
         global $langs;
 
-        $response = $this->callApi("healthcheck", "GET");
+        $response = $this->callApi("healthcheck", "GET", false, [], 'Healthcheck');
 
         if ($response['status_code'] === 200) {
             $returnarray['status_code'] = true;
@@ -184,8 +193,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
             'flowInfo' => json_encode([
                 "trackingId" => $object->ref,
                 "name" => "Invoice_" . $object->ref,
-                "flowSyntax" => "FACTUR_X",
-                "flowProfile" => "Basic",
+                "flowSyntax" => "FACTUR-X",
+                "flowProfile" => "CIUS",
                 "sha256" => hash_file('sha256', $invoice_path)
             ]),
             'file' => new CURLFile($invoice_path, 'application/pdf', basename($invoice_path))
@@ -193,7 +202,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 
 
-        $response = $this->callApi("flows", "POSTALREADYFORMATED", $params, $extraHeaders);
+        $response = $this->callApi("flows", "POSTALREADYFORMATED", $params, $extraHeaders, 'Send Invoice');
 
         if ($response['status_code'] == 200 || $response['status_code'] == 202) {
             $flowId = $response['response']['flowId'];
@@ -214,10 +223,6 @@ class EsalinkPDPProvider extends AbstractPDPProvider
     public function sendSampleInvoice()
     {
         $outputLog = array(); // Feedback to display
-
-        $exchangeProtocolConf = getDolGlobalString('PDPCONNECTFR_PROTOCOL');
-        $ProtocolManager = new ProtocolManager($this->db);
-        $this->exchangeProtocol = $ProtocolManager->getprotocol($exchangeProtocolConf);
 
         // Generate sample invoice
         $invoice_path = $this->exchangeProtocol->generateSampleInvoice();
@@ -244,7 +249,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
             'flowInfo' => json_encode([
                 "trackingId" => "INV-2025-001",
                 "name" => "Invoice_2025_001",
-                "flowSyntax" => "FACTUR_X",
+                "flowSyntax" => "FACTUR-X",
                 "flowProfile" => "CIUS",
                 "sha256" => hash_file('sha256', $invoice_path)
             ]),
@@ -253,7 +258,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 
 
-        $response = $this->callApi("flows", "POSTALREADYFORMATED", $params, $extraHeaders);
+        $response = $this->callApi("flows", "POSTALREADYFORMATED", $params, $extraHeaders, 'Send Sample Invoice');
 
         if ($response['status_code'] == 200 || $response['status_code'] == 202) {
 
@@ -270,7 +275,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                 $resource,
                 "GET",
                 false,
-                ['Accept' => 'application/octet-stream']
+                ['Accept' => 'application/octet-stream'],
+                'Retrive Sample Invoice'
             );
 
             if ($response['status_code'] == 200 || $response['status_code'] == 202) {
@@ -297,17 +303,20 @@ class EsalinkPDPProvider extends AbstractPDPProvider
      * @param string                        $method         HTTP method ('GET', 'POST', etc.)
 	 * @param array<string, mixed>|false 	$params 	    Options for the request
      * @param array<string, string>         $extraHeaders   Optional additional headers
-	 * @return array{status_code:int,response:null|string|array<string,mixed>}
+     * @param string|null                   $callType       Functional type of the API call for logging purposes (e.g., 'sync_flows', 'send_invoice')
+     *
+	 * @return array{status_code:int,response:null|string|array<string,mixed>,call_id:null|string}
 	 */
-	public function callApi($resource, $method, $params = false, $extraHeaders = [])
+	public function callApi($resource, $method, $params = false, $extraHeaders = [], $callType = '')
 	{
+        global $conf, $user;
+
         // Validate configuration
         if (!$this->validateConfiguration()) {
             return array('status_code' => 400, 'response' => $this->errors);
         }
 
         require_once DOL_DOCUMENT_ROOT . '/core/lib/geturl.lib.php';
-        //$otherCurlOptions = [];
 
 		$url = $this->getApiUrl() . $resource;
 
@@ -372,7 +381,378 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			}
 		}
 
+        // Log the API call if we have the fonctional type
+        if (!empty($callType)) {
+            $call = new Call($this->db);
+            $call->call_id = $call->getNextCallId();
+            $call->call_type = $callType ?: '';
+            $call->method = $method;
+            $call->endpoint = '/' . $resource;
+            $call->request_body = is_array($params) ? json_encode($params) : $params;
+            $call->response = is_array($returnarray['response']) ? json_encode($returnarray['response']) : $returnarray['response'];
+            $call->provider = 'Esalink';
+            $call->entity = $conf->entity;
+            $call->status = ($returnarray['status_code'] == 200 || $returnarray['status_code'] == 202) ? 1 : 0;
+
+            $result = $call->create($user);
+            if ($result > 0) {
+                $returnarray['call_id'] = $call->call_id;
+            } else {
+                dol_syslog(__METHOD__ . " Failed to log API call to Esalink PDP provider", LOG_ERR);
+            }
+        }
+
 		return $returnarray;
 	}
+
+    /**
+     * Synchronize flows with EsaLink since the last synchronization date.
+     *
+     * @return bool|array{res:int, messages:array<string>} True on success, false on failure along with messages.
+     */
+    public function syncFlows()
+    {
+        global $conf;
+        $results_messages = array();
+        $uuid = $this->generateUuidV4(); // UUID used to correlate logs between Dolibarr and PDP TODO : Store it somewhere
+
+        //self::$PDPCONNECTFR_LAST_IMPORT_KEY = $uuid;
+        self::$PDPCONNECTFR_LAST_IMPORT_KEY = dol_print_date(dol_now(), 'dayhourlog');
+
+        $resource = 'flows/search';
+        $urlparams = array(
+            'Request-Id' => $uuid,
+        );
+            $resource .= '?' . http_build_query($urlparams);
+
+        // First call to get a total count of flows to sync
+        $params = array(
+            'limit' => 1,
+            'where' => array(
+            'updatedAfter' => dol_print_date($this->getLastSyncDate(), '%Y-%m-%dT%H:%M:%S.000Z', 'gmt')
+            )
+        );
+        $response = $this->callApi($resource, "POST", json_encode($params));
+
+        $totalFlows = 0;
+        if ($response['status_code'] != 200) {
+            $this->errors[] = "Failed to retrieve flows for synchronization.";
+            $results_messages[] = "Failed to retrieve flows for synchronization.";
+            return array('res' => 0, 'messages' => $results_messages);
+        }
+
+        $totalFlows = $response['response']['total'] ?? 0;
+
+        if ($totalFlows == 0) {
+            dol_syslog(__METHOD__ . " No flows to synchronize.", LOG_DEBUG);
+            $results_messages[] = "No flows to synchronize.";
+            return array('res' => 1, 'messages' => $results_messages);
+        } else {
+            dol_syslog(__METHOD__ . " Total flows to synchronize: " . $totalFlows, LOG_DEBUG);
+            // Make a second call to get all flows
+            $params['limit'] = $totalFlows;
+            $response = $this->callApi($resource, "POST", json_encode($params), [], "Synchronization");
+
+            if ($response['status_code'] != 200) {
+                $this->errors[] = "Failed to retrieve flows for synchronization.";
+                $results_messages[] = "Failed to retrieve flows for synchronization.";
+                return array('res' => 0, 'messages' => $results_messages);
+            }
+
+            $call_id = $response['call_id'] ?? null;
+            $documents = array();
+            $cdars = array();
+            foreach ($response['response']['results'] as $flow) {
+                switch ($flow["flowSyntax"]) {
+                    case "CDAR":
+                        $cdars[] = $flow;
+                        break;
+                    case "FACTUR-X":
+                        $documents[] = $flow;
+                        break;
+                    default:
+                        $documents[] = $flow;
+                        break;
+                }
+            }
+
+            // Process documents first
+            foreach ($documents as $flow) {
+                $res = $this->syncFlow($flow['flowId'], $call_id);
+                if ($res['res'] != '1') {
+                    $results_messages[] = "Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'];
+                }
+            }
+
+            // Then process CDARs
+            foreach ($cdars as $flow) {
+                $res = $this->syncFlow($flow['flowId'], $call_id);
+                if ($res['res'] != '1') {
+                    $results_messages[] = "Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'];
+                }
+            }
+        }
+
+        $results_messages[] = "Total flows to synchronize: " . $totalFlows;
+        return array('res' => 1, 'messages' => $results_messages);
+    }
+
+    /**
+     * sync flow data.
+     *
+     * @param string $flowId        FlowId
+     * @param string|null $call_id  Call ID for logging purposes
+     *
+     * @return array{res:int, message:string} Returns array with 'res' (1 on success, -1 on failure) and 'message' if error
+     */
+    public function syncFlow($flowId, $call_id = null)
+    {
+        global $conf, $user;
+        dol_include_once('custom/pdpconnectfr/class/document.class.php');
+
+        // call API to get flow details
+        $flowResource = 'flows/' . $flowId;
+        $flowUrlparams = array(
+            'docType' => 'Metadata', // docType can be 'Metadata', 'Original', 'Converted' or 'ReadableView'
+        );
+        $flowResource .= '?' . http_build_query($flowUrlparams);
+        $flowResponse = $this->callApi(
+            $flowResource,
+            "GET",
+            false,
+            ['Accept' => 'application/octet-stream']
+        );
+
+        if ($flowResponse['status_code'] != 200) {
+            return array('res' => '-1', 'message' => "Failed to retrieve flow details for flowId: " . $flowId);
+        }
+
+        // Process flow data
+        $flowData = json_decode($flowResponse['response'], true);
+        $document = new Document($this->db);
+        $document->date_creation        = dol_now();
+        $document->fk_user_creat        = $user->id;
+        $document->fk_call              = null; // TODO
+        $document->flow_id              = $flowId;
+        $document->tracking_idref       = $flowData['trackingId'] ?? null;
+        $document->flow_type            = $flowData['flowType'] ?? null;
+        $document->flow_direction       = $flowData['flowDirection'] ?? null;
+        $document->flow_syntax          = $flowData['flowSyntax'] ?? null;
+        $document->flow_profile         = $flowData['flowProfile'] ?? null;
+        $document->ack_status           = $flowData['acknowledgement']['status'] ?? null;
+        // Change this fields to fit with the new api response =========================================
+        $document->ack_reason_code      = $flowData['acknowledgement']['reasonCode'] ?? null;
+        $document->ack_info             = $flowData['acknowledgement']['additionalInformation'] ?? null;
+        /*=============================================================================================*/
+        $document->document_body        = null;
+        $document->fk_element_id        = null;
+        $document->fk_element_type      = null;
+        $document->submittedat          = $flowData['submittedAt'] ?? null;
+        $document->updatedat            = $flowData['updatedAt'] ?? null;
+        $document->provider             = getDolGlobalString('PDPCONNECTFR_PDP') ?? null;
+        $document->entity               = $conf->entity;
+        $document->flow_uiid            = $flowData['uuid'] ?? null;
+
+        switch ($document->flow_type) {
+            // CustomerInvoice
+            case "CustomerInvoice":
+                // 1. link flow to customer invoice
+                require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
+                $document->fk_element_type = Facture::class;
+                $factureObj = new Facture($this->db);
+                $res = $factureObj->fetch(0, $document->tracking_idref);
+                if ($res < 0) {
+                    return array('res' => '-1', 'message' => "Failed to fetch customer invoice for flowId: " . $flowId);
+                }
+                $document->fk_element_id = $factureObj->id;
+                // 2. save received converted document
+                // TODO
+                break;
+
+            // SupplierInvoice
+            case "SupplierInvoice":
+                // --- Fetch received documents (FacturX PDF)
+                $flowResource = 'flows/' . $flowId;
+                $flowUrlparams = array(
+                    'docType' => 'Converted', // docType can be 'Metadata', 'Original', 'Converted' or 'ReadableView'
+                );
+                $flowResource .= '?' . http_build_query($flowUrlparams);
+                $flowResponse = $this->callApi(
+                    $flowResource,
+                    "GET",
+                    false,
+                    ['Accept' => 'application/octet-stream']
+                );
+
+                if ($flowResponse['status_code'] != 200) {
+                    return array('res' => -1, 'message' => "Failed to retrieve converted (Original) document for SupplierInvoice flow (flowId: $flowId)");
+                }
+                $receivedFile = $flowResponse['response'];
+
+                // Retrive also PDF file generated by PDP
+                $flowResource = 'flows/' . $flowId;
+                $flowUrlparams = array(
+                    'docType' => 'ReadableView', // docType can be 'Metadata', 'Original', 'Converted' or 'ReadableView'
+                );
+                $flowResource .= '?' . http_build_query($flowUrlparams);
+                $flowResponse = $this->callApi(
+                    $flowResource,
+                    "GET",
+                    false,
+                    ['Accept' => 'application/octet-stream']
+                );
+
+                if ($flowResponse['status_code'] != 200) {
+                    return array('res' => -1, 'message' => "Failed to retrieve ReadableView document for SupplierInvoice flow (flowId: $flowId)");
+                }
+                $ReadableViewFile = $flowResponse['response'];
+
+
+                $res = $this->exchangeProtocol->createSupplierInvoiceFromFacturX($receivedFile, $ReadableViewFile);
+                if ($res['res'] != '1') {
+                    return array('res' => -1, 'message' => "Failed to create supplier invoice from FacturX document for flowId: " . $flowId . ". " . $res['message']);
+                }
+                break;
+
+            // Customer Invoice LC (life cycle)
+            case "CustomerInvoiceLC":
+                // 1. link flow document to customer invoice
+                require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
+                $document->fk_element_type = Facture::class;
+                $factureObj = new Facture($this->db);
+                $res = $factureObj->fetch(0, $document->tracking_idref);
+                if ($res < 0) {
+                    return array('res' => '-1', 'message' => "Failed to fetch customer invoice for flowId: " . $flowId);
+                }
+                $document->fk_element_id = $factureObj->id;
+
+                // 2. Read CDAR and update status of linked customer invoice
+                $flowResource = 'flows/' . $flowId;
+                $flowUrlparams = array(
+                    'docType' => 'Original', // docType can be 'Metadata', 'Original', 'Converted' or 'ReadableView'
+                );
+                $flowResource .= '?' . http_build_query($flowUrlparams);
+                $flowResponse = $this->callApi(
+                    $flowResource,
+                    "GET",
+                    false,
+                    ['Accept' => 'application/octet-stream']
+                );
+
+                if ($flowResponse['status_code'] != 200) {
+                    return array('res' => '-1', 'message' => "Failed to retrieve flow details for flowId: " . $flowId);
+                }
+                $cdarXml = $flowResponse['response'];
+
+                dol_include_once('custom/pdpconnectfr/class/utils/CdarHandler.class.php');
+
+                $cdarHandler = new CdarHandler();
+
+                try {
+                    // Parse the CDAR document (returns an array)
+                    $cdarDocument = $cdarHandler->readFromString($cdarXml);
+
+                    // Check if parsing was successful
+                    if (empty($cdarDocument) || !isset($cdarDocument['AcknowledgementDocument'])) {
+                        return array('res' => '-1', 'message' => "Failed to parse CDAR document for flowId: " . $flowId);
+                    }
+
+                    require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
+
+                    $document->fk_element_type = Facture::class;
+                    $factureObj = new Facture($this->db);
+
+                    // Get Invoice Reference from CDAR
+                    $issuerAssignedID = $cdarDocument['AcknowledgementDocument']['ReferenceReferencedDocument']['IssuerAssignedID'];
+
+                    $res = $factureObj->fetch(0, $issuerAssignedID);
+                    if ($res < 0) {
+                        return array(
+                            'res' => '-1',
+                            'message' => "Failed to fetch customer invoice for flowId: " . $flowId . 
+                                        " using CDAR tracking ID: " . $issuerAssignedID
+                        );
+                    }
+
+                    $document->fk_element_id = $factureObj->id;
+
+                    // Retrieve reference data
+                    $refDoc = $cdarDocument['AcknowledgementDocument']['ReferenceReferencedDocument'];
+
+                    // Fill CDAR information in the document
+                    $document->cdar_lifecycle_code = $refDoc['ProcessConditionCode'];
+                    $document->cdar_lifecycle_label = $refDoc['ProcessCondition'];
+                    $document->cdar_reason_code = isset($refDoc['StatusReasonCode']) ? $refDoc['StatusReasonCode'] : '';
+                    $document->cdar_reason_desc = isset($refDoc['StatusReason']) ? $refDoc['StatusReason'] : '';
+                    $document->cdar_reason_detail = isset($refDoc['StatusIncludedNoteContent']) ? $refDoc['StatusIncludedNoteContent'] : '';
+
+                    // Update customer invoice status based on CDAR lifecycle code
+                    // Mapping of lifecycle codes to Dolibarr invoice statuses
+                    $lifecycleCode = $refDoc['ProcessConditionCode'];
+
+                    switch ($lifecycleCode) {
+                        case CdarHandler::PROC_DEPOSITED:  // 200 - Deposited
+                        case CdarHandler::PROC_ISSUED:     // 201 - Issued
+                            break;
+
+                        case CdarHandler::PROC_RECEIVED:   // 202 - Received
+                        case CdarHandler::PROC_AVAILABLE:  // 203 - Available
+                            break;
+
+                        case CdarHandler::PROC_TAKEN_OVER: // 204 - Taken over
+                            break;
+
+                        case CdarHandler::PROC_APPROVED:   // 205 - Approved
+                        case CdarHandler::PROC_PARTIALLY_APPROVED: // 206 - Partially approved
+                            break;
+
+                        case CdarHandler::PROC_DISPUTED:   // 207 - Disputed
+                        case CdarHandler::PROC_SUSPENDED:  // 208 - Suspended
+                            break;
+
+                        case CdarHandler::PROC_COMPLETED:  // 209 - Completed
+                            break;
+
+                        case CdarHandler::PROC_REFUSED:    // 210 - Refused
+                        case CdarHandler::PROC_REJECTED:   // 213 - Rejected
+                            break;
+
+                        case CdarHandler::PROC_PAYMENT_TRANSMITTED: // 211 - Payment transmitted
+                            break;
+
+                        case CdarHandler::PROC_PAID:       // 212 - Paid
+                            break;
+
+                        default:
+                            // Unknown lifecycle code
+                            dol_syslog("Unknown CDAR lifecycle code: " . $lifecycleCode, LOG_WARNING);
+                            break;
+                    }
+
+                } catch (Exception $e) {
+                    return array(
+                        'res' => '-1',
+                        'message' => "Error processing CDAR document for flowId: " . $flowId . " - " . $e->getMessage()
+                    );
+                }
+
+                break;
+
+            // Supplier Invoice LC (life cycle)
+            case "SupplierInvoiceLC":
+                $document->document_type = 'INVOICE';
+                break;
+        }
+
+        $document->call_id = $call_id;
+        $res = $document->create($user);
+        if ($res < 0) {
+            //print_r($document->errors);
+            return array('res' => '-1', 'message' => "Failed to store flow data for flowId: " . $flowId . ". Errors: " . implode(", ", $document->errors));
+        }
+
+        return array('res' => '1', 'message' => '');
+    }
+
 
 }

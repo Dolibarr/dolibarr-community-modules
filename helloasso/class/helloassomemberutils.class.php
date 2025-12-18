@@ -40,13 +40,13 @@ class HelloAssoMemberUtils
     public $helloasso_members;
     public $helloasso_member_types = array();
     public $helloasso_date_last_fetch = "";
-    
+
     public $error;
     public $errors = array();
     public $nbPosts = 0;
     public $output = "";
     private $helloasso_tokens = array();
-    
+
     public $memberfields = array(
         "name",
         "email",
@@ -92,11 +92,11 @@ class HelloAssoMemberUtils
 
         $mappingstr = getDolGlobalString("HELLOASSO_TYPE_MEMBER_MAPPING");
         if (!empty($mappingstr)) {
-            $this->helloasso_member_types = json_decode($mappingstr, true);   
+            $this->helloasso_member_types = json_decode($mappingstr, true);
 		}
         $mappingcustomfieldsstr = getDolGlobalString("HELLOASSO_CUSTOM_FIELD_MAPPING");
         if (!empty($mappingcustomfieldsstr)) {
-            $this->customfields = json_decode($mappingcustomfieldsstr, true);   
+            $this->customfields = json_decode($mappingcustomfieldsstr, true);
 		}
 
         $this->helloasso_date_last_fetch = getDolGlobalString("HELLOASSO_DATE_LAST_MEMBER_FETCH");
@@ -108,10 +108,10 @@ class HelloAssoMemberUtils
 
     /**
      * Sync Members form HelloAsso to Dolibarr
-     * 
+     *
      * @param   int        $dryrun    0 for normal run, 1 for dry run
      * @param   string     $mode      If set to "cron" disable SetEventMessages
-     * 
+     *
      * @return  int              0 if OK, <> 0 if KO (this function is used also by cron so only 0 is OK)
      */
 
@@ -179,7 +179,7 @@ class HelloAssoMemberUtils
 
     /**
      * Post array $this->helloasso_members of HelloAsso Members to Dolibarr
-     * 
+     *
      * @return int >0 if OK, 0 if nothing to do, <0 if KO
      */
 
@@ -189,7 +189,7 @@ class HelloAssoMemberUtils
         $db = $this->db;
         $error = 0;
         $datelastfetch = 0;
-        
+
         $headers[] = "Authorization: ".ucfirst($this->helloasso_tokens["token_type"])." ".$this->helloasso_tokens["access_token"];
         $headers[] = "Accept: application/json";
         $headers[] = "Content-Type: application/json";
@@ -232,7 +232,7 @@ class HelloAssoMemberUtils
 
         $helloasso_members = $this->helloasso_members;
         foreach ($helloasso_members as $key => $newmember) {
-            $date_start_subscription = dol_stringtotime($newmember->order->meta->createdAt); 
+            $date_start_subscription = dol_stringtotime($newmember->order->meta->createdAt);
             $member = new Adherent($db);
             $membertype = new AdherentType($db);
             $amount = $newmember->initialAmount / 100;
@@ -315,10 +315,10 @@ class HelloAssoMemberUtils
 
                 // Create new subscription
                 if (!$error) {
-                    $date_start_subscription = dol_stringtotime($newmember->order->meta->createdAt); 
+                    $date_start_subscription = dol_stringtotime($newmember->order->meta->createdAt);
                     $date_end_subscription = dol_time_plus_duree($date_start_subscription, $membertype->duration_value, $membertype->duration_unit);
                     if ($jsonmembertype->validityType == "Custom") {
-                        $date_start_subscription = dol_stringtotime($jsonmembertype->startDate); 
+                        $date_start_subscription = dol_stringtotime($jsonmembertype->startDate);
                         $date_end_subscription = dol_stringtotime($jsonmembertype->endDate);
                     } else {
                         $result = $member->fetch_subscriptions();
@@ -328,7 +328,7 @@ class HelloAssoMemberUtils
                             return -6;
                         }
                         if (!empty($member->last_subscription_date_end)) {
-                            $date_start_subscription = $member->last_subscription_date_end; 
+                            $date_start_subscription = $member->last_subscription_date_end;
                             $date_end_subscription = dol_time_plus_duree($date_start_subscription, $membertype->duration_value, $membertype->duration_unit);
                         }
                     }
@@ -412,10 +412,10 @@ class HelloAssoMemberUtils
 
     /**
      * Get Members from HelloAsso API and set $this->helloasso_members
-     * 
+     *
      * @param string        $helloasso_date_last_fetch      Date of last member fetch
      * @param int           $dryrun                         if !=0 dryrun, if 0 normal run
-     * 
+     *
      * @return int          >0 if OK, 0 if noting to do, <0 if KO
      */
 
@@ -513,10 +513,10 @@ class HelloAssoMemberUtils
 
     /**
      * Set array of correspondance between HelloAsso and Dolibarr member type
-     * 
+     *
      * @param   int   $dolibarrmembertype     Id of member type in Dolibarr
      * @param   int   $helloassomembertype    Id of member type in HelloAsso
-     * 
+     *
      * @return  int   >0 if Ok, <0 if Ko
      */
     public function setHelloAssoTypeMemberMapping($dolibarrmembertype, $helloassomembertype)
@@ -546,10 +546,10 @@ class HelloAssoMemberUtils
 
      /**
      * Set array of correspondance between HelloAsso custom fields and Dolibarr fields
-     * 
+     *
      * @param   string   $dolibarrfield          Dolibar field of member object
      * @param   string   $helloassomembertype    HelloAsso custom field name
-     * 
+     *
      * @return  int   >0 if Ok, <0 if Ko
      */
     public function setHelloAssoCustomFieldMapping($dolibarrfield, $helloassofield)
@@ -579,10 +579,10 @@ class HelloAssoMemberUtils
 
     /**
      * Create HelloAsso member type in Dolibarr database
-     * 
+     *
      * @param   stdClass    $object     Object with HelloAsso member type data
      * @param   string      $label      Label of new member type in Dolibarr
-     * 
+     *
      * @return  int   >0 if Ok, <0 if Ko
      */
     public function createHelloAssoTypeMember($object, $label)
@@ -607,7 +607,7 @@ class HelloAssoMemberUtils
                 $duration_unit = "";
                 $subscription = 0;
                 break;
-            
+
             default:
                 $duration_value = "1";
                 $duration_unit = "y";
@@ -633,10 +633,10 @@ class HelloAssoMemberUtils
 
     /**
      * Create HelloAsso member in Dolibarr database
-     * 
+     *
      * @param   stdClass    $newmember     Object with HelloAsso member data
      * @param   int         $membertype    Id of member type in Dolibarr to set to new Dolibarr member
-     * 
+     *
      * @return  int   >0 if Ok, <0 if Ko
      */
     public function createHelloAssoMember($newmember, $membertype)
@@ -648,6 +648,9 @@ class HelloAssoMemberUtils
 
         $createmember->firstname = $newmember->user->firstName;
         $createmember->lastname = $newmember->user->lastName;
+        if (getDolGlobalString('ADHERENT_MAIL_REQUIRED') && isValidEmail((string) $newmember->payer->email)) {
+        	$createmember->email = $newmember->payer->email;
+        }
         $createmember->typeid = $membertype;
         $createmember->morphy = "phy";
         if (!empty($newmember->customFields) && !empty($this->customfields)) {

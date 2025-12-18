@@ -189,7 +189,7 @@ class modPDPConnectFR extends DolibarrModules
 		/* END MODULEBUILDER TABS */
 		// Example:
 		// To add a new tab identified by code tabname1
-		// $this->tabs[] = array('data' => 'objecttype:+tabname1:Title1:mylangfile@pdpconnectfr:$user->hasRight('pdpconnectfr', 'myobject', 'read'):/pdpconnectfr/mynewtab1.php?id=__ID__');
+		// $this->tabs[] = array('data' => 'objecttype:+tabname1:Title1:mylangfile@pdpconnectfr:$user->hasRight('pdpconnectfr', 'call', 'read'):/pdpconnectfr/mynewtab1.php?id=__ID__');
 		// To add another new tab identified by code tabname2. Label will be result of calling all substitution functions on 'Title2' key.
 		// $this->tabs[] = array('data' => 'objecttype:+tabname2:SUBSTITUTION_Title2:mylangfile@pdpconnectfr:$user->hasRight('othermodule', 'otherobject', 'read'):/pdpconnectfr/mynewtab2.php?id=__ID__',
 		// To remove an existing tab identified by code tabname
@@ -268,8 +268,8 @@ class modPDPConnectFR extends DolibarrModules
 			//  0 => array(
 			//      'label' => 'MyJob label',
 			//      'jobtype' => 'method',
-			//      'class' => '/pdpconnectfr/class/myobject.class.php',
-			//      'objectname' => 'MyObject',
+			//      'class' => '/pdpconnectfr/class/call.class.php',
+			//      'objectname' => 'Call',
 			//      'method' => 'doScheduledJob',
 			//      'parameters' => '',
 			//      'comment' => 'Comment',
@@ -291,24 +291,37 @@ class modPDPConnectFR extends DolibarrModules
 		$r = 0;
 		// Add here entries to declare new permissions
 		/* BEGIN MODULEBUILDER PERMISSIONS */
-		/*
-		$o = 1;
-		$this->rights[$r][0] = $this->numero . sprintf("%02d", ($o * 10) + 1); // Permission id (must not be already used)
-		$this->rights[$r][1] = 'Read objects of PDPConnectFR'; // Permission label
-		$this->rights[$r][4] = 'myobject';
-		$this->rights[$r][5] = 'read'; // In php code, permission will be checked by test if ($user->hasRight('pdpconnectfr', 'myobject', 'read'))
+		$this->rights[$r][0] = $this->numero . sprintf('%02d', (0 * 10) + 0 + 1);
+		$this->rights[$r][1] = 'Read Call object of PDPConnectFR';
+		$this->rights[$r][4] = 'call';
+		$this->rights[$r][5] = 'read';
 		$r++;
-		$this->rights[$r][0] = $this->numero . sprintf("%02d", ($o * 10) + 2); // Permission id (must not be already used)
-		$this->rights[$r][1] = 'Create/Update objects of PDPConnectFR'; // Permission label
-		$this->rights[$r][4] = 'myobject';
-		$this->rights[$r][5] = 'write'; // In php code, permission will be checked by test if ($user->hasRight('pdpconnectfr', 'myobject', 'write'))
+		$this->rights[$r][0] = $this->numero . sprintf('%02d', (0 * 10) + 1 + 1);
+		$this->rights[$r][1] = 'Create/Update Call object of PDPConnectFR';
+		$this->rights[$r][4] = 'call';
+		$this->rights[$r][5] = 'write';
 		$r++;
-		$this->rights[$r][0] = $this->numero . sprintf("%02d", ($o * 10) + 3); // Permission id (must not be already used)
-		$this->rights[$r][1] = 'Delete objects of PDPConnectFR'; // Permission label
-		$this->rights[$r][4] = 'myobject';
-		$this->rights[$r][5] = 'delete'; // In php code, permission will be checked by test if ($user->hasRight('pdpconnectfr', 'myobject', 'delete'))
+		$this->rights[$r][0] = $this->numero . sprintf('%02d', (0 * 10) + 2 + 1);
+		$this->rights[$r][1] = 'Delete Call object of PDPConnectFR';
+		$this->rights[$r][4] = 'call';
+		$this->rights[$r][5] = 'delete';
 		$r++;
-		*/
+		$this->rights[$r][0] = $this->numero . sprintf('%02d', (1 * 10) + 0 + 1);
+		$this->rights[$r][1] = 'Read Document object of PDPConnectFR';
+		$this->rights[$r][4] = 'document';
+		$this->rights[$r][5] = 'read';
+		$r++;
+		$this->rights[$r][0] = $this->numero . sprintf('%02d', (1 * 10) + 1 + 1);
+		$this->rights[$r][1] = 'Create/Update Document object of PDPConnectFR';
+		$this->rights[$r][4] = 'document';
+		$this->rights[$r][5] = 'write';
+		$r++;
+		$this->rights[$r][0] = $this->numero . sprintf('%02d', (1 * 10) + 2 + 1);
+		$this->rights[$r][1] = 'Delete Document object of PDPConnectFR';
+		$this->rights[$r][4] = 'document';
+		$this->rights[$r][5] = 'delete';
+		$r++;
+
 		/* END MODULEBUILDER PERMISSIONS */
 
 
@@ -328,59 +341,115 @@ class modPDPConnectFR extends DolibarrModules
 			'langs' => 'pdpconnectfr@pdpconnectfr', // Lang file to use (without .lang) by module. File must be in langs/code_CODE/ directory.
 			'position' => 1000 + $r,
 			'enabled' => 'isModEnabled("pdpconnectfr")', // Define condition to show or hide menu entry. Use 'isModEnabled("pdpconnectfr")' if entry must be visible if module is enabled.
-			'perms' => '1', // Use 'perms'=>'$user->hasRight("pdpconnectfr", "myobject", "read")' if you want your menu with a permission rules
+			'perms' => '1', // Use 'perms'=>'$user->hasRight("pdpconnectfr", "call", "read")' if you want your menu with a permission rules
 			'target' => '',
 			'user' => 2, // 0=Menu for internal users, 1=external users, 2=both
 		);*/
 		/* END MODULEBUILDER TOPMENU */
 
-		/* BEGIN MODULEBUILDER LEFTMENU MYOBJECT */
+
+
+				/* BEGIN MODULEBUILDER LEFTMENU PDPEXCHANGE */
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=billing',
+			'type' => 'left',
+			'titre' => 'pdpExchange',
+			'prefix' => img_picto('', 'pdpconnectfr.png@pdpconnectfr', 'class="pictofixedwidth valignmiddle paddingright"'),
+			'mainmenu' => 'billing',
+			'leftmenu' => 'pdpconnectfr_billing',
+			'url' => '/pdpconnectfr/pdpconnectfrindex.php',
+			'langs' => 'pdpconnectfr@pdpconnectfr',
+			'position' => 1000,
+			'enabled' => 'isModEnabled(\'pdpconnectfr\')',
+			'perms' => '$user->hasRight(\'facture\', \'lire\')',
+			'target' => '',
+			'user' => 2,
+			'object' => '',
+		);
+		/* END MODULEBUILDER LEFTMENU PDPEXCHANGE */
+		/* BEGIN MODULEBUILDER LEFTMENU PDPDOCUMENTS */
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=billing,fk_leftmenu=pdpconnectfr_billing',
+			'type' => 'left',
+			'titre' => 'PdpDocuments',
+			'mainmenu' => 'billing',
+			'leftmenu' => 'pdpconnectfr_documents',
+			'url' => '/pdpconnectfr/document_list.php',
+			'langs' => 'pdpconnectfr@pdpconnectfr',
+			'position' => 1001,
+			'enabled' => 'isModEnabled(pdpconnectfr)',
+			'perms' => '$user->hasRight(facture, lire)',
+			'target' => '',
+			'user' => 2,
+			'object' => '',
+		);
+		/* END MODULEBUILDER LEFTMENU PDPDOCUMENTS */
+		/* BEGIN MODULEBUILDER LEFTMENU PDPSOCIETIES */
+		// $this->menu[$r++] = array(
+		// 	'fk_menu' => 'fk_mainmenu=billing,fk_leftmenu=pdpconnectfr_billing',
+		// 	'type' => 'left',
+		// 	'titre' => 'pdpSocieties',
+		// 	'mainmenu' => 'billing',
+		// 	'leftmenu' => 'pdpconnectfr_societies',
+		// 	'url' => '/pdpconnectfr/pdpconnectfrindex.php',
+		// 	'langs' => 'pdpconnectfr@pdpconnectfr',
+		// 	'position' => 1002,
+		// 	'enabled' => 'isModEnabled(\'pdpconnectfr\')',
+		// 	'perms' => '$user->hasRight(\'facture\', \'lire\')',
+		// 	'target' => '',
+		// 	'user' => 2,
+		// 	'object' => '',
+		// );
+		/* END MODULEBUILDER LEFTMENU PDPSOCIETIES */
+		/* BEGIN MODULEBUILDER LEFTMENU PDPFEEDBACK */
+		$this->menu[$r++] = array( // TODO : we can move this page into the administration menu or module configuration page
+			'fk_menu' => 'fk_mainmenu=billing,fk_leftmenu=pdpconnectfr_billing',
+			'type' => 'left',
+			'titre' => 'pdpFeedback',
+			'mainmenu' => 'billing',
+			'leftmenu' => 'pdpconnectfr_feedback',
+			'url' => '/pdpconnectfr/call_list.php',
+			'langs' => 'pdpconnectfr@pdpconnectfr',
+			'position' => 1003,
+			'enabled' => 'isModEnabled(\'pdpconnectfr\')',
+			'perms' => '$user->hasRight(\'facture\', \'lire\')',
+			'target' => '',
+			'user' => 2,
+			'object' => '',
+		);
+		/* END MODULEBUILDER LEFTMENU PDPFEEDBACK */
+
+
 		/*
 		$this->menu[$r++]=array(
-			'fk_menu' => 'fk_mainmenu=pdpconnectfr',      // '' if this is a top menu. For left menu, use 'fk_mainmenu=xxx' or 'fk_mainmenu=xxx,fk_leftmenu=yyy' where xxx is mainmenucode and yyy is a leftmenucode
-			'type' => 'left',                          // This is a Left menu entry
-			'titre' => 'MyObject',
-			'prefix' => img_picto('', $this->picto, 'class="pictofixedwidth valignmiddle paddingright"'),
-			'mainmenu' => 'pdpconnectfr',
-			'leftmenu' => 'myobject',
-			'url' => '/pdpconnectfr/pdpconnectfrindex.php',
-			'langs' => 'pdpconnectfr@pdpconnectfr',	        // Lang file to use (without .lang) by module. File must be in langs/code_CODE/ directory.
-			'position' => 1000 + $r,
-			'enabled' => 'isModEnabled("pdpconnectfr")', // Define condition to show or hide menu entry. Use 'isModEnabled("pdpconnectfr")' if entry must be visible if module is enabled.
-			'perms' => '$user->hasRight("pdpconnectfr", "myobject", "read")',
-			'target' => '',
-			'user' => 2,				                // 0=Menu for internal users, 1=external users, 2=both
-			'object' => 'MyObject'
-		);
-		$this->menu[$r++]=array(
-			'fk_menu' => 'fk_mainmenu=pdpconnectfr,fk_leftmenu=myobject',	    // '' if this is a top menu. For left menu, use 'fk_mainmenu=xxx' or 'fk_mainmenu=xxx,fk_leftmenu=yyy' where xxx is mainmenucode and yyy is a leftmenucode
+			'fk_menu' => 'fk_mainmenu=pdpconnectfr,fk_leftmenu=call',	    // '' if this is a top menu. For left menu, use 'fk_mainmenu=xxx' or 'fk_mainmenu=xxx,fk_leftmenu=yyy' where xxx is mainmenucode and yyy is a leftmenucode
 			'type' => 'left',			                // This is a Left menu entry
-			'titre' => 'New_MyObject',
+			'titre' => 'New_Call',
 			'mainmenu' => 'pdpconnectfr',
-			'leftmenu' => 'pdpconnectfr_myobject_new',
-			'url' => '/pdpconnectfr/myobject_card.php?action=create',
+			'leftmenu' => 'pdpconnectfr_call_new',
+			'url' => '/pdpconnectfr/call_card.php?action=create',
 			'langs' => 'pdpconnectfr@pdpconnectfr',	        // Lang file to use (without .lang) by module. File must be in langs/code_CODE/ directory.
 			'position' => 1000 + $r,
 			'enabled' => 'isModEnabled("pdpconnectfr")', // Define condition to show or hide menu entry. Use 'isModEnabled("pdpconnectfr")' if entry must be visible if module is enabled. Use '$leftmenu==\'system\'' to show if leftmenu system is selected.
-			'perms' => '$user->hasRight("pdpconnectfr", "myobject", "write")'
+			'perms' => '$user->hasRight("pdpconnectfr", "call", "write")'
 			'target' => '',
 			'user' => 2,				                // 0=Menu for internal users, 1=external users, 2=both
-			'object' => 'MyObject'
+			'object' => 'Call'
 		);
 		$this->menu[$r++]=array(
-			'fk_menu' => 'fk_mainmenu=pdpconnectfr,fk_leftmenu=myobject',	    // '' if this is a top menu. For left menu, use 'fk_mainmenu=xxx' or 'fk_mainmenu=xxx,fk_leftmenu=yyy' where xxx is mainmenucode and yyy is a leftmenucode
+			'fk_menu' => 'fk_mainmenu=pdpconnectfr,fk_leftmenu=call',	    // '' if this is a top menu. For left menu, use 'fk_mainmenu=xxx' or 'fk_mainmenu=xxx,fk_leftmenu=yyy' where xxx is mainmenucode and yyy is a leftmenucode
 			'type' => 'left',			                // This is a Left menu entry
-			'titre' => 'List_MyObject',
+			'titre' => 'List_Call',
 			'mainmenu' => 'pdpconnectfr',
-			'leftmenu' => 'pdpconnectfr_myobject_list',
-			'url' => '/pdpconnectfr/myobject_list.php',
+			'leftmenu' => 'pdpconnectfr_call_list',
+			'url' => '/pdpconnectfr/call_list.php',
 			'langs' => 'pdpconnectfr@pdpconnectfr',	        // Lang file to use (without .lang) by module. File must be in langs/code_CODE/ directory.
 			'position' => 1000 + $r,
 			'enabled' => 'isModEnabled("pdpconnectfr")', // Define condition to show or hide menu entry. Use 'isModEnabled("pdpconnectfr")' if entry must be visible if module is enabled.
-			'perms' => '$user->hasRight("pdpconnectfr", "myobject", "read")'
+			'perms' => '$user->hasRight("pdpconnectfr", "call", "read")'
 			'target' => '',
 			'user' => 2,				                // 0=Menu for internal users, 1=external users, 2=both
-			'object' => 'MyObject'
+			'object' => 'Call'
 		);
 		*/
 		/* END MODULEBUILDER LEFTMENU MYOBJECT */
@@ -392,28 +461,28 @@ class modPDPConnectFR extends DolibarrModules
 		/*
 		$langs->load("pdpconnectfr@pdpconnectfr");
 		$this->export_code[$r] = $this->rights_class.'_'.$r;
-		$this->export_label[$r] = 'MyObjectLines';	// Translation key (used only if key ExportDataset_xxx_z not found)
+		$this->export_label[$r] = 'CallLines';	// Translation key (used only if key ExportDataset_xxx_z not found)
 		$this->export_icon[$r] = $this->picto;
 		// Define $this->export_fields_array, $this->export_TypeFields_array and $this->export_entities_array
-		$keyforclass = 'MyObject'; $keyforclassfile='/pdpconnectfr/class/myobject.class.php'; $keyforelement='myobject@pdpconnectfr';
+		$keyforclass = 'Call'; $keyforclassfile='/pdpconnectfr/class/call.class.php'; $keyforelement='call@pdpconnectfr';
 		include DOL_DOCUMENT_ROOT.'/core/commonfieldsinexport.inc.php';
 		//$this->export_fields_array[$r]['t.fieldtoadd']='FieldToAdd'; $this->export_TypeFields_array[$r]['t.fieldtoadd']='Text';
 		//unset($this->export_fields_array[$r]['t.fieldtoremove']);
-		//$keyforclass = 'MyObjectLine'; $keyforclassfile='/pdpconnectfr/class/myobject.class.php'; $keyforelement='myobjectline@pdpconnectfr'; $keyforalias='tl';
+		//$keyforclass = 'CallLine'; $keyforclassfile='/pdpconnectfr/class/call.class.php'; $keyforelement='callline@pdpconnectfr'; $keyforalias='tl';
 		//include DOL_DOCUMENT_ROOT.'/core/commonfieldsinexport.inc.php';
-		$keyforselect='myobject'; $keyforaliasextra='extra'; $keyforelement='myobject@pdpconnectfr';
+		$keyforselect='call'; $keyforaliasextra='extra'; $keyforelement='call@pdpconnectfr';
 		include DOL_DOCUMENT_ROOT.'/core/extrafieldsinexport.inc.php';
-		//$keyforselect='myobjectline'; $keyforaliasextra='extraline'; $keyforelement='myobjectline@pdpconnectfr';
+		//$keyforselect='callline'; $keyforaliasextra='extraline'; $keyforelement='callline@pdpconnectfr';
 		//include DOL_DOCUMENT_ROOT.'/core/extrafieldsinexport.inc.php';
-		//$this->export_dependencies_array[$r] = array('myobjectline' => array('tl.rowid','tl.ref')); // To force to activate one or several fields if we select some fields that need same (like to select a unique key if we ask a field of a child to avoid the DISTINCT to discard them, or for computed field than need several other fields)
+		//$this->export_dependencies_array[$r] = array('callline' => array('tl.rowid','tl.ref')); // To force to activate one or several fields if we select some fields that need same (like to select a unique key if we ask a field of a child to avoid the DISTINCT to discard them, or for computed field than need several other fields)
 		//$this->export_special_array[$r] = array('t.field' => '...');
 		//$this->export_examplevalues_array[$r] = array('t.field' => 'Example');
 		//$this->export_help_array[$r] = array('t.field' => 'FieldDescHelp');
 		$this->export_sql_start[$r]='SELECT DISTINCT ';
-		$this->export_sql_end[$r]  =' FROM '.$this->db->prefix().'pdpconnectfr_myobject as t';
-		//$this->export_sql_end[$r]  .=' LEFT JOIN '.$this->db->prefix().'pdpconnectfr_myobject_line as tl ON tl.fk_myobject = t.rowid';
+		$this->export_sql_end[$r]  =' FROM '.$this->db->prefix().'pdpconnectfr_call as t';
+		//$this->export_sql_end[$r]  .=' LEFT JOIN '.$this->db->prefix().'pdpconnectfr_call_line as tl ON tl.fk_call = t.rowid';
 		$this->export_sql_end[$r] .=' WHERE 1 = 1';
-		$this->export_sql_end[$r] .=' AND t.entity IN ('.getEntity('myobject').')';
+		$this->export_sql_end[$r] .=' AND t.entity IN ('.getEntity('call').')';
 		$r++; */
 		/* END MODULEBUILDER EXPORT MYOBJECT */
 
@@ -423,27 +492,27 @@ class modPDPConnectFR extends DolibarrModules
 		/*
 		$langs->load("pdpconnectfr@pdpconnectfr");
 		$this->import_code[$r] = $this->rights_class.'_'.$r;
-		$this->import_label[$r] = 'MyObjectLines';	// Translation key (used only if key ExportDataset_xxx_z not found)
+		$this->import_label[$r] = 'CallLines';	// Translation key (used only if key ExportDataset_xxx_z not found)
 		$this->import_icon[$r] = $this->picto;
-		$this->import_tables_array[$r] = array('t' => $this->db->prefix().'pdpconnectfr_myobject', 'extra' => $this->db->prefix().'pdpconnectfr_myobject_extrafields');
+		$this->import_tables_array[$r] = array('t' => $this->db->prefix().'pdpconnectfr_call', 'extra' => $this->db->prefix().'pdpconnectfr_call_extrafields');
 		$this->import_tables_creator_array[$r] = array('t' => 'fk_user_author'); // Fields to store import user id
 		$import_sample = array();
-		$keyforclass = 'MyObject'; $keyforclassfile='/pdpconnectfr/class/myobject.class.php'; $keyforelement='myobject@pdpconnectfr';
+		$keyforclass = 'Call'; $keyforclassfile='/pdpconnectfr/class/call.class.php'; $keyforelement='call@pdpconnectfr';
 		include DOL_DOCUMENT_ROOT.'/core/commonfieldsinimport.inc.php';
 		$import_extrafield_sample = array();
-		$keyforselect='myobject'; $keyforaliasextra='extra'; $keyforelement='myobject@pdpconnectfr';
+		$keyforselect='call'; $keyforaliasextra='extra'; $keyforelement='call@pdpconnectfr';
 		include DOL_DOCUMENT_ROOT.'/core/extrafieldsinimport.inc.php';
-		$this->import_fieldshidden_array[$r] = array('extra.fk_object' => 'lastrowid-'.$this->db->prefix().'pdpconnectfr_myobject');
+		$this->import_fieldshidden_array[$r] = array('extra.fk_object' => 'lastrowid-'.$this->db->prefix().'pdpconnectfr_call');
 		$this->import_regex_array[$r] = array();
 		$this->import_examplevalues_array[$r] = array_merge($import_sample, $import_extrafield_sample);
 		$this->import_updatekeys_array[$r] = array('t.ref' => 'Ref');
 		$this->import_convertvalue_array[$r] = array(
 			't.ref' => array(
 				'rule'=>'getrefifauto',
-				'class'=>(!getDolGlobalString('PDPCONNECTFR_MYOBJECT_ADDON') ? 'mod_myobject_standard' : getDolGlobalString('PDPCONNECTFR_MYOBJECT_ADDON')),
-				'path'=>"/core/modules/pdpconnectfr/".(!getDolGlobalString('PDPCONNECTFR_MYOBJECT_ADDON') ? 'mod_myobject_standard' : getDolGlobalString('PDPCONNECTFR_MYOBJECT_ADDON')).'.php',
-				'classobject'=>'MyObject',
-				'pathobject'=>'/pdpconnectfr/class/myobject.class.php',
+				'class'=>(!getDolGlobalString('PDPCONNECTFR_MYOBJECT_ADDON') ? 'mod_call_standard' : getDolGlobalString('PDPCONNECTFR_MYOBJECT_ADDON')),
+				'path'=>"/core/modules/pdpconnectfr/".(!getDolGlobalString('PDPCONNECTFR_MYOBJECT_ADDON') ? 'mod_call_standard' : getDolGlobalString('PDPCONNECTFR_MYOBJECT_ADDON')).'.php',
+				'classobject'=>'Call',
+				'pathobject'=>'/pdpconnectfr/class/call.class.php',
 			),
 			't.fk_soc' => array('rule' => 'fetchidfromref', 'file' => '/societe/class/societe.class.php', 'class' => 'Societe', 'method' => 'fetch', 'element' => 'ThirdParty'),
 			't.fk_user_valid' => array('rule' => 'fetchidfromref', 'file' => '/user/class/user.class.php', 'class' => 'User', 'method' => 'fetch', 'element' => 'user'),
@@ -479,18 +548,152 @@ class modPDPConnectFR extends DolibarrModules
 		$param = array('options' => array(1 => 0));
 		$sql = array();
 
+		// Product extrafields
+		$result = $extrafields->addExtraField(
+			'pdpconnectfr_product_separator',
+			$langs->trans('PdpConnectFRProductSeparator'),
+			'separate',
+			112008,
+			'',
+			'product',
+			0,
+			1,
+			'',
+			$param,
+			1,
+			'',
+			1,
+			0,
+			'',
+			'',
+			'pdpconnectfr@pdpconnectfr',
+			'isModEnabled("pdpconnectfr")'
+		);
+		$result = $extrafields->addExtraField(
+			'pdpconnectfr_source',
+			$langs->trans('PdpConnectFRProductSource'),
+			'varchar',
+			112009,
+			100,
+			'product',
+			0,
+			0,
+			'',
+			null,
+			1,
+			'',
+			1,
+			0,
+			'',
+			'',
+			'pdpconnectfr@pdpconnectfr',
+			'isModEnabled("pdpconnectfr")',
+			0,
+			1
+		);
+
 		// Invoice extrafields
-		$result = $extrafields->addExtraField('d4d_separator', $langs->trans('ChorusSeparator'), 'separate', 112001, '', 'facture', 0, 1, '', $param, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', '$conf->global->PDPCONNECTFR_USE_CHORUS');
-        $result = $extrafields->addExtraField('d4d_service_code', $langs->trans('ChorusServiceCode'), 'varchar', 112002, 100, 'facture', 0, 0, '', null, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', '$conf->global->PDPCONNECTFR_USE_CHORUS', 0, 2);
-        $result = $extrafields->addExtraField('d4d_contract_number', $langs->trans('ChorusContractNumber'), 'varchar', 112003, 50, 'facture', 0, 0, '', null, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', '$conf->global->PDPCONNECTFR_USE_CHORUS', 0, 2);
-        $result = $extrafields->addExtraField('d4d_promise_code', $langs->trans('ChorusPromiseCode'), 'varchar', 112004, 50, 'facture', 0, 0, '', null, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', '$conf->global->PDPCONNECTFR_USE_CHORUS', 0, 2);
-        $result = $extrafields->addExtraField('d4d_chorus_id', $langs->trans('ChorusId'), 'varchar', 112005, 36, 'facture', 0, 0, '', null, 1, '', 1, 0, '$object->array_options["options_chorus_id"]', '', 'pdpconnectfr@pdpconnectfr', '$conf->global->PDPCONNECTFR_USE_CHORUS', 0, 1);
+		// Chorus fields
+		$result = $extrafields->addExtraField('d4d_separator', $langs->trans('ChorusSeparator'), 'separate', 112001, '', 'facture', 0, 1, '', $param, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', 'getDolGlobalInt("PDPCONNECTFR_USE_CHORUS")');
+        $result = $extrafields->addExtraField('d4d_service_code', $langs->trans('ChorusServiceCode'), 'varchar', 112002, 100, 'facture', 0, 0, '', null, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', 'getDolGlobalInt("PDPCONNECTFR_USE_CHORUS")', 0, 1);
+        $result = $extrafields->addExtraField('d4d_contract_number', $langs->trans('ChorusContractNumber'), 'varchar', 112003, 50, 'facture', 0, 0, '', null, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', 'getDolGlobalInt("PDPCONNECTFR_USE_CHORUS")', 0, 1);
+        $result = $extrafields->addExtraField('d4d_promise_code', $langs->trans('ChorusPromiseCode'), 'varchar', 112004, 50, 'facture', 0, 0, '', null, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', 'getDolGlobalInt("PDPCONNECTFR_USE_CHORUS")', 0, 1);
+        $result = $extrafields->addExtraField('d4d_chorus_id', $langs->trans('ChorusId'), 'varchar', 112005, 36, 'facture', 0, 0, '', null, 1, '', 1, 0, '$object->array_options["options_chorus_id"]', '', 'pdpconnectfr@pdpconnectfr', 'getDolGlobalInt("PDPCONNECTFR_USE_CHORUS")', 0, 1);
+		// FacturX and PDP/PA fields
+		$result = $extrafields->addExtraField(
+			'pdpconnectfr_invoice_separator',
+			$langs->trans('pdpconnectfrInvoiceSeparator'),
+			'separate',
+			112006,
+			'',
+			'facture',
+			0,
+			1,
+			'',
+			$param,
+			1,
+			'',
+			1,
+			0,
+			'',
+			'',
+			'pdpconnectfr@pdpconnectfr',
+			'isModEnabled("pdpconnectfr")'
+		);
+
+		$result = $extrafields->addExtraField(
+			'pdpconnectfr_invoice_status',
+			$langs->trans('pdpconnectfrInvoiceStatus'),
+			'select',
+			112007,
+			50,
+			'facture',
+			0,
+			0,
+			0,
+			array(
+				'options' => array(
+					// Status Interne Dolibarr
+					'0' => 'Not generated',
+					'1' => 'Generated (ready to send)',
+					'2' => 'Sent (awaiting acknowledgment)',
+					// Status normés PDP/PA
+					'200' => 'Deposited',
+					'201' => 'Issued',
+					'202' => 'Received',
+					'203' => 'Available',
+					'204' => 'Taken over',
+					'205' => 'Approved',
+					'206' => 'Partially approved',
+					'207' => 'Disputed',
+					'208' => 'Suspended',
+					'209' => 'Completed',
+					'210' => 'Refused',
+					'211' => 'Payment transmitted',
+					'212' => 'Paid',
+					'213' => 'Rejected'
+				)
+			),
+			1,
+			'',
+			1,
+			0,
+			'',
+			'',
+			'pdpconnectfr@pdpconnectfr',
+			'isModEnabled("pdpconnectfr")',
+			0,
+			1
+		);
+
+		/*$result = $extrafields->addExtraField(
+			'pdpconnectfr_invoice_status',
+			$langs->trans('pdpconnectfrInvoiceStatus'),
+			'text',
+			112008,
+			50,
+			'facture',
+			0,
+			0,
+			'ready',
+			null,
+			0,
+			'',
+			1,
+			0,
+			'1',
+			'',
+			'pdpconnectfr@pdpconnectfr',
+			'isModEnabled("pdpconnectfr")',
+			0,
+			1
+		);*/
 
 		// Same fields for orders
-        $result = $extrafields->addExtraField('d4d_separator', $langs->trans('ChorusSeparator'), 'separate', 112001, '', 'commande', 0, 1, '', $param, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', '$conf->global->PDPCONNECTFR_USE_CHORUS');
-        $result = $extrafields->addExtraField('d4d_service_code', $langs->trans('ChorusServiceCode'), 'varchar', 112002, 100, 'commande', 0, 0, '', null, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', '$conf->global->PDPCONNECTFR_USE_CHORUS', 0, 2);
-        $result = $extrafields->addExtraField('d4d_contract_number', $langs->trans('ChorusContractNumber'), 'varchar', 112003, 50, 'commande', 0, 0, '', null, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', '$conf->global->PDPCONNECTFR_USE_CHORUS', 0, 2);
-        $result = $extrafields->addExtraField('d4d_promise_code', $langs->trans('ChorusPromiseCode'), 'varchar', 112004, 50, 'commande', 0, 0, '', null, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', '$conf->global->PDPCONNECTFR_USE_CHORUS', 0, 2);
+        $result = $extrafields->addExtraField('d4d_separator', $langs->trans('ChorusSeparator'), 'separate', 112001, '', 'commande', 0, 1, '', $param, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', 'getDolGlobalInt("PDPCONNECTFR_USE_CHORUS")');
+        $result = $extrafields->addExtraField('d4d_service_code', $langs->trans('ChorusServiceCode'), 'varchar', 112002, 100, 'commande', 0, 0, '', null, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', 'getDolGlobalInt("PDPCONNECTFR_USE_CHORUS")', 0, 1);
+        $result = $extrafields->addExtraField('d4d_contract_number', $langs->trans('ChorusContractNumber'), 'varchar', 112003, 50, 'commande', 0, 0, '', null, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', 'getDolGlobalInt("PDPCONNECTFR_USE_CHORUS")', 0, 1);
+        $result = $extrafields->addExtraField('d4d_promise_code', $langs->trans('ChorusPromiseCode'), 'varchar', 112004, 50, 'commande', 0, 0, '', null, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', 'getDolGlobalInt("PDPCONNECTFR_USE_CHORUS")', 0, 1);
 
 		// Update display field for old installations
         $sql = array_merge(
@@ -520,11 +723,57 @@ class modPDPConnectFR extends DolibarrModules
             '', //$computerd
             '', //$entity
             'pdpconnectfr@pdpconnectfr', //$langfile
-            '$conf->global->PDPCONNECTFR_USE_CHORUS', //$enabled
+			'getDolGlobalInt("PDPCONNECTFR_USE_CHORUS")',
             0, //$totalizable
             0, //$printable
             array() //$moreparams
         );
+
+			/*
+			CREATE TABLE llx_pdpconnectfr_call(
+				-- BEGIN MODULEBUILDER FIELDS
+				rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL,
+				date_creation datetime NOT NULL,
+				tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+				fk_user_creat integer NOT NULL,
+				fk_user_modif integer,
+				status integer NOT NULL, 			-- Status of the call
+				call_type varchar(50) NOT NULL, 	-- Type of API call
+				method varchar(10), 				-- HTTP method
+				endpoint varchar(255) NOT NULL, 	-- API endpoint URL
+				request_body text, 					-- Request body content (JSON)
+				response text, 						-- Response content (JSON)
+				entity integer DEFAULT 1, 			-- Entity
+				fk_provider integer NOT NULL 		-- Foreign key to provider (EsaLink...)
+				-- END MODULEBUILDER FIELDS
+			) ENGINE=innodb;
+
+			CREATE TABLE llx_pdpconnectfr_document(
+				-- BEGIN MODULEBUILDER FIELDS
+				rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL,
+				date_creation datetime NOT NULL,
+				tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+				fk_user_creat integer NOT NULL,
+				fk_user_modif integer,
+				fk_element_id integer,
+				fk_element_type varchar(50),
+				status integer NOT NULL, 			-- Status of the document
+				fk_call integer,		 			-- Reference to the original call
+				flow_id integer, 					-- PDP Flow identifier
+				tracking_id integer, 				-- Document tracking identifier
+				flow_type varchar(255), 			-- Type of flow (CustomerInvoice, etc.)
+				flow_direction varchar(10), 		-- Direction of flow (In/Out)
+				flow_syntax varchar(50), 			-- Document syntax (FACTUR-X, etc.)
+				flow_profile varchar(50), 			-- Profile used (Basic, Cius, etc.)
+				ack_status varchar(50), 			-- Acknowledgment status (Success, Error, Pending)
+				ack_reason_code varchar(255), 		-- Reason code for acknowledgment
+				ack_info text, 						-- Additional acknowledgment information
+				document_body text, 				-- Full document content XML
+				entity integer DEFAULT 1 			-- Entity identifier
+				-- END MODULEBUILDER FIELDS
+			) ENGINE=innodb;
+
+			*/
 
 		//$result0=$extrafields->addExtraField('pdpconnectfr_separator1', "Separator 1", 'separator', 1,  0, 'thirdparty',   0, 0, '', array('options'=>array(1=>1)), 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', 'isModEnabled("pdpconnectfr")');
 		//$result1=$extrafields->addExtraField('pdpconnectfr_myattr1', "New Attr 1 label", 'boolean', 1,  3, 'thirdparty',   0, 0, '', '', 1, '', -1, 0, '', '', 'pdpconnectfr@pdpconnectfr', 'isModEnabled("pdpconnectfr")');
@@ -540,13 +789,13 @@ class modPDPConnectFR extends DolibarrModules
 		// Document templates
 		// $moduledir = dol_sanitizeFileName('pdpconnectfr');
 		// $myTmpObjects = array();
-		// $myTmpObjects['MyObject'] = array('includerefgeneration' => 0, 'includedocgeneration' => 0);
+		// $myTmpObjects['Call'] = array('includerefgeneration' => 0, 'includedocgeneration' => 0);
 
 		// foreach ($myTmpObjects as $myTmpObjectKey => $myTmpObjectArray) {
 		// 	if ($myTmpObjectArray['includerefgeneration']) {
-		// 		$src = DOL_DOCUMENT_ROOT.'/install/doctemplates/'.$moduledir.'/template_myobjects.odt';
+		// 		$src = DOL_DOCUMENT_ROOT.'/install/doctemplates/'.$moduledir.'/template_calls.odt';
 		// 		$dirodt = DOL_DATA_ROOT.($conf->entity > 1 ? '/'.$conf->entity : '').'/doctemplates/'.$moduledir;
-		// 		$dest = $dirodt.'/template_myobjects.odt';
+		// 		$dest = $dirodt.'/template_calls.odt';
 
 		// 		if (file_exists($src) && !file_exists($dest)) {
 		// 			require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';

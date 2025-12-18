@@ -18,6 +18,17 @@ namespace Symfony\Component\Validator;
  */
 class ConstraintViolation implements ConstraintViolationInterface
 {
+    private $message;
+    private $messageTemplate;
+    private $parameters;
+    private $plural;
+    private $root;
+    private $propertyPath;
+    private $invalidValue;
+    private $constraint;
+    private $code;
+    private $cause;
+
     /**
      * Creates a new constraint violation.
      *
@@ -38,24 +49,33 @@ class ConstraintViolation implements ConstraintViolationInterface
      *                                            caused the violation
      * @param mixed              $cause           The cause of the violation
      */
-    public function __construct(
-        private string|\Stringable $message,
-        private ?string $messageTemplate,
-        private array $parameters,
-        private mixed $root,
-        private ?string $propertyPath,
-        private mixed $invalidValue,
-        private ?int $plural = null,
-        private ?string $code = null,
-        private ?Constraint $constraint = null,
-        private mixed $cause = null,
-    ) {
+    public function __construct($message, ?string $messageTemplate, array $parameters, $root, ?string $propertyPath, $invalidValue, ?int $plural = null, ?string $code = null, ?Constraint $constraint = null, $cause = null)
+    {
+        if (!\is_string($message) && !(\is_object($message) && method_exists($message, '__toString'))) {
+            throw new \TypeError('Constraint violation message should be a string or an object which implements the __toString() method.');
+        }
+
+        $this->message = $message;
+        $this->messageTemplate = $messageTemplate;
+        $this->parameters = $parameters;
+        $this->plural = $plural;
+        $this->root = $root;
+        $this->propertyPath = $propertyPath;
+        $this->invalidValue = $invalidValue;
+        $this->constraint = $constraint;
+        $this->code = $code;
+        $this->cause = $cause;
     }
 
-    public function __toString(): string
+    /**
+     * Converts the violation into a string for debugging purposes.
+     *
+     * @return string
+     */
+    public function __toString()
     {
         if (\is_object($this->root)) {
-            $class = 'Object('.$this->root::class.')';
+            $class = 'Object('.\get_class($this->root).')';
         } elseif (\is_array($this->root)) {
             $class = 'Array';
         } else {
@@ -75,58 +95,86 @@ class ConstraintViolation implements ConstraintViolationInterface
         return $class.$propertyPath.":\n    ".$this->getMessage().$code;
     }
 
-    public function getMessageTemplate(): string
+    /**
+     * {@inheritdoc}
+     */
+    public function getMessageTemplate()
     {
         return (string) $this->messageTemplate;
     }
 
-    public function getParameters(): array
+    /**
+     * {@inheritdoc}
+     */
+    public function getParameters()
     {
         return $this->parameters;
     }
 
-    public function getPlural(): ?int
+    /**
+     * {@inheritdoc}
+     */
+    public function getPlural()
     {
         return $this->plural;
     }
 
-    public function getMessage(): string|\Stringable
+    /**
+     * {@inheritdoc}
+     */
+    public function getMessage()
     {
         return $this->message;
     }
 
-    public function getRoot(): mixed
+    /**
+     * {@inheritdoc}
+     */
+    public function getRoot()
     {
         return $this->root;
     }
 
-    public function getPropertyPath(): string
+    /**
+     * {@inheritdoc}
+     */
+    public function getPropertyPath()
     {
         return (string) $this->propertyPath;
     }
 
-    public function getInvalidValue(): mixed
+    /**
+     * {@inheritdoc}
+     */
+    public function getInvalidValue()
     {
         return $this->invalidValue;
     }
 
     /**
      * Returns the constraint whose validation caused the violation.
+     *
+     * @return Constraint|null
      */
-    public function getConstraint(): ?Constraint
+    public function getConstraint()
     {
         return $this->constraint;
     }
 
     /**
      * Returns the cause of the violation.
+     *
+     * @return mixed
      */
-    public function getCause(): mixed
+    public function getCause()
     {
         return $this->cause;
     }
 
-    public function getCode(): ?string
+    /**
+     * {@inheritdoc}
+     */
+    public function getCode()
     {
         return $this->code;
     }

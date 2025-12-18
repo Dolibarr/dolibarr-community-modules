@@ -12,7 +12,8 @@
 namespace Symfony\Component\Validator\Constraints;
 
 /**
- * Validates that a value is a negative number.
+ * @Annotation
+ * @Target({"PROPERTY", "METHOD", "ANNOTATION"})
  *
  * @author Jan Schädlich <jan.schaedlich@sensiolabs.de>
  */
@@ -21,5 +22,5 @@ class Negative extends LessThan
 {
     use ZeroComparisonConstraintTrait;
 
-    public string $message = 'This value should be negative.';
+    public $message = 'This value should be negative.';
 }

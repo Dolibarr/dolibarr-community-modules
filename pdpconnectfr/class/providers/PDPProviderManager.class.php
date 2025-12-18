@@ -22,7 +22,7 @@
  * \brief   Manage multiple PDP providers and provide a unified access layer.
  */
 
-dol_include_once('pdpconnectfr/class/providers/EsalinkPDPProvider.class.php');
+dol_include_once('/pdpconnectfr/class/providers/EsalinkPDPProvider.class.php');
 
 class PDPProviderManager
 {
@@ -80,6 +80,7 @@ class PDPProviderManager
         switch ($name) {
             case 'ESALINK':
                 $provider = new EsalinkPDPProvider($db);
+                $provider->providerName = 'ESALINK';
                 break;
             case 'TESTPDP':
                 //$provider = new TESTPDPProvider();

@@ -53,21 +53,27 @@ class GetterMetadata extends MemberMetadata
             } elseif (method_exists($class, $hasMethod)) {
                 $method = $hasMethod;
             } else {
-                throw new ValidatorException(\sprintf('Neither of these methods exist in class "%s": "%s", "%s", "%s".', $class, $getMethod, $isMethod, $hasMethod));
+                throw new ValidatorException(sprintf('Neither of these methods exist in class "%s": "%s", "%s", "%s".', $class, $getMethod, $isMethod, $hasMethod));
             }
         } elseif (!method_exists($class, $method)) {
-            throw new ValidatorException(\sprintf('The "%s()" method does not exist in class "%s".', $method, $class));
+            throw new ValidatorException(sprintf('The "%s()" method does not exist in class "%s".', $method, $class));
         }
 
         parent::__construct($class, $method, $property);
     }
 
-    public function getPropertyValue(mixed $object): mixed
+    /**
+     * {@inheritdoc}
+     */
+    public function getPropertyValue($object)
     {
         return $this->newReflectionMember($object)->invoke($object);
     }
 
-    protected function newReflectionMember(object|string $objectOrClassName): \ReflectionMethod|\ReflectionProperty
+    /**
+     * {@inheritdoc}
+     */
+    protected function newReflectionMember($objectOrClassName)
     {
         return new \ReflectionMethod($objectOrClassName, $this->getName());
     }

@@ -47,27 +47,6 @@ class TypedPropertiesDriver implements DriverInterface
         $this->allowList = array_merge($allowList, $this->getDefaultWhiteList());
     }
 
-    /**
-     *  ReflectionUnionType::getTypes() returns the types sorted according to these rules:
-     * - Classes, interfaces, traits, iterable (replaced by Traversable), ReflectionIntersectionType objects, parent and self:
-     *     these types will be returned first, in the order in which they were declared.
-     * - static and all built-in types (iterable replaced by array) will come next. They will always be returned in this order:
-     *     static, callable, array, string, int, float, bool (or false or true), null.
-     *
-     * For determining types of primitives, it is necessary to reorder primitives so that they are tested from lowest specificity to highest:
-     * i.e. null, true, false, int, float, bool, string
-     */
-    private function reorderTypes(array $types): array
-    {
-        uasort($types, static function ($a, $b) {
-            $order = ['null' => 0, 'true' => 1, 'false' => 2, 'bool' => 3, 'int' => 4, 'float' => 5, 'array' => 6, 'string' => 7];
-
-            return ($order[$a['name']] ?? 8) <=> ($order[$b['name']] ?? 8);
-        });
-
-        return $types;
-    }
-
     private function getDefaultWhiteList(): array
     {
         return [
@@ -75,8 +54,6 @@ class TypedPropertiesDriver implements DriverInterface
             'float',
             'bool',
             'boolean',
-            'true',
-            'false',
             'string',
             'double',
             'iterable',
@@ -97,6 +74,10 @@ class TypedPropertiesDriver implements DriverInterface
 
         \assert($classMetadata instanceof SerializerClassMetadata);
 
+        if (PHP_VERSION_ID <= 70400) {
+            return $classMetadata;
+        }
+
         // We base our scan on the internal driver's property list so that we
         // respect any internal allow/blocklist like in the AnnotationDriver
         foreach ($classMetadata->propertyMetadata as $propertyMetadata) {
@@ -112,18 +93,6 @@ class TypedPropertiesDriver implements DriverInterface
                     $type = $reflectionType->getName();
 
                     $propertyMetadata->setType($this->typeParser->parse($type));
-                } elseif ($this->shouldTypeHintUnion($reflectionType)) {
-                    $propertyMetadata->setType([
-                        'name' => 'union',
-                        'params' => [
-                            $this->reorderTypes(
-                                array_map(
-                                    fn (string $type) => $this->typeParser->parse($type),
-                                    array_filter($reflectionType->getTypes(), [$this, 'shouldTypeHintInsideUnion']),
-                                ),
-                            ),
-                        ],
-                    ]);
                 }
             } catch (ReflectionException $e) {
                 continue;
@@ -169,36 +138,5 @@ class TypedPropertiesDriver implements DriverInterface
 
         return class_exists($reflectionType->getName())
             || interface_exists($reflectionType->getName());
-    }
-
-    /**
-     * @phpstan-assert-if-true \ReflectionUnionType $reflectionType
-     */
-    private function shouldTypeHintUnion(?ReflectionType $reflectionType)
-    {
-        if (!$reflectionType instanceof \ReflectionUnionType) {
-            return false;
-        }
-
-        $types = $reflectionType->getTypes();
-
-        foreach ($types as $type) {
-            if ($type instanceof \ReflectionIntersectionType) {
-                return false;
-            }
-        }
-
-        foreach ($types as $type) {
-            if ($this->shouldTypeHintInsideUnion($type)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private function shouldTypeHintInsideUnion(ReflectionNamedType $reflectionType)
-    {
-        return $this->shouldTypeHint($reflectionType) || 'array' === $reflectionType->getName();
     }
 }

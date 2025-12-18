@@ -7,25 +7,16 @@ namespace JMS\Serializer\Handler;
 use JMS\Serializer\Exception\RuntimeException;
 use JMS\Serializer\GraphNavigatorInterface;
 use JMS\Serializer\SerializationContext;
-use JMS\Serializer\Type\Type;
 use JMS\Serializer\Visitor\DeserializationVisitorInterface;
 use JMS\Serializer\Visitor\SerializationVisitorInterface;
 use JMS\Serializer\XmlSerializationVisitor;
 
-/**
- * @phpstan-import-type TypeArray from Type
- */
 final class DateHandler implements SubscribingHandlerInterface
 {
     /**
      * @var string
      */
-    private $defaultSerializationFormat;
-
-    /**
-     * @var array<string>
-     */
-    private $defaultDeserializationFormats;
+    private $defaultFormat;
 
     /**
      * @var \DateTimeZone
@@ -78,24 +69,14 @@ final class DateHandler implements SubscribingHandlerInterface
         return $methods;
     }
 
-    /**
-     * @param array<string> $defaultDeserializationFormats
-     */
-    public function __construct(
-        string $defaultFormat = \DateTime::ATOM,
-        string $defaultTimezone = 'UTC',
-        bool $xmlCData = true,
-        array $defaultDeserializationFormats = []
-    ) {
-        $this->defaultSerializationFormat = $defaultFormat;
-        $this->defaultDeserializationFormats = [] === $defaultDeserializationFormats ? [$defaultFormat] : $defaultDeserializationFormats;
+    public function __construct(string $defaultFormat = \DateTime::ATOM, string $defaultTimezone = 'UTC', bool $xmlCData = true)
+    {
+        $this->defaultFormat = $defaultFormat;
         $this->defaultTimezone = new \DateTimeZone($defaultTimezone);
         $this->xmlCData = $xmlCData;
     }
 
     /**
-     * @param TypeArray $type
-     *
      * @return \DOMCdataSection|\DOMText|mixed
      */
     public function serializeDateTimeInterface(
@@ -105,19 +86,19 @@ final class DateHandler implements SubscribingHandlerInterface
         SerializationContext $context
     ) {
         if ($visitor instanceof XmlSerializationVisitor && false === $this->xmlCData) {
-            return $visitor->visitSimpleString($date->format($this->getSerializationFormat($type)), $type);
+            return $visitor->visitSimpleString($date->format($this->getFormat($type)), $type);
         }
 
-        $format = $this->getSerializationFormat($type);
+        $format = $this->getFormat($type);
         if ('U' === $format) {
             return $visitor->visitInteger((int) $date->format($format), $type);
         }
 
-        return $visitor->visitString($date->format($this->getSerializationFormat($type)), $type);
+        return $visitor->visitString($date->format($this->getFormat($type)), $type);
     }
 
     /**
-     * @param TypeArray $type
+     * @param array $type
      *
      * @return \DOMCdataSection|\DOMText|mixed
      */
@@ -127,7 +108,7 @@ final class DateHandler implements SubscribingHandlerInterface
     }
 
     /**
-     * @param TypeArray $type
+     * @param array $type
      *
      * @return \DOMCdataSection|\DOMText|mixed
      */
@@ -141,7 +122,7 @@ final class DateHandler implements SubscribingHandlerInterface
     }
 
     /**
-     * @param TypeArray $type
+     * @param array $type
      *
      * @return \DOMCdataSection|\DOMText|mixed
      */
@@ -168,7 +149,7 @@ final class DateHandler implements SubscribingHandlerInterface
 
     /**
      * @param mixed $data
-     * @param TypeArray $type
+     * @param array $type
      */
     public function deserializeDateTimeFromXml(DeserializationVisitorInterface $visitor, $data, array $type): ?\DateTimeInterface
     {
@@ -181,7 +162,7 @@ final class DateHandler implements SubscribingHandlerInterface
 
     /**
      * @param mixed $data
-     * @param TypeArray $type
+     * @param array $type
      */
     public function deserializeDateTimeImmutableFromXml(DeserializationVisitorInterface $visitor, $data, array $type): ?\DateTimeInterface
     {
@@ -194,7 +175,7 @@ final class DateHandler implements SubscribingHandlerInterface
 
     /**
      * @param mixed $data
-     * @param TypeArray $type
+     * @param array $type
      */
     public function deserializeDateIntervalFromXml(DeserializationVisitorInterface $visitor, $data, array $type): ?\DateInterval
     {
@@ -207,7 +188,7 @@ final class DateHandler implements SubscribingHandlerInterface
 
     /**
      * @param mixed $data
-     * @param TypeArray $type
+     * @param array $type
      */
     public function deserializeDateTimeFromJson(DeserializationVisitorInterface $visitor, $data, array $type): ?\DateTimeInterface
     {
@@ -220,7 +201,7 @@ final class DateHandler implements SubscribingHandlerInterface
 
     /**
      * @param mixed $data
-     * @param TypeArray $type
+     * @param array $type
      */
     public function deserializeDateTimeImmutableFromJson(DeserializationVisitorInterface $visitor, $data, array $type): ?\DateTimeInterface
     {
@@ -233,7 +214,7 @@ final class DateHandler implements SubscribingHandlerInterface
 
     /**
      * @param mixed $data
-     * @param TypeArray $type
+     * @param array $type
      */
     public function deserializeDateIntervalFromJson(DeserializationVisitorInterface $visitor, $data, array $type): ?\DateInterval
     {
@@ -246,7 +227,7 @@ final class DateHandler implements SubscribingHandlerInterface
 
     /**
      * @param mixed $data
-     * @param TypeArray $type
+     * @param array $type
      */
     private function parseDateTime($data, array $type, bool $immutable = false): \DateTimeInterface
     {
@@ -275,7 +256,7 @@ final class DateHandler implements SubscribingHandlerInterface
         throw new RuntimeException(sprintf(
             'Invalid datetime "%s", expected one of the format %s.',
             $data,
-            '"' . implode('", "', $formatTried) . '"',
+            '"' . implode('", "', $formatTried) . '"'
         ));
     }
 
@@ -299,7 +280,7 @@ final class DateHandler implements SubscribingHandlerInterface
     }
 
     /**
-     * @param TypeArray $type
+     * @param array $type
      */
     private function getDeserializationFormats(array $type): array
     {
@@ -307,19 +288,15 @@ final class DateHandler implements SubscribingHandlerInterface
             return is_array($type['params'][2]) ? $type['params'][2] : [$type['params'][2]];
         }
 
-        if (isset($type['params'][0])) {
-            return [$type['params'][0]];
-        }
-
-        return $this->defaultDeserializationFormats;
+        return [$this->getFormat($type)];
     }
 
     /**
-     * @param TypeArray $type
+     * @param array $type
      */
-    private function getSerializationFormat(array $type): string
+    private function getFormat(array $type): string
     {
-        return $type['params'][0] ?? $this->defaultSerializationFormat;
+        return $type['params'][0] ?? $this->defaultFormat;
     }
 
     public function format(\DateInterval $dateInterval): string

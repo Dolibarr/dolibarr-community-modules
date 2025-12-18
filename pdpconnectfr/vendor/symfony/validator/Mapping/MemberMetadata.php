@@ -34,26 +34,26 @@ abstract class MemberMetadata extends GenericMetadata implements PropertyMetadat
      *           class' serialized representation. Do not access it. Use
      *           {@link getClassName()} instead.
      */
-    public string $class;
+    public $class;
 
     /**
      * @internal This property is public in order to reduce the size of the
      *           class' serialized representation. Do not access it. Use
      *           {@link getName()} instead.
      */
-    public string $name;
+    public $name;
 
     /**
      * @internal This property is public in order to reduce the size of the
      *           class' serialized representation. Do not access it. Use
      *           {@link getPropertyName()} instead.
      */
-    public string $property;
+    public $property;
 
     /**
      * @var \ReflectionMethod[]|\ReflectionProperty[]
      */
-    private array $reflMember = [];
+    private $reflMember = [];
 
     /**
      * @param string $class    The name of the class this member is defined on
@@ -67,7 +67,10 @@ abstract class MemberMetadata extends GenericMetadata implements PropertyMetadat
         $this->property = $property;
     }
 
-    public function addConstraint(Constraint $constraint): static
+    /**
+     * {@inheritdoc}
+     */
+    public function addConstraint(Constraint $constraint)
     {
         $this->checkConstraint($constraint);
 
@@ -76,7 +79,10 @@ abstract class MemberMetadata extends GenericMetadata implements PropertyMetadat
         return $this;
     }
 
-    public function __sleep(): array
+    /**
+     * {@inheritdoc}
+     */
+    public function __sleep()
     {
         return array_merge(parent::__sleep(), [
             'class',
@@ -87,52 +93,76 @@ abstract class MemberMetadata extends GenericMetadata implements PropertyMetadat
 
     /**
      * Returns the name of the member.
+     *
+     * @return string
      */
-    public function getName(): string
+    public function getName()
     {
         return $this->name;
     }
 
-    public function getClassName(): string
+    /**
+     * {@inheritdoc}
+     */
+    public function getClassName()
     {
         return $this->class;
     }
 
-    public function getPropertyName(): string
+    /**
+     * {@inheritdoc}
+     */
+    public function getPropertyName()
     {
         return $this->property;
     }
 
     /**
      * Returns whether this member is public.
+     *
+     * @param object|string $objectOrClassName The object or the class name
+     *
+     * @return bool
      */
-    public function isPublic(object|string $objectOrClassName): bool
+    public function isPublic($objectOrClassName)
     {
         return $this->getReflectionMember($objectOrClassName)->isPublic();
     }
 
     /**
      * Returns whether this member is protected.
+     *
+     * @param object|string $objectOrClassName The object or the class name
+     *
+     * @return bool
      */
-    public function isProtected(object|string $objectOrClassName): bool
+    public function isProtected($objectOrClassName)
     {
         return $this->getReflectionMember($objectOrClassName)->isProtected();
     }
 
     /**
      * Returns whether this member is private.
+     *
+     * @param object|string $objectOrClassName The object or the class name
+     *
+     * @return bool
      */
-    public function isPrivate(object|string $objectOrClassName): bool
+    public function isPrivate($objectOrClassName)
     {
         return $this->getReflectionMember($objectOrClassName)->isPrivate();
     }
 
     /**
      * Returns the reflection instance for accessing the member's value.
+     *
+     * @param object|string $objectOrClassName The object or the class name
+     *
+     * @return \ReflectionMethod|\ReflectionProperty
      */
-    public function getReflectionMember(object|string $objectOrClassName): \ReflectionMethod|\ReflectionProperty
+    public function getReflectionMember($objectOrClassName)
     {
-        $className = \is_string($objectOrClassName) ? $objectOrClassName : $objectOrClassName::class;
+        $className = \is_string($objectOrClassName) ? $objectOrClassName : \get_class($objectOrClassName);
         if (!isset($this->reflMember[$className])) {
             $this->reflMember[$className] = $this->newReflectionMember($objectOrClassName);
         }
@@ -142,13 +172,17 @@ abstract class MemberMetadata extends GenericMetadata implements PropertyMetadat
 
     /**
      * Creates a new reflection instance for accessing the member's value.
+     *
+     * @param object|string $objectOrClassName The object or the class name
+     *
+     * @return \ReflectionMethod|\ReflectionProperty
      */
-    abstract protected function newReflectionMember(object|string $objectOrClassName): \ReflectionMethod|\ReflectionProperty;
+    abstract protected function newReflectionMember($objectOrClassName);
 
-    private function checkConstraint(Constraint $constraint): void
+    private function checkConstraint(Constraint $constraint)
     {
         if (!\in_array(Constraint::PROPERTY_CONSTRAINT, (array) $constraint->getTargets(), true)) {
-            throw new ConstraintDefinitionException(\sprintf('The constraint "%s" cannot be put on properties or getters.', get_debug_type($constraint)));
+            throw new ConstraintDefinitionException(sprintf('The constraint "%s" cannot be put on properties or getters.', get_debug_type($constraint)));
         }
 
         if ($constraint instanceof Composite) {

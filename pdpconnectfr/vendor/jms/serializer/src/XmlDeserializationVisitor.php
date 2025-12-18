@@ -88,7 +88,7 @@ final class XmlDeserializationVisitor extends AbstractVisitor implements NullAwa
             if (!in_array($internalSubset, $this->doctypeAllowList, true)) {
                 throw new InvalidArgumentException(sprintf(
                     'The document type "%s" is not allowed. If it is safe, you may add it to the allowlist configuration.',
-                    $internalSubset,
+                    $internalSubset
                 ));
             }
         }
@@ -288,7 +288,7 @@ final class XmlDeserializationVisitor extends AbstractVisitor implements NullAwa
                 throw new LogicException(sprintf(
                     'The discriminator field name "%s" for base-class "%s" was not found in input data.',
                     $metadata->discriminatorFieldName,
-                    $metadata->name,
+                    $metadata->name
                 ));
         }
     }
@@ -325,70 +325,6 @@ final class XmlDeserializationVisitor extends AbstractVisitor implements NullAwa
             }
 
             throw new NotAcceptableException();
-        }
-
-        if (0 === strpos($name, '@')) {
-            $attributeName = substr($name, 1);
-            $attributes = $data->attributes($metadata->xmlNamespace);
-
-            if (isset($attributes[$attributeName])) {
-                if (!$metadata->type) {
-                    throw RuntimeException::noMetadataForProperty($metadata->class, $metadata->name);
-                }
-
-                return $this->navigator->accept($attributes[$attributeName], $metadata->type);
-            }
-
-            throw new NotAcceptableException(sprintf('Attribute "%s" (derived from serializedName "%s") in namespace "%s" not found for property %s::$%s. XML: %s', $attributeName, $name, $metadata->xmlNamespace ?? '[none]', $metadata->class, $metadata->name, $data->asXML()));
-        }
-
-        if (false !== strpos($name, '/@')) {
-            [$elementName, $attributeName] = explode('/@', $name, 2);
-
-            $childDataNode = null;
-            if ('' === $metadata->xmlNamespace) {
-                // Element explicitly in NO namespace
-                $xpathQuery = "./*[local-name()='" . $elementName . "' and (namespace-uri()='' or not(namespace-uri()))]";
-                $matchingNodes = $data->xpath($xpathQuery);
-                if (!empty($matchingNodes)) {
-                    $childDataNode = $matchingNodes[0];
-                }
-            } elseif ($metadata->xmlNamespace) {
-                // Element in a specific namespace URI
-                $childrenInNs = $data->children($metadata->xmlNamespace);
-                if (isset($childrenInNs->$elementName)) {
-                    $childDataNode = $childrenInNs->$elementName;
-                }
-            } else {
-                // xmlNamespace is null: element in default namespace (or no namespace if no default is active)
-                $childrenInDefaultOrNoNs = $data->children(null);
-                if (isset($childrenInDefaultOrNoNs->$elementName)) {
-                    $childDataNode = $childrenInDefaultOrNoNs->$elementName;
-                }
-            }
-
-            if (!$childDataNode || !$childDataNode->getName()) {
-                if (null === $metadata->xmlNamespace) {
-                    $ns = '[default/none]';
-                } else {
-                    $ns = '' === $metadata->xmlNamespace ? '[none]' : $metadata->xmlNamespace;
-                }
-
-                throw new NotAcceptableException(sprintf('Child element "%s" for attribute access not found (element namespace: %s). Property %s::$%s. XML: %s', $elementName, $ns, $metadata->class, $metadata->name, $data->asXML()));
-            }
-
-            $attributeTargetNs = $metadata->xmlNamespace && '' !== $metadata->xmlNamespace ? $metadata->xmlNamespace : null;
-            $attributes = $childDataNode->attributes($attributeTargetNs);
-
-            if (isset($attributes[$attributeName])) {
-                if (!$metadata->type) {
-                    throw RuntimeException::noMetadataForProperty($metadata->class, $metadata->name);
-                }
-
-                return $this->navigator->accept($attributes[$attributeName], $metadata->type);
-            }
-
-            throw new NotAcceptableException(sprintf('Attribute "%s" on element "%s" not found (attribute namespace: %s). Property %s::$%s. XML: %s', $attributeName, $elementName, $attributeTargetNs ?? '[none]', $metadata->class, $metadata->name, $data->asXML()));
         }
 
         if ($metadata->xmlValue) {
@@ -513,7 +449,7 @@ final class XmlDeserializationVisitor extends AbstractVisitor implements NullAwa
      */
     public function getResult($data)
     {
-        $this->navigator = null;
+        unset($this->navigator);
 
         return $data;
     }

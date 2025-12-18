@@ -6,20 +6,22 @@ namespace JMS\Serializer\Visitor;
 
 use JMS\Serializer\Metadata\ClassMetadata;
 use JMS\Serializer\Metadata\PropertyMetadata;
-use JMS\Serializer\Type\Type;
 use JMS\Serializer\VisitorInterface;
 
 /**
+ * Interface for visitors.
+ *
+ * This contains the minimal set of values that must be supported for any
+ * output format.
+ *
  * @author Johannes M. Schmitt <schmittjoh@gmail.com>
  * @author Asmir Mustafic <goetas@gmail.com>
- *
- * @phpstan-import-type TypeArray from Type
  */
 interface DeserializationVisitorInterface extends VisitorInterface
 {
     /**
      * @param mixed $data
-     * @param TypeArray $type
+     * @param array $type
      *
      * @return null
      */
@@ -27,25 +29,25 @@ interface DeserializationVisitorInterface extends VisitorInterface
 
     /**
      * @param mixed $data
-     * @param TypeArray $type
+     * @param array $type
      */
     public function visitString($data, array $type): ?string;
 
     /**
      * @param mixed $data
-     * @param TypeArray $type
+     * @param array $type
      */
     public function visitBoolean($data, array $type): ?bool;
 
     /**
      * @param mixed $data
-     * @param TypeArray $type
+     * @param array $type
      */
     public function visitDouble($data, array $type): ?float;
 
     /**
      * @param mixed $data
-     * @param TypeArray $type
+     * @param array $type
      */
     public function visitInteger($data, array $type): ?int;
 
@@ -58,7 +60,7 @@ interface DeserializationVisitorInterface extends VisitorInterface
 
     /**
      * @param mixed $data
-     * @param TypeArray $type
+     * @param array $type
      *
      * @return array<mixed>
      */
@@ -67,7 +69,7 @@ interface DeserializationVisitorInterface extends VisitorInterface
     /**
      * Called before the properties of the object are being visited.
      *
-     * @param TypeArray $type
+     * @param array $type
      */
     public function startVisitingObject(ClassMetadata $metadata, object $data, array $type): void;
 
@@ -82,7 +84,7 @@ interface DeserializationVisitorInterface extends VisitorInterface
      * Called after all properties of the object have been visited.
      *
      * @param mixed $data
-     * @param TypeArray $type
+     * @param array $type
      */
     public function endVisitingObject(ClassMetadata $metadata, $data, array $type): object;
 

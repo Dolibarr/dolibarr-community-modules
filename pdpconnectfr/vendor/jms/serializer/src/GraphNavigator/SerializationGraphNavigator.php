@@ -27,7 +27,6 @@ use JMS\Serializer\Handler\HandlerRegistryInterface;
 use JMS\Serializer\Metadata\ClassMetadata;
 use JMS\Serializer\NullAwareVisitorInterface;
 use JMS\Serializer\SerializationContext;
-use JMS\Serializer\Type\Type;
 use JMS\Serializer\Visitor\SerializationVisitorInterface;
 use JMS\Serializer\VisitorInterface;
 use Metadata\MetadataFactoryInterface;
@@ -41,8 +40,6 @@ use function assert;
  * on visitors, or custom handlers to process its nodes.
  *
  * @author Johannes M. Schmitt <schmittjoh@gmail.com>
- *
- * @phpstan-import-type TypeArray from Type
  */
 final class SerializationGraphNavigator extends GraphNavigator
 {
@@ -115,7 +112,7 @@ final class SerializationGraphNavigator extends GraphNavigator
      * Called for each node of the graph that is being traversed.
      *
      * @param mixed $data the data depends on the direction, and type of visitor
-     * @param TypeArray|null $type array has the format ["name" => string, "params" => array]
+     * @param array|null $type array has the format ["name" => string, "params" => array]
      *
      * @return mixed the return value depends on the direction, and type of visitor
      */
@@ -159,8 +156,6 @@ final class SerializationGraphNavigator extends GraphNavigator
 
             case 'bool':
             case 'boolean':
-            case 'true':
-            case 'false':
                 return $this->visitor->visitBoolean((bool) $data, $type);
 
             case 'double':
@@ -182,16 +177,6 @@ final class SerializationGraphNavigator extends GraphNavigator
 
                 throw new RuntimeException($msg);
 
-            case 'union':
-                if (null !== $handler = $this->handlerRegistry->getHandler(GraphNavigatorInterface::DIRECTION_SERIALIZATION, $type['name'], $this->format)) {
-                    try {
-                        return \call_user_func($handler, $this->visitor, $data, $type, $this->context);
-                    } catch (SkipHandlerException $e) {
-                        // Skip handler, fallback to default behavior
-                    }
-                }
-
-                break;
             default:
                 if (null !== $data) {
                     if ($this->context->isVisiting($data)) {
@@ -299,9 +284,6 @@ final class SerializationGraphNavigator extends GraphNavigator
         return $this->context->hasAttribute('allows_root_null') && $this->context->getAttribute('allows_root_null') && 0 === $this->context->getVisitingSet()->count();
     }
 
-    /**
-     * @param TypeArray $type
-     */
     private function afterVisitingObject(ClassMetadata $metadata, object $object, array $type): void
     {
         $this->context->stopVisiting($object);

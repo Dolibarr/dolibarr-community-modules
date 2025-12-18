@@ -35,60 +35,66 @@ class GenericMetadata implements MetadataInterface
      *           class' serialized representation. Do not access it. Use
      *           {@link getConstraints()} and {@link findConstraints()} instead.
      */
-    public array $constraints = [];
+    public $constraints = [];
 
     /**
-     * @var array<string, Constraint[]>
+     * @var array
      *
      * @internal This property is public in order to reduce the size of the
      *           class' serialized representation. Do not access it. Use
      *           {@link findConstraints()} instead.
      */
-    public array $constraintsByGroup = [];
+    public $constraintsByGroup = [];
 
     /**
      * The strategy for cascading objects.
      *
      * By default, objects are not cascaded.
      *
-     * @var CascadingStrategy::*
+     * @var int
+     *
+     * @see CascadingStrategy
      *
      * @internal This property is public in order to reduce the size of the
      *           class' serialized representation. Do not access it. Use
      *           {@link getCascadingStrategy()} instead.
      */
-    public int $cascadingStrategy = CascadingStrategy::NONE;
+    public $cascadingStrategy = CascadingStrategy::NONE;
 
     /**
      * The strategy for traversing traversable objects.
      *
      * By default, traversable objects are not traversed.
      *
-     * @var TraversalStrategy::*
+     * @var int
+     *
+     * @see TraversalStrategy
      *
      * @internal This property is public in order to reduce the size of the
      *           class' serialized representation. Do not access it. Use
      *           {@link getTraversalStrategy()} instead.
      */
-    public int $traversalStrategy = TraversalStrategy::NONE;
+    public $traversalStrategy = TraversalStrategy::NONE;
 
     /**
      * Is auto-mapping enabled?
      *
-     * @var AutoMappingStrategy::*
+     * @var int
+     *
+     * @see AutoMappingStrategy
      *
      * @internal This property is public in order to reduce the size of the
      *           class' serialized representation. Do not access it. Use
      *           {@link getAutoMappingStrategy()} instead.
      */
-    public int $autoMappingStrategy = AutoMappingStrategy::NONE;
+    public $autoMappingStrategy = AutoMappingStrategy::NONE;
 
     /**
      * Returns the names of the properties that should be serialized.
      *
      * @return string[]
      */
-    public function __sleep(): array
+    public function __sleep()
     {
         return [
             'constraints',
@@ -130,10 +136,10 @@ class GenericMetadata implements MetadataInterface
      * @throws ConstraintDefinitionException When trying to add the {@link Cascade}
      *                                       or {@link Traverse} constraint
      */
-    public function addConstraint(Constraint $constraint): static
+    public function addConstraint(Constraint $constraint)
     {
         if ($constraint instanceof Traverse || $constraint instanceof Cascade) {
-            throw new ConstraintDefinitionException(\sprintf('The constraint "%s" can only be put on classes. Please use "Symfony\Component\Validator\Constraints\Valid" instead.', get_debug_type($constraint)));
+            throw new ConstraintDefinitionException(sprintf('The constraint "%s" can only be put on classes. Please use "Symfony\Component\Validator\Constraints\Valid" instead.', get_debug_type($constraint)));
         }
 
         if ($constraint instanceof Valid && null === $constraint->groups) {
@@ -171,7 +177,7 @@ class GenericMetadata implements MetadataInterface
      *
      * @return $this
      */
-    public function addConstraints(array $constraints): static
+    public function addConstraints(array $constraints)
     {
         foreach ($constraints as $constraint) {
             $this->addConstraint($constraint);
@@ -181,37 +187,45 @@ class GenericMetadata implements MetadataInterface
     }
 
     /**
-     * @return Constraint[]
+     * {@inheritdoc}
      */
-    public function getConstraints(): array
+    public function getConstraints()
     {
         return $this->constraints;
     }
 
     /**
      * Returns whether this element has any constraints.
+     *
+     * @return bool
      */
-    public function hasConstraints(): bool
+    public function hasConstraints()
     {
         return \count($this->constraints) > 0;
     }
 
     /**
-     * Aware of the global group (* group).
+     * {@inheritdoc}
      *
-     * @return Constraint[]
+     * Aware of the global group (* group).
      */
-    public function findConstraints(string $group): array
+    public function findConstraints(string $group)
     {
         return $this->constraintsByGroup[$group] ?? [];
     }
 
-    public function getCascadingStrategy(): int
+    /**
+     * {@inheritdoc}
+     */
+    public function getCascadingStrategy()
     {
         return $this->cascadingStrategy;
     }
 
-    public function getTraversalStrategy(): int
+    /**
+     * {@inheritdoc}
+     */
+    public function getTraversalStrategy()
     {
         return $this->traversalStrategy;
     }

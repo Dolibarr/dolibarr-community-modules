@@ -7,17 +7,14 @@ namespace JMS\Serializer;
 use JMS\Serializer\Exception\NonFloatCastableTypeException;
 use JMS\Serializer\Exception\NonIntCastableTypeException;
 use JMS\Serializer\Exception\NonStringCastableTypeException;
-use JMS\Serializer\Type\Type;
 
 /**
  * @internal
- *
- * @phpstan-import-type TypeArray from Type
  */
 abstract class AbstractVisitor implements VisitorInterface
 {
     /**
-     * @var GraphNavigatorInterface|null
+     * @var GraphNavigatorInterface
      */
     protected $navigator;
 
@@ -34,9 +31,6 @@ abstract class AbstractVisitor implements VisitorInterface
         return $data;
     }
 
-    /**
-     * @param TypeArray $typeArray
-     */
     protected function getElementType(array $typeArray): ?array
     {
         if (false === isset($typeArray['params'][0])) {
