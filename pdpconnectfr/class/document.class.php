@@ -130,11 +130,11 @@ class Document extends CommonObject
 	 */
 	public $fields = array(
 		"rowid" => array("type" => "integer", "label" => "TechnicalID", "enabled" => "1", 'position' => 1, 'notnull' => 1, "visible" => "0", "noteditable" => "1", "index" => "1", "css" => "left", "comment" => "Id"),
-		"date_creation" => array("type" => "datetime", "label" => "DateCreation", "enabled" => "1", 'position' => 500, 'notnull' => 1, "visible" => "1",),
+		"date_creation" => array("type" => "datetime", "label" => "DateSyncro", "enabled" => "1", 'position' => 500, 'notnull' => 1, "visible" => "1",),
 		"tms" => array("type" => "timestamp", "label" => "DateModification", "enabled" => "1", 'position' => 501, 'notnull' => 0, "visible" => "-2",),
 		"fk_user_creat" => array("type" => "integer:User:user/class/user.class.php", "label" => "UserAuthor", "picto" => "user", "enabled" => "1", 'position' => 510, 'notnull' => 1, "visible" => "-2", "csslist" => "tdoverflowmax150",),
 		"fk_user_modif" => array("type" => "integer:User:user/class/user.class.php", "label" => "UserModif", "picto" => "user", "enabled" => "1", 'position' => 511, 'notnull' => -1, "visible" => "-2", "csslist" => "tdoverflowmax150",),
-		"status" => array("type" => "integer", "label" => "Status", "enabled" => "1", 'position' => 2000, 'notnull' => 1, "visible" => "1", "index" => "1", "arrayofkeyval" => array("0" => "Brouillon", "1" => "Valid&eacute;", "9" => "Annul&eacute;"), "validate" => "1",),
+		"status" => array("type" => "integer", "label" => "Status", "enabled" => "1", 'position' => 2000, 'notnull' => 1, "visible" => "0", "index" => "1", "arrayofkeyval" => array("0" => "Brouillon", "1" => "Valid&eacute;", "9" => "Annul&eacute;"), "validate" => "1",),
 		"call_id" => array("type" => "varchar(50)", "label" => "call_id", "enabled" => "1", 'position' => 10, 'notnull' => 0, "visible" => "1", "comment" => "Reference to the original call"),
 		"flow_id" => array("type" => "varchar(255)", "label" => "flow_id", "enabled" => "1", 'position' => 20, 'notnull' => 0, "visible" => "-2", "comment" => "PDP flow UUID"),
 		"tracking_idref" => array("type" => "varchar(50)", "label" => "tracking_idref", "enabled" => "1", 'position' => 30, 'notnull' => 0, "visible" => "1", "comment" => "Document tracking identifier"),
