@@ -399,6 +399,30 @@ if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_P
 	}*/
 }
 
+// Setup conf for auto generation of objects
+$formSetup->newItem('PDPCONNECTFR_AUTO_GENERATION')->setAsTitle();
+
+// Setup conf to choose use of auto generation or not of products
+$item = $formSetup->newItem('PDPCONNECTFR_PRODUCTS_AUTO_GENERATION')->setAsYesNo();
+$item->helpText = $langs->transnoentities('PDPCONNECTFR_PRODUCTS_AUTO_GENERATION_HELP');
+$item->defaultFieldValue = 0;
+$item->cssClass = 'minwidth500';
+
+// Setup conf to choose use of auto generation or not of third parties
+$item = $formSetup->newItem('PDPCONNECTFR_THIRDPARTIES_AUTO_GENERATION')->setAsYesNo();
+$item->helpText = $langs->transnoentities('PDPCONNECTFR_THIRDPARTIES_AUTO_GENERATION_HELP');
+$item->defaultFieldValue = 0;
+$item->cssClass = 'minwidth500';
+
+// Setup conf for debug mode
+$formSetup->newItem('PDPCONNECTFR_DEBUG')->setAsTitle();
+
+// Setup conf to enable or not debug mode
+$item = $formSetup->newItem('PDPCONNECTFR_DEBUG_MODE')->setAsYesNo();
+$item->helpText = $langs->transnoentities('PDPCONNECTFR_DEBUG_MODE_HELP');
+$item->defaultFieldValue = 0;
+$item->cssClass = 'minwidth500';
+
 
 include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php';
 //print getDolGlobalString('PDPCONNECTFR_PDP');

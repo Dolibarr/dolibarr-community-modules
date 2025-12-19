@@ -148,17 +148,34 @@ $search_array_options = $extrafields->getOptionalsFromPost($object->table_elemen
 
 // Default sort order (if not yet defined by previous GETPOST)
 if (!$sortfield) {
-	reset($object->fields);					// Reset is required to avoid key() to return null.
-	$sortfield = "t.".key($object->fields); // Set here default search field. By default 1st field in definition.
+	//reset($object->fields);					// Reset is required to avoid key() to return null.
+	$sortfield = "t.rowid"; // Set here default search field. By default 1st field in definition.
 }
 if (!$sortorder) {
-	$sortorder = "ASC";
+	$sortorder = "DESC";
 }
+
+// Add a recap field into $object->fields array for list (we add it into object directly to be able to position it)
+// TODO : Update Module Builder to manage virtual fields
+$object->fields['recap'] = array(
+	'label' => $langs->trans("flowRecap"),
+	'type' => 'text',
+	'visible' => 1,
+	'enabled' => '1',
+	'position' => 51,
+	'checked' => 0,
+	'csslist' => 'tdoverflowmax500',
+	'notsearchable' => 1
+);
+
 
 // Initialize array of search criteria
 $search_all = trim(GETPOST('search_all', 'alphanohtml'));
 $search = array();
 foreach ($object->fields as $key => $val) {
+	if ($key == 'recap') {
+		continue;
+	}
 	if (GETPOST('search_'.$key, 'alpha') !== '') {
 		$search[$key] = GETPOST('search_'.$key, 'alpha');
 	}
@@ -321,7 +338,7 @@ $form = new Form($db);
 $now = dol_now();
 
 $title = $langs->trans("PDPConnectFRArea");
-$title .= ' <a href="'.$_SERVER["PHP_SELF"].'?action=confirm_sync&token='.newToken().'" class="butAction">'.img_picto('', 'refresh', 'class="pictofixedwidth"').'</a>';
+$titleWithSyncButton = $title . ' <a href="'.$_SERVER["PHP_SELF"].'?action=confirm_sync&token='.newToken().'" class="butAction">'.img_picto('', 'refresh', 'class="pictofixedwidth"').'</a>';
 //$help_url = "EN:Module_Document|FR:Module_Document_FR|ES:Módulo_Document";
 $help_url = '';
 $morejs = array();
@@ -331,7 +348,7 @@ $morecss = array();
 // Build and execute select
 // --------------------------------------------------------------------
 $sql = "SELECT";
-$sql .= " ".$object->getFieldList('t');
+$sql .= " ".$object->getFieldList('t', array('recap'));
 // Add fields from extrafields
 if (!empty($extrafields->attributes[$object->table_element]['label'])) {
 	foreach ($extrafields->attributes[$object->table_element]['label'] as $key => $val) {
@@ -618,7 +635,7 @@ $newcardbutton .= dolGetButtonTitle($langs->trans('ViewKanban'), '', 'fa fa-th-l
 $newcardbutton .= dolGetButtonTitleSeparator();
 $newcardbutton .= dolGetButtonTitle($langs->trans('New'), '', 'fa fa-plus-circle', dol_buildpath('/pdpconnectfr/document_card.php', 1).'?action=create&backtopage='.urlencode($_SERVER['PHP_SELF']), '', $permissiontoadd);
 
-print_barre_liste($title, $page, $_SERVER["PHP_SELF"], $param, $sortfield, $sortorder, $massactionbutton, $num, $nbtotalofrecords, $object->picto, 0, $newcardbutton, '', $limit, 0, 0, 1);
+print_barre_liste($titleWithSyncButton, $page, $_SERVER["PHP_SELF"], $param, $sortfield, $sortorder, $massactionbutton, $num, $nbtotalofrecords, $object->picto, 0, $newcardbutton, '', $limit, 0, 0, 1);
 
 // Add code for pre mass action (confirmation or email presend form)
 $topicmail = "SendDocumentRef";
@@ -661,6 +678,7 @@ if (!empty($moreforfilter)) {
 }
 
 $varpage = empty($contextpage) ? $_SERVER["PHP_SELF"] : $contextpage;
+$varpage = '';
 $htmlofselectarray = $form->multiSelectArrayWithCheckbox('selectedfields', $arrayfields, $varpage, $conf->main_checkbox_left_column);  // This also change content of $arrayfields with user setup
 $selectedfields = (($mode != 'kanban' && $mode != 'kanbangroupby') ? $htmlofselectarray : '');
 $selectedfields .= (count($arrayofmassactions) ? $form->showCheckAddButtons('checkforselect', 1) : '');
@@ -736,6 +754,9 @@ foreach ($object->fields as $key => $val) {
 		} elseif ($val['type'] === 'boolean') {
 			print $form->selectyesno('search_' . $key, $search[$key] ?? '', 1, false, 1);
 		} else {
+			if ($val['notsearchable']) {
+				continue;
+			}
 			print '<input type="text" class="flat maxwidth'.(in_array($val['type'], array('integer', 'price')) ? '50' : '75').'" name="search_'.$key.'" value="'.dol_escape_htmltag(isset($search[$key]) ? $search[$key] : '').'">';
 		}
 		print '</td>';
@@ -831,6 +852,33 @@ while ($i < $imaxinloop) {
 
 	// Store properties in $object
 	$object->setVarsFromFetchObj($obj);
+
+	// Set value of additional properties, For example, to compute a field from others
+	$object->recap = '';
+	if ($object->ack_status) {
+		$object->recap .= 'Ack: '.$object->ack_status.'<br>';
+	}
+	if ($object->ack_reason_code) {
+		$object->recap .= 'Reason: '.$object->ack_reason_code.'<br>';
+	}
+	if ($object->ack_info) {
+		$object->recap .= 'Info: '.$object->ack_info.'<br>';
+	}
+	if ($object->cdar_lifecycle_code) {
+		$object->recap .= 'Lifecycle Code: '.$object->cdar_lifecycle_code.'<br>';
+	}
+	if ($object->cdar_lifecycle_label) {
+		$object->recap .= 'Lifecycle Label: '.$object->cdar_lifecycle_label.'<br>';
+	}
+	if ($object->cdar_reason_code) {
+		$object->recap .= 'CDAR Reason Code: '.$object->cdar_reason_code.'<br>';
+	}
+	if ($object->cdar_reason_description) {
+		$object->recap .= 'CDAR Reason Description: '.$object->cdar_reason_description.'<br>';
+	}
+	if ($object->cdar_reason_detail) {
+		$object->recap .= 'CDAR Reason Detail: '.$object->cdar_reason_detail.'<br>';
+	}
 
 	/*
 	$object->thirdparty = null;

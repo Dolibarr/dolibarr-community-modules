@@ -132,6 +132,7 @@ class Call extends CommonObject
 		"rowid" => array("type" => "integer", "label" => "TechnicalID", "enabled" => "1", 'position' => 1, 'notnull' => 1, "visible" => "0", "noteditable" => "1", "index" => "1", "css" => "left", "comment" => "Id"),
 		"call_id" => array("type" => "varchar(50)", "label" => "Ref", "enabled" => "1", 'position' => 0, 'notnull' => 1, "visible" => "1", "index" => "1", "csslist" => "tdoverflowmax150"),
 		"totalflow" => array("type" => "integer", "label" => "totalFlow", "enabled" => "1", 'position' => 0, 'notnull' => 1, "visible" => "1", "comment" => "Total flows handled during the API call"),
+		"skippedflow" => array("type" => "integer", "label" => "skippedFlow", "enabled" => "1", 'position' => 0, 'notnull' => 1, "visible" => "1", "comment" => "Skipped flows during the API call"),
 		"successflow" => array("type" => "integer", "label" => "successFlow", "enabled" => "1", 'position' => 0, 'notnull' => 1, "visible" => "1", "comment" => "Successfully completed flows during the API call"),
 		"date_creation" => array("type" => "datetime", "label" => "DateCreation", "enabled" => "1", 'position' => 500, 'notnull' => 1, "visible" => "-2",),
 		"tms" => array("type" => "timestamp", "label" => "DateModification", "enabled" => "1", 'position' => 501, 'notnull' => 0, "visible" => "-2",),
@@ -143,13 +144,15 @@ class Call extends CommonObject
 		"endpoint" => array("type" => "varchar(255)", "label" => "endpoint", "enabled" => "1", 'position' => 0, 'notnull' => 1, "visible" => "1", "comment" => "-- URL or endpoint called"),
 		"request_body" => array("type" => "text", "label" => "request_body", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "1", "comment" => "Request body (JSON)"),
 		"response" => array("type" => "text", "label" => "response", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "1", "comment" => "Full response body (JSON)"),
+		"processing_result" => array("type" => "text", "label" => "processing_result", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "1", "comment" => "Result of processing (summary of errors/success of internal processing)"),
 		"provider" => array("type" => "varchar(50)", "label" => "provider", "enabled" => "1", 'position' => 0, 'notnull' => 1, "visible" => "1", "comment" => "PDP Name"),
 		"entity" => array("type" => "varchar(50)", "label" => "entity", "enabled" => "1", 'position' => 0, 'notnull' => 0, "visible" => "0", "comment" => "Multi-entity support"),
 	);
 	public $rowid;
 	public $call_id;
-	public $totalFlow;
-	public $successFlow;
+	public $totalflow;
+	public $skippedflow;
+	public $successflow;
 	public $date_creation;
 	public $tms;
 	public $fk_user_creat;
@@ -160,6 +163,8 @@ class Call extends CommonObject
 	public $endpoint;
 	public $request_body;
 	public $response;
+
+	public $processing_result;
 	public $fk_provider;
 	public $entity;
 	// END MODULEBUILDER PROPERTIES
