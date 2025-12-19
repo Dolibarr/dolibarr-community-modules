@@ -42,12 +42,14 @@ class PDPProviderManager
             'ESALINK' => array(
                 'provider_name' => 'ESALINK',
                 'description' => 'Esalink PDP Integration',
-                'is_enabled' => 1
+                'is_enabled' => 1,
+            	'provider_url' => 'https://ppd.hubtimize.fr',
             ),
             'TESTPDP' => array(
                 'provider_name' => 'TESTPDP',
                 'description' => 'Another TESTPDP Integration',
-                'is_enabled' => 0
+                'is_enabled' => 0,
+            	'provider_url' => 'https://example.com',
             )
         );
     }

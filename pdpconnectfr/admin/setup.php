@@ -329,6 +329,14 @@ if (preg_match('/call'.$prefix.'HEALTHCHECK/i', $action, $reg)) {
 }*/
 
 if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_PDP') === "ESALINK") {
+
+	$formSetup->newItem('PDPConnectionSetup')->setAsTitle();
+
+	// Link to get the Credentials
+	$item = $formSetup->newItem('PDPCONNECTFR_LINK_CREATE_ACCOUNT');
+	$url = $providersConfig[getDolGlobalString('PDPCONNECTFR_PDP')]['provider_url'];
+	$item->fieldOverride = img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$url.'">'.$url.'</a>';
+
 	// Username
 	$item = $formSetup->newItem($prefix . 'USERNAME');
 	$item->cssClass = 'minwidth500';
@@ -424,7 +432,7 @@ print dol_get_fiche_head($head, 'settings', $langs->trans($title), -1, "pdpconne
 
 
 // Setup page goes here
-print info_admin($langs->trans("PDPConnectInfo"));
+print info_admin($langs->trans("PDPConnectInfo").'<br>'.$langs->trans("PDPConnectInfo2"));
 print '<br>';
 
 //print '<span class="opacitymedium">'.$langs->trans("PDPConnectFRSetupPage").'</span><br><br>';
