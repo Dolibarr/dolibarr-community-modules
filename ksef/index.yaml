@@ -1,0 +1,28 @@
+# This is the YAML file to describe the location modules
+
+packages:
+  - modulename: 'KSEF'  # Matches modKSEF class name
+    author: 'InPoint Automation'
+    author_url: 'https://inpointautomation.com'
+    label:
+      en: 'KSeF Integration (by InPoint Automation)'
+      pl: 'Integracja KSeF (przez InPoint Automation)'
+    description:
+      en: "Integrates Dolibarr with KSeF (Krajowy System e-Faktur), the Polish National e-Invoice System. Generates FA(3) XML invoices, signs and submits them to KSeF, downloads UPO receipts, and automatically adds QR codes to PDF invoices."
+      pl: "Integruje Dolibarr z KSeF (Krajowy System e-Faktur), polskim systemem e-faktur. Generuje faktury XML FA(3), podpisuje i przesyła je do KSeF, pobiera potwierdzenia UPO oraz automatycznie dodaje kody QR do faktur PDF."
+    status: 'enabled'
+    created_at: '2025-12-04'
+    last_updated_at: 'auto'
+    git: 'https://github.com/InPoint-Automation/Dolibarr-KSeF-Module.git'
+    git-branch: 'main'
+    git-system: 'github'
+    cover: 'https://github.com/InPoint-Automation/Dolibarr-KSeF-Module/blob/e674e8fa72162db968c774b8ef7857d8a2f6c038/img/ksef.png'
+    current_version: 'auto'
+    dolibarrmin: 'auto'
+    dolibarrmax: 'auto'
+    phpmin: '7.4'
+    phpmax: 'auto'
+    price: ""
+    direct-download: yes
+    dolistore-upload: 'no'
+    dolistore-download: ''
