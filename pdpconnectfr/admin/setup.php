@@ -329,13 +329,13 @@ if (preg_match('/call'.$prefix.'HEALTHCHECK/i', $action, $reg)) {
 }*/
 
 if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_PDP') === "ESALINK") {
-
+	// Separator
 	$formSetup->newItem('PDPConnectionSetup')->setAsTitle();
 
 	// Link to get the Credentials
 	$item = $formSetup->newItem('PDPCONNECTFR_LINK_CREATE_ACCOUNT');
 	$url = $providersConfig[getDolGlobalString('PDPCONNECTFR_PDP')]['provider_url'];
-	$item->fieldOverride = img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$url.'">'.$url.'</a>';
+	$item->fieldOverride = img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$url.'" target="_new">'.$url.'</a>';
 
 	// Username
 	$item = $formSetup->newItem($prefix . 'USERNAME');
@@ -363,33 +363,17 @@ if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_P
 	$item = $formSetup->newItem($prefix . 'ACTIONS');
 	$item->fieldOverride = "";
 	if (!$tokenData['token']) {
-		$item->fieldOverride .= "
-			<a
-			href='".$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken()."'
-			>" . $langs->trans('generateAccessToken') . " <i class='fa fa-key'></i></a><br/>
-		";
+		$item->fieldOverride .= '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken().'">' . $langs->trans('generateAccessToken') . " <i class='fa fa-key'></i></a><br>";
 	}
 	if ($tokenData['token']) {
-		$item->fieldOverride .= "
-			<a
-			href='".$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken()."'
-			>" . $langs->trans('reGenerateAccessToken') . " <i class='fa fa-key'></i></a><br/>
-		";
+		$item->fieldOverride .= '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken().'">' . $langs->trans('reGenerateAccessToken') . " <i class='fa fa-key'></i></a><br>";
 	}
 
-	$item->fieldOverride .= "
-		<a
-			href='".$_SERVER["PHP_SELF"]."?action=call".$prefix."HEALTHCHECK&token=".newToken()."'
-		>" . $langs->trans('testConnection') . " (Healthcheck) <i class='fa fa-check'></i></a><br/>
-	";
+	$item->fieldOverride .= '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=call".$prefix."HEALTHCHECK&token=".newToken().'">' . $langs->trans('testConnection') . " (Healthcheck) <i class='fa fa-check'></i></a><br>";
 	$item->cssClass = 'minwidth500';
 
 	if ($tokenData['token'] && getDolGlobalString('PDPCONNECTFR_PROTOCOL') && getDolGlobalString('PDPCONNECTFR_PROTOCOL') === 'FACTURX') {
-		$item->fieldOverride .= "
-			<a
-			href='".$_SERVER["PHP_SELF"]."?action=make".$prefix."sampleinvoice&token=".newToken()."'
-			>" . $langs->trans('generateSendSampleInvoice') . " <i class='fa fa-file'></i></a><br/>
-		";
+		$item->fieldOverride .= '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=make".$prefix."sampleinvoice&token=".newToken().'">' . $langs->trans('generateSendSampleInvoice') . " <i class='fa fa-file'></i></a><br>";
 	}
 
 	// To remove
@@ -466,6 +450,13 @@ if (!empty($formSetup->items)) {
 	print $formSetup->generateOutput(true);
 	print '<br>';
 }
+
+
+if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_PDP') === "ESALINK") {
+
+
+}
+
 
 // on change PDPCONNECTFR_PDP reload page to show specific configuration of selected PDP
 print '<script>
