@@ -19,6 +19,7 @@ CREATE TABLE llx_pdpconnectfr_call(
 	rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL, 
 	call_id varchar(50) NOT NULL, 
 	totalflow integer NOT NULL DEFAULT 1, 
+	skippedflow integer NOT NULL DEFAULT 1, 
 	successflow integer NOT NULL DEFAULT 1, 
 	date_creation datetime NOT NULL, 
 	tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, 
@@ -30,6 +31,7 @@ CREATE TABLE llx_pdpconnectfr_call(
 	endpoint varchar(255) NOT NULL, 
 	request_body text, 
 	response text, 
+	processing_result text, 
 	provider varchar(50) NOT NULL, 
 	entity varchar(50) DEFAULT 1
 	-- END MODULEBUILDER FIELDS

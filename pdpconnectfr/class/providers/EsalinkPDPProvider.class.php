@@ -382,7 +382,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		}
 
         // Log the API call if we have the fonctional type
-        if (!empty($callType)) {
+        if (!empty($callType)) { // TODO : Add a parameter in module configuration to enable/disable logging
             $call = new Call($this->db);
             $call->call_id = $call->getNextCallId();
             $call->call_type = $callType ?: '';
@@ -412,7 +412,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
      */
     public function syncFlows()
     {
-        global $conf;
+        global $db, $user;
         $results_messages = array();
         $uuid = $this->generateUuidV4(); // UUID used to correlate logs between Dolibarr and PDP TODO : Store it somewhere
 
@@ -429,7 +429,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         $params = array(
             'limit' => 1,
             'where' => array(
-            'updatedAfter' => dol_print_date($this->getLastSyncDate(), '%Y-%m-%dT%H:%M:%S.000Z', 'gmt')
+            'updatedAfter' => dol_print_date($this->getLastSyncDate(24), '%Y-%m-%dT%H:%M:%S.000Z', 'gmt')
             )
         );
         $response = $this->callApi($resource, "POST", json_encode($params));
@@ -459,42 +459,130 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                 return array('res' => 0, 'messages' => $results_messages);
             }
 
+            // Since PDP may not return flows in the order we want (by updatedAt ASC), we sort them here
+            usort($response['response']['results'], function ($a, $b) {
+                return strtotime($a['updatedAt']) <=> strtotime($b['updatedAt']);
+            });
+
+            // Clean aleady processed flows from the list
+            $alreadyProcessedFlowIds = [];
+            $flowIds = array_column($response['response']['results'], 'flowId');
+            $sql = "SELECT flow_id FROM " . MAIN_DB_PREFIX . "pdpconnectfr_document WHERE flow_id IN (" . implode(',', array_map('intval', $flowIds)) . ")";
+            $resql = $db->query($sql);
+            if ($resql) {
+                while ($obj = $db->fetch_object($resql)) {
+                    $alreadyProcessedFlowIds[] = $obj->flow_id;
+                }
+            }
+            $response['response']['results'] = array_filter(
+                $response['response']['results'],
+                fn($flow) => !in_array($flow['flowId'], $alreadyProcessedFlowIds)
+            );
+
+            // Update totalFlows after filtering
+            $totalFlows = count($response['response']['results']);
+            $errors = 0;
+            $alreadyExist = 0;
+            $syncedFlows = 0;
+
+            // Call ID for logging purposes
             $call_id = $response['call_id'] ?? null;
-            $documents = array();
-            $cdars = array();
+
+            $lastsuccessfullSyncronizedFlow = null;
             foreach ($response['response']['results'] as $flow) {
-                switch ($flow["flowSyntax"]) {
-                    case "CDAR":
-                        $cdars[] = $flow;
-                        break;
-                    case "FACTUR-X":
-                        $documents[] = $flow;
-                        break;
-                    default:
-                        $documents[] = $flow;
-                        break;
+
+                try {
+                    $db->begin();
+                    $res = $this->syncFlow($flow['flowId'], $call_id);
+
+                    // If res < 0, rollback
+                    if ($res['res'] < 0) {
+                        $db->rollback();
+                        $results_messages[] = "Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'];
+                        $errors++;
+                    }
+
+                    // If res == 0, commit but count as already existed
+                    if ($res['res'] == 0) {
+                        $results_messages[] = "Skipped - Exist or already processed flow " . $flow['flowId'] . ": " . $res['message'];
+                        $alreadyExist++;
+                        $lastsuccessfullSyncronizedFlow = $flow['flowId'];
+                        $db->commit();
+                    }
+
+                    // If res == 1, commit and count as synced
+                    if ($res['res'] > 0) {
+                        $syncedFlows++;
+                        $lastsuccessfullSyncronizedFlow = $flow['flowId'];
+                        $db->commit();
+                    }
+                } catch (Exception $e) {
+                    $db->rollback();
+                    $results_messages[] = "Exception occurred while synchronizing flow " . $flow['flowId'] . ": " . $e->getMessage();
+                    $errors++;
+                }
+
+                if ($errors > 0) {
+                    $results_messages[] = "Aborting synchronization due to errors.";
+                    break;
                 }
             }
 
-            // Process documents first
-            foreach ($documents as $flow) {
-                $res = $this->syncFlow($flow['flowId'], $call_id);
-                if ($res['res'] != '1') {
-                    $results_messages[] = "Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'];
-                }
-            }
 
-            // Then process CDARs
-            foreach ($cdars as $flow) {
-                $res = $this->syncFlow($flow['flowId'], $call_id);
-                if ($res['res'] != '1') {
-                    $results_messages[] = "Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'];
-                }
-            }
+            // $documents = array();
+            // $cdars = array();
+            // foreach ($response['response']['results'] as $flow) {
+            //     switch ($flow["flowSyntax"]) {
+            //         case "CDAR":
+            //             $cdars[] = $flow;
+            //             break;
+            //         case "FACTUR-X":
+            //             $documents[] = $flow;
+            //             break;
+            //         default:
+            //             $documents[] = $flow;
+            //             break;
+            //     }
+            // }
+
+            // // Process documents first
+            // foreach ($documents as $flow) {
+            //     $res = $this->syncFlow($flow['flowId'], $call_id);
+            //     if ($res['res'] != '1') {
+            //         $results_messages[] = "Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'];
+            //     }
+            // }
+
+            // // Then process CDARs
+            // foreach ($cdars as $flow) {
+            //     $res = $this->syncFlow($flow['flowId'], $call_id);
+            //     if ($res['res'] != '1') {
+            //         $results_messages[] = "Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'];
+            //     }
+            // }
         }
 
-        $results_messages[] = "Total flows to synchronize: " . $totalFlows;
-        return array('res' => 1, 'messages' => $results_messages);
+        $res = $errors > 0 ? -1 : 1;
+
+        $results_messages[] = ($res == 1) ? "Synchronization completed successfully." : "Synchronization aborted, last successfull synchronized flow: {$lastsuccessfullSyncronizedFlow}";
+        $results_messages[] = "Total flows to synchronize: {$totalFlows}";
+        $results_messages[] = "Total flows synchronized: {$syncedFlows}";
+        $results_messages[] = "Total flows skipped (exist or already processed): {$alreadyExist}";
+
+        $processingResult = implode("<br>----------------------<br>", $results_messages);
+        $processingResult = "Processing result:<br>" . $processingResult;
+
+        // Save sync recap
+        $sql = "UPDATE " . MAIN_DB_PREFIX . "pdpconnectfr_call
+        SET totalflow = " . intval($totalFlows) . ",
+            successflow = " . intval($syncedFlows) . ",
+            skippedflow = " . intval($alreadyExist) . ",
+            processing_result = '" . $db->escape($processingResult) . "'
+        WHERE call_id = '" . $db->escape($call_id) . "'";
+        $db->query($sql);
+
+        // Return result
+        return array('res' => $res, 'messages' => $results_messages);
     }
 
     /**
@@ -503,11 +591,11 @@ class EsalinkPDPProvider extends AbstractPDPProvider
      * @param string $flowId        FlowId
      * @param string|null $call_id  Call ID for logging purposes
      *
-     * @return array{res:int, message:string} Returns array with 'res' (1 on success, -1 on failure) and 'message' if error
+     * @return array{res:int, message:string} Returns array with 'res' (1 on success, 0 if exists or already processed, -1 on failure) and 'message'
      */
     public function syncFlow($flowId, $call_id = null)
     {
-        global $conf, $user;
+        global $db, $conf, $user;
         dol_include_once('custom/pdpconnectfr/class/document.class.php');
 
         // call API to get flow details
@@ -540,15 +628,26 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         $document->flow_syntax          = $flowData['flowSyntax'] ?? null;
         $document->flow_profile         = $flowData['flowProfile'] ?? null;
         $document->ack_status           = $flowData['acknowledgement']['status'] ?? null;
-        // Change this fields to fit with the new api response =========================================
-        $document->ack_reason_code      = $flowData['acknowledgement']['reasonCode'] ?? null;
-        $document->ack_info             = $flowData['acknowledgement']['additionalInformation'] ?? null;
-        /*=============================================================================================*/
+        // Change this fields to fit with the new api response ===============================================
+        $document->ack_reason_code      = $flowData['acknowledgement']['details'][0]['reasonCode'] ?? null;
+        $document->ack_info             = $flowData['acknowledgement']['details'][0]['reasonMessage'] ?? null;
+        // Change this fields to fit with the new api response ===============================================
         $document->document_body        = null;
         $document->fk_element_id        = null;
         $document->fk_element_type      = null;
-        $document->submittedat          = $flowData['submittedAt'] ?? null;
-        $document->updatedat            = $flowData['updatedAt'] ?? null;
+
+        if (!empty($flowData['submittedAt'])) {
+            $dt = new DateTimeImmutable($flowData['submittedAt'], new DateTimeZone('UTC'));
+            $document->submittedat = $db->idate($dt->getTimestamp());
+        } else {
+            $document->submittedat = null;
+        }
+        if (!empty($flowData['updatedAt'])) {
+            $dt = new DateTimeImmutable($flowData['updatedAt'], new DateTimeZone('UTC'));
+            $document->updatedat = $db->idate($dt->getTimestamp());
+        } else {
+            $document->updatedat = null;
+        }
         $document->provider             = getDolGlobalString('PDPCONNECTFR_PDP') ?? null;
         $document->entity               = $conf->entity;
         $document->flow_uiid            = $flowData['uuid'] ?? null;
@@ -609,8 +708,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 
                 $res = $this->exchangeProtocol->createSupplierInvoiceFromFacturX($receivedFile, $ReadableViewFile);
-                if ($res['res'] != '1') {
+                if ($res['res'] < 0) {
                     return array('res' => -1, 'message' => "Failed to create supplier invoice from FacturX document for flowId: " . $flowId . ". " . $res['message']);
+                } elseif ($res['res'] == 0) {
+                    return array('res' => 0, 'message' => "supplier invoice already exists for flowId: " . $flowId . ". " . $res['message']);
                 }
                 break;
 

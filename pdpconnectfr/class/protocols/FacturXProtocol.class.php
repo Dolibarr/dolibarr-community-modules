@@ -969,7 +969,7 @@ class FacturXProtocol extends AbstractProtocol
      *
      * @param  string $file                         Factur-X file.
      * @param  string|null $ReadableViewFile        Readable view file. (PDP Generated readable PDF)
-     * @return array{res:int, message:string}       Returns array with 'res' (1 on success, -1 on failure) and info 'message'
+     * @return array{res:int, message:string}       Returns array with 'res' (1 on success, 0 already exists, -1 on failure) and info 'message'
      */
     public function createSupplierInvoiceFromFacturX($file, $ReadableViewFile = null)
     {
@@ -1106,7 +1106,7 @@ class FacturXProtocol extends AbstractProtocol
         $resql = $db->query($sql);
         if ($resql) {
             if ($db->num_rows($resql) > 0) {
-                return ['res' => -1, 'message' => 'Supplier Invoice with reference ' . $documentno . ' already exists' ];
+                return ['res' => 0, 'message' => 'Supplier Invoice with reference ' . $documentno . ' already exists' ];
             }
         } else {
             return ['res' => -1, 'message' => 'Database error while checking existing supplier invoice: ' . $db->lasterror() ];
@@ -1892,7 +1892,7 @@ class FacturXProtocol extends AbstractProtocol
         }
 
         // if not found, create new thirdparty
-        if ($thirdpartyId < 0) {
+        if ($thirdpartyId < 0 && !empty(getDolGlobalInt('PDPCONNECTFR_THIRDPARTIES_AUTO_GENERATION'))) {
             dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromFacturXSeller Creating new thirdparty: ' . $sellerInfo['sellername']);
 
             $thirdparty = new Societe($db);
@@ -1942,8 +1942,38 @@ class FacturXProtocol extends AbstractProtocol
                 dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromFacturXSeller Error creating thirdparty: ' . $thirdparty->error, LOG_ERR);
                 return array('res' => -1, 'message' => 'Thirdparty creation error: ' . implode("\n", $thirdparty->errors));
             }
+        } else {
+            dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromFacturXSeller Auto-creation of thirdparties is disabled', LOG_ERR);
+
+            $sellername = trim($sellerInfo['sellername'] ?? 'Unknown Supplier name');
+            $selleremail = trim($sellerInfo['sellercontactemailaddr'] ?? '');
+            $selleridents = [];
+            if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
+                foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
+                    if (!empty($globalId)) {
+                        $idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme);
+                        if (!empty($idprofField)) {
+                            $selleridents[] = $idScheme . ': ' . $globalId;
+                        }
+                    }
+                }
+            }
+
+            $errorDetails = [];
+            if (!empty($sellername)) {
+                $errorDetails[] = 'Supplier: ' . $sellername;
+            }
+            if (!empty($selleremail)) {
+                $errorDetails[] = 'Email: ' . $selleremail;
+            }
+            if (!empty($selleridents)) {
+                $errorDetails[] = 'Identifiers: ' . implode(', ', $selleridents);
+            }
+
+            $detailsStr = !empty($errorDetails) ? ' (' . implode(' | ', $errorDetails) . ')' : '';
+
+            return array('res' => -1, 'message' => 'Unable to find supplier' . $detailsStr . '. Auto-creation of thirdparties is disabled in settings. Please create the supplier manually or enable automatic supplier creation in module configuration.');
         }
-        return array('res' => -1, 'message' => 'Unknown error in _syncOrCreateThirdpartyFromFacturXSeller');
     }
 
     /**
@@ -2027,58 +2057,81 @@ class FacturXProtocol extends AbstractProtocol
         }
 
         // 5. If no match found after all steps: Create new product
-        $product = new Product($db);
-        $product->type        = $this->_detectProductTypeFromFacturx($lineData);
-        $product->ref = 'FACTURX-' . dol_sanitizeFileName(!empty($lineData['prodsellerid']) ? $lineData['prodsellerid'] : time());
-        $product->ref_ext     = trim($lineData['prodsellerid'] ?? '');
-        $product->label       = !empty($lineData['prodname'])
-            ? $lineData['prodname']
-            : 'Imported product from supplier invoice (Ref: ' . $lineData['parentDocumentNo'] . ')';
-        $product->description = trim($lineData['proddesc'] ?? '');
-        $product->tva_tx      = (float) ($lineData['rateApplicablePercent'] ?? 0);
-        $product->status      = 1; // Active
-        $product->note_private = 'Product created automatically from Factur-X import.';
-        $product->import_key  = AbstractPDPProvider::$PDPCONNECTFR_LAST_IMPORT_KEY; // It does not work here, so we will update it after creation
-        $product->array_options['pdpconnectfr_source'] = '1';
-        // Set barcode if global ID is provided and is a GTIN/EAN type
-        if (!empty($lineData['prodglobalid']) && !empty($lineData['prodglobalidtype']) && in_array($lineData['prodglobalidtype'], ['0160', '0011'])) {
-            $product->barcode = $lineData['prodglobalid'];
-            $product->barcode_type = getDolGlobalInt('PRODUIT_DEFAULT_BARCODE_TYPE', 0);
-        } else {
-            $product->barcode = 'auto';
-        }
-        // Validate before creation
-        $resCheck = $product->check();
-        if ($resCheck < 0) {
-            dol_syslog(__METHOD__ . ' Product check failed: ' . $product->error, LOG_ERR);
+        if (!empty(getDolGlobalInt('PDPCONNECTFR_PRODUCTS_AUTO_GENERATION'))) {
+            $product = new Product($db);
+            $product->type        = $this->_detectProductTypeFromFacturx($lineData);
+            $product->ref = 'FACTURX-' . dol_sanitizeFileName(!empty($lineData['prodsellerid']) ? $lineData['prodsellerid'] : time());
+            $product->ref_ext     = trim($lineData['prodsellerid'] ?? '');
+            $product->label       = !empty($lineData['prodname'])
+                ? $lineData['prodname']
+                : 'Imported product from supplier invoice (Ref: ' . $lineData['parentDocumentNo'] . ')';
+            $product->description = trim($lineData['proddesc'] ?? '');
+            $product->tva_tx      = (float) ($lineData['rateApplicablePercent'] ?? 0);
+            $product->status      = 1; // Active
+            $product->note_private = 'Product created automatically from Factur-X import.';
+            $product->import_key  = AbstractPDPProvider::$PDPCONNECTFR_LAST_IMPORT_KEY; // It does not work here, so we will update it after creation
+            $product->array_options['pdpconnectfr_source'] = '1';
+            // Set barcode if global ID is provided and is a GTIN/EAN type
+            if (!empty($lineData['prodglobalid']) && !empty($lineData['prodglobalidtype']) && in_array($lineData['prodglobalidtype'], ['0160', '0011'])) {
+                $product->barcode = $lineData['prodglobalid'];
+                $product->barcode_type = getDolGlobalInt('PRODUIT_DEFAULT_BARCODE_TYPE', 0);
+            } else {
+                $product->barcode = 'auto';
+            }
+            // Validate before creation
+            $resCheck = $product->check();
+            if ($resCheck < 0) {
+                dol_syslog(__METHOD__ . ' Product check failed: ' . $product->error, LOG_ERR);
+                return [
+                    'res'     => -1,
+                    'message' => 'Product check failed: ' . implode("\n", $product->errors),
+                ];
+            }
+
+            // Create product
+            $resCreate = $product->create($user);
+            if ($resCreate > 0) {
+                $productId = $product->id;
+
+                // Set import_key
+                $sql = 'UPDATE '.MAIN_DB_PREFIX."product SET import_key = '".$db->escape($product->import_key)."' WHERE rowid = ".((int) $productId);
+                $db->query($sql);
+
+                dol_syslog(__METHOD__ . ' New product created (ID: ' . $productId . ')');
+                return [
+                    'res'     => $productId,
+                    'message' => 'Product successfully created from Factur-X import',
+                ];
+            }
+
+            // Error on creation
+            dol_syslog(__METHOD__ . ' Product creation error: ' . $product->error, LOG_ERR);
             return [
                 'res'     => -1,
-                'message' => 'Product check failed: ' . implode("\n", $product->errors),
+                'message' => 'Product creation error: ' . implode("\n", $product->errors),
             ];
+        } else {
+            dol_syslog(get_class($this) . '::_findOrCreateProductFromFacturXLine Auto-creation of products is disabled', LOG_ERR);
+
+            $prodRef = trim($lineData['prodsellerid'] ?? '');
+            $prodName = trim($lineData['prodname'] ?? '');
+            $prodDesc = trim($lineData['proddesc'] ?? '');
+
+            $errorDetails = [];
+            if (!empty($prodRef)) {
+                $errorDetails[] = 'Supplier Ref: ' . $prodRef;
+            }
+            if (!empty($prodName)) {
+                $errorDetails[] = 'Name: ' . $prodName;
+            }
+            if (!empty($prodDesc)) {
+                $errorDetails[] = 'Description: ' . $prodDesc;
+            }
+
+            $detailsStr = !empty($errorDetails) ? ' (' . implode(' | ', $errorDetails) . ')' : '';
+
+            return array('res' => -1, 'message' => 'No matching product found (' . $detailsStr . '). Automatic product creation is disabled. Please create the product manually or enable automatic product creation in module configuration.');
         }
-
-        // Create product
-        $resCreate = $product->create($user);
-        if ($resCreate > 0) {
-            $productId = $product->id;
-
-            // Set import_key
-            $sql = 'UPDATE '.MAIN_DB_PREFIX."product SET import_key = '".$db->escape($product->import_key)."' WHERE rowid = ".((int) $productId);
-			$db->query($sql);
-
-            dol_syslog(__METHOD__ . ' New product created (ID: ' . $productId . ')');
-            return [
-                'res'     => $productId,
-                'message' => 'Product successfully created from Factur-X import',
-            ];
-        }
-
-        // Error on creation
-        dol_syslog(__METHOD__ . ' Product creation error: ' . $product->error, LOG_ERR);
-        return [
-            'res'     => -1,
-            'message' => 'Product creation error: ' . implode("\n", $product->errors),
-        ];
 
     }
 
