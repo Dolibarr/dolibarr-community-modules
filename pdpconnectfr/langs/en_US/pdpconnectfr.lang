@@ -131,3 +131,4 @@ ack_status=Acknowledgement status
 ack_reason_code=Acknowledgement reason code
 ack_info=Acknowledgement details
 PASettings=PA/PDP Settings
+PDPConnectInfo=Under the e-invoicing law, all invoicing software must allow for sending and receiving invoices. This is done through communication with an approved private partner called a PA (formerly PDP). This module enables bidirectional synchronization between your Dolibarr system and the PA. The module is free, but your chosen PA will likely charge a subscription fee. Begin by configuring your PA and its login credentials.

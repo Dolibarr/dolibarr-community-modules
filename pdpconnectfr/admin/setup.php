@@ -417,12 +417,17 @@ $linkback = '<a href="'.($backtopage ? $backtopage : DOL_URL_ROOT.'/admin/module
 
 print load_fiche_titre($langs->trans($title), $linkback, 'title_setup');
 
+
 // Configuration header
 $head = pdpconnectfrAdminPrepareHead();
 print dol_get_fiche_head($head, 'settings', $langs->trans($title), -1, "pdpconnectfr.png@pdpconnectfr");
 
+
 // Setup page goes here
-echo '<span class="opacitymedium">'.$langs->trans("PDPConnectFRSetupPage").'</span><br><br>';
+print info_admin($langs->trans("PDPConnectInfo"));
+print '<br>';
+
+//print '<span class="opacitymedium">'.$langs->trans("PDPConnectFRSetupPage").'</span><br><br>';
 
 // Alert mysoc configuration is not complete
 $mysocCheck = validateMyCompanyConfiguration();
