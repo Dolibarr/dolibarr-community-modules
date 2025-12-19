@@ -195,65 +195,9 @@ $item->cssClass = 'minwidth500';
 //$item = $formSetup->newItem('PDPCONNECTFR_MYPARAM13')->setAsDate();	// Not yet implemented
 */
 
-$PDPManager = new PDPProviderManager($db);
-$providersConfig = $PDPManager->getAllProviders();
-
-$ProtocolManager = new ProtocolManager($db);
-$protocolsList = $ProtocolManager->getProtocolsList();
-
-$itemlivemode = $formSetup->newItem('PDPCONNECTFR_LIVE')->setAsYesNo();
-$itemlivemode->fieldParams['forcereload'] = 1;
-
-// PDP providers list
-$TFieldProviders = array('' => '');
-foreach ($providersConfig as $key => $pconfig) {
-	if ($pconfig['is_enabled'] == 0) {
-		continue;
-	}
-	$TFieldProviders[$key] = $pconfig['provider_name'];
-}
-
-// Protocols list
-$TFieldProtocols = array();
-foreach ($protocolsList as $key => $protocolconfig) {
-	if ($protocolconfig['is_enabled'] == 0) {
-		continue;
-	}
-	$TFieldProtocols[$key] = $protocolconfig['protocol_name'];
-}
-
-// Available Profiles
-$TFieldProfiles = array('EN16931' => 'EN16931');
-foreach ($TFieldProfiles as $key => $profileconfig) {
-	$TFieldProfiles[$key] = $profileconfig;
-}
-
-$reg = array();
-$prefix = '';
-
-// If a PDP is selected, show parameters for this PDP
-if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_PDP') === "ESALINK") {
-	$provider = $PDPManager->getProvider('ESALINK');
-	$prefix = $provider->getConf()['dol_prefix'].'_';
-	$tokenData = $provider->getTokenData();
-}
-
-
-// Setup conf to choose a PDP
-$item = $formSetup->newItem('PDPCONNECTFR_PDP')->setAsSelect($TFieldProviders);
-$item->helpText = $langs->transnoentities('PDPCONNECTFR_PDP_HELP');
-$item->cssClass = 'minwidth500';
-
-// Setup conf to choose a protocol of exchange
-$item = $formSetup->newItem('PDPCONNECTFR_PROTOCOL')->setAsSelect($TFieldProtocols);
-$item->helpText = $langs->transnoentities('PDPCONNECTFR_PROTOCOL_HELP');
-$item->defaultFieldValue = 'FACTURX';
-$item->cssClass = 'minwidth500';
-
-// Setup conf to choose a profil of exchange
-$item = $formSetup->newItem('PDPCONNECTFR_PROFILE')->setAsSelect($TFieldProfiles);
-$item->helpText = $langs->transnoentities('PDPCONNECTFR_PROFILE_HELP');
-$item->defaultFieldValue = 'EN16931';
+// Setup conf to choose to use Chorus or not
+$item = $formSetup->newItem('PDPCONNECTFR_USE_CHORUS')->setAsYesNo();
+$item->helpText = $langs->transnoentities('PDPCONNECTFR_USE_CHORUS_HELP');
 $item->cssClass = 'minwidth500';
 
 // End of definition of parameters
@@ -316,83 +260,47 @@ if (preg_match('/call'.$prefix.'HEALTHCHECK/i', $action, $reg)) {
 	}
 }
 
-// To remove
-/*if (preg_match('/makeInvoice/i', $action, $reg)) {
-	$protocol = $ProtocolManager->getprotocol('FACTURX');
 
-	$result = $protocol->generateInvoice('288');
-	if ($result) {
-		setEventMessages('Result : ' . $result, null, 'warnings');
-	} else {
-		setEventMessages('', $protocol->errors, 'errors');
-	}
-}*/
+// Setup conf for auto generation of objects
+$formSetup->newItem('PDPCONNECTFR_SYNC_TO_PA')->setAsTitle();
 
-if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_PDP') === "ESALINK") {
-	// Username
-	$item = $formSetup->newItem($prefix . 'USERNAME');
-	$item->cssClass = 'minwidth500';
+// Setup conf to choose use of auto generation or not of products
+$item = $formSetup->newItem('PDPCONNECTFR_EINVOICE_IN_REAL_TIME')->setAsYesNo();
+$item->helpText = $langs->transnoentities('PDPCONNECTFR_EINVOICE_IN_REAL_TIME');
+$item->defaultFieldValue = 0;
+$item->cssClass = 'minwidth500';
 
-	// Password
-	$item = $formSetup->newItem($prefix . 'PASSWORD')->setAsPassword();
-	$item->cssClass = 'minwidth500';
 
-	// API_KEY
-	$item = $formSetup->newItem($prefix . 'API_KEY');
-	$item->cssClass = 'minwidth500';
+// Setup conf for auto generation of objects
+$formSetup->newItem('PDPCONNECTFR_AUTO_GENERATION')->setAsTitle();
 
-	// Token
-	$item = $formSetup->newItem($prefix . 'TOKEN');
-	$item->cssClass = 'maxwidth500 ';
-	if (!empty($tokenData['token'])) {
-		$item->fieldOverride = "<span class='opacitymedium hideonsmartphone'>" . htmlspecialchars('**************' . substr($tokenData['token'], -4)) . "</span>";
-	}
-	if (!$tokenData['token']) {
-		$item->fieldOverride = "-";
-	}
+// Setup conf to choose use of auto generation or not of products
+$item = $formSetup->newItem('PDPCONNECTFR_PRODUCTS_AUTO_GENERATION')->setAsYesNo();
+$item->helpText = $langs->transnoentities('PDPCONNECTFR_PRODUCTS_AUTO_GENERATION_HELP');
+$item->defaultFieldValue = 0;
+$item->cssClass = 'minwidth500';
 
-	// Actions
-	$item = $formSetup->newItem($prefix . 'ACTIONS');
-	$item->fieldOverride = "";
-	if (!$tokenData['token']) {
-		$item->fieldOverride .= "
-			<a
-			href='".$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken()."'
-			>" . $langs->trans('generateAccessToken') . " <i class='fa fa-key'></i></a><br/>
-		";
-	}
-	if ($tokenData['token']) {
-		$item->fieldOverride .= "
-			<a
-			href='".$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken()."'
-			>" . $langs->trans('reGenerateAccessToken') . " <i class='fa fa-key'></i></a><br/>
-		";
-	}
+// Setup conf to choose use of auto generation or not of products
+$item = $formSetup->newItem('PDPCONNECTFR_PRODUCTS_AUTO_GENERATION')->setAsYesNo();
+$item->helpText = $langs->transnoentities('PDPCONNECTFR_PRODUCTS_AUTO_GENERATION_HELP');
+$item->defaultFieldValue = 0;
+$item->cssClass = 'minwidth500';
 
-	$item->fieldOverride .= "
-		<a
-			href='".$_SERVER["PHP_SELF"]."?action=call".$prefix."HEALTHCHECK&token=".newToken()."'
-		>" . $langs->trans('testConnection') . " (Healthcheck) <i class='fa fa-check'></i></a><br/>
-	";
-	$item->cssClass = 'minwidth500';
+// Setup conf to choose use of auto generation or not of third parties
+$item = $formSetup->newItem('PDPCONNECTFR_THIRDPARTIES_AUTO_GENERATION')->setAsYesNo();
+$item->helpText = $langs->transnoentities('PDPCONNECTFR_THIRDPARTIES_AUTO_GENERATION_HELP');
+$item->defaultFieldValue = 0;
+$item->cssClass = 'minwidth500';
 
-	if ($tokenData['token'] && getDolGlobalString('PDPCONNECTFR_PROTOCOL') && getDolGlobalString('PDPCONNECTFR_PROTOCOL') === 'FACTURX') {
-		$item->fieldOverride .= "
-			<a
-			href='".$_SERVER["PHP_SELF"]."?action=make".$prefix."sampleinvoice&token=".newToken()."'
-			>" . $langs->trans('generateSendSampleInvoice') . " <i class='fa fa-file'></i></a><br/>
-		";
-	}
+// Setup conf for debug mode
+$formSetup->newItem('PDPCONNECTFR_DEBUG')->setAsTitle();
 
-	// To remove
-	/*if ($tokenData['token'] && getDolGlobalString('PDPCONNECTFR_PROTOCOL') && getDolGlobalString('PDPCONNECTFR_PROTOCOL') === 'FACTURX' && getDolGlobalString('PDPCONNECTFR_PROFILE') === 'EN16931') {
-		$item->fieldOverride .= "
-			<a
-			href='".$_SERVER["PHP_SELF"]."?action=makeInvoice&token=".newToken()."'
-			> Generate Invoice <i class='fa fa-file'></i></a><br/>
-		";
-	}*/
-}
+// Setup conf to enable or not debug mode
+$item = $formSetup->newItem('PDPCONNECTFR_DEBUG_MODE')->setAsYesNo();
+$item->helpText = $langs->transnoentities('PDPCONNECTFR_DEBUG_MODE_HELP');
+$item->defaultFieldValue = 0;
+$item->cssClass = 'minwidth500';
+
 
 include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php';
 //print getDolGlobalString('PDPCONNECTFR_PDP');
@@ -419,10 +327,11 @@ print load_fiche_titre($langs->trans($title), $linkback, 'title_setup');
 
 // Configuration header
 $head = pdpconnectfrAdminPrepareHead();
-print dol_get_fiche_head($head, 'settings', $langs->trans($title), -1, "pdpconnectfr.png@pdpconnectfr");
+print dol_get_fiche_head($head, 'options', $langs->trans($title), -1, "pdpconnectfr.png@pdpconnectfr");
 
 // Setup page goes here
-echo '<span class="opacitymedium">'.$langs->trans("PDPConnectFRSetupPage").'</span><br><br>';
+//print '<span class="opacitymedium">'.$langs->trans("PDPConnectFRSetupPage").'</span><br>';
+print '<br>';
 
 // Alert mysoc configuration is not complete
 $mysocCheck = validateMyCompanyConfiguration();

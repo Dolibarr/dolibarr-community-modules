@@ -19,15 +19,15 @@ class ActionsPdpconnectfr
     /**
      * Hook called after a PDF is created
      *
-     * @param array   $parameters Hook parameters
-     * @param CommonObject $object The object related to the PDF (invoice, order, etc.)
-     * @param string  $action     Current action
-     * @param HookManager $hookmanager Hook manager instance
-     * @return int    0 or 1
+     * @param 	array   		$parameters 	Hook parameters
+     * @param 	CommonObject 	$object 		The object related to the PDF (invoice, order, etc.)
+     * @param 	string  		$action     	Current action
+     * @param 	HookManager 	$hookmanager 	Hook manager instance
+     * @return 	int    			0 or 1
      */
     public function afterPDFCreation($parameters, &$object, &$action, $hookmanager)
     {
-        global $db, $langs, $conf;
+        global $db, $langs;
 
         dol_syslog(__METHOD__ . " Hook afterPDFCreation called for object " . get_class($object));
 
@@ -37,29 +37,33 @@ class ActionsPdpconnectfr
         $invoiceObject = $parameters['object'];
         // Check if it's an invoice
         if (get_class($invoiceObject) === 'Facture') {
-            // Call function to create Factur-X document
-            require __DIR__ . "/protocols/ProtocolManager.class.php";
-            require __DIR__ . "/pdpconnectfr.php";
+        	if (getDolGlobalString('PDPCONNECTFR_EINVOICE_IN_REAL_TIME')) {
+	            // Call function to create Factur-X document
+	            require __DIR__ . "/protocols/ProtocolManager.class.php";
+	            require __DIR__ . "/pdpconnectfr.php";
 
-            $usedProtocols = getDolGlobalString('PDPCONNECTFR_PROTOCOL');
-            $ProtocolManager = new ProtocolManager($db);
-            $protocol = $ProtocolManager->getprotocol($usedProtocols);
+	            $usedProtocols = getDolGlobalString('PDPCONNECTFR_PROTOCOL');
+	            $ProtocolManager = new ProtocolManager($db);
+	            $protocol = $ProtocolManager->getprotocol($usedProtocols);
 
-            // Check configuration
-            $result = checkRequiredinformations($invoiceObject->thirdparty);
-            if ($result['res'] < 0) {
-                $message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
-                setEventMessages($message, [], 'errors');
-                return -1;
-            }
+	            // Check configuration
+	            $result = checkRequiredinformations($invoiceObject->thirdparty);
+	            if ($result['res'] < 0) {
+	                $message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
+	                //setEventMessages($message, [], 'warning');
+	                $this->error = $message;
+	                return -1;
+	            }
 
-
-            $result = $protocol->generateInvoice($invoiceObject->id);
-            if ($result) {
-                setEventMessages('Result : ' . $result, null, 'warnings');
-            } else {
-                setEventMessages('', $protocol->errors, 'errors');
-            }
+	            $result = $protocol->generateInvoice($invoiceObject->id);		// Generate E-bill
+	            if ($result) {
+	                //setEventMessages('Result : ' . $result, null, 'warnings');
+	            } else {
+	                //setEventMessages('', $protocol->errors, 'errors');
+	                $this->error = $protocol->errors;
+	                return -1;
+	            }
+        	}
         }
 
         return 0;
@@ -71,7 +75,7 @@ class ActionsPdpconnectfr
      */
     function addMoreActionsButtons($parameters, &$object, &$action, $hookmanager)
     {
-        global $db, $langs, $user, $conf;
+        global $db, $langs, $user;
 
         if (in_array($object->element, ['facture'])) {
             $langs->load("pdpconnectfr@pdpconnectfr");

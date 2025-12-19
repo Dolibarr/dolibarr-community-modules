@@ -58,8 +58,8 @@ function validateMyCompanyConfiguration()
 
 /**
  * Validate thirdparty configuration
- * @param Societe $thirdparty   Thirdparty object
  *
+ * @param Societe $thirdparty   Thirdparty object
  * @return array{res:int, message:string} Returns array with 'res' (1 on success, -1 on failure) and info 'message'
  */
 function validatethirdpartyConfiguration($thirdparty)
@@ -102,6 +102,7 @@ function validatethirdpartyConfiguration($thirdparty)
 
     return ['res' => 1, 'message' => ''];
 }
+
 /**
  * Check required informations for PDP/PA invoicing
  *
@@ -109,7 +110,7 @@ function validatethirdpartyConfiguration($thirdparty)
  *
  * @return array{res:int, message:string} Returns array with 'res' (1 on success, -1 on failure) and info 'message'
  */
-function checkRequiredinformations ($soc) {
+function checkRequiredinformations($soc) {
 
     $baseErrors = [];
     $mysocConfigCheck = validateMyCompanyConfiguration();

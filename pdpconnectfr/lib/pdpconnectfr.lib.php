@@ -40,8 +40,13 @@ function pdpconnectfrAdminPrepareHead()
 	$head = array();
 
 	$head[$h][0] = dol_buildpath("/pdpconnectfr/admin/setup.php", 1);
-	$head[$h][1] = $langs->trans("Settings");
+	$head[$h][1] = $langs->trans("PASettings");
 	$head[$h][2] = 'settings';
+	$h++;
+
+	$head[$h][0] = dol_buildpath("/pdpconnectfr/admin/setup_options.php", 1);
+	$head[$h][1] = $langs->trans("Options");
+	$head[$h][2] = 'options';
 	$h++;
 
 	/*
