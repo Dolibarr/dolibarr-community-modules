@@ -135,3 +135,5 @@ PDPConnectInfo=As part of the French electronic invoicing law, any invoicing sof
 PDPConnectInfo2=Start by configuring your PA and its credentials to connect to it.
 PDPConnectionSetup=Data for PA connection
 PDPCONNECTFR_LINK_CREATE_ACCOUNT=Link to create account and get connection credentials
+pdpconnectfrInvoiceSeparator=E-invoicing
+pdpconnectfrInvoiceStatus=E-invoicing status
