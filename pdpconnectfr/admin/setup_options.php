@@ -230,36 +230,6 @@ if (!getDolGlobalString('PDPCONNECTFR_PROTOCOL')) {
 	exit;
 }
 
-if (preg_match('/set'.$prefix.'TOKEN/i', $action, $reg)) {
-	// Generate token
-	$token = $provider->getAccessToken();
-	if ($token) {
-		setEventMessages("Token generated successfully", null, 'mesgs');
-		header("Location: ".$_SERVER["PHP_SELF"]);
-		exit;
-	} else {
-		setEventMessages('', $provider->errors, 'errors');
-	}
-}
-
-if (preg_match('/make'.$prefix.'sampleinvoice/i', $action, $reg)) {
-	$result = $provider->sendSampleInvoice();
-	if ($result) {
-		setEventMessages('', $result, 'warnings');
-	} else {
-		setEventMessages('', $provider->errors, 'errors');
-	}
-}
-
-if (preg_match('/call'.$prefix.'HEALTHCHECK/i', $action, $reg)) {
-	$statusPDP = $provider->checkHealth();
-	if ($statusPDP['status_code'] == 200) {
-		setEventMessages($statusPDP['message'], null, 'mesgs');
-	} else {
-		setEventMessages('', $provider->errors, 'errors');
-	}
-}
-
 
 // Setup conf for auto generation of objects
 $formSetup->newItem('PDPCONNECTFR_SYNC_TO_PA')->setAsTitle();
@@ -269,7 +239,14 @@ $item = $formSetup->newItem('PDPCONNECTFR_EINVOICE_IN_REAL_TIME')->setAsYesNo();
 $item->helpText = $langs->transnoentities('PDPCONNECTFR_EINVOICE_IN_REAL_TIME');
 $item->defaultFieldValue = 0;
 $item->cssClass = 'minwidth500';
+$item->fieldParams['forcereload'] = 1;
 
+if (getDolGlobalString('PDPCONNECTFR_EINVOICE_IN_REAL_TIME')) {
+	$item = $formSetup->newItem('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS');
+	$item->defaultFieldValue = 0;
+	$item->cssClass = 'minwidth500';
+}
 
 // Setup conf for auto generation of objects
 $formSetup->newItem('PDPCONNECTFR_AUTO_GENERATION')->setAsTitle();

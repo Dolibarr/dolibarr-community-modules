@@ -50,18 +50,24 @@ class ActionsPdpconnectfr
 	            $result = checkRequiredinformations($invoiceObject->thirdparty);
 	            if ($result['res'] < 0) {
 	                $message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
-	                //setEventMessages($message, [], 'warning');
-	                $this->error = $message;
-	                return -1;
+	                if (getDolGlobalString('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
+	                	$this->error = $message;
+	                	return -1;
+	                } else {
+	                	return 0;
+	                }
 	            }
 
-	            $result = $protocol->generateInvoice($invoiceObject->id);		// Generate E-bill
+	            $result = $protocol->generateInvoice($invoiceObject->id);		// Generate E-invoice
 	            if ($result) {
-	                //setEventMessages('Result : ' . $result, null, 'warnings');
+	                // No error;
 	            } else {
-	                //setEventMessages('', $protocol->errors, 'errors');
-	                $this->error = $protocol->errors;
-	                return -1;
+	                if (getDolGlobalString('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
+	            		$this->error = $protocol->errors;
+	                	return -1;
+	                } else {
+	                	return 0;
+	                }
 	            }
         	}
         }
