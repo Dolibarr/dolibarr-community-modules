@@ -38,7 +38,7 @@ MyWidget = My widget
 MyWidgetDescription = My widget description
 
 PDPCONNECTFR_LIVE=Live mode enabled (otherwise test/sandbox mode)
-PDPCONNECTFR_PDP=Select your PDP provider
+PDPCONNECTFR_PDP=Select your E-billing platform endpoint
 PDPCONNECTFR_PDP_HELP=Once a PDP/PA is selected, its specific configuration appears.
 PDPCONNECTFR_ESALINK_USERNAME=API username
 PDPCONNECTFR_ESALINK_PASSWORD=API password

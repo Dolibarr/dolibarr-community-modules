@@ -636,7 +636,6 @@ class modPDPConnectFR extends DolibarrModules
 			array(
 				'options' => array(
 					// Status Interne Dolibarr
-					'0' => 'Not generated',
 					'1' => 'Generated (ready to send)',
 					'2' => 'Sent (awaiting acknowledgment)',
 					// Status normés PDP/PA
@@ -697,12 +696,12 @@ class modPDPConnectFR extends DolibarrModules
         $result = $extrafields->addExtraField('d4d_contract_number', $langs->trans('ChorusContractNumber'), 'varchar', 112003, 50, 'commande', 0, 0, '', null, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', 'getDolGlobalInt("PDPCONNECTFR_USE_CHORUS")', 0, 1);
         $result = $extrafields->addExtraField('d4d_promise_code', $langs->trans('ChorusPromiseCode'), 'varchar', 112004, 50, 'commande', 0, 0, '', null, 1, '', 1, 0, '', '', 'pdpconnectfr@pdpconnectfr', 'getDolGlobalInt("PDPCONNECTFR_USE_CHORUS")', 0, 1);
 
-		// Update display field for old installations
+		// Fix condition of extrafields for old installations
         $sql = array_merge(
             $sql,
             array(
-                "UPDATE " . MAIN_DB_PREFIX . "extrafields SET enabled='\$conf->global->PDPCONNECTFR_USE_CHORUS' WHERE enabled = '\$conf->pdpconnectfr->enabled'",
-                "UPDATE " . MAIN_DB_PREFIX . "extrafields SET enabled='\$conf->global->PDPCONNECTFR_USE_CHORUS' WHERE enabled = '\$conf->global->PDPCONNECTFR_USE_CHORUS'"
+                "UPDATE " . MAIN_DB_PREFIX . "extrafields SET enabled='getDolGlobalInt(\"PDPCONNECTFR_USE_CHORUS\")' WHERE enabled = '\$conf->pdpconnectfr->enabled'",
+                "UPDATE " . MAIN_DB_PREFIX . "extrafields SET enabled='getDolGlobalInt(\"PDPCONNECTFR_USE_CHORUS\")' WHERE enabled = '\$conf->global->PDPCONNECTFR_USE_CHORUS'"
             )
         );
 

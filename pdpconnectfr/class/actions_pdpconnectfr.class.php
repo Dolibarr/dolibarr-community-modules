@@ -1,5 +1,6 @@
 <?php
-/* Copyright (C) 2025		SuperAdmin					<daoud.mouhamed@gmail.com>
+/* Copyright (C) 2025		Mohamed Daoud				<mdaoud@dolicloud.com>
+ * Copyright (C) 2025		Laurent Destailleur			<eldy@users.sourceforge.net>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -14,7 +15,17 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-class ActionsPdpconnectfr
+
+/**
+ * \file    pdpconnectfr/class/actions_pdpconnectfr.class.php
+ * \ingroup pdpconnectfr
+ * \brief   Hook of module
+ */
+
+require_once DOL_DOCUMENT_ROOT.'/core/class/commonhookactions.class.php';
+
+
+class ActionsPdpconnectfr extends CommonHookActions
 {
     /**
      * Hook called after a PDF is created
@@ -51,9 +62,10 @@ class ActionsPdpconnectfr
 	            if ($result['res'] < 0) {
 	                $message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
 	                if (getDolGlobalString('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
-	                	$this->error = $message;
+	                	$this->errors[] = $message;
 	                	return -1;
 	                } else {
+	                	$this->warnings[] = $message;
 	                	return 0;
 	                }
 	            }
@@ -63,7 +75,7 @@ class ActionsPdpconnectfr
 	                // No error;
 	            } else {
 	                if (getDolGlobalString('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
-	            		$this->error = $protocol->errors;
+	            		$this->errors[] = $protocol->errors;
 	                	return -1;
 	                } else {
 	                	return 0;
@@ -77,7 +89,13 @@ class ActionsPdpconnectfr
 
 
     /**
-     * Hook to add buttons on invoice card
+	 * Overload the addMoreMassActions function : replacing the parent's function with the one below
+	 *
+	 * @param	array<string,mixed>	$parameters     Hook metadata (context, etc...)
+	 * @param	CommonObject		$object         The object to process (an invoice if you are in invoice module, a propale in propale's module, etc...)
+	 * @param	?string				$action			Current action (if set). Generally create or edit or null
+	 * @param	HookManager			$hookmanager	Hook manager propagated to allow calling another hook
+	 * @return	int									Return integer < 0 on error, 0 on success, 1 to replace standard code
      */
     function addMoreActionsButtons($parameters, &$object, &$action, $hookmanager)
     {
