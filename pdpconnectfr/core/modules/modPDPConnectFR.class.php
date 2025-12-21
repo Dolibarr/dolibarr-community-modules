@@ -635,10 +635,10 @@ class modPDPConnectFR extends DolibarrModules
 			0,
 			array(
 				'options' => array(
-					// Status Interne Dolibarr
+					// Status defined by Dolibarr
 					'1' => 'Generated (ready to send)',
 					'2' => 'Sent (awaiting acknowledgment)',
-					// Status normés PDP/PA
+					// Status norm PDP/PA
 					'200' => 'Deposited',
 					'201' => 'Issued',
 					'202' => 'Received',
@@ -664,7 +664,8 @@ class modPDPConnectFR extends DolibarrModules
 			'pdpconnectfr@pdpconnectfr',
 			'isModEnabled("pdpconnectfr")',
 			0,
-			1
+			1,
+			array('csslist' => 'tdoverflowmax100')
 		);
 
 		/*$result = $extrafields->addExtraField(
