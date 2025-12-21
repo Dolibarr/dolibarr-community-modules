@@ -665,7 +665,7 @@ class modPDPConnectFR extends DolibarrModules
 			'isModEnabled("pdpconnectfr")',
 			0,
 			1,
-			array('csslist' => 'tdoverflowmax100')
+			array('csslist' => 'tdoverflowmax80')
 		);
 
 		/*$result = $extrafields->addExtraField(
