@@ -144,11 +144,12 @@ class ActionsPdpconnectfr extends CommonHookActions
                 'lang' => 'pdpconnectfr',
                 'enabled' => (isModEnabled('pdpconnectfr') && $object->status == Facture::STATUS_VALIDATED),
                 'perm' => (bool) $user->rights->facture->creer,
-                'label' => $langs->trans('sendToPDP'),
+                'label' => $langs->trans('sendToPDPHelp'),
+            	'text' => $langs->trans('sendToPDP'),
                 'url' => '/compta/facture/card.php?id=' . $object->id . '&action=send_to_pdp&token=' . newToken()
             );
 
-            print dolGetButtonAction('', $langs->trans('pdpBottom'), 'default', $url_button, '', true);
+            print dolGetButtonAction($langs->trans('sendToPDPHelp'), $langs->trans('sendToPDP'), 'default', $url_button, '', true);
         }
 
         return 0;
