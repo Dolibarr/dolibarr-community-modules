@@ -120,6 +120,7 @@ class ActionsPdpconnectfr extends CommonHookActions
                 }
 
                 // if E-invoice is generated but not sent, show button to regenerate e-invoice
+                // if E-invoice is generated but not sent, show button to send e-invoice
                 if ($object->array_options['options_pdpconnectfr_einvoice_status'] == 1) {
                     $url_button[] = array(
                         'lang' => 'pdpconnectfr',
@@ -129,10 +130,7 @@ class ActionsPdpconnectfr extends CommonHookActions
                         //'help' => $langs->trans('RegenerateEinvoiceHelp'),
                         'url' => '/compta/facture/card.php?id=' . $object->id . '&action=generate_einvoice&token=' . newToken()
                     );
-                }
 
-                // if E-invoice is generated but not sent, show button to send e-invoice
-                if ($object->array_options['options_pdpconnectfr_einvoice_status'] == 1) { // E-invoice Generated but not sent
                     $url_button[] = array(
                         'lang' => 'pdpconnectfr',
                         'enabled' => 1,
