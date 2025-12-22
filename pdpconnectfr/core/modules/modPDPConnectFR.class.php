@@ -624,7 +624,7 @@ class modPDPConnectFR extends DolibarrModules
 		);
 
 		$result = $extrafields->addExtraField(
-			'pdpconnectfr_invoice_status',
+			'pdpconnectfr_einvoice_status',
 			$langs->trans('pdpconnectfrInvoiceStatus'),
 			'select',
 			112007,
@@ -636,6 +636,7 @@ class modPDPConnectFR extends DolibarrModules
 			array(
 				'options' => array(
 					// Status defined by Dolibarr
+					'0' => 'Not generated',
 					'1' => 'Generated (ready to send)',
 					'2' => 'Sent (awaiting acknowledgment)',
 					// Status norm PDP/PA

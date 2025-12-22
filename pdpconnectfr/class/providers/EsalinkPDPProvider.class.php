@@ -205,6 +205,9 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         $response = $this->callApi("flows", "POSTALREADYFORMATED", $params, $extraHeaders, 'Send Invoice');
 
         if ($response['status_code'] == 200 || $response['status_code'] == 202) {
+            // Update einvoice status
+            $object->array_options['options_pdpconnectfr_einvoice_status'] = 2;
+            $object->insertExtraFields();
             $flowId = $response['response']['flowId'];
             return $flowId;
         } else {
