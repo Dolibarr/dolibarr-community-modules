@@ -40,10 +40,10 @@ class PDPProviderManager
         // Rest of data could be into the XXXPDPPRovider.class.php file.
         $this->providersList = array (
             'ESALINK' => array(
-                'provider_name' => 'ESALINK',
+                'provider_name' => 'ESALINK - Hubtimize',
                 'description' => 'Esalink PDP Integration',
                 'is_enabled' => 1,
-            	'provider_url' => 'https://ppd.hubtimize.fr',
+            	'provider_url' => 'https://www.esalink.com/contact/',
             ),
             'TESTPDP' => array(
                 'provider_name' => 'TESTPDP',
