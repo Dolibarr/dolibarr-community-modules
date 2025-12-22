@@ -145,10 +145,10 @@ $search_array_options = $extrafields->getOptionalsFromPost($object->table_elemen
 // Default sort order (if not yet defined by previous GETPOST)
 if (!$sortfield) {
 	reset($object->fields);					// Reset is required to avoid key() to return null.
-	$sortfield = "t.".key($object->fields); // Set here default search field. By default 1st field in definition.
+	$sortfield = "t.rowid"; // Set here default search field. By default 1st field in definition.
 }
 if (!$sortorder) {
-	$sortorder = "ASC";
+	$sortorder = "DESC";
 }
 
 // Initialize array of search criteria
@@ -866,8 +866,7 @@ while ($i < $imaxinloop) {
 					print ' title="'.dol_escape_htmltag((string) $object->$key).'"';
 				}
 				print '>';
-				if ($key == 'call_id') {
-					$object->ref = $object->call_id;
+				if ($key == 'rowid') {
 					print $object->getNomUrl(1, '', 0, '', 1);
 				} elseif ($key == 'status') {
 					print $object->getLibStatut(6);

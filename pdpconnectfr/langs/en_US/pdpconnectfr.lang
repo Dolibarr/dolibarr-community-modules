@@ -129,3 +129,4 @@ PDPConnectionSetup=Setup for PA platform connection
 PDPCONNECTFR_LINK_CREATE_ACCOUNT=Link to create account and get connection credentials
 pdpconnectfrInvoiceSeparator=E-invoicing
 pdpconnectfrInvoiceStatus=E-invoicing status
+ProcessingDetail=Detail of processing

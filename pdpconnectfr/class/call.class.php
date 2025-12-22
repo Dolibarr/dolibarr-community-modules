@@ -129,7 +129,7 @@ class Call extends CommonObject
 	 * Array with all fields and their property. Do not use it as a static var. It may be modified by constructor.
 	 */
 	public $fields = array(
-		"rowid" => array("type" => "integer", "label" => "TechnicalID", "enabled" => "1", 'position' => 1, 'notnull' => 1, "visible" => "0", "noteditable" => "1", "index" => "1", "css" => "left", "comment" => "Id"),
+		"rowid" => array("type" => "integer", "label" => "TechnicalID", "enabled" => "1", 'position' => 1, 'notnull' => 1, "visible" => "1", "noteditable" => "1", "index" => "1", "css" => "left", "comment" => "Id"),
 		"call_id" => array("type" => "varchar(50)", "label" => "Ref", "enabled" => "1", 'position' => 10, 'notnull' => 1, "visible" => "1", "index" => "1", "csslist" => "tdoverflowmax150"),
 		"provider" => array("type" => "varchar(50)", "label" => "provider", "enabled" => "1", 'position' => 20, 'notnull' => 1, "visible" => "1", "comment" => "PDP Name"),
 		"call_type" => array("type" => "varchar(50)", "label" => "Type", "enabled" => "1", 'position' => 25, 'notnull' => 1, "visible" => "1", "comment" => "Call type (SyncDocs, SyncSoc, FetchDoc, FetchSoc...)"),
