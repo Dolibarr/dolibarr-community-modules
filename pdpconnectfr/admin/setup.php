@@ -241,6 +241,10 @@ $item = $formSetup->newItem('PDPCONNECTFR_PDP')->setAsSelect($TFieldProviders);
 $item->helpText = $langs->transnoentities('PDPCONNECTFR_PDP_HELP');
 $item->cssClass = 'minwidth500';
 
+
+$item = $formSetup->newItem('PDPCONNECTFR_LIVE')->setAsYesNo();
+$item->fieldParams['forcereload'] = 1;
+
 // End of selection of platform partner
 
 
@@ -316,10 +320,6 @@ if (preg_match('/call'.$prefix.'HEALTHCHECK/i', $action, $reg)) {
 if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_PDP') === "ESALINK") {
 	// Separator
 	$formSetup->newItem('PDPConnectionSetup')->setAsTitle();
-
-
-	$itemlivemode = $formSetup->newItem('PDPCONNECTFR_LIVE')->setAsYesNo();
-	$itemlivemode->fieldParams['forcereload'] = 1;
 
 
 	// Link to get the Credentials
