@@ -130,3 +130,4 @@ PDPCONNECTFR_LINK_CREATE_ACCOUNT=Link to create account and get connection crede
 pdpconnectfrInvoiceSeparator=E-invoicing
 pdpconnectfrInvoiceStatus=E-invoicing status
 ProcessingDetail=Detail of processing
+CallsListHelp=This page is reserved for advanced users. It can help to diagnose troubles of synchronization with the E-invoice partner platform. You don't need to use this screen in a common usage of your application.
