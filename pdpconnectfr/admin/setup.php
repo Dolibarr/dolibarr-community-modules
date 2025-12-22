@@ -323,8 +323,10 @@ if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_P
 
 
 	// Link to get the Credentials
+	$prefixenv = getDolGlobalString('PDPCONNECTFR_LIVE') ? 'prod' : 'test';
+
 	$item = $formSetup->newItem('PDPCONNECTFR_LINK_CREATE_ACCOUNT');
-	$url = $providersConfig[getDolGlobalString('PDPCONNECTFR_PDP')]['provider_url'];
+	$url = $providersConfig[getDolGlobalString('PDPCONNECTFR_PDP')][$prefixenv.'_account_admin_url'];
 	$item->fieldOverride = img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$url.'" target="_new">'.$url.'</a>';
 
 

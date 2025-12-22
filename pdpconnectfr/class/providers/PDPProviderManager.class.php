@@ -43,13 +43,15 @@ class PDPProviderManager
                 'provider_name' => 'ESALINK - Hubtimize',
                 'description' => 'Esalink PDP Integration',
                 'is_enabled' => 1,
-            	'provider_url' => 'https://www.esalink.com/contact/',
+            	'prod_account_admin_url' => 'https://www.esalink.com/contact/',
+            	'test_account_admin_url' => 'https://www.esalink.com/contact/',
             ),
             'TESTPDP' => array(
                 'provider_name' => 'TESTPDP',
                 'description' => 'Another TESTPDP Integration',
                 'is_enabled' => 0,
-            	'provider_url' => 'https://example.com',
+            	'prod_account_admin_url' => 'https://example.com',
+            	'test_account_admin_url' => 'https://example.com',
             )
         );
     }

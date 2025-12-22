@@ -373,7 +373,7 @@ class modPDPConnectFR extends DolibarrModules
 		$this->menu[$r++] = array(
 			'fk_menu' => 'fk_mainmenu=billing,fk_leftmenu=pdpconnectfr_billing',
 			'type' => 'left',
-			'titre' => 'PdpDocuments',
+			'titre' => 'EInvoiceSynchronization',
 			'mainmenu' => 'billing',
 			'leftmenu' => 'pdpconnectfr_documents',
 			'url' => '/pdpconnectfr/document_list.php',
