@@ -298,7 +298,7 @@ $form = new Form($db);
 
 $now = dol_now();
 
-$title = $langs->trans("Calls");
+$title = $langs->trans("pdpFeedback");
 //$help_url = "EN:Module_Call|FR:Module_Call_FR|ES:Módulo_Call";
 $help_url = '';
 $morejs = array();
@@ -866,7 +866,10 @@ while ($i < $imaxinloop) {
 					print ' title="'.dol_escape_htmltag((string) $object->$key).'"';
 				}
 				print '>';
-				if ($key == 'status') {
+				if ($key == 'call_id') {
+					$object->ref = $object->call_id;
+					print $object->getNomUrl(1, '', 0, '', 1);
+				} elseif ($key == 'status') {
 					print $object->getLibStatut(6);
 				} elseif ($key == 'rowid') {
 					print $object->showOutputField($val, $key, (string) $object->id, '');

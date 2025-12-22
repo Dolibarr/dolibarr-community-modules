@@ -337,8 +337,8 @@ $form = new Form($db);
 
 $now = dol_now();
 
-$title = $langs->trans("PDPConnectFRArea");
-$titleWithSyncButton = $title . ' <a href="'.$_SERVER["PHP_SELF"].'?action=confirm_sync&token='.newToken().'" class="butAction">'.img_picto('', 'refresh', 'class="pictofixedwidth"').'</a>';
+$title = $langs->trans("Synchronization");
+$titleWithSyncButton = $title . ' <a href="'.$_SERVER["PHP_SELF"].'?action=confirm_sync&token='.newToken().'" class="butAction small">'.img_picto('', 'refresh', 'class="pictofixedwidth"').'</a>';
 //$help_url = "EN:Module_Document|FR:Module_Document_FR|ES:Módulo_Document";
 $help_url = '';
 $morejs = array();

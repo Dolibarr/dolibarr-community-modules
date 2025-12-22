@@ -241,19 +241,7 @@ $item = $formSetup->newItem('PDPCONNECTFR_PDP')->setAsSelect($TFieldProviders);
 $item->helpText = $langs->transnoentities('PDPCONNECTFR_PDP_HELP');
 $item->cssClass = 'minwidth500';
 
-// Setup conf to choose a protocol of exchange
-$item = $formSetup->newItem('PDPCONNECTFR_PROTOCOL')->setAsSelect($TFieldProtocols);
-$item->helpText = $langs->transnoentities('PDPCONNECTFR_PROTOCOL_HELP');
-$item->defaultFieldValue = 'FACTURX';
-$item->cssClass = 'minwidth500';
-
-// Setup conf to choose a profil of exchange
-$item = $formSetup->newItem('PDPCONNECTFR_PROFILE')->setAsSelect($TFieldProfiles);
-$item->helpText = $langs->transnoentities('PDPCONNECTFR_PROFILE_HELP');
-$item->defaultFieldValue = 'EN16931';
-$item->cssClass = 'minwidth500';
-
-// End of definition of parameters
+// End of selection of platform partner
 
 
 $setupnotempty += count($formSetup->items);
@@ -338,6 +326,20 @@ if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_P
 	$item = $formSetup->newItem('PDPCONNECTFR_LINK_CREATE_ACCOUNT');
 	$url = $providersConfig[getDolGlobalString('PDPCONNECTFR_PDP')]['provider_url'];
 	$item->fieldOverride = img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$url.'" target="_new">'.$url.'</a>';
+
+
+	// Setup conf to choose a protocol of exchange
+	$item = $formSetup->newItem('PDPCONNECTFR_PROTOCOL')->setAsSelect($TFieldProtocols);
+	$item->helpText = $langs->transnoentities('PDPCONNECTFR_PROTOCOL_HELP');
+	$item->defaultFieldValue = 'FACTURX';
+	$item->cssClass = 'minwidth500';
+
+	// Setup conf to choose a profil of exchange
+	$item = $formSetup->newItem('PDPCONNECTFR_PROFILE')->setAsSelect($TFieldProfiles);
+	$item->helpText = $langs->transnoentities('PDPCONNECTFR_PROFILE_HELP');
+	$item->defaultFieldValue = 'EN16931';
+	$item->cssClass = 'minwidth500';
+
 
 	// Username
 	$item = $formSetup->newItem($prefix . 'USERNAME');
@@ -449,7 +451,7 @@ if ($mysocCheck['res'] < 0) {
  }
  */
 if (!empty($formSetup->items)) {
-	print $formSetup->generateOutput(true);
+	print $formSetup->generateOutput(true, false, $langs->transnoentitiesnoconv('PlatformPartner'), 'titlefieldmiddle');
 	print '<br>';
 }
 

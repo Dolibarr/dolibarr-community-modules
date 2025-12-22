@@ -184,8 +184,8 @@ $form = new Form($db);
 
 // Header
 // ------
-$title = $langs->trans("Call")." - ".$langs->trans("Files");
-//$title = $object->ref." - ".$langs->trans("Files");
+//$title = $langs->trans("Call")." - ".$langs->trans("Files");
+$title = $object->call_id." - ".$langs->trans("Files");
 $help_url = '';
 //Example $help_url='EN:Module_Third_Parties|FR:Module_Tiers|ES:Empresas';
 llxHeader('', $title, $help_url, '', 0, 0, '', '', '', 'mod-pdpconnectfr page-card_document');
@@ -193,7 +193,7 @@ llxHeader('', $title, $help_url, '', 0, 0, '', '', '', 'mod-pdpconnectfr page-ca
 // Show tabs
 $head = callPrepareHead($object);
 
-print dol_get_fiche_head($head, 'document', $langs->trans("Call"), -1, $object->picto);
+print dol_get_fiche_head($head, 'document', $langs->trans("pdpFeedback"), -1, $object->picto);
 
 
 // Build file list

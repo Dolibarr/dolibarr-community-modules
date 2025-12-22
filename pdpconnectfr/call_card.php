@@ -242,8 +242,8 @@ if (empty($reshook)) {
 $form = new Form($db);
 $formfile = new FormFile($db);
 
-$title = $langs->trans("Call")." - ".$langs->trans('Card');
-//$title = $object->ref." - ".$langs->trans('Card');
+//$title = $langs->trans("pdpFeedback")." - ".$langs->trans('Card');
+$title = $object->call_id." - ".$langs->trans('Card');
 if ($action == 'create') {
 	$title = $langs->trans("NewObject", $langs->transnoentitiesnoconv("Call"));
 }
@@ -312,7 +312,7 @@ if ($action == 'create') {
 
 // Part to edit record
 if (($id || $ref) && $action == 'edit') {
-	print load_fiche_titre($langs->trans("Call"), '', $object->picto);
+	print load_fiche_titre($langs->trans("pdpFeedback"), '', $object->picto);
 
 	print '<form method="POST" action="'.dolBuildUrl($_SERVER["PHP_SELF"]).'">';
 	print '<input type="hidden" name="token" value="'.newToken().'">';
@@ -348,7 +348,7 @@ if (($id || $ref) && $action == 'edit') {
 if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'create'))) {
 	$head = callPrepareHead($object);
 
-	print dol_get_fiche_head($head, 'card', $langs->trans("Call"), -1, $object->picto, 0, '', '', 0, '', 1);
+	print dol_get_fiche_head($head, 'card', $langs->trans("pdpFeedback"), -1, $object->picto, 0, '', '', 0, '', 1);
 
 	$formconfirm = '';
 

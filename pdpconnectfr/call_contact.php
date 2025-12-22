@@ -157,8 +157,8 @@ if ($action == 'addcontact' && $permissiontoadd) {
  * View
  */
 
-$title = $langs->trans("Call")." - ".$langs->trans('ContactsAddresses');
-//$title = $object->ref." - ".$langs->trans('ContactsAddresses');
+//$title = $langs->trans("Call")." - ".$langs->trans('ContactsAddresses');
+$title = $object->call_id." - ".$langs->trans('ContactsAddresses');
 $help_url = '';
 //$help_url='EN:Module_Third_Parties|FR:Module_Tiers|ES:Empresas';
 llxHeader('', $title, $help_url, '', 0, 0, '', '', '', 'mod-pdpconnectfr page-card_contact');
@@ -181,7 +181,7 @@ if ($object->id) {
 	 */
 	$head = callPrepareHead($object);
 
-	print dol_get_fiche_head($head, 'contact', $langs->trans("Call"), -1, $object->picto);
+	print dol_get_fiche_head($head, 'contact', $langs->trans("pdpFeedback"), -1, $object->picto);
 
 	$linkback = '<a href="'.dol_buildpath('/pdpconnectfr/call_list.php', 1).'?restore_lastsearch_values=1'.(!empty($socid) ? '&socid='.$socid : '').'">'.$langs->trans("BackToList").'</a>';
 

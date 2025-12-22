@@ -203,8 +203,8 @@ if (empty($reshook)) {
 $form = new Form($db);
 
 if ($object->id > 0) {
-	$title = $langs->trans("Call")." - ".$langs->trans('Agenda');
-	//$title = $object->ref." - ".$langs->trans("Agenda");
+	//$title = $langs->trans("pdpFeedback")." - ".$langs->trans('Agenda');
+	$title = $object->call_id." - ".$langs->trans("Agenda");
 	$help_url = 'EN:Module_Agenda_En|DE:Modul_Terminplanung';
 
 	llxHeader('', $title, $help_url, '', 0, 0, '', '', '', 'mod-pdpconnectfr page-card_agenda');
@@ -215,7 +215,7 @@ if ($object->id > 0) {
 	$head = callPrepareHead($object);
 
 
-	print dol_get_fiche_head($head, 'agenda', $langs->trans("Call"), -1, $object->picto);
+	print dol_get_fiche_head($head, 'agenda', $langs->trans("pdpFeedback"), -1, $object->picto);
 
 	// Object card
 	// ------------------------------------------------------------

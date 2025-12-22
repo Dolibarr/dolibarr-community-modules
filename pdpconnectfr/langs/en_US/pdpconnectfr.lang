@@ -25,18 +25,9 @@ About = About
 PDPConnectFRAbout = About PDPConnectFR
 PDPConnectFRAboutPage = PDPConnectFR about page
 
-#
-# Sample page
-#
-PDPConnectFRArea = Home PDPConnectFR
-MyPageName = My page name
 
-#
-# Sample widget
-#
-MyWidget = My widget
-MyWidgetDescription = My widget description
-
+Synchronization = Synchronization
+PlatformPartner=Platform partner
 PDPCONNECTFR_LIVE=Live mode enabled (otherwise test/sandbox mode)
 PDPCONNECTFR_PDP=Select your E-billing platform endpoint
 PDPCONNECTFR_PDP_HELP=Once a PDP/PA is selected, its specific configuration appears.
@@ -92,7 +83,7 @@ ErrorSendingInvoiceToPDP=An error occurred while sending the invoice to the PDP.
 pdpExchange=PDP Connect France
 PdpDocuments=Exchanged Flows
 pdpSocieties=Customers & Suppliers Sync
-pdpFeedback=Calls & Sync Feedback
+pdpFeedback=Calls & Sync logs
 InvoiceNotgeneratedDueToConfigurationIssues=The E-Invoice has not been generated due to configuration issues
 MyCompanyConfigurationError=Please complete the required information for your company/organization in order to use the PDPCONNECTFR module
 ModifyCompanyInformation=Complete company information
@@ -105,8 +96,8 @@ PDPCONNECTFR_PRODUCTS_AUTO_GENERATION_HELP=Automatically create missing products
 PDPCONNECTFR_THIRDPARTIES_AUTO_GENERATION=Automatic third-party generation
 PDPCONNECTFR_THIRDPARTIES_AUTO_GENERATION_HELP=Automatically create missing third parties during PDP synchronization, otherwise stop the process.
 PDPCONNECTFR_DEBUG=Debug
-PDPCONNECTFR_DEBUG_MODE=Debug mode
-PDPCONNECTFR_DEBUG_MODE_HELP=Enable debug mode to log synchronization callback responses for troubleshooting purposes. Note that synchronization calls may take longer when this mode is enabled.
+PDPCONNECTFR_DEBUG_MODE=Store full detail of API calls in history
+PDPCONNECTFR_DEBUG_MODE_HELP=Enable the debug mode to log full details of synchronization calls for troubleshooting purposes (verbose). Note that synchronization calls may take longer when this mode is enabled.
 DateSyncro=Sync date
 Status=Status
 call_id=Call ID
@@ -134,7 +125,7 @@ ack_info=Acknowledgement details
 PASettings=PA/PDP Settings
 PDPConnectInfo=As part of the French electronic invoicing law, any invoicing software must allow the sending and receiving of invoices. This is achieved through communication with an approved private partner called a PA (formerly PDP). This module enables bi-directional synchronization between your Dolibarr and a PA. The module is free, but the PA you choose will most likely charge subscription fees (The contract is drawn up directly with the PA).
 PDPConnectInfo2=Start by configuring your PA and its credentials to connect to it.
-PDPConnectionSetup=Credentials for PA platform connection
+PDPConnectionSetup=Setup for PA platform connection
 PDPCONNECTFR_LINK_CREATE_ACCOUNT=Link to create account and get connection credentials
 pdpconnectfrInvoiceSeparator=E-invoicing
 pdpconnectfrInvoiceStatus=E-invoicing status

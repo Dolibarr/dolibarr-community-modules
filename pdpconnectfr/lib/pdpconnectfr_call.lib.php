@@ -43,7 +43,7 @@ function callPrepareHead($object)
 	$head = array();
 
 	$head[$h][0] = dolBuildUrl(dol_buildpath("/pdpconnectfr/call_card.php", 1), ['id' => $object->id]);
-	$head[$h][1] = $langs->trans("Call");
+	$head[$h][1] = $langs->trans("pdpFeedback");
 	$head[$h][2] = 'card';
 	$h++;
 
