@@ -685,21 +685,21 @@ class FacturXProtocol extends AbstractProtocol
 
 
 
-        // --- Fusionner le PDF original et ajouter le XML comme attachment
+        // Embed XML into PDF using FPDI and save
         require_once DOL_DOCUMENT_ROOT.'/core/lib/pdf.lib.php';
         require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 
         $pdf = pdf_getInstance();
         $pagecount = $pdf->setSourceFile($orig_pdf);
 
-        // Importer toutes les pages du PDF original
+        // import all pages of the original PDF
         for ($i = 1; $i <= $pagecount; $i++) {
             $tpl = $pdf->importPage($i);
             $pdf->addPage();
             $pdf->useTemplate($tpl);
         }
 
-        // Ajouter le XML comme attachment
+        // Embed the XML file as a file attachment in the PDF
         if (file_exists($xmlfile)) {
             $pdf->Annotation(0, 0, 0, 0, '', array(
                 'Subtype' => 'FileAttachment',
@@ -708,17 +708,17 @@ class FacturXProtocol extends AbstractProtocol
             ));
         }
 
-        // Enregistrer le PDF final avec le XML embarqué
+        // Save the final PDF with the embedded XML
         $pdf->Output($orig_pdf, 'F');
 
-        // Nettoyer le fichier XML temporaire
+        // Clean up the temporary XML file
         if (file_exists($xmlfile)) {
             unlink($xmlfile);
             dol_syslog(get_class($this) . '::generateInvoice cleaned up temporary XML file: ' . $xmlfile);
         }
 
         // Update invoice PDP  status field
-        $invoice->array_options['options_pdpconnectfr_invoice_status'] = 1;
+        $invoice->array_options['options_pdpconnectfr_einvoice_status'] = 1;
         $invoice->insertExtraFields();
 
         return 1;
