@@ -201,9 +201,6 @@ $providersConfig = $PDPManager->getAllProviders();
 $ProtocolManager = new ProtocolManager($db);
 $protocolsList = $ProtocolManager->getProtocolsList();
 
-$itemlivemode = $formSetup->newItem('PDPCONNECTFR_LIVE')->setAsYesNo();
-$itemlivemode->fieldParams['forcereload'] = 1;
-
 // PDP providers list
 $TFieldProviders = array('' => '');
 foreach ($providersConfig as $key => $pconfig) {
@@ -331,6 +328,11 @@ if (preg_match('/call'.$prefix.'HEALTHCHECK/i', $action, $reg)) {
 if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_PDP') === "ESALINK") {
 	// Separator
 	$formSetup->newItem('PDPConnectionSetup')->setAsTitle();
+
+
+	$itemlivemode = $formSetup->newItem('PDPCONNECTFR_LIVE')->setAsYesNo();
+	$itemlivemode->fieldParams['forcereload'] = 1;
+
 
 	// Link to get the Credentials
 	$item = $formSetup->newItem('PDPCONNECTFR_LINK_CREATE_ACCOUNT');
