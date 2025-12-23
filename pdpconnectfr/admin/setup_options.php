@@ -288,7 +288,7 @@ if (getDolGlobalString('PDPCONNECTFR_FLOWS_SYNC_CALL_LIMIT')) {
 $item = $formSetup->newItem('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS');
 $item->helpText = $langs->transnoentities('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS_HELP');
 $item->fieldAttr['placeholder'] = $langs->transnoentities('Hours');
-$item->defaultFieldValue = 2;
+$item->defaultFieldValue = 0;
 $item->cssClass = 'minwidth500';
 
 // Setup conf for debug mode
