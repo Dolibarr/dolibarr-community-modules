@@ -120,6 +120,7 @@ $groupby = GETPOST('groupby', 'aZ09');	// Example: $groupby = 'p.fk_opp_status' 
 $id = GETPOSTINT('id');
 $ref = GETPOST('ref', 'alpha');
 $sync_result = '';
+$maxflows = GETPOSTINT('maxflows');
 
 // Load variable for pagination
 $limit = GETPOSTINT('limit') ? GETPOSTINT('limit') : $conf->liste_limit;
@@ -317,7 +318,7 @@ if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_P
 
 if ($action == 'sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $confirm == 'yes') {
 	if (isset($provider)) {
-		$sync_result = $provider->syncFlows();
+		$sync_result = $provider->syncFlows($maxflows);
 		if ($sync_result['res'] > 0) {
 			setEventMessages($langs->trans("DocumentsSyncedSuccessfully"), null, 'mesgs');
 		} else {
@@ -338,7 +339,7 @@ $form = new Form($db);
 $now = dol_now();
 
 $title = $langs->trans("EInvoiceSynchronization");
-$titleWithSyncButton = $title . ' <a href="'.$_SERVER["PHP_SELF"].'?action=confirm_sync&token='.newToken().'" class="butAction small">'.img_picto('', 'refresh', 'class="pictofixedwidth"').'</a>';
+//$titleWithSyncButton = $title . ' <a href="'.$_SERVER["PHP_SELF"].'?action=confirm_sync&token='.newToken().'" class="butAction small">'.img_picto('', 'refresh', 'class="pictofixedwidth"').'</a>';
 //$help_url = "EN:Module_Document|FR:Module_Document_FR|ES:Módulo_Document";
 $help_url = '';
 $morejs = array();
@@ -635,7 +636,9 @@ $newcardbutton = '';
 //$newcardbutton .= dolGetButtonTitleSeparator();
 //$newcardbutton .= dolGetButtonTitle($langs->trans('New'), '', 'fa fa-plus-circle', dol_buildpath('/pdpconnectfr/document_card.php', 1).'?action=create&backtopage='.urlencode($_SERVER['PHP_SELF']), '', $permissiontoadd);
 
-print_barre_liste($titleWithSyncButton, $page, $_SERVER["PHP_SELF"], $param, $sortfield, $sortorder, $massactionbutton, $num, $nbtotalofrecords, $object->picto, 0, $newcardbutton, '', $limit, 0, 0, 1);
+print_barre_liste($title, $page, $_SERVER["PHP_SELF"], $param, $sortfield, $sortorder, $massactionbutton, $num, $nbtotalofrecords, $object->picto, 0, $newcardbutton, '', $limit, 0, 0, 1);
+
+
 
 // Add code for pre mass action (confirmation or email presend form)
 $topicmail = "SendDocumentRef";
@@ -686,9 +689,11 @@ $selectedfields .= (count($arrayofmassactions) ? $form->showCheckAddButtons('che
 
 // Confirmation dialog
 if ($action == 'confirm_sync') {
-	$formconfirm = $form->formconfirm($_SERVER["PHP_SELF"], $langs->trans("ConfirmSyncDocuments"), '', 'sync');
+	$confirmurl = $_SERVER["PHP_SELF"] . '?maxflows='.GETPOSTINT('maxflows');
+	$formconfirm = $form->formconfirm($confirmurl, $langs->trans("ConfirmSyncTitle"), $langs->trans("ConfirmSyncDesc"), 'sync', '', '', 1);
 	print $formconfirm;
 }
+
 
 // sync results
 if ($action == 'sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $confirm == 'yes' && !empty($sync_result)) {
@@ -704,6 +709,59 @@ if ($action == 'sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $confirm == '
 		print '</div>';
 	}
 }
+
+// Form for sync action
+print '<div class="fichecenter">'."\n";
+
+if (getDolGlobalInt('PDPCONNECTFR_FLOWS_SYNC_CALL_LIMIT') && getDolGlobalInt('PDPCONNECTFR_FLOWS_SYNC_CALL_SIZE') > 0) {
+	print '  <div class="inline-block marginright">'."\n";
+	print '    <label for="maxflows" class="minwidth50 opacitymedium">'.$langs->trans("MAX_FLOWS_SYNCRO").'</label>'."\n";
+	print '    <input type="number" class="width75 flat" id="maxflows" name="maxflows" min="1" step="1" value="'.(GETPOSTINT('maxflows') ? GETPOSTINT('maxflows') : getDolGlobalInt('PDPCONNECTFR_FLOWS_SYNC_CALL_SIZE')).'">'."\n";
+	print '  </div>'."\n";
+}
+
+
+print '  <div class="inline-block valignmiddle">'."\n";
+print '    <a href="#" id="runSyncBtn" class="butAction small">'.img_picto('', 'refresh', 'class="pictofixedwidth"').' '.$langs->trans("RUN_SYNC").'</a>'."\n";
+print '  </div>'."\n";
+
+print '</div>'."\n";
+
+print '<script>'."\n";
+print "document.getElementById('runSyncBtn').addEventListener('click', function(e){"."\n";
+print "  e.preventDefault();"."\n";
+print "  var maxFlows = document.getElementById('maxflows') ? encodeURIComponent(document.getElementById('maxflows').value) : '0';"."\n";
+print "  var token = encodeURIComponent('".newToken()."');"."\n";
+print "  window.location.href = '".$_SERVER["PHP_SELF"]."?action=confirm_sync&maxflows=' + maxFlows + '&token=' + token;"."\n";
+print "});"."\n";
+print '</script>'."\n";
+
+print '<br class="clearboth">';
+
+// Last flow sync info
+$last_sync_info = img_picto('', 'long-arrow-alt-right', 'class="pictofixedwidth"');
+
+$Lastsyncinfosql = "SELECT flow_id, updatedat
+FROM ".MAIN_DB_PREFIX."pdpconnectfr_document
+WHERE provider = '".$db->escape($provider->providerName)."' 
+ORDER BY updatedat DESC
+LIMIT 1";
+
+$resLastsyncinfosql = $db->query($Lastsyncinfosql);
+if ($resLastsyncinfosql) {
+	$obj = $db->fetch_object($resLastsyncinfosql);
+	if ($obj) {
+		$last_sync = $obj->updatedat;
+		$last_sync_info .= " ". $langs->trans("lastSyncedFlow") . ': ' . $obj->flow_id . ' - ' . $langs->trans("lastSyncedFlowDate") . ':' . dol_print_date($last_sync, 'dayhour');
+	} else {
+		$last_sync = 0;
+		$last_sync_info = $langs->trans("NoSyncYet");
+	}
+} else {
+	$last_sync_info = $langs->trans("ErrorGettingLastSyncInfo");
+}
+print "<div class=\"opacitymedium floatleft margintoponly\">{$last_sync_info}</div>";
+
 
 print '<div class="div-table-responsive">'; // You can use div-table-responsive-no-min if you don't need reserved height for your table
 print '<table class="tagtable nobottomiftotal noborder liste'.($moreforfilter ? " listwithfilterbefore" : "").'">'."\n";

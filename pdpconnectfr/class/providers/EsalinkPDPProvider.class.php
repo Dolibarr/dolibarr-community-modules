@@ -411,9 +411,11 @@ class EsalinkPDPProvider extends AbstractPDPProvider
     /**
      * Synchronize flows with EsaLink since the last synchronization date.
      *
+     * @param int $limit Maximum number of flows to synchronize. 0 means no limit.
+     *
      * @return bool|array{res:int, messages:array<string>} True on success, false on failure along with messages.
      */
-    public function syncFlows()
+    public function syncFlows($limit = 0)
     {
         global $db, $user;
         $results_messages = array();
@@ -432,7 +434,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         $params = array(
             'limit' => 1,
             'where' => array(
-            'updatedAfter' => dol_print_date($this->getLastSyncDate(24), '%Y-%m-%dT%H:%M:%S.000Z', 'gmt')
+            'updatedAfter' => dol_print_date($this->getLastSyncDate(getDolGlobalInt('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS')), '%Y-%m-%dT%H:%M:%S.000Z', 'gmt')
             )
         );
         $response = $this->callApi($resource, "POST", json_encode($params));
@@ -445,6 +447,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         }
 
         $totalFlows = $response['response']['total'] ?? 0;
+        $limit = $limit > 0 ? min($limit, $totalFlows) : $totalFlows;
 
         if ($totalFlows == 0) {
             dol_syslog(__METHOD__ . " No flows to synchronize.", LOG_DEBUG);
@@ -453,7 +456,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         } else {
             dol_syslog(__METHOD__ . " Total flows to synchronize: " . $totalFlows, LOG_DEBUG);
             // Make a second call to get all flows
-            $params['limit'] = $totalFlows;
+            $params['limit'] = $limit;
             $response = $this->callApi($resource, "POST", json_encode($params), [], "Synchronization");
 
             if ($response['status_code'] != 200) {
@@ -483,7 +486,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
             );
 
             // Update totalFlows after filtering
-            $totalFlows = count($response['response']['results']);
+            //$totalFlows = count($response['response']['results']); // TODO : VERIFY IF NEEDED
             $errors = 0;
             $alreadyExist = 0;
             $syncedFlows = 0;
@@ -569,6 +572,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
         $results_messages[] = ($res == 1) ? "Synchronization completed successfully." : "Synchronization aborted, last successfull synchronized flow: {$lastsuccessfullSyncronizedFlow}";
         $results_messages[] = "Total flows to synchronize: {$totalFlows}";
+        $results_messages[] = "Limit: {$limit}";
         $results_messages[] = "Total flows synchronized: {$syncedFlows}";
         $results_messages[] = "Total flows skipped (exist or already processed): {$alreadyExist}";
 
@@ -580,6 +584,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         SET totalflow = " . intval($totalFlows) . ",
             successflow = " . intval($syncedFlows) . ",
             skippedflow = " . intval($alreadyExist) . ",
+            batchlimit = " . intval($limit) . ",
             processing_result = '" . $db->escape($processingResult) . "'
         WHERE call_id = '" . $db->escape($call_id) . "'";
         $db->query($sql);

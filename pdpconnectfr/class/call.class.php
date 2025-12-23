@@ -138,6 +138,7 @@ class Call extends CommonObject
 		"skippedflow" => array("type" => "integer", "label" => "SkippedFlow", "enabled" => "1", 'position' => 130, 'notnull' => 1, "visible" => "1", "comment" => "Skipped flows during the API call"),
 		"successflow" => array("type" => "integer", "label" => "SuccessFlow", "enabled" => "1", 'position' => 140, 'notnull' => 1, "visible" => "1", "comment" => "Successfully completed flows during the API call"),
 		"totalflow" => array("type" => "integer", "label" => "TotalFlow", "enabled" => "1", 'position' => 150, 'notnull' => 1, "visible" => "-1", "comment" => "Total flows handled during the API call"),
+		"batchlimit" => array("type" => "integer", "label" => "BatchLimit", "enabled" => "1", 'position' => 120, 'notnull' => 1, "visible" => "1", "comment" => "Maximum number of flows to process in this call"),
 		//"processing_result" => array("type" => "text", "label" => "ProcessingDetail", "enabled" => "1", 'position' => 160, 'notnull' => 0, "visible" => "1", "help" => "Result of processing (summary of errors/success of internal processing)", "csslist" => "twolinesmax-normallineheight"),
 		"processing_result" => array("type" => "text", "label" => "ProcessingDetail", "enabled" => "1", 'position' => 160, 'notnull' => 0, "visible" => "1", "help" => "Result of processing (summary of errors/success of internal processing)"),
 		"date_creation" => array("type" => "datetime", "label" => "Date", "enabled" => "1", 'position' => 500, 'notnull' => 1, "visible" => "1",),
@@ -152,6 +153,7 @@ class Call extends CommonObject
 	public $rowid;
 	public $call_id;
 	public $totalflow;
+	public $batchlimit;
 	public $skippedflow;
 	public $successflow;
 	public $date_creation;
