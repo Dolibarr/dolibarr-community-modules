@@ -161,9 +161,11 @@ abstract class AbstractPDPProvider
     /**
      * Synchronize flows with PDP since the last synchronization date.
      *
+     * @param int $limit Maximum number of flows to synchronize. 0 means no limit.
+     *
      * @return bool|array{res:int, messages:array<string>} True on success, false on failure along with messages.
      */
-    abstract public function syncFlows();
+    abstract public function syncFlows($limit = 0);
 
     /**
      * Store a flow data.
@@ -290,7 +292,7 @@ abstract class AbstractPDPProvider
      * for this provider. If no sync has occurred yet, returns Unix epoch (1970-01-01).
      * Optionally applies a margin in hours to the returned timestamp.
      *
-     * @param int $marginHours Optional margin in hours to subtract from the result
+     * @param int $marginHours Optional time margin in hours to go back from the current date of the last synchronization
      * @return int Timestamp of the last synchronization date
      */
     public function getLastSyncDate($marginHours = 0) {
@@ -317,7 +319,7 @@ abstract class AbstractPDPProvider
         //
         // Future enhancement: Individual document sync may be possible when
         // the PDP provider API supports it.
-        $LastSyncDateSql = "SELECT MAX(t.tms) as last_sync_date
+        $LastSyncDateSql = "SELECT MAX(t.updatedat) as last_sync_date
             FROM ".MAIN_DB_PREFIX."pdpconnectfr_document as t
             WHERE t.provider = '".$this->db->escape($this->providerName)."' ";
 
@@ -334,12 +336,12 @@ abstract class AbstractPDPProvider
             // If no last sync date, set to epoch start
             $LastSyncDate = strtotime('1970-01-01 00:00:00');
         }
-        
+
         // Apply margin in hours
         if ($marginHours !== 0) {
             $LastSyncDate -= ($marginHours * 3600);
         }
-        
+
         return $LastSyncDate;
     }
 }
