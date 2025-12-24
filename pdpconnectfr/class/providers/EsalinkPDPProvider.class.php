@@ -480,6 +480,14 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                     $alreadyProcessedFlowIds[] = $obj->flow_id;
                 }
             }
+
+            // Already processed flows
+            $alreadyProcessedFlows = array_filter(
+                $response['response']['results'],
+                fn($flow) => in_array($flow['flowId'], $alreadyProcessedFlowIds)
+            );
+
+            // Clean the results to process only new flows
             $response['response']['results'] = array_filter(
                 $response['response']['results'],
                 fn($flow) => !in_array($flow['flowId'], $alreadyProcessedFlowIds)
@@ -488,7 +496,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
             // Update totalFlows after filtering
             //$totalFlows = count($response['response']['results']); // TODO : VERIFY IF NEEDED
             $errors = 0;
-            $alreadyExist = 0;
+            $alreadyExist = count($alreadyProcessedFlows);
             $syncedFlows = 0;
 
             // Call ID for logging purposes
@@ -533,46 +541,13 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                     break;
                 }
             }
-
-
-            // $documents = array();
-            // $cdars = array();
-            // foreach ($response['response']['results'] as $flow) {
-            //     switch ($flow["flowSyntax"]) {
-            //         case "CDAR":
-            //             $cdars[] = $flow;
-            //             break;
-            //         case "FACTUR-X":
-            //             $documents[] = $flow;
-            //             break;
-            //         default:
-            //             $documents[] = $flow;
-            //             break;
-            //     }
-            // }
-
-            // // Process documents first
-            // foreach ($documents as $flow) {
-            //     $res = $this->syncFlow($flow['flowId'], $call_id);
-            //     if ($res['res'] != '1') {
-            //         $results_messages[] = "Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'];
-            //     }
-            // }
-
-            // // Then process CDARs
-            // foreach ($cdars as $flow) {
-            //     $res = $this->syncFlow($flow['flowId'], $call_id);
-            //     if ($res['res'] != '1') {
-            //         $results_messages[] = "Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'];
-            //     }
-            // }
         }
 
         $res = $errors > 0 ? -1 : 1;
 
         $results_messages[] = ($res == 1) ? "Synchronization completed successfully." : "Synchronization aborted, last successfull synchronized flow: {$lastsuccessfullSyncronizedFlow}";
         $results_messages[] = "Total flows to synchronize: {$totalFlows}";
-        $results_messages[] = "Limit: {$limit}";
+        $results_messages[] = "Batch size: {$limit}";
         $results_messages[] = "Total flows synchronized: {$syncedFlows}";
         $results_messages[] = "Total flows skipped (exist or already processed): {$alreadyExist}";
 
