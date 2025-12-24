@@ -700,12 +700,8 @@ if ($action == 'sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $confirm == '
 	if (isset($provider)) {
 		$cssclass = ($sync_result['res'] > 0) ? 'info' : 'error';
 		print '<div class="wordbreak '.$cssclass.' clearboth">';
-		print '<strong><u>'.$langs->trans("SyncResults").'</u></strong></br>';
-		if ($sync_result['messages'] && is_array($sync_result['messages'])) {
-			foreach ($sync_result['messages'] as $message) {
-				print $message . '<br>';
-			}
-		}
+		print '<strong><u>'.$langs->trans("SyncResults").' :</u></strong></br>';
+		print implode("<br>----------------------<br>", $sync_result['messages']);
 		print '</div>';
 	}
 }
