@@ -264,7 +264,7 @@ $item->cssClass = 'minwidth500';
 // Setup conf to to enable a limit of flows to synchronize per one synchronization call
 $item = $formSetup->newItem('PDPCONNECTFR_FLOWS_SYNC_CALL_LIMIT')->setAsYesNo();
 $item->helpText = $langs->transnoentities('PDPCONNECTFR_FLOWS_SYNC_CALL_LIMIT_HELP');
-$item->defaultFieldValue = 0;
+$item->defaultFieldValue = 1;
 $item->cssClass = 'minwidth500';
 $item->fieldParams['forcereload'] = 1;
 
@@ -272,7 +272,7 @@ if (getDolGlobalString('PDPCONNECTFR_FLOWS_SYNC_CALL_LIMIT')) {
 	// Setup conf to to define the number of flows to synchronize per one synchronization call
 	$item = $formSetup->newItem('PDPCONNECTFR_FLOWS_SYNC_CALL_SIZE');
 	$item->helpText = $langs->transnoentities('PDPCONNECTFR_FLOWS_SYNC_CALL_SIZE_HELP');
-	$item->defaultFieldValue = 100;
+	$item->defaultFieldValue = 10;
 	$item->cssClass = 'minwidth500';
 }
 
@@ -291,6 +291,7 @@ $item = $formSetup->newItem('PDPCONNECTFR_DEBUG_MODE')->setAsYesNo();
 $item->helpText = $langs->transnoentities('PDPCONNECTFR_DEBUG_MODE_HELP');
 $item->defaultFieldValue = 0;
 $item->cssClass = 'minwidth500';
+$item->fieldParams['warningifon'] = 1;
 
 
 include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php';
