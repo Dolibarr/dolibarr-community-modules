@@ -209,19 +209,11 @@ $setupnotempty += count($formSetup->items);
 //$dirmodels = array_merge(array('/'), (array) $conf->modules_parts['models']);
 //$moduledir = 'pdpconnectfr';
 
-$reg = array();
 
 
 /*
  * Actions
  */
-
-// Setup conf for selection of the PDP provider
-if ($action == 'update' && GETPOST('PDPCONNECTFR_PDP') != getDolGlobalString('PDPCONNECTFR_PDP')) {
-	dolibarr_set_const($db, 'PDPCONNECTFR_PDP', GETPOST('PDPCONNECTFR_PDP'), 'chaine', 0, '', $conf->entity);
-	header("Location: ".$_SERVER["PHP_SELF"]);
-	exit;
-}
 
 // Set FACTURX as the default protocol when no default value is specified
 if (!getDolGlobalString('PDPCONNECTFR_PROTOCOL')) {
@@ -288,8 +280,8 @@ if (getDolGlobalString('PDPCONNECTFR_FLOWS_SYNC_CALL_LIMIT')) {
 $item = $formSetup->newItem('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS');
 $item->helpText = $langs->transnoentities('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS_HELP');
 $item->fieldAttr['placeholder'] = $langs->transnoentities('Hours');
-$item->defaultFieldValue = 0;
-$item->cssClass = 'minwidth500';
+$item->defaultFieldValue = 24;
+$item->cssClass = 'maxwidth100';
 
 // Setup conf for debug mode
 $formSetup->newItem('PDPCONNECTFR_DEBUG')->setAsTitle();
