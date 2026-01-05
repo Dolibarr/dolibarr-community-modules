@@ -183,6 +183,7 @@ class ActionsPdpconnectfr extends CommonHookActions
             }
         }
 
+        // Action to generate the E-invoice
         if ($action == 'generate_einvoice') {
             $invoiceObject = $object;
             // Call function to create Factur-X document
@@ -200,7 +201,9 @@ class ActionsPdpconnectfr extends CommonHookActions
                 $this->warnings[] = $message;
             }
 
-            $result = $protocol->generateInvoice($invoiceObject->id);		// Generate E-invoice
+            // Generate E-invoice by calling the method of the Protocol
+            // Example by calling FactureXProcol->generateInvoice()
+            $result = $protocol->generateInvoice($invoiceObject->id);
             if ($result) {
                 // No error;
                 $object->array_options['options_pdpconnectfr_einvoice_status'] = 1;
