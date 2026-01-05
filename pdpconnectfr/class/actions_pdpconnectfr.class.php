@@ -106,13 +106,13 @@ class ActionsPdpconnectfr extends CommonHookActions
 
             $url_button = array();
 
-            if ($object->status == Facture::STATUS_VALIDATED) {
+            if ($object->status == Facture::STATUS_VALIDATED || $object->status == Facture::STATUS_CLOSED) {
                 // if E-invoice is not generated, show button to generate e-invoice
-                if ($object->array_options['options_pdpconnectfr_einvoice_status'] == 0) {
+                if (empty($object->array_options['options_pdpconnectfr_einvoice_status'])) {
                     $url_button[] = array(
                         'lang' => 'pdpconnectfr',
                         'enabled' => 1,
-                        'perm' => (bool) $user->rights->facture->creer,
+                        'perm' => (bool) $user->hasRight("facture", "creer"),
                         'label' => $langs->trans('GenerateEinvoice'),
                         //'help' => $langs->trans('GenerateEinvoiceHelp'),
                         'url' => '/compta/facture/card.php?id=' . $object->id . '&action=generate_einvoice&token=' . newToken()
@@ -125,7 +125,7 @@ class ActionsPdpconnectfr extends CommonHookActions
                     $url_button[] = array(
                         'lang' => 'pdpconnectfr',
                         'enabled' => 1,
-                        'perm' => (bool) $user->rights->facture->creer,
+                        'perm' => (bool) $user->hasRight("facture", "creer"),
                         'label' => $langs->trans('RegenerateEinvoice'),
                         //'help' => $langs->trans('RegenerateEinvoiceHelp'),
                         'url' => '/compta/facture/card.php?id=' . $object->id . '&action=generate_einvoice&token=' . newToken()
@@ -134,7 +134,7 @@ class ActionsPdpconnectfr extends CommonHookActions
                     $url_button[] = array(
                         'lang' => 'pdpconnectfr',
                         'enabled' => 1,
-                        'perm' => (bool) $user->rights->facture->creer,
+                        'perm' => (bool) $user->hasRight("facture", "creer"),
                         'label' => $langs->trans('sendToPDP'),
                         //'help' => $langs->trans('SendToPDPHelp'),
                         'url' => '/compta/facture/card.php?id=' . $object->id . '&action=send_to_pdp&token=' . newToken()

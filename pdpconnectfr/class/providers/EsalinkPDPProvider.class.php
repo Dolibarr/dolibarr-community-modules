@@ -283,14 +283,17 @@ class EsalinkPDPProvider extends AbstractPDPProvider
             );
 
             if ($response['status_code'] == 200 || $response['status_code'] == 202) {
-                $output_path = __DIR__ . '/../../assets/retrived_invoice.pdf';
+            	include_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
+            	$tmpobject = new Facture($this->db);
+                $output_path = getMultidirTemp($tmpobject, 'pdpconnectfr').'/test_retreived_invoice.pdf';
+
                 file_put_contents($output_path, $response['response']);
 
-                $outputLog[] = "Sample invoice retrived successfully.";
+                $outputLog[] = "Sample invoice retreived successfully.";
 
                 return $outputLog;
             } else {
-                $this->errors[] = "Failed to retrive sample invoice.";
+                $this->errors[] = "Failed to retreive sample invoice.";
                 return 0;
             }
         } else {
@@ -753,7 +756,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                     if ($res < 0) {
                         return array(
                             'res' => '-1',
-                            'message' => "Failed to fetch customer invoice for flowId: " . $flowId . 
+                            'message' => "Failed to fetch customer invoice for flowId: " . $flowId .
                                         " using CDAR tracking ID: " . $issuerAssignedID
                         );
                     }
