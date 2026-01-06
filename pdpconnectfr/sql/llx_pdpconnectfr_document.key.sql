@@ -15,7 +15,9 @@
 
 
 -- BEGIN MODULEBUILDER INDEXES
-ALTER TABLE llx_pdpconnectfr_document ADD INDEX idx_pdpconnectfr_document_rowid (rowid);
+ALTER TABLE llx_pdpconnectfr_document ADD INDEX idx_pdpconnectfr_document_flowid (flow_id);
+ALTER TABLE llx_pdpconnectfr_document ADD INDEX idx_pdpconnectfr_document_callid (call_id, entity);
+ALTER TABLE llx_pdpconnectfr_document ADD INDEX idx_pdpconnectfr_document_date_creation (date_creation);
 ALTER TABLE llx_pdpconnectfr_document ADD INDEX idx_pdpconnectfr_document_status (status);
 -- END MODULEBUILDER INDEXES
 

@@ -15,7 +15,8 @@
 
 
 -- BEGIN MODULEBUILDER INDEXES
-ALTER TABLE llx_pdpconnectfr_call ADD INDEX idx_pdpconnectfr_call_rowid (rowid);
+ALTER TABLE llx_pdpconnectfr_call ADD UNIQUE INDEX uk_pdpconnectfr_call_callid (call_id, entity);
+ALTER TABLE llx_pdpconnectfr_call ADD INDEX idx_pdpconnectfr_call_date_creation (date_creation);
 ALTER TABLE llx_pdpconnectfr_call ADD INDEX idx_pdpconnectfr_call_status (status);
 -- END MODULEBUILDER INDEXES
 
