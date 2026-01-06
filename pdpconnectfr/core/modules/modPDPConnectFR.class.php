@@ -188,6 +188,10 @@ class modPDPConnectFR extends DolibarrModules
 		/* BEGIN MODULEBUILDER TABS */
 		// Don't forget to deactivate/reactivate your module to test your changes
 		$this->tabs = array();
+		//$this->tabs[] = array('data' => 'invoice:+CustomerLCtab:einvoicecustomerlctab:pdpconnectfr@pdpconnectfr:$user->hasRight("facture", "read"):/pdpconnectfr/einvoice_object_timeline.php?id=__ID__');
+
+		$this->tabs[] = array('data' => 'invoice,supplier_invoice,thirdparty:+EinvoiceLCTab:EinvoiceLifecycleTab:@pdpconnectfr:$user->hasRight("facture","read")||$user->hasRight("societe","lire"):/pdpconnectfr/einvoice_object_timeline.php?element=__CONTEXT__&id=__ID__');
+
 		/* END MODULEBUILDER TABS */
 		// Example:
 		// To add a new tab identified by code tabname1
@@ -636,24 +640,25 @@ class modPDPConnectFR extends DolibarrModules
 			array(
 				'options' => array(
 					// Status defined by Dolibarr
-					'0' => 'Not generated',
-					'1' => 'Generated (ready to send)',
-					'2' => 'Sent (awaiting acknowledgment)',
+					'0'   => $langs->trans('EInvStatusNotGenerated'),
+					'1'   => $langs->trans('EInvStatusGenerated'),
+					'2'   => $langs->trans('EInvStatusSent'),
 					// Status norm PDP/PA
-					'200' => 'Deposited',
-					'201' => 'Issued',
-					'202' => 'Received',
-					'203' => 'Available',
-					'204' => 'Taken over',
-					'205' => 'Approved',
-					'206' => 'Partially approved',
-					'207' => 'Disputed',
-					'208' => 'Suspended',
-					'209' => 'Completed',
-					'210' => 'Refused',
-					'211' => 'Payment transmitted',
-					'212' => 'Paid',
-					'213' => 'Rejected'
+					// PDP / PA normalized statuses
+					'200' => $langs->trans('EInvStatus200Deposited'),
+					'201' => $langs->trans('EInvStatus201Issued'),
+					'202' => $langs->trans('EInvStatus202Received'),
+					'203' => $langs->trans('EInvStatus203Available'),
+					'204' => $langs->trans('EInvStatus204TakenOver'),
+					'205' => $langs->trans('EInvStatus205Approved'),
+					'206' => $langs->trans('EInvStatus206PartiallyApproved'),
+					'207' => $langs->trans('EInvStatus207Disputed'),
+					'208' => $langs->trans('EInvStatus208Suspended'),
+					'209' => $langs->trans('EInvStatus209Completed'),
+					'210' => $langs->trans('EInvStatus210Refused'),
+					'211' => $langs->trans('EInvStatus211PaymentTransmitted'),
+					'212' => $langs->trans('EInvStatus212Paid'),
+					'213' => $langs->trans('EInvStatus213Rejected')
 				)
 			),
 			1,
