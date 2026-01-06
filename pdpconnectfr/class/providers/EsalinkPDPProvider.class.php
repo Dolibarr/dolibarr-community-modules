@@ -421,6 +421,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
     public function syncFlows($limit = 0)
     {
         global $db, $user;
+
         $results_messages = array();
         $uuid = $this->generateUuidV4(); // UUID used to correlate logs between Dolibarr and PDP TODO : Store it somewhere
 
@@ -431,15 +432,22 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         $urlparams = array(
             'Request-Id' => $uuid,
         );
-            $resource .= '?' . http_build_query($urlparams);
+        $resource .= '?' . http_build_query($urlparams);
+
+        // Get last date minus the offset
+        $dateafter = $this->getLastSyncDate(getDolGlobalInt('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS'));
 
         // First call to get a total count of flows to sync
         $params = array(
             'limit' => 1,
             'where' => array(
-            'updatedAfter' => dol_print_date($this->getLastSyncDate(getDolGlobalInt('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS')), '%Y-%m-%dT%H:%M:%S.000Z', 'gmt')
+            'updatedAfter' => dol_print_date($dateafter, '%Y-%m-%dT%H:%M:%S.000Z', 'gmt')
             )
         );
+
+        dol_syslog(__METHOD__ . " syncFlows start from ".dol_print_date($dateafter, 'standard'), LOG_DEBUG);
+        dol_syslog(__METHOD__ . " syncFlows start from ".dol_print_date($dateafter, 'standard'), LOG_DEBUG, 0, "_pdpconnectfr");
+
         $response = $this->callApi($resource, "POST", json_encode($params));
 
         $totalFlows = 0;
@@ -454,10 +462,13 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
         if ($totalFlows == 0) {
             dol_syslog(__METHOD__ . " No flows to synchronize.", LOG_DEBUG);
+        	dol_syslog(__METHOD__ . " No flows to synchronize.", LOG_DEBUG, 0, "_pdpconnectfr");
+
             $results_messages[] = "No flows to synchronize.";
             return array('res' => 1, 'messages' => $results_messages);
         } else {
             dol_syslog(__METHOD__ . " Total flows to synchronize: " . $totalFlows, LOG_DEBUG);
+        	dol_syslog(__METHOD__ . " Total flows to synchronize: " . $totalFlows, LOG_DEBUG, 0, "_pdpconnectfr");
             // Make a second call to get all flows
             $params['limit'] = $limit;
             $response = $this->callApi($resource, "POST", json_encode($params), [], "Synchronization");
@@ -465,41 +476,33 @@ class EsalinkPDPProvider extends AbstractPDPProvider
             if ($response['status_code'] != 200) {
                 $this->errors[] = "Failed to retrieve flows for synchronization.";
                 $results_messages[] = "Failed to retrieve flows for synchronization.";
+
+                dol_syslog(__METHOD__ . " Failed to retrieve the list of flows for synchronization.", LOG_DEBUG, 0, "_pdpconnectfr");
                 return array('res' => 0, 'messages' => $results_messages);
             }
 
             // Since PDP may not return flows in the order we want (by updatedAt ASC), we sort them here
             usort($response['response']['results'], function ($a, $b) {
+            	dol_syslog(__METHOD__ . " Sort the flows per updatedAt", LOG_DEBUG, 0, "_pdpconnectfr");
                 return strtotime($a['updatedAt']) <=> strtotime($b['updatedAt']);
             });
 
             // Clean aleady processed flows from the list
             $alreadyProcessedFlowIds = [];
             $flowIds = array_column($response['response']['results'], 'flowId');
-            $sql = "SELECT flow_id FROM " . MAIN_DB_PREFIX . "pdpconnectfr_document WHERE flow_id IN (" . implode(',', array_map('intval', $flowIds)) . ")";
+            $sql = "SELECT flow_id FROM " . MAIN_DB_PREFIX . "pdpconnectfr_document";
+            $sql .= " WHERE flow_id IN (" . implode(',', array_map('intval', $flowIds)) . ")";
             $resql = $db->query($sql);
             if ($resql) {
                 while ($obj = $db->fetch_object($resql)) {
-                    $alreadyProcessedFlowIds[] = $obj->flow_id;
+                    $alreadyProcessedFlowIds[$obj->flow_id] = $obj->flow_id;
                 }
             }
-
-            // Already processed flows
-            $alreadyProcessedFlows = array_filter(
-                $response['response']['results'],
-                fn($flow) => in_array($flow['flowId'], $alreadyProcessedFlowIds)
-            );
-
-            // Clean the results to process only new flows
-            $response['response']['results'] = array_filter(
-                $response['response']['results'],
-                fn($flow) => !in_array($flow['flowId'], $alreadyProcessedFlowIds)
-            );
 
             // Update totalFlows after filtering
             //$totalFlows = count($response['response']['results']); // TODO : VERIFY IF NEEDED
             $errors = 0;
-            $alreadyExist = count($alreadyProcessedFlows);
+            $alreadyExist = 0;
             $syncedFlows = 0;
 
             // Call ID for logging purposes
@@ -507,9 +510,17 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
             $lastsuccessfullSyncronizedFlow = null;
             foreach ($response['response']['results'] as $flow) {
+            	if (in_array($flow['flowId'], $alreadyProcessedFlowIds)) {
+            		dol_syslog(__METHOD__ . " Flow ".$flow['flowId']." already processed, discard it.", LOG_DEBUG, 0, "_pdpconnectfr");
+            		$alreadyExist++;
+            		continue;
+            	}
 
                 try {
+                	// Process flow
+
                     $db->begin();
+
                     $res = $this->syncFlow($flow['flowId'], $call_id);
 
                     // If res < 0, rollback
@@ -519,7 +530,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                         $errors++;
                     }
 
-                    // If res == 0, commit but count as already existed
+                    // If res == 0, commit but count it as already existed
                     if ($res['res'] == 0) {
                         $results_messages[] = "Skipped - Exist or already processed flow " . $flow['flowId'] . ": " . $res['message'];
                         $alreadyExist++;
@@ -549,22 +560,26 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         $res = $errors > 0 ? -1 : 1;
 
         $results_messages[] = ($res == 1) ? "Synchronization completed successfully." : "Synchronization aborted, last successfull synchronized flow: {$lastsuccessfullSyncronizedFlow}";
-        $results_messages[] = "Total flows to synchronize: {$totalFlows}";
-        $results_messages[] = "Batch size: {$limit}";
-        $results_messages[] = "Total flows synchronized: {$syncedFlows}";
-        $results_messages[] = "Total flows skipped (exist or already processed): {$alreadyExist}";
+        $results_messages[] = "Total flows to synchronize: ".$totalFlows;
+        $results_messages[] = "Batch size: ".$limit;
+        $results_messages[] = "Total flows skipped (exist or already processed): ".$alreadyExist;
+        $results_messages[] = "Total of new flows synchronized: ".$syncedFlows;
 
         $processingResult = implode("<br>----------------------<br>", $results_messages);
         $processingResult = "Processing result:<br>" . $processingResult;
 
         // Save sync recap
-        $sql = "UPDATE " . MAIN_DB_PREFIX . "pdpconnectfr_call
-        SET totalflow = " . intval($totalFlows) . ",
-            successflow = " . intval($syncedFlows) . ",
-            skippedflow = " . intval($alreadyExist) . ",
-            batchlimit = " . intval($limit) . ",
-            processing_result = '" . $db->escape($processingResult) . "'
-        WHERE call_id = '" . $db->escape($call_id) . "'";
+        if ($call_id) {
+	        $sql = "UPDATE " . MAIN_DB_PREFIX . "pdpconnectfr_call";
+	        $sql .= "SET totalflow = " . ((int) $totalFlows) . ",
+	            successflow = " . ((int) $syncedFlows) . ",
+	            skippedflow = " . ((int) $alreadyExist) . ",
+	            batchlimit = " . ((int) $limit) . ",
+	            processing_result = '" . $db->escape($processingResult) . "'
+				fk_user_modif = " . ((int) $user->id) . ",
+	        WHERE call_id = '" . $db->escape($call_id) . "'";
+        }
+
         $db->query($sql);
 
         // Return result

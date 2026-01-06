@@ -292,19 +292,19 @@ abstract class AbstractPDPProvider
      * for this provider. If no sync has occurred yet, returns Unix epoch (1970-01-01).
      * Optionally applies a margin in hours to the returned timestamp.
      *
-     * @param int $marginHours Optional time margin in hours to go back from the current date of the last synchronization
-     * @return int Timestamp of the last synchronization date
+     * @param 	int 		$marginHours 	Optional time margin in hours to go back from the current date of the last synchronization
+     * @return 	int			 				Timestamp of the last synchronization date
      */
     public function getLastSyncDate($marginHours = 0) {
-        global $conf, $db;
+        global $db;
 
         $LastSyncDate = null;
 
         // Get last sync date
         /*$LastSyncDateSql = "SELECT MAX(t.date_creation) as last_sync_date
             FROM ".MAIN_DB_PREFIX."pdpconnectfr_call as t
-            WHERE t.provider = '".$this->db->escape($this->providerName)."' 
-            AND t.call_type = 'sync_flow' 
+            WHERE t.provider = '".$this->db->escape($this->providerName)."'
+            AND t.call_type = 'sync_flow'
             AND T.status = 'SUCCESS'";
             if ($conf->entity && $conf->entity > 1) {
                 $LastSyncDateSql .= " AND t.entity = ".((int) $conf->entity);
