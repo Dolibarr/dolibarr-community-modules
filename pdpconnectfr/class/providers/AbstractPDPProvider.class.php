@@ -344,4 +344,45 @@ abstract class AbstractPDPProvider
 
         return $LastSyncDate;
     }
+
+    /**
+     * Add an event/action record to track changes or activities related to an object
+     *
+     * @param   string      $eventType The type of event
+     * @param   string      $eventMesg The message/label describing the event
+     * @param   object      $objet The object (Invoice / Supplier invoice) that the event is associated with.
+     *
+     * @return  int         Id of created event, < 0 if KO
+     */
+    public function addEvent($eventType, $eventLabel, $eventMesg, $objet)
+    {
+        global $db, $user;
+        require_once DOL_DOCUMENT_ROOT.'/comm/action/class/actioncomm.class.php';
+
+        $actioncomm = new ActionComm($db);
+
+        $actioncomm->type_code = 'AC_OTH_AUTO';
+        $actioncomm->code = 'AC_PDPCONNECTFR_'.$eventType;
+
+        $actioncomm->socid = $objet->thirdparty->id;
+        $actioncomm->label = $eventLabel;
+        $actioncomm->note_private = $eventMesg;
+        $actioncomm->fk_project = $objet->fk_project;
+        $actioncomm->datep = dol_now();
+        $actioncomm->datef = dol_now();
+        $actioncomm->percentage = -1;
+        $actioncomm->authorid = $user->id;
+        $actioncomm->userownerid = $user->id;
+        $actioncomm->elementid = $objet->id;
+        $actioncomm->elementtype = $objet->element;
+
+        $res = $actioncomm->create($user);
+
+        if ($res < 0) {
+            dol_syslog(__METHOD__ . " Error adding event: " . $actioncomm->error, LOG_ERR);
+            return -1;
+        }
+
+        return $res;
+    }
 }

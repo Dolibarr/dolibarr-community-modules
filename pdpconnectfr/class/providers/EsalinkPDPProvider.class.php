@@ -650,8 +650,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                     return array('res' => '-1', 'message' => "Failed to fetch customer invoice for flowId: " . $flowId);
                 }
                 $document->fk_element_id = $factureObj->id;
-                // 2. save received converted document
-                // TODO
+                // TODO: 2. save received converted document as attachment to customer invoice
                 break;
 
             // SupplierInvoice
@@ -772,6 +771,29 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                     $document->cdar_reason_code = isset($refDoc['StatusReasonCode']) ? $refDoc['StatusReasonCode'] : '';
                     $document->cdar_reason_desc = isset($refDoc['StatusReason']) ? $refDoc['StatusReason'] : '';
                     $document->cdar_reason_detail = isset($refDoc['StatusIncludedNoteContent']) ? $refDoc['StatusIncludedNoteContent'] : '';
+
+                    // Update linked customer invoice status based on CDAR information
+                    $factureObj->array_options['options_pdpconnectfr_einvoice_status'] = $refDoc['ProcessConditionCode'];
+                    $resUpdateStatus = $factureObj->insertExtraFields();
+                    if ($resUpdateStatus < 0) {
+                        return array(
+                            'res' => '-1',
+                            'message' => "Failed to update customer E-invoice status for flowId: " . $flowId
+                        );
+                    }
+
+                    // Log an event in the invoice timeline
+                    $statusLabel = $document->cdar_lifecycle_label;
+                    $reasonDetail = $document->cdar_reason_detail ? " - {$document->cdar_reason_detail}" : '';
+
+
+                    $eventLabel = "PDPCONNECTFR - Status: {$statusLabel}";
+                    $eventMessage = "PDPCONNECTFR - Status: {$statusLabel}{$reasonDetail}";
+
+                    $resLogEvent = $this->addEvent('STATUS', $eventLabel, $eventMessage, $factureObj);
+                    if ($resLogEvent < 0) {
+                        dol_syslog(__METHOD__ . " Failed to log event for flowId: {$flowId}", LOG_WARNING);
+                    }
 
                     // Update customer invoice status based on CDAR lifecycle code
                     // Mapping of lifecycle codes to Dolibarr invoice statuses
