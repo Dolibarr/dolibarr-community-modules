@@ -498,8 +498,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         }
 
 		// Since PDP may not return flows in the order we want (by updatedAt ASC), we sort them here
-		usort($response['response']['results'], function ($a, $b) {
-			dol_syslog(__METHOD__ . " Sort the flows per updatedAt", LOG_DEBUG, 0, "_pdpconnectfr");
+		dol_syslog(__METHOD__ . " Sort the flows per updatedAt", LOG_DEBUG, 0, "_pdpconnectfr");
+        usort($response['response']['results'], function ($a, $b) {
 			return strtotime($a['updatedAt']) <=> strtotime($b['updatedAt']);
 		});
 
@@ -525,9 +525,11 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$call_id = $response['call_id'] ?? null;
 
 		$lastsuccessfullSyncronizedFlow = null;
+		$i = 0;
 		foreach ($response['response']['results'] as $flow) {
+			$i++;
 			if (in_array($flow['flowId'], $alreadyProcessedFlowIds)) {
-				dol_syslog(__METHOD__ . " Flow " . $flow['flowId'] . " already processed, discard it.", LOG_DEBUG, 0, "_pdpconnectfr");
+				dol_syslog(__METHOD__ . "#".$i." Flow " . $flow['flowId'] . " already processed, discard it.", LOG_DEBUG, 0, "_pdpconnectfr");
 				$alreadyExist++;
 				continue;
 			}
@@ -535,7 +537,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			try {
 				// Process flow
 
-				dol_syslog(__METHOD__ . " Process flow " . $flow['flowId'], LOG_DEBUG, 0, "_pdpconnectfr");
+				dol_syslog(__METHOD__ . "#".$i." Process flow " . $flow['flowId'], LOG_DEBUG, 0, "_pdpconnectfr");
 
 				$db->begin();
 
