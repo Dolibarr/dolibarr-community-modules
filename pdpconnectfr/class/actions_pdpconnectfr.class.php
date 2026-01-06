@@ -175,7 +175,7 @@ class ActionsPdpconnectfr extends CommonHookActions
                 $messages = array();
                 $messages[] = $langs->trans("InvoiceSuccessfullySentToPDP");
                 $messages[] = $langs->trans("FlowId") . ": " . $result;
-                setEventMessages('', $messages, 'warnings');
+                setEventMessages('', $messages, 'mesgs');
                 // TODO: Review and update the invoice workflow.
                 // The "Modify" button may need to be disabled once the E-invoice has been sent and distributed by the PDP.
             } else {

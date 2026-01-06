@@ -7,7 +7,7 @@
 # Module label 'ModulePDPConnectFRName'
 ModulePDPConnectFRName = PDPConnectFR
 # Module description 'ModulePDPConnectFRDesc'
-ModulePDPConnectFRDesc = PDPConnectFR description
+ModulePDPConnectFRDesc = Support for E-invoice in France. Module allows to generate (automatically or manually invoices in E-invoice format and send them to an E-invoice platform). It can also retreive purchase invoices from the E-invoice platform.
 
 #
 # Admin page
