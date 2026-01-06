@@ -529,7 +529,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		foreach ($response['response']['results'] as $flow) {
 			$i++;
 			if (in_array($flow['flowId'], $alreadyProcessedFlowIds)) {
-				dol_syslog(__METHOD__ . "#".$i." Flow " . $flow['flowId'] . " already processed, discard it.", LOG_DEBUG, 0, "_pdpconnectfr");
+				dol_syslog(__METHOD__ . " #".$i." Flow " . $flow['flowId'] . " already processed, discard it.", LOG_DEBUG, 0, "_pdpconnectfr");
 				$alreadyExist++;
 				continue;
 			}
@@ -537,7 +537,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			try {
 				// Process flow
 
-				dol_syslog(__METHOD__ . "#".$i." Process flow " . $flow['flowId'], LOG_DEBUG, 0, "_pdpconnectfr");
+				dol_syslog(__METHOD__ . " #".$i." Process flow " . $flow['flowId'], LOG_DEBUG, 0, "_pdpconnectfr");
 
 				$db->begin();
 
