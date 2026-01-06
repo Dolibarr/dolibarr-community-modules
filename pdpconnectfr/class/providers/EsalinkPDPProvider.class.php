@@ -414,9 +414,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
     /**
      * Synchronize flows with EsaLink since the last synchronization date.
      *
-     * @param int $limit Maximum number of flows to synchronize. 0 means no limit.
-     *
-     * @return bool|array{res:int, messages:array<string>} True on success, false on failure along with messages.
+     * @param 	int 			$limit 							Maximum number of flows to synchronize. 0 means no limit.
+     * @return 	bool|array{res:int, messages:array<string>} 	True on success, false on failure along with messages.
      */
     public function syncFlows($limit = 0)
     {
@@ -518,7 +517,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 		// Update totalFlows after filtering
 		// $totalFlows = count($response['response']['results']); // TODO : VERIFY IF NEEDED
-		$errors = 0;
+		$error = 0;
 		$alreadyExist = 0;
 		$syncedFlows = 0;
 
@@ -536,6 +535,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			try {
 				// Process flow
 
+				dol_syslog(__METHOD__ . " Process flow " . $flow['flowId'], LOG_DEBUG, 0, "_pdpconnectfr");
+
 				$db->begin();
 
 				$res = $this->syncFlow($flow['flowId'], $call_id);
@@ -544,7 +545,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				if ($res['res'] < 0) {
 					$db->rollback();
 					$results_messages[] = "Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'];
-					$errors++;
+					$error++;
 				}
 
 				// If res == 0, commit but count it as already existed
@@ -564,19 +565,23 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			} catch (Exception $e) {
 				$db->rollback();
 				$results_messages[] = "Exception occurred while synchronizing flow " . $flow['flowId'] . ": " . $e->getMessage();
-				$errors++;
+				$error++;
 			}
 
-			if ($errors > 0) {
+			if ($error > 0) {
 				$results_messages[] = "Aborting synchronization due to errors.";
 				break;
 			}
 		}
 
 
-        $res = $errors > 0 ? -1 : 1;
+        $res = $error > 0 ? -1 : 1;
 
-        $results_messages[] = ($res == 1) ? "Synchronization completed successfully." : "Synchronization aborted, last successfull synchronized flow: {$lastsuccessfullSyncronizedFlow}";
+        $globalresultmessage = ($res == 1) ? "Synchronization completed successfully." : "Synchronization aborted, last successfull synchronized flow: ".((string) $lastsuccessfullSyncronizedFlow);
+
+		dol_syslog(__METHOD__ . " syncFlows end : ".$globalresultmessage, LOG_DEBUG, 0, "_pdpconnectfr");
+
+		$results_messages[] = $globalresultmessage;
         $results_messages[] = "Total flows to synchronize: ".$totalFlows;
         $results_messages[] = "Batch size: ".$limit;
         $results_messages[] = "Total flows skipped (exist or already processed): ".$alreadyExist;
@@ -600,7 +605,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         $db->query($sql);
 
         // Return result
-        return array('res' => $res, 'messages' => $results_messages);
+        return array('res' => $res, 'messages' => $results_messages, 'alreadyExist' => $alreadyExist, 'syncedFlows' => $syncedFlows);
     }
 
     /**

@@ -318,11 +318,14 @@ if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_P
 
 if ($action == 'sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $confirm == 'yes') {
 	if (isset($provider)) {
+		// Sync all flows
 		$sync_result = $provider->syncFlows($maxflows);
-		if ($sync_result['res'] > 0) {
-			setEventMessages($langs->trans("DocumentsSyncedSuccessfully"), null, 'mesgs');
-		} else {
-			setEventMessages($langs->trans("FailedToSyncDocuments"), null, 'errors');
+
+		if (!empty($sync_result['syncedFlows']) && $sync_result['syncedFlows'] > 0) {
+			setEventMessages($langs->trans("DocumentsSyncedSuccessfully", $sync_result['syncedFlows']), null, 'mesgs');
+		}
+		if ($sync_result['res'] <= 0) {
+			setEventMessages($langs->trans("FailedToSyncADocument"), null, 'errors');
 		}
 	} else {
 		setEventMessages($langs->trans("NoPDPProviderConfigured"), null, 'errors');
@@ -701,7 +704,7 @@ if ($action == 'sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $confirm == '
 		$cssclass = ($sync_result['res'] > 0) ? 'info' : 'error';
 		print '<div class="wordbreak '.$cssclass.' clearboth">';
 		print '<strong><u>'.$langs->trans("SyncResults").' :</u></strong></br>';
-		print implode("<br>----------------------<br>", $sync_result['messages']);
+		print implode("<br>", $sync_result['messages']);
 		print '</div>';
 	}
 }
@@ -739,7 +742,7 @@ $last_sync_info = img_picto('', 'long-arrow-alt-right', 'class="pictofixedwidth"
 
 $Lastsyncinfosql = "SELECT flow_id, updatedat
 FROM ".MAIN_DB_PREFIX."pdpconnectfr_document
-WHERE provider = '".$db->escape($provider->providerName)."' 
+WHERE provider = '".$db->escape($provider->providerName)."'
 ORDER BY updatedat DESC
 LIMIT 1";
 
@@ -747,8 +750,8 @@ $resLastsyncinfosql = $db->query($Lastsyncinfosql);
 if ($resLastsyncinfosql) {
 	$obj = $db->fetch_object($resLastsyncinfosql);
 	if ($obj) {
-		$last_sync = $obj->updatedat;
-		$last_sync_info .= " ". $langs->trans("lastSyncedFlow") . ': ' . $obj->flow_id . ' - ' . $langs->trans("lastSyncedFlowDate") . ':' . dol_print_date($last_sync, 'dayhour');
+		$last_sync = $db->jdate($obj->updatedat);
+		$last_sync_info .= " ". $langs->trans("lastSyncedFlow") . ': ' . $obj->flow_id . ' - ' . $langs->trans("lastSyncedFlowDate") . ':' . dol_print_date($last_sync, 'dayhour', 'tzuserrel');
 	} else {
 		$last_sync = 0;
 		$last_sync_info = $langs->trans("NoSyncYet");
@@ -756,7 +759,7 @@ if ($resLastsyncinfosql) {
 } else {
 	$last_sync_info = $langs->trans("ErrorGettingLastSyncInfo");
 }
-print "<div class=\"opacitymedium floatleft margintoponly\">{$last_sync_info}</div>";
+print '<div class="opacitymedium floatleft margintoponly">'.$last_sync_info.'</div>'."\n";
 
 
 print '<div class="div-table-responsive">'; // You can use div-table-responsive-no-min if you don't need reserved height for your table
