@@ -273,7 +273,7 @@ if (getDolGlobalString('PDPCONNECTFR_FLOWS_SYNC_CALL_LIMIT')) {
 	$item = $formSetup->newItem('PDPCONNECTFR_FLOWS_SYNC_CALL_SIZE');
 	$item->helpText = $langs->transnoentities('PDPCONNECTFR_FLOWS_SYNC_CALL_SIZE_HELP');
 	$item->defaultFieldValue = 10;
-	$item->cssClass = 'minwidth500';
+	$item->cssClass = 'maxwidth100';
 }
 
 // Setup conf to define a time margin in hours to go back from the current date of the last synchronization
