@@ -439,15 +439,15 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
         // First call to get a total count of flows to sync
         $params = array(
-            'limit' => 1,
             'where' => array(
             'updatedAfter' => dol_print_date($dateafter, '%Y-%m-%dT%H:%M:%S.000Z', 'gmt')
             )
         );
 
-        dol_syslog(__METHOD__ . " syncFlows start from ".dol_print_date($dateafter, 'standard'), LOG_DEBUG);
-        dol_syslog(__METHOD__ . " syncFlows start from ".dol_print_date($dateafter, 'standard'), LOG_DEBUG, 0, "_pdpconnectfr");
+        dol_syslog(__METHOD__ . " syncFlows start from ".dol_print_date($dateafter, 'standard')." limit ".$limit, LOG_DEBUG);
+        dol_syslog(__METHOD__ . " syncFlows start from ".dol_print_date($dateafter, 'standard')." limit ".$limit, LOG_DEBUG, 0, "_pdpconnectfr");
 
+        /*
         $response = $this->callApi($resource, "POST", json_encode($params));
 
         $totalFlows = 0;
@@ -466,96 +466,113 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
             $results_messages[] = "No flows to synchronize.";
             return array('res' => 1, 'messages' => $results_messages);
-        } else {
-            dol_syslog(__METHOD__ . " Total flows to synchronize: " . $totalFlows, LOG_DEBUG);
-        	dol_syslog(__METHOD__ . " Total flows to synchronize: " . $totalFlows, LOG_DEBUG, 0, "_pdpconnectfr");
-            // Make a second call to get all flows
-            $params['limit'] = $limit;
-            $response = $this->callApi($resource, "POST", json_encode($params), [], "Synchronization");
-
-            if ($response['status_code'] != 200) {
-                $this->errors[] = "Failed to retrieve flows for synchronization.";
-                $results_messages[] = "Failed to retrieve flows for synchronization.";
-
-                dol_syslog(__METHOD__ . " Failed to retrieve the list of flows for synchronization.", LOG_DEBUG, 0, "_pdpconnectfr");
-                return array('res' => 0, 'messages' => $results_messages);
-            }
-
-            // Since PDP may not return flows in the order we want (by updatedAt ASC), we sort them here
-            usort($response['response']['results'], function ($a, $b) {
-            	dol_syslog(__METHOD__ . " Sort the flows per updatedAt", LOG_DEBUG, 0, "_pdpconnectfr");
-                return strtotime($a['updatedAt']) <=> strtotime($b['updatedAt']);
-            });
-
-            // Clean aleady processed flows from the list
-            $alreadyProcessedFlowIds = [];
-            $flowIds = array_column($response['response']['results'], 'flowId');
-            $sql = "SELECT flow_id FROM " . MAIN_DB_PREFIX . "pdpconnectfr_document";
-            $sql .= " WHERE flow_id IN (" . implode(',', array_map('intval', $flowIds)) . ")";
-            $resql = $db->query($sql);
-            if ($resql) {
-                while ($obj = $db->fetch_object($resql)) {
-                    $alreadyProcessedFlowIds[$obj->flow_id] = $obj->flow_id;
-                }
-            }
-
-            // Update totalFlows after filtering
-            //$totalFlows = count($response['response']['results']); // TODO : VERIFY IF NEEDED
-            $errors = 0;
-            $alreadyExist = 0;
-            $syncedFlows = 0;
-
-            // Call ID for logging purposes
-            $call_id = $response['call_id'] ?? null;
-
-            $lastsuccessfullSyncronizedFlow = null;
-            foreach ($response['response']['results'] as $flow) {
-            	if (in_array($flow['flowId'], $alreadyProcessedFlowIds)) {
-            		dol_syslog(__METHOD__ . " Flow ".$flow['flowId']." already processed, discard it.", LOG_DEBUG, 0, "_pdpconnectfr");
-            		$alreadyExist++;
-            		continue;
-            	}
-
-                try {
-                	// Process flow
-
-                    $db->begin();
-
-                    $res = $this->syncFlow($flow['flowId'], $call_id);
-
-                    // If res < 0, rollback
-                    if ($res['res'] < 0) {
-                        $db->rollback();
-                        $results_messages[] = "Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'];
-                        $errors++;
-                    }
-
-                    // If res == 0, commit but count it as already existed
-                    if ($res['res'] == 0) {
-                        $results_messages[] = "Skipped - Exist or already processed flow " . $flow['flowId'] . ": " . $res['message'];
-                        $alreadyExist++;
-                        $lastsuccessfullSyncronizedFlow = $flow['flowId'];
-                        $db->commit();
-                    }
-
-                    // If res == 1, commit and count as synced
-                    if ($res['res'] > 0) {
-                        $syncedFlows++;
-                        $lastsuccessfullSyncronizedFlow = $flow['flowId'];
-                        $db->commit();
-                    }
-                } catch (Exception $e) {
-                    $db->rollback();
-                    $results_messages[] = "Exception occurred while synchronizing flow " . $flow['flowId'] . ": " . $e->getMessage();
-                    $errors++;
-                }
-
-                if ($errors > 0) {
-                    $results_messages[] = "Aborting synchronization due to errors.";
-                    break;
-                }
-            }
         }
+
+		dol_syslog(__METHOD__ . " Total flows to synchronize: " . $totalFlows, LOG_DEBUG);
+        dol_syslog(__METHOD__ . " Total flows to synchronize: " . $totalFlows, LOG_DEBUG, 0, "_pdpconnectfr");
+        */
+
+
+        // Make a call to get all flows
+        if ($limit) {
+        	$params['limit'] = $limit;
+        }
+        $response = $this->callApi($resource, "POST", json_encode($params), [], "Synchronization");	// This will also create the Call entry
+
+        if ($response['status_code'] != 200) {
+			$this->errors[] = "Failed to retrieve flows for synchronization.";
+            $results_messages[] = "Failed to retrieve flows for synchronization.";
+
+            dol_syslog(__METHOD__ . " Failed to retrieve the list of flows for synchronization.", LOG_DEBUG, 0, "_pdpconnectfr");
+			return array('res' => 0, 'messages' => $results_messages);
+		}
+
+		$totalFlows = $response['response']['total'] ?? 0;
+        $limit = $limit > 0 ? min($limit, $totalFlows) : $totalFlows;
+
+        if ($totalFlows == 0) {
+            dol_syslog(__METHOD__ . " No flows to synchronize.", LOG_DEBUG);
+        	dol_syslog(__METHOD__ . " No flows to synchronize.", LOG_DEBUG, 0, "_pdpconnectfr");
+
+            $results_messages[] = "No flows to synchronize.";
+            return array('res' => 1, 'messages' => $results_messages);
+        }
+
+		// Since PDP may not return flows in the order we want (by updatedAt ASC), we sort them here
+		usort($response['response']['results'], function ($a, $b) {
+			dol_syslog(__METHOD__ . " Sort the flows per updatedAt", LOG_DEBUG, 0, "_pdpconnectfr");
+			return strtotime($a['updatedAt']) <=> strtotime($b['updatedAt']);
+		});
+
+		// Clean aleady processed flows from the list
+		$alreadyProcessedFlowIds = [];
+		$flowIds = array_column($response['response']['results'], 'flowId');
+		$sql = "SELECT flow_id FROM " . MAIN_DB_PREFIX . "pdpconnectfr_document";
+		$sql .= " WHERE flow_id IN (" . implode(',', array_map('intval', $flowIds)) . ")";
+		$resql = $db->query($sql);
+		if ($resql) {
+			while ($obj = $db->fetch_object($resql)) {
+				$alreadyProcessedFlowIds[$obj->flow_id] = $obj->flow_id;
+			}
+		}
+
+		// Update totalFlows after filtering
+		// $totalFlows = count($response['response']['results']); // TODO : VERIFY IF NEEDED
+		$errors = 0;
+		$alreadyExist = 0;
+		$syncedFlows = 0;
+
+		// Call ID for logging purposes
+		$call_id = $response['call_id'] ?? null;
+
+		$lastsuccessfullSyncronizedFlow = null;
+		foreach ($response['response']['results'] as $flow) {
+			if (in_array($flow['flowId'], $alreadyProcessedFlowIds)) {
+				dol_syslog(__METHOD__ . " Flow " . $flow['flowId'] . " already processed, discard it.", LOG_DEBUG, 0, "_pdpconnectfr");
+				$alreadyExist++;
+				continue;
+			}
+
+			try {
+				// Process flow
+
+				$db->begin();
+
+				$res = $this->syncFlow($flow['flowId'], $call_id);
+
+				// If res < 0, rollback
+				if ($res['res'] < 0) {
+					$db->rollback();
+					$results_messages[] = "Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'];
+					$errors++;
+				}
+
+				// If res == 0, commit but count it as already existed
+				if ($res['res'] == 0) {
+					$results_messages[] = "Skipped - Exist or already processed flow " . $flow['flowId'] . ": " . $res['message'];
+					$alreadyExist++;
+					$lastsuccessfullSyncronizedFlow = $flow['flowId'];
+					$db->commit();
+				}
+
+				// If res == 1, commit and count as synced
+				if ($res['res'] > 0) {
+					$syncedFlows++;
+					$lastsuccessfullSyncronizedFlow = $flow['flowId'];
+					$db->commit();
+				}
+			} catch (Exception $e) {
+				$db->rollback();
+				$results_messages[] = "Exception occurred while synchronizing flow " . $flow['flowId'] . ": " . $e->getMessage();
+				$errors++;
+			}
+
+			if ($errors > 0) {
+				$results_messages[] = "Aborting synchronization due to errors.";
+				break;
+			}
+		}
+
 
         $res = $errors > 0 ? -1 : 1;
 

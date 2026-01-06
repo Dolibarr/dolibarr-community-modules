@@ -334,7 +334,7 @@ abstract class AbstractPDPProvider
 
         if ($LastSyncDate === null) {
             // If no last sync date, set to epoch start
-            $LastSyncDate = strtotime('1970-01-01 00:00:00');
+            $LastSyncDate = dol_mktime(0, 0, 0, 1, 1, 1970, 'gmt');
         }
 
         // Apply margin in hours
