@@ -301,7 +301,7 @@ if (preg_match('/call'.$prefix.'HEALTHCHECK/i', $action, $reg)) {
 	if ($statusPDP['status_code'] == 200) {
 		setEventMessages($statusPDP['message'], null, 'mesgs');
 	} else {
-		setEventMessages('', $provider->errors, 'errors');
+		setEventMessages($langs->trans('PdpApiNotReachable'), array(), 'errors');
 	}
 }
 

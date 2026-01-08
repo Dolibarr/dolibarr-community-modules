@@ -158,15 +158,16 @@ abstract class AbstractPDPProvider
 	 * @return array{status_code:int,response:null|string|array<string,mixed>,call_id:null|string}
 	 */
     abstract public function callApi($resource, $method, $options = false, $extraHeaders = [], $callType = '');
+
     /**
-     * Synchronize flows with PDP since the last synchronization date.
-     *
-     * @param int $limit Maximum number of flows to synchronize. 0 means no limit.
+     * Synchronize flows with PDP.
+     * @param   int   $syncFromDate     Timestamp from which to start synchronization. If 0, begins from epoch (1970-01-01).
+     * @param   int   $limit            Maximum number of flows to synchronize. 0 means no limit.
+     * @param   int   $syncLookback     Lookback time in hours to adjust the last sync date.
      *
      * @return bool|array{res:int, messages:array<string>} True on success, false on failure along with messages.
      */
-    abstract public function syncFlows($limit = 0);
-
+    abstract public function syncFlows($syncFromDate = 0, $limit = 0, $syncLookback = 0);
     /**
      * Store a flow data.
      *
