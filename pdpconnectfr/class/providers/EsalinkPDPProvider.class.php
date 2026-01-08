@@ -412,12 +412,14 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	}
 
     /**
-     * Synchronize flows with EsaLink since the last synchronization date.
+     * Synchronize flows with EsaLink.
+     * @param   int   $syncFromDate     Timestamp from which to start synchronization. If 0, begins from epoch (1970-01-01).
+     * @param   int   $limit            Maximum number of flows to synchronize. 0 means no limit.
+     * @param   int   $syncLookback     Lookback time in hours to adjust the last sync date.
      *
-     * @param 	int 			$limit 							Maximum number of flows to synchronize. 0 means no limit.
      * @return 	bool|array{res:int, messages:array<string>} 	True on success, false on failure along with messages.
      */
-    public function syncFlows($limit = 0)
+    public function syncFlows($syncFromDate = 0, $limit = 0, $syncLookback = 0)
     {
         global $db, $user;
 
@@ -433,8 +435,12 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         );
         $resource .= '?' . http_build_query($urlparams);
 
-        // Get last date minus the offset
-        $dateafter = $this->getLastSyncDate(getDolGlobalInt('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS'));
+        // Calculate dateafter
+        if ($syncFromDate > 0) {
+            $dateafter = $syncFromDate - ($syncLookback * 3600);
+        } else {
+            $dateafter = dol_mktime(0, 0, 0, 1, 1, 1970, 'gmt');
+        }
 
         // First call to get a total count of flows to sync
         $params = array(
@@ -446,30 +452,31 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         dol_syslog(__METHOD__ . " syncFlows start from ".dol_print_date($dateafter, 'standard')." limit ".$limit, LOG_DEBUG);
         dol_syslog(__METHOD__ . " syncFlows start from ".dol_print_date($dateafter, 'standard')." limit ".$limit, LOG_DEBUG, 0, "_pdpconnectfr");
 
-        /*
-        $response = $this->callApi($resource, "POST", json_encode($params));
+        // If limit is 0, we first need to get the total number of flows to sync because ESALINK set a default limit of 25 if not specified
+        if ($limit == 0) {
+            $response = $this->callApi($resource, "POST", json_encode($params));
 
-        $totalFlows = 0;
-        if ($response['status_code'] != 200) {
-            $this->errors[] = "Failed to retrieve flows for synchronization.";
-            $results_messages[] = "Failed to retrieve flows for synchronization.";
-            return array('res' => 0, 'messages' => $results_messages);
+            $totalFlows = 0;
+            if ($response['status_code'] != 200) {
+                $this->errors[] = "Failed to retrieve flows for synchronization.";
+                $results_messages[] = "Failed to retrieve flows for synchronization.";
+                return array('res' => 0, 'messages' => $results_messages);
+            }
+
+            $totalFlows = $response['response']['total'] ?? 0;
+            $limit = $totalFlows;
+
+            if ($limit == 0) {
+                dol_syslog(__METHOD__ . " No flows to synchronize.", LOG_DEBUG);
+                dol_syslog(__METHOD__ . " No flows to synchronize.", LOG_DEBUG, 0, "_pdpconnectfr");
+
+                $results_messages[] = "No flows to synchronize.";
+                return array('res' => 1, 'messages' => $results_messages);
+            }
+
+            dol_syslog(__METHOD__ . " Total flows to synchronize: " . $totalFlows, LOG_DEBUG);
+            dol_syslog(__METHOD__ . " Total flows to synchronize: " . $totalFlows, LOG_DEBUG, 0, "_pdpconnectfr");
         }
-
-        $totalFlows = $response['response']['total'] ?? 0;
-        $limit = $limit > 0 ? min($limit, $totalFlows) : $totalFlows;
-
-        if ($totalFlows == 0) {
-            dol_syslog(__METHOD__ . " No flows to synchronize.", LOG_DEBUG);
-        	dol_syslog(__METHOD__ . " No flows to synchronize.", LOG_DEBUG, 0, "_pdpconnectfr");
-
-            $results_messages[] = "No flows to synchronize.";
-            return array('res' => 1, 'messages' => $results_messages);
-        }
-
-		dol_syslog(__METHOD__ . " Total flows to synchronize: " . $totalFlows, LOG_DEBUG);
-        dol_syslog(__METHOD__ . " Total flows to synchronize: " . $totalFlows, LOG_DEBUG, 0, "_pdpconnectfr");
-        */
 
 
         // Make a call to get all flows
@@ -594,14 +601,14 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
         // Save sync recap
         if ($call_id) {
-	        $sql = "UPDATE " . MAIN_DB_PREFIX . "pdpconnectfr_call";
-	        $sql .= "SET totalflow = " . ((int) $totalFlows) . ",
-	            successflow = " . ((int) $syncedFlows) . ",
-	            skippedflow = " . ((int) $alreadyExist) . ",
-	            batchlimit = " . ((int) $limit) . ",
-	            processing_result = '" . $db->escape($processingResult) . "'
-				fk_user_modif = " . ((int) $user->id) . ",
-	        WHERE call_id = '" . $db->escape($call_id) . "'";
+            $sql = "UPDATE " . MAIN_DB_PREFIX . "pdpconnectfr_call";
+            $sql .= " SET totalflow = " . ((int) $totalFlows) . ",
+                successflow = " . ((int) $syncedFlows) . ",
+                skippedflow = " . ((int) $alreadyExist) . ",
+                batchlimit = " . ((int) $limit) . ",
+                processing_result = '" . $db->escape($processingResult) . "',
+                    fk_user_modif = " . ((int) $user->id) . "
+            WHERE call_id = '" . $db->escape($call_id) . "'";
         }
 
         $db->query($sql);

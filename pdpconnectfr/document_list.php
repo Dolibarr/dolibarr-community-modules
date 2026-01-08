@@ -121,6 +121,19 @@ $id = GETPOSTINT('id');
 $ref = GETPOST('ref', 'alpha');
 $sync_result = '';
 $maxflows = GETPOSTINT('maxflows');
+$syncLookback = GETPOSTINT('sync_lookback');
+$syncFromDate = GETPOSTINT('syncfromdate');
+
+$syncfromdatehour = GETPOSTINT('last_sync_datetimehour');
+$syncfromdatemin = GETPOSTINT('last_sync_datetimemin');
+$syncfromdatemonth = GETPOSTINT('last_sync_datetimemonth');
+$syncfromdateday = GETPOSTINT('last_sync_datetimeday');
+$syncfromdateyear = GETPOSTINT('last_sync_datetimeyear');
+if (empty($syncfromdateyear) || empty($syncfromdatemonth) || empty($syncfromdateday)) {
+	$syncfromdate = 0;
+} else {
+	$syncfromdate= dol_mktime($syncfromdatehour, $syncfromdatemin, 0, $syncfromdatemonth, $syncfromdateday, $syncfromdateyear, 'tzuserrel');
+}
 
 // Load variable for pagination
 $limit = GETPOSTINT('limit') ? GETPOSTINT('limit') : $conf->liste_limit;
@@ -316,10 +329,10 @@ if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_P
 	$provider = $providerManager->getProvider(getDolGlobalString('PDPCONNECTFR_PDP'));
 }
 
-if ($action == 'sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $confirm == 'yes') {
+if ($action == 'confirm_sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $confirm == 'yes') {
 	if (isset($provider)) {
 		// Sync all flows
-		$sync_result = $provider->syncFlows($maxflows);
+		$sync_result = $provider->syncFlows($syncFromDate, $maxflows, $syncLookback);
 
 		if (!empty($sync_result['syncedFlows']) && $sync_result['syncedFlows'] > 0) {
 			setEventMessages($langs->trans("DocumentsSyncedSuccessfully", $sync_result['syncedFlows']), null, 'mesgs');
@@ -342,8 +355,6 @@ $form = new Form($db);
 $now = dol_now();
 
 $title = $langs->trans("EInvoiceSynchronization");
-//$titleWithSyncButton = $title . ' <a href="'.$_SERVER["PHP_SELF"].'?action=confirm_sync&token='.newToken().'" class="butAction small">'.img_picto('', 'refresh', 'class="pictofixedwidth"').'</a>';
-//$help_url = "EN:Module_Document|FR:Module_Document_FR|ES:Módulo_Document";
 $help_url = '';
 $morejs = array();
 $morecss = array();
@@ -691,15 +702,42 @@ $selectedfields .= (count($arrayofmassactions) ? $form->showCheckAddButtons('che
 
 
 // Confirmation dialog
-if ($action == 'confirm_sync') {
-	$confirmurl = $_SERVER["PHP_SELF"] . '?maxflows='.GETPOSTINT('maxflows');
-	$formconfirm = $form->formconfirm($confirmurl, $langs->trans("ConfirmSyncTitle"), $langs->trans("ConfirmSyncDesc"), 'sync', '', '', 1);
-	print $formconfirm;
+if ($action == 'sync' && $provider) {
+	$validationFormError = 0;
+
+	if ($maxflows < 0) {
+		$validationFormError++;
+		setEventMessages($langs->trans("InvalidSyncLimit"), array(), 'errors');
+	}
+	if ($syncLookback < 0) {
+		$validationFormError++;
+		setEventMessages($langs->trans("InvalidSyncLookback"), array(), 'errors');
+	}
+	if ($syncfromdate === '') {
+		$validationFormError++;
+		setEventMessages($langs->trans("InvalidSyncFromDate"), array(), 'errors');
+	}
+	if ($syncfromdate > $provider->getLastSyncDate()) {
+		$validationFormError++;
+		setEventMessages($langs->trans("SyncFromDateIsAfterLastSyncDate"), array(), 'errors');
+	}
+
+	if ($validationFormError == 0) {
+		$confirmurl = $_SERVER["PHP_SELF"] . '?';
+		$confirmurl .= 'maxflows='.$maxflows;
+		$confirmurl .= '&sync_lookback='.$syncLookback;
+		$confirmurl .= '&syncfromdate='.urlencode($syncfromdate);
+		$confirmurl .= '&token='.newToken();
+
+		//print $confirmurl;
+		$formconfirm = $form->formconfirm($confirmurl, $langs->trans("ConfirmSyncTitle"), $langs->trans("ConfirmSyncDesc"), 'confirm_sync', '', '', 1);
+		print $formconfirm;
+	}
 }
 
 
 // sync results
-if ($action == 'sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $confirm == 'yes' && !empty($sync_result)) {
+if ($action == 'confirm_sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $confirm == 'yes' && !empty($sync_result)) {
 	if (isset($provider)) {
 		$cssclass = ($sync_result['res'] > 0) ? 'info' : 'error';
 		print '<div class="wordbreak '.$cssclass.' clearboth">';
@@ -709,35 +747,8 @@ if ($action == 'sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $confirm == '
 	}
 }
 
-// Form for sync action
-print '<div class="fichecenter">'."\n";
-
-if (getDolGlobalInt('PDPCONNECTFR_FLOWS_SYNC_CALL_LIMIT') && getDolGlobalInt('PDPCONNECTFR_FLOWS_SYNC_CALL_SIZE') > 0) {
-	print '  <div class="inline-block marginright">'."\n";
-	print '    <label for="maxflows" class="minwidth50 opacitymedium">'.$langs->trans("MAX_FLOWS_SYNCRO").'</label>'."\n";
-	print '    <input type="number" class="width75 flat" id="maxflows" name="maxflows" min="1" step="1" value="'.(GETPOSTINT('maxflows') ? GETPOSTINT('maxflows') : getDolGlobalInt('PDPCONNECTFR_FLOWS_SYNC_CALL_SIZE')).'">'."\n";
-	print '  </div>'."\n";
-}
-
-
-print '  <div class="inline-block valignmiddle">'."\n";
-print '    <a href="#" id="runSyncBtn" class="butAction small">'.img_picto('', 'refresh', 'class="pictofixedwidth"').' '.$langs->trans("RUN_SYNC").'</a>'."\n";
-print '  </div>'."\n";
-
-print '</div>'."\n";
-
-print '<script>'."\n";
-print "document.getElementById('runSyncBtn').addEventListener('click', function(e){"."\n";
-print "  e.preventDefault();"."\n";
-print "  var maxFlows = document.getElementById('maxflows') ? encodeURIComponent(document.getElementById('maxflows').value) : '0';"."\n";
-print "  var token = encodeURIComponent('".newToken()."');"."\n";
-print "  window.location.href = '".$_SERVER["PHP_SELF"]."?action=confirm_sync&maxflows=' + maxFlows + '&token=' + token;"."\n";
-print "});"."\n";
-print '</script>'."\n";
-
-print '<br class="clearboth">';
-
 // Last flow sync info
+$last_sync = 0;
 $last_sync_info = img_picto('', 'long-arrow-alt-right', 'class="pictofixedwidth"');
 
 $Lastsyncinfosql = "SELECT flow_id, updatedat
@@ -759,7 +770,88 @@ if ($resLastsyncinfosql) {
 } else {
 	$last_sync_info = $langs->trans("ErrorGettingLastSyncInfo");
 }
-print '<div class="opacitymedium floatleft margintoponly">'.$last_sync_info.'</div>'."\n";
+
+// Form for sync action
+if ($provider) {
+	print '<div class="fichecenter">'."\n";
+
+	print '<div class="syncParametersSection">'."\n";
+
+	print '<span class="opacitymedium">'.$langs->trans("EInvoiceSynchronizationHelp", $provider->providerName).'</span>'."\n";
+	//print '<br ><br>'."\n";
+	print '<hr class="clearboth">'."\n";
+	print '<table>'."\n";
+
+	if ($last_sync > 0) {
+		print '<tr>';
+		print '<td class="syncFormLabel">'.$langs->trans("StartSynchronizationFrom").'</td>';
+		print '<td>';
+		print $form->selectDate($last_sync, 'last_sync_datetime', 1, 1, 1, '', 1, 0, 0, '', '', '', '', 1, '', $langs->trans('From'), 'tzuserrel');
+
+		print '</td>';
+		print '</tr>';
+	}
+
+	if ($last_sync > 0) {
+		print '<tr>';
+		print '<td class="syncFormLabel">'.$langs->trans("syncLookbackForm").'</td>';
+		print '<td>';
+		print '<input type="number" id="sync_lookback" name="sync_lookback" class="maxwidthdate  flat" min="0" step="1" value="'.(GETPOSTINT('sync_lookback') ? GETPOSTINT('sync_lookback') : getDolGlobalInt('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS')).'" required> ';
+		if ($conf->browser->layout != 'phone') {
+			print '<span class="opacitymedium ">'.$langs->trans("syncLookbackFormHelp").'</span>';
+		}
+		print '</td>';
+		print '</tr>';
+	}
+
+	if (getDolGlobalInt('PDPCONNECTFR_FLOWS_SYNC_CALL_LIMIT')) {
+		print '<tr>';
+		print '<td class="syncFormLabel">'.$langs->trans("maxNumberToProcess").'</td>';
+		print '<td>';
+		print '<input type="number" id="maxflows" name="maxflows" class="maxwidthdate  flat" min="1" step="1" value="'.(GETPOSTINT('maxflows') ? GETPOSTINT('maxflows') : getDolGlobalInt('PDPCONNECTFR_FLOWS_SYNC_CALL_SIZE')).'" required> ';
+		if ($conf->browser->layout != 'phone') {
+			print '<span class="opacitymedium ">'.$langs->trans("maxNumberToProcessHelp").'</span>';
+		}
+		print '</td>';
+		print '</tr>';
+	}
+
+	print '</table>'."\n";
+	print '<br>';
+
+
+	print '<div class="inline-block valignmiddle">'."\n";
+	print '<a href="#" id="runSyncBtn" class="butAction small">'.img_picto('', 'refresh', 'class="pictofixedwidth"').' '.$langs->trans("RUN_SYNC").'</a>'."\n";
+	print '</div>'."\n";
+
+	print "</div>"."\n";
+
+	print '</div>'."\n";
+
+	print '<script>'."\n";
+	print "document.getElementById('runSyncBtn').addEventListener('click', function(e){"."\n";
+	print "  e.preventDefault();"."\n";
+	print "  var maxFlows = document.getElementById('maxflows') ? encodeURIComponent(document.getElementById('maxflows').value) : '0';"."\n";
+	print "  var syncLookback = document.getElementById('sync_lookback') ? encodeURIComponent(document.getElementById('sync_lookback').value) : '0';"."\n";
+	print "  var token = encodeURIComponent('".newToken()."');"."\n";
+	print "  var lastSyncDatetimehour = document.getElementById('last_sync_datetimehour') ? encodeURIComponent(document.getElementById('last_sync_datetimehour').value) : '0';"."\n";
+	print "  var lastSyncDatetimemin = document.getElementById('last_sync_datetimemin') ? encodeURIComponent(document.getElementById('last_sync_datetimemin').value) : '0';"."\n";
+	print "  var lastSyncDatetimemonth = document.getElementById('last_sync_datetimemonth') ? encodeURIComponent(document.getElementById('last_sync_datetimemonth').value) : '0';"."\n";
+	print "  var lastSyncDatetimeday = document.getElementById('last_sync_datetimeday') ? encodeURIComponent(document.getElementById('last_sync_datetimeday').value) : '0';"."\n";
+	print "  var lastSyncDatetimeyear = document.getElementById('last_sync_datetimeyear') ? encodeURIComponent(document.getElementById('last_sync_datetimeyear').value) : '0';"."\n";
+	print "  window.location.href = '".$_SERVER["PHP_SELF"]."?action=sync&maxflows=' + maxFlows + '&sync_lookback=' + syncLookback + '&last_sync_datetimehour=' + lastSyncDatetimehour + '&last_sync_datetimemin=' + lastSyncDatetimemin + '&last_sync_datetimemonth=' + lastSyncDatetimemonth + '&last_sync_datetimeday=' + lastSyncDatetimeday + '&last_sync_datetimeyear=' + lastSyncDatetimeyear + '&token=' + token;"."\n";
+	print "});"."\n";
+	print '</script>'."\n";
+
+
+	print '<br class="clearboth">';
+	print '<div class="opacitymedium floatleft margintoponly">'.$last_sync_info.'</div>'."\n";
+} else {
+	// Message to check module configuration
+	print info_admin($langs->transnoentities("checkPdpConnectFrModuleConfiguration"), 0, 0, '1', '', '', $picto = 'warning');
+}
+
+
 
 
 print '<div class="div-table-responsive">'; // You can use div-table-responsive-no-min if you don't need reserved height for your table

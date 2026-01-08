@@ -111,7 +111,7 @@ class modPDPConnectFR extends DolibarrModules
 			'theme' => 0,
 			// Set this to relative path of css file if module has its own css file
 			'css' => array(
-				//    '/pdpconnectfr/css/pdpconnectfr.css.php',
+				'/pdpconnectfr/css/pdpconnectfr.css.php',
 			),
 			// Set this to relative path of js file if module must load a js on all pages
 			'js' => array(
@@ -190,7 +190,7 @@ class modPDPConnectFR extends DolibarrModules
 		$this->tabs = array();
 		//$this->tabs[] = array('data' => 'invoice:+CustomerLCtab:einvoicecustomerlctab:pdpconnectfr@pdpconnectfr:$user->hasRight("facture", "read"):/pdpconnectfr/einvoice_object_timeline.php?id=__ID__');
 
-		$this->tabs[] = array('data' => 'invoice,supplier_invoice,thirdparty:+EinvoiceLCTab:EinvoiceLifecycleTab:@pdpconnectfr:$user->hasRight("facture","read")||$user->hasRight("societe","lire"):/pdpconnectfr/einvoice_object_timeline.php?element=__CONTEXT__&id=__ID__');
+		//$this->tabs[] = array('data' => 'invoice:+EinvoiceEvents:EinvoiceEventsTab:@pdpconnectfr:$user->hasRight("facture","read"):/pdpconnectfr/einvoice_events.php?id=__ID__&elementtype=invoice');
 
 		/* END MODULEBUILDER TABS */
 		// Example:
@@ -664,7 +664,7 @@ class modPDPConnectFR extends DolibarrModules
 			1,
 			'',
 			1,
-			0,
+			$langs->trans('einvoiceStatusFieldHelp'),
 			'',
 			'',
 			'pdpconnectfr@pdpconnectfr',
