@@ -121,7 +121,6 @@ $id = GETPOSTINT('id');
 $ref = GETPOST('ref', 'alpha');
 $sync_result = '';
 $maxflows = GETPOSTINT('maxflows');
-$syncLookback = GETPOSTINT('sync_lookback');
 $syncFromDate = GETPOSTINT('syncfromdate');
 
 $syncfromdatehour = GETPOSTINT('last_sync_datetimehour');
@@ -332,7 +331,7 @@ if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_P
 if ($action == 'confirm_sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $confirm == 'yes') {
 	if (isset($provider)) {
 		// Sync all flows
-		$sync_result = $provider->syncFlows($syncFromDate, $maxflows, $syncLookback);
+		$sync_result = $provider->syncFlows($syncFromDate, $maxflows);
 
 		if (!empty($sync_result['syncedFlows']) && $sync_result['syncedFlows'] > 0) {
 			setEventMessages($langs->trans("DocumentsSyncedSuccessfully", $sync_result['syncedFlows']), null, 'mesgs');
@@ -713,10 +712,6 @@ if ($action == 'sync' && $provider) {
 		$validationFormError++;
 		setEventMessages($langs->trans("InvalidSyncLimit"), array(), 'errors');
 	}
-	if ($syncLookback < 0) {
-		$validationFormError++;
-		setEventMessages($langs->trans("InvalidSyncLookback"), array(), 'errors');
-	}
 	if ($syncfromdate === '') {
 		$validationFormError++;
 		setEventMessages($langs->trans("InvalidSyncFromDate"), array(), 'errors');
@@ -729,7 +724,6 @@ if ($action == 'sync' && $provider) {
 	if ($validationFormError == 0) {
 		$confirmurl = $_SERVER["PHP_SELF"] . '?';
 		$confirmurl .= 'maxflows='.$maxflows;
-		$confirmurl .= '&sync_lookback='.$syncLookback;
 		$confirmurl .= '&syncfromdate='.urlencode($syncfromdate);
 		$confirmurl .= '&token='.newToken();
 
@@ -781,29 +775,21 @@ if ($provider) {
 
 	print '<div class="syncParametersSection">'."\n";
 
-	print '<hr class="clearboth">'."\n";
+	//print '<hr class="clearboth">'."\n";
 
 	print '<div class="div-table-responsive">'; // You can use div-table-responsive-no-min if you don't need reserved height for your table
 	print '<table>'."\n";
 
 	if ($last_sync > 0) {
+		// Applay a lookback if configured
+		if (getDolGlobalInt('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS')) {
+			$last_sync -= (getDolGlobalInt('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS') * 3600);
+		}
 		print '<tr>';
 		print '<td class="syncFormLabel">'.$langs->trans("StartSynchronizationFrom").'</td>';
 		print '<td>';
 		print $form->selectDate($last_sync, 'last_sync_datetime', 1, 1, 1, '', 1, 0, 0, '', '', '', '', 1, '', $langs->trans('From'), 'tzuserrel');
 
-		print '</td>';
-		print '</tr>';
-	}
-
-	if ($last_sync > 0) {
-		print '<tr>';
-		print '<td class="syncFormLabel">'.$langs->trans("syncLookbackForm").'</td>';
-		print '<td>';
-		print '<input type="number" id="sync_lookback" name="sync_lookback" class="maxwidthdate  flat" min="0" step="1" value="'.(GETPOSTINT('sync_lookback') ? GETPOSTINT('sync_lookback') : getDolGlobalInt('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS')).'" required> ';
-		if ($conf->browser->layout != 'phone') {
-			print '<span class="opacitymedium ">'.$langs->trans("syncLookbackFormHelp").'</span>';
-		}
 		print '</td>';
 		print '</tr>';
 	}
@@ -837,14 +823,13 @@ if ($provider) {
 	print "document.getElementById('runSyncBtn').addEventListener('click', function(e){"."\n";
 	print "  e.preventDefault();"."\n";
 	print "  var maxFlows = document.getElementById('maxflows') ? encodeURIComponent(document.getElementById('maxflows').value) : '0';"."\n";
-	print "  var syncLookback = document.getElementById('sync_lookback') ? encodeURIComponent(document.getElementById('sync_lookback').value) : '0';"."\n";
 	print "  var token = encodeURIComponent('".newToken()."');"."\n";
 	print "  var lastSyncDatetimehour = document.getElementById('last_sync_datetimehour') ? encodeURIComponent(document.getElementById('last_sync_datetimehour').value) : '0';"."\n";
 	print "  var lastSyncDatetimemin = document.getElementById('last_sync_datetimemin') ? encodeURIComponent(document.getElementById('last_sync_datetimemin').value) : '0';"."\n";
 	print "  var lastSyncDatetimemonth = document.getElementById('last_sync_datetimemonth') ? encodeURIComponent(document.getElementById('last_sync_datetimemonth').value) : '0';"."\n";
 	print "  var lastSyncDatetimeday = document.getElementById('last_sync_datetimeday') ? encodeURIComponent(document.getElementById('last_sync_datetimeday').value) : '0';"."\n";
 	print "  var lastSyncDatetimeyear = document.getElementById('last_sync_datetimeyear') ? encodeURIComponent(document.getElementById('last_sync_datetimeyear').value) : '0';"."\n";
-	print "  window.location.href = '".$_SERVER["PHP_SELF"]."?action=sync&maxflows=' + maxFlows + '&sync_lookback=' + syncLookback + '&last_sync_datetimehour=' + lastSyncDatetimehour + '&last_sync_datetimemin=' + lastSyncDatetimemin + '&last_sync_datetimemonth=' + lastSyncDatetimemonth + '&last_sync_datetimeday=' + lastSyncDatetimeday + '&last_sync_datetimeyear=' + lastSyncDatetimeyear + '&token=' + token;"."\n";
+	print "  window.location.href = '".$_SERVER["PHP_SELF"]."?action=sync&maxflows=' + maxFlows + '&last_sync_datetimehour=' + lastSyncDatetimehour + '&last_sync_datetimemin=' + lastSyncDatetimemin + '&last_sync_datetimemonth=' + lastSyncDatetimemonth + '&last_sync_datetimeday=' + lastSyncDatetimeday + '&last_sync_datetimeyear=' + lastSyncDatetimeyear + '&token=' + token;"."\n";
 	print "});"."\n";
 	print '</script>'."\n";
 
