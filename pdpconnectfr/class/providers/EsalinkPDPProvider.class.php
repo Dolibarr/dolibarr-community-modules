@@ -415,11 +415,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
      * Synchronize flows with EsaLink.
      * @param   int   $syncFromDate     Timestamp from which to start synchronization. If 0, begins from epoch (1970-01-01).
      * @param   int   $limit            Maximum number of flows to synchronize. 0 means no limit.
-     * @param   int   $syncLookback     Lookback time in hours to adjust the last sync date.
      *
      * @return 	bool|array{res:int, messages:array<string>} 	True on success, false on failure along with messages.
      */
-    public function syncFlows($syncFromDate = 0, $limit = 0, $syncLookback = 0)
+    public function syncFlows($syncFromDate = 0, $limit = 0)
     {
         global $db, $user;
 
@@ -437,7 +436,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
         // Calculate dateafter
         if ($syncFromDate > 0) {
-            $dateafter = $syncFromDate - ($syncLookback * 3600);
+            $dateafter = $syncFromDate;
         } else {
             $dateafter = dol_mktime(0, 0, 0, 1, 1, 1970, 'gmt');
         }
