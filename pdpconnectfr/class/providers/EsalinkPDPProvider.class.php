@@ -206,6 +206,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
         if ($response['status_code'] == 200 || $response['status_code'] == 202) {
             // Update einvoice status
+            // TODO: We can make another call to get Acknowledgement info and update status but the validation of the document can take time au niveau du PDP, so we set status to "Sent" and we wait for next syncronisation May be make a call next refresh of the page can be an idea
             $object->array_options['options_pdpconnectfr_einvoice_status'] = 2;
             $object->insertExtraFields();
             $flowId = $response['response']['flowId'];
@@ -696,6 +697,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                 }
                 $document->fk_element_id = $factureObj->id;
                 // TODO: 2. save received converted document as attachment to customer invoice
+                // TODO : 3. update E-invoice status based on ack_status
                 break;
 
             // SupplierInvoice
@@ -819,6 +821,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
                     // Update linked customer invoice status based on CDAR information
                     $factureObj->array_options['options_pdpconnectfr_einvoice_status'] = $refDoc['ProcessConditionCode'];
+                    if (!$refDoc['ProcessConditionCode'] && $document->ack_status == 'Error') {
+                        $factureObj->array_options['options_pdpconnectfr_einvoice_status'] = 3; // Error
+                        $factureObj->array_options['pdpconnectfr_einvoice_info'] = $document->ack_info;
+                    }
                     $resUpdateStatus = $factureObj->insertExtraFields();
                     if ($resUpdateStatus < 0) {
                         return array(
@@ -895,6 +901,48 @@ class EsalinkPDPProvider extends AbstractPDPProvider
             // Supplier Invoice LC (life cycle)
             case "SupplierInvoiceLC":
                 $document->document_type = 'INVOICE';
+                break;
+            case "":
+                // Probably it's a return of processing of an invoice we sent, we can use trackingid to link with the client invoice and save flowData['acknowledgement']['status'] into einvoice status it's not a life cycle message but an ack of processing
+
+                require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
+
+                $document->fk_element_type = Facture::class;
+                $factureObj = new Facture($this->db);
+
+                $res = $factureObj->fetch(0, $document->tracking_idref);
+                if ($res < 0) {
+                    return array(
+                        'res' => '0',
+                        'message' => "Failed to fetch customer invoice for flowId: " . $flowId .
+                                    " tracking ID: " . $flowData['trackingId']
+                    );
+                }
+                $document->fk_element_id = $factureObj->id;
+                if ($document->ack_status == 'Error') {
+                    $factureObj->array_options['options_pdpconnectfr_einvoice_status'] = 3; // Error
+                    $factureObj->array_options['pdpconnectfr_einvoice_info'] = $document->ack_info;
+                    $resUpdateStatus = $factureObj->insertExtraFields();
+                    if ($resUpdateStatus < 0) {
+                        return array(
+                            'res' => '-1',
+                            'message' => "Failed to update customer E-invoice status for flowId: " . $flowId
+                        );
+                    }
+
+                    // Log an event in the invoice timeline
+                    $statusLabel = $document->ack_status;
+                    $reasonDetail = $document->ack_info ? " - {$document->ack_info}" : '';
+
+
+                    $eventLabel = "PDPCONNECTFR - Status: {$statusLabel}";
+                    $eventMessage = "PDPCONNECTFR - Status: {$statusLabel}{$reasonDetail}";
+
+                    $resLogEvent = $this->addEvent('STATUS', $eventLabel, $eventMessage, $factureObj);
+                    if ($resLogEvent < 0) {
+                        dol_syslog(__METHOD__ . " Failed to log event for flowId: {$flowId}", LOG_WARNING);
+                    }
+                }
                 break;
         }
 
