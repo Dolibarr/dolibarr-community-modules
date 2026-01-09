@@ -33,21 +33,24 @@ function validateMyCompanyConfiguration()
 
     $baseErrors = [];
 
-    if (empty($mysoc->tva_intra)) {
-        $baseErrors[] = $langs->trans("FxCheckErrorVATnumber");
+    if (empty($mysoc->idprof1)) {
+        $baseErrors[] = $langs->trans("FxCheckErrorIDPROF1");
     }
-    if (empty($mysoc->address)) {
-        $baseErrors[] = $langs->trans("FxCheckErrorAddress");
-    }
-    if (empty($mysoc->zip)) {
-        $baseErrors[] = $langs->trans("FxCheckErrorZIP");
-    }
-    if (empty($mysoc->town)) {
-        $baseErrors[] = $langs->trans("FxCheckErrorTown");
-    }
-    if (empty($mysoc->country_code)) {
-        $baseErrors[] = $langs->trans("FxCheckErrorCountry");
-    }
+    // if (empty($mysoc->tva_intra)) {
+    //     $baseErrors[] = $langs->trans("FxCheckErrorVATnumber");
+    // }
+    // if (empty($mysoc->address)) {
+    //     $baseErrors[] = $langs->trans("FxCheckErrorAddress");
+    // }
+    // if (empty($mysoc->zip)) {
+    //     $baseErrors[] = $langs->trans("FxCheckErrorZIP");
+    // }
+    // if (empty($mysoc->town)) {
+    //     $baseErrors[] = $langs->trans("FxCheckErrorTown");
+    // }
+    // if (empty($mysoc->country_code)) {
+    //     $baseErrors[] = $langs->trans("FxCheckErrorCountry");
+    // }
 
     if (!empty($baseErrors)) {
         return ['res' => -1, 'message' => implode('<br>', $baseErrors)];
@@ -71,30 +74,30 @@ function validatethirdpartyConfiguration($thirdparty)
     if (empty($thirdparty->name)) {
         $baseErrors[] = $langs->trans("FxCheckErrorCustomerName");
     }
-    if ($mysoc->country_code != 'FR' && empty($thirdparty->idprof1)) {
-        $baseErrors[] = $langs->trans("FxCheckErrorCustomerIDPROF1");
-    }
-    if (empty($thirdparty->idprof2)) {
-        $baseErrors[] = $langs->trans("FxCheckErrorCustomerIDPROF2");
-    }
-    if (empty($thirdparty->address)) {
-        $baseErrors[] = $langs->trans("FxCheckErrorCustomerAddress");
-    }
-    if (empty($thirdparty->zip)) {
-        $baseErrors[] = $langs->trans("FxCheckErrorCustomerZIP");
-    }
-    if (empty($thirdparty->town)) {
-        $baseErrors[] = $langs->trans("FxCheckErrorCustomerTown");
-    }
-    if (empty($thirdparty->country_code)) {
-        $baseErrors[] = $langs->trans("FxCheckErrorCustomerCountry");
-    }
-    if (empty($thirdparty->tva_intra)) {
-        //$baseErrors[] = $langs->trans("FxCheckErrorCustomerVAT");
-    }
-    if (empty($thirdparty->email)) {
-        $baseErrors[] = $langs->trans("FxCheckErrorCustomerEmail");
-    }
+    // if (empty($thirdparty->idprof1)) {
+    //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerIDPROF1");
+    // }
+    // if (empty($thirdparty->idprof2)) {
+    //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerIDPROF2");
+    // }
+    // if (empty($thirdparty->address)) {
+    //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerAddress");
+    // }
+    // if (empty($thirdparty->zip)) {
+    //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerZIP");
+    // }
+    // if (empty($thirdparty->town)) {
+    //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerTown");
+    // }
+    // if (empty($thirdparty->country_code)) {
+    //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerCountry");
+    // }
+    // if (empty($thirdparty->tva_intra)) {
+    //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerVAT");
+    // }
+    // if (empty($thirdparty->email)) {
+    //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerEmail");
+    // }
 
     if (!empty($baseErrors)) {
         return ['res' => -1, 'message' => implode('<br>', $baseErrors)];
