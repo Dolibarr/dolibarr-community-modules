@@ -650,6 +650,10 @@ $newcardbutton = '';
 //$newcardbutton .= dolGetButtonTitleSeparator();
 //$newcardbutton .= dolGetButtonTitle($langs->trans('New'), '', 'fa fa-plus-circle', dol_buildpath('/pdpconnectfr/document_card.php', 1).'?action=create&backtopage='.urlencode($_SERVER['PHP_SELF']), '', $permissiontoadd);
 
+if ($provider) {
+	$title = $langs->trans("EInvoiceSynchronizationHelp", $provider->providerName);
+}
+
 print_barre_liste($title, $page, $_SERVER["PHP_SELF"], $param, $sortfield, $sortorder, $massactionbutton, $num, $nbtotalofrecords, $object->picto, 0, $newcardbutton, '', $limit, 0, 0, 1);
 
 
@@ -777,9 +781,9 @@ if ($provider) {
 
 	print '<div class="syncParametersSection">'."\n";
 
-	print '<span class="opacitymedium">'.$langs->trans("EInvoiceSynchronizationHelp", $provider->providerName).'</span>'."\n";
-	//print '<br ><br>'."\n";
 	print '<hr class="clearboth">'."\n";
+
+	print '<div class="div-table-responsive">'; // You can use div-table-responsive-no-min if you don't need reserved height for your table
 	print '<table>'."\n";
 
 	if ($last_sync > 0) {
@@ -817,6 +821,7 @@ if ($provider) {
 	}
 
 	print '</table>'."\n";
+	print '</div>';
 	print '<br>';
 
 
