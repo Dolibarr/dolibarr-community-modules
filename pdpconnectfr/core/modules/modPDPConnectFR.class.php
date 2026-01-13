@@ -643,6 +643,7 @@ class modPDPConnectFR extends DolibarrModules
 					'0'   => $langs->trans('EInvStatusNotGenerated'),
 					'1'   => $langs->trans('EInvStatusGenerated'),
 					'2'   => $langs->trans('EInvStatusSent'),
+					'3'   => $langs->trans('EInvStatusError'),
 					// Status norm PDP/PA
 					// PDP / PA normalized statuses
 					'200' => $langs->trans('EInvStatus200Deposited'),
@@ -665,6 +666,30 @@ class modPDPConnectFR extends DolibarrModules
 			'',
 			1,
 			$langs->trans('einvoiceStatusFieldHelp'),
+			'',
+			'',
+			'pdpconnectfr@pdpconnectfr',
+			'isModEnabled("pdpconnectfr")',
+			0,
+			1,
+			array('csslist' => 'tdoverflowmax100')
+		);
+
+		$result = $extrafields->addExtraField(
+			'pdpconnectfr_einvoice_info',
+			$langs->trans('pdpconnectfrInvoiceInfo'),
+			'text',
+			112008,
+			1008,
+			'facture',
+			0,
+			0,
+			'',
+			'',
+			1,
+			'',
+			1,
+			'',
 			'',
 			'',
 			'pdpconnectfr@pdpconnectfr',

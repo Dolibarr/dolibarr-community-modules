@@ -180,6 +180,7 @@ class FacturXProtocol extends AbstractProtocol
 
 
         // Base Data Validation (FacturX mandatory fields) ---
+        // TODO : use validateMyCompanyConfiguration() and validatethirdpartyConfiguration()
         $baseErrors = [];
 
         // Seller (mysoc) checks
@@ -203,12 +204,12 @@ class FacturXProtocol extends AbstractProtocol
         if (empty($object->thirdparty->name)) {
             $baseErrors[] = $langs->trans("FxCheckErrorCustomerName");
         }
-        if ($mysoc->country_code != 'FR' && empty($object->thirdparty->idprof1)) {
+        if (empty($object->thirdparty->idprof1)) {
             $baseErrors[] = $langs->trans("FxCheckErrorCustomerIDPROF1");
         }
-        if (empty($object->thirdparty->idprof2)) {
-            $baseErrors[] = $langs->trans("FxCheckErrorCustomerIDPROF2");
-        }
+        // if (empty($object->thirdparty->idprof2)) {
+        //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerIDPROF2");
+        // }
         if (empty($object->thirdparty->address)) {
             $baseErrors[] = $langs->trans("FxCheckErrorCustomerAddress");
         }

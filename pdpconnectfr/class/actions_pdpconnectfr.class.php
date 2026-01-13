@@ -121,7 +121,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 
                 // if E-invoice is generated but not sent, show button to regenerate e-invoice
                 // if E-invoice is generated but not sent, show button to send e-invoice
-                if ($object->array_options['options_pdpconnectfr_einvoice_status'] == 1) {
+                if ($object->array_options['options_pdpconnectfr_einvoice_status'] == 1 || $object->array_options['options_pdpconnectfr_einvoice_status'] == 3) {
                     $url_button[] = array(
                         'lang' => 'pdpconnectfr',
                         'enabled' => 1,
