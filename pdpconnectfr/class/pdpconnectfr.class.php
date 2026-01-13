@@ -233,8 +233,8 @@ class PdpConnectFr
         $resprints = '';
 
         $currentStatusInfo = $this->fetchLastknownInvoiceStatus($object->ref);
-		// For test
-		$currentStatusInfo['code'] = 2;
+		// Force value for test
+		//$currentStatusInfo['code'] = 2;
 
         // Title
         $resprints .= '<tr class="liste_titre">';
@@ -263,10 +263,7 @@ class PdpConnectFr
         // JavaScript for AJAX call to update status if current status is pending
         if ((int) $currentStatusInfo['code'] === self::STATUS_AWAITING_VALIDATION) {
 
-            $urlajax = dol_buildpath(
-                'custom/pdpconnectfr/ajax/checkinvoicestatus.php',
-                1
-            );
+            $urlajax = dol_buildpath('pdpconnectfr/ajax/checkinvoicestatus.php', 1);
 
             $resprints .= '
             <script type="text/javascript">

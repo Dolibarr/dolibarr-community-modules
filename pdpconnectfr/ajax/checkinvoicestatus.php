@@ -72,12 +72,6 @@ if (!$res && file_exists("../../main.inc.php")) {
 if (!$res && file_exists("../../../main.inc.php")) {
 	$res = @include "../../../main.inc.php";
 }
-if (!$res && file_exists("../../../../main.inc.php")) {
-	$res = @include "../../../../main.inc.php";
-}
-if (!$res && file_exists("../../../../../main.inc.php")) {
-	$res = @include "../../../../../main.inc.php";
-}
 if (!$res) {
 	http_response_code(500);
 	die("Include of main fails");
@@ -160,7 +154,8 @@ if ($objectRef) {
 	);
 
 	if ($response['status_code'] == 200 || $response['status_code'] == 202) {
-		dol_include_once('custom/pdpconnectfr/class/document.class.php');
+		dol_include_once('pdpconnectfr/class/document.class.php');
+
 		$flowData = json_decode($response['response'], true);
 
 		// Create a document log entry for this flow retrieval

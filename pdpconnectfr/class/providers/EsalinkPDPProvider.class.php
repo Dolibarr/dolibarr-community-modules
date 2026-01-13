@@ -26,9 +26,9 @@
 
 use Luracast\Restler\Data\Arr;
 
-dol_include_once('custom/pdpconnectfr/class/providers/AbstractPDPProvider.class.php');
-dol_include_once('custom/pdpconnectfr/class/protocols/ProtocolManager.class.php');
-dol_include_once('custom/pdpconnectfr/class/call.class.php');
+dol_include_once('pdpconnectfr/class/providers/AbstractPDPProvider.class.php');
+dol_include_once('pdpconnectfr/class/protocols/ProtocolManager.class.php');
+dol_include_once('pdpconnectfr/class/call.class.php');
 require_once DOL_DOCUMENT_ROOT . '/core/lib/admin.lib.php';
 
 
@@ -240,7 +240,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
             );
 
             if ($response['status_code'] == 200 || $response['status_code'] == 202) {
-                dol_include_once('custom/pdpconnectfr/class/document.class.php');
+                dol_include_once('pdpconnectfr/class/document.class.php');
+
                 $flowData = json_decode($response['response'], true);
 
                 // Create a document log entry for this flow retrieval
@@ -786,7 +787,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
     public function syncFlow($flowId, $call_id = null)
     {
         global $db, $conf, $user;
-        dol_include_once('custom/pdpconnectfr/class/document.class.php');
+
+        dol_include_once('pdpconnectfr/class/document.class.php');
 
         // call API to get flow details
         $flowResource = 'flows/' . $flowId;
@@ -937,7 +939,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                 }
                 $cdarXml = $flowResponse['response'];
 
-                dol_include_once('custom/pdpconnectfr/class/utils/CdarHandler.class.php');
+                dol_include_once('pdpconnectfr/class/utils/CdarHandler.class.php');
 
                 $cdarHandler = new CdarHandler();
 
