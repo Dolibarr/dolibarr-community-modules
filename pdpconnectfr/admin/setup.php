@@ -429,7 +429,8 @@ print '<br>';
 //print '<span class="opacitymedium">'.$langs->trans("PDPConnectFRSetupPage").'</span><br><br>';
 
 // Alert mysoc configuration is not complete
-$mysocCheck = validateMyCompanyConfiguration();
+$pdpconnectfr = new PdpConnectFr($db);
+$mysocCheck = $pdpconnectfr->validateMyCompanyConfiguration();
 if ($mysocCheck['res'] < 0) {
 	print '<div class="error">';
 	print '<strong>' . $langs->trans("MyCompanyConfigurationError") . ':</strong><br><br>';
