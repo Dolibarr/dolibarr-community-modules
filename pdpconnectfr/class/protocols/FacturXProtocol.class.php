@@ -68,6 +68,14 @@ dol_include_once('/pdpconnectfr/class/protocols/AbstractProtocol.class.php');
  */
 class FacturXProtocol extends AbstractProtocol
 {
+    /**
+     * Initialize available protocols.
+     */
+    public function __construct($db)
+    {
+    	$this->db = $db;
+    }
+
 
     /**
      * Generate the XML content for a given invoice according to the Factur-X standard.
@@ -424,11 +432,15 @@ class FacturXProtocol extends AbstractProtocol
                 $origFactDate = new DateTime();
                 $discount = new DiscountAbsolute($this->db);
                 $resdiscount = $discount->fetch($line->fk_remise_except);
-                print "<p>Fetch discount " . $line->fk_remise_except . ", res={$resdiscount}</p>";
+
+                dol_syslog("Fetch discount " . $line->fk_remise_except . ", res=".$resdiscount, LOG_DEBUG);
+
                 if ($resdiscount > 0) {
                     $origFact = new Facture($this->db);
                     $resOrigFact = $origFact->fetch($discount->fk_facture_source);
-                    print "<p>Fetch origFact " . $discount->fk_facture_source . ", res={$resOrigFact}</p>";
+
+                    dol_syslog("Fetch origFact " . $discount->fk_facture_source . ", res=".$resOrigFact, LOG_DEBUG);
+
                     if ($resOrigFact > 0) {
                         $origFactRef = $origFact->ref;
                         $origFactDate = new DateTime(dol_print_date($origFact->date, 'dayrfc'));
@@ -436,7 +448,9 @@ class FacturXProtocol extends AbstractProtocol
                 }
                 $prepaidAmount += abs($line->total_ttc);
                 $facturxpdf->addDocumentAllowanceCharge(\abs($line->total_ttc), false, "S", "VAT", $line->tva_tx, null, null, null, null, null, "Prepayment invoice (386)", $origFactRef);
-                print "<p>Set setDocumentBuyerOrderReferencedDocument : " . json_encode($origFactRef) . " :: " . json_encode($origFactDate) . "</p>";
+
+                dol_syslog("Set setDocumentBuyerOrderReferencedDocument : " . json_encode($origFactRef) . " :: " . json_encode($origFactDate), LOG_DEBUG);
+
                 $facturxpdf->setDocumentInvoiceReferencedDocument($origFactRef, $origFactDate->format('Y-m-d'));
                 continue;
             }
@@ -605,13 +619,15 @@ class FacturXProtocol extends AbstractProtocol
             dol_syslog(get_class($this) . '::executeHooks XML validation ok');
         }
 
-        // Générer le fichier XML Factur-X
+        // Generate file XML Factur-X
         $filename = dol_sanitizeFileName($invoice->ref);
-		$filedir = $conf->invoice->multidir_output[$invoice->entity ?? $conf->entity].'/'.dol_sanitizeFileName($invoice->ref);
-        $orig_pdf = $filedir.'/'.$filename.'.pdf';
-        $xmlfile = dirname($orig_pdf) . '/factur-x.xml';
-        $facturxpdf->writeFile($xmlfile);
+		$filedir = getMultidirOutput($invoice, '', 1);
+        $xmlfile = getMultidirOutput($invoice, '', 1, 'temp').'/'.$filename.'/factur-x.xml';	// Nameof file should be factur-x.xml so it will also have this nameonce added into PDF
 
+        dol_mkdir(dirname($xmlfile));
+		dol_delete_file($xmlfile);
+
+        $facturxpdf->writeFile($xmlfile);
 
         return $xmlfile;
     }
@@ -651,13 +667,13 @@ class FacturXProtocol extends AbstractProtocol
         // Load PDPConnectFR specific translations
         $langs->loadLangs(array("admin", "pdpconnectfr@pdpconnectfr"));
 
-
         $filename = dol_sanitizeFileName($invoice->ref);
-		$filedir = $conf->invoice->multidir_output[$invoice->entity ?? $conf->entity].'/'.dol_sanitizeFileName($invoice->ref);
+		$filedir = getMultidirOutput($invoice, '', 1);
         $orig_pdf = $filedir.'/'.$filename.'.pdf';
+
         // Make a copy of the original PDF file
-        $pathfacturxpdf = $filedir.'/'.$filename.'_facturx.pdf';
-        if (copy($orig_pdf, $pathfacturxpdf)) {
+        $pathfacturxpdf = $filedir.'/'.$filename.'_facturx.pdf';	// The new name of the PDF including xml
+        if (dol_copy($orig_pdf, $pathfacturxpdf)) {
             dol_syslog(get_class($this) . "::executeHooks copied original PDF to " . $pathfacturxpdf);
             $orig_pdf = $pathfacturxpdf;
         } else {
@@ -713,8 +729,8 @@ class FacturXProtocol extends AbstractProtocol
         $pdf->Output($orig_pdf, 'F');
 
         // Clean up the temporary XML file
-        if (file_exists($xmlfile)) {
-            unlink($xmlfile);
+        if (file_exists($xmlfile) && !getDolGlobalString('PDPCONNECTFR_DEBUG_MODE')) {
+            dol_delete_file($xmlfile);
             dol_syslog(get_class($this) . '::generateInvoice cleaned up temporary XML file: ' . $xmlfile);
         }
 
@@ -1981,7 +1997,7 @@ class FacturXProtocol extends AbstractProtocol
      * Find or create a Dolibarr product based on Factur-X invoice line data
      * @param array $lineData Array containing invoice line data extracted from Factur-X
      *
-     * @return array{res:int, message:string}   Returns array with 'res' (ID of the found or created product, -1 on error) and info 'message' 
+     * @return array{res:int, message:string}   Returns array with 'res' (ID of the found or created product, -1 on error) and info 'message'
      */
     private function _findOrCreateProductFromFacturXLine($lineData)
     {

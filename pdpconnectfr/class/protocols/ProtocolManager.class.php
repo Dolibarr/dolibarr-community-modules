@@ -21,19 +21,20 @@
  * \ingroup pdpconnectfr
  * \brief   Manage multiple protocols for PPD exchange (Factur-X, CII, UBL ...)
  */
-
-
 class ProtocolManager
 {
     public $db;
 
     private $protocolsList;
 
+
     /**
      * Initialize available protocols.
      */
     public function __construct($db)
     {
+    	$this->db = $db;
+
 		$facturexIsOk = 1;	// TODO Check version of PHP To allow or not
 		$ciiIsOk = 0;
 		$ublIsOk = 0;
@@ -86,13 +87,13 @@ class ProtocolManager
             case 'FACTURX':
 				dol_include_once('/pdpconnectfr/class/protocols/FacturXProtocol.class.php');
 
-                $protocol = new FacturXProtocol();
+                $protocol = new FacturXProtocol($this->db);
                 break;
             case 'CII':
-                //$protocol = new CIIProtocol();
+                //$protocol = new CIIProtocol($this->db);
                 break;
             case 'UBL':
-                //$protocol = new UBLProtocol();
+                //$protocol = new UBLProtocol($this->db);
                 break;
             default:
                 return null;

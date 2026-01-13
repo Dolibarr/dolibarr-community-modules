@@ -361,7 +361,25 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         $outputLog = array(); // Feedback to display
 
         // Generate sample invoice
+
+        // TODO
+        /* The template invoice must be generated using the initAsSpecimen() and then
+            // Call function to create Factur-X document
+            require_once __DIR__ . "/protocols/ProtocolManager.class.php";
+            require_once __DIR__ . "/pdpconnectfr.class.php";
+
+            $usedProtocols = getDolGlobalString('PDPCONNECTFR_PROTOCOL');
+            $ProtocolManager = new ProtocolManager($db);
+            $protocol = $ProtocolManager->getprotocol($usedProtocols);
+
+            // Generate E-invoice by calling the method of the Protocol
+            // Example by calling FactureXProcol->generateInvoice()
+            $result = $protocol->generateInvoice($invoiceObject->id);
+        */
+
         $invoice_path = $this->exchangeProtocol->generateSampleInvoice();
+        // invoice_path is something like "/.../documents/pdpconnectfr/temp/02_ZugferdDocumentPdfBuilder_PrintLayout_Merged.pdf"
+
         if ($invoice_path) {
             $outputLog[] = "Sample invoice generated successfully.";
         }

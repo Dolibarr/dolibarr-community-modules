@@ -72,7 +72,7 @@ require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
 require_once '../lib/pdpconnectfr.lib.php';
 require_once "../class/providers/PDPProviderManager.class.php";
 require_once "../class/protocols/ProtocolManager.class.php";
-require_once "../class/pdpconnectfr.php";
+require_once "../class/pdpconnectfr.class.php";
 
 
 // Translations

@@ -17,7 +17,7 @@
  */
 
 /**
- * \file    pdpconnectfr/class/pdpconnectfr.php
+ * \file    pdpconnectfr/class/pdpconnectfr.class.php
  * \ingroup pdpconnectfr
  * \brief   Base class for all functions to manage PDPCONNECTFR Module.
  */
@@ -30,7 +30,6 @@
 
 class PdpConnectFr
 {
-
     /**
 	 * @var DoliDB Database handler.
 	 */
@@ -220,6 +219,12 @@ class PdpConnectFr
         return ['res' => 1, 'message' => ''];
     }
 
+    /**
+     * EInvoiceCardBlock
+     *
+     * @param 	Facture $object		Facture
+     * @return 	string				HTML content to add
+     */
     public function EInvoiceCardBlock($object) {
         global $langs;
 
@@ -228,6 +233,8 @@ class PdpConnectFr
         $resprints = '';
 
         $currentStatusInfo = $this->fetchLastknownInvoiceStatus($object->ref);
+		// For test
+		$currentStatusInfo['code'] = 2;
 
         // Title
         $resprints .= '<tr class="liste_titre">';
@@ -265,17 +272,22 @@ class PdpConnectFr
             <script type="text/javascript">
             (function() {
                 function checkInvoiceStatus() {
+					console.log("checkInvoiceStatus Checking invoice status...");
                     // alert("Checking invoice status...");
                     $.get("' . $urlajax . '", {
                         token: "' . currentToken() . '",
                         ref: "' . dol_escape_js($object->ref) . '"
                     }, function (data) {
                         if (!data || typeof data.code === "undefined") {
+							console.log("checkInvoiceStatus no data returned");
                             return;
                         }
+						console.log(data);
+
                         // Update UI
                         $("#einvoice-status").html(data.status || "");
                         $("#einvoice-info").html(data.info || "");
+
                         // Retry only if still awaiting validation
                         if (parseInt(data.code, 10) === ' . self::STATUS_AWAITING_VALIDATION . ') {
                             setTimeout(checkInvoiceStatus, 5000);
@@ -284,7 +296,8 @@ class PdpConnectFr
                 }
 
                 // First call
-                setTimeout(checkInvoiceStatus, 5000);
+				console.log("checkInvoiceStatus Invoice has status pending, so we add a timer to run checkInvoiceStatus in few seconds...");
+                setTimeout(checkInvoiceStatus, 2500);
 
             })();
             </script>';
@@ -300,7 +313,7 @@ class PdpConnectFr
 
         $sql = "SELECT ack_status, ack_info, cdar_lifecycle_code, cdar_lifecycle_label, cdar_reason_code, cdar_reason_desc, cdar_reason_detail";
         $sql .= " FROM ".MAIN_DB_PREFIX."pdpconnectfr_document";
-        $sql .= " WHERE tracking_idref = '".$invoiceRef."'";
+        $sql .= " WHERE tracking_idref = '".$db->escape($invoiceRef)."'";
         $sql .= " ORDER BY rowid DESC LIMIT 1";
 
         $resql = $db->query($sql);

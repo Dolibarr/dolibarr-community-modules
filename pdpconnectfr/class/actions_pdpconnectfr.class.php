@@ -23,7 +23,7 @@
  */
 
 require_once DOL_DOCUMENT_ROOT.'/core/class/commonhookactions.class.php';
-require __DIR__ . "/pdpconnectfr.php";
+require_once __DIR__ . "/pdpconnectfr.class.php";
 
 
 class ActionsPdpconnectfr extends CommonHookActions
@@ -187,9 +187,10 @@ class ActionsPdpconnectfr extends CommonHookActions
         // Action to generate the E-invoice
         if ($action == 'generate_einvoice') {
             $invoiceObject = $object;
+
             // Call function to create Factur-X document
-            require __DIR__ . "/protocols/ProtocolManager.class.php";
-            require __DIR__ . "/pdpconnectfr.php";
+            require_once __DIR__ . "/protocols/ProtocolManager.class.php";
+            require_once __DIR__ . "/pdpconnectfr.class.php";
 
             $usedProtocols = getDolGlobalString('PDPCONNECTFR_PROTOCOL');
             $ProtocolManager = new ProtocolManager($db);
@@ -209,6 +210,7 @@ class ActionsPdpconnectfr extends CommonHookActions
             if ($result) {
                 // No error;
                 $object->array_options['options_pdpconnectfr_einvoice_status'] = 1;
+
                 return 0;
             } else {
                 $this->errors[] = $protocol->errors;
@@ -221,7 +223,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 
     /**
      * Hook called when displaying object card
-     * 
+     *
      * @param mixed $parameters
      * @param mixed $object
      * @param mixed $action
@@ -235,7 +237,7 @@ class ActionsPdpconnectfr extends CommonHookActions
         if (in_array($object->element, ['facture'])) {
             $langs->load("pdpconnectfr@pdpconnectfr");
             $pdpconnectfr = new PdpConnectFr($db);
-            $this->resprints .= $pdpconnectfr->EInvoiceCardBlock($object);
+            $this->resprints .= $pdpconnectfr->EInvoiceCardBlock($object);		// Output fields in card, including js for refreshing state
         }
 
         return 0;
