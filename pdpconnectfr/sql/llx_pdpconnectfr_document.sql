@@ -21,7 +21,7 @@ CREATE TABLE llx_pdpconnectfr_document(
 	tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, 
 	fk_user_creat integer NOT NULL, 
 	fk_user_modif integer, 
-	status integer NOT NULL, 
+	status integer NOT NULL DEFAULT 0, 
 	call_id varchar(50), 
 	flow_id varchar(255), 
 	tracking_idref varchar(50), 
