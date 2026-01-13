@@ -177,7 +177,7 @@ $object->fields['recap'] = array(
 	'enabled' => '1',
 	'position' => 51,
 	'checked' => 0,
-	'csslist' => 'tdoverflowmax500',
+	'csslist' => 'tdoverflowmax500 small',
 	'notsearchable' => 1
 );
 
@@ -734,17 +734,6 @@ if ($action == 'sync' && $provider) {
 }
 
 
-// sync results
-if ($action == 'confirm_sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $confirm == 'yes' && !empty($sync_result)) {
-	if (isset($provider)) {
-		$cssclass = ($sync_result['res'] > 0) ? 'info' : 'error';
-		print '<div class="wordbreak '.$cssclass.' clearboth">';
-		print '<strong><u>'.$langs->trans("SyncResults").' :</u></strong></br>';
-		print implode("<br>", $sync_result['messages']);
-		print '</div>';
-	}
-}
-
 // Last flow sync info
 $last_sync = 0;
 $last_sync_info = img_picto('', 'long-arrow-alt-right', 'class="pictofixedwidth"');
@@ -781,7 +770,7 @@ if ($provider) {
 	print '<table>'."\n";
 
 	if ($last_sync > 0) {
-		// Applay a lookback if configured
+		// Apply a lookback if configured
 		if (getDolGlobalInt('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS')) {
 			$last_sync -= (getDolGlobalInt('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS') * 3600);
 		}
@@ -815,9 +804,14 @@ if ($provider) {
 	print '<a href="#" id="runSyncBtn" class="butAction small">'.img_picto('', 'refresh', 'class="pictofixedwidth"').' '.$langs->trans("RUN_SYNC").'</a>'."\n";
 	print '</div>'."\n";
 
+	print '<br class="clearboth">';
+	print '<div class="opacitymedium floatleft margintoponly">'.$last_sync_info.'</div>'."\n";
+
 	print "</div>"."\n";
 
 	print '</div>'."\n";
+
+	print '<br class="clearboth">';
 
 	print '<script>'."\n";
 	print "document.getElementById('runSyncBtn').addEventListener('click', function(e){"."\n";
@@ -833,15 +827,23 @@ if ($provider) {
 	print "});"."\n";
 	print '</script>'."\n";
 
-
-	print '<br class="clearboth">';
-	print '<div class="opacitymedium floatleft margintoponly">'.$last_sync_info.'</div>'."\n";
 } else {
 	// Message to check module configuration
-	print info_admin($langs->transnoentities("checkPdpConnectFrModuleConfiguration"), 0, 0, '1', '', '', $picto = 'warning');
+	print info_admin($langs->transnoentities("checkPdpConnectFrModuleConfiguration"), 0, 0, '1', '', '', 'warning');
 }
 
 
+// sync results
+if ($action == 'confirm_sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $confirm == 'yes' && !empty($sync_result)) {
+	if (isset($provider)) {
+		$cssclass = ($sync_result['res'] > 0) ? 'info' : 'error';
+		print '<div class="wordbreak '.$cssclass.' clearboth">';
+		print '<strong><u>'.$langs->trans("SyncResults").' :</u></strong></br>';
+		print implode("<br>", $sync_result['messages']);
+		print '</div>';
+		print '<br>';
+	}
+}
 
 
 print '<div class="div-table-responsive">'; // You can use div-table-responsive-no-min if you don't need reserved height for your table
