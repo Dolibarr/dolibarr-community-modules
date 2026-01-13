@@ -160,7 +160,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
      */
     public function sendInvoice($object)
     {
-        global $conf;
+        global $conf, $langs, $user, $db;
 
         $outputLog = array(); // Feedback to display
 
@@ -205,11 +205,143 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         $response = $this->callApi("flows", "POSTALREADYFORMATED", $params, $extraHeaders, 'Send Invoice');
 
         if ($response['status_code'] == 200 || $response['status_code'] == 202) {
-            // Update einvoice status
-            // TODO: We can make another call to get Acknowledgement info and update status but the validation of the document can take time au niveau du PDP, so we set status to "Sent" and we wait for next syncronisation May be make a call next refresh of the page can be an idea
+            /**
+             * We make an additional call to retrieve the acknowledgment information and update the status.
+             * However, document validation on the PDP side may take some time.
+             * Therefore, we initially set the status to "Sent".
+             *
+             * We then try to fetch the PDP validation result:
+             * - If the validation is successful, we update the status to "Sent (awaiting acknowledgment)".
+             * - If the PDP validation fails, we set the status to "Error".
+             *
+             * If no response is available yet, we wait for the next synchronization.
+             **/
+
+
+            // Update einvoice status to sent awaiting validation
             $object->array_options['options_pdpconnectfr_einvoice_status'] = 2;
             $object->insertExtraFields();
             $flowId = $response['response']['flowId'];
+
+            // Call the API to retrieve flow details and check the validation status.
+            // A short delay is applied to allow the PDP time to process the document.
+            //sleep(10);
+            $resource = 'flows/' . $flowId;
+            $urlparams = array(
+                'docType' => 'Metadata',
+            );
+            $resource .= '?' . http_build_query($urlparams);
+            $response = $this->callApi(
+                $resource,
+                "GET",
+                false,
+                ['Accept' => 'application/octet-stream'],
+                'Check Invoice validation'
+            );
+
+            if ($response['status_code'] == 200 || $response['status_code'] == 202) {
+                dol_include_once('custom/pdpconnectfr/class/document.class.php');
+                $flowData = json_decode($response['response'], true);
+
+                // Create a document log entry for this flow retrieval
+                $document = new Document($db);
+                $document->date_creation        = dol_now();
+                $document->fk_user_creat        = $user->id;
+                $document->fk_call              = null;
+                $document->flow_id              = $flowId;
+                $document->tracking_idref       = $flowData['trackingId'] ?? null;
+                $document->flow_type            = "ManualValidationCheck";
+                $document->flow_direction       = $flowData['flowDirection'] ?? null;
+                $document->flow_syntax          = $flowData['flowSyntax'] ?? null;
+                $document->flow_profile         = $flowData['flowProfile'] ?? null;
+                $document->ack_status           = $flowData['acknowledgement']['status'] ?? null;
+                $ack_message = '';
+                // Change this fields to fit with the new api response ===============================================
+                $document->ack_reason_code      = $flowData['acknowledgement']['details'][0]['reasonCode'] ?? null;
+                $document->ack_info             = $flowData['acknowledgement']['details'][0]['reasonMessage'] ?? null;
+                // Change this fields to fit with the new api response ===============================================
+                $document->document_body        = null;
+                $document->fk_element_id        = $object->id;
+                $document->fk_element_type      = Facture::class;
+
+                if (!empty($flowData['submittedAt'])) {
+                    $dt = new DateTimeImmutable($flowData['submittedAt'], new DateTimeZone('UTC'));
+                    $document->submittedat = $db->idate($dt->getTimestamp());
+                } else {
+                    $document->submittedat = null;
+                }
+                if (!empty($flowData['updatedAt'])) {
+                    $dt = new DateTimeImmutable($flowData['updatedAt'], new DateTimeZone('UTC'));
+                    $document->updatedat = $db->idate($dt->getTimestamp());
+                } else {
+                    $document->updatedat = null;
+                }
+                $document->provider             = getDolGlobalString('PDPCONNECTFR_PDP') ?? null;
+                $document->entity               = $conf->entity;
+                $document->flow_uiid            = $flowData['uuid'] ?? null;
+
+                // Log an event in the invoice timeline
+                $statusLabel = $document->ack_status;
+                $reasonDetail = $document->ack_info ? " - {$document->ack_info}" : '';
+
+                $eventLabel = "PDPCONNECTFR - Status: {$statusLabel}";
+                $eventMessage = "PDPCONNECTFR - Status: {$statusLabel}{$reasonDetail}";
+
+                $resLogEvent = $this->addEvent('STATUS', $eventLabel, $eventMessage, $object);
+                if ($resLogEvent < 0) {
+                    dol_syslog(__METHOD__ . " Failed to log event for flowId: {$flowId}", LOG_WARNING);
+                }
+
+                $res = $document->create($user);
+                if ($res < 0) {
+                    //print_r($document->errors);
+                    dol_syslog(__METHOD__ . " Failed to create document log for flowId: {$flowId}", LOG_WARNING);
+                }
+
+
+            //     // Check acknowledgement status
+            // 	$ack_status = $flowData['acknowledgement']['status'] ?? null;
+
+            //     if ($ack_status) {
+            //         switch ($ack_status) {
+            //             case 'Ok':
+            //                 // Update einvoice status to sent awaiting acknowledgment
+            //                 $object->array_options['options_pdpconnectfr_einvoice_status'] = 3;
+            //                 $object->insertExtraFields();
+            //                 break;
+            //             case 'Pending':
+            //                 // Keep status as sent awaiting validation
+            //                 break;
+            //             case 'Error':
+            //                 $ack_message = '';
+            //                 foreach ($flowData['acknowledgement']['details'] as $detail) {
+            //                     $code = $detail['reasonCode'] ?? '';
+            //                     $message = $detail['reasonMessage'] ?? '';
+            //                     $ack_message .= $code . ' : ';
+            //                     $ack_message .= $message . '<br>';
+            //                 }
+
+            //                 // Update einvoice status to error and fill error message
+            //                 $object->array_options['options_pdpconnectfr_einvoice_status'] = 4;
+            //                 $object->array_options['options_pdpconnectfr_einvoice_info'] = $ack_message;
+            //                 $object->insertExtraFields();
+            //                 break;
+            //             default:
+            //                 // Unknown status, keep as sent awaiting validation and fill info
+            //                 $object->array_options['options_pdpconnectfr_einvoice_info'] = 'Unknown acknowledgement status: ' . $ack_status;
+            //                 break;
+            //         }
+
+            //     } else {
+            //         // No acknowledgement yet, keep status as "Sent awaiting validation"
+            //     }
+            // } else {
+            //     // Unable to retrieve flow details, keep status as "Sent awaiting validation"
+            //     dol_syslog(__METHOD__ . " Unable to retrieve flow details for flowId " . $flowId . ", status code: " . $response['status_code'], LOG_WARNING);
+            // }
+
+            }
+
             return $flowId;
         } else {
             $this->errors[] = "Failed to send electronic invoice.";
@@ -515,6 +647,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$flowIds = array_column($response['response']['results'], 'flowId');
 		$sql = "SELECT flow_id FROM " . MAIN_DB_PREFIX . "pdpconnectfr_document";
 		$sql .= " WHERE flow_id IN (" . implode(',', array_map('intval', $flowIds)) . ")";
+        //$sql .= " AND (flow_type IS NULL OR flow_type NOT LIKE 'manual%')";
+        $sql .= " AND flow_type NOT LIKE 'manual%'";
 		$resql = $db->query($sql);
 		if ($resql) {
 			while ($obj = $db->fetch_object($resql)) {
@@ -695,9 +829,11 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                 if ($res < 0) {
                     return array('res' => '-1', 'message' => "Failed to fetch customer invoice for flowId: " . $flowId);
                 }
-                $document->fk_element_id = $factureObj->id;
+                $document->fk_element_id = !empty($factureObj->id) ? $factureObj->id : 0;
+                $document->tracking_idref = !empty($factureObj->ref) ? $factureObj->ref : $document->tracking_idref.' (NOTFOUND)'; // Probably the customer invoice is sent from another system that use the same PDP account
+
+                // TODO: Consider creating a new customer invoice in this case?
                 // TODO: 2. save received converted document as attachment to customer invoice
-                // TODO : 3. update E-invoice status based on ack_status
                 break;
 
             // SupplierInvoice
@@ -757,7 +893,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                 if ($res < 0) {
                     return array('res' => '-1', 'message' => "Failed to fetch customer invoice for flowId: " . $flowId);
                 }
-                $document->fk_element_id = $factureObj->id;
+                //$document->fk_element_id = $factureObj->id;
 
                 // 2. Read CDAR and update status of linked customer invoice
                 $flowResource = 'flows/' . $flowId;
@@ -807,7 +943,9 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                         );
                     }
 
-                    $document->fk_element_id = $factureObj->id;
+                    $document->fk_element_id = !empty($factureObj->id) ? $factureObj->id : 0;
+                    $document->tracking_idref = !empty($factureObj->ref) ? $factureObj->ref : $issuerAssignedID.' (NOTFOUND)'; // Probably the customer invoice is sent from another system that use the same PDP account
+                    // TODO: Consider creating a new customer invoice in this case?
 
                     // Retrieve reference data
                     $refDoc = $cdarDocument['AcknowledgementDocument']['ReferenceReferencedDocument'];
@@ -903,7 +1041,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                 $document->document_type = 'INVOICE';
                 break;
             case "":
-                // Probably it's a return of processing of an invoice we sent, we can use trackingid to link with the client invoice and save flowData['acknowledgement']['status'] into einvoice status it's not a life cycle message but an ack of processing
+                // This is probably a processing response for an invoice we previously sent, and not a lifecycle message.
+                // In this case, the trackingId cannot be used because it is null.
+                // To link this response to the client invoice, we try to find the invoice using the flowId
+                // stored in the document table when the invoice was sent.
 
                 require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
 
@@ -912,13 +1053,32 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
                 $res = $factureObj->fetch(0, $document->tracking_idref);
                 if ($res < 0) {
-                    return array(
-                        'res' => '0',
-                        'message' => "Failed to fetch customer invoice for flowId: " . $flowId .
-                                    " tracking ID: " . $flowData['trackingId']
-                    );
+                    // TODO : CHECK WHY tracking_idref is not filled in PDP flow metadata?
+                    // Try to get tracking_idref from document table
+                    $sql = "SELECT d.tracking_idref";
+                    $sql .= " FROM " . MAIN_DB_PREFIX . "pdpconnectfr_document as d";
+                    $sql .= " WHERE d.flow_id = '" . $db->escape($flowId) . "'";
+                    $resql = $db->query($sql);
+                    if ($resql) {
+                        $obj = $db->fetch_object($resql);
+                        if ($obj && !empty($obj->tracking_idref)) {
+                            $res = $factureObj->fetch(0, $obj->tracking_idref);
+                            if ($res < 0) {
+                                return array('res' => '-1', 'message' => "Failed to fetch customer invoice for flowId: " . $flowId . " using tracking_idref from document table: " . $obj->tracking_idref);
+                            } elseif ($res == 0) {
+                                return array('res' => '0', 'message' => "Customer invoice with ref " . $obj->tracking_idref . " not found for flowId: " . $flowId); // Should not happen because we save flowid when sending invoice
+                            }
+                        } else {
+                            //return array('res' => '0', 'message' => "No tracking_idref found in document table for flowId: " . $flowId);
+                        }
+                    } else {
+                        return array('res' => '0', 'message' => "Failed to query document table for flowId: " . $flowId);
+                    }
                 }
+
                 $document->fk_element_id = $factureObj->id;
+                $document->tracking_idref = $factureObj->ref;
+
                 if ($document->ack_status == 'Error') {
                     $factureObj->array_options['options_pdpconnectfr_einvoice_status'] = 3; // Error
                     $factureObj->array_options['pdpconnectfr_einvoice_info'] = $document->ack_info;
@@ -933,7 +1093,6 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                     // Log an event in the invoice timeline
                     $statusLabel = $document->ack_status;
                     $reasonDetail = $document->ack_info ? " - {$document->ack_info}" : '';
-
 
                     $eventLabel = "PDPCONNECTFR - Status: {$statusLabel}";
                     $eventMessage = "PDPCONNECTFR - Status: {$statusLabel}{$reasonDetail}";

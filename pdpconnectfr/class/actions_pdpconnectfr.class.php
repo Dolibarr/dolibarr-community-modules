@@ -23,6 +23,7 @@
  */
 
 require_once DOL_DOCUMENT_ROOT.'/core/class/commonhookactions.class.php';
+require __DIR__ . "/pdpconnectfr.php";
 
 
 class ActionsPdpconnectfr extends CommonHookActions
@@ -51,14 +52,14 @@ class ActionsPdpconnectfr extends CommonHookActions
         	if (getDolGlobalString('PDPCONNECTFR_EINVOICE_IN_REAL_TIME')) { // TODO: Maybe generate only if status is validated
 	            // Call function to create Factur-X document
 	            require __DIR__ . "/protocols/ProtocolManager.class.php";
-	            require __DIR__ . "/pdpconnectfr.php";
 
 	            $usedProtocols = getDolGlobalString('PDPCONNECTFR_PROTOCOL');
 	            $ProtocolManager = new ProtocolManager($db);
 	            $protocol = $ProtocolManager->getprotocol($usedProtocols);
 
 	            // Check configuration
-	            $result = checkRequiredinformations($invoiceObject->thirdparty);
+                $pdpConnectFr = new PdpConnectFr($db);
+	            $result = $pdpConnectFr->checkRequiredinformations($invoiceObject->thirdparty);
 	            if ($result['res'] < 0) {
 	                $message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
 	                if (getDolGlobalString('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
@@ -119,9 +120,9 @@ class ActionsPdpconnectfr extends CommonHookActions
                     );
                 }
 
-                // if E-invoice is generated but not sent, show button to regenerate e-invoice
-                // if E-invoice is generated but not sent, show button to send e-invoice
-                if ($object->array_options['options_pdpconnectfr_einvoice_status'] == 1 || $object->array_options['options_pdpconnectfr_einvoice_status'] == 3) {
+                // If the e-invoice is generated but not sent, or if it was sent and a validation error was received,
+                // display the button to regenerate the e-invoice and the button to send the e-invoice.
+                if ($object->array_options['options_pdpconnectfr_einvoice_status'] == 1 || $object->array_options['options_pdpconnectfr_einvoice_status'] == 4) {
                     $url_button[] = array(
                         'lang' => 'pdpconnectfr',
                         'enabled' => 1,
@@ -195,7 +196,8 @@ class ActionsPdpconnectfr extends CommonHookActions
             $protocol = $ProtocolManager->getprotocol($usedProtocols);
 
             // Check configuration
-            $result = checkRequiredinformations($invoiceObject->thirdparty);
+            $pdpConnectFr = new PdpConnectFr($db);
+            $result = $pdpConnectFr->checkRequiredinformations($invoiceObject->thirdparty);
             if ($result['res'] < 0) {
                 $message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
                 $this->warnings[] = $message;
@@ -216,4 +218,27 @@ class ActionsPdpconnectfr extends CommonHookActions
 
         return 0;
     }
+
+    /**
+     * Hook called when displaying object card
+     * 
+     * @param mixed $parameters
+     * @param mixed $object
+     * @param mixed $action
+     * @param mixed $hookmanager
+     * @return int
+     */
+    public function formObjectOptions($parameters, &$object, &$action, $hookmanager)
+    {
+        global $db, $langs;
+
+        if (in_array($object->element, ['facture'])) {
+            $langs->load("pdpconnectfr@pdpconnectfr");
+            $pdpconnectfr = new PdpConnectFr($db);
+            $this->resprints .= $pdpconnectfr->EInvoiceCardBlock($object);
+        }
+
+        return 0;
+    }
+
 }

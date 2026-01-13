@@ -120,7 +120,7 @@ class modPDPConnectFR extends DolibarrModules
 			// Set here all hooks context managed by module. To find available hook context, make a "grep -r '>initHooks(' *" on source code. You can also set hook context to 'all'
 			/* BEGIN MODULEBUILDER HOOKSCONTEXTS */
 			'hooks' => [
-                'all'
+                'all', 'invoicecard'
             ],
 			/* END MODULEBUILDER HOOKSCONTEXTS */
 			// Set this to 1 if features of module are opened to external users
@@ -644,8 +644,9 @@ class modPDPConnectFR extends DolibarrModules
 					// Status defined by Dolibarr
 					'0'   => $langs->trans('EInvStatusNotGenerated'),
 					'1'   => $langs->trans('EInvStatusGenerated'),
-					'2'   => $langs->trans('EInvStatusSent'),
-					'3'   => $langs->trans('EInvStatusError'),
+					'2'   => $langs->trans('EInvStatusAwaitingValidation'),
+					'3'   => $langs->trans('EInvStatusAwaitingAck'),
+					'4'   => $langs->trans('EInvStatusError'),
 					// Status norm PDP/PA
 					// PDP / PA normalized statuses
 					'200' => $langs->trans('EInvStatus200Deposited'),
