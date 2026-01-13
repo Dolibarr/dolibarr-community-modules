@@ -665,7 +665,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$flowIds = array_column($response['response']['results'], 'flowId');
 		$sql = "SELECT flow_id FROM " . MAIN_DB_PREFIX . "pdpconnectfr_document";
 		$sql .= " WHERE flow_id IN (" . implode(',', array_map('intval', $flowIds)) . ")";
-        $sql .= " AND flow_type NOT LIKE 'manual%'";        // TODO Replace with $sql .= " AND (flow_type LIKE 'syncl%')";
+        $sql .= " AND (flow_type NOT LIKE 'manual%' OR flow_type IS NULL)";        // TODO Replace with $sql .= " AND (flow_type LIKE 'xxxx')";
 
 		$resql = $db->query($sql);
 		if ($resql) {

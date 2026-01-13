@@ -25,7 +25,7 @@ CREATE TABLE llx_pdpconnectfr_document(
 	call_id varchar(50), 
 	flow_id varchar(255), 
 	tracking_idref varchar(50), 
-	flow_type varchar(255) DEFAULT 'sync', 
+	flow_type varchar(64), 
 	flow_direction varchar(10), 
 	flow_syntax varchar(50), 
 	flow_profile varchar(50), 
