@@ -798,7 +798,7 @@ if ($provider) {
 		print '<tr>';
 		print '<td class="syncFormLabel">'.$langs->trans("maxNumberToProcess").'</td>';
 		print '<td>';
-		print '<input type="number" id="maxflows" name="maxflows" class="maxwidthdate  flat" min="1" step="1" value="'.(GETPOSTINT('maxflows') ? GETPOSTINT('maxflows') : getDolGlobalInt('PDPCONNECTFR_FLOWS_SYNC_CALL_SIZE', 100)).'" required> ';
+		print '<input type="number" id="maxflows" name="maxflows" class="maxwidth75 flat" min="1" step="1" value="'.(GETPOSTINT('maxflows') ? GETPOSTINT('maxflows') : getDolGlobalInt('PDPCONNECTFR_FLOWS_SYNC_CALL_SIZE', 100)).'" required> ';
 		if ($conf->browser->layout != 'phone') {
 			print '<span class="opacitymedium ">'.$langs->trans("maxNumberToProcessHelp").'</span>';
 		}

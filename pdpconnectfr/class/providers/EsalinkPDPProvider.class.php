@@ -665,13 +665,19 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$flowIds = array_column($response['response']['results'], 'flowId');
 		$sql = "SELECT flow_id FROM " . MAIN_DB_PREFIX . "pdpconnectfr_document";
 		$sql .= " WHERE flow_id IN (" . implode(',', array_map('intval', $flowIds)) . ")";
-        //$sql .= " AND (flow_type IS NULL OR flow_type NOT LIKE 'manual%')";
-        $sql .= " AND flow_type NOT LIKE 'manual%'";
+        $sql .= " AND flow_type NOT LIKE 'manual%'";        // TODO Replace with $sql .= " AND (flow_type LIKE 'syncl%')";
+
 		$resql = $db->query($sql);
 		if ($resql) {
 			while ($obj = $db->fetch_object($resql)) {
 				$alreadyProcessedFlowIds[$obj->flow_id] = $obj->flow_id;
 			}
+		} else {
+			$this->errors[] = "Failed to retrieve flows already processed among the list of flows received.";
+            $results_messages[] = "Failed to retrieve flows already processed among the list of flows received.";
+
+            dol_syslog(__METHOD__ . " Failed to retrieve flows already processed among the list of flows received.", LOG_DEBUG, 0, "_pdpconnectfr");
+			return array('res' => 0, 'messages' => $results_messages);
 		}
 
 		// Update totalFlows after filtering
