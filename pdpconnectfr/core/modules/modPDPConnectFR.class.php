@@ -171,7 +171,6 @@ class modPDPConnectFR extends DolibarrModules
 		// );
 		$this->const = array(
 			1 => array('PDPCONNECTFR_EINVOICE_IN_REAL_TIME', 'chaine', '1', 0),
-			2 => array('PDPCONNECTFR_LIVE', 'chaine', '1', 0)
 		);
 
 		// Some keys to add into the overwriting translation tables
@@ -356,7 +355,7 @@ class modPDPConnectFR extends DolibarrModules
 
 
 
-				/* BEGIN MODULEBUILDER LEFTMENU PDPEXCHANGE */
+		/* BEGIN MODULEBUILDER LEFTMENU PDPEXCHANGE */
 		$this->menu[$r++] = array(
 			'fk_menu' => 'fk_mainmenu=billing',
 			'type' => 'left',
@@ -850,6 +849,16 @@ class modPDPConnectFR extends DolibarrModules
 		// 		));
 		// 	}
 		// }
+
+		if (!getDolGlobalString('PDPCONNECTFR_PDP')) {
+			// Set the live mode to on, but only if it it the first time we enable the module
+			$sqltmp = "INSERT INTO ".MAIN_DB_PREFIX."const (name, value, visible, entity, note) VALUES";
+			$sqltmp .= " ('PDPCONNECTFR_LIVE'";
+			$sqltmp .= ", ".$this->db->encrypt('1');
+			$sqltmp .= ", 0, ".((int) $conf->entity);
+			$sqltmp .= ", '')";
+			$this->db->query($sqltmp);
+		}
 
 		return $this->_init($sql, $options);
 	}
