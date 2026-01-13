@@ -280,7 +280,7 @@ if (preg_match('/set'.$prefix.'TOKEN/i', $action, $reg)) {
 	$token = $provider->getAccessToken();
 	if ($token) {
 		setEventMessages("Token generated successfully", null, 'mesgs');
-		header("Location: ".$_SERVER["PHP_SELF"]);
+		header("Location: ".$_SERVER["PHP_SELF"].'?page_y='.GETPOSTFLOAT('page_y'));
 		exit;
 	} else {
 		setEventMessages('', $provider->errors, 'errors');
@@ -348,7 +348,7 @@ if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_P
 	$item->cssClass = 'minwidth500';
 
 	// Password
-	$item = $formSetup->newItem($prefix . 'PASSWORD')->setAsPassword();
+	$item = $formSetup->newItem($prefix . 'PASSWORD')->setAsGenericPassword();
 	$item->cssClass = 'minwidth500';
 
 	// API_KEY
@@ -356,30 +356,31 @@ if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_P
 	$item->cssClass = 'minwidth500';
 
 	// Token
-	$item = $formSetup->newItem($prefix . 'TOKEN');
-	$item->cssClass = 'maxwidth500 ';
+	if (getDolGlobalString($prefix . 'API_KEY')) {
+		$item = $formSetup->newItem($prefix . 'TOKEN');
+		$item->cssClass = 'maxwidth500 ';
+		$item->fieldOverride = "";
+		if (!empty($tokenData['token'])) {
+			$item->fieldOverride = "<span class='opacitymedium hideonsmartphone'>" . htmlspecialchars('**************' . substr($tokenData['token'], -4)) . "</span>";
+		}
+		if (!$tokenData['token']) {
+			$item->fieldOverride .= '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken().'">' . $langs->trans('generateAccessToken') . '<i class="fa fa-key paddingleft"></i></a><br>';
+		}
+		if ($tokenData['token']) {
+			$item->fieldOverride .= ' &nbsp; &nbsp; <a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken().'">' . $langs->trans('reGenerateAccessToken') . '<i class="fa fa-key paddingleft"></i></a><br>';
+		}
+	}
+
 	if (!empty($tokenData['token'])) {
-		$item->fieldOverride = "<span class='opacitymedium hideonsmartphone'>" . htmlspecialchars('**************' . substr($tokenData['token'], -4)) . "</span>";
-	}
-	if (!$tokenData['token']) {
-		$item->fieldOverride = "-";
-	}
+		// Actions
+		$item = $formSetup->newItem($prefix . 'ACTIONS');
 
-	// Actions
-	$item = $formSetup->newItem($prefix . 'ACTIONS');
-	$item->fieldOverride = "";
-	if (!$tokenData['token']) {
-		$item->fieldOverride .= '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken().'">' . $langs->trans('generateAccessToken') . " <i class='fa fa-key'></i></a><br>";
-	}
-	if ($tokenData['token']) {
-		$item->fieldOverride .= '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken().'">' . $langs->trans('reGenerateAccessToken') . " <i class='fa fa-key'></i></a><br>";
-	}
+		$item->fieldOverride .= '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=call".$prefix."HEALTHCHECK&token=".newToken().'">' . $langs->trans('testConnection') . ' (Healthcheck)<i class="fa fa-check paddingleft"></i></a><br>';
+		$item->cssClass = 'minwidth500';
 
-	$item->fieldOverride .= '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=call".$prefix."HEALTHCHECK&token=".newToken().'">' . $langs->trans('testConnection') . " (Healthcheck) <i class='fa fa-check'></i></a><br>";
-	$item->cssClass = 'minwidth500';
-
-	if ($tokenData['token'] && getDolGlobalString('PDPCONNECTFR_PROTOCOL') && getDolGlobalString('PDPCONNECTFR_PROTOCOL') === 'FACTURX') {
-		$item->fieldOverride .= '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=make".$prefix."sampleinvoice&token=".newToken().'">' . $langs->trans('generateSendSampleInvoice') . " <i class='fa fa-file'></i></a><br>";
+		if ($tokenData['token'] && getDolGlobalString('PDPCONNECTFR_PROTOCOL') && getDolGlobalString('PDPCONNECTFR_PROTOCOL') === 'FACTURX') {
+			$item->fieldOverride .= '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=make".$prefix."sampleinvoice&token=".newToken().'">' . $langs->trans('generateSendSampleInvoice') . '<i class="fa fa-file paddingleft"></i></a><br>';
+		}
 	}
 
 	// To remove
