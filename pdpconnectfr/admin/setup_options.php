@@ -328,7 +328,8 @@ print dol_get_fiche_head($head, 'options', $langs->trans($title), -1, "pdpconnec
 print '<br>';
 
 // Alert mysoc configuration is not complete
-$mysocCheck = validateMyCompanyConfiguration();
+$pdpconnectfr = new PdpConnectFr($db);
+$mysocCheck = $pdpconnectfr->validateMyCompanyConfiguration();
 if ($mysocCheck['res'] < 0) {
 	print '<div class="error">';
 	print '<strong>' . $langs->trans("MyCompanyConfigurationError") . ':</strong><br><br>';
