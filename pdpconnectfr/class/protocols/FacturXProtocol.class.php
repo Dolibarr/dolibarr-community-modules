@@ -734,10 +734,6 @@ class FacturXProtocol extends AbstractProtocol
             dol_syslog(get_class($this) . '::generateInvoice cleaned up temporary XML file: ' . $xmlfile);
         }
 
-        // Update invoice PDP  status field
-        $invoice->array_options['options_pdpconnectfr_einvoice_status'] = 1;
-        $invoice->insertExtraFields();
-
         return 1;
 
 
@@ -1261,6 +1257,9 @@ class FacturXProtocol extends AbstractProtocol
         $supplierInvoice->total_ht = $taxBasisTotalAmount;
         $supplierInvoice->total_tva = $taxTotalAmount;
         $supplierInvoice->total_ttc = $grandTotalAmount;
+
+        // Add a note about PDP import ( TODO: add a hook or extrafields to store import details)
+        $supplierInvoice->note_private = "Imported from PDP";
 
         // Create the invoice
         $result = $supplierInvoice->create($user);

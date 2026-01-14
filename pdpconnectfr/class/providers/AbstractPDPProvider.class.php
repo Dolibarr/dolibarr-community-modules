@@ -289,7 +289,7 @@ abstract class AbstractPDPProvider
     /**
      * Get the last synchronization date with the PDP provider.
      * Retrieves the timestamp of the most recent successful flow synchronization
-     * for this provider. If no sync has occurred yet, returns Unix epoch (1970-01-01).
+     * for this provider. If no sync has occurred yet, returns 0.
      * Optionally applies a margin in hours to the returned timestamp.
      *
      * @param 	int 		$marginHours 	Optional time margin in hours to go back from the current date of the last synchronization
@@ -300,17 +300,6 @@ abstract class AbstractPDPProvider
 
         $LastSyncDate = null;
 
-        // Get last sync date
-        /*$LastSyncDateSql = "SELECT MAX(t.date_creation) as last_sync_date
-            FROM ".MAIN_DB_PREFIX."pdpconnectfr_call as t
-            WHERE t.provider = '".$this->db->escape($this->providerName)."'
-            AND t.call_type = 'sync_flow'
-            AND T.status = 'SUCCESS'";
-            if ($conf->entity && $conf->entity > 1) {
-                $LastSyncDateSql .= " AND t.entity = ".((int) $conf->entity);
-            }
-        $LastSyncDateSql .= ";";*/
-
         // Retrieve the last synchronization timestamp from the database
         // Note: The PDP API does not support per-document synchronization yet.
         // We perform a global sync for all flows and track the last modification
@@ -319,9 +308,11 @@ abstract class AbstractPDPProvider
         //
         // Future enhancement: Individual document sync may be possible when
         // the PDP provider API supports it.
+
         $LastSyncDateSql = "SELECT MAX(t.updatedat) as last_sync_date
-            FROM ".MAIN_DB_PREFIX."pdpconnectfr_document as t
-            WHERE t.provider = '".$this->db->escape($this->providerName)."' ";
+        FROM ".MAIN_DB_PREFIX."pdpconnectfr_document  as t
+        WHERE t.provider = '".$db->escape($this->providerName)."'
+        AND (t.flow_type NOT LIKE 'manual%' OR t.flow_type IS NULL)"; // Exclude manual flows to get last automatic synchronization date
 
         $resql = $db->query($LastSyncDateSql);
 
@@ -333,8 +324,7 @@ abstract class AbstractPDPProvider
         }
 
         if ($LastSyncDate === null) {
-            // If no last sync date, set to epoch start
-            $LastSyncDate = dol_mktime(0, 0, 0, 1, 1, 1970, 'gmt');
+            $LastSyncDate = 0;
         }
 
         // Apply margin in hours

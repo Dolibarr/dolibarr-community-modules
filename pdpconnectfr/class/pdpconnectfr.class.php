@@ -228,13 +228,11 @@ class PdpConnectFr
     public function EInvoiceCardBlock($object) {
         global $langs;
 
-        // TODO for the lastSyncDate excluding the ones with Flow type is "ManualCheck"
-
-        $resprints = '';
-
         $currentStatusInfo = $this->fetchLastknownInvoiceStatus($object->ref);
 		// Force value for test
 		//$currentStatusInfo['code'] = 2;
+
+        $resprints = '';
 
         // Title
         $resprints .= '<tr class="liste_titre">';
@@ -252,11 +250,12 @@ class PdpConnectFr
         $resprints .= '</tr>';
 
         // PDP Info
-        $resprints .= '<tr>';
-        $resprints .= '<td class="titlefield">'
-            . $langs->trans("pdpconnectfrInvoiceInfo") . '</td>';
-        $resprints .= '<td><span id="einvoice-info">'
-            . $currentStatusInfo['info'] . '</span></td>';
+        $info = $currentStatusInfo['info'] ?? '';
+        $displayStyle = !empty($info) ? '' : 'style="display:none;"';
+
+        $resprints .= '<tr id="einvoice-info-row" ' . $displayStyle . '>';
+        $resprints .= '<td class="titlefield">' . $langs->trans("pdpconnectfrInvoiceInfo") . '</td>';
+        $resprints .= '<td><span id="einvoice-info">' . htmlspecialchars($info) . '</span></td>';
         $resprints .= '</tr>';
 
 
@@ -284,6 +283,9 @@ class PdpConnectFr
                         // Update UI
                         $("#einvoice-status").html(data.status || "");
                         $("#einvoice-info").html(data.info || "");
+                        if (data.info) {
+                            $("#einvoice-info-row").show();
+                        }
 
                         // Retry only if still awaiting validation
                         if (parseInt(data.code, 10) === ' . self::STATUS_AWAITING_VALIDATION . ') {

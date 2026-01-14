@@ -105,11 +105,15 @@ class ActionsPdpconnectfr extends CommonHookActions
         if (in_array($object->element, ['facture'])) {
             $langs->load("pdpconnectfr@pdpconnectfr");
 
-            $url_button = array();
+            $pdpConnectFr = new PdpConnectFr($db);
 
+            // Get current status of e-invoice
+            $currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus($object->ref);
+
+            $url_button = array();
             if ($object->status == Facture::STATUS_VALIDATED || $object->status == Facture::STATUS_CLOSED) {
                 // if E-invoice is not generated, show button to generate e-invoice
-                if (empty($object->array_options['options_pdpconnectfr_einvoice_status'])) {
+                if ($currentStatusDetails['code'] == $pdpConnectFr::STATUS_NOT_GENERATED) {
                     $url_button[] = array(
                         'lang' => 'pdpconnectfr',
                         'enabled' => 1,
@@ -122,7 +126,11 @@ class ActionsPdpconnectfr extends CommonHookActions
 
                 // If the e-invoice is generated but not sent, or if it was sent and a validation error was received,
                 // display the button to regenerate the e-invoice and the button to send the e-invoice.
-                if ($object->array_options['options_pdpconnectfr_einvoice_status'] == 1 || $object->array_options['options_pdpconnectfr_einvoice_status'] == 4) {
+                if (in_array($currentStatusDetails['code'], [
+                    $pdpConnectFr::STATUS_GENERATED,
+                    $pdpConnectFr::STATUS_ERROR,
+                    $pdpConnectFr::STATUS_UNKNOWN
+                ])) {
                     $url_button[] = array(
                         'lang' => 'pdpconnectfr',
                         'enabled' => 1,
@@ -163,8 +171,20 @@ class ActionsPdpconnectfr extends CommonHookActions
 
         dol_syslog(__METHOD__ . " Hook doActions called for object " . get_class($object) . " action=" . $action);
 
+        $pdpConnectFr = new PdpConnectFr($db);
+
+        // Get current status of e-invoice
+        $currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus($object->ref);
+
         // Action to send invoice to PDP
-        if ($action == 'send_to_pdp') {
+        if ($action == 'send_to_pdp' 
+            && $currentStatusDetails['file'] == 1 
+            && in_array($currentStatusDetails['code'], [
+                $pdpConnectFr::STATUS_GENERATED, 
+                $pdpConnectFr::STATUS_ERROR, 
+                $pdpConnectFr::STATUS_UNKNOWN
+            ])
+        ) {
             dol_include_once('/pdpconnectfr/class/providers/EsalinkPDPProvider.class.php');
 
             $provider = new EsalinkPDPProvider($db);
@@ -190,14 +210,12 @@ class ActionsPdpconnectfr extends CommonHookActions
 
             // Call function to create Factur-X document
             require_once __DIR__ . "/protocols/ProtocolManager.class.php";
-            require_once __DIR__ . "/pdpconnectfr.class.php";
 
             $usedProtocols = getDolGlobalString('PDPCONNECTFR_PROTOCOL');
             $ProtocolManager = new ProtocolManager($db);
             $protocol = $ProtocolManager->getprotocol($usedProtocols);
 
             // Check configuration
-            $pdpConnectFr = new PdpConnectFr($db);
             $result = $pdpConnectFr->checkRequiredinformations($invoiceObject->thirdparty);
             if ($result['res'] < 0) {
                 $message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
@@ -209,8 +227,6 @@ class ActionsPdpconnectfr extends CommonHookActions
             $result = $protocol->generateInvoice($invoiceObject->id);
             if ($result) {
                 // No error;
-                $object->array_options['options_pdpconnectfr_einvoice_status'] = 1;
-
                 return 0;
             } else {
                 $this->errors[] = $protocol->errors;
