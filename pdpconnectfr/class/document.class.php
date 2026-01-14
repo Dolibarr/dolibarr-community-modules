@@ -153,7 +153,7 @@ class Document extends CommonObject
 		"ack_status" => array("type" => "varchar(50)", "label" => "ack_status", "enabled" => "1", 'position' => 80, 'notnull' => 0, "visible" => "-1", "comment" => "Acknowledgment status (Success, Error, Pending)"),
 		"ack_reason_code" => array("type" => "varchar(255)", "label" => "ack_reason_code", "enabled" => "1", 'position' => 90, 'notnull' => 0, "visible" => "-1", "comment" => "Reason code if error"),
 		"ack_info" => array("type" => "text", "label" => "ack_info", "enabled" => "1", 'position' => 100, 'notnull' => 0, "visible" => "-1", "comment" => "Additional information if error/warning"),
-		"date_creation" => array("type" => "datetime", "label" => "DateSyncro", "enabled" => "1", 'position' => 500, 'notnull' => 1, "visible" => "1",),
+		"date_creation" => array("type" => "datetime", "label" => "DateSyncro", "enabled" => "1", 'position' => 500, 'notnull' => 1, "visible" => "-1",),
 		"tms" => array("type" => "timestamp", "label" => "DateModification", "enabled" => "1", 'position' => 501, 'notnull' => 0, "visible" => "-2",),
 		"fk_user_creat" => array("type" => "integer:User:user/class/user.class.php", "label" => "UserAuthor", "picto" => "user", "enabled" => "1", 'position' => 510, 'notnull' => 1, "visible" => "-2", "csslist" => "tdoverflowmax150",),
 		"fk_user_modif" => array("type" => "integer:User:user/class/user.class.php", "label" => "UserModif", "picto" => "user", "enabled" => "1", 'position' => 511, 'notnull' => -1, "visible" => "-2", "csslist" => "tdoverflowmax150",),
