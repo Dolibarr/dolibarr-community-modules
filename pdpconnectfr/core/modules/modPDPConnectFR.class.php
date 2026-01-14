@@ -172,7 +172,8 @@ class modPDPConnectFR extends DolibarrModules
 		$this->const = array(
 			1 => array('PDPCONNECTFR_EINVOICE_IN_REAL_TIME', 'chaine', '1', 0),
 			2 => array('PDPCONNECTFR_FLOWS_SYNC_CALL_LIMIT', 'chaine', '1', 0),
-			3 => array('PDPCONNECTFR_FLOWS_SYNC_CALL_SIZE', 'chaine', '100', 0),
+			3 => array('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS_HELP', 'chaine', '12', 0),
+			4 => array('PDPCONNECTFR_FLOWS_SYNC_CALL_SIZE', 'chaine', '100', 0),
 		);
 
 		// Some keys to add into the overwriting translation tables

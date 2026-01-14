@@ -558,7 +558,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
         // If limit is 0, we first need to get the total number of flows to sync because ESALINK set a default limit of 25 if not specified
         if ($limit == 0) {
-            $response = $this->callApi($resource, "POST", json_encode($params));
+			$jsonparams = json_encode($params);
+        	$response = $this->callApi($resource, "POST", $jsonparams);
 
             $totalFlows = 0;
             if ($response['status_code'] != 200) {
@@ -587,7 +588,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         if ($limit) {
         	$params['limit'] = $limit;
         }
-        $response = $this->callApi($resource, "POST", json_encode($params), [], "Synchronization");	// This will also create the Call entry
+		$jsonparams = json_encode($params);
+        $response = $this->callApi($resource, "POST", $jsonparams, [], "Synchronization");	// This will also create the Call entry
 
         if ($response['status_code'] != 200) {
 			$this->errors[] = "Failed to retrieve flows for synchronization.";
@@ -762,6 +764,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
         // Process flow data
         $flowData = json_decode($flowResponse['response'], true);
+
         $document = new Document($this->db);
         $document->date_creation        = dol_now();
         $document->fk_user_creat        = $user->id;
@@ -783,19 +786,23 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
         if (!empty($flowData['submittedAt'])) {
             $dt = new DateTimeImmutable($flowData['submittedAt'], new DateTimeZone('UTC'));
-            $document->submittedat = $db->idate($dt->getTimestamp());
+            $document->submittedat = $dt->getTimestamp();	// $dt is already in GMT in recieved , no need to compensate with the database timezone with db->idate() to get it GMT
         } else {
             $document->submittedat = null;
         }
         if (!empty($flowData['updatedAt'])) {
             $dt = new DateTimeImmutable($flowData['updatedAt'], new DateTimeZone('UTC'));
-            $document->updatedat = $db->idate($dt->getTimestamp());
+            $document->updatedat = $dt->getTimestamp();		// $dt is already in GMT, no need to compensate with the database timezone with db->idate() to get it GMT
         } else {
             $document->updatedat = null;
         }
         $document->provider             = getDolGlobalString('PDPCONNECTFR_PDP') ?? null;
         $document->entity               = $conf->entity;
         $document->flow_uiid            = $flowData['uuid'] ?? null;
+
+        if (getDolGlobalString('PDPCONNECTFR_DEBUG_MODE')) {
+        	$document->response_for_debug = $flowResponse['response'];
+        }
 
         switch ($document->flow_type) {
             // CustomerInvoice

@@ -736,6 +736,9 @@ if ($action == 'sync' && $provider) {
 
 // Last flow sync info
 $last_sync = 0;
+if (GETPOSTDATE('last_sync_datetime', 'getpost', 'tzuserrel')) {
+	$last_sync = GETPOSTDATE('last_sync_datetime', 'getpost', 'tzuserrel');
+}
 $last_sync_info = img_picto('', 'long-arrow-alt-right', 'class="pictofixedwidth"');
 
 $Lastsyncinfosql = "SELECT flow_id, updatedat
@@ -749,7 +752,9 @@ $resLastsyncinfosql = $db->query($Lastsyncinfosql);
 if ($resLastsyncinfosql) {
 	$obj = $db->fetch_object($resLastsyncinfosql);
 	if ($obj) {
-		$last_sync = $db->jdate($obj->updatedat);
+		if (empty($last_sync)) {
+			$last_sync = $db->jdate($obj->updatedat);
+		}
 		$last_sync_info .= " ". $langs->trans("lastSyncedFlow") . ': ' . $obj->flow_id . ' - ' . $langs->trans("lastSyncedFlowDate") . ':' . dol_print_date($last_sync, 'dayhour', 'tzuserrel');
 	} else {
 		$last_sync = 0;
@@ -763,7 +768,7 @@ if ($resLastsyncinfosql) {
 if ($provider) {
 	print '<div class="fichecenter">'."\n";
 
-	print '<div class="syncParametersSection formconsumeproduce">'."\n";
+	print '<div class="syncParametersSection formconsumeproduce colorbacktimesheet">'."\n";
 
 	//print '<hr class="clearboth">'."\n";
 
@@ -772,7 +777,7 @@ if ($provider) {
 
 	if ($last_sync > 0) {
 		// Apply a lookback if configured
-		if (getDolGlobalInt('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS')) {
+		if (getDolGlobalInt('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS') && !GETPOSTDATE('last_sync_datetime', 'getpost', 'tzuserrel')) {
 			$last_sync -= (getDolGlobalInt('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS') * 3600);
 		}
 		print '<tr>';

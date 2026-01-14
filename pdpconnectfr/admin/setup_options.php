@@ -272,7 +272,7 @@ if (getDolGlobalString('PDPCONNECTFR_FLOWS_SYNC_CALL_LIMIT')) {
 	// Setup conf to to define the number of flows to synchronize per one synchronization call
 	$item = $formSetup->newItem('PDPCONNECTFR_FLOWS_SYNC_CALL_SIZE');
 	$item->helpText = $langs->transnoentities('PDPCONNECTFR_FLOWS_SYNC_CALL_SIZE_HELP');
-	$item->defaultFieldValue = 10;
+	$item->defaultFieldValue = 100;
 	$item->cssClass = 'maxwidth100';
 }
 
@@ -280,7 +280,6 @@ if (getDolGlobalString('PDPCONNECTFR_FLOWS_SYNC_CALL_LIMIT')) {
 $item = $formSetup->newItem('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS');
 $item->helpText = $langs->transnoentities('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS_HELP');
 $item->fieldAttr['placeholder'] = $langs->transnoentities('Hours');
-$item->defaultFieldValue = 24;
 $item->cssClass = 'maxwidth100';
 
 // Setup conf for debug mode

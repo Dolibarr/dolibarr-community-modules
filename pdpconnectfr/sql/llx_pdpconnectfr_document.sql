@@ -44,6 +44,7 @@ CREATE TABLE llx_pdpconnectfr_document(
 	cdar_lifecycle_label varchar(255), 
 	cdar_reason_code varchar(50), 
 	cdar_reason_desc varchar(255), 
-	cdar_reason_detail varchar(255)
+	cdar_reason_detail varchar(255),
+	response_for_debug text					-- To store response if debug is on
 	-- END MODULEBUILDER FIELDS
 ) ENGINE=innodb;
