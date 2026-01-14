@@ -317,6 +317,7 @@ if (preg_match('/call'.$prefix.'HEALTHCHECK/i', $action, $reg)) {
 	}
 }*/
 
+
 if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_PDP') === "ESALINK") {
 	// Separator
 	$formSetup->newItem('PDPConnectionSetup')->setAsTitle();
@@ -354,6 +355,7 @@ if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_P
 	// API_KEY
 	$item = $formSetup->newItem($prefix . 'API_KEY');
 	$item->cssClass = 'minwidth500';
+
 
 	// Token
 	if (getDolGlobalString($prefix . 'API_KEY')) {
@@ -393,7 +395,17 @@ if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_P
 	}*/
 }
 
+$valueofapikeybefore = getDolGlobalString($prefix . 'API_KEY');
+
 include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php';
+
+$valueofapikeyafter = getDolGlobalString($prefix . 'API_KEY');
+
+if ($action == 'update' && $prefix && $valueofapikeyafter != $valueofapikeybefore) {
+	header("Location: ".$_SERVER["PHP_SELF"]);
+	exit;
+}
+
 //print getDolGlobalString('PDPCONNECTFR_PDP');
 
 
