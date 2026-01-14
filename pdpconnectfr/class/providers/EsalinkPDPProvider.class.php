@@ -411,41 +411,40 @@ class EsalinkPDPProvider extends AbstractPDPProvider
             'file' => new CURLFile($invoice_path, 'application/pdf', basename($invoice_path))
         ];
 
-
-
         $response = $this->callApi("flows", "POSTALREADYFORMATED", $params, $extraHeaders, 'Send Sample Invoice');
 
-        if ($response['status_code'] == 200 || $response['status_code'] == 202) {
 
+        if ($response['status_code'] == 200 || $response['status_code'] == 202) {
             $flowId = $response['response']['flowId'];
             $outputLog[] = "Sample invoice sent successfully.";
 
-            // Try to retrive flow using callback information
+            // Try to retrieve flow using callback information
             $resource = 'flows/' . $flowId;
             $urlparams = array(
                 'docType' => 'Original',
             );
             $resource .= '?' . http_build_query($urlparams);
+
             $response = $this->callApi(
                 $resource,
                 "GET",
                 false,
                 ['Accept' => 'application/octet-stream'],
-                'Retrive Sample Invoice'
+                'Retrieve Sample Invoice'
             );
 
             if ($response['status_code'] == 200 || $response['status_code'] == 202) {
             	include_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
             	$tmpobject = new Facture($this->db);
-                $output_path = getMultidirTemp($tmpobject, 'pdpconnectfr').'/test_retreived_invoice.pdf';
+                $output_path = getMultidirTemp($tmpobject, 'pdpconnectfr').'/test_retrieved_invoice.pdf';
 
                 file_put_contents($output_path, $response['response']);
 
-                $outputLog[] = "Sample invoice retreived successfully.";
+                $outputLog[] = "Sample invoice retrieved successfully.";
 
                 return $outputLog;
             } else {
-                $this->errors[] = "Failed to retreive sample invoice.";
+                $this->errors[] = "Failed to retrieve sample invoice.";
                 return 0;
             }
         } else {
