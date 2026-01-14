@@ -138,7 +138,7 @@ class Call extends CommonObject
 		"skippedflow" => array("type" => "integer", "label" => "SkippedFlow", "enabled" => "1", 'position' => 130, 'notnull' => 1, "visible" => "1", "comment" => "Skipped flows during the API call"),
 		"successflow" => array("type" => "integer", "label" => "SuccessFlow", "enabled" => "1", 'position' => 140, 'notnull' => 1, "visible" => "1", "comment" => "Successfully completed flows during the API call"),
 		"totalflow" => array("type" => "integer", "label" => "TotalFlow", "enabled" => "1", 'position' => 150, 'notnull' => 1, "visible" => "-1", "comment" => "Total flows handled during the API call"),
-		"batchlimit" => array("type" => "integer", "label" => "BatchLimit", "enabled" => "1", 'position' => 120, 'notnull' => 1, "visible" => "1", "comment" => "Maximum number of flows to process in this call"),
+		"batchlimit" => array("type" => "integer", "label" => "BatchLimit", "enabled" => "1", 'position' => 120, 'notnull' => 1, "visible" => "-1", "comment" => "Maximum number of flows to process in this call"),
 		//"processing_result" => array("type" => "text", "label" => "ProcessingDetail", "enabled" => "1", 'position' => 160, 'notnull' => 0, "visible" => "1", "help" => "Result of processing (summary of errors/success of internal processing)", "csslist" => "twolinesmax-normallineheight"),
 		"processing_result" => array("type" => "text", "label" => "ProcessingDetail", "enabled" => "1", 'position' => 160, 'notnull' => 0, "visible" => "1", "help" => "Result of processing (summary of errors/success of internal processing)", 'csslist' => 'small minwidth150'),
 		"date_creation" => array("type" => "datetime", "label" => "Date", "enabled" => "1", 'position' => 500, 'notnull' => 1, "visible" => "1",),
@@ -147,7 +147,7 @@ class Call extends CommonObject
 		"fk_user_modif" => array("type" => "integer:User:user/class/user.class.php", "label" => "UserModif", "picto" => "user", "enabled" => "1", 'position' => 511, 'notnull' => -1, "visible" => "-2", "csslist" => "tdoverflowmax150",),
 		"status" => array("type" => "integer", "label" => "Status", "enabled" => "1", 'position' => 2000, 'notnull' => 1, "visible" => "1", "index" => "1", "arrayofkeyval" => array("0" => "success", "1" => "error", "9" => "warning"), "validate" => "1",),
 		"request_body" => array("type" => "text", "label" => "Request", "enabled" => "1", 'position' => 200, 'notnull' => 0, "visible" => "-1", "comment" => "Request body (JSON)"),
-		"response" => array("type" => "text", "label" => "Response", "enabled" => "1", 'position' => 201, 'notnull' => 0, "visible" => "-1", "comment" => "Full response body (JSON)"),
+		"response" => array("type" => "text", "label" => "RetreivedMessage", "enabled" => "1", 'position' => 201, 'notnull' => 0, "visible" => "-1", "comment" => "Full response body (JSON)", "help" => "Saved only if Debug mode is on"),
 		"entity" => array("type" => "varchar(50)", "label" => "entity", "enabled" => "1", 'position' => 1900, 'notnull' => 0, "visible" => "0", "comment" => "Multi-entity support"),
 	);
 	public $rowid;

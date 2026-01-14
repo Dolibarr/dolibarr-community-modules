@@ -129,8 +129,9 @@ class Document extends CommonObject
 	 * Array with all fields and their property. Do not use it as a static var. It may be modified by constructor.
 	 */
 	public $fields = array(
-		"rowid" => array("type" => "integer", "label" => "TechnicalID", "enabled" => "1", 'position' => 1, 'notnull' => 1, "visible" => "1", "noteditable" => "1", "index" => "1", "css" => "left", "comment" => "Id"),
-		"flow_id" => array("type" => "varchar(255)", "label" => "flow_id", "enabled" => "1", 'position' => 10, 'notnull' => 0, "visible" => "1", "comment" => "PDP flow UUID", "csslist" => "tdoverflowmax100"),
+		"rowid" => array("type" => "integer", "label" => "ID", "enabled" => "1", 'position' => 1, 'notnull' => 1, "visible" => "1", "noteditable" => "1", "index" => "1", "css" => "left", "comment" => "Id"),
+		"provider" => array("type" => "varchar(50)", "label" => "provider", "enabled" => "1", 'position' => 5, 'notnull' => 1, "visible" => "-1", "comment" => "EInvoice Platform provider"),
+		"flow_id" => array("type" => "varchar(255)", "label" => "flow_id", "enabled" => "1", 'position' => 10, 'notnull' => 0, "visible" => "1", "comment" => "EInvoice flow UUID", "csslist" => "tdoverflowmax100"),
 		"call_id" => array("type" => "varchar(50)", "label" => "call_id", "enabled" => "1", 'position' => 20, 'notnull' => 0, "visible" => "1", "comment" => "Reference to the original call", "csslist" => "tdoverflowmax100"),
 		"flow_type" => array("type" => "varchar(255)", "label" => "flow_type", "enabled" => "1", 'position' => 40, 'notnull' => 0, "visible" => "1", "comment" => "Flow type ('sync', 'CustomerInvoice', 'Manual...', etc.)"),
 		"flow_direction" => array("type" => "varchar(10)", "label" => "flow_direction", "enabled" => "1", 'position' => 50, 'notnull' => 0, "visible" => "1", "comment" => "In or Out"),
@@ -140,9 +141,8 @@ class Document extends CommonObject
 		"tracking_idref" => array("type" => "varchar(50)", "label" => "tracking_idref", "enabled" => "1", 'position' => 115, 'notnull' => 0, "visible" => "1", "comment" => "Document tracking identifier"),
 		"fk_element_type" => array("type" => "varchar(100)", "label" => "fk_element_type", "enabled" => "1", 'position' => 120, 'notnull' => 0, "visible" => "1",),
 		"fk_element_id" => array("type" => "integer", "label" => "fk_element_id", "enabled" => "1", 'position' => 130, 'notnull' => 0, "visible" => "1",),
-		"submittedat" => array("type" => "datetime", "label" => "submittedAt", "enabled" => "1", 'position' => 140, 'notnull' => 1, "visible" => "1", "comment" => "submittedAt (PDP Date)"),
+		"submittedat" => array("type" => "datetime", "label" => "submittedAt", "enabled" => "1", 'position' => 140, 'notnull' => 1, "visible" => "-1", "comment" => "submittedAt (PDP Date)"),
 		"updatedat" => array("type" => "datetime", "label" => "updatedAt", "enabled" => "1", 'position' => 150, 'notnull' => 0, "visible" => "1", "comment" => "updatedAt (PDP Date)"),
-		"provider" => array("type" => "varchar(50)", "label" => "provider", "enabled" => "1", 'position' => 5, 'notnull' => 1, "visible" => "-1", "comment" => "PDP"),
 		"entity" => array("type" => "integer", "label" => "entity", "enabled" => "1", 'position' => 170, 'notnull' => 0, "visible" => "0", "comment" => "Multi-entity support"),
 		"flow_uiid" => array("type" => "varchar(255)", "label" => "flow_uiid", "enabled" => "1", 'position' => 180, 'notnull' => 0, "visible" => "0",),
 		"cdar_lifecycle_code" => array("type" => "varchar(50)", "label" => "cdar_lifecycle_code", "enabled" => "1", 'position' => 101, 'notnull' => 0, "visible" => "-1",),
@@ -157,7 +157,7 @@ class Document extends CommonObject
 		"tms" => array("type" => "timestamp", "label" => "DateModification", "enabled" => "1", 'position' => 501, 'notnull' => 0, "visible" => "-2",),
 		"fk_user_creat" => array("type" => "integer:User:user/class/user.class.php", "label" => "UserAuthor", "picto" => "user", "enabled" => "1", 'position' => 510, 'notnull' => 1, "visible" => "-2", "csslist" => "tdoverflowmax150",),
 		"fk_user_modif" => array("type" => "integer:User:user/class/user.class.php", "label" => "UserModif", "picto" => "user", "enabled" => "1", 'position' => 511, 'notnull' => -1, "visible" => "-2", "csslist" => "tdoverflowmax150",),
-		"response_for_debug" => array("type" => "text", "label" => "FlowForDebug", "enabled" => "1", 'position' => 700, 'notnull' => 0, "visible" => "-1", "comment" => "Full response body (JSON) of flow"),
+		"response_for_debug" => array("type" => "text", "label" => "RetreivedMessage", "enabled" => "1", 'position' => 700, 'notnull' => 0, "visible" => "-1", "comment" => "Full response body (JSON) of flow"),
 		//"status" => array("type" => "integer", "label" => "Status", "enabled" => "1", 'position' => 2000, 'notnull' => 1, "visible" => "0", "index" => "1", "arrayofkeyval" => array("0" => "Brouillon", "1" => "Valid&eacute;", "9" => "Annul&eacute;"), "validate" => "1",),
 	);
 	public $rowid;

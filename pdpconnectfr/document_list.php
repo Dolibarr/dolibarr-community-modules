@@ -768,7 +768,7 @@ if ($resLastsyncinfosql) {
 if ($provider) {
 	print '<div class="fichecenter">'."\n";
 
-	print '<div class="syncParametersSection formconsumeproduce colorbacktimesheet">'."\n";
+	print '<div class="formconsumeproduce" style="padding: 10px;">'."\n";
 
 	//print '<hr class="clearboth">'."\n";
 
@@ -811,7 +811,7 @@ if ($provider) {
 	print '</div>'."\n";
 
 	print '<br class="clearboth">';
-	print '<div class="opacitymedium floatleft margintoponly">'.$last_sync_info.'</div>'."\n";
+	print '<div class="opacitylow floatleft margintoponly">'.$last_sync_info.'</div>'."\n";
 
 	print "</div>"."\n";
 

@@ -194,3 +194,7 @@ einvoiceStatusFieldHelp=To keep this status up to date, regularly run the synchr
 pdpconnectfrInvoiceInfo=Validation feedback
 EInvStatusError=Error
 EInvStatusUnknown=Unknown Status
+RetreivedMessage=Retreived message
+BatchLimit=Batch limit
+SkippedFlow=Skipped flows
+SuccessFlows=Success flows
