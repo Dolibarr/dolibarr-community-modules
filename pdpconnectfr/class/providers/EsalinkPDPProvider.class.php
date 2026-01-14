@@ -873,9 +873,13 @@ class EsalinkPDPProvider extends AbstractPDPProvider
             case "CustomerInvoiceLC":
                 // 1. link flow document to customer invoice
                 require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
+
+                // var_dump($flowData); exit;
+                // TODO This part seems useless:, if invoice ref not found we continue the same way if found
                 $document->fk_element_type = Facture::class;
                 $factureObj = new Facture($this->db);
-                $res = $factureObj->fetch(0, $document->tracking_idref);
+                $res = $factureObj->fetch(0, $document->tracking_idref);		// tracking_idref is field trackingId into the CDAR message that contains invoice ref with ESALINK
+
                 if ($res < 0) {
                     return array('res' => '-1', 'message' => "Failed to fetch customer invoice for flowId: " . $flowId);
                 }
@@ -907,12 +911,12 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                     // Parse the CDAR document (returns an array)
                     $cdarDocument = $cdarHandler->readFromString($cdarXml);
 
+                    //var_dump($cdarDocument); exit;
+
                     // Check if parsing was successful
                     if (empty($cdarDocument) || !isset($cdarDocument['AcknowledgementDocument'])) {
                         return array('res' => '-1', 'message' => "Failed to parse CDAR document for flowId: " . $flowId);
                     }
-
-                    require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
 
                     $document->fk_element_type = Facture::class;
                     $factureObj = new Facture($this->db);
