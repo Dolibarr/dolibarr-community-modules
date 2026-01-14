@@ -22,7 +22,8 @@ CREATE TABLE llx_pdpconnectfr_extlinks(
 	date_creation datetime NOT NULL, 
 	tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, 
 	fk_user_creat integer NOT NULL, 
-	fk_user_modif integer, 
+	fk_user_modif integer,
+	flow_id varchar(255),
 	syncstatus integer NOT NULL,		-- If the object has a status into the einvoice external system
 	syncref varchar(255),				-- If the object has a given reference into the einvoice external system
 	synccomment varchar(255)			-- If we want to store a message for the last sync action try

@@ -130,11 +130,6 @@ class Document extends CommonObject
 	 */
 	public $fields = array(
 		"rowid" => array("type" => "integer", "label" => "TechnicalID", "enabled" => "1", 'position' => 1, 'notnull' => 1, "visible" => "1", "noteditable" => "1", "index" => "1", "css" => "left", "comment" => "Id"),
-		"date_creation" => array("type" => "datetime", "label" => "DateSyncro", "enabled" => "1", 'position' => 500, 'notnull' => 1, "visible" => "1",),
-		"tms" => array("type" => "timestamp", "label" => "DateModification", "enabled" => "1", 'position' => 501, 'notnull' => 0, "visible" => "-2",),
-		"fk_user_creat" => array("type" => "integer:User:user/class/user.class.php", "label" => "UserAuthor", "picto" => "user", "enabled" => "1", 'position' => 510, 'notnull' => 1, "visible" => "-2", "csslist" => "tdoverflowmax150",),
-		"fk_user_modif" => array("type" => "integer:User:user/class/user.class.php", "label" => "UserModif", "picto" => "user", "enabled" => "1", 'position' => 511, 'notnull' => -1, "visible" => "-2", "csslist" => "tdoverflowmax150",),
-		//"status" => array("type" => "integer", "label" => "Status", "enabled" => "1", 'position' => 2000, 'notnull' => 1, "visible" => "0", "index" => "1", "arrayofkeyval" => array("0" => "Brouillon", "1" => "Valid&eacute;", "9" => "Annul&eacute;"), "validate" => "1",),
 		"flow_id" => array("type" => "varchar(255)", "label" => "flow_id", "enabled" => "1", 'position' => 10, 'notnull' => 0, "visible" => "1", "comment" => "PDP flow UUID", "csslist" => "tdoverflowmax100"),
 		"call_id" => array("type" => "varchar(50)", "label" => "call_id", "enabled" => "1", 'position' => 20, 'notnull' => 0, "visible" => "1", "comment" => "Reference to the original call", "csslist" => "tdoverflowmax100"),
 		"flow_type" => array("type" => "varchar(255)", "label" => "flow_type", "enabled" => "1", 'position' => 40, 'notnull' => 0, "visible" => "1", "comment" => "Flow type ('sync', 'CustomerInvoice', 'Manual...', etc.)"),
@@ -147,17 +142,22 @@ class Document extends CommonObject
 		"fk_element_id" => array("type" => "integer", "label" => "fk_element_id", "enabled" => "1", 'position' => 130, 'notnull' => 0, "visible" => "1",),
 		"submittedat" => array("type" => "datetime", "label" => "submittedAt", "enabled" => "1", 'position' => 140, 'notnull' => 1, "visible" => "1", "comment" => "submittedAt (PDP Date)"),
 		"updatedat" => array("type" => "datetime", "label" => "updatedAt", "enabled" => "1", 'position' => 150, 'notnull' => 0, "visible" => "1", "comment" => "updatedAt (PDP Date)"),
-		"provider" => array("type" => "varchar(50)", "label" => "provider", "enabled" => "1", 'position' => 160, 'notnull' => 1, "visible" => "1", "comment" => "PDP"),
+		"provider" => array("type" => "varchar(50)", "label" => "provider", "enabled" => "1", 'position' => 5, 'notnull' => 1, "visible" => "-1", "comment" => "PDP"),
 		"entity" => array("type" => "integer", "label" => "entity", "enabled" => "1", 'position' => 170, 'notnull' => 0, "visible" => "0", "comment" => "Multi-entity support"),
 		"flow_uiid" => array("type" => "varchar(255)", "label" => "flow_uiid", "enabled" => "1", 'position' => 180, 'notnull' => 0, "visible" => "0",),
 		"cdar_lifecycle_code" => array("type" => "varchar(50)", "label" => "cdar_lifecycle_code", "enabled" => "1", 'position' => 101, 'notnull' => 0, "visible" => "-1",),
-		"cdar_lifecycle_label" => array("type" => "varchar(255)", "label" => "cdar_lifecycle_label", "enabled" => "1", 'position' => 102, 'notnull' => 0, "visible" => "-1",),
+		"cdar_lifecycle_label" => array("type" => "varchar(255)", "label" => "cdar_lifecycle_label", "enabled" => "1", 'position' => 102, 'notnull' => 0, "visible" => "-1", "csslist" => "tdoverflowmax150",),
 		"cdar_reason_code" => array("type" => "varchar(50)", "label" => "cdar_reason_code", "enabled" => "1", 'position' => 103, 'notnull' => 0, "visible" => "-1",),
 		"cdar_reason_desc" => array("type" => "varchar(255)", "label" => "cdar_reason_desc", "enabled" => "1", 'position' => 104, 'notnull' => 0, "visible" => "-1",),
 		"cdar_reason_detail" => array("type" => "text", "label" => "cdar_reason_detail", "enabled" => "1", 'position' => 105, 'notnull' => 0, "visible" => "-1",),
 		"ack_status" => array("type" => "varchar(50)", "label" => "ack_status", "enabled" => "1", 'position' => 80, 'notnull' => 0, "visible" => "-1", "comment" => "Acknowledgment status (Success, Error, Pending)"),
 		"ack_reason_code" => array("type" => "varchar(255)", "label" => "ack_reason_code", "enabled" => "1", 'position' => 90, 'notnull' => 0, "visible" => "-1", "comment" => "Reason code if error"),
 		"ack_info" => array("type" => "text", "label" => "ack_info", "enabled" => "1", 'position' => 100, 'notnull' => 0, "visible" => "-1", "comment" => "Additional information if error/warning"),
+		"date_creation" => array("type" => "datetime", "label" => "DateSyncro", "enabled" => "1", 'position' => 500, 'notnull' => 1, "visible" => "1",),
+		"tms" => array("type" => "timestamp", "label" => "DateModification", "enabled" => "1", 'position' => 501, 'notnull' => 0, "visible" => "-2",),
+		"fk_user_creat" => array("type" => "integer:User:user/class/user.class.php", "label" => "UserAuthor", "picto" => "user", "enabled" => "1", 'position' => 510, 'notnull' => 1, "visible" => "-2", "csslist" => "tdoverflowmax150",),
+		"fk_user_modif" => array("type" => "integer:User:user/class/user.class.php", "label" => "UserModif", "picto" => "user", "enabled" => "1", 'position' => 511, 'notnull' => -1, "visible" => "-2", "csslist" => "tdoverflowmax150",),
+		//"status" => array("type" => "integer", "label" => "Status", "enabled" => "1", 'position' => 2000, 'notnull' => 1, "visible" => "0", "index" => "1", "arrayofkeyval" => array("0" => "Brouillon", "1" => "Valid&eacute;", "9" => "Annul&eacute;"), "validate" => "1",),
 	);
 	public $rowid;
 	public $date_creation;

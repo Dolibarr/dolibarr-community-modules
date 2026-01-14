@@ -177,7 +177,7 @@ $object->fields['recap'] = array(
 	'enabled' => '1',
 	'position' => 51,
 	'checked' => 0,
-	'csslist' => 'tdoverflowmax500 small',
+	'csslist' => 'small',
 	'notsearchable' => 1
 );
 
@@ -763,7 +763,7 @@ if ($resLastsyncinfosql) {
 if ($provider) {
 	print '<div class="fichecenter">'."\n";
 
-	print '<div class="syncParametersSection">'."\n";
+	print '<div class="syncParametersSection formconsumeproduce">'."\n";
 
 	//print '<hr class="clearboth">'."\n";
 
@@ -1106,11 +1106,11 @@ while ($i < $imaxinloop) {
 				} elseif ($key == 'rowid') {
 					print $object->showOutputField($val, $key, (string) $object->id, '');
 				} else {
-					if ($val['type'] == 'html') {
-						print '<div class="small lineheightsmall twolinesmax-normallineheight">';
+					if ($val['type'] == 'html' || $val['type'] == 'text') {
+						print '<div class="small minwidth150 lineheightsmall threelinesmax-normallineheight classfortooltip" title="'.dolPrintHTMLForAttribute((string) $object->$key).'">';
 					}
 					print $object->showOutputField($val, $key, (string) $object->$key, '');
-					if ($val['type'] == 'html') {
+					if ($val['type'] == 'html' || $val['type'] == 'text') {
 						print '</div>';
 					}
 				}
