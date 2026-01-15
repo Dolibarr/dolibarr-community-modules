@@ -114,6 +114,26 @@ class PdpConnectFr
         );
     }
 
+    /**
+     * Get internal Dolibarr status code from PDP/PA status label (only for validation statuses 'Error', 'Pending', 'Ok', other status like lifecycle codes are normalized and with the same code in both systems)
+     *
+     * @param string $label PDP/PA status label can be 'Error', 'Pending', 'Ok', etc.
+     * @return int
+     */
+    public function getDolibarrStatusCodeFromPdpLabel($label)
+    {
+        switch ($label) {
+            case 'Error':
+                return self::STATUS_ERROR;
+            case 'Pending':
+                return self::STATUS_AWAITING_VALIDATION;
+            case 'Ok':
+                return self::STATUS_AWAITING_ACK;
+            default:
+                return self::STATUS_UNKNOWN;
+        }
+    }
+
     public function validateMyCompanyConfiguration()
     {
         global $langs, $mysoc;
@@ -310,47 +330,23 @@ class PdpConnectFr
 
         $status = array('code' => self::STATUS_NOT_GENERATED, 'status' => $this->getStatusLabel(self::STATUS_NOT_GENERATED), 'info' => '', 'file' => '0');
 
-        $sql = "SELECT ack_status, ack_info, cdar_lifecycle_code, cdar_lifecycle_label, cdar_reason_code, cdar_reason_desc, cdar_reason_detail";
-        $sql .= " FROM ".MAIN_DB_PREFIX."pdpconnectfr_document";
-        $sql .= " WHERE tracking_idref = '".$db->escape($invoiceRef)."'";
-        $sql .= " ORDER BY rowid DESC LIMIT 1";
+        // Get last status from pdpconnectfr_extlinks table
+        $sql = "SELECT syncstatus, synccomment";
+        $sql .= " FROM ".MAIN_DB_PREFIX."pdpconnectfr_extlinks";
+        $sql .= " WHERE element_type = '".Facture::class."'";
+        $sql .= " AND syncref = '".$db->escape($invoiceRef)."'";
 
         $resql = $db->query($sql);
         if ($resql) {
             if ($db->num_rows($resql) > 0) {
                 $obj = $db->fetch_object($resql);
-
-                switch ($obj->ack_status) {
-                    case 'Error':
-                        $status = array('code' => self::STATUS_ERROR, 'status' => $this->getStatusLabel(self::STATUS_ERROR), 'info' => $obj->ack_info);
-                        break;
-                    case 'Pending':
-                        $status = array('code' => self::STATUS_AWAITING_VALIDATION, 'status' => $this->getStatusLabel(self::STATUS_AWAITING_VALIDATION), 'info' => '');
-                        break;
-                    case 'Ok':
-                        // Further check lifecycle code for more details
-                        if (!empty($obj->cdar_lifecycle_code)) {
-                            $statusLabel = $obj->cdar_lifecycle_label;
-                            $statusInfo = '';
-                            if (!empty($obj->cdar_reason_code)) {
-                                $statusInfo .= $obj->cdar_reason_code;
-                            }
-                            if (!empty($obj->cdar_reason_desc)) {
-                                $statusInfo .= "<br>" . $obj->cdar_reason_desc;
-                            }
-                            if (!empty($obj->cdar_reason_detail)) {
-                                $statusInfo .= "<br>" . $obj->cdar_reason_detail;
-                            }
-                            $status = array('code' => (int) $obj->cdar_lifecycle_code, 'status' => $statusLabel, 'info' => $statusInfo);
-                        } else {
-                            $status = array('code' => self::STATUS_AWAITING_ACK, 'status' => $this->getStatusLabel(self::STATUS_AWAITING_ACK), 'info' => 'No further lifecycle information.');
-                        }
-                        break;
-                    default:
-                        $status['status'] = array('code' => self::STATUS_UNKNOWN, 'status' => 'N/A', 'info' => 'Unknown status retrieved from PDP/PA.');
-                }
+                $status = array(
+                    'code' => (int) $obj->syncstatus,
+                    'status' => $this->getStatusLabel((int) $obj->syncstatus),
+                    'info' => $obj->synccomment ?? '',
+                );
             } else {
-                $status = array('code' => self::STATUS_NOT_GENERATED, 'status' => $this->getStatusLabel(self::STATUS_NOT_GENERATED), 'info' => '');
+                dol_syslog("No entry found in pdpconnectfr_extlinks table for invoiceRef: " . $invoiceRef);
             }
         } else {
             dol_print_error($db);
@@ -371,5 +367,72 @@ class PdpConnectFr
         }
 
         return $status;
+    }
+
+    /**
+     * Insert or update external link record
+     *
+     * @param int       $elementId      Linked Element ID
+     * @param string    $elementType    Linked Element type
+     * @param string    $flowId         Flow ID
+     * @param int       $syncStatus     If the object has a status into the einvoice external system
+     * @param string    $syncRef        If the object has a given reference into the einvoice external system
+     * @param string    $syncComment    If we want to store a message for the last sync action try
+     *
+     * @return int -1 on error, rowid on success
+     */
+    public function insertOrUpdateExtLink($elementId, $elementType, $flowId = '', $syncStatus = 0, $syncRef = '', $syncComment = '')
+    {
+        global $db, $user;
+
+        $provider = getDolGlobalString('PDPCONNECTFR_PDP');
+
+        // Check if record exists
+        $sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "pdpconnectfr_extlinks";
+        $sql .= " WHERE element_id = " . (int)$elementId;
+        $sql .= " AND element_type = '" . $db->escape($elementType) . "'";
+        $sql .= " AND provider = '" . $db->escape($provider) . "'";
+
+        $resql = $db->query($sql);
+        if (!$resql) {
+            dol_print_error($db);
+            return -1;
+        }
+
+        $exists = $db->num_rows($resql) > 0;
+
+        if ($exists) {
+            // Update existing record
+            $sql = "UPDATE " . MAIN_DB_PREFIX . "pdpconnectfr_extlinks SET";
+            $sql .= " syncstatus = " . (int) $syncStatus;
+            $sql .= ", synccomment = '" . $db->escape($syncComment) . "'";
+            if (!empty($syncRef)) {
+                $sql .= ", syncref = '" . $db->escape($syncRef) . "'";
+            }
+            if (!empty($flowId)) {
+                $sql .= ", flow_id = '" . $db->escape($flowId) . "'";
+            }
+            $sql .= ", fk_user_modif = " . (int) $user->id;
+            $sql .= " WHERE element_id = " . (int) $elementId;
+            $sql .= " AND element_type = '" . $db->escape($elementType) . "'";
+            $sql .= " AND provider = '" . $db->escape($provider) . "'";
+        } else {
+            // Insert new record
+            $sql = "INSERT INTO " . MAIN_DB_PREFIX . "pdpconnectfr_extlinks";
+            $sql .= " (element_id, element_type, provider, date_creation, fk_user_creat, syncstatus, syncref, synccomment, flow_id)";
+            $sql .= " VALUES (" . (int)$elementId . ", '" . $db->escape($elementType) . "', '" . $db->escape($provider) . "'";
+            $sql .= ", NOW(), " . (int)$user->id . ", " . (int)$syncStatus;
+            $sql .= ", " . ($syncRef ? "'" . $db->escape($syncRef) . "'" : "NULL");
+            $sql .= ", " . ($syncComment ? "'" . $db->escape($syncComment) . "'" : "NULL");
+            $sql .= ", " . ($flowId ? "'" . $db->escape($flowId) . "'" : "NULL") . ")";
+        }
+
+        $resql = $db->query($sql);
+        if (!$resql) {
+            dol_print_error($db);
+            return -1;
+        }
+
+        return $exists ? 1 : $db->last_insert_id(MAIN_DB_PREFIX."pdpconnectfr_extlinks");
     }
 }
