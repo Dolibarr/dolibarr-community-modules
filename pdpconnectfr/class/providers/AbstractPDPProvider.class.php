@@ -311,8 +311,7 @@ abstract class AbstractPDPProvider
 
         $LastSyncDateSql = "SELECT MAX(t.updatedat) as last_sync_date
         FROM ".MAIN_DB_PREFIX."pdpconnectfr_document  as t
-        WHERE t.provider = '".$db->escape($this->providerName)."'
-        AND (t.flow_type NOT LIKE 'manual%' OR t.flow_type IS NULL)"; // Exclude manual flows to get last automatic synchronization date
+        WHERE t.provider = '".$db->escape($this->providerName)."'";
 
         $resql = $db->query($LastSyncDateSql);
 

@@ -111,6 +111,9 @@ top_httphead();
 // Update the object field with the new value
 if ($objectRef) {
 
+	dol_include_once('pdpconnectfr/class/pdpconnectfr.class.php');
+	$pdpconnectfr = new PdpConnectFr($db);
+
 	// Load object
 	require_once DOL_DOCUMENT_ROOT."/compta/facture/class/facture.class.php";
 
@@ -123,23 +126,20 @@ if ($objectRef) {
 
 	// Get flowId from linked document log
 	$flowId = '';
-	$sql = "SELECT rowid, flow_id";
-	$sql .= " FROM ".MAIN_DB_PREFIX."pdpconnectfr_document";
-	$sql .= " WHERE fk_element_type = '".$db->escape(Facture::class). "'";
-	$sql .= " AND fk_element_id = ".((int) $invoice->id);
-	$sql .= " AND flow_type = 'ManualValidationCheck'";
-	$sql .= " ORDER BY rowid DESC LIMIT 1";
-	$result = $db->query($sql);
-	if ($result) {
-		if ($db->num_rows($result) > 0) {
-			$obj = $db->fetch_object($result);
-			$flowId = $obj->flow_id;;
+	$sql = "SELECT flow_id";
+	$sql .= " FROM ".MAIN_DB_PREFIX."pdpconnectfr_extlinks";
+	$sql .= " WHERE element_type = '".Facture::class."'";
+	$sql .= " AND syncref = '".$db->escape($invoice->ref)."'";
+	$resql = $db->query($sql);
+	if ($resql) {
+		if ($db->num_rows($resql) > 0) {
+			$obj = $db->fetch_object($resql);
+			$flowId = $obj->flow_id;
 		}
 	} else {
-		print json_encode(['status' => 'error', 'message' => 'Error retrieving flowId for invoice ref '. $objectRef]);
+		print json_encode(['status' => 'error', 'message' => 'Error retrieving flowId for invoice ref '. $invoice->ref]);
 		exit;
 	}
-
 
 	// make a call to get validation result from PDP
 	require_once "../class/providers/PDPProviderManager.class.php";
@@ -160,63 +160,25 @@ if ($objectRef) {
 	);
 
 	if ($response['status_code'] == 200 || $response['status_code'] == 202) {
-		dol_include_once('pdpconnectfr/class/document.class.php');
 
 		$flowData = json_decode($response['response'], true);
 
-		// Create a document log entry for this flow retrieval
-		$document = new Document($db);
-		$document->date_creation        = dol_now();
-		$document->fk_user_creat        = $user->id;
-		$document->fk_call              = null;
-		$document->flow_id              = $flowId;
-		$document->tracking_idref       = $flowData['trackingId'] ?? null;
-		$document->flow_type            = "ManualValidationCheck";
-		$document->flow_direction       = $flowData['flowDirection'] ?? null;
-		$document->flow_syntax          = $flowData['flowSyntax'] ?? null;
-		$document->flow_profile         = $flowData['flowProfile'] ?? null;
-		$document->ack_status           = $flowData['acknowledgement']['status'] ?? null;
-		$ack_message = '';
-		// Change this fields to fit with the new api response ===============================================
-		$document->ack_reason_code      = $flowData['acknowledgement']['details'][0]['reasonCode'] ?? null;
-		$document->ack_info             = $flowData['acknowledgement']['details'][0]['reasonMessage'] ?? null;
-		// Change this fields to fit with the new api response ===============================================
-		$document->document_body        = null;
-		$document->fk_element_id        = $invoice->id;
-		$document->fk_element_type      = Facture::class;
-
-		if (!empty($flowData['submittedAt'])) {
-			$dt = new DateTimeImmutable($flowData['submittedAt'], new DateTimeZone('UTC'));
-			$document->submittedat = $db->idate($dt->getTimestamp());
-		} else {
-			$document->submittedat = null;
+		$syncStatus = $pdpconnectfr::STATUS_UNKNOWN;
+		$ack_statusLabel = $flowData['acknowledgement']['status'] ?? '';
+		if ($ack_statusLabel) {
+			$syncStatus = $pdpconnectfr->getDolibarrStatusCodeFromPdpLabel($ack_statusLabel);
 		}
-		if (!empty($flowData['updatedAt'])) {
-			$dt = new DateTimeImmutable($flowData['updatedAt'], new DateTimeZone('UTC'));
-			$document->updatedat = $db->idate($dt->getTimestamp());
-		} else {
-			$document->updatedat = null;
-		}
-		$document->provider             = getDolGlobalString('PDPCONNECTFR_PDP') ?? null;
-		$document->entity               = $conf->entity;
-		$document->flow_uiid            = $flowData['uuid'] ?? null;
+		$syncRef = $flowData['trackingId'] ?? '';
+		$syncComment = $flowData['acknowledgement']['details'][0]['reasonMessage'] ?? '';
+		$pdpconnectfr->insertOrUpdateExtLink($invoice->id, Facture::class, $flowId, $syncStatus, $syncRef, $syncComment);
 
 		// Log an event in the invoice timeline
-		$statusLabel = $document->ack_status;
-		$reasonDetail = $document->ack_info ? " - {$document->ack_info}" : '';
-
-		$eventLabel = "PDPCONNECTFR - Status: {$statusLabel}";
-		$eventMessage = "PDPCONNECTFR - Status: {$statusLabel}{$reasonDetail}";
+		$eventLabel = "PDPCONNECTFR - Status: " . $ack_statusLabel;
+		$eventMessage = "PDPCONNECTFR - Status: " . $ack_statusLabel . (!empty($syncComment) ? " - " . $syncComment : "");
 
 		$resLogEvent = $provider->addEvent('STATUS', $eventLabel, $eventMessage, $invoice);
 		if ($resLogEvent < 0) {
 			dol_syslog(__METHOD__ . " Failed to log event for flowId: {$flowId}", LOG_WARNING);
-		}
-
-		$res = $document->create($user);
-		if ($res < 0) {
-			//print_r($document->errors);
-			dol_syslog(__METHOD__ . " Failed to create document log for flowId: {$flowId}", LOG_WARNING);
 		}
 
 		// Refresh current status info

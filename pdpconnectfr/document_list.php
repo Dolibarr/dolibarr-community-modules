@@ -744,7 +744,6 @@ $last_sync_info = img_picto('', 'long-arrow-alt-right', 'class="pictofixedwidth"
 $Lastsyncinfosql = "SELECT flow_id, updatedat
 FROM ".MAIN_DB_PREFIX."pdpconnectfr_document
 WHERE provider = '".$db->escape($provider->providerName)."'
-AND (flow_type NOT LIKE 'manual%' OR flow_type IS NULL)
 ORDER BY updatedat DESC
 LIMIT 1";
 
