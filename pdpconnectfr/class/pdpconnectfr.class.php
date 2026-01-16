@@ -134,109 +134,198 @@ class PdpConnectFr
         }
     }
 
+    /**
+     * Validate my company configuration
+     *
+     * @return array{res:int, message:string} Returns array with 'res' (1 on success, -1 on error and 0 on warning) and info 'message'
+     */
     public function validateMyCompanyConfiguration()
     {
         global $langs, $mysoc;
 
+        $res = 1;
+        $message = '';
         $baseErrors = [];
+        $baseWarnings = [];
 
         if (empty($mysoc->idprof1)) {
             $baseErrors[] = $langs->trans("FxCheckErrorIDPROF1");
         }
-        // if (empty($mysoc->tva_intra)) {
-        //     $baseErrors[] = $langs->trans("FxCheckErrorVATnumber");
-        // }
-        // if (empty($mysoc->address)) {
-        //     $baseErrors[] = $langs->trans("FxCheckErrorAddress");
-        // }
-        // if (empty($mysoc->zip)) {
-        //     $baseErrors[] = $langs->trans("FxCheckErrorZIP");
-        // }
-        // if (empty($mysoc->town)) {
-        //     $baseErrors[] = $langs->trans("FxCheckErrorTown");
-        // }
-        // if (empty($mysoc->country_code)) {
-        //     $baseErrors[] = $langs->trans("FxCheckErrorCountry");
-        // }
-
-        if (!empty($baseErrors)) {
-            return ['res' => -1, 'message' => implode('<br>', $baseErrors)];
+        if (empty($mysoc->tva_intra)) {
+            $baseWarnings[] = $langs->trans("FxCheckErrorVATnumber");
+        }
+        if (empty($mysoc->address)) {
+            $baseWarnings[] = $langs->trans("FxCheckErrorAddress");
+        }
+        if (empty($mysoc->zip)) {
+            $baseWarnings[] = $langs->trans("FxCheckErrorZIP");
+        }
+        if (empty($mysoc->town)) {
+            $baseWarnings[] = $langs->trans("FxCheckErrorTown");
+        }
+        if (empty($mysoc->country_code)) {
+            $baseErrors[] = $langs->trans("FxCheckErrorCountry");
         }
 
-        return ['res' => 1, 'message' => ''];
+        if (!empty($baseWarnings)) {
+            $res = 0;
+            $message .= '<br> Warning: ' . implode('<br> Warning: ', $baseWarnings);
+        }
+        if (!empty($baseErrors)) {
+            $res = -1;
+            $message .= '<br> Error: ' . implode('<br> Error: ', $baseErrors);
+        }
+        if (empty($baseErrors) && empty($baseWarnings)) {
+            $res = 1;
+        }
+
+        return ['res' => $res, 'message' => $message];
     }
 
     /**
      * Validate thirdparty configuration
      *
      * @param Societe $thirdparty   Thirdparty object
-     * @return array{res:int, message:string} Returns array with 'res' (1 on success, -1 on failure) and info 'message'
+     * @return array{res:int, message:string} Returns array with 'res' (1 on success, -1 on error and 0 on warning) and info 'message'
      */
     public function validatethirdpartyConfiguration($thirdparty)
     {
         global $langs, $mysoc;
 
+        $res = 1;
+        $message = '';
         $baseErrors = [];
+        $baseWarnings = [];
 
         if (empty($thirdparty->name)) {
             $baseErrors[] = $langs->trans("FxCheckErrorCustomerName");
         }
-        // if (empty($thirdparty->idprof1)) {
-        //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerIDPROF1");
-        // }
+        if (empty($thirdparty->idprof1)) {
+            $baseErrors[] = $langs->trans("FxCheckErrorCustomerIDPROF1");
+        }
         // if (empty($thirdparty->idprof2)) {
         //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerIDPROF2");
         // }
-        // if (empty($thirdparty->address)) {
-        //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerAddress");
-        // }
-        // if (empty($thirdparty->zip)) {
-        //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerZIP");
-        // }
-        // if (empty($thirdparty->town)) {
-        //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerTown");
-        // }
-        // if (empty($thirdparty->country_code)) {
-        //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerCountry");
-        // }
-        // if (empty($thirdparty->tva_intra)) {
-        //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerVAT");
-        // }
-        // if (empty($thirdparty->email)) {
-        //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerEmail");
-        // }
-
-        if (!empty($baseErrors)) {
-            return ['res' => -1, 'message' => implode('<br>', $baseErrors)];
+        if (empty($thirdparty->address)) {
+            $baseWarnings[] = $langs->trans("FxCheckErrorCustomerAddress");
+        }
+        if (empty($thirdparty->zip)) {
+            $baseWarnings[] = $langs->trans("FxCheckErrorCustomerZIP");
+        }
+        if (empty($thirdparty->town)) {
+            $baseWarnings[] = $langs->trans("FxCheckErrorCustomerTown");
+        }
+        if (empty($thirdparty->country_code)) {
+            $baseWarnings[] = $langs->trans("FxCheckErrorCustomerCountry");
+        }
+        if ($thirdparty->tva_assuj && empty($thirdparty->tva_intra)) {
+            // Test VAT code only if thirdparty is subject to VAT
+            $baseWarnings[] = $langs->trans("FxCheckErrorCustomerVAT");
+        }
+        if (empty($thirdparty->email)) {
+            $baseErrors[] = $langs->trans("FxCheckErrorCustomerEmail");
         }
 
-        return ['res' => 1, 'message' => ''];
+        if (!empty($baseWarnings)) {
+            $res = 0;
+            $message .= '<br> Warning: ' . implode('<br> Warning: ', $baseWarnings);
+        }
+        if (!empty($baseErrors)) {
+            $res = -1;
+            $message .= '<br> Error: ' . implode('<br> Error: ', $baseErrors);
+        }
+        if (empty($baseErrors) && empty($baseWarnings)) {
+            $res = 1;
+        }
+
+        return ['res' => $res, 'message' => $message];
     }
 
     /**
-     * Check required informations for PDP/PA invoicing
+     * Validate chorus specific informations
      *
-     * @param Societe $soc   Thirdparty object
+     * @param Facture $object   Invoice object
      *
-     * @return array{res:int, message:string} Returns array with 'res' (1 on success, -1 on failure) and info 'message'
+     * @return array{res:int, message:string} Returns array with 'res' (1 on success, -1 on error and 0 on warning) and info 'message'
      */
-    public function checkRequiredinformations($soc) {
+    public function validateChorusInformations($object)
+    { // TODO add a field into pdpconnectfr_extlinks table to define if this invoice is for chorus or not and all chorus specific fields and then replace use of extrafields
+        global $langs, $mysoc;
 
+        $res = 1;
+        $message = '';
         $baseErrors = [];
-        $mysocConfigCheck = $this->validateMyCompanyConfiguration();
-        if ($mysocConfigCheck['res'] < 0) {
-            $baseErrors[] = $mysocConfigCheck['message'];
+        $baseWarnings = [];
+
+        if (empty($object->array_options['options_d4d_promise_code'])) {
+            $baseWarnings[] = "N° d'engagement absent";
+        } elseif (strlen($object->array_options['options_d4d_promise_code']) > 50) {
+            $baseWarnings[] = "Ref client trop longue pour chorus (max 50 caractères)";
         }
 
-        $socConfigCheck = $this->validatethirdpartyConfiguration($soc);
-        if ($socConfigCheck['res'] < 0) {
-            $baseErrors[] = $socConfigCheck['message'];
+        if (empty($object->array_options['options_d4d_contract_number'])) {
+            $baseWarnings[] = "N° de marché absent";
         }
 
+        if (empty($object->array_options['options_d4d_service_code'])) {
+            $baseWarnings[] = "Code service absent";
+        }
+
+        if (empty($object->thirdparty->idprof2)) {
+            $baseWarnings[] = "Numéro SIRET du client manquant";
+        }
+
+        if (!empty($baseWarnings)) {
+            $res = 0;
+            $message .= '<br> Warning chorus: ' . implode('<br> Warning chorus: ', $baseWarnings);
+        }
         if (!empty($baseErrors)) {
-            return ['res' => -1, 'message' => implode('<br>', $baseErrors)];
+            $res = -1;
+            $message .= '<br> Error chorus: ' . implode('<br> Error chorus: ', $baseErrors);
         }
-        return ['res' => 1, 'message' => ''];
+        if (empty($baseErrors) && empty($baseWarnings)) {
+            $res = 1;
+        }
+
+        return ['res' => $res, 'message' => $message];
+
+    }
+
+    /**
+     * Check required informations for E-Invoicing
+     *
+     * @param Facture $invoice   Invoice object
+     *
+     * @return array{res:int, message:string} Returns array with 'res' (1 on success, -1 on failure and 0 on warning) and info 'message'
+     */
+    public function checkRequiredinformations($invoice) {
+
+        $messages = [];
+        $mysocConfigCheck = $this->validateMyCompanyConfiguration();
+        $socConfigCheck = $this->validatethirdpartyConfiguration($invoice->thirdparty);
+        if (getDolGlobalInt('PDPCONNECTFR_USE_CHORUS')) {
+            $chorusConfigCheck = $this->validateChorusInformations($invoice);
+        }
+        if (!empty($mysocConfigCheck['message'])) {
+            $messages[] = $mysocConfigCheck['message'];
+        }
+        if (!empty($socConfigCheck['message'])) {
+            $messages[] = $socConfigCheck['message'];
+        }
+        if (!empty($chorusConfigCheck['message'])) {
+            $messages[] = $chorusConfigCheck['message'];
+        }
+
+        $res = 1;
+        if ($mysocConfigCheck['res'] === -1 || $socConfigCheck['res'] === -1 || (isset($chorusConfigCheck) && $chorusConfigCheck['res'] === -1)) {
+            $res = -1;
+        } elseif ($mysocConfigCheck['res'] === 0 || $socConfigCheck['res'] === 0 || (isset($chorusConfigCheck) && $chorusConfigCheck['res'] === 0)) {
+            $res = 0;
+        }
+
+        $message = implode('<br>', $messages);
+
+        return ['res' => $res, 'message' => $message];
     }
 
     /**
@@ -434,5 +523,30 @@ class PdpConnectFr
         }
 
         return $exists ? 1 : $db->last_insert_id(MAIN_DB_PREFIX."pdpconnectfr_extlinks");
+    }
+
+
+    /**
+     * Calculate TVA intracommunity number for a thirdparty if missing
+     *
+     * @param mixed $thirdparty
+     *
+     * @return string
+     */
+    public function thirdpartyCalcTva_intra($thirdparty)
+    {
+        if ($thirdparty->country_code == 'FR' && empty($thirdparty->tva_intra) && !empty($thirdparty->tva_assuj)) {
+            $siren = trim($thirdparty->idprof1);
+            if (empty($siren)) {
+                $siren = (int) substr(str_replace(' ', '', $thirdparty->idprof2), 0, 9);
+            }
+            if (!empty($siren)) {
+                // [FR + code clé  + numéro SIREN ]
+                //Clé TVA = [12 + 3 × (SIREN modulo 97)] modulo 97
+                $cle = (12 + 3 * $siren % 97) % 97;
+                $tva_intra = 'FR' . $cle . $siren;
+            }
+        }
+        return $tva_intra ?? '';
     }
 }

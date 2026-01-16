@@ -47,8 +47,11 @@ class ActionsPdpconnectfr extends CommonHookActions
         $pdfPath = $parameters['file'];
 
         $invoiceObject = $parameters['object'];
+        $invoiceObject->fetch_thirdparty();
+        $thirdpartyCountryCode = $invoiceObject->thirdparty->country_code;
+
         // Check if it's an invoice
-        if (get_class($invoiceObject) === 'Facture') {
+        if (get_class($invoiceObject) === 'Facture' && $thirdpartyCountryCode === 'FR') {
         	if (getDolGlobalString('PDPCONNECTFR_EINVOICE_IN_REAL_TIME')) { // TODO: Maybe generate only if status is validated
 	            // Call function to create Factur-X document
 	            require __DIR__ . "/protocols/ProtocolManager.class.php";
@@ -59,21 +62,32 @@ class ActionsPdpconnectfr extends CommonHookActions
 
 	            // Check configuration
                 $pdpConnectFr = new PdpConnectFr($db);
-	            $result = $pdpConnectFr->checkRequiredinformations($invoiceObject->thirdparty);
+	            $result = $pdpConnectFr->checkRequiredinformations($invoiceObject);
 	            if ($result['res'] < 0) {
 	                $message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
+
+                    dol_syslog(__METHOD__ . " " . $message);
+                    setEventMessages($message, array(), 'errors');
+
 	                if (getDolGlobalString('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
-	                	$this->errors[] = $message;
+	                	// $this->errors[] = $message;
 	                	return -1;
 	                } else {
 	                	$this->warnings[] = $message;
 	                	return 0;
 	                }
-	            }
+	            } elseif ($result['res'] == 0) {
+                    $message = $langs->trans("InvoiceGeneratedWithWarnings") . ': <br>' . $result['message'];
+                    $this->warnings[] = $message;
+
+                    dol_syslog(__METHOD__ . " " . $message);
+                    setEventMessages($message, array(), 'warnings');
+                }
 
 	            $result = $protocol->generateInvoice($invoiceObject->id);		// Generate E-invoice
 	            if ($result) {
 	                // No error;
+                    setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
 	            } else {
 	                if (getDolGlobalString('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
 	            		$this->errors[] = $protocol->errors;
@@ -102,57 +116,61 @@ class ActionsPdpconnectfr extends CommonHookActions
     {
         global $db, $langs, $user;
 
-        if (in_array($object->element, ['facture'])) {
-            $langs->load("pdpconnectfr@pdpconnectfr");
+        $object->fetch_thirdparty();
+        $thirdpartyCountryCode = $object->thirdparty->country_code;
+        if (!in_array($object->element, ['facture']) || $thirdpartyCountryCode !== 'FR') {
+            return 0;
+        }
 
-            $pdpConnectFr = new PdpConnectFr($db);
+        $langs->load("pdpconnectfr@pdpconnectfr");
 
-            // Get current status of e-invoice
-            $currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus($object->ref);
+        $pdpConnectFr = new PdpConnectFr($db);
 
-            $url_button = array();
-            if ($object->status == Facture::STATUS_VALIDATED || $object->status == Facture::STATUS_CLOSED) {
-                // if E-invoice is not generated, show button to generate e-invoice
-                if ($currentStatusDetails['code'] == $pdpConnectFr::STATUS_NOT_GENERATED) {
-                    $url_button[] = array(
-                        'lang' => 'pdpconnectfr',
-                        'enabled' => 1,
-                        'perm' => (bool) $user->hasRight("facture", "creer"),
-                        'label' => $langs->trans('GenerateEinvoice'),
-                        //'help' => $langs->trans('GenerateEinvoiceHelp'),
-                        'url' => '/compta/facture/card.php?id=' . $object->id . '&action=generate_einvoice&token=' . newToken()
-                    );
-                }
+        // Get current status of e-invoice
+        $currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus($object->ref);
 
-                // If the e-invoice is generated but not sent, or if it was sent and a validation error was received,
-                // display the button to regenerate the e-invoice and the button to send the e-invoice.
-                if (in_array($currentStatusDetails['code'], [
-                    $pdpConnectFr::STATUS_GENERATED,
-                    $pdpConnectFr::STATUS_ERROR,
-                    $pdpConnectFr::STATUS_UNKNOWN
-                ])) {
-                    $url_button[] = array(
-                        'lang' => 'pdpconnectfr',
-                        'enabled' => 1,
-                        'perm' => (bool) $user->hasRight("facture", "creer"),
-                        'label' => $langs->trans('RegenerateEinvoice'),
-                        //'help' => $langs->trans('RegenerateEinvoiceHelp'),
-                        'url' => '/compta/facture/card.php?id=' . $object->id . '&action=generate_einvoice&token=' . newToken()
-                    );
-
-                    $url_button[] = array(
-                        'lang' => 'pdpconnectfr',
-                        'enabled' => 1,
-                        'perm' => (bool) $user->hasRight("facture", "creer"),
-                        'label' => $langs->trans('sendToPDP'),
-                        //'help' => $langs->trans('SendToPDPHelp'),
-                        'url' => '/compta/facture/card.php?id=' . $object->id . '&action=send_to_pdp&token=' . newToken()
-                    );
-                }
+        $url_button = array();
+        if ($object->status == Facture::STATUS_VALIDATED || $object->status == Facture::STATUS_CLOSED) {
+            // if E-invoice is not generated, show button to generate e-invoice
+            if ($currentStatusDetails['code'] == $pdpConnectFr::STATUS_NOT_GENERATED) {
+                $url_button[] = array(
+                    'lang' => 'pdpconnectfr',
+                    'enabled' => 1,
+                    'perm' => (bool) $user->hasRight("facture", "creer"),
+                    'label' => $langs->trans('GenerateEinvoice'),
+                    //'help' => $langs->trans('GenerateEinvoiceHelp'),
+                    'url' => '/compta/facture/card.php?id=' . $object->id . '&action=generate_einvoice&token=' . newToken()
+                );
             }
 
-            print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true);
+            // If the e-invoice is generated but not sent, or if it was sent and a validation error was received,
+            // display the button to regenerate the e-invoice and the button to send the e-invoice.
+            if (in_array($currentStatusDetails['code'], [
+                $pdpConnectFr::STATUS_GENERATED,
+                $pdpConnectFr::STATUS_ERROR,
+                $pdpConnectFr::STATUS_UNKNOWN
+            ])) {
+                $url_button[] = array(
+                    'lang' => 'pdpconnectfr',
+                    'enabled' => 1,
+                    'perm' => (bool) $user->hasRight("facture", "creer"),
+                    'label' => $langs->trans('RegenerateEinvoice'),
+                    //'help' => $langs->trans('RegenerateEinvoiceHelp'),
+                    'url' => '/compta/facture/card.php?id=' . $object->id . '&action=generate_einvoice&token=' . newToken()
+                );
+
+                $url_button[] = array(
+                    'lang' => 'pdpconnectfr',
+                    'enabled' => 1,
+                    'perm' => (bool) $user->hasRight("facture", "creer"),
+                    'label' => $langs->trans('sendToPDP'),
+                    //'help' => $langs->trans('SendToPDPHelp'),
+                    'url' => '/compta/facture/card.php?id=' . $object->id . '&action=send_to_pdp&token=' . newToken()
+                );
+            }
         }
+
+        print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true);
 
         return 0;
     }
@@ -170,6 +188,12 @@ class ActionsPdpconnectfr extends CommonHookActions
         global $db, $langs, $user;
 
         dol_syslog(__METHOD__ . " Hook doActions called for object " . get_class($object) . " action=" . $action);
+
+        $object->fetch_thirdparty();
+        $thirdpartyCountryCode = $object->thirdparty->country_code;
+        if (!in_array($object->element, ['facture']) || $thirdpartyCountryCode !== 'FR') {
+            return 0;
+        }
 
         $pdpConnectFr = new PdpConnectFr($db);
 
@@ -207,6 +231,7 @@ class ActionsPdpconnectfr extends CommonHookActions
         // Action to generate the E-invoice
         if ($action == 'generate_einvoice') {
             $invoiceObject = $object;
+            $invoiceObject->fetch_thirdparty();
 
             // Call function to create Factur-X document
             require_once __DIR__ . "/protocols/ProtocolManager.class.php";
@@ -216,21 +241,35 @@ class ActionsPdpconnectfr extends CommonHookActions
             $protocol = $ProtocolManager->getprotocol($usedProtocols);
 
             // Check configuration
-            $result = $pdpConnectFr->checkRequiredinformations($invoiceObject->thirdparty);
+            $result = $pdpConnectFr->checkRequiredinformations($invoiceObject);
             if ($result['res'] < 0) {
                 $message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
                 $this->warnings[] = $message;
+
+                dol_syslog(__METHOD__ . " " . $message);
+                setEventMessages($message, array(), 'errors');
+                return -1;
+            } elseif ($result['res'] == 0) {
+                $message = $langs->trans("InvoiceGeneratedWithWarnings") . ': <br>' . $result['message'];
+                $this->warnings[] = $message;
+
+                dol_syslog(__METHOD__ . " " . $message);
+                setEventMessages($message, array(), 'warnings');
             }
 
             // Generate E-invoice by calling the method of the Protocol
             // Example by calling FactureXProcol->generateInvoice()
             $result = $protocol->generateInvoice($invoiceObject->id);
             if ($result) {
-                // No error;
+                dol_syslog(__METHOD__ . " Invoice generated successfully for invoice ID " . $invoiceObject->id);
+                setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
+
                 return 0;
             } else {
                 $this->errors[] = $protocol->errors;
-                return 0;
+                dol_syslog(__METHOD__ . " " . $protocol->errors);
+                setEventMessages('', $protocol->errors, 'errors');
+                return -1;
             }
         }
 
@@ -250,11 +289,15 @@ class ActionsPdpconnectfr extends CommonHookActions
     {
         global $db, $langs;
 
-        if (in_array($object->element, ['facture'])) {
-            $langs->load("pdpconnectfr@pdpconnectfr");
-            $pdpconnectfr = new PdpConnectFr($db);
-            $this->resprints .= $pdpconnectfr->EInvoiceCardBlock($object);		// Output fields in card, including js for refreshing state
+        $object->fetch_thirdparty();
+        $thirdpartyCountryCode = $object->thirdparty->country_code;
+        if (!in_array($object->element, ['facture']) || $thirdpartyCountryCode !== 'FR') {
+            return 0;
         }
+
+        $langs->load("pdpconnectfr@pdpconnectfr");
+        $pdpconnectfr = new PdpConnectFr($db);
+        $this->resprints .= $pdpconnectfr->EInvoiceCardBlock($object);		// Output fields in card, including js for refreshing state
 
         return 0;
     }

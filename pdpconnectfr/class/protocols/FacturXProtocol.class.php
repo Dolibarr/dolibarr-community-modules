@@ -52,6 +52,7 @@ use horstoeko\zugferd\ZugferdDocumentPdfReader;
 require __DIR__ . "/../../vendor/autoload.php";
 
 dol_include_once('/pdpconnectfr/class/protocols/AbstractProtocol.class.php');
+dol_include_once('pdpconnectfr/class/pdpconnectfr.class.php');
 
 /**
  * FacturX Protocol Class
@@ -93,6 +94,9 @@ class FacturXProtocol extends AbstractProtocol
         $this->sourceinvoice = $invoice;
         $outputlang = $langs->defaultlang;
 
+        // Load PDPConnectFr class
+        $pdpconnectfr = new PdpConnectFr($db);
+
         // Initialize variables
         $ret = $prepaidAmount = 0;
         $billing_period = [];
@@ -131,6 +135,11 @@ class FacturXProtocol extends AbstractProtocol
             $contact = $object->contact;
         }
 
+        // Calculate missing VAT number for thirdparty if applicable
+        if ($object->thirdparty->tva_assuj && empty($object->thirdparty->tva_intra)) {
+            $object->thirdparty->tva_intra = $pdpconnectfr->thirdpartyCalcTva_intra($object->thirdparty);
+        }
+
         // Customer Email
         $buyerEmail = $this->extractBuyerMail($contact, $object->thirdparty);
 
@@ -144,7 +153,7 @@ class FacturXProtocol extends AbstractProtocol
         $chorus = false;
         $chorusErrors = [];
         if (getDolGlobalInt('PDPCONNECTFR_USE_CHORUS')) {
-            $chorus = true;
+            $chorus = true; // TODO : check this condition
         }
         $promise_code = $object->array_options['options_d4d_promise_code'] ?? '';
         if ($promise_code == '') {
@@ -154,99 +163,95 @@ class FacturXProtocol extends AbstractProtocol
             $promise_code = $customerOrderReferenceList[0];
         }
 
-        // Chorus errors checks
-        if ($promise_code == '') {
-            $chorusErrors[] = "N° d'engagement absent";
-        } elseif (\strlen($promise_code) > 50 && $promise_code == $object->ref_customer) {
-            $chorusErrors[] = "Ref client trop longue pour chorus (max 50 caractères)";
-        }
-        if ($object->array_options['options_d4d_contract_number'] == '') {
-            $chorusErrors[] = "N° de marché absent";
-        } else {
-            $chorus = true;
-        }
-        if ($object->array_options['options_d4d_service_code'] == '') {
-            $chorusErrors[] = "Code service absent";
-        } else {
-            $chorus = true;
-        }
-        if (isset($object->thirdparty->idprof2) && trim($object->thirdparty->idprof2) == '') {
-            $chorusErrors[] = "Numéro SIRET du client manquant";
-        }
+        // // Chorus errors checks
+        // if ($promise_code == '') {
+        //     $chorusErrors[] = "N° d'engagement absent";
+        // } elseif (\strlen($promise_code) > 50 && $promise_code == $object->ref_customer) {
+        //     $chorusErrors[] = "Ref client trop longue pour chorus (max 50 caractères)";
+        // }
+        // if ($object->array_options['options_d4d_contract_number'] == '') {
+        //     $chorusErrors[] = "N° de marché absent";
+        // } else {
+        //     $chorus = true;
+        // }
+        // if ($object->array_options['options_d4d_service_code'] == '') {
+        //     $chorusErrors[] = "Code service absent";
+        // } else {
+        //     $chorus = true;
+        // }
+        // if (isset($object->thirdparty->idprof2) && trim($object->thirdparty->idprof2) == '') {
+        //     $chorusErrors[] = "Numéro SIRET du client manquant";
+        // }
 
-        // Display Chorus warnings/errors
-        if ($chorus) {
-            if (count($chorusErrors) > 0) {
-                setEventMessages("Alerte conformité Chorus:", $chorusErrors, 'warnings');
-                dol_syslog(\get_class($this) . '::executeHooks error chorus : ' . \json_encode($chorusErrors), \LOG_ERR);
-            } else {
-                dol_syslog(\get_class($this) . '::executeHooks chorus enabled, no errors detected');
-            }
-        } else {
-            dol_syslog(\get_class($this) . '::executeHooks no chorus data'); // TODO: maybe disable by default
-        }
+        // // Display Chorus warnings/errors
+        // if ($chorus) {
+        //     if (count($chorusErrors) > 0) {
+        //         setEventMessages("Alerte conformité Chorus:", $chorusErrors, 'warnings');
+        //         dol_syslog(\get_class($this) . '::executeHooks error chorus : ' . \json_encode($chorusErrors), \LOG_ERR);
+        //     } else {
+        //         dol_syslog(\get_class($this) . '::executeHooks chorus enabled, no errors detected');
+        //     }
+        // } else {
+        //     dol_syslog(\get_class($this) . '::executeHooks no chorus data'); // TODO: maybe disable by default
+        // }
 
 
         // Base Data Validation (FacturX mandatory fields) ---
         // TODO : use validateMyCompanyConfiguration() and validatethirdpartyConfiguration()
-        $baseErrors = [];
+        // $baseErrors = [];
 
-        // Seller (mysoc) checks
-        if (empty($mysoc->tva_intra)) {
-            $baseErrors[] = $langs->trans("FxCheckErrorVATnumber");
-        }
-        if (empty($mysoc->address)) {
-            $baseErrors[] = $langs->trans("FxCheckErrorAddress");
-        }
-        if (empty($mysoc->zip)) {
-            $baseErrors[] = $langs->trans("FxCheckErrorZIP");
-        }
-        if (empty($mysoc->town)) {
-            $baseErrors[] = $langs->trans("FxCheckErrorTown");
-        }
-        if (empty($mysoc->country_code)) {
-            $baseErrors[] = $langs->trans("FxCheckErrorCountry");
-        }
-
-        // Buyer (thirdparty) checks
-        if (empty($object->thirdparty->name)) {
-            $baseErrors[] = $langs->trans("FxCheckErrorCustomerName");
-        }
-        if (empty($object->thirdparty->idprof1)) {
-            $baseErrors[] = $langs->trans("FxCheckErrorCustomerIDPROF1");
-        }
-        // if (empty($object->thirdparty->idprof2)) {
-        //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerIDPROF2");
+        // // Seller (mysoc) checks
+        // if (empty($mysoc->tva_intra)) {
+        //     $baseErrors[] = $langs->trans("FxCheckErrorVATnumber");
         // }
-        if (empty($object->thirdparty->address)) {
-            $baseErrors[] = $langs->trans("FxCheckErrorCustomerAddress");
-        }
-        if (empty($object->thirdparty->zip)) {
-            $baseErrors[] = $langs->trans("FxCheckErrorCustomerZIP");
-        }
-        if (empty($object->thirdparty->town)) {
-            $baseErrors[] = $langs->trans("FxCheckErrorCustomerTown");
-        }
-        if (empty($object->thirdparty->country_code)) {
-            $baseErrors[] = $langs->trans("FxCheckErrorCustomerCountry");
-        }
-        if ($object->thirdparty->tva_assuj) {
-            // Test VAT code only if thirdparty is subject to VAT
-            $this->_thirdpartyCalcTva_intra($object);
-            if (empty($object->thirdparty->tva_intra)) {
-                $baseErrors[] = $langs->trans("FxCheckErrorCustomerVAT");
-            }
-        }
-        if (!$buyerEmail) {
-            $baseErrors[] = $langs->trans("FxCheckErrorCustomerEmail");
-        }
+        // if (empty($mysoc->address)) {
+        //     $baseErrors[] = $langs->trans("FxCheckErrorAddress");
+        // }
+        // if (empty($mysoc->zip)) {
+        //     $baseErrors[] = $langs->trans("FxCheckErrorZIP");
+        // }
+        // if (empty($mysoc->town)) {
+        //     $baseErrors[] = $langs->trans("FxCheckErrorTown");
+        // }
+        // if (empty($mysoc->country_code)) {
+        //     $baseErrors[] = $langs->trans("FxCheckErrorCountry");
+        // }
 
-        // Display base data warnings
-        if (count($baseErrors) > 0) {
-            dol_syslog(get_class($this) . '::executeHooks baseErrors count > 0');
-            setEventMessages($langs->trans("FxCheckError"), $baseErrors, 'warnings');
-            dol_syslog(get_class($this) . '::executeHooks baseErrors count > 0, error = ' . json_encode($baseErrors));
-        }
+        // // Buyer (thirdparty) checks
+        // if (empty($object->thirdparty->name)) {
+        //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerName");
+        // }
+        // if (empty($object->thirdparty->idprof1)) {
+        //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerIDPROF1");
+        // }
+        // // if (empty($object->thirdparty->idprof2)) {
+        // //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerIDPROF2");
+        // // }
+        // if (empty($object->thirdparty->address)) {
+        //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerAddress");
+        // }
+        // if (empty($object->thirdparty->zip)) {
+        //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerZIP");
+        // }
+        // if (empty($object->thirdparty->town)) {
+        //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerTown");
+        // }
+        // if (empty($object->thirdparty->country_code)) {
+        //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerCountry");
+        // }
+        // if ($object->thirdparty->tva_assuj &&  empty($object->thirdparty->tva_intra)) {
+        //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerVAT");
+        // }
+        // if (!$buyerEmail) {
+        //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerEmail");
+        // }
+
+        // // Display base data warnings
+        // if (count($baseErrors) > 0) {
+        //     dol_syslog(get_class($this) . '::executeHooks baseErrors count > 0');
+        //     setEventMessages($langs->trans("FxCheckError"), $baseErrors, 'warnings');
+        //     dol_syslog(get_class($this) . '::executeHooks baseErrors count > 0, error = ' . json_encode($baseErrors));
+        // }
 
         // Initialize ZugferdDocumentBuilder (FacturX XML) -----------------------------------------------
         dol_syslog(\get_class($this) . '::executeHooks create new XML document based on PROFILE_EN16931 (CIUS-FR)');
@@ -305,7 +310,7 @@ class FacturXProtocol extends AbstractProtocol
                 $object->thirdparty->town         ?? 'TOWN',
                 $object->thirdparty->country_code ?? 'COUNTRY'
             )
-            ->addDocumentBuyerTaxRegistration("VA", $object->thirdparty->tva_intra ?? '')
+            ->addDocumentBuyerTaxRegistration("VA", $object->thirdparty->tva_intra ?? '') //
             ->setDocumentBuyerLegalOrganisation(
                 $this->_remove_spaces($this->thirdpartyidprof($object) ?? ''),
                 $this->IEC_6523_code($object->thirdparty->country_code),
@@ -332,7 +337,7 @@ class FacturXProtocol extends AbstractProtocol
 
         // Add additional referenced documents (Order references) - Disabled for Chorus
         // Not for chorus : a été rejetée pour le(s) motif(s) suivants, identifié(s) dans le flux cycle de vie : L'element (AttachmentBinaryObject.value) est obligatoire si l'element (FichierXml.SupplyChainTradeTransaction.ApplicableHeaderTradeAgreement.AdditionalReferencedDocument) est renseigne.
-        if (!$chorus) {
+        if (!$chorus) { // TODO : check this condition
             foreach ($customerOrderReferenceList as $customerOrderRef) {
                 if ($customerOrderRef != $promise_code) {
                     $facturxpdf->addDocumentAdditionalReferencedDocument($customerOrderRef, "130");
@@ -1374,26 +1379,6 @@ class FacturXProtocol extends AbstractProtocol
         \sort($customerOrderReferenceList);
         $deliveryDateList = \array_unique($deliveryDateList);
         \rsort($deliveryDateList);
-    }
-
-    /** VMA calcul n°tva intracomm si absent
-     * in France only
-     *
-     */
-    private function _thirdpartyCalcTva_intra(Facture &$object)
-    { // TODO: move this function to class utils
-        if ($object->thirdparty->country_code == 'FR' && empty($object->thirdparty->tva_intra) && !empty($object->thirdparty->tva_assuj)) {
-            $siren = trim($object->thirdparty->idprof1);
-            if (empty($siren)) {
-                $siren = (int) substr(str_replace(' ', '', $object->thirdparty->idprof2), 0, 9);
-            }
-            if (!empty($siren)) {
-                // [FR + code clé  + numéro SIREN ]
-                //Clé TVA = [12 + 3 × (SIREN modulo 97)] modulo 97
-                $cle = (12 + 3 * $siren % 97) % 97;
-                $object->thirdparty->tva_intra = 'FR' . $cle . $siren;
-            }
-        }
     }
 
     /**
