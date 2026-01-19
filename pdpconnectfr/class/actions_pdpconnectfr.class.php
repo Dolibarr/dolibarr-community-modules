@@ -22,6 +22,8 @@
  * \brief   Hook of module
  */
 
+use Luracast\Restler\Data\Arr;
+
 require_once DOL_DOCUMENT_ROOT.'/core/class/commonhookactions.class.php';
 require_once __DIR__ . "/pdpconnectfr.class.php";
 
@@ -189,9 +191,14 @@ class ActionsPdpconnectfr extends CommonHookActions
 
         dol_syslog(__METHOD__ . " Hook doActions called for object " . get_class($object) . " action=" . $action);
 
+
+        if (!in_array($object->element, ['facture'])) {
+            return 0;
+        }
         $object->fetch_thirdparty();
         $thirdpartyCountryCode = $object->thirdparty->country_code;
-        if (!in_array($object->element, ['facture']) || $thirdpartyCountryCode !== 'FR') {
+
+        if ($thirdpartyCountryCode !== 'FR') {
             return 0;
         }
 
@@ -302,4 +309,154 @@ class ActionsPdpconnectfr extends CommonHookActions
         return 0;
     }
 
+
+    /**
+     * Add SELECT fields
+     */
+    public function printFieldListSelect($parameters, &$object, &$action, $hookmanager)
+    {
+        if (in_array('invoicelist', explode(':', $parameters['context']))) {
+            $this->resprints .= ', ext.syncstatus  AS pdp_syncstatus';
+        }
+        return 0;
+    }
+
+    /**
+     * Add FROM / JOIN
+     */
+    public function printFieldListFrom($parameters, &$object, &$action, $hookmanager)
+    {
+        if (in_array('invoicelist', explode(':', $parameters['context']))) {
+            $this->resprints .= ' LEFT JOIN '.MAIN_DB_PREFIX.'pdpconnectfr_extlinks ext
+                ON ext.element_id = f.rowid
+                AND ext.element_type = "facture"';
+        }
+        return 0;
+    }
+
+    /**
+     * Add WHERE (search filters)
+     */
+    public function printFieldListWhere($parameters, &$object, &$action, $hookmanager)
+    {
+        if (!in_array('invoicelist', explode(':', $parameters['context']))) {
+            return 0;
+        }
+
+        if (GETPOST('search_pdp_syncstatus', 'alpha') !== '' && GETPOST('search_pdp_syncstatus', 'alpha') != -2) {
+            $this->resprints .= ' AND ext.syncstatus = '.((int) GETPOST('search_pdp_syncstatus'));
+        }
+
+        return 0;
+    }
+
+
+    /**
+     * Column titles
+     */
+    public function printFieldListTitle($parameters, &$object, &$action, $hookmanager)
+    {
+        global $langs;
+
+        if (!in_array('invoicelist', explode(':', $parameters['context']))) {
+            return 0;
+        }
+
+        // Einvoice generated or not
+        print print_liste_field_titre(
+            $langs->trans('EInvoiceFile')
+        );
+
+        // syncstatus
+        print print_liste_field_titre(
+            $langs->trans('PDPSyncStatus')
+        );
+
+        return 0;
+    }
+
+    /**
+     * Filter options
+     */
+    public function printFieldListOption($parameters, &$object, &$action, $hookmanager)
+    {
+        global  $form, $langs, $db;
+        if (in_array('invoicelist', explode(':', $parameters['context']))) {
+
+            // Einvoice generated or not
+            print '<td class="liste_titre">';
+            print '&nbsp;';
+            print '</td>';
+
+            // syncstatus
+            $pdpConnectFr = new PdpConnectFr($db);
+            $listofoptions = $pdpConnectFr->getEinvoiceStatusOptions();
+
+            // Remove option related to E-invoice generation status
+            unset($listofoptions[$pdpConnectFr::STATUS_NOT_GENERATED]);
+            unset($listofoptions[$pdpConnectFr::STATUS_GENERATED]);
+            unset($listofoptions[$pdpConnectFr::STATUS_UNKNOWN]);
+
+            print '<td class="liste_titre">';
+            print $form->selectarray(
+                'search_pdp_syncstatus',
+                $listofoptions,
+                GETPOST('search_pdp_syncstatus', 'alpha'),
+                -2,
+                0,
+                0,
+                '',
+                0,
+                0,
+                0,
+                '',
+                'width100 ',
+            );
+            print '</td>';
+        }
+        return 0;
+    }
+
+    /**
+     * Row values
+     */
+    public function printFieldListValue($parameters, &$object, &$action, $hookmanager)
+    {
+        global $db, $langs;
+
+        if (!in_array('invoicelist', explode(':', $parameters['context']))) {
+            return 0;
+        }
+
+        $obj = $parameters['obj'];
+
+
+        $pdpConnectFr = new PdpConnectFr($db);
+        // Einvoice generated or not
+        $einvoiceGenerated = $pdpConnectFr->fetchLastknownInvoiceStatus($obj->ref)['file'];
+        print '<td class="center">';
+        if ($einvoiceGenerated) {
+            print '<i class="fas fa-check-circle" style="color:green;" title="'.$langs->trans('EInvoiceGeneratedList').'"></i>';
+        }
+        print '</td>';
+
+        // syncstatus
+        $currentStatusDetails = $obj->pdp_syncstatus ? $pdpConnectFr->getStatusLabel($obj->pdp_syncstatus) : '-';
+        print '<td class="center">';
+        print $currentStatusDetails;
+        print '</td>';
+
+        return 0;
+    }
+
+    /**
+     * Footer line
+     */
+    /*public function printFieldListFooter($parameters, &$object, &$action, $hookmanager)
+    {
+        if (in_array('invoicelist', explode(':', $parameters['context']))) {
+            print '<td>xxx</td>';
+        }
+        return 0;
+    }*/
 }

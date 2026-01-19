@@ -16,15 +16,15 @@
 
 CREATE TABLE llx_pdpconnectfr_extlinks(
 	rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL,
-	element_id int NOT NULL, 		    -- ID of element.
-	element_type int NOT NULL, 		    -- Type of element (from property object->element)
-    provider varchar(50) NOT NULL, 		-- Provider key ('esalink', ...)
+	element_id int, 		    		-- ID of element.
+	element_type varchar(50) NOT NULL, 		    -- Type of element (from property object->element)
+    provider varchar(50) NOT NULL, 				-- Provider key ('esalink', ...)
 	date_creation datetime NOT NULL, 
 	tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, 
 	fk_user_creat integer NOT NULL, 
 	fk_user_modif integer,
 	flow_id varchar(255),
-	syncstatus integer NOT NULL,		-- If the object has a status into the einvoice external system
-	syncref varchar(255),				-- If the object has a given reference into the einvoice external system
-	synccomment varchar(255)			-- If we want to store a message for the last sync action try
+	syncstatus integer,				-- If the object has a status into the einvoice external system
+	syncref varchar(255),						-- If the object has a given reference into the einvoice external system
+	synccomment varchar(255)					-- If we want to store a message for the last sync action try
 ) ENGINE=innodb;

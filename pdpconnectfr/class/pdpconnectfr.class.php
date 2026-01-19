@@ -135,6 +135,21 @@ class PdpConnectFr
     }
 
     /**
+     * Get all e-invoice status options
+     *
+     * @return array<int, string>
+     */
+    public function getEinvoiceStatusOptions()
+    {
+        global $langs;
+        $options = [];
+        foreach (self::STATUS_LABEL_KEYS as $code => $labelKey) {
+            $options[$code] = $langs->trans($labelKey);
+        }
+        return $options;
+    }
+
+    /**
      * Validate my company configuration
      *
      * @return array{res:int, message:string} Returns array with 'res' (1 on success, -1 on error and 0 on warning) and info 'message'
@@ -365,6 +380,13 @@ class PdpConnectFr
         $resprints .= '<tr id="einvoice-info-row" ' . $displayStyle . '>';
         $resprints .= '<td class="titlefield">' . $langs->trans("pdpconnectfrInvoiceInfo") . '</td>';
         $resprints .= '<td><span id="einvoice-info">' . htmlspecialchars($info) . '</span></td>';
+        $resprints .= '</tr>';
+
+        // E-Invoice events history link
+        $resprints .= '<tr>';
+        $resprints .= '<td>' . $langs->trans("EInvoiceEventsLabel") . '</td>';
+        $url = dol_buildpath('compta/facture/agenda.php', 1) . '?id=' . urlencode($object->id) . '&search_agenda_label=PDPCONNECTFR';
+        $resprints .= '<td><a href="' . $url . '">' . $langs->trans("EInvoiceEventsLink") . ' <i class="fas fa-history"></i></a></td>';
         $resprints .= '</tr>';
 
 
