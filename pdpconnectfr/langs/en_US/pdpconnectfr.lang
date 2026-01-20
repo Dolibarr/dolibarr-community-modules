@@ -205,3 +205,5 @@ EInvoiceEventsLink=History
 EInvoiceFile=E-invoice File
 PDPSyncStatus=PDP Status
 EInvoiceGeneratedList=Generated
+SuggestedActions=Recommended actions before the next synchronization
+CreateSupplier=Create supplier

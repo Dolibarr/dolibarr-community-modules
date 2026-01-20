@@ -846,6 +846,14 @@ if ($action == 'confirm_sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $conf
 		print '<strong><u>'.$langs->trans("SyncResults").' :</u></strong></br>';
 		print implode("<br>", $sync_result['messages']);
 		print '</div>';
+
+		// Suggested action after sync failed
+		if ($sync_result['actions']) {
+			print '<div class="wordbreak error clearboth">';
+			print '<strong><u>'.$langs->trans("SuggestedActions").' :</u></strong></br>';
+			print implode("<br>", $sync_result['actions']);
+			print '</div>';
+		}
 		print '<br>';
 	}
 }

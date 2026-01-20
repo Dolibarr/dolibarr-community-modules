@@ -160,20 +160,23 @@ abstract class AbstractPDPProvider
     abstract public function callApi($resource, $method, $options = false, $extraHeaders = [], $callType = '');
 
     /**
-     * Synchronize flows with PDP.
+     * Synchronize flows with EsaLink.
      * @param   int   $syncFromDate     Timestamp from which to start synchronization. If 0, begins from epoch (1970-01-01).
      * @param   int   $limit            Maximum number of flows to synchronize. 0 means no limit.
      *
-     * @return bool|array{res:int, messages:array<string>} True on success, false on failure along with messages.
+     * @return 	bool|array{res:int, messages:array<string>, actions:array<string>} 	True on success, false on failure along with messages and suggested optional actions.
      */
     abstract public function syncFlows($syncFromDate = 0, $limit = 0);
+
     /**
-     * Store a flow data.
+     * sync flow data.
      *
-     * @param  string $flowId       FlowId
-     * @return bool                 True on success, false on failure
+     * @param string $flowId        FlowId
+     * @param string|null $call_id  Call ID for logging purposes
+     *
+     * @return array{res:int, message:string, action:string|null} Returns array with 'res' (1 on success, 0 if exists or already processed, -1 on failure) with a 'message' and an optional 'action'.
      */
-    abstract public function syncFlow($flowId);
+    abstract public function syncFlow($flowId, $call_id = null);
 
     /**
      * Insert or update OAuth token for the given PDP.
