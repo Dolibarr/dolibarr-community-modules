@@ -953,8 +953,9 @@ class ActionsHelloAsso extends CommonHookActions
 	public function printFieldListSelect($parameters, &$object, &$action, $hookmanager){
 		if (isModEnabled('helloasso') && $parameters["currentcontext"] == "thirdpartylist") {
 			$this->resprints = ", hmember.rowid as member_id, hmember.statut as member_status";
+			return 1;
 		}
-		return 1;
+		return 0;
 	}
 
 	/**
@@ -969,8 +970,9 @@ class ActionsHelloAsso extends CommonHookActions
 	public function printFieldListFrom($parameters, &$object, &$action, $hookmanager){
 		if (isModEnabled('helloasso') && $parameters["currentcontext"] == "thirdpartylist") {
 			$this->resprints = " LEFT JOIN ".MAIN_DB_PREFIX."adherent as hmember on (hmember.fk_soc = s.rowid)";
+			return 1;
 		}
-		return 1;
+		return 0;
 	}
 
 	/**
@@ -989,8 +991,9 @@ class ActionsHelloAsso extends CommonHookActions
 				$this->resprints = '<td class="liste_titre">';
 				$this->resprints .= '</td>';
 			}
+			return 1;
 		}
-		return 1;
+		return 0;
 	}
 
 	/**
@@ -1012,8 +1015,9 @@ class ActionsHelloAsso extends CommonHookActions
 				$this->resprints = getTitleFieldOfList($arrayfields['hmember.status']['label'], 0, $_SERVER["PHP_SELF"], 'hmember.statut', '', $param, '',$sortfield, $sortorder);
 				$parameters["totalarray"]['nbfield']++;
 			}
+			return 1;
 		}
-		return 1;
+		return 0;
 	}
 
 	/**
@@ -1045,8 +1049,9 @@ class ActionsHelloAsso extends CommonHookActions
 					$this->resprints .= '</td>';
 				}
 			}
+			return 1;
 		}
-		return 1;
+		return 0;
 	}
 }
 
