@@ -987,7 +987,7 @@ class FacturXProtocol extends AbstractProtocol
      *
      * @param  string $file                         Factur-X file.
      * @param  string|null $ReadableViewFile        Readable view file. (PDP Generated readable PDF)
-     * @return array{res:int, message:string}       Returns array with 'res' (1 on success, 0 already exists, -1 on failure) and info 'message'
+     * @return array{res:int, message:string, action:string|null}       Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and an optional 'action'.
      */
     public function createSupplierInvoiceFromFacturX($file, $ReadableViewFile = null)
     {
@@ -1139,8 +1139,9 @@ class FacturXProtocol extends AbstractProtocol
         $syncSocRes = $this->_syncOrCreateThirdpartyFromFacturXSeller($parsedData);
         $socId = $syncSocRes['res'];
         $return_messages[] = $syncSocRes['message'];
+        $action = $syncSocRes['action'] ?? null;
         if ($socId < 0) {
-            return ['res' => -1, 'message' => 'Thirdparty sync or creation error: ' . implode("\n", $return_messages) ];
+            return ['res' => -1, 'message' => 'Thirdparty sync or creation error: ' . implode("\n", $return_messages) , 'action' => $action ];
         }
 
         // Load supplier (thirdparty)
@@ -1702,7 +1703,7 @@ class FacturXProtocol extends AbstractProtocol
      * @param array     $sellerInfo Array containing seller information extracted from Factur-X
      * @param string    $priority Fill priority ('dolibarr' or 'pdp'). If both data are available, which one to prefer
      *
-     * @return array{res:int, message:string}   Returns array with 'res' (ID of the synchronized or created thirdparty, -1 on error) and info 'message'
+     * @return array{res:int, message:string, action:string|null}   Returns array with 'res' (ID of the synchronized or created thirdparty, -1 on error) with a 'message' and an optional 'action'.
      */
     private function _syncOrCreateThirdpartyFromFacturXSeller($sellerInfo, $priority = 'dolibarr')
     {
@@ -1791,6 +1792,8 @@ class FacturXProtocol extends AbstractProtocol
         }
 
         // Step 3: Create or update thirdparty
+
+        //$thirdpartyId = -2; // For testing
 
         // if found, update information
         if ($thirdpartyId > 0) {
@@ -1946,18 +1949,37 @@ class FacturXProtocol extends AbstractProtocol
         } else {
             dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromFacturXSeller Auto-creation of thirdparties is disabled', LOG_ERR);
 
-            $sellername = trim($sellerInfo['sellername'] ?? 'Unknown Supplier name');
+            $sellername = trim($sellerInfo['sellername'] ?? '');
             $selleremail = trim($sellerInfo['sellercontactemailaddr'] ?? '');
+
             $selleridents = [];
+            $createParams = [];
+
+            if (!empty($sellername)) {
+                $selleridents[] = 'Supplier: ' . $sellername;
+                $createParams['name'] = $sellername;
+            }
+            if (!empty($selleremail)) {
+                $selleridents[] = 'Email: ' . $selleremail;
+                $createParams['email'] = $selleremail;
+            }
+
             if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
                 foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
                     if (!empty($globalId)) {
                         $idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme);
                         if (!empty($idprofField)) {
                             $selleridents[] = $idScheme . ': ' . $globalId;
+                            $createParams[$idprofField] = $globalId;
                         }
                     }
                 }
+            }
+
+            // Create URL to prefill thirdparty creation form
+            $createUrl = DOL_URL_ROOT . '/societe/card.php?action=create&type=f';
+            if (!empty($createParams)) {
+                $createUrl .= '&' . http_build_query($createParams);
             }
 
             $errorDetails = [];
@@ -1973,7 +1995,14 @@ class FacturXProtocol extends AbstractProtocol
 
             $detailsStr = !empty($errorDetails) ? ' (' . implode(' | ', $errorDetails) . ')' : '';
 
-            return array('res' => -1, 'message' => 'Unable to find supplier' . $detailsStr . '. Auto-creation of thirdparties is disabled in settings. Please create the supplier manually or enable automatic supplier creation in module configuration.');
+            $message = 'Unable to find supplier' . $detailsStr . '. Auto-creation of thirdparties is disabled in settings.';
+
+            $action = 'Manual supplier creation based on the retrieved information from E-invoice ';
+            $action .= '<a class="butAction small" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
+            $action .= '<i class="fas fa-plus-circle"></i> ';
+            $action .= $langs->trans('CreateSupplier');
+            $action .= '</a>';
+            return array('res' => -1, 'message' => $message, 'action' => $action);
         }
     }
 

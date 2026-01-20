@@ -489,13 +489,14 @@ class EsalinkPDPProvider extends AbstractPDPProvider
      * @param   int   $syncFromDate     Timestamp from which to start synchronization. If 0, begins from epoch (1970-01-01).
      * @param   int   $limit            Maximum number of flows to synchronize. 0 means no limit.
      *
-     * @return 	bool|array{res:int, messages:array<string>} 	True on success, false on failure along with messages.
+     * @return 	bool|array{res:int, messages:array<string>, actions:array<string>} 	True on success, false on failure along with messages and suggested optional actions.
      */
     public function syncFlows($syncFromDate = 0, $limit = 0)
     {
         global $db, $user;
 
         $results_messages = array();
+        $actions = array();
         $uuid = $this->generateUuidV4(); // UUID used to correlate logs between Dolibarr and PDP TODO : Store it somewhere
 
         //self::$PDPCONNECTFR_LAST_IMPORT_KEY = $uuid;
@@ -634,12 +635,15 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				if ($res['res'] < 0) {
 					$db->rollback();
 					$results_messages[] = "Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'];
+                    if (isset($res['action']) && $res['action'] != '') {
+                        $actions[] = $res['action'];
+                    }
 					$error++;
 				}
 
 				// If res == 0, commit but count it as already existed
 				if ($res['res'] == 0) {
-					$results_messages[] = "Skipped - Exist or already processed flow " . $flow['flowId'] . ": " . $res['message'];
+					$results_messages[] = "<span class=\"opacitylow\">Skipped - Exist or already processed flow " . $flow['flowId'] . ": " . $res['message'] . "</span>";
 					$alreadyExist++;
 					$lastsuccessfullSyncronizedFlow = $flow['flowId'];
 					$db->commit();
@@ -670,6 +674,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 		dol_syslog(__METHOD__ . " syncFlows end : ".$globalresultmessage, LOG_DEBUG, 0, "_pdpconnectfr");
 
+        $results_messages[] = "<hr>";
 		$results_messages[] = $globalresultmessage;
         $results_messages[] = "Total flows to synchronize: ".$totalFlows;
         $results_messages[] = "Batch size: ".$limit;
@@ -694,7 +699,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         $db->query($sql);
 
         // Return result
-        return array('res' => $res, 'messages' => $results_messages, 'alreadyExist' => $alreadyExist, 'syncedFlows' => $syncedFlows);
+        return array('res' => $res, 'messages' => $results_messages, 'alreadyExist' => $alreadyExist, 'syncedFlows' => $syncedFlows, 'actions' => $actions);
     }
 
     /**
@@ -703,7 +708,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
      * @param string $flowId        FlowId
      * @param string|null $call_id  Call ID for logging purposes
      *
-     * @return array{res:int, message:string} Returns array with 'res' (1 on success, 0 if exists or already processed, -1 on failure) and 'message'
+     * @return array{res:int, message:string, action:string|null} Returns array with 'res' (1 on success, 0 if exists or already processed, -1 on failure) with a 'message' and an optional 'action'.
      */
     public function syncFlow($flowId, $call_id = null)
     {
@@ -830,7 +835,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
                 $res = $this->exchangeProtocol->createSupplierInvoiceFromFacturX($receivedFile, $ReadableViewFile);
                 if ($res['res'] < 0) {
-                    return array('res' => -1, 'message' => "Failed to create supplier invoice from FacturX document for flowId: " . $flowId . ". " . $res['message']);
+                    return array('res' => -1, 'message' => "Failed to create supplier invoice from FacturX document for flowId: " . $flowId . ". " . $res['message'], 'action' => $res['action'] ?? null);
                 } elseif ($res['res'] == 0) {
                     return array('res' => 0, 'message' => "supplier invoice already exists for flowId: " . $flowId . ". " . $res['message']);
                 }
