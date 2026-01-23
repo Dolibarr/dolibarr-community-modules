@@ -733,6 +733,44 @@ if ($action == 'sync' && $provider) {
 	}
 }
 
+// sync results
+if ($action == 'confirm_sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $confirm == 'yes' && !empty($sync_result)) {
+	if (isset($provider)) {
+
+		$cssclass = ($sync_result['res'] > 0) ? 'info' : 'error';
+
+		if (getDolGlobalInt('PDPCONNECTFR_DEBUG_MODE') && !empty($sync_result['details'])) {
+			print '<div class="wordbreak '.$cssclass.' clearboth">';
+			print '<strong><u>'.$langs->trans("SyncLog").' :</u></strong><br>';
+			print implode("<br>", $sync_result['details']);
+			print '</div>';
+		}
+
+		// Sync result messages
+		print '<div class="wordbreak '.$cssclass.' clearboth">';
+		print '<strong><u>'.$langs->trans("SyncResults").' :</u></strong></br>';
+		print implode("<br>", $sync_result['messages']);
+		print '</div>';
+
+		// Suggested action after sync failed
+		if ($sync_result['actions']) {
+			print '<div class="wordbreak warning clearboth">';
+			print '<strong><u>'.$langs->trans("SuggestedActions").' :</u></strong></br>';
+			print implode("<br>", $sync_result['actions']);
+			print '</div>';
+		}
+
+		// If error but no suggested action and debug mode is off, show a message to ask to enable debug mode
+		if ($sync_result['res'] < 0 && empty($sync_result['actions']) && !getDolGlobalInt('PDPCONNECTFR_DEBUG_MODE')) {
+			print '<div class="wordbreak warning clearboth">';
+			print '<strong><u>'.$langs->trans("SuggestedActions").' :</u></strong></br>';
+			print $langs->trans("EnableDebugModeToSeeMoreDetails");
+			print '</div>';
+		}
+		print '<br>';
+	}
+}
+
 
 // Last flow sync info
 $last_sync = 0;
@@ -761,6 +799,23 @@ if ($resLastsyncinfosql) {
 	}
 } else {
 	$last_sync_info = $langs->trans("ErrorGettingLastSyncInfo");
+}
+
+// Last supplier invoice that could not be processed by the system
+$last_supplier_invoice_error = '';
+$filePath = $conf->pdpconnectfr->dir_temp . '/facturx.pdf';
+if (file_exists($filePath)) {
+	$urlOriginalFile = DOL_URL_ROOT . '/document.php?modulepart=pdpconnectfr'
+        . '&file=' . urlencode('temp/facturx.pdf');
+	$urlConvertedFile = DOL_URL_ROOT . '/document.php?modulepart=pdpconnectfr'
+        . '&file=' . urlencode('temp/facturx_readable.pdf');
+	$last_supplier_invoice_error = img_picto('', 'times', 'class="pictofixedwidth" style="color:red;"');
+	$last_supplier_invoice_error .= ' ' . $langs->trans("LastSupplierInvoiceCouldNotBeProcessed");
+	$last_supplier_invoice_error .= '<i class="fas fa-info-circle em088 opacityhigh classfortooltip" title="'. $langs->trans("LastSupplierInvoiceCouldNotBeProcessedInfo") .'"></i>';
+	$last_supplier_invoice_error .= ' : ';
+	$last_supplier_invoice_error .= '<a href="'.$urlOriginalFile.'">' . $langs->trans("facturXDownloadOriginal") . ' ' . img_picto('', 'download', 'class="pictofixedwidth"') . '</a>';
+	$last_supplier_invoice_error .= ' | ';
+	$last_supplier_invoice_error .= '<a href="'.$urlConvertedFile.'">' . $langs->trans("facturXDownloadConverted") . ' ' . img_picto('', 'download', 'class="pictofixedwidth"') . '</a>';
 }
 
 // Form for sync action
@@ -802,14 +857,19 @@ if ($provider) {
 
 	print '</table>'."\n";
 	print '</div>';
-	print '<br>';
+	//print '<br>';
 
 
 	print '<div class="inline-block valignmiddle">'."\n";
-	print '<a href="#" id="runSyncBtn" class="butAction small">'.img_picto('', 'refresh', 'class="pictofixedwidth"').' '.$langs->trans("RUN_SYNC").'</a>'."\n";
+	print '<a href="#" id="runSyncBtn" class="butAction small" style="margin: 0;">'.img_picto('', 'refresh', 'class="pictofixedwidth"').' '.$langs->trans("RUN_SYNC").'</a>'."\n";
 	print '</div>'."\n";
 
 	print '<br class="clearboth">';
+	print '<br>';
+	print '<hr>';
+	if ($last_supplier_invoice_error) {
+		print '<div class="opacitylow floatleft margintoponly">'.$last_supplier_invoice_error.'</div>'."\n";
+	}
 	print '<div class="opacitylow floatleft margintoponly">'.$last_sync_info.'</div>'."\n";
 
 	print "</div>"."\n";
@@ -835,27 +895,6 @@ if ($provider) {
 } else {
 	// Message to check module configuration
 	print info_admin($langs->transnoentities("checkPdpConnectFrModuleConfiguration"), 0, 0, '1', '', '', 'warning');
-}
-
-
-// sync results
-if ($action == 'confirm_sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $confirm == 'yes' && !empty($sync_result)) {
-	if (isset($provider)) {
-		$cssclass = ($sync_result['res'] > 0) ? 'info' : 'error';
-		print '<div class="wordbreak '.$cssclass.' clearboth">';
-		print '<strong><u>'.$langs->trans("SyncResults").' :</u></strong></br>';
-		print implode("<br>", $sync_result['messages']);
-		print '</div>';
-
-		// Suggested action after sync failed
-		if ($sync_result['actions']) {
-			print '<div class="wordbreak error clearboth">';
-			print '<strong><u>'.$langs->trans("SuggestedActions").' :</u></strong></br>';
-			print implode("<br>", $sync_result['actions']);
-			print '</div>';
-		}
-		print '<br>';
-	}
 }
 
 

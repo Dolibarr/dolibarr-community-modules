@@ -489,7 +489,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
      * @param   int   $syncFromDate     Timestamp from which to start synchronization. If 0, begins from epoch (1970-01-01).
      * @param   int   $limit            Maximum number of flows to synchronize. 0 means no limit.
      *
-     * @return 	bool|array{res:int, messages:array<string>, actions:array<string>} 	True on success, false on failure along with messages and suggested optional actions.
+     * @return 	bool|array{res:int, messages:array<string>, details:array<string>, actions:array<string>} 	True on success, false on failure along with messages, details for debugging, and suggested optional actions.
      */
     public function syncFlows($syncFromDate = 0, $limit = 0)
     {
@@ -612,7 +612,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		// Call ID for logging purposes
 		$call_id = $response['call_id'] ?? null;
 
-		$lastsuccessfullSyncronizedFlow = null;
+		//$lastsuccessfullSyncronizedFlow = null;
 		$i = 0;
 		foreach ($response['response']['results'] as $flow) {
 			$i++;
@@ -645,14 +645,14 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				if ($res['res'] == 0) {
 					$results_messages[] = "<span class=\"opacitylow\">Skipped - Exist or already processed flow " . $flow['flowId'] . ": " . $res['message'] . "</span>";
 					$alreadyExist++;
-					$lastsuccessfullSyncronizedFlow = $flow['flowId'];
+					//$lastsuccessfullSyncronizedFlow = $flow['flowId'];
 					$db->commit();
 				}
 
 				// If res == 1, commit and count as synced
 				if ($res['res'] > 0) {
 					$syncedFlows++;
-					$lastsuccessfullSyncronizedFlow = $flow['flowId'];
+					//$lastsuccessfullSyncronizedFlow = $flow['flowId'];
 					$db->commit();
 				}
 			} catch (Exception $e) {
@@ -670,18 +670,21 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
         $res = $error > 0 ? -1 : 1;
 
-        $globalresultmessage = ($res == 1) ? "Synchronization completed successfully." : "Synchronization aborted, last successfull synchronized flow: ".((string) $lastsuccessfullSyncronizedFlow);
+        $globalresultmessage = ($res == 1) ? "Synchronization completed successfully." : "Synchronization aborted on flow :: " . ($flow['flowId'] ?? 'N/A');
 
 		dol_syslog(__METHOD__ . " syncFlows end : ".$globalresultmessage, LOG_DEBUG, 0, "_pdpconnectfr");
 
-        $results_messages[] = "<hr>";
-		$results_messages[] = $globalresultmessage;
-        $results_messages[] = "Total flows to synchronize: ".$totalFlows;
-        $results_messages[] = "Batch size: ".$limit;
-        $results_messages[] = "Total flows skipped (exist or already processed): ".$alreadyExist;
-        $results_messages[] = "Total of new flows synchronized: ".$syncedFlows;
 
+        $messages = array();
+		$messages[] = $globalresultmessage;
+        $messages[] = "Total flows to synchronize: ".$totalFlows;
+        $messages[] = "Batch size: ".$limit;
+        $messages[] = "Total flows skipped (exist or already processed): ".$alreadyExist;
+        $messages[] = "Total of new flows synchronized: ".$syncedFlows;
+
+        // Processing result that will be saved in DB
         $processingResult = implode("<br>----------------------<br>", $results_messages);
+        $processingResult .= "<br>----------------------<br>" . implode("<br>", $messages);
         $processingResult = "Processing result:<br>" . $processingResult;
 
         // Save sync recap
@@ -699,7 +702,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         $db->query($sql);
 
         // Return result
-        return array('res' => $res, 'messages' => $results_messages, 'alreadyExist' => $alreadyExist, 'syncedFlows' => $syncedFlows, 'actions' => $actions);
+        return array('res' => $res, 'messages' => $messages, 'alreadyExist' => $alreadyExist, 'syncedFlows' => $syncedFlows, 'actions' => $actions, 'details' => $results_messages);
     }
 
     /**

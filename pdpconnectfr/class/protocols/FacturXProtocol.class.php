@@ -482,13 +482,23 @@ class FacturXProtocol extends AbstractProtocol
                 }
             }
             if (empty($libelle)) {
-                $libelle = $line->product_label ? $line->product_label : "libre";
+                $libelle = $line->product_label ? $line->product_label : "";
             }
             if (empty($description)) {
-                $description = $line->desc ? $line->desc : "";
+                $description = $line->desc ? dol_string_nohtmltag($line->desc, 0) : "";
+            }
+            if (empty($libelle) && !empty($description)) {
+                $libelle = dol_trunc(dolGetFirstLineOfText(dol_string_nohtmltag($description)), 49, 'right', 'UTF-8', 1);
+
+                if ($libelle == $description) {
+                    $description = "";
+                }
             }
             $lineref = $line->product_ref ? $line->product_ref : "0000";
             $lineproductref = $line->product_ref ? $line->product_ref : "0000";
+
+            // TODO: ADD supplier product reference if available
+            // TODO: Add globalIDType and globalID if available
 
             // Add the line item to the XML
             $facturxpdf
@@ -1000,13 +1010,21 @@ class FacturXProtocol extends AbstractProtocol
             dol_mkdir($tempDir);
         }
 
-        $tempFile = $tempDir . '/' . uniqid('facturx_') . '.pdf';
+        // If tmp dir in not empty, clean it
+        $files = scandir($tempDir);
+        foreach ($files as $f) {
+            if ($f != '.' && $f != '..') {
+                dol_delete_file($tempDir . '/' . $f);
+            }
+        }
+
+        $tempFile = $tempDir . '/facturx.pdf';
         if (file_put_contents($tempFile, $file) === false) {
             return ['res' => -1, 'message' => 'Failed to save Factur-X file to temporary location' ];
         }
 
         if ($ReadableViewFile) {
-            $tempFileReadableView = $tempDir . '/' . uniqid('facturx_readable_') . '.pdf';
+            $tempFileReadableView = $tempDir . '/facturx_readable.pdf';
             if (file_put_contents($tempFileReadableView, $ReadableViewFile) === false) {
                 return ['res' => -1, 'message' => 'Failed to save readable view file to temporary location' ];
             }
@@ -1233,7 +1251,7 @@ class FacturXProtocol extends AbstractProtocol
                 // Sync or create product
                 $res = $this->_findOrCreateProductFromFacturXLine($productRetrievedData);
                 if ($res['res'] < 0) {
-                    return ['res' => -1, 'message' => 'Product sync or creation error: ' . $res['message'] ];
+                    return ['res' => -1, 'message' => 'Product sync or creation error: ' . $res['message'], 'action' => $res['action'] ?? null ];
                 }
                 /*print "<pre>";
                 print_r($res);
@@ -1273,6 +1291,8 @@ class FacturXProtocol extends AbstractProtocol
         if ($result < 0) {
             return ['res' => -1, 'message' => 'Invoice creation error: ' . $supplierInvoice->error];
         } else {
+
+            // TODO : Add supplier price for products (all lines of the invoice)
 
             // Set import_key
             $sql = 'UPDATE '.MAIN_DB_PREFIX."facture_fourn SET import_key = '".$db->escape($supplierInvoice->import_key)."' WHERE rowid = ".((int) $result);
@@ -2010,7 +2030,7 @@ class FacturXProtocol extends AbstractProtocol
      * Find or create a Dolibarr product based on Factur-X invoice line data
      * @param array $lineData Array containing invoice line data extracted from Factur-X
      *
-     * @return array{res:int, message:string}   Returns array with 'res' (ID of the found or created product, -1 on error) and info 'message'
+     * @return array{res:int, message:string, action:string|null}   Returns array with 'res' (ID of the found or created product, -1 on error) with a 'message' and an optional 'action'.
      */
     private function _findOrCreateProductFromFacturXLine($lineData)
     {
@@ -2041,7 +2061,7 @@ class FacturXProtocol extends AbstractProtocol
         *    - Use this product for supplier invoice line (with extrafield to be verified tag)
         *    - Add supplier price information (if not added automatically by Dolibarr)
         */
-        global $db, $user;
+        global $db, $user, $langs;
 
         // 1. Search in product supplier prices table using prodsellerid
         $sql = "SELECT p.rowid ";
@@ -2090,7 +2110,7 @@ class FacturXProtocol extends AbstractProtocol
         if (!empty(getDolGlobalInt('PDPCONNECTFR_PRODUCTS_AUTO_GENERATION'))) {
             $product = new Product($db);
             $product->type        = $this->_detectProductTypeFromFacturx($lineData);
-            $product->ref = 'FACTURX-' . dol_sanitizeFileName(!empty($lineData['prodsellerid']) ? $lineData['prodsellerid'] : time());
+            $product->ref = 'FACTURX-' . dol_sanitizeFileName(!empty($lineData['prodsellerid'] && $lineData['prodsellerid'] !== "0000") ? $lineData['prodsellerid'] : time());
             $product->ref_ext     = trim($lineData['prodsellerid'] ?? '');
             $product->label       = !empty($lineData['prodname'])
                 ? $lineData['prodname']
@@ -2148,19 +2168,48 @@ class FacturXProtocol extends AbstractProtocol
             $prodDesc = trim($lineData['proddesc'] ?? '');
 
             $errorDetails = [];
-            if (!empty($prodRef)) {
-                $errorDetails[] = 'Supplier Ref: ' . $prodRef;
+            $createParams = [];
+            if (!empty($prodRef) && $prodRef !== "0000") {
+                $errorDetails[] = $prodRef . " | ";
+                $createParams['ref_ext'] = $prodRef;
             }
             if (!empty($prodName)) {
                 $errorDetails[] = 'Name: ' . $prodName;
+                $createParams['label'] = $prodName;
             }
             if (!empty($prodDesc)) {
-                $errorDetails[] = 'Description: ' . $prodDesc;
+                //$errorDetails[] = 'Description: ' . $prodDesc;
+                $createParams['desc'] = $prodDesc;
+            }
+
+            // Detect product type to prefill form
+            $createParams['type'] = $this->_detectProductTypeFromFacturx($lineData);
+            $createParams['tva_tx'] = (float) ($lineData['rateApplicablePercent'] ?? 0);
+            $createParams['status'] = 1; // Active
+            if (!empty($lineData['prodglobalid']) && !empty($lineData['prodglobalidtype']) && in_array($lineData['prodglobalidtype'], ['0160', '0011'])) {
+                $createParams['barcode'] = $lineData['prodglobalid'];
+                $createParams['barcode_type'] = getDolGlobalInt('PRODUIT_DEFAULT_BARCODE_TYPE', 0);
+            } else {
+                $createParams['barcode'] = 'auto';
+            }
+
+            // Create URL to prefill product creation form
+            $createUrl = DOL_URL_ROOT . '/product/card.php?action=create';
+            if (!empty($createParams)) {
+                $createUrl .= '&' . http_build_query($createParams);
             }
 
             $detailsStr = !empty($errorDetails) ? ' (' . implode(' | ', $errorDetails) . ')' : '';
 
-            return array('res' => -1, 'message' => 'No matching product found (' . $detailsStr . '). Automatic product creation is disabled. Please create the product manually or enable automatic product creation in module configuration.');
+            $message = 'Unable to find product' . $detailsStr . '. Auto-creation of products is disabled in settings.';
+
+            $action = $langs->trans('ManualUnfoundProductCreationFromEInvoice', $detailsStr) . ' ';
+            $action .= '<a class="butAction small" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
+            $action .= '<i class="fas fa-plus-circle"></i> ';
+            $action .= $langs->trans('CreateProduct');
+            $action .= '</a>';
+
+            return array('res' => -1, 'message' => $message, 'action' => $action);
         }
 
     }
