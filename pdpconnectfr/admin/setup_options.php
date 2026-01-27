@@ -243,15 +243,21 @@ if (getDolGlobalString('PDPCONNECTFR_EINVOICE_IN_REAL_TIME')) {
 // Setup conf for auto generation of objects
 $formSetup->newItem('PDPCONNECTFR_AUTO_GENERATION')->setAsTitle();
 
+// Setup conf to choose use of auto generation or not of products
+$item = $formSetup->newItem('PDPCONNECTFR_PRODUCTS_AUTO_GENERATION')->setAsYesNo();
+$item->helpText = $langs->transnoentities('PDPCONNECTFR_PRODUCTS_AUTO_GENERATION_HELP');
+$item->defaultFieldValue = 0;
+$item->cssClass = 'minwidth500';
+
 // Setup conf to choose use of auto generation or not of third parties
 $item = $formSetup->newItem('PDPCONNECTFR_THIRDPARTIES_AUTO_GENERATION')->setAsYesNo();
 $item->helpText = $langs->transnoentities('PDPCONNECTFR_THIRDPARTIES_AUTO_GENERATION_HELP');
 $item->defaultFieldValue = 0;
 $item->cssClass = 'minwidth500';
 
-// Setup conf to choose use of auto generation or not of products
-$item = $formSetup->newItem('PDPCONNECTFR_PRODUCTS_AUTO_GENERATION')->setAsYesNo();
-$item->helpText = $langs->transnoentities('PDPCONNECTFR_PRODUCTS_AUTO_GENERATION_HELP');
+// Setup conf to enable complete third party information when receiving an invoice from from PDP
+$item = $formSetup->newItem('PDPCONNECTFR_THIRDPARTIES_COMPLETE_INFO')->setAsYesNo();
+$item->helpText = $langs->transnoentities('PDPCONNECTFR_THIRDPARTIES_COMPLETE_INFO_HELP');
 $item->defaultFieldValue = 0;
 $item->cssClass = 'minwidth500';
 

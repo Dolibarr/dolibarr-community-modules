@@ -997,9 +997,11 @@ class FacturXProtocol extends AbstractProtocol
      *
      * @param  string $file                         Factur-X file.
      * @param  string|null $ReadableViewFile        Readable view file. (PDP Generated readable PDF)
+     * @param  string $flowId                       Flow identifier source of the invoice.
+     *
      * @return array{res:int, message:string, action:string|null}       Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and an optional 'action'.
      */
-    public function createSupplierInvoiceFromFacturX($file, $ReadableViewFile = null)
+    public function createSupplierInvoiceFromFacturX($file, $ReadableViewFile = null, $flowId = '')
     {
         global $conf, $db, $user;
         $return_messages = array();
@@ -1137,12 +1139,13 @@ class FacturXProtocol extends AbstractProtocol
         );
 
         // Check if this invoice has already been imported
-        $sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "facture_fourn";
+        $sql = "SELECT rowid as id FROM " . MAIN_DB_PREFIX . "facture_fourn";
         $sql .= " WHERE ref_supplier = '" . $db->escape($documentno) . "'";
         $resql = $db->query($sql);
         if ($resql) {
             if ($db->num_rows($resql) > 0) {
-                return ['res' => 0, 'message' => 'Supplier Invoice with reference ' . $documentno . ' already exists' ];
+                $supplierInvoiceId = $db->fetch_object($resql)->id;
+                return ['res' => $supplierInvoiceId, 'message' => 'Supplier Invoice with reference ' . $documentno . ' already exists' ];
             }
         } else {
             return ['res' => -1, 'message' => 'Database error while checking existing supplier invoice: ' . $db->lasterror() ];
@@ -1154,7 +1157,7 @@ class FacturXProtocol extends AbstractProtocol
         dol_syslog(get_class($this) . '::createSupplierInvoiceFromFacturX parsedData: ' . json_encode($parsedData));
 
         // Sync or create supplier based on seller info
-        $syncSocRes = $this->_syncOrCreateThirdpartyFromFacturXSeller($parsedData);
+        $syncSocRes = $this->_syncOrCreateThirdpartyFromFacturXSeller($parsedData, 'dolibarr', $flowId);
         $socId = $syncSocRes['res'];
         $return_messages[] = $syncSocRes['message'];
         $action = $syncSocRes['action'] ?? null;
@@ -1249,7 +1252,7 @@ class FacturXProtocol extends AbstractProtocol
 
                 // TODO : Add a parameter to choose between sync or create invoice with a free text line (no product)
                 // Sync or create product
-                $res = $this->_findOrCreateProductFromFacturXLine($productRetrievedData);
+                $res = $this->_findOrCreateProductFromFacturXLine($productRetrievedData, $flowId);
                 if ($res['res'] < 0) {
                     return ['res' => -1, 'message' => 'Product sync or creation error: ' . $res['message'], 'action' => $res['action'] ?? null ];
                 }
@@ -1292,11 +1295,22 @@ class FacturXProtocol extends AbstractProtocol
             return ['res' => -1, 'message' => 'Invoice creation error: ' . $supplierInvoice->error];
         } else {
 
+            // Update thirdparty as a supplier if not already the case
+            if ($supplier->fournisseur != 1) {
+                $supplier->fournisseur = 1;
+                $supplier->code_fournisseur = 'auto';
+                $supplier->update($supplier->id, $user);
+            }
+
             // TODO : Add supplier price for products (all lines of the invoice)
 
             // Set import_key
             $sql = 'UPDATE '.MAIN_DB_PREFIX."facture_fourn SET import_key = '".$db->escape($supplierInvoice->import_key)."' WHERE rowid = ".((int) $result);
 			$db->query($sql);
+
+            // Add entry in pdpconnectfr_extlinks table to mark that this supplier invoice is imported from PDP
+            $pdpconnectfr = new PdpConnectFr($db);
+            $pdpconnectfr->insertOrUpdateExtLink($result, $supplierInvoice->element, $flowId);
 
             dol_syslog(__METHOD__ . ' New supplier invoice created (ID: ' . $result . ')');
 
@@ -1722,10 +1736,11 @@ class FacturXProtocol extends AbstractProtocol
      * Synchronize or create a Dolibarr thirdparty based on Factur-X seller information
      * @param array     $sellerInfo Array containing seller information extracted from Factur-X
      * @param string    $priority Fill priority ('dolibarr' or 'pdp'). If both data are available, which one to prefer
+     * @param string    $flowId Flow identifier source of the thirdparty.
      *
      * @return array{res:int, message:string, action:string|null}   Returns array with 'res' (ID of the synchronized or created thirdparty, -1 on error) with a 'message' and an optional 'action'.
      */
-    private function _syncOrCreateThirdpartyFromFacturXSeller($sellerInfo, $priority = 'dolibarr')
+    private function _syncOrCreateThirdpartyFromFacturXSeller($sellerInfo, $priority = 'dolibarr', $flowId = '')
     {
         /**
          * Scenario to find or create a thirdparty based on Factur-X seller information:
@@ -1817,6 +1832,12 @@ class FacturXProtocol extends AbstractProtocol
 
         // if found, update information
         if ($thirdpartyId > 0) {
+            // if complete info is disabled, we return directly the thirdpartyId
+            if (!empty(getDolGlobalInt('PDPCONNECTFR_THIRDPARTIES_COMPLETE_INFO'))) {
+                dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromFacturXSeller Complete info disabled, returning existing thirdparty: ' . $thirdpartyId);
+                return array('res' => $thirdpartyId, 'message' => 'Existing thirdparty used without update: ' . $thirdpartyId);
+            }
+
             dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromFacturXSeller Updating existing thirdparty: ' . $thirdpartyId);
             // TODO: MAYBE we should call PDP to retrieve more information
 
@@ -1856,7 +1877,6 @@ class FacturXProtocol extends AbstractProtocol
                     $thirdparty->tva_assuj = 1;
                 }
             } elseif ($priority === 'dolibarr') { // Fill only empty fields from pdp data
-                // If priority is dolibarr and thirdparty found, do not update anything
                 dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromFacturXSeller Keeping existing thirdparty data and fill only empty fields as priority is dolibarr: ' . $thirdpartyId);
 
                 if (empty($thirdparty->name) && !empty($sellerInfo['sellername'])) {
@@ -1960,6 +1980,11 @@ class FacturXProtocol extends AbstractProtocol
             $result = $thirdparty->create($user);
             if ($result > 0) {
                 $thirdpartyId = $thirdparty->id;
+
+                // Add entry in pdpconnectfr_extlinks table to mark that this thirdparty is imported from PDP
+                $pdpconnectfr = new PdpConnectFr($db);
+                $pdpconnectfr->insertOrUpdateExtLink($thirdpartyId, $thirdparty->element, $flowId);
+
                 dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromFacturXSeller Created new thirdparty: ' . $thirdpartyId);
                 return array('res' => $thirdpartyId, 'message' => 'Thirdparty ' . $thirdparty->name . ' created successfully');
             } else {
@@ -2029,10 +2054,11 @@ class FacturXProtocol extends AbstractProtocol
     /**
      * Find or create a Dolibarr product based on Factur-X invoice line data
      * @param array $lineData Array containing invoice line data extracted from Factur-X
+     * @param string $flowId Flow identifier source of the product. Used for logging purposes.
      *
      * @return array{res:int, message:string, action:string|null}   Returns array with 'res' (ID of the found or created product, -1 on error) with a 'message' and an optional 'action'.
      */
-    private function _findOrCreateProductFromFacturXLine($lineData)
+    private function _findOrCreateProductFromFacturXLine($lineData, $flowId = '')
     {
         /*
         * PRODUCT MATCHING FOR SUPPLIER INVOICE (Factur-X)
@@ -2120,7 +2146,6 @@ class FacturXProtocol extends AbstractProtocol
             $product->status      = 1; // Active
             $product->note_private = 'Product created automatically from Factur-X import.';
             $product->import_key  = AbstractPDPProvider::$PDPCONNECTFR_LAST_IMPORT_KEY; // It does not work here, so we will update it after creation
-            $product->array_options['pdpconnectfr_source'] = '1';
             // Set barcode if global ID is provided and is a GTIN/EAN type
             if (!empty($lineData['prodglobalid']) && !empty($lineData['prodglobalidtype']) && in_array($lineData['prodglobalidtype'], ['0160', '0011'])) {
                 $product->barcode = $lineData['prodglobalid'];
@@ -2146,6 +2171,10 @@ class FacturXProtocol extends AbstractProtocol
                 // Set import_key
                 $sql = 'UPDATE '.MAIN_DB_PREFIX."product SET import_key = '".$db->escape($product->import_key)."' WHERE rowid = ".((int) $productId);
                 $db->query($sql);
+
+                // Add entry in pdpconnectfr_extlinks table to mark product as created from e-invoice
+                $pdpconnectfr = new PdpConnectFr($db);
+                $pdpconnectfr->insertOrUpdateExtLink($productId, $product->element, $flowId);
 
                 dol_syslog(__METHOD__ . ' New product created (ID: ' . $productId . ')');
                 return [

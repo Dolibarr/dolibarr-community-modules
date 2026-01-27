@@ -800,6 +800,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
             // SupplierInvoice
             case "SupplierInvoice":
                 // --- Fetch received documents (FacturX PDF)
+                $document->fk_element_type = FactureFournisseur::class;
                 $flowResource = 'flows/' . $flowId;
                 $flowUrlparams = array(
                     'docType' => 'Converted', // docType can be 'Metadata', 'Original', 'Converted' or 'ReadableView'
@@ -836,11 +837,24 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                 $ReadableViewFile = $flowResponse['response'];
 
 
-                $res = $this->exchangeProtocol->createSupplierInvoiceFromFacturX($receivedFile, $ReadableViewFile);
+                $res = $this->exchangeProtocol->createSupplierInvoiceFromFacturX($receivedFile, $ReadableViewFile, $flowId);
                 if ($res['res'] < 0) {
                     return array('res' => -1, 'message' => "Failed to create supplier invoice from FacturX document for flowId: " . $flowId . ". " . $res['message'], 'action' => $res['action'] ?? null);
                 } elseif ($res['res'] == 0) {
                     return array('res' => 0, 'message' => "supplier invoice already exists for flowId: " . $flowId . ". " . $res['message']);
+
+                    // Complete the document object with the created supplier invoice details
+                    $suplierInvoiceObj = new FactureFournisseur($this->db);
+                    $resFetch = $suplierInvoiceObj->fetch($res['res']);
+                    $document->fk_element_id = !empty($suplierInvoiceObj->id) ? $suplierInvoiceObj->id : 0;
+                    $document->tracking_idref = !empty($suplierInvoiceObj->ref) ? $suplierInvoiceObj->ref : 'Error'; // Should always be found here
+                } elseif ($res['res'] > 0) {
+
+                    // Complete the document object with the created supplier invoice details
+                    $suplierInvoiceObj = new FactureFournisseur($this->db);
+                    $resFetch = $suplierInvoiceObj->fetch($res['res']);
+                    $document->fk_element_id = !empty($suplierInvoiceObj->id) ? $suplierInvoiceObj->id : 0;
+                    $document->tracking_idref = !empty($suplierInvoiceObj->ref) ? $suplierInvoiceObj->ref : 'Error'; // Should always be found here
                 }
                 break;
 

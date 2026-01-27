@@ -576,28 +576,28 @@ class modPDPConnectFR extends DolibarrModules
 			'pdpconnectfr@pdpconnectfr',
 			'isModEnabled("pdpconnectfr")'
 		);
-		$result = $extrafields->addExtraField(
-			'pdpconnectfr_source',
-			$langs->trans('PdpConnectFRProductSource'),
-			'varchar',
-			95022,
-			100,
-			'product',
-			0,
-			0,
-			'',
-			null,
-			1,
-			'',
-			1,
-			0,
-			'',
-			'',
-			'pdpconnectfr@pdpconnectfr',
-			'isModEnabled("pdpconnectfr")',
-			0,
-			1
-		);
+		// $result = $extrafields->addExtraField(
+		// 	'pdpconnectfr_source',
+		// 	$langs->trans('PdpConnectFRProductSource'),
+		// 	'varchar',
+		// 	95022,
+		// 	100,
+		// 	'product',
+		// 	0,
+		// 	0,
+		// 	'',
+		// 	null,
+		// 	1,
+		// 	'',
+		// 	1,
+		// 	0,
+		// 	'',
+		// 	'',
+		// 	'pdpconnectfr@pdpconnectfr',
+		// 	'isModEnabled("pdpconnectfr")',
+		// 	0,
+		// 	1
+		// );
 
 		// Invoice extrafields
 		// Chorus fields

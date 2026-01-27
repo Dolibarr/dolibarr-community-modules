@@ -137,15 +137,52 @@ class PdpConnectFr
     /**
      * Get all e-invoice status options
      *
+     * @param int $includeCodesInLabel 0 to not include codes in label, 1 to include codes in label
+     * @param int $onlyPdpStatuses If 1, only return PDP/PA statuses (exclude Dolibarr internal statuses)
+     * @param int $onlySendable If 1, only return statuses that can be sent to PDP/PA (for example, exclude STATUS_ERROR)
+     *
      * @return array<int, string>
      */
-    public function getEinvoiceStatusOptions()
+    public function getEinvoiceStatusOptions($includeCodesInLabel = 0, $onlyPdpStatuses = 0, $onlySendable = 0)
     {
         global $langs;
         $options = [];
         foreach (self::STATUS_LABEL_KEYS as $code => $labelKey) {
-            $options[$code] = $langs->trans($labelKey);
+            $value = $langs->trans($labelKey);
+            if ($includeCodesInLabel === 1) {
+                $value = $value . ' (' . $code . ')';
+            }
+            $options[$code] = $value;
         }
+
+        if ($onlyPdpStatuses === 1) {
+            // Remove Dolibarr internal statuses
+            unset($options[self::STATUS_UNKNOWN]);
+            unset($options[self::STATUS_NOT_GENERATED]);
+            unset($options[self::STATUS_GENERATED]);
+            unset($options[self::STATUS_AWAITING_VALIDATION]);
+            unset($options[self::STATUS_AWAITING_ACK]);
+            unset($options[self::STATUS_ERROR]);
+        }
+
+        if ($onlySendable === 1) {
+            // Remove Dolibarr internal statuses
+            unset($options[self::STATUS_UNKNOWN]);
+            unset($options[self::STATUS_NOT_GENERATED]);
+            unset($options[self::STATUS_GENERATED]);
+            unset($options[self::STATUS_AWAITING_VALIDATION]);
+            unset($options[self::STATUS_AWAITING_ACK]);
+            unset($options[self::STATUS_ERROR]);
+            // Remove PDP/PA statuses that cannot be sent
+            unset($options[self::STATUS_DEPOSITED]);
+            unset($options[self::STATUS_ISSUED]);
+            unset($options[self::STATUS_RECEIVED]);
+            unset($options[self::STATUS_AVAILABLE]);
+
+
+        }
+
+
         return $options;
     }
 
@@ -431,6 +468,88 @@ class PdpConnectFr
 
             })();
             </script>';
+        }
+
+        return $resprints;
+    }
+
+    /**
+     * SupplierInvoiceCardBlock
+     *
+     * @param 	FactureFournisseur $object		FactureFournisseur
+     * @return 	string				HTML content to add
+     */
+    public function SupplierInvoiceCardBlock($object) {
+        global $langs;
+
+        $resprints = '';
+
+        // Check if this invoice is present into pdpconnectfr_extlinks table to know if it is an imported object
+        $sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."pdpconnectfr_extlinks";
+        $sql .= " WHERE element_type = '".$object->element."'";
+        $sql .= " AND element_id = ".(int) $object->id;
+        $sql .= " LIMIT 1"; 
+        $resql = $this->db->query($sql);
+        if ($resql && $this->db->num_rows($resql) > 0) {
+            // Add block only for imported invoices
+            $resprints .= '<tr>';
+            $resprints .= '<td>' . $langs->trans("pdpconnectfrSourceTitle") . '</td>';
+            $resprints .= '<td>' . $langs->trans("pdpconnectfrSourceDesc") . '</td>';
+            $resprints .= '</tr>';
+        }
+
+        return $resprints;
+    }
+
+    /**
+     * ThirdpartyCardBlock
+     * @param 	Societe $object		Thirdparty
+     * @return 	string				HTML content to add
+     */
+    public function ThirdpartyCardBlock($object) {
+        global $langs;
+
+        $resprints = '';
+
+        // Check if this thirdparty is present into pdpconnectfr_extlinks table to know if it is an imported object
+        $sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."pdpconnectfr_extlinks";
+        $sql .= " WHERE element_type = '".$object->element."'";
+        $sql .= " AND element_id = ".(int) $object->id;
+        $sql .= " LIMIT 1";
+        $resql = $this->db->query($sql);
+        if ($resql && $this->db->num_rows($resql) > 0) {
+            // Add block only for imported invoices
+            $resprints .= '<tr>';
+            $resprints .= '<td>' . $langs->trans("pdpconnectfrSourceTitle") . '</td>';
+            $resprints .= '<td>' . $langs->trans("pdpconnectfrSourceDesc") . '</td>';
+            $resprints .= '</tr>';
+        }
+
+        return $resprints;
+    }
+
+    /**
+     * ProductServiceCardBlock
+     * @param 	Product|Service $object		Product or Service
+     * @return 	string				HTML content to add
+     */
+    public function ProductServiceCardBlock($object) {
+        global $langs;
+
+        $resprints = '';
+
+        // Check if this product or service is present into pdpconnectfr_extlinks table to know if it is an imported object
+        $sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."pdpconnectfr_extlinks";
+        $sql .= " WHERE element_type = '".$object->element."'";
+        $sql .= " AND element_id = ".(int) $object->id;
+        $sql .= " LIMIT 1";
+        $resql = $this->db->query($sql);
+        if ($resql && $this->db->num_rows($resql) > 0) {
+            // Add block only for imported invoices
+            $resprints .= '<tr>';
+            $resprints .= '<td>' . $langs->trans("pdpconnectfrSourceTitle") . '</td>';
+            $resprints .= '<td>' . $langs->trans("pdpconnectfrSourceDesc") . '</td>';
+            $resprints .= '</tr>';
         }
 
         return $resprints;
