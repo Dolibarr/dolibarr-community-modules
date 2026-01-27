@@ -118,61 +118,78 @@ class ActionsPdpconnectfr extends CommonHookActions
     {
         global $db, $langs, $user;
 
-        $object->fetch_thirdparty();
-        $thirdpartyCountryCode = $object->thirdparty->country_code;
-        if (!in_array($object->element, ['facture']) || $thirdpartyCountryCode !== 'FR') {
-            return 0;
-        }
-
         $langs->load("pdpconnectfr@pdpconnectfr");
-
         $pdpConnectFr = new PdpConnectFr($db);
 
-        // Get current status of e-invoice
-        $currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus($object->ref);
+        // Add buttons in invoice card
+        if (in_array($object->element, ['facture'])) {
 
-        $url_button = array();
-        if ($object->status == Facture::STATUS_VALIDATED || $object->status == Facture::STATUS_CLOSED) {
-            // if E-invoice is not generated, show button to generate e-invoice
-            if ($currentStatusDetails['code'] == $pdpConnectFr::STATUS_NOT_GENERATED) {
-                $url_button[] = array(
-                    'lang' => 'pdpconnectfr',
-                    'enabled' => 1,
-                    'perm' => (bool) $user->hasRight("facture", "creer"),
-                    'label' => $langs->trans('GenerateEinvoice'),
-                    //'help' => $langs->trans('GenerateEinvoiceHelp'),
-                    'url' => '/compta/facture/card.php?id=' . $object->id . '&action=generate_einvoice&token=' . newToken()
-                );
+            // Get current status of e-invoice
+            $currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus($object->ref);
+
+            $url_button = array();
+            if ($object->status == Facture::STATUS_VALIDATED || $object->status == Facture::STATUS_CLOSED) {
+                // if E-invoice is not generated, show button to generate e-invoice
+                if ($currentStatusDetails['code'] == $pdpConnectFr::STATUS_NOT_GENERATED) {
+                    $url_button[] = array(
+                        'lang' => 'pdpconnectfr',
+                        'enabled' => 1,
+                        'perm' => (bool) $user->hasRight("facture", "creer"),
+                        'label' => $langs->trans('GenerateEinvoice'),
+                        //'help' => $langs->trans('GenerateEinvoiceHelp'),
+                        'url' => '/compta/facture/card.php?id=' . $object->id . '&action=generate_einvoice&token=' . newToken()
+                    );
+                }
+
+                // If the e-invoice is generated but not sent, or if it was sent and a validation error was received,
+                // display the button to regenerate the e-invoice and the button to send the e-invoice.
+                if (in_array($currentStatusDetails['code'], [
+                    $pdpConnectFr::STATUS_GENERATED,
+                    $pdpConnectFr::STATUS_ERROR,
+                    $pdpConnectFr::STATUS_UNKNOWN
+                ])) {
+                    $url_button[] = array(
+                        'lang' => 'pdpconnectfr',
+                        'enabled' => 1,
+                        'perm' => (bool) $user->hasRight("facture", "creer"),
+                        'label' => $langs->trans('RegenerateEinvoice'),
+                        //'help' => $langs->trans('RegenerateEinvoiceHelp'),
+                        'url' => '/compta/facture/card.php?id=' . $object->id . '&action=generate_einvoice&token=' . newToken()
+                    );
+
+                    $url_button[] = array(
+                        'lang' => 'pdpconnectfr',
+                        'enabled' => 1,
+                        'perm' => (bool) $user->hasRight("facture", "creer"),
+                        'label' => $langs->trans('sendToPDP'),
+                        //'help' => $langs->trans('SendToPDPHelp'),
+                        'url' => '/compta/facture/card.php?id=' . $object->id . '&action=send_to_pdp&token=' . newToken()
+                    );
+                }
             }
 
-            // If the e-invoice is generated but not sent, or if it was sent and a validation error was received,
-            // display the button to regenerate the e-invoice and the button to send the e-invoice.
-            if (in_array($currentStatusDetails['code'], [
-                $pdpConnectFr::STATUS_GENERATED,
-                $pdpConnectFr::STATUS_ERROR,
-                $pdpConnectFr::STATUS_UNKNOWN
-            ])) {
-                $url_button[] = array(
-                    'lang' => 'pdpconnectfr',
-                    'enabled' => 1,
-                    'perm' => (bool) $user->hasRight("facture", "creer"),
-                    'label' => $langs->trans('RegenerateEinvoice'),
-                    //'help' => $langs->trans('RegenerateEinvoiceHelp'),
-                    'url' => '/compta/facture/card.php?id=' . $object->id . '&action=generate_einvoice&token=' . newToken()
-                );
-
-                $url_button[] = array(
-                    'lang' => 'pdpconnectfr',
-                    'enabled' => 1,
-                    'perm' => (bool) $user->hasRight("facture", "creer"),
-                    'label' => $langs->trans('sendToPDP'),
-                    //'help' => $langs->trans('SendToPDPHelp'),
-                    'url' => '/compta/facture/card.php?id=' . $object->id . '&action=send_to_pdp&token=' . newToken()
-                );
-            }
+            print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true);
         }
 
-        print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true);
+
+        // Add buttons in supplier invoice card
+        if (in_array($object->element, ['invoice_supplier'])) {
+            // TODO : only if source is PDP
+
+            $availableStatuses = $pdpConnectFr->getEinvoiceStatusOptions(1, 1, 1);
+            $url_button = array();
+            foreach ($availableStatuses as $code => $label) {
+                $url_button[] = array(
+                    'lang' => 'pdpconnectfr',
+                    'enabled' => 1,
+                    'perm' => (bool) $user->hasRight("facture", "creer"),
+                    'label' => $label,
+                    'url' => '#'
+                );
+            }
+
+            print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true);
+        }
 
         return 0;
     }
@@ -296,15 +313,34 @@ class ActionsPdpconnectfr extends CommonHookActions
     {
         global $db, $langs;
 
-        $object->fetch_thirdparty();
-        $thirdpartyCountryCode = $object->thirdparty->country_code;
-        if (!in_array($object->element, ['facture']) || $thirdpartyCountryCode !== 'FR') {
-            return 0;
-        }
+        // $object->fetch_thirdparty();
+        // $thirdpartyCountryCode = $object->thirdparty->country_code;
+        // if (!in_array($object->element, ['facture']) || $thirdpartyCountryCode !== 'FR') {
+        //     return 0;
+        // }
 
         $langs->load("pdpconnectfr@pdpconnectfr");
         $pdpconnectfr = new PdpConnectFr($db);
-        $this->resprints .= $pdpconnectfr->EInvoiceCardBlock($object);		// Output fields in card, including js for refreshing state
+
+        // Add block in invoice card
+        if (in_array($object->element, ['facture'])) {
+            $this->resprints .= $pdpconnectfr->EInvoiceCardBlock($object);		// Output fields in card, including js for refreshing state
+        }
+
+        // Add block in supplier invoice card
+        if (in_array($object->element, ['invoice_supplier'])) {
+            $this->resprints .= $pdpconnectfr->SupplierInvoiceCardBlock($object);		// Output fields in card, including js for refreshing state
+        }
+
+        // Add block in product/service card
+        if (in_array($object->element, ['product'])) {
+            $this->resprints .= $pdpconnectfr->ProductServiceCardBlock($object);		// Output fields in card, including js for refreshing state
+        }
+
+        // Add block in thirdparty card
+        if (in_array($object->element, ['societe'])) {
+            $this->resprints .= $pdpconnectfr->ThirdpartyCardBlock($object);		// Output fields in card
+        }
 
         return 0;
     }
@@ -315,9 +351,20 @@ class ActionsPdpconnectfr extends CommonHookActions
      */
     public function printFieldListSelect($parameters, &$object, &$action, $hookmanager)
     {
+        // Invoice list
         if (in_array('invoicelist', explode(':', $parameters['context']))) {
             $this->resprints .= ', ext.syncstatus  AS pdp_syncstatus';
         }
+
+        // Supplier invoice list, Product list, Soc list
+        $contexts = explode(':', $parameters['context']);
+        if (array_intersect(
+            $contexts,
+            ['supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist']
+        )) {
+            $this->resprints .= ', ext.rowid AS pdplink_id';
+        }
+
         return 0;
     }
 
@@ -331,6 +378,34 @@ class ActionsPdpconnectfr extends CommonHookActions
                 ON ext.element_id = f.rowid
                 AND ext.element_type = "facture"';
         }
+
+        // Supplier invoice list, Product list, Soc list
+        $contexts = explode(':', $parameters['context']);
+        if (array_intersect(
+            $contexts,
+            ['supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist']
+        )) {
+
+            if (in_array('thirdpartylist', $contexts, true)) {
+                $this->resprints .= ' LEFT JOIN '.MAIN_DB_PREFIX.'pdpconnectfr_extlinks ext
+                    ON ext.element_id = s.rowid
+                    AND ext.element_type = "societe"';
+            }
+
+            if (in_array('supplierinvoicelist', $contexts, true)) {
+                $this->resprints .= ' LEFT JOIN '.MAIN_DB_PREFIX.'pdpconnectfr_extlinks ext
+                    ON ext.element_id = f.rowid
+                    AND ext.element_type = "invoice_supplier"';
+            }
+
+            if (in_array('productservicelist', $contexts, true)) {
+                $this->resprints .= ' LEFT JOIN '.MAIN_DB_PREFIX.'pdpconnectfr_extlinks ext
+                    ON ext.element_id = p.rowid
+                    AND ext.element_type = "product"';
+            }
+
+        }
+
         return 0;
     }
 
@@ -339,12 +414,21 @@ class ActionsPdpconnectfr extends CommonHookActions
      */
     public function printFieldListWhere($parameters, &$object, &$action, $hookmanager)
     {
-        if (!in_array('invoicelist', explode(':', $parameters['context']))) {
-            return 0;
+        if (in_array('invoicelist', explode(':', $parameters['context']))) {
+            if (GETPOST('search_pdp_syncstatus', 'alpha') !== '' && GETPOST('search_pdp_syncstatus', 'alpha') != -2) {
+                $this->resprints .= ' AND ext.syncstatus = '.((int) GETPOST('search_pdp_syncstatus'));
+            }
         }
 
-        if (GETPOST('search_pdp_syncstatus', 'alpha') !== '' && GETPOST('search_pdp_syncstatus', 'alpha') != -2) {
-            $this->resprints .= ' AND ext.syncstatus = '.((int) GETPOST('search_pdp_syncstatus'));
+        // Supplier invoice list, Product list, Soc list
+        $contexts = explode(':', $parameters['context']);
+        if (array_intersect(
+            $contexts,
+            ['supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist']
+        )) {
+            if (GETPOST('search_pdplinked', 'alpha') !== '' && GETPOST('search_pdplinked', 'alpha') == 'PDP') {
+                $this->resprints .= ' AND ext.rowid IS NOT NULL';
+            }
         }
 
         return 0;
@@ -358,19 +442,28 @@ class ActionsPdpconnectfr extends CommonHookActions
     {
         global $langs;
 
-        if (!in_array('invoicelist', explode(':', $parameters['context']))) {
-            return 0;
+        if (in_array('invoicelist', explode(':', $parameters['context']))) {
+            // Einvoice generated or not
+            print print_liste_field_titre(
+                $langs->trans('EInvoiceFile')
+            );
+
+            // syncstatus
+            print print_liste_field_titre(
+                $langs->trans('PDPSyncStatus')
+            );
         }
 
-        // Einvoice generated or not
-        print print_liste_field_titre(
-            $langs->trans('EInvoiceFile')
-        );
-
-        // syncstatus
-        print print_liste_field_titre(
-            $langs->trans('PDPSyncStatus')
-        );
+        // Supplier invoice list, Product list, Soc list
+        $contexts = explode(':', $parameters['context']);
+        if (array_intersect(
+            $contexts,
+            ['supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist']
+        )) {
+            print print_liste_field_titre(
+                $langs->trans('pdpconnectfrSourceTitle')
+            );
+        }
 
         return 0;
     }
@@ -414,6 +507,34 @@ class ActionsPdpconnectfr extends CommonHookActions
             );
             print '</td>';
         }
+
+        // Supplier invoice list, Product list, Soc list
+        $contexts = explode(':', $parameters['context']);
+        if (array_intersect(
+            $contexts,
+            ['supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist']
+        )) {
+            $listofoptions = array(
+                'PDP' => 'PDP',
+            );
+            print '<td class="liste_titre">';
+            print $form->selectarray(
+                'search_pdplinked',
+                $listofoptions,
+                GETPOST('search_pdplinked', 'alpha'),
+                -2,
+                0,
+                0,
+                '',
+                0,
+                0,
+                0,
+                '',
+                'width100 ',
+            );
+            print '</td>';
+        }
+
         return 0;
     }
 
@@ -424,27 +545,40 @@ class ActionsPdpconnectfr extends CommonHookActions
     {
         global $db, $langs;
 
-        if (!in_array('invoicelist', explode(':', $parameters['context']))) {
-            return 0;
+        if (in_array('invoicelist', explode(':', $parameters['context']))) {
+            $obj = $parameters['obj'];
+
+
+            $pdpConnectFr = new PdpConnectFr($db);
+            // Einvoice generated or not
+            $einvoiceGenerated = $pdpConnectFr->fetchLastknownInvoiceStatus($obj->ref)['file'];
+            print '<td class="center">';
+            if ($einvoiceGenerated) {
+                print '<i class="fas fa-check-circle" style="color:green;" title="'.$langs->trans('EInvoiceGeneratedList').'"></i>';
+            }
+            print '</td>';
+
+            // syncstatus
+            $currentStatusDetails = $obj->pdp_syncstatus ? $pdpConnectFr->getStatusLabel($obj->pdp_syncstatus) : '-';
+            print '<td class="center">';
+            print $currentStatusDetails;
+            print '</td>';
         }
 
-        $obj = $parameters['obj'];
+        // Supplier invoice list, Product list, Soc list
+        $contexts = explode(':', $parameters['context']);
+        if (array_intersect(
+            $contexts,
+            ['supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist']
+        )) {
+            $obj = $parameters['obj'];
 
-
-        $pdpConnectFr = new PdpConnectFr($db);
-        // Einvoice generated or not
-        $einvoiceGenerated = $pdpConnectFr->fetchLastknownInvoiceStatus($obj->ref)['file'];
-        print '<td class="center">';
-        if ($einvoiceGenerated) {
-            print '<i class="fas fa-check-circle" style="color:green;" title="'.$langs->trans('EInvoiceGeneratedList').'"></i>';
+            print '<td>';
+            if ($obj->pdplink_id) {
+                print 'PDP';
+            }
+            print '</td>';
         }
-        print '</td>';
-
-        // syncstatus
-        $currentStatusDetails = $obj->pdp_syncstatus ? $pdpConnectFr->getStatusLabel($obj->pdp_syncstatus) : '-';
-        print '<td class="center">';
-        print $currentStatusDetails;
-        print '</td>';
 
         return 0;
     }

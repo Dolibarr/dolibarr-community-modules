@@ -54,9 +54,11 @@ abstract class AbstractProtocol
      *
      * @param array $file                       Factur-X file.
      * @param string|null $ReadableViewFile     Readable view file. (PDP Generated readable PDF)
+     * @param string $flowId                    Flow identifier source of the invoice.
+     *
      * @return array{res:int, message:string}   Returns array with 'res' (1 on success, -1 on failure) and 'message' if error
      */
-    abstract public function createSupplierInvoiceFromFacturX($file, $ReadableViewFile = null);
+    abstract public function createSupplierInvoiceFromFacturX($file, $ReadableViewFile = null, $flowId = '');
 
     /**
      * Generate a complete Factur-X invoice file by embedding the XML

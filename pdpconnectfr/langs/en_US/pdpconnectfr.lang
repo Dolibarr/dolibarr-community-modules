@@ -215,3 +215,7 @@ CreateSupplier=Create supplier
 CreateProduct=Create Product
 ManualUnfoundProductCreationFromEInvoice=Manual creation of unfound product based on information retrieved from the e-invoice %s
 EnableDebugModeToSeeMoreDetails=Enable debug mode to see more details
+PDPCONNECTFR_THIRDPARTIES_COMPLETE_INFO=Complete missing third-party information when receiving an e-invoice
+PDPCONNECTFR_THIRDPARTIES_COMPLETE_INFO_HELP=By checking this option, the system will automatically complete missing third-party information when receiving an e-invoice (only filling in empty fields, without modifying already completed information).
+pdpconnectfrSourceTitle=Source
+pdpconnectfrSourceDesc=PDP
