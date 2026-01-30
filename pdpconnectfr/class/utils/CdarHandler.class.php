@@ -24,6 +24,11 @@
 
 class CdarHandler
 {
+    /**
+	 * @var DoliDB Database handler.
+	 */
+	public $db;
+
     // ==================== CONSTANTS ====================
 
     // DateTime Formats
@@ -84,7 +89,17 @@ class CdarHandler
         'qdt' => 'urn:un:unece:uncefact:data:standard:QualifiedDataType:100'
     ];
 
-    public $data = [];
+    /**
+	 * Constructor
+	 *
+	 * @param DoliDB $db handler
+	 */
+	public function __construct($db)
+	{
+        global $langs;
+		$this->db = $db;
+	}
+
     public function readFromFile($xmlFile)
     {
         if (!file_exists($xmlFile)) {
@@ -127,8 +142,144 @@ class CdarHandler
 
     public function saveToFile($data, $filename)
     {
-        file_put_contents($filename, $this->generate($data));
+        $xmlContent = $this->generate($data);
+        if ($xmlContent === false) {
+            return false;
+        } else {
+            file_put_contents($filename, $xmlContent);
+        }
+        return true;
     }
+
+    /**
+     * Generate a CDAR file
+     *
+     * @param   mixed $object       Invoice object (CustomerInvoice or SupplierInvoice)
+     * @param   int $statusCode     Status code to send
+     *
+     * @return  array{res:int, message:string}   Returns array with 'res' (1 on success, -1 on failure) with a 'message'.
+     */
+    function generateCdarFile($object, $statusCode)
+    {
+        global $conf, $db, $mysoc;
+
+        /**
+         * Peut-être dans les prochaines mise à jour des PDP des endpoints vont apparaître pour simplifier l'envoyer les messages de cycle de vie sans passer par les CDAR
+         * Actuellement on doit générer les CDAR manuellement
+         * Le CDAR peut/doit contenir plusieurs blocs, pour certains statuts il faut ajouter des blocs informatifs
+         * On doit essayer de les créer avec le minimum de blocs obligatoires
+         * Les blocs seront ajoutés suivant les retours PDP
+         * Peut-être faut-il importer les fichiers XSD de l’UN/CEFACT pour valider les fichiers générés
+         * On commence par traiter les cas suivants :
+         * - Refus (210) - obligatoire dans le cas d’un refus ( Le seul statut obligatoire pour l’instant )
+         * - Paiement transmis (212) - optionnel mais recommandé
+         * - Prise en charge (204) - optionnel
+         * - Acceptation (205) - optionnel
+         * On peut en ajouter d’autres suivant le besoin
+         */
+
+
+        // Id format: {SupplierRef}_{StatusCode}_{CreationDate}#{DocType}_{CreationDate} as defined in documentation
+        // TODO: map DOC_INVOICE with $object type
+        $ID = $object->ref_supplier . '_' . $statusCode . '_' . date('YmdHis', $object->date_creation) . '#' . CdarHandler::DOC_INVOICE . '_' . date('Ymd', $object->date_creation);
+
+        // We use same as ID for Name as its not required to be different
+        $Name = $ID;
+
+        // SIREN (0002) 
+        $GlobalID = $mysoc->idprof1;
+
+        // Issuer SIREN (0002)
+        $IssuerGlobalID = $object->thirdparty->idprof1;
+
+        // Invoice reference
+        $IssuerAssignedID = $object->ref_supplier;
+
+        /**
+         * MDT-88
+         * TODO: Map status codes from Dolibarr to CDAR status codes
+         * 45 (In Process) = Prise en charge
+         * 39 (on hold) = Suspendue
+         * 37 (Complete) = Complétée
+         * 50 (Rejected / Refused) = Refusée (by C4)
+         * 49 (Conditionally accepted) = Approuvée Partiellement
+         * 47 (Paid) = Paiement Transmis ET Encaissée
+         * 46 (Under Query) = En litige
+         * 1 (accepted) = Approuvée
+         */
+        $StatusCodeCdar = '45';
+
+        // Label for ProcessCondition (Label of status code) we get it from class pdpconnectfr
+        dol_include_once('/pdpconnectfr/class/providers/PDPProviderManager.class.php');
+        $pdpConnectFr = new PdpConnectFr($db);
+        $ProcessCondition = $pdpConnectFr->getStatusLabel($statusCode);
+        $ProcessCondition = str_replace(' ', '_', $ProcessCondition);
+        $ProcessCondition = preg_replace('/[^A-Za-z0-9_]/', '', $ProcessCondition); // Clean special chars
+
+
+        $data = [
+            'GuidelineID' => 'urn.cpro.gouv.fr:1p0:CDV:invoice',
+
+            'ExchangedDocument' => [
+                'ID' => $ID,
+                'Name' => $Name,
+                'IssueDateTime' => CdarHandler::getCurrentDateTime(),
+
+                'SenderTradeParty' => [
+                    'RoleCode' => CdarHandler::ROLE_WK
+                ],
+
+                'IssuerTradeParty' => [
+                    'RoleCode' => CdarHandler::ROLE_BY
+                ],
+
+                'RecipientTradeParty' => [
+                    'GlobalID'     => $GlobalID,
+                    'SchemeID'     => CdarHandler::SCHEME_SIREN_0002,
+                    'RoleCode'     => CdarHandler::ROLE_SE,
+                    'URIID'        => $GlobalID,
+                    'URISchemeID'  => CdarHandler::SCHEME_SIREN_0225
+                ]
+            ],
+
+            'AcknowledgementDocument' => [
+                'MultipleReferencesIndicator' => false,
+                'TypeCode' => '23',
+                'IssueDateTime' => CdarHandler::getCurrentDateTime(),
+
+                'ReferenceReferencedDocument' => [
+                    'IssuerAssignedID' => $IssuerAssignedID,
+                    'StatusCode' => $StatusCodeCdar,
+                    'TypeCode' => CdarHandler::DOC_INVOICE, // TODO: map DOC_INVOICE with $object type
+                    'FormattedIssueDateTime' => date('Ymd', $object->date),
+                    'ProcessConditionCode' => $statusCode,
+                    'ProcessCondition' => $ProcessCondition,
+
+                    'IssuerTradeParty' => [
+                        'GlobalID' => $IssuerGlobalID,
+                        'SchemeID' => CdarHandler::SCHEME_SIREN_0002,
+                        'RoleCode' => CdarHandler::ROLE_SE
+                    ]
+                ]
+            ]
+        ];
+
+        $tempDir = $conf->pdpconnectfr->dir_temp;
+        if (!dol_is_dir($tempDir)) {
+            dol_mkdir($tempDir);
+        }
+
+        $filename = $tempDir . '/cdar_' . $ProcessCondition . '.xml';
+
+        $result = $this->saveToFile($data, $filename);
+        if ($result === false) {
+            return array('res' => -1, 'message' => 'Error saving CDAR file');
+        }
+        echo "CDAR file generated: " . $filename;
+
+        return array('res' => 1, 'message' => 'CDAR file generated successfully');
+    }
+
 
     // ==================== UTILITY METHODS ====================
 
@@ -187,6 +338,11 @@ class CdarHandler
     private function addContext($xml, $root, $guidelineID)
     {
         $context = $xml->createElement('rsm:ExchangedDocumentContext');
+
+        $process = $xml->createElement('ram:BusinessProcessSpecifiedDocumentContextParameter');
+        $process->appendChild($xml->createElement('ram:ID', 'REGULATED'));
+        $context->appendChild($process);
+
         $guideline = $xml->createElement('ram:GuidelineSpecifiedDocumentContextParameter');
         $guideline->appendChild($xml->createElement('ram:ID', $guidelineID));
         $context->appendChild($guideline);

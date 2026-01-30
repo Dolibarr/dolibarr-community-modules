@@ -46,20 +46,115 @@ class PdpConnectFr
     public const STATUS_ERROR               = 4;
 
     // PDP / PA normalized statuses
-    public const STATUS_DEPOSITED           = 200;
-    public const STATUS_ISSUED              = 201;
-    public const STATUS_RECEIVED            = 202;
-    public const STATUS_AVAILABLE           = 203;
-    public const STATUS_TAKEN_OVER          = 204;
-    public const STATUS_APPROVED            = 205;
-    public const STATUS_PARTIALLY_APPROVED  = 206;
-    public const STATUS_DISPUTED            = 207;
-    public const STATUS_SUSPENDED           = 208;
-    public const STATUS_COMPLETED           = 209;
-    public const STATUS_REFUSED             = 210;
-    public const STATUS_PAYMENT_SENT        = 211;
-    public const STATUS_PAID                = 212;
-    public const STATUS_REJECTED            = 213;
+    // public const STATUS_DEPOSITED           = 200;
+    // public const STATUS_ISSUED              = 201;
+    // public const STATUS_RECEIVED            = 202;
+    // public const STATUS_AVAILABLE           = 203;
+    // public const STATUS_TAKEN_OVER          = 204;
+    // public const STATUS_APPROVED            = 205;
+    // public const STATUS_PARTIALLY_APPROVED  = 206;
+    // public const STATUS_DISPUTED            = 207;
+    // public const STATUS_SUSPENDED           = 208;
+    // public const STATUS_COMPLETED           = 209;
+    // public const STATUS_REFUSED             = 210;
+    // public const STATUS_PAYMENT_SENT        = 211;
+    // public const STATUS_PAID                = 212;
+    // public const STATUS_REJECTED            = 213;
+
+
+    /**
+     * Facture déposée
+     * Statut envoyé uniquement par le PDP/PA
+     */
+    public const STATUS_DEPOSITED = 200;
+
+    /**
+     * Facture émise
+     * Statut envoyé uniquement par le PDP/PA
+     */
+    public const STATUS_ISSUED = 201;
+
+    /**
+     * Facture reçue
+     * Statut envoyé uniquement par le PDP/PA
+     */
+    public const STATUS_RECEIVED = 202;
+
+    /**
+     * Facture mise à disposition
+     * Statut envoyé uniquement par le PDP/PA
+     */
+    public const STATUS_AVAILABLE = 203;
+
+    /**
+     * Facture prise en charge
+     * - Facture client : reçue à partir du PDP
+     * - Facture fournisseur : peut être envoyée par Dolibarr (facultatif)
+     */
+    public const STATUS_TAKEN_OVER = 204;
+
+    /**
+     * Facture acceptée
+     * - Facture client : reçue à partir du PDP
+     * - Facture fournisseur : peut être envoyée par Dolibarr (facultatif)
+     */
+    public const STATUS_APPROVED = 205;
+
+    /**
+     * Facture partiellement acceptée
+     * - Facture client : reçue à partir du PDP
+     * - Facture fournisseur : peut être envoyée par Dolibarr (facultatif)
+     */
+    public const STATUS_PARTIALLY_APPROVED = 206;
+
+    /**
+     * Facture contestée
+     * - Facture client : reçue à partir du PDP
+     * - Facture fournisseur : peut être envoyée par Dolibarr (facultatif)
+     */
+    public const STATUS_DISPUTED = 207;
+
+    /**
+     * Facture suspendue
+     * - Facture client : reçue à partir du PDP
+     * - Facture fournisseur : peut être envoyée par Dolibarr (facultatif)
+     */
+    public const STATUS_SUSPENDED = 208;
+
+    /**
+     * Facture refusée
+     * - Facture client : reçue à partir du PDP
+     * - Facture fournisseur : peut être envoyée par Dolibarr (obligatoire)
+     */
+    public const STATUS_REFUSED = 210;
+
+    /**
+     * Paiement transmis
+     * - Facture client : reçue à partir du PDP
+     * - Facture fournisseur : peut être envoyée par Dolibarr (facultatif, recommandé)
+     */
+    public const STATUS_PAYMENT_SENT = 211;
+
+    /**
+     * Facture payée
+     * - Facture client : peut être envoyée par Dolibarr (facultatif, recommandé)
+     * - Facture fournisseur : /
+     */
+    public const STATUS_PAID = 212;
+
+    /**
+     * Facture complétée
+     * - Facture client : /
+     * - Facture fournisseur : /
+     */
+    public const STATUS_COMPLETED = 209;
+
+    /**
+     * Facture rejetée (technique)
+     * - Facture client : reçue à partir du PDP
+     * - Facture fournisseur : /
+     */
+    public const STATUS_REJECTED = 213;
 
     private const STATUS_LABEL_KEYS = [
         // Dolibarr
@@ -96,6 +191,29 @@ class PdpConnectFr
 	{
 		$this->db = $db;
 	}
+
+    /**
+     * Check Module prerequisites
+     *
+     * @return int Returns 1 if ok, -1 if not
+     */
+    public function checkModulePrerequisites() {
+
+        // Check if required module 'pdpconnectfr' is enabled
+        if (!isModEnabled("pdpconnectfr")) {
+            return -1;
+        }
+
+        if (!getDolGlobalString('PDPCONNECTFR_PDP')) {
+            return -1;
+        }
+
+        if (!getDolGlobalString('PDPCONNECTFR_PROTOCOL')) {
+            return -1;
+        }
+
+        return 1;
+    }
 
     /**
      * Return label for an e-invoice status code
@@ -150,7 +268,7 @@ class PdpConnectFr
         foreach (self::STATUS_LABEL_KEYS as $code => $labelKey) {
             $value = $langs->trans($labelKey);
             if ($includeCodesInLabel === 1) {
-                $value = $value . ' (' . $code . ')';
+                $value = '(' . $code . ') ' . $value;
             }
             $options[$code] = $value;
         }
@@ -178,8 +296,9 @@ class PdpConnectFr
             unset($options[self::STATUS_ISSUED]);
             unset($options[self::STATUS_RECEIVED]);
             unset($options[self::STATUS_AVAILABLE]);
-
-
+            unset($options[self::STATUS_COMPLETED]);
+            unset($options[self::STATUS_REJECTED]);
+            unset($options[self::STATUS_PAID]);
         }
 
 

@@ -894,7 +894,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
                 dol_include_once('pdpconnectfr/class/utils/CdarHandler.class.php');
 
-                $cdarHandler = new CdarHandler();
+                $cdarHandler = new CdarHandler($db);
 
                 try {
                     // Parse the CDAR document (returns an array)
@@ -1110,6 +1110,40 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         }
 
         return array('res' => '1', 'message' => '');
+    }
+
+    /**
+     * Send status message of an invoice to PDP/PA
+     *
+     * @param mixed $object Invoice object (CustomerInvoice or SupplierInvoice)
+     * @param int $statusCode   Status code to send (see class constants for available codes)
+     *
+     * @return array{res:int, message:string}       Returns array with 'res' (1 on success, -1 on failure) with a 'message'.
+     */
+    public function sendStatusMessage($object, $statusCode){
+        global $langs, $db;
+
+        $res = 1;
+        $message = '';
+
+        if (!in_array($object->element, ['facture', 'invoice_supplier'])) {
+            $res = -1;
+            $message = 'SendStatusMessage Not does not support this object type: ' . $object->element;
+            return ['res' => $res, 'message' => $message];
+        }
+
+        dol_include_once('/pdpconnectfr/class/utils/CdarHandler.class.php');
+        $cdarHandler = new CdarHandler($db);
+        $result = $cdarHandler->generateCdarFile($object, $statusCode);
+        if ($result['res'] < 0) {
+            $res = -1;
+            $message = 'Failed to generate CDAR file: ' . $result['message'];
+            return ['res' => $res, 'message' => $message];
+        }
+
+
+
+        return ['res' => $res, 'message' => $message];
     }
 
 
