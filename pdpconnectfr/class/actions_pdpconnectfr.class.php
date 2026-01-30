@@ -26,6 +26,7 @@ use Luracast\Restler\Data\Arr;
 
 require_once DOL_DOCUMENT_ROOT.'/core/class/commonhookactions.class.php';
 require_once __DIR__ . "/pdpconnectfr.class.php";
+dol_include_once('/pdpconnectfr/class/providers/PDPProviderManager.class.php');
 
 
 class ActionsPdpconnectfr extends CommonHookActions
@@ -48,6 +49,13 @@ class ActionsPdpconnectfr extends CommonHookActions
         // Invoice pdf path
         $pdfPath = $parameters['file'];
 
+        $pdpConnectFr = new PdpConnectFr($db);
+        $checkConfig = $pdpConnectFr->checkModulePrerequisites();
+        if ($checkConfig < 0) {
+            dol_syslog(__METHOD__ . "PDPCONNECTFR Module is not correctly configured.");
+            return 0;
+        }
+
         $invoiceObject = $parameters['object'];
         $invoiceObject->fetch_thirdparty();
         $thirdpartyCountryCode = $invoiceObject->thirdparty->country_code;
@@ -63,7 +71,6 @@ class ActionsPdpconnectfr extends CommonHookActions
 	            $protocol = $ProtocolManager->getprotocol($usedProtocols);
 
 	            // Check configuration
-                $pdpConnectFr = new PdpConnectFr($db);
 	            $result = $pdpConnectFr->checkRequiredinformations($invoiceObject);
 	            if ($result['res'] < 0) {
 	                $message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
@@ -120,6 +127,11 @@ class ActionsPdpconnectfr extends CommonHookActions
 
         $langs->load("pdpconnectfr@pdpconnectfr");
         $pdpConnectFr = new PdpConnectFr($db);
+        $checkConfig = $pdpConnectFr->checkModulePrerequisites();
+        if ($checkConfig < 0) {
+            dol_syslog(__METHOD__ . "PDPCONNECTFR Module is not correctly configured.");
+            return 0;
+        }
 
         // Add buttons in invoice card
         if (in_array($object->element, ['facture'])) {
@@ -184,7 +196,7 @@ class ActionsPdpconnectfr extends CommonHookActions
                     'enabled' => 1,
                     'perm' => (bool) $user->hasRight("facture", "creer"),
                     'label' => $label,
-                    'url' => '#'
+                    'url' => '/fourn/facture/card.php?id=' . $object->id . '&action=generate_lc_message&token=' . newToken()
                 );
             }
 
@@ -206,97 +218,116 @@ class ActionsPdpconnectfr extends CommonHookActions
     function doActions($parameters, &$object, &$action, $hookmanager) {
         global $db, $langs, $user;
 
-        dol_syslog(__METHOD__ . " Hook doActions called for object " . get_class($object) . " action=" . $action);
-
-
-        if (!in_array($object->element, ['facture'])) {
-            return 0;
-        }
-        $object->fetch_thirdparty();
-        $thirdpartyCountryCode = $object->thirdparty->country_code;
-
-        if ($thirdpartyCountryCode !== 'FR') {
-            return 0;
-        }
+        //dol_syslog(__METHOD__ . " Hook doActions called for object " . get_class($object) . " action=" . $action);
 
         $pdpConnectFr = new PdpConnectFr($db);
+        $checkConfig = $pdpConnectFr->checkModulePrerequisites();
+        if ($checkConfig < 0) {
+            dol_syslog(__METHOD__ . "PDPCONNECTFR Module is not correctly configured.");
+            return 0;
+        }
+        $langs->load("pdpconnectfr@pdpconnectfr");
 
-        // Get current status of e-invoice
-        $currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus($object->ref);
+        if (in_array($object->element, ['facture'])) {
 
-        // Action to send invoice to PDP
-        if ($action == 'send_to_pdp' 
-            && $currentStatusDetails['file'] == 1 
-            && in_array($currentStatusDetails['code'], [
-                $pdpConnectFr::STATUS_GENERATED, 
-                $pdpConnectFr::STATUS_ERROR, 
-                $pdpConnectFr::STATUS_UNKNOWN
-            ])
-        ) {
-            dol_include_once('/pdpconnectfr/class/providers/EsalinkPDPProvider.class.php');
+            // $object->fetch_thirdparty();
+            // $thirdpartyCountryCode = $object->thirdparty->country_code;
 
-            $provider = new EsalinkPDPProvider($db);
+            // if ($thirdpartyCountryCode !== 'FR') {
+            //     return 0;
+            // }
 
-            // Send invoice
-            $result = $provider->sendInvoice($object);
+            // Get current status of e-invoice
+            $currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus($object->ref);
 
-            if ($result) {
-                $messages = array();
-                $messages[] = $langs->trans("InvoiceSuccessfullySentToPDP");
-                $messages[] = $langs->trans("FlowId") . ": " . $result;
-                setEventMessages('', $messages, 'mesgs');
-                // TODO: Review and update the invoice workflow.
-                // The "Modify" button may need to be disabled once the E-invoice has been sent and distributed by the PDP.
-            } else {
-                setEventMessages("", $provider->errors, 'errors');
+            // Action to send invoice to PDP
+            if ($action == 'send_to_pdp' 
+                && $currentStatusDetails['file'] == 1 
+                && in_array($currentStatusDetails['code'], [
+                    $pdpConnectFr::STATUS_GENERATED, 
+                    $pdpConnectFr::STATUS_ERROR, 
+                    $pdpConnectFr::STATUS_UNKNOWN
+                ])
+            ) {
+                $PDPManager = new PDPProviderManager($db);
+                $provider = $PDPManager->getProvider(getDolGlobalString('PDPCONNECTFR_PDP'));
+
+                // Send invoice
+                $result = $provider->sendInvoice($object);
+
+                if ($result) {
+                    $messages = array();
+                    $messages[] = $langs->trans("InvoiceSuccessfullySentToPDP");
+                    $messages[] = $langs->trans("FlowId") . ": " . $result;
+                    setEventMessages('', $messages, 'mesgs');
+                    // TODO: Review and update the invoice workflow.
+                    // The "Modify" button may need to be disabled once the E-invoice has been sent and distributed by the PDP.
+                } else {
+                    setEventMessages("", $provider->errors, 'errors');
+                }
+            }
+
+            // Action to generate the E-invoice
+            if ($action == 'generate_einvoice') {
+                $invoiceObject = $object;
+                $invoiceObject->fetch_thirdparty();
+
+                // Call function to create Factur-X document
+                require_once __DIR__ . "/protocols/ProtocolManager.class.php";
+
+                $usedProtocols = getDolGlobalString('PDPCONNECTFR_PROTOCOL');
+                $ProtocolManager = new ProtocolManager($db);
+                $protocol = $ProtocolManager->getprotocol($usedProtocols);
+
+                // Check configuration
+                $result = $pdpConnectFr->checkRequiredinformations($invoiceObject);
+                if ($result['res'] < 0) {
+                    $message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
+                    $this->warnings[] = $message;
+
+                    dol_syslog(__METHOD__ . " " . $message);
+                    setEventMessages($message, array(), 'errors');
+                    return -1;
+                } elseif ($result['res'] == 0) {
+                    $message = $langs->trans("InvoiceGeneratedWithWarnings") . ': <br>' . $result['message'];
+                    $this->warnings[] = $message;
+
+                    dol_syslog(__METHOD__ . " " . $message);
+                    setEventMessages($message, array(), 'warnings');
+                }
+
+                // Generate E-invoice by calling the method of the Protocol
+                $result = $protocol->generateInvoice($invoiceObject->id);
+                if ($result) {
+                    dol_syslog(__METHOD__ . " Invoice generated successfully for invoice ID " . $invoiceObject->id);
+                    setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
+
+                    return 0;
+                } else {
+                    $this->errors[] = $protocol->errors;
+                    dol_syslog(__METHOD__ . " " . $protocol->errors);
+                    setEventMessages('', $protocol->errors, 'errors');
+                    return -1;
+                }
             }
         }
 
-        // Action to generate the E-invoice
-        if ($action == 'generate_einvoice') {
-            $invoiceObject = $object;
-            $invoiceObject->fetch_thirdparty();
+        if (in_array($object->element, ['invoice_supplier'])) {
 
-            // Call function to create Factur-X document
-            require_once __DIR__ . "/protocols/ProtocolManager.class.php";
+            if ($action == 'generate_lc_message') {
+                $PDPManager = new PDPProviderManager($db);
+                $provider = $PDPManager->getProvider(getDolGlobalString('PDPCONNECTFR_PDP'));
 
-            $usedProtocols = getDolGlobalString('PDPCONNECTFR_PROTOCOL');
-            $ProtocolManager = new ProtocolManager($db);
-            $protocol = $ProtocolManager->getprotocol($usedProtocols);
+                $result = $provider->sendStatusMessage($object, '204'); // TODO : Pass status code according to button clicked
 
-            // Check configuration
-            $result = $pdpConnectFr->checkRequiredinformations($invoiceObject);
-            if ($result['res'] < 0) {
-                $message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
-                $this->warnings[] = $message;
+                if ($result > 0) {
+                    setEventMessages($result['message'], array(), 'mesgs');
+                } else {
+                    setEventMessages($result['message'], $provider->errors, 'errors');
+                }
 
-                dol_syslog(__METHOD__ . " " . $message);
-                setEventMessages($message, array(), 'errors');
-                return -1;
-            } elseif ($result['res'] == 0) {
-                $message = $langs->trans("InvoiceGeneratedWithWarnings") . ': <br>' . $result['message'];
-                $this->warnings[] = $message;
-
-                dol_syslog(__METHOD__ . " " . $message);
-                setEventMessages($message, array(), 'warnings');
-            }
-
-            // Generate E-invoice by calling the method of the Protocol
-            // Example by calling FactureXProcol->generateInvoice()
-            $result = $protocol->generateInvoice($invoiceObject->id);
-            if ($result) {
-                dol_syslog(__METHOD__ . " Invoice generated successfully for invoice ID " . $invoiceObject->id);
-                setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
-
-                return 0;
-            } else {
-                $this->errors[] = $protocol->errors;
-                dol_syslog(__METHOD__ . " " . $protocol->errors);
-                setEventMessages('', $protocol->errors, 'errors');
-                return -1;
             }
         }
-
         return 0;
     }
 
@@ -319,27 +350,33 @@ class ActionsPdpconnectfr extends CommonHookActions
         //     return 0;
         // }
 
+        $pdpConnectFr = new PdpConnectFr($db);
+        $checkConfig = $pdpConnectFr->checkModulePrerequisites();
+        if ($checkConfig < 0) {
+            dol_syslog(__METHOD__ . "PDPCONNECTFR Module is not correctly configured.");
+            return 0;
+        }
+
         $langs->load("pdpconnectfr@pdpconnectfr");
-        $pdpconnectfr = new PdpConnectFr($db);
 
         // Add block in invoice card
         if (in_array($object->element, ['facture'])) {
-            $this->resprints .= $pdpconnectfr->EInvoiceCardBlock($object);		// Output fields in card, including js for refreshing state
+            $this->resprints .= $pdpConnectFr->EInvoiceCardBlock($object);		// Output fields in card, including js for refreshing state
         }
 
         // Add block in supplier invoice card
         if (in_array($object->element, ['invoice_supplier'])) {
-            $this->resprints .= $pdpconnectfr->SupplierInvoiceCardBlock($object);		// Output fields in card, including js for refreshing state
+            $this->resprints .= $pdpConnectFr->SupplierInvoiceCardBlock($object);		// Output fields in card, including js for refreshing state
         }
 
         // Add block in product/service card
         if (in_array($object->element, ['product'])) {
-            $this->resprints .= $pdpconnectfr->ProductServiceCardBlock($object);		// Output fields in card, including js for refreshing state
+            $this->resprints .= $pdpConnectFr->ProductServiceCardBlock($object);		// Output fields in card, including js for refreshing state
         }
 
         // Add block in thirdparty card
         if (in_array($object->element, ['societe'])) {
-            $this->resprints .= $pdpconnectfr->ThirdpartyCardBlock($object);		// Output fields in card
+            $this->resprints .= $pdpConnectFr->ThirdpartyCardBlock($object);		// Output fields in card
         }
 
         return 0;
@@ -483,6 +520,12 @@ class ActionsPdpconnectfr extends CommonHookActions
 
             // syncstatus
             $pdpConnectFr = new PdpConnectFr($db);
+            $checkConfig = $pdpConnectFr->checkModulePrerequisites();
+            if ($checkConfig < 0) {
+                dol_syslog(__METHOD__ . "PDPCONNECTFR Module is not correctly configured.");
+                return 0;
+            }
+
             $listofoptions = $pdpConnectFr->getEinvoiceStatusOptions();
 
             // Remove option related to E-invoice generation status
@@ -550,6 +593,13 @@ class ActionsPdpconnectfr extends CommonHookActions
 
 
             $pdpConnectFr = new PdpConnectFr($db);
+            $checkConfig = $pdpConnectFr->checkModulePrerequisites();
+            if ($checkConfig < 0) {
+                dol_syslog(__METHOD__ . "PDPCONNECTFR Module is not correctly configured.");
+                return 0;
+            }
+
+
             // Einvoice generated or not
             $einvoiceGenerated = $pdpConnectFr->fetchLastknownInvoiceStatus($obj->ref)['file'];
             print '<td class="center">';
