@@ -24,6 +24,10 @@
 
 dol_include_once('/pdpconnectfr/class/providers/EsalinkPDPProvider.class.php');
 
+
+/**
+ * Class to declare all Access Point providers.
+ */
 class PDPProviderManager
 {
     public $db;

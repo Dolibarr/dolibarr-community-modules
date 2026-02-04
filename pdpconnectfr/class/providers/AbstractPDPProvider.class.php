@@ -24,7 +24,7 @@
  * \brief   Base class for all PDP provider integrations.
  */
 
-dol_include_once('/pdpconnectfr/class/protocols/ProtocolManager.class.php');
+require_once __DIR__ . '/../protocols/ProtocolManager.class.php';
 
 
 abstract class AbstractPDPProvider

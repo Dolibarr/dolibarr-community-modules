@@ -64,7 +64,7 @@ class ActionsPdpconnectfr extends CommonHookActions
         if (get_class($invoiceObject) === 'Facture' && $thirdpartyCountryCode === 'FR') {
         	if (getDolGlobalString('PDPCONNECTFR_EINVOICE_IN_REAL_TIME')) { // TODO: Maybe generate only if status is validated
 	            // Call function to create Factur-X document
-	            require __DIR__ . "/protocols/ProtocolManager.class.php";
+	            require_once __DIR__ . '/protocols/ProtocolManager.class.php';
 
 	            $usedProtocols = getDolGlobalString('PDPCONNECTFR_PROTOCOL');
 	            $ProtocolManager = new ProtocolManager($db);
@@ -76,12 +76,13 @@ class ActionsPdpconnectfr extends CommonHookActions
 	                $message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
 
                     dol_syslog(__METHOD__ . " " . $message);
-                    setEventMessages($message, array(), 'errors');
 
 	                if (getDolGlobalString('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
+                    	setEventMessages($message, array(), 'errors');
 	                	// $this->errors[] = $message;
 	                	return -1;
 	                } else {
+                    	setEventMessages($message, array(), 'warnings');
 	                	$this->warnings[] = $message;
 	                	return 0;
 	                }
@@ -241,11 +242,11 @@ class ActionsPdpconnectfr extends CommonHookActions
             $currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus($object->ref);
 
             // Action to send invoice to PDP
-            if ($action == 'send_to_pdp' 
-                && $currentStatusDetails['file'] == 1 
+            if ($action == 'send_to_pdp'
+                && $currentStatusDetails['file'] == 1
                 && in_array($currentStatusDetails['code'], [
-                    $pdpConnectFr::STATUS_GENERATED, 
-                    $pdpConnectFr::STATUS_ERROR, 
+                    $pdpConnectFr::STATUS_GENERATED,
+                    $pdpConnectFr::STATUS_ERROR,
                     $pdpConnectFr::STATUS_UNKNOWN
                 ])
             ) {
@@ -273,7 +274,7 @@ class ActionsPdpconnectfr extends CommonHookActions
                 $invoiceObject->fetch_thirdparty();
 
                 // Call function to create Factur-X document
-                require_once __DIR__ . "/protocols/ProtocolManager.class.php";
+                require_once __DIR__.'/protocols/ProtocolManager.class.php';
 
                 $usedProtocols = getDolGlobalString('PDPCONNECTFR_PROTOCOL');
                 $ProtocolManager = new ProtocolManager($db);

@@ -24,8 +24,6 @@
  * \brief   Esalink PDP provider integration class
  */
 
-use Luracast\Restler\Data\Arr;
-
 dol_include_once('pdpconnectfr/class/providers/AbstractPDPProvider.class.php');
 dol_include_once('pdpconnectfr/class/protocols/ProtocolManager.class.php');
 dol_include_once('pdpconnectfr/class/call.class.php');
