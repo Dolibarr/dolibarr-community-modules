@@ -337,7 +337,12 @@ if ($action == 'confirm_sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $conf
 			setEventMessages($langs->trans("DocumentsSyncedSuccessfully", $sync_result['syncedFlows']), null, 'mesgs');
 		}
 		if ($sync_result['res'] <= 0) {
-			setEventMessages($langs->trans("FailedToSyncADocument"), null, 'errors');
+			$errortype = 'errors';
+			if (!empty($sync_result['actions'])) {
+				$errortype = 'warnings';
+			}
+			setEventMessages($langs->trans("FailedToSyncADocument").($errortype ? '<br>'.$langs->trans("FailedToSyncADocumentMore") : ''), null, $errortype);
+
 		}
 	} else {
 		setEventMessages($langs->trans("NoPDPProviderConfigured"), null, 'errors');
@@ -704,73 +709,6 @@ $selectedfields = (($mode != 'kanban' && $mode != 'kanbangroupby') ? $htmlofsele
 $selectedfields .= (count($arrayofmassactions) ? $form->showCheckAddButtons('checkforselect', 1) : '');
 
 
-// Confirmation dialog
-if ($action == 'sync' && $provider) {
-	$validationFormError = 0;
-
-	if ($maxflows < 0) {
-		$validationFormError++;
-		setEventMessages($langs->trans("InvalidSyncLimit"), array(), 'errors');
-	}
-	if ($syncfromdate === '') {
-		$validationFormError++;
-		setEventMessages($langs->trans("InvalidSyncFromDate"), array(), 'errors');
-	}
-	if ($syncfromdate > $provider->getLastSyncDate()) {
-		$validationFormError++;
-		setEventMessages($langs->trans("SyncFromDateIsAfterLastSyncDate"), array(), 'errors');
-	}
-
-	if ($validationFormError == 0) {
-		$confirmurl = $_SERVER["PHP_SELF"] . '?';
-		$confirmurl .= 'maxflows='.$maxflows;
-		$confirmurl .= '&syncfromdate='.urlencode($syncfromdate);
-		$confirmurl .= '&token='.newToken();
-
-		//print $confirmurl;
-		$formconfirm = $form->formconfirm($confirmurl, $langs->trans("ConfirmSyncTitle"), $langs->trans("ConfirmSyncDesc"), 'confirm_sync', '', '', 1);
-		print $formconfirm;
-	}
-}
-
-// sync results
-if ($action == 'confirm_sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $confirm == 'yes' && !empty($sync_result)) {
-	if (isset($provider)) {
-
-		$cssclass = ($sync_result['res'] > 0) ? 'info' : 'error';
-
-		if (getDolGlobalInt('PDPCONNECTFR_DEBUG_MODE') && !empty($sync_result['details'])) {
-			print '<div class="wordbreak '.$cssclass.' clearboth">';
-			print '<strong><u>'.$langs->trans("SyncLog").' :</u></strong><br>';
-			print implode("<br>", $sync_result['details']);
-			print '</div>';
-		}
-
-		// Sync result messages
-		print '<div class="wordbreak '.$cssclass.' clearboth">';
-		print '<strong><u>'.$langs->trans("SyncResults").' :</u></strong></br>';
-		print implode("<br>", $sync_result['messages']);
-		print '</div>';
-
-		// Suggested action after sync failed
-		if ($sync_result['actions']) {
-			print '<div class="wordbreak warning clearboth">';
-			print '<strong><u>'.$langs->trans("SuggestedActions").' :</u></strong></br>';
-			print implode("<br>", $sync_result['actions']);
-			print '</div>';
-		}
-
-		// If error but no suggested action and debug mode is off, show a message to ask to enable debug mode
-		if ($sync_result['res'] < 0 && empty($sync_result['actions']) && !getDolGlobalInt('PDPCONNECTFR_DEBUG_MODE')) {
-			print '<div class="wordbreak warning clearboth">';
-			print '<strong><u>'.$langs->trans("SuggestedActions").' :</u></strong></br>';
-			print $langs->trans("EnableDebugModeToSeeMoreDetails");
-			print '</div>';
-		}
-		print '<br>';
-	}
-}
-
 
 // Last flow sync info
 $last_sync = 0;
@@ -820,6 +758,7 @@ if (file_exists($filePath)) {
 
 // Form for sync action
 if ($provider) {
+	print '<!-- Form to make the Sync -->'."\n";
 	print '<div class="fichecenter">'."\n";
 
 	print '<div class="formconsumeproduce" style="padding: 10px;">'."\n";
@@ -867,10 +806,12 @@ if ($provider) {
 	print '<br class="clearboth">';
 	print '<br>';
 	print '<hr>';
+
+	print '<div class="opacitylow floatleft margintoponly">'.$last_sync_info.'</div>'."\n";
+
 	if ($last_supplier_invoice_error) {
 		print '<div class="opacitylow floatleft margintoponly">'.$last_supplier_invoice_error.'</div>'."\n";
 	}
-	print '<div class="opacitylow floatleft margintoponly">'.$last_sync_info.'</div>'."\n";
 
 	print "</div>"."\n";
 
@@ -891,12 +832,91 @@ if ($provider) {
 	print "  window.location.href = '".$_SERVER["PHP_SELF"]."?action=sync&maxflows=' + maxFlows + '&last_sync_datetimehour=' + lastSyncDatetimehour + '&last_sync_datetimemin=' + lastSyncDatetimemin + '&last_sync_datetimemonth=' + lastSyncDatetimemonth + '&last_sync_datetimeday=' + lastSyncDatetimeday + '&last_sync_datetimeyear=' + lastSyncDatetimeyear + '&token=' + token;"."\n";
 	print "});"."\n";
 	print '</script>'."\n";
-
 } else {
 	// Message to check module configuration
 	print info_admin($langs->transnoentities("checkPdpConnectFrModuleConfiguration"), 0, 0, '1', '', '', 'warning');
 }
 
+
+// Confirmation dialog
+if ($action == 'sync' && $provider) {
+	$validationFormError = 0;
+
+	if ($maxflows < 0) {
+		$validationFormError++;
+		setEventMessages($langs->trans("InvalidSyncLimit"), array(), 'errors');
+	}
+	if ($syncfromdate === '') {
+		$validationFormError++;
+		setEventMessages($langs->trans("InvalidSyncFromDate"), array(), 'errors');
+	}
+	if ($syncfromdate > $provider->getLastSyncDate()) {
+		$validationFormError++;
+		setEventMessages($langs->trans("SyncFromDateIsAfterLastSyncDate"), array(), 'errors');
+	}
+
+	if ($validationFormError == 0) {
+		$confirmurl = $_SERVER["PHP_SELF"] . '?';
+		$confirmurl .= 'maxflows='.$maxflows;
+		$confirmurl .= '&syncfromdate='.urlencode($syncfromdate);
+		$confirmurl .= '&token='.newToken();
+
+		//print $confirmurl;
+		$formconfirm = $form->formconfirm($confirmurl, $langs->trans("ConfirmSyncTitle"), $langs->trans("ConfirmSyncDesc"), 'confirm_sync', '', '', 1);
+		print $formconfirm;
+	}
+}
+
+// sync results
+if ($action == 'confirm_sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $confirm == 'yes' && !empty($sync_result)) {
+	if (isset($provider)) {
+
+		$cssclass = ($sync_result['res'] > 0) ? 'info' : 'error';
+
+		$syncerrortype = '';		// '', 'business' or 'technical'
+		if ($sync_result['res'] < 0) {
+			if (empty($sync_result['actions'])) {
+				$syncerrortype = 'technical';
+				$cssclass = 'error';
+			} else {
+				$syncerrortype = 'business';
+				$cssclass = 'warning';
+			}
+		} else {
+			$cssclass = 'info';
+		}
+
+		// Show sync summary result
+		print '<div class="wordbreak '.$cssclass.' clearboth">';
+		print '<strong><u>'.$langs->trans("SyncResults").'</u></strong></br>';
+		print implode("<br>", $sync_result['messages']);
+		if (getDolGlobalInt('PDPCONNECTFR_DEBUG_MODE') && !empty($sync_result['details'])) {
+			print '<br><br><small>'.$langs->trans("TechnicalInformation").' : '.implode("<br>", $sync_result['details']).'</small>';
+		}
+		print '</div>';
+
+		// Suggested action after sync failed
+		if ($sync_result['actions']) {
+			print '<div class="wordbreak warning clearboth">';
+			print '<strong><u>'.$langs->trans("SuggestedActions").'</u></strong></br>';
+			print implode("<br>", $sync_result['actions']);
+			print '</div>';
+		}
+
+		// If error but no suggested action and debug mode is off, show a message to ask to enable debug mode
+		if ($sync_result['res'] < 0 && empty($sync_result['actions']) && !getDolGlobalInt('PDPCONNECTFR_DEBUG_MODE')) {
+			print '<div class="wordbreak warning clearboth">';
+			print '<strong><u>'.$langs->trans("SuggestedActions").' :</u></strong></br>';
+			print $langs->trans("EnableDebugModeToSeeMoreDetails");
+			print '</div>';
+		}
+		print '<br>';
+	}
+}
+
+
+
+// List of flows sync
 
 print '<div class="div-table-responsive">'; // You can use div-table-responsive-no-min if you don't need reserved height for your table
 print '<table class="tagtable nobottomiftotal noborder liste'.($moreforfilter ? " listwithfilterbefore" : "").'">'."\n";

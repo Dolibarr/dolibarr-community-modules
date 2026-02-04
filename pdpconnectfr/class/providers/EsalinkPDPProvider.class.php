@@ -627,6 +627,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 				$db->begin();
 
+				// Do a unitary sync of flow $flow['flowId'] instead the global transaction $call_id
 				$res = $this->syncFlow($flow['flowId'], $call_id);
 
 				// If res < 0, rollback
@@ -634,7 +635,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 					$db->rollback();
 					$results_messages[] = "Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'];
                     if (isset($res['action']) && $res['action'] != '') {
-                        $actions[] = $res['action'];
+                        $actions[$res['actioncode'] ?? '0'] = $res['action'];
                     }
 					$error++;
 				}
@@ -668,7 +669,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
         $res = $error > 0 ? -1 : 1;
 
-        $globalresultmessage = ($res == 1) ? "Synchronization completed successfully." : "Synchronization aborted on flow :: " . ($flow['flowId'] ?? 'N/A');
+        $globalresultmessage = ($res == 1) ? "Synchronization completed successfully." : "Synchronization aborted on flow " . ($flow['flowId'] ?? 'N/A');
 
 		dol_syslog(__METHOD__ . " syncFlows end : ".$globalresultmessage, LOG_DEBUG, 0, "_pdpconnectfr");
 
@@ -700,15 +701,16 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         $db->query($sql);
 
         // Return result
+        // 'actions' contains the action to do (in case of business error)
+        // 'details' will containes all technical error (for Log)
         return array('res' => $res, 'messages' => $messages, 'alreadyExist' => $alreadyExist, 'syncedFlows' => $syncedFlows, 'actions' => $actions, 'details' => $results_messages);
     }
 
     /**
-     * sync flow data.
+     * Sync a given flow data.
      *
-     * @param string $flowId        FlowId
-     * @param string|null $call_id  Call ID for logging purposes
-     *
+     * @param string 		$flowId        	FlowId
+     * @param string|null 	$call_id  		Call ID for logging purposes
      * @return array{res:int, message:string, action:string|null} Returns array with 'res' (1 on success, 0 if exists or already processed, -1 on failure) with a 'message' and an optional 'action'.
      */
     public function syncFlow($flowId, $call_id = null)
@@ -834,10 +836,14 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                 }
                 $ReadableViewFile = $flowResponse['response'];
 
-
+				// Try to create the supplier + product + invoice
                 $res = $this->exchangeProtocol->createSupplierInvoiceFromFacturX($receivedFile, $ReadableViewFile, $flowId);
                 if ($res['res'] < 0) {
-                    return array('res' => -1, 'message' => "Failed to create supplier invoice from FacturX document for flowId: " . $flowId . ". " . $res['message'], 'action' => $res['action'] ?? null);
+                    return array(
+                    	'res' => -1,
+                    	'message' => "Failed to create supplier invoice from FacturX document for flowId: " . $flowId . ". " . $res['message'],
+                    	'actioncode' => $res['actioncode'] ?? 'UNKNOWN',
+                    	'action' => $res['action'] ?? null);
                 } elseif ($res['res'] == 0) {
                     return array('res' => 0, 'message' => "supplier invoice already exists for flowId: " . $flowId . ". " . $res['message']);
 

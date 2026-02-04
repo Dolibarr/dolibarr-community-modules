@@ -1041,6 +1041,7 @@ class FacturXProtocol extends AbstractProtocol
 
         // --- Read the Factur-X file
         $document = ZugferdDocumentPdfReader::readAndGuessFromFile($tempFile);
+
         $document->getDocumentInformation($documentno, $documenttypecode, $documentdate, $invoiceCurrency, $taxCurrency, $documentname, $documentlanguage, $effectiveSpecifiedPeriod);
 
         $document->getDocumentSupplyChainEvent(
@@ -1049,6 +1050,7 @@ class FacturXProtocol extends AbstractProtocol
 
         // Get seller information (supplier)
         $document->getDocumentSeller($sellername, $sellerids, $sellerdescription);
+
         // Get seller address
         $document->getDocumentSellerAddress(
             $sellerlineone,
@@ -1791,7 +1793,12 @@ class FacturXProtocol extends AbstractProtocol
                 if ($resql) {
                     if ($db->num_rows($resql) > 1) {
                         dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromFacturXSeller Error: Multiple thirdparties found for VAT number: ' . $sellerInfo['sellerTaxRegistations']['VA'], LOG_ERR);
-                        return array('res' => -1, 'message' => 'Multiple thirdparties found for VAT number: ' . $sellerInfo['sellerTaxRegistations']['VA']);
+                        return array(
+                        	'res' => -1,
+                        	'message' => 'Multiple thirdparties found for VAT number: ' . $sellerInfo['sellerTaxRegistations']['VA'],
+                        	'actioncode' => 'DUPLICATE_THIRDPARTIES',
+                        	'action' => 'Merge the 2 thirdparties'
+                        );
                     } elseif ($db->num_rows($resql) === 1) {
                         $obj = $db->fetch_object($resql);
                         $result = $thirdparty->fetch($obj->rowid);
@@ -2047,7 +2054,12 @@ class FacturXProtocol extends AbstractProtocol
             $action .= '<i class="fas fa-plus-circle"></i> ';
             $action .= $langs->trans('CreateSupplier');
             $action .= '</a>';
-            return array('res' => -1, 'message' => $message, 'action' => $action);
+
+            return array(
+            	'res' => -1,
+            	'message' => $message,
+            	'actioncode' => 'THIRDPARTY_NOT_FOUND',
+            	'action' => $action);
         }
     }
 
@@ -2238,7 +2250,12 @@ class FacturXProtocol extends AbstractProtocol
             $action .= $langs->trans('CreateProduct');
             $action .= '</a>';
 
-            return array('res' => -1, 'message' => $message, 'action' => $action);
+            return array(
+            	'res' => -1,
+            	'message' => $message,
+            	'actioncode' => 'PROUCT_NOT_FOUND',
+            	'action' => $action
+            );
         }
 
     }

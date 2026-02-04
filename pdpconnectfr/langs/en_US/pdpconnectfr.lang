@@ -7,14 +7,13 @@
 # Module label 'ModulePDPConnectFRName'
 ModulePDPConnectFRName = PDPConnectFR
 # Module description 'ModulePDPConnectFRDesc'
-ModulePDPConnectFRDesc = Support for E-invoice in France. This module allows to generate (automatically or manually) invoices in E-invoice format and send them to an E-invoice platform. It can also retreive purchase invoices from the E-invoice platform.
-
+ModulePDPConnectFRDesc = Support for E-invoice management. This module allows to generate (automatically or manually) invoices in E-invoice format and send them to an E-invoice Access Point. It can also retreive purchase invoices from this E-invoice Access Point. Only few countries (France) and Access Point (also called PDP/PA) are supported.
 #
 # Admin page
 #
 PDPConnectFRSetup = Setup of module PDPConnect (France)
 Settings = Settings
-PDPConnectFRSetupPage = Setup of the PA/PDP endpoint. You must choose here the PA/PDP you subscribed as the official PA/PDP for your company. 
+PDPConnectFRSetupPage = Setup of the Access Point. You must choose here the Access Point you subscribed as the official Access Point for your company. 
 NewSection=New section
 
 
@@ -30,7 +29,7 @@ Synchronization = Synchronization
 PlatformPartner=Platform partner
 PDPCONNECTFR_LIVE=Live mode enabled (otherwise test/sandbox mode)
 PDPCONNECTFR_PDP=Select your E-billing platform endpoint
-PDPCONNECTFR_PDP_HELP=Once a PDP/PA is selected, its specific configuration appears.
+PDPCONNECTFR_PDP_HELP=Once an Access Point is selected, its specific configuration appears.
 PDPCONNECTFR_ESALINK_USERNAME=API username
 PDPCONNECTFR_ESALINK_PASSWORD=API password
 PDPCONNECTFR_ESALINK_API_KEY = API KEY
@@ -82,6 +81,7 @@ checkInvoiceData= Check Invoice
 InvoiceSuccessfullySentToPDP=Invoice successfully sent to PDP.
 ErrorSendingInvoiceToPDP=An error occurred while sending the invoice to the PDP.
 pdpExchange=PDP Connect France
+EInvoiceManagement=E-invoice Management
 EInvoiceSynchronization=E-invoice Synchronization
 PdpDocuments=Exchanged Flows
 pdpSocieties=Customers & Suppliers Sync
@@ -151,7 +151,7 @@ HOURS_BACK=Hours back
 MAX_FLOWS_SYNCRO=Maximum number of documents per synchronization
 RUN_SYNC=Start sync
 lastSyncedFlowDate=Last synchronized flow date
-lastSyncedFlow=Last synchronized flow
+lastSyncedFlow=Last successfully synchronized flow
 LastSupplierInvoiceCouldNotBeProcessed=Last supplier invoice that could not be synchronized
 LastSupplierInvoiceCouldNotBeProcessedInfo=This is the last supplier invoice for which synchronization was stopped and could not be completed.<br>You can find here the original e-invoice sent by the supplier, as well as the invoice converted by the PDP.<br><br>Please check the following points:<br>- All products listed on the invoice exist in Dolibarr.<br>- The supplier (third party) exists in Dolibarr with the same information (company name, SIREN number, VAT number, etc.).<br><br>If synchronization still cannot continue after creating these elements (automatically if the option is enabled, or manually), please enable debug mode (if not already enabled) to get more detailed information.
 facturXDownloadOriginal=Original e-invoice
@@ -161,8 +161,9 @@ ErrorGettingLastSyncInfo=Error while retrieving last synchronization information
 ConfirmSyncTitle=Confirm Synchronization
 ConfirmSyncDesc=Are you sure you want to start the synchronization process?
 DocumentsSyncedSuccessfully=%s documents synced successfully
-FailedToSyncADocument=Failed to sync at least one document. Synchronization has been stopped on first error.
-SyncResults=Synchronization result
+FailedToSyncADocument=Failed to sync at least one document. The synchronization has been stopped on the first error.
+FailedToSyncADocumentMore=See the recommanded action on the main page to solve this...
+SyncResults=Synchronization summary
 SyncLog=Synchronization Log (Debug Mode)
 EInvStatusNotGenerated=Not generated
 EInvStatusGenerated=Generated (ready to send)
@@ -194,7 +195,7 @@ syncLookbackForm=lookback (hours)
 syncLookbackFormHelp=0 means no lookback.
 StartSynchronizationFromHelp=(Last synchronized flow date: %s)
 maxNumberToProcessHelp=0 means no limit.
-PdpApiNotReachable=Connection failed: PDP/PA API is not reachable.
+PdpApiNotReachable=Connection failed: AP is not reachable.
 checkPdpConnectFrModuleConfiguration=Please check your PDPCONNECTFR module configuration to enable synchronization.
 EInvoiceSynchronizationHelp=E-invoice synchronization from <b>%s</b>
 einvoiceStatusFieldHelp=To keep this status up to date, regularly run the synchronization with the e-invoice platform (from the Invoice / E-invoice Synchronization menu), or wait for it to be done automatically.
@@ -208,7 +209,7 @@ SuccessFlows=Success flows
 EInvoiceEventsLabel=E-invoice events
 EInvoiceEventsLink=History
 EInvoiceFile=E-invoice File
-PDPSyncStatus=PDP Status
+PDPSyncStatus=AP Status
 EInvoiceGeneratedList=Generated
 SuggestedActions=Recommended actions before the next synchronization
 CreateSupplier=Create supplier
@@ -218,4 +219,4 @@ EnableDebugModeToSeeMoreDetails=Enable debug mode to see more details
 PDPCONNECTFR_THIRDPARTIES_COMPLETE_INFO=Complete missing third-party information when receiving an e-invoice
 PDPCONNECTFR_THIRDPARTIES_COMPLETE_INFO_HELP=By checking this option, the system will automatically complete missing third-party information when receiving an e-invoice (only filling in empty fields, without modifying already completed information).
 pdpconnectfrSourceTitle=Source
-pdpconnectfrSourceDesc=PDP
+pdpconnectfrSourceDesc=Access Point

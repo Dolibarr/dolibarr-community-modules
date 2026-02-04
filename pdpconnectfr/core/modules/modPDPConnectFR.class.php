@@ -360,7 +360,7 @@ class modPDPConnectFR extends DolibarrModules
 		$this->menu[$r++] = array(
 			'fk_menu' => 'fk_mainmenu=billing',
 			'type' => 'left',
-			'titre' => 'pdpExchange',
+			'titre' => 'EInvoiceManagement',
 			'prefix' => img_picto('', 'pdpconnectfr.png@pdpconnectfr', 'class="pictofixedwidth valignmiddle paddingright"'),
 			'mainmenu' => 'billing',
 			'leftmenu' => 'pdpconnectfr_billing',

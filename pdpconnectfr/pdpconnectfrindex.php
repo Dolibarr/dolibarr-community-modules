@@ -120,9 +120,9 @@ if (!empty($user->socid) && $user->socid > 0) {
 $form = new Form($db);
 $formfile = new FormFile($db);
 
-llxHeader("", $langs->trans("PDPConnectFRArea"), '', '', 0, 0, '', '', '', 'mod-pdpconnectfr page-index');
+llxHeader("", $langs->trans("EInvoiceManagement"), '', '', 0, 0, '', '', '', 'mod-pdpconnectfr page-index');
 
-print load_fiche_titre($langs->trans("PDPConnectFRArea"), '', 'pdpconnectfr.png@pdpconnectfr');
+print load_fiche_titre($langs->trans("EInvoiceManagement"), '', 'pdpconnectfr.png@pdpconnectfr');
 
 print '<div class="fichecenter"><div class="fichethirdleft">';
 
