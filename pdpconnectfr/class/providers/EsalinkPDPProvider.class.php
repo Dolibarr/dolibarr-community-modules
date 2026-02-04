@@ -493,7 +493,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
      */
     public function syncFlows($syncFromDate = 0, $limit = 0)
     {
-        global $db, $user;
+        global $db, $user, $conf;
 
         $results_messages = array();
         $actions = array();
@@ -585,11 +585,15 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			return strtotime($a['updatedAt']) <=> strtotime($b['updatedAt']);
 		});
 
-		// Clean aleady processed flows from the list
+		// Clean already processed flows from the list
 		$alreadyProcessedFlowIds = [];
 		$flowIds = array_column($response['response']['results'], 'flowId');
+        $escapedFlowIds = array();
+        foreach ($flowIds as $flowId) {
+            $escapedFlowIds[] = "'" . $db->escape($flowId) . "'";
+        }
 		$sql = "SELECT flow_id FROM " . MAIN_DB_PREFIX . "pdpconnectfr_document";
-		$sql .= " WHERE flow_id IN (" . implode(',', array_map('intval', $flowIds)) . ")";
+		$sql .= " WHERE flow_id IN (" . implode(',', $escapedFlowIds) . ")";
 		$resql = $db->query($sql);
 		if ($resql) {
 			while ($obj = $db->fetch_object($resql)) {
@@ -734,7 +738,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         );
 
         if ($flowResponse['status_code'] != 200) {
-            return array('res' => '-1', 'message' => "Failed to retrieve flow details for flowId: " . $flowId);
+            return array('res' => -1, 'message' => "Failed to retrieve flow details for flowId: " . $flowId);
         }
 
         // Process flow data
@@ -779,6 +783,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         	$document->response_for_debug = $flowResponse['response'];
         }
 
+        $returnRes = 1;
+        $returnMessage = "";
         switch ($document->flow_type) {
             // CustomerInvoice
             case "CustomerInvoice":
@@ -788,7 +794,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                 $factureObj = new Facture($this->db);
                 $res = $factureObj->fetch(0, $document->tracking_idref);
                 if ($res < 0) {
-                    return array('res' => '-1', 'message' => "Failed to fetch customer invoice for flowId: " . $flowId);
+                    return array('res' => -1, 'message' => "Failed to fetch customer invoice for flowId: " . $flowId);
                 }
                 $document->fk_element_id = !empty($factureObj->id) ? $factureObj->id : 0;
                 $document->tracking_idref = !empty($factureObj->ref) ? $factureObj->ref : $document->tracking_idref.' (NOTFOUND)'; // Probably the customer invoice is sent from another system that use the same PDP account
@@ -840,21 +846,16 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                 $res = $this->exchangeProtocol->createSupplierInvoiceFromFacturX($receivedFile, $ReadableViewFile, $flowId);
                 if ($res['res'] < 0) {
                     return array('res' => -1, 'message' => "Failed to create supplier invoice from FacturX document for flowId: " . $flowId . ". " . $res['message'], 'action' => $res['action'] ?? null);
-                } elseif ($res['res'] == 0) {
-                    return array('res' => 0, 'message' => "supplier invoice already exists for flowId: " . $flowId . ". " . $res['message']);
-
+                } else{
                     // Complete the document object with the created supplier invoice details
                     $suplierInvoiceObj = new FactureFournisseur($this->db);
                     $resFetch = $suplierInvoiceObj->fetch($res['res']);
                     $document->fk_element_id = !empty($suplierInvoiceObj->id) ? $suplierInvoiceObj->id : 0;
                     $document->tracking_idref = !empty($suplierInvoiceObj->ref) ? $suplierInvoiceObj->ref : 'Error'; // Should always be found here
-                } elseif ($res['res'] > 0) {
 
-                    // Complete the document object with the created supplier invoice details
-                    $suplierInvoiceObj = new FactureFournisseur($this->db);
-                    $resFetch = $suplierInvoiceObj->fetch($res['res']);
-                    $document->fk_element_id = !empty($suplierInvoiceObj->id) ? $suplierInvoiceObj->id : 0;
-                    $document->tracking_idref = !empty($suplierInvoiceObj->ref) ? $suplierInvoiceObj->ref : 'Error'; // Should always be found here
+                    //return array('res' => 0, 'message' => "supplier invoice already exists for flowId: " . $flowId . ". " . $res['message']);
+                    $returnRes = 0;
+                    $returnMessage = "Supplier invoice already exists for flowId: " . $flowId . ". " . $res['message'];
                 }
                 break;
 
@@ -870,7 +871,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                 $res = $factureObj->fetch(0, $document->tracking_idref);		// tracking_idref is field trackingId into the CDAR message that contains invoice ref with ESALINK
 
                 if ($res < 0) {
-                    return array('res' => '-1', 'message' => "Failed to fetch customer invoice for flowId: " . $flowId);
+                    return array('res' => -1, 'message' => "Failed to fetch customer invoice for flowId: " . $flowId);
                 }
                 //$document->fk_element_id = $factureObj->id;
 
@@ -888,7 +889,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                 );
 
                 if ($flowResponse['status_code'] != 200) {
-                    return array('res' => '-1', 'message' => "Failed to retrieve flow details for flowId: " . $flowId);
+                    return array('res' => -1, 'message' => "Failed to retrieve flow details for flowId: " . $flowId);
                 }
                 $cdarXml = $flowResponse['response'];
 
@@ -904,7 +905,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
                     // Check if parsing was successful
                     if (empty($cdarDocument) || !isset($cdarDocument['AcknowledgementDocument'])) {
-                        return array('res' => '-1', 'message' => "Failed to parse CDAR document for flowId: " . $flowId);
+                        return array('res' => -1, 'message' => "Failed to parse CDAR document for flowId: " . $flowId);
                     }
 
                     $document->fk_element_type = Facture::class;
@@ -1041,10 +1042,11 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                         if ($obj && !empty($obj->tracking_idref)) {
                             $document->tracking_idref = $obj->tracking_idref;
                         } else {
-                            //return array('res' => '0', 'message' => "No tracking_idref found in pdpconnectfr_extlinks table for flowId: " . $flowId);
+                            //return array('res' => 0, 'message' => "No tracking_idref found in pdpconnectfr_extlinks table for flowId: " . $flowId);
                         }
                     } else {
-                        return array('res' => '0', 'message' => "Failed to query pdpconnectfr_extlinks table for flowId: " . $flowId);
+                        // return array('res' => 0, 'message' => "Failed to query pdpconnectfr_extlinks table for flowId: " . $flowId);
+                        $returnRes = 0;
                     }
                 }
 
@@ -1053,7 +1055,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                     $factureObj = new Facture($this->db);
                     $res = $factureObj->fetch(0, $document->tracking_idref);
                     if ($res < 0) {
-                        return array('res' => '-1', 'message' => "Failed to fetch customer invoice for flowId: " . $flowId . " using syncref from pdpconnectfr_extlinks table: " . $obj->tracking_idref);
+                        return array('res' => -1, 'message' => "Failed to fetch customer invoice for flowId: " . $flowId . " using syncref from pdpconnectfr_extlinks table: " . $obj->tracking_idref);
                     }
                     $document->fk_element_id = !empty($factureObj->id) ? $factureObj->id : 0;
                     $document->tracking_idref = !empty($factureObj->ref) ? $factureObj->ref : $document->tracking_idref.' (NOTFOUND)'; // Probably the customer invoice is sent from another system that use the same PDP account
@@ -1106,10 +1108,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         $res = $document->create($user);
         if ($res < 0) {
             //print_r($document->errors);
-            return array('res' => '-1', 'message' => "Failed to store flow data for flowId: " . $flowId . ". Errors: " . implode(", ", $document->errors));
+            return array('res' => -1, 'message' => "Failed to store flow data for flowId: " . $flowId . ". Errors: " . implode(", ", $document->errors));
         }
 
-        return array('res' => '1', 'message' => '');
+        return array('res' => $returnRes, 'message' => $returnMessage);
     }
 
     /**
@@ -1132,6 +1134,16 @@ class EsalinkPDPProvider extends AbstractPDPProvider
             return ['res' => $res, 'message' => $message];
         }
 
+
+        $pdpconnectfr = new PdpConnectFr($db);
+        $availableStatuses = $pdpconnectfr->getEinvoiceStatusOptions(1, 1, 1);
+        if (!array_key_exists($statusCode, $availableStatuses)) {
+            $res = -1;
+            $message = 'SendStatusMessage Unsupported status code: ' . $statusCode;
+            return ['res' => $res, 'message' => $message];
+        }
+        $statusLabelToSend = $pdpconnectfr->getStatusLabel($statusCode);
+
         dol_include_once('/pdpconnectfr/class/utils/CdarHandler.class.php');
         $cdarHandler = new CdarHandler($db);
         $result = $cdarHandler->generateCdarFile($object, $statusCode);
@@ -1141,10 +1153,107 @@ class EsalinkPDPProvider extends AbstractPDPProvider
             return ['res' => $res, 'message' => $message];
         }
 
+        $filepath = $result['file'];
+        if (file_exists($filepath)) {
+            dol_syslog(__METHOD__ . " Generated CDAR file path: " . $filepath, LOG_DEBUG, 0, "_pdpconnectfr");
 
+            // Extra headers
+            $extraHeaders = [
+                'Content-Type' => 'multipart/form-data'
+            ];
+
+            // Params
+            $params = [
+                'flowInfo' => json_encode([
+                    "name" => "LC_" . $object->ref,
+                    "flowSyntax" => "CDAR"
+                ]),
+                'file' => new CURLFile($filepath, 'application/xml', basename($filepath))
+            ];
+
+            // Call API to send CDAR
+            $response = $this->callApi("flows", "POSTALREADYFORMATED", $params, $extraHeaders, 'Send Status Message');
+
+            if ($response['status_code'] == 200 || $response['status_code'] == 202) {
+                /**
+                 * We make an additional call to retrieve the acknowledgment information and update the status.
+                 * However, document validation on the PDP side may take some time.
+                 * Therefore, we initially set the status to "Sent".
+                 *
+                 * We then try to fetch the PDP validation result:
+                 * - If the validation is successful, we update the status of the electronic invoice accordingly.
+                 * - If the PDP validation fails, we set the status to "Error" and log the reason.
+                 *
+                 * If no response is available yet, we wait for the next synchronization.
+                 **/
+
+                $flowId = $response['response']['flowId'];
+
+                // Update einvoice status with awaiting validation
+                $pdpconnectfr = new PdpConnectFr($db);
+                //$pdpconnectfr->insertOrUpdateExtLink($object->id, $object->element, $flowId, PdpConnectFr::STATUS_AWAITING_VALIDATION, $object->ref);
+                $resStoreStatus = $pdpconnectfr->storeStatusMessage($object->id, $object->element, $statusCode, 'out', $flowId);
+
+                // Call the API to retrieve flow details and check the validation status.
+                $resource = 'flows/' . $flowId;
+                $urlparams = array(
+                    'docType' => 'Metadata',
+                );
+                $resource .= '?' . http_build_query($urlparams);
+                $response = $this->callApi(
+                    $resource,
+                    "GET",
+                    false,
+                    ['Accept' => 'application/octet-stream'],
+                    'Check Status validation'
+                );
+
+                if ($response['status_code'] == 200 || $response['status_code'] == 202) {
+                    //dol_include_once('pdpconnectfr/class/document.class.php');
+
+                    $flowData = json_decode($response['response'], true);
+
+                    // Update einvoice status with received validation result
+                    $syncStatus = $pdpconnectfr::STATUS_AWAITING_VALIDATION;
+                    $ack_statusLabel = $flowData['acknowledgement']['status'] ?? '';
+                    if ($ack_statusLabel === 'Ok') { // So status is sent and validated so we log sent status
+                        $syncStatus = $statusCode;
+                    } else {
+                        if ($ack_statusLabel) {
+                            $syncStatus = $pdpconnectfr->getDolibarrStatusCodeFromPdpLabel($ack_statusLabel);
+                        }
+                    }
+
+                    $syncRef = $flowData['trackingId'] ?? '';
+                    $syncComment = $flowData['acknowledgement']['details'][0]['reasonMessage'] ?? '';
+                    //$pdpconnectfr->insertOrUpdateExtLink($object->id, $object->element, $flowId, $syncStatus, $syncRef, $syncComment);
+                    $pdpconnectfr->updateStatusMessageValidation($resStoreStatus, $ack_statusLabel, $syncComment );
+
+                    // Log an event in the invoice timeline
+                    $eventLabel = "PDPCONNECTFR - Send status " . $statusLabelToSend . " : " . $ack_statusLabel;
+                    $eventMessage = "PDPCONNECTFR - Send status " . $statusLabelToSend . " : " . $ack_statusLabel . (!empty($syncComment) ? " - " . $syncComment : "");
+
+                    $resLogEvent = $this->addEvent('STATUS', $eventLabel, $eventMessage, $object);
+                    if ($resLogEvent < 0) {
+                        dol_syslog(__METHOD__ . " Failed to log event for flowId: {$flowId}", LOG_WARNING);
+                    }
+
+                } else {
+                    dol_syslog(__METHOD__ . " Unable to retrieve flow details after sending status message for flowId: {$flowId}. Status code: " . $response['status_code'], LOG_WARNING);
+                    $res = 1;
+                    $message = 'Failed to retrieve flow details after sending status message. Status code: ' . $response['status_code'];
+                }
+            } else {
+                $res = -1;
+                $message = 'Failed to send CDAR file to PDP. Status code: ' . $response['status_code'] . '. Message: ' . ($response['response']['message'] ?? 'No message');
+                return ['res' => $res, 'message' => $message];
+            }
+        } else {
+            $res = -1;
+            $message = 'CDAR file does not exist: ' . $filepath;
+            return ['res' => $res, 'message' => $message];
+        }
 
         return ['res' => $res, 'message' => $message];
     }
-
-
 }

@@ -14,17 +14,18 @@
 -- along with this program.  If not, see https://www.gnu.org/licenses/.
 
 
-CREATE TABLE llx_pdpconnectfr_extlinks(
+CREATE TABLE llx_pdpconnectfr_lifecycle_msg(
 	rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL,
-	element_id int, 		    				-- ID of element.
-	element_type varchar(50) NOT NULL, 		    -- Type of element (from property object->element)
-    provider varchar(50) NOT NULL, 				-- Provider key ('esalink', ...)
-	date_creation datetime NOT NULL, 
-	tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, 
-	fk_user_creat integer NOT NULL, 
-	fk_user_modif integer,
-	flow_id varchar(255),
-	syncstatus integer,							-- If the object has a status into the einvoice external system
-	syncref varchar(255),						-- If the object has a given reference into the einvoice external system
-	synccomment varchar(255)					-- If we want to store a message for the last sync action try
+	element_id int NOT NULL, 		    			-- ID of element.
+	element_type varchar(50) NOT NULL, 		    	-- Type of element (from property object->element)
+    provider varchar(50) NOT NULL, 					-- Provider key ('esalink', ...)
+	flow_id varchar(255),							-- Flow identifier UUID
+	direction varchar(3) NOT NULL,					-- IN | OUT
+	lc_status_code integer NOT NULL,						-- Lifecycle status code
+	lc_validation_status varchar(20) NOT NULL,		-- OK | PENDING | ERROR
+	lc_validation_message varchar(255) NOT NULL,	-- Lifecycle validation message if error
+	date_creation datetime NOT NULL,
+	tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+	fk_user_creat integer NOT NULL,
+	fk_user_modif integer
 ) ENGINE=innodb;
