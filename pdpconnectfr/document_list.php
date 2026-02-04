@@ -129,10 +129,12 @@ $syncfromdatemonth = GETPOSTINT('last_sync_datetimemonth');
 $syncfromdateday = GETPOSTINT('last_sync_datetimeday');
 $syncfromdateyear = GETPOSTINT('last_sync_datetimeyear');
 if (empty($syncfromdateyear) || empty($syncfromdatemonth) || empty($syncfromdateday)) {
-	$syncfromdate = 0;
+	// If "sync from" date not provied from the form, we may have it into the syncfromdate parameter.
+	$syncfromdate = $syncFromDate;
 } else {
-	$syncfromdate= dol_mktime($syncfromdatehour, $syncfromdatemin, 0, $syncfromdatemonth, $syncfromdateday, $syncfromdateyear, 'tzuserrel');
+	$syncfromdate = dol_mktime($syncfromdatehour, $syncfromdatemin, 0, $syncfromdatemonth, $syncfromdateday, $syncfromdateyear, 'tzuserrel');
 }
+//var_dump(dol_print_date($syncfromdate, 'dayhour', 'gmt'));exit;
 
 // Load variable for pagination
 $limit = GETPOSTINT('limit') ? GETPOSTINT('limit') : $conf->liste_limit;
@@ -715,7 +717,7 @@ $last_sync = 0;
 if (GETPOSTDATE('last_sync_datetime', 'getpost', 'tzuserrel')) {
 	$last_sync = GETPOSTDATE('last_sync_datetime', 'getpost', 'tzuserrel');
 }
-$last_sync_info = img_picto('', 'long-arrow-alt-right', 'class="pictofixedwidth"');
+$last_sync_info = '<span class="opacitylow">'.img_picto('', 'long-arrow-alt-right', 'class="pictofixedwidth"');
 
 $Lastsyncinfosql = "SELECT flow_id, updatedat
 FROM ".MAIN_DB_PREFIX."pdpconnectfr_document
@@ -730,7 +732,7 @@ if ($resLastsyncinfosql) {
 		if (empty($last_sync)) {
 			$last_sync = $db->jdate($obj->updatedat);
 		}
-		$last_sync_info .= " ". $langs->trans("lastSyncedFlow") . ': ' . $obj->flow_id . ' - ' . $langs->trans("lastSyncedFlowDate") . ':' . dol_print_date($last_sync, 'dayhour', 'tzuserrel');
+		$last_sync_info .= " ". $langs->trans("lastSyncedFlow") . ': ' . $obj->flow_id . ' &nbsp; &nbsp; '.img_picto('', 'calendar').' ' . dol_print_date($last_sync, 'dayhour', 'tzuserrel');
 	} else {
 		$last_sync = 0;
 		$last_sync_info = $langs->trans("NoSyncYet");
@@ -738,23 +740,25 @@ if ($resLastsyncinfosql) {
 } else {
 	$last_sync_info = $langs->trans("ErrorGettingLastSyncInfo");
 }
+$last_sync_info .= '</span>';
 
 // Last supplier invoice that could not be processed by the system
 $last_supplier_invoice_error = '';
 $filePath = $conf->pdpconnectfr->dir_temp . '/facturx.pdf';
 if (file_exists($filePath)) {
-	$urlOriginalFile = DOL_URL_ROOT . '/document.php?modulepart=pdpconnectfr'
-        . '&file=' . urlencode('temp/facturx.pdf');
-	$urlConvertedFile = DOL_URL_ROOT . '/document.php?modulepart=pdpconnectfr'
-        . '&file=' . urlencode('temp/facturx_readable.pdf');
-	$last_supplier_invoice_error = img_picto('', 'times', 'class="pictofixedwidth" style="color:red;"');
+	$urlOriginalFile = DOL_URL_ROOT . '/document.php?modulepart=pdpconnectfr&file=' . urlencode('temp/facturx.pdf');
+	$urlConvertedFile = DOL_URL_ROOT . '/document.php?modulepart=pdpconnectfr&file=' . urlencode('temp/facturx_readable.pdf');
+
+
+	$last_supplier_invoice_error = '<span class="opacitylow">'.img_picto('', 'times', 'class="pictofixedwidth" style="color:red;"');
 	$last_supplier_invoice_error .= ' ' . $langs->trans("LastSupplierInvoiceCouldNotBeProcessed");
 	$last_supplier_invoice_error .= '<i class="fas fa-info-circle em088 opacityhigh classfortooltip" title="'. $langs->trans("LastSupplierInvoiceCouldNotBeProcessedInfo") .'"></i>';
-	$last_supplier_invoice_error .= ' : ';
+	$last_supplier_invoice_error .= ' : </span>';
 	$last_supplier_invoice_error .= '<a href="'.$urlOriginalFile.'">' . $langs->trans("facturXDownloadOriginal") . ' ' . img_picto('', 'download', 'class="pictofixedwidth"') . '</a>';
-	$last_supplier_invoice_error .= ' | ';
+	$last_supplier_invoice_error .= ' <span class="opacitylow">|</span> ';
 	$last_supplier_invoice_error .= '<a href="'.$urlConvertedFile.'">' . $langs->trans("facturXDownloadConverted") . ' ' . img_picto('', 'download', 'class="pictofixedwidth"') . '</a>';
 }
+
 
 // Form for sync action
 if ($provider) {
@@ -776,7 +780,21 @@ if ($provider) {
 		print '<tr>';
 		print '<td class="syncFormLabel">'.$langs->trans("StartSynchronizationFrom").'</td>';
 		print '<td>';
-		print $form->selectDate($last_sync, 'last_sync_datetime', 1, 1, 1, '', 1, 0, 0, '', '', '', '', 1, '', $langs->trans('From'), 'tzuserrel');
+
+		$gmtdatetosuggest = $last_sync;
+		if ($syncfromdate && $syncfromdate > $last_sync) {
+			$gmtdatetosuggest = $syncfromdate;
+		}
+
+		print $form->selectDate($gmtdatetosuggest, 'last_sync_datetime', 1, 1, 1, '', 1, 0, 0, '', '', '', '', 1, '', $langs->trans('From'), 'tzuserrel');
+
+		print '</td>';
+
+		$rowspan = getDolGlobalInt('PDPCONNECTFR_FLOWS_SYNC_CALL_LIMIT') ? 2 : 1;
+		print '<td style="padding-left: 40px; padding-right: 40px"'.($rowspan > 1 ? ' rowspan="'.$rowspan.'"' : '').'>';
+
+		// Button to submit
+		print '<a href="#" id="runSyncBtn" class="butAction small" style="margin: 0;">'.img_picto('', 'refresh', 'class="pictofixedwidth"').' '.$langs->trans("RUN_SYNC").'</a>'."\n";
 
 		print '</td>';
 		print '</tr>';
@@ -786,7 +804,7 @@ if ($provider) {
 		print '<tr>';
 		print '<td class="syncFormLabel">'.$langs->trans("maxNumberToProcess").'</td>';
 		print '<td>';
-		print '<input type="number" id="maxflows" name="maxflows" class="maxwidth75 flat" min="1" step="1" value="'.(GETPOSTINT('maxflows') ? GETPOSTINT('maxflows') : getDolGlobalInt('PDPCONNECTFR_FLOWS_SYNC_CALL_SIZE', 100)).'" required> ';
+		print '<input type="number" id="maxflows" name="maxflows" class="maxwidth75 right" min="1" step="1" value="'.(GETPOSTINT('maxflows') ? GETPOSTINT('maxflows') : getDolGlobalInt('PDPCONNECTFR_FLOWS_SYNC_CALL_SIZE', 100)).'" required> ';
 		if ($conf->browser->layout != 'phone') {
 			print '<span class="opacitymedium ">'.$langs->trans("maxNumberToProcessHelp").'</span>';
 		}
@@ -796,21 +814,14 @@ if ($provider) {
 
 	print '</table>'."\n";
 	print '</div>';
-	//print '<br>';
 
 
-	print '<div class="inline-block valignmiddle">'."\n";
-	print '<a href="#" id="runSyncBtn" class="butAction small" style="margin: 0;">'.img_picto('', 'refresh', 'class="pictofixedwidth"').' '.$langs->trans("RUN_SYNC").'</a>'."\n";
-	print '</div>'."\n";
+	print '<hr class="margintoponly paddingbottom">';
 
-	print '<br class="clearboth">';
-	print '<br>';
-	print '<hr>';
-
-	print '<div class="opacitylow floatleft margintoponly">'.$last_sync_info.'</div>'."\n";
+	print '<div class="floatleft margintoponly">'.$last_sync_info.'</div>'."\n";
 
 	if ($last_supplier_invoice_error) {
-		print '<div class="opacitylow floatleft margintoponly">'.$last_supplier_invoice_error.'</div>'."\n";
+		print '<div class="floatleft margintoponly">'.$last_supplier_invoice_error.'</div>'."\n";
 	}
 
 	print "</div>"."\n";

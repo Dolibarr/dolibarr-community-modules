@@ -157,7 +157,7 @@ class CdarHandler
      * @param   mixed $object       Invoice object (CustomerInvoice or SupplierInvoice)
      * @param   int $statusCode     Status code to send
      *
-     * @return  array{res:int, message:string}   Returns array with 'res' (1 on success, -1 on failure) with a 'message'.
+     * @return  array{res:int, message:string, file:string}   Returns array with 'res' (1 on success, -1 on failure) with a 'message' and 'file' with the path.
      */
     function generateCdarFile($object, $statusCode)
     {
@@ -171,9 +171,9 @@ class CdarHandler
          * Les blocs seront ajoutés suivant les retours PDP
          * Peut-être faut-il importer les fichiers XSD de l’UN/CEFACT pour valider les fichiers générés
          * On commence par traiter les cas suivants :
+         * - Prise en charge (204) - optionnel => Implémenté
          * - Refus (210) - obligatoire dans le cas d’un refus ( Le seul statut obligatoire pour l’instant )
          * - Paiement transmis (212) - optionnel mais recommandé
-         * - Prise en charge (204) - optionnel
          * - Acceptation (205) - optionnel
          * On peut en ajouter d’autres suivant le besoin
          */
@@ -277,7 +277,7 @@ class CdarHandler
         }
         echo "CDAR file generated: " . $filename;
 
-        return array('res' => 1, 'message' => 'CDAR file generated successfully');
+        return array('res' => 1, 'message' => 'CDAR file generated successfully', 'file' => $filename);
     }
 
 

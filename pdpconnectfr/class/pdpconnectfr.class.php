@@ -182,6 +182,261 @@ class PdpConnectFr
         self::STATUS_REJECTED            => 'EInvStatus213Rejected',
     ];
 
+
+    // All raisons with their details (Used when sending supplier invoices status : Refusee, Litige, Suspendue, Approuvee partiellement)
+    private const RAISONS = [
+        "NON_TRANSMISE" => [
+            "label" => "Destinataire non connecté",
+            "desc" => "Ce motif est utilisé UNIQUEMENT avec le statut \"DÉPOSÉE\" pour signifier que la facture n'a pas pu être transmise parce que le destinataire (ACHETEUR), bien que présent dans l'Annuaire PPF, n'a aucune adresse de réception de facture active (c'est-à-dire connectée à une Plateforme Agréée en réception)."
+        ],
+        "JUSTIF_ABS" => [
+            "label" => "Justificatif absent ou insuffisant",
+            "desc" => "Ce motif doit être utilisé s'il manque des pièces jointes pour le traitement de la facture (statut \"Suspendue\"). Elle devra faire l'objet d'un renvoi par l'émetteur d'un cycle de vie au statut \"Complétée\" avec la ou les pièce(s) jointe(s) manquante(s)"
+        ],
+        "ROUTAGE_ERR" => [
+            "label" => "Erreur de routage",
+            "desc" => "Ce motif doit être utilisé dans le cas où les informations servant au routage de la facture sont devenues obsolètes. Ceci peut se produire par exemple : en cas de décalage de mise à jour d'annuaire, une erreur de la Plateforme Agréée émettrice. Post correction de l'annuaire par le destinataire de la facture, la facture peut-être transmise à nouveau (Sans aucun changement sur les données de la facture)"
+        ],
+        "AUTRE" => [
+            "label" => "Autre",
+            "desc" => "Ce motif nécessite une explication en Note de CDV"
+        ],
+        "COORD_BANC_ERR" => [
+            "label" => "Erreur de coordonnées bancaires",
+            "desc" => "Les références bancaires sur la facture ne correspondent pas à ce qui est paramétré chez le Payeur / Acheteur"
+        ],
+        "TX_TVA_ERR" => [
+            "label" => "Taux de TVA erroné",
+            "desc" => "Un taux de TVA utilisé n'est pas celui qui aurait dû"
+        ],
+        "MONTANTTOTAL_ERR" => [
+            "label" => "Montant Total Erroné",
+            "desc" => "Un des montants totaux de la facture est erronée, par exemple Net à payer"
+        ],
+        "CALCUL_ERR" => [
+            "label" => "Erreur de calcul de la facture",
+            "desc" => "Soit détecté au schematron, soit après (pour les lignes, ou arrondi non accepté)"
+        ],
+        "NON_CONFORME" => [
+            "label" => "Mention légale manquante",
+            "desc" => "Toute mention légale non contrôlée"
+        ],
+        "DOUBLON" => [
+            "label" => "Facture en doublon (déjà émise / réçue)",
+            "desc" => "Facture en doublon (même numéro même fournisseur et même année de la date de facture)"
+        ],
+        "DEST_INC" => [
+            "label" => "Destinataire inconnu",
+            "desc" => "A l'émission, le destinataire est inconnu. Il n'existe pas dans l'annuaire."
+        ],
+        "DEST_ERR" => [
+            "label" => "Erreur de destinataire",
+            "desc" => "L'entité juridique destinataire de la facture n'est pas la bonne (n° de SIREN du Destinataire). Par exemple en cas de multi-société dans un groupe, il arrive que la société facturée ne soit pas celle qui aurait dû l'être."
+        ],
+        "TRANSAC_INC" => [
+            "label" => "Transaction inconnue",
+            "desc" => "La facture ne correspond pas à une livraison effectuée ou une prestation de service livrée."
+        ],
+        "EMMET_INC" => [
+            "label" => "Emetteur inconnu",
+            "desc" => "L'émetteur de la facture est inconnu du Destinataire (anti-spam)"
+        ],
+        "CONTRAT_TERM" => [
+            "label" => "Contrat terminé",
+            "desc" => "Contrat terminé, plus de facture possible"
+        ],
+        "DOUBLE_FACT" => [
+            "label" => "DOUBLE FACTURE",
+            "desc" => "Prestation ou livraison déjà facturé sur une autre facture"
+        ],
+        "CMD_ERR" => [
+            "label" => "N° de COMMANDE Incorrect ou manquant",
+            "desc" => "N° de commande erroné, inexistant ou déjà facturé. Ne peut être utilisé avec un statut REFUSÉE que si le numéro de commande a été fourni par l'ACHETEUR AVANT LA FACTURATION."
+        ],
+        "ADR_ERR" => [
+            "label" => "L'adresse de facturation électronique erronée",
+            "desc" => "L'adresse de facturation électronique du destinataire (BT-49 ou BT-34) est absente ou erronée"
+        ],
+        "SIRET_ERR" => [
+            "label" => "SIRET Erroné ou absent",
+            "desc" => "Le SIRET du destinataire est erroné ou absent si exigé"
+        ],
+        "CODE_ROUTAGE_ERR" => [
+            "label" => "CODE_ROUTAGE Absent ou Erroné",
+            "desc" => "Le CODE_ROUTAGE du destinataire est erroné ou absent si exigé"
+        ],
+        "REF_CT_ABSENT" => [
+            "label" => "Référence contractuelle nécessaire pour le traitement de la facture manquante",
+            "desc" => "Référence exigée contractuellement est absente (liste à encadrer) et à identifier dans le CDV : BT-12 (N° de contrat), N° de BL (BT-16), Ref Acheteur (BT-10), Objet Facturé (BT-18), Référence Projet (BT-11), Facture antérieure (BG-3), …"
+        ],
+        "REF_ERR" => [
+            "label" => "Référence incorrecte",
+            "desc" => "A préciser dans les autres données du CDV de quelle référence il s'agit"
+        ],
+        "PU_ERR" => [
+            "label" => "Prix Unitaires incorrects",
+            "desc" => "Un prix Unitaire n'est pas celui attendu"
+        ],
+        "REM_ERR" => [
+            "label" => "Remise erronée",
+            "desc" => "Une remise est absente ou n'est pas celle attendue"
+        ],
+        "QTE_ERR" => [
+            "label" => "Quantité facturée incorrecte",
+            "desc" => "Une quantité facturée n'est pas celle attendue"
+        ],
+        "ART_ERR" => [
+            "label" => "Article facturé incorrect",
+            "desc" => "Un article facturé n'est pas le bon ou est erroné"
+        ],
+        "MODPAI_ERR" => [
+            "label" => "Modalités de paiement incorrectes",
+            "desc" => "Les modalités de paiement (date d'échéance par exemple) n'est pas celle escomptées"
+        ],
+        "QUALITE_ERR" => [
+            "label" => "Qualité d'article livré incorrecte",
+            "desc" => "Un des articles livré est défectueux"
+        ],
+        "LIVR_INCOMP" => [
+            "label" => "Problème de livraison",
+            "desc" => "Livraison incomplète, non conforme"
+        ],
+        "REJ_SEMAN" => [
+            "label" => "Rejet pour erreur sémantique",
+            "desc" => "Analyse du format sémantique"
+        ],
+        "REJ_UNI" => [
+            "label" => "Rejet sur contrôle unicité",
+            "desc" => "Contrôle d'unicité"
+        ],
+        "REJ_COH" => [
+            "label" => "Rejet sur contrôle Cohérence de données",
+            "desc" => "Contrôle cohérence de données (les balises et les référentiels)"
+        ],
+        "REJ_ADR" => [
+            "label" => "Rejet sur Contrôle d'adressage",
+            "desc" => "Contrôle d'adressage"
+        ],
+        "REJ_CONT_B2G" => [
+            "label" => "Rejet sur Contrôles métier B2G",
+            "desc" => "Contrôles B2G (vérification du n° d'engagement…)"
+        ],
+        "REJ_REF_PJ" => [
+            "label" => "Rejet sur Référence de PJ",
+            "desc" => "Référence de PJ"
+        ],
+        "REJ_ASS_PJ" => [
+            "label" => "Rejet sur Erreur d'association de la PJ",
+            "desc" => "Erreur d'association de la PJ"
+        ],
+        "IRR_VIDE_F" => [
+            "label" => "Contrôle de non vide sur les fichiers du flux",
+            "desc" => "Contrôle de non vide sur les fichiers du flux"
+        ],
+        "IRR_TYPE_F" => [
+            "label" => "Contrôle de type et extension des fichiers du flux",
+            "desc" => "Contrôle de type et extension des fichiers du flux"
+        ],
+        "IRR_SYNTAX" => [
+            "label" => "Contrôle syntaxique des fichiers du flux",
+            "desc" => "Contrôle syntaxique des fichiers du flux"
+        ],
+        "IRR_TAILLE_PJ" => [
+            "label" => "Contrôle de taille des PJ de chaque fichier du flux",
+            "desc" => "Contrôle de taille des PJ de chaque fichier du flux"
+        ],
+        "IRR_NOM_PJ" => [
+            "label" => "Contrôle du nom des PJ de chaque fichier du flux (absence de caractères interdits)",
+            "desc" => "Contrôle du nom des PJ de chaque fichier du flux (absence de caractères interdits)"
+        ],
+        "IRR_VID_PJ" => [
+            "label" => "Contrôle de PJ non vide de chaque fichier du flux",
+            "desc" => "Contrôle de PJ non vide de chaque fichier du flux"
+        ],
+        "IRR_EXT_DOC" => [
+            "label" => "Contrôle de l'extension des PJ de chaque fichier du flux",
+            "desc" => "Contrôle de l'extension des PJ de chaque fichier du flux"
+        ],
+        "IRR_TAILLE_F" => [
+            "label" => "Contrôle de taille max des fichiers contenus dans le flux",
+            "desc" => "Contrôle de taille max des fichiers contenus dans le flux"
+        ],
+        "IRR_ANTIVIRUS" => [
+            "label" => "Contrôle anti-virus",
+            "desc" => "Le flux ne respecte pas les conditions de sécurité"
+        ]
+    ];
+
+    // Codes raisons by status
+    private const RAISONS_CODE_FOR_STATUS = [
+        self::STATUS_DISPUTED => [
+            "AUTRE",
+            "COORD_BANC_ERR",
+            "TX_TVA_ERR",
+            "MONTANTTOTAL_ERR",
+            "CALCUL_ERR",
+            "NON_CONFORME",
+            "DOUBLON",
+            "DEST_ERR",
+            "TRANSAC_INC",
+            "EMMET_INC",
+            "CONTRAT_TERM",
+            "DOUBLE_FACT",
+            "CMD_ERR",
+            "ADR_ERR",
+            "SIRET_ERR",
+            "CODE_ROUTAGE_ERR",
+            "REF_CT_ABSENT",
+            "REF_ERR",
+            "PU_ERR",
+            "REM_ERR",
+            "QTE_ERR",
+            "ART_ERR",
+            "MODPAI_ERR",
+            "QUALITE_ERR",
+            "LIVR_INCOMP"
+        ],
+
+        self::STATUS_REFUSED => [
+            "TX_TVA_ERR",
+            "MONTANTTOTAL_ERR",
+            "CALCUL_ERR",
+            "NON_CONFORME",
+            "DOUBLON",
+            "DEST_ERR",
+            "TRANSAC_INC",
+            "EMMET_INC",
+            "CONTRAT_TERM",
+            "DOUBLE_FACT",
+            "CMD_ERR",
+            "ADR_ERR",
+            "REF_CT_ABSENT"
+        ],
+
+        self::STATUS_PARTIALLY_APPROVED => [
+            "COORD_BANC_ERR",
+            "CMD_ERR",
+            "SIRET_ERR",
+            "CODE_ROUTAGE_ERR",
+            "REF_CT_ABSENT",
+            "REF_ERR"
+        ],
+
+        self::STATUS_SUSPENDED => [
+            "JUSTIF_ABS",
+            "ROUTAGE_ERR",
+            "CMD_ERR"
+        ]
+    ];
+
+    public const STATUS_REQUIRING_RAISONS = [
+        self::STATUS_REFUSED,
+        self::STATUS_DISPUTED,
+        self::STATUS_PARTIALLY_APPROVED,
+        self::STATUS_SUSPENDED
+    ];
+
+
     /**
 	 * Constructor
 	 *
@@ -303,6 +558,36 @@ class PdpConnectFr
 
 
         return $options;
+    }
+
+    /**
+     * Get raisons for a given status that will be used when sending supplier invoice status updates to PDP/PA (for statuses Refused, Disputed, Partially Approved, Suspended)
+     *
+     * @param int $statut
+     * @param int $withDetails return also desc if 1
+     *
+     * @return array<string, array{code:string, label:string, desc:string}>|null
+     */
+    public function getRaisonsByStatut($statut, $withDetails = 1) {
+
+        if (!isset(self::RAISONS_CODE_FOR_STATUS[$statut])) {
+            return null;
+        }
+
+        $raisons = [];
+        foreach (self::RAISONS_CODE_FOR_STATUS[$statut] as $code) {
+            if (isset(self::RAISONS[$code])) {
+                $raisons[$code] = [
+                    'code' => $code,
+                    'label' => self::RAISONS[$code]['label']
+                ];
+                if ($withDetails === 1) {
+                    $raisons[$code]['desc'] = self::RAISONS[$code]['desc'];
+                }
+            }
+        }
+
+        return $raisons;
     }
 
     /**
@@ -604,16 +889,78 @@ class PdpConnectFr
         $resprints = '';
 
         // Check if this invoice is present into pdpconnectfr_extlinks table to know if it is an imported object
-        $sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."pdpconnectfr_extlinks";
+        $sql = "SELECT rowid, provider FROM ".MAIN_DB_PREFIX."pdpconnectfr_extlinks";
         $sql .= " WHERE element_type = '".$object->element."'";
         $sql .= " AND element_id = ".(int) $object->id;
         $sql .= " LIMIT 1"; 
         $resql = $this->db->query($sql);
         if ($resql && $this->db->num_rows($resql) > 0) {
+            $obj = $this->db->fetch_object($resql);
             // Add block only for imported invoices
+            // Title
+            $resprints .= '<tr class="liste_titre">';
+            $resprints .= '<td colspan="2"><span class="far fa-plus-square"></span><strong> ' . $langs->trans("pdpconnectfrInvoiceSeparator") . '</strong></td>';
+            $resprints .= '</tr>';
+
+            // Source
             $resprints .= '<tr>';
             $resprints .= '<td>' . $langs->trans("pdpconnectfrSourceTitle") . '</td>';
-            $resprints .= '<td>' . $langs->trans("pdpconnectfrSourceDesc") . '</td>';
+            $resprints .= '<td>' . $obj->provider . '</td>';
+            $resprints .= '</tr>';
+
+            // Get current status (LC) from pdpconnectfr_lifecycle_msg table
+            $currentStatusInfo = array();
+            $sql = "SELECT lc_status_code, lc_validation_status, lc_validation_message FROM ".MAIN_DB_PREFIX."pdpconnectfr_lifecycle_msg";
+            $sql .= " WHERE element_type = '".$object->element."'";
+            $sql .= " AND element_id = ".(int) $object->id;
+            $sql .= " ORDER BY rowid DESC LIMIT 1";
+            $resql = $this->db->query($sql);
+            if ($resql && $this->db->num_rows($resql) > 0) {
+                $obj = $this->db->fetch_object($resql);
+                $currentStatusInfo = [
+                    'lc_status_code' => $obj->lc_status_code,
+                    'lc_validation_status' => $obj->lc_validation_status,
+                    'lc_validation_message' => $obj->lc_validation_message
+                ];
+            }
+
+            if (!empty($currentStatusInfo['lc_status_code'])) {
+                //Sent Status
+                $resprints .= '<tr>';
+                $resprints .= '<td class="titlefield">'
+                    . $langs->trans("pdpconnectfrInvoiceStatus")
+                    . ' <i class="fas fa-info-circle em088 opacityhigh classfortooltip" title="'
+                    . $langs->trans("einvoiceStatusFieldHelp") . '"></i></td>';
+                $resprints .= '<td><span id="einvoice-status">'
+                    . $currentStatusInfo['lc_status_code'] . '</span></td>';
+                $resprints .= '</tr>';
+
+                // Validation Status
+                $resprints .= '<tr>';
+                $resprints .= '<td class="titlefield">'
+                    . $langs->trans("pdpconnectfrInvoiceStatus")
+                    . ' <i class="fas fa-info-circle em088 opacityhigh classfortooltip" title="'
+                    . $langs->trans("einvoiceStatusFieldHelp") . '"></i></td>';
+                $resprints .= '<td><span id="einvoice-status">'
+                    . $currentStatusInfo['lc_validation_status'] . '</span></td>';
+                $resprints .= '</tr>';
+
+                // Validation Info
+                $info = $currentStatusInfo['lc_validation_message'] ?? '';
+                $displayStyle = !empty($info) ? '' : 'style="display:none;"';
+
+                $resprints .= '<tr id="einvoice-info-row" ' . $displayStyle . '>';
+                $resprints .= '<td class="titlefield">' . $langs->trans("pdpconnectfrInvoiceInfo") . '</td>';
+                $resprints .= '<td><span id="einvoice-info">' . htmlspecialchars($info) . '</span></td>';
+                $resprints .= '</tr>';
+
+            }
+
+            // E-Invoice events history link
+            $resprints .= '<tr>';
+            $resprints .= '<td>' . $langs->trans("EInvoiceEventsLabel") . '</td>';
+            $url = dol_buildpath('compta/facture/agenda.php', 1) . '?id=' . urlencode($object->id) . '&search_agenda_label=PDPCONNECTFR';
+            $resprints .= '<td><a href="' . $url . '">' . $langs->trans("EInvoiceEventsLink") . ' <i class="fas fa-history"></i></a></td>';
             $resprints .= '</tr>';
         }
 
@@ -631,16 +978,17 @@ class PdpConnectFr
         $resprints = '';
 
         // Check if this thirdparty is present into pdpconnectfr_extlinks table to know if it is an imported object
-        $sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."pdpconnectfr_extlinks";
+        $sql = "SELECT rowid, provider FROM ".MAIN_DB_PREFIX."pdpconnectfr_extlinks";
         $sql .= " WHERE element_type = '".$object->element."'";
         $sql .= " AND element_id = ".(int) $object->id;
         $sql .= " LIMIT 1";
         $resql = $this->db->query($sql);
         if ($resql && $this->db->num_rows($resql) > 0) {
+            $obj = $this->db->fetch_object($resql);
             // Add block only for imported invoices
             $resprints .= '<tr>';
             $resprints .= '<td>' . $langs->trans("pdpconnectfrSourceTitle") . '</td>';
-            $resprints .= '<td>' . $langs->trans("pdpconnectfrSourceDesc") . '</td>';
+            $resprints .= '<td>' . $obj->provider . '</td>';
             $resprints .= '</tr>';
         }
 
@@ -658,16 +1006,17 @@ class PdpConnectFr
         $resprints = '';
 
         // Check if this product or service is present into pdpconnectfr_extlinks table to know if it is an imported object
-        $sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."pdpconnectfr_extlinks";
+        $sql = "SELECT rowid, provider FROM ".MAIN_DB_PREFIX."pdpconnectfr_extlinks";
         $sql .= " WHERE element_type = '".$object->element."'";
         $sql .= " AND element_id = ".(int) $object->id;
         $sql .= " LIMIT 1";
         $resql = $this->db->query($sql);
         if ($resql && $this->db->num_rows($resql) > 0) {
+            $obj = $this->db->fetch_object($resql);
             // Add block only for imported invoices
             $resprints .= '<tr>';
             $resprints .= '<td>' . $langs->trans("pdpconnectfrSourceTitle") . '</td>';
-            $resprints .= '<td>' . $langs->trans("pdpconnectfrSourceDesc") . '</td>';
+            $resprints .= '<td>' . $obj->provider . '</td>';
             $resprints .= '</tr>';
         }
 
@@ -787,6 +1136,92 @@ class PdpConnectFr
 
 
     /**
+     * Store a lifecycle status message in the pdpconnectfr_lifecycle_msg table.
+     *
+     * This method is used to persist incoming or outgoing lifecycle status messages
+     * received from or sent to the PDP, and to link each message to a Dolibarr
+     * business object (invoice, supplier invoice, payment, etc.) in order to keep a full history
+     * of lifecycle events.
+     *
+     * @param int    $elementId             Element ID (rowid of the linked object)
+     * @param string $elementType           Element type (class name)
+     * @param int    $statusCode            Lifecycle status code (normalized)
+     * @param string $direction             Message direction: IN or OUT
+     * @param string $flowId                PDP flow identifier (UUID), if available
+     * @param string $validationStatus      Validation status: OK, PENDING or ERROR, if status is sent by dolibarr to PDP
+     * @param string $validationMessage     Validation or error message returned by PDP, if status is sent by dolibarr to PDP
+     *
+     * @return int  Rowid inserted or -1 on error
+     */
+    public function storeStatusMessage($elementId, $elementType, $statusCode, $direction, $flowId = '', $validationStatus = '', $validationMessage = '')
+    {
+        global $db, $user;
+
+        $provider = getDolGlobalString('PDPCONNECTFR_PDP');
+
+        $sql = "INSERT INTO " . MAIN_DB_PREFIX . "pdpconnectfr_lifecycle_msg (";
+        $sql .= "element_id, ";
+        $sql .= "element_type, ";
+        $sql .= "provider, ";
+        $sql .= "flow_id, ";
+        $sql .= "direction, ";
+        $sql .= "lc_status_code, ";
+        $sql .= "lc_validation_status, ";
+        $sql .= "lc_validation_message, ";
+        $sql .= "date_creation, ";
+        $sql .= "fk_user_creat";
+        $sql .= ") VALUES (";
+        $sql .= (int) $elementId . ", ";
+        $sql .= "'" . $db->escape($elementType) . "', ";
+        $sql .= "'" . $db->escape($provider) . "', ";
+        $sql .= ($flowId ? "'" . $db->escape($flowId) . "'" : "NULL") . ", ";
+        $sql .= "'" . $db->escape($direction) . "', ";
+        $sql .= (int) $statusCode . ", ";
+        $sql .= "'" . $db->escape($validationStatus) . "', ";
+        $sql .= "'" . $db->escape($validationMessage) . "', ";
+        $sql .= "'" . $this->db->idate(dol_now()) . "', ";
+        $sql .= (int) $user->id;
+        $sql .= ")";
+
+        $resql = $db->query($sql);
+        if (!$resql) {
+            dol_syslog(__METHOD__ . ' SQL error: ' . $db->lasterror(), LOG_ERR);
+            return -1;
+        }
+
+        return (int) $db->last_insert_id(MAIN_DB_PREFIX . 'pdpconnectfr_lifecycle_msg');
+    }
+
+
+    /**
+     * Update validation information of an existing lifecycle status message.
+     *
+     * @param int    $rowid
+     * @param string $validationStatus      Validation status: OK, PENDING or ERROR, if status is sent by dolibarr to PDP
+     * @param string $validationMessage     Validation or error message returned by PDP, if status is sent by dolibarr to PDP
+     *
+     * @return int 1 on success, -1 on error
+     */
+    public function updateStatusMessageValidation($rowid, $validationStatus, $validationMessage = '')
+    {
+        global $db, $user;
+
+        $sql = "UPDATE " . MAIN_DB_PREFIX . "pdpconnectfr_lifecycle_msg SET ";
+        $sql .= "lc_validation_status = '" . $db->escape($validationStatus) . "', ";
+        $sql .= "lc_validation_message = '" . $db->escape($validationMessage) . "', ";
+        $sql .= "fk_user_modif = " . (int) $user->id . " ";
+        $sql .= "WHERE rowid = " . (int) $rowid;
+
+        if (!$db->query($sql)) {
+            dol_syslog(__METHOD__ . ' SQL error: ' . $db->lasterror(), LOG_ERR);
+            return -1;
+        }
+
+        return 1;
+    }
+
+
+    /**
      * Calculate TVA intracommunity number for a thirdparty if missing
      *
      * @param mixed $thirdparty
@@ -808,5 +1243,30 @@ class PdpConnectFr
             }
         }
         return $tva_intra ?? '';
+    }
+
+    /**
+     * Clean up temporary files
+     *
+     * @return void
+     */
+    public function cleanUpTemporaryFiles()
+    {
+        global $conf;
+        // Clean up temporary files
+        $tempDir = $conf->pdpconnectfr->dir_temp ?? '';
+        if (!empty($tempDir) && is_dir($tempDir)) {
+            $files = scandir($tempDir);
+            if (is_array($files)) {
+                foreach ($files as $file) {
+                    if ($file !== '.' && $file !== '..') {
+                        $filePath = "$tempDir/$file";
+                        if (is_file($filePath)) {
+                            dol_delete_file($filePath);
+                        }
+                    }
+                }
+            }
+        }
     }
 }

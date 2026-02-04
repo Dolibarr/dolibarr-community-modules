@@ -1147,6 +1147,8 @@ class FacturXProtocol extends AbstractProtocol
         if ($resql) {
             if ($db->num_rows($resql) > 0) {
                 $supplierInvoiceId = $db->fetch_object($resql)->id;
+                $pdpconnectfr = new PdpConnectFr($db);
+                $pdpconnectfr->cleanUpTemporaryFiles(); // Clean up temp files to remove retrieved Factur-X file since invoice already exists
                 return ['res' => $supplierInvoiceId, 'message' => 'Supplier Invoice with reference ' . $documentno . ' already exists' ];
             }
         } else {
@@ -1735,12 +1737,13 @@ class FacturXProtocol extends AbstractProtocol
     }
 
     /**
-     * Synchronize or create a Dolibarr thirdparty based on Factur-X seller information
+     * Synchronize or create a Dolibarr thirdparty based on Factur-X seller information.
+     *
      * @param array     $sellerInfo Array containing seller information extracted from Factur-X
      * @param string    $priority Fill priority ('dolibarr' or 'pdp'). If both data are available, which one to prefer
      * @param string    $flowId Flow identifier source of the thirdparty.
      *
-     * @return array{res:int, message:string, action:string|null}   Returns array with 'res' (ID of the synchronized or created thirdparty, -1 on error) with a 'message' and an optional 'action'.
+     * @return array{res:int, message:string, actioncode:string|null, actionurl:string|null, action:string|null}   Returns array with 'res' (ID of the synchronized or created thirdparty, -1 on error) with a 'message' and an optional 'action'.
      */
     private function _syncOrCreateThirdpartyFromFacturXSeller($sellerInfo, $priority = 'dolibarr', $flowId = '')
     {
@@ -2033,6 +2036,7 @@ class FacturXProtocol extends AbstractProtocol
             if (!empty($createParams)) {
                 $createUrl .= '&' . http_build_query($createParams);
             }
+			$createUrl .= '&backtopage='.urlencode(dol_buildpath('/pdpconnectfr/document_list.php', 1));
 
             $errorDetails = [];
             if (!empty($sellername)) {
@@ -2059,6 +2063,7 @@ class FacturXProtocol extends AbstractProtocol
             	'res' => -1,
             	'message' => $message,
             	'actioncode' => 'THIRDPARTY_NOT_FOUND',
+            	'actionurl' => $createUrl,
             	'action' => $action);
         }
     }
@@ -2068,7 +2073,7 @@ class FacturXProtocol extends AbstractProtocol
      * @param array $lineData Array containing invoice line data extracted from Factur-X
      * @param string $flowId Flow identifier source of the product. Used for logging purposes.
      *
-     * @return array{res:int, message:string, action:string|null}   Returns array with 'res' (ID of the found or created product, -1 on error) with a 'message' and an optional 'action'.
+     * @return array{res:int, message:string, actioncode:string|null, actionurl:string|null, action:string|null}   Returns array with 'res' (ID of the found or created product, -1 on error) with a 'message' and an optional 'action'.
      */
     private function _findOrCreateProductFromFacturXLine($lineData, $flowId = '')
     {
@@ -2239,6 +2244,7 @@ class FacturXProtocol extends AbstractProtocol
             if (!empty($createParams)) {
                 $createUrl .= '&' . http_build_query($createParams);
             }
+			$createUrl .= '&backtopage='.urlencode(dol_buildpath('/pdpconnectfr/document_list.php', 1));
 
             $detailsStr = !empty($errorDetails) ? ' (' . implode(' | ', $errorDetails) . ')' : '';
 
@@ -2254,6 +2260,7 @@ class FacturXProtocol extends AbstractProtocol
             	'res' => -1,
             	'message' => $message,
             	'actioncode' => 'PROUCT_NOT_FOUND',
+            	'actionurl' => $createUrl,
             	'action' => $action
             );
         }
