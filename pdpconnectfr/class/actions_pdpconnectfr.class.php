@@ -196,7 +196,7 @@ class ActionsPdpconnectfr extends CommonHookActions
                     'enabled' => 1,
                     'perm' => (bool) $user->hasRight("facture", "creer"),
                     'label' => $label,
-                    'url' => '/fourn/facture/card.php?id=' . $object->id . '&action=generate_lc_message&token=' . newToken()
+                    'url' => '/fourn/facture/card.php?id=' . $object->id . '&action=sendStatusMessage&pdpstatuscode=' . $code . '&token=' . newToken()
                 );
             }
 
@@ -314,13 +314,14 @@ class ActionsPdpconnectfr extends CommonHookActions
 
         if (in_array($object->element, ['invoice_supplier'])) {
 
-            if ($action == 'generate_lc_message') {
+            if ($action == 'confirm_sendStatusMessage') {
                 $PDPManager = new PDPProviderManager($db);
                 $provider = $PDPManager->getProvider(getDolGlobalString('PDPCONNECTFR_PDP'));
+                $pdpstatuscode = GETPOSTINT('pdpstatuscode') ?: 0;
 
-                $result = $provider->sendStatusMessage($object, '204'); // TODO : Pass status code according to button clicked
+                $result = $provider->sendStatusMessage($object, $pdpstatuscode); // Send status message
 
-                if ($result > 0) {
+                if ($result['res'] > 0) {
                     setEventMessages($result['message'], array(), 'mesgs');
                 } else {
                     setEventMessages($result['message'], $provider->errors, 'errors');
@@ -329,6 +330,54 @@ class ActionsPdpconnectfr extends CommonHookActions
             }
         }
         return 0;
+    }
+
+    public function formConfirm($parameters, &$object, &$action, $hookmanager)
+    {
+        global $db, $langs, $user, $form;
+
+        $pdpConnectFr = new PdpConnectFr($db);
+        $checkConfig = $pdpConnectFr->checkModulePrerequisites();
+        if ($checkConfig < 0) {
+            dol_syslog(__METHOD__ . "PDPCONNECTFR Module is not correctly configured.");
+            return 0;
+        }
+        $langs->load("pdpconnectfr@pdpconnectfr");
+
+
+        if (in_array($object->element, ['invoice_supplier'])) {
+            // Clone confirmation
+            if ($action == 'sendStatusMessage') {
+                $form = new Form($db);
+                $pdpstatuscode = GETPOST('pdpstatuscode', 'alpha');
+
+                $formquestion = array();
+                if (in_array($pdpstatuscode, array_values($pdpConnectFr::STATUS_REQUIRING_RAISONS))) {
+                    $formquestion = array(
+                        'array' => [
+                            'type' => 'select',
+                            'name' => 'statusRaison',
+                            'label' => $langs->trans("SelectStatusReason"),
+                            'value' => '',
+                            'values' => $pdpConnectFr->getRaisonsByStatut($pdpstatuscode, 1)
+                        ]
+                    );
+                }
+
+                $formconfirm = $form->formconfirm(
+                    DOL_URL_ROOT . "/fourn/facture/card.php?id={$object->id}&action=confirm_sendStatusMessage&pdpstatuscode={$pdpstatuscode}",
+                    $langs->trans('SendStatusMessage'),
+                    $langs->trans('ConfirmSendStatusMessage', $object->ref, $pdpConnectFr->getStatusLabel($pdpstatuscode)),
+                    'confirm_sendStatusMessage',
+                    $formquestion,
+                    'yes',
+                    1,
+                    250
+                );
+
+                $this->resprints .= $formconfirm;
+            }
+        }
     }
 
     /**
@@ -399,7 +448,7 @@ class ActionsPdpconnectfr extends CommonHookActions
             $contexts,
             ['supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist']
         )) {
-            $this->resprints .= ', ext.rowid AS pdplink_id';
+            $this->resprints .= ', ext.rowid AS pdplink_id, ext.provider AS pdp_provider';
         }
 
         return 0;
@@ -463,8 +512,8 @@ class ActionsPdpconnectfr extends CommonHookActions
             $contexts,
             ['supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist']
         )) {
-            if (GETPOST('search_pdplinked', 'alpha') !== '' && GETPOST('search_pdplinked', 'alpha') == 'PDP') {
-                $this->resprints .= ' AND ext.rowid IS NOT NULL';
+            if (GETPOST('search_pdplinked', 'alpha') !== '' && GETPOST('search_pdplinked', 'alpha') == getDolGlobalString('PDPCONNECTFR_PDP')) {
+                $this->resprints .= ' AND ext.provider = "'.getDolGlobalString('PDPCONNECTFR_PDP').'"';
             }
         }
 
@@ -558,7 +607,7 @@ class ActionsPdpconnectfr extends CommonHookActions
             ['supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist']
         )) {
             $listofoptions = array(
-                'PDP' => 'PDP',
+                getDolGlobalString('PDPCONNECTFR_PDP') => getDolGlobalString('PDPCONNECTFR_PDP'),
             );
             print '<td class="liste_titre">';
             print $form->selectarray(
@@ -625,7 +674,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 
             print '<td>';
             if ($obj->pdplink_id) {
-                print 'PDP';
+                print $obj->pdp_provider;
             }
             print '</td>';
         }

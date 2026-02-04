@@ -1145,6 +1145,8 @@ class FacturXProtocol extends AbstractProtocol
         if ($resql) {
             if ($db->num_rows($resql) > 0) {
                 $supplierInvoiceId = $db->fetch_object($resql)->id;
+                $pdpconnectfr = new PdpConnectFr($db);
+                $pdpconnectfr->cleanUpTemporaryFiles(); // Clean up temp files to remove retrieved Factur-X file since invoice already exists
                 return ['res' => $supplierInvoiceId, 'message' => 'Supplier Invoice with reference ' . $documentno . ' already exists' ];
             }
         } else {

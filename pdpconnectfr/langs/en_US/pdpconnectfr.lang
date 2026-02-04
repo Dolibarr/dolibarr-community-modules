@@ -219,3 +219,6 @@ PDPCONNECTFR_THIRDPARTIES_COMPLETE_INFO=Complete missing third-party information
 PDPCONNECTFR_THIRDPARTIES_COMPLETE_INFO_HELP=By checking this option, the system will automatically complete missing third-party information when receiving an e-invoice (only filling in empty fields, without modifying already completed information).
 pdpconnectfrSourceTitle=Source
 pdpconnectfrSourceDesc=PDP
+SendStatusMessage=Change and submit invoice status
+ConfirmSendStatusMessage=Are you sure you want to update the status of invoice %s and submit it to the PDP as <b>%s</b>?
+SelectStatusReason=Reason
