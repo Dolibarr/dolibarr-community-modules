@@ -959,6 +959,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                             $syncComment = $document->ack_info;
                         }
                         $pdpconnectfr->insertOrUpdateExtLink($factureObj->id, Facture::class, $flowId, $syncStatus, $factureObj->ref, $syncComment);
+
+                        $pdpconnectfr->storeStatusMessage($document->fk_element_id, $document->fk_element_type, $document->cdar_lifecycle_code,$document->flow_direction, $flowId, $syncStatus, $syncComment, $document->submittedat);
                     } else {
                         dol_syslog(__METHOD__ . " Customer invoice not found for flowId: {$flowId}, so we save the flow into document table but we don't create an entry into pdpconnectfr_extlinks table", LOG_WARNING); // This can happen if the invoice was sent from another system using the same PDP account
                     }
@@ -1030,13 +1032,40 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
             // Supplier Invoice LC (life cycle)
             case "SupplierInvoiceLC":
-                $document->document_type = 'INVOICE';
+                // This is a supplier invoice lifecycle message that we sent to PDP.
+                // We link it to the supplier invoice in dolibarr and we check validation response.
+                // Since we trigger an AJAX every X seconds to get validation response while validation of sent LC message remains in the "Pending" status after sending. That will be a double check of validation of sent LC message in case ajax call it not triggered or failed for some reason.
+
+                require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
+                $document->fk_element_type = FactureFournisseur::class;
+
+                // Fetch the linked supplier invoice using flowId stored in pdpconnectfr_lifecycle_msg table when the LC message was sent
+                $resFetchStatusMessages = $pdpconnectfr->fetchStatusMessages($flowId);
+                if ($resFetchStatusMessages < 0 || empty($resFetchStatusMessages)) {
+                    $returnRes = 0;
+                    $returnMessage = "Failed to fetch status messages for flowId: " . $flowId;
+                } else {
+                    // Fetch ref and id to link the document to supplier invoice
+                    $suplierInvoiceObj = new FactureFournisseur($this->db);
+                    $resFetch = $suplierInvoiceObj->fetch($resFetchStatusMessages['element_id']);
+                    if ($resFetch <= 0) {
+                        $returnRes = 0;
+                        $returnMessage = "Failed to fetch supplier invoice for flowId: " . $flowId . " using rowid from pdpconnectfr_lifecycle_msg table: " . $resFetchStatusMessages['rowid'];
+                    } else {
+                        $document->fk_element_id = !empty($suplierInvoiceObj->id) ? $suplierInvoiceObj->id : 0;
+                        $document->tracking_idref = !empty($suplierInvoiceObj->ref) ? $suplierInvoiceObj->ref : '(NOTFOUND)'; // Should always be found here
+                    }
+
+                    // Update LC message status in pdpconnectfr_lifecycle_msg table based on validation response
+                    $syncStatus = $document->ack_status;
+                    $syncComment = $document->ack_info;
+                    $pdpconnectfr->updateStatusMessageValidation($resFetchStatusMessages['rowid'], $syncStatus, $syncComment);
+                }
                 break;
             case "":
                 // TODO: Remove all this case or condition it with debug mode
                 // This is likely a valisation response for an invoice that was previously sent, and not a lifecycle message.
                 // Since we trigger an AJAX every X seconds to get validation response while an invoice remains in the "Pending" status after sending, no need to handle this case and to store all validation responses in document table.
-
 
                 // In this case, the trackingId may be null.
                 // - If trackingId is set, it is used to find the invoice as usual.
