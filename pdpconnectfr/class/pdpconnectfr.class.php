@@ -1248,14 +1248,16 @@ class PdpConnectFr
      * @param string $flowId                PDP flow identifier (UUID), if available
      * @param string $validationStatus      Validation status: OK, PENDING or ERROR, if status is sent by dolibarr to PDP
      * @param string $validationMessage     Validation or error message returned by PDP, if status is sent by dolibarr to PDP
+     * @param string|null $date_creation    Date of the event, if we want to store a past event (for example when importing lifecycle history from PDP), if null current date will be used
      *
      * @return int  Rowid inserted or -1 on error
      */
-    public function storeStatusMessage($elementId, $elementType, $statusCode, $direction, $flowId = '', $validationStatus = '', $validationMessage = '')
+    public function storeStatusMessage($elementId, $elementType, $statusCode, $direction, $flowId = '', $validationStatus = '', $validationMessage = '', $date_creation = null)
     {
         global $db, $user;
 
         $provider = getDolGlobalString('PDPCONNECTFR_PDP');
+        $date_creation = $date_creation ? $db->idate($date_creation) : $db->idate(dol_now());
 
         $sql = "INSERT INTO " . MAIN_DB_PREFIX . "pdpconnectfr_lifecycle_msg (";
         $sql .= "element_id, ";
@@ -1277,7 +1279,7 @@ class PdpConnectFr
         $sql .= (int) $statusCode . ", ";
         $sql .= "'" . $db->escape($validationStatus) . "', ";
         $sql .= "'" . $db->escape($validationMessage) . "', ";
-        $sql .= "'" . $this->db->idate(dol_now()) . "', ";
+        $sql .= "'" . $date_creation . "', ";
         $sql .= (int) $user->id;
         $sql .= ")";
 
@@ -1289,6 +1291,55 @@ class PdpConnectFr
 
         return (int) $db->last_insert_id(MAIN_DB_PREFIX . 'pdpconnectfr_lifecycle_msg');
     }
+
+    /**
+     * Fetch lifecycle status messages linked to a given flow ID.
+     */
+    public function fetchStatusMessages($flowId)
+    {
+        global $db;
+
+        $sql = "SELECT rowid, element_id, element_type, provider, flow_id, direction, lc_status_code, lc_validation_status, lc_validation_message, date_creation";
+        $sql .= " FROM " . MAIN_DB_PREFIX . "pdpconnectfr_lifecycle_msg";
+        $sql .= " WHERE flow_id = '" . $db->escape($flowId) . "'";
+
+        $resql = $db->query($sql);
+        if (!$resql) {
+            dol_syslog(__METHOD__ . ' SQL error: ' . $db->lasterror(), LOG_ERR);
+            return -1;
+        }
+
+        // If no message is found, we return an empty array
+        if ($db->num_rows($resql) === 0) {
+            return -1;
+        }
+
+        // If more than 1 message is returned, we return an error
+        if ($db->num_rows($resql) > 1) {
+            dol_syslog(__METHOD__ . ' Error: more than 1 message found for flow_id ' . $flowId, LOG_ERR);
+            return -1;
+        }
+
+        $messages = [];
+        if ($db->num_rows($resql) > 0) {
+            $obj = $db->fetch_object($resql);
+            $messages = [
+            'rowid' => (int) $obj->rowid,
+            'element_id' => (int) $obj->element_id,
+            'element_type' => $obj->element_type,
+            'provider' => $obj->provider,
+            'flow_id' => $obj->flow_id,
+            'direction' => $obj->direction,
+            'lc_status_code' => (int) $obj->lc_status_code,
+            'lc_validation_status' => $obj->lc_validation_status,
+            'lc_validation_message' => $obj->lc_validation_message,
+            'date_creation' => $db->jdate($obj->date_creation),
+            ];
+        }
+
+        return $messages;
+    }
+
 
 
     /**
