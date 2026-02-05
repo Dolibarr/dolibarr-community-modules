@@ -236,7 +236,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                 "GET",
                 false,
                 ['Accept' => 'application/octet-stream'],
-                'Check Invoice validation'
+                'check_invoice_validation'
             );
 
             if ($response['status_code'] == 200 || $response['status_code'] == 202) {

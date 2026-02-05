@@ -100,7 +100,7 @@ class FacturXProtocol extends AbstractProtocol
         // Initialize variables
         $ret = $prepaidAmount = 0;
         $billing_period = [];
-        $deltemp = array();
+
         $object = $invoice;
         if (!is_object($invoice->thirdparty)) {
             $invoice->fetch_thirdparty();
@@ -273,6 +273,17 @@ class FacturXProtocol extends AbstractProtocol
         	throw new Exception('BADINVOICETYPE: The type for invoice id '.$object->id.' is not yet supported.');
         }
 
+        $idprof = $this->_remove_spaces($this->thirdpartyidprof($object) ?? '');
+        $myidprof = $this->idprof($mysoc);
+
+        // Add test
+        if (empty($idprof)) {
+			throw new Exception('BADTHIRDPARTYPROFID: The main professional ID of the thirdparty '.$object->name.' is empty.');
+        }
+        if (empty($myidprof)) {
+			throw new Exception('BADPROFID: The professional ID of your company is empty. Fix this in your company setup page.');
+        }
+
         //  Build XML Document Header (Seller, Buyer, Dates)
         $facturxpdf
             ->setDocumentInformation(
@@ -286,10 +297,10 @@ class FacturXProtocol extends AbstractProtocol
             ->addDocumentNote($note_pub)
 
             // ---------------- Seller ----------------
-            ->setDocumentSeller($mysoc->name, $this->idprof($mysoc))
+            ->setDocumentSeller($mysoc->name, $myidprof)
             ->addDocumentSellerTaxRegistration("VA", $mysoc->tva_intra ?? 'FRSPECIMEN')
             ->setDocumentSellerLegalOrganisation(
-                $this->idprof($mysoc),
+                $myidprof,
                 $this->IEC_6523_code($mysoc->country_code), // TODO: maybe we can add a parameter to customize this.
                 $mysoc->name ?? 'SPECIMEN'
             )
@@ -305,7 +316,7 @@ class FacturXProtocol extends AbstractProtocol
             // ---------------- Buyer ----------------
             ->setDocumentBuyer(
                 $object->thirdparty->name ?? 'CUSTOMER',
-                $this->_remove_spaces($this->thirdpartyidprof($object) ?? 'IDPROF2')
+                $idprof ?: 'IDPROF'
             )
             ->setDocumentBuyerAddress(
                 $object->thirdparty->address      ?? 'ADDRESS',
@@ -317,7 +328,7 @@ class FacturXProtocol extends AbstractProtocol
             )
             ->addDocumentBuyerTaxRegistration("VA", $object->thirdparty->tva_intra ?? '') //
             ->setDocumentBuyerLegalOrganisation(
-                $this->_remove_spaces($this->thirdpartyidprof($object) ?? ''),
+                $idprof,
                 $this->IEC_6523_code($object->thirdparty->country_code),
                 $contact->name ?? $contact->lastname
             )
@@ -328,7 +339,7 @@ class FacturXProtocol extends AbstractProtocol
 
 
         // Add seller ID scheme
-        $facturxpdf->addDocumentSellerGlobalId($this->idprof($mysoc), $this->IEC_6523_code($mysoc->country_code)); // TODO: maybe we can add a parameter to customize this.
+        $facturxpdf->addDocumentSellerGlobalId($myidprof, $this->IEC_6523_code($mysoc->country_code)); // TODO: maybe we can add a parameter to customize this.
 
         // Add buyer ID scheme
         /*if (!empty($this->thirdpartyidprof($object))) {
@@ -665,7 +676,7 @@ class FacturXProtocol extends AbstractProtocol
     public function generateInvoice($invoice_id)
     {
         // Global variables declaration (typical for Dolibarr environment)
-        global $conf, $langs, $db;
+        global $langs, $db;
 
         dol_syslog(get_class($this) . '::generateInvoice');
 
@@ -1455,9 +1466,8 @@ class FacturXProtocol extends AbstractProtocol
     /**
      * extract id prof : it depends on country ...
      *
-     * @param   $thirdparty  dolibarr thirdparty
-     *
-     * @return  string return siret siren or locale prod if
+     * @param   Societe		$thirdparty  	Dolibarr thirdparty
+     * @return  string 						Return siret siren or locale prof id
      */
     private function idprof($thirdpart)
     { // TODO: move this function to class utils
@@ -1476,13 +1486,13 @@ class FacturXProtocol extends AbstractProtocol
                     $retour = $thirdpart->idprof1;
                 }
                 break;
-            //SIRET
             case 'FR':
-                $retour = $thirdpart->idprof1;
+                $retour = $thirdpart->idprof1;		// SIRET
                 break;
             default:
-                $retour = $thirdpart->idprof2;
+                $retour = $thirdpart->idprof1 ? $thirdpart->idprof1 : $thirdpart->idprof2;
         }
+
         return $this->_remove_spaces($retour);
     }
 
