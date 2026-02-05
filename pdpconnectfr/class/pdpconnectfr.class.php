@@ -1320,10 +1320,9 @@ class PdpConnectFr
 
 
     /**
-     * Calculate TVA intracommunity number for a thirdparty if missing
+     * Calculate TVA intracommunity number for a thirdparty if missing, from the professional ID
      *
      * @param mixed $thirdparty
-     *
      * @return string
      */
     public function thirdpartyCalcTva_intra($thirdparty)
