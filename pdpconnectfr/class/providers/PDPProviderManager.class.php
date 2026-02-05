@@ -39,11 +39,14 @@ class PDPProviderManager
      */
     public function __construct($db)
     {
-        // Esalink Provider configuration
-        // May be we can keep only the provider name and description in the array of available providers.
+        // Access point declaration
+        // You can enter entry for a new access point here.
+
+        // TODO May be we can keep only the provider name, country scope, and description in the array of available providers.
         // Rest of data could be into the XXXPDPPRovider.class.php file.
         $this->providersList = array (
             'ESALINK' => array(
+            	'provider_countries' => array('FR'),
                 'provider_name' => 'ESALINK - Hubtimize',
                 'description' => 'Esalink PDP Integration',
                 'is_enabled' => 1,
@@ -51,7 +54,8 @@ class PDPProviderManager
             	'test_account_admin_url' => 'https://www.esalink.com/contact/',
             ),
             'TESTPDP' => array(
-                'provider_name' => 'TESTPDP',
+            	'provider_countries' => array('all'),
+            	'provider_name' => 'TESTPDP',
                 'description' => 'Another TESTPDP Integration',
                 'is_enabled' => 0,
             	'prod_account_admin_url' => 'https://example.com',
