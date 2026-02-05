@@ -154,8 +154,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
      *
      * This function send an invoice to PDP
      *
-     * $object Invoice object
-     * @return string   flowId if the invoice was successfully sent, false otherwise.
+     * @param	Facture		$object 	Invoice object
+     * @return 	string   				flowId if the invoice was successfully sent, false otherwise.
      */
     public function sendInvoice($object)
     {
@@ -201,7 +201,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 
 
-        $response = $this->callApi("flows", "POSTALREADYFORMATED", $params, $extraHeaders, 'Send Invoice');
+        $response = $this->callApi("flows", "POSTALREADYFORMATED", $params, $extraHeaders, 'send_invoice');
 
         if ($response['status_code'] == 200 || $response['status_code'] == 202) {
             /**
@@ -217,6 +217,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
              **/
 
             $flowId = $response['response']['flowId'];
+            $callId = $response['id'];
+            $callRef = $response['call_id'];
 
             // Update einvoice status with awaiting validation
             $pdpconnectfr = new PdpConnectFr($db);
@@ -254,7 +256,11 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
                 // Log an event in the invoice timeline
                 $eventLabel = "PDPCONNECTFR - Status: " . $ack_statusLabel;
+                $eventLabel .= " - ".$callRef;
+
                 $eventMessage = "PDPCONNECTFR - Status: " . $ack_statusLabel . (!empty($syncComment) ? " - " . $syncComment : "");
+                $eventMessage .= "\nFlowID=".$flowId;
+                $eventMessage .= "\nCallID ".$callRef;
 
                 $resLogEvent = $this->addEvent('STATUS', $eventLabel, $eventMessage, $object);
                 if ($resLogEvent < 0) {
@@ -463,7 +469,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
             $call = new Call($this->db);
             $call->call_id = $call->getNextCallId();
             $call->call_type = $callType ?: '';
-            $call->method = $method;
+            $call->method = ($method == 'POSTALREADYFORMATED' ? 'POST' : $method);
             $call->endpoint = '/' . $resource;
             $call->request_body = is_array($params) ? json_encode($params) : $params;
             $call->response = is_array($returnarray['response']) ? json_encode($returnarray['response']) : $returnarray['response'];
@@ -472,10 +478,12 @@ class EsalinkPDPProvider extends AbstractPDPProvider
             $call->status = ($returnarray['status_code'] == 200 || $returnarray['status_code'] == 202) ? 1 : 0;
 
             $result = $call->create($user);
+
             if ($result > 0) {
-                $returnarray['call_id'] = $call->call_id;
+                $returnarray['id'] = $call->id;
+            	$returnarray['call_id'] = $call->call_id;
             } else {
-                dol_syslog(__METHOD__ . " Failed to log API call to Esalink PDP provider", LOG_ERR);
+                dol_syslog(__METHOD__ . " Failed to log API call to Esalink PDP provider: ".$call->error." - ".implode(',', $call->errors), LOG_ERR);
             }
         }
 
