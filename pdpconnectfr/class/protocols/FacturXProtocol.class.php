@@ -267,12 +267,17 @@ class FacturXProtocol extends AbstractProtocol
         dol_syslog(\get_class($this) . '::executeHooks create new XML document based on ' . $used_profile);
         // Initialize ZugferdDocumentBuilder (FacturX XML) -----------------------------------------------
 
+        // Get the type of invoice in FacturX nomenclature
+        $objecttype = $this->_getTypeOfInvoice($object);
+        if ($objecttype == null) {
+        	throw new Exception('BADINVOICETYPE: The type for invoice id '.$object->id.' is not yet supported.');
+        }
 
         //  Build XML Document Header (Seller, Buyer, Dates)
         $facturxpdf
             ->setDocumentInformation(
                 $facture_number,
-                $this->_getTypeOfInvoice($object),
+                $objecttype,
                 $ladate,
                 $conf->currency,
                 $object->ref_customer,
@@ -662,22 +667,33 @@ class FacturXProtocol extends AbstractProtocol
         // Global variables declaration (typical for Dolibarr environment)
         global $conf, $langs, $db;
 
+        dol_syslog(get_class($this) . '::generateInvoice');
+
         require_once DOL_DOCUMENT_ROOT."/compta/facture/class/facture.class.php";
         $invoice = new Facture($db);
 	    $invoiceObject = $invoice->fetch((int) $invoice_id);
 
         if ($invoiceObject < 0) {
-            dol_syslog(get_class($this) . "::executeHooks failed to load invoice id=" . $invoice_id, LOG_ERR);
+            dol_syslog(get_class($this) . "::generateInvoice failed to load invoice id=" . $invoice_id, LOG_ERR);
             setEventMessages($langs->trans("ErrorLoadingInvoice"), [], 'errors');
             return -1;
         }
 
-        $xmlfile = $this->generateXML($invoice);
+        // Generate XML
+        try {
+	        $xmlfile = $this->generateXML($invoice);
+        } catch(Exception $e) {
+            dol_syslog(get_class($this) . "::generateInvoice failed to generate XML for invoice id=" . $invoice_id.". Error ".$e->getMessage(), LOG_ERR);
+            setEventMessages($langs->trans("ErrorGeneratingXML").'. '.$e->getMessage(), [], 'errors');
+            return -1;
+        }
+
         if (empty($xmlfile) || !file_exists($xmlfile)) {
-            dol_syslog(get_class($this) . "::executeHooks failed to generate XML for invoice id=" . $invoice_id, LOG_ERR);
+            dol_syslog(get_class($this) . "::generateInvoice failed to generate XML for invoice id=" . $invoice_id, LOG_ERR);
             setEventMessages($langs->trans("ErrorGeneratingXML"), [], 'errors');
             return -1;
         }
+
 
         // Load PDPConnectFR specific translations
         $langs->loadLangs(array("admin", "pdpconnectfr@pdpconnectfr"));
@@ -712,9 +728,7 @@ class FacturXProtocol extends AbstractProtocol
             return -1;
         }
 
-        dol_syslog('PDPConnectFR::generateInvoice');
         clearstatcache(true);
-
 
 
         // Embed XML into PDF using FPDI and save
@@ -1433,6 +1447,7 @@ class FacturXProtocol extends AbstractProtocol
             CommonInvoice::TYPE_REPLACEMENT     => ZugferdInvoiceType::CORRECTION,
             CommonInvoice::TYPE_CREDIT_NOTE     => ZugferdInvoiceType::CREDITNOTE,
             CommonInvoice::TYPE_DEPOSIT         => ZugferdInvoiceType::PREPAYMENTINVOICE,
+        	CommonInvoice::TYPE_SITUATION       => ZugferdInvoiceType::INVOICE,				// Process situation invoice as common invoice
         ];
         return $map[$object->type] ?? null;
     }
@@ -1440,7 +1455,7 @@ class FacturXProtocol extends AbstractProtocol
     /**
      * extract id prof : it depends on country ...
      *
-     * @param   $thirdpart  dolibarr thirdpart
+     * @param   $thirdparty  dolibarr thirdparty
      *
      * @return  string return siret siren or locale prod if
      */

@@ -95,12 +95,13 @@ class ActionsPdpconnectfr extends CommonHookActions
                 }
 
 	            $result = $protocol->generateInvoice($invoiceObject->id);		// Generate E-invoice
-	            if ($result) {
+
+	            if ($result && (!is_numeric($result) || $result > 0)) {
 	                // No error;
                     setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
 	            } else {
 	                if (getDolGlobalString('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
-	            		$this->errors[] = $protocol->errors;
+	            		$this->errors = array_merge($this->errors, $protocol->errors);
 	                	return -1;
 	                } else {
 	                	return 0;
@@ -229,6 +230,7 @@ class ActionsPdpconnectfr extends CommonHookActions
         }
         $langs->load("pdpconnectfr@pdpconnectfr");
 
+
         if (in_array($object->element, ['facture'])) {
 
             // $object->fetch_thirdparty();
@@ -264,7 +266,7 @@ class ActionsPdpconnectfr extends CommonHookActions
                     // TODO: Review and update the invoice workflow.
                     // The "Modify" button may need to be disabled once the E-invoice has been sent and distributed by the PDP.
                 } else {
-                    setEventMessages("", $provider->errors, 'errors');
+                	$this->errors = array_merge($this->errors, $provider->errors);
                 }
             }
 
@@ -282,39 +284,43 @@ class ActionsPdpconnectfr extends CommonHookActions
 
                 // Check configuration
                 $result = $pdpConnectFr->checkRequiredinformations($invoiceObject);
-                if ($result['res'] < 0) {
+
+                if ($result['res'] < 0) {			// Blocking error
                     $message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
                     $this->warnings[] = $message;
 
                     dol_syslog(__METHOD__ . " " . $message);
                     setEventMessages($message, array(), 'errors');
                     return -1;
-                } elseif ($result['res'] == 0) {
-                    $message = $langs->trans("InvoiceGeneratedWithWarnings") . ': <br>' . $result['message'];
-                    $this->warnings[] = $message;
+                } elseif ($result['res'] == 0) {	// Non blocking error, warning
+                    $this->warnings[] = $result['message'];
 
-                    dol_syslog(__METHOD__ . " " . $message);
-                    setEventMessages($message, array(), 'warnings');
+                    dol_syslog(__METHOD__ . " " . $result['message']);
                 }
 
                 // Generate E-invoice by calling the method of the Protocol
                 $result = $protocol->generateInvoice($invoiceObject->id);
-                if ($result) {
-                    dol_syslog(__METHOD__ . " Invoice generated successfully for invoice ID " . $invoiceObject->id);
-                    setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
 
+                if ($result && (!is_numeric($result) || $result > 0)) {
+                    dol_syslog(__METHOD__ . " Invoice generated successfully for invoice ID " . $invoiceObject->id);
+                    if (!empty($this->warnings)){
+                    	setEventMessages($langs->trans("InvoiceGeneratedWithWarnings"), $this->warnings, 'warnings');
+                    } else {
+                    	setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
+                    }
                     return 0;
                 } else {
-                    $this->errors[] = $protocol->errors;
-                    dol_syslog(__METHOD__ . " " . $protocol->errors);
-                    setEventMessages('', $protocol->errors, 'errors');
+                	// If there is an error, we move warnings into error message
+                    $this->errors = array_merge($this->errors, $protocol->errors);
+                    $this->errors = array_merge($this->errors, $this->warnings);
+                    $this->warnings = array();
+                    dol_syslog(__METHOD__ . " " . implode(',', $protocol->errors));
                     return -1;
                 }
             }
         }
 
         if (in_array($object->element, ['invoice_supplier'])) {
-
             if ($action == 'confirm_sendStatusMessage') {
                 $PDPManager = new PDPProviderManager($db);
                 $provider = $PDPManager->getProvider(getDolGlobalString('PDPCONNECTFR_PDP'));
@@ -325,7 +331,8 @@ class ActionsPdpconnectfr extends CommonHookActions
                 if ($result['res'] > 0) {
                     setEventMessages($result['message'], array(), 'mesgs');
                 } else {
-                    setEventMessages($result['message'], $provider->errors, 'errors');
+                	$this->errors = array_merge($this->errors, $protocol->errors);
+                    //setEventMessages($result['message'], $provider->errors, 'errors');
                 }
 
             }
