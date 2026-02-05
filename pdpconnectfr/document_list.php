@@ -729,9 +729,7 @@ $resLastsyncinfosql = $db->query($Lastsyncinfosql);
 if ($resLastsyncinfosql) {
 	$obj = $db->fetch_object($resLastsyncinfosql);
 	if ($obj) {
-		if (empty($last_sync)) {
-			$last_sync = $db->jdate($obj->updatedat);
-		}
+		$last_sync = $db->jdate($obj->updatedat);
 		$last_sync_info .= " ". $langs->trans("lastSyncedFlow") . ': ' . $obj->flow_id . ' &nbsp; &nbsp; '.img_picto('', 'calendar').' ' . dol_print_date($last_sync, 'dayhour', 'tzuserrel');
 	} else {
 		$last_sync = 0;
@@ -766,8 +764,6 @@ if ($provider) {
 	print '<div class="fichecenter">'."\n";
 
 	print '<div class="formconsumeproduce" style="padding: 10px;">'."\n";
-
-	//print '<hr class="clearboth">'."\n";
 
 	print '<div class="div-table-responsive">'; // You can use div-table-responsive-no-min if you don't need reserved height for your table
 	print '<table>'."\n";
@@ -828,8 +824,6 @@ if ($provider) {
 
 	print '</div>'."\n";
 
-	print '<br class="clearboth">';
-
 	print '<script>'."\n";
 	print "document.getElementById('runSyncBtn').addEventListener('click', function(e){"."\n";
 	print "  e.preventDefault();"."\n";
@@ -878,7 +872,7 @@ if ($action == 'sync' && $provider) {
 	}
 }
 
-// sync results
+// Sync results
 if ($action == 'confirm_sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $confirm == 'yes' && !empty($sync_result)) {
 	if (isset($provider)) {
 
@@ -894,10 +888,15 @@ if ($action == 'confirm_sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $conf
 				$cssclass = 'warning';
 			}
 		} else {
-			$cssclass = 'info';
+			if (empty($sync_result['syncedFlows']) && !empty($sync_result['alreadyExist'])) {
+				$cssclass = 'warning';
+				$sync_result['actions'][] = $langs->trans("TryToIncreaseStartDateOrMax", $langs->transnoentitiesnoconv("StartSynchronizationFrom"), $langs->transnoentitiesnoconv("maxNumberToProcess"));
+			} else {
+				$cssclass = 'info';
+			}
 		}
 
-		// Show sync summary result
+		// Show sync summary result (to show in popup)
 		print '<div class="wordbreak '.$cssclass.' clearboth">';
 		print '<strong><u>'.$langs->trans("SyncResults").'</u></strong></br>';
 		print implode("<br>", $sync_result['messages']);
@@ -906,7 +905,7 @@ if ($action == 'confirm_sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $conf
 		}
 		print '</div>';
 
-		// Suggested action after sync failed
+		// Suggested action after sync failed (to show under the form)
 		if ($sync_result['actions']) {
 			print '<div class="wordbreak warning clearboth">';
 			print '<strong><u>'.$langs->trans("SuggestedActions").'</u></strong></br>';
@@ -925,6 +924,8 @@ if ($action == 'confirm_sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $conf
 	}
 }
 
+
+print '<br class="clearboth">';
 
 
 // List of flows sync
