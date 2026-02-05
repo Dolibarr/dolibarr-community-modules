@@ -826,7 +826,11 @@ class PdpConnectFr
         // E-Invoice events history link
         $resprints .= '<tr>';
         $resprints .= '<td>' . $langs->trans("EInvoiceEventsLabel") . '</td>';
-        $url = dol_buildpath('compta/facture/agenda.php', 1) . '?id=' . urlencode($object->id) . '&search_agenda_label=PDPCONNECTFR';
+        if ($object->element == 'facture' || $object->element == 'invoice') {
+        	$url = DOL_URL_ROOT.'/compta/facture/agenda.php?id=' . urlencode($object->id) . '&search_agenda_label=PDPCONNECTFR';
+        } else {
+        	$url = DOL_URL_ROOT.'/fourn/facture/agenda.php?id=' . urlencode($object->id) . '&search_agenda_label=PDPCONNECTFR';
+        }
         $resprints .= '<td><a href="' . $url . '">' . $langs->trans("EInvoiceEventsLink") . ' <i class="fas fa-history"></i></a></td>';
         $resprints .= '</tr>';
 
@@ -892,7 +896,7 @@ class PdpConnectFr
         $sql = "SELECT rowid, provider FROM ".MAIN_DB_PREFIX."pdpconnectfr_extlinks";
         $sql .= " WHERE element_type = '".$object->element."'";
         $sql .= " AND element_id = ".(int) $object->id;
-        $sql .= " LIMIT 1"; 
+        $sql .= " LIMIT 1";
         $resql = $this->db->query($sql);
         if ($resql && $this->db->num_rows($resql) > 0) {
             $obj = $this->db->fetch_object($resql);
@@ -959,7 +963,13 @@ class PdpConnectFr
             // E-Invoice events history link
             $resprints .= '<tr>';
             $resprints .= '<td>' . $langs->trans("EInvoiceEventsLabel") . '</td>';
-            $url = dol_buildpath('compta/facture/agenda.php', 1) . '?id=' . urlencode($object->id) . '&search_agenda_label=PDPCONNECTFR';
+
+            if ($object->element == 'facture' || $object->element == 'invoice') {
+        		$url = DOL_URL_ROOT.'/compta/facture/agenda.php?id=' . urlencode($object->id) . '&search_agenda_label=PDPCONNECTFR';
+        	} else {
+        		$url = DOL_URL_ROOT.'/fourn/facture/agenda.php?id=' . urlencode($object->id) . '&search_agenda_label=PDPCONNECTFR';
+        	}
+
             $resprints .= '<td><a href="' . $url . '">' . $langs->trans("EInvoiceEventsLink") . ' <i class="fas fa-history"></i></a></td>';
             $resprints .= '</tr>';
         }

@@ -995,7 +995,7 @@ class FacturXProtocol extends AbstractProtocol
     /**
      * Create a supplier invoice from a Factur-X file.
      *
-     * @param  string $file                         Factur-X file.
+     * @param  string $file                         Content of Factur-X file.
      * @param  string|null $ReadableViewFile        Readable view file. (PDP Generated readable PDF)
      * @param  string $flowId                       Flow identifier source of the invoice.
      *
@@ -2376,7 +2376,7 @@ class FacturXProtocol extends AbstractProtocol
 
         // Register file in database index
         $res = addFileIntoDatabaseIndex(
-            $relative_path,
+            $dest_path,
             $filename,
             $filename,
             'generated',
