@@ -787,10 +787,11 @@ class PdpConnectFr
     /**
      * EInvoiceCardBlock
      *
-     * @param 	Facture $object		Facture
+     * @param 	Facture 			$object					Facture
+     * @param	string				$mode					'create', 'view'
      * @return 	string				HTML content to add
      */
-    public function EInvoiceCardBlock($object) {
+    public function EInvoiceCardBlock($object, $mode = '') {
         global $langs;
 
         $currentStatusInfo = $this->fetchLastknownInvoiceStatus($object->ref);
@@ -799,32 +800,74 @@ class PdpConnectFr
 
         $resprints = '';
 
-        // Title
-        $resprints .= '<tr class="liste_titre">';
-        $resprints .= '<td colspan="2"><span class="far fa-plus-square"></span><strong> ' . $langs->trans("pdpconnectfrInvoiceSeparator") . '</strong></td>';
+       		// Set $extrafield_collapse_display_value (do we have to collapse/expand the group after the separator)
+			$extrafield_collapse_display_value = -1;
+			$expand_display = ((isset($_COOKIE['DOLUSER_COLLAPSE_facture_trpdpconnectseparator']) || GETPOSTINT('ignorecollapsesetup')) ? (!empty($_COOKIE['DOLUSER_COLLAPSE_facture_trpdpconnectseparator'])) : !($extrafield_collapse_display_value == 2));
+			$disabledcookiewrite = 0;
+			if ($mode == 'create') {
+				// On create mode, force separator group to not be collapsible
+				$extrafield_collapse_display_value = 1;
+				$expand_display = true;	// We force group to be shown expanded
+				$disabledcookiewrite = 1; // We keep status of group unchanged into the cookie
+			}
+            $resprints .= '
+            <script nonce="" type="text/javascript">
+			jQuery(document).ready(function() {';
+				if (empty($disabledcookiewrite)) {
+					if (!$expand_display) {
+						$resprints .= 'console.log("Inject js for the collapsing of trpdpconnect_collapseseparator - hide");
+						jQuery(".trpdpconnect_collapseseparator").hide();';
+					} else {
+						$resprints .= 'console.log("Inject js for collapsing of trpdpconnect_collapseseparator - keep visible and set cookie");
+						document.cookie = "DOLUSER_COLLAPSE_facture_trpdpconnectseparator=1; path='.$_SERVER["PHP_SELF"].'";';
+					}
+				}
+			$resprints .= '
+			   jQuery("#trpdpconnect").click(function(){
+			       console.log("We click on collapse/uncollapse to hide/show .trpdpconnectseparator");
+			       jQuery(".trpdpconnect_collapseseparator").toggle(100, function(){
+			           if (jQuery(".trpdpconnect_collapseseparator").is(":hidden")) {
+			               jQuery("#trpdpconnect td span").addClass("fa-plus-square").removeClass("fa-minus-square");
+			               document.cookie = "DOLUSER_COLLAPSE_facture_trpdpconnectseparator=0; path='.$_SERVER["PHP_SELF"].'"
+			           } else {
+			               jQuery("#trpdpconnect td span").addClass("fa-minus-square").removeClass("fa-plus-square");
+			               document.cookie = "DOLUSER_COLLAPSE_facture_trpdpconnectseparator=1; path='.$_SERVER["PHP_SELF"].'"
+			           }
+			       });
+			   });
+			});
+			</script>';
+
+        // Title separator
+        $resprints .= '<tr id="trpdpconnect" class="trpdpconnectseparator trtrpdpconnectseparator_1">';
+        $resprints .= '<td colspan="2"><span class="far fa-'.(($expand_display ? 'minus' : 'plus').'-square').'"></span><strong> ' . $langs->trans("pdpconnectfrInvoiceSeparator") . '</strong></td>';
         $resprints .= '</tr>';
 
-        // PDP Status
-        $resprints .= '<tr>';
+        $info = $currentStatusInfo['info'] ?? '';
+
+        // Access Point Status + Field for real time update info
+        $resprints .= '<tr class="trpdpconnect_collapseseparator">';
         $resprints .= '<td class="titlefield">'
             . $langs->trans("pdpconnectfrInvoiceStatus")
             . ' <i class="fas fa-info-circle em088 opacityhigh classfortooltip" title="'
             . $langs->trans("einvoiceStatusFieldHelp") . '"></i></td>';
         $resprints .= '<td><span id="einvoice-status">'
-            . $currentStatusInfo['status'] . '</span></td>';
+            . $currentStatusInfo['status'] . '</span><br>
+			<span id="einvoice-info" class="clearboth">' . htmlspecialchars($info) . '</span></td>';
         $resprints .= '</tr>';
 
-        // PDP Info
-        $info = $currentStatusInfo['info'] ?? '';
+        // AP Info
+        /*
         $displayStyle = !empty($info) ? '' : 'style="display:none;"';
 
-        $resprints .= '<tr id="einvoice-info-row" ' . $displayStyle . '>';
+        $resprints .= '<tr id="einvoice-info-row" ' . $displayStyle . ' class="trpdpconnect_collapseseparator">';
         $resprints .= '<td class="titlefield">' . $langs->trans("pdpconnectfrInvoiceInfo") . '</td>';
         $resprints .= '<td><span id="einvoice-info">' . htmlspecialchars($info) . '</span></td>';
         $resprints .= '</tr>';
+        */
 
         // E-Invoice events history link
-        $resprints .= '<tr>';
+        $resprints .= '<tr class="trpdpconnect_collapseseparator">';
         $resprints .= '<td>' . $langs->trans("EInvoiceEventsLabel") . '</td>';
         if ($object->element == 'facture' || $object->element == 'invoice') {
         	$url = DOL_URL_ROOT.'/compta/facture/agenda.php?id=' . urlencode($object->id) . '&search_agenda_label=PDPCONNECTFR';
@@ -859,9 +902,6 @@ class PdpConnectFr
                         // Update UI
                         $("#einvoice-status").html(data.status || "");
                         $("#einvoice-info").html(data.info || "");
-                        if (data.info) {
-                            $("#einvoice-info-row").show();
-                        }
 
                         // Retry only if still awaiting validation
                         if (parseInt(data.code, 10) === ' . self::STATUS_AWAITING_VALIDATION . ') {
@@ -884,10 +924,11 @@ class PdpConnectFr
     /**
      * SupplierInvoiceCardBlock
      *
-     * @param 	FactureFournisseur $object		FactureFournisseur
+     * @param 	FactureFournisseur 	$object					FactureFournisseur
+     * @param	string				$mode					'create', 'view'
      * @return 	string				HTML content to add
      */
-    public function SupplierInvoiceCardBlock($object) {
+    public function SupplierInvoiceCardBlock($object, $mode = '') {
         global $langs;
 
         $resprints = '';
@@ -901,13 +942,52 @@ class PdpConnectFr
         if ($resql && $this->db->num_rows($resql) > 0) {
             $obj = $this->db->fetch_object($resql);
             // Add block only for imported invoices
-            // Title
-            $resprints .= '<tr class="liste_titre">';
-            $resprints .= '<td colspan="2"><span class="far fa-plus-square"></span><strong> ' . $langs->trans("pdpconnectfrInvoiceSeparator") . '</strong></td>';
+
+       		// Set $extrafield_collapse_display_value (do we have to collapse/expand the group after the separator)
+			$extrafield_collapse_display_value = -1;
+			$expand_display = ((isset($_COOKIE['DOLUSER_COLLAPSE_facture_trpdpconnectseparator']) || GETPOSTINT('ignorecollapsesetup')) ? (!empty($_COOKIE['DOLUSER_COLLAPSE_facture_trpdpconnectseparator'])) : !($extrafield_collapse_display_value == 2));
+			$disabledcookiewrite = 0;
+			if ($mode == 'create') {
+				// On create mode, force separator group to not be collapsible
+				$extrafield_collapse_display_value = 1;
+				$expand_display = true;	// We force group to be shown expanded
+				$disabledcookiewrite = 1; // We keep status of group unchanged into the cookie
+			}
+            $resprints .= '
+            <script nonce="" type="text/javascript">
+			jQuery(document).ready(function() {';
+				if (empty($disabledcookiewrite)) {
+					if (!$expand_display) {
+						$resprints .= 'console.log("Inject js for the collapsing of trpdpconnect_collapseseparator - hide");
+						jQuery(".trpdpconnect_collapseseparator").hide();';
+					} else {
+						$resprints .= 'console.log("Inject js for collapsing of trpdpconnect_collapseseparator - keep visible and set cookie");
+						document.cookie = "DOLUSER_COLLAPSE_facture_trpdpconnectseparator=1; path='.$_SERVER["PHP_SELF"].'";';
+					}
+				}
+			$resprints .= '
+			   jQuery("#trpdpconnect").click(function(){
+			       console.log("We click on collapse/uncollapse to hide/show .trpdpconnectseparator");
+			       jQuery(".trpdpconnect_collapseseparator").toggle(100, function(){
+			           if (jQuery(".trpdpconnect_collapseseparator").is(":hidden")) {
+			               jQuery("#trpdpconnect td span").addClass("fa-plus-square").removeClass("fa-minus-square");
+			               document.cookie = "DOLUSER_COLLAPSE_facture_trpdpconnectseparator=0; path='.$_SERVER["PHP_SELF"].'"
+			           } else {
+			               jQuery("#trpdpconnect td span").addClass("fa-minus-square").removeClass("fa-plus-square");
+			               document.cookie = "DOLUSER_COLLAPSE_facture_trpdpconnectseparator=1; path='.$_SERVER["PHP_SELF"].'"
+			           }
+			       });
+			   });
+			});
+			</script>';
+
+            // Title separator
+            $resprints .= '<tr id="trpdpconnect" class="trpdpconnectseparator trtrpdpconnectseparator_1">';
+            $resprints .= '<td colspan="2"><span class="far fa-'.(($expand_display ? 'minus' : 'plus').'-square').'"></span><strong> ' . $langs->trans("pdpconnectfrInvoiceSeparator") . '</strong></td>';
             $resprints .= '</tr>';
 
             // Source
-            $resprints .= '<tr>';
+            $resprints .= '<tr class="trpdpconnect_collapseseparator">';
             $resprints .= '<td>' . $langs->trans("pdpconnectfrSourceTitle") . '</td>';
             $resprints .= '<td>' . $obj->provider . '</td>';
             $resprints .= '</tr>';
@@ -929,8 +1009,10 @@ class PdpConnectFr
             }
 
             if (!empty($currentStatusInfo['lc_status_code'])) {
+            	$info = $currentStatusInfo['lc_validation_message'] ?? '';
+
                 //Sent Status
-                $resprints .= '<tr>';
+                $resprints .= '<tr class="trpdpconnect_collapseseparator">';
                 $resprints .= '<td class="titlefield">'
                     . $langs->trans("pdpconnectfrInvoiceStatus")
                     . ' <i class="fas fa-info-circle em088 opacityhigh classfortooltip" title="'
@@ -940,16 +1022,19 @@ class PdpConnectFr
                 $resprints .= '</tr>';
 
                 // Validation Status
-                $resprints .= '<tr>';
+                $resprints .= '<tr class="trpdpconnect_collapseseparator">';
                 $resprints .= '<td class="titlefield">'
                     . $langs->trans("pdpconnectfrInvoiceStatus")
                     . ' <i class="fas fa-info-circle em088 opacityhigh classfortooltip" title="'
                     . $langs->trans("einvoiceStatusFieldHelp") . '"></i></td>';
                 $resprints .= '<td><span id="einvoice-status">'
-                    . $currentStatusInfo['lc_validation_status'] . '</span></td>';
+                    . $currentStatusInfo['lc_validation_status'] . '</span>';
+                $resprints .= '<span id="einvoice-info">' . htmlspecialchars($info) . '</span>';
+                $resprints .= '</td>';
                 $resprints .= '</tr>';
 
                 // Validation Info
+                /*
                 $info = $currentStatusInfo['lc_validation_message'] ?? '';
                 $displayStyle = !empty($info) ? '' : 'style="display:none;"';
 
@@ -957,11 +1042,11 @@ class PdpConnectFr
                 $resprints .= '<td class="titlefield">' . $langs->trans("pdpconnectfrInvoiceInfo") . '</td>';
                 $resprints .= '<td><span id="einvoice-info">' . htmlspecialchars($info) . '</span></td>';
                 $resprints .= '</tr>';
-
+                */
             }
 
             // E-Invoice events history link
-            $resprints .= '<tr>';
+            $resprints .= '<tr class="trpdpconnect_collapseseparator">';
             $resprints .= '<td>' . $langs->trans("EInvoiceEventsLabel") . '</td>';
 
             if ($object->element == 'facture' || $object->element == 'invoice') {
@@ -979,10 +1064,12 @@ class PdpConnectFr
 
     /**
      * ThirdpartyCardBlock
-     * @param 	Societe $object		Thirdparty
-     * @return 	string				HTML content to add
+     *
+     * @param 	Societe 			$object			Thirdparty
+     * @param	string				$mode			'create', 'view'
+     * @return 	string								HTML content to add
      */
-    public function ThirdpartyCardBlock($object) {
+    public function ThirdpartyCardBlock($object, $mode = '') {
         global $langs;
 
         $resprints = '';
@@ -1007,10 +1094,11 @@ class PdpConnectFr
 
     /**
      * ProductServiceCardBlock
-     * @param 	Product|Service $object		Product or Service
+     * @param 	Product|Service 	$object					Product or Service
+     * @param	string				$mode					'create', 'view'
      * @return 	string				HTML content to add
      */
-    public function ProductServiceCardBlock($object) {
+    public function ProductServiceCardBlock($object, $mode= '') {
         global $langs;
 
         $resprints = '';

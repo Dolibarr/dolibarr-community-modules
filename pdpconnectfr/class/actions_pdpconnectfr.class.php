@@ -333,6 +333,15 @@ class ActionsPdpconnectfr extends CommonHookActions
         return 0;
     }
 
+    /**
+     * formConfirm
+     *
+     * @param array			$parameters		Array of parameters
+     * @param CommonObject	$object			Object
+     * @param string		$action			Action code
+     * @param Hookmanager	$hookmanager	Hook manager
+     * @return number
+     */
     public function formConfirm($parameters, &$object, &$action, $hookmanager)
     {
         global $db, $langs, $user, $form;
@@ -411,22 +420,22 @@ class ActionsPdpconnectfr extends CommonHookActions
 
         // Add block in invoice card
         if (in_array($object->element, ['facture'])) {
-            $this->resprints .= $pdpConnectFr->EInvoiceCardBlock($object);		// Output fields in card, including js for refreshing state
+            $this->resprints .= $pdpConnectFr->EInvoiceCardBlock($object, $action);		// Output fields in card, including js for refreshing state
         }
 
         // Add block in supplier invoice card
         if (in_array($object->element, ['invoice_supplier'])) {
-            $this->resprints .= $pdpConnectFr->SupplierInvoiceCardBlock($object);		// Output fields in card, including js for refreshing state
+            $this->resprints .= $pdpConnectFr->SupplierInvoiceCardBlock($object, $action);		// Output fields in card, including js for refreshing state
         }
 
         // Add block in product/service card
         if (in_array($object->element, ['product'])) {
-            $this->resprints .= $pdpConnectFr->ProductServiceCardBlock($object);		// Output fields in card, including js for refreshing state
+            $this->resprints .= $pdpConnectFr->ProductServiceCardBlock($object, $action);		// Output fields in card, including js for refreshing state
         }
 
         // Add block in thirdparty card
         if (in_array($object->element, ['societe'])) {
-            $this->resprints .= $pdpConnectFr->ThirdpartyCardBlock($object);		// Output fields in card
+            $this->resprints .= $pdpConnectFr->ThirdpartyCardBlock($object, $action);		// Output fields in card
         }
 
         return 0;
