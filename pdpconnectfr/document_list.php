@@ -343,7 +343,7 @@ if ($action == 'confirm_sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $conf
 			if (!empty($sync_result['actions'])) {
 				$errortype = 'warnings';
 			}
-			setEventMessages($langs->trans("FailedToSyncADocument").($errortype ? '<br>'.$langs->trans("FailedToSyncADocumentMore") : ''), null, $errortype);
+			//setEventMessages($langs->trans("FailedToSyncADocument").($errortype ? '<br>'.$langs->trans("FailedToSyncADocumentMore") : ''), null, $errortype);
 
 		}
 	} else {
@@ -879,7 +879,7 @@ if ($action == 'confirm_sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $conf
 		$cssclass = ($sync_result['res'] > 0) ? 'info' : 'error';
 
 		$syncerrortype = '';		// '', 'business' or 'technical'
-		if ($sync_result['res'] < 0) {
+		if ($sync_result['res'] <= 0) {
 			if (empty($sync_result['actions'])) {
 				$syncerrortype = 'technical';
 				$cssclass = 'error';
@@ -888,7 +888,7 @@ if ($action == 'confirm_sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $conf
 				$cssclass = 'warning';
 			}
 		} else {
-			if (empty($sync_result['syncedFlows']) && !empty($sync_result['alreadyExist'])) {
+			if ($sync_result['totalFlows'] > $sync_result['batchlimit'] && empty($sync_result['syncedFlows']) && !empty($sync_result['alreadyExist'])) {
 				$cssclass = 'warning';
 				$sync_result['actions'][] = $langs->trans("TryToIncreaseStartDateOrMax", $langs->transnoentitiesnoconv("StartSynchronizationFrom"), $langs->transnoentitiesnoconv("maxNumberToProcess"));
 			} else {
