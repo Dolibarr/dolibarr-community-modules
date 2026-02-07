@@ -547,14 +547,10 @@ class ActionsPdpconnectfr extends CommonHookActions
 
         if (in_array('invoicelist', explode(':', $parameters['context']))) {
             // Einvoice generated or not
-            print print_liste_field_titre(
-                $langs->trans('EInvoiceFile')
-            );
+            print print_liste_field_titre($langs->trans('EInvoiceFile'), '', '', '', $parameters['param'] ?? '', '', $parameters['sortfield'] ?? '', $parameters['sotorder'] ?? '', 'center ');
 
             // syncstatus
-            print print_liste_field_titre(
-                $langs->trans('PDPSyncStatus')
-            );
+            print print_liste_field_titre($langs->trans('PDPSyncStatus'), '', '', '', $parameters['param'] ?? '', '', $parameters['sortfield'] ?? '', $parameters['sotorder'] ?? '', 'center ');
         }
 
         // Supplier invoice list, Product list, Soc list
@@ -576,7 +572,7 @@ class ActionsPdpconnectfr extends CommonHookActions
      */
     public function printFieldListOption($parameters, &$object, &$action, $hookmanager)
     {
-        global  $form, $langs, $db;
+        global  $form, $db;
         if (in_array('invoicelist', explode(':', $parameters['context']))) {
 
             // Einvoice generated or not
@@ -612,7 +608,7 @@ class ActionsPdpconnectfr extends CommonHookActions
                 0,
                 0,
                 '',
-                'width100 ',
+                'width100 '
             );
             print '</td>';
         }
@@ -639,7 +635,7 @@ class ActionsPdpconnectfr extends CommonHookActions
                 0,
                 0,
                 '',
-                'width100 ',
+                'width100 '
             );
             print '</td>';
         }
