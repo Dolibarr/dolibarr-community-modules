@@ -452,16 +452,16 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				'response' => $body
 			);
 		} else {
-			$returnarray = array(
-				'status_code' => $status_code,
-				'response' => $body
-			);
 			if (!empty($response['curl_error_no'])) {
 				$returnarray['curl_error_no'] = $response['curl_error_no'];
 			}
 			if (!empty($response['curl_error_msg'])) {
 				$returnarray['curl_error_msg'] = $response['curl_error_msg'];
 			}
+            $returnarray = array(
+				'status_code' => $status_code,
+				'response' => 'Error ' . $status_code . ' - ' . $response['content']
+			);
 		}
 
         // Log the API call if we have the fonctional type
@@ -567,8 +567,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         $response = $this->callApi($resource, "POST", $jsonparams, [], "Synchronization");	// This will also create the Call entry
 
         if ($response['status_code'] != 200) {
-			$this->errors[] = "Failed to retrieve flows for synchronization.";
-            $results_messages[] = "Failed to retrieve flows for synchronization.";
+			$this->errors[] = "Failed to retrieve flows for synchronization." . ' (HTTP ' . $response['status_code'] . ')';
+            $results_messages[] = "Failed to retrieve flows for synchronization." . ' (HTTP ' . $response['status_code'] . ')';
 
             dol_syslog(__METHOD__ . " Failed to retrieve the list of flows for synchronization.", LOG_DEBUG, 0, "_pdpconnectfr");
 			return array('res' => 0, 'messages' => $results_messages);
@@ -576,6 +576,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 		$totalFlows = $response['response']['total'] ?? 0;
         $limit = $limit > 0 ? min($limit, $totalFlows) : $totalFlows;
+        $batchlimit = $limit; // Set batch limit for logging purposes
 
         if ($totalFlows == 0) {
             dol_syslog(__METHOD__ . " No flows to synchronize.", LOG_DEBUG);
@@ -688,13 +689,16 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
         $messages = array();
 		$messages[] = $globalresultmessage;
-        $messages[] = "Total flows to synchronize: ".$totalFlows;
-        $messages[] = "Batch size: ".$limit;
+        $messages[] = "Total flows available to synchronize: ".$totalFlows;
+        $messages[] = "Limit: ".$batchlimit;
         $messages[] = "Total flows skipped (exist or already processed): ".$alreadyExist;
         $messages[] = "Total of new flows synchronized: ".$syncedFlows;
 
         // Processing result that will be saved in DB
-        $processingResult = implode("<br>----------------------<br>", $results_messages);
+        $processingResult = '';
+        if (!empty($results_messages)) {
+            $processingResult .= implode("<br>----------------------<br>", $results_messages);
+        }
         $processingResult .= "<br>----------------------<br>" . implode("<br>", $messages);
         $processingResult = "Processing result:<br>" . $processingResult;
 
@@ -704,7 +708,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
             $sql .= " SET totalflow = " . ((int) $totalFlows) . ",
                 successflow = " . ((int) $syncedFlows) . ",
                 skippedflow = " . ((int) $alreadyExist) . ",
-                batchlimit = " . ((int) $limit) . ",
+                batchlimit = " . ((int) $batchlimit) . ",
                 processing_result = '" . $db->escape($processingResult) . "',
                     fk_user_modif = " . ((int) $user->id) . "
             WHERE call_id = '" . $db->escape($call_id) . "'";
@@ -715,7 +719,16 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         // Return result
         // 'actions' contains the action to do (in case of business error)
         // 'details' will containes all technical error (for Log)
-        return array('res' => $res, 'messages' => $messages, 'alreadyExist' => $alreadyExist, 'syncedFlows' => $syncedFlows, 'actions' => $actions, 'details' => $results_messages);
+        return [
+            'res' => $res,
+            'messages' => $messages,
+            'totalFlows' => $totalFlows,
+            'alreadyExist' => $alreadyExist,
+            'syncedFlows' => $syncedFlows,
+            'batchlimit' => $batchlimit,
+            'actions' => $actions,
+            'details' => $results_messages
+        ];
     }
 
     /**
@@ -953,12 +966,16 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                     // Update einvoice status with received CDAR status
                     if ($factureObj->id > 0) {
                         $syncStatus = $refDoc['ProcessConditionCode'];
-                        $syncComment = '';
+                        $syncValidationStatus = $document->ack_status;
+                        $syncValidationComment = $document->ack_info;
+                        $syncComment = $document->cdar_reason_detail ? $document->cdar_reason_detail : '';
                         if (!$syncStatus && $document->ack_status == 'Error') {
                             $syncStatus = $pdpconnectfr::STATUS_ERROR;
                             $syncComment = $document->ack_info;
                         }
                         $pdpconnectfr->insertOrUpdateExtLink($factureObj->id, Facture::class, $flowId, $syncStatus, $factureObj->ref, $syncComment);
+
+                        $pdpconnectfr->storeStatusMessage($document->fk_element_id, $document->fk_element_type, $document->cdar_lifecycle_code, $syncComment, $document->flow_direction, $flowId, $syncValidationStatus, $syncValidationComment, $document->submittedat);
                     } else {
                         dol_syslog(__METHOD__ . " Customer invoice not found for flowId: {$flowId}, so we save the flow into document table but we don't create an entry into pdpconnectfr_extlinks table", LOG_WARNING); // This can happen if the invoice was sent from another system using the same PDP account
                     }
@@ -1030,13 +1047,41 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
             // Supplier Invoice LC (life cycle)
             case "SupplierInvoiceLC":
-                $document->document_type = 'INVOICE';
+                // This is a supplier invoice lifecycle message that we sent to PDP.
+                // We link it to the supplier invoice in dolibarr and we check validation response.
+                // Since we trigger an AJAX every X seconds to get validation response while validation of sent LC message remains in the "Pending" status after sending. That will be a double check of validation of sent LC message in case ajax call it not triggered or failed for some reason.
+
+                require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
+                $document->fk_element_type = FactureFournisseur::class;
+
+                // Fetch the linked supplier invoice using flowId stored in pdpconnectfr_lifecycle_msg table when the LC message was sent
+                $resFetchStatusMessages = $pdpconnectfr->fetchStatusMessages($flowId);
+                if ($resFetchStatusMessages < 0 || empty($resFetchStatusMessages)) {
+                    $returnRes = 0;
+                    $returnMessage = "Failed to fetch status messages for flowId: " . $flowId;
+                } else {
+                    // Fetch ref and id to link the document to supplier invoice
+                    $suplierInvoiceObj = new FactureFournisseur($this->db);
+                    $resFetch = $suplierInvoiceObj->fetch($resFetchStatusMessages['element_id']);
+                    if ($resFetch <= 0) {
+                        $returnRes = 0;
+                        $returnMessage = "Failed to fetch supplier invoice for flowId: " . $flowId . " using rowid from pdpconnectfr_lifecycle_msg table: " . $resFetchStatusMessages['rowid'];
+                    } else {
+                        $document->fk_element_id = !empty($suplierInvoiceObj->id) ? $suplierInvoiceObj->id : 0;
+                        $document->tracking_idref = !empty($suplierInvoiceObj->ref) ? $suplierInvoiceObj->ref : '(NOTFOUND)'; // Should always be found here
+                    }
+
+                    // Update LC message status in pdpconnectfr_lifecycle_msg table based on validation response
+                    $syncStatusComment = $document->cdar_reason_detail ? $document->cdar_reason_detail : '';
+                    $syncValidationStatus = $document->ack_status;
+                    $syncValidationComment = $document->ack_info;
+                    $pdpconnectfr->updateStatusMessageValidation($resFetchStatusMessages['rowid'], $syncStatusComment, $syncValidationStatus, $syncValidationComment);
+                }
                 break;
             case "":
                 // TODO: Remove all this case or condition it with debug mode
                 // This is likely a valisation response for an invoice that was previously sent, and not a lifecycle message.
                 // Since we trigger an AJAX every X seconds to get validation response while an invoice remains in the "Pending" status after sending, no need to handle this case and to store all validation responses in document table.
-
 
                 // In this case, the trackingId may be null.
                 // - If trackingId is set, it is used to find the invoice as usual.
@@ -1205,7 +1250,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                 // Update einvoice status with awaiting validation
                 $pdpconnectfr = new PdpConnectFr($db);
                 //$pdpconnectfr->insertOrUpdateExtLink($object->id, $object->element, $flowId, PdpConnectFr::STATUS_AWAITING_VALIDATION, $object->ref);
-                $resStoreStatus = $pdpconnectfr->storeStatusMessage($object->id, $object->element, $statusCode, 'out', $flowId);
+                $resStoreStatus = $pdpconnectfr->storeStatusMessage($object->id, $object->element, $statusCode, '', 'out', $flowId);
 
                 // Call the API to retrieve flow details and check the validation status.
                 $resource = 'flows/' . $flowId;
@@ -1240,7 +1285,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                     $syncRef = $flowData['trackingId'] ?? '';
                     $syncComment = $flowData['acknowledgement']['details'][0]['reasonMessage'] ?? '';
                     //$pdpconnectfr->insertOrUpdateExtLink($object->id, $object->element, $flowId, $syncStatus, $syncRef, $syncComment);
-                    $pdpconnectfr->updateStatusMessageValidation($resStoreStatus, $ack_statusLabel, $syncComment );
+                    $pdpconnectfr->updateStatusMessageValidation($resStoreStatus, '', $ack_statusLabel, $syncComment );
 
                     // Log an event in the invoice timeline
                     $eventLabel = "PDPCONNECTFR - Send status " . $statusLabelToSend . " : " . $ack_statusLabel;
