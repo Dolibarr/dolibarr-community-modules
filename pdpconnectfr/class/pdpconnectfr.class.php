@@ -554,7 +554,16 @@ class PdpConnectFr
             unset($options[self::STATUS_COMPLETED]);
             unset($options[self::STATUS_REJECTED]);
             unset($options[self::STATUS_PAID]);
+
+            // Remove statuses that are not supported for now.
+            unset($options[self::STATUS_TAKEN_OVER]);
+            unset($options[self::STATUS_DISPUTED]);
+            unset($options[self::STATUS_PARTIALLY_APPROVED]);
+            unset($options[self::STATUS_SUSPENDED]);
+            unset($options[self::STATUS_PAYMENT_SENT]);
         }
+
+        // TODO : remove statuses that cannot be chronologically be sent (for example, it doesn't make sense to send "Taken over" if invoice is refused), PDP may accept them and ignore them without returning an error.
 
 
         return $options;
@@ -794,7 +803,7 @@ class PdpConnectFr
     public function EInvoiceCardBlock($object, $mode = '') {
         global $langs;
 
-        $currentStatusInfo = $this->fetchLastknownInvoiceStatus($object->ref);
+        $currentStatusInfo = $this->fetchLastknownInvoiceStatus($object->ref, $object->id);
 		// Force value for test
 		//$currentStatusInfo['code'] = 2;
 
@@ -856,15 +865,14 @@ class PdpConnectFr
 			<span id="einvoice-info" class="clearboth">' . htmlspecialchars($info) . '</span></td>';
         $resprints .= '</tr>';
 
-        // AP Info
-        /*
-        $displayStyle = !empty($info) ? '' : 'style="display:none;"';
-
-        $resprints .= '<tr id="einvoice-info-row" ' . $displayStyle . ' class="trpdpconnect_collapseseparator">';
-        $resprints .= '<td class="titlefield">' . $langs->trans("pdpconnectfrInvoiceInfo") . '</td>';
-        $resprints .= '<td><span id="einvoice-info">' . htmlspecialchars($info) . '</span></td>';
-        $resprints .= '</tr>';
-        */
+        // If current status requires a reason, display it
+        if (!empty($currentStatusInfo['reasonCode'])) {
+            $reasonLabel = self::RAISONS[$currentStatusInfo['reasonCode']]['label'] ?? $currentStatusInfo['reasonCode'];
+            $resprints .= '<tr class="trpdpconnect_collapseseparator" id="trpdpconnect_reason">';
+            $resprints .= '<td class="titlefield">' . $langs->trans("pdpconnectfrInvoiceReason") . '</td>';
+            $resprints .= '<td><span id="einvoice-reason">' . $reasonLabel . '</span></td>';
+            $resprints .= '</tr>';
+        }
 
         // E-Invoice events history link
         $resprints .= '<tr class="trpdpconnect_collapseseparator">';
@@ -992,8 +1000,39 @@ class PdpConnectFr
             $resprints .= '<td>' . $obj->provider . '</td>';
             $resprints .= '</tr>';
 
-            // Get current status (LC) from pdpconnectfr_lifecycle_msg table
-            $currentStatusInfo = array();
+            // Get current status
+            $currentStatus = '-';
+            $sql = "SELECT lc_status, lc_reason_code FROM ".MAIN_DB_PREFIX."pdpconnectfr_lifecycle_msg";
+            $sql .= " WHERE element_type = '".$object->element."'";
+            $sql .= " AND element_id = ".(int) $object->id;
+            $sql .= " AND lc_validation_status = 'Ok'";
+            $sql .= " ORDER BY rowid DESC LIMIT 1";
+            $resql = $this->db->query($sql);
+            if ($resql && $this->db->num_rows($resql) > 0) {
+                $obj = $this->db->fetch_object($resql);
+                $currentStatus = $obj->lc_status;
+                $currentStatus = $this->getStatusLabel($currentStatus);
+            }
+            // Current status
+            $resprints .= '<tr class="trpdpconnect_collapseseparator">';
+            $resprints .= '<td class="titlefield">' . $langs->trans("pdpconnectfrInvoiceStatus") . '</td>';
+            $resprints .= '<td><span id="einvoice-status">' . $currentStatus . '</span></td>';
+            $resprints .= '</tr>';
+
+            // If current status requires a reason, display it
+            $reasonLabel = '';
+            $displayReasonLabel = 'style="display:none;"';
+            if (!empty($obj->lc_reason_code)) {
+                $reasonLabel = $this->getRaisonsByStatut($obj->lc_status)[$obj->lc_reason_code]['label'] ?? $obj->lc_reason_code;
+                $displayReasonLabel = '';
+            }
+            $resprints .= '<tr class="trpdpconnect_collapseseparator" id="trpdpconnect_reason" ' . $displayReasonLabel . '>';
+            $resprints .= '<td class="titlefield">' . $langs->trans("pdpconnectfrInvoiceReason") . '</td>';
+            $resprints .= '<td><span id="einvoice-reason">' . $reasonLabel . '</span></td>';
+            $resprints .= '</tr>';
+
+            // Get last sent status to know if we need to add the JavaScript for real time update of status and to display last sent status validation if it is pending or in error
+            $lastSentStatus = array();
             $sql = "SELECT lc_status, lc_status_message, lc_validation_status, lc_validation_message FROM ".MAIN_DB_PREFIX."pdpconnectfr_lifecycle_msg";
             $sql .= " WHERE element_type = '".$object->element."'";
             $sql .= " AND element_id = ".(int) $object->id;
@@ -1001,7 +1040,7 @@ class PdpConnectFr
             $resql = $this->db->query($sql);
             if ($resql && $this->db->num_rows($resql) > 0) {
                 $obj = $this->db->fetch_object($resql);
-                $currentStatusInfo = [
+                $lastSentStatus = [
                     'lc_status' => $obj->lc_status,
                     'lc_status_message' => $obj->lc_status_message,
                     'lc_validation_status' => $obj->lc_validation_status,
@@ -1009,51 +1048,75 @@ class PdpConnectFr
                 ];
             }
 
-            if (!empty($currentStatusInfo['lc_status'])) {
-            	$info = $currentStatusInfo['lc_validation_message'] ?? '';
+            if (!empty($lastSentStatus) && ($lastSentStatus['lc_validation_status'] == 'Pending' || $lastSentStatus['lc_validation_status'] == 'Error')) {
+                $statusLabel = $this->getStatusLabel($lastSentStatus['lc_status']);
+                $statusvalidationLabel = $this->getStatusLabel($this->getDolibarrStatusCodeFromPdpLabel($lastSentStatus['lc_validation_status']));
+                if ($lastSentStatus['lc_validation_status'] === 'Pending') {
+                    $picto = img_picto('', 'timespent');
+                } elseif ($lastSentStatus['lc_validation_status'] === 'Error') {
+                    $picto = img_picto('', 'error');
+                }
+                $statusValidation = ' : ' . $statusvalidationLabel . ' ' .$picto;
+                $statusValidationInfo = $lastSentStatus['lc_validation_message'] ?? '';
 
-                //Sent Status
-                $resprints .= '<tr class="trpdpconnect_collapseseparator">';
-                $resprints .= '<td class="titlefield">'
-                    . $langs->trans("pdpconnectfrInvoiceStatus")
-                    . ' <i class="fas fa-info-circle em088 opacityhigh classfortooltip" title="'
-                    . $langs->trans("einvoiceStatusFieldHelp") . '"></i></td>';
-                $resprints .= '<td><span id="einvoice-status">'
-                    . $currentStatusInfo['lc_status'] . '</span></td>';
-                $resprints .= '</tr>';
-
-                // Status Message
-                $resprints .= '<tr class="trpdpconnect_collapseseparator">';
-                $resprints .= '<td class="titlefield">'
-                    . $langs->trans("pdpconnectfrInvoiceStatusMessage")
-                    . ' <i class="fas fa-info-circle em088 opacityhigh classfortooltip" title="'
-                    . $langs->trans("einvoiceStatusMessageFieldHelp") . '"></i></td>';
-                $resprints .= '<td><span id="einvoice-status-message">'
-                    . $currentStatusInfo['lc_status_message'] . '</span></td>';
-                $resprints .= '</tr>';
-
-                // Validation Status
-                $resprints .= '<tr class="trpdpconnect_collapseseparator">';
-                $resprints .= '<td class="titlefield">'
-                    . $langs->trans("pdpconnectfrInvoiceStatus")
-                    . ' <i class="fas fa-info-circle em088 opacityhigh classfortooltip" title="'
-                    . $langs->trans("einvoiceStatusFieldHelp") . '"></i></td>';
-                $resprints .= '<td><span id="einvoice-status">'
-                    . $currentStatusInfo['lc_validation_status'] . '</span>';
-                $resprints .= '<span id="einvoice-info">' . htmlspecialchars($info) . '</span>';
+                // Validation of last sent status to display it in the invoice card and to know if we need to add the JavaScript for real time update of status
+                $resprints .= '<tr class="trpdpconnect_collapseseparator " id="trpdpconnect_lastsentstatusvalidation">';
+                $resprints .= '<td class="titlefield">'. $langs->trans("pdpconnectfrLastSentStatus"). '</td>';
+                $resprints .= '<td><span>'. $statusLabel .'</span><span id="status-validation"> ' . $statusValidation . '</span><br>';
+                $resprints .= '<span id="status-validation-info" class="opacitymedium" style="overflow-wrap: anywhere;">' . htmlspecialchars($statusValidationInfo) . '</span>';
                 $resprints .= '</td>';
                 $resprints .= '</tr>';
 
-                // Validation Info
-                /*
-                $info = $currentStatusInfo['lc_validation_message'] ?? '';
-                $displayStyle = !empty($info) ? '' : 'style="display:none;"';
+                // JavaScript for AJAX call to update status if current status is pending
+                if ($this->getDolibarrStatusCodeFromPdpLabel($lastSentStatus['lc_validation_status']) == self::STATUS_AWAITING_VALIDATION) {
 
-                $resprints .= '<tr id="einvoice-info-row" ' . $displayStyle . '>';
-                $resprints .= '<td class="titlefield">' . $langs->trans("pdpconnectfrInvoiceInfo") . '</td>';
-                $resprints .= '<td><span id="einvoice-info">' . htmlspecialchars($info) . '</span></td>';
-                $resprints .= '</tr>';
-                */
+                    $urlajax = dol_buildpath('pdpconnectfr/ajax/checksupplierinvoicestatus.php', 1);
+
+                    $resprints .= '
+                    <script type="text/javascript">
+                    (function() {
+                        function checkSupplierInvoiceStatus() {
+                            console.log("checkSupplierInvoiceStatus Checking invoice status...");
+                            $.get("' . $urlajax . '", {
+                                token: "' . currentToken() . '",
+                                id: "' . dol_escape_js($object->id) . '"
+                            }, function (data) {
+                                if (!data || typeof data.statusvalidationlabel === "undefined") {
+                                    console.log("checkSupplierInvoiceStatus no data returned");
+                                    return;
+                                }
+                                console.log(data);
+
+                                // Update UI
+                                $("#status-validation").html(data.htmlstatusvalidationLabel || "");
+                                $("#status-validation-info").html(data.statusvalidationinfo || "");
+
+                                // Hide row if status is OK and replace current status with the new one
+                                if (data.statusvalidationlabel === "Ok") {
+                                    $("#trpdpconnect_lastsentstatusvalidation").hide();
+                                    $("#einvoice-status").html(data.statuslabel || "");
+                                    if (data.statusreasonlabel) {
+                                        $("#einvoice-reason").html(data.statusreasonlabel || "");
+                                        $("#trpdpconnect_reason").show();
+                                    } else {
+                                        $("#trpdpconnect_reason").hide();
+                                    }
+                                }
+
+                                // Retry only if still awaiting validation
+                                if (data.statusvalidationlabel === "Pending") {
+                                    setTimeout(checkSupplierInvoiceStatus, 5000);
+                                }
+                            }, "json");
+                        }
+
+                        // First call
+                        console.log("checkSupplierInvoiceStatus Invoice has status pending, so we add a timer to run checkInvoiceStatus in few seconds...");
+                        setTimeout(checkSupplierInvoiceStatus, 2500);
+
+                    })();
+                    </script>';
+                }
             }
 
             // E-Invoice events history link
@@ -1132,13 +1195,13 @@ class PdpConnectFr
         return $resprints;
     }
 
-    function fetchLastknownInvoiceStatus($invoiceRef) {
+    function fetchLastknownInvoiceStatus($invoiceRef, $invoiceId = 0) {
         global $db, $conf;
 
         $status = array('code' => self::STATUS_NOT_GENERATED, 'status' => $this->getStatusLabel(self::STATUS_NOT_GENERATED), 'info' => '', 'file' => '0');
 
-        // Get last status from pdpconnectfr_extlinks table
-        $sql = "SELECT syncstatus, synccomment";
+        // Get last status from pdpconnectfr_extlinks table (table contain dolibarr object recieved or sent to PDP)
+        $sql = "SELECT syncstatus, synccomment"; // Validation message of einvoice sent.
         $sql .= " FROM ".MAIN_DB_PREFIX."pdpconnectfr_extlinks";
         $sql .= " WHERE element_type = '".Facture::class."'";
         $sql .= " AND syncref = '".$db->escape($invoiceRef)."'";
@@ -1157,6 +1220,18 @@ class PdpConnectFr
             }
         } else {
             dol_print_error($db);
+        }
+
+        // Fetch last status message from pdpconnectfr_lifecycle_msg table to get more details on current status of the invoice into the PDP system
+        $currentStatus = '-';
+        $sql = "SELECT lc_status, lc_reason_code FROM ".MAIN_DB_PREFIX."pdpconnectfr_lifecycle_msg";
+        $sql .= " WHERE element_type = '".Facture::class."'";
+        $sql .= " AND element_id = ".(int) $invoiceId;
+        $sql .= " ORDER BY rowid DESC LIMIT 1";
+        $resql = $this->db->query($sql);
+        if ($resql && $this->db->num_rows($resql) > 0) {
+            $obj = $this->db->fetch_object($resql);
+            $status['reasonCode'] = $obj->lc_reason_code ?? '';
         }
 
         // Check if there is an e-invoice file generated
@@ -1264,7 +1339,7 @@ class PdpConnectFr
      *
      * @return int  Rowid inserted or -1 on error
      */
-    public function storeStatusMessage($elementId, $elementType, $statusCode, $statusMessage = '', $direction, $flowId = '', $validationStatus = '', $validationMessage = '', $date_creation = null)
+    public function storeStatusMessage($elementId, $elementType, $statusCode, $statusMessage = '', $direction, $flowId = '', $validationStatus = '', $validationMessage = '', $date_creation = null, $reasonCode = '')
     {
         global $db, $user;
 
@@ -1282,7 +1357,8 @@ class PdpConnectFr
         $sql .= "lc_validation_status, ";
         $sql .= "lc_validation_message, ";
         $sql .= "date_creation, ";
-        $sql .= "fk_user_creat";
+        $sql .= "fk_user_creat, ";
+        $sql .= "lc_reason_code";
         $sql .= ") VALUES (";
         $sql .= (int) $elementId . ", ";
         $sql .= "'" . $db->escape($elementType) . "', ";
@@ -1294,7 +1370,8 @@ class PdpConnectFr
         $sql .= "'" . $db->escape($validationStatus) . "', ";
         $sql .= "'" . $db->escape($validationMessage) . "', ";
         $sql .= "'" . $date_creation . "', ";
-        $sql .= (int) $user->id;
+        $sql .= (int) $user->id . ", ";
+        $sql .= "'" . $db->escape($reasonCode) . "'";
         $sql .= ")";
 
         $resql = $db->query($sql);

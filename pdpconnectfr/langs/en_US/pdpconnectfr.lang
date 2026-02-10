@@ -225,3 +225,5 @@ ConfirmSendStatusMessage=Are you sure you want to update the status of invoice %
 SelectStatusReason=Reason
 TryToIncreaseStartDateOrMax=No new flow processed. Try to increase the "%s" date or the "Maximum number of flows to process at once"
 ErrorGeneratingXML=Error when generating the XML file
+pdpconnectfrLastSentStatus=Last sent status
+pdpconnectfrInvoiceReason=E-invoicing status reason

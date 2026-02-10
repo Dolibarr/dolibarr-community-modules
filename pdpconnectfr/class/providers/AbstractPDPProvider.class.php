@@ -393,8 +393,9 @@ abstract class AbstractPDPProvider
      *
      * @param mixed $object Invoice object (CustomerInvoice or SupplierInvoice)
      * @param int $statusCode   Status code to send (see class constants for available codes)
+     * @param string $reasonCode Reason code to send (optional)
      *
      * @return array{res:int, message:string}       Returns array with 'res' (1 on success, -1 on failure) with a 'message'.
      */
-    abstract public function sendStatusMessage($object, $statusCode);
+    abstract public function sendStatusMessage($object, $statusCode, $reasonCode = '');
 }
