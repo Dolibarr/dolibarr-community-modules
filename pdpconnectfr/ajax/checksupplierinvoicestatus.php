@@ -18,8 +18,8 @@
  */
 
 /**
- *       \file       htdocs/pdpconnectfr/ajax/checkinvoicestatus.php
- *       \brief      File to return Ajax response on document list request
+ *       \file       htdocs/pdpconnectfr/ajax/checksupplierinvoicestatus.php
+ *       \brief      File to return Ajax response on supplier invoice status
  */
 
 if (!defined('NOTOKENRENEWAL')) {
@@ -91,7 +91,7 @@ if (!$res) {
  */
 
 //$mode = GETPOST('mode', 'aZ09');
-$objectRef = GETPOST('ref', 'aZ09');
+$objectID = GETPOSTINT('id');
 // $field = GETPOST('field', 'aZ09');
 // $value = GETPOST('value', 'aZ09');
 
@@ -104,40 +104,44 @@ if (!$user->hasRight('pdpconnectfr', 'document', 'write')) {
  * View
  */
 
-dol_syslog("Call ajax pdpconnectfr/ajax/checkinvoicestatus.php");
+dol_syslog("Call ajax pdpconnectfr/ajax/checksupplierinvoicestatus.php");
 $langs->load('pdpconnectfr@pdpconnectfr');
 
 top_httphead();
 // Update the object field with the new value
-if ($objectRef) {
+if ($objectID) {
 
 	dol_include_once('pdpconnectfr/class/pdpconnectfr.class.php');
 	$pdpconnectfr = new PdpConnectFr($db);
 
 	// Load object
-	require_once DOL_DOCUMENT_ROOT."/compta/facture/class/facture.class.php";
+	require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
 
-	$invoice = new Facture($db);
-	$object = $invoice->fetch(0, $objectRef);
+	$invoice = new FactureFournisseur($db);
+	$object = $invoice->fetch($objectID);
 	if ($invoice->id <= 0) {
-		print json_encode(['status' => 'error', 'message' => 'Error loading invoice with ref '. $objectRef]);
+		print json_encode(['status' => 'error', 'message' => 'Error loading supplier invoice with id '. $objectID]);
 		exit;
 	}
 
 	// Get flowId from linked document log
 	$flowId = '';
-	$sql = "SELECT flow_id";
-	$sql .= " FROM ".MAIN_DB_PREFIX."pdpconnectfr_extlinks";
-	$sql .= " WHERE element_type = '".Facture::class."'";
-	$sql .= " AND syncref = '".$db->escape($invoice->ref)."'";
+	$sql = "SELECT rowid, flow_id, lc_status, lc_reason_code FROM ".MAIN_DB_PREFIX."pdpconnectfr_lifecycle_msg";
+	$sql .= " WHERE element_type = '".$invoice->element."'";
+	$sql .= " AND element_id = ".(int) $invoice->id;
+	$sql .= " ORDER BY rowid DESC LIMIT 1";
+
 	$resql = $db->query($sql);
 	if ($resql) {
 		if ($db->num_rows($resql) > 0) {
 			$obj = $db->fetch_object($resql);
+			$lcId = $obj->rowid;
 			$flowId = $obj->flow_id;
+			$lcStatus = $obj->lc_status;
+			$lcReasonCode = $obj->lc_reason_code;
 		}
 	} else {
-		print json_encode(['status' => 'error', 'message' => 'Error retrieving flowId for invoice ref '. $invoice->ref]);
+		print json_encode(['status' => 'error', 'message' => 'Error retrieving flowId for supplier invoice ref '. $invoice->ref]);
 		exit;
 	}
 
@@ -157,39 +161,45 @@ if ($objectRef) {
 		"GET",
 		false,
 		['Accept' => 'application/octet-stream'],
-		'check_invoice_validation'
+		'check_sentstatus_validation'
 	);
 
 	if ($response['status_code'] == 200 || $response['status_code'] == 202) {
-
 		$flowData = json_decode($response['response'], true);
 
-		$syncStatus = $pdpconnectfr::STATUS_UNKNOWN;
-		$ack_statusLabel = $flowData['acknowledgement']['status'] ?? '';
-		if ($ack_statusLabel) {
-			$syncStatus = $pdpconnectfr->getDolibarrStatusCodeFromPdpLabel($ack_statusLabel);
-		}
-		$syncRef = $flowData['trackingId'] ?? '';
-		$syncComment = $flowData['acknowledgement']['details'][0]['reasonMessage'] ?? '';
-		$pdpconnectfr->insertOrUpdateExtLink($invoice->id, Facture::class, $flowId, $syncStatus, $syncRef, $syncComment);
+		$statusvalidationlabel = $flowData['acknowledgement']['status'] ?? '';
+		$statusvalidationinfo = $flowData['acknowledgement']['details'][0]['reasonMessage'] ?? '';
+
+		$pdpconnectfr->updateStatusMessageValidation($lcId, '', $statusvalidationlabel, $statusvalidationinfo );
 
 		// Log an event in the invoice timeline
-		$eventLabel = "PDPCONNECTFR - Status: " . $ack_statusLabel;
-		$eventMessage = "PDPCONNECTFR - Status: " . $ack_statusLabel . (!empty($syncComment) ? " - " . $syncComment : "");
-
+		$CurrentLCStatusLabel = $pdpconnectfr->getStatusLabel($obj->lc_status);
+		$currentLCReasonLabel = $pdpconnectfr->getRaisonsByStatut($obj->lc_status)[$obj->lc_reason_code]['label'] ?? $obj->lc_reason_code;
+		$eventLabel = "PDPCONNECTFR - Send status " . $CurrentLCStatusLabel . " : " . $statusvalidationlabel;
+		$eventMessage = "PDPCONNECTFR - Send status " . $CurrentLCStatusLabel . " : " . $statusvalidationlabel . (!empty($statusvalidationinfo) ? " - " . $statusvalidationinfo : "") . (!empty($lcReasonCode) ? " - Reason: " . $currentLCReasonLabel : "");
 		$resLogEvent = $provider->addEvent('STATUS', $eventLabel, $eventMessage, $invoice);
 		if ($resLogEvent < 0) {
 			dol_syslog(__METHOD__ . " Failed to log event for flowId: {$flowId}", LOG_WARNING);
 		}
 
-		// Refresh current status info
-		require_once "../class/pdpconnectfr.class.php";
-		$pdpconnectfr = new PdpConnectFr($db);
-		$currentStatusInfo = $pdpconnectfr->fetchLastknownInvoiceStatus($invoice->ref);
+		// Prepare validation status to be displayed in the supplier invoice card
+		if ($statusvalidationlabel === 'Pending') {
+			$picto = img_picto('', 'timespent');
+		} elseif ($statusvalidationlabel === 'Error') {
+			$picto = img_picto('', 'error');
+		}
+		$htmlstatusvalidationLabel = ' : ' . $pdpconnectfr->getStatusLabel($pdpconnectfr->getDolibarrStatusCodeFromPdpLabel($statusvalidationlabel)) . ' ' .$picto;
 
-		print json_encode($currentStatusInfo);
+		// Return current status of the supplier invoice to update it in the invoice card
+		print json_encode([
+			'statuslabel' => $CurrentLCStatusLabel,
+			'statusreasonlabel' => $currentLCReasonLabel,
+			'statusvalidationlabel' => $statusvalidationlabel,
+			'htmlstatusvalidationLabel' => $htmlstatusvalidationLabel,
+			'statusvalidationinfo' => $statusvalidationinfo,
+		]);
 	} else {
-		print json_encode(['code' => -1, 'status' => 'N/A', 'info' => 'Error retrieving validation status from PDP for invoice ref '. $invoice->ref]);
+		print json_encode(['statusvalidationlabel' => 'N/A', 'statusvalidationinfo' => 'Error retrieving validation of sent status']);
 		exit;
 	}
 }

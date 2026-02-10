@@ -22,9 +22,10 @@ CREATE TABLE llx_pdpconnectfr_lifecycle_msg(
 	flow_id varchar(255),							-- Flow identifier UUID
 	direction varchar(3) NOT NULL,					-- IN | OUT
 	lc_status integer NOT NULL,						-- Lifecycle status code
-	lc_status_message varchar(255) NOT NULL,		-- Lifecycle status message - only filled if status is sent by dolibarr to PDP direction IN
+	lc_status_message varchar(255) NOT NULL,		-- Lifecycle status message
 	lc_validation_status varchar(20) NOT NULL,		-- Lifecycle validation status: OK | PENDING | ERROR - only filled if direction is OUT
-	lc_validation_message varchar(255) NOT NULL,	-- Lifecycle validation message if error - only filled if direction is OUT
+	lc_validation_message text NOT NULL,	-- Lifecycle validation message if error - only filled if direction is OUT
+	lc_reason_code varchar(50) NOT NULL,			-- Reason code for current status if applicable (e.g. for rejected status)
 	date_creation datetime NOT NULL,
 	tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 	fk_user_creat integer NOT NULL,

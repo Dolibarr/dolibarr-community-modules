@@ -156,10 +156,11 @@ class CdarHandler
      *
      * @param   mixed $object       Invoice object (CustomerInvoice or SupplierInvoice)
      * @param   int $statusCode     Status code to send
+     * @param string $reasonCode Reason code to send (optional)
      *
      * @return  array{res:int, message:string, file:string}   Returns array with 'res' (1 on success, -1 on failure) with a 'message' and 'file' with the path.
      */
-    function generateCdarFile($object, $statusCode)
+    function generateCdarFile($object, $statusCode, $reasonCode = '')
     {
         global $conf, $db, $mysoc;
 
@@ -255,6 +256,12 @@ class CdarHandler
                     'ProcessConditionCode' => $statusCode,
                     'ProcessCondition' => $ProcessCondition,
 
+                    'SpecifiedDocumentStatus' => !empty($reasonCode) ? [
+                        'ReasonCode' => $reasonCode,
+                        //'Reason' => 'Taux de TVA erroné',
+                        //'SequenceNumeric' => 1
+                    ] : [],
+
                     'IssuerTradeParty' => [
                         'GlobalID' => $IssuerGlobalID,
                         'SchemeID' => CdarHandler::SCHEME_SIREN_0002,
@@ -275,7 +282,7 @@ class CdarHandler
         if ($result === false) {
             return array('res' => -1, 'message' => 'Error saving CDAR file');
         }
-        echo "CDAR file generated: " . $filename;
+        //echo "CDAR file generated: " . $filename;
 
         return array('res' => 1, 'message' => 'CDAR file generated successfully', 'file' => $filename);
     }
@@ -501,5 +508,32 @@ class CdarHandler
 
         $this->addTradeParty($xml, $ref, 'ram:IssuerTradeParty', $doc['IssuerTradeParty']);
         $parent->appendChild($ref);
+
+        if (!empty($doc['SpecifiedDocumentStatus'])) {
+            $status = $xml->createElement('ram:SpecifiedDocumentStatus');
+
+            if (!empty($doc['SpecifiedDocumentStatus']['ReasonCode'])) {
+                $status->appendChild(
+                    $xml->createElement('ram:ReasonCode', $doc['SpecifiedDocumentStatus']['ReasonCode'])
+                );
+            }
+
+            if (!empty($doc['SpecifiedDocumentStatus']['Reason'])) {
+                $status->appendChild(
+                    $xml->createElement('ram:Reason', $doc['SpecifiedDocumentStatus']['Reason'])
+                );
+            }
+
+            /*if (isset($doc['SpecifiedDocumentStatus']['SequenceNumeric'])) {
+                $status->appendChild(
+                    $xml->createElement(
+                        'ram:SequenceNumeric',
+                        (int) $doc['SpecifiedDocumentStatus']['SequenceNumeric']
+                    )
+                );
+            }*/
+
+            $ref->appendChild($status);
+        }
     }
 }

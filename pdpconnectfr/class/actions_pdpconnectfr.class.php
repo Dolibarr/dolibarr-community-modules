@@ -160,7 +160,8 @@ class ActionsPdpconnectfr extends CommonHookActions
                 if (in_array($currentStatusDetails['code'], [
                     $pdpConnectFr::STATUS_GENERATED,
                     $pdpConnectFr::STATUS_ERROR,
-                    $pdpConnectFr::STATUS_UNKNOWN
+                    $pdpConnectFr::STATUS_UNKNOWN,
+                    $pdpConnectFr::STATUS_REJECTED
                 ])) {
                     $url_button[] = array(
                         'lang' => 'pdpconnectfr',
@@ -249,7 +250,8 @@ class ActionsPdpconnectfr extends CommonHookActions
                 && in_array($currentStatusDetails['code'], [
                     $pdpConnectFr::STATUS_GENERATED,
                     $pdpConnectFr::STATUS_ERROR,
-                    $pdpConnectFr::STATUS_UNKNOWN
+                    $pdpConnectFr::STATUS_UNKNOWN,
+                    $pdpConnectFr::STATUS_REJECTED
                 ])
             ) {
                 $PDPManager = new PDPProviderManager($db);
@@ -325,8 +327,9 @@ class ActionsPdpconnectfr extends CommonHookActions
                 $PDPManager = new PDPProviderManager($db);
                 $provider = $PDPManager->getProvider(getDolGlobalString('PDPCONNECTFR_PDP'));
                 $pdpstatuscode = GETPOSTINT('pdpstatuscode') ?: 0;
+                $statusRaison = GETPOST('statusRaison', 'alpha');
 
-                $result = $provider->sendStatusMessage($object, $pdpstatuscode); // Send status message
+                $result = $provider->sendStatusMessage($object, $pdpstatuscode, $statusRaison); // Send status message
 
                 if ($result['res'] > 0) {
                     setEventMessages($result['message'], array(), 'mesgs');
