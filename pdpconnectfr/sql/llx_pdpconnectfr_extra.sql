@@ -26,5 +26,6 @@ CREATE TABLE llx_pdpconnectfr_extlinks(
 	flow_id varchar(255),
 	syncstatus integer,							-- If the object has a status into the einvoice external system
 	syncref varchar(255),						-- If the object has a given reference into the einvoice external system
-	synccomment varchar(255)					-- If we want to store a message for the last sync action try
+	synccomment varchar(255),					-- If we want to store a message for the last sync action try
+	routing_id varchar(255)						-- Store the routing ID of thirdparty objects (manually set or retrieved from external system)
 ) ENGINE=innodb;
