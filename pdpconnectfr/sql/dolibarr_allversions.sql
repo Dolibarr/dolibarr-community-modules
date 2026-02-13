@@ -10,3 +10,5 @@ ALTER TABLE llx_pdpconnectfr_document MODIFY COLUMN flow_type varchar(64);
 
 ALTER TABLE llx_pdpconnectfr_document ADD COLUMN response_for_debug text;
 
+ALTER TABLE llx_pdpconnectfr_extlinks ADD COLUMN routing_id varchar(255) AFTER synccomment;
+

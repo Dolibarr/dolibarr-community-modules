@@ -1148,6 +1148,63 @@ class PdpConnectFr
 
         $resprints = '';
 
+        // Set $extrafield_collapse_display_value (do we have to collapse/expand the group after the separator)
+        $extrafield_collapse_display_value = -1;
+        $expand_display = ((isset($_COOKIE['DOLUSER_COLLAPSE_facture_trpdpconnectseparator']) || GETPOSTINT('ignorecollapsesetup')) ? (!empty($_COOKIE['DOLUSER_COLLAPSE_facture_trpdpconnectseparator'])) : !($extrafield_collapse_display_value == 2));
+        $disabledcookiewrite = 0;
+        if ($mode == 'create') {
+            // On create mode, force separator group to not be collapsible
+            $extrafield_collapse_display_value = 1;
+            $expand_display = true;	// We force group to be shown expanded
+            $disabledcookiewrite = 1; // We keep status of group unchanged into the cookie
+        }
+        $resprints .= '
+        <script nonce="" type="text/javascript">
+        jQuery(document).ready(function() {';
+            if (empty($disabledcookiewrite)) {
+                if (!$expand_display) {
+                    $resprints .= 'console.log("Inject js for the collapsing of trpdpconnect_collapseseparator - hide");
+                    jQuery(".trpdpconnect_collapseseparator").hide();';
+                } else {
+                    $resprints .= 'console.log("Inject js for collapsing of trpdpconnect_collapseseparator - keep visible and set cookie");
+                    document.cookie = "DOLUSER_COLLAPSE_facture_trpdpconnectseparator=1; path='.$_SERVER["PHP_SELF"].'";';
+                }
+            }
+        $resprints .= '
+            jQuery("#trpdpconnect").click(function(){
+                console.log("We click on collapse/uncollapse to hide/show .trpdpconnectseparator");
+                jQuery(".trpdpconnect_collapseseparator").toggle(100, function(){
+                    if (jQuery(".trpdpconnect_collapseseparator").is(":hidden")) {
+                        jQuery("#trpdpconnect td span").addClass("fa-plus-square").removeClass("fa-minus-square");
+                        document.cookie = "DOLUSER_COLLAPSE_facture_trpdpconnectseparator=0; path='.$_SERVER["PHP_SELF"].'"
+                    } else {
+                        jQuery("#trpdpconnect td span").addClass("fa-minus-square").removeClass("fa-plus-square");
+                        document.cookie = "DOLUSER_COLLAPSE_facture_trpdpconnectseparator=1; path='.$_SERVER["PHP_SELF"].'"
+                    }
+                });
+            });
+        });
+        </script>';
+
+        // Title separator
+        $resprints .= '<tr id="trpdpconnect" class="trpdpconnectseparator trtrpdpconnectseparator_1">';
+        $resprints .= '<td colspan="2"><span class="far fa-'.(($expand_display ? 'minus' : 'plus').'-square').'"></span><strong> ' . $langs->trans("pdpconnectfrInvoiceSeparator") . '</strong></td>';
+        $resprints .= '</tr>';
+
+
+        if ($mode == 'create' || $mode == 'edit') {
+            $resprints .= '<tr class="trpdpconnect_collapseseparator">';
+            $resprints .= '<td class="titlefield">' . $langs->trans("RoutingId") . '</td>';
+            $resprints .= '<td>';
+            $resprints .= '<input type="text" name="routing_id" ';
+            $resprints .= 'value="' . dol_escape_htmltag($test ?? '') . '" ';
+            $resprints .= 'class="flat minwidth300" />';
+            $resprints .= '</td>';
+            $resprints .= '</tr>';
+
+            return $resprints;
+        }
+
         // Check if this thirdparty is present into pdpconnectfr_extlinks table to know if it is an imported object
         $sql = "SELECT rowid, provider FROM ".MAIN_DB_PREFIX."pdpconnectfr_extlinks";
         $sql .= " WHERE element_type = '".$object->element."'";
@@ -1157,11 +1214,16 @@ class PdpConnectFr
         if ($resql && $this->db->num_rows($resql) > 0) {
             $obj = $this->db->fetch_object($resql);
             // Add block only for imported invoices
-            $resprints .= '<tr>';
+            $resprints .= '<tr class="trpdpconnect_collapseseparator">';
             $resprints .= '<td>' . $langs->trans("pdpconnectfrSourceTitle") . '</td>';
             $resprints .= '<td>' . $obj->provider . '</td>';
             $resprints .= '</tr>';
         }
+
+        $resprints .= '<tr class="trpdpconnect_collapseseparator">';
+        $resprints .= '<td>' . $langs->trans("RoutingId") . '</td>';
+        $resprints .= '<td>' . dol_escape_htmltag($test ?? '') . '</td>';
+        $resprints .= '</tr>';
 
         return $resprints;
     }
