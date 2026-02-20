@@ -42,13 +42,13 @@ function callPrepareHead($object)
 	$h = 0;
 	$head = array();
 
-	$head[$h][0] = dolBuildUrl(dol_buildpath("/pdpconnectfr/call_card.php", 1), ['id' => $object->id]);
+	$head[$h][0] = dol_buildpath("/pdpconnectfr/call_card.php", 1) . '?id=' . $object->id;
 	$head[$h][1] = $langs->trans("pdpFeedback");
 	$head[$h][2] = 'card';
 	$h++;
 
 	if ($showtabofpagecontact) {
-		$head[$h][0] = dolBuildUrl(dol_buildpath("/pdpconnectfr/call_contact.php", 1), ['id' => $object->id]);
+		$head[$h][0] = dol_buildpath("/pdpconnectfr/call_contact.php", 1) . '?id=' . $object->id;
 		$head[$h][1] = $langs->trans("Contacts");
 		$head[$h][2] = 'contact';
 		$h++;
@@ -63,7 +63,7 @@ function callPrepareHead($object)
 			if (!empty($object->note_public)) {
 				$nbNote++;
 			}
-			$head[$h][0] = dolBuildUrl(dol_buildpath('/pdpconnectfr/call_note.php', 1), ['id' => $object->id]);
+			$head[$h][0] = dol_buildpath('/pdpconnectfr/call_note.php', 1) . '?id=' . $object->id;
 			$head[$h][1] = $langs->trans('Notes');
 			if ($nbNote > 0) {
 				$head[$h][1] .= (!getDolGlobalInt('MAIN_OPTIMIZEFORTEXTBROWSER') ? '<span class="badge marginleftonlyshort">'.$nbNote.'</span>' : '');
@@ -79,7 +79,7 @@ function callPrepareHead($object)
 		$upload_dir = $conf->pdpconnectfr->dir_output."/call/".dol_sanitizeFileName($object->ref);
 		$nbFiles = count(dol_dir_list($upload_dir, 'files', 0, '', '(\.meta|_preview.*\.png)$'));
 		$nbLinks = Link::count($db, $object->element, $object->id);
-		$head[$h][0] = dolBuildUrl(dol_buildpath("/pdpconnectfr/call_document.php", 1), ['id' => $object->id]);
+		$head[$h][0] = dol_buildpath("/pdpconnectfr/call_document.php", 1) . '?id=' . $object->id;
 		$head[$h][1] = $langs->trans('Documents');
 		if (($nbFiles + $nbLinks) > 0) {
 			$head[$h][1] .= '<span class="badge marginleftonlyshort">'.($nbFiles + $nbLinks).'</span>';
@@ -89,7 +89,7 @@ function callPrepareHead($object)
 	}
 
 	if ($showtabofpageagenda) {
-		$head[$h][0] = dolBuildUrl(dol_buildpath("/pdpconnectfr/call_agenda.php", 1), ['id' => $object->id]);
+		$head[$h][0] = dol_buildpath("/pdpconnectfr/call_agenda.php", 1) . '?id=' . $object->id;
 		$head[$h][1] = $langs->trans("Events");
 		$head[$h][2] = 'agenda';
 		$h++;

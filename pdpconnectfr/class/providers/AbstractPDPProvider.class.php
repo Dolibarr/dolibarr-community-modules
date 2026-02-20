@@ -198,49 +198,65 @@ abstract class AbstractPDPProvider
         // Build service name depending on environment
         $serviceName = $this->config['dol_prefix'] . '_' . ($this->config['live'] ? 'PROD' : 'TEST');
 
-        // Check if a token already exists for this service
-        $sql_check = "SELECT rowid FROM ".MAIN_DB_PREFIX."oauth_token
-                    WHERE service = '".$db->escape($serviceName)."'
-                    AND entity = ".((int) $conf->entity);
+        // For backward compatibility with Dolibarr versions < 23.0.0
+        if (version_compare(DOL_VERSION, '23.0.0', '<')) {
 
-        $resql = $db->query($sql_check);
-        if (!$resql) {
-            $this->errors[] = __METHOD__." SQL error (check): ".$db->lasterror();
-            return false;
-        }
+            dolibarr_set_const($db, $serviceName.'_TOKEN', $accessToken, 'chaine', 0, '', $conf->entity);
 
-        if ($db->num_rows($resql) > 0) {
-            // --- Update existing token ---
-            $sql  = "UPDATE ".MAIN_DB_PREFIX."oauth_token SET ";
-            $sql .= "tokenstring = '".$db->escape($accessToken)."'";
             if ($refreshToken !== null) {
-                $sql .= ", tokenstring_refresh = '".$db->escape($refreshToken)."'";
+                dolibarr_set_const($db, $serviceName.'_REFRESH', $refreshToken, 'chaine', 0, '', $conf->entity);
             }
-            if ($expire_at !== null) {
-                $sql .= ", expire_at = '".$db->idate($expire_at)."'";
-            }
-            $sql .= " WHERE service = '".$db->escape($serviceName)."'";
-            $sql .= " AND entity = ".((int) $conf->entity);
-        } else {
-            // --- Insert new token ---
-            $sql  = "INSERT INTO ".MAIN_DB_PREFIX."oauth_token (service, tokenstring";
-            $sql .= $refreshToken !== null ? ", tokenstring_refresh" : "";
-            $sql .= ", datec";
-            $sql .= $expire_at !== null ? ", expire_at" : "";
-            $sql .= ", entity) VALUES (";
-            $sql .= "'".$db->escape($serviceName)."', ";
-            $sql .= "'".$db->escape($accessToken)."'";
-            $sql .= $refreshToken !== null ? ", '".$db->escape($refreshToken)."'" : "";
-            $sql .= ", '".$db->idate($now)."'";
-            $sql .= $expire_at !== null ? ", '".$db->idate($expire_at)."'" : "";
-            $sql .= ", ".(int) $conf->entity.")";
-        }
 
-        // Execute SQL
-        $res = $db->query($sql);
-        if (!$res) {
-            $this->errors[] = __METHOD__." SQL error (insert/update): ".$db->lasterror();
-            return false;
+            if ($expire_at !== null) {
+                dolibarr_set_const($db, $serviceName.'_EXPIRE', $expire_at, 'chaine', 0, '', $conf->entity);
+            }
+
+        } else {
+
+            // Check if a token already exists for this service
+            $sql_check = "SELECT rowid FROM ".MAIN_DB_PREFIX."oauth_token
+                        WHERE service = '".$db->escape($serviceName)."'
+                        AND entity = ".((int) $conf->entity);
+
+            $resql = $db->query($sql_check);
+            if (!$resql) {
+                $this->errors[] = __METHOD__." SQL error (check): ".$db->lasterror();
+                return false;
+            }
+
+            if ($db->num_rows($resql) > 0) {
+                // --- Update existing token ---
+                $sql  = "UPDATE ".MAIN_DB_PREFIX."oauth_token SET ";
+                $sql .= "tokenstring = '".$db->escape($accessToken)."'";
+                if ($refreshToken !== null) {
+                    $sql .= ", tokenstring_refresh = '".$db->escape($refreshToken)."'";
+                }
+                if ($expire_at !== null) {
+                    $sql .= ", expire_at = '".$db->idate($expire_at)."'";
+                }
+                $sql .= " WHERE service = '".$db->escape($serviceName)."'";
+                $sql .= " AND entity = ".((int) $conf->entity);
+            } else {
+                // --- Insert new token ---
+                $sql  = "INSERT INTO ".MAIN_DB_PREFIX."oauth_token (service, tokenstring";
+                $sql .= $refreshToken !== null ? ", tokenstring_refresh" : "";
+                $sql .= ", datec";
+                $sql .= $expire_at !== null ? ", expire_at" : "";
+                $sql .= ", entity) VALUES (";
+                $sql .= "'".$db->escape($serviceName)."', ";
+                $sql .= "'".$db->escape($accessToken)."'";
+                $sql .= $refreshToken !== null ? ", '".$db->escape($refreshToken)."'" : "";
+                $sql .= ", '".$db->idate($now)."'";
+                $sql .= $expire_at !== null ? ", '".$db->idate($expire_at)."'" : "";
+                $sql .= ", ".(int) $conf->entity.")";
+            }
+
+            // Execute SQL
+            $res = $db->query($sql);
+            if (!$res) {
+                $this->errors[] = __METHOD__." SQL error (insert/update): ".$db->lasterror();
+                return false;
+            }
         }
 
         // Update config array
@@ -263,6 +279,24 @@ abstract class AbstractPDPProvider
 
         // Build service name depending on environment
         $serviceName = $this->config['dol_prefix'] . '_' . ($this->config['live'] ? 'PROD' : 'TEST');
+
+        // For backward compatibility with Dolibarr versions < 23.0.0
+        if (version_compare(DOL_VERSION, '23.0.0', '<')) {
+
+            $token = $conf->global->{$serviceName.'_TOKEN'} ?? '';
+            $refresh = $conf->global->{$serviceName.'_REFRESH'} ?? '';
+            $expire = $conf->global->{$serviceName.'_EXPIRE'} ?? '';
+
+            if (empty($token)) {
+                return false;
+            }
+
+            return [
+                'token' => $token,
+                'refresh_token' => $refresh,
+                'token_expires_at' => $expire
+            ];
+        }
 
         // Prepare SQL
         $sql = "SELECT tokenstring, tokenstring_refresh, expire_at
