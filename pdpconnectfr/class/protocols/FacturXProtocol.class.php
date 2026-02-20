@@ -295,12 +295,9 @@ class FacturXProtocol extends AbstractProtocol
                 $outputlang
             )
             ->addDocumentNote($note_pub)
-            ->addDocumentNote('-', null, "PMT")
-            ->addDocumentNote('-', null, "PMD")
-            ->addDocumentNote('-', null, "AAB")
-            // TODO : Add PMT La mention relative aux frais de recouvrement
-            // TODO : Add PMD La mention relative aux pénalités de retard
-            // TODO : Add AAB La mention relative à l'absence d'escompte pour paiement anticipé
+            ->addDocumentNote(getDolGlobalString('PDPCONNECTFR_PMT', 'NA'), null, "PMT")
+            ->addDocumentNote(getDolGlobalString('PDPCONNECTFR_PMD', 'NA'), null, "PMD")
+            ->addDocumentNote(getDolGlobalString('PDPCONNECTFR_AAB', 'NA'), null, "AAB")
 
             // ---------------- Seller ----------------
             ->setDocumentSeller($mysoc->name, $myidprof)

@@ -815,7 +815,7 @@ class Call extends CommonObject
 				$query = array_merge($query, ['save_lastsearch_values' => 1]);
 			}
 		}
-		$url = dolBuildUrl($baseurl, $query);
+		$url = $baseurl.'?'.http_build_query($query);
 
 		$linkclose = '';
 		if (empty($notooltip)) {

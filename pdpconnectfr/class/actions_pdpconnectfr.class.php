@@ -160,8 +160,7 @@ class ActionsPdpconnectfr extends CommonHookActions
                 if (in_array($currentStatusDetails['code'], [
                     $pdpConnectFr::STATUS_GENERATED,
                     $pdpConnectFr::STATUS_ERROR,
-                    $pdpConnectFr::STATUS_UNKNOWN,
-                    $pdpConnectFr::STATUS_REJECTED
+                    $pdpConnectFr::STATUS_UNKNOWN
                 ])) {
                     $url_button[] = array(
                         'lang' => 'pdpconnectfr',
@@ -189,21 +188,27 @@ class ActionsPdpconnectfr extends CommonHookActions
 
         // Add buttons in supplier invoice card
         if (in_array($object->element, ['invoice_supplier'])) {
-            // TODO : only if source is PDP
+            // Check if this invoice is present into pdpconnectfr_extlinks table to know if it is an imported invoice from PDP or not
+            $sql = "SELECT rowid, provider FROM ".MAIN_DB_PREFIX."pdpconnectfr_extlinks";
+            $sql .= " WHERE element_type = '".$object->element."'";
+            $sql .= " AND element_id = ".(int) $object->id;
+            $sql .= " LIMIT 1";
+            $resql = $db->query($sql);
+            if ($resql && $db->num_rows($resql) > 0) {
+                $availableStatuses = $pdpConnectFr->getEinvoiceStatusOptions(1, 1, 1);
+                $url_button = array();
+                foreach ($availableStatuses as $code => $label) {
+                    $url_button[] = array(
+                        'lang' => 'pdpconnectfr',
+                        'enabled' => 1,
+                        'perm' => (bool) $user->hasRight("facture", "creer"),
+                        'label' => $label,
+                        'url' => '/fourn/facture/card.php?id=' . $object->id . '&action=sendStatusMessage&pdpstatuscode=' . $code . '&token=' . newToken()
+                    );
+                }
 
-            $availableStatuses = $pdpConnectFr->getEinvoiceStatusOptions(1, 1, 1);
-            $url_button = array();
-            foreach ($availableStatuses as $code => $label) {
-                $url_button[] = array(
-                    'lang' => 'pdpconnectfr',
-                    'enabled' => 1,
-                    'perm' => (bool) $user->hasRight("facture", "creer"),
-                    'label' => $label,
-                    'url' => '/fourn/facture/card.php?id=' . $object->id . '&action=sendStatusMessage&pdpstatuscode=' . $code . '&token=' . newToken()
-                );
+                print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true);
             }
-
-            print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true);
         }
 
         return 0;
@@ -230,6 +235,7 @@ class ActionsPdpconnectfr extends CommonHookActions
             return 0;
         }
         $langs->load("pdpconnectfr@pdpconnectfr");
+        $contexts = explode(':', $parameters['context']);
 
 
         if (in_array($object->element, ['facture'])) {
@@ -250,8 +256,7 @@ class ActionsPdpconnectfr extends CommonHookActions
                 && in_array($currentStatusDetails['code'], [
                     $pdpConnectFr::STATUS_GENERATED,
                     $pdpConnectFr::STATUS_ERROR,
-                    $pdpConnectFr::STATUS_UNKNOWN,
-                    $pdpConnectFr::STATUS_REJECTED
+                    $pdpConnectFr::STATUS_UNKNOWN
                 ])
             ) {
                 $PDPManager = new PDPProviderManager($db);
@@ -338,6 +343,15 @@ class ActionsPdpconnectfr extends CommonHookActions
                     //setEventMessages($result['message'], $provider->errors, 'errors');
                 }
 
+            }
+        }
+
+        if (in_array('thirdpartycard', $contexts)) {
+            if (($action == 'add' || $action == 'update') && !empty($object->id)) {
+                $result = $pdpConnectFr->setDefaultRouting($object->id, GETPOST('routing_id', 'aZ09'));
+                if ($result < 0) {
+                    setEventMessages('Failed to save routing ID', null, 'errors');
+                }
             }
         }
         return 0;
@@ -471,6 +485,13 @@ class ActionsPdpconnectfr extends CommonHookActions
             $this->resprints .= ', ext.rowid AS pdplink_id, ext.provider AS pdp_provider';
         }
 
+        if (array_intersect(
+            $contexts,
+            ['thirdpartylist', 'societelist']
+        )) {
+            $this->resprints .= ', rt.routing_id AS routing_id';
+        }
+
         return 0;
     }
 
@@ -496,6 +517,8 @@ class ActionsPdpconnectfr extends CommonHookActions
                 $this->resprints .= ' LEFT JOIN '.MAIN_DB_PREFIX.'pdpconnectfr_extlinks ext
                     ON ext.element_id = s.rowid
                     AND ext.element_type = "societe"';
+                $this->resprints .= ' LEFT JOIN '.MAIN_DB_PREFIX.'pdpconnectfr_routing rt
+                    ON rt.fk_soc = s.rowid';
             }
 
             if (in_array('supplierinvoicelist', $contexts, true)) {
@@ -535,6 +558,10 @@ class ActionsPdpconnectfr extends CommonHookActions
             if (GETPOST('search_pdplinked', 'alpha') !== '' && GETPOST('search_pdplinked', 'alpha') == getDolGlobalString('PDPCONNECTFR_PDP')) {
                 $this->resprints .= ' AND ext.provider = "'.getDolGlobalString('PDPCONNECTFR_PDP').'"';
             }
+
+            if (GETPOST('search_routing_id', 'alpha') !== '' && GETPOST('search_routing_id', 'alpha') != "") {
+                $this->resprints .= ' AND ext.routing_id = "'.GETPOST('search_routing_id', 'alpha').'"';
+            }
         }
 
         return 0;
@@ -564,6 +591,12 @@ class ActionsPdpconnectfr extends CommonHookActions
         )) {
             print print_liste_field_titre(
                 $langs->trans('pdpconnectfrSourceTitle')
+            );
+        }
+
+        if (in_array('thirdpartylist', $contexts, true)) {
+            print print_liste_field_titre(
+                $langs->trans('pdpconnectfrThirdPartyRoutingTitle')
             );
         }
 
@@ -643,6 +676,12 @@ class ActionsPdpconnectfr extends CommonHookActions
             print '</td>';
         }
 
+        if (in_array('thirdpartylist', $contexts, true)) {
+            print '<td class="liste_titre">';
+            print '<input type="text" name="search_routing_id" value="' . GETPOST('search_routing_id', 'alpha') . '" class="minwidth150">';
+            print '</td>';
+        }
+
         return 0;
     }
 
@@ -695,6 +734,16 @@ class ActionsPdpconnectfr extends CommonHookActions
             print '</td>';
         }
 
+        if (in_array('thirdpartylist', $contexts, true)) {
+            $obj = $parameters['obj'];
+
+            print '<td>';
+            if ($obj->pdplink_id) {
+                print $obj->routing_id;
+            }
+            print '</td>';
+        }
+
         return 0;
     }
 
@@ -708,4 +757,33 @@ class ActionsPdpconnectfr extends CommonHookActions
         }
         return 0;
     }*/
+
+
+    public function isEditable($parameters, &$object, &$action, $hookmanager)
+    {
+        global $langs, $db;
+
+        // Only target customer invoices
+        if (!in_array($object->element, ['facture'])) {
+            return 0;
+        }
+
+        $pdpConnectFr = new PdpConnectFr($db);
+        $currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus($object->ref);
+
+        // Block modification if invoice is already transmitted to PDP
+        if ($currentStatusDetails['transmitted'] == 1) {
+
+            $langs->load("pdpconnectfr@pdpconnectfr");
+
+            $this->results = [
+                'result' => -10, // Custom error code
+                'error'  => $langs->trans('InvoiceLinkedToPdpCannotBeModified')
+            ];
+
+            return 1;
+        }
+
+        return 0;
+    }
 }
