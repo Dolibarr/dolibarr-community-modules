@@ -1016,7 +1016,7 @@ class PdpConnectFr
             </script>';
         }
 
-        // Disable edit button if invoice is already sent to PDP/PA (we consider that if invoice is present into pdpconnectfr_extlinks table, it means that it has been sent to PDP/PA and so we block edition in order to avoid integrity issues with the status returned by PDP/PA and that we display into invoice card)
+        // Disable edit button if invoice is already sent to PDP/PA
         if ($currentStatusInfo['transmitted'] == 1) {
             $resprints .= '
                 <script>
@@ -1500,8 +1500,6 @@ class PdpConnectFr
 
 
     /**
-     * Create or replace the default routing for a thirdparty (1 -> 1 mode)
-     *
      * Create or replace the default routing for a thirdparty.
      *
      * This method enforces a 1 → 1 relationship between a thirdparty and its active default routing:
