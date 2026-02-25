@@ -235,7 +235,7 @@ $item->fieldParams['forcereload'] = 1;
 
 if (getDolGlobalString('PDPCONNECTFR_EINVOICE_IN_REAL_TIME')) {
 	$item = $formSetup->newItem('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS')->setAsYesNo();
-	$item->helpText = $langs->transnoentities('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS');
+	$item->helpText = $langs->transnoentities('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS').'<br>'.$langs->transnoentities('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS2');
 	$item->defaultFieldValue = 0;
 	$item->cssClass = 'minwidth500';
 }

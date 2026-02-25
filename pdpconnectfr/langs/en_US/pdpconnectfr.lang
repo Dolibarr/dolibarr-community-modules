@@ -4,14 +4,13 @@
 # Generic
 #
 
-# Module label 'ModulePDPConnectFRName'
 ModulePDPConnectFRName = PDPConnectFR
-# Module description 'ModulePDPConnectFRDesc'
 ModulePDPConnectFRDesc = Support for E-invoice management. This module allows to generate (automatically or manually) invoices in E-invoice format and send them to an E-invoice Access Point. It can also retreive purchase invoices from this E-invoice Access Point. Only few countries (France) and Access Point (also called PDP/PA) are supported.
+
 #
 # Admin page
 #
-PDPConnectFRSetup = Setup of module PDPConnect (France)
+PDPConnectFRSetup = Setup of module E-invoice (France - PDPConnect)
 Settings = Settings
 PDPConnectFRSetupPage = Setup of the Access Point. You must choose here the Access Point you subscribed as the official Access Point for your company. 
 NewSection=New section
@@ -41,10 +40,10 @@ testConnection=Test connection
 UsernameIsRequired=Please enter your Esalink Username.
 PasswordIsRequired=Please enter your Esalink Password.
 ApiKeyIsRequired=API key is required. Please provide a valid key.
-CheckEsalinkPdpConfiguration=Please verify the Esalink PDP provider configuration.
-FailedToRetrieveAccessToken=Failed to obtain access token from the Esalink PDP provider.
-EsalinkPdpApiReachable=Connection successful: Esalink PDP API is reachable.
-EsalinkPdpApiNotReachable=Connection failed: Esalink PDP API is not reachable.
+CheckEsalinkPdpConfiguration=Please verify the Esalink Access Point provider configuration.
+FailedToRetrieveAccessToken=Failed to obtain access token from the Esalink Access Point provider.
+APApiReachable=Connection successful: %s Access point is reachable.
+APApiNotReachable=Connection failed: %s Access point is not reachable.
 PDPCONNECTFR_PROTOCOL=Select the exchange protocol
 PDPCONNECTFR_PROTOCOL_HELP=Available protocols are listed here.
 generateSendSampleInvoice=Generate, send, and retrieve a sample invoice
@@ -95,10 +94,11 @@ PDPCONNECTFR_SYNC_TO_PA=Synchronization Dolibarr -> PA/PDP
 PDPCONNECTFR_AUTO_GENERATION=Synchronization PA/PDP -> Dolibarr
 PDPCONNECTFR_EINVOICE_IN_REAL_TIME=Automatic generation of E-invoice when invoice is validated.
 PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS=Cancel invoice recording if the automatic generation of E-invoice fails.
+PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS2=By default, the invoice creation is done even if E-invoice generation fails. in such a case, you can re-generate this E-invoice later.
 PDPCONNECTFR_PRODUCTS_AUTO_GENERATION=Automatic product generation
-PDPCONNECTFR_PRODUCTS_AUTO_GENERATION_HELP=Automatically create missing products during PDP synchronization, otherwise stop the process.
+PDPCONNECTFR_PRODUCTS_AUTO_GENERATION_HELP=Automatically create missing products during Access Point synchronization, otherwise stop the synchronization process until the product has been created manually.
 PDPCONNECTFR_THIRDPARTIES_AUTO_GENERATION=Automatic third-party generation
-PDPCONNECTFR_THIRDPARTIES_AUTO_GENERATION_HELP=Automatically create missing third parties during PDP synchronization, otherwise stop the process.
+PDPCONNECTFR_THIRDPARTIES_AUTO_GENERATION_HELP=Automatically create missing third parties during Access Point synchronization, otherwise stop the process until the thirdparty has been created manually.
 PDPCONNECTFR_DEBUG=Debug
 PDPCONNECTFR_DEBUG_MODE=Store full detail of API calls in history
 PDPCONNECTFR_DEBUG_MODE_HELP=Enable the debug mode to log full details of synchronization calls for troubleshooting purposes (verbose). Note that synchronization calls may take longer when this mode is enabled.
@@ -196,7 +196,7 @@ syncLookbackFormHelp=0 means no lookback.
 StartSynchronizationFromHelp=(Last synchronized flow date: %s)
 maxNumberToProcessHelp=0 means no limit.
 PdpApiNotReachable=Connection failed: AP is not reachable.
-checkPdpConnectFrModuleConfiguration=Please check your PDPCONNECTFR module configuration to enable synchronization.
+checkPdpConnectFrModuleConfiguration=Please check your E-invoice module configuration to enable synchronization.
 EInvoiceSynchronizationHelp=E-invoice synchronization from <b>%s</b>
 einvoiceStatusFieldHelp=To keep this status up to date, regularly run the synchronization with the E-invoice Access Point (from the menu Invoice - E-invoice Synchronization), or wait for it to be done automatically.
 pdpconnectfrInvoiceInfo=Validation feedback

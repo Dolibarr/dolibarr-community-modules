@@ -140,7 +140,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
         if ($response['status_code'] === 200) {
             $returnarray['status_code'] = true;
-            $returnarray['message'] = $langs->trans('EsalinkPdpApiReachable');
+            $returnarray['message'] = $langs->trans('APApiReachable', getDolGlobalString('PDPCONNECTFR_PROTOCOL'));
         } else {
             $returnarray['status_code'] = false;
         }
