@@ -388,6 +388,7 @@ if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_P
 	// ROUTING ID
 	$item = $formSetup->newItem($prefix . 'ROUTING_ID');
 	$item->helpText = $langs->transnoentities($prefix . 'ROUTING_ID_HELP');
+	$item->fieldParams['isMandatory'] = 1;
 	$item->cssClass = 'minwidth500';
 
 	// To remove

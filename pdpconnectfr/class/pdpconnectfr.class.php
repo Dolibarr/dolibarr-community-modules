@@ -695,6 +695,9 @@ class PdpConnectFr
         $baseErrors = [];
         $baseWarnings = [];
 
+        if (empty($this->getSellerCommunicationURI())) {
+            $baseErrors[] = $langs->trans("FxCheckErrorRoutingID");
+        }
         if (empty($mysoc->idprof1)) {
             $baseErrors[] = $langs->trans("FxCheckErrorIDPROF1");
         }
@@ -766,12 +769,9 @@ class PdpConnectFr
             $baseErrors[] = $langs->trans("FxCheckErrorCustomerCountry");
         }
         // Check routing_id
-        $routing_id = '';
-        $resFetch = $this->fetchDefaultRouting($thirdparty->id);
-        if ($resFetch <= 0) {
-            if (getDolGlobalInt('PDPCONNECTFR_BLOCK_INVOICE_NO_ROUTING_ID') == 1) {
-                $baseErrors[] = $langs->trans("FxCheckErrorCustomerRoutingID");
-            }
+        $routing_id = $this->getBuyerCommunicationURI($thirdparty);
+        if (empty($routing_id)) {
+            $baseErrors[] = $langs->trans("FxCheckErrorCustomerRoutingID");
         }
         if ($thirdparty->tva_assuj && empty($thirdparty->tva_intra)) {
             // Test VAT code only if thirdparty is subject to VAT
@@ -1792,4 +1792,56 @@ class PdpConnectFr
             }
         }
     }
+
+    /**
+     * Get seller communication URI
+     *
+     * @return string
+     */
+    public function getSellerCommunicationURI()
+    {
+        $provider = getDolGlobalString('PDPCONNECTFR_PDP');
+        $uri = '';
+
+        // Get seller URI for provider
+        $uriConf = 'PDPCONNECTFR_' . strtoupper($provider) . '_ROUTING_ID';
+        $uri = getDolGlobalString($uriConf);
+
+        return $uri;
+    }
+
+    /**
+    * Get buyer communication URI
+    * @param  Societe $thirdparty
+    *
+    * @return string
+    */
+    public function getBuyerCommunicationURI($thirdparty)
+    {
+        $uri = '';
+        $resFetch = $this->fetchDefaultRouting($thirdparty->id);
+        if ($resFetch > 0) {
+            $uri = $resFetch;
+        }
+
+        if (empty($uri) && empty('PDPCONNECTFR_BLOCK_INVOICE_NO_ROUTING_ID')) {
+            $uri = $thirdparty->idprof1;
+        }
+
+        return $uri;
+    }
+
+    /**
+     * remove spaces from string for example french people add spaces into long numbers like
+     * SIRET: 844 431 239 00020
+     *
+     * @param   string  $str  string to cleanup
+     *
+     * @return  string  cleaned up string
+     */
+    public function remove_spaces($str)
+    { // TODO: move this function to class utils
+        return preg_replace('/\\s+/', '', $str);
+    }
+
 }
