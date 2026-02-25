@@ -447,6 +447,88 @@ class PdpConnectFr
 		$this->db = $db;
 	}
 
+
+    /**
+     * Build an e-invoice payload.
+     *
+     * This method:
+     *  1. Extracts all relevant invoice data required for electronic invoicing.
+     *  2. Return an structured array that can be used by specific format generation methods (Factur-X, UBL, CII...) to generate the final e-invoice file to send to PDP/PA.
+     *  3. Computes an integrity hash of the payload for later verification in triggers (e.g. BILL_UPDATE) to prevent unauthorized modifications after sending to PDP/PA.
+     *
+     * @param Facture $invoice Fully loaded Dolibarr invoice object
+     * @return array Normalized e-invoice payload
+     */
+    public function buildEInvoicePayloadFromInvoice($invoice): array
+    {
+        global $conf;
+
+        if (empty($invoice->id)) {
+            return array(
+                'payload' => array(),
+                'integrity_hash' => ''
+            );
+        }
+
+        $payload = array();
+        // TODO : Complete and use this payload structure with methodes to generate e-invoicing (Factur-X, UBL, CII...) instead of fetching data separately in each method for each format.
+        // $payload = array(
+        //     'header' => array(
+        //         'invoice_number'   => $invoice->ref,
+        //         'invoice_date'     => $invoice->date,
+        //         'due_date'         => $invoice->date_lim_reglement,
+        //         'currency'         => $invoice->multicurrency_code ?: $conf->currency,
+        //         'total_ht'         => $invoice->total_ht,
+        //         'total_vat'        => $invoice->total_tva,
+        //         'total_ttc'        => $invoice->total_ttc,
+        //         'payment_terms_id' => $invoice->cond_reglement_id,
+        //         'payment_mode_id'  => $invoice->mode_reglement_id,
+        //     ),
+        //     'seller' => array(
+        //         'name'        => $conf->global->MAIN_INFO_SOCIETE_NOM,
+        //         'vat_number'  => $conf->global->MAIN_INFO_SIREN,
+        //         'address'     => $conf->global->MAIN_INFO_SOCIETE_ADDRESS,
+        //         'zip'         => $conf->global->MAIN_INFO_SOCIETE_ZIP,
+        //         'town'        => $conf->global->MAIN_INFO_SOCIETE_TOWN,
+        //         'country'     => $conf->global->MAIN_INFO_SOCIETE_COUNTRY,
+        //     ),
+        //     'buyer' => array(
+        //         'name'        => $invoice->thirdparty->name,
+        //         'vat_number'  => $invoice->thirdparty->tva_intra,
+        //         'address'     => $invoice->thirdparty->address,
+        //         'zip'         => $invoice->thirdparty->zip,
+        //         'town'        => $invoice->thirdparty->town,
+        //         'country'     => $invoice->thirdparty->country_code,
+        //     ),
+        //     'lines' => array()
+        // );
+
+        // // Extract invoice lines
+        // foreach ($invoice->lines as $line) {
+        //     $payload['lines'][] = array(
+        //         'description' => $line->desc,
+        //         'product_ref' => $line->ref,
+        //         'qty'         => $line->qty,
+        //         'unit_price'  => $line->subprice,
+        //         'vat_rate'    => $line->tva_tx,
+        //         'total_ht'    => $line->total_ht,
+        //         'total_ttc'   => $line->total_ttc,
+        //     );
+        // }
+
+
+        // TODO : Store payload and integrity hash in a dedicated table linked to invoice when sending to PDP/PA, and use it in BILL_UPDATE trigger to check integrity and block modifications on locked fields.
+        $integrityHash = '';
+        // $integrityHash = hash('sha256', json_encode($payload));
+
+        return array(
+            'payload'        => $payload,
+            'integrity_hash' => $integrityHash
+        );
+    }
+
+
+
     /**
      * Check Module prerequisites
      *
@@ -554,7 +636,16 @@ class PdpConnectFr
             unset($options[self::STATUS_COMPLETED]);
             unset($options[self::STATUS_REJECTED]);
             unset($options[self::STATUS_PAID]);
+
+            // Remove statuses that are not supported for now.
+            unset($options[self::STATUS_TAKEN_OVER]);
+            unset($options[self::STATUS_DISPUTED]);
+            unset($options[self::STATUS_PARTIALLY_APPROVED]);
+            unset($options[self::STATUS_SUSPENDED]);
+            unset($options[self::STATUS_PAYMENT_SENT]);
         }
+
+        // TODO : remove statuses that cannot be chronologically be sent (for example, it doesn't make sense to send "Taken over" if invoice is refused), PDP may accept them and ignore them without returning an error.
 
 
         return $options;
@@ -604,6 +695,9 @@ class PdpConnectFr
         $baseErrors = [];
         $baseWarnings = [];
 
+        if (empty($this->getSellerCommunicationURI())) {
+            $baseErrors[] = $langs->trans("FxCheckErrorRoutingID");
+        }
         if (empty($mysoc->idprof1)) {
             $baseErrors[] = $langs->trans("FxCheckErrorIDPROF1");
         }
@@ -672,7 +766,12 @@ class PdpConnectFr
             $baseWarnings[] = $langs->trans("FxCheckErrorCustomerTown");
         }
         if (empty($thirdparty->country_code)) {
-            $baseWarnings[] = $langs->trans("FxCheckErrorCustomerCountry");
+            $baseErrors[] = $langs->trans("FxCheckErrorCustomerCountry");
+        }
+        // Check routing_id
+        $routing_id = $this->getBuyerCommunicationURI($thirdparty);
+        if (empty($routing_id)) {
+            $baseErrors[] = $langs->trans("FxCheckErrorCustomerRoutingID");
         }
         if ($thirdparty->tva_assuj && empty($thirdparty->tva_intra)) {
             // Test VAT code only if thirdparty is subject to VAT
@@ -794,7 +893,7 @@ class PdpConnectFr
     public function EInvoiceCardBlock($object, $mode = '') {
         global $langs;
 
-        $currentStatusInfo = $this->fetchLastknownInvoiceStatus($object->ref);
+        $currentStatusInfo = $this->fetchLastknownInvoiceStatus($object->ref, $object->id);
 		// Force value for test
 		//$currentStatusInfo['code'] = 2;
 
@@ -856,15 +955,14 @@ class PdpConnectFr
 			<span id="einvoice-info" class="clearboth">' . htmlspecialchars($info) . '</span></td>';
         $resprints .= '</tr>';
 
-        // AP Info
-        /*
-        $displayStyle = !empty($info) ? '' : 'style="display:none;"';
-
-        $resprints .= '<tr id="einvoice-info-row" ' . $displayStyle . ' class="trpdpconnect_collapseseparator">';
-        $resprints .= '<td class="titlefield">' . $langs->trans("pdpconnectfrInvoiceInfo") . '</td>';
-        $resprints .= '<td><span id="einvoice-info">' . htmlspecialchars($info) . '</span></td>';
-        $resprints .= '</tr>';
-        */
+        // If current status requires a reason, display it
+        if (!empty($currentStatusInfo['reasonCode'])) {
+            $reasonLabel = self::RAISONS[$currentStatusInfo['reasonCode']]['label'] ?? $currentStatusInfo['reasonCode'];
+            $resprints .= '<tr class="trpdpconnect_collapseseparator" id="trpdpconnect_reason">';
+            $resprints .= '<td class="titlefield">' . $langs->trans("pdpconnectfrInvoiceReason") . '</td>';
+            $resprints .= '<td><span id="einvoice-reason">' . $reasonLabel . '</span></td>';
+            $resprints .= '</tr>';
+        }
 
         // E-Invoice events history link
         $resprints .= '<tr class="trpdpconnect_collapseseparator">';
@@ -916,6 +1014,27 @@ class PdpConnectFr
 
             })();
             </script>';
+        }
+
+        // Disable edit button if invoice is already sent to PDP/PA
+        if ($currentStatusInfo['transmitted'] == 1) {
+            $resprints .= '
+                <script>
+                $(document).ready(function() {
+                    // Target the "Edit" link in the action buttons
+                    $("a.butAction").filter(function() {
+                        return $(this).attr("href") && $(this).attr("href").indexOf("action=modif") !== -1;
+                    }).each(function() {
+                        // Replace with a disabled button
+                        $(this).replaceWith(
+                            $("<span>")
+                                .addClass("butActionRefused classfortooltip")
+                                .attr("title", "' . $langs->trans("InvoiceLinkedToPdpCannotBeModified") . '")
+                                .text($(this).text())
+                        );
+                    });
+                });
+                </script>';
         }
 
         return $resprints;
@@ -992,8 +1111,39 @@ class PdpConnectFr
             $resprints .= '<td>' . $obj->provider . '</td>';
             $resprints .= '</tr>';
 
-            // Get current status (LC) from pdpconnectfr_lifecycle_msg table
-            $currentStatusInfo = array();
+            // Get current status
+            $currentStatus = '-';
+            $sql = "SELECT lc_status, lc_reason_code FROM ".MAIN_DB_PREFIX."pdpconnectfr_lifecycle_msg";
+            $sql .= " WHERE element_type = '".$object->element."'";
+            $sql .= " AND element_id = ".(int) $object->id;
+            $sql .= " AND lc_validation_status = 'Ok'";
+            $sql .= " ORDER BY rowid DESC LIMIT 1";
+            $resql = $this->db->query($sql);
+            if ($resql && $this->db->num_rows($resql) > 0) {
+                $obj = $this->db->fetch_object($resql);
+                $currentStatus = $obj->lc_status;
+                $currentStatus = $this->getStatusLabel($currentStatus);
+            }
+            // Current status
+            $resprints .= '<tr class="trpdpconnect_collapseseparator">';
+            $resprints .= '<td class="titlefield">' . $langs->trans("pdpconnectfrInvoiceStatus") . '</td>';
+            $resprints .= '<td><span id="einvoice-status">' . $currentStatus . '</span></td>';
+            $resprints .= '</tr>';
+
+            // If current status requires a reason, display it
+            $reasonLabel = '';
+            $displayReasonLabel = 'style="display:none;"';
+            if (!empty($obj->lc_reason_code)) {
+                $reasonLabel = $this->getRaisonsByStatut($obj->lc_status)[$obj->lc_reason_code]['label'] ?? $obj->lc_reason_code;
+                $displayReasonLabel = '';
+            }
+            $resprints .= '<tr class="trpdpconnect_collapseseparator" id="trpdpconnect_reason" ' . $displayReasonLabel . '>';
+            $resprints .= '<td class="titlefield">' . $langs->trans("pdpconnectfrInvoiceReason") . '</td>';
+            $resprints .= '<td><span id="einvoice-reason">' . $reasonLabel . '</span></td>';
+            $resprints .= '</tr>';
+
+            // Get last sent status to know if we need to add the JavaScript for real time update of status and to display last sent status validation if it is pending or in error
+            $lastSentStatus = array();
             $sql = "SELECT lc_status, lc_status_message, lc_validation_status, lc_validation_message FROM ".MAIN_DB_PREFIX."pdpconnectfr_lifecycle_msg";
             $sql .= " WHERE element_type = '".$object->element."'";
             $sql .= " AND element_id = ".(int) $object->id;
@@ -1001,7 +1151,7 @@ class PdpConnectFr
             $resql = $this->db->query($sql);
             if ($resql && $this->db->num_rows($resql) > 0) {
                 $obj = $this->db->fetch_object($resql);
-                $currentStatusInfo = [
+                $lastSentStatus = [
                     'lc_status' => $obj->lc_status,
                     'lc_status_message' => $obj->lc_status_message,
                     'lc_validation_status' => $obj->lc_validation_status,
@@ -1009,51 +1159,75 @@ class PdpConnectFr
                 ];
             }
 
-            if (!empty($currentStatusInfo['lc_status'])) {
-            	$info = $currentStatusInfo['lc_validation_message'] ?? '';
+            if (!empty($lastSentStatus) && ($lastSentStatus['lc_validation_status'] == 'Pending' || $lastSentStatus['lc_validation_status'] == 'Error')) {
+                $statusLabel = $this->getStatusLabel($lastSentStatus['lc_status']);
+                $statusvalidationLabel = $this->getStatusLabel($this->getDolibarrStatusCodeFromPdpLabel($lastSentStatus['lc_validation_status']));
+                if ($lastSentStatus['lc_validation_status'] === 'Pending') {
+                    $picto = img_picto('', 'timespent');
+                } elseif ($lastSentStatus['lc_validation_status'] === 'Error') {
+                    $picto = img_picto('', 'error');
+                }
+                $statusValidation = ' : ' . $statusvalidationLabel . ' ' .$picto;
+                $statusValidationInfo = $lastSentStatus['lc_validation_message'] ?? '';
 
-                //Sent Status
-                $resprints .= '<tr class="trpdpconnect_collapseseparator">';
-                $resprints .= '<td class="titlefield">'
-                    . $langs->trans("pdpconnectfrInvoiceStatus")
-                    . ' <i class="fas fa-info-circle em088 opacityhigh classfortooltip" title="'
-                    . $langs->trans("einvoiceStatusFieldHelp") . '"></i></td>';
-                $resprints .= '<td><span id="einvoice-status">'
-                    . $currentStatusInfo['lc_status'] . '</span></td>';
-                $resprints .= '</tr>';
-
-                // Status Message
-                $resprints .= '<tr class="trpdpconnect_collapseseparator">';
-                $resprints .= '<td class="titlefield">'
-                    . $langs->trans("pdpconnectfrInvoiceStatusMessage")
-                    . ' <i class="fas fa-info-circle em088 opacityhigh classfortooltip" title="'
-                    . $langs->trans("einvoiceStatusMessageFieldHelp") . '"></i></td>';
-                $resprints .= '<td><span id="einvoice-status-message">'
-                    . $currentStatusInfo['lc_status_message'] . '</span></td>';
-                $resprints .= '</tr>';
-
-                // Validation Status
-                $resprints .= '<tr class="trpdpconnect_collapseseparator">';
-                $resprints .= '<td class="titlefield">'
-                    . $langs->trans("pdpconnectfrInvoiceStatus")
-                    . ' <i class="fas fa-info-circle em088 opacityhigh classfortooltip" title="'
-                    . $langs->trans("einvoiceStatusFieldHelp") . '"></i></td>';
-                $resprints .= '<td><span id="einvoice-status">'
-                    . $currentStatusInfo['lc_validation_status'] . '</span>';
-                $resprints .= '<span id="einvoice-info">' . htmlspecialchars($info) . '</span>';
+                // Validation of last sent status to display it in the invoice card and to know if we need to add the JavaScript for real time update of status
+                $resprints .= '<tr class="trpdpconnect_collapseseparator " id="trpdpconnect_lastsentstatusvalidation">';
+                $resprints .= '<td class="titlefield">'. $langs->trans("pdpconnectfrLastSentStatus"). '</td>';
+                $resprints .= '<td><span>'. $statusLabel .'</span><span id="status-validation"> ' . $statusValidation . '</span><br>';
+                $resprints .= '<span id="status-validation-info" class="opacitymedium" style="overflow-wrap: anywhere;">' . htmlspecialchars($statusValidationInfo) . '</span>';
                 $resprints .= '</td>';
                 $resprints .= '</tr>';
 
-                // Validation Info
-                /*
-                $info = $currentStatusInfo['lc_validation_message'] ?? '';
-                $displayStyle = !empty($info) ? '' : 'style="display:none;"';
+                // JavaScript for AJAX call to update status if current status is pending
+                if ($this->getDolibarrStatusCodeFromPdpLabel($lastSentStatus['lc_validation_status']) == self::STATUS_AWAITING_VALIDATION) {
 
-                $resprints .= '<tr id="einvoice-info-row" ' . $displayStyle . '>';
-                $resprints .= '<td class="titlefield">' . $langs->trans("pdpconnectfrInvoiceInfo") . '</td>';
-                $resprints .= '<td><span id="einvoice-info">' . htmlspecialchars($info) . '</span></td>';
-                $resprints .= '</tr>';
-                */
+                    $urlajax = dol_buildpath('pdpconnectfr/ajax/checksupplierinvoicestatus.php', 1);
+
+                    $resprints .= '
+                    <script type="text/javascript">
+                    (function() {
+                        function checkSupplierInvoiceStatus() {
+                            console.log("checkSupplierInvoiceStatus Checking invoice status...");
+                            $.get("' . $urlajax . '", {
+                                token: "' . currentToken() . '",
+                                id: "' . dol_escape_js($object->id) . '"
+                            }, function (data) {
+                                if (!data || typeof data.statusvalidationlabel === "undefined") {
+                                    console.log("checkSupplierInvoiceStatus no data returned");
+                                    return;
+                                }
+                                console.log(data);
+
+                                // Update UI
+                                $("#status-validation").html(data.htmlstatusvalidationLabel || "");
+                                $("#status-validation-info").html(data.statusvalidationinfo || "");
+
+                                // Hide row if status is OK and replace current status with the new one
+                                if (data.statusvalidationlabel === "Ok") {
+                                    $("#trpdpconnect_lastsentstatusvalidation").hide();
+                                    $("#einvoice-status").html(data.statuslabel || "");
+                                    if (data.statusreasonlabel) {
+                                        $("#einvoice-reason").html(data.statusreasonlabel || "");
+                                        $("#trpdpconnect_reason").show();
+                                    } else {
+                                        $("#trpdpconnect_reason").hide();
+                                    }
+                                }
+
+                                // Retry only if still awaiting validation
+                                if (data.statusvalidationlabel === "Pending") {
+                                    setTimeout(checkSupplierInvoiceStatus, 5000);
+                                }
+                            }, "json");
+                        }
+
+                        // First call
+                        console.log("checkSupplierInvoiceStatus Invoice has status pending, so we add a timer to run checkInvoiceStatus in few seconds...");
+                        setTimeout(checkSupplierInvoiceStatus, 2500);
+
+                    })();
+                    </script>';
+                }
             }
 
             // E-Invoice events history link
@@ -1085,6 +1259,69 @@ class PdpConnectFr
 
         $resprints = '';
 
+        // Set $extrafield_collapse_display_value (do we have to collapse/expand the group after the separator)
+        $extrafield_collapse_display_value = -1;
+        $expand_display = ((isset($_COOKIE['DOLUSER_COLLAPSE_facture_trpdpconnectseparator']) || GETPOSTINT('ignorecollapsesetup')) ? (!empty($_COOKIE['DOLUSER_COLLAPSE_facture_trpdpconnectseparator'])) : !($extrafield_collapse_display_value == 2));
+        $disabledcookiewrite = 0;
+        if ($mode == 'create') {
+            // On create mode, force separator group to not be collapsible
+            $extrafield_collapse_display_value = 1;
+            $expand_display = true;	// We force group to be shown expanded
+            $disabledcookiewrite = 1; // We keep status of group unchanged into the cookie
+        }
+        $resprints .= '
+        <script nonce="" type="text/javascript">
+        jQuery(document).ready(function() {';
+            if (empty($disabledcookiewrite)) {
+                if (!$expand_display) {
+                    $resprints .= 'console.log("Inject js for the collapsing of trpdpconnect_collapseseparator - hide");
+                    jQuery(".trpdpconnect_collapseseparator").hide();';
+                } else {
+                    $resprints .= 'console.log("Inject js for collapsing of trpdpconnect_collapseseparator - keep visible and set cookie");
+                    document.cookie = "DOLUSER_COLLAPSE_facture_trpdpconnectseparator=1; path='.$_SERVER["PHP_SELF"].'";';
+                }
+            }
+        $resprints .= '
+            jQuery("#trpdpconnect").click(function(){
+                console.log("We click on collapse/uncollapse to hide/show .trpdpconnectseparator");
+                jQuery(".trpdpconnect_collapseseparator").toggle(100, function(){
+                    if (jQuery(".trpdpconnect_collapseseparator").is(":hidden")) {
+                        jQuery("#trpdpconnect td span").addClass("fa-plus-square").removeClass("fa-minus-square");
+                        document.cookie = "DOLUSER_COLLAPSE_facture_trpdpconnectseparator=0; path='.$_SERVER["PHP_SELF"].'"
+                    } else {
+                        jQuery("#trpdpconnect td span").addClass("fa-minus-square").removeClass("fa-plus-square");
+                        document.cookie = "DOLUSER_COLLAPSE_facture_trpdpconnectseparator=1; path='.$_SERVER["PHP_SELF"].'"
+                    }
+                });
+            });
+        });
+        </script>';
+
+        // Title separator
+        $resprints .= '<tr id="trpdpconnect" class="trpdpconnectseparator trtrpdpconnectseparator_1">';
+        $resprints .= '<td colspan="2"><span class="far fa-'.(($expand_display ? 'minus' : 'plus').'-square').'"></span><strong> ' . $langs->trans("pdpconnectfrInvoiceSeparator") . '</strong></td>';
+        $resprints .= '</tr>';
+
+
+        // Fetch routing_id
+        $routing_id = '';
+        $resFetch = $this->fetchDefaultRouting($object->id);
+        if ($resFetch > 0) {
+            $routing_id = $resFetch;
+        }
+        if ($mode == 'create' || $mode == 'edit') {
+            $resprints .= '<tr class="trpdpconnect_collapseseparator">';
+            $resprints .= '<td class="titlefield">' . $langs->trans("RoutingIdField") . '</td>';
+            $resprints .= '<td>';
+            $resprints .= '<input type="text" name="routing_id" ';
+            $resprints .= 'value="' . dol_escape_htmltag($routing_id ?? '') . '" ';
+            $resprints .= 'class="flat minwidth300" />';
+            $resprints .= '</td>';
+            $resprints .= '</tr>';
+
+            return $resprints;
+        }
+
         // Check if this thirdparty is present into pdpconnectfr_extlinks table to know if it is an imported object
         $sql = "SELECT rowid, provider FROM ".MAIN_DB_PREFIX."pdpconnectfr_extlinks";
         $sql .= " WHERE element_type = '".$object->element."'";
@@ -1094,11 +1331,16 @@ class PdpConnectFr
         if ($resql && $this->db->num_rows($resql) > 0) {
             $obj = $this->db->fetch_object($resql);
             // Add block only for imported invoices
-            $resprints .= '<tr>';
+            $resprints .= '<tr class="trpdpconnect_collapseseparator">';
             $resprints .= '<td>' . $langs->trans("pdpconnectfrSourceTitle") . '</td>';
             $resprints .= '<td>' . $obj->provider . '</td>';
             $resprints .= '</tr>';
         }
+
+        $resprints .= '<tr class="trpdpconnect_collapseseparator">';
+        $resprints .= '<td>' . $langs->trans("RoutingIdField") . '</td>';
+        $resprints .= '<td>' . dol_escape_htmltag($routing_id ?? '') . '</td>';
+        $resprints .= '</tr>';
 
         return $resprints;
     }
@@ -1132,13 +1374,13 @@ class PdpConnectFr
         return $resprints;
     }
 
-    function fetchLastknownInvoiceStatus($invoiceRef) {
+    function fetchLastknownInvoiceStatus($invoiceRef, $invoiceId = 0) {
         global $db, $conf;
 
-        $status = array('code' => self::STATUS_NOT_GENERATED, 'status' => $this->getStatusLabel(self::STATUS_NOT_GENERATED), 'info' => '', 'file' => '0');
+        $status = array('code' => self::STATUS_NOT_GENERATED, 'status' => $this->getStatusLabel(self::STATUS_NOT_GENERATED), 'info' => '', 'file' => '0', 'transmitted' => 0);
 
-        // Get last status from pdpconnectfr_extlinks table
-        $sql = "SELECT syncstatus, synccomment";
+        // Get last status from pdpconnectfr_extlinks table (table contain dolibarr object recieved or sent to PDP)
+        $sql = "SELECT syncstatus, synccomment"; // Validation message of einvoice sent.
         $sql .= " FROM ".MAIN_DB_PREFIX."pdpconnectfr_extlinks";
         $sql .= " WHERE element_type = '".Facture::class."'";
         $sql .= " AND syncref = '".$db->escape($invoiceRef)."'";
@@ -1151,12 +1393,25 @@ class PdpConnectFr
                     'code' => (int) $obj->syncstatus,
                     'status' => $this->getStatusLabel((int) $obj->syncstatus),
                     'info' => $obj->synccomment ?? '',
+                    'transmitted' => 1, // If we have an entry in pdpconnectfr_extlinks table for this invoice, it means that it has been transmitted to PDP
                 );
             } else {
                 dol_syslog("No entry found in pdpconnectfr_extlinks table for invoiceRef: " . $invoiceRef);
             }
         } else {
             dol_print_error($db);
+        }
+
+        // Fetch last status message from pdpconnectfr_lifecycle_msg table to get more details on current status of the invoice into the PDP system
+        $currentStatus = '-';
+        $sql = "SELECT lc_status, lc_reason_code FROM ".MAIN_DB_PREFIX."pdpconnectfr_lifecycle_msg";
+        $sql .= " WHERE element_type = '".Facture::class."'";
+        $sql .= " AND element_id = ".(int) $invoiceId;
+        $sql .= " ORDER BY rowid DESC LIMIT 1";
+        $resql = $this->db->query($sql);
+        if ($resql && $this->db->num_rows($resql) > 0) {
+            $obj = $this->db->fetch_object($resql);
+            $status['reasonCode'] = $obj->lc_reason_code ?? '';
         }
 
         // Check if there is an e-invoice file generated
@@ -1245,6 +1500,107 @@ class PdpConnectFr
 
 
     /**
+     * Create or replace the default routing for a thirdparty.
+     *
+     * This method enforces a 1 → 1 relationship between a thirdparty and its active default routing:
+     * - Only one active default routing can exist per thirdparty at any given time
+     * - Any existing routing(s) for this thirdparty are automatically deleted before insertion
+     * - The new routing is marked as active (active = 1) and default (is_default = 1)
+     *
+     * Note: Future versions may support true 1 → N routing management with:
+     * - Multiple concurrent routings per thirdparty
+     * - Switching default routing without deletion
+     *
+     * @param int    $fk_soc   Thirdparty ID
+     * @param string $routing_id
+     * @param string $source
+     * @param string $info
+     * @param string $syncflowid
+     *
+     * @return int Rowid on success, -1 on error
+     */
+    public function setDefaultRouting($fk_soc, $routing_id, $source = '', $info = '', $syncflowid = '')
+    {
+        global $db, $user;
+
+        $db->begin();
+
+        // Delete existing routing(s) for this thirdparty (1→1 logic)
+        $sql = "DELETE FROM " . MAIN_DB_PREFIX . "pdpconnectfr_routing";
+        $sql .= " WHERE fk_soc = " . (int) $fk_soc;
+
+        if (!$db->query($sql)) {
+            $db->rollback();
+            dol_syslog(__METHOD__ . ' Delete error: ' . $db->lasterror(), LOG_ERR);
+            return -1;
+        }
+
+        if ($routing_id === '') {
+            // If routing_id is empty, we just delete existing routing(s) and do not insert a new one
+            $db->commit();
+            return 0;
+        }
+
+        // Insert new default routing
+        $sql = "INSERT INTO " . MAIN_DB_PREFIX . "pdpconnectfr_routing (";
+        $sql .= "fk_soc, source, routing_id, info, syncflowid, active, is_default, date_creation, fk_user_creat";
+        $sql .= ") VALUES (";
+        $sql .= (int) $fk_soc . ", ";
+        $sql .= "'" . $db->escape($source) . "', ";
+        $sql .= "'" . $db->escape($routing_id) . "', ";
+        $sql .= ($info !== '' ? "'" . $db->escape($info) . "'" : "NULL") . ", ";
+        $sql .= ($syncflowid !== '' ? "'" . $db->escape($syncflowid) . "'" : "NULL") . ", ";
+        $sql .= "1, 1, NOW(), " . (int) $user->id;
+        $sql .= ")";
+
+        if (!$db->query($sql)) {
+            $db->rollback();
+            dol_syslog(__METHOD__ . ' Insert error: ' . $db->lasterror(), LOG_ERR);
+            return -1;
+        }
+
+        $rowid = (int) $db->last_insert_id(MAIN_DB_PREFIX . 'pdpconnectfr_routing');
+
+        $db->commit();
+
+        return $rowid;
+    }
+
+
+    /**
+     * Fetch default routing for a thirdparty
+     *
+     * @param int $fk_soc   Thirdparty ID
+     * @return string|int   Routing ID string if found, 0 if not found, -1 if error
+     */
+    public function fetchDefaultRouting($fk_soc)
+    {
+        global $db;
+
+        $sql = "SELECT rowid, fk_soc, source, routing_id, info, syncflowid";
+        $sql .= " FROM " . MAIN_DB_PREFIX . "pdpconnectfr_routing";
+        $sql .= " WHERE fk_soc = " . (int) $fk_soc;
+        $sql .= " AND active = 1";
+        $sql .= " AND is_default = 1";
+        $sql .= " LIMIT 1";
+
+        $resql = $db->query($sql);
+        if (!$resql) {
+            dol_syslog(__METHOD__ . ' SQL error: ' . $db->lasterror(), LOG_ERR);
+            return -1;
+        }
+
+        if ($db->num_rows($resql) === 0) {
+            return 0;
+        }
+
+        $obj = $db->fetch_object($resql);
+
+        return $obj->routing_id;
+    }
+
+
+    /**
      * Store a lifecycle status message in the pdpconnectfr_lifecycle_msg table.
      *
      * This method is used to persist incoming or outgoing lifecycle status messages
@@ -1264,7 +1620,7 @@ class PdpConnectFr
      *
      * @return int  Rowid inserted or -1 on error
      */
-    public function storeStatusMessage($elementId, $elementType, $statusCode, $statusMessage = '', $direction, $flowId = '', $validationStatus = '', $validationMessage = '', $date_creation = null)
+    public function storeStatusMessage($elementId, $elementType, $statusCode, $statusMessage = '', $direction, $flowId = '', $validationStatus = '', $validationMessage = '', $date_creation = null, $reasonCode = '')
     {
         global $db, $user;
 
@@ -1282,7 +1638,8 @@ class PdpConnectFr
         $sql .= "lc_validation_status, ";
         $sql .= "lc_validation_message, ";
         $sql .= "date_creation, ";
-        $sql .= "fk_user_creat";
+        $sql .= "fk_user_creat, ";
+        $sql .= "lc_reason_code";
         $sql .= ") VALUES (";
         $sql .= (int) $elementId . ", ";
         $sql .= "'" . $db->escape($elementType) . "', ";
@@ -1294,7 +1651,8 @@ class PdpConnectFr
         $sql .= "'" . $db->escape($validationStatus) . "', ";
         $sql .= "'" . $db->escape($validationMessage) . "', ";
         $sql .= "'" . $date_creation . "', ";
-        $sql .= (int) $user->id;
+        $sql .= (int) $user->id . ", ";
+        $sql .= "'" . $db->escape($reasonCode) . "'";
         $sql .= ")";
 
         $resql = $db->query($sql);
@@ -1434,4 +1792,56 @@ class PdpConnectFr
             }
         }
     }
+
+    /**
+     * Get seller communication URI
+     *
+     * @return string
+     */
+    public function getSellerCommunicationURI()
+    {
+        $provider = getDolGlobalString('PDPCONNECTFR_PDP');
+        $uri = '';
+
+        // Get seller URI for provider
+        $uriConf = 'PDPCONNECTFR_' . strtoupper($provider) . '_ROUTING_ID';
+        $uri = getDolGlobalString($uriConf);
+
+        return $uri;
+    }
+
+    /**
+    * Get buyer communication URI
+    * @param  Societe $thirdparty
+    *
+    * @return string
+    */
+    public function getBuyerCommunicationURI($thirdparty)
+    {
+        $uri = '';
+        $resFetch = $this->fetchDefaultRouting($thirdparty->id);
+        if ($resFetch > 0) {
+            $uri = $resFetch;
+        }
+
+        if (empty($uri) && empty('PDPCONNECTFR_BLOCK_INVOICE_NO_ROUTING_ID')) {
+            $uri = $thirdparty->idprof1;
+        }
+
+        return $uri;
+    }
+
+    /**
+     * remove spaces from string for example french people add spaces into long numbers like
+     * SIRET: 844 431 239 00020
+     *
+     * @param   string  $str  string to cleanup
+     *
+     * @return  string  cleaned up string
+     */
+    public function remove_spaces($str)
+    { // TODO: move this function to class utils
+        return preg_replace('/\\s+/', '', $str);
+    }
+
 }

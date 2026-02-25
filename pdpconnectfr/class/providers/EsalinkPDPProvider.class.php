@@ -575,8 +575,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		}
 
 		$totalFlows = $response['response']['total'] ?? 0;
-        $limit = $limit > 0 ? min($limit, $totalFlows) : $totalFlows;
         $batchlimit = $limit; // Set batch limit for logging purposes
+        $limit = $limit > 0 ? min($limit, $totalFlows) : $totalFlows;
 
         if ($totalFlows == 0) {
             dol_syslog(__METHOD__ . " No flows to synchronize.", LOG_DEBUG);
@@ -975,7 +975,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                         }
                         $pdpconnectfr->insertOrUpdateExtLink($factureObj->id, Facture::class, $flowId, $syncStatus, $factureObj->ref, $syncComment);
 
-                        $pdpconnectfr->storeStatusMessage($document->fk_element_id, $document->fk_element_type, $document->cdar_lifecycle_code, $syncComment, $document->flow_direction, $flowId, $syncValidationStatus, $syncValidationComment, $document->submittedat);
+                        $pdpconnectfr->storeStatusMessage($document->fk_element_id, $document->fk_element_type, $document->cdar_lifecycle_code, $syncComment, $document->flow_direction, $flowId, $syncValidationStatus, $syncValidationComment, $document->submittedat, $document->cdar_reason_code);
                     } else {
                         dol_syslog(__METHOD__ . " Customer invoice not found for flowId: {$flowId}, so we save the flow into document table but we don't create an entry into pdpconnectfr_extlinks table", LOG_WARNING); // This can happen if the invoice was sent from another system using the same PDP account
                     }
@@ -1177,10 +1177,11 @@ class EsalinkPDPProvider extends AbstractPDPProvider
      *
      * @param mixed $object Invoice object (CustomerInvoice or SupplierInvoice)
      * @param int $statusCode   Status code to send (see class constants for available codes)
+     * @param string $reasonCode Reason code to send (optional)
      *
      * @return array{res:int, message:string}       Returns array with 'res' (1 on success, -1 on failure) with a 'message'.
      */
-    public function sendStatusMessage($object, $statusCode){
+    public function sendStatusMessage($object, $statusCode, $reasonCode = ''){
         global $langs, $db;
 
         $res = 1;
@@ -1190,6 +1191,11 @@ class EsalinkPDPProvider extends AbstractPDPProvider
             $res = -1;
             $message = 'SendStatusMessage Not does not support this object type: ' . $object->element;
             return ['res' => $res, 'message' => $message];
+        }
+
+        //Clear reason code if status code is -1
+        if ($reasonCode == '-1') {
+            $reasonCode = '';
         }
 
 
@@ -1204,7 +1210,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
         dol_include_once('/pdpconnectfr/class/utils/CdarHandler.class.php');
         $cdarHandler = new CdarHandler($db);
-        $result = $cdarHandler->generateCdarFile($object, $statusCode);
+        $result = $cdarHandler->generateCdarFile($object, $statusCode, $reasonCode);
         if ($result['res'] < 0) {
             $res = -1;
             $message = 'Failed to generate CDAR file: ' . $result['message'];
@@ -1250,7 +1256,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                 // Update einvoice status with awaiting validation
                 $pdpconnectfr = new PdpConnectFr($db);
                 //$pdpconnectfr->insertOrUpdateExtLink($object->id, $object->element, $flowId, PdpConnectFr::STATUS_AWAITING_VALIDATION, $object->ref);
-                $resStoreStatus = $pdpconnectfr->storeStatusMessage($object->id, $object->element, $statusCode, '', 'out', $flowId);
+                $resStoreStatus = $pdpconnectfr->storeStatusMessage($object->id, $object->element, $statusCode, '', 'out', $flowId, '', '', '', $reasonCode);
 
                 // Call the API to retrieve flow details and check the validation status.
                 $resource = 'flows/' . $flowId;
@@ -1285,7 +1291,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                     $syncRef = $flowData['trackingId'] ?? '';
                     $syncComment = $flowData['acknowledgement']['details'][0]['reasonMessage'] ?? '';
                     //$pdpconnectfr->insertOrUpdateExtLink($object->id, $object->element, $flowId, $syncStatus, $syncRef, $syncComment);
-                    $pdpconnectfr->updateStatusMessageValidation($resStoreStatus, '', $ack_statusLabel, $syncComment );
+                    $pdpconnectfr->updateStatusMessageValidation($resStoreStatus, '', $ack_statusLabel, $syncComment);
 
                     // Log an event in the invoice timeline
                     $eventLabel = "PDPCONNECTFR - Send status " . $statusLabelToSend . " : " . $ack_statusLabel;

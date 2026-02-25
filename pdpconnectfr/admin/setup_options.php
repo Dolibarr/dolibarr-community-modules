@@ -240,6 +240,28 @@ if (getDolGlobalString('PDPCONNECTFR_EINVOICE_IN_REAL_TIME')) {
 	$item->cssClass = 'minwidth500';
 }
 
+// Setup conf to choose to block generation/send of an invoice if no routing ID is found for the third party otherwise use SIREN
+$item = $formSetup->newItem('PDPCONNECTFR_BLOCK_INVOICE_NO_ROUTING_ID')->setAsYesNo();
+$item->helpText = $langs->transnoentities('PDPCONNECTFR_BLOCK_INVOICE_NO_ROUTING_ID_HELP');
+$item->defaultFieldValue = 0;
+$item->cssClass = 'minwidth500';
+$item->fieldParams['forcereload'] = 0;
+
+// Setup conf for PMT - Mention regarding recovery fees
+$item = $formSetup->newItem('PDPCONNECTFR_PMT');
+$item->helpText = $langs->transnoentities('PDPCONNECTFR_PMT_HELP');
+$item->cssClass = 'minwidth500';
+
+// Setup conf for PMD - Mention regarding late payment penalties
+$item = $formSetup->newItem('PDPCONNECTFR_PMD');
+$item->helpText = $langs->transnoentities('PDPCONNECTFR_PMD_HELP');
+$item->cssClass = 'minwidth500';
+
+// Setup conf for AAB - Mention regarding absence of discount for early payment
+$item = $formSetup->newItem('PDPCONNECTFR_AAB');
+$item->helpText = $langs->transnoentities('PDPCONNECTFR_AAB_HELP');
+$item->cssClass = 'minwidth500';
+
 // Setup conf for auto generation of objects
 $formSetup->newItem('PDPCONNECTFR_AUTO_GENERATION')->setAsTitle();
 

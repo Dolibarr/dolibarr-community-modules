@@ -163,96 +163,6 @@ class FacturXProtocol extends AbstractProtocol
             $promise_code = $customerOrderReferenceList[0];
         }
 
-        // // Chorus errors checks
-        // if ($promise_code == '') {
-        //     $chorusErrors[] = "N° d'engagement absent";
-        // } elseif (\strlen($promise_code) > 50 && $promise_code == $object->ref_customer) {
-        //     $chorusErrors[] = "Ref client trop longue pour chorus (max 50 caractères)";
-        // }
-        // if ($object->array_options['options_d4d_contract_number'] == '') {
-        //     $chorusErrors[] = "N° de marché absent";
-        // } else {
-        //     $chorus = true;
-        // }
-        // if ($object->array_options['options_d4d_service_code'] == '') {
-        //     $chorusErrors[] = "Code service absent";
-        // } else {
-        //     $chorus = true;
-        // }
-        // if (isset($object->thirdparty->idprof2) && trim($object->thirdparty->idprof2) == '') {
-        //     $chorusErrors[] = "Numéro SIRET du client manquant";
-        // }
-
-        // // Display Chorus warnings/errors
-        // if ($chorus) {
-        //     if (count($chorusErrors) > 0) {
-        //         setEventMessages("Alerte conformité Chorus:", $chorusErrors, 'warnings');
-        //         dol_syslog(\get_class($this) . '::executeHooks error chorus : ' . \json_encode($chorusErrors), \LOG_ERR);
-        //     } else {
-        //         dol_syslog(\get_class($this) . '::executeHooks chorus enabled, no errors detected');
-        //     }
-        // } else {
-        //     dol_syslog(\get_class($this) . '::executeHooks no chorus data'); // TODO: maybe disable by default
-        // }
-
-
-        // Base Data Validation (FacturX mandatory fields) ---
-        // TODO : use validateMyCompanyConfiguration() and validatethirdpartyConfiguration()
-        // $baseErrors = [];
-
-        // // Seller (mysoc) checks
-        // if (empty($mysoc->tva_intra)) {
-        //     $baseErrors[] = $langs->trans("FxCheckErrorVATnumber");
-        // }
-        // if (empty($mysoc->address)) {
-        //     $baseErrors[] = $langs->trans("FxCheckErrorAddress");
-        // }
-        // if (empty($mysoc->zip)) {
-        //     $baseErrors[] = $langs->trans("FxCheckErrorZIP");
-        // }
-        // if (empty($mysoc->town)) {
-        //     $baseErrors[] = $langs->trans("FxCheckErrorTown");
-        // }
-        // if (empty($mysoc->country_code)) {
-        //     $baseErrors[] = $langs->trans("FxCheckErrorCountry");
-        // }
-
-        // // Buyer (thirdparty) checks
-        // if (empty($object->thirdparty->name)) {
-        //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerName");
-        // }
-        // if (empty($object->thirdparty->idprof1)) {
-        //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerIDPROF1");
-        // }
-        // // if (empty($object->thirdparty->idprof2)) {
-        // //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerIDPROF2");
-        // // }
-        // if (empty($object->thirdparty->address)) {
-        //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerAddress");
-        // }
-        // if (empty($object->thirdparty->zip)) {
-        //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerZIP");
-        // }
-        // if (empty($object->thirdparty->town)) {
-        //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerTown");
-        // }
-        // if (empty($object->thirdparty->country_code)) {
-        //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerCountry");
-        // }
-        // if ($object->thirdparty->tva_assuj &&  empty($object->thirdparty->tva_intra)) {
-        //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerVAT");
-        // }
-        // if (!$buyerEmail) {
-        //     $baseErrors[] = $langs->trans("FxCheckErrorCustomerEmail");
-        // }
-
-        // // Display base data warnings
-        // if (count($baseErrors) > 0) {
-        //     dol_syslog(get_class($this) . '::executeHooks baseErrors count > 0');
-        //     setEventMessages($langs->trans("FxCheckError"), $baseErrors, 'warnings');
-        //     dol_syslog(get_class($this) . '::executeHooks baseErrors count > 0, error = ' . json_encode($baseErrors));
-        // }
-
         // Initialize ZugferdDocumentBuilder (FacturX XML) -----------------------------------------------
         dol_syslog(\get_class($this) . '::executeHooks create new XML document based on PROFILE_EN16931 (CIUS-FR)');
         $profile = getDolGlobalString('PDPCONNECTFR_PROFILE');
@@ -273,7 +183,7 @@ class FacturXProtocol extends AbstractProtocol
         	throw new Exception('BADINVOICETYPE: The type for invoice id '.$object->id.' is not yet supported.');
         }
 
-        $idprof = $this->_remove_spaces($this->thirdpartyidprof($object) ?? '');
+        $idprof = $pdpconnectfr->remove_spaces($this->thirdpartyidprof($object) ?? '');
         $myidprof = $this->idprof($mysoc);
 
         // Add test
@@ -295,6 +205,9 @@ class FacturXProtocol extends AbstractProtocol
                 $outputlang
             )
             ->addDocumentNote($note_pub)
+            ->addDocumentNote(getDolGlobalString('PDPCONNECTFR_PMT', 'NA'), null, "PMT")
+            ->addDocumentNote(getDolGlobalString('PDPCONNECTFR_PMD', 'NA'), null, "PMD")
+            ->addDocumentNote(getDolGlobalString('PDPCONNECTFR_AAB', 'NA'), null, "AAB")
 
             // ---------------- Seller ----------------
             ->setDocumentSeller($mysoc->name, $myidprof)
@@ -326,7 +239,7 @@ class FacturXProtocol extends AbstractProtocol
                 $object->thirdparty->town         ?? 'TOWN',
                 $object->thirdparty->country_code ?? 'COUNTRY'
             )
-            ->addDocumentBuyerTaxRegistration("VA", $object->thirdparty->tva_intra ?? '') //
+            ->addDocumentBuyerTaxRegistration("VA", $object->thirdparty->tva_intra ?? '')
             ->setDocumentBuyerLegalOrganisation(
                 $idprof,
                 $this->IEC_6523_code($object->thirdparty->country_code),
@@ -334,7 +247,7 @@ class FacturXProtocol extends AbstractProtocol
             )
             ->setDocumentBuyerCommunication(
                 '0225',
-                $this->_remove_spaces($this->thirdpartyidprof($object) ?? '') // 0002 => SIREN, EM => Email
+                $pdpconnectfr->remove_spaces($pdpconnectfr->getBuyerCommunicationURI($object->thirdparty))
             );
 
 
@@ -391,7 +304,7 @@ class FacturXProtocol extends AbstractProtocol
             $email = $mysoc->email;
         }
         $facturxpdf->setDocumentSellerContact($name, "", $office_phone, $office_fax, $email);
-        $facturxpdf->setDocumentSellerCommunication("0225", $this->_remove_spaces($this->idprof($mysoc)));
+        $facturxpdf->setDocumentSellerCommunication("0225", $pdpconnectfr->remove_spaces($pdpconnectfr->getSellerCommunicationURI()));
 
 
         // Set Buyer Reference (Service Code for Chorus) and Contract References
@@ -411,13 +324,12 @@ class FacturXProtocol extends AbstractProtocol
         }
 
         // Set Business Process ID according to invoice type
-        $facturxpdf->setDocumentBusinessProcess($this->getBillingProcessID($object->type));
+        $facturxpdf->setDocumentBusinessProcess($this->getBillingProcessID($object));
 
 
         // --- 11. Process Invoice Lines ---
         // is there multi VAT informatins ? in case we need to collect all data to be able to join it at the end
         $tabTVA = [];
-        // in case of prepaid invoice we have to forget dolibarr point of view with negative line
         $grand_total_ht = $grand_total_tva = $grand_total_ttc = 0;
 
         // Determine customer language for line labels
@@ -447,7 +359,6 @@ class FacturXProtocol extends AbstractProtocol
                 continue;
             }
 
-            // Handle deposit/prepayment lines (treated as a global allowance/charge)
             if ($line->desc == '(DEPOSIT)') {
                 $origFactRef = "";
                 $origFactDate = new DateTime();
@@ -468,12 +379,28 @@ class FacturXProtocol extends AbstractProtocol
                     }
                 }
                 $prepaidAmount += abs($line->total_ttc);
-                $facturxpdf->addDocumentAllowanceCharge(\abs($line->total_ttc), false, "S", "VAT", $line->tva_tx, null, null, null, null, null, "Prepayment invoice (386)", $origFactRef);
+                // $facturxpdf->addDocumentAllowanceCharge(
+                //     abs($line->total_ttc),
+                //     false,
+                //     "S",
+                //     "VAT",
+                //     $line->tva_tx,
+                //     null,
+                //     null,
+                //     null,
+                //     null,
+                //     null,
+                //     null,
+                //     "Prepayment invoice (386)" . $origFactRef
+                // );
 
                 dol_syslog("Set setDocumentBuyerOrderReferencedDocument : " . json_encode($origFactRef) . " :: " . json_encode($origFactDate), LOG_DEBUG);
 
-                $facturxpdf->setDocumentInvoiceReferencedDocument($origFactRef, $origFactDate->format('Y-m-d'));
-                continue;
+                $facturxpdf->setDocumentInvoiceReferencedDocument($origFactRef, ZugferdInvoiceType::PREPAYMENTINVOICE, $origFactDate);
+
+                $line->qty = -$line->qty;
+                $line->subprice = abs($line->subprice);
+                // continue;
             }
 
             // Get product labels (multilangs support)
@@ -619,10 +546,10 @@ class FacturXProtocol extends AbstractProtocol
                 null,
                 null,
                 null,
-                $this->_remove_spaces($account->iban),
+                $pdpconnectfr->remove_spaces($account->iban),
                 $account_proprio,
-                $this->_remove_spaces($account->number),
-                $this->_remove_spaces($account->bic)
+                $pdpconnectfr->remove_spaces($account->number),
+                $pdpconnectfr->remove_spaces($account->bic)
             );
 
         // is there a billing period for that invoice ?
@@ -1029,6 +956,8 @@ class FacturXProtocol extends AbstractProtocol
     public function createSupplierInvoiceFromFacturX($file, $ReadableViewFile = null, $flowId = '')
     {
         global $conf, $db, $user;
+
+        $pdpconnectfr = new PdpConnectFr($db);
         $return_messages = array();
 
         // Save uploaded file to temporary directory
@@ -1172,7 +1101,6 @@ class FacturXProtocol extends AbstractProtocol
         if ($resql) {
             if ($db->num_rows($resql) > 0) {
                 $supplierInvoiceId = $db->fetch_object($resql)->id;
-                $pdpconnectfr = new PdpConnectFr($db);
                 $pdpconnectfr->cleanUpTemporaryFiles(); // Clean up temp files to remove retrieved Factur-X file since invoice already exists
                 return ['res' => $supplierInvoiceId, 'message' => 'Supplier Invoice with reference ' . $documentno . ' already exists' ];
             }
@@ -1338,7 +1266,6 @@ class FacturXProtocol extends AbstractProtocol
 			$db->query($sql);
 
             // Add entry in pdpconnectfr_extlinks table to mark that this supplier invoice is imported from PDP
-            $pdpconnectfr = new PdpConnectFr($db);
             $pdpconnectfr->insertOrUpdateExtLink($result, $supplierInvoice->element, $flowId);
 
             dol_syslog(__METHOD__ . ' New supplier invoice created (ID: ' . $result . ')');
@@ -1452,7 +1379,7 @@ class FacturXProtocol extends AbstractProtocol
      * @return  string|null code of invoice type
      */
     private function _getTypeOfInvoice($object)
-    { // TODO: move this function to class utils
+    {
         $map = [
             CommonInvoice::TYPE_STANDARD        => ZugferdInvoiceType::INVOICE,
             CommonInvoice::TYPE_REPLACEMENT     => ZugferdInvoiceType::CORRECTION,
@@ -1471,6 +1398,10 @@ class FacturXProtocol extends AbstractProtocol
      */
     private function idprof($thirdpart)
     { // TODO: move this function to class utils
+        global $db;
+
+        $pdpconnectfr = new PdpConnectFr($db);
+
         $retour = "";
         switch ($thirdpart->country_code) {
             case 'BE':
@@ -1493,20 +1424,7 @@ class FacturXProtocol extends AbstractProtocol
                 $retour = $thirdpart->idprof1 ? $thirdpart->idprof1 : $thirdpart->idprof2;
         }
 
-        return $this->_remove_spaces($retour);
-    }
-
-    /**
-     * remove spaces from string for example french people add spaces into long numbers like
-     * SIRET: 844 431 239 00020
-     *
-     * @param   string  $str  string to cleanup
-     *
-     * @return  string  cleaned up string
-     */
-    private function _remove_spaces($str)
-    { // TODO: move this function to class utils
-        return preg_replace('/\\s+/', '', $str);
+        return $pdpconnectfr->remove_spaces($retour);
     }
 
     /**
@@ -1668,46 +1586,94 @@ class FacturXProtocol extends AbstractProtocol
     }
 
     /**
-     * Map Dolibarr invoice type to Factur-X BillingProcessID
+     * Determine Factur-X BillingProcessID (Cadre / Mode de facturation)
+     * according to French e-invoicing
      *
-     * @param int $type Dolibarr invoice type
-     * @return string Factur-X BillingProcessID
+     * BillingProcessID allowed values:
+     *
+     * STANDARD INVOICE (initial submission)
+     * --------------------------------------
+     * B1 : Products invoice
+     * S1 : Services invoice
+     * M1 : Mixed invoice (products + services non-accessory)
+     *
+     * INVOICE (already paid)
+     * -------------------------------------------
+     * B2 : Products invoice
+     * S2 : Services invoice
+     * M2 : Mixed invoice (products + services non-accessory)
+     *
+     * FINAL INVOICE AFTER DEPOSIT
+     * ----------------------------
+     * B4 : Final products invoice (after deposit)
+     * S4 : Final services invoice (after deposit)
+     * M4 : Final mixed invoice (after deposit)
+     *
+     * SPECIFIC CASES
+     * --------------
+     * S5 : Services invoice issued by subcontractor
+     * S6 : Services invoice issued by co-contractor
+     *
+     * E-REPORTING CASE (VAT already collected)
+     * -----------------------------------------
+     * B7 : Products invoice already reported (VAT already collected)
+     * S7 : Services invoice already reported (VAT already collected)
+     *
+     * Notes:
+     * - Prefix meaning:
+     *     B = Products
+     *     S = Services
+     *     M = Mixed (products + services non-accessory)
+     *
+     * @param  Facture $invoice Dolibarr invoice object
+     * @return string  BillingProcessID
      */
-    public function getBillingProcessID($type)
+    public function getBillingProcessID($invoice)
     {
+        $hasProduct  = false;
+        $hasService  = false;
 
-        /**
-         * Other codes provided by EN16931 standard but not used in Dolibarr:
-         *
-         *  - S1: Simplified invoice (e.g., POS receipt) - in Dolibarr considered as standard invoice
-         *  - S2: Simplified prepayment invoice
-         *  - M2: Prepayment credit note
-         *  - S4: Simplified partial invoice
-         *  - M4: Partial credit note
-         *  - S5: Simplified specific invoice (special tax case)
-         *  - S6: Simplified credit note (e.g., cancelled receipt / POS return)
-         *  - B7: Final settlement invoice
-         *  - S7: Simplified final settlement invoice
-         */
+        // Check invoice lines to determine if invoice contains products, services or both
+        if (!empty($invoice->lines)) {
+            foreach ($invoice->lines as $line) {
+                if ((int) $line->product_type === 0) {
+                    $hasProduct = true;
+                }
 
-        switch ($type) {
+                if ((int) $line->product_type === 1) {
+                    $hasService = true;
+                }
+            }
+        }
 
-            case Facture::TYPE_STANDARD:
-                return 'B1'; // Standard invoice
+        // Determine prefix B / S / M
+        if ($hasProduct && $hasService) {
+            $prefix = 'M';
+        } elseif ($hasService && !$hasProduct) {
+            $prefix = 'S';
+        } else {
+            // Default to products
+            $prefix = 'B';
+        }
 
-            case Facture::TYPE_REPLACEMENT:
-                return 'M1'; // Replacement invoice (corrective)
-
-            case Facture::TYPE_CREDIT_NOTE:
-                return 'M1'; // Credit note
-
-            case Facture::TYPE_DEPOSIT:
-                return 'B2'; // Prepayment invoice
-
-            case Facture::TYPE_SITUATION:
-                return 'B4'; // Progress/partial invoice
-            default:
-                return 'B1';
+        // Determine suffix 1 (initial invoice) or 2 (already paid invoice) according to invoice status and payment information and if the invoice contain a line a deposit (prepayment) so final invoice after deposit then suffix is 4
+        if ($invoice->status == Facture::STATUS_CLOSED && empty($invoice->close_code)) {
+            return $prefix . '2';
+        } else {
+            // Check if the invoice contains a deposit (prepayment) line
+            $hasDepositLine = false;
+            if (!empty($invoice->lines)) {
+                foreach ($invoice->lines as $line) {
+                    if ($line->desc == '(DEPOSIT)') {
+                        $hasDepositLine = true;
+                        break;
+                    }
+                }
+            }
+            if ($hasDepositLine) {
+                return $prefix . '4';
+            }
+            return $prefix . '1';
         }
     }
 
@@ -1724,8 +1690,8 @@ class FacturXProtocol extends AbstractProtocol
          * Codes UNTDID 1001 utilisés par EN16931 pour le type de facture (InvoiceTypeCode BT-3).
          * 325 – Facture pro-forma
          * 211 – Demande de paiement intermédiaire (une facture de situation?)
-         * 210 – Facture d’acompte
-         * 380 – Note de crédit
+         * 386 – Facture d’acompte
+         * 381 – Note de crédit
          * 384 – Facture corrective
          * 380 – Facture standard
          *
@@ -1788,6 +1754,7 @@ class FacturXProtocol extends AbstractProtocol
         require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
 
         $thirdparty = new Societe($db);
+        $pdpconnectfr = new PdpConnectFr($db);
         $thirdpartyId = -1;
 
         // Step 1: Try to find thirdparty by global IDs
@@ -1816,7 +1783,7 @@ class FacturXProtocol extends AbstractProtocol
         if ($thirdpartyId < 0) {
             // Try to find by VAT number if provided
             if (!empty($sellerInfo['sellerTaxRegistations']['VA'])) {
-                $sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "societe WHERE REPLACE(tva_intra, ' ', '') = '" . $db->escape($this->_remove_spaces($sellerInfo['sellerTaxRegistations']['VA'])) . "'";
+                $sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "societe WHERE REPLACE(tva_intra, ' ', '') = '" . $db->escape($pdpconnectfr->remove_spaces($sellerInfo['sellerTaxRegistations']['VA'])) . "'";
                 $resql = $db->query($sql);
                 if ($resql) {
                     if ($db->num_rows($resql) > 1) {
@@ -1902,13 +1869,13 @@ class FacturXProtocol extends AbstractProtocol
                         if (!empty($globalId)) {
                             $idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme);
                             if (!empty($idprofField)) {
-                                $thirdparty->$idprofField = $this->_remove_spaces($globalId);
+                                $thirdparty->$idprofField = $pdpconnectfr->remove_spaces($globalId);
                             }
                         }
                     }
                 }
                 if (!empty($sellerInfo['sellerTaxRegistations']['VA'])) {
-                    $thirdparty->tva_intra = $this->_remove_spaces($sellerInfo['sellerTaxRegistations']['VA']);
+                    $thirdparty->tva_intra = $pdpconnectfr->remove_spaces($sellerInfo['sellerTaxRegistations']['VA']);
                     $thirdparty->tva_assuj = 1;
                 }
             } elseif ($priority === 'dolibarr') { // Fill only empty fields from pdp data
@@ -1950,13 +1917,13 @@ class FacturXProtocol extends AbstractProtocol
                         if (!empty($globalId)) {
                             $idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme);
                             if (!empty($idprofField) && empty($thirdparty->$idprofField)) {
-                                $thirdparty->$idprofField = $this->_remove_spaces($globalId);
+                                $thirdparty->$idprofField = $pdpconnectfr->remove_spaces($globalId);
                             }
                         }
                     }
                 }
                 if (!empty($sellerInfo['sellerTaxRegistations']['VA']) && empty($thirdparty->tva_intra)) {
-                    $thirdparty->tva_intra = $this->_remove_spaces($sellerInfo['sellerTaxRegistations']['VA']);
+                    $thirdparty->tva_intra = $pdpconnectfr->remove_spaces($sellerInfo['sellerTaxRegistations']['VA']);
                     $thirdparty->tva_assuj = 1;
                 }
             }
@@ -1997,14 +1964,14 @@ class FacturXProtocol extends AbstractProtocol
                     if (!empty($globalId)) {
                         $idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme);
                         if (!empty($idprofField)) {
-                            $thirdparty->$idprofField = $this->_remove_spaces($globalId);
+                            $thirdparty->$idprofField = $pdpconnectfr->remove_spaces($globalId);
                         }
                     }
                 }
             }
 
             if (!empty($sellerInfo['sellerTaxRegistations']['VA'])) {
-                $thirdparty->tva_intra = $this->_remove_spaces($sellerInfo['sellerTaxRegistations']['VA']);
+                $thirdparty->tva_intra = $pdpconnectfr->remove_spaces($sellerInfo['sellerTaxRegistations']['VA']);
                 $thirdparty->tva_assuj = 1;
             }
 
@@ -2017,7 +1984,6 @@ class FacturXProtocol extends AbstractProtocol
                 $thirdpartyId = $thirdparty->id;
 
                 // Add entry in pdpconnectfr_extlinks table to mark that this thirdparty is imported from PDP
-                $pdpconnectfr = new PdpConnectFr($db);
                 $pdpconnectfr->insertOrUpdateExtLink($thirdpartyId, $thirdparty->element, $flowId);
 
                 dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromFacturXSeller Created new thirdparty: ' . $thirdpartyId);
@@ -2131,6 +2097,8 @@ class FacturXProtocol extends AbstractProtocol
         */
         global $db, $user, $langs;
 
+        $pdpconnectfr = new PdpConnectFr($db);
+
         // 1. Search in product supplier prices table using prodsellerid
         $sql = "SELECT p.rowid ";
         $sql .= " FROM " . MAIN_DB_PREFIX . "product as p ";
@@ -2215,7 +2183,6 @@ class FacturXProtocol extends AbstractProtocol
                 $db->query($sql);
 
                 // Add entry in pdpconnectfr_extlinks table to mark product as created from e-invoice
-                $pdpconnectfr = new PdpConnectFr($db);
                 $pdpconnectfr->insertOrUpdateExtLink($productId, $product->element, $flowId);
 
                 dol_syslog(__METHOD__ . ' New product created (ID: ' . $productId . ')');

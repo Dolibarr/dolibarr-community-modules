@@ -385,6 +385,12 @@ if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_P
 		}
 	}
 
+	// ROUTING ID
+	$item = $formSetup->newItem($prefix . 'ROUTING_ID');
+	$item->helpText = $langs->transnoentities($prefix . 'ROUTING_ID_HELP');
+	$item->fieldParams['isMandatory'] = 1;
+	$item->cssClass = 'minwidth500';
+
 	// To remove
 	/*if ($tokenData['token'] && getDolGlobalString('PDPCONNECTFR_PROTOCOL') && getDolGlobalString('PDPCONNECTFR_PROTOCOL') === 'FACTURX' && getDolGlobalString('PDPCONNECTFR_PROFILE') === 'EN16931') {
 		$item->fieldOverride .= "
