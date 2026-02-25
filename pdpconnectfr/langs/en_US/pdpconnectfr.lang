@@ -79,6 +79,7 @@ FxCheckErrorVATnumber = Your VAT number is empty
 FxCheckErrorZIP = Your company's zip code is missing
 FxCheckErrorIDPROF1=Your company’s professional ID (SIREN) is missing.
 FxCheckErrorCustomerRoutingID=The customer does not have an E-invoicing address
+FxCheckErrorRoutingID=Your company’s does not have an E-invoicing address
 sendToPDP=Transmit
 sendToPDPHelp=Submit the E-invoice to the network platform
 checkCustomerData= Check Customer
