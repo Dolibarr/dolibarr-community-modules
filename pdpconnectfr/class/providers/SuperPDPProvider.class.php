@@ -88,6 +88,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 		$tokenData = $this->getTokenData();
 
+		$langs->load("oauth");
 
 		$item = $formSetup->newItem('PDPCONNECTFR_LINK_CREATE_ACCOUNT');
 		$url = $providersConfig[getDolGlobalString('PDPCONNECTFR_PDP')][$prefixenv.'_account_admin_url'];
@@ -114,10 +115,12 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 		// Username
 		$item = $formSetup->newItem($prefix . 'CLIENT_ID');
+		$item->nameText = $langs->trans('OAUTH_ID');
 		$item->cssClass = 'minwidth500';
 
 		// Password
 		$item = $formSetup->newItem($prefix . 'CLIENT_SECRET')->setAsGenericPassword();
+		$item->nameText = $langs->trans('OAUTH_SECRET');
 		$item->cssClass = 'minwidth500';
 
 		// API_KEY
@@ -127,6 +130,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		// Token
 		if (getDolGlobalString($prefix . 'CLIENT_ID') && getDolGlobalString($prefix . 'CLIENT_SECRET')) {
 			$item = $formSetup->newItem($prefix . 'TOKEN');
+			$item->nameText = $langs->trans('Token');
 			$item->cssClass = 'maxwidth500 ';
 			$item->fieldOverride = "";
 			if (!empty($tokenData['token'])) {
@@ -140,10 +144,10 @@ class SuperPDPProvider extends AbstractPDPProvider
 			}
 		}
 
-		/*
 		if (!empty($tokenData['token'])) {
 			// Actions
 			$item = $formSetup->newItem($prefix . 'ACTIONS');
+			$item->nameText = "&nbsp;";
 
 			$item->fieldOverride .= '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=call".$prefix."HEALTHCHECK&token=".newToken().'">' . $langs->trans('testConnection') . ' (Healthcheck)<i class="fa fa-check paddingleft"></i></a><br>';
 			$item->cssClass = 'minwidth500';
@@ -152,7 +156,6 @@ class SuperPDPProvider extends AbstractPDPProvider
 				$item->fieldOverride .= '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=make".$prefix."sampleinvoice&token=".newToken().'">' . $langs->trans('generateSendSampleInvoice') . '<i class="fa fa-file paddingleft"></i></a><br>';
 			}
 		}
-		*/
 
 		// To remove
 		/*if ($tokenData['token'] && getDolGlobalString('PDPCONNECTFR_PROTOCOL') && getDolGlobalString('PDPCONNECTFR_PROTOCOL') === 'FACTURX' && getDolGlobalString('PDPCONNECTFR_PROFILE') === 'EN16931') {
@@ -185,9 +188,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 	            $error[] = $langs->trans('ErrorFieldRequired', $langs->transnoentities('OAUTH_SECRET'));
 	        }
         } elseif ($mode == 1) {
-	        if (empty($this->config['api_key'])) {
-	            $error[] = $langs->trans('ApiKeyIsRequired');
-	        }
+        	// TODO Check token exists
         }
 
         if (!empty($error)) {
@@ -252,11 +253,11 @@ class SuperPDPProvider extends AbstractPDPProvider
     {
         global $langs;
 
-        $response = $this->callApi("companies/me", "GET", false, [], 'Healthcheck');
+        $response = $this->callApi("companies/me", "GET", false, [], 'healthcheck');
 
         if ($response['status_code'] === 200) {
             $returnarray['status_code'] = true;
-            $returnarray['message'] = $langs->trans('APApiReachable', getDolGlobalString('PDPCONNECTFR_PROTOCOL'));
+            $returnarray['message'] = $langs->trans('APApiReachable', getDolGlobalString('PDPCONNECTFR_PDP'));
         } else {
             $returnarray['status_code'] = false;
         }

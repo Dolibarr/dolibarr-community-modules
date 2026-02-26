@@ -142,6 +142,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		if (!empty($tokenData['token'])) {
 			// Actions
 			$item = $formSetup->newItem($prefix . 'ACTIONS');
+			$item->nameText = "&nbsp;";
 
 			$item->fieldOverride .= '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=call".$prefix."HEALTHCHECK&token=".newToken().'">' . $langs->trans('testConnection') . ' (Healthcheck)<i class="fa fa-check paddingleft"></i></a><br>';
 			$item->cssClass = 'minwidth500';
@@ -241,11 +242,11 @@ class EsalinkPDPProvider extends AbstractPDPProvider
     {
         global $langs;
 
-        $response = $this->callApi("healthcheck", "GET", false, [], 'Healthcheck');
+        $response = $this->callApi("healthcheck", "GET", false, [], 'healthcheck');
 
         if ($response['status_code'] === 200) {
             $returnarray['status_code'] = true;
-            $returnarray['message'] = $langs->trans('APApiReachable', getDolGlobalString('PDPCONNECTFR_PROTOCOL'));
+            $returnarray['message'] = $langs->trans('APApiReachable', getDolGlobalString('PDPCONNECTFR_PDP'));
         } else {
             $returnarray['status_code'] = false;
         }
