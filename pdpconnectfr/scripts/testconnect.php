@@ -76,16 +76,31 @@ include_once __DIR__.'/../class/providers/PDPProviderManager.class.php';
 $PDPManager = new PDPProviderManager($db);
 $provider = $PDPManager->getProvider(getDolGlobalString('PDPCONNECTFR_PDP'));
 
+
+// Emulate the getAccessToken
+
 $providerconfig  = $provider->getConf();
-$param = json_encode(array(
-	'username' => $providerconfig['username'],
-    'password' => $providerconfig['password']
-));
+$param = array(
+	'grant_type' => "client_credentials",
+	'client_id' => $providerconfig['client_id'],
+    'client_secret' => $providerconfig['client_secret']
+);
+
+$paramstring = http_build_query($param);
 
 $user = new User($db);
 $user->id = 0;
 
-$response = $provider->callApi("token", "POSTALREADYFORMATED", $param, [], 'get_access_token');
+print json_encode($providerconfig);
+
+$extraHeaders = array(
+    'Content-Type' => 'application/x-www-form-urlencoded'
+);
+
+
+$response = $provider->callApi("oauth2/token", "POST", $paramstring, $extraHeaders, 'get_access_token');
+
+var_dump($response);
 
 $status_code = $response['status_code'];
 $body = $response['response'];

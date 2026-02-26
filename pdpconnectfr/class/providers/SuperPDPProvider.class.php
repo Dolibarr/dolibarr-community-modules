@@ -51,12 +51,12 @@ class SuperPDPProvider extends AbstractPDPProvider
 
         $this->config = array(
             'provider_url' => 'https://api.superpdp.tech/oauth2',
-            'prod_api_url' => 'https://api.superpdp.tech/', // TODO: Replace the URL once known
-            'test_api_url' => 'https://api.superpdp.tech/',
+            'prod_api_url' => 'https://api.superpdp.tech/v1.beta', // TODO: Replace the URL once known
+            'test_api_url' => 'https://api.superpdp.tech/v1.beta',
             'username' => getDolGlobalString('PDPCONNECTFR_SUPERPDP_USERNAME', ''),
             'password' => getDolGlobalString('PDPCONNECTFR_SUPERPDP_PASSWORD', ''),
-            'api_key' => getDolGlobalString('PDPCONNECTFR_SUPERPDP_API_KEY', ''),
-            'api_secret' => getDolGlobalString('PDPCONNECTFR_SUPERPDP_API_SECRET', ''),
+            'client_id' => getDolGlobalString('PDPCONNECTFR_SUPERPDP_CLIENT_ID', ''),
+            'client_secret' => getDolGlobalString('PDPCONNECTFR_SUPERPDP_CLIENT_SECRET', ''),
             'dol_prefix' => 'PDPCONNECTFR_SUPERPDP',
             'live' => getDolGlobalInt('PDPCONNECTFR_LIVE', 0)
         );
@@ -123,7 +123,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		//$item->cssClass = 'minwidth500';
 
 		// Token
-		if (getDolGlobalString($prefix . 'API_KEY')) {
+		if (getDolGlobalString($prefix . 'CLIENT_ID') && getDolGlobalString($prefix . 'CLIENT_SECRET')) {
 			$item = $formSetup->newItem($prefix . 'TOKEN');
 			$item->cssClass = 'maxwidth500 ';
 			$item->fieldOverride = "";
@@ -138,6 +138,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 			}
 		}
 
+		/*
 		if (!empty($tokenData['token'])) {
 			// Actions
 			$item = $formSetup->newItem($prefix . 'ACTIONS');
@@ -149,6 +150,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				$item->fieldOverride .= '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=make".$prefix."sampleinvoice&token=".newToken().'">' . $langs->trans('generateSendSampleInvoice') . '<i class="fa fa-file paddingleft"></i></a><br>';
 			}
 		}
+		*/
 
 		// To remove
 		/*if ($tokenData['token'] && getDolGlobalString('PDPCONNECTFR_PROTOCOL') && getDolGlobalString('PDPCONNECTFR_PROTOCOL') === 'FACTURX' && getDolGlobalString('PDPCONNECTFR_PROFILE') === 'EN16931') {
@@ -172,11 +174,13 @@ class SuperPDPProvider extends AbstractPDPProvider
 
         $error = array();
         if ($mode == 0) {
-	        if (empty($this->config['username'])) {
-	            $error[] = $langs->trans('UsernameIsRequired');
+	        if (empty($this->config['client_id'])) {
+	        	$langs->loadLangs(array("main", "oauth"));
+	            $error[] = $langs->trans('ErrorFieldRequired', $langs->transnoentities('OAUTH_ID'));
 	        }
-	        if (empty($this->config['password'])) {
-	            $error[] = $langs->trans('PasswordIsRequired');
+	        if (empty($this->config['client_secret'])) {
+	        	$langs->loadLangs(array("main", "oauth"));
+	            $error[] = $langs->trans('ErrorFieldRequired', $langs->transnoentities('OAUTH_SECRET'));
 	        }
         } elseif ($mode == 1) {
 	        if (empty($this->config['api_key'])) {
@@ -199,12 +203,20 @@ class SuperPDPProvider extends AbstractPDPProvider
     public function getAccessToken() {
         global $langs;
 
-        $param = json_encode(array(
-            'username' => $this->config['username'],
-            'password' => $this->config['password']
-        ));
+        $providerconfig = $this->getConf();
 
-        $response = $this->callApi("token", "POSTALREADYFORMATED", $param, [], 'get_access_token');
+        $param = array(
+        	'grant_type' => "client_credentials",
+			'client_id' => $providerconfig['client_id'],
+    		'client_secret' => $providerconfig['client_secret']
+        );
+        $paramstring = http_build_query($param);
+
+        $extraHeaders = array(
+    		'Content-Type' => 'application/x-www-form-urlencoded'
+		);
+
+        $response = $this->callApi("oauth2/token", "POST", $paramstring, $extraHeaders, 'get_access_token');
 
         $status_code = $response['status_code'];
 		$body = $response['response'];
@@ -238,7 +250,7 @@ class SuperPDPProvider extends AbstractPDPProvider
     {
         global $langs;
 
-        $response = $this->callApi("healthcheck", "GET", false, [], 'Healthcheck');
+        $response = $this->callApi("companies/me", "GET", false, [], 'Healthcheck');
 
         if ($response['status_code'] === 200) {
             $returnarray['status_code'] = true;
@@ -484,7 +496,7 @@ class SuperPDPProvider extends AbstractPDPProvider
     /**
 	 * Call the provider API.
 	 *
-	 * @param string 						$resource 	    Resource relative URL ('Flows', 'healthcheck' or others)
+	 * @param string 						$resource 	    Resource relative URL ('token', 'healthcheck', 'Flows', or others)
      * @param string                        $method         HTTP method ('GET', 'POST', etc.)
 	 * @param array<string, mixed>|false 	$params 	    Options for the request
      * @param array<string, string>         $extraHeaders   Optional additional headers
@@ -505,10 +517,6 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 		$url = $this->getApiUrl() . $resource;
 
-        $httpheader = array(
-            'hubtimize-api-key: '. $this->config['api_key']
-        );
-
         if (!isset($extraHeaders['Content-Type'])) {
             $httpheader[] = 'Content-Type: application/json';
             $httpheader[] = 'Accept: application/json';
@@ -519,7 +527,7 @@ class SuperPDPProvider extends AbstractPDPProvider
         }
 
         // check or get access token
-        if ($resource != 'token') {
+        if ($resource != 'oauth2/token') {
             if ($this->tokenData['token']) {
                 $tokenexpiresat = strtotime($this->tokenData['token_expires_at'] ?? 0);
                 if ($tokenexpiresat < dol_now()) {
@@ -531,7 +539,7 @@ class SuperPDPProvider extends AbstractPDPProvider
         }
 
         // Add Authorization header if we have a token
-        if ($this->tokenData['token'] && $resource != 'token') {
+        if ($this->tokenData['token'] && $resource != 'token' && $resource != 'oauth2/token') {
             $httpheader[] = 'Authorization: Bearer ' . $this->tokenData['token'];
         }
 

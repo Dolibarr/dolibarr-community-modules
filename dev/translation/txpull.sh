@@ -29,7 +29,7 @@ fi
 
 if [ "x$1" = "xall" ]
 then
-	for dir in `find htdocs/*/langs/* -type d | cut -d '/' -f 4 | sort -u`
+	for dir in `find */langs/* -type d | cut -d '/' -f 3 | sort -u`
 	do
 	    fic=$dir
 	    if [ $fic != "en_US" ]

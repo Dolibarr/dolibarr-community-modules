@@ -59,8 +59,8 @@ class PDPProviderManager
             	'provider_name' => 'SuperPDP',
                 'description' => 'SuperPDP Integration',
                 'is_enabled' => getDolGlobalString('PDPCONNECTFR_TEST_SUPERPDP'),
-            	'prod_account_admin_url' => 'https://superpdp.tech',
-            	'test_account_admin_url' => 'https://superpdp.tech',
+            	'prod_account_admin_url' => 'https://www.superpdp.tech/app/users/create',
+            	'test_account_admin_url' => 'https://www.superpdp.tech/app/users/create',
             ),
         	'TESTPDP' => array(
         		'class' => 'TestPDPProvider',

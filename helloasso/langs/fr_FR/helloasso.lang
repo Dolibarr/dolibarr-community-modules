@@ -1,4 +1,4 @@
-# Copyright (C) 2023 Alice Adminson 
+# Copyright (C) 2023 Alice Adminson
 # Copyright (C) 2025 	   Pablo Lagrave           <contact@devlandes.com>
 #
 # This program is free software: you can redistribute it and/or modify
@@ -21,110 +21,108 @@
 # Module label 'ModuleHelloAssoName'
 ModuleHelloAssoName = HelloAsso
 # Module description 'ModuleHelloAssoDesc'
-ModuleHelloAssoDesc = Proposez à vos clients une page de paiement en ligne HelloAsso (cartes de crédit/débit). Cela peut être utilisé pour permettre à vos clients d'effectuer des paiements ponctuels ou liés à un objet Dolibarr spécifique (facture, commande etc...)
+ModuleHelloAssoDesc = Proposez à vos clients une page de paiement en ligne HelloAsso (cartes bancaires). Celle-ci leur permettra d'effectuer des paiements ponctuels ou liés à un objet Dolibarr spécifique (facture, commande, etc.).
 
 #
 # Admin page
 #
-HelloAssoSetup = Paramètres HelloAsso
+HelloAssoSetup = Configuration HelloAsso
 Settings = Paramètres
-SettingsMember=Paramètre d'adhésion
+SettingsMember=Paramètres d'abonnement
 
-HELLOASSO_LIVE = Helloasso live activé (otherwise test/sandbox mode)
-HELLOASSO_TEST_CLIENT_ID=Client id clé de test
-HELLOASSO_TEST_CLIENT_ID_HELP=La clé d'identification du client de test de votre configuration API Helloasso
-HELLOASSO_TEST_CLIENT_SECRET=Clé secrète de test du client
-HELLOASSO_TEST_SECRET_HELP=La clé secrète de l'ID client de test de votre configuration API Helloasso
-HELLOASSO_TEST_CLIENT_ORGANISATION=Client organisation test
-HELLOASSO_TEST_CLIENT_ORGANISATION_HELP=Le nom de l'organisation pour le mode test. Doit correspondre au nom défini dans le compte HelloAsso
+HELLOASSO_LIVE = Helloasso en mode live activé (sinon en mode test/bac à sable)
+HELLOASSO_TEST_CLIENT_ID=Clé de test d'identifiant client
+HELLOASSO_TEST_CLIENT_ID_HELP=La clé d'identification du client de test issue de votre configuration d'API Helloasso
+HELLOASSO_TEST_CLIENT_SECRET=Clé de test secrète du client
+HELLOASSO_TEST_SECRET_HELP=La clé secrète d'identification du client de test issue de votre configuration d'API Helloasso
+HELLOASSO_TEST_CLIENT_ORGANISATION=test d'organisation client
+HELLOASSO_TEST_CLIENT_ORGANISATION_HELP=Nom de l'organisation pour le mode test. Doit correspondre au nom défini dans le compte HelloAsso.
 
-HELLOASSO_CLIENT_ID=Client id clé production
-HELLOASSO_CLIENT_ID_HELP=La clé d'identification du client en production de votre configuration API Helloasso
-HELLOASSO_CLIENT_SECRET=Clé secrète de production du client
-HELLOASSO_SECRET_HELP=La clé secrète de l'ID client en production de votre configuration API Helloasso
-HELLOASSO_CLIENT_ORGANISATION=Client organisation production
-HELLOASSO_CLIENT_ORGANISATION_HELP=Le nom de l'organisation pour le mode production. Doit correspondre au nom défini dans le compte HelloAsso
+HELLOASSO_CLIENT_ID=Clé d'identification du client en direct
+HELLOASSO_CLIENT_ID_HELP=La clé d'identification du client actif issue de votre configuration d'API Helloasso
+HELLOASSO_CLIENT_SECRET=Clé secrète du client en direct
+HELLOASSO_SECRET_HELP=La clé secrète d'identification du client actif issue de votre configuration d'API Helloasso
+HELLOASSO_CLIENT_ORGANISATION=Organisation cliente en direct
+HELLOASSO_CLIENT_ORGANISATION_HELP=Nom de l'organisation pour le mode production. Doit correspondre au nom défini dans le compte HelloAsso.
 HELLOASSO_BANK_ACCOUNT_FOR_PAYMENTS=Compte bancaire pour les paiements
 HELLOASSO_SHOW_ONLINE_PAYMENTS=Afficher la page de paiement en ligne
-HELLOASSO_STANDAR_BTN = Activer le style graphique HelloAssopour le bouton de paiement
-HELLOASSO_STANDAR_BTN_HELP = Activez cette option pour charger le fichier CSS HelloAsso, qui remplace le style par défaut de Dolibarr par un design harmonisé avec l'identité visuelle HelloAsso (boutons, couleurs, etc.).
+HELLOASSO_STANDAR_BTN = Activez le style graphique HelloAsso pour le bouton de paiement
+HELLOASSO_STANDAR_BTN_HELP = Activez cette option pour charger le fichier CSS HelloAsso, qui remplace le style par défaut de Dolibarr par un design harmonisé avec l'identité visuelle de HelloAsso (boutons, couleurs, etc.).
 
-ExampleOfTestCreditCardHelloAsso=Un exemple de carte de crédit peut être trouvé à cette URL :<br> %s 
-TestConnectionHelloasso=Tester la connexion
+ExampleOfTestCreditCardHelloAsso=Un exemple de carte de crédit est disponible à cette URL :
+TestConnectionHelloasso=Test de connexion
+SuccessfullyConnected=Connexion réussie
+TestGetMembersHelloasso=Testez l'obtention de l'abonnement helloasso
 
-TestGetMembersHelloasso=Tester l'obtention des adherent HelloAsso
-
-HELLOASSO_FORM_MEMBERSHIP_SLUG=Nom du formulaire d'adhésion de production
-HELLOASSO_FORM_MEMBERSHIP_SLUG_HELP=Nom du formulaire d'adhésion de production à partir duquel obtenir les informations. Elle doit correspondre à l'adresse Web de votre formulaire dans le compte HelloAsso.
+HELLOASSO_FORM_MEMBERSHIP_SLUG=Nom du formulaire d'adhésion en direct
+HELLOASSO_FORM_MEMBERSHIP_SLUG_HELP=Nom du formulaire d'adhésion en ligne pour obtenir des informations. Doit correspondre à l'adresse Web de votre formulaire dans votre compte HelloAsso.
 HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG=Nom du formulaire d'adhésion de test
-HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG_HELP=Nom du formulaire d'adhésion de test à partir duquel obtenir les informations. Doit correspondre à l'adresse Web de votre formulaire dans le compte HelloAsso.
-HELLOASSO_FORM_PAGINATION_PAGES_SIZE=Nombre maximal d'adherent récupérés par page
-HELLOASSO_FORM_PAGINATION_PAGES_SIZE_HELP=Nombre maximal d'adherents récupérés par les pages lors de l'importation d'adherent depuis HelloAsso.
-HELLOASSO_MAX_FORM_PAGINATION_PAGES=Nombre maximal de pages d'adherents à récupérer
-HELLOASSO_MAX_FORM_PAGINATION_PAGES_HELP=Nombre maximal de pages à récupérer lors de l'importation d'adherents depuis HelloAsso
-HELLOASSO_FORM_CREATE_THIRDPARTY=Activer la création du tiers lors de la synchronisation
-HELLOASSO_FORM_CREATE_THIRDPARTY_HELP=Active la création et la liaison d'un tiers lorsqu'un nouveau membre est synchronisé.
+HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG_HELP=Nom du formulaire d'adhésion test à partir duquel extraire les informations. Doit correspondre à l'adresse Web de votre formulaire dans votre compte HelloAsso.
+HELLOASSO_FORM_PAGINATION_PAGES_SIZE=Nombre maximal de membres récupérés par page
+HELLOASSO_FORM_PAGINATION_PAGES_SIZE_HELP=Le nombre maximal de membres récupérés par les pages lors de l'importation de membres depuis HelloAsso.
+HELLOASSO_MAX_FORM_PAGINATION_PAGES=Nombre maximal de pages de membres à récupérer
+HELLOASSO_MAX_FORM_PAGINATION_PAGES_HELP=Nombre maximal de pages à récupérer lors de l'importation de membres depuis HelloAsso.
+HELLOASSO_FORM_CREATE_THIRDPARTY=Créer et lier un tiers au nouveau membre
+HELLOASSO_FORM_CREATE_THIRDPARTY_HELP=Lorsqu'un nouveau membre est synchronisé, créez un nouveau tiers pour ce membre et liez-le.
 
-HelloAssoMemberTypeDictionary=Dictionnaire de correspondance des types de membres entre HelloAsso et Dolibarr
-HelloAssoMemberCustomFieldDictionary=Dictionnaire des correspondance des champs personnalisés d'HelloAsso et de Dolibarr
+HelloAssoMemberTypeDictionary=Correspondance entre le dictionnaire des types de membres HelloAsso et Dolibarr
+HelloAssoMemberCustomFieldDictionary=Dictionnaire de correspondance entre les champs personnalisés HelloAsso et les champs Dolibarr
 
-HelloAssoDolibarrMemberTypeID=ID du type de membre Dolibarr
-HelloAssoMemberTypeID=ID du type de membre HelloAsso
-ErrorHelloAssoBadParameter=Mauvais paramètre %s
+HelloAssoDolibarrMemberTypeID=Identifiant du type de membre Dolibarr
+HelloAssoMemberTypeID=Identifiant du type de membre HelloAsso
+ErrorHelloAssoBadParameter=Paramètre incorrect %s
 
 ErrorHelloAssoMemberTypeAlreadySet=Type de membre déjà défini
-ErrorHelloAssoAddingMemberType=Erreur lors de l'ajout d'un type de membre
-ErrorHelloAssoRemovingMemberType=Erreur lors de la suppression du type de membre
+ErrorHelloAssoAddingMemberType=Erreur lors de la tentative d'ajout du type de membre
+ErrorHelloAssoRemovingMemberType=Erreur lors de la tentative de suppression du type de membre
 HelloAssoMemberTypeDictionaryAddedSucesfully=Type de membre ajouté avec succès
 HelloAssoMemberTypeDictionaryRemovedSucesfully=Type de membre supprimé avec succès
 
 ErrorHelloAssoCustomFieldAlreadySet=Champ personnalisé déjà défini
-ErrorHelloAssoAddingCustomField=Erreur lors de l'ajout d'un champ personnalisé
-ErrorHelloAssoRemovingCustomField=Erreur lors de la suppression d'un champ personnalisé
+ErrorHelloAssoAddingCustomField=Erreur lors de la tentative d'ajout d'un champ personnalisé
+ErrorHelloAssoRemovingCustomField=Erreur lors de la tentative de suppression d'un champ personnalisé
 HelloAssoCustomFieldDictionaryAddedSucesfully=Champ personnalisé ajouté avec succès
 HelloAssoCustomFieldDictionaryRemovedSucesfully=Champ personnalisé supprimé avec succès
-HelloAssoDolibarrCorrespondenceParameters=Paramètres de correspondance entre HelloAsso et Dolibarr
-HelloAssoFormParameters=Paramètre du formulaire d'HelloAsso
-HelloAssoMemberTypeIdTitle=Identifiant du type d'adherent correspondant dans HelloAsso
-HelloAssoMemberTypeId=Identifiant du type d'adherent HelloAsso
-HelloAssoCustomField=Nom du champ personnalisé HelloAsso
-HelloAssoCustomFieldTitle=Nom du champ personnalisé correspondant dans HelloAsso
-HelloAssoSelectMemberType=Sélectionnez un type d'adherent Dolibarr
-HelloAssoSelectMemberField=Sélectionnez un champ de l'objet adherent de Dolibarr
-HelloAssoMemberTypeDictionaryHelp=Dictionnaire de correspondance entre les types de membres HelloAsso et Dolibarr. Si le dictionnaire reste vide, un nouveau type de membre sera créé dans Dolibarr. Pour trouver l'identifiant HelloAsso d'un membre, vous pouvez suivre la procédure expliquée dans le wiki du module HelloAsso.
-HelloAssoMemberCustomFieldDictionaryHelp=Dictionnaire des champs personnalisés HelloAsso et correspondance avec les champs Dolibarr.<br>Pour configurer un nouveau champ personnalisé. Sélectionnez un champ de l'objet membre Dolibarr et définissez le nom du champ HelloAsso correspondant dans le champ de saisie.
-ModuleHelloAssoMemberSyncDesc=Synchronisez les membres HelloAsso dans la base de données Dolibarr en créant des membres et des abonnements.
-HelloAssoSyncButtonDesc=Testez la synchronisation de vos membres avec votre application sans modifier vos données. <br>Une fois la configuration validée, vous pouvez automatiser la synchronisation dans le module Tâches planifiées avec la tâche HelloAssoGetNewMembers.
 
 HelloAssoRecordNotFound=Enregistrement introuvable
-HELLOASSO_SUBSCRIPTION_COMPLEMENTARYACTIONS=Action complémentaire lors de la synchronisation des membres
+
+HelloAssoMembersNothingDone=%s Membre(s) traité(s), mais aucune action n'a été effectuée (simulation à blanc)
+HelloAssoMembersAddedSucessfully=%s Un ou plusieurs membres ont été ajoutés avec succès
+HelloAssoDolibarrCorrespondenceParameters=Paramètres de correspondance entre HelloAsso et Dolibarr
+HelloAssoFormParameters=BonjourAsso à partir des paramètres
+HelloAssoMemberTypeIdTitle=Identifiant du type de membre correspondant dans HelloAsso
+HelloAssoMemberTypeId=Identifiant de type de membre HelloAsso
+HelloAssoCustomField=Slug du champ personnalisé HelloAsso
+HelloAssoCustomFieldTitle=Slug du champ personnalisé correspondant dans HelloAsso
+HelloAssoSelectMemberType=Sélectionnez un type de membre dolibarr
+HelloAssoSelectMemberField=Sélectionnez un champ membre dolibarr
+HelloAssoMemberTypeDictionaryHelp=Dictionnaire de correspondance entre les types de membres HelloAsso et Dolibarr. Si le dictionnaire est vide, un nouveau type de membre sera créé dans Dolibarr. Pour trouver l'identifiant du membre HelloAsso, suivez la procédure décrite dans le wiki du module HelloAsso.
+HelloAssoMemberCustomFieldDictionaryHelp=Dictionnaire de correspondance entre les champs personnalisés HelloAsso et les champs Dolibarr.<br>Pour configurer un nouveau champ personnalisé : sélectionnez un champ de l’objet membre Dolibarr et indiquez le nom du champ HelloAsso correspondant dans le champ de saisie.
+ModuleHelloAssoMemberSyncDesc=Synchronisez les membres HelloAsso dans la base de données Dolibarr en créant des membres et des abonnements.
+HelloAssoSyncButtonDesc=Testez la synchronisation de vos membres avec votre application sans modifier vos données. <br> Une fois la configuration validée, vous pouvez automatiser la synchronisation dans le module Tâches planifiées avec la tâche HelloAssoGetNewMembers.
+HELLOASSO_SUBSCRIPTION_COMPLEMENTARYACTIONS=Action complémentaire sur la synchronisation des membres
 HELLOASSO_SUBSCRIPTION_COMPLEMENTARYACTIONS_HELP=Action complémentaire lors de la synchronisation des membres. <br>D'autres actions complémentaires peuvent être définies si la création par un tiers est activée lors de la synchronisation.
 
 # About page
 #
-About = A propos
-HelloAssoAboutPage = A propos d'HelloAsso
+About = À propos
+HelloAssoAboutPage = Page « À propos » de HelloAsso
 
 #
 # Sample page
 #
-HelloAssoArea = Home HelloAsso
-MyPageName = My page name
+HelloAssoArea = Accueil HelloAsso
 
-#
-# Sample widget
-#
-MyWidget = My widget
-MyWidgetDescription = My widget description
+HelloAssoDoPayment = Payez avec HelloAsso
 
-HelloAssoDoPayment = Payer avec HelloAsso
+ErrorBadValueAmount=Veuillez modifier le montant de votre panier. Il doit être gratuit ou supérieur à 0,50 € pour autoriser votre paiement.
+ErrorValueFinalPaymentDiffers= La valeur du paiement final (%s) diffère de la valeur attendue pour l'adhésion (%s).
+ErrorBadClientIdOrSecret=Identifiant client ou secret incorrects
 
-ErrorBadValueAmount=Please change your basket amount. It must be free or greater than €0.50 to authorize your payment
-ErrorValueFinalPaymentDiffers= Value of FinalPayment (%s) differs from value expected for membership (%s).
-ErrorBadClientIdOrSecret=Bad client ID or secret
-
-HelloAssoExplanatoryText=Adhérer à HelloAsso, c'est adhérer à un système solidaire, <b>financé par les cotisations volontaires des utilisateurs</b>, pour proposer des services en ligne gratuits et de qualité à toutes les associations.<br>Ainsi, en adhérant, vous bénéficiez de ce modèle solidaire, vous permettant de collecter gratuitement les paiements en ligne.<br>Il est donc important de communiquer sur ce modèle, d'informer vos utilisateurs de la portée de leurs paiements.<br><br><b>Pour accepter les paiements avec HelloAsso, vous devrez avoir un compte HelloAsso.</b>
-HelloAssoExplanatoryText2=Vous n'avez pas de compte sur HelloAsso, <b><a href="https://auth.helloasso.com/inscription" target="_blank">créez votre compte en quelques minutes ici.</a></b><br><i>Si vous rencontrez des problèmes, n'hésitez pas à consulter <a href="https://centredaide.helloasso.com/s/" target="_blank">notre centre d'aide</a> ou à <a href="https://www.helloasso.com/contactez-nous" target="_blank">contactez-nous</a> directement.</i>
-HelloAssoExplanatoryText3=Pour créer un compte HelloAsso de test, vous devez <b><a href="https://auth.helloasso-sandbox.com/inscription" target="_blank">créer un autre compte ici</a></b>
+HelloAssoExplanatoryText=Rejoindre HelloAsso, c'est intégrer un système solidaire, financé par les contributions volontaires des utilisateurs, afin d'offrir des services en ligne gratuits et de qualité à toutes les associations. En adhérant, vous bénéficiez de ce modèle solidaire et pouvez ainsi collecter les paiements en ligne gratuitement. Il est donc important de communiquer sur ce modèle et d'informer vos utilisateurs sur l'étendue de leurs paiements. Pour accepter les paiements avec HelloAsso, vous devez posséder un compte HelloAsso.
+HelloAssoExplanatoryText2=Vous n'avez pas de compte sur HelloAsso ? <a href="https://auth.helloasso.com/inscription" target="_blank">Créez votre compte en quelques minutes ici.</a></strong><br><i>Si vous rencontrez des problèmes, n'hésitez pas à consulter <a href="https://centredaide.helloasso.com/s/" target="_blank">notre centre d'aide. class='notranslate'></a> ou pour <a href="https://www.helloasso.com/contactez-nous" target="_blank">nous contacter</a> directement.</i>
+HelloAssoExplanatoryText3=Pour obtenir un compte de test HelloAsso, vous devez <a href="https://auth.helloasso.com/inscription" target="_blank">créer un autre compte ici</a>
+Connected=Connecté.
+LastRecordedToken=Dernier jeton enregistré
 HelloAssoMembershipStatus=Statut de membre
-HelloAssoMemberPaymentLabel=Paiement d'adhésion HelloAsso n°%s
+HelloAssoMemberPaymentLabel=Paiement d'abonnement HelloAsso n°%s

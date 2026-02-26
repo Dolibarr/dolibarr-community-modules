@@ -1,8 +1,15 @@
 [main]
 host = https://www.transifex.com
 
-[o:dolibarr:p:dolibarrcommunitytools:r:helloasso]
+[o:dolibarr-association:p:dolibarr-community-modules:r:helloasso]
 file_filter = helloasso/langs/<lang>/helloasso.lang
 source_file = helloasso/langs/en_US/helloasso.lang
 source_lang = en_US
 type        = MOZILLAPROPERTIES
+
+[o:dolibarr-association:p:dolibarr-community-modules:r:pdpconnectfr]
+file_filter = pdpconnectfr/langs/<lang>/pdpconnectfr.lang
+source_file = pdpconnectfr/langs/en_US/pdpconnectfr.lang
+source_lang = en_US
+type        = MOZILLAPROPERTIES
+

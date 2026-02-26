@@ -172,10 +172,12 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         $error = array();
         if ($mode == 0) {
 	        if (empty($this->config['username'])) {
-	            $error[] = $langs->trans('UsernameIsRequired');
+	        	 $langs->load("main");
+	            $error[] = $langs->trans("ErrorFieldRequired", $langs->transnoentities('Username'));
 	        }
 	        if (empty($this->config['password'])) {
-	            $error[] = $langs->trans('PasswordIsRequired');
+	        	$langs->load("main");
+	            $error[] = $langs->trans('ErrorFieldRequired', $langs->transnoentities('Password'));
 	        }
         } elseif ($mode == 1) {
 	        if (empty($this->config['api_key'])) {
@@ -483,7 +485,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
     /**
 	 * Call the provider API.
 	 *
-	 * @param string 						$resource 	    Resource relative URL ('Flows', 'healthcheck' or others)
+	 * @param string 						$resource 	    Resource relative URL ('token', 'healthcheck', 'Flows', or others)
      * @param string                        $method         HTTP method ('GET', 'POST', etc.)
 	 * @param array<string, mixed>|false 	$params 	    Options for the request
      * @param array<string, string>         $extraHeaders   Optional additional headers
