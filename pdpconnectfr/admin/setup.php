@@ -203,21 +203,21 @@ if (preg_match('/set'.$prefix.'TOKEN/i', $action, $reg)) {
 	}
 }
 
-if (preg_match('/make'.$prefix.'sampleinvoice/i', $action, $reg)) {
-	$result = $provider->sendSampleInvoice();
-	if ($result) {
-		setEventMessages('', $result, 'warnings');
-	} else {
-		setEventMessages('', $provider->errors, 'errors');
-	}
-}
-
 if (preg_match('/call'.$prefix.'HEALTHCHECK/i', $action, $reg)) {
 	$statusPDP = $provider->checkHealth();
 	if ($statusPDP['status_code'] == 200) {
 		setEventMessages($statusPDP['message'], null, 'mesgs');
 	} else {
 		setEventMessages($langs->trans('APApiNotReachable', $PDPManager->getProvider(getDolGlobalString('PDPCONNECTFR_PDP'))), array(), 'errors');
+	}
+}
+
+if (preg_match('/make'.$prefix.'sampleinvoice/i', $action, $reg)) {
+	$result = $provider->sendSampleInvoice();
+	if ($result) {
+		setEventMessages('', $result, 'warnings');
+	} else {
+		setEventMessages('', $provider->errors, 'errors');
 	}
 }
 
@@ -272,8 +272,6 @@ if ($action == 'update' && $prefix && $valueofapikeyafter != $valueofapikeybefor
 
 $action = 'edit';
 
-$form = new Form($db);
-
 $help_url = '';
 $title = "PDPConnectFRSetup";
 
@@ -324,6 +322,13 @@ print '<br>';
 
 if (!empty($formSetup->items)) {
 	print $formSetup->generateOutput(3, false, $langs->transnoentitiesnoconv('PlatformPartner'), 'titlefieldmiddle');
+	print '<br>';
+}
+
+if (!empty($provider) && !empty($formSetup2->items)) {
+    print '<div class="formborder opacitylow">';
+	print $provider->helpToGetCredentials;
+	print '</div>';
 	print '<br>';
 }
 

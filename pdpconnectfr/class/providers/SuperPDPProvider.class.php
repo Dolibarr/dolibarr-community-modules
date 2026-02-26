@@ -41,12 +41,19 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 */
     var $name = 'SUPERPDP';
 
+	/**
+	 * @var string		Help to get credentials and set up the provider configuration.
+	 */
+    var $helpToGetCredentials = '';
+
 
     /**
      * Constructor
      *
      */
     public function __construct($db) {
+    	global $langs;
+
     	parent::__construct($db);
 
         $this->config = array(
@@ -62,6 +69,15 @@ class SuperPDPProvider extends AbstractPDPProvider
             'dol_prefix' => 'PDPCONNECTFR_SUPERPDP',
             'live' => getDolGlobalInt('PDPCONNECTFR_LIVE', 0)
         );
+
+        $this->helpToGetCredentials = '<div class="">'.$langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL1").'</div>';
+        $this->helpToGetCredentials .= '<div class="margintoponly">'.$langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL2", '{s1}').'</div>';
+		$this->helpToGetCredentials .= '<div class="margintoponly">'.$langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL3", '{s2}').'</div>';
+		$this->helpToGetCredentials .= '<div class="margintoponly">'.$langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL4", '{s3}', '{s4}', '{s5}').'</div>';
+
+		$redirect_uri = dol_buildpath('/pdpconnectfr/admin/setup.php', 2);
+
+		$this->callbackurl = $redirect_uri;
 
         // Retrieve and complete the OAuth token information from the database
        	$this->tokenData = $this->fetchOAuthTokenDB();
@@ -90,9 +106,14 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 		$langs->load("oauth");
 
-		$item = $formSetup->newItem('PDPCONNECTFR_LINK_CREATE_ACCOUNT');
+		// Set content of the help page
 		$url = $providersConfig[getDolGlobalString('PDPCONNECTFR_PDP')][$prefixenv.'_account_admin_url'];
-		$item->fieldOverride = img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$url.'" target="_new">'.$url.'</a>';
+		$this->helpToGetCredentials = str_replace('{s1}', img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$url.'" target="_new">'.$url.'</a>', $this->helpToGetCredentials);
+		$this->helpToGetCredentials = str_replace('{s2}', '<input type="text" class="width300" value="'.$this->callbackurl.'">', $this->helpToGetCredentials);
+		$this->helpToGetCredentials = str_replace('{s3}', $langs->transnoentitiesnoconv("OAUTH_ID"), $this->helpToGetCredentials);
+		$this->helpToGetCredentials = str_replace('{s4}', $langs->transnoentitiesnoconv("OAUTH_SECRET"), $this->helpToGetCredentials);
+		$this->helpToGetCredentials = str_replace('{s5}', $langs->transnoentitiesnoconv("Save"), $this->helpToGetCredentials);
+
 
 		// E-Invoice ID
 		$item = $formSetup->newItem($prefix . 'ROUTING_ID');
@@ -106,12 +127,14 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$item->helpText = $langs->transnoentities('PDPCONNECTFR_PROTOCOL_HELP');
 		$item->defaultFieldValue = 'FACTURX';
 		$item->cssClass = 'minwidth500';
+		$item->fieldParams['trClass'] = 'advancedoption';
 
 		// Setup conf to choose a profil of exchange
 		$item = $formSetup->newItem('PDPCONNECTFR_PROFILE')->setAsSelect($TFieldProfiles);
 		$item->helpText = $langs->transnoentities('PDPCONNECTFR_PROFILE_HELP');
 		$item->defaultFieldValue = 'EN16931';
 		$item->cssClass = 'minwidth500';
+		$item->fieldParams['trClass'] = 'advancedoption';
 
 		// Username
 		$item = $formSetup->newItem($prefix . 'CLIENT_ID');

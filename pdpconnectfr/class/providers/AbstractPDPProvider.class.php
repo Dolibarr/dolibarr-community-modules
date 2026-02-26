@@ -47,7 +47,11 @@ abstract class AbstractPDPProvider
     /** @var string Provider name */
     public $providerName;
 
+    /** @var string Help message to guide users in obtaining credentials for this provider */
+    public $helpToGetCredentials;
+
     public static $PDPCONNECTFR_LAST_IMPORT_KEY;
+
 
     /**
      * Constructor

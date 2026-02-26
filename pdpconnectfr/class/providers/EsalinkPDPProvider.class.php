@@ -42,10 +42,18 @@ class EsalinkPDPProvider extends AbstractPDPProvider
     var $name = 'ESALINK';
 
 	/**
+	 * @var string		Help to get credentials and set up the provider configuration.
+	 */
+    var $helpToGetCredentials = '';
+
+
+	/**
      * Constructor
      *
      */
     public function __construct($db) {
+    	global $langs;
+
     	parent::__construct($db);
 
         $this->config = array(
@@ -61,6 +69,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
             'dol_prefix' => 'PDPCONNECTFR_ESALINK',
             'live' => getDolGlobalInt('PDPCONNECTFR_LIVE', 0)
         );
+
+
+        $this->helpToGetCredentials = $langs->trans("PDPCONNECTFR_ESALINKP_HELP_CREDENTIAL1");
+        $this->helpToGetCredentials .= '<br>'.$langs->trans("PDPCONNECTFR_ESALINKP_HELP_CREDENTIAL2", '{s1}');
 
         // Retrieve and complete the OAuth token information from the database
        	$this->tokenData = $this->fetchOAuthTokenDB();
@@ -88,9 +100,11 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$tokenData = $this->getTokenData();
 
 
-		$item = $formSetup->newItem('PDPCONNECTFR_LINK_CREATE_ACCOUNT');
+		// Set content of the help page
 		$url = $providersConfig[getDolGlobalString('PDPCONNECTFR_PDP')][$prefixenv.'_account_admin_url'];
-		$item->fieldOverride = img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$url.'" target="_new">'.$url.'</a>';
+		$urltosubscribe = img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$url.'" target="_new">'.$url.'</a>';
+		$this->helpToGetCredentials = str_replace('{s1}', $urltosubscribe, $this->helpToGetCredentials);
+
 
 		// E-Invoice ID
 		$item = $formSetup->newItem($prefix . 'ROUTING_ID');
@@ -104,12 +118,14 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$item->helpText = $langs->transnoentities('PDPCONNECTFR_PROTOCOL_HELP');
 		$item->defaultFieldValue = 'FACTURX';
 		$item->cssClass = 'minwidth500';
+		$item->fieldParams['trClass'] = 'advancedoption';
 
 		// Setup conf to choose a profil of exchange
 		$item = $formSetup->newItem('PDPCONNECTFR_PROFILE')->setAsSelect($TFieldProfiles);
 		$item->helpText = $langs->transnoentities('PDPCONNECTFR_PROFILE_HELP');
 		$item->defaultFieldValue = 'EN16931';
 		$item->cssClass = 'minwidth500';
+		$item->fieldParams['trClass'] = 'advancedoption';
 
 		// Username
 		$item = $formSetup->newItem($prefix . 'USERNAME');
