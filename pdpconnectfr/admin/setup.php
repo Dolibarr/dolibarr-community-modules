@@ -230,7 +230,8 @@ $prefix = '';
 // If Access Point is selected, show parameters for if
 if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 	$provider = $PDPManager->getProvider(getDolGlobalString('PDPCONNECTFR_PDP'));
-	$prefix = $provider->getConf()['dol_prefix'].'_';
+	$providerconfig  = $provider->getConf();
+	$prefix = $providerconfig['dol_prefix'].'_';
 }
 
 

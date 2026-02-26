@@ -22,7 +22,6 @@
  * \brief   Manage multiple PDP providers and provide a unified access layer.
  */
 
-dol_include_once('/pdpconnectfr/class/providers/EsalinkPDPProvider.class.php');
 
 
 /**
@@ -46,6 +45,7 @@ class PDPProviderManager
         // Rest of data could be into the XXXPDPPRovider.class.php file.
         $this->providersList = array (
             'ESALINK' => array(
+            	'class' => 'EsalinkPDPProvider',
             	'provider_countries' => array('FR'),
                 'provider_name' => 'ESALINK - Hubtimize',
                 'description' => 'Esalink PDP Integration',
@@ -53,7 +53,17 @@ class PDPProviderManager
             	'prod_account_admin_url' => 'https://www.esalink.com/contact/',
             	'test_account_admin_url' => 'https://www.esalink.com/contact/',
             ),
-            'TESTPDP' => array(
+            'SUPERPDP' => array(
+            	'class' => 'SuperPDPProvider',
+            	'provider_countries' => array('all'),
+            	'provider_name' => 'SuperPDP',
+                'description' => 'SuperPDP Integration',
+                'is_enabled' => getDolGlobalString('PDPCONNECTFR_TEST_SUPERPDP'),
+            	'prod_account_admin_url' => 'https://superpdp.tech',
+            	'test_account_admin_url' => 'https://superpdp.tech',
+            ),
+        	'TESTPDP' => array(
+        		'class' => 'TestPDPProvider',
             	'provider_countries' => array('all'),
             	'provider_name' => 'TESTPDP',
                 'description' => 'Another TESTPDP Integration',
@@ -88,18 +98,24 @@ class PDPProviderManager
             return null;
         }
 
-        // Initialize provider based on name
-        switch ($name) {
-            case 'ESALINK':
-                $provider = new EsalinkPDPProvider($db);
-                $provider->providerName = 'ESALINK';
-                break;
-            case 'TESTPDP':
-                //$provider = new TESTPDPProvider();
-                break;
-            default:
-                return null;
+
+        $classnametouse = $this->providersList[$name]['class'];
+
+		$resultinclude = dol_include_once('/pdpconnectfr/class/providers/'.$classnametouse.'.class.php');
+
+		if (!$resultinclude) {
+			dol_syslog("Failed to include provider class file for provider: ".$name, LOG_ERR);
+            return null;
         }
+		if (!class_exists($classnametouse)) {
+			dol_syslog("Include provider class was done, but class is still not found: ".$classnametouse, LOG_ERR);
+            return null;
+		}
+        $provider = new $classnametouse($db);
+        if ($provider) {
+        	$provider->providerName = $name;
+        }
+
         return $provider;
     }
 

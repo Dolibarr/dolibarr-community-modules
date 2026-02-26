@@ -2044,7 +2044,7 @@ class FacturXProtocol extends AbstractProtocol
 
             $message = 'Unable to find supplier' . $detailsStr . '. Auto-creation of thirdparties is disabled in settings.';
 
-            $action = 'Manual supplier creation based on the retrieved information from E-invoice ';
+            $action = $langs->trans('CreateSupplierManually');
             $action .= '<a class="butAction small" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
             $action .= '<i class="fas fa-plus-circle"></i> ';
             $action .= $langs->trans('CreateSupplier');

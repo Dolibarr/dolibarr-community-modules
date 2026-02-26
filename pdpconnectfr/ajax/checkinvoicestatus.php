@@ -161,7 +161,6 @@ if ($objectRef) {
 	);
 
 	if ($response['status_code'] == 200 || $response['status_code'] == 202) {
-
 		$flowData = json_decode($response['response'], true);
 
 		$syncStatus = $pdpconnectfr::STATUS_UNKNOWN;

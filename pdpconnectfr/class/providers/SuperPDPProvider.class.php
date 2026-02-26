@@ -19,9 +19,9 @@
 
 
 /**
- * \file    pdpconnectfr/class/providers/EsalinkPDPProvider.class.php
+ * \file    pdpconnectfr/class/providers/SuperPDPProvider.class.php
  * \ingroup pdpconnectfr
- * \brief   Esalink PDP provider integration class
+ * \brief   SuperPDP PDP provider integration class
  */
 
 dol_include_once('pdpconnectfr/class/providers/AbstractPDPProvider.class.php');
@@ -32,16 +32,17 @@ require_once DOL_DOCUMENT_ROOT . '/core/lib/admin.lib.php';
 
 
 /**
- * Class to manage Esalink PDP provider integration.
+ * Class to manage SuperPDP PDP provider integration.
  */
-class EsalinkPDPProvider extends AbstractPDPProvider
+class SuperPDPProvider extends AbstractPDPProvider
 {
 	/**
 	 * @var string		Name
 	 */
-    var $name = 'ESALINK';
+    var $name = 'SUPERPDP';
 
-	/**
+
+    /**
      * Constructor
      *
      */
@@ -49,14 +50,14 @@ class EsalinkPDPProvider extends AbstractPDPProvider
     	parent::__construct($db);
 
         $this->config = array(
-            'provider_url' => 'https://ppd.hubtimize.fr',
-            'prod_api_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/', // TODO: Replace the URL once known
-            'test_api_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/',
-            'username' => getDolGlobalString('PDPCONNECTFR_ESALINK_USERNAME', ''),
-            'password' => getDolGlobalString('PDPCONNECTFR_ESALINK_PASSWORD', ''),
-            'api_key' => getDolGlobalString('PDPCONNECTFR_ESALINK_API_KEY', ''),
-            'api_secret' => getDolGlobalString('PDPCONNECTFR_ESALINK_API_SECRET', ''),
-            'dol_prefix' => 'PDPCONNECTFR_ESALINK',
+            'provider_url' => 'https://api.superpdp.tech/oauth2',
+            'prod_api_url' => 'https://api.superpdp.tech/', // TODO: Replace the URL once known
+            'test_api_url' => 'https://api.superpdp.tech/',
+            'username' => getDolGlobalString('PDPCONNECTFR_SUPERPDP_USERNAME', ''),
+            'password' => getDolGlobalString('PDPCONNECTFR_SUPERPDP_PASSWORD', ''),
+            'api_key' => getDolGlobalString('PDPCONNECTFR_SUPERPDP_API_KEY', ''),
+            'api_secret' => getDolGlobalString('PDPCONNECTFR_SUPERPDP_API_SECRET', ''),
+            'dol_prefix' => 'PDPCONNECTFR_SUPERPDP',
             'live' => getDolGlobalInt('PDPCONNECTFR_LIVE', 0)
         );
 
@@ -92,7 +93,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 		// E-Invoice ID
 		$item = $formSetup->newItem($prefix . 'ROUTING_ID');
-		$item->helpText = $langs->transnoentities($prefix . 'PDPCONNECTFR_ROUTING_ID_HELP');
+		$item->helpText = $langs->transnoentities('PDPCONNECTFR_ROUTING_ID_HELP');
 		$item->fieldAttr['placeholder'] = $mysoc->idprof1;
 		$item->fieldParams['isMandatory'] = 0;
 		$item->cssClass = 'minwidth300';
@@ -110,16 +111,16 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$item->cssClass = 'minwidth500';
 
 		// Username
-		$item = $formSetup->newItem($prefix . 'USERNAME');
+		$item = $formSetup->newItem($prefix . 'CLIENT_ID');
 		$item->cssClass = 'minwidth500';
 
 		// Password
-		$item = $formSetup->newItem($prefix . 'PASSWORD')->setAsGenericPassword();
+		$item = $formSetup->newItem($prefix . 'CLIENT_SECRET')->setAsGenericPassword();
 		$item->cssClass = 'minwidth500';
 
 		// API_KEY
-		$item = $formSetup->newItem($prefix . 'API_KEY');
-		$item->cssClass = 'minwidth500';
+		//$item = $formSetup->newItem($prefix . 'API_KEY');
+		//$item->cssClass = 'minwidth500';
 
 		// Token
 		if (getDolGlobalString($prefix . 'API_KEY')) {
@@ -224,7 +225,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
      * @return string|null New access token or null on failure.
      */
     public function refreshAccessToken() {
-        // No route to refresh token for PDP provider so we get a new one
+        // No route to refresh token for AP provider so we get a new one
         return $this->getAccessToken();
     }
 
@@ -574,7 +575,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
             $call->endpoint = '/' . $resource;
             $call->request_body = is_array($params) ? json_encode($params) : $params;
             $call->response = is_array($returnarray['response']) ? json_encode($returnarray['response']) : $returnarray['response'];
-            $call->provider = 'Esalink';
+            $call->provider = 'SuperPDP';
             $call->entity = $conf->entity;
             $call->status = ($returnarray['status_code'] == 200 || $returnarray['status_code'] == 202) ? 1 : 0;
 
@@ -632,7 +633,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         dol_syslog(__METHOD__ . " syncFlows start from ".dol_print_date($dateafter, 'standard')." limit ".$limit, LOG_DEBUG);
         dol_syslog(__METHOD__ . " syncFlows start from ".dol_print_date($dateafter, 'standard')." limit ".$limit, LOG_DEBUG, 0, "_pdpconnectfr");
 
-        // If limit is 0, we first need to get the total number of flows to sync because set a default limit of 25 if not specified
+        // If limit is 0, we first need to get the total number of flows to sync because AP set a default limit of 25 if not specified
         if ($limit == 0) {
 			$jsonparams = json_encode($params);
         	$response = $this->callApi($resource, "POST", $jsonparams);

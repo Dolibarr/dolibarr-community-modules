@@ -65,9 +65,10 @@ abstract class AbstractPDPProvider
     /**
      * Validate configuration parameters before API calls.
      *
-     * @return bool True if configuration is valid.
+     * @param 	int		$mode 	0 check that user/pass is set, 1 check that token is set
+     * @return 	bool 			True if configuration is valid.
      */
-    abstract public function validateConfiguration();
+    abstract public function validateConfiguration($mode = 1);
 
     /**
      * Get access token for the provider.
