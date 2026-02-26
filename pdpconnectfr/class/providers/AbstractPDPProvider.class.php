@@ -87,15 +87,26 @@ abstract class AbstractPDPProvider
     /**
      * Get the base API URL for Esalink PDP
      *
-     * @return string
+     * @param string 	$mode 		'authent' or 'api'
+     * @return string				URL of the endpoint to call depending on the mode (authentication or regular API calls)
      */
-    public function getApiUrl()
+    public function getApiUrl($mode = 'api')
     {
         $prod = getDolGlobalString('PDPCONNECTFR_LIVE', '');
-		$url = $this->config['test_api_url'];
-		if ($prod != '') {
-			$url = $this->config['prod_api_url'];
+
+		if ($mode === 'auth') {
+            $url = $this->config['test_auth_url'];
+            if ($prod != '') {
+                $url = $this->config['prod_auth_url'];
+            }
+            return $url;
+		} else {
+			$url = $this->config['test_api_url'];
+			if ($prod != '') {
+				$url = $this->config['prod_api_url'];
+			}
 		}
+
 		return $url;
     }
 

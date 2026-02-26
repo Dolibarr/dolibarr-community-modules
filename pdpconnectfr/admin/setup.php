@@ -193,6 +193,7 @@ if (!getDolGlobalString('PDPCONNECTFR_PROTOCOL')) {
 if (preg_match('/set'.$prefix.'TOKEN/i', $action, $reg)) {
 	// Generate token
 	$token = $provider->getAccessToken();
+
 	if ($token) {
 		setEventMessages("Token generated successfully", null, 'mesgs');
 		header("Location: ".$_SERVER["PHP_SELF"].'?page_y='.GETPOSTFLOAT('page_y'));

@@ -717,7 +717,7 @@ $last_sync = 0;
 if (GETPOSTDATE('last_sync_datetime', 'getpost', 'tzuserrel')) {
 	$last_sync = GETPOSTDATE('last_sync_datetime', 'getpost', 'tzuserrel');
 }
-$last_sync_info = '<span class="opacitylow">'.img_picto('', 'long-arrow-alt-right', 'class="pictofixedwidth"');
+$last_sync_info = '<span class="opacitylowx">'.img_picto('', 'long-arrow-alt-right', 'class="pictofixedwidth"');
 
 $Lastsyncinfosql = "SELECT flow_id, updatedat
 FROM ".MAIN_DB_PREFIX."pdpconnectfr_document
@@ -748,7 +748,7 @@ if (file_exists($filePath)) {
 	$urlConvertedFile = DOL_URL_ROOT . '/document.php?modulepart=pdpconnectfr&file=' . urlencode('temp/facturx_readable.pdf');
 
 
-	$last_supplier_invoice_error = '<span class="opacitylow">'.img_picto('', 'times', 'class="pictofixedwidth" style="color:red;"');
+	$last_supplier_invoice_error = '<span class="opacitylowx">'.img_picto('', 'times', 'class="pictofixedwidth" style="color:red;"');
 	$last_supplier_invoice_error .= ' ' . $langs->trans("LastSupplierInvoiceCouldNotBeProcessed");
 	$last_supplier_invoice_error .= '<i class="fas fa-info-circle em088 opacityhigh classfortooltip" title="'. $langs->trans("LastSupplierInvoiceCouldNotBeProcessedInfo") .'"></i>';
 	$last_supplier_invoice_error .= ' : </span>';
@@ -810,14 +810,16 @@ if ($provider) {
 
 	print '</table>'."\n";
 	print '</div>';
+	print '</div>'."\n";
 
+	//print '<hr class="margintoponly paddingbottom">';
+	//$last_supplier_invoice_error = '';
 
-	print '<hr class="margintoponly paddingbottom">';
-
-	print '<div class="floatleft margintoponly">'.$last_sync_info.'</div>'."\n";
+	print '<div class="'.($last_supplier_invoice_error ? 'warning' : 'info').' div-table-responsive">';
+	print '<div class="floatleft">'.$last_sync_info.'</div>'."\n";
 
 	if ($last_supplier_invoice_error) {
-		print '<div class="floatleft margintoponly">'.$last_supplier_invoice_error.'</div>'."\n";
+		print '<div class="floatleft">'.$last_supplier_invoice_error.'</div>'."\n";
 	}
 
 	print "</div>"."\n";

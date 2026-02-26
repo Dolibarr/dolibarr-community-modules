@@ -50,11 +50,13 @@ class SuperPDPProvider extends AbstractPDPProvider
     	parent::__construct($db);
 
         $this->config = array(
-            'provider_url' => 'https://api.superpdp.tech/oauth2',
-            'prod_api_url' => 'https://api.superpdp.tech/v1.beta', // TODO: Replace the URL once known
-            'test_api_url' => 'https://api.superpdp.tech/v1.beta',
-            'username' => getDolGlobalString('PDPCONNECTFR_SUPERPDP_USERNAME', ''),
-            'password' => getDolGlobalString('PDPCONNECTFR_SUPERPDP_PASSWORD', ''),
+            'provider_url' => 'https://superpdp.tech/',
+            'prod_auth_url' => 'https://api.superpdp.tech/oauth2/', 	// TODO: Replace the URL once known
+            'test_auth_url' => 'https://api.superpdp.tech/oauth2/',
+        	'prod_api_url' => 'https://api.superpdp.tech/v1.beta/', // TODO: Replace the URL once known
+            'test_api_url' => 'https://api.superpdp.tech/v1.beta/',
+            //'username' => getDolGlobalString('PDPCONNECTFR_SUPERPDP_USERNAME', ''),
+            //'password' => getDolGlobalString('PDPCONNECTFR_SUPERPDP_PASSWORD', ''),
             'client_id' => getDolGlobalString('PDPCONNECTFR_SUPERPDP_CLIENT_ID', ''),
             'client_secret' => getDolGlobalString('PDPCONNECTFR_SUPERPDP_CLIENT_SECRET', ''),
             'dol_prefix' => 'PDPCONNECTFR_SUPERPDP',
@@ -216,13 +218,13 @@ class SuperPDPProvider extends AbstractPDPProvider
     		'Content-Type' => 'application/x-www-form-urlencoded'
 		);
 
-        $response = $this->callApi("oauth2/token", "POST", $paramstring, $extraHeaders, 'get_access_token');
+        $response = $this->callApi("token", "POST", $paramstring, $extraHeaders, 'get_access_token');
 
         $status_code = $response['status_code'];
 		$body = $response['response'];
 
-        if ($status_code == 200 && isset($body['access_token']) && isset($body['refresh_token']) && isset($body['expires_in'])) {
-            $this->saveOAuthTokenDB($body['access_token'], $body['refresh_token'], $body['expires_in']);
+        if ($status_code == 200 && isset($body['access_token']) && isset($body['expires_in'])) {
+            $this->saveOAuthTokenDB($body['access_token'], $body['refresh_token'] ?? '', $body['expires_in']);
 
             return $body['access_token'];
         } else {
@@ -515,7 +517,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
         require_once DOL_DOCUMENT_ROOT . '/core/lib/geturl.lib.php';
 
-		$url = $this->getApiUrl() . $resource;
+		$url = $this->getApiUrl(($callType == 'get_access_token') ? 'auth' : 'api') . $resource;
 
         if (!isset($extraHeaders['Content-Type'])) {
             $httpheader[] = 'Content-Type: application/json';
@@ -527,7 +529,7 @@ class SuperPDPProvider extends AbstractPDPProvider
         }
 
         // check or get access token
-        if ($resource != 'oauth2/token') {
+        if ($resource != 'token') {
             if ($this->tokenData['token']) {
                 $tokenexpiresat = strtotime($this->tokenData['token_expires_at'] ?? 0);
                 if ($tokenexpiresat < dol_now()) {
@@ -539,7 +541,7 @@ class SuperPDPProvider extends AbstractPDPProvider
         }
 
         // Add Authorization header if we have a token
-        if ($this->tokenData['token'] && $resource != 'token' && $resource != 'oauth2/token') {
+        if ($this->tokenData['token'] && $resource != 'token') {
             $httpheader[] = 'Authorization: Bearer ' . $this->tokenData['token'];
         }
 
@@ -557,6 +559,7 @@ class SuperPDPProvider extends AbstractPDPProvider
             if (!isset($extraHeaders['Accept'])) { // Json if default format
                 $body = json_decode($body, true);
             }
+
 			$returnarray = array(
 				'status_code' => $status_code,
 				'response' => $body
@@ -609,7 +612,7 @@ class SuperPDPProvider extends AbstractPDPProvider
      */
     public function syncFlows($syncFromDate = 0, $limit = 0)
     {
-        global $db, $user, $conf;
+        global $db, $langs, $user, $conf;
 
         $results_messages = array();
         $actions = array();
@@ -792,17 +795,18 @@ class SuperPDPProvider extends AbstractPDPProvider
 
         $res = $error > 0 ? -1 : 1;
 
-        $globalresultmessage = ($res == 1) ? "Synchronization completed successfully." : "Synchronization aborted on flow " . ($flow['flowId'] ?? 'N/A');
+        $globalresultmessage = ($res == 1) ? $langs->trans("SyncCompletedSuccessfuly") : ($langs->trans("SyncAborted", $i, $totalFlows, ($flow['flowId'] ?? 'N/A')));
 
 		dol_syslog(__METHOD__ . " syncFlows end : ".$globalresultmessage, LOG_DEBUG, 0, "_pdpconnectfr");
 
 
         $messages = array();
 		$messages[] = $globalresultmessage;
-        $messages[] = "Total flows available to synchronize: ".$totalFlows;
-        $messages[] = "Limit: ".$batchlimit;
-        $messages[] = "Total flows skipped (exist or already processed): ".$alreadyExist;
-        $messages[] = "Total of new flows synchronized: ".$syncedFlows;
+        if ($res == 1) {
+			$messages[] = $langs->trans("TotalToSync").": <b>".$totalFlows."</b>";
+        	$messages[] = "Limit: ".$batchlimit;
+        }
+        $messages[] = $langs->trans("TotalSkippedSync").": <b>".$alreadyExist."</b> - ".$langs->trans("TotalNewSync").": <b>".$syncedFlows."</b>";
 
         // Processing result that will be saved in DB
         $processingResult = '';

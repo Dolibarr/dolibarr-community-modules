@@ -47,7 +47,7 @@ class Call extends CommonObject
 	 * @var string		Prefix to check for any trigger code of any business class to prevent bad value for trigger code.
 	 * @see CommonTrigger::call_trigger()
 	 */
-	public $TRIGGER_PREFIX = 'PDPCONNECTFR_MYOBJECT';	// Will be used to build trgiger keys 'PDPCONNECTFR_MYOBJECT_MODIFY', ...
+	public $TRIGGER_PREFIX = 'CALL';	// Will be used to build trgiger keys 'PDPCONNECTFR_MYOBJECT_MODIFY', ...
 
 	/**
 	 * @var string 		Name of table without prefix where object is stored. This is also the key used for extrafields management (so extrafields know the link to the parent table).
@@ -135,9 +135,9 @@ class Call extends CommonObject
 		"call_type" => array("type" => "varchar(50)", "label" => "Type", "enabled" => "1", 'position' => 25, 'notnull' => 1, "visible" => "1", "comment" => "Call type (SyncDocs, SyncSoc, FetchDoc, FetchSoc...)", "csslist" => "tdoverflowmax125"),
 		"method" => array("type" => "varchar(10)", "label" => "Method", "enabled" => "1", 'position' => 30, 'notnull' => 0, "visible" => "1", "comment" => "-- HTTP method (GET, POST, PUT, DELETE)"),
 		"endpoint" => array("type" => "varchar(255)", "label" => "Endpoint", "enabled" => "1", 'position' => 35, 'notnull' => 1, "visible" => "-1", "comment" => "-- URL or endpoint called"),
-		"skippedflow" => array("type" => "integer", "label" => "SkippedFlow", "enabled" => "1", 'position' => 130, 'notnull' => 1, "visible" => "1", "comment" => "Skipped flows during the API call"),
-		"successflow" => array("type" => "integer", "label" => "SuccessFlow", "enabled" => "1", 'position' => 140, 'notnull' => 1, "visible" => "1", "comment" => "Successfully completed flows during the API call"),
-		"totalflow" => array("type" => "integer", "label" => "TotalFlow", "enabled" => "1", 'position' => 150, 'notnull' => 1, "visible" => "-1", "comment" => "Total flows handled during the API call"),
+		"skippedflow" => array("type" => "integer", "label" => "SkippedFlows", "enabled" => "1", 'position' => 130, 'notnull' => 1, "visible" => "1", "comment" => "Skipped flows during the API call"),
+		"successflow" => array("type" => "integer", "label" => "SuccessfullFlows", "langs" => "pdpconnectfr@pdpconnectfr", "enabled" => "1", 'position' => 140, 'notnull' => 1, "visible" => "1", "comment" => "Successfully completed flows during the API call"),
+		"totalflow" => array("type" => "integer", "label" => "TotalFlows", "enabled" => "1", 'position' => 150, 'notnull' => 1, "visible" => "-1", "comment" => "Total flows handled during the API call"),
 		"batchlimit" => array("type" => "integer", "label" => "BatchLimit", "enabled" => "1", 'position' => 120, 'notnull' => 1, "visible" => "-1", "comment" => "Maximum number of flows to process in this call"),
 		//"processing_result" => array("type" => "text", "label" => "ProcessingDetail", "enabled" => "1", 'position' => 160, 'notnull' => 0, "visible" => "1", "help" => "Result of processing (summary of errors/success of internal processing)", "csslist" => "twolinesmax-normallineheight"),
 		"processing_result" => array("type" => "text", "label" => "ProcessingDetail", "enabled" => "1", 'position' => 160, 'notnull' => 0, "visible" => "1", "help" => "Result of processing (summary of errors/success of internal processing)", 'csslist' => 'small minwidth150'),

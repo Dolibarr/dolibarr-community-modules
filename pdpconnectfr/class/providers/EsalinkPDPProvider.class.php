@@ -50,7 +50,9 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
         $this->config = array(
             'provider_url' => 'https://ppd.hubtimize.fr',
-            'prod_api_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/', // TODO: Replace the URL once known
+            'prod_auth_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/', 	// TODO: Replace the URL once known
+            'test_auth_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/',
+        	'prod_api_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/', 		// TODO: Replace the URL once known
             'test_api_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/',
             'username' => getDolGlobalString('PDPCONNECTFR_ESALINK_USERNAME', ''),
             'password' => getDolGlobalString('PDPCONNECTFR_ESALINK_PASSWORD', ''),
@@ -504,7 +506,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
         require_once DOL_DOCUMENT_ROOT . '/core/lib/geturl.lib.php';
 
-		$url = $this->getApiUrl() . $resource;
+		$url = $this->getApiUrl(($callType == 'get_access_token') ? 'auth' : 'api') . $resource;
 
         $httpheader = array(
             'hubtimize-api-key: '. $this->config['api_key']
@@ -602,7 +604,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
      */
     public function syncFlows($syncFromDate = 0, $limit = 0)
     {
-        global $db, $user, $conf;
+        global $db, $langs, $user, $conf;
 
         $results_messages = array();
         $actions = array();
@@ -785,17 +787,18 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
         $res = $error > 0 ? -1 : 1;
 
-        $globalresultmessage = ($res == 1) ? "Synchronization completed successfully." : "Synchronization aborted on flow " . ($flow['flowId'] ?? 'N/A');
+        $globalresultmessage = ($res == 1) ? $langs->trans("SyncCompletedSuccessfuly") : ($langs->trans("SyncAborted", $i, $totalFlows, ($flow['flowId'] ?? 'N/A')));
 
 		dol_syslog(__METHOD__ . " syncFlows end : ".$globalresultmessage, LOG_DEBUG, 0, "_pdpconnectfr");
 
 
         $messages = array();
 		$messages[] = $globalresultmessage;
-        $messages[] = "Total flows available to synchronize: ".$totalFlows;
-        $messages[] = "Limit: ".$batchlimit;
-        $messages[] = "Total flows skipped (exist or already processed): ".$alreadyExist;
-        $messages[] = "Total of new flows synchronized: ".$syncedFlows;
+        if ($res == 1) {
+			$messages[] = $langs->trans("TotalToSync").": <b>".$totalFlows."</b>";
+        	$messages[] = "Limit: ".$batchlimit;
+        }
+        $messages[] = $langs->trans("TotalSkippedSync").": <b>".$alreadyExist."</b> - ".$langs->trans("TotalNewSync").": <b>".$syncedFlows."</b>";
 
         // Processing result that will be saved in DB
         $processingResult = '';
