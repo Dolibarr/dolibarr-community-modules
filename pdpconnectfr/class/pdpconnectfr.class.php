@@ -697,6 +697,9 @@ class PdpConnectFr
 
         if (empty($this->getSellerCommunicationURI())) {
             $baseErrors[] = $langs->trans("FxCheckErrorRoutingID");
+            if ($mysoc->country_code == 'FR') {
+                $baseErrors[] = $langs->trans("FxCheckErrorRoutingIDFR");
+            }
         }
         if (empty($mysoc->idprof1)) {
             $baseErrors[] = $langs->trans("FxCheckErrorIDPROF1");
@@ -719,11 +722,11 @@ class PdpConnectFr
 
         if (!empty($baseWarnings)) {
             $res = 0;
-            $message .= '<br> Warning: ' . implode('<br> Warning: ', $baseWarnings);
+            $message .= 'Warning: ' . implode('<br> Warning: ', $baseWarnings);
         }
         if (!empty($baseErrors)) {
             $res = -1;
-            $message .= '<br> Error: ' . implode('<br> Error: ', $baseErrors);
+            $message .= 'Error: ' . implode('<br> Error: ', $baseErrors);
         }
         if (empty($baseErrors) && empty($baseWarnings)) {
             $res = 1;
@@ -1800,14 +1803,30 @@ class PdpConnectFr
      */
     public function getSellerCommunicationURI()
     {
+    	global $mysoc;
+
         $provider = getDolGlobalString('PDPCONNECTFR_PDP');
-        $uri = '';
+        $einvoiceid = '';
 
         // Get seller URI for provider
         $uriConf = 'PDPCONNECTFR_' . strtoupper($provider) . '_ROUTING_ID';
-        $uri = getDolGlobalString($uriConf);
+        $einvoiceid = getDolGlobalString($uriConf);
 
-        return $uri;
+        // If electronic invoicing routing ID is not set for the provider, we use professional ID 1 as default value
+        if (empty($einvoiceid)) {
+			$einvoiceid = $mysoc->idprof1;
+        }
+
+        // Check that einvoice id is ok
+        if ($mysoc->country_code == 'FR' && !empty($einvoiceid)) {
+            $einvoiceid = $this->remove_spaces($einvoiceid);
+            if (!preg_match('/^'.$mysoc->idprof1.'/', $einvoiceid)) {
+                dol_syslog("Error: The seller communication URI seems not correct (should be or start with your SIRET number). Value: " . $einvoiceid, LOG_ERR);
+                $einvoiceid = '';
+            }
+        }
+
+        return $einvoiceid;
     }
 
     /**

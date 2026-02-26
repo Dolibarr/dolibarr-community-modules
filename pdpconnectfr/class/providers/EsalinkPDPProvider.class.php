@@ -63,6 +63,97 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         $this->exchangeProtocol = $ProtocolManager->getprotocol($exchangeProtocolConf);
     }
 
+
+    /**
+     * Set the setup factory specifi to the provider.
+     *
+     * @param FormSetup $formSetup 			The form setup object to initialize
+     * @param string 	$prefix 			The prefix for configuration keys
+     * @param string 	$prefixenv 			The prefix for environment variable keys
+     * @param array 	$providersConfig 	The array containing providers configuration
+     * @param array 	$TFieldProtocols 	The array of available protocols to set in the select field
+     * @param array 	$TFieldProfiles 	The array of available profiles to set in the select field
+     * @return void
+     */
+    public function initFormSetup(&$formSetup, $prefix, $prefixenv, $providersConfig, $TFieldProtocols, $TFieldProfiles) {
+    	global $langs, $mysoc;
+
+		$tokenData = $this->getTokenData();
+
+
+		$item = $formSetup->newItem('PDPCONNECTFR_LINK_CREATE_ACCOUNT');
+		$url = $providersConfig[getDolGlobalString('PDPCONNECTFR_PDP')][$prefixenv.'_account_admin_url'];
+		$item->fieldOverride = img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$url.'" target="_new">'.$url.'</a>';
+
+		// E-Invoice ID
+		$item = $formSetup->newItem($prefix . 'ROUTING_ID');
+		$item->helpText = $langs->transnoentities($prefix . 'ROUTING_ID_HELP');
+		$item->fieldAttr['placeholder'] = $mysoc->idprof1;
+		$item->fieldParams['isMandatory'] = 0;
+		$item->cssClass = 'minwidth300';
+
+		// Setup conf to choose a protocol of exchange
+		$item = $formSetup->newItem('PDPCONNECTFR_PROTOCOL')->setAsSelect($TFieldProtocols);
+		$item->helpText = $langs->transnoentities('PDPCONNECTFR_PROTOCOL_HELP');
+		$item->defaultFieldValue = 'FACTURX';
+		$item->cssClass = 'minwidth500';
+
+		// Setup conf to choose a profil of exchange
+		$item = $formSetup->newItem('PDPCONNECTFR_PROFILE')->setAsSelect($TFieldProfiles);
+		$item->helpText = $langs->transnoentities('PDPCONNECTFR_PROFILE_HELP');
+		$item->defaultFieldValue = 'EN16931';
+		$item->cssClass = 'minwidth500';
+
+		// Username
+		$item = $formSetup->newItem($prefix . 'USERNAME');
+		$item->cssClass = 'minwidth500';
+
+		// Password
+		$item = $formSetup->newItem($prefix . 'PASSWORD')->setAsGenericPassword();
+		$item->cssClass = 'minwidth500';
+
+		// API_KEY
+		$item = $formSetup->newItem($prefix . 'API_KEY');
+		$item->cssClass = 'minwidth500';
+
+		// Token
+		if (getDolGlobalString($prefix . 'API_KEY')) {
+			$item = $formSetup->newItem($prefix . 'TOKEN');
+			$item->cssClass = 'maxwidth500 ';
+			$item->fieldOverride = "";
+			if (!empty($tokenData['token'])) {
+				$item->fieldOverride = "<span class='opacitymedium hideonsmartphone'>" . htmlspecialchars('**************' . substr($tokenData['token'], -4)) . "</span>";
+			}
+			if (!$tokenData['token']) {
+				$item->fieldOverride .= '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken().'">' . $langs->trans('generateAccessToken') . '<i class="fa fa-key paddingleft"></i></a><br>';
+			}
+			if ($tokenData['token']) {
+				$item->fieldOverride .= ' &nbsp; &nbsp; <a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken().'">' . $langs->trans('reGenerateAccessToken') . '<i class="fa fa-key paddingleft"></i></a><br>';
+			}
+		}
+
+		if (!empty($tokenData['token'])) {
+			// Actions
+			$item = $formSetup->newItem($prefix . 'ACTIONS');
+
+			$item->fieldOverride .= '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=call".$prefix."HEALTHCHECK&token=".newToken().'">' . $langs->trans('testConnection') . ' (Healthcheck)<i class="fa fa-check paddingleft"></i></a><br>';
+			$item->cssClass = 'minwidth500';
+
+			if ($tokenData['token'] && getDolGlobalString('PDPCONNECTFR_PROTOCOL') && getDolGlobalString('PDPCONNECTFR_PROTOCOL') === 'FACTURX') {
+				$item->fieldOverride .= '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=make".$prefix."sampleinvoice&token=".newToken().'">' . $langs->trans('generateSendSampleInvoice') . '<i class="fa fa-file paddingleft"></i></a><br>';
+			}
+		}
+
+		// To remove
+		/*if ($tokenData['token'] && getDolGlobalString('PDPCONNECTFR_PROTOCOL') && getDolGlobalString('PDPCONNECTFR_PROTOCOL') === 'FACTURX' && getDolGlobalString('PDPCONNECTFR_PROFILE') === 'EN16931') {
+			$item->fieldOverride .= "
+				<a
+				href='".$_SERVER["PHP_SELF"]."?action=makeInvoice&token=".newToken()."'
+				> Generate Invoice <i class='fa fa-file'></i></a><br/>
+			";
+		}*/
+    }
+
     /**
      * Validate configuration parameters before API calls.
      *
@@ -94,7 +185,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
      * @return string|null Access token or null on failure.
      */
     public function getAccessToken() {
-        global $db, $conf, $langs;
+        global $langs;
 
         $param = json_encode(array(
             'username' => $this->config['username'],

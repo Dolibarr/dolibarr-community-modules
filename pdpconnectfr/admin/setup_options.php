@@ -346,23 +346,22 @@ print dol_get_fiche_head($head, 'options', $langs->trans($title), -1, "pdpconnec
 // Setup page goes here
 //print info_admin($langs->trans("PDPConnectInfo"));
 //print '<span class="opacitymedium">'.$langs->trans("PDPConnectFRSetupPage").'</span><br>';
-print '<br>';
 
 // Alert mysoc configuration is not complete
 $pdpconnectfr = new PdpConnectFr($db);
 $mysocCheck = $pdpconnectfr->validateMyCompanyConfiguration();
 if ($mysocCheck['res'] < 0) {
-	print '<div class="error">';
-	print '<strong>' . $langs->trans("MyCompanyConfigurationError") . ':</strong><br><br>';
+	print '<div class="warning">';
+	print '<strong>' . $langs->trans("MyCompanyConfigurationWarning") . ':</strong><br>';
 	print $mysocCheck['message'];
 	print '<br><br>';
 	print '<a class="button" href="' . DOL_URL_ROOT . '/admin/company.php">';
 	print $langs->trans("ModifyCompanyInformation") . ' <i class="fas fa-tools"></i>';
 	print '</a>';
 	print '</div>';
-	print '<br>';
 }
 
+print '<br>';
 
 /*if ($action == 'edit') {
  print $formSetup->generateOutput(true);
