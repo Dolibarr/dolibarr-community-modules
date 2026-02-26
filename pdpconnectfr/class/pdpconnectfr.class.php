@@ -1797,7 +1797,7 @@ class PdpConnectFr
     }
 
     /**
-     * Get seller communication URI
+     * Get mycompany communication URI
      *
      * @return string
      */
