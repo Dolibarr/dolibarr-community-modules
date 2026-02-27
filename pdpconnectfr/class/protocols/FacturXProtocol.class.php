@@ -591,14 +591,13 @@ class FacturXProtocol extends AbstractProtocol
     }
 
     /**
-     * Generate a complete Factur-X invoice file by embedding the XML
-     * into a PDF.
+     * Generate a complete Factur-X invoice file by embedding the XML into a PDF.
      *
      * This function combines the invoice data with its corresponding XML
      * to produce a final hybrid document ready for exchange or archiving.
      *
-     * @param object $invoice_id    Invoice ID to be processed.
-     * @return string               -1 if ko, path if ok.
+     * @param 	int|Object 	$invoice_id    	Invoice ID or Invoice Object to be processed.
+     * @return 	string       				-1 if ko, path if ok.
      */
     public function generateInvoice($invoice_id)
     {
@@ -608,13 +607,19 @@ class FacturXProtocol extends AbstractProtocol
         dol_syslog(get_class($this) . '::generateInvoice');
 
         require_once DOL_DOCUMENT_ROOT."/compta/facture/class/facture.class.php";
-        $invoice = new Facture($db);
-	    $invoiceObject = $invoice->fetch((int) $invoice_id);
 
-        if ($invoiceObject < 0) {
-            dol_syslog(get_class($this) . "::generateInvoice failed to load invoice id=" . $invoice_id, LOG_ERR);
-            setEventMessages($langs->trans("ErrorLoadingInvoice"), [], 'errors');
-            return -1;
+        if ($invoice_id instanceof Facture) {
+            $invoice = $invoice_id;
+            $invoice_id = $invoice->id;
+        } else {
+        	$invoice = new Facture($db);
+	    	$invoiceResult = $invoice->fetch((int) $invoice_id);
+
+	        if ($invoiceResult < 0) {
+	            dol_syslog(get_class($this) . "::generateInvoice failed to load invoice id=" . $invoice_id, LOG_ERR);
+	            setEventMessages($langs->trans("ErrorLoadingInvoice"), [], 'errors');
+	            return -1;
+	        }
         }
 
         // Generate XML

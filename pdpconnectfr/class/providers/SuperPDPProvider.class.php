@@ -459,11 +459,13 @@ class SuperPDPProvider extends AbstractPDPProvider
         $uuid = $this->generateUuidV4(); // UUID used to correlate logs between Dolibarr and PDP
 
         // Format PDP resource Url
+        /*
         $resource = 'flows';
         $urlparams = array(
             'Request-Id' => $uuid,
         );
 		$resource .= '?' . http_build_query($urlparams);
+		*/
 
         // Extra headers
         $extraHeaders = [
@@ -574,9 +576,9 @@ class SuperPDPProvider extends AbstractPDPProvider
             $httpheader[] = 'Authorization: Bearer ' . $this->tokenData['token'];
         }
 
-		/*if ($params) {
-			$url .= '?' . http_build_query($params);
-		}*/
+        /*if (is_array($params)){
+        	$params = http_build_query($params);
+        }*/
 
 		$response = getURLContent($url, $method, $params, 1, $httpheader);
 

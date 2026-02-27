@@ -439,11 +439,13 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         $uuid = $this->generateUuidV4(); // UUID used to correlate logs between Dolibarr and PDP
 
         // Format PDP resource Url
+        /* The URL must be like : https://ppd.hubtimize.fr/api/orchestrator/v1/flows?Request-Id={UUID}
         $resource = 'flows';
         $urlparams = array(
             'Request-Id' => $uuid,
         );
 		$resource .= '?' . http_build_query($urlparams);
+		*/
 
         // Extra headers
         $extraHeaders = [
@@ -558,9 +560,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
             $httpheader[] = 'Authorization: Bearer ' . $this->tokenData['token'];
         }
 
-		/*if ($params) {
-			$url .= '?' . http_build_query($params);
-		}*/
+        /*
+        if (is_array($params)){
+        	$params = http_build_query($params);
+        }*/
 
 		$response = getURLContent($url, $method, $params, 1, $httpheader);
 
