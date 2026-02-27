@@ -148,11 +148,13 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				$item->fieldOverride = "<span class='opacitymedium hideonsmartphone'>" . htmlspecialchars('**************' . substr($tokenData['token'], -4)) . "</span>";
 			}
 			if (!$tokenData['token']) {
-				$item->fieldOverride .= '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken().'">' . $langs->trans('generateAccessToken') . '<i class="fa fa-key paddingleft"></i></a><br>';
+				$item->fieldOverride .= '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken().'">' . $langs->trans('generateAccessToken') . '<i class="fa fa-key paddingleft"></i></a>';
 			}
 			if ($tokenData['token']) {
-				$item->fieldOverride .= ' &nbsp; &nbsp; <a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken().'">' . $langs->trans('reGenerateAccessToken') . '<i class="fa fa-key paddingleft"></i></a><br>';
+				$item->fieldOverride .= ' &nbsp; &nbsp; <a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken().'">' . $langs->trans('reGenerateAccessToken') . '<i class="fa fa-key paddingleft"></i></a>';
 			}
+
+			$item->fieldOverride .= ' &nbsp; &nbsp; <a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=delete".$prefix."TOKEN&token=".newToken().'">' . img_picto('', 'delete') . '</a>';
 		}
 
 		if (!empty($tokenData['token'])) {
@@ -167,15 +169,6 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				$item->fieldOverride .= '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=make".$prefix."sampleinvoice&token=".newToken().'">' . $langs->trans('generateSendSampleInvoice') . '<i class="fa fa-file paddingleft"></i></a><br>';
 			}
 		}
-
-		// To remove
-		/*if ($tokenData['token'] && getDolGlobalString('PDPCONNECTFR_PROTOCOL') && getDolGlobalString('PDPCONNECTFR_PROTOCOL') === 'FACTURX' && getDolGlobalString('PDPCONNECTFR_PROFILE') === 'EN16931') {
-			$item->fieldOverride .= "
-				<a
-				href='".$_SERVER["PHP_SELF"]."?action=makeInvoice&token=".newToken()."'
-				> Generate Invoice <i class='fa fa-file'></i></a><br/>
-			";
-		}*/
     }
 
     /**
@@ -247,6 +240,16 @@ class EsalinkPDPProvider extends AbstractPDPProvider
     public function refreshAccessToken() {
         // No route to refresh token for PDP provider so we get a new one
         return $this->getAccessToken();
+    }
+
+    /**
+     * Delete access token.
+     *
+     * @return 	bool                	       	True if success, false otherwise
+     */
+    public function deleteAccessToken() {
+        $result = $this->deleteOAuthTokenDB();
+        return $result;
     }
 
     /**
@@ -436,11 +439,13 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         $uuid = $this->generateUuidV4(); // UUID used to correlate logs between Dolibarr and PDP
 
         // Format PDP resource Url
+        /* The URL must be like : https://ppd.hubtimize.fr/api/orchestrator/v1/flows?Request-Id={UUID}
         $resource = 'flows';
         $urlparams = array(
             'Request-Id' => $uuid,
         );
 		$resource .= '?' . http_build_query($urlparams);
+		*/
 
         // Extra headers
         $extraHeaders = [
@@ -555,9 +560,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
             $httpheader[] = 'Authorization: Bearer ' . $this->tokenData['token'];
         }
 
-		/*if ($params) {
-			$url .= '?' . http_build_query($params);
-		}*/
+        /*
+        if (is_array($params)){
+        	$params = http_build_query($params);
+        }*/
 
 		$response = getURLContent($url, $method, $params, 1, $httpheader);
 
