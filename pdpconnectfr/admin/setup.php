@@ -221,18 +221,18 @@ if (preg_match('/make'.$prefix.'sampleinvoice/i', $action, $reg)) {
 	}
 }
 
-// To remove
-/*if (preg_match('/makeInvoice/i', $action, $reg)) {
-	$protocol = $ProtocolManager->getprotocol('FACTURX');
+if (preg_match('/delete'.$prefix.'TOKEN/i', $action, $reg)) {
+	// Delete token
+	$result = $provider->deleteAccessToken();
 
-	$result = $protocol->generateInvoice('288');
 	if ($result) {
-		setEventMessages('Result : ' . $result, null, 'warnings');
+		setEventMessages("Token deleted successfully", null, 'mesgs');
+		header("Location: ".$_SERVER["PHP_SELF"].'?page_y='.GETPOSTFLOAT('page_y'));
+		exit;
 	} else {
-		setEventMessages('', $protocol->errors, 'errors');
+		setEventMessages('', $provider->errors, 'errors');
 	}
-}*/
-
+}
 
 if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 	// Link to get the Credentials

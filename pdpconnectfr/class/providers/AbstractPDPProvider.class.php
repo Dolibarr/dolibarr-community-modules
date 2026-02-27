@@ -336,6 +336,34 @@ abstract class AbstractPDPProvider
         ];
     }
 
+
+    /**
+     * Insert or update OAuth token for the given PDP.
+     *
+     * @return bool                        True if success, false otherwise
+     */
+    public function deleteOAuthTokenDB()
+    {
+        global $conf, $db;
+
+        // Build service name depending on environment
+        $serviceName = $this->config['dol_prefix'] . '_' . ($this->config['live'] ? 'PROD' : 'TEST');
+
+        // Check if a token already exists for this service
+        $sql_check = "DELETE FROM ".MAIN_DB_PREFIX."oauth_token
+                        WHERE service = '".$db->escape($serviceName)."'
+                        AND entity = ".((int) $conf->entity);
+
+        $resql = $db->query($sql_check);
+        if (!$resql) {
+            $this->errors[] = __METHOD__." SQL error (check): ".$db->lasterror();
+            return false;
+        }
+
+        return true;
+    }
+
+
     /**
      * Get the last synchronization date with the PDP provider.
      * Retrieves the timestamp of the most recent successful flow synchronization
