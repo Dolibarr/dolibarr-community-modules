@@ -451,7 +451,24 @@ class CdarHandler
                 $result['StatusSequenceNumeric'] = (int) $seqResult[0];
             }
 
-            $result['StatusIncludedNoteContent'] = $this->getXpathValue($status, 'ram:IncludedNote/ram:Content');
+            // Collect all note contents from all SpecifiedDocumentStatus nodes
+            $allContents = [];
+            foreach ($statusNodes as $statusNode) {
+                $contentNodes = $statusNode->xpath('ram:IncludedNote/ram:Content');
+                if (!empty($contentNodes)) {
+                    foreach ($contentNodes as $node) {
+                        $content = trim((string) $node);
+                        if ($content !== '') {
+                            $allContents[] = $content;
+                        }
+                    }
+                }
+            }
+
+            if (!empty($allContents)) {
+                $result['StatusIncludedNoteContents'] = $allContents;               // array of all notes
+                $result['StatusIncludedNoteContent'] = implode("\n", $allContents); // backward-compatible string
+            }
         }
 
         return $result;
