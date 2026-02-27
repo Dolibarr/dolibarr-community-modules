@@ -238,7 +238,7 @@ class ActionsPdpconnectfr extends CommonHookActions
         $contexts = explode(':', $parameters['context']);
 
 
-        if (in_array($object->element, ['facture'])) {
+        if (isset($object->element) && in_array($object->element, ['facture'])) {
 
             // $object->fetch_thirdparty();
             // $thirdpartyCountryCode = $object->thirdparty->country_code;
@@ -327,7 +327,7 @@ class ActionsPdpconnectfr extends CommonHookActions
             }
         }
 
-        if (in_array($object->element, ['invoice_supplier'])) {
+        if (isset($object->element) && in_array($object->element, ['invoice_supplier'])) {
             if ($action == 'confirm_sendStatusMessage') {
                 $PDPManager = new PDPProviderManager($db);
                 $provider = $PDPManager->getProvider(getDolGlobalString('PDPCONNECTFR_PDP'));
