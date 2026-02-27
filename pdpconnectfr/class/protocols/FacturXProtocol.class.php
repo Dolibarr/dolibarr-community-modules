@@ -168,10 +168,10 @@ class FacturXProtocol extends AbstractProtocol
         $profile = getDolGlobalString('PDPCONNECTFR_PROFILE');
         switch ($profile) {
             case 'EN16931' :
-                $used_profile = ZugferdProfiles::PROFILE_EN16931;
+                $used_profile = ZugferdProfiles::PROFILE_EXTENDED;
                 $facturxpdf = ZugferdDocumentBuilder::createNew($used_profile);
             default :
-                $used_profile = ZugferdProfiles::PROFILE_EN16931;
+                $used_profile = ZugferdProfiles::PROFILE_EXTENDED;
                 $facturxpdf = ZugferdDocumentBuilder::createNew($used_profile);
         }
         dol_syslog(\get_class($this) . '::executeHooks create new XML document based on ' . $used_profile);
@@ -353,6 +353,10 @@ class FacturXProtocol extends AbstractProtocol
         // Add invoice lines
         $numligne = 1;
         foreach ($object->lines as $line) {
+
+            // Specific handling for deposit lines (negative lines with description '(DEPOSIT)')
+            $isDepositLine = 0;
+
             // Skip subtotal lines
             $isSubTotalLine = $this->_isLineFromExternalModule($line, $object->element, 'modSubtotal');
             if ($isSubTotalLine) {
@@ -360,8 +364,10 @@ class FacturXProtocol extends AbstractProtocol
             }
 
             if ($line->desc == '(DEPOSIT)') {
-                $origFactRef = "";
-                $origFactDate = new DateTime();
+                $isDepositLine = 1;
+                $depositFactRef = "";
+                $depositFactDate = new DateTime();
+
                 $discount = new DiscountAbsolute($this->db);
                 $resdiscount = $discount->fetch($line->fk_remise_except);
 
@@ -374,29 +380,15 @@ class FacturXProtocol extends AbstractProtocol
                     dol_syslog("Fetch origFact " . $discount->fk_facture_source . ", res=".$resOrigFact, LOG_DEBUG);
 
                     if ($resOrigFact > 0) {
-                        $origFactRef = $origFact->ref;
-                        $origFactDate = new DateTime(dol_print_date($origFact->date, 'dayrfc'));
+                        $depositFactRef = $origFact->ref;
+                        $depositFactDate = new DateTime(dol_print_date($origFact->date, 'dayrfc'));
                     }
                 }
                 $prepaidAmount += abs($line->total_ttc);
-                // $facturxpdf->addDocumentAllowanceCharge(
-                //     abs($line->total_ttc),
-                //     false,
-                //     "S",
-                //     "VAT",
-                //     $line->tva_tx,
-                //     null,
-                //     null,
-                //     null,
-                //     null,
-                //     null,
-                //     null,
-                //     "Prepayment invoice (386)" . $origFactRef
-                // );
 
-                dol_syslog("Set setDocumentBuyerOrderReferencedDocument : " . json_encode($origFactRef) . " :: " . json_encode($origFactDate), LOG_DEBUG);
+                dol_syslog("Set setDocumentBuyerOrderReferencedDocument : " . json_encode($depositFactRef) . " :: " . json_encode($depositFactDate), LOG_DEBUG);
 
-                $facturxpdf->setDocumentInvoiceReferencedDocument($origFactRef, ZugferdInvoiceType::PREPAYMENTINVOICE, $origFactDate);
+                $facturxpdf->setDocumentInvoiceReferencedDocument($depositFactRef, ZugferdInvoiceType::PREPAYMENTINVOICE, $depositFactDate);
 
                 $line->qty = -$line->qty;
                 $line->subprice = abs($line->subprice);
@@ -437,7 +429,6 @@ class FacturXProtocol extends AbstractProtocol
                     $description = "";
                 }
             }
-            $lineref = $line->product_ref ? $line->product_ref : "0000";
             $lineproductref = $line->product_ref ? $line->product_ref : "0000";
 
             // TODO: ADD supplier product reference if available
@@ -451,6 +442,30 @@ class FacturXProtocol extends AbstractProtocol
                 ->setDocumentPositionNetPrice($line->subprice)
                 ->setDocumentPositionQuantity($line->qty, "H87") // H87 = Pieces (TODO: customize unit code, required from 09/2027) https://unece.org/trade/documents/2021/06/uncefact-rec20-0
                 ->setDocumentPositionLineSummation($line->total_ht);
+
+            // Add reference to original invoice for deposit lines
+            // if ($isDepositLine) {
+            //     $facturxpdf->addDocumentPositionAdditionalReferencedDocument($depositFactRef, ZugferdInvoiceType::PREPAYMENTINVOICE, null, null, null, null, $depositFactDate);
+            // }
+
+            // Add reference to original invoice for deposit lines
+            if ($isDepositLine) {
+                $ref = new \ReflectionClass($facturxpdf);
+
+                $helperMethod = $ref->getMethod('getObjectHelper');
+                $helperMethod->setAccessible(true);
+                $helper = $helperMethod->invoke($facturxpdf);
+
+                $positionProp = $ref->getProperty('currentPosition');
+                $positionProp->setAccessible(true);
+                $position = $positionProp->getValue($facturxpdf);
+
+                $helper->tryCall(
+                    $helper->tryCallAndReturn($position, "getSpecifiedLineTradeSettlement"),
+                    "addToAdditionalReferencedDocument",
+                    $helper->getReferencedDocumentType($depositFactRef, null, null, "386", null, null, $depositFactDate, null)
+                );
+            }
 
             // Set billing period for the line
             if (!empty($line->date_start)) {
@@ -1046,6 +1061,9 @@ class FacturXProtocol extends AbstractProtocol
             $sellerTaxRegistations
         );
 
+        // Get references to the previous invoices if any (for credit notes for example)
+        $document->getDocumentInvoiceReferencedDocuments($invoiceRefDocs);
+
         // Debug: print all retrieved variables
         $parsedData = array(
             'documentno' => $documentno ?? null,
@@ -1097,6 +1115,9 @@ class FacturXProtocol extends AbstractProtocol
             // Seller Global Ids and Tax Registrations (may be unset due to reader var name)
             'sellerGlobalIds' => $sellerGlobalIds ?? null,
             'sellerTaxRegistations' => $sellerTaxRegistations ?? null,
+
+            // Invoice referenced documents
+            'invoiceRefDocs' => $invoiceRefDocs ?? null,
         );
 
         // Check if this invoice has already been imported
@@ -1256,6 +1277,18 @@ class FacturXProtocol extends AbstractProtocol
         if ($result < 0) {
             return ['res' => -1, 'message' => 'Invoice creation error: ' . $supplierInvoice->error];
         } else {
+
+            // Add linked object to original invoice (for example for credit note)
+            // if (!empty($invoiceRefDocs) && is_array($invoiceRefDocs)) {
+            //     foreach ($invoiceRefDocs as $doc) {
+            //         $refDoc = $doc['IssuerAssignedID'] ?? null;
+            //         $dateDoc = $doc['FormattedIssueDateTime'] ?? null;
+            //         $typeDoc = $doc['TypeCode'] ?? null;
+
+            //         $sql = 'INSERT INTO '.MAIN_DB_PREFIX."element_element (fk_source, source_type, fk_target, target_type) VALUES (".$result.", 'facture_fourn', '".$db->escape($refDoc)."', 'facture')";
+            //         $db->query($sql);
+            //     }
+            // }
 
             // Update thirdparty as a supplier if not already the case
             if ($supplier->fournisseur != 1) {
@@ -2201,7 +2234,7 @@ class FacturXProtocol extends AbstractProtocol
             dol_syslog(__METHOD__ . ' Product creation error: ' . $product->error, LOG_ERR);
             return [
                 'res'     => -1,
-                'message' => 'Product creation error: ' . implode("\n", $product->errors),
+                'message' => 'Product creation error: ' . $product->error,
             ];
         } else {
             dol_syslog(get_class($this) . '::_findOrCreateProductFromFacturXLine Auto-creation of products is disabled', LOG_ERR);
