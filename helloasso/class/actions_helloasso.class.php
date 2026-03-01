@@ -620,7 +620,7 @@ class ActionsHelloAsso extends CommonHookActions
 			$result = helloassoDoConnection();
 
 			if ($result <= 0) {
-				$errors[] = $langs->trans("ErrorFailedToGetTokenFromClientIdAndSecret");
+				$errors[] = $langs->trans("ErrorFailedToGetTokenFromClientIdAndSecret", 'HelloAsso');
 				$error++;
 				$action = '';
 			}
