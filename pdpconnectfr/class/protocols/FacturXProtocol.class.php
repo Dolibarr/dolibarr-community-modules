@@ -721,6 +721,16 @@ class FacturXProtocol extends AbstractProtocol
             dol_syslog(get_class($this) . '::generateInvoice cleaned up temporary XML file: ' . $xmlfile);
         }
 
+        // Add factorx pdfgeneration hook
+        global $action, $hookmanager;
+        $hookmanager->initHooks(array('pdfgeneration'));
+        $parameters = array('file' => $orig_pdf, 'object' => $invoice, 'outputlangs' => $langs);
+        $reshook = $hookmanager->executeHooks('afterFactorxPDFCreation', $parameters, $this, $action); // Note that $action and $object may have been modified by some hooks
+        if ($reshook < 0) {
+            $this->error = $hookmanager->error;
+            $this->errors = $hookmanager->errors;
+        }
+
         return 1;
 
 
