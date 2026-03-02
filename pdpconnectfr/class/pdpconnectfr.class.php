@@ -1404,8 +1404,15 @@ class PdpConnectFr
         return $resprints;
     }
 
+    /**
+     * fetchLastknownInvoiceStatus
+     *
+     * @param string		$invoiceRef		Invoice ref
+     * @param int			$invoiceId		Invoice ID
+     * @return string[]|number[]|mixed[][]|mixed[]
+     */
     function fetchLastknownInvoiceStatus($invoiceRef, $invoiceId = 0) {
-        global $db, $conf;
+        global $conf;
 
         $status = array('code' => self::STATUS_NOT_GENERATED, 'status' => $this->getStatusLabel(self::STATUS_NOT_GENERATED), 'info' => '', 'file' => '0', 'transmitted' => 0);
 
@@ -1416,13 +1423,13 @@ class PdpConnectFr
         if ($invoiceId > 0) {
         	$sql .= " AND element_id = ".((int) $invoiceId);
         } else {
-        	$sql .= " AND syncref = '".$db->escape($invoiceRef)."'";
+        	$sql .= " AND syncref = '".$this->db->escape($invoiceRef)."'";
         }
 
-        $resql = $db->query($sql);
+        $resql = $this->db->query($sql);
         if ($resql) {
-            if ($db->num_rows($resql) > 0) {
-                $obj = $db->fetch_object($resql);
+            if ($this->db->num_rows($resql) > 0) {
+                $obj = $this->db->fetch_object($resql);
                 $status = array(
                     'code' => (int) $obj->syncstatus,
                     'status' => $this->getStatusLabel((int) $obj->syncstatus),
@@ -1433,7 +1440,7 @@ class PdpConnectFr
                 dol_syslog("No entry found in pdpconnectfr_extlinks table for invoiceRef: " . $invoiceRef);
             }
         } else {
-            dol_print_error($db);
+            dol_print_error($this->db);
         }
 
         // Fetch last status message from pdpconnectfr_lifecycle_msg table to get more details on current status of the invoice into the PDP system
@@ -1442,10 +1449,15 @@ class PdpConnectFr
         $sql .= " WHERE element_type = '".Facture::class."'";
         $sql .= " AND element_id = ".(int) $invoiceId;
         $sql .= " ORDER BY rowid DESC LIMIT 1";
+
         $resql = $this->db->query($sql);
-        if ($resql && $this->db->num_rows($resql) > 0) {
-            $obj = $this->db->fetch_object($resql);
-            $status['reasonCode'] = $obj->lc_reason_code ?? '';
+        if ($resql) {
+        	if ($this->db->num_rows($resql) > 0) {
+            	$obj = $this->db->fetch_object($resql);
+            	$status['reasonCode'] = $obj->lc_reason_code ?? '';
+        	}
+        } else {
+			dol_print_error($this->db);
         }
 
         // Check if there is an e-invoice file generated

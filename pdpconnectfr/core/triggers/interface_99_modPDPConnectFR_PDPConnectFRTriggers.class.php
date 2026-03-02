@@ -62,6 +62,27 @@ class InterfacePDPConnectFRTriggers extends DolibarrTriggers
 			return 0;
 		}
 
+		if ($action == 'BILL_CREATE') {
+			//When invoice is created
+		}
+
+		if ($action == 'BILL_VALIDATE') {
+			if ($object->module_source == 'takepos') {
+				// If invoice is generated from TakePOS, we must not make any e-invoice sync.
+				// We will do a Z sync instead from the cash closing feature.
+				$pdpConnectFr = new PdpConnectFr($db);
+
+				$newobject = dol_clone($object, 2);
+				$newobject->ref = $object->newref;
+
+				$result = $pdpConnectFr->setEInvoiceStatus($newobject, $pdpConnectFr::STATUS_IGNORE, '');
+            	if ($result < 0) {
+                	$this->errors = array_merge($this->errors, $pdpConnectFr->errors);
+                	return -1;
+                }
+			}
+		}
+
 		if ($action == 'BILL_MODIFY') {
 			// Fields that locked after transmission.
 			$lockedFields = array(
@@ -84,7 +105,7 @@ class InterfacePDPConnectFRTriggers extends DolibarrTriggers
 				// If invoice is transmitted, check if any locked field is modified.;
 				foreach ($lockedFields as $field) {
 					if ($object->$field != $object->oldcopy->$field) {
-						$this->errors[] = 'You try to modify a property that is locked once the invoice has been transmitted to PDP';
+						$this->errors[] = 'You try to modify a property that is locked once the invoice has been transmitted to th Access Point';
 						return -2;
 					}
 				}
