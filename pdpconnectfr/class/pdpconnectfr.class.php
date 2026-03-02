@@ -942,7 +942,13 @@ class PdpConnectFr
 
         // Title separator
         $resprints .= '<tr id="trpdpconnect" class="trpdpconnectseparator trtrpdpconnectseparator_1">';
-        $resprints .= '<td colspan="2"><span class="far fa-'.(($expand_display ? 'minus' : 'plus').'-square').'"></span><strong> ' . $langs->trans("pdpconnectfrInvoiceSeparator") . '</strong></td>';
+        $resprints .= '<td><span class="far fa-'.(($expand_display ? 'minus' : 'plus').'-square').'"></span><strong> ' . $langs->trans("pdpconnectfrInvoiceSeparator") . '</strong></td>';
+        if ($object->element == 'facture' || $object->element == 'invoice') {
+        	$url = DOL_URL_ROOT.'/compta/facture/agenda.php?id=' . urlencode($object->id) . '&search_agenda_label=PDPCONNECTFR';
+        } else {
+        	$url = DOL_URL_ROOT.'/fourn/facture/agenda.php?id=' . urlencode($object->id) . '&search_agenda_label=PDPCONNECTFR';
+        }
+        $resprints .= '<td><a href="' . $url . '">' . $langs->trans("EInvoiceEventsLink") . '<i class="marginleftonly fas fa-calendar-alt infobox-action"></i></a></td>';
         $resprints .= '</tr>';
 
         $info = $currentStatusInfo['info'] ?? '';
@@ -966,18 +972,6 @@ class PdpConnectFr
             $resprints .= '<td><span id="einvoice-reason">' . $reasonLabel . '</span></td>';
             $resprints .= '</tr>';
         }
-
-        // E-Invoice events history link
-        $resprints .= '<tr class="trpdpconnect_collapseseparator">';
-        $resprints .= '<td>' . $langs->trans("EInvoiceEventsLabel") . '</td>';
-        if ($object->element == 'facture' || $object->element == 'invoice') {
-        	$url = DOL_URL_ROOT.'/compta/facture/agenda.php?id=' . urlencode($object->id) . '&search_agenda_label=PDPCONNECTFR';
-        } else {
-        	$url = DOL_URL_ROOT.'/fourn/facture/agenda.php?id=' . urlencode($object->id) . '&search_agenda_label=PDPCONNECTFR';
-        }
-        $resprints .= '<td><a href="' . $url . '">' . $langs->trans("EInvoiceEventsLink") . ' <i class="fas fa-history"></i></a></td>';
-        $resprints .= '</tr>';
-
 
         // JavaScript for AJAX call to update status if current status is pending
         if ((int) $currentStatusInfo['code'] === self::STATUS_AWAITING_VALIDATION) {
