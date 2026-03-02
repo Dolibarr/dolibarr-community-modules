@@ -239,7 +239,6 @@ class ActionsPdpconnectfr extends CommonHookActions
 
 
         if (isset($object->element) && in_array($object->element, ['facture'])) {
-
             // $object->fetch_thirdparty();
             // $thirdpartyCountryCode = $object->thirdparty->country_code;
 
@@ -249,6 +248,14 @@ class ActionsPdpconnectfr extends CommonHookActions
 
             // Get current status of e-invoice
             $currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus($object->ref);
+
+           // Action to set the E-invoice status manually
+            if ($action == 'seteinvoicestatus') {
+				$result = $pdpConnectFr->setEInvoiceStatus($object, GETPOSTINT('seteinvoicestatus'), '');
+            	if ($result < 0) {
+                	$this->errors = array_merge($this->errors, $pdpConnectFr->errors);
+                }
+            }
 
             // Action to send invoice to PDP
             if ($action == 'send_to_pdp'
@@ -279,8 +286,8 @@ class ActionsPdpconnectfr extends CommonHookActions
 
             // Action to generate the E-invoice
             if ($action == 'generate_einvoice') {
+            	$object->fetch_thirdparty();
                 $invoiceObject = $object;
-                $invoiceObject->fetch_thirdparty();
 
                 // Call function to create Factur-X document
                 require_once __DIR__.'/protocols/ProtocolManager.class.php';
