@@ -738,9 +738,9 @@ class ActionsPdpconnectfr extends CommonHookActions
         )) {
             $obj = $parameters['obj'];
 
-            print '<td>';
+            print '<td class="tdoverflowmax125">';
             if ($obj->pdplink_id) {
-                print $obj->pdp_provider;
+                print dolPrintHTML($obj->pdp_provider);
             }
             print '</td>';
 			if (isset($parameters['i']) && empty($parameters['i'])) {
@@ -751,9 +751,9 @@ class ActionsPdpconnectfr extends CommonHookActions
         if (in_array('thirdpartylist', $contexts, true)) {
             $obj = $parameters['obj'];
 
-            print '<td>';
+            print '<td class="tdoverflowmax125">';
             if ($obj->pdplink_id) {
-                print $obj->routing_id;
+                print dolPrintHTML($obj->routing_id);
             }
             print '</td>';
 			if (isset($parameters['i']) && empty($parameters['i'])) {
