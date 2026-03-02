@@ -773,7 +773,9 @@ class PdpConnectFr
         }
         // Check routing_id
         $routing_id = $this->getBuyerCommunicationURI($thirdparty);
-        if (empty($routing_id)) {
+        // If PDPCONNECTFR_BLOCK_INVOICE_NO_ROUTING_ID is off, we use the profid as einvoice id and we already have the previous error message of
+        // profid missing. But if on, we also add a message dedicated to einvoice ID.
+        if (getDolGlobalString('PDPCONNECTFR_BLOCK_INVOICE_NO_ROUTING_ID') && empty($routing_id)) {
             $baseErrors[] = $langs->trans("FxCheckErrorCustomerRoutingID");
         }
         if ($thirdparty->tva_assuj && empty($thirdparty->tva_intra)) {
@@ -1837,7 +1839,7 @@ class PdpConnectFr
             $uri = $resFetch;
         }
 
-        if (empty($uri) && empty('PDPCONNECTFR_BLOCK_INVOICE_NO_ROUTING_ID')) {
+        if (empty($uri) && !getDolGlobalString('PDPCONNECTFR_BLOCK_INVOICE_NO_ROUTING_ID')) {	// Fallback on profid1
             $uri = $thirdparty->idprof1;
         }
 
