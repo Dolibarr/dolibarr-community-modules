@@ -29,7 +29,6 @@ require __DIR__ . "/../../vendor/autoload.php";
 
 class ZugferdDocumentBuilderPatcher
 {
-
     /**
      * URN for the standard Factur-X EXTENDED profile (horstoeko default output)
      */
@@ -50,12 +49,13 @@ class ZugferdDocumentBuilderPatcher
      *
      * @var array<int, array{lineId: string|int, invoiceRef: string, invoiceDate: \DateTimeInterface}>
      */
-    private array $depositRefs = [];
+    public $depositRefs = [];
+
 
     /**
      * @param ZugferdDocumentBuilder $builder  The horstoeko builder after all lines have been added
      */
-    public function __construct(private readonly ZugferdDocumentBuilder $builder)
+    public function __construct(ZugferdDocumentBuilder $builder)
     {
     }
 
@@ -67,7 +67,7 @@ class ZugferdDocumentBuilderPatcher
      * @param \DateTimeInterface    $invoiceDate    Deposit invoice date
      */
     public function addDepositLineReference(
-        string|int $lineId,
+        $lineId,
         string $invoiceRef,
         \DateTimeInterface $invoiceDate
     ): self {
