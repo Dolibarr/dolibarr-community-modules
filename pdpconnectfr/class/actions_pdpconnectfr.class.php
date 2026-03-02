@@ -22,8 +22,6 @@
  * \brief   Hook of module
  */
 
-use Luracast\Restler\Data\Arr;
-
 require_once DOL_DOCUMENT_ROOT.'/core/class/commonhookactions.class.php';
 require_once __DIR__ . "/pdpconnectfr.class.php";
 dol_include_once('/pdpconnectfr/class/providers/PDPProviderManager.class.php');
@@ -713,17 +711,23 @@ class ActionsPdpconnectfr extends CommonHookActions
 
             // Einvoice generated or not
             $einvoiceGenerated = $pdpConnectFr->fetchLastknownInvoiceStatus($obj->ref)['file'];
-            print '<td class="center">';
+            print '<td class="center tdoverflowmax125">';
             if ($einvoiceGenerated) {
                 print '<i class="fas fa-check-circle" style="color:green;" title="'.$langs->trans('EInvoiceGeneratedList').'"></i>';
             }
             print '</td>';
+			if (isset($parameters['i']) && empty($parameters['i'])) {
+				$parameters['totalarray']['nbfield']++;
+			}
 
             // syncstatus
             $currentStatusDetails = $obj->pdp_syncstatus ? $pdpConnectFr->getStatusLabel($obj->pdp_syncstatus) : '-';
-            print '<td class="center">';
+            print '<td class="center tdoverflowmax125" title="'.dolPrintHTMLForAttribute($currentStatusDetails).'">';
             print $currentStatusDetails;
             print '</td>';
+			if (isset($parameters['i']) && empty($parameters['i'])) {
+				$parameters['totalarray']['nbfield']++;
+			}
         }
 
         // Supplier invoice list, Product list, Soc list
@@ -739,6 +743,9 @@ class ActionsPdpconnectfr extends CommonHookActions
                 print $obj->pdp_provider;
             }
             print '</td>';
+			if (isset($parameters['i']) && empty($parameters['i'])) {
+				$parameters['totalarray']['nbfield']++;
+			}
         }
 
         if (in_array('thirdpartylist', $contexts, true)) {
@@ -749,6 +756,9 @@ class ActionsPdpconnectfr extends CommonHookActions
                 print $obj->routing_id;
             }
             print '</td>';
+			if (isset($parameters['i']) && empty($parameters['i'])) {
+				$parameters['totalarray']['nbfield']++;
+			}
         }
 
         return 0;
