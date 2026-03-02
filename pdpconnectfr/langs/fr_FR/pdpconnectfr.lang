@@ -209,7 +209,6 @@ SkippedFlows=Flux non explorés
 TotalFlows=Débits totaux
 SuccessfullFlows=Flux réussis
 EInvoiceEventsLabel=Événements
-EInvoiceEventsLink=Histoire
 EInvoiceFile=Fichier de facture électronique
 PDPSyncStatus=État AP
 EInvoiceGeneratedList=Généré

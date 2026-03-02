@@ -210,7 +210,6 @@ SkippedFlows=Skipped flows
 TotalFlows=Total flows
 SuccessfullFlows=Successfull flows
 EInvoiceEventsLabel=E-invoicing events
-EInvoiceEventsLink=History
 EInvoiceFile=E-invoice File
 PDPSyncStatus=AP Status
 EInvoiceGeneratedList=Generated

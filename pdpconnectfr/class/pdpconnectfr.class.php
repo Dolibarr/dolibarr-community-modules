@@ -956,7 +956,8 @@ class PdpConnectFr
         } else {
         	$url = DOL_URL_ROOT.'/fourn/facture/agenda.php?id=' . urlencode($object->id) . '&search_agenda_label=PDPCONNECTFR';
         }
-        $resprints .= '<td><a href="' . $url . '">' . $langs->trans("EInvoiceEventsLink") . '<i class="marginleftonly fas fa-calendar-alt infobox-action"></i></a></td>';
+        $langs->load("suppliers");
+        $resprints .= '<td><a href="' . $url . '">' . $langs->trans("History") . '<i class="marginleftonly fas fa-calendar-alt infobox-action"></i></a></td>';
         $resprints .= '</tr>';
 
         $info = $currentStatusInfo['info'] ?? '';
@@ -1271,7 +1272,8 @@ class PdpConnectFr
         		$url = DOL_URL_ROOT.'/fourn/facture/agenda.php?id=' . urlencode($object->id) . '&search_agenda_label=PDPCONNECTFR';
         	}
 
-            $resprints .= '<td><a href="' . $url . '">' . $langs->trans("EInvoiceEventsLink") . ' <i class="fas fa-history"></i></a></td>';
+        	$langs->load("suppliers");
+            $resprints .= '<td><a href="' . $url . '">' . $langs->trans("History") . '<i class="marginleftonly fas fa-calendar-alt infobox-action"></i></a></td>';
             $resprints .= '</tr>';
         }
 
