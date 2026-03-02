@@ -150,7 +150,7 @@ class modPDPConnectFR extends DolibarrModules
 		$this->langfiles = array("pdpconnectfr@pdpconnectfr");
 
 		// Prerequisites
-		$this->phpmin = array(7, 2); // Minimum version of PHP required by module
+		$this->phpmin = array(8, 2); // Minimum version of PHP required by module
 		// $this->phpmax = array(8, 0); // Maximum version of PHP required by module
 		$this->need_dolibarr_version = array(22, -3); // Minimum version of Dolibarr required by module
 		// $this->max_dolibarr_version = array(19, -3); // Maximum version of Dolibarr required by module
