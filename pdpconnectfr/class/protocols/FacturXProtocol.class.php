@@ -53,6 +53,7 @@ require __DIR__ . "/../../vendor/autoload.php";
 
 dol_include_once('/pdpconnectfr/class/protocols/AbstractProtocol.class.php');
 dol_include_once('pdpconnectfr/class/pdpconnectfr.class.php');
+dol_include_once('/pdpconnectfr/class/utils/ZugferdDocumentBuilderPatcher.class.php');
 
 /**
  * FacturX Protocol Class
@@ -352,6 +353,7 @@ class FacturXProtocol extends AbstractProtocol
 
         // Add invoice lines
         $numligne = 1;
+        $depositlines = array();
         foreach ($object->lines as $line) {
 
             // Specific handling for deposit lines (negative lines with description '(DEPOSIT)')
@@ -392,6 +394,12 @@ class FacturXProtocol extends AbstractProtocol
 
                 $line->qty = -$line->qty;
                 $line->subprice = abs($line->subprice);
+
+                $depositlines[] = array(
+                    'lineId' => $numligne,
+                    'invoiceRef' => $depositFactRef,
+                    'invoiceDate' => $depositFactDate
+                );
                 // continue;
             }
 
@@ -450,21 +458,21 @@ class FacturXProtocol extends AbstractProtocol
 
             // Add reference to original invoice for deposit lines
             if ($isDepositLine) {
-                $ref = new \ReflectionClass($facturxpdf);
+                // $ref = new \ReflectionClass($facturxpdf);
 
-                $helperMethod = $ref->getMethod('getObjectHelper');
-                $helperMethod->setAccessible(true);
-                $helper = $helperMethod->invoke($facturxpdf);
+                // $helperMethod = $ref->getMethod('getObjectHelper');
+                // $helperMethod->setAccessible(true);
+                // $helper = $helperMethod->invoke($facturxpdf);
 
-                $positionProp = $ref->getProperty('currentPosition');
-                $positionProp->setAccessible(true);
-                $position = $positionProp->getValue($facturxpdf);
+                // $positionProp = $ref->getProperty('currentPosition');
+                // $positionProp->setAccessible(true);
+                // $position = $positionProp->getValue($facturxpdf);
 
-                $helper->tryCall(
-                    $helper->tryCallAndReturn($position, "getSpecifiedLineTradeSettlement"),
-                    "addToAdditionalReferencedDocument",
-                    $helper->getReferencedDocumentType($depositFactRef, null, null, "386", null, null, $depositFactDate, null)
-                );
+                // $helper->tryCall(
+                //     $helper->tryCallAndReturn($position, "getSpecifiedLineTradeSettlement"),
+                //     "addToAdditionalReferencedDocument",
+                //     $helper->getReferencedDocumentType($depositFactRef, null, null, "386", null, null, $depositFactDate, null)
+                // );
             }
 
             // Set billing period for the line
@@ -601,6 +609,14 @@ class FacturXProtocol extends AbstractProtocol
 		dol_delete_file($xmlfile);
 
         $facturxpdf->writeFile($xmlfile);
+
+        // Patch the generated XML to add missing elements for better EXTENDED-CTC-FR compatibility (Only for some specific cases)
+        if ($invoice->type == 'final' || !empty($depositlines)) {
+            dol_syslog(get_class($this) . '::executeHooks Patch XML for better EXTENDED-CTC-FR compatibility');
+            $patcher = new ZugferdDocumentBuilderPatcher($facturxpdf);
+            $patchedXml = $patcher->patchXmlString($xmlfile, $depositlines);
+            file_put_contents($xmlfile, $patchedXml); // overwrite the file with the patched content
+        }
 
         return $xmlfile;
     }
