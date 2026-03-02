@@ -957,7 +957,7 @@ class PdpConnectFr
 
         // Access Point Status + Field for real time update info
         $resprints .= '<tr class="trpdpconnect_collapseseparator">';
-        $resprints .= '<td class="titlefield">'
+        $resprints .= '<td class="">'
             . $langs->trans("pdpconnectfrInvoiceStatus")
             . ' <i class="fas fa-info-circle em088 opacityhigh classfortooltip" title="'
             . $langs->trans("einvoiceStatusFieldHelp") . '"></i></td>';
@@ -970,7 +970,7 @@ class PdpConnectFr
         if (!empty($currentStatusInfo['reasonCode'])) {
             $reasonLabel = self::RAISONS[$currentStatusInfo['reasonCode']]['label'] ?? $currentStatusInfo['reasonCode'];
             $resprints .= '<tr class="trpdpconnect_collapseseparator" id="trpdpconnect_reason">';
-            $resprints .= '<td class="titlefield">' . $langs->trans("pdpconnectfrInvoiceReason") . '</td>';
+            $resprints .= '<td class="">' . $langs->trans("pdpconnectfrInvoiceReason") . '</td>';
             $resprints .= '<td><span id="einvoice-reason">' . $reasonLabel . '</span></td>';
             $resprints .= '</tr>';
         }
@@ -1125,7 +1125,7 @@ class PdpConnectFr
             }
             // Current status
             $resprints .= '<tr class="trpdpconnect_collapseseparator">';
-            $resprints .= '<td class="titlefield">' . $langs->trans("pdpconnectfrInvoiceStatus") . '</td>';
+            $resprints .= '<td class="">' . $langs->trans("pdpconnectfrInvoiceStatus") . '</td>';
             $resprints .= '<td><span id="einvoice-status">' . $currentStatus . '</span></td>';
             $resprints .= '</tr>';
 
@@ -1137,7 +1137,7 @@ class PdpConnectFr
                 $displayReasonLabel = '';
             }
             $resprints .= '<tr class="trpdpconnect_collapseseparator" id="trpdpconnect_reason" ' . $displayReasonLabel . '>';
-            $resprints .= '<td class="titlefield">' . $langs->trans("pdpconnectfrInvoiceReason") . '</td>';
+            $resprints .= '<td class="">' . $langs->trans("pdpconnectfrInvoiceReason") . '</td>';
             $resprints .= '<td><span id="einvoice-reason">' . $reasonLabel . '</span></td>';
             $resprints .= '</tr>';
 
@@ -1171,7 +1171,7 @@ class PdpConnectFr
 
                 // Validation of last sent status to display it in the invoice card and to know if we need to add the JavaScript for real time update of status
                 $resprints .= '<tr class="trpdpconnect_collapseseparator " id="trpdpconnect_lastsentstatusvalidation">';
-                $resprints .= '<td class="titlefield">'. $langs->trans("pdpconnectfrLastSentStatus"). '</td>';
+                $resprints .= '<td class="">'. $langs->trans("pdpconnectfrLastSentStatus"). '</td>';
                 $resprints .= '<td><span>'. $statusLabel .'</span><span id="status-validation"> ' . $statusValidation . '</span><br>';
                 $resprints .= '<span id="status-validation-info" class="opacitymedium" style="overflow-wrap: anywhere;">' . htmlspecialchars($statusValidationInfo) . '</span>';
                 $resprints .= '</td>';
@@ -1310,7 +1310,7 @@ class PdpConnectFr
         }
         if ($mode == 'create' || $mode == 'edit') {
             $resprints .= '<tr class="trpdpconnect_collapseseparator">';
-            $resprints .= '<td class="titlefield">' . $langs->trans("RoutingIdField") . '</td>';
+            $resprints .= '<td class="">' . $langs->trans("RoutingIdField") . '</td>';
             $resprints .= '<td>';
             $resprints .= '<input type="text" name="routing_id" ';
             $resprints .= 'value="' . dol_escape_htmltag($routing_id ?? '') . '" ';
