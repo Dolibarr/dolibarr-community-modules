@@ -979,6 +979,7 @@ class PdpConnectFr
 			$resprints .=  '<form name="seteinvoicestatus" action="' . $_SERVER["PHP_SELF"] . '?id=' . $object->id . '" method="post">';
 			$resprints .=  '<input type="hidden" name="token" value="' . newToken() . '">';
 			$resprints .=  '<input type="hidden" name="action" value="seteinvoicestatus">';
+			$resprints .=  '<input type="hidden" name="page_y" value="page_y">';
 			//$resprints .=  '<input type="hidden" name="backtopage" value="' . $backtopage . '">';
 
 			// TODO Use a combo list with only status for ync Dolibarr -> AP
@@ -987,7 +988,7 @@ class PdpConnectFr
 			$arrayofeinvoicestatus = $this->getEinvoiceStatusOptions(0, 0, 0);
 
 			$resprints .=  $form->selectarray("seteinvoicestatus", $arrayofeinvoicestatus, $currentStatusInfo['code'], 0, 0, 0, '', 1);
-			$resprints .=  '<input type="submit" class="button button-edit smallpaddingimp" value="' . $langs->trans('Modify') . '">';
+			$resprints .=  '<input type="submit" class="button button-edit smallpaddingimp reposition" value="' . $langs->trans('Modify') . '">';
 			$resprints .=  '</form>';
         } else {
         	$resprints .= '<span id="einvoice-status">';
