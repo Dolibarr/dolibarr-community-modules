@@ -700,14 +700,24 @@ class PdpConnectFr
         $baseErrors = [];
         $baseWarnings = [];
 
-        if (empty($this->getSellerCommunicationURI())) {
-            $baseErrors[] = $langs->trans("FxCheckErrorRoutingID");
-            if ($mysoc->country_code == 'FR') {
-                $baseErrors[] = $langs->trans("FxCheckErrorRoutingIDFR");
-            }
-        }
-        if (empty($mysoc->idprof1)) {
-            $baseErrors[] = $langs->trans("FxCheckErrorIDPROF1");
+		if (empty($this->getSellerCommunicationURI())) {
+	        if (empty($mysoc->idprof1)) {
+    	        $baseErrors[] = $langs->trans("FxCheckErrorIDPROF1");
+	        } else {
+	            if ($mysoc->country_code == 'FR') {
+			        // Get seller Einvoice ID
+			        $provider = getDolGlobalString('PDPCONNECTFR_PDP');
+			        $uriConf = 'PDPCONNECTFR_' . strtoupper($provider) . '_ROUTING_ID';
+			        $einvoiceid = getDolGlobalString($uriConf);
+	            	if (!preg_match('/^'.$mysoc->idprof1.'/', $einvoiceid)) {
+						$baseWarnings[] = $langs->trans("FxCheckErrorRoutingIDFR");
+	            	} else {
+	            		$baseErrors[] = $langs->trans("FxCheckErrorRoutingID");
+	            	}
+	            } else {
+		            $baseErrors[] = $langs->trans("FxCheckErrorRoutingID");
+	            }
+	        }
         }
         if (empty($mysoc->tva_intra)) {
             $baseWarnings[] = $langs->trans("FxCheckErrorVATnumber");
@@ -727,11 +737,11 @@ class PdpConnectFr
 
         if (!empty($baseWarnings)) {
             $res = 0;
-            $message .= 'Warning: ' . implode('<br> Warning: ', $baseWarnings);
+            $message .= '<b>'.$langs->trans("Warning").'</b>: ' . implode('<br><b>'.$langs->trans("Warning").'</b>: ', $baseWarnings);
         }
         if (!empty($baseErrors)) {
             $res = -1;
-            $message .= 'Error: ' . implode('<br> Error: ', $baseErrors);
+            $message .= '<b>'.$langs->trans("Error").'</b>: ' . implode('<br><b>'.$langs->trans("Error").'</b>: ', $baseErrors);
         }
         if (empty($baseErrors) && empty($baseWarnings)) {
             $res = 1;
@@ -1863,10 +1873,10 @@ class PdpConnectFr
     {
     	global $mysoc;
 
-        $provider = getDolGlobalString('PDPCONNECTFR_PDP');
         $einvoiceid = '';
 
-        // Get seller URI for provider
+        // Get seller Einvoice ID
+        $provider = getDolGlobalString('PDPCONNECTFR_PDP');
         $uriConf = 'PDPCONNECTFR_' . strtoupper($provider) . '_ROUTING_ID';
         $einvoiceid = getDolGlobalString($uriConf);
 

@@ -295,19 +295,10 @@ print info_admin($langs->trans("PDPConnectInfo").'<br>'.$langs->trans("PDPConnec
 
 // Alert mysoc configuration is not complete
 $pdpconnectfr = new PdpConnectFr($db);
-$mysocCheck = $pdpconnectfr->validateMyCompanyConfiguration();
-if ($mysocCheck['res'] < 0) {
-	print '<div class="warning">';
-	print '<strong>' . $langs->trans("MyCompanyConfigurationWarning") . ':</strong><br>';
-	print $mysocCheck['message'];
-	print '<br><br>';
-	print '<a class="button" href="' . DOL_URL_ROOT . '/admin/company.php">';
-	print $langs->trans("ModifyCompanyInformation") . ' <i class="fas fa-tools"></i>';
-	print '</a>';
-	print '</div>';
-}
 
-print '<br>';
+
+pdpShowWarning($pdpconnectfr);
+
 
 /*if ($action == 'edit') {
  print $formSetup->generateOutput(true);

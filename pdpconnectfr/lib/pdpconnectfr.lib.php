@@ -88,3 +88,27 @@ function pdpconnectfrAdminPrepareHead()
 
 	return $head;
 }
+
+/**
+ * Show a warning if setup not correct.
+ *
+ * @param 	PdpConnectFr $pdpconnectfr	Object PdpConnectFr
+ * @return	void
+ */
+function pdpShowWarning($pdpconnectfr) {
+	global $langs;
+
+	$mysocCheck = $pdpconnectfr->validateMyCompanyConfiguration();
+	if ($mysocCheck['res'] <= 0) {
+		print '<div class="'.($mysocCheck['res'] < 0 ? 'error' : 'warning').'">';
+		print $mysocCheck['message'];
+		print '<br><br>';
+		print $langs->trans("MyCompanyConfigurationWarning") . ': ';
+		print '<a class="gotomycompanysetup" href="' . DOL_URL_ROOT . '/admin/company.php">';
+		print $langs->trans("ModifyCompanyInformation") . '<i class="fas fa-tools marginleftonly"></i>';
+		print '</a>';
+		print '</div>';
+	}
+
+	print '<br>';
+}

@@ -112,9 +112,6 @@ $linkback = '<a href="'.($backtopage ? $backtopage : DOL_URL_ROOT.'/admin/module
 print load_fiche_titre($langs->trans($title), $linkback, 'title_setup');
 
 
-//print info_admin($langs->trans("PDPConnectInfo"));
-
-
 // Configuration header
 $head = pdpconnectfrAdminPrepareHead();
 print dol_get_fiche_head($head, 'about', $langs->trans($title), 0, 'pdpconnectfr@pdpconnectfr');
