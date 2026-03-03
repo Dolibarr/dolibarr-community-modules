@@ -118,7 +118,7 @@ if ($objectID) {
 	require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
 
 	$invoice = new FactureFournisseur($db);
-	$object = $invoice->fetch($objectID);
+	$invoice->fetch($objectID);
 	if ($invoice->id <= 0) {
 		print json_encode(['status' => 'error', 'message' => 'Error loading supplier invoice with id '. $objectID]);
 		exit;
@@ -127,7 +127,7 @@ if ($objectID) {
 	// Get flowId from linked document log
 	$flowId = '';
 	$sql = "SELECT rowid, flow_id, lc_status, lc_reason_code FROM ".MAIN_DB_PREFIX."pdpconnectfr_lifecycle_msg";
-	$sql .= " WHERE element_type = '".$invoice->element."'";
+	$sql .= " WHERE element_type = '".$db->escape($invoice->element)."'";
 	$sql .= " AND element_id = ".(int) $invoice->id;
 	$sql .= " ORDER BY rowid DESC LIMIT 1";
 

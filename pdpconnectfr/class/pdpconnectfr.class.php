@@ -1096,7 +1096,7 @@ class PdpConnectFr
 
         // Check if this invoice is present into pdpconnectfr_extlinks table to know if it is an imported object
         $sql = "SELECT rowid, provider FROM ".MAIN_DB_PREFIX."pdpconnectfr_extlinks";
-        $sql .= " WHERE element_type = '".$object->element."'";
+        $sql .= " WHERE element_type = '".$this->db->escape($object->element)."'";
         $sql .= " AND element_id = ".(int) $object->id;
         $sql .= " LIMIT 1";
         $resql = $this->db->query($sql);
@@ -1156,7 +1156,7 @@ class PdpConnectFr
             // Get current status
             $currentStatus = '-';
             $sql = "SELECT lc_status, lc_reason_code FROM ".MAIN_DB_PREFIX."pdpconnectfr_lifecycle_msg";
-            $sql .= " WHERE element_type = '".$object->element."'";
+            $sql .= " WHERE element_type = '".$this->db->escape($object->element)."'";
             $sql .= " AND element_id = ".(int) $object->id;
             $sql .= " AND lc_validation_status = 'Ok'";
             $sql .= " ORDER BY rowid DESC LIMIT 1";
@@ -1187,7 +1187,7 @@ class PdpConnectFr
             // Get last sent status to know if we need to add the JavaScript for real time update of status and to display last sent status validation if it is pending or in error
             $lastSentStatus = array();
             $sql = "SELECT lc_status, lc_status_message, lc_validation_status, lc_validation_message FROM ".MAIN_DB_PREFIX."pdpconnectfr_lifecycle_msg";
-            $sql .= " WHERE element_type = '".$object->element."'";
+            $sql .= " WHERE element_type = '".$this->db->escape($object->element)."'";
             $sql .= " AND element_id = ".(int) $object->id;
             $sql .= " ORDER BY rowid DESC LIMIT 1";
             $resql = $this->db->query($sql);
@@ -1367,7 +1367,7 @@ class PdpConnectFr
 
         // Check if this thirdparty is present into pdpconnectfr_extlinks table to know if it is an imported object
         $sql = "SELECT rowid, provider FROM ".MAIN_DB_PREFIX."pdpconnectfr_extlinks";
-        $sql .= " WHERE element_type = '".$object->element."'";
+        $sql .= " WHERE element_type = '".$this->db->escape($object->element)."'";
         $sql .= " AND element_id = ".(int) $object->id;
         $sql .= " LIMIT 1";
         $resql = $this->db->query($sql);
@@ -1401,7 +1401,7 @@ class PdpConnectFr
 
         // Check if this product or service is present into pdpconnectfr_extlinks table to know if it is an imported object
         $sql = "SELECT rowid, provider FROM ".MAIN_DB_PREFIX."pdpconnectfr_extlinks";
-        $sql .= " WHERE element_type = '".$object->element."'";
+        $sql .= " WHERE element_type = '".$this->db->escape($object->element)."'";
         $sql .= " AND element_id = ".(int) $object->id;
         $sql .= " LIMIT 1";
         $resql = $this->db->query($sql);
@@ -1432,7 +1432,7 @@ class PdpConnectFr
         // Get last status from pdpconnectfr_extlinks table (table contain dolibarr object recieved or sent to PDP)
         $sql = "SELECT syncstatus, synccomment"; // Validation message of einvoice sent.
         $sql .= " FROM ".MAIN_DB_PREFIX."pdpconnectfr_extlinks";
-        $sql .= " WHERE element_type = '".Facture::class."'";
+        $sql .= " WHERE element_type = '".$this->db->escape('facture')."'";
         if ($invoiceId > 0) {
         	$sql .= " AND element_id = ".((int) $invoiceId);
         } else {
@@ -1459,7 +1459,7 @@ class PdpConnectFr
         // Fetch last status message from pdpconnectfr_lifecycle_msg table to get more details on current status of the invoice into the PDP system
         $currentStatus = '-';
         $sql = "SELECT lc_status, lc_reason_code FROM ".MAIN_DB_PREFIX."pdpconnectfr_lifecycle_msg";
-        $sql .= " WHERE element_type = '".Facture::class."'";
+        $sql .= " WHERE element_type = '".$this->db->escape('facture')."'";
         $sql .= " AND element_id = ".(int) $invoiceId;
         $sql .= " ORDER BY rowid DESC LIMIT 1";
 

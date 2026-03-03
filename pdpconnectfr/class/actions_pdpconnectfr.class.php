@@ -188,9 +188,10 @@ class ActionsPdpconnectfr extends CommonHookActions
         if (in_array($object->element, ['invoice_supplier'])) {
             // Check if this invoice is present into pdpconnectfr_extlinks table to know if it is an imported invoice from PDP or not
             $sql = "SELECT rowid, provider FROM ".MAIN_DB_PREFIX."pdpconnectfr_extlinks";
-            $sql .= " WHERE element_type = '".$object->element."'";
+            $sql .= " WHERE element_type = '".$db->escape($object->element)."'";
             $sql .= " AND element_id = ".(int) $object->id;
             $sql .= " LIMIT 1";
+
             $resql = $db->query($sql);
             if ($resql && $db->num_rows($resql) > 0) {
                 $availableStatuses = $pdpConnectFr->getEinvoiceStatusOptions(1, 1, 1);

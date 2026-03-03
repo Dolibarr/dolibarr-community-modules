@@ -118,7 +118,7 @@ if ($objectRef) {
 	require_once DOL_DOCUMENT_ROOT."/compta/facture/class/facture.class.php";
 
 	$invoice = new Facture($db);
-	$object = $invoice->fetch(0, $objectRef);
+	$invoice->fetch(0, $objectRef);
 	if ($invoice->id <= 0) {
 		print json_encode(['status' => 'error', 'message' => 'Error loading invoice with ref '. $objectRef]);
 		exit;
@@ -128,8 +128,9 @@ if ($objectRef) {
 	$flowId = '';
 	$sql = "SELECT flow_id";
 	$sql .= " FROM ".MAIN_DB_PREFIX."pdpconnectfr_extlinks";
-	$sql .= " WHERE element_type = '".Facture::class."'";
+	$sql .= " WHERE element_type = '".$db->escape($invoice->element)."'";
 	$sql .= " AND syncref = '".$db->escape($invoice->ref)."'";
+
 	$resql = $db->query($sql);
 	if ($resql) {
 		if ($db->num_rows($resql) > 0) {
@@ -138,6 +139,11 @@ if ($objectRef) {
 		}
 	} else {
 		print json_encode(['status' => 'error', 'message' => 'Error retrieving flowId for invoice ref '. $invoice->ref]);
+		exit;
+	}
+
+	if (empty($flowId)) {
+		print json_encode(['status' => 'N/A', 'message' => 'No einvoice status recorded yet for the invoice ref '. $invoice->ref]);
 		exit;
 	}
 
@@ -170,7 +176,7 @@ if ($objectRef) {
 		}
 		$syncRef = $flowData['trackingId'] ?? '';
 		$syncComment = $flowData['acknowledgement']['details'][0]['reasonMessage'] ?? '';
-		$pdpconnectfr->insertOrUpdateExtLink($invoice->id, Facture::class, $flowId, $syncStatus, $syncRef, $syncComment);
+		$pdpconnectfr->insertOrUpdateExtLink($invoice->id, $invoice->element, $flowId, $syncStatus, $syncRef, $syncComment);
 
 		// Log an event in the invoice timeline
 		$eventLabel = "PDPCONNECTFR - Status: " . $ack_statusLabel;
