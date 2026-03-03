@@ -225,6 +225,10 @@ class ActionsPdpconnectfr extends CommonHookActions
     function doActions($parameters, &$object, &$action, $hookmanager) {
         global $db, $langs, $user;
 
+        if (empty($action)) {
+        	return 0;
+        }
+
         //dol_syslog(__METHOD__ . " Hook doActions called for object " . get_class($object) . " action=" . $action);
 
         $pdpConnectFr = new PdpConnectFr($db);
@@ -238,18 +242,13 @@ class ActionsPdpconnectfr extends CommonHookActions
 
 
         if (isset($object->element) && in_array($object->element, ['facture'])) {
-            // $object->fetch_thirdparty();
-            // $thirdpartyCountryCode = $object->thirdparty->country_code;
-
-            // if ($thirdpartyCountryCode !== 'FR') {
-            //     return 0;
-            // }
+        	$permissiontoedit = $user->hasRight('facture', 'write');
 
             // Get current status of e-invoice
             $currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus($object->ref);
 
            // Action to set the E-invoice status manually
-            if ($action == 'seteinvoicestatus') {
+            if ($action == 'seteinvoicestatus' && $permissiontoedit) {
 				$result = $pdpConnectFr->setEInvoiceStatus($object, GETPOSTINT('seteinvoicestatus'), '');
             	if ($result < 0) {
                 	$this->errors = array_merge($this->errors, $pdpConnectFr->errors);
@@ -257,7 +256,7 @@ class ActionsPdpconnectfr extends CommonHookActions
             }
 
             // Action to send invoice to PDP
-            if ($action == 'send_to_pdp'
+            if ($action == 'send_to_pdp' && $permissiontoedit
                 && $currentStatusDetails['file'] == 1
                 && in_array($currentStatusDetails['code'], [
                     $pdpConnectFr::STATUS_GENERATED,
@@ -284,7 +283,7 @@ class ActionsPdpconnectfr extends CommonHookActions
             }
 
             // Action to generate the E-invoice
-            if ($action == 'generate_einvoice') {
+            if ($action == 'generate_einvoice' && $permissiontoedit) {
             	$object->fetch_thirdparty();
                 $invoiceObject = $object;
 
@@ -334,7 +333,9 @@ class ActionsPdpconnectfr extends CommonHookActions
         }
 
         if (isset($object->element) && in_array($object->element, ['invoice_supplier'])) {
-            if ($action == 'confirm_sendStatusMessage') {
+        	$permissiontoedit = $user->hasRight('fournisseur', 'facture', 'creer');
+
+            if ($action == 'confirm_sendStatusMessage' && $permissiontoedit) {
                 $PDPManager = new PDPProviderManager($db);
                 $provider = $PDPManager->getProvider(getDolGlobalString('PDPCONNECTFR_PDP'));
                 $pdpstatuscode = GETPOSTINT('pdpstatuscode') ?: 0;
@@ -353,7 +354,9 @@ class ActionsPdpconnectfr extends CommonHookActions
         }
 
         if (in_array('thirdpartycard', $contexts)) {
-            if (($action == 'add' || $action == 'update') && !empty($object->id)) {
+        	$permissiontoedit = $user->hasRight('societe', 'creer');
+
+        	if (($action == 'add' || $action == 'update') && !empty($object->id) && $permissiontoedit) {
                 $result = $pdpConnectFr->setDefaultRouting($object->id, GETPOST('routing_id', 'aZ09'));
                 if ($result < 0) {
                     setEventMessages('Failed to save routing ID', null, 'errors');
