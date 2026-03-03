@@ -545,6 +545,10 @@ class FacturXProtocol extends AbstractProtocol
             $facturxpdf->addDocumentTax($code, "VAT", $v['totalHT'], $v['totalTVA'], $k);
         }
 
+        // Get already paid amount
+        $getAlreadyPaid = $object->getSommePaiement();
+        $prepaidAmount = $object->sumpayed + $prepaidAmount;
+
         // Set final summation details (totals, payable amount, prepaid amount)
         $facturxpdf
             ->setDocumentSummation(
@@ -611,7 +615,7 @@ class FacturXProtocol extends AbstractProtocol
         $facturxpdf->writeFile($xmlfile);
 
         // Patch the generated XML to add missing elements for better EXTENDED-CTC-FR compatibility (Only for some specific cases)
-        if ($invoice->type == 'final' || !empty($depositlines)) {
+        if ($invoice->type == $invoice::TYPE_CREDIT_NOTE || !empty($depositlines)) {
             dol_syslog(get_class($this) . '::executeHooks Patch XML for better EXTENDED-CTC-FR compatibility');
             $patcher = new ZugferdDocumentBuilderPatcher($facturxpdf);
             $patchedXml = $patcher->patchXmlString($xmlfile, $depositlines);
@@ -2163,7 +2167,7 @@ class FacturXProtocol extends AbstractProtocol
 
         $pdpconnectfr = new PdpConnectFr($db);
 
-        // 1. Search in product supplier prices table using prodsellerid
+        // Search in product supplier prices table using prodsellerid
         $sql = "SELECT p.rowid ";
         $sql .= " FROM " . MAIN_DB_PREFIX . "product as p ";
         $sql .= " INNER JOIN " . MAIN_DB_PREFIX . "product_fournisseur_price as pfp ON pfp.fk_product = p.rowid ";
@@ -2178,10 +2182,10 @@ class FacturXProtocol extends AbstractProtocol
             // No match found, continue to next step
         }
 
-        // 2. Global ID (prodglobalid + prodglobalidtype) and prodglobalidtype = '0160' search by barcode
+        // Global ID (prodglobalid + prodglobalidtype) and prodglobalidtype = '0160' search by barcode
         // TODO
 
-        // 3. if Buyer Reference (prodbuyerid) is available search prodbuyerid = internal product reference
+        // if Buyer Reference (prodbuyerid) is available search prodbuyerid = internal product reference
         if (!empty($lineData['prodbuyerid'])) {
             $sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product ";
             $sql .= " WHERE ref = '" . $db->escape($lineData['prodbuyerid']) . "' OR rowid = '" . $db->escape($lineData['prodbuyerid']) . "' ";
@@ -2194,7 +2198,19 @@ class FacturXProtocol extends AbstractProtocol
             }
         }
 
-        // 4. Text Search using prodname
+        // Check with FACTURX- prefix for product inmported using prodsellerid as internal reference with FACTURX- prefix
+        $sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product ";
+        $sql .= " WHERE ref = 'FACTURX-" . $db->escape($lineData['prodsellerid']) . "'";
+        $sql .= " LIMIT 1";
+        $resql = $db->query($sql);
+        if ($resql && $db->num_rows($resql) > 0)
+        {
+            $obj = $db->fetch_object($resql);
+            dol_syslog(get_class($this) . '::_findOrCreateProductFromFacturXLine Found product by prodsellerid with FACTURX- prefix: ' . $obj->rowid);
+            return array('res' => $obj->rowid, 'message' => 'Product found by prodsellerid with FACTURX- prefix');
+        }
+
+        // Text Search using prodname
         $sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product ";
         $sql .= " WHERE label = '" . $db->escape($lineData['prodname']) . "' ";
         $resql = $db->query($sql);
@@ -2206,7 +2222,7 @@ class FacturXProtocol extends AbstractProtocol
             }
         }
 
-        // 5. If no match found after all steps: Create new product
+        // If no match found after all steps: Create new product
         if (!empty(getDolGlobalInt('PDPCONNECTFR_PRODUCTS_AUTO_GENERATION'))) {
             $product = new Product($db);
             $product->type        = $this->_detectProductTypeFromFacturx($lineData);
