@@ -24,6 +24,7 @@
 
 
 use horstoeko\zugferd\ZugferdDocumentBuilder;
+use Luracast\Restler\Data\Arr;
 
 require __DIR__ . "/../../vendor/autoload.php";
 
@@ -38,11 +39,6 @@ class ZugferdDocumentBuilderPatcher
      * URN for the EXTENDED-CTC-FR profile (French e-invoicing mandate)
      */
     private const URN_EXTENDED_CTC_FR = 'urn:cen.eu:en16931:2017#conformant#urn.cpro.gouv.fr:1p0:extended-ctc-fr';
-
-    /**
-     * TypeCode identifying a deposit recovery line
-     */
-    private const DEPOSIT_TYPE_CODE = '386';
 
     /**
      * Deposit line references to inject: array of ['lineId', 'invoiceRef', 'invoiceDate']
@@ -98,27 +94,23 @@ class ZugferdDocumentBuilderPatcher
      *   - Replace GuidelineID with EXTENDED-CTC-FR URN
      *   - Inject AdditionalReferencedDocument on deposit lines
      *
-     * @param string $xmlpath         Path to the raw XML produced by horstoeko/zugferd
-     * @param array  $depositRefs Array of deposit refs:
-     *                            [['lineId' => '1', 'invoiceRef' => 'AC2602-0015', 'invoiceDate' => DateTime], ...]
+     * @param string $xmlpath           Path to the raw XML produced by horstoeko/zugferd
+     * @param array  $depositRefs       Array of deposit refs to inject: array of ['lineId', 'invoiceRef', 'invoiceDate']
      *
      * @return string Patched XML string
      */
-    public static function patchXmlString(string $xmlpath, array $depositRefs = []): string
+    public static function patchXmlString($xmlpath, $depositRefs = []): string
     {
         $dom = new \DOMDocument('1.0', 'UTF-8');
-        $dom->preserveWhiteSpace = true;
-        $dom->formatOutput       = false;
 
         if (!$dom->load($xmlpath)) {
             throw new \RuntimeException('ZugferdDocumentBuilderPatcher: Failed to parse XML.');
         }
 
         $xpath = new \DOMXPath($dom);
-        self::registerNamespaces($xpath);
 
         // 1. Patch the GuidelineSpecifiedDocumentContextParameter ID to switch from EXTENDED to EXTENDED-CTC-FR
-        self::patchGuidelineId($xpath);
+        // self::patchGuidelineId($xpath);
 
         // 2. Inject AdditionalReferencedDocument on each deposit line if it is a final invoice after a deposit
         foreach ($depositRefs as $ref) {
@@ -134,18 +126,6 @@ class ZugferdDocumentBuilderPatcher
         // Other potential patches for CTC-FR can be added here in the future
 
         return $dom->saveXML();
-    }
-
-
-    /**
-     * Register all Factur-X / UN/CEFACT namespaces on the XPath object.
-     */
-    private static function registerNamespaces(\DOMXPath $xpath): void
-    {
-        $xpath->registerNamespace('rsm', 'urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100');
-        $xpath->registerNamespace('ram', 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100');
-        $xpath->registerNamespace('qdt', 'urn:un:unece:uncefact:data:standard:QualifiedDataType:100');
-        $xpath->registerNamespace('udt', 'urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100');
     }
 
     /**
@@ -213,7 +193,7 @@ class ZugferdDocumentBuilderPatcher
         // Check if an AdditionalReferencedDocument with TypeCode=386 already exists
         // to avoid duplicates when called multiple times
         $existing = $xpath->query(
-            'ram:AdditionalReferencedDocument[ram:TypeCode="' . self::DEPOSIT_TYPE_CODE . '"]',
+            'ram:AdditionalReferencedDocument[ram:TypeCode="130"]',
             $settlement
         );
 
@@ -224,23 +204,17 @@ class ZugferdDocumentBuilderPatcher
 
         $ramNs = 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100';
 
-        $indent     = "\n          ";   // enfants de AdditionalReferencedDocument (10 espaces)
-        $indentDeep = "\n            "; // enfants de FormattedIssueDateTime (12 espaces)
-        $indentBack = "\n        ";     // fermeture AdditionalReferencedDocument (8 espaces)
-
         // <ram:AdditionalReferencedDocument>
         $refDoc = $dom->createElementNS($ramNs, 'ram:AdditionalReferencedDocument');
 
         // <ram:IssuerAssignedID>
         $idEl = $dom->createElementNS($ramNs, 'ram:IssuerAssignedID');
         $idEl->appendChild($dom->createTextNode($invoiceRef));
-        $refDoc->appendChild($dom->createTextNode($indent));
         $refDoc->appendChild($idEl);
 
         // <ram:TypeCode>386</ram:TypeCode>
         $typeEl = $dom->createElementNS($ramNs, 'ram:TypeCode');
-        $typeEl->appendChild($dom->createTextNode(self::DEPOSIT_TYPE_CODE));
-        $refDoc->appendChild($dom->createTextNode($indent));
+        $typeEl->appendChild($dom->createTextNode('130'));
         $refDoc->appendChild($typeEl);
 
         // <ram:FormattedIssueDateTime>
@@ -248,16 +222,9 @@ class ZugferdDocumentBuilderPatcher
         $dtString    = $dom->createElement('qdt:DateTimeString');
         $dtString->setAttribute('format', '102');
         $dtString->appendChild($dom->createTextNode($invoiceDate->format('Ymd')));
-        $formattedDt->appendChild($dom->createTextNode($indentDeep));
         $formattedDt->appendChild($dtString);
-        $formattedDt->appendChild($dom->createTextNode($indent));
-        $refDoc->appendChild($dom->createTextNode($indent));
         $refDoc->appendChild($formattedDt);
-        $refDoc->appendChild($dom->createTextNode($indentBack));
 
-        // Append into SpecifiedLineTradeSettlement
-        $settlement->appendChild($dom->createTextNode("    "));
         $settlement->appendChild($refDoc);
-        $settlement->appendChild($dom->createTextNode("\n      "));
     }
 }
