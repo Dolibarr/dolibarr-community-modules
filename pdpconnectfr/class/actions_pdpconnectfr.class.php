@@ -510,38 +510,25 @@ class ActionsPdpconnectfr extends CommonHookActions
     public function printFieldListFrom($parameters, &$object, &$action, $hookmanager)
     {
         if (in_array('invoicelist', explode(':', $parameters['context']))) {
-            $this->resprints .= ' LEFT JOIN '.MAIN_DB_PREFIX.'pdpconnectfr_extlinks ext
-                ON ext.element_id = f.rowid
-                AND ext.element_type = "facture"';
+            $this->resprints .= " LEFT JOIN ".MAIN_DB_PREFIX."pdpconnectfr_extlinks as ext ON ext.element_id = f.rowid AND ext.element_type = 'facture'";
         }
 
         // Supplier invoice list, Product list, Soc list
         $contexts = explode(':', $parameters['context']);
-        if (array_intersect(
-            $contexts,
-            ['supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist']
-        )) {
 
+        if (array_intersect($contexts, ['supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist'])) {
             if (in_array('thirdpartylist', $contexts, true)) {
-                $this->resprints .= ' LEFT JOIN '.MAIN_DB_PREFIX.'pdpconnectfr_extlinks ext
-                    ON ext.element_id = s.rowid
-                    AND ext.element_type = "societe"';
-                $this->resprints .= ' LEFT JOIN '.MAIN_DB_PREFIX.'pdpconnectfr_routing rt
-                    ON rt.fk_soc = s.rowid';
+                $this->resprints .= ' LEFT JOIN '.MAIN_DB_PREFIX."pdpconnectfr_extlinks as ext ON ext.element_id = s.rowid AND ext.element_type = 'societe'";
+                $this->resprints .= ' LEFT JOIN '.MAIN_DB_PREFIX."pdpconnectfr_routing rt ON rt.fk_soc = s.rowid";
             }
 
             if (in_array('supplierinvoicelist', $contexts, true)) {
-                $this->resprints .= ' LEFT JOIN '.MAIN_DB_PREFIX.'pdpconnectfr_extlinks ext
-                    ON ext.element_id = f.rowid
-                    AND ext.element_type = "invoice_supplier"';
+                $this->resprints .= ' LEFT JOIN '.MAIN_DB_PREFIX."pdpconnectfr_extlinks as ext ON ext.element_id = f.rowid AND ext.element_type = 'invoice_supplier'";
             }
 
             if (in_array('productservicelist', $contexts, true)) {
-                $this->resprints .= ' LEFT JOIN '.MAIN_DB_PREFIX.'pdpconnectfr_extlinks ext
-                    ON ext.element_id = p.rowid
-                    AND ext.element_type = "product"';
+                $this->resprints .= ' LEFT JOIN '.MAIN_DB_PREFIX."pdpconnectfr_extlinks as ext ON ext.element_id = p.rowid AND ext.element_type = 'product'";
             }
-
         }
 
         return 0;

@@ -1256,7 +1256,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                         $sql = "SELECT d.syncstatus as status";
                         $sql .= " FROM " . MAIN_DB_PREFIX . "pdpconnectfr_extlinks as d";
                         $sql .= " WHERE d.fk_element = " . ((int) $factureObj->id);
-                        $sql .= " AND d.element_type = '" . $db->escape(Facture::class) . "'";
+                        $sql .= " AND d.element_type = '" . $db->escape($factureObj->elem) . "'";
                         $resql = $db->query($sql);
                         $needToInsertExtLink = 0;
                         if ($resql) {
