@@ -131,7 +131,7 @@ foreach ($protocolsList as $key => $protocolconfig) {
 }
 
 // Available Profiles
-$TFieldProfiles = array('EN16931' => 'EN16931');
+$TFieldProfiles = array('EN16931' => 'EN16931', 'EXTENDED' => 'EXTENDED');
 foreach ($TFieldProfiles as $key => $profileconfig) {
 	$TFieldProfiles[$key] = $profileconfig;
 }

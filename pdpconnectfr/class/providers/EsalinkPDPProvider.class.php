@@ -121,11 +121,11 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$item->fieldParams['trClass'] = 'advancedoption';
 
 		// Setup conf to choose a profil of exchange
-		$item = $formSetup->newItem('PDPCONNECTFR_PROFILE')->setAsSelect($TFieldProfiles);
-		$item->helpText = $langs->transnoentities('PDPCONNECTFR_PROFILE_HELP');
-		$item->defaultFieldValue = 'EN16931';
-		$item->cssClass = 'minwidth500';
-		$item->fieldParams['trClass'] = 'advancedoption';
+		// $item = $formSetup->newItem('PDPCONNECTFR_PROFILE')->setAsSelect($TFieldProfiles);
+		// $item->helpText = $langs->transnoentities('PDPCONNECTFR_PROFILE_HELP');
+		// $item->defaultFieldValue = 'EN16931';
+		// $item->cssClass = 'minwidth500';
+		// $item->fieldParams['trClass'] = 'advancedoption';
 
 		// Username
 		$item = $formSetup->newItem($prefix . 'USERNAME');
@@ -318,7 +318,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                 "trackingId" => $object->ref,
                 "name" => "Invoice_" . $object->ref,
                 "flowSyntax" => "FACTUR-X",
-                "flowProfile" => "CIUS",
+                "flowProfile" => "Extended-CTC-FR",
                 "sha256" => hash_file('sha256', $invoice_path)
             ]),
             'file' => new CURLFile($invoice_path, 'application/pdf', basename($invoice_path))
