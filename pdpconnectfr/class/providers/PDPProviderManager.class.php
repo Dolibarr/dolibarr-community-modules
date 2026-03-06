@@ -40,12 +40,21 @@ class PDPProviderManager
     {
         // Access point declaration
         // You can enter entry for a new access point here.
+        global $langs;
+		global $dolibarr_main_url_root;
+
+		// Define $urlwithroot
+		$urlwithouturlroot = preg_replace('/'.preg_quote(DOL_URL_ROOT, '/').'$/i', '', trim($dolibarr_main_url_root));
+		$urlwithroot = $urlwithouturlroot.DOL_URL_ROOT; // This is to use external domain name found into config file
+		//$urlwithroot=DOL_MAIN_URL_ROOT;					// This is to use same domain name than current
+
 
         // TODO May be we can keep only the provider name, country scope, and description in the array of available providers.
         // Rest of data could be into the XXXPDPPRovider.class.php file.
         $this->providersList = array (
             'ESALINK' => array(
             	'class' => 'EsalinkPDPProvider',
+            	'position' => 10,
             	'provider_countries' => array('FR'),
                 'provider_name' => 'ESALINK - Hubtimize',
                 'description' => 'Esalink PDP Integration',
@@ -55,8 +64,9 @@ class PDPProviderManager
             ),
             'SUPERPDP' => array(
             	'class' => 'SuperPDPProvider',
+            	'position' => getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER') ? 2: 20,
             	'provider_countries' => array('all'),
-            	'provider_name' => 'SuperPDP',
+            	'provider_name' => 'SuperPDP'.(getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER') ? ' <span class="opacitymedium">('.$langs->trans("UsingYourOwnBillingAccount").")</span>" : ""),
                 'description' => 'SuperPDP Integration',
                 //'is_enabled' => getDolGlobalString('PDPCONNECTFR_TEST_SUPERPDP'),
                 'is_enabled' => 1,
@@ -65,6 +75,7 @@ class PDPProviderManager
             ),
         	'TESTPDP' => array(
         		'class' => 'TestPDPProvider',
+        		'position' => 100,
             	'provider_countries' => array('all'),
             	'provider_name' => 'TESTPDP',
                 'description' => 'Another TESTPDP Integration',
@@ -73,6 +84,37 @@ class PDPProviderManager
             	'test_account_admin_url' => 'https://example.com',
             )
         );
+
+        if (getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER')) {
+        	$urltorenew = $urlwithroot.'/core/modules/oauth/generic_oauthcallback.php';	// This one is the one used for test when native using Oauth module.
+        	if (getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER_OAUTH_URL')) {	// This one is to use your own redirect URI knowing its ownn client id/secret
+        		$shortscope = 'none';
+				$state = 'none';
+
+				$redirecturl = getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER_OAUTH_URL');
+
+				$urltorenew = $redirecturl;
+				$urltodelete = $redirecturl;
+        	}
+
+			$urltorenew = $urltorenew.'?shortscope='.urlencode($shortscope).'&state='.urlencode($state).'&backtourl='.urlencode(DOL_URL_ROOT.'/admin/oauthlogintokens.php');
+			$urltodelete = $urltodelete.'?action=delete&token='.newToken().'&backtourl='.urlencode(DOL_URL_ROOT.'/admin/oauthlogintokens.php');
+
+        	$this->providersList['SUPERPDPViaPartner'] = array(
+            	'class' => 'SuperPDPProvider',
+        		'position' => 1,
+            	'provider_countries' => array('all'),
+            	'provider_name' => 'SuperPDP  <span class="opacitymedium">(Free and easy setup via '.getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER').' - '.$langs->trans("Recommended").')</span>',
+                'description' => 'SuperPDP Integration',
+                //'is_enabled' => getDolGlobalString('PDPCONNECTFR_TEST_SUPERPDP'),
+                'is_enabled' => 1,
+            	'prod_account_admin_url' => $urltorenew,
+            	'test_account_admin_url' => $urltorenew,
+            );
+        }
+
+        // Sort list by position
+        $this->providersList = dol_sort_array($this->providersList, 'position');
     }
 
     /**

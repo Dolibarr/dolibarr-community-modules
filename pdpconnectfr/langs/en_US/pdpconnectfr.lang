@@ -246,6 +246,8 @@ SyncAborted=Synchronization aborted on flow <b>#%s / %s</b>: %s
 TotalToSync=Total of flows available to synchronize
 TotalNewSync=Total of new flows synchronized
 TotalSkippedSync=Total of flows skipped (existing or already processed)
+UsingYourOwnBillingAccount=Via subscription and direct account
+PDPCONNECTFR_ROUTING_ID=Your company E-Invoicing ID
 
 # AP EsaLink
 PDPCONNECTFR_ESALINK_USERNAME=API username
@@ -253,12 +255,10 @@ PDPCONNECTFR_ESALINK_PASSWORD=API password
 PDPCONNECTFR_ESALINK_API_KEY = API KEY
 PDPCONNECTFR_ESALINK_TOKEN=Access token
 PDPCONNECTFR_ESALINK_ACTIONS=Actions
-PDPCONNECTFR_ESALINK_ROUTING_ID=Your company E-Invoicing ID
 PDPCONNECTFR_ESALINKP_HELP_CREDENTIAL1=To use the <b>EsaLink Access Point</b> as your official Access Point for E-invoicing, you must follow the following steps:
 PDPCONNECTFR_ESALINKP_HELP_CREDENTIAL2=...Create account on %s. Next steps will be described later once feature is available...
 
 # AP SuperPDP
-PDPCONNECTFR_SUPERPDP_ROUTING_ID=Your company E-Invoicing ID
 PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL1=To use the <b>SuperPDP Access Point</b> as your official Access Point for E-invoicing, you must follow the following steps:
 PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL2=1) Create an account on the SuperPDP platform - %s - and subscribe to their service for your company.
 PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL3=2) Go into your customer area, into menu "Application", then click "New application" and select your company, copy this value <b>%s</b> in the field URLs of redirection, and finally choose "Confidential" as type of application, then "Create".

@@ -1865,7 +1865,7 @@ class PdpConnectFr
     }
 
     /**
-     * Get mycompany communication URI
+     * Get mycompany communication URI. Return '' if not defined OR if not valid.
      *
      * @return string
      */

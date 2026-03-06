@@ -66,14 +66,20 @@ class SuperPDPProvider extends AbstractPDPProvider
             //'password' => getDolGlobalString('PDPCONNECTFR_SUPERPDP_PASSWORD', ''),
             'client_id' => getDolGlobalString('PDPCONNECTFR_SUPERPDP_CLIENT_ID', ''),
             'client_secret' => getDolGlobalString('PDPCONNECTFR_SUPERPDP_CLIENT_SECRET', ''),
-            'dol_prefix' => 'PDPCONNECTFR_SUPERPDP',
+            'dol_prefix' => getDolGlobalString('PDPCONNECTFR_PDP') == 'SUPERPDPViaPartner' ? 'PDPCONNECTFR_SUPERPDPVIAPARTNER' : 'PDPCONNECTFR_SUPERPDP',
             'live' => getDolGlobalInt('PDPCONNECTFR_LIVE', 0)
         );
 
+        // Default mode
         $this->helpToGetCredentials = '<div class="">'.$langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL1").'</div>';
-        $this->helpToGetCredentials .= '<div class="margintoponly">'.$langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL2", '{s1}').'</div>';
+   	    $this->helpToGetCredentials .= '<div class="margintoponly">'.$langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL2", '{s1}').'</div>';
 		$this->helpToGetCredentials .= '<div class="margintoponly">'.$langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL3", '{s2}').'</div>';
 		$this->helpToGetCredentials .= '<div class="margintoponly">'.$langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL4", '{s3}', '{s4}', '{s5}').'</div>';
+
+		if (getDolGlobalString('PDPCONNECTFR_PDP') == 'SUPERPDPViaPartner') {
+	        $this->helpToGetCredentials = '<div class="">'.$langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL1").'</div>';
+    	    $this->helpToGetCredentials .= '<div class="margintoponly">'.$langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL2", '{s1}').'</div>';
+        }
 
 		$redirect_uri = dol_buildpath('/pdpconnectfr/admin/setup.php', 2);
 
@@ -108,15 +114,28 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 		// Set content of the help page
 		$url = $providersConfig[getDolGlobalString('PDPCONNECTFR_PDP')][$prefixenv.'_account_admin_url'];
-		$this->helpToGetCredentials = str_replace('{s1}', img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$url.'" target="_new">'.$url.'</a>', $this->helpToGetCredentials);
-		$this->helpToGetCredentials = str_replace('{s2}', '<input type="text" class="width300" value="'.$this->callbackurl.'">', $this->helpToGetCredentials);
-		$this->helpToGetCredentials = str_replace('{s3}', $langs->transnoentitiesnoconv("OAUTH_ID"), $this->helpToGetCredentials);
-		$this->helpToGetCredentials = str_replace('{s4}', $langs->transnoentitiesnoconv("OAUTH_SECRET"), $this->helpToGetCredentials);
-		$this->helpToGetCredentials = str_replace('{s5}', $langs->transnoentitiesnoconv("Save"), $this->helpToGetCredentials);
+		$urltoshow = $url;
 
+    	if (getDolGlobalString('PDPCONNECTFR_PDP') == 'SUPERPDPViaPartner') {
+			$urltoshow = 'Link to create account';
+
+			$this->helpToGetCredentials = str_replace('{s1}', img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$url.'" target="_new">'.$urltoshow.'</a>', $this->helpToGetCredentials);
+			$this->helpToGetCredentials = str_replace('{s2}', '<input type="text" class="width300" value="'.$this->callbackurl.'">', $this->helpToGetCredentials);
+			$this->helpToGetCredentials = str_replace('{s3}', $langs->transnoentitiesnoconv("OAUTH_ID"), $this->helpToGetCredentials);
+			$this->helpToGetCredentials = str_replace('{s4}', $langs->transnoentitiesnoconv("OAUTH_SECRET"), $this->helpToGetCredentials);
+			$this->helpToGetCredentials = str_replace('{s5}', $langs->transnoentitiesnoconv("Save"), $this->helpToGetCredentials);
+    	} else {
+			// Default help
+			$this->helpToGetCredentials = str_replace('{s1}', img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$url.'" target="_new">'.$urltoshow.'</a>', $this->helpToGetCredentials);
+			$this->helpToGetCredentials = str_replace('{s2}', '<input type="text" class="width300" value="'.$this->callbackurl.'">', $this->helpToGetCredentials);
+			$this->helpToGetCredentials = str_replace('{s3}', $langs->transnoentitiesnoconv("OAUTH_ID"), $this->helpToGetCredentials);
+			$this->helpToGetCredentials = str_replace('{s4}', $langs->transnoentitiesnoconv("OAUTH_SECRET"), $this->helpToGetCredentials);
+			$this->helpToGetCredentials = str_replace('{s5}', $langs->transnoentitiesnoconv("Save"), $this->helpToGetCredentials);
+    	}
 
 		// E-Invoice ID
 		$item = $formSetup->newItem($prefix . 'ROUTING_ID');
+		$item->nameText = $langs->trans('PDPCONNECTFR_ROUTING_ID');
 		$item->helpText = $langs->transnoentities('PDPCONNECTFR_ROUTING_ID_HELP');
 		$item->fieldAttr['placeholder'] = $mysoc->idprof1;
 		$item->fieldParams['isMandatory'] = 0;
