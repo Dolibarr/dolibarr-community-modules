@@ -431,6 +431,9 @@ abstract class AbstractPDPProvider
         $actioncomm->type_code = 'AC_OTH_AUTO';
         $actioncomm->code = 'AC_PDPCONNECTFR_'.$eventType;
 
+        if (!isset($objet->thirdparty->id)) {
+            $objet->fetch_thirdparty();
+        }
         $actioncomm->socid = $objet->thirdparty->id;
         $actioncomm->label = $eventLabel;
         $actioncomm->note_private = $eventMesg;

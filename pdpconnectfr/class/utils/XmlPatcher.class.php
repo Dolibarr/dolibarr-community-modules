@@ -17,19 +17,31 @@
  */
 
 /**
- * \file    pdpconnectfr/class/utils/ZugferdDocumentBuilderPatcher.class.php
+ * \file    pdpconnectfr/class/utils/XmlPatcher.class.php
  * \ingroup pdpconnectfr
  * \brief   Extend ZugferdDocumentBuilder to handle specific needs of CTC-FR guideline
  */
 
 
 use horstoeko\zugferd\ZugferdDocumentBuilder;
-use Luracast\Restler\Data\Arr;
 
 require __DIR__ . "/../../vendor/autoload.php";
 
-class ZugferdDocumentBuilderPatcher
+class XmlPatcher
 {
+
+    /**
+    * @var ZugferdDocumentBuilder
+    */
+    private $builder;
+
+    /**
+     * Embedded XML content
+     *
+     * @var string
+     */
+    private $embeddedXml;
+
     /**
      * URN for the standard Factur-X EXTENDED profile (horstoeko default output)
      */
@@ -49,10 +61,13 @@ class ZugferdDocumentBuilderPatcher
 
 
     /**
-     * @param ZugferdDocumentBuilder $builder  The horstoeko builder after all lines have been added
+     * @param ZugferdDocumentBuilder|null   $builder          The horstoeko build used to generate invoice file
+     * @param string|null                   $embeddedXml      The embedded XML content use to read invoice data
      */
-    public function __construct(ZugferdDocumentBuilder $builder)
+    public function __construct($builder = null, $embeddedXml = null)
     {
+        $this->builder = $builder;
+        $this->embeddedXml = $embeddedXml;
     }
 
     /**
@@ -104,7 +119,7 @@ class ZugferdDocumentBuilderPatcher
         $dom = new \DOMDocument('1.0', 'UTF-8');
 
         if (!$dom->load($xmlpath)) {
-            throw new \RuntimeException('ZugferdDocumentBuilderPatcher: Failed to parse XML.');
+            throw new \RuntimeException('XmlPatcher: Failed to parse XML.');
         }
 
         $xpath = new \DOMXPath($dom);
@@ -141,7 +156,7 @@ class ZugferdDocumentBuilderPatcher
 
         if ($nodes === false || $nodes->length === 0) {
             throw new \RuntimeException(
-                'ZugferdDocumentBuilderPatcher: GuidelineSpecifiedDocumentContextParameter/ID not found in XML.'
+                'XmlPatcher: GuidelineSpecifiedDocumentContextParameter/ID not found in XML.'
             );
         }
 
@@ -151,7 +166,7 @@ class ZugferdDocumentBuilderPatcher
         // Accept both EXTENDED and already-patched CTC-FR values
         if (!in_array($node->nodeValue, [self::URN_EXTENDED, self::URN_EXTENDED_CTC_FR], true)) {
             throw new \RuntimeException(sprintf(
-                'ZugferdDocumentBuilderPatcher: Unexpected guideline URN "%s". Only EXTENDED profile and EXTENDED-CTC-FR profile are supported.',
+                'XmlPatcher: Unexpected guideline URN "%s". Only EXTENDED profile and EXTENDED-CTC-FR profile are supported.',
                 $node->nodeValue
             ));
         }
@@ -182,7 +197,7 @@ class ZugferdDocumentBuilderPatcher
 
         if ($settlements === false || $settlements->length === 0) {
             throw new \RuntimeException(sprintf(
-                'ZugferdDocumentBuilderPatcher: SpecifiedLineTradeSettlement not found for LineID "%s".',
+                'XmlPatcher: SpecifiedLineTradeSettlement not found for LineID "%s".',
                 $lineId
             ));
         }
@@ -227,4 +242,54 @@ class ZugferdDocumentBuilderPatcher
 
         $settlement->appendChild($refDoc);
     }
+
+
+    /**
+     * Parse an XML string and return all AdditionalReferencedDocument entries
+     * for a given line ID, with their IssuerAssignedID, TypeCode and IssueDate (if available).
+     *
+     * @param string|int $lineid        Line ID to look up
+     *
+     * @return array
+     */
+    public function getLineAdditionalReferencedDocuments($lineid): array
+    {
+        $additionalRefDocs = [];
+
+        $dom = new \DOMDocument();
+
+        $dom->loadXML($this->embeddedXml);
+
+        $xpath = new \DOMXPath($dom);
+        $xpath->registerNamespace('ram', 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100');
+        $xpath->registerNamespace('qdt', 'urn:un:unece:uncefact:data:standard:QualifiedDataType:100');
+
+        $query = sprintf(
+            '//ram:IncludedSupplyChainTradeLineItem'
+            . '[ram:AssociatedDocumentLineDocument/ram:LineID[normalize-space(.)="%s"]]'
+            . '/ram:SpecifiedLineTradeSettlement/ram:AdditionalReferencedDocument',
+            addslashes((string) $lineid)
+        );
+
+        $refDocs = $xpath->query($query);
+
+        if ($refDocs !== false) {
+            foreach ($refDocs as $refDoc) {
+                $id       = $xpath->evaluate('string(ram:IssuerAssignedID)', $refDoc);
+                $typeCode = $xpath->evaluate('string(ram:TypeCode)', $refDoc);
+                $dateStr  = $xpath->evaluate('string(ram:FormattedIssueDateTime/qdt:DateTimeString)', $refDoc);
+
+                $additionalRefDocs[] = [
+                    'issuerAssignedId' => $id ?: null,
+                    'typeCode'         => $typeCode ?: null,
+                    'issueDate'        => $dateStr
+                        ? \DateTime::createFromFormat('Ymd', $dateStr)->format('Y-m-d')
+                        : null,
+                ];
+            }
+        }
+
+        return $additionalRefDocs;
+    }
+
 }
