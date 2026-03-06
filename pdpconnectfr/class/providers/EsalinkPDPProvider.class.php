@@ -108,8 +108,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 		// E-Invoice ID
 		$item = $formSetup->newItem($prefix . 'ROUTING_ID');
-		$item->nameText = $langs->trans('PDPCONNECTFR_ROUTING_ID');
-		$item->helpText = $langs->transnoentities($prefix . 'PDPCONNECTFR_ROUTING_ID_HELP');
+		$item->nameText = $langs->transnoentities('PDPCONNECTFR_ROUTING_ID');
+		$item->helpText = $langs->transnoentities('PDPCONNECTFR_ROUTING_ID_HELP');
 		$item->fieldAttr['placeholder'] = $mysoc->idprof1;
 		$item->fieldParams['isMandatory'] = 0;
 		$item->cssClass = 'minwidth300';
