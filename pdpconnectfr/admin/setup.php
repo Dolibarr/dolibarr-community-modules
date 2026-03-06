@@ -317,7 +317,7 @@ if (!empty($formSetup->items)) {
 }
 
 if (!empty($provider) && !empty($formSetup2->items)) {
-    print '<div class="formborder opacitylow">';
+    print '<div class="formborder">';
 	print $provider->helpToGetCredentials;
 	print '</div>';
 	print '<br>';
