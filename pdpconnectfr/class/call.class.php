@@ -73,7 +73,7 @@ class Call extends CommonObject
 	 * @var int<0,1>|string		Does this object support multicompany module ?
 	 * 							0=No test on entity, 1=Test with field entity in local table, 'field@table'=Test entity into the field@table (example 'fk_soc@societe')
 	 */
-	public $ismultientitymanaged = 0;
+	public $ismultientitymanaged = 1;
 
 
 	const STATUS_FAILED = 0;
