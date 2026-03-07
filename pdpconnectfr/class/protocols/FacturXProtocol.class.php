@@ -2487,7 +2487,8 @@ class FacturXProtocol extends AbstractProtocol
                 : 'Imported product from supplier invoice (Ref: ' . $lineData['parentDocumentNo'] . ')';
             $product->description = trim($lineData['proddesc'] ?? '');
             $product->tva_tx      = (float) ($lineData['rateApplicablePercent'] ?? 0);
-            $product->status      = 1; // Active
+            $product->status      = 0; // Status not to sell
+            $product->status_buy  = 1; // Status to buy
             $product->note_private = 'Product created automatically from Factur-X import.';
             $product->import_key  = AbstractPDPProvider::$PDPCONNECTFR_LAST_IMPORT_KEY; // It does not work here, so we will update it after creation
             // Set barcode if global ID is provided and is a GTIN/EAN type
