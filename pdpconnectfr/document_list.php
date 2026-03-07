@@ -768,33 +768,31 @@ if ($provider) {
 	print '<div class="div-table-responsive">'; // You can use div-table-responsive-no-min if you don't need reserved height for your table
 	print '<table>'."\n";
 
-	if ($last_sync > 0) {
-		// Apply a lookback if configured
-		if (getDolGlobalInt('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS') && !GETPOSTDATE('last_sync_datetime', 'getpost', 'tzuserrel')) {
-			$last_sync -= (getDolGlobalInt('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS') * 3600);
-		}
-		print '<tr>';
-		print '<td class="syncFormLabel">'.$langs->trans("StartSynchronizationFrom").'</td>';
-		print '<td>';
-
-		$gmtdatetosuggest = $last_sync;
-		if ($syncfromdate && $syncfromdate > $last_sync) {
-			$gmtdatetosuggest = $syncfromdate;
-		}
-
-		print $form->selectDate($gmtdatetosuggest, 'last_sync_datetime', 1, 1, 1, '', 1, 0, 0, '', '', '', '', 1, '', $langs->trans('From'), 'tzuserrel');
-
-		print '</td>';
-
-		$rowspan = getDolGlobalInt('PDPCONNECTFR_FLOWS_SYNC_CALL_LIMIT') ? 2 : 1;
-		print '<td style="padding-left: 40px; padding-right: 40px"'.($rowspan > 1 ? ' rowspan="'.$rowspan.'"' : '').'>';
-
-		// Button to submit
-		print '<a href="#" id="runSyncBtn" class="butAction small" style="margin: 0;">'.img_picto('', 'refresh', 'class="pictofixedwidth"').' '.$langs->trans("RUN_SYNC").'</a>'."\n";
-
-		print '</td>';
-		print '</tr>';
+	// Apply a lookback if configured
+	if (getDolGlobalInt('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS') && !GETPOSTDATE('last_sync_datetime', 'getpost', 'tzuserrel')) {
+		$last_sync -= (getDolGlobalInt('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS') * 3600);
 	}
+	print '<tr>';
+	print '<td class="syncFormLabel">'.$langs->trans("StartSynchronizationFrom").'</td>';
+	print '<td>';
+
+	$gmtdatetosuggest = $last_sync;
+	if ($syncfromdate && $syncfromdate > $last_sync) {
+		$gmtdatetosuggest = $syncfromdate;
+	}
+
+	print $form->selectDate($gmtdatetosuggest, 'last_sync_datetime', 1, 1, 1, '', 1, 0, 0, '', '', '', '', 1, '', $langs->trans('From'), 'tzuserrel');
+
+	print '</td>';
+
+	$rowspan = getDolGlobalInt('PDPCONNECTFR_FLOWS_SYNC_CALL_LIMIT') ? 2 : 1;
+	print '<td style="padding-left: 40px; padding-right: 40px"'.($rowspan > 1 ? ' rowspan="'.$rowspan.'"' : '').'>';
+
+	// Button to submit
+	print '<a href="#" id="runSyncBtn" class="butAction small" style="margin: 0;">'.img_picto('', 'refresh', 'class="pictofixedwidth"').' '.$langs->trans("RUN_SYNC").'</a>'."\n";
+
+	print '</td>';
+	print '</tr>';
 
 	if (getDolGlobalInt('PDPCONNECTFR_FLOWS_SYNC_CALL_LIMIT')) {
 		print '<tr>';
