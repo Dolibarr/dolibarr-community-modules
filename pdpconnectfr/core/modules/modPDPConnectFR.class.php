@@ -272,6 +272,20 @@ class modPDPConnectFR extends DolibarrModules
 		// unit_frequency must be 60 for minute, 3600 for hour, 86400 for day, 604800 for week
 		/* BEGIN MODULEBUILDER CRON */
 		$this->cronjobs = array(
+			  0 => array(
+			      'label' => 'PDPConnectFRDocumentSync',
+			      'jobtype' => 'method',
+			      'class' => '/pdpconnectfr/class/document.class.php',
+			      'objectname' => 'Document',
+			      'method' => 'cronSyncFlows',
+			      'parameters' => '',
+			      'comment' => 'PDPConnectFRDocumentSyncDescription',
+			      'frequency' => 1,
+			      'unitfrequency' => 3600,
+			      'status' => 0,
+			      'test' => 'isModEnabled("pdpconnectfr")',
+			      'priority' => 50,
+				  ),
 			//  0 => array(
 			//      'label' => 'MyJob label',
 			//      'jobtype' => 'method',

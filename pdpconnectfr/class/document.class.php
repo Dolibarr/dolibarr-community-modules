@@ -1255,6 +1255,50 @@ class Document extends CommonObject
 
 		return $error;
 	}
+
+	public function cronSyncFlows()
+	{
+		global $langs;
+
+		$error = 0;
+		$this->output = '';
+
+		dol_syslog(__METHOD__." start", LOG_INFO);
+
+		if (getDolGlobalString('PDPCONNECTFR_PDP')) {
+			$providerManager = new PDPProviderManager($this->db);
+			$provider = $providerManager->getProvider(getDolGlobalString('PDPCONNECTFR_PDP'));
+		}
+
+		if (isset($provider)) {
+			$syncFromDate = $provider->getLastSyncDate();
+			$maxflows = getDolGlobalString('PDPCONNECTFR_MAX_SYNC_FLOWS', 0);
+
+			// Sync all flows
+			$sync_result = $provider->syncFlows($syncFromDate, $maxflows);
+
+			if (!empty($sync_result['syncedFlows']) && $sync_result['syncedFlows'] > 0) {
+				$this->output = $langs->trans("DocumentsSyncedSuccessfully", $sync_result['syncedFlows']);
+			}
+			if ($sync_result['res'] <= 0) {
+				$error++;
+				$errortype = 'errors';
+				if (!empty($sync_result['actions'])) {
+					$errortype = 'warnings';
+				}
+				//$this->output = $langs->trans("FailedToSyncADocument").($errortype ? '<br>'.$langs->trans("FailedToSyncADocumentMore") : '');
+			}
+		} else {
+			$error++;
+			$this->output = $langs->trans("NoPDPProviderConfigured");
+		}
+
+		$this->output = trim($this->output);
+
+		dol_syslog(__METHOD__." end", LOG_INFO);
+
+		return $error ?: 0;
+	}
 }
 
 

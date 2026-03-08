@@ -248,6 +248,8 @@ TotalNewSync=Total of new flows synchronized
 TotalSkippedSync=Total of flows skipped (existing or already processed)
 UsingYourOwnBillingAccount=Via subscription and direct account
 PDPCONNECTFR_ROUTING_ID=Your company E-Invoicing ID
+PDPConnectFRDocumentSync=PDPConnectFR Document Sync
+PDPConnectFRDocumentSyncDescription=This job automatically launches the documents syncrhonization with the E-invoice partner platform.
 
 # AP EsaLink
 PDPCONNECTFR_ESALINK_USERNAME=API username

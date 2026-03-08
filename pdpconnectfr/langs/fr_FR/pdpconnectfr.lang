@@ -245,6 +245,8 @@ SyncAborted=Synchronisation interrompue sur le flux <b>#%s / %s</b> : %s
 TotalToSync=Nombre total de flux disponibles pour la synchronisation
 TotalNewSync=Total des nouveaux flux synchronisés
 TotalSkippedSync=Nombre total de flux ignorés (existants ou déjà traités)
+PDPConnectFRDocumentSync=PDPConnectFR synchronisation des factures électroniques
+PDPConnectFRDocumentSyncDescription=Synchronisation automatique des flux e-invoicing avec la plateforme partenaire
 
 # AP EsaLink
 PDPCONNECTFR_ESALINK_USERNAME=Nom d'utilisateur API
