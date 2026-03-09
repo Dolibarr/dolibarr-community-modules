@@ -1424,7 +1424,7 @@ class FacturXProtocol extends AbstractProtocol
                 if ($is_deposit_line && !empty($fk_remise)) {
                     $line->fk_remise_except = $fk_remise;
                     $line->info_bits = 2;
-                    $line->desc = $prodname . (!empty($proddesc) ? "\n" . $proddesc : '') . ' (DEPOSIT)';
+                    $line->desc = '(DEPOSIT)';
                     $line->rang = -1;
 
                     $remise_already_used_line_level_ids[] = $fk_remise;
