@@ -37,14 +37,15 @@ class PdpConnectFr
 
 
     // Dolibarr internal statuses
-    public const STATUS_UNKNOWN             = -1;
-    public const STATUS_NOT_GENERATED       = 0;
-    public const STATUS_GENERATED           = 1;
-    public const STATUS_AWAITING_VALIDATION = 2;
-    public const STATUS_AWAITING_ACK        = 3;
-    public const STATUS_ERROR               = 4;
+    public const STATUS_UNKNOWN             = 0;		// By default, before th einvoice has been generated
 
-    public const STATUS_IGNORE              = 99;
+    public const STATUS_NOT_GENERATED       = 5;		// To sync
+    public const STATUS_GENERATED           = 10;
+    public const STATUS_AWAITING_VALIDATION = 15;
+    public const STATUS_AWAITING_ACK        = 20;
+    public const STATUS_ERROR               = 25;
+
+    public const STATUS_IGNORE              = 99;		// To not sync
 
     // PDP / PA normalized statuses
     // public const STATUS_DEPOSITED           = 200;
@@ -915,6 +916,7 @@ class PdpConnectFr
         global $action;
 
         $currentStatusInfo = $this->fetchLastknownInvoiceStatus($object->ref, $object->id);
+        //var_dump($currentStatusInfo);
 		// Force value for test
 		//$currentStatusInfo['code'] = 2;
 
@@ -1427,7 +1429,8 @@ class PdpConnectFr
     function fetchLastknownInvoiceStatus($invoiceRef, $invoiceId = 0) {
         global $conf;
 
-        $status = array('code' => self::STATUS_NOT_GENERATED, 'status' => $this->getStatusLabel(self::STATUS_NOT_GENERATED), 'info' => '', 'file' => '0', 'transmitted' => 0);
+        // Default status is unknown until invoice is validated
+        $status = array('code' => self::STATUS_UNKNOWN, 'status' => $this->getStatusLabel(self::STATUS_UNKNOWN), 'info' => '', 'file' => '0', 'transmitted' => 0);
 
         // Get last status from pdpconnectfr_extlinks table (table contain dolibarr object recieved or sent to PDP)
         $sql = "SELECT syncstatus, synccomment"; // Validation message of einvoice sent.

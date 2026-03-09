@@ -62,54 +62,75 @@ class InterfacePDPConnectFRTriggers extends DolibarrTriggers
 			return 0;
 		}
 
+		if ($action == 'THIRDPARTY_MODIFY') {
+			// If we modify the country of a thirdparty, we update status of invoice
+			// FR->other: status must be modified from "To generate" into "To ignore"
+			// Other->FR: status must be modified from "To ignore" into "To generate"
+			// TODO
+		}
+
 		if ($action == 'BILL_CREATE') {
 			//When invoice is created
 		}
 
 		if ($action == 'BILL_VALIDATE') {
-			if ($object->module_source == 'takepos') {
+			$pdpConnectFr = new PdpConnectFr($db);
+
+			$statustouse = $pdpConnectFr::STATUS_IGNORE;
+
+			if ($object->thirdparty->country_code == 'FR') {	// We need to sync invoice if for french customer
+				$statustouse = $pdpConnectFr::STATUS_NOT_GENERATED;
+			}
+			if ($object->module_source == 'takepos') {			// Force to ignore for all invoices generated from TakePOS
 				// If invoice is generated from TakePOS, we must not make any e-invoice sync.
 				// We will do a Z sync instead from the cash closing feature.
-				$pdpConnectFr = new PdpConnectFr($db);
-
-				$newobject = dol_clone($object, 2);
-				$newobject->ref = $object->newref;
-
-				$result = $pdpConnectFr->setEInvoiceStatus($newobject, $pdpConnectFr::STATUS_IGNORE, '');
-            	if ($result < 0) {
-                	$this->errors = array_merge($this->errors, $pdpConnectFr->errors);
-                	return -1;
-                }
+				$statustouse = $pdpConnectFr::STATUS_IGNORE;
 			}
+
+			$newobject = dol_clone($object, 2);
+			$newobject->ref = $object->newref;
+
+			$result = $pdpConnectFr->setEInvoiceStatus($newobject, $statustouse, '');
+            if ($result < 0) {
+               	$this->errors = array_merge($this->errors, $pdpConnectFr->errors);
+               	return -1;
+            }
 		}
 
 		if ($action == 'BILL_MODIFY') {
-			// Fields that locked after transmission.
-			$lockedFields = array(
-				'ref',
-				'date',
-				'date_lim_reglement',
-				'multicurrency_code',
-				'total_ht',
-				'total_tva',
-				'total_ttc',
-				'fk_soc',
-				'cond_reglement_id',
-				'mode_reglement_id'
-			);
+			$pdpConnectFr = new PdpConnectFr($db);
 
-			// Check if the invoice is transmitted to PDPConnectFR.
-			$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."pdpconnectfr_extlinks WHERE element_id = ".((int) $object->id)." AND element_type = '" . $object->element . "'";
-			$resql = $db->query($sql);
-			if ($resql && $db->num_rows($resql) > 0) {
-				// If invoice is transmitted, check if any locked field is modified.;
-				foreach ($lockedFields as $field) {
-					if ($object->$field != $object->oldcopy->$field) {
-						$this->errors[] = 'You try to modify a property that is locked once the invoice has been transmitted to th Access Point';
-						return -2;
+			$result = $pdpConnectFr->fetchLastknownInvoiceStatus(0, $object->id);
+
+			// If einvoice has been transmitted, we must check that we don't try to modify some fields
+			if (is_array($result) && !in_array($result['code'], array($pdpConnectFr::STATUS_UNKNOWN, $pdpConnectFr::STATUS_IGNORE, $pdpConnectFr::STATUS_NOT_GENERATED, $pdpConnectFr::STATUS_GENERATED))) {
+				// Fields that are locked after transmission.
+				$lockedFields = array(
+					'ref',
+					'date',
+					'date_lim_reglement',
+					'multicurrency_code',
+					'total_ht',
+					'total_tva',
+					'total_ttc',
+					'fk_soc',
+					'cond_reglement_id',
+					'mode_reglement_id'
+				);
+
+				// Check if the invoice is transmitted to PDPConnectFR.
+				$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."pdpconnectfr_extlinks WHERE element_id = ".((int) $object->id)." AND element_type = '" . $object->element . "'";
+				$resql = $db->query($sql);
+				if ($resql && $db->num_rows($resql) > 0) {
+					// If invoice is transmitted, check if any locked field is modified.;
+					foreach ($lockedFields as $field) {
+						if ($object->$field != $object->oldcopy->$field) {
+							$this->errors[] = 'You try to modify a property that is locked once the invoice has been transmitted to th Access Point';
+							return -2;
+						}
 					}
+					return 1; // Return >0 if OK.
 				}
-				return 1; // Return >0 if OK.
 			}
 		}
 

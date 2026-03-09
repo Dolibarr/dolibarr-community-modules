@@ -751,7 +751,7 @@ class modPDPConnectFR extends DolibarrModules
 		// }
 
 		if (!getDolGlobalString('PDPCONNECTFR_PDP')) {
-			// Set the live mode to on, but only if it it the first time we enable the module
+			// Set the live mode to on, but only if it is the first time we enable the module
 			$sqltmp = "INSERT INTO ".MAIN_DB_PREFIX."const (name, value, visible, entity, note) VALUES";
 			$sqltmp .= " ('PDPCONNECTFR_LIVE'";
 			$sqltmp .= ", ".$this->db->encrypt('1');
