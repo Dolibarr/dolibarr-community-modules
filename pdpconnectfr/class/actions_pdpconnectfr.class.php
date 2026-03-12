@@ -487,10 +487,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 
         // Supplier invoice list, Product list, Soc list
         $contexts = explode(':', $parameters['context']);
-        if (array_intersect(
-            $contexts,
-            ['supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist']
-        )) {
+        if (array_intersect($contexts, ['supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist'])) {
             $this->resprints .= ', ext.rowid AS pdplink_id, ext.provider AS pdp_provider';
         }
 
@@ -500,7 +497,7 @@ class ActionsPdpconnectfr extends CommonHookActions
         )) {
             $this->resprints .= ', rt.routing_id AS routing_id';
         }
-
+        
         return 0;
     }
 
@@ -512,7 +509,7 @@ class ActionsPdpconnectfr extends CommonHookActions
         if (in_array('invoicelist', explode(':', $parameters['context']))) {
             $this->resprints .= " LEFT JOIN ".MAIN_DB_PREFIX."pdpconnectfr_extlinks as ext ON ext.element_id = f.rowid AND ext.element_type = 'facture'";
         }
-
+        
         // Supplier invoice list, Product list, Soc list
         $contexts = explode(':', $parameters['context']);
 
@@ -573,10 +570,10 @@ class ActionsPdpconnectfr extends CommonHookActions
 
         if (in_array('invoicelist', explode(':', $parameters['context']))) {
             // Einvoice generated or not
-            print print_liste_field_titre($langs->trans('EInvoiceFile'), '', '', '', $parameters['param'] ?? '', '', $parameters['sortfield'] ?? '', $parameters['sotorder'] ?? '', 'center ');
+            print print_liste_field_titre($langs->transnoentitiesnoconv('EInvoiceFile'), '', '', '', $parameters['param'] ?? '', '', $parameters['sortfield'] ?? '', $parameters['sotorder'] ?? '', 'center ');
 
             // syncstatus
-            print print_liste_field_titre($langs->trans('PDPSyncStatus'), '', '', '', $parameters['param'] ?? '', '', $parameters['sortfield'] ?? '', $parameters['sotorder'] ?? '', 'center ');
+            print print_liste_field_titre($langs->transnoentitiesnoconv('PDPSyncStatus'), '', '', '', $parameters['param'] ?? '', '', $parameters['sortfield'] ?? '', $parameters['sotorder'] ?? '', 'center ');
         }
 
         // Supplier invoice list, Product list, Soc list
@@ -585,15 +582,11 @@ class ActionsPdpconnectfr extends CommonHookActions
             $contexts,
             ['supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist']
         )) {
-            print print_liste_field_titre(
-                $langs->trans('pdpconnectfrSourceTitle')
-            );
+            print print_liste_field_titre($langs->transnoentitiesnoconv('pdpconnectfrSourceTitle'));
         }
 
         if (in_array('thirdpartylist', $contexts, true)) {
-            print print_liste_field_titre(
-                $langs->trans('pdpconnectfrThirdPartyRoutingTitle')
-            );
+            print print_liste_field_titre($langs->transnoentitiesnoconv('pdpconnectfrThirdPartyRoutingTitle'));
         }
 
         return 0;
@@ -674,7 +667,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 
         if (in_array('thirdpartylist', $contexts, true)) {
             print '<td class="liste_titre">';
-            print '<input type="text" name="search_routing_id" value="' . GETPOST('search_routing_id', 'alpha') . '" class="minwidth150">';
+            print '<input type="text" name="search_routing_id" value="' . GETPOST('search_routing_id', 'alpha') . '" class="minwidth50 maxwidth100">';
             print '</td>';
         }
 
