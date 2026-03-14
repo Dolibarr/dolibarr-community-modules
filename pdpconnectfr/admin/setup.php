@@ -215,7 +215,7 @@ if (preg_match('/call'.$prefix.'HEALTHCHECK/i', $action, $reg)) {
 if (preg_match('/make'.$prefix.'sampleinvoice/i', $action, $reg)) {
 	$result = $provider->sendSampleInvoice();
 	if ($result) {
-		setEventMessages('', $result, 'warnings');
+		setEventMessages('', $result, 'mesgs');
 	} else {
 		setEventMessages('', $provider->errors, 'errors');
 	}
