@@ -52,9 +52,11 @@ use horstoeko\zugferd\ZugferdDocumentPdfReaderExt;
 
 require __DIR__ . "/../../vendor/autoload.php";
 
-dol_include_once('/pdpconnectfr/class/protocols/AbstractProtocol.class.php');
+dol_include_once('pdpconnectfr/class/protocols/AbstractProtocol.class.php');
 dol_include_once('pdpconnectfr/class/pdpconnectfr.class.php');
-dol_include_once('/pdpconnectfr/class/utils/XmlPatcher.class.php');
+dol_include_once('pdpconnectfr/class/utils/XmlPatcher.class.php');
+dol_include_once('pdpconnectfr/lib/pdpconnectfr.lib.php');
+
 
 /**
  * FacturX Protocol Class
@@ -185,8 +187,8 @@ class FacturXProtocol extends AbstractProtocol
         	throw new Exception('BADINVOICETYPE: The type for invoice id '.$object->id.' is not yet supported.');
         }
 
-        $idprof = $pdpconnectfr->remove_spaces($this->thirdpartyidprof($object) ?? '');
-        $myidprof = $this->idprof($mysoc);
+        $idprof = thirdpartyidprof($object) ?? '';
+        $myidprof = idprof($mysoc);
 
         // Add test
         if (empty($idprof)) {
@@ -1713,67 +1715,20 @@ class FacturXProtocol extends AbstractProtocol
     }
 
     /**
-     * extract id prof : it depends on country ...
-     *
-     * @param   Societe		$thirdparty  	Dolibarr thirdparty
-     * @return  string 						Return siret siren or locale prof id
-     */
-    private function idprof($thirdpart)
-    { // TODO: move this function to class utils
-        global $db;
-
-        $pdpconnectfr = new PdpConnectFr($db);
-
-        $retour = "";
-        switch ($thirdpart->country_code) {
-            case 'BE':
-                $retour = $thirdpart->idprof1;
-                break;
-            case 'DE':
-                if (!empty($thirdpart->idprof6)) {
-                    $retour = $thirdpart->idprof6;
-                    break;
-                } elseif (!empty($thirdpart->idprof2) && !empty($thirdpart->idprof3)) {
-                    $retour = $thirdpart->idprof2 . $thirdpart->idprof3;
-                } else {
-                    $retour = $thirdpart->idprof1;
-                }
-                break;
-            case 'FR':
-                $retour = $thirdpart->idprof1;		// SIRET
-                break;
-            default:
-                $retour = $thirdpart->idprof1 ? $thirdpart->idprof1 : $thirdpart->idprof2;
-        }
-
-        return $pdpconnectfr->remove_spaces($retour);
-    }
-
-    /**
-     * buyer id prof depends on country
-     *
-     * @return  string idprof
-     */
-    private function thirdpartyidprof($object)
-    { // TODO: move this function to class utils
-        return $this->idprof($object->thirdparty);
-    }
-
-    /**
      * extract mail from contact or thirdparty
      *
-     * @param   $contact dolibarr contact
-     * @param   $thirdpart  dolibarr thirdpart/societe
+     * @param   $contact 	Contact		Dolibarr contact
+     * @param   $thirdparty Societe		Dolibarr thirdpart/societe
      *
      * @return  string email of buyer
      */
-    private function extractBuyerMail($contact, $thirdpart)
+    private function extractBuyerMail($contact, $thirdparty)
     { // TODO: move this function to class utils
-        dol_syslog("pdpconnectfr extractBuyerMail : contact=" . $contact->email . " | soc=" . $thirdpart->email);
+        dol_syslog("pdpconnectfr extractBuyerMail : contact=" . $contact->email . " | soc=" . $thirdparty->email);
         if (!empty($contact->email)) {
             return $contact->email;
         }
-        return $thirdpart->email;
+        return $thirdparty->email;
     }
 
     /**
@@ -2084,6 +2039,7 @@ class FacturXProtocol extends AbstractProtocol
             foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
                 if (!empty($globalId)) {
                     // Map scheme to idprof field (0002 = SIREN)
+                    // TODO Use function idprof() ?
                     $idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme);
                     if (!empty($idprofField)) {
                         $result = 0;

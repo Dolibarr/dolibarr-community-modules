@@ -112,3 +112,51 @@ function pdpShowWarning($pdpconnectfr) {
 
 	print '<br>';
 }
+
+/**
+ * Extract prof id : it depends on country ...
+ *
+ * @param 	Societe 	$thirdparty		Dolibarr thirdparty
+ * @return 	string 						Return siren or locale prof id
+ */
+function idprof($thirdparty)
+{
+	$retour = "";
+	switch ($thirdparty->country_code) {
+		case 'BE':
+			$retour = $thirdparty->idprof1;
+			break;
+		case 'DE':
+			if (!empty($thirdparty->idprof6)) {
+				$retour = $thirdparty->idprof6;
+				break;
+			} elseif (!empty($thirdparty->idprof2) && !empty($thirdparty->idprof3)) {
+				$retour = $thirdparty->idprof2 . $thirdparty->idprof3;
+			} else {
+				$retour = $thirdparty->idprof1;
+			}
+			break;
+		case 'FR':
+			if (!empty($thirdparty->idprof1)) {
+				$retour = $thirdparty->idprof1; // SIREN
+			} else {
+				$retour = substr($thirdparty->idprof2, 9); // 9 first chars of SIRET
+			}
+			break;
+		default:
+			$retour = $thirdparty->idprof1 ? $thirdparty->idprof1 : $thirdparty->idprof2;
+	}
+
+	return preg_replace('/\\s+/', '', $retour);
+}
+
+/**
+ * Buyer prof id depends on country
+ *
+ * @param 	CommonObject $object	Object invoice, ...
+ * @return 	string 					Prof id
+ */
+function thirdpartyidprof($object)
+{
+	return idprof($object->thirdparty);
+}

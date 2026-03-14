@@ -22,6 +22,8 @@
  * \brief   CDAR (Cross Domain Acknowledgement and Response) Handler
  */
 
+dol_include_once('pdpconnectfr/lib/pdpconnectfr.lib.php');
+
 class CdarHandler
 {
     /**
@@ -188,10 +190,10 @@ class CdarHandler
         $Name = $ID;
 
         // SIREN (0002) 
-        $GlobalID = $mysoc->idprof1;
+        $GlobalID = idprof($mysoc);
 
         // Issuer SIREN (0002)
-        $IssuerGlobalID = $object->thirdparty->idprof1;
+        $IssuerGlobalID = thirdpartyidprof($object);
 
         // Invoice reference
         $IssuerAssignedID = $object->ref_supplier;

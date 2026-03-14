@@ -701,7 +701,10 @@ class PdpConnectFr
         $baseErrors = [];
         $baseWarnings = [];
 
-		if (empty($this->getSellerCommunicationURI())) {
+        $einvoiceid = $this->getSellerCommunicationURI();
+        
+        // Error message if we failed to found the einvoiceid
+		if (empty($einvoiceid)) {
 	        if (empty($mysoc->idprof1)) {
     	        $baseErrors[] = $langs->trans("FxCheckErrorIDPROF1");
 	        } else {
@@ -720,6 +723,7 @@ class PdpConnectFr
 	            }
 	        }
         }
+
         if (empty($mysoc->tva_intra)) {
             $baseWarnings[] = $langs->trans("FxCheckErrorVATnumber");
         }
@@ -1392,6 +1396,7 @@ class PdpConnectFr
 
     /**
      * ProductServiceCardBlock
+     * 
      * @param 	Product|Service 	$object					Product or Service
      * @param	string				$mode					'create', 'view'
      * @return 	string				HTML content to add
@@ -1885,18 +1890,20 @@ class PdpConnectFr
 
         // If electronic invoicing routing ID is not set for the provider, we use professional ID 1 as default value
         if (empty($einvoiceid)) {
-			$einvoiceid = $mysoc->idprof1;
+			$einvoiceid = idprof($mysoc);
         }
 
-        // Check that einvoice id is ok
-        if ($mysoc->country_code == 'FR' && !empty($einvoiceid)) {
-            $einvoiceid = $this->remove_spaces($einvoiceid);
-            if (!preg_match('/^'.$mysoc->idprof1.'/', $einvoiceid)) {
-                dol_syslog("Error: The seller communication URI seems not correct (should be or start with your SIRET number). Value: " . $einvoiceid, LOG_ERR);
-                $einvoiceid = '';
-            }
+	    // Check that einvoice id is ok. Control may depend on country
+        if ($mysoc->country_code == 'FR') {
+	        if (!empty($einvoiceid)) {
+	            $einvoiceid = $this->remove_spaces($einvoiceid);
+	            if (!preg_match('/^'.$mysoc->idprof1.'/', $einvoiceid)) {
+	                dol_syslog("Error: The seller communication URI seems not correct (should be or start with your SIRET number). Value: " . $einvoiceid, LOG_ERR);
+	                $einvoiceid = '';
+	            }
+	        }
         }
-
+        
         return $einvoiceid;
     }
 

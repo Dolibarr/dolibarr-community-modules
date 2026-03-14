@@ -28,6 +28,7 @@ dol_include_once('pdpconnectfr/class/providers/AbstractPDPProvider.class.php');
 dol_include_once('pdpconnectfr/class/protocols/ProtocolManager.class.php');
 dol_include_once('pdpconnectfr/class/call.class.php');
 dol_include_once('pdpconnectfr/class/pdpconnectfr.class.php');
+dol_include_once('pdpconnectfr/lib/pdpconnectfr.lib.php');
 require_once DOL_DOCUMENT_ROOT . '/core/lib/admin.lib.php';
 
 
@@ -137,7 +138,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$item = $formSetup->newItem($prefix . 'ROUTING_ID');
 		$item->nameText = $langs->transnoentities('PDPCONNECTFR_ROUTING_ID');
 		$item->helpText = $langs->transnoentities('PDPCONNECTFR_ROUTING_ID_HELP');
-		$item->fieldAttr['placeholder'] = $mysoc->idprof1;
+		$item->fieldAttr['placeholder'] = idprof($mysoc);
 		$item->fieldParams['isMandatory'] = 0;
 		$item->cssClass = 'minwidth300';
 

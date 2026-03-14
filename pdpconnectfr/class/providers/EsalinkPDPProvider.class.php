@@ -110,7 +110,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$item = $formSetup->newItem($prefix . 'ROUTING_ID');
 		$item->nameText = $langs->transnoentities('PDPCONNECTFR_ROUTING_ID');
 		$item->helpText = $langs->transnoentities('PDPCONNECTFR_ROUTING_ID_HELP');
-		$item->fieldAttr['placeholder'] = $mysoc->idprof1;
+		$item->fieldAttr['placeholder'] = idprof($mysoc);
 		$item->fieldParams['isMandatory'] = 0;
 		$item->cssClass = 'minwidth300';
 
