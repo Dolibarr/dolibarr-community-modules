@@ -79,7 +79,12 @@ function combineYamlFiles($files, $outputFile) {
 	        // Complete auto tags
 	        $content = completAutoTags($content, dirname($file));
 
-        	$combinedContent .= $content . "\n";
+	        if ($content != '-1') {
+	        	$combinedContent .= $content . "\n\n";
+	        } else {
+	        	print "Failed to get value to replace into the yaml source file\n";
+	        	$combinedContent .= "\n\n";
+	        }
         } else {
         	print "Failed to get content of yaml source file\n";
         }
@@ -96,7 +101,7 @@ function combineYamlFiles($files, $outputFile) {
  */
 function completAutoTags($content, $modulePath) {
     // Look for missing auto tags in the module's core class file
-	$DOLIBARRMAXBYDEFAULT = '22.0';
+	$DOLIBARRMAXBYDEFAULT = '23.0';
 
     $tagsToExtractFromDescriptor = array(
         'current_version'   => 'version',
@@ -167,6 +172,7 @@ function completAutoTags($content, $modulePath) {
 		if (empty($gitsystem) || $gitsystem == 'github') {
 	    	$urltoget = preg_replace('/https:\/\/github.com/', 'https://raw.githubusercontent.com', $git);
     		$urltoget = preg_replace('/\/tree\//', '/refs/heads/', $urltoget);
+    		$urltoget = preg_replace('/\.git$/', '/refs/heads/main', $urltoget);
     		$urltoget .= '/core/modules/mod'.$modulename.'.class.php';
 		} elseif ($gitsystem == 'gitlab') {
 			$urltoget = preg_replace('/\.git$/', '/-/raw/'.$gitbranch, $git);
@@ -251,7 +257,8 @@ function completAutoTags($content, $modulePath) {
 	    	if (empty($gitsystem) || $gitsystem == 'github') {
 		    	$urltoget = preg_replace('/https:\/\/github.com/', 'https://api.github.com/repos', $git);
 	    		$urltoget = preg_replace('/\/tree\/.*$/', '/commits?per_page=1&sha='.$gitbranch, $urltoget);
-			} elseif ($gitsystem == 'gitlab') {
+	    		$urltoget = preg_replace('/\.git$/', '/commits?per_page=1&sha='.$gitbranch, $urltoget);
+	    	} elseif ($gitsystem == 'gitlab') {
 				$urltoget = preg_replace('/\.git$/', '/-/commits/'.$gitbranch.'?format=atom', $git);
 				//$urltoget = ' https://inligit.fr/cap-rel/dolibarr/plugin-peppol/-/raw/master/core/modules/modPeppol.class.php?inline=false https://gitlab.com/api/v4/projects/cap-rel/repository/commits?per_page=1&ref_name=$branch";
 	    		// Example: 'https://mydomain.com/accoun/project/repo/-/blob/master/core/modules/modFacturx.class.php?ref_type=heads'

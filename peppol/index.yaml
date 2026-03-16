@@ -1,25 +1,25 @@
 # This is the YAML file to describe the location modules
 
 packages:
-    - modulename: 'Peppol'
-      author: 'CAP-REL'
-      author_url: 'https://cap-rel.fr' 
+    - modulename: "Peppol"
+      author: "CAP-REL"
+      author_url: "https://cap-rel.fr"
       label:
-        fr: 'Peppol'
-        en: 'Peppol'
-      git: 'https://inligit.fr/cap-rel/dolibarr/plugin-peppol.git'
-      git-branch: 'master'
-      git-system: 'gitlab'	  
-      status: 'disabled'	
-      current_version: 'auto'
-      dolibarrmin: 'auto'
-      dolibarrmax: 'auto'
-      phpmin: 'auto'
-      phpmax: 'auto'
-      last_updated_at: 'auto'
+          fr: "Peppol"
+          en: "Peppol"
+      git: "https://inligit.fr/cap-rel/dolibarr/plugin-peppol.git"
+      git-branch: "master"
+      git-system: "gitlab"
+      status: "disabled"
+      current_version: "auto"
+      dolibarrmin: "auto"
+      dolibarrmax: "auto"
+      phpmin: "auto"
+      phpmax: "auto"
+      last_updated_at: "auto"
       # direct-download is yes if we can download the module to install it in application
       direct-download: no
       # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
-      dolistore-upload: 'manual'
+      dolistore-upload: "manual"
       # dolistore-download is url of product page for download if module can also be found on dolistore.com
-      dolistore-download: 'https://www.dolistore.com/product.php?id=884'
+      dolistore-download: "https://www.dolistore.com/product.php?id=884"
