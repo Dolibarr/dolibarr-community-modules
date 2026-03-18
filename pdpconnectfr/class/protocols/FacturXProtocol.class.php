@@ -788,11 +788,12 @@ class FacturXProtocol extends AbstractProtocol
      * This method creates a dummy invoice with representative data
      * to illustrate the Factur-X structure without using real business information.
      *
-     * @return string Path or content of the generated sample invoice.
+     * @param	PdpConnectFr		$pdpconnectfr		PDPConnectFR
+     * @return 	string 									Path or content of the generated sample invoice.
      */
-    public function generateSampleInvoice()
+    public function generateSampleInvoice($pdpconnectfr)
     {
-    	global $conf;
+    	global $conf, $mysoc;
 
 		dol_mkdir($conf->pdpconnectfr->dir_temp);
 
@@ -814,7 +815,12 @@ class FacturXProtocol extends AbstractProtocol
             ZugferdCurrencyCodes::EURO                          // Invoice currency is EUR (Euro) (BT-5)
         );
 
-        $documentBuilder->addDocumentNote('Lieferant GmbH' . PHP_EOL . 'Lieferantenstraße 20' . PHP_EOL . '80333 München' . PHP_EOL . 'Deutschland' . PHP_EOL . 'Geschäftsführer: Hans Muster' . PHP_EOL . 'Handelsregisternummer: H A 123' . PHP_EOL . PHP_EOL, null, 'REG');
+        $sellername = $mysoc->name ?: "MyBigCompanyTest";
+        $sellervat = $mysoc->tva_intra ?: "FRVAT123456";
+        $sellerid = $pdpconnectfr->getSellerCommunicationURI(0);
+        $sellerglobalid = $pdpconnectfr->getSellerCommunicationURI(0);
+
+        $documentBuilder->addDocumentNote($sellername . PHP_EOL . 'Lieferantenstraße 20' . PHP_EOL . '80333 München' . PHP_EOL . 'Deutschland' . PHP_EOL . 'Geschäftsführer: Hans Muster' . PHP_EOL . 'Handelsregisternummer: H A 123' . PHP_EOL . PHP_EOL, null, 'REG');
         $documentBuilder->setDocumentBillingPeriod(DateTime::createFromFormat("Ymd", "20250101"), DateTime::createFromFormat("Ymd", "20250131"), "01.01.2025 - 31.01.2025");
         $documentBuilder->addDocumentInvoiceSupportingDocumentWithUri('REFDOC-2024/00001-1', 'http.//some.url', 'Inhaltsstoffe Joghurt');
         $documentBuilder->addDocumentInvoiceSupportingDocumentWithFile('REFDOC-2024/00001-2', $AdditionalDocument, 'Herkunftsnachweis Trennblätter');
@@ -824,9 +830,13 @@ class FacturXProtocol extends AbstractProtocol
         $documentBuilder->setDocumentProcuringProject('PROJ-2025-001-1', 'Allgemeine Dienstleistungen');
         $documentBuilder->addDocumentPaymentMeanToDirectDebit("DE12500105170648489890", "R-2024/00001");
         $documentBuilder->addDocumentPaymentTerm('Wird von Konto DE12500105170648489890 abgebucht', DateTime::createFromFormat("Ymd", "20250131"), 'MANDATE-2024/000001');
-        $documentBuilder->setDocumentSeller("Lieferant GmbH", "549910");
-        $documentBuilder->addDocumentSellerGlobalId("4000001123452", "0088");
-        $documentBuilder->addDocumentSellerTaxNumber("201/113/40209");
+        
+        $documentBuilder->setDocumentSeller($sellername, $sellerid);
+        
+        $documentBuilder->addDocumentSellerGlobalId($sellerglobalid, "0088");
+        
+        $documentBuilder->addDocumentSellerTaxNumber($sellervat);
+        
         $documentBuilder->addDocumentSellerVATRegistrationNumber("DE123456789");
         $documentBuilder->setDocumentSellerAddress("Lieferantenstraße 20", "", "", "80333", "München", ZugferdCountryCodes::GERMANY);
         $documentBuilder->setDocumentSellerContact("H. Müller", "Verkauf", "+49-111-2222222", "+49-111-3333333", "hm@lieferant.de");

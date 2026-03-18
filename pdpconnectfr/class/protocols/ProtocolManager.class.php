@@ -84,6 +84,7 @@ class ProtocolManager
 
         // Initialize protocol based on name
         switch ($name) {
+        	case 'Factur-X':
             case 'FACTURX':
 				dol_include_once('/pdpconnectfr/class/protocols/FacturXProtocol.class.php');
 

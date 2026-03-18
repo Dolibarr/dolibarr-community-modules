@@ -1875,9 +1875,10 @@ class PdpConnectFr
     /**
      * Get mycompany communication URI. Return '' if not defined OR if not valid.
      *
-     * @return string
+     * @param	int		$check		0=Do not clear value if check fails
+     * @return 	string				Prof ID
      */
-    public function getSellerCommunicationURI()
+    public function getSellerCommunicationURI($check = 1)
     {
     	global $mysoc;
 
@@ -1894,13 +1895,15 @@ class PdpConnectFr
         }
 
 	    // Check that einvoice id is ok. Control may depend on country
-        if ($mysoc->country_code == 'FR') {
-	        if (!empty($einvoiceid)) {
-	            $einvoiceid = $this->remove_spaces($einvoiceid);
-	            if (!preg_match('/^'.$mysoc->idprof1.'/', $einvoiceid)) {
-	                dol_syslog("Error: The seller communication URI seems not correct (should be or start with your SIRET number). Value: " . $einvoiceid, LOG_ERR);
-	                $einvoiceid = '';
-	            }
+        if ($check) {
+	        if ($mysoc->country_code == 'FR') {
+		        if (!empty($einvoiceid)) {
+		            $einvoiceid = $this->remove_spaces($einvoiceid);
+		            if (!preg_match('/^'.$mysoc->idprof1.'/', $einvoiceid)) {
+		                dol_syslog("Error: The seller communication URI seems not correct (should be or start with your SIRET number). Value: " . $einvoiceid, LOG_ERR);
+		                $einvoiceid = '';
+		            }
+		        }
 	        }
         }
         

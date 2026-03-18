@@ -82,7 +82,8 @@ abstract class AbstractProtocol
      * Each protocol should provide a representative sample
      * illustrating its structure and data format.
      *
-     * @return mixed Content of the generated sample invoice.
+     * @param	PdpConnectFr		$pdpconnectfr		PDPConnectFR
+     * @return 	string 									Path or content of the generated sample invoice.
      */
-    abstract public function generateSampleInvoice();
+    abstract public function generateSampleInvoice($pdpconnectfr);
 }

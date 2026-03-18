@@ -135,7 +135,7 @@ class Document extends CommonObject
 		"call_id" => array("type" => "varchar(50)", "label" => "TransactionID", "enabled" => "1", 'position' => 20, 'notnull' => 0, "visible" => "1", "comment" => "Reference to the original call", "csslist" => "tdoverflowmax100"),
 		"flow_type" => array("type" => "varchar(255)", "label" => "flow_type", "enabled" => "1", 'position' => 40, 'notnull' => 0, "visible" => "1", "comment" => "Flow type ('sync', 'CustomerInvoice', 'Manual...', etc.)"),
 		"flow_direction" => array("type" => "varchar(10)", "label" => "flow_direction", "enabled" => "1", 'position' => 50, 'notnull' => 0, "visible" => "1", "comment" => "In or Out"),
-		"flow_syntax" => array("type" => "varchar(50)", "label" => "flow_syntax", "enabled" => "1", 'position' => 60, 'notnull' => 0, "visible" => "-1", "comment" => "Document syntax (FACTUR-X, etc.)"),
+		"flow_syntax" => array("type" => "varchar(50)", "label" => "flow_syntax", "enabled" => "1", 'position' => 60, 'notnull' => 0, "visible" => "-1", "comment" => "Document syntax (Factur-X, CII, UBL, etc.)"),
 		"flow_profile" => array("type" => "varchar(50)", "label" => "flow_profile", "enabled" => "1", 'position' => 70, 'notnull' => 0, "visible" => "-1", "comment" => "Profile used (Basic, Cius, etc.)"),
 		"document_body" => array("type" => "text", "label" => "document_body", "enabled" => "1", 'position' => 110, 'notnull' => 0, "visible" => "0", "comment" => "Full document content XML"),
 		"tracking_idref" => array("type" => "varchar(50)", "label" => "RefObject", "enabled" => "1", 'position' => 115, 'notnull' => 0, "visible" => "1", "comment" => "Document tracking identifier"),

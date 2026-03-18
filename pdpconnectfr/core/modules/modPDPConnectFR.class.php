@@ -696,7 +696,7 @@ class modPDPConnectFR extends DolibarrModules
 				tracking_id integer, 				-- Document tracking identifier
 				flow_type varchar(255), 			-- Type of flow (CustomerInvoice, etc.)
 				flow_direction varchar(10), 		-- Direction of flow (In/Out)
-				flow_syntax varchar(50), 			-- Document syntax (FACTUR-X, etc.)
+				flow_syntax varchar(50), 			-- Document syntax (Factur-X, CII, UBL, etc.)
 				flow_profile varchar(50), 			-- Profile used (Basic, Cius, etc.)
 				ack_status varchar(50), 			-- Acknowledgment status (Success, Error, Pending)
 				ack_reason_code varchar(255), 		-- Reason code for acknowledgment
