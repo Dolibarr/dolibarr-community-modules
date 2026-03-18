@@ -250,6 +250,9 @@ UsingYourOwnBillingAccount=Via subscription and direct account
 PDPCONNECTFR_ROUTING_ID=Your company E-Invoicing ID
 PDPConnectFRDocumentSync=PDPConnectFR Document Sync
 PDPConnectFRDocumentSyncDescription=This job automatically launches the documents syncrhonization with the E-invoice partner platform.
+NoInvoiceCollectionFees=No invoice collection fee
+NoLatePaymentFees=No late payment fees
+NoEarlyPaymentDiscount=No early payment discounts
 
 # AP EsaLink
 PDPCONNECTFR_ESALINK_USERNAME=API username

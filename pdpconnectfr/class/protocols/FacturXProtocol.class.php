@@ -95,6 +95,8 @@ class FacturXProtocol extends AbstractProtocol
     {
         global $conf, $user, $langs, $mysoc, $db;
 
+        $outputlangs = $langs;		// TODO Get the lang of target of generation
+        
         $this->sourceinvoice = $invoice;
         $outputlang = $langs->defaultlang;
 
@@ -209,9 +211,9 @@ class FacturXProtocol extends AbstractProtocol
                 $outputlang
             )
             ->addDocumentNote($note_pub)
-            ->addDocumentNote(getDolGlobalString('PDPCONNECTFR_PMT', 'NA'), null, "PMT")
-            ->addDocumentNote(getDolGlobalString('PDPCONNECTFR_PMD', 'NA'), null, "PMD")
-            ->addDocumentNote(getDolGlobalString('PDPCONNECTFR_AAB', 'NA'), null, "AAB")
+            ->addDocumentNote(getDolGlobalString('PDPCONNECTFR_PMT') ?: $outputlangs->trans("NoInvoiceCollectionFees"), null, "PMT")
+            ->addDocumentNote(getDolGlobalString('PDPCONNECTFR_PMD') ?: $outputlangs->trans('NoLatePaymentFees'), null, "PMD")
+            ->addDocumentNote(getDolGlobalString('PDPCONNECTFR_AAB') ?: $outputlangs->trans('NoEarlyPaymentDiscount'), null, "AAB")
 
             // ---------------- Seller ----------------
             ->setDocumentSeller($mysoc->name, $myidprof)
@@ -795,10 +797,12 @@ class FacturXProtocol extends AbstractProtocol
      */
     public function generateSampleInvoice($pdpconnectfr)
     {
-    	global $conf, $mysoc;
+    	global $conf, $langs, $mysoc;
 
 		dol_mkdir($conf->pdpconnectfr->dir_temp);
 
+		$outputlangs = $langs;		// TODO Use the target language
+		
         require __DIR__ . "/ExampleHelpers.php";
 
         $existingPdfFilename = __DIR__ . "/../../assets/00_ZugferdDocumentPdfBuilder_PrintLayout.pdf";
@@ -823,6 +827,12 @@ class FacturXProtocol extends AbstractProtocol
         $sellerglobalid = $pdpconnectfr->getSellerCommunicationURI(0);
 
         $documentBuilder->addDocumentNote($sellername . PHP_EOL . 'Lieferantenstraße 20' . PHP_EOL . '80333 München' . PHP_EOL . 'Deutschland' . PHP_EOL . 'Geschäftsführer: Hans Muster' . PHP_EOL . 'Handelsregisternummer: H A 123' . PHP_EOL . PHP_EOL, null, 'REG');
+        
+        $documentBuilder->addDocumentNote(getDolGlobalString('PDPCONNECTFR_PMT') ?: $outputlangs->trans('NoInvoiceCollectionFees'), null, "PMT");
+        $documentBuilder->addDocumentNote(getDolGlobalString('PDPCONNECTFR_PMD') ?: $outputlangs->trans('NoLatePaymentFees'), null, "PMD");
+        $documentBuilder->addDocumentNote(getDolGlobalString('PDPCONNECTFR_AAB') ?: $outputlangs->trans('NoEarlyPaymentDiscount'), null, "AAB");
+        
+        
         $documentBuilder->setDocumentBillingPeriod(DateTime::createFromFormat("Ymd", "20250101"), DateTime::createFromFormat("Ymd", "20250131"), "01.01.2025 - 31.01.2025");
         $documentBuilder->addDocumentInvoiceSupportingDocumentWithUri('REFDOC-2024/00001-1', 'http.//some.url', 'Inhaltsstoffe Joghurt');
         $documentBuilder->addDocumentInvoiceSupportingDocumentWithFile('REFDOC-2024/00001-2', $AdditionalDocument, 'Herkunftsnachweis Trennblätter');
@@ -844,11 +854,11 @@ class FacturXProtocol extends AbstractProtocol
         $documentBuilder->addDocumentSellerVATRegistrationNumber($sellervat);
         
         $documentBuilder->setDocumentSellerAddress("Lieferantenstraße 20", "", "", "80333", "München", ZugferdCountryCodes::GERMANY);
-        $documentBuilder->setDocumentSellerContact("H. Müller", "Verkauf", "+49-111-2222222", "+49-111-3333333", "hm@lieferant.de");
+        $documentBuilder->setDocumentSellerContact("H. Müller", "", "+49-111-2222222", "+49-111-3333333", "hm@lieferant.de");
         $documentBuilder->setDocumentSellerCommunication(ZugferdElectronicAddressScheme::UNECE3155_EM, 'sales@lieferant.de');
         $documentBuilder->setDocumentBuyer("Kunden AG Mitte", "GE2020211");
         $documentBuilder->setDocumentBuyerAddress("Kundenstraße 15", "", "", "69876", "Frankfurt", ZugferdCountryCodes::GERMANY);
-        $documentBuilder->setDocumentBuyerContact("H. Meier", "Einkauf", "+49-333-4444444", "+49-333-5555555", "hm@kunde.de");
+        $documentBuilder->setDocumentBuyerContact("H. Meier", "", "+49-333-4444444", "+49-333-5555555", "hm@kunde.de");
         $documentBuilder->setDocumentBuyerCommunication(ZugferdElectronicAddressScheme::UNECE3155_EM, 'purchase@kunde.de');
         $documentBuilder->setDocumentPayee('Kunden AG Zahlungsdienstleistung');
         $documentBuilder->setDocumentBuyerOrderReferencedDocument("PO-2024-0003324");
@@ -878,6 +888,7 @@ class FacturXProtocol extends AbstractProtocol
         $documentBuilder->addDocumentTax(ZugferdVatCategoryCodes::STAN_RATE, ZugferdVatTypeCodes::VALUE_ADDED_TAX, 675.0, 47.25, 7.0);
         $documentBuilder->setDocumentSummation(957.87, 957.87, 873.00, 0.0, 0.0, 873.00, 84.87);
 
+            
         // Next let's do the ZugferddocumentPdfBuilder it's job - let's attach the XML to the PDF. The attachment filename will be factur-x.xml
         // since whe choosed the profile EN16931 in the ZugferdDocumentBuilder (see above)
         // In the following there are multiple methods how you can build a conform PDF from an existing print layout
