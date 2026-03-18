@@ -374,7 +374,8 @@ class FacturXProtocol extends AbstractProtocol
             $outputlangs->setDefaultLang($newlang);
         }
 
-        // Add invoice lines
+  
+        // Loop on each invoice line
         $numligne = 1;
         $depositlines = array();
         foreach ($object->lines as $line) {
@@ -1132,7 +1133,7 @@ class FacturXProtocol extends AbstractProtocol
 		$line->multicurrency_total_ttc = 240;
 		$line->multicurrency_total_tva = 40;
 
-		$this->lines[1] = $line;
+		$tmpinvoice->lines[] = $line;
 
 		$this->total_ht       += $line->total_ht;
 		$this->total_tva      += $line->total_tva;
