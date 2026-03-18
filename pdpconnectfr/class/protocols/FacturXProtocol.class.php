@@ -540,7 +540,7 @@ class FacturXProtocol extends AbstractProtocol
             	$categoryVAT = 'K';
             	if (empty($mysoc->tva_assuj)) {
             		$categoryVAT = 'E';
-            	} elseif (! $$invoice->thirdparty->isInEEC()) {
+            	} elseif (! $invoice->thirdparty->isInEEC()) {
             		$categoryVAT = 'G';
             	} elseif ($mysoc->isInEEC() && $invoice->thirdparty->isInEEC() && $mysoc->country_code != $invoice->thirdparty->country_code) {
             		$categoryVAT = 'K';
