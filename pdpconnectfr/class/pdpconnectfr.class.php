@@ -1907,7 +1907,7 @@ class PdpConnectFr
 	        }
         }
         
-        return $einvoiceid;
+        return $this->remove_spaces($einvoiceid);
     }
 
     /**
@@ -1928,7 +1928,7 @@ class PdpConnectFr
             $uri = $thirdparty->idprof1;
         }
 
-        return $uri;
+        return $this->remove_spaces($uri);
     }
 
     /**

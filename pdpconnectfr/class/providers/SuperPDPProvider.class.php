@@ -469,13 +469,26 @@ class SuperPDPProvider extends AbstractPDPProvider
 
             // Generate E-invoice by calling the method of the Protocol
             // Example by calling FactureXProcol->generateInvoice()
-            $result = $protocol->generateInvoice($invoiceObject->id);
+            $result = $protocol->generateInvoice($invoiceObject);
         */
 
         $pdpconnectfr = new PdpConnectFr($db);
         
-        
-        $invoice_path = $this->exchangeProtocol->generateSampleInvoice($pdpconnectfr);
+        try {
+	        if ((float) DOL_VERSION < 24.0) {
+	        	$invoice_path = $this->exchangeProtocol->generateSampleInvoiceOld($pdpconnectfr);
+	        } else {
+	        	$invoice_path = $this->exchangeProtocol->generateSampleInvoice($pdpconnectfr);
+	        }
+	        if ($invoice_path === -1) {
+	        	$this->errors[] = $this->exchangeProtocol->error;
+	            return 0;
+	        }
+        } catch(Exception $e) {
+        	$this->errors[] = $e->getMessage();
+            return 0;
+        }
+
         // invoice_path is something like "/.../documents/pdpconnectfr/temp/02_ZugferdDocumentPdfBuilder_PrintLayout_Merged.pdf"
 
         if ($invoice_path) {
@@ -510,8 +523,7 @@ class SuperPDPProvider extends AbstractPDPProvider
             'file' => new CURLFile($invoice_path, 'application/pdf', basename($invoice_path))
         ];
 
-        $response = $this->callApi("flows", "POSTALREADYFORMATED", $params, $extraHeaders, 'Send Sample Invoice');
-
+        $response = $this->callApi("flows", "POSTALREADYFORMATED", $params, $extraHeaders, 'send_sample_invoice');
 
         if ($response['status_code'] == 200 || $response['status_code'] == 202) {
             $flowId = $response['response']['flowId'];
@@ -547,7 +559,7 @@ class SuperPDPProvider extends AbstractPDPProvider
                 return 0;
             }
         } else {
-            $this->errors[] = "Failed to send sample invoice.";
+            $this->errors[] = "Failed to send sample invoice: HTTP ".$response['status_code'];
             return 0;
         }
     }

@@ -429,12 +429,22 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
             // Generate E-invoice by calling the method of the Protocol
             // Example by calling FactureXProcol->generateInvoice()
-            $result = $protocol->generateInvoice($invoiceObject->id);
+            $result = $protocol->generateInvoice($invoiceObject);
         */
 
         $pdpconnectfr = new PdpConnectFr($db);
         
-        $invoice_path = $this->exchangeProtocol->generateSampleInvoice($pdpconnectfr);
+        try {
+	        if ((float) DOL_VERSION < 24.0) {
+	        	$invoice_path = $this->exchangeProtocol->generateSampleInvoiceOld($pdpconnectfr);
+	        } else {
+	        	$invoice_path = $this->exchangeProtocol->generateSampleInvoice($pdpconnectfr);
+	        }
+        } catch(Exception $e) {
+        	$this->errors[] = $e->getMessage();
+            return 0;
+        }
+
         // invoice_path is something like "/.../documents/pdpconnectfr/temp/02_ZugferdDocumentPdfBuilder_PrintLayout_Merged.pdf"
 
         if ($invoice_path) {

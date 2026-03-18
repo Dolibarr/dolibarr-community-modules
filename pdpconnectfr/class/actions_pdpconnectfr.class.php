@@ -43,6 +43,8 @@ class ActionsPdpconnectfr extends CommonHookActions
         global $db, $langs;
 
         dol_syslog(__METHOD__ . " Hook afterPDFCreation called for object " . get_class($object));
+        
+        $outputlangs = $langs;
 
         // Invoice pdf path
         $pdfPath = $parameters['file'];
@@ -92,7 +94,7 @@ class ActionsPdpconnectfr extends CommonHookActions
                     setEventMessages($message, array(), 'warnings');
                 }
 
-	            $result = $protocol->generateInvoice($invoiceObject->id);		// Generate E-invoice
+	            $result = $protocol->generateInvoice($invoiceObject, $outputlangs);		// Generate E-invoice
 
 	            if ($result && (!is_numeric($result) || $result > 0)) {
 	                // No error;
@@ -240,6 +242,7 @@ class ActionsPdpconnectfr extends CommonHookActions
         $langs->load("pdpconnectfr@pdpconnectfr");
         $contexts = explode(':', $parameters['context']);
 
+        $outputlangs = $langs;
 
         if (isset($object->element) && in_array($object->element, ['facture'])) {
         	$permissiontoedit = $user->hasRight('facture', 'write');
@@ -311,7 +314,7 @@ class ActionsPdpconnectfr extends CommonHookActions
                 }
 
                 // Generate E-invoice by calling the method of the Protocol
-                $result = $protocol->generateInvoice($invoiceObject->id);
+                $result = $protocol->generateInvoice($invoiceObject, $outputlangs);
 
                 if ($result && (!is_numeric($result) || $result > 0)) {
                     dol_syslog(__METHOD__ . " Invoice generated successfully for invoice ID " . $invoiceObject->id);
