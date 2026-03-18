@@ -610,7 +610,9 @@ class FacturXProtocol extends AbstractProtocol
         // Generate file XML Factur-X
         $filename = dol_sanitizeFileName($invoice->ref);
 		$filedir = getMultidirOutput($invoice, '', 1);
-        $xmlfile = getMultidirOutput($invoice, '', 1, 'temp').'/'.$filename.'/factur-x.xml';	// Nameof file should be factur-x.xml so it will also have this nameonce added into PDF
+		// Add a file with name factur-x.xml or xrechnung.xml
+        $xmlfile = getMultidirOutput($invoice, '', 1, 'temp').'/'.$filename.'/factur-x.xml';	// Nameof file should be factur-x.xml so it will also have this name once added into PDF
+        
 
         dol_mkdir(dirname($xmlfile));
 		dol_delete_file($xmlfile);
