@@ -88,14 +88,20 @@ class FacturXProtocol extends AbstractProtocol
      * This method converts the provided invoice data into a structured XML file
      * compliant with the Factur-X specification (hybrid PDF + XML format).
      *
-     * @param object $invoice Invoice object containing all necessary data.
-     * @return string XML representation of the invoice.
+     * @param 	CommonInvoice	$invoice 		Invoice object containing all necessary data.
+     * @param	?Translate		$outputlangs	Output language
+     * @return 	string 							XML representation of the invoice.
      */
-    public function generateXML($invoice)
+    public function generateXML($invoice, $outputlangs = null)
     {
         global $conf, $user, $langs, $mysoc, $db;
 
-        $outputlangs = $langs;		// TODO Get the lang of target of generation
+        // Use customer language
+        if (empty($outputlangs) || ! ($outputlangs instanceOf Translate)) {
+        	$outputlangs = $langs;
+        }
+        $newlang = '';
+        
         
         $this->sourceinvoice = $invoice;
         $outputlang = $langs->defaultlang;
@@ -129,25 +135,16 @@ class FacturXProtocol extends AbstractProtocol
         } else {
             $account->fetch(getDolGlobalString('FACTURX_DEFAULT_BANK_ACCOUNT'));
         }
-        $account_proprio = \trim($account->owner_name);
+        $account_proprio = trim($account->owner_name);
         if ($account_proprio == '') {
-            dol_syslog('Bank account holder name is empty, please correct it, use socname instead but it could be inccorrect for XRechnung BT-85: Payment account name', \LOG_WARNING);
+            dol_syslog('Bank account holder name is empty, please correct it, use socname instead but it could be inccorrect for XRechnung BT-85: Payment account name', LOG_WARNING);
             $account_proprio = $mysoc->name;
-        }
-
-        // customer account linked
-        $contact = $object->thirdparty;
-        if (isset($object->contact)) {
-            $contact = $object->contact;
         }
 
         // Calculate missing VAT number for thirdparty if applicable
         if ($object->thirdparty->tva_assuj && empty($object->thirdparty->tva_intra)) {
             $object->thirdparty->tva_intra = $pdpconnectfr->thirdpartyCalcTva_intra($object->thirdparty);
         }
-
-        // Customer Email
-        $buyerEmail = $this->extractBuyerMail($contact, $object->thirdparty);
 
         // Get customer order references and delivery dates
         $customerOrderReferenceList = [];
@@ -190,7 +187,10 @@ class FacturXProtocol extends AbstractProtocol
         }
 
         $idprof = thirdpartyidprof($object) ?? '';
+        $legalOrgId = $this->IEC_6523_code($object->thirdparty->country_code);		// TODO Value must come from thirdpartyidprof
+
         $myidprof = idprof($mysoc);
+        $myLegalOrgId = $this->IEC_6523_code($mysoc->country_code);				// TODO Value must come from idprof
 
         // Add test
         if (empty($idprof)) {
@@ -200,6 +200,7 @@ class FacturXProtocol extends AbstractProtocol
 			throw new Exception('BADPROFID: The professional ID of your company is empty. Fix this in your company setup page.');
         }
 
+        
         //  Build XML Document Header (Seller, Buyer, Dates)
         $facturxpdf
             ->setDocumentInformation(
@@ -220,9 +221,10 @@ class FacturXProtocol extends AbstractProtocol
             ->addDocumentSellerTaxRegistration("VA", $mysoc->tva_intra ?? 'FRSPECIMEN')
             ->setDocumentSellerLegalOrganisation(
                 $myidprof,
-                $this->IEC_6523_code($mysoc->country_code), // TODO: maybe we can add a parameter to customize this.
+                $myLegalOrgId,
                 $mysoc->name ?? 'SPECIMEN'
             )
+            ->addDocumentSellerGlobalId($myidprof, $myLegalOrgId)
             ->setDocumentSellerAddress(
                 $mysoc->address      ?? 'ADDRESS EMPTY',
                 "",
@@ -248,17 +250,15 @@ class FacturXProtocol extends AbstractProtocol
             ->addDocumentBuyerTaxRegistration("VA", $object->thirdparty->tva_intra ?? '')
             ->setDocumentBuyerLegalOrganisation(
                 $idprof,
-                $this->IEC_6523_code($object->thirdparty->country_code),
-                $contact->name ?? $contact->lastname
+                $legalOrgId,
+                $object->thirdparty->name
             )
+            //->addDocumentSellerGlobalId($idprof, $legalOrgId)
             ->setDocumentBuyerCommunication(
                 '0225',
                 $pdpconnectfr->remove_spaces($pdpconnectfr->getBuyerCommunicationURI($object->thirdparty))
             );
 
-
-        // Add seller ID scheme
-        $facturxpdf->addDocumentSellerGlobalId($myidprof, $this->IEC_6523_code($mysoc->country_code)); // TODO: maybe we can add a parameter to customize this.
 
         // Add buyer ID scheme
         /*if (!empty($this->thirdpartyidprof($object))) {
@@ -280,38 +280,38 @@ class FacturXProtocol extends AbstractProtocol
             }
         }
 
-        // use customer language
-        $outputlangs = $langs;
-        $newlang = '';
-
-        // Set Trade Contact details --- TODO: Check logic
-        $contacts = $object->getIdContact('internal', 'SALESREPFOLL');
+        // Set Trade Contact details (sale representative)
+        $usercontacts = $object->getIdContact('internal', 'SALESREPFOLL');
         $object->user = null;
-        if (!empty($contacts) && $object->fetch_user($contacts[0]) > 0) {
-            $name = $object->user->getFullName($outputlangs);
-            $office_phone = $object->user->office_phone;
-            $office_fax = $object->user->office_fax;
-            $email = $object->user->email;
+        if (!empty($usercontacts) && $object->fetch_user($usercontacts[0]) > 0) {
+            $salerepresentative_name = $object->user->getFullName($outputlangs);
+            $salerepresentative_office_phone = $object->user->office_phone;
+            $salerepresentative_office_fax = $object->user->office_fax;
+            $salerepresentative_email = $object->user->email;
         } else {
             // Fallback to current user if no sales representative found
-            $name = $user->getFullName($outputlangs);
-            $office_phone = $user->office_phone;
-            $office_fax = $user->office_fax;
-            $email = $user->email;
+            $salerepresentative_name = $user->getFullName($outputlangs);
+            $salerepresentative_office_phone = $user->office_phone;
+            $salerepresentative_office_fax = $user->office_fax;
+            $salerepresentative_email = $user->email;
         }
         // Fallback to company details if user details are missing
-        if (empty($office_phone)) {
-            $office_phone = $mysoc->phone;
+        if (empty($salerepresentative_office_phone)) {
+            $salerepresentative_office_phone = $mysoc->phone;
         }
-        if (empty($office_fax)) {
-            $office_fax = $mysoc->fax;
+        if (empty($salerepresentative_office_fax)) {
+            $salerepresentative_office_fax = $mysoc->fax;
         }
-        if (empty($email)) {
-            $email = $mysoc->email;
+        if (empty($salerepresentative_email)) {
+            $salerepresentative_email = $mysoc->email;
         }
-        $facturxpdf->setDocumentSellerContact($name, "", $office_phone, $office_fax, $email);
+        $facturxpdf->setDocumentSellerContact($salerepresentative_name, "", $salerepresentative_office_phone, $salerepresentative_office_fax, $salerepresentative_email);	// If contactPersonName is set, contactDepartmentNamemust not be set.
         $facturxpdf->setDocumentSellerCommunication("0225", $pdpconnectfr->remove_spaces($pdpconnectfr->getSellerCommunicationURI()));
 
+        // Set buyer contact
+        if ($object->contact instanceOf Contact) {
+        	$facturxpdf->setDocumentBuyerContact($object->contact->getFullName($outputlangs), "", $object->contact->phone ?: $object->contact->phone_mobile, $object->contact->fax, $object->contact->email);	// If contactPersonName is set, contactDepartmentNamemust not be set.
+        }
 
         // Set Buyer Reference (Service Code for Chorus) and Contract References
         if (!empty($object->array_options['options_d4d_service_code'])) {
@@ -639,15 +639,20 @@ class FacturXProtocol extends AbstractProtocol
      * to produce a final hybrid document ready for exchange or archiving.
      *
      * @param 	int|Object 	$invoice_id    	Invoice ID or Invoice Object to be processed.
-     * @return 	string       				-1 if ko, path if ok.
+     * @param	?Translate	$outputlangs	Output language
+     * @return 	int|string       			-1 if ko, path if ok.
      */
-    public function generateInvoice($invoice_id)
+    public function generateInvoice($invoice_id, $outputlangs = null)
     {
         // Global variables declaration (typical for Dolibarr environment)
         global $langs, $db;
 
         dol_syslog(get_class($this) . '::generateInvoice');
 
+        if (empty($outputlangs) || ! ($outputlangs instanceOf Translate)) {
+        	$outputlangs = $langs;
+        }
+        
         require_once DOL_DOCUMENT_ROOT."/compta/facture/class/facture.class.php";
 
         if ($invoice_id instanceof Facture) {
@@ -659,6 +664,8 @@ class FacturXProtocol extends AbstractProtocol
 
 	        if ($invoiceResult < 0) {
 	            dol_syslog(get_class($this) . "::generateInvoice failed to load invoice id=" . $invoice_id, LOG_ERR);
+	            $this->error = $langs->trans("ErrorLoadingInvoice");
+	            $this->errors[] = $this->error; 
 	            setEventMessages($langs->trans("ErrorLoadingInvoice"), [], 'errors');
 	            return -1;
 	        }
@@ -666,15 +673,19 @@ class FacturXProtocol extends AbstractProtocol
 
         // Generate XML
         try {
-	        $xmlfile = $this->generateXML($invoice);
+	        $xmlfile = $this->generateXML($invoice, $outputlangs);
         } catch(Exception $e) {
             dol_syslog(get_class($this) . "::generateInvoice failed to generate XML for invoice id=" . $invoice_id.". Error ".$e->getMessage(), LOG_ERR);
+	        $this->error = $langs->trans("ErrorGeneratingXML").'. '.$e->getMessage();
+	        $this->errors[] = $this->error; 
             setEventMessages($langs->trans("ErrorGeneratingXML").'. '.$e->getMessage(), [], 'errors');
             return -1;
         }
 
         if (empty($xmlfile) || !file_exists($xmlfile)) {
             dol_syslog(get_class($this) . "::generateInvoice failed to generate XML for invoice id=" . $invoice_id, LOG_ERR);
+	        $this->error = $langs->trans("ErrorGeneratingXML");
+	        $this->errors[] = $this->error; 
             setEventMessages($langs->trans("ErrorGeneratingXML"), [], 'errors');
             return -1;
         }
@@ -691,18 +702,19 @@ class FacturXProtocol extends AbstractProtocol
         $pathfacturxpdf = $filedir.'/'.$filename.'_facturx.pdf';	// The new name of the PDF including xml
         if (dol_copy($orig_pdf, $pathfacturxpdf)) {
             dol_syslog(get_class($this) . "::executeHooks copied original PDF to " . $pathfacturxpdf);
-            $orig_pdf = $pathfacturxpdf;
         } else {
             dol_syslog(get_class($this) . "::executeHooks failed to copy original PDF to " . $pathfacturxpdf, LOG_ERR);
+	        $this->error = $langs->trans("ErrorFailToCopyFile", $orig_pdf, $pathfacturxpdf);
+	        $this->errors[] = $this->error; 
             return -1;
         }
 
 
         // Initial PDF File Pre-check ---
         $precheck = false;
-        if (file_exists($orig_pdf) && is_readable($orig_pdf)) {
+        if (file_exists($pathfacturxpdf) && is_readable($pathfacturxpdf)) {
             $finfo = finfo_open(FILEINFO_MIME_TYPE);
-            if (finfo_file($finfo, $orig_pdf) == 'application/pdf') {
+            if (finfo_file($finfo, $pathfacturxpdf) == 'application/pdf') {
                 $precheck = true;
             }
         }
@@ -710,6 +722,8 @@ class FacturXProtocol extends AbstractProtocol
         // Check if the source PDF is valid, log error and exit if not.
         if ($precheck == false) {
             dol_syslog(get_class($this) . "::executeHooks orig pdf file does not exists, can't create facturX");
+	        $this->error = 'Orig pdf file does not exists, can t create facturX';
+	        $this->errors[] = $this->error; 
             return -1;
         }
 
@@ -721,7 +735,7 @@ class FacturXProtocol extends AbstractProtocol
         require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 
         $pdf = pdf_getInstance();
-        $pagecount = $pdf->setSourceFile($orig_pdf);
+        $pagecount = $pdf->setSourceFile($pathfacturxpdf);
 
         // import all pages of the original PDF
         for ($i = 1; $i <= $pagecount; $i++) {
@@ -756,9 +770,10 @@ class FacturXProtocol extends AbstractProtocol
         if ($reshook < 0) {
             $this->error = $hookmanager->error;
             $this->errors = $hookmanager->errors;
+            return -1;
         }
 
-        return 1;
+        return $pathfacturxpdf;		// Name of PDF with factur-x
 
 
         // Saving ---
@@ -786,6 +801,7 @@ class FacturXProtocol extends AbstractProtocol
         return $ret;*/
     }
 
+    
     /**
      * Generate a sample Factur-X invoice for demonstration or testing purposes.
      *
@@ -796,6 +812,52 @@ class FacturXProtocol extends AbstractProtocol
      * @return 	string 									Path or content of the generated sample invoice.
      */
     public function generateSampleInvoice($pdpconnectfr)
+    {
+    	global $conf, $langs;
+
+		dol_mkdir($conf->pdpconnectfr->dir_temp);
+
+		$outputlangs = $langs;		// TODO Use the target language
+
+		require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
+		$tmpinvoice = new Facture($this->db);
+		$tmpinvoice->initAsSpecimen('');
+
+		require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
+		$tmpthirdparty = new Societe($this->db);
+		$tmpthirdparty->initAsSpecimen();
+		$tmpinvoice->thirdparty = $tmpthirdparty;
+		$tmpinvoice->socid = $tmpthirdparty->id;				// 0 for specimen
+
+		require_once DOL_DOCUMENT_ROOT . '/contact/class/contact.class.php';
+		$tmpcontact = new Contact($this->db);
+		$tmpcontact->initAsSpecimen();
+		$tmpcontact->socid = $tmpthirdparty->id;			// 0 for specimen
+		$tmpinvoice->contact = $tmpcontact;
+
+		// Generate the PDF
+		$tmpinvoice->generateDocument($tmpinvoice->model, $outputlangs);
+
+		// GenerateFacture-X PDF
+		$pathOfPdf = $this->generateInvoice($tmpinvoice, $outputlangs);
+
+		var_dump($pathOfPdf, $this->errors);
+		exit;
+
+		return $pathOfPdf;
+    }
+    
+
+    /**
+     * Generate a sample Factur-X invoice for demonstration or testing purposes.
+     *
+     * This method creates a dummy invoice with representative data
+     * to illustrate the Factur-X structure without using real business information.
+     *
+     * @param	PdpConnectFr		$pdpconnectfr		PDPConnectFR
+     * @return 	string 									Path or content of the generated sample invoice.
+     */
+    public function generateSampleInvoiceOld($pdpconnectfr)
     {
     	global $conf, $langs, $mysoc;
 
@@ -2607,6 +2669,8 @@ class FacturXProtocol extends AbstractProtocol
         $desc         = strtolower($line['proddesc'] ?? '');
 
         // A. Global ID known => product
+        // SIREN = 0088
+        // DUNS = ...
         $productGlobalIdTypes = ['0160', '0011', '0002', '0023', '0004', '0001', '0088']; // GTIN/UPC/EAN/GLN...
         if ($globalId !== '' && in_array($globalIdType, $productGlobalIdTypes, true)) {
             return 0;
