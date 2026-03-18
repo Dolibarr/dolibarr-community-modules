@@ -460,8 +460,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         // Params
         $params = [
             'flowInfo' => json_encode([
-                "trackingId" => "INV-Test",
-                "name" => "Invoice_INV-Test",
+                "trackingId" => "INV-TEST",
+                "name" => "Invoice_INV-TEST",
                 "flowSyntax" => "Factur-X",
                 "flowProfile" => "CIUS",
                 "sha256" => hash_file('sha256', $invoice_path)

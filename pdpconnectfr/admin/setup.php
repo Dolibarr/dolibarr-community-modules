@@ -195,7 +195,7 @@ if (preg_match('/set'.$prefix.'TOKEN/i', $action, $reg)) {
 	$token = $provider->getAccessToken();
 
 	if ($token) {
-		setEventMessages("Token generated successfully", null, 'mesgs');
+		setEventMessages("Token generated successfully: ".dol_trunc($token, 48), null, 'mesgs');
 		header("Location: ".$_SERVER["PHP_SELF"].'?page_y='.GETPOSTFLOAT('page_y'));
 		exit;
 	} else {

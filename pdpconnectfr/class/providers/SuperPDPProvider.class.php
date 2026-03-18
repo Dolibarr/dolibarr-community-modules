@@ -301,7 +301,7 @@ class SuperPDPProvider extends AbstractPDPProvider
     {
         global $langs;
 
-        $response = $this->callApi("companies/me", "GET", false, [], 'healthcheck');
+        $response = $this->callApi("healthcheck", "GET", false, [], 'healthcheck');
 
         if ($response['status_code'] === 200) {
             $returnarray['status_code'] = true;
@@ -501,8 +501,8 @@ class SuperPDPProvider extends AbstractPDPProvider
         // Params
         $params = [
             'flowInfo' => json_encode([
-                "trackingId" => "INV-Test",
-                "name" => "Invoice_INV-Test",
+                "trackingId" => "INV-TEST",
+                "name" => "Invoice_INV-TEST",
                 "flowSyntax" => "Factur-X",
                 "flowProfile" => "CIUS",
                 "sha256" => hash_file('sha256', $invoice_path)

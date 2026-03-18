@@ -809,7 +809,7 @@ class FacturXProtocol extends AbstractProtocol
         $documentBuilder = ZugferdDocumentBuilder::createNew(ZugferdProfiles::PROFILE_EN16931);
 
         $documentBuilder->setDocumentInformation(
-            'R-2024/00001',                                     // Invoice Number (BT-1)
+            'INV-TEST',                                     	// Invoice Number (BT-1)
             ZugferdInvoiceType::INVOICE,                        // Type "Invoice" (BT-3)
             DateTime::createFromFormat("Ymd", "20241231"),      // Invoice Date (BT-2)
             ZugferdCurrencyCodes::EURO                          // Invoice currency is EUR (Euro) (BT-5)
@@ -826,18 +826,21 @@ class FacturXProtocol extends AbstractProtocol
         $documentBuilder->addDocumentInvoiceSupportingDocumentWithFile('REFDOC-2024/00001-2', $AdditionalDocument, 'Herkunftsnachweis Trennblätter');
         $documentBuilder->addDocumentTenderOrLotReferenceDocument('LOS 738625');
         $documentBuilder->addDocumentInvoicedObjectReferenceDocument('125', ZugferdReferenceCodeQualifiers::SALE_PERS_NUMB); // Sales person number
+
         $documentBuilder->setDocumentContractReferencedDocument('CON-2024/2025-001');
         $documentBuilder->setDocumentProcuringProject('PROJ-2025-001-1', 'Allgemeine Dienstleistungen');
-        $documentBuilder->addDocumentPaymentMeanToDirectDebit("DE12500105170648489890", "R-2024/00001");
+        
+        $documentBuilder->addDocumentPaymentMeanToDirectDebit("DE12500105170648489890", "INV-TEST");
         $documentBuilder->addDocumentPaymentTerm('Wird von Konto DE12500105170648489890 abgebucht', DateTime::createFromFormat("Ymd", "20250131"), 'MANDATE-2024/000001');
         
         $documentBuilder->setDocumentSeller($sellername, $sellerid);
-        
-        $documentBuilder->addDocumentSellerGlobalId($sellerglobalid, "0088");
-        
+        $documentBuilder->addDocumentSellerGlobalId($sellerglobalid, "0088");					// 0088 = SIREN
+        $documentBuilder->setDocumentSellerLegalOrganisation($sellerid, "0088", $sellername);	// 0088 = SIREN
+
+        //$documentBuilder->setSpecifiedLegalOrganization();
         $documentBuilder->addDocumentSellerTaxNumber($sellervat);
+        $documentBuilder->addDocumentSellerVATRegistrationNumber($sellervat);
         
-        $documentBuilder->addDocumentSellerVATRegistrationNumber("DE123456789");
         $documentBuilder->setDocumentSellerAddress("Lieferantenstraße 20", "", "", "80333", "München", ZugferdCountryCodes::GERMANY);
         $documentBuilder->setDocumentSellerContact("H. Müller", "Verkauf", "+49-111-2222222", "+49-111-3333333", "hm@lieferant.de");
         $documentBuilder->setDocumentSellerCommunication(ZugferdElectronicAddressScheme::UNECE3155_EM, 'sales@lieferant.de');
@@ -952,9 +955,9 @@ class FacturXProtocol extends AbstractProtocol
         // - %4$s .... contains the invoice date (extracted from the XML data)
         // The following example generates...
         // - the author:  .... Issued by seller with name Lieferant GmbH
-        // - the title    .... Lieferant GmbH : Invoice R-2024/00001
+        // - the title    .... Lieferant GmbH : Invoice INV-TEST
         // - the subject  .... Invoice-Document, Issued by Lieferant GmbH
-        // - the keywords .... R-2024/00001, Invoice, Lieferant GmbH, 2024-12-31
+        // - the keywords .... INV-TEST, Invoice, Lieferant GmbH, 2024-12-31
 
         $zugferdDocumentPdfBuilder = ZugferdDocumentPdfBuilder::fromPdfFile($documentBuilder, $existingPdfFilename);
         $zugferdDocumentPdfBuilder->setAuthorTemplate('Issued by seller with name %3$s');
