@@ -785,7 +785,10 @@ if ($provider) {
 		$gmtdatetosuggest = $syncfromdate;
 	}
 
-	print $form->selectDate($gmtdatetosuggest ? $gmtdatetosuggest : '', 'last_sync_datetime', 1, 1, 1, '', 1, 0, 0, '', '', '', '', 1, '', $langs->trans('From'), 'tzuserrel');
+	print $form->selectDate($gmtdatetosuggest > 0 ? $gmtdatetosuggest : '', 'last_sync_datetime', 1, 1, 1, '', 1, 0, 0, '', '', '', '', 1, '', $langs->trans('From'), 'tzuserrel');
+	if ($conf->browser->layout != 'phone' && getDolGlobalInt('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS')) {
+		print $form->textwithpicto('', $langs->transnoentitiesnoconv("PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS").': '.getDolGlobalInt('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS').'<br><br>'.$langs->transnoentitiesnoconv("PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS_HELP"));
+	}
 
 	print '</td>';
 

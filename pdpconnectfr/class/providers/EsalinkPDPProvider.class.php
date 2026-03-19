@@ -151,7 +151,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			$item->cssClass = 'maxwidth500 ';
 			$item->fieldOverride = "";
 			if (!empty($tokenData['token'])) {
-				$item->fieldOverride = "<span class='opacitymedium hideonsmartphone'>" . htmlspecialchars('**************' . substr($tokenData['token'], -4)) . "</span>";
+				$item->fieldOverride = htmlspecialchars('**************' . substr($tokenData['token'], -4));
+
 				if (!empty($tokenData['token_expires_at'])) {
 					$item->fieldOverride .= ' &nbsp; <span class="opacitymedium hideonsmartphone">('.$langs->trans("until").' '.dol_print_date($tokenData['token_expires_at'], 'dayhoursec', 'tzuserrel').')</span>';
 				}
@@ -226,15 +227,16 @@ class EsalinkPDPProvider extends AbstractPDPProvider
             'username' => $this->config['username'],
             'password' => $this->config['password']
         ));
+		$extraHeaders = array();
 
         // We call /token api of Esalink with username and pass. May be they are just client_id / client_secret that were renamed ?
-        $response = $this->callApi("token", "POSTALREADYFORMATED", $param, [], 'get_access_token');
+        $response = $this->callApi("token", "POSTALREADYFORMATED", $param, $extraHeaders, 'get_access_token');
 
         $status_code = $response['status_code'];
 		$body = $response['response'];
 
-        if ($status_code == 200 && isset($body['access_token']) && isset($body['refresh_token']) && isset($body['expires_in'])) {
-            $this->saveOAuthTokenDB($body['access_token'], $body['refresh_token'], $body['expires_in']);
+        if ($status_code == 200 && isset($body['access_token']) && isset($body['expires_in'])) {
+            $this->saveOAuthTokenDB($body['access_token'], $body['refresh_token'] ?? '', $body['expires_in']);
 
             return $body['access_token'];
         } else {
@@ -250,7 +252,9 @@ class EsalinkPDPProvider extends AbstractPDPProvider
      */
     public function refreshAccessToken() {
         // No route to refresh token for PDP provider so we get a new one
-        return $this->getAccessToken();
+        $result = $this->getAccessToken();
+
+        return $result;
     }
 
     /**
@@ -272,7 +276,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
     {
         global $langs;
 
-        $response = $this->callApi("healthcheck", "GET", false, [], 'healthcheck');
+        $response = $this->callApi("healthcheck", "GET", false, [], 'healthcheck');		// This include the refresh of token
 
         if ($response['status_code'] === 200) {
             $returnarray['status_code'] = true;
@@ -432,6 +436,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	        } else {
 	        	$invoice_path = $this->exchangeProtocol->generateSampleInvoice($pdpconnectfr);
 	        }
+	        if ($invoice_path === -1) {
+	        	$this->errors[] = $this->exchangeProtocol->error;
+	            return 0;
+	        }
         } catch(Exception $e) {
         	$this->errors[] = $e->getMessage();
             return 0;
@@ -508,7 +516,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                 return 0;
             }
         } else {
-            $this->errors[] = "Failed to send sample invoice.";
+            $this->errors[] = "Failed to send sample invoice: HTTP ".$response['status_code'];
             return 0;
         }
     }
@@ -552,7 +560,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
         // check or get access token
         if ($resource != 'token') {
-            if ($this->tokenData['token']) {
+            if (!empty($this->tokenData['token'])) {
             	if ($this->isTokenExpired()) {
                     $this->refreshAccessToken(); // This will fill again $this->tokenData['token'] and save it in database
                 }
@@ -633,7 +641,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
      */
     public function syncFlows($syncFromDate = 0, $limit = 0)
     {
-        global $db, $langs, $user, $conf;
+        global $db, $langs, $user;
 
         $results_messages = array();
         $actions = array();
@@ -698,7 +706,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
         	$params['limit'] = $limit;
         }
 		$jsonparams = json_encode($params);
-        $response = $this->callApi($resource, "POST", $jsonparams, [], "Synchronization");	// This will also create the Call entry
+        $response = $this->callApi($resource, "POST", $jsonparams, [], "synchronization");	// This will also create the Call entry
 
         if ($response['status_code'] != 200) {
 			$this->errors[] = "Failed to retrieve flows for synchronization." . ' (HTTP ' . $response['status_code'] . ')';

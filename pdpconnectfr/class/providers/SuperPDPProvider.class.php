@@ -673,7 +673,7 @@ class SuperPDPProvider extends AbstractPDPProvider
      */
     public function syncFlows($syncFromDate = 0, $limit = 0)
     {
-        global $db, $langs, $user, $conf;
+        global $db, $langs, $user;
 
         $results_messages = array();
         $actions = array();
@@ -738,7 +738,7 @@ class SuperPDPProvider extends AbstractPDPProvider
         	$params['limit'] = $limit;
         }
 		$jsonparams = json_encode($params);
-        $response = $this->callApi($resource, "POST", $jsonparams, [], "Synchronization");	// This will also create the Call entry
+        $response = $this->callApi($resource, "POST", $jsonparams, [], "synchronization");	// This will also create the Call entry
 
         if ($response['status_code'] != 200) {
 			$this->errors[] = "Failed to retrieve flows for synchronization." . ' (HTTP ' . $response['status_code'] . ')';
@@ -748,7 +748,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 			return array('res' => 0, 'messages' => $results_messages);
 		}
 
-		$totalFlows = $response['response']['total'] ?? 0;
+		// Some AP returns nb of lines into "total", others returns into "limit"
+		$totalFlows = $response['response']['total'] ?? ($response['response']['limit'] ?? 0);
+
         $batchlimit = $limit; // Set batch limit for logging purposes
         $limit = $limit > 0 ? min($limit, $totalFlows) : $totalFlows;
 
