@@ -196,8 +196,8 @@ if (!getDolGlobalString('PDPCONNECTFR_PROTOCOL')) {
 	exit;
 }
 
+// Action to get/generate a token
 if (preg_match('/set'.$prefix.'TOKEN/i', $action, $reg)) {
-	// Generate token
 	$token = $provider->getAccessToken();
 
 	if ($token) {

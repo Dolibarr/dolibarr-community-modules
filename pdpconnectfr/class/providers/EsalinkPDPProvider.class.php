@@ -227,6 +227,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
             'password' => $this->config['password']
         ));
 
+        // We call /token api of Esalink with username and pass. May be they are just client_id / client_secret that were renamed ?
         $response = $this->callApi("token", "POSTALREADYFORMATED", $param, [], 'get_access_token');
 
         $status_code = $response['status_code'];
