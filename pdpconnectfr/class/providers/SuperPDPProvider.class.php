@@ -51,6 +51,9 @@ class SuperPDPProvider extends AbstractPDPProvider
     /**
      * Constructor
      *
+     * Load setup properties and last token.
+     *
+     * @param DoliDB $db Database handler
      */
     public function __construct($db) {
     	global $langs;
@@ -177,7 +180,12 @@ class SuperPDPProvider extends AbstractPDPProvider
 			$item->cssClass = 'maxwidth500 ';
 			$item->fieldOverride = "";
 			if (!empty($tokenData['token'])) {
-				$item->fieldOverride = "<span class='opacitymedium hideonsmartphone'>" . htmlspecialchars('**************' . substr($tokenData['token'], -4)) . "</span>";
+				$item->fieldOverride = htmlspecialchars('**************' . substr($tokenData['token'], -4));
+
+				if (!empty($tokenData['token_expires_at'])) {
+					$item->fieldOverride .= ' &nbsp; <span class="opacitymedium hideonsmartphone">('.$langs->trans("until").' '.dol_print_date($tokenData['token_expires_at'], 'dayhoursec', 'tzuserrel').')</span>';
+				}
+				//var_dump($tokenData);
 			}
 			if (!$tokenData['token']) {
 				$item->fieldOverride .= '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken().'">' . $langs->trans('generateAccessToken') . '<i class="fa fa-key paddingleft"></i></a>';
@@ -235,7 +243,7 @@ class SuperPDPProvider extends AbstractPDPProvider
     }
 
     /**
-     * Get access token.
+     * Get access token from OAUth server and save it into database.
      *
      * @return string|null Access token or null on failure.
      */
@@ -276,7 +284,7 @@ class SuperPDPProvider extends AbstractPDPProvider
      * @return string|null New access token or null on failure.
      */
     public function refreshAccessToken() {
-        // TODO For the moment we regenerate a new token, but we should refresh if we can
+    	// Get access token from OAUth server and save it into database.
         $result = $this->getAccessToken();
 
         return $result;
@@ -301,7 +309,7 @@ class SuperPDPProvider extends AbstractPDPProvider
     {
         global $langs;
 
-        $response = $this->callApi("healthcheck", "GET", false, [], 'healthcheck');
+        $response = $this->callApi("healthcheck", "GET", false, [], 'healthcheck');		// This include the refresh of token
 
         if ($response['status_code'] === 200) {
             $returnarray['status_code'] = true;
@@ -452,12 +460,12 @@ class SuperPDPProvider extends AbstractPDPProvider
     public function sendSampleInvoice()
     {
     	global $db;
-    	
+
         $outputLog = array(); // Feedback to display
 
         // Generate sample invoice
         $pdpconnectfr = new PdpConnectFr($db);
-        
+
         try {
 	        if ((float) DOL_VERSION < 24.0) {
 	        	$invoice_path = $this->exchangeProtocol->generateSampleInvoiceOld($pdpconnectfr);
@@ -583,13 +591,12 @@ class SuperPDPProvider extends AbstractPDPProvider
 
         // check or get access token
         if ($resource != 'token') {
-            if ($this->tokenData['token']) {
-                $tokenexpiresat = strtotime($this->tokenData['token_expires_at'] ?? 0);
-                if ($tokenexpiresat < dol_now()) {
-                    $this->refreshAccessToken(); // This will fill again $this->tokenData['token']
+            if (!empty($this->tokenData['token'])) {
+            	if ($this->isTokenExpired()) {
+                    $this->refreshAccessToken(); // This will fill again $this->tokenData['token'] and save it in database
                 }
             } else {
-                $this->getAccessToken(); // This will fill again $this->tokenData['token']
+                $this->getAccessToken(); // This will fill again $this->tokenData['token'] and save it in database
             }
         }
 

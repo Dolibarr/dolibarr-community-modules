@@ -350,7 +350,8 @@ print dol_get_fiche_head($head, 'options', $langs->trans($title), -1, "pdpconnec
 // Alert mysoc configuration is not complete
 $pdpconnectfr = new PdpConnectFr($db);
 
-pdpShowWarning($pdpconnectfr);
+$stringwarning = pdpShowWarning($pdpconnectfr);
+print $stringwarning;
 
 
 /*if ($action == 'edit') {

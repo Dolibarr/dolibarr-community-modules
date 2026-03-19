@@ -105,7 +105,7 @@ if (!$user->admin) {
 	accessforbidden();
 }
 
-
+$pdpconnectfr = new PdpConnectFr($db);
 $PDPManager = new PDPProviderManager($db);
 $providersConfig = $PDPManager->getAllProviders();
 
@@ -139,12 +139,18 @@ foreach ($TFieldProfiles as $key => $profileconfig) {
 $reg = array();
 $prefix = '';
 
-// If Access Point is selected, show parameters for if
+// If Access Point is selected, show parameters for it
 if (getDolGlobalString('PDPCONNECTFR_PDP')) {
+	// Generate a $provider (this call the constructor that load the token with fetchOAuthTokenDB() and save it in the memory var $provider->tokenData)
+	// Note: Token may have been expired
 	$provider = $PDPManager->getProvider(getDolGlobalString('PDPCONNECTFR_PDP'));
+	// Now we load the conf
 	$providerconfig  = $provider->getConf();
+
 	$prefix = $providerconfig['dol_prefix'].'_';
 }
+
+$stringwarning = pdpShowWarning($pdpconnectfr);
 
 
 // Setup conf to choose an Access Point Provider
@@ -203,6 +209,7 @@ if (preg_match('/set'.$prefix.'TOKEN/i', $action, $reg)) {
 	}
 }
 
+// Action healthcheck
 if (preg_match('/call'.$prefix.'HEALTHCHECK/i', $action, $reg)) {
 	$statusPDP = $provider->checkHealth();
 	if ($statusPDP['status_code'] == 200) {
@@ -212,6 +219,7 @@ if (preg_match('/call'.$prefix.'HEALTHCHECK/i', $action, $reg)) {
 	}
 }
 
+// Generate a sample invoice and try to send it
 if (preg_match('/make'.$prefix.'sampleinvoice/i', $action, $reg)) {
 	$result = $provider->sendSampleInvoice();
 	if ($result) {
@@ -240,7 +248,6 @@ if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 
 	$provider->initFormSetup($formSetup2, $prefix, $prefixenv, $providersConfig, $TFieldProtocols, $TFieldProfiles);
 }
-
 
 $valueofapikeybefore = getDolGlobalString($prefix . 'API_KEY');
 
@@ -293,12 +300,6 @@ print info_admin($langs->trans("PDPConnectInfo").'<br>'.$langs->trans("PDPConnec
 
 //print '<span class="opacitymedium">'.$langs->trans("PDPConnectFRSetupPage").'</span><br><br>';
 
-// Alert mysoc configuration is not complete
-$pdpconnectfr = new PdpConnectFr($db);
-
-
-pdpShowWarning($pdpconnectfr);
-
 
 /*if ($action == 'edit') {
  print $formSetup->generateOutput(true);
@@ -322,6 +323,8 @@ if (!empty($provider) && !empty($formSetup2->items)) {
 	print '</div>';
 	print '<br>';
 }
+
+print $stringwarning;
 
 if (!empty($formSetup2->items)) {
 	print $formSetup2->generateOutput(true, false, $langs->transnoentitiesnoconv('PDPConnectionSetup'), 'titlefieldmiddle');

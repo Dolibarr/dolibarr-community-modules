@@ -93,24 +93,26 @@ function pdpconnectfrAdminPrepareHead()
  * Show a warning if setup not correct.
  *
  * @param 	PdpConnectFr $pdpconnectfr	Object PdpConnectFr
- * @return	void
+ * @return	string						Return string with warning (or '')
  */
 function pdpShowWarning($pdpconnectfr) {
 	global $langs;
 
+	$ret = '';
+
 	$mysocCheck = $pdpconnectfr->validateMyCompanyConfiguration();
 	if ($mysocCheck['res'] <= 0) {
-		print '<div class="'.($mysocCheck['res'] < 0 ? 'error' : 'warning').'">';
-		print $mysocCheck['message'];
-		print '<br><br>';
-		print $langs->trans("MyCompanyConfigurationWarning") . ': ';
-		print '<a class="gotomycompanysetup" href="' . DOL_URL_ROOT . '/admin/company.php">';
-		print $langs->trans("ModifyCompanyInformation") . '<i class="fas fa-tools marginleftonly"></i>';
-		print '</a>';
-		print '</div>';
+		$ret .= '<div class="'.($mysocCheck['res'] < 0 ? 'error' : 'warning').'">';
+		$ret .= $mysocCheck['message'];
+		$ret .= '<br><br>';
+		$ret .= $langs->trans("MyCompanyConfigurationWarning") . ': ';
+		$ret .= '<a class="gotomycompanysetup" href="' . DOL_URL_ROOT . '/admin/company.php">';
+		$ret .= $langs->trans("ModifyCompanyInformation") . '<i class="fas fa-tools marginleftonly"></i>';
+		$ret .= '</a>';
+		$ret .= '</div>';
 	}
 
-	print '<br>';
+	return ($ret ? $ret.'<br>' : '');
 }
 
 /**

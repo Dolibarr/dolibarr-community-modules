@@ -56,6 +56,8 @@ abstract class AbstractPDPProvider
     /**
      * Constructor
      *
+     * Load setup properties and last token.
+     *
      * @param DoliDB $db Database handler
      */
     public function __construct($db)
@@ -74,12 +76,53 @@ abstract class AbstractPDPProvider
      */
     abstract public function validateConfiguration($mode = 1);
 
+
     /**
-     * Get access token for the provider.
+     * Get access token from OAUth server and save it into database
      *
      * @return string|null
      */
     abstract public function getAccessToken();
+
+    /**
+     * Get current token in memory (loaded by fetchOAuthTokenDB in constructor)
+     *
+     * @return mixed	Token
+     */
+    public function getTokenData() {
+        return $this->tokenData;
+    }
+
+    /**
+     * Return of a token is expired
+     *
+     * @return boolean	yes or no
+     */
+    public function isTokenExpired() {
+    	if (!empty($this->tokenData['token_expires_at'])) {
+    		try {
+	    		// Check date
+				$expiryDate = $this->tokenData['token_expires_at'];
+				$now = dol_now();
+				$expired = ($now >= ($expiryDate - 60));
+	    		//var_dump($this->tokenData, dol_print_date($expiryDate, 'standard', 'gmt').' UTC', $expiryDate, $now, $expired);exit;
+
+				return $expired;	// We report token as expired 60 seconds before real end.
+    		} catch(Exception $e) {
+    			return true;
+    		}
+    	}
+
+		return true;
+    }
+
+    /**
+     * Refresh access token.
+     *
+     * @return string|null 		New access token or null on failure.
+     */
+    abstract public function refreshAccessToken();
+
 
     /**
      * Perform a health check call for the provider endpoint.
@@ -145,11 +188,6 @@ abstract class AbstractPDPProvider
      */
     public function getConf() {
         return $this->config;
-    }
-
-    /** @var array OAuth token information */
-    public function getTokenData() {
-        return $this->tokenData;
     }
 
     /**
@@ -245,7 +283,7 @@ abstract class AbstractPDPProvider
                     $sql .= ", tokenstring_refresh = '".$db->escape($refreshToken)."'";
                 }
                 if ($expire_at !== null) {
-                    $sql .= ", expire_at = '".$db->idate($expire_at)."'";
+                    $sql .= ", expire_at = '".$db->idate($expire_at, 'gmt')."'";
                 }
                 $sql .= " WHERE service = '".$db->escape($serviceName)."'";
                 $sql .= " AND entity = ".((int) $conf->entity);
@@ -260,7 +298,7 @@ abstract class AbstractPDPProvider
                 $sql .= "'".$db->escape($accessToken)."'";
                 $sql .= $refreshToken !== null ? ", '".$db->escape($refreshToken)."'" : "";
                 $sql .= ", '".$db->idate($now)."'";
-                $sql .= $expire_at !== null ? ", '".$db->idate($expire_at)."'" : "";
+                $sql .= $expire_at !== null ? ", '".$db->idate($expire_at, 'gmt')."'" : "";
                 $sql .= ", ".(int) $conf->entity.")";
             }
 
@@ -296,9 +334,9 @@ abstract class AbstractPDPProvider
         // For backward compatibility with Dolibarr versions < 23.0.0
         if (version_compare(DOL_VERSION, '23.0.0', '<')) {
 
-            $token = $conf->global->{$serviceName.'_TOKEN'} ?? '';
-            $refresh = $conf->global->{$serviceName.'_REFRESH'} ?? '';
-            $expire = $conf->global->{$serviceName.'_EXPIRE'} ?? '';
+            $token = getDolGlobalString($serviceName.'_TOKEN');
+            $refresh = getDolGlobalString($serviceName.'_REFRESH');
+            $expire = getDolGlobalString($serviceName.'_EXPIRE');
 
             if (empty($token)) {
                 return false;
@@ -330,9 +368,9 @@ abstract class AbstractPDPProvider
         $obj = $db->fetch_object($resql);
 
         return [
-            'token'  => $obj->tokenstring,
+            'token' => $obj->tokenstring,
             'refresh_token' => $obj->tokenstring_refresh,
-            'token_expires_at'     => $obj->expire_at
+            'token_expires_at' => $db->jdate($obj->expire_at, 'gmt')
         ];
     }
 
