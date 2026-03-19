@@ -325,7 +325,7 @@ if (empty($reshook)) {
 }
 
 
-if (getDolGlobalString('PDPCONNECTFR_PDP') && getDolGlobalString('PDPCONNECTFR_PDP') === "ESALINK") {
+if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 	$providerManager = new PDPProviderManager($db);
 	$provider = $providerManager->getProvider(getDolGlobalString('PDPCONNECTFR_PDP'));
 }
@@ -656,6 +656,7 @@ $newcardbutton = '';
 //$newcardbutton .= dolGetButtonTitleSeparator();
 //$newcardbutton .= dolGetButtonTitle($langs->trans('New'), '', 'fa fa-plus-circle', dol_buildpath('/pdpconnectfr/document_card.php', 1).'?action=create&backtopage='.urlencode($_SERVER['PHP_SELF']), '', $permissiontoadd);
 
+
 if ($provider) {
 	$title = $langs->trans("EInvoiceSynchronizationHelp", $provider->providerName);
 }
@@ -740,10 +741,12 @@ if ($resLastsyncinfosql) {
 }
 $last_sync_info .= '</span>';
 
+
 // Last supplier invoice that could not be processed by the system
 $last_supplier_invoice_error = '';
 $filePath = $conf->pdpconnectfr->dir_temp . '/facturx.pdf';
 if (file_exists($filePath)) {
+	//var_dump($filePath);
 	$urlOriginalFile = DOL_URL_ROOT . '/document.php?modulepart=pdpconnectfr&file=' . urlencode('temp/facturx.pdf');
 	$urlConvertedFile = DOL_URL_ROOT . '/document.php?modulepart=pdpconnectfr&file=' . urlencode('temp/facturx_readable.pdf');
 
@@ -772,6 +775,7 @@ if ($provider) {
 	if (getDolGlobalInt('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS') && !GETPOSTDATE('last_sync_datetime', 'getpost', 'tzuserrel')) {
 		$last_sync -= (getDolGlobalInt('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS') * 3600);
 	}
+
 	print '<tr>';
 	print '<td class="syncFormLabel">'.$langs->trans("StartSynchronizationFrom").'</td>';
 	print '<td>';
@@ -781,7 +785,7 @@ if ($provider) {
 		$gmtdatetosuggest = $syncfromdate;
 	}
 
-	print $form->selectDate($gmtdatetosuggest, 'last_sync_datetime', 1, 1, 1, '', 1, 0, 0, '', '', '', '', 1, '', $langs->trans('From'), 'tzuserrel');
+	print $form->selectDate($gmtdatetosuggest ? $gmtdatetosuggest : '', 'last_sync_datetime', 1, 1, 1, '', 1, 0, 0, '', '', '', '', 1, '', $langs->trans('From'), 'tzuserrel');
 
 	print '</td>';
 
@@ -800,7 +804,7 @@ if ($provider) {
 		print '<td>';
 		print '<input type="number" id="maxflows" name="maxflows" class="maxwidth75 right" min="1" step="1" value="'.(GETPOSTINT('maxflows') ? GETPOSTINT('maxflows') : getDolGlobalInt('PDPCONNECTFR_FLOWS_SYNC_CALL_SIZE', 100)).'" required> ';
 		if ($conf->browser->layout != 'phone') {
-			print '<span class="opacitymedium ">'.$langs->trans("maxNumberToProcessHelp").'</span>';
+			print $form->textwithpicto('', $langs->transnoentitiesnoconv("maxNumberToProcessHelp"));
 		}
 		print '</td>';
 		print '</tr>';
