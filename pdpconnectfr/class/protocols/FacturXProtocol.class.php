@@ -118,8 +118,8 @@ class FacturXProtocol extends AbstractProtocol
         if (!is_object($invoice->thirdparty)) {
             $invoice->fetch_thirdparty();
         }
-        
-        
+
+
         // Prepare Invoice Data for XML Generation
         $facture_number = $object->ref;
         $note_pub = $object->note_public ? $object->note_public : "";
@@ -199,7 +199,7 @@ class FacturXProtocol extends AbstractProtocol
 
         $myUri = $pdpconnectfr->getSellerCommunicationURI(0);							// May be SIREN or SIREN_xxx
         $myLegalOrgUri = $this->IEC_6523_code($mysoc->country_code, 1);
-        
+
         //var_dump($idprof, $legalOrgId, $uri, $legalOrgUri, $myidprof, $myLegalOrgId, $myUri, $myLegalOrgUri); exit;
 
         // Add test
@@ -221,7 +221,7 @@ class FacturXProtocol extends AbstractProtocol
         if (!empty($object->thirdparty->tva_intra) && !empty($object->thirdparty->country_code) && substr($object->thirdparty->tva_intra, 0, 2) != $object->thirdparty->country_code) {
         	throw new Exception('BADVATNUMBER: The VAT number of the thirdparty '.$object->thirdparty->name.' must start with its 2 letter country code.');
         }
-        
+
         //  Build XML Document Header (Seller, Buyer, Dates)
         $facturxpdf
             ->setDocumentInformation(
@@ -280,14 +280,14 @@ class FacturXProtocol extends AbstractProtocol
                 $uri
             );
 
-            
+
         // Add delivery date for section ApplicableHeaderTradeDelivery
         if (!empty($deliveryDateList)) {
 			$deliveryDateList = $invoice->date;
         }
         $facturxpdf->setDocumentSupplyChainEvent(new DateTime($deliveryDateList[0]));
 
-        
+
         // Add additional referenced documents (Order references) - Disabled for Chorus
         // Not for chorus : a été rejetée pour le(s) motif(s) suivants, identifié(s) dans le flux cycle de vie : L'element (AttachmentBinaryObject.value) est obligatoire si l'element (FichierXml.SupplyChainTradeTransaction.ApplicableHeaderTradeAgreement.AdditionalReferencedDocument) est renseigne.
         if (!$chorus) { // TODO : check this condition
@@ -374,7 +374,7 @@ class FacturXProtocol extends AbstractProtocol
             $outputlangs->setDefaultLang($newlang);
         }
 
-  
+
         // Loop on each invoice line
         $numligne = 1;
         $depositlines = array();
@@ -392,7 +392,7 @@ class FacturXProtocol extends AbstractProtocol
         	if ($line->subprice < 0 || $line->subprice_ttc < 0) {
 				throw new Exception("NEGATIVE_UNIT_PRICE_NOT_ALLOWED: Unit price in lines can't be negative. Try to edit the line with ID ".$line->id);
         	}
-            
+
             if ($line->desc == '(DEPOSIT)') {
                 $isDepositLine = 1;
                 $depositFactRef = "";
@@ -535,7 +535,7 @@ class FacturXProtocol extends AbstractProtocol
             // G: Export outside of EU
             if ($line->tva_tx > 0) {
             	$categoryVAT = 'S';
-            	
+
                 $facturxpdf->addDocumentPositionTax($categoryVAT, 'VAT', $line->tva_tx);
             } else {
             	$categoryVAT = 'K';
@@ -654,20 +654,20 @@ class FacturXProtocol extends AbstractProtocol
 		$filedir = getMultidirOutput($invoice, '', 1, 'temp');
 		// Add a file with name factur-x.xml or xrechnung.xml
         $xmlfile = $filedir.'/'.$filename.'/factur-x.xml';	// Nameof file should be factur-x.xml so it will also have this name once added into PDF
-        
+
 
         dol_mkdir(dirname($xmlfile));
 		dol_delete_file($xmlfile);
 
         $facturxpdf->writeFile($xmlfile);
-        
-        
+
+
         // Remove the string <ram:ApplicableHeaderTradeDelivery/> from file if it exists (it is an empty tag that may be refused by some AP)
 		/*$content = file_get_contents($xmlfile);
 		$content = str_replace('<ram:ApplicableHeaderTradeDelivery/>', '', $content);	// Remove the tag
 		file_put_contents($xmlfile, $content);*/
 
-		
+
         // Patch the generated XML to add missing elements for better EXTENDED-CTC-FR compatibility (Only for some specific cases)
         if ($invoice->type == $invoice::TYPE_CREDIT_NOTE || !empty($depositlines)) {
             dol_syslog(get_class($this) . '::executeHooks Patch XML for better EXTENDED-CTC-FR compatibility');
@@ -677,7 +677,7 @@ class FacturXProtocol extends AbstractProtocol
         }
 
         dolChmod($xmlfile);
-        
+
         return $xmlfile;
     }
 
@@ -695,13 +695,13 @@ class FacturXProtocol extends AbstractProtocol
     {
         // Global variables declaration (typical for Dolibarr environment)
         global $langs, $db;
-        
+
         dol_syslog(get_class($this) . '::generateInvoice');
 
         if (empty($outputlangs) || ! ($outputlangs instanceOf Translate)) {
         	$outputlangs = $langs;
         }
-        
+
         require_once DOL_DOCUMENT_ROOT."/compta/facture/class/facture.class.php";
 
         if ($invoice_id instanceof Facture) {
@@ -714,7 +714,7 @@ class FacturXProtocol extends AbstractProtocol
 	        if ($invoiceResult < 0) {
 	            dol_syslog(get_class($this) . "::generateInvoice failed to load invoice id=" . $invoice_id, LOG_ERR);
 	            $this->error = $langs->trans("ErrorLoadingInvoice");
-	            $this->errors[] = $this->error; 
+	            $this->errors[] = $this->error;
 	            return -1;
 	        }
         }
@@ -725,14 +725,14 @@ class FacturXProtocol extends AbstractProtocol
         } catch(Exception $e) {
             dol_syslog(get_class($this) . "::generateInvoice failed to generate XML for invoice id=" . $invoice_id.". Error ".$e->getMessage(), LOG_ERR);
 	        $this->error = $langs->trans("ErrorGeneratingXML").'. '.$e->getMessage();
-	        $this->errors[] = $this->error; 
+	        $this->errors[] = $this->error;
             return -1;
         }
 
         if (empty($xmlfile) || !file_exists($xmlfile)) {
             dol_syslog(get_class($this) . "::generateInvoice failed to generate XML for invoice id=" . $invoice_id, LOG_ERR);
 	        $this->error = $langs->trans("ErrorGeneratingXML");
-	        $this->errors[] = $this->error; 
+	        $this->errors[] = $this->error;
             return -1;
         }
 
@@ -751,7 +751,7 @@ class FacturXProtocol extends AbstractProtocol
         } else {
             dol_syslog(get_class($this) . "::executeHooks failed to copy original PDF to " . $pathfacturxpdf, LOG_ERR);
 	        $this->error = $langs->trans("ErrorFailToCopyFile", $orig_pdf, $pathfacturxpdf);
-	        $this->errors[] = $this->error; 
+	        $this->errors[] = $this->error;
             return -1;
         }
 
@@ -768,7 +768,7 @@ class FacturXProtocol extends AbstractProtocol
         if ($precheck == false) {
             dol_syslog(get_class($this) . "::executeHooks orig pdf file does not exists, can't create facturX");
 	        $this->error = 'Orig pdf file does not exists, can t create facturX';
-	        $this->errors[] = $this->error; 
+	        $this->errors[] = $this->error;
             return -1;
         }
 
@@ -787,7 +787,7 @@ class FacturXProtocol extends AbstractProtocol
             $pdf->addPage();
             $pdf->useTemplate($tpl);
         }
-        
+
         // Embed the XML file as a file attachment in the PDF
         if (file_exists($xmlfile)) {
             $pdf->Annotation(0, 0, 0, 0, '', array(
@@ -845,7 +845,7 @@ class FacturXProtocol extends AbstractProtocol
         return $ret;*/
     }
 
-    
+
     /**
      * Generate a sample Factur-X invoice for demonstration or testing purposes (for Dolibarr version < 24.0)
      *
@@ -862,7 +862,7 @@ class FacturXProtocol extends AbstractProtocol
 		dol_mkdir($conf->pdpconnectfr->dir_temp);
 
 		$outputlangs = $langs;		// TODO Use the target language
-		
+
         require __DIR__ . "/ExampleHelpers.php";
 
         $existingPdfFilename = __DIR__ . "/../../assets/00_ZugferdDocumentPdfBuilder_PrintLayout.pdf";
@@ -886,22 +886,22 @@ class FacturXProtocol extends AbstractProtocol
 
         $myLegalOrgId = "0002";
         $sellerid = $pdpconnectfr->getSellerCommunicationURI(0);
-        
+
         $myUri = "0225";
         $sellerglobalid = $pdpconnectfr->getSellerCommunicationURI(0);
 
         if ($myLegalOrgId == "0002" && strlen($sellerid) != 9) {	// If einvoice ID is French SIREN, we check it has 9 chars.
 			throw new Exception('BADPROFID: The professional ID has type SIREN but length is not 9 characters. Fix this in your company or einvoice module setup page.');
         }
-        
+
         $documentBuilder->addDocumentNote($sellername . PHP_EOL . 'Lieferantenstraße 20' . PHP_EOL . '80333 München' . PHP_EOL . 'Deutschland' . PHP_EOL . 'Geschäftsführer: Hans Muster' . PHP_EOL . 'Handelsregisternummer: H A 123' . PHP_EOL . PHP_EOL, null, 'REG');
-        
+
 
         $documentBuilder->addDocumentNote(getDolGlobalString('PDPCONNECTFR_PMT') ?: $outputlangs->trans('NoInvoiceCollectionFees'), null, "PMT");
         $documentBuilder->addDocumentNote(getDolGlobalString('PDPCONNECTFR_PMD') ?: $outputlangs->trans('NoLatePaymentFees'), null, "PMD");
         $documentBuilder->addDocumentNote(getDolGlobalString('PDPCONNECTFR_AAB') ?: $outputlangs->trans('NoEarlyPaymentDiscount'), null, "AAB");
 
-        
+
         $documentBuilder->setDocumentBillingPeriod(DateTime::createFromFormat("Ymd", "20250101"), DateTime::createFromFormat("Ymd", "20250131"), "01.01.2025 - 31.01.2025");
         $documentBuilder->addDocumentInvoiceSupportingDocumentWithUri('REFDOC-2024/00001-1', 'http.//some.url', 'Inhaltsstoffe Joghurt');
         $documentBuilder->addDocumentInvoiceSupportingDocumentWithFile('REFDOC-2024/00001-2', $AdditionalDocument, 'Herkunftsnachweis Trennblätter');
@@ -910,18 +910,18 @@ class FacturXProtocol extends AbstractProtocol
 
         $documentBuilder->setDocumentContractReferencedDocument('CON-2024/2025-001');
         $documentBuilder->setDocumentProcuringProject('PROJ-2025-001-1', 'Allgemeine Dienstleistungen');
-        
+
         $documentBuilder->addDocumentPaymentMeanToDirectDebit("DE12500105170648489890", "INV-TEST");
         $documentBuilder->addDocumentPaymentTerm('Wird von Konto DE12500105170648489890 abgebucht', DateTime::createFromFormat("Ymd", "20250131"), 'MANDATE-2024/000001');
-        
+
         $documentBuilder->setDocumentSeller($sellername, $sellerid);
         $documentBuilder->setDocumentSellerLegalOrganisation($sellerid, $myLegalOrgId, $sellername);	// Mandatory: 0002 = SIREN
         $documentBuilder->addDocumentSellerGlobalId($sellerglobalid, $myUri);							// Optional : 0225 = SIREN. Can be a more international code like DUNS
-        
+
         //$documentBuilder->setSpecifiedLegalOrganization();
         $documentBuilder->addDocumentSellerTaxNumber($sellervat);
         $documentBuilder->addDocumentSellerVATRegistrationNumber($sellervat);
-        
+
         $documentBuilder->setDocumentSellerAddress("Lieferantenstraße 20", "", "", "80333", "München", ZugferdCountryCodes::GERMANY);
         $documentBuilder->setDocumentSellerContact("H. Müller", "", "+49-111-2222222", "+49-111-3333333", "hm@lieferant.de");
         $documentBuilder->setDocumentSellerCommunication(ZugferdElectronicAddressScheme::UNECE3155_EM, 'sales@lieferant.de');
@@ -937,7 +937,7 @@ class FacturXProtocol extends AbstractProtocol
         $documentBuilder->setDocumentShipTo("Kunden AG Ost");
         $documentBuilder->setDocumentShipToAddress("Lieferstraße 1", "", "", "04109", "Leipzig", ZugferdCountryCodes::GERMANY);
         $documentBuilder->setDocumentSupplyChainEvent(DateTime::createFromFormat("Ymd", "20250115"));
-        
+
         $documentBuilder->addNewPosition("1");
         $documentBuilder->setDocumentPositionProductDetails("Trennblätter A4", "50er Pack", "TB100A4");
         $documentBuilder->setDocumentPositionNetPrice(9.9000);
@@ -960,7 +960,7 @@ class FacturXProtocol extends AbstractProtocol
         $documentBuilder->addDocumentTax(ZugferdVatCategoryCodes::STAN_RATE, ZugferdVatTypeCodes::VALUE_ADDED_TAX, 675.0, 47.25, 7.0);
         $documentBuilder->setDocumentSummation(957.87, 957.87, 873.00, 0.0, 0.0, 873.00, 84.87);
 
-            
+
         // Next let's do the ZugferddocumentPdfBuilder it's job - let's attach the XML to the PDF. The attachment filename will be factur-x.xml
         // since whe choosed the profile EN16931 in the ZugferdDocumentBuilder (see above)
         // In the following there are multiple methods how you can build a conform PDF from an existing print layout
@@ -1116,7 +1116,7 @@ class FacturXProtocol extends AbstractProtocol
 		$tmpinvoice = new Facture($this->db);
 		$tmpinvoice->initAsSpecimen('nolines');
 
-		
+
 		$line = new FactureLigne($this->db);
 		$line->desc = $langs->trans("Description")." 1";
 		$line->qty = 1;
@@ -1144,12 +1144,13 @@ class FacturXProtocol extends AbstractProtocol
 		$tmpinvoice->multicurrency_total_ht       += $line->multicurrency_total_ht;
 		$tmpinvoice->multicurrency_total_tva      += $line->multicurrency_total_tva;
 		$tmpinvoice->multicurrency_total_ttc      += $line->multicurrency_total_ttc;
-	
-		
+
+
 		require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
 		$tmpthirdparty = new Societe($this->db);
 		$tmpthirdparty->initAsSpecimen();
 		$tmpinvoice->thirdparty = $tmpthirdparty;
+		$tmpinvoice->thirdparty->idprof1 = '000000001';
 		$tmpinvoice->socid = $tmpthirdparty->id;				// 0 for specimen
 
 		require_once DOL_DOCUMENT_ROOT . '/contact/class/contact.class.php';
@@ -1166,8 +1167,8 @@ class FacturXProtocol extends AbstractProtocol
 
 		return $pathOfPdf;
     }
-    
-    
+
+
     /**
      * Create a supplier invoice from a Factur-X file.
      *
@@ -1893,7 +1894,7 @@ class FacturXProtocol extends AbstractProtocol
      * @return string code
      */
     private function IEC_6523_code($country_code, $global = 0)
-    { 	
+    {
         $retour = "";
         switch ($country_code) {
             case 'BE':
@@ -1913,8 +1914,8 @@ class FacturXProtocol extends AbstractProtocol
         }
         return $retour;
     }
-    
-    
+
+
 
     /************************************************
      *    Check line type from external module ?
