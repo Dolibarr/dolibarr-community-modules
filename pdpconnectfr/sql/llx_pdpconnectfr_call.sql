@@ -18,7 +18,7 @@ CREATE TABLE llx_pdpconnectfr_call(
 	-- BEGIN MODULEBUILDER FIELDS
 	rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL, 
 	call_id varchar(50) NOT NULL, 
-	totalflow integer NOT NULL DEFAULT 1, 
+	totalflow integer NULL DEFAULT NULL, 
 	batchlimit integer NOT NULL DEFAULT 1, 
 	skippedflow integer NOT NULL DEFAULT 1, 
 	successflow integer NOT NULL DEFAULT 1, 

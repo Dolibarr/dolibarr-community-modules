@@ -715,7 +715,7 @@ $selectedfields .= (count($arrayofmassactions) ? $form->showCheckAddButtons('che
 
 // Last flow sync info
 $last_sync = 0;
-if (GETPOSTDATE('last_sync_datetime', 'getpost', 'tzuserrel')) {
+if (GETPOSTDATE('last_sync_datetime', 'getpost', 'tzuserrel') && $action == 'delete') {		// If we do a delete, we may want to go older in past for next sync to retreive the deleted record, so we do not reuse the last date
 	$last_sync = GETPOSTDATE('last_sync_datetime', 'getpost', 'tzuserrel');
 }
 $last_sync_info = '<span class="opacitylowx">'.img_picto('', 'long-arrow-alt-right', 'class="pictofixedwidth"');
@@ -882,7 +882,6 @@ if ($action == 'sync' && $provider) {
 // Sync results
 if ($action == 'confirm_sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $confirm == 'yes' && !empty($sync_result)) {
 	if (isset($provider)) {
-
 		$cssclass = ($sync_result['res'] > 0) ? 'info' : 'error';
 
 		$syncerrortype = '';		// '', 'business' or 'technical'
@@ -895,9 +894,9 @@ if ($action == 'confirm_sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $conf
 				$cssclass = 'warning';
 			}
 		} else {
-			if ($sync_result['totalFlows'] > $sync_result['batchlimit'] && empty($sync_result['syncedFlows']) && !empty($sync_result['alreadyExist'])) {
+			if ((is_null($sync_result['totalFlows']) || $sync_result['totalFlows'] > $sync_result['batchlimit']) && empty($sync_result['syncedFlows']) && !empty($sync_result['alreadyExist'])) {
 				$cssclass = 'warning';
-				$sync_result['actions'][] = $langs->trans("TryToIncreaseStartDateOrMax", $langs->transnoentitiesnoconv("StartSynchronizationFrom"), $langs->transnoentitiesnoconv("maxNumberToProcess"));
+				$sync_result['actions'][] = $langs->trans("TryToIncreaseStartDateOrMax", $langs->transnoentitiesnoconv("maxNumberToProcess"));
 			} else {
 				$cssclass = 'info';
 			}

@@ -706,6 +706,7 @@ class SuperPDPProvider extends AbstractPDPProvider
         dol_syslog(__METHOD__ . " syncFlows start from ".dol_print_date($dateafter, 'standard')." limit ".$limit, LOG_DEBUG, 0, "_pdpconnectfr");
 
         // If limit is 0, we first need to get the total number of flows to sync because AP set a default limit of 25 if not specified
+        /* response param "total" not supported by SuperPDP
         if ($limit == 0) {
 			$jsonparams = json_encode($params);
         	$response = $this->callApi($resource, "POST", $jsonparams);
@@ -731,7 +732,7 @@ class SuperPDPProvider extends AbstractPDPProvider
             dol_syslog(__METHOD__ . " Total flows to synchronize: " . $totalFlows, LOG_DEBUG);
             dol_syslog(__METHOD__ . " Total flows to synchronize: " . $totalFlows, LOG_DEBUG, 0, "_pdpconnectfr");
         }
-
+		*/
 
         // Make a call to get all flows
         if ($limit) {
@@ -749,12 +750,13 @@ class SuperPDPProvider extends AbstractPDPProvider
 		}
 
 		// Some AP returns nb of lines into "total", others returns into "limit"
-		$totalFlows = $response['response']['total'] ?? ($response['response']['limit'] ?? 0);
+		$totalFlows = ($response['response']['total'] ?? null);		// If not defined (not into the spec), we set it to null
+		$limitFlows = ($response['response']['limit'] ?? 0);
 
         $batchlimit = $limit; // Set batch limit for logging purposes
-        $limit = $limit > 0 ? min($limit, $totalFlows) : $totalFlows;
+        $limit = (($limit > 0 && $limitFlows > 0) ? min($limit, $limitFlows) : ($limitFlows ? $limitFlows : $limit));
 
-        if ($totalFlows == 0) {
+        if ($limit == 0) {
             dol_syslog(__METHOD__ . " No flows to synchronize.", LOG_DEBUG);
         	dol_syslog(__METHOD__ . " No flows to synchronize.", LOG_DEBUG, 0, "_pdpconnectfr");
 
@@ -762,7 +764,7 @@ class SuperPDPProvider extends AbstractPDPProvider
             return array('res' => 1, 'messages' => $results_messages);
         }
 
-		// Since PDP may not return flows in the order we want (by updatedAt ASC), we sort them here
+		// Since AP may not return flows in the order they want (by updatedAt ASC), we sort them here
 		dol_syslog(__METHOD__ . " Sort the flows per updatedAt", LOG_DEBUG, 0, "_pdpconnectfr");
         usort($response['response']['results'], function ($a, $b) {
 			return strtotime($a['updatedAt']) <=> strtotime($b['updatedAt']);
@@ -856,18 +858,19 @@ class SuperPDPProvider extends AbstractPDPProvider
 		}
 
 
-        $res = $error > 0 ? -1 : 1;
+        $globalres = ($error > 0 ? -1 : 1);
 
-        $globalresultmessage = ($res == 1) ? $langs->trans("SyncCompletedSuccessfuly") : ($langs->trans("SyncAborted", $i, $totalFlows, ($flow['flowId'] ?? 'N/A')));
+        $globalresultmessage = ($globalres == 1) ? $langs->trans("SyncCompletedSuccessfuly") . ($batchlimit > 0 ? ' <span class="opacitylow">('.$langs->trans("maxNumberToProcess").' '.$batchlimit.")</span>" : "")  : ($langs->trans("SyncAborted", $i, $limit, ($flow['flowId'] ?? 'N/A')));
 
 		dol_syslog(__METHOD__ . " syncFlows end : ".$globalresultmessage, LOG_DEBUG, 0, "_pdpconnectfr");
 
 
         $messages = array();
 		$messages[] = $globalresultmessage;
-        if ($res == 1) {
-			$messages[] = $langs->trans("TotalToSync").": <b>".$totalFlows."</b>";
-        	$messages[] = "Limit: ".$batchlimit;
+        if ($globalres == 1) {
+        	if (!is_null($totalFlows)) {
+				$messages[] = $langs->trans("TotalToSync").": <b>".$totalFlows."</b>";
+        	}
         }
         $messages[] = $langs->trans("TotalSkippedSync").": <b>".$alreadyExist."</b> - ".$langs->trans("TotalNewSync").": <b>".$syncedFlows."</b>";
 
@@ -882,7 +885,7 @@ class SuperPDPProvider extends AbstractPDPProvider
         // Save sync recap
         if ($call_id) {
             $sql = "UPDATE " . MAIN_DB_PREFIX . "pdpconnectfr_call";
-            $sql .= " SET totalflow = " . ((int) $totalFlows) . ",
+            $sql .= " SET totalflow = " . (is_null($totalFlows) ? "null" : ((int) $totalFlows)) . ",
                 successflow = " . ((int) $syncedFlows) . ",
                 skippedflow = " . ((int) $alreadyExist) . ",
                 batchlimit = " . ((int) $batchlimit) . ",
@@ -897,7 +900,7 @@ class SuperPDPProvider extends AbstractPDPProvider
         // 'actions' contains the action to do (in case of business error)
         // 'details' will containes all technical error (for Log)
         return [
-            'res' => $res,
+            'res' => $globalres,
             'messages' => $messages,
             'totalFlows' => $totalFlows,
             'alreadyExist' => $alreadyExist,
