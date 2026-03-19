@@ -883,14 +883,16 @@ class FacturXProtocol extends AbstractProtocol
 
         $sellername = $mysoc->name ?: "MyBigCompanyTest";
         $sellervat = $mysoc->tva_intra ?: "FRVAT123456";
-        $sellerid = $pdpconnectfr->getSellerCommunicationURI(0);
-        $sellerglobalid = $pdpconnectfr->getSellerCommunicationURI(0);
 
         $myLegalOrgId = "0002";
+        $sellerid = $pdpconnectfr->getSellerCommunicationURI(0);
+        
+        $myUri = "0225";
+        $sellerglobalid = $pdpconnectfr->getSellerCommunicationURI(0);
+
         if ($myLegalOrgId == "0002" && strlen($sellerid) != 9) {	// If einvoice ID is French SIREN, we check it has 9 chars.
 			throw new Exception('BADPROFID: The professional ID has type SIREN but length is not 9 characters. Fix this in your company or einvoice module setup page.');
         }
-        
         
         $documentBuilder->addDocumentNote($sellername . PHP_EOL . 'Lieferantenstraße 20' . PHP_EOL . '80333 München' . PHP_EOL . 'Deutschland' . PHP_EOL . 'Geschäftsführer: Hans Muster' . PHP_EOL . 'Handelsregisternummer: H A 123' . PHP_EOL . PHP_EOL, null, 'REG');
         
@@ -914,7 +916,7 @@ class FacturXProtocol extends AbstractProtocol
         
         $documentBuilder->setDocumentSeller($sellername, $sellerid);
         $documentBuilder->setDocumentSellerLegalOrganisation($sellerid, $myLegalOrgId, $sellername);	// Mandatory: 0002 = SIREN
-        $documentBuilder->addDocumentSellerGlobalId($sellerglobalid, $myLegalOrgId);					// Optional : 0002 = SIREN. Can be a more international code like DUNS
+        $documentBuilder->addDocumentSellerGlobalId($sellerglobalid, $myUri);							// Optional : 0225 = SIREN. Can be a more international code like DUNS
         
         //$documentBuilder->setSpecifiedLegalOrganization();
         $documentBuilder->addDocumentSellerTaxNumber($sellervat);
@@ -1135,14 +1137,14 @@ class FacturXProtocol extends AbstractProtocol
 
 		$tmpinvoice->lines[] = $line;
 
-		$this->total_ht       += $line->total_ht;
-		$this->total_tva      += $line->total_tva;
-		$this->total_ttc      += $line->total_ttc;
+		$tmpinvoice->total_ht       += $line->total_ht;
+		$tmpinvoice->total_tva      += $line->total_tva;
+		$tmpinvoice->total_ttc      += $line->total_ttc;
 
-		$this->multicurrency_total_ht       += $line->multicurrency_total_ht;
-		$this->multicurrency_total_tva      += $line->multicurrency_total_tva;
-		$this->multicurrency_total_ttc      += $line->multicurrency_total_ttc;
-		
+		$tmpinvoice->multicurrency_total_ht       += $line->multicurrency_total_ht;
+		$tmpinvoice->multicurrency_total_tva      += $line->multicurrency_total_tva;
+		$tmpinvoice->multicurrency_total_ttc      += $line->multicurrency_total_ttc;
+	
 		
 		require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
 		$tmpthirdparty = new Societe($this->db);
