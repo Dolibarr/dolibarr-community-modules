@@ -926,38 +926,36 @@ class PdpConnectFr
 
         $resprints = '';
 
-       		// Set $extrafield_collapse_display_value (do we have to collapse/expand the group after the separator)
-			$extrafield_collapse_display_value = -1;
-			$expand_display = ((isset($_COOKIE['DOLUSER_COLLAPSE_facture_trpdpconnectseparator']) || GETPOSTINT('ignorecollapsesetup')) ? (!empty($_COOKIE['DOLUSER_COLLAPSE_facture_trpdpconnectseparator'])) : !($extrafield_collapse_display_value == 2));
-			$disabledcookiewrite = 0;
-			if ($mode == 'create') {
-				// On create mode, force separator group to not be collapsible
-				$extrafield_collapse_display_value = 1;
-				$expand_display = true;	// We force group to be shown expanded
-				$disabledcookiewrite = 1; // We keep status of group unchanged into the cookie
-			}
-            $resprints .= '
-            <script nonce="" type="text/javascript">
+		// Set $extrafield_collapse_display_value (do we have to collapse/expand the group after the separator)
+		$extrafield_collapse_display_value = -1;
+		$expand_display = ((isset($_COOKIE['DOLUSER_COLLAPSE_facture_trpdpconnectseparator']) || GETPOSTINT('ignorecollapsesetup')) ? (!empty($_COOKIE['DOLUSER_COLLAPSE_facture_trpdpconnectseparator'])) : !($extrafield_collapse_display_value == 2));
+		$disabledcookiewrite = 0;
+		if ($mode == 'create') {
+			// On create mode, force separator group to not be collapsible
+			$extrafield_collapse_display_value = 1;
+			$expand_display = true; // We force group to be shown expanded
+			$disabledcookiewrite = 1; // We keep status of group unchanged into the cookie
+		}
+		$resprints .= '<script nonce="" type="text/javascript">
 			jQuery(document).ready(function() {';
-				if (empty($disabledcookiewrite)) {
-					if (!$expand_display) {
-						$resprints .= 'console.log("Inject js for the collapsing of trpdpconnect_collapseseparator - hide");
+		if (empty($disabledcookiewrite)) {
+			if (!$expand_display) {
+				$resprints .= 'console.log("Inject js for the collapsing of trpdpconnect_collapseseparator - hide");
 						jQuery(".trpdpconnect_collapseseparator").hide();';
-					} else {
-						$resprints .= 'console.log("Inject js for collapsing of trpdpconnect_collapseseparator - keep visible and set cookie");
-						document.cookie = "DOLUSER_COLLAPSE_facture_trpdpconnectseparator=1; path='.$_SERVER["PHP_SELF"].'";';
-					}
-				}
-			$resprints .= '
-			   jQuery("#trpdpconnect").click(function(){
+			} else {
+				$resprints .= 'console.log("Inject js for collapsing of trpdpconnect_collapseseparator - keep visible and set cookie");
+						document.cookie = "DOLUSER_COLLAPSE_facture_trpdpconnectseparator=1; path=' . $_SERVER["PHP_SELF"] . '";';
+			}
+		}
+		$resprints .= 'jQuery("#trpdpconnect").click(function(){
 			       console.log("We click on collapse/uncollapse to hide/show .trpdpconnectseparator");
 			       jQuery(".trpdpconnect_collapseseparator").toggle(100, function(){
 			           if (jQuery(".trpdpconnect_collapseseparator").is(":hidden")) {
 			               jQuery("#trpdpconnect td span").addClass("fa-plus-square").removeClass("fa-minus-square");
-			               document.cookie = "DOLUSER_COLLAPSE_facture_trpdpconnectseparator=0; path='.$_SERVER["PHP_SELF"].'"
+			               document.cookie = "DOLUSER_COLLAPSE_facture_trpdpconnectseparator=0; path=' . $_SERVER["PHP_SELF"] . '"
 			           } else {
 			               jQuery("#trpdpconnect td span").addClass("fa-minus-square").removeClass("fa-plus-square");
-			               document.cookie = "DOLUSER_COLLAPSE_facture_trpdpconnectseparator=1; path='.$_SERVER["PHP_SELF"].'"
+			               document.cookie = "DOLUSER_COLLAPSE_facture_trpdpconnectseparator=1; path=' . $_SERVER["PHP_SELF"] . '"
 			           }
 			       });
 			   });
@@ -973,13 +971,20 @@ class PdpConnectFr
         	$url = DOL_URL_ROOT.'/fourn/facture/agenda.php?id=' . urlencode($object->id) . '&search_agenda_label=PDPCONNECTFR';
         }
         $langs->load("suppliers");
-        $resprints .= '<td><a href="' . $url . '">' . $langs->trans("History") . '<i class="marginleftonly fas fa-calendar-alt infobox-action"></i></a></td>';
+        $resprints .= '<td>';
+        if ($action != 'create') {
+	        $resprints .= '<a href="' . $url . '">' . $langs->trans("History") . '<i class="marginleftonly fas fa-calendar-alt infobox-action"></i></a>';
+        }
+        $resprints .= '</td>';
         $resprints .= '</tr>';
 
         $info = $currentStatusInfo['info'] ?? '';
 
         $editenable = $user->hasRight('facture', 'creer');
         if (method_exists($object, 'isEditable') && !$object->isEditable()) {
+        	$editenable = false;
+        }
+        if ($action == 'create') {
         	$editenable = false;
         }
 
