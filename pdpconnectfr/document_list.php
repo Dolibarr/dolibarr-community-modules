@@ -1190,7 +1190,15 @@ while ($i < $imaxinloop) {
 					print ' title="'.dol_escape_htmltag((string) $object->$key).'"';
 				}
 				print '>';
-				if ($key == 'status') {
+				if ($key == 'flow_direction') {
+					if ($object->flow_direction == 'Out') {
+						print '<span class="stockmovementexit">';
+					} else {
+						print '<span class="stockmovemententry">';
+					}
+					print $object->flow_direction;
+					print '</span>';
+				} elseif ($key == 'status') {
 					print $object->getLibStatut(5);
 				} elseif ($key == 'rowid') {
 					print $object->showOutputField($val, $key, (string) $object->id, '');
