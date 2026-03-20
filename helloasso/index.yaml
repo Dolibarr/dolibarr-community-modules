@@ -4,6 +4,7 @@ packages:
     - modulename: 'HelloAsso'
       author: 'Dolicloud'
       author_url: 'https://www.dolicloud.com'
+      maintener_email: 'contact@dolicloud.com'
       label:
         fr: "HelloAsso (par DoliCloud)"
         en: "HelloAsso (by DoliCloud)"

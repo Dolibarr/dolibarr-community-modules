@@ -85,7 +85,7 @@ packages:
       dolibarrmax: "23.0"
       phpmin: '7.4'
       phpmax: ""
-      price: ''
+      price: 0
       direct-download: yes
       dolistore-upload: 'no'
       dolistore-download: ''

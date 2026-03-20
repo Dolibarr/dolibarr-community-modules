@@ -4,6 +4,7 @@ packages:
     - modulename: 'PDPConnectFR'
       author: 'Dolibarr foundation'
       author_url: 'https://www.dolibarr.org'
+      maintener_email: 'mdaoud@dolicloud.com'
       label:
         fr: 'PDP Connect (France)'
         en: 'PDP Connect (France)'

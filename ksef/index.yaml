@@ -22,7 +22,7 @@ packages:
       dolibarrmax: "auto"
       phpmin: "7.4"
       phpmax: "auto"
-      price: ""
+      price: 0
       direct-download: yes
       dolistore-upload: "no"
       dolistore-download: ""
