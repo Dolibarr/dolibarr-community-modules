@@ -985,7 +985,7 @@ foreach ($object->fields as $key => $val) {
 		} elseif ($val['type'] === 'boolean') {
 			print $form->selectyesno('search_' . $key, $search[$key] ?? '', 1, false, 1);
 		} else {
-			if ($val['notsearchable']) {
+            if (!empty($val['notsearchable'])) {
 				continue;
 			}
 			print '<input type="text" class="flat maxwidth'.(in_array($val['type'], array('integer', 'price')) ? '50' : '75').'" name="search_'.$key.'" value="'.dol_escape_htmltag(isset($search[$key]) ? $search[$key] : '').'">';
