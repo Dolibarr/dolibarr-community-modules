@@ -253,9 +253,14 @@ $valueofapikeybefore = getDolGlobalString($prefix . 'API_KEY');
 
 if ($action == 'update' && !empty($formSetup) && is_object($formSetup) && !empty($user->admin) && GETPOSTISSET('PDPCONNECTFR_PDP')) {
 	$formSetup->saveConfFromPost();
+	header("Location: ".$_SERVER["PHP_SELF"]);
+	exit;
+
 }
 if ($action == 'update' && !empty($formSetup) && is_object($formSetup) && !empty($user->admin) && !GETPOSTISSET('PDPCONNECTFR_PDP')) {
 	$formSetup2->saveConfFromPost();
+	header("Location: ".$_SERVER["PHP_SELF"]);
+	exit;
 }
 // The actions_setmoduleoptions.inc.php is not able to manage 2 formSetup so we do not use it.
 //include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php';
