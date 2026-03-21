@@ -84,19 +84,19 @@ abstract class AbstractProtocol
      * Each protocol should provide a representative sample
      * illustrating its structure and data format.
      *
-     * @param	PdpConnectFr		$pdpconnectfr		PDPConnectFR
-     * @return 	string 									Path or content of the generated sample invoice.
+     * @param	PdpConnectFr		$pdpconnectfr			PDPConnectFR
+     * @return 	array<string,string> 						Path or content of the generated sample invoice.
      */
     abstract public function generateSampleInvoiceOld($pdpconnectfr);
-    
+
     /**
      * Generate a sample invoice for testing or demonstration purposes (for Dolibarr version >= 24.0)
      *
      * Each protocol should provide a representative sample
      * illustrating its structure and data format.
      *
-     * @param	PdpConnectFr		$pdpconnectfr		PDPConnectFR
-     * @return 	string 									Path or content of the generated sample invoice.
+     * @param	PdpConnectFr		$pdpconnectfr			PDPConnectFR
+     * @return 	string 										Path or content of the generated sample invoice.
      */
     abstract public function generateSampleInvoice($pdpconnectfr);
 }

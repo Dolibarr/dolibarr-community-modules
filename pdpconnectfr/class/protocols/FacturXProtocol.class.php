@@ -852,8 +852,8 @@ class FacturXProtocol extends AbstractProtocol
      * This method creates a dummy invoice with representative data
      * to illustrate the Factur-X structure without using real business information.
      *
-     * @param	PdpConnectFr		$pdpconnectfr		PDPConnectFR
-     * @return 	string 									Path or content of the generated sample invoice.
+     * @param	PdpConnectFr			$pdpconnectfr		PDPConnectFR
+     * @return 	array<string,string> 						Path or content of the generated sample invoice.
      */
     public function generateSampleInvoiceOld($pdpconnectfr)
     {
@@ -1091,7 +1091,7 @@ class FacturXProtocol extends AbstractProtocol
         $zugferdDocumentPdfBuilder->generateDocument();
         $zugferdDocumentPdfBuilder->saveDocument($newPdfFilename);
 
-        return $newPdfFilename;
+        return array('path' => $newPdfFilename, 'ref' => 'INV-TEST');
     }
 
 
@@ -1101,8 +1101,8 @@ class FacturXProtocol extends AbstractProtocol
      * This method creates a dummy invoice with representative data
      * to illustrate the Factur-X structure without using real business information.
      *
-     * @param	PdpConnectFr		$pdpconnectfr		PDPConnectFR
-     * @return 	string 									Path or content of the generated sample invoice.
+     * @param	PdpConnectFr		$pdpconnectfr			PDPConnectFR
+     * @return 	array<string,string> 						Path or content of the generated sample invoice.
      */
     public function generateSampleInvoice($pdpconnectfr)
     {
@@ -1173,7 +1173,7 @@ class FacturXProtocol extends AbstractProtocol
 		// Generate the Factur-X PDF
 		$pathOfPdf = $this->generateInvoice($tmpinvoice, $outputlangs);
 
-		return $pathOfPdf;
+		return array('path' => $pathOfPdf, 'ref' => $tmpinvoice->ref);
     }
 
 

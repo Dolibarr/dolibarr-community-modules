@@ -468,9 +468,13 @@ class SuperPDPProvider extends AbstractPDPProvider
 
         try {
 	        if ((float) DOL_VERSION < 24.0) {
-	        	$invoice_path = $this->exchangeProtocol->generateSampleInvoiceOld($pdpconnectfr);
+	        	$resarray = $this->exchangeProtocol->generateSampleInvoiceOld($pdpconnectfr);
+	        	$invoice_path = $resarray['path'];
+	        	$ref = $resarray['ref'];
 	        } else {
-	        	$invoice_path = $this->exchangeProtocol->generateSampleInvoice($pdpconnectfr);
+	        	$resarray = $this->exchangeProtocol->generateSampleInvoice($pdpconnectfr);
+	        	$invoice_path = $resarray['path'];
+	        	$ref = $resarray['ref'];
 	        }
 	        if ($invoice_path === -1) {
 	        	$this->errors[] = $this->exchangeProtocol->error;
@@ -506,8 +510,8 @@ class SuperPDPProvider extends AbstractPDPProvider
         // Params
         $params = [
             'flowInfo' => json_encode([
-                "trackingId" => "INV-TEST",
-                "name" => "Invoice_INV-TEST",
+                "trackingId" => $ref,
+                "name" => "Invoice_".$ref,
                 "flowSyntax" => "Factur-X",
                 "flowProfile" => "CIUS",
                 "sha256" => hash_file('sha256', $invoice_path)
@@ -869,7 +873,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
         $globalres = ($error > 0 ? -1 : 1);
 
-        $globalresultmessage = ($globalres == 1) ? $langs->trans("SyncCompletedSuccessfuly") . ($batchlimit > 0 ? ' <span class="opacitylow">('.$langs->trans("maxNumberToProcess").' '.$batchlimit.")</span>" : "")  : ($langs->trans("SyncAborted", $i, $limit, ($flow['flowId'] ?? 'N/A')));
+        $globalresultmessage = ($globalres == 1) ? $langs->trans("SyncCompletedSuccessfuly") . ($batchlimit > 0 ? ' <span class="opacitylow">('.$langs->trans("maxNumberToProcess").': '.$batchlimit.")</span>" : "")  : ($langs->trans("SyncAborted", $i, $limit, ($flow['flowId'] ?? 'N/A')));
 
 		dol_syslog(__METHOD__ . " syncFlows end : ".$globalresultmessage, LOG_DEBUG, 0, "_pdpconnectfr");
 
