@@ -459,12 +459,12 @@ class SuperPDPProvider extends AbstractPDPProvider
      */
     public function sendSampleInvoice()
     {
-    	global $db;
+    	global $langs;
 
         $outputLog = array(); // Feedback to display
 
         // Generate sample invoice
-        $pdpconnectfr = new PdpConnectFr($db);
+        $pdpconnectfr = new PdpConnectFr($this->db);
 
         try {
 	        if ((float) DOL_VERSION < 24.0) {
@@ -551,7 +551,12 @@ class SuperPDPProvider extends AbstractPDPProvider
                 return 0;
             }
         } else {
-            $this->errors[] = "Failed to send sample invoice: HTTP ".$response['status_code'];
+            $this->error = $langs->trans("ErrorSendingInvoiceToPDP");
+            $this->error .= ': HTTP '.$response['status_code'];
+            if (!empty($response['errorCode'])) {
+				$this->error .= '<br>'.$response['errorCode'].(empty($response['errorMessage']) ? '': ' - '.$response['errorMessage']);
+            }
+            $this->errors[] = $this->error;
             return 0;
         }
     }
@@ -565,7 +570,7 @@ class SuperPDPProvider extends AbstractPDPProvider
      * @param array<string, string>         $extraHeaders   Optional additional headers
      * @param string|null                   $callType       Functional type of the API call for logging purposes (e.g., 'sync_flows', 'send_invoice')
      *
-	 * @return array{status_code:int,response:null|string|array<string,mixed>,call_id:null|string}
+	 * @return array{status_code:int,response:null|string|array<string,mixed>,?errorCode:string,?errorMessage:string,?id:int,?call_id:string}
 	 */
 	public function callApi($resource, $method, $params = false, $extraHeaders = [], $callType = '')
 	{
@@ -634,8 +639,12 @@ class SuperPDPProvider extends AbstractPDPProvider
 			}
             $returnarray = array(
 				'status_code' => $status_code,
-				'response' => 'Error ' . $status_code . ' - ' . $response['content']
-			);
+				'response' => 'Error ' . $status_code . ' - ' . (string) $response['content']
+            );
+            if ($contentarray = json_decode((string) $response['content'], true)) {
+				$returnarray['errorCode'] = $contentarray['errorCode'];
+	            $returnarray['errorMessage'] = $contentarray['errorMessage'];
+            }
 		}
 
         // Log the API call if we have the fonctional type

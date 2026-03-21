@@ -205,7 +205,7 @@ if (preg_match('/set'.$prefix.'TOKEN/i', $action, $reg)) {
 		header("Location: ".$_SERVER["PHP_SELF"].'?page_y='.GETPOSTFLOAT('page_y'));
 		exit;
 	} else {
-		setEventMessages('', $provider->errors, 'errors');
+		setEventMessages($provider->error, $provider->errors, 'errors');
 	}
 }
 
@@ -225,7 +225,7 @@ if (preg_match('/make'.$prefix.'sampleinvoice/i', $action, $reg)) {
 	if ($result) {
 		setEventMessages('', $result, 'mesgs');
 	} else {
-		setEventMessages('', $provider->errors, 'errors');
+		setEventMessages($provider->error, $provider->errors, 'errors');
 	}
 }
 
@@ -238,7 +238,7 @@ if (preg_match('/delete'.$prefix.'TOKEN/i', $action, $reg)) {
 		header("Location: ".$_SERVER["PHP_SELF"].'?page_y='.GETPOSTFLOAT('page_y'));
 		exit;
 	} else {
-		setEventMessages('', $provider->errors, 'errors');
+		setEventMessages($provider->error, $provider->errors, 'errors');
 	}
 }
 
