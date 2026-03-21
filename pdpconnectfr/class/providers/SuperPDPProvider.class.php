@@ -552,9 +552,9 @@ class SuperPDPProvider extends AbstractPDPProvider
             }
         } else {
             $this->error = $langs->trans("ErrorSendingInvoiceToPDP");
-            $this->error .= ': HTTP '.$response['status_code'];
+            $this->error .= '<br>HTTP '.$response['status_code'];
             if (!empty($response['errorCode'])) {
-				$this->error .= '<br>'.$response['errorCode'].(empty($response['errorMessage']) ? '': ' - '.$response['errorMessage']);
+				$this->error .= ' '.$response['errorCode'].(empty($response['errorMessage']) ? '': ' - '.$response['errorMessage']);
             }
             $this->errors[] = $this->error;
             return 0;

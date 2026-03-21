@@ -1116,6 +1116,7 @@ class FacturXProtocol extends AbstractProtocol
 		$tmpinvoice = new Facture($this->db);
 		$tmpinvoice->initAsSpecimen('nolines');
 
+		$tmpinvoice->ref .= '-'.dol_print_date(dol_now(), '%Y%m%d-%H%M%S');
 
 		$line = new FactureLigne($this->db);
 		$line->desc = $langs->trans("Description")." 1";
@@ -1161,6 +1162,13 @@ class FacturXProtocol extends AbstractProtocol
 
 		// Generate the PDF
 		$tmpinvoice->generateDocument($tmpinvoice->model, $outputlangs);
+
+		// For invoice with ->specimen=1, the file is SPECIMEN.pdf so we rename it into ref
+		$dir = $conf->invoice->multidir_output[$conf->entity];
+		$srcfile = $dir.'/SPECIMEN.pdf';
+		$destfile = $dir.'/'.dol_sanitizeFileName($tmpinvoice->ref).'.pdf';
+
+		dol_move($srcfile, $destfile, '0', 1);
 
 		// Generate the Factur-X PDF
 		$pathOfPdf = $this->generateInvoice($tmpinvoice, $outputlangs);
