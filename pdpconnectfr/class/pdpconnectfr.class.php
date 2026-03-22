@@ -570,7 +570,7 @@ class PdpConnectFr
 
         $code = (int) $code;
 
-        return $langs->trans(
+        return $langs->transnoentitiesnoconv(
             self::STATUS_LABEL_KEYS[$code] ?? 'EInvStatusUnknown'
         );
     }
@@ -651,7 +651,7 @@ class PdpConnectFr
             unset($options[self::STATUS_APPROVED]);
             unset($options[self::STATUS_REFUSED]);
         }
-        
+
         // TODO : remove statuses that cannot be chronologically be sent (for example, it doesn't make sense to send "Taken over" if invoice is refused), PDP may accept them and ignore them without returning an error.
 
 
@@ -703,7 +703,7 @@ class PdpConnectFr
         $baseWarnings = [];
 
         $einvoiceid = $this->getSellerCommunicationURI();
-        
+
         // Error message if we failed to found the einvoiceid
 		if (empty($einvoiceid)) {
 	        if (empty($mysoc->idprof1)) {
@@ -921,7 +921,6 @@ class PdpConnectFr
         global $action;
 
         $currentStatusInfo = $this->fetchLastknownInvoiceStatus($object->ref, $object->id);
-        //var_dump($currentStatusInfo);
 		// Force value for test
 		//$currentStatusInfo['code'] = 2;
 
@@ -1005,10 +1004,9 @@ class PdpConnectFr
 			$resprints .=  '<input type="hidden" name="page_y" value="page_y">';
 			//$resprints .=  '<input type="hidden" name="backtopage" value="' . $backtopage . '">';
 
-			// TODO Use a combo list with only status for ync Dolibarr -> AP
+			// TODO Use a combo list with only status for sync Dolibarr -> AP
 			// Also status we can't modify manually must be greyed/disabled
-			//$arrayofeinvoicestatus = array();
-			$arrayofeinvoicestatus = $this->getEinvoiceStatusOptions(0, 0, 0, 1);
+			$arrayofeinvoicestatus = $this->getEinvoiceStatusOptions(0, 0, 0, ($action == 'create' ? 1 : 0));
 
 			$resprints .=  $form->selectarray("seteinvoicestatus", $arrayofeinvoicestatus, $currentStatusInfo['code'], 0, 0, 0, '', 1);
 			if ($action != 'create') {
@@ -1018,7 +1016,7 @@ class PdpConnectFr
         } else {
         	$resprints .= '<span id="einvoice-status">';
         	$resprints .= $currentStatusInfo['status'] . '</span><br>';
-			$resprints .= '<span id="einvoice-info" class="clearboth">' . dolPrintHTML($info) . '</span>';
+			$resprints .= '<span id="einvoice-info" class="clearboth small opacitymedium">' . dolPrintHTML($info) . '</span>';
         }
 		$resprints .= '</td>';
         $resprints .= '</tr>';
@@ -1051,10 +1049,12 @@ class PdpConnectFr
 							console.log("checkInvoiceStatus no data returned");
                             return;
                         }
-						console.log(data);
+						console.log(data.status);
 
                         // Update UI
-                        $("#einvoice-status").html(data.status || "");
+						if (typeof data.status !== "undefined") {
+	                        $("#einvoice-status").html(data.status || "");
+						}
                         $("#einvoice-info").html(data.info || "");
 
                         // Retry only if still awaiting validation
@@ -1073,10 +1073,13 @@ class PdpConnectFr
         }
 
         // Disable edit button if invoice is already sent to PDP/PA
+        // Note: Real protection is done in PHP side as it is not reliable in JS. This is for cosmetic purpose only
+        /*
         if ($currentStatusInfo['transmitted'] == 1) {
             $resprints .= '
                 <script>
                 $(document).ready(function() {
+					console.log("Invoice has a status saying is was already sent so we change the button Modify to disable it");
                     // Target the "Edit" link in the action buttons
                     $("a.butAction").filter(function() {
                         return $(this).attr("href") && $(this).attr("href").indexOf("action=modif") !== -1;
@@ -1092,6 +1095,7 @@ class PdpConnectFr
                 });
                 </script>';
         }
+		*/
 
         return $resprints;
     }
@@ -1404,7 +1408,7 @@ class PdpConnectFr
 
     /**
      * ProductServiceCardBlock
-     * 
+     *
      * @param 	Product|Service 	$object					Product or Service
      * @param	string				$mode					'create', 'view'
      * @return 	string				HTML content to add
@@ -1445,10 +1449,13 @@ class PdpConnectFr
         // Default status is unknown until invoice is validated
         $status = array('code' => self::STATUS_UNKNOWN, 'status' => $this->getStatusLabel(self::STATUS_UNKNOWN), 'info' => '', 'file' => '0', 'transmitted' => 0);
 
+        $provider = getDolGlobalString('PDPCONNECTFR_PDP');
+
         // Get last status from pdpconnectfr_extlinks table (table contain dolibarr object recieved or sent to PDP)
         $sql = "SELECT syncstatus, synccomment"; // Validation message of einvoice sent.
         $sql .= " FROM ".MAIN_DB_PREFIX."pdpconnectfr_extlinks";
         $sql .= " WHERE element_type = '".$this->db->escape('facture')."'";
+        $sql .= " AND provider = '".$this->db->escape($provider)."'";
         if ($invoiceId > 0) {
         	$sql .= " AND element_id = ".((int) $invoiceId);
         } else {
@@ -1462,9 +1469,13 @@ class PdpConnectFr
                 $status = array(
                     'code' => (int) $obj->syncstatus,
                     'status' => $this->getStatusLabel((int) $obj->syncstatus),
-                    'info' => $obj->synccomment ?? '',
-                    'transmitted' => 1, // If we have an entry in pdpconnectfr_extlinks table for this invoice, it means that it has been transmitted to PDP
+                    'info' => $obj->synccomment ?? ''
                 );
+                if (!in_array((int) $obj->syncstatus, array(self::STATUS_UNKNOWN, self::STATUS_IGNORE, self::STATUS_NOT_GENERATED, self::STATUS_GENERATED))) {
+                	$status['transmitted'] = 1;
+                } else {
+                	$status['transmitted'] = 0;
+                }
             } else {
                 dol_syslog("No entry found in pdpconnectfr_extlinks table for invoiceRef: " . $invoiceRef);
             }
@@ -1914,7 +1925,7 @@ class PdpConnectFr
 		        }
 	        }
         }
-        
+
         return $this->remove_spaces($einvoiceid);
     }
 

@@ -194,7 +194,7 @@ if ($objectRef) {
 
 		print json_encode($currentStatusInfo);
 	} else {
-		print json_encode(['code' => -1, 'status' => 'N/A', 'info' => 'Error retrieving validation status from PDP for invoice ref '. $invoice->ref]);
+		print json_encode(['code' => -1, 'info' => 'Error retrieving validation status from PDP for invoice ref '. $invoice->ref]);
 		exit;
 	}
 }

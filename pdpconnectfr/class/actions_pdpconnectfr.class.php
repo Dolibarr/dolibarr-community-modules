@@ -43,7 +43,7 @@ class ActionsPdpconnectfr extends CommonHookActions
         global $db, $langs;
 
         dol_syslog(__METHOD__ . " Hook afterPDFCreation called for object " . get_class($object));
-        
+
         $outputlangs = $langs;
 
         // Invoice pdf path
@@ -244,16 +244,20 @@ class ActionsPdpconnectfr extends CommonHookActions
 
         $outputlangs = $langs;
 
+        $error = 0;
+
+        $db->begin();
+
         if (isset($object->element) && in_array($object->element, ['facture'])) {
         	$permissiontoedit = $user->hasRight('facture', 'write');
 
             // Get current status of e-invoice
             $currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus($object->ref);
-
            // Action to set the E-invoice status manually
             if ($action == 'seteinvoicestatus' && $permissiontoedit) {
 				$result = $pdpConnectFr->setEInvoiceStatus($object, GETPOSTINT('seteinvoicestatus'), '');
             	if ($result < 0) {
+            		$error++;
                 	$this->errors = array_merge($this->errors, $pdpConnectFr->errors);
                 }
             }
@@ -281,6 +285,7 @@ class ActionsPdpconnectfr extends CommonHookActions
                     // TODO: Review and update the invoice workflow.
                     // The "Modify" button may need to be disabled once the E-invoice has been sent and distributed by the PDP.
                 } else {
+            		$error++;
                 	$this->errors = array_merge($this->errors, $provider->errors);
                 }
             }
@@ -306,7 +311,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 
                     dol_syslog(__METHOD__ . " " . $message);
                     setEventMessages($message, array(), 'errors');
-                    return -1;
+            		$error++;
                 } elseif ($result['res'] == 0) {	// Non blocking error, warning
                     $this->warnings[] = $result['message'];
 
@@ -323,14 +328,13 @@ class ActionsPdpconnectfr extends CommonHookActions
                     } else {
                     	setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
                     }
-                    return 0;
                 } else {
                 	// If there is an error, we move warnings into error message
                     $this->errors = array_merge($this->errors, $protocol->errors);
                     $this->errors = array_merge($this->errors, $this->warnings);
                     $this->warnings = array();
                     dol_syslog(__METHOD__ . " " . implode(',', $protocol->errors));
-                    return -1;
+            		$error++;
                 }
             }
         }
@@ -349,6 +353,7 @@ class ActionsPdpconnectfr extends CommonHookActions
                 if ($result['res'] > 0) {
                     setEventMessages($result['message'], array(), 'mesgs');
                 } else {
+            		$error++;
                 	$this->errors = array_merge($this->errors, $protocol->errors);
                     //setEventMessages($result['message'], $provider->errors, 'errors');
                 }
@@ -362,11 +367,19 @@ class ActionsPdpconnectfr extends CommonHookActions
         	if (($action == 'add' || $action == 'update') && !empty($object->id) && $permissiontoedit) {
                 $result = $pdpConnectFr->setDefaultRouting($object->id, GETPOST('routing_id', 'aZ09'));
                 if ($result < 0) {
+            		$error++;
                     setEventMessages('Failed to save routing ID', null, 'errors');
                 }
             }
         }
-        return 0;
+
+        if ($error) {
+        	$db->rollback();
+        	return -1;
+        } else {
+        	$db->commit();
+	        return 0;
+        }
     }
 
     /**
@@ -500,7 +513,7 @@ class ActionsPdpconnectfr extends CommonHookActions
         )) {
             $this->resprints .= ', rt.routing_id AS routing_id';
         }
-        
+
         return 0;
     }
 
@@ -512,7 +525,7 @@ class ActionsPdpconnectfr extends CommonHookActions
         if (in_array('invoicelist', explode(':', $parameters['context']))) {
             $this->resprints .= " LEFT JOIN ".MAIN_DB_PREFIX."pdpconnectfr_extlinks as ext ON ext.element_id = f.rowid AND ext.element_type = 'facture'";
         }
-        
+
         // Supplier invoice list, Product list, Soc list
         $contexts = explode(':', $parameters['context']);
 
@@ -751,18 +764,16 @@ class ActionsPdpconnectfr extends CommonHookActions
         return 0;
     }
 
+
     /**
-     * Footer line
+     * isEditable
+     *
+     * @param 	array<string,mixed> 	$parameters
+     * @param 	CommonObject			$object
+     * @param 	string					$action
+     * @param 	Hookmanager				$hookmanager
+     * @return 	number
      */
-    /*public function printFieldListFooter($parameters, &$object, &$action, $hookmanager)
-    {
-        if (in_array('invoicelist', explode(':', $parameters['context']))) {
-            print '<td>xxx</td>';
-        }
-        return 0;
-    }*/
-
-
     public function isEditable($parameters, &$object, &$action, $hookmanager)
     {
         global $langs, $db;
@@ -777,11 +788,10 @@ class ActionsPdpconnectfr extends CommonHookActions
 
         // Block modification if invoice is already transmitted to PDP
         if ($currentStatusDetails['transmitted'] == 1) {
-
             $langs->load("pdpconnectfr@pdpconnectfr");
 
             $this->results = [
-                'result' => -10, // Custom error code
+                'result' => -100, 	// Custom error code. Must be higher that core reserve code between -1...-50
                 'error'  => $langs->trans('InvoiceLinkedToPdpCannotBeModified')
             ];
 

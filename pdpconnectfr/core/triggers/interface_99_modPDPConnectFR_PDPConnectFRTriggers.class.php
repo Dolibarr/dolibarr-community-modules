@@ -97,9 +97,22 @@ class InterfacePDPConnectFRTriggers extends DolibarrTriggers
             }
 		}
 
-		if ($action == 'BILL_MODIFY') {
+		if ($action == 'BILL_UNVALIDATE') {
 			$pdpConnectFr = new PdpConnectFr($db);
+			$result = $pdpConnectFr->fetchLastknownInvoiceStatus(0, $object->id);
 
+			// If einvoice has been transmitted, we must check that we don't try to modify some fields
+			if (is_array($result) && !in_array($result['code'], array($pdpConnectFr::STATUS_UNKNOWN, $pdpConnectFr::STATUS_IGNORE, $pdpConnectFr::STATUS_NOT_GENERATED, $pdpConnectFr::STATUS_GENERATED))) {
+				$this->errors[] = 'You try to modify the status of an invoice that is locked once the invoice has been transmitted to the Access Point';
+				return -3;
+			}
+		}
+
+		if ($action == 'BILL_MODIFY') {
+			var_dump($object, $object->oldcopy);
+
+
+			$pdpConnectFr = new PdpConnectFr($db);
 			$result = $pdpConnectFr->fetchLastknownInvoiceStatus(0, $object->id);
 
 			// If einvoice has been transmitted, we must check that we don't try to modify some fields
@@ -125,7 +138,7 @@ class InterfacePDPConnectFRTriggers extends DolibarrTriggers
 					// If invoice is transmitted, check if any locked field is modified.;
 					foreach ($lockedFields as $field) {
 						if ($object->$field != $object->oldcopy->$field) {
-							$this->errors[] = 'You try to modify a property that is locked once the invoice has been transmitted to th Access Point';
+							$this->errors[] = 'You try to modify a property that is locked once the invoice has been transmitted to the Access Point';
 							return -2;
 						}
 					}
