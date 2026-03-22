@@ -1173,7 +1173,14 @@ class FacturXProtocol extends AbstractProtocol
 		// Generate the Factur-X PDF
 		$pathOfPdf = $this->generateInvoice($tmpinvoice, $outputlangs);
 
-		return array('path' => $pathOfPdf, 'ref' => $tmpinvoice->ref);
+		// Restore name SPECIMEN.pdf
+		dol_move($destfile, $srcfile, '0', 1);
+
+		// Move factur-x pdf into the temp directory
+		$newPathOfPdf = dirname($pathOfPdf).'/temp/'.basename($pathOfPdf);
+		dol_move($pathOfPdf, $newPathOfPdf, '0', 1);
+
+		return array('path' => $newPathOfPdf, 'ref' => $tmpinvoice->ref);
     }
 
 
