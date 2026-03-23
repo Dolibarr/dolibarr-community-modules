@@ -148,7 +148,7 @@ class FacturXProtocol extends AbstractProtocol
 
 		// Calculate missing VAT number for thirdparty if applicable
 		if ($object->thirdparty->tva_assuj && empty($object->thirdparty->tva_intra)) {
-			$object->thirdparty->tva_intra = $pdpconnectfr->thirdpartyCalcTva_intra($object->thirdparty);
+			$object->thirdparty->tva_intra = $pdpconnectfr->thirdpartyCalcVATIntra($object->thirdparty);
 		}
 
 		// Get customer order references and delivery dates
@@ -619,10 +619,10 @@ class FacturXProtocol extends AbstractProtocol
 				null,
 				null,
 				null,
-				$pdpconnectfr->remove_spaces($account->iban),
+				$pdpconnectfr->removeSpaces($account->iban),
 				$account_proprio,
-				$pdpconnectfr->remove_spaces($account->number),
-				$pdpconnectfr->remove_spaces($account->bic)
+				$pdpconnectfr->removeSpaces($account->number),
+				$pdpconnectfr->removeSpaces($account->bic)
 			);
 
 
@@ -2242,7 +2242,7 @@ class FacturXProtocol extends AbstractProtocol
 		if ($thirdpartyId < 0) {
 			// Try to find by VAT number if provided
 			if (!empty($sellerInfo['sellerTaxRegistations']['VA'])) {
-				$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "societe WHERE REPLACE(tva_intra, ' ', '') = '" . $db->escape($pdpconnectfr->remove_spaces($sellerInfo['sellerTaxRegistations']['VA'])) . "'";
+				$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "societe WHERE REPLACE(tva_intra, ' ', '') = '" . $db->escape($pdpconnectfr->removeSpaces($sellerInfo['sellerTaxRegistations']['VA'])) . "'";
 				$resql = $db->query($sql);
 				if ($resql) {
 					if ($db->num_rows($resql) > 1) {
@@ -2328,13 +2328,13 @@ class FacturXProtocol extends AbstractProtocol
 						if (!empty($globalId)) {
 							$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme);
 							if (!empty($idprofField)) {
-								$thirdparty->$idprofField = $pdpconnectfr->remove_spaces($globalId);
+								$thirdparty->$idprofField = $pdpconnectfr->removeSpaces($globalId);
 							}
 						}
 					}
 				}
 				if (!empty($sellerInfo['sellerTaxRegistations']['VA'])) {
-					$thirdparty->tva_intra = $pdpconnectfr->remove_spaces($sellerInfo['sellerTaxRegistations']['VA']);
+					$thirdparty->tva_intra = $pdpconnectfr->removeSpaces($sellerInfo['sellerTaxRegistations']['VA']);
 					$thirdparty->tva_assuj = 1;
 				}
 			} elseif ($priority === 'dolibarr') { // Fill only empty fields from pdp data
@@ -2376,13 +2376,13 @@ class FacturXProtocol extends AbstractProtocol
 						if (!empty($globalId)) {
 							$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme);
 							if (!empty($idprofField) && empty($thirdparty->$idprofField)) {
-								$thirdparty->$idprofField = $pdpconnectfr->remove_spaces($globalId);
+								$thirdparty->$idprofField = $pdpconnectfr->removeSpaces($globalId);
 							}
 						}
 					}
 				}
 				if (!empty($sellerInfo['sellerTaxRegistations']['VA']) && empty($thirdparty->tva_intra)) {
-					$thirdparty->tva_intra = $pdpconnectfr->remove_spaces($sellerInfo['sellerTaxRegistations']['VA']);
+					$thirdparty->tva_intra = $pdpconnectfr->removeSpaces($sellerInfo['sellerTaxRegistations']['VA']);
 					$thirdparty->tva_assuj = 1;
 				}
 			}
@@ -2423,14 +2423,14 @@ class FacturXProtocol extends AbstractProtocol
 					if (!empty($globalId)) {
 						$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme);
 						if (!empty($idprofField)) {
-							$thirdparty->$idprofField = $pdpconnectfr->remove_spaces($globalId);
+							$thirdparty->$idprofField = $pdpconnectfr->removeSpaces($globalId);
 						}
 					}
 				}
 			}
 
 			if (!empty($sellerInfo['sellerTaxRegistations']['VA'])) {
-				$thirdparty->tva_intra = $pdpconnectfr->remove_spaces($sellerInfo['sellerTaxRegistations']['VA']);
+				$thirdparty->tva_intra = $pdpconnectfr->removeSpaces($sellerInfo['sellerTaxRegistations']['VA']);
 				$thirdparty->tva_assuj = 1;
 			}
 

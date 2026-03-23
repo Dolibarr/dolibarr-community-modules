@@ -413,7 +413,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 				$pdpstatuscode = GETPOST('pdpstatuscode', 'alpha');
 
 				$formquestion = array();
-				if (in_array($pdpstatuscode, array_values($pdpConnectFr::STATUS_REQUIRING_RAISONS))) {
+				if (in_array($pdpstatuscode, array_values($pdpConnectFr::STATUS_REQUIRING_REASONS))) {
 					$formquestion = array(
 						'array' => [
 							'type' => 'select',
@@ -476,17 +476,17 @@ class ActionsPdpconnectfr extends CommonHookActions
 
 		// Add block in supplier invoice card
 		if (in_array($object->element, ['invoice_supplier'])) {
-			$this->resprints .= $pdpConnectFr->SupplierInvoiceCardBlock($object, $action);		// Output fields in card, including js for refreshing state
+			$this->resprints .= $pdpConnectFr->supplierInvoiceCardBlock($object, $action);		// Output fields in card, including js for refreshing state
 		}
 
 		// Add block in product/service card
 		if (in_array($object->element, ['product'])) {
-			$this->resprints .= $pdpConnectFr->ProductServiceCardBlock($object, $action);		// Output fields in card, including js for refreshing state
+			$this->resprints .= $pdpConnectFr->productServiceCardBlock($object, $action);		// Output fields in card, including js for refreshing state
 		}
 
 		// Add block in thirdparty card
 		if (in_array($object->element, ['societe'])) {
-			$this->resprints .= $pdpConnectFr->ThirdpartyCardBlock($object, $action);		// Output fields in card
+			$this->resprints .= $pdpConnectFr->thirdpartyCardBlock($object, $action);		// Output fields in card
 		}
 
 		return 0;

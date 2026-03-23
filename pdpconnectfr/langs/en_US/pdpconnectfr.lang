@@ -5,14 +5,14 @@
 #
 
 ModulePDPConnectFRName = PDPConnectFR
-ModulePDPConnectFRDesc = Support for E-invoice management. This module allows to generate (automatically or manually) invoices in E-invoice format and send them to an E-invoice Access Point. It can also retreive purchase invoices from this E-invoice Access Point. Only few countries (France) and Access Point (also called PDP/PA) are supported.
+ModulePDPConnectFRDesc = Support for E-invoice management. This module allows to generate (automatically or manually) invoices in E-invoice format and send them to an E-invoice Access Point. It can also retrieve purchase invoices from this E-invoice Access Point. Only few countries (France) and Access Point (also called PDP/PA) are supported.
 
 #
 # Admin page
 #
 PDPConnectFRSetup = Setup of module E-invoice (France - PDPConnect)
 Settings = Settings
-PDPConnectFRSetupPage = Setup of the Access Point. You must choose here the Access Point you subscribed as the official Access Point for your company. 
+PDPConnectFRSetupPage = Setup of the Access Point. You must choose here the Access Point you subscribed as the official Access Point for your company.
 NewSection=New section
 
 
@@ -29,8 +29,8 @@ PlatformPartner=Platform partner
 PDPCONNECTFR_LIVE=Live mode enabled (otherwise test/sandbox mode)
 PDPCONNECTFR_PDP=Select your E-billing platform Access Point (PA)
 PDPCONNECTFR_PDP_HELP=Once an Access Point is selected, its specific configuration appears.
-PDPCONNECTFR_ROUTING_ID_HELP=You can enter here a dedicated E-invoice ID for this Access Point. Usually your [SIREN] or [SIREN_suffix] (where suffix can be a SIRET, a free text...).<br>Keep emtpy to use the default professional ID of your company (Example SIREN in France).
-PDPCONNECTFR_BLOCK_INVOICE_NO_ROUTING_ID=Block invoices generation/send for third parties without an Electronic Invoicing ID set manually (usually we are using an E-invoicing ID generated from third-party information) 
+PDPCONNECTFR_ROUTING_ID_HELP=You can enter here a dedicated E-invoice ID for this Access Point. Usually your [SIREN] or [SIREN_suffix] (where suffix can be a SIRET, a free text...).<br>Keep empty to use the default professional ID of your company (Example SIREN in France).
+PDPCONNECTFR_BLOCK_INVOICE_NO_ROUTING_ID=Block invoices generation/send for third parties without an Electronic Invoicing ID set manually (usually we are using an E-invoicing ID generated from third-party information)
 PDPCONNECTFR_BLOCK_INVOICE_NO_ROUTING_ID_HELP=Enable to prevent creating or sending invoices when a third party has no Electronic Invoicing ID. <br> If Disabled the SIREN will be used if no ID is provided.
 generateAccessToken=Generate access token
 reGenerateAccessToken=Re-generate access token
@@ -132,7 +132,7 @@ PDPConnectInfo=As part of the French electronic invoicing law, any invoicing sof
 PDPConnectInfo2=Start by configuring your Access Point and its credentials to connect to it.
 PDPConnectionSetup=Setup for Access Point connection
 PDPCONNECTFR_LINK_CREATE_ACCOUNT=Link to create account and get connection credentials
-pdpconnectfrInvoiceSeparator=E-invoicing
+EInvoicing=E-invoicing
 pdpconnectfrInvoiceStatus=E-invoicing status
 ProcessingDetail=Detail of processing
 CallsListHelp=This page is reserved for advanced users. It can help to diagnose troubles of synchronization with the E-invoice partner platform. You don't need to use this screen in a common usage of your application.
@@ -163,7 +163,7 @@ ConfirmSyncTitle=Confirm Synchronization
 ConfirmSyncDesc=Are you sure you want to start the synchronization process?
 DocumentsSyncedSuccessfully=%s documents synced successfully
 FailedToSyncADocument=Failed to sync at least one document. The synchronization has been stopped on the first error.
-FailedToSyncADocumentMore=See the recommanded action on the main page to solve this...
+FailedToSyncADocumentMore=See the recommended action on the main page to solve this...
 SyncResults=Synchronization summary
 SyncLog=Synchronization Log (Debug Mode)
 EInvStatusNotGenerated=Not generated
@@ -204,11 +204,11 @@ pdpconnectfrInvoiceInfo=Validation feedback
 EInvStatusError=Error
 EInvStatusUnknown=Unknown Status
 EInvStatusDoNotSync=Do not manage E-invoice
-RetreivedMessage=Retreived message
+RetreivedMessage=Retrieved message
 BatchLimit=Batch limit
 SkippedFlows=Skipped flows
 TotalFlows=Total flows
-SuccessfullFlows=Successfull flows
+SuccessfullFlows=Successful flows
 EInvoiceEventsLabel=E-invoicing events
 EInvoiceFile=E-invoice File
 PDPSyncStatus=AP Status
@@ -216,7 +216,7 @@ EInvoiceGeneratedList=Generated
 SuggestedActions=Recommended actions to do
 CreateSupplier=Create supplier
 CreateProduct=Create Product
-CreateSupplierManually=Create manually the supplier based on the information retreived from E-invoice, then relaunch the synchronization...
+CreateSupplierManually=Create manually the supplier based on the information retrieved from E-invoice, then relaunch the synchronization...
 ManualUnfoundProductCreationFromEInvoice=Create manually the unfound product based on information retrieved from the e-invoice %s, then relaunch the synchronization...
 EnableDebugModeToSeeMoreDetails=Enable debug mode to see more details
 PDPCONNECTFR_THIRDPARTIES_COMPLETE_INFO=Complete missing third-party information when receiving an e-invoice
@@ -249,7 +249,7 @@ TotalSkippedSync=Total of flows skipped (existing or already processed)
 UsingYourOwnBillingAccount=Via subscription and direct account
 PDPCONNECTFR_ROUTING_ID=Your company E-Invoicing ID
 PDPConnectFRDocumentSync=PDPConnectFR Document Sync
-PDPConnectFRDocumentSyncDescription=This job automatically launches the documents syncrhonization with the E-invoice partner platform.
+PDPConnectFRDocumentSyncDescription=This job automatically launches the documents synchronization with the E-invoice partner platform.
 NoInvoiceCollectionFees=No invoice collection fee
 NoLatePaymentFees=No late payment fees
 NoEarlyPaymentDiscount=No early payment discounts
@@ -268,4 +268,3 @@ PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL1=To use the <b>SuperPDP Access Point</b> a
 PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL2=1) Create an account on the SuperPDP platform - %s - and subscribe to their service for your company.
 PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL3=2) Go into your customer area, into menu "Application", then click "New application" and select your company, copy this value <b>%s</b> in the field URLs of redirection, and finally choose "Confidential" as type of application, then "Create".
 PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL4=3) Once the application has been created, an couple client_id/client_secret is available (warning the client secret is available only once at the creation of the application, so make sure to save it securely), you can enter these credentials in the field "%s" and "%s" on this configuration page and click on "%s".
-
