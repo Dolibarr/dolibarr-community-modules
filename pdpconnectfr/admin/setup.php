@@ -255,7 +255,6 @@ if ($action == 'update' && !empty($formSetup) && is_object($formSetup) && !empty
 	$formSetup->saveConfFromPost();
 	header("Location: ".$_SERVER["PHP_SELF"]);
 	exit;
-
 }
 if ($action == 'update' && !empty($formSetup) && is_object($formSetup) && !empty($user->admin) && !GETPOSTISSET('PDPCONNECTFR_PDP')) {
 	$formSetup2->saveConfFromPost();
@@ -323,7 +322,7 @@ if (!empty($formSetup->items)) {
 }
 
 if (!empty($provider) && !empty($formSetup2->items)) {
-    print '<div class="formborder">';
+	print '<div class="formborder">';
 	print $provider->helpToGetCredentials;
 	print '</div>';
 	print '<br>';

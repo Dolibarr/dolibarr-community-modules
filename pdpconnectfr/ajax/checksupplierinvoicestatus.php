@@ -110,7 +110,6 @@ $langs->load('pdpconnectfr@pdpconnectfr');
 top_httphead();
 // Update the object field with the new value
 if ($objectID) {
-
 	dol_include_once('pdpconnectfr/class/pdpconnectfr.class.php');
 	$pdpconnectfr = new PdpConnectFr($db);
 
@@ -170,7 +169,7 @@ if ($objectID) {
 		$statusvalidationlabel = $flowData['acknowledgement']['status'] ?? '';
 		$statusvalidationinfo = $flowData['acknowledgement']['details'][0]['reasonMessage'] ?? '';
 
-		$pdpconnectfr->updateStatusMessageValidation($lcId, '', $statusvalidationlabel, $statusvalidationinfo );
+		$pdpconnectfr->updateStatusMessageValidation($lcId, '', $statusvalidationlabel, $statusvalidationinfo);
 
 		// Log an event in the invoice timeline
 		$CurrentLCStatusLabel = $pdpconnectfr->getStatusLabel($obj->lc_status);

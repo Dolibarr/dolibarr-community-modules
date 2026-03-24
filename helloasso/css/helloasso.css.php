@@ -108,114 +108,114 @@ div.mainmenu.helloasso {
 }
 
 .HaPay {
-        width: fit-content;
-        display: -webkit-box;
-        display: -ms-flexbox;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        -webkit-box-pack: center;
-        -ms-flex-pack: center;
-      }
+		width: fit-content;
+		display: -webkit-box;
+		display: -ms-flexbox;
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		align-items: center;
+		-webkit-box-pack: center;
+		-ms-flex-pack: center;
+	  }
 
-      .HaPay * {
-        font-family: "Open Sans", "Trebuchet MS", "Lucida Sans Unicode",
-          "Lucida Grande", "Lucida Sans", Arial, sans-serif;
-        transition: all 0.3s ease-out;
-      }
+	  .HaPay * {
+		font-family: "Open Sans", "Trebuchet MS", "Lucida Sans Unicode",
+		  "Lucida Grande", "Lucida Sans", Arial, sans-serif;
+		transition: all 0.3s ease-out;
+	  }
 
-      .HaPayButton {
-        align-items: stretch;
-        -webkit-box-pack: stretch;
-        -ms-flex-pack: stretch;
-        background: none;
-        border: none;
-        display: -webkit-box;
-        display: -ms-flexbox;
-        display: flex;
-        padding: 0;
-        border-radius: 8px;
-      }
+	  .HaPayButton {
+		align-items: stretch;
+		-webkit-box-pack: stretch;
+		-ms-flex-pack: stretch;
+		background: none;
+		border: none;
+		display: -webkit-box;
+		display: -ms-flexbox;
+		display: flex;
+		padding: 0;
+		border-radius: 8px;
+	  }
 
-      .HaPayButton:hover {
-        cursor: pointer;
-      }
+	  .HaPayButton:hover {
+		cursor: pointer;
+	  }
 
-      .HaPayButton:not(:disabled):focus {
-        box-shadow: 0 0 0 0.25rem rgba(73, 211, 138, 0.25);
-        -webkit-box-shadow: 0 0 0 0.25rem rgba(73, 211, 138, 0.25);
-      }
+	  .HaPayButton:not(:disabled):focus {
+		box-shadow: 0 0 0 0.25rem rgba(73, 211, 138, 0.25);
+		-webkit-box-shadow: 0 0 0 0.25rem rgba(73, 211, 138, 0.25);
+	  }
 
-      .HaPayButton:not(:disabled):hover .HaPayButtonLabel,
-      .HaPayButton:not(:disabled):focus .HaPayButtonLabel {
-        background-color: #483dbe;
-      }
+	  .HaPayButton:not(:disabled):hover .HaPayButtonLabel,
+	  .HaPayButton:not(:disabled):focus .HaPayButtonLabel {
+		background-color: #483dbe;
+	  }
 
-      .HaPayButton:not(:disabled):hover .HaPayButtonLogo,
-      .HaPayButton:not(:disabled):focus .HaPayButtonLogo,
-      .HaPayButton:not(:disabled):hover .HaPayButtonLabel,
-      .HaPayButton:not(:disabled):focus .HaPayButtonLabel {
-        border: 1px solid #483dbe;
-      }
+	  .HaPayButton:not(:disabled):hover .HaPayButtonLogo,
+	  .HaPayButton:not(:disabled):focus .HaPayButtonLogo,
+	  .HaPayButton:not(:disabled):hover .HaPayButtonLabel,
+	  .HaPayButton:not(:disabled):focus .HaPayButtonLabel {
+		border: 1px solid #483dbe;
+	  }
 
-      .HaPayButton:disabled {
-        cursor: not-allowed;
-      }
+	  .HaPayButton:disabled {
+		cursor: not-allowed;
+	  }
 
-      .HaPayButton:disabled .HaPayButtonLogo,
-      .HaPayButton:disabled .HaPayButtonLabel {
-        border: 1px solid #d1d6de;
-      }
+	  .HaPayButton:disabled .HaPayButtonLogo,
+	  .HaPayButton:disabled .HaPayButtonLabel {
+		border: 1px solid #d1d6de;
+	  }
 
-      .HaPayButtonLogo {
-        background-color: #ffffff;
-        border: 1px solid #4c40cf;
-        border-top-left-radius: 8px;
-        border-bottom-left-radius: 8px;
-        padding: 10px 16px;
-        width: 30px;
-      }
+	  .HaPayButtonLogo {
+		background-color: #ffffff;
+		border: 1px solid #4c40cf;
+		border-top-left-radius: 8px;
+		border-bottom-left-radius: 8px;
+		padding: 10px 16px;
+		width: 30px;
+	  }
 
-      .HaPayButtonLabel {
-        align-items: center;
-        -webkit-box-pack: center;
-        -ms-flex-pack: center;
-        justify-content: space-between;
-        column-gap: 5px;
-        background-color: #4c40cf;
-        border: 1px solid #4c40cf;
-        border-top-right-radius: 8px;
-        border-bottom-right-radius: 8px;
-        color: #ffffff;
-        font-size: 16px;
-        font-weight: 800;
-        display: -webkit-box;
-        display: -ms-flexbox;
-        display: flex;
-        padding: 0 16px;
-      }
+	  .HaPayButtonLabel {
+		align-items: center;
+		-webkit-box-pack: center;
+		-ms-flex-pack: center;
+		justify-content: space-between;
+		column-gap: 5px;
+		background-color: #4c40cf;
+		border: 1px solid #4c40cf;
+		border-top-right-radius: 8px;
+		border-bottom-right-radius: 8px;
+		color: #ffffff;
+		font-size: 16px;
+		font-weight: 800;
+		display: -webkit-box;
+		display: -ms-flexbox;
+		display: flex;
+		padding: 0 16px;
+	  }
 
-      .HaPayButton:disabled .HaPayButtonLabel {
-        background-color: #d1d6de;
-        color: #505870;
-      }
+	  .HaPayButton:disabled .HaPayButtonLabel {
+		background-color: #d1d6de;
+		color: #505870;
+	  }
 
-      .HaPaySecured {
-        align-items: center;
-        -webkit-box-pack: center;
-        -ms-flex-pack: center;
-        justify-content: space-between;
-        display: -webkit-box;
-        display: -ms-flexbox;
-        display: flex;
-        column-gap: 5px;
-        padding: 8px 16px;
-        font-size: 12px;
-        font-weight: 600;
-        color: #2e2f5e;
-      }
+	  .HaPaySecured {
+		align-items: center;
+		-webkit-box-pack: center;
+		-ms-flex-pack: center;
+		justify-content: space-between;
+		display: -webkit-box;
+		display: -ms-flexbox;
+		display: flex;
+		column-gap: 5px;
+		padding: 8px 16px;
+		font-size: 12px;
+		font-weight: 600;
+		color: #2e2f5e;
+	  }
 
-      .HaPay svg {
-        fill: currentColor;
-      }
+	  .HaPay svg {
+		fill: currentColor;
+	  }

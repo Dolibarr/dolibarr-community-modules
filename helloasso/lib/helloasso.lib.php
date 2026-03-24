@@ -89,7 +89,8 @@ function helloassoAdminPrepareHead()
  * @throws Exception
  * @return TokenInterface|int	Token if OK
  */
-function helloassoRefreshToken($storage, $service, $tokenobj, $client_id, $urltocall) {
+function helloassoRefreshToken($storage, $service, $tokenobj, $client_id, $urltocall)
+{
 	include_once DOL_DOCUMENT_ROOT.'/core/lib/geturl.lib.php';
 	dol_syslog('HelloAsso::helloassoRefreshToken clientid='.$client_id.', service='.$service);
 
@@ -121,7 +122,8 @@ function helloassoRefreshToken($storage, $service, $tokenobj, $client_id, $urlto
  * @throws Exception
  * @return int			Return <0 if KO, >0 if OK
  */
-function helloassoDeleteToken() {
+function helloassoDeleteToken()
+{
 	require_once DOL_DOCUMENT_ROOT.'/includes/OAuth/bootstrap.php';
 	include_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php';
 	include_once DOL_DOCUMENT_ROOT.'/core/lib/security.lib.php';
@@ -141,7 +143,7 @@ function helloassoDeleteToken() {
 		$client_id_secret = getDolGlobalString("HELLOASSO_CLIENT_SECRET");
 		$helloassourl = "api.helloasso.com";
 		$service = "Helloasso-Live";
-	} else{
+	} else {
 		$client_id = getDolGlobalString("HELLOASSO_TEST_CLIENT_ID");
 		$client_id_secret = getDolGlobalString("HELLOASSO_TEST_CLIENT_SECRET");
 	}
@@ -152,7 +154,6 @@ function helloassoDeleteToken() {
 	$storage = new DoliStorage($db, $conf);
 	try {
 		$storage->clearToken($service);
-
 	} catch (Exception $e) {
 		// Error
 	}
@@ -187,7 +188,7 @@ function helloassoDoConnection()
 		$client_id_secret = getDolGlobalString("HELLOASSO_CLIENT_SECRET");
 		$helloassourl = "api.helloasso.com";
 		$service = "Helloasso-Live";
-	} else{
+	} else {
 		$client_id = getDolGlobalString("HELLOASSO_TEST_CLIENT_ID");
 		$client_id_secret = getDolGlobalString("HELLOASSO_TEST_CLIENT_SECRET");
 	}
@@ -247,7 +248,6 @@ function helloassoDoConnection()
  *
  * @return	int				The amount to pay if mode amount or fill $payerarray for payer mode
  */
-
 function helloassoGetDataFromObjects($source, $ref, $mode = 'amount', &$payerarray = null)
 {
 	global $db;
@@ -290,7 +290,7 @@ function helloassoGetDataFromObjects($source, $ref, $mode = 'amount', &$payerarr
 					} else {
 						$amount = $don->getRemainToPay();
 					}
-				} else if($mode == 'payer' && !is_null($payerarray)) {
+				} elseif ($mode == 'payer' && !is_null($payerarray)) {
 					$payerarray['firstName'] = $don->firstname;
 					$payerarray['lastName'] = $don->lastname;
 					$payerarray['email'] = $don->email;
@@ -322,11 +322,11 @@ function helloassoGetDataFromObjects($source, $ref, $mode = 'amount', &$payerarr
 						$amount = $adht->amount;
 					}
 
-					if (!empty($member->last_subscription_amount) && !GETPOSTISSET('newamount') && is_numeric($amount)){
+					if (!empty($member->last_subscription_amount) && !GETPOSTISSET('newamount') && is_numeric($amount)) {
 						$amount = max($member->last_subscription_amount, $amount);
 					}
 					$amount = max(0, getDolGlobalString('MEMBER_MIN_AMOUNT'), $amount);
-				} else if($mode == 'payer' && !is_null($payerarray)) {
+				} elseif ($mode == 'payer' && !is_null($payerarray)) {
 					$payerarray['firstName'] = $member->firstname;
 					$payerarray['lastName'] = $member->lastname;
 					$payerarray['companyName'] = $member->societe;
@@ -357,7 +357,7 @@ function helloassoGetDataFromObjects($source, $ref, $mode = 'amount', &$payerarr
 
 						$amount = $pu_ttc;
 					}
-				} else if ($mode == 'payer' && !is_null($payerarray)) {
+				} elseif ($mode == 'payer' && !is_null($payerarray)) {
 					$contract = new Contrat($db);
 					$contract->fetch($contractline->fk_contrat);
 					$contract->fetch_thirdparty();
@@ -391,7 +391,7 @@ function helloassoGetDataFromObjects($source, $ref, $mode = 'amount', &$payerarr
 					if (GETPOST("amount", 'alpha')) {
 						$amount = GETPOST("amount", 'alpha');
 					}
-				} else if ($mode == 'payer' && !is_null($payerarray)) {
+				} elseif ($mode == 'payer' && !is_null($payerarray)) {
 					$invoice->fetch_thirdparty();
 
 					if ($invoice->thirdparty->isACompany()) {
@@ -423,7 +423,7 @@ function helloassoGetDataFromObjects($source, $ref, $mode = 'amount', &$payerarr
 					if (GETPOST("amount", 'alpha')) {
 						$amount = GETPOST("amount", 'alpha');
 					}
-				} else if ($mode == 'payer' && !is_null($payerarray)) {
+				} elseif ($mode == 'payer' && !is_null($payerarray)) {
 					$order->fetch_thirdparty();
 
 					if ($order->thirdparty->isACompany()) {
@@ -452,7 +452,7 @@ function helloassoGetDataFromObjects($source, $ref, $mode = 'amount', &$payerarr
 			} else {
 				if ($mode == 'amount') {
 					$amount = $invoice->total_ttc;
-				} else if ($mode == 'payer' && !is_null($payerarray)) {
+				} elseif ($mode == 'payer' && !is_null($payerarray)) {
 					$invoice->fetch_thirdparty();
 
 					if ($invoice->thirdparty->isACompany()) {

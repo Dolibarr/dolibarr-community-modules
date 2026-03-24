@@ -42,128 +42,128 @@ $conf->global->HELLOASSO_CUSTOM_FIELD_MAPPING = "[]";
 class HelloAssoMemberUtilsTest extends CommonClassTest
 {
 
-     /**
+	 /**
 	 * testcreateHelloAssoTypeMember
 	 *
 	 * @return	integer
 	 *
 	 */
-    function testcreateHelloAssoTypeMember()
-    {
-        global $conf,$user,$langs,$db;
+	function testcreateHelloAssoTypeMember()
+	{
+		global $conf,$user,$langs,$db;
 		$conf = $this->savconf;
 		$user = $this->savuser;
 		$langs = $this->savlangs;
 		$db = $this->savdb;
 
-        $helloassoid = 123456;
-        $label = "HELLOASSO_MEMBERTYPE_".$helloassoid;
+		$helloassoid = 123456;
+		$label = "HELLOASSO_MEMBERTYPE_".$helloassoid;
 		$localobject = new HelloAssoMemberUtils($db);
 
-        $helloassomember = new stdClass();
-        $helloassomember->validityType = "validityType";
-        $priceobj = new stdClass();
-        $priceobj->price = 1000;
-        $helloassomember->tiers =array($priceobj);
-        
-        $result = $localobject->createHelloAssoTypeMember($helloassomember, $label);
+		$helloassomember = new stdClass();
+		$helloassomember->validityType = "validityType";
+		$priceobj = new stdClass();
+		$priceobj->price = 1000;
+		$helloassomember->tiers =array($priceobj);
+
+		$result = $localobject->createHelloAssoTypeMember($helloassomember, $label);
 		print __METHOD__." validityType=".$helloassomember->validityType." price = ".$priceobj->price." label=".$label." result=".$result."\n";
 		$this->assertLessThan($result, 0);
 
-        return $result;
-    }
+		return $result;
+	}
 
-    /**
+	/**
 	 * testsetHelloAssoTypeMemberMapping
 	 *
 	 * @return	void
 	 * @depends	testcreateHelloAssoTypeMember
 	 * The depends says test is run only if previous is ok
 	 */
-    function testsetHelloAssoTypeMemberMapping($dolibarrid)
-    {
-        global $conf,$user,$langs,$db;
+	function testsetHelloAssoTypeMemberMapping($dolibarrid)
+	{
+		global $conf,$user,$langs,$db;
 		$conf = $this->savconf;
 		$user = $this->savuser;
 		$langs = $this->savlangs;
 		$db = $this->savdb;
 
-        $helloassoid = 123456;
+		$helloassoid = 123456;
 		$localobject = new HelloAssoMemberUtils($db);
 
-        $testmembertypes = array($helloassoid => $dolibarrid);
+		$testmembertypes = array($helloassoid => $dolibarrid);
 
-        $result = $localobject->setHelloAssoTypeMemberMapping($dolibarrid, $helloassoid);
+		$result = $localobject->setHelloAssoTypeMemberMapping($dolibarrid, $helloassoid);
 		print __METHOD__." dolibarrid=".$dolibarrid." helloassoid=".$helloassoid." result=".$result."\n";
 		$this->assertLessThan($result, 0);
 
-        $membertypes = $localobject->helloasso_member_types;
+		$membertypes = $localobject->helloasso_member_types;
 		$this->assertEquals($membertypes, $testmembertypes);
 
-        return 1;
-    }
+		return 1;
+	}
 
-    /**
+	/**
 	 * testsetHelloAssoCustomFieldMapping
 	 *
 	 * @return	void
 	 * @depends	testsetHelloAssoTypeMemberMapping
 	 * The depends says test is run only if previous is ok
 	 */
-    function testsetHelloAssoCustomFieldMapping()
-    {
-        global $conf,$user,$langs,$db;
+	function testsetHelloAssoCustomFieldMapping()
+	{
+		global $conf,$user,$langs,$db;
 		$conf = $this->savconf;
 		$user = $this->savuser;
 		$langs = $this->savlangs;
 		$db = $this->savdb;
 
-        $dolibarrfield = "email";
-        $helloassofield = "Member email";
-        $localobject = new HelloAssoMemberUtils($db);
+		$dolibarrfield = "email";
+		$helloassofield = "Member email";
+		$localobject = new HelloAssoMemberUtils($db);
 
-        $testcustomfields = array($dolibarrfield => $helloassofield);
+		$testcustomfields = array($dolibarrfield => $helloassofield);
 
-        $result = $localobject->setHelloAssoCustomFieldMapping($dolibarrfield, $helloassofield);
+		$result = $localobject->setHelloAssoCustomFieldMapping($dolibarrfield, $helloassofield);
 		print __METHOD__." dolibarrfield=".$dolibarrfield." helloassofield=".$helloassofield." result=".$result."\n";
 		$this->assertLessThan($result, 0);
 
-        $customfields = $localobject->customfields;
+		$customfields = $localobject->customfields;
 		$this->assertEquals($customfields, $testcustomfields);
-        return 1;
-    }
+		return 1;
+	}
 
-    /**
+	/**
 	 * testcreateHelloAssoMember
 	 *
 	 * @return	void
 	 * @depends	testsetHelloAssoCustomFieldMapping testcreateHelloAssoTypeMember
 	 * The depends says test is run only if previous is ok
 	 */
-    function testcreateHelloAssoMember($dolibarrid)
-    {
-        global $conf,$user,$langs,$db;
+	function testcreateHelloAssoMember($dolibarrid)
+	{
+		global $conf,$user,$langs,$db;
 		$conf = $this->savconf;
 		$user = $this->savuser;
 		$langs = $this->savlangs;
 		$db = $this->savdb;
 
-        $localobject = new HelloAssoMemberUtils($db);
-        $newmember = new stdClass();
-        $newmember->user = new stdClass();
+		$localobject = new HelloAssoMemberUtils($db);
+		$newmember = new stdClass();
+		$newmember->user = new stdClass();
 
-        $newmember->user->firstName = "Test";
-        $newmember->user->lastName = "Adherent";
+		$newmember->user->firstName = "Test";
+		$newmember->user->lastName = "Adherent";
 
-        $customfield = new stdClass();
-        $customfield->name = "Member email";
-        $customfield->answer = "test.adherent@exemple.com";
-        $newmember->customFields = array();
-        $newmember->customFields[] = $customfield;
+		$customfield = new stdClass();
+		$customfield->name = "Member email";
+		$customfield->answer = "test.adherent@exemple.com";
+		$newmember->customFields = array();
+		$newmember->customFields[] = $customfield;
 
-        $result = $localobject->createHelloAssoMember($newmember, $dolibarrid);
+		$result = $localobject->createHelloAssoMember($newmember, $dolibarrid);
 		print __METHOD__." result=".$result."\n";
 		$this->assertLessThan($result, 0);
-        return 1;
-    }
+		return 1;
+	}
 }

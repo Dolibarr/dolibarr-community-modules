@@ -83,7 +83,7 @@ $providerconfig  = $provider->getConf();
 $param = array(
 	'grant_type' => "client_credentials",
 	'client_id' => $providerconfig['client_id'],
-    'client_secret' => $providerconfig['client_secret']
+	'client_secret' => $providerconfig['client_secret']
 );
 
 $paramstring = http_build_query($param);
@@ -94,7 +94,7 @@ $user->id = 0;
 print json_encode($providerconfig);
 
 $extraHeaders = array(
-    'Content-Type' => 'application/x-www-form-urlencoded'
+	'Content-Type' => 'application/x-www-form-urlencoded'
 );
 
 
@@ -111,10 +111,5 @@ if ($status_code == 200 && isset($body['access_token']) && isset($body['refresh_
 	return $body['access_token'];
 } else {
 	$provider->errors[] = $langs->trans("FailedToRetrieveAccessToken");
-    return null;
+	return null;
 }
-
-
-
-
-
