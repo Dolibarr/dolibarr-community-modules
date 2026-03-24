@@ -24,6 +24,9 @@
 
 dol_include_once('pdpconnectfr/lib/pdpconnectfr.lib.php');
 
+/**
+ * CdarHandler
+ */
 class CdarHandler
 {
 	/**
@@ -101,7 +104,13 @@ class CdarHandler
 		global $langs;
 		$this->db = $db;
 	}
-
+	
+	/**
+	 * readFromFile
+	 *
+	 * @param  string $xmlFile xml file
+	 * @return void
+	 */
 	public function readFromFile($xmlFile)
 	{
 		if (!file_exists($xmlFile)) {
@@ -109,7 +118,13 @@ class CdarHandler
 		}
 		return $this->readFromString(file_get_contents($xmlFile));
 	}
-
+	
+	/**
+	 * readFromString
+	 *
+	 * @param  string $xmlString xml string
+	 * @return void
+	 */
 	public function readFromString($xmlString)
 	{
 		$xml = simplexml_load_string($xmlString);
@@ -127,7 +142,13 @@ class CdarHandler
 			'AcknowledgementDocument' => $this->parseAcknowledgementDocument($xml)
 		];
 	}
-
+	
+	/**
+	 * generate
+	 *
+	 * @param  array $data array of data
+	 * @return void
+	 */
 	public function generate($data)
 	{
 		$xml = new DOMDocument('1.0', 'UTF-8');
@@ -141,7 +162,14 @@ class CdarHandler
 
 		return $xml->saveXML();
 	}
-
+	
+	/**
+	 * saveToFile
+	 *
+	 * @param  array $data array of data
+	 * @param  string $filename filename
+	 * @return void
+	 */
 	public function saveToFile($data, $filename)
 	{
 		$xmlContent = $this->generate($data);
@@ -291,7 +319,13 @@ class CdarHandler
 
 
 	// ==================== UTILITY METHODS ====================
-
+	
+	/**
+	 * formatDateTime
+	 *
+	 * @param  string $dateTimeStr datetime
+	 * @return void
+	 */
 	public static function formatDateTime($dateTimeStr)
 	{
 		return strlen($dateTimeStr) === 14

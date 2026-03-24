@@ -203,7 +203,6 @@ function completAutoTags($content, $modulePath)
 			if (preg_match('/(' . preg_quote($tag) . ':\s*)["\']?auto["\']?/', $content)) {	// If the key: is 'auto'
 				$value = '';
 
-				
 				$matches = array();
 				if (preg_match('/\$this->' . preg_quote($property) . '\s*=\s*array\(([^)]+)\)/', $coreClassContent, $matches)) {
 					// Case where the value is an array

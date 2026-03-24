@@ -27,6 +27,9 @@ use horstoeko\zugferd\ZugferdDocumentBuilder;
 
 require __DIR__ . "/../../vendor/autoload.php";
 
+/**
+ * XmlPatcher
+ */
 class XmlPatcher
 {
 
