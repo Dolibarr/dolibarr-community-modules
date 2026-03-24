@@ -35,6 +35,6 @@ jobs:
       - name: Run PHPCS
         run: phpcs -q --report=checkstyle --standard=dev/setup/codesniffer/ruleset.xml --extensions=php --ignore=*/tx/*,*/vendor/* . | cs2pr --graceful-warnings
       - name: Run Parallel Lint
-        run: parallel-lint --exclude vendor/ .
+        run: parallel-lint --exclude */vendor/* .
       - name: Run VarDump Check
-        run: var-dump-check --extensions php --tracy --exclude vendor/ .
+        run: var-dump-check --extensions php --tracy --exclude */vendor/* .
