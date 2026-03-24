@@ -335,6 +335,12 @@ class CdarHandler
 			: $dateTimeStr;
 	}
 
+	/**
+	 * formatDate
+	 *
+	 * @param  string $dateStr date
+	 * @return void
+	 */
 	public static function formatDate($dateStr)
 	{
 		return strlen($dateStr) === 8
@@ -342,11 +348,21 @@ class CdarHandler
 			: $dateStr;
 	}
 
+	/**
+	 * getCurrentDateTime
+	 *
+	 * @return string
+	 */
 	public static function getCurrentDateTime()
 	{
 		return date('YmdHis');
 	}
 
+	/**
+	 * getCurrentDate
+	 *
+	 * @return string
+	 */
 	public static function getCurrentDate()
 	{
 		return date('Ymd');
