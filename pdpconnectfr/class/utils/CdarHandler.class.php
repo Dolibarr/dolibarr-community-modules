@@ -495,7 +495,7 @@ class CdarHandler
 	/**
 	 * parseExchangedDocument
 	 *
-	 * @param  SimpleXml $xml
+	 * @param  SimpleXml $xml xml
 	 * @return array
 	 */
 	private function parseExchangedDocument($xml)
@@ -523,7 +523,7 @@ class CdarHandler
 	/**
 	 * parseAcknowledgementDocument
 	 *
-	 * @param  SimpleXml $xml
+	 * @param  SimpleXml $xml xml
 	 * @return array
 	 */
 	private function parseAcknowledgementDocument($xml)
@@ -541,7 +541,7 @@ class CdarHandler
 	/**
 	 * parseReferencedDocument
 	 *
-	 * @param  SimpleXml $xml
+	 * @param  SimpleXml $xml xml
 	 * @return array
 	 */
 	private function parseReferencedDocument($xml)
@@ -596,6 +596,14 @@ class CdarHandler
 
 	// ==================== GENERATION ====================
 
+	/**
+	 * addExchangedDocument
+	 *
+	 * @param  SimpleXml $xml xml
+	 * @param  mixed $root root
+	 * @param  mixed $doc doc
+	 * @return void
+	 */
 	private function addExchangedDocument($xml, $root, $doc)
 	{
 		$exchanged = $xml->createElement('rsm:ExchangedDocument');
@@ -611,6 +619,14 @@ class CdarHandler
 		$root->appendChild($exchanged);
 	}
 
+	/**
+	 * addAcknowledgementDocument
+	 *
+	 * @param  SimpleXml $xml xml
+	 * @param  mixed $root rrot
+	 * @param  mixed $doc doc
+	 * @return void
+	 */
 	private function addAcknowledgementDocument($xml, $root, $doc)
 	{
 		$ack = $xml->createElement('rsm:AcknowledgementDocument');
@@ -627,6 +643,14 @@ class CdarHandler
 		$root->appendChild($ack);
 	}
 
+	/**
+	 * addReferencedDocument
+	 *
+	 * @param  SimpleXml $xml xml
+	 * @param  mixed $parent parent
+	 * @param  mixed $doc doc
+	 * @return void
+	 */
 	private function addReferencedDocument($xml, $parent, $doc)
 	{
 		$ref = $xml->createElement('ram:ReferenceReferencedDocument');

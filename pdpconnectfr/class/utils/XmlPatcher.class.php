@@ -79,6 +79,8 @@ class XmlPatcher
 	 * @param string|int            $lineId         Line identifier as set with setDocumentPositionId()
 	 * @param string                $invoiceRef     Deposit invoice number
 	 * @param \DateTimeInterface    $invoiceDate    Deposit invoice date
+	 *
+	 * @return void
 	 */
 	public function addDepositLineReference(
 		$lineId,
@@ -148,6 +150,8 @@ class XmlPatcher
 
 	/**
 	 * Replace the GuidelineSpecifiedDocumentContextParameter ID value.
+	 *
+	 * @return void
 	 */
 	private static function patchGuidelineId(\DOMXPath $xpath): void
 	{
@@ -179,7 +183,8 @@ class XmlPatcher
 
 	/**
 	 * Find the trade line with the given LineID and append an AdditionalReferencedDocument identifying it as a deposit recovery line.
-	  *
+	 *
+	 * @return void
 	 */
 	private static function injectDepositLineRef(
 		\DOMDocument $dom,
