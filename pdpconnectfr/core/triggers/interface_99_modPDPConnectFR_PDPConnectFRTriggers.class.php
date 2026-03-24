@@ -109,9 +109,6 @@ class InterfacePDPConnectFRTriggers extends DolibarrTriggers
 		}
 
 		if ($action == 'BILL_MODIFY') {
-			var_dump($object, $object->oldcopy);
-
-
 			$pdpConnectFr = new PdpConnectFr($db);
 			$result = $pdpConnectFr->fetchLastknownInvoiceStatus(0, $object->id);
 
