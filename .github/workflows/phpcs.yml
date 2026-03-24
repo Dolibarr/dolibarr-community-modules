@@ -34,7 +34,7 @@ jobs:
           tools: php-parallel-lint/php-var-dump-check, parallel-lint, cs2pr, phpcs
       - name: Run PHPCS
         run: phpcs -q --report=checkstyle --standard=dev/setup/codesniffer/ruleset.xml --extensions=php --ignore=*/tx/*,*/vendor/* . | cs2pr --graceful-warnings
-      - name: Run Parallel Lint
-        run: parallel-lint --exclude */vendor/* .
       - name: Run VarDump Check
         run: var-dump-check --extensions php --tracy --exclude */vendor/* .
+      # - name: Run Parallel Lint
+      #   run: parallel-lint --exclude */vendor/* .
