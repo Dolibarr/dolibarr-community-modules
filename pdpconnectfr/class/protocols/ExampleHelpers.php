@@ -88,8 +88,8 @@ function writeNewLineToCli(): void
 /**
  * Implode an associative array to form key=value
  *
- * @param string $separator
- * @param array $array
+ * @param string $separator separator
+ * @param array $array array
  * @return string
  */
 function implodeAssocArray(string $separator, array $array): string

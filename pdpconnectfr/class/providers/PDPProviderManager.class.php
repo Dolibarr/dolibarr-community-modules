@@ -29,8 +29,14 @@
  */
 class PDPProviderManager
 {
+	/**
+	 * @var DoliDB db
+	 */
 	public $db;
 
+	/**
+	 * @var mixed provider list
+	 */
 	private $providersList;
 
 	/**
@@ -130,7 +136,7 @@ class PDPProviderManager
 	/**
 	 * Get provider instance by name.
 	 *
-	 * @param string $name
+	 * @param string $name name
 	 * @return AbstractPDPProvider|null
 	 */
 	public function getProvider($name)
