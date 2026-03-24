@@ -41,6 +41,7 @@ class PDPProviderManager
 
 	/**
 	 * Initialize available PDP providers.
+	 * @param DoliDB $db db
 	 */
 	public function __construct($db)
 	{

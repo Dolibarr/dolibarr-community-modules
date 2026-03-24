@@ -23,8 +23,14 @@
  */
 class ProtocolManager
 {
+	/**
+	 * @var DoliDB db
+	 */
 	public $db;
 
+	/**
+	 * @var mixed protocolsList
+	 */
 	private $protocolsList;
 
 

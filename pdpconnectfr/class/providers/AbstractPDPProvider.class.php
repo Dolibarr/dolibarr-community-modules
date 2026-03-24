@@ -506,7 +506,7 @@ abstract class AbstractPDPProvider
 	 *
 	 * This function send an invoice to PDP
 	 *
-	 * $object Invoice object
+	 * @param  Facture $object Invoice object
 	 * @return string   flowId if the invoice was successfully sent, false otherwise.
 	 */
 	abstract public function sendInvoice($object);
