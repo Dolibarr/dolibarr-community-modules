@@ -1,6 +1,7 @@
 <?php
 /* Copyright (C) 2025       Laurent Destailleur         <eldy@users.sourceforge.net>
  * Copyright (C) 2025       Mohamed DAOUD               <mdaoud@dolicloud.com>
+ * Copyright (C) 2026       Frédéric France             <frederic.france@free.fr>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -160,10 +161,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				}
 				//var_dump($tokenData);
 			}
-			if (!$tokenData['token']) {
+			if (empty($tokenData['token'])) {
 				$item->fieldOverride .= '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken().'">' . $langs->trans('generateAccessToken') . '<i class="fa fa-key paddingleft"></i></a>';
 			}
-			if ($tokenData['token']) {
+			if (!empty($tokenData['token'])) {
 				$item->fieldOverride .= ' &nbsp; &nbsp; <a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken().'">' . $langs->trans('reGenerateAccessToken') . '<i class="fa fa-key paddingleft"></i></a>';
 			}
 
