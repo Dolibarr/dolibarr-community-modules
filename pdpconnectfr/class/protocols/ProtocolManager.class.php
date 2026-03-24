@@ -36,6 +36,7 @@ class ProtocolManager
 
 	/**
 	 * Initialize available protocols.
+	 * @var DoliDB $db db
 	 */
 	public function __construct($db)
 	{
