@@ -48,7 +48,7 @@ class HelloAssoMemberUtilsTest extends CommonClassTest
 	 * @return	integer
 	 *
 	 */
-	function testcreateHelloAssoTypeMember()
+	public function testcreateHelloAssoTypeMember()
 	{
 		global $conf,$user,$langs,$db;
 		$conf = $this->savconf;
@@ -75,12 +75,13 @@ class HelloAssoMemberUtilsTest extends CommonClassTest
 
 	/**
 	 * testsetHelloAssoTypeMemberMapping
+	 * @param int $dolibarrid dolibarr id
 	 *
 	 * @return	void
 	 * @depends	testcreateHelloAssoTypeMember
 	 * The depends says test is run only if previous is ok
 	 */
-	function testsetHelloAssoTypeMemberMapping($dolibarrid)
+	public function testsetHelloAssoTypeMemberMapping($dolibarrid)
 	{
 		global $conf,$user,$langs,$db;
 		$conf = $this->savconf;
@@ -110,7 +111,7 @@ class HelloAssoMemberUtilsTest extends CommonClassTest
 	 * @depends	testsetHelloAssoTypeMemberMapping
 	 * The depends says test is run only if previous is ok
 	 */
-	function testsetHelloAssoCustomFieldMapping()
+	public function testsetHelloAssoCustomFieldMapping()
 	{
 		global $conf,$user,$langs,$db;
 		$conf = $this->savconf;
@@ -135,12 +136,13 @@ class HelloAssoMemberUtilsTest extends CommonClassTest
 
 	/**
 	 * testcreateHelloAssoMember
+	 * @param int $dolibarrid dolibarr id
 	 *
 	 * @return	void
 	 * @depends	testsetHelloAssoCustomFieldMapping testcreateHelloAssoTypeMember
 	 * The depends says test is run only if previous is ok
 	 */
-	function testcreateHelloAssoMember($dolibarrid)
+	public function testcreateHelloAssoMember($dolibarrid)
 	{
 		global $conf,$user,$langs,$db;
 		$conf = $this->savconf;
