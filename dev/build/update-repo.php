@@ -203,17 +203,16 @@ function completAutoTags($content, $modulePath)
 			if (preg_match('/(' . preg_quote($tag) . ':\s*)["\']?auto["\']?/', $content)) {	// If the key: is 'auto'
 				$value = '';
 
-				// Case where the value is an array
+				
 				$matches = array();
 				if (preg_match('/\$this->' . preg_quote($property) . '\s*=\s*array\(([^)]+)\)/', $coreClassContent, $matches)) {
+					// Case where the value is an array
 					$value = trim($matches[1]);
 					$value = preg_replace('/\s+/', '', $value); // Remove spaces
 					$value = str_replace(',', '.', $value); // Replace commas with dots
 					print "Found array value for '$property': $value\n";
-				}
-
-				// Case where the value is a simple string
-				elseif (preg_match('/\$this->' . preg_quote($property) . '\s*=\s*[\'"]([^\'"]+)[\'"]/', $coreClassContent, $matches)) {
+				} elseif (preg_match('/\$this->' . preg_quote($property) . '\s*=\s*[\'"]([^\'"]+)[\'"]/', $coreClassContent, $matches)) {
+					// Case where the value is a simple string
 					$value = trim($matches[1]);
 					print "Found string value for '$property': $value\n";
 				}

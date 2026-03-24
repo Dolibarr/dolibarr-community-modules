@@ -30,6 +30,9 @@ require_once DOL_DOCUMENT_ROOT.'/adherents/class/adherent_type.class.php';
 require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
 dol_include_once('helloasso/lib/helloasso.lib.php');
 
+/**
+ * HelloAssoMemberUtils
+ */
 class HelloAssoMemberUtils
 {
 	public $db;
@@ -544,7 +547,7 @@ class HelloAssoMemberUtils
 	 * Set array of correspondance between HelloAsso custom fields and Dolibarr fields
 	 *
 	 * @param   string   $dolibarrfield          Dolibar field of member object
-	 * @param   string   $helloassomembertype    HelloAsso custom field name
+	 * @param   string   $helloassofield         HelloAsso custom field name
 	 *
 	 * @return  int   >0 if Ok, <0 if Ko
 	 */

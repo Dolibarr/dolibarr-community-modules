@@ -85,7 +85,12 @@ function helloassoAdminPrepareHead()
 
 /**
  * Refresh connection token
- *
+ * @param  mixed $storage
+ * @param  mixed $service
+ * @param  mixed $tokenobj
+ * @param  mixed $client_id
+ * @param  string $urltocall
+ * 
  * @throws Exception
  * @return TokenInterface|int	Token if OK
  */
