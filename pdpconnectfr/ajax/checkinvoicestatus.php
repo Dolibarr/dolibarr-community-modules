@@ -110,7 +110,6 @@ $langs->load('pdpconnectfr@pdpconnectfr');
 top_httphead();
 // Update the object field with the new value
 if ($objectRef) {
-
 	dol_include_once('pdpconnectfr/class/pdpconnectfr.class.php');
 	$pdpconnectfr = new PdpConnectFr($db);
 

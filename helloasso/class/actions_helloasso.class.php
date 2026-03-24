@@ -415,13 +415,13 @@ class ActionsHelloAsso extends CommonHookActions
 				$resprints .= '       <path
               d="M23.8154 10.6972V0.692948L27.1243 0.352539V10.527C27.1243 10.8296 27.2551 10.9809 27.5355 10.9809C27.6477 10.9809 27.7786 10.962 27.8907 10.9052L28.4889 13.2881C27.8907 13.4961 27.2738 13.6096 26.6569 13.5907C24.8249 13.6285 23.8154 12.5505 23.8154 10.6972Z"
             />';
-			$resprints .='<path
+				$resprints .='<path
               d="M18.8057 10.6972V0.692948L22.1145 0.352539V10.527C22.1145 10.8296 22.2454 10.9809 22.5071 10.9809C22.6192 10.9809 22.7501 10.962 22.8623 10.9052L23.4418 13.2881C22.8436 13.4961 22.2267 13.6096 21.6098 13.5907C19.8151 13.6285 18.8057 12.5505 18.8057 10.6972Z"
             /> ';
-			$resprints .=' <path
+				$resprints .=' <path
               d="M17.9071 9.71359H12.4859C12.6728 11.0185 13.3084 11.2454 14.2805 11.2454C14.9161 11.2454 15.533 10.9807 16.2994 10.4511L17.6454 12.2856C16.6172 13.1555 15.3087 13.6283 13.9627 13.6283C10.6912 13.6283 9.13965 11.5858 9.13965 8.78692C9.13965 6.13929 10.6352 3.90771 13.5888 3.90771C16.2247 3.90771 17.9632 5.60976 17.9632 8.63562C17.9819 8.93821 17.9445 9.39209 17.9071 9.71359ZM14.7291 7.70895C14.7105 6.80119 14.5235 6.04473 13.6823 6.04473C12.9719 6.04473 12.6167 6.46079 12.4859 7.84134H14.7291V7.70895Z"
             /> ';
-			$resprints .='<path
+				$resprints .='<path
               d="M8.24307 6.61229V13.2692H4.93423V7.21746C4.93423 6.49882 4.7286 6.32862 4.4295 6.32862C4.07431 6.32862 3.70043 6.61229 3.30786 7.21746V13.2503H-0.000976562V0.692948L3.30786 0.352539V5.06154C4.07431 4.24834 4.82207 3.90793 5.83154 3.90793C7.32706 3.90793 8.24307 4.89133 8.24307 6.61229Z"
             /> ';
 				$resprints .= '      </svg>';
@@ -453,7 +453,6 @@ class ActionsHelloAsso extends CommonHookActions
 				$resprints .= '<input type="hidden" name="noidempotency" value="'.GETPOST('noidempotency', 'int').'">';
 				$resprints .= '<input type="hidden" name="s" value="'.(GETPOST('s', 'alpha') ? GETPOST('s', 'alpha') : GETPOST('source', 'alpha')).'">';
 				$resprints .= '<input type="hidden" name="ref" value="'.GETPOST('ref').'">';
-
 			}
 
 			if (!$error) {
@@ -557,7 +556,7 @@ class ActionsHelloAsso extends CommonHookActions
 			}
 		}
 
-		if (in_array($parameters['context'],array('newpayment')) && empty($parameters['paymentmethod'])) {
+		if (in_array($parameters['context'], array('newpayment')) && empty($parameters['paymentmethod'])) {
 			$amount = price2num(helloassoGetDataFromObjects($source, $ref));
 			if (!GETPOST("currency", 'alpha')) {
 				$currency = $conf->currency;
@@ -566,7 +565,6 @@ class ActionsHelloAsso extends CommonHookActions
 			}
 			$_SESSION["FinalPaymentAmt"] = $amount;
 			$_SESSION["currencyCodeType"] = $currency;
-
 		} elseif (in_array($parameters['paymentmethod'], array('helloasso')) && $parameters['validpaymentmethod']["helloasso"] == "valid") {
 			require_once DOL_DOCUMENT_ROOT."/core/lib/geturl.lib.php";
 			$urlback = $urlwithroot.'/public/payment/newpayment.php?';
@@ -641,7 +639,7 @@ class ActionsHelloAsso extends CommonHookActions
 						$amounttab = explode('.', $amount);
 						if (strlen($amounttab[1]) == 1) {
 							$amounttab[1] .= "0";
-						} else if (strlen($amounttab[1]) > 2) {
+						} elseif (strlen($amounttab[1]) > 2) {
 							$amounttab[1] = substr($amounttab[1], 0, 2);
 						}
 						if (isset($amounttab[0])) {
@@ -671,8 +669,8 @@ class ActionsHelloAsso extends CommonHookActions
 							"errorUrl": "'.$urlback.'&typereturn=error",
 							"containsDonation": false,';
 
-							if (!empty($payerarray)) {
-								$jsontosenddata .= '
+						if (!empty($payerarray)) {
+							$jsontosenddata .= '
 									"payer": {
 										'.(!empty($payerarray['firstName']) ? '"firstName": "'.dol_escape_js($payerarray['firstName']).'",' : '' ).'
 										'.(!empty($payerarray['lastName']) ? '"lastName": "'.dol_escape_js($payerarray['lastName']).'",' : '' ).'
@@ -684,7 +682,7 @@ class ActionsHelloAsso extends CommonHookActions
 										'.(!empty($payerarray['country']) ? '"country": "'.dol_escape_js($payerarray['country']).'",' : '' ).'
 										'.(!empty($payerarray['companyName']) ? '"companyName": "'.dol_escape_js($payerarray['companyName']).'",' : '' ).'
 									},';
-							}
+						}
 						$jsontosenddata .= '
 							"metadata": {
 								"source": "'.dol_escape_js($source).'",
@@ -720,7 +718,7 @@ class ActionsHelloAsso extends CommonHookActions
 								$errors[] = $arrayofmessage['message'];
 							} else {
 								if (!empty($arrayofmessage['errors']) && is_array($arrayofmessage['errors'])) {
-									foreach($arrayofmessage['errors'] as $tmpkey => $tmpmessage) {
+									foreach ($arrayofmessage['errors'] as $tmpkey => $tmpmessage) {
 										if (!empty($tmpmessage['message'])) {
 											$errors[] = $langs->trans("Error").' - '.$tmpmessage['message'];
 										} else {
@@ -771,7 +769,7 @@ class ActionsHelloAsso extends CommonHookActions
 		$FULLTAG = GETPOST("fulltag", 'alpha'); // fulltag is tag with more informations
 		$tmptag = dolExplodeIntoArray($FULLTAG, '.', '=');
 
-		if (in_array($parameters['paymentmethod'], array('helloasso'))){
+		if (in_array($parameters['paymentmethod'], array('helloasso'))) {
 			$db->begin();
 			$code = GETPOST("code");
 			if ($code == "refused") {
@@ -877,7 +875,6 @@ class ActionsHelloAsso extends CommonHookActions
 							$ispaymentok = false;
 						}
 					}
-
 				}
 			}
 		}
@@ -908,7 +905,7 @@ class ActionsHelloAsso extends CommonHookActions
 
 		$bankaccountid = 0;
 
-		if (in_array($parameters['paymentmethod'], array('helloasso'))){
+		if (in_array($parameters['paymentmethod'], array('helloasso'))) {
 			$bankaccountid = getDolGlobalInt('HELLOASSO_BANK_ACCOUNT_FOR_PAYMENTS');
 			if ($bankaccountid == 0) {
 				$error++;
@@ -932,10 +929,11 @@ class ActionsHelloAsso extends CommonHookActions
 	 * @param   HookManager     $hookmanager    Hook manager propagated to allow calling another hook
 	 * @return  int                             Return integer < 0 on error, 0 on success, 1 to replace standard code
 	 */
-	public function doShowOnlinePaymentUrl($parameters, &$object, &$action, $hookmanager){
+	public function doShowOnlinePaymentUrl($parameters, &$object, &$action, $hookmanager)
+	{
 		if (isModEnabled('helloasso')) {
 			$this->results['showonlinepaymenturl'] = isModEnabled('helloasso');
-		}else {
+		} else {
 			return -1;
 		}
 		return 1;
@@ -950,7 +948,8 @@ class ActionsHelloAsso extends CommonHookActions
 	 * @param   HookManager     $hookmanager    Hook manager propagated to allow calling another hook
 	 * @return  int                             Return integer < 0 on error, 0 on success, 1 to replace standard code
 	 */
-	public function printFieldListSelect($parameters, &$object, &$action, $hookmanager){
+	public function printFieldListSelect($parameters, &$object, &$action, $hookmanager)
+	{
 		if (isModEnabled('helloasso') && $parameters["currentcontext"] == "thirdpartylist") {
 			$this->resprints = ", hmember.rowid as member_id, hmember.statut as member_status";
 			return 1;
@@ -967,7 +966,8 @@ class ActionsHelloAsso extends CommonHookActions
 	 * @param   HookManager     $hookmanager    Hook manager propagated to allow calling another hook
 	 * @return  int                             Return integer < 0 on error, 0 on success, 1 to replace standard code
 	 */
-	public function printFieldListFrom($parameters, &$object, &$action, $hookmanager){
+	public function printFieldListFrom($parameters, &$object, &$action, $hookmanager)
+	{
 		if (isModEnabled('helloasso') && $parameters["currentcontext"] == "thirdpartylist") {
 			$this->resprints = " LEFT JOIN ".MAIN_DB_PREFIX."adherent as hmember on (hmember.fk_soc = s.rowid)";
 			return 1;
@@ -984,7 +984,8 @@ class ActionsHelloAsso extends CommonHookActions
 	 * @param   HookManager     $hookmanager    Hook manager propagated to allow calling another hook
 	 * @return  int                             Return integer < 0 on error, 0 on success, 1 to replace standard code
 	 */
-	public function printFieldListOption($parameters, &$object, &$action, $hookmanager){
+	public function printFieldListOption($parameters, &$object, &$action, $hookmanager)
+	{
 		if (isModEnabled('helloasso') && $parameters["currentcontext"] == "thirdpartylist") {
 			$arrayfields = $parameters["arrayfields"];
 			if (!empty($arrayfields["hmember.status"]['checked'])) {
@@ -1005,14 +1006,15 @@ class ActionsHelloAsso extends CommonHookActions
 	 * @param   HookManager     $hookmanager    Hook manager propagated to allow calling another hook
 	 * @return  int                             Return integer < 0 on error, 0 on success, 1 to replace standard code
 	 */
-	public function printFieldListTitle($parameters, &$object, &$action, $hookmanager){
- 		if (isModEnabled('helloasso') && $parameters["currentcontext"] == "thirdpartylist") {
+	public function printFieldListTitle($parameters, &$object, &$action, $hookmanager)
+	{
+		if (isModEnabled('helloasso') && $parameters["currentcontext"] == "thirdpartylist") {
 			$arrayfields = $parameters["arrayfields"];
 			$param = $parameters["param"];
 			$sortfield = $parameters["sortfield"];
 			$sortorder = $parameters["sortorder"];
 			if (!empty($arrayfields["hmember.status"]['checked'])) {
-				$this->resprints = getTitleFieldOfList($arrayfields['hmember.status']['label'], 0, $_SERVER["PHP_SELF"], 'hmember.statut', '', $param, '',$sortfield, $sortorder);
+				$this->resprints = getTitleFieldOfList($arrayfields['hmember.status']['label'], 0, $_SERVER["PHP_SELF"], 'hmember.statut', '', $param, '', $sortfield, $sortorder);
 				$parameters["totalarray"]['nbfield']++;
 			}
 			return 1;
@@ -1029,7 +1031,8 @@ class ActionsHelloAsso extends CommonHookActions
 	 * @param   HookManager     $hookmanager    Hook manager propagated to allow calling another hook
 	 * @return  int                             Return integer < 0 on error, 0 on success, 1 to replace standard code
 	 */
-	public function printFieldListValue($parameters, &$object, &$action, $hookmanager){
+	public function printFieldListValue($parameters, &$object, &$action, $hookmanager)
+	{
 		if (isModEnabled('helloasso') && $parameters["currentcontext"] == "thirdpartylist") {
 			$arrayfields = $parameters["arrayfields"];
 			if (!empty($arrayfields["hmember.status"]['checked'])) {
@@ -1054,4 +1057,3 @@ class ActionsHelloAsso extends CommonHookActions
 		return 0;
 	}
 }
-
