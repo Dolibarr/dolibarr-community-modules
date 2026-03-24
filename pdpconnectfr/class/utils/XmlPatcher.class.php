@@ -157,9 +157,7 @@ class XmlPatcher
 	private static function patchGuidelineId(\DOMXPath $xpath): void
 	{
 		$nodes = $xpath->query(
-			'//rsm:ExchangedDocumentContext'
-			. '/ram:GuidelineSpecifiedDocumentContextParameter'
-			. '/ram:ID'
+			'//rsm:ExchangedDocumentContext/ram:GuidelineSpecifiedDocumentContextParameter/ram:ID'
 		);
 
 		if ($nodes === false || $nodes->length === 0) {
@@ -277,9 +275,7 @@ class XmlPatcher
 		$xpath->registerNamespace('qdt', 'urn:un:unece:uncefact:data:standard:QualifiedDataType:100');
 
 		$query = sprintf(
-			'//ram:IncludedSupplyChainTradeLineItem'
-			. '[ram:AssociatedDocumentLineDocument/ram:LineID[normalize-space(.)="%s"]]'
-			. '/ram:SpecifiedLineTradeSettlement/ram:AdditionalReferencedDocument',
+			'//ram:IncludedSupplyChainTradeLineItem[ram:AssociatedDocumentLineDocument/ram:LineID[normalize-space(.)="%s"]]/ram:SpecifiedLineTradeSettlement/ram:AdditionalReferencedDocument',
 			addslashes((string) $lineid)
 		);
 
