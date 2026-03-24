@@ -40,7 +40,7 @@ function getKositValidatorRemotePort(): int
  * - 1 = Validation was successfull
  * - 2 = Validation was not successfull
  *
- * @param  ZugferdDocument $zugferdDocument
+ * @param  ZugferdDocument $zugferdDocument zugfer document
  * @return int
  */
 function validateUsingKositValidator(ZugferdDocument $zugferdDocument): int
@@ -62,8 +62,8 @@ function validateUsingKositValidator(ZugferdDocument $zugferdDocument): int
 /**
  * Outputs a line to CLI. It uses sprintf.
  *
- * @param string $message
- * @param mixed ...$args
+ * @param string $message message
+ * @param mixed ...$args args
  * @return void
  */
 function writeLnToCli(string $message, ...$args): void
