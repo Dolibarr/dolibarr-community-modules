@@ -104,7 +104,7 @@ class CdarHandler
 		global $langs;
 		$this->db = $db;
 	}
-	
+
 	/**
 	 * readFromFile
 	 *
@@ -118,7 +118,7 @@ class CdarHandler
 		}
 		return $this->readFromString(file_get_contents($xmlFile));
 	}
-	
+
 	/**
 	 * readFromString
 	 *
@@ -142,7 +142,7 @@ class CdarHandler
 			'AcknowledgementDocument' => $this->parseAcknowledgementDocument($xml)
 		];
 	}
-	
+
 	/**
 	 * generate
 	 *
@@ -162,7 +162,7 @@ class CdarHandler
 
 		return $xml->saveXML();
 	}
-	
+
 	/**
 	 * saveToFile
 	 *
@@ -190,7 +190,7 @@ class CdarHandler
 	 *
 	 * @return  array{res:int, message:string, file:string}   Returns array with 'res' (1 on success, -1 on failure) with a 'message' and 'file' with the path.
 	 */
-	function generateCdarFile($object, $statusCode, $reasonCode = '')
+	public function generateCdarFile($object, $statusCode, $reasonCode = '')
 	{
 		global $conf, $db, $mysoc;
 
@@ -319,7 +319,7 @@ class CdarHandler
 
 
 	// ==================== UTILITY METHODS ====================
-	
+
 	/**
 	 * formatDateTime
 	 *

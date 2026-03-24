@@ -90,7 +90,7 @@ function helloassoAdminPrepareHead()
  * @param  mixed $tokenobj tokenobj
  * @param  mixed $client_id client_id
  * @param  string $urltocall url to call
- * 
+ *
  * @throws Exception
  * @return TokenInterface|int	Token if OK
  */
