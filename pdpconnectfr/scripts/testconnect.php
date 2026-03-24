@@ -100,7 +100,7 @@ $extraHeaders = array(
 
 $response = $provider->callApi("oauth2/token", "POST", $paramstring, $extraHeaders, 'get_access_token');
 
-var_dump($response);
+// var_dump($response);
 
 $status_code = $response['status_code'];
 $body = $response['response'];
