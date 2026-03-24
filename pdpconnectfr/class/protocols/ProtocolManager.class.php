@@ -36,7 +36,7 @@ class ProtocolManager
 
 	/**
 	 * Initialize available protocols.
-	 * @var DoliDB $db db
+	 * @param DoliDB $db db
 	 */
 	public function __construct($db)
 	{
@@ -78,7 +78,7 @@ class ProtocolManager
 	/**
 	 * Get protocol instance by name.
 	 *
-	 * @param string $name
+	 * @param string $name name
 	 * @return AbstractProtocol|null
 	 */
 	public function getprotocol($name)
