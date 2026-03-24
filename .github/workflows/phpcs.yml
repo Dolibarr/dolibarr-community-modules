@@ -31,6 +31,8 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '7.4'
+          extensions: calendar, json, imagick, gd, zip, mbstring, intl, opcache, imap,
+              mysql, pgsql, sqlite3, ldap, xml, mcrypt
           tools: php-parallel-lint/php-var-dump-check, parallel-lint, cs2pr, phpcs
       - name: Run PHPCS
         run: phpcs -q --report=checkstyle --standard=dev/setup/codesniffer/ruleset.xml --extensions=php --ignore=*/tx/*,*/vendor/* . | cs2pr --graceful-warnings
