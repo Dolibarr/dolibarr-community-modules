@@ -150,6 +150,7 @@ class XmlPatcher
 
 	/**
 	 * Replace the GuidelineSpecifiedDocumentContextParameter ID value.
+	 * @param DOMXPath $xpath xpath
 	 *
 	 * @return void
 	 */
@@ -183,6 +184,11 @@ class XmlPatcher
 
 	/**
 	 * Find the trade line with the given LineID and append an AdditionalReferencedDocument identifying it as a deposit recovery line.
+	 * @param DOMDocument $dom dom
+	 * @param DOMXPath $xpath xpath
+	 * @param string $lineId line id
+	 * @param string $invoiceRef invoice ref
+	 * @param DateTimeInterface $invoiceDate invoice date
 	 *
 	 * @return void
 	 */
@@ -195,9 +201,7 @@ class XmlPatcher
 	): void {
 		// Find the SpecifiedLineTradeSettlement for this LineID
 		$query = sprintf(
-			'//ram:IncludedSupplyChainTradeLineItem'
-			. '[ram:AssociatedDocumentLineDocument/ram:LineID[normalize-space(.)="%s"]]'
-			. '/ram:SpecifiedLineTradeSettlement',
+			'//ram:IncludedSupplyChainTradeLineItem[ram:AssociatedDocumentLineDocument/ram:LineID[normalize-space(.)="%s"]]/ram:SpecifiedLineTradeSettlement',
 			addslashes($lineId)
 		);
 
