@@ -417,6 +417,14 @@ class CdarHandler
 		return $root;
 	}
 
+	/**
+	 * addContext
+	 *
+	 * @param  SimpleXml $xml xml
+	 * @param  mixed $root root
+	 * @param  mixed $guidelineID guideline id
+	 * @return void
+	 */
 	private function addContext($xml, $root, $guidelineID)
 	{
 		$context = $xml->createElement('rsm:ExchangedDocumentContext');
@@ -431,6 +439,16 @@ class CdarHandler
 		$root->appendChild($context);
 	}
 
+	/**
+	 * addDateTimeElement
+	 *
+	 * @param  SimpleXml $xml xml
+	 * @param  mixed $parent parent
+	 * @param  mixed $elementName element name
+	 * @param  mixed $value value
+	 * @param  mixed $format format
+	 * @return void
+	 */
 	private function addDateTimeElement($xml, $parent, $elementName, $value, $format)
 	{
 		$element = $xml->createElement($elementName);
@@ -440,6 +458,15 @@ class CdarHandler
 		$parent->appendChild($element);
 	}
 
+	/**
+	 * addTradeParty
+	 *
+	 * @param  SimpleXml $xml xml
+	 * @param  mixed $parent parent
+	 * @param  mixed $elementName element name
+	 * @param  array $data data
+	 * @return void
+	 */
 	private function addTradeParty($xml, $parent, $elementName, $data)
 	{
 		$party = $xml->createElement($elementName);
