@@ -370,18 +370,41 @@ class CdarHandler
 
 	// ==================== PRIVATE HELPERS ====================
 
+	/**
+	 * getXpathValue
+	 *
+	 * @param  SimpleXml $xml xml
+	 * @param  mixed $path path
+	 * @param  mixed $default default
+	 * @return void
+	 */
 	private function getXpathValue($xml, $path, $default = '')
 	{
 		$result = $xml->xpath($path);
 		return !empty($result) ? (string) $result[0] : $default;
 	}
 
+	/**
+	 * getXpathAttribute
+	 *
+	 * @param  SimpleXml $xml xml
+	 * @param  mixed $path path
+	 * @param  mixed $attribute attribute
+	 * @param  mixed $default default
+	 * @return void
+	 */
 	private function getXpathAttribute($xml, $path, $attribute, $default = '')
 	{
 		$result = $xml->xpath($path);
 		return !empty($result) ? (string) $result[0][$attribute] : $default;
 	}
 
+	/**
+	 * createRootElement
+	 *
+	 * @param  SimpleXml $xml xml
+	 * @return void
+	 */
 	private function createRootElement($xml)
 	{
 		$root = $xml->createElement('rsm:CrossDomainAcknowledgementAndResponse');
@@ -442,6 +465,12 @@ class CdarHandler
 
 	// ==================== PARSING ====================
 
+	/**
+	 * parseExchangedDocument
+	 *
+	 * @param  SimpleXml $xml
+	 * @return array
+	 */
 	private function parseExchangedDocument($xml)
 	{
 		return [
@@ -464,6 +493,12 @@ class CdarHandler
 		];
 	}
 
+	/**
+	 * parseAcknowledgementDocument
+	 *
+	 * @param  SimpleXml $xml
+	 * @return array
+	 */
 	private function parseAcknowledgementDocument($xml)
 	{
 		$indicator = $this->getXpathValue($xml, '//rsm:AcknowledgementDocument/ram:MultipleReferencesIndicator/udt:Indicator');
@@ -476,6 +511,12 @@ class CdarHandler
 		];
 	}
 
+	/**
+	 * parseReferencedDocument
+	 *
+	 * @param  SimpleXml $xml
+	 * @return array
+	 */
 	private function parseReferencedDocument($xml)
 	{
 		$result = [
