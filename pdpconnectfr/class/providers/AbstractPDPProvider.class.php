@@ -27,6 +27,9 @@
 require_once __DIR__ . '/../protocols/ProtocolManager.class.php';
 
 
+/**
+ * AbstractPDPProvider
+ */
 abstract class AbstractPDPProvider
 {
 	/** @var DoliDB Database handler */
@@ -457,6 +460,7 @@ abstract class AbstractPDPProvider
 	 * Add an event/action record to track changes or activities related to an object
 	 *
 	 * @param   string      $eventType The type of event
+	 * @param   string      $eventLabel The label of event
 	 * @param   string      $eventMesg The message/label describing the event
 	 * @param   object      $objet The object (Invoice / Supplier invoice) that the event is associated with.
 	 *
