@@ -64,7 +64,8 @@ class ActionsPdpconnectfr extends CommonHookActions
 
 		// Check if it's an invoice
 		if (get_class($invoiceObject) === 'Facture' && $thirdpartyCountryCode === 'FR') {
-			if (getDolGlobalString('PDPCONNECTFR_EINVOICE_IN_REAL_TIME')) { // TODO: Maybe generate only if status is validated
+			/** @var Facture $invoiceObject */
+			if ($invoiceObject->status != $invoiceObject::STATUS_DRAFT && getDolGlobalString('PDPCONNECTFR_EINVOICE_IN_REAL_TIME')) {
 				// Call function to create Factur-X document
 				require_once __DIR__ . '/protocols/ProtocolManager.class.php';
 
