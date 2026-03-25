@@ -999,11 +999,13 @@ class PdpConnectFr
 		$resprints .= '</td>';
 		$resprints .= '<td>';
 		if ($action == 'editeinvoicestatus' || $action == 'create') {
-			$resprints .=  '<form name="seteinvoicestatus" action="' . $_SERVER["PHP_SELF"] . '?id=' . $object->id . '" method="post">';
-			$resprints .=  '<input type="hidden" name="token" value="' . newToken() . '">';
-			$resprints .=  '<input type="hidden" name="action" value="seteinvoicestatus">';
-			$resprints .=  '<input type="hidden" name="page_y" value="page_y">';
-			//$resprints .=  '<input type="hidden" name="backtopage" value="' . $backtopage . '">';
+			if ($action != 'create') {
+				$resprints .=  '<form name="seteinvoicestatus" action="' . $_SERVER["PHP_SELF"] . '?id=' . $object->id . '" method="post">';
+				$resprints .=  '<input type="hidden" name="token" value="' . newToken() . '">';
+				$resprints .=  '<input type="hidden" name="action" value="seteinvoicestatus">';
+				$resprints .=  '<input type="hidden" name="page_y" value="page_y">';
+				//$resprints .=  '<input type="hidden" name="backtopage" value="' . $backtopage . '">';
+			}
 
 			// TODO Use a combo list with only status for sync Dolibarr -> AP
 			// Also status we can't modify manually must be greyed/disabled
@@ -1012,8 +1014,8 @@ class PdpConnectFr
 			$resprints .=  $form->selectarray("seteinvoicestatus", $arrayofeinvoicestatus, $currentStatusInfo['code'], 0, 0, 0, '', 1);
 			if ($action != 'create') {
 				$resprints .=  '<input type="submit" class="button button-edit smallpaddingimp reposition" value="' . $langs->trans('Modify') . '">';
+				$resprints .=  '</form>';
 			}
-			$resprints .=  '</form>';
 		} else {
 			$resprints .= '<span id="einvoice-status">';
 			$resprints .= $currentStatusInfo['status'] . '</span><br>';
