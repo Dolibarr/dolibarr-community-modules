@@ -308,8 +308,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 
 				// Check configuration
 				$result = $pdpConnectFr->checkRequiredinformations($invoiceObject);
-
-				if ($result['res'] < 0) {			// Blocking error
+				if ($result['res'] < 0) {			// Blocking error, message contains at least one error and may also have warnings
 					$message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
 					$this->warnings[] = $message;
 
@@ -323,25 +322,27 @@ class ActionsPdpconnectfr extends CommonHookActions
 				}
 
 				// Generate E-invoice by calling the method of the Protocol
-				$result = $protocol->generateInvoice($invoiceObject, $outputlangs);
-
-				if ($result && (!is_numeric($result) || $result > 0)) {
-					dol_syslog(__METHOD__ . " Invoice generated successfully for invoice ID " . $invoiceObject->id);
-					if (!empty($this->warnings)) {
-						setEventMessages($langs->trans("InvoiceGeneratedWithWarnings"), $this->warnings, 'warnings');
+				if (!$error) {
+					$result = $protocol->generateInvoice($invoiceObject, $outputlangs);
+					if ($result && (!is_numeric($result) || $result > 0)) {
+						dol_syslog(__METHOD__ . " Invoice generated successfully for invoice ID " . $invoiceObject->id);
+						if (!empty($this->warnings)) {
+							setEventMessages($langs->trans("InvoiceGeneratedWithWarnings"), $this->warnings, 'warnings');
+						} else {
+							setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
+						}
 					} else {
-						setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
+						// If there is an error, we move warnings into error message
+						$this->errors = array_merge($this->errors, $protocol->errors);
+						$this->errors = array_merge($this->errors, $this->warnings);
+						$this->warnings = array();
+						dol_syslog(__METHOD__ . " " . implode(',', $protocol->errors));
+						$error++;
 					}
-				} else {
-					// If there is an error, we move warnings into error message
-					$this->errors = array_merge($this->errors, $protocol->errors);
-					$this->errors = array_merge($this->errors, $this->warnings);
-					$this->warnings = array();
-					dol_syslog(__METHOD__ . " " . implode(',', $protocol->errors));
-					$error++;
 				}
 			}
 		}
+
 
 		if (isset($object->element) && in_array($object->element, ['invoice_supplier'])) {
 			$permissiontoedit = $user->hasRight('fournisseur', 'facture', 'creer');
