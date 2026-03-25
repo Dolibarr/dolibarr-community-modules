@@ -310,7 +310,6 @@ class ActionsPdpconnectfr extends CommonHookActions
 				$result = $pdpConnectFr->checkRequiredinformations($invoiceObject);
 				if ($result['res'] < 0) {			// Blocking error, message contains at least one error and may also have warnings
 					$message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
-					$this->warnings[] = $message;
 
 					dol_syslog(__METHOD__ . " " . $message);
 					setEventMessages($message, array(), 'errors');
