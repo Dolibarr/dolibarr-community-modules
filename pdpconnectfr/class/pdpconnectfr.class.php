@@ -1040,8 +1040,9 @@ class PdpConnectFr
 			$resprints .= '
             <script type="text/javascript">
             (function() {
+				var countCheckInvoiceStatus = 1;
                 function checkInvoiceStatus() {
-					console.log("checkInvoiceStatus Checking invoice status...");
+					console.log("checkInvoiceStatus Checking invoice status ("+countCheckInvoiceStatus+")...");
                     // alert("Checking invoice status...");
                     $.get("' . $urlajax . '", {
                         token: "' . currentToken() . '",
@@ -1061,7 +1062,12 @@ class PdpConnectFr
 
                         // Retry only if still awaiting validation
                         if (parseInt(data.code, 10) === ' . self::STATUS_AWAITING_VALIDATION . ') {
-                            setTimeout(checkInvoiceStatus, 5000);
+							countCheckInvoiceStatus++;
+							if (countCheckInvoiceStatus <= 5) {
+                            	setTimeout(checkInvoiceStatus, 5000);
+							} else if (countCheckInvoiceStatus <= 10) {
+                            	setTimeout(checkInvoiceStatus, 10000);
+							}
                         }
                     }, "json");
                 }
