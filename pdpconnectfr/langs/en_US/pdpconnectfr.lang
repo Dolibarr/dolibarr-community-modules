@@ -253,6 +253,7 @@ PDPConnectFRDocumentSyncDescription=This job automatically launches the document
 NoInvoiceCollectionFees=No invoice collection fee
 NoLatePaymentFees=No late payment fees
 NoEarlyPaymentDiscount=No early payment discounts
+CurrentAP=Current access point: %s
 
 # AP EsaLink
 PDPCONNECTFR_ESALINK_USERNAME=API username
