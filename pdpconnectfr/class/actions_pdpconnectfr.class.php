@@ -183,7 +183,8 @@ class ActionsPdpconnectfr extends CommonHookActions
 				}
 			}
 
-			print dolGetButtonAction($langs->trans("CurrentAP", getDolGlobalString('PDPCONNECTFR_PDP')), $langs->trans('einvoice'), 'default', $url_button, '', true);
+			print '<!-- Current AP: '.getDolGlobalString('PDPCONNECTFR_PDP').' -->';
+			print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true);
 		}
 
 
