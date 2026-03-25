@@ -107,7 +107,7 @@ $syncfromdatemonth = GETPOSTINT('last_sync_datetimemonth');
 $syncfromdateday = GETPOSTINT('last_sync_datetimeday');
 $syncfromdateyear = GETPOSTINT('last_sync_datetimeyear');
 if (empty($syncfromdateyear) || empty($syncfromdatemonth) || empty($syncfromdateday)) {
-	// If "sync from" date not provied from the form, we may have it into the syncfromdate parameter.
+	// If "sync from" date not provided from the form, we may have it into the syncfromdate parameter.
 	$syncfromdate = $syncFromDate;
 } else {
 	$syncfromdate = dol_mktime($syncfromdatehour, $syncfromdatemin, 0, $syncfromdatemonth, $syncfromdateday, $syncfromdateyear, 'tzuserrel');
@@ -692,7 +692,7 @@ $selectedfields .= (count($arrayofmassactions) ? $form->showCheckAddButtons('che
 
 // Last flow sync info
 $last_sync = 0;
-if (GETPOSTDATE('last_sync_datetime', 'getpost', 'tzuserrel') && $action == 'delete') {		// If we do a delete, we may want to go older in past for next sync to retreive the deleted record, so we do not reuse the last date
+if (GETPOSTDATE('last_sync_datetime', 'getpost', 'tzuserrel') && $action == 'delete') {		// If we do a delete, we may want to go older in past for next sync to retrieve the deleted record, so we do not reuse the last date
 	$last_sync = GETPOSTDATE('last_sync_datetime', 'getpost', 'tzuserrel');
 }
 $last_sync_info = '<span class="opacitylowx">'.img_picto('', 'long-arrow-alt-right', 'class="pictofixedwidth"');
@@ -871,9 +871,13 @@ if ($action == 'confirm_sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $conf
 				$cssclass = 'warning';
 			}
 		} else {
-			if ((is_null($sync_result['totalFlows']) || $sync_result['totalFlows'] > $sync_result['batchlimit']) && empty($sync_result['syncedFlows']) && !empty($sync_result['alreadyExist'])) {
-				$cssclass = 'warning';
-				$sync_result['actions'][] = $langs->trans("TryToIncreaseStartDateOrMax", $langs->transnoentitiesnoconv("maxNumberToProcess"));
+			if ((is_null($sync_result['totalFlows']) || $sync_result['totalFlows'] > $sync_result['batchlimit'])
+				&& empty($sync_result['syncedFlows'])
+				&& !empty($sync_result['alreadyExist'])) {
+				if (empty($sync_result['batchlimit']) || ($sync_result['batchlimit'] <= $sync_result['alreadyExist'])) {
+					$cssclass = 'warning';
+					$sync_result['actions'][] = $langs->trans("TryToIncreaseStartDateOrMax", $langs->transnoentitiesnoconv("maxNumberToProcess"));
+				}
 			} else {
 				$cssclass = 'info';
 			}
