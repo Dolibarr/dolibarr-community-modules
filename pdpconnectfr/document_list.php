@@ -23,28 +23,6 @@
  *		\brief      List page for document
  */
 
-// General defined Options
-//if (! defined('CSRFCHECK_WITH_TOKEN'))     define('CSRFCHECK_WITH_TOKEN', '1');					// Force use of CSRF protection with tokens even for GET
-//if (! defined('MAIN_AUTHENTICATION_MODE')) define('MAIN_AUTHENTICATION_MODE', 'aloginmodule');	// Force authentication handler
-//if (! defined('MAIN_LANG_DEFAULT'))        define('MAIN_LANG_DEFAULT', 'auto');					// Force LANG (language) to a particular value
-//if (! defined('MAIN_SECURITY_FORCECSP'))   define('MAIN_SECURITY_FORCECSP', 'none');				// Disable all Content Security Policies
-//if (! defined('NOBROWSERNOTIF'))     		 define('NOBROWSERNOTIF', '1');					// Disable browser notification
-//if (! defined('NOIPCHECK'))                define('NOIPCHECK', '1');						// Do not check IP defined into conf $dolibarr_main_restrict_ip
-//if (! defined('NOLOGIN'))                  define('NOLOGIN', '1');						// Do not use login - if this page is public (can be called outside logged session). This includes the NOIPCHECK too.
-//if (! defined('NOREQUIREAJAX'))            define('NOREQUIREAJAX', '1');       	  		// Do not load ajax.lib.php library
-//if (! defined('NOREQUIREDB'))              define('NOREQUIREDB', '1');					// Do not create database handler $db
-//if (! defined('NOREQUIREHTML'))            define('NOREQUIREHTML', '1');					// Do not load html.form.class.php
-//if (! defined('NOREQUIREMENU'))            define('NOREQUIREMENU', '1');					// Do not load and show top and left menu
-//if (! defined('NOREQUIRESOC'))             define('NOREQUIRESOC', '1');					// Do not load object $mysoc
-//if (! defined('NOREQUIRETRAN'))            define('NOREQUIRETRAN', '1');					// Do not load object $langs
-//if (! defined('NOREQUIREUSER'))            define('NOREQUIREUSER', '1');					// Do not load object $user
-//if (! defined('NOSCANGETFORINJECTION'))    define('NOSCANGETFORINJECTION', '1');			// Do not check injection attack on GET parameters
-//if (! defined('NOSCANPOSTFORINJECTION'))   define('NOSCANPOSTFORINJECTION', '1');			// Do not check injection attack on POST parameters
-//if (! defined('NOSESSION'))                define('NOSESSION', '1');						// On CLI mode, no need to use web sessions
-//if (! defined('NOSTYLECHECK'))             define('NOSTYLECHECK', '1');					// Do not check style html tag into posted data
-//if (! defined('NOTOKENRENEWAL'))           define('NOTOKENRENEWAL', '1');					// Do not roll the Anti CSRF token (used if MAIN_SECURITY_CSRF_WITH_TOKEN is on)
-
-
 // Load Dolibarr environment
 $res = 0;
 // Try main.inc.php into web root known defined into CONTEXT_DOCUMENT_ROOT (not always defined)
@@ -344,7 +322,6 @@ if ($action == 'confirm_sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $conf
 				$errortype = 'warnings';
 			}
 			//setEventMessages($langs->trans("FailedToSyncADocument").($errortype ? '<br>'.$langs->trans("FailedToSyncADocumentMore") : ''), null, $errortype);
-
 		}
 	} else {
 		setEventMessages($langs->trans("NoPDPProviderConfigured"), null, 'errors');
@@ -827,23 +804,23 @@ if ($provider) {
 		print '<div class="floatleft">'.$last_supplier_invoice_error.'</div>'."\n";
 	}
 
-	print "</div>"."\n";
+	print "</div>\n";
 
-	print '</div>'."\n";
+	print "</div>\n";
 
 	print '<script>'."\n";
-	print "document.getElementById('runSyncBtn').addEventListener('click', function(e){"."\n";
-	print "  e.preventDefault();"."\n";
-	print "  var maxFlows = document.getElementById('maxflows') ? encodeURIComponent(document.getElementById('maxflows').value) : '0';"."\n";
-	print "  var token = encodeURIComponent('".newToken()."');"."\n";
-	print "  var lastSyncDatetimehour = document.getElementById('last_sync_datetimehour') ? encodeURIComponent(document.getElementById('last_sync_datetimehour').value) : '0';"."\n";
-	print "  var lastSyncDatetimemin = document.getElementById('last_sync_datetimemin') ? encodeURIComponent(document.getElementById('last_sync_datetimemin').value) : '0';"."\n";
-	print "  var lastSyncDatetimemonth = document.getElementById('last_sync_datetimemonth') ? encodeURIComponent(document.getElementById('last_sync_datetimemonth').value) : '0';"."\n";
-	print "  var lastSyncDatetimeday = document.getElementById('last_sync_datetimeday') ? encodeURIComponent(document.getElementById('last_sync_datetimeday').value) : '0';"."\n";
-	print "  var lastSyncDatetimeyear = document.getElementById('last_sync_datetimeyear') ? encodeURIComponent(document.getElementById('last_sync_datetimeyear').value) : '0';"."\n";
-	print "  window.location.href = '".$_SERVER["PHP_SELF"]."?action=sync&maxflows=' + maxFlows + '&last_sync_datetimehour=' + lastSyncDatetimehour + '&last_sync_datetimemin=' + lastSyncDatetimemin + '&last_sync_datetimemonth=' + lastSyncDatetimemonth + '&last_sync_datetimeday=' + lastSyncDatetimeday + '&last_sync_datetimeyear=' + lastSyncDatetimeyear + '&token=' + token;"."\n";
-	print "});"."\n";
-	print '</script>'."\n";
+	print "document.getElementById('runSyncBtn').addEventListener('click', function(e){\n";
+	print "  e.preventDefault();\n";
+	print "  var maxFlows = document.getElementById('maxflows') ? encodeURIComponent(document.getElementById('maxflows').value) : '0';\n";
+	print "  var token = encodeURIComponent('".newToken()."');\n";
+	print "  var lastSyncDatetimehour = document.getElementById('last_sync_datetimehour') ? encodeURIComponent(document.getElementById('last_sync_datetimehour').value) : '0';\n";
+	print "  var lastSyncDatetimemin = document.getElementById('last_sync_datetimemin') ? encodeURIComponent(document.getElementById('last_sync_datetimemin').value) : '0';\n";
+	print "  var lastSyncDatetimemonth = document.getElementById('last_sync_datetimemonth') ? encodeURIComponent(document.getElementById('last_sync_datetimemonth').value) : '0';\n";
+	print "  var lastSyncDatetimeday = document.getElementById('last_sync_datetimeday') ? encodeURIComponent(document.getElementById('last_sync_datetimeday').value) : '0';\n";
+	print "  var lastSyncDatetimeyear = document.getElementById('last_sync_datetimeyear') ? encodeURIComponent(document.getElementById('last_sync_datetimeyear').value) : '0';\n";
+	print "  window.location.href = '".$_SERVER["PHP_SELF"]."?action=sync&maxflows=' + maxFlows + '&last_sync_datetimehour=' + lastSyncDatetimehour + '&last_sync_datetimemin=' + lastSyncDatetimemin + '&last_sync_datetimemonth=' + lastSyncDatetimemonth + '&last_sync_datetimeday=' + lastSyncDatetimeday + '&last_sync_datetimeyear=' + lastSyncDatetimeyear + '&token=' + token;\n";
+	print "});\n";
+	print "</script>\n";
 } else {
 	// Message to check module configuration
 	print info_admin($langs->transnoentities("checkPdpConnectFrModuleConfiguration"), 0, 0, '1', '', '', 'warning');
@@ -985,7 +962,7 @@ foreach ($object->fields as $key => $val) {
 		} elseif ($val['type'] === 'boolean') {
 			print $form->selectyesno('search_' . $key, $search[$key] ?? '', 1, false, 1);
 		} else {
-            if (!empty($val['notsearchable'])) {
+			if (!empty($val['notsearchable'])) {
 				continue;
 			}
 			print '<input type="text" class="flat maxwidth'.(in_array($val['type'], array('integer', 'price')) ? '50' : '75').'" name="search_'.$key.'" value="'.dol_escape_htmltag(isset($search[$key]) ? $search[$key] : '').'">';

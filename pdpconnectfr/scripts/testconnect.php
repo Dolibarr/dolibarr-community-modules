@@ -83,7 +83,7 @@ $providerconfig  = $provider->getConf();
 $param = array(
 	'grant_type' => "client_credentials",
 	'client_id' => $providerconfig['client_id'],
-    'client_secret' => $providerconfig['client_secret']
+	'client_secret' => $providerconfig['client_secret']
 );
 
 $paramstring = http_build_query($param);
@@ -94,13 +94,13 @@ $user->id = 0;
 print json_encode($providerconfig);
 
 $extraHeaders = array(
-    'Content-Type' => 'application/x-www-form-urlencoded'
+	'Content-Type' => 'application/x-www-form-urlencoded'
 );
 
 
 $response = $provider->callApi("oauth2/token", "POST", $paramstring, $extraHeaders, 'get_access_token');
 
-var_dump($response);
+// var_dump($response);
 
 $status_code = $response['status_code'];
 $body = $response['response'];
@@ -111,10 +111,5 @@ if ($status_code == 200 && isset($body['access_token']) && isset($body['refresh_
 	return $body['access_token'];
 } else {
 	$provider->errors[] = $langs->trans("FailedToRetrieveAccessToken");
-    return null;
+	return null;
 }
-
-
-
-
-

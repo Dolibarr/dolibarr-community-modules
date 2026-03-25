@@ -95,7 +95,8 @@ function pdpconnectfrAdminPrepareHead()
  * @param 	PdpConnectFr $pdpconnectfr	Object PdpConnectFr
  * @return	string						Return string with warning (or '')
  */
-function pdpShowWarning($pdpconnectfr) {
+function pdpShowWarning($pdpconnectfr)
+{
 	global $langs;
 
 	$ret = '';

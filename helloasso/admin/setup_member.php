@@ -147,7 +147,7 @@ if ($action == 'test') {
 	//Try to sync members on HelloAsso to Dolibarr (Dry mode)
 	$helloassomemberutils->helloassoSyncMembersToDolibarr(1, "test");
 	header("Location: ".$_SERVER["PHP_SELF"]);
-} elseif ($action == 'addmembertype'){
+} elseif ($action == 'addmembertype') {
 	$dolibarrmembertype = GETPOST("select_mapdolibarrhelloassomember", 'int');
 	if (empty($dolibarrmembertype)) {
 		setEventMessages($langs->transnoentities("ErrorHelloAssoBadParameter", $langs->transnoentities("HelloAssoDolibarrMemberTypeID")), null, 'errors');
@@ -172,7 +172,7 @@ if ($action == 'test') {
 	} else {
 		$db->rollback();
 	}
-} elseif ($action == 'delmembertype'){
+} elseif ($action == 'delmembertype') {
 	$helloassomembertype = GETPOST("helloassomembertype", 'int');
 	if (empty($helloassomembertype)) {
 		setEventMessages($langs->transnoentities("ErrorHelloAssoBadParameter", $langs->transnoentities("HelloAssoMemberTypeID")), null, 'errors');
@@ -207,7 +207,7 @@ if ($action == 'test') {
 	} else {
 		$db->rollback();
 	}
-} elseif ($action == 'addcustomfield'){
+} elseif ($action == 'addcustomfield') {
 	$dolibarrfield = GETPOST("select_mapcutomfield");
 	if (empty($dolibarrfield)) {
 		setEventMessages($langs->transnoentities("ErrorHelloAssoBadParameter", $langs->transnoentities("HelloAssoDolibarrMemberTypeID")), null, 'errors');
@@ -232,7 +232,7 @@ if ($action == 'test') {
 	} else {
 		$db->rollback();
 	}
-} elseif ($action == 'delcustomfield'){
+} elseif ($action == 'delcustomfield') {
 	$dolibarrfield = GETPOST("dolibarrfield");
 	if (empty($dolibarrfield)) {
 		setEventMessages($langs->transnoentities("ErrorHelloAssoBadParameter", $langs->transnoentities("HelloAssoDolibarrMemberTypeID")), null, 'errors');

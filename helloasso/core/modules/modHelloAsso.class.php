@@ -118,7 +118,7 @@ class modHelloAsso extends DolibarrModules
 			// Set here all hooks context managed by module. To find available hook context, make a "grep -r '>initHooks(' *" on source code. You can also set hook context to 'all'
 			'hooks' => array(
 				  'data' => array(
-				      'newpayment',
+					  'newpayment',
 					  'subscription',
 					  'globalcard',
 					  'thirdpartylist',
@@ -254,18 +254,18 @@ class modHelloAsso extends DolibarrModules
 		/* BEGIN MODULEBUILDER CRON */
 		$this->cronjobs = array(
 			 0 => array(
-			     'label' => 'HelloAssoGetNewMembers',
-			     'jobtype' => 'method',
-			     'class' => '/helloasso/class/helloassomemberutils.class.php',
-			     'objectname' => 'HelloAssoMemberUtils',
-			     'method' => 'helloassoSyncMembersToDolibarr',
-			     'parameters' => '0, cron',
-			     'comment' => 'HelloAssoGetNewMembersComment',
-			     'frequency' => 1,
-			     'unitfrequency' => 86400,
-			     'status' => 0,
-			     'test' => 'isModEnabled("helloasso")',
-			     'priority' => 50,
+				 'label' => 'HelloAssoGetNewMembers',
+				 'jobtype' => 'method',
+				 'class' => '/helloasso/class/helloassomemberutils.class.php',
+				 'objectname' => 'HelloAssoMemberUtils',
+				 'method' => 'helloassoSyncMembersToDolibarr',
+				 'parameters' => '0, cron',
+				 'comment' => 'HelloAssoGetNewMembersComment',
+				 'frequency' => 1,
+				 'unitfrequency' => 86400,
+				 'status' => 0,
+				 'test' => 'isModEnabled("helloasso")',
+				 'priority' => 50,
 			 ),
 		);
 		/* END MODULEBUILDER CRON */

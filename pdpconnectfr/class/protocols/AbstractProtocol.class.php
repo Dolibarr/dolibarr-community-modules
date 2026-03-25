@@ -25,78 +25,78 @@
 
 abstract class AbstractProtocol
 {
-    /**
-     * Invoice object
-     * @var Facture
-     */
-    public $sourceinvoice;
+	/**
+	 * Invoice object
+	 * @var Facture
+	 */
+	public $sourceinvoice;
 
-    /** @var array Error messages */
-    public $errors = [];
+	/** @var array Error messages */
+	public $errors = [];
 
-    /**
-     * Generate the XML content for a given invoice.
-     *
-     * Each protocol must implement this method to convert
-     * the invoice data into an XML structure compliant
-     * with its own e-invoicing format.
-     *
-     * @param	CommonInvoice	$invoice 		Invoice object containing all necessary data.
-     * @param	?Translate		$outputlangs	Output language
-     * @return 	string 							XML representation of the invoice.
-     */
-    abstract public function generateXML($invoice, $outputlangs = null);
+	/**
+	 * Generate the XML content for a given invoice.
+	 *
+	 * Each protocol must implement this method to convert
+	 * the invoice data into an XML structure compliant
+	 * with its own e-invoicing format.
+	 *
+	 * @param	CommonInvoice	$invoice 		Invoice object containing all necessary data.
+	 * @param	?Translate		$outputlangs	Output language
+	 * @return 	string 							XML representation of the invoice.
+	 */
+	abstract public function generateXML($invoice, $outputlangs = null);
 
-    /**
-     * Create a supplier invoice in Dolibarr from Factur-X content.
-     *
-     * This function parses the provided Factur-X XML content
-     * and generates a corresponding supplier invoice within Dolibarr.
-     *
-     * @param array $file                       Factur-X file.
-     * @param string|null $ReadableViewFile     Readable view file. (PDP Generated readable PDF)
-     * @param string $flowId                    Flow identifier source of the invoice.
-     *
-     * @return array{res:int, message:string}   Returns array with 'res' (1 on success, -1 on failure) and 'message' if error
-     */
-    abstract public function createSupplierInvoiceFromFacturX($file, $ReadableViewFile = null, $flowId = '');
+	/**
+	 * Create a supplier invoice in Dolibarr from Factur-X content.
+	 *
+	 * This function parses the provided Factur-X XML content
+	 * and generates a corresponding supplier invoice within Dolibarr.
+	 *
+	 * @param array $file                       Factur-X file.
+	 * @param string|null $ReadableViewFile     Readable view file. (PDP Generated readable PDF)
+	 * @param string $flowId                    Flow identifier source of the invoice.
+	 *
+	 * @return array{res:int, message:string}   Returns array with 'res' (1 on success, -1 on failure) and 'message' if error
+	 */
+	abstract public function createSupplierInvoiceFromFacturX($file, $ReadableViewFile = null, $flowId = '');
 
-    /**
-     * Generate a complete Factur-X invoice file by embedding the XML
-     * into a PDF.
-     *
-     * This function combines the invoice data with its corresponding XML
-     * to produce a final hybrid document ready for exchange or archiving.
-     *
-     * @param 	CommonInvoice 	$invoice_id    	Invoice ID to be processed.
-     * @param	?Translate		$outputlangs	Output language
-     * @return 	int|string             			-1 if ko, path if ok.
-     */
-    public function generateInvoice($invoice_id, $outputlangs = null)
-    {
-        // Default implementation: not required for all protocols
-        return -1;
-    }
+	/**
+	 * Generate a complete Factur-X invoice file by embedding the XML
+	 * into a PDF.
+	 *
+	 * This function combines the invoice data with its corresponding XML
+	 * to produce a final hybrid document ready for exchange or archiving.
+	 *
+	 * @param 	CommonInvoice 	$invoice_id    	Invoice ID to be processed.
+	 * @param	?Translate		$outputlangs	Output language
+	 * @return 	int|string             			-1 if ko, path if ok.
+	 */
+	public function generateInvoice($invoice_id, $outputlangs = null)
+	{
+		// Default implementation: not required for all protocols
+		return -1;
+	}
 
-    /**
-     * Generate a sample invoice for testing or demonstration purposes (for Dolibarr version < 24.0)
-     *
-     * Each protocol should provide a representative sample
-     * illustrating its structure and data format.
-     *
-     * @param	PdpConnectFr		$pdpconnectfr			PDPConnectFR
-     * @return 	array<string,string> 						Path or content of the generated sample invoice.
-     */
-    abstract public function generateSampleInvoiceOld($pdpconnectfr);
+	/**
+	 * Generate a sample invoice for testing or demonstration purposes (for Dolibarr version < 24.0)
+	 *
+	 * Each protocol should provide a representative sample
+	 * illustrating its structure and data format.
+	 *
+	 * @param	PdpConnectFr		$pdpconnectfr			PDPConnectFR
+	 * @return 	array<string,string> 						Path or content of the generated sample invoice.
+	 */
+	abstract public function generateSampleInvoiceOld($pdpconnectfr);
 
-    /**
-     * Generate a sample invoice for testing or demonstration purposes (for Dolibarr version >= 24.0)
-     *
-     * Each protocol should provide a representative sample
-     * illustrating its structure and data format.
-     *
-     * @param	PdpConnectFr		$pdpconnectfr			PDPConnectFR
-     * @return 	string 										Path or content of the generated sample invoice.
-     */
-    abstract public function generateSampleInvoice($pdpconnectfr);
+	/**
+	 * Generate a sample invoice for testing or demonstration purposes (for Dolibarr version >= 24.0)
+	 *
+	 * Each protocol should provide a representative sample
+	 * illustrating its structure and data format.
+	 *
+	 * @param	PdpConnectFr		$pdpconnectfr			PDPConnectFR
+	 * @return 	string 										Path or content of the generated sample invoice.
+	 */
+	abstract public function generateSampleInvoice($pdpconnectfr);
 }

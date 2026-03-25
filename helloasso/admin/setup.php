@@ -280,7 +280,7 @@ if ($action == 'updateMask') {
 				$errors[] = $arrayofmessage['message'];
 			} else {
 				if (!empty($arrayofmessage['errors']) && is_array($arrayofmessage['errors'])) {
-					foreach($arrayofmessage['errors'] as $tmpkey => $tmpmessage) {
+					foreach ($arrayofmessage['errors'] as $tmpkey => $tmpmessage) {
 						if (!empty($tmpmessage['message'])) {
 							$errors[] = $langs->trans("Error").' - '.$tmpmessage['message'];
 						} else {
@@ -624,7 +624,7 @@ if (getDolGlobalInt("HELLOASSO_LIVE")) {
 	$client_id_secret = getDolGlobalString("HELLOASSO_CLIENT_SECRET");
 	$helloassourl = "api.helloasso.com";
 	$service = "Helloasso-Live";
-} else{
+} else {
 	$client_id = getDolGlobalString("HELLOASSO_TEST_CLIENT_ID");
 	$client_id_secret = getDolGlobalString("HELLOASSO_TEST_CLIENT_SECRET");
 }
@@ -663,10 +663,9 @@ try {
 	print $langs->trans("TTL").': '.dol_print_date($ttl, 'dayhour')." UTC<br>";
 
 	print '<a class="reposition" href="'.$_SERVER["PHP_SELF"].'?action=deletetoken&token='.newToken().'">'.img_picto('', 'delete').'</a>';
-} catch(Exception $e) {
+} catch (Exception $e) {
 	print '<br><br>'.$e->getMessage();
 	print ' Run a connection test to validate a first connexion';
-
 }
 
 print '<br><br>';

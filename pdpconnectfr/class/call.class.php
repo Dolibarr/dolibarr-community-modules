@@ -1268,7 +1268,6 @@ class Call extends CommonObject
 
 		return $prefix.sprintf('%06d', $next);
 	}
-
 }
 
 
