@@ -145,7 +145,8 @@ class ActionsPdpconnectfr extends CommonHookActions
 			$url_button = array();
 			if ($object->status == Facture::STATUS_VALIDATED || $object->status == Facture::STATUS_CLOSED) {
 				// if E-invoice is not generated, show button to generate e-invoice
-				if ($currentStatusDetails['code'] == $pdpConnectFr::STATUS_NOT_GENERATED) {
+				if ($currentStatusDetails['code'] == $pdpConnectFr::STATUS_NOT_GENERATED
+					|| !array_key_exists($currentStatusDetails['code'], $pdpConnectFr::STATUS_LABEL_KEYS)) {
 					$url_button[] = array(
 						'lang' => 'pdpconnectfr',
 						'enabled' => 1,

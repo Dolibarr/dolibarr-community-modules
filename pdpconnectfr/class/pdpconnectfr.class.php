@@ -161,7 +161,7 @@ class PdpConnectFr
 	/**
 	 * List of Einvoice status
 	 */
-	private const STATUS_LABEL_KEYS = [
+	public const STATUS_LABEL_KEYS = [
 		// Dolibarr
 		self::STATUS_UNKNOWN             => 'EInvStatusUnknown',
 		self::STATUS_IGNORE              => 'EInvStatusDoNotSync',		// To exclude invoice from einvoice sync
