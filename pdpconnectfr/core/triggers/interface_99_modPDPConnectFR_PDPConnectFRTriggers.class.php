@@ -99,7 +99,7 @@ class InterfacePDPConnectFRTriggers extends DolibarrTriggers
 
 		if ($action == 'BILL_UNVALIDATE') {
 			$pdpConnectFr = new PdpConnectFr($db);
-			$result = $pdpConnectFr->fetchLastknownInvoiceStatus(0, $object->id);
+			$result = $pdpConnectFr->fetchLastknownInvoiceStatus($object->id);
 
 			// If einvoice has been transmitted, we must check that we don't try to modify some fields
 			if (is_array($result) && !in_array($result['code'], array($pdpConnectFr::STATUS_UNKNOWN, $pdpConnectFr::STATUS_IGNORE, $pdpConnectFr::STATUS_NOT_GENERATED, $pdpConnectFr::STATUS_GENERATED))) {
@@ -110,7 +110,7 @@ class InterfacePDPConnectFRTriggers extends DolibarrTriggers
 
 		if ($action == 'BILL_MODIFY') {
 			$pdpConnectFr = new PdpConnectFr($db);
-			$result = $pdpConnectFr->fetchLastknownInvoiceStatus(0, $object->id);
+			$result = $pdpConnectFr->fetchLastknownInvoiceStatus($object->id);
 
 			// If einvoice has been transmitted, we must check that we don't try to modify some fields
 			if (is_array($result) && !in_array($result['code'], array($pdpConnectFr::STATUS_UNKNOWN, $pdpConnectFr::STATUS_IGNORE, $pdpConnectFr::STATUS_NOT_GENERATED, $pdpConnectFr::STATUS_GENERATED))) {

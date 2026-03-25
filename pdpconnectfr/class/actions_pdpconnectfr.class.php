@@ -141,7 +141,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 		// Add buttons in invoice card
 		if (in_array($object->element, ['facture'])) {
 			// Get current status of e-invoice
-			$currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus($object->ref);
+			$currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus(0, $object->ref);
 
 			$url_button = array();
 			if ($object->status == Facture::STATUS_VALIDATED || $object->status == Facture::STATUS_CLOSED) {
@@ -257,7 +257,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 			$permissiontoedit = $user->hasRight('facture', 'write');
 
 			// Get current status of e-invoice
-			$currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus($object->ref);
+			$currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus(0, $object->ref);
 			// Action to set the E-invoice status manually
 			if ($action == 'seteinvoicestatus' && $permissiontoedit) {
 				$result = $pdpConnectFr->setEInvoiceStatus($object, GETPOSTINT('seteinvoicestatus'), '');
@@ -750,7 +750,8 @@ class ActionsPdpconnectfr extends CommonHookActions
 
 
 			// Einvoice generated or not
-			$einvoiceGenerated = $pdpConnectFr->fetchLastknownInvoiceStatus($obj->ref)['file'];
+			$tmparray = $pdpConnectFr->fetchLastknownInvoiceStatus(0, $obj->ref);
+			$einvoiceGenerated = $tmparray['file'];
 			print '<td class="center tdoverflowmax125">';
 			if ($einvoiceGenerated) {
 				print '<i class="fas fa-check-circle" style="color:green;" title="'.$langs->trans('EInvoiceGeneratedList').'"></i>';
@@ -824,7 +825,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 		}
 
 		$pdpConnectFr = new PdpConnectFr($db);
-		$currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus($object->ref);
+		$currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus(0, $object->ref);
 
 		// Block modification if invoice is already transmitted to PDP
 		if ($currentStatusDetails['transmitted'] == 1) {

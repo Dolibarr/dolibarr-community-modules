@@ -821,7 +821,7 @@ class FacturXProtocol extends AbstractProtocol
 
 		// Set status of einvoice
 		$pdpConnectFr = new PdpConnectFr($db);
-		$result = $pdpConnectFr->fetchLastknownInvoiceStatus(0, $invoice->id);
+		$result = $pdpConnectFr->fetchLastknownInvoiceStatus($invoice->id);
 
 		if (isset($result['code']) &&
 			(in_array($result['code'], array($pdpConnectFr::STATUS_UNKNOWN, $pdpConnectFr::STATUS_NOT_GENERATED))

@@ -173,6 +173,9 @@ if ($objectRef) {
 		if ($ack_statusLabel) {
 			$syncStatus = $pdpconnectfr->getDolibarrStatusCodeFromPdpLabel($ack_statusLabel);
 		}
+
+		$tmparray = $pdpconnectfr->fetchLastknownInvoiceStatus($invoice->id);
+
 		$syncRef = $flowData['trackingId'] ?? '';
 		$syncComment = $flowData['acknowledgement']['details'][0]['reasonMessage'] ?? '';
 		$pdpconnectfr->insertOrUpdateExtLink($invoice->id, $invoice->element, $flowId, $syncStatus, $syncRef, $syncComment);
@@ -181,15 +184,25 @@ if ($objectRef) {
 		$eventLabel = "PDPCONNECTFR - Status: " . $ack_statusLabel;
 		$eventMessage = "PDPCONNECTFR - Status: " . $ack_statusLabel . (!empty($syncComment) ? " - " . $syncComment : "");
 
-		$resLogEvent = $provider->addEvent('STATUS', $eventLabel, $eventMessage, $invoice);
-		if ($resLogEvent < 0) {
-			dol_syslog(__METHOD__ . " Failed to log event for flowId: {$flowId}", LOG_WARNING);
+		// We add an event only if somethiing has changed
+		$addevent = 1;
+		if ($syncStatus == $pdpconnectfr::STATUS_UNKNOWN) {						// Do not add event if status of invoice is unknown (failed to retrieve it ?)
+			$addevent = 0;
+		}
+		if (!empty($tmparray['code']) && $syncStatus == $tmparray['code']) {	// Do not add event if status has not change
+			$addevent = 0;
+		}
+		if ($addevent) {
+			$resLogEvent = $provider->addEvent('STATUS', $eventLabel, $eventMessage, $invoice);
+			if ($resLogEvent < 0) {
+				dol_syslog(__METHOD__ . " Failed to log event for flowId: {$flowId}", LOG_WARNING);
+			}
 		}
 
 		// Refresh current status info
 		require_once "../class/pdpconnectfr.class.php";
 		$pdpconnectfr = new PdpConnectFr($db);
-		$currentStatusInfo = $pdpconnectfr->fetchLastknownInvoiceStatus($invoice->ref);
+		$currentStatusInfo = $pdpconnectfr->fetchLastknownInvoiceStatus(0, $invoice->ref);
 
 		print json_encode($currentStatusInfo);
 	} else {

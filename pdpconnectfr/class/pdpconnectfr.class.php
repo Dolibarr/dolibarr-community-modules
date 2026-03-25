@@ -921,7 +921,7 @@ class PdpConnectFr
 		global $langs, $form, $user;
 		global $action;
 
-		$currentStatusInfo = $this->fetchLastknownInvoiceStatus($object->ref, $object->id);
+		$currentStatusInfo = $this->fetchLastknownInvoiceStatus($object->id, $object->ref);
 		// Force value for test
 		//$currentStatusInfo['code'] = 2;
 
@@ -1048,6 +1048,7 @@ class PdpConnectFr
                         token: "' . currentToken() . '",
                         ref: "' . dol_escape_js($object->ref) . '"
                     }, function (data) {
+						/* code is executed here if response is valid json */
                         if (!data || typeof data.code === "undefined") {
 							console.log("checkInvoiceStatus no data returned");
                             return;
@@ -1061,7 +1062,7 @@ class PdpConnectFr
                         $("#einvoice-info").html(data.info || "");
 
                         // Retry only if still awaiting validation
-                        if (parseInt(data.code, 10) === ' . self::STATUS_AWAITING_VALIDATION . ') {
+                        if (parseInt(data.code) === ' . self::STATUS_AWAITING_VALIDATION . ') {
 							countCheckInvoiceStatus++;
 							if (countCheckInvoiceStatus <= 5) {
                             	setTimeout(checkInvoiceStatus, 5000);
@@ -1449,11 +1450,11 @@ class PdpConnectFr
 	/**
 	 * fetchLastknownInvoiceStatus
 	 *
-	 * @param string		$invoiceRef		Invoice ref
 	 * @param int			$invoiceId		Invoice ID
+	 * @param string		$invoiceRef		Invoice ref
 	 * @return string[]|number[]|mixed[][]|mixed[]
 	 */
-	public function fetchLastknownInvoiceStatus($invoiceRef, $invoiceId = 0)
+	public function fetchLastknownInvoiceStatus($invoiceId = 0, $invoiceRef = '')
 	{
 		global $conf;
 
