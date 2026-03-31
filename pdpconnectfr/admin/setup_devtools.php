@@ -124,7 +124,7 @@ $invoice_path = '';
 
 if ($provider && $action == 'buildsamplesupplierinvoice') {
 	$sellerId = GETPOST('seller_id', 'alpha');
-	$supplierId = GETPOST('supplier_id', 'alpha');
+	$buyerId = GETPOST('buyer_id', 'alpha');
 
 	if ((float) DOL_VERSION < 24.0) {
 		$resarray = $provider->exchangeProtocol->generateSampleInvoiceOld($pdpconnectfr);
@@ -137,9 +137,9 @@ if ($provider && $action == 'buildsamplesupplierinvoice') {
 		} else {
 			$thirdpartySeller = null;
 		}
-		if ($supplierId > 0) {
+		if ($buyerId > 0) {
 			$thirdpartyBuyer = new Societe($db);
-			$thirdpartyBuyer->fetch($supplierId);
+			$thirdpartyBuyer->fetch($buyerId);
 		} else {
 			$thirdpartyBuyer = $mysoc;
 		}
@@ -248,16 +248,16 @@ if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 	print ' - <a href="'.$_SERVER["PHP_SELF"].'?seller_einvoiceid=000000001" class="reposition">Select thirdparty with SIREN 000000001</a>';
 	print '<br>';
 
-	print '<span class="width100 inline-block">'.$langs->trans("Supplier").'</span> ';
-	//print '<input type="text" name="supplier_id" value="000000001" placeholder="Supplier e-invoice ID (Usually SIREN)" class="minwidth150"><br>';
-	if (GETPOST("supplier_einvoiceid") && $supplierId <= 0) {
+	print '<span class="width100 inline-block">'.$langs->trans("Buyer").'</span> ';
+	//print '<input type="text" name="buyer_id" value="000000001" placeholder="Supplier e-invoice ID (Usually SIREN)" class="minwidth150"><br>';
+	if (GETPOST("buyer_einvoiceid") && $buyerId <= 0) {
 		$tmpthirdparty = new Societe($db);
-		$tmpthirdparty->fetch(0, '', '', '', GETPOST("supplier_einvoiceid"));
-		$supplierId = $tmpthirdparty->id;
+		$tmpthirdparty->fetch(0, '', '', '', GETPOST("buyer_einvoiceid"));
+		$buyerId = $tmpthirdparty->id;
 	}
-	print $form->select_company($supplierId ?: '', 'supplier_id', '', $langs->trans("MyCompany"), 1);
-	print ' &nbsp; <a href="'.$_SERVER["PHP_SELF"].'?supplier_einvoiceid=000000001" class="reposition">Select thirdparty with SIREN 000000001</a>';
-	print ' - <a href="'.$_SERVER["PHP_SELF"].'?supplier_einvoiceid=me" class="reposition">Select me</a>';
+	print $form->select_company($buyerId ?: '', 'buyer_id', '', $langs->trans("MyCompany"), 1);
+	print ' &nbsp; <a href="'.$_SERVER["PHP_SELF"].'?buyer_einvoiceid=000000001" class="reposition">Select thirdparty with SIREN 000000001</a>';
+	print ' - <a href="'.$_SERVER["PHP_SELF"].'?buyer_einvoiceid=me" class="reposition">Select me</a>';
 	print '<br>';
 
 	print '<input type="submit" class="button small reposition" name="Generate" value="Generate">';
