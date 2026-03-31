@@ -145,12 +145,17 @@ if ($provider && $action == 'buildsamplesupplierinvoice') {
 		}
 
 		$resarray = $provider->exchangeProtocol->generateSampleInvoice($pdpconnectfr, $thirdpartySeller, $thirdpartyBuyer);
-		$invoice_path = $resarray['path'];
-		$ref = $resarray['ref'];
 	}
 
-	if ($invoice_path) {
-		setEventMessage('Sample invoice generated with ref '.$ref, 'mesgs');
+	if (is_numeric($resarray) && $resarray < 0) {
+		setEventMessages($provider->exchangeProtocol->error, $provider->exchangeProtocol->errors, 'errors');
+
+		$resarray = array();
+	} else {
+		$invoice_path = $resarray['path'];
+		$ref = $resarray['ref'];
+
+		setEventMessages('Sample invoice generated with ref '.$ref, 'mesgs');
 	}
 }
 
@@ -231,7 +236,7 @@ if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 	print '<input type="hidden" name="action" value="buildsamplesupplierinvoice">';
 	print '<input type="hidden" name="token" value="'.newToken().'">';
 
-	print $langs->trans("Seller").' Einvoice ID ';
+	print '<span class="width100 inline-block">'.$langs->trans("Seller").'</span> ';
 	//print '<input type="text" name="seller_einvoiceid" value="000000002" placeholder="Seller e-invoice ID (Usually SIREN)" class="minwidth150"><br>';
 	if (GETPOST("seller_einvoiceid") && $sellerId <= 0) {
 		$tmpthirdparty = new Societe($db);
@@ -243,7 +248,7 @@ if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 	print ' - <a href="'.$_SERVER["PHP_SELF"].'?seller_einvoiceid=000000001" class="reposition">Select thirdparty with SIREN 000000001</a>';
 	print '<br>';
 
-	print $langs->trans("Supplier").' Einvoice ID ';
+	print '<span class="width100 inline-block">'.$langs->trans("Supplier").'</span> ';
 	//print '<input type="text" name="supplier_id" value="000000001" placeholder="Supplier e-invoice ID (Usually SIREN)" class="minwidth150"><br>';
 	if (GETPOST("supplier_einvoiceid") && $supplierId <= 0) {
 		$tmpthirdparty = new Societe($db);
@@ -260,7 +265,7 @@ if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 
 	if ($invoice_path) {
 		print '<br>';
-		print 'Sample invoice generated into path:<br>'.$invoice_path;
+		print 'Sample invoice generated into document directory into path:<br><b>'.preg_replace('/^'.preg_quote(DOL_DATA_ROOT.'/', '/').'/', '', $invoice_path).'</b>';
 	}
 	print '</div>';
 }
