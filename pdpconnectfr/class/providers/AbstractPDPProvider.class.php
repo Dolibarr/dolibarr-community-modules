@@ -81,9 +81,11 @@ abstract class AbstractPDPProvider
 
 
 	/**
-	 * Get access token from OAUth server and save it into database
+	 * Get access token from OAUth server and save it into database.
+	 * This erase old token.
 	 *
-	 * @return string|null
+	 * @return string|null 		Access token or null on failure.
+	 * @see getTokenData() to get current token in memory (loaded by fetchOAuthTokenDB in constructor)
 	 */
 	abstract public function getAccessToken();
 
@@ -459,14 +461,14 @@ abstract class AbstractPDPProvider
 	/**
 	 * Add an event/action record to track changes or activities related to an object
 	 *
-	 * @param   string      $eventType The type of event
+	 * @param   string      $eventType 	The type of event
 	 * @param   string      $eventLabel The label of event
-	 * @param   string      $eventMesg The message/label describing the event
-	 * @param   object      $objet The object (Invoice / Supplier invoice) that the event is associated with.
+	 * @param   string      $eventMesg 	The message/label describing the event
+	 * @param   object      $object 	The object (Invoice / Supplier invoice) that the event is associated with.
 	 *
 	 * @return  int         Id of created event, < 0 if KO
 	 */
-	public function addEvent($eventType, $eventLabel, $eventMesg, $objet)
+	public function addEvent($eventType, $eventLabel, $eventMesg, $object)
 	{
 		global $db, $user;
 		require_once DOL_DOCUMENT_ROOT.'/comm/action/class/actioncomm.class.php';
@@ -476,20 +478,20 @@ abstract class AbstractPDPProvider
 		$actioncomm->type_code = 'AC_OTH_AUTO';
 		$actioncomm->code = 'AC_PDPCONNECTFR_'.$eventType;
 
-		if (!isset($objet->thirdparty->id)) {
-			$objet->fetch_thirdparty();
+		if (!isset($object->thirdparty->id)) {
+			$object->fetch_thirdparty();
 		}
-		$actioncomm->socid = $objet->thirdparty->id;
+		$actioncomm->socid = $object->thirdparty->id;
 		$actioncomm->label = $eventLabel;
 		$actioncomm->note_private = $eventMesg;
-		$actioncomm->fk_project = $objet->fk_project;
+		$actioncomm->fk_project = $object->fk_project;
 		$actioncomm->datep = dol_now();
 		$actioncomm->datef = dol_now();
 		$actioncomm->percentage = -1;
 		$actioncomm->authorid = $user->id;
 		$actioncomm->userownerid = $user->id;
-		$actioncomm->elementid = $objet->id;
-		$actioncomm->elementtype = $objet->element;
+		$actioncomm->elementid = $object->id;
+		$actioncomm->elementtype = $object->element;
 
 		$res = $actioncomm->create($user);
 

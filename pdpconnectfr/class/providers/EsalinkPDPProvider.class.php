@@ -220,8 +220,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 	/**
 	 * Get access token from OAUth server and save it into database.
+	 * This erase old token.
 	 *
-	 * @return string|null Access token or null on failure.
+	 * @return string|null 		Access token or null on failure.
+	 * @see getTokenData() to get current token in memory (loaded by fetchOAuthTokenDB in constructor)
 	 */
 	public function getAccessToken()
 	{

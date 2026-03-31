@@ -175,10 +175,14 @@ if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 		// Generate a $provider (this call the constructor that load the token with fetchOAuthTokenDB() and save it in the memory var $provider->tokenData)
 		// Note: Token may have been expired
 		print 'Current token (can be used for '.getDolGlobalString('PDPCONNECTFR_PDP').' API as HTTP "Bearer: token"):<br>';
-		$token = $provider->getAccessToken();
+		$tokendata = $provider->getTokenData();
+		$token = $tokendata['token'] ?? '';
 		//print '<input id="bearertoken" type="text" class="width500 text-security" value="'.$token.'" spellcheck="false" readonly>';
-		print showValueWithClipboardCPButton($token, 0, dol_trunc($token, 6));
-		//print ajax_autoselect("bearertoken");
+		if ($token)	{
+			print showValueWithClipboardCPButton($token, 0, dol_trunc($token, 10));
+		} else {
+			print 'Not yet generated or error when generating token.';
+		}
 	}
 }
 
