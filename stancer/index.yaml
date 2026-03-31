@@ -4,6 +4,7 @@ packages:
     - modulename: 'Stancer'
       author: 'CAP-REL'
       author_url: 'https://www.cap-rel.fr'
+      maintener_email: 'contact@cap-rel.fr'
       label:
         fr: 'Stancer (par CAP-REL)'
         en: 'Stancer (by CAP-REL)'
@@ -11,16 +12,15 @@ packages:
         fr: "Intègre le mode de paiement Stancer dans Dolibarr. Permet d'utiliser un compte Stancer pour régler les cotisations, les dons, les factures et les commandes clients via l'API Stancer."
         en: "Integrates the Stancer payment mode inside Dolibarr. Allow to use a Stancer account to pay any membership dues, donation, customer invoice or customer order with the Stancer API."
       status: 'enabled'
-      git: 'https://inligit.fr/cap-rel/dolibarr/plugin-stancer'
+      git: 'https://inligit.fr/cap-rel/dolibarr/plugin-stancer.git'
       git-branch: 'master'
       git-system: 'gitlab'
       cover: 'https://inligit.fr/cap-rel/dolibarr/plugin-stancer/-/raw/master/img/object_stancer.png?ref_type=heads&inline=false'
-      current_version: '2.0.0'
-      dolibarrmin: '18.0'
+      current_version: 'auto'
+      dolibarrmin: 'auto'
       dolibarrmax: 'auto'
-      phpmin: '7.3'
-      phpmax: '8.4'
-      price: ""
+      phpmin: 'auto'
+      phpmax: 'auto'
       created_at: '2026-03-20'
       last_updated_at: 'auto'
       # direct-download is yes if we can download the module to install it in application
