@@ -191,19 +191,27 @@ class FacturXProtocol extends AbstractProtocol
 			throw new Exception('BADINVOICETYPE: The type for invoice id '.$object->id.' is not yet supported.');
 		}
 
+		// For buyer
 		$idprof = thirdpartyidprof($object) ?? '';										// May be SIREN
-		$legalOrgId = $this->getIEC6523Code($object->thirdparty->country_code);
+		$schemeIdProf = $this->getIEC6523Code($object->thirdparty->country_code);
+
+		$globalIdProf = thirdpartyidprof($object) ?? '';								// May be SIREN
+		$schemeGlobalIdProf = $this->getIEC6523Code($object->thirdparty->country_code, 1);
 
 		$uri = $pdpconnectfr->getBuyerCommunicationURI($object->thirdparty);			// May be SIREN or SIREN_xxx
-		$legalOrgUri = $this->getIEC6523Code($object->thirdparty->country_code, 1);
+		$schemeUri = $this->getIEC6523Code($object->thirdparty->country_code, 2);
 
+		// For seller (my company)
 		$myidprof = idprof($mysoc);														// May be SIREN
-		$myLegalOrgId = $this->getIEC6523Code($mysoc->country_code);
+		$mySchemeIdProf = $this->getIEC6523Code($mysoc->country_code);					// For example: "0002"
 
-		$myUri = $pdpconnectfr->getSellerCommunicationURI(0);							// May be SIREN or SIREN_xxx
-		$myLegalOrgUri = $this->getIEC6523Code($mysoc->country_code, 1);
+		$myGlobalIdProf = idprof($mysoc);												// May be SIREN
+		$mySchemeGlobalIdProf = $this->getIEC6523Code($mysoc->country_code, 1);			// For example: "0225"
 
-		//var_dump($idprof, $legalOrgId, $uri, $legalOrgUri, $myidprof, $myLegalOrgId, $myUri, $myLegalOrgUri); exit;
+		$myUri = $pdpconnectfr->getSellerCommunicationURI(0);							// May be SIREN or SIREN_xxx, or email if scheme is "EM"
+		$mySchemeUri = $this->getIEC6523Code($mysoc->country_code, 2);					// For example: "0225", "EM"
+
+		//var_dump($idprof, $schemeIdProf, $uri, $schemeUri, $myidprof, $mySchemeIdProf, $myUri, $mySchemeUri); exit;
 
 		// Add test
 		if (empty($idprof)) {
@@ -213,8 +221,8 @@ class FacturXProtocol extends AbstractProtocol
 			throw new Exception('BADPROFID: The professional ID of your company is empty. Fix this in your company or module setup page.');
 		}
 
-		if ($myLegalOrgId == "0002" && strlen($myidprof) != 9) {	// If einvoice ID is French SIREN, we check it has 9 chars.
-			throw new Exception('BADPROFID: The professional ID has type SIREN but length is not 9 characters. Fix this in your company or einvoice module setup page.');
+		if ($mySchemeIdProf == "0002" && strlen($myidprof) != 9) {	// If einvoice ID is French SIREN, we check it has 9 chars.
+			throw new Exception('BADPROFID: The professional ID '.$myidprof.' has type SIREN but length is not 9 characters. Fix this in your company or einvoice module setup page.');
 		}
 
 		// Test VAT number
@@ -243,12 +251,16 @@ class FacturXProtocol extends AbstractProtocol
 			// ---------------- Seller ----------------
 			->setDocumentSeller($mysoc->name, $myidprof)
 			->addDocumentSellerTaxRegistration("VA", $mysoc->tva_intra ?? 'FRSPECIMEN')
-			->setDocumentSellerLegalOrganisation(					// Mandatory : 0002 = SIREN.
+			->setDocumentSellerLegalOrganisation(									// Mandatory : 0002 = SIREN.
 				$myidprof,
-				$myLegalOrgId,
+				$mySchemeIdProf,
 				$mysoc->name ?? 'SPECIMEN'
 			)
-			->addDocumentSellerGlobalId($myUri, $myLegalOrgUri)		// Optional  : 0225 = SIREN. Can be a more international code like DUNS
+			->addDocumentSellerGlobalId($myGlobalIdProf, $mySchemeGlobalIdProf)		// Optional Global ID: 0225 = SIREN. Can be a more international code like DUNS
+			->setDocumentSellerCommunication(										// URI:       		   0225 = SIREN or SIREN_xxx or other according to scheme used
+				$mySchemeUri,
+				$myUri
+			)
 			->setDocumentSellerAddress(
 				$mysoc->address      ?? 'ADDRESS EMPTY',
 				"",
@@ -272,17 +284,24 @@ class FacturXProtocol extends AbstractProtocol
 				$object->thirdparty->country_code ?? 'COUNTRY'
 			)
 			->addDocumentBuyerTaxRegistration("VA", $object->thirdparty->tva_intra ?? '')
-			->setDocumentBuyerLegalOrganisation(					// Mandatory : 0002 = SIREN.
+			->setDocumentBuyerLegalOrganisation(									// Mandatory : 0002 = SIREN.
 				$idprof,
-				$legalOrgId,
+				$schemeIdProf,
 				$object->thirdparty->name
 			)
-			->addDocumentBuyerGlobalId($uri, $legalOrgUri)			// Optional  : 0225 = SIREN. Can be a more international code like DUNS
-			->setDocumentBuyerCommunication(
-				$legalOrgUri,
+			->addDocumentBuyerGlobalId($globalIdProf, $schemeGlobalIdProf)			// Optional Global ID: 0225 = SIREN. Can be a more international code like DUNS
+			->setDocumentBuyerCommunication(										// URI:       		   0225 = SIREN or SIREN_xxx or other according to scheme used
+				$schemeUri,
 				$uri
 			);
 
+
+		// If specimen, we set the test flag
+		if (!empty($invoice->specimen)) {
+			$facturxpdf->setIsTestDocument();
+		}
+
+		$facturxpdf->setAdditionalCreatorTool("Generated with Dolibarr ".DOL_VERSION." - https://www.dolibarr.org");
 
 		// Add delivery date for section ApplicableHeaderTradeDelivery
 		if (!empty($deliveryDateList)) {
@@ -327,7 +346,6 @@ class FacturXProtocol extends AbstractProtocol
 			$salerepresentative_email = $mysoc->email;
 		}
 		$facturxpdf->setDocumentSellerContact($salerepresentative_name, "", $salerepresentative_office_phone, $salerepresentative_office_fax, $salerepresentative_email);	// If contactPersonName is set, contactDepartmentNamemust not be set.
-		$facturxpdf->setDocumentSellerCommunication($myLegalOrgUri, $myUri);
 
 		// Set buyer contact
 		if ($object->contact instanceOf Contact) {
@@ -897,14 +915,17 @@ class FacturXProtocol extends AbstractProtocol
 		$sellername = $mysoc->name ?: "MyBigCompanyTest";
 		$sellervat = $mysoc->tva_intra ?: "FRVAT123456";
 
-		$myLegalOrgId = "0002";
-		$sellerid = $pdpconnectfr->getSellerCommunicationURI(0);
+		$mySchemeIdProf = "0002";
+		//$sellerid = $pdpconnectfr->getSellerCommunicationURI(0);
+		$sellerid = idprof($mysoc);														// May be SIREN
 
-		$myUri = "0225";
-		$sellerglobalid = $pdpconnectfr->getSellerCommunicationURI(0);
+		$mySchemeGlobalId = "0225";
+		//$sellerglobalid = $pdpconnectfr->getSellerCommunicationURI(0);
+		$sellerglobalid = idprof($mysoc);
 
-		if ($myLegalOrgId == "0002" && strlen($sellerid) != 9) {	// If einvoice ID is French SIREN, we check it has 9 chars.
-			throw new Exception('BADPROFID: The professional ID has type SIREN but length is not 9 characters. Fix this in your company or einvoice module setup page.');
+
+		if ($mySchemeIdProf == "0002" && strlen($sellerid) != 9) {	// If einvoice ID is French SIREN, we check it has 9 chars.
+			throw new Exception('BADPROFID (generateSampleInvoiceOld): The professional ID '.$sellerid.' has type SIREN but length is not 9 characters. Fix this in your company or einvoice module setup page.');
 		}
 
 		$documentBuilder->addDocumentNote($sellername . PHP_EOL . 'Lieferantenstraße 20' . PHP_EOL . '80333 München' . PHP_EOL . 'Deutschland' . PHP_EOL . 'Geschäftsführer: Hans Muster' . PHP_EOL . 'Handelsregisternummer: H A 123' . PHP_EOL . PHP_EOL, null, 'REG');
@@ -917,7 +938,9 @@ class FacturXProtocol extends AbstractProtocol
 
 		$documentBuilder->setDocumentBillingPeriod(DateTime::createFromFormat("Ymd", "20250101"), DateTime::createFromFormat("Ymd", "20250131"), "01.01.2025 - 31.01.2025");
 		$documentBuilder->addDocumentInvoiceSupportingDocumentWithUri('REFDOC-2024/00001-1', 'http.//some.url', 'Inhaltsstoffe Joghurt');
-		$documentBuilder->addDocumentInvoiceSupportingDocumentWithFile('REFDOC-2024/00001-2', $AdditionalDocument, 'Herkunftsnachweis Trennblätter');
+
+		//$documentBuilder->addDocumentInvoiceSupportingDocumentWithFile('REFDOC-2024/00001-2', $AdditionalDocument, 'Herkunftsnachweis Trennblätter');
+
 		$documentBuilder->addDocumentTenderOrLotReferenceDocument('LOS 738625');
 		$documentBuilder->addDocumentInvoicedObjectReferenceDocument('125', ZugferdReferenceCodeQualifiers::SALE_PERS_NUMB); // Sales person number
 
@@ -928,8 +951,8 @@ class FacturXProtocol extends AbstractProtocol
 		$documentBuilder->addDocumentPaymentTerm('Wird von Konto DE12500105170648489890 abgebucht', DateTime::createFromFormat("Ymd", "20250131"), 'MANDATE-2024/000001');
 
 		$documentBuilder->setDocumentSeller($sellername, $sellerid);
-		$documentBuilder->setDocumentSellerLegalOrganisation($sellerid, $myLegalOrgId, $sellername);	// Mandatory: 0002 = SIREN
-		$documentBuilder->addDocumentSellerGlobalId($sellerglobalid, $myUri);							// Optional : 0225 = SIREN. Can be a more international code like DUNS
+		$documentBuilder->setDocumentSellerLegalOrganisation($sellerid, $mySchemeIdProf, $sellername);	// Mandatory: 0002 = SIREN
+		$documentBuilder->addDocumentSellerGlobalId($sellerglobalid, $mySchemeGlobalId);				// Optional : 0225 = SIREN. Can be a more international code like DUNS
 
 		//$documentBuilder->setSpecifiedLegalOrganization();
 		$documentBuilder->addDocumentSellerTaxNumber($sellervat);
@@ -974,38 +997,46 @@ class FacturXProtocol extends AbstractProtocol
 		$documentBuilder->setDocumentSummation(957.87, 957.87, 873.00, 0.0, 0.0, 873.00, 84.87);
 
 
+		// This is a test doc
+		$documentBuilder->setIsTestDocument();		// seems not stored into XML
+
+
+
 		// Next let's do the ZugferddocumentPdfBuilder it's job - let's attach the XML to the PDF. The attachment filename will be factur-x.xml
 		// since we chose the profile EN16931 in the ZugferdDocumentBuilder (see above)
 		// In the following there are multiple methods how you can build a conform PDF from an existing print layout
 
 		// First method: Merge the generated XML from ZugferdDocumentBuilder with an existing print layout file to a new PDF file
 
+		/*
 		$zugferdDocumentPdfBuilder = ZugferdDocumentPdfBuilder::fromPdfFile($documentBuilder, $existingPdfFilename);
 		$zugferdDocumentPdfBuilder->generateDocument();
 		$zugferdDocumentPdfBuilder->saveDocument($newPdfFilename);
+		*/
 
 		// Second method: Merge the generated XML from ZugferdDocumentBuilder with an stream (string) which contains the PDF to a new PDF file
+
 		// Note: We simulate the PDF stream (string) by calling file_get_contents.
+		/*
+		$pdfContent = file_get_contents($existingPdfFilename);
+
+		$zugferdDocumentPdfBuilder = ZugferdDocumentPdfBuilder::fromPdfString($documentBuilder, $pdfContent);
+		$zugferdDocumentPdfBuilder->generateDocument();
+		$zugferdDocumentPdfBuilder->saveDocument($newPdfFilename);
+		*/
+
+		// There is not only the saveDocument method of the ZugferdDocumentPdfBuilder. It is also possible to receive the merged
+		// content (PDF with embedded XML) as a stream (string)
+
+		/*
+		$mergedPdfContent = $zugferdDocumentPdfBuilder->downloadString();
 
 		$pdfContent = file_get_contents($existingPdfFilename);
 
 		$zugferdDocumentPdfBuilder = ZugferdDocumentPdfBuilder::fromPdfString($documentBuilder, $pdfContent);
 		$zugferdDocumentPdfBuilder->generateDocument();
 		$zugferdDocumentPdfBuilder->saveDocument($newPdfFilename);
-
-		// There is not only the saveDocument method of the ZugferdDocumentPdfBuilder. It is also possible to receive the merged
-		// content (PDF with embedded XML) as a stream (string)
-
-		$mergedPdfContent = $zugferdDocumentPdfBuilder->downloadString();
-
-		// If you would like to brand the merged PDF with the name of you own solution you can call
-		// the method setAdditionalCreatorTool. Before calling this method the creator of the PDF is identified as 'Factur-X library 1.x.x by HorstOeko'.
-		// After calling this method you get 'MyERPSolution 1.0 / Factur-X PHP library 1.x.x by HorstOeko' as the creator
-
-		$zugferdDocumentPdfBuilder = ZugferdDocumentPdfBuilder::fromPdfString($documentBuilder, $pdfContent);
-		$zugferdDocumentPdfBuilder->setAdditionalCreatorTool('MyERPSolution 1.0');
-		$zugferdDocumentPdfBuilder->generateDocument();
-		$zugferdDocumentPdfBuilder->saveDocument($newPdfFilename);
+		*/
 
 		// And last but not least, it is also possible to add additional attachments to the merged PDF. These can be any files that can help the invoice
 		// recipient with processing. For example, a time sheet as an Excel file would be conceivable.
@@ -1017,6 +1048,7 @@ class FacturXProtocol extends AbstractProtocol
 		// - The displayname is calculated from the filename you specified
 		// - The type of the relationship of the attachment will be AF_RELATIONSHIP_SUPPLEMENT (Supplement)
 
+		/*
 		$zugferdDocumentPdfBuilder = ZugferdDocumentPdfBuilder::fromPdfString($documentBuilder, $pdfContent);
 		$zugferdDocumentPdfBuilder->attachAdditionalFileByRealFile($AdditionalDocument, "Some display Name", ZugferdDocumentPdfBuilderAbstract::AF_RELATIONSHIP_SUPPLEMENT);
 		$zugferdDocumentPdfBuilder->generateDocument();
@@ -1033,18 +1065,11 @@ class FacturXProtocol extends AbstractProtocol
 		$zugferdDocumentPdfBuilder->attachAdditionalFileByContent($attachmentContent, 'additionalDocument.csv', "Some other display Name", ZugferdDocumentPdfBuilderAbstract::AF_RELATIONSHIP_SUPPLEMENT);
 		$zugferdDocumentPdfBuilder->generateDocument();
 		$zugferdDocumentPdfBuilder->saveDocument($newPdfFilename);
+		*/
 
 		// Set values for metadata-fields
 		// We can change some meta information such as the title, the subject, the author and the keywords.  This library essentially provides 4 methods for this.
 		// These methods use so-called templates. These methods are:
-
-		$zugferdDocumentPdfBuilder = ZugferdDocumentPdfBuilder::fromPdfFile($documentBuilder, $existingPdfFilename);
-		$zugferdDocumentPdfBuilder->setAuthorTemplate('.....');
-		$zugferdDocumentPdfBuilder->setTitleTemplate('.....');
-		$zugferdDocumentPdfBuilder->setSubjectTemplate('.....');
-		$zugferdDocumentPdfBuilder->setKeywordTemplate('.....');
-		$zugferdDocumentPdfBuilder->generateDocument();
-		$zugferdDocumentPdfBuilder->saveDocument($newPdfFilename);
 
 		// The 4 methods just mentioned accept a free text that can accept the following placeholders:
 		// - %1$s .... contains the invoice number (is extracted from the XML data)
@@ -1057,50 +1082,16 @@ class FacturXProtocol extends AbstractProtocol
 		// - the subject  .... Invoice-Document, Issued by Lieferant GmbH
 		// - the keywords .... INV-TEST, Invoice, Lieferant GmbH, 2024-12-31
 
+		// This rebuild the PDF including the XML and added PDF metadata.
 		$zugferdDocumentPdfBuilder = ZugferdDocumentPdfBuilder::fromPdfFile($documentBuilder, $existingPdfFilename);
-		$zugferdDocumentPdfBuilder->setAuthorTemplate('Issued by seller with name %3$s');
-		$zugferdDocumentPdfBuilder->setTitleTemplate('%3$s : %2$s %1$s');
-		$zugferdDocumentPdfBuilder->setSubjectTemplate('%2$s-Document, Issued by %3$s');
-		$zugferdDocumentPdfBuilder->setKeywordTemplate('%1$s, %2$s, %3$s, %4$s');
-		$zugferdDocumentPdfBuilder->generateDocument();
-		$zugferdDocumentPdfBuilder->saveDocument($newPdfFilename);
-
-		// If the previously mentioned options for manipulating the meta information are not sufficient,
-		// you can also use a callback function. The following 4 parameters are passed to the callback
-		// function in the specified order:
-		// - $which               .... one of "author", "title", "subject" and "keywords"
-		// - $xmlContent          .... the content of the xml as a string
-		// - $invoiceInformation  .... an array with some information about the invoice
-		// - $default             .... The default value for the specified field (see $which
-
-		$zugferdDocumentPdfBuilder = ZugferdDocumentPdfBuilder::fromPdfFile($documentBuilder, $existingPdfFilename);
-		$zugferdDocumentPdfBuilder->setMetaInformationCallback(
-			function ($which) {
-				if ($which === 'title') {
-					return "DummyTitle";
-				}
-
-				if ($which === 'author') {
-					return "DummyAuthor";
-				}
-
-				if ($which === 'subject') {
-					return "DummySubject";
-				}
-
-				if ($which === 'keywords') {
-					return "DummyKeywords";
-				}
-			}
-		);
-		$zugferdDocumentPdfBuilder->generateDocument();
-		$zugferdDocumentPdfBuilder->saveDocument($newPdfFilename);
-
-		// To remove the callback you can call the setMetaInformationCallback
-		// method with a null value
-
-		$zugferdDocumentPdfBuilder = ZugferdDocumentPdfBuilder::fromPdfFile($documentBuilder, $existingPdfFilename);
-		$zugferdDocumentPdfBuilder->setMetaInformationCallback(null);
+		$zugferdDocumentPdfBuilder->setAuthorTemplate('Issued by %3$s');
+		$zugferdDocumentPdfBuilder->setTitleTemplate('%3$s : %2$s SPECIMEN %1$s');
+		$zugferdDocumentPdfBuilder->setSubjectTemplate('%2$s-Document, Issued by %3$s - Dolibarr '.DOL_VERSION);
+		$zugferdDocumentPdfBuilder->setKeywordTemplate('%1$s, %2$s, %3$s, %4$s, Dolibarr');
+		// If you would like to brand the merged PDF with the name of you own solution you can call
+		// the method setAdditionalCreatorTool. Before calling this method the creator of the PDF is identified as 'Factur-X library 1.x.x by HorstOeko'.
+		// After calling this method you get 'MyERPSolution 1.0 / Factur-X PHP library 1.x.x by HorstOeko' as the creator
+		$zugferdDocumentPdfBuilder->setAdditionalCreatorTool('Dolibarr generateSampleInvoiceOld - '.DOL_VERSION);
 		$zugferdDocumentPdfBuilder->generateDocument();
 		$zugferdDocumentPdfBuilder->saveDocument($newPdfFilename);
 
@@ -1909,7 +1900,7 @@ class FacturXProtocol extends AbstractProtocol
 	 * Return IEC_6523 code (https://docs.peppol.eu/poacc/billing/3.0/codelist/ICD/)
 	 *
 	 * @param	string		$country_code		Country code
-	 * @param	int			$global				Use 1 for a global ID
+	 * @param	int			$global				Use 0 for legal ID, use 1 for a global ID, use 2 for URI.
 	 * @return string code
 	 */
 	private function getIEC6523Code($country_code, $global = 0)
@@ -1917,7 +1908,7 @@ class FacturXProtocol extends AbstractProtocol
 		$retour = "";
 		switch ($country_code) {
 			case 'BE':
-				if ($global) {
+				if ($global == 1 || $global == 2) {
 					$retour = "0208";
 				} else {
 					$retour = "0008";
@@ -1927,10 +1918,10 @@ class FacturXProtocol extends AbstractProtocol
 				$retour = "0000";
 				break;
 			case 'FR':
-				if ($global) {
-					$retour = "0225";	// SIREN.  0225 Einvoice ID
+				if ($global == 1 || $global == 2) {
+					$retour = "0225";	// SIREN.  	Einvoice global ID, example: "000000002" or URI OD, example "315143296_1939"
 				} else {
-					$retour = "0002";	// SIREN.
+					$retour = "0002";	// SIREN.	Used for LegalOrganization, example: "315143296"
 				}
 				break;
 			default:
