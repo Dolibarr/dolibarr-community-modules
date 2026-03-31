@@ -818,6 +818,30 @@ class FacturXProtocol extends AbstractProtocol
 			));
 		}
 
+
+		// Restore metadata from original PDF.
+		if (function_exists('pdfExtractMetadata')) {	// From Dolibarr v22
+			// Now we get the metadata keywords from the $sourcefile PDF (by parsing the binary PDF file)
+			$keywords = pdfExtractMetadata($pathfacturxpdf, 'Keywords');
+			$subject = pdfExtractMetadata($pathfacturxpdf, 'Subject');
+			$author = pdfExtractMetadata($pathfacturxpdf, 'Author');
+			$creator = pdfExtractMetadata($pathfacturxpdf, 'Creator');
+
+			if (!preg_match('/^ERROR/', $keywords)) {
+				$pdf->setKeywords($keywords);
+			}
+			if (!preg_match('/^ERROR/', $subject)) {
+				$pdf->setSubject($subject);
+			}
+			if (!preg_match('/^ERROR/', $author)) {
+				$pdf->setAuthor($author);
+			}
+			if (!preg_match('/^ERROR/', $creator)) {
+				$pdf->setCreator($creator);
+			}
+		}
+
+
 		// Save the final PDF with the embedded XML
 		$pdf->Output($pathfacturxpdf, 'F');
 
@@ -883,10 +907,12 @@ class FacturXProtocol extends AbstractProtocol
 	 * This method creates a dummy invoice with representative data
 	 * to illustrate the Factur-X structure without using real business information.
 	 *
-	 * @param	PdpConnectFr			$pdpconnectfr		PDPConnectFR
-	 * @return 	array<string,string> 						Path or content of the generated sample invoice.
+	 * @param	PdpConnectFr			$pdpconnectfr			PDPConnectFR
+	 * @param   Societe|null			$thirdpartySeller		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
+	 * @param   Societe|null			$thirdpartyBuyer		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
+	 * @return 	array<string,string> 							Path or content of the generated sample invoice.
 	 */
-	public function generateSampleInvoiceOld($pdpconnectfr)
+	public function generateSampleInvoiceOld($pdpconnectfr, $thirdpartySeller = null, $thirdpartyBuyer = null)
 	{
 		global $conf, $langs, $mysoc;
 
@@ -1104,12 +1130,14 @@ class FacturXProtocol extends AbstractProtocol
 	 * This method creates a dummy invoice with representative data
 	 * to illustrate the Factur-X structure without using real business information.
 	 *
-	 * @param	PdpConnectFr		$pdpconnectfr			PDPConnectFR
-	 * @return 	array<string,string> 						Path or content of the generated sample invoice.
+	 * @param	PdpConnectFr			$pdpconnectfr			PDPConnectFR
+	 * @param   Societe|null			$thirdpartySeller		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
+	 * @param   Societe|null			$thirdpartyBuyer		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
+	 * @return 	array<string,string> 							Path or content of the generated sample invoice.
 	 */
-	public function generateSampleInvoice($pdpconnectfr)
+	public function generateSampleInvoice($pdpconnectfr, $thirdpartySeller = null, $thirdpartyBuyer = null)
 	{
-		global $conf, $langs;
+		global $conf, $langs, $mysoc;
 
 		dol_mkdir($conf->pdpconnectfr->dir_temp);
 
@@ -1151,11 +1179,15 @@ class FacturXProtocol extends AbstractProtocol
 
 
 		require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
-		$tmpthirdparty = new Societe($this->db);
-		$tmpthirdparty->initAsSpecimen();
+		if ($thirdpartyBuyer instanceof Societe) {
+			$tmpthirdparty = $thirdpartyBuyer;
+		} else {
+			$tmpthirdparty = new Societe($this->db);
+			$tmpthirdparty->initAsSpecimen();
+			$tmpthirdparty->idprof1 = '000000001';
+		}
 		$tmpinvoice->thirdparty = $tmpthirdparty;
-		$tmpinvoice->thirdparty->idprof1 = '000000001';
-		$tmpinvoice->socid = $tmpthirdparty->id;				// 0 for specimen
+		$tmpinvoice->socid = $tmpthirdparty->id;			// 0 for specimen
 
 		require_once DOL_DOCUMENT_ROOT . '/contact/class/contact.class.php';
 		$tmpcontact = new Contact($this->db);
@@ -1173,8 +1205,25 @@ class FacturXProtocol extends AbstractProtocol
 
 		dol_move($srcfile, $destfile, '0', 1);
 
+
+		// Set $mysoc is seller is a thirdparty when we want to generate a supplier sample invoice.
+		$savmysoc = null;
+		if ($thirdpartySeller instanceof Societe) {
+			$savmysoc = $mysoc;
+			$mysoc = $thirdpartySeller;
+		}
+		//var_dump(($savmysoc ? $savmysoc->name : ''), $mysoc->name, $thirdpartyBuyer->name);
+
+
 		// Generate the Factur-X PDF
 		$pathOfPdf = $this->generateInvoice($tmpinvoice, $outputlangs);
+
+
+		if (!empty($savmysoc)) {
+			$mysoc = $savmysoc;
+			$savmysoc = null;
+		}
+
 
 		// Restore name SPECIMEN.pdf
 		dol_move($destfile, $srcfile, '0', 1);

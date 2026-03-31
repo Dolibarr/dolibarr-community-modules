@@ -84,10 +84,12 @@ abstract class AbstractProtocol
 	 * Each protocol should provide a representative sample
 	 * illustrating its structure and data format.
 	 *
-	 * @param	PdpConnectFr		$pdpconnectfr			PDPConnectFR
-	 * @return 	array<string,string> 						Path or content of the generated sample invoice.
+	 * @param	PdpConnectFr			$pdpconnectfr			PDPConnectFR
+	 * @param   Societe|null			$thirdpartySeller		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
+	 * @param   Societe|null			$thirdpartyBuyer		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
+	 * @return 	array<string,string> 							Path or content of the generated sample invoice.
 	 */
-	abstract public function generateSampleInvoiceOld($pdpconnectfr);
+	abstract public function generateSampleInvoiceOld($pdpconnectfr, $thirdpartySeller = null, $thirdpartyBuyer = null);
 
 	/**
 	 * Generate a sample invoice for testing or demonstration purposes (for Dolibarr version >= 24.0)
@@ -95,8 +97,10 @@ abstract class AbstractProtocol
 	 * Each protocol should provide a representative sample
 	 * illustrating its structure and data format.
 	 *
-	 * @param	PdpConnectFr		$pdpconnectfr			PDPConnectFR
-	 * @return 	string 										Path or content of the generated sample invoice.
+	 * @param	PdpConnectFr			$pdpconnectfr			PDPConnectFR
+	 * @param   Societe|null			$thirdpartySeller		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
+	 * @param   Societe|null			$thirdpartyBuyer		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
+	 * @return 	string 											Path or content of the generated sample invoice.
 	 */
-	abstract public function generateSampleInvoice($pdpconnectfr);
+	abstract public function generateSampleInvoice($pdpconnectfr, $thirdpartySeller = null, $thirdpartyBuyer = null);
 }

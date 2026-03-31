@@ -353,9 +353,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 		}
 
 		$file_info = pathinfo($invoice_path);
-		$uuid = $this->generateUuidV4(); // UUID used to correlate logs between Dolibarr and PDP TODO : Store it somewhere
 
 		// Format PDP resource Url
+		$uuid = $this->generateUuidV4(); // UUID used to correlate logs between Dolibarr and PDP TODO : Store it somewhere
 		$resource = 'flows';
 		$urlparams = array(
 			'Request-Id' => $uuid,
@@ -512,10 +512,10 @@ class SuperPDPProvider extends AbstractPDPProvider
 			$outputLog[] = "Sample invoice generated successfully.";
 		}
 		$file_info = pathinfo($invoice_path);
-		$uuid = $this->generateUuidV4(); // UUID used to correlate logs between Dolibarr and PDP
 
 		// Format PDP resource Url
 		/*
+		$uuid = $this->generateUuidV4(); // UUID used to correlate logs between Dolibarr and PDP
 		$resource = 'flows';
 		$urlparams = array(
 			'Request-Id' => $uuid,
@@ -714,16 +714,16 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 		$results_messages = array();
 		$actions = array();
-		$uuid = $this->generateUuidV4(); // UUID used to correlate logs between Dolibarr and PDP TODO : Store it somewhere
-
-		//self::$PDPCONNECTFR_LAST_IMPORT_KEY = $uuid;
-		self::$PDPCONNECTFR_LAST_IMPORT_KEY = dol_print_date(dol_now(), 'dayhourlog');
 
 		$resource = 'flows/search';
+		$uuid = $this->generateUuidV4(); // UUID used to correlate logs between Dolibarr and PDP TODO : Store it somewhere
 		$urlparams = array(
 			'Request-Id' => $uuid,
 		);
 		$resource .= '?' . http_build_query($urlparams);
+
+		//self::$PDPCONNECTFR_LAST_IMPORT_KEY = $uuid;
+		self::$PDPCONNECTFR_LAST_IMPORT_KEY = dol_print_date(dol_now(), 'dayhourlog');
 
 		// Calculate dateafter
 		if ($syncFromDate > 0) {

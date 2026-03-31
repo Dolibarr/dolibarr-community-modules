@@ -64,6 +64,7 @@ if (!$res) {
  * @var Conf $conf
  * @var DoliDB $db
  * @var HookManager $hookmanager
+ * @var Societe $mysoc
  * @var Translate $langs
  * @var User $user
  */
@@ -114,19 +115,51 @@ if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 	$prefix = $providerconfig['dol_prefix'].'_';
 }
 
+$invoice_path = '';
 
 
 /*
  * Actions
  */
 
-// None
+if ($provider && $action == 'buildsamplesupplierinvoice') {
+	$sellerId = GETPOST('seller_id', 'alpha');
+	$supplierId = GETPOST('supplier_id', 'alpha');
 
+	if ((float) DOL_VERSION < 24.0) {
+		$resarray = $provider->exchangeProtocol->generateSampleInvoiceOld($pdpconnectfr);
+		$invoice_path = $resarray['path'];
+		$ref = $resarray['ref'];
+	} else {
+		if ($sellerId > 0) {
+			$thirdpartySeller = new Societe($db);
+			$thirdpartySeller->fetch($sellerId);
+		} else {
+			$thirdpartySeller = null;
+		}
+		if ($supplierId > 0) {
+			$thirdpartyBuyer = new Societe($db);
+			$thirdpartyBuyer->fetch($supplierId);
+		} else {
+			$thirdpartyBuyer = $mysoc;
+		}
+
+		$resarray = $provider->exchangeProtocol->generateSampleInvoice($pdpconnectfr, $thirdpartySeller, $thirdpartyBuyer);
+		$invoice_path = $resarray['path'];
+		$ref = $resarray['ref'];
+	}
+
+	if ($invoice_path) {
+		setEventMessage('Sample invoice generated with ref '.$ref, 'mesgs');
+	}
+}
 
 
 /*
  * View
  */
+
+$form = new Form($db);
 
 $action = 'edit';
 
@@ -155,18 +188,21 @@ $pdpconnectfr = new PdpConnectFr($db);
 $stringwarning = pdpShowWarning($pdpconnectfr);
 print $stringwarning;
 
-
+print '<div class="neutral">';
 print 'Link to test a PDF E-invoice from SuperPDP<br>';
 print img_picto('', 'url', 'class="pictofixedwidth"');
 print '<a href="https://www.superpdp.tech/outils/validateur-facture-electronique" target="_blank">here</a>';
+print '</div>';
 
-print '<br><br>';
+print '<br>';
 
+print '<div class="neutral">';
 print 'Check annuary<br>';
 print img_picto('', 'url', 'class="pictofixedwidth"');
 print '<a href="https://www.superpdp.tech/outils/info-annuaire" target="_blank">here</a>';
+print '</div>';
 
-print '<br><br>';
+print '<br>';
 
 if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 	$provider = $PDPManager->getProvider(getDolGlobalString('PDPCONNECTFR_PDP'));
@@ -174,7 +210,8 @@ if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 	if (getDolGlobalString('PDPCONNECTFR_PDP') == 'SUPERPDP') {
 		// Generate a $provider (this call the constructor that load the token with fetchOAuthTokenDB() and save it in the memory var $provider->tokenData)
 		// Note: Token may have been expired
-		print 'Current token (can be used for '.getDolGlobalString('PDPCONNECTFR_PDP').' API as HTTP "Bearer: token"):<br>';
+		print '<div class="neutral">';
+		print 'Current token (can be used for '.getDolGlobalString('PDPCONNECTFR_PDP').' API as HTTP "Bearer: token")<br>';
 		$tokendata = $provider->getTokenData();
 		$token = $tokendata['token'] ?? '';
 		//print '<input id="bearertoken" type="text" class="width500 text-security" value="'.$token.'" spellcheck="false" readonly>';
@@ -183,7 +220,49 @@ if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 		} else {
 			print 'Not yet generated or error when generating token.';
 		}
+		print '</div>';
+
+		print '<br>';
 	}
+
+	print '<div class="neutral">';
+	print 'Generate an Einvoice sample in the protocol (Factur-X, ...) set for the Access Point '.getDolGlobalString('PDPCONNECTFR_PDP').' in the first setup tab<br>';
+	print '<form action="'.$_SERVER["PHP_SELF"].'" method="POST">';
+	print '<input type="hidden" name="action" value="buildsamplesupplierinvoice">';
+	print '<input type="hidden" name="token" value="'.newToken().'">';
+
+	print $langs->trans("Seller").' Einvoice ID ';
+	//print '<input type="text" name="seller_einvoiceid" value="000000002" placeholder="Seller e-invoice ID (Usually SIREN)" class="minwidth150"><br>';
+	if (GETPOST("seller_einvoiceid") && $sellerId <= 0) {
+		$tmpthirdparty = new Societe($db);
+		$tmpthirdparty->fetch(0, '', '', '', GETPOST("seller_einvoiceid"));
+		$sellerId = $tmpthirdparty->id;
+	}
+	print $form->select_company($sellerId ?: '', 'seller_id', '', $langs->trans("MyCompany"), 1);
+	print ' &nbsp; <a href="'.$_SERVER["PHP_SELF"].'?seller_einvoiceid=me" class="reposition">Select me</a>';
+	print ' - <a href="'.$_SERVER["PHP_SELF"].'?seller_einvoiceid=000000001" class="reposition">Select thirdparty with SIREN 000000001</a>';
+	print '<br>';
+
+	print $langs->trans("Supplier").' Einvoice ID ';
+	//print '<input type="text" name="supplier_id" value="000000001" placeholder="Supplier e-invoice ID (Usually SIREN)" class="minwidth150"><br>';
+	if (GETPOST("supplier_einvoiceid") && $supplierId <= 0) {
+		$tmpthirdparty = new Societe($db);
+		$tmpthirdparty->fetch(0, '', '', '', GETPOST("supplier_einvoiceid"));
+		$supplierId = $tmpthirdparty->id;
+	}
+	print $form->select_company($supplierId ?: '', 'supplier_id', '', $langs->trans("MyCompany"), 1);
+	print ' &nbsp; <a href="'.$_SERVER["PHP_SELF"].'?supplier_einvoiceid=000000001" class="reposition">Select thirdparty with SIREN 000000001</a>';
+	print ' - <a href="'.$_SERVER["PHP_SELF"].'?supplier_einvoiceid=me" class="reposition">Select me</a>';
+	print '<br>';
+
+	print '<input type="submit" class="button small reposition" name="Generate" value="Generate">';
+	print '</form>';
+
+	if ($invoice_path) {
+		print '<br>';
+		print 'Sample invoice generated into path:<br>'.$invoice_path;
+	}
+	print '</div>';
 }
 
 
