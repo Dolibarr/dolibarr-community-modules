@@ -100,7 +100,19 @@ if (!$user->admin) {
 	accessforbidden();
 }
 
+$pdpconnectfr = new PdpConnectFr($db);
+$PDPManager = new PDPProviderManager($db);
 
+// If Access Point is selected, show parameters for it
+if (getDolGlobalString('PDPCONNECTFR_PDP')) {
+	// Generate a $provider (this call the constructor that load the token with fetchOAuthTokenDB() and save it in the memory var $provider->tokenData)
+	// Note: Token may have been expired
+	$provider = $PDPManager->getProvider(getDolGlobalString('PDPCONNECTFR_PDP'));
+	// Now we load the conf
+	$providerconfig  = $provider->getConf();
+
+	$prefix = $providerconfig['dol_prefix'].'_';
+}
 
 
 
@@ -131,7 +143,7 @@ print load_fiche_titre($langs->trans($title), $linkback, 'title_setup');
 
 // Configuration header
 $head = pdpconnectfrAdminPrepareHead();
-print dol_get_fiche_head($head, 'options', $langs->trans($title), -1, "pdpconnectfr.png@pdpconnectfr");
+print dol_get_fiche_head($head, 'devtools', $langs->trans($title), -1, "pdpconnectfr.png@pdpconnectfr");
 
 // Setup page goes here
 //print info_admin($langs->trans("PDPConnectInfo"));
@@ -154,6 +166,21 @@ print 'Check annuary<br>';
 print img_picto('', 'url', 'class="pictofixedwidth"');
 print '<a href="https://www.superpdp.tech/outils/info-annuaire" target="_blank">here</a>';
 
+print '<br><br>';
+
+if (getDolGlobalString('PDPCONNECTFR_PDP')) {
+	$provider = $PDPManager->getProvider(getDolGlobalString('PDPCONNECTFR_PDP'));
+
+	if (getDolGlobalString('PDPCONNECTFR_PDP') == 'SUPERPDP') {
+		// Generate a $provider (this call the constructor that load the token with fetchOAuthTokenDB() and save it in the memory var $provider->tokenData)
+		// Note: Token may have been expired
+		print 'Current token (can be used for '.getDolGlobalString('PDPCONNECTFR_PDP').' API as HTTP "Bearer: token"):<br>';
+		$token = $provider->getAccessToken();
+		//print '<input id="bearertoken" type="text" class="width500 text-security" value="'.$token.'" spellcheck="false" readonly>';
+		print showValueWithClipboardCPButton($token, 0, dol_trunc($token, 6));
+		//print ajax_autoselect("bearertoken");
+	}
+}
 
 
 // Page end
