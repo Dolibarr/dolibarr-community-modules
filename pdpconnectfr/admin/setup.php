@@ -100,10 +100,12 @@ $setupnotempty = 0;
 $formSetup = new FormSetup($db);
 $formSetup2 = new FormSetup($db);
 
+
 // Access control
 if (!$user->admin) {
 	accessforbidden();
 }
+
 
 $pdpconnectfr = new PdpConnectFr($db);
 $PDPManager = new PDPProviderManager($db);

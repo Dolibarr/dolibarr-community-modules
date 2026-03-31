@@ -18,7 +18,7 @@
  */
 
 /**
- * \file    pdpconnectfr/admin/setup.php
+ * \file    pdpconnectfr/admin/setup_options.php
  * \ingroup pdpconnectfr
  * \brief   PDPConnectFR setup page.
  */
@@ -94,11 +94,6 @@ $type = 'myobject';
 
 $error = 0;
 $setupnotempty = 0;
-
-// Access control
-if (!$user->admin) {
-	accessforbidden();
-}
 
 
 // Set this to 1 to use the factory to manage constants. Warning, the generated module will be compatible with version v15+ only
@@ -331,7 +326,7 @@ $form = new Form($db);
 $help_url = '';
 $title = "PDPConnectFRSetup";
 
-llxHeader('', $langs->trans($title), $help_url, '', 0, 0, '', '', '', 'mod-pdpconnectfr page-admin');
+llxHeader('', $langs->trans($title), $help_url, '', 0, 0, '', '', '', 'mod-pdpconnectfr page-admin-options');
 
 // Subheader
 $linkback = '<a href="'.($backtopage ? $backtopage : DOL_URL_ROOT.'/admin/modules.php?restore_lastsearch_values=1').'">'.img_picto($langs->trans("BackToModuleList"), 'back', 'class="pictofixedwidth"').'<span class="hideonsmartphone">'.$langs->trans("BackToModuleList").'</span></a>';

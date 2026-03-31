@@ -75,6 +75,7 @@ class PDPProviderManager
 				'provider_countries' => array('all'),
 				'provider_name' => 'SuperPDP'.(getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER') ? ' <span class="opacitymedium">('.$langs->trans("UsingYourOwnBillingAccount").")</span>" : ""),
 				'description' => 'SuperPDP Integration',
+				'note' => 'Use "client_credentials" mode',
 				//'is_enabled' => getDolGlobalString('PDPCONNECTFR_TEST_SUPERPDP'),
 				'is_enabled' => 1,
 				'prod_account_admin_url' => 'https://www.superpdp.tech/app/users/create',
@@ -92,6 +93,7 @@ class PDPProviderManager
 			)
 		);
 
+		// Add entry to use SuperPDP via OAuth delegation.
 		if (getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER')) {
 			$urltorenew = $urlwithroot.'/core/modules/oauth/generic_oauthcallback.php';	// This one is the one used for test when native using Oauth module.
 			if (getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER_OAUTH_URL')) {	// This one is to use your own redirect URI knowing its ownn client id/secret
@@ -113,6 +115,7 @@ class PDPProviderManager
 				'provider_countries' => array('all'),
 				'provider_name' => 'SuperPDP  <span class="opacitymedium">(Free and easy setup via '.getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER').' - '.$langs->trans("Recommended").')</span>',
 				'description' => 'SuperPDP Integration',
+				'note' => 'Use "authorization_code" mode',
 				//'is_enabled' => getDolGlobalString('PDPCONNECTFR_TEST_SUPERPDP'),
 				'is_enabled' => 1,
 				'prod_account_admin_url' => $urltorenew,

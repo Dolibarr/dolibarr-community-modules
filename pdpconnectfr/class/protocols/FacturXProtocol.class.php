@@ -1917,7 +1917,11 @@ class FacturXProtocol extends AbstractProtocol
 		$retour = "";
 		switch ($country_code) {
 			case 'BE':
-				$retour = "0008";
+				if ($global) {
+					$retour = "0208";
+				} else {
+					$retour = "0008";
+				}
 				break;
 			case 'DE':
 				$retour = "0000";

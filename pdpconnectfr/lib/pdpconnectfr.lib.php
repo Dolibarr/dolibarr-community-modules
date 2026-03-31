@@ -69,6 +69,13 @@ function pdpconnectfrAdminPrepareHead()
 	$h++;
 	*/
 
+	if (getDolGlobalInt('PDPCONNECTFR_DEV_MODE')) {
+		$head[$h][0] = dol_buildpath("/pdpconnectfr/admin/setup_devtools.php", 1);
+		$head[$h][1] = $langs->trans("DevTools");
+		$head[$h][2] = 'devtools';
+		$h++;
+	}
+
 	$head[$h][0] = dol_buildpath("/pdpconnectfr/admin/about.php", 1);
 	$head[$h][1] = $langs->trans("About");
 	$head[$h][2] = 'about';
