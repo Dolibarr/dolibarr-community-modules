@@ -276,23 +276,39 @@ class ActionsPdpconnectfr extends CommonHookActions
 					$pdpConnectFr::STATUS_UNKNOWN
 				])
 			) {
-				$PDPManager = new PDPProviderManager($db);
-				$provider = $PDPManager->getProvider(getDolGlobalString('PDPCONNECTFR_PDP'));
-
-				// Send invoice
-				$result = $provider->sendInvoice($object);
-
-				if ($result) {
-					$messages = array();
-					$messages[] = $langs->trans("InvoiceSuccessfullySentToPDP");
-					$messages[] = $langs->trans("FlowId") . ": " . $result;
-					setEventMessages('', $messages, 'mesgs');
-					// TODO: Review and update the invoice workflow.
-					// The "Modify" button may need to be disabled once the E-invoice has been sent and distributed by the PDP.
-				} else {
+				// Validate thirdparty data before sending to PDP
+				$object->fetch_thirdparty();
+				$checkResult = $pdpConnectFr->checkRequiredinformations($object);
+				if ($checkResult['res'] < 0) {
+					$message = $langs->trans("InvoiceNotSentToPDPDueToThirdpartyIssues") . ': <br>' . $checkResult['message'];
+					dol_syslog(__METHOD__ . " " . strip_tags($message));
+					setEventMessages($message, array(), 'errors');
 					$error++;
-					$this->error = $provider->error;
-					$this->errors = array_merge($this->errors, $provider->errors);
+				} elseif ($checkResult['res'] == 0) {
+					// Non-blocking warning: notify user but proceed with sending
+					dol_syslog(__METHOD__ . " " . strip_tags($checkResult['message']));
+					setEventMessages($checkResult['message'], array(), 'warnings');
+				}
+
+				if (!$error) {
+					$PDPManager = new PDPProviderManager($db);
+					$provider = $PDPManager->getProvider(getDolGlobalString('PDPCONNECTFR_PDP'));
+
+					// Send invoice
+					$result = $provider->sendInvoice($object);
+
+					if ($result) {
+						$messages = array();
+						$messages[] = $langs->trans("InvoiceSuccessfullySentToPDP");
+						$messages[] = $langs->trans("FlowId") . ": " . $result;
+						setEventMessages('', $messages, 'mesgs');
+						// TODO: Review and update the invoice workflow.
+						// The "Modify" button may need to be disabled once the E-invoice has been sent and distributed by the PDP.
+					} else {
+						$error++;
+						$this->error = $provider->error;
+						$this->errors = array_merge($this->errors, $provider->errors);
+					}
 				}
 			}
 
