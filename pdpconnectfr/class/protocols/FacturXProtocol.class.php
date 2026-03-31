@@ -214,6 +214,10 @@ class FacturXProtocol extends AbstractProtocol
 
 		//var_dump($idprof, $schemeIdProf, $uri, $schemeUri, $myidprof, $mySchemeIdProf, $myUri, $mySchemeUri); exit;
 
+
+		// Section to control data and throw errors in case of problem, to avoid generating non compliant XML
+		// --------------------------------------------------------------------------------------------------
+
 		// Add test
 		if (empty($idprof)) {
 			throw new Exception('BADTHIRDPARTYPROFID: The main professional ID of the thirdparty '.$object->name.' is empty.');
@@ -245,6 +249,9 @@ class FacturXProtocol extends AbstractProtocol
 		if (!empty($object->thirdparty->tva_intra) && !empty($object->thirdparty->country_code) && substr($object->thirdparty->tva_intra, 0, 2) != $object->thirdparty->country_code) {
 			throw new Exception('BADVATNUMBER: The VAT number of the thirdparty '.$object->thirdparty->name.' must start with its 2 letter country code.');
 		}
+
+
+
 
 		//  Build XML Document Header (Seller, Buyer, Dates)
 		$facturxpdf
@@ -566,6 +573,11 @@ class FacturXProtocol extends AbstractProtocol
 			// G: Export outside of EU
 			if ($line->tva_tx > 0) {
 				$categoryVAT = 'S';
+
+				// Check if seller has a VAT number.
+				if (empty($mysoc->tva_intra)) {
+					throw new Exception('BADVATNUMBER: The VAT number of the thirdparty '.$object->thirdparty->name.' is mandatory when there is a non null VAT on at least on line.');
+				}
 
 				$facturxpdf->addDocumentPositionTax($categoryVAT, 'VAT', $line->tva_tx);
 			} else {
