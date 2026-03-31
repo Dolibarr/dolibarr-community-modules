@@ -4,6 +4,7 @@ packages:
     - modulename: 'Facturx'
       author: 'CAP-REL'
       author_url: 'https://cap-rel.fr'
+      maintener_email: 'contact@cap-rel.fr'
       label:
         fr: 'Factur-X (par CAP-REL)'
         en: 'Factur-X (by CAP-REL)'
@@ -14,13 +15,13 @@ packages:
         de: 'Fügt dolibarr die Fähigkeit hinzu, Rechnungen im Format XRechnung (Elektronische Rechnung) zu erstellen: Die PDF-Datei wird um eine eingebettete XML-Datei erweitert.'
       status: 'enabled'
       created_at: '2024-12-10'
-      last_updated_at: "2026-03-10"
+      last_updated_at: "2026-03-31"
       # The git url, stable branch and system to get the sources and guess all auto value
       git: 'https://inligit.fr/cap-rel/dolibarr/plugin-facturx.git'
       git-branch: 'master'
       git-system: 'gitlab'
       cover: 'https://www.dolistore.com/wrapper.php?hashp=KOkM9ktPixXZY62rjv7J4oKjKV86704r'
-      current_version: "1.6.100"
+      current_version: "1.6.102"
       dolibarrmin: "10.0"
       dolibarrmax: "23.0"
       phpmin: "7.3"
@@ -36,6 +37,7 @@ packages:
     - modulename: 'HelloAsso'
       author: 'Dolicloud'
       author_url: 'https://www.dolicloud.com'
+      maintener_email: 'contact@dolicloud.com'
       label:
         fr: 'HelloAsso (par DoliCloud)'
         en: 'HelloAsso (by DoliCloud)'
@@ -44,7 +46,7 @@ packages:
         en: 'Provides a way to make an online checkout of any membership dues, donation, customer invoice or customer order with the HelloAsso API. Also offer an option to synchronize membership.'
       status: 'enabled'		
       created_at: '2024-12-10'
-      last_updated_at: "2026-03-14"
+      last_updated_at: "2026-03-31"
       category: '68, 67'
       git: 'https://github.com/Dolibarr/dolibarr-community-modules/tree/main/helloasso'
       git-branch: 'main'
@@ -75,12 +77,12 @@ packages:
           pl: 'Integruje Dolibarr z KSeF (Krajowy System e-Faktur), polskim systemem e-faktur. Generuje faktury XML FA(3), podpisuje i przesyła je do KSeF, pobiera potwierdzenia UPO oraz automatycznie dodaje kody QR do faktur PDF.'
       status: 'enabled'
       created_at: '2025-12-04'
-      last_updated_at: "2026-02-24"
+      last_updated_at: "2026-03-29"
       git: 'https://github.com/InPoint-Automation/Dolibarr-KSeF-Module.git'
       git-branch: 'main'
       git-system: 'github'
       cover: 'https://github.com/InPoint-Automation/Dolibarr-KSeF-Module/blob/e674e8fa72162db968c774b8ef7857d8a2f6c038/img/ksef.png'
-      current_version: "1.2.0"
+      current_version: "1.3.4"
       dolibarrmin: "14.0"
       dolibarrmax: "23.0"
       phpmin: '7.4'
@@ -94,6 +96,7 @@ packages:
     - modulename: 'PDPConnectFR'
       author: 'Dolibarr foundation'
       author_url: 'https://www.dolibarr.org'
+      maintener_email: 'mdaoud@dolicloud.com'
       label:
         fr: 'PDP Connect (France)'
         en: 'PDP Connect (France)'
@@ -112,7 +115,7 @@ packages:
       phpmax: ""
       price: 0
       created_at: '2025-10-10'
-      last_updated_at: "2026-03-14"
+      last_updated_at: "2026-03-31"
       # direct-download is yes if we can download the module to install it in application
       direct-download: no
       # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
@@ -122,27 +125,66 @@ packages:
       dolistore-download: ''
 
 
+    # modulename must match the value in file name of the descriptor of the module
     - modulename: 'Peppol'
       author: 'CAP-REL'
       author_url: 'https://cap-rel.fr'
+      maintener_email: 'contact@cap-rel.fr'
       label:
-          fr: 'Peppol'
-          en: 'Peppol'
+        fr: 'Peppol (par CAP-REL)'
+        en: 'Peppol (by CAP-REL)'
+      description:
+        fr: 'Ajoute à Dolibarr la capacité de générer et recevoir des factures électroniques au format Peppol BIS 3 (UBL) via le réseau Peppol.'
+        en: 'Adds to Dolibarr the ability to generate and receive electronic invoices in Peppol BIS 3 (UBL) format via the Peppol network.'
+      status: 'enabled'
+      created_at: '2024-12-10'
+      last_updated_at: "2026-03-27"
+      # The git url, stable branch and system to get the sources and guess all auto value
       git: 'https://inligit.fr/cap-rel/dolibarr/plugin-peppol.git'
       git-branch: 'master'
       git-system: 'gitlab'
-      status: 'disabled'
-      current_version: "1.2.118"
+      cover: 'https://www.dolistore.com/wrapper.php?hashp=7TBpGJTTra9b4051Lv9ltKaD8qQk6J5i'
+      current_version: "1.2.120"
       dolibarrmin: "10.0"
       dolibarrmax: "23.0"
       phpmin: "7.1"
       phpmax: ""
-      last_updated_at: "2026-03-16"
       # direct-download is yes if we can download the module to install it in application
       direct-download: no
       # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
       dolistore-upload: 'manual'
       # dolistore-download is url of product page for download if module can also be found on dolistore.com
       dolistore-download: 'https://www.dolistore.com/product.php?id=884'
+
+
+    - modulename: 'Stancer'
+      author: 'CAP-REL'
+      author_url: 'https://www.cap-rel.fr'
+      maintener_email: 'contact@cap-rel.fr'
+      label:
+        fr: 'Stancer (par CAP-REL)'
+        en: 'Stancer (by CAP-REL)'
+      description:
+        fr: 'Intègre le mode de paiement Stancer dans Dolibarr. Permet d’utiliser un compte Stancer pour régler les cotisations, les dons, les factures et les commandes clients via l’API Stancer.'
+        en: 'Integrates the Stancer payment mode inside Dolibarr. Allow to use a Stancer account to pay any membership dues, donation, customer invoice or customer order with the Stancer API.'
+      status: 'enabled'
+      git: 'https://inligit.fr/cap-rel/dolibarr/plugin-stancer.git'
+      git-branch: 'master'
+      git-system: 'gitlab'
+      cover: 'https://inligit.fr/cap-rel/dolibarr/plugin-stancer/-/raw/master/img/object_stancer.png?ref_type=heads&inline=false'
+      current_version: "2.0.6"
+      dolibarrmin: "15.0"
+      dolibarrmax: "23.0"
+      phpmin: "7.4"
+      phpmax: ""
+      created_at: '2026-03-20'
+      last_updated_at: "2026-03-31"
+      # direct-download is yes if we can download the module to install it in application
+      direct-download: no
+      # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
+      dolistore-upload: 'manual'
+      # dolistore-download is url of product page for download if module can also be found on dolistore.com
+      # Example: https://www.dolistore.com/product.php?id=xxx
+      dolistore-download: 'https://www.dolistore.com/product.php?id=623'
 
 
