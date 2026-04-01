@@ -5,6 +5,7 @@ packages:
     - modulename: 'Facturx'
       author: 'CAP-REL'
       author_url: 'https://cap-rel.fr'
+      maintener_email: 'contact@cap-rel.fr'
       label:
         fr: 'Factur-X (par CAP-REL)'
         en: 'Factur-X (by CAP-REL)'
