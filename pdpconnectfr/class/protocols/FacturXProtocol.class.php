@@ -572,12 +572,16 @@ class FacturXProtocol extends AbstractProtocol
 			// K: Intracomm sale
 			// G: Export outside of EU
 			if ($line->tva_tx > 0) {
-				$categoryVAT = 'S';
-
 				// Check if seller has a VAT number.
 				if (empty($mysoc->tva_intra)) {
 					throw new Exception('BADVATNUMBER: The VAT number of the thirdparty '.$object->thirdparty->name.' is mandatory when there is a non null VAT on at least on line.');
 				}
+				// Check if VAT is in a valid range (BR-FR-16)
+				if (!$this->checkIfVatRateIsValid($line->tva_tx, $mysoc->country_code)) {
+					throw new Exception('BADVATRATE[BR-FR-16]: The VAT rate '.$line->tva_tx.' on line '.$line->id.' is not a valid string value for country '.$mysoc->country_code.'.');
+				}
+
+				$categoryVAT = 'S';
 
 				$facturxpdf->addDocumentPositionTax($categoryVAT, 'VAT', $line->tva_tx);
 			} else {
@@ -1028,23 +1032,41 @@ class FacturXProtocol extends AbstractProtocol
 		$documentBuilder->setDocumentPositionProductDetails("Trennblätter A4", "50er Pack", "TB100A4");
 		$documentBuilder->setDocumentPositionNetPrice(9.9000);
 		$documentBuilder->setDocumentPositionQuantity(20, ZugferdUnitCodes::REC20_PIECE);
-		$documentBuilder->addDocumentPositionTax(ZugferdVatCategoryCodes::STAN_RATE, ZugferdVatTypeCodes::VALUE_ADDED_TAX, 19);
+		$vatrate = 20;
+		if (!$this->checkIfVatRateIsValid($vatrate, $mysoc->country_code)) {
+			throw new Exception('BADVATRATE: The VAT rate '.$vatrate.' on line is not a valid string value for country '.$mysoc->country_code.'.');
+		}
+		$documentBuilder->addDocumentPositionTax(ZugferdVatCategoryCodes::STAN_RATE, ZugferdVatTypeCodes::VALUE_ADDED_TAX, $vatrate);
 		$documentBuilder->setDocumentPositionLineSummation(198.0);
+
 		$documentBuilder->addNewPosition("2");
 		$documentBuilder->setDocumentPositionProductDetails("Joghurt Banane", "B-Ware", "ARNR2");
 		$documentBuilder->setDocumentPositionNetPrice(5.5000);
 		$documentBuilder->setDocumentPositionQuantity(50, ZugferdUnitCodes::REC20_PIECE);
-		$documentBuilder->addDocumentPositionTax(ZugferdVatCategoryCodes::STAN_RATE, ZugferdVatTypeCodes::VALUE_ADDED_TAX, 7);
+		$vatrate = 7;
+		if (!$this->checkIfVatRateIsValid($vatrate, $mysoc->country_code)) {
+			throw new Exception('BADVATRATE: The VAT rate '.$vatrate.' on line is not a valid string value for country '.$mysoc->country_code.'.');
+		}
+		$documentBuilder->addDocumentPositionTax(ZugferdVatCategoryCodes::STAN_RATE, ZugferdVatTypeCodes::VALUE_ADDED_TAX, $vatrate);
 		$documentBuilder->setDocumentPositionLineSummation(275.0);
+
 		$documentBuilder->addNewPosition("3");
 		$documentBuilder->setDocumentPositionProductDetails("Joghurt Erdbeer", "", "ARNR3");
 		$documentBuilder->setDocumentPositionNetPrice(4.0000);
 		$documentBuilder->setDocumentPositionQuantity(100, ZugferdUnitCodes::REC20_PIECE);
-		$documentBuilder->addDocumentPositionTax(ZugferdVatCategoryCodes::STAN_RATE, ZugferdVatTypeCodes::VALUE_ADDED_TAX, 7);
+		$vatrate = 7;
+		if (!$this->checkIfVatRateIsValid($vatrate, $mysoc->country_code)) {
+			throw new Exception('BADVATRATE: The VAT rate '.$vatrate.' on line is not a valid string value for country '.$mysoc->country_code.'.');
+		}
+		$documentBuilder->addDocumentPositionTax(ZugferdVatCategoryCodes::STAN_RATE, ZugferdVatTypeCodes::VALUE_ADDED_TAX, $vatrate);
+
 		$documentBuilder->setDocumentPositionLineSummation(400.0);
-		$documentBuilder->addDocumentTax(ZugferdVatCategoryCodes::STAN_RATE, ZugferdVatTypeCodes::VALUE_ADDED_TAX, 198.0, 37.62, 19.0);
+
+		// Add total of vat per vat rate
+		$documentBuilder->addDocumentTax(ZugferdVatCategoryCodes::STAN_RATE, ZugferdVatTypeCodes::VALUE_ADDED_TAX, 198.0, 39.60, 20.0);
 		$documentBuilder->addDocumentTax(ZugferdVatCategoryCodes::STAN_RATE, ZugferdVatTypeCodes::VALUE_ADDED_TAX, 675.0, 47.25, 7.0);
-		$documentBuilder->setDocumentSummation(957.87, 957.87, 873.00, 0.0, 0.0, 873.00, 84.87);
+
+		$documentBuilder->setDocumentSummation(959.85, 959.85, 873.00, 0.0, 0.0, 873.00, 86.85);
 
 
 		// This is a test doc
@@ -2943,5 +2965,28 @@ class FacturXProtocol extends AbstractProtocol
 		}
 
 		return array('res' => 1, 'message' => 'Attachment saved successfully ' . $dest_path);
+	}
+
+
+	/**
+	 * Check if a given VAT rate is valid for a specific country based on the c_tva table in the database.
+	 *
+	 * @param 	string	$vatrate		Vat rate to check (e.g. '20' for 20%)
+	 * @param 	string	$countryCode	Country code to check the VAT rate against (e.g. 'FR' for France)
+	 * @return 	boolean					Returns true if the VAT rate is valid for the given country, false otherwise.
+	 * TODO Move common function into an implemented CommonXProtocol.class.php if needed by other protocol handlers
+	 */
+	public function checkIfVatRateIsValid($vatrate, $countryCode)
+	{
+		if ($countryCode == 'FR') {
+			// Check rule BR-FR-16 For AFNOR Einvoice - List in XP-Z12-012
+			$validRatesString = ['0', '10', '13', '20', '8.5', '19.6', '2.1', '5.5', '7', '20.6', '1.05', '0.9', '1.75', '9.2', '9.6'];
+			//$valtotest = price2num((float) $vatrate, '', 1);
+			if (!in_array($vatrate, $validRatesString)) {
+				return false;
+			}
+		}
+
+		return true;
 	}
 }
