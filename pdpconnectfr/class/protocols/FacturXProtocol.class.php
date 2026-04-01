@@ -328,6 +328,15 @@ class FacturXProtocol extends AbstractProtocol
 		$facturxpdf->setDocumentSupplyChainEvent(new DateTime($deliveryDateList[0]));
 
 
+		// Add data of project if invoice is into a project
+		if (! ($invoice->project instanceOf Project)) {
+			$invoice->fetchProject();
+		}
+		if ($invoice->project instanceOf Project) {
+			$facturxpdf->setDocumentProcuringProject($invoice->project->ref, $invoice->project->title);
+		}
+
+
 		// Add additional referenced documents (Order references) - Disabled for Chorus
 		// Not for chorus : has been rejected for the reason identified in lifecycle: L'element (AttachmentBinaryObject.value) est obligatoire si l'element (FichierXml.SupplyChainTradeTransaction.ApplicableHeaderTradeAgreement.AdditionalReferencedDocument) est renseigne.
 		if (!$chorus) { // TODO : check this condition
@@ -370,21 +379,32 @@ class FacturXProtocol extends AbstractProtocol
 			// 	$facturxpdf->setDocumentBuyerContact($object->contact->getFullName($outputlangs), "", $object->contact->phone ?: $object->contact->phone_mobile, $object->contact->fax, $object->contact->email);	// If contactPersonName is set, contactDepartmentNamemust not be set.
 		}
 
+
 		// Set Buyer Reference (Service Code for Chorus) and Contract References
 		if (!empty($object->array_options['options_d4d_service_code'])) {
 			// CHORUS Debtor. Service Code
 			$facturxpdf->setDocumentBuyerReference($object->array_options['options_d4d_service_code']);
 		}
 
+		// Add data of contract if invoice is linked to a contract
 		// CHORUS Commitment. Contract Number
 		if (!empty($object->array_options['options_d4d_contract_number'])) {
 			$facturxpdf->setDocumentContractReferencedDocument($object->array_options['options_d4d_contract_number']);
 		}
+		/*
+		if (! ($invoice->contract instanceOf Contract)) {
+			$invoice->fetchProject();
+		}
+		if ($invoice->contract instanceOf Contract) {
+			$facturxpdf->setDocumentContractReferencedDocument($invoice->contract->ref)
+		}
+		*/
 
 		// CHORUS Commitment. Commitment Number / Client Ref
 		if (!empty($promise_code)) {
 			$facturxpdf->setDocumentBuyerOrderReferencedDocument($promise_code);
 		}
+
 
 		// Set Business Process ID according to invoice type
 		$facturxpdf->setDocumentBusinessProcess($this->getBillingProcessID($object));
@@ -991,15 +1011,17 @@ class FacturXProtocol extends AbstractProtocol
 
 
 		$documentBuilder->setDocumentBillingPeriod(DateTime::createFromFormat("Ymd", "20250101"), DateTime::createFromFormat("Ymd", "20250131"), "01.01.2025 - 31.01.2025");
-		$documentBuilder->addDocumentInvoiceSupportingDocumentWithUri('REFDOC-2024/00001-1', 'http.//some.url', 'Inhaltsstoffe Joghurt');
 
+		$documentBuilder->addDocumentInvoiceSupportingDocumentWithUri('FA2401-000001', 'https://publiclinktoinvoice', 'LISIBLE');
+		$documentBuilder->addDocumentInvoiceSupportingDocumentWithUri('SO2401-000001', 'https://linktoorder', 'BON_COMMANDE');
 		//$documentBuilder->addDocumentInvoiceSupportingDocumentWithFile('REFDOC-2024/00001-2', $AdditionalDocument, 'Herkunftsnachweis Trennblätter');
 
 		$documentBuilder->addDocumentTenderOrLotReferenceDocument('LOS 738625');
 		$documentBuilder->addDocumentInvoicedObjectReferenceDocument('125', ZugferdReferenceCodeQualifiers::SALE_PERS_NUMB); // Sales person number
 
-		$documentBuilder->setDocumentContractReferencedDocument('CON-2024/2025-001');
-		$documentBuilder->setDocumentProcuringProject('PROJ-2025-001-1', 'Allgemeine Dienstleistungen');
+		$documentBuilder->setDocumentContractReferencedDocument('CO2401-000001');			// Ref of contract
+
+		$documentBuilder->setDocumentProcuringProject('PR2401-000001', 'Project label');	// Ref of project
 
 		$documentBuilder->addDocumentPaymentMeanToDirectDebit("DE12500105170648489890", "INV-TEST");
 		$documentBuilder->addDocumentPaymentTerm('Wird von Konto DE12500105170648489890 abgebucht', DateTime::createFromFormat("Ymd", "20250131"), 'MANDATE-2024/000001');
