@@ -1485,6 +1485,10 @@ class FacturXProtocol extends AbstractProtocol
 			if ($db->num_rows($resql) > 0) {
 				$supplierInvoiceId = $db->fetch_object($resql)->id;
 				$pdpconnectfr->cleanUpTemporaryFiles(); // Clean up temp files to remove retrieved Factur-X file since invoice already exists
+
+				// FIXME supplierinvoice already found but may be that documents are not linked (this is done later but only after creating invoice,
+				// may be we should also do it in this case to fix inconsistent data).
+
 				return ['res' => $supplierInvoiceId, 'message' => 'Supplier Invoice with reference ' . $documentno . ' already exists' ];
 			}
 		} else {
@@ -1899,15 +1903,17 @@ class FacturXProtocol extends AbstractProtocol
 			// TODO : Add supplier price for products (all lines of the invoice)
 
 			// Set import_key
-			$sql = 'UPDATE '.MAIN_DB_PREFIX."facture_fourn SET import_key = '".$db->escape($supplierInvoice->import_key)."' WHERE rowid = ".((int) $supplierInvoiceId);
+			$sql = 'UPDATE '.MAIN_DB_PREFIX."facture_fourn SET import_key = '".$db->escape($supplierInvoice->import_key)."'";
+			$sql .= " WHERE rowid = ".((int) $supplierInvoiceId);
 			$db->query($sql);
 
 			// Add entry in pdpconnectfr_extlinks table to mark that this supplier invoice is imported from PDP
 			$pdpconnectfr->insertOrUpdateExtLink($supplierInvoiceId, $supplierInvoice->element, $flowId);
 
-			dol_syslog(__METHOD__ . ' New supplier invoice created (ID: ' . $supplierInvoiceId . ')');
+			dol_syslog(__METHOD__ . ' New supplier invoice created or updated (ID: ' . $supplierInvoiceId . ')');
 
-			$return_messages[] = 'Supplier Invoice created with ID: ' . $supplierInvoiceId;
+			$return_messages[] = 'Supplier Invoice created or updated with ID: ' . $supplierInvoiceId;
+
 
 			// Save original invoice in supplier invoice attachments
 			if ($tempFile && file_exists($tempFile)) {
@@ -1922,9 +1928,10 @@ class FacturXProtocol extends AbstractProtocol
 				dol_syslog("Temporary 'converted pdf file' not found for attachment", LOG_ERR);
 			}
 
+
 			// Save readable view file in supplier invoice attachments
 			if ($ReadableViewFile && $tempFileReadableView && file_exists($tempFileReadableView)) {
-				$res = $this->_saveFacturXFileToSupplierInvoiceAttachment($supplierInvoice, $tempFileReadableView, 'PDP');
+				$res = $this->_saveFacturXFileToSupplierInvoiceAttachment($supplierInvoice, $tempFileReadableView, getDolGlobalString('PDPCONNECTFR_PDP', 'PDP'));
 
 				if ($res['res'] < 0) {
 					$return_messages[] = 'Failed to save readable view file as attachment: ' . $res['message'];
@@ -2928,15 +2935,15 @@ class FacturXProtocol extends AbstractProtocol
 
 	/**
 	 * Save Factur-X file to dolibarr supplier invoice attachment.
-	 * @param FactureFournisseur    $supplierInvoice Supplier invoice object
-	 * @param string                $filePath        Path to the Factur-X file to save
-	 * @param string                $prefix          Optional prefix for the saved file name
 	 *
-	 * @return array{res:int, message:string}   Returns array with 'res' (1 on success, -1 on error) and info 'message'
+	 * @param FactureFournisseur    $supplierInvoice 	Supplier invoice object
+	 * @param string                $filePath        	Path to the Factur-X file to save
+	 * @param string                $suffix          	Optional suffix for the saved file name
+	 * @return array{res:int, message:string}   		Returns array with 'res' (1 on success, -1 on error) and info 'message'
 	 */
-	private function _saveFacturXFileToSupplierInvoiceAttachment($supplierInvoice, $filePath, $prefix = '')
+	private function _saveFacturXFileToSupplierInvoiceAttachment($supplierInvoice, $filePath, $suffix = '')
 	{
-		global $conf, $langs;
+		global $conf;
 
 		// Ensure upload directory exists
 		$folder_part   = get_exdir(0, 0, 0, 0, $supplierInvoice);
@@ -2951,10 +2958,7 @@ class FacturXProtocol extends AbstractProtocol
 		}
 
 		// Prepare destination filename with optional prefix
-		$filename  = dol_sanitizeFileName($supplierInvoice->ref_supplier . '.pdf');
-		if (!empty($prefix)) {
-			$filename = dol_sanitizeFileName($prefix . '_' . $filename);
-		}
+		$filename  = dol_sanitizeFileName($supplierInvoice->ref_supplier . (empty($suffix) ? '' : '_'.$suffix) . '.pdf');
 
 		$dest_path = $upload_dir . '/' . $filename;
 
