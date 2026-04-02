@@ -606,7 +606,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		}
 
 		// Add Authorization header if we have a token
-		if ($this->tokenData['token'] && $resource != 'token') {
+		if (!empty($this->tokenData['token']) && $resource != 'token') {
 			$httpheader[] = 'Authorization: Bearer ' . $this->tokenData['token'];
 		}
 
