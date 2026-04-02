@@ -29,6 +29,7 @@ dol_include_once('pdpconnectfr/class/providers/AbstractPDPProvider.class.php');
 dol_include_once('pdpconnectfr/class/protocols/ProtocolManager.class.php');
 dol_include_once('pdpconnectfr/class/call.class.php');
 dol_include_once('pdpconnectfr/class/pdpconnectfr.class.php');
+dol_include_once('pdpconnectfr/lib/pdpconnectfr.lib.php');
 require_once DOL_DOCUMENT_ROOT . '/core/lib/admin.lib.php';
 
 
@@ -40,7 +41,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	/**
 	 * @var string		Name
 	 */
-	public $name = 'ESALINK';
+	public $name = 'Esalink';
 
 	/**
 	 * @var string		Help to get credentials and set up the provider configuration.
@@ -67,8 +68,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			'test_auth_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/',
 			'prod_api_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/', 		// TODO: Replace the URL once known
 			'test_api_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/',
-			'username' => getDolGlobalString('PDPCONNECTFR_ESALINK_USERNAME', ''),
-			'password' => getDolGlobalString('PDPCONNECTFR_ESALINK_PASSWORD', ''),
+			'username' => getDolGlobalString('PDPCONNECTFR_ESALINK_USERNAME'),
+			'password' => getDolGlobalString('PDPCONNECTFR_ESALINK_PASSWORD'),
 			'api_key' => getDolGlobalString('PDPCONNECTFR_ESALINK_API_KEY', ''),
 			'api_secret' => getDolGlobalString('PDPCONNECTFR_ESALINK_API_SECRET', ''),
 			'dol_prefix' => 'PDPCONNECTFR_ESALINK',
@@ -84,7 +85,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 		$exchangeProtocolConf = getDolGlobalString('PDPCONNECTFR_PROTOCOL');
 		$ProtocolManager = new ProtocolManager($this->db);
-		$this->exchangeProtocol = $ProtocolManager->getprotocol($exchangeProtocolConf);
+		$this->exchangeProtocol = $ProtocolManager->getProtocol($exchangeProtocolConf);
 	}
 
 
@@ -198,11 +199,11 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$error = array();
 		if ($mode == 0) {
 			if (empty($this->config['username'])) {
-				 $langs->load("main");
+				$langs->loadLangs(array("main", "oauth"));
 				$error[] = $langs->trans("ErrorFieldRequired", $langs->transnoentities('Username'));
 			}
 			if (empty($this->config['password'])) {
-				$langs->load("main");
+				$langs->loadLangs(array("main", "oauth"));
 				$error[] = $langs->trans('ErrorFieldRequired', $langs->transnoentities('Password'));
 			}
 		} elseif ($mode == 1) {
@@ -258,7 +259,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	 */
 	public function refreshAccessToken()
 	{
-		// No route to refresh token for PDP provider so we get a new one
+		// Get access token from OAUth server and save it into database.
 		$result = $this->getAccessToken();
 
 		return $result;
@@ -307,7 +308,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	 */
 	public function sendInvoice($object)
 	{
-		global $conf, $langs, $user, $db;
+		global $conf, $langs, $user;
 
 		$outputLog = array(); // Feedback to display
 
@@ -321,9 +322,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		}
 
 		$file_info = pathinfo($invoice_path);
+
 		$uuid = $this->generateUuidV4(); // UUID used to correlate logs between Dolibarr and PDP TODO : Store it somewhere
 
-		// Format PDP resource Url
+		// Format AP resource Url
 		$resource = 'flows';
 		$urlparams = array(
 			'Request-Id' => $uuid,
@@ -351,6 +353,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$response = $this->callApi("flows", "POSTALREADYFORMATED", $params, $extraHeaders, 'send_invoice');
 
 		if ($response['status_code'] == 200 || $response['status_code'] == 202) {
+			$flowId = $response['response']['flowId'];
+			$callId = $response['id'];
+			$callRef = $response['call_id'];
+
 			/**
 			 * We make an additional call to retrieve the acknowledgment information and update the status.
 			 * However, document validation on the PDP side may take some time.
@@ -363,12 +369,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			 * If no response is available yet, we wait for the next synchronization.
 			 **/
 
-			$flowId = $response['response']['flowId'];
-			$callId = $response['id'];
-			$callRef = $response['call_id'];
-
 			// Update einvoice status with awaiting validation
-			$pdpconnectfr = new PdpConnectFr($db);
+			$pdpconnectfr = new PdpConnectFr($this->db);
 			$pdpconnectfr->insertOrUpdateExtLink($object->id, Facture::class, $flowId, PdpConnectFr::STATUS_AWAITING_VALIDATION, $object->ref);
 
 			// Call the API to retrieve flow details and check the validation status.
@@ -387,7 +389,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			);
 
 			if ($response['status_code'] != 200 && $response['status_code'] != 202) {
-				return array('res' => -1, 'message' => "Failed to retrieve flow details for flowId: " . $flowId);
+				return array('res' => -1, 'message' => "FlowId: " . $flowId." - Failed to retrieve flow details");
 			}
 
 			// Process flow data
@@ -395,7 +397,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			try {
 				$flowData = json_decode($response['response'], true);
 			} catch (Exception $e) {
-				return array('res' => -1, 'message' => "Failed to parse the json answer for flowId: " . $flowId);
+				return array('res' => -1, 'message' => "FlowId: " . $flowId." - Failed to parse the json answer");
 			}
 
 			// Update einvoice status with received validation result
@@ -423,7 +425,15 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 			return $flowId;
 		} else {
-			$this->errors[] = "Failed to send electronic invoice.";
+			$this->error = $langs->trans("ErrorSendingInvoiceToPDP");
+			$this->error .= '<br>HTTP '.$response['status_code'];
+			if (!empty($response['errorCode'])) {
+				$this->error .= ' - '.$response['errorCode'].(empty($response['errorMessage']) ? '': ' - '.$response['errorMessage']);
+			}
+			if (!empty($response['curl_error_no'])) {
+				$this->error .= ' - Curl error '.$response['curl_error_no'].(empty($response['curl_error_msg']) ? '': ' - '.$response['curl_error_msg']);
+			}
+			$this->errors[] = $this->error;
 			return 0;
 		}
 	}
@@ -469,10 +479,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			$outputLog[] = "Sample invoice generated successfully.";
 		}
 		$file_info = pathinfo($invoice_path);
-		$uuid = $this->generateUuidV4(); // UUID used to correlate logs between Dolibarr and PDP
 
 		// Format PDP resource Url
 		/* The URL must be like : https://ppd.hubtimize.fr/api/orchestrator/v1/flows?Request-Id={UUID}
+		$uuid = $this->generateUuidV4(); // UUID used to correlate logs between Dolibarr and PDP
 		$resource = 'flows';
 		$urlparams = array(
 			'Request-Id' => $uuid,
@@ -645,7 +655,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			$call->endpoint = '/' . $resource;
 			$call->request_body = is_array($params) ? json_encode($params) : $params;
 			$call->response = is_array($returnarray['response']) ? json_encode($returnarray['response']) : $returnarray['response'];
-			$call->provider = 'Esalink';
+			$call->provider = $this->name;
 			$call->entity = $conf->entity;
 			$call->status = ($returnarray['status_code'] == 200 || $returnarray['status_code'] == 202) ? 1 : 0;
 
@@ -675,16 +685,16 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 		$results_messages = array();
 		$actions = array();
-		$uuid = $this->generateUuidV4(); // UUID used to correlate logs between Dolibarr and PDP TODO : Store it somewhere
-
-		//self::$PDPCONNECTFR_LAST_IMPORT_KEY = $uuid;
-		self::$PDPCONNECTFR_LAST_IMPORT_KEY = dol_print_date(dol_now(), 'dayhourlog');
 
 		$resource = 'flows/search';
+		$uuid = $this->generateUuidV4(); // UUID used to correlate logs between Dolibarr and PDP TODO : Store it somewhere
 		$urlparams = array(
 			'Request-Id' => $uuid,
 		);
 		$resource .= '?' . http_build_query($urlparams);
+
+		//self::$PDPCONNECTFR_LAST_IMPORT_KEY = $uuid;
+		self::$PDPCONNECTFR_LAST_IMPORT_KEY = dol_print_date(dol_now(), 'dayhourlog');
 
 		// Calculate dateafter
 		if ($syncFromDate > 0) {
@@ -821,7 +831,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				// If res < 0, rollback
 				if ($res['res'] < 0) {
 					$db->rollback();
-					$results_messages[] = "Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'];
+					$results_messages[] = "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'];
 					if (isset($res['action']) && $res['action'] != '') {
 						$actions[$res['actioncode'] ?? '0'] = $res['action'];
 					}
@@ -830,7 +840,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 				// If res == 0, commit but count it as already existed
 				if ($res['res'] == 0) {
-					$results_messages[] = "<span class=\"opacitylow\">Skipped - Exist or already processed flow " . $flow['flowId'] . ": " . $res['message'] . "</span>";
+					$results_messages[] = "<span class=\"opacitylow\">Flow " . $flow['flowId'] . " skipped: " . $res['message'] . "</span>";
 					$alreadyExist++;
 					//$lastsuccessfullSyncronizedFlow = $flow['flowId'];
 					$db->commit();
@@ -925,26 +935,26 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		// call API to get flow details
 		$flowResource = 'flows/' . $flowId;
 		$flowUrlparams = array(
-			'docType' => 'Metadata', // docType can be 'Metadata', 'Original', 'Converted' or 'ReadableView'
+			'docType' => 'Metadata', 					// docType can be 'Metadata' (JSON), 'Original', 'Converted' or 'ReadableView'
 		);
 		$flowResource .= '?' . http_build_query($flowUrlparams);
-		$flowResponse = $this->callApi(
+		$response = $this->callApi(
 			$flowResource,
 			"GET",
 			false,
 			['Accept' => 'application/octet-stream']
 		);
 
-		if ($flowResponse['status_code'] != 200) {
-			return array('res' => -1, 'message' => "Failed to retrieve flow details for flowId: " . $flowId);
+		if ($response['status_code'] != 200) {
+			return array('res' => -1, 'message' => "ERROR_FLOW_METADATA Failed to retrieve flow metadata for flowId: " . $flowId);
 		}
 
 		// Process flow data
 		$flowData = array();
 		try {
-			$flowData = json_decode($flowResponse['response'], true);
+			$flowData = json_decode($response['response'], true);
 		} catch (Exception $e) {
-			return array('res' => -1, 'message' => "Failed to parse the json answer for flowId: " . $flowId);
+			return array('res' => -1, 'message' => "ERROR_FLOW_METADATA Failed to parse the json answer for flowId: " . $flowId);
 		}
 
 		$document = new Document($this->db);
@@ -983,7 +993,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$document->flow_uiid            = $flowData['uuid'] ?? null;
 
 		if (getDolGlobalString('PDPCONNECTFR_DEBUG_MODE')) {
-			$document->response_for_debug = $flowResponse['response'];
+			$document->response_for_debug = $response['response'];
 		}
 
 		$returnRes = 1;
@@ -997,7 +1007,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				$factureObj = new Facture($this->db);
 				$res = $factureObj->fetch(0, $document->tracking_idref);
 				if ($res < 0) {
-					return array('res' => -1, 'message' => "Failed to fetch customer invoice for flowId: " . $flowId);
+					return array('res' => -1, 'message' => "ERROR_FETCH_INVOICE Failed to fetch customer invoice for flowId: " . $flowId);
 				}
 				$document->fk_element_id = !empty($factureObj->id) ? $factureObj->id : 0;
 				$document->tracking_idref = !empty($factureObj->ref) ? $factureObj->ref : $document->tracking_idref.' (NOTFOUND)'; // Probably the customer invoice is sent from another system that use the same PDP account
@@ -1010,9 +1020,12 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			case "SupplierInvoice":
 				// --- Fetch received documents (FacturX PDF)
 				$document->fk_element_type = FactureFournisseur::class;
+
+				// Retrieve the PDF file converted by Access Point
+				$receivedFile = null;
 				$flowResource = 'flows/' . $flowId;
 				$flowUrlparams = array(
-					'docType' => 'Converted', // docType can be 'Metadata', 'Original', 'Converted' or 'ReadableView'
+					'docType' => 'Converted', 					// docType can be 'Metadata' (JSON), 'Original', 'Converted' or 'ReadableView'
 				);
 				$flowResource .= '?' . http_build_query($flowUrlparams);
 				$flowResponse = $this->callApi(
@@ -1023,14 +1036,15 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				);
 
 				if ($flowResponse['status_code'] != 200) {
-					return array('res' => -1, 'message' => "Failed to retrieve converted (Original) document for SupplierInvoice flow (flowId: $flowId)");
+					return array('res' => -1, 'message' => "ERROR_FLOW_GETCONV Failed to retrieve 'Converted' document for SupplierInvoice flow (flowId: $flowId)");
 				}
-				$receivedFile = $flowResponse['response'];
+				$receivedFile = $flowResponse['response'];		// This is a string with PDF file content (with both Original and Converted).
 
-				// Retrieve also PDF file generated by PDP
+				// Retrieve also PDF file generated by Access Point
+				$ReadableViewFile = null;
 				$flowResource = 'flows/' . $flowId;
 				$flowUrlparams = array(
-					'docType' => 'ReadableView', // docType can be 'Metadata', 'Original', 'Converted' or 'ReadableView'
+					'docType' => 'ReadableView', 				// docType can be 'Metadata' (JSON), 'Original', 'Converted' or 'ReadableView'
 				);
 				$flowResource .= '?' . http_build_query($flowUrlparams);
 				$flowResponse = $this->callApi(
@@ -1041,12 +1055,24 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				);
 
 				if ($flowResponse['status_code'] != 200) {
-					return array('res' => -1, 'message' => "Failed to retrieve ReadableView document for SupplierInvoice flow (flowId: $flowId)");
+					// We disable this error, getting the readable file is optional.
+					//return array('res' => -1, 'message' => "ERROR_FLOW_GETREADABLE Failed to retrieve ReadableView document for SupplierInvoice flow (flowId: $flowId)");
+				} else {
+					$ReadableViewFile = $flowResponse['response'];	// This is a string with PDF file content.
 				}
-				$ReadableViewFile = $flowResponse['response'];
+
+
+				// Build the $exchangeProtocol factory for the format of supplier invoice
+				$tmpProtocolManager = new ProtocolManager($this->db);
+				$detectedProtocol = $tmpProtocolManager->detectProtocolFromContent($receivedFile);
+				if (empty($detectedProtocol)) {
+					return array('res' => -1, 'message' => "ERROR_FLOW_DETECTPROTOCOL Failed to detect protocol from received document for flowId: " . $flowId);
+				}
+
+				$exchangeProtocol = $tmpProtocolManager->getProtocol($detectedProtocol);
 
 				// Try to create the supplier + product + invoice
-				$res = $this->exchangeProtocol->createSupplierInvoiceFromFacturX($receivedFile, $ReadableViewFile, $flowId);
+				$res = $exchangeProtocol->createSupplierInvoiceFromSource($receivedFile, $ReadableViewFile, $flowId);
 				if ($res['res'] < 0) {
 					return array(
 						'res' => -1,
@@ -1062,8 +1088,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 					$document->tracking_idref = !empty($suplierInvoiceObj->ref) ? $suplierInvoiceObj->ref : 'Error'; // Should always be found here
 
 					//return array('res' => 0, 'message' => "supplier invoice already exists for flowId: " . $flowId . ". " . $res['message']);
-					$returnRes = 0;
-					$returnMessage = "Supplier invoice already exists for flowId: " . $flowId . ". " . $res['message'];
+					$returnRes = 1;		// If invoice did already exists, we process one more line from list of flows, so we must return 1, even if nothing was done.
+					$returnMessage = "Supplier invoice ".$suplierInvoiceObj->ref." created or already existing for flowId: " . $flowId . ". " . $res['message'];
 				}
 				break;
 
@@ -1086,10 +1112,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 					return array('res' => -1, 'message' => "FlowId: ".$flowId." - Receive flow with type CustomerInvoiceLC without any ref of invoice");
 				}
 				if ($factureObj->entity && $factureObj->entity != $conf->entity) {
-					return array('res' => -1, 'message' => "FlowId: ".$flowId." - Failed to fetch customer invoice ref " . $document->tracking_idref." in entity ".$conf->entity);
+					return array('res' => -1, 'message' => "FlowId: ".$flowId." - Failed to fetch customer invoice ref '" . $document->tracking_idref."' in entity ".$conf->entity);
 				}
 				if ($res < 0) {
-					return array('res' => -1, 'message' => "FlowId: ".$flowId." - Failed to fetch customer invoice ref " . $document->tracking_idref);
+					return array('res' => -1, 'message' => "FlowId: ".$flowId." - Failed to fetch customer invoice ref '" . $document->tracking_idref . "'");
 				}
 				*/
 
@@ -1314,7 +1340,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 					$document->tracking_idref = !empty($factureObj->ref) ? $factureObj->ref : $document->tracking_idref.' (NOTFOUND)'; // Probably the customer invoice is sent from another system that use the same PDP account
 
 					// If ack_status is Error, and there is no entry in pdpconnectfr_extlinks table, or there is an entry with status Awaiting Validation we log an event in the invoice and we add an entry in pdpconnectfr_extlinks table with status Error
-					// Should never happened because we make an ajax call every x seconds when an invoice is in status Pending after sending it
+					// Should never happen because we make an ajax call every x seconds when an invoice is in status Pending after sending it
 					// we maintain this code to handle old envoices that sended before table pdpconnectfr_extlinks was created
 					// TODO : REMOVE THIS CODE IN A FUTURE
 					if ($document->ack_status == 'Error' && !empty($factureObj->id)) {

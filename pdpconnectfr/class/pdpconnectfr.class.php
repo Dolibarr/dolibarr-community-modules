@@ -764,7 +764,7 @@ class PdpConnectFr
 	 */
 	public function validatethirdpartyConfiguration($thirdparty)
 	{
-		global $langs, $mysoc;
+		global $langs;
 
 		$res = 1;
 		$message = '';

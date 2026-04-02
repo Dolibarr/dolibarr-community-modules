@@ -1319,15 +1319,14 @@ class FacturXProtocol extends AbstractProtocol
 
 
 	/**
-	 * Create a supplier invoice from a Factur-X file.
+	 * Create a supplier invoice from a Factur-X file and attach the file (and readable file if exists)to the document.
 	 *
-	 * @param  string $file                         Content of Factur-X file.
-	 * @param  string|null $ReadableViewFile        Readable view file. (PDP Generated readable PDF)
-	 * @param  string $flowId                       Flow identifier source of the invoice.
-	 *
-	 * @return array{res:int, message:string, action:string|null}       Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and an optional 'action'.
+	 * @param  string 			$file                       		Source string file. We use this file to get data of supplier invoice.
+	 * @param  string|null 		$ReadableViewFile        			Readable view file (PDP Generated readable PDF).e only store it if available.
+	 * @param  string 			$flowId                       		Flow identifier source of the invoice.
+	 * @return array{res:int, message:string, action:string|null}   Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and an optional 'action'.
 	 */
-	public function createSupplierInvoiceFromFacturX($file, $ReadableViewFile = null, $flowId = '')
+	public function createSupplierInvoiceFromSource($file, $ReadableViewFile = null, $flowId = '')
 	{
 		global $conf, $db, $user;
 
@@ -1370,6 +1369,9 @@ class FacturXProtocol extends AbstractProtocol
 		// --- Read the Factur-X file
 		$document = ZugferdDocumentPdfReader::readAndGuessFromFile($tempFile);
 		$embeddedXml = ZugferdDocumentPdfReaderExt::getInvoiceDocumentContentFromFile($tempFile);
+
+		// TODO Initialize the variablethat will be set.
+		// ....
 
 		$document->getDocumentInformation($documentno, $documenttypecode, $documentdate, $invoiceCurrency, $taxCurrency, $documentname, $documentlanguage, $effectiveSpecifiedPeriod);
 
@@ -1504,7 +1506,7 @@ class FacturXProtocol extends AbstractProtocol
 			}
 		}
 
-		dol_syslog(get_class($this) . '::createSupplierInvoiceFromFacturX parsedData: ' . json_encode($parsedData), LOG_DEBUG);
+		dol_syslog(get_class($this) . '::createSupplierInvoiceFromSource parsedData: ' . json_encode($parsedData), LOG_DEBUG);
 
 		// Sync or create supplier based on seller info
 		$syncSocRes = $this->_syncOrCreateThirdpartyFromFacturXSeller($parsedData, 'dolibarr', $flowId);
@@ -1603,7 +1605,7 @@ class FacturXProtocol extends AbstractProtocol
 				);
 
 
-				dol_syslog(get_class($this) . '::createSupplierInvoiceFromFacturX productRetrievedData: ' . json_encode($productRetrievedData), LOG_DEBUG);
+				dol_syslog(get_class($this) . '::createSupplierInvoiceFromSource productRetrievedData: ' . json_encode($productRetrievedData), LOG_DEBUG);
 
 				$is_deposit_line = 0;
 				$fk_remise = 0;
@@ -1917,7 +1919,7 @@ class FacturXProtocol extends AbstractProtocol
 					$return_messages[] = 'Factur-X file saved as attachment';
 				}
 			} else {
-				dol_syslog("Temporary file not found for attachment", LOG_ERR);
+				dol_syslog("Temporary 'converted pdf file' not found for attachment", LOG_ERR);
 			}
 
 			// Save readable view file in supplier invoice attachments
@@ -1930,7 +1932,7 @@ class FacturXProtocol extends AbstractProtocol
 					$return_messages[] = 'Readable view file saved as attachment';
 				}
 			} else {
-				dol_syslog("Temporary file not found for attachment", LOG_ERR);
+				dol_syslog("Temporary 'readable pdf file' not found for attachment", LOG_ERR);
 			}
 
 			// TODO : Save receivedFile in supplier invoice attachments
@@ -2028,6 +2030,7 @@ class FacturXProtocol extends AbstractProtocol
 
 	/**
 	 * Return IEC_6523 code (https://docs.peppol.eu/poacc/billing/3.0/codelist/ICD/)
+	 * This list of codes describes schemes codes for thirdparties but also products. This functions returns need for thirdparty schemes only.
 	 *
 	 * @param	string		$country_code		Country code
 	 * @param	int			$global				Use 0 for legal ID, use 1 for a global ID, use 2 for URI.
@@ -2049,12 +2052,19 @@ class FacturXProtocol extends AbstractProtocol
 				break;
 			case 'FR':
 				if ($global == 1 || $global == 2) {
-					$retour = "0225";	// SIREN.  	Einvoice global ID, example: "000000002" or URI OD, example "315143296_1939"
+					$retour = "0225";	// SIREN or SIREN_XXX.  	Einvoice global ID, example: "000000002" or URI OD, example "315143296_1939"
 				} else {
 					$retour = "0002";	// SIREN.	Used for LegalOrganization, example: "315143296"
 				}
 				break;
 			default:
+				if ($global == 1 || $global == 2) {
+					$retour = "0060";	// DUNS
+					// $retour = "EM";	// Emails
+				} else {
+					$retour = "0060";	// DUNS
+					// $retour = "EM";	// Emails
+				}
 		}
 		return $retour;
 	}
@@ -2515,8 +2525,11 @@ class FacturXProtocol extends AbstractProtocol
 			}
 			$result = $thirdparty->update($thirdpartyId, $user);
 			if ($result < 0) {
-				dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromFacturXSeller Error updating thirdparty: ' . $thirdparty->error, LOG_ERR);
-				return array('res' => -1, 'message' => 'Thirdparty update error: ' . $thirdparty->error);
+				$this->error = $thirdparty->error;
+				$this->errors = $thirdparty->errors;
+
+				dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromFacturXSeller Error updating thirdparty: ' .implode(',', array_merge(array($thirdparty->error), $thirdparty->errors)), LOG_ERR);
+				return array('res' => -1, 'message' => 'Thirdparty update error: ' . implode(',', array_merge(array($thirdparty->error), $thirdparty->errors)));
 			} else {
 				dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromFacturXSeller Updated thirdparty: ' . $thirdpartyId);
 				return array('res' => $thirdpartyId, 'message' => 'Thirdparty ' . $thirdparty->name . ' updated successfully');
@@ -2884,10 +2897,8 @@ class FacturXProtocol extends AbstractProtocol
 		$desc         = strtolower($line['proddesc'] ?? '');
 
 		// A. Global ID known => product
-		// SIREN = 0002
 		// EAN = 0088
-		// DUNS = 0060
-		$productGlobalIdTypes = ['0160', '0011', '0002', '0023', '0004', '0001', '0088']; // GTIN/UPC/EAN/GLN/DUNS...
+		$productGlobalIdTypes = ['0160', '0011', '0002', '0023', '0004', '0001', '0088']; // GTIN/UPC/EAN...
 		if ($globalId !== '' && in_array($globalIdType, $productGlobalIdTypes, true)) {
 			return 0;
 		}

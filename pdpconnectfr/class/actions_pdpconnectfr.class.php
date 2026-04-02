@@ -71,7 +71,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 
 				$usedProtocols = getDolGlobalString('PDPCONNECTFR_PROTOCOL');
 				$ProtocolManager = new ProtocolManager($db);
-				$protocol = $ProtocolManager->getprotocol($usedProtocols);
+				$protocol = $ProtocolManager->getProtocol($usedProtocols);
 
 				// Check configuration
 				$result = $pdpConnectFr->checkRequiredinformations($invoiceObject);
@@ -306,7 +306,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 
 				$usedProtocols = getDolGlobalString('PDPCONNECTFR_PROTOCOL');
 				$ProtocolManager = new ProtocolManager($db);
-				$protocol = $ProtocolManager->getprotocol($usedProtocols);
+				$protocol = $ProtocolManager->getProtocol($usedProtocols);
 
 				// Check configuration
 				$result = $pdpConnectFr->checkRequiredinformations($invoiceObject);
