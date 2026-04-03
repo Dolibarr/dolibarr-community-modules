@@ -1848,6 +1848,32 @@ class PdpConnectFr
 	 * Update validation information of an existing lifecycle status message.
 	 *
 	 * @param 	Object	$object		Object
+	 * @return 	int 				1 if the invoice object need management of EInvoicing, 0 if not.
+	 */
+	public function needEInvoiceManagement($object)
+	{
+		$return = 0;	// By default, no einvoicing.
+
+		if ($object->thirdparty->country_code == 'FR') {	// We need to sync invoice if for french customer
+			$return = 1;
+		}
+		if ($object->module_source == 'takepos') {			// Force to ignore for all invoices generated from TakePOS
+			// If invoice is generated from TakePOS, we must not make any e-invoice sync.
+			// We will do a Z sync instead from the cash closing feature.
+			$return = 0;
+		}
+
+		// TODO More tests to do...
+		// TODO Add hook
+
+		return $return;
+	}
+
+
+	/**
+	 * Update validation information of an existing lifecycle status message.
+	 *
+	 * @param 	Object	$object		Object
 	 * @param 	string 	$status     Status
 	 * @param	string	$comment	Comment
 	 * @return 	int 				Rowid on success, -1 on error

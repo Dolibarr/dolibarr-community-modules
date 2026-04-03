@@ -78,13 +78,10 @@ class InterfacePDPConnectFRTriggers extends DolibarrTriggers
 
 			$statustouse = $pdpConnectFr::STATUS_IGNORE;
 
-			if ($object->thirdparty->country_code == 'FR') {	// We need to sync invoice if for french customer
+			// Test if invoice need to be managed by EInvoice
+			$needEinvoice = $pdpConnectFr->needEInvoiceManagement($object);
+			if ($needEinvoice) {
 				$statustouse = $pdpConnectFr::STATUS_NOT_GENERATED;
-			}
-			if ($object->module_source == 'takepos') {			// Force to ignore for all invoices generated from TakePOS
-				// If invoice is generated from TakePOS, we must not make any e-invoice sync.
-				// We will do a Z sync instead from the cash closing feature.
-				$statustouse = $pdpConnectFr::STATUS_IGNORE;
 			}
 
 			$newobject = dol_clone($object, 2);
