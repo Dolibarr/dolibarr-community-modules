@@ -1,6 +1,6 @@
 # This is the YAML file to describe the location of a module
 packages:
-  - modulename: KSEF
+  - modulename: 'KSEF'
     author: 'InPoint Automation'
     author_url: 'https://inpointautomation.com'
     maintener_email: 'kontakt@inpointautomation.com'
