@@ -261,6 +261,7 @@ class CdarHandler
 				],
 
 				'IssuerTradeParty' => [
+					'GlobalID' => $IssuerGlobalID,
 					'RoleCode' => CdarHandler::ROLE_BY
 				],
 
