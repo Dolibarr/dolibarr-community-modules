@@ -243,6 +243,12 @@ $item->defaultFieldValue = 0;
 $item->cssClass = 'minwidth500';
 $item->fieldParams['forcereload'] = 0;
 
+// Setup conf to enable third-party validation via government APIs (SIREN via data.gouv.fr and VAT via VIES)
+$item = $formSetup->newItem('PDPCONNECTFR_ENABLE_API_VALIDATION')->setAsYesNo();
+$item->helpText = $langs->transnoentities('PDPCONNECTFR_ENABLE_API_VALIDATION_HELP');
+$item->defaultFieldValue = 0;
+$item->cssClass = 'minwidth500';
+
 // Setup conf for PMT - Mention regarding recovery fees
 $item = $formSetup->newItem('PDPCONNECTFR_PMT');
 $item->helpText = $langs->transnoentities('PDPCONNECTFR_PMT_HELP');

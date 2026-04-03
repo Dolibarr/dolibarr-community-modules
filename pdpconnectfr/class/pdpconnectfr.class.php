@@ -22,6 +22,10 @@
  * \brief   Base class for all functions to manage PDPCONNECTFR Module.
  */
 
+require_once DOL_DOCUMENT_ROOT.'/core/lib/profid.lib.php';
+require_once DOL_DOCUMENT_ROOT.'/core/lib/geturl.lib.php';
+dol_include_once('pdpconnectfr/lib/pdpconnectfr.lib.php');
+
 /**
  * Validate mysoc configuration
  *
@@ -776,6 +780,20 @@ class PdpConnectFr
 		}
 		if (empty($thirdparty->idprof1)) {
 			$baseErrors[] = $langs->trans("FxCheckErrorCustomerIDPROF1");
+		} elseif (!empty($thirdparty->country_code) && $thirdparty->country_code === 'FR') {
+			// Validate SIREN/SIRET format based on length (French companies only)
+			$idprof1 = preg_replace('/\s+/', '', (string) $thirdparty->idprof1);
+			if (strlen($idprof1) === 14) {
+				if (!isValidSiret($idprof1)) {
+					$baseErrors[] = $langs->trans("FxCheckErrorCustomerSIRETFormat");
+				}
+			} elseif (strlen($idprof1) === 9) {
+				if (!isValidSiren($idprof1)) {
+					$baseErrors[] = $langs->trans("FxCheckErrorCustomerSIRENFormat");
+				}
+			} else {
+				$baseErrors[] = $langs->trans("FxCheckErrorCustomerSIRETLength");
+			}
 		}
 		// if (empty($thirdparty->idprof2)) {
 		//     $baseErrors[] = $langs->trans("FxCheckErrorCustomerIDPROF2");
@@ -802,6 +820,22 @@ class PdpConnectFr
 		if ($thirdparty->tva_assuj && empty($thirdparty->tva_intra)) {
 			// Test VAT code only if thirdparty is subject to VAT
 			$baseWarnings[] = $langs->trans("FxCheckErrorCustomerVAT");
+		} elseif ($thirdparty->tva_assuj && !empty($thirdparty->tva_intra) && !empty($thirdparty->country_code) && $thirdparty->country_code === 'FR') {
+			// Validate French intra-community VAT number format: FR + 2 alphanumeric characters + 9 digits (SIREN)
+			$vatNormalized = strtoupper(preg_replace('/\s+/', '', $thirdparty->tva_intra));
+			if (!preg_match('/^FR[0-9A-Z]{2}[0-9]{9}$/', $vatNormalized)) {
+				$baseWarnings[] = $langs->trans("FxCheckErrorCustomerVATFormat");
+			} elseif (!empty($thirdparty->idprof1)) {
+				// Cross-check VAT against SIREN: French VAT key is deterministic (formula: (12 + 3 * (SIREN % 97)) % 97)
+				$siren9 = substr(preg_replace('/\s+/', '', $thirdparty->idprof1), 0, 9);
+				if (ctype_digit($siren9) && strlen($siren9) === 9) {
+					$expectedKey = (12 + 3 * ((int) $siren9 % 97)) % 97;
+					$expectedVAT = 'FR' . str_pad((string) $expectedKey, 2, '0', STR_PAD_LEFT) . $siren9;
+					if ($vatNormalized !== $expectedVAT) {
+						$baseWarnings[] = $langs->trans("FxCheckErrorCustomerVATMismatch", $thirdparty->tva_intra, $expectedVAT);
+					}
+				}
+			}
 		}
 		if (empty($thirdparty->email)) {
 			$baseErrors[] = $langs->trans("FxCheckErrorCustomerEmail");
@@ -873,6 +907,91 @@ class PdpConnectFr
 	}
 
 	/**
+	 * Check the thirdparty existence and active status via the French National Business Registry API (data.gouv.fr).
+	 * Search is performed by company name; the returned SIREN is then cross-checked against idprof1.
+	 * No authentication required. API rate limit: 7 req/s.
+	 *
+	 * This check is optional and non-blocking: an API timeout or unavailability is
+	 * silently ignored (warning logged, no error raised to the user).
+	 * Only runs when PDPCONNECTFR_ENABLE_API_VALIDATION constant is set to 1.
+	 *
+	 * @param Societe $thirdparty   Thirdparty object to check
+	 * @return array{res:int, message:string} res=1 OK, res=0 warning, res=-1 blocking error (never returned by this method)
+	 */
+	private function _checkThirdpartyViaExternalAPIs($thirdparty)
+	{
+		global $langs;
+
+		$warnings = [];
+
+		// Check company via the French National Business Registry API (data.gouv.fr)
+		// Search by company name, then cross-check the returned SIREN against idprof1
+		if (!empty($thirdparty->country_code) && $thirdparty->country_code === 'FR'
+			&& !empty($thirdparty->name) && !empty($thirdparty->idprof1)) {
+			$siren = substr(preg_replace('/\s+/', '', $thirdparty->idprof1), 0, 9);
+			$apiUrl = 'https://recherche-entreprises.api.gouv.fr/search?q=' . urlencode($thirdparty->name) . '&per_page=5';
+
+			$response = getURLContent($apiUrl, 'GET', '', 1, ['Accept: application/json']);
+
+			if ($response['http_code'] !== 200) {
+				// API unreachable: log and continue without blocking
+				dol_syslog(get_class($this) . '::_checkThirdpartyViaExternalAPIs business registry API unreachable (HTTP ' . $response['http_code'] . ')', LOG_WARNING);
+			} else {
+				$data = json_decode($response['content'], true);
+				$matchedCompany = null;
+
+				// Look for a result whose SIREN matches the one stored in Dolibarr
+				if (!empty($data['results']) && is_array($data['results'])) {
+					foreach ($data['results'] as $result) {
+						if (isset($result['siren']) && $result['siren'] === $siren) {
+							$matchedCompany = $result;
+							break;
+						}
+					}
+				}
+
+				if ($matchedCompany === null) {
+					// No result matched the name + SIREN combination
+					$warnings[] = $langs->trans("FxCheckWarnSIRENNotFound", $siren, $thirdparty->name);
+				} else {
+					// Check that the matched company is not closed
+					if (isset($matchedCompany['etat_administratif']) && $matchedCompany['etat_administratif'] !== 'A') {
+						$warnings[] = $langs->trans("FxCheckWarnSIRENClosed", $siren);
+					}
+
+					// Cross-check company name (partial match to handle legal form suffixes and abbreviations)
+					$nomApi      = strtolower(preg_replace('/[^a-z0-9]/i', '', $matchedCompany['nom_complet'] ?? ''));
+					$nomDolibarr = strtolower(preg_replace('/[^a-z0-9]/i', '', $thirdparty->name));
+					if (!empty($nomApi) && !empty($nomDolibarr)
+						&& strpos($nomApi, $nomDolibarr) === false
+						&& strpos($nomDolibarr, $nomApi) === false) {
+						$warnings[] = $langs->trans("FxCheckWarnNameMismatch", $thirdparty->name, $matchedCompany['nom_complet']);
+					}
+
+					// Cross-check ZIP code (objective field, no formatting ambiguity)
+					$zipApi      = trim($matchedCompany['siege']['code_postal'] ?? '');
+					$zipDolibarr = trim($thirdparty->zip ?? '');
+					if (!empty($zipApi) && !empty($zipDolibarr) && $zipApi !== $zipDolibarr) {
+						$warnings[] = $langs->trans("FxCheckWarnZIPMismatch", $zipDolibarr, $zipApi);
+					}
+
+					// Cross-check town (case-insensitive, strip accents for robustness)
+					$townApi      = strtolower(trim($matchedCompany['siege']['libelle_commune'] ?? ''));
+					$townDolibarr = strtolower(trim($thirdparty->town ?? ''));
+					if (!empty($townApi) && !empty($townDolibarr) && $townApi !== $townDolibarr) {
+						$warnings[] = $langs->trans("FxCheckWarnTownMismatch", $thirdparty->town, $matchedCompany['siege']['libelle_commune']);
+					}
+				}
+			}
+		}
+
+		if (!empty($warnings)) {
+			return ['res' => 0, 'message' => implode('<br> Warning API: ', $warnings)];
+		}
+		return ['res' => 1, 'message' => ''];
+	}
+
+	/**
 	 * Check required information for E-Invoicing
 	 *
 	 * @param Facture 	$invoice   Invoice object
@@ -880,13 +999,21 @@ class PdpConnectFr
 	 */
 	public function checkRequiredinformations($invoice)
 	{
-
 		$messages = [];
-		$mysocConfigCheck = $this->validateMyCompanyConfiguration();
-		$socConfigCheck = $this->validatethirdpartyConfiguration($invoice->thirdparty);
+		$mysocConfigCheck   = $this->validateMyCompanyConfiguration();
+		$socConfigCheck     = $this->validatethirdpartyConfiguration($invoice->thirdparty);
+		$chorusConfigCheck  = null;
 		if (getDolGlobalInt('PDPCONNECTFR_USE_CHORUS')) {
 			$chorusConfigCheck = $this->validateChorusInformations($invoice);
 		}
+
+		// External API checks (optional, enabled by PDPCONNECTFR_ENABLE_API_VALIDATION)
+		$apiConfigCheck = null;
+		if (getDolGlobalInt('PDPCONNECTFR_ENABLE_API_VALIDATION') && $socConfigCheck['res'] >= 0) {
+			// Only call external APIs if format checks already passed (avoids unnecessary requests)
+			$apiConfigCheck = $this->_checkThirdpartyViaExternalAPIs($invoice->thirdparty);
+		}
+
 		if (!empty($mysocConfigCheck['message'])) {
 			$messages[] = $mysocConfigCheck['message'];
 		}
@@ -896,11 +1023,16 @@ class PdpConnectFr
 		if (!empty($chorusConfigCheck['message'])) {
 			$messages[] = $chorusConfigCheck['message'];
 		}
+		if (!empty($apiConfigCheck['message'])) {
+			$messages[] = $apiConfigCheck['message'];
+		}
 
 		$res = 1;
 		if ($mysocConfigCheck['res'] === -1 || $socConfigCheck['res'] === -1 || (isset($chorusConfigCheck) && $chorusConfigCheck['res'] === -1)) {
 			$res = -1;
-		} elseif ($mysocConfigCheck['res'] === 0 || $socConfigCheck['res'] === 0 || (isset($chorusConfigCheck) && $chorusConfigCheck['res'] === 0)) {
+		} elseif ($mysocConfigCheck['res'] === 0 || $socConfigCheck['res'] === 0
+			|| (isset($chorusConfigCheck) && $chorusConfigCheck['res'] === 0)
+			|| (isset($apiConfigCheck) && $apiConfigCheck['res'] === 0)) {
 			$res = 0;
 		}
 
