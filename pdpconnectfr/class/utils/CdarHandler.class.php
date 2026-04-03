@@ -195,20 +195,19 @@ class CdarHandler
 		global $conf, $db, $mysoc;
 
 		/**
-		 * Peut-être dans les prochaines mise à jour des PDP des endpoints vont apparaître pour simplifier l'envoyer les messages de cycle de vie sans passer par les CDAR
-		 * Actuellement on doit générer les CDAR manuellement
-		 * Le CDAR peut/doit contenir plusieurs blocs, pour certains statuts il faut ajouter des blocs informatifs
-		 * On doit essayer de les créer avec le minimum de blocs obligatoires
-		 * Les blocs seront ajoutés suivant les retours PDP
-		 * Peut-être faut-il importer les fichiers XSD de l’UN/CEFACT pour valider les fichiers générés
-		 * On commence par traiter les cas suivants :
-		 * - Prise en charge (204) - optionnel => Implémenté
-		 * - Refus (210) - obligatoire dans le cas d’un refus ( Le seul statut obligatoire pour l’instant )
-		 * - Paiement transmis (212) - optionnel mais recommandé
-		 * - Acceptation (205) - optionnel
-		 * On peut en ajouter d’autres suivant le besoin
-		 */
-
+		* Perhaps in future PDP updates, endpoints will appear to simplify sending lifecycle messages without going through CDARs.
+		* Currently, CDARs must be generated manually.
+		* The CDAR can/must contain several blocks; for some statuses, informational blocks must be added.
+		* We should try to create them with the minimum number of mandatory blocks.
+		* Blocks will be added based on PDP feedback.
+		* Perhaps we need to import the UN/CEFACT XSD files to validate the generated files.
+		* We start by processing the following cases:
+		* - Acceptance (204) - optional => Implemented
+		* - Rejection (210) - mandatory in the case of a rejection (The only mandatory status for now)
+		* - Payment transmitted (212) - optional but recommended
+		* - Acceptance (205) - optional
+		* Others can be added as needed.
+		*/
 
 		// Id format: {SupplierRef}_{StatusCode}_{CreationDate}#{DocType}_{CreationDate} as defined in documentation
 		// TODO: map DOC_INVOICE with $object type
