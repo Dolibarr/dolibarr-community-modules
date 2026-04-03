@@ -81,6 +81,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 					dol_syslog(__METHOD__ . " " . $message);
 
 					if (getDolGlobalString('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
+						// TODO : Remove this conf or add more conditions like thirdparty nature to avoid blocking invoice creation for non FR companies or for thirdparties that are not subject to E-invoicing obligation
 						setEventMessages($message, array(), 'errors');
 						// $this->errors[] = $message;
 						return -1;
@@ -118,7 +119,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 
 
 	/**
-	 * Overload the addMoreMassActions function : replacing the parent's function with the one below
+	 * Overload the addMoreActionsButtons function : replacing the parent's function with the one below
 	 *
 	 * @param	array<string,mixed>	$parameters     Hook metadata (context, etc...)
 	 * @param	CommonObject		$object         The object to process (an invoice if you are in invoice module, a propale in propale's module, etc...)
@@ -200,6 +201,8 @@ class ActionsPdpconnectfr extends CommonHookActions
 
 			$resql = $db->query($sql);
 			if ($resql && $db->num_rows($resql) > 0) {
+				// TODO : we can link validate button to approval LC message or remove the approval message since it is not mandatory.
+				// TODO : if Invoice is already refused, we should not display the button to send status message
 				$availableStatuses = $pdpConnectFr->getEinvoiceStatusOptions(1, 1, 1);
 				$url_button = array();
 				foreach ($availableStatuses as $code => $label) {

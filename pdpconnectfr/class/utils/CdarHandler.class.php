@@ -217,10 +217,10 @@ class CdarHandler
 		$Name = $ID;
 
 		// SIREN (0002)
-		$GlobalID = idprof($mysoc);
+		$mysocGlobalID = idprof($mysoc);
 
 		// Issuer SIREN (0002)
-		$IssuerGlobalID = thirdpartyidprof($object);
+		$InvoiceIssuerGlobalID = thirdpartyidprof($object);
 
 		// Invoice reference
 		$IssuerAssignedID = $object->ref_supplier;
@@ -260,14 +260,15 @@ class CdarHandler
 				],
 
 				'IssuerTradeParty' => [
+					'GlobalID' => $mysocGlobalID, // GlobalID of CDAR SENDER
 					'RoleCode' => CdarHandler::ROLE_BY
 				],
 
 				'RecipientTradeParty' => [
-					'GlobalID'     => $GlobalID,
+					'GlobalID'     => $InvoiceIssuerGlobalID, // GlobalID of CDAR RECIPIENT
 					'SchemeID'     => CdarHandler::SCHEME_SIREN_0002,
 					'RoleCode'     => CdarHandler::ROLE_SE,
-					'URIID'        => $GlobalID,
+					'URIID'        => $InvoiceIssuerGlobalID,
 					'URISchemeID'  => CdarHandler::SCHEME_SIREN_0225
 				]
 			],
@@ -292,7 +293,7 @@ class CdarHandler
 					] : [],
 
 					'IssuerTradeParty' => [
-						'GlobalID' => $IssuerGlobalID,
+						'GlobalID' => $InvoiceIssuerGlobalID, // GlobalID of invoice sender (Supplier)
 						'SchemeID' => CdarHandler::SCHEME_SIREN_0002,
 						'RoleCode' => CdarHandler::ROLE_SE
 					]

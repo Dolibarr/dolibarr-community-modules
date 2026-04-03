@@ -47,8 +47,8 @@ class ProtocolManager
 		$ublIsOk = 0;
 
 		$this->protocolsList = array(
-			'Factur-X' => array(
-				'protocol_name' => 'Factur-X',
+			'FACTURX' => array(
+				'protocol_name' => 'FACTURX',
 				'description' => 'Factur-X is a French-German hybrid e-invoicing format combining a readable PDF invoice with embedded XML data for seamless automated processing.',
 				'is_enabled' => $facturexIsOk
 			),
@@ -78,7 +78,7 @@ class ProtocolManager
 	/**
 	 * Get protocol instance by name.
 	 *
-	 * @param string 	$name 			Name of the protocol to retrieve ('Factur-x', 'CII', 'UBL').
+	 * @param string 	$name 			Name of the protocol to retrieve ('FACTURX', 'CII', 'UBL').
 	 * @return AbstractProtocol|null
 	 */
 	public function getProtocol($name)
@@ -114,7 +114,7 @@ class ProtocolManager
 	 * Detect the e-invoicing protocol used in the given content.
 	 *
 	 * This function analyzes the provided string to identify
-	 * which e-invoicing protocol it conforms to (e.g., Factur-X, CII, UBL).
+	 * which e-invoicing protocol it conforms to (e.g., FACTURX, CII, UBL).
 	 *
 	 * @param 	string 		$content 	XML content of the invoice.
 	 * @return 	string|null 			Returns the name of the detected protocol or null if unknown.
@@ -123,7 +123,7 @@ class ProtocolManager
 	{
 		// Simple detection based on XML namespaces or root elements
 		if (preg_match('/^%PDF\-/', $content) !== false) {
-			return 'Factur-X';
+			return 'FACTURX';
 		} elseif (strpos($content, 'urn:un:unece:uncefact:data:standard:CrossIndustryInvoice') !== false) {
 			return 'CII';
 		} elseif (strpos($content, 'urn:oasis:names:specification:ubl:schema:xsd:Invoice-2') !== false) {
