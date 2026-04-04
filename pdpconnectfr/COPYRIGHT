@@ -1,0 +1,61 @@
+Copyright and license
+----------------------
+
+The module pdpconnectfr is distributed under the GNU General Public License as published by the Free Software Foundation;
+either version 3 of the License, or (at your option) any later version (GPL-3+).
+More information: https://www.gnu.org/licenses/gpl-3.0.txt
+
+A copy of this license should be provided with the module.
+
+This module depends on third-party components released under their own licenses.
+These dependencies are listed at the bottom of this file.
+
+
+Licence of dependencies of third-party components used by pdpconnectfr
+(all compatible with the licence of the module):
+
+Component                          Version     License                     GPL Compatible  Usage
+------------------------------------------------------------------------------------------------
+PHP libraries:
+doctrine/annotations               2.0.2       MIT                         Yes             Doctrine annotations support
+doctrine/deprecations              1.1.5       MIT                         Yes             Deprecation helper
+doctrine/instantiator              1.5.0       MIT                         Yes             Object instantiation helper
+doctrine/lexer                     2.1.1       MIT                         Yes             Lexer utility
+
+goetas-webservices/xsd2php-runtime 0.2.17      MIT                         Yes             XSD to PHP runtime support
+
+horstoeko/mimedb                   1.0.8       MIT                         Yes             MIME database utilities
+horstoeko/stringmanagement         1.0.12      MIT                         Yes             String helper utilities
+horstoeko/zugferd                  1.0.117     MIT                         Yes             ZUGFeRD / Factur-X / XRechnung handling
+
+jms/metadata                       2.9.0       MIT                         Yes             Metadata management
+jms/serializer                     3.29.1      MIT                         Yes             Serialization / deserialization
+
+phpstan/phpdoc-parser              1.33.0      MIT                         Yes             PHPDoc parsing
+psr/cache                          1.0.1       MIT                         Yes             PSR cache interfaces
+
+setasign/fpdf                      1.8.6       MIT                         Yes             PDF generation
+setasign/fpdi                      2.6.4       MIT                         Yes             Import pages from existing PDF files
+smalot/pdfparser                   2.12.2      LGPL-3.0                    Yes             PDF parsing
+
+symfony/deprecation-contracts      2.5.4       MIT                         Yes             Symfony contracts
+symfony/finder                     5.4.45      MIT                         Yes             File finder utilities
+symfony/polyfill-ctype             1.33.0      MIT                         Yes             PHP polyfill
+symfony/polyfill-mbstring          1.33.0      MIT                         Yes             PHP polyfill
+symfony/polyfill-php73             1.33.0      MIT                         Yes             PHP polyfill
+symfony/polyfill-php80             1.33.0      MIT                         Yes             PHP polyfill
+symfony/polyfill-php81             1.33.0      MIT                         Yes             PHP polyfill
+symfony/process                    5.4.47      MIT                         Yes             Process execution
+symfony/translation-contracts      2.5.4       MIT                         Yes             Translation contracts
+symfony/validator                  5.4.48      MIT                         Yes             Validation component
+symfony/yaml                       5.4.45      MIT                         Yes             YAML loader/dumper
+
+
+For more licenses compatibility information:
+https://www.gnu.org/licenses/licenses.en.html
+
+
+Authors
+-------------------
+
+See the project repository history and contributors.
