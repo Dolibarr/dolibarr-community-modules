@@ -82,6 +82,7 @@ FxCheckWarnSIRENClosed=L'entreprise associée au SIREN %s est cessée dans le re
 FxCheckWarnNameMismatch=La dénomination sociale du tiers (%s) ne correspond pas à celle du registre national des entreprises (%s).
 FxCheckWarnZIPMismatch=Le code postal du tiers (%s) ne correspond pas à celui du registre national des entreprises (%s).
 FxCheckWarnTownMismatch=La ville du tiers (%s) ne correspond pas à celle du registre national des entreprises (%s).
+FxCheckErrorCreditNoteNoSource=Cet avoir ne référence aucune facture d'origine. Veuillez lier la facture source avant de générer la facture électronique.
 InvoiceNotSentToPDPDueToThirdpartyIssues=La facture n'a pas été envoyée au point d'accès en raison d'erreurs sur les données du tiers
 PDPCONNECTFR_ENABLE_API_VALIDATION=Activer la validation des données du tiers via les APIs gouvernementales (SIREN, TVA)
 PDPCONNECTFR_ENABLE_API_VALIDATION_HELP=Si activée, les données du tiers (SIREN/SIRET et numéro de TVA) sont vérifiées en temps réel via le Registre National des Entreprises (data.gouv.fr) et le service VIES (UE) avant la génération et l'envoi de la facture électronique. En cas d'indisponibilité de ces services, le contrôle est ignoré (avertissement non bloquant).
