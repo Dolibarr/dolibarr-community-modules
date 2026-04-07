@@ -21,6 +21,7 @@
  * \file    pdpconnectfr/admin/setup_devtools.php
  * \ingroup pdpconnectfr
  * \brief   PDPConnectFR setup page to provide some tools for dev or test.
+ * 			This page is visible in the setup menu only if the constant PDPCONNECTFR_ALLOW_DEVTOOLS is set to 1.
  */
 
 // Load Dolibarr environment
@@ -212,24 +213,6 @@ print '<br>';
 if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 	$provider = $PDPManager->getProvider(getDolGlobalString('PDPCONNECTFR_PDP'));
 
-	if (getDolGlobalString('PDPCONNECTFR_PDP') == 'SUPERPDP') {
-		// Generate a $provider (this call the constructor that load the token with fetchOAuthTokenDB() and save it in the memory var $provider->tokenData)
-		// Note: Token may have been expired
-		print '<div class="neutral">';
-		print 'Current token (can be used for '.getDolGlobalString('PDPCONNECTFR_PDP').' API as HTTP "Bearer: token")<br>';
-		$tokendata = $provider->getTokenData();
-		$token = $tokendata['token'] ?? '';
-		//print '<input id="bearertoken" type="text" class="width500 text-security" value="'.$token.'" spellcheck="false" readonly>';
-		if ($token)	{
-			print showValueWithClipboardCPButton($token, 0, dol_trunc($token, 10));
-		} else {
-			print 'Not yet generated or error when generating token.';
-		}
-		print '</div>';
-
-		print '<br>';
-	}
-
 	print '<div class="neutral">';
 	print 'Generate an Einvoice sample in the protocol (Factur-X, ...) set for the Access Point '.getDolGlobalString('PDPCONNECTFR_PDP').' in the first setup tab<br>';
 	print '<form action="'.$_SERVER["PHP_SELF"].'" method="POST">';
@@ -268,6 +251,63 @@ if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 		print 'Sample invoice generated into document directory into path:<br><b>'.preg_replace('/^'.preg_quote(DOL_DATA_ROOT.'/', '/').'/', '', $invoice_path).'</b>';
 	}
 	print '</div>';
+	print '<br>';
+
+
+	if (strpos(getDolGlobalString('PDPCONNECTFR_PDP'), 'SUPERPDP') !== false) {
+		// Generate a $provider (this call the constructor that load the token with fetchOAuthTokenDB() and save it in the memory var $provider->tokenData)
+		// Note: Token may have been expired
+		print '<div class="neutral">';
+		print 'Current token (can be used for '.getDolGlobalString('PDPCONNECTFR_PDP').' API as HTTP "Bearer: token")<br>';
+		$tokendata = $provider->getTokenData();
+		$token = $tokendata['token'] ?? '';
+		//print '<input id="bearertoken" type="text" class="width500 text-security" value="'.$token.'" spellcheck="false" readonly>';
+		if ($token)	{
+			print showValueWithClipboardCPButton($token, 0, dol_trunc($token, 10));
+		} else {
+			print 'Not yet generated or error when generating token.';
+		}
+		print '</div>';
+
+		print '<br>';
+
+		global $dolibarr_main_url_root;
+
+		$urlforproxy = $dolibarr_main_url_root.'/custom/pdpconnectfr/public/proxy_oauthcallback.php';
+
+
+		if (getDolGlobalString('PDPCONNECTFR_PDP') == 'SUPERPDPViaPartner' && getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER') == 'proxy') {
+			print '<div class="neutral">';
+			print '<b>You are a proxy for SuperPDP</b> Access Point registration (PDPCONNTECTFR_SUPERPDP_VIAPARTNER = "proxy"). ';
+			print 'To have customer instances using this server as proxy for SuperPDP registration:<br>';
+			print '- on this instance, you must have set the Client ID and Client Secret of reseller account on the setup tab - '.((getDolGlobalString('PDPCONNECTFR_SUPERPDPVIAPARTNER_CLIENT_ID') && getDolGlobalString('PDPCONNECTFR_SUPERPDPVIAPARTNER_CLIENT_SECRET')) ? 'OK' : '<span class="error">KO</span>').'.<br>';
+			print '- on the SuperPDP Access Point, for the account of your company, the callback url must also be set to "'.$urlforproxy.'"<br>';
+			print '- on the instance of your customers, the variable PDPCONNTECTFR_SUPERPDP_VIAPARTNER to the name of your company, for example "'.$mysoc->name.'"<br>';
+			print '- on the instance of your customers, the variable PDPCONNTECTFR_SUPERPDP_VIAPARTNER_OAUTH_URL to "'.$urlforproxy.'"<br>';
+			print '</div>';
+		} elseif (getDolGlobalString('PDPCONNECTFR_PDP') == 'SUPERPDPViaPartner') {
+			print '<div class="neutral">';
+			print '<b>You are using the proxy for SuperPDP Access Point</b> registration with property:<br>';
+			print '- PDPCONNTECTFR_SUPERPDP_VIAPARTNER = '.getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER').'<br>';
+			print '- PDPCONNTECTFR_SUPERPDP_VIAPARTNER_OAUTH_URL = '.getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER_OAUTH_URL');
+			print '</div>';
+		} else {
+			print '<div class="neutral">';
+			print 'This instance can be a Proxy for the SuperPDP Access Point registration for your customer if you set:<br>';
+			print '- on this instance, the variable PDPCONNTECTFR_SUPERPDP_VIAPARTNER to the value "proxy"<br>';
+			print '- on the instance of your customers, the variable PDPCONNTECTFR_SUPERPDP_VIAPARTNER to the name of your company, for example "'.$mysoc->name.'"<br>';
+			print '- on the instance of your customers, the variable PDPCONNTECTFR_SUPERPDP_VIAPARTNER_OAUTH_URL to "'.$urlforproxy.'"<br>';
+			print '- on the instance of your customers, choose the Access Point provider working through your Proxy.<br>';
+			print '- on the SuperPDP Access Point, for the account of your company, the callback url must also be set to "'.$urlforproxy.'"<br>';
+			print '<br>';
+			print 'This instance can be a customer instance registering to SuperPDP through the OAUth proxy of a partner if you set:<br>';
+			print '- on this instance, the variable PDPCONNTECTFR_SUPERPDP_VIAPARTNER to the name of the company offering the proxy, for example DoliCloud.<br>';
+			print '- on this instance, the variable PDPCONNTECTFR_SUPERPDP_VIAPARTNER_OAUTH_URL to the url of the proxy (provided by the proxy)<br>';
+			print '- on this instance, choose the Access Point provider working through the Proxy.<br>';
+			print '- on the proxy instance, the variable PDPCONNTECTFR_SUPERPDP_VIAPARTNER to the value "proxy"<br>';
+			print '</div>';
+		}
+	}
 }
 
 

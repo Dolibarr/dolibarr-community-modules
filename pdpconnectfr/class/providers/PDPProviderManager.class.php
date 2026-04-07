@@ -123,6 +123,21 @@ class PDPProviderManager
 			);
 		}
 
+		if (getDolGlobalString("PDPCONNTECTFR_SUPERPDP_VIAPARTNER") == 'proxy') {
+			$this->providersList['SUPERPDPViaPartner'] = array(
+				'class' => 'SuperPDPProvider',
+				'position' => 1,
+				'provider_countries' => array('all'),
+				'provider_name' => 'SuperPDP OAuth proxy</span>',
+				'description' => 'SuperPDP OAuth proxy',
+				'note' => 'Proxy for client to use "authorization_code" mode',
+				//'is_enabled' => getDolGlobalString('PDPCONNECTFR_TEST_SUPERPDP'),
+				'is_enabled' => 1,
+				'prod_account_admin_url' => $urltorenew,
+				'test_account_admin_url' => $urltorenew,
+			);
+		}
+
 		// Sort list by position
 		$this->providersList = dol_sort_array($this->providersList, 'position');
 	}

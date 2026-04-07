@@ -82,8 +82,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$this->helpToGetCredentials .= '<div class="margintoponly">'.$langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL4", '{s3}', '{s4}', '{s5}').'</div>';
 
 		if (getDolGlobalString('PDPCONNECTFR_PDP') == 'SUPERPDPViaPartner') {
-			$this->helpToGetCredentials = '<div class="">'.$langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL1").'</div>';
-			$this->helpToGetCredentials .= '<div class="margintoponly">'.$langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL2", '{s1}').'</div>';
+			$this->helpToGetCredentials = '<div class="">'.$langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL_VIA_PARTNER", '{s1}').'</div>';
 		}
 
 		$redirect_uri = dol_buildpath('/pdpconnectfr/admin/setup.php', 2);
@@ -123,13 +122,14 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$urltoshow = $url;
 
 		if (getDolGlobalString('PDPCONNECTFR_PDP') == 'SUPERPDPViaPartner') {
-			$urltoshow = 'Link to create account';
+			if (getDolGlobalString("PDPCONNTECTFR_SUPERPDP_VIAPARTNER") != 'proxy') {
+				$url = getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER_OAUTH_URL');
+				$urltoshow = 'Link to create account';
 
-			$this->helpToGetCredentials = str_replace('{s1}', img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$url.'" target="_new">'.$urltoshow.'</a>', $this->helpToGetCredentials);
-			$this->helpToGetCredentials = str_replace('{s2}', '<input type="text" class="width300" value="'.$this->callbackurl.'">', $this->helpToGetCredentials);
-			$this->helpToGetCredentials = str_replace('{s3}', $langs->transnoentitiesnoconv("OAUTH_ID"), $this->helpToGetCredentials);
-			$this->helpToGetCredentials = str_replace('{s4}', $langs->transnoentitiesnoconv("OAUTH_SECRET"), $this->helpToGetCredentials);
-			$this->helpToGetCredentials = str_replace('{s5}', $langs->transnoentitiesnoconv("Save"), $this->helpToGetCredentials);
+				$this->helpToGetCredentials = str_replace('{s1}', img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$url.'" target="_new">'.$urltoshow.'</a>', $this->helpToGetCredentials);
+			} else {
+				$this->helpToGetCredentials = 'You are on the proxy for SuperPDP Access Point registration.';
+			}
 		} else {
 			// Default help
 			$this->helpToGetCredentials = str_replace('{s1}', img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$url.'" target="_new">'.$urltoshow.'</a>', $this->helpToGetCredentials);
@@ -161,54 +161,64 @@ class SuperPDPProvider extends AbstractPDPProvider
 		// $item->cssClass = 'minwidth500';
 		// $item->fieldParams['trClass'] = 'advancedoption';
 
-		// Username
-		$item = $formSetup->newItem($prefix . 'CLIENT_ID');
-		$item->nameText = $langs->trans('OAUTH_ID');
-		$item->cssClass = 'minwidth500';
+		if (getDolGlobalString('PDPCONNECTFR_PDP') != 'SUPERPDPViaPartner') {
+			// Username
+			$item = $formSetup->newItem($prefix . 'CLIENT_ID');
+			$item->nameText = $langs->trans('OAUTH_ID');
+			$item->cssClass = 'minwidth500';
 
-		// Password
-		$item = $formSetup->newItem($prefix . 'CLIENT_SECRET')->setAsGenericPassword();
-		$item->nameText = $langs->trans('OAUTH_SECRET');
-		$item->cssClass = 'minwidth500';
+			// Password
+			$item = $formSetup->newItem($prefix . 'CLIENT_SECRET')->setAsGenericPassword();
+			$item->nameText = $langs->trans('OAUTH_SECRET');
+			$item->cssClass = 'minwidth500';
+		}
 
 		// API_KEY
 		//$item = $formSetup->newItem($prefix . 'API_KEY');
 		//$item->cssClass = 'minwidth500';
 
 		// Token
-		if (getDolGlobalString($prefix . 'CLIENT_ID') && getDolGlobalString($prefix . 'CLIENT_SECRET')) {
-			$item = $formSetup->newItem($prefix . 'TOKEN');
-			$item->nameText = $langs->trans('Token');
-			$item->cssClass = 'maxwidth500 ';
-			$item->fieldOverride = "";
-			if (!empty($tokenData['token'])) {
-				$item->fieldOverride = htmlspecialchars('**************' . substr($tokenData['token'], -4));
+		if (getDolGlobalString('PDPCONNECTFR_PDP') != 'SUPERPDPViaPartner' || getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER') != 'proxy') {
+			if ((getDolGlobalString('PDPCONNECTFR_PDP') == 'SUPERPDP' || getDolGlobalString('PDPCONNECTFR_PDP') == 'SUPERPDPViaPartner')) {	// When we are on a proxy server, no token need to be generated here.
+				if (getDolGlobalString($prefix . 'CLIENT_ID') && getDolGlobalString($prefix . 'CLIENT_SECRET')) {
+					$item = $formSetup->newItem($prefix . 'TOKEN');
+					$item->nameText = $langs->trans('Token');
+					$item->cssClass = 'maxwidth500 ';
+					$item->fieldOverride = "";
+					if (!empty($tokenData['token'])) {
+						$item->fieldOverride = htmlspecialchars('**************' . substr($tokenData['token'], -4));
 
-				if (!empty($tokenData['token_expires_at'])) {
-					$item->fieldOverride .= ' &nbsp; <span class="opacitymedium hideonsmartphone">('.$langs->trans("until").' '.dol_print_date($tokenData['token_expires_at'], 'dayhoursec', 'tzuserrel').')</span>';
+						if (!empty($tokenData['token_expires_at'])) {
+							$item->fieldOverride .= ' &nbsp; <span class="opacitymedium hideonsmartphone">('.$langs->trans("until").' '.dol_print_date($tokenData['token_expires_at'], 'dayhoursec', 'tzuserrel').')</span>';
+						}
+						//var_dump($tokenData);
+					}
+					if (empty($tokenData['token'])) {
+						$item->fieldOverride .= '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken().'">' . $langs->trans('generateAccessToken') . '<i class="fa fa-key paddingleft"></i></a>';
+					}
+					if (!empty($tokenData['token'])) {
+						$item->fieldOverride .= ' &nbsp; &nbsp; <a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken().'">' . $langs->trans('reGenerateAccessToken') . '<i class="fa fa-key paddingleft"></i></a>';
+					}
+
+					if (!empty($tokenData['token'])) {
+						$item->fieldOverride .= ' &nbsp; &nbsp; <a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=delete".$prefix."TOKEN&token=".newToken().'">' . img_picto('', 'delete') . '</a>';
+					}
 				}
-				//var_dump($tokenData);
-			}
-			if (empty($tokenData['token'])) {
-				$item->fieldOverride .= '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken().'">' . $langs->trans('generateAccessToken') . '<i class="fa fa-key paddingleft"></i></a>';
-			}
-			if (!empty($tokenData['token'])) {
-				$item->fieldOverride .= ' &nbsp; &nbsp; <a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken().'">' . $langs->trans('reGenerateAccessToken') . '<i class="fa fa-key paddingleft"></i></a>';
 			}
 
-			$item->fieldOverride .= ' &nbsp; &nbsp; <a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=delete".$prefix."TOKEN&token=".newToken().'">' . img_picto('', 'delete') . '</a>';
-		}
+			if (getDolGlobalString('PDPCONNECTFR_PDP') != 'SUPERPDPViaPartner') {	// When we are on a proxy server, no token need to be generated here.
+				if (!empty($tokenData['token'])) {
+					// Actions
+					$item = $formSetup->newItem($prefix . 'ACTIONS');
+					$item->nameText = "&nbsp;";
 
-		if (!empty($tokenData['token'])) {
-			// Actions
-			$item = $formSetup->newItem($prefix . 'ACTIONS');
-			$item->nameText = "&nbsp;";
+					$item->fieldOverride .= '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=call".$prefix."HEALTHCHECK&token=".newToken().'">' . $langs->trans('testConnection') . ' (Healthcheck)<i class="fa fa-check paddingleft"></i></a><br>';
+					$item->cssClass = 'minwidth500';
 
-			$item->fieldOverride .= '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=call".$prefix."HEALTHCHECK&token=".newToken().'">' . $langs->trans('testConnection') . ' (Healthcheck)<i class="fa fa-check paddingleft"></i></a><br>';
-			$item->cssClass = 'minwidth500';
-
-			if ($tokenData['token'] && getDolGlobalString('PDPCONNECTFR_PROTOCOL') && getDolGlobalString('PDPCONNECTFR_PROTOCOL') === 'FACTURX') {
-				$item->fieldOverride .= '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=make".$prefix."sampleinvoice&token=".newToken().'">' . $langs->trans('generateSendSampleInvoice') . '<i class="fa fa-file paddingleft"></i></a><br>';
+					if ($tokenData['token'] && getDolGlobalString('PDPCONNECTFR_PROTOCOL') && getDolGlobalString('PDPCONNECTFR_PROTOCOL') === 'FACTURX') {
+						$item->fieldOverride .= '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=make".$prefix."sampleinvoice&token=".newToken().'">' . $langs->trans('generateSendSampleInvoice') . '<i class="fa fa-file paddingleft"></i></a><br>';
+					}
+				}
 			}
 		}
 	}
