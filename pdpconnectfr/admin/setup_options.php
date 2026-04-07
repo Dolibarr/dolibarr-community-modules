@@ -229,7 +229,6 @@ $item->cssClass = 'minwidth500';
 $item->fieldParams['forcereload'] = 1;
 
 if (getDolGlobalString('PDPCONNECTFR_EINVOICE_IN_REAL_TIME')) {
-	// TODO : Remove this conf or add more conditions like thirdparty nature to avoid blocking invoice creation for non FR companies or for thirdparties that are not subject to E-invoicing obligation 
 	$item = $formSetup->newItem('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS')->setAsYesNo();
 	$item->helpText = $langs->transnoentities('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS').'<br>'.$langs->transnoentities('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS2');
 	$item->defaultFieldValue = 0;
