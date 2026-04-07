@@ -1610,11 +1610,9 @@ class PdpConnectFr
 		if ($resql) {
 			if ($this->db->num_rows($resql) > 0) {
 				$obj = $this->db->fetch_object($resql);
-				$status = array(
-					'code' => (int) $obj->syncstatus,
-					'status' => $this->getStatusLabel((int) $obj->syncstatus),
-					'info' => $obj->synccomment ?? ''
-				);
+				$status['code'] = (int) $obj->syncstatus;
+				$status['status'] = $this->getStatusLabel((int) $obj->syncstatus);
+				$status['info'] = $obj->synccomment ?? '';
 				if (!in_array((int) $obj->syncstatus, array(self::STATUS_UNKNOWN, self::STATUS_IGNORE, self::STATUS_NOT_GENERATED, self::STATUS_GENERATED))) {
 					$status['transmitted'] = 1;
 				} else {

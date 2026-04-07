@@ -544,15 +544,15 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				return 0;
 			}
 		} else {
-			$this->error = $langs->trans("ErrorSendingInvoiceToPDP");
-			$this->error .= '<br>HTTP '.$response['status_code'];
+			$errormsg = $langs->trans("ErrorSendingInvoiceToPDP");
+			$errormsg .= '<br>HTTP '.$response['status_code'];
 			if (!empty($response['errorCode'])) {
-				$this->error .= ' - '.$response['errorCode'].(empty($response['errorMessage']) ? '': ' - '.$response['errorMessage']);
+				$errormsg .= ' - '.$response['errorCode'].(empty($response['errorMessage']) ? '': ' - '.$response['errorMessage']);
 			}
 			if (!empty($response['curl_error_no'])) {
-				$this->error .= ' - Curl error '.$response['curl_error_no'].(empty($response['curl_error_msg']) ? '': ' - '.$response['curl_error_msg']);
+				$errormsg .= ' - Curl error '.$response['curl_error_no'].(empty($response['curl_error_msg']) ? '': ' - '.$response['curl_error_msg']);
 			}
-			$this->errors[] = $this->error;
+			$this->errors[] = $errormsg;
 			return 0;
 		}
 	}

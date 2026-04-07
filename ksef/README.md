@@ -1,11 +1,10 @@
 # KSEF for Dolibarr ERP CRM
 
-## Main Repository:
-https://github.com/InPoint-Automation/Dolibarr-KSeF-Module
+## [Po Polsku](https://github.com/InPoint-Automation/Dolibarr-KSeF-Module/blob/main/README_PL.md)
 
 ## Description
 
-This module integrates Dolibarr with KSEF (Krajowy System e-Faktur / National e-Invoice System), the Polish electronic
+This module integrates Dolibarr (https://www.dolibarr.org/) with KSEF (Krajowy System e-Faktur / National e-Invoice System), the Polish electronic
 invoicing system.
 
 ## Features
@@ -17,12 +16,14 @@ invoicing system.
 - Can exclude 3rd parties from KSeF (e.g. generic B2C third parties)
 - Adds KSeF Fields (including clickable KSeF number and submission status to verify submission) to main invoice page
 - Adds page with overview of all submissions, as well as KSeF tab to invoice page
+- Download and processing of incoming invoices from KSeF
+- Generation of KSeF-style invoice visualizations
 
 ## Requirements
 
 ### System Requirements
 
-- Dolibarr: As of 02 Dec 25 only tested on v22.0.3
+- Dolibarr: tested on v22.0.3 and higher
 - PHP: 7.4 or higher
 - PHP Extensions:
     - `OpenSSL`
@@ -51,6 +52,12 @@ The recommended installation method is from a ZIP file.
 Feel free to fork this module or contribute a PR to help improve the Dolibarr community
 
 Build instructions can be found in the developer readme [DEV.md](DEV.md)
+
+## Roadmap
+
+- [X] ~~Add KSeF exclusion to Third Party tabs (https://www.dolibarr.org/forum/t/ksef-module-for-dolibarr/30788/9)~~
+- [ ] FA(3) builder is yet not complete for some edge cases
+- [ ] Fix php-scoper issues with phpseclib
 
 ## Licenses
 
@@ -92,3 +99,6 @@ Thanks to Éric Seigne and the FacturX plugin (https://registry.inligit.fr/cap-r
 learning from their module, this project would have taken ages longer to complete
 
 This module was developed by InPoint Automation Sp. z o.o.
+
+## Changelog
+Visible on GitHub Repo
