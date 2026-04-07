@@ -409,6 +409,23 @@ class FacturXProtocol extends AbstractProtocol
 		// Set Business Process ID according to invoice type
 		$facturxpdf->setDocumentBusinessProcess($this->getBillingProcessID($object));
 
+		// Add reference to source invoice for credit notes (BT-25/BT-26, mandatory per EN16931)
+		if ($object->type == $object::TYPE_CREDIT_NOTE && !empty($object->fk_facture_source)) {
+			$sourceFact = new Facture($this->db);
+			if ($sourceFact->fetch($object->fk_facture_source) > 0) {
+				$sourceFactDate = new DateTime(dol_print_date($sourceFact->date, 'dayrfc'));
+				$sourceType = $this->_getTypeOfInvoice($sourceFact);
+				$facturxpdf->setDocumentInvoiceReferencedDocument(
+					$sourceFact->ref,
+					$sourceType,
+					$sourceFactDate
+				);
+				dol_syslog(get_class($this).'::generateXML Set source invoice reference '.$sourceFact->ref.' for credit note '.$object->ref);
+			} else {
+				dol_syslog(get_class($this).'::generateXML Cannot fetch source invoice id='.$object->fk_facture_source.' for credit note '.$object->ref, LOG_WARNING);
+			}
+		}
+
 
 		// --- 11. Process Invoice Lines ---
 		// is there multi VAT information ? in case we need to collect all data to be able to join it at the end
@@ -445,6 +462,16 @@ class FacturXProtocol extends AbstractProtocol
 			$isSubTotalLine = $this->_isLineFromExternalModule($line, $object->element, 'modSubtotal');
 			if ($isSubTotalLine) {
 				continue;
+			}
+
+			// For credit notes, EN16931 requires positive amounts (sign is implied by TypeCode 381)
+			if ($object->type == $object::TYPE_CREDIT_NOTE) {
+				$line->subprice     = abs($line->subprice);
+				$line->subprice_ttc = abs($line->subprice_ttc);
+				$line->total_ht     = abs($line->total_ht);
+				$line->total_ttc    = abs($line->total_ttc);
+				$line->total_tva    = abs($line->total_tva);
+				$line->qty          = abs($line->qty);
 			}
 
 			if ($line->subprice < 0 || $line->subprice_ttc < 0) {
