@@ -89,10 +89,12 @@ $action = GETPOST('action', 'aZ09');
 $backtopage = GETPOST('backtopage', 'alpha');
 $modulepart = GETPOST('modulepart', 'aZ09');	// Used by actions_setmoduleoptions.inc.php
 
+/*
 $value = GETPOST('value', 'alpha');
 $label = GETPOST('label', 'alpha');
 $scandir = GETPOST('scan_dir', 'alpha');
 $type = 'myobject';
+*/
 
 $error = 0;
 $setupnotempty = 0;
@@ -275,7 +277,9 @@ if ($action == 'update' && $prefix && $valueofapikeyafter != $valueofapikeybefor
 	exit;
 }
 
-
+if (GETPOST('error')) {
+	setEventMessages($langs->trans('Error').' '.GETPOST('error'), null, 'errors');
+}
 
 
 

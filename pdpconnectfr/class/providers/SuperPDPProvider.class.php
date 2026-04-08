@@ -63,11 +63,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 		$this->config = array(
 			'provider_url' => 'https://superpdp.tech/',
-			'prod_auth_url' => 'https://api.superpdp.tech/oauth2/', 	// TODO: Replace the URL once known
+			'prod_auth_url' => 'https://api.superpdp.tech/oauth2/',
 			'test_auth_url' => 'https://api.superpdp.tech/oauth2/',
-			//'prod_api_url' => 'https://api.superpdp.tech/v1.beta/', // TODO: Replace the URL once known
-			//'test_api_url' => 'https://api.superpdp.tech/v1.beta/',
-			'prod_api_url' => 'https://api.superpdp.tech/afnor-flow/v1/', // TODO: Replace the URL once known
+			'prod_api_url' => 'https://api.superpdp.tech/afnor-flow/v1/',
 			'test_api_url' => 'https://api.superpdp.tech/afnor-flow/v1/',
 			'client_id' => getDolGlobalString('PDPCONNECTFR_SUPERPDP_CLIENT_ID'),
 			'client_secret' => getDolGlobalString('PDPCONNECTFR_SUPERPDP_CLIENT_SECRET'),
@@ -118,19 +116,33 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$langs->load("oauth");
 
 		// Set content of the help page
-		$url = $providersConfig[getDolGlobalString('PDPCONNECTFR_PDP')][$prefixenv.'_account_admin_url'];
-		$urltoshow = $url;
-
 		if (getDolGlobalString('PDPCONNECTFR_PDP') == 'SUPERPDPViaPartner') {
 			if (getDolGlobalString("PDPCONNTECTFR_SUPERPDP_VIAPARTNER") != 'proxy') {
-				$url = getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER_OAUTH_URL');
-				$urltoshow = 'Link to create account';
+				/*
+				// Define $urlwithroot
+				global $dolibarr_main_url_root;
+				$urlwithouturlroot = preg_replace('/'.preg_quote(DOL_URL_ROOT, '/').'$/i', '', trim($dolibarr_main_url_root));
+				//$urlwithroot = $urlwithouturlroot.DOL_URL_ROOT; // This is to use external domain name found into config file
+				$urlwithroot = DOL_MAIN_URL_ROOT;				// This is to use same domain name than current
 
-				$this->helpToGetCredentials = str_replace('{s1}', img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$url.'" target="_new">'.$urltoshow.'</a>', $this->helpToGetCredentials);
+				include DOL_DOCUMENT_ROOT.'/core/lib/geturl.lib.php';
+				$currentrooturl = getRootURLFromURL(DOL_MAIN_URL_ROOT);
+				$externalrooturl = getRootURLFromURL($urlwithroot);
+				*/
+
+				$urltogeneratetoken = getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER_OAUTH_URL');
+				$urltogeneratetoken .= '?state=none&response_type=code&redirect_uri='.urlencode(dol_buildpath('/pdpconnectfr/admin/setup.php', 2));
+
+				$urltoshow = 'Link to create account via '.getDolGlobalString("PDPCONNTECTFR_SUPERPDP_VIAPARTNER");
+
+				$this->helpToGetCredentials = str_replace('{s1}', img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$urltogeneratetoken.'" target="_new">'.$urltoshow.'</a>', $this->helpToGetCredentials);
 			} else {
 				$this->helpToGetCredentials = 'You are on the proxy for SuperPDP Access Point registration.';
 			}
 		} else {
+			$url = $providersConfig[getDolGlobalString('PDPCONNECTFR_PDP')][$prefixenv.'_account_admin_url'];
+			$urltoshow = $url;
+
 			// Default help
 			$this->helpToGetCredentials = str_replace('{s1}', img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$url.'" target="_new">'.$urltoshow.'</a>', $this->helpToGetCredentials);
 			$this->helpToGetCredentials = str_replace('{s2}', '<input type="text" class="width300" value="'.$this->callbackurl.'">', $this->helpToGetCredentials);
@@ -161,7 +173,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		// $item->cssClass = 'minwidth500';
 		// $item->fieldParams['trClass'] = 'advancedoption';
 
-		if (getDolGlobalString('PDPCONNECTFR_PDP') != 'SUPERPDPViaPartner') {
+		if (getDolGlobalString('PDPCONNECTFR_PDP') != 'SUPERPDPViaPartner' || getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER') == 'proxy') {
 			// Username
 			$item = $formSetup->newItem($prefix . 'CLIENT_ID');
 			$item->nameText = $langs->trans('OAUTH_ID');
@@ -180,7 +192,17 @@ class SuperPDPProvider extends AbstractPDPProvider
 		// Token
 		if (getDolGlobalString('PDPCONNECTFR_PDP') != 'SUPERPDPViaPartner' || getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER') != 'proxy') {
 			if ((getDolGlobalString('PDPCONNECTFR_PDP') == 'SUPERPDP' || getDolGlobalString('PDPCONNECTFR_PDP') == 'SUPERPDPViaPartner')) {	// When we are on a proxy server, no token need to be generated here.
-				if (getDolGlobalString($prefix . 'CLIENT_ID') && getDolGlobalString($prefix . 'CLIENT_SECRET')) {
+				$texttoshow = '';
+				$urltogeneratetoken = '';
+				if (getDolGlobalString('PDPCONNECTFR_PDP') == 'SUPERPDPViaPartner' && getDolGlobalString("PDPCONNTECTFR_SUPERPDP_VIAPARTNER")) {
+					$texttoshow = $langs->trans('generateAccessToken').' via '.getDolGlobalString("PDPCONNTECTFR_SUPERPDP_VIAPARTNER");
+					$urltogeneratetoken = getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER_OAUTH_URL');
+					$urltogeneratetoken .= '?state=none&response_type=code&redirect_uri='.urlencode(dol_buildpath('/pdpconnectfr/admin/setup.php', 2));
+				} elseif (getDolGlobalString($prefix . 'CLIENT_ID') && getDolGlobalString($prefix . 'CLIENT_SECRET')) {
+					$texttoshow = $langs->trans('generateAccessToken');
+					$urltogeneratetoken = $_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken();
+				}
+				if ($urltogeneratetoken) {
 					$item = $formSetup->newItem($prefix . 'TOKEN');
 					$item->nameText = $langs->trans('Token');
 					$item->cssClass = 'maxwidth500 ';
@@ -194,7 +216,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 						//var_dump($tokenData);
 					}
 					if (empty($tokenData['token'])) {
-						$item->fieldOverride .= '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken().'">' . $langs->trans('generateAccessToken') . '<i class="fa fa-key paddingleft"></i></a>';
+						$item->fieldOverride .= '<a class="reposition" href="'.$urltogeneratetoken.'">' .$texttoshow . '<i class="fa fa-key paddingleft"></i></a>';
 					}
 					if (!empty($tokenData['token'])) {
 						$item->fieldOverride .= ' &nbsp; &nbsp; <a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken().'">' . $langs->trans('reGenerateAccessToken') . '<i class="fa fa-key paddingleft"></i></a>';

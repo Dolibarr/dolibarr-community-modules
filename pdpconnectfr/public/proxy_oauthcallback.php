@@ -36,15 +36,57 @@ if (!defined('NOLOGIN') && $forlogin) {
 }
 
 // Load Dolibarr environment
-require '../../../main.inc.php';
+// Load Dolibarr environment
+$res = 0;
+// Try main.inc.php into web root known defined into CONTEXT_DOCUMENT_ROOT (not always defined)
+if (!$res && !empty($_SERVER["CONTEXT_DOCUMENT_ROOT"])) {
+	$res = @include $_SERVER["CONTEXT_DOCUMENT_ROOT"]."/main.inc.php";
+}
+// Try main.inc.php into web root detected using web root calculated from SCRIPT_FILENAME
+$tmp = empty($_SERVER['SCRIPT_FILENAME']) ? '' : $_SERVER['SCRIPT_FILENAME'];
+$tmp2 = realpath(__FILE__);
+$i = strlen($tmp) - 1;
+$j = strlen($tmp2) - 1;
+while ($i > 0 && $j > 0 && isset($tmp[$i]) && isset($tmp2[$j]) && $tmp[$i] == $tmp2[$j]) {
+	$i--;
+	$j--;
+}
+if (!$res && $i > 0 && file_exists(substr($tmp, 0, ($i + 1))."/main.inc.php")) {
+	$res = @include substr($tmp, 0, ($i + 1))."/main.inc.php";
+}
+if (!$res && $i > 0 && file_exists(dirname(substr($tmp, 0, ($i + 1)))."/main.inc.php")) {
+	$res = @include dirname(substr($tmp, 0, ($i + 1)))."/main.inc.php";
+}
+// Try main.inc.php using relative path
+if (!$res && file_exists("../main.inc.php")) {
+	$res = @include "../main.inc.php";
+}
+if (!$res && file_exists("../../main.inc.php")) {
+	$res = @include "../../main.inc.php";
+}
+if (!$res && file_exists("../../../main.inc.php")) {
+	$res = @include "../../../main.inc.php";
+}
+if (!$res && file_exists("../../../../main.inc.php")) {
+	$res = @include "../../../../main.inc.php";
+}
+if (!$res) {
+	die("Include of main fails");
+}
 /**
+ * The main.inc.php has been included so the following variable are now defined:
  * @var Conf $conf
  * @var DoliDB $db
+ * @var HookManager $hookmanager
  * @var Translate $langs
  * @var User $user
  *
  * @var string $dolibarr_main_url_root
  */
+require_once '../lib/pdpconnectfr.lib.php';
+require_once "../class/providers/PDPProviderManager.class.php";
+require_once "../class/protocols/ProtocolManager.class.php";
+require_once "../class/pdpconnectfr.class.php";
 
 
 // Define $urlwithroot
@@ -62,9 +104,9 @@ if (!GETPOSTISSET('keyforprovider') && !empty($_SESSION["oauthkeyforproviderbefo
 	// If we are coming from the Oauth page
 	$keyforprovider = $_SESSION["oauthkeyforproviderbeforeoauthjump"];
 }
-$genericstring = 'GENERIC';
 
 
+$nonce = bin2hex(random_bytes(64 / 8));
 $state = GETPOST('state');
 $statewithscopeonly = '';
 $statewithanticsrfonly = '';
@@ -81,38 +123,18 @@ if ($state) {
 	}
 }
 
-// Add a test to check that the state parameter is provided into URL when we make the first call to ask the redirect or when we receive the callback,
-// but NOT when callback was ok and we recall the page
-if ($action != 'delete' && !GETPOST('afteroauthloginreturn') && (empty($statewithscopeonly) || empty($requestedpermissionsarray)) && !preg_match('/^none/', $state)) {
-	if (GETPOST('error') || GETPOST('error_description')) {
-		setEventMessages($langs->trans("Error").' '.GETPOST('error_description'), null, 'errors');
-	} else {
-		dol_syslog("state or statewithscopeonly and/or requestedpermissionsarray are empty");
-		setEventMessages($langs->trans('ScopeUndefined'), null, 'errors');
-		if (empty($backtourl)) {
-			$backtourl = DOL_URL_ROOT.'/';
-		}
-		header('Location: '.$backtourl);
-		exit();
-	}
+$providertouse = getDolGlobalString('PDPCONNECTFR_PDP');
+
+if (!preg_match('/ViaPartner/', $providertouse)) {
+	accessforbidden('Setup of service is not correct to use the proxy page. The Access Point provider must have a name including "ViaPartner".');
 }
 
-
-$setupprovider = new SuperPDPProvider($db);
-$setupprovider->config['prod_auth_url'];
-
-$keyforurl = $setupprovider->config['prod_auth_url'].'/token';
-if (getDolGlobalString($keyforurl)) {
-	//$baseApiUriInt = new Uri(getDolGlobalString($keyforurl));
-} else {
-	print 'Error, failed to get value for constant '.$keyforurl;
-	exit;
-}
+$pdpprovider = new PDPProviderManager($db);
+$setupprovider = $pdpprovider->getProvider(getDolGlobalString('PDPCONNECTFR_PDP'));
 
 
-$keyforparamid = getDolGlobalString('PDPCONNECTFR_SUPERPDP_CLIENT_ID');
-$keyforparamsecret = getDolGlobalString('PDPCONNECTFR_SUPERPDP_CLIENT_SECRET');
-
+$keyforparamid = 'PDPCONNECTFR_'.strtoupper($providertouse).'_CLIENT_ID';
+$keyforparamsecret = 'PDPCONNECTFR_'.strtoupper($providertouse).'_CLIENT_SECRET';
 if (!getDolGlobalString($keyforparamid)) {
 	accessforbidden('Setup of service '.$keyforparamid.' is not complete. Customer ID is missing');
 }
@@ -124,6 +146,38 @@ if (!getDolGlobalString($keyforparamsecret)) {
 /*
  * Actions
  */
+
+// Add a test to check that the state parameter is provided into URL when we make the first call to ask the redirect or when we receive the callback,
+// but NOT when callback was ok and we recall the page
+if ($action != 'delete' && !GETPOST('afteroauthloginreturn') && (empty($statewithscopeonly) || empty($requestedpermissionsarray)) && !preg_match('/^none/', $state)) {
+	if (GETPOST('error') || GETPOST('error_description')) {
+		setEventMessages($langs->trans("Error").' '.GETPOST('error_description'), null, 'errors');
+	} else {
+		dol_syslog("state or statewithscopeonly and/or requestedpermissionsarray are empty");
+
+		$backtourl = GETPOST('redirect_uri').(strpos(GETPOST('redirect_uri'), '?') !== false ? '&' : '?').'error=scopeundefined';
+
+		// TODO Test that backtourl start with the allowed domain
+
+		header('Location: '.$backtourl);
+		exit();
+	}
+}
+
+
+
+$keyforurl = $setupprovider->config['prod_auth_url'];
+if ($keyforurl) {
+	//$baseApiUriInt = new Uri(getDolGlobalString($keyforurl));
+} else {
+	print 'Error, failed to get value for constant '.$keyforurl;
+	exit;
+}
+
+
+$oauthserverurl = $keyforurl.'/oauth2/authorize?client_id='.urlencode(getDolGlobalString($keyforparamid)).'&response_type=code&state='.urlencode($state).'&redirect_uri='.urlencode($_SERVER["PHP_SELF"].'&nonce='.$nonce);
+var_dump($oauthserverurl);exit;
+
 
 if (!GETPOST('code') && !GETPOST('error')) {
 	dol_syslog("Page is called without the 'code' parameter defined");
