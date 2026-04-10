@@ -417,7 +417,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 	 */
 	public function formConfirm($parameters, &$object, &$action, $hookmanager)
 	{
-		global $db, $langs, $user, $form;
+		global $db, $langs, $form;
 
 		$pdpConnectFr = new PdpConnectFr($db);
 		$checkConfig = $pdpConnectFr->checkModulePrerequisites();
@@ -442,7 +442,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 							'name' => 'statusRaison',
 							'label' => $langs->trans("SelectStatusReason"),
 							'value' => '',
-							'values' => $pdpConnectFr->getRaisonsByStatut($pdpstatuscode, 1)
+							'values' => $pdpConnectFr->getRaisonsByStatus($pdpstatuscode, 1)
 						]
 					);
 				}

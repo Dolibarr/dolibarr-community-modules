@@ -670,7 +670,7 @@ class PdpConnectFr
 	 * @param int $withDetails 	Return also desc if 1
 	 * @return array<string, array{code:string, label:string, desc:string}>|null
 	 */
-	public function getRaisonsByStatut($statut, $withDetails = 1)
+	public function getRaisonsByStatus($statut, $withDetails = 1)
 	{
 		if (!isset(self::REASONS_CODE_FOR_STATUS[$statut])) {
 			return null;
@@ -1188,7 +1188,12 @@ class PdpConnectFr
 			}
 		} else {
 			$resprints .= '<span id="einvoice-status">';
-			$resprints .= $currentStatusInfo['status'] . '</span><br>';
+			if ($currentStatusInfo['code'] == self::STATUS_NOT_GENERATED) {
+				$resprints .= '<span class="opacitymedium">'.$currentStatusInfo['status'].'</span>';
+			} else {
+				$resprints .= $currentStatusInfo['status'];
+			}
+			$resprints .= '</span><br>';
 			$resprints .= '<span id="einvoice-info" class="clearboth small opacitymedium">' . dolPrintHTML($info) . '</span>';
 		}
 		$resprints .= '</td>';
@@ -1289,10 +1294,12 @@ class PdpConnectFr
 	public function supplierInvoiceCardBlock($object, $mode = '')
 	{
 		global $langs;
+		global $action;
 
 		$resprints = '';
 
 		// Check if this invoice is present into pdpconnectfr_extlinks table to know if it is an imported object
+		$provider = '';
 		$sql = "SELECT rowid, provider FROM ".MAIN_DB_PREFIX."pdpconnectfr_extlinks";
 		$sql .= " WHERE element_type = '".$this->db->escape($object->element)."'";
 		$sql .= " AND element_id = ".(int) $object->id;
@@ -1300,30 +1307,34 @@ class PdpConnectFr
 		$resql = $this->db->query($sql);
 		if ($resql && $this->db->num_rows($resql) > 0) {
 			$obj = $this->db->fetch_object($resql);
-			// Add block only for imported invoices
 
-			// Set $extrafield_collapse_display_value (do we have to collapse/expand the group after the separator)
+			$provider = $obj->provider;
+		}
+
+		// Add block only for imported invoices
+
+		// Set $extrafield_collapse_display_value (do we have to collapse/expand the group after the separator)
 			$extrafield_collapse_display_value = -1;
 			$expand_display = ((isset($_COOKIE['DOLUSER_COLLAPSE_facture_trpdpconnectseparator']) || GETPOSTINT('ignorecollapsesetup')) ? (!empty($_COOKIE['DOLUSER_COLLAPSE_facture_trpdpconnectseparator'])) : !($extrafield_collapse_display_value == 2));
 			$disabledcookiewrite = 0;
-			if ($mode == 'create') {
-				// On create mode, force separator group to not be collapsible
-				$extrafield_collapse_display_value = 1;
-				$expand_display = true;	// We force group to be shown expanded
-				$disabledcookiewrite = 1; // We keep status of group unchanged into the cookie
-			}
+		if ($mode == 'create') {
+			// On create mode, force separator group to not be collapsible
+			$extrafield_collapse_display_value = 1;
+			$expand_display = true;	// We force group to be shown expanded
+			$disabledcookiewrite = 1; // We keep status of group unchanged into the cookie
+		}
 			$resprints .= '
             <script nonce="" type="text/javascript">
 			jQuery(document).ready(function() {';
-			if (empty($disabledcookiewrite)) {
-				if (!$expand_display) {
-					$resprints .= 'console.log("Inject js for the collapsing of trpdpconnect_collapseseparator - hide");
+		if (empty($disabledcookiewrite)) {
+			if (!$expand_display) {
+				$resprints .= 'console.log("Inject js for the collapsing of trpdpconnect_collapseseparator - hide");
 						jQuery(".trpdpconnect_collapseseparator").hide();';
-				} else {
-					$resprints .= 'console.log("Inject js for collapsing of trpdpconnect_collapseseparator - keep visible and set cookie");
+			} else {
+				$resprints .= 'console.log("Inject js for collapsing of trpdpconnect_collapseseparator - keep visible and set cookie");
 						document.cookie = "DOLUSER_COLLAPSE_facture_trpdpconnectseparator=1; path='.$_SERVER["PHP_SELF"].'";';
-				}
 			}
+		}
 			$resprints .= '
 			   jQuery("#trpdpconnect").click(function(){
 			       console.log("We click on collapse/uncollapse to hide/show .trpdpconnectseparator");
@@ -1342,15 +1353,30 @@ class PdpConnectFr
 
 			// Title separator
 			$resprints .= '<tr id="trpdpconnect" class="trpdpconnectseparator trtrpdpconnectseparator_1">';
-			$resprints .= '<td colspan="2"><span class="far fa-'.(($expand_display ? 'minus' : 'plus').'-square').'"></span><strong> ' . $langs->trans("EInvoicing") . '</strong></td>';
+			$resprints .= '<td>';
+			$resprints .= '<span class="far fa-'.(($expand_display ? 'minus' : 'plus').'-square').'"></span><strong> ' . $langs->trans("EInvoicing") . '</strong>';
+			$resprints .= '</td>';
+			$resprints .= '<td>';
+		if ($action != 'create') {
+			if ($object->element == 'facture' || $object->element == 'invoice') {
+				$url = DOL_URL_ROOT.'/compta/facture/agenda.php?id=' . urlencode($object->id) . '&search_agenda_label=PDPCONNECTFR';
+			} else {
+				$url = DOL_URL_ROOT.'/fourn/facture/agenda.php?id=' . urlencode($object->id) . '&search_agenda_label=PDPCONNECTFR';
+			}
+
+			$resprints .= '<a href="' . $url . '">' . $langs->trans("History") . '<i class="marginleftonly fas fa-calendar-alt infobox-action"></i></a>';
+		}
+
+			$resprints .= '</td>';
 			$resprints .= '</tr>';
 
 			// Source
 			$resprints .= '<tr class="trpdpconnect_collapseseparator">';
 			$resprints .= '<td>' . $langs->trans("pdpconnectfrSourceTitle") . '</td>';
-			$resprints .= '<td>' . $obj->provider . '</td>';
+			$resprints .= '<td>' . ($provider ? dolPrintHTML($provider) : '<span class="opacitymedium">'.$langs->trans("CreatedManually").'</span>') . '</td>';
 			$resprints .= '</tr>';
 
+		if ($provider) {
 			// Get current status
 			$currentStatus = '-';
 			$sql = "SELECT lc_status, lc_reason_code FROM ".MAIN_DB_PREFIX."pdpconnectfr_lifecycle_msg";
@@ -1367,19 +1393,19 @@ class PdpConnectFr
 			// Current status
 			$resprints .= '<tr class="trpdpconnect_collapseseparator">';
 			$resprints .= '<td class="">' . $langs->trans("pdpconnectfrInvoiceStatus") . '</td>';
-			$resprints .= '<td><span id="einvoice-status">' . $currentStatus . '</span></td>';
-			$resprints .= '</tr>';
+			$resprints .= '<td><span id="einvoice-status">' . $currentStatus . '</span>';
 
 			// If current status requires a reason, display it
 			$reasonLabel = '';
 			$displayReasonLabel = 'style="display:none;"';
 			if (!empty($obj->lc_reason_code)) {
-				$reasonLabel = $this->getRaisonsByStatut($obj->lc_status)[$obj->lc_reason_code]['label'] ?? $obj->lc_reason_code;
+				$reasonLabel = $this->getRaisonsByStatus($obj->lc_status)[$obj->lc_reason_code]['label'] ?? $obj->lc_reason_code;
 				$displayReasonLabel = '';
 			}
-			$resprints .= '<tr class="trpdpconnect_collapseseparator" id="trpdpconnect_reason" ' . $displayReasonLabel . '>';
-			$resprints .= '<td class="">' . $langs->trans("pdpconnectfrInvoiceReason") . '</td>';
-			$resprints .= '<td><span id="einvoice-reason">' . $reasonLabel . '</span></td>';
+
+			$resprints .= '<span id="einvoice-reason"'.($displayReasonLabel ? ' '.$displayReasonLabel : '').'>' . $reasonLabel . '</span>';
+
+			$resprints .= '</td>';
 			$resprints .= '</tr>';
 
 			// Get last sent status to know if we need to add the JavaScript for real time update of status and to display last sent status validation if it is pending or in error
@@ -1468,20 +1494,6 @@ class PdpConnectFr
                     </script>';
 				}
 			}
-
-			// E-Invoice events history link
-			$resprints .= '<tr class="trpdpconnect_collapseseparator">';
-			$resprints .= '<td>' . $langs->trans("EInvoiceEventsLabel") . '</td>';
-
-			if ($object->element == 'facture' || $object->element == 'invoice') {
-				$url = DOL_URL_ROOT.'/compta/facture/agenda.php?id=' . urlencode($object->id) . '&search_agenda_label=PDPCONNECTFR';
-			} else {
-				$url = DOL_URL_ROOT.'/fourn/facture/agenda.php?id=' . urlencode($object->id) . '&search_agenda_label=PDPCONNECTFR';
-			}
-
-			$langs->load("suppliers");
-			$resprints .= '<td><a href="' . $url . '">' . $langs->trans("History") . '<i class="marginleftonly fas fa-calendar-alt infobox-action"></i></a></td>';
-			$resprints .= '</tr>';
 		}
 
 		return $resprints;

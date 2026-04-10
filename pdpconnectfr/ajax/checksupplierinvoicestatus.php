@@ -173,7 +173,7 @@ if ($objectID) {
 
 		// Log an event in the invoice timeline
 		$CurrentLCStatusLabel = $pdpconnectfr->getStatusLabel($obj->lc_status);
-		$currentLCReasonLabel = $pdpconnectfr->getRaisonsByStatut($obj->lc_status)[$obj->lc_reason_code]['label'] ?? $obj->lc_reason_code;
+		$currentLCReasonLabel = $pdpconnectfr->getRaisonsByStatuS($obj->lc_status)[$obj->lc_reason_code]['label'] ?? $obj->lc_reason_code;
 		$eventLabel = "PDPCONNECTFR - Send status " . $CurrentLCStatusLabel . " : " . $statusvalidationlabel;
 		$eventMessage = "PDPCONNECTFR - Send status " . $CurrentLCStatusLabel . " : " . $statusvalidationlabel . (!empty($statusvalidationinfo) ? " - " . $statusvalidationinfo : "") . (!empty($lcReasonCode) ? " - Reason: " . $currentLCReasonLabel : "");
 		$resLogEvent = $provider->addEvent('STATUS', $eventLabel, $eventMessage, $invoice);
