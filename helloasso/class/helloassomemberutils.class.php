@@ -313,6 +313,27 @@ class HelloAssoMemberUtils
 					}
 				}
 
+				// Create new thirdparty if member already exist and socid is not defined
+				if (getDolGlobalInt("HELLOASSO_FORM_CREATE_THIRDPARTY") && empty($member->socid)) {
+					$newthirdparty = new Societe($db);
+					$newthirdparty->name = $newmember->user->firstName ." ". $newmember->user->lastName;
+					$newthirdparty->client = 1;
+					$newthirdparty->code_client = -1;
+					$newthirdpartyid = $newthirdparty->create($user);
+					if ($newthirdpartyid <= 0) {
+						$this->error = $newthirdparty->error;
+						$this->errors = array_merge($this->errors, $newthirdparty->errors);
+						return -5;
+					}
+					$member->socid = $newthirdpartyid;
+					$res = $member->update($user);
+					if ($res <= 0) {
+						$this->error = $member->error;
+						$this->errors = array_merge($this->errors, $member->errors);
+						return -5;
+					}
+				}
+
 				// Create new subscription
 				if (!$error) {
 					$date_start_subscription = dol_stringtotime($newmember->order->meta->createdAt);
