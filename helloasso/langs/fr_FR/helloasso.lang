@@ -126,3 +126,4 @@ Connected=Connecté.
 LastRecordedToken=Dernier jeton enregistré
 HelloAssoMembershipStatus=Statut de membre
 HelloAssoMemberPaymentLabel=Paiement d'abonnement HelloAsso n°%s
+ErrorHelloAssoCode=Une erreur %s est survenue, vérifiez que les slugs, les noms de formulaires, et la clé sont valides dans la configuration du module HelloAsso

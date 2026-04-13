@@ -216,12 +216,12 @@ class HelloAssoMemberUtils
 							$this->error = $langs->trans("Error").' - '.$tmpmessage['message'];
 							$this->errors[] = $this->error;
 						} else {
-							$this->error = $langs->trans("UnkownError").' - HTTP code = '.$ret["http_code"];
+							$this->error = $langs->trans("ErrorHelloAssoCode", $ret["http_code"]);
 							$this->errors[] = $this->error;
 						}
 					}
 				} else {
-					$this->error = $langs->trans("UnkownError").' - HTTP code = '.$ret["http_code"];
+					$this->error = $langs->trans("ErrorHelloAssoCode", $ret["http_code"]);
 					$this->errors[] = $this->error;
 				}
 			}
@@ -463,12 +463,12 @@ class HelloAssoMemberUtils
 								$this->error = $langs->trans("Error").' - '.$tmpmessage['message'];
 								$this->errors[] = $this->error;
 							} else {
-								$this->error = $langs->trans("UnkownError").' - HTTP code = '.$ret["http_code"];
+								$this->error = $langs->trans("ErrorHelloAssoCode", $ret["http_code"]);
 								$this->errors[] = $this->error;
 							}
 						}
 					} else {
-						$this->error = $langs->trans("UnkownError").' - HTTP code = '.$ret["http_code"];
+						$this->error = $langs->trans("ErrorHelloAssoCode", $ret["http_code"]);
 						$this->errors[] = $this->error;
 					}
 				}
