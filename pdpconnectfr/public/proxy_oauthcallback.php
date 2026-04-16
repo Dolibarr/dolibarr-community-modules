@@ -166,7 +166,8 @@ if ($action != 'delete' && !GETPOST('afteroauthloginreturn') && (empty($statewit
 
 
 
-$keyforurl = $setupprovider->config['prod_auth_url'];
+$config = $setupprovider->getConf();
+$keyforurl = $config['prod_auth_url'].'/token';
 if ($keyforurl) {
 	//$baseApiUriInt = new Uri(getDolGlobalString($keyforurl));
 } else {
