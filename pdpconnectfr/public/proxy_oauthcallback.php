@@ -1,7 +1,7 @@
 <?php
-/* Copyright (C) 2022       Laurent Destailleur  <eldy@users.sourceforge.net>
- * Copyright (C) 2015-2024  Frédéric France      <frederic.france@free.fr>
- * Copyright (C) 2024		MDW							<mdeweerd@users.noreply.github.com>
+/* Copyright (C) 2022       Laurent Destailleur     <eldy@users.sourceforge.net>
+ * Copyright (C) 2015-2026  Frédéric France         <frederic.france@free.fr>
+ * Copyright (C) 2024		MDW						<mdeweerd@users.noreply.github.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -176,8 +176,6 @@ if ($keyforurl) {
 
 
 $oauthserverurl = $keyforurl.'/oauth2/authorize?client_id='.urlencode(getDolGlobalString($keyforparamid)).'&response_type=code&state='.urlencode($state).'&redirect_uri='.urlencode($_SERVER["PHP_SELF"].'&nonce='.$nonce);
-var_dump($oauthserverurl);exit;
-
 
 if (!GETPOST('code') && !GETPOST('error')) {
 	dol_syslog("Page is called without the 'code' parameter defined");
