@@ -64,9 +64,9 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 		$this->config = array(
 			'provider_url' => 'https://ppd.hubtimize.fr',
-			'prod_auth_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/', 	// TODO: Replace the URL once known
+			'prod_auth_url' => 'https://hubtimize.fr/api/orchestrator/v1/',
+			'prod_api_url' => 'https://hubtimize.fr/api/orchestrator/v1/',
 			'test_auth_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/',
-			'prod_api_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/', 		// TODO: Replace the URL once known
 			'test_api_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/',
 			'username' => getDolGlobalString('PDPCONNECTFR_ESALINK_USERNAME'),
 			'password' => getDolGlobalString('PDPCONNECTFR_ESALINK_PASSWORD'),
