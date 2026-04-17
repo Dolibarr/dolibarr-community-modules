@@ -319,7 +319,7 @@ class HelloAssoMemberUtils
 				if (getDolGlobalInt("HELLOASSO_FORM_CREATE_THIRDPARTY") && empty($member->socid)) {
 					dol_syslog(get_class($this)."::helloassoPostMembersToDolibarr  Thirdparty creation for exiting members", LOG_DEBUG);
 					$newthirdparty = new Societe($db);
-					$newthirdparty->name = $newmember->user->firstName ." ". $newmember->user->lastName;
+					$newthirdparty->name = $member->getFullName($langs);
 					$newthirdparty->client = 1;
 					$newthirdparty->code_client = -1;
 					$newthirdpartyid = $newthirdparty->create($user);
@@ -506,6 +506,10 @@ class HelloAssoMemberUtils
 				break;
 			}
 			foreach ($json->data as $key => $member) {
+				if (empty($member->user->firstName) || empty($member->user->lastName)) {
+					$this->error = $langs->trans("ErrorHelloassoMissingFirstNameOrLastName");
+					return -2;
+				}
 				if ($helloasso_date_last_fetch == "") {
 					$arraymembers[] = $member;
 					continue;
@@ -670,7 +674,7 @@ class HelloAssoMemberUtils
 	 */
 	public function createHelloAssoMember($newmember, $membertype)
 	{
-		global $user;
+		global $user, $langs;
 		dol_syslog(get_class($this)."::createHelloAssoMember ", LOG_DEBUG);
 		$db = $this->db;
 		$customfields = array_flip($this->customfields);
@@ -718,7 +722,7 @@ class HelloAssoMemberUtils
 			dol_syslog(get_class($this)."::createHelloAssoMember Create thirdparty for new member", LOG_DEBUG);
 
 			$newthirdparty = new Societe($db);
-			$newthirdparty->name = $newmember->user->firstName ." ". $newmember->user->lastName;
+			$newthirdparty->name = $createmember->getFullName($langs);
 			$newthirdparty->client = 1;
 			$newthirdparty->code_client = -1;
 			$newthirdpartyid = $newthirdparty->create($user);
