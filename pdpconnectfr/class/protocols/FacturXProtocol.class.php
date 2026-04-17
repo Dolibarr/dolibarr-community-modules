@@ -1537,7 +1537,7 @@ class FacturXProtocol extends AbstractProtocol
 		if ($supplierInvoice->type === '-1') {
 			return ['res' => -1, 'message' => 'Unfounded dolibarr corresponding Invoice code for document type code: ' . $documenttypecode ];
 		}
-		$supplierInvoice->date = isset($documentdate) && $documentdate instanceof DateTime ? $documentdate->format('Y-m-d') : null;
+		$supplierInvoice->date = isset($documentdate) && $documentdate instanceof DateTime ? $documentdate->getTimestamp() : null;
 
 
 		// Set currency
