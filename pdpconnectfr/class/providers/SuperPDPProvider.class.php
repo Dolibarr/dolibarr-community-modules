@@ -137,7 +137,12 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 				$this->helpToGetCredentials = str_replace('{s1}', img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$urltogeneratetoken.'" target="_new">'.$urltoshow.'</a>', $this->helpToGetCredentials);
 			} else {
-				$this->helpToGetCredentials = 'You are on the proxy for SuperPDP Access Point registration.';
+				global $dolibarr_main_url_root;
+
+				$urlforproxy = $dolibarr_main_url_root.'/custom/pdpconnectfr/public/proxy_oauthcallback.php';
+
+				$this->helpToGetCredentials = 'You are on the proxy for SuperPDP Access Point registration. URL of proxy is:<br><input type="text" class="quatrevingtpercent" id="urlproxy" value="'.$urlforproxy.'"spellcheck="false">';
+				$this->helpToGetCredentials .= ajax_autoselect("urlproxy");
 			}
 		} else {
 			$url = $providersConfig[getDolGlobalString('PDPCONNECTFR_PDP')][$prefixenv.'_account_admin_url'];
