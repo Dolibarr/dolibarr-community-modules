@@ -332,6 +332,7 @@ if (!empty($provider) && !empty($formSetup2->items)) {
 	print $provider->helpToGetCredentials;
 	print '</div>';
 	print '<br>';
+	print '<br>';
 }
 
 print $stringwarning;
@@ -340,7 +341,6 @@ if (!empty($formSetup2->items)) {
 	print $formSetup2->generateOutput(true, false, $langs->transnoentitiesnoconv('PDPConnectionSetup'), 'titlefieldmiddle');
 	print '<br>';
 }
-
 
 
 // If we change the Access point, we reload page to show specific configuration of the selected Access Point

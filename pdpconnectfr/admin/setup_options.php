@@ -354,6 +354,7 @@ $pdpconnectfr = new PdpConnectFr($db);
 $stringwarning = pdpShowWarning($pdpconnectfr);
 print $stringwarning;
 
+print '<br>';
 
 /*if ($action == 'edit') {
  print $formSetup->generateOutput(true);
