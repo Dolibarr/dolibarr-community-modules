@@ -278,7 +278,7 @@ if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 
 		if (getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER') == 'proxy') {
 			print '<div class="neutral">';
-			print 'You are the <b>Proxy for SuperPDP Access Point registration</b> (PDPCONNTECTFR_SUPERPDP_VIAPARTNER = "proxy").<br><br>';
+			print 'You are a Proxy for <b>SuperPDP Access Point registration</b> (PDPCONNTECTFR_SUPERPDP_VIAPARTNER = "proxy").<br><br>';
 			print 'To have customer instances using this server as proxy for SuperPDP registration:<br>';
 			print '- on this instance, you must have set the Client ID and Client Secret of reseller account on the setup tab: '.((getDolGlobalString('PDPCONNECTFR_SUPERPDPVIAPARTNER_CLIENT_ID') && getDolGlobalString('PDPCONNECTFR_SUPERPDPVIAPARTNER_CLIENT_SECRET')) ? '<span class="ok">'.img_picto('', 'tick').' OK</span>' : '<span class="error">KO</span>').'.<br>';
 			print '- on the SuperPDP Access Point admin dashboard, for the account of your company, the callback url must also be set to <input type="text" id="idproxyurl" value="'.$urlforproxy.'" spellcheck="false">';

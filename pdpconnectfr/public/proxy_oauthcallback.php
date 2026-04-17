@@ -125,8 +125,9 @@ if ($state) {
 
 $providertouse = getDolGlobalString('PDPCONNECTFR_PDP');
 
-if (!preg_match('/ViaPartner/', $providertouse)) {
-	accessforbidden('Setup of service is not correct to use the proxy page. The Access Point provider must have a name including "ViaPartner".');
+//if (!preg_match('/ViaPartner/', $providertouse)) {
+if (getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER') != 'proxy') {
+	accessforbidden('Setup of service is not correct to use the proxy page. The option PDPCONNTECTFR_SUPERPDP_VIAPARTNER to enable the proxy is was not set.');
 }
 
 $pdpprovider = new PDPProviderManager($db);
@@ -166,7 +167,9 @@ if ($action != 'delete' && !GETPOST('afteroauthloginreturn') && (empty($statewit
 
 
 
-$keyforurl = $setupprovider->config['prod_auth_url'];
+$providerconfig = $setupprovider->getConf();
+$keyforurl = getDolGlobalString('PDPCONNECTFR_PDP');
+
 if ($keyforurl) {
 	//$baseApiUriInt = new Uri(getDolGlobalString($keyforurl));
 } else {
@@ -174,9 +177,14 @@ if ($keyforurl) {
 	exit;
 }
 
+$oauthserverurl = $providerconfig['prod_auth_url'];
+$oauthserverurl .= (preg_match('/\/$/', $oauthserverurl) ? '' : '/').'authorize?client_id='.urlencode(getDolGlobalString($keyforparamid)).'&response_type=code&state='.urlencode($state);
 
-$oauthserverurl = $keyforurl.'/oauth2/authorize?client_id='.urlencode(getDolGlobalString($keyforparamid)).'&response_type=code&state='.urlencode($state).'&redirect_uri='.urlencode($_SERVER["PHP_SELF"].'&nonce='.$nonce);
-var_dump($oauthserverurl);exit;
+//$redirect_uri = GETPOST('redirect_uri');
+$redirect_uri = dol_buildpath('/custom/pdpconnectfr/public/proxy_oauth2callback.php', 3);
+// TODO Test that redirect_uri match an allowed url/domain
+$oauthserverurl .= '&redirect_uri='.urlencode($redirect_uri);
+//$oauthserverurl .= '&nonce='.$nonce;
 
 
 if (!GETPOST('code') && !GETPOST('error')) {
@@ -197,7 +205,6 @@ if (!GETPOST('code') && !GETPOST('error')) {
 	// No need to save more data in sessions. We have several info into $_SESSION['datafromloginform'], saved when form is posted with a click
 	// on "Login with Generic" with param actionlogin=login and beforeoauthloginredirect=generic, by the functions_genericoauth.php.
 
-
 	// This may create record into oauth_state before the header redirect.
 	// Creation of record with state, create record or just update column state of table llx_oauth_token (and create/update entry in llx_oauth_state) depending on the Provider used (see its constructor).
 	//if ($state && $state != 'none') {
@@ -206,6 +213,8 @@ if (!GETPOST('code') && !GETPOST('error')) {
 	//	$url = $apiService->getAuthorizationUri(array('client_id' => getDolGlobalString($keyforparamid), 'response_type' => 'code')); // Parameter state will be randomly generated
 	//}
 	// The redirect_uri is included into this $url
+	$url = $oauthserverurl;
+	$url = preg_replace('/&state=(none)?/', '&state='.urlencode($state), $url);
 
 	// Add scopes
 	if ($statewithscopeonly) {
