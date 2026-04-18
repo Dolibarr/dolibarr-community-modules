@@ -163,6 +163,8 @@ $item = $formSetup->newItem('PDPCONNECTFR_PDP')->setAsSelect($TFieldProviders);
 $item->fieldValue = getDolGlobalString('PDPCONNECTFR_PDP');
 $item->defaultFieldValue = getDolGlobalString('PDPCONNECTFR_PDP');
 $item->helpText = $langs->transnoentities('PDPCONNECTFR_PDP_HELP');
+$item->helpText .= '<br>'.$langs->transnoentities('PDPCONNECTFR_PDP_HELP2');
+$item->helpText .= '<br>'.$langs->transnoentities('PDPCONNECTFR_PDP_HELP3');
 $item->cssClass = 'minwidth500';
 //var_dump($item);exit;
 
@@ -332,6 +334,7 @@ if (!empty($provider) && !empty($formSetup2->items)) {
 	print $provider->helpToGetCredentials;
 	print '</div>';
 	print '<br>';
+	print '<br>';
 }
 
 print $stringwarning;
@@ -340,7 +343,6 @@ if (!empty($formSetup2->items)) {
 	print $formSetup2->generateOutput(true, false, $langs->transnoentitiesnoconv('PDPConnectionSetup'), 'titlefieldmiddle');
 	print '<br>';
 }
-
 
 
 // If we change the Access point, we reload page to show specific configuration of the selected Access Point
