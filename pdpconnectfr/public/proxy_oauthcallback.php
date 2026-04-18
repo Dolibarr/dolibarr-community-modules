@@ -20,18 +20,10 @@
 /**
  *      \file       pdpconnect/public/proxy_oauthcallback.php
  *      \ingroup    pdpconnectpfr
- *      \brief      Page to get oauth callback
+ *      \brief      Page to proxy OAuth for PDP Connect client module
  */
 
-// Force keyforprovider
-$forlogin = 0;
-/*
-if (!empty($_GET['state']) && preg_match('/^forlogin-/', $_GET['state'])) {
-	$forlogin = 1;
-	$_GET['keyforprovider'] = 'Login';
-}
-*/
-if (!defined('NOLOGIN') && $forlogin) {
+if (!defined('NOLOGIN')) {
 	define("NOLOGIN", 1); // This means this output page does not require to be logged.
 }
 
@@ -125,9 +117,10 @@ if ($state) {
 
 $providertouse = getDolGlobalString('PDPCONNECTFR_PDP');
 
-//if (!preg_match('/ViaPartner/', $providertouse)) {
+// Security checks
+
 if (getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER') != 'proxy') {
-	accessforbidden('Setup of service is not correct to use the proxy page. The option PDPCONNTECTFR_SUPERPDP_VIAPARTNER to enable the proxy is was not set.');
+	accessforbidden('Setup of service is not correct to use the proxy page. The option PDPCONNTECTFR_SUPERPDP_VIAPARTNER to enable the proxy was not set to "proxy".');
 }
 
 $pdpprovider = new PDPProviderManager($db);
@@ -181,7 +174,7 @@ $oauthserverurl = $providerconfig['prod_auth_url'];
 $oauthserverurl .= (preg_match('/\/$/', $oauthserverurl) ? '' : '/').'authorize?client_id='.urlencode(getDolGlobalString($keyforparamid)).'&response_type=code&state='.urlencode($state);
 
 //$redirect_uri = GETPOST('redirect_uri');
-$redirect_uri = dol_buildpath('/custom/pdpconnectfr/public/proxy_oauth2callback.php', 3);
+$redirect_uri = dol_buildpath('/custom/pdpconnectfr/public/proxy_oauthcallback.php', 3);
 // TODO Test that redirect_uri match an allowed url/domain
 $oauthserverurl .= '&redirect_uri='.urlencode($redirect_uri);
 //$oauthserverurl .= '&nonce='.$nonce;

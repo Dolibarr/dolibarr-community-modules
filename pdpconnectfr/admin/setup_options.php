@@ -190,10 +190,30 @@ $item->cssClass = 'minwidth500';
 //$item = $formSetup->newItem('PDPCONNECTFR_MYPARAM13')->setAsDate();	// Not yet implemented
 */
 
+$ProtocolManager = new ProtocolManager($db);
+$protocolsList = $ProtocolManager->getProtocolsList();
+
+// Protocols list
+$TFieldProtocols = array();
+foreach ($protocolsList as $key => $protocolconfig) {
+	if ($protocolconfig['is_enabled'] == 0) {
+		continue;
+	}
+	$TFieldProtocols[$key] = $protocolconfig['protocol_name'];
+}
+
+
+$item = $formSetup->newItem('PDPCONNECTFR_PROTOCOL')->setAsSelect($TFieldProtocols);
+$item->helpText = $langs->transnoentities('PDPCONNECTFR_PROTOCOL_HELP');
+$item->defaultFieldValue = 'FACTURX';
+$item->cssClass = 'minwidth500';
+$item->fieldParams['trClass'] = 'advancedoption';
+
 // Setup conf to choose to use Chorus or not
 $item = $formSetup->newItem('PDPCONNECTFR_USE_CHORUS')->setAsYesNo();
 $item->helpText = $langs->transnoentities('PDPCONNECTFR_USE_CHORUS_HELP');
 $item->cssClass = 'minwidth500';
+
 
 // End of definition of parameters
 
@@ -219,7 +239,9 @@ if (!getDolGlobalString('PDPCONNECTFR_PROTOCOL')) {
 
 
 // Setup conf for auto generation of objects
-$formSetup->newItem('PDPCONNECTFR_SYNC_TO_PA')->setAsTitle();
+$itemtitle = $formSetup->newItem('PDPCONNECTFR_SYNC_TO_PA');
+$itemtitle->setAsTitle();
+$itemtitle->nameText = '<b>'.$langs->trans("PDPCONNECTFR_SYNC_TO_PA").'</b>';
 
 // Setup conf to choose use of auto generation or not of products
 $item = $formSetup->newItem('PDPCONNECTFR_EINVOICE_IN_REAL_TIME')->setAsYesNo();
@@ -264,7 +286,10 @@ $item->helpText = $langs->transnoentities('PDPCONNECTFR_AAB_HELP');
 $item->cssClass = 'minwidth500';
 
 // Setup conf for auto generation of objects
-$formSetup->newItem('PDPCONNECTFR_AUTO_GENERATION')->setAsTitle();
+$itemtitle = $formSetup->newItem('PDPCONNECTFR_AUTO_GENERATION');
+$itemtitle->setAsTitle();
+$itemtitle->nameText = '<b>'.$langs->trans("PDPCONNECTFR_AUTO_GENERATION").'</b>';
+
 
 // Setup conf to choose use of auto generation or not of products
 $item = $formSetup->newItem('PDPCONNECTFR_PRODUCTS_AUTO_GENERATION')->setAsYesNo();

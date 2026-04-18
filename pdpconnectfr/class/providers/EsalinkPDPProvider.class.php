@@ -123,11 +123,13 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$item->cssClass = 'minwidth300';
 
 		// Setup conf to choose a protocol of exchange
+		/* Moved into the tab "Options"
 		$item = $formSetup->newItem('PDPCONNECTFR_PROTOCOL')->setAsSelect($TFieldProtocols);
 		$item->helpText = $langs->transnoentities('PDPCONNECTFR_PROTOCOL_HELP');
 		$item->defaultFieldValue = 'FACTURX';
 		$item->cssClass = 'minwidth500';
 		$item->fieldParams['trClass'] = 'advancedoption';
+		*/
 
 		// Setup conf to choose a profil of exchange
 		// $item = $formSetup->newItem('PDPCONNECTFR_PROFILE')->setAsSelect($TFieldProfiles);

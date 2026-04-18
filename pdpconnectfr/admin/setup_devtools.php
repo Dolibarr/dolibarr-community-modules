@@ -277,16 +277,23 @@ if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 
 
 		if (getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER') == 'proxy') {
+			$providerproxy = $PDPManager->getProvider('SUPERPDPViaPartner');
+
+			$providerproxyconfig  = $providerproxy->getConf();
+
+			$urlproxyadmin = $providerproxyconfig['provider_url'];
+
+			//if ($providerconfig['client_id'] && $providerconfig['client_secret']
 			print '<div class="neutral">';
-			print 'You are a Proxy for <b>SuperPDP Access Point registration</b> (PDPCONNTECTFR_SUPERPDP_VIAPARTNER = "proxy").<br><br>';
-			print 'To have customer instances using this server as proxy for SuperPDP registration:<br>';
-			print '- on this instance, you must have set the Client ID and Client Secret of reseller account on the setup tab: '.((getDolGlobalString('PDPCONNECTFR_SUPERPDPVIAPARTNER_CLIENT_ID') && getDolGlobalString('PDPCONNECTFR_SUPERPDPVIAPARTNER_CLIENT_SECRET')) ? '<span class="ok">'.img_picto('', 'tick').' OK</span>' : '<span class="error">KO</span>').'.<br>';
-			print '- on the SuperPDP Access Point admin dashboard, for the account of your company, the callback url must also be set to <input type="text" id="idproxyurl" value="'.$urlforproxy.'" spellcheck="false">';
+			print 'You are a Proxy for <b>SuperPDP Access Point registration</b> (PDPCONNTECTFR_SUPERPDP_VIAPARTNER = "proxy").<br>';
+			print '<div class="marginbottomonly inline-block">To have customer instances using this server as a proxy for SuperPDP registration:</div><br>';
+			print '- on this instance, you must have set the Client ID and Client Secret of reseller account on the "Access Point setup" tab for proxy mode: '.((getDolGlobalString('PDPCONNECTFR_SUPERPDPVIAPARTNER_CLIENT_ID') && getDolGlobalString('PDPCONNECTFR_SUPERPDPVIAPARTNER_CLIENT_SECRET')) ? '<span class="ok">'.img_picto('', 'tick').' OK</span>' : '<span class="error">KO</span>').'.<br>';
+			print '- on the <a href="'.$urlproxyadmin.'" target=_blank">SuperPDP Access Point admin dashboard '.img_picto('', 'url').'</a>, for the account of your company, the callback url must be set to <input type="text" id="idproxyurl" class="width300" value="'.$urlforproxy.'" spellcheck="false">';
 			print ajax_autoselect("idproxyurl");
 			print '<br>';
 			print '- on the instance of your customers, the variable PDPCONNTECTFR_SUPERPDP_VIAPARTNER to the name of your company, for example <input type="text" id="idproxyname" value="'.$mysoc->name.'" spellcheck="false"><br>';
 			print ajax_autoselect("idproxyname");
-			print '- on the instance of your customers, the variable PDPCONNTECTFR_SUPERPDP_VIAPARTNER_OAUTH_URL to <input type="text" id="idproxyurl2" value="'.$urlforproxy.'" spellcheck="false"><br>';
+			print '- on the instance of your customers, the variable PDPCONNTECTFR_SUPERPDP_VIAPARTNER_OAUTH_URL to <input type="text" class="width300" id="idproxyurl2" value="'.$urlforproxy.'" spellcheck="false"><br>';
 			print ajax_autoselect("idproxyurl2");
 			print '</div>';
 			print '<br>';
@@ -315,7 +322,7 @@ if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 			print '</div>';
 		} else {
 			print '<div class="neutral">';
-			print 'This instance can also connect to SuperPDP Access Point directly but can\'t connect throught a proxy as it is itself a proxy..<br>';
+			print 'This instance can also connect to SuperPDP Access Point directly but can\'t connect through a proxy as it is itself a proxy..<br>';
 			print '</div>';
 		}
 	}

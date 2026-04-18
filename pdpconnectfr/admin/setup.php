@@ -163,6 +163,8 @@ $item = $formSetup->newItem('PDPCONNECTFR_PDP')->setAsSelect($TFieldProviders);
 $item->fieldValue = getDolGlobalString('PDPCONNECTFR_PDP');
 $item->defaultFieldValue = getDolGlobalString('PDPCONNECTFR_PDP');
 $item->helpText = $langs->transnoentities('PDPCONNECTFR_PDP_HELP');
+$item->helpText .= '<br>'.$langs->transnoentities('PDPCONNECTFR_PDP_HELP2');
+$item->helpText .= '<br>'.$langs->transnoentities('PDPCONNECTFR_PDP_HELP3');
 $item->cssClass = 'minwidth500';
 //var_dump($item);exit;
 

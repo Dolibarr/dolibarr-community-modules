@@ -133,9 +133,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 				$urltogeneratetoken = getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER_OAUTH_URL');
 				$urltogeneratetoken .= '?state=none&response_type=code&redirect_uri='.urlencode(dol_buildpath('/pdpconnectfr/admin/setup.php', 2));
 
-				$urltoshow = 'Link to create account via '.getDolGlobalString("PDPCONNTECTFR_SUPERPDP_VIAPARTNER");
+				$urltoshow = $langs->trans("PDPCONNECTFR_LINK_CREATE_ACCOUNTVia", getDolGlobalString("PDPCONNTECTFR_SUPERPDP_VIAPARTNER"));
 
-				$this->helpToGetCredentials = str_replace('{s1}', img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$urltogeneratetoken.'" target="_new">'.$urltoshow.'</a>', $this->helpToGetCredentials);
+				$this->helpToGetCredentials = str_replace('{s1}', '<br><br><center>'.img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$urltogeneratetoken.'" target="_new">'.$urltoshow.'</a></center>', $this->helpToGetCredentials);
 			} else {
 				global $dolibarr_main_url_root;
 
@@ -165,11 +165,13 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$item->cssClass = 'minwidth300';
 
 		// Setup conf to choose a protocol of exchange
+		/* Moved into the tab "Options"
 		$item = $formSetup->newItem('PDPCONNECTFR_PROTOCOL')->setAsSelect($TFieldProtocols);
 		$item->helpText = $langs->transnoentities('PDPCONNECTFR_PROTOCOL_HELP');
 		$item->defaultFieldValue = 'FACTURX';
 		$item->cssClass = 'minwidth500';
 		$item->fieldParams['trClass'] = 'advancedoption';
+		*/
 
 		// Setup conf to choose a profil of exchange
 		// $item = $formSetup->newItem('PDPCONNECTFR_PROFILE')->setAsSelect($TFieldProfiles);
