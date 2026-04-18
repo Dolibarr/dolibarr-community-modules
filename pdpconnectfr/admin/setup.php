@@ -142,6 +142,7 @@ foreach ($TFieldProfiles as $key => $profileconfig) {
 
 $reg = array();
 $prefix = '';
+$provider = null;
 
 // If Access Point is selected, show parameters for it
 if (getDolGlobalString('PDPCONNECTFR_PDP')) {
@@ -284,8 +285,19 @@ if (GETPOST('error')) {
 }
 
 
-if (GETPOST('code')) {
-	// We are in the return of an OAUT authorize callback
+if (GETPOST('accesstoken') && $provider instanceof AbstractPDPProvider) {
+	// We are in the return of an OAUT proxy authorize+token callback
+
+	$result = $provider->saveOAuthTokenDB(GETPOST('accesstoken'), GETPOST('refresh_token'), GETPOST('expires_in'));
+
+	if ($result) {
+		setEventMessages("Token generated successfully", null, 'mesgs');
+	} else {
+		setEventMessages($provider->error, $provider->errors, 'errors');
+	}
+
+	header("Location: ".$_SERVER["PHP_SELF"]);
+	exit;
 }
 
 
@@ -330,16 +342,14 @@ print info_admin($langs->trans("PDPConnectInfo").'<br>'.$langs->trans("PDPConnec
 
 if (!empty($formSetup->items)) {
 	print $formSetup->generateOutput(3, false, $langs->transnoentitiesnoconv('PlatformPartner'), 'titlefieldmiddle');
-	print '<br>';
 }
 
 if (!empty($provider) && !empty($formSetup2->items)) {
-	print '<div class="formborder">';
 	print $provider->helpToGetCredentials;
-	print '</div>';
-	print '<br>';
 	print '<br>';
 }
+
+print '<br>';
 
 print $stringwarning;
 

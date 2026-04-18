@@ -273,9 +273,9 @@ abstract class AbstractPDPProvider
 			}
 		} else {
 			// Check if a token already exists for this service
-			$sql_check = "SELECT rowid FROM ".MAIN_DB_PREFIX."oauth_token
-                        WHERE service = '".$db->escape($serviceName)."'
-                        AND entity = ".((int) $conf->entity);
+			$sql_check = "SELECT rowid FROM ".MAIN_DB_PREFIX."oauth_token";
+			$sql_check .= " WHERE service = '".$db->escape($serviceName)."'";
+			$sql_check .= " AND entity = ".((int) $conf->entity);
 
 			$resql = $db->query($sql_check);
 			if (!$resql) {

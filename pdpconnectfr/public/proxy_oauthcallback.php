@@ -116,6 +116,10 @@ if ($state) {
 }
 
 $providertouse = getDolGlobalString('PDPCONNECTFR_PDP');
+if (GETPOSt('proxy') && getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER') == 'proxy') {	// If using a proxy is requested and we are on a server proxy
+	$providertouse = strtoupper(GETPOST('proxy', 'aZ09'));
+}
+
 
 // Security checks
 
@@ -124,7 +128,7 @@ if (getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER') != 'proxy') {
 }
 
 $pdpprovider = new PDPProviderManager($db);
-$setupprovider = $pdpprovider->getProvider(getDolGlobalString('PDPCONNECTFR_PDP'));
+$setupprovider = $pdpprovider->getProvider($providertouse);
 
 
 $keyforparamid = 'PDPCONNECTFR_'.strtoupper($providertouse).'_CLIENT_ID';
@@ -180,7 +184,7 @@ $redirect_uri = dol_buildpath('/custom/pdpconnectfr/public/proxy_oauthcallback.p
 $oauthserverurl .= '&redirect_uri='.urlencode($redirect_uri);
 
 
-if (!$code && !GETPOST('error')) {
+if (empty($code) && !GETPOST('error')) {
 	dol_syslog("Page is called without the 'code' parameter defined");
 
 	$origin_state = $state;
@@ -231,7 +235,9 @@ if (!$code && !GETPOST('error')) {
 	// We must validate that the $state is the same than the one into $_SESSION['oauthstateanticsrf'], return error if not.
 	if (!isset($_SESSION['oauthstateanticsrf']) || $state != $_SESSION['oauthstateanticsrf']) {
 		//var_dump($_SESSION['oauthstateanticsrf']);exit;
-		print 'Value for state='.dol_escape_htmltag($state).' differs from value in $_SESSION["oauthstateanticsrf"]. Code is refused. Retry to register or generate the token.';
+		print 'Value for state received in callback URL differs from value in session ($_SESSION["oauthstateanticsrf"]). So code for token creation is refused. Retry to register or to generate the token from scratch.';
+		print '<br>'."\n";
+		print 'State received in parameter: '.dol_escape_htmltag($state);
 		unset($_SESSION['oauthstateanticsrf']);
 	} else {
 		// This was a callback request from service, get the token
@@ -244,14 +250,8 @@ if (!$code && !GETPOST('error')) {
 
 				$oauthserverurl = $providerconfig['prod_auth_url'];
 				$oauthserverurl .= (preg_match('/\/$/', $oauthserverurl) ? '' : '/').'token';
-				//$oauthserverurl .= '?client_id='.urlencode(getDolGlobalString($keyforparamid));
-				//$oauthserverurl .= '&client_secret='.urlencode(getDolGlobalString($keyforparamsecret));
-				//$oauthserverurl .= '&grant_type=authorization_code';
-				//$oauthserverurl .= '&code='.urlencode($code);
-				//$oauthserverurl .= '&consumer_key='.urlencode(getDolGlobalString($keyforparamid));
 
 				$redirect_uri = dol_buildpath('/custom/pdpconnectfr/public/proxy_oauthcallback.php', 3);
-				//$oauthserverurl .= '&redirect_uri='.urlencode($redirect_uri);
 
 				$params = [
 					"client_id" => getDolGlobalString($keyforparamid),
@@ -264,19 +264,20 @@ if (!$code && !GETPOST('error')) {
 
 				$resultget = getURLContent($oauthserverurl, 'POST', $params);
 
-				if (!$resultget['curl_error_no'] && $resultget['http_code'] == 200) {
-					$reg = array();
-					$origin_redirect_uri = '';
-					if (preg_match('/^[a-z0-9]+\-(.*)/', $state, $reg)) {
-						$origin_redirect_uri = $reg[1];
-					}
-					$origin_redirect_uri = urldecode($origin_redirect_uri);
+				$reg = array();
+				$origin_redirect_uri = '';
+				if (preg_match('/^[a-z0-9]+\-(.*)/', $state, $reg)) {
+					$origin_redirect_uri = $reg[1];
+				}
+				$origin_redirect_uri = urldecode($origin_redirect_uri);
+
+				if (empty($resultget['curl_error_no']) && isset($resultget['http_code']) && $resultget['http_code'] == 200) {
 					dol_syslog("From state, we have origin_redirect_uri=".$origin_redirect_uri);
 
 					$origin_state = $_SESSION['oauthoriginstateanticsrf'];
 					dol_syslog("From session, we have original_state=".$origin_state);
 
-					$content = json_decode($resultget['content']);
+					$content = json_decode($resultget['content'], true);
 
 					$access_token = $content['access_token'];
 					$expires_in = $content['expires_in'];
@@ -289,14 +290,32 @@ if (!$code && !GETPOST('error')) {
 					$origin_redirect_uri .= '&state='.urlencode($origin_state);
 					$origin_redirect_uri .= '&scope='.urlencode($scope);
 
-					var_dump($origin_redirect_uri);	exit;
+					//var_dump($origin_redirect_uri);	exit;
 
-					dol_syslog("Redirect now on backtourl=".$origin_redirect_uri);
+					dol_syslog("Redirect now on origin_redirect_uri=".$origin_redirect_uri);
 
 					header('Location: '.$origin_redirect_uri);
 					exit();
 				} else {
-					print 'Error: '.$resultget['curl_error_msg'];
+					print '<center>';
+					print 'Error in OAuth proxy step...<br>';
+					print '<br>';
+					if (!empty($resultget['curl_error_no'])) {
+						print 'getURLContent error: '.$resultget['curl_error_msg'];
+					}
+					if (!isset($resultget['http_code']) || $resultget['http_code'] != 200) {
+						print 'getURLContent error: '.$resultget['content'];
+					}
+
+					print '<br>';
+					print '<br>';
+					print '<a href="'.$origin_redirect_uri.'">Go back to setup page...</a>';
+					print '<br>';
+
+					print '</center>';
+
+					// TODO Make a redirect to setup page to show the error message
+
 					exit;
 				}
 			}

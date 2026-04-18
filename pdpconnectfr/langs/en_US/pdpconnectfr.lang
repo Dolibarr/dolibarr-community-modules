@@ -274,6 +274,9 @@ NoEarlyPaymentDiscount=No early payment discounts
 CurrentAP=Current access point: %s
 CreatedManually=Created manually
 DevTools=Dev tools
+YourSoftwareSeemsConnectedWith=You software seems connected with the Access Point Platform %s
+ClickHereToRemoveConnection=Click here to remove this connection
+
 
 # AP EsaLink
 PDPCONNECTFR_ESALINK_USERNAME=API username
