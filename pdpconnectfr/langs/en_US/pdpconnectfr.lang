@@ -269,6 +269,7 @@ NoLatePaymentFees=No late payment fees
 NoEarlyPaymentDiscount=No early payment discounts
 CurrentAP=Current access point: %s
 CreatedManually=Created manually
+DevTools=Dev tools
 
 # AP EsaLink
 PDPCONNECTFR_ESALINK_USERNAME=API username
