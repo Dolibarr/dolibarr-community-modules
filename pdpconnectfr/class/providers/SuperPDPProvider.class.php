@@ -234,7 +234,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 					$urltogeneratetoken = $_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken();
 				}
 
-				if ($urltogeneratetoken && !empty($tokenData['token'])) {
+				if ($urltogeneratetoken && (getDolGlobalString('PDPCONNECTFR_PDP') != 'SUPERPDPViaPartner' || !empty($tokenData['token']))) {
 					$item = $formSetup->newItem($prefix . 'TOKEN');
 					$item->nameText = $langs->trans('AccessToken');
 					$item->cssClass = 'maxwidth500 ';
@@ -247,9 +247,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 						}
 						//var_dump($tokenData);
 					}
-					//if (empty($tokenData['token'])) {
-					//	$item->fieldOverride .= '<a class="reposition" href="'.$urltogeneratetoken.'">' .$texttoshow . '<i class="fa fa-key paddingleft"></i></a>';
-					//}
+					if (empty($tokenData['token'])) {
+						$item->fieldOverride .= '<a class="reposition" href="'.$urltogeneratetoken.'">' .$texttoshow . '<i class="fa fa-key paddingleft"></i></a>';
+					}
 					if (!empty($tokenData['token'])) {
 						$item->fieldOverride .= ' &nbsp; &nbsp; <a class="reposition" href="'.$urltogeneratetoken.'">' . $langs->trans('reGenerateAccessToken') . '<i class="fa fa-key paddingleft"></i></a>';
 					}
