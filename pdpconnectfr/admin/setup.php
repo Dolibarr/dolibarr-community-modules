@@ -204,7 +204,7 @@ if (!getDolGlobalString('PDPCONNECTFR_PROTOCOL')) {
 
 // Action to get/generate a token
 if (preg_match('/set'.$prefix.'TOKEN/i', $action, $reg)) {
-	$token = $provider->getAccessToken();
+	$token = $provider->getAccessToken();	// Get access token from provider and save it into database
 
 	if ($token) {
 		setEventMessages("Token generated successfully: ".dol_trunc($token, 48), null, 'mesgs');
@@ -283,6 +283,10 @@ if (GETPOST('error')) {
 	setEventMessages($langs->trans('Error').' '.GETPOST('error'), null, 'errors');
 }
 
+
+if (GETPOST('code')) {
+	// We are in the return of an OAUT authorize callback
+}
 
 
 /*

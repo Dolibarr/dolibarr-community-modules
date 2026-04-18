@@ -28,7 +28,6 @@ if (!defined('NOLOGIN')) {
 }
 
 // Load Dolibarr environment
-// Load Dolibarr environment
 $res = 0;
 // Try main.inc.php into web root known defined into CONTEXT_DOCUMENT_ROOT (not always defined)
 if (!$res && !empty($_SERVER["CONTEXT_DOCUMENT_ROOT"])) {
@@ -98,7 +97,8 @@ if (!GETPOSTISSET('keyforprovider') && !empty($_SESSION["oauthkeyforproviderbefo
 }
 
 
-$nonce = bin2hex(random_bytes(64 / 8));
+$nonce = bin2hex(random_bytes(8));
+$code = GETPOST('code');
 $state = GETPOST('state');
 $statewithscopeonly = '';
 $statewithanticsrfonly = '';
@@ -106,7 +106,7 @@ $statewithanticsrfonly = '';
 $requestedpermissionsarray = array();
 if ($state) {
 	// 'state' parameter is standard to store a hash value and can also be used to retrieve some parameters back
-	$statewithscopeonly = preg_replace('/\-.*$/', '', preg_replace('/^forlogin-/', '', $state));
+	$statewithscopeonly = preg_replace('/\-.*$/', '', $state);
 	if ($statewithscopeonly != 'none') {
 		$requestedpermissionsarray = explode(',', $statewithscopeonly); // Example: 'userinfo_email,userinfo_profile,openid,email,profile,cloud_print'.
 		$statewithanticsrfonly = preg_replace('/^.*\-/', '', $state);
@@ -173,25 +173,27 @@ if ($keyforurl) {
 $oauthserverurl = $providerconfig['prod_auth_url'];
 $oauthserverurl .= (preg_match('/\/$/', $oauthserverurl) ? '' : '/').'authorize?client_id='.urlencode(getDolGlobalString($keyforparamid)).'&response_type=code&state='.urlencode($state);
 
-//$redirect_uri = GETPOST('redirect_uri');
-$redirect_uri = dol_buildpath('/custom/pdpconnectfr/public/proxy_oauthcallback.php', 3);
+$save_redirect_uri = GETPOST('redirect_uri');
 // TODO Test that redirect_uri match an allowed url/domain
+
+$redirect_uri = dol_buildpath('/custom/pdpconnectfr/public/proxy_oauthcallback.php', 3);
 $oauthserverurl .= '&redirect_uri='.urlencode($redirect_uri);
-//$oauthserverurl .= '&nonce='.$nonce;
 
 
-if (!GETPOST('code') && !GETPOST('error')) {
+if (!$code && !GETPOST('error')) {
 	dol_syslog("Page is called without the 'code' parameter defined");
 
-	if (empty($state) || $state == 'none') {
-		// Generate a random state value to prevent CSRF attack. Store it into session juste after to check it when we will receive the callback from provider.
-		$state = 'none-'.bin2hex(random_bytes(16));
-	}
+	$origin_state = $state;
+
+	// Generate a random state value to prevent CSRF attack. Will be stored into session just after to check it when we will receive the callback from provider.
+	$state = $nonce;
+	$state .= '-'.urlencode($save_redirect_uri);
 
 	// If we enter this page without 'code' parameter, it means we click on the link from login page ($forlogin is set) or from setup page and we want to get the redirect
 	// to the OAuth provider login page.
 	$_SESSION["backtourlsavedbeforeoauthjump"] = $backtourl;
 	$_SESSION["oauthkeyforproviderbeforeoauthjump"] = $keyforprovider;
+	$_SESSION['oauthoriginstateanticsrf'] = $origin_state;
 	$_SESSION['oauthstateanticsrf'] = $state;
 
 	// Save more data into session
@@ -217,34 +219,7 @@ if (!GETPOST('code') && !GETPOST('error')) {
 	// Add more param
 	$url .= '&nonce='.bin2hex(random_bytes(64 / 8));
 
-	if ($forlogin) {
-		// TODO Add param hd. What is it for ?
-		//$url .= 'hd=xxx';
-
-		if (GETPOST('username')) {
-			$url .= '&login_hint='.urlencode(GETPOST('username'));
-		}
-
-		// Check that the redirect_uri that will be used is same than url of current domain
-
-		// Define $urlwithroot
-		global $dolibarr_main_url_root;
-		$urlwithouturlroot = preg_replace('/'.preg_quote(DOL_URL_ROOT, '/').'$/i', '', trim($dolibarr_main_url_root));
-		$urlwithroot = $urlwithouturlroot.DOL_URL_ROOT; // This is to use external domain name found into config file
-		//$urlwithroot = DOL_MAIN_URL_ROOT;				// This is to use same domain name than current
-
-		include DOL_DOCUMENT_ROOT.'/core/lib/geturl.lib.php';
-		$currentrooturl = getRootURLFromURL(DOL_MAIN_URL_ROOT);
-		$externalrooturl = getRootURLFromURL($urlwithroot);
-
-		if ($currentrooturl != $externalrooturl) {
-			$langs->load("errors");
-			setEventMessages($langs->trans("ErrorTheUrlOfYourDolInstanceDoesNotMatchURLIntoOAuthSetup", $currentrooturl, $externalrooturl), null, 'errors');
-			$url = DOL_URL_ROOT;
-		}
-	}
-
-	//var_dump($keyforurl, $url, $statewithscopeonly);exit;
+	//var_dump($keyforurl, $url, $statewithscopeonly, $origin_state);exit;
 
 	// we go on oauth provider authorization page, we will then go back on this page but into the other branch of the if (!GETPOST('code'))
 	header('Location: '.$url);
@@ -254,127 +229,104 @@ if (!GETPOST('code') && !GETPOST('error')) {
 	dol_syslog(basename(__FILE__)." We are coming from the oauth provider page keyforprovider=".$keyforprovider." code=".dol_trunc(GETPOST('code'), 5));
 
 	// We must validate that the $state is the same than the one into $_SESSION['oauthstateanticsrf'], return error if not.
-	if (isset($_SESSION['oauthstateanticsrf']) && $state != $_SESSION['oauthstateanticsrf']) {
+	if (!isset($_SESSION['oauthstateanticsrf']) || $state != $_SESSION['oauthstateanticsrf']) {
 		//var_dump($_SESSION['oauthstateanticsrf']);exit;
-		print 'Value for state='.dol_escape_htmltag($state).' differs from value in $_SESSION["oauthstateanticsrf"]. Code is refused.';
+		print 'Value for state='.dol_escape_htmltag($state).' differs from value in $_SESSION["oauthstateanticsrf"]. Code is refused. Retry to register or generate the token.';
 		unset($_SESSION['oauthstateanticsrf']);
 	} else {
 		// This was a callback request from service, get the token
 		try {
 			//var_dump($apiService);      // OAuth\OAuth2\Service\Generic
-			//dol_syslog("_GET=".var_export($_GET, true));
+			dol_syslog("We received a code=".$code." or error=".GETPOST('error'));
+
+			if (getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER') == 'proxy') {
+				// Ask the token
+
+				$oauthserverurl = $providerconfig['prod_auth_url'];
+				$oauthserverurl .= (preg_match('/\/$/', $oauthserverurl) ? '' : '/').'token';
+				//$oauthserverurl .= '?client_id='.urlencode(getDolGlobalString($keyforparamid));
+				//$oauthserverurl .= '&client_secret='.urlencode(getDolGlobalString($keyforparamsecret));
+				//$oauthserverurl .= '&grant_type=authorization_code';
+				//$oauthserverurl .= '&code='.urlencode($code);
+				//$oauthserverurl .= '&consumer_key='.urlencode(getDolGlobalString($keyforparamid));
+
+				$redirect_uri = dol_buildpath('/custom/pdpconnectfr/public/proxy_oauthcallback.php', 3);
+				//$oauthserverurl .= '&redirect_uri='.urlencode($redirect_uri);
+
+				$params = [
+					"client_id" => getDolGlobalString($keyforparamid),
+					"client_secret" => getDolGlobalString($keyforparamsecret),
+					"grant_type" => 'authorization_code',
+					"code" => $code,
+					"consumer_key" => getDolGlobalString($keyforparamid),
+					"redirect_uri" => $redirect_uri
+				];
+
+				$resultget = getURLContent($oauthserverurl, 'POST', $params);
+
+				if (!$resultget['curl_error_no'] && $resultget['http_code'] == 200) {
+					$reg = array();
+					$origin_redirect_uri = '';
+					if (preg_match('/^[a-z0-9]+\-(.*)/', $state, $reg)) {
+						$origin_redirect_uri = $reg[1];
+					}
+					$origin_redirect_uri = urldecode($origin_redirect_uri);
+					dol_syslog("From state, we have origin_redirect_uri=".$origin_redirect_uri);
+
+					$origin_state = $_SESSION['oauthoriginstateanticsrf'];
+					dol_syslog("From session, we have original_state=".$origin_state);
+
+					$content = json_decode($resultget['content']);
+
+					$access_token = $content['access_token'];
+					$expires_in = $content['expires_in'];
+					$refresh_token = $content['refresh_token'];
+					$scope = $content['scope'];
+
+					$origin_redirect_uri .= '?accesstoken='.urlencode($access_token);
+					$origin_redirect_uri .= '&expires_in='.urlencode($expires_in);
+					$origin_redirect_uri .= '&refresh_token='.urlencode($refresh_token);
+					$origin_redirect_uri .= '&state='.urlencode($origin_state);
+					$origin_redirect_uri .= '&scope='.urlencode($scope);
+
+					var_dump($origin_redirect_uri);	exit;
+
+					dol_syslog("Redirect now on backtourl=".$origin_redirect_uri);
+
+					header('Location: '.$origin_redirect_uri);
+					exit();
+				} else {
+					print 'Error: '.$resultget['curl_error_msg'];
+					exit;
+				}
+			}
+
+			// Here we receive callback from the OAuth provider or from the proxy.
 
 			$errorincheck = 0;
 
 			$db->begin();
 
-			$token = null;
+			$token = GETPOST('oauthtoken');
 
-			/*
-			$last_insert_id = 0;
-			try {
-				// This requests the token from the received OAuth code (call of the endpoint)
-				// Result is stored into object managed by class DoliStorage into includes/OAuth/Common/Storage/DoliStorage.php and into database table llx_oauth_token
-				$token = $apiService->requestAccessToken(GETPOST('code'), $state);
-				'@phan-var-force OAuth\Common\Token\AbstractToken $token';
+			// Insert or update token
 
-				$storage = $apiService->getStorage();
-				if (property_exists($storage, 'last_insert_id')) {
-					$last_insert_id = $storage->last_insert_id;
-				}
-			} catch (Exception $e) {
-				dol_syslog("Failed to get token with requestAccessToken: ".$e->getMessage(), LOG_ERR);
-				setEventMessages("Failed to get token with requestAccessToken: ".$e->getMessage(), null, 'errors');
-				$errorincheck++;
-			}
 
-			// The refresh token is inside the object token if the prompt was forced only. Otherwise, it may be found into extraParams section.
-			//$refreshtoken = $token->getRefreshToken();
-			//var_dump($refreshtoken);
 			dol_syslog("requestAccessToken complete");
 
 			// The refresh token is inside the object token if the prompt was forced only.
 			//$refreshtoken = $token->getRefreshToken();
 			//var_dump($refreshtoken);
 
-			// Note: The extraparams has the 'id_token' than contains a lot of information about the user.
-			if ($token)	{
-				$extraparams = $token->getExtraParams();
-
-				$scope = empty($extraparams['scope']) ? '' : $extraparams['scope'];
-				$tokenstring = $token->getAccessToken();
-				// Update entry in llx_oauth_token to store the scope associated to the token into field "state" (field should be renamed).
-				// It is not stored by default by DoliStorage.
-				// TODO Update using $scope and $tokenstring and $last_insert_id
-				$refreshtoken = empty($extraparams['refresh_token']) ? '' : $extraparams['refresh_token'];
-				if (empty($refreshtoken)) {
-					$refreshtoken = $token->getRefreshToken();
-				}
-
-				if ($last_insert_id) {
-					$sqlupdate = "UPDATE ".MAIN_DB_PREFIX."oauth_token";
-					$sqlupdate .= " SET state = '".(empty($scope) ? '' : $db->escape($scope))."', tokenstring = '".$db->escape($tokenstring)."', tokenstring_refresh = '".$db->escape($refreshtoken)."'";
-					$sqlupdate .= " WHERE rowid = ".((int) $last_insert_id);
-
-					$db->query($sqlupdate);
-
-					//var_dump($scope, $token, $refreshtoken, $last_insert_id, $sqlupdate);exit;
-				}
-			}
-			*/
-
-			$username = '';
-			$useremail = '';
-
-			// Extract the middle part, base64 decode, then json_decode it
-			/*
-			$jwt = explode('.', $extraparams['id_token']);
-
-			if (!empty($jwt[1])) {
-				$userinfo = json_decode(base64_decode($jwt[1]), true);
-
-				dol_syslog("userinfo=".var_export($userinfo, true));
-
-				$useremail = $userinfo['email'];
-
-				// We should make the steps of validation of id_token
-
-				// Verify that the state is the one expected
-				// TODO
-
-				// Verify that the ID token is properly signed by the issuer.
-				// TODO
-
-				// Verify that the value of the iss claim in the ID token is equal to https://accounts.google.com or accounts.google.com.
-				if ($userinfo['iss'] != 'accounts.google.com' && $userinfo['iss'] != 'https://accounts.google.com') {
-					setEventMessages($langs->trans('Bad value for returned userinfo[iss]'), null, 'errors');
-					$errorincheck++;
-				}
-
-				// Verify that the value of the aud claim in the ID token is equal to your app's client ID.
-				if ($userinfo['aud'] != getDolGlobalString($keyforparamid)) {
-					setEventMessages($langs->trans('Bad value for returned userinfo[aud]'), null, 'errors');
-					$errorincheck++;
-				}
-
-				// Verify that the expiry time (exp claim) of the ID token has not passed.
-				if ($userinfo['exp'] <= dol_now()) {
-					setEventMessages($langs->trans('Bad value for returned userinfo[exp]. Token expired.'), null, 'errors');
-					$errorincheck++;
-				}
-
-				// If you specified a hd parameter value in the request, verify that the ID token has a hd claim that matches an accepted G Suite hosted domain.
-				// $userinfo['hd'] is the domain name of Gmail account.
-				// TODO
-			}
-			*/
-
 			if (!$errorincheck) {
+				setEventMessages("Token generated and saved", null, 'mesgs');
 				$db->commit();
 			} else {
+				setEventMessages("Error during token retrieval", null, 'errors');
 				$db->rollback();
 			}
 
+			/*
 			$backtourl = $_SESSION["backtourlsavedbeforeoauthjump"];
 			unset($_SESSION["backtourlsavedbeforeoauthjump"]);
 
@@ -382,19 +334,11 @@ if (!GETPOST('code') && !GETPOST('error')) {
 				$backtourl = DOL_URL_ROOT.'/';
 			}
 
-			// If call back to this url was for a OAUTH2 login
-			if ($forlogin) {
-				// _SESSION['genericoauth_receivedlogin'] has been set to the key to validate the next test by function_genericoauth(), so we can make the redirect
-				$backtourl .= '?actionlogin=login&afteroauthloginreturn=generic&mainmenu=home'.($username ? '&username='.urlencode($username) : '').'&token='.newToken();
-				/*if (!empty($tmparray['entity'])) {
-					$backtourl .= '&entity='.$tmparray['entity'];
-				}*/
-			}
-
 			dol_syslog("Redirect now on backtourl=".$backtourl);
 
 			header('Location: '.$backtourl);
 			exit();
+			*/
 		} catch (Exception $e) {
 			print $e->getMessage();
 		}
