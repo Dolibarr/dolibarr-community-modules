@@ -31,6 +31,9 @@ abstract class AbstractProtocol
 	 */
 	public $sourceinvoice;
 
+	/** @var string Error message */
+	public $error;
+
 	/** @var array Error messages */
 	public $errors = [];
 

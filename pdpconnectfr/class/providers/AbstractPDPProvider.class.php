@@ -35,9 +35,6 @@ abstract class AbstractPDPProvider
 	/** @var DoliDB Database handler */
 	public $db;
 
-	/** @var string Error message */
-	public $error;
-
 	/** @var array Error messages */
 	public $errors = [];
 
