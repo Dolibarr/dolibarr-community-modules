@@ -1535,7 +1535,7 @@ class FacturXProtocol extends AbstractProtocol
 		$supplierInvoice->ref_supplier = $documentno;
 		$supplierInvoice->type = $this->_getDolibarrInvoiceType($documenttypecode);
 		if ($supplierInvoice->type === '-1') {
-			return ['res' => -1, 'message' => 'Unfounded dolibarr corresponding Invoice code for document type code: ' . $documenttypecode ];
+			return ['res' => -1, 'message' => 'Unfound dolibarr corresponding Invoice code for document type code: ' . $documenttypecode ];
 		}
 		$supplierInvoice->date = (isset($documentdate) && $documentdate instanceof DateTime) ? $documentdate->getTimestamp() : null;
 
