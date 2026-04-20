@@ -225,7 +225,6 @@ class FacturXProtocol extends AbstractProtocol
 		if (empty($myidprof)) {
 			throw new Exception('BADPROFID: The professional ID of your company is empty. Fix this in your company or module setup page.');
 		}
-
 		if ($mySchemeIdProf == "0002" && strlen($myidprof) != 9) {	// If einvoice ID is French SIREN, we check it has 9 chars.
 			throw new Exception('BADPROFID: The professional ID '.$myidprof.' has type SIREN but length is not 9 characters. Fix this in your company or einvoice module setup page.');
 		}
@@ -238,7 +237,7 @@ class FacturXProtocol extends AbstractProtocol
 		}
 		if ($object->thirdparty->country_code == 'FR' && !empty($object->thirdparty->idprof1) && !empty($object->thirdparty->idprof2)) {
 			if (strpos($object->thirdparty->idprof2, $object->thirdparty->idprof1) !== 0) {
-				throw new Exception('BADVALUEFORSIRENORSIRET: The buyer both a SIREN and SIRET but SIRET does not start with value of SIREN.');
+				throw new Exception('BADVALUEFORSIRENORSIRET: The buyer both a SIREN "'.$object->thirdparty->idprof1.'" and SIRET "'.$object->thirdparty->idprof2.'" but SIRET does not start with value of SIREN.');
 			}
 		}
 
@@ -1281,6 +1280,7 @@ class FacturXProtocol extends AbstractProtocol
 			$tmpthirdparty = new Societe($this->db);
 			$tmpthirdparty->initAsSpecimen();
 			$tmpthirdparty->idprof1 = '000000001';
+			$tmpthirdparty->idprof2 = '00000000100010';
 		}
 		$tmpinvoice->thirdparty = $tmpthirdparty;
 		$tmpinvoice->socid = $tmpthirdparty->id;			// 0 for specimen
