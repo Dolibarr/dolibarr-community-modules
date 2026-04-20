@@ -783,7 +783,7 @@ class FacturXProtocol extends AbstractProtocol
 	 *
 	 * @param 	int|Object 	$invoice_id    	Invoice ID or Invoice Object to be processed.
 	 * @param	?Translate	$outputlangs	Output language
-	 * @return 	int|string       			-1 if ko, path if ok.
+	 * @return 	-1|string       			-1 if ko, path if ok.
 	 */
 	public function generateInvoice($invoice_id, $outputlangs = null)
 	{
@@ -985,6 +985,7 @@ class FacturXProtocol extends AbstractProtocol
 	 * @param	PdpConnectFr			$pdpconnectfr			PDPConnectFR
 	 * @param   Societe|null			$thirdpartySeller		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
 	 * @param   Societe|null			$thirdpartyBuyer		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
+	 * @throws  Exception
 	 * @return 	array<string,string> 							Path or content of the generated sample invoice.
 	 */
 	public function generateSampleInvoiceOld($pdpconnectfr, $thirdpartySeller = null, $thirdpartyBuyer = null)
@@ -1228,7 +1229,7 @@ class FacturXProtocol extends AbstractProtocol
 	 * @param	PdpConnectFr			$pdpconnectfr			PDPConnectFR
 	 * @param   Societe|null			$thirdpartySeller		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
 	 * @param   Societe|null			$thirdpartyBuyer		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
-	 * @return 	array<string,string> 							Path or content of the generated sample invoice.
+	 * @return 	-1|array<string,string> 							Path or content of the generated sample invoice.
 	 */
 	public function generateSampleInvoice($pdpconnectfr, $thirdpartySeller = null, $thirdpartyBuyer = null)
 	{
