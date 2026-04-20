@@ -225,7 +225,6 @@ class FacturXProtocol extends AbstractProtocol
 		if (empty($myidprof)) {
 			throw new Exception('BADPROFID: The professional ID of your company is empty. Fix this in your company or module setup page.');
 		}
-
 		if ($mySchemeIdProf == "0002" && strlen($myidprof) != 9) {	// If einvoice ID is French SIREN, we check it has 9 chars.
 			throw new Exception('BADPROFID: The professional ID '.$myidprof.' has type SIREN but length is not 9 characters. Fix this in your company or einvoice module setup page.');
 		}
@@ -238,7 +237,7 @@ class FacturXProtocol extends AbstractProtocol
 		}
 		if ($object->thirdparty->country_code == 'FR' && !empty($object->thirdparty->idprof1) && !empty($object->thirdparty->idprof2)) {
 			if (strpos($object->thirdparty->idprof2, $object->thirdparty->idprof1) !== 0) {
-				throw new Exception('BADVALUEFORSIRENORSIRET: The buyer both a SIREN and SIRET but SIRET does not start with value of SIREN.');
+				throw new Exception('BADVALUEFORSIRENORSIRET: The buyer both a SIREN "'.$object->thirdparty->idprof1.'" and SIRET "'.$object->thirdparty->idprof2.'" but SIRET does not start with value of SIREN.');
 			}
 		}
 
@@ -249,8 +248,6 @@ class FacturXProtocol extends AbstractProtocol
 		if (!empty($object->thirdparty->tva_intra) && !empty($object->thirdparty->country_code) && substr($object->thirdparty->tva_intra, 0, 2) != $object->thirdparty->country_code) {
 			throw new Exception('BADVATNUMBER: The VAT number of the thirdparty '.$object->thirdparty->name.' must start with its 2 letter country code.');
 		}
-
-
 
 
 		//  Build XML Document Header (Seller, Buyer, Dates)
@@ -409,6 +406,23 @@ class FacturXProtocol extends AbstractProtocol
 		// Set Business Process ID according to invoice type
 		$facturxpdf->setDocumentBusinessProcess($this->getBillingProcessID($object));
 
+		// Add reference to source invoice for credit notes (BT-25/BT-26, mandatory per EN16931)
+		if ($object->type == $object::TYPE_CREDIT_NOTE && !empty($object->fk_facture_source)) {
+			$sourceFact = new Facture($this->db);
+			if ($sourceFact->fetch($object->fk_facture_source) > 0) {
+				$sourceFactDate = new DateTime(dol_print_date($sourceFact->date, 'dayrfc'));
+				$sourceType = $this->_getTypeOfInvoice($sourceFact);
+				$facturxpdf->setDocumentInvoiceReferencedDocument(
+					$sourceFact->ref,
+					$sourceType,
+					$sourceFactDate
+				);
+				dol_syslog(get_class($this).'::generateXML Set source invoice reference '.$sourceFact->ref.' for credit note '.$object->ref);
+			} else {
+				dol_syslog(get_class($this).'::generateXML Cannot fetch source invoice id='.$object->fk_facture_source.' for credit note '.$object->ref, LOG_WARNING);
+			}
+		}
+
 
 		// --- 11. Process Invoice Lines ---
 		// is there multi VAT information ? in case we need to collect all data to be able to join it at the end
@@ -445,6 +459,16 @@ class FacturXProtocol extends AbstractProtocol
 			$isSubTotalLine = $this->_isLineFromExternalModule($line, $object->element, 'modSubtotal');
 			if ($isSubTotalLine) {
 				continue;
+			}
+
+			// For credit notes, EN16931 requires positive amounts (sign is implied by TypeCode 381)
+			if ($object->type == $object::TYPE_CREDIT_NOTE) {
+				$line->subprice     = abs($line->subprice);
+				$line->subprice_ttc = abs($line->subprice_ttc);
+				$line->total_ht     = abs($line->total_ht);
+				$line->total_ttc    = abs($line->total_ttc);
+				$line->total_tva    = abs($line->total_tva);
+				$line->qty          = abs($line->qty);
 			}
 
 			if ($line->subprice < 0 || $line->subprice_ttc < 0) {
@@ -756,7 +780,7 @@ class FacturXProtocol extends AbstractProtocol
 	 *
 	 * @param 	int|Object 	$invoice_id    	Invoice ID or Invoice Object to be processed.
 	 * @param	?Translate	$outputlangs	Output language
-	 * @return 	int|string       			-1 if ko, path if ok.
+	 * @return 	-1|string       			-1 if ko, path if ok.
 	 */
 	public function generateInvoice($invoice_id, $outputlangs = null)
 	{
@@ -958,6 +982,7 @@ class FacturXProtocol extends AbstractProtocol
 	 * @param	PdpConnectFr			$pdpconnectfr			PDPConnectFR
 	 * @param   Societe|null			$thirdpartySeller		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
 	 * @param   Societe|null			$thirdpartyBuyer		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
+	 * @throws  Exception
 	 * @return 	array<string,string> 							Path or content of the generated sample invoice.
 	 */
 	public function generateSampleInvoiceOld($pdpconnectfr, $thirdpartySeller = null, $thirdpartyBuyer = null)
@@ -1201,7 +1226,7 @@ class FacturXProtocol extends AbstractProtocol
 	 * @param	PdpConnectFr			$pdpconnectfr			PDPConnectFR
 	 * @param   Societe|null			$thirdpartySeller		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
 	 * @param   Societe|null			$thirdpartyBuyer		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
-	 * @return 	array<string,string> 							Path or content of the generated sample invoice.
+	 * @return 	-1|array<string,string> 							Path or content of the generated sample invoice.
 	 */
 	public function generateSampleInvoice($pdpconnectfr, $thirdpartySeller = null, $thirdpartyBuyer = null)
 	{
@@ -1253,6 +1278,8 @@ class FacturXProtocol extends AbstractProtocol
 			$tmpthirdparty = new Societe($this->db);
 			$tmpthirdparty->initAsSpecimen();
 			$tmpthirdparty->idprof1 = '000000001';
+			$tmpthirdparty->idprof2 = '00000000100010';
+			$tmpthirdparty->tva_intra = 'FR12000000001';
 		}
 		$tmpinvoice->thirdparty = $tmpthirdparty;
 		$tmpinvoice->socid = $tmpthirdparty->id;			// 0 for specimen
@@ -1535,9 +1562,9 @@ class FacturXProtocol extends AbstractProtocol
 		$supplierInvoice->ref_supplier = $documentno;
 		$supplierInvoice->type = $this->_getDolibarrInvoiceType($documenttypecode);
 		if ($supplierInvoice->type === '-1') {
-			return ['res' => -1, 'message' => 'Unfounded dolibarr corresponding Invoice code for document type code: ' . $documenttypecode ];
+			return ['res' => -1, 'message' => 'Unfound dolibarr corresponding Invoice code for document type code: ' . $documenttypecode ];
 		}
-		$supplierInvoice->date = isset($documentdate) && $documentdate instanceof DateTime ? $documentdate->format('Y-m-d') : null;
+		$supplierInvoice->date = (isset($documentdate) && $documentdate instanceof DateTime) ? $documentdate->getTimestamp() : null;
 
 
 		// Set currency

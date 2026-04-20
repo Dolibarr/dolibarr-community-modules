@@ -213,6 +213,7 @@ repos:
         # we can specify two dicts only on the CLI.
         # You can update the contents of the exclude-file codespell-lines-ignore with the script
         # dev/tools/codespell/addCodespellIgnores.sh
+        files: ^.*/htdocs/.*\.php$
         args:
           - -D
           - "-"
@@ -230,7 +231,7 @@ repos:
         # -D contains predefined conversion dictionaries
         # -L is to ignore some words
         id: codespell
-        files: ^htdocs/langs/en_US/.*$
+        files: ^.*/langs/en_US/.*$
         args:
           - -D
           - "-"

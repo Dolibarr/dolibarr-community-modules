@@ -125,6 +125,7 @@ class HelloAssoMemberUtils
 		$helloasso_date_last_fetch = "";
 		$error = 0;
 		$db->begin();
+		dol_syslog(get_class($this)."::helloassoSyncMembersToDolibarr with drymode = ".$dryrun." and mode = ".$mode, LOG_DEBUG);
 
 
 		if ($dryrun == 0) {
@@ -190,6 +191,7 @@ class HelloAssoMemberUtils
 		$db = $this->db;
 		$error = 0;
 		$datelastfetch = 0;
+		dol_syslog(get_class($this)."::helloassoPostMembersToDolibarr ", LOG_DEBUG);
 
 		$headers[] = "Authorization: ".ucfirst($this->helloasso_tokens["token_type"])." ".$this->helloasso_tokens["access_token"];
 		$headers[] = "Accept: application/json";
@@ -216,12 +218,12 @@ class HelloAssoMemberUtils
 							$this->error = $langs->trans("Error").' - '.$tmpmessage['message'];
 							$this->errors[] = $this->error;
 						} else {
-							$this->error = $langs->trans("UnkownError").' - HTTP code = '.$ret["http_code"];
+							$this->error = $langs->trans("ErrorHelloAssoCode", $ret["http_code"]);
 							$this->errors[] = $this->error;
 						}
 					}
 				} else {
-					$this->error = $langs->trans("UnkownError").' - HTTP code = '.$ret["http_code"];
+					$this->error = $langs->trans("ErrorHelloAssoCode", $ret["http_code"]);
 					$this->errors[] = $this->error;
 				}
 			}
@@ -313,8 +315,31 @@ class HelloAssoMemberUtils
 					}
 				}
 
+				// Create new thirdparty if member already exist and socid is not defined
+				if (getDolGlobalInt("HELLOASSO_FORM_CREATE_THIRDPARTY") && empty($member->socid)) {
+					dol_syslog(get_class($this)."::helloassoPostMembersToDolibarr  Thirdparty creation for exiting members", LOG_DEBUG);
+					$newthirdparty = new Societe($db);
+					$newthirdparty->name = $member->getFullName($langs);
+					$newthirdparty->client = 1;
+					$newthirdparty->code_client = -1;
+					$newthirdpartyid = $newthirdparty->create($user);
+					if ($newthirdpartyid <= 0) {
+						$this->error = $newthirdparty->error;
+						$this->errors = array_merge($this->errors, $newthirdparty->errors);
+						return -5;
+					}
+					$member->socid = $newthirdpartyid;
+					$res = $member->update($user);
+					if ($res <= 0) {
+						$this->error = $member->error;
+						$this->errors = array_merge($this->errors, $member->errors);
+						return -5;
+					}
+				}
+
 				// Create new subscription
 				if (!$error) {
+					dol_syslog(get_class($this)."::helloassoPostMembersToDolibarr  Subscription creation", LOG_DEBUG);
 					$date_start_subscription = dol_stringtotime($newmember->order->meta->createdAt);
 					$date_end_subscription = dol_time_plus_duree($date_start_subscription, $membertype->duration_value, $membertype->duration_unit);
 					if ($jsonmembertype->validityType == "Custom") {
@@ -421,6 +446,7 @@ class HelloAssoMemberUtils
 	public function helloassoGetMembers($helloasso_date_last_fetch = "", $dryrun = 0)
 	{
 		global $langs;
+		dol_syslog(get_class($this)."::helloassoGetMembers ", LOG_DEBUG);
 
 		$maxmemberpages = getDolGlobalInt("HELLOASSO_MAX_FORM_PAGINATION_PAGES", 100);
 		$pagesize = getDolGlobalInt("HELLOASSO_FORM_PAGINATION_PAGES_SIZE", 20);
@@ -450,7 +476,7 @@ class HelloAssoMemberUtils
 			$ret = getURLContent($urlformemebers, 'GET', "", 1, $headers);
 			if ($ret["http_code"] != 200) {
 				$arrayofmessage = array();
-				if (!empty($ret2['content'])) {
+				if (!empty($ret['content'])) {
 					$arrayofmessage = json_decode($ret['content'], true);
 				}
 				if (!empty($arrayofmessage['message'])) {
@@ -463,12 +489,12 @@ class HelloAssoMemberUtils
 								$this->error = $langs->trans("Error").' - '.$tmpmessage['message'];
 								$this->errors[] = $this->error;
 							} else {
-								$this->error = $langs->trans("UnkownError").' - HTTP code = '.$ret["http_code"];
+								$this->error = $langs->trans("ErrorHelloAssoCode", $ret["http_code"]);
 								$this->errors[] = $this->error;
 							}
 						}
 					} else {
-						$this->error = $langs->trans("UnkownError").' - HTTP code = '.$ret["http_code"];
+						$this->error = $langs->trans("ErrorHelloAssoCode", $ret["http_code"]);
 						$this->errors[] = $this->error;
 					}
 				}
@@ -480,6 +506,10 @@ class HelloAssoMemberUtils
 				break;
 			}
 			foreach ($json->data as $key => $member) {
+				if (empty($member->user->firstName) || empty($member->user->lastName)) {
+					$this->error = $langs->trans("ErrorHelloassoMissingFirstNameOrLastName");
+					return -2;
+				}
 				if ($helloasso_date_last_fetch == "") {
 					$arraymembers[] = $member;
 					continue;
@@ -521,6 +551,7 @@ class HelloAssoMemberUtils
 	public function setHelloAssoTypeMemberMapping($dolibarrmembertype, $helloassomembertype)
 	{
 		global $langs, $conf;
+		dol_syslog(get_class($this)."::setHelloAssoTypeMemberMapping ", LOG_DEBUG);
 		$mappingstr = getDolGlobalString("HELLOASSO_TYPE_MEMBER_MAPPING");
 		if (empty($mappingstr)) {
 			$mappingstr = "[]";
@@ -554,6 +585,8 @@ class HelloAssoMemberUtils
 	public function setHelloAssoCustomFieldMapping($dolibarrfield, $helloassofield)
 	{
 		global $langs, $conf;
+		dol_syslog(get_class($this)."::setHelloAssoCustomFieldMapping ", LOG_DEBUG);
+
 		$mappingstr = getDolGlobalString("HELLOASSO_CUSTOM_FIELD_MAPPING");
 		if (empty($mappingstr)) {
 			$mappingstr = "[]";
@@ -587,6 +620,7 @@ class HelloAssoMemberUtils
 	public function createHelloAssoTypeMember($object, $label)
 	{
 		global $user;
+		dol_syslog(get_class($this)."::createHelloAssoTypeMember ", LOG_DEBUG);
 		require_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php';
 		$db = $this->db;
 		$newmembertype = new AdherentType($db);
@@ -640,7 +674,8 @@ class HelloAssoMemberUtils
 	 */
 	public function createHelloAssoMember($newmember, $membertype)
 	{
-		global $user;
+		global $user, $langs;
+		dol_syslog(get_class($this)."::createHelloAssoMember ", LOG_DEBUG);
 		$db = $this->db;
 		$customfields = array_flip($this->customfields);
 		$createmember = new Adherent($db);
@@ -684,8 +719,10 @@ class HelloAssoMemberUtils
 		}
 
 		if (getDolGlobalInt("HELLOASSO_FORM_CREATE_THIRDPARTY")) {
+			dol_syslog(get_class($this)."::createHelloAssoMember Create thirdparty for new member", LOG_DEBUG);
+
 			$newthirdparty = new Societe($db);
-			$newthirdparty->name = $newmember->user->firstName ." ". $newmember->user->lastName;
+			$newthirdparty->name = $createmember->getFullName($langs);
 			$newthirdparty->client = 1;
 			$newthirdparty->code_client = -1;
 			$newthirdpartyid = $newthirdparty->create($user);

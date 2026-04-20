@@ -126,3 +126,5 @@ Connected=Connected.
 LastRecordedToken=Last recorded token 
 HelloAssoMembershipStatus=Membership status
 HelloAssoMemberPaymentLabel=HelloAsso subscription payment n°%s
+ErrorHelloAssoCode=A %s error has occurred. Please verify that the slugs, form names, and key are valid in the HelloAsso module configuration.
+ErrorHelloassoMissingFirstNameOrLastName=An error occurred while fetching the member's information, missing Firstname or Lastname for at least a member

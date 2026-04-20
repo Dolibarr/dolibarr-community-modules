@@ -64,9 +64,9 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 		$this->config = array(
 			'provider_url' => 'https://ppd.hubtimize.fr',
-			'prod_auth_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/', 	// TODO: Replace the URL once known
+			'prod_auth_url' => 'https://hubtimize.fr/api/orchestrator/v1/',
+			'prod_api_url' => 'https://hubtimize.fr/api/orchestrator/v1/',
 			'test_auth_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/',
-			'prod_api_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/', 		// TODO: Replace the URL once known
 			'test_api_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/',
 			'username' => getDolGlobalString('PDPCONNECTFR_ESALINK_USERNAME'),
 			'password' => getDolGlobalString('PDPCONNECTFR_ESALINK_PASSWORD'),
@@ -111,7 +111,19 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		// Set content of the help page
 		$url = $providersConfig[getDolGlobalString('PDPCONNECTFR_PDP')][$prefixenv.'_account_admin_url'];
 		$urltosubscribe = img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$url.'" target="_new">'.$url.'</a>';
-		$this->helpToGetCredentials = str_replace('{s1}', $urltosubscribe, $this->helpToGetCredentials);
+
+		if (empty($tokenData['token'])) {
+			$this->helpToGetCredentials = str_replace('{s1}', $urltosubscribe, $this->helpToGetCredentials);
+
+			$this->helpToGetCredentials = '<div class="formborder">'.$this->helpToGetCredentials.'</div>';
+		} else {
+			$this->helpToGetCredentials = '<div class="green greenborder">';
+			$this->helpToGetCredentials .= '<center>';
+			$this->helpToGetCredentials .= $langs->trans("YourSoftwareSeemsConnectedWith", strtoupper($this->name));
+			$this->helpToGetCredentials .= '<br><br>'.img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$_SERVER["PHP_SELF"].'?action=delete'.$prefix."TOKEN&token=".newToken().'">'.$langs->trans("ClickHereToRemoveConnection").'</a>';
+			$this->helpToGetCredentials .= '</center>';
+			$this->helpToGetCredentials .= '</div>';
+		}
 
 
 		// E-Invoice ID
@@ -123,11 +135,13 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$item->cssClass = 'minwidth300';
 
 		// Setup conf to choose a protocol of exchange
+		/* Moved into the tab "Options"
 		$item = $formSetup->newItem('PDPCONNECTFR_PROTOCOL')->setAsSelect($TFieldProtocols);
 		$item->helpText = $langs->transnoentities('PDPCONNECTFR_PROTOCOL_HELP');
 		$item->defaultFieldValue = 'FACTURX';
 		$item->cssClass = 'minwidth500';
 		$item->fieldParams['trClass'] = 'advancedoption';
+		*/
 
 		// Setup conf to choose a profil of exchange
 		// $item = $formSetup->newItem('PDPCONNECTFR_PROFILE')->setAsSelect($TFieldProfiles);
@@ -169,7 +183,9 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				$item->fieldOverride .= ' &nbsp; &nbsp; <a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken().'">' . $langs->trans('reGenerateAccessToken') . '<i class="fa fa-key paddingleft"></i></a>';
 			}
 
-			$item->fieldOverride .= ' &nbsp; &nbsp; <a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=delete".$prefix."TOKEN&token=".newToken().'">' . img_picto('', 'delete') . '</a>';
+			if (!empty($tokenData['token'])) {
+				$item->fieldOverride .= ' &nbsp; &nbsp; <a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=delete".$prefix."TOKEN&token=".newToken().'">' . img_picto('', 'delete') . '</a>';
+			}
 		}
 
 		if (!empty($tokenData['token'])) {
@@ -457,17 +473,15 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		try {
 			if ((float) DOL_VERSION < 24.0) {
 				$resarray = $this->exchangeProtocol->generateSampleInvoiceOld($pdpconnectfr);
-				$invoice_path = $resarray['path'];
-				$ref = $resarray['ref'];
 			} else {
 				$resarray = $this->exchangeProtocol->generateSampleInvoice($pdpconnectfr);
-				$invoice_path = $resarray['path'];
-				$ref = $resarray['ref'];
 			}
-			if ($invoice_path === -1) {
+			if ($resarray === -1) {
 				$this->errors[] = $this->exchangeProtocol->error;
 				return 0;
 			}
+			$invoice_path = $resarray['path'];
+			$ref = $resarray['ref'];
 		} catch (Exception $e) {
 			$this->errors[] = $e->getMessage();
 			return 0;
@@ -544,15 +558,15 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				return 0;
 			}
 		} else {
-			$this->error = $langs->trans("ErrorSendingInvoiceToPDP");
-			$this->error .= '<br>HTTP '.$response['status_code'];
+			$errormsg = $langs->trans("ErrorSendingInvoiceToPDP");
+			$errormsg .= '<br>HTTP '.$response['status_code'];
 			if (!empty($response['errorCode'])) {
-				$this->error .= ' - '.$response['errorCode'].(empty($response['errorMessage']) ? '': ' - '.$response['errorMessage']);
+				$errormsg .= ' - '.$response['errorCode'].(empty($response['errorMessage']) ? '': ' - '.$response['errorMessage']);
 			}
 			if (!empty($response['curl_error_no'])) {
-				$this->error .= ' - Curl error '.$response['curl_error_no'].(empty($response['curl_error_msg']) ? '': ' - '.$response['curl_error_msg']);
+				$errormsg .= ' - Curl error '.$response['curl_error_no'].(empty($response['curl_error_msg']) ? '': ' - '.$response['curl_error_msg']);
 			}
-			$this->errors[] = $this->error;
+			$this->errors[] = $errormsg;
 			return 0;
 		}
 	}

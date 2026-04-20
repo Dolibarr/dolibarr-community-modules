@@ -2,9 +2,9 @@
 
 ## Features
 
-Dolibarr module for secure API connection and data synchronization with French PDP portals.
+Dolibarr module for secure API connection and data synchronization with EInvoice Access Point.
 
-PDPConnectFR enables Dolibarr to communicate securely with certified French PDP (Partner Dematerialization Platform) portals, as part of the French e-invoicing and e-reporting framework.
+PDPConnectFR enables Dolibarr to communicate securely with certified Access Point portals (French "Plateforme Agréée").
 It manages authentication, token renewal, and data exchange through standardized APIs, ensuring full traceability and compliance with upcoming regulations.
 
 Other external modules are available on [Dolistore.com](https://www.dolistore.com).
@@ -30,7 +30,7 @@ go to menu `Home> Setup> Modules> Deploy external module` and upload the zip fil
 Using your browser:
 
   - Log into Dolibarr as a super-administrator
-  - Go to "Setup"> "Modules"
+  - Go to "Setup - Modules"
   - You should now be able to find and enable the module
 
 

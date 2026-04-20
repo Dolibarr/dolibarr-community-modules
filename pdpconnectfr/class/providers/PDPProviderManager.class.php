@@ -63,7 +63,7 @@ class PDPProviderManager
 				'class' => 'EsalinkPDPProvider',
 				'position' => 10,
 				'provider_countries' => array('FR'),
-				'provider_name' => 'ESALINK - Hubtimize',
+				'provider_name' => 'ESALINK <span class="opacitymedium">('.$langs->trans("NeedASubscriptionTo", "PDPLibre").')</span>',
 				'description' => 'Esalink PDP Integration',
 				'is_enabled' => 1,
 				'prod_account_admin_url' => 'https://www.esalink.com/contact/',
@@ -116,6 +116,21 @@ class PDPProviderManager
 				'provider_name' => 'SuperPDP  <span class="opacitymedium">(Free and easy setup via '.getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER').' - '.$langs->trans("Recommended").')</span>',
 				'description' => 'SuperPDP Integration',
 				'note' => 'Use "authorization_code" mode',
+				//'is_enabled' => getDolGlobalString('PDPCONNECTFR_TEST_SUPERPDP'),
+				'is_enabled' => 1,
+				'prod_account_admin_url' => $urltorenew,
+				'test_account_admin_url' => $urltorenew,
+			);
+		}
+
+		if (getDolGlobalString("PDPCONNTECTFR_SUPERPDP_VIAPARTNER") == 'proxy') {
+			$this->providersList['SUPERPDPViaPartner'] = array(
+				'class' => 'SuperPDPProvider',
+				'position' => 1,
+				'provider_countries' => array('all'),
+				'provider_name' => 'SuperPDP OAuth proxy</span>',
+				'description' => 'SuperPDP OAuth proxy',
+				'note' => 'Proxy for client to use "authorization_code" mode',
 				//'is_enabled' => getDolGlobalString('PDPCONNECTFR_TEST_SUPERPDP'),
 				'is_enabled' => 1,
 				'prod_account_admin_url' => $urltorenew,

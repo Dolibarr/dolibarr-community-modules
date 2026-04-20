@@ -89,10 +89,12 @@ $action = GETPOST('action', 'aZ09');
 $backtopage = GETPOST('backtopage', 'alpha');
 $modulepart = GETPOST('modulepart', 'aZ09');	// Used by actions_setmoduleoptions.inc.php
 
+/*
 $value = GETPOST('value', 'alpha');
 $label = GETPOST('label', 'alpha');
 $scandir = GETPOST('scan_dir', 'alpha');
 $type = 'myobject';
+*/
 
 $error = 0;
 $setupnotempty = 0;
@@ -140,6 +142,7 @@ foreach ($TFieldProfiles as $key => $profileconfig) {
 
 $reg = array();
 $prefix = '';
+$provider = null;
 
 // If Access Point is selected, show parameters for it
 if (getDolGlobalString('PDPCONNECTFR_PDP')) {
@@ -161,6 +164,8 @@ $item = $formSetup->newItem('PDPCONNECTFR_PDP')->setAsSelect($TFieldProviders);
 $item->fieldValue = getDolGlobalString('PDPCONNECTFR_PDP');
 $item->defaultFieldValue = getDolGlobalString('PDPCONNECTFR_PDP');
 $item->helpText = $langs->transnoentities('PDPCONNECTFR_PDP_HELP');
+$item->helpText .= '<br>'.$langs->transnoentities('PDPCONNECTFR_PDP_HELP2');
+$item->helpText .= '<br>'.$langs->transnoentities('PDPCONNECTFR_PDP_HELP3');
 $item->cssClass = 'minwidth500';
 //var_dump($item);exit;
 
@@ -200,7 +205,7 @@ if (!getDolGlobalString('PDPCONNECTFR_PROTOCOL')) {
 
 // Action to get/generate a token
 if (preg_match('/set'.$prefix.'TOKEN/i', $action, $reg)) {
-	$token = $provider->getAccessToken();
+	$token = $provider->getAccessToken();	// Get access token from provider and save it into database
 
 	if ($token) {
 		setEventMessages("Token generated successfully: ".dol_trunc($token, 48), null, 'mesgs');
@@ -217,7 +222,7 @@ if (preg_match('/call'.$prefix.'HEALTHCHECK/i', $action, $reg)) {
 	if ($statusPDP['status_code'] == 200) {
 		setEventMessages($statusPDP['message'], null, 'mesgs');
 	} else {
-		setEventMessages($langs->trans('APApiNotReachable', $PDPManager->getProvider(getDolGlobalString('PDPCONNECTFR_PDP'))), array(), 'errors');
+		setEventMessages($langs->trans('APApiNotReachable', getDolGlobalString('PDPCONNECTFR_PDP')), array(), 'errors');
 	}
 }
 
@@ -275,8 +280,25 @@ if ($action == 'update' && $prefix && $valueofapikeyafter != $valueofapikeybefor
 	exit;
 }
 
+if (GETPOST('error')) {
+	setEventMessages($langs->trans('Error').' '.GETPOST('error'), null, 'errors');
+}
 
 
+if (GETPOST('accesstoken') && $provider instanceof AbstractPDPProvider) {
+	// We are in the return of an OAUT proxy authorize+token callback
+
+	$result = $provider->saveOAuthTokenDB(GETPOST('accesstoken'), GETPOST('refresh_token'), GETPOST('expires_in'));
+
+	if ($result) {
+		setEventMessages("Token generated successfully", null, 'mesgs');
+	} else {
+		setEventMessages($provider->error, $provider->errors, 'errors');
+	}
+
+	header("Location: ".$_SERVER["PHP_SELF"]);
+	exit;
+}
 
 
 /*
@@ -320,15 +342,14 @@ print info_admin($langs->trans("PDPConnectInfo").'<br>'.$langs->trans("PDPConnec
 
 if (!empty($formSetup->items)) {
 	print $formSetup->generateOutput(3, false, $langs->transnoentitiesnoconv('PlatformPartner'), 'titlefieldmiddle');
-	print '<br>';
 }
 
 if (!empty($provider) && !empty($formSetup2->items)) {
-	print '<div class="formborder">';
 	print $provider->helpToGetCredentials;
-	print '</div>';
 	print '<br>';
 }
+
+print '<br>';
 
 print $stringwarning;
 
@@ -336,7 +357,6 @@ if (!empty($formSetup2->items)) {
 	print $formSetup2->generateOutput(true, false, $langs->transnoentitiesnoconv('PDPConnectionSetup'), 'titlefieldmiddle');
 	print '<br>';
 }
-
 
 
 // If we change the Access point, we reload page to show specific configuration of the selected Access Point
