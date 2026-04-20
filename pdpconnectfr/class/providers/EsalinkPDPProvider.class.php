@@ -64,9 +64,9 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 		$this->config = array(
 			'provider_url' => 'https://ppd.hubtimize.fr',
-			'prod_auth_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/', 	// TODO: Replace the URL once known
+			'prod_auth_url' => 'https://hubtimize.fr/api/orchestrator/v1/',
+			'prod_api_url' => 'https://hubtimize.fr/api/orchestrator/v1/',
 			'test_auth_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/',
-			'prod_api_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/', 		// TODO: Replace the URL once known
 			'test_api_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/',
 			'username' => getDolGlobalString('PDPCONNECTFR_ESALINK_USERNAME'),
 			'password' => getDolGlobalString('PDPCONNECTFR_ESALINK_PASSWORD'),
@@ -473,17 +473,15 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		try {
 			if ((float) DOL_VERSION < 24.0) {
 				$resarray = $this->exchangeProtocol->generateSampleInvoiceOld($pdpconnectfr);
-				$invoice_path = $resarray['path'];
-				$ref = $resarray['ref'];
 			} else {
 				$resarray = $this->exchangeProtocol->generateSampleInvoice($pdpconnectfr);
-				$invoice_path = $resarray['path'];
-				$ref = $resarray['ref'];
 			}
-			if ($invoice_path === -1) {
+			if ($resarray === -1) {
 				$this->errors[] = $this->exchangeProtocol->error;
 				return 0;
 			}
+			$invoice_path = $resarray['path'];
+			$ref = $resarray['ref'];
 		} catch (Exception $e) {
 			$this->errors[] = $e->getMessage();
 			return 0;
