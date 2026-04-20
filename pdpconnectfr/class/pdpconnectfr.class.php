@@ -719,7 +719,7 @@ class PdpConnectFr
 					$uriConf = 'PDPCONNECTFR_' . strtoupper($provider) . '_ROUTING_ID';
 					$einvoiceid = getDolGlobalString($uriConf);
 					if (!preg_match('/^'.$mysoc->idprof1.'/', $einvoiceid)) {
-						$baseWarnings[] = $langs->trans("FxCheckErrorRoutingIDFR");
+						$baseWarnings[] = $langs->trans("FxCheckErrorRoutingIDFR", $einvoiceid);
 					} else {
 						$baseErrors[] = $langs->trans("FxCheckErrorRoutingID");
 					}

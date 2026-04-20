@@ -69,17 +69,17 @@ function pdpconnectfrAdminPrepareHead()
 	$h++;
 	*/
 
+	$head[$h][0] = dol_buildpath("/pdpconnectfr/admin/about.php", 1);
+	$head[$h][1] = $langs->trans("About");
+	$head[$h][2] = 'about';
+	$h++;
+
 	if (getDolGlobalInt('PDPCONNECTFR_ALLOW_DEVTOOLS')) {
 		$head[$h][0] = dol_buildpath("/pdpconnectfr/admin/setup_devtools.php", 1);
 		$head[$h][1] = $langs->trans("DevTools");
 		$head[$h][2] = 'devtools';
 		$h++;
 	}
-
-	$head[$h][0] = dol_buildpath("/pdpconnectfr/admin/about.php", 1);
-	$head[$h][1] = $langs->trans("About");
-	$head[$h][2] = 'about';
-	$h++;
 
 	// Show more tabs from modules
 	// Entries must be declared in modules descriptor with line
