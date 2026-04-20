@@ -232,12 +232,12 @@ class FacturXProtocol extends AbstractProtocol
 
 		// More tests
 		if ($mysoc->country_code == 'FR' && !empty($mysoc->idprof1) && !empty($mysoc->idprof2)) {
-			if (strpos($mysoc->idprof2, $mysoc->idprof1) !== 0) {
+			if (strpos(preg_replace('/\s+/', '', $mysoc->idprof2), preg_replace('/\s+/', '', $mysoc->idprof1)) !== 0) {
 				throw new Exception('BADVALUEFORSIRENORSIRET: The seller has both a SIREN and SIRET but SIRET does not start with value of SIREN.');
 			}
 		}
 		if ($object->thirdparty->country_code == 'FR' && !empty($object->thirdparty->idprof1) && !empty($object->thirdparty->idprof2)) {
-			if (strpos($object->thirdparty->idprof2, $object->thirdparty->idprof1) !== 0) {
+			if (strpos(preg_replace('/\s+/', '', $object->thirdparty->idprof2), preg_replace('/\s+/', '', $object->thirdparty->idprof1)) !== 0) {
 				throw new Exception('BADVALUEFORSIRENORSIRET: The buyer both a SIREN and SIRET but SIRET does not start with value of SIREN.');
 			}
 		}

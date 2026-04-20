@@ -718,7 +718,7 @@ class PdpConnectFr
 					$provider = getDolGlobalString('PDPCONNECTFR_PDP');
 					$uriConf = 'PDPCONNECTFR_' . strtoupper($provider) . '_ROUTING_ID';
 					$einvoiceid = getDolGlobalString($uriConf);
-					if (!preg_match('/^'.$mysoc->idprof1.'/', $einvoiceid)) {
+					if (!preg_match('/^'.preg_replace('/\s+/', '', $mysoc->idprof1).'/', $this->removeSpaces($einvoiceid))) {
 						$baseWarnings[] = $langs->trans("FxCheckErrorRoutingIDFR", $einvoiceid);
 					} else {
 						$baseErrors[] = $langs->trans("FxCheckErrorRoutingID");
@@ -2139,7 +2139,7 @@ class PdpConnectFr
 			if ($mysoc->country_code == 'FR') {
 				if (!empty($einvoiceid)) {
 					$einvoiceid = $this->removeSpaces($einvoiceid);
-					if (!preg_match('/^'.$mysoc->idprof1.'/', $einvoiceid)) {
+					if (!preg_match('/^'.preg_replace('/\s+/', '', $mysoc->idprof1).'/', $einvoiceid)) {
 						dol_syslog("Error: The seller communication URI seems not correct (should be or start with your SIRET number). Value: " . $einvoiceid, LOG_ERR);
 						$einvoiceid = '';
 					}
