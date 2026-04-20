@@ -63,7 +63,7 @@ class PDPProviderManager
 				'class' => 'EsalinkPDPProvider',
 				'position' => 10,
 				'provider_countries' => array('FR'),
-				'provider_name' => 'ESALINK - Hubtimize',
+				'provider_name' => 'ESALINK <span class="opacitymedium">('.$langs->trans("NeedASubscriptionTo", "PDPLibre").')</span>',
 				'description' => 'Esalink PDP Integration',
 				'is_enabled' => 1,
 				'prod_account_admin_url' => 'https://www.esalink.com/contact/',

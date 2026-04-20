@@ -111,7 +111,19 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		// Set content of the help page
 		$url = $providersConfig[getDolGlobalString('PDPCONNECTFR_PDP')][$prefixenv.'_account_admin_url'];
 		$urltosubscribe = img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$url.'" target="_new">'.$url.'</a>';
-		$this->helpToGetCredentials = str_replace('{s1}', $urltosubscribe, $this->helpToGetCredentials);
+
+		if (empty($tokenData['token'])) {
+			$this->helpToGetCredentials = str_replace('{s1}', $urltosubscribe, $this->helpToGetCredentials);
+
+			$this->helpToGetCredentials = '<div class="formborder">'.$this->helpToGetCredentials.'</div>';
+		} else {
+			$this->helpToGetCredentials = '<div class="green greenborder">';
+			$this->helpToGetCredentials .= '<center>';
+			$this->helpToGetCredentials .= $langs->trans("YourSoftwareSeemsConnectedWith", strtoupper($this->name));
+			$this->helpToGetCredentials .= '<br><br>'.img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$_SERVER["PHP_SELF"].'?action=delete'.$prefix."TOKEN&token=".newToken().'">'.$langs->trans("ClickHereToRemoveConnection").'</a>';
+			$this->helpToGetCredentials .= '</center>';
+			$this->helpToGetCredentials .= '</div>';
+		}
 
 
 		// E-Invoice ID
@@ -123,11 +135,13 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$item->cssClass = 'minwidth300';
 
 		// Setup conf to choose a protocol of exchange
+		/* Moved into the tab "Options"
 		$item = $formSetup->newItem('PDPCONNECTFR_PROTOCOL')->setAsSelect($TFieldProtocols);
 		$item->helpText = $langs->transnoentities('PDPCONNECTFR_PROTOCOL_HELP');
 		$item->defaultFieldValue = 'FACTURX';
 		$item->cssClass = 'minwidth500';
 		$item->fieldParams['trClass'] = 'advancedoption';
+		*/
 
 		// Setup conf to choose a profil of exchange
 		// $item = $formSetup->newItem('PDPCONNECTFR_PROFILE')->setAsSelect($TFieldProfiles);
@@ -169,7 +183,9 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				$item->fieldOverride .= ' &nbsp; &nbsp; <a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken().'">' . $langs->trans('reGenerateAccessToken') . '<i class="fa fa-key paddingleft"></i></a>';
 			}
 
-			$item->fieldOverride .= ' &nbsp; &nbsp; <a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=delete".$prefix."TOKEN&token=".newToken().'">' . img_picto('', 'delete') . '</a>';
+			if (!empty($tokenData['token'])) {
+				$item->fieldOverride .= ' &nbsp; &nbsp; <a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=delete".$prefix."TOKEN&token=".newToken().'">' . img_picto('', 'delete') . '</a>';
+			}
 		}
 
 		if (!empty($tokenData['token'])) {
