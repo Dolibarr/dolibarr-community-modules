@@ -31,6 +31,9 @@ abstract class AbstractProtocol
 	 */
 	public $sourceinvoice;
 
+	/** @var string Error message */
+	public $error;
+
 	/** @var array Error messages */
 	public $errors = [];
 
@@ -86,6 +89,7 @@ abstract class AbstractProtocol
 	 * @param	PdpConnectFr			$pdpconnectfr			PDPConnectFR
 	 * @param   Societe|null			$thirdpartySeller		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
 	 * @param   Societe|null			$thirdpartyBuyer		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
+	 * @throws  Exception
 	 * @return 	array<string,string> 							Path or content of the generated sample invoice.
 	 */
 	abstract public function generateSampleInvoiceOld($pdpconnectfr, $thirdpartySeller = null, $thirdpartyBuyer = null);
@@ -99,7 +103,7 @@ abstract class AbstractProtocol
 	 * @param	PdpConnectFr			$pdpconnectfr			PDPConnectFR
 	 * @param   Societe|null			$thirdpartySeller		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
 	 * @param   Societe|null			$thirdpartyBuyer		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
-	 * @return 	string 											Path or content of the generated sample invoice.
+	 * @return 	-1|array<string,string>							Path or content of the generated sample invoice.
 	 */
 	abstract public function generateSampleInvoice($pdpconnectfr, $thirdpartySeller = null, $thirdpartyBuyer = null);
 }

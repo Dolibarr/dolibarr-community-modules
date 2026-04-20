@@ -415,9 +415,13 @@ class ActionsPdpconnectfr extends CommonHookActions
 	 * @param Hookmanager	$hookmanager	Hook manager
 	 * @return number
 	 */
-	public function formConfirm($parameters, &$object, &$action, $hookmanager)
+	public function formConfirm($parameters, $object, &$action, $hookmanager)
 	{
 		global $db, $langs, $form;
+
+		if (empty($object->element)) {
+			return 0;
+		}
 
 		$pdpConnectFr = new PdpConnectFr($db);
 		$checkConfig = $pdpConnectFr->checkModulePrerequisites();
@@ -426,7 +430,6 @@ class ActionsPdpconnectfr extends CommonHookActions
 			return 0;
 		}
 		$langs->load("pdpconnectfr@pdpconnectfr");
-
 
 		if (in_array($object->element, ['invoice_supplier'])) {
 			// Clone confirmation

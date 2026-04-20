@@ -131,24 +131,53 @@ class SuperPDPProvider extends AbstractPDPProvider
 				*/
 
 				$urltogeneratetoken = getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER_OAUTH_URL');
-				$urltogeneratetoken .= '?state=none&response_type=code&redirect_uri='.urlencode(dol_buildpath('/pdpconnectfr/admin/setup.php', 2));
+				$urltogeneratetoken .= '?proxy=superpdp&state=none&response_type=code&redirect_uri='.urlencode(dol_buildpath('/pdpconnectfr/admin/setup.php', 2));
 
-				$urltoshow = 'Link to create account via '.getDolGlobalString("PDPCONNTECTFR_SUPERPDP_VIAPARTNER");
+				$urltoshow = $langs->trans("PDPCONNECTFR_LINK_CREATE_ACCOUNTVia", getDolGlobalString("PDPCONNTECTFR_SUPERPDP_VIAPARTNER"));
 
-				$this->helpToGetCredentials = str_replace('{s1}', img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$urltogeneratetoken.'" target="_new">'.$urltoshow.'</a>', $this->helpToGetCredentials);
+				if (empty($tokenData['token'])) {
+					$this->helpToGetCredentials = str_replace('{s1}', '<br><br><center>'.img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$urltogeneratetoken.'" target="_new">'.$urltoshow.'</a></center>', $this->helpToGetCredentials);
+					$this->helpToGetCredentials = '<div class="formborder">'.$this->helpToGetCredentials.'</div>';
+				} else {
+					$this->helpToGetCredentials = '<div class="green greenborder">';
+					$this->helpToGetCredentials .= '<center>';
+					$this->helpToGetCredentials .= $langs->trans("YourSoftwareSeemsConnectedWith", strtoupper($this->name));
+					$this->helpToGetCredentials .= '<br><br>'.img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$_SERVER["PHP_SELF"].'?action=delete'.$prefix."TOKEN&token=".newToken().'">'.$langs->trans("ClickHereToRemoveConnection").'</a>';
+					$this->helpToGetCredentials .= '</center>';
+					$this->helpToGetCredentials .= '</div>';
+				}
 			} else {
-				$this->helpToGetCredentials = 'You are on the proxy for SuperPDP Access Point registration.';
+				global $dolibarr_main_url_root;
+
+				$urlforproxy = $dolibarr_main_url_root.'/custom/pdpconnectfr/public/proxy_oauthcallback.php';
+
+				$this->helpToGetCredentials = '<div class="green greenborder">';
+				$this->helpToGetCredentials .= 'You are on the proxy for SuperPDP Access Point registration.<br><br>';
+				$this->helpToGetCredentials .= 'URL of proxy is:<br><input type="text" class="quatrevingtpercent" id="urlproxy" value="'.$urlforproxy.'"spellcheck="false">';
+				$this->helpToGetCredentials .= ajax_autoselect("urlproxy");
+				$this->helpToGetCredentials .= '</div>';
 			}
 		} else {
 			$url = $providersConfig[getDolGlobalString('PDPCONNECTFR_PDP')][$prefixenv.'_account_admin_url'];
 			$urltoshow = $url;
 
 			// Default help
-			$this->helpToGetCredentials = str_replace('{s1}', img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$url.'" target="_new">'.$urltoshow.'</a>', $this->helpToGetCredentials);
-			$this->helpToGetCredentials = str_replace('{s2}', '<input type="text" class="width300" value="'.$this->callbackurl.'">', $this->helpToGetCredentials);
-			$this->helpToGetCredentials = str_replace('{s3}', $langs->transnoentitiesnoconv("OAUTH_ID"), $this->helpToGetCredentials);
-			$this->helpToGetCredentials = str_replace('{s4}', $langs->transnoentitiesnoconv("OAUTH_SECRET"), $this->helpToGetCredentials);
-			$this->helpToGetCredentials = str_replace('{s5}', $langs->transnoentitiesnoconv("Save"), $this->helpToGetCredentials);
+			if (empty($tokenData['token'])) {
+				$this->helpToGetCredentials = str_replace('{s1}', img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$url.'" target="_new">'.$urltoshow.'</a>', $this->helpToGetCredentials);
+				$this->helpToGetCredentials = str_replace('{s2}', '<input type="text" class="width300" value="'.$this->callbackurl.'">', $this->helpToGetCredentials);
+				$this->helpToGetCredentials = str_replace('{s3}', $langs->transnoentitiesnoconv("OAUTH_ID"), $this->helpToGetCredentials);
+				$this->helpToGetCredentials = str_replace('{s4}', $langs->transnoentitiesnoconv("OAUTH_SECRET"), $this->helpToGetCredentials);
+				$this->helpToGetCredentials = str_replace('{s5}', $langs->transnoentitiesnoconv("Save"), $this->helpToGetCredentials);
+
+				$this->helpToGetCredentials = '<div class="formborder">'.$this->helpToGetCredentials.'</div>';
+			} else {
+				$this->helpToGetCredentials = '<div class="green greenborder">';
+				$this->helpToGetCredentials .= '<center>';
+				$this->helpToGetCredentials .= $langs->trans("YourSoftwareSeemsConnectedWith", strtoupper($this->name));
+				$this->helpToGetCredentials .= '<br><br>'.img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$_SERVER["PHP_SELF"].'?action=delete'.$prefix."TOKEN&token=".newToken().'">'.$langs->trans("ClickHereToRemoveConnection").'</a>';
+				$this->helpToGetCredentials .= '</center>';
+				$this->helpToGetCredentials .= '</div>';
+			}
 		}
 
 		// E-Invoice ID
@@ -160,11 +189,13 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$item->cssClass = 'minwidth300';
 
 		// Setup conf to choose a protocol of exchange
+		/* Moved into the tab "Options"
 		$item = $formSetup->newItem('PDPCONNECTFR_PROTOCOL')->setAsSelect($TFieldProtocols);
 		$item->helpText = $langs->transnoentities('PDPCONNECTFR_PROTOCOL_HELP');
 		$item->defaultFieldValue = 'FACTURX';
 		$item->cssClass = 'minwidth500';
 		$item->fieldParams['trClass'] = 'advancedoption';
+		*/
 
 		// Setup conf to choose a profil of exchange
 		// $item = $formSetup->newItem('PDPCONNECTFR_PROFILE')->setAsSelect($TFieldProfiles);
@@ -202,9 +233,10 @@ class SuperPDPProvider extends AbstractPDPProvider
 					$texttoshow = $langs->trans('generateAccessToken');
 					$urltogeneratetoken = $_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken();
 				}
-				if ($urltogeneratetoken) {
+
+				if ($urltogeneratetoken && (getDolGlobalString('PDPCONNECTFR_PDP') != 'SUPERPDPViaPartner' || !empty($tokenData['token']))) {
 					$item = $formSetup->newItem($prefix . 'TOKEN');
-					$item->nameText = $langs->trans('Token');
+					$item->nameText = $langs->trans('AccessToken');
 					$item->cssClass = 'maxwidth500 ';
 					$item->fieldOverride = "";
 					if (!empty($tokenData['token'])) {
@@ -219,7 +251,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 						$item->fieldOverride .= '<a class="reposition" href="'.$urltogeneratetoken.'">' .$texttoshow . '<i class="fa fa-key paddingleft"></i></a>';
 					}
 					if (!empty($tokenData['token'])) {
-						$item->fieldOverride .= ' &nbsp; &nbsp; <a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken().'">' . $langs->trans('reGenerateAccessToken') . '<i class="fa fa-key paddingleft"></i></a>';
+						$item->fieldOverride .= ' &nbsp; &nbsp; <a class="reposition" href="'.$urltogeneratetoken.'">' . $langs->trans('reGenerateAccessToken') . '<i class="fa fa-key paddingleft"></i></a>';
 					}
 
 					if (!empty($tokenData['token'])) {
@@ -228,7 +260,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				}
 			}
 
-			if (getDolGlobalString('PDPCONNECTFR_PDP') != 'SUPERPDPViaPartner') {	// When we are on a proxy server, no token need to be generated here.
+			if (getDolGlobalString('PDPCONNECTFR_PDP') != 'SUPERPDPViaPartner' || getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER') != 'proxy') {	// When we are on a proxy server, no token need to be generated here.
 				if (!empty($tokenData['token'])) {
 					// Actions
 					$item = $formSetup->newItem($prefix . 'ACTIONS');
@@ -352,7 +384,10 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 		if ($response['status_code'] === 200) {
 			$returnarray['status_code'] = true;
-			$returnarray['message'] = $langs->trans('APApiReachable', getDolGlobalString('PDPCONNECTFR_PDP'));
+			$nameOfAccessPoint = getDolGlobalString('PDPCONNECTFR_PDP');
+			$nameOfAccessPoint = preg_replace('/ViaPartner/', '', $nameOfAccessPoint);
+
+			$returnarray['message'] = $langs->trans('APApiReachable', $nameOfAccessPoint);
 		} else {
 			$returnarray['status_code'] = false;
 		}
@@ -524,17 +559,15 @@ class SuperPDPProvider extends AbstractPDPProvider
 		try {
 			if ((float) DOL_VERSION < 24.0) {
 				$resarray = $this->exchangeProtocol->generateSampleInvoiceOld($pdpconnectfr);
-				$invoice_path = $resarray['path'];
-				$ref = $resarray['ref'];
 			} else {
 				$resarray = $this->exchangeProtocol->generateSampleInvoice($pdpconnectfr);
-				$invoice_path = $resarray['path'];
-				$ref = $resarray['ref'];
 			}
-			if ($invoice_path === -1) {
+			if ($resarray === -1) {
 				$this->errors[] = $this->exchangeProtocol->error;
 				return 0;
 			}
+			$invoice_path = $resarray['path'];
+			$ref = $resarray['ref'];
 		} catch (Exception $e) {
 			$this->errors[] = $e->getMessage();
 			return 0;
