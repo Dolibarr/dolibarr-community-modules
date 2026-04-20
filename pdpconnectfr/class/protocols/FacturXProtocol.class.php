@@ -250,8 +250,6 @@ class FacturXProtocol extends AbstractProtocol
 		}
 
 
-
-
 		//  Build XML Document Header (Seller, Buyer, Dates)
 		$facturxpdf
 			->setDocumentInformation(
@@ -1281,6 +1279,7 @@ class FacturXProtocol extends AbstractProtocol
 			$tmpthirdparty->initAsSpecimen();
 			$tmpthirdparty->idprof1 = '000000001';
 			$tmpthirdparty->idprof2 = '00000000100010';
+			$tmpthirdparty->tva_intra = 'FR12000000001';
 		}
 		$tmpinvoice->thirdparty = $tmpthirdparty;
 		$tmpinvoice->socid = $tmpthirdparty->id;			// 0 for specimen
