@@ -473,17 +473,15 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		try {
 			if ((float) DOL_VERSION < 24.0) {
 				$resarray = $this->exchangeProtocol->generateSampleInvoiceOld($pdpconnectfr);
-				$invoice_path = $resarray['path'];
-				$ref = $resarray['ref'];
 			} else {
 				$resarray = $this->exchangeProtocol->generateSampleInvoice($pdpconnectfr);
-				$invoice_path = $resarray['path'];
-				$ref = $resarray['ref'];
 			}
-			if ($invoice_path === -1) {
+			if ($resarray === -1) {
 				$this->errors[] = $this->exchangeProtocol->error;
 				return 0;
 			}
+			$invoice_path = $resarray['path'];
+			$ref = $resarray['ref'];
 		} catch (Exception $e) {
 			$this->errors[] = $e->getMessage();
 			return 0;
