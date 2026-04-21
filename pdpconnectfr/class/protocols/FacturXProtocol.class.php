@@ -2039,10 +2039,10 @@ class FacturXProtocol extends AbstractProtocol
 	}
 
 	/**
-	 * map type of invoices dolibarr <-> facturx
-	 * @param $object the invoice object
+	 * Map type of invoices dolibarr <-> facturx
 	 *
-	 * @return  string|null code of invoice type
+	 * @param 	CommonInvoice	$object 	The invoice object
+	 * @return  string|null 				code of invoice type
 	 */
 	private function _getTypeOfInvoice($object)
 	{
@@ -2143,9 +2143,8 @@ class FacturXProtocol extends AbstractProtocol
 	/**
 	 * Get a timestamp and return a php DateTime object
 	 *
-	 * @param   $ts  timestamp
-	 *
-	 * @return \DateTime|null DateTime object or null if $ts is empty
+	 * @param	int		$ts			Timestamp
+	 * @return 	\DateTime|null 		DateTime object or null if $ts is empty
 	 */
 	private function _tsToDateTime($ts)
 	{
