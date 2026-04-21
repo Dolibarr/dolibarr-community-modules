@@ -49,6 +49,8 @@ use horstoeko\zugferd\ZugferdDocumentPdfBuilderAbstract;
 use horstoeko\zugferd\ZugferdDocumentValidator;
 use horstoeko\zugferd\ZugferdDocumentPdfReader;
 use horstoeko\zugferd\ZugferdDocumentPdfReaderExt;
+use horstoeko\zugferd\ZugferdDocumentPdfMerger;
+
 
 require __DIR__ . "/../../vendor/autoload.php";
 
@@ -794,6 +796,8 @@ class FacturXProtocol extends AbstractProtocol
 		}
 
 		require_once DOL_DOCUMENT_ROOT."/compta/facture/class/facture.class.php";
+		require_once DOL_DOCUMENT_ROOT.'/core/lib/pdf.lib.php';
+		require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 
 		if ($invoice_id instanceof Facture) {
 			$invoice = $invoice_id;
@@ -865,63 +869,77 @@ class FacturXProtocol extends AbstractProtocol
 
 		clearstatcache(true);
 
+
 		// Embed the XML file $xmlfile into the file $pathfacturxpdf (that was copied from $orig_pdf) using FPDI and overwrite it.
-		// TODO We can also use the horstoeko/zugferd-php library to do this like it is done in the generateSampleInvoiceOld() method.
+		// 2 methods are provided depending on the version of Dolibarr.
 
-		require_once DOL_DOCUMENT_ROOT.'/core/lib/pdf.lib.php';
-		require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+		if ((float) DOL_VERSION < 24.0) {
+			// Generate the PDF including the XML using the TCPDF library.
+			// Bugged version that include the factur-x.xml file twice in the PDF. This can be viewed using Acrobat Reader only.
+			// But it works with Esalink and is the only solution when Dolibarr < 24.0 because such version have a class FPDF provided by default in Dolibarr
+			// that is in conflict with the class FPDF provided bu the module pdpconnectfr and the library horstoeko/zugferd.
+			$pdf = pdf_getInstance();
+			$pagecount = $pdf->setSourceFile($pathfacturxpdf);
 
-		$pdf = pdf_getInstance();
-		$pagecount = $pdf->setSourceFile($pathfacturxpdf);
+			// import all pages of the original PDF
+			for ($i = 1; $i <= $pagecount; $i++) {
+				$tpl = $pdf->importPage($i);
+				$pdf->addPage();
+				$pdf->useTemplate($tpl);
+			}
 
-		// import all pages of the original PDF
-		for ($i = 1; $i <= $pagecount; $i++) {
-			$tpl = $pdf->importPage($i);
-			$pdf->addPage();
-			$pdf->useTemplate($tpl);
+			// Embed the XML file as a file attachment in the PDF
+			if (file_exists($xmlfile)) {
+				$pdf->Annotation(10, 10, 5, 5, 'factur-x.xml', array(
+					'Subtype' => 'FileAttachment',
+					'Name' => 'PushPin'
+				));
+			}
+
+			// Restore metadata from original PDF.
+			if (function_exists('pdfExtractMetadata')) {	// From Dolibarr v22
+				// Now we get the metadata keywords from the $sourcefile PDF (by parsing the binary PDF file)
+				$keywords = pdfExtractMetadata($pathfacturxpdf, 'Keywords');
+				$subject = pdfExtractMetadata($pathfacturxpdf, 'Subject');
+				$author = pdfExtractMetadata($pathfacturxpdf, 'Author');
+				$creator = pdfExtractMetadata($pathfacturxpdf, 'Creator');
+
+				if (!preg_match('/^ERROR/', $keywords)) {
+					$pdf->setKeywords($keywords);
+				}
+				if (!preg_match('/^ERROR/', $subject)) {
+					$pdf->setSubject($subject);
+				}
+				if (!preg_match('/^ERROR/', $author)) {
+					$pdf->setAuthor($author);
+				}
+				if (!preg_match('/^ERROR/', $creator)) {
+					$pdf->setCreator($creator);
+				}
+			}
+
+			// Save the final PDF with the embedded XML
+			$pdf->Output($pathfacturxpdf, 'F');
+		} else {
+			// Generate the PDF including the XML using the horstoeko/zugferd library.
+			// This can works with Dolibarr 24.0+ only, because the previous version of Dolibarr was already including a FPDF class that is
+			// in conflict with the one provided by horstoeko/zugferd library.
+			if (!file_exists($orig_pdf)) {
+				throw new \Exception("XML and/or PDF does not exist");
+			}
+			$merger = new ZugferdDocumentPdfMerger($xmlfile, $orig_pdf);
+
+			$merger->generateDocument();
+			$merger->saveDocument($pathfacturxpdf);
 		}
 
-		// Embed the XML file as a file attachment in the PDF
-		if (file_exists($xmlfile)) {
-			$pdf->Annotation(0, 0, 0, 0, '', array(
-				'Subtype' => 'FileAttachment',
-				'Name' => 'PushPin',
-				'FS' => $xmlfile
-			));
-		}
-
-
-		// Restore metadata from original PDF.
-		if (function_exists('pdfExtractMetadata')) {	// From Dolibarr v22
-			// Now we get the metadata keywords from the $sourcefile PDF (by parsing the binary PDF file)
-			$keywords = pdfExtractMetadata($pathfacturxpdf, 'Keywords');
-			$subject = pdfExtractMetadata($pathfacturxpdf, 'Subject');
-			$author = pdfExtractMetadata($pathfacturxpdf, 'Author');
-			$creator = pdfExtractMetadata($pathfacturxpdf, 'Creator');
-
-			if (!preg_match('/^ERROR/', $keywords)) {
-				$pdf->setKeywords($keywords);
-			}
-			if (!preg_match('/^ERROR/', $subject)) {
-				$pdf->setSubject($subject);
-			}
-			if (!preg_match('/^ERROR/', $author)) {
-				$pdf->setAuthor($author);
-			}
-			if (!preg_match('/^ERROR/', $creator)) {
-				$pdf->setCreator($creator);
-			}
-		}
-
-
-		// Save the final PDF with the embedded XML
-		$pdf->Output($pathfacturxpdf, 'F');
 
 		// Clean up the temporary XML file
 		if (file_exists($xmlfile) && !getDolGlobalString('PDPCONNECTFR_DEBUG_MODE')) {
 			dol_delete_file($xmlfile);
 			dol_syslog(get_class($this) . '::generateInvoice cleaned up temporary XML file: ' . $xmlfile);
 		}
+
 
 		// Add factorx pdfgeneration hook
 		global $action, $hookmanager;
@@ -946,30 +964,6 @@ class FacturXProtocol extends AbstractProtocol
 		}
 
 		return $pathfacturxpdf;		// Name of PDF with factur-x
-
-		// Saving ---
-		// Embed XML into PDF and save using horstoeko method
-		/*$pdfBuilder = new ZugferdDocumentPdfBuilder($facturxpdf, $orig_pdf);
-		$pdfBuilder->generateDocument();
-
-		$new_pdf = $orig_pdf;
-		if (getDolGlobalString('FACTURX_SUFFIX_ENABLE', '') != '') {
-			$suffix = getDolGlobalString('FACTURX_SUFFIX_CUSTOM', '_facturx');
-			$new_pdf = \str_replace('.pdf', $suffix . '.pdf', $orig_pdf);
-		}
-
-		$pdfBuilder->saveDocument($new_pdf);
-		dol_syslog(\get_class($this) . '::executeHooks save facturx document to : ' . $new_pdf . ', checksum : ' . \sha1_file($new_pdf));
-
-		// Rename if no suffix is used
-		if (empty(getDolGlobalString('FACTURX_SUFFIX_ENABLE', '')) && \file_exists($new_pdf)) {
-			\rename($new_pdf, $orig_pdf);
-		}
-
-		\clearstatcache(\true);
-
-		// dol_syslog(get_class($this) . '::executeHooks end action=' . $action . ', file saved as ' . $new_pdf);
-		return $ret;*/
 	}
 
 
