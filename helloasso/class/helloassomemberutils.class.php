@@ -151,12 +151,15 @@ class HelloAssoMemberUtils
 					$mesg = $langs->transnoentities("HelloAssoMembersNoNewMembers");
 				}
 				setEventMessages($mesg, null, 'mesgs');
+				dol_syslog(get_class($this)."::helloassoSyncMembersToDolibarr ended with setEventMessage with mesg = ".$mesg, LOG_DEBUG);
+				
 			} else {
 				$mesg = $this->nbPosts." Member(s) have been added successfully";
 				if ($this->nbPosts == 0) {
 					$mesg = "0 Member where added, no new members on HelloAsso";
 				}
 				$this->output = $mesg;
+				dol_syslog(get_class($this)."::helloassoSyncMembersToDolibarr ended with cron output with mesg = ".$mesg, LOG_DEBUG);
 			}
 		} else {
 			$db->rollback();
@@ -167,14 +170,19 @@ class HelloAssoMemberUtils
 				$errmsg = (implode(', ', $this->errors));
 				if ($mode != "cron") {
 					setEventMessages($errmsg, null, 'errors');
+					dol_syslog(get_class($this)."::helloassoSyncMembersToDolibarr ended setEventMessage with mesg = ".$errmsg, LOG_DEBUG);
+				} else {
+					dol_syslog(get_class($this)."::helloassoSyncMembersToDolibarr ended with cron output with mesg = ".$errmsg, LOG_DEBUG);
 				}
 				return 1;
 			}
 			$mesg = $langs->transnoentities("HelloAssoMembersNothingDone", $this->nbPosts);
 			if ($mode != "cron") {
 				setEventMessages($mesg, null, 'warnings');
+				dol_syslog(get_class($this)."::helloassoSyncMembersToDolibarr ended setEventMessage with mesg = ".$mesg, LOG_DEBUG);
 			} else {
 				$this->output = "Nothing done (Dry mode)";
+				dol_syslog(get_class($this)."::helloassoSyncMembersToDolibarr ended with cron output with mesg = ".$this->output, LOG_DEBUG);
 			}
 		}
 		return 0;
