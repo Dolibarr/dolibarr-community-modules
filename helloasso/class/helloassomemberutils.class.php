@@ -152,7 +152,6 @@ class HelloAssoMemberUtils
 				}
 				setEventMessages($mesg, null, 'mesgs');
 				dol_syslog(get_class($this)."::helloassoSyncMembersToDolibarr ended with setEventMessage with mesg = ".$mesg, LOG_DEBUG);
-				
 			} else {
 				$mesg = $this->nbPosts." Member(s) have been added successfully";
 				if ($this->nbPosts == 0) {
