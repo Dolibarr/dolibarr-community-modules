@@ -353,10 +353,11 @@ class ActionsPdpconnectfr extends CommonHookActions
 						}
 					} else {
 						// If there is an error, we move warnings into error message
-						$this->errors = array_merge($this->errors, $protocol->errors);
-						$this->errors = array_merge($this->errors, $this->warnings);
+						// Cast to array to avoid TypeError on PHP 8 when property is null
+						$this->errors = array_merge($this->errors, (array) $protocol->errors);
+						$this->errors = array_merge($this->errors, (array) $this->warnings);
 						$this->warnings = array();
-						dol_syslog(__METHOD__ . " " . implode(',', $protocol->errors));
+						dol_syslog(__METHOD__ . " " . implode(',', (array) $protocol->errors));
 						$error++;
 					}
 				}
