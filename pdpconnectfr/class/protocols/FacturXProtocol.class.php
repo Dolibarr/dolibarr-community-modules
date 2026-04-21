@@ -927,9 +927,25 @@ class FacturXProtocol extends AbstractProtocol
 			if (!file_exists($orig_pdf)) {
 				throw new \Exception("XML and/or PDF does not exist");
 			}
+
+			// Restore metadata from original PDF.
+			if (function_exists('pdfExtractMetadata')) {	// From Dolibarr v22
+				// Now we get the metadata keywords from the $sourcefile PDF (by parsing the binary PDF file)
+				$keywords = pdfExtractMetadata($orig_pdf, 'Keywords');
+				$subject = pdfExtractMetadata($orig_pdf, 'Subject');
+				$author = pdfExtractMetadata($orig_pdf, 'Author');
+				$creator = pdfExtractMetadata($orig_pdf, 'Creator');
+			}
+
 			$merger = new ZugferdDocumentPdfMerger($xmlfile, $orig_pdf);
 
+			$merger->setKeywordTemplate($keywords);
+			$merger->setSubjectTemplate($subject);
+			$merger->setAuthorTemplate($author);
+			$merger->setAdditionalCreatorTool($creator);
+
 			$merger->generateDocument();
+
 			$merger->saveDocument($pathfacturxpdf);
 		}
 
@@ -939,7 +955,6 @@ class FacturXProtocol extends AbstractProtocol
 			dol_delete_file($xmlfile);
 			dol_syslog(get_class($this) . '::generateInvoice cleaned up temporary XML file: ' . $xmlfile);
 		}
-
 
 		// Add factorx pdfgeneration hook
 		global $action, $hookmanager;
