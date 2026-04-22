@@ -500,7 +500,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 
 		$langs->load("pdpconnectfr@pdpconnectfr");
 
-		if (empty($parameters['tpl_context'])) {
+		if (empty($parameters['tpl_context'])) {	// Do not show the new fields when we are in the public form to register a thirdparty.
 			// Add block in invoice card
 			if (in_array($object->element, ['facture'])) {
 				$this->resprints .= $pdpConnectFr->EInvoiceCardBlock($object, $action);		// Output fields in card, including js for refreshing state
