@@ -866,8 +866,6 @@ class PdpConnectFr
 	public function validateChorusInformations($object)
 	{
 		// TODO add a field into pdpconnectfr_extlinks table to define if this invoice is for chorus or not and all chorus specific fields and then replace use of extrafields
-		global $langs, $mysoc;
-
 		$res = 1;
 		$message = '';
 		$baseErrors = [];
@@ -1509,7 +1507,7 @@ class PdpConnectFr
 	 */
 	public function thirdpartyCardBlock($object, $mode = '')
 	{
-		global $langs;
+		global $langs, $form;
 
 		$resprints = '';
 
@@ -1561,20 +1559,35 @@ class PdpConnectFr
 		// Fetch routing_id
 		$routing_id = '';
 		$resFetch = $this->fetchDefaultRouting($object->id);
-		if ($resFetch > 0) {
+		if ($resFetch !== '-1' && $resFetch !== '0') {
 			$routing_id = $resFetch;
 		}
+		$resFetchP = $this->fetchDefaultRouting($object->id, 'product');
+		if ($resFetchP > 0) {
+			$product_id = (int) $resFetchP;
+		}
+
 		if ($mode == 'create' || $mode == 'edit') {
+			// Add line for the default thirdparty routing ID
 			$resprints .= '<tr class="trpdpconnect_collapseseparator">';
 			$resprints .= '<td class="">' . $langs->trans("RoutingIdField") . '</td>';
 			$resprints .= '<td>';
 			$resprints .= '<input type="text" name="routing_id" ';
-			$resprints .= 'value="' . dol_escape_htmltag($routing_id ?? '') . '" ';
+			$resprints .= 'value="' . dolPrintHTML($routing_id ?? '') . '" ';
 			$resprints .= 'class="flat minwidth300" />';
 			$resprints .= '</td>';
 			$resprints .= '</tr>';
 
-			// TODO Add a line for the Default product for thirdparty (to use when importing vendor invoice and no product found)
+			// Add a line for the Default product for thirdparty (to use when importing vendor invoice and no product found)
+			$resprints .= '<tr class="trpdpconnect_collapseseparator">';
+			$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
+			$resprints .= '<td>';
+			// TODO Use a combo list of products
+			$resprints .= '<input type="text" name="routing_product_id" ';
+			$resprints .= 'value="' . dolPrintHTML($product_id ?? '') . '" ';
+			$resprints .= 'class="flat minwidth300" />';
+			$resprints .= '</td>';
+			$resprints .= '</tr>';
 
 			return $resprints;
 		}
@@ -1590,16 +1603,25 @@ class PdpConnectFr
 			// Add block only for imported invoices
 			$resprints .= '<tr class="trpdpconnect_collapseseparator">';
 			$resprints .= '<td>' . $langs->trans("pdpconnectfrSourceTitle") . '</td>';
-			$resprints .= '<td>' . $obj->provider . '</td>';
+			$resprints .= '<td>' . dolPrintHTML($obj->provider) . '</td>';
 			$resprints .= '</tr>';
 		}
 
 		$resprints .= '<tr class="trpdpconnect_collapseseparator">';
 		$resprints .= '<td>' . $langs->trans("RoutingIdField") . '</td>';
-		$resprints .= '<td>' . dol_escape_htmltag($routing_id ?? '') . '</td>';
+		$resprints .= '<td>' . dolPrintHTML($routing_id ?? '') . '</td>';
 		$resprints .= '</tr>';
 
-		// TODO Add the line for the Default product for thirdparty
+		$resprints .= '<tr class="trpdpconnect_collapseseparator">';
+		$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
+		$resprints .= '<td>';
+		if ($product_id > 0) {
+			$tmpproduct = new Product($this->db);
+			$tmpproduct->fetch($product_id);
+			$resprints .= $tmpproduct->getNomUrl(1);
+		}
+		$resprints .= '</td>';
+		$resprints .= '</tr>';
 
 		return $resprints;
 	}

@@ -390,7 +390,12 @@ class ActionsPdpconnectfr extends CommonHookActions
 			$permissiontoedit = $user->hasRight('societe', 'creer');
 
 			if (($action == 'add' || $action == 'update') && !empty($object->id) && $permissiontoedit) {
-				$result = $pdpConnectFr->setDefaultRouting($object->id, GETPOST('routing_id', 'aZ09'));
+				$result = $pdpConnectFr->setDefaultRouting($object->id, GETPOST('routing_id', 'aZ09'), '', '', '', 'thirdparty');
+				if ($result < 0) {
+					$error++;
+					setEventMessages('Failed to save routing ID', null, 'errors');
+				}
+				$result = $pdpConnectFr->setDefaultRouting($object->id, GETPOST('routing_product_id', 'aZ09'), '', '', '', 'product');
 				if ($result < 0) {
 					$error++;
 					setEventMessages('Failed to save routing ID', null, 'errors');

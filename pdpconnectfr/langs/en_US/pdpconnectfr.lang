@@ -113,7 +113,7 @@ PDPCONNECTFR_EINVOICE_IN_REAL_TIME=Automatic generation of E-invoice when invoic
 PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS=Cancel invoice recording if the automatic generation of E-invoice fails.
 PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS2=By default, the invoice creation is done even if E-invoice generation fails. in such a case, you can re-generate this E-invoice later.
 PDPCONNECTFR_PRODUCTS_AUTO_GENERATION=Automatic generation of missing products
-PDPCONNECTFR_PRODUCTS_AUTO_GENERATION_HELP=Automatically create missing products during Access Point synchronization, otherwise stop the synchronization process until the product has been created manually.
+PDPCONNECTFR_PRODUCTS_AUTO_GENERATION_HELP=When importing a supplier invoice, if the bought product can't be found in database, and if there is no default product to use on the supplier card, enabling this option will automatically create missing products during Access Point synchronization, otherwise the synchronization process is stopped until the product has been created manually or a default product for import is set on the vendor card.
 PDPCONNECTFR_THIRDPARTIES_AUTO_GENERATION=Automatic generation of missing third parties
 PDPCONNECTFR_THIRDPARTIES_AUTO_GENERATION_HELP=Automatically create missing third parties during Access Point synchronization, otherwise stop the process until the thirdparty has been created manually.
 PDPCONNECTFR_DEBUG=Debug
@@ -276,7 +276,8 @@ CreatedManually=Created manually
 DevTools=Dev tools
 YourSoftwareSeemsConnectedWith=You software seems connected with the Access Point Platform %s
 ClickHereToRemoveConnection=Click here to remove this connection
-
+DefaultProductEBilling=Default product
+DefaultProductEBillingHelp=Default product to use when importing an invoice if no existing product can be found.
 
 # AP EsaLink
 PDPCONNECTFR_ESALINK_USERNAME=API username
