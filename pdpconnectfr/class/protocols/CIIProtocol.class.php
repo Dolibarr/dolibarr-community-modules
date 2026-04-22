@@ -62,185 +62,185 @@ class CIIProtocol extends AbstractProtocol
 		$this->invoiceTemplate = [
 
 			// ── Document ────────────────────────────────────────────────────────
-			'documentno'           => '/rsm:CrossIndustryInvoice/rsm:ExchangedDocument/ram:ID',
-			'documenttypecode'     => '/rsm:CrossIndustryInvoice/rsm:ExchangedDocument/ram:TypeCode',
-			'documentdate'         => '/rsm:CrossIndustryInvoice/rsm:ExchangedDocument/ram:IssueDateTime/udt:DateTimeString',
-			'invoiceCurrency'      => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:InvoiceCurrencyCode',
-			'taxCurrency'          => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:TaxCurrencyCode',
-			'documentname'         => '/rsm:CrossIndustryInvoice/rsm:ExchangedDocument/ram:Name',
-			'documentlanguage'     => '/rsm:CrossIndustryInvoice/rsm:ExchangedDocument/ram:LanguageID',
+			'documentno' => '/rsm:CrossIndustryInvoice/rsm:ExchangedDocument/ram:ID',
+			'documenttypecode' => '/rsm:CrossIndustryInvoice/rsm:ExchangedDocument/ram:TypeCode',
+			'documentdate' => '/rsm:CrossIndustryInvoice/rsm:ExchangedDocument/ram:IssueDateTime/udt:DateTimeString',
+			'invoiceCurrency' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:InvoiceCurrencyCode',
+			'taxCurrency' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:TaxCurrencyCode',
+			'documentname' => '/rsm:CrossIndustryInvoice/rsm:ExchangedDocument/ram:Name',
+			'documentlanguage' => '/rsm:CrossIndustryInvoice/rsm:ExchangedDocument/ram:LanguageID',
 			'effectiveSpecifiedPeriod' => 'NA',
 
 			'documentDeliveryDate' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeDelivery/ram:ActualDeliverySupplyChainEvent/ram:OccurrenceDateTime/udt:DateTimeString',
 
 			'invoicingPeriodStart' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:BillingSpecifiedPeriod/ram:StartDateTime/udt:DateTimeString',
-			'invoicingPeriodEnd'   => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:BillingSpecifiedPeriod/ram:EndDateTime/udt:DateTimeString',
+			'invoicingPeriodEnd' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:BillingSpecifiedPeriod/ram:EndDateTime/udt:DateTimeString',
 
-			'businessProcessId'    => '/rsm:CrossIndustryInvoice/rsm:ExchangedDocumentContext/ram:BusinessProcessSpecifiedDocumentContextParameter/ram:ID',
-			'guidelineId'          => '/rsm:CrossIndustryInvoice/rsm:ExchangedDocumentContext/ram:GuidelineSpecifiedDocumentContextParameter/ram:ID',
-			'isTestDocument'       => 'NA',
+			'businessProcessId' => '/rsm:CrossIndustryInvoice/rsm:ExchangedDocumentContext/ram:BusinessProcessSpecifiedDocumentContextParameter/ram:ID',
+			'guidelineId' => '/rsm:CrossIndustryInvoice/rsm:ExchangedDocumentContext/ram:GuidelineSpecifiedDocumentContextParameter/ram:ID',
+			'isTestDocument' => 'NA',
 
 			// ── Notes ────────────────────────────────────────────────────────────
-			'documentNotePublic'   => '/rsm:CrossIndustryInvoice/rsm:ExchangedDocument/ram:IncludedNote[1]/ram:Content',
+			'documentNotePublic' => '/rsm:CrossIndustryInvoice/rsm:ExchangedDocument/ram:IncludedNote[1]/ram:Content',
 			// Notes by SubjectCode
-			'documentNotePMT'      => '/rsm:CrossIndustryInvoice/rsm:ExchangedDocument/ram:IncludedNote[ram:SubjectCode="PMT"]/ram:Content',
-			'documentNotePMD'      => '/rsm:CrossIndustryInvoice/rsm:ExchangedDocument/ram:IncludedNote[ram:SubjectCode="PMD"]/ram:Content',
-			'documentNoteAAB'      => '/rsm:CrossIndustryInvoice/rsm:ExchangedDocument/ram:IncludedNote[ram:SubjectCode="AAB"]/ram:Content',
+			'documentNotePMT' => '/rsm:CrossIndustryInvoice/rsm:ExchangedDocument/ram:IncludedNote[ram:SubjectCode="PMT"]/ram:Content',
+			'documentNotePMD' => '/rsm:CrossIndustryInvoice/rsm:ExchangedDocument/ram:IncludedNote[ram:SubjectCode="PMD"]/ram:Content',
+			'documentNoteAAB' => '/rsm:CrossIndustryInvoice/rsm:ExchangedDocument/ram:IncludedNote[ram:SubjectCode="AAB"]/ram:Content',
 			// All notes (multi-value: returns array of ['content'=>…,'subjectCode'=>…])
-            'documentNotes'        => '__MULTI__/rsm:CrossIndustryInvoice/rsm:ExchangedDocument/ram:IncludedNote',
+			'documentNotes' => '__MULTI__/rsm:CrossIndustryInvoice/rsm:ExchangedDocument/ram:IncludedNote',
 
 			// ── Seller ───────────────────────────────────────────────────────────
-			'sellername'           => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:Name',
-			'sellerids'            => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:ID',
+			'sellername' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:Name',
+			'sellerids' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:ID',
 
-			'sellerlineone'        => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:PostalTradeAddress/ram:LineOne',
-			'sellerlinetwo'        => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:PostalTradeAddress/ram:LineTwo',
-			'sellerlinethree'      => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:PostalTradeAddress/ram:LineThree',
-			'sellerpostcode'       => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:PostalTradeAddress/ram:PostcodeCode',
-			'sellercity'           => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:PostalTradeAddress/ram:CityName',
-			'sellercountry'        => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:PostalTradeAddress/ram:CountryID',
-			'sellersubdivision'    => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:PostalTradeAddress/ram:CountrySubDivisionName',
+			'sellerlineone' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:PostalTradeAddress/ram:LineOne',
+			'sellerlinetwo' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:PostalTradeAddress/ram:LineTwo',
+			'sellerlinethree' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:PostalTradeAddress/ram:LineThree',
+			'sellerpostcode' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:PostalTradeAddress/ram:PostcodeCode',
+			'sellercity' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:PostalTradeAddress/ram:CityName',
+			'sellercountry' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:PostalTradeAddress/ram:CountryID',
+			'sellersubdivision' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:PostalTradeAddress/ram:CountrySubDivisionName',
 
-			'sellercontactpersonname'     => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:DefinedTradeContact/ram:PersonName',
+			'sellercontactpersonname' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:DefinedTradeContact/ram:PersonName',
 			'sellercontactdepartmentname' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:DefinedTradeContact/ram:DepartmentName',
-			'sellercontactphoneno'        => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:DefinedTradeContact/ram:TelephoneUniversalCommunication/ram:CompleteNumber',
-			'sellercontactemailaddr'      => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:DefinedTradeContact/ram:EmailURIUniversalCommunication/ram:URIID',
+			'sellercontactphoneno' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:DefinedTradeContact/ram:TelephoneUniversalCommunication/ram:CompleteNumber',
+			'sellercontactemailaddr' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:DefinedTradeContact/ram:EmailURIUniversalCommunication/ram:URIID',
 
 			'sellerCommunicationUriScheme' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:URIUniversalCommunication/ram:URIID/@schemeID',
-			'sellerCommunicationUri'       => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:URIUniversalCommunication/ram:URIID',
+			'sellerCommunicationUri' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:URIUniversalCommunication/ram:URIID',
 			// ─────────────────────────────────────────────────────────────────────
 
 			// Returns array ['schemeID' => id, 'value' => globalId]
-			'sellerGlobalIds'      => '__ATTRPAIRS__/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:GlobalID',
+			'sellerGlobalIds' => '__ATTRPAIRS__/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:GlobalID',
 			// Returns array ['type' => VA/FC/..., 'value' => id]
-			'sellerTaxRegistations'=> '__ATTRPAIRS__/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:SpecifiedTaxRegistration/ram:ID',
-			'sellervatnumber'      => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:SpecifiedTaxRegistration[ram:ID/@schemeID="VA"]/ram:ID',
+			'sellerTaxRegistations' => '__ATTRPAIRS__/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:SpecifiedTaxRegistration/ram:ID',
+			'sellervatnumber' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:SpecifiedTaxRegistration[ram:ID/@schemeID="VA"]/ram:ID',
 
-			'sellerLegalOrgId'     => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:SpecifiedLegalOrganization/ram:ID',
+			'sellerLegalOrgId' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:SpecifiedLegalOrganization/ram:ID',
 			'sellerLegalOrgScheme' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:SpecifiedLegalOrganization/ram:ID/@schemeID',
-			'sellerTradingName'    => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:SpecifiedLegalOrganization/ram:TradingBusinessName',
+			'sellerTradingName' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:SpecifiedLegalOrganization/ram:TradingBusinessName',
 
 			// ── Buyer ────────────────────────────────────────────────────────────
-			'buyername'            => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:Name',
-			'buyerids'             => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:ID',
+			'buyername' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:Name',
+			'buyerids' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:ID',
 
-			'buyerlineone'         => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:PostalTradeAddress/ram:LineOne',
-			'buyerlinetwo'         => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:PostalTradeAddress/ram:LineTwo',
-			'buyerlinethree'       => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:PostalTradeAddress/ram:LineThree',
-			'buyerpostcode'        => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:PostalTradeAddress/ram:PostcodeCode',
-			'buyercity'            => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:PostalTradeAddress/ram:CityName',
-			'buyercountry'         => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:PostalTradeAddress/ram:CountryID',
-			'buyersubdivision'     => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:PostalTradeAddress/ram:CountrySubDivisionName',
+			'buyerlineone' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:PostalTradeAddress/ram:LineOne',
+			'buyerlinetwo' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:PostalTradeAddress/ram:LineTwo',
+			'buyerlinethree' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:PostalTradeAddress/ram:LineThree',
+			'buyerpostcode' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:PostalTradeAddress/ram:PostcodeCode',
+			'buyercity' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:PostalTradeAddress/ram:CityName',
+			'buyercountry' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:PostalTradeAddress/ram:CountryID',
+			'buyersubdivision' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:PostalTradeAddress/ram:CountrySubDivisionName',
 
-			'buyervatnumber'       => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:SpecifiedTaxRegistration[ram:ID/@schemeID="VA"]/ram:ID',
-			'buyerGlobalIds'       => '__ATTRPAIRS__/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:GlobalID',
+			'buyervatnumber' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:SpecifiedTaxRegistration[ram:ID/@schemeID="VA"]/ram:ID',
+			'buyerGlobalIds' => '__ATTRPAIRS__/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:GlobalID',
 
-			'buyerLegalOrgId'      => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:SpecifiedLegalOrganization/ram:ID',
-			'buyerLegalOrgScheme'  => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:SpecifiedLegalOrganization/ram:ID/@schemeID',
-			'buyerTradingName'     => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:SpecifiedLegalOrganization/ram:TradingBusinessName',
+			'buyerLegalOrgId' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:SpecifiedLegalOrganization/ram:ID',
+			'buyerLegalOrgScheme' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:SpecifiedLegalOrganization/ram:ID/@schemeID',
+			'buyerTradingName' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:SpecifiedLegalOrganization/ram:TradingBusinessName',
 
-			'buyerReference'       => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerReference',
+			'buyerReference' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerReference',
 
-			'buyercontactpersonname'  => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:DefinedTradeContact/ram:PersonName',
-			'buyercontactemailaddr'   => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:DefinedTradeContact/ram:EmailURIUniversalCommunication/ram:URIID',
-			'buyercontactphoneno'     => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:DefinedTradeContact/ram:TelephoneUniversalCommunication/ram:CompleteNumber',
+			'buyercontactpersonname' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:DefinedTradeContact/ram:PersonName',
+			'buyercontactemailaddr' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:DefinedTradeContact/ram:EmailURIUniversalCommunication/ram:URIID',
+			'buyercontactphoneno' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:DefinedTradeContact/ram:TelephoneUniversalCommunication/ram:CompleteNumber',
 
 			// ── Totals ───────────────────────────────────────────────────────────
-			'grandTotalAmount'     => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:GrandTotalAmount',
-			'duePayableAmount'     => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:DuePayableAmount',
-			'lineTotalAmount'      => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:LineTotalAmount',
-			'chargeTotalAmount'    => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:ChargeTotalAmount',
+			'grandTotalAmount' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:GrandTotalAmount',
+			'duePayableAmount' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:DuePayableAmount',
+			'lineTotalAmount' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:LineTotalAmount',
+			'chargeTotalAmount' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:ChargeTotalAmount',
 			'allowanceTotalAmount' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:AllowanceTotalAmount',
-			'taxBasisTotalAmount'  => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:TaxBasisTotalAmount',
-			'taxTotalAmount'       => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:TaxTotalAmount',
-			'roundingAmount'       => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:RoundingAmount',
-			'totalPrepaidAmount'   => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:TotalPrepaidAmount',
+			'taxBasisTotalAmount' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:TaxBasisTotalAmount',
+			'taxTotalAmount' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:TaxTotalAmount',
+			'roundingAmount' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:RoundingAmount',
+			'totalPrepaidAmount' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:TotalPrepaidAmount',
 
 			// ── Payment ──────────────────────────────────────────────────────────
-			'paymentMeansCode'     => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans/ram:TypeCode',
-			'paymentMeansText'     => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans/ram:Information',
-			'iban'                 => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans/ram:PayeePartyCreditorFinancialAccount/ram:IBANID',
-			'bic'                  => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans/ram:PayeeSpecifiedCreditorFinancialInstitution/ram:BICID',
-			'accountName'          => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans/ram:PayeePartyCreditorFinancialAccount/ram:AccountName',
+			'paymentMeansCode' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans/ram:TypeCode',
+			'paymentMeansText' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans/ram:Information',
+			'iban' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans/ram:PayeePartyCreditorFinancialAccount/ram:IBANID',
+			'bic' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans/ram:PayeeSpecifiedCreditorFinancialInstitution/ram:BICID',
+			'accountName' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans/ram:PayeePartyCreditorFinancialAccount/ram:AccountName',
 
-			'paymentDueDate'       => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradePaymentTerms/ram:DueDateDateTime/udt:DateTimeString',
-			'paymentTermsText'     => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradePaymentTerms/ram:Description',
+			'paymentDueDate' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradePaymentTerms/ram:DueDateDateTime/udt:DateTimeString',
+			'paymentTermsText' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradePaymentTerms/ram:Description',
 
 			// ── Header-level allowances & charges ────────────────────────────────
 			'headerAllowancesCharges' => '__MULTI__/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeAllowanceCharge',
 
 			// ── Referenced documents ──────────────────────────────────────────────
-			'invoiceRefDocs'       => '__MULTI__/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:InvoiceReferencedDocument',
-			'orderReference'       => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerOrderReferencedDocument/ram:IssuerAssignedID',
-			'contractReference'    => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:ContractReferencedDocument/ram:IssuerAssignedID',
-			'despatchAdviceRef'    => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeDelivery/ram:DespatchAdviceReferencedDocument/ram:IssuerAssignedID',
+			'invoiceRefDocs' => '__MULTI__/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:InvoiceReferencedDocument',
+			'orderReference' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerOrderReferencedDocument/ram:IssuerAssignedID',
+			'contractReference' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:ContractReferencedDocument/ram:IssuerAssignedID',
+			'despatchAdviceRef' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeDelivery/ram:DespatchAdviceReferencedDocument/ram:IssuerAssignedID',
 
 			// ── Tax breakdown (multi-value) ────────────────────────────────────────
-			'taxBreakdown'         => '__MULTI__/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:ApplicableTradeTax',
-        ];
+			'taxBreakdown' => '__MULTI__/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:ApplicableTradeTax',
+		];
 
 		$this->lineTemplate = [
 
-			'lineid'               => './ram:AssociatedDocumentLineDocument/ram:LineID',
-			'linestatuscode'       => 'NA',
+			'lineid' => './ram:AssociatedDocumentLineDocument/ram:LineID',
+			'linestatuscode' => 'NA',
 			'linestatusreasoncode' => 'NA',
-			'lineNote'             => './ram:AssociatedDocumentLineDocument/ram:IncludedNote/ram:Content',
+			'lineNote' => './ram:AssociatedDocumentLineDocument/ram:IncludedNote/ram:Content',
 
-			'prodname'             => './ram:SpecifiedTradeProduct/ram:Name',
-			'proddesc'             => './ram:SpecifiedTradeProduct/ram:Description',
-			'prodsellerid'         => './ram:SpecifiedTradeProduct/ram:SellerAssignedID',
-			'prodbuyerid'          => './ram:SpecifiedTradeProduct/ram:BuyerAssignedID',
-			'prodglobalidtype'     => './ram:SpecifiedTradeProduct/ram:GlobalID/@schemeID',
-			'prodglobalid'         => './ram:SpecifiedTradeProduct/ram:GlobalID',
-			'prodmultilangs'       => [],
-			'prodClassificationCode'   => './ram:SpecifiedTradeProduct/ram:DesignatedProductClassification/ram:ClassCode',
+			'prodname' => './ram:SpecifiedTradeProduct/ram:Name',
+			'proddesc' => './ram:SpecifiedTradeProduct/ram:Description',
+			'prodsellerid' => './ram:SpecifiedTradeProduct/ram:SellerAssignedID',
+			'prodbuyerid' => './ram:SpecifiedTradeProduct/ram:BuyerAssignedID',
+			'prodglobalidtype' => './ram:SpecifiedTradeProduct/ram:GlobalID/@schemeID',
+			'prodglobalid' => './ram:SpecifiedTradeProduct/ram:GlobalID',
+			'prodmultilangs' => [],
+			'prodClassificationCode' => './ram:SpecifiedTradeProduct/ram:DesignatedProductClassification/ram:ClassCode',
 			'prodClassificationScheme' => './ram:SpecifiedTradeProduct/ram:DesignatedProductClassification/ram:ClassCode/@listID',
-			'prodOriginCountry'    => './ram:SpecifiedTradeProduct/ram:OriginTradeCountry/ram:ID',
+			'prodOriginCountry' => './ram:SpecifiedTradeProduct/ram:OriginTradeCountry/ram:ID',
 
-			'grosspriceamount'             => './ram:SpecifiedLineTradeAgreement/ram:GrossPriceProductTradePrice/ram:ChargeAmount',
-			'grosspricebasisquantity'      => './ram:SpecifiedLineTradeAgreement/ram:GrossPriceProductTradePrice/ram:BasisQuantity',
+			'grosspriceamount' => './ram:SpecifiedLineTradeAgreement/ram:GrossPriceProductTradePrice/ram:ChargeAmount',
+			'grosspricebasisquantity' => './ram:SpecifiedLineTradeAgreement/ram:GrossPriceProductTradePrice/ram:BasisQuantity',
 			'grosspricebasisquantityunitcode' => './ram:SpecifiedLineTradeAgreement/ram:GrossPriceProductTradePrice/ram:BasisQuantity/@unitCode',
 
-			'netpriceamount'               => './ram:SpecifiedLineTradeAgreement/ram:NetPriceProductTradePrice/ram:ChargeAmount',
-			'netpricebasisquantity'        => './ram:SpecifiedLineTradeAgreement/ram:NetPriceProductTradePrice/ram:BasisQuantity',
-			'netpricebasisquantityunitcode'=> './ram:SpecifiedLineTradeAgreement/ram:NetPriceProductTradePrice/ram:BasisQuantity/@unitCode',
+			'netpriceamount' => './ram:SpecifiedLineTradeAgreement/ram:NetPriceProductTradePrice/ram:ChargeAmount',
+			'netpricebasisquantity' => './ram:SpecifiedLineTradeAgreement/ram:NetPriceProductTradePrice/ram:BasisQuantity',
+			'netpricebasisquantityunitcode' => './ram:SpecifiedLineTradeAgreement/ram:NetPriceProductTradePrice/ram:BasisQuantity/@unitCode',
 
-			'billedquantity'       => './ram:SpecifiedLineTradeDelivery/ram:BilledQuantity',
+			'billedquantity' => './ram:SpecifiedLineTradeDelivery/ram:BilledQuantity',
 			'billedquantityunitcode' => './ram:SpecifiedLineTradeDelivery/ram:BilledQuantity/@unitCode',
-			'chargeFreeQuantity'          => './ram:SpecifiedLineTradeDelivery/ram:ChargeFreeQuantity',
-			'chargeFreeQuantityunitcode'  => './ram:SpecifiedLineTradeDelivery/ram:ChargeFreeQuantity/@unitCode',
-			'packageQuantity'             => './ram:SpecifiedLineTradeDelivery/ram:PackageQuantity',
-			'packageQuantityunitcode'     => './ram:SpecifiedLineTradeDelivery/ram:PackageQuantity/@unitCode',
+			'chargeFreeQuantity' => './ram:SpecifiedLineTradeDelivery/ram:ChargeFreeQuantity',
+			'chargeFreeQuantityunitcode' => './ram:SpecifiedLineTradeDelivery/ram:ChargeFreeQuantity/@unitCode',
+			'packageQuantity' => './ram:SpecifiedLineTradeDelivery/ram:PackageQuantity',
+			'packageQuantityunitcode' => './ram:SpecifiedLineTradeDelivery/ram:PackageQuantity/@unitCode',
 
-			'lineTotalAmount'            => './ram:SpecifiedLineTradeSettlement/ram:SpecifiedTradeSettlementLineMonetarySummation/ram:LineTotalAmount',
+			'lineTotalAmount' => './ram:SpecifiedLineTradeSettlement/ram:SpecifiedTradeSettlementLineMonetarySummation/ram:LineTotalAmount',
 			'totalAllowanceChargeAmount' => './ram:SpecifiedLineTradeSettlement/ram:SpecifiedTradeSettlementLineMonetarySummation/ram:TotalAllowanceChargeAmount',
 
-			'categoryCode'         => './ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:CategoryCode',
-			'typeCode'             => './ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:TypeCode',
-			'rateApplicablePercent'=> './ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:RateApplicablePercent',
-			'calculatedAmount'     => './ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:CalculatedAmount',
+			'categoryCode' => './ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:CategoryCode',
+			'typeCode' => './ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:TypeCode',
+			'rateApplicablePercent' => './ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:RateApplicablePercent',
+			'calculatedAmount' => './ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:CalculatedAmount',
 
-			'exemptionReason'      => './ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:ExemptionReason',
-			'exemptionReasonCode'  => './ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:ExemptionReasonCode',
+			'exemptionReason' => './ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:ExemptionReason',
+			'exemptionReasonCode' => './ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:ExemptionReasonCode',
 
-			'lineAllowances'       => [],
+			'lineAllowances' => [],
 			'lineGrossPriceAllowances' => [],
-			'lineremisepercent'    => 'NA',
+			'lineremisepercent' => 'NA',
 
-			'linePeriodStart'      => './ram:SpecifiedLineTradeSettlement/ram:BillingSpecifiedPeriod/ram:StartDateTime/udt:DateTimeString',
-			'linePeriodEnd'        => './ram:SpecifiedLineTradeSettlement/ram:BillingSpecifiedPeriod/ram:EndDateTime/udt:DateTimeString',
+			'linePeriodStart' => './ram:SpecifiedLineTradeSettlement/ram:BillingSpecifiedPeriod/ram:StartDateTime/udt:DateTimeString',
+			'linePeriodEnd' => './ram:SpecifiedLineTradeSettlement/ram:BillingSpecifiedPeriod/ram:EndDateTime/udt:DateTimeString',
 
-			'additionalRefDocs'    => '__MULTI__./ram:SpecifiedLineTradeSettlement/ram:AdditionalReferencedDocument',
+			'additionalRefDocs' => '__MULTI__./ram:SpecifiedLineTradeSettlement/ram:AdditionalReferencedDocument',
 
-			'isDepositLine'        => false,
-			'depositInvoiceRef'    => 'NA',
-			'depositInvoiceDate'   => 'NA',
+			'isDepositLine' => false,
+			'depositInvoiceRef' => 'NA',
+			'depositInvoiceDate' => 'NA',
 
-			'parentDocumentNo'     => null,
-			'is_deposit'           => 0,
-			'fk_remise'            => null,
-        ];
-    }
+			'parentDocumentNo' => null,
+			'is_deposit' => 0,
+			'fk_remise' => null,
+		];
+	}
 
 
 	/**
@@ -294,7 +294,8 @@ class CIIProtocol extends AbstractProtocol
 	 * @param   Societe|null			$thirdpartyBuyer		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
 	 * @return 	array<string,string> 							Path or content of the generated sample invoice.
 	 */
-	public function generateSampleInvoiceOld($pdpconnectfr, $thirdpartySeller = null, $thirdpartyBuyer = null) {
+	public function generateSampleInvoiceOld($pdpconnectfr, $thirdpartySeller = null, $thirdpartyBuyer = null)
+	{
 		// Not yet implemented.
 		return array('path' => '', 'ref' => '');
 	}
@@ -311,7 +312,8 @@ class CIIProtocol extends AbstractProtocol
 	 * @param   Societe|null			$thirdpartyBuyer		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
 	 * @return 	array<string,string> 							Path or content of the generated sample invoice.
 	 */
-	public function generateSampleInvoice($pdpconnectfr, $thirdpartySeller = null, $thirdpartyBuyer = null) {
+	public function generateSampleInvoice($pdpconnectfr, $thirdpartySeller = null, $thirdpartyBuyer = null)
+	{
 		// Not yet implemented.
 		return array('path' => '', 'ref' => '');
 	}
@@ -349,13 +351,13 @@ class CIIProtocol extends AbstractProtocol
 
 		$tempFile = $tempDir . '/einvoice.xml';
 		if (file_put_contents($tempFile, $file) === false) {
-			return ['res' => -1, 'message' => 'Failed to save CII file to temporary location' ];
+			return ['res' => -1, 'message' => 'Failed to save CII file to temporary location'];
 		}
 
 		if ($ReadableViewFile) {
 			$tempFileReadableView = $tempDir . '/einvoice_readable.pdf';
 			if (file_put_contents($tempFileReadableView, $ReadableViewFile) === false) {
-				return ['res' => -1, 'message' => 'Failed to save readable view file to temporary location' ];
+				return ['res' => -1, 'message' => 'Failed to save readable view file to temporary location'];
 			}
 		}
 
@@ -366,7 +368,7 @@ class CIIProtocol extends AbstractProtocol
 
 		// Read using native parser
 		$parsedHeader = $this->parseInvoiceXML($file);
-    	$parsedLines  = $this->parseInvoiceLines($file);
+		$parsedLines = $this->parseInvoiceLines($file);
 
 		// Check if this invoice has already been imported
 		$sql = "SELECT rowid as id FROM " . MAIN_DB_PREFIX . "facture_fourn";
@@ -380,10 +382,10 @@ class CIIProtocol extends AbstractProtocol
 				// FIXME supplierinvoice already found but may be that documents are not linked (this is done later but only after creating invoice,
 				// may be we should also do it in this case to fix inconsistent data).
 
-				return ['res' => $supplierInvoiceId, 'message' => 'Supplier Invoice with reference ' . $parsedHeader['documentno'] . ' already exists' ];
+				return ['res' => $supplierInvoiceId, 'message' => 'Supplier Invoice with reference ' . $parsedHeader['documentno'] . ' already exists'];
 			}
 		} else {
-			return ['res' => -1, 'message' => 'Database error while checking existing supplier invoice: ' . $db->lasterror() ];
+			return ['res' => -1, 'message' => 'Database error while checking existing supplier invoice: ' . $db->lasterror()];
 		}
 
 		// Check if all referenced documents in the invoice exist in Dolibarr, if not return with error since we need them for correct linking in the invoice
@@ -396,7 +398,7 @@ class CIIProtocol extends AbstractProtocol
 				$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "facture_fourn WHERE ref_supplier = '" . $db->escape($refDoc) . "' LIMIT 1";
 				$resql = $db->query($sql);
 				if ($db->num_rows($resql) != 1) {
-					return ['res' => -1, 'message' => 'Document : ' . $refDoc . ' linked to document ' . $parsedHeader['documentno'] . ' not found in Dolibarr' ];
+					return ['res' => -1, 'message' => 'Document : ' . $refDoc . ' linked to document ' . $parsedHeader['documentno'] . ' not found in Dolibarr'];
 				}
 			}
 		}
@@ -409,7 +411,7 @@ class CIIProtocol extends AbstractProtocol
 		$return_messages[] = $syncSocRes['message'];
 		$action = $syncSocRes['action'] ?? null;
 		if ($socId < 0) {
-			return ['res' => -1, 'message' => 'Thirdparty sync or creation error: ' . implode("\n", $return_messages) , 'action' => $action ];
+			return ['res' => -1, 'message' => 'Thirdparty sync or creation error: ' . implode("\n", $return_messages), 'action' => $action];
 		}
 
 		// Load supplier (thirdparty)
@@ -426,7 +428,7 @@ class CIIProtocol extends AbstractProtocol
 		$supplierInvoice->ref_supplier = $parsedHeader['documentno'] ?? null;
 		$supplierInvoice->type = $this->_getDolibarrInvoiceType($parsedHeader['documenttypecode'] ?? null);
 		if ($supplierInvoice->type === '-1') {
-			return ['res' => -1, 'message' => 'Unfounded dolibarr corresponding Invoice code for document type code: ' . ($parsedHeader['documenttypecode'] ?? 'NA') ];
+			return ['res' => -1, 'message' => 'Unfounded dolibarr corresponding Invoice code for document type code: ' . ($parsedHeader['documenttypecode'] ?? 'NA')];
 		}
 		$supplierInvoice->date = isset($parsedHeader['documentdate']) && $parsedHeader['documentdate'] instanceof DateTime ? $parsedHeader['documentdate']->format('Y-m-d') : null;
 
@@ -442,7 +444,6 @@ class CIIProtocol extends AbstractProtocol
 
 		// Add invoice lines
 		foreach ($parsedLines as $parsedLine) {
-
 			$is_deposit_line = 0;
 			$fk_remise = 0;
 			// --------------------------------------------------
@@ -457,7 +458,7 @@ class CIIProtocol extends AbstractProtocol
 					$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "facture_fourn WHERE ref_supplier = '" . $db->escape($lineRefDocId) . "' LIMIT 1";
 					$resql = $db->query($sql);
 					if ($db->num_rows($resql) != 1) {
-						return ['res' => -1, 'message' => 'Document : ' . $lineRefDocId . ' linked to line ' . $parsedLine['lineid'] . ' not found in Dolibarr' ];
+						return ['res' => -1, 'message' => 'Document : ' . $lineRefDocId . ' linked to line ' . $parsedLine['lineid'] . ' not found in Dolibarr'];
 					}
 
 					// Load linked supplier invoice
@@ -466,24 +467,24 @@ class CIIProtocol extends AbstractProtocol
 					$resFetchLinkedObject = $linkedObject->fetch($linkedObjectId);
 					if ($resFetchLinkedObject > 0) {
 						/*
-						* --------------------------------------------------
-						* Deposit handling
-						* --------------------------------------------------
-						* Deposits may be referenced:
-						*  - at document level
-						*  - at line level
-						*
-						* If the deposit is referenced at line level:
-						*   → we create the discount before creating the invoice line,
-						*     so it can be linked later.
-						*
-						* If the same deposit appears both at line and document level:
-						*    line-level handling takes priority to avoid duplicates.
-						*
-						* If the deposit exists only at document level:
-						*   → a discount line will be created later after all invoice
-						*     lines are generated.
-						*/
+						 * --------------------------------------------------
+						 * Deposit handling
+						 * --------------------------------------------------
+						 * Deposits may be referenced:
+						 *  - at document level
+						 *  - at line level
+						 *
+						 * If the deposit is referenced at line level:
+						 *   → we create the discount before creating the invoice line,
+						 *     so it can be linked later.
+						 *
+						 * If the same deposit appears both at line and document level:
+						 *    line-level handling takes priority to avoid duplicates.
+						 *
+						 * If the deposit exists only at document level:
+						 *   → a discount line will be created later after all invoice
+						 *     lines are generated.
+						 */
 						if ($linkedObject->type == FactureFournisseur::TYPE_DEPOSIT) {
 							$is_deposit_line = 1;
 
@@ -498,7 +499,7 @@ class CIIProtocol extends AbstractProtocol
 								$i = 0;
 								foreach ($linkedObject->lines as $line) {
 									if ($line->product_type < 9 && $line->total_ht != 0) { // Remove lines with product_type greater than or equal to 9 and no need to create discount if amount is null
-										$keyforvatrate = $line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '');
+										$keyforvatrate = $line->tva_tx . ($line->vat_src_code ? ' (' . $line->vat_src_code . ')' : '');
 
 										$amount_ht[$keyforvatrate] += $line->total_ht;
 										$amount_tva[$keyforvatrate] += $line->total_tva;
@@ -550,14 +551,14 @@ class CIIProtocol extends AbstractProtocol
 						}
 
 						/*
-						* --------------------------------------------------
-						* Other linked document types
-						* --------------------------------------------------
-						* Additional logic may be added here for other
-						* document types such as credit notes, etc.
-						*/
+						 * --------------------------------------------------
+						 * Other linked document types
+						 * --------------------------------------------------
+						 * Additional logic may be added here for other
+						 * document types such as credit notes, etc.
+						 */
 					} else {
-						return ['res' => -1, 'message' => 'Document : ' . $lineRefDocId . ' linked to line ' . $parsedLine['lineid'] . ' not found in Dolibarr' ];
+						return ['res' => -1, 'message' => 'Document : ' . $lineRefDocId . ' linked to line ' . $parsedLine['lineid'] . ' not found in Dolibarr'];
 					}
 				}
 			}
@@ -567,7 +568,7 @@ class CIIProtocol extends AbstractProtocol
 				// Sync or create product
 				$res = $this->_findOrCreateProductFromEinvoiceLine($parsedLine, $flowId);
 				if ($res['res'] < 0) {
-					return ['res' => -1, 'message' => 'Product sync or creation error: ' . $res['message'], 'action' => $res['action'] ?? null ];
+					return ['res' => -1, 'message' => 'Product sync or creation error: ' . $res['message'], 'action' => $res['action'] ?? null];
 				}
 				$productId = $res['res'];
 			}
@@ -627,7 +628,7 @@ class CIIProtocol extends AbstractProtocol
 					$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "facture_fourn WHERE ref_supplier = '" . $db->escape($lineRefDocId) . "' LIMIT 1";
 					$resql = $db->query($sql);
 					if ($db->num_rows($resql) != 1) {
-						return ['res' => -1, 'message' => 'Document : ' . $refDoc . ' linked to document ' . $parsedHeader['documentno'] . ' not found in Dolibarr' ];
+						return ['res' => -1, 'message' => 'Document : ' . $refDoc . ' linked to document ' . $parsedHeader['documentno'] . ' not found in Dolibarr'];
 					}
 					$linkedObjectId = $db->fetch_object($resql)->rowid;
 
@@ -652,7 +653,7 @@ class CIIProtocol extends AbstractProtocol
 								$i = 0;
 								foreach ($linkedObject->lines as $line) {
 									if ($line->product_type < 9 && $line->total_ht != 0) { // Remove lines with product_type greater than or equal to 9 and no need to create discount if amount is null
-										$keyforvatrate = $line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '');
+										$keyforvatrate = $line->tva_tx . ($line->vat_src_code ? ' (' . $line->vat_src_code . ')' : '');
 
 										$amount_ht[$keyforvatrate] += $line->total_ht;
 										$amount_tva[$keyforvatrate] += $line->total_tva;
@@ -719,7 +720,7 @@ class CIIProtocol extends AbstractProtocol
 
 						// Other linked document handling can be implemented here based on the type of the linked document for example credit note etc...
 					} else {
-						return ['res' => -1, 'message' => 'Document : ' . $refDoc . ' linked to document ' . $parsedHeader['documentno'] . ' not found in Dolibarr' ];
+						return ['res' => -1, 'message' => 'Document : ' . $refDoc . ' linked to document ' . $parsedHeader['documentno'] . ' not found in Dolibarr'];
 					}
 				}
 			}
@@ -734,8 +735,8 @@ class CIIProtocol extends AbstractProtocol
 			// TODO : Add supplier price for products (all lines of the invoice)
 
 			// Set import_key
-			$sql = 'UPDATE '.MAIN_DB_PREFIX."facture_fourn SET import_key = '".$db->escape($supplierInvoice->import_key)."'";
-			$sql .= " WHERE rowid = ".((int) $supplierInvoiceId);
+			$sql = 'UPDATE ' . MAIN_DB_PREFIX . "facture_fourn SET import_key = '" . $db->escape($supplierInvoice->import_key) . "'";
+			$sql .= " WHERE rowid = " . ((int) $supplierInvoiceId);
 			$db->query($sql);
 
 			// Add entry in pdpconnectfr_extlinks table to mark that this supplier invoice is imported from PDP
@@ -774,7 +775,7 @@ class CIIProtocol extends AbstractProtocol
 			}
 
 			// TODO : Save receivedFile in supplier invoice attachments
-			return ['res' => $supplierInvoiceId, 'message' => implode("\n", $return_messages) ];
+			return ['res' => $supplierInvoiceId, 'message' => implode("\n", $return_messages)];
 		}
 	}
 
@@ -787,95 +788,103 @@ class CIIProtocol extends AbstractProtocol
 	 XML parsing methods
 	======================================================================================== */
 	/**
-     * Initialise DOMDocument + DOMXPath with the three CII namespaces.
-     */
-    private function initXPath($xml)
-    {
-        $doc = new \DOMDocument();
-        $doc->loadXML($xml);
+	 * Initialise DOMDocument + DOMXPath with the three CII namespaces.
+	 *
+	 * @param string $xml XML string to parse
+	 * @return array{0:\DOMDocument, 1:\DOMXPath}
+	 */
+	private function initXPath($xml)
+	{
+		$doc = new \DOMDocument();
+		$doc->loadXML($xml);
 
-        $xpath = new \DOMXPath($doc);
-        $xpath->registerNamespace('rsm', 'urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100');
-        $xpath->registerNamespace('ram', 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100');
-        $xpath->registerNamespace('udt', 'urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100');
+		$xpath = new \DOMXPath($doc);
+		$xpath->registerNamespace('rsm', 'urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100');
+		$xpath->registerNamespace('ram', 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100');
+		$xpath->registerNamespace('udt', 'urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100');
 
-        return [$doc, $xpath];
-    }
-
-	/**
-     * Extract a single scalar value from an XPath expression.
-     *
-     * Supports attribute extraction: expressions ending with /@attrName.
-     *
-     * @param \DOMXPath    $xpath
-     * @param string       $expr         XPath expression or 'NA'
-     * @param \DOMNode|null $contextNode
-     * @return string|null
-     */
-    private function getXPathValue($xpath, $expr, $contextNode = null)
-    {
-        if ($expr === 'NA' || empty($expr)) return null;
-
-        $nodes = $xpath->query($expr, $contextNode);
-        if (!$nodes || $nodes->length === 0) return null;
-
-        $node  = $nodes->item(0);
-        $value = trim($node->nodeValue);
-        return $value !== '' ? $value : null;
-    }
+		return [$doc, $xpath];
+	}
 
 	/**
-     * Extract all matching nodes as an array of their text values.
-     *
-     * @param \DOMXPath    $xpath
-     * @param string       $expr
-     * @param \DOMNode|null $contextNode
-     * @return string[]
-     */
-    private function getXPathValues($xpath, $expr, $contextNode = null)
-    {
-        if ($expr === 'NA' || empty($expr)) return [];
+	 * Extract a single scalar value from an XPath expression.
+	 *
+	 * Supports attribute extraction: expressions ending with /@attrName.
+	 *
+	 * @param \DOMXPath    $xpath 			XPath
+	 * @param string       $expr         	XPath expression or 'NA'
+	 * @param \DOMNode|null $contextNode	Optional context node for relative XPath queries
+	 * @return string|null
+	 */
+	private function getXPathValue($xpath, $expr, $contextNode = null)
+	{
+		if ($expr === 'NA' || empty($expr))
+			return null;
 
-        $nodes  = $xpath->query($expr, $contextNode);
-        $result = [];
-        if ($nodes) {
-            foreach ($nodes as $node) {
-                $v = trim($node->nodeValue);
-                if ($v !== '') $result[] = $v;
-            }
-        }
-        return $result;
-    }
+		$nodes = $xpath->query($expr, $contextNode);
+		if (!$nodes || $nodes->length === 0)
+			return null;
+
+		$node = $nodes->item(0);
+		$value = trim($node->nodeValue);
+		return $value !== '' ? $value : null;
+	}
 
 	/**
-     * Extract attribute-keyed pairs from repeating elements.
-     *
-     * Example: ram:GlobalID[@schemeID="0225"] → ['0225' => '000000002']
-     * Example: ram:SpecifiedTaxRegistration/ram:ID → ['VA' => 'FR12345']
-     *
-     * @param \DOMXPath    $xpath
-     * @param string       $expr         XPath pointing to the element (not the attribute)
-     * @param string       $attrName     Name of the attribute used as key (default: 'schemeID')
-     * @param \DOMNode|null $contextNode
-     * @return array<string,string>
-     */
-    private function getXPathAttrPairs($xpath, $expr, $attrName = 'schemeID', $contextNode = null)
-    {
-        if ($expr === 'NA' || empty($expr)) return [];
+	 * Extract all matching nodes as an array of their text values.
+	 *
+	 * @param \DOMXPath			$xpath			XPath
+	 * @param string			$expr			XPath expression or 'NA'
+	 * @param \DOMNode|null		$contextNode	Optional context node for relative XPath queries
+	 * @return string[]
+	 */
+	private function getXPathValues($xpath, $expr, $contextNode = null)
+	{
+		if ($expr === 'NA' || empty($expr))
+			return [];
 
-        $nodes  = $xpath->query($expr, $contextNode);
-        $result = [];
-        if ($nodes) {
-            foreach ($nodes as $node) {
-                $key   = $node->getAttribute($attrName);
-                $value = trim($node->nodeValue);
-                if ($value !== '') {
-                    $result[$key !== '' ? $key : count($result)] = $value;
-                }
-            }
-        }
-        return $result;
-    }
+		$nodes = $xpath->query($expr, $contextNode);
+		$result = [];
+		if ($nodes) {
+			foreach ($nodes as $node) {
+				$v = trim($node->nodeValue);
+				if ($v !== '')
+					$result[] = $v;
+			}
+		}
+		return $result;
+	}
+
+	/**
+	 * Extract attribute-keyed pairs from repeating elements.
+	 *
+	 * Example: ram:GlobalID[@schemeID="0225"] → ['0225' => '000000002']
+	 * Example: ram:SpecifiedTaxRegistration/ram:ID → ['VA' => 'FR12345']
+	 *
+	 * @param \DOMXPath    $xpath 			XPath
+	 * @param string       $expr         	XPath pointing to the element (not the attribute)
+	 * @param string       $attrName     	Name of the attribute used as key (default: 'schemeID')
+	 * @param \DOMNode|null $contextNode	Optional context node for relative XPath queries
+	 * @return array<string,string>
+	 */
+	private function getXPathAttrPairs($xpath, $expr, $attrName = 'schemeID', $contextNode = null)
+	{
+		if ($expr === 'NA' || empty($expr))
+			return [];
+
+		$nodes = $xpath->query($expr, $contextNode);
+		$result = [];
+		if ($nodes) {
+			foreach ($nodes as $node) {
+				$key = $node->getAttribute($attrName);
+				$value = trim($node->nodeValue);
+				if ($value !== '') {
+					$result[$key !== '' ? $key : count($result)] = $value;
+				}
+			}
+		}
+		return $result;
+	}
 
 	/**
 	 * Normalise any CII date string to YYYY-MM-DD.
@@ -885,12 +894,13 @@ class CIIProtocol extends AbstractProtocol
 	 *   - YYYY-MM-DD 	=> 2025-06-30
 	 *   - YYYYMMDDHHmm => 2025-06-30  (date part only)
 	 *
-	 * @param  string|null $raw
+	 * @param  string|null 	$raw	Raw date string
 	 * @return string|null  YYYY-MM-DD or null if input is null/empty/unparseable
 	 */
 	private function normDate(?string $raw): ?string
 	{
-		if ($raw === null || trim($raw) === '') return null;
+		if ($raw === null || trim($raw) === '')
+			return null;
 		$raw = trim($raw);
 
 		// YYYY-MM-DD — already the target format
@@ -906,224 +916,228 @@ class CIIProtocol extends AbstractProtocol
 		return $raw; // unknown format — pass through unchanged
 	}
 
-    /**
-     * Cast a string amount to float, or null if empty / not numeric.
-     */
-    private function toFloat(?string $v): ?float
-    {
-        if ($v === null || $v === '') return null;
-        $v = str_replace(',', '.', trim($v));
-        return is_numeric($v) ? (float) $v : null;
-    }
+	/**
+	 * Cast a string amount to float, or null if empty / not numeric.
+	 *
+	 *  @param string|null $v Input string, e.g. "1234.56" or "1 234,56"
+	 *  @return float|null Parsed float or null
+	 */
+	private function toFloat(?string $v): ?float
+	{
+		if ($v === null || $v === '')
+			return null;
+		$v = str_replace(',', '.', trim($v));
+		return is_numeric($v) ? (float) $v : null;
+	}
 
 
 	/**
-     * Parse the invoice header from CII XML.
-     *
-     * Special prefixes in $invoiceTemplate:
-     *   '__MULTI__<xpath>'     → returns array of child node data
-     *   '__ATTRPAIRS__<xpath>' → returns ['schemeID' => 'value', …]
-     *
-     * @param  string $xml Raw XML content
-     * @return array<string,mixed>
-     */
-    public function parseInvoiceXML($xml)
-    {
-        list(, $xpath) = $this->initXPath($xml);
+	 * Parse the invoice header from CII XML.
+	 *
+	 * Special prefixes in $invoiceTemplate:
+	 *   '__MULTI__<xpath>'     → returns array of child node data
+	 *   '__ATTRPAIRS__<xpath>' → returns ['schemeID' => 'value', …]
+	 *
+	 * @param  string $xml Raw XML content
+	 * @return array<string,mixed>
+	 */
+	public function parseInvoiceXML($xml)
+	{
+		list(, $xpath) = $this->initXPath($xml);
 
-        $data = [];
+		$data = [];
 
-        foreach ($this->invoiceTemplate as $key => $expr) {
+		foreach ($this->invoiceTemplate as $key => $expr) {
+			// Skip PHP-native placeholders
+			if (is_array($expr) || $expr === false || $expr === null) {
+				$data[$key] = is_array($expr) ? [] : $expr;
+				continue;
+			}
 
-            // Skip PHP-native placeholders
-            if (is_array($expr) || $expr === false || $expr === null) {
-                $data[$key] = is_array($expr) ? [] : $expr;
-                continue;
-            }
+			// Multi-value nodes
+			if (strpos($expr, '__MULTI__') === 0) {
+				$realExpr = substr($expr, strlen('__MULTI__'));
+				$data[$key] = $this->parseMultiNodes($xpath, $realExpr, $key);
+				continue;
+			}
 
-            // Multi-value nodes
-            if (strpos($expr, '__MULTI__') === 0) {
-                $realExpr  = substr($expr, strlen('__MULTI__'));
-                $data[$key] = $this->parseMultiNodes($xpath, $realExpr, $key);
-                continue;
-            }
+			// Attribute-keyed pairs
+			if (strpos($expr, '__ATTRPAIRS__') === 0) {
+				$realExpr = substr($expr, strlen('__ATTRPAIRS__'));
+				$data[$key] = $this->getXPathAttrPairs($xpath, $realExpr);
+				continue;
+			}
 
-            // Attribute-keyed pairs
-            if (strpos($expr, '__ATTRPAIRS__') === 0) {
-                $realExpr   = substr($expr, strlen('__ATTRPAIRS__'));
-                $data[$key] = $this->getXPathAttrPairs($xpath, $realExpr);
-                continue;
-            }
+			// Scalar values (including /@attr)
+			$data[$key] = $this->getXPathValue($xpath, $expr);
+		}
 
-            // Scalar values (including /@attr)
-            $data[$key] = $this->getXPathValue($xpath, $expr);
-        }
+		// Type normalisation
+		foreach (['documentdate', 'documentDeliveryDate', 'invoicingPeriodStart', 'invoicingPeriodEnd', 'paymentDueDate'] as $f) {
+			if (isset($data[$f]))
+				$data[$f] = $this->normDate($data[$f]);
+		}
+		foreach (['grandTotalAmount', 'duePayableAmount', 'lineTotalAmount', 'chargeTotalAmount', 'allowanceTotalAmount', 'taxBasisTotalAmount', 'taxTotalAmount', 'roundingAmount', 'totalPrepaidAmount'] as $f) {
+			if (isset($data[$f]))
+				$data[$f] = $this->toFloat($data[$f]);
+		}
 
-        // Type normalisation
-        foreach (['documentdate','documentDeliveryDate','invoicingPeriodStart','invoicingPeriodEnd','paymentDueDate'] as $f) {
-            if (isset($data[$f])) $data[$f] = $this->normDate($data[$f]);
-        }
-        foreach (['grandTotalAmount','duePayableAmount','lineTotalAmount','chargeTotalAmount',
-                  'allowanceTotalAmount','taxBasisTotalAmount','taxTotalAmount',
-                  'roundingAmount','totalPrepaidAmount'] as $f) {
-            if (isset($data[$f])) $data[$f] = $this->toFloat($data[$f]);
-        }
-
-        return $data;
-    }
-
-	/**
-     * Parse all invoice line items from CII XML.
-     *
-     * @param  string $xml Raw XML content
-     * @return array<int,array<string,mixed>>
-     */
-    public function parseInvoiceLines($xml)
-    {
-        list(, $xpath) = $this->initXPath($xml);
-
-        // Grab header documentno once so we can fill parentDocumentNo on each line
-        $parentDocNo = $this->getXPathValue($xpath,
-            '/rsm:CrossIndustryInvoice/rsm:ExchangedDocument/ram:ID');
-
-        $lines = [];
-        $nodes = $xpath->query('//ram:IncludedSupplyChainTradeLineItem');
-
-        foreach ($nodes as $node) {
-            $line = [];
-
-            foreach ($this->lineTemplate as $key => $expr) {
-
-                // PHP-native placeholders
-                if (is_array($expr) || $expr === false) {
-                    $line[$key] = is_array($expr) ? [] : $expr;
-                    continue;
-                }
-                if ($key === 'parentDocumentNo') {
-                    $line[$key] = $parentDocNo;
-                    continue;
-                }
-                if ($key === 'is_deposit') {
-                    $line[$key] = 0;
-                    continue;
-                }
-                if ($key === 'fk_remise') {
-                    $line[$key] = null;
-                    continue;
-                }
-
-                // Multi-value at line level
-                if (is_string($expr) && strpos($expr, '__MULTI__') === 0) {
-                    $realExpr = substr($expr, strlen('__MULTI__'));
-                    $line[$key] = $this->parseMultiNodes($xpath, $realExpr, $key, $node);
-                    continue;
-                }
-
-                $line[$key] = $this->getXPathValue($xpath, $expr, $node);
-            }
-
-            // Type normalisation
-            foreach (['linePeriodStart','linePeriodEnd'] as $f) {
-                if (isset($line[$f])) $line[$f] = $this->normDate($line[$f]);
-            }
-            foreach (['grosspriceamount','grosspricebasisquantity','netpriceamount',
-                      'netpricebasisquantity','billedquantity','chargeFreeQuantity',
-                      'packageQuantity','lineTotalAmount','totalAllowanceChargeAmount',
-                      'rateApplicablePercent','calculatedAmount'] as $f) {
-                if (isset($line[$f])) $line[$f] = $this->toFloat($line[$f]);
-            }
-            $line['isDepositLine'] = (bool)($line['isDepositLine'] ?? false);
-
-            $lines[] = $line;
-        }
-
-        return $lines;
-    }
+		return $data;
+	}
 
 	/**
-     * Generic parser for repeated container nodes (notes, tax breakdown,
-     * allowances/charges, referenced documents, line additionalRefDocs).
-     *
-     * @param \DOMXPath     $xpath
-     * @param string        $expr       XPath pointing to the repeated element
-     * @param string        $fieldKey   Original template key — used to pick child fields
-     * @param \DOMNode|null $contextNode
-     * @return array<int,array<string,mixed>>
-     */
-    private function parseMultiNodes($xpath, $expr, $fieldKey, $contextNode = null)
-    {
-        $nodes = $xpath->query($expr, $contextNode);
-        if (!$nodes || $nodes->length === 0) return [];
+	 * Parse all invoice line items from CII XML.
+	 *
+	 * @param  string $xml Raw XML content
+	 * @return array<int,array<string,mixed>>
+	 */
+	public function parseInvoiceLines($xml)
+	{
+		list(, $xpath) = $this->initXPath($xml);
 
-        $result = [];
+		// Grab header documentno once so we can fill parentDocumentNo on each line
+		$parentDocNo = $this->getXPathValue(
+			$xpath,
+			'/rsm:CrossIndustryInvoice/rsm:ExchangedDocument/ram:ID'
+		);
 
-        foreach ($nodes as $n) {
-            switch ($fieldKey) {
-                case 'documentNotes':
-                    $result[] = [
-                        'content'     => trim($this->getXPathValue($xpath, 'ram:Content', $n) ?? ''),
-                        'subjectCode' => trim($this->getXPathValue($xpath, 'ram:SubjectCode', $n) ?? ''),
-                    ];
-                    break;
+		$lines = [];
+		$nodes = $xpath->query('//ram:IncludedSupplyChainTradeLineItem');
 
-                case 'taxBreakdown':
-                    $result[] = [
-                        'typeCode'             => $this->getXPathValue($xpath, 'ram:TypeCode', $n),
-                        'categoryCode'         => $this->getXPathValue($xpath, 'ram:CategoryCode', $n),
-                        'rateApplicablePercent'=> $this->toFloat($this->getXPathValue($xpath, 'ram:RateApplicablePercent', $n)),
-                        'calculatedAmount'     => $this->toFloat($this->getXPathValue($xpath, 'ram:CalculatedAmount', $n)),
-                        'basisAmount'          => $this->toFloat($this->getXPathValue($xpath, 'ram:BasisAmount', $n)),
-                        'exemptionReason'      => $this->getXPathValue($xpath, 'ram:ExemptionReason', $n),
-                        'exemptionReasonCode'  => $this->getXPathValue($xpath, 'ram:ExemptionReasonCode', $n),
-                    ];
-                    break;
+		foreach ($nodes as $node) {
+			$line = [];
 
-                case 'headerAllowancesCharges':
-                    $result[] = [
-                        'indicator'            => $this->getXPathValue($xpath, 'ram:ChargeIndicator/udt:Indicator', $n),
-                        'reasonCode'           => $this->getXPathValue($xpath, 'ram:ReasonCode', $n),
-                        'reason'               => $this->getXPathValue($xpath, 'ram:Reason', $n),
-                        'calculationPercent'   => $this->toFloat($this->getXPathValue($xpath, 'ram:CalculationPercent', $n)),
-                        'basisAmount'          => $this->toFloat($this->getXPathValue($xpath, 'ram:BasisAmount', $n)),
-                        'actualAmount'         => $this->toFloat($this->getXPathValue($xpath, 'ram:ActualAmount', $n)),
-                        'categoryCode'         => $this->getXPathValue($xpath, 'ram:CategoryTradeTax/ram:CategoryCode', $n),
-                        'rateApplicablePercent'=> $this->toFloat($this->getXPathValue($xpath, 'ram:CategoryTradeTax/ram:RateApplicablePercent', $n)),
-                    ];
-                    break;
+			foreach ($this->lineTemplate as $key => $expr) {
+				// PHP-native placeholders
+				if (is_array($expr) || $expr === false) {
+					$line[$key] = is_array($expr) ? [] : $expr;
+					continue;
+				}
+				if ($key === 'parentDocumentNo') {
+					$line[$key] = $parentDocNo;
+					continue;
+				}
+				if ($key === 'is_deposit') {
+					$line[$key] = 0;
+					continue;
+				}
+				if ($key === 'fk_remise') {
+					$line[$key] = null;
+					continue;
+				}
 
-                case 'invoiceRefDocs':
-                    $result[] = [
-                        'issuerAssignedID' => $this->getXPathValue($xpath, 'ram:IssuerAssignedID', $n),
-                        'issueDate'        => $this->normDate($this->getXPathValue($xpath, 'ram:FormattedIssueDateTime/qdt:DateTimeString', $n)
-                            ?? $this->getXPathValue($xpath, 'ram:IssueDateTime/udt:DateTimeString', $n)),
-                    ];
-                    break;
+				// Multi-value at line level
+				if (is_string($expr) && strpos($expr, '__MULTI__') === 0) {
+					$realExpr = substr($expr, strlen('__MULTI__'));
+					$line[$key] = $this->parseMultiNodes($xpath, $realExpr, $key, $node);
+					continue;
+				}
 
-                case 'additionalRefDocs':
-                    $result[] = [
-                        'issuerAssignedID' => $this->getXPathValue($xpath, 'ram:IssuerAssignedID', $n),
-                        'typeCode'         => $this->getXPathValue($xpath, 'ram:TypeCode', $n),
-                        'name'             => $this->getXPathValue($xpath, 'ram:Name', $n),
-                        'referenceTypeCode'=> $this->getXPathValue($xpath, 'ram:ReferenceTypeCode', $n),
-                        'uriid'            => $this->getXPathValue($xpath, 'ram:URIID', $n),
-                    ];
-                    break;
+				$line[$key] = $this->getXPathValue($xpath, $expr, $node);
+			}
 
-                default:
-                    // Generic: grab all child element text nodes
-                    $entry = [];
-                    foreach ($n->childNodes as $child) {
-                        if ($child->nodeType === XML_ELEMENT_NODE) {
-                            $localName        = $child->localName;
-                            $entry[$localName] = trim($child->nodeValue);
-                        }
-                    }
-                    $result[] = $entry;
-            }
-        }
+			// Type normalisation
+			foreach (['linePeriodStart', 'linePeriodEnd'] as $f) {
+				if (isset($line[$f]))
+					$line[$f] = $this->normDate($line[$f]);
+			}
+			foreach (['grosspriceamount', 'grosspricebasisquantity', 'netpriceamount', 'netpricebasisquantity', 'billedquantity', 'chargeFreeQuantity', 'packageQuantity', 'lineTotalAmount', 'totalAllowanceChargeAmount', 'rateApplicablePercent', 'calculatedAmount'] as $f) {
+				if (isset($line[$f]))
+					$line[$f] = $this->toFloat($line[$f]);
+			}
+			$line['isDepositLine'] = (bool) ($line['isDepositLine'] ?? false);
 
-        return $result;
-    }
+			$lines[] = $line;
+		}
+
+		return $lines;
+	}
+
+	/**
+	 * Generic parser for repeated container nodes (notes, tax breakdown,
+	 * allowances/charges, referenced documents, line additionalRefDocs).
+	 *
+	 * @param \DOMXPath     $xpath			XPath
+	 * @param string        $expr       	XPath pointing to the repeated element
+	 * @param string        $fieldKey   	Original template key — used to pick child fields
+	 * @param \DOMNode|null $contextNode	Optional context node for relative XPath queries
+	 * @return array<int,array<string,mixed>>
+	 */
+	private function parseMultiNodes($xpath, $expr, $fieldKey, $contextNode = null)
+	{
+		$nodes = $xpath->query($expr, $contextNode);
+		if (!$nodes || $nodes->length === 0)
+			return [];
+
+		$result = [];
+
+		foreach ($nodes as $n) {
+			switch ($fieldKey) {
+				case 'documentNotes':
+					$result[] = [
+						'content' => trim($this->getXPathValue($xpath, 'ram:Content', $n) ?? ''),
+						'subjectCode' => trim($this->getXPathValue($xpath, 'ram:SubjectCode', $n) ?? ''),
+					];
+					break;
+
+				case 'taxBreakdown':
+					$result[] = [
+						'typeCode' => $this->getXPathValue($xpath, 'ram:TypeCode', $n),
+						'categoryCode' => $this->getXPathValue($xpath, 'ram:CategoryCode', $n),
+						'rateApplicablePercent' => $this->toFloat($this->getXPathValue($xpath, 'ram:RateApplicablePercent', $n)),
+						'calculatedAmount' => $this->toFloat($this->getXPathValue($xpath, 'ram:CalculatedAmount', $n)),
+						'basisAmount' => $this->toFloat($this->getXPathValue($xpath, 'ram:BasisAmount', $n)),
+						'exemptionReason' => $this->getXPathValue($xpath, 'ram:ExemptionReason', $n),
+						'exemptionReasonCode' => $this->getXPathValue($xpath, 'ram:ExemptionReasonCode', $n),
+					];
+					break;
+
+				case 'headerAllowancesCharges':
+					$result[] = [
+						'indicator' => $this->getXPathValue($xpath, 'ram:ChargeIndicator/udt:Indicator', $n),
+						'reasonCode' => $this->getXPathValue($xpath, 'ram:ReasonCode', $n),
+						'reason' => $this->getXPathValue($xpath, 'ram:Reason', $n),
+						'calculationPercent' => $this->toFloat($this->getXPathValue($xpath, 'ram:CalculationPercent', $n)),
+						'basisAmount' => $this->toFloat($this->getXPathValue($xpath, 'ram:BasisAmount', $n)),
+						'actualAmount' => $this->toFloat($this->getXPathValue($xpath, 'ram:ActualAmount', $n)),
+						'categoryCode' => $this->getXPathValue($xpath, 'ram:CategoryTradeTax/ram:CategoryCode', $n),
+						'rateApplicablePercent' => $this->toFloat($this->getXPathValue($xpath, 'ram:CategoryTradeTax/ram:RateApplicablePercent', $n)),
+					];
+					break;
+
+				case 'invoiceRefDocs':
+					$result[] = [
+						'issuerAssignedID' => $this->getXPathValue($xpath, 'ram:IssuerAssignedID', $n),
+						'issueDate' => $this->normDate($this->getXPathValue($xpath, 'ram:FormattedIssueDateTime/qdt:DateTimeString', $n)
+							?? $this->getXPathValue($xpath, 'ram:IssueDateTime/udt:DateTimeString', $n)),
+					];
+					break;
+
+				case 'additionalRefDocs':
+					$result[] = [
+						'issuerAssignedID' => $this->getXPathValue($xpath, 'ram:IssuerAssignedID', $n),
+						'typeCode' => $this->getXPathValue($xpath, 'ram:TypeCode', $n),
+						'name' => $this->getXPathValue($xpath, 'ram:Name', $n),
+						'referenceTypeCode' => $this->getXPathValue($xpath, 'ram:ReferenceTypeCode', $n),
+						'uriid' => $this->getXPathValue($xpath, 'ram:URIID', $n),
+					];
+					break;
+
+				default:
+					// Generic: grab all child element text nodes
+					$entry = [];
+					foreach ($n->childNodes as $child) {
+						if ($child->nodeType === XML_ELEMENT_NODE) {
+							$localName = $child->localName;
+							$entry[$localName] = trim($child->nodeValue);
+						}
+					}
+					$result[] = $entry;
+			}
+		}
+
+		return $result;
+	}
 
 
 
@@ -1337,7 +1351,7 @@ class CIIProtocol extends AbstractProtocol
 				$this->error = $thirdparty->error;
 				$this->errors = $thirdparty->errors;
 
-				dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Error updating thirdparty: ' .implode(',', array_merge(array($thirdparty->error), $thirdparty->errors)), LOG_ERR);
+				dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Error updating thirdparty: ' . implode(',', array_merge(array($thirdparty->error), $thirdparty->errors)), LOG_ERR);
 				return array('res' => -1, 'message' => 'Thirdparty update error: ' . implode(',', array_merge(array($thirdparty->error), $thirdparty->errors)));
 			} else {
 				dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Updated thirdparty: ' . $thirdpartyId);
@@ -1435,7 +1449,7 @@ class CIIProtocol extends AbstractProtocol
 			if (!empty($createParams)) {
 				$createUrl .= '&' . http_build_query($createParams);
 			}
-			$createUrl .= '&backtopage='.urlencode(dol_buildpath('/pdpconnectfr/document_list.php', 1));
+			$createUrl .= '&backtopage=' . urlencode(dol_buildpath('/pdpconnectfr/document_list.php', 1));
 
 			$errorDetails = [];
 			if (!empty($sellername)) {
@@ -1463,7 +1477,8 @@ class CIIProtocol extends AbstractProtocol
 				'message' => $message,
 				'actioncode' => 'THIRDPARTY_NOT_FOUND',
 				'actionurl' => $createUrl,
-				'action' => $action);
+				'action' => $action
+			);
 		}
 	}
 
@@ -1516,12 +1531,12 @@ class CIIProtocol extends AbstractProtocol
 		 */
 
 		$map = [
-			'380'=> CommonInvoice::TYPE_STANDARD,
-			'384'=> CommonInvoice::TYPE_REPLACEMENT,
-			'381'=> CommonInvoice::TYPE_CREDIT_NOTE,
-			'386'=> CommonInvoice::TYPE_DEPOSIT,
-			'211'=> CommonInvoice::TYPE_SITUATION,
-			'325'=> CommonInvoice::TYPE_PROFORMA,
+			'380' => CommonInvoice::TYPE_STANDARD,
+			'384' => CommonInvoice::TYPE_REPLACEMENT,
+			'381' => CommonInvoice::TYPE_CREDIT_NOTE,
+			'386' => CommonInvoice::TYPE_DEPOSIT,
+			'211' => CommonInvoice::TYPE_SITUATION,
+			'325' => CommonInvoice::TYPE_PROFORMA,
 		];
 
 
@@ -1543,32 +1558,32 @@ class CIIProtocol extends AbstractProtocol
 	private function _findOrCreateProductFromEinvoiceLine($lineData, $flowId = '')
 	{
 		/*
-		* PRODUCT MATCHING FOR SUPPLIER INVOICE (CII invoice line => Dolibarr product)
-		*
-		* This matching strategy attempts to find or create a product based on
-		* CII invoice line data, following a priority-based approach.
-		*
-		* 1. Search in product supplier prices table using prodsellerid
-		*    - Ok if match found
-		*    - ko, continue to step 2
-		*
-		* 2. Global ID (prodglobalid + prodglobalidtype) and prodglobalidtype = '0160' search by barcode
-		*    - ok if match found
-		*    - KO if Other schemes or no match, continue to step 3
-		*
-		* 3. if Buyer Reference (prodbuyerid) is available search prodbuyerid = internal product reference
-		*    - ok if match found
-		*    - ko, continue to step 4
-		*
-		* 4. Text Search using prodname
-		*    - ok if match found
-		*    - ko if multiple matches or no match, continue to create product
-		*
-		* 5. If no match found after all steps:
-		*    - Automatic product creation (with extrafield source=Einvoice and to be verified tag)
-		*    - Use this product for supplier invoice line (with extrafield to be verified tag)
-		*    - Add supplier price information (if not added automatically by Dolibarr)
-		*/
+		 * PRODUCT MATCHING FOR SUPPLIER INVOICE (CII invoice line => Dolibarr product)
+		 *
+		 * This matching strategy attempts to find or create a product based on
+		 * CII invoice line data, following a priority-based approach.
+		 *
+		 * 1. Search in product supplier prices table using prodsellerid
+		 *    - Ok if match found
+		 *    - ko, continue to step 2
+		 *
+		 * 2. Global ID (prodglobalid + prodglobalidtype) and prodglobalidtype = '0160' search by barcode
+		 *    - ok if match found
+		 *    - KO if Other schemes or no match, continue to step 3
+		 *
+		 * 3. if Buyer Reference (prodbuyerid) is available search prodbuyerid = internal product reference
+		 *    - ok if match found
+		 *    - ko, continue to step 4
+		 *
+		 * 4. Text Search using prodname
+		 *    - ok if match found
+		 *    - ko if multiple matches or no match, continue to create product
+		 *
+		 * 5. If no match found after all steps:
+		 *    - Automatic product creation (with extrafield source=Einvoice and to be verified tag)
+		 *    - Use this product for supplier invoice line (with extrafield to be verified tag)
+		 *    - Add supplier price information (if not added automatically by Dolibarr)
+		 */
 		global $db, $user, $langs;
 
 		$pdpconnectfr = new PdpConnectFr($db);
@@ -1632,18 +1647,18 @@ class CIIProtocol extends AbstractProtocol
 		// If no match found after all steps: Create new product
 		if (!empty(getDolGlobalInt('PDPCONNECTFR_PRODUCTS_AUTO_GENERATION'))) {
 			$product = new Product($db);
-			$product->type        = $this->_detectProductTypeFromEinvoiceLine($lineData);
+			$product->type = $this->_detectProductTypeFromEinvoiceLine($lineData);
 			$product->ref = 'EI-' . dol_sanitizeFileName(!empty($lineData['prodsellerid'] && $lineData['prodsellerid'] !== "0000") ? $lineData['prodsellerid'] : uniqid());
-			$product->ref_ext     = trim($lineData['prodsellerid'] ?? '');
-			$product->label       = !empty($lineData['prodname'])
+			$product->ref_ext = trim($lineData['prodsellerid'] ?? '');
+			$product->label = !empty($lineData['prodname'])
 				? $lineData['prodname']
 				: 'Imported product from supplier invoice (Ref: ' . $lineData['parentDocumentNo'] . ')';
 			$product->description = trim($lineData['proddesc'] ?? '');
-			$product->tva_tx      = (float) ($lineData['rateApplicablePercent'] ?? 0);
-			$product->status      = 0; // Status not to sell
-			$product->status_buy  = 1; // Status to buy
+			$product->tva_tx = (float) ($lineData['rateApplicablePercent'] ?? 0);
+			$product->status = 0; // Status not to sell
+			$product->status_buy = 1; // Status to buy
 			$product->note_private = 'Product created automatically from E-invoice import.';
-			$product->import_key  = AbstractPDPProvider::$PDPCONNECTFR_LAST_IMPORT_KEY; // It does not work here, so we will update it after creation
+			$product->import_key = AbstractPDPProvider::$PDPCONNECTFR_LAST_IMPORT_KEY; // It does not work here, so we will update it after creation
 			// Set barcode if global ID is provided and is a GTIN/EAN type
 			if (!empty($lineData['prodglobalid']) && !empty($lineData['prodglobalidtype']) && in_array($lineData['prodglobalidtype'], ['0160', '0011'])) {
 				$product->barcode = $lineData['prodglobalid'];
@@ -1664,7 +1679,7 @@ class CIIProtocol extends AbstractProtocol
 				$productId = $product->id;
 
 				// Set import_key
-				$sql = 'UPDATE '.MAIN_DB_PREFIX."product SET import_key = '".$db->escape($product->import_key)."' WHERE rowid = ".((int) $productId);
+				$sql = 'UPDATE ' . MAIN_DB_PREFIX . "product SET import_key = '" . $db->escape($product->import_key) . "' WHERE rowid = " . ((int) $productId);
 				$db->query($sql);
 
 				// Add entry in pdpconnectfr_extlinks table to mark product as created from e-invoice
@@ -1672,7 +1687,7 @@ class CIIProtocol extends AbstractProtocol
 
 				dol_syslog(__METHOD__ . ' New product created (ID: ' . $productId . ')');
 				return [
-					'res'     => $productId,
+					'res' => $productId,
 					'message' => 'Product successfully created from E-invoice synchronization',
 				];
 			}
@@ -1680,7 +1695,7 @@ class CIIProtocol extends AbstractProtocol
 			// Error on creation
 			dol_syslog(__METHOD__ . ' Product creation error: ' . $product->error, LOG_ERR);
 			return [
-				'res'     => -1,
+				'res' => -1,
 				'message' => 'Product creation error: ' . $product->error,
 			];
 		} else {
@@ -1721,7 +1736,7 @@ class CIIProtocol extends AbstractProtocol
 			if (!empty($createParams)) {
 				$createUrl .= '&' . http_build_query($createParams);
 			}
-			$createUrl .= '&backtopage='.urlencode(dol_buildpath('/pdpconnectfr/document_list.php', 1));
+			$createUrl .= '&backtopage=' . urlencode(dol_buildpath('/pdpconnectfr/document_list.php', 1));
 
 			$detailsStr = !empty($errorDetails) ? ' (' . implode(' | ', $errorDetails) . ')' : '';
 
@@ -1751,12 +1766,12 @@ class CIIProtocol extends AbstractProtocol
 	 */
 	private function _detectProductTypeFromEinvoiceLine(array $line): int
 	{
-		$globalId     = trim($line['prodglobalid'] ?? '');
+		$globalId = trim($line['prodglobalid'] ?? '');
 		$globalIdType = trim($line['prodglobalidtype'] ?? '');
-		$sellerId     = trim($line['prodsellerid'] ?? '');
-		$unitCode     = strtoupper(trim($line['billedquantityunitcode'] ?? ''));
-		$name         = strtolower($line['prodname'] ?? '');
-		$desc         = strtolower($line['proddesc'] ?? '');
+		$sellerId = trim($line['prodsellerid'] ?? '');
+		$unitCode = strtoupper(trim($line['billedquantityunitcode'] ?? ''));
+		$name = strtolower($line['prodname'] ?? '');
+		$desc = strtolower($line['proddesc'] ?? '');
 
 		// A. Global ID known => product
 		// EAN = 0088
@@ -1802,9 +1817,9 @@ class CIIProtocol extends AbstractProtocol
 		global $conf;
 
 		// Ensure upload directory exists
-		$folder_part   = get_exdir(0, 0, 0, 0, $supplierInvoice);
+		$folder_part = get_exdir(0, 0, 0, 0, $supplierInvoice);
 		$relative_path = 'fournisseur/facture/' . $folder_part . dol_sanitizeFileName($supplierInvoice->ref);
-		$upload_dir    = $conf->fournisseur->dir_output . '/facture/' . $folder_part . dol_sanitizeFileName($supplierInvoice->ref);
+		$upload_dir = $conf->fournisseur->dir_output . '/facture/' . $folder_part . dol_sanitizeFileName($supplierInvoice->ref);
 
 		if (!file_exists($upload_dir)) {
 			if (!dol_mkdir($upload_dir)) {
@@ -1814,7 +1829,7 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		// Prepare destination filename with optional prefix
-		$filename  = dol_sanitizeFileName($supplierInvoice->ref_supplier . (empty($suffix) ? '' : '_'.$suffix) . '.xml');
+		$filename = dol_sanitizeFileName($supplierInvoice->ref_supplier . (empty($suffix) ? '' : '_' . $suffix) . '.xml');
 
 		$dest_path = $upload_dir . '/' . $filename;
 
