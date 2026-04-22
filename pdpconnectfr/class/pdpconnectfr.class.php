@@ -785,14 +785,14 @@ class PdpConnectFr
 			$idprof1 = preg_replace('/\s+/', '', (string) $thirdparty->idprof1);
 			if (strlen($idprof1) === 14) {
 				if (!isValidSiret($idprof1)) {
-					$baseErrors[] = $langs->trans("FxCheckErrorCustomerSIRETFormat");
+					$baseWarnings[] = $langs->trans("FxCheckErrorCustomerSIRETFormat");
 				}
 			} elseif (strlen($idprof1) === 9) {
 				if (!isValidSiren($idprof1)) {
-					$baseErrors[] = $langs->trans("FxCheckErrorCustomerSIRENFormat");
+					$baseWarnings[] = $langs->trans("FxCheckErrorCustomerSIRENFormat");
 				}
 			} else {
-				$baseErrors[] = $langs->trans("FxCheckErrorCustomerSIRETLength");
+				$baseWarnings[] = $langs->trans("FxCheckErrorCustomerSIRETLength");
 			}
 		}
 		// if (empty($thirdparty->idprof2)) {

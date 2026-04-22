@@ -380,8 +380,8 @@ class ActionsPdpconnectfr extends CommonHookActions
 					setEventMessages($result['message'], array(), 'mesgs');
 				} else {
 					$error++;
-					$this->errors = array_merge($this->errors, $protocol->errors);
-					//setEventMessages($result['message'], $provider->errors, 'errors');
+					$this->errors = array_merge($this->errors, $provider->errors);
+					setEventMessages($result['message'], $provider->errors, 'errors');
 				}
 			}
 		}

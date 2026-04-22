@@ -560,7 +560,7 @@ class FacturXProtocol extends AbstractProtocol
 				->setDocumentPositionProductDetails($libelle, $description, $lineproductref)
 				->setDocumentPositionGrossPrice($line->subprice)
 				->setDocumentPositionNetPrice($line->subprice)
-				->setDocumentPositionQuantity($line->qty, "H87") // H87 = Pieces (TODO: customize unit code, required from 09/2027) https://unece.org/trade/documents/2021/06/uncefact-rec20-0
+				->setDocumentPositionQuantity($line->qty, "C62") // H87 = Pieces, C62 = unit (TODO: customize unit code, required from 09/2027) https://unece.org/trade/documents/2021/06/uncefact-rec20-0
 				->setDocumentPositionLineSummation($line->total_ht);
 
 			// Add reference to original invoice for deposit lines
@@ -1406,116 +1406,191 @@ class FacturXProtocol extends AbstractProtocol
 		$document = ZugferdDocumentPdfReader::readAndGuessFromFile($tempFile);
 		$embeddedXml = ZugferdDocumentPdfReaderExt::getInvoiceDocumentContentFromFile($tempFile);
 
-		// TODO Initialize the variablethat will be set.
-		// ....
+		$parsedHeader = [];
+		$parsedLines = [];
+		if (!empty(getDolGlobalInt('PDPCONNECTFR_USE_CII_READER_FOR_FACTURX'))) {
+			dol_include_once('pdpconnectfr/class/protocols/ProtocolManager.class.php');
+			$ProtocolManager = new ProtocolManager($db);
+			$CII = $ProtocolManager->getProtocol('CII');
 
-		$document->getDocumentInformation($documentno, $documenttypecode, $documentdate, $invoiceCurrency, $taxCurrency, $documentname, $documentlanguage, $effectiveSpecifiedPeriod);
+			$parsedHeader = $CII->parseInvoiceXML($embeddedXml);
+    		$parsedLines  = $CII->parseInvoiceLines($embeddedXml);
+		} else {
 
-		$document->getDocumentSupplyChainEvent(
-			$documentDeliveryDate
-		);
+			$document->getDocumentInformation($documentno, $documenttypecode, $documentdate, $invoiceCurrency, $taxCurrency, $documentname, $documentlanguage, $effectiveSpecifiedPeriod);
 
-		// Get seller information (supplier)
-		$document->getDocumentSeller($sellername, $sellerids, $sellerdescription);
+			$document->getDocumentSupplyChainEvent(
+				$documentDeliveryDate
+			);
 
-		// Get seller address
-		$document->getDocumentSellerAddress(
-			$sellerlineone,
-			$sellerlinetwo,
-			$sellerlinethree,
-			$sellerpostcode,
-			$sellercity,
-			$sellercountry,
-			$sellersubdivision
-		);
+			// Get seller information (supplier)
+			$document->getDocumentSeller($sellername, $sellerids, $sellerdescription);
 
-		// Get seller contact
-		$document->getDocumentSellerContact(
-			$sellercontactpersonname,
-			$sellercontactdepartmentname,
-			$sellercontactphoneno,
-			$sellercontactfaxno,
-			$sellercontactemailaddr
-		);
+			// Get seller address
+			$document->getDocumentSellerAddress(
+				$sellerlineone,
+				$sellerlinetwo,
+				$sellerlinethree,
+				$sellerpostcode,
+				$sellercity,
+				$sellercountry,
+				$sellersubdivision
+			);
 
-		$document->getDocumentSellerCommunication(
-			$sellerCommunicationUriScheme,
-			$sellerCommunicationUri
-		);
+			// Get seller contact
+			$document->getDocumentSellerContact(
+				$sellercontactpersonname,
+				$sellercontactdepartmentname,
+				$sellercontactphoneno,
+				$sellercontactfaxno,
+				$sellercontactemailaddr
+			);
 
-		// Get document summation
-		$document->getDocumentSummation($grandTotalAmount, $duePayableAmount, $lineTotalAmount, $chargeTotalAmount, $allowanceTotalAmount, $taxBasisTotalAmount, $taxTotalAmount, $roundingAmount, $totalPrepaidAmount);
+			$document->getDocumentSellerCommunication(
+				$sellerCommunicationUriScheme,
+				$sellerCommunicationUri
+			);
 
-		$document->getDocumentSellerGlobalId(
-			$sellerGlobalIds
-		);
+			// Get document summation
+			$document->getDocumentSummation($grandTotalAmount, $duePayableAmount, $lineTotalAmount, $chargeTotalAmount, $allowanceTotalAmount, $taxBasisTotalAmount, $taxTotalAmount, $roundingAmount, $totalPrepaidAmount);
 
-		$document->getDocumentSellerTaxRegistration(
-			$sellerTaxRegistations
-		);
+			$document->getDocumentSellerGlobalId(
+				$sellerGlobalIds
+			);
 
-		// Get references to the previous invoices if any (for credit notes for example)
-		$document->getDocumentInvoiceReferencedDocuments($invoiceRefDocs);
+			$document->getDocumentSellerTaxRegistration(
+				$sellerTaxRegistations
+			);
 
-		// Debug: print all retrieved variables
-		$parsedData = array(
-			'documentno' => $documentno ?? null,
-			'documenttypecode' => $documenttypecode ?? null,
-			'documentdate' => isset($documentdate) && $documentdate instanceof DateTime ? $documentdate->format('Y-m-d') : ($documentdate ?? null),
-			'invoiceCurrency' => $invoiceCurrency ?? null,
-			'taxCurrency' => $taxCurrency ?? null,
-			'documentname' => $documentname ?? null,
-			'documentlanguage' => $documentlanguage ?? null,
-			'effectiveSpecifiedPeriod' => $effectiveSpecifiedPeriod ?? null,
-			'documentDeliveryDate' => isset($documentDeliveryDate) && $documentDeliveryDate instanceof DateTime ? $documentDeliveryDate->format('Y-m-d') : ($documentDeliveryDate ?? null),
+			// Get references to the previous invoices if any (for credit notes for example)
+			$document->getDocumentInvoiceReferencedDocuments($invoiceRefDocs);
 
-			// Seller
-			'sellername' => $sellername ?? null,
-			'sellerids' => $sellerids ?? null,
-			'sellerdescription' => $sellerdescription ?? null,
+			// Debug: print all retrieved variables
+			$parsedHeader = array(
+				'documentno' => $documentno ?? null,
+				'documenttypecode' => $documenttypecode ?? null,
+				'documentdate' => isset($documentdate) && $documentdate instanceof DateTime ? $documentdate->format('Y-m-d') : ($documentdate ?? null),
+				'invoiceCurrency' => $invoiceCurrency ?? null,
+				'taxCurrency' => $taxCurrency ?? null,
+				'documentname' => $documentname ?? null,
+				'documentlanguage' => $documentlanguage ?? null,
+				'effectiveSpecifiedPeriod' => $effectiveSpecifiedPeriod ?? null,
+				'documentDeliveryDate' => isset($documentDeliveryDate) && $documentDeliveryDate instanceof DateTime ? $documentDeliveryDate->format('Y-m-d') : ($documentDeliveryDate ?? null),
 
-			// Seller Address
-			'sellerlineone' => $sellerlineone ?? null,
-			'sellerlinetwo' => $sellerlinetwo ?? null,
-			'sellerlinethree' => $sellerlinethree ?? null,
-			'sellerpostcode' => $sellerpostcode ?? null,
-			'sellercity' => $sellercity ?? null,
-			'sellercountry' => $sellercountry ?? null,
-			'sellersubdivision' => $sellersubdivision ?? null,
+				// Seller
+				'sellername' => $sellername ?? null,
+				'sellerids' => $sellerids ?? null,
+				'sellerdescription' => $sellerdescription ?? null,
 
-			// Seller Contact
-			'sellercontactpersonname' => $sellercontactpersonname ?? null,
-			'sellercontactdepartmentname' => $sellercontactdepartmentname ?? null,
-			'sellercontactphoneno' => $sellercontactphoneno ?? null,
-			'sellercontactfaxno' => $sellercontactfaxno ?? null,
-			'sellercontactemailaddr' => $sellercontactemailaddr ?? null,
+				// Seller Address
+				'sellerlineone' => $sellerlineone ?? null,
+				'sellerlinetwo' => $sellerlinetwo ?? null,
+				'sellerlinethree' => $sellerlinethree ?? null,
+				'sellerpostcode' => $sellerpostcode ?? null,
+				'sellercity' => $sellercity ?? null,
+				'sellercountry' => $sellercountry ?? null,
+				'sellersubdivision' => $sellersubdivision ?? null,
 
-			// Seller Communication (may be unset due to reader var name)
-			'sellerCommunicationUriScheme' => $sellerCommunicationUriScheme ?? null,
-			'sellerCommunicationUri' => $sellerCommunicationUri ?? null,
+				// Seller Contact
+				'sellercontactpersonname' => $sellercontactpersonname ?? null,
+				'sellercontactdepartmentname' => $sellercontactdepartmentname ?? null,
+				'sellercontactphoneno' => $sellercontactphoneno ?? null,
+				'sellercontactfaxno' => $sellercontactfaxno ?? null,
+				'sellercontactemailaddr' => $sellercontactemailaddr ?? null,
 
-			// Summation
-			'grandTotalAmount' => $grandTotalAmount ?? null,
-			'duePayableAmount' => $duePayableAmount ?? null,
-			'lineTotalAmount' => $lineTotalAmount ?? null,
-			'chargeTotalAmount' => $chargeTotalAmount ?? null,
-			'allowanceTotalAmount' => $allowanceTotalAmount ?? null,
-			'taxBasisTotalAmount' => $taxBasisTotalAmount ?? null,
-			'taxTotalAmount' => $taxTotalAmount ?? null,
-			'roundingAmount' => $roundingAmount ?? null,
-			'totalPrepaidAmount' => $totalPrepaidAmount ?? null,
+				// Seller Communication (may be unset due to reader var name)
+				'sellerCommunicationUriScheme' => $sellerCommunicationUriScheme ?? null,
+				'sellerCommunicationUri' => $sellerCommunicationUri ?? null,
 
-			// Seller Global Ids and Tax Registrations (may be unset due to reader var name)
-			'sellerGlobalIds' => $sellerGlobalIds ?? null,
-			'sellerTaxRegistations' => $sellerTaxRegistations ?? null,
+				// Summation
+				'grandTotalAmount' => $grandTotalAmount ?? null,
+				'duePayableAmount' => $duePayableAmount ?? null,
+				'lineTotalAmount' => $lineTotalAmount ?? null,
+				'chargeTotalAmount' => $chargeTotalAmount ?? null,
+				'allowanceTotalAmount' => $allowanceTotalAmount ?? null,
+				'taxBasisTotalAmount' => $taxBasisTotalAmount ?? null,
+				'taxTotalAmount' => $taxTotalAmount ?? null,
+				'roundingAmount' => $roundingAmount ?? null,
+				'totalPrepaidAmount' => $totalPrepaidAmount ?? null,
 
-			// Invoice referenced documents
-			'invoiceRefDocs' => $invoiceRefDocs ?? null,
-		);
+				// Seller Global Ids and Tax Registrations (may be unset due to reader var name)
+				'sellerGlobalIds' => $sellerGlobalIds ?? null,
+				'sellerTaxRegistations' => $sellerTaxRegistations ?? null,
+
+				// Invoice referenced documents
+				'invoiceRefDocs' => $invoiceRefDocs ?? null,
+			);
+
+
+			// Read invoice lines
+			$additionalRefDocs = [];
+			if ($document->firstDocumentPosition()) {
+				do {
+					// Get line information
+					$document->getDocumentPositionGenerals($lineid, $linestatuscode, $linestatusreasoncode);
+					$document->getDocumentPositionProductDetails($prodname, $proddesc, $prodsellerid, $prodbuyerid, $prodglobalidtype, $prodglobalid);
+					$document->getDocumentPositionGrossPrice($grosspriceamount, $grosspricebasisquantity, $grosspricebasisquantityunitcode);
+					$document->getDocumentPositionNetPrice($netpriceamount, $netpricebasisquantity, $netpricebasisquantityunitcode);
+					$document->getDocumentPositionLineSummation($lineTotalAmount, $totalAllowanceChargeAmount);
+					$document->getDocumentPositionQuantity($billedquantity, $billedquantityunitcode, $chargeFreeQuantity, $chargeFreeQuantityunitcode, $packageQuantity, $packageQuantityunitcode);
+
+					// Get AdditionalReferencedDocument at line level
+					$patcher = new XmlPatcher(null, $embeddedXml);
+					$additionalRefDocs[$lineid] = $patcher->getLineAdditionalReferencedDocuments($lineid);
+
+					// Get tax information for the line
+					//$vatRate = 0;
+					if ($document->firstDocumentPositionTax()) {
+						$document->getDocumentPositionTax($categoryCode, $typeCode, $rateApplicablePercent, $calculatedAmount, $exemptionReason, $exemptionReasonCode);
+						//$vatRate = $rateApplicablePercent;
+					}
+
+					$parsedLines[] = array(
+						'lineid' => $lineid ?? null,
+						'linestatuscode' => $linestatuscode ?? null,
+						'linestatusreasoncode' => $linestatusreasoncode ?? null,
+						'prodname' => $prodname ?? null,
+						'proddesc' => $proddesc ?? null,
+						'prodsellerid' => $prodsellerid ?? null,
+						'prodbuyerid' => $prodbuyerid ?? null,
+						'prodglobalidtype' => $prodglobalidtype ?? null,
+						'prodglobalid' => $prodglobalid ?? null,
+						'grosspriceamount' => $grosspriceamount ?? null,
+						'grosspricebasisquantity' => $grosspricebasisquantity ?? null,
+						'grosspricebasisquantityunitcode' => $grosspricebasisquantityunitcode ?? null,
+						'netpriceamount' => $netpriceamount ?? null,
+						'netpricebasisquantity' => $netpricebasisquantity ?? null,
+						'netpricebasisquantityunitcode' => $netpricebasisquantityunitcode ?? null,
+						'lineTotalAmount' => $lineTotalAmount ?? null,
+						'totalAllowanceChargeAmount' => $totalAllowanceChargeAmount ?? null,
+						'billedquantity' => $billedquantity ?? null,
+						'billedquantityunitcode' => $billedquantityunitcode ?? null,
+						'chargeFreeQuantity' => $chargeFreeQuantity ?? null,
+						'chargeFreeQuantityunitcode' => $chargeFreeQuantityunitcode ?? null,
+						'packageQuantity' => $packageQuantity ?? null,
+						'packageQuantityunitcode' => $packageQuantityunitcode ?? null,
+						// Tax
+						'categoryCode' => $categoryCode ?? null,
+						'typeCode' => $typeCode ?? null,
+						'rateApplicablePercent' => $rateApplicablePercent ?? null,
+						'calculatedAmount' => $calculatedAmount ?? null,
+						'exemptionReason' => $exemptionReason ?? null,
+						'exemptionReasonCode' => $exemptionReasonCode ?? null,
+						// Parent invoice ref
+						'parentDocumentNo' => $parsedHeader['documentno'] ?? null,
+						// Additional referenced documents at line level
+						'additionalRefDocs' => $additionalRefDocs[$lineid] ?? null,
+					);
+
+
+					dol_syslog(get_class($this) . '::createSupplierInvoiceFromSource parsedLines: ' . json_encode($parsedLines), LOG_DEBUG);
+				} while ($document->nextDocumentPosition());
+			}
+		}
 
 		// Check if this invoice has already been imported
 		$sql = "SELECT rowid as id FROM " . MAIN_DB_PREFIX . "facture_fourn";
-		$sql .= " WHERE ref_supplier = '" . $db->escape($documentno) . "'";
+		$sql .= " WHERE ref_supplier = '" . $db->escape($parsedHeader['documentno']) . "'";
 		$resql = $db->query($sql);
 		if ($resql) {
 			if ($db->num_rows($resql) > 0) {
@@ -1525,15 +1600,15 @@ class FacturXProtocol extends AbstractProtocol
 				// FIXME supplierinvoice already found but may be that documents are not linked (this is done later but only after creating invoice,
 				// may be we should also do it in this case to fix inconsistent data).
 
-				return ['res' => $supplierInvoiceId, 'message' => 'Supplier Invoice with reference ' . $documentno . ' already exists' ];
+				return ['res' => $supplierInvoiceId, 'message' => 'Supplier Invoice with reference ' . $parsedHeader['documentno'] . ' already exists' ];
 			}
 		} else {
 			return ['res' => -1, 'message' => 'Database error while checking existing supplier invoice: ' . $db->lasterror() ];
 		}
 
 		// Check if all referenced documents in the invoice exist in Dolibarr, if not return with error since we need them for correct linking in the invoice
-		if (!empty($invoiceRefDocs) && is_array($invoiceRefDocs)) {
-			foreach ($invoiceRefDocs as $invoiceRefDoc) {
+		if (!empty($parsedHeader['invoiceRefDocs']) && is_array($parsedHeader['invoiceRefDocs'])) {
+			foreach ($parsedHeader['invoiceRefDocs'] as $invoiceRefDoc) {
 				$refDoc = $invoiceRefDoc['IssuerAssignedID'] ?? null;
 				$dateDoc = $invoiceRefDoc['FormattedIssueDateTime'] ?? null;
 				$typeDoc = $invoiceRefDoc['TypeCode'] ?? null;
@@ -1541,15 +1616,15 @@ class FacturXProtocol extends AbstractProtocol
 				$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "facture_fourn WHERE ref_supplier = '" . $db->escape($refDoc) . "' LIMIT 1";
 				$resql = $db->query($sql);
 				if ($db->num_rows($resql) != 1) {
-					return ['res' => -1, 'message' => 'Document : ' . $refDoc . ' linked to document ' . $documentno . ' not found in Dolibarr' ];
+					return ['res' => -1, 'message' => 'Document : ' . $refDoc . ' linked to document ' . $parsedHeader['documentno'] . ' not found in Dolibarr' ];
 				}
 			}
 		}
 
-		dol_syslog(get_class($this) . '::createSupplierInvoiceFromSource parsedData: ' . json_encode($parsedData), LOG_DEBUG);
+		dol_syslog(get_class($this) . '::createSupplierInvoiceFromSource parsedHeader: ' . json_encode($parsedHeader), LOG_DEBUG);
 
 		// Sync or create supplier based on seller info
-		$syncSocRes = $this->_syncOrCreateThirdpartyFromFacturXSeller($parsedData, 'dolibarr', $flowId);
+		$syncSocRes = $this->_syncOrCreateThirdpartyFromFacturXSeller($parsedHeader, 'dolibarr', $flowId);
 		$socId = $syncSocRes['res'];
 		$return_messages[] = $syncSocRes['message'];
 		$action = $syncSocRes['action'] ?? null;
@@ -1568,246 +1643,186 @@ class FacturXProtocol extends AbstractProtocol
 		$supplierInvoice->socid = $socId;
 
 		// Set basic invoice information
-		$supplierInvoice->ref_supplier = $documentno;
-		$supplierInvoice->type = $this->_getDolibarrInvoiceType($documenttypecode);
+		$supplierInvoice->ref_supplier = $parsedHeader['documentno'] ?? null;
+		$supplierInvoice->type = $this->_getDolibarrInvoiceType($parsedHeader['documenttypecode'] ?? null);
 		if ($supplierInvoice->type === '-1') {
-			return ['res' => -1, 'message' => 'Unfound dolibarr corresponding Invoice code for document type code: ' . $documenttypecode ];
+			return ['res' => -1, 'message' => 'Unfounded dolibarr corresponding Invoice code for document type code: ' . ($parsedHeader['documenttypecode'] ?? 'NA') ];
 		}
-		$supplierInvoice->date = (isset($documentdate) && $documentdate instanceof DateTime) ? $documentdate->getTimestamp() : null;
+		$supplierInvoice->date = isset($parsedHeader['documentdate']) && $parsedHeader['documentdate'] instanceof DateTime ? $parsedHeader['documentdate']->format('Y-m-d') : null;
 
 
 		// Set currency
-		$supplierInvoice->multicurrency_code = $invoiceCurrency;
+		$supplierInvoice->multicurrency_code = $parsedHeader['invoiceCurrency'];
 
 		// Set import_key
 		$supplierInvoice->import_key = AbstractPDPProvider::$PDPCONNECTFR_LAST_IMPORT_KEY;
 
-		$additionalRefDocs = [];
+
 		$remise_already_used_line_level_ids = array();
 
 		// Add invoice lines
-		if ($document->firstDocumentPosition()) {
-			do {
-				// Get line information
-				$document->getDocumentPositionGenerals($lineid, $linestatuscode, $linestatusreasoncode);
-				$document->getDocumentPositionProductDetails($prodname, $proddesc, $prodsellerid, $prodbuyerid, $prodglobalidtype, $prodglobalid);
-				$document->getDocumentPositionGrossPrice($grosspriceamount, $grosspricebasisquantity, $grosspricebasisquantityunitcode);
-				$document->getDocumentPositionNetPrice($netpriceamount, $netpricebasisquantity, $netpricebasisquantityunitcode);
-				$document->getDocumentPositionLineSummation($lineTotalAmount, $totalAllowanceChargeAmount);
-				$document->getDocumentPositionQuantity($billedquantity, $billedquantityunitcode, $chargeFreeQuantity, $chargeFreeQuantityunitcode, $packageQuantity, $packageQuantityunitcode);
+		foreach ($parsedLines as $parsedLine) {
 
-				// Get AdditionalReferencedDocument at line level
-				$patcher = new XmlPatcher(null, $embeddedXml);
-				$additionalRefDocs[$lineid] = $patcher->getLineAdditionalReferencedDocuments($lineid);
+			$is_deposit_line = 0;
+			$fk_remise = 0;
+			// --------------------------------------------------
+			// Loop on linked documents at line level
+			// --------------------------------------------------
+			if (!empty($parsedLine['additionalRefDocs']) && is_array($parsedLine['additionalRefDocs'])) {
+				foreach ($parsedLine['additionalRefDocs'] as $refDoc) {
+					$lineRefDocId = $refDoc['issuerAssignedId'] ?? null;
+					$lineRefDocType = $refDoc['typeCode'] ?? null;
+					$lineRefDocDate = $refDoc['issueDate'] ?? null;
 
-				// Get tax information for the line
-				$vatRate = 0;
-				if ($document->firstDocumentPositionTax()) {
-					$document->getDocumentPositionTax($categoryCode, $typeCode, $rateApplicablePercent, $calculatedAmount, $exemptionReason, $exemptionReasonCode);
-					$vatRate = $rateApplicablePercent;
-				}
+					$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "facture_fourn WHERE ref_supplier = '" . $db->escape($lineRefDocId) . "' LIMIT 1";
+					$resql = $db->query($sql);
+					if ($db->num_rows($resql) != 1) {
+						return ['res' => -1, 'message' => 'Document : ' . $lineRefDocId . ' linked to line ' . $parsedLine['lineid'] . ' not found in Dolibarr' ];
+					}
 
-				$productRetrievedData = array(
-					'lineid' => $lineid ?? null,
-					'linestatuscode' => $linestatuscode ?? null,
-					'linestatusreasoncode' => $linestatusreasoncode ?? null,
-					'prodname' => $prodname ?? null,
-					'proddesc' => $proddesc ?? null,
-					'prodsellerid' => $prodsellerid ?? null,
-					'prodbuyerid' => $prodbuyerid ?? null,
-					'prodglobalidtype' => $prodglobalidtype ?? null,
-					'prodglobalid' => $prodglobalid ?? null,
-					'grosspriceamount' => $grosspriceamount ?? null,
-					'grosspricebasisquantity' => $grosspricebasisquantity ?? null,
-					'grosspricebasisquantityunitcode' => $grosspricebasisquantityunitcode ?? null,
-					'netpriceamount' => $netpriceamount ?? null,
-					'netpricebasisquantity' => $netpricebasisquantity ?? null,
-					'netpricebasisquantityunitcode' => $netpricebasisquantityunitcode ?? null,
-					'lineTotalAmount' => $lineTotalAmount ?? null,
-					'totalAllowanceChargeAmount' => $totalAllowanceChargeAmount ?? null,
-					'billedquantity' => $billedquantity ?? null,
-					'billedquantityunitcode' => $billedquantityunitcode ?? null,
-					'chargeFreeQuantity' => $chargeFreeQuantity ?? null,
-					'chargeFreeQuantityunitcode' => $chargeFreeQuantityunitcode ?? null,
-					'packageQuantity' => $packageQuantity ?? null,
-					'packageQuantityunitcode' => $packageQuantityunitcode ?? null,
-					// Tax
-					'categoryCode' => $categoryCode ?? null,
-					'typeCode' => $typeCode ?? null,
-					'rateApplicablePercent' => $rateApplicablePercent ?? null,
-					'calculatedAmount' => $calculatedAmount ?? null,
-					'exemptionReason' => $exemptionReason ?? null,
-					'exemptionReasonCode' => $exemptionReasonCode ?? null,
-					// Parent invoice ref
-					'parentDocumentNo' => $documentno ?? null,
-					// Additional referenced documents at line level
-					'additionalRefDocs' => $additionalRefDocs[$lineid] ?? null,
-				);
+					// Load linked supplier invoice
+					$linkedObject = new FactureFournisseur($db);
+					$linkedObjectId = $db->fetch_object($resql)->rowid;
+					$resFetchLinkedObject = $linkedObject->fetch($linkedObjectId);
+					if ($resFetchLinkedObject > 0) {
+						/*
+						* --------------------------------------------------
+						* Deposit handling
+						* --------------------------------------------------
+						* Deposits may be referenced:
+						*  - at document level
+						*  - at line level
+						*
+						* If the deposit is referenced at line level:
+						*   → we create the discount before creating the invoice line,
+						*     so it can be linked later.
+						*
+						* If the same deposit appears both at line and document level:
+						*    line-level handling takes priority to avoid duplicates.
+						*
+						* If the deposit exists only at document level:
+						*   → a discount line will be created later after all invoice
+						*     lines are generated.
+						*/
+						if ($linkedObject->type == FactureFournisseur::TYPE_DEPOSIT) {
+							$is_deposit_line = 1;
 
+							// Check if deposit line is already converted to a reduction otherwise we convert it
+							//require_once DOL_DOCUMENT_ROOT.'/core/class/discount.class.php';
+							$discountcheck = new DiscountAbsolute($db);
+							$result = $discountcheck->fetch(0, 0, $linkedObject->id);
+							if ($result <= 0) {
+								// Loop on each vat rate
+								$amount_ht = $amount_tva = $amount_ttc = array();
+								$multicurrency_amount_ht = $multicurrency_amount_tva = $multicurrency_amount_ttc = array();
+								$i = 0;
+								foreach ($linkedObject->lines as $line) {
+									if ($line->product_type < 9 && $line->total_ht != 0) { // Remove lines with product_type greater than or equal to 9 and no need to create discount if amount is null
+										$keyforvatrate = $line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '');
 
-				dol_syslog(get_class($this) . '::createSupplierInvoiceFromSource productRetrievedData: ' . json_encode($productRetrievedData), LOG_DEBUG);
-
-				$is_deposit_line = 0;
-				$fk_remise = 0;
-				// --------------------------------------------------
-				// Loop on linked documents at line level
-				// --------------------------------------------------
-				if (!empty($additionalRefDocs[$lineid]) && is_array($additionalRefDocs[$lineid])) {
-					foreach ($additionalRefDocs[$lineid] as $refDoc) {
-						$lineRefDocId = $refDoc['issuerAssignedId'] ?? null;
-						$lineRefDocType = $refDoc['typeCode'] ?? null;
-						$lineRefDocDate = $refDoc['issueDate'] ?? null;
-
-						$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "facture_fourn WHERE ref_supplier = '" . $db->escape($lineRefDocId) . "' LIMIT 1";
-						$resql = $db->query($sql);
-						if ($db->num_rows($resql) != 1) {
-							return ['res' => -1, 'message' => 'Document : ' . $lineRefDocId . ' linked to line ' . $lineid . ' not found in Dolibarr' ];
-						}
-
-						// Load linked supplier invoice
-						$linkedObject = new FactureFournisseur($db);
-						$linkedObjectId = $db->fetch_object($resql)->rowid;
-						$resFetchLinkedObject = $linkedObject->fetch($linkedObjectId);
-						if ($resFetchLinkedObject > 0) {
-							/*
-							* --------------------------------------------------
-							* Deposit handling
-							* --------------------------------------------------
-							* Deposits may be referenced:
-							*  - at document level
-							*  - at line level
-							*
-							* If the deposit is referenced at line level:
-							*   → we create the discount before creating the invoice line,
-							*     so it can be linked later.
-							*
-							* If the same deposit appears both at line and document level:
-							*    line-level handling takes priority to avoid duplicates.
-							*
-							* If the deposit exists only at document level:
-							*   → a discount line will be created later after all invoice
-							*     lines are generated.
-							*/
-							if ($linkedObject->type == FactureFournisseur::TYPE_DEPOSIT) {
-								$is_deposit_line = 1;
-
-								// Check if deposit line is already converted to a reduction otherwise we convert it
-								//require_once DOL_DOCUMENT_ROOT.'/core/class/discount.class.php';
-								$discountcheck = new DiscountAbsolute($db);
-								$result = $discountcheck->fetch(0, 0, $linkedObject->id);
-								if ($result <= 0) {
-									// Loop on each vat rate
-									$amount_ht = $amount_tva = $amount_ttc = array();
-									$multicurrency_amount_ht = $multicurrency_amount_tva = $multicurrency_amount_ttc = array();
-									$i = 0;
-									foreach ($linkedObject->lines as $line) {
-										if ($line->product_type < 9 && $line->total_ht != 0) { // Remove lines with product_type greater than or equal to 9 and no need to create discount if amount is null
-											$keyforvatrate = $line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '');
-
-											$amount_ht[$keyforvatrate] += $line->total_ht;
-											$amount_tva[$keyforvatrate] += $line->total_tva;
-											$amount_ttc[$keyforvatrate] += $line->total_ttc;
-											$multicurrency_amount_ht[$keyforvatrate] += $line->multicurrency_total_ht;
-											$multicurrency_amount_tva[$keyforvatrate] += $line->multicurrency_total_tva;
-											$multicurrency_amount_ttc[$keyforvatrate] += $line->multicurrency_total_ttc;
-											$i++;
-										}
+										$amount_ht[$keyforvatrate] += $line->total_ht;
+										$amount_tva[$keyforvatrate] += $line->total_tva;
+										$amount_ttc[$keyforvatrate] += $line->total_ttc;
+										$multicurrency_amount_ht[$keyforvatrate] += $line->multicurrency_total_ht;
+										$multicurrency_amount_tva[$keyforvatrate] += $line->multicurrency_total_tva;
+										$multicurrency_amount_ttc[$keyforvatrate] += $line->multicurrency_total_ttc;
+										$i++;
 									}
-
-									$discount = new DiscountAbsolute($db);
-									$discount->description = '(DEPOSIT)';
-									$discount->discount_type = 1; // Supplier discount
-									$discount->fk_soc = $linkedObject->socid;
-									$discount->socid = $linkedObject->socid;
-									$discount->fk_invoice_supplier_source = $linkedObject->id;
-									foreach ($amount_ht as $tva_tx => $xxx) {
-										$discount->amount_ht = abs((float) $amount_ht[$tva_tx]);
-										$discount->amount_tva = abs((float) $amount_tva[$tva_tx]);
-										$discount->amount_ttc = abs((float) $amount_ttc[$tva_tx]);
-										$discount->multicurrency_amount_ht = abs((float) $multicurrency_amount_ht[$tva_tx]);
-										$discount->multicurrency_amount_tva = abs((float) $multicurrency_amount_tva[$tva_tx]);
-										$discount->multicurrency_amount_ttc = abs((float) $multicurrency_amount_ttc[$tva_tx]);
-
-										// Clean vat code
-										$reg = array();
-										$vat_src_code = '';
-										if (preg_match('/\((.*)\)/', $tva_tx, $reg)) {
-											$vat_src_code = $reg[1];
-											$tva_tx = preg_replace('/\s*\(.*\)/', '', $tva_tx); // Remove code into vatrate.
-										}
-
-										$discount->tva_tx = abs((float) $tva_tx);
-										$discount->vat_src_code = $vat_src_code;
-
-										$result = $discount->create($user);
-										if ($result < 0) {
-											return ['res' => -1, 'message' => 'Failed to create discount for deposit line: ' . $discount->error];
-											break;
-										}
-										$fk_remise = $result;
-									}
-								} else {
-									// Deposit already converted so reuse existing discount
-									$is_deposit_line = 1;
-									$fk_remise = $discountcheck->id;
 								}
+
+								$discount = new DiscountAbsolute($db);
+								$discount->description = '(DEPOSIT)';
+								$discount->discount_type = 1; // Supplier discount
+								$discount->fk_soc = $linkedObject->socid;
+								$discount->socid = $linkedObject->socid;
+								$discount->fk_invoice_supplier_source = $linkedObject->id;
+								foreach ($amount_ht as $tva_tx => $xxx) {
+									$discount->amount_ht = abs((float) $amount_ht[$tva_tx]);
+									$discount->amount_tva = abs((float) $amount_tva[$tva_tx]);
+									$discount->amount_ttc = abs((float) $amount_ttc[$tva_tx]);
+									$discount->multicurrency_amount_ht = abs((float) $multicurrency_amount_ht[$tva_tx]);
+									$discount->multicurrency_amount_tva = abs((float) $multicurrency_amount_tva[$tva_tx]);
+									$discount->multicurrency_amount_ttc = abs((float) $multicurrency_amount_ttc[$tva_tx]);
+
+									// Clean vat code
+									$reg = array();
+									$vat_src_code = '';
+									if (preg_match('/\((.*)\)/', $tva_tx, $reg)) {
+										$vat_src_code = $reg[1];
+										$tva_tx = preg_replace('/\s*\(.*\)/', '', $tva_tx); // Remove code into vatrate.
+									}
+
+									$discount->tva_tx = abs((float) $tva_tx);
+									$discount->vat_src_code = $vat_src_code;
+
+									$result = $discount->create($user);
+									if ($result < 0) {
+										return ['res' => -1, 'message' => 'Failed to create discount for deposit line: ' . $discount->error];
+										break;
+									}
+									$fk_remise = $result;
+								}
+							} else {
+								// Deposit already converted so reuse existing discount
+								$is_deposit_line = 1;
+								$fk_remise = $discountcheck->id;
 							}
-
-							/*
-							* --------------------------------------------------
-							* Other linked document types
-							* --------------------------------------------------
-							* Additional logic may be added here for other
-							* document types such as credit notes, etc.
-							*/
-						} else {
-							return ['res' => -1, 'message' => 'Document : ' . $lineRefDocId . ' linked to line ' . $lineid . ' not found in Dolibarr' ];
 						}
+
+						/*
+						* --------------------------------------------------
+						* Other linked document types
+						* --------------------------------------------------
+						* Additional logic may be added here for other
+						* document types such as credit notes, etc.
+						*/
+					} else {
+						return ['res' => -1, 'message' => 'Document : ' . $lineRefDocId . ' linked to line ' . $parsedLine['lineid'] . ' not found in Dolibarr' ];
 					}
 				}
+			}
 
-				$productId = 0;
-				if (!$is_deposit_line) {
-					// Sync or create product
-					$res = $this->_findOrCreateProductFromFacturXLine($productRetrievedData, $flowId);
-					if ($res['res'] < 0) {
-						return ['res' => -1, 'message' => 'Product sync or creation error: ' . $res['message'], 'action' => $res['action'] ?? null ];
-					}
-					$productId = $res['res'];
+			$productId = 0;
+			if (!$is_deposit_line) {
+				// Sync or create product
+				$res = $this->_findOrCreateProductFromFacturXLine($parsedLine, $flowId);
+				if ($res['res'] < 0) {
+					return ['res' => -1, 'message' => 'Product sync or creation error: ' . $res['message'], 'action' => $res['action'] ?? null ];
 				}
+				$productId = $res['res'];
+			}
 
 
-				// Add line to invoice
-				$line = new SupplierInvoiceLine($db);
-				//$line->desc = $prodname . (!empty($proddesc) ? "\n" . $proddesc : '');
-				if (!empty($productId)) {
-					$line->fk_product = $productId;
-				}
-				if ($is_deposit_line && !empty($fk_remise)) {
-					$line->fk_remise_except = $fk_remise;
-					$line->info_bits = 2;
-					$line->desc = '(DEPOSIT)';
-					$line->rang = -1;
+			// Add line to invoice
+			$line = new SupplierInvoiceLine($db);
+			//$line->desc = $prodname . (!empty($proddesc) ? "\n" . $proddesc : '');
+			if (!empty($productId)) {
+				$line->fk_product = $productId;
+			}
+			if ($is_deposit_line && !empty($fk_remise)) {
+				$line->fk_remise_except = $fk_remise;
+				$line->info_bits = 2;
+				$line->desc = '(DEPOSIT)';
+				$line->rang = -1;
 
-					$remise_already_used_line_level_ids[] = $fk_remise;
-				}
-				$line->qty = $billedquantity;
-				$line->subprice = $netpriceamount;
-				$line->tva_tx = $vatRate;
-				$line->total_ht = $lineTotalAmount;
-				$line->total_tva = $calculatedAmount ?? 0;
-				$line->total_ttc = $lineTotalAmount + ($calculatedAmount ?? 0);
+				$remise_already_used_line_level_ids[] = $fk_remise;
+			}
+			$line->qty = $parsedLine['billedquantity'];
+			$line->subprice = $parsedLine['netpriceamount'];
+			$line->tva_tx = $parsedLine['rateApplicablePercent'];
+			$line->total_ht = $parsedLine['lineTotalAmount'];
+			$line->total_tva = $parsedLine['calculatedAmount'] ?? 0;
+			$line->total_ttc = $parsedLine['lineTotalAmount'] + ($parsedLine['calculatedAmount'] ?? 0);
 
-				$supplierInvoice->lines[] = $line;
-			} while ($document->nextDocumentPosition());
+			$supplierInvoice->lines[] = $line;
 		}
 
 		//return ['res' => 1, 'message' => 'Not implemented yet' ];
 
 		// Set invoice totals
-		$supplierInvoice->total_ht = $taxBasisTotalAmount;
-		$supplierInvoice->total_tva = $taxTotalAmount;
-		$supplierInvoice->total_ttc = $grandTotalAmount;
+		$supplierInvoice->total_ht = $parsedHeader['taxBasisTotalAmount'] ?? 0;
+		$supplierInvoice->total_tva = $parsedHeader['taxTotalAmount'] ?? 0;
+		$supplierInvoice->total_ttc = $parsedHeader['grandTotalAmount'] ?? 0;
 
 		// Add a note about PDP import ( TODO: add a hook or extrafields to store import details)
 		$supplierInvoice->note_private = "Imported from PDP";
@@ -1823,8 +1838,8 @@ class FacturXProtocol extends AbstractProtocol
 			// --------------------------------------------------
 			// Loop on linked documents at document level
 			// --------------------------------------------------
-			if (!empty($invoiceRefDocs) && is_array($invoiceRefDocs)) {
-				foreach ($invoiceRefDocs as $doc) {
+			if (!empty($parsedHeader['invoiceRefDocs']) && is_array($parsedHeader['invoiceRefDocs'])) {
+				foreach ($parsedHeader['invoiceRefDocs'] as $doc) {
 					$refDoc = $doc['IssuerAssignedID'] ?? null;
 					$dateDoc = $doc['FormattedIssueDateTime'] ?? null;
 					$typeDoc = $doc['TypeCode'] ?? null;
@@ -1832,7 +1847,7 @@ class FacturXProtocol extends AbstractProtocol
 					$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "facture_fourn WHERE ref_supplier = '" . $db->escape($lineRefDocId) . "' LIMIT 1";
 					$resql = $db->query($sql);
 					if ($db->num_rows($resql) != 1) {
-						return ['res' => -1, 'message' => 'Document : ' . $refDoc . ' linked to document ' . $documentno . ' not found in Dolibarr' ];
+						return ['res' => -1, 'message' => 'Document : ' . $refDoc . ' linked to document ' . $parsedHeader['documentno'] . ' not found in Dolibarr' ];
 					}
 					$linkedObjectId = $db->fetch_object($resql)->rowid;
 
@@ -1924,7 +1939,7 @@ class FacturXProtocol extends AbstractProtocol
 
 						// Other linked document handling can be implemented here based on the type of the linked document for example credit note etc...
 					} else {
-						return ['res' => -1, 'message' => 'Document : ' . $refDoc . ' linked to document ' . $documentno . ' not found in Dolibarr' ];
+						return ['res' => -1, 'message' => 'Document : ' . $refDoc . ' linked to document ' . $parsedHeader['documentno'] . ' not found in Dolibarr' ];
 					}
 				}
 			}
@@ -2771,15 +2786,17 @@ class FacturXProtocol extends AbstractProtocol
 			}
 		}
 
-		// Check with FACTURX- prefix for product inmported using prodsellerid as internal reference with FACTURX- prefix
-		$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product ";
-		$sql .= " WHERE ref = 'FACTURX-" . $db->escape($lineData['prodsellerid']) . "'";
-		$sql .= " LIMIT 1";
-		$resql = $db->query($sql);
-		if ($resql && $db->num_rows($resql) > 0) {
-			$obj = $db->fetch_object($resql);
-			dol_syslog(get_class($this) . '::_findOrCreateProductFromFacturXLine Found product by prodsellerid with FACTURX- prefix: ' . $obj->rowid);
-			return array('res' => $obj->rowid, 'message' => 'Product found by prodsellerid with FACTURX- prefix');
+		// Check with EI- prefix for product inmported using prodsellerid as internal reference with EI- prefix
+		if (!empty($lineData['prodsellerid']) && $lineData['prodsellerid'] !== "0000") {
+			$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product ";
+			$sql .= " WHERE ref = 'EI-" . $db->escape($lineData['prodsellerid']) . "'";
+			$sql .= " LIMIT 1";
+			$resql = $db->query($sql);
+			if ($resql && $db->num_rows($resql) > 0) {
+				$obj = $db->fetch_object($resql);
+				dol_syslog(get_class($this) . '::_findOrCreateProductFromFacturXLine Found product by prodsellerid with EI- prefix: ' . $obj->rowid);
+				return array('res' => $obj->rowid, 'message' => 'Product found by prodsellerid with EI- prefix');
+			}
 		}
 
 		// Text Search using prodname
@@ -2798,7 +2815,7 @@ class FacturXProtocol extends AbstractProtocol
 		if (!empty(getDolGlobalInt('PDPCONNECTFR_PRODUCTS_AUTO_GENERATION'))) {
 			$product = new Product($db);
 			$product->type        = $this->_detectProductTypeFromFacturx($lineData);
-			$product->ref = 'FACTURX-' . dol_sanitizeFileName(!empty($lineData['prodsellerid'] && $lineData['prodsellerid'] !== "0000") ? $lineData['prodsellerid'] : time());
+			$product->ref = 'EI-' . dol_sanitizeFileName(!empty($lineData['prodsellerid'] && $lineData['prodsellerid'] !== "0000") ? $lineData['prodsellerid'] : uniqid());
 			$product->ref_ext     = trim($lineData['prodsellerid'] ?? '');
 			$product->label       = !empty($lineData['prodname'])
 				? $lineData['prodname']

@@ -721,9 +721,8 @@ $last_sync_info .= '</span>';
 
 // Last supplier invoice that could not be processed by the system
 $last_supplier_invoice_error = '';
-$filePath = $conf->pdpconnectfr->dir_temp . '/facturx.pdf';
-if (file_exists($filePath)) {
-	//var_dump($filePath);
+$filePathFacturX = $conf->pdpconnectfr->dir_temp . '/facturx.pdf';
+if (file_exists($filePathFacturX)) {
 	$urlOriginalFile = DOL_URL_ROOT . '/document.php?modulepart=pdpconnectfr&file=' . urlencode('temp/facturx.pdf');
 	$urlConvertedFile = DOL_URL_ROOT . '/document.php?modulepart=pdpconnectfr&file=' . urlencode('temp/facturx_readable.pdf');
 
@@ -737,6 +736,16 @@ if (file_exists($filePath)) {
 	$last_supplier_invoice_error .= '<a href="'.$urlConvertedFile.'">' . $langs->trans("facturXDownloadConverted") . ' ' . img_picto('', 'download', 'class="pictofixedwidth"') . '</a>';
 }
 
+$filePathCII = $conf->pdpconnectfr->dir_temp . '/einvoice.xml';
+if (file_exists($filePathCII)) {
+	$urlOriginalFile = DOL_URL_ROOT . '/document.php?modulepart=pdpconnectfr&file=' . urlencode('temp/einvoice.xml');
+
+	$last_supplier_invoice_error = '<span class="opacitylowx">'.img_picto('', 'times', 'class="pictofixedwidth" style="color:red;"');
+	$last_supplier_invoice_error .= ' ' . $langs->trans("LastSupplierInvoiceCouldNotBeProcessed");
+	$last_supplier_invoice_error .= '<i class="fas fa-info-circle em088 opacityhigh classfortooltip" title="'. $langs->trans("LastSupplierInvoiceCouldNotBeProcessedInfo") .'"></i>';
+	$last_supplier_invoice_error .= ' : </span>';
+	$last_supplier_invoice_error .= '<a href="'.$urlOriginalFile.'">' . $langs->trans("facturXDownloadOriginal") . ' ' . img_picto('', 'download', 'class="pictofixedwidth"') . '</a>';
+}
 
 // Form for sync action
 if ($provider) {
@@ -839,7 +848,8 @@ if ($action == 'sync' && $provider) {
 		$validationFormError++;
 		setEventMessages($langs->trans("InvalidSyncFromDate"), array(), 'errors');
 	}
-	if ($syncfromdate > $provider->getLastSyncDate()) {
+	$lastSyncDateForThisProvider = $provider->getLastSyncDate();
+	if ($lastSyncDateForThisProvider && $syncfromdate > $lastSyncDateForThisProvider) {
 		$validationFormError++;
 		setEventMessages($langs->trans("SyncFromDateIsAfterLastSyncDate"), array(), 'errors');
 	}
