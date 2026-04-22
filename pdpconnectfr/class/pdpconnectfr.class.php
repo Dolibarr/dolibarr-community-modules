@@ -1107,7 +1107,8 @@ class PdpConnectFr
 			$expand_display = true; // We force group to be shown expanded
 			$disabledcookiewrite = 1; // We keep status of group unchanged into the cookie
 		}
-		$resprints .= '<script nonce="" type="text/javascript">
+		$resprints .= '<!-- EInvoiceCardBlock -->
+			<script nonce="" type="text/javascript">
 			jQuery(document).ready(function() {';
 		if (empty($disabledcookiewrite)) {
 			if (!$expand_display) {
@@ -1323,7 +1324,7 @@ class PdpConnectFr
 			$expand_display = true;	// We force group to be shown expanded
 			$disabledcookiewrite = 1; // We keep status of group unchanged into the cookie
 		}
-			$resprints .= '
+			$resprints .= '<!-- supplierInvoiceCardBlock -->
             <script nonce="" type="text/javascript">
 			jQuery(document).ready(function() {';
 		if (empty($disabledcookiewrite)) {
@@ -1522,7 +1523,7 @@ class PdpConnectFr
 			$expand_display = true;	// We force group to be shown expanded
 			$disabledcookiewrite = 1; // We keep status of group unchanged into the cookie
 		}
-		$resprints .= '
+		$resprints .= '<!-- thirdpartyCardBlock -->
         <script nonce="" type="text/javascript">
         jQuery(document).ready(function() {';
 		if (empty($disabledcookiewrite)) {
@@ -1620,6 +1621,8 @@ class PdpConnectFr
 		if ($resql && $this->db->num_rows($resql) > 0) {
 			$obj = $this->db->fetch_object($resql);
 			// Add block only for imported invoices
+			$resprints .= '<!-- productServiceCardBlock -->'."\n";
+
 			$resprints .= '<tr>';
 			$resprints .= '<td>' . $langs->trans("pdpconnectfrSourceTitle") . '</td>';
 			$resprints .= '<td>' . $obj->provider . '</td>';
