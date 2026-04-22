@@ -500,24 +500,26 @@ class ActionsPdpconnectfr extends CommonHookActions
 
 		$langs->load("pdpconnectfr@pdpconnectfr");
 
-		// Add block in invoice card
-		if (in_array($object->element, ['facture'])) {
-			$this->resprints .= $pdpConnectFr->EInvoiceCardBlock($object, $action);		// Output fields in card, including js for refreshing state
-		}
+		if (empty($parameters['tpl_context'])) {
+			// Add block in invoice card
+			if (in_array($object->element, ['facture'])) {
+				$this->resprints .= $pdpConnectFr->EInvoiceCardBlock($object, $action);		// Output fields in card, including js for refreshing state
+			}
 
-		// Add block in supplier invoice card
-		if (in_array($object->element, ['invoice_supplier'])) {
-			$this->resprints .= $pdpConnectFr->supplierInvoiceCardBlock($object, $action);		// Output fields in card, including js for refreshing state
-		}
+			// Add block in supplier invoice card
+			if (in_array($object->element, ['invoice_supplier'])) {
+				$this->resprints .= $pdpConnectFr->supplierInvoiceCardBlock($object, $action);		// Output fields in card, including js for refreshing state
+			}
 
-		// Add block in product/service card
-		if (in_array($object->element, ['product'])) {
-			$this->resprints .= $pdpConnectFr->productServiceCardBlock($object, $action);		// Output fields in card, including js for refreshing state
-		}
+			// Add block in product/service card
+			if (in_array($object->element, ['product'])) {
+				$this->resprints .= $pdpConnectFr->productServiceCardBlock($object, $action);		// Output fields in card, including js for refreshing state
+			}
 
-		// Add block in thirdparty card
-		if (in_array($object->element, ['societe'])) {
-			$this->resprints .= $pdpConnectFr->thirdpartyCardBlock($object, $action);		// Output fields in card
+			// Add block in thirdparty card
+			if (in_array($object->element, ['societe'])) {
+				$this->resprints .= $pdpConnectFr->thirdpartyCardBlock($object, $action);		// Output fields in card
+			}
 		}
 
 		return 0;
