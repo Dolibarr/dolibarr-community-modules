@@ -19,9 +19,9 @@ CREATE TABLE llx_pdpconnectfr_extlinks(
 	element_id int, 		    				-- ID of element.
 	element_type varchar(50) NOT NULL, 		    -- Type of element (from property object->element)
     provider varchar(50) NOT NULL, 				-- Provider key ('esalink', ...)
-	date_creation datetime NOT NULL, 
-	tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, 
-	fk_user_creat integer NOT NULL, 
+	date_creation datetime NOT NULL,
+	tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+	fk_user_creat integer NOT NULL,
 	fk_user_modif integer,
 	flow_id varchar(255),
 	syncstatus integer,							-- If the object has a status into the einvoice external system

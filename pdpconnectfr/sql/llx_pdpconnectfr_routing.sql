@@ -13,10 +13,13 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see https://www.gnu.org/licenses/.
 
+-- Table to defined where to route thirdparty invoices export (routing_type = 'thirdparty')
+-- or to store which default product to use for thirdparty invoice import (routing_type = 'product')
 
 CREATE TABLE llx_pdpconnectfr_routing (
     rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL,
     fk_soc integer NOT NULL,			-- ID of thirdparty
+    routing_type varchar(12) NOT NULL DEFAULT 'thirdparty',	-- 'thirdparty' or 'product'
     routing_id varchar(255) NOT NULL,	-- Electronic invoicing routing identifier (In most cases it will be SIREN OR SIREN_XXX for multi-routing cases, but it can be any identifier depending on the provider and third party)
 	source varchar(20) NOT NULL,		-- Source of routing ID: 'manual', 'automatic', 'synchronisation'
     info varchar(255),					-- Optional complementary information or comment
@@ -28,4 +31,3 @@ CREATE TABLE llx_pdpconnectfr_routing (
     fk_user_creat integer NOT NULL,
     fk_user_modif integer
 ) ENGINE=InnoDB;
-

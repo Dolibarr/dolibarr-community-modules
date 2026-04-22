@@ -1523,7 +1523,8 @@ class PdpConnectFr
 			$expand_display = true;	// We force group to be shown expanded
 			$disabledcookiewrite = 1; // We keep status of group unchanged into the cookie
 		}
-		$resprints .= '<!-- thirdpartyCardBlock -->
+
+		$resprints .= '<!-- thirdpartyCardBlockfor objec->element = '.$object->element.' -->
         <script nonce="" type="text/javascript">
         jQuery(document).ready(function() {';
 		if (empty($disabledcookiewrite)) {
@@ -1573,6 +1574,8 @@ class PdpConnectFr
 			$resprints .= '</td>';
 			$resprints .= '</tr>';
 
+			// TODO Add a line for the Default product for thirdparty (to use when importing vendor invoice and no product found)
+
 			return $resprints;
 		}
 
@@ -1595,6 +1598,8 @@ class PdpConnectFr
 		$resprints .= '<td>' . $langs->trans("RoutingIdField") . '</td>';
 		$resprints .= '<td>' . dol_escape_htmltag($routing_id ?? '') . '</td>';
 		$resprints .= '</tr>';
+
+		// TODO Add the line for the Default product for thirdparty
 
 		return $resprints;
 	}
@@ -1790,15 +1795,15 @@ class PdpConnectFr
 	 * - Multiple concurrent routings per thirdparty
 	 * - Switching default routing without deletion
 	 *
-	 * @param int    $fk_soc   		Thirdparty ID
-	 * @param string $routing_id	Routing ID
-	 * @param string $source		Source
-	 * @param string $info			Info
-	 * @param string $syncflowid	Flow ID
-	 *
-	 * @return int Rowid on success, -1 on error
+	 * @param 	int    $fk_soc   		Thirdparty ID
+	 * @param 	string $routing_id		Routing ID
+	 * @param 	string $source			Source
+	 * @param 	string $info			Info
+	 * @param 	string $syncflowid		Flow ID
+	 * @param 	string $routing_type	Routing type ('thirdparty' to get the routing ID for a thirdparty when exporting invoice, 'product' to get internal ID of product to use as default product on invoice import)
+	 * @return	int						Rowid on success, -1 on error
 	 */
-	public function setDefaultRouting($fk_soc, $routing_id, $source = '', $info = '', $syncflowid = '')
+	public function setDefaultRouting($fk_soc, $routing_id, $source = '', $info = '', $syncflowid = '', $routing_type = 'thirdparty')
 	{
 		global $db, $user;
 
@@ -1807,6 +1812,7 @@ class PdpConnectFr
 		// Delete existing routing(s) for this thirdparty (1→1 logic)
 		$sql = "DELETE FROM " . MAIN_DB_PREFIX . "pdpconnectfr_routing";
 		$sql .= " WHERE fk_soc = " . (int) $fk_soc;
+		$sql .= " AND routing_type = '".$db->escape($routing_type)."'";
 
 		if (!$db->query($sql)) {
 			$db->rollback();
@@ -1822,14 +1828,15 @@ class PdpConnectFr
 
 		// Insert new default routing
 		$sql = "INSERT INTO " . MAIN_DB_PREFIX . "pdpconnectfr_routing (";
-		$sql .= "fk_soc, source, routing_id, info, syncflowid, active, is_default, date_creation, fk_user_creat";
+		$sql .= "fk_soc, source, routing_id, info, syncflowid, active, is_default, date_creation, fk_user_creat, routing_type";
 		$sql .= ") VALUES (";
 		$sql .= (int) $fk_soc . ", ";
 		$sql .= "'" . $db->escape($source) . "', ";
 		$sql .= "'" . $db->escape($routing_id) . "', ";
 		$sql .= ($info !== '' ? "'" . $db->escape($info) . "'" : "NULL") . ", ";
 		$sql .= ($syncflowid !== '' ? "'" . $db->escape($syncflowid) . "'" : "NULL") . ", ";
-		$sql .= "1, 1, NOW(), " . (int) $user->id;
+		$sql .= "1, 1, NOW(), " . (int) $user->id.", ";
+		$sql .= "'" . $db->escape($routing_type) . "'";
 		$sql .= ")";
 
 		if (!$db->query($sql)) {
@@ -1849,16 +1856,18 @@ class PdpConnectFr
 	/**
 	 * Fetch default routing for a thirdparty
 	 *
-	 * @param int $fk_soc   Thirdparty ID
-	 * @return string|int   Routing ID string if found, 0 if not found, -1 if error
+	 * @param 	int 		$fk_soc   		Thirdparty ID
+	 * @param 	string 		$routing_type	Routing type ('thirdparty' to get the routing ID for a thirdparty when exporting invoice, 'product' to get internal ID of product to use as default product on invoice import)
+	 * @return 	string|int   				Routing ID string if found, 0 if not found, -1 if error
 	 */
-	public function fetchDefaultRouting($fk_soc)
+	public function fetchDefaultRouting($fk_soc, $routing_type = 'thirdparty')
 	{
 		global $db;
 
 		$sql = "SELECT rowid, fk_soc, source, routing_id, info, syncflowid";
 		$sql .= " FROM " . MAIN_DB_PREFIX . "pdpconnectfr_routing";
 		$sql .= " WHERE fk_soc = " . (int) $fk_soc;
+		$sql .= " AND routing_type = '".$db->escape($routing_type)."'";
 		$sql .= " AND active = 1";
 		$sql .= " AND is_default = 1";
 		$sql .= " LIMIT 1";
@@ -1875,7 +1884,7 @@ class PdpConnectFr
 
 		$obj = $db->fetch_object($resql);
 
-		return $obj->routing_id;
+		return (string) $obj->routing_id;
 	}
 
 
