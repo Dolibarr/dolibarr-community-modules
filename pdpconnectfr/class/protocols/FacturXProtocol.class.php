@@ -893,7 +893,8 @@ class FacturXProtocol extends AbstractProtocol
 			if (file_exists($xmlfile)) {
 				$pdf->Annotation(10, 10, 5, 5, 'factur-x.xml', array(
 					'Subtype' => 'FileAttachment',
-					'Name' => 'PushPin'
+					'Name' => 'PushPin',
+					'FS' => $xmlfile
 				));
 			}
 
