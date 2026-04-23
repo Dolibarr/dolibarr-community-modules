@@ -43,7 +43,7 @@ class ProtocolManager
 		$this->db = $db;
 
 		$facturexIsOk = 1;	// TODO Check version of PHP To allow or not
-		$ciiIsOk = 0;
+		$ciiIsOk = 1;
 		$ublIsOk = 0;
 
 		$this->protocolsList = array(
@@ -98,7 +98,8 @@ class ProtocolManager
 				$protocol = new FacturXProtocol($this->db);
 				break;
 			case 'CII':
-				//$protocol = new CIIProtocol($this->db);
+				dol_include_once('/pdpconnectfr/class/protocols/CIIProtocol.class.php');
+				$protocol = new CIIProtocol($this->db);
 				break;
 			case 'UBL':
 				//$protocol = new UBLProtocol($this->db);
@@ -122,7 +123,7 @@ class ProtocolManager
 	public function detectProtocolFromContent($content)
 	{
 		// Simple detection based on XML namespaces or root elements
-		if (preg_match('/^%PDF\-/', $content) !== false) {
+		if (preg_match('/^%PDF\-/', $content) === 1) { // We can also check for embedded XML in PDF for Factur-X
 			return 'FACTURX';
 		} elseif (strpos($content, 'urn:un:unece:uncefact:data:standard:CrossIndustryInvoice') !== false) {
 			return 'CII';

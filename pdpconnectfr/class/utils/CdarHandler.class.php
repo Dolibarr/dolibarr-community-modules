@@ -282,7 +282,7 @@ class CdarHandler
 					'IssuerAssignedID' => $IssuerAssignedID,
 					'StatusCode' => $StatusCodeCdar,
 					'TypeCode' => CdarHandler::DOC_INVOICE, // TODO: map DOC_INVOICE with $object type
-					'FormattedIssueDateTime' => date('Ymd', $object->date),
+					'FormattedIssueDateTime' => date('YmdHis', $object->date),
 					'ProcessConditionCode' => $statusCode,
 					'ProcessCondition' => $ProcessCondition,
 
@@ -660,7 +660,7 @@ class CdarHandler
 
 		$formattedDateTime = $xml->createElement('ram:FormattedIssueDateTime');
 		$dateTimeStr = $xml->createElement('qdt:DateTimeString', $doc['FormattedIssueDateTime']);
-		$dateTimeStr->setAttribute('format', self::FORMAT_DATE);
+		$dateTimeStr->setAttribute('format', self::FORMAT_DATETIME);
 		$formattedDateTime->appendChild($dateTimeStr);
 		$ref->appendChild($formattedDateTime);
 
