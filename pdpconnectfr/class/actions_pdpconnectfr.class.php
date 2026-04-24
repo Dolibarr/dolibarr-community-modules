@@ -270,6 +270,16 @@ class ActionsPdpconnectfr extends CommonHookActions
 				}
 			}
 
+			// Action to set an invoice-level routing ID override
+			if ($action == 'setoverriderouting' && $permissiontoedit) {
+				$overrideRoutingId = GETPOST('override_routing_id', 'alphanohtml');
+				$result = $pdpConnectFr->insertOrUpdateExtLink($object->id, $object->element, '', $currentStatusDetails['code'], $object->ref, $currentStatusDetails['info'], $overrideRoutingId);
+				if ($result < 0) {
+					$error++;
+					$this->errors = array_merge($this->errors, $pdpConnectFr->errors);
+				}
+			}
+
 			// Action to send invoice to PDP
 			if ($action == 'send_to_pdp' && $permissiontoedit
 				&& $currentStatusDetails['file'] == 1
@@ -389,16 +399,67 @@ class ActionsPdpconnectfr extends CommonHookActions
 		if (in_array('thirdpartycard', $contexts)) {
 			$permissiontoedit = $user->hasRight('societe', 'creer');
 
-			if (($action == 'add' || $action == 'update') && !empty($object->id) && $permissiontoedit) {
-				$result = $pdpConnectFr->setDefaultRouting($object->id, GETPOST('routing_id', 'aZ09'), '', '', '', 'thirdparty');
-				if ($result < 0) {
-					$error++;
-					setEventMessages('Failed to save routing ID', null, 'errors');
+			// $object->id may be empty at hook time if core hasn't fetched the object yet
+			$socId = !empty($object->id) ? (int) $object->id : GETPOSTINT('id');
+
+			// Save routing from create/edit thirdparty form
+			if (($action == 'add' || $action == 'update') && !empty($socId) && $permissiontoedit) {
+				// Thirdparty routing ID
+				$routingId = GETPOST('routing_id', 'alphanohtml');
+				if ($routingId !== '') {
+					$existing = $pdpConnectFr->fetchDefaultRouting($socId, 'thirdparty');
+					if (empty($existing)) {
+						$result = $pdpConnectFr->addRouting($socId, $routingId);
+					} else {
+						$result = $pdpConnectFr->setDefaultRouting($socId, $routingId, '', '', '', 'thirdparty');
+					}
+					if ($result < 0) {
+						$error++;
+						setEventMessages($langs->trans('FailedToSaveRoutingID'), null, 'errors');
+					}
 				}
-				$result = $pdpConnectFr->setDefaultRouting($object->id, GETPOST('routing_product_id', 'aZ09'), '', '', '', 'product');
+				// Default product for import
+				$result = $pdpConnectFr->setDefaultRouting($socId, GETPOST('routing_product_id', 'aZ09'), '', '', '', 'product');
 				if ($result < 0) {
 					$error++;
-					setEventMessages('Failed to save routing ID', null, 'errors');
+					setEventMessages($langs->trans('FailedToSaveRoutingID'), null, 'errors');
+				}
+			}
+
+			// Add a new routing entry
+			if ($action == 'pdp_addrouting' && !empty($socId) && $permissiontoedit) {
+				$newRoutingId = GETPOST('new_routing_id', 'alphanohtml');
+				$newRoutingInfo = GETPOST('new_routing_info', 'alphanohtml');
+				if (!empty($newRoutingId)) {
+					$result = $pdpConnectFr->addRouting($socId, $newRoutingId, $newRoutingInfo);
+					if ($result < 0) {
+						$error++;
+						setEventMessages($langs->trans('FailedToSaveRoutingID'), null, 'errors');
+					}
+				}
+			}
+
+			// Delete a routing entry
+			if ($action == 'pdp_deleterouting' && !empty($socId) && $permissiontoedit) {
+				$routingRowid = GETPOSTINT('routing_rowid');
+				if ($routingRowid > 0) {
+					$result = $pdpConnectFr->deleteRouting($routingRowid, $socId);
+					if ($result < 0) {
+						$error++;
+						setEventMessages($langs->trans('FailedToDeleteRoutingID'), null, 'errors');
+					}
+				}
+			}
+
+			// Set a routing entry as default
+			if ($action == 'pdp_setdefaultrouting' && !empty($socId) && $permissiontoedit) {
+				$routingRowid = GETPOSTINT('routing_rowid');
+				if ($routingRowid > 0) {
+					$result = $pdpConnectFr->setRoutingAsDefault($routingRowid, $socId);
+					if ($result < 0) {
+						$error++;
+						setEventMessages($langs->trans('FailedToSetDefaultRoutingID'), null, 'errors');
+					}
 				}
 			}
 		}
