@@ -1655,7 +1655,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 				}
 			} else {
 				$res = -1;
-				$message = 'Failed to send CDAR file to PDP. Status code: ' . $response['status_code'] . '. Message: ' . ($response['response']['message'] ?? 'No message');
+				$message = 'Failed to send CDAR file to PDP. Status code: ' . $response['status_code'] . '. Message: ' . (!empty($response['response']['message'])
+				? $response['response']['message']
+				: ($response['errorMessage'] ?? 'No message'));
 				return ['res' => $res, 'message' => $message];
 			}
 		} else {
