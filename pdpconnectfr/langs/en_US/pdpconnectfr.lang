@@ -236,7 +236,6 @@ SuccessfullFlows=Successful flows
 EInvoiceEventsLabel=E-invoicing events
 EInvoiceFile=E-invoice File
 PDPSyncStatus=AP Status
-EInvoiceGeneratedList=Generated
 SuggestedActions=Recommended actions to do
 CreateSupplier=Create supplier
 CreateProduct=Create Product

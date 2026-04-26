@@ -170,10 +170,10 @@ class PdpConnectFr
 		self::STATUS_UNKNOWN             => 'EInvStatusUnknown',
 		self::STATUS_IGNORE              => 'EInvStatusDoNotSync',		// To exclude invoice from einvoice sync
 		self::STATUS_NOT_GENERATED       => 'EInvStatusNotGenerated',
+		self::STATUS_ERROR               => 'EInvStatusError',			// Error in generation by Dolibarr
 		self::STATUS_GENERATED           => 'EInvStatusGenerated',
 		self::STATUS_AWAITING_VALIDATION => 'EInvStatusAwaitingValidation',
 		self::STATUS_AWAITING_ACK        => 'EInvStatusAwaitingAck',
-		self::STATUS_ERROR               => 'EInvStatusError',
 
 		// PDP / PA
 		self::STATUS_DEPOSITED           => 'EInvStatus200Deposited',
@@ -186,9 +186,9 @@ class PdpConnectFr
 		self::STATUS_DISPUTED            => 'EInvStatus207Disputed',
 		self::STATUS_SUSPENDED           => 'EInvStatus208Suspended',
 		self::STATUS_COMPLETED           => 'EInvStatus209Completed',
-		self::STATUS_REFUSED             => 'EInvStatus210Refused',
 		self::STATUS_PAYMENT_SENT        => 'EInvStatus211PaymentTransmitted',
 		self::STATUS_PAID                => 'EInvStatus212Paid',
+		self::STATUS_REFUSED             => 'EInvStatus210Refused',
 		self::STATUS_REJECTED            => 'EInvStatus213Rejected',
 	];
 
@@ -604,18 +604,28 @@ class PdpConnectFr
 	 * @param int $onlyPdpStatuses 		If 1, only return PDP/PA statuses (exclude Dolibarr internal statuses)
 	 * @param int $onlySendable 		If 1, only return statuses that can be sent to Access Point (for example, exclude Access Point STATUS_ERROR)
 	 * @param int $onlyCreate			Keep only status used in create mode
+	 * @param int $onlyOut				Keep only status used for outgoing invoices
+	 * @param int $addseparator			If 1, add decorators like a separator after status when einvoice life cycle has not started.
 	 * @return array<int, string>		Array of status
 	 */
-	public function getEinvoiceStatusOptions($includeCodesInLabel = 0, $onlyPdpStatuses = 0, $onlySendable = 0, $onlyCreate = 0)
+	public function getEinvoiceStatusOptions($includeCodesInLabel = 0, $onlyPdpStatuses = 0, $onlySendable = 0, $onlyCreate = 0, $onlyOut = 0, $addseparator = 0)
 	{
 		global $langs;
 		$options = [];
 		foreach (self::STATUS_LABEL_KEYS as $code => $labelKey) {
+			if ($code == self::STATUS_GENERATED) {
+				$options['separator1'] = array('label' => '--------------------', 'disabled' => 1);
+			}
+
 			$value = $langs->trans($labelKey);
 			if ($includeCodesInLabel === 1) {
 				$value = '(' . $code . ') ' . $value;
 			}
 			$options[$code] = $value;
+
+			if ($code == self::STATUS_PAID) {
+				$options['separator2'] = array('label' => '--------------------', 'disabled' => 1);
+			}
 		}
 
 		if ($onlyPdpStatuses || $onlySendable) {
@@ -628,7 +638,7 @@ class PdpConnectFr
 			unset($options[self::STATUS_GENERATED]);
 			unset($options[self::STATUS_AWAITING_VALIDATION]);
 			unset($options[self::STATUS_AWAITING_ACK]);
-			unset($options[self::STATUS_ERROR]);
+			unset($options[self::STATUS_ERROR]);					// Error in generation by Dolibarr
 		}
 
 		if ($onlySendable || $onlyCreate) {
@@ -647,6 +657,10 @@ class PdpConnectFr
 			unset($options[self::STATUS_PARTIALLY_APPROVED]);
 			unset($options[self::STATUS_SUSPENDED]);
 			unset($options[self::STATUS_PAYMENT_SENT]);
+		}
+
+		if ($onlyOut) {
+			unset($options[self::STATUS_AVAILABLE]);
 		}
 
 		if ($onlyCreate) {

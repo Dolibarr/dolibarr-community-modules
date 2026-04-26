@@ -718,11 +718,11 @@ class ActionsPdpconnectfr extends CommonHookActions
 
 			// Sync status
 			print '<td class="liste_titre">';
-			$listofoptions = $pdpConnectFr->getEinvoiceStatusOptions();
+			$listofoptions = $pdpConnectFr->getEinvoiceStatusOptions(0, 0, 0, 0, 1, 1);
 
 			// Remove option related to E-invoice generation status
-			unset($listofoptions[$pdpConnectFr::STATUS_NOT_GENERATED]);
-			unset($listofoptions[$pdpConnectFr::STATUS_GENERATED]);
+			//unset($listofoptions[$pdpConnectFr::STATUS_NOT_GENERATED]);
+			//unset($listofoptions[$pdpConnectFr::STATUS_GENERATED]);
 			unset($listofoptions[$pdpConnectFr::STATUS_UNKNOWN]);
 
 			print $form->selectarray(
@@ -840,7 +840,6 @@ class ActionsPdpconnectfr extends CommonHookActions
 		if (in_array('invoicelist', explode(':', $parameters['context']))) {
 			$obj = $parameters['obj'];
 
-
 			$pdpConnectFr = new PdpConnectFr($db);
 			$checkConfig = $pdpConnectFr->checkModulePrerequisites();
 			if ($checkConfig < 0) {
@@ -848,20 +847,19 @@ class ActionsPdpconnectfr extends CommonHookActions
 				return 0;
 			}
 
-
 			// Einvoice generated or not
 			$tmparray = $pdpConnectFr->fetchLastknownInvoiceStatus(0, $obj->ref);
 			$einvoiceGenerated = $tmparray['file'];
 			print '<td class="center tdoverflowmax125">';
 			if ($einvoiceGenerated) {
-				print '<i class="fas fa-check-circle" style="color:green;" title="'.$langs->trans('EInvoiceGeneratedList').'"></i>';
+				print '<i class="fas fa-check-circle" style="color:green;" title="'.$langs->trans('EInvoiceGenerated').'"></i>';
 			}
 			print '</td>';
 			if (isset($parameters['i']) && empty($parameters['i'])) {
 				$parameters['totalarray']['nbfield']++;
 			}
 
-			// syncstatus
+			// Sync status
 			$currentStatusDetails = $obj->pdp_syncstatus ? $pdpConnectFr->getStatusLabel($obj->pdp_syncstatus) : '-';
 			print '<td class="center tdoverflowmax125" title="'.dolPrintHTMLForAttribute($currentStatusDetails).'">';
 			print $currentStatusDetails;
@@ -914,7 +912,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 	 * @param string		 		$action			Code action
 	 * @param Hookmanager			$hookmanager	Hookmanager
 	 * @return int									Result
-		 */
+	 */
 	public function isEditable($parameters, &$object, &$action, $hookmanager)
 	{
 		global $langs, $db;
