@@ -588,6 +588,37 @@ class ActionsPdpconnectfr extends CommonHookActions
 
 
 	/**
+	 * Complete the $arrayfields with custom fields to be able to use them in list views (like thirdparty or invoice list)
+	 *
+	 * @param array<string,mixed> 	$parameters		Array of parameters
+	 * @param CommonObject			$object			Object invoice
+	 * @param string		 		$action			Code action
+	 * @param Hookmanager			$hookmanager	Hookmanager
+	 * @return int									Result
+	 */
+	public function completeArrayFields($parameters, &$object, &$action, $hookmanager)
+	{
+		if (in_array('invoicelist', explode(':', $parameters['context']))) {
+			// Add fields to invoice list
+			$parameters['arrayfields']['einvoicegenerated'] = array(
+				'label' => 'EInvoiceFile',
+				'checked' => -1,
+				'position' => 900,
+				'enabled' => 1,
+				'perms' => '1'
+			);
+			$parameters['arrayfields']['pdp_syncstatus'] = array(
+				'label' => 'PDPSyncStatus',
+				'checked' => 1,
+				'position' => 901,
+				'enabled' => '1',
+				'perms' => '1'
+			);
+		}
+	}
+
+
+	/**
 	 * Add SELECT fields
 	 *
 	 * @param array<string,mixed> 	$parameters		Array of parameters
@@ -713,33 +744,37 @@ class ActionsPdpconnectfr extends CommonHookActions
 			}
 
 			// Einvoice generated or not
-			print '<td class="liste_titre einvoicefile">';
-			print '</td>';
+			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
+				print '<td class="liste_titre einvoicegenerated">';
+				print '</td>';
+			}
 
 			// Sync status
-			print '<td class="liste_titre">';
-			$listofoptions = $pdpConnectFr->getEinvoiceStatusOptions(0, 0, 0, 0, 1, 1);
+			if (empty($parameters['arrayfields']['pdp_syncstatus']) || !empty($parameters['arrayfields']['pdp_syncstatus']['checked'])) {
+				print '<td class="liste_titre pdp_syncstatus">';
+				$listofoptions = $pdpConnectFr->getEinvoiceStatusOptions(0, 0, 0, 0, 1, 1);
 
-			// Remove option related to E-invoice generation status
-			//unset($listofoptions[$pdpConnectFr::STATUS_NOT_GENERATED]);
-			//unset($listofoptions[$pdpConnectFr::STATUS_GENERATED]);
-			unset($listofoptions[$pdpConnectFr::STATUS_UNKNOWN]);
+				// Remove option related to E-invoice generation status
+				//unset($listofoptions[$pdpConnectFr::STATUS_NOT_GENERATED]);
+				//unset($listofoptions[$pdpConnectFr::STATUS_GENERATED]);
+				unset($listofoptions[$pdpConnectFr::STATUS_UNKNOWN]);
 
-			print $form->selectarray(
-				'search_pdp_syncstatus',
-				$listofoptions,
-				GETPOST('search_pdp_syncstatus', 'alpha'),
-				-2,
-				0,
-				0,
-				'',
-				0,
-				0,
-				0,
-				'',
-				'width100 '
-			);
-			print '</td>';
+				print $form->selectarray(
+					'search_pdp_syncstatus',
+					$listofoptions,
+					GETPOST('search_pdp_syncstatus', 'alpha'),
+					-2,
+					0,
+					0,
+					'',
+					0,
+					0,
+					0,
+					'',
+					'width100 '
+				);
+				print '</td>';
+			}
 		}
 
 		// Supplier invoice list, Product list, Soc list
@@ -801,10 +836,14 @@ class ActionsPdpconnectfr extends CommonHookActions
 			}
 
 			// Einvoice generated or not
-			print print_liste_field_titre($langs->transnoentitiesnoconv('EInvoiceFile'), '', '', '', $parameters['param'] ?? '', '', $parameters['sortfield'] ?? '', $parameters['sotorder'] ?? '', 'center ');
+			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
+				print print_liste_field_titre($langs->transnoentitiesnoconv('EInvoiceFile'), '', '', '', $parameters['param'] ?? '', '', $parameters['sortfield'] ?? '', $parameters['sotorder'] ?? '', 'center ');
+			}
 
 			// syncstatus
-			print print_liste_field_titre($langs->transnoentitiesnoconv('PDPSyncStatus'), '', '', '', $parameters['param'] ?? '', '', $parameters['sortfield'] ?? '', $parameters['sotorder'] ?? '', 'center ');
+			if (empty($parameters['arrayfields']['pdp_syncstatus']) || !empty($parameters['arrayfields']['pdp_syncstatus']['checked'])) {
+				print print_liste_field_titre($langs->transnoentitiesnoconv('PDPSyncStatus'), '', '', '', $parameters['param'] ?? '', '', $parameters['sortfield'] ?? '', $parameters['sotorder'] ?? '', 'center ');
+			}
 		}
 
 		// Supplier invoice list, Product list, Soc list
@@ -848,24 +887,28 @@ class ActionsPdpconnectfr extends CommonHookActions
 			}
 
 			// Einvoice generated or not
-			$tmparray = $pdpConnectFr->fetchLastknownInvoiceStatus(0, $obj->ref);
-			$einvoiceGenerated = $tmparray['file'];
-			print '<td class="center tdoverflowmax125">';
-			if ($einvoiceGenerated) {
-				print '<i class="fas fa-check-circle" style="color:green;" title="'.$langs->trans('EInvoiceGenerated').'"></i>';
-			}
-			print '</td>';
-			if (isset($parameters['i']) && empty($parameters['i'])) {
-				$parameters['totalarray']['nbfield']++;
+			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
+				$tmparray = $pdpConnectFr->fetchLastknownInvoiceStatus(0, $obj->ref);
+				$einvoiceGenerated = $tmparray['file'];
+				print '<td class="center tdoverflowmax125">';
+				if ($einvoiceGenerated) {
+					print '<i class="fas fa-check-circle" style="color:green;" title="'.$langs->trans('EInvoiceGenerated').'"></i>';
+				}
+				print '</td>';
+				if (isset($parameters['i']) && empty($parameters['i'])) {
+					$parameters['totalarray']['nbfield']++;
+				}
 			}
 
 			// Sync status
-			$currentStatusDetails = $obj->pdp_syncstatus ? $pdpConnectFr->getStatusLabel($obj->pdp_syncstatus) : '-';
-			print '<td class="center tdoverflowmax125" title="'.dolPrintHTMLForAttribute($currentStatusDetails).'">';
-			print $currentStatusDetails;
-			print '</td>';
-			if (isset($parameters['i']) && empty($parameters['i'])) {
-				$parameters['totalarray']['nbfield']++;
+			if (empty($parameters['arrayfields']['pdp_syncstatus']) || !empty($parameters['arrayfields']['pdp_syncstatus']['checked'])) {
+				$currentStatusDetails = $obj->pdp_syncstatus ? $pdpConnectFr->getStatusLabel($obj->pdp_syncstatus) : '-';
+				print '<td class="center tdoverflowmax125" title="'.dolPrintHTMLForAttribute($currentStatusDetails).'">';
+				print $currentStatusDetails;
+				print '</td>';
+				if (isset($parameters['i']) && empty($parameters['i'])) {
+					$parameters['totalarray']['nbfield']++;
+				}
 			}
 		}
 

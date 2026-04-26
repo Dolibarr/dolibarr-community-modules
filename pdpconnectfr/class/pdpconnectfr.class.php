@@ -1872,7 +1872,7 @@ function pdpSubmitAddRouting() {
 	 * @param int       $syncStatus     	If the object has a status into the einvoice external system
 	 * @param string    $syncRef        	If the object has a given reference into the einvoice external system
 	 * @param string    $syncComment    	If we want to store a message for the last sync action try
-	 * @param sting     $overrideRoutingId	Forced routing ID
+	 * @param string    $overrideRoutingId	Forced routing ID
 	 * @return int 							-1 on error, 0 if nothing done, rowid on success
 	 */
 	public function insertOrUpdateExtLink($elementId, $elementType, $flowId = '', $syncStatus = 0, $syncRef = '', $syncComment = '', $overrideRoutingId = null)
