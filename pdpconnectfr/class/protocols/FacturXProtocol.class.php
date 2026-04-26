@@ -201,7 +201,7 @@ class FacturXProtocol extends AbstractProtocol
 		$globalIdProf = thirdpartyidprof($object) ?? '';								// May be SIREN
 		$schemeGlobalIdProf = $this->getIEC6523Code($object->thirdparty->country_code, 1);
 
-		$uri = $pdpconnectfr->getBuyerCommunicationURI($object->thirdparty);			// May be SIREN or SIREN_xxx
+		$uri = $pdpconnectfr->getBuyerCommunicationURI($object->thirdparty, $object);	// May be SIREN or SIREN_xxx, invoice-level override takes priority
 		$schemeUri = $this->getIEC6523Code($object->thirdparty->country_code, 2);
 
 		// For seller (my company)
