@@ -262,7 +262,7 @@ repos:
     hooks:
       - id: sqlfluff-lint
         stages: [pre-commit, manual]  # manual needed for ci
-        args: ["--dialect=mysql", "--exclude-rules=RF04,LT05,CP01"]
+        args: ["--dialect=mysql", "--exclude-rules=RF04,LT05,CP01,LT14"]
         exclude: (?x)^
           (dev/initdemo/mysqldump_.*\.sql
           |htdocs/core/menus/init_menu_auguria\.sql
