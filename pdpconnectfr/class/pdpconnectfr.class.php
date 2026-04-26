@@ -471,8 +471,6 @@ class PdpConnectFr
 	 */
 	public function buildEInvoicePayloadFromInvoice($invoice): array
 	{
-		global $conf;
-
 		if (empty($invoice->id)) {
 			return array(
 				'payload' => array(),
@@ -546,7 +544,6 @@ class PdpConnectFr
 	 */
 	public function checkModulePrerequisites()
 	{
-
 		// Check if required module 'pdpconnectfr' is enabled
 		if (!isModEnabled("pdpconnectfr")) {
 			return -1;
@@ -716,6 +713,7 @@ class PdpConnectFr
 				if ($mysoc->country_code == 'FR') {
 					// Get seller Einvoice ID
 					$provider = getDolGlobalString('PDPCONNECTFR_PDP');
+
 					$uriConf = 'PDPCONNECTFR_' . strtoupper($provider) . '_ROUTING_ID';
 					$einvoiceid = getDolGlobalString($uriConf);
 					if (!preg_match('/^'.preg_replace('/\s+/', '', $mysoc->idprof1).'/', $this->removeSpaces($einvoiceid))) {
@@ -1748,13 +1746,18 @@ class PdpConnectFr
 	 * @param int       $syncStatus     If the object has a status into the einvoice external system
 	 * @param string    $syncRef        If the object has a given reference into the einvoice external system
 	 * @param string    $syncComment    If we want to store a message for the last sync action try
-	 * @return int -1 on error, rowid on success
+	 * @return int 						-1 on error, 0 if nothing done, rowid on success
 	 */
 	public function insertOrUpdateExtLink($elementId, $elementType, $flowId = '', $syncStatus = 0, $syncRef = '', $syncComment = '')
 	{
 		global $db, $user;
 
 		$provider = getDolGlobalString('PDPCONNECTFR_PDP');
+
+		if (empty($provider) || $provider === '-1') {
+			dol_syslog("Error: E-invoice Access Point is not defined");
+			return 0;
+		}
 
 		// Check if record exists
 		$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "pdpconnectfr_extlinks";
@@ -1935,6 +1938,12 @@ class PdpConnectFr
 		global $db, $user;
 
 		$provider = getDolGlobalString('PDPCONNECTFR_PDP');
+
+		if (empty($provider) || $provider === '-1') {
+			dol_syslog("Error: E-invoice Access Point is not defined");
+			return 0;
+		}
+
 		$date_creation = $date_creation ? $db->idate($date_creation) : $db->idate(dol_now());
 
 		$sql = "INSERT INTO " . MAIN_DB_PREFIX . "pdpconnectfr_lifecycle_msg (";
@@ -2090,7 +2099,7 @@ class PdpConnectFr
 	 * @param 	Object	$object		Object
 	 * @param 	string 	$status     Status
 	 * @param	string	$comment	Comment
-	 * @return 	int 				Rowid on success, -1 on error
+	 * @return 	int 				Rowid on success, 0 if nothing done, -1 on error
 	 */
 	public function setEInvoiceStatus($object, $status, $comment)
 	{
@@ -2160,6 +2169,12 @@ class PdpConnectFr
 
 		// Get seller Einvoice ID
 		$provider = getDolGlobalString('PDPCONNECTFR_PDP');
+
+		if (empty($provider) || $provider === '-1') {
+			dol_syslog("Error: E-invoice Access Point is not defined");
+			return '';
+		}
+
 		$uriConf = 'PDPCONNECTFR_' . strtoupper($provider) . '_ROUTING_ID';
 		$einvoiceid = getDolGlobalString($uriConf);
 
