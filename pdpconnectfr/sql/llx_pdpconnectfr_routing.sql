@@ -20,8 +20,8 @@ CREATE TABLE llx_pdpconnectfr_routing (
     rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL,
     fk_soc integer NOT NULL,			-- ID of thirdparty
     routing_type varchar(12) NOT NULL DEFAULT 'thirdparty',	-- 'thirdparty' or 'product'
-    routing_id varchar(255) NOT NULL,	-- Electronic invoicing routing identifier (In most cases it will be SIREN OR SIREN_XXX for multi-routing cases, but it can be any identifier depending on the provider and third party)
-	source varchar(20) NOT NULL,		-- Source of routing ID: 'manual', 'automatic', 'synchronisation'
+    routing_id varchar(255) NOT NULL,	-- Electronic thirdparty invoicing routing identifier (In most cases it will be SIREN OR SIREN_XXX, but it can be any identifier depending on the provider and third party) or Product id for import
+    source varchar(20) NOT NULL,		-- Source of routing ID: 'manual', 'automatic', 'synchronisation'
     info varchar(255),					-- Optional complementary information or comment
     syncflowid varchar(255),			-- Optional Flow ID when source = 'synchronisation'
     active tinyint DEFAULT 1,			-- 1 = enabled, 0 = disabled
@@ -30,4 +30,4 @@ CREATE TABLE llx_pdpconnectfr_routing (
     tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     fk_user_creat integer NOT NULL,
     fk_user_modif integer
-) ENGINE=InnoDB;
+) ENGINE = InnoDB;
