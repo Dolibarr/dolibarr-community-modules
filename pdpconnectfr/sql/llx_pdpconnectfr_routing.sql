@@ -20,7 +20,7 @@ CREATE TABLE llx_pdpconnectfr_routing (
     rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL,
     fk_soc integer NOT NULL,			-- ID of thirdparty
     routing_type varchar(12) NOT NULL DEFAULT 'thirdparty',	-- 'thirdparty' or 'product'
-    routing_id varchar(255) NOT NULL,	-- Electronic thirdparty invoicing routing identifier (In most cases it will be SIREN OR SIREN_XXX, but it can be any identifier depending on the provider and third party) or Product id for import
+    routing_id varchar(255) NOT NULL,	-- Electronic invoicing routing identifier for thirdparty (Type 'thirdparty': In most cases it will be SIREN OR SIREN_XXX, Type 'product': The default product ID for the thirdparty when importing invoice)
     source varchar(20) NOT NULL,		-- Source of routing ID: 'manual', 'automatic', 'synchronisation'
     info varchar(255),					-- Optional complementary information or comment
     syncflowid varchar(255),			-- Optional Flow ID when source = 'synchronisation'
