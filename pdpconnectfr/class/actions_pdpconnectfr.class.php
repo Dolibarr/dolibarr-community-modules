@@ -641,41 +641,43 @@ class ActionsPdpconnectfr extends CommonHookActions
 	 */
 	public function printFieldListOption($parameters, &$object, &$action, $hookmanager)
 	{
-		global  $form, $db;
-		if (in_array('invoicelist', explode(':', $parameters['context']))) {
-			// Einvoice generated or not
-			print '<td class="liste_titre einvoicefile">';
-			print '</td>';
+		global $form, $db;
 
-			print '<td class="liste_titre">';
-			// syncstatus
+		if (in_array('invoicelist', explode(':', $parameters['context']))) {
 			$pdpConnectFr = new PdpConnectFr($db);
 			$checkConfig = $pdpConnectFr->checkModulePrerequisites();
 			if ($checkConfig < 0) {
 				dol_syslog(__METHOD__ . "PDPCONNECTFR Module is not correctly configured.");
-			} else {
-				$listofoptions = $pdpConnectFr->getEinvoiceStatusOptions();
-
-				// Remove option related to E-invoice generation status
-				unset($listofoptions[$pdpConnectFr::STATUS_NOT_GENERATED]);
-				unset($listofoptions[$pdpConnectFr::STATUS_GENERATED]);
-				unset($listofoptions[$pdpConnectFr::STATUS_UNKNOWN]);
-
-				print $form->selectarray(
-					'search_pdp_syncstatus',
-					$listofoptions,
-					GETPOST('search_pdp_syncstatus', 'alpha'),
-					-2,
-					0,
-					0,
-					'',
-					0,
-					0,
-					0,
-					'',
-					'width100 '
-				);
+				return 0;
 			}
+
+			// Einvoice generated or not
+			print '<td class="liste_titre einvoicefile">';
+			print '</td>';
+
+			// Sync status
+			print '<td class="liste_titre">';
+			$listofoptions = $pdpConnectFr->getEinvoiceStatusOptions();
+
+			// Remove option related to E-invoice generation status
+			unset($listofoptions[$pdpConnectFr::STATUS_NOT_GENERATED]);
+			unset($listofoptions[$pdpConnectFr::STATUS_GENERATED]);
+			unset($listofoptions[$pdpConnectFr::STATUS_UNKNOWN]);
+
+			print $form->selectarray(
+				'search_pdp_syncstatus',
+				$listofoptions,
+				GETPOST('search_pdp_syncstatus', 'alpha'),
+				-2,
+				0,
+				0,
+				'',
+				0,
+				0,
+				0,
+				'',
+				'width100 '
+			);
 			print '</td>';
 		}
 
@@ -727,9 +729,16 @@ class ActionsPdpconnectfr extends CommonHookActions
 	 */
 	public function printFieldListTitle($parameters, &$object, &$action, $hookmanager)
 	{
-		global $langs;
+		global $db, $langs;
 
 		if (in_array('invoicelist', explode(':', $parameters['context']))) {
+			$pdpConnectFr = new PdpConnectFr($db);
+			$checkConfig = $pdpConnectFr->checkModulePrerequisites();
+			if ($checkConfig < 0) {
+				dol_syslog(__METHOD__ . "PDPCONNECTFR Module is not correctly configured.");
+				return 0;
+			}
+
 			// Einvoice generated or not
 			print print_liste_field_titre($langs->transnoentitiesnoconv('EInvoiceFile'), '', '', '', $parameters['param'] ?? '', '', $parameters['sortfield'] ?? '', $parameters['sotorder'] ?? '', 'center ');
 
