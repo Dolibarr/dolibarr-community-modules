@@ -701,7 +701,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		}
 
 		// Add Authorization header if we have a token
-		if ($this->tokenData['token'] && $resource != 'token') {
+		if (!empty($this->tokenData['token']) && $resource != 'token') {
 			$httpheader[] = 'Authorization: Bearer ' . $this->tokenData['token'];
 		}
 
@@ -906,6 +906,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$call_id = $response['call_id'] ?? null;
 
 		//$lastsuccessfullSyncronizedFlow = null;
+
+		// Loop on each flow received in list
 		$i = 0;
 		foreach ($response['response']['results'] as $flow) {
 			$i++;
@@ -928,9 +930,11 @@ class SuperPDPProvider extends AbstractPDPProvider
 				// If res < 0, rollback
 				if ($res['res'] < 0) {
 					$db->rollback();
+
+					dol_syslog(__METHOD__ . " Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], LOG_DEBUG, 0, "_pdpconnectfr");
 					$results_messages[] = "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'];
-					if (isset($res['action']) && $res['action'] != '') {
-						$actions[$res['actioncode'] ?? '0'] = $res['action'];
+					if (isset($res['action']) && $res['action'] != '') {	// Save business errors if it is
+						$actions[$res['actioncode'] ?? '0'] = array('actionurl' => $res['actionurl'], 'action' => $res['action']);	// Set the result code and label into array $actions.
 					}
 					$error++;
 				}
@@ -1017,10 +1021,11 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 	/**
 	 * Sync a given flow data.
+	 * Called by syncFlows() for example.
 	 *
 	 * @param string 		$flowId        	FlowId
 	 * @param string|null 	$call_id  		Call ID for logging purposes
-	 * @return array{res:int, message:string, action:string|null} Returns array with 'res' (1 on success, 0 if exists or already processed, -1 on failure) with a 'message' and an optional 'action'.
+	 * @return array{res:int, message:string, actioncode:string|null, actionurl:string|null, action:string|null} Returns array with 'res' (1 on success, 0 if exists or already processed, -1 on failure) with a 'message' and for business errors an optional 'actioncode', 'actionurl' and 'action'.
 	 */
 	public function syncFlow($flowId, $call_id = null)
 	{
@@ -1194,13 +1199,16 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 				// Try to create the supplier + product + invoice
 				$res = $exchangeProtocol->createSupplierInvoiceFromSource($receivedFile, $ReadableViewFile, $flowId);
+
 				if ($res['res'] < 0) {
-					return array(
+					$retarray = array(
 						'res' => -1,
-						'message' => "Failed to create supplier invoice from FacturX document for flowId: " . $flowId . ". " . $res['message'],
-						'actioncode' => $res['actioncode'] ?? 'UNKNOWN',
-						'action' => $res['action'] ?? null
+						'message' => "Failed to create supplier invoice from E-invoice document for flowId: " . $flowId . ". " . $res['message']
 					);
+					$retarray['actioncode'] = $res['actioncode'] ?? null;
+					$retarray['actionurl'] = $res['actionurl'] ?? null;
+					$retarray['action'] = $res['action'] ?? null;
+					return $retarray;
 				} else {
 					// Complete the document object with the created supplier invoice details
 					$suplierInvoiceObj = new FactureFournisseur($this->db);

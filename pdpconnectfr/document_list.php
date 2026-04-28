@@ -112,7 +112,7 @@ if (empty($syncfromdateyear) || empty($syncfromdatemonth) || empty($syncfromdate
 } else {
 	$syncfromdate = dol_mktime($syncfromdatehour, $syncfromdatemin, 0, $syncfromdatemonth, $syncfromdateday, $syncfromdateyear, 'tzuserrel');
 }
-//var_dump(dol_print_date($syncfromdate, 'dayhour', 'gmt'));exit;
+//var_dump($syncfromdatehour, 'syncfromdate gmt = '.dol_print_date($syncfromdate, 'dayhour', 'gmt'));
 
 // Load variable for pagination
 $limit = GETPOSTINT('limit') ? GETPOSTINT('limit') : $conf->liste_limit;
@@ -316,6 +316,7 @@ if ($action == 'confirm_sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $conf
 		if (!empty($sync_result['syncedFlows']) && $sync_result['syncedFlows'] > 0) {
 			setEventMessages($langs->trans("DocumentsSyncedSuccessfully", $sync_result['syncedFlows']), null, 'mesgs');
 		}
+
 		if ($sync_result['res'] <= 0) {
 			$errortype = 'errors';
 			if (!empty($sync_result['actions'])) {
@@ -689,28 +690,29 @@ $selectedfields = (($mode != 'kanban' && $mode != 'kanbangroupby') ? $htmlofsele
 $selectedfields .= (count($arrayofmassactions) ? $form->showCheckAddButtons('checkforselect', 1) : '');
 
 
-
 // Last flow sync info
-$last_sync = 0;
+$last_sync_post = 0;
 if (GETPOSTDATE('last_sync_datetime', 'getpost', 'tzuserrel') && $action == 'delete') {		// If we do a delete, we may want to go older in past for next sync to retrieve the deleted record, so we do not reuse the last date
-	$last_sync = GETPOSTDATE('last_sync_datetime', 'getpost', 'tzuserrel');
+	$last_sync_post = GETPOSTDATE('last_sync_datetime', 'getpost', 'tzuserrel');
 }
 $last_sync_info = '<span class="opacitylowx">'.img_picto('', 'long-arrow-alt-right', 'class="pictofixedwidth"');
 
-$Lastsyncinfosql = "SELECT flow_id, updatedat
-FROM ".MAIN_DB_PREFIX."pdpconnectfr_document
-WHERE provider = '".$db->escape($provider->providerName)."'
-ORDER BY updatedat DESC
-LIMIT 1";
+$Lastsyncinfosql = "SELECT flow_id, updatedat";
+$Lastsyncinfosql .= " FROM ".MAIN_DB_PREFIX."pdpconnectfr_document";
+$Lastsyncinfosql .= " WHERE provider = '".$db->escape($provider->providerName)."'";
+$Lastsyncinfosql .= " AND entity = ".((int) $conf->entity);		// Do not use getentity here, must always be on 1 entity.
+$Lastsyncinfosql .= $db->order("updatedat", "DESC");
+$Lastsyncinfosql .= $db->plimit(1);
 
+$last_sync_db = 0;
 $resLastsyncinfosql = $db->query($Lastsyncinfosql);
 if ($resLastsyncinfosql) {
 	$obj = $db->fetch_object($resLastsyncinfosql);
 	if ($obj) {
-		$last_sync = $db->jdate($obj->updatedat);
-		$last_sync_info .= " ". $langs->trans("lastSyncedFlow") . ': ' . $obj->flow_id . ' &nbsp; &nbsp; '.img_picto('', 'calendar').' ' . dol_print_date($last_sync, 'dayhour', 'tzuserrel');
+		$last_sync_db = $db->jdate($obj->updatedat);
+		$last_sync_info .= " ". $langs->trans("lastSyncedFlow") . ': ' . $obj->flow_id . ' &nbsp; &nbsp; '.img_picto('', 'calendar').' ' . dol_print_date($last_sync_db, 'dayhour', 'tzuserrel');
 	} else {
-		$last_sync = 0;
+		$last_sync_db = 0;
 		$last_sync_info = $langs->trans("NoSyncYet");
 	}
 } else {
@@ -757,20 +759,30 @@ if ($provider) {
 	print '<div class="div-table-responsive">'; // You can use div-table-responsive-no-min if you don't need reserved height for your table
 	print '<table>'."\n";
 
-	// Apply a lookback if configured
-	if (getDolGlobalInt('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS') && !GETPOSTDATE('last_sync_datetime', 'getpost', 'tzuserrel')) {
-		$last_sync -= (getDolGlobalInt('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS') * 3600);
-	}
-
 	print '<tr>';
 	print '<td class="syncFormLabel">'.$langs->trans("StartSynchronizationFrom").'</td>';
 	print '<td>';
 
-	$gmtdatetosuggest = $last_sync;
-	if ($syncfromdate && $syncfromdate > $last_sync) {
-		$gmtdatetosuggest = $syncfromdate;
+	// $syncfromdate is date provided in selection.
+	$gmtdatetosuggest = $syncfromdate ? $syncfromdate : $last_sync_db;
+
+	// protection to not use a date higher than last date in db
+	if ($syncfromdate && $syncfromdate > $last_sync_db) {
+		$gmtdatetosuggest = $last_sync_db;
 	}
 
+	//var_dump($last_sync_db, 'last_sync_db gmt = '.dol_print_date($last_sync_db, 'dayhour', 'gmt'));
+	//var_dump($syncfromdate, 'syncfromdate gmt = '.dol_print_date($syncfromdate, 'dayhour', 'gmt'));
+	//var_dump($gmtdatetosuggest, 'gmtdatetosuggest gmt = '.dol_print_date($gmtdatetosuggest, 'dayhour', 'gmt'));
+
+	// Apply a lookback if configured
+	if (getDolGlobalInt('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS') && !$syncfromdate && !GETPOSTDATE('last_sync_datetime', 'getpost', 'tzuserrel')) {
+		$gmtdatetosuggest -= (getDolGlobalInt('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS') * 3600);
+	}
+
+	//var_dump($gmtdatetosuggest, 'gmtdatetosuggest gmt = '.dol_print_date($gmtdatetosuggest, 'dayhour', 'gmt'));
+
+	// Print date selector
 	print $form->selectDate($gmtdatetosuggest > 0 ? $gmtdatetosuggest : '', 'last_sync_datetime', 1, 1, 1, '', 1, 0, 0, '', '', '', '', 1, '', $langs->trans('From'), 'tzuserrel');
 	if ($conf->browser->layout != 'phone' && getDolGlobalInt('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS')) {
 		print $form->textwithpicto('', $langs->transnoentitiesnoconv("PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS").': '.getDolGlobalInt('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS').'<br><br>'.$langs->transnoentitiesnoconv("PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS_HELP"));
@@ -805,6 +817,8 @@ if ($provider) {
 
 	//print '<hr class="margintoponly paddingbottom">';
 	//$last_supplier_invoice_error = '';
+
+	print '<!-- last_sync_info and last supplier invoice error -->'."\n";
 
 	print '<div class="'.($last_supplier_invoice_error ? 'warning' : 'info').' div-table-responsive">';
 	print '<div class="floatleft">'.$last_sync_info.'</div>'."\n";
@@ -886,7 +900,7 @@ if ($action == 'confirm_sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $conf
 				&& !empty($sync_result['alreadyExist'])) {
 				if (empty($sync_result['batchlimit']) || ($sync_result['batchlimit'] <= $sync_result['alreadyExist'])) {
 					$cssclass = 'warning';
-					$sync_result['actions'][] = $langs->trans("TryToIncreaseStartDateOrMax", $langs->transnoentitiesnoconv("maxNumberToProcess"));
+					$sync_result['actions']['LIMIT_TOO_LOW'] = array('action' => $langs->trans("TryToIncreaseStartDateOrMax", $langs->transnoentitiesnoconv("maxNumberToProcess")));
 				}
 			} else {
 				$cssclass = 'info';
@@ -894,24 +908,35 @@ if ($action == 'confirm_sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $conf
 		}
 
 		// Show sync summary result (to show in popup)
+		print '<!-- sync summary -->'."\n";
 		print '<div class="wordbreak '.$cssclass.' clearboth">';
 		print '<strong><u>'.$langs->trans("SyncResults").'</u></strong></br>';
 		print implode("<br>", $sync_result['messages']);
 		if (getDolGlobalInt('PDPCONNECTFR_DEBUG_MODE') && !empty($sync_result['details'])) {
 			print '<br><br><small>'.$langs->trans("TechnicalInformation").' : '.implode("<br>", $sync_result['details']).'</small>';
 		}
-		print '</div>';
 
 		// Suggested action after sync failed (to show under the form)
 		if ($sync_result['actions']) {
-			print '<div class="wordbreak warning clearboth">';
+			print '<br><br>';
+			print '<!-- suggested action -->'."\n";
 			print '<strong><u>'.$langs->trans("SuggestedActions").'</u></strong></br>';
-			print implode("<br>", $sync_result['actions']);
-			print '</div>';
+			$i = 0;
+			foreach ($sync_result['actions'] as $tmpactioncode => $tmpactionstodo) {
+				print '<!-- action for code '.$tmpactioncode.' -->';
+				print $tmpactionstodo['action'];
+				if ($i) {
+					print '<br>';
+				}
+				$i++;
+			}
 		}
 
-		// If error but no suggested action and debug mode is off, show a message to ask to enable debug mode
+		print '</div>';
+
+		// If error but no suggested action (should not happen) and debug mode is off, show a message to ask to enable debug mode (in case of)
 		if ($sync_result['res'] < 0 && empty($sync_result['actions']) && !getDolGlobalInt('PDPCONNECTFR_DEBUG_MODE')) {
+			print '<!-- message to recommand to enable debug mode -->'."\n";
 			print '<div class="wordbreak warning clearboth">';
 			print '<strong><u>'.$langs->trans("SuggestedActions").' :</u></strong></br>';
 			print $langs->trans("EnableDebugModeToSeeMoreDetails");

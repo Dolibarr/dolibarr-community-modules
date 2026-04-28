@@ -256,29 +256,9 @@ class CIIProtocol extends AbstractProtocol
 	 */
 	public function generateXML($invoice, $outputlangs = null)
 	{
-		// $doc = new \DOMDocument('1.0', 'UTF-8');
+		// TODO
+		// Can reuse the generateXML() of FactureXProtocol.
 
-		// $root = $doc->createElementNS(
-		// 	'urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100',
-		// 	'rsm:CrossIndustryInvoice'
-		// );
-
-		// $doc->appendChild($root);
-
-		// $exchanged = $doc->createElement('rsm:ExchangedDocument');
-		// $root->appendChild($exchanged);
-
-		// if (!empty($data['documentno'])) {
-		// 	$el = $doc->createElement('ram:ID', htmlspecialchars($data['documentno']));
-		// 	$exchanged->appendChild($el);
-		// }
-
-		// if (!empty($data['documenttypecode'])) {
-		// 	$el = $doc->createElement('ram:TypeCode', $data['documenttypecode']);
-		// 	$exchanged->appendChild($el);
-		// }
-
-		// return $doc->saveXML();
 		return 'NOTIMPLEMENTED';
 	}
 
@@ -325,7 +305,7 @@ class CIIProtocol extends AbstractProtocol
 	 * @param  string 			$file                       		Source string file. We use this file to get data of supplier invoice.
 	 * @param  string|null 		$ReadableViewFile        			Readable view file (PDP Generated readable PDF).e only store it if available.
 	 * @param  string 			$flowId                       		Flow identifier source of the invoice.
-	 * @return array{res:int, message:string, action:string|null}   Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and an optional 'action'.
+	 * @return array{res:int, message:string, actioncode: string|null, actionurl: string|null, action:string|null}   Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and an optional 'actioncode' and 'action'.
 	 */
 	public function createSupplierInvoiceFromSource($file, $ReadableViewFile = null, $flowId = '')
 	{
@@ -411,7 +391,7 @@ class CIIProtocol extends AbstractProtocol
 		$return_messages[] = $syncSocRes['message'];
 		$action = $syncSocRes['action'] ?? null;
 		if ($socId < 0) {
-			return ['res' => -1, 'message' => 'Thirdparty sync or creation error: ' . implode("\n", $return_messages), 'action' => $action];
+			return ['res' => -1, 'message' => 'Thirdparty sync or creation error: ' . implode("\n", $return_messages), 'actioncode' => $syncSocRes['actioncode'] ?? '', 'actionurl' => $syncSocRes['actionurl'] ?? '', 'action' => $action];
 		}
 
 		// Load supplier (thirdparty)
@@ -1152,7 +1132,7 @@ class CIIProtocol extends AbstractProtocol
 	 * @param string    $priority Fill priority ('dolibarr' or 'pdp'). If both data are available, which one to prefer
 	 * @param string    $flowId Flow identifier source of the thirdparty.
 	 *
-	 * @return array{res:int, message:string, actioncode:string|null, actionurl:string|null, action:string|null}   Returns array with 'res' (ID of the synchronized or created thirdparty, -1 on error) with a 'message' and an optional 'action'.
+	 * @return array{res:int, message:string, actioncode:string|null, actionurl:string|null, action:string|null}   Returns array with 'res' (ID of the synchronized or created thirdparty, -1 on error) with a 'message' and an optional 'actioncode', 'actionurl', and 'action'.
 	 */
 	private function _syncOrCreateThirdpartyFromEInvoiceSeller($sellerInfo, $priority = 'dolibarr', $flowId = '')
 	{

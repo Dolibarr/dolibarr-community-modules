@@ -1632,7 +1632,7 @@ class FacturXProtocol extends AbstractProtocol
 		$return_messages[] = $syncSocRes['message'];
 		$action = $syncSocRes['action'] ?? null;
 		if ($socId < 0) {
-			return ['res' => -1, 'message' => 'Thirdparty sync or creation error: ' . implode("\n", $return_messages), 'action' => $action];
+			return ['res' => -1, 'message' => 'Thirdparty sync or creation error: ' . implode("\n", $return_messages), 'actioncode' => $syncSocRes['actioncode'] ?? '', 'actionurl' => $syncSocRes['actionurl'] ?? '', 'action' => $action];
 		}
 
 		// Load supplier (thirdparty)
@@ -2388,7 +2388,7 @@ class FacturXProtocol extends AbstractProtocol
 	 * @param string    $priority Fill priority ('dolibarr' or 'pdp'). If both data are available, which one to prefer
 	 * @param string    $flowId Flow identifier source of the thirdparty.
 	 *
-	 * @return array{res:int, message:string, actioncode:string|null, actionurl:string|null, action:string|null}   Returns array with 'res' (ID of the synchronized or created thirdparty, -1 on error) with a 'message' and an optional 'action'.
+	 * @return array{res:int, message:string, actioncode:string|null, actionurl:string|null, action:string|null}   Returns array with 'res' (ID of the synchronized or created thirdparty, -1 on error) with a 'message' and an optional 'actioncode', 'actionurl', and 'action'.
 	 */
 	private function _syncOrCreateThirdpartyFromFacturXSeller($sellerInfo, $priority = 'dolibarr', $flowId = '')
 	{
