@@ -301,6 +301,7 @@ class CIIProtocol extends AbstractProtocol
 
 	/**
 	 * Create a supplier invoice from a CII file and attach the file (and readable file if exists) to the document.
+	 * This may create the Supplier and the Product depending on setup.
 	 *
 	 * @param  string 			$file                       		Source string file. We use this file to get data of supplier invoice.
 	 * @param  string|null 		$ReadableViewFile        			Readable view file (PDP Generated readable PDF).e only store it if available.
@@ -309,7 +310,6 @@ class CIIProtocol extends AbstractProtocol
 	 */
 	public function createSupplierInvoiceFromSource($file, $ReadableViewFile = null, $flowId = '')
 	{
-
 		global $conf, $db, $user;
 
 		$pdpconnectfr = new PdpConnectFr($db);
@@ -1674,7 +1674,7 @@ class CIIProtocol extends AbstractProtocol
 				dol_syslog(__METHOD__ . ' New product created (ID: ' . $productId . ')');
 				return [
 					'res' => $productId,
-					'message' => 'Product successfully created from E-invoice synchronization',
+					'message' => 'Product successfully created from E-invoice import',
 				];
 			}
 
@@ -1685,6 +1685,7 @@ class CIIProtocol extends AbstractProtocol
 				'message' => 'Product creation error: ' . $product->error,
 			];
 		} else {
+			// Suggest manual creation of product
 			dol_syslog(get_class($this) . '::_findOrCreateProductFromEinvoiceLine Auto-creation of products is disabled', LOG_ERR);
 
 			$prodRef = trim($lineData['prodsellerid'] ?? '');
@@ -1695,6 +1696,9 @@ class CIIProtocol extends AbstractProtocol
 			$createParams = [];
 			if (!empty($prodRef) && $prodRef !== "0000") {
 				$errorDetails[] = $prodRef;
+
+				$createParams['ref'] = 'EI-' . dol_sanitizeFileName(!empty($lineData['prodsellerid'] && $lineData['prodsellerid'] !== "0000") ? $lineData['prodsellerid'] : uniqid());
+
 				$createParams['ref_ext'] = $prodRef;
 			}
 			if (!empty($prodName)) {
