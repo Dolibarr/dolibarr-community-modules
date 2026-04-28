@@ -249,6 +249,9 @@ if (!$permissiontoread) {
 	accessforbidden();
 }
 
+$filePathFacturX = $conf->pdpconnectfr->dir_temp . '/facturx.pdf';
+$filePathCII = $conf->pdpconnectfr->dir_temp . '/einvoice.xml';
+
 
 /*
  * Actions
@@ -323,6 +326,15 @@ if ($action == 'confirm_sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $conf
 				$errortype = 'warnings';
 			}
 			//setEventMessages($langs->trans("FailedToSyncADocument").($errortype ? '<br>'.$langs->trans("FailedToSyncADocumentMore") : ''), null, $errortype);
+		} else {
+			// If sync is successful, we delete the old cached files that could not be processed
+			dol_delete_file($filePathCII);
+			dol_delete_file($filePathFacturX);
+
+			if (!empty($sync_result['syncedFlows']) && $sync_result['syncedFlows'] > 0) {
+				// If sync was successful and we processed 1 new record, we clear the submited date so a new one will be suggested from the last record in db.
+				$syncfromdate = 0;
+			}
 		}
 	} else {
 		setEventMessages($langs->trans("NoPDPProviderConfigured"), null, 'errors');
@@ -690,11 +702,6 @@ $selectedfields = (($mode != 'kanban' && $mode != 'kanbangroupby') ? $htmlofsele
 $selectedfields .= (count($arrayofmassactions) ? $form->showCheckAddButtons('checkforselect', 1) : '');
 
 
-// Last flow sync info
-$last_sync_post = 0;
-if (GETPOSTDATE('last_sync_datetime', 'getpost', 'tzuserrel') && $action == 'delete') {		// If we do a delete, we may want to go older in past for next sync to retrieve the deleted record, so we do not reuse the last date
-	$last_sync_post = GETPOSTDATE('last_sync_datetime', 'getpost', 'tzuserrel');
-}
 $last_sync_info = '<span class="opacitylowx">'.img_picto('', 'long-arrow-alt-right', 'class="pictofixedwidth"');
 
 $Lastsyncinfosql = "SELECT flow_id, updatedat";
@@ -723,11 +730,10 @@ $last_sync_info .= '</span>';
 
 // Last supplier invoice that could not be processed by the system
 $last_supplier_invoice_error = '';
-$filePathFacturX = $conf->pdpconnectfr->dir_temp . '/facturx.pdf';
+
 if (file_exists($filePathFacturX)) {
 	$urlOriginalFile = DOL_URL_ROOT . '/document.php?modulepart=pdpconnectfr&file=' . urlencode('temp/facturx.pdf');
 	$urlConvertedFile = DOL_URL_ROOT . '/document.php?modulepart=pdpconnectfr&file=' . urlencode('temp/facturx_readable.pdf');
-
 
 	$last_supplier_invoice_error = '<span class="opacitylowx">'.img_picto('', 'times', 'class="pictofixedwidth" style="color:red;"');
 	$last_supplier_invoice_error .= ' ' . $langs->trans("LastSupplierInvoiceCouldNotBeProcessed");
@@ -738,7 +744,6 @@ if (file_exists($filePathFacturX)) {
 	$last_supplier_invoice_error .= '<a href="'.$urlConvertedFile.'">' . $langs->trans("facturXDownloadConverted") . ' ' . img_picto('', 'download', 'class="pictofixedwidth"') . '</a>';
 }
 
-$filePathCII = $conf->pdpconnectfr->dir_temp . '/einvoice.xml';
 if (file_exists($filePathCII)) {
 	$urlOriginalFile = DOL_URL_ROOT . '/document.php?modulepart=pdpconnectfr&file=' . urlencode('temp/einvoice.xml');
 
@@ -769,6 +774,13 @@ if ($provider) {
 	// protection to not use a date higher than last date in db
 	if ($syncfromdate && $syncfromdate > $last_sync_db) {
 		$gmtdatetosuggest = $last_sync_db;
+	}
+
+	// If we have just do a delete, we force the $gmtdatetosuggest to the last_sync_db if it is higher
+	if ($action == 'delete') {
+		if ($gmtdatetosuggest && $gmtdatetosuggest > $last_sync_db) {
+			$gmtdatetosuggest = $last_sync_db;
+		}
 	}
 
 	//var_dump($last_sync_db, 'last_sync_db gmt = '.dol_print_date($last_sync_db, 'dayhour', 'gmt'));
