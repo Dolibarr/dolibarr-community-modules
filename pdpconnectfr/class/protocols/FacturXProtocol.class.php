@@ -1632,7 +1632,8 @@ class FacturXProtocol extends AbstractProtocol
 		$return_messages[] = $syncSocRes['message'];
 		$action = $syncSocRes['action'] ?? null;
 		if ($socId < 0) {
-			return ['res' => -1, 'message' => 'Thirdparty sync or creation error: ' . implode("\n", $return_messages), 'actioncode' => $syncSocRes['actioncode'] ?? '', 'actionurl' => $syncSocRes['actionurl'] ?? '', 'action' => $action];
+			return ['res' => -1, 'message' => 'Thirdparty sync or creation error: ' . implode("\n", $return_messages),
+			'actioncode' => $syncSocRes['actioncode'] ?? '', 'actionurl' => $syncSocRes['actionurl'] ?? '', 'action' => $action];
 		}
 
 		// Load supplier (thirdparty)
@@ -1789,7 +1790,8 @@ class FacturXProtocol extends AbstractProtocol
 				// Sync or create product
 				$res = $this->_findOrCreateProductFromFacturXLine($parsedLine, $flowId);
 				if ($res['res'] < 0) {
-					return ['res' => -1, 'message' => 'Product sync or creation error: ' . $res['message'], 'action' => $res['action'] ?? null];
+					return ['res' => -1, 'message' => 'Product sync or creation error: ' . $res['message'],
+					'actioncode' => $res['actioncode'] ?? '', 'actionurl' => $res['actionurl'] ?? '', 'action' => $res['action'] ?? null];
 				}
 				$productId = $res['res'];
 			}
@@ -2695,10 +2697,10 @@ class FacturXProtocol extends AbstractProtocol
 				$errorDetails[] = 'Email: ' . $selleremail;
 			}
 			if (!empty($selleridents)) {
-				$errorDetails[] = 'Identifiers: ' . implode(', ', $selleridents);
+				$errorDetails[] = 'ID: ' . implode(', ', $selleridents);
 			}
 
-			$detailsStr = !empty($errorDetails) ? ' (' . implode(' | ', $errorDetails) . ')' : '';
+			$detailsStr = !empty($errorDetails) ? ' [' . implode(' - ', $errorDetails) . ']' : '';
 
 			$message = 'Unable to find supplier' . $detailsStr . '. Auto-creation of thirdparties is disabled in settings.';
 
@@ -2878,7 +2880,7 @@ class FacturXProtocol extends AbstractProtocol
 			$errorDetails = [];
 			$createParams = [];
 			if (!empty($prodRef) && $prodRef !== "0000") {
-				$errorDetails[] = $prodRef . " | ";
+				$errorDetails[] = $prodRef;
 				$createParams['ref_ext'] = $prodRef;
 			}
 			if (!empty($prodName)) {
@@ -2908,7 +2910,7 @@ class FacturXProtocol extends AbstractProtocol
 			}
 			$createUrl .= '&backtopage=' . urlencode(dol_buildpath('/pdpconnectfr/document_list.php', 1));
 
-			$detailsStr = !empty($errorDetails) ? ' (' . implode(' | ', $errorDetails) . ')' : '';
+			$detailsStr = !empty($errorDetails) ? ' [' . implode(' - ', $errorDetails) . ']' : '';
 
 			$message = 'Unable to find product' . $detailsStr . '. Auto-creation of products is disabled in settings.';
 
@@ -2921,7 +2923,7 @@ class FacturXProtocol extends AbstractProtocol
 			return array(
 				'res' => -1,
 				'message' => $message,
-				'actioncode' => 'PROUCT_NOT_FOUND',
+				'actioncode' => 'PRODUCT_NOT_FOUND',
 				'actionurl' => $createUrl,
 				'action' => $action
 			);
