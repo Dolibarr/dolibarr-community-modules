@@ -126,5 +126,5 @@ Connected=Connecté.
 LastRecordedToken=Dernier jeton enregistré
 HelloAssoMembershipStatus=Statut de membre
 HelloAssoMemberPaymentLabel=Paiement d'abonnement HelloAsso n°%s
-ErrorHelloAssoCode=Une erreur %s est survenue, vérifiez que les slugs, les noms de formulaires, et la clé sont valides dans la configuration du module HelloAsso
-ErrorHelloassoMissingFirstNameOrLastName=Une erreur s'est produite lors de la récupération des informations du membre : le prénom ou le nom de famille d'au moins un membre est manquant.
+ErrorHelloAssoCode=A %s error has occurred. Please verify that the slugs, form names, and key are valid in the HelloAsso module configuration.
+ErrorHelloassoMissingFirstNameOrLastName=An error occurred while fetching the member's information, missing Firstname or Lastname for at least a member
