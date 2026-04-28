@@ -420,7 +420,7 @@ abstract class AbstractPDPProvider
 	 */
 	public function getLastSyncDate($marginHours = 0)
 	{
-		global $db;
+		global $conf, $db;
 
 		$LastSyncDate = null;
 
@@ -433,9 +433,10 @@ abstract class AbstractPDPProvider
 		// Future enhancement: Individual document sync may be possible when
 		// the PDP provider API supports it.
 
-		$LastSyncDateSql = "SELECT MAX(t.updatedat) as last_sync_date
-        FROM ".MAIN_DB_PREFIX."pdpconnectfr_document  as t
-        WHERE t.provider = '".$db->escape($this->providerName)."'";
+		$LastSyncDateSql = "SELECT MAX(t.updatedat) as last_sync_date";
+		$LastSyncDateSql .= " FROM ".MAIN_DB_PREFIX."pdpconnectfr_document as t";
+		$LastSyncDateSql .= " WHERE t.provider = '".$db->escape($this->providerName)."'";
+		$LastSyncDateSql .= " AND entity = ".((int) $conf->entity);		// Do not use getentity here, must always be on 1 entity.
 
 		$resql = $db->query($LastSyncDateSql);
 
