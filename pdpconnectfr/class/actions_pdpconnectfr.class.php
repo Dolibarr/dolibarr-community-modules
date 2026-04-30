@@ -22,7 +22,7 @@
  * \brief   Hook of module
  */
 
-require_once DOL_DOCUMENT_ROOT.'/core/class/commonhookactions.class.php';
+require_once DOL_DOCUMENT_ROOT . '/core/class/commonhookactions.class.php';
 require_once __DIR__ . "/pdpconnectfr.class.php";
 dol_include_once('/pdpconnectfr/class/providers/PDPProviderManager.class.php');
 
@@ -147,8 +147,10 @@ class ActionsPdpconnectfr extends CommonHookActions
 			$url_button = array();
 			if ($object->status == Facture::STATUS_VALIDATED || $object->status == Facture::STATUS_CLOSED) {
 				// if E-invoice is not generated, show button to generate e-invoice
-				if ($currentStatusDetails['code'] == $pdpConnectFr::STATUS_NOT_GENERATED
-					|| !array_key_exists($currentStatusDetails['code'], $pdpConnectFr::STATUS_LABEL_KEYS)) {
+				if (
+					$currentStatusDetails['code'] == $pdpConnectFr::STATUS_NOT_GENERATED
+					|| !array_key_exists($currentStatusDetails['code'], $pdpConnectFr::STATUS_LABEL_KEYS)
+				) {
 					$url_button[] = array(
 						'lang' => 'pdpconnectfr',
 						'enabled' => 1,
@@ -186,7 +188,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 				}
 			}
 
-			print '<!-- Current AP: '.getDolGlobalString('PDPCONNECTFR_PDP').' -->';
+			print '<!-- Current AP: ' . getDolGlobalString('PDPCONNECTFR_PDP') . ' -->';
 			print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true);
 		}
 
@@ -194,9 +196,9 @@ class ActionsPdpconnectfr extends CommonHookActions
 		// Add buttons in supplier invoice card
 		if (in_array($object->element, ['invoice_supplier'])) {
 			// Check if this invoice is present into pdpconnectfr_extlinks table to know if it is an imported invoice from PDP or not
-			$sql = "SELECT rowid, provider FROM ".MAIN_DB_PREFIX."pdpconnectfr_extlinks";
-			$sql .= " WHERE element_type = '".$db->escape($object->element)."'";
-			$sql .= " AND element_id = ".(int) $object->id;
+			$sql = "SELECT rowid, provider FROM " . MAIN_DB_PREFIX . "pdpconnectfr_extlinks";
+			$sql .= " WHERE element_type = '" . $db->escape($object->element) . "'";
+			$sql .= " AND element_id = " . (int) $object->id;
 			$sql .= " LIMIT 1";
 
 			$resql = $db->query($sql);
@@ -281,7 +283,8 @@ class ActionsPdpconnectfr extends CommonHookActions
 			}
 
 			// Action to send invoice to PDP
-			if ($action == 'send_to_pdp' && $permissiontoedit
+			if (
+				$action == 'send_to_pdp' && $permissiontoedit
 				&& $currentStatusDetails['file'] == 1
 				&& in_array($currentStatusDetails['code'], [
 					$pdpConnectFr::STATUS_GENERATED,
@@ -331,7 +334,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 				$invoiceObject = $object;
 
 				// Call function to create Factur-X document
-				require_once __DIR__.'/protocols/ProtocolManager.class.php';
+				require_once __DIR__ . '/protocols/ProtocolManager.class.php';
 
 				$usedProtocols = getDolGlobalString('PDPCONNECTFR_PROTOCOL');
 				$ProtocolManager = new ProtocolManager($db);
@@ -662,7 +665,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 	public function printFieldListFrom($parameters, &$object, &$action, $hookmanager)
 	{
 		if (in_array('invoicelist', explode(':', $parameters['context']))) {
-			$this->resprints .= " LEFT JOIN ".MAIN_DB_PREFIX."pdpconnectfr_extlinks as ext ON ext.element_id = f.rowid AND ext.element_type = 'facture'";
+			$this->resprints .= " LEFT JOIN " . MAIN_DB_PREFIX . "pdpconnectfr_extlinks as ext ON ext.element_id = f.rowid AND ext.element_type = 'facture'";
 		}
 
 		// Supplier invoice list, Product list, Soc list
@@ -670,16 +673,16 @@ class ActionsPdpconnectfr extends CommonHookActions
 
 		if (array_intersect($contexts, ['supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist'])) {
 			if (in_array('thirdpartylist', $contexts, true)) {
-				$this->resprints .= ' LEFT JOIN '.MAIN_DB_PREFIX."pdpconnectfr_extlinks as ext ON ext.element_id = s.rowid AND ext.element_type = 'societe'";
-				$this->resprints .= ' LEFT JOIN '.MAIN_DB_PREFIX."pdpconnectfr_routing rt ON rt.fk_soc = s.rowid";
+				$this->resprints .= ' LEFT JOIN ' . MAIN_DB_PREFIX . "pdpconnectfr_extlinks as ext ON ext.element_id = s.rowid AND ext.element_type = 'societe'";
+				$this->resprints .= ' LEFT JOIN ' . MAIN_DB_PREFIX . "pdpconnectfr_routing rt ON rt.fk_soc = s.rowid";
 			}
 
 			if (in_array('supplierinvoicelist', $contexts, true)) {
-				$this->resprints .= ' LEFT JOIN '.MAIN_DB_PREFIX."pdpconnectfr_extlinks as ext ON ext.element_id = f.rowid AND ext.element_type = 'invoice_supplier'";
+				$this->resprints .= ' LEFT JOIN ' . MAIN_DB_PREFIX . "pdpconnectfr_extlinks as ext ON ext.element_id = f.rowid AND ext.element_type = 'invoice_supplier'";
 			}
 
 			if (in_array('productservicelist', $contexts, true)) {
-				$this->resprints .= ' LEFT JOIN '.MAIN_DB_PREFIX."pdpconnectfr_extlinks as ext ON ext.element_id = p.rowid AND ext.element_type = 'product'";
+				$this->resprints .= ' LEFT JOIN ' . MAIN_DB_PREFIX . "pdpconnectfr_extlinks as ext ON ext.element_id = p.rowid AND ext.element_type = 'product'";
 			}
 		}
 
@@ -699,7 +702,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 	{
 		if (in_array('invoicelist', explode(':', $parameters['context']))) {
 			if (GETPOST('search_pdp_syncstatus', 'alpha') !== '' && GETPOST('search_pdp_syncstatus', 'alpha') != -2) {
-				$this->resprints .= ' AND ext.syncstatus = '.((int) GETPOST('search_pdp_syncstatus'));
+				$this->resprints .= ' AND ext.syncstatus = ' . ((int) GETPOST('search_pdp_syncstatus'));
 			}
 		}
 
@@ -710,11 +713,11 @@ class ActionsPdpconnectfr extends CommonHookActions
 			['supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist']
 		)) {
 			if (GETPOST('search_pdplinked', 'alpha') !== '' && GETPOST('search_pdplinked', 'alpha') == getDolGlobalString('PDPCONNECTFR_PDP')) {
-				$this->resprints .= ' AND ext.provider = "'.getDolGlobalString('PDPCONNECTFR_PDP').'"';
+				$this->resprints .= ' AND ext.provider = "' . getDolGlobalString('PDPCONNECTFR_PDP') . '"';
 			}
 
 			if (GETPOST('search_routing_id', 'alpha') !== '' && GETPOST('search_routing_id', 'alpha') != "") {
-				$this->resprints .= ' AND ext.routing_id = "'.GETPOST('search_routing_id', 'alpha').'"';
+				$this->resprints .= ' AND ext.routing_id = "' . GETPOST('search_routing_id', 'alpha') . '"';
 			}
 		}
 
@@ -892,7 +895,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 				$einvoiceGenerated = $tmparray['file'];
 				print '<td class="center tdoverflowmax125">';
 				if ($einvoiceGenerated) {
-					print '<i class="fas fa-check-circle" style="color:green;" title="'.$langs->trans('EInvoiceGenerated').'"></i>';
+					print '<i class="fas fa-check-circle" style="color:green;" title="' . $langs->trans('EInvoiceGenerated') . '"></i>';
 				}
 				print '</td>';
 				if (isset($parameters['i']) && empty($parameters['i'])) {
@@ -903,7 +906,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 			// Sync status
 			if (empty($parameters['arrayfields']['pdp_syncstatus']) || !empty($parameters['arrayfields']['pdp_syncstatus']['checked'])) {
 				$currentStatusDetails = $obj->pdp_syncstatus ? $pdpConnectFr->getStatusLabel($obj->pdp_syncstatus) : '-';
-				print '<td class="center tdoverflowmax125" title="'.dolPrintHTMLForAttribute($currentStatusDetails).'">';
+				print '<td class="center tdoverflowmax125" title="' . dolPrintHTMLForAttribute($currentStatusDetails) . '">';
 				print $currentStatusDetails;
 				print '</td>';
 				if (isset($parameters['i']) && empty($parameters['i'])) {

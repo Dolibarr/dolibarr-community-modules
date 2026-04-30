@@ -74,13 +74,13 @@ class SuperPDPProvider extends AbstractPDPProvider
 		);
 
 		// Default mode
-		$this->helpToGetCredentials = '<div class="">'.$langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL1").'</div>';
-		$this->helpToGetCredentials .= '<div class="margintoponly">'.$langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL2", '{s1}').'</div>';
-		$this->helpToGetCredentials .= '<div class="margintoponly">'.$langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL3", '{s2}').'</div>';
-		$this->helpToGetCredentials .= '<div class="margintoponly">'.$langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL4", '{s3}', '{s4}', '{s5}').'</div>';
+		$this->helpToGetCredentials = '<div class="">' . $langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL1") . '</div>';
+		$this->helpToGetCredentials .= '<div class="margintoponly">' . $langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL2", '{s1}') . '</div>';
+		$this->helpToGetCredentials .= '<div class="margintoponly">' . $langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL3", '{s2}') . '</div>';
+		$this->helpToGetCredentials .= '<div class="margintoponly">' . $langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL4", '{s3}', '{s4}', '{s5}') . '</div>';
 
 		if (getDolGlobalString('PDPCONNECTFR_PDP') == 'SUPERPDPViaPartner') {
-			$this->helpToGetCredentials = '<div class="">'.$langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL_VIA_PARTNER", '{s1}').'</div>';
+			$this->helpToGetCredentials = '<div class="">' . $langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL_VIA_PARTNER", '{s1}') . '</div>';
 		}
 
 		$redirect_uri = dol_buildpath('/pdpconnectfr/admin/setup.php', 2);
@@ -131,50 +131,50 @@ class SuperPDPProvider extends AbstractPDPProvider
 				*/
 
 				$urltogeneratetoken = getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER_OAUTH_URL');
-				$urltogeneratetoken .= '?proxy=superpdp&state=none&response_type=code&redirect_uri='.urlencode(dol_buildpath('/pdpconnectfr/admin/setup.php', 2));
+				$urltogeneratetoken .= '?proxy=superpdp&state=none&response_type=code&redirect_uri=' . urlencode(dol_buildpath('/pdpconnectfr/admin/setup.php', 2));
 
 				$urltoshow = $langs->trans("PDPCONNECTFR_LINK_CREATE_ACCOUNTVia", getDolGlobalString("PDPCONNTECTFR_SUPERPDP_VIAPARTNER"));
 
 				if (empty($tokenData['token'])) {
-					$this->helpToGetCredentials = str_replace('{s1}', '<br><br><center>'.img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$urltogeneratetoken.'" target="_new">'.$urltoshow.'</a></center>', $this->helpToGetCredentials);
-					$this->helpToGetCredentials = '<div class="formborder">'.$this->helpToGetCredentials.'</div>';
+					$this->helpToGetCredentials = str_replace('{s1}', '<br><br><center>' . img_picto('', 'url', 'class="pictofixedwidth"') . '<a href="' . $urltogeneratetoken . '" target="_new">' . $urltoshow . '</a></center>', $this->helpToGetCredentials);
+					$this->helpToGetCredentials = '<div class="formborder">' . $this->helpToGetCredentials . '</div>';
 				} else {
 					$this->helpToGetCredentials = '<div class="green greenborder">';
 					$this->helpToGetCredentials .= '<center>';
 					$this->helpToGetCredentials .= $langs->trans("YourSoftwareSeemsConnectedWith", strtoupper($this->name));
-					$this->helpToGetCredentials .= '<br><br>'.img_picto('', 'delete', 'class="pictofixedwidth"').'<a href="'.$_SERVER["PHP_SELF"].'?action=delete'.$prefix."TOKEN&token=".newToken().'">'.$langs->trans("ClickHereToRemoveConnection").'</a>';
+					$this->helpToGetCredentials .= '<br><br>' . img_picto('', 'delete', 'class="pictofixedwidth"') . '<a href="' . $_SERVER["PHP_SELF"] . '?action=delete' . $prefix . "TOKEN&token=" . newToken() . '">' . $langs->trans("ClickHereToRemoveConnection") . '</a>';
 					$this->helpToGetCredentials .= '</center>';
 					$this->helpToGetCredentials .= '</div>';
 				}
 			} else {
 				global $dolibarr_main_url_root;
 
-				$urlforproxy = $dolibarr_main_url_root.'/custom/pdpconnectfr/public/proxy_oauthcallback.php';
+				$urlforproxy = $dolibarr_main_url_root . '/custom/pdpconnectfr/public/proxy_oauthcallback.php';
 
 				$this->helpToGetCredentials = '<div class="green greenborder">';
 				$this->helpToGetCredentials .= 'You are on the proxy for SuperPDP Access Point registration.<br><br>';
-				$this->helpToGetCredentials .= 'URL of proxy is:<br><input type="text" class="quatrevingtpercent" id="urlproxy" value="'.$urlforproxy.'"spellcheck="false">';
+				$this->helpToGetCredentials .= 'URL of proxy is:<br><input type="text" class="quatrevingtpercent" id="urlproxy" value="' . $urlforproxy . '"spellcheck="false">';
 				$this->helpToGetCredentials .= ajax_autoselect("urlproxy");
 				$this->helpToGetCredentials .= '</div>';
 			}
 		} else {
-			$url = $providersConfig[getDolGlobalString('PDPCONNECTFR_PDP')][$prefixenv.'_account_admin_url'];
+			$url = $providersConfig[getDolGlobalString('PDPCONNECTFR_PDP')][$prefixenv . '_account_admin_url'];
 			$urltoshow = $url;
 
 			// Default help
 			if (empty($tokenData['token'])) {
-				$this->helpToGetCredentials = str_replace('{s1}', img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$url.'" target="_new">'.$urltoshow.'</a>', $this->helpToGetCredentials);
-				$this->helpToGetCredentials = str_replace('{s2}', '<input type="text" class="width300" value="'.$this->callbackurl.'">', $this->helpToGetCredentials);
+				$this->helpToGetCredentials = str_replace('{s1}', img_picto('', 'url', 'class="pictofixedwidth"') . '<a href="' . $url . '" target="_new">' . $urltoshow . '</a>', $this->helpToGetCredentials);
+				$this->helpToGetCredentials = str_replace('{s2}', '<input type="text" class="width300" value="' . $this->callbackurl . '">', $this->helpToGetCredentials);
 				$this->helpToGetCredentials = str_replace('{s3}', $langs->transnoentitiesnoconv("OAUTH_ID"), $this->helpToGetCredentials);
 				$this->helpToGetCredentials = str_replace('{s4}', $langs->transnoentitiesnoconv("OAUTH_SECRET"), $this->helpToGetCredentials);
 				$this->helpToGetCredentials = str_replace('{s5}', $langs->transnoentitiesnoconv("Save"), $this->helpToGetCredentials);
 
-				$this->helpToGetCredentials = '<div class="formborder">'.$this->helpToGetCredentials.'</div>';
+				$this->helpToGetCredentials = '<div class="formborder">' . $this->helpToGetCredentials . '</div>';
 			} else {
 				$this->helpToGetCredentials = '<div class="green greenborder">';
 				$this->helpToGetCredentials .= '<center>';
 				$this->helpToGetCredentials .= $langs->trans("YourSoftwareSeemsConnectedWith", strtoupper($this->name));
-				$this->helpToGetCredentials .= '<br><br>'.img_picto('', 'delete', 'class="pictofixedwidth"').'<a href="'.$_SERVER["PHP_SELF"].'?action=delete'.$prefix."TOKEN&token=".newToken().'">'.$langs->trans("ClickHereToRemoveConnection").'</a>';
+				$this->helpToGetCredentials .= '<br><br>' . img_picto('', 'delete', 'class="pictofixedwidth"') . '<a href="' . $_SERVER["PHP_SELF"] . '?action=delete' . $prefix . "TOKEN&token=" . newToken() . '">' . $langs->trans("ClickHereToRemoveConnection") . '</a>';
 				$this->helpToGetCredentials .= '</center>';
 				$this->helpToGetCredentials .= '</div>';
 			}
@@ -226,12 +226,12 @@ class SuperPDPProvider extends AbstractPDPProvider
 				$texttoshow = '';
 				$urltogeneratetoken = '';
 				if (getDolGlobalString('PDPCONNECTFR_PDP') == 'SUPERPDPViaPartner' && getDolGlobalString("PDPCONNTECTFR_SUPERPDP_VIAPARTNER")) {
-					$texttoshow = $langs->trans('generateAccessToken').' via '.getDolGlobalString("PDPCONNTECTFR_SUPERPDP_VIAPARTNER");
+					$texttoshow = $langs->trans('generateAccessToken') . ' via ' . getDolGlobalString("PDPCONNTECTFR_SUPERPDP_VIAPARTNER");
 					$urltogeneratetoken = getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER_OAUTH_URL');
-					$urltogeneratetoken .= '?state=none&response_type=code&redirect_uri='.urlencode(dol_buildpath('/pdpconnectfr/admin/setup.php', 2));
+					$urltogeneratetoken .= '?state=none&response_type=code&redirect_uri=' . urlencode(dol_buildpath('/pdpconnectfr/admin/setup.php', 2));
 				} elseif (getDolGlobalString($prefix . 'CLIENT_ID') && getDolGlobalString($prefix . 'CLIENT_SECRET')) {
 					$texttoshow = $langs->trans('generateAccessToken');
-					$urltogeneratetoken = $_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken();
+					$urltogeneratetoken = $_SERVER["PHP_SELF"] . "?action=set" . $prefix . "TOKEN&token=" . newToken();
 				}
 
 				if ($urltogeneratetoken && (getDolGlobalString('PDPCONNECTFR_PDP') != 'SUPERPDPViaPartner' || !empty($tokenData['token']))) {
@@ -243,19 +243,19 @@ class SuperPDPProvider extends AbstractPDPProvider
 						$item->fieldOverride = htmlspecialchars('**************' . substr($tokenData['token'], -4));
 
 						if (!empty($tokenData['token_expires_at'])) {
-							$item->fieldOverride .= ' &nbsp; <span class="opacitymedium hideonsmartphone">('.$langs->trans("until").' '.dol_print_date($tokenData['token_expires_at'], 'dayhoursec', 'tzuserrel').')</span>';
+							$item->fieldOverride .= ' &nbsp; <span class="opacitymedium hideonsmartphone">(' . $langs->trans("until") . ' ' . dol_print_date($tokenData['token_expires_at'], 'dayhoursec', 'tzuserrel') . ')</span>';
 						}
 						//var_dump($tokenData);
 					}
 					if (empty($tokenData['token'])) {
-						$item->fieldOverride .= '<a class="reposition" href="'.$urltogeneratetoken.'">' .$texttoshow . '<i class="fa fa-key paddingleft"></i></a>';
+						$item->fieldOverride .= '<a class="reposition" href="' . $urltogeneratetoken . '">' . $texttoshow . '<i class="fa fa-key paddingleft"></i></a>';
 					}
 					if (!empty($tokenData['token'])) {
-						$item->fieldOverride .= ' &nbsp; &nbsp; <a class="reposition" href="'.$urltogeneratetoken.'">' . $langs->trans('reGenerateAccessToken') . '<i class="fa fa-key paddingleft"></i></a>';
+						$item->fieldOverride .= ' &nbsp; &nbsp; <a class="reposition" href="' . $urltogeneratetoken . '">' . $langs->trans('reGenerateAccessToken') . '<i class="fa fa-key paddingleft"></i></a>';
 					}
 
 					if (!empty($tokenData['token'])) {
-						$item->fieldOverride .= ' &nbsp; &nbsp; <a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=delete".$prefix."TOKEN&token=".newToken().'">' . img_picto('', 'delete') . '</a>';
+						$item->fieldOverride .= ' &nbsp; &nbsp; <a class="reposition" href="' . $_SERVER["PHP_SELF"] . "?action=delete" . $prefix . "TOKEN&token=" . newToken() . '">' . img_picto('', 'delete') . '</a>';
 					}
 				}
 			}
@@ -266,11 +266,11 @@ class SuperPDPProvider extends AbstractPDPProvider
 					$item = $formSetup->newItem($prefix . 'ACTIONS');
 					$item->nameText = "&nbsp;";
 
-					$item->fieldOverride .= '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=call".$prefix."HEALTHCHECK&token=".newToken().'">' . $langs->trans('testConnection') . ' (Healthcheck)<i class="fa fa-check paddingleft"></i></a><br>';
+					$item->fieldOverride .= '<a class="reposition" href="' . $_SERVER["PHP_SELF"] . "?action=call" . $prefix . "HEALTHCHECK&token=" . newToken() . '">' . $langs->trans('testConnection') . ' (Healthcheck)<i class="fa fa-check paddingleft"></i></a><br>';
 					$item->cssClass = 'minwidth500';
 
-					if ($tokenData['token'] && getDolGlobalString('PDPCONNECTFR_PROTOCOL') && getDolGlobalString('PDPCONNECTFR_PROTOCOL') === 'FACTURX') {
-						$item->fieldOverride .= '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=make".$prefix."sampleinvoice&token=".newToken().'">' . $langs->trans('generateSendSampleInvoice') . '<i class="fa fa-file paddingleft"></i></a><br>';
+					if ($tokenData['token'] && getDolGlobalString('PDPCONNECTFR_PROTOCOL')) {
+						$item->fieldOverride .= '<a class="reposition" href="' . $_SERVER["PHP_SELF"] . "?action=make" . $prefix . "sampleinvoice&token=" . newToken() . '">' . $langs->trans('generateSendSampleInvoice') . '<i class="fa fa-file paddingleft"></i></a><br>';
 					}
 				}
 			}
@@ -411,8 +411,24 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$outputLog = array(); // Feedback to display
 
 		$filename = dol_sanitizeFileName($object->ref);
-		$filedir = $conf->invoice->multidir_output[$object->entity ?? $conf->entity].'/'.dol_sanitizeFileName($object->ref);
-		$invoice_path = $filedir.'/'.$filename.'_facturx.pdf';
+		$filedir = $conf->invoice->multidir_output[$object->entity ?? $conf->entity] . '/' . dol_sanitizeFileName($object->ref);
+		switch (getDolGlobalString('PDPCONNECTFR_PROTOCOL')) {
+			case 'FACTURX':
+				$suffix = '_facturx.pdf';
+				$mime_type = 'application/pdf';
+				$flowSyntax = 'Factur-X';
+				break;
+			case 'CII':
+				$suffix = '_EInvoice.xml';
+				$mime_type = 'application/xml';
+				$flowSyntax = 'CII';
+				break;
+			default:
+				$suffix = '_facturx.pdf';
+				$mime_type = 'application/pdf';
+				$flowSyntax = 'Factur-X';
+		}
+		$invoice_path = $filedir . '/' . $filename . $suffix;
 
 		if (!file_exists($invoice_path)) {
 			$this->errors[] = "Electronic Invoice file not found";
@@ -441,12 +457,12 @@ class SuperPDPProvider extends AbstractPDPProvider
 			'flowInfo' => json_encode([
 				"trackingId" => $object->ref,
 				"name" => "Invoice_" . $object->ref,
-				"flowSyntax" => "Factur-X",
+				"flowSyntax" => $flowSyntax,
 				//"flowProfile" => "CIUS",
 				"flowProfile" => "Extended-CTC-FR",
 				"sha256" => hash_file('sha256', $invoice_path)
 			]),
-			'file' => new CURLFile($invoice_path, 'application/pdf', basename($invoice_path))
+			'file' => new CURLFile($invoice_path, $mime_type, basename($invoice_path))
 		];
 
 
@@ -491,7 +507,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 			);
 
 			if ($response['status_code'] != 200 && $response['status_code'] != 202) {
-				return array('res' => -1, 'message' => "FlowId: " . $flowId." - Failed to retrieve flow details");
+				return array('res' => -1, 'message' => "FlowId: " . $flowId . " - Failed to retrieve flow details");
 			}
 
 			// Process flow data
@@ -499,7 +515,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 			try {
 				$flowData = json_decode($response['response'], true);
 			} catch (Exception $e) {
-				return array('res' => -1, 'message' => "FlowId: " . $flowId." - Failed to parse the json answer");
+				return array('res' => -1, 'message' => "FlowId: " . $flowId . " - Failed to parse the json answer");
 			}
 
 			// Update einvoice status with received validation result
@@ -514,11 +530,11 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 			// Log an event in the invoice timeline
 			$eventLabel = "PDPCONNECTFR - Status: " . $ack_statusLabel;
-			$eventLabel .= " - ".$callRef;
+			$eventLabel .= " - " . $callRef;
 
 			$eventMessage = "PDPCONNECTFR - Status: " . $ack_statusLabel . (!empty($syncComment) ? " - " . $syncComment : "");
-			$eventMessage .= "\nFlowID=".$flowId;
-			$eventMessage .= "\nCallID ".$callRef;
+			$eventMessage .= "\nFlowID=" . $flowId;
+			$eventMessage .= "\nCallID " . $callRef;
 
 			$resLogEvent = $this->addEvent('STATUS', $eventLabel, $eventMessage, $object);
 			if ($resLogEvent < 0) {
@@ -528,12 +544,12 @@ class SuperPDPProvider extends AbstractPDPProvider
 			return $flowId;
 		} else {
 			$this->error = $langs->trans("ErrorSendingInvoiceToPDP");
-			$this->error .= '<br>HTTP '.$response['status_code'];
+			$this->error .= '<br>HTTP ' . $response['status_code'];
 			if (!empty($response['errorCode'])) {
-				$this->error .= ' - '.$response['errorCode'].(empty($response['errorMessage']) ? '': ' - '.$response['errorMessage']);
+				$this->error .= ' - ' . $response['errorCode'] . (empty($response['errorMessage']) ? '' : ' - ' . $response['errorMessage']);
 			}
 			if (!empty($response['curl_error_no'])) {
-				$this->error .= ' - Curl error '.$response['curl_error_no'].(empty($response['curl_error_msg']) ? '': ' - '.$response['curl_error_msg']);
+				$this->error .= ' - Curl error ' . $response['curl_error_no'] . (empty($response['curl_error_msg']) ? '' : ' - ' . $response['curl_error_msg']);
 			}
 			$this->errors[] = $this->error;
 			return 0;
@@ -579,6 +595,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 			$outputLog[] = "Sample invoice generated successfully.";
 		}
 		$file_info = pathinfo($invoice_path);
+		$mime_type = mime_content_type($invoice_path);
+		$fileext = $file_info['extension'] ?? ''; // Should be "pdf" or "xml" depending on the protocol
 
 		// Format PDP resource Url
 		/*
@@ -599,12 +617,12 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$params = [
 			'flowInfo' => json_encode([
 				"trackingId" => $ref,
-				"name" => "Invoice_".$ref,
+				"name" => "Invoice_" . $ref,
 				"flowSyntax" => "Factur-X",
 				"flowProfile" => "CIUS",
 				"sha256" => hash_file('sha256', $invoice_path)
 			]),
-			'file' => new CURLFile($invoice_path, 'application/pdf', basename($invoice_path))
+			'file' => new CURLFile($invoice_path, $mime_type, basename($invoice_path))
 		];
 
 		$response = $this->callApi("flows", "POSTALREADYFORMATED", $params, $extraHeaders, 'send_sample_invoice');
@@ -629,9 +647,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 			);
 
 			if ($response['status_code'] == 200 || $response['status_code'] == 202) {
-				include_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
+				include_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
 				$tmpobject = new Facture($this->db);
-				$output_path = getMultidirTemp($tmpobject, 'pdpconnectfr').'/test_retrieved_invoice.pdf';
+				$output_path = getMultidirTemp($tmpobject, 'pdpconnectfr') . '/test_retrieved_invoice.' . $fileext;
 
 				file_put_contents($output_path, $response['response']);
 
@@ -644,12 +662,12 @@ class SuperPDPProvider extends AbstractPDPProvider
 			}
 		} else {
 			$this->error = $langs->trans("ErrorSendingInvoiceToPDP");
-			$this->error .= '<br>HTTP '.$response['status_code'];
+			$this->error .= '<br>HTTP ' . $response['status_code'];
 			if (!empty($response['errorCode'])) {
-				$this->error .= ' - '.$response['errorCode'].(empty($response['errorMessage']) ? '': ' - '.$response['errorMessage']);
+				$this->error .= ' - ' . $response['errorCode'] . (empty($response['errorMessage']) ? '' : ' - ' . $response['errorMessage']);
 			}
 			if (!empty($response['curl_error_no'])) {
-				$this->error .= ' - Curl error '.$response['curl_error_no'].(empty($response['curl_error_msg']) ? '': ' - '.$response['curl_error_msg']);
+				$this->error .= ' - Curl error ' . $response['curl_error_no'] . (empty($response['curl_error_msg']) ? '' : ' - ' . $response['curl_error_msg']);
 			}
 			$this->errors[] = $this->error;
 			return 0;
@@ -761,7 +779,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				$returnarray['id'] = $call->id;
 				$returnarray['call_id'] = $call->call_id;
 			} else {
-				dol_syslog(__METHOD__ . " Failed to log API call to PDP provider: ".$call->error." - ".implode(',', $call->errors), LOG_ERR);
+				dol_syslog(__METHOD__ . " Failed to log API call to PDP provider: " . $call->error . " - " . implode(',', $call->errors), LOG_ERR);
 			}
 		}
 
@@ -802,12 +820,12 @@ class SuperPDPProvider extends AbstractPDPProvider
 		// First call to get a total count of flows to sync
 		$params = array(
 			'where' => array(
-			'updatedAfter' => dol_print_date($dateafter, '%Y-%m-%dT%H:%M:%S.000Z', 'gmt')
+				'updatedAfter' => dol_print_date($dateafter, '%Y-%m-%dT%H:%M:%S.000Z', 'gmt')
 			)
 		);
 
-		dol_syslog(__METHOD__ . " syncFlows start from ".dol_print_date($dateafter, 'standard')." limit ".$limit, LOG_DEBUG);
-		dol_syslog(__METHOD__ . " syncFlows start from ".dol_print_date($dateafter, 'standard')." limit ".$limit, LOG_DEBUG, 0, "_pdpconnectfr");
+		dol_syslog(__METHOD__ . " syncFlows start from " . dol_print_date($dateafter, 'standard') . " limit " . $limit, LOG_DEBUG);
+		dol_syslog(__METHOD__ . " syncFlows start from " . dol_print_date($dateafter, 'standard') . " limit " . $limit, LOG_DEBUG, 0, "_pdpconnectfr");
 
 		// If limit is 0, we first need to get the total number of flows to sync because AP set a default limit of 25 if not specified
 		/* response param "total" not supported by SuperPDP
@@ -912,7 +930,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		foreach ($response['response']['results'] as $flow) {
 			$i++;
 			if (in_array($flow['flowId'], $alreadyProcessedFlowIds)) {
-				dol_syslog(__METHOD__ . " #".$i." Flow " . $flow['flowId'] . " already processed, discard it.", LOG_DEBUG, 0, "_pdpconnectfr");
+				dol_syslog(__METHOD__ . " #" . $i . " Flow " . $flow['flowId'] . " already processed, discard it.", LOG_DEBUG, 0, "_pdpconnectfr");
 				$alreadyExist++;
 				continue;
 			}
@@ -920,7 +938,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 			try {
 				// Process flow
 
-				dol_syslog(__METHOD__ . " #".$i." Process flow " . $flow['flowId'], LOG_DEBUG, 0, "_pdpconnectfr");
+				dol_syslog(__METHOD__ . " #" . $i . " Process flow " . $flow['flowId'], LOG_DEBUG, 0, "_pdpconnectfr");
 
 				$db->begin();
 
@@ -968,19 +986,19 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 		$globalres = ($error > 0 ? -1 : 1);
 
-		$globalresultmessage = ($globalres == 1) ? $langs->trans("SyncCompletedSuccessfuly") . ($batchlimit > 0 ? ' <span class="opacitylow">('.$langs->trans("maxNumberToProcess").': '.$batchlimit.")</span>" : "")  : ($langs->trans("SyncAborted", $i, $limit, ($flow['flowId'] ?? 'N/A')));
+		$globalresultmessage = ($globalres == 1) ? $langs->trans("SyncCompletedSuccessfuly") . ($batchlimit > 0 ? ' <span class="opacitylow">(' . $langs->trans("maxNumberToProcess") . ': ' . $batchlimit . ")</span>" : "")  : ($langs->trans("SyncAborted", $i, $limit, ($flow['flowId'] ?? 'N/A')));
 
-		dol_syslog(__METHOD__ . " syncFlows end : ".$globalresultmessage, LOG_DEBUG, 0, "_pdpconnectfr");
+		dol_syslog(__METHOD__ . " syncFlows end : " . $globalresultmessage, LOG_DEBUG, 0, "_pdpconnectfr");
 
 
 		$messages = array();
 		$messages[] = $globalresultmessage;
 		if ($globalres == 1) {
 			if (!is_null($totalFlows)) {
-				$messages[] = $langs->trans("TotalToSync").": <b>".$totalFlows."</b>";
+				$messages[] = $langs->trans("TotalToSync") . ": <b>" . $totalFlows . "</b>";
 			}
 		}
-		$messages[] = $langs->trans("TotalSkippedSync").": <b>".$alreadyExist."</b> - ".$langs->trans("TotalNewSync").": <b>".$syncedFlows."</b>";
+		$messages[] = $langs->trans("TotalSkippedSync") . ": <b>" . $alreadyExist . "</b> - " . $langs->trans("TotalNewSync") . ": <b>" . $syncedFlows . "</b>";
 
 		// Processing result that will be saved in DB
 		$processingResult = '';
@@ -1112,7 +1130,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 					return array('res' => -1, 'message' => "ERROR_FETCH_INVOICE Failed to fetch customer invoice for flowId: " . $flowId);
 				}
 				$document->fk_element_id = !empty($factureObj->id) ? $factureObj->id : 0;
-				$document->tracking_idref = !empty($factureObj->ref) ? $factureObj->ref : $document->tracking_idref.' (NOTFOUND)'; // Probably the customer invoice is sent from another system that use the same PDP account
+				$document->tracking_idref = !empty($factureObj->ref) ? $factureObj->ref : $document->tracking_idref . ' (NOTFOUND)'; // Probably the customer invoice is sent from another system that use the same PDP account
 
 				// TODO: Consider creating a new customer invoice in this case?
 				// TODO: 2. save received converted document as attachment to customer invoice
@@ -1120,7 +1138,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 			// SupplierInvoice
 			case "SupplierInvoice":
-				// --- Fetch received documents (FacturX PDF)
+				// --- Fetch received documents (Einvoice)
 				$document->fk_element_type = FactureFournisseur::class;
 
 				// Retrieve the PDF file converted by Access Point
@@ -1183,7 +1201,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				);
 
 				if ($flowResponse['status_code'] != 200) {
-					return array('res' => -1, 'message' => "ERROR_FLOW_GETORIG Failed to retrieve 'Original' document for SupplierInvoice flow (flowId: ".$flowId.")".(empty($flowResponse['errorMessage']) ? '' : ' - '.$flowResponse['errorMessage']));
+					return array('res' => -1, 'message' => "ERROR_FLOW_GETORIG Failed to retrieve 'Original' document for SupplierInvoice flow (flowId: " . $flowId . ")" . (empty($flowResponse['errorMessage']) ? '' : ' - ' . $flowResponse['errorMessage']));
 				}
 				$receivedFile = $flowResponse['response'];
 
@@ -1203,7 +1221,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 				if ($res['res'] < 0) {
 					$retarray = array(
 						'res' => -1,
-						'message' => "Failed to create supplier invoice from E-invoice document for flowId: " . $flowId . ". " . $res['message']
+						'message' => "Failed to create supplier invoice from Einvoice document for flowId: " . $flowId . ". " . $res['message'],
+						'actioncode' => $res['actioncode'] ?? 'UNKNOWN',
+						'action' => $res['action'] ?? null
 					);
 					$retarray['actioncode'] = $res['actioncode'] ?? null;
 					$retarray['actionurl'] = $res['actionurl'] ?? null;
@@ -1218,7 +1238,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 					//return array('res' => 0, 'message' => "supplier invoice already exists for flowId: " . $flowId . ". " . $res['message']);
 					$returnRes = 1;		// If invoice did already exists, we process one more line from list of flows, so we must return 1, even if nothing was done.
-					$returnMessage = "Supplier invoice ".$suplierInvoiceObj->ref." created or already existing for flowId: " . $flowId . ". " . $res['message'];
+					$returnMessage = "Supplier invoice " . $suplierInvoiceObj->ref . " created or already existing for flowId: " . $flowId . ". " . $res['message'];
 				}
 				break;
 
@@ -1278,7 +1298,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 					// Check if parsing was successful
 					if (empty($cdarDocument) || !isset($cdarDocument['AcknowledgementDocument'])) {
-						return array('res' => -1, 'message' => "FlowId: ".$flowId." - Failed to parse CDAR document");
+						return array('res' => -1, 'message' => "FlowId: " . $flowId . " - Failed to parse CDAR document");
 					}
 
 					$document->fk_element_type = Facture::class;	// 'Facture', 'FactureFournisseur'
@@ -1291,15 +1311,15 @@ class SuperPDPProvider extends AbstractPDPProvider
 					if ($res < 0) {
 						return array(
 							'res' => '-1',
-							'message' => "FlowId ".$flowId." - Failed to fetch customer invoice using CDAR IssuerAssignedID/ref: " . $issuerAssignedID
+							'message' => "FlowId " . $flowId . " - Failed to fetch customer invoice using CDAR IssuerAssignedID/ref: " . $issuerAssignedID
 						);
 					}
 					if ($factureObj->entity && $factureObj->entity != $conf->entity) {
-						return array('res' => -1, 'message' => "Processing flowId: ".$flowId." - Failed to fetch customer invoice ref " . $document->tracking_idref." in entity ".$conf->entity);
+						return array('res' => -1, 'message' => "Processing flowId: " . $flowId . " - Failed to fetch customer invoice ref " . $document->tracking_idref . " in entity " . $conf->entity);
 					}
 
 					$document->fk_element_id = !empty($factureObj->id) ? $factureObj->id : 0;
-					$document->tracking_idref = !empty($factureObj->ref) ? $factureObj->ref : $issuerAssignedID.' (NOTFOUND)'; // Probably the customer invoice is sent from another system that use the same PDP account
+					$document->tracking_idref = !empty($factureObj->ref) ? $factureObj->ref : $issuerAssignedID . ' (NOTFOUND)'; // Probably the customer invoice is sent from another system that use the same PDP account
 
 					// TODO: Consider creating a new customer invoice if invoice not found even if this should not happen ?
 
@@ -1388,7 +1408,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				} catch (Exception $e) {
 					return array(
 						'res' => '-1',
-						'message' => "FlowId ".$flowId." - Error processing CDAR document - " . $e->getMessage()
+						'message' => "FlowId " . $flowId . " - Error processing CDAR document - " . $e->getMessage()
 					);
 				}
 
@@ -1465,7 +1485,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 						return array('res' => -1, 'message' => "Failed to fetch customer invoice for flowId: " . $flowId . " using syncref from pdpconnectfr_extlinks table: " . $obj->tracking_idref);
 					}
 					$document->fk_element_id = !empty($factureObj->id) ? $factureObj->id : 0;
-					$document->tracking_idref = !empty($factureObj->ref) ? $factureObj->ref : $document->tracking_idref.' (NOTFOUND)'; // Probably the customer invoice is sent from another system that use the same PDP account
+					$document->tracking_idref = !empty($factureObj->ref) ? $factureObj->ref : $document->tracking_idref . ' (NOTFOUND)'; // Probably the customer invoice is sent from another system that use the same PDP account
 
 					// If ack_status is Error, and there is no entry in pdpconnectfr_extlinks table, or there is an entry with status Awaiting Validation we log an event in the invoice and we add an entry in pdpconnectfr_extlinks table with status Error
 					// Should never happen because we make an ajax call every x seconds when an invoice is in status Pending after sending it
@@ -1664,8 +1684,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 			} else {
 				$res = -1;
 				$message = 'Failed to send CDAR file to PDP. Status code: ' . $response['status_code'] . '. Message: ' . (!empty($response['response']['message'])
-				? $response['response']['message']
-				: ($response['errorMessage'] ?? 'No message'));
+					? $response['response']['message']
+					: ($response['errorMessage'] ?? 'No message'));
 				return ['res' => $res, 'message' => $message];
 			}
 		} else {

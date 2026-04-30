@@ -110,7 +110,7 @@ function pdpShowWarning($pdpconnectfr)
 
 	$mysocCheck = $pdpconnectfr->validateMyCompanyConfiguration();
 	if ($mysocCheck['res'] <= 0) {
-		$ret .= '<div class="'.($mysocCheck['res'] < 0 ? 'error' : 'warning').'">';
+		$ret .= '<div class="' . ($mysocCheck['res'] < 0 ? 'error' : 'warning') . '">';
 		$ret .= $mysocCheck['message'];
 		$ret .= '<br><br>';
 		$ret .= $langs->trans("MyCompanyConfigurationWarning") . ': ';
@@ -120,7 +120,7 @@ function pdpShowWarning($pdpconnectfr)
 		$ret .= '</div>';
 	}
 
-	return ($ret ? $ret.'<br>' : '');
+	return ($ret ? $ret . '<br>' : '');
 }
 
 /**
@@ -168,5 +168,6 @@ function idprof($thirdparty)
  */
 function thirdpartyidprof($object)
 {
+	$object->fetch_thirdparty();
 	return idprof($object->thirdparty);
 }

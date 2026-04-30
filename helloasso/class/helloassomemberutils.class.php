@@ -142,7 +142,7 @@ class HelloAssoMemberUtils
 			}
 		}
 
-		//Error management with errorPosts 
+		//Error management with errorPosts
 		if (!empty($this->errorPosts)) {
 			foreach ($this->errorPosts as $key => $err) {
 				$firstname = $err["member"]->user->firstName;
@@ -207,7 +207,7 @@ class HelloAssoMemberUtils
 	/**
 	 * Post array $this->helloasso_members of HelloAsso Members to Dolibarr
 	 * @param   int        $dryrun    0 for normal run, 1 for dry run
-	 * 
+	 *
 	 * @return int >0 if OK, 0 if nothing to do, <0 if KO
 	 */
 	public function helloassoPostMembersToDolibarr($dryrun = 0)
@@ -326,7 +326,7 @@ class HelloAssoMemberUtils
 							$result = $member->update($user);
 							if ($result <= 0) {
 								$this->error = $member->error;
-								$this->errors = array_merge($member->errors,$this->errors);
+								$this->errors = array_merge($member->errors, $this->errors);
 								$error++;
 							}
 						}
@@ -339,7 +339,7 @@ class HelloAssoMemberUtils
 							$res = $member->fetch($memberid);
 							if ($res <= 0) {
 								$this->error = $member->error;
-								$this->errors = array_merge($member->errors,$this->errors);
+								$this->errors = array_merge($member->errors, $this->errors);
 								$error++;
 							}
 						}

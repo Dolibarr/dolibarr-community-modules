@@ -34,8 +34,8 @@ class XmlPatcher
 {
 
 	/**
-	* @var ZugferdDocumentBuilder
-	*/
+	 * @var ZugferdDocumentBuilder
+	 */
 	private $builder;
 
 	/**
@@ -288,7 +288,7 @@ class XmlPatcher
 				$dateStr  = $xpath->evaluate('string(ram:FormattedIssueDateTime/qdt:DateTimeString)', $refDoc);
 
 				$additionalRefDocs[] = [
-					'issuerAssignedId' => $id ?: null,
+					'IssuerAssignedID' => $id ?: null,
 					'typeCode'         => $typeCode ?: null,
 					'issueDate'        => $dateStr
 						? \DateTime::createFromFormat('Ymd', $dateStr)->format('Y-m-d')
