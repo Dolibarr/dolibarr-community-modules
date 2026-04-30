@@ -340,7 +340,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				$flowSyntax = 'Factur-X';
 				break;
 			case 'CII':
-				$suffix = '_EInvoice.xml';
+				$suffix = '_einvoice.xml';
 				$mime_type = 'application/xml';
 				$flowSyntax = 'CII';
 				break;

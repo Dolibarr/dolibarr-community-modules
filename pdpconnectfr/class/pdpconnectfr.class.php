@@ -1868,7 +1868,7 @@ function pdpSubmitAddRouting() {
 			}
 		}
 		if (getDolGlobalString('PDPCONNECTFR_PROTOCOL') == 'CII') {
-			$patheinvoice = $filedir . '/' . $filename . '_EInvoice.xml';
+			$patheinvoice = $filedir . '/' . $filename . '_einvoice.xml';
 			if (is_readable($patheinvoice)) {
 				$status['file'] = '1';
 				if ($status['code'] == self::STATUS_NOT_GENERATED) {

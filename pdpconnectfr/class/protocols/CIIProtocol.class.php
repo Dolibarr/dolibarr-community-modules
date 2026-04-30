@@ -823,7 +823,7 @@ class CIIProtocol extends AbstractProtocol
 		// Make a copy of the XML file in the final destination
 		$filename = dol_sanitizeFileName($invoice->ref);
 		$filedir = getMultidirOutput($invoice, '', 1);
-		$einvoice_path = $filedir . '/' . $filename . '_EInvoice.xml';
+		$einvoice_path = $filedir . '/' . $filename . '_einvoice.xml';
 		if (dol_copy($xmlfile, $einvoice_path)) {
 			dol_syslog(get_class($this) . "::generateInvoice copied XML file to " . $einvoice_path);
 		} else {
@@ -2970,7 +2970,7 @@ class CIIProtocol extends AbstractProtocol
 	 * @param string                $suffix          	Optional suffix for the saved file name
 	 * @return array{res:int, message:string}   		Returns array with 'res' (1 on success, -1 on error) and info 'message'
 	 */
-	private function _saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $filePath, $suffix = '')
+	private function _saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $filePath, $suffix = 'einvoice')
 	{
 		global $conf;
 
