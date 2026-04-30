@@ -127,25 +127,25 @@ if ($provider && $action == 'buildsamplesupplierinvoice') {
 	$sellerId = GETPOST('seller_id', 'alpha');
 	$buyerId = GETPOST('buyer_id', 'alpha');
 
-	if ((float) DOL_VERSION < 24.0) {
-		$resarray = $provider->exchangeProtocol->generateSampleInvoiceOld($pdpconnectfr);
-		$invoice_path = $resarray['path'];
-		$ref = $resarray['ref'];
+	if ($sellerId > 0) {
+		$thirdpartySeller = new Societe($db);
+		$thirdpartySeller->fetch($sellerId);
 	} else {
-		if ($sellerId > 0) {
-			$thirdpartySeller = new Societe($db);
-			$thirdpartySeller->fetch($sellerId);
-		} else {
-			$thirdpartySeller = null;
-		}
-		if ($buyerId > 0) {
-			$thirdpartyBuyer = new Societe($db);
-			$thirdpartyBuyer->fetch($buyerId);
-		} else {
-			$thirdpartyBuyer = $mysoc;
-		}
+		$thirdpartySeller = null;
+	}
+	if ($buyerId > 0) {
+		$thirdpartyBuyer = new Societe($db);
+		$thirdpartyBuyer->fetch($buyerId);
+	} else {
+		$thirdpartyBuyer = $mysoc;
+	}
 
-		$resarray = $provider->exchangeProtocol->generateSampleInvoice($pdpconnectfr, $thirdpartySeller, $thirdpartyBuyer);
+	$options = array('invoicetype' => GETPOSTINT('invoicetype'));
+
+	if ((float) DOL_VERSION < 24.0) {
+		$resarray = $provider->exchangeProtocol->generateSampleInvoiceOld($pdpconnectfr, $thirdpartySeller, $thirdpartyBuyer, $options);
+	} else {
+		$resarray = $provider->exchangeProtocol->generateSampleInvoice($pdpconnectfr, $thirdpartySeller, $thirdpartyBuyer, $options);
 	}
 
 	if (is_numeric($resarray) && $resarray < 0) {
@@ -210,6 +210,8 @@ print '</div>';
 
 print '<br>';
 
+
+// Tool to geenrate sample invoice
 if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 	$provider = $PDPManager->getProvider(getDolGlobalString('PDPCONNECTFR_PDP'));
 
@@ -218,6 +220,19 @@ if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 	print '<form action="'.$_SERVER["PHP_SELF"].'" method="POST">';
 	print '<input type="hidden" name="action" value="buildsamplesupplierinvoice">';
 	print '<input type="hidden" name="token" value="'.newToken().'">';
+
+	print '<span class="width100 inline-block">'.$langs->trans("InvoiceType").'</span> ';
+	if ((float) DOL_VERSION >= 24.0) {
+		$typeofinvoice = array(
+			Facture::TYPE_DEPOSIT => array('label' => $langs->trans('Deposit')),
+			Facture::TYPE_STANDARD => array('label' => $langs->trans('Standard')),
+			//Facture::TYPE_CREDIT_NOTE => array('label' => $langs->trans('CreditNote'), 'enabled' => false
+		);
+		print $form->selectarray('invoicetype', $typeofinvoice, Facture::TYPE_STANDARD);
+	} else {
+		print $langs->trans("Standard");
+	}
+	print '<br>';
 
 	print '<span class="width100 inline-block">'.$langs->trans("Seller").'</span> ';
 	//print '<input type="text" name="seller_einvoiceid" value="000000002" placeholder="Seller e-invoice ID (Usually SIREN)" class="minwidth150"><br>';

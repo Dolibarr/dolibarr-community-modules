@@ -1811,10 +1811,11 @@ class FacturXProtocol extends AbstractProtocol
 	 * @param	PdpConnectFr			$pdpconnectfr			PDPConnectFR
 	 * @param   Societe|null			$thirdpartySeller		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
 	 * @param   Societe|null			$thirdpartyBuyer		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
-	 * @throws  Exception
+	 * @param   array<string,mixed>		$options				More options
 	 * @return 	array<string,string> 							Path or content of the generated sample invoice.
+	 * @throws  Exception
 	 */
-	public function generateSampleInvoiceOld($pdpconnectfr, $thirdpartySeller = null, $thirdpartyBuyer = null)
+	public function generateSampleInvoiceOld($pdpconnectfr, $thirdpartySeller = null, $thirdpartyBuyer = null, $options = array())
 	{
 		global $conf, $langs, $mysoc;
 
@@ -1833,9 +1834,16 @@ class FacturXProtocol extends AbstractProtocol
 
 		$documentBuilder = ZugferdDocumentBuilder::createNew(ZugferdProfiles::PROFILE_EN16931);
 
+		$invoicetype = ZugferdInvoiceType::INVOICE;				// Type "Invoice" (BT-3)
+		if (!empty($options['invoicetype'])) {
+			if ($options['invoicetype'] == Facture::TYPE_CREDIT_NOTE) {
+				$invoicetype = ZugferdInvoiceType::CREDITNOTE;
+			}
+		}
+
 		$documentBuilder->setDocumentInformation(
 			'INV-TEST',                                     	// Invoice Number (BT-1)
-			ZugferdInvoiceType::INVOICE,                        // Type "Invoice" (BT-3)
+			$invoicetype,                        				// Type "Invoice" (BT-3)
 			DateTime::createFromFormat("Ymd", "20241231"),      // Invoice Date (BT-2)
 			ZugferdCurrencyCodes::EURO                          // Invoice currency is EUR (Euro) (BT-5)
 		);
@@ -2055,9 +2063,10 @@ class FacturXProtocol extends AbstractProtocol
 	 * @param	PdpConnectFr			$pdpconnectfr			PDPConnectFR
 	 * @param   Societe|null			$thirdpartySeller		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
 	 * @param   Societe|null			$thirdpartyBuyer		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
+	 * @param   array<string,mixed>		$options				More options
 	 * @return 	-1|array<string,string> 							Path or content of the generated sample invoice.
 	 */
-	public function generateSampleInvoice($pdpconnectfr, $thirdpartySeller = null, $thirdpartyBuyer = null)
+	public function generateSampleInvoice($pdpconnectfr, $thirdpartySeller = null, $thirdpartyBuyer = null, $options = array())
 	{
 		global $conf, $langs, $mysoc;
 
@@ -2070,6 +2079,9 @@ class FacturXProtocol extends AbstractProtocol
 		$tmpinvoice->initAsSpecimen('nolines');
 
 		$tmpinvoice->ref .= '-' . dol_print_date(dol_now(), '%Y%m%d-%H%M%S');
+		if (!empty($options['invoicetype'])) {
+			$tmpinvoice->type = $options['invoicetype'];
+		}
 
 		$line = new FactureLigne($this->db);
 		$line->desc = $langs->trans("Description") . " 1";
