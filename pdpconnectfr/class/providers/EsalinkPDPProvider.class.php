@@ -352,7 +352,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$invoice_path = $filedir . '/' . $filename . $suffix;
 
 		if (!file_exists($invoice_path)) {
-			$this->errors[] = "Electronic Invoice file not found" . "Expected path: " . $invoice_path;
+			$this->errors[] = "Electronic Invoice file not found";
 			return false;
 		}
 

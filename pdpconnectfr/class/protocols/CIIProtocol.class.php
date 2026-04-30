@@ -1862,7 +1862,7 @@ class CIIProtocol extends AbstractProtocol
 	 * @param array 		$invoiceData 	Header-level invoice data
 	 * @param array 		$linesData 		Array of line-level data arrays
 	 * @param string 		$profile 		Profile ('MINIMUM', 'BASICWL', 'BASIC', 'EN16931', 'EXTENDED')
-	 * 
+	 *
 	 * @return string Generated XML content
 	 */
 	public function buildXML(array $invoiceData, array $linesData, $profile = '')
