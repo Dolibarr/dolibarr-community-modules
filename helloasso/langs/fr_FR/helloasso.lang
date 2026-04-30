@@ -86,7 +86,7 @@ HelloAssoCustomFieldDictionaryRemovedSucesfully=Champ personnalisé supprimé av
 
 HelloAssoRecordNotFound=Enregistrement introuvable
 
-HelloAssoMembersNothingDone=%s Membre(s) traité(s), mais aucune action n'a été effectuée (simulation à blanc)
+HelloAssoMembersNothingDone=%s Membre(s) traité(s), mais aucune action n'a été effectuée (simulation à blanc). %s Membre(s) en erreur.
 HelloAssoMembersAddedSucessfully=%s Un ou plusieurs membres ont été ajoutés avec succès
 HelloAssoDolibarrCorrespondenceParameters=Paramètres de correspondance entre HelloAsso et Dolibarr
 HelloAssoFormParameters=BonjourAsso à partir des paramètres
@@ -128,3 +128,5 @@ HelloAssoMembershipStatus=Statut de membre
 HelloAssoMemberPaymentLabel=Paiement d'abonnement HelloAsso n°%s
 ErrorHelloAssoCode=Une erreur %s est survenue, vérifiez que les slugs, les noms de formulaires, et la clé sont valides dans la configuration du module HelloAsso
 ErrorHelloassoMissingFirstNameOrLastName=Une erreur s'est produite lors de la récupération des informations du membre : le prénom ou le nom de famille d'au moins un membre est manquant.
+ErrorHelloAssoMembershipPost=Une erreur s'est produite lors du traitement de l'enregistrement de la cotisation avec les informations %s et les erreurs %s.
+HelloAssoMembersError=%s cotisation(s) en erreur

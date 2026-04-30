@@ -86,7 +86,7 @@ HelloAssoCustomFieldDictionaryRemovedSucesfully=Custom Field removed successfull
 
 HelloAssoRecordNotFound=Record not found
 
-HelloAssoMembersNothingDone=%s Member(s) processed but nothing was done (Dry run)
+HelloAssoMembersNothingDone=%s Member(s) processed but nothing was done (Dry run). There was %s member(s) in error.
 HelloAssoMembersAddedSucessfully=%s Member(s) have been added successfully
 HelloAssoDolibarrCorrespondenceParameters=Correspondence parameters between HelloAsso and Dolibarr
 HelloAssoFormParameters=HelloAsso from parameters
@@ -127,4 +127,6 @@ LastRecordedToken=Last recorded token
 HelloAssoMembershipStatus=Membership status
 HelloAssoMemberPaymentLabel=HelloAsso subscription payment n°%s
 ErrorHelloAssoCode=A %s error has occurred. Please verify that the slugs, form names, and key are valid in the HelloAsso module configuration.
-ErrorHelloassoMissingFirstNameOrLastName=An error occurred while fetching the member's information, missing Firstname or Lastname for at least a member
+ErrorHelloassoMissingFirstNameOrLastName=An error occurred while fetching the member's information, missing Firstname or Lastname for at least a member.
+ErrorHelloAssoMembershipPost=An error occurred while processing the membership fee record with the information %s and the errors %s.
+HelloAssoMembersError=%s member(s) fee records are on error
