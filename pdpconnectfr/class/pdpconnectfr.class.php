@@ -170,10 +170,10 @@ class PdpConnectFr
 		self::STATUS_UNKNOWN             => 'EInvStatusUnknown',
 		self::STATUS_IGNORE              => 'EInvStatusDoNotSync',		// To exclude invoice from einvoice sync
 		self::STATUS_NOT_GENERATED       => 'EInvStatusNotGenerated',
+		self::STATUS_ERROR               => 'EInvStatusError',			// Error in generation by Dolibarr
 		self::STATUS_GENERATED           => 'EInvStatusGenerated',
 		self::STATUS_AWAITING_VALIDATION => 'EInvStatusAwaitingValidation',
 		self::STATUS_AWAITING_ACK        => 'EInvStatusAwaitingAck',
-		self::STATUS_ERROR               => 'EInvStatusError',
 
 		// PDP / PA
 		self::STATUS_DEPOSITED           => 'EInvStatus200Deposited',
@@ -186,9 +186,9 @@ class PdpConnectFr
 		self::STATUS_DISPUTED            => 'EInvStatus207Disputed',
 		self::STATUS_SUSPENDED           => 'EInvStatus208Suspended',
 		self::STATUS_COMPLETED           => 'EInvStatus209Completed',
-		self::STATUS_REFUSED             => 'EInvStatus210Refused',
 		self::STATUS_PAYMENT_SENT        => 'EInvStatus211PaymentTransmitted',
 		self::STATUS_PAID                => 'EInvStatus212Paid',
+		self::STATUS_REFUSED             => 'EInvStatus210Refused',
 		self::STATUS_REJECTED            => 'EInvStatus213Rejected',
 	];
 
@@ -471,8 +471,6 @@ class PdpConnectFr
 	 */
 	public function buildEInvoicePayloadFromInvoice($invoice): array
 	{
-		global $conf;
-
 		if (empty($invoice->id)) {
 			return array(
 				'payload' => array(),
@@ -546,7 +544,6 @@ class PdpConnectFr
 	 */
 	public function checkModulePrerequisites()
 	{
-
 		// Check if required module 'pdpconnectfr' is enabled
 		if (!isModEnabled("pdpconnectfr")) {
 			return -1;
@@ -607,18 +604,28 @@ class PdpConnectFr
 	 * @param int $onlyPdpStatuses 		If 1, only return PDP/PA statuses (exclude Dolibarr internal statuses)
 	 * @param int $onlySendable 		If 1, only return statuses that can be sent to Access Point (for example, exclude Access Point STATUS_ERROR)
 	 * @param int $onlyCreate			Keep only status used in create mode
+	 * @param int $onlyOut				Keep only status used for outgoing invoices
+	 * @param int $addseparator			If 1, add decorators like a separator after status when einvoice life cycle has not started.
 	 * @return array<int, string>		Array of status
 	 */
-	public function getEinvoiceStatusOptions($includeCodesInLabel = 0, $onlyPdpStatuses = 0, $onlySendable = 0, $onlyCreate = 0)
+	public function getEinvoiceStatusOptions($includeCodesInLabel = 0, $onlyPdpStatuses = 0, $onlySendable = 0, $onlyCreate = 0, $onlyOut = 0, $addseparator = 0)
 	{
 		global $langs;
 		$options = [];
 		foreach (self::STATUS_LABEL_KEYS as $code => $labelKey) {
+			if ($code == self::STATUS_GENERATED) {
+				$options['separator1'] = array('label' => '--------------------', 'disabled' => 1);
+			}
+
 			$value = $langs->trans($labelKey);
 			if ($includeCodesInLabel === 1) {
 				$value = '(' . $code . ') ' . $value;
 			}
 			$options[$code] = $value;
+
+			if ($code == self::STATUS_PAID) {
+				$options['separator2'] = array('label' => '--------------------', 'disabled' => 1);
+			}
 		}
 
 		if ($onlyPdpStatuses || $onlySendable) {
@@ -631,7 +638,7 @@ class PdpConnectFr
 			unset($options[self::STATUS_GENERATED]);
 			unset($options[self::STATUS_AWAITING_VALIDATION]);
 			unset($options[self::STATUS_AWAITING_ACK]);
-			unset($options[self::STATUS_ERROR]);
+			unset($options[self::STATUS_ERROR]);					// Error in generation by Dolibarr
 		}
 
 		if ($onlySendable || $onlyCreate) {
@@ -650,6 +657,10 @@ class PdpConnectFr
 			unset($options[self::STATUS_PARTIALLY_APPROVED]);
 			unset($options[self::STATUS_SUSPENDED]);
 			unset($options[self::STATUS_PAYMENT_SENT]);
+		}
+
+		if ($onlyOut) {
+			unset($options[self::STATUS_AVAILABLE]);
 		}
 
 		if ($onlyCreate) {
@@ -716,6 +727,7 @@ class PdpConnectFr
 				if ($mysoc->country_code == 'FR') {
 					// Get seller Einvoice ID
 					$provider = getDolGlobalString('PDPCONNECTFR_PDP');
+
 					$uriConf = 'PDPCONNECTFR_' . strtoupper($provider) . '_ROUTING_ID';
 					$einvoiceid = getDolGlobalString($uriConf);
 					if (!preg_match('/^'.preg_replace('/\s+/', '', $mysoc->idprof1).'/', $this->removeSpaces($einvoiceid))) {
@@ -785,14 +797,14 @@ class PdpConnectFr
 			$idprof1 = preg_replace('/\s+/', '', (string) $thirdparty->idprof1);
 			if (strlen($idprof1) === 14) {
 				if (!isValidSiret($idprof1)) {
-					$baseErrors[] = $langs->trans("FxCheckErrorCustomerSIRETFormat");
+					$baseWarnings[] = $langs->trans("FxCheckErrorCustomerSIRETFormat");
 				}
 			} elseif (strlen($idprof1) === 9) {
 				if (!isValidSiren($idprof1)) {
-					$baseErrors[] = $langs->trans("FxCheckErrorCustomerSIRENFormat");
+					$baseWarnings[] = $langs->trans("FxCheckErrorCustomerSIRENFormat");
 				}
 			} else {
-				$baseErrors[] = $langs->trans("FxCheckErrorCustomerSIRETLength");
+				$baseWarnings[] = $langs->trans("FxCheckErrorCustomerSIRETLength");
 			}
 		}
 		// if (empty($thirdparty->idprof2)) {
@@ -866,8 +878,6 @@ class PdpConnectFr
 	public function validateChorusInformations($object)
 	{
 		// TODO add a field into pdpconnectfr_extlinks table to define if this invoice is for chorus or not and all chorus specific fields and then replace use of extrafields
-		global $langs, $mysoc;
-
 		$res = 1;
 		$message = '';
 		$baseErrors = [];
@@ -1107,7 +1117,8 @@ class PdpConnectFr
 			$expand_display = true; // We force group to be shown expanded
 			$disabledcookiewrite = 1; // We keep status of group unchanged into the cookie
 		}
-		$resprints .= '<script nonce="" type="text/javascript">
+		$resprints .= '<!-- EInvoiceCardBlock -->
+			<script nonce="" type="text/javascript">
 			jQuery(document).ready(function() {';
 		if (empty($disabledcookiewrite)) {
 			if (!$expand_display) {
@@ -1198,6 +1209,49 @@ class PdpConnectFr
 		}
 		$resprints .= '</td>';
 		$resprints .= '</tr>';
+
+		// Invoice-level routing ID override (BT-49)
+		if ($object->element == 'facture' || $object->element == 'invoice') {
+			$currentOverrideRouting = $currentStatusInfo['override_routing_id'] ?? '';
+			$allRoutings = $this->fetchAllRoutings($object->socid);
+			if (is_array($allRoutings) && count($allRoutings) >= 1) {
+				$resprints .= '<tr class="trpdpconnect_collapseseparator">';
+				$resprints .= '<td>';
+				$resprints .= $form->editfieldkey($langs->trans("InvoiceRoutingOverride"), 'override_routing_id', '', $object, (int) $editenable);
+				$resprints .= '</td>';
+				$resprints .= '<td>';
+				if ($action == 'editoverride_routing_id') {
+					$resprints .= '<form name="setoverrriderouting" action="' . $_SERVER["PHP_SELF"] . '?id=' . $object->id . '" method="post">';
+					$resprints .= '<input type="hidden" name="token" value="' . newToken() . '">';
+					$resprints .= '<input type="hidden" name="action" value="setoverriderouting">';
+					$resprints .= '<input type="hidden" name="page_y" value="page_y">';
+
+					// Build select options: first option = thirdparty default (empty = no override)
+					$selectOptions = array('' => $langs->trans("InvoiceRoutingOverrideDefault"));
+					foreach ($allRoutings as $r) {
+						$label = $r['routing_id'];
+						if ($r['is_default']) {
+							$label .= ' (' . $langs->trans("Default") . ')';
+						}
+						if (!empty($r['info'])) {
+							$label .= ' — ' . $r['info'];
+						}
+						$selectOptions[$r['routing_id']] = $label;
+					}
+					$resprints .= $form->selectarray('override_routing_id', $selectOptions, $currentOverrideRouting, 0, 0, 0, '', 1);
+					$resprints .= '<input type="submit" class="button button-edit smallpaddingimp reposition" value="' . $langs->trans('Modify') . '">';
+					$resprints .= '</form>';
+				} else {
+					if (!empty($currentOverrideRouting)) {
+						$resprints .= dol_escape_htmltag($currentOverrideRouting);
+					} else {
+						$resprints .= '<span class="opacitymedium">' . $langs->trans("InvoiceRoutingOverrideDefault") . '</span>';
+					}
+				}
+				$resprints .= '</td>';
+				$resprints .= '</tr>';
+			}
+		}
 
 		// If current status requires a reason, display it
 		if (!empty($currentStatusInfo['reasonCode'])) {
@@ -1323,7 +1377,7 @@ class PdpConnectFr
 			$expand_display = true;	// We force group to be shown expanded
 			$disabledcookiewrite = 1; // We keep status of group unchanged into the cookie
 		}
-			$resprints .= '
+			$resprints .= '<!-- supplierInvoiceCardBlock -->
             <script nonce="" type="text/javascript">
 			jQuery(document).ready(function() {';
 		if (empty($disabledcookiewrite)) {
@@ -1508,7 +1562,7 @@ class PdpConnectFr
 	 */
 	public function thirdpartyCardBlock($object, $mode = '')
 	{
-		global $langs;
+		global $langs, $form;
 
 		$resprints = '';
 
@@ -1522,7 +1576,8 @@ class PdpConnectFr
 			$expand_display = true;	// We force group to be shown expanded
 			$disabledcookiewrite = 1; // We keep status of group unchanged into the cookie
 		}
-		$resprints .= '
+
+		$resprints .= '<!-- thirdpartyCardBlockfor objec->element = '.$object->element.' -->
         <script nonce="" type="text/javascript">
         jQuery(document).ready(function() {';
 		if (empty($disabledcookiewrite)) {
@@ -1556,18 +1611,36 @@ class PdpConnectFr
 		$resprints .= '</tr>';
 
 
-		// Fetch routing_id
+		// Fetch routing_id and optional default product for import
 		$routing_id = '';
-		$resFetch = $this->fetchDefaultRouting($object->id);
-		if ($resFetch > 0) {
+		$product_id = 0;
+		$resFetch = $this->fetchDefaultRouting($object->id, 'thirdparty');
+		if ($resFetch !== false && $resFetch !== 0 && $resFetch !== '0') {
 			$routing_id = $resFetch;
 		}
+		$resFetchP = $this->fetchDefaultRouting($object->id, 'product');
+		if ($resFetchP > 0) {
+			$product_id = (int) $resFetchP;
+		}
+
+		// In create/edit mode, keep simple text fields (thirdparty not yet saved, no routing rows exist)
 		if ($mode == 'create' || $mode == 'edit') {
 			$resprints .= '<tr class="trpdpconnect_collapseseparator">';
 			$resprints .= '<td class="">' . $langs->trans("RoutingIdField") . '</td>';
 			$resprints .= '<td>';
 			$resprints .= '<input type="text" name="routing_id" ';
-			$resprints .= 'value="' . dol_escape_htmltag($routing_id ?? '') . '" ';
+			$resprints .= 'value="' . dolPrintHTML($routing_id ?? '') . '" ';
+			$resprints .= 'class="flat minwidth300" />';
+			$resprints .= '</td>';
+			$resprints .= '</tr>';
+
+			// Add a line for the Default product for thirdparty (to use when importing vendor invoice and no product found)
+			$resprints .= '<tr class="trpdpconnect_collapseseparator">';
+			$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
+			$resprints .= '<td>';
+			// TODO Use a combo list of products
+			$resprints .= '<input type="text" name="routing_product_id" ';
+			$resprints .= 'value="' . dolPrintHTML($product_id ?? '') . '" ';
 			$resprints .= 'class="flat minwidth300" />';
 			$resprints .= '</td>';
 			$resprints .= '</tr>';
@@ -1583,16 +1656,94 @@ class PdpConnectFr
 		$resql = $this->db->query($sql);
 		if ($resql && $this->db->num_rows($resql) > 0) {
 			$obj = $this->db->fetch_object($resql);
-			// Add block only for imported invoices
 			$resprints .= '<tr class="trpdpconnect_collapseseparator">';
 			$resprints .= '<td>' . $langs->trans("pdpconnectfrSourceTitle") . '</td>';
-			$resprints .= '<td>' . $obj->provider . '</td>';
+			$resprints .= '<td>' . dolPrintHTML($obj->provider) . '</td>';
 			$resprints .= '</tr>';
 		}
 
+		// Routing list management block (view mode)
+		$allRoutings = $this->fetchAllRoutings($object->id);
+		if (!is_array($allRoutings)) {
+			$allRoutings = array();
+		}
+
 		$resprints .= '<tr class="trpdpconnect_collapseseparator">';
-		$resprints .= '<td>' . $langs->trans("RoutingIdField") . '</td>';
-		$resprints .= '<td>' . dol_escape_htmltag($routing_id ?? '') . '</td>';
+		$resprints .= '<td class="tdtop">' . $langs->trans("RoutingIdField") . '</td>';
+		$resprints .= '<td>';
+
+		// Existing routing list
+		if (!empty($allRoutings)) {
+			$resprints .= '<table class="nobordernopadding" style="width:100%">';
+			foreach ($allRoutings as $r) {
+				$resprints .= '<tr>';
+				$resprints .= '<td>' . dol_escape_htmltag($r['routing_id']);
+				if ($r['is_default']) {
+					$resprints .= ' <span class="badge badge-status4 badge-status">' . $langs->trans("Default") . '</span>';
+				}
+				if (!empty($r['info'])) {
+					$resprints .= ' <span class="opacitymedium small"> — ' . dol_escape_htmltag($r['info']) . '</span>';
+				}
+				$resprints .= '</td>';
+				$resprints .= '<td class="right nowraponall">';
+				if (!$r['is_default']) {
+					$resprints .= '<a class="reposition paddingrightonly" href="' . $_SERVER["PHP_SELF"] . '?id=' . $object->id . '&action=pdp_setdefaultrouting&routing_rowid=' . $r['rowid'] . '&token=' . newToken() . '">';
+					$resprints .= '<i class="fas fa-star" title="' . $langs->trans("SetAsDefault") . '"></i>';
+					$resprints .= '</a>';
+				}
+				$resprints .= '<a class="reposition paddingrightonly" href="' . $_SERVER["PHP_SELF"] . '?id=' . $object->id . '&action=pdp_deleterouting&routing_rowid=' . $r['rowid'] . '&token=' . newToken() . '">';
+				$resprints .= '<i class="fas fa-trash" title="' . $langs->trans("Delete") . '"></i>';
+				$resprints .= '</a>';
+				$resprints .= '</td>';
+				$resprints .= '</tr>';
+			}
+			$resprints .= '</table>';
+		} else {
+			$resprints .= '<span class="opacitymedium">' . $langs->trans("None") . '</span>';
+		}
+
+		// Add new routing — use a JS-submitted form appended to body to avoid nested form issue
+		$addToken = newToken();
+		$addUrl   = dol_escape_js($_SERVER["PHP_SELF"] . '?id=' . $object->id);
+		$resprints .= '<div style="margin-top:6px">';
+		$resprints .= '<input type="text" id="pdp_new_routing_id" placeholder="' . dol_escape_htmltag($langs->trans("RoutingIdField")) . '" class="flat minwidth200">';
+		$resprints .= ' <input type="text" id="pdp_new_routing_info" placeholder="' . dol_escape_htmltag($langs->trans("RoutingIdInfo")) . '" class="flat minwidth150">';
+		$resprints .= ' <button type="button" class="button smallpaddingimp" onclick="pdpSubmitAddRouting()">' . $langs->trans("Add") . '</button>';
+		$resprints .= '</div>';
+		$resprints .= '<script>
+function pdpSubmitAddRouting() {
+	var f = document.createElement("form");
+	f.method = "post";
+	f.action = "' . $addUrl . '";
+	var fields = {
+		token: "' . dol_escape_js($addToken) . '",
+		action: "pdp_addrouting",
+		new_routing_id: document.getElementById("pdp_new_routing_id").value,
+		new_routing_info: document.getElementById("pdp_new_routing_info").value
+	};
+	for (var k in fields) {
+		var i = document.createElement("input");
+		i.type = "hidden"; i.name = k; i.value = fields[k];
+		f.appendChild(i);
+	}
+	document.body.appendChild(f);
+	f.submit();
+}
+</script>';
+
+		$resprints .= '</td>';
+		$resprints .= '</tr>';
+
+		// Default product for import (upstream addition)
+		$resprints .= '<tr class="trpdpconnect_collapseseparator">';
+		$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
+		$resprints .= '<td>';
+		if ($product_id > 0) {
+			$tmpproduct = new Product($this->db);
+			$tmpproduct->fetch($product_id);
+			$resprints .= $tmpproduct->getNomUrl(1);
+		}
+		$resprints .= '</td>';
 		$resprints .= '</tr>';
 
 		return $resprints;
@@ -1620,6 +1771,8 @@ class PdpConnectFr
 		if ($resql && $this->db->num_rows($resql) > 0) {
 			$obj = $this->db->fetch_object($resql);
 			// Add block only for imported invoices
+			$resprints .= '<!-- productServiceCardBlock -->'."\n";
+
 			$resprints .= '<tr>';
 			$resprints .= '<td>' . $langs->trans("pdpconnectfrSourceTitle") . '</td>';
 			$resprints .= '<td>' . $obj->provider . '</td>';
@@ -1641,12 +1794,12 @@ class PdpConnectFr
 		global $conf;
 
 		// Default status is unknown until invoice is validated
-		$status = array('code' => self::STATUS_UNKNOWN, 'status' => $this->getStatusLabel(self::STATUS_UNKNOWN), 'info' => '', 'file' => '0', 'transmitted' => 0);
+		$status = array('code' => self::STATUS_UNKNOWN, 'status' => $this->getStatusLabel(self::STATUS_UNKNOWN), 'info' => '', 'file' => '0', 'transmitted' => 0, 'override_routing_id' => '');
 
 		$provider = getDolGlobalString('PDPCONNECTFR_PDP');
 
 		// Get last status from pdpconnectfr_extlinks table (table contain dolibarr object received or sent to PDP)
-		$sql = "SELECT syncstatus, synccomment"; // Validation message of einvoice sent.
+		$sql = "SELECT syncstatus, synccomment, override_routing_id"; // Validation message of einvoice sent.
 		$sql .= " FROM ".MAIN_DB_PREFIX."pdpconnectfr_extlinks";
 		$sql .= " WHERE element_type = '".$this->db->escape('facture')."'";
 		$sql .= " AND provider = '".$this->db->escape($provider)."'";
@@ -1663,6 +1816,7 @@ class PdpConnectFr
 				$status['code'] = (int) $obj->syncstatus;
 				$status['status'] = $this->getStatusLabel((int) $obj->syncstatus);
 				$status['info'] = $obj->synccomment ?? '';
+				$status['override_routing_id'] = $obj->override_routing_id ?? '';
 				if (!in_array((int) $obj->syncstatus, array(self::STATUS_UNKNOWN, self::STATUS_IGNORE, self::STATUS_NOT_GENERATED, self::STATUS_GENERATED))) {
 					$status['transmitted'] = 1;
 				} else {
@@ -1712,19 +1866,25 @@ class PdpConnectFr
 	/**
 	 * Insert or update external link record
 	 *
-	 * @param int       $elementId      Linked Element ID
-	 * @param string    $elementType    Linked Element type
-	 * @param string    $flowId         Flow ID
-	 * @param int       $syncStatus     If the object has a status into the einvoice external system
-	 * @param string    $syncRef        If the object has a given reference into the einvoice external system
-	 * @param string    $syncComment    If we want to store a message for the last sync action try
-	 * @return int -1 on error, rowid on success
+	 * @param int       $elementId      	Linked Element ID
+	 * @param string    $elementType    	Linked Element type
+	 * @param string    $flowId         	Flow ID
+	 * @param int       $syncStatus     	If the object has a status into the einvoice external system
+	 * @param string    $syncRef        	If the object has a given reference into the einvoice external system
+	 * @param string    $syncComment    	If we want to store a message for the last sync action try
+	 * @param string    $overrideRoutingId	Forced routing ID
+	 * @return int 							-1 on error, 0 if nothing done, rowid on success
 	 */
-	public function insertOrUpdateExtLink($elementId, $elementType, $flowId = '', $syncStatus = 0, $syncRef = '', $syncComment = '')
+	public function insertOrUpdateExtLink($elementId, $elementType, $flowId = '', $syncStatus = 0, $syncRef = '', $syncComment = '', $overrideRoutingId = null)
 	{
 		global $db, $user;
 
 		$provider = getDolGlobalString('PDPCONNECTFR_PDP');
+
+		if (empty($provider) || $provider === '-1') {
+			dol_syslog("Error: E-invoice Access Point is not defined");
+			return 0;
+		}
 
 		// Check if record exists
 		$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "pdpconnectfr_extlinks";
@@ -1750,6 +1910,10 @@ class PdpConnectFr
 			if (!empty($flowId)) {
 				$sql .= ", flow_id = '" . $db->escape($flowId) . "'";
 			}
+			// Update override_routing_id only when explicitly provided (not null)
+			if ($overrideRoutingId !== null) {
+				$sql .= ", override_routing_id = " . ($overrideRoutingId !== '' ? "'" . $db->escape($overrideRoutingId) . "'" : "NULL");
+			}
 			$sql .= ", fk_user_modif = " . (int) $user->id;
 			$sql .= " WHERE element_id = " . (int) $elementId;
 			$sql .= " AND element_type = '" . $db->escape($elementType) . "'";
@@ -1757,12 +1921,13 @@ class PdpConnectFr
 		} else {
 			// Insert new record
 			$sql = "INSERT INTO " . MAIN_DB_PREFIX . "pdpconnectfr_extlinks";
-			$sql .= " (element_id, element_type, provider, date_creation, fk_user_creat, syncstatus, syncref, synccomment, flow_id)";
+			$sql .= " (element_id, element_type, provider, date_creation, fk_user_creat, syncstatus, syncref, synccomment, flow_id, override_routing_id)";
 			$sql .= " VALUES (" . (int) $elementId . ", '" . $db->escape($elementType) . "', '" . $db->escape($provider) . "'";
 			$sql .= ", NOW(), " . (int) $user->id . ", " . (int) $syncStatus;
 			$sql .= ", " . ($syncRef ? "'" . $db->escape($syncRef) . "'" : "NULL");
 			$sql .= ", " . ($syncComment ? "'" . $db->escape($syncComment) . "'" : "NULL");
-			$sql .= ", " . ($flowId ? "'" . $db->escape($flowId) . "'" : "NULL") . ")";
+			$sql .= ", " . ($flowId ? "'" . $db->escape($flowId) . "'" : "NULL");
+			$sql .= ", " . ($overrideRoutingId !== null && $overrideRoutingId !== '' ? "'" . $db->escape($overrideRoutingId) . "'" : "NULL") . ")";
 		}
 
 		$resql = $db->query($sql);
@@ -1787,15 +1952,15 @@ class PdpConnectFr
 	 * - Multiple concurrent routings per thirdparty
 	 * - Switching default routing without deletion
 	 *
-	 * @param int    $fk_soc   		Thirdparty ID
-	 * @param string $routing_id	Routing ID
-	 * @param string $source		Source
-	 * @param string $info			Info
-	 * @param string $syncflowid	Flow ID
-	 *
-	 * @return int Rowid on success, -1 on error
+	 * @param 	int    $fk_soc   		Thirdparty ID
+	 * @param 	string $routing_id		Routing ID
+	 * @param 	string $source			Source
+	 * @param 	string $info			Info
+	 * @param 	string $syncflowid		Flow ID
+	 * @param 	string $routing_type	Routing type ('thirdparty' to get the routing ID for a thirdparty when exporting invoice, 'product' to get internal ID of product to use as default product on invoice import)
+	 * @return	int						Rowid on success, -1 on error
 	 */
-	public function setDefaultRouting($fk_soc, $routing_id, $source = '', $info = '', $syncflowid = '')
+	public function setDefaultRouting($fk_soc, $routing_id, $source = '', $info = '', $syncflowid = '', $routing_type = 'thirdparty')
 	{
 		global $db, $user;
 
@@ -1804,6 +1969,7 @@ class PdpConnectFr
 		// Delete existing routing(s) for this thirdparty (1→1 logic)
 		$sql = "DELETE FROM " . MAIN_DB_PREFIX . "pdpconnectfr_routing";
 		$sql .= " WHERE fk_soc = " . (int) $fk_soc;
+		$sql .= " AND routing_type = '".$db->escape($routing_type)."'";
 
 		if (!$db->query($sql)) {
 			$db->rollback();
@@ -1819,14 +1985,15 @@ class PdpConnectFr
 
 		// Insert new default routing
 		$sql = "INSERT INTO " . MAIN_DB_PREFIX . "pdpconnectfr_routing (";
-		$sql .= "fk_soc, source, routing_id, info, syncflowid, active, is_default, date_creation, fk_user_creat";
+		$sql .= "fk_soc, source, routing_id, info, syncflowid, active, is_default, date_creation, fk_user_creat, routing_type";
 		$sql .= ") VALUES (";
 		$sql .= (int) $fk_soc . ", ";
 		$sql .= "'" . $db->escape($source) . "', ";
 		$sql .= "'" . $db->escape($routing_id) . "', ";
 		$sql .= ($info !== '' ? "'" . $db->escape($info) . "'" : "NULL") . ", ";
 		$sql .= ($syncflowid !== '' ? "'" . $db->escape($syncflowid) . "'" : "NULL") . ", ";
-		$sql .= "1, 1, NOW(), " . (int) $user->id;
+		$sql .= "1, 1, NOW(), " . (int) $user->id.", ";
+		$sql .= "'" . $db->escape($routing_type) . "'";
 		$sql .= ")";
 
 		if (!$db->query($sql)) {
@@ -1844,18 +2011,152 @@ class PdpConnectFr
 
 
 	/**
+	 * Add a new routing entry for a thirdparty.
+	 * If no routing exists yet, the new entry is automatically set as default.
+	 *
+	 * @param  int    $fk_soc     Thirdparty ID
+	 * @param  string $routing_id Routing ID value
+	 * @param  string $info       Optional label/comment
+	 * @return int    Rowid on success, -1 on error
+	 */
+	public function addRouting($fk_soc, $routing_id, $info = '')
+	{
+		global $db, $user;
+
+		if (empty($routing_id)) {
+			return -1;
+		}
+
+		$db->begin();
+
+		// Determine if this will be the first routing (auto-default)
+		$sql = "SELECT COUNT(*) AS cnt FROM " . MAIN_DB_PREFIX . "pdpconnectfr_routing";
+		$sql .= " WHERE fk_soc = " . (int) $fk_soc . " AND active = 1";
+		$resql = $db->query($sql);
+		if (!$resql) {
+			$db->rollback();
+			return -1;
+		}
+		$obj = $db->fetch_object($resql);
+		$isDefault = ($obj->cnt == 0) ? 1 : 0;
+
+		$sql = "INSERT INTO " . MAIN_DB_PREFIX . "pdpconnectfr_routing (";
+		$sql .= "fk_soc, source, routing_id, info, active, is_default, date_creation, fk_user_creat";
+		$sql .= ") VALUES (";
+		$sql .= (int) $fk_soc . ", 'manual', ";
+		$sql .= "'" . $db->escape($routing_id) . "', ";
+		$sql .= ($info !== '' ? "'" . $db->escape($info) . "'" : "NULL") . ", ";
+		$sql .= "1, " . $isDefault . ", NOW(), " . (int) $user->id;
+		$sql .= ")";
+
+		if (!$db->query($sql)) {
+			$db->rollback();
+			dol_syslog(__METHOD__ . ' Insert error: ' . $db->lasterror(), LOG_ERR);
+			return -1;
+		}
+
+		$rowid = (int) $db->last_insert_id(MAIN_DB_PREFIX . 'pdpconnectfr_routing');
+		$db->commit();
+
+		return $rowid;
+	}
+
+	/**
+	 * Delete a routing entry by rowid.
+	 * If the deleted entry was the default, the oldest remaining entry becomes the new default.
+	 *
+	 * @param  int  $rowid    Routing rowid to delete
+	 * @param  int  $fk_soc   Thirdparty ID (used to reassign default if needed)
+	 * @return int  1 on success, -1 on error
+	 */
+	public function deleteRouting($rowid, $fk_soc)
+	{
+		global $db;
+
+		$db->begin();
+
+		// Check if this entry was the default
+		$sql = "SELECT is_default FROM " . MAIN_DB_PREFIX . "pdpconnectfr_routing";
+		$sql .= " WHERE rowid = " . (int) $rowid;
+		$resql = $db->query($sql);
+		if (!$resql) {
+			$db->rollback();
+			return -1;
+		}
+		$obj = $db->fetch_object($resql);
+		$wasDefault = $obj ? (int) $obj->is_default : 0;
+
+		$sql = "DELETE FROM " . MAIN_DB_PREFIX . "pdpconnectfr_routing WHERE rowid = " . (int) $rowid;
+		if (!$db->query($sql)) {
+			$db->rollback();
+			dol_syslog(__METHOD__ . ' Delete error: ' . $db->lasterror(), LOG_ERR);
+			return -1;
+		}
+
+		// Reassign default to oldest remaining entry if needed
+		if ($wasDefault) {
+			$sql = "UPDATE " . MAIN_DB_PREFIX . "pdpconnectfr_routing";
+			$sql .= " SET is_default = 1";
+			$sql .= " WHERE fk_soc = " . (int) $fk_soc . " AND active = 1";
+			$sql .= " ORDER BY rowid ASC LIMIT 1";
+			$db->query($sql); // Non-blocking: if no rows remain, nothing to reassign
+		}
+
+		$db->commit();
+
+		return 1;
+	}
+
+	/**
+	 * Set a routing entry as the default for a thirdparty.
+	 * Clears is_default on all other entries for the same thirdparty.
+	 *
+	 * @param  int  $rowid    Routing rowid to set as default
+	 * @param  int  $fk_soc   Thirdparty ID
+	 * @return int  1 on success, -1 on error
+	 */
+	public function setRoutingAsDefault($rowid, $fk_soc)
+	{
+		global $db;
+
+		$db->begin();
+
+		// Clear default on all entries for this thirdparty
+		$sql = "UPDATE " . MAIN_DB_PREFIX . "pdpconnectfr_routing";
+		$sql .= " SET is_default = 0 WHERE fk_soc = " . (int) $fk_soc;
+		if (!$db->query($sql)) {
+			$db->rollback();
+			return -1;
+		}
+
+		// Set new default
+		$sql = "UPDATE " . MAIN_DB_PREFIX . "pdpconnectfr_routing";
+		$sql .= " SET is_default = 1 WHERE rowid = " . (int) $rowid;
+		if (!$db->query($sql)) {
+			$db->rollback();
+			return -1;
+		}
+
+		$db->commit();
+
+		return 1;
+	}
+
+	/**
 	 * Fetch default routing for a thirdparty
 	 *
-	 * @param int $fk_soc   Thirdparty ID
-	 * @return string|int   Routing ID string if found, 0 if not found, -1 if error
+	 * @param 	int 		$fk_soc   		Thirdparty ID
+	 * @param 	string 		$routing_type	Routing type ('thirdparty' to get the routing ID for a thirdparty when exporting invoice, 'product' to get internal ID of product to use as default product on invoice import)
+	 * @return 	string|int   				Routing ID string if found, 0 if not found, -1 if error
 	 */
-	public function fetchDefaultRouting($fk_soc)
+	public function fetchDefaultRouting($fk_soc, $routing_type = 'thirdparty')
 	{
 		global $db;
 
 		$sql = "SELECT rowid, fk_soc, source, routing_id, info, syncflowid";
 		$sql .= " FROM " . MAIN_DB_PREFIX . "pdpconnectfr_routing";
 		$sql .= " WHERE fk_soc = " . (int) $fk_soc;
+		$sql .= " AND routing_type = '".$db->escape($routing_type)."'";
 		$sql .= " AND active = 1";
 		$sql .= " AND is_default = 1";
 		$sql .= " LIMIT 1";
@@ -1872,7 +2173,44 @@ class PdpConnectFr
 
 		$obj = $db->fetch_object($resql);
 
-		return $obj->routing_id;
+		return (string) $obj->routing_id;
+	}
+
+
+	/**
+	 * Fetch all active routings for a thirdparty
+	 *
+	 * @param  int    $fk_soc   Thirdparty ID
+	 * @return array            Array of routing rows (assoc), empty array if none, -1 if error
+	 */
+	public function fetchAllRoutings($fk_soc)
+	{
+		global $db;
+
+		$sql = "SELECT rowid, routing_id, source, info, is_default";
+		$sql .= " FROM " . MAIN_DB_PREFIX . "pdpconnectfr_routing";
+		$sql .= " WHERE fk_soc = " . (int) $fk_soc;
+		$sql .= " AND active = 1";
+		$sql .= " ORDER BY is_default DESC, rowid ASC";
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . ' SQL error: ' . $db->lasterror(), LOG_ERR);
+			return -1;
+		}
+
+		$routings = array();
+		while ($obj = $db->fetch_object($resql)) {
+			$routings[] = array(
+				'rowid'      => (int) $obj->rowid,
+				'routing_id' => $obj->routing_id,
+				'source'     => $obj->source,
+				'info'       => $obj->info,
+				'is_default' => (int) $obj->is_default,
+			);
+		}
+
+		return $routings;
 	}
 
 
@@ -1901,6 +2239,12 @@ class PdpConnectFr
 		global $db, $user;
 
 		$provider = getDolGlobalString('PDPCONNECTFR_PDP');
+
+		if (empty($provider) || $provider === '-1') {
+			dol_syslog("Error: E-invoice Access Point is not defined");
+			return 0;
+		}
+
 		$date_creation = $date_creation ? $db->idate($date_creation) : $db->idate(dol_now());
 
 		$sql = "INSERT INTO " . MAIN_DB_PREFIX . "pdpconnectfr_lifecycle_msg (";
@@ -2056,7 +2400,7 @@ class PdpConnectFr
 	 * @param 	Object	$object		Object
 	 * @param 	string 	$status     Status
 	 * @param	string	$comment	Comment
-	 * @return 	int 				Rowid on success, -1 on error
+	 * @return 	int 				Rowid on success, 0 if nothing done, -1 on error
 	 */
 	public function setEInvoiceStatus($object, $status, $comment)
 	{
@@ -2126,6 +2470,12 @@ class PdpConnectFr
 
 		// Get seller Einvoice ID
 		$provider = getDolGlobalString('PDPCONNECTFR_PDP');
+
+		if (empty($provider) || $provider === '-1') {
+			dol_syslog("Error: E-invoice Access Point is not defined");
+			return '';
+		}
+
 		$uriConf = 'PDPCONNECTFR_' . strtoupper($provider) . '_ROUTING_ID';
 		$einvoiceid = getDolGlobalString($uriConf);
 
@@ -2153,12 +2503,23 @@ class PdpConnectFr
 	/**
 	* Get buyer communication URI
 	*
-	* @param  Societe 	$thirdparty		Third party
+	* @param  Societe 		$thirdparty		Third party
+	* @param  Facture|null	$invoice		Invoice
 	* @return string
 	*/
-	public function getBuyerCommunicationURI($thirdparty)
+	public function getBuyerCommunicationURI($thirdparty, $invoice = null)
 	{
 		$uri = '';
+
+		// If an invoice is provided, check for an invoice-level routing override first
+		if ($invoice !== null && !empty($invoice->id)) {
+			$statusInfo = $this->fetchLastknownInvoiceStatus($invoice->id, $invoice->ref);
+			if (!empty($statusInfo['override_routing_id'])) {
+				return $this->removeSpaces($statusInfo['override_routing_id']);
+			}
+		}
+
+		// Fall back to thirdparty default routing
 		$resFetch = $this->fetchDefaultRouting($thirdparty->id);
 		if ($resFetch > 0) {
 			$uri = $resFetch;

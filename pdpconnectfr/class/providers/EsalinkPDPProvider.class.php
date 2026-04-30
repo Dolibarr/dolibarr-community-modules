@@ -120,7 +120,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			$this->helpToGetCredentials = '<div class="green greenborder">';
 			$this->helpToGetCredentials .= '<center>';
 			$this->helpToGetCredentials .= $langs->trans("YourSoftwareSeemsConnectedWith", strtoupper($this->name));
-			$this->helpToGetCredentials .= '<br><br>'.img_picto('', 'url', 'class="pictofixedwidth"').'<a href="'.$_SERVER["PHP_SELF"].'?action=delete'.$prefix."TOKEN&token=".newToken().'">'.$langs->trans("ClickHereToRemoveConnection").'</a>';
+			$this->helpToGetCredentials .= '<br><br>'.img_picto('', 'delete', 'class="pictofixedwidth"').'<a href="'.$_SERVER["PHP_SELF"].'?action=delete'.$prefix."TOKEN&token=".newToken().'">'.$langs->trans("ClickHereToRemoveConnection").'</a>';
 			$this->helpToGetCredentials .= '</center>';
 			$this->helpToGetCredentials .= '</div>';
 		}
@@ -164,6 +164,9 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 		// Token
 		if (getDolGlobalString($prefix . 'API_KEY')) {
+			$texttoshow = $langs->trans('generateAccessToken');
+			$urltogeneratetoken = $_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken();
+
 			$item = $formSetup->newItem($prefix . 'TOKEN');
 			//$item->nameText = $langs->trans('Token');
 			$item->cssClass = 'maxwidth500 ';
@@ -177,10 +180,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				//var_dump($tokenData);
 			}
 			if (empty($tokenData['token'])) {
-				$item->fieldOverride .= '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken().'">' . $langs->trans('generateAccessToken') . '<i class="fa fa-key paddingleft"></i></a>';
+				$item->fieldOverride .= '<a class="reposition" href="'.$urltogeneratetoken.'">' . $texttoshow . '<i class="fa fa-key paddingleft"></i></a>';
 			}
 			if (!empty($tokenData['token'])) {
-				$item->fieldOverride .= ' &nbsp; &nbsp; <a class="reposition" href="'.$_SERVER["PHP_SELF"]."?action=set".$prefix."TOKEN&token=".newToken().'">' . $langs->trans('reGenerateAccessToken') . '<i class="fa fa-key paddingleft"></i></a>';
+				$item->fieldOverride .= ' &nbsp; &nbsp; <a class="reposition" href="'.$urltogeneratetoken.'">' . $langs->trans('reGenerateAccessToken') . '<i class="fa fa-key paddingleft"></i></a>';
 			}
 
 			if (!empty($tokenData['token'])) {
@@ -339,6 +342,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 		$file_info = pathinfo($invoice_path);
 
+		// Format Access Point resource Url
 		$uuid = $this->generateUuidV4(); // UUID used to correlate logs between Dolibarr and PDP TODO : Store it somewhere
 
 		// Format AP resource Url
@@ -823,6 +827,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$call_id = $response['call_id'] ?? null;
 
 		//$lastsuccessfullSyncronizedFlow = null;
+
+		// Loop on each flow received in list
 		$i = 0;
 		foreach ($response['response']['results'] as $flow) {
 			$i++;
@@ -845,9 +851,11 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				// If res < 0, rollback
 				if ($res['res'] < 0) {
 					$db->rollback();
+
+					dol_syslog(__METHOD__ . " Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], LOG_DEBUG, 0, "_pdpconnectfr");
 					$results_messages[] = "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'];
-					if (isset($res['action']) && $res['action'] != '') {
-						$actions[$res['actioncode'] ?? '0'] = $res['action'];
+					if (isset($res['action']) && $res['action'] != '') {	// Save business errors if it is
+						$actions[$res['actioncode'] ?? '0'] = array('actionurl' => $res['actionurl'], 'action' => $res['action']);	// Set the result code and label into array $actions.
 					}
 					$error++;
 				}
@@ -934,10 +942,11 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 	/**
 	 * Sync a given flow data.
+	 * Called by syncFlows() for example.
 	 *
 	 * @param string 		$flowId        	FlowId
 	 * @param string|null 	$call_id  		Call ID for logging purposes
-	 * @return array{res:int, message:string, action:string|null} Returns array with 'res' (1 on success, 0 if exists or already processed, -1 on failure) with a 'message' and an optional 'action'.
+	 * @return array{res:int, message:string, actioncode:string|null, actionurl:string|null, action:string|null} Returns array with 'res' (1 on success, 0 if exists or already processed, -1 on failure) with a 'message' and for business errors an optional 'actioncode', 'actionurl' and 'action'.
 	 */
 	public function syncFlow($flowId, $call_id = null)
 	{
@@ -1088,12 +1097,14 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				// Try to create the supplier + product + invoice
 				$res = $exchangeProtocol->createSupplierInvoiceFromSource($receivedFile, $ReadableViewFile, $flowId);
 				if ($res['res'] < 0) {
-					return array(
+					$retarray = array(
 						'res' => -1,
-						'message' => "Failed to create supplier invoice from FacturX document for flowId: " . $flowId . ". " . $res['message'],
-						'actioncode' => $res['actioncode'] ?? 'UNKNOWN',
-						'action' => $res['action'] ?? null
+						'message' => "Failed to create supplier invoice from E-invoice document for flowId: " . $flowId . ". " . $res['message']
 					);
+					$retarray['actioncode'] = $res['actioncode'] ?? null;
+					$retarray['actionurl'] = $res['actionurl'] ?? null;
+					$retarray['action'] = $res['action'] ?? null;
+					return $retarray;
 				} else {
 					// Complete the document object with the created supplier invoice details
 					$suplierInvoiceObj = new FactureFournisseur($this->db);
@@ -1549,7 +1560,9 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				}
 			} else {
 				$res = -1;
-				$message = 'Failed to send CDAR file to PDP. Status code: ' . $response['status_code'] . '. Message: ' . ($response['response']['message'] ?? 'No message');
+				$message = 'Failed to send CDAR file to PDP. Status code: ' . $response['status_code'] . '. Message: ' . (!empty($response['response']['message'])
+				? $response['response']['message']
+				: ($response['errorMessage'] ?? 'No message'));
 				return ['res' => $res, 'message' => $message];
 			}
 		} else {

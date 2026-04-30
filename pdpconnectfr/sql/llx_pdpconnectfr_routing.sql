@@ -13,12 +13,15 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see https://www.gnu.org/licenses/.
 
+-- Table to defined where to route thirdparty invoices export (routing_type = 'thirdparty')
+-- or to store which default product to use for thirdparty invoice import (routing_type = 'product')
 
 CREATE TABLE llx_pdpconnectfr_routing (
     rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL,
     fk_soc integer NOT NULL,			-- ID of thirdparty
-    routing_id varchar(255) NOT NULL,	-- Electronic invoicing routing identifier (In most cases it will be SIREN OR SIREN_XXX for multi-routing cases, but it can be any identifier depending on the provider and third party)
-	source varchar(20) NOT NULL,		-- Source of routing ID: 'manual', 'automatic', 'synchronisation'
+    routing_type varchar(12) NOT NULL DEFAULT 'thirdparty',	-- 'thirdparty' or 'product'
+    routing_id varchar(255) NOT NULL,	-- Electronic invoicing routing identifier for thirdparty (Type 'thirdparty': In most cases it will be SIREN OR SIREN_XXX, Type 'product': The default product ID for the thirdparty when importing invoice)
+    source varchar(20) NOT NULL,		-- Source of routing ID: 'manual', 'automatic', 'synchronisation'
     info varchar(255),					-- Optional complementary information or comment
     syncflowid varchar(255),			-- Optional Flow ID when source = 'synchronisation'
     active tinyint DEFAULT 1,			-- 1 = enabled, 0 = disabled
@@ -27,5 +30,4 @@ CREATE TABLE llx_pdpconnectfr_routing (
     tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     fk_user_creat integer NOT NULL,
     fk_user_modif integer
-) ENGINE=InnoDB;
-
+) ENGINE = InnoDB;

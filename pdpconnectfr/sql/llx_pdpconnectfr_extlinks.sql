@@ -19,12 +19,13 @@ CREATE TABLE llx_pdpconnectfr_extlinks(
 	element_id int, 		    				-- ID of element.
 	element_type varchar(50) NOT NULL, 		    -- Type of element (from property object->element)
     provider varchar(50) NOT NULL, 				-- Provider key ('esalink', ...)
-	date_creation datetime NOT NULL, 
-	tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, 
-	fk_user_creat integer NOT NULL, 
+	date_creation datetime NOT NULL,
+	tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+	fk_user_creat integer NOT NULL,
 	fk_user_modif integer,
 	flow_id varchar(255),
 	syncstatus integer,							-- If the object has a status into the einvoice external system
 	syncref varchar(255),						-- If the object has a given reference into the einvoice external system
-	synccomment text							-- If we want to store a message for the last sync action try
+	synccomment text,						-- If we want to store a message for the last sync action try
+	override_routing_id varchar(255)		-- Optional routing ID override for this specific invoice (overrides thirdparty default routing)
 ) ENGINE=innodb;

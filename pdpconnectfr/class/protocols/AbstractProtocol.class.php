@@ -63,22 +63,22 @@ abstract class AbstractProtocol
 	 */
 	abstract public function createSupplierInvoiceFromSource($file, $ReadableViewFile = null, $flowId = '');
 
-	/**
-	 * Generate a complete Factur-X invoice file by embedding the XML
-	 * into a PDF.
-	 *
-	 * This function combines the invoice data with its corresponding XML
-	 * to produce a final hybrid document ready for exchange or archiving.
-	 *
-	 * @param 	CommonInvoice 	$invoice_id    	Invoice ID to be processed.
-	 * @param	?Translate		$outputlangs	Output language
-	 * @return 	int|string             			-1 if ko, path if ok.
-	 */
-	public function generateInvoice($invoice_id, $outputlangs = null)
-	{
-		// Default implementation: not required for all protocols
-		return -1;
-	}
+	// /**
+	//  * Generate a complete Factur-X invoice file by embedding the XML
+	//  * into a PDF.
+	//  *
+	//  * This function combines the invoice data with its corresponding XML
+	//  * to produce a final hybrid document ready for exchange or archiving.
+	//  *
+	//  * @param 	CommonInvoice 	$invoice_id    	Invoice ID to be processed.
+	//  * @param	?Translate		$outputlangs	Output language
+	//  * @return 	int|string             			-1 if ko, path if ok.
+	//  */
+	// public function generateInvoice($invoice_id, $outputlangs = null)
+	// {
+	// 	// Default implementation: not required for all protocols
+	// 	return -1;
+	// }
 
 	/**
 	 * Generate a sample invoice for testing or demonstration purposes (for Dolibarr version < 24.0)
