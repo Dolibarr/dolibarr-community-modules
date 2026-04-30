@@ -226,7 +226,7 @@ if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 		$tmpthirdparty->fetch(0, '', '', '', GETPOST("seller_einvoiceid"));
 		$sellerId = $tmpthirdparty->id;
 	}
-	print $form->select_company($sellerId ?: '', 'seller_id', '', $langs->trans("MyCompany"), 1);
+	print $form->select_company($sellerId ?: '', 'seller_id', '', $langs->trans("MyCompany").' ('.$mysoc->idprof1.')', 1);
 	print ' &nbsp; <a href="'.$_SERVER["PHP_SELF"].'?seller_einvoiceid=me" class="reposition">Select me</a>';
 	print ' - <a href="'.$_SERVER["PHP_SELF"].'?seller_einvoiceid=000000001" class="reposition">Select thirdparty SIREN 000000001</a>';
 	print ' - <a href="'.$_SERVER["PHP_SELF"].'?seller_einvoiceid=000000002" class="reposition">Select thirdparty SIREN 000000002</a>';
@@ -239,7 +239,7 @@ if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 		$tmpthirdparty->fetch(0, '', '', '', GETPOST("buyer_einvoiceid"));
 		$buyerId = $tmpthirdparty->id;
 	}
-	print $form->select_company($buyerId ?: '', 'buyer_id', '', $langs->trans("MyCompany"), 1);
+	print $form->select_company($buyerId ?: '', 'buyer_id', '', $langs->trans("MyCompany").' ('.$mysoc->idprof1.')', 1);
 	print ' &nbsp; <a href="'.$_SERVER["PHP_SELF"].'?buyer_einvoiceid=000000001" class="reposition">Select thirdparty with SIREN 000000001</a>';
 	print ' - <a href="'.$_SERVER["PHP_SELF"].'?buyer_einvoiceid=000000002" class="reposition">Select thirdparty with SIREN 000000002</a>';
 	print ' - <a href="'.$_SERVER["PHP_SELF"].'?buyer_einvoiceid=me" class="reposition">Select me</a>';
