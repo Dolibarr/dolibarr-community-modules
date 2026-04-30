@@ -252,32 +252,619 @@ class CIIProtocol extends AbstractProtocol
 	 *
 	 * @param 	CommonInvoice	$invoice 		Invoice object containing all necessary data.
 	 * @param	?Translate		$outputlangs	Output language
-	 * @return 	string 							XML representation of the invoice.
+	 * @return 	string 							XML representation path of the invoice.
 	 */
 	public function generateXML($invoice, $outputlangs = null)
 	{
-		// TODO
-		// Can reuse the generateXML() of FactureXProtocol.
+		global $conf, $user, $langs, $mysoc, $db;
 
-		return 'NOTIMPLEMENTED';
+		// Use customer language
+		if (empty($outputlangs) || ! ($outputlangs instanceof Translate)) {
+			$outputlangs = $langs;
+		}
+		$newlang = '';
+
+		$this->sourceinvoice = $invoice;
+		$outputlang = $langs->defaultlang;
+
+		// Load PDPConnectFr class
+		$pdpconnectfr = new PdpConnectFr($db);
+
+		// Reload object
+		$facture = new Facture($db);
+		$object = $facture->fetch($invoice->id) > 0 ? $facture : $invoice;
+		if (!is_object($invoice->thirdparty)) {
+			$invoice->fetch_thirdparty();
+		}
+
+		// =====================================================================
+		// Data collection into $invoiceData and $linesData arrays
+		// =====================================================================
+
+		// Customer references and delivery dates
+		$customerOrderReferenceList = [];
+		$deliveryDateList = [];
+		$this->_determineDeliveryDatesAndCustomerOrderNumbers($customerOrderReferenceList, $deliveryDateList, $object);
+
+		// Chorus
+		$chorus = false;
+		$chorusErrors = [];
+		if (getDolGlobalInt('PDPCONNECTFR_USE_CHORUS')) {
+			$chorus = true;
+		}
+		$promise_code = $object->array_options['options_d4d_promise_code'] ?? '';
+		if ($promise_code == '') {
+			$promise_code = $object->ref_customer ?? '';
+		}
+		if ($promise_code == '' && !empty($customerOrderReferenceList)) {
+			$promise_code = $customerOrderReferenceList[0];
+		}
+
+		// Bank account
+		$account = new Account($db);
+		if ($object->fk_account > 0) {
+			$account->fetch($object->fk_account);
+		} else {
+			$account->fetch(getDolGlobalString('FACTURX_DEFAULT_BANK_ACCOUNT'));
+		}
+		$account_proprio = trim($account->owner_name);
+		if ($account_proprio == '') {
+			dol_syslog('Bank account holder name is empty, please correct it, use socname instead but it could be inccorrect for XRechnung BT-85: Payment account name', LOG_WARNING);
+			$account_proprio = $mysoc->name;
+		}
+
+		// Buyer intra VAT (calculated if missing)
+		if ($object->thirdparty->tva_assuj && empty($object->thirdparty->tva_intra)) {
+			$object->thirdparty->tva_intra = $pdpconnectfr->thirdpartyCalcVATIntra($object->thirdparty);
+		}
+
+		// Seller identifiers (mysoc)
+		$myidprof          = idprof($mysoc);
+		$mySchemeIdProf    = $this->getIEC6523Code($mysoc->country_code);
+		$myGlobalIdProf    = idprof($mysoc);
+		$mySchemeGlobalIdProf = $this->getIEC6523Code($mysoc->country_code, 1);
+		$myUri             = $pdpconnectfr->getSellerCommunicationURI(0);
+		$mySchemeUri       = $this->getIEC6523Code($mysoc->country_code, 2);
+
+		// Buyer identifiers (thirdparty)
+		$idprof            = thirdpartyidprof($object) ?? '';
+		$schemeIdProf      = $this->getIEC6523Code($object->thirdparty->country_code);
+		$globalIdProf      = thirdpartyidprof($object) ?? '';
+		$schemeGlobalIdProf = $this->getIEC6523Code($object->thirdparty->country_code, 1);
+		$uri               = $pdpconnectfr->getBuyerCommunicationURI($object->thirdparty);
+		$schemeUri         = $this->getIEC6523Code($object->thirdparty->country_code, 2);
+
+		// Seller contact
+		$usercontacts = $object->getIdContact('internal', 'SALESREPFOLL');
+		$object->user = null;
+		if (!empty($usercontacts) && $object->fetch_user($usercontacts[0]) > 0) {
+			$salerepresentative_name          = $object->user->getFullName($outputlangs);
+			$salerepresentative_office_phone  = $object->user->office_phone;
+			$salerepresentative_office_fax    = $object->user->office_fax;
+			$salerepresentative_email         = $object->user->email;
+		} else {
+			$salerepresentative_name          = $user->getFullName($outputlangs);
+			$salerepresentative_office_phone  = $user->office_phone;
+			$salerepresentative_office_fax    = $user->office_fax;
+			$salerepresentative_email         = $user->email;
+		}
+		if (empty($salerepresentative_office_phone)) {
+			$salerepresentative_office_phone = $mysoc->phone;
+		}
+		if (empty($salerepresentative_office_fax)) {
+			$salerepresentative_office_fax = $mysoc->fax;
+		}
+		if (empty($salerepresentative_email)) {
+			$salerepresentative_email = $mysoc->email;
+		}
+
+		// Output language (client lang)
+		if (isset($object->thirdparty->default_lang)) {
+			$newlang = $object->thirdparty->default_lang;
+		}
+		// @phan-suppress-next-line PhanUndeclaredProperty
+		if (isset($object->default_lang)) {
+			$newlang = $object->default_lang;
+		}
+		if (GETPOST('lang_id', 'alphanohtml') != "") {
+			$newlang = GETPOST('lang_id', 'alphanohtml');
+		}
+		if (!empty($newlang)) {
+			$outputlangs = new Translate("", $conf);
+			$outputlangs->setDefaultLang($newlang);
+		}
+
+		// Project
+		if (! ($invoice->project instanceof Project)) {
+			$invoice->fetchProject();
+		}
+
+		$invoiceRefDocs = [];
+		// Source invoice (credit note)
+		if ($object->type == $object::TYPE_CREDIT_NOTE && !empty($object->fk_facture_source)) {
+			$sourceFact = new Facture($this->db);
+			if ($sourceFact->fetch($object->fk_facture_source) > 0) {
+				$sourceFactDate = new DateTime(dol_print_date($sourceFact->date, 'dayrfc'));
+				$invoiceRefDocs[] = [
+					'ref' => $sourceFact->ref,
+					'date' => $sourceFactDate,
+					'type' => '381' // Credit note
+				];
+				dol_syslog(get_class($this) . '::generateXML Set source invoice reference ' . $sourceFact->ref . ' for credit note ' . $object->ref);
+			} else {
+				dol_syslog(get_class($this) . '::generateXML Cannot fetch source invoice id=' . $object->fk_facture_source . ' for credit note ' . $object->ref, LOG_WARNING);
+			}
+		}
+
+		// Collect lines into $linesData array
+		$linesData         = [];
+		$tabTVA            = [];
+		$grand_total_ht    = $grand_total_tva = $grand_total_ttc = 0;
+		$prepaidAmount     = 0;
+		$depositlines      = [];
+		$billing_period    = [];
+		$numligne          = 1;
+
+		foreach ($object->lines as $line) {
+			$isDepositLine = 0;
+
+			// Skip subtotal lines
+			$isSubTotalLine = $this->_isLineFromExternalModule($line, $object->element, 'modSubtotal');
+			if ($isSubTotalLine) {
+				continue;
+			}
+
+			// For credit notes EN16931 requires positive amounts
+			if ($object->type == $object::TYPE_CREDIT_NOTE) {
+				$line->subprice     = abs($line->subprice);
+				$line->subprice_ttc = abs($line->subprice_ttc);
+				$line->total_ht     = abs($line->total_ht);
+				$line->total_ttc    = abs($line->total_ttc);
+				$line->total_tva    = abs($line->total_tva);
+				$line->qty          = abs($line->qty);
+			}
+
+			// if ($line->subprice < 0 || $line->subprice_ttc < 0) {
+			// 	throw new Exception("NEGATIVE_UNIT_PRICE_NOT_ALLOWED: Unit price in lines can't be negative. Try to edit the line with ID " . $line->id);
+			// }
+
+			// Deposit line
+			$depositFactRef  = null;
+			$depositFactDate = null;
+			if ($line->desc == '(DEPOSIT)') {
+				$isDepositLine   = 1;
+				$depositFactRef  = "";
+				$depositFactDate = new DateTime();
+
+				$discount    = new DiscountAbsolute($this->db);
+				$resdiscount = $discount->fetch($line->fk_remise_except);
+				dol_syslog("Fetch discount " . $line->fk_remise_except . ", res=" . $resdiscount, LOG_DEBUG);
+
+				if ($resdiscount > 0) {
+					$origFact    = new Facture($this->db);
+					$resOrigFact = $origFact->fetch($discount->fk_facture_source);
+					dol_syslog("Fetch origFact " . $discount->fk_facture_source . ", res=" . $resOrigFact, LOG_DEBUG);
+					if ($resOrigFact > 0) {
+						$depositFactRef  = $origFact->ref;
+						$depositFactDate = new DateTime(dol_print_date($origFact->date, 'dayrfc'));
+					}
+				}
+				$prepaidAmount += abs($line->total_ttc);
+				$line->qty      = -$line->qty;
+				$line->subprice = abs($line->subprice);
+
+				$depositlines[] = [
+					'lineId'      => $numligne,
+					'invoiceRef'  => $depositFactRef,
+					'invoiceDate' => $depositFactDate,
+				];
+				$invoiceRefDocs[] = [
+					'ref' => $depositFactRef,
+					'date' => $depositFactDate,
+					'type' => '386' // Prepayment invoice
+				];
+			}
+
+			// Product labels (multilangs)
+			$libelle = $description = "";
+			if ($newlang != "") {
+				if (!isset($line->multilangs)) {
+					$tmpproduct = new Product($db);
+					$resproduct = $tmpproduct->fetch($line->fk_product);
+					if ($resproduct > 0) {
+						$getm = $tmpproduct->getMultiLangs();
+						if ($getm < 0) {
+							dol_syslog("PDPConnectFR error fetching multilang for product error is " . $tmpproduct->error, LOG_DEBUG);
+						}
+						$line->multilangs = $tmpproduct->multilangs;
+					} else {
+						dol_syslog("PDPConnectFR error fetching product", LOG_DEBUG);
+					}
+				}
+				if (isset($line->multilangs)) {
+					$libelle     = $line->multilangs[$newlang]["label"];
+					$description = $line->multilangs[$newlang]["description"];
+				}
+			}
+			if (empty($libelle)) {
+				$libelle = $line->product_label ? $line->product_label : "";
+			}
+			if (empty($description)) {
+				$description = $line->desc ? dol_string_nohtmltag($line->desc, 0) : "";
+			}
+			if (empty($libelle) && !empty($description)) {
+				$libelle = dol_trunc(dolGetFirstLineOfText(dol_string_nohtmltag($description)), 49, 'right', 'UTF-8', 1);
+				if ($libelle == $description) {
+					$description = "";
+				}
+			}
+
+			// VAT category
+			if ($line->tva_tx > 0) {
+				if (empty($mysoc->tva_intra)) {
+					throw new Exception('BADVATNUMBER: The VAT number of the thirdparty ' . $object->thirdparty->name . ' is mandatory when there is a non null VAT on at least on line.');
+				}
+				if (!$this->checkIfVatRateIsValid($line->tva_tx, $mysoc->country_code)) {
+					throw new Exception('BADVATRATE[BR-FR-16]: The VAT rate ' . $line->tva_tx . ' on line ' . $line->id . ' is not a valid string value for country ' . $mysoc->country_code . '.');
+				}
+				$categoryVAT = 'S';
+			} else {
+				$categoryVAT = 'K';
+				if (empty($mysoc->tva_assuj)) {
+					$categoryVAT = 'E';
+				} elseif (!$invoice->thirdparty->isInEEC()) {
+					$categoryVAT = 'G';
+				} elseif ($mysoc->isInEEC() && $invoice->thirdparty->isInEEC() && $mysoc->country_code != $invoice->thirdparty->country_code) {
+					$categoryVAT = 'K';
+				}
+			}
+
+			// Billing period of the line
+			$linePeriodStart = null;
+			$linePeriodEnd   = null;
+			if (!empty($line->date_start)) {
+				$billing_period["start"][$numligne] = $line->date_start;
+				$linePeriodStart = $this->_tsToDateTime($line->date_start);
+			}
+			if (!empty($line->date_end)) {
+				$billing_period["end"][$numligne] = $line->date_end;
+				$linePeriodEnd = $this->_tsToDateTime($line->date_end);
+			}
+
+			// Cumulative VAT totals
+			if (!isset($tabTVA[$line->tva_tx])) {
+				$tabTVA[$line->tva_tx] = ['totalHT' => 0, 'totalTVA' => 0];
+			}
+			$tabTVA[$line->tva_tx]['totalHT']  += $line->total_ht;
+			$tabTVA[$line->tva_tx]['totalTVA'] += $line->total_tva;
+
+			$grand_total_ht  += $line->total_ht;
+			$grand_total_ttc += $line->total_ttc;
+			$grand_total_tva += $line->total_tva;
+
+			// Filling $linesData (based on $lineTemplate)
+			$linesData[$numligne] = [
+				'lineid'                    => $numligne,
+				'linestatuscode'            => 'NA',
+				'linestatusreasoncode'      => 'NA',
+				'lineNote'                  => null,
+
+				'prodname'                  => $libelle,
+				'proddesc'                  => $description,
+				'prodsellerid'              => $line->product_ref ? $line->product_ref : "0000",
+				'prodbuyerid'               => null,
+				'prodglobalidtype'          => null,
+				'prodglobalid'              => null,
+				'prodmultilangs'            => [],
+				'prodClassificationCode'    => null,
+				'prodClassificationScheme'  => null,
+				'prodOriginCountry'         => null,
+
+				'grosspriceamount'          => $line->subprice,
+				'grosspricebasisquantity'   => null,
+				'grosspricebasisquantityunitcode' => null,
+
+				'netpriceamount'            => $line->subprice,
+				'netpricebasisquantity'     => null,
+				'netpricebasisquantityunitcode' => null,
+
+				'billedquantity'            => $line->qty,
+				'billedquantityunitcode'    => "C62",
+				'chargeFreeQuantity'        => null,
+				'chargeFreeQuantityunitcode' => null,
+				'packageQuantity'           => null,
+				'packageQuantityunitcode'   => null,
+
+				'lineTotalAmount'           => $line->total_ht,
+				'totalAllowanceChargeAmount' => null,
+
+				'categoryCode'              => $categoryVAT,
+				'typeCode'                  => 'VAT',
+				'rateApplicablePercent'     => $line->tva_tx > 0 ? number_format($line->tva_tx, 2, '.', '') : '0.00',
+				'calculatedAmount'          => null,
+				'exemptionReason'           => null,
+				'exemptionReasonCode'       => null,
+
+				'lineAllowances'            => [],
+				'lineGrossPriceAllowances'  => [],
+				'lineremisepercent'         => $line->remise_percent ?? 'NA',
+
+				'linePeriodStart'           => $linePeriodStart,
+				'linePeriodEnd'             => $linePeriodEnd,
+
+				'additionalRefDocs'         => [],
+
+				'isDepositLine'             => (bool) $isDepositLine,
+				'depositInvoiceRef'         => $depositFactRef,
+				'depositInvoiceDate'        => $depositFactDate,
+
+				'parentDocumentNo'          => null,
+				'is_deposit'                => $isDepositLine,
+				'fk_remise'                 => $line->fk_remise_except ?? null,
+			];
+
+			$numligne++;
+		}
+
+		// Already paid deposits
+		$getAlreadyPaid = $object->getSommePaiement();
+		// $prepaidAmount  = $object->sumpayed + $prepaidAmount;
+		$prepaidAmount  = $object->sumpayed + $getAlreadyPaid;
+
+		// Delivery date
+		$deliveryDate = !empty($deliveryDateList)
+			? new DateTime(dol_print_date($deliveryDateList[0], 'dayrfc'))
+			: new DateTime(dol_print_date($invoice->date, 'dayrfc'));
+
+		// Filling $invoiceData (based on $invoiceTemplate)
+		$invoiceData = [
+			// Document part
+			'documentno'           => $object->ref,
+			'documenttypecode'     => $this->_getTypeOfInvoice($object),
+			'documentdate'         => new DateTime(dol_print_date($object->date, 'dayrfc')),
+			'invoiceCurrency'      => $conf->currency,
+			'taxCurrency'          => null,
+			'documentname'         => null,
+			'documentlanguage'     => $outputlang,
+			'effectiveSpecifiedPeriod' => 'NA',
+
+			'documentDeliveryDate' => $deliveryDate,
+
+			'invoicingPeriodStart' => null,
+			'invoicingPeriodEnd'   => null,
+
+			'businessProcessId'    => $this->getBillingProcessID($object),
+			'isTestDocument'       => !empty($invoice->specimen),
+
+			// Notes
+			'documentNotePublic'   => dol_concatdesc(
+				$object->note_public ?: "",
+				' - Einvoice generated by Dolibarr ' . DOL_VERSION
+			),
+			'documentNotePMT'      => getDolGlobalString('PDPCONNECTFR_PMT') ?: $outputlangs->trans("NoInvoiceCollectionFees"),
+			'documentNotePMD'      => getDolGlobalString('PDPCONNECTFR_PMD') ?: $outputlangs->trans('NoLatePaymentFees'),
+			'documentNoteAAB'      => getDolGlobalString('PDPCONNECTFR_AAB') ?: $outputlangs->trans('NoEarlyPaymentDiscount'),
+			'documentNotes'        => [],
+
+			// Seller part
+			'sellername'                => $mysoc->name,
+			'sellerids'                 => $myidprof,
+
+			'sellerlineone'             => $mysoc->address      ?? 'ADDRESS EMPTY',
+			'sellerlinetwo'             => "",
+			'sellerlinethree'           => "",
+			'sellerpostcode'            => $mysoc->zip          ?? 'ZIP EMPTY',
+			'sellercity'                => $mysoc->town         ?? 'NO TOWN',
+			'sellercountry'             => $mysoc->country_code ?? 'COUNTRY NOT SET',
+			'sellersubdivision'         => null,
+
+			'sellercontactpersonname'   => $salerepresentative_name,
+			'sellercontactdepartmentname' => null,
+			'sellercontactphoneno'      => $salerepresentative_office_phone,
+			'sellercontactfaxno'        => $salerepresentative_office_fax,
+			'sellercontactemailaddr'    => $salerepresentative_email,
+
+			'sellerCommunicationUriScheme' => $mySchemeUri,
+			'sellerCommunicationUri'    => $myUri,
+
+			'sellerGlobalIds'           => [['schemeID' => $mySchemeGlobalIdProf, 'value' => $myGlobalIdProf]],
+			'sellerTaxRegistations'     => [['type' => 'VA', 'value' => $mysoc->tva_intra ?? 'FRSPECIMEN']],
+			'sellervatnumber'           => $mysoc->tva_intra ?? 'FRSPECIMEN',
+
+			'sellerLegalOrgId'          => $myidprof,
+			'sellerLegalOrgScheme'      => $mySchemeIdProf,
+			'sellerTradingName'         => $mysoc->name ?? 'SPECIMEN',
+
+			// Buyer part
+			'buyername'                 => $object->thirdparty->name ?? 'CUSTOMER',
+			'buyerids'                  => $idprof ?: 'IDPROF',
+
+			'buyerlineone'              => $object->thirdparty->address      ?? 'ADDRESS',
+			'buyerlinetwo'              => "",
+			'buyerlinethree'            => "",
+			'buyerpostcode'             => $object->thirdparty->zip          ?? 'ZIP',
+			'buyercity'                 => $object->thirdparty->town         ?? 'TOWN',
+			'buyercountry'              => $object->thirdparty->country_code ?? 'COUNTRY',
+			'buyersubdivision'          => null,
+
+			'buyervatnumber'            => $object->thirdparty->tva_intra ?? '',
+			'buyerGlobalIds'            => [['schemeID' => $schemeGlobalIdProf, 'value' => $globalIdProf]],
+
+			'buyerLegalOrgId'           => $idprof,
+			'buyerLegalOrgScheme'       => $schemeIdProf,
+			'buyerTradingName'          => $object->thirdparty->name,
+
+			'buyerReference'            => $object->array_options['options_d4d_service_code'] ?? null,
+
+			'buyerCommunicationUriScheme' => $schemeUri,
+			'buyerCommunicationUri'    	=> $uri,
+
+			'buyercontactpersonname'    => null,
+			'buyercontactemailaddr'     => null,
+			'buyercontactphoneno'       => null,
+
+			// Totals parts
+			'grandTotalAmount'          => $grand_total_ttc,
+			'duePayableAmount'          => $grand_total_ttc - $prepaidAmount,
+			'lineTotalAmount'           => $grand_total_ht,
+			'chargeTotalAmount'         => 0.0,
+			'allowanceTotalAmount'      => 0.0,
+			'taxBasisTotalAmount'       => $grand_total_ht,
+			'taxTotalAmount'            => $grand_total_tva,
+			'roundingAmount'            => null,
+			'totalPrepaidAmount'        => $prepaidAmount,
+
+			// Payment part
+			'paymentMeansCode'          => $this->_getPaymentMeanNumber($object),
+			'paymentMeansText'          => $langs->transnoentitiesnoconv("PaymentType" . $object->mode_reglement_code),
+			'iban'                      => $pdpconnectfr->removeSpaces($account->iban),
+			'bic'                       => $pdpconnectfr->removeSpaces($account->bic),
+			'accountName'               => $account_proprio,
+
+			'paymentDueDate'            => new DateTime(dol_print_date($object->date_lim_reglement, 'dayrfc')),
+			'paymentTermsText'          => $langs->transnoentitiesnoconv("PaymentConditions") . ": " . $langs->transnoentitiesnoconv("PaymentCondition" . $object->cond_reglement_code),
+
+			// Allowances / charges part
+			'headerAllowancesCharges'   => [],
+
+			// Referenced documents part
+			'invoiceRefDocs'            => $invoiceRefDocs,
+			'orderReference'            => $promise_code,
+			'contractReference'         => $object->array_options['options_d4d_contract_number'] ?? null,
+			'despatchAdviceRef'         => null,
+
+			// VAT breakdown
+			'taxBreakdown'              => $tabTVA,
+
+			// Internal data (useful for the builder)
+			'_chorus'                   => $chorus,
+			'_depositlines'             => $depositlines,
+			'_customerOrderReferenceList' => $customerOrderReferenceList,
+			'_project'                  => ($invoice->project instanceof Project) ? $invoice->project : null,
+		];
+
+		// Generate the XML file
+		$filename = dol_sanitizeFileName($invoice->ref);
+		$filedir = getMultidirOutput($invoice, '', 1, 'temp');
+		$xmlfile = $filedir . '/' . $filename . '/EInvoice.xml';
+
+		dol_mkdir(dirname($xmlfile));
+		dol_delete_file($xmlfile);
+
+		$xmlcontent = $this->buildXML($invoiceData, $linesData, 'EN16931', $outputlangs);
+		file_put_contents($xmlfile, $xmlcontent);
+
+		dolChmod($xmlfile);
+
+		return $xmlfile;
 	}
 
 
 	/**
-	 * Generate a sample CII invoice for demonstration or testing purposes (for Dolibarr version < 24.0)
+	 * Generate a complete CII invoice file.
 	 *
-	 * This method creates a dummy invoice with representative data
-	 * to illustrate the CII structure without using real business information.
+	 * This function combines the invoice data with its corresponding XML
 	 *
-	 * @param	PdpConnectFr			$pdpconnectfr			PDPConnectFR
-	 * @param   Societe|null			$thirdpartySeller		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
-	 * @param   Societe|null			$thirdpartyBuyer		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
-	 * @return 	array<string,string> 							Path or content of the generated sample invoice.
+	 * @param 	int|Object 	$invoice_id    	Invoice ID or Invoice Object to be processed.
+	 * @param	?Translate	$outputlangs	Output language
+	 * @return 	-1|string       			-1 if ko, path if ok.
 	 */
-	public function generateSampleInvoiceOld($pdpconnectfr, $thirdpartySeller = null, $thirdpartyBuyer = null)
+	public function generateInvoice($invoice_id, $outputlangs = null)
 	{
-		// Not yet implemented.
-		return array('path' => '', 'ref' => '');
+		// Global variables declaration (typical for Dolibarr environment)
+		global $langs, $db;
+
+		dol_syslog(get_class($this) . '::generateInvoice');
+
+		if (empty($outputlangs) || ! ($outputlangs instanceof Translate)) {
+			$outputlangs = $langs;
+		}
+
+		require_once DOL_DOCUMENT_ROOT . "/compta/facture/class/facture.class.php";
+		require_once DOL_DOCUMENT_ROOT . '/core/lib/pdf.lib.php';
+		require_once DOL_DOCUMENT_ROOT . '/core/lib/files.lib.php';
+
+		if ($invoice_id instanceof Facture) {
+			$invoice = $invoice_id;
+			$invoice_id = $invoice->id;
+		} else {
+			$invoice = new Facture($db);
+			$invoiceResult = $invoice->fetch((int) $invoice_id);
+
+			if ($invoiceResult < 0) {
+				dol_syslog(get_class($this) . "::generateInvoice failed to load invoice id=" . $invoice_id, LOG_ERR);
+				$this->error = $langs->trans("ErrorLoadingInvoice");
+				$this->errors[] = $this->error;
+				return -1;
+			}
+		}
+
+		// Generate XML
+		try {
+			$xmlfile = $this->generateXML($invoice, $outputlangs);
+		} catch (Exception $e) {
+			dol_syslog(get_class($this) . "::generateInvoice failed to generate XML for invoice id=" . $invoice_id . ". Error " . $e->getMessage(), LOG_ERR);
+			$this->error = $langs->trans("ErrorGeneratingXML") . '. ' . $e->getMessage();
+			$this->errors[] = $this->error;
+			return -1;
+		}
+
+		if (empty($xmlfile) || !file_exists($xmlfile)) {
+			dol_syslog(get_class($this) . "::generateInvoice failed to generate XML for invoice id=" . $invoice_id, LOG_ERR);
+			$this->error = $langs->trans("ErrorGeneratingXML");
+			$this->errors[] = $this->error;
+			return -1;
+		}
+
+
+		// Load PDPConnectFR specific translations
+		$langs->loadLangs(array("admin", "pdpconnectfr@pdpconnectfr"));
+
+		// Make a copy of the XML file in the final destination
+		$filename = dol_sanitizeFileName($invoice->ref);
+		$filedir = getMultidirOutput($invoice, '', 1);
+		$einvoice_path = $filedir . '/' . $filename . '_EInvoice.xml';
+		if (dol_copy($xmlfile, $einvoice_path)) {
+			dol_syslog(get_class($this) . "::generateInvoice copied XML file to " . $einvoice_path);
+		} else {
+			dol_syslog(get_class($this) . "::generateInvoice failed to copy XML file to " . $einvoice_path, LOG_ERR);
+			$this->error = $langs->trans("ErrorFailToCopyFile", $xmlfile, $einvoice_path);
+			$this->errors[] = $this->error;
+			return -1;
+		}
+
+
+		// Clean up the temporary XML file
+		if (file_exists($xmlfile) && !getDolGlobalString('PDPCONNECTFR_DEBUG_MODE')) {
+			dol_delete_file($xmlfile);
+			dol_syslog(get_class($this) . '::generateInvoice cleaned up temporary XML file: ' . $xmlfile);
+		}
+
+		// Add einvoice hook
+		global $action, $hookmanager;
+		$hookmanager->initHooks(array('einvoicegeneration'));
+		$parameters = array('file' => $einvoice_path, 'object' => $invoice, 'outputlangs' => $langs);
+		$reshook = $hookmanager->executeHooks('afterEinvoiceCreation', $parameters, $this, $action); // Note that $action and $object may have been modified by some hooks
+		if ($reshook < 0) {
+			$this->error = $hookmanager->error;
+			$this->errors = $hookmanager->errors;
+			return -1;
+		}
+
+		// Set status of einvoice
+		$pdpConnectFr = new PdpConnectFr($db);
+		$result = $pdpConnectFr->fetchLastknownInvoiceStatus($invoice->id);
+
+		if (
+			isset($result['code']) &&
+			(in_array($result['code'], array($pdpConnectFr::STATUS_UNKNOWN, $pdpConnectFr::STATUS_NOT_GENERATED))
+				|| !array_key_exists($result['code'], $pdpConnectFr::STATUS_LABEL_KEYS))
+		) {
+			// Set status to e-einvoice generated
+			$pdpConnectFr->setEInvoiceStatus($invoice, $pdpConnectFr::STATUS_GENERATED, 'Invoice status set to Generated by generateInvoice()');
+		}
+
+		return $einvoice_path;
 	}
 
 
@@ -290,12 +877,139 @@ class CIIProtocol extends AbstractProtocol
 	 * @param	PdpConnectFr			$pdpconnectfr			PDPConnectFR
 	 * @param   Societe|null			$thirdpartySeller		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
 	 * @param   Societe|null			$thirdpartyBuyer		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
-	 * @return 	array<string,string> 							Path or content of the generated sample invoice.
+	 * @return 	-1|array<string,string> 							Path or content of the generated sample invoice.
 	 */
 	public function generateSampleInvoice($pdpconnectfr, $thirdpartySeller = null, $thirdpartyBuyer = null)
 	{
-		// Not yet implemented.
-		return array('path' => '', 'ref' => '');
+		global $conf, $langs, $mysoc;
+
+		dol_mkdir($conf->pdpconnectfr->dir_temp);
+
+		$outputlangs = $langs;		// TODO Use the target language
+
+		require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
+		$tmpinvoice = new Facture($this->db);
+		$tmpinvoice->initAsSpecimen('nolines');
+
+		$tmpinvoice->ref .= '-' . dol_print_date(dol_now(), '%Y%m%d-%H%M%S');
+
+		$line = new FactureLigne($this->db);
+		$line->desc = $langs->trans("Description") . " 1";
+		$line->qty = 1;
+		$line->subprice = 100;
+		$line->tva_tx = 20.0;
+		$line->localtax1_tx = 0;
+		$line->localtax2_tx = 0;
+		$line->remise_percent = 0;
+		$line->fk_product = 0;
+		$line->qty = 1;
+		$line->total_ht = 100;
+		$line->total_ttc = 120;
+		$line->total_tva = 20;
+		$line->multicurrency_tx = 2;
+		$line->multicurrency_total_ht = 200;
+		$line->multicurrency_total_ttc = 240;
+		$line->multicurrency_total_tva = 40;
+
+		$tmpinvoice->lines[] = $line;
+
+		$tmpinvoice->total_ht       += $line->total_ht;
+		$tmpinvoice->total_tva      += $line->total_tva;
+		$tmpinvoice->total_ttc      += $line->total_ttc;
+
+		$tmpinvoice->multicurrency_total_ht       += $line->multicurrency_total_ht;
+		$tmpinvoice->multicurrency_total_tva      += $line->multicurrency_total_tva;
+		$tmpinvoice->multicurrency_total_ttc      += $line->multicurrency_total_ttc;
+
+
+		require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
+		if ($thirdpartyBuyer instanceof Societe) {
+			$tmpthirdparty = $thirdpartyBuyer;
+		} else {
+			$tmpthirdparty = new Societe($this->db);
+			$tmpthirdparty->initAsSpecimen();
+			$tmpthirdparty->idprof1 = '000000001';
+			$tmpthirdparty->idprof2 = '00000000100010';
+			$tmpthirdparty->tva_intra = 'FR12000000001';
+		}
+		$tmpinvoice->thirdparty = $tmpthirdparty;
+		$tmpinvoice->socid = $tmpthirdparty->id;			// 0 for specimen
+
+		require_once DOL_DOCUMENT_ROOT . '/contact/class/contact.class.php';
+		$tmpcontact = new Contact($this->db);
+		$tmpcontact->initAsSpecimen();
+		$tmpcontact->socid = $tmpthirdparty->id;			// 0 for specimen
+		$tmpinvoice->contact = $tmpcontact;
+
+
+
+		// Set $mysoc if seller is a thirdparty when we want to generate a sample invoice for a purchase.
+		$keyforconst = 'PDPCONNECTFR_' . getDolGlobalString('PDPCONNECTFR_PDP') . '_ROUTING_ID';
+		$savmysoc = null;
+		$savPDPCONNECTFR_ROUTING_ID = null;
+		if ($thirdpartySeller instanceof Societe) {
+			$savmysoc = $mysoc;
+			$savPDPCONNECTFR_ROUTING_ID = getDolGlobalString($keyforconst);
+
+			$mysoc = $thirdpartySeller;
+			$conf->global->PDPCONNECTFR_SUPERPDP_ROUTING_ID = idprof($thirdpartySeller);
+		}
+		//var_dump(($savmysoc ? $savmysoc->name : ''), $mysoc->name, $thirdpartyBuyer->name);
+
+
+
+		// Generate the PDF
+		$tmpinvoice->generateDocument($tmpinvoice->model, $outputlangs);
+
+		// For invoice with ->specimen=1, the file is SPECIMEN.pdf so we rename it into ref
+		$dir = $conf->invoice->multidir_output[$conf->entity];
+		$srcfile = $dir . '/SPECIMEN.pdf';
+		$destfile = $dir . '/' . dol_sanitizeFileName($tmpinvoice->ref) . '.pdf';
+
+		dol_move($srcfile, $destfile, '0', 1);
+
+
+		// Generate CII xml file
+		$pathOfXml = $this->generateInvoice($tmpinvoice, $outputlangs);
+
+		// Restore switched variables if we changed $mysoc for generation of the sample invoice
+		if (!empty($savmysoc)) {
+			$mysoc = $savmysoc;
+			$conf->global->$keyforconst = $savPDPCONNECTFR_ROUTING_ID;
+
+			$savmysoc = null;
+			$savPDPCONNECTFR_ROUTING_ID = null;
+		}
+
+		// Restore name SPECIMEN.pdf
+		dol_move($destfile, $srcfile, '0', 1);
+
+		// Move CII xml file into the temp directory
+		if (is_numeric($pathOfXml) && $pathOfXml < 0) {
+			return $pathOfXml;
+		} else {
+			$newPathOfXml = dirname($pathOfXml) . '/temp/' . basename($pathOfXml);
+			dol_move($pathOfXml, $newPathOfXml, '0', 1);
+
+			return array('path' => $newPathOfXml, 'ref' => $tmpinvoice->ref);
+		}
+	}
+
+	/**
+	 * Generate a sample CII invoice for demonstration or testing purposes (for Dolibarr version < 24.0)
+	 *
+	 * This method creates a dummy invoice with representative data
+	 * to illustrate the CII structure without using real business information.
+	 *
+	 * @param	PdpConnectFr			$pdpconnectfr			PDPConnectFR
+	 * @param   Societe|null			$thirdpartySeller		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
+	 * @param   Societe|null			$thirdpartyBuyer		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
+	 * @throws  Exception
+	 * @return 	array<string,string> 							Path or content of the generated sample invoice.
+	 */
+	public function generateSampleInvoiceOld($pdpconnectfr, $thirdpartySeller = null, $thirdpartyBuyer = null)
+	{
+		return array('path' => '', 'ref' => ''); // Not yet implemented
 	}
 
 
@@ -390,8 +1104,13 @@ class CIIProtocol extends AbstractProtocol
 		$socId = $syncSocRes['res'];
 		$return_messages[] = $syncSocRes['message'];
 		if ($socId < 0) {
-			return ['res' => -1, 'message' => 'Thirdparty sync or creation error: ' . implode("\n", $return_messages),
-			'actioncode' => $syncSocRes['actioncode'] ?? '', 'actionurl' => $syncSocRes['actionurl'] ?? '', 'action' => $syncSocRes['action'] ?? null];
+			return [
+				'res' => -1,
+				'message' => 'Thirdparty sync or creation error: ' . implode("\n", $return_messages),
+				'actioncode' => $syncSocRes['actioncode'] ?? '',
+				'actionurl' => $syncSocRes['actionurl'] ?? '',
+				'action' => $syncSocRes['action'] ?? null
+			];
 		}
 
 		// Load supplier (thirdparty)
@@ -431,14 +1150,18 @@ class CIIProtocol extends AbstractProtocol
 			// --------------------------------------------------
 			if (!empty($parsedLine['additionalRefDocs']) && is_array($parsedLine['additionalRefDocs'])) {
 				foreach ($parsedLine['additionalRefDocs'] as $refDoc) {
-					$lineRefDocId = $refDoc['issuerAssignedId'] ?? null;
+					$lineRefDocId = $refDoc['IssuerAssignedID'] ?? null;
 					$lineRefDocType = $refDoc['typeCode'] ?? null;
 					$lineRefDocDate = $refDoc['issueDate'] ?? null;
 
 					$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "facture_fourn WHERE ref_supplier = '" . $db->escape($lineRefDocId) . "' LIMIT 1";
 					$resql = $db->query($sql);
 					if ($db->num_rows($resql) != 1) {
-						return ['res' => -1, 'message' => 'Document : ' . $lineRefDocId . ' linked to line ' . $parsedLine['lineid'] . ' not found in Dolibarr'];
+						return [
+							'res' => -1,
+							'message' => 'Document "' . $lineRefDocId . '" linked to line ' . $parsedLine['lineid'] . ' was not found in Dolibarr. Please verify why this document is missing (deleted, not imported, or not provided by the supplier). To resolve this issue, you must manually create the invoice using the supplier invoice reference "' . $lineRefDocId . '".'
+						];
+						// TODO: Add a check before sending a final invoice after deposit to ensure that the deposit invoice has been properly sent to the PDP and successfully received.
 					}
 
 					// Load linked supplier invoice
@@ -548,8 +1271,13 @@ class CIIProtocol extends AbstractProtocol
 				// Sync or create product
 				$res = $this->_findOrCreateProductFromEinvoiceLine($parsedLine, $flowId);
 				if ($res['res'] < 0) {
-					return ['res' => -1, 'message' => 'Product sync or creation error: ' . $res['message'],
-					'actioncode' => $res['actioncode'] ?? '', 'actionurl' => $res['actionurl'] ?? '', 'action' => $res['action'] ?? null];
+					return [
+						'res' => -1,
+						'message' => 'Product sync or creation error: ' . $res['message'],
+						'actioncode' => $res['actioncode'] ?? '',
+						'actionurl' => $res['actionurl'] ?? '',
+						'action' => $res['action'] ?? null
+					];
 				}
 				$productId = $res['res'];
 			}
@@ -588,6 +1316,8 @@ class CIIProtocol extends AbstractProtocol
 
 		// Add a note about PDP import ( TODO: add a hook or extrafields to store import details)
 		$supplierInvoice->note_private = "Imported from PDP";
+
+		// TODO : save AAB, PMD, PMT notes ( all notes are grouped into documentNotes)
 
 		// Create the invoice
 		$supplierInvoiceId = $supplierInvoice->create($user);
@@ -1088,7 +1818,7 @@ class CIIProtocol extends AbstractProtocol
 
 				case 'invoiceRefDocs':
 					$result[] = [
-						'issuerAssignedID' => $this->getXPathValue($xpath, 'ram:IssuerAssignedID', $n),
+						'IssuerAssignedID' => $this->getXPathValue($xpath, 'ram:IssuerAssignedID', $n),
 						'issueDate' => $this->normDate($this->getXPathValue($xpath, 'ram:FormattedIssueDateTime/qdt:DateTimeString', $n)
 							?? $this->getXPathValue($xpath, 'ram:IssueDateTime/udt:DateTimeString', $n)),
 					];
@@ -1096,7 +1826,7 @@ class CIIProtocol extends AbstractProtocol
 
 				case 'additionalRefDocs':
 					$result[] = [
-						'issuerAssignedID' => $this->getXPathValue($xpath, 'ram:IssuerAssignedID', $n),
+						'IssuerAssignedID' => $this->getXPathValue($xpath, 'ram:IssuerAssignedID', $n),
 						'typeCode' => $this->getXPathValue($xpath, 'ram:TypeCode', $n),
 						'name' => $this->getXPathValue($xpath, 'ram:Name', $n),
 						'referenceTypeCode' => $this->getXPathValue($xpath, 'ram:ReferenceTypeCode', $n),
@@ -1122,9 +1852,447 @@ class CIIProtocol extends AbstractProtocol
 
 
 
-	/* =====================================================================================
-	 Common methods with FacturX class
-	======================================================================================== */
+	// =====================================================================
+	// XML GENERATION
+	// =====================================================================
+
+	/**
+	 * Build CII XML from invoice data.
+	 *
+	 * @param array 		$invoiceData 	Header-level invoice data
+	 * @param array 		$linesData 		Array of line-level data arrays
+	 * @param string 		$profile 		Profile ('MINIMUM', 'BASICWL', 'BASIC', 'EN16931', 'EXTENDED')
+	 * 
+	 * @return string Generated XML content
+	 */
+	public function buildXML(array $invoiceData, array $linesData, $profile = '')
+	{
+		$doc = new \DOMDocument('1.0', 'UTF-8');
+		$doc->formatOutput = true;
+
+		// Root
+		$root = $doc->createElementNS(
+			'urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100',
+			'rsm:CrossIndustryInvoice'
+		);
+		$root->setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns:qdt', 'urn:un:unece:uncefact:data:standard:QualifiedDataType:100');
+		$root->setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns:ram', 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100');
+		$root->setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns:xs', 'http://www.w3.org/2001/XMLSchema');
+		$root->setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns:udt', 'urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100');
+		$root->setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns:xsi', 'http://www.w3.org/2001/XMLSchema-instance');
+		$doc->appendChild($root);
+
+		// Context
+		$ctx = $doc->createElement('rsm:ExchangedDocumentContext');
+		$root->appendChild($ctx);
+
+		// BusinessProcessId
+		if (!empty($invoiceData['businessProcessId'])) {
+			$bp = $doc->createElement('ram:BusinessProcessSpecifiedDocumentContextParameter');
+			$ctx->appendChild($bp);
+			$bp->appendChild($doc->createElement('ram:ID', $invoiceData['businessProcessId']));
+		}
+
+		$profile = !empty($profile) ? strtoupper($profile) : 'EXTENDED';
+
+		$guideline = $doc->createElement('ram:GuidelineSpecifiedDocumentContextParameter');
+		$ctx->appendChild($guideline);
+
+		$profileGuidelines = [
+			'MINIMUM'  => 'urn:factur-x.eu:1p0:minimum', // Factur-X profile
+			'BASICWL'  => 'urn:factur-x.eu:1p0:basicwl', // Factur-X profile
+			'BASIC'    => 'urn:factur-x.eu:1p0:basic', // Factur-X profile
+			'EN16931'  => 'urn:cen.eu:en16931:2017', // CII Profile
+			'EXTENDED' => 'urn:cen.eu:en16931:2017#conformant#urn:factur-x.eu:1p0:extended', // Factur-X profile
+		];
+
+		if (!isset($profileGuidelines[$profile])) {
+			throw new \InvalidArgumentException("Profil inconnu : $profile");
+		}
+
+		$guideline->appendChild(
+			$doc->createElement('ram:ID', $profileGuidelines[$profile])
+		);
+
+		// Document
+		$exDoc = $doc->createElement('rsm:ExchangedDocument');
+		$root->appendChild($exDoc);
+
+		$exDoc->appendChild($doc->createElement('ram:ID', $invoiceData['documentno']));
+		$exDoc->appendChild($doc->createElement('ram:TypeCode', $invoiceData['documenttypecode']));
+
+		// Date
+		$issueDT = $doc->createElement('ram:IssueDateTime');
+		$exDoc->appendChild($issueDT);
+
+		$dt = $doc->createElement(
+			'udt:DateTimeString',
+			$invoiceData['documentdate']->format('Ymd')
+		);
+		$dt->setAttribute('format', '102');
+		$issueDT->appendChild($dt);
+
+		// Notes
+		if (!empty($invoiceData['documentNotePublic'])) {
+			$note = $doc->createElement('ram:IncludedNote');
+			$exDoc->appendChild($note);
+			$note->appendChild($doc->createElement('ram:Content', htmlspecialchars($invoiceData['documentNotePublic'])));
+		}
+		if (!empty($invoiceData['documentNotePMT'])) {
+			$note = $doc->createElement('ram:IncludedNote');
+			$exDoc->appendChild($note);
+			$note->appendChild($doc->createElement('ram:Content', htmlspecialchars($invoiceData['documentNotePMT'])));
+			$note->appendChild($doc->createElement('ram:SubjectCode', 'PMT'));
+		}
+		if (!empty($invoiceData['documentNotePMD'])) {
+			$note = $doc->createElement('ram:IncludedNote');
+			$exDoc->appendChild($note);
+			$note->appendChild($doc->createElement('ram:Content', htmlspecialchars($invoiceData['documentNotePMD'])));
+			$note->appendChild($doc->createElement('ram:SubjectCode', 'PMD'));
+		}
+		if (!empty($invoiceData['documentNoteAAB'])) {
+			$note = $doc->createElement('ram:IncludedNote');
+			$exDoc->appendChild($note);
+			$note->appendChild($doc->createElement('ram:Content', htmlspecialchars($invoiceData['documentNoteAAB'])));
+			$note->appendChild($doc->createElement('ram:SubjectCode', 'AAB'));
+		}
+
+		// Transaction
+		$sctt = $doc->createElement('rsm:SupplyChainTradeTransaction');
+		$root->appendChild($sctt);
+
+		// LINES
+		foreach ($linesData as $line) {
+			$sctt->appendChild($this->buildLineItem($doc, $line, $profile));
+		}
+
+		// SELLER / BUYER
+		$agreement = $doc->createElement('ram:ApplicableHeaderTradeAgreement');
+		$sctt->appendChild($agreement);
+
+		$this->buildParty($doc, $agreement, $invoiceData, 'seller');
+		$this->buildParty($doc, $agreement, $invoiceData, 'buyer');
+
+		// DELIVERY
+		$delivery = $doc->createElement('ram:ApplicableHeaderTradeDelivery');
+		$sctt->appendChild($delivery);
+
+		if (!empty($invoiceData['documentDeliveryDate'])) {
+			$event = $doc->createElement('ram:ActualDeliverySupplyChainEvent');
+			$delivery->appendChild($event);
+
+			$dtNode = $doc->createElement('ram:OccurrenceDateTime');
+			$event->appendChild($dtNode);
+
+			$str = $doc->createElement(
+				'udt:DateTimeString',
+				$invoiceData['documentDeliveryDate']->format('Ymd')
+			);
+			$str->setAttribute('format', '102');
+			$dtNode->appendChild($str);
+		}
+
+		// SETTLEMENT
+		$settlement = $doc->createElement('ram:ApplicableHeaderTradeSettlement');
+		$sctt->appendChild($settlement);
+
+		// Currency
+		$settlement->appendChild($doc->createElement(
+			'ram:InvoiceCurrencyCode',
+			$invoiceData['invoiceCurrency']
+		));
+
+		// Payment means
+		$pm = $doc->createElement('ram:SpecifiedTradeSettlementPaymentMeans');
+		$settlement->appendChild($pm);
+
+		$pm->appendChild($doc->createElement('ram:TypeCode', $invoiceData['paymentMeansCode']));
+		$pm->appendChild($doc->createElement('ram:Information', $invoiceData['paymentMeansText']));
+
+		$acc = $doc->createElement('ram:PayeePartyCreditorFinancialAccount');
+		$pm->appendChild($acc);
+
+		$acc->appendChild($doc->createElement('ram:AccountName', $invoiceData['accountName']));
+
+		// TVA
+		foreach ($invoiceData['taxBreakdown'] as $rate => $vals) {
+			$settlement->appendChild(
+				$this->buildTaxNode($doc, $rate, $vals, $invoiceData['invoiceCurrency'])
+			);
+		}
+
+		$terms = $doc->createElement('ram:SpecifiedTradePaymentTerms');
+		$settlement->appendChild($terms);
+
+		$terms->appendChild($doc->createElement('ram:Description', $invoiceData['paymentTermsText']));
+
+		$dtNode = $doc->createElement('ram:DueDateDateTime');
+		$str = $doc->createElement('udt:DateTimeString', $invoiceData['paymentDueDate']->format('Ymd'));
+		$str->setAttribute('format', '102');
+		$dtNode->appendChild($str);
+
+		$terms->appendChild($dtNode);
+
+		// Totals
+		$sum = $doc->createElement('ram:SpecifiedTradeSettlementHeaderMonetarySummation');
+		$settlement->appendChild($sum);
+
+		$sum->appendChild($doc->createElement('ram:LineTotalAmount', number_format($invoiceData['lineTotalAmount'], 2, '.', '')));
+		$sum->appendChild($doc->createElement('ram:ChargeTotalAmount', number_format($invoiceData['chargeTotalAmount'], 2, '.', '')));
+		$sum->appendChild($doc->createElement('ram:AllowanceTotalAmount', number_format($invoiceData['allowanceTotalAmount'], 2, '.', '')));
+		$sum->appendChild($doc->createElement('ram:TaxBasisTotalAmount', number_format($invoiceData['taxBasisTotalAmount'], 2, '.', '')));
+
+		$taxTotal = $doc->createElement('ram:TaxTotalAmount', number_format($invoiceData['taxTotalAmount'], 2, '.', ''));
+		$taxTotal->setAttribute('currencyID', $invoiceData['invoiceCurrency']);
+		$sum->appendChild($taxTotal);
+
+		$sum->appendChild($doc->createElement('ram:GrandTotalAmount', number_format($invoiceData['grandTotalAmount'], 2, '.', '')));
+		$sum->appendChild($doc->createElement('ram:TotalPrepaidAmount', number_format($invoiceData['totalPrepaidAmount'], 2, '.', '')));
+		$sum->appendChild($doc->createElement('ram:DuePayableAmount', number_format($invoiceData['duePayableAmount'], 2, '.', '')));
+
+		// Referenced documents
+		if (!empty($invoiceData['invoiceRefDocs'])) {
+			foreach ($invoiceData['invoiceRefDocs'] as $refDoc) {
+				$refNode = $doc->createElement('ram:InvoiceReferencedDocument');
+
+				$refNode->appendChild($doc->createElement('ram:IssuerAssignedID', $refDoc['ref']));
+				if ($profile === 'EXTENDED') {
+					$refNode->appendChild($doc->createElement('ram:TypeCode', $refDoc['type']));
+				}
+
+				if (!empty($refDoc['date']) && $profile === 'EXTENDED') {
+					$dateNode = $doc->createElement('ram:FormattedIssueDateTime');
+					$str = $doc->createElement('qdt:DateTimeString', $refDoc['date']->format('Ymd'));
+					$str->setAttribute('format', '102');
+					$dateNode->appendChild($str);
+					$refNode->appendChild($dateNode);
+				}
+
+				$settlement->appendChild($refNode);
+			}
+		}
+		$xml = $doc->saveXML();
+
+		return $xml;
+	}
+
+	/**
+	 * Build a single line item node.
+	 *
+	 * @param \DOMDocument 		$doc		Document to create nodes in
+	 * @param array 			$line 		Line data
+	 * @param string 			$profile 	Profile (used to conditionally include certain nodes)
+	 *
+	 * @return \DOMElement
+	 */
+	private function buildLineItem(\DOMDocument $doc, array $line, string $profile)
+	{
+		$el = $doc->createElement('ram:IncludedSupplyChainTradeLineItem');
+
+		// ID
+		$docLine = $doc->createElement('ram:AssociatedDocumentLineDocument');
+		$el->appendChild($docLine);
+		$docLine->appendChild($doc->createElement('ram:LineID', $line['lineid']));
+
+		// Product
+		$prod = $doc->createElement('ram:SpecifiedTradeProduct');
+		$el->appendChild($prod);
+		if (!empty($line['prodsellerid'])) {
+			$prod->appendChild(
+				$doc->createElement('ram:SellerAssignedID', $line['prodsellerid'])
+			);
+		}
+		$prod->appendChild($doc->createElement('ram:Name', htmlspecialchars($line['prodname'])));
+		if (!empty($line['proddesc'])) {
+			$prod->appendChild($doc->createElement('ram:Description', htmlspecialchars($line['proddesc'])));
+		}
+
+		// Price
+		$price = $doc->createElement('ram:SpecifiedLineTradeAgreement');
+		$el->appendChild($price);
+
+		$gross = $doc->createElement('ram:GrossPriceProductTradePrice');
+		$price->appendChild($gross);
+		$gross->appendChild($doc->createElement('ram:ChargeAmount', number_format($line['grosspriceamount'], 2, '.', '')));
+
+		$net = $doc->createElement('ram:NetPriceProductTradePrice');
+		$price->appendChild($net);
+		$net->appendChild($doc->createElement('ram:ChargeAmount', number_format($line['netpriceamount'], 2, '.', '')));
+
+		// Quantity
+		$deliv = $doc->createElement('ram:SpecifiedLineTradeDelivery');
+		$el->appendChild($deliv);
+
+		$qty = $doc->createElement('ram:BilledQuantity', number_format($line['billedquantity'], 2, '.', ''));
+		$qty->setAttribute('unitCode', $line['billedquantityunitcode']);
+		$deliv->appendChild($qty);
+
+		// VAT
+		$sett = $doc->createElement('ram:SpecifiedLineTradeSettlement');
+		$el->appendChild($sett);
+
+		$tax = $doc->createElement('ram:ApplicableTradeTax');
+		$sett->appendChild($tax);
+
+		$tax->appendChild($doc->createElement('ram:TypeCode', 'VAT'));
+		$tax->appendChild($doc->createElement('ram:CategoryCode', $line['categoryCode']));
+		$tax->appendChild($doc->createElement('ram:RateApplicablePercent', $line['rateApplicablePercent']));
+
+		// Total line
+		$sum = $doc->createElement('ram:SpecifiedTradeSettlementLineMonetarySummation');
+		$sett->appendChild($sum);
+		$sum->appendChild($doc->createElement('ram:LineTotalAmount', number_format($line['lineTotalAmount'], 2, '.', '')));
+
+		// Ref doc for deposit line
+		if (!empty($line['isDepositLine'])) {
+			$refNode = $doc->createElement('ram:AdditionalReferencedDocument');
+
+			$refNode->appendChild($doc->createElement('ram:IssuerAssignedID', $line['depositInvoiceRef']));
+			$refNode->appendChild($doc->createElement('ram:TypeCode', '130'));
+
+			if (!empty($line['depositInvoiceDate']) && $profile === 'EXTENDED') {
+				$dateNode = $doc->createElement('ram:FormattedIssueDateTime');
+				$str = $doc->createElement('qdt:DateTimeString', $line['depositInvoiceDate']->format('Ymd'));
+				$str->setAttribute('format', '102');
+				$dateNode->appendChild($str);
+				$refNode->appendChild($dateNode);
+			}
+
+			$sett->appendChild($refNode);
+		}
+
+		return $el;
+	}
+
+	/**
+	 * Build the seller or buyer party node.
+	 *
+	 * @param \DOMDocument 		$doc			Document to create nodes in
+	 * @param \DOMElement  		$agreement 		Parent agreement node to append to
+	 * @param array       		$data      		Invoice data array
+	 * @param string      		$type      		'seller' or 'buyer'
+	 *
+	 * @return void
+	 */
+	private function buildParty($doc, $agreement, $data, $type)
+	{
+		$tag = $type === 'seller' ? 'ram:SellerTradeParty' : 'ram:BuyerTradeParty';
+		$node = $doc->createElement($tag);
+		$agreement->appendChild($node);
+
+		$prefix = $type;
+
+		$node->appendChild($doc->createElement('ram:ID', $data[$prefix . 'ids']));
+
+		// GlobalID
+		if (!empty($data[$prefix . 'GlobalIds'])) {
+			foreach ($data[$prefix . 'GlobalIds'] as $globalId) {
+				$g = $doc->createElement('ram:GlobalID', $globalId['value']);
+				$g->setAttribute('schemeID', $globalId['schemeID']);
+				$node->appendChild($g);
+			}
+		}
+
+		$node->appendChild($doc->createElement('ram:Name', htmlspecialchars($data[$prefix . 'name'])));
+
+		// Legal org
+		$legal = $doc->createElement('ram:SpecifiedLegalOrganization');
+		$node->appendChild($legal);
+		$id = $doc->createElement('ram:ID', $data[$prefix . 'LegalOrgId']);
+		$id->setAttribute('schemeID', $data[$prefix . 'LegalOrgScheme']);
+		$legal->appendChild($id);
+		$legal->appendChild(
+			$doc->createElement('ram:TradingBusinessName', $data[$prefix . 'TradingName'])
+		);
+
+		// Contact
+		if (!empty($data[$prefix . 'contactpersonname'])) {
+			$contact = $doc->createElement('ram:DefinedTradeContact');
+			$node->appendChild($contact);
+			$contact->appendChild($doc->createElement('ram:PersonName', htmlspecialchars($data[$prefix . 'contactpersonname'])));
+		}
+
+		if (!empty($data[$prefix . 'contactdepartmentname'])) {
+			$contact->appendChild($doc->createElement('ram:DepartmentName', htmlspecialchars($data[$prefix . 'contactdepartmentname'])));
+		}
+
+		if (!empty($data[$prefix . 'contactphoneno'])) {
+			$phone = $doc->createElement('ram:TelephoneUniversalCommunication');
+			$contact->appendChild($phone);
+			$phone->appendChild($doc->createElement('ram:CompleteNumber', $data[$prefix . 'contactphoneno']));
+		}
+
+		if (!empty($data[$prefix . 'contactfaxno'])) {
+			$fax = $doc->createElement('ram:FaxUniversalCommunication');
+			$contact->appendChild($fax);
+			$fax->appendChild($doc->createElement('ram:CompleteNumber', $data[$prefix . 'contactfaxno']));
+		}
+
+		if (!empty($data[$prefix . 'contactemailaddr'])) {
+			$email = $doc->createElement('ram:EmailURIUniversalCommunication');
+			$contact->appendChild($email);
+			$email->appendChild($doc->createElement('ram:URIID', $data[$prefix . 'contactemailaddr']));
+		}
+
+
+		// Address
+		$addr = $doc->createElement('ram:PostalTradeAddress');
+		$node->appendChild($addr);
+
+		$addr->appendChild($doc->createElement('ram:PostcodeCode', $data[$prefix . 'postcode']));
+		$addr->appendChild($doc->createElement('ram:LineOne', htmlspecialchars($data[$prefix . 'lineone'])));
+		$addr->appendChild($doc->createElement('ram:CityName', htmlspecialchars($data[$prefix . 'city'])));
+		$addr->appendChild($doc->createElement('ram:CountryID', $data[$prefix . 'country']));
+
+		// URIUniversalCommunication
+		if (!empty($data[$prefix . 'CommunicationUriScheme']) && !empty($data[$prefix . 'CommunicationUri'])) {
+			$uri = $doc->createElement('ram:URIUniversalCommunication');
+			$node->appendChild($uri);
+			$uriid = $doc->createElement('ram:URIID', $data[$prefix . 'CommunicationUri']);
+			$uriid->setAttribute('schemeID', $data[$prefix . 'CommunicationUriScheme']);
+			$uri->appendChild($uriid);
+		}
+
+		// VAT
+		if (!empty($data[$prefix . 'vatnumber'])) {
+			$tax = $doc->createElement('ram:SpecifiedTaxRegistration');
+			$id = $doc->createElement('ram:ID', $data[$prefix . 'vatnumber']);
+			$id->setAttribute('schemeID', 'VA');
+			$tax->appendChild($id);
+			$node->appendChild($tax);
+		}
+	}
+
+	/**
+	 * Build a tax node.
+	 *
+	 * @param \DOMDocument $doc 		Document to create nodes in
+	 * @param float        $rate 		Tax rate
+	 * @param array        $vals 		Array containing tax values
+	 * @param string       $currency 	Currency code
+	 *
+	 * @return \DOMElement
+	 */
+	private function buildTaxNode($doc, $rate, $vals, $currency)
+	{
+		$tax = $doc->createElement('ram:ApplicableTradeTax');
+
+		$tax->appendChild($doc->createElement('ram:CalculatedAmount', number_format($vals['totalTVA'], 2, '.', '')));
+
+		$tax->appendChild($doc->createElement('ram:TypeCode', 'VAT'));
+
+		$tax->appendChild($doc->createElement('ram:BasisAmount', number_format($vals['totalHT'], 2, '.', '')));
+
+		$tax->appendChild($doc->createElement('ram:CategoryCode', $rate > 0 ? 'S' : 'Z'));
+		$tax->appendChild($doc->createElement('ram:RateApplicablePercent', number_format($rate, 2, '.', '')));
+
+		return $tax;
+	}
+
+
+	// =====================================================================
+	// Common methods with FacturX class
+	// =====================================================================
 
 	/**
 	 * Synchronize or create a Dolibarr thirdparty based on E-invoice seller information.
@@ -1575,7 +2743,7 @@ class CIIProtocol extends AbstractProtocol
 		$sql .= " INNER JOIN " . MAIN_DB_PREFIX . "product_fournisseur_price as pfp ON pfp.fk_product = p.rowid ";
 		$sql .= " WHERE pfp.product_supplier_id = '" . $db->escape($lineData['prodsellerid']) . "' ";
 		$sql .= " AND pfp.fk_soc = " . intval($lineData['supplierId']) . " ";
-		$sql .= " AND p.entity IN (".getEntity('product').")";
+		$sql .= " AND p.entity IN (" . getEntity('product') . ")";
 		$sql .= " LIMIT 1";
 		$resql = $db->query($sql);
 		if ($resql && $db->num_rows($resql) > 0) {
@@ -1592,7 +2760,7 @@ class CIIProtocol extends AbstractProtocol
 		if (!empty($lineData['prodbuyerid'])) {
 			$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product";
 			$sql .= " WHERE ref = '" . $db->escape($lineData['prodbuyerid']) . "' OR rowid = '" . $db->escape($lineData['prodbuyerid']) . "' ";
-			$sql .= " AND entity IN (".getEntity('product').")";
+			$sql .= " AND entity IN (" . getEntity('product') . ")";
 			$sql .= " LIMIT 1";
 			$resql = $db->query($sql);
 			if ($resql && $db->num_rows($resql) > 0) {
@@ -1606,7 +2774,7 @@ class CIIProtocol extends AbstractProtocol
 		if (!empty($lineData['prodsellerid']) && $lineData['prodsellerid'] !== "0000") {
 			$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product";
 			$sql .= " WHERE ref = 'EI-" . $db->escape($lineData['prodsellerid']) . "'";
-			$sql .= " AND entity IN (".getEntity('product').")";
+			$sql .= " AND entity IN (" . getEntity('product') . ")";
 			$sql .= " LIMIT 1";
 			$resql = $db->query($sql);
 			if ($resql && $db->num_rows($resql) > 0) {
@@ -1619,7 +2787,7 @@ class CIIProtocol extends AbstractProtocol
 		// Text Search using prodname
 		$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product";
 		$sql .= " WHERE label = '" . $db->escape($lineData['prodname']) . "'";
-		$sql .= " AND entity IN (".getEntity('product').")";
+		$sql .= " AND entity IN (" . getEntity('product') . ")";
 		$resql = $db->query($sql);
 		if ($resql) {
 			if ($db->num_rows($resql) === 1) {
@@ -1863,5 +3031,321 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		return array('res' => 1, 'message' => 'Attachment saved successfully ' . $dest_path);
+	}
+
+	/**
+	 * Determines the delivery dates and the corresponding order numbers within two arrays
+	 *
+	 * @param 	array   $customerOrderReferenceList  	array to store the corresponding order ids as strings
+	 * @param 	array   $deliveryDateList            	array to store the corresponding delivery dates as string in format YYYY-MM-DD
+	 * @param 	Facture $object 						invoice object
+	 * @return	void
+	 */
+	private function _determineDeliveryDatesAndCustomerOrderNumbers(&$customerOrderReferenceList, &$deliveryDateList, $object)
+	{
+		// TODO: move this function to class utils
+		$object->fetchObjectLinked();
+		// check for delivery notes and corresponding real delivery dates
+		if (isset($object->linkedObjectsIds['shipping']) && is_array($object->linkedObjectsIds['shipping'])) {
+			foreach ($object->linkedObjectsIds['shipping'] as $expeditionId) {
+				$expedition = new Expedition($this->db);
+				$expeditionFetchResult = $expedition->fetch($expeditionId);
+				if ($expeditionFetchResult > 0) {
+					if (!empty($expedition->origin) && $expedition->origin == "commande" && !empty($expedition->origin_id)) {
+						$commande = new Commande($this->db);
+						$commandeFetchResult = $commande->fetch($expedition->origin_id);
+						if ($commandeFetchResult > 0 && !empty($commande->ref_client)) {
+							$customerOrderReferenceList[] = $commande->ref_client;
+						}
+					}
+					if (!empty($expedition->date_delivery)) {
+						$deliveryDateList[] = date('Y-m-d', $expedition->date_delivery);
+					}
+				}
+			}
+		}
+		// if delivery notes are linked and take the real delivery date from there. if no delivery notes are available,
+		// take delivery date from order.
+		if (isset($object->linkedObjectsIds['commande']) && is_array($object->linkedObjectsIds['commande'])) {
+			foreach ($object->linkedObjectsIds['commande'] as $commandeId) {
+				$commande = new Commande($this->db);
+				$commandeFetchResult = $commande->fetch($commandeId);
+				if ($commandeFetchResult > 0) {
+					if (!empty($commande->ref_client)) {
+						$customerOrderReferenceList[] = $commande->ref_client;
+					}
+					$commande->fetchObjectLinked();
+					$found = 0;
+					if (!empty($commande->linkedObjectsIds) && !empty($commande->linkedObjectsIds['shipping']) && \count($commande->linkedObjectsIds['shipping']) > 0) {
+						foreach ($commande->linkedObjectsIds['shipping'] as $expeditionId) {
+							$expedition = new Expedition($this->db);
+							$expeditionFetchResult = $expedition->fetch($expeditionId);
+							if ($expeditionFetchResult > 0) {
+								if (!empty($expedition->date_delivery)) {
+									$found++;
+									$deliveryDateList[] = date('Y-m-d', $expedition->date_delivery);
+								}
+							}
+						}
+					}
+					if ($found == 0) {
+						if (!empty($commande->delivery_date)) {
+							$deliveryDateList[] = date('Y-m-d', $commande->delivery_date);
+						}
+					}
+				}
+			}
+		}
+		$customerOrderReferenceList = array_unique($customerOrderReferenceList);
+		sort($customerOrderReferenceList);
+		$deliveryDateList = array_unique($deliveryDateList);
+		rsort($deliveryDateList);
+	}
+
+	/**
+	 * Return IEC_6523 code (https://docs.peppol.eu/poacc/billing/3.0/codelist/ICD/)
+	 * This list of codes describes schemes codes for thirdparties but also products. This functions returns need for thirdparty schemes only.
+	 *
+	 * @param	string		$country_code		Country code
+	 * @param	int			$global				Use 0 for legal ID, use 1 for a global ID, use 2 for URI.
+	 * @return string code
+	 */
+	private function getIEC6523Code($country_code, $global = 0)
+	{
+		$retour = "";
+		switch ($country_code) {
+			case 'BE':
+				if ($global == 1 || $global == 2) {
+					$retour = "0208";
+				} else {
+					$retour = "0008";
+				}
+				break;
+			case 'DE':
+				$retour = "0000";
+				break;
+			case 'FR':
+				if ($global == 1 || $global == 2) {
+					$retour = "0225";	// SIREN or SIREN_XXX.  	Einvoice global ID, example: "000000002" or URI OD, example "315143296_1939"
+				} else {
+					$retour = "0002";	// SIREN.	Used for LegalOrganization, example: "315143296"
+				}
+				break;
+			default:
+				if ($global == 1 || $global == 2) {
+					$retour = "0060";	// DUNS
+					// $retour = "EM";	// Emails
+				} else {
+					$retour = "0060";	// DUNS
+					// $retour = "EM";	// Emails
+				}
+		}
+		return $retour;
+	}
+
+	/************************************************
+	 *    Check line type from external module ?
+	 *
+	 * @param  object $line       line we work on
+	 * @param  string $element    line object element (for special case like shipping)
+	 * @param  string $searchName module name we look for
+	 * @return boolean                        true if the line is a special one and was created by the module we ask for
+	 ************************************************/
+	private function _isLineFromExternalModule($line, $element, $searchName)
+	{
+		// TODO: move this function to class utils
+		global $db;
+		if ($element == 'shipping' || $element == 'delivery') {
+			$fk_origin_line = $line->fk_origin_line;
+			$line = new OrderLine($db);
+			$line->fetch($fk_origin_line);
+		}
+		if ($line->product_type == 9 && $line->special_code == $this->_getModNumber($searchName)) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	/**
+	 * Check if a given VAT rate is valid for a specific country based on the c_tva table in the database.
+	 *
+	 * @param 	string	$vatrate		Vat rate to check (e.g. '20' for 20%)
+	 * @param 	string	$countryCode	Country code to check the VAT rate against (e.g. 'FR' for France)
+	 * @return 	boolean					Returns true if the VAT rate is valid for the given country, false otherwise.
+	 * TODO Move common function into an implemented CommonXProtocol.class.php if needed by other protocol handlers
+	 */
+	public function checkIfVatRateIsValid($vatrate, $countryCode)
+	{
+		if ($countryCode == 'FR') {
+			// Check rule BR-FR-16 For AFNOR Einvoice - List in XP-Z12-012
+			$validRatesString = ['0', '10', '13', '20', '8.5', '19.6', '2.1', '5.5', '7', '20.6', '1.05', '0.9', '1.75', '9.2', '9.6'];
+			//$valtotest = price2num((float) $vatrate, '', 1);
+			if (!in_array($vatrate, $validRatesString)) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Map type of invoices dolibarr <-> facturx
+	 *
+	 * @param 	CommonInvoice	$object 	The invoice object
+	 * @return  string|null 				code of invoice type
+	 */
+	private function _getTypeOfInvoice($object)
+	{
+		$map = [
+			CommonInvoice::TYPE_STANDARD        => '380',
+			CommonInvoice::TYPE_REPLACEMENT     => '384',
+			CommonInvoice::TYPE_CREDIT_NOTE     => '381',
+			CommonInvoice::TYPE_DEPOSIT         => '386',
+			CommonInvoice::TYPE_SITUATION       => '380',				// Process situation invoice as common invoice
+		];
+		return $map[$object->type] ?? null;
+	}
+
+	/**
+	 * Determine Factur-X BillingProcessID (Cadre / Mode de facturation)
+	 * according to French e-invoicing
+	 *
+	 * BillingProcessID allowed values:
+	 *
+	 * STANDARD INVOICE (initial submission)
+	 * --------------------------------------
+	 * B1 : Products invoice
+	 * S1 : Services invoice
+	 * M1 : Mixed invoice (products + services non-accessory)
+	 *
+	 * INVOICE (already paid)
+	 * -------------------------------------------
+	 * B2 : Products invoice
+	 * S2 : Services invoice
+	 * M2 : Mixed invoice (products + services non-accessory)
+	 *
+	 * FINAL INVOICE AFTER DEPOSIT
+	 * ----------------------------
+	 * B4 : Final products invoice (after deposit)
+	 * S4 : Final services invoice (after deposit)
+	 * M4 : Final mixed invoice (after deposit)
+	 *
+	 * SPECIFIC CASES
+	 * --------------
+	 * S5 : Services invoice issued by subcontractor
+	 * S6 : Services invoice issued by co-contractor
+	 *
+	 * E-REPORTING CASE (VAT already collected)
+	 * -----------------------------------------
+	 * B7 : Products invoice already reported (VAT already collected)
+	 * S7 : Services invoice already reported (VAT already collected)
+	 *
+	 * Notes:
+	 * - Prefix meaning:
+	 *     B = Products
+	 *     S = Services
+	 *     M = Mixed (products + services non-accessory)
+	 *
+	 * @param  Facture $invoice Dolibarr invoice object
+	 * @return string  BillingProcessID
+	 */
+	public function getBillingProcessID($invoice)
+	{
+		$hasProduct  = false;
+		$hasService  = false;
+
+		// Check invoice lines to determine if invoice contains products, services or both
+		if (!empty($invoice->lines)) {
+			foreach ($invoice->lines as $line) {
+				if ((int) $line->product_type === 0) {
+					$hasProduct = true;
+				}
+
+				if ((int) $line->product_type === 1) {
+					$hasService = true;
+				}
+			}
+		}
+
+		// Determine prefix B / S / M
+		if ($hasProduct && $hasService) {
+			$prefix = 'M';
+		} elseif ($hasService && !$hasProduct) {
+			$prefix = 'S';
+		} else {
+			// Default to products
+			$prefix = 'B';
+		}
+
+		// Determine suffix 1 (initial invoice) or 2 (already paid invoice) according to invoice status and payment information and if the invoice contain a line a deposit (prepayment) so final invoice after deposit then suffix is 4
+		if ($invoice->status == Facture::STATUS_CLOSED && empty($invoice->close_code)) {
+			return $prefix . '2';
+		} else {
+			// Check if the invoice contains a deposit (prepayment) line
+			$hasDepositLine = false;
+			if (!empty($invoice->lines)) {
+				foreach ($invoice->lines as $line) {
+					if ($line->desc == '(DEPOSIT)') {
+						$hasDepositLine = true;
+						break;
+					}
+				}
+			}
+			if ($hasDepositLine) {
+				return $prefix . '4';
+			}
+			return $prefix . '1';
+		}
+	}
+
+	/************************************************
+	 * Find paymentMean number
+	 *
+	 * @param  object 	$invoice 			object name we look for
+	 * @return integer                      paymentMeanId for HorstOeko libs
+	 ************************************************/
+	private function _getPaymentMeanNumber($invoice)
+	{
+		$paymentMeanId = 97;
+		//"Must be defined between trading parties" for empty values
+		switch ($invoice->mode_reglement_code) {
+			case 'CB':
+				$paymentMeanId = 54;
+				break;
+			//Credit Card
+			case 'CHQ':
+				$paymentMeanId = 20;
+				break;
+			//Check
+			case 'FAC':
+				$paymentMeanId = 1;
+				break;
+			//Local payment method
+			case 'LIQ':
+				$paymentMeanId = 10;
+				break;
+			//Cash
+			case 'PRE':
+				$paymentMeanId = 59;
+				break;
+			//SEPA direct debit
+			case 'TIP':
+				$paymentMeanId = 45;
+				break;
+			//Bank Transfer with document
+			case 'TRA':
+				$paymentMeanId = 23;
+				break;
+			//Check
+			case 'VAD':
+				$paymentMeanId = 68;
+				break;
+			//Online Payment
+			case 'VIR':
+				$paymentMeanId = 30;
+				break;
+		}
+		return $paymentMeanId;
 	}
 }
