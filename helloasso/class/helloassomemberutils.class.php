@@ -468,7 +468,7 @@ class HelloAssoMemberUtils
 			if ($error) {
 				$db->rollback();
 				$this->errorPosts[] = array("member" => $newmember, "error" => $this->error, "errors" => $this->errors);
-			} else if ($dryrun) {
+			} elseif ($dryrun) {
 				$db->rollback();
 			} else {
 				$db->commit();
