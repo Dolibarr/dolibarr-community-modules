@@ -228,7 +228,8 @@ if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 	}
 	print $form->select_company($sellerId ?: '', 'seller_id', '', $langs->trans("MyCompany"), 1);
 	print ' &nbsp; <a href="'.$_SERVER["PHP_SELF"].'?seller_einvoiceid=me" class="reposition">Select me</a>';
-	print ' - <a href="'.$_SERVER["PHP_SELF"].'?seller_einvoiceid=000000001" class="reposition">Select thirdparty with SIREN 000000001</a>';
+	print ' - <a href="'.$_SERVER["PHP_SELF"].'?seller_einvoiceid=000000001" class="reposition">Select thirdparty SIREN 000000001</a>';
+	print ' - <a href="'.$_SERVER["PHP_SELF"].'?seller_einvoiceid=000000002" class="reposition">Select thirdparty SIREN 000000002</a>';
 	print '<br>';
 
 	print '<span class="width100 inline-block">'.$langs->trans("Buyer").'</span> ';
@@ -240,6 +241,7 @@ if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 	}
 	print $form->select_company($buyerId ?: '', 'buyer_id', '', $langs->trans("MyCompany"), 1);
 	print ' &nbsp; <a href="'.$_SERVER["PHP_SELF"].'?buyer_einvoiceid=000000001" class="reposition">Select thirdparty with SIREN 000000001</a>';
+	print ' - <a href="'.$_SERVER["PHP_SELF"].'?buyer_einvoiceid=000000002" class="reposition">Select thirdparty with SIREN 000000002</a>';
 	print ' - <a href="'.$_SERVER["PHP_SELF"].'?buyer_einvoiceid=me" class="reposition">Select me</a>';
 	print '<br>';
 
