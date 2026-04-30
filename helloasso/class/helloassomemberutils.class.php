@@ -47,6 +47,7 @@ class HelloAssoMemberUtils
 	public $error;
 	public $errors = array();
 	public $nbPosts = 0;
+	public $errorPosts = array();
 	public $output = "";
 	private $helloasso_tokens = array();
 
@@ -124,9 +125,7 @@ class HelloAssoMemberUtils
 		$db = $this->db;
 		$helloasso_date_last_fetch = "";
 		$error = 0;
-		$db->begin();
 		dol_syslog(get_class($this)."::helloassoSyncMembersToDolibarr with drymode = ".$dryrun." and mode = ".$mode, LOG_DEBUG);
-
 
 		if ($dryrun == 0) {
 			$helloasso_date_last_fetch = $this->helloasso_date_last_fetch;
@@ -137,51 +136,69 @@ class HelloAssoMemberUtils
 			$error++;
 		}
 		if (!$error) {
-			$res = $this->helloassoPostMembersToDolibarr();
+			$res = $this->helloassoPostMembersToDolibarr($dryrun);
 			if ($res < 0) {
 				$error++;
 			}
 		}
 
-		if (!$error && $dryrun == 0) {
-			$db->commit();
-			if ($mode != "cron") {
-				$mesg = $langs->transnoentities("HelloAssoMembersAddedSucessfully", $this->nbPosts);
-				if ($this->nbPosts == 0) {
-					$mesg = $langs->transnoentities("HelloAssoMembersNoNewMembers");
+		//Error management with errorPosts 
+		if (!empty($this->errorPosts)) {
+			foreach ($this->errorPosts as $key => $err) {
+				$firstname = $err["member"]->user->firstName;
+				$lastname = $err["member"]->user->lastName;
+				if (!empty($this->customfields['email'])) {
+					$email = "";
+					foreach ($err["member"]->customFields as $key => $field) {
+						if ($field->name == $this->customfields['email']) {
+							$email = $field->answer;
+							break;
+						}
+					}
 				}
-				setEventMessages($mesg, null, 'mesgs');
-				dol_syslog(get_class($this)."::helloassoSyncMembersToDolibarr ended with setEventMessage with mesg = ".$mesg, LOG_DEBUG);
+				$membererror = "Id: ".$err["member"]->id.", ".$langs->transnoentities("Firstname").": ".$firstname.", ".$langs->transnoentities("Lastname").": ".$lastname.(!empty($email) ? ", ".$langs->transnoentities("Email").": ".$email : "");
+				$this->errors[] = $langs->transnoentities("ErrorHelloAssoMembershipPost", $membererror, $err["error"]);
+			}
+		}
+
+		$nberrors = count($this->errorPosts);
+		if ($dryrun == 1) {
+			$mesg = $langs->transnoentities("HelloAssoMembersNothingDone", $this->nbPosts, $nberrors);
+			if ($mode != "cron") {
+				setEventMessages($mesg, null, 'warnings');
+				dol_syslog(get_class($this)."::helloassoSyncMembersToDolibarr ended setEventMessage with mesg = ".$mesg, LOG_DEBUG);
+				if ($nberrors > 0 || $error) {
+					setEventMessages($this->error, $this->errors, "errors");
+				}
 			} else {
-				$mesg = $this->nbPosts." Member(s) have been added successfully";
-				if ($this->nbPosts == 0) {
-					$mesg = "0 Member where added, no new members on HelloAsso";
+				$mesg = "Nothing done (Dry mode).";
+				if ($nberrors > 0 || $error) {
+					$mesg.= $langs->trans("HelloAssoMembersError", $nberrors).": ". implode(",", $this->errors);
 				}
 				$this->output = $mesg;
 				dol_syslog(get_class($this)."::helloassoSyncMembersToDolibarr ended with cron output with mesg = ".$mesg, LOG_DEBUG);
 			}
 		} else {
-			$db->rollback();
-			if ($error) {
-				if (!empty($this->error)) {
-					$this->errors[] = $this->error;
-				}
-				$errmsg = (implode(', ', $this->errors));
-				if ($mode != "cron") {
-					setEventMessages($errmsg, null, 'errors');
-					dol_syslog(get_class($this)."::helloassoSyncMembersToDolibarr ended setEventMessage with mesg = ".$errmsg, LOG_DEBUG);
-				} else {
-					dol_syslog(get_class($this)."::helloassoSyncMembersToDolibarr ended with cron output with mesg = ".$errmsg, LOG_DEBUG);
-				}
-				return 1;
-			}
-			$mesg = $langs->transnoentities("HelloAssoMembersNothingDone", $this->nbPosts);
 			if ($mode != "cron") {
-				setEventMessages($mesg, null, 'warnings');
-				dol_syslog(get_class($this)."::helloassoSyncMembersToDolibarr ended setEventMessage with mesg = ".$mesg, LOG_DEBUG);
+				$mesg = $langs->transnoentities("HelloAssoMembersAddedSucessfully", $this->nbPosts);
+				if ($this->nbPosts == 0 && $nberrors == 0) {
+					$mesg = $langs->transnoentities("HelloAssoMembersNoNewMembers");
+				}
+				setEventMessages($mesg, null, 'mesgs');
+				if ($nberrors > 0 || $error) {
+					setEventMessages($langs->trans("HelloAssoMembersError", $nberrors), null, "errors");
+					setEventMessages($this->error, $this->errors, "errors");
+				}
+				dol_syslog(get_class($this)."::helloassoSyncMembersToDolibarr ended with setEventMessage with mesg = ".$mesg, LOG_DEBUG);
 			} else {
-				$this->output = "Nothing done (Dry mode)";
-				dol_syslog(get_class($this)."::helloassoSyncMembersToDolibarr ended with cron output with mesg = ".$this->output, LOG_DEBUG);
+				$mesg = $langs->transnoentities("HelloAssoMembersAddedSucessfully", $this->nbPosts);
+				if ($this->nbPosts == 0 && $nberrors == 0) {
+					$mesg = $langs->transnoentities("HelloAssoMembersNoNewMembers");
+				} else {
+					$mesg .= "<br>".$langs->trans("HelloAssoMembersError", $nberrors).": ". implode(",", $this->errors);
+				}
+				$this->output = $mesg;
+				dol_syslog(get_class($this)."::helloassoSyncMembersToDolibarr ended with cron output with mesg = ".$mesg, LOG_DEBUG);
 			}
 		}
 		return 0;
@@ -189,14 +206,14 @@ class HelloAssoMemberUtils
 
 	/**
 	 * Post array $this->helloasso_members of HelloAsso Members to Dolibarr
-	 *
+	 * @param   int        $dryrun    0 for normal run, 1 for dry run
+	 * 
 	 * @return int >0 if OK, 0 if nothing to do, <0 if KO
 	 */
-	public function helloassoPostMembersToDolibarr()
+	public function helloassoPostMembersToDolibarr($dryrun = 0)
 	{
 		global $user, $conf, $langs;
 		$db = $this->db;
-		$error = 0;
 		$datelastfetch = 0;
 		dol_syslog(get_class($this)."::helloassoPostMembersToDolibarr ", LOG_DEBUG);
 
@@ -242,6 +259,9 @@ class HelloAssoMemberUtils
 
 		$helloasso_members = $this->helloasso_members;
 		foreach ($helloasso_members as $key => $newmember) {
+			$db->begin();
+			$error = 0;
+			$this->errors = array();
 			$date_start_subscription = dol_stringtotime($newmember->order->meta->createdAt);
 			$member = new Adherent($db);
 			$membertype = new AdherentType($db);
@@ -267,161 +287,167 @@ class HelloAssoMemberUtils
 					}
 					$res = $this->setHelloAssoTypeMemberMapping($dolibarrmembertype, $newmember->tierId);
 					if ($res <= 0) {
-						return -1;
+						$error++;
 					}
 				} else {
 					$this->errors[] = $db->lasterror();
-					return -2;
+					$error++;
 				}
 			}
-			$membertype->fetch($this->helloasso_member_types[$newmember->tierId]);
+			if (!$error) {
+				$membertype->fetch($this->helloasso_member_types[$newmember->tierId]);
 
-			// Try to find dolibarr member linked to HelloAsso member
-			$dolibarrmembertype = $this->helloasso_member_types[$newmember->tierId];
-			$sql = "SELECT rowid as id";
-			$sql .= " FROM ".MAIN_DB_PREFIX."adherent as a";
-			$sql .= " WHERE a.firstname = '".$db->escape($newmember->user->firstName)."'";
-			$sql .= " AND a.lastname = '".$db->escape($newmember->user->lastName)."'";
-			$sql .= " AND statut = 1";
-			$sql .= " AND entity IN (".getEntity($member->element).")";
-			if (!empty($this->customfields['email'])) {
-				$email = "";
-				foreach ($newmember->customFields as $key => $field) {
-					if ($field->name == $this->customfields['email']) {
-						$email = $field->answer;
-						break;
+				// Try to find dolibarr member linked to HelloAsso member
+				$dolibarrmembertype = $this->helloasso_member_types[$newmember->tierId];
+				$sql = "SELECT rowid as id";
+				$sql .= " FROM ".MAIN_DB_PREFIX."adherent as a";
+				$sql .= " WHERE a.firstname = '".$db->escape($newmember->user->firstName)."'";
+				$sql .= " AND a.lastname = '".$db->escape($newmember->user->lastName)."'";
+				$sql .= " AND statut = 1";
+				$sql .= " AND entity IN (".getEntity($member->element).")";
+				if (!empty($this->customfields['email'])) {
+					$email = "";
+					foreach ($newmember->customFields as $key => $field) {
+						if ($field->name == $this->customfields['email']) {
+							$email = $field->answer;
+							break;
+						}
 					}
+					$sql .= " AND a.email = '".$db->escape($email)."'";
 				}
-				$sql .= " AND a.email = '".$db->escape($email)."'";
-			}
-			$resql = $db->query($sql);
-			if ($resql) {
-				$num_rows = $db->num_rows($resql);
-				if ($num_rows == 1) {
-					$obj = $db->fetch_object($resql);
-					$member->fetch($obj->id);
-					if ($member->typeid != $dolibarrmembertype) {
-						$member->typeid = $dolibarrmembertype;
-						$result = $member->update($user);
-						if ($result <= 0) {
+				$resql = $db->query($sql);
+				if ($resql) {
+					$num_rows = $db->num_rows($resql);
+					if ($num_rows == 1) {
+						$obj = $db->fetch_object($resql);
+						$member->fetch($obj->id);
+						if ($member->typeid != $dolibarrmembertype) {
+							$member->typeid = $dolibarrmembertype;
+							$result = $member->update($user);
+							if ($result <= 0) {
+								$this->error = $member->error;
+								$this->errors = array_merge($member->errors,$this->errors);
+								$error++;
+							}
+						}
+					} else {
+						// Create in Dolibarr an HelloAsso member
+						$memberid = $this->createHelloAssoMember($newmember, $dolibarrmembertype);
+						if ($memberid <= 0) {
+							$error++;
+						} else {
+							$res = $member->fetch($memberid);
+							if ($res <= 0) {
+								$this->error = $member->error;
+								$this->errors = array_merge($member->errors,$this->errors);
+								$error++;
+							}
+						}
+					}
+
+					// Create new thirdparty if member already exist and socid is not defined
+					if (!$error && getDolGlobalInt("HELLOASSO_FORM_CREATE_THIRDPARTY") && empty($member->socid)) {
+						dol_syslog(get_class($this)."::helloassoPostMembersToDolibarr  Thirdparty creation for exiting members", LOG_DEBUG);
+						$newthirdparty = new Societe($db);
+						$newthirdparty->name = $member->getFullName($langs);
+						$newthirdparty->client = 1;
+						$newthirdparty->code_client = -1;
+						$newthirdpartyid = $newthirdparty->create($user);
+						if ($newthirdpartyid <= 0) {
+							$this->error = $newthirdparty->error;
+							$this->errors = array_merge($newthirdparty->errors, $this->errors);
+							$error++;
+						}
+						if (!$error) {
+							$member->socid = $newthirdpartyid;
+							$res = $member->update($user);
+							if ($res <= 0) {
+								$this->error = $member->error;
+								$this->errors = array_merge($member->errors, $this->errors);
+								$error++;
+							}
+						}
+					}
+
+					// Create new subscription
+					if (!$error) {
+						dol_syslog(get_class($this)."::helloassoPostMembersToDolibarr  Subscription creation", LOG_DEBUG);
+						$date_start_subscription = dol_stringtotime($newmember->order->meta->createdAt);
+						$date_end_subscription = dol_time_plus_duree($date_start_subscription, $membertype->duration_value, $membertype->duration_unit);
+						if ($jsonmembertype->validityType == "Custom") {
+							$date_start_subscription = dol_stringtotime($jsonmembertype->startDate);
+							$date_end_subscription = dol_stringtotime($jsonmembertype->endDate);
+						} else {
+							$result = $member->fetch_subscriptions();
+							if ($result <= 0) {
+								$this->error = $member->error;
+								$this->errors = array_merge($member->errors, $this->errors);
+								$error++;
+							}
+							if (!empty($member->last_subscription_date_end)) {
+								$date_start_subscription = $member->last_subscription_date_end;
+								$date_end_subscription = dol_time_plus_duree($date_start_subscription, $membertype->duration_value, $membertype->duration_unit);
+							}
+						}
+						$subscriptionid = $member->subscription($date_start_subscription, $amount, 0, '', '', '', '', '', $date_end_subscription, $dolibarrmembertype);
+						if ($subscriptionid <= 0) {
 							$this->error = $member->error;
-							$this->errors = array_merge($this->errors, $member->errors);
-							return -3;
+							$this->errors = array_merge($member->errors, $this->errors);
+							$error++;
+						}
+
+						// Create new bank payment
+						$bankaccountid = getDolGlobalInt('HELLOASSO_BANK_ACCOUNT_FOR_PAYMENTS');
+						$subscriptioncomplementaryaction = getDolGlobalInt('HELLOASSO_SUBSCRIPTION_COMPLEMENTARYACTIONS');
+						if (!$error && (isModEnabled('bank') || isModEnabled('invoice'))) {
+							switch ($subscriptioncomplementaryaction) {
+								case 1:
+									$subscriptioncomplementaryaction = "bankdirect";
+									break;
+								case 2:
+									$subscriptioncomplementaryaction = (getDolGlobalInt("HELLOASSO_FORM_CREATE_THIRDPARTY") ? "invoiceonly" : "none");
+									break;
+								case 3:
+									$subscriptioncomplementaryaction = (getDolGlobalInt("HELLOASSO_FORM_CREATE_THIRDPARTY") ? "bankviainvoice" : "none");
+									break;
+								default:
+									$subscriptioncomplementaryaction = "none";
+									break;
+							}
+							foreach ($newmember->payments as $key => $payment) {
+								$paymentmethod = "";
+								switch ($payment->paymentMeans) {
+									case 'BankTransfer':
+										$paymentmethod = "VIR";
+										break;
+
+									case 'Check':
+										$paymentmethod = "CHQ";
+										break;
+
+									case 'Cash':
+										$paymentmethod = "LIQ";
+										break;
+
+									default:
+										$paymentmethod = "CB";
+										break;
+								}
+								$label = $langs->transnoentitiesnoconv("HelloAssoMemberPaymentLabel", $payment->id);
+								$paymentamount = $payment->amount /100;
+								$result = $member->subscriptionComplementaryActions($subscriptionid, $subscriptioncomplementaryaction, $bankaccountid, $date_start_subscription, $payment->date, $paymentmethod, $label, $paymentamount, '');
+								if ($result <= 0) {
+									$this->error = $member->error;
+									$this->errors = array_merge($member->errors, $this->errors);
+									$error++;
+								}
+							}
 						}
 					}
 				} else {
-					// Create in Dolibarr an HelloAsso member
-					$memberid = $this->createHelloAssoMember($newmember, $dolibarrmembertype);
-					if ($memberid <= 0) {
-						return -4;
-					}
-					$res = $member->fetch($memberid);
-					if ($res <= 0) {
-						$this->errors = array_merge($this->errors, $member->errors);
-						return -5;
-					}
+					$this->errors[] = $db->lasterror();
+					$error ++;
 				}
-
-				// Create new thirdparty if member already exist and socid is not defined
-				if (getDolGlobalInt("HELLOASSO_FORM_CREATE_THIRDPARTY") && empty($member->socid)) {
-					dol_syslog(get_class($this)."::helloassoPostMembersToDolibarr  Thirdparty creation for exiting members", LOG_DEBUG);
-					$newthirdparty = new Societe($db);
-					$newthirdparty->name = $member->getFullName($langs);
-					$newthirdparty->client = 1;
-					$newthirdparty->code_client = -1;
-					$newthirdpartyid = $newthirdparty->create($user);
-					if ($newthirdpartyid <= 0) {
-						$this->error = $newthirdparty->error;
-						$this->errors = array_merge($this->errors, $newthirdparty->errors);
-						return -5;
-					}
-					$member->socid = $newthirdpartyid;
-					$res = $member->update($user);
-					if ($res <= 0) {
-						$this->error = $member->error;
-						$this->errors = array_merge($this->errors, $member->errors);
-						return -5;
-					}
-				}
-
-				// Create new subscription
-				if (!$error) {
-					dol_syslog(get_class($this)."::helloassoPostMembersToDolibarr  Subscription creation", LOG_DEBUG);
-					$date_start_subscription = dol_stringtotime($newmember->order->meta->createdAt);
-					$date_end_subscription = dol_time_plus_duree($date_start_subscription, $membertype->duration_value, $membertype->duration_unit);
-					if ($jsonmembertype->validityType == "Custom") {
-						$date_start_subscription = dol_stringtotime($jsonmembertype->startDate);
-						$date_end_subscription = dol_stringtotime($jsonmembertype->endDate);
-					} else {
-						$result = $member->fetch_subscriptions();
-						if ($result <= 0) {
-							$this->error = $member->error;
-							$this->errors = array_merge($this->errors, $member->errors);
-							return -6;
-						}
-						if (!empty($member->last_subscription_date_end)) {
-							$date_start_subscription = $member->last_subscription_date_end;
-							$date_end_subscription = dol_time_plus_duree($date_start_subscription, $membertype->duration_value, $membertype->duration_unit);
-						}
-					}
-					$subscriptionid = $member->subscription($date_start_subscription, $amount, 0, '', '', '', '', '', $date_end_subscription, $dolibarrmembertype);
-					if ($subscriptionid <= 0) {
-						$this->error = $member->error;
-						$this->errors = array_merge($this->errors, $member->errors);
-						return -6;
-					}
-
-					// Create new bank payment
-					$bankaccountid = getDolGlobalInt('HELLOASSO_BANK_ACCOUNT_FOR_PAYMENTS');
-					$subscriptioncomplementaryaction = getDolGlobalInt('HELLOASSO_SUBSCRIPTION_COMPLEMENTARYACTIONS');
-					if (isModEnabled('bank') || isModEnabled('invoice')) {
-						switch ($subscriptioncomplementaryaction) {
-							case 1:
-								$subscriptioncomplementaryaction = "bankdirect";
-								break;
-							case 2:
-								$subscriptioncomplementaryaction = (getDolGlobalInt("HELLOASSO_FORM_CREATE_THIRDPARTY") ? "invoiceonly" : "none");
-								break;
-							case 3:
-								$subscriptioncomplementaryaction = (getDolGlobalInt("HELLOASSO_FORM_CREATE_THIRDPARTY") ? "bankviainvoice" : "none");
-								break;
-							default:
-								$subscriptioncomplementaryaction = "none";
-								break;
-						}
-						foreach ($newmember->payments as $key => $payment) {
-							$paymentmethod = "";
-							switch ($payment->paymentMeans) {
-								case 'BankTransfer':
-									$paymentmethod = "VIR";
-									break;
-
-								case 'Check':
-									$paymentmethod = "CHQ";
-									break;
-
-								case 'Cash':
-									$paymentmethod = "LIQ";
-									break;
-
-								default:
-									$paymentmethod = "CB";
-									break;
-							}
-							$label = $langs->transnoentitiesnoconv("HelloAssoMemberPaymentLabel", $payment->id);
-							$paymentamount = $payment->amount /100;
-							$result = $member->subscriptionComplementaryActions($subscriptionid, $subscriptioncomplementaryaction, $bankaccountid, $date_start_subscription, $payment->date, $paymentmethod, $label, $paymentamount, '');
-							if ($result <= 0) {
-								$this->error = $member->error;
-								$this->errors = array_merge($this->errors, $member->errors);
-								return -6;
-							}
-						}
-					}
-				}
-			} else {
-				$this->errors[] = $db->lasterror();
-				return -7;
 			}
 			$this->nbPosts++;
 			$newdatelastfetch = dol_stringtotime($newmember->order->date);
@@ -431,12 +457,21 @@ class HelloAssoMemberUtils
 			}
 			$datelastfetch = max($newdatelastfetch, $datelastfetch);
 
-			if (!$error && count($helloasso_members) == $this->nbPosts) {
+			if (!$error) {
 				$datetime = $db->idate($datelastfetch, "gmt");
 				$res = dolibarr_set_const($db, 'HELLOASSO_DATE_LAST_MEMBER_FETCH', $datetime, 'chaine', 0, '', $conf->entity);
 				if ($res <= 0) {
-					$error++;
+					$error++; //Better error management
 				}
+			}
+
+			if ($error) {
+				$db->rollback();
+				$this->errorPosts[] = array("member" => $newmember, "error" => $this->error, "errors" => $this->errors);
+			} else if ($dryrun) {
+				$db->rollback();
+			} else {
+				$db->commit();
 			}
 		}
 		return $this->nbPosts;
@@ -515,7 +550,8 @@ class HelloAssoMemberUtils
 			foreach ($json->data as $key => $member) {
 				if (empty($member->user->firstName) || empty($member->user->lastName)) {
 					$this->error = $langs->trans("ErrorHelloassoMissingFirstNameOrLastName");
-					return -2;
+					$this->errorPosts[] = array("member" => $member, "error" => $this->error);
+					continue;
 				}
 				if ($helloasso_date_last_fetch == "") {
 					$arraymembers[] = $member;
