@@ -1634,7 +1634,7 @@ class PdpConnectFr
 		// In create/edit mode, keep simple text fields (thirdparty not yet saved, no routing rows exist)
 		if ($mode == 'create' || $mode == 'edit') {
 			$resprints .= '<tr class="trpdpconnect_collapseseparator">';
-			$resprints .= '<td class="">' . $langs->trans("RoutingIdField") . '</td>';
+			$resprints .= '<td class="">' . $langs->trans("SpecificRoutingField") . '</td>';
 			$resprints .= '<td>';
 			$resprints .= '<input type="text" name="routing_id" ';
 			$resprints .= 'value="' . dolPrintHTML($routing_id ?? '') . '" ';
@@ -1677,7 +1677,7 @@ class PdpConnectFr
 		}
 
 		$resprints .= '<tr class="trpdpconnect_collapseseparator">';
-		$resprints .= '<td class="tdtop">' . $langs->trans("RoutingIdField") . '</td>';
+		$resprints .= '<td class="tdtop">' . $form->textwithpicto($langs->trans("RoutingIdFieldShort"), $langs->trans("SpecificRoutingFieldHelp")) . '</td>';
 		$resprints .= '<td>';
 
 		// Existing routing list
@@ -1707,15 +1707,17 @@ class PdpConnectFr
 			}
 			$resprints .= '</table>';
 		} else {
-			$resprints .= '<span class="opacitymedium">' . $langs->trans("None") . '</span>';
+			$resprints .= '<span class="opacitymedium">' . $langs->trans("Automatic") . '</span>';
 		}
+
+		$resprints .= ' <span class="fa fa-plus" title="'.$langs->trans("Add").'" onclick="javascript:jQuery(\'.addroutingsection\').toggle();"></span>';
 
 		// Add new routing — use a JS-submitted form appended to body to avoid nested form issue
 		$addToken = newToken();
 		$addUrl   = dol_escape_js($_SERVER["PHP_SELF"] . '?id=' . $object->id);
-		$resprints .= '<div style="margin-top:6px">';
-		$resprints .= '<input type="text" id="pdp_new_routing_id" placeholder="' . dol_escape_htmltag($langs->trans("RoutingIdField")) . '" class="flat minwidth200">';
-		$resprints .= ' <input type="text" id="pdp_new_routing_info" placeholder="' . dol_escape_htmltag($langs->trans("RoutingIdInfo")) . '" class="flat minwidth150">';
+		$resprints .= '<div style="margin-top:6px" class="hidden addroutingsection">';
+		$resprints .= '<input type="text" id="pdp_new_routing_id" placeholder="' . dolPrintHTMLForAttribute($langs->trans("RoutingIdFieldShort")) . '" class="flat minwidth100 maxwidth150">';
+		$resprints .= ' <input type="text" id="pdp_new_routing_info" placeholder="' . dolPrintHTMLForAttribute($langs->trans("RoutingIdInfo")) . '" title="' . dolPrintHTMLForAttribute($langs->trans("RoutingIdInfo")) . '" class="flat minwidth100 maxwidth100">';
 		$resprints .= ' <button type="button" class="button smallpaddingimp" onclick="pdpSubmitAddRouting()">' . $langs->trans("Add") . '</button>';
 		$resprints .= '</div>';
 		$resprints .= '<script>
@@ -1743,16 +1745,18 @@ function pdpSubmitAddRouting() {
 		$resprints .= '</tr>';
 
 		// Default product for import (upstream addition)
-		$resprints .= '<tr class="trpdpconnect_collapseseparator">';
-		$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
-		$resprints .= '<td>';
-		if ($product_id > 0) {
-			$tmpproduct = new Product($this->db);
-			$tmpproduct->fetch($product_id);
-			$resprints .= $tmpproduct->getNomUrl(1);
+		if ($object->fournisseur) {
+			$resprints .= '<tr class="trpdpconnect_collapseseparator">';
+			$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
+			$resprints .= '<td>';
+			if ($product_id > 0) {
+				$tmpproduct = new Product($this->db);
+				$tmpproduct->fetch($product_id);
+				$resprints .= $tmpproduct->getNomUrl(1);
+			}
+			$resprints .= '</td>';
+			$resprints .= '</tr>';
 		}
-		$resprints .= '</td>';
-		$resprints .= '</tr>';
 
 		return $resprints;
 	}
