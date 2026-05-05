@@ -22,6 +22,17 @@
  */
 
 
+/**
+ * @var Conf 		$conf
+ * @var DoliDB     	$db
+ * @var Societe    	$mysoc
+ * @var Translate 	$langs
+ * @var User       	$user
+ *
+ * @var Translate 	$outputlangs
+ * @var Facture    	$invoice
+ * @var PDPProviderManager	$this
+ */
 
 // Use customer language
 if (empty($outputlangs) || ! ($outputlangs instanceof Translate)) {
@@ -53,7 +64,6 @@ $this->_determineDeliveryDatesAndCustomerOrderNumbers($customerOrderReferenceLis
 
 // Chorus
 $chorus = false;
-$chorusErrors = [];
 if (getDolGlobalInt('PDPCONNECTFR_USE_CHORUS')) {
 	$chorus = true;
 }
@@ -537,3 +547,7 @@ if (!empty($mysoc->tva_intra) && !empty($mysoc->country_code) && substr($mysoc->
 if (!empty($object->thirdparty->tva_intra) && !empty($object->thirdparty->country_code) && substr($object->thirdparty->tva_intra, 0, 2) != $object->thirdparty->country_code) {
 	throw new Exception('BADVATNUMBER: The VAT number of the thirdparty ' . $object->thirdparty->name . ' must start with its 2 letter country code.');
 }
+
+
+// In output, we have
+// $invoiceData and $linesData
