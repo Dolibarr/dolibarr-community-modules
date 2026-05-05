@@ -118,15 +118,15 @@ if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 
 $invoice_path = '';
 
+$sellerId = GETPOSTINT('seller_id');
+$buyerId = GETPOSTINT('buyer_id');
+
 
 /*
  * Actions
  */
 
 if ($provider && $action == 'buildsamplesupplierinvoice') {
-	$sellerId = GETPOST('seller_id', 'alpha');
-	$buyerId = GETPOST('buyer_id', 'alpha');
-
 	if ($sellerId > 0) {
 		$thirdpartySeller = new Societe($db);
 		$thirdpartySeller->fetch($sellerId);
@@ -234,30 +234,31 @@ if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 	}
 	print '<br>';
 
-	print '<span class="width100 inline-block">'.$langs->trans("Seller").'</span> ';
-	//print '<input type="text" name="seller_einvoiceid" value="000000002" placeholder="Seller e-invoice ID (Usually SIREN)" class="minwidth150"><br>';
-	if (GETPOST("seller_einvoiceid") && $sellerId <= 0) {
-		$tmpthirdparty = new Societe($db);
-		$tmpthirdparty->fetch(0, '', '', '', GETPOST("seller_einvoiceid"));
-		$sellerId = $tmpthirdparty->id;
-	}
-	print $form->select_company($sellerId ?: '', 'seller_id', '', $langs->trans("MyCompany").' ('.$mysoc->idprof1.')', 1);
-	print ' &nbsp; <a href="'.$_SERVER["PHP_SELF"].'?seller_einvoiceid=me" class="reposition">Select me</a>';
-	print ' - <a href="'.$_SERVER["PHP_SELF"].'?seller_einvoiceid=000000001" class="reposition">Select thirdparty SIREN 000000001</a>';
-	print ' - <a href="'.$_SERVER["PHP_SELF"].'?seller_einvoiceid=000000002" class="reposition">Select thirdparty SIREN 000000002</a>';
-	print '<br>';
-
-	print '<span class="width100 inline-block">'.$langs->trans("Buyer").'</span> ';
-	//print '<input type="text" name="buyer_id" value="000000001" placeholder="Supplier e-invoice ID (Usually SIREN)" class="minwidth150"><br>';
 	if (GETPOST("buyer_einvoiceid") && $buyerId <= 0) {
 		$tmpthirdparty = new Societe($db);
 		$tmpthirdparty->fetch(0, '', '', '', GETPOST("buyer_einvoiceid"));
 		$buyerId = $tmpthirdparty->id;
 	}
+	if (GETPOST("seller_einvoiceid") && $sellerId <= 0) {
+		$tmpthirdparty = new Societe($db);
+		$tmpthirdparty->fetch(0, '', '', '', GETPOST("seller_einvoiceid"));
+		$sellerId = $tmpthirdparty->id;
+	}
+
+	print '<span class="width100 inline-block">'.$langs->trans("Seller").'</span> ';
+	//print '<input type="text" name="seller_einvoiceid" value="000000002" placeholder="Seller e-invoice ID (Usually SIREN)" class="minwidth150"><br>';
+	print $form->select_company($sellerId ?: '', 'seller_id', '', $langs->trans("MyCompany").' ('.$mysoc->idprof1.')', 1);
+	print ' &nbsp; <a href="'.$_SERVER["PHP_SELF"].'?seller_einvoiceid=me'.($buyerId > 0 ? '&buyer_id='.$buyerId : '').'" class="reposition">Select me</a>';
+	print ' - <a href="'.$_SERVER["PHP_SELF"].'?seller_einvoiceid=000000001" class="reposition">Select thirdparty SIREN 000000001</a>';
+	print ' - <a href="'.$_SERVER["PHP_SELF"].'?seller_einvoiceid=000000002'.($buyerId > 0 ? '&buyer_id='.$buyerId : '').'" class="reposition">Select thirdparty SIREN 000000002</a>';
+	print '<br>';
+
+	print '<span class="width100 inline-block">'.$langs->trans("Buyer").'</span> ';
+	//print '<input type="text" name="buyer_id" value="000000001" placeholder="Supplier e-invoice ID (Usually SIREN)" class="minwidth150"><br>';
 	print $form->select_company($buyerId ?: '', 'buyer_id', '', $langs->trans("MyCompany").' ('.$mysoc->idprof1.')', 1);
 	print ' &nbsp; <a href="'.$_SERVER["PHP_SELF"].'?buyer_einvoiceid=000000001" class="reposition">Select thirdparty with SIREN 000000001</a>';
-	print ' - <a href="'.$_SERVER["PHP_SELF"].'?buyer_einvoiceid=000000002" class="reposition">Select thirdparty with SIREN 000000002</a>';
-	print ' - <a href="'.$_SERVER["PHP_SELF"].'?buyer_einvoiceid=me" class="reposition">Select me</a>';
+	print ' - <a href="'.$_SERVER["PHP_SELF"].'?buyer_einvoiceid=000000002'.($sellerId > 0 ? '&seller_id='.$sellerId : '').'" class="reposition">Select thirdparty with SIREN 000000002</a>';
+	print ' - <a href="'.$_SERVER["PHP_SELF"].'?buyer_einvoiceid=me'.($sellerId > 0 ? '&seller_id='.$sellerId : '').'" class="reposition">Select me</a>';
 	print '<br>';
 
 	print '<input type="submit" class="button small reposition" name="Generate" value="Generate">';
