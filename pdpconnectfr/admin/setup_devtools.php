@@ -156,7 +156,7 @@ if ($provider && $action == 'buildsamplesupplierinvoice') {
 		$invoice_path = $resarray['path'];
 		$ref = $resarray['ref'];
 
-		setEventMessages('Sample invoice generated with ref '.$ref, 'mesgs');
+		setEventMessages('Sample invoice generated with ref '.$ref, null, 'mesgs');
 	}
 }
 

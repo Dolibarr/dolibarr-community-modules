@@ -1826,7 +1826,7 @@ class FacturXProtocol extends AbstractProtocol
 		require __DIR__ . "/ExampleHelpers.php";
 
 		$existingPdfFilename = __DIR__ . "/../../assets/00_ZugferdDocumentPdfBuilder_PrintLayout.pdf";
-		$newPdfFilename = $conf->pdpconnectfr->dir_temp . "/02_ZugferdDocumentPdfBuilder_PrintLayout_Merged.pdf";
+		$newPdfFilename = $conf->pdpconnectfr->dir_temp . "/INVTEST-".dol_print_date(dol_now(), '%Y%m%d-%H%M%S').".pdf";
 		//$AdditionalDocument = __DIR__ . "/../../assets/00_AdditionalDocument.csv";
 
 		// First we create a new valid document in EN16931-Profile (== COMFORT-Profile)
@@ -1842,10 +1842,10 @@ class FacturXProtocol extends AbstractProtocol
 		}
 
 		$documentBuilder->setDocumentInformation(
-			'INV-TEST',                                     	// Invoice Number (BT-1)
-			$invoicetype,                        				// Type "Invoice" (BT-3)
-			DateTime::createFromFormat("Ymd", "20241231"),      // Invoice Date (BT-2)
-			ZugferdCurrencyCodes::EURO                          // Invoice currency is EUR (Euro) (BT-5)
+			'INVTEST',                                     	// Invoice Number (BT-1)
+			$invoicetype,                        			// Type "Invoice" (BT-3)
+			DateTime::createFromFormat("Ymd", "20241231"),  // Invoice Date (BT-2)
+			ZugferdCurrencyCodes::EURO                      // Invoice currency is EUR (Euro) (BT-5)
 		);
 
 		$sellername = $mysoc->name ?: "MyBigCompanyTest";
