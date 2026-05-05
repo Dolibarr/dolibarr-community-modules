@@ -102,93 +102,13 @@ $useFormSetup = 1;
 if (!class_exists('FormSetup')) {
 	require_once DOL_DOCUMENT_ROOT.'/core/class/html.formsetup.class.php';
 }
+
 $formSetup = new FormSetup($db);
 
 // Access control
 if (!$user->admin) {
 	accessforbidden();
 }
-
-
-// Enter here all parameters in your setup page
-/*
-// Setup conf for selection of an URL
-$item = $formSetup->newItem('PDPCONNECTFR_MYPARAM1');
-$item->fieldParams['isMandatory'] = 1;
-$item->fieldAttr['placeholder'] = (empty($_SERVER['HTTPS']) ? 'http://' : 'https://') . $_SERVER['HTTP_HOST'];
-$item->cssClass = 'minwidth500';
-
-// Setup conf for selection of a simple string input
-$item = $formSetup->newItem('PDPCONNECTFR_MYPARAM2');
-$item->defaultFieldValue = 'default value';
-$item->fieldAttr['placeholder'] = 'A placeholder here';
-$item->helpText = 'Tooltip text';
-
-// Setup conf for selection of a simple textarea input but we replace the text of field title
-$item = $formSetup->newItem('PDPCONNECTFR_MYPARAM3');
-$item->nameText = $item->getNameText().' more html text ';
-
-// Setup conf for a selection of a Thirdparty
-$item = $formSetup->newItem('PDPCONNECTFR_MYPARAM4');
-$item->setAsThirdpartyType();
-
-// Setup conf for a selection of a boolean
-$formSetup->newItem('PDPCONNECTFR_MYPARAM5')->setAsYesNo();
-
-// Setup conf for a selection of an Email template of type thirdparty
-$formSetup->newItem('PDPCONNECTFR_MYPARAM6')->setAsEmailTemplate('thirdparty');
-
-// Setup conf for a selection of a secured key
-//$formSetup->newItem('PDPCONNECTFR_MYPARAM7')->setAsSecureKey();
-
-// Setup conf for a selection of a Product
-$formSetup->newItem('PDPCONNECTFR_MYPARAM8')->setAsProduct();
-
-// Add a title for a new section
-$formSetup->newItem('NewSection')->setAsTitle();
-
-$TField = array(
-	'test01' => $langs->trans('test01'),
-	'test02' => $langs->trans('test02'),
-	'test03' => $langs->trans('test03'),
-	'test04' => $langs->trans('test04'),
-	'test05' => $langs->trans('test05'),
-	'test06' => $langs->trans('test06'),
-);
-
-// Setup conf for a simple combo list
-$formSetup->newItem('PDPCONNECTFR_MYPARAM9')->setAsSelect($TField);
-
-// Setup conf for a multiselect combo list
-$item = $formSetup->newItem('PDPCONNECTFR_MYPARAM10');
-$item->setAsMultiSelect($TField);
-$item->helpText = $langs->transnoentities('PDPCONNECTFR_MYPARAM10');
-
-// Setup conf for a category selection
-$formSetup->newItem('PDPCONNECTFR_CATEGORY_ID_XXX')->setAsCategory('product');
-
-// Setup conf PDPCONNECTFR_MYPARAM10
-$item = $formSetup->newItem('PDPCONNECTFR_MYPARAM10');
-$item->setAsColor();
-$item->defaultFieldValue = '#FF0000';
-//$item->fieldValue = '';
-//$item->fieldAttr = array() ; // fields attribute only for compatible fields like input text
-//$item->fieldOverride = false; // set this var to override field output will override $fieldInputOverride and $fieldOutputOverride too
-//$item->fieldInputOverride = false; // set this var to override field input
-//$item->fieldOutputOverride = false; // set this var to override field output
-
-$item = $formSetup->newItem('PDPCONNECTFR_MYPARAM11')->setAsHtml();
-$item->nameText = $item->getNameText().' more html text ';
-$item->fieldInputOverride = '';
-$item->helpText = $langs->transnoentities('HelpMessage');
-$item->cssClass = 'minwidth500';
-
-$item = $formSetup->newItem('PDPCONNECTFR_MYPARAM12');
-$item->fieldOverride = "Value forced, can't be modified";
-$item->cssClass = 'minwidth500';
-
-//$item = $formSetup->newItem('PDPCONNECTFR_MYPARAM13')->setAsDate();	// Not yet implemented
-*/
 
 $ProtocolManager = new ProtocolManager($db);
 $protocolsList = $ProtocolManager->getProtocolsList();
@@ -203,22 +123,7 @@ foreach ($protocolsList as $key => $protocolconfig) {
 }
 
 
-$item = $formSetup->newItem('PDPCONNECTFR_PROTOCOL')->setAsSelect($TFieldProtocols);
-$item->helpText = $langs->transnoentities('PDPCONNECTFR_PROTOCOL_HELP');
-$item->defaultFieldValue = 'FACTURX';
-$item->cssClass = 'minwidth500';
-$item->fieldParams['trClass'] = 'advancedoption';
-
-// Setup conf to choose to use Chorus or not
-$item = $formSetup->newItem('PDPCONNECTFR_USE_CHORUS')->setAsYesNo();
-$item->helpText = $langs->transnoentities('PDPCONNECTFR_USE_CHORUS_HELP');
-$item->cssClass = 'minwidth500';
-
-
 // End of definition of parameters
-
-
-$setupnotempty += count($formSetup->items);
 
 
 //$dirmodels = array_merge(array('/'), (array) $conf->modules_parts['models']);
@@ -237,111 +142,134 @@ if (!getDolGlobalString('PDPCONNECTFR_PROTOCOL')) {
 	exit;
 }
 
+if ($action == 'savesyncoptions') {
+	dolibarr_set_const($db, "PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI", !GETPOSTINT("PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI"));
+	dolibarr_set_const($db, "PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP", !GETPOSTINT("PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP"));
+}
 
-// Setup conf for auto generation of objects
-$itemtitle = $formSetup->newItem('PDPCONNECTFR_SYNC_TO_PA');
-$itemtitle->setAsTitle();
-$itemtitle->nameText = '<b>'.$langs->trans("PDPCONNECTFR_SYNC_TO_PA").'</b>';
 
-// Setup conf to choose use of auto generation or not of products
-$item = $formSetup->newItem('PDPCONNECTFR_EINVOICE_IN_REAL_TIME')->setAsYesNo();
-$item->helpText = $langs->transnoentities('PDPCONNECTFR_EINVOICE_IN_REAL_TIME');
-$item->defaultFieldValue = 0;
-$item->cssClass = 'minwidth500';
-$item->fieldParams['forcereload'] = 1;
+if (!getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP')) {
+	$itemtitle = $formSetup->newItem('PDPCONNECTFR_SYNC_TO_PA');
+	$itemtitle->setAsTitle();
+	$itemtitle->nameText = '<b>'.$langs->trans("PDPCONNECTFR_SYNC_TO_PA").'</b>';
 
-if (getDolGlobalString('PDPCONNECTFR_EINVOICE_IN_REAL_TIME')) {
-	$item = $formSetup->newItem('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS')->setAsYesNo();
-	$item->helpText = $langs->transnoentities('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS').'<br>'.$langs->transnoentities('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS2');
+	// Setup conf to enable third-party validation via government APIs (SIREN via data.gouv.fr and VAT via VIES)
+	$item = $formSetup->newItem('PDPCONNECTFR_ENABLE_API_VALIDATION')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('PDPCONNECTFR_ENABLE_API_VALIDATION_HELP');
 	$item->defaultFieldValue = 0;
+	$item->cssClass = 'minwidth500';
+
+	// Setup conf to choose to block generation/send of an invoice if no routing ID is found for the third party otherwise use SIREN
+	$item = $formSetup->newItem('PDPCONNECTFR_BLOCK_INVOICE_NO_ROUTING_ID')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('PDPCONNECTFR_BLOCK_INVOICE_NO_ROUTING_ID_HELP');
+	$item->defaultFieldValue = 0;
+	$item->cssClass = 'minwidth500';
+	$item->fieldParams['forcereload'] = 0;
+
+	$item = $formSetup->newItem('PDPCONNECTFR_PROTOCOL')->setAsSelect($TFieldProtocols);
+	$item->helpText = $langs->transnoentities('PDPCONNECTFR_PROTOCOL_HELP');
+	$item->defaultFieldValue = 'FACTURX';
+	$item->cssClass = 'minwidth500';
+	$item->fieldParams['trClass'] = 'advancedoption';
+
+	// Setup conf to choose use of auto generation or not of products
+	$item = $formSetup->newItem('PDPCONNECTFR_EINVOICE_IN_REAL_TIME')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('PDPCONNECTFR_EINVOICE_IN_REAL_TIME');
+	$item->defaultFieldValue = 0;
+	$item->cssClass = 'minwidth500';
+	$item->fieldParams['forcereload'] = 1;
+
+	if (getDolGlobalString('PDPCONNECTFR_EINVOICE_IN_REAL_TIME')) {
+		$item = $formSetup->newItem('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS')->setAsYesNo();
+		$item->helpText = $langs->transnoentities('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS').'<br>'.$langs->transnoentities('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS2');
+		$item->defaultFieldValue = 0;
+		$item->cssClass = 'minwidth500';
+	}
+
+	// Setup conf for PMT - Mention regarding recovery fees
+	$item = $formSetup->newItem('PDPCONNECTFR_PMT');
+	$item->helpText = $langs->transnoentities('PDPCONNECTFR_PMT_HELP');
+	$item->cssClass = 'minwidth500';
+
+	// Setup conf for PMD - Mention regarding late payment penalties
+	$item = $formSetup->newItem('PDPCONNECTFR_PMD');
+	$item->helpText = $langs->transnoentities('PDPCONNECTFR_PMD_HELP');
+	$item->cssClass = 'minwidth500';
+
+	// Setup conf for AAB - Mention regarding absence of discount for early payment
+	$item = $formSetup->newItem('PDPCONNECTFR_AAB');
+	$item->helpText = $langs->transnoentities('PDPCONNECTFR_AAB_HELP');
 	$item->cssClass = 'minwidth500';
 }
 
-// Setup conf to choose to block generation/send of an invoice if no routing ID is found for the third party otherwise use SIREN
-$item = $formSetup->newItem('PDPCONNECTFR_BLOCK_INVOICE_NO_ROUTING_ID')->setAsYesNo();
-$item->helpText = $langs->transnoentities('PDPCONNECTFR_BLOCK_INVOICE_NO_ROUTING_ID_HELP');
-$item->defaultFieldValue = 0;
-$item->cssClass = 'minwidth500';
-$item->fieldParams['forcereload'] = 0;
 
-// Setup conf to enable third-party validation via government APIs (SIREN via data.gouv.fr and VAT via VIES)
-$item = $formSetup->newItem('PDPCONNECTFR_ENABLE_API_VALIDATION')->setAsYesNo();
-$item->helpText = $langs->transnoentities('PDPCONNECTFR_ENABLE_API_VALIDATION_HELP');
-$item->defaultFieldValue = 0;
-$item->cssClass = 'minwidth500';
+if (!getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI')) {
+	// Setup conf for auto generation of objects
+	$itemtitle = $formSetup->newItem('PDPCONNECTFR_AUTO_GENERATION');
+	$itemtitle->setAsTitle();
+	$itemtitle->nameText = '<b>'.$langs->trans("PDPCONNECTFR_AUTO_GENERATION").'</b>';
 
-// Setup conf for PMT - Mention regarding recovery fees
-$item = $formSetup->newItem('PDPCONNECTFR_PMT');
-$item->helpText = $langs->transnoentities('PDPCONNECTFR_PMT_HELP');
-$item->cssClass = 'minwidth500';
+	// Setup conf to choose use of auto generation or not of products
+	$item = $formSetup->newItem('PDPCONNECTFR_PRODUCTS_AUTO_GENERATION')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('PDPCONNECTFR_PRODUCTS_AUTO_GENERATION_HELP');
+	$item->defaultFieldValue = 0;
+	$item->cssClass = 'minwidth500';
 
-// Setup conf for PMD - Mention regarding late payment penalties
-$item = $formSetup->newItem('PDPCONNECTFR_PMD');
-$item->helpText = $langs->transnoentities('PDPCONNECTFR_PMD_HELP');
-$item->cssClass = 'minwidth500';
+	// Setup conf to choose use of auto generation or not of third parties
+	$item = $formSetup->newItem('PDPCONNECTFR_THIRDPARTIES_AUTO_GENERATION')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('PDPCONNECTFR_THIRDPARTIES_AUTO_GENERATION_HELP');
+	$item->defaultFieldValue = 0;
+	$item->cssClass = 'minwidth500';
 
-// Setup conf for AAB - Mention regarding absence of discount for early payment
-$item = $formSetup->newItem('PDPCONNECTFR_AAB');
-$item->helpText = $langs->transnoentities('PDPCONNECTFR_AAB_HELP');
-$item->cssClass = 'minwidth500';
+	// Setup conf to enable complete third party information when receiving an invoice from from PDP
+	$item = $formSetup->newItem('PDPCONNECTFR_THIRDPARTIES_COMPLETE_INFO')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('PDPCONNECTFR_THIRDPARTIES_COMPLETE_INFO_HELP');
+	$item->defaultFieldValue = 0;
+	$item->cssClass = 'minwidth500';
 
-// Setup conf for auto generation of objects
-$itemtitle = $formSetup->newItem('PDPCONNECTFR_AUTO_GENERATION');
-$itemtitle->setAsTitle();
-$itemtitle->nameText = '<b>'.$langs->trans("PDPCONNECTFR_AUTO_GENERATION").'</b>';
+	// Setup conf to to enable a limit of flows to synchronize per one synchronization call
+	$item = $formSetup->newItem('PDPCONNECTFR_FLOWS_SYNC_CALL_LIMIT')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('PDPCONNECTFR_FLOWS_SYNC_CALL_LIMIT_HELP');
+	$item->defaultFieldValue = 1;
+	$item->cssClass = 'minwidth500';
+	$item->fieldParams['forcereload'] = 1;
 
+	if (getDolGlobalString('PDPCONNECTFR_FLOWS_SYNC_CALL_LIMIT')) {
+		// Setup conf to to define the number of flows to synchronize per one synchronization call
+		$item = $formSetup->newItem('PDPCONNECTFR_FLOWS_SYNC_CALL_SIZE');
+		$item->helpText = $langs->transnoentities('PDPCONNECTFR_FLOWS_SYNC_CALL_SIZE_HELP');
+		$item->defaultFieldValue = 100;
+		$item->cssClass = 'maxwidth100';
+	}
 
-// Setup conf to choose use of auto generation or not of products
-$item = $formSetup->newItem('PDPCONNECTFR_PRODUCTS_AUTO_GENERATION')->setAsYesNo();
-$item->helpText = $langs->transnoentities('PDPCONNECTFR_PRODUCTS_AUTO_GENERATION_HELP');
-$item->defaultFieldValue = 0;
-$item->cssClass = 'minwidth500';
-
-// Setup conf to choose use of auto generation or not of third parties
-$item = $formSetup->newItem('PDPCONNECTFR_THIRDPARTIES_AUTO_GENERATION')->setAsYesNo();
-$item->helpText = $langs->transnoentities('PDPCONNECTFR_THIRDPARTIES_AUTO_GENERATION_HELP');
-$item->defaultFieldValue = 0;
-$item->cssClass = 'minwidth500';
-
-// Setup conf to enable complete third party information when receiving an invoice from from PDP
-$item = $formSetup->newItem('PDPCONNECTFR_THIRDPARTIES_COMPLETE_INFO')->setAsYesNo();
-$item->helpText = $langs->transnoentities('PDPCONNECTFR_THIRDPARTIES_COMPLETE_INFO_HELP');
-$item->defaultFieldValue = 0;
-$item->cssClass = 'minwidth500';
-
-// Setup conf to to enable a limit of flows to synchronize per one synchronization call
-$item = $formSetup->newItem('PDPCONNECTFR_FLOWS_SYNC_CALL_LIMIT')->setAsYesNo();
-$item->helpText = $langs->transnoentities('PDPCONNECTFR_FLOWS_SYNC_CALL_LIMIT_HELP');
-$item->defaultFieldValue = 1;
-$item->cssClass = 'minwidth500';
-$item->fieldParams['forcereload'] = 1;
-
-if (getDolGlobalString('PDPCONNECTFR_FLOWS_SYNC_CALL_LIMIT')) {
-	// Setup conf to to define the number of flows to synchronize per one synchronization call
-	$item = $formSetup->newItem('PDPCONNECTFR_FLOWS_SYNC_CALL_SIZE');
-	$item->helpText = $langs->transnoentities('PDPCONNECTFR_FLOWS_SYNC_CALL_SIZE_HELP');
-	$item->defaultFieldValue = 100;
+	// Setup conf to define a time margin in hours to go back from the current date of the last synchronization
+	$item = $formSetup->newItem('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS');
+	$item->helpText = $langs->transnoentities('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS_HELP');
+	$item->fieldAttr['placeholder'] = $langs->transnoentities('Hours');
 	$item->cssClass = 'maxwidth100';
 }
 
-// Setup conf to define a time margin in hours to go back from the current date of the last synchronization
-$item = $formSetup->newItem('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS');
-$item->helpText = $langs->transnoentities('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS_HELP');
-$item->fieldAttr['placeholder'] = $langs->transnoentities('Hours');
-$item->cssClass = 'maxwidth100';
 
-// Setup conf for debug mode
-$formSetup->newItem('PDPCONNECTFR_DEBUG')->setAsTitle();
+if (!getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI') || !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP')) {
+	$itemtitle = $formSetup->newItem('PDPCONNECTFR_DEBUG')->setAsTitle();
+	$itemtitle->nameText = '<b>'.$langs->trans("Other").'</b>';
 
-// Setup conf to enable or not debug mode
-$item = $formSetup->newItem('PDPCONNECTFR_DEBUG_MODE')->setAsYesNo();
-$item->helpText = $langs->transnoentities('PDPCONNECTFR_DEBUG_MODE_HELP');
-$item->defaultFieldValue = 0;
-$item->cssClass = 'minwidth500';
-$item->fieldParams['warningifon'] = 1;
+	// Setup conf to choose to use Chorus or not
+	$item = $formSetup->newItem('PDPCONNECTFR_USE_CHORUS')->setAsYesNo();
+	$item->nameText = $langs->trans("PDPCONNECTFR_USE_CHORUS").' <span class="opacitymedium">('.$langs->trans("FeatureNotYetSupported").')</span>';
+	$item->helpText = $langs->transnoentities('PDPCONNECTFR_USE_CHORUS_HELP');
+	$item->cssClass = 'minwidth500';
 
+	// Setup conf to enable or not debug mode
+	$item = $formSetup->newItem('PDPCONNECTFR_DEBUG_MODE')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('PDPCONNECTFR_DEBUG_MODE_HELP');
+	$item->defaultFieldValue = 0;
+	$item->cssClass = 'minwidth500';
+	$item->fieldParams['warningifon'] = 1;
+}
 
 include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php';
+
 //print getDolGlobalString('PDPCONNECTFR_PDP');
 
 
@@ -379,20 +307,61 @@ $pdpconnectfr = new PdpConnectFr($db);
 $stringwarning = pdpShowWarning($pdpconnectfr);
 print $stringwarning;
 
+print '<form name="options" action="'.$_SERVER["PHP_SELF"].'" method="POST">';
+print '<input type="hidden" name="token" value="'.newToken().'">';
+print '<input type="hidden" name="action" value="savesyncoptions">';
+
+print '<div class="neutral">';
+print img_picto('', 'supplier_invoice', 'class="pictofixedwidth"').$langs->trans("EnableInvoiceImport").' ';
+print $form->selectyesno("PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI", GETPOSTISSET("PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI") ? GETPOSTINT("PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI") : !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI'), 1, false, 0, 1);
+print '<br><br>';
+
+print img_picto('', 'bill', 'class="pictofixedwidth"').$langs->trans("EnableInvoiceExport").' ';
+print $form->selectyesno("PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP", GETPOSTISSET("PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP") ? GETPOSTINT('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP') : !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP'), 1, false, 0, 1);
 print '<br>';
 
-/*if ($action == 'edit') {
- print $formSetup->generateOutput(true);
- print '<br>';
- } elseif (!empty($formSetup->items)) {
- print $formSetup->generateOutput();
- print '<div class="tabsAction">';
- print '<a class="butAction" href="'.$_SERVER["PHP_SELF"].'?action=edit&token='.newToken().'">'.$langs->trans("Modify").'</a>';
- print '</div>';
- }
- */
+print '</div>';
+
+print '<div class="center">';
+print '<input type="submit" name="save" class="button" value="'.$langs->trans("Save").'">';
+print "</div>";
+
+print '</form>';
+
+
+/*
+print '<br><br><br>';
+
+
+if (!empty($formSetupAP2Doli->items)) {
+	if ((float) DOL_VERSION < 24.0) {
+		print load_fiche_titre($langs->trans("PDPCONNECTFR_AUTO_GENERATION"));
+	}
+
+	print $formSetupAP2Doli->generateOutput(true, false, $langs->trans("PDPCONNECTFR_AUTO_GENERATION"));
+	print '<br><br>';
+	if ((float) DOL_VERSION >= 24.0) {
+		print '<br>';
+	}
+}
+
+if (!empty($formSetupDoli2AP->items)) {
+	if ((float) DOL_VERSION < 24.0) {
+		print load_fiche_titre($langs->trans("PDPCONNECTFR_SYNC_TO_PA"));
+	}
+
+	print $formSetupDoli2AP->generateOutput(true, false, $langs->trans("PDPCONNECTFR_SYNC_TO_PA"));
+	print '<br><br>';
+	if ((float) DOL_VERSION >= 24.0) {
+		print '<br>';
+	}
+}
+*/
+
 if (!empty($formSetup->items)) {
-	print $formSetup->generateOutput(true);
+	print '<br><br>';
+
+	print $formSetup->generateOutput(true, true);
 	print '<br>';
 }
 
@@ -408,10 +377,6 @@ $(document).ready(function() {
 	}
 });
 </script>';
-
-if (empty($setupnotempty)) {
-	print '<br>'.$langs->trans("NothingToSetup");
-}
 
 // Page end
 print dol_get_fiche_end();

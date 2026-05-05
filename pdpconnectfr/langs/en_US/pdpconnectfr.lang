@@ -10,7 +10,7 @@ ModulePDPConnectFRDesc = Support for E-invoice management. This module allows to
 #
 # Admin page
 #
-PDPConnectFRSetup = Setup of module E-invoice (France - PDPConnect)
+PDPConnectFRSetup = Setup of module E-invoice
 Settings = Settings
 PDPConnectFRSetupPage = Setup of the Access Point. You must choose here the Access Point you subscribed as the official Access Point for your company.
 NewSection=New section
@@ -32,8 +32,8 @@ PDPCONNECTFR_PDP_HELP=Only compatible E-billing Access Point platforms are visib
 PDPCONNECTFR_PDP_HELP2=Depending on the selected platform, prices may be free, may be a flat price or a price per invoice. You should compare them before making your selection.
 PDPCONNECTFR_PDP_HELP3=Once an Access Point is selected, its specific configuration appears.
 PDPCONNECTFR_ROUTING_ID_HELP=You can enter here a dedicated E-invoice ID for this Access Point. Usually your [SIREN] or [SIREN_suffix] (where suffix can be a SIRET, a free text...).<br>Keep empty to use the default professional ID of your company (Example SIREN in France).
-PDPCONNECTFR_BLOCK_INVOICE_NO_ROUTING_ID=Block invoices generation/send for third parties without an Electronic Invoicing ID set manually (usually we are using an E-invoicing ID generated from third-party information)
-PDPCONNECTFR_BLOCK_INVOICE_NO_ROUTING_ID_HELP=Enable to prevent creating or sending invoices when a third party has no EXPLICIT Electronic Invoicing ID. <br> If Disabled the SIREN will be used if no ID is provided.
+PDPCONNECTFR_BLOCK_INVOICE_NO_ROUTING_ID=Block invoices generation/send for third parties without an Electronic Invoicing ID set manually
+PDPCONNECTFR_BLOCK_INVOICE_NO_ROUTING_ID_HELP=Usually we are using an E-invoicing ID auto generated from third-party information. You can activate this option to disable guessing of E-invoiceID and prevent creating or sending invoices when a third party has no EXPLICIT Electronic Invoicing ID. <br> If disabled (default, recommended), the E-invoice ID will be guessed if not provided (For example, using the SIRENT for French companies).
 generateAccessToken=Generate access token
 reGenerateAccessToken=Re-generate access token
 testConnection=Test connection
@@ -114,6 +114,8 @@ InvoiceGeneratedWithWarnings = E-invoice generated with warnings
 EInvoiceGenerated = E-invoice generated successfully
 MyCompanyConfigurationWarning=Please check the required information for your company/organization in order to use E-invoicing features. This information is required to generate compliant E-invoices and ensure proper synchronization with the Access Point
 ModifyCompanyInformation=Complete company information
+EnableInvoiceExport=Enable export of customer invoices
+EnableInvoiceImport=Enable import of purchase invoices
 PDPCONNECTFR_SYNC_TO_PA=Synchronization Dolibarr -> PA/PDP
 PDPCONNECTFR_AUTO_GENERATION=Synchronization PA/PDP -> Dolibarr
 PDPCONNECTFR_EINVOICE_IN_REAL_TIME=Automatic generation of E-invoice when invoice is validated.
@@ -174,7 +176,7 @@ PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS=Default synchronization lookback (hours)
 PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS_HELP=Number of hours to go back from the last synchronization date. This ensures that no flows are missed even when platform has hours or different timezone not correctly managed or if several flows have the same hour on the Access Point platform. If a flow was already processed, it will just be discarded.
 HOURS_BACK=Hours back
 MAX_FLOWS_SYNCRO=Maximum number of documents per synchronization
-RUN_SYNC=Start manual synchronization
+RUN_SYNC=Synchronize
 lastSyncedFlowDate=Last synchronized flow date
 lastSyncedFlow=Last successfully synchronized flow
 LastSupplierInvoiceCouldNotBeProcessed=Last supplier invoice that could not be synchronized

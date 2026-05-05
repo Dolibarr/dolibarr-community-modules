@@ -65,7 +65,9 @@ class ActionsPdpconnectfr extends CommonHookActions
 		// Check if it's an invoice
 		if (get_class($invoiceObject) === 'Facture' && $thirdpartyCountryCode === 'FR') {
 			/** @var Facture $invoiceObject */
-			if ($invoiceObject->status != $invoiceObject::STATUS_DRAFT && getDolGlobalString('PDPCONNECTFR_EINVOICE_IN_REAL_TIME')) {
+			if ($invoiceObject->status != $invoiceObject::STATUS_DRAFT
+				&& !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP')
+				&& getDolGlobalString('PDPCONNECTFR_EINVOICE_IN_REAL_TIME')) {
 				// Call function to create Factur-X document
 				require_once __DIR__ . '/protocols/ProtocolManager.class.php';
 
@@ -140,7 +142,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 		}
 
 		// Add buttons in invoice card
-		if (in_array($object->element, ['facture'])) {
+		if (in_array($object->element, ['facture']) && !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP')) {
 			// Get current status of e-invoice
 			$currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus(0, $object->ref);
 
@@ -194,7 +196,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 
 
 		// Add buttons in supplier invoice card
-		if (in_array($object->element, ['invoice_supplier'])) {
+		if (in_array($object->element, ['invoice_supplier']) && !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI')) {
 			// Check if this invoice is present into pdpconnectfr_extlinks table to know if it is an imported invoice from PDP or not
 			$sql = "SELECT rowid, provider FROM " . MAIN_DB_PREFIX . "pdpconnectfr_extlinks";
 			$sql .= " WHERE element_type = '" . $db->escape($object->element) . "'";
@@ -258,7 +260,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 
 		$db->begin();
 
-		if (isset($object->element) && in_array($object->element, ['facture'])) {
+		if (isset($object->element) && in_array($object->element, ['facture']) && !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP')) {
 			$permissiontoedit = $user->hasRight('facture', 'write');
 
 			// Get current status of e-invoice
@@ -378,7 +380,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 		}
 
 
-		if (isset($object->element) && in_array($object->element, ['invoice_supplier'])) {
+		if (isset($object->element) && in_array($object->element, ['invoice_supplier']) && !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI')) {
 			$permissiontoedit = $user->hasRight('fournisseur', 'facture', 'creer');
 
 			if ($action == 'confirm_sendStatusMessage' && $permissiontoedit) {
@@ -399,7 +401,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 			}
 		}
 
-		if (in_array('thirdpartycard', $contexts)) {
+		if (in_array('thirdpartycard', $contexts) && (!getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI'))) {
 			$permissiontoedit = $user->hasRight('societe', 'creer');
 
 			// $object->id may be empty at hook time if core hasn't fetched the object yet
@@ -501,7 +503,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 		}
 		$langs->load("pdpconnectfr@pdpconnectfr");
 
-		if (in_array($object->element, ['invoice_supplier'])) {
+		if (in_array($object->element, ['invoice_supplier']) && !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI')) {
 			// Clone confirmation
 			if ($action == 'sendStatusMessage') {
 				$form = new Form($db);
@@ -566,22 +568,22 @@ class ActionsPdpconnectfr extends CommonHookActions
 
 		if (empty($parameters['tpl_context'])) {	// Do not show the new fields when we are in the public form to register a thirdparty.
 			// Add block in invoice card
-			if (in_array($object->element, ['facture'])) {
+			if (in_array($object->element, ['facture']) && !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP')) {
 				$this->resprints .= $pdpConnectFr->EInvoiceCardBlock($object, $action);		// Output fields in card, including js for refreshing state
 			}
 
 			// Add block in supplier invoice card
-			if (in_array($object->element, ['invoice_supplier'])) {
+			if (in_array($object->element, ['invoice_supplier']) && !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI')) {
 				$this->resprints .= $pdpConnectFr->supplierInvoiceCardBlock($object, $action);		// Output fields in card, including js for refreshing state
 			}
 
 			// Add block in product/service card
-			if (in_array($object->element, ['product'])) {
+			if (in_array($object->element, ['product']) && (!getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI'))) {
 				$this->resprints .= $pdpConnectFr->productServiceCardBlock($object, $action);		// Output fields in card, including js for refreshing state
 			}
 
 			// Add block in thirdparty card
-			if (in_array($object->element, ['societe'])) {
+			if (in_array($object->element, ['societe']) && (!getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI'))) {
 				$this->resprints .= $pdpConnectFr->thirdpartyCardBlock($object, $action);		// Output fields in card
 			}
 		}
@@ -601,7 +603,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 	 */
 	public function completeArrayFields($parameters, &$object, &$action, $hookmanager)
 	{
-		if (in_array('invoicelist', explode(':', $parameters['context']))) {
+		if (in_array('invoicelist', explode(':', $parameters['context'])) && !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP')) {
 			// Add fields to invoice list
 			$parameters['arrayfields']['einvoicegenerated'] = array(
 				'label' => 'EInvoiceFile',
@@ -619,7 +621,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 			);
 		}
 
-		if (in_array('thirdpartylist', explode(':', $parameters['context']))) {
+		if (in_array('thirdpartylist', explode(':', $parameters['context'])) && (!getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI'))) {
 			// Add fields to invoice list
 			$parameters['arrayfields']['routing_id'] = array(
 				'label' => 'RoutingIdField',
@@ -658,15 +660,17 @@ class ActionsPdpconnectfr extends CommonHookActions
 		}
 
 		// Supplier invoice list, Product list, Soc list
-		$contexts = explode(':', $parameters['context']);
-		if (array_intersect($contexts, ['supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist'])) {
+		if (in_array('supplierinvoicelist', explode(':', $parameters['context']))) {
 			$this->resprints .= ', ext.rowid AS pdplink_id, ext.provider AS pdp_provider';
 		}
 
-		if (array_intersect(
-			$contexts,
-			['thirdpartylist', 'societelist']
-		)) {
+		if (in_array('thirdpartylist', explode(':', $parameters['context']))) {
+			$this->resprints .= ', ext.rowid AS pdplink_id, ext.provider AS pdp_provider';
+			$this->resprints .= ', rt.routing_id AS routing_id';
+		}
+
+		if (in_array('societelist', explode(':', $parameters['context']))) {
+			$this->resprints .= ', ext.rowid AS pdplink_id, ext.provider AS pdp_provider';
 			$this->resprints .= ', rt.routing_id AS routing_id';
 		}
 
@@ -758,7 +762,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 	{
 		global $form, $db;
 
-		if (in_array('invoicelist', explode(':', $parameters['context']))) {
+		if (in_array('invoicelist', explode(':', $parameters['context'])) && !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP')) {
 			$pdpConnectFr = new PdpConnectFr($db);
 			$checkConfig = $pdpConnectFr->checkModulePrerequisites();
 			if ($checkConfig < 0) {
@@ -801,7 +805,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 		}
 
 		// Supplier invoice list, Product list, Soc list
-		if (in_array('supplierinvoicelist', explode(':', $parameters['context']))) {
+		if (in_array('supplierinvoicelist', explode(':', $parameters['context'])) && !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI')) {
 			$listofoptions = array(
 				getDolGlobalString('PDPCONNECTFR_PDP') => getDolGlobalString('PDPCONNECTFR_PDP'),
 			);
@@ -824,7 +828,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 		}
 
 
-		if (in_array('thirdpartylist', explode(':', $parameters['context']))) {
+		if (in_array('thirdpartylist', explode(':', $parameters['context'])) && (!getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI'))) {
 			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
 				print '<td class="liste_titre">';
 				print '<input type="text" name="search_routing_id" value="' . GETPOST('search_routing_id', 'alpha') . '" class="minwidth50 maxwidth100">';
@@ -832,7 +836,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 			}
 		}
 
-		if (in_array('productlist', explode(':', $parameters['context']))) {
+		if (in_array('productlist', explode(':', $parameters['context'])) && (!getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI'))) {
 			// None yet
 		}
 
@@ -853,7 +857,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 	{
 		global $db, $langs;
 
-		if (in_array('invoicelist', explode(':', $parameters['context']))) {
+		if (in_array('invoicelist', explode(':', $parameters['context'])) && !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP')) {
 			$pdpConnectFr = new PdpConnectFr($db);
 			$checkConfig = $pdpConnectFr->checkModulePrerequisites();
 			if ($checkConfig < 0) {
@@ -873,15 +877,15 @@ class ActionsPdpconnectfr extends CommonHookActions
 		}
 
 		// Supplier invoice list, Product list, Soc list
-		if (in_array('supplierinvoicelist', explode(':', $parameters['context']))) {
+		if (in_array('supplierinvoicelist', explode(':', $parameters['context'])) && !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI')) {
 			print print_liste_field_titre($langs->transnoentitiesnoconv('pdpconnectfrSourceTitle'));
 		}
 
-		if (in_array('thirdpartylist', explode(':', $parameters['context']))) {
+		if (in_array('thirdpartylist', explode(':', $parameters['context'])) && (!getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI'))) {
 			print print_liste_field_titre($langs->transnoentitiesnoconv('pdpconnectfrThirdPartyRoutingTitle'));
 		}
 
-		if (in_array('productlist', explode(':', $parameters['context']))) {
+		if (in_array('productlist', explode(':', $parameters['context'])) && (!getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI'))) {
 			// None yet
 		}
 
@@ -902,7 +906,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 	{
 		global $db, $langs;
 
-		if (in_array('invoicelist', explode(':', $parameters['context']))) {
+		if (in_array('invoicelist', explode(':', $parameters['context'])) && !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP')) {
 			$obj = $parameters['obj'];
 
 			$pdpConnectFr = new PdpConnectFr($db);
@@ -939,11 +943,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 		}
 
 		// Supplier invoice list, Product list, Soc list
-		$contexts = explode(':', $parameters['context']);
-		if (array_intersect(
-			$contexts,
-			['supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist']
-		)) {
+		if (in_array('supplierinvoicelist', explode(':', $parameters['context'])) && !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI')) {
 			$obj = $parameters['obj'];
 
 			print '<td class="tdoverflowmax125">';
@@ -956,7 +956,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 			}
 		}
 
-		if (in_array('thirdpartylist', $contexts, true)) {
+		if (in_array('thirdpartylist', explode(':', $parameters['context']), true)) {
 			$obj = $parameters['obj'];
 
 			print '<td class="tdoverflowmax125">';

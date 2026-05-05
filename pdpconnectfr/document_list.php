@@ -805,8 +805,10 @@ if ($provider) {
 	$rowspan = getDolGlobalInt('PDPCONNECTFR_FLOWS_SYNC_CALL_LIMIT') ? 2 : 1;
 	print '<td style="padding-left: 40px; padding-right: 40px"'.($rowspan > 1 ? ' rowspan="'.$rowspan.'"' : '').'>';
 
-	// Button to submit
-	print '<a href="#" id="runSyncBtn" class="butAction small" style="margin: 0;">'.img_picto('', 'refresh', 'class="pictofixedwidth"').' '.$langs->trans("RUN_SYNC").'</a>'."\n";
+	// Button to submit (sync manage both in and update of out invoices)
+	print '<a href="#" id="runSyncBtn" class="butAction small" style="margin: 0;">';
+	print img_picto('', 'refresh', 'class="pictofixedwidth"').' '.$langs->trans("RUN_SYNC");
+	print '</a>'."\n";
 
 	print '</td>';
 	print '</tr>';

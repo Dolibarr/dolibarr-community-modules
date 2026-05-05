@@ -10,7 +10,7 @@ ModulePDPConnectFRDesc = Gestion des factures électroniques. Ce module permet d
 #
 # Admin page
 #
-PDPConnectFRSetup = Configuration du module Facture électronique (France - PDPConnect)
+PDPConnectFRSetup = Configuration du module Facture électronique
 Settings = Paramètres
 PDPConnectFRSetupPage = Configuration du point d'accès. Vous devez sélectionner ici le point d'accès que vous avez choisi comme point d'accès officiel de votre entreprise.
 NewSection=Nouvelle section
@@ -174,7 +174,7 @@ PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS=Délai de recouvrement de synchronisation pa
 PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS_HELP=Nombre d'heures à remonter en arrière depuis la dernière synchronisation. Ceci garantit qu'aucun flux n'est manqué, même si la plateforme a des heures ou différent timezone not géré correctement ou si plusieurs plux ont été reçu à la même heure par la plateforme. Si un flux a déjà été traité, il sera simplement ignoré.
 HOURS_BACK=Il y a quelques heures
 MAX_FLOWS_SYNCRO=Nombre maximal de documents par synchronisation
-RUN_SYNC=Démarrer la synchronisation manuelle
+RUN_SYNC=Synchroniser
 lastSyncedFlowDate=Dernière date de synchronisation du flux
 lastSyncedFlow=Dernier flux synchronisé avec succès
 LastSupplierInvoiceCouldNotBeProcessed=Dernière facture fournisseur qui n'a pas pu être synchronisée
