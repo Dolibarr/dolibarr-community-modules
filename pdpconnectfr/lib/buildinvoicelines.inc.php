@@ -395,7 +395,7 @@ $deliveryDate = !empty($deliveryDateList)
 $invoiceData = [
 	// Document part
 	'documentno'           => $object->ref,
-	'documenttypecode'     => $this->_getTypeOfInvoice($object),
+	'documenttypecode'     => $this->_getTypeOfInvoice($object),						// Set the type of invoice (standard, deposit, credit note)
 	'documentdate'         => new DateTime(dol_print_date($object->date, 'dayrfc')),
 	'invoiceCurrency'      => $conf->currency,
 	'taxCurrency'          => null,

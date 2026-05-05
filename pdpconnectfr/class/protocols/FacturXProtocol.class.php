@@ -1690,11 +1690,11 @@ class FacturXProtocol extends AbstractProtocol
 
 
 	/**
-	 * Create a supplier invoice from a Factur-X file and attach the file (and readable file if exists)to the document.
+	 * Create a supplier invoice from a Factur-X PDF file and attach the file (and readable file if exists) to the document.
 	 * This may create the Supplier and the Product depending on setup.
 	 *
-	 * @param  string 			$file                       		Source string file. We use this file to get data of supplier invoice.
-	 * @param  string|null 		$ReadableViewFile        			Readable view file (PDP Generated readable PDF).e only store it if available.
+	 * @param  string 			$file                       		Source string file (PDF string). We use this file to get data of supplier invoice.
+	 * @param  string|null 		$ReadableViewFile        			Readable view file (PDP Generated readable PDF). We only store it if available.
 	 * @param  string 			$flowId                       		Flow identifier source of the invoice.
 	 * @return array{res:int, message:string, action:string|null}   Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and an optional 'action'.
 	 */
@@ -1981,9 +1981,9 @@ class FacturXProtocol extends AbstractProtocol
 
 		// Set supplier reference
 		$supplierInvoice->socid = $socId;
-
-		// Set basic invoice information
 		$supplierInvoice->ref_supplier = $parsedHeader['documentno'] ?? null;
+
+		// Set basic invoice information (type, date)
 		$supplierInvoice->type = $this->_getDolibarrInvoiceType($parsedHeader['documenttypecode'] ?? null);
 		if ($supplierInvoice->type === '-1') {
 			return ['res' => -1, 'message' => 'Unfounded dolibarr corresponding Invoice code for document type code: ' . ($parsedHeader['documenttypecode'] ?? 'NA')];
@@ -2686,7 +2686,6 @@ class FacturXProtocol extends AbstractProtocol
 	 */
 	private function _getDolibarrInvoiceType($documenttypecode)
 	{
-
 		/**
 		 * Codes UNTDID 1001 utilisés par EN16931 pour le type de facture (InvoiceTypeCode BT-3).
 		 * 325 – Facture pro-forma
