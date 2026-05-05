@@ -455,11 +455,11 @@ class SuperPDPProvider extends AbstractPDPProvider
 		// Params
 		$params = [
 			'flowInfo' => json_encode([
+				"flowProfile" => "Extended-CTC-FR",
+				"flowSyntax" => $flowSyntax,			// CII or Factur-X
 				"trackingId" => $object->ref,
 				"name" => "Invoice_" . $object->ref,
-				"flowSyntax" => $flowSyntax,
 				//"flowProfile" => "CIUS",
-				"flowProfile" => "Extended-CTC-FR",
 				"sha256" => hash_file('sha256', $invoice_path)
 			]),
 			'file' => new CURLFile($invoice_path, $mime_type, basename($invoice_path))
