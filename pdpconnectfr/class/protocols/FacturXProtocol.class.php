@@ -797,6 +797,11 @@ class FacturXProtocol extends AbstractProtocol
 		/**
 		 * @var array<mixed,mixed> 	$invoiceData
 		 * @var array<mixed,mixed> 	$linesData
+		 * @var Facture 			$object
+		 * @var Translate 			$outputlangs
+		 * @var string 				$outputlang
+		 * @var Account				$account
+		 * @var PdpConnectFr		$pdpconnectfr
 		 */
 
 
