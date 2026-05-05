@@ -282,7 +282,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 				}
 			}
 
-			// Action to send invoice to PDP
+			// Action to send invoice to Access Point
 			if (
 				$action == 'send_to_pdp' && $permissiontoedit
 				&& $currentStatusDetails['file'] == 1
@@ -292,7 +292,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 					$pdpConnectFr::STATUS_UNKNOWN
 				])
 			) {
-				// Validate thirdparty data before sending to PDP
+				// Validate thirdparty data before sending to Access Point
 				$object->fetch_thirdparty();
 				$checkResult = $pdpConnectFr->checkRequiredinformations($object);
 				if ($checkResult['res'] < 0) {
@@ -618,7 +618,27 @@ class ActionsPdpconnectfr extends CommonHookActions
 				'perms' => '1'
 			);
 		}
+
+		if (in_array('thirdpartylist', explode(':', $parameters['context']))) {
+			// Add fields to invoice list
+			$parameters['arrayfields']['routing_id'] = array(
+				'label' => 'RoutingIdField',
+				'help' => 'SpecificRoutingFieldHelp',
+				'checked' => -1,
+				'position' => 900,
+				'enabled' => 1,
+				'perms' => '1'
+			);
+			$parameters['arrayfields']['routing_product_id'] = array(
+				'label' => 'DefaultProductEBilling',
+				'checked' => -1,
+				'position' => 901,
+				'enabled' => '1',
+				'perms' => '1'
+			);
+		}
 	}
+
 
 
 	/**
@@ -781,11 +801,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 		}
 
 		// Supplier invoice list, Product list, Soc list
-		$contexts = explode(':', $parameters['context']);
-		if (array_intersect(
-			$contexts,
-			['supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist']
-		)) {
+		if (in_array('supplierinvoicelist', explode(':', $parameters['context']))) {
 			$listofoptions = array(
 				getDolGlobalString('PDPCONNECTFR_PDP') => getDolGlobalString('PDPCONNECTFR_PDP'),
 			);
@@ -807,10 +823,17 @@ class ActionsPdpconnectfr extends CommonHookActions
 			print '</td>';
 		}
 
-		if (in_array('thirdpartylist', $contexts, true)) {
-			print '<td class="liste_titre">';
-			print '<input type="text" name="search_routing_id" value="' . GETPOST('search_routing_id', 'alpha') . '" class="minwidth50 maxwidth100">';
-			print '</td>';
+
+		if (in_array('thirdpartylist', explode(':', $parameters['context']))) {
+			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
+				print '<td class="liste_titre">';
+				print '<input type="text" name="search_routing_id" value="' . GETPOST('search_routing_id', 'alpha') . '" class="minwidth50 maxwidth100">';
+				print '</td>';
+			}
+		}
+
+		if (in_array('productlist', explode(':', $parameters['context']))) {
+			// None yet
 		}
 
 		return 0;
@@ -850,16 +873,16 @@ class ActionsPdpconnectfr extends CommonHookActions
 		}
 
 		// Supplier invoice list, Product list, Soc list
-		$contexts = explode(':', $parameters['context']);
-		if (array_intersect(
-			$contexts,
-			['supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist']
-		)) {
+		if (in_array('supplierinvoicelist', explode(':', $parameters['context']))) {
 			print print_liste_field_titre($langs->transnoentitiesnoconv('pdpconnectfrSourceTitle'));
 		}
 
-		if (in_array('thirdpartylist', $contexts, true)) {
+		if (in_array('thirdpartylist', explode(':', $parameters['context']))) {
 			print print_liste_field_titre($langs->transnoentitiesnoconv('pdpconnectfrThirdPartyRoutingTitle'));
+		}
+
+		if (in_array('productlist', explode(':', $parameters['context']))) {
+			// None yet
 		}
 
 		return 0;

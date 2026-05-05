@@ -1577,9 +1577,10 @@ class PdpConnectFr
 		// Set $extrafield_collapse_display_value (do we have to collapse/expand the group after the separator)
 		$extrafield_collapse_display_value = -1;
 		$expand_display = ((isset($_COOKIE['DOLUSER_COLLAPSE_facture_trpdpconnectseparator']) || GETPOSTINT('ignorecollapsesetup')) ? (!empty($_COOKIE['DOLUSER_COLLAPSE_facture_trpdpconnectseparator'])) : !($extrafield_collapse_display_value == 2));
+
 		$disabledcookiewrite = 0;
 		if ($mode == 'create') {
-			// On create mode, force separator group to not be collapsible
+			// On create mode, force separator group to not be collapsed
 			$extrafield_collapse_display_value = 1;
 			$expand_display = true;	// We force group to be shown expanded
 			$disabledcookiewrite = 1; // We keep status of group unchanged into the cookie
@@ -1598,6 +1599,14 @@ class PdpConnectFr
 			}
 		}
 		$resprints .= '
+			jQuery("#customerinput").change(function() {
+				console.log("span nature 2 was modified, we must check the properties for einvoice");
+				// TODO Show or hide the address
+			});
+			jQuery("#supplierinput").change(function() {
+				console.log("span nature 3 was modified, we must check the properties for einvoice");
+				// TODO Show or hide the product combo list
+			});
             jQuery("#trpdpconnect").click(function(){
                 console.log("We click on collapse/uncollapse to hide/show .trpdpconnectseparator");
                 jQuery(".trpdpconnect_collapseseparator").toggle(100, function(){
@@ -1605,6 +1614,7 @@ class PdpConnectFr
                         jQuery("#trpdpconnect td span").addClass("fa-plus-square").removeClass("fa-minus-square");
                         document.cookie = "DOLUSER_COLLAPSE_facture_trpdpconnectseparator=0; path=' . $_SERVER["PHP_SELF"] . '"
                     } else {
+						/* show all properties */
                         jQuery("#trpdpconnect td span").addClass("fa-minus-square").removeClass("fa-plus-square");
                         document.cookie = "DOLUSER_COLLAPSE_facture_trpdpconnectseparator=1; path=' . $_SERVER["PHP_SELF"] . '"
                     }
@@ -1615,7 +1625,11 @@ class PdpConnectFr
 
 		// Title separator
 		$resprints .= '<tr id="trpdpconnect" class="trpdpconnectseparator trtrpdpconnectseparator_1">';
-		$resprints .= '<td colspan="2"><span class="far fa-' . (($expand_display ? 'minus' : 'plus') . '-square') . '"></span><strong> ' . $langs->trans("EInvoicing") . '</strong></td>';
+		$resprints .= '<td colspan="2">';
+		if ($mode == 'create' || $mode == 'edit') {
+			$resprints .= '<br>';
+		}
+		$resprints .= '<span class="far fa-' . (($expand_display ? 'minus' : 'plus') . '-square') . '"></span><strong> ' . $langs->trans("EInvoicing") . '</strong></td>';
 		$resprints .= '</tr>';
 
 
@@ -1633,8 +1647,8 @@ class PdpConnectFr
 
 		// In create/edit mode, keep simple text fields (thirdparty not yet saved, no routing rows exist)
 		if ($mode == 'create' || $mode == 'edit') {
-			$resprints .= '<tr class="trpdpconnect_collapseseparator">';
-			$resprints .= '<td class="">' . $langs->trans("SpecificRoutingField") . '</td>';
+			$resprints .= '<tr class="trpdpconnect_collapseseparator trrouting_id '.($expand_display ? '' : 'hidden').'">';
+			$resprints .= '<td class="">' . $form->textwithpicto($langs->trans("RoutingIdFieldShort"), $langs->trans("SpecificRoutingFieldHelp")) . '</td>';
 			$resprints .= '<td>';
 			$resprints .= '<input type="text" name="routing_id" ';
 			$resprints .= 'value="' . dolPrintHTML($routing_id ?? '') . '" ';
@@ -1643,7 +1657,7 @@ class PdpConnectFr
 			$resprints .= '</tr>';
 
 			// Add a line for the Default product for thirdparty (to use when importing vendor invoice and no product found)
-			$resprints .= '<tr class="trpdpconnect_collapseseparator">';
+			$resprints .= '<tr class="trpdpconnect_collapseseparator trrouting_product_id '.($expand_display ? '' : 'hidden').'">';
 			$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
 			$resprints .= '<td>';
 			// TODO Use a combo list of products
@@ -1664,7 +1678,7 @@ class PdpConnectFr
 		$resql = $this->db->query($sql);
 		if ($resql && $this->db->num_rows($resql) > 0) {
 			$obj = $this->db->fetch_object($resql);
-			$resprints .= '<tr class="trpdpconnect_collapseseparator">';
+			$resprints .= '<tr class="trpdpconnect_collapseseparator '.($expand_display ? '' : 'hidden').'">';
 			$resprints .= '<td>' . $langs->trans("pdpconnectfrSourceTitle") . '</td>';
 			$resprints .= '<td>' . dolPrintHTML($obj->provider) . '</td>';
 			$resprints .= '</tr>';
@@ -1676,7 +1690,7 @@ class PdpConnectFr
 			$allRoutings = array();
 		}
 
-		$resprints .= '<tr class="trpdpconnect_collapseseparator">';
+		$resprints .= '<tr class="trpdpconnect_collapseseparator '.($expand_display ? '' : 'hidden').'">';
 		$resprints .= '<td class="tdtop">' . $form->textwithpicto($langs->trans("RoutingIdFieldShort"), $langs->trans("SpecificRoutingFieldHelp")) . '</td>';
 		$resprints .= '<td>';
 
@@ -1746,7 +1760,7 @@ function pdpSubmitAddRouting() {
 
 		// Default product for import (upstream addition)
 		if ($object->fournisseur) {
-			$resprints .= '<tr class="trpdpconnect_collapseseparator">';
+			$resprints .= '<tr class="trpdpconnect_collapseseparator '.($expand_display ? '' : 'hidden').'">';
 			$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
 			$resprints .= '<td>';
 			if ($product_id > 0) {
