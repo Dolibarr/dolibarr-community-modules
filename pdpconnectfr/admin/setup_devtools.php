@@ -224,11 +224,11 @@ if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 	print '<span class="width100 inline-block">'.$langs->trans("InvoiceType").'</span> ';
 	if ((float) DOL_VERSION >= 24.0) {
 		$typeofinvoice = array(
-			Facture::TYPE_DEPOSIT => array('label' => $langs->trans('Deposit')),
 			Facture::TYPE_STANDARD => array('label' => $langs->trans('Standard')),
+			Facture::TYPE_DEPOSIT => array('label' => $langs->trans('Deposit')),
 			//Facture::TYPE_CREDIT_NOTE => array('label' => $langs->trans('CreditNote'), 'enabled' => false
 		);
-		print $form->selectarray('invoicetype', $typeofinvoice, Facture::TYPE_STANDARD);
+		print $form->selectarray('invoicetype', $typeofinvoice, GETPOSTISSET('invoicetype') ? GETPOSTINT('invoicetype') : Facture::TYPE_STANDARD);
 	} else {
 		print $langs->trans("Standard");
 	}
