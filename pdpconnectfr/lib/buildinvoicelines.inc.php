@@ -16,7 +16,7 @@
  */
 
 /**
- * \file    lib/buildinvoicelines.inc.php
+ * \file    pdpconnectfr/lib/buildinvoicelines.inc.php
  * \ingroup pdpconnectfr
  * \brief   Code to generate the array of invoice and lines
  */
@@ -31,7 +31,7 @@
  *
  * @var Translate 	$outputlangs
  * @var Facture    	$invoice
- * @var PDPProviderManager	$this
+ * @var CIIProtocol|FacturXProtocol	$this
  */
 
 // Use customer language

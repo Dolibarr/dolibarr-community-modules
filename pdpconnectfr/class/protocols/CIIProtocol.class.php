@@ -261,7 +261,10 @@ class CIIProtocol extends AbstractProtocol
 
 		// Call page to generate the invoice
 		include dol_buildpath('pdpconnectfr/lib/buildinvoicelines.inc.php');
-
+		/**
+		 * @var array<mixed,mixed> 	$invoiceData
+		 * @var array<mixed,mixed> 	$linesData
+		 */
 
 		// Generate the XML file
 		$filename = dol_sanitizeFileName($invoice->ref);

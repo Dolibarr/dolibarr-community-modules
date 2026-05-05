@@ -34,7 +34,7 @@ include_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
 include_once DOL_DOCUMENT_ROOT . '/core/class/discount.class.php';
 require_once DOL_DOCUMENT_ROOT . '/core/lib/files.lib.php';
 
-use custom\facturx\Fidry\FileSystem\FS;
+//use custom\facturx\Fidry\FileSystem\FS;
 use horstoeko\zugferd\codelists\ZugferdCountryCodes;
 use horstoeko\zugferd\codelists\ZugferdCurrencyCodes;
 use horstoeko\zugferd\codelists\ZugferdElectronicAddressScheme;
@@ -794,9 +794,17 @@ class FacturXProtocol extends AbstractProtocol
 
 		// Call page to generate the invoice
 		include dol_buildpath('pdpconnectfr/lib/buildinvoicelines.inc.php');
+		/**
+		 * @var array<mixed,mixed> 	$invoiceData
+		 * @var array<mixed,mixed> 	$linesData
+		 */
 
 
 		if (!getDolGlobalInt('PDPCONNECTFR_USE_EXTERNAL_FACTURX_BUILDER')) {
+			// =====================================================================
+			// Use the CII protocol to generate the XML file
+			// =====================================================================
+
 			dol_include_once('pdpconnectfr/class/protocols/ProtocolManager.class.php');
 			$ProtocolManager = new ProtocolManager($db);
 			$CII = $ProtocolManager->getProtocol('CII');
@@ -815,270 +823,269 @@ class FacturXProtocol extends AbstractProtocol
 			dolChmod($xmlfile);
 
 			return $xmlfile;
-		}
-
-
-		// =====================================================================
-		// XML generation
-		// =====================================================================
-
-		// Initialize ZugferdDocumentBuilder (FacturX XML)
-		dol_syslog(get_class($this) . '::executeHooks create new XML document based on PROFILE_EN16931 (CIUS-FR)');
-		$profile = getDolGlobalString('PDPCONNECTFR_PROFILE');
-		switch ($profile) {
-			case 'EN16931':
-				$used_profile = ZugferdProfiles::PROFILE_EXTENDED;
-				$facturxpdf = ZugferdDocumentBuilder::createNew($used_profile);
-			default:
-				$used_profile = ZugferdProfiles::PROFILE_EXTENDED;
-				$facturxpdf = ZugferdDocumentBuilder::createNew($used_profile);
-		}
-		dol_syslog(get_class($this) . '::executeHooks create new XML document based on ' . $used_profile);
-
-		// Get the type of invoice in FacturX nomenclature
-		$objecttype = $invoiceData['documenttypecode'];
-		if ($objecttype == null) {
-			throw new Exception('BADINVOICETYPE: The type for invoice id ' . $object->id . ' is not yet supported.');
-		}
-
-		//  Build XML Document Header (Seller, Buyer, Dates)
-		$facturxpdf
-			->setDocumentInformation(
-				$invoiceData['documentno'],
-				$invoiceData['documenttypecode'],
-				$invoiceData['documentdate'],
-				$invoiceData['invoiceCurrency'],
-				$object->ref_customer,
-				$outputlang
-			)
-			->addDocumentNote($invoiceData['documentNotePublic'])
-			->addDocumentNote($invoiceData['documentNotePMT'], null, "PMT")
-			->addDocumentNote($invoiceData['documentNotePMD'], null, "PMD")
-			->addDocumentNote($invoiceData['documentNoteAAB'], null, "AAB")
-
-			// ---------------- Seller ----------------
-			->setDocumentSeller($invoiceData['sellername'], $invoiceData['sellerids'])
-			->addDocumentSellerTaxRegistration("VA", $invoiceData['sellervatnumber'])
-			->setDocumentSellerLegalOrganisation(
-				$invoiceData['sellerLegalOrgId'],
-				$invoiceData['sellerLegalOrgScheme'],
-				$invoiceData['sellerTradingName']
-			)
-			->addDocumentSellerGlobalId($invoiceData['sellerGlobalIds'][0]['value'], $invoiceData['sellerGlobalIds'][0]['schemeID'])
-			->setDocumentSellerCommunication(
-				$invoiceData['sellerCommunicationUriScheme'],
-				$invoiceData['sellerCommunicationUri']
-			)
-			->setDocumentSellerAddress(
-				$invoiceData['sellerlineone'],
-				$invoiceData['sellerlinetwo'],
-				$invoiceData['sellerlinethree'],
-				$invoiceData['sellerpostcode'],
-				$invoiceData['sellercity'],
-				$invoiceData['sellercountry']
-			)
-
-			// ---------------- Buyer ----------------
-			->setDocumentBuyer(
-				$invoiceData['buyername'],
-				$invoiceData['buyerids']
-			)
-			->setDocumentBuyerAddress(
-				$invoiceData['buyerlineone'],
-				$invoiceData['buyerlinetwo'],
-				$invoiceData['buyerlinethree'],
-				$invoiceData['buyerpostcode'],
-				$invoiceData['buyercity'],
-				$invoiceData['buyercountry']
-			)
-			->addDocumentBuyerTaxRegistration("VA", $invoiceData['buyervatnumber'])
-			->setDocumentBuyerLegalOrganisation(
-				$invoiceData['buyerLegalOrgId'],
-				$invoiceData['buyerLegalOrgScheme'],
-				$invoiceData['buyerTradingName']
-			)
-			->addDocumentBuyerGlobalId($invoiceData['buyerGlobalIds'][0]['value'], $invoiceData['buyerGlobalIds'][0]['schemeID'])
-			->setDocumentBuyerCommunication(
-				$schemeUri,
-				$uri
-			);
-
-		// If specimen, we set the test flag
-		if ($invoiceData['isTestDocument']) {
-			$facturxpdf->setIsTestDocument();
-		}
-
-		// Add delivery date for section ApplicableHeaderTradeDelivery
-		$facturxpdf->setDocumentSupplyChainEvent($invoiceData['documentDeliveryDate']);
-
-		// Add data of project if invoice is into a project
-		if ($invoiceData['_project'] instanceof Project) {
-			$facturxpdf->setDocumentProcuringProject($invoiceData['_project']->ref, $invoiceData['_project']->title);
-		}
-
-		// Add additional referenced documents (Order references) - Disabled for Chorus
-		if (!$invoiceData['_chorus']) {
-			foreach ($invoiceData['_customerOrderReferenceList'] as $customerOrderRef) {
-				if ($customerOrderRef != $invoiceData['orderReference']) {
-					$facturxpdf->addDocumentAdditionalReferencedDocument($customerOrderRef, "130");
-				}
-			}
-		}
-
-		// Set Trade Contact details (sale representative)
-		$facturxpdf->setDocumentSellerContact(
-			$invoiceData['sellercontactpersonname'],
-			"",
-			$invoiceData['sellercontactphoneno'],
-			$invoiceData['sellercontactfaxno'],
-			$invoiceData['sellercontactemailaddr']
-		);
-
-		// Set Buyer Reference (Service Code for Chorus)
-		if (!empty($invoiceData['buyerReference'])) {
-			$facturxpdf->setDocumentBuyerReference($invoiceData['buyerReference']);
-		}
-
-		// Contract reference
-		if (!empty($invoiceData['contractReference'])) {
-			$facturxpdf->setDocumentContractReferencedDocument($invoiceData['contractReference']);
-		}
-
-		// Commitment number / client ref
-		if (!empty($invoiceData['orderReference'])) {
-			$facturxpdf->setDocumentBuyerOrderReferencedDocument($invoiceData['orderReference']);
-		}
-
-		// Set Business Process ID
-		$facturxpdf->setDocumentBusinessProcess($invoiceData['businessProcessId']);
-
-		// Add reference to source invoice for credit notes (BT-25/BT-26)
-		if (!empty($invoiceData['invoiceRefDocs'])) {
-			foreach ($invoiceData['invoiceRefDocs'] as $refDoc) {
-				$facturxpdf->setDocumentInvoiceReferencedDocument($refDoc['ref'], $refDoc['type'], $refDoc['date']);
-			}
-		}
-
-		// --- Process Invoice Lines ---
-		foreach ($linesData as $numligne => $lineData) {
-			$facturxpdf
-				->addNewPosition($lineData['lineid'])
-				->setDocumentPositionProductDetails($lineData['prodname'], $lineData['proddesc'], $lineData['prodsellerid'])
-				->setDocumentPositionGrossPrice($lineData['grosspriceamount'])
-				->setDocumentPositionNetPrice($lineData['netpriceamount'])
-				->setDocumentPositionQuantity($lineData['billedquantity'], $lineData['billedquantityunitcode'])
-				->setDocumentPositionLineSummation($lineData['lineTotalAmount']);
-
-			// Add reference to original invoice for deposit lines
-			if ($lineData['isDepositLine']) {
-				$facturxpdf->setDocumentInvoiceReferencedDocument($lineData['depositInvoiceRef'], ZugferdInvoiceType::PREPAYMENTINVOICE, $lineData['depositInvoiceDate']);
-			}
-
-			// Set billing period for the line
-			if ($lineData['linePeriodStart'] !== null && $lineData['linePeriodEnd'] !== null) {
-				$facturxpdf->setDocumentPositionBillingPeriod($lineData['linePeriodStart'], $lineData['linePeriodEnd']);
-			}
-
-			// Handle negative amount lines as a line discount
-			if ($lineData['grosspriceamount'] < 0) {
-				dol_syslog("PDPConnectFR : there is negative line, convert as a global discount", \LOG_INFO);
-				$facturxpdf->addDocumentPositionGrossPriceAllowanceCharge(abs($lineData['grosspriceamount']) * $lineData['billedquantity'], false, null, null, "Discount");
-			}
-
-			// VAT information (Line Tax)
-			if ($lineData['rateApplicablePercent'] > 0) {
-				$facturxpdf->addDocumentPositionTax($lineData['categoryCode'], 'VAT', $lineData['rateApplicablePercent']);
-			} else {
-				$facturxpdf->addDocumentPositionTax($lineData['categoryCode'], 'VAT', '0.00');
-			}
-
-			// Discount percentage on a line
-			if ($lineData['lineremisepercent'] !== 'NA' && $lineData['lineremisepercent'] > 0) {
-				$remise_amount = $lineData['lineTotalAmount'] - $lineData['grosspriceamount'] * $lineData['billedquantity'];
-				dol_syslog("PDPConnectFR : there is a discount on that line : " . $lineData['lineremisepercent'] . ", amount is " . $remise_amount);
-				$facturxpdf->addDocumentPositionAllowanceCharge(abs($remise_amount), false, $lineData['lineremisepercent'], $lineData['grosspriceamount'] * $lineData['billedquantity'], null, "Discount");
-			}
-		}
-
-		// Final Document Summation and Payment Means
-
-		// Multi VAT (Document Tax Summary)
-		foreach ($invoiceData['taxBreakdown'] as $k => $v) {
-			$code = ($k == 0) ? 'K' : 'S';
-			$facturxpdf->addDocumentTax($code, "VAT", $v['totalHT'], $v['totalTVA'], $k);
-		}
-
-		// Set final summation details
-		$facturxpdf
-			->setDocumentSummation(
-				$invoiceData['grandTotalAmount'],
-				$invoiceData['duePayableAmount'],
-				$invoiceData['lineTotalAmount'],
-				$invoiceData['chargeTotalAmount'],
-				$invoiceData['allowanceTotalAmount'],
-				$invoiceData['taxBasisTotalAmount'],
-				$invoiceData['taxTotalAmount'],
-				null,
-				$invoiceData['totalPrepaidAmount']
-			)
-			->addDocumentPaymentTerm(
-				$invoiceData['paymentTermsText'],
-				$invoiceData['paymentDueDate']
-			)
-			->addDocumentPaymentMean(
-				$invoiceData['paymentMeansCode'],
-				$invoiceData['paymentMeansText'],
-				null,
-				null,
-				null,
-				null,
-				$invoiceData['iban'],
-				$invoiceData['accountName'],
-				$pdpconnectfr->removeSpaces($account->number),
-				$invoiceData['bic']
-			);
-
-		// Validate the generated XML document
-		dol_syslog(get_class($this) . '::executeHooks try to validate XML');
-
-		$pdfCheck = new ZugferdDocumentValidator($facturxpdf);
-		$res = $pdfCheck->validateDocument();
-		if (count($res) > 0) {
-			$allErrors = "";
-			foreach ($res as $error) {
-				if (is_array($error)) {
-					$allErrors .= json_encode($error) . "\n";
-				} else {
-					$allErrors .= $error . "\n";
-				}
-			}
-			$this->errors = $allErrors;
-			dol_syslog(get_class($this) . '::executeHooks  (1) : ' . $allErrors, LOG_ERR);
 		} else {
-			dol_syslog(get_class($this) . '::executeHooks XML validation ok');
+			// =====================================================================
+			// Use horstoeko lib to build the XML
+			// =====================================================================
+
+			// Initialize ZugferdDocumentBuilder (FacturX XML)
+			dol_syslog(get_class($this) . '::executeHooks create new XML document based on PROFILE_EN16931 (CIUS-FR)');
+			$profile = getDolGlobalString('PDPCONNECTFR_PROFILE');
+			switch ($profile) {
+				case 'EN16931':
+					$used_profile = ZugferdProfiles::PROFILE_EXTENDED;
+					$facturxpdf = ZugferdDocumentBuilder::createNew($used_profile);
+				default:
+					$used_profile = ZugferdProfiles::PROFILE_EXTENDED;
+					$facturxpdf = ZugferdDocumentBuilder::createNew($used_profile);
+			}
+			dol_syslog(get_class($this) . '::executeHooks create new XML document based on ' . $used_profile);
+
+			// Get the type of invoice in FacturX nomenclature
+			$objecttype = $invoiceData['documenttypecode'];
+			if ($objecttype == null) {
+				throw new Exception('BADINVOICETYPE: The type for invoice id ' . $object->id . ' is not yet supported.');
+			}
+
+			//  Build XML Document Header (Seller, Buyer, Dates)
+			$facturxpdf
+				->setDocumentInformation(
+					$invoiceData['documentno'],
+					$invoiceData['documenttypecode'],
+					$invoiceData['documentdate'],
+					$invoiceData['invoiceCurrency'],
+					$object->ref_customer,
+					$outputlang
+				)
+				->addDocumentNote($invoiceData['documentNotePublic'])
+				->addDocumentNote($invoiceData['documentNotePMT'], null, "PMT")
+				->addDocumentNote($invoiceData['documentNotePMD'], null, "PMD")
+				->addDocumentNote($invoiceData['documentNoteAAB'], null, "AAB")
+
+				// ---------------- Seller ----------------
+				->setDocumentSeller($invoiceData['sellername'], $invoiceData['sellerids'])
+				->addDocumentSellerTaxRegistration("VA", $invoiceData['sellervatnumber'])
+				->setDocumentSellerLegalOrganisation(
+					$invoiceData['sellerLegalOrgId'],
+					$invoiceData['sellerLegalOrgScheme'],
+					$invoiceData['sellerTradingName']
+				)
+				->addDocumentSellerGlobalId($invoiceData['sellerGlobalIds'][0]['value'], $invoiceData['sellerGlobalIds'][0]['schemeID'])
+				->setDocumentSellerCommunication(
+					$invoiceData['sellerCommunicationUriScheme'],
+					$invoiceData['sellerCommunicationUri']
+				)
+				->setDocumentSellerAddress(
+					$invoiceData['sellerlineone'],
+					$invoiceData['sellerlinetwo'],
+					$invoiceData['sellerlinethree'],
+					$invoiceData['sellerpostcode'],
+					$invoiceData['sellercity'],
+					$invoiceData['sellercountry']
+				)
+
+				// ---------------- Buyer ----------------
+				->setDocumentBuyer(
+					$invoiceData['buyername'],
+					$invoiceData['buyerids']
+				)
+				->setDocumentBuyerAddress(
+					$invoiceData['buyerlineone'],
+					$invoiceData['buyerlinetwo'],
+					$invoiceData['buyerlinethree'],
+					$invoiceData['buyerpostcode'],
+					$invoiceData['buyercity'],
+					$invoiceData['buyercountry']
+				)
+				->addDocumentBuyerTaxRegistration("VA", $invoiceData['buyervatnumber'])
+				->setDocumentBuyerLegalOrganisation(
+					$invoiceData['buyerLegalOrgId'],
+					$invoiceData['buyerLegalOrgScheme'],
+					$invoiceData['buyerTradingName']
+				)
+				->addDocumentBuyerGlobalId($invoiceData['buyerGlobalIds'][0]['value'], $invoiceData['buyerGlobalIds'][0]['schemeID'])
+				->setDocumentBuyerCommunication(
+					$schemeUri,
+					$uri
+				);
+
+			// If specimen, we set the test flag
+			if ($invoiceData['isTestDocument']) {
+				$facturxpdf->setIsTestDocument();
+			}
+
+			// Add delivery date for section ApplicableHeaderTradeDelivery
+			$facturxpdf->setDocumentSupplyChainEvent($invoiceData['documentDeliveryDate']);
+
+			// Add data of project if invoice is into a project
+			if ($invoiceData['_project'] instanceof Project) {
+				$facturxpdf->setDocumentProcuringProject($invoiceData['_project']->ref, $invoiceData['_project']->title);
+			}
+
+			// Add additional referenced documents (Order references) - Disabled for Chorus
+			if (!$invoiceData['_chorus']) {
+				foreach ($invoiceData['_customerOrderReferenceList'] as $customerOrderRef) {
+					if ($customerOrderRef != $invoiceData['orderReference']) {
+						$facturxpdf->addDocumentAdditionalReferencedDocument($customerOrderRef, "130");
+					}
+				}
+			}
+
+			// Set Trade Contact details (sale representative)
+			$facturxpdf->setDocumentSellerContact(
+				$invoiceData['sellercontactpersonname'],
+				"",
+				$invoiceData['sellercontactphoneno'],
+				$invoiceData['sellercontactfaxno'],
+				$invoiceData['sellercontactemailaddr']
+			);
+
+			// Set Buyer Reference (Service Code for Chorus)
+			if (!empty($invoiceData['buyerReference'])) {
+				$facturxpdf->setDocumentBuyerReference($invoiceData['buyerReference']);
+			}
+
+			// Contract reference
+			if (!empty($invoiceData['contractReference'])) {
+				$facturxpdf->setDocumentContractReferencedDocument($invoiceData['contractReference']);
+			}
+
+			// Commitment number / client ref
+			if (!empty($invoiceData['orderReference'])) {
+				$facturxpdf->setDocumentBuyerOrderReferencedDocument($invoiceData['orderReference']);
+			}
+
+			// Set Business Process ID
+			$facturxpdf->setDocumentBusinessProcess($invoiceData['businessProcessId']);
+
+			// Add reference to source invoice for credit notes (BT-25/BT-26)
+			if (!empty($invoiceData['invoiceRefDocs'])) {
+				foreach ($invoiceData['invoiceRefDocs'] as $refDoc) {
+					$facturxpdf->setDocumentInvoiceReferencedDocument($refDoc['ref'], $refDoc['type'], $refDoc['date']);
+				}
+			}
+
+			// --- Process Invoice Lines ---
+			foreach ($linesData as $numligne => $lineData) {
+				$facturxpdf
+					->addNewPosition($lineData['lineid'])
+					->setDocumentPositionProductDetails($lineData['prodname'], $lineData['proddesc'], $lineData['prodsellerid'])
+					->setDocumentPositionGrossPrice($lineData['grosspriceamount'])
+					->setDocumentPositionNetPrice($lineData['netpriceamount'])
+					->setDocumentPositionQuantity($lineData['billedquantity'], $lineData['billedquantityunitcode'])
+					->setDocumentPositionLineSummation($lineData['lineTotalAmount']);
+
+				// Add reference to original invoice for deposit lines
+				if ($lineData['isDepositLine']) {
+					$facturxpdf->setDocumentInvoiceReferencedDocument($lineData['depositInvoiceRef'], ZugferdInvoiceType::PREPAYMENTINVOICE, $lineData['depositInvoiceDate']);
+				}
+
+				// Set billing period for the line
+				if ($lineData['linePeriodStart'] !== null && $lineData['linePeriodEnd'] !== null) {
+					$facturxpdf->setDocumentPositionBillingPeriod($lineData['linePeriodStart'], $lineData['linePeriodEnd']);
+				}
+
+				// Handle negative amount lines as a line discount
+				if ($lineData['grosspriceamount'] < 0) {
+					dol_syslog("PDPConnectFR : there is negative line, convert as a global discount", \LOG_INFO);
+					$facturxpdf->addDocumentPositionGrossPriceAllowanceCharge(abs($lineData['grosspriceamount']) * $lineData['billedquantity'], false, null, null, "Discount");
+				}
+
+				// VAT information (Line Tax)
+				if ($lineData['rateApplicablePercent'] > 0) {
+					$facturxpdf->addDocumentPositionTax($lineData['categoryCode'], 'VAT', $lineData['rateApplicablePercent']);
+				} else {
+					$facturxpdf->addDocumentPositionTax($lineData['categoryCode'], 'VAT', '0.00');
+				}
+
+				// Discount percentage on a line
+				if ($lineData['lineremisepercent'] !== 'NA' && $lineData['lineremisepercent'] > 0) {
+					$remise_amount = $lineData['lineTotalAmount'] - $lineData['grosspriceamount'] * $lineData['billedquantity'];
+					dol_syslog("PDPConnectFR : there is a discount on that line : " . $lineData['lineremisepercent'] . ", amount is " . $remise_amount);
+					$facturxpdf->addDocumentPositionAllowanceCharge(abs($remise_amount), false, $lineData['lineremisepercent'], $lineData['grosspriceamount'] * $lineData['billedquantity'], null, "Discount");
+				}
+			}
+
+			// Final Document Summation and Payment Means
+
+			// Multi VAT (Document Tax Summary)
+			foreach ($invoiceData['taxBreakdown'] as $k => $v) {
+				$code = ($k == 0) ? 'K' : 'S';
+				$facturxpdf->addDocumentTax($code, "VAT", $v['totalHT'], $v['totalTVA'], $k);
+			}
+
+			// Set final summation details
+			$facturxpdf
+				->setDocumentSummation(
+					$invoiceData['grandTotalAmount'],
+					$invoiceData['duePayableAmount'],
+					$invoiceData['lineTotalAmount'],
+					$invoiceData['chargeTotalAmount'],
+					$invoiceData['allowanceTotalAmount'],
+					$invoiceData['taxBasisTotalAmount'],
+					$invoiceData['taxTotalAmount'],
+					null,
+					$invoiceData['totalPrepaidAmount']
+				)
+				->addDocumentPaymentTerm(
+					$invoiceData['paymentTermsText'],
+					$invoiceData['paymentDueDate']
+				)
+				->addDocumentPaymentMean(
+					$invoiceData['paymentMeansCode'],
+					$invoiceData['paymentMeansText'],
+					null,
+					null,
+					null,
+					null,
+					$invoiceData['iban'],
+					$invoiceData['accountName'],
+					$pdpconnectfr->removeSpaces($account->number),
+					$invoiceData['bic']
+				);
+
+			// Validate the generated XML document
+			dol_syslog(get_class($this) . '::executeHooks try to validate XML');
+
+			$pdfCheck = new ZugferdDocumentValidator($facturxpdf);
+			$res = $pdfCheck->validateDocument();
+			if (count($res) > 0) {
+				$allErrors = "";
+				foreach ($res as $error) {
+					if (is_array($error)) {
+						$allErrors .= json_encode($error) . "\n";
+					} else {
+						$allErrors .= $error . "\n";
+					}
+				}
+				$this->errors = $allErrors;
+				dol_syslog(get_class($this) . '::executeHooks  (1) : ' . $allErrors, LOG_ERR);
+			} else {
+				dol_syslog(get_class($this) . '::executeHooks XML validation ok');
+			}
+
+			// Generate the XML file Factur-X
+			$filename = dol_sanitizeFileName($invoice->ref);
+			$filedir  = getMultidirOutput($invoice, '', 1, 'temp');
+			$xmlfile  = $filedir . '/' . $filename . '/factur-x3.xml';
+
+			dol_mkdir(dirname($xmlfile));
+			dol_delete_file($xmlfile);
+
+			$facturxpdf->writeFile($xmlfile);
+
+			// Patch the generated XML for better EXTENDED-CTC-FR compatibility
+			if ($invoice->type == $invoice::TYPE_CREDIT_NOTE || !empty($invoiceData['_depositlines'])) {
+				dol_syslog(get_class($this) . '::executeHooks Patch XML for better EXTENDED-CTC-FR compatibility');
+				$patcher    = new XmlPatcher($facturxpdf);
+				$patchedXml = $patcher->patchXmlString($xmlfile, $invoiceData['_depositlines']);
+				file_put_contents($xmlfile, $patchedXml);
+			}
+
+			dolChmod($xmlfile);
+
+			return $xmlfile;
 		}
-
-		// Generate the XML file Factur-X
-		$filename = dol_sanitizeFileName($invoice->ref);
-		$filedir  = getMultidirOutput($invoice, '', 1, 'temp');
-		$xmlfile  = $filedir . '/' . $filename . '/factur-x3.xml';
-
-		dol_mkdir(dirname($xmlfile));
-		dol_delete_file($xmlfile);
-
-		$facturxpdf->writeFile($xmlfile);
-
-		// Patch the generated XML for better EXTENDED-CTC-FR compatibility
-		if ($invoice->type == $invoice::TYPE_CREDIT_NOTE || !empty($invoiceData['_depositlines'])) {
-			dol_syslog(get_class($this) . '::executeHooks Patch XML for better EXTENDED-CTC-FR compatibility');
-			$patcher    = new XmlPatcher($facturxpdf);
-			$patchedXml = $patcher->patchXmlString($xmlfile, $invoiceData['_depositlines']);
-			file_put_contents($xmlfile, $patchedXml);
-		}
-
-		dolChmod($xmlfile);
-
-		return $xmlfile;
 	}
 
 	/**
