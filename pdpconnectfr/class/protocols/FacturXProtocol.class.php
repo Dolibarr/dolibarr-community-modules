@@ -1650,8 +1650,7 @@ class FacturXProtocol extends AbstractProtocol
 		//var_dump(($savmysoc ? $savmysoc->name : ''), $mysoc->name, $thirdpartyBuyer->name);
 
 
-
-		// Generate the PDF
+		// Generate the Dolibarr PDF of the invoice
 		$tmpinvoice->generateDocument($tmpinvoice->model, $outputlangs);
 
 		// For invoice with ->specimen=1, the file is SPECIMEN.pdf so we rename it into ref
@@ -1662,7 +1661,7 @@ class FacturXProtocol extends AbstractProtocol
 		dol_move($srcfile, $destfile, '0', 1);
 
 
-		// Generate the Factur-X PDF
+		// Generate the EInvoice - Factur-X PDF
 		$pathOfPdf = $this->generateInvoice($tmpinvoice, $outputlangs);
 
 		// Restore switched variables if we changed $mysoc for generation of the sample invoice

@@ -126,6 +126,7 @@ class ProtocolManager
 		if (preg_match('/^%PDF\-/', $content) === 1) { // We can also check for embedded XML in PDF for Factur-X
 			return 'FACTURX';
 		} elseif (strpos($content, 'urn:un:unece:uncefact:data:standard:CrossIndustryInvoice') !== false) {
+			// Should contains also #conformant#urn.cpro.gouv.fr:1p0:extended-ctc-fr into <ram:ID>
 			return 'CII';
 		} elseif (strpos($content, 'urn:oasis:names:specification:ubl:schema:xsd:Invoice-2') !== false) {
 			return 'UBL';

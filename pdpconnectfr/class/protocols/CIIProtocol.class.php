@@ -351,7 +351,7 @@ class CIIProtocol extends AbstractProtocol
 		// Make a copy of the XML file in the final destination
 		$filename = dol_sanitizeFileName($invoice->ref);
 		$filedir = getMultidirOutput($invoice, '', 1);
-		$einvoice_path = $filedir . '/' . $filename . '_einvoice.xml';
+		$einvoice_path = $filedir . '/' . $filename . '_cii.xml';
 		if (dol_copy($xmlfile, $einvoice_path)) {
 			dol_syslog(get_class($this) . "::generateInvoice copied XML file to " . $einvoice_path);
 		} else {
@@ -420,11 +420,10 @@ class CIIProtocol extends AbstractProtocol
 		$tmpinvoice = new Facture($this->db);
 		$tmpinvoice->initAsSpecimen('nolines');
 
-		$tmpinvoice->ref .= '-' . dol_print_date(dol_now(), '%Y%m%d-%H%M%S');
+		$tmpinvoice->ref .= '-' . dol_print_date(dol_now(), '%y%m%d-%H%M%S');
 		if (!empty($options['invoicetype'])) {
 			$tmpinvoice->type = $options['invoicetype'];
 		}
-
 
 		$line = new FactureLigne($this->db);
 		$line->desc = $langs->trans("Description") . " 1";
@@ -490,8 +489,7 @@ class CIIProtocol extends AbstractProtocol
 		//var_dump(($savmysoc ? $savmysoc->name : ''), $mysoc->name, $thirdpartyBuyer->name);
 
 
-
-		// Generate the PDF
+		// Generate the Dolibarr PDF of the invoice
 		$tmpinvoice->generateDocument($tmpinvoice->model, $outputlangs);
 
 		// For invoice with ->specimen=1, the file is SPECIMEN.pdf so we rename it into ref
@@ -502,7 +500,7 @@ class CIIProtocol extends AbstractProtocol
 		dol_move($srcfile, $destfile, '0', 1);
 
 
-		// Generate CII xml file
+		// Generate the EInvoice - CII xml file
 		$pathOfXml = $this->generateInvoice($tmpinvoice, $outputlangs);
 
 		// Restore switched variables if we changed $mysoc for generation of the sample invoice
@@ -1432,12 +1430,14 @@ class CIIProtocol extends AbstractProtocol
 		$guideline = $doc->createElement('ram:GuidelineSpecifiedDocumentContextParameter');
 		$ctx->appendChild($guideline);
 
+		// XML Format = Profile
 		$profileGuidelines = [
-			'MINIMUM'  => 'urn:factur-x.eu:1p0:minimum', // Factur-X profile
-			'BASICWL'  => 'urn:factur-x.eu:1p0:basicwl', // Factur-X profile
-			'BASIC'    => 'urn:factur-x.eu:1p0:basic', // Factur-X profile
-			'EN16931'  => 'urn:cen.eu:en16931:2017', // CII Profile
-			'EXTENDED' => 'urn:cen.eu:en16931:2017#conformant#urn:factur-x.eu:1p0:extended', // Factur-X profile
+			'MINIMUM'  => 'urn:factur-x.eu:1p0:minimum', 	// Factur-X profile
+			'BASICWL'  => 'urn:factur-x.eu:1p0:basicwl', 	// Factur-X profile
+			'BASIC'    => 'urn:factur-x.eu:1p0:basic', 		// Factur-X profile
+			//'EN16931'=> 'urn:cen.eu:en16931:2017', 		// CII Profile.
+			'EN16931'  => 'urn:cen.eu:en16931:2017#conformant#urn.cpro.gouv.fr:1p0:extended-ctc-fr',	// CII Profile.
+			'EXTENDED' => 'urn:cen.eu:en16931:2017#conformant#urn:factur-x.eu:1p0:extended', 			// Factur-X profile
 		];
 
 		if (!isset($profileGuidelines[$profile])) {

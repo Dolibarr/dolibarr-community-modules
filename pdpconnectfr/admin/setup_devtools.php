@@ -126,7 +126,7 @@ $buyerId = GETPOSTINT('buyer_id');
  * Actions
  */
 
-if ($provider && $action == 'buildsamplesupplierinvoice') {
+if ($action == 'buildsamplesupplierinvoice') {	// Test on permissions already done
 	if ($sellerId > 0) {
 		$thirdpartySeller = new Societe($db);
 		$thirdpartySeller->fetch($sellerId);
@@ -140,16 +140,26 @@ if ($provider && $action == 'buildsamplesupplierinvoice') {
 		$thirdpartyBuyer = $mysoc;
 	}
 
-	$options = array('invoicetype' => GETPOSTINT('invoicetype'));
+	$options = array(
+		'invoiceformat' => GETPOST('invoiceformat'),
+		'invoicetype' => GETPOSTINT('invoicetype')
+	);
+
+	// Init a dedicated provider with the selected format that is forced to the one selected.
+	$providerSample = $PDPManager->getProvider(getDolGlobalString('PDPCONNECTFR_PDP'));
+
+	$exchangeProtocolConf = (GETPOST('invoiceformat') ? GETPOST('invoiceformat') : 'PDPCONNECTFR_PROTOCOL');
+	$tmpProtocolManager = new ProtocolManager($db);
+	$providerSample->exchangeProtocol = $tmpProtocolManager->getProtocol($exchangeProtocolConf);
 
 	if ((float) DOL_VERSION < 24.0) {
-		$resarray = $provider->exchangeProtocol->generateSampleInvoiceOld($pdpconnectfr, $thirdpartySeller, $thirdpartyBuyer, $options);
+		$resarray = $providerSample->exchangeProtocol->generateSampleInvoiceOld($pdpconnectfr, $thirdpartySeller, $thirdpartyBuyer, $options);
 	} else {
-		$resarray = $provider->exchangeProtocol->generateSampleInvoice($pdpconnectfr, $thirdpartySeller, $thirdpartyBuyer, $options);
+		$resarray = $providerSample->exchangeProtocol->generateSampleInvoice($pdpconnectfr, $thirdpartySeller, $thirdpartyBuyer, $options);
 	}
 
 	if (is_numeric($resarray) && $resarray < 0) {
-		setEventMessages($provider->exchangeProtocol->error, $provider->exchangeProtocol->errors, 'errors');
+		setEventMessages($providerSample->exchangeProtocol->error, $providerSample->exchangeProtocol->errors, 'errors');
 
 		$resarray = array();
 	} else {
@@ -211,16 +221,38 @@ print '</div>';
 print '<br>';
 
 
-// Tool to geenrate sample invoice
+// Tool to generate sample invoice
 if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 	$provider = $PDPManager->getProvider(getDolGlobalString('PDPCONNECTFR_PDP'));
 
 	print '<div class="neutral">';
-	print 'Generate an Einvoice sample in the protocol Factur-X<br><br>';
+	print 'Generate an Einvoice sample<br><br>';
 	print '<form action="'.$_SERVER["PHP_SELF"].'" method="POST">';
 	print '<input type="hidden" name="action" value="buildsamplesupplierinvoice">';
 	print '<input type="hidden" name="token" value="'.newToken().'">';
 
+	$ProtocolManager = new ProtocolManager($db);
+	$protocolsList = $ProtocolManager->getProtocolsList();
+
+	// Protocols list
+	$TFieldProtocols = array();
+	foreach ($protocolsList as $key => $protocolconfig) {
+		if ($protocolconfig['is_enabled'] == 0) {
+			continue;
+		}
+		$TFieldProtocols[$key] = $protocolconfig['protocol_name'];
+	}
+
+	// Format
+	print '<span class="width100 inline-block">'.$langs->trans("InvoiceFormat").'</span> ';
+	if ((float) DOL_VERSION >= 24.0) {
+		print $form->selectarray('invoiceformat', $TFieldProtocols, GETPOSTISSET('invoiceformat') ? GETPOST('invoiceformat') : getDolGlobalString('PDPCONNECTFR_PROTOCOL'));
+	} else {
+		print $langs->trans("Factur-X");
+	}
+	print '<br>';
+
+	// Invoice type
 	print '<span class="width100 inline-block">'.$langs->trans("InvoiceType").'</span> ';
 	if ((float) DOL_VERSION >= 24.0) {
 		$typeofinvoice = array(
