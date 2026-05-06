@@ -391,6 +391,8 @@ $deliveryDate = !empty($deliveryDateList)
 	? new DateTime(dol_print_date($deliveryDateList[0], 'dayrfc'))
 	: new DateTime(dol_print_date($invoice->date, 'dayrfc'));
 
+
+
 // Filling $invoiceData (based on $invoiceTemplate)
 $invoiceData = [
 	// Document part
@@ -489,9 +491,6 @@ $invoiceData = [
 	'roundingAmount'            => null,
 	'totalPrepaidAmount'        => $prepaidAmount,
 
-	// Payment part
-	'paymentMeansCode'          => $this->_getPaymentMeanNumber($object),
-	'paymentMeansText'          => $langs->transnoentitiesnoconv("PaymentType" . $object->mode_reglement_code),
 	'iban'                      => $pdpconnectfr->removeSpaces($account->iban),
 	'bic'                       => $pdpconnectfr->removeSpaces($account->bic),
 	'accountName'               => $account_proprio,
@@ -518,6 +517,12 @@ $invoiceData = [
 	'_project'                  => ($invoice->project instanceof Project) ? $invoice->project : null,
 ];
 
+
+// Payment mode
+if ($object->mode_reglement_code) {
+	$invoiceData['paymentMeansCode'] = $this->_getPaymentMeanNumber($object);
+	$invoiceData['paymentMeansText'] = $langs->transnoentitiesnoconv("PaymentType" . $object->mode_reglement_code);
+}
 
 
 // Section to control data and throw errors in case of problem, to avoid generating non compliant XML
