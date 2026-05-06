@@ -290,6 +290,8 @@ ClickHereToRemoveConnection=Click here to remove this connection
 DefaultProductEBilling=Default product
 DefaultProductEBillingHelp=Default product to use when importing an invoice if no existing product can be found.
 InvoiceFormat=Invoice format
+WarningIfYouSetAnIDItMustExistsInAnnuary=WARNING: If you set a specific E-invoice ID here, it must exists in the annuary.
+CheckYourIDInFrenchEInvoiceAnnuary=Check your Einvoice ID in french E-invoice annuary.
 
 # AP EsaLink
 PDPCONNECTFR_ESALINK_USERNAME=API username

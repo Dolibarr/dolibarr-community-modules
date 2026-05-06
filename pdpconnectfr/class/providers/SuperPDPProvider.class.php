@@ -184,6 +184,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$item = $formSetup->newItem($prefix . 'ROUTING_ID');
 		$item->nameText = $langs->transnoentities('PDPCONNECTFR_ROUTING_ID');
 		$item->helpText = $langs->transnoentities('PDPCONNECTFR_ROUTING_ID_HELP');
+		$item->helpText .= '<br><br>'.img_picto('', 'warning').' '.$langs->trans('WarningIfYouSetAnIDItMustExistsInAnnuary');
 		$item->fieldAttr['placeholder'] = idprof($mysoc);
 		$item->fieldParams['isMandatory'] = 0;
 		$item->cssClass = 'minwidth300';
@@ -251,11 +252,11 @@ class SuperPDPProvider extends AbstractPDPProvider
 						$item->fieldOverride .= '<a class="reposition" href="' . $urltogeneratetoken . '">' . $texttoshow . '<i class="fa fa-key paddingleft"></i></a>';
 					}
 					if (!empty($tokenData['token'])) {
-						$item->fieldOverride .= ' &nbsp; &nbsp; <a class="reposition" href="' . $urltogeneratetoken . '">' . $langs->trans('reGenerateAccessToken') . '<i class="fa fa-key paddingleft"></i></a>';
+						$item->fieldOverride .= ' &nbsp; &nbsp; &nbsp; <a class="reposition" href="' . $urltogeneratetoken . '"><i class="fa fa-key paddingright"></i>' . $langs->trans('reGenerateAccessToken') . '</a>';
 					}
 
 					if (!empty($tokenData['token'])) {
-						$item->fieldOverride .= ' &nbsp; &nbsp; <a class="reposition" href="' . $_SERVER["PHP_SELF"] . "?action=delete" . $prefix . "TOKEN&token=" . newToken() . '">' . img_picto('', 'delete') . '</a>';
+						$item->fieldOverride .= ' &nbsp; &nbsp; <a class="reposition" href="' . $_SERVER["PHP_SELF"] . "?action=delete" . $prefix . "TOKEN&token=" . newToken() . '">' . img_picto($langs->trans("Delete"), 'delete') . '</a>';
 					}
 				}
 			}
@@ -266,11 +267,16 @@ class SuperPDPProvider extends AbstractPDPProvider
 					$item = $formSetup->newItem($prefix . 'ACTIONS');
 					$item->nameText = "&nbsp;";
 
-					$item->fieldOverride .= '<a class="reposition" href="' . $_SERVER["PHP_SELF"] . "?action=call" . $prefix . "HEALTHCHECK&token=" . newToken() . '">' . $langs->trans('testConnection') . ' (Healthcheck)<i class="fa fa-check paddingleft"></i></a><br>';
+					$item->fieldOverride .= '<a class="reposition" href="' . $_SERVER["PHP_SELF"] . "?action=call" . $prefix . "HEALTHCHECK&token=" . newToken() . '"><i class="fa fa-heartbeat pictofixedwidth"></i>' . $langs->trans('testConnection') . ' (Healthcheck)</a><br>';
 					$item->cssClass = 'minwidth500';
 
 					if ($tokenData['token'] && getDolGlobalString('PDPCONNECTFR_PROTOCOL')) {
-						$item->fieldOverride .= '<a class="reposition" href="' . $_SERVER["PHP_SELF"] . "?action=make" . $prefix . "sampleinvoice&token=" . newToken() . '">' . $langs->trans('generateSendSampleInvoice') . '<i class="fa fa-file paddingleft"></i></a><br>';
+						$item->fieldOverride .= '<a class="reposition" href="' . $_SERVER["PHP_SELF"] . "?action=make" . $prefix . "sampleinvoice&token=" . newToken() . '"><i class="fa fa-file pictofixedwidth"></i>' . $langs->trans('generateSendSampleInvoice') . '</a><br>';
+					}
+
+					// Check your ID in French E-Invoice Annuary
+					if ($mysoc->country_code == 'FR') {
+						$item->fieldOverride .= '<a class="reposition" href="https://facturation.chorus-pro.gouv.fr/annuaire/#/" target="_blank"><i class="fa fa-check pictofixedwidth"></i>' . $langs->trans('CheckYourIDInFrenchEInvoiceAnnuary') . '</a><br>';
 					}
 				}
 			}
