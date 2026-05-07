@@ -137,7 +137,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 				if (empty($tokenData['token'])) {
 					$this->helpToGetCredentials = str_replace('{s1}', '<br><br><center>' . img_picto('', 'url', 'class="pictofixedwidth"') . '<a href="' . $urltogeneratetoken . '" target="_new">' . $urltoshow . '</a></center>', $this->helpToGetCredentials);
-					$this->helpToGetCredentials = '<div class="formborder">' . $this->helpToGetCredentials . '</div>';
+					$this->helpToGetCredentials = '<div class="formborderx info">' . $this->helpToGetCredentials . '</div>';
 				} else {
 					$this->helpToGetCredentials = '<div class="green greenborder">';
 					$this->helpToGetCredentials .= '<center>';
@@ -170,7 +170,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				$this->helpToGetCredentials = str_replace('{s4}', $langs->transnoentitiesnoconv("OAUTH_SECRET"), $this->helpToGetCredentials);
 				$this->helpToGetCredentials = str_replace('{s5}', $langs->transnoentitiesnoconv("Save"), $this->helpToGetCredentials);
 
-				$this->helpToGetCredentials = '<div class="formborder">' . $this->helpToGetCredentials . '</div>';
+				$this->helpToGetCredentials = '<div class="formborderx info">' . $this->helpToGetCredentials . '</div>';
 			} else {
 				$this->helpToGetCredentials = '<div class="green greenborder">';
 				$this->helpToGetCredentials .= '<center>';
@@ -273,7 +273,11 @@ class SuperPDPProvider extends AbstractPDPProvider
 					$item->cssClass = 'minwidth500';
 
 					if ($tokenData['token'] && getDolGlobalString('PDPCONNECTFR_PROTOCOL')) {
-						$item->fieldOverride .= '<a class="reposition" href="' . $_SERVER["PHP_SELF"] . "?action=make" . $prefix . "sampleinvoice&token=" . newToken() . '"><i class="fa fa-file pictofixedwidth"></i>' . $langs->trans('generateSendSampleInvoice') . '</a><br>';
+						if (getDolGlobalString('PDPCONNECTFR_LIVE')) {
+							$item->fieldOverride .= '<span class="opacitymedium" title="'.$langs->trans("DisabledInProductionMode").'"><i class="fa fa-file pictofixedwidth"></i>' . $langs->trans('generateSendSampleInvoice') . '</span><br>';
+						} else {
+							$item->fieldOverride .= '<a class="reposition" href="' . $_SERVER["PHP_SELF"] . "?action=make" . $prefix . "sampleinvoice&token=" . newToken() . '"><i class="fa fa-file pictofixedwidth"></i>' . $langs->trans('generateSendSampleInvoice') . '</a><br>';
+						}
 					}
 
 					// Check your ID in French E-Invoice Annuary
