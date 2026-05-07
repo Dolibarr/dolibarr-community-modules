@@ -911,19 +911,21 @@ class SuperPDPProvider extends AbstractPDPProvider
 		foreach ($flowIds as $flowId) {
 			$escapedFlowIds[] = "'" . $db->escape($flowId) . "'";
 		}
-		$sql = "SELECT flow_id FROM " . MAIN_DB_PREFIX . "pdpconnectfr_document";
-		$sql .= " WHERE flow_id IN (" . implode(',', $escapedFlowIds) . ")";
-		$resql = $db->query($sql);
-		if ($resql) {
-			while ($obj = $db->fetch_object($resql)) {
-				$alreadyProcessedFlowIds[$obj->flow_id] = $obj->flow_id;
-			}
-		} else {
-			$this->errors[] = "Failed to retrieve flows already processed among the list of flows received.";
-			$results_messages[] = "Failed to retrieve flows already processed among the list of flows received.";
+		if (count($escapedFlowIds)) {
+			$sql = "SELECT flow_id FROM " . MAIN_DB_PREFIX . "pdpconnectfr_document";
+			$sql .= " WHERE flow_id IN (" . implode(',', $escapedFlowIds) . ")";
+			$resql = $db->query($sql);
+			if ($resql) {
+				while ($obj = $db->fetch_object($resql)) {
+					$alreadyProcessedFlowIds[$obj->flow_id] = $obj->flow_id;
+				}
+			} else {
+				$this->errors[] = "Failed to retrieve the list of flows already processed from database. ".$this->db->lasterror();
+				$results_messages[] = "Failed to retrieve the list of flows already processed from database. ".$this->db->lasterror();
 
-			dol_syslog(__METHOD__ . " Failed to retrieve flows already processed among the list of flows received.", LOG_DEBUG, 0, "_pdpconnectfr");
-			return array('res' => 0, 'messages' => $results_messages);
+				dol_syslog(__METHOD__ . " Failed to retrieve flows already processed among the list of flows received. ".$this->db->lasterror(), LOG_DEBUG, 0, "_pdpconnectfr");
+				return array('res' => 0, 'messages' => $results_messages);
+			}
 		}
 
 		// Update totalFlows after filtering
