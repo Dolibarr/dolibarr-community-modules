@@ -120,6 +120,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			$this->helpToGetCredentials = '<div class="green greenborder">';
 			$this->helpToGetCredentials .= '<center>';
 			$this->helpToGetCredentials .= $langs->trans("YourSoftwareSeemsConnectedWith", strtoupper($this->name));
+			$this->helpToGetCredentials .= ' <a href="'.$this->config['provider_url'].'" target="_blank">('.$this->config['provider_url'].')</a>';
 			$this->helpToGetCredentials .= '<br><br>' . img_picto('', 'delete', 'class="pictofixedwidth"') . '<a href="' . $_SERVER["PHP_SELF"] . '?action=delete' . $prefix . "TOKEN&token=" . newToken() . '">' . $langs->trans("ClickHereToRemoveConnection") . '</a>';
 			$this->helpToGetCredentials .= '</center>';
 			$this->helpToGetCredentials .= '</div>';
