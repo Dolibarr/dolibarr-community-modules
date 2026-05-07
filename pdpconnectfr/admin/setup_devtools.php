@@ -208,19 +208,21 @@ $pdpconnectfr = new PdpConnectFr($db);
 $stringwarning = pdpShowWarning($pdpconnectfr);
 print $stringwarning;
 
+
 print '<div class="neutral">';
-print 'Link to test a PDF E-invoice from SuperPDP<br>';
+print 'Link to test an E-invoice from SuperPDP (Factur-X, CII, ...): ';
 print img_picto('', 'url', 'class="pictofixedwidth"');
 print '<a href="https://www.superpdp.tech/outils/validateur-facture-electronique" target="_blank">here</a>';
-print '</div>';
-
 print '<br>';
-
-print '<div class="neutral">';
-print 'Check annuary<br>';
+print 'Check annuary: ';
 print img_picto('', 'url', 'class="pictofixedwidth"');
 print '<a href="https://www.superpdp.tech/outils/info-annuaire" target="_blank">here</a>';
+print '<br>';
+print 'API documentation/test: ';
+print img_picto('', 'url', 'class="pictofixedwidth"');
+print '<a href="https://www.superpdp.tech/openapi/#afnor-flow" target="_blank">here</a>';
 print '</div>';
+
 
 print '<br>';
 
