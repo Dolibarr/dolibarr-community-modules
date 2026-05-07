@@ -293,10 +293,11 @@ InvoiceFormat=Invoice format
 WarningIfYouSetAnIDItMustExistsInAnnuary=WARNING: If you set a specific E-invoice ID here, it must exists in the annuary.
 CheckYourIDInFrenchEInvoiceAnnuary=Check your Einvoice ID in french E-invoice annuary.
 
+PDPCONNECTFR_CLIENT_ID=Client ID
+PDPCONNECTFR_CLIENT_SECRET=Client secret
+PDPCONNECTFR_API_KEY=API key
+
 # AP EsaLink
-PDPCONNECTFR_ESALINK_USERNAME=API username
-PDPCONNECTFR_ESALINK_PASSWORD=API password
-PDPCONNECTFR_ESALINK_API_KEY = API KEY
 PDPCONNECTFR_ESALINK_TOKEN=Access token
 PDPCONNECTFR_ESALINK_ACTIONS=Actions
 PDPCONNECTFR_ESALINKP_HELP_CREDENTIAL1=To use the <b>EsaLink Access Point</b> as your official Access Point for E-invoicing, you must follow the following steps:

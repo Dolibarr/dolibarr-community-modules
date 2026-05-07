@@ -68,10 +68,9 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			'prod_api_url' => 'https://hubtimize.fr/api/orchestrator/v1/',
 			'test_auth_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/',
 			'test_api_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/',
-			'username' => getDolGlobalString('PDPCONNECTFR_ESALINK_USERNAME'),
-			'password' => getDolGlobalString('PDPCONNECTFR_ESALINK_PASSWORD'),
-			'api_key' => getDolGlobalString('PDPCONNECTFR_ESALINK_API_KEY', ''),
-			'api_secret' => getDolGlobalString('PDPCONNECTFR_ESALINK_API_SECRET', ''),
+			'username' => getDolGlobalString('PDPCONNECTFR_ESALINK_USERNAME'.(getDolGlobalInt('PDPCONNECTFR_LIVE') ? '_PROD' : '')),
+			'password' => getDolGlobalString('PDPCONNECTFR_ESALINK_PASSWORD'.(getDolGlobalInt('PDPCONNECTFR_LIVE') ? '_PROD' : '')),
+			'api_key'  => getDolGlobalString('PDPCONNECTFR_ESALINK_API_KEY'.(getDolGlobalInt('PDPCONNECTFR_LIVE') ? '_PROD' : '')),
 			'dol_prefix' => 'PDPCONNECTFR_ESALINK',
 			'live' => getDolGlobalInt('PDPCONNECTFR_LIVE', 0)
 		);
@@ -152,25 +151,28 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		// $item->cssClass = 'minwidth500';
 		// $item->fieldParams['trClass'] = 'advancedoption';
 
-		// Username
-		$item = $formSetup->newItem($prefix . 'USERNAME');
+		// Client ID
+		$item = $formSetup->newItem($prefix . 'USERNAME'.(getDolGlobalInt('PDPCONNECTFR_LIVE') ? '_PROD' : ''));
+		$item->nameText = $langs->transnoentities('PDPCONNECTFR_CLIENT_ID');
 		$item->cssClass = 'minwidth500';
 
-		// Password
-		$item = $formSetup->newItem($prefix . 'PASSWORD')->setAsGenericPassword();
+		// Client secret
+		$item = $formSetup->newItem($prefix . 'PASSWORD'.(getDolGlobalInt('PDPCONNECTFR_LIVE') ? '_PROD' : ''))->setAsGenericPassword();
+		$item->nameText = $langs->transnoentities('PDPCONNECTFR_CLIENT_SECRET');
 		$item->cssClass = 'minwidth500';
 
 		// API_KEY
-		$item = $formSetup->newItem($prefix . 'API_KEY');
+		$item = $formSetup->newItem($prefix . 'API_KEY'.(getDolGlobalInt('PDPCONNECTFR_LIVE') ? '_PROD' : ''));
+		$item->nameText = $langs->transnoentities('PDPCONNECTFR_API_KEY');
 		$item->cssClass = 'minwidth500';
 
 		// Token
-		if (getDolGlobalString($prefix . 'API_KEY')) {
+		if (getDolGlobalString($prefix . 'API_KEY'.(getDolGlobalInt('PDPCONNECTFR_LIVE') ? '_PROD' : ''))) {
 			$texttoshow = $langs->trans('generateAccessToken');
 			$urltogeneratetoken = $_SERVER["PHP_SELF"] . "?action=set" . $prefix . "TOKEN&token=" . newToken();
 
-			$item = $formSetup->newItem($prefix . 'TOKEN');
-			//$item->nameText = $langs->trans('Token');
+			$item = $formSetup->newItem($prefix . 'TOKEN'.(getDolGlobalInt('PDPCONNECTFR_LIVE') ? '_PROD' : ''));
+			$item->nameText = $langs->trans('Token');
 			$item->cssClass = 'maxwidth500 ';
 			$item->fieldOverride = "";
 			if (!empty($tokenData['token'])) {

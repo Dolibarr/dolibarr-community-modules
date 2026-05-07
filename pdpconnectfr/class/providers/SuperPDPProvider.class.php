@@ -62,14 +62,14 @@ class SuperPDPProvider extends AbstractPDPProvider
 		parent::__construct($db);
 
 		$this->config = array(
-			'provider_url' => 'https://superpdp.tech/',
+			'provider_url'  => 'https://superpdp.tech/',
 			'prod_auth_url' => 'https://api.superpdp.tech/oauth2/',
 			'test_auth_url' => 'https://api.superpdp.tech/oauth2/',
-			'prod_api_url' => 'https://api.superpdp.tech/afnor-flow/v1/',
-			'test_api_url' => 'https://api.superpdp.tech/afnor-flow/v1/',
-			'client_id' => getDolGlobalString('PDPCONNECTFR_SUPERPDP_CLIENT_ID'),
-			'client_secret' => getDolGlobalString('PDPCONNECTFR_SUPERPDP_CLIENT_SECRET'),
-			'dol_prefix' => getDolGlobalString('PDPCONNECTFR_PDP') == 'SUPERPDPViaPartner' ? 'PDPCONNECTFR_SUPERPDPVIAPARTNER' : 'PDPCONNECTFR_SUPERPDP',
+			'prod_api_url'  => 'https://api.superpdp.tech/afnor-flow/v1/',
+			'test_api_url'  => 'https://api.superpdp.tech/afnor-flow/v1/',
+			'client_id'     => getDolGlobalString('PDPCONNECTFR_SUPERPDP_CLIENT_ID'.(getDolGlobalInt('PDPCONNECTFR_LIVE') ? '_PROD' : '')),
+			'client_secret' => getDolGlobalString('PDPCONNECTFR_SUPERPDP_CLIENT_SECRET'.(getDolGlobalInt('PDPCONNECTFR_LIVE') ? '_PROD' : '')),
+			'dol_prefix'    => getDolGlobalString('PDPCONNECTFR_PDP') == 'SUPERPDPViaPartner' ? 'PDPCONNECTFR_SUPERPDPVIAPARTNER' : 'PDPCONNECTFR_SUPERPDP',
 			'live' => getDolGlobalInt('PDPCONNECTFR_LIVE', 0)
 		);
 
@@ -209,18 +209,18 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 		if (getDolGlobalString('PDPCONNECTFR_PDP') != 'SUPERPDPViaPartner' || getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER') == 'proxy') {
 			// Username
-			$item = $formSetup->newItem($prefix . 'CLIENT_ID');
-			$item->nameText = $langs->trans('OAUTH_ID');
+			$item = $formSetup->newItem($prefix.'CLIENT_ID'.(getDolGlobalInt('PDPCONNECTFR_LIVE') ? '_PROD' : ''));
+			$item->nameText = $langs->trans('PDPCONNECTFR_CLIENT_ID');
 			$item->cssClass = 'minwidth500';
 
 			// Password
-			$item = $formSetup->newItem($prefix . 'CLIENT_SECRET')->setAsGenericPassword();
-			$item->nameText = $langs->trans('OAUTH_SECRET');
+			$item = $formSetup->newItem($prefix.'CLIENT_SECRET'.(getDolGlobalInt('PDPCONNECTFR_LIVE') ? '_PROD' : ''))->setAsGenericPassword();
+			$item->nameText = $langs->trans('PDPCONNECTFR_CLIENT_SECRET');
 			$item->cssClass = 'minwidth500';
 		}
 
 		// API_KEY
-		//$item = $formSetup->newItem($prefix . 'API_KEY');
+		//$item = $formSetup->newItem($prefix . 'API_KEY'.(getDolGlobalInt('PDPCONNECTFR_LIVE') ? '_PROD' : ''));
 		//$item->cssClass = 'minwidth500';
 
 		// Token
@@ -232,13 +232,13 @@ class SuperPDPProvider extends AbstractPDPProvider
 					$texttoshow = $langs->trans('generateAccessToken') . ' via ' . getDolGlobalString("PDPCONNTECTFR_SUPERPDP_VIAPARTNER");
 					$urltogeneratetoken = getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER_OAUTH_URL');
 					$urltogeneratetoken .= '?state=none&response_type=code&redirect_uri=' . urlencode(dol_buildpath('/pdpconnectfr/admin/setup.php', 2));
-				} elseif (getDolGlobalString($prefix . 'CLIENT_ID') && getDolGlobalString($prefix . 'CLIENT_SECRET')) {
+				} elseif (getDolGlobalString($prefix . 'CLIENT_ID'.(getDolGlobalInt('PDPCONNECTFR_LIVE') ? '_PROD' : '')) && getDolGlobalString($prefix . 'CLIENT_SECRET'.(getDolGlobalInt('PDPCONNECTFR_LIVE') ? '_PROD' : ''))) {
 					$texttoshow = $langs->trans('generateAccessToken');
 					$urltogeneratetoken = $_SERVER["PHP_SELF"] . "?action=set" . $prefix . "TOKEN&token=" . newToken();
 				}
 
 				if ($urltogeneratetoken && (getDolGlobalString('PDPCONNECTFR_PDP') != 'SUPERPDPViaPartner' || !empty($tokenData['token']))) {
-					$item = $formSetup->newItem($prefix . 'TOKEN');
+					$item = $formSetup->newItem($prefix . 'TOKEN'.(getDolGlobalInt('PDPCONNECTFR_LIVE') ? '_PROD' : ''));
 					$item->nameText = $langs->trans('AccessToken');
 					$item->cssClass = 'maxwidth500 ';
 					$item->fieldOverride = "";
