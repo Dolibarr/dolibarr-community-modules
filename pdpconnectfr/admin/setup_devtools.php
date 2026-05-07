@@ -126,6 +126,10 @@ $buyerId = GETPOSTINT('buyer_id');
  * Actions
  */
 
+if ($action == 'setMAIN_FORCE_SYSTEM_MESSAGE') {	// Test on permissions already done
+	dolibarr_set_const($db, 'MAIN_FORCE_SYSTEM_MESSAGE', GETPOST('MAIN_FORCE_SYSTEM_MESSAGE', 'restricthtml'));
+}
+
 if ($action == 'buildsamplesupplierinvoice') {	// Test on permissions already done
 	if ($sellerId > 0) {
 		$thirdpartySeller = new Societe($db);
@@ -227,6 +231,7 @@ if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 
 	print '<div class="neutral">';
 	print 'Generate an Einvoice sample<br><br>';
+
 	print '<form action="'.$_SERVER["PHP_SELF"].'" method="POST">';
 	print '<input type="hidden" name="action" value="buildsamplesupplierinvoice">';
 	print '<input type="hidden" name="token" value="'.newToken().'">';
@@ -293,7 +298,7 @@ if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 	print ' - <a href="'.$_SERVER["PHP_SELF"].'?buyer_einvoiceid=me'.($sellerId > 0 ? '&seller_id='.$sellerId : '').'" class="reposition">Select me</a>';
 	print '<br>';
 
-	print '<input type="submit" class="button small reposition" name="Generate" value="Generate">';
+	print '<input type="submit" class="button smallpaddingimp reposition" name="Generate" value="Generate">';
 	print '</form>';
 
 	if ($invoice_path) {
@@ -377,6 +382,20 @@ if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 		}
 	}
 }
+
+print '<br>';
+
+print '<div class="neutral">';
+print '<form action="'.$_SERVER["PHP_SELF"].'" method="POST">';
+print '<input type="hidden" name="action" value="setMAIN_FORCE_SYSTEM_MESSAGE">';
+print '<input type="hidden" name="token" value="'.newToken().'">';
+
+print 'You can force a legal message on instances >= 24.0 to warn users about the need to enable the E-invoicing, by setting the constant MAIN_FORCE_SYSTEM_MESSAGE.<br>';
+print '<textarea name="MAIN_FORCE_SYSTEM_MESSAGE" class="quatrevingtpercent" rows="2">'.getDolGlobalString('MAIN_FORCE_SYSTEM_MESSAGE').'</textarea><br>';
+print '<input type="submit" class="button smallpaddingimp reposition" name="save" value="'.$langs->trans("Save").'">';
+
+print '</form>';
+print '</div>';
 
 
 // Page end

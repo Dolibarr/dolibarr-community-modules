@@ -32,6 +32,20 @@ dol_include_once('/pdpconnectfr/class/providers/PDPProviderManager.class.php');
 class ActionsPdpconnectfr extends CommonHookActions
 {
 	/**
+	 * systemMessage
+	 *
+	 * @param array<string,mixed> 	$parameters		Array of parameters
+	 * @param CommonObject			$object			Object invoice
+	 * @param string		 		$action			Code action
+	 * @param Hookmanager			$hookmanager	Hookmanager
+	 * @return int									Result
+	 */
+	public function messageOfTheDay($parameters, &$object, &$action, $hookmanager)
+	{
+		return 0;
+	}
+
+	/**
 	 * Hook called after a PDF is created
 	 *
 	 * @param 	array   		$parameters 	Hook parameters
