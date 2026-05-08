@@ -172,7 +172,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			$urltogeneratetoken = $_SERVER["PHP_SELF"] . "?action=set" . $prefix . "TOKEN&token=" . newToken();
 
 			$item = $formSetup->newItem($prefix . 'TOKEN'.(getDolGlobalInt('PDPCONNECTFR_LIVE') ? '_PROD' : ''));
-			$item->nameText = $langs->trans('Token');
+			$item->nameText = $langs->trans('AccessToken');
 			$item->cssClass = 'maxwidth500 ';
 			$item->fieldOverride = "";
 			if (!empty($tokenData['token'])) {
@@ -221,7 +221,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	/**
 	 * Validate configuration parameters before API calls.
 	 *
-	 * @param 	int		$mode 	0 check that user/pass is set, 1 check that token is set
+	 * @param 	int		$mode 	0 check that user/pass is set, 1 check that api key is set
 	 * @return 	bool 			True if configuration is valid.
 	 */
 	public function validateConfiguration($mode = 1)
@@ -232,11 +232,11 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		if ($mode == 0) {
 			if (empty($this->config['username'])) {
 				$langs->loadLangs(array("main", "oauth"));
-				$error[] = $langs->trans("ErrorFieldRequired", $langs->transnoentities('Username'));
+				$error[] = $langs->trans('ErrorFieldRequired', $langs->transnoentities('PDPCONNECTFR_CLIENT_ID'));
 			}
 			if (empty($this->config['password'])) {
 				$langs->loadLangs(array("main", "oauth"));
-				$error[] = $langs->trans('ErrorFieldRequired', $langs->transnoentities('Password'));
+				$error[] = $langs->trans('ErrorFieldRequired', $langs->transnoentities('PDPCONNECTFR_CLIENT_SECRET'));
 			}
 		} elseif ($mode == 1) {
 			if (empty($this->config['api_key'])) {
@@ -321,7 +321,9 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 		if ($response['status_code'] === 200) {
 			$returnarray['status_code'] = true;
-			$returnarray['message'] = $langs->trans('APApiReachable', getDolGlobalString('PDPCONNECTFR_PDP'));
+			$nameOfAccessPoint = getDolGlobalString('PDPCONNECTFR_PDP');
+
+			$returnarray['message'] = $langs->trans('APApiReachable', $nameOfAccessPoint);
 		} else {
 			$returnarray['status_code'] = false;
 		}
@@ -389,10 +391,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		// Params
 		$params = [
 			'flowInfo' => json_encode([
+				"flowProfile" => "Extended-CTC-FR",
+				"flowSyntax" => $flowSyntax,			// CII or Factur-X
 				"trackingId" => $object->ref,
 				"name" => "Invoice_" . $object->ref,
-				"flowSyntax" => $flowSyntax,
-				"flowProfile" => "Extended-CTC-FR",
 				"sha256" => hash_file('sha256', $invoice_path)
 			]),
 			'file' => new CURLFile($invoice_path, $mime_type, basename($invoice_path))
@@ -731,8 +733,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	{
 		global $db, $langs, $user;
 
-		$results_messages = array();
-		$actions = array();
+		$results_messages = array();	// result message (technical error)
+		$actions = array();				// business message (manual action to do)
 
 		$resource = 'flows/search';
 		$uuid = $this->generateUuidV4(); // UUID used to correlate logs between Dolibarr and PDP TODO : Store it somewhere
@@ -832,19 +834,21 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		foreach ($flowIds as $flowId) {
 			$escapedFlowIds[] = "'" . $db->escape($flowId) . "'";
 		}
-		$sql = "SELECT flow_id FROM " . MAIN_DB_PREFIX . "pdpconnectfr_document";
-		$sql .= " WHERE flow_id IN (" . implode(',', $escapedFlowIds) . ")";
-		$resql = $db->query($sql);
-		if ($resql) {
-			while ($obj = $db->fetch_object($resql)) {
-				$alreadyProcessedFlowIds[$obj->flow_id] = $obj->flow_id;
-			}
-		} else {
-			$this->errors[] = "Failed to retrieve flows already processed among the list of flows received.";
-			$results_messages[] = "Failed to retrieve flows already processed among the list of flows received.";
+		if (count($escapedFlowIds)) {
+			$sql = "SELECT flow_id FROM " . MAIN_DB_PREFIX . "pdpconnectfr_document";
+			$sql .= " WHERE flow_id IN (" . implode(',', $escapedFlowIds) . ")";
+			$resql = $db->query($sql);
+			if ($resql) {
+				while ($obj = $db->fetch_object($resql)) {
+					$alreadyProcessedFlowIds[$obj->flow_id] = $obj->flow_id;
+				}
+			} else {
+				$this->errors[] = "Failed to retrieve from database the list of flows already processed. ".$this->db->lasterror();
+				$results_messages[] = "Failed to retrieve from database the list of flows already processed. ".$this->db->lasterror();
 
-			dol_syslog(__METHOD__ . " Failed to retrieve flows already processed among the list of flows received.", LOG_DEBUG, 0, "_pdpconnectfr");
-			return array('res' => 0, 'messages' => $results_messages);
+				dol_syslog(__METHOD__ . " Failed to retrieve flows already processed among the list of flows received. ".$this->db->lasterror(), LOG_DEBUG, 0, "_pdpconnectfr");
+				return array('res' => 0, 'messages' => $results_messages);
+			}
 		}
 
 		// Update totalFlows after filtering
@@ -868,6 +872,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				continue;
 			}
 
+			$rescode = '';
 			try {
 				// Process flow
 
@@ -882,11 +887,17 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				if ($res['res'] < 0) {
 					$db->rollback();
 
+					if (isset($res['action']) && $res['action'] != '') {	// Save business errors if it is
+						$rescode = $res['actioncode'] ?? '0';
+						// Set the result code and label into array $actions.
+						$actions[$rescode] = array('actionurl' => $res['actionurl'], 'actioncode' => ($res['actioncode'] ?? '0'), 'action' => $res['action']);
+						if ($rescode == 'THIRDPARTY_NOT_FOUND') {
+							$actions[$rescode]['businessmessage'] = $langs->trans("CantFindThirdpartyFromTheImportedInvoice");
+						}
+					}
 					dol_syslog(__METHOD__ . " Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], LOG_DEBUG, 0, "_pdpconnectfr");
 					$results_messages[] = "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'];
-					if (isset($res['action']) && $res['action'] != '') {	// Save business errors if it is
-						$actions[$res['actioncode'] ?? '0'] = array('actionurl' => $res['actionurl'], 'action' => $res['action']);	// Set the result code and label into array $actions.
-					}
+
 					$error++;
 				}
 
@@ -911,7 +922,11 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			}
 
 			if ($error > 0) {
-				$results_messages[] = "Aborting synchronization due to errors.";
+				if ($rescode == 'THIRDPARTY_NOT_FOUND') {
+					$results_messages[] = "Aborting synchronization due to a business error. There is a manual action to do.";
+				} else {
+					$results_messages[] = "Aborting synchronization due to errors.";
+				}
 				break;
 			}
 		}
@@ -1129,7 +1144,9 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				if ($res['res'] < 0) {
 					$retarray = array(
 						'res' => -1,
-						'message' => "Failed to create supplier invoice from E-invoice document for flowId: " . $flowId . ". " . $res['message']
+						'message' => "Failed to create supplier invoice from E-invoice document for flowId: " . $flowId . ". " . $res['message'],
+						'actioncode' => $res['actioncode'] ?? 'UNKNOWN',
+						'action' => $res['action'] ?? null
 					);
 					$retarray['actioncode'] = $res['actioncode'] ?? null;
 					$retarray['actionurl'] = $res['actionurl'] ?? null;

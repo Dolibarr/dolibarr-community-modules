@@ -927,7 +927,21 @@ if ($action == 'confirm_sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $conf
 		print '<strong><u>'.$langs->trans("SyncResults").'</u></strong></br>';
 		print implode("<br>", $sync_result['messages']);
 		if (getDolGlobalInt('PDPCONNECTFR_DEBUG_MODE') && !empty($sync_result['details'])) {
-			print '<br><br><small>'.$langs->trans("TechnicalInformation").' : '.implode("<br>", $sync_result['details']).'</small>';
+			print '<br><br>';
+			if (empty($sync_result['actions'])) {
+				// No business error, so technical error. We show all technical data we have
+				print '<small>'.$langs->trans("TechnicalInformation").' : '.implode("<br>", $sync_result['details']).'</small>';
+			} else {
+				// Business error, so we show only the first technical data
+				$tmpi = 0;
+				foreach ($sync_result['actions'] as $actionkey => $actionvalue) {
+					if ($tmpi) {
+						print '<br>';
+					}
+					print $actionvalue['businessmessage'];
+					$tmpi++;
+				}
+			}
 		}
 
 		// Suggested action after sync failed (to show under the form)

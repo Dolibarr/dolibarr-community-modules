@@ -293,6 +293,9 @@ InvoiceFormat=Invoice format
 WarningIfYouSetAnIDItMustExistsInAnnuary=WARNING: If you set a specific E-invoice ID here, it must exists in the annuary.
 CheckYourIDInFrenchEInvoiceAnnuary=Check your Einvoice ID in french E-invoice annuary.
 
+CantFindThirdpartyFromTheImportedInvoice=The third party (vendor) found in the imported invoice could not be found in your database, and auto-creation of third party is disabled, so you must create the thirdpary declared into imported invoice manually. See the following line...
+CantFindProductFromTheImportedInvoice=A product found in the imported invoice could not be found in your database, and auto-creation of product is disabled, so you must create it manually. See the following line...
+
 PDPCONNECTFR_CLIENT_ID=Client ID
 PDPCONNECTFR_CLIENT_SECRET=Client secret
 PDPCONNECTFR_API_KEY=API key

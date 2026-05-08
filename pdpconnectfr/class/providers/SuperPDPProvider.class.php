@@ -292,7 +292,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 	/**
 	 * Validate configuration parameters before API calls.
 	 *
-	 * @param 	int		$mode 	0 check that user/pass is set, 1 check that token is set
+	 * @param 	int		$mode 	0 check that user/pass is set, 1 check that api key is set
 	 * @return 	bool 			True if configuration is valid.
 	 */
 	public function validateConfiguration($mode = 1)
@@ -303,14 +303,14 @@ class SuperPDPProvider extends AbstractPDPProvider
 		if ($mode == 0) {
 			if (empty($this->config['client_id'])) {
 				$langs->loadLangs(array("main", "oauth"));
-				$error[] = $langs->trans('ErrorFieldRequired', $langs->transnoentities('OAUTH_ID'));
+				$error[] = $langs->trans('ErrorFieldRequired', $langs->transnoentities('PDPCONNECTFR_CLIENT_ID'));
 			}
 			if (empty($this->config['client_secret'])) {
 				$langs->loadLangs(array("main", "oauth"));
-				$error[] = $langs->trans('ErrorFieldRequired', $langs->transnoentities('OAUTH_SECRET'));
+				$error[] = $langs->trans('ErrorFieldRequired', $langs->transnoentities('PDPCONNECTFR_CLIENT_SECRET'));
 			}
 		} elseif ($mode == 1) {
-			// TODO Check token exists
+			// Not used
 		}
 
 		if (!empty($error)) {
@@ -467,11 +467,11 @@ class SuperPDPProvider extends AbstractPDPProvider
 		// Params
 		$params = [
 			'flowInfo' => json_encode([
+				//"flowProfile" => "CIUS",
 				"flowProfile" => "Extended-CTC-FR",
 				"flowSyntax" => $flowSyntax,			// CII or Factur-X
 				"trackingId" => $object->ref,
 				"name" => "Invoice_" . $object->ref,
-				//"flowProfile" => "CIUS",
 				"sha256" => hash_file('sha256', $invoice_path)
 			]),
 			'file' => new CURLFile($invoice_path, $mime_type, basename($invoice_path))
@@ -673,15 +673,16 @@ class SuperPDPProvider extends AbstractPDPProvider
 				return 0;
 			}
 		} else {
-			$this->error = $langs->trans("ErrorSendingInvoiceToPDP");
-			$this->error .= '<br>HTTP ' . $response['status_code'];
+			$errormsg = $langs->trans("ErrorSendingInvoiceToPDP");
+			$errormsg .= '<br>HTTP ' . $response['status_code'];
 			if (!empty($response['errorCode'])) {
-				$this->error .= ' - ' . $response['errorCode'] . (empty($response['errorMessage']) ? '' : ' - ' . $response['errorMessage']);
+				$errormsg .= ' - ' . $response['errorCode'] . (empty($response['errorMessage']) ? '' : ' - ' . $response['errorMessage']);
 			}
 			if (!empty($response['curl_error_no'])) {
-				$this->error .= ' - Curl error ' . $response['curl_error_no'] . (empty($response['curl_error_msg']) ? '' : ' - ' . $response['curl_error_msg']);
+				$errormsg .= ' - Curl error ' . $response['curl_error_no'] . (empty($response['curl_error_msg']) ? '' : ' - ' . $response['curl_error_msg']);
 			}
-			$this->errors[] = $this->error;
+			$this->error = $errormsg;
+			$this->errors[] = $errormsg;
 			return 0;
 		}
 	}
@@ -920,8 +921,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 					$alreadyProcessedFlowIds[$obj->flow_id] = $obj->flow_id;
 				}
 			} else {
-				$this->errors[] = "Failed to retrieve the list of flows already processed from database. ".$this->db->lasterror();
-				$results_messages[] = "Failed to retrieve the list of flows already processed from database. ".$this->db->lasterror();
+				$this->errors[] = "Failed to retrieve from database the list of flows already processed. ".$this->db->lasterror();
+				$results_messages[] = "Failed to retrieve from database the list of flows already processed. ".$this->db->lasterror();
 
 				dol_syslog(__METHOD__ . " Failed to retrieve flows already processed among the list of flows received. ".$this->db->lasterror(), LOG_DEBUG, 0, "_pdpconnectfr");
 				return array('res' => 0, 'messages' => $results_messages);
@@ -949,6 +950,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				continue;
 			}
 
+			$rescode = '';
 			try {
 				// Process flow
 
@@ -963,11 +965,17 @@ class SuperPDPProvider extends AbstractPDPProvider
 				if ($res['res'] < 0) {
 					$db->rollback();
 
+					if (isset($res['action']) && $res['action'] != '') {	// Save business errors if it is
+						$rescode = $res['actioncode'] ?? '0';
+						// Set the result code and label into array $actions.
+						$actions[$rescode] = array('actionurl' => $res['actionurl'], 'actioncode' => ($res['actioncode'] ?? '0'), 'action' => $res['action']);
+						if ($rescode == 'THIRDPARTY_NOT_FOUND') {
+							$actions[$rescode]['businessmessage'] = $langs->trans("CantFindThirdpartyFromTheImportedInvoice");
+						}
+					}
 					dol_syslog(__METHOD__ . " Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], LOG_DEBUG, 0, "_pdpconnectfr");
 					$results_messages[] = "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'];
-					if (isset($res['action']) && $res['action'] != '') {	// Save business errors if it is
-						$actions[$res['actioncode'] ?? '0'] = array('actionurl' => $res['actionurl'], 'action' => $res['action']);	// Set the result code and label into array $actions.
-					}
+
 					$error++;
 				}
 
@@ -992,7 +1000,11 @@ class SuperPDPProvider extends AbstractPDPProvider
 			}
 
 			if ($error > 0) {
-				$results_messages[] = "Aborting synchronization due to errors.";
+				if ($rescode == 'THIRDPARTY_NOT_FOUND') {
+					$results_messages[] = "Aborting synchronization due to a business error. There is a manual action to do.";
+				} else {
+					$results_messages[] = "Aborting synchronization due to errors.";
+				}
 				break;
 			}
 		}
@@ -1235,7 +1247,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				if ($res['res'] < 0) {
 					$retarray = array(
 						'res' => -1,
-						'message' => "Failed to create supplier invoice from Einvoice document for flowId: " . $flowId . ". " . $res['message'],
+						'message' => "Failed to create supplier invoice from E-invoice document for flowId: " . $flowId . ". " . $res['message'],
 						'actioncode' => $res['actioncode'] ?? 'UNKNOWN',
 						'action' => $res['action'] ?? null
 					);
