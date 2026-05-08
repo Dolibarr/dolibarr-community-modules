@@ -809,9 +809,14 @@ class SuperPDPProvider extends AbstractPDPProvider
 	public function syncFlows($syncFromDate = 0, $limit = 0)
 	{
 		global $db, $langs, $user;
+		global $form;
 
-		$results_messages = array();
-		$actions = array();
+		if (!is_object($form)) {
+			$form = new Form($db);
+		}
+
+		$results_messages = array();	// result message (technical error)
+		$actions = array();				// business message (manual action to do)
 
 		$resource = 'flows/search';
 		$uuid = $this->generateUuidV4(); // UUID used to correlate logs between Dolibarr and PDP TODO : Store it somewhere
@@ -971,6 +976,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 						$actions[$rescode] = array('actionurl' => $res['actionurl'], 'actioncode' => ($res['actioncode'] ?? '0'), 'action' => $res['action']);
 						if ($rescode == 'THIRDPARTY_NOT_FOUND') {
 							$actions[$rescode]['businessmessage'] = $langs->trans("CantFindThirdpartyFromTheImportedInvoice");
+							// Add technical message in tooltip on the picto
+							$actions[$rescode]['businessmessage'] .= $form->textwithpicto('', "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], 1, 'help', '', 0, 2, 'help');
 						}
 					}
 					dol_syslog(__METHOD__ . " Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], LOG_DEBUG, 0, "_pdpconnectfr");
