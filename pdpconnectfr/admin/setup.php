@@ -353,9 +353,11 @@ if (!empty($provider) && !empty($formSetup2->items)) {
 	print '<br>';
 }
 
-print '<br>';
-
-print $stringwarning;
+if ($stringwarning) {
+	print $stringwarning;
+} else {
+	print '<br>';
+}
 
 if (!empty($formSetup2->items)) {
 	print $formSetup2->generateOutput(true, false, $langs->transnoentitiesnoconv('PDPConnectionSetup'), 'titlefieldmiddle');

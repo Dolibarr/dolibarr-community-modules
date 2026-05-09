@@ -165,9 +165,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 			// Default help
 			if (empty($tokenData['token'])) {
 				$this->helpToGetCredentials = str_replace('{s1}', img_picto('', 'url', 'class="pictofixedwidth"') . '<a href="' . $url . '" target="_new">' . $urltoshow . '</a>', $this->helpToGetCredentials);
-				$this->helpToGetCredentials = str_replace('{s2}', '<input type="text" class="width300" value="' . $this->callbackurl . '">', $this->helpToGetCredentials);
-				$this->helpToGetCredentials = str_replace('{s3}', $langs->transnoentitiesnoconv("OAUTH_ID"), $this->helpToGetCredentials);
-				$this->helpToGetCredentials = str_replace('{s4}', $langs->transnoentitiesnoconv("OAUTH_SECRET"), $this->helpToGetCredentials);
+				$this->helpToGetCredentials = str_replace('{s2}', '<input type="text" class="width300" value="' . $this->callbackurl . '" spellcheck="false">', $this->helpToGetCredentials);
+				$this->helpToGetCredentials = str_replace('{s3}', $langs->transnoentitiesnoconv("PDPCONNECTFR_CLIENT_ID"), $this->helpToGetCredentials);
+				$this->helpToGetCredentials = str_replace('{s4}', $langs->transnoentitiesnoconv("PDPCONNECTFR_CLIENT_SECRET"), $this->helpToGetCredentials);
 				$this->helpToGetCredentials = str_replace('{s5}', $langs->transnoentitiesnoconv("Save"), $this->helpToGetCredentials);
 
 				$this->helpToGetCredentials = '<div class="formborderx info">' . $this->helpToGetCredentials . '</div>';
