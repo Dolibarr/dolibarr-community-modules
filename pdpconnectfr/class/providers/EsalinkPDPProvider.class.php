@@ -665,7 +665,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			$params = http_build_query($params);
 		}*/
 
-		$response = getURLContent($url, $method, $params, 1, $httpheader);
+		$response = getURLContent($url, $method, $params, 1, $httpheader, array('http', 'https'), 0, -1, 0, 0, array(), '_pdpconnectfr');
 
 		$status_code = $response['http_code'];
 		$body = 'Error';
@@ -895,9 +895,30 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 					if (isset($res['action']) && $res['action'] != '') {	// Save business errors if it is
 						$rescode = $res['actioncode'] ?? '0';
 						// Set the result code and label into array $actions.
-						$actions[$rescode] = array('actionurl' => $res['actionurl'], 'actioncode' => ($res['actioncode'] ?? '0'), 'action' => $res['action']);
+						$actions[$rescode] = array(
+							'actionurl' => $res['actionurl'],
+							'actioncode' => ($res['actioncode'] ?? '0'),
+							'action' => $res['action']
+						);
 						if ($rescode == 'THIRDPARTY_NOT_FOUND') {
-							$actions[$rescode]['businessmessage'] = $langs->trans("CantFindThirdpartyFromTheImportedInvoice");
+							$infostring = '';
+							foreach ($res['actiondata'] as $datakey => $dataval) {
+								if ($datakey && $dataval) {
+									$infostring .= ($infostring ? ', ': '').$datakey.': '.$dataval;
+								}
+							}
+							$actions[$rescode]['businessmessage'] = $langs->trans("CantFindThirdpartyFromTheImportedInvoice", $infostring);
+							// Add technical message in tooltip on the picto
+							$actions[$rescode]['businessmessage'] .= $form->textwithpicto('', "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], 1, 'help', '', 0, 2, 'help');
+						}
+						if ($rescode == 'PRODUCT_NOT_FOUND') {
+							$infostring = '';
+							foreach ($res['actiondata'] as $datakey => $dataval) {
+								if ($datakey && $dataval) {
+									$infostring .= ($infostring ? ', ': '').$datakey.': '.$dataval;
+								}
+							}
+							$actions[$rescode]['businessmessage'] = $langs->trans("CantFindProductFromTheImportedInvoice", $infostring);
 							// Add technical message in tooltip on the picto
 							$actions[$rescode]['businessmessage'] .= $form->textwithpicto('', "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], 1, 'help', '', 0, 2, 'help');
 						}
@@ -929,7 +950,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			}
 
 			if ($error > 0) {
-				if ($rescode == 'THIRDPARTY_NOT_FOUND') {
+				if (in_array($rescode, array('THIRDPARTY_NOT_FOUND','PRODUCT_NOT_FOUND'))) {
 					$results_messages[] = "Aborting synchronization due to a business error. There is a manual action to do.";
 				} else {
 					$results_messages[] = "Aborting synchronization due to errors.";
@@ -1151,13 +1172,12 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				if ($res['res'] < 0) {
 					$retarray = array(
 						'res' => -1,
-						'message' => "Failed to create supplier invoice from E-invoice document for flowId: " . $flowId . ". " . $res['message'],
-						'actioncode' => $res['actioncode'] ?? 'UNKNOWN',
-						'action' => $res['action'] ?? null
+						'message' => "Failed to create supplier invoice from E-invoice document for flowId: " . $flowId . ". " . $res['message']
 					);
 					$retarray['actioncode'] = $res['actioncode'] ?? null;
 					$retarray['actionurl'] = $res['actionurl'] ?? null;
 					$retarray['action'] = $res['action'] ?? null;
+					$retarray['actiondata'] = $res['actiondata'] ?? null;
 					return $retarray;
 				} else {
 					// Complete the document object with the created supplier invoice details

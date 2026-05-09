@@ -924,10 +924,25 @@ if ($action == 'confirm_sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $conf
 		// Show sync summary result (to show in popup)
 		print '<!-- sync summary -->'."\n";
 		print '<div class="wordbreak '.$cssclass.' clearboth">';
-		print '<strong><u>'.$langs->trans("SyncResults").'</u></strong></br>';
-		print implode("<br>", $sync_result['messages']);
-		if (getDolGlobalInt('PDPCONNECTFR_DEBUG_MODE') && !empty($sync_result['details'])) {
-			print '<br><br>';
+		print '<strong><u>'.$langs->trans("SyncResults").'</u></strong>';
+
+		$newarrayofmessagetoshow = array_reverse($sync_result['messages'], true);
+		$i = 0;
+		foreach ($newarrayofmessagetoshow as $keyofmessagetoshow => $messagetoshow) {
+			if ($i == 0) {
+				print ' - <span class="opacitymedium">';
+			} else {
+				print '<br>';
+			}
+			print $messagetoshow;
+			if ($i == 0) {
+				print '</span>';
+			}
+			$i++;
+		}
+
+		if (!empty($sync_result['details'])) {
+			print '<br>';
 			if (empty($sync_result['actions'])) {
 				// No business error, so technical error. We show all technical data we have
 				print '<small>'.$langs->trans("TechnicalInformation").' : '.implode("<br>", $sync_result['details']).'</small>';
@@ -935,9 +950,9 @@ if ($action == 'confirm_sync' && getDolGlobalString('PDPCONNECTFR_PDP') && $conf
 				// Business error, so we show only the first technical data
 				$tmpi = 0;
 				foreach ($sync_result['actions'] as $actionkey => $actionvalue) {
-					if ($tmpi) {
+					/*if ($tmpi) {
 						print '<br>';
-					}
+					}*/
 					print $actionvalue['businessmessage'];
 					$tmpi++;
 				}

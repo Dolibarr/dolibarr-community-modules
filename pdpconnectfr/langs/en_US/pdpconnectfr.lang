@@ -242,6 +242,7 @@ SuggestedActions=Recommended actions to do
 CreateSupplier=Create supplier
 CreateProduct=Create Product
 CreateSupplierManually=Create manually the supplier based on the information retrieved from E-invoice, then relaunch the synchronization...
+CreateProductManually=Create manually the product or vendor product reference based on the information retrieved from E-invoice, then relaunch the synchronization...
 ManualUnfoundProductCreationFromEInvoice=Create manually the unfound product based on information retrieved from the e-invoice %s, then relaunch the synchronization...
 EnableDebugModeToSeeMoreDetails=Enable debug mode to see more details
 PDPCONNECTFR_THIRDPARTIES_COMPLETE_INFO=Complete missing third-party information when receiving an e-invoice
@@ -270,7 +271,7 @@ InvoiceLinkedToPdpCannotBeModified=This invoice has already been transmitted to 
 RefObject=Ref object
 flowRecap=Flow recap
 SyncCompletedSuccessfuly=Synchronization completed with success
-SyncAborted=Synchronization aborted on flow <b>#%s / %s</b>: %s
+SyncAborted=Synchronization aborted on flow # <b>%s</b> / %s (Flow <b>%s</b>)
 TotalToSync=Total of flows available to synchronize
 TotalNewSync=Total of new flows synchronized
 TotalSkippedSync=Total of flows skipped (existing or already processed)
@@ -293,8 +294,8 @@ InvoiceFormat=Invoice format
 WarningIfYouSetAnIDItMustExistsInAnnuary=WARNING: If you set a specific E-invoice ID here, it must exists in the annuary.
 CheckYourIDInFrenchEInvoiceAnnuary=Check your Einvoice ID in french E-invoice annuary.
 
-CantFindThirdpartyFromTheImportedInvoice=The third party (vendor) found in the imported invoice could not be found in your database, and auto-creation of third party is disabled, so you must create the thirdpary declared into imported invoice manually. See the following line...
-CantFindProductFromTheImportedInvoice=A product found in the imported invoice could not be found in your database, and auto-creation of product is disabled, so you must create it manually. See the following line...
+CantFindThirdpartyFromTheImportedInvoice=The third party of the vendor of the imported invoice (%s) could not be found in your database and auto-creation of third party is disabled. So you must create it manually. See the next line on Recommended action to do...
+CantFindProductFromTheImportedInvoice=A product found in the imported invoice (%s) could not be found in your database, and auto-creation of product is disabled, so you must create it manually. See the following line...
 
 PDPCONNECTFR_CLIENT_ID=Client ID
 PDPCONNECTFR_CLIENT_SECRET=Client secret
