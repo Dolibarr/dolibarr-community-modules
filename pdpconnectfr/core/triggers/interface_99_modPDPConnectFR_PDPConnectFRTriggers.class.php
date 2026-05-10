@@ -62,6 +62,8 @@ class InterfacePDPConnectFRTriggers extends DolibarrTriggers
 			return 0;
 		}
 
+		$error = 0;
+
 		if ($action == 'THIRDPARTY_MODIFY') {
 			// If we modify the country of a thirdparty, we update status of invoice
 			// FR->other: status must be modified from "To generate" into "To ignore"
@@ -138,6 +140,46 @@ class InterfacePDPConnectFRTriggers extends DolibarrTriggers
 					}
 					return 1; // Return >0 if OK.
 				}
+			}
+		}
+
+		if ($action == 'COMPANY_CREATE') {
+			$pdpConnectFr = new PdpConnectFr($db);
+
+			$socId = $object->socid;
+
+			// Thirdparty routing ID
+			$routingId = GETPOST('routing_id', 'alphanohtml');
+			if ($routingId !== '') {
+				$existing = $pdpConnectFr->fetchDefaultRouting($socId, 'thirdparty');
+				if (empty($existing)) {
+					$result = $pdpConnectFr->addRouting($socId, $routingId, '', 'thirdparty');
+				} else {
+					$result = $pdpConnectFr->setDefaultRouting($socId, $routingId, '', '', '', 'thirdparty');
+				}
+				if ($result < 0) {
+					$error++;
+					$this->errors[] = $langs->trans('FailedToSaveRoutingID').' '.$pdpConnectFr->error;
+				}
+			}
+
+			// Default product for import
+			$routingProductId = GETPOST('routing_product_id', 'aZ09');
+			if ($routingProductId !== '' && $routingProductId !== '-1') {
+				$existing = $pdpConnectFr->fetchDefaultRouting($socId, 'product');
+				if (empty($existing)) {
+					$result = $pdpConnectFr->addRouting($socId, $routingProductId, '', 'product');
+				} else {
+					$result = $pdpConnectFr->setDefaultRouting($socId, $routingProductId, '', '', '', 'product');
+				}
+				if ($result < 0) {
+					$error++;
+					$this->errors[] = $langs->trans('FailedToSaveRoutingID').' '.$pdpConnectFr->error;
+				}
+			}
+
+			if ($error) {
+				return -4;
 			}
 		}
 

@@ -1641,14 +1641,14 @@ class PdpConnectFr
 
 		// Fetch routing_id and optional default product for import
 		$routing_id = '';
-		$product_id = 0;
 		$resFetch = $this->fetchDefaultRouting($object->id, 'thirdparty');
 		if ($resFetch !== false && $resFetch !== 0 && $resFetch !== '0') {
 			$routing_id = $resFetch;
 		}
+		$product_id = '';
 		$resFetchP = $this->fetchDefaultRouting($object->id, 'product');
-		if ($resFetchP > 0) {
-			$product_id = (int) $resFetchP;
+		if (!empty($resFetchP) && $resFetchP != '-1') {
+			$product_id = (string) $resFetchP;		// Can be 'idprod_123' (product id) or '456' (supplier ref id)
 		}
 
 		// In create/edit mode, keep simple text fields (thirdparty not yet saved, no routing rows exist)
@@ -1666,12 +1666,7 @@ class PdpConnectFr
 			$resprints .= '<tr class="trpdpconnect_collapseseparator trrouting_product_id '.($expand_display ? '' : 'hidden').'">';
 			$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
 			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) -1).'"').'>';
-			$resprints .= $form->select_produits_fournisseurs($object->id, 'idprod_'.$product_id, 'routing_product_id', '', '', array(), 0, 1, '', '', 1);
-			/*
-			$resprints .= '<input type="text" name="routing_product_id" ';
-			$resprints .= 'value="' . dolPrintHTML($product_id ?? '') . '" ';
-			$resprints .= 'class="flat minwidth300" />';
-			*/
+			$resprints .= $form->select_produits_fournisseurs($object->id, $product_id, 'routing_product_id', '', '', array(), 0, 1, '', '', 1);
 			$resprints .= '</td>';
 			$resprints .= '</tr>';
 
@@ -1773,10 +1768,16 @@ function pdpSubmitAddRouting() {
 			$resprints .= '<tr class="trpdpconnect_collapseseparator '.($expand_display ? '' : 'hidden').'">';
 			$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
 			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) -1).'"').'>';
-			if ($product_id > 0) {
-				$tmpproduct = new Product($this->db);
-				$tmpproduct->fetch($product_id);
-				$resprints .= $tmpproduct->getNomUrl(1);
+
+			if ($product_id != '' && $product_id != '-1') {
+				if (preg_match('/^idprod/', $product_id)) {
+					$new_product_id = str_replace('idprod_', '', $product_id);
+					$tmpproduct = new Product($this->db);
+					$tmpproduct->fetch($new_product_id);
+					$resprints .= $tmpproduct->getNomUrl(1);
+				} else {
+					// TODO Show ref of product price
+				}
 			}
 			$resprints .= '</td>';
 			$resprints .= '</tr>';
@@ -2011,11 +2012,11 @@ function pdpSubmitAddRouting() {
 	{
 		global $db, $user;
 
-		$db->begin();
-
-		if ($routing_type == 'product') {
+		/*if ($routing_type == 'product') {
 			$routing_id = (int) (str_replace('idprod_', '', $routing_id));
-		}
+		}*/
+
+		$db->begin();
 
 		// Delete existing routing(s) for this thirdparty (1→1 logic)
 		$sql = "DELETE FROM " . MAIN_DB_PREFIX . "pdpconnectfr_routing";
@@ -2077,14 +2078,13 @@ function pdpSubmitAddRouting() {
 	{
 		global $db, $user;
 
-		if ($routing_type == 'product') {
+		/*if ($routing_type == 'product') {
 			$routing_id = (int) (str_replace('idprod_', '', $routing_id));
-		}
+		}*/
 
 		if (empty($routing_id)) {
 			return -1;
 		}
-
 
 		$db->begin();
 
