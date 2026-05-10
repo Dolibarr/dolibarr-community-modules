@@ -1691,7 +1691,10 @@ class PdpConnectFr
 		}
 
 		$resprints .= '<tr class="trpdpconnect_collapseseparator '.($expand_display ? '' : 'hidden').'">';
-		$resprints .= '<td class="tdtop">' . $form->textwithpicto($langs->trans("RoutingIdFieldShort"), $langs->trans("SpecificRoutingFieldHelp")) . '</td>';
+		$resprints .= '<td class="tdtop">' . $form->textwithpicto($langs->trans("RoutingIdFieldShort"), $langs->trans("SpecificRoutingFieldHelp"));
+		$resprints .= ' '.img_picto('', 'add', 'onclick="javascript:jQuery(\'.addroutingsection\').toggle();"', 0, 0, 0, $langs->transnoentitiesnoconv("Add"), 'valignmiddle cursorpointer');
+		//$resprints .= ' <span class="fa fa-plus valignmiddle" title="'.$langs->trans("Add").'" onclick="javascript:jQuery(\'.addroutingsection\').toggle();"></span>';
+		$resprints .= '</td>';
 		$resprints .= '<td>';
 
 		// Existing routing list
@@ -1724,15 +1727,13 @@ class PdpConnectFr
 			$resprints .= '<span class="opacitymedium">' . $langs->trans("Automatic") . '</span>';
 		}
 
-		$resprints .= ' <span class="fa fa-plus" title="'.$langs->trans("Add").'" onclick="javascript:jQuery(\'.addroutingsection\').toggle();"></span>';
-
 		// Add new routing — use a JS-submitted form appended to body to avoid nested form issue
 		$addToken = newToken();
 		$addUrl   = dol_escape_js($_SERVER["PHP_SELF"] . '?id=' . $object->id);
 		$resprints .= '<div style="margin-top:6px" class="hidden addroutingsection">';
-		$resprints .= '<input type="text" id="pdp_new_routing_id" placeholder="' . dolPrintHTMLForAttribute($langs->trans("RoutingIdFieldShort")) . '" class="flat minwidth100 maxwidth150">';
-		$resprints .= ' <input type="text" id="pdp_new_routing_info" placeholder="' . dolPrintHTMLForAttribute($langs->trans("RoutingIdInfo")) . '" title="' . dolPrintHTMLForAttribute($langs->trans("RoutingIdInfo")) . '" class="flat minwidth100 maxwidth100">';
-		$resprints .= ' <button type="button" class="button smallpaddingimp" onclick="pdpSubmitAddRouting()">' . $langs->trans("Add") . '</button>';
+		$resprints .= '<input type="text" id="pdp_new_routing_id" placeholder="' . dolPrintHTMLForAttribute($langs->trans("RoutingIdFieldShort")) . '" class="flat minwidth100 maxwidth150 valignmiddle">';
+		$resprints .= ' <input type="text" id="pdp_new_routing_info" placeholder="' . dolPrintHTMLForAttribute($langs->trans("RoutingIdInfo")) . '" title="' . dolPrintHTMLForAttribute($langs->trans("RoutingIdInfo")) . '" class="flat minwidth100 maxwidth100 valignmiddle">';
+		$resprints .= ' <button type="button" class="button small smallpaddingimp" onclick="pdpSubmitAddRouting()">' . $langs->trans("Add") . '</button>';
 		$resprints .= '</div>';
 		$resprints .= '<script>
 function pdpSubmitAddRouting() {
@@ -2237,13 +2238,15 @@ function pdpSubmitAddRouting() {
 
 		$routings = array();
 		while ($obj = $db->fetch_object($resql)) {
-			$routings[] = array(
-				'rowid'      => (int) $obj->rowid,
-				'routing_id' => $obj->routing_id,
-				'source'     => $obj->source,
-				'info'       => $obj->info,
-				'is_default' => (int) $obj->is_default,
-			);
+			if (!empty($obj->rowid) && !empty($obj->routing_id)) {
+				$routings[] = array(
+					'rowid'      => (int) $obj->rowid,
+					'routing_id' => $obj->routing_id,
+					'source'     => $obj->source,
+					'info'       => $obj->info,
+					'is_default' => (int) $obj->is_default,
+				);
+			}
 		}
 
 		return $routings;
