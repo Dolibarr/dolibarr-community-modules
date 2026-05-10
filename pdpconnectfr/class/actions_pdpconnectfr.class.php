@@ -428,20 +428,29 @@ class ActionsPdpconnectfr extends CommonHookActions
 				if ($routingId !== '') {
 					$existing = $pdpConnectFr->fetchDefaultRouting($socId, 'thirdparty');
 					if (empty($existing)) {
-						$result = $pdpConnectFr->addRouting($socId, $routingId);
+						$result = $pdpConnectFr->addRouting($socId, $routingId, '', 'thirdparty');
 					} else {
 						$result = $pdpConnectFr->setDefaultRouting($socId, $routingId, '', '', '', 'thirdparty');
 					}
 					if ($result < 0) {
 						$error++;
-						setEventMessages($langs->trans('FailedToSaveRoutingID'), null, 'errors');
+						setEventMessages($langs->trans('FailedToSaveRoutingID').' '.$pdpConnectFr->error, null, 'errors');
 					}
 				}
+
 				// Default product for import
-				$result = $pdpConnectFr->setDefaultRouting($socId, GETPOST('routing_product_id', 'aZ09'), '', '', '', 'product');
-				if ($result < 0) {
-					$error++;
-					setEventMessages($langs->trans('FailedToSaveRoutingID'), null, 'errors');
+				$routingProductId = GETPOST('routing_product_id', 'aZ09');
+				if ($routingProductId !== '' && $routingProductId !== '-1') {
+					$existing = $pdpConnectFr->fetchDefaultRouting($socId, 'product');
+					if (empty($existing)) {
+						$result = $pdpConnectFr->addRouting($socId, $routingProductId, '', 'product');
+					} else {
+						$result = $pdpConnectFr->setDefaultRouting($socId, $routingProductId, '', '', '', 'product');
+					}
+					if ($result < 0) {
+						$error++;
+						setEventMessages($langs->trans('FailedToSaveRoutingID').' '.$pdpConnectFr->error, null, 'errors');
+					}
 				}
 			}
 
@@ -450,10 +459,10 @@ class ActionsPdpconnectfr extends CommonHookActions
 				$newRoutingId = GETPOST('new_routing_id', 'alphanohtml');
 				$newRoutingInfo = GETPOST('new_routing_info', 'alphanohtml');
 				if (!empty($newRoutingId)) {
-					$result = $pdpConnectFr->addRouting($socId, $newRoutingId, $newRoutingInfo);
+					$result = $pdpConnectFr->addRouting($socId, $newRoutingId, $newRoutingInfo, 'thirdparty');
 					if ($result < 0) {
 						$error++;
-						setEventMessages($langs->trans('FailedToSaveRoutingID'), null, 'errors');
+						setEventMessages($langs->trans('FailedToSaveRoutingID').' '.$pdpConnectFr->error, null, 'errors');
 					}
 				}
 			}
@@ -465,7 +474,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 					$result = $pdpConnectFr->deleteRouting($routingRowid, $socId);
 					if ($result < 0) {
 						$error++;
-						setEventMessages($langs->trans('FailedToDeleteRoutingID'), null, 'errors');
+						setEventMessages($langs->trans('FailedToDeleteRoutingID').' '.$pdpConnectFr->error, null, 'errors');
 					}
 				}
 			}
@@ -477,7 +486,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 					$result = $pdpConnectFr->setRoutingAsDefault($routingRowid, $socId);
 					if ($result < 0) {
 						$error++;
-						setEventMessages($langs->trans('FailedToSetDefaultRoutingID'), null, 'errors');
+						setEventMessages($langs->trans('FailedToSetDefaultRoutingID').' '.$pdpConnectFr->error, null, 'errors');
 					}
 				}
 			}
@@ -583,22 +592,22 @@ class ActionsPdpconnectfr extends CommonHookActions
 		if (empty($parameters['tpl_context'])) {	// Do not show the new fields when we are in the public form to register a thirdparty.
 			// Add block in invoice card
 			if (in_array($object->element, ['facture']) && !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP')) {
-				$this->resprints .= $pdpConnectFr->EInvoiceCardBlock($object, $action);		// Output fields in card, including js for refreshing state
+				$this->resprints .= $pdpConnectFr->EInvoiceCardBlock($object, $action, $parameters);		// Output fields in card, including js for refreshing state
 			}
 
 			// Add block in supplier invoice card
 			if (in_array($object->element, ['invoice_supplier']) && !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI')) {
-				$this->resprints .= $pdpConnectFr->supplierInvoiceCardBlock($object, $action);		// Output fields in card, including js for refreshing state
+				$this->resprints .= $pdpConnectFr->supplierInvoiceCardBlock($object, $action, $parameters);		// Output fields in card, including js for refreshing state
 			}
 
 			// Add block in product/service card
 			if (in_array($object->element, ['product']) && (!getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI'))) {
-				$this->resprints .= $pdpConnectFr->productServiceCardBlock($object, $action);		// Output fields in card, including js for refreshing state
+				$this->resprints .= $pdpConnectFr->productServiceCardBlock($object, $action, $parameters);		// Output fields in card, including js for refreshing state
 			}
 
 			// Add block in thirdparty card
 			if (in_array($object->element, ['societe']) && (!getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI'))) {
-				$this->resprints .= $pdpConnectFr->thirdpartyCardBlock($object, $action);		// Output fields in card
+				$this->resprints .= $pdpConnectFr->thirdpartyCardBlock($object, $action, $parameters);		// Output fields in card
 			}
 		}
 

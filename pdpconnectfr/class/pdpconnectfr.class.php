@@ -1100,11 +1100,12 @@ class PdpConnectFr
 	/**
 	 * EInvoiceCardBlock
 	 *
-	 * @param 	Facture 			$object					Facture
-	 * @param	string				$mode					'create', 'view'
-	 * @return 	string				HTML content to add
+	 * @param 	Facture 				$object			Facture
+	 * @param	string					$mode			'create', 'view'
+	 * @param 	array<string,mixed> 	$parameters		Array of parameters
+	 * @return 	string									HTML content to add
 	 */
-	public function EInvoiceCardBlock($object, $mode = '')
+	public function EInvoiceCardBlock($object, $mode = '', $parameters = array())
 	{
 		global $langs, $form, $user;
 		global $action;
@@ -1349,11 +1350,12 @@ class PdpConnectFr
 	/**
 	 * supplierInvoiceCardBlock
 	 *
-	 * @param 	FactureFournisseur 	$object					FactureFournisseur
-	 * @param	string				$mode					'create', 'view'
-	 * @return 	string				HTML content to add
+	 * @param 	FactureFournisseur 		$object			FactureFournisseur
+	 * @param	string					$mode			'create', 'view'
+	 * @param 	array<string,mixed> 	$parameters		Array of parameters
+	 * @return 	string									HTML content to add
 	 */
-	public function supplierInvoiceCardBlock($object, $mode = '')
+	public function supplierInvoiceCardBlock($object, $mode = '', $parameters = array())
 	{
 		global $langs;
 		global $action;
@@ -1564,11 +1566,12 @@ class PdpConnectFr
 	/**
 	 * thirdpartyCardBlock
 	 *
-	 * @param 	Societe 			$object			Thirdparty
-	 * @param	string				$mode			'create', 'view'
-	 * @return 	string								HTML content to add
+	 * @param 	Societe 				$object			Thirdparty
+	 * @param	string					$mode			'create', 'view'
+	 * @param 	array<string,mixed> 	$parameters		Array of parameters
+	 * @return 	string									HTML content to add
 	 */
-	public function thirdpartyCardBlock($object, $mode = '')
+	public function thirdpartyCardBlock($object, $mode = '', $parameters = array())
 	{
 		global $conf, $langs, $form;
 
@@ -1652,21 +1655,23 @@ class PdpConnectFr
 		if ($mode == 'create' || $mode == 'edit') {
 			$resprints .= '<tr class="trpdpconnect_collapseseparator trrouting_id '.($expand_display ? '' : 'hidden').'">';
 			$resprints .= '<td class="">' . $form->textwithpicto($langs->trans("RoutingIdFieldShort"), $langs->trans("SpecificRoutingFieldHelp")) . '</td>';
-			$resprints .= '<td>';
+			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) -1).'"').'>';
 			$resprints .= '<input type="text" name="routing_id" ';
 			$resprints .= 'value="' . dolPrintHTML($routing_id ?? '') . '" ';
-			$resprints .= 'class="flat minwidth300" />';
+			$resprints .= 'class="flat minwidth300" spellcheck="false" />';
 			$resprints .= '</td>';
 			$resprints .= '</tr>';
 
 			// Add a line for the Default product for thirdparty (to use when importing vendor invoice and no product found)
 			$resprints .= '<tr class="trpdpconnect_collapseseparator trrouting_product_id '.($expand_display ? '' : 'hidden').'">';
 			$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
-			$resprints .= '<td>';
-			// TODO Use a combo list of products
+			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) -1).'"').'>';
+			$resprints .= $form->select_produits_fournisseurs($object->id, $product_id, 'routing_product_id', '', '', array(), 0, 1, '', '', 1);
+			/*
 			$resprints .= '<input type="text" name="routing_product_id" ';
 			$resprints .= 'value="' . dolPrintHTML($product_id ?? '') . '" ';
 			$resprints .= 'class="flat minwidth300" />';
+			*/
 			$resprints .= '</td>';
 			$resprints .= '</tr>';
 
@@ -1683,7 +1688,9 @@ class PdpConnectFr
 			$obj = $this->db->fetch_object($resql);
 			$resprints .= '<tr class="trpdpconnect_collapseseparator '.($expand_display ? '' : 'hidden').'">';
 			$resprints .= '<td>' . $langs->trans("pdpconnectfrSourceTitle") . '</td>';
-			$resprints .= '<td>' . dolPrintHTML($obj->provider) . '</td>';
+			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) -1).'"').'>';
+			$resprints .= dolPrintHTML($obj->provider);
+			$resprints .= '</td>';
 			$resprints .= '</tr>';
 		}
 
@@ -1697,7 +1704,7 @@ class PdpConnectFr
 		$resprints .= '<td class="tdtop">' . $form->textwithpicto($langs->trans("RoutingIdFieldShort"), $langs->trans("SpecificRoutingFieldHelp"));
 		$resprints .= ' '.img_picto('', 'add', 'onclick="javascript:jQuery(\'.addroutingsection\').toggle();"', 0, 0, 0, $langs->transnoentitiesnoconv("Add"), 'valignmiddle cursorpointer');
 		$resprints .= '</td>';
-		$resprints .= '<td>';
+		$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) -1).'"').'>';
 
 		// Existing routing list
 		if (!empty($allRoutings)) {
@@ -1762,10 +1769,10 @@ function pdpSubmitAddRouting() {
 		$resprints .= '</tr>';
 
 		// Default product for import (upstream addition)
-		if ($object->fournisseur) {
+		if ($object->fournisseur > 0) {
 			$resprints .= '<tr class="trpdpconnect_collapseseparator '.($expand_display ? '' : 'hidden').'">';
 			$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
-			$resprints .= '<td>';
+			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) -1).'"').'>';
 			if ($product_id > 0) {
 				$tmpproduct = new Product($this->db);
 				$tmpproduct->fetch($product_id);
@@ -1781,11 +1788,12 @@ function pdpSubmitAddRouting() {
 	/**
 	 * productServiceCardBlock
 	 *
-	 * @param 	Product			 	$object					Product or Service
-	 * @param	string				$mode					'create', 'view'
-	 * @return 	string				HTML content to add
+	 * @param 	Product			 		$object			Product or Service
+	 * @param	string					$mode			'create', 'view'
+	 * @param 	array<string,mixed> 	$parameters		Array of parameters
+	 * @return 	string									HTML content to add
 	 */
-	public function productServiceCardBlock($object, $mode = '')
+	public function productServiceCardBlock($object, $mode = '', $parameters = array())
 	{
 		global $langs;
 
@@ -2005,12 +2013,17 @@ function pdpSubmitAddRouting() {
 
 		$db->begin();
 
+		if ($routing_type == 'product') {
+			$routing_id = (int) (str_replace('idprod_', '', $routing_id));
+		}
+
 		// Delete existing routing(s) for this thirdparty (1→1 logic)
 		$sql = "DELETE FROM " . MAIN_DB_PREFIX . "pdpconnectfr_routing";
 		$sql .= " WHERE fk_soc = " . (int) $fk_soc;
 		$sql .= " AND routing_type = '" . $db->escape($routing_type) . "'";
 
 		if (!$db->query($sql)) {
+			$this->error = $db->lasterror();
 			$db->rollback();
 			dol_syslog(__METHOD__ . ' Delete error: ' . $db->lasterror(), LOG_ERR);
 			return -1;
@@ -2036,6 +2049,7 @@ function pdpSubmitAddRouting() {
 		$sql .= ")";
 
 		if (!$db->query($sql)) {
+			$this->error = $db->lasterror();
 			$db->rollback();
 			dol_syslog(__METHOD__ . ' Insert error: ' . $db->lasterror(), LOG_ERR);
 			return -1;
@@ -2053,24 +2067,31 @@ function pdpSubmitAddRouting() {
 	 * Add a new routing entry for a thirdparty.
 	 * If no routing exists yet, the new entry is automatically set as default.
 	 *
-	 * @param  int    $fk_soc     Thirdparty ID
-	 * @param  string $routing_id Routing ID value
-	 * @param  string $info       Optional label/comment
-	 * @return int    Rowid on success, -1 on error
+	 * @param  	int    	$fk_soc     	Thirdparty ID
+	 * @param  	string 	$routing_id 	Routing ID value
+	 * @param  	string 	$info       	Optional label/comment
+	 * @param 	string 	$routing_type	Routing type ('thirdparty' to get the routing ID for a thirdparty when exporting invoice, 'product' to get internal ID of product to use as default product on invoice import)
+	 * @return 	int    					Rowid on success, -1 on error
 	 */
-	public function addRouting($fk_soc, $routing_id, $info = '')
+	public function addRouting($fk_soc, $routing_id, $info = '', $routing_type = 'thirdparty')
 	{
 		global $db, $user;
+
+		if ($routing_type == 'product') {
+			$routing_id = (int) (str_replace('idprod_', '', $routing_id));
+		}
 
 		if (empty($routing_id)) {
 			return -1;
 		}
+
 
 		$db->begin();
 
 		// Determine if this will be the first routing (auto-default)
 		$sql = "SELECT COUNT(*) AS cnt FROM " . MAIN_DB_PREFIX . "pdpconnectfr_routing";
 		$sql .= " WHERE fk_soc = " . (int) $fk_soc . " AND active = 1";
+		$sql .= " AND routing_type = '" . $db->escape($routing_type) . "'";
 		$resql = $db->query($sql);
 		if (!$resql) {
 			$db->rollback();
@@ -2080,16 +2101,18 @@ function pdpSubmitAddRouting() {
 		$isDefault = ($obj->cnt == 0) ? 1 : 0;
 
 		$sql = "INSERT INTO " . MAIN_DB_PREFIX . "pdpconnectfr_routing (";
-		$sql .= "fk_soc, source, routing_id, info, active, is_default, date_creation, fk_user_creat";
+		$sql .= "fk_soc, source, routing_id, info, active, is_default, date_creation, fk_user_creat, routing_type";
 		$sql .= ") VALUES (";
 		$sql .= (int) $fk_soc . ", 'manual', ";
 		$sql .= "'" . $db->escape($routing_id) . "', ";
 		$sql .= ($info !== '' ? "'" . $db->escape($info) . "'" : "NULL") . ", ";
-		$sql .= "1, " . $isDefault . ", NOW(), " . (int) $user->id;
+		$sql .= "1, " . $isDefault . ", NOW(), " . (int) $user->id.", ";
+		$sql .= "'" . $db->escape($routing_type) . "'";
 		$sql .= ")";
 
 		if (!$db->query($sql)) {
 			$db->rollback();
+			$this->error = $db->lasterror();
 			dol_syslog(__METHOD__ . ' Insert error: ' . $db->lasterror(), LOG_ERR);
 			return -1;
 		}
@@ -2120,12 +2143,14 @@ function pdpSubmitAddRouting() {
 		$resql = $db->query($sql);
 		if (!$resql) {
 			$db->rollback();
+			$this->error = $db->lasterror();
 			return -1;
 		}
 		$obj = $db->fetch_object($resql);
 		$wasDefault = $obj ? (int) $obj->is_default : 0;
 
-		$sql = "DELETE FROM " . MAIN_DB_PREFIX . "pdpconnectfr_routing WHERE rowid = " . (int) $rowid;
+		$sql = "DELETE FROM " . MAIN_DB_PREFIX . "pdpconnectfr_routing";
+		$sql .= " WHERE rowid = " . (int) $rowid;
 		if (!$db->query($sql)) {
 			$db->rollback();
 			dol_syslog(__METHOD__ . ' Delete error: ' . $db->lasterror(), LOG_ERR);
@@ -2150,11 +2175,12 @@ function pdpSubmitAddRouting() {
 	 * Set a routing entry as the default for a thirdparty.
 	 * Clears is_default on all other entries for the same thirdparty.
 	 *
-	 * @param  int  $rowid    Routing rowid to set as default
-	 * @param  int  $fk_soc   Thirdparty ID
-	 * @return int  1 on success, -1 on error
+	 * @param  	int  	$rowid    		Routing rowid to set as default
+	 * @param  	int  	$fk_soc   		Thirdparty ID
+	 * @param 	string 	$routing_type	Routing type ('thirdparty' to get the routing ID for a thirdparty when exporting invoice, 'product' to get internal ID of product to use as default product on invoice import)
+	 * @return 	int  					1 on success, -1 on error
 	 */
-	public function setRoutingAsDefault($rowid, $fk_soc)
+	public function setRoutingAsDefault($rowid, $fk_soc, $routing_type = 'thirdparty')
 	{
 		global $db;
 
@@ -2162,8 +2188,12 @@ function pdpSubmitAddRouting() {
 
 		// Clear default on all entries for this thirdparty
 		$sql = "UPDATE " . MAIN_DB_PREFIX . "pdpconnectfr_routing";
-		$sql .= " SET is_default = 0 WHERE fk_soc = " . (int) $fk_soc;
+		$sql .= " SET is_default = 0";
+		$sql .= " WHERE fk_soc = " . (int) $fk_soc;
+		$sql .= " AND routing_type = '" . $db->escape($routing_type) . "'";
+
 		if (!$db->query($sql)) {
+			$this->error = $db->lasterror();
 			$db->rollback();
 			return -1;
 		}
@@ -2171,7 +2201,10 @@ function pdpSubmitAddRouting() {
 		// Set new default
 		$sql = "UPDATE " . MAIN_DB_PREFIX . "pdpconnectfr_routing";
 		$sql .= " SET is_default = 1 WHERE rowid = " . (int) $rowid;
+		$sql .= " AND routing_type = '" . $db->escape($routing_type) . "'";
+
 		if (!$db->query($sql)) {
+			$this->error = $db->lasterror();
 			$db->rollback();
 			return -1;
 		}
@@ -2219,17 +2252,22 @@ function pdpSubmitAddRouting() {
 	/**
 	 * Fetch all active routings for a thirdparty
 	 *
-	 * @param  int    $fk_soc   Thirdparty ID
-	 * @return array            Array of routing rows (assoc), empty array if none, -1 if error
+	 * @param  	int    	$fk_soc   		Thirdparty ID
+	 * @param 	string 	$routing_type	Routing type ('thirdparty' to get the routing ID for a thirdparty when exporting invoice, 'product' to get internal ID of product to use as default product on invoice import)
+	 * @param	int		$active			1=only active routings
+	 * @return 	array            		Array of routing rows (assoc), empty array if none, -1 if error
 	 */
-	public function fetchAllRoutings($fk_soc)
+	public function fetchAllRoutings($fk_soc, $routing_type = 'thirdparty', $active = 1)
 	{
 		global $db;
 
 		$sql = "SELECT rowid, routing_id, source, info, is_default";
 		$sql .= " FROM " . MAIN_DB_PREFIX . "pdpconnectfr_routing";
 		$sql .= " WHERE fk_soc = " . (int) $fk_soc;
-		$sql .= " AND active = 1";
+		$sql .= " AND routing_type = '" . $db->escape($routing_type) . "'";
+		if ($active) {
+			$sql .= " AND active = 1";
+		}
 		$sql .= " ORDER BY is_default DESC, rowid ASC";
 
 		$resql = $db->query($sql);
