@@ -1567,7 +1567,7 @@ class PdpConnectFr
 	 * thirdpartyCardBlock
 	 *
 	 * @param 	Societe 				$object			Thirdparty
-	 * @param	string					$mode			'create', 'view'
+	 * @param	string					$mode			'create', 'edit', 'view'
 	 * @param 	array<string,mixed> 	$parameters		Array of parameters
 	 * @return 	string									HTML content to add
 	 */
@@ -1666,7 +1666,7 @@ class PdpConnectFr
 			$resprints .= '<tr class="trpdpconnect_collapseseparator trrouting_product_id '.($expand_display ? '' : 'hidden').'">';
 			$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
 			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) -1).'"').'>';
-			$resprints .= $form->select_produits_fournisseurs($object->id, $product_id, 'routing_product_id', '', '', array(), 0, 1, '', '', 1);
+			$resprints .= $form->select_produits_fournisseurs($object->id, 'idprod_'.$product_id, 'routing_product_id', '', '', array(), 0, 1, '', '', 1);
 			/*
 			$resprints .= '<input type="text" name="routing_product_id" ';
 			$resprints .= 'value="' . dolPrintHTML($product_id ?? '') . '" ';
