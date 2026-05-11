@@ -195,12 +195,7 @@ if ($action == 'update' && GETPOSTISSET('PDPCONNECTFR_PDP') && GETPOST('PDPCONNE
 
 	// Set the default protocol when no default value is specified
 	if (getDolGlobalString('PDPCONNECTFR_PDP') && !getDolGlobalString('PDPCONNECTFR_PROTOCOL')) {
-		if (getDolGlobalString('PDPCONNECTFR_PDP') == 'ESALINK') {
-			// Default protocol for ESALINK is Factur-x. TODO Change to CII ?
-			dolibarr_set_const($db, 'PDPCONNECTFR_PROTOCOL', 'FACTURX', 'chaine', 0, '', $conf->entity);
-		} else {
-			dolibarr_set_const($db, 'PDPCONNECTFR_PROTOCOL', 'CII', 'chaine', 0, '', $conf->entity);
-		}
+		dolibarr_set_const($db, 'PDPCONNECTFR_PROTOCOL', 'CII', 'chaine', 0, '', $conf->entity); // Default protocol is CII (can be changed by the user). This setting is mostly technical and may later be hidden or displayed only in debug mode. PA supports all protocols for customer invoices, and Dolibarr automatically detects it for supplier invoice by detectProtocolFromContent().
 	}
 
 	header("Location: ".$_SERVER["PHP_SELF"]);
