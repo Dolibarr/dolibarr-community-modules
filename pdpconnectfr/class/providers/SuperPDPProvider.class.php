@@ -287,7 +287,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 						$pdpconnectfr = new PdPConnectFr($this->db);
 						$idtocheck = $pdpconnectfr->getSellerCommunicationURI(0);
 
-						if (!getDolGlobalString('PDPCONNECTFR_LIVE')) {
+						if (getDolGlobalString('PDPCONNECTFR_LIVE')) {
 							$item->fieldOverride .= ': <a class="reposition" href="https://facturation.chorus-pro.gouv.fr/annuaire/#/" target="_blank">' . $langs->trans('FrenchGovAnnuary') . '</a>';
 							$item->fieldOverride .= ' - <a class="reposition" href="https://www.superpdp.tech/outils/info-annuaire/?query='.$idtocheck.'&mode=fr&env=production" target="_blank">' . $langs->trans('SuperPDPAnnuary') . '</a><br>';
 						} else {
