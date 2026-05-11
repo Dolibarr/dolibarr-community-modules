@@ -163,7 +163,7 @@ if ($object->type == $object::TYPE_CREDIT_NOTE && !empty($object->fk_facture_sou
 		$invoiceRefDocs[] = [
 			'ref' => $sourceFact->ref,
 			'date' => $sourceFactDate,
-			'type' => '381' // Credit note
+			'type' => '381' 				// Credit note
 		];
 		dol_syslog(get_class($this) . '::generateXML Set source invoice reference ' . $sourceFact->ref . ' for credit note ' . $object->ref);
 	} else {
@@ -203,7 +203,9 @@ foreach ($object->lines as $line) {
 	// 	throw new Exception("NEGATIVE_UNIT_PRICE_NOT_ALLOWED: Unit price in lines can't be negative. Try to edit the line with ID " . $line->id);
 	// }
 
-	// Deposit line
+	// Deposit line - When the final invoice has a line from a deposit invoice, we must store the deposit invoice line + reference
+	// This is the first method described into XP_Z12-014 using the line into field BT-153 / BT-154
+	// The second method need to use the field BT-113. We don't use it as we use the first method.
 	$depositFactRef  = null;
 	$depositFactDate = null;
 	if ($line->desc == '(DEPOSIT)') {
@@ -225,18 +227,18 @@ foreach ($object->lines as $line) {
 			}
 		}
 		$prepaidAmount += abs($line->total_ttc);
-		$line->qty      = -$line->qty;
+		$line->qty      = -$line->qty;				// For a deposit, ->qty should be -1.
 		$line->subprice = abs($line->subprice);
 
 		$depositlines[] = [
 			'lineId'      => $numligne,
-			'invoiceRef'  => $depositFactRef,
+			'invoiceRef'  => $depositFactRef,		// BT-153
 			'invoiceDate' => $depositFactDate,
 		];
 		$invoiceRefDocs[] = [
-			'ref' => $depositFactRef,
-			'date' => $depositFactDate,
-			'type' => '386' // Prepayment invoice
+			'ref' => $depositFactRef,				// EXT-FR-FE-BG-06
+			'date' => $depositFactDate,				// EXT-FR-FE-BG-06
+			'type' => '386' 						// Deposit invoice EXT-FR-FE-137
 		];
 	}
 
@@ -324,8 +326,8 @@ foreach ($object->lines as $line) {
 		'linestatusreasoncode'      => 'NA',
 		'lineNote'                  => null,
 
-		'prodname'                  => $libelle,
-		'proddesc'                  => $description,
+		'prodname'                  => $libelle,			// BT-153
+		'proddesc'                  => $description,		// BT-154
 		'prodsellerid'              => $line->product_ref ? $line->product_ref : "0000",
 		'prodbuyerid'               => null,
 		'prodglobalidtype'          => null,
@@ -339,7 +341,7 @@ foreach ($object->lines as $line) {
 		'grosspricebasisquantity'   => null,
 		'grosspricebasisquantityunitcode' => null,
 
-		'netpriceamount'            => $line->subprice,
+		'netpriceamount'            => $line->subprice,		// BT-148 / BT-146
 		'netpricebasisquantity'     => null,
 		'netpricebasisquantityunitcode' => null,
 
@@ -397,7 +399,7 @@ $deliveryDate = !empty($deliveryDateList)
 $invoiceData = [
 	// Document part
 	'documentno'           => $object->ref,
-	'documenttypecode'     => $this->_getTypeOfInvoice($object),						// Set the type of invoice (standard, deposit, credit note)
+	'documenttypecode'     => $this->_getTypeOfInvoice($object),						// BT-3 Set the type of invoice (standard, deposit, credit note)
 	'documentdate'         => new DateTime(dol_print_date($object->date, 'dayrfc')),
 	'invoiceCurrency'      => $conf->currency,
 	'taxCurrency'          => null,
