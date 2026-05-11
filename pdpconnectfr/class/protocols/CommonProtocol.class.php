@@ -505,7 +505,39 @@ trait CommonProtocol
 		}
 
 		// If not found, we check by using the default product ID on thirdpary level
-		// TODO
+		$resFetchP = $pdpconnectfr->fetchDefaultRouting($lineData['supplierId'], 'product');
+		if (!empty($resFetchP) && $resFetchP != '-1') {
+			$product_id = (string) $resFetchP;		// Can be 'idprod_123' (product id) or '456' (supplier ref id)
+			if (str_starts_with($product_id, 'idprod_')) {
+				$productId = str_replace('idprod_', '', $product_id);
+				$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product";
+				$sql .= " WHERE rowid = '" . (int) $productId . "'";
+				$sql .= " AND entity IN (" . getEntity('product') . ")";
+				$sql .= " LIMIT 1";
+				$resql = $db->query($sql);
+				if ($resql && $db->num_rows($resql) > 0) {
+					$obj = $db->fetch_object($resql);
+					dol_syslog(get_class($this) . '::_findOrCreateProductFromEinvoiceLine Default routing product found for supplier=' . $lineData['supplierId'] . ' product=' . $obj->rowid);
+					return array('res' => $obj->rowid, 'message' => 'Line product not found, but a default routing product ID was found for this supplier');
+				}
+			} else {
+				// We search in product supplier prices table.
+				$sql = "SELECT pfp.fk_product";
+				$sql .= " FROM " . MAIN_DB_PREFIX . "product_fournisseur_price as pfp";
+				$sql .= " INNER JOIN " . MAIN_DB_PREFIX . "product as p";
+				$sql .= " ON p.rowid = pfp.fk_product";
+				$sql .= " WHERE pfp.rowid = " . ((int) $product_id);
+				$sql .= " AND pfp.fk_soc = " . ((int) $lineData['supplierId']);
+				$sql .= " AND p.entity IN (" . getEntity('product') . ")";
+				$sql .= " LIMIT 1";
+				$resql = $db->query($sql);
+				if ($resql && $db->num_rows($resql) > 0) {
+					$obj = $db->fetch_object($resql);
+					dol_syslog(get_class($this) . '::_findOrCreateProductFromEinvoiceLine Default routing product found for supplier=' . $lineData['supplierId'] . ' product=' . $obj->fk_product);
+					return array('res' => $obj->fk_product, 'message' => 'Line product not found, but a default routing product was found for this supplier');
+				}
+			}
+		}
 
 
 		// If no match found after all steps: Create new product
