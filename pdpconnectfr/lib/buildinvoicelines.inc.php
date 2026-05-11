@@ -155,6 +155,7 @@ if (! ($invoice->project instanceof Project)) {
 }
 
 $invoiceRefDocs = [];
+
 // Source invoice (credit note)
 if ($object->type == $object::TYPE_CREDIT_NOTE && !empty($object->fk_facture_source)) {
 	$sourceFact = new Facture($this->db);
@@ -163,7 +164,7 @@ if ($object->type == $object::TYPE_CREDIT_NOTE && !empty($object->fk_facture_sou
 		$invoiceRefDocs[] = [
 			'ref' => $sourceFact->ref,
 			'date' => $sourceFactDate,
-			'type' => '381' 				// Credit note
+			'type' => '381' 				// 381 = Credit note
 		];
 		dol_syslog(get_class($this) . '::generateXML Set source invoice reference ' . $sourceFact->ref . ' for credit note ' . $object->ref);
 	} else {
@@ -235,10 +236,12 @@ foreach ($object->lines as $line) {
 			'invoiceRef'  => $depositFactRef,		// BT-153
 			'invoiceDate' => $depositFactDate,
 		];
+
+		// Ref of parent deposit invoice
 		$invoiceRefDocs[] = [
-			'ref' => $depositFactRef,				// EXT-FR-FE-BG-06
-			'date' => $depositFactDate,				// EXT-FR-FE-BG-06
-			'type' => '386' 						// Deposit invoice EXT-FR-FE-137
+			'ref' => $depositFactRef,				// BT-25 EXT-FR-FE-BG-06
+			'date' => $depositFactDate,				// BT-26 EXT-FR-FE-BG-06
+			'type' => '386' 						// 386 = Deposit invoice EXT-FR-FE-137 EXT-FR-FE-02
 		];
 	}
 
@@ -398,9 +401,9 @@ $deliveryDate = !empty($deliveryDateList)
 // Filling $invoiceData (based on $invoiceTemplate)
 $invoiceData = [
 	// Document part
-	'documentno'           => $object->ref,
+	'documentno'           => $object->ref,												// BT-25
 	'documenttypecode'     => $this->_getTypeOfInvoice($object),						// BT-3 Set the type of invoice (standard, deposit, credit note)
-	'documentdate'         => new DateTime(dol_print_date($object->date, 'dayrfc')),
+	'documentdate'         => new DateTime(dol_print_date($object->date, 'dayrfc')),	// BT-26
 	'invoiceCurrency'      => $conf->currency,
 	'taxCurrency'          => null,
 	'documentname'         => null,
