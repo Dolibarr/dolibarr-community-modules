@@ -1740,25 +1740,25 @@ class PdpConnectFr
 		$resprints .= ' <button type="button" class="button small smallpaddingimp" onclick="pdpSubmitAddRouting()">' . $langs->trans("Add") . '</button>';
 		$resprints .= '</div>';
 		$resprints .= '<script>
-function pdpSubmitAddRouting() {
-	var f = document.createElement("form");
-	f.method = "post";
-	f.action = "' . $addUrl . '";
-	var fields = {
-		token: "' . dol_escape_js($addToken) . '",
-		action: "pdp_addrouting",
-		new_routing_id: document.getElementById("pdp_new_routing_id").value,
-		new_routing_info: document.getElementById("pdp_new_routing_info").value
-	};
-	for (var k in fields) {
-		var i = document.createElement("input");
-		i.type = "hidden"; i.name = k; i.value = fields[k];
-		f.appendChild(i);
-	}
-	document.body.appendChild(f);
-	f.submit();
-}
-</script>';
+		function pdpSubmitAddRouting() {
+			var f = document.createElement("form");
+			f.method = "post";
+			f.action = "' . $addUrl . '";
+			var fields = {
+				token: "' . dol_escape_js($addToken) . '",
+				action: "pdp_addrouting",
+				new_routing_id: document.getElementById("pdp_new_routing_id").value,
+				new_routing_info: document.getElementById("pdp_new_routing_info").value
+			};
+			for (var k in fields) {
+				var i = document.createElement("input");
+				i.type = "hidden"; i.name = k; i.value = fields[k];
+				f.appendChild(i);
+			}
+			document.body.appendChild(f);
+			f.submit();
+		}
+		</script>';
 
 		$resprints .= '</td>';
 		$resprints .= '</tr>';
