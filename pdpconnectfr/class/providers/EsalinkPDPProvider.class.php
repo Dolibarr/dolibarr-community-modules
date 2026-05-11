@@ -200,20 +200,20 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			$item = $formSetup->newItem($prefix . 'ACTIONS');
 			$item->nameText = "&nbsp;";
 
-			$item->fieldOverride .= '<a class="reposition" href="' . $_SERVER["PHP_SELF"] . "?action=call" . $prefix . "HEALTHCHECK&token=" . newToken() . '"><i class="fa fa-heartbeat pictofixedwidth"></i>' . $langs->trans('testConnection') . ' (Healthcheck)</a><br>';
+			$item->fieldOverride .= '<a class="reposition" href="' . $_SERVER["PHP_SELF"] . "?action=call" . $prefix . "HEALTHCHECK&token=" . newToken() . '"><i class="fa fa-heartbeat pictofixedwidth centerimp"></i>' . $langs->trans('testConnection') . ' (Healthcheck)</a><br>';
 			$item->cssClass = 'minwidth500';
 
 			if ($tokenData['token'] && getDolGlobalString('PDPCONNECTFR_PROTOCOL')) {
 				if (getDolGlobalString('PDPCONNECTFR_LIVE')) {
-					$item->fieldOverride .= '<span class="opacitymedium" title="'.$langs->trans("DisabledInProductionMode").'"><i class="fa fa-file pictofixedwidth"></i>' . $langs->trans('generateSendSampleInvoice') . '</span><br>';
+					$item->fieldOverride .= '<span class="opacitymedium" title="'.$langs->trans("DisabledInProductionMode").'"><i class="fa fa-file pictofixedwidth centerimp"></i>' . $langs->trans('generateSendSampleInvoice') . '</span><br>';
 				} else {
-					$item->fieldOverride .= '<a class="reposition" href="' . $_SERVER["PHP_SELF"] . "?action=make" . $prefix . "sampleinvoice&token=" . newToken() . '"><i class="fa fa-file pictofixedwidth"></i>' . $langs->trans('generateSendSampleInvoice') . '</a><br>';
+					$item->fieldOverride .= '<a class="reposition" href="' . $_SERVER["PHP_SELF"] . "?action=make" . $prefix . "sampleinvoice&token=" . newToken() . '"><i class="fa fa-file pictofixedwidth centerimp"></i>' . $langs->trans('generateSendSampleInvoice') . '</a><br>';
 				}
 			}
 
 			// Check your ID in French E-Invoice Annuary
 			if ($mysoc->country_code == 'FR') {
-				$item->fieldOverride .= '<a class="reposition" href="https://facturation.chorus-pro.gouv.fr/annuaire/#/" target="_blank"><i class="fa fa-check pictofixedwidth"></i>' . $langs->trans('CheckYourIDInFrenchEInvoiceAnnuary') . '</a><br>';
+				$item->fieldOverride .= '<a class="reposition" href="https://facturation.chorus-pro.gouv.fr/annuaire/#/" target="_blank"><i class="fa fa-list-alt pictofixedwidth centerimp"></i>' . $langs->trans('CheckYourIDInFrenchEInvoiceAnnuary') . '</a><br>';
 			}
 		}
 	}
