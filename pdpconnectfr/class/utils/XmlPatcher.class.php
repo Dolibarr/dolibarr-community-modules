@@ -229,7 +229,7 @@ class XmlPatcher
 
 		$ramNs = 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100';
 
-		// <ram:AdditionalReferencedDocument>
+		// <ram:AdditionalReferencedDocument>		BG-3
 		$refDoc = $dom->createElementNS($ramNs, 'ram:AdditionalReferencedDocument');
 
 		// <ram:IssuerAssignedID>

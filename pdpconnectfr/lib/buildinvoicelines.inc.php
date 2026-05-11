@@ -415,7 +415,7 @@ $invoiceData = [
 	'invoicingPeriodStart' => null,
 	'invoicingPeriodEnd'   => null,
 
-	'businessProcessId'    => $this->getBillingProcessID($object),
+	'businessProcessId'    => $this->getBillingProcessID($object),		// B1, B2, B3, B4 / S1, S2, S3, S4 / M1, M2, M3, M4
 	'isTestDocument'       => !empty($invoice->specimen),
 
 	// Notes
@@ -507,7 +507,7 @@ $invoiceData = [
 	'headerAllowancesCharges'   => [],
 
 	// Referenced documents part
-	'invoiceRefDocs'            => $invoiceRefDocs,
+	'invoiceRefDocs'            => $invoiceRefDocs,		// BG-3
 	'orderReference'            => $promise_code,
 	'contractReference'         => $object->array_options['options_d4d_contract_number'] ?? null,
 	'despatchAdviceRef'         => null,

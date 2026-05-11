@@ -1595,7 +1595,7 @@ class CIIProtocol extends AbstractProtocol
 		$sum->appendChild($doc->createElement('ram:TotalPrepaidAmount', number_format($invoiceData['totalPrepaidAmount'], 2, '.', '')));
 		$sum->appendChild($doc->createElement('ram:DuePayableAmount', number_format($invoiceData['duePayableAmount'], 2, '.', '')));
 
-		// Referenced documents
+		// Referenced documents BG-3
 		if (!empty($invoiceData['invoiceRefDocs'])) {
 			foreach ($invoiceData['invoiceRefDocs'] as $refDoc) {
 				$refNode = $doc->createElement('ram:InvoiceReferencedDocument');
