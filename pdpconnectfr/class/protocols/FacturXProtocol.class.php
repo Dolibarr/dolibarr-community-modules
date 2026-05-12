@@ -2423,66 +2423,6 @@ class FacturXProtocol extends AbstractProtocol
 		rsort($deliveryDateList);
 	}
 
-	/**
-	 * Map type of invoices dolibarr <-> facturx
-	 *
-	 * @param 	CommonInvoice	$object 	The invoice object
-	 * @return  string|null 				code of invoice type
-	 */
-	private function _getTypeOfInvoice($object)
-	{
-		$map = [
-			CommonInvoice::TYPE_STANDARD        => '380',
-			CommonInvoice::TYPE_REPLACEMENT     => '384',
-			CommonInvoice::TYPE_CREDIT_NOTE     => '381',
-			CommonInvoice::TYPE_DEPOSIT         => '386',
-			CommonInvoice::TYPE_SITUATION       => '380',				// Process situation invoice as common invoice
-		];
-		return $map[$object->type] ?? null;
-	}
-
-	/**
-	 * Return IEC_6523 code (https://docs.peppol.eu/poacc/billing/3.0/codelist/ICD/)
-	 * This list of codes describes schemes codes for thirdparties but also products. This functions returns need for thirdparty schemes only.
-	 *
-	 * @param	string		$country_code		Country code
-	 * @param	int			$global				Use 0 for legal ID, use 1 for a global ID, use 2 for URI.
-	 * @return string code
-	 */
-	private function getIEC6523Code($country_code, $global = 0)
-	{
-		$retour = "";
-		switch ($country_code) {
-			case 'BE':
-				if ($global == 1 || $global == 2) {
-					$retour = "0208";
-				} else {
-					$retour = "0008";
-				}
-				break;
-			case 'DE':
-				$retour = "0000";
-				break;
-			case 'FR':
-				if ($global == 1 || $global == 2) {
-					$retour = "0225";	// SIREN or SIREN_XXX.  	Einvoice global ID, example: "000000002" or URI OD, example "315143296_1939"
-				} else {
-					$retour = "0002";	// SIREN.	Used for LegalOrganization, example: "315143296"
-				}
-				break;
-			default:
-				if ($global == 1 || $global == 2) {
-					$retour = "0060";	// DUNS
-					// $retour = "EM";	// Emails
-				} else {
-					$retour = "0060";	// DUNS
-					// $retour = "EM";	// Emails
-				}
-		}
-		return $retour;
-	}
-
-
 
 	/************************************************
 	 *    Check line type from external module ?
