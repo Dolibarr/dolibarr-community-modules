@@ -39,6 +39,16 @@ class PdpConnectFr
 	 */
 	public $db;
 
+	/**
+	 * @var string		Error string
+	 */
+	public $error;
+
+	/**
+	 * @var string[]	Errors string
+	 */
+	public $errors = array();
+
 
 	// Dolibarr internal statuses
 	public const STATUS_UNKNOWN             = 0;		// By default, before the e-invoice has been generated
