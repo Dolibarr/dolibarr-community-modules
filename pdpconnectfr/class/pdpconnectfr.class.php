@@ -1241,7 +1241,7 @@ class PdpConnectFr
 			if (is_array($allRoutings) && count($allRoutings) >= 1) {
 				$resprints .= '<tr class="trpdpconnect_collapseseparator">';
 				$resprints .= '<td>';
-				$resprints .= $form->editfieldkey($langs->trans("InvoiceRoutingOverride"), 'override_routing_id', '', $object, (int) $editenable);
+				$resprints .= $form->editfieldkey($form->textwithpicto($langs->trans("InvoiceRoutingOverride"), $langs->trans("InvoiceRoutingOverrideHelp")), 'override_routing_id', '', $object, (int) $editenable);
 				$resprints .= '</td>';
 				$resprints .= '<td>';
 				if ($action == 'editoverride_routing_id') {
