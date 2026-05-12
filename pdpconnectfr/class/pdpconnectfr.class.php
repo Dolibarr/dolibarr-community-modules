@@ -615,15 +615,16 @@ class PdpConnectFr
 	 * @param int $onlySendable 		If 1, only return statuses that can be sent to Access Point (for example, exclude Access Point STATUS_ERROR)
 	 * @param int $onlyCreate			Keep only status used in create mode
 	 * @param int $onlyOut				Keep only status used for outgoing invoices
+	 * @param int $disableUnknownStatus	If 1, disable unknown status
 	 * @param int $addseparator			If 1, add decorators like a separator after status when einvoice life cycle has not started.
 	 * @return array<int, string>		Array of status
 	 */
-	public function getEinvoiceStatusOptions($includeCodesInLabel = 0, $onlyPdpStatuses = 0, $onlySendable = 0, $onlyCreate = 0, $onlyOut = 0, $addseparator = 0)
+	public function getEinvoiceStatusOptions($includeCodesInLabel = 0, $onlyPdpStatuses = 0, $onlySendable = 0, $onlyCreate = 0, $onlyOut = 0, $disableUnknownStatus = 1, $addseparator = 0)
 	{
 		global $langs;
 		$options = [];
 		foreach (self::STATUS_LABEL_KEYS as $code => $labelKey) {
-			if ($code == self::STATUS_GENERATED) {
+			if ($code == self::STATUS_GENERATED && $addseparator) {
 				$options['separator1'] = array('label' => '--------------------', 'disabled' => 1);
 			}
 
@@ -633,9 +634,13 @@ class PdpConnectFr
 			}
 			$options[$code] = $value;
 
-			if ($code == self::STATUS_PAID) {
+			if ($code == self::STATUS_PAID && $addseparator) {
 				$options['separator2'] = array('label' => '--------------------', 'disabled' => 1);
 			}
+		}
+
+		if ($disableUnknownStatus) {
+			unset($options[self::STATUS_UNKNOWN]);
 		}
 
 		if ($onlyPdpStatuses || $onlySendable) {
@@ -1209,7 +1214,7 @@ class PdpConnectFr
 
 			// TODO Use a combo list with only status for sync Dolibarr -> AP
 			// Also status we can't modify manually must be greyed/disabled
-			$arrayofeinvoicestatus = $this->getEinvoiceStatusOptions(0, 0, 0, ($action == 'create' ? 1 : 0));
+			$arrayofeinvoicestatus = $this->getEinvoiceStatusOptions(0, 0, 0, ($action == 'create' ? 1 : 0), 0, ((empty($currentStatusInfo['code']) && $action != 'create') ? 0 : 1), ($action != 'create' ? 1 : 0));
 
 			$resprints .=  $form->selectarray("seteinvoicestatus", $arrayofeinvoicestatus, $currentStatusInfo['code'], 0, 0, 0, '', 1);
 			if ($action != 'create') {

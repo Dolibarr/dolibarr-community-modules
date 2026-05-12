@@ -802,12 +802,16 @@ class ActionsPdpconnectfr extends CommonHookActions
 			// Sync status
 			if (empty($parameters['arrayfields']['pdp_syncstatus']) || !empty($parameters['arrayfields']['pdp_syncstatus']['checked'])) {
 				print '<td class="liste_titre pdp_syncstatus">';
-				$listofoptions = $pdpConnectFr->getEinvoiceStatusOptions(0, 0, 0, 0, 1, 1);
+				$listofoptions = $pdpConnectFr->getEinvoiceStatusOptions(0, 0, 0, 0, 1, 0, 1);
 
 				// Remove option related to E-invoice generation status
 				//unset($listofoptions[$pdpConnectFr::STATUS_NOT_GENERATED]);
 				//unset($listofoptions[$pdpConnectFr::STATUS_GENERATED]);
-				unset($listofoptions[$pdpConnectFr::STATUS_UNKNOWN]);
+
+				// Remove unknow status because "unknown" means there is no status set so we can't search on it.
+				//if (in_array($action, array('add', 'create', 'edit', 'save'))) {
+					unset($listofoptions[$pdpConnectFr::STATUS_UNKNOWN]);
+				//}
 
 				print $form->selectarray(
 					'search_pdp_syncstatus',
