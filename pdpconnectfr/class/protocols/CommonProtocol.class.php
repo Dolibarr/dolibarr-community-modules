@@ -715,7 +715,7 @@ trait CommonProtocol
 		$resFetchP = $pdpconnectfr->fetchDefaultRouting($lineData['supplierId'], 'product');
 		if (!empty($resFetchP) && $resFetchP != '-1') {
 			$product_id = (string) $resFetchP;		// Can be 'idprod_123' (product id) or '456' (supplier ref id)
-			if (str_starts_with($product_id, 'idprod_')) {
+			if (preg_match('/^idprod_/', $product_id)) {
 				$productId = str_replace('idprod_', '', $product_id);
 				$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product";
 				$sql .= " WHERE rowid = '" . (int) $productId . "'";
