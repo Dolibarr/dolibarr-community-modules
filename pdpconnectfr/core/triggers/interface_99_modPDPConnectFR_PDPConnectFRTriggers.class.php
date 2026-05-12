@@ -91,7 +91,7 @@ class InterfacePDPConnectFRTriggers extends DolibarrTriggers
 
 			$result = $pdpConnectFr->setEInvoiceStatus($newobject, $statustouse, '');
 			if ($result < 0) {
-				$this->errors = array_merge($this->errors, $pdpConnectFr->errors);
+				$this->errors[] = $pdpConnectFr->errors;
 				return -1;
 			}
 		}

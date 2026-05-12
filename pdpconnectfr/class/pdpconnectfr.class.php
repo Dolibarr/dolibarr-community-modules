@@ -1952,7 +1952,7 @@ class PdpConnectFr
 
 		$resql = $db->query($sql);
 		if (!$resql) {
-			dol_print_error($db);
+			$this->errors[] = $db->lasterror();
 			return -1;
 		}
 
@@ -1990,7 +1990,7 @@ class PdpConnectFr
 
 		$resql = $db->query($sql);
 		if (!$resql) {
-			dol_print_error($db);
+			$this->errors[] = $db->lasterror();
 			return -1;
 		}
 
