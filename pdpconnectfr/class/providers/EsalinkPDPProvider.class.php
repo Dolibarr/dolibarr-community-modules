@@ -211,9 +211,15 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				}
 			}
 
+			$pdpconnectfr = new PdPConnectFr($this->db);
+			$idtocheck = $pdpconnectfr->getSellerCommunicationURI(0);
+
 			// Check your ID in French E-Invoice Annuary
 			if ($mysoc->country_code == 'FR') {
-				$item->fieldOverride .= '<a class="reposition" href="https://facturation.chorus-pro.gouv.fr/annuaire/#/" target="_blank"><i class="fa fa-list-alt pictofixedwidth centerimp"></i>' . $langs->trans('CheckYourIDInFrenchEInvoiceAnnuary') . '</a><br>';
+				$item->fieldOverride .= '<a class="reposition" href="https://facturation.chorus-pro.gouv.fr/annuaire/#/" target="_blank"><i class="fa fa-list-alt pictofixedwidth centerimp"></i>' . $langs->trans('CheckYourIDInFrenchEInvoiceAnnuary') . '</a>';
+				if (!getDolGlobalString('PDPCONNECTFR_LIVE')) {
+					$item->fieldOverride .= ' - <a class="reposition" href="https://test-directory.peppol.eu/public/locale-en_US/menuitem-search?q='.urlencode($idtocheck).'&mode=fr&env=sandbox" target="_blank">' . $langs->trans('PeppolTestAnnuary') . '</a>';
+				}
 			}
 		}
 	}

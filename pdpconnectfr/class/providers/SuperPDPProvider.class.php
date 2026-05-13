@@ -280,8 +280,11 @@ class SuperPDPProvider extends AbstractPDPProvider
 						}
 					}
 
-					// Check your ID in French E-Invoice Annuary
+					// Check your ID in E-Invoice Annuary
+					$showannuary = 0;
 					if ($mysoc->country_code == 'FR') {
+						$showannuary++;
+
 						$item->fieldOverride .= '<i class="fa fa-list-alt pictofixedwidth centerimp"></i>'.$langs->trans('CheckYourIDInEInvoiceAnnuary');
 
 						$pdpconnectfr = new PdPConnectFr($this->db);
@@ -289,10 +292,16 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 						if (getDolGlobalString('PDPCONNECTFR_LIVE')) {
 							$item->fieldOverride .= ': <a class="reposition" href="https://facturation.chorus-pro.gouv.fr/annuaire/#/" target="_blank">' . $langs->trans('FrenchGovAnnuary') . '</a>';
-							$item->fieldOverride .= ' - <a class="reposition" href="https://www.superpdp.tech/outils/info-annuaire/?query='.$idtocheck.'&mode=fr&env=production" target="_blank">' . $langs->trans('SuperPDPAnnuary') . '</a><br>';
+							$item->fieldOverride .= ' - <a class="reposition" href="https://www.superpdp.tech/outils/info-annuaire/?query='.urlencode($idtocheck).'&mode=fr&env=production" target="_blank">' . $langs->trans('SuperPDPAnnuary') . '</a>';
 						} else {
-							$item->fieldOverride .= ': <a class="reposition" href="https://www.superpdp.tech/outils/info-annuaire/?query='.$idtocheck.'&mode=fr&env=sandbox" target="_blank">' . $langs->trans('SuperPDPAnnuary') . '</a><br>';
+							$item->fieldOverride .= ': <a class="reposition" href="https://www.superpdp.tech/outils/info-annuaire/?query='.urlencode($idtocheck).'&mode=fr&env=sandbox" target="_blank">' . $langs->trans('SuperPDPAnnuary') . '</a>';
 						}
+					}
+					if (!getDolGlobalString('PDPCONNECTFR_LIVE')) {
+						if ($showannuary) {
+							$item->fieldOverride .= ' - ';
+						}
+						$item->fieldOverride .= '<a class="reposition" href="https://test-directory.peppol.eu/public/locale-en_US/menuitem-search?q='.urlencode($idtocheck).'&mode=fr&env=sandbox" target="_blank">' . $langs->trans('PeppolTestAnnuary') . '</a>';
 					}
 				}
 			}

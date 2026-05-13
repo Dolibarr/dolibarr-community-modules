@@ -296,6 +296,7 @@ CheckYourIDInEInvoiceAnnuary=Check your Einvoice ID
 CheckYourIDInFrenchEInvoiceAnnuary=Check your Einvoice ID in french E-invoice annuary
 FrenchGovAnnuary=French gouvernement annuary
 SuperPDPAnnuary=SuperPDP annuary
+PeppolTestAnnuary=Peppol test annuary
 CantFindThirdpartyFromTheImportedInvoice=The third party of the vendor of the imported invoice (%s) could not be found in your database and auto-creation of third party is disabled. So you must create it manually. See the next line on Recommended action to do...
 CantFindProductFromTheImportedInvoice=A product found in the imported invoice (%s) could not be found in your database, and auto-creation of product is disabled, so you must create it manually. See the following line...
 
