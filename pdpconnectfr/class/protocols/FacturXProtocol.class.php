@@ -1939,4 +1939,271 @@ class FacturXProtocol extends AbstractProtocol
 
 		return true;
 	}
-}
+
+	/**
+	 * Find or create a Dolibarr product based on Factur-X invoice line data
+	 * @param array $lineData Array containing invoice line data extracted from Factur-X
+	 * @param string $flowId Flow identifier source of the product. Used for logging purposes.
+	 *
+	 * @return array{res:int, message:string, actioncode:string|null, actionurl:string|null, action:string|null}   Returns array with 'res' (ID of the found or created product, -1 on error) with a 'message' and an optional 'action'.
+	 */
+	private function _findOrCreateProductFromFacturXLine($lineData, $flowId = '')
+	{
+		/*
+		* PRODUCT MATCHING FOR SUPPLIER INVOICE (Factur-X)
+		*
+		* This matching strategy attempts to find or create a product based on
+		* Factur-X invoice line data, following a priority-based approach.
+		*
+		* 1. Search in product supplier prices table using prodsellerid
+		*    - Ok if match found
+		*    - ko, continue to step 2
+		*
+		* 2. Global ID (prodglobalid + prodglobalidtype) and prodglobalidtype = '0160' search by barcode
+		*    - ok if match found
+		*    - KO if Other schemes or no match, continue to step 3
+		*
+		* 3. if Buyer Reference (prodbuyerid) is available search prodbuyerid = internal product reference
+		*    - ok if match found
+		*    - ko, continue to step 4
+		*
+		* 4. Text Search using prodname
+		*    - ok if match found
+		*    - ko if multiple matches or no match, continue to create product
+		*
+		* 5. If no match found after all steps:
+		*    - Automatic product creation (with extrafield source=facturx and to be verified tag)
+		*    - Use this product for supplier invoice line (with extrafield to be verified tag)
+		*    - Add supplier price information (if not added automatically by Dolibarr)
+		*/
+		global $db, $user, $langs;
+
+		$pdpconnectfr = new PdpConnectFr($db);
+
+
+		// Search in product supplier prices table using prodsellerid
+		$sql = "SELECT p.rowid ";
+		$sql .= " FROM " . MAIN_DB_PREFIX . "product as p ";
+		$sql .= " INNER JOIN " . MAIN_DB_PREFIX . "product_fournisseur_price as pfp ON pfp.fk_product = p.rowid ";
+		$sql .= " WHERE pfp.product_supplier_id = '" . $db->escape($lineData['prodsellerid']) . "' ";
+		$sql .= " AND pfp.fk_soc = " . intval($lineData['supplierId']) . " ";
+		$sql .= " LIMIT 1";
+		$resql = $db->query($sql);
+		if ($resql && $db->num_rows($resql) > 0) {
+			$obj = $db->fetch_object($resql);
+			dol_syslog(get_class($this) . '::_findOrCreateProductFromFacturXLine Found product by prodsellerid: ' . $obj->rowid);
+			return array('res' => $obj->rowid, 'message' => 'Product found by prodsellerid');
+			// No match found, continue to next step
+		}
+
+		// Global ID (prodglobalid + prodglobalidtype) and prodglobalidtype = '0160' search by barcode
+		// TODO
+
+		// if Buyer Reference (prodbuyerid) is available search prodbuyerid = internal product reference
+		if (!empty($lineData['prodbuyerid'])) {
+			$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product ";
+			$sql .= " WHERE ref = '" . $db->escape($lineData['prodbuyerid']) . "' OR rowid = '" . $db->escape($lineData['prodbuyerid']) . "' ";
+			$sql .= " LIMIT 1";
+			$resql = $db->query($sql);
+			if ($resql && $db->num_rows($resql) > 0) {
+				$obj = $db->fetch_object($resql);
+				dol_syslog(get_class($this) . '::_findOrCreateProductFromFacturXLine Found product by prodbuyerid: ' . $obj->rowid);
+				return array('res' => $obj->rowid, 'message' => 'Product found by prodbuyerid');
+			}
+		}
+
+		// Check with EI- prefix for product inmported using prodsellerid as internal reference with EI- prefix
+		if (!empty($lineData['prodsellerid']) && $lineData['prodsellerid'] !== "0000") {
+			$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product ";
+			$sql .= " WHERE ref = 'EI-" . $db->escape($lineData['prodsellerid']) . "'";
+			$sql .= " LIMIT 1";
+			$resql = $db->query($sql);
+			if ($resql && $db->num_rows($resql) > 0) {
+				$obj = $db->fetch_object($resql);
+				dol_syslog(get_class($this) . '::_findOrCreateProductFromFacturXLine Found product by prodsellerid with EI- prefix: ' . $obj->rowid);
+				return array('res' => $obj->rowid, 'message' => 'Product found by prodsellerid with EI- prefix');
+			}
+		}
+
+		// Text Search using prodname
+		$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product ";
+		$sql .= " WHERE label = '" . $db->escape($lineData['prodname']) . "' ";
+		$resql = $db->query($sql);
+		if ($resql) {
+			if ($db->num_rows($resql) === 1) {
+				$obj = $db->fetch_object($resql);
+				dol_syslog(get_class($this) . '::_findOrCreateProductFromFacturXLine Found product by text search: ' . $obj->rowid);
+				return array('res' => $obj->rowid, 'message' => 'Product found by text search');
+			}
+		}
+
+		// If not found, we check by using the default product ID on thirdpary level
+		// TODO
+
+
+		// If no match found after all steps
+		if (!empty(getDolGlobalInt('PDPCONNECTFR_PRODUCTS_AUTO_GENERATION'))) {
+			// Auto-create prouct
+			$product = new Product($db);
+			$product->type        = $this->_detectProductTypeFromFacturx($lineData);
+			$product->ref = 'EI-' . dol_sanitizeFileName(!empty($lineData['prodsellerid'] && $lineData['prodsellerid'] !== "0000") ? $lineData['prodsellerid'] : uniqid());
+			$product->ref_ext     = trim($lineData['prodsellerid'] ?? '');
+			$product->label       = !empty($lineData['prodname'])
+				? $lineData['prodname']
+				: 'Imported product from supplier invoice (Ref: ' . $lineData['parentDocumentNo'] . ')';
+			$product->description = trim($lineData['proddesc'] ?? '');
+			$product->tva_tx      = (float) ($lineData['rateApplicablePercent'] ?? 0);
+			$product->status      = 0; // Status not to sell
+			$product->status_buy  = 1; // Status to buy
+			$product->note_private = 'Product created automatically from E-invoice import.';
+			$product->import_key  = AbstractPDPProvider::$PDPCONNECTFR_LAST_IMPORT_KEY; // It does not work here, so we will update it after creation
+			// Set barcode if global ID is provided and is a GTIN/EAN type
+			if (!empty($lineData['prodglobalid']) && !empty($lineData['prodglobalidtype']) && in_array($lineData['prodglobalidtype'], ['0160', '0011'])) {
+				$product->barcode = $lineData['prodglobalid'];
+				$product->barcode_type = getDolGlobalInt('PRODUIT_DEFAULT_BARCODE_TYPE', 0);
+			} else {
+				$product->barcode = 'auto';
+			}
+			// Validate before creation
+			$resCheck = $product->check();
+			if ($resCheck < 0) {
+				dol_syslog(__METHOD__ . ' Product check failed: ' . $product->error, LOG_ERR);
+				return array('res' => -1, 'message' => 'Product check failed: ' . implode("\n", $product->errors));
+			}
+
+			// Create product
+			$resCreate = $product->create($user);
+			if ($resCreate > 0) {
+				$productId = $product->id;
+
+				// Set import_key
+				$sql = 'UPDATE ' . MAIN_DB_PREFIX . "product SET import_key = '" . $db->escape($product->import_key) . "' WHERE rowid = " . ((int) $productId);
+				$db->query($sql);
+
+				// Add entry in pdpconnectfr_extlinks table to mark product as created from e-invoice
+				$pdpconnectfr->insertOrUpdateExtLink($productId, $product->element, $flowId);
+
+				dol_syslog(__METHOD__ . ' New product created (ID: ' . $productId . ')');
+				return [
+					'res'     => $productId,
+					'message' => 'Product successfully created from E-invoice import',
+				];
+			}
+
+			// Error on creation
+			dol_syslog(__METHOD__ . ' Product creation error: ' . $product->error, LOG_ERR);
+			return [
+				'res'     => -1,
+				'message' => 'Product creation error: ' . $product->error,
+			];
+		} else {
+			// Suggest manual creation of product
+			dol_syslog(get_class($this) . '::_findOrCreateProductFromFacturXLine Auto-creation of products is disabled', LOG_ERR);
+
+			$prodRef = trim($lineData['prodsellerid'] ?? '');
+			$prodName = trim($lineData['prodname'] ?? '');
+			$prodDesc = trim($lineData['proddesc'] ?? '');
+
+			$errorDetails = [];
+			$createParams = [];
+			if (!empty($prodRef) && $prodRef !== "0000") {
+				$errorDetails[] = $prodRef;
+
+				$createParams['ref'] = 'EI-' . dol_sanitizeFileName(!empty($lineData['prodsellerid'] && $lineData['prodsellerid'] !== "0000") ? $lineData['prodsellerid'] : uniqid());
+
+				$createParams['ref_ext'] = $prodRef;
+			}
+			if (!empty($prodName)) {
+				$errorDetails[] = 'Name: ' . $prodName;
+				$createParams['label'] = $prodName;
+			}
+			if (!empty($prodDesc)) {
+				//$errorDetails[] = 'Description: ' . $prodDesc;
+				$createParams['desc'] = $prodDesc;
+			}
+
+			// Detect product type to prefill form
+			$createParams['type'] = $this->_detectProductTypeFromFacturx($lineData);
+			$createParams['tva_tx'] = (float) ($lineData['rateApplicablePercent'] ?? 0);
+			$createParams['status'] = 1; // Active
+			if (!empty($lineData['prodglobalid']) && !empty($lineData['prodglobalidtype']) && in_array($lineData['prodglobalidtype'], ['0160', '0011'])) {
+				$createParams['barcode'] = $lineData['prodglobalid'];
+				$createParams['barcode_type'] = getDolGlobalInt('PRODUIT_DEFAULT_BARCODE_TYPE', 0);
+			} else {
+				$createParams['barcode'] = 'auto';
+			}
+
+			// Create URL to prefill product creation form
+			$createUrl = DOL_URL_ROOT . '/product/card.php?action=create';
+			if (!empty($createParams)) {
+				$createUrl .= '&' . http_build_query($createParams);
+			}
+			$createUrl .= '&backtopage=' . urlencode(dol_buildpath('/pdpconnectfr/document_list.php', 1));
+
+			$detailsStr = !empty($errorDetails) ? ' [' . implode(' - ', $errorDetails) . ']' : '';
+
+			$message = 'Unable to find product' . $detailsStr . '. Auto-creation of products is disabled in settings.';
+
+			$action = $langs->trans('ManualUnfoundProductCreationFromEInvoice', $detailsStr) . ' ';
+			$action .= '<a class="butAction small" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
+			$action .= '<i class="fas fa-plus-circle"></i> ';
+			$action .= $langs->trans('CreateProduct');
+			$action .= '</a>';
+
+			return array(
+				'res' => -1,
+				'message' => $message,
+				'actioncode' => 'PRODUCT_NOT_FOUND',
+				'actionurl' => $createUrl,
+				'action' => $action
+			);
+		}
+	}
+
+	/**
+	 * Determine if a Factur-X line corresponds to a product (0) or a service (1)
+	 *
+	 * @param array $line Factur-X line data
+	 * @return int 0 = product / 1 = service
+	 */
+	private function _detectProductTypeFromFacturx(array $line): int
+	{
+		$globalId     = trim($line['prodglobalid'] ?? '');
+		$globalIdType = trim($line['prodglobalidtype'] ?? '');
+		$sellerId     = trim($line['prodsellerid'] ?? '');
+		$unitCode     = strtoupper(trim($line['billedquantityunitcode'] ?? ''));
+		$name         = strtolower($line['prodname'] ?? '');
+		$desc         = strtolower($line['proddesc'] ?? '');
+
+		// A. Global ID known => product
+		// EAN = 0088
+		$productGlobalIdTypes = ['0160', '0011', '0002', '0023', '0004', '0001', '0088']; // GTIN/UPC/EAN...
+		if ($globalId !== '' && in_array($globalIdType, $productGlobalIdTypes, true)) {
+			return 0;
+		}
+
+		// B. Units typical for services
+		$serviceUnits = ['HUR', 'HRS', 'DAY', 'MON', 'ANN', 'MIN', 'WEE', 'E48']; // hours, days, months...
+		if (in_array($unitCode, $serviceUnits, true)) {
+			return 1;
+		}
+
+		// C. Piece but no seller reference => likely service
+		if ($sellerId === '' || $sellerId === '0000') {
+			return 1;
+		}
+
+		// D. Keywords indicating service
+		$keywordsService = ['service', 'prestation', 'maintenance', 'installation', 'abonnement', 'support', 'forfait', 'consult'];
+		foreach ($keywordsService as $kw) {
+			if (stripos($name, $kw) !== false || stripos($desc, $kw) !== false) {
+				return 1;
+			}
+		}
+
+		// Fallback = service
+		return 0;
+	}
+
+
+	}
