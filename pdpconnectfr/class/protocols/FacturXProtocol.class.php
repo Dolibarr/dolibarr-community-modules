@@ -1305,7 +1305,8 @@ class FacturXProtocol extends AbstractProtocol
 		if ($supplierInvoice->type === '-1') {
 			return ['res' => -1, 'message' => 'Unfounded dolibarr corresponding Invoice code for document type code: ' . ($parsedHeader['documenttypecode'] ?? 'NA')];
 		}
-		$supplierInvoice->date = isset($parsedHeader['documentdate']) && $parsedHeader['documentdate'] instanceof DateTime ? $parsedHeader['documentdate']->format('Y-m-d') : null;
+		// documentdate est déjà formaté en 'Y-m-d' par les parseurs ZugFerd et CII
+		$supplierInvoice->date = !empty($parsedHeader['documentdate']) ? dol_stringtotime($parsedHeader['documentdate']) : null;
 
 
 		// Set currency

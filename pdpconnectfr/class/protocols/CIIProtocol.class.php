@@ -1557,6 +1557,15 @@ class CIIProtocol extends AbstractProtocol
 			$pm->appendChild($acc);
 
 			$acc->appendChild($doc->createElement('ram:AccountName', $invoiceData['accountName']));
+			if (!empty($invoiceData['iban'])) {
+				$acc->appendChild($doc->createElement('ram:IBANID', $invoiceData['iban']));
+			}
+
+			if (!empty($invoiceData['bic'])) {
+				$inst = $doc->createElement('ram:PayeeSpecifiedCreditorFinancialInstitution');
+				$pm->appendChild($inst);
+				$inst->appendChild($doc->createElement('ram:BICID', $invoiceData['bic']));
+			}
 		}
 
 		// TVA
