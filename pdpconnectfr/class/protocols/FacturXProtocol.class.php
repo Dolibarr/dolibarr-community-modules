@@ -2204,6 +2204,4 @@ class FacturXProtocol extends AbstractProtocol
 		// Fallback = service
 		return 0;
 	}
-
-
-	}
+}
