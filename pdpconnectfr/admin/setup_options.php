@@ -119,7 +119,13 @@ foreach ($protocolsList as $key => $protocolconfig) {
 	if ($protocolconfig['is_enabled'] == 0) {
 		continue;
 	}
-	$TFieldProtocols[$key] = $protocolconfig['protocol_name'];
+	$TFieldProtocols[$key] = array('label' => $protocolconfig['protocol_name']);
+	if (!empty($protocolconfig['protocol_dol_min'])) {
+		// With Esalink, we can use the Factur-X even on version lower than v24 because it accepts duplicate factur-x.xml inside the PDF.
+		if ($protocolconfig['protocol_name'] != 'FACTURX' || getDolGlobalString('PDPCONNECTFR_PDP') != 'ESALINK') {
+			$TFieldProtocols[$key]['data-html'] = $protocolconfig['protocol_name'].' <span class="opacitymedium">(Dolibarr '.$protocolconfig['protocol_dol_min'].'+)</span>';
+		}
+	}
 }
 
 
