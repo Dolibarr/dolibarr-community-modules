@@ -220,21 +220,33 @@ class ActionsPdpconnectfr extends CommonHookActions
 
 			$resql = $db->query($sql);
 			if ($resql && $db->num_rows($resql) > 0) {
-				// TODO : we can link validate button to approval LC message or remove the approval message since it is not mandatory.
-				// TODO : if Invoice is already refused, we should not display the button to send status message
-				$availableStatuses = $pdpConnectFr->getEinvoiceStatusOptions(1, 1, 1);
-				$url_button = array();
-				foreach ($availableStatuses as $code => $label) {
-					$url_button[] = array(
-						'lang' => 'pdpconnectfr',
-						'enabled' => 1,
-						'perm' => (bool) $user->hasRight("facture", "creer"),
-						'label' => $label,
-						'url' => '/fourn/facture/card.php?id=' . $object->id . '&action=sendStatusMessage&pdpstatuscode=' . $code . '&token=' . newToken()
-					);
-				}
+				// Vérifier si un statut final (approuvé ou refusé) a déjà été envoyé et validé
+				// → dans ce cas, le cycle de vie est terminé, on masque le bouton
+				$sqlFinal = "SELECT rowid FROM " . MAIN_DB_PREFIX . "pdpconnectfr_lifecycle_msg";
+				$sqlFinal .= " WHERE element_id = " . (int) $object->id;
+				$sqlFinal .= " AND element_type = '" . $db->escape($object->element) . "'";
+				$sqlFinal .= " AND direction = 'out'";
+				$sqlFinal .= " AND lc_status IN (" . (int) PdpConnectFr::STATUS_APPROVED . ", " . (int) PdpConnectFr::STATUS_REFUSED . ")";
+				$sqlFinal .= " AND lc_validation_status = 'Ok'";
+				$sqlFinal .= " LIMIT 1";
+				$resqlFinal = $db->query($sqlFinal);
+				$hasFinalLifecycle = ($resqlFinal && $db->num_rows($resqlFinal) > 0);
 
-				print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true);
+				if (!$hasFinalLifecycle) {
+					$availableStatuses = $pdpConnectFr->getEinvoiceStatusOptions(1, 1, 1);
+					$url_button = array();
+					foreach ($availableStatuses as $code => $label) {
+						$url_button[] = array(
+							'lang' => 'pdpconnectfr',
+							'enabled' => 1,
+							'perm' => (bool) $user->hasRight("facture", "creer"),
+							'label' => $label,
+							'url' => '/fourn/facture/card.php?id=' . $object->id . '&action=sendStatusMessage&pdpstatuscode=' . $code . '&token=' . newToken()
+						);
+					}
+
+					print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true);
+				}
 			}
 		}
 
@@ -423,8 +435,9 @@ class ActionsPdpconnectfr extends CommonHookActions
 			// $object->id may be empty at hook time if core hasn't fetched the object yet
 			$socId = !empty($object->id) ? (int) $object->id : GETPOSTINT('id');
 
-			// Save routing from create/edit thirdparty form
-			if (($action == 'add' || $action == 'update') && !empty($socId) && $permissiontoedit) {
+			// Sauvegarde du routage depuis le formulaire de création du tiers uniquement
+			// (action=update exclut intentionnellement : en édition on passe par le tableau de routage dédié)
+			if ($action == 'add' && !empty($socId) && $permissiontoedit) {
 				// Thirdparty routing ID
 				$routingId = GETPOST('routing_id', 'alphanohtml');
 				if ($routingId !== '') {

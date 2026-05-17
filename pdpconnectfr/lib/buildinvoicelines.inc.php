@@ -107,7 +107,7 @@ $idprof            = thirdpartyidprof($object) ?? '';
 $schemeIdProf      = $this->getIEC6523Code($object->thirdparty->country_code);
 $globalIdProf      = thirdpartyidprof($object) ?? '';
 $schemeGlobalIdProf = $this->getIEC6523Code($object->thirdparty->country_code, 1);
-$uri               = $pdpconnectfr->getBuyerCommunicationURI($object->thirdparty);
+$uri               = $pdpconnectfr->getBuyerCommunicationURI($object->thirdparty, $object);
 $schemeUri         = $this->getIEC6523Code($object->thirdparty->country_code, 2);
 
 // Seller contact

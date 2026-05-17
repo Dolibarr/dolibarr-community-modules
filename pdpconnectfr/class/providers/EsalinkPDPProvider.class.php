@@ -58,7 +58,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	 */
 	public function __construct($db)
 	{
-		global $langs;
+		global $conf, $langs;
 
 		parent::__construct($db);
 
