@@ -1445,7 +1445,7 @@ class FacturXProtocol extends AbstractProtocol
 			$productId = 0;
 			if (!$is_deposit_line) {
 				// Sync or create product
-				$res = $this->_findOrCreateProductFromFacturXLine($parsedLine, $flowId);
+				$res = $this->_findOrCreateProductFromEinvoiceLine($parsedLine, $flowId);
 				$return_messages[] = $res['message'];
 				if ($res['res'] < 0) {
 					return [
