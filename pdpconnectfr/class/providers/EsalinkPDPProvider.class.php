@@ -62,20 +62,6 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 		parent::__construct($db);
 
-		// Migration automatique des credentials sans suffixe vers _PROD (cassé par eb7816c)
-		// S'exécute une seule fois : dès que _PROD est renseigné, la condition est fausse
-		if (getDolGlobalInt('PDPCONNECTFR_LIVE')) {
-			foreach (array('USERNAME', 'PASSWORD', 'API_KEY') as $key) {
-				$oldConst = 'PDPCONNECTFR_ESALINK_' . $key;
-				$newConst = 'PDPCONNECTFR_ESALINK_' . $key . '_PROD';
-				$oldVal   = getDolGlobalString($oldConst);
-				if (!getDolGlobalString($newConst) && $oldVal) {
-					dolibarr_set_const($this->db, $newConst, $oldVal, 'chaine', 1, '', $conf->entity);
-					$conf->global->$newConst = $oldVal; // mise à jour en mémoire pour la requête courante
-				}
-			}
-		}
-
 		$this->config = array(
 			'provider_url' => 'https://ppd.hubtimize.fr',
 			'prod_auth_url' => 'https://hubtimize.fr/api/orchestrator/v1/',
