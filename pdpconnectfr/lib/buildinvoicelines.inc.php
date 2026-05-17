@@ -49,6 +49,7 @@ $pdpconnectfr = new PdpConnectFr($db);
 // Reload object
 $facture = new Facture($db);
 $object = $facture->fetch($invoice->id) > 0 ? $facture : $invoice;
+$object->fetch_thirdparty();
 if (!is_object($invoice->thirdparty)) {
 	$invoice->fetch_thirdparty();
 }

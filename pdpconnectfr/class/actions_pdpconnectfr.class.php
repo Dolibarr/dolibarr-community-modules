@@ -1,6 +1,7 @@
 <?php
-/* Copyright (C) 2025		Mohamed Daoud				<mdaoud@dolicloud.com>
- * Copyright (C) 2025		Laurent Destailleur			<eldy@users.sourceforge.net>
+/* Copyright (C) 2025		Mohamed Daoud			<mdaoud@dolicloud.com>
+ * Copyright (C) 2025		Laurent Destailleur		<eldy@users.sourceforge.net>
+ * Copyright (C) 2026		Charlene Benke			<charlene@patas-monkey.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -384,7 +385,8 @@ class ActionsPdpconnectfr extends CommonHookActions
 						// If there is an error, we move warnings into error message
 						// Cast to array to avoid TypeError on PHP 8 when property is null
 						$this->errors = array_merge($this->errors, (array) $protocol->errors);
-						$this->errors = array_merge($this->errors, (array) $this->warnings);
+						if (!empty($this->warnings))
+							$this->errors = array_merge($this->errors, (array) $this->warnings);
 						$this->warnings = array();
 						dol_syslog(__METHOD__ . " " . implode(',', (array) $protocol->errors));
 						$error++;
