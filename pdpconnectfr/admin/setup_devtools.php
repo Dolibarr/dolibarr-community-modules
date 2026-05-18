@@ -183,7 +183,7 @@ $form = new Form($db);
 
 $action = 'edit';
 
-$help_url = '';
+$help_url = 'EN:Module_PDPConnectFR';
 $title = "PDPConnectFRSetup";
 
 llxHeader('', $langs->trans($title), $help_url, '', 0, 0, '', '', '', 'mod-pdpconnectfr page-admin-devtools');

@@ -100,7 +100,7 @@ $backtopage = GETPOST('backtopage', 'alpha');
 
 $form = new Form($db);
 
-$help_url = '';
+$help_url = 'EN:Module_PDPConnectFR';
 $title = "PDPConnectFRSetup";
 
 llxHeader('', $langs->trans($title), $help_url, '', 0, 0, '', '', '', 'mod-pdpconnectfr page-admin_about');
