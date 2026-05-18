@@ -74,58 +74,61 @@ class ActionsPdpconnectfr extends CommonHookActions
 		}
 
 		$invoiceObject = $parameters['object'];
-		$invoiceObject->fetch_thirdparty();
-		$thirdpartyCountryCode = $invoiceObject->thirdparty->country_code;
 
 		// Check if it's an invoice
-		if (get_class($invoiceObject) === 'Facture' && $thirdpartyCountryCode === 'FR') {
-			/** @var Facture $invoiceObject */
-			if ($invoiceObject->status != $invoiceObject::STATUS_DRAFT
-				&& !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP')
-				&& getDolGlobalString('PDPCONNECTFR_EINVOICE_IN_REAL_TIME')) {
-				// Call function to create Factur-X document
-				require_once __DIR__ . '/protocols/ProtocolManager.class.php';
+		if ($invoiceObject instanceOf Facture) {
+			$invoiceObject->fetch_thirdparty();
+			$thirdpartyCountryCode = $invoiceObject->thirdparty->country_code;
 
-				$usedProtocols = getDolGlobalString('PDPCONNECTFR_PROTOCOL');
-				$ProtocolManager = new ProtocolManager($db);
-				$protocol = $ProtocolManager->getProtocol($usedProtocols);
+			if ($thirdpartyCountryCode === 'FR') {
+				/** @var Facture $invoiceObject */
+				if ($invoiceObject->status != $invoiceObject::STATUS_DRAFT
+					&& !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP')
+					&& getDolGlobalString('PDPCONNECTFR_EINVOICE_IN_REAL_TIME')) {
+					// Call function to create Factur-X document
+					require_once __DIR__ . '/protocols/ProtocolManager.class.php';
 
-				// Check configuration
-				$result = $pdpConnectFr->checkRequiredinformations($invoiceObject);
-				if ($result['res'] < 0) {
-					$message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
+					$usedProtocols = getDolGlobalString('PDPCONNECTFR_PROTOCOL');
+					$ProtocolManager = new ProtocolManager($db);
+					$protocol = $ProtocolManager->getProtocol($usedProtocols);
 
-					dol_syslog(__METHOD__ . " " . $message);
+					// Check configuration
+					$result = $pdpConnectFr->checkRequiredinformations($invoiceObject);
+					if ($result['res'] < 0) {
+						$message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
 
-					if (getDolGlobalString('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
-						// TODO : Remove this conf or add more conditions like thirdparty nature to avoid blocking invoice creation for non FR companies or for thirdparties that are not subject to E-invoicing obligation
-						setEventMessages($message, array(), 'errors');
-						// $this->errors[] = $message;
-						return -1;
-					} else {
-						setEventMessages($message, array(), 'warnings');
+						dol_syslog(__METHOD__ . " " . $message);
+
+						if (getDolGlobalString('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
+							// TODO : Remove this conf or add more conditions like thirdparty nature to avoid blocking invoice creation for non FR companies or for thirdparties that are not subject to E-invoicing obligation
+							setEventMessages($message, array(), 'errors');
+							// $this->errors[] = $message;
+							return -1;
+						} else {
+							setEventMessages($message, array(), 'warnings');
+							$this->warnings[] = $message;
+							return 0;
+						}
+					} elseif ($result['res'] == 0) {
+						$message = $langs->trans("InvoiceGeneratedWithWarnings") . ': <br>' . $result['message'];
 						$this->warnings[] = $message;
-						return 0;
+
+						dol_syslog(__METHOD__ . " " . $message);
+						setEventMessages($message, array(), 'warnings');
 					}
-				} elseif ($result['res'] == 0) {
-					$message = $langs->trans("InvoiceGeneratedWithWarnings") . ': <br>' . $result['message'];
-					$this->warnings[] = $message;
 
-					dol_syslog(__METHOD__ . " " . $message);
-					setEventMessages($message, array(), 'warnings');
-				}
+					$result = $protocol->generateInvoice($invoiceObject, $outputlangs);		// Generate E-invoice
 
-				$result = $protocol->generateInvoice($invoiceObject, $outputlangs);		// Generate E-invoice
-
-				if ($result && (!is_numeric($result) || $result > 0)) {
-					// No error;
-					setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
-				} else {
-					if (getDolGlobalString('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
-						$this->errors = array_merge($this->errors, $protocol->errors);
-						return -1;
+					if ($result && (!is_numeric($result) || $result > 0)) {
+						// No error;
+						setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
 					} else {
-						return 0;
+						if (getDolGlobalString('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
+							$this->errors = array_merge($this->errors, $protocol->errors);
+							return -1;
+						} else {
+							return 0;
+						}
 					}
 				}
 			}
@@ -435,8 +438,8 @@ class ActionsPdpconnectfr extends CommonHookActions
 			// $object->id may be empty at hook time if core hasn't fetched the object yet
 			$socId = !empty($object->id) ? (int) $object->id : GETPOSTINT('id');
 
-			// Sauvegarde du routage depuis le formulaire de création du tiers uniquement
-			// (action=update exclut intentionnellement : en édition on passe par le tableau de routage dédié)
+			// Save einvoice ID from creation formonly
+			// (action=update excludes intentionnally : in edit mode, we are using the routing edit array)
 			if ($action == 'add' && !empty($socId) && $permissiontoedit) {
 				// Thirdparty routing ID
 				$routingId = GETPOST('routing_id', 'alphanohtml');
