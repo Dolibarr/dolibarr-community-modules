@@ -168,7 +168,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 		// Token
 		if (getDolGlobalString($prefix . 'API_KEY'.(getDolGlobalInt('PDPCONNECTFR_LIVE') ? '_PROD' : ''))) {
-			$texttoshow = $langs->trans('generateAccessToken');
+			$texttoshow = $langs->trans('ConnectTo').' ('.$langs->trans('generateAccessToken').')';
 			$urltogeneratetoken = $_SERVER["PHP_SELF"] . "?action=set" . $prefix . "TOKEN&token=" . newToken();
 
 			$item = $formSetup->newItem($prefix . 'TOKEN'.(getDolGlobalInt('PDPCONNECTFR_LIVE') ? '_PROD' : ''));
@@ -203,7 +203,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			$item->fieldOverride .= '<a class="reposition" href="' . $_SERVER["PHP_SELF"] . "?action=call" . $prefix . "HEALTHCHECK&token=" . newToken() . '"><i class="fa fa-heartbeat pictofixedwidth centerimp"></i>' . $langs->trans('testConnection') . ' (Healthcheck)</a><br>';
 			$item->cssClass = 'minwidth500';
 
-			if ($tokenData['token'] && getDolGlobalString('PDPCONNECTFR_PROTOCOL') && getDolGlobalInt('PDPCONNECTFR_ALLOW_DEV_TOOLS')) {
+			if ($tokenData['token'] && getDolGlobalString('PDPCONNECTFR_PROTOCOL')) {
 				if (getDolGlobalString('PDPCONNECTFR_LIVE')) {
 					$item->fieldOverride .= '<span class="opacitymedium" title="'.$langs->trans("DisabledInProductionMode").'"><i class="fa fa-file pictofixedwidth centerimp"></i>' . $langs->trans('generateSendSampleInvoice') . '</span><br>';
 				} else {
