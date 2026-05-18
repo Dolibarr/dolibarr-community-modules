@@ -169,8 +169,10 @@ $item->helpText .= '<br>'.$langs->transnoentities('PDPCONNECTFR_PDP_HELP3');
 $item->cssClass = 'minwidth500';
 //var_dump($item);exit;
 
-$item = $formSetup->newItem('PDPCONNECTFR_LIVE')->setAsYesNo();
-$item->fieldParams['forcereload'] = 1;
+if (getDolGlobalInt('MAIN_FEATURES_LEVEL') >= 1) {
+	$item = $formSetup->newItem('PDPCONNECTFR_LIVE')->setAsYesNo();
+	$item->fieldParams['forcereload'] = 1;
+}
 
 // End of selection of platform partner
 
