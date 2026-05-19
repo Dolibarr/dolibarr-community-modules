@@ -77,7 +77,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$this->helpToGetCredentials = '<div class="">' . $langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL1") . '</div>';
 		$this->helpToGetCredentials .= '<div class="margintoponly">' . $langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL2", '{s1}') . '</div>';
 		$this->helpToGetCredentials .= '<div class="margintoponly">' . $langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL3", '{s2}') . '</div>';
-		$this->helpToGetCredentials .= '<div class="margintoponly">' . $langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL4", '{s3}', '{s4}', '{s5}') . '</div>';
+		$this->helpToGetCredentials .= '<div class="margintoponly">' . $langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL4", '{s3}', '{s4}', '{s5}', '{s6}') . '</div>';
 
 		if (getDolGlobalString('PDPCONNECTFR_PDP') == 'SUPERPDPViaPartner') {
 			$this->helpToGetCredentials = '<div class="">' . $langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL_VIA_PARTNER", '{s1}') . '</div>';
@@ -169,6 +169,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				$this->helpToGetCredentials = str_replace('{s3}', $langs->transnoentitiesnoconv("PDPCONNECTFR_CLIENT_ID"), $this->helpToGetCredentials);
 				$this->helpToGetCredentials = str_replace('{s4}', $langs->transnoentitiesnoconv("PDPCONNECTFR_CLIENT_SECRET"), $this->helpToGetCredentials);
 				$this->helpToGetCredentials = str_replace('{s5}', $langs->transnoentitiesnoconv("Save"), $this->helpToGetCredentials);
+				$this->helpToGetCredentials = str_replace('{s6}', $langs->transnoentitiesnoconv("ConnectTo"), $this->helpToGetCredentials);
 
 				$this->helpToGetCredentials = '<div class="formborderx info">' . $this->helpToGetCredentials . '</div>';
 			} else {
