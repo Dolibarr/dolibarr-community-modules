@@ -345,13 +345,10 @@ if (!empty($formSetup->items)) {
 
 if (!empty($provider) && !empty($formSetup2->items)) {
 	print $provider->helpToGetCredentials;
-	print '<br>';
 }
 
 if ($stringwarning) {
 	print $stringwarning;
-} else {
-	print '<br>';
 }
 
 if (!empty($formSetup2->items)) {

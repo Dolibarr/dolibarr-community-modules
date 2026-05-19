@@ -108,16 +108,18 @@ function pdpShowWarning($pdpconnectfr)
 
 	$ret = '';
 
-	$mysocCheck = $pdpconnectfr->validateMyCompanyConfiguration();
-	if ($mysocCheck['res'] <= 0) {
-		$ret .= '<div class="' . ($mysocCheck['res'] < 0 ? 'error' : 'warning') . '">';
-		$ret .= $mysocCheck['message'];
-		$ret .= '<br><br>';
-		$ret .= $langs->trans("MyCompanyConfigurationWarning") . ': ';
-		$ret .= '<a class="gotomycompanysetup" href="' . DOL_URL_ROOT . '/admin/company.php">';
-		$ret .= $langs->trans("ModifyCompanyInformation") . '<i class="fas fa-tools marginleftonly"></i>';
-		$ret .= '</a>';
-		$ret .= '</div>';
+	if (getDolGlobalString('PDPCONNECTFR_LIVE')) {
+		$mysocCheck = $pdpconnectfr->validateMyCompanyConfiguration();
+		if ($mysocCheck['res'] <= 0) {
+			$ret .= '<div class="' . ($mysocCheck['res'] < 0 ? 'error' : 'warning') . '">';
+			$ret .= $mysocCheck['message'];
+			$ret .= '<br><br>';
+			$ret .= $langs->trans("MyCompanyConfigurationWarning") . ': ';
+			$ret .= '<a class="gotomycompanysetup" href="' . DOL_URL_ROOT . '/admin/company.php">';
+			$ret .= $langs->trans("ModifyCompanyInformation") . '<i class="fas fa-tools marginleftonly"></i>';
+			$ret .= '</a>';
+			$ret .= '</div>';
+		}
 	}
 
 	return ($ret ? $ret . '<br>' : '');
