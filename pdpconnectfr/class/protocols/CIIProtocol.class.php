@@ -261,7 +261,7 @@ class CIIProtocol extends AbstractProtocol
 		global $conf, $user, $langs, $mysoc, $db;	// Used by the include
 
 
-		// Call page to generate the invoice
+		// Call page to generate the invoice variables ($invoiceData, ...)
 		include dol_buildpath('pdpconnectfr/lib/buildinvoicelines.inc.php');
 		/**
 		 * @var array<mixed,mixed> 	$invoiceData
@@ -1802,8 +1802,8 @@ class CIIProtocol extends AbstractProtocol
 		if (!empty($data[$prefix . 'CommunicationUriScheme']) && !empty($data[$prefix . 'CommunicationUri'])) {
 			$uri = $doc->createElement('ram:URIUniversalCommunication');
 			$node->appendChild($uri);
-			$uriid = $doc->createElement('ram:URIID', $data[$prefix . 'CommunicationUri']);
-			$uriid->setAttribute('schemeID', $data[$prefix . 'CommunicationUriScheme']);
+			$uriid = $doc->createElement('ram:URIID', $data[$prefix . 'CommunicationUri']);			// Example 315143296_1939
+			$uriid->setAttribute('schemeID', $data[$prefix . 'CommunicationUriScheme']);			// Example 0225
 			$uri->appendChild($uriid);
 		}
 

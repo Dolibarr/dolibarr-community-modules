@@ -78,7 +78,7 @@ require_once "../class/pdpconnectfr.class.php";
 
 
 // Translations
-$langs->loadLangs(array("admin", "pdpconnectfr@pdpconnectfr"));
+$langs->loadLangs(array("admin", "pdpconnectfr@pdpconnectfr", "other"));
 
 // Initialize a technical object to manage hooks of page. Note that conf->hooks_modules contains an array of hook context
 /** @var HookManager $hookmanager */
@@ -277,11 +277,19 @@ if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 		$tmpthirdparty = new Societe($db);
 		$tmpthirdparty->fetch(0, '', '', '', GETPOST("buyer_einvoiceid"));
 		$buyerId = $tmpthirdparty->id;
+		if (!$buyerId) {
+			$langs->load("errors");
+			setEventMessages($langs->trans("ErrorThirdPartyNotFound"), null, 'warnings');
+		}
 	}
 	if (GETPOST("seller_einvoiceid") && $sellerId <= 0) {
 		$tmpthirdparty = new Societe($db);
 		$tmpthirdparty->fetch(0, '', '', '', GETPOST("seller_einvoiceid"));
 		$sellerId = $tmpthirdparty->id;
+		if (!$sellerId) {
+			$langs->load("errors");
+			setEventMessages($langs->trans("ErrorThirdPartyNotFound"), null, 'warnings');
+		}
 	}
 
 	print '<span class="width100 inline-block">'.$langs->trans("Seller").'</span> ';

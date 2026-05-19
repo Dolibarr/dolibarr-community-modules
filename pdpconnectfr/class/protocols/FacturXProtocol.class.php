@@ -120,7 +120,7 @@ class FacturXProtocol extends AbstractProtocol
 		 * @var PdpConnectFr		$pdpconnectfr
 		 */
 
-
+		var_dump(getDolGlobalInt('PDPCONNECTFR_USE_EXTERNAL_FACTURX_BUILDER'));
 		if (!getDolGlobalInt('PDPCONNECTFR_USE_EXTERNAL_FACTURX_BUILDER')) {
 			// =====================================================================
 			// Use the CII protocol to generate the XML file
@@ -678,7 +678,6 @@ class FacturXProtocol extends AbstractProtocol
 		//$sellerglobalid = $pdpconnectfr->getSellerCommunicationURI(0);
 		$sellerglobalid = idprof($mysoc);
 
-
 		if ($mySchemeIdProf == "0002" && strlen($sellerid) != 9) {	// If einvoice ID is French SIREN, we check it has 9 chars.
 			throw new Exception('BADPROFID (generateSampleInvoiceOld): The professional ID ' . $sellerid . ' has type SIREN but length is not 9 characters. Fix this in your company or einvoice module setup page.');
 		}
@@ -717,11 +716,24 @@ class FacturXProtocol extends AbstractProtocol
 
 		$documentBuilder->setDocumentSellerAddress("Lieferantenstraße 20", "", "", "80333", "München", ZugferdCountryCodes::GERMANY);
 		$documentBuilder->setDocumentSellerContact("H. Müller", "", "+49-111-2222222", "+49-111-3333333", "hm@lieferant.de");
-		$documentBuilder->setDocumentSellerCommunication(ZugferdElectronicAddressScheme::UNECE3155_EM, 'sales@lieferant.de');
+
+		//$documentBuilder->setDocumentSellerCommunication(ZugferdElectronicAddressScheme::UNECE3155_EM, 'sales@lieferant.de');
+		$myUri             = $pdpconnectfr->getSellerCommunicationURI(0);			// Example "315143296_1939"
+		$mySchemeUri       = $this->getIEC6523Code($mysoc->country_code, 2);		// Example "0225"
+		$documentBuilder->setDocumentSellerCommunication($mySchemeUri, $myUri);
+
 		$documentBuilder->setDocumentBuyer("Kunden AG Mitte", "GE2020211");
 		$documentBuilder->setDocumentBuyerAddress("Kundenstraße 15", "", "", "69876", "Frankfurt", ZugferdCountryCodes::GERMANY);
 		$documentBuilder->setDocumentBuyerContact("H. Meier", "", "+49-333-4444444", "+49-333-5555555", "hm@kunde.de");
-		$documentBuilder->setDocumentBuyerCommunication(ZugferdElectronicAddressScheme::UNECE3155_EM, 'purchase@kunde.de');
+
+		//$documentBuilder->setDocumentBuyerCommunication(ZugferdElectronicAddressScheme::UNECE3155_EM, 'purchase@kunde.de');
+		$buyerUri             = $pdpconnectfr->getBuyerCommunicationURI(null);		// Example "315143296_1940"
+		$buyerSchemeUri       = $this->getIEC6523Code($mysoc->country_code, 2);		// Example "0225"
+		if (empty($buyerUri)) {
+			$buyerUri = '315143296_1940';
+		}
+		$documentBuilder->setDocumentBuyerCommunication($buyerSchemeUri, $buyerUri);
+
 		$documentBuilder->setDocumentPayee('Kunden AG Zahlungsdienstleistung');
 		$documentBuilder->setDocumentBuyerOrderReferencedDocument("PO-2024-0003324");
 		$documentBuilder->setDocumentSellerOrderReferencedDocument('SO-2024-000993337');
