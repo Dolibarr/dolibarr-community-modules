@@ -307,6 +307,336 @@ function completAutoTags($content, $modulePath)
 	return $content;
 }
 
+/**
+ * build modules zip file if module sources are available into the repository.
+ *
+ * @return void
+ */
+function buildModulePackages()
+{
+
+	// list of files & dirs to include into the zip
+	$listOfModuleContent = [
+		'admin',
+		'ajax',
+		'assets',
+		'public',
+		'scripts',
+		'vendor',
+		'backport',
+		'class',
+		'css',
+		'COPYING',
+		'core',
+		'img',
+		'js',
+		'langs',
+		'lib',
+		'sql',
+		'tpl',
+		'*.md',
+		'*.json',
+		'*.php',
+		'modulebuilder.txt',
+	];
+
+	// Get path of module dir
+	$directoryToSearch = realpath(__DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . '..'); // We are in dev/build, we want to go to root of repository
+	$outputFile = $directoryToSearch . DIRECTORY_SEPARATOR . 'index.yaml';
+	$yamlFiles = findIndexYamlFiles($directoryToSearch, 2);
+	$yamlFiles = array_filter($yamlFiles, function ($file) use ($outputFile) {
+		return $file != $outputFile; // Exclude the output file from the list of files to combine
+	});
+
+	// Get module lists from yaml files
+	$projects = [];
+	foreach ($yamlFiles as $yamlFile) {
+		// Parse YAML file to get the name of the module
+		$content = file_get_contents($yamlFile);
+		$reg = array();
+		if (preg_match('/modulename:\s*[\'"]([^\'"]+)[\'"]/', $content, $reg)) {
+			$projects[] = $reg[1];
+		} else {
+			print "Can't extract module name from yaml file: ".$yamlFile."\n";
+			continue;
+		}
+	}
+
+
+	// For each module, we generate the zip file
+	foreach ($projects as $project) {
+		print "----------- Build package for project: ".$project."\n";
+
+		// Change current dir to module dir, we will execute all next operations from this dir
+		chdir($directoryToSearch . DIRECTORY_SEPARATOR . $project);
+
+		list($mod, $version) = detectModule();
+		if ($mod == "" || $version == "") {
+			print "[fail] This repository does not contain a valid module sources, skipped.\n";
+			print "--------------------------------------------------------------\n";
+			continue;
+			// TODO : Try to retreive zip from Dolistore or make a git clone and then generate the build from sources.
+		}
+
+		//  Define the name of the output zip file and remove it if already exists
+		$outzip = $directoryToSearch . DIRECTORY_SEPARATOR . $project . DIRECTORY_SEPARATOR . "module_" . $mod . "-" . $version . ".zip";
+		if (file_exists($outzip)) {
+			secureUnlink($outzip);
+		}
+
+		//copy all sources into system temp directory
+		$tmpdir = tempnam(sys_get_temp_dir(), $mod . "-module");
+		secureUnlink($tmpdir);
+		mkdirAndCheck($tmpdir);
+		$dst = $tmpdir . "/" . $mod;
+		mkdirAndCheck($dst);
+
+		foreach ($listOfModuleContent as $moduleContent) {
+			foreach (glob($moduleContent) as $entry) {
+				if (!rcopy($entry, $dst . '/' . $entry)) {
+					print "[fail]  Error on copy " . $entry . " to " . $dst . "/" . $entry . " for project: ".$project."\n";
+					print "Please take time to analyze the problem and fix the bug\n";
+					print "--------------------------------------------------------------\n";
+					continue 3; // Skip to the next project if copy fails.
+				}
+			}
+		}
+
+		$z = new ZipArchive();
+		$z->open($outzip, ZIPARCHIVE::CREATE);
+		zipDir($tmpdir, $z, $tmpdir . '/');
+		$z->close();
+		delTree($tmpdir);
+		if (file_exists($outzip)) {
+			print "[success] module archive is ready : $outzip ...\n";
+			print "--------------------------------------------------------------\n";
+		} else {
+			print "[fail] build zip error\n";
+			continue;
+			print "--------------------------------------------------------------\n";
+		}
+	}
+}
+
+/**
+ * auto detect module name and version from file name
+ *
+ * @return  (string|string)[] module name and module version
+ */
+function detectModule()
+{
+	$name  = $version = "";
+	$tab = glob("core/modules/mod*.class.php");
+	if (count($tab) == 0) {
+		print "[fail] Error on auto detect data : there is no mod*.class.php file into core/modules dir\n";
+		return ["", ""];
+	}
+	if (count($tab) == 1) {
+		$file = $tab[0];
+		$pattern = "/.*mod(?<mod>.*)\.class\.php/";
+		if (preg_match_all($pattern, $file, $matches)) {
+			$name = strtolower(reset($matches['mod']));
+		}
+
+		print "extract data from $file\n";
+		if (!file_exists($file) || $name == "") {
+			print "[fail] Error on auto detect data\n";
+			return ["", ""];
+		}
+	} else {
+		print "[fail] Error there is more than one mod*.class.php file into core/modules dir\n";
+		return ["", ""];
+	}
+
+	//extract version from file
+	$contents = file_get_contents($file);
+	$pattern = "/^.*this->version\s*=\s*'(?<version>.*)'\s*;.*\$/m";
+
+	// search, and store all matching occurrences in $matches
+	if (preg_match_all($pattern, $contents, $matches)) {
+		$version = reset($matches['version']);
+	}
+
+	if (version_compare($version, '0.0.1', '>=') != 1) {
+		print "[fail] Error auto extract version fail\n";
+		return ["", ""];
+	}
+
+	print "module name = $name, version = $version\n";
+	return [(string) $name, (string) $version];
+}
+
+/**
+ * delete recursively a directory
+ *
+ * @param   string  $dir  dir path to delete
+ *
+ * @return bool true on success or false on failure.
+ */
+function delTree($dir)
+{
+	$files = array_diff(scandir($dir), array('.', '..'));
+	foreach ($files as $file) {
+		(is_dir("$dir/$file")) ? delTree("$dir/$file") : secureUnlink("$dir/$file");
+	}
+	return rmdir($dir);
+}
+
+
+/**
+ * do a secure delete file/dir with double check
+ * (don't trust unlink return)
+ *
+ * @param   string  $path  full path to delete
+ *
+ * @return bool true on success ($path does not exists at the end of process), else exit
+ */
+function secureUnlink($path)
+{
+	if (file_exists($path)) {
+		if (unlink($path)) {
+			//then check if really deleted
+			clearstatcache();
+			if (file_exists($path)) {	// @phpstan-ignore-line
+				print "[fail] unlink of $path fail !\n";
+				exit(2);
+			}
+		} else {
+			print "[fail] unlink of $path fail !\n";
+			exit(2);
+		}
+	}
+	return true;
+}
+
+/**
+ * create a directory and check if dir exists
+ *
+ * @param   string  $path  path to make
+ *
+ * @return bool true on success ($path exists at the end of process), else exit
+ */
+function mkdirAndCheck($path)
+{
+	if (mkdir($path)) {
+		clearstatcache();
+		if (is_dir($path)) {
+			return true;
+		}
+	}
+	print "[fail] Error on $path (mkdir)\n";
+	exit(3);
+}
+
+/**
+ * check if that filename is concerned by exclude filter
+ *
+ * @param   string  $filename  file name to check
+ *
+ * @return bool true if file is in excluded list
+ */
+function is_excluded($filename)
+{
+	/**
+	 * if you want to exclude some files from your zip
+	 */
+	$exclude_list = [
+		'/^.git$/',
+		'/.*js.map/',
+		'/DEV.md/'
+	];
+
+	$count = 0;
+	$notused = preg_filter($exclude_list, '1', $filename, -1, $count);
+	if ($count > 0) {
+		print " - exclude $filename\n";
+		return true;
+	}
+	return false;
+}
+
+/**
+ * recursive copy files & dirs
+ *
+ * @param   string  $src  source dir
+ * @param   string  $dst  target dir
+ *
+ * @return bool true on success or false on failure.
+ */
+function rcopy($src, $dst)
+{
+	if (is_dir($src)) {
+		// Make the destination directory if not exist
+		mkdirAndCheck($dst);
+		// open the source directory
+		$dir = opendir($src);
+
+		// Loop through the files in source directory
+		while ($file = readdir($dir)) {
+			if (($file != '.') && ($file != '..')) {
+				if (is_dir($src . '/' . $file)) {
+					// Recursively calling custom copy function
+					// for sub directory
+					if (!rcopy($src . '/' . $file, $dst . '/' . $file)) {
+						return false;
+					}
+				} else {
+					if (!is_excluded($file)) {
+						if (!copy($src . '/' . $file, $dst . '/' . $file)) {
+							return false;
+						}
+					}
+				}
+			}
+		}
+		closedir($dir);
+	} elseif (is_file($src)) {
+		if (!is_excluded($src)) {
+			if (!copy($src, $dst)) {
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+/**
+ * build a zip file from a folder
+ *
+ * @param   string  	$folder  folder to use as zip root
+ * @param   ZipArchive  $zip     zip object (ZipArchive)
+ * @param   string  	$root    relative root path into the zip
+ *
+ * @return bool true on success or false on failure.
+ */
+function zipDir($folder, &$zip, $root = "")
+{
+	foreach (new \DirectoryIterator($folder) as $f) {
+		if ($f->isDot()) {
+			continue;
+		} //skip . ..
+		$src = $folder . '/' . $f;
+		$dst = substr($f->getPathname(), strlen($root));
+		if ($f->isDir()) {
+			if ($zip->addEmptyDir($dst)) {
+				if (zipDir($src, $zip, $root)) {
+					continue;
+				} else {
+					return false;
+				}
+			} else {
+				return false;
+			}
+		}
+		if ($f->isFile()) {
+			if (! $zip->addFile($src, $dst)) {
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
 
 // Main
 
@@ -318,13 +648,20 @@ print "----- ".$script_file." -----\n";
 
 // Test if batch mode
 if (substr($sapi_type, 0, 3) == 'cgi') {
-	echo "Error: You are using PHP for CGI. To execute ".$script_file." from command line, you must use PHP for CLI mode.\n";
+	print "Error: You are using PHP for CGI. To execute ".$script_file." from command line, you must use PHP for CLI mode.\n";
+	exit(1);
+}
+
+// Test if zip extension is loaded
+if (!extension_loaded('zip')) {
+	print "Error: PHP extension 'zip' is not loaded. To execute ".$script_file." you must have this extension loaded.\n";
 	exit(1);
 }
 
 if (empty($argv[1])) {
-	print "Usage:   ".$script_file." index|pushdolistore\n";
+	print "Usage:   ".$script_file." index|makezip|pushdolistore\n";
 	print "Example: ".$script_file." index      	to rebuild the index.yaml file (used by Dolibarr to retreive list of community modules)\n";
+	print "Example: ".$script_file." makezip      	to regenerate zip of packages \n";
 	print "Example: ".$script_file." pushdolistore  to regenerate zip of packages and publish them on dolistore (TODO)\n";
 	print "\n";
 	exit(1);
@@ -356,6 +693,12 @@ if ($argv[1] == 'dolistore') {
 	// TODO Ask the api key
 
 	// Scan all modules, for each one, call the makepack.pl to regenerate the zip file then publish the file using the api key.
+}
+
+if ($argv[1] == 'makezip') {
+	// For each module, we generate the zip file
+	buildModulePackages();
+	print "All done.\n";
 }
 
 print "\n";

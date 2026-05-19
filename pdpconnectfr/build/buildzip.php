@@ -34,6 +34,10 @@
 $listOfModuleContent = [
 	'admin',
 	'ajax',
+	'assets',
+	'public',
+	'scripts',
+	'vendor',
 	'backport',
 	'class',
 	'css',
