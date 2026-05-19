@@ -318,8 +318,8 @@ print dol_get_fiche_head($head, 'options', $langs->trans($title), -1, "pdpconnec
 // Alert mysoc configuration is not complete
 $pdpconnectfr = new PdpConnectFr($db);
 
-$stringwarning = pdpShowWarning($pdpconnectfr);
-print $stringwarning;
+//$stringwarning = pdpShowWarning($pdpconnectfr);
+//print $stringwarning;
 
 print '<form name="options" action="'.$_SERVER["PHP_SELF"].'" method="POST">';
 print '<input type="hidden" name="token" value="'.newToken().'">';
