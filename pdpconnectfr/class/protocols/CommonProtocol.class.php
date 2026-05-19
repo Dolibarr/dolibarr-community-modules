@@ -938,4 +938,21 @@ trait CommonProtocol
 		// Fallback = service
 		return 0;
 	}
+
+	/**
+	 * Get a timestamp and return a php DateTime object
+	 *
+	 * @param	int		$ts			Timestamp
+	 * @return 	\DateTime|null 		DateTime object or null if $ts is empty
+	 */
+	private function _tsToDateTime($ts)
+	{
+		dol_syslog("call _tsToDateTime for {$ts} ...");
+		if (empty($ts)) {
+			return null;
+		}
+		$dt = new \DateTime();
+		$dt->setTimestamp($ts);
+		return $dt;
+	}
 }

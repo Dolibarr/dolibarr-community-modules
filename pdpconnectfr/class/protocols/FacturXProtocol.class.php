@@ -1780,23 +1780,6 @@ class FacturXProtocol extends AbstractProtocol
 	}
 
 	/**
-	 * Get a timestamp and return a php DateTime object
-	 *
-	 * @param	int		$ts			Timestamp
-	 * @return 	\DateTime|null 		DateTime object or null if $ts is empty
-	 */
-	private function _tsToDateTime($ts)
-	{
-		dol_syslog("facturx call _tsToDateTime for {$ts} ...");
-		if (empty($ts)) {
-			return null;
-		}
-		$dt = new \DateTime();
-		$dt->setTimestamp($ts);
-		return $dt;
-	}
-
-	/**
 	 * Map Factur-X document type code to Dolibarr invoice type
 	 *
 	 * @param string $documenttypecode Factur-X document type code
