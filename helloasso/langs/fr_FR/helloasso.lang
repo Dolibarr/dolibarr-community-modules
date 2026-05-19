@@ -30,20 +30,20 @@ HelloAssoSetup = Configuration HelloAsso
 Settings = Paramètres
 SettingsMember=Paramètres d'abonnement
 
-HELLOASSO_LIVE = HelloAsso en mode live activé (sinon en mode test/bac à sable)
-HELLOASSO_TEST_CLIENT_ID=Clé d'identification du client de test
+HELLOASSO_LIVE = Helloasso en mode live activé (sinon en mode test/bac à sable)
+HELLOASSO_TEST_CLIENT_ID=Clé de test d'identifiant client
 HELLOASSO_TEST_CLIENT_ID_HELP=La clé d'identification du client de test issue de votre configuration d'API Helloasso
-HELLOASSO_TEST_CLIENT_SECRET=Clé secrète d'identification du client de test
+HELLOASSO_TEST_CLIENT_SECRET=Clé de test secrète du client
 HELLOASSO_TEST_SECRET_HELP=La clé secrète d'identification du client de test issue de votre configuration d'API Helloasso
-HELLOASSO_TEST_CLIENT_ORGANISATION=Nom de l'organisation pour le mode test
+HELLOASSO_TEST_CLIENT_ORGANISATION=test d'organisation client
 HELLOASSO_TEST_CLIENT_ORGANISATION_HELP=Nom de l'organisation pour le mode test. Doit correspondre au nom défini dans le compte HelloAsso.
 
-HELLOASSO_CLIENT_ID=Clé d'identification du client pour le mode live
-HELLOASSO_CLIENT_ID_HELP=La clé d'identification du client pour le mode live issue de votre configuration d'API Helloasso
-HELLOASSO_CLIENT_SECRET=Clé secrète du client pour le mode live
-HELLOASSO_SECRET_HELP=La clé secrète d'identification du client pour le mode live issue de votre configuration d'API Helloasso
-HELLOASSO_CLIENT_ORGANISATION=Nom de l'organisation pour le mode live
-HELLOASSO_CLIENT_ORGANISATION_HELP=Nom de l'organisation pour le mode live. Doit correspondre au nom défini dans le compte HelloAsso.
+HELLOASSO_CLIENT_ID=Clé d'identification du client en direct
+HELLOASSO_CLIENT_ID_HELP=La clé d'identification du client actif issue de votre configuration d'API Helloasso
+HELLOASSO_CLIENT_SECRET=Clé secrète du client en direct
+HELLOASSO_SECRET_HELP=La clé secrète d'identification du client actif issue de votre configuration d'API Helloasso
+HELLOASSO_CLIENT_ORGANISATION=Organisation cliente en direct
+HELLOASSO_CLIENT_ORGANISATION_HELP=Nom de l'organisation pour le mode production. Doit correspondre au nom défini dans le compte HelloAsso.
 HELLOASSO_BANK_ACCOUNT_FOR_PAYMENTS=Compte bancaire pour les paiements
 HELLOASSO_SHOW_ONLINE_PAYMENTS=Afficher la page de paiement en ligne
 HELLOASSO_STANDAR_BTN = Activez le style graphique HelloAsso pour le bouton de paiement
@@ -52,31 +52,31 @@ HELLOASSO_STANDAR_BTN_HELP = Activez cette option pour charger le fichier CSS He
 ExampleOfTestCreditCardHelloAsso=Un exemple de carte de crédit est disponible à cette URL :
 TestConnectionHelloasso=Test de connexion
 SuccessfullyConnected=Connexion réussie
-TestGetMembersHelloasso=Testez l'obtention des cotisations HelloAsso
+TestGetMembersHelloasso=Testez l'obtention de l'abonnement helloasso
 
-HELLOASSO_FORM_MEMBERSHIP_SLUG=Nom du formulaire d'adhésion pour le mode live
+HELLOASSO_FORM_MEMBERSHIP_SLUG=Nom du formulaire d'adhésion en direct
 HELLOASSO_FORM_MEMBERSHIP_SLUG_HELP=Nom du formulaire d'adhésion en ligne pour obtenir des informations. Doit correspondre à l'adresse Web de votre formulaire dans votre compte HelloAsso.
 HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG=Nom du formulaire d'adhésion de test
-HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG_HELP=Nom du formulaire d'adhésion de test à partir duquel extraire les informations. Doit correspondre à l'adresse Web de votre formulaire dans votre compte HelloAsso.
-HELLOASSO_FORM_PAGINATION_PAGES_SIZE=Nombre maximal de cotisations récupérés par page
-HELLOASSO_FORM_PAGINATION_PAGES_SIZE_HELP=Le nombre maximal de cotisations récupérés par les pages lors de l'importation de membres depuis HelloAsso.
-HELLOASSO_MAX_FORM_PAGINATION_PAGES=Nombre maximal de pages de cotisations à récupérer
-HELLOASSO_MAX_FORM_PAGINATION_PAGES_HELP=Nombre maximal de pages à récupérer lors de l'import des cotisations depuis HelloAsso.
-HELLOASSO_FORM_CREATE_THIRDPARTY=Créer et lier un tiers au nouvel adhérant
-HELLOASSO_FORM_CREATE_THIRDPARTY_HELP=Lorsqu'une nouvelle cotisation est synchronisée, créez un nouveau tiers pour cet adhérent et liez-le.
+HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG_HELP=Nom du formulaire d'adhésion test à partir duquel extraire les informations. Doit correspondre à l'adresse Web de votre formulaire dans votre compte HelloAsso.
+HELLOASSO_FORM_PAGINATION_PAGES_SIZE=Nombre maximal de membres récupérés par page
+HELLOASSO_FORM_PAGINATION_PAGES_SIZE_HELP=Le nombre maximal de membres récupérés par les pages lors de l'importation de membres depuis HelloAsso.
+HELLOASSO_MAX_FORM_PAGINATION_PAGES=Nombre maximal de pages de membres à récupérer
+HELLOASSO_MAX_FORM_PAGINATION_PAGES_HELP=Nombre maximal de pages à récupérer lors de l'importation de membres depuis HelloAsso.
+HELLOASSO_FORM_CREATE_THIRDPARTY=Créer et lier un tiers au nouveau membre
+HELLOASSO_FORM_CREATE_THIRDPARTY_HELP=Lorsqu'un nouveau membre est synchronisé, créez un nouveau tiers pour ce membre et liez-le.
 
-HelloAssoMemberTypeDictionary=Correspondance entre le dictionnaire des types d'adhérant HelloAsso et Dolibarr
+HelloAssoMemberTypeDictionary=Correspondance entre le dictionnaire des types de membres HelloAsso et Dolibarr
 HelloAssoMemberCustomFieldDictionary=Dictionnaire de correspondance entre les champs personnalisés HelloAsso et les champs Dolibarr
 
-HelloAssoDolibarrMemberTypeID=Identifiant du type d'adhérant Dolibarr
-HelloAssoMemberTypeID=Identifiant du type d'adhérant HelloAsso
+HelloAssoDolibarrMemberTypeID=Identifiant du type de membre Dolibarr
+HelloAssoMemberTypeID=Identifiant du type de membre HelloAsso
 ErrorHelloAssoBadParameter=Paramètre incorrect %s
 
-ErrorHelloAssoMemberTypeAlreadySet=Type d'adhérant déjà défini
-ErrorHelloAssoAddingMemberType=Erreur lors de la tentative d'ajout du type d'adhérant
-ErrorHelloAssoRemovingMemberType=Erreur lors de la tentative de suppression du type d'adhérant
-HelloAssoMemberTypeDictionaryAddedSucesfully=Type d'adhérant ajouté avec succès
-HelloAssoMemberTypeDictionaryRemovedSucesfully=Type d'adhérant supprimé avec succès
+ErrorHelloAssoMemberTypeAlreadySet=Type de membre déjà défini
+ErrorHelloAssoAddingMemberType=Erreur lors de la tentative d'ajout du type de membre
+ErrorHelloAssoRemovingMemberType=Erreur lors de la tentative de suppression du type de membre
+HelloAssoMemberTypeDictionaryAddedSucesfully=Type de membre ajouté avec succès
+HelloAssoMemberTypeDictionaryRemovedSucesfully=Type de membre supprimé avec succès
 
 ErrorHelloAssoCustomFieldAlreadySet=Champ personnalisé déjà défini
 ErrorHelloAssoAddingCustomField=Erreur lors de la tentative d'ajout d'un champ personnalisé
@@ -86,22 +86,22 @@ HelloAssoCustomFieldDictionaryRemovedSucesfully=Champ personnalisé supprimé av
 
 HelloAssoRecordNotFound=Enregistrement introuvable
 
-HelloAssoMembersNothingDone=%s Cotisation(s) traitée(s), mais aucune action n'a été effectuée (simulation à blanc). %s Cotisation(s) en erreur.
-HelloAssoMembersAddedSucessfully=%s Cotisation(s) ont été ajoutés avec succès
+HelloAssoMembersNothingDone=%s Member(s) processed but nothing was done (Dry run). There was %s member(s) in error.
+HelloAssoMembersAddedSucessfully=%s Un ou plusieurs membres ont été ajoutés avec succès
 HelloAssoDolibarrCorrespondenceParameters=Paramètres de correspondance entre HelloAsso et Dolibarr
-HelloAssoFormParameters=Paramètres du formulaire HelloAsso
-HelloAssoMemberTypeIdTitle=Identifiant du type d'adhérant correspondant dans HelloAsso
-HelloAssoMemberTypeId=Identifiant de type d'adhérant HelloAsso
+HelloAssoFormParameters=HelloAsso form parameters
+HelloAssoMemberTypeIdTitle=Identifiant du type de membre correspondant dans HelloAsso
+HelloAssoMemberTypeId=Identifiant de type de membre HelloAsso
 HelloAssoCustomField=Slug du champ personnalisé HelloAsso
 HelloAssoCustomFieldTitle=Slug du champ personnalisé correspondant dans HelloAsso
-HelloAssoSelectMemberType=Sélectionnez un type d'adhérant dolibarr
-HelloAssoSelectMemberField=Sélectionnez un champ d'adhérant dolibarr
-HelloAssoMemberTypeDictionaryHelp=Dictionnaire de correspondance entre les types d'adhérant HelloAsso et Dolibarr. Si le dictionnaire est vide, un nouveau type d'adhérant sera créé dans Dolibarr. Pour trouver l'identifiant d'adhérant HelloAsso, suivez la procédure décrite dans le wiki du module HelloAsso.
+HelloAssoSelectMemberType=Sélectionnez un type de membre dolibarr
+HelloAssoSelectMemberField=Sélectionnez un champ membre dolibarr
+HelloAssoMemberTypeDictionaryHelp=Dictionnaire de correspondance entre les types de membres HelloAsso et Dolibarr. Si le dictionnaire est vide, un nouveau type de membre sera créé dans Dolibarr. Pour trouver l'identifiant du membre HelloAsso, suivez la procédure décrite dans le wiki du module HelloAsso.
 HelloAssoMemberCustomFieldDictionaryHelp=Dictionnaire de correspondance entre les champs personnalisés HelloAsso et les champs Dolibarr.<br>Pour configurer un nouveau champ personnalisé : sélectionnez un champ de l’objet membre Dolibarr et indiquez le nom du champ HelloAsso correspondant dans le champ de saisie.
-ModuleHelloAssoMemberSyncDesc=Synchronisez les adhérants HelloAsso dans la base de données Dolibarr en créant des adherants et des cotisations.
-HelloAssoSyncButtonDesc=Testez la synchronisation de vos cotisations avec votre application sans modifier vos données. <br> Une fois la configuration validée, vous pouvez automatiser la synchronisation dans le module Tâches planifiées avec la tâche HelloAssoGetNewMembers.
-HELLOASSO_SUBSCRIPTION_COMPLEMENTARYACTIONS=Action complémentaire sur la synchronisation des cotisations
-HELLOASSO_SUBSCRIPTION_COMPLEMENTARYACTIONS_HELP=Action complémentaire lors de la synchronisation des cotisations. <br>D'autres actions complémentaires peuvent être définies si la création par un tiers est activée lors de la synchronisation.
+ModuleHelloAssoMemberSyncDesc=Synchronisez les membres HelloAsso dans la base de données Dolibarr en créant des membres et des abonnements.
+HelloAssoSyncButtonDesc=Testez la synchronisation de vos membres avec votre application sans modifier vos données. <br> Une fois la configuration validée, vous pouvez automatiser la synchronisation dans le module Tâches planifiées avec la tâche HelloAssoGetNewMembers.
+HELLOASSO_SUBSCRIPTION_COMPLEMENTARYACTIONS=Action complémentaire sur la synchronisation des membres
+HELLOASSO_SUBSCRIPTION_COMPLEMENTARYACTIONS_HELP=Action complémentaire lors de la synchronisation des membres. <br>D'autres actions complémentaires peuvent être définies si la création par un tiers est activée lors de la synchronisation.
 
 # About page
 #
@@ -126,7 +126,7 @@ Connected=Connecté.
 LastRecordedToken=Dernier jeton enregistré
 HelloAssoMembershipStatus=Statut de membre
 HelloAssoMemberPaymentLabel=Paiement d'abonnement HelloAsso n°%s
-ErrorHelloAssoCode=Une erreur %s est survenue, vérifiez que les slugs, les noms de formulaires, et la clé sont valides dans la configuration du module HelloAsso
-ErrorHelloassoMissingFirstNameOrLastName=Une erreur s'est produite lors de la récupération des informations du membre : le prénom ou le nom de famille d'au moins un membre est manquant.
-ErrorHelloAssoMembershipPost=Une erreur s'est produite lors du traitement de l'enregistrement de la cotisation avec les informations %s et les erreurs %s.
-HelloAssoMembersError=%s cotisation(s) en erreur
+ErrorHelloAssoCode=A %s error has occurred. Please verify that the slugs, form names, and key are valid in the HelloAsso module configuration.
+ErrorHelloassoMissingFirstNameOrLastName=An error occurred while fetching the member's information, missing Firstname or Lastname for at least a member.
+ErrorHelloAssoMembershipPost=An error occurred while processing the membership fee record with the information %s and the errors %s.
+HelloAssoMembersError=%s member(s) fee records are on error
