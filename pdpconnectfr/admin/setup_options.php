@@ -126,6 +126,9 @@ foreach ($protocolsList as $key => $protocolconfig) {
 			$TFieldProtocols[$key]['data-html'] = $protocolconfig['protocol_name'].' <span class="opacitymedium">(Dolibarr '.$protocolconfig['protocol_dol_min'].'+)</span>';
 		}
 	}
+	if ($protocolconfig['protocol_name'] == 'CII') {
+		$TFieldProtocols[$key]['data-html'] = $protocolconfig['protocol_name'].' <span class="opacitymedium">('.$langs->trans("Recommended").')</span>';
+	}
 }
 
 

@@ -47,16 +47,16 @@ class ProtocolManager
 		$ublIsOk = 0;
 
 		$this->protocolsList = array(
+			'CII' => array(
+				'protocol_name' => 'CII',
+				'description' => 'CII (Cross Industry Invoice) is an international XML-based standard developed by UN/CEFACT to enable structured electronic invoicing and data exchange between businesses.',
+				'is_enabled' => $ciiIsOk
+			),
 			'FACTURX' => array(
 				'protocol_name' => 'FACTURX',
 				'protocol_dol_min' => '24.0',
 				'description' => 'Factur-X is a French-German hybrid e-invoicing format combining a readable PDF invoice with embedded XML data for seamless automated processing.',
 				'is_enabled' => $facturexIsOk
-			),
-			'CII' => array(
-				'protocol_name' => 'CII',
-				'description' => 'CII (Cross Industry Invoice) is an international XML-based standard developed by UN/CEFACT to enable structured electronic invoicing and data exchange between businesses.',
-				'is_enabled' => $ciiIsOk
 			),
 			'UBL' => array(
 				'protocol_name' => 'UBL',
