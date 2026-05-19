@@ -109,6 +109,11 @@ $globalIdProf      = thirdpartyidprof($object) ?? '';
 $schemeGlobalIdProf = $this->getIEC6523Code($object->thirdparty->country_code, 1);
 $uri               = $pdpconnectfr->getBuyerCommunicationURI($object->thirdparty, $object);
 $schemeUri         = $this->getIEC6523Code($object->thirdparty->country_code, 2);
+// In case of sample tests, we may have this const defined to overwrite buyer Einvoice address ID.
+if (defined('PDPCONNECT_FORCE_BUYER_EID')) {
+	$uri               = constant('PDPCONNECT_FORCE_BUYER_EID');
+	$schemeUri         = "0225";
+}
 
 // Seller contact
 $usercontacts = $object->getIdContact('internal', 'SALESREPFOLL');
@@ -479,6 +484,7 @@ $invoiceData = [
 
 	'buyerReference'            => $object->array_options['options_d4d_service_code'] ?? null,
 
+	// URIUniversalCommunication
 	'buyerCommunicationUriScheme' => $schemeUri,
 	'buyerCommunicationUri'    	=> $uri,
 

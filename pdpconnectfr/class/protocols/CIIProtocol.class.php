@@ -481,13 +481,17 @@ class CIIProtocol extends AbstractProtocol
 			$tmpthirdparty = new Societe($this->db);
 			$tmpthirdparty->initAsSpecimen();
 			if ($thirdpartySeller->idprof1 == "000000001") {
+				// Example Burger Queen on SuperPDP Network
 				$tmpthirdparty->idprof1 = '000000002';
 				$tmpthirdparty->idprof2 = '00000000200010';
 				$tmpthirdparty->tva_intra = 'FR12000000002';
+				define('PDPCONNECT_FORCE_BUYER_EID', '315143296_1940');
 			} else {
+				// Example Tricatel on SuperPDP Network
 				$tmpthirdparty->idprof1 = '000000001';
 				$tmpthirdparty->idprof2 = '00000000100010';
 				$tmpthirdparty->tva_intra = 'FR12000000001';
+				define('PDPCONNECT_FORCE_BUYER_EID', '315143296_1939');
 			}
 		}
 		$tmpinvoice->thirdparty = $tmpthirdparty;
