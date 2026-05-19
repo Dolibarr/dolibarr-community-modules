@@ -621,6 +621,11 @@ class SuperPDPProvider extends AbstractPDPProvider
 			return 0;
 		}
 
+		if (empty($ref) || empty($invoice_path)) {
+			$this->errors[] = 'Failed to generate the sample invoice';
+			return 0;
+		}
+
 		// invoice_path is something like "/.../documents/pdpconnectfr/temp/02_ZugferdDocumentPdfBuilder_PrintLayout_Merged.pdf"
 
 		if ($invoice_path) {

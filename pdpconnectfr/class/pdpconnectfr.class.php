@@ -1860,7 +1860,7 @@ class PdpConnectFr
 		if ($invoiceId > 0) {
 			$sql .= " AND element_id = " . ((int) $invoiceId);
 		} else {
-			$sql .= " AND syncref = '" . $this->db->escape($invoiceRef) . "'";
+			$sql .= " AND syncref = '" . $this->db->escape($invoiceRef) . "'";	// Using id is more reliable.
 		}
 
 		$resql = $this->db->query($sql);
@@ -1884,7 +1884,6 @@ class PdpConnectFr
 		}
 
 		// Fetch last status message from pdpconnectfr_lifecycle_msg table to get more details on current status of the invoice into the PDP system
-		$currentStatus = '-';
 		$sql = "SELECT lc_status, lc_reason_code FROM " . MAIN_DB_PREFIX . "pdpconnectfr_lifecycle_msg";
 		$sql .= " WHERE element_type = '" . $this->db->escape('facture') . "'";
 		$sql .= " AND element_id = " . (int) $invoiceId;
