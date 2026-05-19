@@ -1666,8 +1666,8 @@ class PdpConnectFr
 			$product_id = (string) $resFetchP;		// Can be 'idprod_123' (product id) or '456' (supplier ref id)
 		}
 
-		// En mode create uniquement : champ texte simple (le tiers n'est pas encore en base, aucune ligne de routage n'existe)
-		// En mode edit, on affiche directement le tableau de routage existant (bloc plus bas)
+		// In create mode only : we show a text input (the thirdparty is not yet in database, no routing line exists)
+		// In edit mode, we show the routing array
 		if ($mode == 'create') {
 			$resprints .= '<tr class="trpdpconnect_collapseseparator trrouting_id '.($expand_display ? '' : 'hidden').'">';
 			$resprints .= '<td class="">' . $form->textwithpicto($langs->trans("RoutingIdFieldShort"), $langs->trans("SpecificRoutingFieldHelp")) . '</td>';
