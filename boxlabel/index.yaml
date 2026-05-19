@@ -1,0 +1,23 @@
+packages:
+    - modulename: 'Boxlabel'
+      author: 'Zachary Melo'
+      author_url: 'https://github.com/zacharymelo'
+      maintener_email: 'contact@zachmelo.com'
+      label:
+        en: 'Box Labels'
+      description:
+        en: 'Generate and print box labels for Manufacturing Orders with per-product PDF templates, serial number tracking, and auto-archive on shipment.'
+      status: 'enabled'
+      created_at: '2026-03-30'
+      last_updated_at: 'auto'
+      git: 'https://github.com/zacharymelo/boxlabel'
+      git-branch: 'main'
+      git-system: 'github'
+      current_version: 'auto'
+      dolibarrmin: 'auto'
+      dolibarrmax: 'auto'
+      phpmin: 'auto'
+      phpmax: 'auto'
+      price: 0
+      direct-download: no
+      dolistore-upload: 'manual'
