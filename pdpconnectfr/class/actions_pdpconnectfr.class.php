@@ -23,9 +23,14 @@
  * \brief   Hook of module
  */
 
-require_once DOL_DOCUMENT_ROOT . '/core/class/commonhookactions.class.php';
+if ((float) DOL_VERSION < 19) {
+	dol_include_once('/pdpconnectfr/compat/commonhookactions.class.php');
+} else {
+	require_once DOL_DOCUMENT_ROOT . '/core/class/commonhookactions.class.php';
+}
 require_once __DIR__ . "/pdpconnectfr.class.php";
 dol_include_once('/pdpconnectfr/class/providers/PDPProviderManager.class.php');
+
 
 /**
  * Class for hooks of module

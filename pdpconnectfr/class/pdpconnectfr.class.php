@@ -22,7 +22,12 @@
  * \brief   Base class for all functions to manage PDPCONNECTFR Module.
  */
 
-require_once DOL_DOCUMENT_ROOT . '/core/lib/profid.lib.php';
+if ((float) DOL_VERSION < 20) {
+	dol_include_once('/pdpconnectfr/compat/profid.lib.php');
+} else {
+	require_once DOL_DOCUMENT_ROOT . '/core/lib/profid.lib.php';
+}
+
 require_once DOL_DOCUMENT_ROOT . '/core/lib/geturl.lib.php';
 dol_include_once('pdpconnectfr/lib/pdpconnectfr.lib.php');
 
