@@ -631,9 +631,14 @@ class SuperPDPProvider extends AbstractPDPProvider
 		if ($invoice_path) {
 			$outputLog[] = "Sample invoice generated successfully.";
 		}
+
 		$file_info = pathinfo($invoice_path);
-		$mime_type = mime_content_type($invoice_path);
 		$fileext = $file_info['extension'] ?? ''; // Should be "pdf" or "xml" depending on the protocol
+		if (strtolower($fileext) == 'pdf') {
+			$mime_type = 'application/pdf';
+		} else {
+			$mime_type = 'text/xml';
+		}
 
 		// Format PDP resource Url
 		/*
