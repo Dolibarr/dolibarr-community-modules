@@ -215,7 +215,10 @@ class SuperPDPProvider extends AbstractPDPProvider
 			$item->cssClass = 'minwidth500';
 
 			// Password
-			$item = $formSetup->newItem($prefix.'CLIENT_SECRET'.(getDolGlobalInt('PDPCONNECTFR_LIVE') ? '_PROD' : ''))->setAsGenericPassword();
+			$item = $formSetup->newItem($prefix.'CLIENT_SECRET'.(getDolGlobalInt('PDPCONNECTFR_LIVE') ? '_PROD' : ''));
+			if (method_exists('FormSetupItem', 'setAsGenericPassword')) {
+				$item->setAsGenericPassword();
+			}
 			$item->nameText = $langs->trans('PDPCONNECTFR_CLIENT_SECRET');
 			$item->cssClass = 'minwidth500';
 		}

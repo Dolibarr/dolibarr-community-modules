@@ -157,7 +157,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$item->cssClass = 'minwidth500';
 
 		// Client secret
-		$item = $formSetup->newItem($prefix . 'PASSWORD'.(getDolGlobalInt('PDPCONNECTFR_LIVE') ? '_PROD' : ''))->setAsGenericPassword();
+		$item = $formSetup->newItem($prefix . 'PASSWORD'.(getDolGlobalInt('PDPCONNECTFR_LIVE') ? '_PROD' : ''));
+		if (method_exists('FormSetupItem', 'setAsGenericPassword')) {
+			$item->setAsGenericPassword();
+		}
 		$item->nameText = $langs->transnoentities('PDPCONNECTFR_CLIENT_SECRET');
 		$item->cssClass = 'minwidth500';
 
