@@ -103,8 +103,8 @@ packages:
         fr: 'PDP Connect (France)'
         en: 'PDP Connect (France)'
       description:
-        fr: 'Offre une solution pour connecter votre Dolibarr à une Plateforme de Dématérialisation Partenaire (aussi appelé Plateforme Agréée) afin d’’envoyer et de recevoir les factures au format Electronique. Inclut la lecture et la génération de factures au format FacturX.'
-        en: 'Offers a solution to connect your Dolibarr to a Partner Dematerialized Platform (also called Approved Platform) in order to send and receive invoices in electronic format. Includes reading and generation of invoices in FacturX format.'
+        fr: "Offre une solution de facturation électronique pour connecter votre Dolibarr à une Plateforme de Dématérialisation Partenaire (aussi appelé Plateforme Agréée) afin de générer, d''envoyer et de recevoir les factures au format Electronique (e-invoice au format FacturX ou CII)."
+        en: "Offers an e-invoice solution to connect your Dolibarr to a Partner Dematerialized Platform (also called Approved Platform) in order to send and receive invoices in electronic format. Includes reading and generation of invoices in FacturX format."
       status: 'soon'
       git: 'https://github.com/Dolibarr/dolibarr-community-modules/tree/main/pdpconnectfr'
       git-branch: 'main'
@@ -188,5 +188,3 @@ packages:
       # dolistore-download is url of product page for download if module can also be found on dolistore.com
       # Example: https://www.dolistore.com/product.php?id=xxx
       dolistore-download: 'https://www.dolistore.com/product.php?id=623'
-
-
