@@ -332,20 +332,38 @@ trait CommonProtocol
 
 		// Step 3: If not found, try to find by findNearest function
 		if ($thirdpartyId < 0) {
-			$result = $thirdparty->findNearest(
-				0,
-				$sellerInfo['sellername'] ?? '',
-				$sellerInfo['sellername'] ?? '',
-				'',
-				'',
-				'',
-				'',
-				'',
-				'',
-				'',
-				$sellerInfo['sellercontactemailaddr'] ?? '',
-				$sellerInfo['sellername'] ?? ''
-			); // TODO: we can add phone, address and vat number to improve matching
+			if (method_exists($thirdparty, 'findNearest')) {
+				$result = $thirdparty->findNearest(
+					0,
+					$sellerInfo['sellername'] ?? '',
+					$sellerInfo['sellername'] ?? '',
+					'',
+					'',
+					'',
+					'',
+					'',
+					'',
+					'',
+					$sellerInfo['sellercontactemailaddr'] ?? '',
+					$sellerInfo['sellername'] ?? ''
+				); // TODO: we can add phone, address and vat number to improve matching
+			} else {	// Compat method for old versions
+				$result = findNearest(
+					0,
+					$sellerInfo['sellername'] ?? '',
+					$sellerInfo['sellername'] ?? '',
+					'',
+					'',
+					'',
+					'',
+					'',
+					'',
+					'',
+					$sellerInfo['sellercontactemailaddr'] ?? '',
+					$sellerInfo['sellername'] ?? ''
+				);
+			}
+
 			if ($result > 0) {
 				$thirdpartyId = $thirdparty->id;
 				dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Found thirdparty by findNearest: ' . $thirdpartyId);

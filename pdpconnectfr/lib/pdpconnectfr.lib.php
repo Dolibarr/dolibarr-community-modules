@@ -226,3 +226,177 @@ if (!function_exists('dolPrintHTMLForAttribute')) {
 		}
 	}
 }
+
+
+if (!method_exists('Societe', 'findNearest')) {
+	/**
+	 *    Search the thirdparty that match the most the provided parameters.
+	 *    Searching rules try to find the existing third party.
+	 *
+	 *    @param	int		$rowid			Id of third party
+	 *    @param    string	$ref			Reference of third party, name (Warning, this can return several records)
+	 *    @param    string	$ref_ext       	External reference of third party (Warning, this information is a free field not provided by Dolibarr)
+	 *    @param    string	$barcode       	Barcode of third party to load
+	 *    @param    string	$idprof1		Prof id 1 of third party (Warning, this can return several records)
+	 *    @param    string	$idprof2		Prof id 2 of third party (Warning, this can return several records)
+	 *    @param    string	$idprof3		Prof id 3 of third party (Warning, this can return several records)
+	 *    @param    string	$idprof4		Prof id 4 of third party (Warning, this can return several records)
+	 *    @param    string	$idprof5		Prof id 5 of third party (Warning, this can return several records)
+	 *    @param    string	$idprof6		Prof id 6 of third party (Warning, this can return several records)
+	 *    @param    string	$email   		Email of third party (Warning, this can return several records)
+	 *    @param    string	$ref_alias 		Name_alias of third party (Warning, this can return several records)
+	 * 	  @param	int		$is_client		Only client third party
+	 *    @param	int		$is_supplier	Only supplier third party
+	 *    @return   int						ID of thirdparty found if OK, <0 if KO (-2 if two records found or other negative if error), 0 if not found.
+	 */
+	function findNearest($rowid = 0, $ref = '', $ref_ext = '', $barcode = '', $idprof1 = '', $idprof2 = '', $idprof3 = '', $idprof4 = '', $idprof5 = '', $idprof6 = '', $email = '', $ref_alias = '', $is_client = 0, $is_supplier = 0)
+	{
+		global $db;
+
+		// A rowid is known, it is a unique key so we found it
+		if ($rowid) {
+			return $rowid;
+		}
+
+		dol_syslog("findNearest", LOG_DEBUG);
+		$tmpthirdparty = new Societe($db);
+
+		// We try to find the thirdparty with exact matching on all fields
+		$result = $tmpthirdparty->fetch($rowid, $ref, $ref_ext, $barcode, $idprof1, $idprof2, $idprof3, $idprof4, $idprof5, $idprof6, $email, $ref_alias, $is_client, $is_supplier);
+		if ($result != 0) {
+			return $result;
+		}
+
+		// Then search on barcode if we have it (+ restriction on is_client and is_supplier)
+		dol_syslog("Thirdparty not found with exact match so we try barcode search", LOG_DEBUG);
+		if ($barcode) {
+			$result = $tmpthirdparty->fetch(0, '', '', $barcode, '', '', '', '', '', '', '', '', $is_client, $is_supplier);
+			if ($result != 0) {
+				return $result;
+			}
+		}
+
+		$sqlstart = "SELECT s.rowid as id FROM ".MAIN_DB_PREFIX."societe as s";
+		$sqlstart .= ' WHERE s.entity IN ('.getEntity('societe').')';
+		if ($is_client) {
+			$sqlstart .= ' AND s.client > 0';
+		}
+		if ($is_supplier) {
+			$sqlstart .= ' AND s.fournisseur > 0';
+		} // if both false, no test (the thirdparty can be client and/or supplier)
+
+		// Then search on profids with a OR (+ restriction on is_client and is_supplier)
+		dol_syslog("Thirdparty not found with barcode search so we try profids search", LOG_DEBUG);
+		$sqlprof = "";
+		if ($idprof1) {
+			$sqlprof .= " s.siren = '".$db->escape($idprof1)."'";
+		}
+		if ($idprof2) {
+			if ($sqlprof) {
+				$sqlprof .= " OR";
+			}
+			$sqlprof .= " s.siret = '".$db->escape($idprof2)."'";
+		}
+		if ($idprof3) {
+			if ($sqlprof) {
+				$sqlprof .= " OR";
+			}
+			$sqlprof .= " s.ape = '".$db->escape($idprof3)."'";
+		}
+		if ($idprof4) {
+			if ($sqlprof) {
+				$sqlprof .= " OR";
+			}
+			$sqlprof .= " s.idprof4 = '".$db->escape($idprof4)."'";
+		}
+		if ($idprof5) {
+			if ($sqlprof) {
+				$sqlprof .= " OR";
+			}
+			$sqlprof .= " s.idprof5 = '".$db->escape($idprof5)."'";
+		}
+		if ($idprof6) {
+			if ($sqlprof) {
+				$sqlprof .= " OR";
+			}
+			$sqlprof .= " s.idprof6 = '".$db->escape($idprof6)."'";
+		}
+
+		if ($sqlprof) {
+			$sqlprofquery = $sqlstart . " AND (".$sqlprof." )";
+			$resql = $db->query($sqlprofquery);
+			if ($resql) {
+				$num = $db->num_rows($resql);
+				if ($num > 1) {
+					$error = 'Fetch found several records. Rename one of thirdparties to avoid duplicate.';
+					dol_syslog($error, LOG_WARNING);
+					$result = -2;
+				} elseif ($num) {
+					$obj = $db->fetch_object($resql);
+					$result = $obj->id;
+				} else {
+					$result = 0;
+				}
+			} else {
+				$error = $db->lasterror();
+				$errors[] = $db->lasterror();
+				$result = -3;
+			}
+			if ($result != 0) {
+				return $result;
+			}
+		}
+
+		// Then search on email (+ restriction on is_client and is_supplier)
+		dol_syslog("Thirdparty not found with profids search so we try email search", LOG_DEBUG);
+		if ($email) {
+			$result = $tmpthirdparty->fetch(0, '', '', '', '', '', '', '', '', '', $email, '', $is_client, $is_supplier);
+			if ($result != 0) {
+				return $result;
+			}
+		}
+
+		// Then search ref, ref_ext or alias with a OR (+ restriction on is_client and is_supplier)
+		dol_syslog("Thirdparty not found with email search so we try ref, ref_ext or ref_alias search", LOG_DEBUG);
+		$sqlref = "";
+		if ($ref) {
+			$sqlref .= " s.nom = '".$db->escape($ref)."'";
+		}
+		if ($ref_alias) {
+			if ($sqlref) {
+				$sqlref .= " OR";
+			}
+			$sqlref .= " s.name_alias = '".$db->escape($ref_alias)."'";
+		}
+		if ($ref_ext) {
+			if ($sqlref) {
+				$sqlref .= " OR";
+			}
+			$sqlref .= " s.ref_ext = '".$db->escape($ref_ext)."'";
+		}
+
+		if ($sqlref) {
+			$sqlrefquery = $sqlstart . " AND (".$sqlref." )";
+			$resql = $db->query($sqlrefquery);
+			if ($resql) {
+				$num = $db->num_rows($resql);
+				if ($num > 1) {
+					$error = 'Fetch found several records. Rename one of thirdparties to avoid duplicate.';
+					dol_syslog($error, LOG_WARNING);
+					$result = -2;
+				} elseif ($num) {
+					$obj = $db->fetch_object($resql);
+					$result = $obj->id;
+				} else {
+					$result = 0;
+				}
+			} else {
+				$error = $db->lasterror();
+				$errors[] = $db->lasterror();
+				$result = -3;
+			}
+		}
+
+		return $result;
+	}
+}

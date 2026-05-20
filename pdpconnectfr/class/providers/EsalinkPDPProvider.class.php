@@ -275,6 +275,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			'username' => $this->config['username'],
 			'password' => $this->config['password']
 		));
+
 		$extraHeaders = array();
 
 		// We call /token api of Esalink with username and pass. May be they are just client_id / client_secret that were renamed ?
@@ -621,6 +622,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			if (!empty($response['curl_error_no'])) {
 				$errormsg .= ' - Curl error ' . $response['curl_error_no'] . (empty($response['curl_error_msg']) ? '' : ' - ' . $response['curl_error_msg']);
 			}
+			$this->error = $errormsg;
 			$this->errors[] = $errormsg;
 			return 0;
 		}
@@ -1077,7 +1079,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$document->fk_user_creat        = $user->id;
 		$document->call_id              = $call_id;		// Call id for unitary fetch
 		$document->flow_id              = $flowId;
-		$document->tracking_idref       = $flowData['trackingId'] ?? null;
+		$document->tracking_idref       = $flowData['trackingId'] ?? (getDolGlobalString('PDPCONNECTFR_PDP', 'REF').' '.$flowId);
 		$document->flow_type            = $flowData['flowType'] ?? null;
 		$document->flow_direction       = $flowData['flowDirection'] ?? null;
 		$document->flow_syntax          = $flowData['flowSyntax'] ?? null;
@@ -1120,17 +1122,25 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
 				$document->fk_element_type = Facture::class;
 				$factureObj = new Facture($this->db);
-				$res = $factureObj->fetch(0, $document->tracking_idref);
-				if ($res < 0) {
-					return array('res' => -1, 'message' => "ERROR_FETCH_INVOICE Failed to fetch customer invoice for flowId: " . $flowId);
+				if (!empty($document->tracking_idref)) {
+					$res = $factureObj->fetch(0, $document->tracking_idref);
+					if ($res < 0) {
+						return array('res' => -1, 'message' => "ERROR_FETCH_INVOICE Failed to fetch customer invoice for flowId: " . $flowId);
+					} elseif ($res == 0) {
+						$returnRes = 1;
+						$returnMessage = 'Source invoice not found for '.$document->flowId;
+					} else {
+						// TODO: save received converted document as attachment to customer invoice
+					}
+				} else {
+					$returnRes = 1;
+					$returnMessage = 'Source invoice not found for '.$document->flowId;
 				}
+
 				$document->fk_element_id = !empty($factureObj->id) ? $factureObj->id : 0;
-				$document->tracking_idref = !empty($factureObj->ref) ? $factureObj->ref : $document->tracking_idref . ' (NOTFOUND)'; // Probably the customer invoice is sent from another system that use the same PDP account
+				$document->tracking_idref = !empty($factureObj->ref) ? $factureObj->ref : $document->tracking_idref . ' (NOTFOUND)'; // Probably the customer invoice was sent from another system that use the same PDP account
 
-				// TODO: Consider creating a new customer invoice in this case?
-				// TODO: 2. save received converted document as attachment to customer invoice
 				break;
-
 			// SupplierInvoice
 			case "SupplierInvoice":
 				// --- Fetch received documents (Einvoice)
@@ -1418,7 +1428,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				}
 				break;
 			case "":
-				// TODO: Remove all this case or condition it with debug mode
+				// TODO: Remove all this case or condition if with debug mode
 				// This is likely a valisation response for an invoice that was previously sent, and not a lifecycle message.
 				// Since we trigger an AJAX every X seconds to get validation response while an invoice remains in the "Pending" status after sending, no need to handle this case and to store all validation responses in document table.
 

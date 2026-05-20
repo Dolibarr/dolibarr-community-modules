@@ -136,10 +136,14 @@ class CdarHandler
 			$xml->registerXPathNamespace($prefix, $uri);
 		}
 
+		$GuidelineID = $this->getXpathValue($xml, '//ram:GuidelineSpecifiedDocumentContextParameter/ram:ID');
+		$ExchangedDocument = $this->parseExchangedDocument($xml);
+		$AcknowledgementDocument = $this->parseAcknowledgementDocument($xml);
+
 		return [
-			'GuidelineID' => $this->getXpathValue($xml, '//ram:GuidelineSpecifiedDocumentContextParameter/ram:ID'),
-			'ExchangedDocument' => $this->parseExchangedDocument($xml),
-			'AcknowledgementDocument' => $this->parseAcknowledgementDocument($xml)
+			'GuidelineID' => $GuidelineID,
+			'ExchangedDocument' => $ExchangedDocument,
+			'AcknowledgementDocument' => $AcknowledgementDocument
 		];
 	}
 
@@ -530,11 +534,14 @@ class CdarHandler
 	{
 		$indicator = $this->getXpathValue($xml, '//rsm:AcknowledgementDocument/ram:MultipleReferencesIndicator/udt:Indicator');
 
+		// Parse the referenced document
+		$referenceDocument = $this->parseReferencedDocument($xml);
+
 		return [
 			'MultipleReferencesIndicator' => $indicator === 'true',
 			'TypeCode' => $this->getXpathValue($xml, '//rsm:AcknowledgementDocument/ram:TypeCode'),
 			'IssueDateTime' => $this->getXpathValue($xml, '//rsm:AcknowledgementDocument/ram:IssueDateTime/udt:DateTimeString'),
-			'ReferenceReferencedDocument' => $this->parseReferencedDocument($xml)
+			'ReferenceReferencedDocument' => $referenceDocument
 		];
 	}
 
