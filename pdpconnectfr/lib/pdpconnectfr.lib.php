@@ -173,3 +173,56 @@ function thirdpartyidprof($object)
 	$object->fetch_thirdparty();
 	return idprof($object->thirdparty);
 }
+
+
+
+// Compatibility functions
+
+
+if (!function_exists("GETPOSTFLOAT")) {
+	/**
+	 *  Return the value of a $_GET or $_POST supervariable, converted into float.
+	 *  Warning: This function assumes by default that the input is a number entered by end user in user format in local language (with possible thousands separator and decimal separator).
+	 *  If it is not the case, use the parameter $option = 1 instead.
+	 *
+	 *  @param  string          $paramname      Name of the $_GET or $_POST parameter
+	 *	@param	''|'MU'|'MT'|'MS'|'CU'|'CT'|int	$rounding	Type of rounding ('', 'MU', 'MT, 'MS', 'CU', 'CT', integer) {@see price2num()}
+	 * 	@param	int<0,2>		$option			Put 1 if you know that content is already universal format number (so no correction on decimal will be done)
+	 * 											Put 2 if you know that number is a user input (so we know we have to fix decimal separator).
+	 * 					                        Use 0 if unknown (never use this anymore, automatic detection is not reliable with some languages).
+	 *  @return float                           Value converted into float
+	 *  @since	Dolibarr V20
+	 */
+	function GETPOSTFLOAT($paramname, $rounding = '', $option = 2)
+	{
+		// price2num() can be used to round to an expected accuracy and/or to sanitize any valid user input (such as "1 234.5", "1 234,5", "1'234,5", "1·234,5", "1,234.5", etc.)
+		return (float) price2num(GETPOST($paramname), $rounding, $option);
+	}
+}
+
+if (!function_exists('dolPrintHTMLForAttribute')) {
+	/**
+	 * Return a string ready to be output into an HTML attribute (alt, title, data-html, ...)
+	 * With dolPrintHTMLForAttribute(), the content is HTML encode, even if it is already HTML content.
+	 *
+	 * @param	string		$s						String to print
+	 * @param	int			$escapeonlyhtmltags		1=Escape only html tags, not the special chars like accents.
+	 * @param	string[]	$allowothertags			List of other tags allowed
+	 * @return	string								String ready for HTML output
+	 * @see dolPrintHTML(), dolPrintHTMLFortextArea()
+	 */
+	function dolPrintHTMLForAttribute($s, $escapeonlyhtmltags = 0, $allowothertags = array())
+	{
+		$allowedtags = array('br', 'b', 'font', 'hr', 'span');
+		if (!empty($allowothertags) && is_array($allowothertags)) {
+			$allowedtags = array_merge($allowedtags, $allowothertags);
+		}
+		// The dol_htmlentitiesbr will convert simple text into html, including switching accent into HTML entities
+		// The dol_escape_htmltag will escape html tags.
+		if ($escapeonlyhtmltags) {
+			return dol_escape_htmltag(dol_string_onlythesehtmltags($s, 1, 0, 0, 0, $allowedtags), 1, -1, '', 1, 1);
+		} else {
+			return dol_escape_htmltag(dol_string_onlythesehtmltags(dol_htmlentitiesbr($s), 1, 0, 0, 0, $allowedtags), 1, -1, '', 0, 1);
+		}
+	}
+}

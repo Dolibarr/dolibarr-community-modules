@@ -40,7 +40,7 @@ class InterfacePDPConnectFRTriggers extends DolibarrTriggers
 		parent::__construct($db);
 		$this->family = "pdpconnectfr";
 		$this->description = "PDPConnectFR triggers.";
-		$this->version = self::VERSIONS['dev'];
+		$this->version = 'development';
 		$this->picto = 'pdpconnectfr@pdpconnectfr';
 	}
 
