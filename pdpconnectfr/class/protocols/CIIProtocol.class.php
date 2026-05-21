@@ -429,21 +429,27 @@ class CIIProtocol extends AbstractProtocol
 
 		$line = new FactureLigne($this->db);
 		$line->desc = $langs->trans("Description") . " 1";
-		$line->qty = 1;
-		$line->subprice = 100;
+		$line->qty = 5;
+		$line->subprice = 100.05;		// unit price (no discount yet)
 		$line->tva_tx = 20.0;
 		$line->localtax1_tx = 0;
 		$line->localtax2_tx = 0;
-		$line->remise_percent = 0;
+		$line->remise_percent = 10;
 		$line->fk_product = 0;
-		$line->qty = 1;
-		$line->total_ht = 100;
-		$line->total_ttc = 120;
-		$line->total_tva = 20;
+
+		include_once DOL_DOCUMENT_ROOT.'/core/lib/price.lib.php';
+		// Force MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY, so we are sure sample is valid at the initial object.
+		$conf->global->MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY = 2;
+
+		$tmp = calcul_price_total($line->qty, $line->subprice, $line->remise_percent, $line->tva_tx, 0, 0, 0, 'HT', 0, 0);
+
+		$line->total_ht = $tmp[0];
+		$line->total_ttc = $tmp[2];
+		$line->total_tva = $tmp[1];
 		$line->multicurrency_tx = 2;
-		$line->multicurrency_total_ht = 200;
-		$line->multicurrency_total_ttc = 240;
-		$line->multicurrency_total_tva = 40;
+		$line->multicurrency_total_ht = 2 * $line->total_ht;
+		$line->multicurrency_total_ttc = 2 * $line->total_ttc;
+		$line->multicurrency_total_tva = 2 * $line->total_tva;
 
 		$tmpinvoice->lines[] = $line;
 
@@ -1679,13 +1685,20 @@ class CIIProtocol extends AbstractProtocol
 		$price = $doc->createElement('ram:SpecifiedLineTradeAgreement');
 		$el->appendChild($price);
 
-		$gross = $doc->createElement('ram:GrossPriceProductTradePrice');
-		$price->appendChild($gross);
-		$gross->appendChild($doc->createElement('ram:ChargeAmount', number_format($line['grosspriceamount'], 2, '.', '')));
+		// This section seems not required.
+		// It can be used if the price base is including tax (TTC) and without discount (= Catalog public unit price for individual customers)
+		if (isset($line['grosspriceamount'])) {
+			$gross = $doc->createElement('ram:GrossPriceProductTradePrice');
+			$price->appendChild($gross);
+			$gross->appendChild($doc->createElement('ram:ChargeAmount', number_format($line['grosspriceamount'], 2, '.', '')));
+		}
 
+		// Mandatory by Factur-X, EN 16931
+		// This is the unit price, including the discount (if any) but excluding tax.
 		$net = $doc->createElement('ram:NetPriceProductTradePrice');
 		$price->appendChild($net);
 		$net->appendChild($doc->createElement('ram:ChargeAmount', number_format($line['netpriceamount'], 2, '.', '')));
+
 
 		// Quantity
 		$deliv = $doc->createElement('ram:SpecifiedLineTradeDelivery');
@@ -1698,6 +1711,26 @@ class CIIProtocol extends AbstractProtocol
 		// VAT
 		$sett = $doc->createElement('ram:SpecifiedLineTradeSettlement');
 		$el->appendChild($sett);
+
+
+		// Add section ...AllowanceCharge
+		/*
+		if ($line['allowanceactualamount']) {
+			$allowance = $doc->createElement('ram:SpecifiedTradeAllowanceCharge');
+			$sett->appendChild($allowance);
+
+			$chargeindicator = $doc->createElement('ram:ChargeIndicator', 'false');
+			$allowance->appendChild($chargeindicator);
+			$chargereason = $doc->createElement('ram:AllowanceChargeReason', 'Relative discount');
+			$allowance->appendChild($chargereason);
+			$basisamount = $doc->createElement('ram:BasisAmount', $line['allowancebasisamount']);
+			$allowance->appendChild($basisamount);
+			$actualamount = $doc->createElement('ram:ActualAmount', $line['allowanceactualamount']);
+			$allowance->appendChild($actualamount);
+			$calculationpercent = $doc->createElement('ram:CalculationPercent', $line['lineremisepercent']);
+			$allowance->appendChild($calculationpercent);
+		}
+		*/
 
 		$tax = $doc->createElement('ram:ApplicableTradeTax');
 		$sett->appendChild($tax);

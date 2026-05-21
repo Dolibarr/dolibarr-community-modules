@@ -120,7 +120,6 @@ class FacturXProtocol extends AbstractProtocol
 		 * @var PdpConnectFr		$pdpconnectfr
 		 */
 
-		var_dump(getDolGlobalInt('PDPCONNECTFR_USE_EXTERNAL_FACTURX_BUILDER'));
 		if (!getDolGlobalInt('PDPCONNECTFR_USE_EXTERNAL_FACTURX_BUILDER')) {
 			// =====================================================================
 			// Use the CII protocol to generate the XML file

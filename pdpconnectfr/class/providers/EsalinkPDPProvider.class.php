@@ -536,7 +536,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			return 0;
 		}
 
-		// invoice_path is something like "/.../documents/pdpconnectfr/temp/02_ZugferdDocumentPdfBuilder_PrintLayout_Merged.pdf"
+		// invoice_path is something like "/.../documents/pdpconnectfr/temp/..." or "/.../documents/facture/temp/..."
 
 		if ($invoice_path) {
 			$outputLog[] = "Sample invoice generated successfully.";
