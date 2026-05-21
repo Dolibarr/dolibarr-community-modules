@@ -2116,4 +2116,21 @@ class CIIProtocol extends AbstractProtocol
 			return false;
 		}
 	}
+
+	/**
+	 * Find module number
+	 *
+	 * @param  string 	$modName 	Module name we look for
+	 * @return integer              -1 if KO, 0 not found or module number if Ok
+	 */
+	private function _getModNumber($modName)
+	{
+		// TODO: move this function to class utils
+		global $db;
+		if (class_exists($modName)) {
+			$objMod = new $modName($db);
+			return $objMod->numero;
+		}
+		return 0;
+	}
 }
