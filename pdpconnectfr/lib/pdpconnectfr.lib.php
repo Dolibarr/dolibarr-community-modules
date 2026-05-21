@@ -177,7 +177,141 @@ function thirdpartyidprof($object)
 
 
 // Compatibility functions
+/**
+ * Return the full path of the directory where a module (or an object of a module) stores its files.
+ * Path may depends on the entity if a multicompany module is enabled.
+ *
+ * @param 	CommonObject|BlockedLog|null	$object 	Dolibarr common object.
+ * @param 	string 							$module 	Override object element, for example to use 'mycompany' instead of 'societe'
+ * @param	int								$forobject	Return the more complete path for the given object (including ref) instead of for the module only.
+ * @param	string							$mode		'output' (full main dir) or 'outputrel' (relative dir) or 'temp' (full dir for temporary files) or 'version' (full dir for archived files)
+ * @return 	string|null									The path of the relative directory of the module, ending with /
+ */
+function getMultidirOutputCompat($object, $module = '', $forobject = 0, $mode = 'output')
+{
+	global $conf;
 
+	$subdirectory = '';
+	if (!is_object($object) && empty($module)) {
+		return null;
+	}
+	if (empty($module) && !empty($object->element)) {
+		$module = $object->element;
+	}
+
+	// Special case for backward compatibility
+	switch ($module) {
+		case 'fichinter':
+			$module = 'ficheinter';
+			break;
+		case 'invoice_supplier':
+			$module = 'supplier_invoice';
+			break;
+		case 'order_supplier':
+			$module = 'supplier_order';
+			break;
+		case 'recruitmentjobposition':
+			$module = 'recruitment';
+			$subdirectory = '/recruitmentjobposition';
+			break;
+		case 'recruitmentcandidature':
+			$module = 'recruitment';
+			$subdirectory = '/recruitmentcandidature';
+			break;
+		case 'knowledgerecord':
+			$module = 'knowledgemanagement';
+			$subdirectory = '/knowledgerecord';
+			break;
+		case 'commande_fournisseur':
+			$module = 'fournisseur';
+			$subdirectory = '/commande';
+			break;
+		case 'expedition':
+			$subdirectory = '/sending';
+			break;
+		case 'company':
+			$module = 'societe';
+			break;
+		case 'service':
+		case 'produit':
+			$module = 'product';
+			break;
+		case 'action':
+		case 'actioncomm':
+		case 'event':
+			$module = 'agenda';
+			break;
+		default:
+			break;
+	}
+
+	// Get the relative path of directory
+	if ($mode == 'output' || $mode == 'outputrel' || $mode == 'version') {
+		if (isset($conf->$module) && property_exists($conf->$module, 'multidir_output')) {
+			$s = '';
+			if ($mode != 'outputrel') {
+				$s = $conf->$module->multidir_output[(empty($object->entity) ? $conf->entity : $object->entity)] . $subdirectory;
+			}
+			if ($forobject && $object->id > 0) {
+				$s .= ($mode != 'outputrel' ? '/' : '') . get_exdir(0, 0, 0, 0, $object);
+			}
+			return $s;
+		} elseif (isset($conf->$module) && property_exists($conf->$module, 'dir_output')) {
+			$s = '';
+			if ($mode != 'outputrel') {
+				$s = $conf->$module->dir_output . $subdirectory;
+			}
+			if ($forobject && $object->id > 0) {
+				$s .= ($mode != 'outputrel' ? '/' : '') . get_exdir(0, 0, 0, 0, $object);
+			}
+			return $s;
+		} else {
+			return 'error-diroutput-not-defined-for-this-object=' . $module;
+		}
+	} elseif ($mode == 'temp') {
+		if (isset($conf->$module) && property_exists($conf->$module, 'multidir_temp')) {
+			return $conf->$module->multidir_temp[(empty($object->entity) ? $conf->entity : $object->entity)];
+		} elseif (isset($conf->$module) && property_exists($conf->$module, 'dir_temp')) {
+			return $conf->$module->dir_temp;
+		} else {
+			return 'error-dirtemp-not-defined-for-this-object=' . $module;
+		}
+	} else {
+		return 'error-bad-value-for-mode';
+	}
+}
+
+if (!function_exists("getMultidirTemp")) {
+	/**
+	 * Return the full path of the directory where a module (or an object of a module) stores its temporary files.
+	 * Path may depends on the entity if a multicompany module is enabled.
+	 *
+	 * @param 	CommonObject 	$object 	Dolibarr common object
+	 * @param 	string 			$module 	Override object element, for example to use 'mycompany' instead of 'societe'
+	 * @param	int				$forobject	Return the more complete path for the given object instead of for the module only.
+	 * @return 	string|null					The path of the relative temp directory of the module
+	 */
+	function getMultidirTemp($object, $module = '', $forobject = 0)
+	{
+		return getMultidirOutputCompat($object, $module, $forobject, 'temp');
+	}
+}
+
+if (!function_exists("getMultidirVersion")) {
+	/**
+	 * Return the full path of the directory where a module (or an object of a module) stores its versioned files.
+	 * Path may depends on the entity if a multicompany module is enabled.
+	 *
+	 * @param 	CommonObject 	$object 	Dolibarr common object
+	 * @param 	string 			$module 	Override object element, for example to use 'mycompany' instead of 'societe'
+	 * @param	int				$forobject	Return the more complete path for the given object instead of for the module only.
+	 * @return string|null					The path of the relative version directory of the module
+	 */
+	function getMultidirVersion($object, $module = '', $forobject = 0)
+	{
+		return getMultidirOutputCompat($object, $module, $forobject, 'version');
+	}
+}
 
 if (!function_exists("GETPOSTFLOAT")) {
 	/**
