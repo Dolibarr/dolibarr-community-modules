@@ -160,7 +160,11 @@ if (!empty($newlang)) {
 
 // Project
 if (! ($object->project instanceof Project)) {
-	$object->fetchProject();
+	if (method_exists($object, 'fetchProject')) {
+		$object->fetchProject();
+	} else {
+		$object->fetch_project();
+	}
 }
 
 $invoiceRefDocs = [];
