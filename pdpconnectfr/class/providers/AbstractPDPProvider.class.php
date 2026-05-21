@@ -200,12 +200,12 @@ abstract class AbstractPDPProvider
 
 	/**
 	 * Send a sample electronic invoice for testing purposes.
-	 *
 	 * This function generates a sample invoice and sends it to PDP
 	 *
-	 * @return array|string True if the invoice was successfully sent, false otherwise.
+	 * @param 	int 			$onlymake		1=to only make the sample
+	 * @return 	array|string 					True if the invoice was successfully sent, false otherwise.
 	 */
-	abstract public function sendSampleInvoice();
+	abstract public function sendSampleInvoice($onlymake = 0);
 
 
 	/**

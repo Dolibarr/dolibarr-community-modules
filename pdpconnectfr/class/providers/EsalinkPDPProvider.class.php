@@ -58,7 +58,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	 */
 	public function __construct($db)
 	{
-		global $conf, $langs;
+		global $langs;
 
 		parent::__construct($db);
 
@@ -210,7 +210,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				if (getDolGlobalString('PDPCONNECTFR_LIVE')) {
 					$item->fieldOverride .= '<span class="opacitymedium" title="'.$langs->trans("DisabledInProductionMode").'"><i class="fa fa-file pictofixedwidth centerimp"></i>' . $langs->trans('generateSendSampleInvoice') . '</span><br>';
 				} else {
-					$item->fieldOverride .= '<a class="reposition" href="' . $_SERVER["PHP_SELF"] . "?action=make" . $prefix . "sampleinvoice&token=" . newToken() . '"><i class="fa fa-file pictofixedwidth centerimp"></i>' . $langs->trans('generateSendSampleInvoice') . '</a><br>';
+					if (getDolGlobalInt('PDPCONNECTFR_ALLOW_DEVTOOLS')) {
+						$item->fieldOverride .= '<a class="reposition" href="' . $_SERVER["PHP_SELF"] . "?action=make" . $prefix . "sampleinvoice&token=" . newToken() . '"><i class="fa fa-file pictofixedwidth centerimp"></i>' . $langs->trans('generateSampleInvoice') . '</a><br>';
+					}
+					$item->fieldOverride .= '<a class="reposition" href="' . $_SERVER["PHP_SELF"] . "?action=makesend" . $prefix . "sampleinvoice&token=" . newToken() . '"><i class="fa fa-file pictofixedwidth centerimp"></i>' . $langs->trans('generateSendSampleInvoice') . '</a><br>';
 				}
 			}
 
@@ -500,12 +503,12 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 	/**
 	 * Send a sample electronic invoice for testing purposes.
-	 *
 	 * This function generates a sample invoice and sends it to PDP
 	 *
-	 * @return array|string True if the invoice was successfully sent, false otherwise.
+	 * @param 	int 			$onlymake		1=to only make the sample
+	 * @return array|string 					True if the invoice was successfully sent, false otherwise.
 	 */
-	public function sendSampleInvoice()
+	public function sendSampleInvoice($onlymake = 0)
 	{
 		global $langs;
 
@@ -541,6 +544,13 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		if ($invoice_path) {
 			$outputLog[] = "Sample invoice generated successfully.";
 		}
+
+
+		// Stop here if we want just generation
+		if ($onlymake) {
+			return $outputLog;
+		}
+
 
 		$file_info = pathinfo($invoice_path);
 		$fileext = $file_info['extension'] ?? ''; // Should be "pdf" or "xml" depending on the protocol

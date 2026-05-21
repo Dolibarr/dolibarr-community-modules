@@ -227,7 +227,15 @@ if (preg_match('/call'.$prefix.'HEALTHCHECK/i', $action, $reg)) {
 
 // Generate a sample invoice and try to send it
 if (preg_match('/make'.$prefix.'sampleinvoice/i', $action, $reg)) {
-	$result = $provider->sendSampleInvoice();
+	$result = $provider->sendSampleInvoice(1);
+	if ($result) {
+		setEventMessages('', $result, 'mesgs');
+	} else {
+		setEventMessages($provider->error, $provider->errors, 'errors');
+	}
+}
+if (preg_match('/makesend'.$prefix.'sampleinvoice/i', $action, $reg)) {
+	$result = $provider->sendSampleInvoice(0);
 	if ($result) {
 		setEventMessages('', $result, 'mesgs');
 	} else {

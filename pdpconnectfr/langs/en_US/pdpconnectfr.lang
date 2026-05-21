@@ -46,6 +46,7 @@ APApiReachable=Connection successful: The Access point %s is reachable.
 APApiNotReachable=Connection failed: The Access point %s is not reachable.
 PDPCONNECTFR_PROTOCOL=Select the exchange protocol (for generating and sending invoices)
 PDPCONNECTFR_PROTOCOL_HELP=Available protocols are listed here.
+generateSampleInvoice=Generate a sample invoice
 generateSendSampleInvoice=Generate, send, and retrieve a sample invoice
 PDPCONNECTFR_PROFILE=Select the exchange profile
 PDPCONNECTFR_PROFILE_HELP=Available profiles are listed here.
