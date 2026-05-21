@@ -86,7 +86,7 @@ if ($object->fk_account > 0) {
 } else {
 	$account->fetch(getDolGlobalString('FACTURX_DEFAULT_BANK_ACCOUNT'));
 }
-$account_proprio = trim($account->owner_name);
+$account_proprio = trim(!empty($account->proprio) ? $account->proprio : $account->owner_name);
 if ($account_proprio == '') {
 	dol_syslog('Bank account holder name is empty, please correct it, use socname instead but it could be inccorrect for XRechnung BT-85: Payment account name', LOG_WARNING);
 	$account_proprio = $mysoc->name;
