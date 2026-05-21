@@ -1052,7 +1052,7 @@ trait CommonProtocol
 				} elseif ($buyer->thirdparty->isInEEC() && $seller->country_code != $buyer->thirdparty->country_code) {
 					$categoryVAT = 'K';		// Intra communautary VAT
 					$exemptionReasonCode = 'VATEX-EU-IC';
-					$exemptionReason = 'Intracomm';
+					$exemptionReason = 'Intracomm VAT';
 				} else {
 					$exemptionReason = 'Unknown exempt vat reason';
 				}
