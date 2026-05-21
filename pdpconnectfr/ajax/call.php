@@ -102,7 +102,7 @@ $value = GETPOST('value', 'aZ09');
 $object = new Call($db);
 
 // Security check
-if (!$user->hasRight('pdpconnectfr', 'call', 'write')) {
+if (!$user->hasRight('pdpconnectfr', 'document', 'write')) {
 	accessforbidden();
 }
 

@@ -2,6 +2,10 @@
 -- Script run when an upgrade of Dolibarr is done. Whatever is the Dolibarr version.
 --
 
+DELETE FROM llx_rights_def WHERE perms = 'document' AND module = 'pdpconnectfr' AND id >= 9502004;
+
+UPDATE llx_rights_def SET perms = 'document' WHERE perms = 'call' AND module = 'pdpconnectfr';
+
 ALTER TABLE llx_pdpconnectfr_call ADD COLUMN batchlimit integer NOT NULL DEFAULT 1;
 
 UPDATE llx_pdpconnectfr_document SET flow_type = 'sync' WHERE flow_type IS NULL;

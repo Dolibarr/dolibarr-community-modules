@@ -247,12 +247,6 @@ class Document extends CommonObject
 			$this->fields['entity']['enabled'] = 0;
 		}
 
-		// Example to show how to set values of fields definition dynamically
-		/*if ($user->hasRight('pdpconnectfr', 'document', 'read')) {
-			$this->fields['myfield']['visible'] = 1;
-			$this->fields['myfield']['noteditable'] = 0;
-		}*/
-
 		// Unset fields that are disabled
 		foreach ($this->fields as $key => $val) {
 			if (isset($val['enabled']) && empty($val['enabled'])) {
@@ -571,14 +565,6 @@ class Document extends CommonObject
 			return 0;
 		}
 
-		/* if (! ((!getDolGlobalInt('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('pdpconnectfr', 'document', 'write'))
-		 || (getDolGlobalInt('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('pdpconnectfr', 'document_advance', 'validate')))
-		 {
-		 $this->error='NotEnoughPermissions';
-		 dol_syslog(get_class($this)."::valid ".$this->error, LOG_ERR);
-		 return -1;
-		 }*/
-
 		$now = dol_now();
 
 		$this->db->begin();
@@ -700,13 +686,6 @@ class Document extends CommonObject
 			return 0;
 		}
 
-		/* if (! ((!getDolGlobalInt('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('pdpconnectfr','write'))
-		 || (getDolGlobalInt('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('pdpconnectfr','pdpconnectfr_advance','validate'))))
-		 {
-		 $this->error='Permission denied';
-		 return -1;
-		 }*/
-
 		return $this->setStatusCommon($user, self::STATUS_DRAFT, $notrigger, 'PDPCONNECTFR_MYOBJECT_UNVALIDATE');
 	}
 
@@ -724,13 +703,6 @@ class Document extends CommonObject
 			return 0;
 		}
 
-		/* if (! ((!getDolGlobalInt('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('pdpconnectfr','write'))
-		 || (getDolGlobalInt('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('pdpconnectfr','pdpconnectfr_advance','validate'))))
-		 {
-		 $this->error='Permission denied';
-		 return -1;
-		 }*/
-
 		return $this->setStatusCommon($user, self::STATUS_CANCELED, $notrigger, 'PDPCONNECTFR_MYOBJECT_CANCEL');
 	}
 
@@ -747,13 +719,6 @@ class Document extends CommonObject
 		if ($this->status == self::STATUS_VALIDATED) {
 			return 0;
 		}
-
-		/*if (! ((!getDolGlobalInt('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('pdpconnectfr','write'))
-		 || (getDolGlobalInt('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('pdpconnectfr','pdpconnectfr_advance','validate'))))
-		 {
-		 $this->error='Permission denied';
-		 return -1;
-		 }*/
 
 		return $this->setStatusCommon($user, self::STATUS_VALIDATED, $notrigger, 'PDPCONNECTFR_MYOBJECT_REOPEN');
 	}

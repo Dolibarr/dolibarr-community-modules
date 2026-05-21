@@ -196,7 +196,7 @@ class modPDPConnectFR extends DolibarrModules
 		/* END MODULEBUILDER TABS */
 		// Example:
 		// To add a new tab identified by code tabname1
-		// $this->tabs[] = array('data' => 'objecttype:+tabname1:Title1:mylangfile@pdpconnectfr:$user->hasRight('pdpconnectfr', 'call', 'read'):/pdpconnectfr/mynewtab1.php?id=__ID__');
+		// $this->tabs[] = array('data' => 'objecttype:+tabname1:Title1:mylangfile@pdpconnectfr:$user->hasRight('pdpconnectfr', 'document', 'read'):/pdpconnectfr/mynewtab1.php?id=__ID__');
 		// To add another new tab identified by code tabname2. Label will be result of calling all substitution functions on 'Title2' key.
 		// $this->tabs[] = array('data' => 'objecttype:+tabname2:SUBSTITUTION_Title2:mylangfile@pdpconnectfr:$user->hasRight('othermodule', 'otherobject', 'read'):/pdpconnectfr/mynewtab2.php?id=__ID__',
 		// To remove an existing tab identified by code tabname
@@ -313,33 +313,18 @@ class modPDPConnectFR extends DolibarrModules
 		// Add here entries to declare new permissions
 		/* BEGIN MODULEBUILDER PERMISSIONS */
 		$this->rights[$r][0] = $this->numero . sprintf('%02d', (0 * 10) + 0 + 1);
-		$this->rights[$r][1] = 'Read Call object of PDPConnectFR';
-		$this->rights[$r][4] = 'call';
+		$this->rights[$r][1] = 'Read synchronized documents and logs';
+		$this->rights[$r][4] = 'documents';
 		$this->rights[$r][5] = 'read';
 		$r++;
 		$this->rights[$r][0] = $this->numero . sprintf('%02d', (0 * 10) + 1 + 1);
-		$this->rights[$r][1] = 'Create/Update Call object of PDPConnectFR';
-		$this->rights[$r][4] = 'call';
+		$this->rights[$r][1] = 'Create/Run/Update synchronization of documentes';
+		$this->rights[$r][4] = 'documents';
 		$this->rights[$r][5] = 'write';
 		$r++;
 		$this->rights[$r][0] = $this->numero . sprintf('%02d', (0 * 10) + 2 + 1);
-		$this->rights[$r][1] = 'Delete Call object of PDPConnectFR';
-		$this->rights[$r][4] = 'call';
-		$this->rights[$r][5] = 'delete';
-		$r++;
-		$this->rights[$r][0] = $this->numero . sprintf('%02d', (1 * 10) + 0 + 1);
-		$this->rights[$r][1] = 'Read Document object of PDPConnectFR';
-		$this->rights[$r][4] = 'document';
-		$this->rights[$r][5] = 'read';
-		$r++;
-		$this->rights[$r][0] = $this->numero . sprintf('%02d', (1 * 10) + 1 + 1);
-		$this->rights[$r][1] = 'Create/Update Document object of PDPConnectFR';
-		$this->rights[$r][4] = 'document';
-		$this->rights[$r][5] = 'write';
-		$r++;
-		$this->rights[$r][0] = $this->numero . sprintf('%02d', (1 * 10) + 2 + 1);
-		$this->rights[$r][1] = 'Delete Document object of PDPConnectFR';
-		$this->rights[$r][4] = 'document';
+		$this->rights[$r][1] = 'Delete synchronization document or logs';
+		$this->rights[$r][4] = 'documents';
 		$this->rights[$r][5] = 'delete';
 		$r++;
 
