@@ -1550,11 +1550,7 @@ class CIIProtocol extends AbstractProtocol
 		$shiptotrade = $doc->createElement('ram:ShipToTradeParty');
 		$delivery->appendChild($shiptotrade);
 		$this->buildParty($doc, $shiptotrade, $invoiceData, 'buyer');
-		/*
-		$postaladdress = $doc->createElement('ram:PostalTradeAddress');
-		$shiptotrade->appendChild($postaladdress);
-		$postaladdress->appendChild($doc->createElement('ram:CountryID', 'eee'));
-		*/
+
 
 		if (!empty($invoiceData['documentDeliveryDate'])) {
 			$event = $doc->createElement('ram:ActualDeliverySupplyChainEvent');
