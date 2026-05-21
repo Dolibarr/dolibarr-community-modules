@@ -111,13 +111,14 @@ class FacturXProtocol extends AbstractProtocol
 		// Call page to generate the invoice
 		include dol_buildpath('pdpconnectfr/lib/buildinvoicelines.inc.php');
 		/**
+		 * @var Facture 			$object			The $invoice object used in entry on inc file, but completed.
 		 * @var array<mixed,mixed> 	$invoiceData
 		 * @var array<mixed,mixed> 	$linesData
-		 * @var Facture 			$object
-		 * @var Translate 			$outputlangs
-		 * @var string 				$outputlang
+		 * @var string 				$outputlang		Value of $outputlangs->defaultlang
 		 * @var Account				$account
 		 * @var PdpConnectFr		$pdpconnectfr
+		 * @var string 				$schemdUri		Buyer scheme uri
+		 * @var string 				$uri			Buyer uri
 		 */
 
 		if (!getDolGlobalInt('PDPCONNECTFR_USE_EXTERNAL_FACTURX_BUILDER')) {
@@ -144,6 +145,8 @@ class FacturXProtocol extends AbstractProtocol
 
 			return $xmlfile;
 		} else {
+			// deprecated, use the native $CII->buildXML method instead !
+
 			// =====================================================================
 			// Use horstoeko lib to build the XML
 			// =====================================================================
@@ -1014,13 +1017,17 @@ class FacturXProtocol extends AbstractProtocol
 
 		// Move factur-x pdf into the temp directory
 		if (is_numeric($pathOfPdf) && $pathOfPdf < 0) {
-			return $pathOfPdf;
+			$result = $pathOfPdf;
 		} else {
 			$newPathOfPdf = dirname($pathOfPdf) . '/temp/' . basename($pathOfPdf);
 			dol_move($pathOfPdf, $newPathOfPdf, '0', 1);
 
-			return array('path' => $newPathOfPdf, 'ref' => $tmpinvoice->ref);
+			$result = array('path' => $newPathOfPdf, 'ref' => $tmpinvoice->ref);
 		}
+
+		// exit;
+
+		return $result;
 	}
 
 
@@ -1921,28 +1928,5 @@ class FacturXProtocol extends AbstractProtocol
 		}
 
 		return array('res' => 1, 'message' => 'Attachment saved successfully ' . $dest_path);
-	}
-
-
-	/**
-	 * Check if a given VAT rate is valid for a specific country based on the c_tva table in the database.
-	 *
-	 * @param 	string	$vatrate		Vat rate to check (e.g. '20' for 20%)
-	 * @param 	string	$countryCode	Country code to check the VAT rate against (e.g. 'FR' for France)
-	 * @return 	boolean					Returns true if the VAT rate is valid for the given country, false otherwise.
-	 * TODO Move common function into an implemented CommonXProtocol.class.php if needed by other protocol handlers
-	 */
-	public function checkIfVatRateIsValid($vatrate, $countryCode)
-	{
-		if ($countryCode == 'FR') {
-			// Check rule BR-FR-16 For AFNOR Einvoice - List in XP-Z12-012
-			$validRatesString = ['0', '10', '13', '20', '8.5', '19.6', '2.1', '5.5', '7', '20.6', '1.05', '0.9', '1.75', '9.2', '9.6'];
-			//$valtotest = price2num((float) $vatrate, '', 1);
-			if (!in_array($vatrate, $validRatesString)) {
-				return false;
-			}
-		}
-
-		return true;
 	}
 }

@@ -264,13 +264,15 @@ class CIIProtocol extends AbstractProtocol
 		// Call page to generate the invoice variables ($invoiceData, ...)
 		include dol_buildpath('pdpconnectfr/lib/buildinvoicelines.inc.php');
 		/**
+		 * @var Facture 			$object			The $invoice object used in entry on inc file, but completed.
 		 * @var array<mixed,mixed> 	$invoiceData
 		 * @var array<mixed,mixed> 	$linesData
-		 * @var Facture 			$object
-		 * @var Translate 			$outputlangs
-		 * @var string 				$outputlang
+		 * @var string 				$outputlang		Value of $outputlangs->defaultlang
+		 * @var Societe 			$mysoc
 		 * @var Account				$account
 		 * @var PdpConnectFr		$pdpconnectfr
+		 * @var string 				$schemdUri		Buyer scheme uri
+		 * @var string 				$uri			Buyer uri
 		 */
 
 		// Generate the XML file
@@ -538,13 +540,17 @@ class CIIProtocol extends AbstractProtocol
 
 		// Move CII xml file into the temp directory
 		if (is_numeric($pathOfXml) && $pathOfXml < 0) {
-			return $pathOfXml;
+			$result = $pathOfXml;
 		} else {
 			$newPathOfXml = dirname($pathOfXml) . '/temp/' . basename($pathOfXml);
 			dol_move($pathOfXml, $newPathOfXml, '0', 1);
 
-			return array('path' => $newPathOfXml, 'ref' => $tmpinvoice->ref);
+			$result = array('path' => $newPathOfXml, 'ref' => $tmpinvoice->ref);
 		}
+
+		// exit;
+
+		return $result;
 	}
 
 	/**
@@ -1588,10 +1594,10 @@ class CIIProtocol extends AbstractProtocol
 			}
 		}
 
-		// TVA
-		foreach ($invoiceData['taxBreakdown'] as $rate => $vals) {
+		// VAT array by rate
+		foreach ($invoiceData['taxBreakdown'] as $rate => $vals) {		// $rate is 0, 20.0, ..., $vals is a float value
 			$settlement->appendChild(
-				$this->buildTaxNode($doc, $rate, $vals, $invoiceData['invoiceCurrency'])
+				$this->buildTaxNode($doc, $rate, $vals, $invoiceData['invoiceCurrency']) 	// ApplicableTradeTax
 			);
 		}
 
@@ -1884,8 +1890,11 @@ class CIIProtocol extends AbstractProtocol
 
 		$tax->appendChild($doc->createElement('ram:BasisAmount', number_format($vals['totalHT'], 2, '.', '')));
 
-		$tax->appendChild($doc->createElement('ram:CategoryCode', $rate > 0 ? 'S' : 'Z'));
+		$tax->appendChild($doc->createElement('ram:CategoryCode', $vals['categoryVAT']));
+
 		$tax->appendChild($doc->createElement('ram:RateApplicablePercent', number_format($rate, 2, '.', '')));
+
+		// TODO Add the ExemptionReasonCode found into the $vals['ExemptionReasonCode'] if required
 
 		return $tax;
 	}
@@ -2106,27 +2115,5 @@ class CIIProtocol extends AbstractProtocol
 		} else {
 			return false;
 		}
-	}
-
-	/**
-	 * Check if a given VAT rate is valid for a specific country based on the c_tva table in the database.
-	 *
-	 * @param 	string	$vatrate		Vat rate to check (e.g. '20' for 20%)
-	 * @param 	string	$countryCode	Country code to check the VAT rate against (e.g. 'FR' for France)
-	 * @return 	boolean					Returns true if the VAT rate is valid for the given country, false otherwise.
-	 * TODO Move common function into an implemented CommonXProtocol.class.php if needed by other protocol handlers
-	 */
-	public function checkIfVatRateIsValid($vatrate, $countryCode)
-	{
-		if ($countryCode == 'FR') {
-			// Check rule BR-FR-16 For AFNOR Einvoice - List in XP-Z12-012
-			$validRatesString = ['0', '10', '13', '20', '8.5', '19.6', '2.1', '5.5', '7', '20.6', '1.05', '0.9', '1.75', '9.2', '9.6'];
-			//$valtotest = price2num((float) $vatrate, '', 1);
-			if (!in_array($vatrate, $validRatesString)) {
-				return false;
-			}
-		}
-
-		return true;
 	}
 }

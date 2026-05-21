@@ -973,4 +973,58 @@ trait CommonProtocol
 		$dt->setTimestamp($ts);
 		return $dt;
 	}
+
+	/**
+	 * Check if a given VAT rate is valid for a specific country based on the c_tva table in the database.
+	 *
+	 * @param 	string	$vatrate		Vat rate to check (e.g. '20' for 20%)
+	 * @param 	string	$countryCode	Country code to check the VAT rate against (e.g. 'FR' for France)
+	 * @return 	boolean					Returns true if the VAT rate is valid for the given country, false otherwise.
+	 */
+	public function checkIfVatRateIsValid($vatrate, $countryCode)
+	{
+		if ($countryCode == 'FR') {
+			// Check rule BR-FR-16 For AFNOR Einvoice - List in XP-Z12-012
+			$validRatesString = ['0', '10', '13', '20', '8.5', '19.6', '2.1', '5.5', '7', '20.6', '1.05', '0.9', '1.75', '9.2', '9.6'];
+			//$valtotest = price2num((float) $vatrate, '', 1);
+			if (!in_array($vatrate, $validRatesString)) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Get the category of the VAT rate
+	 *
+	 * @param 	float		$vat_rate		Vat rate
+	 * @param 	int			$id				Id of line for log if an error is found
+	 * @param 	Societe 	$seller			Seller
+	 * @param 	Societe		$buyer			Buyer
+	 * @return 	string						Category of VAT rate ('S', 'K', 'E', 'G')
+	 */
+	public function getCategoryRate($vat_rate, $id, $seller, $buyer)
+	{
+		if ($vat_rate > 0) {
+			if (empty($seller->tva_intra)) {
+				throw new Exception('BADVATNUMBER: The VAT number of the thirdparty ' . $buyer->thirdparty->name . ' is mandatory when there is a non null VAT on at least on line.');
+			}
+			if (!$this->checkIfVatRateIsValid($vat_rate, $seller->country_code)) {
+				throw new Exception('BADVATRATE[BR-FR-16]: The VAT rate ' . $vat_rate . ($id ? ' on line ' . $id : '') . ' is not a valid string value for country ' . $seller->country_code . '.');
+			}
+			$categoryVAT = 'S';
+		} else {
+			$categoryVAT = 'K';
+			if (empty($seller->tva_assuj)) {
+				$categoryVAT = 'E';		// Exempt from VAT
+			} elseif (!$buyer->thirdparty->isInEEC()) {
+				$categoryVAT = 'G';
+			} elseif ($seller->isInEEC() && $buyer->thirdparty->isInEEC() && $seller->country_code != $buyer->thirdparty->country_code) {
+				$categoryVAT = 'K';		// Intra VAT
+			}
+		}
+
+		return $categoryVAT;
+	}
 }

@@ -40,19 +40,22 @@ if (empty($outputlangs) || ! ($outputlangs instanceof Translate)) {
 }
 $newlang = '';
 
-$this->sourceinvoice = $invoice;
-$outputlang = $langs->defaultlang;
-
 // Load PDPConnectFr class
 $pdpconnectfr = new PdpConnectFr($db);
 
-// Reload object
-$facture = new Facture($db);
-$object = $facture->fetch($invoice->id) > 0 ? $facture : $invoice;
-$object->fetch_thirdparty();
+
+$outputlang = $langs->defaultlang;
+
 if (!is_object($invoice->thirdparty)) {
 	$invoice->fetch_thirdparty();
 }
+
+$this->sourceinvoice = $invoice;
+
+// Reload object if not a new object (to get all fields)
+$tmpfacture = new Facture($db);
+$object = $tmpfacture->fetch($invoice->id) > 0 ? $tmpfacture : $invoice;
+
 
 // =====================================================================
 // Data collection into $invoiceData and $linesData arrays
@@ -156,8 +159,8 @@ if (!empty($newlang)) {
 }
 
 // Project
-if (! ($invoice->project instanceof Project)) {
-	$invoice->fetchProject();
+if (! ($object->project instanceof Project)) {
+	$object->fetchProject();
 }
 
 $invoiceRefDocs = [];
@@ -285,25 +288,8 @@ foreach ($object->lines as $line) {
 		}
 	}
 
-	// VAT category
-	if ($line->tva_tx > 0) {
-		if (empty($mysoc->tva_intra)) {
-			throw new Exception('BADVATNUMBER: The VAT number of the thirdparty ' . $object->thirdparty->name . ' is mandatory when there is a non null VAT on at least on line.');
-		}
-		if (!$this->checkIfVatRateIsValid($line->tva_tx, $mysoc->country_code)) {
-			throw new Exception('BADVATRATE[BR-FR-16]: The VAT rate ' . $line->tva_tx . ' on line ' . $line->id . ' is not a valid string value for country ' . $mysoc->country_code . '.');
-		}
-		$categoryVAT = 'S';
-	} else {
-		$categoryVAT = 'K';
-		if (empty($mysoc->tva_assuj)) {
-			$categoryVAT = 'E';
-		} elseif (!$invoice->thirdparty->isInEEC()) {
-			$categoryVAT = 'G';
-		} elseif ($mysoc->isInEEC() && $invoice->thirdparty->isInEEC() && $mysoc->country_code != $invoice->thirdparty->country_code) {
-			$categoryVAT = 'K';
-		}
-	}
+	// VAT category of the line
+	$categoryVAT = $this->getCategoryRate($line->tva_tx, $line->id, $mysoc, $object);
 
 	// Billing period of the line
 	$linePeriodStart = null;
@@ -342,8 +328,7 @@ foreach ($object->lines as $line) {
 	$line_total_tva = price2num($line_unit_price_with_discount * $line->qty * ($line->tva_tx > 0 ? number_format($line->tva_tx, 2, '.', '') / 100 : 0), 2);
 	$line_total_ttc = price2num($line_total_ht + $line_total_tva, 2);
 
-
-	// Uncomment for test using the most accurante possible calculation (not following the rule to round to 2 digit at each step)
+	// Uncomment for test using the most accurate possible calculation (but not following the e-invoice rule to round to 2 digit at each step)
 	/*
 	$line_unit_price = price2num($line->subprice, 'MU');
 	$line_unit_price_with_discount = price2num($line->subprice * (1 - $line->remise_percent / 100), 'MU');
@@ -352,12 +337,15 @@ foreach ($object->lines as $line) {
 	$line_total_ttc = $line->total_ttc;
 	*/
 
+
 	// Cumulative VAT totals
 	if (!isset($tabTVA[$line->tva_tx])) {
 		$tabTVA[$line->tva_tx] = ['totalHT' => 0, 'totalTVA' => 0];
 	}
 	$tabTVA[$line->tva_tx]['totalHT']  += $line_total_ht;
 	$tabTVA[$line->tva_tx]['totalTVA'] += $line_total_tva;
+	$tabTVA[$line->tva_tx]['categoryVAT'] = $categoryVAT;
+	//$tabTVA[$line->tva_tx]['ExemptionReasonCode'] = '...';	// TODO: Add exemption reason code if applicable
 
 	$grand_total_ht  += $line_total_ht;
 	$grand_total_ttc += $line_total_ttc;
@@ -403,7 +391,7 @@ foreach ($object->lines as $line) {
 		'lineTotalAmount'           => $line_total_ht,
 		'totalAllowanceChargeAmount' => null,
 
-		// For section ApplicableHeaderTradeSettlement
+		// For section ApplicableTradeTax
 		'categoryCode'              => $categoryVAT,
 		'typeCode'                  => 'VAT',
 		'rateApplicablePercent'     => $line->tva_tx > 0 ? number_format($line->tva_tx, 2, '.', '') : '0.00',
@@ -455,7 +443,7 @@ $prepaidAmount  = $object->sumpayed + $getAlreadyPaid;
 // Delivery date
 $deliveryDate = !empty($deliveryDateList)
 	? new DateTime(dol_print_date($deliveryDateList[0], 'dayrfc'))
-	: new DateTime(dol_print_date($invoice->date, 'dayrfc'));
+	: new DateTime(dol_print_date($object->date, 'dayrfc'));
 
 
 
@@ -477,7 +465,7 @@ $invoiceData = [
 	'invoicingPeriodEnd'   => null,
 
 	'businessProcessId'    => $this->getBillingProcessID($object),		// B1, B2, B3, B4 / S1, S2, S3, S4 / M1, M2, M3, M4
-	'isTestDocument'       => !empty($invoice->specimen),
+	'isTestDocument'       => !empty($object->specimen),
 
 	// Notes
 	'documentNotePublic'   => dol_concatdesc(
@@ -574,14 +562,14 @@ $invoiceData = [
 	'contractReference'         => $object->array_options['options_d4d_contract_number'] ?? null,
 	'despatchAdviceRef'         => null,
 
-	// VAT breakdown
+	// VAT breakdown for section ApplicableHeaderTradeSettlement
 	'taxBreakdown'              => $tabTVA,
 
 	// Internal data (useful for the builder)
 	'_chorus'                   => $chorus,
 	'_depositlines'             => $depositlines,
 	'_customerOrderReferenceList' => $customerOrderReferenceList,
-	'_project'                  => ($invoice->project instanceof Project) ? $invoice->project : null,
+	'_project'                  => ($object->project instanceof Project) ? $object->project : null,
 ];
 
 
