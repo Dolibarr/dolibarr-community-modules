@@ -288,8 +288,11 @@ foreach ($object->lines as $line) {
 		}
 	}
 
-	// VAT category of the line
-	$categoryVAT = $this->getCategoryRate($line->tva_tx, $line->id, $mysoc, $object);
+	// VAT category and exemption reason of the line
+	$tmparray = $this->getCategoryRate($line->tva_tx, $line->id, $mysoc, $object);
+	$categoryVAT = $tmparray['categoryVAT'];
+	$exemptionReason = $tmparray['ExemptionReason'];
+	$exemptionReasonCode = $tmparray['ExemptionReasonCode'];
 
 	// Billing period of the line
 	$linePeriodStart = null;
@@ -345,7 +348,8 @@ foreach ($object->lines as $line) {
 	$tabTVA[$line->tva_tx]['totalHT']  += $line_total_ht;
 	$tabTVA[$line->tva_tx]['totalTVA'] += $line_total_tva;
 	$tabTVA[$line->tva_tx]['categoryVAT'] = $categoryVAT;
-	//$tabTVA[$line->tva_tx]['ExemptionReasonCode'] = '...';	// TODO: Add exemption reason code if applicable
+	$tabTVA[$line->tva_tx]['ExemptionReasonCode'] = $exemptionReasonCode;
+	$tabTVA[$line->tva_tx]['ExemptionReason'] = $exemptionReason;
 
 	$grand_total_ht  += $line_total_ht;
 	$grand_total_ttc += $line_total_ttc;
@@ -396,8 +400,8 @@ foreach ($object->lines as $line) {
 		'typeCode'                  => 'VAT',
 		'rateApplicablePercent'     => $line->tva_tx > 0 ? number_format($line->tva_tx, 2, '.', '') : '0.00',
 		'calculatedAmount'          => null,
-		'exemptionReason'           => null,
-		'exemptionReasonCode'       => null,
+		'ExemptionReason'           => null,
+		'ExemptionReasonCode'       => null,
 
 		'lineAllowances'            => [],
 		'lineGrossPriceAllowances'  => [],

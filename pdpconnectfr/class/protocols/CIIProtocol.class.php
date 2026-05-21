@@ -222,8 +222,8 @@ class CIIProtocol extends AbstractProtocol
 			'rateApplicablePercent' => './ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:RateApplicablePercent',
 			'calculatedAmount' => './ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:CalculatedAmount',
 
-			'exemptionReason' => './ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:ExemptionReason',
-			'exemptionReasonCode' => './ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:ExemptionReasonCode',
+			'ExemptionReason' => './ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:ExemptionReason',
+			'ExemptionReasonCode' => './ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:ExemptionReasonCode',
 
 			'lineAllowances' => [],
 			'lineGrossPriceAllowances' => [],
@@ -433,7 +433,7 @@ class CIIProtocol extends AbstractProtocol
 		$line->desc = $langs->trans("Description") . " 1";
 		$line->qty = 5;
 		$line->subprice = 100.05;		// unit price (no discount yet)
-		$line->tva_tx = 20.0;
+		$line->tva_tx = get_default_tva($thirdpartySeller, $thirdpartyBuyer);
 		$line->localtax1_tx = 0;
 		$line->localtax2_tx = 0;
 		$line->remise_percent = 10;
@@ -1364,8 +1364,8 @@ class CIIProtocol extends AbstractProtocol
 						'rateApplicablePercent' => $this->toFloat($this->getXPathValue($xpath, 'ram:RateApplicablePercent', $n)),
 						'calculatedAmount' => $this->toFloat($this->getXPathValue($xpath, 'ram:CalculatedAmount', $n)),
 						'basisAmount' => $this->toFloat($this->getXPathValue($xpath, 'ram:BasisAmount', $n)),
-						'exemptionReason' => $this->getXPathValue($xpath, 'ram:ExemptionReason', $n),
-						'exemptionReasonCode' => $this->getXPathValue($xpath, 'ram:ExemptionReasonCode', $n),
+						'ExemptionReason' => $this->getXPathValue($xpath, 'ram:ExemptionReason', $n),
+						'ExemptionReasonCode' => $this->getXPathValue($xpath, 'ram:ExemptionReasonCode', $n),
 					];
 					break;
 
@@ -1738,12 +1738,15 @@ class CIIProtocol extends AbstractProtocol
 		}
 		*/
 
+		// Add the VAT block for the line
 		$tax = $doc->createElement('ram:ApplicableTradeTax');
 		$sett->appendChild($tax);
 
 		$tax->appendChild($doc->createElement('ram:TypeCode', 'VAT'));
 		$tax->appendChild($doc->createElement('ram:CategoryCode', $line['categoryCode']));
 		$tax->appendChild($doc->createElement('ram:RateApplicablePercent', $line['rateApplicablePercent']));
+		// What about the ExemptionReasonCode and ExemptionReasonCode ?
+
 
 		// Total line
 		$sum = $doc->createElement('ram:SpecifiedTradeSettlementLineMonetarySummation');
@@ -1888,13 +1891,19 @@ class CIIProtocol extends AbstractProtocol
 
 		$tax->appendChild($doc->createElement('ram:TypeCode', 'VAT'));
 
+		if ($vals['ExemptionReason']) {
+			$tax->appendChild($doc->createElement('ram:ExemptionReason', $vals['ExemptionReason']));
+		}
+
 		$tax->appendChild($doc->createElement('ram:BasisAmount', number_format($vals['totalHT'], 2, '.', '')));
 
 		$tax->appendChild($doc->createElement('ram:CategoryCode', $vals['categoryVAT']));
 
-		$tax->appendChild($doc->createElement('ram:RateApplicablePercent', number_format($rate, 2, '.', '')));
+		if ($vals['ExemptionReasonCode']) {
+			$tax->appendChild($doc->createElement('ram:ExemptionReasonCode', $vals['ExemptionReasonCode']));
+		}
 
-		// TODO Add the ExemptionReasonCode found into the $vals['ExemptionReasonCode'] if required
+		$tax->appendChild($doc->createElement('ram:RateApplicablePercent', number_format($rate, 2, '.', '')));
 
 		return $tax;
 	}

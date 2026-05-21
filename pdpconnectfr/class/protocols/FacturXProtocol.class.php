@@ -1251,8 +1251,8 @@ class FacturXProtocol extends AbstractProtocol
 						'typeCode' => $typeCode ?? null,
 						'rateApplicablePercent' => $rateApplicablePercent ?? null,
 						'calculatedAmount' => $calculatedAmount ?? null,
-						'exemptionReason' => $exemptionReason ?? null,
-						'exemptionReasonCode' => $exemptionReasonCode ?? null,
+						'ExemptionReason' => $exemptionReason ?? null,
+						'ExemptionReasonCode' => $exemptionReasonCode ?? null,
 						// Parent invoice ref
 						'parentDocumentNo' => $parsedHeader['documentno'] ?? null,
 						// Additional referenced documents at line level
