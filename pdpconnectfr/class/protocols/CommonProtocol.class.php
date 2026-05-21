@@ -1053,6 +1053,8 @@ trait CommonProtocol
 					$categoryVAT = 'K';		// Intra communautary VAT
 					$exemptionReasonCode = 'VATEX-EU-IC';
 					$exemptionReason = 'Intracomm';
+				} else {
+					$exemptionReason = 'Unknown exempt vat reason';
 				}
 			} else {
 				$categoryVAT = 'Z';		// Seller is not in EU

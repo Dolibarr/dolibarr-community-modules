@@ -1541,9 +1541,20 @@ class CIIProtocol extends AbstractProtocol
 		$this->buildParty($doc, $agreement, $invoiceData, 'seller');
 		$this->buildParty($doc, $agreement, $invoiceData, 'buyer');
 
+
 		// DELIVERY
 		$delivery = $doc->createElement('ram:ApplicableHeaderTradeDelivery');
 		$sctt->appendChild($delivery);
+
+		// Add the ship to trade party (mandatory when using intracommunity delivery)
+		$shiptotrade = $doc->createElement('ram:ShipToTradeParty');
+		$delivery->appendChild($shiptotrade);
+		$this->buildParty($doc, $shiptotrade, $invoiceData, 'buyer');
+		/*
+		$postaladdress = $doc->createElement('ram:PostalTradeAddress');
+		$shiptotrade->appendChild($postaladdress);
+		$postaladdress->appendChild($doc->createElement('ram:CountryID', 'eee'));
+		*/
 
 		if (!empty($invoiceData['documentDeliveryDate'])) {
 			$event = $doc->createElement('ram:ActualDeliverySupplyChainEvent');
@@ -1559,6 +1570,10 @@ class CIIProtocol extends AbstractProtocol
 			$str->setAttribute('format', '102');
 			$dtNode->appendChild($str);
 		}
+
+
+
+
 
 		// SETTLEMENT
 		$settlement = $doc->createElement('ram:ApplicableHeaderTradeSettlement');
