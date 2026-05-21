@@ -1063,4 +1063,44 @@ trait CommonProtocol
 
 		return array('categoryVAT' => $categoryVAT, 'ExemptionReason' => $exemptionReason, 'ExemptionReasonCode' => $exemptionReasonCode);
 	}
+
+
+	/************************************************
+	 *    Check line type from external module ?
+	 *
+	 * @param  object $line       line we work on
+	 * @param  string $element    line object element (for special case like shipping)
+	 * @param  string $searchName module name we look for
+	 * @return boolean                        true if the line is a special one and was created by the module we ask for
+	 ************************************************/
+	private function _isLineFromExternalModule($line, $element, $searchName)
+	{
+		global $db;
+		if ($element == 'shipping' || $element == 'delivery') {
+			$fk_origin_line = $line->fk_origin_line;
+			$line = new OrderLine($db);
+			$line->fetch($fk_origin_line);
+		}
+		if ($line->product_type == 9 && $line->special_code == $this->_getModNumber($searchName)) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	/**
+	 * Find module number
+	 *
+	 * @param  string 	$modName 	Module name we look for
+	 * @return integer              -1 if KO, 0 not found or module number if Ok
+	 */
+	private function _getModNumber($modName)
+	{
+		global $db;
+		if (class_exists($modName)) {
+			$objMod = new $modName($db);
+			return $objMod->numero;
+		}
+		return 0;
+	}
 }
