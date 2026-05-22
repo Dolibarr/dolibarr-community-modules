@@ -998,33 +998,109 @@ trait CommonProtocol
 	/**
 	 * Get the category of the VAT rate
 	 *
-	 * @param 	float		$vat_rate		Vat rate
-	 * @param 	int			$id				Id of line for log if an error is found
-	 * @param 	Societe 	$seller			Seller
-	 * @param 	Societe		$buyer			Buyer
-	 * @return 	string						Category of VAT rate ('S', 'K', 'E', 'G')
+	 * @param 	float					$vat_rate		Vat rate
+	 * @param 	int						$id				Id of line for log if an error is found
+	 * @param 	Societe 				$seller			Seller
+	 * @param 	Societe					$buyer			Buyer
+	 * @return 	array<string,string>					array('categoryVAT' => Category of VAT rate ('S', 'K', 'E', 'G'), 'ExemptionReason' => '', 'ExemptionReasonCode => '')
 	 */
 	public function getCategoryRate($vat_rate, $id, $seller, $buyer)
 	{
+		$exemptionReason = null;		// BT-120
+		$exemptionReasonCode = null;	// BT-121 - Mut contains a VATEX code. https://docs.peppol.eu/poacc/billing/3.0/codelist/vatex/
+
 		if ($vat_rate > 0) {
+			$categoryVAT = 'S';
+
 			if (empty($seller->tva_intra)) {
 				throw new Exception('BADVATNUMBER: The VAT number of the thirdparty ' . $buyer->thirdparty->name . ' is mandatory when there is a non null VAT on at least on line.');
 			}
 			if (!$this->checkIfVatRateIsValid($vat_rate, $seller->country_code)) {
 				throw new Exception('BADVATRATE[BR-FR-16]: The VAT rate ' . $vat_rate . ($id ? ' on line ' . $id : '') . ' is not a valid string value for country ' . $seller->country_code . '.');
 			}
-			$categoryVAT = 'S';
 		} else {
-			$categoryVAT = 'K';
-			if (empty($seller->tva_assuj)) {
-				$categoryVAT = 'E';		// Exempt from VAT
-			} elseif (!$buyer->thirdparty->isInEEC()) {
-				$categoryVAT = 'G';
-			} elseif ($seller->isInEEC() && $buyer->thirdparty->isInEEC() && $seller->country_code != $buyer->thirdparty->country_code) {
-				$categoryVAT = 'K';		// Intra VAT
+			if ($seller->isInEEC()) {
+				$categoryVAT = 'K';
+
+				if (empty($seller->tva_assuj)) {
+					// Can be $categoryVAT = E or AE
+					if (1 == 2) {	// Autoliquidation (the VAT is declared by the customer that pay it directly to the government). TODO Not yet managed.
+						$categoryVAT = 'AE';	// Autoliquidation
+						$exemptionReasonCode = 'VATEX-'.($seller->country_code == 'FR' ? 'FR' : 'EU').'-AE';	// VATEX-EU-AE or VATEX-FR-AE
+						$exemptionReason = 'Autoliquidation';
+					} else {
+						$categoryVAT = 'E';		// Exempt from VAT (self-entrepreneurs, doctor, ...)
+						$exemptionReasonCode = getDolGlobalString('MAIN_INFO_SOCIETE_VAT_EXEMPTION_CODE');
+						$exemptionReason = getDolGlobalString('MAIN_INFO_SOCIETE_VAT_EXEMPTION_REASON');
+						if ($seller->country_code == 'FR') {
+							// List of VATEX: https://docs.peppol.eu/poacc/billing/3.0/codelist/vatex/
+							// TVA non applicable article 293B CGI (auto-entrepreneurs, volume sous seuil): VATEX-FR-FRANCHISE (rule BR-FR-CO-16)
+							// TVA non applicable article 261-4 CGI (nature non soumis à TVA, comme médecin): VATEX-FR-CGI261-4
+							// TVA non applicable - Vente objet :  art = VATEX-FR-I, antiquité = VATEX-FR-J
+							// TVA non applicable - Vente agence voyage:  VATEX-EU-D
+							$exemptionReasonCode = getDolGlobalString('MAIN_INFO_SOCIETE_VAT_EXEMPTION_CODE', 'VATEX-FR-FRANCHISE');		// VATEX-FR-FRANCHISE, VATEX-FR-CGI261-1, VATEX-FR-CGI261-4, ...
+							$exemptionReason = getDolGlobalString('MAIN_INFO_SOCIETE_VAT_EXEMPTION_REASON', 'Tax exempted');
+						}
+						if (empty($exemptionReasonCode)) {
+							throw new Exception('MISSINGSETUP: Your organization is configured to not use VAT. In this case, you must enter into MAIN_INFO_SOCIETE_VAT_EXEMPTION_CODE the reason code of exemption (VATEX-FR-CGI261-4, VATEX-FR-CGI261-4.');
+						}
+					}
+				} elseif (!$buyer->thirdparty->isInEEC()) {
+					$categoryVAT = 'G';
+					$exemptionReasonCode = 'VATEX-EU-G';
+					$exemptionReason = 'Exportation outside UE';
+				} elseif ($buyer->thirdparty->isInEEC() && $seller->country_code != $buyer->thirdparty->country_code) {
+					$categoryVAT = 'K';		// Intra communautary VAT
+					$exemptionReasonCode = 'VATEX-EU-IC';
+					$exemptionReason = 'Intracomm VAT';
+				} else {
+					$exemptionReason = 'Unknown exempt vat reason';
+				}
+			} else {
+				$categoryVAT = 'Z';		// Seller is not in EU
 			}
 		}
 
-		return $categoryVAT;
+		return array('categoryVAT' => $categoryVAT, 'ExemptionReason' => $exemptionReason, 'ExemptionReasonCode' => $exemptionReasonCode);
+	}
+
+
+	/************************************************
+	 *    Check line type from external module ?
+	 *
+	 * @param  object $line       line we work on
+	 * @param  string $element    line object element (for special case like shipping)
+	 * @param  string $searchName module name we look for
+	 * @return boolean                        true if the line is a special one and was created by the module we ask for
+	 ************************************************/
+	private function _isLineFromExternalModule($line, $element, $searchName)
+	{
+		global $db;
+		if ($element == 'shipping' || $element == 'delivery') {
+			$fk_origin_line = $line->fk_origin_line;
+			$line = new OrderLine($db);
+			$line->fetch($fk_origin_line);
+		}
+		if ($line->product_type == 9 && $line->special_code == $this->_getModNumber($searchName)) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	/**
+	 * Find module number
+	 *
+	 * @param  string 	$modName 	Module name we look for
+	 * @return integer              -1 if KO, 0 not found or module number if Ok
+	 */
+	private function _getModNumber($modName)
+	{
+		global $db;
+		if (class_exists($modName)) {
+			$objMod = new $modName($db);
+			return $objMod->numero;
+		}
+		return 0;
 	}
 }

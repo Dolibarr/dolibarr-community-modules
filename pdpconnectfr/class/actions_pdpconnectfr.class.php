@@ -2,6 +2,7 @@
 /* Copyright (C) 2025		Mohamed Daoud			<mdaoud@dolicloud.com>
  * Copyright (C) 2025		Laurent Destailleur		<eldy@users.sourceforge.net>
  * Copyright (C) 2026		Charlene Benke			<charlene@patas-monkey.com>
+ * Copyright (C) 2026       Frédéric France         <frederic.france@free.fr>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -437,7 +438,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 			}
 		}
 
-		if (in_array('thirdpartycard', $contexts) && (!getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI'))) {
+		if (array_intersect(['thirdpartycard', 'thirdpartycomm'], $contexts) && (!getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI'))) {
 			$permissiontoedit = $user->hasRight('societe', 'creer');
 
 			// $object->id may be empty at hook time if core hasn't fetched the object yet

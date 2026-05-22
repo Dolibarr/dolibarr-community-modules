@@ -1,6 +1,6 @@
 <?php
 /* Copyright (C) 2025		SuperAdmin					<daoud.mouhamed@gmail.com>
- * Copyright (C) 2025       Frédéric France         <frederic.france@free.fr>
+ * Copyright (C) 2025-2026  Frédéric France             <frederic.france@free.fr>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -31,6 +31,8 @@
 function callPrepareHead($object)
 {
 	global $db, $langs, $conf;
+
+	require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 
 	$langs->load("pdpconnectfr@pdpconnectfr");
 
@@ -74,7 +76,6 @@ function callPrepareHead($object)
 	}
 
 	if ($showtabofpagedocument) {
-		require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 		require_once DOL_DOCUMENT_ROOT.'/core/class/link.class.php';
 		$upload_dir = $conf->pdpconnectfr->dir_output."/call/".dol_sanitizeFileName($object->ref);
 		$nbFiles = count(dol_dir_list($upload_dir, 'files', 0, '', '(\.meta|_preview.*\.png)$'));

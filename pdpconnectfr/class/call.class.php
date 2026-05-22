@@ -55,7 +55,7 @@ class Call extends CommonObject
 	public $table_element = 'pdpconnectfr_call';
 
 	/**
-	 * @var string 		If permission must be checked with hasRight('pdpconnectfr', 'read') and not hasright('pdpconnectfr', 'call', 'read'), you can uncomment this line
+	 * @var string 		If permission must be checked with hasRight('pdpconnectfr', 'read') and not hasright('pdpconnectfr', 'document', 'read'), you can uncomment this line
 	 */
 	//public $element_for_permission = 'pdpconnectfr';
 
@@ -229,7 +229,7 @@ class Call extends CommonObject
 		}
 
 		// Example to show how to set values of fields definition dynamically
-		/*if ($user->hasRight('pdpconnectfr', 'call', 'read')) {
+		/*if ($user->hasRight('pdpconnectfr', 'document', 'read')) {
 			$this->fields['myfield']['visible'] = 1;
 			$this->fields['myfield']['noteditable'] = 0;
 		}*/
@@ -552,14 +552,6 @@ class Call extends CommonObject
 			return 0;
 		}
 
-		/* if (! ((!getDolGlobalInt('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('pdpconnectfr', 'call', 'write'))
-		 || (getDolGlobalInt('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('pdpconnectfr', 'call_advance', 'validate')))
-		 {
-		 $this->error='NotEnoughPermissions';
-		 dol_syslog(get_class($this)."::valid ".$this->error, LOG_ERR);
-		 return -1;
-		 }*/
-
 		$now = dol_now();
 
 		$this->db->begin();
@@ -681,13 +673,6 @@ class Call extends CommonObject
 			return 0;
 		}
 
-		/* if (! ((!getDolGlobalInt('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('pdpconnectfr','write'))
-		 || (getDolGlobalInt('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('pdpconnectfr','pdpconnectfr_advance','validate'))))
-		 {
-		 $this->error='Permission denied';
-		 return -1;
-		 }*/
-
 		return $this->setStatusCommon($user, self::STATUS_FAILED, $notrigger, 'PDPCONNECTFR_MYOBJECT_UNVALIDATE');
 	}
 
@@ -705,13 +690,6 @@ class Call extends CommonObject
 			return 0;
 		}
 
-		/* if (! ((!getDolGlobalInt('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('pdpconnectfr','write'))
-		 || (getDolGlobalInt('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('pdpconnectfr','pdpconnectfr_advance','validate'))))
-		 {
-		 $this->error='Permission denied';
-		 return -1;
-		 }*/
-
 		return $this->setStatusCommon($user, self::STATUS_CANCELED, $notrigger, 'PDPCONNECTFR_MYOBJECT_CANCEL');
 	}
 
@@ -728,13 +706,6 @@ class Call extends CommonObject
 		if ($this->status == self::STATUS_SUCCESS) {
 			return 0;
 		}
-
-		/*if (! ((!getDolGlobalInt('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('pdpconnectfr','write'))
-		 || (getDolGlobalInt('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('pdpconnectfr','pdpconnectfr_advance','validate'))))
-		 {
-		 $this->error='Permission denied';
-		 return -1;
-		 }*/
 
 		return $this->setStatusCommon($user, self::STATUS_SUCCESS, $notrigger, 'PDPCONNECTFR_MYOBJECT_REOPEN');
 	}

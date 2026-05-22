@@ -135,7 +135,7 @@ if ($action == 'buildsamplesupplierinvoice') {	// Test on permissions already do
 		$thirdpartySeller = new Societe($db);
 		$thirdpartySeller->fetch($sellerId);
 	} else {
-		$thirdpartySeller = null;
+		$thirdpartySeller = $mysoc;
 	}
 	if ($buyerId > 0) {
 		$thirdpartyBuyer = new Societe($db);
