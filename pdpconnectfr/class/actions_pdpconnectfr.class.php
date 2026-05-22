@@ -47,7 +47,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 	 * @param Hookmanager			$hookmanager	Hookmanager
 	 * @return int									Result
 	 */
-	public function messageOfTheDay($parameters, &$object, &$action, $hookmanager)
+	public function messageOfTheDay($parameters, $object, &$action, $hookmanager)
 	{
 		return 0;
 	}
@@ -215,7 +215,9 @@ class ActionsPdpconnectfr extends CommonHookActions
 			}
 
 			print '<!-- Current AP: ' . getDolGlobalString('PDPCONNECTFR_PDP') . ' -->';
-			print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true);
+			if (count($url_button)) {
+				print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true);
+			}
 		}
 
 
@@ -688,6 +690,8 @@ class ActionsPdpconnectfr extends CommonHookActions
 				'perms' => '1'
 			);
 		}
+
+		return 0;
 	}
 
 
