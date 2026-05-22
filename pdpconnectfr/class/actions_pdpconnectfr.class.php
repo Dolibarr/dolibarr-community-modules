@@ -531,7 +531,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 	 * @param CommonObject	$object			Object
 	 * @param string		$action			Action code
 	 * @param Hookmanager	$hookmanager	Hook manager
-	 * @return number
+	 * @return int
 	 */
 	public function formConfirm($parameters, $object, &$action, $hookmanager)
 	{
@@ -582,6 +582,8 @@ class ActionsPdpconnectfr extends CommonHookActions
 				$this->resprints .= $formconfirm;
 			}
 		}
+
+		return 0;
 	}
 
 	/**
