@@ -24,6 +24,6 @@ packages:
     phpmin: '7.4'
     phpmax: 'auto'
     price: 0
-    direct-download: yes
+    direct-download: no
     dolistore-upload: 'no'
     dolistore-download: ''
