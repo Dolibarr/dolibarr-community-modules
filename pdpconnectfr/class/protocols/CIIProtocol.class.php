@@ -277,7 +277,7 @@ class CIIProtocol extends AbstractProtocol
 
 		// Generate the XML file
 		$filename = dol_sanitizeFileName($invoice->ref);
-		$filedir = getMultidirOutput($invoice, '', 1, 'temp');
+		$filedir = getMultidirOutputCompat($invoice, '', 1, 'temp');
 		$xmlfile = $filedir . '/' . $filename . '/einvoice.xml';
 
 		dol_mkdir(dirname($xmlfile));
@@ -354,8 +354,8 @@ class CIIProtocol extends AbstractProtocol
 
 		// Make a copy of the XML file in the final destination
 		$filename = dol_sanitizeFileName($invoice->ref);
-		$filedir = getMultidirOutput($invoice, '', 1);
-		$einvoice_path = $filedir . '/' . get_exdir(0, 0, 0, 0, $invoice, 'invoice') . $filename . '_cii.xml';
+		$filedir = getMultidirOutputCompat($invoice, '', 1);
+		$einvoice_path = $filedir . '/' . $filename . '_cii.xml';
 		if (dol_copy($xmlfile, $einvoice_path)) {
 			dol_syslog(get_class($this) . "::generateInvoice copied XML file to " . $einvoice_path);
 		} else {

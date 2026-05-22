@@ -132,7 +132,7 @@ class FacturXProtocol extends AbstractProtocol
 
 			// Generate the XML file
 			$filename = dol_sanitizeFileName($invoice->ref);
-			$filedir = getMultidirOutput($invoice, '', 1, 'temp');
+			$filedir = getMultidirOutputCompat($invoice, '', 1, 'temp');
 			$xmlfile = $filedir . '/' . $filename . '/factur-x.xml';	// Name of file should be factur-x.xml so it will also have this name once added into PDF
 
 			dol_mkdir(dirname($xmlfile));
@@ -389,7 +389,7 @@ class FacturXProtocol extends AbstractProtocol
 
 			// Generate the XML file Factur-X
 			$filename = dol_sanitizeFileName($invoice->ref);
-			$filedir  = getMultidirOutput($invoice, '', 1, 'temp');
+			$filedir  = getMultidirOutputCompat($invoice, '', 1, 'temp');
 			$xmlfile  = $filedir . '/' . $filename . '/factur-x3.xml';
 
 			dol_mkdir(dirname($xmlfile));
@@ -473,11 +473,11 @@ class FacturXProtocol extends AbstractProtocol
 		$langs->loadLangs(array("admin", "pdpconnectfr@pdpconnectfr"));
 
 		$filename = dol_sanitizeFileName($invoice->ref);
-		$filedir = getMultidirOutput($invoice, '', 1);
-		$orig_pdf = $filedir . '/' . get_exdir(0, 0, 0, 0, $invoice, 'invoice') . '/' . $filename . '.pdf';
+		$filedir = getMultidirOutputCompat($invoice, '', 1);
+		$orig_pdf = $filedir . '/' . $filename . '.pdf';
 
 		// Make a copy of the original PDF file
-		$pathfacturxpdf = $filedir . '/' . get_exdir(0, 0, 0, 0, $invoice, 'invoice') . $filename . '_facturx.pdf';	// The new name of the PDF including xml
+		$pathfacturxpdf = $filedir . '/' . $filename . '_facturx.pdf';	// The new name of the PDF including xml
 		if (dol_copy($orig_pdf, $pathfacturxpdf)) {
 			dol_syslog(get_class($this) . "::generateInvoice copied original PDF to " . $pathfacturxpdf);
 		} else {
