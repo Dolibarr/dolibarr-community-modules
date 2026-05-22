@@ -334,6 +334,21 @@ if (!function_exists("GETPOSTFLOAT")) {
 	}
 }
 
+if (!function_exists('dolPrintHTML'))
+{
+	/**
+	 * Return a string ready to be output on HTML page
+	 * To use text inside an attribute, use can use only dol_escape_htmltag()
+	 *
+	 * @param	string	$s		String to print
+	 * @return	string			String ready for HTML output
+	 */
+	function dolPrintHTML($s)
+	{
+		return dol_escape_htmltag(dol_htmlwithnojs(dol_string_onlythesehtmltags(dol_htmlentitiesbr($s), 1, 1, 1)), 1, 1, 'common', 0, 1);
+	}
+}
+
 if (!function_exists('dolPrintHTMLForAttribute')) {
 	/**
 	 * Return a string ready to be output into an HTML attribute (alt, title, data-html, ...)
@@ -532,5 +547,39 @@ if (!method_exists('Societe', 'findNearest')) {
 		}
 
 		return $result;
+	}
+}
+
+if (!function_exists('pdfExtractMetadata'))
+{
+	/**
+	 * Function to extract metadata from a PDF file by doing a binary parsing of the PDF file
+	 *
+	 * @param 	string	$file		Path of file
+	 * @param 	string	$field		Key to extract
+	 * @return 	string				String of the extracted key or string started with 'ERROR:' if error.
+	 */
+	function pdfExtractMetadata($file, $field = 'Keywords')
+	{
+		if (!dol_is_file($file)) {
+			return "ERROR: FILE NOT FOUND OR NOT VALID";
+		}
+	
+		// Get content of PDF file
+		$content = file_get_contents(dol_osencode($file));
+	
+		// Use a regex to capture the metadata
+		if ($content) {
+			$matches = array();
+	
+			// Remove non printablecaracters
+			$content = preg_replace('/[^(\x20-\x7F)]*/', '', $content);
+			if (preg_match('/\/' . preg_quote($field, '/') . '\s*\((.*?)\)/', $content, $matches)) {
+				return trim($matches[1]);
+			}
+			return "ERROR: NOT FOUND";
+		} else {
+			return "ERROR: FAILED TO READ PDF";
+		}
 	}
 }
