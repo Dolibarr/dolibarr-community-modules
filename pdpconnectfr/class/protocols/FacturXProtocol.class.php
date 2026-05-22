@@ -474,10 +474,10 @@ class FacturXProtocol extends AbstractProtocol
 
 		$filename = dol_sanitizeFileName($invoice->ref);
 		$filedir = getMultidirOutput($invoice, '', 1);
-		$orig_pdf = $filedir . '/' . $filename . '.pdf';
+		$orig_pdf = $filedir . '/' . get_exdir(0, 0, 0, 0, $invoice, 'invoice') . '/' . $filename . '.pdf';
 
 		// Make a copy of the original PDF file
-		$pathfacturxpdf = $filedir . '/' . $filename . '_facturx.pdf';	// The new name of the PDF including xml
+		$pathfacturxpdf = $filedir . '/' . get_exdir(0, 0, 0, 0, $invoice, 'invoice') . $filename . '_facturx.pdf';	// The new name of the PDF including xml
 		if (dol_copy($orig_pdf, $pathfacturxpdf)) {
 			dol_syslog(get_class($this) . "::generateInvoice copied original PDF to " . $pathfacturxpdf);
 		} else {
