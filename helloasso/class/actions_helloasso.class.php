@@ -536,6 +536,12 @@ class ActionsHelloAsso extends CommonHookActions
 		$entity = GETPOST('entity');
 		$getpostlang = GETPOST('lang');
 		$amount = price2num(GETPOST("amount", 'alpha'));
+		$newamount = price2num(GETPOST("newamount", 'alpha'));
+		if ((float)$newamount != (int)$newamount) {
+			$newamount = strval(round($newamount, 2));
+		} else {
+			$newamount = strval((int)$newamount);
+		}
 
 		$object = null;
 
@@ -655,6 +661,12 @@ class ActionsHelloAsso extends CommonHookActions
 					}
 
 					if ($FinalPaymentAmt == $amounttotest) {
+						if ($amounttotest !== $newamount) {
+							$urlredirect = $urlwithroot."/public/payment/newpayment.php?source=member&amount=".urlencode($newamount)."&ref=".$ref."&newamount=".$newamount;
+							header("Location: ".$urlredirect);
+							exit;
+							//it would be nice to display a message explaining that the amount has been changed and ask for confirmation
+						}
 						$headers = array();
 						$headers[] = "Authorization: ".ucfirst($result["token_type"])." ".$result["access_token"];
 						$headers[] = "Accept: application/json";
