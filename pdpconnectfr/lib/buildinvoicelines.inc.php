@@ -56,6 +56,9 @@ $this->sourceinvoice = $invoice;
 $tmpfacture = new Facture($db);
 $object = $tmpfacture->fetch($invoice->id) > 0 ? $tmpfacture : $invoice;
 
+if (!is_object($object->thirdparty)) {
+	$object->fetch_thirdparty();
+}
 
 // =====================================================================
 // Data collection into $invoiceData and $linesData arrays
