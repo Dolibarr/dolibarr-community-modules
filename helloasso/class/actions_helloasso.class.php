@@ -537,10 +537,10 @@ class ActionsHelloAsso extends CommonHookActions
 		$getpostlang = GETPOST('lang');
 		$amount = price2num(GETPOST("amount", 'alpha'));
 		$newamount = price2num(GETPOST("newamount", 'alpha'));
-		if ((float)$newamount != (int)$newamount) {
+		if ((float) $newamount != (int) $newamount) {
 			$newamount = strval(round($newamount, 2));
 		} else {
-			$newamount = strval((int)$newamount);
+			$newamount = strval((int) $newamount);
 		}
 
 		$object = null;
