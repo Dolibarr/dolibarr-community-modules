@@ -933,7 +933,9 @@ class ActionsPdpconnectfr extends CommonHookActions
 		}
 
 		if (in_array('thirdpartylist', explode(':', $parameters['context'])) && (!getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI'))) {
-			print print_liste_field_titre($langs->transnoentitiesnoconv('pdpconnectfrThirdPartyRoutingTitle'));
+			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
+				print print_liste_field_titre($langs->transnoentitiesnoconv('pdpconnectfrThirdPartyRoutingTitle'));
+			}
 		}
 
 		if (in_array('productlist', explode(':', $parameters['context'])) && (!getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI'))) {
@@ -1008,15 +1010,17 @@ class ActionsPdpconnectfr extends CommonHookActions
 		}
 
 		if (in_array('thirdpartylist', explode(':', $parameters['context']), true)) {
-			$obj = $parameters['obj'];
+			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
+				$obj = $parameters['obj'];
 
-			print '<td class="tdoverflowmax125">';
-			if ($obj->pdplink_id) {
-				print dolPrintHTML($obj->routing_id);
-			}
-			print '</td>';
-			if (isset($parameters['i']) && empty($parameters['i'])) {
-				$parameters['totalarray']['nbfield']++;
+				print '<td class="tdoverflowmax125">';
+				if ($obj->pdplink_id) {
+					print dolPrintHTML($obj->routing_id);
+				}
+				print '</td>';
+				if (isset($parameters['i']) && empty($parameters['i'])) {
+					$parameters['totalarray']['nbfield']++;
+				}
 			}
 		}
 
