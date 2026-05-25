@@ -160,6 +160,11 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$item = $formSetup->newItem($prefix . 'PASSWORD'.(getDolGlobalInt('PDPCONNECTFR_LIVE') ? '_PROD' : ''));
 		if (method_exists('FormSetupItem', 'setAsGenericPassword')) {
 			$item->setAsGenericPassword();
+		} else {
+			// Dolibarr 18/19 fallback: setAsGenericPassword() does not exist yet.
+			// Force a masked password input so the secret is not displayed in clear text.
+			$item->fieldAttr['type'] = 'password';
+			$item->fieldAttr['autocomplete'] = 'new-password';
 		}
 		$item->nameText = $langs->transnoentities('PDPCONNECTFR_CLIENT_SECRET');
 		$item->cssClass = 'minwidth500';
