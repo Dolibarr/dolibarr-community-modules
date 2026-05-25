@@ -969,11 +969,11 @@ class ActionsPdpconnectfr extends CommonHookActions
 				return 0;
 			}
 
-			// Einvoice generated or not
+			// E-invoice generation status
 			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
 				$tmparray = $pdpConnectFr->fetchLastknownInvoiceStatus(0, $obj->ref);
 				$einvoiceGenerated = $tmparray['file'];
-				print '<td class="center tdoverflowmax125">';
+				print '<td class="center tdoverflowmax100">';
 				if ($einvoiceGenerated) {
 					print '<i class="fas fa-check-circle" style="color:green;" title="' . $langs->trans('EInvoiceGenerated') . '"></i>';
 				}
@@ -983,10 +983,10 @@ class ActionsPdpconnectfr extends CommonHookActions
 				}
 			}
 
-			// Sync status
+			// E-invoice sync status
 			if (empty($parameters['arrayfields']['pdp_syncstatus']) || !empty($parameters['arrayfields']['pdp_syncstatus']['checked'])) {
 				$currentStatusDetails = $obj->pdp_syncstatus ? $pdpConnectFr->getStatusLabel($obj->pdp_syncstatus) : '-';
-				print '<td class="center tdoverflowmax125" title="' . dolPrintHTMLForAttribute($currentStatusDetails) . '">';
+				print '<td class="center tdoverflowmax100" title="' . dolPrintHTMLForAttribute($currentStatusDetails) . '">';
 				print $currentStatusDetails;
 				print '</td>';
 				if (isset($parameters['i']) && empty($parameters['i'])) {
@@ -999,7 +999,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 		if (in_array('supplierinvoicelist', explode(':', $parameters['context'])) && !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI')) {
 			$obj = $parameters['obj'];
 
-			print '<td class="tdoverflowmax125">';
+			print '<td class="tdoverflowmax100">';
 			if ($obj->pdplink_id) {
 				print dolPrintHTML($obj->pdp_provider);
 			}
