@@ -293,7 +293,7 @@ foreach ($object->lines as $line) {
 	}
 
 	// VAT category and exemption reason of the line
-	$tmparray = $this->getCategoryRate($line->tva_tx, $line->id, $mysoc, $object);
+	$tmparray = $this->getCategoryRate($line, $mysoc, $object);
 	$categoryVAT = $tmparray['categoryVAT'];
 	$exemptionReason = $tmparray['ExemptionReason'];
 	$exemptionReasonCode = $tmparray['ExemptionReasonCode'];

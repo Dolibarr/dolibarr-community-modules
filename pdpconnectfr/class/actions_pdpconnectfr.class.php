@@ -215,8 +215,11 @@ class ActionsPdpconnectfr extends CommonHookActions
 			}
 
 			print '<!-- Current AP: ' . getDolGlobalString('PDPCONNECTFR_PDP') . ' -->';
-			if (count($url_button)) {
-				print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true);
+			if (!empty($url_button)) {
+				// Pass the visible label as the 1st arg ($label), not the 2nd ($text). On Dolibarr 18/19
+				// the dropdown <a> renders only $label; v22+ falls back to $text when $label is empty,
+				// but to keep behavior consistent across versions we always use $label.
+				print dolGetButtonAction($langs->trans('einvoice'), '', 'default', $url_button, '', true);
 			}
 		}
 
@@ -256,7 +259,9 @@ class ActionsPdpconnectfr extends CommonHookActions
 						);
 					}
 
-					print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true);
+					if (!empty($url_button)) {
+						print dolGetButtonAction($langs->trans('einvoice'), '', 'default', $url_button, '', true);
+					}
 				}
 			}
 		}
@@ -939,7 +944,9 @@ class ActionsPdpconnectfr extends CommonHookActions
 		}
 
 		if (in_array('thirdpartylist', explode(':', $parameters['context'])) && (!getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI'))) {
-			print print_liste_field_titre($langs->transnoentitiesnoconv('pdpconnectfrThirdPartyRoutingTitle'));
+			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
+				print print_liste_field_titre($langs->transnoentitiesnoconv('pdpconnectfrThirdPartyRoutingTitle'));
+			}
 		}
 
 		if (in_array('productlist', explode(':', $parameters['context'])) && (!getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI'))) {
@@ -973,11 +980,11 @@ class ActionsPdpconnectfr extends CommonHookActions
 				return 0;
 			}
 
-			// Einvoice generated or not
+			// E-invoice generation status
 			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
 				$tmparray = $pdpConnectFr->fetchLastknownInvoiceStatus(0, $obj->ref);
 				$einvoiceGenerated = $tmparray['file'];
-				print '<td class="center tdoverflowmax125">';
+				print '<td class="center tdoverflowmax100">';
 				if ($einvoiceGenerated) {
 					print '<i class="fas fa-check-circle" style="color:green;" title="' . $langs->trans('EInvoiceGenerated') . '"></i>';
 				}
@@ -987,10 +994,10 @@ class ActionsPdpconnectfr extends CommonHookActions
 				}
 			}
 
-			// Sync status
+			// E-invoice sync status
 			if (empty($parameters['arrayfields']['pdp_syncstatus']) || !empty($parameters['arrayfields']['pdp_syncstatus']['checked'])) {
 				$currentStatusDetails = $obj->pdp_syncstatus ? $pdpConnectFr->getStatusLabel($obj->pdp_syncstatus) : '-';
-				print '<td class="center tdoverflowmax125" title="' . dolPrintHTMLForAttribute($currentStatusDetails) . '">';
+				print '<td class="center tdoverflowmax100" title="' . dolPrintHTMLForAttribute($currentStatusDetails) . '">';
 				print $currentStatusDetails;
 				print '</td>';
 				if (isset($parameters['i']) && empty($parameters['i'])) {
@@ -1003,7 +1010,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 		if (in_array('supplierinvoicelist', explode(':', $parameters['context'])) && !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI')) {
 			$obj = $parameters['obj'];
 
-			print '<td class="tdoverflowmax125">';
+			print '<td class="tdoverflowmax100">';
 			if ($obj->pdplink_id) {
 				print dolPrintHTML($obj->pdp_provider);
 			}
@@ -1014,15 +1021,17 @@ class ActionsPdpconnectfr extends CommonHookActions
 		}
 
 		if (in_array('thirdpartylist', explode(':', $parameters['context']), true)) {
-			$obj = $parameters['obj'];
+			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
+				$obj = $parameters['obj'];
 
-			print '<td class="tdoverflowmax125">';
-			if ($obj->pdplink_id) {
-				print dolPrintHTML($obj->routing_id);
-			}
-			print '</td>';
-			if (isset($parameters['i']) && empty($parameters['i'])) {
-				$parameters['totalarray']['nbfield']++;
+				print '<td class="tdoverflowmax125">';
+				if ($obj->pdplink_id) {
+					print dolPrintHTML($obj->routing_id);
+				}
+				print '</td>';
+				if (isset($parameters['i']) && empty($parameters['i'])) {
+					$parameters['totalarray']['nbfield']++;
+				}
 			}
 		}
 

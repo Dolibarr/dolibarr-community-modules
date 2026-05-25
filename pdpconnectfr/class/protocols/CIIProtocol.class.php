@@ -441,6 +441,7 @@ class CIIProtocol extends AbstractProtocol
 
 		include_once DOL_DOCUMENT_ROOT.'/core/lib/price.lib.php';
 		// Force MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY, so we are sure sample is valid at the initial object.
+		// TODO Make this sample generation working with any configuration of discount.
 		$conf->global->MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY = 2;
 
 		$tmp = calcul_price_total($line->qty, $line->subprice, $line->remise_percent, $line->tva_tx, 0, 0, 0, 'HT', 0, 0);
@@ -706,6 +707,9 @@ class CIIProtocol extends AbstractProtocol
 
 		// Add invoice lines
 		foreach ($parsedLines as $parsedLine) {
+			// Add supplier ID to line for later use in product sync
+			$parsedLine['supplierId'] = $socId;
+
 			$is_deposit_line = 0;
 			$fk_remise = 0;
 			// --------------------------------------------------
@@ -1549,7 +1553,7 @@ class CIIProtocol extends AbstractProtocol
 		// Add the ship to trade party (mandatory when using intracommunity delivery)
 		$shiptotrade = $doc->createElement('ram:ShipToTradeParty');
 		$delivery->appendChild($shiptotrade);
-		$this->buildParty($doc, $shiptotrade, $invoiceData, 'buyer');
+		$this->buildParty($doc, $shiptotrade, $invoiceData, 'buyer', false);
 
 
 		if (!empty($invoiceData['documentDeliveryDate'])) {
@@ -1792,14 +1796,19 @@ class CIIProtocol extends AbstractProtocol
 	 * @param \DOMElement  		$agreement 		Parent agreement node to append to
 	 * @param array       		$data      		Invoice data array
 	 * @param string      		$type      		'seller' or 'buyer'
+	 * @param bool        		$wrap			Whether to wrap in SellerTradeParty/BuyerTradeParty (true for main parties, false for ship to party)
 	 *
 	 * @return void
 	 */
-	private function buildParty($doc, $agreement, $data, $type)
+	private function buildParty($doc, $agreement, $data, $type, $wrap = true)
 	{
-		$tag = $type === 'seller' ? 'ram:SellerTradeParty' : 'ram:BuyerTradeParty';
-		$node = $doc->createElement($tag);
-		$agreement->appendChild($node);
+		if ($wrap) {
+			$tag = $type === 'seller' ? 'ram:SellerTradeParty' : 'ram:BuyerTradeParty';
+			$node = $doc->createElement($tag);
+			$agreement->appendChild($node);
+		} else {
+			$node = $agreement;
+		}
 
 		$prefix = $type;
 
@@ -1861,7 +1870,9 @@ class CIIProtocol extends AbstractProtocol
 		$node->appendChild($addr);
 
 		$addr->appendChild($doc->createElement('ram:PostcodeCode', $data[$prefix . 'postcode']));
-		$addr->appendChild($doc->createElement('ram:LineOne', htmlspecialchars($data[$prefix . 'lineone'])));
+		if (!empty($data[$prefix . 'lineone'])) {
+			$addr->appendChild($doc->createElement('ram:LineOne', htmlspecialchars($data[$prefix . 'lineone'])));
+		}
 		$addr->appendChild($doc->createElement('ram:CityName', htmlspecialchars($data[$prefix . 'city'])));
 		$addr->appendChild($doc->createElement('ram:CountryID', $data[$prefix . 'country']));
 

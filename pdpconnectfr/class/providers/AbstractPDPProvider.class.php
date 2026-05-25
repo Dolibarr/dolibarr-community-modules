@@ -146,17 +146,21 @@ abstract class AbstractPDPProvider
 	 */
 	public function getApiUrl($mode = 'api')
 	{
-		$prod = getDolGlobalString('PDPCONNECTFR_LIVE', '');
+		// Use getDolGlobalInt so that PDPCONNECTFR_LIVE = "0" is correctly treated as test mode.
+		// A previous "$prod != ''" comparison was incorrect because '0' != '' is true in PHP,
+		// which made the module hit the production endpoint as soon as the user had ever toggled
+		// the "real mode" switch (the const gets stored as "0" instead of being deleted).
+		$prod = getDolGlobalInt('PDPCONNECTFR_LIVE');
 
 		if ($mode === 'auth') {
 			$url = $this->config['test_auth_url'];
-			if ($prod != '') {
+			if (!empty($prod)) {
 				$url = $this->config['prod_auth_url'];
 			}
 			return $url;
 		} else {
 			$url = $this->config['test_api_url'];
-			if ($prod != '') {
+			if (!empty($prod)) {
 				$url = $this->config['prod_api_url'];
 			}
 		}
