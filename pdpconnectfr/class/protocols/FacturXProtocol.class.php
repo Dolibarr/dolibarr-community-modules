@@ -568,12 +568,19 @@ class FacturXProtocol extends AbstractProtocol
 			}
 
 			// Restore metadata from original PDF.
+			// horstoeko/zugferd setters require non-null strings, so default to '' for Dolibarr
+			// versions that do not ship pdfExtractMetadata() (v18 / v19); v22+ overwrites these
+			// with the actual values parsed from the source PDF.
+			$keywords = '';
+			$subject = '';
+			$author = '';
+			$creator = '';
 			if (function_exists('pdfExtractMetadata')) {	// From Dolibarr v22
 				// Now we get the metadata keywords from the $sourcefile PDF (by parsing the binary PDF file)
-				$keywords = pdfExtractMetadata($orig_pdf, 'Keywords');
-				$subject = pdfExtractMetadata($orig_pdf, 'Subject');
-				$author = pdfExtractMetadata($orig_pdf, 'Author');
-				$creator = pdfExtractMetadata($orig_pdf, 'Creator');
+				$keywords = (string) pdfExtractMetadata($orig_pdf, 'Keywords');
+				$subject = (string) pdfExtractMetadata($orig_pdf, 'Subject');
+				$author = (string) pdfExtractMetadata($orig_pdf, 'Author');
+				$creator = (string) pdfExtractMetadata($orig_pdf, 'Creator');
 			}
 
 			$merger = new ZugferdDocumentPdfMerger($xmlfile, $orig_pdf);
