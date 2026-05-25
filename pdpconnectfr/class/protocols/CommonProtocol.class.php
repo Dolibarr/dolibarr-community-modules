@@ -996,16 +996,23 @@ trait CommonProtocol
 	}
 
 	/**
-	 * Get the category of the VAT rate
+	 * Get the category of the VAT rate and the VATEX code and reason.
 	 *
-	 * @param 	float					$vat_rate		Vat rate
-	 * @param 	int						$id				Id of line for log if an error is found
+	 * @param 	CommonInvoiceLine		$line			Invoice line
 	 * @param 	Societe 				$seller			Seller
 	 * @param 	Societe					$buyer			Buyer
 	 * @return 	array<string,string>					array('categoryVAT' => Category of VAT rate ('S', 'K', 'E', 'G'), 'ExemptionReason' => '', 'ExemptionReasonCode => '')
 	 */
-	public function getCategoryRate($vat_rate, $id, $seller, $buyer)
+	public function getCategoryRate($line, $seller, $buyer)
 	{
+		global $langs;
+
+		$vat_rate = $line->tva_tx;
+		$vat_src_code = $line->vat_src_code;
+		$id = $line->id;
+
+		$errormsg = '';
+
 		$exemptionReason = null;		// BT-120
 		$exemptionReasonCode = null;	// BT-121 - Mut contains a VATEX code. https://docs.peppol.eu/poacc/billing/3.0/codelist/vatex/
 
@@ -1042,7 +1049,11 @@ trait CommonProtocol
 							$exemptionReason = getDolGlobalString('MAIN_INFO_SOCIETE_VAT_EXEMPTION_REASON', 'Tax exempted');
 						}
 						if (empty($exemptionReasonCode)) {
-							throw new Exception('MISSINGSETUP: Your organization is configured to not use VAT. In this case, you must enter into MAIN_INFO_SOCIETE_VAT_EXEMPTION_CODE the reason code of exemption (VATEX-FR-CGI261-4, VATEX-FR-CGI261-4.');
+							if ((float) DOl_VERSION < 24.0) {
+								throw new Exception('MISSINGSETUP: Your organization is configured to not use VAT. In this case, you must enter into the constant MAIN_INFO_SOCIETE_VAT_EXEMPTION_CODE the reason code of exemption (VATEX-FR-CGI261-4, VATEX-FR-CGI261-4.');
+							} else {
+								throw new Exception('MISSINGSETUP: Your organization is configured to not use VAT. In this case, you must enter into the reason code of exemption in the setup of your organization (VATEX-FR-CGI261-4, VATEX-FR-CGI261-4.');
+							}
 						}
 					}
 				} elseif (!$buyer->thirdparty->isInEEC()) {
@@ -1052,9 +1063,52 @@ trait CommonProtocol
 				} elseif ($buyer->thirdparty->isInEEC() && $seller->country_code != $buyer->thirdparty->country_code) {
 					$categoryVAT = 'K';		// Intra communautary VAT
 					$exemptionReasonCode = 'VATEX-EU-IC';
-					$exemptionReason = 'Intracomm VAT';
+					$exemptionReason = 'Intracommunautary VAT';
 				} else {
-					$exemptionReason = 'Unknown exempt vat reason';
+					// The sell is from an EU country to the same country, reason depends on the line itself (on the vat race/code used)
+					if ((float) DOL_VERSION < 24.0) {
+						// We must use the reason found in the constant MAIN_VAT_EXEMPTION_CODE_FOR_0.00_XXXX
+						$vat_rate = price2num($vat_rate, 2);
+						$constantforvatex = "MAIN_VAT_EXEMPTION_CODE_FOR_" . $vat_rate.($vat_src_code ? "_". $vat_src_code : '');
+						$vatex = getDolGlobalString($constantforvatex);
+
+						if (empty($vatex)) {
+							$errormsg = $langs->trans("UnknownVATEX1", $id, '0', $vat_src_code);
+							$errormsg .= ' '.$langs->trans("UnknownVATEX2a", $constantforvatex);
+							//$exemptionReason .= ' '.$langs->trans("ClickHere", $constantforvatex);		// Go on other setup page
+
+							throw new Exception('MISSINGSETUP: '.$errormsg);
+						} else {
+							$exemptionReasonCode = $vatex;
+							$exemptionReason = '';
+						}
+					} else {
+						// We must use the reason found on the vat code definition in the dictionnary table.
+						global $db, $mysoc;
+						$sql = "SELECT einvoice_vatex FROM ".MAIN_DB_PREFIX."c_tva";
+						$sql .= " WHERE taux = ".((float) $vat_rate);
+						$sql .= " AND active = 1";
+						$sql .= " AND fk_pays = '".$db->escape($mysoc->country_code)."'";
+						$sql .= " AND code = '".$db->escape($vat_src_code)."'";
+						$resql = $db->query($sql);
+						if ($resql) {
+							$obj = $db->fetch_object($resql);
+							if ($obj) {
+								$exemptionReasonCode = $obj->einvoice_vatex;
+							}
+						}
+
+						if (empty($vatex)) {
+							$errormsg = $langs->trans("UnknownVATEX1", $id, '0', $vat_src_code);
+							$errormsg .= ' '.$langs->trans("UnknownVATEX2b", $constantforvatex);
+							//$errormsg .= ' '.$langs->trans("ClickHere", $constantforvatex);		// Go on dictionary page
+
+							throw new Exception('MISSINGSETUP: '.$errormsg);
+						} else {
+							$exemptionReasonCode = $vatex;
+							$exemptionReason = '';
+						}
+					}
 				}
 			} else {
 				$categoryVAT = 'Z';		// Seller is not in EU
