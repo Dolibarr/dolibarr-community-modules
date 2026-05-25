@@ -47,7 +47,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 	 * @param Hookmanager			$hookmanager	Hookmanager
 	 * @return int									Result
 	 */
-	public function messageOfTheDay($parameters, &$object, &$action, $hookmanager)
+	public function messageOfTheDay($parameters, $object, &$action, $hookmanager)
 	{
 		return 0;
 	}
@@ -539,7 +539,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 	 * @param CommonObject	$object			Object
 	 * @param string		$action			Action code
 	 * @param Hookmanager	$hookmanager	Hook manager
-	 * @return number
+	 * @return int
 	 */
 	public function formConfirm($parameters, $object, &$action, $hookmanager)
 	{
@@ -590,6 +590,8 @@ class ActionsPdpconnectfr extends CommonHookActions
 				$this->resprints .= $formconfirm;
 			}
 		}
+
+		return 0;
 	}
 
 	/**
@@ -693,6 +695,8 @@ class ActionsPdpconnectfr extends CommonHookActions
 				'perms' => '1'
 			);
 		}
+
+		return 0;
 	}
 
 
