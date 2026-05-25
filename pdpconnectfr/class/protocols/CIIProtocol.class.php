@@ -707,7 +707,6 @@ class CIIProtocol extends AbstractProtocol
 
 		// Add invoice lines
 		foreach ($parsedLines as $parsedLine) {
-
 			// Add supplier ID to line for later use in product sync
 			$parsedLine['supplierId'] = $socId;
 
