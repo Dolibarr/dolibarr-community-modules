@@ -334,8 +334,7 @@ if (!function_exists("GETPOSTFLOAT")) {
 	}
 }
 
-if (!function_exists('dolPrintHTML'))
-{
+if (!function_exists('dolPrintHTML')) {
 	/**
 	 * Return a string ready to be output on HTML page
 	 * To use text inside an attribute, use can use only dol_escape_htmltag()
@@ -570,14 +569,14 @@ if (!function_exists('pdfExtractMetadata')) {
 		if (!dol_is_file($file)) {
 			return "ERROR: FILE NOT FOUND OR NOT VALID";
 		}
-	
+
 		// Get content of PDF file
 		$content = file_get_contents(dol_osencode($file));
-	
+
 		// Use a regex to capture the metadata
 		if ($content) {
 			$matches = array();
-	
+
 			// Remove non printablecaracters
 			$content = preg_replace('/[^(\x20-\x7F)]*/', '', $content);
 			if (preg_match('/\/' . preg_quote($field, '/') . '\s*\((.*?)\)/', $content, $matches)) {
