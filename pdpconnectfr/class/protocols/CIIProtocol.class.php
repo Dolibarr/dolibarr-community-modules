@@ -514,7 +514,7 @@ class CIIProtocol extends AbstractProtocol
 
 
 		// Generate the Dolibarr PDF of the invoice
-		$tmpinvoice->generateDocument($tmpinvoice->model, $outputlangs);
+		$tmpinvoice->generateDocument($tmpinvoice->model_pdf, $outputlangs);
 
 		// For invoice with ->specimen=1, the file is SPECIMEN.pdf so we rename it into ref
 		$dir = $conf->invoice->multidir_output[$conf->entity];
