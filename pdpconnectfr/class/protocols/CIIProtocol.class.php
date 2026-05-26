@@ -543,7 +543,7 @@ class CIIProtocol extends AbstractProtocol
 		if (is_numeric($pathOfXml) && $pathOfXml < 0) {
 			$result = $pathOfXml;
 		} else {
-			$newPathOfXml = dirname($pathOfXml) . '/temp/' . basename($pathOfXml);
+			$newPathOfXml = $dir . '/temp/' . basename($pathOfXml);
 			dol_move($pathOfXml, $newPathOfXml, '0', 1);
 
 			$result = array('path' => $newPathOfXml, 'ref' => $tmpinvoice->ref);
