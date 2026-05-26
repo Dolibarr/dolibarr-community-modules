@@ -1263,7 +1263,6 @@ class PdpConnectFr
 					}
 					$selectOptions[$routing_id] = $label;
 				}
-				var_dump($selectOptions, $currentOverrideRouting);
 				if ($action == 'editoverride_routing_id') {
 					$resprints .= '<form name="setoverrriderouting" action="' . $_SERVER["PHP_SELF"] . '?id=' . $object->id . '" method="post">';
 					$resprints .= '<input type="hidden" name="token" value="' . newToken() . '">';
