@@ -550,8 +550,14 @@ if (!method_exists('Societe', 'findNearest')) {
 	}
 }
 
-if (!function_exists('pdfExtractMetadata'))
-{
+// Force-load core's pdf.lib.php on versions where pdfExtractMetadata exists in core,
+// otherwise function_exists() returns false here (core lib not loaded yet) and the
+// polyfill below is declared, then core's later require_once redeclares it -> fatal.
+if (file_exists(DOL_DOCUMENT_ROOT . '/core/lib/pdf.lib.php')) {
+	require_once DOL_DOCUMENT_ROOT . '/core/lib/pdf.lib.php';
+}
+
+if (!function_exists('pdfExtractMetadata')) {
 	/**
 	 * Function to extract metadata from a PDF file by doing a binary parsing of the PDF file
 	 *
