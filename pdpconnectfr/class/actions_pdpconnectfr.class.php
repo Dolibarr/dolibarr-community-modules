@@ -86,7 +86,10 @@ class ActionsPdpconnectfr extends CommonHookActions
 			$invoiceObject->fetch_thirdparty();
 			$thirdpartyCountryCode = $invoiceObject->thirdparty->country_code;
 
-			if ($thirdpartyCountryCode === 'FR') {
+			// Get current status of e-invoice
+			$currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus($invoiceObject->id);
+
+			if ($thirdpartyCountryCode === 'FR' && (!isset($currentStatusDetails['code']) || $currentStatusDetails['code'] != $pdpConnectFr::STATUS_IGNORE)) {
 				/** @var Facture $invoiceObject */
 				if ($invoiceObject->status != $invoiceObject::STATUS_DRAFT
 					&& !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP')

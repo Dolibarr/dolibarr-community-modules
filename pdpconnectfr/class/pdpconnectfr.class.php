@@ -64,7 +64,7 @@ class PdpConnectFr
 	public const STATUS_AWAITING_ACK        = 20;
 	public const STATUS_ERROR               = 25;
 
-	public const STATUS_IGNORE              = 99;		// To not sync
+	public const STATUS_IGNORE              = 99;		// Never sync
 
 	// PDP / PA normalized statuses
 	// public const STATUS_DEPOSITED           = 200;

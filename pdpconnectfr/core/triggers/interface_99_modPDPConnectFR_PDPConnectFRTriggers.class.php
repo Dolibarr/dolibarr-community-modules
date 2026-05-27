@@ -85,21 +85,28 @@ class InterfacePDPConnectFRTriggers extends DolibarrTriggers
 		if ($action == 'BILL_VALIDATE') {
 			$pdpConnectFr = new PdpConnectFr($db);
 
-			$statustouse = $pdpConnectFr::STATUS_IGNORE;
+			$result = $pdpConnectFr->fetchLastknownInvoiceStatus($object->id);
 
-			// Test if invoice need to be managed by EInvoice
-			$needEinvoice = $pdpConnectFr->needEInvoiceManagement($object);
-			if ($needEinvoice) {
-				$statustouse = $pdpConnectFr::STATUS_NOT_GENERATED;
-			}
+			// If $result is $pdpConnectFr::STATUS_IGNORE, we do nothing.
 
-			$newobject = dol_clone($object, 2);
-			$newobject->ref = $object->newref;
+			// If einvoice was set to $pdpConnectFr::STATUS_NOT_GENERATED or $pdpConnectFr::STATUS_UNKNOWN, we set it to STATUS_IGNORE (if not qualified for einvoice) or STATUS_NOT_GENERATED (if qualified for einvoice)
+			if ($result == $pdpConnectFr::STATUS_NOT_GENERATED || $result == $pdpConnectFr::STATUS_UNKNOWN) {
+				$statustouse = $pdpConnectFr::STATUS_IGNORE;
 
-			$result = $pdpConnectFr->setEInvoiceStatus($newobject, $statustouse, '');
-			if ($result < 0) {
-				$this->errors[] = $pdpConnectFr->errors;
-				return -1;
+				// Test if invoice need to be managed by EInvoice
+				$needEinvoice = $pdpConnectFr->needEInvoiceManagement($object);
+				if ($needEinvoice) {
+					$statustouse = $pdpConnectFr::STATUS_NOT_GENERATED;
+				}
+
+				$newobject = dol_clone($object, 2);
+				$newobject->ref = $object->newref;
+
+				$result = $pdpConnectFr->setEInvoiceStatus($newobject, $statustouse, '');
+				if ($result < 0) {
+					$this->errors[] = $pdpConnectFr->errors;
+					return -1;
+				}
 			}
 		}
 
