@@ -236,7 +236,11 @@ class ActionsPdpconnectfr extends CommonHookActions
 				// Pass the visible label as the 1st arg ($label), not the 2nd ($text). On Dolibarr 18/19
 				// the dropdown <a> renders only $label; v22+ falls back to $text when $label is empty,
 				// but to keep behavior consistent across versions we always use $label.
-				print dolGetButtonAction($langs->trans('einvoice'), '', 'default', $url_button, '', true);
+				if ((float) DOL_VERSION < 22) {
+					print dolGetButtonAction($langs->trans('einvoice'), '', 'default', $url_button, '', true);
+				} else {
+					print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true);
+				}
 			}
 		}
 

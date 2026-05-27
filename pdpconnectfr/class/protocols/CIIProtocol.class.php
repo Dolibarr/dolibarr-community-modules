@@ -1440,6 +1440,7 @@ class CIIProtocol extends AbstractProtocol
 	public function buildXML(array $invoiceData, array $linesData, $profile = '')
 	{
 		$doc = new \DOMDocument('1.0', 'UTF-8');
+		$doc->preserveWhiteSpace = true; // Keep spaces and line feed
 		$doc->formatOutput = true;
 
 		// Root
@@ -1535,6 +1536,10 @@ class CIIProtocol extends AbstractProtocol
 			$note->appendChild($doc->createElement('ram:SubjectCode', 'AAB'));
 		}
 
+
+		//$root->appendChild($doc->createTextNode("\n "));
+
+
 		// Transaction
 		$sctt = $doc->createElement('rsm:SupplyChainTradeTransaction');
 		$root->appendChild($sctt);
@@ -1542,8 +1547,15 @@ class CIIProtocol extends AbstractProtocol
 
 		// LINES
 		foreach ($linesData as $line) {
+			// Add a XML comment to help debug
+			$comment = $doc->createComment('Line '.$line['lineid']);
+			$sctt->appendChild($comment);
+
 			$sctt->appendChild($this->buildLineItem($doc, $line, $profile));
 		}
+		// Add a XML comment to help debug
+		$comment = $doc->createComment('End of lines');
+		$sctt->appendChild($comment);
 
 
 		// SELLER / BUYER
@@ -1580,6 +1592,9 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 
+		// Add a XML comment to help debug
+		$comment = $doc->createComment('Footer');
+		$sctt->appendChild($comment);
 
 		// SETTLEMENT
 		$settlement = $doc->createElement('ram:ApplicableHeaderTradeSettlement');
