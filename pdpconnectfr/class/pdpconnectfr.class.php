@@ -1,6 +1,7 @@
 <?php
 /* Copyright (C) 2025       Laurent Destailleur         <eldy@users.sourceforge.net>
  * Copyright (C) 2025       Mohamed DAOUD               <mdaoud@dolicloud.com>
+ * Copyright (C) 2026		William Mead				<william@m34d.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -1691,7 +1692,14 @@ class PdpConnectFr
 			$resprints .= '<tr class="trpdpconnect_collapseseparator trrouting_product_id '.($expand_display ? '' : 'hidden').'">';
 			$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
 			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) -1).'"').'>';
-			$resprints .= $form->select_produits_fournisseurs($object->id, $product_id, 'routing_product_id', '', '', array(), 0, 1, '', '', 1);
+			if (version_compare(DOL_VERSION, '22.0.0', '<')) {
+				// Before v22, select_produits_fournisseurs() uses print instead of return
+				ob_start();
+				$form->select_produits_fournisseurs($object->id, $product_id, 'routing_product_id', '', '', array(), 0, 1);
+				$resprints .= ob_get_clean();
+			} else {
+				$resprints .= $form->select_produits_fournisseurs($object->id, $product_id, 'routing_product_id', '', '', array(), 0, 1, '', '', 1);
+			}
 			$resprints .= '</td>';
 			$resprints .= '</tr>';
 
