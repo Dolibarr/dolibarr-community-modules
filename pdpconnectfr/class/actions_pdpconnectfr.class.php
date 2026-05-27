@@ -91,8 +91,8 @@ class ActionsPdpconnectfr extends CommonHookActions
 
 			if ($thirdpartyCountryCode === 'FR' && (!isset($currentStatusDetails['code']) || $currentStatusDetails['code'] != $pdpConnectFr::STATUS_IGNORE)) {
 				/** @var Facture $invoiceObject */
-				if ($invoiceObject->status != $invoiceObject::STATUS_DRAFT
-					&& !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP')
+				if (//$invoiceObject->status != $invoiceObject::STATUS_DRAFT &&
+					!getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP')
 					&& getDolGlobalString('PDPCONNECTFR_EINVOICE_IN_REAL_TIME')) {
 					// Call function to create Factur-X document
 					require_once __DIR__ . '/protocols/ProtocolManager.class.php';

@@ -1562,11 +1562,25 @@ class CIIProtocol extends AbstractProtocol
 		$agreement = $doc->createElement('ram:ApplicableHeaderTradeAgreement');
 		$sctt->appendChild($agreement);
 
+		// Seller
+		$comment = $doc->createComment('Seller');
+		$agreement->appendChild($comment);
+
 		$this->buildParty($doc, $agreement, $invoiceData, 'seller');
+
+		// Add comment
+		$comment = $doc->createComment('Buyer');
+		$agreement->appendChild($comment);
+
 		$this->buildParty($doc, $agreement, $invoiceData, 'buyer');
 
 
 		// DELIVERY
+
+		// Add comment
+		$comment = $doc->createComment('Delivery');
+		$sctt->appendChild($comment);
+
 		$delivery = $doc->createElement('ram:ApplicableHeaderTradeDelivery');
 		$sctt->appendChild($delivery);
 
@@ -1632,10 +1646,20 @@ class CIIProtocol extends AbstractProtocol
 
 		// VAT array by rate (tax breakdown)
 		foreach ($invoiceData['taxBreakdown'] as $rate => $vals) {		// $rate is 0, 20.0, ..., $vals is an array
+			// Add comment
+			$comment = $doc->createComment('VAT rate: '.$vals['tva_tx'].', VAT src code: '.$vals['vat_src_code'].', ExemptionReasonCode: '.$vals['ExemptionReasonCode']);
+			$settlement->appendChild($comment);
+
 			$settlement->appendChild(
 				$this->buildTaxNode($doc, $rate, $vals, $invoiceData['invoiceCurrency']) 	// ApplicableTradeTax
 			);
 		}
+
+		// Payment mode
+
+		// Add comment
+		$comment = $doc->createComment('Payment mode');
+		$settlement->appendChild($comment);
 
 		$terms = $doc->createElement('ram:SpecifiedTradePaymentTerms');
 		$settlement->appendChild($terms);
@@ -1650,6 +1674,11 @@ class CIIProtocol extends AbstractProtocol
 		$terms->appendChild($dtNode);
 
 		// Totals
+
+		// Add comment
+		$comment = $doc->createComment('Totals');
+		$settlement->appendChild($comment);
+
 		$sum = $doc->createElement('ram:SpecifiedTradeSettlementHeaderMonetarySummation');
 		$settlement->appendChild($sum);
 
@@ -1935,10 +1964,6 @@ class CIIProtocol extends AbstractProtocol
 	private function buildTaxNode($doc, $rate, $vals, $currency)
 	{
 		$tax = $doc->createElement('ram:ApplicableTradeTax');
-
-		// Add comment
-		$comment = $doc->createComment('VAT rate: '.$vals['tva_tx'].', VAT src code: '.$vals['vat_src_code'].', ExemptionReasonCode: '.$vals['ExemptionReasonCode']);
-		$tax->appendChild($comment);
 
 		$tax->appendChild($doc->createElement('ram:CalculatedAmount', number_format($vals['totalTVA'], 2, '.', '')));
 
