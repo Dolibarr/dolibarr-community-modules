@@ -650,6 +650,7 @@ class FacturXProtocol extends AbstractProtocol
 		dol_mkdir($conf->pdpconnectfr->dir_temp);
 
 		$outputlangs = $langs;		// TODO Use the target language
+		$outputlangs->load("pdpconnectfr@pdpconnectfr");
 
 		require __DIR__ . "/ExampleHelpers.php";
 

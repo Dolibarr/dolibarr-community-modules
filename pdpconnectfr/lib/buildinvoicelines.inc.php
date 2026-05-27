@@ -149,6 +149,8 @@ if (empty($salerepresentative_email)) {
 	$salerepresentative_email = $mysoc->email;
 }
 
+
+$outputlangs = $langs;
 // Output language (client lang)
 if (isset($object->thirdparty->default_lang)) {
 	$newlang = $object->thirdparty->default_lang;
@@ -164,6 +166,8 @@ if (!empty($newlang)) {
 	$outputlangs = new Translate("", $conf);
 	$outputlangs->setDefaultLang($newlang);
 }
+$outputlangs->load("pdpconnectfr@pdpconnectfr");
+
 
 // Project
 if (! ($object->project instanceof Project)) {
