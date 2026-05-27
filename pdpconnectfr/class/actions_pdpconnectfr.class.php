@@ -86,10 +86,13 @@ class ActionsPdpconnectfr extends CommonHookActions
 			$invoiceObject->fetch_thirdparty();
 			$thirdpartyCountryCode = $invoiceObject->thirdparty->country_code;
 
-			if ($thirdpartyCountryCode === 'FR') {
+			// Get current status of e-invoice
+			$currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus($invoiceObject->id);
+
+			if ($thirdpartyCountryCode === 'FR' && (!isset($currentStatusDetails['code']) || $currentStatusDetails['code'] != $pdpConnectFr::STATUS_IGNORE)) {
 				/** @var Facture $invoiceObject */
-				if ($invoiceObject->status != $invoiceObject::STATUS_DRAFT
-					&& !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP')
+				if (//$invoiceObject->status != $invoiceObject::STATUS_DRAFT &&
+					!getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP')
 					&& getDolGlobalString('PDPCONNECTFR_EINVOICE_IN_REAL_TIME')) {
 					// Call function to create Factur-X document
 					require_once __DIR__ . '/protocols/ProtocolManager.class.php';
@@ -100,40 +103,58 @@ class ActionsPdpconnectfr extends CommonHookActions
 
 					// Check configuration
 					$result = $pdpConnectFr->checkRequiredinformations($invoiceObject);
-					if ($result['res'] < 0) {
+					if ($result['res'] < 0) {			// Error case
 						$message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
 
 						dol_syslog(__METHOD__ . " " . $message);
 
 						if (getDolGlobalString('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
-							// TODO : Remove this conf or add more conditions like thirdparty nature to avoid blocking invoice creation for non FR companies or for thirdparties that are not subject to E-invoicing obligation
-							setEventMessages($message, array(), 'errors');
-							// $this->errors[] = $message;
+							// Add more conditions like thirdparty nature to avoid blocking invoice creation for non FR companies
+							// or for thirdparties that are not subject to E-invoicing obligation
+							$messagecss = 'errors';
+							setEventMessages($message, array(), $messagecss);
 							return -1;
 						} else {
-							setEventMessages($message, array(), 'warnings');
+							$messagecss = 'warnings';
+							setEventMessages($message, array(), $messagecss);
 							$this->warnings[] = $message;
 							return 0;
 						}
-					} elseif ($result['res'] == 0) {
+					} elseif ($result['res'] == 0) {	// Warning case
 						$message = $langs->trans("InvoiceGeneratedWithWarnings") . ': <br>' . $result['message'];
 						$this->warnings[] = $message;
 
 						dol_syslog(__METHOD__ . " " . $message);
-						setEventMessages($message, array(), 'warnings');
+						$messagecss = 'warnings';
+						//setEventMessages($message, array(), $messagecss);
 					}
 
 					$result = $protocol->generateInvoice($invoiceObject, $outputlangs);		// Generate E-invoice
 
+					if ($result >= 0) {
+						setEventMessages($message, array(), $messagecss);
+					}
+
 					if ($result && (!is_numeric($result) || $result > 0)) {
-						// No error;
+						// No error
 						setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
 					} else {
 						if (getDolGlobalString('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
+							// If einvoice fails here, it must be always an error
 							$this->errors = array_merge($this->errors, $protocol->errors);
 							return -1;
 						} else {
-							return 0;
+							if ($result < 0) {
+								if ((float) DOL_VERSION < 24.0) {
+									$this->errors = array_merge($this->errors, $protocol->errors);
+									$this->warnings = array();	// We remove warning array to keep only the error array, because only errors array is managed with version < 24.0 of Dolibarr.
+								} else {
+									$this->warnings = array_merge($this->errors, $protocol->errors);	// We want to return the error as a warning.
+								}
+								return -1;
+							} else {
+								return 0;
+							}
 						}
 					}
 				}
@@ -219,7 +240,11 @@ class ActionsPdpconnectfr extends CommonHookActions
 				// Pass the visible label as the 1st arg ($label), not the 2nd ($text). On Dolibarr 18/19
 				// the dropdown <a> renders only $label; v22+ falls back to $text when $label is empty,
 				// but to keep behavior consistent across versions we always use $label.
-				print dolGetButtonAction($langs->trans('einvoice'), '', 'default', $url_button, '', true);
+				if ((float) DOL_VERSION < 22) {
+					print dolGetButtonAction($langs->trans('einvoice'), '', 'default', $url_button, '', true);
+				} else {
+					print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true);
+				}
 			}
 		}
 
@@ -306,14 +331,18 @@ class ActionsPdpconnectfr extends CommonHookActions
 		if (isset($object->element) && in_array($object->element, ['facture']) && !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP')) {
 			$permissiontoedit = $user->hasRight('facture', 'write');
 
-			// Get current status of e-invoice
-			$currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus(0, $object->ref);
-			// Action to set the E-invoice status manually
-			if ($action == 'seteinvoicestatus' && $permissiontoedit) {
-				$result = $pdpConnectFr->setEInvoiceStatus($object, GETPOSTINT('seteinvoicestatus'), '');
-				if ($result < 0) {
-					$error++;
-					$this->errors = array_merge($this->errors, $pdpConnectFr->errors);
+			if ($action == 'add') {
+				// On create, we can do nothing here. We will update the einvoice status into the CREATE trigger.
+			} else {
+				// Get current status of e-invoice
+				$currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus(0, $object->ref);
+				// Action to set the E-invoice status manually
+				if ($action == 'seteinvoicestatus' && $permissiontoedit) {
+					$result = $pdpConnectFr->setEInvoiceStatus($object, GETPOSTINT('seteinvoicestatus'), '');
+					if ($result < 0) {
+						$error++;
+						$this->errors = array_merge($this->errors, $pdpConnectFr->errors);
+					}
 				}
 			}
 
@@ -373,12 +402,12 @@ class ActionsPdpconnectfr extends CommonHookActions
 				}
 			}
 
-			// Action to generate the E-invoice
+			// Action to generate the E-invoice alone
 			if ($action == 'generate_einvoice' && $permissiontoedit) {
 				$object->fetch_thirdparty();
 				$invoiceObject = $object;
 
-				// Call function to create Factur-X document
+				// Call function to create E-invoice document
 				require_once __DIR__ . '/protocols/ProtocolManager.class.php';
 
 				$usedProtocols = getDolGlobalString('PDPCONNECTFR_PROTOCOL');
@@ -391,6 +420,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 					$message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
 
 					dol_syslog(__METHOD__ . " " . $message);
+
 					setEventMessages($message, array(), 'errors');
 					$error++;
 				} elseif ($result['res'] == 0) {	// Non blocking error, warning
@@ -403,6 +433,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 				if (!$error) {
 					$result = $protocol->generateInvoice($invoiceObject, $outputlangs);
 					if ($result && (!is_numeric($result) || $result > 0)) {
+						// No error
 						dol_syslog(__METHOD__ . " Invoice generated successfully for invoice ID " . $invoiceObject->id);
 						if (!empty($this->warnings)) {
 							setEventMessages($langs->trans("InvoiceGeneratedWithWarnings"), $this->warnings, 'warnings');

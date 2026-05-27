@@ -1030,7 +1030,7 @@ trait CommonProtocol
 				$categoryVAT = 'K';
 
 				if (empty($seller->tva_assuj)) {
-					// Can be $categoryVAT = E or AE
+					// Can be $categoryVAT = E (VAT exempted) or AE (Autoliquidation)
 					if (1 == 2) {	// Autoliquidation (the VAT is declared by the customer that pay it directly to the government). TODO Not yet managed.
 						$categoryVAT = 'AE';	// Autoliquidation
 						$exemptionReasonCode = 'VATEX-'.($seller->country_code == 'FR' ? 'FR' : 'EU').'-AE';	// VATEX-EU-AE or VATEX-FR-AE
@@ -1046,7 +1046,7 @@ trait CommonProtocol
 							// TVA non applicable - Vente objet :  art = VATEX-FR-I, antiquité = VATEX-FR-J
 							// TVA non applicable - Vente agence voyage:  VATEX-EU-D
 							$exemptionReasonCode = getDolGlobalString('MAIN_INFO_SOCIETE_VAT_EXEMPTION_CODE', 'VATEX-FR-FRANCHISE');		// VATEX-FR-FRANCHISE, VATEX-FR-CGI261-1, VATEX-FR-CGI261-4, ...
-							$exemptionReason = getDolGlobalString('MAIN_INFO_SOCIETE_VAT_EXEMPTION_REASON', 'Tax exempted');
+							$exemptionReason = getDolGlobalString('MAIN_INFO_SOCIETE_VAT_EXEMPTION_REASON', 'Tax exempted - TVA en franchise');
 						}
 						if (empty($exemptionReasonCode)) {
 							if ((float) DOl_VERSION < 24.0) {
@@ -1065,7 +1065,9 @@ trait CommonProtocol
 					$exemptionReasonCode = 'VATEX-EU-IC';
 					$exemptionReason = 'Intracommunautary VAT';
 				} else {
-					// The sell is from an EU country to the same country, reason depends on the line itself (on the vat race/code used)
+					$categoryVAT = 'E';		// Exempt from VAT (product).
+
+					// The sell is from an EU country to the same country, reason depends on the product line itself (reason saved into the VAT rate/code used)
 					if ((float) DOL_VERSION < 24.0) {
 						// We must use the reason found in the constant MAIN_VAT_EXEMPTION_CODE_FOR_0.00_XXXX
 						$vat_rate = price2num($vat_rate, 2);
@@ -1074,7 +1076,7 @@ trait CommonProtocol
 
 						if (empty($vatex)) {
 							$errormsg = $langs->trans("UnknownVATEX1", $id, '0', $vat_src_code);
-							$errormsg .= ' '.$langs->trans("UnknownVATEX2a", $constantforvatex);
+							$errormsg .= '<br>'.$langs->trans("UnknownVATEX2a", '0', ($vat_src_code ? $vat_src_code : "''"), $constantforvatex);
 							//$exemptionReason .= ' '.$langs->trans("ClickHere", $constantforvatex);		// Go on other setup page
 
 							throw new Exception('MISSINGSETUP: '.$errormsg);
@@ -1085,22 +1087,24 @@ trait CommonProtocol
 					} else {
 						// We must use the reason found on the vat code definition in the dictionnary table.
 						global $db, $mysoc;
+
 						$sql = "SELECT einvoice_vatex FROM ".MAIN_DB_PREFIX."c_tva";
 						$sql .= " WHERE taux = ".((float) $vat_rate);
 						$sql .= " AND active = 1";
-						$sql .= " AND fk_pays = '".$db->escape($mysoc->country_code)."'";
-						$sql .= " AND code = '".$db->escape($vat_src_code)."'";
+						$sql .= " AND fk_pays = ".((int) $mysoc->country_id);
+						$sql .= " AND (code = '".$db->escape($vat_src_code)."')";
 						$resql = $db->query($sql);
 						if ($resql) {
 							$obj = $db->fetch_object($resql);
 							if ($obj) {
-								$exemptionReasonCode = $obj->einvoice_vatex;
+								$vatex = $obj->einvoice_vatex;
 							}
 						}
 
 						if (empty($vatex)) {
+							$urltovatdic = DOL_URL_ROOT.'/admin/dict.php?id=10';
 							$errormsg = $langs->trans("UnknownVATEX1", $id, '0', $vat_src_code);
-							$errormsg .= ' '.$langs->trans("UnknownVATEX2b", $constantforvatex);
+							$errormsg .= '<br>'.$langs->trans("UnknownVATEX2b", '0', ($vat_src_code ? $vat_src_code : "''"), $urltovatdic);
 							//$errormsg .= ' '.$langs->trans("ClickHere", $constantforvatex);		// Go on dictionary page
 
 							throw new Exception('MISSINGSETUP: '.$errormsg);
