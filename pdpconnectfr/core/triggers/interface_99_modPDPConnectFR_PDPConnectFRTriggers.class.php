@@ -72,7 +72,14 @@ class InterfacePDPConnectFRTriggers extends DolibarrTriggers
 		}
 
 		if ($action == 'BILL_CREATE') {
-			//When invoice is created
+			$pdpConnectFr = new PdpConnectFr($db);
+
+			// When invoice is created
+			$result = $pdpConnectFr->setEInvoiceStatus($object, GETPOST('seteinvoicestatus'), '');
+			if ($result < 0) {
+				$this->errors[] = $pdpConnectFr->errors;
+				return -1;
+			}
 		}
 
 		if ($action == 'BILL_VALIDATE') {

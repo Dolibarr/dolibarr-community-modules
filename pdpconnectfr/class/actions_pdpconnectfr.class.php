@@ -306,14 +306,18 @@ class ActionsPdpconnectfr extends CommonHookActions
 		if (isset($object->element) && in_array($object->element, ['facture']) && !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP')) {
 			$permissiontoedit = $user->hasRight('facture', 'write');
 
-			// Get current status of e-invoice
-			$currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus(0, $object->ref);
-			// Action to set the E-invoice status manually
-			if ($action == 'seteinvoicestatus' && $permissiontoedit) {
-				$result = $pdpConnectFr->setEInvoiceStatus($object, GETPOSTINT('seteinvoicestatus'), '');
-				if ($result < 0) {
-					$error++;
-					$this->errors = array_merge($this->errors, $pdpConnectFr->errors);
+			if ($action == 'add') {
+				// On create, we can do nothing here. We will update the einvoice status into the CREATE trigger.
+			} else {
+				// Get current status of e-invoice
+				$currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus(0, $object->ref);
+				// Action to set the E-invoice status manually
+				if ($action == 'seteinvoicestatus' && $permissiontoedit) {
+					$result = $pdpConnectFr->setEInvoiceStatus($object, GETPOSTINT('seteinvoicestatus'), '');
+					if ($result < 0) {
+						$error++;
+						$this->errors = array_merge($this->errors, $pdpConnectFr->errors);
+					}
 				}
 			}
 
