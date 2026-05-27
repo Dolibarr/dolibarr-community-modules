@@ -1586,6 +1586,8 @@ class CIIProtocol extends AbstractProtocol
 		$sctt->appendChild($delivery);
 
 		// Add the ship to trade party (mandatory when using intracommunity delivery)
+		// ShipToTradeParty is itself a TradePartyType — populate it directly without
+		// wrapping it in another BuyerTradeParty (which would break XSD validation).
 		$shiptotrade = $doc->createElement('ram:ShipToTradeParty');
 		$delivery->appendChild($shiptotrade);
 		$this->buildParty($doc, $shiptotrade, $invoiceData, 'buyer', false);
@@ -1636,6 +1638,7 @@ class CIIProtocol extends AbstractProtocol
 			$acc = $doc->createElement('ram:PayeePartyCreditorFinancialAccount');
 			$pm->appendChild($acc);
 
+			// CII XSD order for CreditorFinancialAccountType: IBANID, ProprietaryID, AccountName
 			if (!empty($invoiceData['iban'])) {
 				$acc->appendChild($doc->createElement('ram:IBANID', $invoiceData['iban']));					// BT-84
 			} else {
@@ -1648,7 +1651,6 @@ class CIIProtocol extends AbstractProtocol
 					}
 				}
 			}
-
 			$acc->appendChild($doc->createElement('ram:AccountName', $invoiceData['accountName']));			// BT-85
 			if (empty($invoiceData['iban']) && !empty($invoiceData['accountRef'])) {	// If IBAN unknown we can fallback on the private ref.
 				$acc->appendChild($doc->createElement('ram:ProprietaryID', $invoiceData['accountRef']));	// BT-84-0
@@ -1883,8 +1885,26 @@ class CIIProtocol extends AbstractProtocol
 			$node = $agreement;
 		}
 
-		$prefix = $type;
+		$prefix = $type === 'seller' ? 'seller' : 'buyer';
+		$this->fillPartyData($doc, $node, $data, $prefix);
+	}
 
+	/**
+	 * Fill a TradeParty-typed element with seller/buyer data, respecting the XSD
+	 * child order (ID, GlobalID, Name, SpecifiedLegalOrganization, DefinedTradeContact,
+	 * PostalTradeAddress, URIUniversalCommunication, SpecifiedTaxRegistration).
+	 *
+	 * Used for SellerTradeParty/BuyerTradeParty wrappers AND directly for
+	 * ShipToTradeParty (which is itself a TradePartyType with no inner wrapper).
+	 *
+	 * @param \DOMDocument $doc    Document
+	 * @param \DOMElement  $node   TradeParty node to populate
+	 * @param array        $data   Invoice data
+	 * @param string       $prefix 'seller' or 'buyer'
+	 * @return void
+	 */
+	private function fillPartyData($doc, $node, $data, $prefix)
+	{
 		$node->appendChild($doc->createElement('ram:ID', $data[$prefix . 'ids']));
 
 		// GlobalID
