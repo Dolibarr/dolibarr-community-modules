@@ -1325,6 +1325,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 				}
 
 				$exchangeProtocol = $tmpProtocolManager->getProtocol($detectedProtocol);
+				if (empty($exchangeProtocol)) {
+					return array('res' => -1, 'message' => $langs->trans('ErrorProtocol', $detectedProtocol ?? 'undefefined'));
+				}
 
 				// Try to create the supplier + product + invoice
 				$res = $exchangeProtocol->createSupplierInvoiceFromSource($receivedFile, $ReadableViewFile, $flowId);
