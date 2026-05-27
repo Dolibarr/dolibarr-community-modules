@@ -295,8 +295,7 @@ class CIIProtocol extends AbstractProtocol
 
 	/**
 	 * Generate a complete CII invoice file.
-	 *
-	 * This function combines the invoice data with its corresponding XML
+	 * This function generates the einvoice file.
 	 *
 	 * @param 	int|Object 	$invoice_id    	Invoice ID or Invoice Object to be processed.
 	 * @param	?Translate	$outputlangs	Output language
@@ -1439,6 +1438,8 @@ class CIIProtocol extends AbstractProtocol
 	 */
 	public function buildXML(array $invoiceData, array $linesData, $profile = '')
 	{
+		global $langs;
+
 		$doc = new \DOMDocument('1.0', 'UTF-8');
 		$doc->preserveWhiteSpace = true; // Keep spaces and line feed
 		$doc->formatOutput = true;
@@ -1622,25 +1623,38 @@ class CIIProtocol extends AbstractProtocol
 
 		// Payment mode
 		if (!empty($invoiceData['paymentMeansCode'])) {
+			$comment = $doc->createComment('Payment mode');
+			$settlement->appendChild($comment);
+
 			// Payment means
 			$pm = $doc->createElement('ram:SpecifiedTradeSettlementPaymentMeans');
 			$settlement->appendChild($pm);
 
-			$pm->appendChild($doc->createElement('ram:TypeCode', $invoiceData['paymentMeansCode']));		// A code for payment type
+			$pm->appendChild($doc->createElement('ram:TypeCode', $invoiceData['paymentMeansCode']));		// A code for payment type BT-81 (BG-16)
 			$pm->appendChild($doc->createElement('ram:Information', $invoiceData['paymentMeansText']));		// A label for payment type
 
 			$acc = $doc->createElement('ram:PayeePartyCreditorFinancialAccount');
 			$pm->appendChild($acc);
 
-			$acc->appendChild($doc->createElement('ram:AccountName', $invoiceData['accountName']));
+			$acc->appendChild($doc->createElement('ram:AccountName', $invoiceData['accountName']));			// BT-85
+
 			if (!empty($invoiceData['iban'])) {
-				$acc->appendChild($doc->createElement('ram:IBANID', $invoiceData['iban']));
+				$acc->appendChild($doc->createElement('ram:IBANID', $invoiceData['iban']));					// BT-84
+			} else {
+				// If no IBAN provided
+				if ($invoiceData['paymentMeansCode'] == 30) {	// If payment by credit transfer
+					if (empty($invoiceData['iban_id'])) {
+						throw new Exception($langs->trans("IBANForSellerMandatoryOnCreditTransferButNotBankAcount").'<br>'.$langs->trans("IBANForSellerMandatoryOnCreditTransferButNotBankAcount2"), 1);
+					} else {
+						throw new Exception($langs->trans("IBANForSellerMandatoryOnCreditTransferButNotBAN").'<br>'.$langs->trans("IBANForSellerMandatoryOnCreditTransferButNotBAN2"), 1);
+					}
+				}
 			}
 
 			if (!empty($invoiceData['bic'])) {
 				$inst = $doc->createElement('ram:PayeeSpecifiedCreditorFinancialInstitution');
 				$pm->appendChild($inst);
-				$inst->appendChild($doc->createElement('ram:BICID', $invoiceData['bic']));
+				$inst->appendChild($doc->createElement('ram:BICID', $invoiceData['bic']));					// BT-86
 			}
 		}
 
@@ -1655,10 +1669,10 @@ class CIIProtocol extends AbstractProtocol
 			);
 		}
 
-		// Payment mode
+		// Payment terms
 
 		// Add comment
-		$comment = $doc->createComment('Payment mode');
+		$comment = $doc->createComment('Payment terms');
 		$settlement->appendChild($comment);
 
 		$terms = $doc->createElement('ram:SpecifiedTradePaymentTerms');

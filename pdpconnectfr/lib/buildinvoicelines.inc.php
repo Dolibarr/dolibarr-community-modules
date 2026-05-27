@@ -86,10 +86,14 @@ if ($promise_code == '' && !empty($customerOrderReferenceList)) {
 $account = new Account($db);
 if ($object->fk_account > 0) {
 	$account->fetch($object->fk_account);
-} else {
-	$account->fetch(getDolGlobalString('FACTURX_DEFAULT_BANK_ACCOUNT'));
+} elseif (getDolGlobalInt('FACTURE_RIB_NUMBER')) {
+	$account->fetch(getDolGlobalInt('FACTURE_RIB_NUMBER'));
 }
-$account_proprio = trim(!empty($account->proprio) ? $account->proprio : $account->owner_name);
+
+$account_proprio = '';
+if ($account->id > 0) {
+	$account_proprio = trim(!empty($account->proprio) ? $account->proprio : $account->owner_name);	// $account->proprio is for old version compatibility
+}
 if ($account_proprio == '') {
 	dol_syslog('Bank account holder name is empty, please correct it, use socname instead but it could be inccorrect for XRechnung BT-85: Payment account name', LOG_WARNING);
 	$account_proprio = $mysoc->name;
@@ -561,6 +565,7 @@ $invoiceData = [
 	'roundingAmount'            => null,
 	'totalPrepaidAmount'        => $prepaidAmount,
 
+	'iban_id'                   => $account->id,
 	'iban'                      => $pdpconnectfr->removeSpaces($account->iban),
 	'bic'                       => $pdpconnectfr->removeSpaces($account->bic),
 	'accountName'               => $account_proprio,

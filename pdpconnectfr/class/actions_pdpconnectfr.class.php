@@ -136,7 +136,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 					}
 
 					if ($result && (!is_numeric($result) || $result > 0)) {
-						// No error;
+						// No error
 						setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
 					} else {
 						if (getDolGlobalString('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
@@ -145,8 +145,12 @@ class ActionsPdpconnectfr extends CommonHookActions
 							return -1;
 						} else {
 							if ($result < 0) {
-								$this->errors = array_merge($this->errors, $protocol->errors);
-								$this->warnings = array();	// We remove warning array to keep only the error array.
+								if ((float) DOL_VERSION < 24.0) {
+									$this->errors = array_merge($this->errors, $protocol->errors);
+									$this->warnings = array();	// We remove warning array to keep only the error array, because only errors array is managed with version < 24.0 of Dolibarr.
+								} else {
+									$this->warnings = array_merge($this->errors, $protocol->errors);	// We want to return the error as a warning.
+								}
 								return -1;
 							} else {
 								return 0;
@@ -398,12 +402,12 @@ class ActionsPdpconnectfr extends CommonHookActions
 				}
 			}
 
-			// Action to generate the E-invoice
+			// Action to generate the E-invoice alone
 			if ($action == 'generate_einvoice' && $permissiontoedit) {
 				$object->fetch_thirdparty();
 				$invoiceObject = $object;
 
-				// Call function to create Factur-X document
+				// Call function to create E-invoice document
 				require_once __DIR__ . '/protocols/ProtocolManager.class.php';
 
 				$usedProtocols = getDolGlobalString('PDPCONNECTFR_PROTOCOL');
@@ -416,6 +420,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 					$message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
 
 					dol_syslog(__METHOD__ . " " . $message);
+
 					setEventMessages($message, array(), 'errors');
 					$error++;
 				} elseif ($result['res'] == 0) {	// Non blocking error, warning
@@ -428,6 +433,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 				if (!$error) {
 					$result = $protocol->generateInvoice($invoiceObject, $outputlangs);
 					if ($result && (!is_numeric($result) || $result > 0)) {
+						// No error
 						dol_syslog(__METHOD__ . " Invoice generated successfully for invoice ID " . $invoiceObject->id);
 						if (!empty($this->warnings)) {
 							setEventMessages($langs->trans("InvoiceGeneratedWithWarnings"), $this->warnings, 'warnings');

@@ -305,6 +305,10 @@ ConnectTo=Connect
 UnknownVATEX1=Unknown exempting VAT reason for the line %s that has the VAT rate %s and VAT code '%s'.
 UnknownVATEX2a=The administrator must define a valid VATEX code (reason of VAT exemption) for the couple (VAT rate / code) = (%s / %s) into the constant %s.
 UnknownVATEX2b=The administrator must define a valid VATEX code (reason of VAT exemption) for the couple (VAT rate / code) = (%s / %s) into the <a href="%s" target="_blank">dictionary of VAT rates</a>.
+IBANForSellerMandatoryOnCreditTransferButNotBankAcount=A payment mode was set to pay with credit transfer, but no default bank account to use for has been set.
+IBANForSellerMandatoryOnCreditTransferButNotBankAcount2=Set a default bank account in the configuration of the invoice module OR in the invoice itself (and check that this bank account has a BAN number defined).
+IBANForSellerMandatoryOnCreditTransferButNotBAN=A payment mode was set to pay with credit transfer, but the selected default bank account has no BAN number defined.
+IBANForSellerMandatoryOnCreditTransferButNotBAN2=Set a BAN number on the bank account.
 
 PDPCONNECTFR_CLIENT_ID=Client ID
 PDPCONNECTFR_CLIENT_SECRET=Client secret
