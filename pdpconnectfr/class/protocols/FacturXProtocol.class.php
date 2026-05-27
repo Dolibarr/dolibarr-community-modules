@@ -132,7 +132,7 @@ class FacturXProtocol extends AbstractProtocol
 
 			// Generate the XML file
 			$filename = dol_sanitizeFileName($invoice->ref);
-			$filedir = getMultidirOutputCompat($invoice, '', 1, 'temp');
+			$filedir = getMultidirOutputCompat($invoice, '', 1, 'temp');		// Example '/mydolibarr/documents/facture/temp/FAYYMM-XXXX'
 			$xmlfile = $filedir . '/' . $filename . '/factur-x.xml';	// Name of file should be factur-x.xml so it will also have this name once added into PDF
 
 			dol_mkdir(dirname($xmlfile));
@@ -389,7 +389,7 @@ class FacturXProtocol extends AbstractProtocol
 
 			// Generate the XML file Factur-X
 			$filename = dol_sanitizeFileName($invoice->ref);
-			$filedir  = getMultidirOutputCompat($invoice, '', 1, 'temp');
+			$filedir  = getMultidirOutputCompat($invoice, '', 1, 'temp');   // Example '/mydolibarr/documents/facture/temp/FAYYMM-XXXX'
 			$xmlfile  = $filedir . '/' . $filename . '/factur-x3.xml';
 
 			dol_mkdir(dirname($xmlfile));
@@ -473,7 +473,7 @@ class FacturXProtocol extends AbstractProtocol
 		$langs->loadLangs(array("admin", "pdpconnectfr@pdpconnectfr"));
 
 		$filename = dol_sanitizeFileName($invoice->ref);
-		$filedir = getMultidirOutputCompat($invoice, '', 1);
+		$filedir = getMultidirOutputCompat($invoice, '', 1);		// Example '/mydolibarr/documents/facture/FAYYMM-XXXX'
 		$orig_pdf = $filedir . '/' . $filename . '.pdf';
 
 		// Make a copy of the original PDF file
@@ -650,6 +650,7 @@ class FacturXProtocol extends AbstractProtocol
 		dol_mkdir($conf->pdpconnectfr->dir_temp);
 
 		$outputlangs = $langs;		// TODO Use the target language
+		$outputlangs->load("pdpconnectfr@pdpconnectfr");
 
 		require __DIR__ . "/ExampleHelpers.php";
 
