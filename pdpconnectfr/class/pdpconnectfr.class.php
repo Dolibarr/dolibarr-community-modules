@@ -1690,11 +1690,14 @@ class PdpConnectFr
 			$resprints .= '<tr class="trpdpconnect_collapseseparator trrouting_product_id '.($expand_display ? '' : 'hidden').'">';
 			$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
 			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) -1).'"').'>';
-			// select_produits_fournisseurs() uses print (not return) in older Dolibarr versions; capture either way
-			ob_start();
-			$selectOut = $form->select_produits_fournisseurs($object->id, $product_id, 'routing_product_id', '', '', array(), 0, 1);
-			$captured = ob_get_clean();
-			$resprints .= ($captured !== '' && $captured !== false) ? $captured : (string) $selectOut;
+			if (version_compare(DOL_VERSION, '22.0.0', '<')) {
+				// Before v22, select_produits_fournisseurs() uses print instead of return
+				ob_start();
+				$form->select_produits_fournisseurs($object->id, $product_id, 'routing_product_id', '', '', array(), 0, 1);
+				$resprints .= ob_get_clean();
+			} else {
+				$resprints .= $form->select_produits_fournisseurs($object->id, $product_id, 'routing_product_id', '', '', array(), 0, 1, '', '', 1);
+			}
 			$resprints .= '</td>';
 			$resprints .= '</tr>';
 
