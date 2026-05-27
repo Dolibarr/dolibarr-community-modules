@@ -336,7 +336,7 @@ class CIIProtocol extends AbstractProtocol
 			$xmlfile = $this->generateXML($invoice, $outputlangs);
 		} catch (Exception $e) {
 			dol_syslog(get_class($this) . "::generateInvoice failed to generate XML for invoice id=" . $invoice_id . ". Error " . $e->getMessage(), LOG_ERR);
-			$this->error = $langs->trans("ErrorGeneratingXML") . '. ' . $e->getMessage();
+			$this->error = $langs->trans("ErrorGeneratingXML") . '.<br>' . $e->getMessage();
 			$this->errors[] = $this->error;
 			return -1;
 		}

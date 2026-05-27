@@ -1074,7 +1074,7 @@ trait CommonProtocol
 
 						if (empty($vatex)) {
 							$errormsg = $langs->trans("UnknownVATEX1", $id, '0', $vat_src_code);
-							$errormsg .= ' '.$langs->trans("UnknownVATEX2a", $constantforvatex);
+							$errormsg .= '<br>'.$langs->trans("UnknownVATEX2a", '0', ($vat_src_code ? $vat_src_code : "''"), $constantforvatex);
 							//$exemptionReason .= ' '.$langs->trans("ClickHere", $constantforvatex);		// Go on other setup page
 
 							throw new Exception('MISSINGSETUP: '.$errormsg);
@@ -1099,8 +1099,9 @@ trait CommonProtocol
 						}
 
 						if (empty($vatex)) {
+							$urltovatdic = DOL_URL_ROOT.'/admin/dict.php?id=10';
 							$errormsg = $langs->trans("UnknownVATEX1", $id, '0', $vat_src_code);
-							$errormsg .= ' '.$langs->trans("UnknownVATEX2b", $constantforvatex);
+							$errormsg .= '<br>'.$langs->trans("UnknownVATEX2b", '0', ($vat_src_code ? $vat_src_code : "''"), $urltovatdic);
 							//$errormsg .= ' '.$langs->trans("ClickHere", $constantforvatex);		// Go on dictionary page
 
 							throw new Exception('MISSINGSETUP: '.$errormsg);

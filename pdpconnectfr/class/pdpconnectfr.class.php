@@ -737,7 +737,7 @@ class PdpConnectFr
 		$baseErrors = [];
 		$baseWarnings = [];
 
-		$einvoiceid = $this->getSellerCommunicationURI();
+		$einvoiceid = $this->getSellerCommunicationURI();	// Force value to '' if routing value does not match prof id.
 
 		// Error message if we failed to found the einvoiceid
 		if (empty($einvoiceid)) {
@@ -750,10 +750,12 @@ class PdpConnectFr
 
 					$uriConf = 'PDPCONNECTFR_' . strtoupper($provider) . '_ROUTING_ID';
 					$einvoiceid = getDolGlobalString($uriConf);
+
+					//PDPCONNECTFR_LIVE
 					if (!preg_match('/^' . preg_replace('/\s+/', '', $mysoc->idprof1) . '/', $this->removeSpaces($einvoiceid))) {
-						$baseWarnings[] = $langs->trans("FxCheckErrorRoutingIDFR", $einvoiceid);
+						$baseWarnings[] = $langs->trans("FxCheckErrorRoutingIDFR", $einvoiceid);	// Your company profid must match the routing ID
 					} else {
-						$baseErrors[] = $langs->trans("FxCheckErrorRoutingID");
+						$baseErrors[] = $langs->trans("FxCheckErrorRoutingID");	// Your company does not have a valid prof id
 					}
 				} else {
 					$baseErrors[] = $langs->trans("FxCheckErrorRoutingID");
@@ -2589,8 +2591,10 @@ class PdpConnectFr
 				if (!empty($einvoiceid)) {
 					$einvoiceid = $this->removeSpaces($einvoiceid);
 					if (!preg_match('/^' . preg_replace('/\s+/', '', $mysoc->idprof1) . '/', $einvoiceid)) {
-						dol_syslog("Error: The seller communication URI seems not correct (should be or start with your SIRET number). Value: " . $einvoiceid, LOG_ERR);
-						$einvoiceid = '';
+						if (getDolGlobalString('PDPCONNECTFR_LIVE')) {	// In live mode, we do not allow profid1 not matching routing id
+							dol_syslog("Error: The seller communication URI seems not correct (should be or start with your SIRET number). Value: " . $einvoiceid, LOG_WARNING);
+							$einvoiceid = '';
+						}
 					}
 				}
 			}

@@ -103,40 +103,54 @@ class ActionsPdpconnectfr extends CommonHookActions
 
 					// Check configuration
 					$result = $pdpConnectFr->checkRequiredinformations($invoiceObject);
-					if ($result['res'] < 0) {
+					if ($result['res'] < 0) {			// Error case
 						$message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
 
 						dol_syslog(__METHOD__ . " " . $message);
 
 						if (getDolGlobalString('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
-							// TODO : Remove this conf or add more conditions like thirdparty nature to avoid blocking invoice creation for non FR companies or for thirdparties that are not subject to E-invoicing obligation
-							setEventMessages($message, array(), 'errors');
-							// $this->errors[] = $message;
+							// Add more conditions like thirdparty nature to avoid blocking invoice creation for non FR companies
+							// or for thirdparties that are not subject to E-invoicing obligation
+							$messagecss = 'errors';
+							setEventMessages($message, array(), $messagecss);
 							return -1;
 						} else {
-							setEventMessages($message, array(), 'warnings');
+							$messagecss = 'warnings';
+							setEventMessages($message, array(), $messagecss);
 							$this->warnings[] = $message;
 							return 0;
 						}
-					} elseif ($result['res'] == 0) {
+					} elseif ($result['res'] == 0) {	// Warning case
 						$message = $langs->trans("InvoiceGeneratedWithWarnings") . ': <br>' . $result['message'];
 						$this->warnings[] = $message;
 
 						dol_syslog(__METHOD__ . " " . $message);
-						setEventMessages($message, array(), 'warnings');
+						$messagecss = 'warnings';
+						//setEventMessages($message, array(), $messagecss);
 					}
 
 					$result = $protocol->generateInvoice($invoiceObject, $outputlangs);		// Generate E-invoice
+
+					if ($result >= 0) {
+						setEventMessages($message, array(), $messagecss);
+					}
 
 					if ($result && (!is_numeric($result) || $result > 0)) {
 						// No error;
 						setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
 					} else {
 						if (getDolGlobalString('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
+							// If einvoice fails here, it must be always an error
 							$this->errors = array_merge($this->errors, $protocol->errors);
 							return -1;
 						} else {
-							return 0;
+							if ($result < 0) {
+								$this->errors = array_merge($this->errors, $protocol->errors);
+								$this->warnings = array();	// We remove warning array to keep only the error array.
+								return -1;
+							} else {
+								return 0;
+							}
 						}
 					}
 				}

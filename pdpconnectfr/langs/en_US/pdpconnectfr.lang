@@ -254,7 +254,7 @@ SendStatusMessage=Change and submit invoice status
 ConfirmSendStatusMessage=Are you sure you want to update the status of invoice %s and submit it to the Access Point as <b>%s</b>?
 SelectStatusReason=Reason
 TryToIncreaseStartDateOrMax=No new flow processed. Try to increase the "%s"
-ErrorGeneratingXML=Error when generating the XML file
+ErrorGeneratingXML=Error when generating the e-invoice XML file
 pdpconnectfrLastSentStatus=Last sent status
 pdpconnectfrInvoiceReason=E-invoicing status reason
 PDPCONNECTFR_PMT=Notice for recovery fees
@@ -302,9 +302,9 @@ CantFindThirdpartyFromTheImportedInvoice=The third party of the vendor of the im
 CantFindProductFromTheImportedInvoice=A product found in the imported invoice (%s) could not be found in your database, and auto-creation of product is disabled, so you must create it manually. See the following line...
 DisabledInProductionMode=Disabled in production mode.
 ConnectTo=Connect
-UnknownVATEX1=Unknown exempting VAT reason for the line %s with VAT rate %s (code '%s')
-UnknownVATEX2a=You must define the VATEX code (reason of vat exemption) for this VAT rate/code into the constant %s.
-UnknownVATEX2b=You must define the VATEX code (reason of vat exemption) for the VAT rate/code into the dictionary if VAT rates.
+UnknownVATEX1=Unknown exempting VAT reason for the line %s that has the VAT rate %s and VAT code '%s'.
+UnknownVATEX2a=The administrator must define a valid VATEX code (reason of VAT exemption) for the couple (VAT rate / VAT code) = (%s / %s) into the constant %s.
+UnknownVATEX2b=The administrator must define a valid VATEX code (reason of VAT exemption) for the couple (VAT rate / VAT code) = (%s / %s) into the <a href="%s">dictionary of VAT rates</a>.
 
 PDPCONNECTFR_CLIENT_ID=Client ID
 PDPCONNECTFR_CLIENT_SECRET=Client secret
