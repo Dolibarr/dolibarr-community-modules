@@ -28,9 +28,9 @@
 require_once DOL_DOCUMENT_ROOT . '/compta/bank/class/account.class.php';
 require_once DOL_DOCUMENT_ROOT . '/expedition/class/expedition.class.php';
 require_once DOL_DOCUMENT_ROOT . '/commande/class/commande.class.php';
-include_once DOL_DOCUMENT_ROOT . '/core/class/translate.class.php';
-include_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
-include_once DOL_DOCUMENT_ROOT . '/core/class/discount.class.php';
+require_once DOL_DOCUMENT_ROOT . '/core/class/translate.class.php';
+require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
+require_once DOL_DOCUMENT_ROOT . '/core/class/discount.class.php';
 require_once DOL_DOCUMENT_ROOT . '/core/lib/files.lib.php';
 
 dol_include_once('pdpconnectfr/class/protocols/AbstractProtocol.class.php');
@@ -544,7 +544,7 @@ class CIIProtocol extends AbstractProtocol
 		if (is_numeric($pathOfXml) && $pathOfXml < 0) {
 			$result = $pathOfXml;
 		} else {
-			$newPathOfXml = dirname($pathOfXml) . '/temp/' . basename($pathOfXml);
+			$newPathOfXml = $dir . '/temp/' . basename($pathOfXml);
 			dol_move($pathOfXml, $newPathOfXml, '0', 1);
 
 			$result = array('path' => $newPathOfXml, 'ref' => $tmpinvoice->ref);
