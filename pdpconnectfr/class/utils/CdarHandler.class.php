@@ -477,7 +477,9 @@ class CdarHandler
 
 		if (isset($data['GlobalID'])) {
 			$globalID = $xml->createElement('ram:GlobalID', $data['GlobalID']);
-			$globalID->setAttribute('schemeID', $data['SchemeID']);
+			if (!empty($data['SchemeID'])) {
+				$globalID->setAttribute('schemeID', $data['SchemeID']);
+			}
 			$party->appendChild($globalID);
 		}
 
