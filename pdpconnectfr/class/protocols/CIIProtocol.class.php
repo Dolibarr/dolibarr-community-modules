@@ -1651,8 +1651,6 @@ class CIIProtocol extends AbstractProtocol
 					}
 				}
 			}
-			$acc->appendChild($doc->createElement('ram:AccountName', $invoiceData['accountName']));
-
 			$acc->appendChild($doc->createElement('ram:AccountName', $invoiceData['accountName']));			// BT-85
 			if (empty($invoiceData['iban']) && !empty($invoiceData['accountRef'])) {	// If IBAN unknown we can fallback on the private ref.
 				$acc->appendChild($doc->createElement('ram:ProprietaryID', $invoiceData['accountRef']));	// BT-84-0
