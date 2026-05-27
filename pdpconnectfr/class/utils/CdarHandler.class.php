@@ -151,7 +151,7 @@ class CdarHandler
 	 * generate
 	 *
 	 * @param  array $data array of data
-	 * @return void
+	 * @return string|false
 	 */
 	public function generate($data)
 	{
@@ -172,7 +172,7 @@ class CdarHandler
 	 *
 	 * @param  array $data array of data
 	 * @param  string $filename filename
-	 * @return void
+	 * @return bool
 	 */
 	public function saveToFile($data, $filename)
 	{
