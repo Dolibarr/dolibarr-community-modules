@@ -1251,30 +1251,32 @@ class PdpConnectFr
 				$resprints .= $form->editfieldkey($form->textwithpicto($langs->trans("InvoiceRoutingOverride"), $langs->trans("InvoiceRoutingOverrideHelp")), 'override_routing_id', '', $object, (int) $editenable);
 				$resprints .= '</td>';
 				$resprints .= '<td>';
+				// Build select options: first option = thirdparty default (empty = no override)
+				$selectOptions = array('' => $langs->trans("InvoiceRoutingOverrideDefault"));
+				foreach ($allRoutings as $r) {
+					$label = $r['routing_id'];
+					$routing_id = $r['routing_id'];
+					if ($r['is_default']) {
+						$label .= ' (' . $langs->trans("Default") . ')';
+					}
+					if (!empty($r['info'])) {
+						$label .= ' — ' . $r['info'];
+						$routing_id .= '_' . $r['info'];
+					}
+					$selectOptions[$routing_id] = $label;
+				}
 				if ($action == 'editoverride_routing_id') {
 					$resprints .= '<form name="setoverrriderouting" action="' . $_SERVER["PHP_SELF"] . '?id=' . $object->id . '" method="post">';
 					$resprints .= '<input type="hidden" name="token" value="' . newToken() . '">';
 					$resprints .= '<input type="hidden" name="action" value="setoverriderouting">';
 					$resprints .= '<input type="hidden" name="page_y" value="page_y">';
 
-					// Build select options: first option = thirdparty default (empty = no override)
-					$selectOptions = array('' => $langs->trans("InvoiceRoutingOverrideDefault"));
-					foreach ($allRoutings as $r) {
-						$label = $r['routing_id'];
-						if ($r['is_default']) {
-							$label .= ' (' . $langs->trans("Default") . ')';
-						}
-						if (!empty($r['info'])) {
-							$label .= ' — ' . $r['info'];
-						}
-						$selectOptions[$r['routing_id']] = $label;
-					}
 					$resprints .= $form->selectarray('override_routing_id', $selectOptions, $currentOverrideRouting, 0, 0, 0, '', 1);
 					$resprints .= '<input type="submit" class="button button-edit smallpaddingimp reposition" value="' . $langs->trans('Modify') . '">';
 					$resprints .= '</form>';
 				} else {
 					if (!empty($currentOverrideRouting)) {
-						$resprints .= dol_escape_htmltag($currentOverrideRouting);
+						$resprints .= dol_escape_htmltag($selectOptions[$currentOverrideRouting]);
 					} else {
 						$resprints .= '<span class="opacitymedium">' . $langs->trans("InvoiceRoutingOverrideDefault") . '</span>';
 					}
@@ -1848,7 +1850,7 @@ class PdpConnectFr
 	 *
 	 * @param int			$invoiceId		Invoice ID
 	 * @param string		$invoiceRef		Invoice ref
-	 * @return string[]|number[]|mixed[][]|mixed[]
+	 * @return string[]|float[]|mixed[][]|mixed[]
 	 */
 	public function fetchLastknownInvoiceStatus($invoiceId = 0, $invoiceRef = '')
 	{
@@ -2266,8 +2268,12 @@ class PdpConnectFr
 		}
 
 		$obj = $db->fetch_object($resql);
+		$routing_id =  (string) $obj->routing_id;
+		if (!empty($obj->info)) {
+			$routing_id .= '_' . $obj->info;
+		}
 
-		return (string) $obj->routing_id;
+		return $routing_id;
 	}
 
 
