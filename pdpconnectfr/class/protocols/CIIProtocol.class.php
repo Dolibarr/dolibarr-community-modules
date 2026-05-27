@@ -277,7 +277,7 @@ class CIIProtocol extends AbstractProtocol
 
 		// Generate the XML file
 		$filename = dol_sanitizeFileName($invoice->ref);
-		$filedir = getMultidirOutput($invoice, '', 1, 'temp');		// Example '/mydolibarr/documents/facture/temp/FAYYMM-XXXX'
+		$filedir = getMultidirOutputCompat($invoice, '', 1, 'temp');    // Example '/mydolibarr/documents/facture/temp/FAYYMM-XXXX'
 		$xmlfile = $filedir . '/' . $filename . '/einvoice.xml';
 
 		dol_mkdir(dirname($xmlfile));
@@ -353,7 +353,7 @@ class CIIProtocol extends AbstractProtocol
 		$langs->loadLangs(array("admin", "pdpconnectfr@pdpconnectfr"));
 		// Make a copy of the XML file into the final destination
 		$filename = dol_sanitizeFileName($invoice->ref);
-		$filedir = getMultidirOutput($invoice, '', 1);		// Example '/mydolibarr/documents/facture/FAYYMM-XXXX'
+		$filedir = getMultidirOutputCompat($invoice, '', 1);      // Example '/mydolibarr/documents/facture/FAYYMM-XXXX'
 		$einvoice_path = $filedir . '/' . $filename . '_cii.xml';
 
 		if (dol_copy($xmlfile, $einvoice_path) > 0) {
