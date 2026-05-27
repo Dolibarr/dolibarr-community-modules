@@ -573,6 +573,8 @@ $invoiceData = [
 	'iban'                      => $pdpconnectfr->removeSpaces($account->iban),
 	'bic'                       => $pdpconnectfr->removeSpaces($account->bic),
 	'accountName'               => $account_proprio,
+	'accountRef'                => $account->ref,
+	'accountLabel'              => $account->label,
 
 	'paymentDueDate'            => new DateTime(dol_print_date($object->date_lim_reglement, 'dayrfc')),
 	'paymentTermsText'          => $langs->transnoentitiesnoconv("PaymentConditions") . ": " . $langs->transnoentitiesnoconv("PaymentCondition" . $object->cond_reglement_code),
