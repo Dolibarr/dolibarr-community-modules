@@ -272,11 +272,11 @@ class PdpConnectFr
 			"desc" => "Contrat terminé, plus de facture possible"
 		],
 		"DOUBLE_FACT" => [
-			"label" => "DOUBLE INVOICE",
+			"label" => "ReasonDoubleInvoice",
 			"desc" => "Prestation ou livraison déjà facturé sur une autre facture"
 		],
 		"CMD_ERR" => [
-			"label" => "Incorrect or missing ORDER number",
+			"label" => "ReasonIncorrectOrMissingOrderNumber",
 			"desc" => "Purchase Order (PO) number is incorrect, non-existent, or already invoiced. This reason can only be used with a 'REFUSED' status if the PO number was provided by the BUYER PRIOR TO INVOICING."
 		],
 		"ADR_ERR" => [

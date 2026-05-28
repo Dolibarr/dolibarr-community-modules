@@ -334,5 +334,8 @@ ReasonRoutingError=Routing error
 ReasonOther=Other
 ReasonBankCoordinatesError=Bank coordinates error
 ReasonContractTerminated=Contract terminated
+ReasonDoubleInvoice=Double invoice
+ReasonIncorrectOrMissingOrderNumber=Incorrect or missing order number
+
 ReasonUnknownTransaction=Unknown transaction
 ReasonUnknownIssuer=Unknown issuer
