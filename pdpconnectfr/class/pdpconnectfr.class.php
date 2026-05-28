@@ -1476,8 +1476,7 @@ class PdpConnectFr
 			$resql = $this->db->query($sql);
 			if ($resql && $this->db->num_rows($resql) > 0) {
 				$obj = $this->db->fetch_object($resql);
-				$currentStatus = $obj->lc_status;
-				$currentStatus = $this->getStatusLabel($currentStatus);
+				$currentStatus = $this->getStatusLabel($obj->lc_status);
 			}
 			// Current status
 			$resprints .= '<tr class="trpdpconnect_collapseseparator">';
@@ -1492,7 +1491,7 @@ class PdpConnectFr
 				$displayReasonLabel = '';
 			}
 
-			$resprints .= '<span id="einvoice-reason"' . ($displayReasonLabel ? ' ' . $displayReasonLabel : '') . '>' . $reasonLabel . '</span>';
+			$resprints .= '&nbsp;<span id="einvoice-reason"' . ($displayReasonLabel ? $displayReasonLabel : '') . '>' . $reasonLabel . '</span>';
 
 			$resprints .= '</td>';
 			$resprints .= '</tr>';
@@ -1517,6 +1516,7 @@ class PdpConnectFr
 			if (!empty($lastSentStatus) && ($lastSentStatus['lc_validation_status'] == 'Pending' || $lastSentStatus['lc_validation_status'] == 'Error')) {
 				$statusLabel = $this->getStatusLabel($lastSentStatus['lc_status']);
 				$statusvalidationLabel = $this->getStatusLabel($this->getDolibarrStatusCodeFromPdpLabel($lastSentStatus['lc_validation_status']));
+				$picto = '';
 				if ($lastSentStatus['lc_validation_status'] === 'Pending') {
 					$picto = img_picto('', 'timespent');
 				} elseif ($lastSentStatus['lc_validation_status'] === 'Error') {
