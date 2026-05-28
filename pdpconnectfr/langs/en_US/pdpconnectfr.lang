@@ -328,5 +328,11 @@ PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL4=3) Once the application has been created,
 PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL_VIA_PARTNER=To be able to use E-invoicing (using our Access Point partner <b>SuperPDP</b>), you must first create an E-Invoice account (this is a legal requirement in France): %s
 
 # Reasons
+ReasonRecipientNotConnected=Recipient not connected
+ReasonMissingOrInsufficientSupportingDocument=Missing or insufficient supporting document
+ReasonRoutingError=Routing error
+ReasonOther=Other
+ReasonBankCoordinatesError=Bank coordinates error
+ReasonContractTerminated=Contract terminated
 ReasonUnknownTransaction=Unknown transaction
 ReasonUnknownIssuer=Unknown issuer

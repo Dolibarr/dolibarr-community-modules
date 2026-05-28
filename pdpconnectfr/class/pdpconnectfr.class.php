@@ -212,23 +212,23 @@ class PdpConnectFr
 	// All reasons with their details (Used when sending supplier invoices status: Refused, Disputed, Suspended, Partially Approved)
 	private const REASONS = [
 		"NON_TRANSMISE" => [
-			"label" => "Recipient not connected",
+			"label" => "ReasonRecipientNotConnected",
 			"desc" => "This reason is used ONLY with the \"DEPOSITED\" status to indicate that the invoice could not be transmitted because the recipient (BUYER), although present in the PPF Directory, has no active invoice reception address (i.e., connected to an Approved Platform for reception)."
 		],
 		"JUSTIF_ABS" => [
-			"label" => "Missing or insufficient supporting document",
+			"label" => "ReasonMissingOrInsufficientSupportingDocument",
 			"desc" => "This reason should be used if attachments required for invoice processing are missing (status 'Suspended'). The issuer must then resubmit the lifecycle with a 'Completed' status, including the missing attachment(s)."
 		],
 		"ROUTAGE_ERR" => [
-			"label" => "Routing error",
+			"label" => "ReasonRoutingError",
 			"desc" => "This reason code should be used when the invoice routing information has become obsolete. This may occur, for example, due to a delay in directory updates or an error by the originating Certified Platform. Once the recipient has updated the directory, the invoice can be retransmitted (with no changes to the invoice data)."
 		],
 		"AUTRE" => [
-			"label" => "Other",
+			"label" => "ReasonOther",
 			"desc" => "Ce motif nécessite une explication en Note de CDV"
 		],
 		"COORD_BANC_ERR" => [
-			"label" => "Bank coordinates error",
+			"label" => "ReasonBankCoordinatesError",
 			"desc" => "Les références bancaires sur la facture ne correspondent pas à ce qui est paramétré chez le Payeur / Acheteur"
 		],
 		"TX_TVA_ERR" => [
@@ -268,7 +268,7 @@ class PdpConnectFr
 			"desc" => "L'émetteur de la facture est inconnu du Destinataire (anti-spam)"
 		],
 		"CONTRAT_TERM" => [
-			"label" => "Contract terminated",
+			"label" => "ReasonContractTerminated",
 			"desc" => "Contrat terminé, plus de facture possible"
 		],
 		"DOUBLE_FACT" => [
