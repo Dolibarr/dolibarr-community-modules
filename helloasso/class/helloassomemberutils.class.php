@@ -740,7 +740,8 @@ class HelloAssoMemberUtils
 		}
 		// Login creation for member
 		if (empty($createmember->login)) {
-			$login = strtolower($newmember->user->firstName).strtolower($newmember->user->lastName);
+			$login = $newmember->user->firstName.$newmember->user->lastName;
+			$login = mb_strtolower($login);
 			$sql = "SELECT COUNT(rowid) as nbmembers";
 			$sql .= " FROM ".MAIN_DB_PREFIX."adherent";
 			$sql .= " WHERE entity IN (".((int) getEntity($createmember->element)).")";
