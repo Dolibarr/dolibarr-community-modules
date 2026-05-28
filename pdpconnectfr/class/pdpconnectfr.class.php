@@ -260,11 +260,11 @@ class PdpConnectFr
 			"desc" => "The recipient legal entity is incorrect (Recipient's SIREN/Registration number). For instance, within a multi-company group, the invoiced company may not be the one that should have been billed."
 		],
 		"TRANSAC_INC" => [
-			"label" => "Unknown transaction",
+			"label" => "ReasonUnknownTransaction",
 			"desc" => "La facture ne correspond pas à une livraison effectuée ou une prestation de service livrée."
 		],
 		"EMMET_INC" => [
-			"label" => "Unknown issuer",
+			"label" => "ReasonUnknownIssuer",
 			"desc" => "L'émetteur de la facture est inconnu du Destinataire (anti-spam)"
 		],
 		"CONTRAT_TERM" => [
@@ -698,18 +698,18 @@ class PdpConnectFr
 	/**
 	 * Get reasons for a given status that will be used when sending supplier invoice status updates to PDP/PA (for statuses Refused, Disputed, Partially Approved, Suspended)
 	 *
-	 * @param int $statut		Status ID
+	 * @param int $status		Status ID
 	 * @param int $withDetails 	Return also desc if 1
 	 * @return array<string, array{code:string, label:string, desc:string}>|null
 	 */
-	public function getRaisonsByStatus($statut, $withDetails = 1)
+	public function getRaisonsByStatus($status, $withDetails = 1)
 	{
-		if (!isset(self::REASONS_CODE_FOR_STATUS[$statut])) {
+		if (!isset(self::REASONS_CODE_FOR_STATUS[$status])) {
 			return null;
 		}
 
 		$reasons = [];
-		foreach (self::REASONS_CODE_FOR_STATUS[$statut] as $code) {
+		foreach (self::REASONS_CODE_FOR_STATUS[$status] as $code) {
 			if (isset(self::REASONS[$code])) {
 				$reasons[$code] = [
 					'code' => $code,
@@ -1487,7 +1487,7 @@ class PdpConnectFr
 			$reasonLabel = '';
 			$displayReasonLabel = 'style="display:none;"';
 			if (!empty($obj->lc_reason_code)) {
-				$reasonLabel = $this->getRaisonsByStatus($obj->lc_status)[$obj->lc_reason_code]['label'] ?? $obj->lc_reason_code;
+				$reasonLabel = $langs->trans($this->getRaisonsByStatus($obj->lc_status)[$obj->lc_reason_code]['label'] ?? $obj->lc_reason_code);
 				$displayReasonLabel = '';
 			}
 
