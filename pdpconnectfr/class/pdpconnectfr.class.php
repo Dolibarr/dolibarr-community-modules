@@ -702,7 +702,7 @@ class PdpConnectFr
 	 * @param int $withDetails 	Return also desc if 1
 	 * @return array<string, array{code:string, label:string, desc:string}>|null
 	 */
-	public function getRaisonsByStatus($status, $withDetails = 1)
+	public function getReasonsByStatus($status, $withDetails = 1)
 	{
 		if (!isset(self::REASONS_CODE_FOR_STATUS[$status])) {
 			return null;
@@ -1487,7 +1487,7 @@ class PdpConnectFr
 			$reasonLabel = '';
 			$displayReasonLabel = 'style="display:none;"';
 			if (!empty($obj->lc_reason_code)) {
-				$reasonLabel = $langs->trans($this->getRaisonsByStatus($obj->lc_status)[$obj->lc_reason_code]['label'] ?? $obj->lc_reason_code);
+				$reasonLabel = $langs->trans($this->getReasonsByStatus($obj->lc_status)[$obj->lc_reason_code]['label'] ?? $obj->lc_reason_code);
 				$displayReasonLabel = '';
 			}
 

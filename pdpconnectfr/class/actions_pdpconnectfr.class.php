@@ -602,7 +602,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 							'name' => 'statusRaison',
 							'label' => $langs->trans("SelectStatusReason"),
 							'value' => '',
-							'values' => $pdpConnectFr->getRaisonsByStatus($pdpstatuscode, 1)
+							'values' => $pdpConnectFr->getReasonsByStatus($pdpstatuscode, 1)
 						]
 					);
 				}
