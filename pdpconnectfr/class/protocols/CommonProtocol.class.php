@@ -1041,18 +1041,15 @@ trait CommonProtocol
 						$exemptionReason = getDolGlobalString('MAIN_INFO_SOCIETE_VAT_EXEMPTION_REASON');
 						if ($seller->country_code == 'FR') {
 							// List of VATEX: https://docs.peppol.eu/poacc/billing/3.0/codelist/vatex/
-							// TVA non applicable article 293B CGI (auto-entrepreneurs, volume sous seuil): VATEX-FR-FRANCHISE (rule BR-FR-CO-16)
-							// TVA non applicable article 261-4 CGI (nature non soumis à TVA, comme médecin): VATEX-FR-CGI261-4
-							// TVA non applicable - Vente objet :  art = VATEX-FR-I, antiquité = VATEX-FR-J
-							// TVA non applicable - Vente agence voyage:  VATEX-EU-D
-							$exemptionReasonCode = getDolGlobalString('MAIN_INFO_SOCIETE_VAT_EXEMPTION_CODE', 'VATEX-FR-FRANCHISE');		// VATEX-FR-FRANCHISE, VATEX-FR-CGI261-1, VATEX-FR-CGI261-4, ...
+							// TVA non applicable article 293B CGI (auto-entrepreneurs, volume sous seuil, defined into setup of company):   VATEX-FR-FRANCHISE (rule BR-FR-CO-16), the default one
+							$exemptionReasonCode = getDolGlobalString('MAIN_INFO_SOCIETE_VAT_EXEMPTION_CODE', 'VATEX-FR-FRANCHISE');		// VATEX-FR-FRANCHISE, VATEX-FR-CGI261-1, VATEX-FR-CGI261-4, VATEX-EU-79-C...
 							$exemptionReason = getDolGlobalString('MAIN_INFO_SOCIETE_VAT_EXEMPTION_REASON', 'Tax exempted - TVA en franchise');
 						}
 						if (empty($exemptionReasonCode)) {
 							if ((float) DOl_VERSION < 24.0) {
-								throw new Exception('MISSINGSETUP: Your organization is configured to not use VAT. In this case, you must enter into the constant MAIN_INFO_SOCIETE_VAT_EXEMPTION_CODE the reason code of exemption (VATEX-FR-CGI261-4, VATEX-FR-CGI261-4.');
+								throw new Exception('MISSINGSETUP: Your organization is configured to not use VAT. In this case, you must enter into the constant MAIN_INFO_SOCIETE_VAT_EXEMPTION_CODE the reason code of exemption (VATEX-FR-CGI261-1, VATEX-FR-CGI261-4, VATEX-EU-79C.');
 							} else {
-								throw new Exception('MISSINGSETUP: Your organization is configured to not use VAT. In this case, you must enter into the reason code of exemption in the setup of your organization (VATEX-FR-CGI261-4, VATEX-FR-CGI261-4.');
+								throw new Exception('MISSINGSETUP: Your organization is configured to not use VAT. In this case, you must enter into the reason code of exemption in the setup of your organization (VATEX-FR-CGI261-1, VATEX-FR-CGI261-4, VATEX-EU-79C.');
 							}
 						}
 					}
@@ -1070,6 +1067,12 @@ trait CommonProtocol
 					// The sell is from an EU country to the same country, reason depends on the product line itself (reason saved into the VAT rate/code used)
 					if ((float) DOL_VERSION < 24.0) {
 						// We must use the reason found in the constant MAIN_VAT_EXEMPTION_CODE_FOR_0.00_XXXX
+						// List of VATEX: https://docs.peppol.eu/poacc/billing/3.0/codelist/vatex/
+						// TVA non applicable article 261-4 CGI (nature non soumis à TVA, comme médecin): VATEX-FR-CGI261-4
+						// TVA non applicable - Vente objet art :       VATEX-FR-I
+						// TVA non applicable - Vente objet antiquité : VATEX-FR-J
+						// TVA non applicable - Vente agence voyage:    VATEX-EU-D
+						// TVA non applicable - Debours (VAT paid by customer):  VATEX-EU-79-C
 						$vat_rate = price2num($vat_rate, 2);
 						$constantforvatex = "MAIN_VAT_EXEMPTION_CODE_FOR_" . $vat_rate.($vat_src_code ? "_". $vat_src_code : '');
 						$vatex = getDolGlobalString($constantforvatex);
