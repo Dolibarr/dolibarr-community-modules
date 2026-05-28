@@ -336,6 +336,13 @@ ReasonBankCoordinatesError=Bank coordinates error
 ReasonContractTerminated=Contract terminated
 ReasonDoubleInvoice=Double invoice
 ReasonIncorrectOrMissingOrderNumber=Incorrect or missing order number
-
+ReasonIncorrectVATRate=Incorrect VAT rate
+ReasonIncorrectTotalAmount=Incorrect total amount
+ReasonInvoiceCalculationError=Invoice calculation error
+ReasonMissingLegalMention=Missing legal mention
+ReasonDuplicateInvoiceAlreadyIssuedOrReceived=Duplicate invoice (already issued/received)
+ReasonUnknownRecipient=Unknown recipient
+ReasonRecipientError=Recipient error
 ReasonUnknownTransaction=Unknown transaction
 ReasonUnknownIssuer=Unknown issuer
+ReasonAntivirusControl=Antivirus control

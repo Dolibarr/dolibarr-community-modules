@@ -2,6 +2,7 @@
 /* Copyright (C) 2025       Laurent Destailleur         <eldy@users.sourceforge.net>
  * Copyright (C) 2025       Mohamed DAOUD               <mdaoud@dolicloud.com>
  * Copyright (C) 2026		William Mead				<william@m34d.com>
+ * Copyright (C) 2026       Frédéric France             <frederic.france@free.fr>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -232,31 +233,31 @@ class PdpConnectFr
 			"desc" => "Les références bancaires sur la facture ne correspondent pas à ce qui est paramétré chez le Payeur / Acheteur"
 		],
 		"TX_TVA_ERR" => [
-			"label" => "Incorrect VAT rate",
+			"label" => "ReasonIncorrectVATRate",
 			"desc" => "Un taux de TVA utilisé n'est pas celui qui aurait dû"
 		],
 		"MONTANTTOTAL_ERR" => [
-			"label" => "Incorrect Total Amount",
+			"label" => "ReasonIncorrectTotalAmount",
 			"desc" => "One of the invoice totals is incorrect, such as the Net Payable amount."
 		],
 		"CALCUL_ERR" => [
-			"label" => "Invoice calculation error",
+			"label" => "ReasonInvoiceCalculationError",
 			"desc" => "Soit détecté au schematron, soit après (pour les lignes, ou arrondi non accepté)"
 		],
 		"NON_CONFORME" => [
-			"label" => "Missing legal mention",
+			"label" => "ReasonMissingLegalMention",
 			"desc" => "Toute mention légale non contrôlée"
 		],
 		"DOUBLON" => [
-			"label" => "Duplicate invoice (already issued/received)",
+			"label" => "ReasonDuplicateInvoiceAlreadyIssuedOrReceived",
 			"desc" => "Facture en doublon (même numéro même fournisseur et même année de la date de facture)"
 		],
 		"DEST_INC" => [
-			"label" => "Unknown recipient",
+			"label" => "ReasonUnknownRecipient",
 			"desc" => "A l'émission, le destinataire est inconnu. Il n'existe pas dans l'annuaire."
 		],
 		"DEST_ERR" => [
-			"label" => "Recipient error",
+			"label" => "ReasonRecipientError",
 			"desc" => "The recipient legal entity is incorrect (Recipient's SIREN/Registration number). For instance, within a multi-company group, the invoiced company may not be the one that should have been billed."
 		],
 		"TRANSAC_INC" => [
@@ -388,7 +389,7 @@ class PdpConnectFr
 			"desc" => "Control of max size of files contained in the flow"
 		],
 		"IRR_ANTIVIRUS" => [
-			"label" => "Antivirus control",
+			"label" => "ReasonAntivirusControl",
 			"desc" => "Le flux ne respecte pas les conditions de sécurité"
 		]
 	];
