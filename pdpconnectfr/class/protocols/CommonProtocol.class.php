@@ -1073,9 +1073,32 @@ trait CommonProtocol
 						// TVA non applicable - Vente objet antiquité : VATEX-FR-J
 						// TVA non applicable - Vente agence voyage:    VATEX-EU-D
 						// TVA non applicable - Debours (VAT paid by customer):  VATEX-EU-79-C
+						$vatex = '';
+
+						// We try to find code in the vat code definition in the dictionnary table (code only because einvoice_vatex does not exists).
+						global $db, $mysoc;
+
+						$sql = "SELECT code FROM ".MAIN_DB_PREFIX."c_tva";
+						$sql .= " WHERE taux = ".((float) $vat_rate);
+						$sql .= " AND active = 1";
+						$sql .= " AND fk_pays = ".((int) $mysoc->country_id);
+						$sql .= " AND (code = '".$db->escape($vat_src_code)."')";
+						$resql = $db->query($sql);
+						if ($resql) {
+							$obj = $db->fetch_object($resql);
+							if ($obj) {
+								if (preg_match('/^VATEX/i', $obj->code)) {
+									$vatex = strtoupper((string) $obj->code);
+								}
+							}
+						}
+
 						$vat_rate = price2num($vat_rate, 2);
-						$constantforvatex = "MAIN_VAT_EXEMPTION_CODE_FOR_" . $vat_rate.($vat_src_code ? "_". $vat_src_code : '');
-						$vatex = getDolGlobalString($constantforvatex);
+
+						if (empty($vatex)) {
+							$constantforvatex = "MAIN_VAT_EXEMPTION_CODE_FOR_" . $vat_rate.($vat_src_code ? "_". $vat_src_code : '');
+							$vatex = strtoupper(getDolGlobalString($constantforvatex));
+						}
 
 						if (empty($vatex)) {
 							$errormsg = $langs->trans("UnknownVATEX1", $id, '0', $vat_src_code);
@@ -1088,10 +1111,12 @@ trait CommonProtocol
 							$exemptionReason = '';
 						}
 					} else {
-						// We must use the reason found on the vat code definition in the dictionnary table.
+						$vatex = '';
+
+						// We try to find code in the vat code definition in the dictionnary table (einvoice_vatex else code).
 						global $db, $mysoc;
 
-						$sql = "SELECT einvoice_vatex FROM ".MAIN_DB_PREFIX."c_tva";
+						$sql = "SELECT code, einvoice_vatex FROM ".MAIN_DB_PREFIX."c_tva";
 						$sql .= " WHERE taux = ".((float) $vat_rate);
 						$sql .= " AND active = 1";
 						$sql .= " AND fk_pays = ".((int) $mysoc->country_id);
@@ -1100,7 +1125,10 @@ trait CommonProtocol
 						if ($resql) {
 							$obj = $db->fetch_object($resql);
 							if ($obj) {
-								$vatex = $obj->einvoice_vatex;
+								$vatex = strtoupper((string) $obj->einvoice_vatex);
+								if (empty($vatex) && preg_match('/^VATEX/i', $obj->code)) {
+									$vatex = strtoupper((string) $obj->code);
+								}
 							}
 						}
 
