@@ -318,3 +318,6 @@ PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL2=1) Créez un compte sur la plateforme Sup
 PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL3=2) Accédez au tableau de bord client de SuperPDP, au menu « Application », puis cliquez sur « Nouvelle application » et sélectionnez votre entreprise, copiez cette valeur <b>%s</b> dans le champ URL de redirection, et enfin choisissez « Confidentiel » comme type d'application, puis « Créer ».
 PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL4=3) Une fois l'application créée, deux identifiants client_id/client_secret sont disponibles (attention, le secret client n'est disponible qu'une seule fois lors de la création de l'application, assurez-vous donc de le sauvegarder en lieu sûr). Vous pouvez saisir ces identifiants dans les champs « %s » et « %s » sur cette page de configuration et cliquer sur « %s ».
 PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL_VIA_PARTNER=Pour pouvoir utiliser la facturation électronique (via notre partenaire Point d'accès SuperPDP), vous devez d'abord créer un compte de facturation électronique (obligation légale en France) : %s.
+
+# Reasons
+ReasonUnknownTransaction=Transaction inconnue
