@@ -33,7 +33,7 @@ function stristartswith(string $haystack, string $needle): bool
 
 function correctAuthor(string $author): string
 {
-    if ($author === "horstoeko" || $author === "ruff" || $author === "Daniel Erling") {
+    if (in_array($author, ["horstoeko", "ruff", "Daniel Erling"], true)) {
         return "HorstOeko";
     }
 
@@ -65,7 +65,7 @@ function correctSubject(string $commitSubject, ?array &$issues): string
 
 function mustHideCommit(?string $commitHash = "", ?string $commitAuthor = "", ?string $commitDate = "", ?string $commitSubject = ""): bool
 {
-    if ($commitSubject === null || $commitSubject === '' || $commitSubject === '0') {
+    if (in_array($commitSubject, [null, '', '0'], true)) {
         return true;
     }
 
@@ -142,7 +142,7 @@ function getMarkDown($prevTag, $currTag)
         $markDown[] = '';
     }
 
-    if ($noOfHiddenCommits == 1) {
+    if ($noOfHiddenCommits === 1) {
         $markDown[] = ":exclamation: _There is one internal commit_";
         $markDown[] = '';
     }

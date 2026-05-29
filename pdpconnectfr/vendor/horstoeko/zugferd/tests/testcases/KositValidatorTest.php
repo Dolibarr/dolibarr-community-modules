@@ -536,9 +536,9 @@ class KositValidatorTest extends TestCase
         $this->assertFileDoesNotExist($filenameAppZip);
         $this->assertFileDoesNotExist($filenameScenarioZip);
         $this->assertCount(2, $kositValidator->getProcessErrors());
-        $this->assertStringContainsString("HTTP/1.1 404 Not Found", $kositValidator->getProcessErrors()[0]);
-        $this->assertStringContainsString("Unable to download from", $kositValidator->getProcessErrors()[1]);
-        $this->assertStringContainsString("containing the JAVA-Application", $kositValidator->getProcessErrors()[1]);
+        $this->assertStringContainsString("HTTP/1.1 404 Not Found", (string) $kositValidator->getProcessErrors()[0]);
+        $this->assertStringContainsString("Unable to download from", (string) $kositValidator->getProcessErrors()[1]);
+        $this->assertStringContainsString("containing the JAVA-Application", (string) $kositValidator->getProcessErrors()[1]);
         $this->assertClearMessageBag($kositValidator);
 
         $this->invokeCleanup($kositValidator);
@@ -562,9 +562,9 @@ class KositValidatorTest extends TestCase
         $this->assertFileExists($filenameAppZip);
         $this->assertFileDoesNotExist($filenameScenarioZip);
         $this->assertCount(2, $kositValidator->getProcessErrors());
-        $this->assertStringContainsString("HTTP/1.1 404 Not Found", $kositValidator->getProcessErrors()[0]);
-        $this->assertStringContainsString("Unable to download from", $kositValidator->getProcessErrors()[1]);
-        $this->assertStringContainsString("containing the validation scenarios", $kositValidator->getProcessErrors()[1]);
+        $this->assertStringContainsString("HTTP/1.1 404 Not Found", (string) $kositValidator->getProcessErrors()[0]);
+        $this->assertStringContainsString("Unable to download from", (string) $kositValidator->getProcessErrors()[1]);
+        $this->assertStringContainsString("containing the validation scenarios", (string) $kositValidator->getProcessErrors()[1]);
         $this->assertClearMessageBag($kositValidator);
 
         $this->invokeCleanup($kositValidator);
@@ -665,7 +665,7 @@ class KositValidatorTest extends TestCase
             $this->assertTrue($kositValidator->hasNoValidationInformation());
             $this->assertFalse($kositValidator->hasValidationInformation());
             $this->assertCount(1, $kositValidator->getProcessErrors());
-            $this->assertStringContainsString("JAVA not installed on this machine", $kositValidator->getProcessErrors()[0]);
+            $this->assertStringContainsString("JAVA not installed on this machine", (string) $kositValidator->getProcessErrors()[0]);
             $this->assertEmpty($kositValidator->getProcessOutput());
         }
     }
@@ -703,7 +703,7 @@ class KositValidatorTest extends TestCase
             $this->assertCount(1, $kositValidator->getProcessErrors());
             $this->assertEmpty($kositValidator->getProcessOutput());
             $this->assertEmpty($kositValidator->getValidationErrors());
-            $this->assertStringContainsString("JAVA not installed on this machine", $kositValidator->getProcessErrors()[0]);
+            $this->assertStringContainsString("JAVA not installed on this machine", (string) $kositValidator->getProcessErrors()[0]);
         }
     }
 
