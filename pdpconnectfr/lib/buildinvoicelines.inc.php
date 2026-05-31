@@ -118,8 +118,15 @@ $schemeIdProf      = $this->getIEC6523Code($object->thirdparty->country_code);
 $globalIdProf      = thirdpartyidprof($object) ?? '';
 $schemeGlobalIdProf = $this->getIEC6523Code($object->thirdparty->country_code, 1);
 $uri               = $pdpconnectfr->getBuyerCommunicationURI($object->thirdparty, $object);
-$schemeUri         = $this->getIEC6523Code($object->thirdparty->country_code, 2);
+$reg = array();
+if (preg_match('/(\d+):(.+)/', $uri, $reg)) {
+	$uri		= $reg[2];
+	$schemeUri  = $reg[1];
+} else {
+	$schemeUri  = $this->getIEC6523Code($object->thirdparty->country_code, 2);
+}
 // In case of sample tests, we may have this const defined to overwrite buyer Einvoice address ID.
+// In common case, this should not be used
 if (defined('PDPCONNECT_FORCE_BUYER_EID')) {
 	$uri               = constant('PDPCONNECT_FORCE_BUYER_EID');
 	$schemeUri         = "0225";
