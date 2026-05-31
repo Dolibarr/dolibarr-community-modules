@@ -669,11 +669,11 @@ trait CommonProtocol
 
 		$pdpconnectfr = new PdpConnectFr($db);
 
-		// Search in product supplier prices table using prodsellerid
+		// Search in product supplier prices table using prodsellerid (the ref of product of the vendor)
 		$sql = "SELECT p.rowid ";
 		$sql .= " FROM " . MAIN_DB_PREFIX . "product as p ";
 		$sql .= " INNER JOIN " . MAIN_DB_PREFIX . "product_fournisseur_price as pfp ON pfp.fk_product = p.rowid ";
-		$sql .= " WHERE pfp.product_supplier_id = '" . $db->escape($lineData['prodsellerid']) . "' ";
+		$sql .= " WHERE pfp.ref_fourn = '" . $db->escape($lineData['prodsellerid']) . "' ";
 		$sql .= " AND pfp.fk_soc = " . intval($lineData['supplierId']) . " ";
 		$sql .= " AND p.entity IN (" . getEntity('product') . ")";
 		$sql .= " LIMIT 1";
