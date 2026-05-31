@@ -90,13 +90,13 @@ class InterfacePDPConnectFRTriggers extends DolibarrTriggers
 			// If $result is $pdpConnectFr::STATUS_IGNORE, we do nothing.
 
 			// If einvoice was set to $pdpConnectFr::STATUS_NOT_GENERATED or $pdpConnectFr::STATUS_UNKNOWN, we set it to STATUS_IGNORE (if not qualified for einvoice) or STATUS_NOT_GENERATED (if qualified for einvoice)
-			if ($result == $pdpConnectFr::STATUS_NOT_GENERATED || $result == $pdpConnectFr::STATUS_UNKNOWN) {
+			if ($result['code'] == $pdpConnectFr::STATUS_NOT_GENERATED || $result['code'] == $pdpConnectFr::STATUS_UNKNOWN) {
+				// By default, we set status to ignore
 				$statustouse = $pdpConnectFr::STATUS_IGNORE;
-
 				// Test if invoice need to be managed by EInvoice
 				$needEinvoice = $pdpConnectFr->needEInvoiceManagement($object);
 				if ($needEinvoice) {
-					$statustouse = $pdpConnectFr::STATUS_NOT_GENERATED;
+					$statustouse = $needEinvoice;
 				}
 
 				$newobject = dol_clone($object, 2);
