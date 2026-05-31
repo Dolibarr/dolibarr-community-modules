@@ -310,6 +310,7 @@ IBANForSellerMandatoryOnCreditTransferButNotBankAcount=A payment mode was set to
 IBANForSellerMandatoryOnCreditTransferButNotBankAcount2=Set a default bank account in the configuration of the invoice module OR in the invoice itself (and check that this bank account has a BAN number defined).
 IBANForSellerMandatoryOnCreditTransferButNotBAN=A payment mode was set to pay with credit transfer, but the selected default bank account has no BAN number defined.
 IBANForSellerMandatoryOnCreditTransferButNotBAN2=Set a BAN number on the bank account.
+CreateTheProduct=Create the product
 
 PDPCONNECTFR_CLIENT_ID=Client ID
 PDPCONNECTFR_CLIENT_SECRET=Client secret

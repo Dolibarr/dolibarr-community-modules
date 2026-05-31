@@ -1311,6 +1311,7 @@ class FacturXProtocol extends AbstractProtocol
 
 		// Sync or create supplier based on seller info
 		$syncSocRes = $this->_syncOrCreateThirdpartyFromEInvoiceSeller($parsedHeader, 'dolibarr', $flowId);
+
 		$socId = $syncSocRes['res'];
 		$return_messages[] = $syncSocRes['message'];
 		if ($socId < 0) {
@@ -1355,6 +1356,9 @@ class FacturXProtocol extends AbstractProtocol
 
 		// Add invoice lines
 		foreach ($parsedLines as $parsedLine) {
+			// Add supplier ID to line for later use in product sync
+			$parsedLine['supplierId'] = $socId;
+
 			$is_deposit_line = 0;
 			$fk_remise = 0;
 			// --------------------------------------------------
@@ -1530,6 +1534,8 @@ class FacturXProtocol extends AbstractProtocol
 
 		// Add a note about PDP import ( TODO: add a hook or extrafields to store import details)
 		$supplierInvoice->note_private = "Imported from PDP";
+
+		// TODO : save AAB, PMD, PMT notes (all notes are grouped into documentNotes)
 
 		// Create the invoice
 		$supplierInvoiceId = $supplierInvoice->create($user);

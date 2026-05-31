@@ -238,7 +238,7 @@ trait CommonProtocol
 	 * @param array     $sellerInfo 	Array containing seller information extracted from E-invoice
 	 * @param string    $priority 		Fill priority ('dolibarr' or 'pdp'). If both data are available, which one to prefer
 	 * @param string    $flowId 		Flow identifier source of the thirdparty.
-	 * @return array{res:int, message:string, actioncode:string|null, actionurl:string|null, action:string|null}   Returns array with 'res' (ID of the synchronized or created thirdparty, -1 on error) with a 'message' and an optional 'actioncode', 'actionurl', and 'action'.
+	 * @return array{res:int, message:string, actioncode:string|null, actionurl:string|null, action:string|null}   Returns array with 'res' (ID of the synchronized or created/updated thirdparty, -1 on error) with a 'message' and an optional 'actioncode', 'actionurl', and 'action'.
 	 */
 	private function _syncOrCreateThirdpartyFromEInvoiceSeller($sellerInfo, $priority = 'dolibarr', $flowId = '')
 	{
@@ -829,6 +829,7 @@ trait CommonProtocol
 			$prodSupplierRef = trim($lineData['prodsellerid'] ?? '');
 			$prodName = trim($lineData['prodname'] ?? '');
 			$prodDesc = trim($lineData['proddesc'] ?? '');
+			$vendorId = $lineData['supplierId'];
 
 			$errorDetails = [];
 			$createParams = [];
@@ -841,9 +842,13 @@ trait CommonProtocol
 
 				$createParams['ref_ext'] = $prodRef;
 			}
+			if (!empty($vendorId)) {
+				$errorDetails[] = 'Vendor id: ' . $vendorId;
+				$createParams['socid'] = $vendorId;							// TODO Dolibarr must be able to handle this parameter
+			}
 			if (!empty($prodSupplierRef)) {
 				$errorDetails[] = 'Supplier ref: ' . $prodSupplierRef;
-				$createParams['supplierref'] = $prodSupplierRef;
+				$createParams['supplierref'] = $prodSupplierRef;			// TODO Dolibarr must be able to handle this parameter
 			}
 			if (!empty($prodName)) {
 				$errorDetails[] = 'Name: ' . $prodName;
@@ -877,10 +882,21 @@ trait CommonProtocol
 			$message = 'Unable to find product' . $detailsStr . '. Auto-creation of products is disabled in settings.';
 
 			$action = $langs->trans('CreateProductManually') . ' ';
-			$action .= '<a class="butAction small" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
+			$action .= '<a class="butAction smallpaddingimp" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
 			$action .= '<i class="fas fa-plus-circle"></i> ';
-			$action .= $langs->trans('CreateProduct');
+			$action .= $langs->trans('CreateTheProduct');
 			$action .= '</a>';
+
+			/*
+			$createSupplierRefUrl = 'todo';
+			$sellerName ='xxx';
+
+			$action .= $langs->trans("or");
+			$action .= '<a class="butAction smallpaddingimp" href="' . dol_escape_htmltag($createSupplierRefUrl) . '" target="_blank">';
+			$action .= '<i class="fas fa-plus-circle"></i> ';
+			$action .= $langs->trans('CreateSupplierRef').' '.dol_trunc($prodSupplierRef, 8).' for '.dol_trunc($sellerName, 8);
+			$action .= '</a>';
+			*/
 
 			return array(
 				'res' => -1,

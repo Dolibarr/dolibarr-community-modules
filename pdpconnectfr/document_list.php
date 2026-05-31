@@ -735,7 +735,7 @@ if (file_exists($filePathFacturX)) {
 	$urlOriginalFile = DOL_URL_ROOT . '/document.php?modulepart=pdpconnectfr&file=' . urlencode('temp/facturx.pdf');
 	$urlConvertedFile = DOL_URL_ROOT . '/document.php?modulepart=pdpconnectfr&file=' . urlencode('temp/facturx_readable.pdf');
 
-	$last_supplier_invoice_error = '<span class="opacitylowx">'.img_picto('', 'times', 'class="pictofixedwidth" style="color:red;"');
+	$last_supplier_invoice_error = '<span class="opacitylowx">'.img_picto('', 'times', 'class="pictofixedwidth"');
 	$last_supplier_invoice_error .= ' ' . $langs->trans("LastSupplierInvoiceCouldNotBeProcessed");
 	$last_supplier_invoice_error .= '<i class="fas fa-info-circle em088 opacityhigh classfortooltip" title="'. $langs->trans("LastSupplierInvoiceCouldNotBeProcessedInfo") .'"></i>';
 	$last_supplier_invoice_error .= ' : </span>';
@@ -747,7 +747,7 @@ if (file_exists($filePathFacturX)) {
 if (file_exists($filePathCII)) {
 	$urlOriginalFile = DOL_URL_ROOT . '/document.php?modulepart=pdpconnectfr&file=' . urlencode('temp/einvoice.xml');
 
-	$last_supplier_invoice_error = '<span class="opacitylowx">'.img_picto('', 'times', 'class="pictofixedwidth" style="color:red;"');
+	$last_supplier_invoice_error = '<span class="opacitylowx">'.img_picto('', 'times', 'class="pictofixedwidth"');
 	$last_supplier_invoice_error .= ' ' . $langs->trans("LastSupplierInvoiceCouldNotBeProcessed");
 	$last_supplier_invoice_error .= '<i class="fas fa-info-circle em088 opacityhigh classfortooltip" title="'. $langs->trans("LastSupplierInvoiceCouldNotBeProcessedInfo") .'"></i>';
 	$last_supplier_invoice_error .= ' : </span>';
