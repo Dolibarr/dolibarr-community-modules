@@ -1,3 +1,60 @@
+## v1.0.122
+
+:exclamation: _There are 2 internal commit(s)_
+
+## v1.0.121
+
+``Previous version v1.0.120``
+
+| Type | Hash    | Date    | Author  | Subject  | Issue(s)
+| :--- | :------ | :------ | :------ | :------- | :-----------: 
+| :new_moon:  | [eb90579](https://github.com/horstoeko/zugferd/commit/eb90579) | 2026-03-17 15:37:59 CET | Thomas Wunner | fix: set private property accessible in reflection for PHP 7 | 
+| :new_moon:  | [fe71983](https://github.com/horstoeko/zugferd/commit/fe71983) | 2026-03-16 23:18:53 CET | Thomas Wunner | fix: re-enabled PHP 7 compatibility and make sure to always close curl handles | 
+| :new_moon:  | [28b8486](https://github.com/horstoeko/zugferd/commit/28b8486) | 2026-03-01 07:53:59 CET | Thomas Wunner | fixed right method and variable spelling, added new tests and refactored deprecated phpunit calls | 
+| :new_moon:  | [e48c7b0](https://github.com/horstoeko/zugferd/commit/e48c7b0) | 2026-03-01 06:36:37 CET | Thomas Wunner | static code analysis fixes, many English spelling corrections and .editorconfig as it already was in that style | 
+| :new_moon:  | [b062388](https://github.com/horstoeko/zugferd/commit/b062388) | 2026-03-01 05:06:42 CET | Thomas Wunner | trim line endings | 
+| :new_moon:  | [972b259](https://github.com/horstoeko/zugferd/commit/972b259) | 2026-03-01 04:59:41 CET | Thomas Wunner | bump php version to minimal PHP 8.3, updated and migrated dependencies and migrated PHPUnit | 
+| :new_moon:  | [1743bcf](https://github.com/horstoeko/zugferd/commit/1743bcf) | 2026-03-01 04:31:13 CET | Thomas Wunner | performance improvement: grouped logical xor as such | 
+| :new_moon:  | [181fbd0](https://github.com/horstoeko/zugferd/commit/181fbd0) | 2026-03-01 04:05:29 CET | Thomas Wunner | fixed php lib mismatch to PHP 8.1 and updated dependency accordingly | 
+| :new_moon:  | [2507626](https://github.com/horstoeko/zugferd/commit/2507626) | 2026-03-01 03:22:29 CET | Thomas Wunner | merged from forks | 
+| :new_moon:  | [057c9a5](https://github.com/horstoeko/zugferd/commit/057c9a5) | 2026-03-01 03:02:31 CET | Thomas Wunner | security update and comment fix | 
+| :new_moon:  | [45d8425](https://github.com/horstoeko/zugferd/commit/45d8425) | 2026-03-01 02:24:50 CET | Thomas Wunner | many improvements in document handling, more test coverage and minor adjustments | 
+| :new_moon:  | [71ae90e](https://github.com/horstoeko/zugferd/commit/71ae90e) | 2026-02-09 14:37:11 CET | HorstOeko | Fixed deprecations with PHP 8.4/8.5 | [#351](https://github.com/horstoeko/zugferd/issues/351)
+| :new_moon:  | [b9b8e70](https://github.com/horstoeko/zugferd/commit/b9b8e70) | 2026-01-06 22:42:30 CET | HorstOeko | Add Additional Document with BASE64-Encoded data (instead of a filename) -> Added missing test asset | [#337](https://github.com/horstoeko/zugferd/issues/337)
+| :new_moon:  | [9e7a9e7](https://github.com/horstoeko/zugferd/commit/9e7a9e7) | 2026-01-06 22:37:08 CET | HorstOeko | Add Additional Document with BASE64-Encoded data (instead of a filename) -> Added missing picture | [#337](https://github.com/horstoeko/zugferd/issues/337)
+| :new_moon:  | [8a3fc33](https://github.com/horstoeko/zugferd/commit/8a3fc33) | 2026-01-06 22:32:24 CET | HorstOeko | Add Additional Document with BASE64-Encoded data (instead of a filename) | [#337](https://github.com/horstoeko/zugferd/issues/337)
+
+:exclamation: _There are 4 internal commit(s)_
+
+## v1.0.120
+
+:exclamation: _There is one internal commit_
+
+## v1.0.119
+
+``Previous version v1.0.118``
+
+| Type | Hash    | Date    | Author  | Subject  | Issue(s)
+| :--- | :------ | :------ | :------ | :------- | :-----------: 
+| :new_moon:  | [9a9aa45](https://github.com/horstoeko/zugferd/commit/9a9aa45) | 2026-01-07 10:16:07 CET | HorstOeko | Fixed "PDF/A3 invalide when original PDF contains link" | [#342](https://github.com/horstoeko/zugferd/issues/342)
+| :new_moon:  | [689dcef](https://github.com/horstoeko/zugferd/commit/689dcef) | 2025-12-18 17:16:11 CET | Bernhard Kraemer | Fix handling of short IDs in ZugferdObjectHelper | 
+
+:exclamation: _There are 4 internal commit(s)_
+
+## v1.0.118
+
+:exclamation: _There are 3 internal commit(s)_
+
+## v1.0.117
+
+``Previous version v1.0.116``
+
+| Type | Hash    | Date    | Author  | Subject  | Issue(s)
+| :--- | :------ | :------ | :------ | :------- | :-----------: 
+| :new_moon:  | [1fcd469](https://github.com/horstoeko/zugferd/commit/1fcd469) | 2025-11-17 14:35:05 CET | Niklas Reitz | Allow XML documents with non-default namespace prefixes Issue | [#331](https://github.com/horstoeko/zugferd/issues/331)
+
+:exclamation: _There are 2 internal commit(s)_
+
 ## v1.0.116
 
 ``Previous version v1.0.115``

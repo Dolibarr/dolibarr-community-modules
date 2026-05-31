@@ -4139,7 +4139,7 @@ class ZugferdDocumentReader extends ZugferdDocument
     private function convertToArray($value, array $methods)
     {
         $result = [];
-        $isFlat = count($methods) == 1;
+        $isFlat = count($methods) === 1;
         $value = $this->getObjectHelper()->ensureArray($value);
 
         foreach ($value as $valueItem) {

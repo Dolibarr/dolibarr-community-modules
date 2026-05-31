@@ -702,7 +702,7 @@ class ZugferdPdfValidator
             }
         }
 
-        if ($numFilesExists == $zipArchive->numFiles) {
+        if ($numFilesExists === $zipArchive->numFiles) {
             return true;
         }
 
@@ -893,7 +893,7 @@ class ZugferdPdfValidator
             return false;
         }
 
-        if (count($validatorExecutableOutputObject->report->jobs) != 1) {
+        if (count($validatorExecutableOutputObject->report->jobs) !== 1) {
             $this->addToMessageBag("Invalid report response - jobs property should be an array with one element", static::MSG_TYPE_VALIDATIONERROR);
             return false;
         }
