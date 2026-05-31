@@ -2,6 +2,7 @@
 /* Copyright (C) 2025       Laurent Destailleur         <eldy@users.sourceforge.net>
  * Copyright (C) 2025       Mohamed DAOUD               <mdaoud@dolicloud.com>
  * Copyright (C) 2026		William Mead				<william@m34d.com>
+ * Copyright (C) 2026       Frédéric France             <frederic.france@free.fr>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -212,71 +213,71 @@ class PdpConnectFr
 	// All reasons with their details (Used when sending supplier invoices status: Refused, Disputed, Suspended, Partially Approved)
 	private const REASONS = [
 		"NON_TRANSMISE" => [
-			"label" => "Recipient not connected",
+			"label" => "ReasonRecipientNotConnected",
 			"desc" => "This reason is used ONLY with the \"DEPOSITED\" status to indicate that the invoice could not be transmitted because the recipient (BUYER), although present in the PPF Directory, has no active invoice reception address (i.e., connected to an Approved Platform for reception)."
 		],
 		"JUSTIF_ABS" => [
-			"label" => "Missing or insufficient supporting document",
+			"label" => "ReasonMissingOrInsufficientSupportingDocument",
 			"desc" => "This reason should be used if attachments required for invoice processing are missing (status 'Suspended'). The issuer must then resubmit the lifecycle with a 'Completed' status, including the missing attachment(s)."
 		],
 		"ROUTAGE_ERR" => [
-			"label" => "Routing error",
+			"label" => "ReasonRoutingError",
 			"desc" => "This reason code should be used when the invoice routing information has become obsolete. This may occur, for example, due to a delay in directory updates or an error by the originating Certified Platform. Once the recipient has updated the directory, the invoice can be retransmitted (with no changes to the invoice data)."
 		],
 		"AUTRE" => [
-			"label" => "Other",
+			"label" => "ReasonOther",
 			"desc" => "Ce motif nécessite une explication en Note de CDV"
 		],
 		"COORD_BANC_ERR" => [
-			"label" => "Bank coordinates error",
+			"label" => "ReasonBankCoordinatesError",
 			"desc" => "Les références bancaires sur la facture ne correspondent pas à ce qui est paramétré chez le Payeur / Acheteur"
 		],
 		"TX_TVA_ERR" => [
-			"label" => "Incorrect VAT rate",
+			"label" => "ReasonIncorrectVATRate",
 			"desc" => "Un taux de TVA utilisé n'est pas celui qui aurait dû"
 		],
 		"MONTANTTOTAL_ERR" => [
-			"label" => "Incorrect Total Amount",
+			"label" => "ReasonIncorrectTotalAmount",
 			"desc" => "One of the invoice totals is incorrect, such as the Net Payable amount."
 		],
 		"CALCUL_ERR" => [
-			"label" => "Invoice calculation error",
+			"label" => "ReasonInvoiceCalculationError",
 			"desc" => "Soit détecté au schematron, soit après (pour les lignes, ou arrondi non accepté)"
 		],
 		"NON_CONFORME" => [
-			"label" => "Missing legal mention",
+			"label" => "ReasonMissingLegalMention",
 			"desc" => "Toute mention légale non contrôlée"
 		],
 		"DOUBLON" => [
-			"label" => "Duplicate invoice (already issued/received)",
+			"label" => "ReasonDuplicateInvoiceAlreadyIssuedOrReceived",
 			"desc" => "Facture en doublon (même numéro même fournisseur et même année de la date de facture)"
 		],
 		"DEST_INC" => [
-			"label" => "Unknown recipient",
+			"label" => "ReasonUnknownRecipient",
 			"desc" => "A l'émission, le destinataire est inconnu. Il n'existe pas dans l'annuaire."
 		],
 		"DEST_ERR" => [
-			"label" => "Recipient error",
+			"label" => "ReasonRecipientError",
 			"desc" => "The recipient legal entity is incorrect (Recipient's SIREN/Registration number). For instance, within a multi-company group, the invoiced company may not be the one that should have been billed."
 		],
 		"TRANSAC_INC" => [
-			"label" => "Unknown transaction",
+			"label" => "ReasonUnknownTransaction",
 			"desc" => "La facture ne correspond pas à une livraison effectuée ou une prestation de service livrée."
 		],
 		"EMMET_INC" => [
-			"label" => "Unknown issuer",
+			"label" => "ReasonUnknownIssuer",
 			"desc" => "L'émetteur de la facture est inconnu du Destinataire (anti-spam)"
 		],
 		"CONTRAT_TERM" => [
-			"label" => "Contract terminated",
+			"label" => "ReasonContractTerminated",
 			"desc" => "Contrat terminé, plus de facture possible"
 		],
 		"DOUBLE_FACT" => [
-			"label" => "DOUBLE INVOICE",
+			"label" => "ReasonDoubleInvoice",
 			"desc" => "Prestation ou livraison déjà facturé sur une autre facture"
 		],
 		"CMD_ERR" => [
-			"label" => "Incorrect or missing ORDER number",
+			"label" => "ReasonIncorrectOrMissingOrderNumber",
 			"desc" => "Purchase Order (PO) number is incorrect, non-existent, or already invoiced. This reason can only be used with a 'REFUSED' status if the PO number was provided by the BUYER PRIOR TO INVOICING."
 		],
 		"ADR_ERR" => [
@@ -388,7 +389,7 @@ class PdpConnectFr
 			"desc" => "Control of max size of files contained in the flow"
 		],
 		"IRR_ANTIVIRUS" => [
-			"label" => "Antivirus control",
+			"label" => "ReasonAntivirusControl",
 			"desc" => "Le flux ne respecte pas les conditions de sécurité"
 		]
 	];
@@ -698,18 +699,18 @@ class PdpConnectFr
 	/**
 	 * Get reasons for a given status that will be used when sending supplier invoice status updates to PDP/PA (for statuses Refused, Disputed, Partially Approved, Suspended)
 	 *
-	 * @param int $statut		Status ID
+	 * @param int $status		Status ID
 	 * @param int $withDetails 	Return also desc if 1
 	 * @return array<string, array{code:string, label:string, desc:string}>|null
 	 */
-	public function getRaisonsByStatus($statut, $withDetails = 1)
+	public function getReasonsByStatus($status, $withDetails = 1)
 	{
-		if (!isset(self::REASONS_CODE_FOR_STATUS[$statut])) {
+		if (!isset(self::REASONS_CODE_FOR_STATUS[$status])) {
 			return null;
 		}
 
 		$reasons = [];
-		foreach (self::REASONS_CODE_FOR_STATUS[$statut] as $code) {
+		foreach (self::REASONS_CODE_FOR_STATUS[$status] as $code) {
 			if (isset(self::REASONS[$code])) {
 				$reasons[$code] = [
 					'code' => $code,
@@ -1476,8 +1477,7 @@ class PdpConnectFr
 			$resql = $this->db->query($sql);
 			if ($resql && $this->db->num_rows($resql) > 0) {
 				$obj = $this->db->fetch_object($resql);
-				$currentStatus = $obj->lc_status;
-				$currentStatus = $this->getStatusLabel($currentStatus);
+				$currentStatus = $this->getStatusLabel($obj->lc_status);
 			}
 			// Current status
 			$resprints .= '<tr class="trpdpconnect_collapseseparator">';
@@ -1488,11 +1488,11 @@ class PdpConnectFr
 			$reasonLabel = '';
 			$displayReasonLabel = 'style="display:none;"';
 			if (!empty($obj->lc_reason_code)) {
-				$reasonLabel = $this->getRaisonsByStatus($obj->lc_status)[$obj->lc_reason_code]['label'] ?? $obj->lc_reason_code;
+				$reasonLabel = $langs->trans($this->getReasonsByStatus($obj->lc_status)[$obj->lc_reason_code]['label'] ?? $obj->lc_reason_code);
 				$displayReasonLabel = '';
 			}
 
-			$resprints .= '<span id="einvoice-reason"' . ($displayReasonLabel ? ' ' . $displayReasonLabel : '') . '>' . $reasonLabel . '</span>';
+			$resprints .= '&nbsp;<span id="einvoice-reason"' . ($displayReasonLabel ? $displayReasonLabel : '') . '>' . $reasonLabel . '</span>';
 
 			$resprints .= '</td>';
 			$resprints .= '</tr>';
@@ -1517,6 +1517,7 @@ class PdpConnectFr
 			if (!empty($lastSentStatus) && ($lastSentStatus['lc_validation_status'] == 'Pending' || $lastSentStatus['lc_validation_status'] == 'Error')) {
 				$statusLabel = $this->getStatusLabel($lastSentStatus['lc_status']);
 				$statusvalidationLabel = $this->getStatusLabel($this->getDolibarrStatusCodeFromPdpLabel($lastSentStatus['lc_validation_status']));
+				$picto = '';
 				if ($lastSentStatus['lc_validation_status'] === 'Pending') {
 					$picto = img_picto('', 'timespent');
 				} elseif ($lastSentStatus['lc_validation_status'] === 'Error') {
