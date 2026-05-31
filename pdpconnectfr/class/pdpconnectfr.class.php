@@ -62,8 +62,8 @@ class PdpConnectFr
 
 	public const STATUS_NOT_GENERATED       = 5;		// To sync
 	public const STATUS_GENERATED           = 10;
-	public const STATUS_AWAITING_VALIDATION = 15;
-	public const STATUS_AWAITING_ACK        = 20;
+	public const STATUS_AWAITING_VALIDATION = 15;		// Einvoice received but not yet analyzed by your AP
+	public const STATUS_AWAITING_ACK        = 20;		// Einvoice received and analyzed by your AP. Next step happen when doing sync.
 	public const STATUS_ERROR               = 25;
 
 	public const STATUS_IGNORE              = 99;		// Never sync
@@ -1299,7 +1299,7 @@ class PdpConnectFr
 
 		// JavaScript for AJAX call to update status if current status is pending
 		if ((int) $currentStatusInfo['code'] === self::STATUS_AWAITING_VALIDATION
-			|| (int) $currentStatusInfo['code'] === self::STATUS_AWAITING_ACK
+			// || (int) $currentStatusInfo['code'] === self::STATUS_AWAITING_ACK			// If we want to call the checkinvoicestatus to get next steps...
 			) {
 			$urlajax = dol_buildpath('pdpconnectfr/ajax/checkinvoicestatus.php', 1);
 

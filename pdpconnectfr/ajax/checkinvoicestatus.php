@@ -108,6 +108,7 @@ dol_syslog("Call ajax pdpconnectfr/ajax/checkinvoicestatus.php");
 $langs->load('pdpconnectfr@pdpconnectfr');
 
 top_httphead();
+
 // Update the object field with the new value
 if ($objectRef) {
 	dol_include_once('pdpconnectfr/class/pdpconnectfr.class.php');
@@ -146,10 +147,20 @@ if ($objectRef) {
 		exit;
 	}
 
-	// make a call to get validation result from PDP
+	// make a call to get validation result from AP
 	require_once "../class/providers/PDPProviderManager.class.php";
 	$PDPManager = new PDPProviderManager($db);
 	$provider = $PDPManager->getProvider(getDolGlobalString('PDPCONNECTFR_PDP'));
+
+
+	$tmparray = $pdpconnectfr->fetchLastknownInvoiceStatus($invoice->id);
+	if ($tmparray['code'] == $pdpconnectfr::STATUS_AWAITING_ACK) {
+		// We have reached the status Ok for the AP. Now we need to check the status 200+
+		// TODO ...
+		//print json_encode(['code' => -1, 'info' => 'We have reached the status Ok for the AP. Now we need to check the status 200+ by running the sync']);
+		print json_encode(['code' => -1, 'info' => 'The file has been accepted by your Access Point as valid. Next step need to wait you run the synchronization from menu Invoice - Synchronize']);
+		exit;
+	}
 
 	$resource = 'flows/' . $flowId;
 	$urlparams = array(
@@ -169,6 +180,8 @@ if ($objectRef) {
 
 		$syncStatus = $pdpconnectfr::STATUS_UNKNOWN;
 		$ack_statusLabel = $flowData['acknowledgement']['status'] ?? '';			// May be 'Ok', 'Pending', ...
+		// Here, with SuperPDP, we receive Ok, but the invoice was validated (200), Sent to customer AP (201), and accepted by customer platform (202)
+		// TODO How to get the 200, 201, 202 ?
 		if ($ack_statusLabel) {
 			$syncStatus = $pdpconnectfr->getDolibarrStatusCodeFromPdpLabel($ack_statusLabel);
 		}
@@ -188,7 +201,7 @@ if ($objectRef) {
 		if ($syncStatus == $pdpconnectfr::STATUS_UNKNOWN) {						// Do not add event if status of invoice is unknown (failed to retrieve it ?)
 			$addevent = 0;
 		}
-		if (!empty($tmparray['code']) && $syncStatus == $tmparray['code']) {	// Do not add event if status has not change
+		if (!empty($tmparray['code']) && $syncStatus == $tmparray['code']) {	// Do not add event if status has not changed
 			$addevent = 0;
 		}
 		if ($addevent) {
