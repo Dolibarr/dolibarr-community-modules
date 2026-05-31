@@ -1298,7 +1298,9 @@ class PdpConnectFr
 		}
 
 		// JavaScript for AJAX call to update status if current status is pending
-		if ((int) $currentStatusInfo['code'] === self::STATUS_AWAITING_VALIDATION) {
+		if ((int) $currentStatusInfo['code'] === self::STATUS_AWAITING_VALIDATION
+			|| (int) $currentStatusInfo['code'] === self::STATUS_AWAITING_ACK
+			) {
 			$urlajax = dol_buildpath('pdpconnectfr/ajax/checkinvoicestatus.php', 1);
 
 			$resprints .= '
@@ -1306,17 +1308,21 @@ class PdpConnectFr
             (function() {
 				var countCheckInvoiceStatus = 1;
                 function checkInvoiceStatus() {
-					console.log("checkInvoiceStatus Checking invoice status ("+countCheckInvoiceStatus+")...");
+					console.log(\'checkInvoiceStatus Checking invoice status (try \'+countCheckInvoiceStatus+\') to url '.dol_escape_js($urlajax).'...\');
                     // alert("Checking invoice status...");
                     $.get("' . $urlajax . '", {
                         token: "' . currentToken() . '",
                         ref: "' . dol_escape_js($object->ref) . '"
                     }, function (data) {
-						/* code is executed here if response is valid json */
-                        if (!data || typeof data.code === "undefined") {
-							console.log("checkInvoiceStatus no data returned");
-                            return;
-                        }
+    					if (typeof data === "string") {
+	        				try {
+	            				data = JSON.parse(data); // Convert into object if valid JSON
+	        				} catch (e) {
+	            				console.error("Error : Answer is not a JSON content:", data);
+	            				return;
+	        				}
+						}
+
 						console.log(data.status);
 
                         // Update UI
@@ -1334,11 +1340,14 @@ class PdpConnectFr
                             	setTimeout(checkInvoiceStatus, 10000);
 							}
                         }
-                    }, "json");
+                    }, "text")		/* We force text to avoid that js parse automatically the json response and try to convert it into a js object */
+					.fail(function(jqXHR) {
+    					console.error("Error AJAX :", jqXHR.status, jqXHR.statusText);
+					});
                 }
 
                 // First call
-				console.log("checkInvoiceStatus Invoice has status pending, so we add a timer to run checkInvoiceStatus in few seconds...");
+				console.log("checkInvoiceStatus Invoice has status pending, so we add a timer to run checkInvoiceStatus in 2.5 seconds...");
                 setTimeout(checkInvoiceStatus, 2500);
 
             })();

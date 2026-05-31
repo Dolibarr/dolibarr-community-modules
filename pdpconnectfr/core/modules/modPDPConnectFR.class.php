@@ -314,17 +314,17 @@ class modPDPConnectFR extends DolibarrModules
 		/* BEGIN MODULEBUILDER PERMISSIONS */
 		$this->rights[$r][0] = $this->numero . sprintf('%02d', (0 * 10) + 0 + 1);
 		$this->rights[$r][1] = 'Read synchronized documents and logs';
-		$this->rights[$r][4] = 'documents';
+		$this->rights[$r][4] = 'document';
 		$this->rights[$r][5] = 'read';
 		$r++;
 		$this->rights[$r][0] = $this->numero . sprintf('%02d', (0 * 10) + 1 + 1);
 		$this->rights[$r][1] = 'Create/Run/Update synchronization of documentes';
-		$this->rights[$r][4] = 'documents';
+		$this->rights[$r][4] = 'document';
 		$this->rights[$r][5] = 'write';
 		$r++;
 		$this->rights[$r][0] = $this->numero . sprintf('%02d', (0 * 10) + 2 + 1);
 		$this->rights[$r][1] = 'Delete synchronization document or logs';
-		$this->rights[$r][4] = 'documents';
+		$this->rights[$r][4] = 'document';
 		$this->rights[$r][5] = 'delete';
 		$r++;
 

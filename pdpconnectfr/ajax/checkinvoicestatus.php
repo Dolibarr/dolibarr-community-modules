@@ -147,7 +147,6 @@ if ($objectRef) {
 	}
 
 	// make a call to get validation result from PDP
-	// TODO: Move this code to a method in the provider class to avoid breaking the abstraction principle.
 	require_once "../class/providers/PDPProviderManager.class.php";
 	$PDPManager = new PDPProviderManager($db);
 	$provider = $PDPManager->getProvider(getDolGlobalString('PDPCONNECTFR_PDP'));
@@ -169,7 +168,7 @@ if ($objectRef) {
 		$flowData = json_decode($response['response'], true);
 
 		$syncStatus = $pdpconnectfr::STATUS_UNKNOWN;
-		$ack_statusLabel = $flowData['acknowledgement']['status'] ?? '';
+		$ack_statusLabel = $flowData['acknowledgement']['status'] ?? '';			// May be 'Ok', 'Pending', ...
 		if ($ack_statusLabel) {
 			$syncStatus = $pdpconnectfr->getDolibarrStatusCodeFromPdpLabel($ack_statusLabel);
 		}
