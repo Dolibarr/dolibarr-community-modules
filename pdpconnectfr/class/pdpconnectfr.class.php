@@ -2287,9 +2287,6 @@ class PdpConnectFr
 
 		$obj = $db->fetch_object($resql);
 		$routing_id =  (string) $obj->routing_id;
-		if (!empty($obj->info)) {
-			$routing_id .= '_' . $obj->info;
-		}
 
 		return $routing_id;
 	}

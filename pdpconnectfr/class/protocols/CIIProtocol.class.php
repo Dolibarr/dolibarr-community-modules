@@ -1885,26 +1885,7 @@ class CIIProtocol extends AbstractProtocol
 			$node = $agreement;
 		}
 
-		$prefix = $type === 'seller' ? 'seller' : 'buyer';
-		$this->fillPartyData($doc, $node, $data, $prefix);
-	}
-
-	/**
-	 * Fill a TradeParty-typed element with seller/buyer data, respecting the XSD
-	 * child order (ID, GlobalID, Name, SpecifiedLegalOrganization, DefinedTradeContact,
-	 * PostalTradeAddress, URIUniversalCommunication, SpecifiedTaxRegistration).
-	 *
-	 * Used for SellerTradeParty/BuyerTradeParty wrappers AND directly for
-	 * ShipToTradeParty (which is itself a TradePartyType with no inner wrapper).
-	 *
-	 * @param \DOMDocument $doc    Document
-	 * @param \DOMElement  $node   TradeParty node to populate
-	 * @param array        $data   Invoice data
-	 * @param string       $prefix 'seller' or 'buyer'
-	 * @return void
-	 */
-	private function fillPartyData($doc, $node, $data, $prefix)
-	{
+		$prefix = $type;
 		$node->appendChild($doc->createElement('ram:ID', $data[$prefix . 'ids']));
 
 		// GlobalID
