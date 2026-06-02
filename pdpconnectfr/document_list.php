@@ -1260,7 +1260,35 @@ while ($i < $imaxinloop) {
 				} elseif ($key == 'status') {
 					print $object->getLibStatut(5);
 				} elseif ($key == 'rowid') {
-					print $object->showOutputField($val, $key, (string) $object->id, '');
+					print $object->showOutputField($val, $key, (string)$object->id, '');
+				} elseif ($key == 'tracking_idref') {
+					$label = dol_escape_htmltag($object->tracking_idref);
+					$type = $object->fk_element_type;
+					$id = (int) $object->fk_element_id;
+					$url = '';
+
+					$map = array(
+						'Facture' => array(
+							'file' => DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php',
+							'url'  => '/compta/facture/card.php?id='
+						),
+						'FactureFournisseur' => array(
+							'file' => DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php',
+							'url'  => '/fourn/facture/card.php?id='
+						),
+					);
+
+					if (!empty($map[$type]) && !empty($id)) {
+						$url = dol_buildpath($map[$type]['url'].$id, 1);
+					}
+
+					if (!empty($url)) {
+						print '<a href="'.$url.'" target="_blank" rel="noopener noreferrer" title="'.$label.'">';
+						print $label;
+						print '</a>';
+					} else {
+						print $label;
+					}
 				} else {
 					if ($val['type'] == 'html' || $val['type'] == 'text') {
 						print '<div class="small minwidth150 lineheightsmall threelinesmax-normallineheight classfortooltip" title="'.dolPrintHTMLForAttribute((string) $object->$key).'">';
