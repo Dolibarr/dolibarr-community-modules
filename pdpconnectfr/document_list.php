@@ -1262,33 +1262,31 @@ while ($i < $imaxinloop) {
 				} elseif ($key == 'rowid') {
 					print $object->showOutputField($val, $key, (string)$object->id, '');
 				} elseif ($key == 'tracking_idref') {
-					$label = dol_escape_htmltag($object->tracking_idref);
-					$type = $object->fk_element_type;
-					$id = (int) $object->fk_element_id;
-					$url = '';
+					$out = dol_escape_htmltag($object->tracking_idref);
 
-					$map = array(
-						'Facture' => array(
-							'file' => DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php',
-							'url'  => '/compta/facture/card.php?id='
-						),
-						'FactureFournisseur' => array(
-							'file' => DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php',
-							'url'  => '/fourn/facture/card.php?id='
-						),
-					);
+					if (!empty($object->fk_element_type) && !empty($object->fk_element_id)) {
+						if ($object->fk_element_type === 'Facture') {
+							require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
+							$linkedobj = new Facture($db);
 
-					if (!empty($map[$type]) && !empty($id)) {
-						$url = dol_buildpath($map[$type]['url'].$id, 1);
+							if ($linkedobj->fetch((int) $object->fk_element_id) > 0) {
+								$out = $linkedobj->getNomUrl(0);
+							}
+						} elseif ($object->fk_element_type === 'FactureFournisseur') {
+							require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';
+							$linkedobj = new FactureFournisseur($db);
+
+							if ($linkedobj->fetch((int) $object->fk_element_id) > 0) {
+								$out = $linkedobj->getNomUrl(0);
+							}
+						}
 					}
 
-					if (!empty($url)) {
-						print '<a href="'.$url.'" target="_blank" rel="noopener noreferrer" title="'.$label.'">';
-						print $label;
-						print '</a>';
-					} else {
-						print $label;
+					if (strpos($out, '<a ') !== false) {
+						$out = preg_replace('/<a /', '<a target="_blank" rel="noopener noreferrer" ', $out, 1);
 					}
+
+					print $out;
 				} else {
 					if ($val['type'] == 'html' || $val['type'] == 'text') {
 						print '<div class="small minwidth150 lineheightsmall threelinesmax-normallineheight classfortooltip" title="'.dolPrintHTMLForAttribute((string) $object->$key).'">';
