@@ -1273,14 +1273,14 @@ while ($i < $imaxinloop) {
 							$linkedobj = new Facture($db);
 
 							if ($linkedobj->fetch((int) $object->fk_element_id) > 0) {
-								$out = $linkedobj->getNomUrl(0);
+								$out = $linkedobj->getNomUrl(1);
 							}
 						} elseif ($object->fk_element_type === 'FactureFournisseur') {
 							require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';
 							$linkedobj = new FactureFournisseur($db);
 
 							if ($linkedobj->fetch((int) $object->fk_element_id) > 0) {
-								$out = $linkedobj->getNomUrl(0);
+								$out = $linkedobj->getNomUrl(1);
 							}
 						}
 					}
