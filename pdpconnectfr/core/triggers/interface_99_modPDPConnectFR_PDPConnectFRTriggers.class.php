@@ -197,6 +197,16 @@ class InterfacePDPConnectFRTriggers extends DolibarrTriggers
 			}
 		}
 
+		if ($action == 'BILL_PAYED') {
+			$PDPManager = new PDPProviderManager($db);
+			$provider = $PDPManager->getProvider(getDolGlobalString('PDPCONNECTFR_PDP'));
+			$result = $provider->sendStatusMessage($object, 212); // Send status message
+			if ($result['res'] > 0)
+					setEventMessage('PDP Connect : '.$langs->trans('EInvStatus212Paid'), 'mesgs');
+			else
+					setEventMessage('PDP Connect : '.$result['message'], 'errors');
+		}
+
 		return 0;
 	}
 }
