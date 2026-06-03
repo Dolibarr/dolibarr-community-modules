@@ -1260,7 +1260,7 @@ while ($i < $imaxinloop) {
 				} elseif ($key == 'status') {
 					print $object->getLibStatut(5);
 				} elseif ($key == 'rowid') {
-					print $object->showOutputField($val, $key, (string)$object->id, '');
+					print $object->showOutputField($val, $key, (string) $object->id, '');
 				} elseif ($key == 'tracking_idref') {
 					$out = dol_escape_htmltag($object->tracking_idref);
 
