@@ -26,7 +26,7 @@ goetas-webservices/xsd2php-runtime 0.2.17      MIT                         Yes  
 
 horstoeko/mimedb                   1.0.8       MIT                         Yes             MIME database utilities
 horstoeko/stringmanagement         1.0.12      MIT                         Yes             String helper utilities
-horstoeko/zugferd                  1.0.222     MIT                         Yes             ZUGFeRD / Factur-X / XRechnung handling
+horstoeko/zugferd                  1.0.122     MIT                         Yes             ZUGFeRD / Factur-X / XRechnung handling
 
 jms/metadata                       2.9.0       MIT                         Yes             Metadata management
 jms/serializer                     3.29.1      MIT                         Yes             Serialization / deserialization
