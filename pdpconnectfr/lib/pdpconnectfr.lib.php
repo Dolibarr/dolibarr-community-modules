@@ -152,7 +152,8 @@ function idprof($thirdparty)
 			if (!empty($thirdparty->idprof1)) {
 				$retour = $thirdparty->idprof1; // SIREN
 			} else {
-				$retour = substr($thirdparty->idprof2, 9); // 9 first chars of SIRET
+				$siret = str_replace(array(' ', '&nbsp;', "\xc2\xa0"), '', $thirdparty->idprof2);
+				$retour = substr($siret, 9); // 9 first chars of SIRET
 			}
 			break;
 		default:
