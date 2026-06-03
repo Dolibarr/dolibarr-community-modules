@@ -97,8 +97,8 @@ include DOL_DOCUMENT_ROOT.'/core/actions_fetchobject.inc.php'; // Must be 'inclu
 // Set $enablepermissioncheck to 1 to enable a minimum low level of checks
 $enablepermissioncheck = getDolGlobalInt('PDPCONNECTFR_ENABLE_PERMISSION_CHECK');
 if ($enablepermissioncheck) {
-	$permissiontoread = $user->hasRight('pdpconnectfr', 'document', 'read');
-	$permissiontoadd = $user->hasRight('pdpconnectfr', 'document', 'write');
+	$permissiontoread = $user->hasRight('pdpconnectfr', 'read');
+	$permissiontoadd = $user->hasRight('pdpconnectfr', 'write');
 } else {
 	$permissiontoread = 1;
 	$permissiontoadd = 1;

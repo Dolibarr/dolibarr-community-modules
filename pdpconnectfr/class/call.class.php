@@ -229,7 +229,7 @@ class Call extends CommonObject
 		}
 
 		// Example to show how to set values of fields definition dynamically
-		/*if ($user->hasRight('pdpconnectfr', 'document', 'read')) {
+		/*if ($user->hasRight('pdpconnectfr', 'read')) {
 			$this->fields['myfield']['visible'] = 1;
 			$this->fields['myfield']['noteditable'] = 0;
 		}*/
