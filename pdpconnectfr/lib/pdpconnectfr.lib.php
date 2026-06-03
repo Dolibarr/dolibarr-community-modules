@@ -159,7 +159,7 @@ function idprof($thirdparty)
 			$retour = $thirdparty->idprof1 ? $thirdparty->idprof1 : $thirdparty->idprof2;
 	}
 
-	return preg_replace('/\\s+/', '', $retour);
+	return str_replace(array(' ', '&nbsp;', "\xc2\xa0"), '', $retour);
 }
 
 /**
