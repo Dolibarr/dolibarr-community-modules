@@ -313,29 +313,19 @@ class modPDPConnectFR extends DolibarrModules
 		// Add here entries to declare new permissions
 		/* BEGIN MODULEBUILDER PERMISSIONS */
 		$this->rights[$r][0] = $this->numero . sprintf('%02d', 1);
-		$this->rights[$r][1] = 'Read synchronized documents';
-		$this->rights[$r][4] = 'document';
-		$this->rights[$r][5] = 'read';
+		$this->rights[$r][1] = 'Read synchronized documents and logs';
+		$this->rights[$r][4] = 'read';
+		$this->rights[$r][5] = '';
 		$r++;
 		$this->rights[$r][0] = $this->numero . sprintf('%02d', 2);
-		$this->rights[$r][1] = 'Create/Run/Update synchronization of documents';
-		$this->rights[$r][4] = 'document';
-		$this->rights[$r][5] = 'write';
+		$this->rights[$r][1] = 'Create/Run/Update synchronization of documents and logs';
+		$this->rights[$r][4] = 'write';
+		$this->rights[$r][5] = '';
 		$r++;
 		$this->rights[$r][0] = $this->numero . sprintf('%02d', 3);
-		$this->rights[$r][1] = 'Delete synchronization documents';
-		$this->rights[$r][4] = 'document';
-		$this->rights[$r][5] = 'delete';
-		$r++;
-		$this->rights[$r][0] = $this->numero . sprintf('%02d', 4);
-		$this->rights[$r][1] = 'Read synchronization logs';
-		$this->rights[$r][4] = 'call';
-		$this->rights[$r][5] = 'read';
-		$r++;
-		$this->rights[$r][0] = $this->numero . sprintf('%02d', 5);
-		$this->rights[$r][1] = 'Delete synchronization logs';
-		$this->rights[$r][4] = 'call';
-		$this->rights[$r][5] = 'delete';
+		$this->rights[$r][1] = 'Delete synchronization documents and logs';
+		$this->rights[$r][4] = 'delete';
+		$this->rights[$r][5] = '';
 		$r++;
 
 		/* END MODULEBUILDER PERMISSIONS */
