@@ -2076,7 +2076,7 @@ class CIIProtocol extends AbstractProtocol
 	 *
 	 * @param \DOMDocument 		$doc			Document to create nodes in
 	 * @param float|null        $amount 		Amount of the discount/charge (final amount after calculation)
-	 * @param float|null        $percent 		Percentage of the discount/charge 
+	 * @param float|null        $percent 		Percentage of the discount/charge
 	 * @param float|null        $basisAmount 	Base amount for percentage calculation
 	 * @param bool        		$isCharge 		Whether this is a charge (true) or a discount (false)
 	 * @param string|null       $reason 		Reason for the discount/charge (optional)
@@ -2086,7 +2086,7 @@ class CIIProtocol extends AbstractProtocol
 	 *
 	 * @return \DOMElement
 	 */
-	function buildAllowanceChargeNode(
+	private function buildAllowanceChargeNode(
 		DOMDocument $doc,
 		$amount = null,
 		$percent = null,
@@ -2151,7 +2151,8 @@ class CIIProtocol extends AbstractProtocol
 	 *
 	 * @return void
 	 */
-	function addLineDiscount(DOMDocument $doc, DOMElement $lineTradeAgreement, array $discount) {
+	private function addLineDiscount(DOMDocument $doc, DOMElement $lineTradeAgreement, array $discount)
+	{
 
 		$node = $this->buildAllowanceChargeNode(
 			$doc,
@@ -2177,8 +2178,8 @@ class CIIProtocol extends AbstractProtocol
 	 *
 	 * @return void
 	 */
-	function addHeaderDiscount(DOMDocument $doc, DOMElement $headerSettlement, array $discount) {
-
+	private function addHeaderDiscount(DOMDocument $doc, DOMElement $headerSettlement, array $discount)
+	{
 		$node = $this->buildAllowanceChargeNode(
 			$doc,
 			$discount['amount'] ?? null,
@@ -2458,7 +2459,6 @@ class CIIProtocol extends AbstractProtocol
 		$result = [];
 
 		foreach ($headerAllowancesCharges as $index => $allowanceCharge) {
-
 			// Skip charges
 			if (($allowanceCharge['indicator'] ?? '') !== 'false') {
 				continue;
