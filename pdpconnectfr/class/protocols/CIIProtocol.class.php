@@ -225,8 +225,9 @@ class CIIProtocol extends AbstractProtocol
 			'ExemptionReason' => './ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:ExemptionReason',
 			'ExemptionReasonCode' => './ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:ExemptionReasonCode',
 
-			'lineAllowances' => [],
-			'lineGrossPriceAllowances' => [],
+			// ── line-level allowances & charges ────────────────────────────────
+			'lineAllowances' => '__MULTI__./ram:SpecifiedLineTradeSettlement/ram:SpecifiedTradeAllowanceCharge',
+			'lineGrossPriceAllowances' => '__MULTI__./ram:SpecifiedLineTradeAgreement/ram:GrossPriceProductTradePrice/ram:AppliedTradeAllowanceCharge',
 			'lineremisepercent' => 'NA',
 
 			'linePeriodStart' => './ram:SpecifiedLineTradeSettlement/ram:BillingSpecifiedPeriod/ram:StartDateTime/udt:DateTimeString',
@@ -868,14 +869,33 @@ class CIIProtocol extends AbstractProtocol
 
 				$remise_already_used_line_level_ids[] = $fk_remise;
 			}
+			// handle line-level discount if exists and update amounts
+			if (!empty($parsedLine['lineAllowances'])) {
+				$discount = $this->_resolveLineDiscountPercent($parsedLine['lineAllowances'], $parsedLine['lineTotalAmount']);
+				if ($discount !== false) {
+					$line->remise_percent  = $discount['percent'];
+					$line->subprice = round($discount['priceWithoutDiscount'] / $parsedLine['billedquantity'], 8);
+				}
+			}
 			$line->qty = $parsedLine['billedquantity'];
-			$line->subprice = $parsedLine['netpriceamount'];
+			$line->subprice = $line->subprice ?? $parsedLine['netpriceamount'];
 			$line->tva_tx = $parsedLine['rateApplicablePercent'];
 			$line->total_ht = $parsedLine['lineTotalAmount'];
 			$line->total_tva = $parsedLine['calculatedAmount'] ?? 0;
 			$line->total_ttc = $parsedLine['lineTotalAmount'] + ($parsedLine['calculatedAmount'] ?? 0);
 
 			$supplierInvoice->lines[] = $line;
+		}
+
+		// Create document level discounts (allowances) as discounts in Dolibarr
+		$globalDiscountIds = array();
+		if (!empty($parsedHeader['headerAllowancesCharges'])) {
+			$headerDiscountIds = $this->_createHeaderDiscounts($parsedHeader['headerAllowancesCharges'], $socId, 	$parsedHeader['documentno']);
+			if (!empty($headerDiscountIds[-1])) {
+				return ['res' => -1, 'message' => $headerDiscountIds[-1]];
+			} else {
+				$globalDiscountIds = $headerDiscountIds;
+			}
 		}
 
 		//return ['res' => 1, 'message' => 'Not implemented yet' ];
@@ -1012,6 +1032,20 @@ class CIIProtocol extends AbstractProtocol
 				$supplier->fournisseur = 1;
 				$supplier->code_fournisseur = 'auto';
 				$supplier->update($supplier->id, $user);
+			}
+
+			// Insert global discounts (allowances) as lines in this supplier invoice
+			if (!empty($globalDiscountIds)) {
+				foreach ($globalDiscountIds as $fk_remise_except) {
+					$currentSupplierInvoice = new FactureFournisseur($db);
+					$currentSupplierInvoice->fetch($supplierInvoiceId);
+					$result = $currentSupplierInvoice->insert_discount($fk_remise_except);
+					if ($result < 0) {
+						return ['res' => -1, 'message' => 'Failed to insert global discount into supplier invoice: ' . $currentSupplierInvoice->error];
+					} else {
+						dol_syslog('Global discount inserted into supplier invoice with line id: ' . $result);
+					}
+				}
 			}
 
 			// TODO : Add supplier price for products (all lines of the invoice)
@@ -1387,6 +1421,28 @@ class CIIProtocol extends AbstractProtocol
 					];
 					break;
 
+				case 'lineAllowances':
+					$result[] = [
+						'indicator'          => $this->getXPathValue($xpath, 'ram:ChargeIndicator/udt:Indicator', $n),
+						'reasonCode'         => $this->getXPathValue($xpath, 'ram:ReasonCode', $n),
+						'reason'             => $this->getXPathValue($xpath, 'ram:Reason', $n),
+						'calculationPercent' => $this->toFloat($this->getXPathValue($xpath, 'ram:CalculationPercent', $n)),
+						'basisAmount'        => $this->toFloat($this->getXPathValue($xpath, 'ram:BasisAmount', $n)),
+						'actualAmount'       => $this->toFloat($this->getXPathValue($xpath, 'ram:ActualAmount', $n)),
+					];
+					break;
+
+				case 'lineGrossPriceAllowances':
+					$result[] = [
+						'indicator'          => $this->getXPathValue($xpath, 'ram:ChargeIndicator/udt:Indicator', $n),
+						'reasonCode'         => $this->getXPathValue($xpath, 'ram:ReasonCode', $n),
+						'reason'             => $this->getXPathValue($xpath, 'ram:Reason', $n),
+						'calculationPercent' => $this->toFloat($this->getXPathValue($xpath, 'ram:CalculationPercent', $n)),
+						'basisAmount'        => $this->toFloat($this->getXPathValue($xpath, 'ram:BasisAmount', $n)),
+						'actualAmount'       => $this->toFloat($this->getXPathValue($xpath, 'ram:ActualAmount', $n)),
+					];
+					break;
+
 				case 'invoiceRefDocs':
 					$result[] = [
 						'IssuerAssignedID' => $this->getXPathValue($xpath, 'ram:IssuerAssignedID', $n),
@@ -1673,6 +1729,23 @@ class CIIProtocol extends AbstractProtocol
 			);
 		}
 
+		// Discounts
+		if (!empty($invoiceData['_globalDiscounts'])) {
+			$comment = $doc->createComment('Global discounts');
+			$settlement->appendChild($comment);
+			foreach ($invoiceData['_globalDiscounts'] as $globaldiscount) {
+				$discount = [
+					'amount' => number_format($globaldiscount['value'], 2, '.', ''),
+					'reason' => $globaldiscount['reason'],
+					'code' => '95',
+					'taxCategory' => $globaldiscount['categoryVAT'],
+					'taxRate' => $globaldiscount['taxRate'], // The tax rate for the discount is the same as the line tax rate. This is a common practice but not mandatory.
+				];
+				$this->addHeaderDiscount($doc, $settlement, $discount);
+			}
+		}
+
+
 		// Payment terms
 
 		// Add comment
@@ -1802,25 +1875,6 @@ class CIIProtocol extends AbstractProtocol
 		$el->appendChild($sett);
 
 
-		// Add section ...AllowanceCharge
-		/*
-		if ($line['allowanceactualamount']) {
-			$allowance = $doc->createElement('ram:SpecifiedTradeAllowanceCharge');
-			$sett->appendChild($allowance);
-
-			$chargeindicator = $doc->createElement('ram:ChargeIndicator', 'false');
-			$allowance->appendChild($chargeindicator);
-			$chargereason = $doc->createElement('ram:AllowanceChargeReason', 'Relative discount');
-			$allowance->appendChild($chargereason);
-			$basisamount = $doc->createElement('ram:BasisAmount', $line['allowancebasisamount']);
-			$allowance->appendChild($basisamount);
-			$actualamount = $doc->createElement('ram:ActualAmount', $line['allowanceactualamount']);
-			$allowance->appendChild($actualamount);
-			$calculationpercent = $doc->createElement('ram:CalculationPercent', $line['lineremisepercent']);
-			$allowance->appendChild($calculationpercent);
-		}
-		*/
-
 		// Add the VAT block for the line
 		$tax = $doc->createElement('ram:ApplicableTradeTax');
 		$sett->appendChild($tax);
@@ -1836,6 +1890,18 @@ class CIIProtocol extends AbstractProtocol
 
 		// Note that the $line['ExemptionReasonCode'] and $line['ExemptionReasonCode'] is added into the section ApplicableHeaderTradeSettlement
 		// that is a vat breakdown array and not inside each line.
+
+		if ($line['discountPercent']) {
+			$discount = [
+				'basis' => $line['netpriceamount'] * $line['billedquantity'],	// The base amount for the discount is the line net price * quantity.
+				'amount' => $line['netpriceamount'] * $line['billedquantity'] * $line['discountPercent'] / 100,
+				'percent' => $line['discountPercent'],
+				'taxCategory' => $line['categoryCode'],
+				'taxRate' => $line['rateApplicablePercent'], // The tax rate for the discount is the same as the line tax rate.
+				'code' => '95', // '95' is the code for "Promotion discount" can be replaced by a reason.
+			];
+			$this->addLineDiscount($doc, $sett, $discount);
+		}
 
 
 		// Total line
@@ -2003,6 +2069,129 @@ class CIIProtocol extends AbstractProtocol
 		$tax->appendChild($doc->createElement('ram:RateApplicablePercent', number_format($floatrate, 2, '.', '')));
 
 		return $tax;
+	}
+
+	/**
+	 * Build an allowance charge node (discount or charge).
+	 *
+	 * @param \DOMDocument 		$doc			Document to create nodes in
+	 * @param float|null        $amount 		Amount of the discount/charge (final amount after calculation)
+	 * @param float|null        $percent 		Percentage of the discount/charge 
+	 * @param float|null        $basisAmount 	Base amount for percentage calculation
+	 * @param bool        		$isCharge 		Whether this is a charge (true) or a discount (false)
+	 * @param string|null       $reason 		Reason for the discount/charge (optional)
+	 * @param string|null       $reasonCode 	Code for the reason (optional, can be used instead of reason or together with reason)
+	 * @param string            $taxCategory 	Tax category code
+	 * @param float             $taxRate 		Tax rate applicable to this discount/charge
+	 *
+	 * @return \DOMElement
+	 */
+	function buildAllowanceChargeNode(
+		DOMDocument $doc,
+		$amount = null,
+		$percent = null,
+		$basisAmount = null,
+		$isCharge = false,
+		$reason = null,
+		$reasonCode = null,
+		$taxCategory = 'S',
+		$taxRate = 20.0
+	) {
+		$node = $doc->createElement('ram:SpecifiedTradeAllowanceCharge');
+
+		// Indicator (remise ou charge)
+		$indicator = $doc->createElement('ram:ChargeIndicator');
+		$indicatorValue = $doc->createElement('udt:Indicator', $isCharge ? 'true' : 'false');
+		$indicator->appendChild($indicatorValue);
+		$node->appendChild($indicator);
+
+		// Percent (optionnel)
+		if ($percent !== null) {
+			$node->appendChild($doc->createElement('ram:CalculationPercent', number_format($percent, 2, '.', '')));
+		}
+
+		// Basis amount (optionnel)
+		if ($basisAmount !== null) {
+			$node->appendChild($doc->createElement('ram:BasisAmount', number_format($basisAmount, 2, '.', '')));
+		}
+
+		// Amount (final discount/charge)
+		if ($amount !== null) {
+			$node->appendChild($doc->createElement('ram:ActualAmount', number_format($amount, 2, '.', '')));
+		}
+
+		// reasonCode
+		if ($reasonCode !== null) {
+			$node->appendChild($doc->createElement('ram:ReasonCode', $reasonCode));
+		}
+
+		// Reason
+		if ($reason !== null) {
+			$node->appendChild($doc->createElement('ram:Reason', $reason));
+		}
+
+		// Tax (important Factur-X)
+		$taxNode = $doc->createElement('ram:CategoryTradeTax');
+
+		$taxNode->appendChild($doc->createElement('ram:TypeCode', 'VAT'));
+		$taxNode->appendChild($doc->createElement('ram:CategoryCode', $taxCategory));
+		$taxNode->appendChild($doc->createElement('ram:RateApplicablePercent', number_format($taxRate, 2, '.', '')));
+
+		$node->appendChild($taxNode);
+
+		return $node;
+	}
+
+	/**
+	 * Add a discount line to a line trade agreement node.
+	 *
+	 * @param \DOMDocument 		$doc					Document to create nodes in
+	 * @param \DOMElement  		$lineTradeAgreement 	Node representing the line trade agreement to append the discount to
+	 * @param array 			$discount 				Array containing discount data (amount, percent, basis, reason, code, taxCategory, taxRate)
+	 *
+	 * @return void
+	 */
+	function addLineDiscount(DOMDocument $doc, DOMElement $lineTradeAgreement, array $discount) {
+
+		$node = $this->buildAllowanceChargeNode(
+			$doc,
+			$discount['amount'] ?? null,
+			$discount['percent'] ?? null,
+			$discount['basis'] ?? null,
+			false,
+			$discount['reason'] ?? null,
+			$discount['code'] ?? null,
+			$discount['taxCategory'] ?? 'S',
+			$discount['taxRate'] ?? 20.0
+		);
+
+		$lineTradeAgreement->appendChild($node);
+	}
+
+	/**
+	 * Add a discount or charge to the header settlement node.
+	 *
+	 * @param \DOMDocument 		$doc				Document to create nodes in
+	 * @param \DOMElement  		$headerSettlement 	Node representing the header settlement to append the discount/charge to
+	 * @param array 			$discount 			Array containing discount/charge data (amount, percent, basis, reason, code, taxCategory, taxRate)
+	 *
+	 * @return void
+	 */
+	function addHeaderDiscount(DOMDocument $doc, DOMElement $headerSettlement, array $discount) {
+
+		$node = $this->buildAllowanceChargeNode(
+			$doc,
+			$discount['amount'] ?? null,
+			$discount['percent'] ?? null,
+			$discount['basis'] ?? null,
+			false,
+			$discount['reason'] ?? null,
+			$discount['code'] ?? null,
+			$discount['taxCategory'] ?? 'S',
+			$discount['taxRate'] ?? 20.0
+		);
+
+		$headerSettlement->appendChild($node);
 	}
 
 	/**
@@ -2196,5 +2385,113 @@ class CIIProtocol extends AbstractProtocol
 		sort($customerOrderReferenceList);
 		$deliveryDateList = array_unique($deliveryDateList);
 		rsort($deliveryDateList);
+	}
+
+	/**
+	 * Resolve multiple line allowances into a single percentage for Dolibarr.
+	 *
+	 * Dolibarr only supports percentage discounts on lines, so fixed amounts
+	 * are converted using basisAmount or lineTotalAmount as base.
+	 * Multiple allowances are summed into one final percentage.
+	 *
+	 * @param array      $lineAllowances  parsed lineAllowances array
+	 * @param float|null $lineTotalAmount BT-131 net line amount (base ht)
+	 * @return false|array{percent: float, base: float, discountAmount: float, priceWithoutDiscount: float}
+	 */
+	private function _resolveLineDiscountPercent(array $lineAllowances, ?float $lineTotalAmount): false|array
+	{
+		// Keep only allowances (indicator = "false"), ignore charges (indicator = "true")
+		$allowances = array();
+		foreach ($lineAllowances as $allowance) {
+			if (($allowance['indicator'] ?? '') === 'false') {
+				$allowances[] = $allowance;
+			}
+		}
+
+		if (empty($allowances)) {
+			return false;
+		}
+
+		$allowances = array_values($allowances);
+
+		// Base used for percent calculation — basisAmount of first entry, fallback to lineTotalAmount
+		$base = $allowances[0]['basisAmount'] ?? $lineTotalAmount;
+
+		if (!$base) {
+			return false;
+		}
+
+		// Sum all actualAmounts — always populated whether the source was % or fixed
+		$totalDiscountAmount = 0.0;
+		foreach ($allowances as $allowance) {
+			$totalDiscountAmount += (float) ($allowance['actualAmount'] ?? 0);
+		}
+
+		if ($totalDiscountAmount === 0.0) {
+			return false;
+		}
+
+		return [
+			'percent'              => round(($totalDiscountAmount / $base) * 100, 4),
+			'base'                 => (float) $base,
+			'discountAmount'       => $totalDiscountAmount,
+			'priceWithoutDiscount' => (float) $lineTotalAmount + $totalDiscountAmount,
+		];
+	}
+
+
+	/**
+	 * Create Dolibarr global discount exceptions from CII header allowances.
+	 *
+	 * Only processes allowances (indicator = "false"), ignores charges (indicator = "true").
+	 * Returns array of created fk_remise_except IDs.
+	 *
+	 * @param array  $headerAllowancesCharges  	parsed headerAllowancesCharges array
+	 * @param int    $fk_soc                  	supplier ID
+	 * @param string $description             	invoice number or any reference
+	 * @return array							[ originalIndex => fk_remise_except_id ] or '-1' on error
+	 */
+	private function _createHeaderDiscounts(array $headerAllowancesCharges, int $fk_soc, string $description): array
+	{
+		global $db, $user;
+
+		$result = [];
+
+		foreach ($headerAllowancesCharges as $index => $allowanceCharge) {
+
+			// Skip charges
+			if (($allowanceCharge['indicator'] ?? '') !== 'false') {
+				continue;
+			}
+
+			$actualAmount = (float) ($allowanceCharge['actualAmount'] ?? 0);
+			if ($actualAmount === 0.0) {
+				continue;
+			}
+
+			$remise = new DiscountAbsolute($db);
+			$remise->socid          = $fk_soc;
+			$remise->amount_ht       = $actualAmount;
+			$remise->amount_tva      = round($actualAmount * (($allowanceCharge['rateApplicablePercent'] ?? 0) / 100), 2);
+			$remise->amount_ttc      = round($remise->amount_ht + $remise->amount_tva, 2);
+			$remise->total_ht 		= $remise->amount_ht;
+			$remise->total_tva 		= $remise->amount_tva;
+			$remise->total_ttc 		= $remise->amount_ttc;
+			$remise->tva_tx          = (float) ($allowanceCharge['rateApplicablePercent'] ?? 0);
+			$remise->fk_user         = $user->id;
+			$remise->description     = $allowanceCharge['reason'] ?? $description;
+			$remise->discount_type   = 1;
+
+			$id = $remise->create($user);
+
+			if ($id > 0) {
+				$result[$index] = $id;
+			} else {
+				dol_syslog(__METHOD__ . ' Failed to create discount exception: ' . $remise->error, LOG_WARNING);
+				return array(-1 => 'Failed to create discount exception: ' . $remise->error);
+			}
+		}
+
+		return $result;
 	}
 }
