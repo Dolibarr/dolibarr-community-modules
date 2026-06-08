@@ -2399,7 +2399,7 @@ class CIIProtocol extends AbstractProtocol
 	 * @param float|null $lineTotalAmount BT-131 net line amount (base ht)
 	 * @return false|array{percent: float, base: float, discountAmount: float, priceWithoutDiscount: float}
 	 */
-	private function _resolveLineDiscountPercent(array $lineAllowances, ?float $lineTotalAmount): false|array
+	private function _resolveLineDiscountPercent(array $lineAllowances, ?float $lineTotalAmount)
 	{
 		// Keep only allowances (indicator = "false"), ignore charges (indicator = "true")
 		$allowances = array();
