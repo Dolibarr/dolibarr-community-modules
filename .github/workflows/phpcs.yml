@@ -39,4 +39,4 @@ jobs:
       - name: Run VarDump Check
         run: var-dump-check --extensions php --tracy --exclude */vendor/* .
       - name: Run Parallel Lint
-        run: parallel-lint --exclude */vendor/* .
+        run: parallel-lint --exclude pdpconnectfr/vendor/ .
