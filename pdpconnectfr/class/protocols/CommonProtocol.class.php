@@ -1047,7 +1047,8 @@ trait CommonProtocol
 
 				if (empty($seller->tva_assuj)) {
 					// Can be $categoryVAT = E (VAT exempted) or AE (Autoliquidation)
-					if (1 == 2) {	// Autoliquidation (the VAT is declared by the customer that pay it directly to the government). TODO Not yet managed.
+					if (1 == 2) {	// Autoliquidation (the VAT is declared by the customer that pay it directly to the government). TODO Not implemented.
+						// Note: the option ACCOUNTING_FORCE_ENABLE_VAT_REVERSE_CHARGE is for purchase invoices only and is used to dispatch vat differently in accounting..
 						$categoryVAT = 'AE';	// Autoliquidation
 						$exemptionReasonCode = 'VATEX-'.($seller->country_code == 'FR' ? 'FR' : 'EU').'-AE';	// VATEX-EU-AE or VATEX-FR-AE
 						$exemptionReason = 'Autoliquidation';
