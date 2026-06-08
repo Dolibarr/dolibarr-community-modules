@@ -1262,8 +1262,9 @@ class PdpConnectFr
 						$label .= ' (' . $langs->trans("Default") . ')';
 					}
 					if (!empty($r['info'])) {
+						// Le libellé info est affiché uniquement pour aider l'utilisateur à choisir,
+						// il ne doit pas être stocké ni transmis à la PA.
 						$label .= ' — ' . $r['info'];
-						$routing_id .= '_' . $r['info'];
 					}
 					$selectOptions[$routing_id] = $label;
 				}

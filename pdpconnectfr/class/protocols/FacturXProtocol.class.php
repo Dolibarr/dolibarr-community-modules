@@ -476,6 +476,18 @@ class FacturXProtocol extends AbstractProtocol
 		$filedir = getMultidirOutputCompat($invoice, '', 1);		// Example '/mydolibarr/documents/facture/FAYYMM-XXXX'
 		$orig_pdf = $filedir . '/' . $filename . '.pdf';
 
+		// Si le PDF source n'existe plus (supprimé manuellement), on le regénère avant d'embarquer le XML.
+		if (!file_exists($orig_pdf)) {
+			$modelname = getDolGlobalString('FACTURE_ADDON_PDF') ?: 'crabe';
+			$resultpdf = $invoice->generateDocument($modelname, $langs);
+			if ($resultpdf < 0) {
+				dol_syslog(get_class($this) . "::generateInvoice failed to regenerate missing PDF for invoice id=" . $invoice_id, LOG_ERR);
+				$this->error = $langs->trans("ErrorFailedToRegeneratePDF");
+				$this->errors[] = $this->error;
+				return -1;
+			}
+		}
+
 		// Make a copy of the original PDF file
 		$pathfacturxpdf = $filedir . '/' . $filename . '_facturx.pdf';	// The new name of the PDF including xml
 		if (dol_copy($orig_pdf, $pathfacturxpdf)) {

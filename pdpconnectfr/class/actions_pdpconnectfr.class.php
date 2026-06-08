@@ -224,14 +224,17 @@ class ActionsPdpconnectfr extends CommonHookActions
 						'url' => '/compta/facture/card.php?id=' . $object->id . '&action=generate_einvoice&token=' . newToken()
 					);
 
-					$url_button[] = array(
-						'lang' => 'pdpconnectfr',
-						'enabled' => 1,
-						'perm' => (bool) $user->hasRight("facture", "creer"),
-						'label' => $langs->trans('sendToPDP'),
-						//'help' => $langs->trans('SendToPDPHelp'),
-						'url' => '/compta/facture/card.php?id=' . $object->id . '&action=send_to_pdp&token=' . newToken()
-					);
+					// Le bouton d'envoi n'est affiché que si le fichier FacturX a bien été généré.
+					if ($currentStatusDetails['file'] == 1) {
+						$url_button[] = array(
+							'lang' => 'pdpconnectfr',
+							'enabled' => 1,
+							'perm' => (bool) $user->hasRight("facture", "creer"),
+							'label' => $langs->trans('sendToPDP'),
+							//'help' => $langs->trans('SendToPDPHelp'),
+							'url' => '/compta/facture/card.php?id=' . $object->id . '&action=send_to_pdp&token=' . newToken()
+						);
+					}
 				}
 			}
 
