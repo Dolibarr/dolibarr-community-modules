@@ -54,7 +54,7 @@ packages:
       cover: 'https://raw.githubusercontent.com/Dolibarr/dolibarr-community-modules/main/helloasso/cover.png'
       current_version: "2.0"
       dolibarrmin: "21.0"
-      dolibarrmax: "23.0"
+      dolibarrmax: "24.0"
       phpmin: "7.1"
       phpmax: "8.4"
       price: 0
