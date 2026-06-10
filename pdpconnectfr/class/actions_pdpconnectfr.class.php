@@ -296,7 +296,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 							'enabled' => 1,
 							'perm' => (bool) $user->hasRight("facture", "creer"),
 							'label' => $label,
-							'url' => '/fourn/facture/card.php?id=' . $object->id . '&action=sendStatusMessage&pdpstatuscode=' . $code . '&token=' . newToken()
+							'url' => dol_buildpath('/fourn/facture/card.php?id=' . $object->id . '&action=sendStatusMessage&pdpstatuscode=' . $code . '&token=' . newToken(), 1)
 						);
 					}
 
