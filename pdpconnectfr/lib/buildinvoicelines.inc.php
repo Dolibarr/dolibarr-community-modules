@@ -199,7 +199,18 @@ if ($object->type == $object::TYPE_CREDIT_NOTE && !empty($object->fk_facture_sou
 		];
 		dol_syslog(get_class($this) . '::generateXML Set source invoice reference ' . $sourceFact->ref . ' for credit note ' . $object->ref);
 	} else {
-		dol_syslog(get_class($this) . '::generateXML Cannot fetch source invoice id=' . $object->fk_facture_source . ' for credit note ' . $object->ref, LOG_WARNING);
+		if ($object->id == 0) { // Specimen case.
+			$specimenRefDoc = $object->fk_facture_source ?? 'FA0000-SPECIMEN';
+			$sourceFactDate = new DateTime(dol_print_date(dol_now() - 100, 'dayrfc'));
+			$invoiceRefDocs[] = [
+				'ref' => $specimenRefDoc,
+				'date' => $sourceFactDate,
+				'type' => '381' 				// 381 = Credit note
+			];
+			dol_syslog(get_class($this) . '::generateXML Set source invoice reference ' . $specimenRefDoc . ' for credit note specimen ' . $object->ref);
+		} else {
+			dol_syslog(get_class($this) . '::generateXML Cannot fetch source invoice id=' . $object->fk_facture_source . ' for credit note ' . $object->ref, LOG_WARNING);
+		}
 	}
 }
 
@@ -511,10 +522,39 @@ foreach ($object->lines as $line) {
 	$numligne++;
 }
 
+// already used credit note amount
+$usedcreditnoteamount = 0;
+$usedcreditnote = array();
+$sql = "SELECT re.rowid, re.amount_ht, re.amount_tva, re.amount_ttc,";
+$sql .= " re.description, re.fk_facture_source";
+$sql .= " FROM ".MAIN_DB_PREFIX."societe_remise_except as re";
+$sql .= " WHERE fk_facture = ".((int) $object->id) ." AND description = '(CREDIT_NOTE)'";
+$resql = $db->query($sql);
+if ($resql) {
+	while ($obj = $db->fetch_object($resql)) {
+		$usedcreditnoteamount += abs($obj->amount_ttc);
+
+		// Add used credit note into reference documents of invoice
+		$usedCreditNoteFact = new Facture($this->db);
+		if ($usedCreditNoteFact->fetch($obj->fk_facture_source) > 0) {
+			$usedCreditNoteFactDate = new DateTime(dol_print_date($usedCreditNoteFact->date, 'dayrfc'));
+			$invoiceRefDocs[] = [
+				'ref' => $usedCreditNoteFact->ref,
+				'date' => $usedCreditNoteFactDate,
+				'type' => '381'
+			];
+		} else {
+			dol_syslog("Error " . $db->error() . " when looking for credit note linked to invoice to calculate prepaid amount for invoice " . $object->id, LOG_WARNING);
+		}
+	}
+} else {
+	dol_syslog("Error " . $db->error() . " when looking for credit note linked to invoice to calculate prepaid amount for invoice " . $object->id, LOG_WARNING);
+}
+
 // Already paid deposits
 $getAlreadyPaid = $object->getSommePaiement();
-// $prepaidAmount  = $object->sumpayed + $prepaidAmount;
-$prepaidAmount  = $object->sumpayed + $getAlreadyPaid;
+
+$prepaidAmount  = $object->sumpayed + $getAlreadyPaid + $usedcreditnoteamount;
 
 // Delivery date
 $deliveryDate = !empty($deliveryDateList)
