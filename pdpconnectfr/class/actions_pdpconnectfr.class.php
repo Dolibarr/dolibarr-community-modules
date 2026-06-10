@@ -2,6 +2,7 @@
 /* Copyright (C) 2025		Mohamed Daoud			<mdaoud@dolicloud.com>
  * Copyright (C) 2025		Laurent Destailleur		<eldy@users.sourceforge.net>
  * Copyright (C) 2026		Charlene Benke			<charlene@patas-monkey.com>
+ * Copyright (C) 2026       Frédéric France         <frederic.france@free.fr>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,9 +24,14 @@
  * \brief   Hook of module
  */
 
-require_once DOL_DOCUMENT_ROOT . '/core/class/commonhookactions.class.php';
+if ((float) DOL_VERSION < 19) {
+	dol_include_once('/pdpconnectfr/compat/commonhookactions.class.php');
+} else {
+	require_once DOL_DOCUMENT_ROOT . '/core/class/commonhookactions.class.php';
+}
 require_once __DIR__ . "/pdpconnectfr.class.php";
 dol_include_once('/pdpconnectfr/class/providers/PDPProviderManager.class.php');
+
 
 /**
  * Class for hooks of module
@@ -41,7 +47,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 	 * @param Hookmanager			$hookmanager	Hookmanager
 	 * @return int									Result
 	 */
-	public function messageOfTheDay($parameters, &$object, &$action, $hookmanager)
+	public function messageOfTheDay($parameters, $object, &$action, $hookmanager)
 	{
 		return 0;
 	}
@@ -80,10 +86,13 @@ class ActionsPdpconnectfr extends CommonHookActions
 			$invoiceObject->fetch_thirdparty();
 			$thirdpartyCountryCode = $invoiceObject->thirdparty->country_code;
 
-			if ($thirdpartyCountryCode === 'FR') {
+			// Get current status of e-invoice
+			$currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus($invoiceObject->id);
+
+			if ($thirdpartyCountryCode === 'FR' && (!isset($currentStatusDetails['code']) || $currentStatusDetails['code'] != $pdpConnectFr::STATUS_IGNORE)) {
 				/** @var Facture $invoiceObject */
-				if ($invoiceObject->status != $invoiceObject::STATUS_DRAFT
-					&& !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP')
+				if (//$invoiceObject->status != $invoiceObject::STATUS_DRAFT &&
+					!getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP')
 					&& getDolGlobalString('PDPCONNECTFR_EINVOICE_IN_REAL_TIME')) {
 					// Call function to create Factur-X document
 					require_once __DIR__ . '/protocols/ProtocolManager.class.php';
@@ -94,40 +103,58 @@ class ActionsPdpconnectfr extends CommonHookActions
 
 					// Check configuration
 					$result = $pdpConnectFr->checkRequiredinformations($invoiceObject);
-					if ($result['res'] < 0) {
+					if ($result['res'] < 0) {			// Error case
 						$message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
 
 						dol_syslog(__METHOD__ . " " . $message);
 
 						if (getDolGlobalString('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
-							// TODO : Remove this conf or add more conditions like thirdparty nature to avoid blocking invoice creation for non FR companies or for thirdparties that are not subject to E-invoicing obligation
-							setEventMessages($message, array(), 'errors');
-							// $this->errors[] = $message;
+							// Add more conditions like thirdparty nature to avoid blocking invoice creation for non FR companies
+							// or for thirdparties that are not subject to E-invoicing obligation
+							$messagecss = 'errors';
+							setEventMessages($message, array(), $messagecss);
 							return -1;
 						} else {
-							setEventMessages($message, array(), 'warnings');
+							$messagecss = 'warnings';
+							setEventMessages($message, array(), $messagecss);
 							$this->warnings[] = $message;
 							return 0;
 						}
-					} elseif ($result['res'] == 0) {
+					} elseif ($result['res'] == 0) {	// Warning case
 						$message = $langs->trans("InvoiceGeneratedWithWarnings") . ': <br>' . $result['message'];
 						$this->warnings[] = $message;
 
 						dol_syslog(__METHOD__ . " " . $message);
-						setEventMessages($message, array(), 'warnings');
+						$messagecss = 'warnings';
+						//setEventMessages($message, array(), $messagecss);
 					}
 
 					$result = $protocol->generateInvoice($invoiceObject, $outputlangs);		// Generate E-invoice
 
+					if ($result >= 0) {
+						setEventMessages($message, array(), $messagecss);
+					}
+
 					if ($result && (!is_numeric($result) || $result > 0)) {
-						// No error;
+						// No error
 						setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
 					} else {
 						if (getDolGlobalString('PDPCONNECTFR_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
+							// If einvoice fails here, it must be always an error
 							$this->errors = array_merge($this->errors, $protocol->errors);
 							return -1;
 						} else {
-							return 0;
+							if ($result < 0) {
+								if ((float) DOL_VERSION < 24.0) {
+									$this->errors = array_merge($this->errors, $protocol->errors);
+									$this->warnings = array();	// We remove warning array to keep only the error array, because only errors array is managed with version < 24.0 of Dolibarr.
+								} else {
+									$this->warnings = array_merge($this->errors, $protocol->errors);	// We want to return the error as a warning.
+								}
+								return -1;
+							} else {
+								return 0;
+							}
 						}
 					}
 				}
@@ -165,6 +192,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 			$currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus(0, $object->ref);
 
 			$url_button = array();
+
 			if ($object->status == Facture::STATUS_VALIDATED || $object->status == Facture::STATUS_CLOSED) {
 				// if E-invoice is not generated, show button to generate e-invoice
 				if (
@@ -182,25 +210,38 @@ class ActionsPdpconnectfr extends CommonHookActions
 				}
 
 				// If the e-invoice is generated but not sent, or if it was sent and a validation error was received,
-				// display the button to regenerate the e-invoice and the button to send the e-invoice.
+				// display the button to regenerate the e-invoice
 				if (in_array($currentStatusDetails['code'], [
 					$pdpConnectFr::STATUS_GENERATED,
 					$pdpConnectFr::STATUS_ERROR,
 					$pdpConnectFr::STATUS_UNKNOWN
 				])) {
-					$url_button[] = array(
-						'lang' => 'pdpconnectfr',
-						'enabled' => 1,
-						'perm' => (bool) $user->hasRight("facture", "creer"),
-						'label' => $langs->trans('RegenerateEinvoice'),
-						//'help' => $langs->trans('RegenerateEinvoiceHelp'),
-						'url' => '/compta/facture/card.php?id=' . $object->id . '&action=generate_einvoice&token=' . newToken()
-					);
+					$perm = (bool) $user->hasRight("facture", "creer");
+				} else {
+					$perm = false;
+				}
+				$url_button[] = array(
+					'lang' => 'pdpconnectfr',
+					'enabled' => 1,
+					'perm' => $perm,
+					'label' => $langs->trans('RegenerateEinvoice'),
+					//'help' => $langs->trans('RegenerateEinvoiceHelp'),
+					'url' => '/compta/facture/card.php?id=' . $object->id . '&action=generate_einvoice&token=' . newToken()
+				);
 
+				// If the e-invoice is generated but not sent, or if it was sent and a validation error was received,
+				// display the button to regenerate the e-invoice
+				if (in_array($currentStatusDetails['code'], [
+					$pdpConnectFr::STATUS_GENERATED,
+					$pdpConnectFr::STATUS_ERROR,
+					$pdpConnectFr::STATUS_UNKNOWN,
+					$pdpConnectFr::STATUS_AWAITING_VALIDATION,		// We may retry to resend. We should get an error if we do, but it is interesting to test the retry.
+					$pdpConnectFr::STATUS_AWAITING_ACK				// We may retry to resend. We should get an error if we do, but it is interesting to test the retry.
+				])) {
 					$url_button[] = array(
 						'lang' => 'pdpconnectfr',
 						'enabled' => 1,
-						'perm' => (bool) $user->hasRight("facture", "creer"),
+						'perm' => (bool) $user->hasRight("pdpconnectfr", "document", "write"),
 						'label' => $langs->trans('sendToPDP'),
 						//'help' => $langs->trans('SendToPDPHelp'),
 						'url' => '/compta/facture/card.php?id=' . $object->id . '&action=send_to_pdp&token=' . newToken()
@@ -208,8 +249,19 @@ class ActionsPdpconnectfr extends CommonHookActions
 				}
 			}
 
-			print '<!-- Current AP: ' . getDolGlobalString('PDPCONNECTFR_PDP') . ' -->';
-			print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true);
+			if (!empty($parameters['context']) && !preg_match('/takepospay/', $parameters['context'])) {
+				print '<!-- Current AP: ' . getDolGlobalString('PDPCONNECTFR_PDP') . ' -->';
+				if (!empty($url_button)) {
+					// Pass the visible label as the 1st arg ($label), not the 2nd ($text). On Dolibarr 18/19
+					// the dropdown <a> renders only $label; v22+ falls back to $text when $label is empty,
+					// but to keep behavior consistent across versions we always use $label.
+					if ((float) DOL_VERSION < 22) {
+						print dolGetButtonAction($langs->trans('einvoice'), '', 'default', $url_button, '', true);
+					} else {
+						print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true);
+					}
+				}
+			}
 		}
 
 
@@ -248,7 +300,9 @@ class ActionsPdpconnectfr extends CommonHookActions
 						);
 					}
 
-					print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true);
+					if (!empty($url_button)) {
+						print dolGetButtonAction($langs->trans('einvoice'), '', 'default', $url_button, '', true);
+					}
 				}
 			}
 		}
@@ -293,14 +347,18 @@ class ActionsPdpconnectfr extends CommonHookActions
 		if (isset($object->element) && in_array($object->element, ['facture']) && !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP')) {
 			$permissiontoedit = $user->hasRight('facture', 'write');
 
-			// Get current status of e-invoice
-			$currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus(0, $object->ref);
-			// Action to set the E-invoice status manually
-			if ($action == 'seteinvoicestatus' && $permissiontoedit) {
-				$result = $pdpConnectFr->setEInvoiceStatus($object, GETPOSTINT('seteinvoicestatus'), '');
-				if ($result < 0) {
-					$error++;
-					$this->errors = array_merge($this->errors, $pdpConnectFr->errors);
+			if ($action == 'add') {
+				// On create, we can do nothing here. We will update the einvoice status into the CREATE trigger.
+			} else {
+				// Get current status of e-invoice
+				$currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus(0, $object->ref);
+				// Action to set the E-invoice status manually
+				if ($action == 'seteinvoicestatus' && $permissiontoedit) {
+					$result = $pdpConnectFr->setEInvoiceStatus($object, GETPOSTINT('seteinvoicestatus'), '');
+					if ($result < 0) {
+						$error++;
+						$this->errors = array_merge($this->errors, $pdpConnectFr->errors);
+					}
 				}
 			}
 
@@ -360,12 +418,12 @@ class ActionsPdpconnectfr extends CommonHookActions
 				}
 			}
 
-			// Action to generate the E-invoice
+			// Action to generate the E-invoice alone
 			if ($action == 'generate_einvoice' && $permissiontoedit) {
 				$object->fetch_thirdparty();
 				$invoiceObject = $object;
 
-				// Call function to create Factur-X document
+				// Call function to create E-invoice document
 				require_once __DIR__ . '/protocols/ProtocolManager.class.php';
 
 				$usedProtocols = getDolGlobalString('PDPCONNECTFR_PROTOCOL');
@@ -378,6 +436,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 					$message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
 
 					dol_syslog(__METHOD__ . " " . $message);
+
 					setEventMessages($message, array(), 'errors');
 					$error++;
 				} elseif ($result['res'] == 0) {	// Non blocking error, warning
@@ -390,6 +449,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 				if (!$error) {
 					$result = $protocol->generateInvoice($invoiceObject, $outputlangs);
 					if ($result && (!is_numeric($result) || $result > 0)) {
+						// No error
 						dol_syslog(__METHOD__ . " Invoice generated successfully for invoice ID " . $invoiceObject->id);
 						if (!empty($this->warnings)) {
 							setEventMessages($langs->trans("InvoiceGeneratedWithWarnings"), $this->warnings, 'warnings');
@@ -432,7 +492,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 			}
 		}
 
-		if (in_array('thirdpartycard', $contexts) && (!getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI'))) {
+		if (array_intersect(['thirdpartycard', 'thirdpartycomm'], $contexts) && (!getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI'))) {
 			$permissiontoedit = $user->hasRight('societe', 'creer');
 
 			// $object->id may be empty at hook time if core hasn't fetched the object yet
@@ -526,7 +586,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 	 * @param CommonObject	$object			Object
 	 * @param string		$action			Action code
 	 * @param Hookmanager	$hookmanager	Hook manager
-	 * @return number
+	 * @return int
 	 */
 	public function formConfirm($parameters, $object, &$action, $hookmanager)
 	{
@@ -558,7 +618,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 							'name' => 'statusRaison',
 							'label' => $langs->trans("SelectStatusReason"),
 							'value' => '',
-							'values' => $pdpConnectFr->getRaisonsByStatus($pdpstatuscode, 1)
+							'values' => $pdpConnectFr->getReasonsByStatus($pdpstatuscode, 1)
 						]
 					);
 				}
@@ -577,6 +637,8 @@ class ActionsPdpconnectfr extends CommonHookActions
 				$this->resprints .= $formconfirm;
 			}
 		}
+
+		return 0;
 	}
 
 	/**
@@ -680,6 +742,8 @@ class ActionsPdpconnectfr extends CommonHookActions
 				'perms' => '1'
 			);
 		}
+
+		return 0;
 	}
 
 
@@ -927,7 +991,9 @@ class ActionsPdpconnectfr extends CommonHookActions
 		}
 
 		if (in_array('thirdpartylist', explode(':', $parameters['context'])) && (!getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI'))) {
-			print print_liste_field_titre($langs->transnoentitiesnoconv('pdpconnectfrThirdPartyRoutingTitle'));
+			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
+				print print_liste_field_titre($langs->transnoentitiesnoconv('pdpconnectfrThirdPartyRoutingTitle'));
+			}
 		}
 
 		if (in_array('productlist', explode(':', $parameters['context'])) && (!getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI'))) {
@@ -961,11 +1027,11 @@ class ActionsPdpconnectfr extends CommonHookActions
 				return 0;
 			}
 
-			// Einvoice generated or not
+			// E-invoice generation status
 			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
 				$tmparray = $pdpConnectFr->fetchLastknownInvoiceStatus(0, $obj->ref);
 				$einvoiceGenerated = $tmparray['file'];
-				print '<td class="center tdoverflowmax125">';
+				print '<td class="center tdoverflowmax100">';
 				if ($einvoiceGenerated) {
 					print '<i class="fas fa-check-circle" style="color:green;" title="' . $langs->trans('EInvoiceGenerated') . '"></i>';
 				}
@@ -975,10 +1041,10 @@ class ActionsPdpconnectfr extends CommonHookActions
 				}
 			}
 
-			// Sync status
+			// E-invoice sync status
 			if (empty($parameters['arrayfields']['pdp_syncstatus']) || !empty($parameters['arrayfields']['pdp_syncstatus']['checked'])) {
 				$currentStatusDetails = $obj->pdp_syncstatus ? $pdpConnectFr->getStatusLabel($obj->pdp_syncstatus) : '-';
-				print '<td class="center tdoverflowmax125" title="' . dolPrintHTMLForAttribute($currentStatusDetails) . '">';
+				print '<td class="center tdoverflowmax100" title="' . dolPrintHTMLForAttribute($currentStatusDetails) . '">';
 				print $currentStatusDetails;
 				print '</td>';
 				if (isset($parameters['i']) && empty($parameters['i'])) {
@@ -991,7 +1057,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 		if (in_array('supplierinvoicelist', explode(':', $parameters['context'])) && !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_AP_TO_DOLI')) {
 			$obj = $parameters['obj'];
 
-			print '<td class="tdoverflowmax125">';
+			print '<td class="tdoverflowmax100">';
 			if ($obj->pdplink_id) {
 				print dolPrintHTML($obj->pdp_provider);
 			}
@@ -1002,15 +1068,17 @@ class ActionsPdpconnectfr extends CommonHookActions
 		}
 
 		if (in_array('thirdpartylist', explode(':', $parameters['context']), true)) {
-			$obj = $parameters['obj'];
+			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
+				$obj = $parameters['obj'];
 
-			print '<td class="tdoverflowmax125">';
-			if ($obj->pdplink_id) {
-				print dolPrintHTML($obj->routing_id);
-			}
-			print '</td>';
-			if (isset($parameters['i']) && empty($parameters['i'])) {
-				$parameters['totalarray']['nbfield']++;
+				print '<td class="tdoverflowmax125">';
+				if ($obj->pdplink_id) {
+					print dolPrintHTML($obj->routing_id);
+				}
+				print '</td>';
+				if (isset($parameters['i']) && empty($parameters['i'])) {
+					$parameters['totalarray']['nbfield']++;
+				}
 			}
 		}
 

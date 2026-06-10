@@ -70,6 +70,7 @@ if (!$res) {
  * @var User $user
  */
 // Libraries
+require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
 require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
 require_once '../lib/pdpconnectfr.lib.php';
 require_once "../class/providers/PDPProviderManager.class.php";
@@ -78,7 +79,7 @@ require_once "../class/pdpconnectfr.class.php";
 
 
 // Translations
-$langs->loadLangs(array("admin", "pdpconnectfr@pdpconnectfr"));
+$langs->loadLangs(array("admin", "pdpconnectfr@pdpconnectfr", "other"));
 
 // Initialize a technical object to manage hooks of page. Note that conf->hooks_modules contains an array of hook context
 /** @var HookManager $hookmanager */
@@ -135,7 +136,7 @@ if ($action == 'buildsamplesupplierinvoice') {	// Test on permissions already do
 		$thirdpartySeller = new Societe($db);
 		$thirdpartySeller->fetch($sellerId);
 	} else {
-		$thirdpartySeller = null;
+		$thirdpartySeller = $mysoc;
 	}
 	if ($buyerId > 0) {
 		$thirdpartyBuyer = new Societe($db);
@@ -146,7 +147,8 @@ if ($action == 'buildsamplesupplierinvoice') {	// Test on permissions already do
 
 	$options = array(
 		'invoiceformat' => GETPOST('invoiceformat'),
-		'invoicetype' => GETPOSTINT('invoicetype')
+		'invoicetype' => GETPOSTINT('invoicetype'),
+		'referencedinvoice' => GETPOST('referencedinvoice')
 	);
 
 	// Init a dedicated provider with the selected format that is forced to the one selected.
@@ -238,6 +240,49 @@ if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 	print '<input type="hidden" name="action" value="buildsamplesupplierinvoice">';
 	print '<input type="hidden" name="token" value="'.newToken().'">';
 
+	if (GETPOST("buyer_einvoiceid") && GETPOST("buyer_einvoiceid") != 'me' && $buyerId <= 0) {
+		$tmpthirdparty = new Societe($db);
+		$result = $tmpthirdparty->fetch(0, '', '', '', GETPOST("buyer_einvoiceid"));
+		if ($result == -2) {
+			setEventMessages('Error - More than one thirdparty found with these SIREN', null, 'warnings');
+		} else {
+			$buyerId = $tmpthirdparty->id;
+			if (!$buyerId) {
+				$langs->load("errors");
+				setEventMessages($langs->trans("ErrorThirdPartyNotFound"), null, 'warnings');
+			}
+		}
+	}
+	if (GETPOST("seller_einvoiceid") && GETPOST("seller_einvoiceid") != 'me' && $sellerId <= 0) {
+		$tmpthirdparty = new Societe($db);
+		$result = $tmpthirdparty->fetch(0, '', '', '', GETPOST("seller_einvoiceid"));
+		if ($result == -2) {
+			setEventMessages('Error - More than one thirdparty found with these SIREN', null, 'warnings');
+		} else {
+			$sellerId = $tmpthirdparty->id;
+			if (!$sellerId) {
+				$langs->load("errors");
+				setEventMessages($langs->trans("ErrorThirdPartyNotFound"), null, 'warnings');
+			}
+		}
+	}
+
+	print '<span class="width150 inline-block">'.$langs->trans("Seller").'</span> ';
+	//print '<input type="text" name="seller_einvoiceid" value="000000002" placeholder="Seller e-invoice ID (Usually SIREN)" class="minwidth150"><br>';
+	print $form->select_company($sellerId ?: '', 'seller_id', '', $langs->trans("MyCompany").' ('.$mysoc->idprof1.')', 1, 0, array(), 0, 'width300');
+	print ' &nbsp; <a href="'.$_SERVER["PHP_SELF"].'?seller_einvoiceid=me'.($buyerId > 0 ? '&buyer_id='.$buyerId : '').'" class="reposition">Select me</a>';
+	print ' - <a href="'.$_SERVER["PHP_SELF"].'?seller_einvoiceid=000000001" class="reposition">Select thirdparty SIREN 000000001</a>';
+	print ' - <a href="'.$_SERVER["PHP_SELF"].'?seller_einvoiceid=000000002'.($buyerId > 0 ? '&buyer_id='.$buyerId : '').'" class="reposition">Select thirdparty SIREN 000000002</a>';
+	print '<br>';
+
+	print '<span class="width150 inline-block">'.$langs->trans("Buyer").'</span> ';
+	//print '<input type="text" name="buyer_id" value="000000001" placeholder="Supplier e-invoice ID (Usually SIREN)" class="minwidth150"><br>';
+	print $form->select_company($buyerId ?: '', 'buyer_id', '', $langs->trans("MyCompany").' ('.$mysoc->idprof1.')', 1, 0, array(), 0, 'width300');
+	print ' &nbsp; <a href="'.$_SERVER["PHP_SELF"].'?buyer_einvoiceid=000000001" class="reposition">Select thirdparty with SIREN 000000001</a>';
+	print ' - <a href="'.$_SERVER["PHP_SELF"].'?buyer_einvoiceid=000000002'.($sellerId > 0 ? '&seller_id='.$sellerId : '').'" class="reposition">Select thirdparty with SIREN 000000002</a>';
+	print ' - <a href="'.$_SERVER["PHP_SELF"].'?buyer_einvoiceid=me'.($sellerId > 0 ? '&seller_id='.$sellerId : '').'" class="reposition">Select me</a>';
+	print '<br>';
+
 	$ProtocolManager = new ProtocolManager($db);
 	$protocolsList = $ProtocolManager->getProtocolsList();
 
@@ -251,53 +296,50 @@ if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 	}
 
 	// Format
-	print '<span class="width100 inline-block">'.$langs->trans("InvoiceFormat").'</span> ';
+	print '<span class="width150 inline-block">'.$langs->trans("InvoiceFormat").'</span> ';
 	if ((float) DOL_VERSION >= 24.0) {
-		print $form->selectarray('invoiceformat', $TFieldProtocols, GETPOSTISSET('invoiceformat') ? GETPOST('invoiceformat') : getDolGlobalString('PDPCONNECTFR_PROTOCOL'));
+		print $form->selectarray('invoiceformat', $TFieldProtocols, GETPOSTISSET('invoiceformat') ? GETPOST('invoiceformat') : getDolGlobalString('PDPCONNECTFR_PROTOCOL'), 0, 0, 0, '', 0, 0, 0, '', 'minwidth300 ');
 	} else {
 		print $langs->trans("Factur-X");
 	}
 	print '<br>';
 
 	// Invoice type
-	print '<span class="width100 inline-block">'.$langs->trans("InvoiceType").'</span> ';
+	print '<span class="width150 inline-block">'.$langs->trans("InvoiceType").'</span> ';
 	if ((float) DOL_VERSION >= 24.0) {
 		$typeofinvoice = array(
 			Facture::TYPE_STANDARD => array('label' => $langs->trans('Standard')),
 			Facture::TYPE_DEPOSIT => array('label' => $langs->trans('Deposit')),
-			//Facture::TYPE_CREDIT_NOTE => array('label' => $langs->trans('CreditNote'), 'enabled' => false
+			Facture::TYPE_CREDIT_NOTE => array('label' => $langs->trans('CreditNote')),
 		);
-		print $form->selectarray('invoicetype', $typeofinvoice, GETPOSTISSET('invoicetype') ? GETPOSTINT('invoicetype') : Facture::TYPE_STANDARD);
+		print $form->selectarray('invoicetype', $typeofinvoice, GETPOSTISSET('invoicetype') ? GETPOSTINT('invoicetype') : Facture::TYPE_STANDARD, 0, 0, 0, '', 0, 0, 0, '', 'minwidth300');
 	} else {
 		print $langs->trans("Standard");
 	}
-	print '<br>';
 
-	if (GETPOST("buyer_einvoiceid") && $buyerId <= 0) {
-		$tmpthirdparty = new Societe($db);
-		$tmpthirdparty->fetch(0, '', '', '', GETPOST("buyer_einvoiceid"));
-		$buyerId = $tmpthirdparty->id;
-	}
-	if (GETPOST("seller_einvoiceid") && $sellerId <= 0) {
-		$tmpthirdparty = new Societe($db);
-		$tmpthirdparty->fetch(0, '', '', '', GETPOST("seller_einvoiceid"));
-		$sellerId = $tmpthirdparty->id;
-	}
+	// Referenced invoice
+	print '<span class="referencedinvoiceblock">';
+	print '<span class="inline-block"> Sur la facture : </span> ';
+	print '<input type="text" name="referencedinvoice" value="'.GETPOST('referencedinvoice').'" placeholder="FA0000-SPECIMEN" class="width150">';
+	print '</span>';
 
-	print '<span class="width100 inline-block">'.$langs->trans("Seller").'</span> ';
-	//print '<input type="text" name="seller_einvoiceid" value="000000002" placeholder="Seller e-invoice ID (Usually SIREN)" class="minwidth150"><br>';
-	print $form->select_company($sellerId ?: '', 'seller_id', '', $langs->trans("MyCompany").' ('.$mysoc->idprof1.')', 1);
-	print ' &nbsp; <a href="'.$_SERVER["PHP_SELF"].'?seller_einvoiceid=me'.($buyerId > 0 ? '&buyer_id='.$buyerId : '').'" class="reposition">Select me</a>';
-	print ' - <a href="'.$_SERVER["PHP_SELF"].'?seller_einvoiceid=000000001" class="reposition">Select thirdparty SIREN 000000001</a>';
-	print ' - <a href="'.$_SERVER["PHP_SELF"].'?seller_einvoiceid=000000002'.($buyerId > 0 ? '&buyer_id='.$buyerId : '').'" class="reposition">Select thirdparty SIREN 000000002</a>';
-	print '<br>';
+	// JS to show/hide referenced invoice and credit note type options only if credit note type is selected
+	print '<script>
+	$(function() {
+		function toggleCreditNoteOptions() {
+			var invoicetype = $("select[name=\'invoicetype\']").val();
+			if (invoicetype == "'.Facture::TYPE_CREDIT_NOTE.'") {
+				$(".referencedinvoiceblock").show();
+			} else {
+				$(".referencedinvoiceblock").hide();
+			}
+		}
+		$("select[name=\'invoicetype\']")
+			.on("change select2:select", toggleCreditNoteOptions);
+		toggleCreditNoteOptions();
+	});
+	</script>';
 
-	print '<span class="width100 inline-block">'.$langs->trans("Buyer").'</span> ';
-	//print '<input type="text" name="buyer_id" value="000000001" placeholder="Supplier e-invoice ID (Usually SIREN)" class="minwidth150"><br>';
-	print $form->select_company($buyerId ?: '', 'buyer_id', '', $langs->trans("MyCompany").' ('.$mysoc->idprof1.')', 1);
-	print ' &nbsp; <a href="'.$_SERVER["PHP_SELF"].'?buyer_einvoiceid=000000001" class="reposition">Select thirdparty with SIREN 000000001</a>';
-	print ' - <a href="'.$_SERVER["PHP_SELF"].'?buyer_einvoiceid=000000002'.($sellerId > 0 ? '&seller_id='.$sellerId : '').'" class="reposition">Select thirdparty with SIREN 000000002</a>';
-	print ' - <a href="'.$_SERVER["PHP_SELF"].'?buyer_einvoiceid=me'.($sellerId > 0 ? '&seller_id='.$sellerId : '').'" class="reposition">Select me</a>';
 	print '<br>';
 
 	print '<input type="submit" class="button smallpaddingimp reposition" name="Generate" value="Generate">';

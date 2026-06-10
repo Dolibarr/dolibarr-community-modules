@@ -30,7 +30,7 @@ HelloAssoSetup = Configuration HelloAsso
 Settings = Paramètres
 SettingsMember=Paramètres d'abonnement
 
-HELLOASSO_LIVE = HelloAsso en mode live activé (sinon en mode test/bac à sable)
+HELLOASSO_LIVE = HelloAsso en mode production activé (sinon en mode test/bac à sable)
 HELLOASSO_TEST_CLIENT_ID=Clé d'identification du client de test
 HELLOASSO_TEST_CLIENT_ID_HELP=La clé d'identification du client de test issue de votre configuration d'API Helloasso
 HELLOASSO_TEST_CLIENT_SECRET=Clé secrète d'identification du client de test
@@ -38,12 +38,12 @@ HELLOASSO_TEST_SECRET_HELP=La clé secrète d'identification du client de test i
 HELLOASSO_TEST_CLIENT_ORGANISATION=Nom de l'organisation pour le mode test
 HELLOASSO_TEST_CLIENT_ORGANISATION_HELP=Nom de l'organisation pour le mode test. Doit correspondre au nom défini dans le compte HelloAsso.
 
-HELLOASSO_CLIENT_ID=Clé d'identification du client pour le mode live
-HELLOASSO_CLIENT_ID_HELP=La clé d'identification du client pour le mode live issue de votre configuration d'API Helloasso
-HELLOASSO_CLIENT_SECRET=Clé secrète du client pour le mode live
-HELLOASSO_SECRET_HELP=La clé secrète d'identification du client pour le mode live issue de votre configuration d'API Helloasso
-HELLOASSO_CLIENT_ORGANISATION=Nom de l'organisation pour le mode live
-HELLOASSO_CLIENT_ORGANISATION_HELP=Nom de l'organisation pour le mode live. Doit correspondre au nom défini dans le compte HelloAsso.
+HELLOASSO_CLIENT_ID=Clé d'identification du client de production
+HELLOASSO_CLIENT_ID_HELP=La clé d'identification du client pour le mode production issue de votre configuration d'API Helloasso
+HELLOASSO_CLIENT_SECRET=Clé secrète du client pour le mode production
+HELLOASSO_SECRET_HELP=La clé secrète d'identification du client pour le mode production issue de votre configuration d'API Helloasso
+HELLOASSO_CLIENT_ORGANISATION=Nom de l'organisation pour le mode production
+HELLOASSO_CLIENT_ORGANISATION_HELP=Nom de l'organisation pour le mode production. Doit correspondre au nom défini dans le compte HelloAsso.
 HELLOASSO_BANK_ACCOUNT_FOR_PAYMENTS=Compte bancaire pour les paiements
 HELLOASSO_SHOW_ONLINE_PAYMENTS=Afficher la page de paiement en ligne
 HELLOASSO_STANDAR_BTN = Activez le style graphique HelloAsso pour le bouton de paiement
@@ -54,7 +54,7 @@ TestConnectionHelloasso=Test de connexion
 SuccessfullyConnected=Connexion réussie
 TestGetMembersHelloasso=Testez l'obtention des cotisations HelloAsso
 
-HELLOASSO_FORM_MEMBERSHIP_SLUG=Nom du formulaire d'adhésion pour le mode live
+HELLOASSO_FORM_MEMBERSHIP_SLUG=Nom du formulaire d'adhésion pour le mode production
 HELLOASSO_FORM_MEMBERSHIP_SLUG_HELP=Nom du formulaire d'adhésion en ligne pour obtenir des informations. Doit correspondre à l'adresse Web de votre formulaire dans votre compte HelloAsso.
 HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG=Nom du formulaire d'adhésion de test
 HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG_HELP=Nom du formulaire d'adhésion de test à partir duquel extraire les informations. Doit correspondre à l'adresse Web de votre formulaire dans votre compte HelloAsso.

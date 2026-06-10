@@ -1,6 +1,7 @@
 <?php
 /* Copyright (C) 2025       Laurent Destailleur         <eldy@users.sourceforge.net>
  * Copyright (C) 2025       Mohamed DAOUD               <mdaoud@dolicloud.com>
+ * Copyright (C) 2026       Frédéric France             <frederic.france@free.fr>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -101,7 +102,6 @@ class CdarHandler
 	 */
 	public function __construct($db)
 	{
-		global $langs;
 		$this->db = $db;
 	}
 
@@ -136,10 +136,14 @@ class CdarHandler
 			$xml->registerXPathNamespace($prefix, $uri);
 		}
 
+		$GuidelineID = $this->getXpathValue($xml, '//ram:GuidelineSpecifiedDocumentContextParameter/ram:ID');
+		$ExchangedDocument = $this->parseExchangedDocument($xml);
+		$AcknowledgementDocument = $this->parseAcknowledgementDocument($xml);
+
 		return [
-			'GuidelineID' => $this->getXpathValue($xml, '//ram:GuidelineSpecifiedDocumentContextParameter/ram:ID'),
-			'ExchangedDocument' => $this->parseExchangedDocument($xml),
-			'AcknowledgementDocument' => $this->parseAcknowledgementDocument($xml)
+			'GuidelineID' => $GuidelineID,
+			'ExchangedDocument' => $ExchangedDocument,
+			'AcknowledgementDocument' => $AcknowledgementDocument
 		];
 	}
 
@@ -147,20 +151,22 @@ class CdarHandler
 	 * generate
 	 *
 	 * @param  array $data array of data
-	 * @return void
+	 *
+	 * @return string|false
 	 */
 	public function generate($data)
 	{
-		$xml = new DOMDocument('1.0', 'UTF-8');
-		$xml->formatOutput = true;
-		$xml->standalone = true;
+		$dom = new DOMDocument('1.0', 'UTF-8');
+		$dom->formatOutput = true;
+		$dom->standalone = true;
+		$dom->xmlStandalone = true;
 
-		$root = $this->createRootElement($xml);
-		$this->addContext($xml, $root, $data['GuidelineID']);
-		$this->addExchangedDocument($xml, $root, $data['ExchangedDocument']);
-		$this->addAcknowledgementDocument($xml, $root, $data['AcknowledgementDocument']);
+		$root = $this->createRootElement($dom);
+		$this->addContext($dom, $root, $data['GuidelineID']);
+		$this->addExchangedDocument($dom, $root, $data['ExchangedDocument']);
+		$this->addAcknowledgementDocument($dom, $root, $data['AcknowledgementDocument']);
 
-		return $xml->saveXML();
+		return $dom->saveXML();
 	}
 
 	/**
@@ -168,7 +174,7 @@ class CdarHandler
 	 *
 	 * @param  array $data array of data
 	 * @param  string $filename filename
-	 * @return void
+	 * @return bool
 	 */
 	public function saveToFile($data, $filename)
 	{
@@ -178,21 +184,22 @@ class CdarHandler
 		} else {
 			file_put_contents($filename, $xmlContent);
 		}
+
 		return true;
 	}
 
 	/**
 	 * Generate a CDAR file
 	 *
-	 * @param   mixed $object       Invoice object (CustomerInvoice or SupplierInvoice)
-	 * @param   int $statusCode     Status code to send
-	 * @param string $reasonCode Reason code to send (optional)
+	 * @param Facture|FactureFournisseur    $object       Invoice object (CustomerInvoice or SupplierInvoice)
+	 * @param int                           $statusCode     Status code to send
+	 * @param string                        $reasonCode Reason code to send (optional)
 	 *
 	 * @return  array{res:int, message:string, file:string}   Returns array with 'res' (1 on success, -1 on failure) with a 'message' and 'file' with the path.
 	 */
 	public function generateCdarFile($object, $statusCode, $reasonCode = '')
 	{
-		global $conf, $db, $mysoc;
+		global $conf, $mysoc;
 
 		/**
 		* Perhaps in future PDP updates, endpoints will appear to simplify sending lifecycle messages without going through CDARs.
@@ -241,7 +248,7 @@ class CdarHandler
 
 		// Label for ProcessCondition (Label of status code) we get it from class pdpconnectfr
 		dol_include_once('/pdpconnectfr/class/providers/PDPProviderManager.class.php');
-		$pdpConnectFr = new PdpConnectFr($db);
+		$pdpConnectFr = new PdpConnectFr($this->db);
 		$ProcessCondition = $pdpConnectFr->getStatusLabel($statusCode);
 		$ProcessCondition = str_replace(' ', '_', $ProcessCondition);
 		$ProcessCondition = preg_replace('/[^A-Za-z0-9_]/', '', $ProcessCondition); // Clean special chars
@@ -324,7 +331,8 @@ class CdarHandler
 	 * formatDateTime
 	 *
 	 * @param  string $dateTimeStr datetime
-	 * @return void
+	 *
+	 * @return string
 	 */
 	public static function formatDateTime($dateTimeStr)
 	{
@@ -339,7 +347,8 @@ class CdarHandler
 	 * formatDate
 	 *
 	 * @param  string $dateStr date
-	 * @return void
+	 *
+	 * @return string
 	 */
 	public static function formatDate($dateStr)
 	{
@@ -373,68 +382,72 @@ class CdarHandler
 	/**
 	 * getXpathValue
 	 *
-	 * @param  SimpleXml $xml xml
-	 * @param  mixed $path path
-	 * @param  mixed $default default
-	 * @return void
+	 * @param  SimpleXmlElement $xml xml
+	 * @param  string $path path
+	 * @param  string $default default
+	 * @return string
 	 */
 	private function getXpathValue($xml, $path, $default = '')
 	{
 		$result = $xml->xpath($path);
+
 		return !empty($result) ? (string) $result[0] : $default;
 	}
 
 	/**
 	 * getXpathAttribute
 	 *
-	 * @param  SimpleXml $xml xml
-	 * @param  mixed $path path
-	 * @param  mixed $attribute attribute
-	 * @param  mixed $default default
-	 * @return void
+	 * @param  SimpleXmlElement $xml xml
+	 * @param  string $path path
+	 * @param  string $attribute attribute
+	 * @param  string $default default
+	 * @return string
 	 */
 	private function getXpathAttribute($xml, $path, $attribute, $default = '')
 	{
 		$result = $xml->xpath($path);
+
 		return !empty($result) ? (string) $result[0][$attribute] : $default;
 	}
 
 	/**
 	 * createRootElement
 	 *
-	 * @param  SimpleXml $xml xml
-	 * @return void
+	 * @param  DOMDocument $dom dom
+	 *
+	 * @return DOMElement|false
 	 */
-	private function createRootElement($xml)
+	private function createRootElement($dom)
 	{
-		$root = $xml->createElement('rsm:CrossDomainAcknowledgementAndResponse');
+		$root = $dom->createElement('rsm:CrossDomainAcknowledgementAndResponse');
 		$root->setAttribute('xmlns:rsm', $this->namespaces['rsm']);
 		$root->setAttribute('xmlns:xsi', 'http://www.w3.org/2001/XMLSchema-instance');
 		$root->setAttribute('xmlns:qdt', $this->namespaces['qdt']);
 		$root->setAttribute('xmlns:ram', $this->namespaces['ram']);
 		$root->setAttribute('xmlns:udt', $this->namespaces['udt']);
-		$xml->appendChild($root);
+		$dom->appendChild($root);
+
 		return $root;
 	}
 
 	/**
 	 * addContext
 	 *
-	 * @param  SimpleXml $xml xml
+	 * @param  DOMDocument $dom dom
 	 * @param  mixed $root root
 	 * @param  mixed $guidelineID guideline id
 	 * @return void
 	 */
-	private function addContext($xml, $root, $guidelineID)
+	private function addContext($dom, $root, $guidelineID)
 	{
-		$context = $xml->createElement('rsm:ExchangedDocumentContext');
+		$context = $dom->createElement('rsm:ExchangedDocumentContext');
 
-		$process = $xml->createElement('ram:BusinessProcessSpecifiedDocumentContextParameter');
-		$process->appendChild($xml->createElement('ram:ID', 'REGULATED'));
+		$process = $dom->createElement('ram:BusinessProcessSpecifiedDocumentContextParameter');
+		$process->appendChild($dom->createElement('ram:ID', 'REGULATED'));
 		$context->appendChild($process);
 
-		$guideline = $xml->createElement('ram:GuidelineSpecifiedDocumentContextParameter');
-		$guideline->appendChild($xml->createElement('ram:ID', $guidelineID));
+		$guideline = $dom->createElement('ram:GuidelineSpecifiedDocumentContextParameter');
+		$guideline->appendChild($dom->createElement('ram:ID', $guidelineID));
 		$context->appendChild($guideline);
 		$root->appendChild($context);
 	}
@@ -442,17 +455,17 @@ class CdarHandler
 	/**
 	 * addDateTimeElement
 	 *
-	 * @param  SimpleXml $xml xml
-	 * @param  mixed $parent parent
-	 * @param  mixed $elementName element name
-	 * @param  mixed $value value
-	 * @param  mixed $format format
+	 * @param  DOMDocument $dom dom
+	 * @param  DOMElement $parent parent
+	 * @param  string $elementName element name
+	 * @param  string $value value
+	 * @param  string $format format
 	 * @return void
 	 */
-	private function addDateTimeElement($xml, $parent, $elementName, $value, $format)
+	private function addDateTimeElement($dom, $parent, $elementName, $value, $format)
 	{
-		$element = $xml->createElement($elementName);
-		$dateTimeStr = $xml->createElement('udt:DateTimeString', $value);
+		$element = $dom->createElement($elementName);
+		$dateTimeStr = $dom->createElement('udt:DateTimeString', $value);
 		$dateTimeStr->setAttribute('format', $format);
 		$element->appendChild($dateTimeStr);
 		$parent->appendChild($element);
@@ -461,27 +474,29 @@ class CdarHandler
 	/**
 	 * addTradeParty
 	 *
-	 * @param  SimpleXml $xml xml
-	 * @param  mixed $parent parent
-	 * @param  mixed $elementName element name
+	 * @param  DOMDocument $dom dom
+	 * @param  DOMElement $parent parent
+	 * @param  string $elementName element name
 	 * @param  array $data data
 	 * @return void
 	 */
-	private function addTradeParty($xml, $parent, $elementName, $data)
+	private function addTradeParty($dom, $parent, $elementName, $data)
 	{
-		$party = $xml->createElement($elementName);
+		$party = $dom->createElement($elementName);
 
 		if (isset($data['GlobalID'])) {
-			$globalID = $xml->createElement('ram:GlobalID', $data['GlobalID']);
-			$globalID->setAttribute('schemeID', $data['SchemeID']);
+			$globalID = $dom->createElement('ram:GlobalID', $data['GlobalID']);
+			if (!empty($data['SchemeID'])) {
+				$globalID->setAttribute('schemeID', $data['SchemeID']);
+			}
 			$party->appendChild($globalID);
 		}
 
-		$party->appendChild($xml->createElement('ram:RoleCode', $data['RoleCode']));
+		$party->appendChild($dom->createElement('ram:RoleCode', $data['RoleCode']));
 
 		if (isset($data['URIID'])) {
-			$uriComm = $xml->createElement('ram:URIUniversalCommunication');
-			$uriID = $xml->createElement('ram:URIID', $data['URIID']);
+			$uriComm = $dom->createElement('ram:URIUniversalCommunication');
+			$uriID = $dom->createElement('ram:URIID', $data['URIID']);
 			$uriID->setAttribute('schemeID', $data['URISchemeID']);
 			$uriComm->appendChild($uriID);
 			$party->appendChild($uriComm);
@@ -495,7 +510,7 @@ class CdarHandler
 	/**
 	 * parseExchangedDocument
 	 *
-	 * @param  SimpleXml $xml xml
+	 * @param  SimpleXmlElement $xml xml
 	 * @return array
 	 */
 	private function parseExchangedDocument($xml)
@@ -523,25 +538,30 @@ class CdarHandler
 	/**
 	 * parseAcknowledgementDocument
 	 *
-	 * @param  SimpleXml $xml xml
+	 * @param  SimpleXmlElement $xml xml
+	 *
 	 * @return array
 	 */
 	private function parseAcknowledgementDocument($xml)
 	{
 		$indicator = $this->getXpathValue($xml, '//rsm:AcknowledgementDocument/ram:MultipleReferencesIndicator/udt:Indicator');
 
+		// Parse the referenced document
+		$referenceDocument = $this->parseReferencedDocument($xml);
+
 		return [
 			'MultipleReferencesIndicator' => $indicator === 'true',
 			'TypeCode' => $this->getXpathValue($xml, '//rsm:AcknowledgementDocument/ram:TypeCode'),
 			'IssueDateTime' => $this->getXpathValue($xml, '//rsm:AcknowledgementDocument/ram:IssueDateTime/udt:DateTimeString'),
-			'ReferenceReferencedDocument' => $this->parseReferencedDocument($xml)
+			'ReferenceReferencedDocument' => $referenceDocument
 		];
 	}
 
 	/**
 	 * parseReferencedDocument
 	 *
-	 * @param  SimpleXml $xml xml
+	 * @param  SimpleXmlElement $xml xml
+	 *
 	 * @return array
 	 */
 	private function parseReferencedDocument($xml)
@@ -599,22 +619,22 @@ class CdarHandler
 	/**
 	 * addExchangedDocument
 	 *
-	 * @param  SimpleXml $xml xml
-	 * @param  mixed $root root
-	 * @param  mixed $doc doc
+	 * @param  DOMDocument $dom dom
+	 * @param  DOMElement $root root
+	 * @param  array $doc doc
 	 * @return void
 	 */
-	private function addExchangedDocument($xml, $root, $doc)
+	private function addExchangedDocument($dom, $root, $doc)
 	{
-		$exchanged = $xml->createElement('rsm:ExchangedDocument');
-		$exchanged->appendChild($xml->createElement('ram:ID', $doc['ID']));
-		$exchanged->appendChild($xml->createElement('ram:Name', $doc['Name']));
+		$exchanged = $dom->createElement('rsm:ExchangedDocument');
+		$exchanged->appendChild($dom->createElement('ram:ID', $doc['ID']));
+		$exchanged->appendChild($dom->createElement('ram:Name', $doc['Name']));
 
-		$this->addDateTimeElement($xml, $exchanged, 'ram:IssueDateTime', $doc['IssueDateTime'], self::FORMAT_DATETIME);
+		$this->addDateTimeElement($dom, $exchanged, 'ram:IssueDateTime', $doc['IssueDateTime'], self::FORMAT_DATETIME);
 
-		$this->addTradeParty($xml, $exchanged, 'ram:SenderTradeParty', $doc['SenderTradeParty']);
-		$this->addTradeParty($xml, $exchanged, 'ram:IssuerTradeParty', $doc['IssuerTradeParty']);
-		$this->addTradeParty($xml, $exchanged, 'ram:RecipientTradeParty', $doc['RecipientTradeParty']);
+		$this->addTradeParty($dom, $exchanged, 'ram:SenderTradeParty', $doc['SenderTradeParty']);
+		$this->addTradeParty($dom, $exchanged, 'ram:IssuerTradeParty', $doc['IssuerTradeParty']);
+		$this->addTradeParty($dom, $exchanged, 'ram:RecipientTradeParty', $doc['RecipientTradeParty']);
 
 		$root->appendChild($exchanged);
 	}
@@ -622,23 +642,23 @@ class CdarHandler
 	/**
 	 * addAcknowledgementDocument
 	 *
-	 * @param  SimpleXml $xml xml
-	 * @param  mixed $root rrot
-	 * @param  mixed $doc doc
+	 * @param  DOMDocument $dom dom
+	 * @param  DOMElement $root root
+	 * @param  array $doc doc
 	 * @return void
 	 */
-	private function addAcknowledgementDocument($xml, $root, $doc)
+	private function addAcknowledgementDocument($dom, $root, $doc)
 	{
-		$ack = $xml->createElement('rsm:AcknowledgementDocument');
+		$ack = $dom->createElement('rsm:AcknowledgementDocument');
 
-		$multipleRef = $xml->createElement('ram:MultipleReferencesIndicator');
-		$indicator = $xml->createElement('udt:Indicator', $doc['MultipleReferencesIndicator'] ? 'true' : 'false');
+		$multipleRef = $dom->createElement('ram:MultipleReferencesIndicator');
+		$indicator = $dom->createElement('udt:Indicator', $doc['MultipleReferencesIndicator'] ? 'true' : 'false');
 		$multipleRef->appendChild($indicator);
 		$ack->appendChild($multipleRef);
 
-		$ack->appendChild($xml->createElement('ram:TypeCode', $doc['TypeCode']));
-		$this->addDateTimeElement($xml, $ack, 'ram:IssueDateTime', $doc['IssueDateTime'], self::FORMAT_DATETIME);
-		$this->addReferencedDocument($xml, $ack, $doc['ReferenceReferencedDocument']);
+		$ack->appendChild($dom->createElement('ram:TypeCode', $doc['TypeCode']));
+		$this->addDateTimeElement($dom, $ack, 'ram:IssueDateTime', $doc['IssueDateTime'], self::FORMAT_DATETIME);
+		$this->addReferencedDocument($dom, $ack, $doc['ReferenceReferencedDocument']);
 
 		$root->appendChild($ack);
 	}
@@ -646,48 +666,48 @@ class CdarHandler
 	/**
 	 * addReferencedDocument
 	 *
-	 * @param  SimpleXml $xml xml
-	 * @param  mixed $parent parent
-	 * @param  mixed $doc doc
+	 * @param  DOMDocument $dom dom
+	 * @param  DOMElement $parent parent
+	 * @param  array $doc doc
 	 * @return void
 	 */
-	private function addReferencedDocument($xml, $parent, $doc)
+	private function addReferencedDocument($dom, $parent, $doc)
 	{
-		$ref = $xml->createElement('ram:ReferenceReferencedDocument');
-		$ref->appendChild($xml->createElement('ram:IssuerAssignedID', $doc['IssuerAssignedID']));
-		$ref->appendChild($xml->createElement('ram:StatusCode', $doc['StatusCode']));
-		$ref->appendChild($xml->createElement('ram:TypeCode', $doc['TypeCode']));
+		$ref = $dom->createElement('ram:ReferenceReferencedDocument');
+		$ref->appendChild($dom->createElement('ram:IssuerAssignedID', $doc['IssuerAssignedID']));
+		$ref->appendChild($dom->createElement('ram:StatusCode', $doc['StatusCode']));
+		$ref->appendChild($dom->createElement('ram:TypeCode', $doc['TypeCode']));
 
-		$formattedDateTime = $xml->createElement('ram:FormattedIssueDateTime');
-		$dateTimeStr = $xml->createElement('qdt:DateTimeString', $doc['FormattedIssueDateTime']);
+		$formattedDateTime = $dom->createElement('ram:FormattedIssueDateTime');
+		$dateTimeStr = $dom->createElement('qdt:DateTimeString', $doc['FormattedIssueDateTime']);
 		$dateTimeStr->setAttribute('format', self::FORMAT_DATETIME);
 		$formattedDateTime->appendChild($dateTimeStr);
 		$ref->appendChild($formattedDateTime);
 
-		$ref->appendChild($xml->createElement('ram:ProcessConditionCode', $doc['ProcessConditionCode']));
-		$ref->appendChild($xml->createElement('ram:ProcessCondition', $doc['ProcessCondition']));
+		$ref->appendChild($dom->createElement('ram:ProcessConditionCode', $doc['ProcessConditionCode']));
+		$ref->appendChild($dom->createElement('ram:ProcessCondition', $doc['ProcessCondition']));
 
-		$this->addTradeParty($xml, $ref, 'ram:IssuerTradeParty', $doc['IssuerTradeParty']);
+		$this->addTradeParty($dom, $ref, 'ram:IssuerTradeParty', $doc['IssuerTradeParty']);
 		$parent->appendChild($ref);
 
 		if (!empty($doc['SpecifiedDocumentStatus'])) {
-			$status = $xml->createElement('ram:SpecifiedDocumentStatus');
+			$status = $dom->createElement('ram:SpecifiedDocumentStatus');
 
 			if (!empty($doc['SpecifiedDocumentStatus']['ReasonCode'])) {
 				$status->appendChild(
-					$xml->createElement('ram:ReasonCode', $doc['SpecifiedDocumentStatus']['ReasonCode'])
+					$dom->createElement('ram:ReasonCode', $doc['SpecifiedDocumentStatus']['ReasonCode'])
 				);
 			}
 
 			if (!empty($doc['SpecifiedDocumentStatus']['Reason'])) {
 				$status->appendChild(
-					$xml->createElement('ram:Reason', $doc['SpecifiedDocumentStatus']['Reason'])
+					$dom->createElement('ram:Reason', $doc['SpecifiedDocumentStatus']['Reason'])
 				);
 			}
 
 			/*if (isset($doc['SpecifiedDocumentStatus']['SequenceNumeric'])) {
 				$status->appendChild(
-					$xml->createElement(
+					$dom->createElement(
 						'ram:SequenceNumeric',
 						(int) $doc['SpecifiedDocumentStatus']['SequenceNumeric']
 					)

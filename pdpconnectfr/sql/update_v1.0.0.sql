@@ -1,5 +1,5 @@
 --
--- Script run when an upgrade of Dolibarr is done. Whatever is the Dolibarr version.
+-- Script run when module is reloaded. Whatever is the Dolibarr version.
 --
 
 DELETE FROM llx_rights_def WHERE perms = 'document' AND module = 'pdpconnectfr' AND id >= 9502004;

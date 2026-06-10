@@ -40,18 +40,24 @@ if (empty($outputlangs) || ! ($outputlangs instanceof Translate)) {
 }
 $newlang = '';
 
-$this->sourceinvoice = $invoice;
-$outputlang = $langs->defaultlang;
-
 // Load PDPConnectFr class
 $pdpconnectfr = new PdpConnectFr($db);
 
-// Reload object
-$facture = new Facture($db);
-$object = $facture->fetch($invoice->id) > 0 ? $facture : $invoice;
-$object->fetch_thirdparty();
+
+$outputlang = $langs->defaultlang;
+
 if (!is_object($invoice->thirdparty)) {
 	$invoice->fetch_thirdparty();
+}
+
+$this->sourceinvoice = $invoice;
+
+// Reload object if not a new object (to get all fields)
+$tmpfacture = new Facture($db);
+$object = $tmpfacture->fetch($invoice->id) > 0 ? $tmpfacture : $invoice;
+
+if (!is_object($object->thirdparty)) {
+	$object->fetch_thirdparty();
 }
 
 // =====================================================================
@@ -80,10 +86,14 @@ if ($promise_code == '' && !empty($customerOrderReferenceList)) {
 $account = new Account($db);
 if ($object->fk_account > 0) {
 	$account->fetch($object->fk_account);
-} else {
-	$account->fetch(getDolGlobalString('FACTURX_DEFAULT_BANK_ACCOUNT'));
+} elseif (getDolGlobalInt('FACTURE_RIB_NUMBER')) {
+	$account->fetch(getDolGlobalInt('FACTURE_RIB_NUMBER'));
 }
-$account_proprio = trim($account->owner_name);
+
+$account_proprio = '';
+if ($account->id > 0) {
+	$account_proprio = trim(!empty($account->proprio) ? $account->proprio : $account->owner_name);	// $account->proprio is for old version compatibility
+}
 if ($account_proprio == '') {
 	dol_syslog('Bank account holder name is empty, please correct it, use socname instead but it could be inccorrect for XRechnung BT-85: Payment account name', LOG_WARNING);
 	$account_proprio = $mysoc->name;
@@ -108,7 +118,19 @@ $schemeIdProf      = $this->getIEC6523Code($object->thirdparty->country_code);
 $globalIdProf      = thirdpartyidprof($object) ?? '';
 $schemeGlobalIdProf = $this->getIEC6523Code($object->thirdparty->country_code, 1);
 $uri               = $pdpconnectfr->getBuyerCommunicationURI($object->thirdparty, $object);
-$schemeUri         = $this->getIEC6523Code($object->thirdparty->country_code, 2);
+$reg = array();
+if (preg_match('/(\d+):(.+)/', $uri, $reg)) {
+	$uri		= $reg[2];
+	$schemeUri  = $reg[1];
+} else {
+	$schemeUri  = $this->getIEC6523Code($object->thirdparty->country_code, 2);
+}
+// In case of sample tests, we may have this const defined to overwrite buyer Einvoice address ID.
+// In common case, this should not be used
+if (defined('PDPCONNECT_FORCE_BUYER_EID')) {
+	$uri               = constant('PDPCONNECT_FORCE_BUYER_EID');
+	$schemeUri         = "0225";
+}
 
 // Seller contact
 $usercontacts = $object->getIdContact('internal', 'SALESREPFOLL');
@@ -134,6 +156,8 @@ if (empty($salerepresentative_email)) {
 	$salerepresentative_email = $mysoc->email;
 }
 
+
+$outputlangs = $langs;
 // Output language (client lang)
 if (isset($object->thirdparty->default_lang)) {
 	$newlang = $object->thirdparty->default_lang;
@@ -149,10 +173,16 @@ if (!empty($newlang)) {
 	$outputlangs = new Translate("", $conf);
 	$outputlangs->setDefaultLang($newlang);
 }
+$outputlangs->load("pdpconnectfr@pdpconnectfr");
+
 
 // Project
-if (! ($invoice->project instanceof Project)) {
-	$invoice->fetchProject();
+if (! ($object->project instanceof Project)) {
+	if (method_exists($object, 'fetchProject')) {
+		$object->fetchProject();
+	} else {
+		$object->fetch_project();
+	}
 }
 
 $invoiceRefDocs = [];
@@ -169,18 +199,31 @@ if ($object->type == $object::TYPE_CREDIT_NOTE && !empty($object->fk_facture_sou
 		];
 		dol_syslog(get_class($this) . '::generateXML Set source invoice reference ' . $sourceFact->ref . ' for credit note ' . $object->ref);
 	} else {
-		dol_syslog(get_class($this) . '::generateXML Cannot fetch source invoice id=' . $object->fk_facture_source . ' for credit note ' . $object->ref, LOG_WARNING);
+		if ($object->id == 0) { // Specimen case.
+			$specimenRefDoc = $object->fk_facture_source ?? 'FA0000-SPECIMEN';
+			$sourceFactDate = new DateTime(dol_print_date(dol_now() - 100, 'dayrfc'));
+			$invoiceRefDocs[] = [
+				'ref' => $specimenRefDoc,
+				'date' => $sourceFactDate,
+				'type' => '381' 				// 381 = Credit note
+			];
+			dol_syslog(get_class($this) . '::generateXML Set source invoice reference ' . $specimenRefDoc . ' for credit note specimen ' . $object->ref);
+		} else {
+			dol_syslog(get_class($this) . '::generateXML Cannot fetch source invoice id=' . $object->fk_facture_source . ' for credit note ' . $object->ref, LOG_WARNING);
+		}
 	}
 }
 
 // Collect lines into $linesData array
-$linesData         = [];
-$tabTVA            = [];
-$grand_total_ht    = $grand_total_tva = $grand_total_ttc = 0;
-$prepaidAmount     = 0;
-$depositlines      = [];
-$billing_period    = [];
-$numligne          = 1;
+$linesData         	= [];
+$taxBreakdown		= [];
+$lines_total_ht 	= $lines_total_tva = $lines_total_ttc = 0;
+$grand_total_ht    	= $grand_total_tva = $grand_total_ttc = 0;
+$prepaidAmount     	= 0;
+$depositlines      	= [];
+$globalDiscounts	= [];
+$billing_period    	= [];
+$numligne          	= 1;
 
 foreach ($object->lines as $line) {
 	$isDepositLine = 0;
@@ -200,6 +243,13 @@ foreach ($object->lines as $line) {
 		$line->total_tva    = abs($line->total_tva);
 		$line->qty          = abs($line->qty);
 	}
+
+	// VAT category and exemption reason of the line
+	$tmparray = $this->getCategoryRate($line, $mysoc, $object);
+
+	$categoryVAT = $tmparray['categoryVAT'];
+	$exemptionReason = $tmparray['ExemptionReason'];
+	$exemptionReasonCode = $tmparray['ExemptionReasonCode'];
 
 	// if ($line->subprice < 0 || $line->subprice_ttc < 0) {
 	// 	throw new Exception("NEGATIVE_UNIT_PRICE_NOT_ALLOWED: Unit price in lines can't be negative. Try to edit the line with ID " . $line->id);
@@ -246,6 +296,45 @@ foreach ($object->lines as $line) {
 		];
 	}
 
+	// Discount line (Amount) - When fk_remise_except > 0 this is a global discount.
+	if ($line->desc != '(DEPOSIT)' && $line->fk_remise_except > 0) {
+		$isDiscountLine = 1;
+
+		$discount    = new DiscountAbsolute($this->db);
+		$resdiscount = $discount->fetch($line->fk_remise_except);
+		dol_syslog("Fetch discount " . $line->fk_remise_except . ", res=" . $resdiscount, LOG_DEBUG);
+
+		$globalDiscounts[] = array(
+			'value' => (float) $discount->total_ht,
+			'reason' => $discount->description ?? 'REMISE',
+			'taxRate' => (float) $discount->tva_tx,
+			'categoryVAT' => $categoryVAT,
+		);
+
+		// Add (or update) VAT rate to $taxBreakdown
+		if (!isset($taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')])) {
+			$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')] = ['tva_tx' => '', 'vat_src_code' => '', 'categoryVAT' => '', 'ExemptionReasonCode' => '', 'ExemptionReason' => '', 'totalHT' => 0, 'totalTVA' => 0];
+		}
+		$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['tva_tx'] = $line->tva_tx;
+		$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['vat_src_code'] = $line->vat_src_code;
+		$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['categoryVAT'] = $categoryVAT;
+		$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['ExemptionReasonCode'] = $exemptionReasonCode;
+		$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['ExemptionReason'] = $exemptionReason;
+
+		$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['totalHT']  -= $discount->total_ht;
+		$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['totalTVA'] -= $discount->total_tva;
+
+
+		$grand_total_ht  -= $discount->total_ht;
+		$grand_total_ttc -= $discount->total_ttc;
+		$grand_total_tva -= $discount->total_tva;
+
+		continue;	// We don't want to add this line into linesData as it is not a real line but a global discount. It will be added into the headerAllowancesCharges section.
+	}
+
+	// Discount line (Percent) - When remise_percent > 0.
+	$LineDiscountPercent = (float) ($line->remise_percent ?? 0);
+
 	// Product labels (multilangs)
 	$libelle = $description = "";
 	if ($newlang != "") {
@@ -280,26 +369,6 @@ foreach ($object->lines as $line) {
 		}
 	}
 
-	// VAT category
-	if ($line->tva_tx > 0) {
-		if (empty($mysoc->tva_intra)) {
-			throw new Exception('BADVATNUMBER: The VAT number of the thirdparty ' . $object->thirdparty->name . ' is mandatory when there is a non null VAT on at least on line.');
-		}
-		if (!$this->checkIfVatRateIsValid($line->tva_tx, $mysoc->country_code)) {
-			throw new Exception('BADVATRATE[BR-FR-16]: The VAT rate ' . $line->tva_tx . ' on line ' . $line->id . ' is not a valid string value for country ' . $mysoc->country_code . '.');
-		}
-		$categoryVAT = 'S';
-	} else {
-		$categoryVAT = 'K';
-		if (empty($mysoc->tva_assuj)) {
-			$categoryVAT = 'E';
-		} elseif (!$invoice->thirdparty->isInEEC()) {
-			$categoryVAT = 'G';
-		} elseif ($mysoc->isInEEC() && $invoice->thirdparty->isInEEC() && $mysoc->country_code != $invoice->thirdparty->country_code) {
-			$categoryVAT = 'K';
-		}
-	}
-
 	// Billing period of the line
 	$linePeriodStart = null;
 	$linePeriodEnd   = null;
@@ -312,16 +381,62 @@ foreach ($object->lines as $line) {
 		$linePeriodEnd = $this->_tsToDateTime($line->date_end);
 	}
 
-	// Cumulative VAT totals
-	if (!isset($tabTVA[$line->tva_tx])) {
-		$tabTVA[$line->tva_tx] = ['totalHT' => 0, 'totalTVA' => 0];
-	}
-	$tabTVA[$line->tva_tx]['totalHT']  += $line->total_ht;
-	$tabTVA[$line->tva_tx]['totalTVA'] += $line->total_tva;
 
-	$grand_total_ht  += $line->total_ht;
-	$grand_total_ttc += $line->total_ttc;
-	$grand_total_tva += $line->total_tva;
+	// Set amounts for the line
+
+	$line_unit_price = $line->subprice;
+	$line_unit_price = price2num($line_unit_price, 2);		// Must be rounded to 2 digits. Not used directly, may be used as intermediate data.
+
+	$line_unit_price_ttc = $line->subprice_ttc;
+	$line_unit_price_ttc = price2num($line_unit_price_ttc, 2);	// Must be rounded to 2 digits.
+
+	$amountdiscount = 0;
+	$line_unit_price_with_discount = $line_unit_price;
+	if ($line->remise_percent) {
+		$amountdiscount = price2num($line_unit_price * $line->remise_percent / 100, 2);
+		$line_unit_price_with_discount = price2num($line_unit_price - $amountdiscount, 2);
+	}
+
+	// We need to recalculate the total using the Unit price rounded (netpriceamount) * Quantity, and rounding all temporary calculations to 2.
+	// This means we may get a different result than Dolibarr default calculation if:
+	// - MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY was not set (if Einvoice is on, it is recommended to set it to 2 or 'MU' with unit price of 2, so accuracy will be reduced to match einvoice rule)
+	// or if
+	// - MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY is set to a value different than 2, or, if set to 'MU', if the currency accuracy for unit price has a different number of decimals than 2.
+	$line_total_ht = price2num($line_unit_price_with_discount * $line->qty, 2);
+	$line_total_tva = price2num($line_unit_price_with_discount * $line->qty * ($line->tva_tx > 0 ? number_format($line->tva_tx, 2, '.', '') / 100 : 0), 2);
+	$line_total_ttc = price2num($line_total_ht + $line_total_tva, 2);
+
+	// Uncomment for test using the most accurate possible calculation (but not following the e-invoice rule to round to 2 digit at each step)
+	/*
+	$line_unit_price = price2num($line->subprice, 'MU');
+	$line_unit_price_with_discount = price2num($line->subprice * (1 - $line->remise_percent / 100), 'MU');
+	$line_total_ht = $line->total_ht;
+	$line_total_tva = $line->total_tva;
+	$line_total_ttc = $line->total_ttc;
+	*/
+
+	// Add (or update) VAT rate to $taxBreakdown
+	if (!isset($taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')])) {
+		$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')] = ['tva_tx' => '', 'vat_src_code' => '', 'categoryVAT' => '', 'ExemptionReasonCode' => '', 'ExemptionReason' => '', 'totalHT' => 0, 'totalTVA' => 0];
+	}
+	$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['tva_tx'] = $line->tva_tx;
+	$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['vat_src_code'] = $line->vat_src_code;
+	$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['categoryVAT'] = $categoryVAT;
+	$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['ExemptionReasonCode'] = $exemptionReasonCode;
+	$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['ExemptionReason'] = $exemptionReason;
+
+	$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['totalHT']  += $line_total_ht;
+	$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['totalTVA'] += $line_total_tva;
+
+	$lines_total_ht  += $line_total_ht;
+	$lines_total_ttc += $line_total_ttc;
+	$lines_total_tva += $line_total_tva;
+
+	$grand_total_ht  += $line_total_ht;
+	$grand_total_ttc += $line_total_ttc;
+	$grand_total_tva += $line_total_tva;
+
+
 
 	// Filling $linesData (based on $lineTemplate)
 	$linesData[$numligne] = [
@@ -341,11 +456,13 @@ foreach ($object->lines as $line) {
 		'prodClassificationScheme'  => null,
 		'prodOriginCountry'         => null,
 
-		'grosspriceamount'          => $line->subprice,
-		'grosspricebasisquantity'   => null,
-		'grosspricebasisquantityunitcode' => null,
-
-		'netpriceamount'            => $line->subprice,		// BT-148 / BT-146
+		// Mandatory by Factur-X, EN 16931
+		// This is the unit price, excluding tax. We can use
+		// $line_unit_price_with_discount
+		// or
+		//$line_unit_price but we must add block TradeAllowanceCharge
+		//'netpriceamount'            => $line_unit_price_with_discount,		// BT-148 / BT-146
+		'netpriceamount'            => $line_unit_price,		// BT-148 / BT-146
 		'netpricebasisquantity'     => null,
 		'netpricebasisquantityunitcode' => null,
 
@@ -356,15 +473,20 @@ foreach ($object->lines as $line) {
 		'packageQuantity'           => null,
 		'packageQuantityunitcode'   => null,
 
-		'lineTotalAmount'           => $line->total_ht,
+		'lineTotalAmount'           => $line_total_ht,
 		'totalAllowanceChargeAmount' => null,
 
+		// For section ApplicableTradeTax
 		'categoryCode'              => $categoryVAT,
 		'typeCode'                  => 'VAT',
 		'rateApplicablePercent'     => $line->tva_tx > 0 ? number_format($line->tva_tx, 2, '.', '') : '0.00',
+
+		'tva_tx'                    => $line->tva_tx,				// For comments only
+		'vat_src_code'              => $line->vat_src_code ?? '',	// For comments only
+		'ExemptionReason'           => $exemptionReason,			// Set when vat rate is 0
+		'ExemptionReasonCode'       => $exemptionReasonCode,		// Set when vat rate is 0
+
 		'calculatedAmount'          => null,
-		'exemptionReason'           => null,
-		'exemptionReasonCode'       => null,
 
 		'lineAllowances'            => [],
 		'lineGrossPriceAllowances'  => [],
@@ -382,20 +504,62 @@ foreach ($object->lines as $line) {
 		'parentDocumentNo'          => null,
 		'is_deposit'                => $isDepositLine,
 		'fk_remise'                 => $line->fk_remise_except ?? null,
+
+		'discountPercent'       	=> $LineDiscountPercent,
 	];
+
+
+
+	// If a unit price inluding tax is known (rarely)
+	if ($line_unit_price_ttc) {
+		// This section seems not required.
+		// It can be used if the price base is including tax (TTC) and without discount (= Catalog public unit price for individual customers)
+		$linesData[$numligne]['grosspriceamount'] = $line_unit_price_ttc;
+		$linesData[$numligne]['grosspricebasisquantity'] = null;
+		$linesData[$numligne]['grosspricebasisquantityunitcode'] = null;
+	}
 
 	$numligne++;
 }
 
+// already used credit note amount
+$usedcreditnoteamount = 0;
+$usedcreditnote = array();
+$sql = "SELECT re.rowid, re.amount_ht, re.amount_tva, re.amount_ttc,";
+$sql .= " re.description, re.fk_facture_source";
+$sql .= " FROM ".MAIN_DB_PREFIX."societe_remise_except as re";
+$sql .= " WHERE fk_facture = ".((int) $object->id) ." AND description = '(CREDIT_NOTE)'";
+$resql = $db->query($sql);
+if ($resql) {
+	while ($obj = $db->fetch_object($resql)) {
+		$usedcreditnoteamount += abs($obj->amount_ttc);
+
+		// Add used credit note into reference documents of invoice
+		$usedCreditNoteFact = new Facture($this->db);
+		if ($usedCreditNoteFact->fetch($obj->fk_facture_source) > 0) {
+			$usedCreditNoteFactDate = new DateTime(dol_print_date($usedCreditNoteFact->date, 'dayrfc'));
+			$invoiceRefDocs[] = [
+				'ref' => $usedCreditNoteFact->ref,
+				'date' => $usedCreditNoteFactDate,
+				'type' => '381'
+			];
+		} else {
+			dol_syslog("Error " . $db->error() . " when looking for credit note linked to invoice to calculate prepaid amount for invoice " . $object->id, LOG_WARNING);
+		}
+	}
+} else {
+	dol_syslog("Error " . $db->error() . " when looking for credit note linked to invoice to calculate prepaid amount for invoice " . $object->id, LOG_WARNING);
+}
+
 // Already paid deposits
 $getAlreadyPaid = $object->getSommePaiement();
-// $prepaidAmount  = $object->sumpayed + $prepaidAmount;
-$prepaidAmount  = $object->sumpayed + $getAlreadyPaid;
+
+$prepaidAmount  = $object->sumpayed + $getAlreadyPaid + $usedcreditnoteamount;
 
 // Delivery date
 $deliveryDate = !empty($deliveryDateList)
 	? new DateTime(dol_print_date($deliveryDateList[0], 'dayrfc'))
-	: new DateTime(dol_print_date($invoice->date, 'dayrfc'));
+	: new DateTime(dol_print_date($object->date, 'dayrfc'));
 
 
 
@@ -417,13 +581,10 @@ $invoiceData = [
 	'invoicingPeriodEnd'   => null,
 
 	'businessProcessId'    => $this->getBillingProcessID($object),		// B1, B2, B3, B4 / S1, S2, S3, S4 / M1, M2, M3, M4
-	'isTestDocument'       => !empty($invoice->specimen),
+	'isTestDocument'       => !empty($object->specimen),
 
 	// Notes
-	'documentNotePublic'   => dol_concatdesc(
-		$object->note_public ?: "",
-		' - Einvoice generated by Dolibarr ' . DOL_VERSION
-	),
+	'documentNotePublic'   => $object->note_public ?: "",
 	'documentNotePMT'      => getDolGlobalString('PDPCONNECTFR_PMT') ?: $outputlangs->trans("NoInvoiceCollectionFees"),
 	'documentNotePMD'      => getDolGlobalString('PDPCONNECTFR_PMD') ?: $outputlangs->trans('NoLatePaymentFees'),
 	'documentNoteAAB'      => getDolGlobalString('PDPCONNECTFR_AAB') ?: $outputlangs->trans('NoEarlyPaymentDiscount'),
@@ -479,6 +640,7 @@ $invoiceData = [
 
 	'buyerReference'            => $object->array_options['options_d4d_service_code'] ?? null,
 
+	// URIUniversalCommunication
 	'buyerCommunicationUriScheme' => $schemeUri,
 	'buyerCommunicationUri'    	=> $uri,
 
@@ -489,17 +651,20 @@ $invoiceData = [
 	// Totals parts
 	'grandTotalAmount'          => $grand_total_ttc,
 	'duePayableAmount'          => $grand_total_ttc - $prepaidAmount,
-	'lineTotalAmount'           => $grand_total_ht,
+	'lineTotalAmount'           => $lines_total_ht,
 	'chargeTotalAmount'         => 0.0,
-	'allowanceTotalAmount'      => 0.0,
+	'allowanceTotalAmount'      => array_sum(array_column($globalDiscounts, 'value')), // We sum all global discounts defined in the invoice
 	'taxBasisTotalAmount'       => $grand_total_ht,
 	'taxTotalAmount'            => $grand_total_tva,
 	'roundingAmount'            => null,
 	'totalPrepaidAmount'        => $prepaidAmount,
 
+	'iban_id'                   => $account->id,
 	'iban'                      => $pdpconnectfr->removeSpaces($account->iban),
 	'bic'                       => $pdpconnectfr->removeSpaces($account->bic),
 	'accountName'               => $account_proprio,
+	'accountRef'                => $account->ref,
+	'accountLabel'              => $account->label,
 
 	'paymentDueDate'            => new DateTime(dol_print_date($object->date_lim_reglement, 'dayrfc')),
 	'paymentTermsText'          => $langs->transnoentitiesnoconv("PaymentConditions") . ": " . $langs->transnoentitiesnoconv("PaymentCondition" . $object->cond_reglement_code),
@@ -513,14 +678,15 @@ $invoiceData = [
 	'contractReference'         => $object->array_options['options_d4d_contract_number'] ?? null,
 	'despatchAdviceRef'         => null,
 
-	// VAT breakdown
-	'taxBreakdown'              => $tabTVA,
+	// VAT breakdown for section ApplicableHeaderTradeSettlement
+	'taxBreakdown'              => $taxBreakdown,
 
 	// Internal data (useful for the builder)
 	'_chorus'                   => $chorus,
 	'_depositlines'             => $depositlines,
+	'_globalDiscounts'          => $globalDiscounts,
 	'_customerOrderReferenceList' => $customerOrderReferenceList,
-	'_project'                  => ($invoice->project instanceof Project) ? $invoice->project : null,
+	'_project'                  => ($object->project instanceof Project) ? $object->project : null,
 ];
 
 

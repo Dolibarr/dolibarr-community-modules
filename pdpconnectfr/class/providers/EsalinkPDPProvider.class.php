@@ -58,7 +58,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	 */
 	public function __construct($db)
 	{
-		global $conf, $langs;
+		global $langs;
 
 		parent::__construct($db);
 
@@ -157,7 +157,15 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$item->cssClass = 'minwidth500';
 
 		// Client secret
-		$item = $formSetup->newItem($prefix . 'PASSWORD'.(getDolGlobalInt('PDPCONNECTFR_LIVE') ? '_PROD' : ''))->setAsGenericPassword();
+		$item = $formSetup->newItem($prefix . 'PASSWORD'.(getDolGlobalInt('PDPCONNECTFR_LIVE') ? '_PROD' : ''));
+		if (method_exists('FormSetupItem', 'setAsGenericPassword')) {
+			$item->setAsGenericPassword();
+		} else {
+			// Dolibarr 18/19 fallback: setAsGenericPassword() does not exist yet.
+			// Force a masked password input so the secret is not displayed in clear text.
+			$item->fieldAttr['type'] = 'password';
+			$item->fieldAttr['autocomplete'] = 'new-password';
+		}
 		$item->nameText = $langs->transnoentities('PDPCONNECTFR_CLIENT_SECRET');
 		$item->cssClass = 'minwidth500';
 
@@ -207,7 +215,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				if (getDolGlobalString('PDPCONNECTFR_LIVE')) {
 					$item->fieldOverride .= '<span class="opacitymedium" title="'.$langs->trans("DisabledInProductionMode").'"><i class="fa fa-file pictofixedwidth centerimp"></i>' . $langs->trans('generateSendSampleInvoice') . '</span><br>';
 				} else {
-					$item->fieldOverride .= '<a class="reposition" href="' . $_SERVER["PHP_SELF"] . "?action=make" . $prefix . "sampleinvoice&token=" . newToken() . '"><i class="fa fa-file pictofixedwidth centerimp"></i>' . $langs->trans('generateSendSampleInvoice') . '</a><br>';
+					if (getDolGlobalInt('PDPCONNECTFR_ALLOW_DEVTOOLS')) {
+						$item->fieldOverride .= '<a class="reposition" href="' . $_SERVER["PHP_SELF"] . "?action=make" . $prefix . "sampleinvoice&token=" . newToken() . '"><i class="fa fa-file pictofixedwidth centerimp"></i>' . $langs->trans('generateSampleInvoice') . '</a><br>';
+					}
+					$item->fieldOverride .= '<a class="reposition" href="' . $_SERVER["PHP_SELF"] . "?action=makesend" . $prefix . "sampleinvoice&token=" . newToken() . '"><i class="fa fa-file pictofixedwidth centerimp"></i>' . $langs->trans('generateSendSampleInvoice') . '</a><br>';
 				}
 			}
 
@@ -272,6 +283,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			'username' => $this->config['username'],
 			'password' => $this->config['password']
 		));
+
 		$extraHeaders = array();
 
 		// We call /token api of Esalink with username and pass. May be they are just client_id / client_secret that were renamed ?
@@ -496,12 +508,12 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 	/**
 	 * Send a sample electronic invoice for testing purposes.
-	 *
 	 * This function generates a sample invoice and sends it to PDP
 	 *
-	 * @return array|string True if the invoice was successfully sent, false otherwise.
+	 * @param 	int 			$onlymake		1=to only make the sample
+	 * @return array|string 					True if the invoice was successfully sent, false otherwise.
 	 */
-	public function sendSampleInvoice()
+	public function sendSampleInvoice($onlymake = 0)
 	{
 		global $langs;
 
@@ -527,14 +539,31 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			return 0;
 		}
 
-		// invoice_path is something like "/.../documents/pdpconnectfr/temp/02_ZugferdDocumentPdfBuilder_PrintLayout_Merged.pdf"
+		if (empty($ref) || empty($invoice_path)) {
+			$this->errors[] = 'Failed to generate the sample invoice';
+			return 0;
+		}
+
+		// invoice_path is something like "/.../documents/pdpconnectfr/temp/..." or "/.../documents/facture/temp/..."
 
 		if ($invoice_path) {
 			$outputLog[] = "Sample invoice generated successfully.";
 		}
+
+
+		// Stop here if we want just generation
+		if ($onlymake) {
+			return $outputLog;
+		}
+
+
 		$file_info = pathinfo($invoice_path);
-		$mime_type = mime_content_type($invoice_path);
 		$fileext = $file_info['extension'] ?? ''; // Should be "pdf" or "xml" depending on the protocol
+		if (strtolower($fileext) == 'pdf') {
+			$mime_type = 'application/pdf';
+		} else {
+			$mime_type = 'text/xml';
+		}
 
 		// Format PDP resource Url
 		/* The URL must be like : https://ppd.hubtimize.fr/api/orchestrator/v1/flows?Request-Id={UUID}
@@ -608,6 +637,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			if (!empty($response['curl_error_no'])) {
 				$errormsg .= ' - Curl error ' . $response['curl_error_no'] . (empty($response['curl_error_msg']) ? '' : ' - ' . $response['curl_error_msg']);
 			}
+			$this->error = $errormsg;
 			$this->errors[] = $errormsg;
 			return 0;
 		}
@@ -1064,7 +1094,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$document->fk_user_creat        = $user->id;
 		$document->call_id              = $call_id;		// Call id for unitary fetch
 		$document->flow_id              = $flowId;
-		$document->tracking_idref       = $flowData['trackingId'] ?? null;
+		$document->tracking_idref       = $flowData['trackingId'] ?? (getDolGlobalString('PDPCONNECTFR_PDP', 'REF').' '.$flowId);
 		$document->flow_type            = $flowData['flowType'] ?? null;
 		$document->flow_direction       = $flowData['flowDirection'] ?? null;
 		$document->flow_syntax          = $flowData['flowSyntax'] ?? null;
@@ -1107,17 +1137,25 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
 				$document->fk_element_type = Facture::class;
 				$factureObj = new Facture($this->db);
-				$res = $factureObj->fetch(0, $document->tracking_idref);
-				if ($res < 0) {
-					return array('res' => -1, 'message' => "ERROR_FETCH_INVOICE Failed to fetch customer invoice for flowId: " . $flowId);
+				if (!empty($document->tracking_idref)) {
+					$res = $factureObj->fetch(0, $document->tracking_idref);
+					if ($res < 0) {
+						return array('res' => -1, 'message' => "ERROR_FETCH_INVOICE Failed to fetch customer invoice for flowId: " . $flowId);
+					} elseif ($res == 0) {
+						$returnRes = 1;
+						$returnMessage = 'Source invoice not found for '.$document->flowId;
+					} else {
+						// TODO: save received converted document as attachment to customer invoice
+					}
+				} else {
+					$returnRes = 1;
+					$returnMessage = 'Source invoice not found for '.$document->flowId;
 				}
+
 				$document->fk_element_id = !empty($factureObj->id) ? $factureObj->id : 0;
-				$document->tracking_idref = !empty($factureObj->ref) ? $factureObj->ref : $document->tracking_idref . ' (NOTFOUND)'; // Probably the customer invoice is sent from another system that use the same PDP account
+				$document->tracking_idref = !empty($factureObj->ref) ? $factureObj->ref : $document->tracking_idref . ' (NOTFOUND)'; // Probably the customer invoice was sent from another system that use the same PDP account
 
-				// TODO: Consider creating a new customer invoice in this case?
-				// TODO: 2. save received converted document as attachment to customer invoice
 				break;
-
 			// SupplierInvoice
 			case "SupplierInvoice":
 				// --- Fetch received documents (Einvoice)
@@ -1405,7 +1443,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				}
 				break;
 			case "":
-				// TODO: Remove all this case or condition it with debug mode
+				// TODO: Remove all this case or condition if with debug mode
 				// This is likely a valisation response for an invoice that was previously sent, and not a lifecycle message.
 				// Since we trigger an AJAX every X seconds to get validation response while an invoice remains in the "Pending" status after sending, no need to handle this case and to store all validation responses in document table.
 

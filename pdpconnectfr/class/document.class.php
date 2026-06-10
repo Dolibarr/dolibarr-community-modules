@@ -140,7 +140,7 @@ class Document extends CommonObject
 		"document_body" => array("type" => "text", "label" => "document_body", "enabled" => "1", 'position' => 110, 'notnull' => 0, "visible" => "0", "comment" => "Full document content XML"),
 		"fk_element_type" => array("type" => "varchar(100)", "label" => "fk_element_type", "enabled" => "1", 'position' => 120, 'notnull' => 0, "visible" => "1",),
 		"fk_element_id" => array("type" => "integer", "label" => "fk_element_id", "enabled" => "1", 'position' => 130, 'notnull' => 0, "visible" => "-1",),
-		"tracking_idref" => array("type" => "varchar(50)", "label" => "RefObject", "enabled" => "1", 'position' => 135, 'notnull' => 0, "visible" => "1", "comment" => "Document tracking identifier"),
+		"tracking_idref" => array("type" => "varchar(255)", "label" => "RefObject", "enabled" => "1", 'position' => 135, 'notnull' => 0, "visible" => "1", "comment" => "Document tracking identifier"),
 		"submittedat" => array("type" => "datetime", "label" => "submittedAt", "enabled" => "1", 'position' => 140, 'notnull' => 1, "visible" => "-1", "comment" => "submittedAt (PDP Date)"),
 		"updatedat" => array("type" => "datetime", "label" => "updatedAt", "enabled" => "1", 'position' => 150, 'notnull' => 0, "visible" => "1", "comment" => "updatedAt (PDP Date)"),
 		"entity" => array("type" => "integer", "label" => "entity", "enabled" => "1", 'position' => 170, 'notnull' => 0, "visible" => "0", "comment" => "Multi-entity support"),
@@ -246,12 +246,6 @@ class Document extends CommonObject
 		if (!isModEnabled('multicompany') && isset($this->fields['entity'])) {
 			$this->fields['entity']['enabled'] = 0;
 		}
-
-		// Example to show how to set values of fields definition dynamically
-		/*if ($user->hasRight('pdpconnectfr', 'document', 'read')) {
-			$this->fields['myfield']['visible'] = 1;
-			$this->fields['myfield']['noteditable'] = 0;
-		}*/
 
 		// Unset fields that are disabled
 		foreach ($this->fields as $key => $val) {
@@ -571,14 +565,6 @@ class Document extends CommonObject
 			return 0;
 		}
 
-		/* if (! ((!getDolGlobalInt('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('pdpconnectfr', 'document', 'write'))
-		 || (getDolGlobalInt('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('pdpconnectfr', 'document_advance', 'validate')))
-		 {
-		 $this->error='NotEnoughPermissions';
-		 dol_syslog(get_class($this)."::valid ".$this->error, LOG_ERR);
-		 return -1;
-		 }*/
-
 		$now = dol_now();
 
 		$this->db->begin();
@@ -700,13 +686,6 @@ class Document extends CommonObject
 			return 0;
 		}
 
-		/* if (! ((!getDolGlobalInt('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('pdpconnectfr','write'))
-		 || (getDolGlobalInt('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('pdpconnectfr','pdpconnectfr_advance','validate'))))
-		 {
-		 $this->error='Permission denied';
-		 return -1;
-		 }*/
-
 		return $this->setStatusCommon($user, self::STATUS_DRAFT, $notrigger, 'PDPCONNECTFR_MYOBJECT_UNVALIDATE');
 	}
 
@@ -724,13 +703,6 @@ class Document extends CommonObject
 			return 0;
 		}
 
-		/* if (! ((!getDolGlobalInt('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('pdpconnectfr','write'))
-		 || (getDolGlobalInt('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('pdpconnectfr','pdpconnectfr_advance','validate'))))
-		 {
-		 $this->error='Permission denied';
-		 return -1;
-		 }*/
-
 		return $this->setStatusCommon($user, self::STATUS_CANCELED, $notrigger, 'PDPCONNECTFR_MYOBJECT_CANCEL');
 	}
 
@@ -747,13 +719,6 @@ class Document extends CommonObject
 		if ($this->status == self::STATUS_VALIDATED) {
 			return 0;
 		}
-
-		/*if (! ((!getDolGlobalInt('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('pdpconnectfr','write'))
-		 || (getDolGlobalInt('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('pdpconnectfr','pdpconnectfr_advance','validate'))))
-		 {
-		 $this->error='Permission denied';
-		 return -1;
-		 }*/
 
 		return $this->setStatusCommon($user, self::STATUS_VALIDATED, $notrigger, 'PDPCONNECTFR_MYOBJECT_REOPEN');
 	}

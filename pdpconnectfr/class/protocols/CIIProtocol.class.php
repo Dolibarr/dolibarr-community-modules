@@ -28,9 +28,9 @@
 require_once DOL_DOCUMENT_ROOT . '/compta/bank/class/account.class.php';
 require_once DOL_DOCUMENT_ROOT . '/expedition/class/expedition.class.php';
 require_once DOL_DOCUMENT_ROOT . '/commande/class/commande.class.php';
-include_once DOL_DOCUMENT_ROOT . '/core/class/translate.class.php';
-include_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
-include_once DOL_DOCUMENT_ROOT . '/core/class/discount.class.php';
+require_once DOL_DOCUMENT_ROOT . '/core/class/translate.class.php';
+require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
+require_once DOL_DOCUMENT_ROOT . '/core/class/discount.class.php';
 require_once DOL_DOCUMENT_ROOT . '/core/lib/files.lib.php';
 
 dol_include_once('pdpconnectfr/class/protocols/AbstractProtocol.class.php');
@@ -222,11 +222,12 @@ class CIIProtocol extends AbstractProtocol
 			'rateApplicablePercent' => './ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:RateApplicablePercent',
 			'calculatedAmount' => './ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:CalculatedAmount',
 
-			'exemptionReason' => './ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:ExemptionReason',
-			'exemptionReasonCode' => './ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:ExemptionReasonCode',
+			'ExemptionReason' => './ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:ExemptionReason',
+			'ExemptionReasonCode' => './ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:ExemptionReasonCode',
 
-			'lineAllowances' => [],
-			'lineGrossPriceAllowances' => [],
+			// ── line-level allowances & charges ────────────────────────────────
+			'lineAllowances' => '__MULTI__./ram:SpecifiedLineTradeSettlement/ram:SpecifiedTradeAllowanceCharge',
+			'lineGrossPriceAllowances' => '__MULTI__./ram:SpecifiedLineTradeAgreement/ram:GrossPriceProductTradePrice/ram:AppliedTradeAllowanceCharge',
 			'lineremisepercent' => 'NA',
 
 			'linePeriodStart' => './ram:SpecifiedLineTradeSettlement/ram:BillingSpecifiedPeriod/ram:StartDateTime/udt:DateTimeString',
@@ -261,27 +262,30 @@ class CIIProtocol extends AbstractProtocol
 		global $conf, $user, $langs, $mysoc, $db;	// Used by the include
 
 
-		// Call page to generate the invoice
+		// Call page to generate the invoice variables ($invoiceData, ...)
 		include dol_buildpath('pdpconnectfr/lib/buildinvoicelines.inc.php');
 		/**
+		 * @var Facture 			$object			The $invoice object used in entry on inc file, but completed.
 		 * @var array<mixed,mixed> 	$invoiceData
 		 * @var array<mixed,mixed> 	$linesData
-		 * @var Facture 			$object
-		 * @var Translate 			$outputlangs
-		 * @var string 				$outputlang
+		 * @var string 				$outputlang		Value of $outputlangs->defaultlang
+		 * @var Societe 			$mysoc
 		 * @var Account				$account
 		 * @var PdpConnectFr		$pdpconnectfr
+		 * @var string 				$schemdUri		Buyer scheme uri
+		 * @var string 				$uri			Buyer uri
 		 */
 
 		// Generate the XML file
 		$filename = dol_sanitizeFileName($invoice->ref);
-		$filedir = getMultidirOutput($invoice, '', 1, 'temp');
+		$filedir = getMultidirOutputCompat($invoice, '', 1, 'temp');    // Example '/mydolibarr/documents/facture/temp/FAYYMM-XXXX'
 		$xmlfile = $filedir . '/' . $filename . '/einvoice.xml';
 
 		dol_mkdir(dirname($xmlfile));
 		dol_delete_file($xmlfile);
 
 		$xmlcontent = $this->buildXML($invoiceData, $linesData, 'EN16931', $outputlangs);
+
 		file_put_contents($xmlfile, $xmlcontent);
 
 		dolChmod($xmlfile);
@@ -292,8 +296,7 @@ class CIIProtocol extends AbstractProtocol
 
 	/**
 	 * Generate a complete CII invoice file.
-	 *
-	 * This function combines the invoice data with its corresponding XML
+	 * This function generates the einvoice file.
 	 *
 	 * @param 	int|Object 	$invoice_id    	Invoice ID or Invoice Object to be processed.
 	 * @param	?Translate	$outputlangs	Output language
@@ -334,7 +337,7 @@ class CIIProtocol extends AbstractProtocol
 			$xmlfile = $this->generateXML($invoice, $outputlangs);
 		} catch (Exception $e) {
 			dol_syslog(get_class($this) . "::generateInvoice failed to generate XML for invoice id=" . $invoice_id . ". Error " . $e->getMessage(), LOG_ERR);
-			$this->error = $langs->trans("ErrorGeneratingXML") . '. ' . $e->getMessage();
+			$this->error = $langs->trans("ErrorGeneratingXML") . '.<br>' . $e->getMessage();
 			$this->errors[] = $this->error;
 			return -1;
 		}
@@ -349,15 +352,16 @@ class CIIProtocol extends AbstractProtocol
 
 		// Load PDPConnectFR specific translations
 		$langs->loadLangs(array("admin", "pdpconnectfr@pdpconnectfr"));
-
-		// Make a copy of the XML file in the final destination
+		// Make a copy of the XML file into the final destination
 		$filename = dol_sanitizeFileName($invoice->ref);
-		$filedir = getMultidirOutput($invoice, '', 1);
+		$filedir = getMultidirOutputCompat($invoice, '', 1);      // Example '/mydolibarr/documents/facture/FAYYMM-XXXX'
 		$einvoice_path = $filedir . '/' . $filename . '_cii.xml';
-		if (dol_copy($xmlfile, $einvoice_path)) {
+
+		if (dol_copy($xmlfile, $einvoice_path) > 0) {
 			dol_syslog(get_class($this) . "::generateInvoice copied XML file to " . $einvoice_path);
 		} else {
 			dol_syslog(get_class($this) . "::generateInvoice failed to copy XML file to " . $einvoice_path, LOG_ERR);
+			$langs->load("errors");
 			$this->error = $langs->trans("ErrorFailToCopyFile", $xmlfile, $einvoice_path);
 			$this->errors[] = $this->error;
 			return -1;
@@ -370,7 +374,7 @@ class CIIProtocol extends AbstractProtocol
 			dol_syslog(get_class($this) . '::generateInvoice cleaned up temporary XML file: ' . $xmlfile);
 		}
 
-		// Add einvoice hook
+		// Add afterEinvoiceCreation hook
 		global $action, $hookmanager;
 		$hookmanager->initHooks(array('einvoicegeneration'));
 		$parameters = array('protocol' => 'cii', 'file' => $einvoice_path, 'object' => $invoice, 'outputlangs' => $langs);
@@ -398,135 +402,6 @@ class CIIProtocol extends AbstractProtocol
 	}
 
 
-	/**
-	 * Generate a sample CII invoice for demonstration or testing purposes (for Dolibarr version >= 24.0)
-	 *
-	 * This method creates a dummy invoice with representative data
-	 * to illustrate the CII structure without using real business information.
-	 *
-	 * @param	PdpConnectFr			$pdpconnectfr			PDPConnectFR
-	 * @param   Societe|null			$thirdpartySeller		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
-	 * @param   Societe|null			$thirdpartyBuyer		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
-	 * @param   array<string,mixed>		$options				More options
-	 * @return 	-1|array<string,string> 							Path or content of the generated sample invoice.
-	 */
-	public function generateSampleInvoice($pdpconnectfr, $thirdpartySeller = null, $thirdpartyBuyer = null, $options = array())
-	{
-		global $conf, $langs, $mysoc;
-
-		dol_mkdir($conf->pdpconnectfr->dir_temp);
-
-		$outputlangs = $langs;		// TODO Use the target language
-
-		require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
-		$tmpinvoice = new Facture($this->db);
-		$tmpinvoice->initAsSpecimen('nolines');
-
-		$tmpinvoice->ref .= '-' . dol_print_date(dol_now(), '%y%m%d-%H%M%S');
-		if (!empty($options['invoicetype'])) {
-			$tmpinvoice->type = $options['invoicetype'];
-		}
-
-		$line = new FactureLigne($this->db);
-		$line->desc = $langs->trans("Description") . " 1";
-		$line->qty = 1;
-		$line->subprice = 100;
-		$line->tva_tx = 20.0;
-		$line->localtax1_tx = 0;
-		$line->localtax2_tx = 0;
-		$line->remise_percent = 0;
-		$line->fk_product = 0;
-		$line->qty = 1;
-		$line->total_ht = 100;
-		$line->total_ttc = 120;
-		$line->total_tva = 20;
-		$line->multicurrency_tx = 2;
-		$line->multicurrency_total_ht = 200;
-		$line->multicurrency_total_ttc = 240;
-		$line->multicurrency_total_tva = 40;
-
-		$tmpinvoice->lines[] = $line;
-
-		$tmpinvoice->total_ht       += $line->total_ht;
-		$tmpinvoice->total_tva      += $line->total_tva;
-		$tmpinvoice->total_ttc      += $line->total_ttc;
-
-		$tmpinvoice->multicurrency_total_ht       += $line->multicurrency_total_ht;
-		$tmpinvoice->multicurrency_total_tva      += $line->multicurrency_total_tva;
-		$tmpinvoice->multicurrency_total_ttc      += $line->multicurrency_total_ttc;
-
-
-		require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
-		if ($thirdpartyBuyer instanceof Societe) {
-			$tmpthirdparty = $thirdpartyBuyer;
-		} else {
-			$tmpthirdparty = new Societe($this->db);
-			$tmpthirdparty->initAsSpecimen();
-			$tmpthirdparty->idprof1 = '000000001';
-			$tmpthirdparty->idprof2 = '00000000100010';
-			$tmpthirdparty->tva_intra = 'FR12000000001';
-		}
-		$tmpinvoice->thirdparty = $tmpthirdparty;
-		$tmpinvoice->socid = $tmpthirdparty->id;			// 0 for specimen
-
-		require_once DOL_DOCUMENT_ROOT . '/contact/class/contact.class.php';
-		$tmpcontact = new Contact($this->db);
-		$tmpcontact->initAsSpecimen();
-		$tmpcontact->socid = $tmpthirdparty->id;			// 0 for specimen
-		$tmpinvoice->contact = $tmpcontact;
-
-
-
-		// Set $mysoc if seller is a thirdparty when we want to generate a sample invoice for a purchase.
-		$keyforconst = 'PDPCONNECTFR_' . getDolGlobalString('PDPCONNECTFR_PDP') . '_ROUTING_ID';
-		$savmysoc = null;
-		$savPDPCONNECTFR_ROUTING_ID = null;
-		if ($thirdpartySeller instanceof Societe) {
-			$savmysoc = $mysoc;
-			$savPDPCONNECTFR_ROUTING_ID = getDolGlobalString($keyforconst);
-
-			$mysoc = $thirdpartySeller;
-			$conf->global->PDPCONNECTFR_SUPERPDP_ROUTING_ID = idprof($thirdpartySeller);
-		}
-		//var_dump(($savmysoc ? $savmysoc->name : ''), $mysoc->name, $thirdpartyBuyer->name);
-
-
-		// Generate the Dolibarr PDF of the invoice
-		$tmpinvoice->generateDocument($tmpinvoice->model, $outputlangs);
-
-		// For invoice with ->specimen=1, the file is SPECIMEN.pdf so we rename it into ref
-		$dir = $conf->invoice->multidir_output[$conf->entity];
-		$srcfile = $dir . '/SPECIMEN.pdf';
-		$destfile = $dir . '/' . dol_sanitizeFileName($tmpinvoice->ref) . '.pdf';
-
-		dol_move($srcfile, $destfile, '0', 1);
-
-
-		// Generate the EInvoice - CII xml file
-		$pathOfXml = $this->generateInvoice($tmpinvoice, $outputlangs);
-
-		// Restore switched variables if we changed $mysoc for generation of the sample invoice
-		if (!empty($savmysoc)) {
-			$mysoc = $savmysoc;
-			$conf->global->$keyforconst = $savPDPCONNECTFR_ROUTING_ID;
-
-			$savmysoc = null;
-			$savPDPCONNECTFR_ROUTING_ID = null;
-		}
-
-		// Restore name SPECIMEN.pdf
-		dol_move($destfile, $srcfile, '0', 1);
-
-		// Move CII xml file into the temp directory
-		if (is_numeric($pathOfXml) && $pathOfXml < 0) {
-			return $pathOfXml;
-		} else {
-			$newPathOfXml = dirname($pathOfXml) . '/temp/' . basename($pathOfXml);
-			dol_move($pathOfXml, $newPathOfXml, '0', 1);
-
-			return array('path' => $newPathOfXml, 'ref' => $tmpinvoice->ref);
-		}
-	}
 
 	/**
 	 * Generate a sample CII invoice for demonstration or testing purposes (for Dolibarr version < 24.0)
@@ -543,7 +418,8 @@ class CIIProtocol extends AbstractProtocol
 	 */
 	public function generateSampleInvoiceOld($pdpconnectfr, $thirdpartySeller = null, $thirdpartyBuyer = null, $options = array())
 	{
-		return array('path' => '', 'ref' => ''); // Not yet implemented
+		// For CII protocol, the old sample method now use the new one.
+		return $this->generateSampleInvoice($pdpconnectfr, $thirdpartySeller, $thirdpartyBuyer, $options);
 	}
 
 
@@ -680,6 +556,9 @@ class CIIProtocol extends AbstractProtocol
 
 		// Add invoice lines
 		foreach ($parsedLines as $parsedLine) {
+			// Add supplier ID to line for later use in product sync
+			$parsedLine['supplierId'] = $socId;
+
 			$is_deposit_line = 0;
 			$fk_remise = 0;
 			// --------------------------------------------------
@@ -837,14 +716,33 @@ class CIIProtocol extends AbstractProtocol
 
 				$remise_already_used_line_level_ids[] = $fk_remise;
 			}
+			// handle line-level discount if exists and update amounts
+			if (!empty($parsedLine['lineAllowances'])) {
+				$discount = $this->_resolveLineDiscountPercent($parsedLine['lineAllowances'], $parsedLine['lineTotalAmount']);
+				if ($discount !== false) {
+					$line->remise_percent  = $discount['percent'];
+					$line->subprice = round($discount['priceWithoutDiscount'] / $parsedLine['billedquantity'], 8);
+				}
+			}
 			$line->qty = $parsedLine['billedquantity'];
-			$line->subprice = $parsedLine['netpriceamount'];
+			$line->subprice = $line->subprice ?? $parsedLine['netpriceamount'];
 			$line->tva_tx = $parsedLine['rateApplicablePercent'];
 			$line->total_ht = $parsedLine['lineTotalAmount'];
 			$line->total_tva = $parsedLine['calculatedAmount'] ?? 0;
 			$line->total_ttc = $parsedLine['lineTotalAmount'] + ($parsedLine['calculatedAmount'] ?? 0);
 
 			$supplierInvoice->lines[] = $line;
+		}
+
+		// Create document level discounts (allowances) as discounts in Dolibarr
+		$globalDiscountIds = array();
+		if (!empty($parsedHeader['headerAllowancesCharges'])) {
+			$headerDiscountIds = $this->_createHeaderDiscounts($parsedHeader['headerAllowancesCharges'], $socId, 	$parsedHeader['documentno']);
+			if (!empty($headerDiscountIds[-1])) {
+				return ['res' => -1, 'message' => $headerDiscountIds[-1]];
+			} else {
+				$globalDiscountIds = $headerDiscountIds;
+			}
 		}
 
 		//return ['res' => 1, 'message' => 'Not implemented yet' ];
@@ -857,7 +755,7 @@ class CIIProtocol extends AbstractProtocol
 		// Add a note about PDP import ( TODO: add a hook or extrafields to store import details)
 		$supplierInvoice->note_private = "Imported from PDP";
 
-		// TODO : save AAB, PMD, PMT notes ( all notes are grouped into documentNotes)
+		// TODO : save AAB, PMD, PMT notes (all notes are grouped into documentNotes)
 
 		// Create the invoice
 		$supplierInvoiceId = $supplierInvoice->create($user);
@@ -981,6 +879,20 @@ class CIIProtocol extends AbstractProtocol
 				$supplier->fournisseur = 1;
 				$supplier->code_fournisseur = 'auto';
 				$supplier->update($supplier->id, $user);
+			}
+
+			// Insert global discounts (allowances) as lines in this supplier invoice
+			if (!empty($globalDiscountIds)) {
+				foreach ($globalDiscountIds as $fk_remise_except) {
+					$currentSupplierInvoice = new FactureFournisseur($db);
+					$currentSupplierInvoice->fetch($supplierInvoiceId);
+					$result = $currentSupplierInvoice->insert_discount($fk_remise_except);
+					if ($result < 0) {
+						return ['res' => -1, 'message' => 'Failed to insert global discount into supplier invoice: ' . $currentSupplierInvoice->error];
+					} else {
+						dol_syslog('Global discount inserted into supplier invoice with line id: ' . $result);
+					}
+				}
 			}
 
 			// TODO : Add supplier price for products (all lines of the invoice)
@@ -1338,8 +1250,8 @@ class CIIProtocol extends AbstractProtocol
 						'rateApplicablePercent' => $this->toFloat($this->getXPathValue($xpath, 'ram:RateApplicablePercent', $n)),
 						'calculatedAmount' => $this->toFloat($this->getXPathValue($xpath, 'ram:CalculatedAmount', $n)),
 						'basisAmount' => $this->toFloat($this->getXPathValue($xpath, 'ram:BasisAmount', $n)),
-						'exemptionReason' => $this->getXPathValue($xpath, 'ram:ExemptionReason', $n),
-						'exemptionReasonCode' => $this->getXPathValue($xpath, 'ram:ExemptionReasonCode', $n),
+						'ExemptionReason' => $this->getXPathValue($xpath, 'ram:ExemptionReason', $n),
+						'ExemptionReasonCode' => $this->getXPathValue($xpath, 'ram:ExemptionReasonCode', $n),
 					];
 					break;
 
@@ -1353,6 +1265,28 @@ class CIIProtocol extends AbstractProtocol
 						'actualAmount' => $this->toFloat($this->getXPathValue($xpath, 'ram:ActualAmount', $n)),
 						'categoryCode' => $this->getXPathValue($xpath, 'ram:CategoryTradeTax/ram:CategoryCode', $n),
 						'rateApplicablePercent' => $this->toFloat($this->getXPathValue($xpath, 'ram:CategoryTradeTax/ram:RateApplicablePercent', $n)),
+					];
+					break;
+
+				case 'lineAllowances':
+					$result[] = [
+						'indicator'          => $this->getXPathValue($xpath, 'ram:ChargeIndicator/udt:Indicator', $n),
+						'reasonCode'         => $this->getXPathValue($xpath, 'ram:ReasonCode', $n),
+						'reason'             => $this->getXPathValue($xpath, 'ram:Reason', $n),
+						'calculationPercent' => $this->toFloat($this->getXPathValue($xpath, 'ram:CalculationPercent', $n)),
+						'basisAmount'        => $this->toFloat($this->getXPathValue($xpath, 'ram:BasisAmount', $n)),
+						'actualAmount'       => $this->toFloat($this->getXPathValue($xpath, 'ram:ActualAmount', $n)),
+					];
+					break;
+
+				case 'lineGrossPriceAllowances':
+					$result[] = [
+						'indicator'          => $this->getXPathValue($xpath, 'ram:ChargeIndicator/udt:Indicator', $n),
+						'reasonCode'         => $this->getXPathValue($xpath, 'ram:ReasonCode', $n),
+						'reason'             => $this->getXPathValue($xpath, 'ram:Reason', $n),
+						'calculationPercent' => $this->toFloat($this->getXPathValue($xpath, 'ram:CalculationPercent', $n)),
+						'basisAmount'        => $this->toFloat($this->getXPathValue($xpath, 'ram:BasisAmount', $n)),
+						'actualAmount'       => $this->toFloat($this->getXPathValue($xpath, 'ram:ActualAmount', $n)),
 					];
 					break;
 
@@ -1407,7 +1341,10 @@ class CIIProtocol extends AbstractProtocol
 	 */
 	public function buildXML(array $invoiceData, array $linesData, $profile = '')
 	{
+		global $langs;
+
 		$doc = new \DOMDocument('1.0', 'UTF-8');
+		$doc->preserveWhiteSpace = true; // Keep spaces and line feed
 		$doc->formatOutput = true;
 
 		// Root
@@ -1421,6 +1358,10 @@ class CIIProtocol extends AbstractProtocol
 		$root->setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns:udt', 'urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100');
 		$root->setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns:xsi', 'http://www.w3.org/2001/XMLSchema-instance');
 		$doc->appendChild($root);
+
+		// Add comment
+		$comment = $doc->createComment('Einvoice XML generated by Dolibarr ' . DOL_VERSION . ' - ' . dol_print_date(dol_now('gmt'), 'dayhourrfc', 'gmt'));
+		$root->appendChild($comment);
 
 		// Context
 		$ctx = $doc->createElement('rsm:ExchangedDocumentContext');
@@ -1499,25 +1440,61 @@ class CIIProtocol extends AbstractProtocol
 			$note->appendChild($doc->createElement('ram:SubjectCode', 'AAB'));
 		}
 
+
+		//$root->appendChild($doc->createTextNode("\n "));
+
+
 		// Transaction
 		$sctt = $doc->createElement('rsm:SupplyChainTradeTransaction');
 		$root->appendChild($sctt);
 
+
 		// LINES
 		foreach ($linesData as $line) {
+			// Add a XML comment to help debug
+			$comment = $doc->createComment('Line '.$line['lineid']);
+			$sctt->appendChild($comment);
+
 			$sctt->appendChild($this->buildLineItem($doc, $line, $profile));
 		}
+		// Add a XML comment to help debug
+		$comment = $doc->createComment('End of lines');
+		$sctt->appendChild($comment);
+
 
 		// SELLER / BUYER
 		$agreement = $doc->createElement('ram:ApplicableHeaderTradeAgreement');
 		$sctt->appendChild($agreement);
 
+		// Seller
+		$comment = $doc->createComment('Seller');
+		$agreement->appendChild($comment);
+
 		$this->buildParty($doc, $agreement, $invoiceData, 'seller');
+
+		// Add comment
+		$comment = $doc->createComment('Buyer');
+		$agreement->appendChild($comment);
+
 		$this->buildParty($doc, $agreement, $invoiceData, 'buyer');
 
+
 		// DELIVERY
+
+		// Add comment
+		$comment = $doc->createComment('Delivery');
+		$sctt->appendChild($comment);
+
 		$delivery = $doc->createElement('ram:ApplicableHeaderTradeDelivery');
 		$sctt->appendChild($delivery);
+
+		// Add the ship to trade party (mandatory when using intracommunity delivery)
+		// ShipToTradeParty is itself a TradePartyType — populate it directly without
+		// wrapping it in another BuyerTradeParty (which would break XSD validation).
+		$shiptotrade = $doc->createElement('ram:ShipToTradeParty');
+		$delivery->appendChild($shiptotrade);
+		$this->buildParty($doc, $shiptotrade, $invoiceData, 'buyer', false);
+
 
 		if (!empty($invoiceData['documentDeliveryDate'])) {
 			$event = $doc->createElement('ram:ActualDeliverySupplyChainEvent');
@@ -1534,6 +1511,11 @@ class CIIProtocol extends AbstractProtocol
 			$dtNode->appendChild($str);
 		}
 
+
+		// Add a XML comment to help debug
+		$comment = $doc->createComment('Footer');
+		$sctt->appendChild($comment);
+
 		// SETTLEMENT
 		$settlement = $doc->createElement('ram:ApplicableHeaderTradeSettlement');
 		$sctt->appendChild($settlement);
@@ -1546,34 +1528,76 @@ class CIIProtocol extends AbstractProtocol
 
 		// Payment mode
 		if (!empty($invoiceData['paymentMeansCode'])) {
+			$comment = $doc->createComment('Payment mode');
+			$settlement->appendChild($comment);
+
 			// Payment means
 			$pm = $doc->createElement('ram:SpecifiedTradeSettlementPaymentMeans');
 			$settlement->appendChild($pm);
 
-			$pm->appendChild($doc->createElement('ram:TypeCode', $invoiceData['paymentMeansCode']));		// A code for payment type
+			$pm->appendChild($doc->createElement('ram:TypeCode', $invoiceData['paymentMeansCode']));		// A code for payment type BT-81 (BG-16)
 			$pm->appendChild($doc->createElement('ram:Information', $invoiceData['paymentMeansText']));		// A label for payment type
 
 			$acc = $doc->createElement('ram:PayeePartyCreditorFinancialAccount');
 			$pm->appendChild($acc);
 
-			$acc->appendChild($doc->createElement('ram:AccountName', $invoiceData['accountName']));
+			// CII XSD order for CreditorFinancialAccountType: IBANID, ProprietaryID, AccountName
 			if (!empty($invoiceData['iban'])) {
-				$acc->appendChild($doc->createElement('ram:IBANID', $invoiceData['iban']));
+				$acc->appendChild($doc->createElement('ram:IBANID', $invoiceData['iban']));					// BT-84
+			} else {
+				// If no IBAN provided
+				if ($invoiceData['paymentMeansCode'] == 30) {	// If payment by credit transfer
+					if (empty($invoiceData['iban_id'])) {
+						throw new Exception($langs->trans("IBANForSellerMandatoryOnCreditTransferButNotBankAcount").'<br>'.$langs->trans("IBANForSellerMandatoryOnCreditTransferButNotBankAcount2"), 1);
+					} else {
+						throw new Exception($langs->trans("IBANForSellerMandatoryOnCreditTransferButNotBAN").'<br>'.$langs->trans("IBANForSellerMandatoryOnCreditTransferButNotBAN2"), 1);
+					}
+				}
 			}
-
+			$acc->appendChild($doc->createElement('ram:AccountName', $invoiceData['accountName']));			// BT-85
+			if (empty($invoiceData['iban']) && !empty($invoiceData['accountRef'])) {	// If IBAN unknown we can fallback on the private ref.
+				$acc->appendChild($doc->createElement('ram:ProprietaryID', $invoiceData['accountRef']));	// BT-84-0
+			}
 			if (!empty($invoiceData['bic'])) {
 				$inst = $doc->createElement('ram:PayeeSpecifiedCreditorFinancialInstitution');
 				$pm->appendChild($inst);
-				$inst->appendChild($doc->createElement('ram:BICID', $invoiceData['bic']));
+				$inst->appendChild($doc->createElement('ram:BICID', $invoiceData['bic']));					// BT-86
 			}
 		}
 
-		// TVA
-		foreach ($invoiceData['taxBreakdown'] as $rate => $vals) {
+		// VAT array by rate (tax breakdown)
+		foreach ($invoiceData['taxBreakdown'] as $rate => $vals) {		// $rate is 0, 20.0, ..., $vals is an array
+			// Add comment
+			$comment = $doc->createComment('VAT rate: '.$vals['tva_tx'].', VAT src code: '.$vals['vat_src_code'].', ExemptionReasonCode: '.$vals['ExemptionReasonCode']);
+			$settlement->appendChild($comment);
+
 			$settlement->appendChild(
-				$this->buildTaxNode($doc, $rate, $vals, $invoiceData['invoiceCurrency'])
+				$this->buildTaxNode($doc, $rate, $vals, $invoiceData['invoiceCurrency']) 	// ApplicableTradeTax
 			);
 		}
+
+		// Discounts
+		if (!empty($invoiceData['_globalDiscounts'])) {
+			$comment = $doc->createComment('Global discounts');
+			$settlement->appendChild($comment);
+			foreach ($invoiceData['_globalDiscounts'] as $globaldiscount) {
+				$discount = [
+					'amount' => number_format($globaldiscount['value'], 2, '.', ''),
+					'reason' => $globaldiscount['reason'],
+					'code' => '95',
+					'taxCategory' => $globaldiscount['categoryVAT'],
+					'taxRate' => $globaldiscount['taxRate'], // The tax rate for the discount is the same as the line tax rate. This is a common practice but not mandatory.
+				];
+				$this->addHeaderDiscount($doc, $settlement, $discount);
+			}
+		}
+
+
+		// Payment terms
+
+		// Add comment
+		$comment = $doc->createComment('Payment terms');
+		$settlement->appendChild($comment);
 
 		$terms = $doc->createElement('ram:SpecifiedTradePaymentTerms');
 		$settlement->appendChild($terms);
@@ -1588,6 +1612,11 @@ class CIIProtocol extends AbstractProtocol
 		$terms->appendChild($dtNode);
 
 		// Totals
+
+		// Add comment
+		$comment = $doc->createComment('Totals');
+		$settlement->appendChild($comment);
+
 		$sum = $doc->createElement('ram:SpecifiedTradeSettlementHeaderMonetarySummation');
 		$settlement->appendChild($sum);
 
@@ -1665,13 +1694,20 @@ class CIIProtocol extends AbstractProtocol
 		$price = $doc->createElement('ram:SpecifiedLineTradeAgreement');
 		$el->appendChild($price);
 
-		$gross = $doc->createElement('ram:GrossPriceProductTradePrice');
-		$price->appendChild($gross);
-		$gross->appendChild($doc->createElement('ram:ChargeAmount', number_format($line['grosspriceamount'], 2, '.', '')));
+		// This section seems not required.
+		// It can be used if the price base is including tax (TTC) and without discount (= Catalog public unit price for individual customers)
+		if (isset($line['grosspriceamount'])) {
+			$gross = $doc->createElement('ram:GrossPriceProductTradePrice');
+			$price->appendChild($gross);
+			$gross->appendChild($doc->createElement('ram:ChargeAmount', number_format($line['grosspriceamount'], 2, '.', '')));
+		}
 
+		// Mandatory by Factur-X, EN 16931
+		// This is the unit price excluding tax. If it does not contains the discount, the discount must be declared into AllowanceCharge.
 		$net = $doc->createElement('ram:NetPriceProductTradePrice');
 		$price->appendChild($net);
 		$net->appendChild($doc->createElement('ram:ChargeAmount', number_format($line['netpriceamount'], 2, '.', '')));
+
 
 		// Quantity
 		$deliv = $doc->createElement('ram:SpecifiedLineTradeDelivery');
@@ -1685,12 +1721,35 @@ class CIIProtocol extends AbstractProtocol
 		$sett = $doc->createElement('ram:SpecifiedLineTradeSettlement');
 		$el->appendChild($sett);
 
+
+		// Add the VAT block for the line
 		$tax = $doc->createElement('ram:ApplicableTradeTax');
 		$sett->appendChild($tax);
+
+		// Add a XML comment to help debug
+		$comment = $doc->createComment('VAT rate: '.$line['tva_tx'].', VAT src code: '.$line['vat_src_code']);
+		$tax->appendChild($comment);
+
 
 		$tax->appendChild($doc->createElement('ram:TypeCode', 'VAT'));
 		$tax->appendChild($doc->createElement('ram:CategoryCode', $line['categoryCode']));
 		$tax->appendChild($doc->createElement('ram:RateApplicablePercent', $line['rateApplicablePercent']));
+
+		// Note that the $line['ExemptionReasonCode'] and $line['ExemptionReasonCode'] is added into the section ApplicableHeaderTradeSettlement
+		// that is a vat breakdown array and not inside each line.
+
+		if ($line['discountPercent']) {
+			$discount = [
+				'basis' => $line['netpriceamount'] * $line['billedquantity'],	// The base amount for the discount is the line net price * quantity.
+				'amount' => $line['netpriceamount'] * $line['billedquantity'] * $line['discountPercent'] / 100,
+				'percent' => $line['discountPercent'],
+				'taxCategory' => $line['categoryCode'],
+				'taxRate' => $line['rateApplicablePercent'], // The tax rate for the discount is the same as the line tax rate.
+				'code' => '95', // '95' is the code for "Promotion discount" can be replaced by a reason.
+			];
+			$this->addLineDiscount($doc, $sett, $discount);
+		}
+
 
 		// Total line
 		$sum = $doc->createElement('ram:SpecifiedTradeSettlementLineMonetarySummation');
@@ -1725,17 +1784,21 @@ class CIIProtocol extends AbstractProtocol
 	 * @param \DOMElement  		$agreement 		Parent agreement node to append to
 	 * @param array       		$data      		Invoice data array
 	 * @param string      		$type      		'seller' or 'buyer'
+	 * @param bool        		$wrap			Whether to wrap in SellerTradeParty/BuyerTradeParty (true for main parties, false for ship to party)
 	 *
 	 * @return void
 	 */
-	private function buildParty($doc, $agreement, $data, $type)
+	private function buildParty($doc, $agreement, $data, $type, $wrap = true)
 	{
-		$tag = $type === 'seller' ? 'ram:SellerTradeParty' : 'ram:BuyerTradeParty';
-		$node = $doc->createElement($tag);
-		$agreement->appendChild($node);
+		if ($wrap) {
+			$tag = $type === 'seller' ? 'ram:SellerTradeParty' : 'ram:BuyerTradeParty';
+			$node = $doc->createElement($tag);
+			$agreement->appendChild($node);
+		} else {
+			$node = $agreement;
+		}
 
 		$prefix = $type;
-
 		$node->appendChild($doc->createElement('ram:ID', $data[$prefix . 'ids']));
 
 		// GlobalID
@@ -1794,7 +1857,9 @@ class CIIProtocol extends AbstractProtocol
 		$node->appendChild($addr);
 
 		$addr->appendChild($doc->createElement('ram:PostcodeCode', $data[$prefix . 'postcode']));
-		$addr->appendChild($doc->createElement('ram:LineOne', htmlspecialchars($data[$prefix . 'lineone'])));
+		if (!empty($data[$prefix . 'lineone'])) {
+			$addr->appendChild($doc->createElement('ram:LineOne', htmlspecialchars($data[$prefix . 'lineone'])));
+		}
 		$addr->appendChild($doc->createElement('ram:CityName', htmlspecialchars($data[$prefix . 'city'])));
 		$addr->appendChild($doc->createElement('ram:CountryID', $data[$prefix . 'country']));
 
@@ -1802,8 +1867,8 @@ class CIIProtocol extends AbstractProtocol
 		if (!empty($data[$prefix . 'CommunicationUriScheme']) && !empty($data[$prefix . 'CommunicationUri'])) {
 			$uri = $doc->createElement('ram:URIUniversalCommunication');
 			$node->appendChild($uri);
-			$uriid = $doc->createElement('ram:URIID', $data[$prefix . 'CommunicationUri']);
-			$uriid->setAttribute('schemeID', $data[$prefix . 'CommunicationUriScheme']);
+			$uriid = $doc->createElement('ram:URIID', $data[$prefix . 'CommunicationUri']);			// Example 315143296_1939
+			$uriid->setAttribute('schemeID', $data[$prefix . 'CommunicationUriScheme']);			// Example 0225
 			$uri->appendChild($uriid);
 		}
 
@@ -1820,11 +1885,10 @@ class CIIProtocol extends AbstractProtocol
 	/**
 	 * Build a tax node.
 	 *
-	 * @param \DOMDocument $doc 		Document to create nodes in
-	 * @param float        $rate 		Tax rate
-	 * @param array        $vals 		Array containing tax values
-	 * @param string       $currency 	Currency code
-	 *
+	 * @param \DOMDocument 		$doc 		Document to create nodes in
+	 * @param float|string      $rate 		Tax rate
+	 * @param array       		$vals 		Array containing tax values
+	 * @param string       		$currency 	Currency code
 	 * @return \DOMElement
 	 */
 	private function buildTaxNode($doc, $rate, $vals, $currency)
@@ -1835,19 +1899,153 @@ class CIIProtocol extends AbstractProtocol
 
 		$tax->appendChild($doc->createElement('ram:TypeCode', 'VAT'));
 
+		if ($vals['ExemptionReason']) {
+			$tax->appendChild($doc->createElement('ram:ExemptionReason', $vals['ExemptionReason']));
+		}
+
 		$tax->appendChild($doc->createElement('ram:BasisAmount', number_format($vals['totalHT'], 2, '.', '')));
 
-		$tax->appendChild($doc->createElement('ram:CategoryCode', $rate > 0 ? 'S' : 'Z'));
-		$tax->appendChild($doc->createElement('ram:RateApplicablePercent', number_format($rate, 2, '.', '')));
+		$tax->appendChild($doc->createElement('ram:CategoryCode', $vals['categoryVAT']));
+
+		if ($vals['ExemptionReasonCode']) {
+			$tax->appendChild($doc->createElement('ram:ExemptionReasonCode', $vals['ExemptionReasonCode']));
+		}
+
+		$floatrate = preg_replace('/\(.*\)/', '', (string) $rate);		// If $rate is 'x.x (CODE)', we change it into 'x.x'
+
+		$tax->appendChild($doc->createElement('ram:RateApplicablePercent', number_format($floatrate, 2, '.', '')));
 
 		return $tax;
 	}
 
+	/**
+	 * Build an allowance charge node (discount or charge).
+	 *
+	 * @param \DOMDocument 		$doc			Document to create nodes in
+	 * @param float|null        $amount 		Amount of the discount/charge (final amount after calculation)
+	 * @param float|null        $percent 		Percentage of the discount/charge
+	 * @param float|null        $basisAmount 	Base amount for percentage calculation
+	 * @param bool        		$isCharge 		Whether this is a charge (true) or a discount (false)
+	 * @param string|null       $reason 		Reason for the discount/charge (optional)
+	 * @param string|null       $reasonCode 	Code for the reason (optional, can be used instead of reason or together with reason)
+	 * @param string            $taxCategory 	Tax category code
+	 * @param float             $taxRate 		Tax rate applicable to this discount/charge
+	 *
+	 * @return \DOMElement
+	 */
+	private function buildAllowanceChargeNode(
+		DOMDocument $doc,
+		$amount = null,
+		$percent = null,
+		$basisAmount = null,
+		$isCharge = false,
+		$reason = null,
+		$reasonCode = null,
+		$taxCategory = 'S',
+		$taxRate = 20.0
+	) {
+		$node = $doc->createElement('ram:SpecifiedTradeAllowanceCharge');
+
+		// Indicator (remise ou charge)
+		$indicator = $doc->createElement('ram:ChargeIndicator');
+		$indicatorValue = $doc->createElement('udt:Indicator', $isCharge ? 'true' : 'false');
+		$indicator->appendChild($indicatorValue);
+		$node->appendChild($indicator);
+
+		// Percent (optionnel)
+		if ($percent !== null) {
+			$node->appendChild($doc->createElement('ram:CalculationPercent', number_format($percent, 2, '.', '')));
+		}
+
+		// Basis amount (optionnel)
+		if ($basisAmount !== null) {
+			$node->appendChild($doc->createElement('ram:BasisAmount', number_format($basisAmount, 2, '.', '')));
+		}
+
+		// Amount (final discount/charge)
+		if ($amount !== null) {
+			$node->appendChild($doc->createElement('ram:ActualAmount', number_format($amount, 2, '.', '')));
+		}
+
+		// reasonCode
+		if ($reasonCode !== null) {
+			$node->appendChild($doc->createElement('ram:ReasonCode', $reasonCode));
+		}
+
+		// Reason
+		if ($reason !== null) {
+			$node->appendChild($doc->createElement('ram:Reason', $reason));
+		}
+
+		// Tax (important Factur-X)
+		$taxNode = $doc->createElement('ram:CategoryTradeTax');
+
+		$taxNode->appendChild($doc->createElement('ram:TypeCode', 'VAT'));
+		$taxNode->appendChild($doc->createElement('ram:CategoryCode', $taxCategory));
+		$taxNode->appendChild($doc->createElement('ram:RateApplicablePercent', number_format($taxRate, 2, '.', '')));
+
+		$node->appendChild($taxNode);
+
+		return $node;
+	}
 
 	/**
-	 * Map CII document type code to Dolibarr invoice type
+	 * Add a discount line to a line trade agreement node.
 	 *
-	 * @param string $documenttypecode CII document type code
+	 * @param \DOMDocument 		$doc					Document to create nodes in
+	 * @param \DOMElement  		$lineTradeAgreement 	Node representing the line trade agreement to append the discount to
+	 * @param array 			$discount 				Array containing discount data (amount, percent, basis, reason, code, taxCategory, taxRate)
+	 *
+	 * @return void
+	 */
+	private function addLineDiscount(DOMDocument $doc, DOMElement $lineTradeAgreement, array $discount)
+	{
+
+		$node = $this->buildAllowanceChargeNode(
+			$doc,
+			$discount['amount'] ?? null,
+			$discount['percent'] ?? null,
+			$discount['basis'] ?? null,
+			false,
+			$discount['reason'] ?? null,
+			$discount['code'] ?? null,
+			$discount['taxCategory'] ?? 'S',
+			$discount['taxRate'] ?? 20.0
+		);
+
+		$lineTradeAgreement->appendChild($node);
+	}
+
+	/**
+	 * Add a discount or charge to the header settlement node.
+	 *
+	 * @param \DOMDocument 		$doc				Document to create nodes in
+	 * @param \DOMElement  		$headerSettlement 	Node representing the header settlement to append the discount/charge to
+	 * @param array 			$discount 			Array containing discount/charge data (amount, percent, basis, reason, code, taxCategory, taxRate)
+	 *
+	 * @return void
+	 */
+	private function addHeaderDiscount(DOMDocument $doc, DOMElement $headerSettlement, array $discount)
+	{
+		$node = $this->buildAllowanceChargeNode(
+			$doc,
+			$discount['amount'] ?? null,
+			$discount['percent'] ?? null,
+			$discount['basis'] ?? null,
+			false,
+			$discount['reason'] ?? null,
+			$discount['code'] ?? null,
+			$discount['taxCategory'] ?? 'S',
+			$discount['taxRate'] ?? 20.0
+		);
+
+		$headerSettlement->appendChild($node);
+	}
+
+	/**
+	 * Map document type code to Dolibarr invoice type
+	 *
+	 * @param string $documenttypecode Document type code
 	 * @return int|string Dolibarr invoice type or '-1' if unknown
 	 */
 	private function _getDolibarrInvoiceType($documenttypecode)
@@ -2037,50 +2235,110 @@ class CIIProtocol extends AbstractProtocol
 		rsort($deliveryDateList);
 	}
 
-
-	/************************************************
-	 *    Check line type from external module ?
-	 *
-	 * @param  object $line       line we work on
-	 * @param  string $element    line object element (for special case like shipping)
-	 * @param  string $searchName module name we look for
-	 * @return boolean                        true if the line is a special one and was created by the module we ask for
-	 ************************************************/
-	private function _isLineFromExternalModule($line, $element, $searchName)
-	{
-		// TODO: move this function to class utils
-		global $db;
-		if ($element == 'shipping' || $element == 'delivery') {
-			$fk_origin_line = $line->fk_origin_line;
-			$line = new OrderLine($db);
-			$line->fetch($fk_origin_line);
-		}
-		if ($line->product_type == 9 && $line->special_code == $this->_getModNumber($searchName)) {
-			return true;
-		} else {
-			return false;
-		}
-	}
-
 	/**
-	 * Check if a given VAT rate is valid for a specific country based on the c_tva table in the database.
+	 * Resolve multiple line allowances into a single percentage for Dolibarr.
 	 *
-	 * @param 	string	$vatrate		Vat rate to check (e.g. '20' for 20%)
-	 * @param 	string	$countryCode	Country code to check the VAT rate against (e.g. 'FR' for France)
-	 * @return 	boolean					Returns true if the VAT rate is valid for the given country, false otherwise.
-	 * TODO Move common function into an implemented CommonXProtocol.class.php if needed by other protocol handlers
+	 * Dolibarr only supports percentage discounts on lines, so fixed amounts
+	 * are converted using basisAmount or lineTotalAmount as base.
+	 * Multiple allowances are summed into one final percentage.
+	 *
+	 * @param array      $lineAllowances  parsed lineAllowances array
+	 * @param float|null $lineTotalAmount BT-131 net line amount (base ht)
+	 * @return false|array{percent: float, base: float, discountAmount: float, priceWithoutDiscount: float}
 	 */
-	public function checkIfVatRateIsValid($vatrate, $countryCode)
+	private function _resolveLineDiscountPercent(array $lineAllowances, ?float $lineTotalAmount)
 	{
-		if ($countryCode == 'FR') {
-			// Check rule BR-FR-16 For AFNOR Einvoice - List in XP-Z12-012
-			$validRatesString = ['0', '10', '13', '20', '8.5', '19.6', '2.1', '5.5', '7', '20.6', '1.05', '0.9', '1.75', '9.2', '9.6'];
-			//$valtotest = price2num((float) $vatrate, '', 1);
-			if (!in_array($vatrate, $validRatesString)) {
-				return false;
+		// Keep only allowances (indicator = "false"), ignore charges (indicator = "true")
+		$allowances = array();
+		foreach ($lineAllowances as $allowance) {
+			if (($allowance['indicator'] ?? '') === 'false') {
+				$allowances[] = $allowance;
 			}
 		}
 
-		return true;
+		if (empty($allowances)) {
+			return false;
+		}
+
+		$allowances = array_values($allowances);
+
+		// Base used for percent calculation — basisAmount of first entry, fallback to lineTotalAmount
+		$base = $allowances[0]['basisAmount'] ?? $lineTotalAmount;
+
+		if (!$base) {
+			return false;
+		}
+
+		// Sum all actualAmounts — always populated whether the source was % or fixed
+		$totalDiscountAmount = 0.0;
+		foreach ($allowances as $allowance) {
+			$totalDiscountAmount += (float) ($allowance['actualAmount'] ?? 0);
+		}
+
+		if ($totalDiscountAmount === 0.0) {
+			return false;
+		}
+
+		return [
+			'percent'              => round(($totalDiscountAmount / $base) * 100, 4),
+			'base'                 => (float) $base,
+			'discountAmount'       => $totalDiscountAmount,
+			'priceWithoutDiscount' => (float) $lineTotalAmount + $totalDiscountAmount,
+		];
+	}
+
+
+	/**
+	 * Create Dolibarr global discount exceptions from CII header allowances.
+	 *
+	 * Only processes allowances (indicator = "false"), ignores charges (indicator = "true").
+	 * Returns array of created fk_remise_except IDs.
+	 *
+	 * @param array  $headerAllowancesCharges  	parsed headerAllowancesCharges array
+	 * @param int    $fk_soc                  	supplier ID
+	 * @param string $description             	invoice number or any reference
+	 * @return array							[ originalIndex => fk_remise_except_id ] or '-1' on error
+	 */
+	private function _createHeaderDiscounts(array $headerAllowancesCharges, int $fk_soc, string $description): array
+	{
+		global $db, $user;
+
+		$result = [];
+
+		foreach ($headerAllowancesCharges as $index => $allowanceCharge) {
+			// Skip charges
+			if (($allowanceCharge['indicator'] ?? '') !== 'false') {
+				continue;
+			}
+
+			$actualAmount = (float) ($allowanceCharge['actualAmount'] ?? 0);
+			if ($actualAmount === 0.0) {
+				continue;
+			}
+
+			$remise = new DiscountAbsolute($db);
+			$remise->socid          = $fk_soc;
+			$remise->amount_ht       = $actualAmount;
+			$remise->amount_tva      = round($actualAmount * (($allowanceCharge['rateApplicablePercent'] ?? 0) / 100), 2);
+			$remise->amount_ttc      = round($remise->amount_ht + $remise->amount_tva, 2);
+			$remise->total_ht 		= $remise->amount_ht;
+			$remise->total_tva 		= $remise->amount_tva;
+			$remise->total_ttc 		= $remise->amount_ttc;
+			$remise->tva_tx          = (float) ($allowanceCharge['rateApplicablePercent'] ?? 0);
+			$remise->fk_user         = $user->id;
+			$remise->description     = $allowanceCharge['reason'] ?? $description;
+			$remise->discount_type   = 1;
+
+			$id = $remise->create($user);
+
+			if ($id > 0) {
+				$result[$index] = $id;
+			} else {
+				dol_syslog(__METHOD__ . ' Failed to create discount exception: ' . $remise->error, LOG_WARNING);
+				return array(-1 => 'Failed to create discount exception: ' . $remise->error);
+			}
+		}
+
+		return $result;
 	}
 }

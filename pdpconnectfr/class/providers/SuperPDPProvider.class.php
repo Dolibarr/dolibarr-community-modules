@@ -77,7 +77,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$this->helpToGetCredentials = '<div class="">' . $langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL1") . '</div>';
 		$this->helpToGetCredentials .= '<div class="margintoponly">' . $langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL2", '{s1}') . '</div>';
 		$this->helpToGetCredentials .= '<div class="margintoponly">' . $langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL3", '{s2}') . '</div>';
-		$this->helpToGetCredentials .= '<div class="margintoponly">' . $langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL4", '{s3}', '{s4}', '{s5}') . '</div>';
+		$this->helpToGetCredentials .= '<div class="margintoponly">' . $langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL4", '{s3}', '{s4}', '{s5}', '{s6}') . '</div>';
 
 		if (getDolGlobalString('PDPCONNECTFR_PDP') == 'SUPERPDPViaPartner') {
 			$this->helpToGetCredentials = '<div class="">' . $langs->trans("PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL_VIA_PARTNER", '{s1}') . '</div>';
@@ -169,6 +169,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				$this->helpToGetCredentials = str_replace('{s3}', $langs->transnoentitiesnoconv("PDPCONNECTFR_CLIENT_ID"), $this->helpToGetCredentials);
 				$this->helpToGetCredentials = str_replace('{s4}', $langs->transnoentitiesnoconv("PDPCONNECTFR_CLIENT_SECRET"), $this->helpToGetCredentials);
 				$this->helpToGetCredentials = str_replace('{s5}', $langs->transnoentitiesnoconv("Save"), $this->helpToGetCredentials);
+				$this->helpToGetCredentials = str_replace('{s6}', $langs->transnoentitiesnoconv("ConnectTo"), $this->helpToGetCredentials);
 
 				$this->helpToGetCredentials = '<div class="formborderx info">' . $this->helpToGetCredentials . '</div>';
 			} else {
@@ -214,7 +215,15 @@ class SuperPDPProvider extends AbstractPDPProvider
 			$item->cssClass = 'minwidth500';
 
 			// Password
-			$item = $formSetup->newItem($prefix.'CLIENT_SECRET'.(getDolGlobalInt('PDPCONNECTFR_LIVE') ? '_PROD' : ''))->setAsGenericPassword();
+			$item = $formSetup->newItem($prefix.'CLIENT_SECRET'.(getDolGlobalInt('PDPCONNECTFR_LIVE') ? '_PROD' : ''));
+			if (method_exists('FormSetupItem', 'setAsGenericPassword')) {
+				$item->setAsGenericPassword();
+			} else {
+				// Dolibarr 18/19 fallback: setAsGenericPassword() does not exist yet.
+				// Force a masked password input so the secret is not displayed in clear text.
+				$item->fieldAttr['type'] = 'password';
+				$item->fieldAttr['autocomplete'] = 'new-password';
+			}
 			$item->nameText = $langs->trans('PDPCONNECTFR_CLIENT_SECRET');
 			$item->cssClass = 'minwidth500';
 		}
@@ -276,7 +285,10 @@ class SuperPDPProvider extends AbstractPDPProvider
 						if (getDolGlobalString('PDPCONNECTFR_LIVE')) {
 							$item->fieldOverride .= '<span class="opacitymedium" title="'.$langs->trans("DisabledInProductionMode").'"><i class="fa fa-file pictofixedwidth centerimp"></i>' . $langs->trans('generateSendSampleInvoice') . '</span><br>';
 						} else {
-							$item->fieldOverride .= '<a class="reposition" href="' . $_SERVER["PHP_SELF"] . "?action=make" . $prefix . "sampleinvoice&token=" . newToken() . '"><i class="fa fa-file pictofixedwidth centerimp"></i>' . $langs->trans('generateSendSampleInvoice') . '</a><br>';
+							if (getDolGlobalInt('PDPCONNECTFR_ALLOW_DEVTOOLS')) {
+								$item->fieldOverride .= '<a class="reposition" href="' . $_SERVER["PHP_SELF"] . "?action=make" . $prefix . "sampleinvoice&token=" . newToken() . '"><i class="fa fa-file pictofixedwidth centerimp"></i>' . $langs->trans('generateSampleInvoice') . '</a><br>';
+							}
+							$item->fieldOverride .= '<a class="reposition" href="' . $_SERVER["PHP_SELF"] . "?action=makesend" . $prefix . "sampleinvoice&token=" . newToken() . '"><i class="fa fa-file pictofixedwidth centerimp"></i>' . $langs->trans('generateSendSampleInvoice') . '</a><br>';
 						}
 					}
 
@@ -589,12 +601,12 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 	/**
 	 * Send a sample electronic invoice for testing purposes.
-	 *
 	 * This function generates a sample invoice and sends it to PDP
 	 *
-	 * @return array|string True if the invoice was successfully sent, false otherwise.
+	 * @param 	int 			$onlymake		1=to only make the sample
+	 * @return 	array|string 					True if the invoice was successfully sent, false otherwise.
 	 */
-	public function sendSampleInvoice()
+	public function sendSampleInvoice($onlymake = 0)
 	{
 		global $langs;
 
@@ -620,14 +632,31 @@ class SuperPDPProvider extends AbstractPDPProvider
 			return 0;
 		}
 
-		// invoice_path is something like "/.../documents/pdpconnectfr/temp/02_ZugferdDocumentPdfBuilder_PrintLayout_Merged.pdf"
+		if (empty($ref) || empty($invoice_path)) {
+			$this->errors[] = 'Failed to generate the sample invoice';
+			return 0;
+		}
+
+		// invoice_path is something like "/.../documents/pdpconnectfr/temp/..." or "/.../documents/facture/temp/..."
 
 		if ($invoice_path) {
 			$outputLog[] = "Sample invoice generated successfully.";
 		}
+
+
+		// Stop here if we want just generation
+		if ($onlymake) {
+			return $outputLog;
+		}
+
+
 		$file_info = pathinfo($invoice_path);
-		$mime_type = mime_content_type($invoice_path);
 		$fileext = $file_info['extension'] ?? ''; // Should be "pdf" or "xml" depending on the protocol
+		if (strtolower($fileext) == 'pdf') {
+			$mime_type = 'application/pdf';
+		} else {
+			$mime_type = 'text/xml';
+		}
 
 		// Format PDP resource Url
 		/*
@@ -980,15 +1009,11 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 				dol_syslog(__METHOD__ . " #" . $i . " Process flow " . $flow['flowId'], LOG_DEBUG, 0, "_pdpconnectfr");
 
-				$db->begin();
-
 				// Do a unitary sync of flow $flow['flowId'] instead the global transaction $call_id
 				$res = $this->syncFlow($flow['flowId'], $call_id);
 
 				// If res < 0, rollback
 				if ($res['res'] < 0) {
-					$db->rollback();
-
 					if (isset($res['action']) && $res['action'] != '') {	// Save business errors if it is
 						$rescode = $res['actioncode'] ?? '0';
 						// Set the result code and label into array $actions.
@@ -1032,17 +1057,14 @@ class SuperPDPProvider extends AbstractPDPProvider
 					$results_messages[] = "<span class=\"opacitylow\">Flow " . $flow['flowId'] . " skipped: " . $res['message'] . "</span>";
 					$alreadyExist++;
 					//$lastsuccessfullSyncronizedFlow = $flow['flowId'];
-					$db->commit();
 				}
 
 				// If res == 1, commit and count as synced
 				if ($res['res'] > 0) {
 					$syncedFlows++;
 					//$lastsuccessfullSyncronizedFlow = $flow['flowId'];
-					$db->commit();
 				}
 			} catch (Exception $e) {
-				$db->rollback();
 				$results_messages[] = "Exception occurred while synchronizing flow " . $flow['flowId'] . ": " . $e->getMessage();
 				$error++;
 			}
@@ -1136,7 +1158,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 			$flowResource,
 			"GET",
 			false,
-			['Accept' => 'application/octet-stream']
+			['Accept' => 'application/octet-stream'],
+			''			// No call type, so won't be logged
 		);
 
 		if ($response['status_code'] != 200) {
@@ -1156,7 +1179,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$document->fk_user_creat        = $user->id;
 		$document->call_id              = $call_id;		// Call id for unitary fetch
 		$document->flow_id              = $flowId;
-		$document->tracking_idref       = $flowData['trackingId'] ?? null;
+		$document->tracking_idref       = $flowData['trackingId'] ?? (getDolGlobalString('PDPCONNECTFR_PDP', 'REF').' '.$flowId);
 		$document->flow_type            = $flowData['flowType'] ?? null;
 		$document->flow_direction       = $flowData['flowDirection'] ?? null;
 		$document->flow_syntax          = $flowData['flowSyntax'] ?? null;
@@ -1190,6 +1213,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 			$document->response_for_debug = $response['response'];
 		}
 
+
+
 		$returnRes = 1;
 		$returnMessage = "";
 		switch ($document->flow_type) {
@@ -1199,17 +1224,35 @@ class SuperPDPProvider extends AbstractPDPProvider
 				require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
 				$document->fk_element_type = Facture::class;
 				$factureObj = new Facture($this->db);
-				$res = $factureObj->fetch(0, $document->tracking_idref);
-				if ($res < 0) {
-					return array('res' => -1, 'message' => "ERROR_FETCH_INVOICE Failed to fetch customer invoice for flowId: " . $flowId);
+				if (!empty($document->tracking_idref)) {
+					$res = $factureObj->fetch(0, $document->tracking_idref);
+					if ($res < 0) {
+						return array('res' => -1, 'message' => "ERROR_FETCH_INVOICE Failed to fetch customer invoice for flowId: " . $flowId);
+					} elseif ($res == 0) {
+						$returnRes = 1;
+						$returnMessage = 'Source invoice not found for '.$document->flowId;
+					} else {
+						// TODO: save received converted document as attachment to customer invoice
+						/*
+						try {
+							$db->begin();
+
+							$db->commit();
+						} catch(Exception $e)
+						{
+							$db->rollback();
+						}
+						*/
+					}
+				} else {
+					$returnRes = 1;
+					$returnMessage = 'Source invoice not found for '.$document->flowId;
 				}
+
 				$document->fk_element_id = !empty($factureObj->id) ? $factureObj->id : 0;
-				$document->tracking_idref = !empty($factureObj->ref) ? $factureObj->ref : $document->tracking_idref . ' (NOTFOUND)'; // Probably the customer invoice is sent from another system that use the same PDP account
+				$document->tracking_idref = !empty($factureObj->ref) ? $factureObj->ref : $document->tracking_idref . ' (NOTFOUND)'; // Probably the customer invoice was sent from another system that use the same PDP account
 
-				// TODO: Consider creating a new customer invoice in this case?
-				// TODO: 2. save received converted document as attachment to customer invoice
 				break;
-
 			// SupplierInvoice
 			case "SupplierInvoice":
 				// --- Fetch received documents (Einvoice)
@@ -1261,6 +1304,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				}
 				*/
 
+				// Retreive Original file
 				$receivedFile = null;
 				$flowResource = 'flows/' . $flowId;
 				$flowUrlparams = array(
@@ -1271,14 +1315,14 @@ class SuperPDPProvider extends AbstractPDPProvider
 					$flowResource,
 					"GET",
 					false,
-					['Accept' => 'application/octet-stream']
+					['Accept' => 'application/octet-stream'],
+					'get_flow_for_supplier_invoice'
 				);
 
 				if ($flowResponse['status_code'] != 200) {
 					return array('res' => -1, 'message' => "ERROR_FLOW_GETORIG Failed to retrieve 'Original' document for SupplierInvoice flow (flowId: " . $flowId . ")" . (empty($flowResponse['errorMessage']) ? '' : ' - ' . $flowResponse['errorMessage']));
 				}
 				$receivedFile = $flowResponse['response'];
-
 
 				// Build the $exchangeProtocol factory for the format of supplier invoice
 				$tmpProtocolManager = new ProtocolManager($this->db);
@@ -1289,30 +1333,48 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 				$exchangeProtocol = $tmpProtocolManager->getProtocol($detectedProtocol);
 
-				// Try to create the supplier + product + invoice
-				$res = $exchangeProtocol->createSupplierInvoiceFromSource($receivedFile, $ReadableViewFile, $flowId);
+				$exceptionmessage = '';
+				$db->begin();
 
-				if ($res['res'] < 0) {
-					$retarray = array(
-						'res' => -1,
-						'message' => "Failed to create supplier invoice from E-invoice document for flowId: " . $flowId . ". " . $res['message']
-					);
-					$retarray['actioncode'] = $res['actioncode'] ?? null;
-					$retarray['actionurl'] = $res['actionurl'] ?? null;
-					$retarray['action'] = $res['action'] ?? null;
-					$retarray['actiondata'] = $res['actiondata'] ?? null;
-					return $retarray;
-				} else {
-					// Complete the document object with the created supplier invoice details
-					$suplierInvoiceObj = new FactureFournisseur($this->db);
-					$resFetch = $suplierInvoiceObj->fetch($res['res']);
-					$document->fk_element_id = !empty($suplierInvoiceObj->id) ? $suplierInvoiceObj->id : 0;
-					$document->tracking_idref = !empty($suplierInvoiceObj->ref) ? $suplierInvoiceObj->ref : 'Error'; // Should always be found here
+				try {
+					// Try to create the supplier + product + invoice
+					$res = $exchangeProtocol->createSupplierInvoiceFromSource($receivedFile, $ReadableViewFile, $flowId);
 
-					//return array('res' => 0, 'message' => "supplier invoice already exists for flowId: " . $flowId . ". " . $res['message']);
-					$returnRes = 1;		// If invoice did already exists, we process one more line from list of flows, so we must return 1, even if nothing was done.
-					$returnMessage = "Supplier invoice " . $suplierInvoiceObj->ref . " created or already existing for flowId: " . $flowId . ". " . $res['message'];
+					if ($res['res'] < 0) {
+						$retarray = array(
+							'res' => -1,
+							'message' => "Failed to create supplier invoice from E-invoice document for flowId: " . $flowId . ". " . $res['message']
+						);
+						$retarray['actioncode'] = $res['actioncode'] ?? null;
+						$retarray['actionurl'] = $res['actionurl'] ?? null;
+						$retarray['action'] = $res['action'] ?? null;
+						$retarray['actiondata'] = $res['actiondata'] ?? null;
+
+						$db->rollback();
+						return $retarray;
+					} else {
+						// Complete the document object with the created supplier invoice details
+						$suplierInvoiceObj = new FactureFournisseur($this->db);
+						$resFetch = $suplierInvoiceObj->fetch($res['res']);
+						$document->fk_element_id = !empty($suplierInvoiceObj->id) ? $suplierInvoiceObj->id : 0;
+						$document->tracking_idref = !empty($suplierInvoiceObj->ref) ? $suplierInvoiceObj->ref : 'Error'; // Should always be found here
+
+						//return array('res' => 0, 'message' => "supplier invoice already exists for flowId: " . $flowId . ". " . $res['message']);
+						$returnRes = 1;		// If invoice did already exists, we process one more line from list of flows, so we must return 1, even if nothing was done.
+						$returnMessage = "Supplier invoice " . $suplierInvoiceObj->ref . " created or already existing for flowId: " . $flowId . ". " . $res['message'];
+
+						$db->commit();
+					}
+				} catch (Exception $e) {
+					$exceptionmessage = $e->getMessage();
+
+					$db->rollback();
 				}
+
+				if ($exceptionmessage) {
+					throw new Exception($exceptionmessage);
+				}
+
 				break;
 
 			// Customer Invoice LC (life cycle)
@@ -1406,34 +1468,49 @@ class SuperPDPProvider extends AbstractPDPProvider
 					$document->cdar_reason_desc = isset($refDoc['StatusReason']) ? $refDoc['StatusReason'] : '';
 					$document->cdar_reason_detail = isset($refDoc['StatusIncludedNoteContent']) ? $refDoc['StatusIncludedNoteContent'] : '';
 
-					// Update einvoice status with received CDAR status
-					if ($factureObj->id > 0) {
-						$syncStatus = $refDoc['ProcessConditionCode'];
-						$syncValidationStatus = $document->ack_status;
-						$syncValidationComment = $document->ack_info;
-						$syncComment = $document->cdar_reason_detail ? $document->cdar_reason_detail : '';
-						if (!$syncStatus && $document->ack_status == 'Error') {
-							$syncStatus = $pdpconnectfr::STATUS_ERROR;
-							$syncComment = $document->ack_info;
-						}
-						$pdpconnectfr->insertOrUpdateExtLink($factureObj->id, Facture::class, $flowId, $syncStatus, $factureObj->ref, $syncComment);
+					$exceptionmessage = '';
+					$db->begin();
 
-						$pdpconnectfr->storeStatusMessage($document->fk_element_id, $document->fk_element_type, $document->cdar_lifecycle_code, $syncComment, $document->flow_direction, $flowId, $syncValidationStatus, $syncValidationComment, $document->submittedat, $document->cdar_reason_code);
-					} else {
-						dol_syslog(__METHOD__ . " Customer invoice not found for flowId: {$flowId}, so we save the flow into document table but we don't create an entry into pdpconnectfr_extlinks table", LOG_WARNING); // This can happen if the invoice was sent from another system using the same PDP account
+					try {
+						// Update einvoice status with received CDAR status
+						if ($factureObj->id > 0) {
+							$syncStatus = $refDoc['ProcessConditionCode'];
+							$syncValidationStatus = $document->ack_status;
+							$syncValidationComment = $document->ack_info;
+							$syncComment = $document->cdar_reason_detail ? $document->cdar_reason_detail : '';
+							if (!$syncStatus && $document->ack_status == 'Error') {
+								$syncStatus = $pdpconnectfr::STATUS_ERROR;
+								$syncComment = $document->ack_info;
+							}
+							$pdpconnectfr->insertOrUpdateExtLink($factureObj->id, Facture::class, $flowId, $syncStatus, $factureObj->ref, $syncComment);
+
+							$pdpconnectfr->storeStatusMessage($document->fk_element_id, $document->fk_element_type, $document->cdar_lifecycle_code, $syncComment, $document->flow_direction, $flowId, $syncValidationStatus, $syncValidationComment, $document->submittedat, $document->cdar_reason_code);
+						} else {
+							dol_syslog(__METHOD__ . " Customer invoice not found for flowId: {$flowId}, so we save the flow into document table but we don't create an entry into pdpconnectfr_extlinks table", LOG_WARNING); // This can happen if the invoice was sent from another system using the same PDP account
+						}
+
+						// Log an event in the invoice timeline
+						$statusLabel = $document->cdar_lifecycle_label;
+						$reasonDetail = $document->cdar_reason_detail ? " - {$document->cdar_reason_detail}" : '';
+
+
+						$eventLabel = "PDPCONNECTFR - Status: {$statusLabel}";
+						$eventMessage = "PDPCONNECTFR - Status: {$statusLabel}{$reasonDetail}";
+
+						$resLogEvent = $this->addEvent('STATUS', $eventLabel, $eventMessage, $factureObj);
+						if ($resLogEvent < 0) {
+							dol_syslog(__METHOD__ . " Failed to log event for flowId: {$flowId}", LOG_WARNING);
+						}
+
+						$db->commit();
+					} catch (Exception $e) {
+						$exceptionmessage = $e->getMessage();
+
+						$db->rollback();
 					}
 
-					// Log an event in the invoice timeline
-					$statusLabel = $document->cdar_lifecycle_label;
-					$reasonDetail = $document->cdar_reason_detail ? " - {$document->cdar_reason_detail}" : '';
-
-
-					$eventLabel = "PDPCONNECTFR - Status: {$statusLabel}";
-					$eventMessage = "PDPCONNECTFR - Status: {$statusLabel}{$reasonDetail}";
-
-					$resLogEvent = $this->addEvent('STATUS', $eventLabel, $eventMessage, $factureObj);
-					if ($resLogEvent < 0) {
-						dol_syslog(__METHOD__ . " Failed to log event for flowId: {$flowId}", LOG_WARNING);
+					if ($exceptionmessage) {
+						throw new Exception($exceptionmessage);
 					}
 
 					// Update customer invoice status based on CDAR lifecycle code
@@ -1517,13 +1594,30 @@ class SuperPDPProvider extends AbstractPDPProvider
 					$syncStatusComment = $document->cdar_reason_detail ? $document->cdar_reason_detail : '';
 					$syncValidationStatus = $document->ack_status;
 					$syncValidationComment = $document->ack_info;
-					$pdpconnectfr->updateStatusMessageValidation($resFetchStatusMessages['rowid'], $syncStatusComment, $syncValidationStatus, $syncValidationComment);
+
+					$exceptionmessage = '';
+					$db->begin();
+
+					try {
+						$pdpconnectfr->updateStatusMessageValidation($resFetchStatusMessages['rowid'], $syncStatusComment, $syncValidationStatus, $syncValidationComment);
+
+						$db->commit();
+					} catch (Exception $e) {
+						$exceptionmessage = $e->getMessage();
+
+						$db->rollback();
+					}
+
+					if ($exceptionmessage) {
+						throw new Exception($exceptionmessage);
+					}
 				}
 				break;
 			case "":
-				// TODO: Remove all this case or condition it with debug mode
-				// This is likely a valisation response for an invoice that was previously sent, and not a lifecycle message.
-				// Since we trigger an AJAX every X seconds to get validation response while an invoice remains in the "Pending" status after sending, no need to handle this case and to store all validation responses in document table.
+				// This is likely a validation response for an invoice that was previously sent, and not a lifecycle message.
+				// Since we trigger an AJAX every X seconds to get validation response while an invoice remains in the "Pending" status after sending, we should not
+				// need to handle this case and to store all validation responses in document table.
+				// TODO: Move all this case or condition into a function. Weshould also call this int the Ajax component that update the status of an einvoice sent.
 
 				// In this case, the trackingId may be null.
 				// - If trackingId is set, it is used to find the invoice as usual.
@@ -1562,7 +1656,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 					// If ack_status is Error, and there is no entry in pdpconnectfr_extlinks table, or there is an entry with status Awaiting Validation we log an event in the invoice and we add an entry in pdpconnectfr_extlinks table with status Error
 					// Should never happen because we make an ajax call every x seconds when an invoice is in status Pending after sending it
-					// we maintain this code to handle old envoices that sended before table pdpconnectfr_extlinks was created
+					// we maintain this code to handle old einvoices sent before table pdpconnectfr_extlinks was created
 					// TODO : REMOVE THIS CODE IN A FUTURE
 					if ($document->ack_status == 'Error' && !empty($factureObj->id)) {
 						// SQL query to check whether: there is no entry in the pdpconnectfr_extlinks table, or there is an entry with status Awaiting Validation
@@ -1582,18 +1676,33 @@ class SuperPDPProvider extends AbstractPDPProvider
 						}
 
 						if ($needToInsertExtLink) {
-							$pdpconnectfr->insertOrUpdateExtLink($factureObj->id, Facture::class, $flowId, $pdpconnectfr::STATUS_ERROR, $factureObj->ref, $document->ack_info);
+							$exceptionmessage = '';
+							$db->begin();
 
-							// Log an event in the invoice timeline
-							$statusLabel = $document->ack_status;
-							$reasonDetail = $document->ack_info ? " - {$document->ack_info}" : '';
+							try {
+								$pdpconnectfr->insertOrUpdateExtLink($factureObj->id, Facture::class, $flowId, $pdpconnectfr::STATUS_ERROR, $factureObj->ref, $document->ack_info);
 
-							$eventLabel = "PDPCONNECTFR - Status: {$statusLabel}";
-							$eventMessage = "PDPCONNECTFR - Status: {$statusLabel}{$reasonDetail}";
+								// Log an event in the invoice timeline
+								$statusLabel = $document->ack_status;
+								$reasonDetail = $document->ack_info ? " - {$document->ack_info}" : '';
 
-							$resLogEvent = $this->addEvent('STATUS', $eventLabel, $eventMessage, $factureObj);
-							if ($resLogEvent < 0) {
-								dol_syslog(__METHOD__ . " Failed to log event for flowId: {$flowId}", LOG_WARNING);
+								$eventLabel = "PDPCONNECTFR - Status: {$statusLabel}";
+								$eventMessage = "PDPCONNECTFR - Status: {$statusLabel}{$reasonDetail}";
+
+								$resLogEvent = $this->addEvent('STATUS', $eventLabel, $eventMessage, $factureObj);
+								if ($resLogEvent < 0) {
+									dol_syslog(__METHOD__ . " Failed to log event for flowId: {$flowId}", LOG_WARNING);
+								}
+
+								$db->commit();
+							} catch (Exception $e) {
+								$exceptionmessage = $e->getMessage();
+
+								$db->rollback();
+							}
+
+							if ($exceptionmessage) {
+								throw new Exception($exceptionmessage);
 							}
 						}
 					}

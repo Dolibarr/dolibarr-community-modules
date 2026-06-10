@@ -1,6 +1,8 @@
 <?php
 /* Copyright (C) 2025       Laurent Destailleur         <eldy@users.sourceforge.net>
  * Copyright (C) 2025       Mohamed DAOUD               <mdaoud@dolicloud.com>
+ * Copyright (C) 2026		William Mead				<william@m34d.com>
+ * Copyright (C) 2026       Frédéric France             <frederic.france@free.fr>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,7 +24,12 @@
  * \brief   Base class for all functions to manage PDPCONNECTFR Module.
  */
 
-require_once DOL_DOCUMENT_ROOT . '/core/lib/profid.lib.php';
+if ((float) DOL_VERSION < 20) {
+	dol_include_once('/pdpconnectfr/compat/profid.lib.php');
+} else {
+	require_once DOL_DOCUMENT_ROOT . '/core/lib/profid.lib.php';
+}
+
 require_once DOL_DOCUMENT_ROOT . '/core/lib/geturl.lib.php';
 dol_include_once('pdpconnectfr/lib/pdpconnectfr.lib.php');
 
@@ -55,11 +62,11 @@ class PdpConnectFr
 
 	public const STATUS_NOT_GENERATED       = 5;		// To sync
 	public const STATUS_GENERATED           = 10;
-	public const STATUS_AWAITING_VALIDATION = 15;
-	public const STATUS_AWAITING_ACK        = 20;
+	public const STATUS_AWAITING_VALIDATION = 15;		// Einvoice received but not yet analyzed by your AP
+	public const STATUS_AWAITING_ACK        = 20;		// Einvoice received and analyzed by your AP. Next step happen when doing sync.
 	public const STATUS_ERROR               = 25;
 
-	public const STATUS_IGNORE              = 99;		// To not sync
+	public const STATUS_IGNORE              = 99;		// Never sync
 
 	// PDP / PA normalized statuses
 	// public const STATUS_DEPOSITED           = 200;
@@ -206,71 +213,71 @@ class PdpConnectFr
 	// All reasons with their details (Used when sending supplier invoices status: Refused, Disputed, Suspended, Partially Approved)
 	private const REASONS = [
 		"NON_TRANSMISE" => [
-			"label" => "Recipient not connected",
+			"label" => "ReasonRecipientNotConnected",
 			"desc" => "This reason is used ONLY with the \"DEPOSITED\" status to indicate that the invoice could not be transmitted because the recipient (BUYER), although present in the PPF Directory, has no active invoice reception address (i.e., connected to an Approved Platform for reception)."
 		],
 		"JUSTIF_ABS" => [
-			"label" => "Missing or insufficient supporting document",
+			"label" => "ReasonMissingOrInsufficientSupportingDocument",
 			"desc" => "This reason should be used if attachments required for invoice processing are missing (status 'Suspended'). The issuer must then resubmit the lifecycle with a 'Completed' status, including the missing attachment(s)."
 		],
 		"ROUTAGE_ERR" => [
-			"label" => "Routing error",
+			"label" => "ReasonRoutingError",
 			"desc" => "This reason code should be used when the invoice routing information has become obsolete. This may occur, for example, due to a delay in directory updates or an error by the originating Certified Platform. Once the recipient has updated the directory, the invoice can be retransmitted (with no changes to the invoice data)."
 		],
 		"AUTRE" => [
-			"label" => "Other",
+			"label" => "ReasonOther",
 			"desc" => "Ce motif nécessite une explication en Note de CDV"
 		],
 		"COORD_BANC_ERR" => [
-			"label" => "Bank coordinates error",
+			"label" => "ReasonBankCoordinatesError",
 			"desc" => "Les références bancaires sur la facture ne correspondent pas à ce qui est paramétré chez le Payeur / Acheteur"
 		],
 		"TX_TVA_ERR" => [
-			"label" => "Incorrect VAT rate",
+			"label" => "ReasonIncorrectVATRate",
 			"desc" => "Un taux de TVA utilisé n'est pas celui qui aurait dû"
 		],
 		"MONTANTTOTAL_ERR" => [
-			"label" => "Incorrect Total Amount",
+			"label" => "ReasonIncorrectTotalAmount",
 			"desc" => "One of the invoice totals is incorrect, such as the Net Payable amount."
 		],
 		"CALCUL_ERR" => [
-			"label" => "Invoice calculation error",
+			"label" => "ReasonInvoiceCalculationError",
 			"desc" => "Soit détecté au schematron, soit après (pour les lignes, ou arrondi non accepté)"
 		],
 		"NON_CONFORME" => [
-			"label" => "Missing legal mention",
+			"label" => "ReasonMissingLegalMention",
 			"desc" => "Toute mention légale non contrôlée"
 		],
 		"DOUBLON" => [
-			"label" => "Duplicate invoice (already issued/received)",
+			"label" => "ReasonDuplicateInvoiceAlreadyIssuedOrReceived",
 			"desc" => "Facture en doublon (même numéro même fournisseur et même année de la date de facture)"
 		],
 		"DEST_INC" => [
-			"label" => "Unknown recipient",
+			"label" => "ReasonUnknownRecipient",
 			"desc" => "A l'émission, le destinataire est inconnu. Il n'existe pas dans l'annuaire."
 		],
 		"DEST_ERR" => [
-			"label" => "Recipient error",
+			"label" => "ReasonRecipientError",
 			"desc" => "The recipient legal entity is incorrect (Recipient's SIREN/Registration number). For instance, within a multi-company group, the invoiced company may not be the one that should have been billed."
 		],
 		"TRANSAC_INC" => [
-			"label" => "Unknown transaction",
+			"label" => "ReasonUnknownTransaction",
 			"desc" => "La facture ne correspond pas à une livraison effectuée ou une prestation de service livrée."
 		],
 		"EMMET_INC" => [
-			"label" => "Unknown issuer",
+			"label" => "ReasonUnknownIssuer",
 			"desc" => "L'émetteur de la facture est inconnu du Destinataire (anti-spam)"
 		],
 		"CONTRAT_TERM" => [
-			"label" => "Contract terminated",
+			"label" => "ReasonContractTerminated",
 			"desc" => "Contrat terminé, plus de facture possible"
 		],
 		"DOUBLE_FACT" => [
-			"label" => "DOUBLE INVOICE",
+			"label" => "ReasonDoubleInvoice",
 			"desc" => "Prestation ou livraison déjà facturé sur une autre facture"
 		],
 		"CMD_ERR" => [
-			"label" => "Incorrect or missing ORDER number",
+			"label" => "ReasonIncorrectOrMissingOrderNumber",
 			"desc" => "Purchase Order (PO) number is incorrect, non-existent, or already invoiced. This reason can only be used with a 'REFUSED' status if the PO number was provided by the BUYER PRIOR TO INVOICING."
 		],
 		"ADR_ERR" => [
@@ -382,7 +389,7 @@ class PdpConnectFr
 			"desc" => "Control of max size of files contained in the flow"
 		],
 		"IRR_ANTIVIRUS" => [
-			"label" => "Antivirus control",
+			"label" => "ReasonAntivirusControl",
 			"desc" => "Le flux ne respecte pas les conditions de sécurité"
 		]
 	];
@@ -692,18 +699,18 @@ class PdpConnectFr
 	/**
 	 * Get reasons for a given status that will be used when sending supplier invoice status updates to PDP/PA (for statuses Refused, Disputed, Partially Approved, Suspended)
 	 *
-	 * @param int $statut		Status ID
+	 * @param int $status		Status ID
 	 * @param int $withDetails 	Return also desc if 1
 	 * @return array<string, array{code:string, label:string, desc:string}>|null
 	 */
-	public function getRaisonsByStatus($statut, $withDetails = 1)
+	public function getReasonsByStatus($status, $withDetails = 1)
 	{
-		if (!isset(self::REASONS_CODE_FOR_STATUS[$statut])) {
+		if (!isset(self::REASONS_CODE_FOR_STATUS[$status])) {
 			return null;
 		}
 
 		$reasons = [];
-		foreach (self::REASONS_CODE_FOR_STATUS[$statut] as $code) {
+		foreach (self::REASONS_CODE_FOR_STATUS[$status] as $code) {
 			if (isset(self::REASONS[$code])) {
 				$reasons[$code] = [
 					'code' => $code,
@@ -732,7 +739,7 @@ class PdpConnectFr
 		$baseErrors = [];
 		$baseWarnings = [];
 
-		$einvoiceid = $this->getSellerCommunicationURI();
+		$einvoiceid = $this->getSellerCommunicationURI();	// Force value to '' if routing value does not match prof id.
 
 		// Error message if we failed to found the einvoiceid
 		if (empty($einvoiceid)) {
@@ -745,10 +752,12 @@ class PdpConnectFr
 
 					$uriConf = 'PDPCONNECTFR_' . strtoupper($provider) . '_ROUTING_ID';
 					$einvoiceid = getDolGlobalString($uriConf);
+
+					//PDPCONNECTFR_LIVE
 					if (!preg_match('/^' . preg_replace('/\s+/', '', $mysoc->idprof1) . '/', $this->removeSpaces($einvoiceid))) {
-						$baseWarnings[] = $langs->trans("FxCheckErrorRoutingIDFR", $einvoiceid);
+						$baseWarnings[] = $langs->trans("FxCheckErrorRoutingIDFR", $einvoiceid);	// Your company profid must match the routing ID
 					} else {
-						$baseErrors[] = $langs->trans("FxCheckErrorRoutingID");
+						$baseErrors[] = $langs->trans("FxCheckErrorRoutingID");	// Your company does not have a valid prof id
 					}
 				} else {
 					$baseErrors[] = $langs->trans("FxCheckErrorRoutingID");
@@ -1244,30 +1253,32 @@ class PdpConnectFr
 				$resprints .= $form->editfieldkey($form->textwithpicto($langs->trans("InvoiceRoutingOverride"), $langs->trans("InvoiceRoutingOverrideHelp")), 'override_routing_id', '', $object, (int) $editenable);
 				$resprints .= '</td>';
 				$resprints .= '<td>';
+				// Build select options: first option = thirdparty default (empty = no override)
+				$selectOptions = array('' => $langs->trans("InvoiceRoutingOverrideDefault"));
+				foreach ($allRoutings as $r) {
+					$label = $r['routing_id'];
+					$routing_id = $r['routing_id'];
+					if ($r['is_default']) {
+						$label .= ' (' . $langs->trans("Default") . ')';
+					}
+					if (!empty($r['info'])) {
+						$label .= ' — ' . $r['info'];
+						$routing_id .= '_' . $r['info'];
+					}
+					$selectOptions[$routing_id] = $label;
+				}
 				if ($action == 'editoverride_routing_id') {
 					$resprints .= '<form name="setoverrriderouting" action="' . $_SERVER["PHP_SELF"] . '?id=' . $object->id . '" method="post">';
 					$resprints .= '<input type="hidden" name="token" value="' . newToken() . '">';
 					$resprints .= '<input type="hidden" name="action" value="setoverriderouting">';
 					$resprints .= '<input type="hidden" name="page_y" value="page_y">';
 
-					// Build select options: first option = thirdparty default (empty = no override)
-					$selectOptions = array('' => $langs->trans("InvoiceRoutingOverrideDefault"));
-					foreach ($allRoutings as $r) {
-						$label = $r['routing_id'];
-						if ($r['is_default']) {
-							$label .= ' (' . $langs->trans("Default") . ')';
-						}
-						if (!empty($r['info'])) {
-							$label .= ' — ' . $r['info'];
-						}
-						$selectOptions[$r['routing_id']] = $label;
-					}
 					$resprints .= $form->selectarray('override_routing_id', $selectOptions, $currentOverrideRouting, 0, 0, 0, '', 1);
 					$resprints .= '<input type="submit" class="button button-edit smallpaddingimp reposition" value="' . $langs->trans('Modify') . '">';
 					$resprints .= '</form>';
 				} else {
 					if (!empty($currentOverrideRouting)) {
-						$resprints .= dol_escape_htmltag($currentOverrideRouting);
+						$resprints .= dol_escape_htmltag($selectOptions[$currentOverrideRouting]);
 					} else {
 						$resprints .= '<span class="opacitymedium">' . $langs->trans("InvoiceRoutingOverrideDefault") . '</span>';
 					}
@@ -1287,7 +1298,9 @@ class PdpConnectFr
 		}
 
 		// JavaScript for AJAX call to update status if current status is pending
-		if ((int) $currentStatusInfo['code'] === self::STATUS_AWAITING_VALIDATION) {
+		if ((int) $currentStatusInfo['code'] === self::STATUS_AWAITING_VALIDATION
+			// || (int) $currentStatusInfo['code'] === self::STATUS_AWAITING_ACK			// If we want to call the checkinvoicestatus to get next steps...
+			) {
 			$urlajax = dol_buildpath('pdpconnectfr/ajax/checkinvoicestatus.php', 1);
 
 			$resprints .= '
@@ -1295,17 +1308,21 @@ class PdpConnectFr
             (function() {
 				var countCheckInvoiceStatus = 1;
                 function checkInvoiceStatus() {
-					console.log("checkInvoiceStatus Checking invoice status ("+countCheckInvoiceStatus+")...");
+					console.log(\'checkInvoiceStatus Checking invoice status (try \'+countCheckInvoiceStatus+\') to url '.dol_escape_js($urlajax).'...\');
                     // alert("Checking invoice status...");
                     $.get("' . $urlajax . '", {
                         token: "' . currentToken() . '",
                         ref: "' . dol_escape_js($object->ref) . '"
                     }, function (data) {
-						/* code is executed here if response is valid json */
-                        if (!data || typeof data.code === "undefined") {
-							console.log("checkInvoiceStatus no data returned");
-                            return;
-                        }
+    					if (typeof data === "string") {
+	        				try {
+	            				data = JSON.parse(data); // Convert into object if valid JSON
+	        				} catch (e) {
+	            				console.error("Error : Answer is not a JSON content:", data);
+	            				return;
+	        				}
+						}
+
 						console.log(data.status);
 
                         // Update UI
@@ -1323,11 +1340,14 @@ class PdpConnectFr
                             	setTimeout(checkInvoiceStatus, 10000);
 							}
                         }
-                    }, "json");
+                    }, "text")		/* We force text to avoid that js parse automatically the json response and try to convert it into a js object */
+					.fail(function(jqXHR) {
+    					console.error("Error AJAX :", jqXHR.status, jqXHR.statusText);
+					});
                 }
 
                 // First call
-				console.log("checkInvoiceStatus Invoice has status pending, so we add a timer to run checkInvoiceStatus in few seconds...");
+				console.log("checkInvoiceStatus Invoice has status pending, so we add a timer to run checkInvoiceStatus in 2.5 seconds...");
                 setTimeout(checkInvoiceStatus, 2500);
 
             })();
@@ -1466,8 +1486,7 @@ class PdpConnectFr
 			$resql = $this->db->query($sql);
 			if ($resql && $this->db->num_rows($resql) > 0) {
 				$obj = $this->db->fetch_object($resql);
-				$currentStatus = $obj->lc_status;
-				$currentStatus = $this->getStatusLabel($currentStatus);
+				$currentStatus = $this->getStatusLabel($obj->lc_status);
 			}
 			// Current status
 			$resprints .= '<tr class="trpdpconnect_collapseseparator">';
@@ -1478,11 +1497,11 @@ class PdpConnectFr
 			$reasonLabel = '';
 			$displayReasonLabel = 'style="display:none;"';
 			if (!empty($obj->lc_reason_code)) {
-				$reasonLabel = $this->getRaisonsByStatus($obj->lc_status)[$obj->lc_reason_code]['label'] ?? $obj->lc_reason_code;
+				$reasonLabel = $langs->trans($this->getReasonsByStatus($obj->lc_status)[$obj->lc_reason_code]['label'] ?? $obj->lc_reason_code);
 				$displayReasonLabel = '';
 			}
 
-			$resprints .= '<span id="einvoice-reason"' . ($displayReasonLabel ? ' ' . $displayReasonLabel : '') . '>' . $reasonLabel . '</span>';
+			$resprints .= '&nbsp;<span id="einvoice-reason"' . ($displayReasonLabel ? $displayReasonLabel : '') . '>' . $reasonLabel . '</span>';
 
 			$resprints .= '</td>';
 			$resprints .= '</tr>';
@@ -1507,6 +1526,7 @@ class PdpConnectFr
 			if (!empty($lastSentStatus) && ($lastSentStatus['lc_validation_status'] == 'Pending' || $lastSentStatus['lc_validation_status'] == 'Error')) {
 				$statusLabel = $this->getStatusLabel($lastSentStatus['lc_status']);
 				$statusvalidationLabel = $this->getStatusLabel($this->getDolibarrStatusCodeFromPdpLabel($lastSentStatus['lc_validation_status']));
+				$picto = '';
 				if ($lastSentStatus['lc_validation_status'] === 'Pending') {
 					$picto = img_picto('', 'timespent');
 				} elseif ($lastSentStatus['lc_validation_status'] === 'Error') {
@@ -1666,8 +1686,8 @@ class PdpConnectFr
 			$product_id = (string) $resFetchP;		// Can be 'idprod_123' (product id) or '456' (supplier ref id)
 		}
 
-		// En mode create uniquement : champ texte simple (le tiers n'est pas encore en base, aucune ligne de routage n'existe)
-		// En mode edit, on affiche directement le tableau de routage existant (bloc plus bas)
+		// In create mode only : we show a text input (the thirdparty is not yet in database, no routing line exists)
+		// In edit mode, we show the routing array
 		if ($mode == 'create') {
 			$resprints .= '<tr class="trpdpconnect_collapseseparator trrouting_id '.($expand_display ? '' : 'hidden').'">';
 			$resprints .= '<td class="">' . $form->textwithpicto($langs->trans("RoutingIdFieldShort"), $langs->trans("SpecificRoutingFieldHelp")) . '</td>';
@@ -1682,7 +1702,14 @@ class PdpConnectFr
 			$resprints .= '<tr class="trpdpconnect_collapseseparator trrouting_product_id '.($expand_display ? '' : 'hidden').'">';
 			$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
 			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) -1).'"').'>';
-			$resprints .= $form->select_produits_fournisseurs($object->id, $product_id, 'routing_product_id', '', '', array(), 0, 1, '', '', 1);
+			if (version_compare(DOL_VERSION, '22.0.0', '<')) {
+				// Before v22, select_produits_fournisseurs() uses print instead of return
+				ob_start();
+				$form->select_produits_fournisseurs($object->id, $product_id, 'routing_product_id', '', '', array(), 0, 1);
+				$resprints .= ob_get_clean();
+			} else {
+				$resprints .= $form->select_produits_fournisseurs($object->id, $product_id, 'routing_product_id', '', '', array(), 0, 1, '', '', 1);
+			}
 			$resprints .= '</td>';
 			$resprints .= '</tr>';
 
@@ -1841,7 +1868,7 @@ class PdpConnectFr
 	 *
 	 * @param int			$invoiceId		Invoice ID
 	 * @param string		$invoiceRef		Invoice ref
-	 * @return string[]|number[]|mixed[][]|mixed[]
+	 * @return string[]|float[]|mixed[][]|mixed[]
 	 */
 	public function fetchLastknownInvoiceStatus($invoiceId = 0, $invoiceRef = '')
 	{
@@ -1860,7 +1887,7 @@ class PdpConnectFr
 		if ($invoiceId > 0) {
 			$sql .= " AND element_id = " . ((int) $invoiceId);
 		} else {
-			$sql .= " AND syncref = '" . $this->db->escape($invoiceRef) . "'";
+			$sql .= " AND syncref = '" . $this->db->escape($invoiceRef) . "'";	// Using id is more reliable.
 		}
 
 		$resql = $this->db->query($sql);
@@ -1884,7 +1911,6 @@ class PdpConnectFr
 		}
 
 		// Fetch last status message from pdpconnectfr_lifecycle_msg table to get more details on current status of the invoice into the PDP system
-		$currentStatus = '-';
 		$sql = "SELECT lc_status, lc_reason_code FROM " . MAIN_DB_PREFIX . "pdpconnectfr_lifecycle_msg";
 		$sql .= " WHERE element_type = '" . $this->db->escape('facture') . "'";
 		$sql .= " AND element_id = " . (int) $invoiceId;
@@ -2260,8 +2286,9 @@ class PdpConnectFr
 		}
 
 		$obj = $db->fetch_object($resql);
+		$routing_id =  (string) $obj->routing_id;
 
-		return (string) $obj->routing_id;
+		return $routing_id;
 	}
 
 
@@ -2467,19 +2494,19 @@ class PdpConnectFr
 	 * Update validation information of an existing lifecycle status message.
 	 *
 	 * @param 	Object	$object		Object
-	 * @return 	int 				1 if the invoice object need management of EInvoicing, 0 if not.
+	 * @return 	int 				self::STATUS_NOT_GENERATED if the invoice object need management of EInvoicing, self::STATUS_IGNORE if not.
 	 */
 	public function needEInvoiceManagement($object)
 	{
 		$return = 0;	// By default, no einvoicing.
 
 		if ($object->thirdparty->country_code == 'FR') {	// We need to sync invoice if for french customer
-			$return = 1;
+			$return = self::STATUS_NOT_GENERATED;
 		}
 		if ($object->module_source == 'takepos') {			// Force to ignore for all invoices generated from TakePOS
 			// If invoice is generated from TakePOS, we must not make any e-invoice sync.
 			// We will do a Z sync instead from the cash closing feature.
-			$return = 0;
+			$return = getDolGlobalInt('PDPCONNECTFR_DEFAULT_EINVOICE_STATUS_FOR_TAKEPOS', self::STATUS_IGNORE);
 		}
 
 		// TODO More tests to do...
@@ -2585,8 +2612,10 @@ class PdpConnectFr
 				if (!empty($einvoiceid)) {
 					$einvoiceid = $this->removeSpaces($einvoiceid);
 					if (!preg_match('/^' . preg_replace('/\s+/', '', $mysoc->idprof1) . '/', $einvoiceid)) {
-						dol_syslog("Error: The seller communication URI seems not correct (should be or start with your SIRET number). Value: " . $einvoiceid, LOG_ERR);
-						$einvoiceid = '';
+						if (getDolGlobalString('PDPCONNECTFR_LIVE')) {	// In live mode, we do not allow profid1 not matching routing id
+							dol_syslog("Error: The seller communication URI seems not correct (should be or start with your SIRET number). Value: " . $einvoiceid, LOG_WARNING);
+							$einvoiceid = '';
+						}
 					}
 				}
 			}

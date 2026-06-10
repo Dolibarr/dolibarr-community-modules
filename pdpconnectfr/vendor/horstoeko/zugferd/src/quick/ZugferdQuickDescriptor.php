@@ -518,7 +518,7 @@ class ZugferdQuickDescriptor extends ZugferdDocumentBuilder
      */
     public function doAddTradeLineItem(string $lineId, string $productName, float $unitPrice, float $quantity, string $unitCode, float $allowanceChargeAmount, string $allowanceChargeReason, string $taxCategoryCode, string $taxTypeCode, float $taxPercent): ZugferdQuickDescriptor
     {
-        $hasChargeAmountIsAllowance = $allowanceChargeAmount != 0.0;
+        $hasChargeAmountIsAllowance = $allowanceChargeAmount !== 0.0;
         $allowanceChargeAmountIsAllowance = $allowanceChargeAmount < 0.0;
         $allowanceAmount = $allowanceChargeAmountIsAllowance ? abs($allowanceChargeAmount) : 0.0;
         $chargeAmount = $allowanceChargeAmountIsAllowance === false ? abs($allowanceChargeAmount) : 0.0;
@@ -532,7 +532,7 @@ class ZugferdQuickDescriptor extends ZugferdDocumentBuilder
         $this->addDocumentPositionTax($taxCategoryCode, $taxTypeCode, $taxPercent);
         $this->setDocumentPositionLineSummation($lineTotalAmount);
 
-        if ($hasChargeAmountIsAllowance == true) {
+        if ($hasChargeAmountIsAllowance) {
             $this->addDocumentPositionAllowanceCharge($allowanceChargeAmount, $allowanceChargeAmountIsAllowance === false, null, null, null, $allowanceChargeReason);
         }
 
@@ -646,7 +646,7 @@ class ZugferdQuickDescriptor extends ZugferdDocumentBuilder
      */
     public function doAddTradeAllowanceCharge(float $actualAmount, string $reason, string $taxCategoryCode, string $taxTypeCode, float $taxPercent): ZugferdQuickDescriptor
     {
-        if ($actualAmount == 0.0) {
+        if ($actualAmount === 0.0) {
             return $this;
         }
 
@@ -654,7 +654,7 @@ class ZugferdQuickDescriptor extends ZugferdDocumentBuilder
         $allowanceAmount = $allowanceChargeAmountIsAllowance ? abs($actualAmount) : 0.0;
         $chargeAmount = $allowanceChargeAmountIsAllowance === false ? abs($actualAmount) : 0.0;
 
-        $this->addDocumentAllowanceCharge(abs($actualAmount), $allowanceChargeAmountIsAllowance == false, $taxCategoryCode, $taxTypeCode, $taxPercent, null, null, null, null, null, null, $reason);
+        $this->addDocumentAllowanceCharge(abs($actualAmount), $allowanceChargeAmountIsAllowance === false, $taxCategoryCode, $taxTypeCode, $taxPercent, null, null, null, null, null, null, $reason);
 
         $this->addToInternalVatBuffer(
             $taxCategoryCode,

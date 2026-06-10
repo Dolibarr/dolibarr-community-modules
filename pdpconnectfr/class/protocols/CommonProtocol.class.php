@@ -184,7 +184,7 @@ trait CommonProtocol
 			CommonInvoice::TYPE_SITUATION       => '380',				// Process situation invoice as common invoice
 		];
 
-		// TODO Manage the credit note of a deposit invoice
+		// TODO Manage the credit note of a deposit invoice ?
 
 		return $map[$object->type] ?? null;
 	}
@@ -233,12 +233,170 @@ trait CommonProtocol
 
 
 	/**
+	 * Generate a sample E-invoice for demonstration or testing purposes (for Dolibarr version >= 24.0)
+	 *
+	 * This method creates a dummy invoice with representative data
+	 * to illustrate the E-invoice structure without using real business information.
+	 *
+	 * @param	PdpConnectFr			$pdpconnectfr			PDPConnectFR
+	 * @param   Societe|null			$thirdpartySeller		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
+	 * @param   Societe|null			$thirdpartyBuyer		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
+	 * @param   array<string,mixed>		$options				More options
+	 * @return 	-1|array<string,string> 							Path or content of the generated sample invoice.
+	 */
+	public function generateSampleInvoice($pdpconnectfr, $thirdpartySeller = null, $thirdpartyBuyer = null, $options = array())
+	{
+		global $conf, $langs, $mysoc;
+
+		dol_mkdir($conf->pdpconnectfr->dir_temp);
+
+		$outputlangs = $langs;		// TODO Use the target language
+
+		require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
+		$tmpinvoice = new Facture($this->db);
+		$tmpinvoice->initAsSpecimen('nolines');
+
+		$tmpinvoice->ref .= '-' . dol_print_date(dol_now(), '%y%m%d-%H%M%S');
+		if (!empty($options['invoicetype'])) {
+			$tmpinvoice->type = $options['invoicetype'];
+		}
+
+		// Reference of original invoice in case of credit note
+		if ($tmpinvoice->type == Facture::TYPE_CREDIT_NOTE) {
+			$tmpinvoice->fk_facture_source = $options['referencedinvoice'] ?? 'FA0000-SPECIMEN';
+		}
+
+		$line = new FactureLigne($this->db);
+		$line->desc = $langs->trans("Description") . " 1";
+		$line->qty = 5;
+		$line->subprice = 100.05;		// unit price (no discount yet)
+		$line->tva_tx = get_default_tva($thirdpartySeller, $thirdpartyBuyer);
+		$line->localtax1_tx = 0;
+		$line->localtax2_tx = 0;
+		$line->remise_percent = 10;
+		$line->fk_product = 0;
+
+		include_once DOL_DOCUMENT_ROOT.'/core/lib/price.lib.php';
+		// Force MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY, so we are sure sample is valid at the initial object.
+		// TODO Make this sample generation working with any configuration of discount.
+		$conf->global->MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY = 2;
+
+		$tmp = calcul_price_total($line->qty, $line->subprice, $line->remise_percent, $line->tva_tx, 0, 0, 0, 'HT', 0, 0);
+
+		$line->total_ht = $tmp[0];
+		$line->total_ttc = $tmp[2];
+		$line->total_tva = $tmp[1];
+		$line->multicurrency_tx = 2;
+		$line->multicurrency_total_ht = 2 * $line->total_ht;
+		$line->multicurrency_total_ttc = 2 * $line->total_ttc;
+		$line->multicurrency_total_tva = 2 * $line->total_tva;
+
+		$tmpinvoice->lines[] = $line;
+
+		$tmpinvoice->total_ht       += $line->total_ht;
+		$tmpinvoice->total_tva      += $line->total_tva;
+		$tmpinvoice->total_ttc      += $line->total_ttc;
+
+		$tmpinvoice->multicurrency_total_ht       += $line->multicurrency_total_ht;
+		$tmpinvoice->multicurrency_total_tva      += $line->multicurrency_total_tva;
+		$tmpinvoice->multicurrency_total_ttc      += $line->multicurrency_total_ttc;
+
+
+		require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
+
+
+		// Set $mysoc if seller is not myself (when we want to generate a sample invoice for a purchase).
+		$keyforconst = 'PDPCONNECTFR_' . getDolGlobalString('PDPCONNECTFR_PDP') . '_ROUTING_ID';
+		$savmysoc = null;
+		$savPDPCONNECTFR_ROUTING_ID = null;
+		if ($thirdpartySeller instanceof Societe) {
+			$savmysoc = $mysoc;
+			$savPDPCONNECTFR_ROUTING_ID = getDolGlobalString($keyforconst);
+
+			$mysoc = $thirdpartySeller;
+			$conf->global->PDPCONNECTFR_SUPERPDP_ROUTING_ID = idprof($thirdpartySeller);
+		} else {
+			$thirdpartySeller = $mysoc;
+		}
+		//var_dump(($savmysoc ? $savmysoc->name : ''), $mysoc->name, $thirdpartyBuyer->name);
+
+
+		if ($thirdpartyBuyer instanceof Societe) {
+			$tmpthirdparty = $thirdpartyBuyer;
+		} else {
+			$tmpthirdparty = new Societe($this->db);
+			$tmpthirdparty->initAsSpecimen();
+			if ($thirdpartySeller->idprof1 == "000000001") {
+				// Example Burger Queen on SuperPDP Network
+				$tmpthirdparty->idprof1 = '000000002';
+				$tmpthirdparty->idprof2 = '00000000200010';
+				$tmpthirdparty->tva_intra = 'FR12000000002';
+				define('PDPCONNECT_FORCE_BUYER_EID', getDolGlobalString('PDPCONNECT_DEMO_ROUTING_BURGER_QUEEN', '315143296_1940')); // vary into demo accounts
+			} else {
+				// Example Tricatel on SuperPDP Network
+				$tmpthirdparty->idprof1 = '000000001';
+				$tmpthirdparty->idprof2 = '00000000100010';
+				$tmpthirdparty->tva_intra = 'FR12000000001';
+				define('PDPCONNECT_FORCE_BUYER_EID', getDolGlobalString('PDPCONNECT_DEMO_ROUTING_TRICATEL', '315143296_1939'));
+			}
+		}
+		$tmpinvoice->thirdparty = $tmpthirdparty;
+		$tmpinvoice->socid = $tmpthirdparty->id;			// 0 for specimen
+
+		require_once DOL_DOCUMENT_ROOT . '/contact/class/contact.class.php';
+		$tmpcontact = new Contact($this->db);
+		$tmpcontact->initAsSpecimen();
+		$tmpcontact->socid = $tmpthirdparty->id;			// 0 for specimen
+		$tmpinvoice->contact = $tmpcontact;
+
+
+		// Generate the Dolibarr PDF of the invoice
+		$tmpinvoice->generateDocument($tmpinvoice->model_pdf, $outputlangs);
+
+		// For invoice with ->specimen=1, the file is SPECIMEN.pdf so we rename it into ref
+		$dir = $conf->invoice->multidir_output[$conf->entity];
+		$srcfile = $dir . '/SPECIMEN.pdf';
+		$destfile = $dir . '/' . dol_sanitizeFileName($tmpinvoice->ref) . '.pdf';
+
+		dol_move($srcfile, $destfile, '0', 1);
+
+
+		// Generate the EInvoice file
+		$pathOfEInvoice = $this->generateInvoice($tmpinvoice, $outputlangs);
+
+		// Restore switched variables if we changed $mysoc for generation of the sample invoice
+		if (!empty($savmysoc)) {
+			$mysoc = $savmysoc;
+			$conf->global->$keyforconst = $savPDPCONNECTFR_ROUTING_ID;
+
+			$savmysoc = null;
+			$savPDPCONNECTFR_ROUTING_ID = null;
+		}
+
+		// Restore name SPECIMEN.pdf
+		dol_move($destfile, $srcfile, '0', 1);
+
+		// Move EInvoice file into the temp directory
+		if (is_numeric($pathOfEInvoice) && $pathOfEInvoice < 0) {
+			$result = $pathOfEInvoice;
+		} else {
+			$newPathOfEInvoice = $dir . '/temp/' . basename($pathOfEInvoice);
+			dol_move($pathOfEInvoice, $newPathOfEInvoice, '0', 1);
+
+			$result = array('path' => $newPathOfEInvoice, 'ref' => $tmpinvoice->ref);
+		}
+
+		return $result;
+	}
+
+
+	/**
 	 * Synchronize or create a Dolibarr thirdparty based on E-invoice seller information.
 	 *
 	 * @param array     $sellerInfo 	Array containing seller information extracted from E-invoice
 	 * @param string    $priority 		Fill priority ('dolibarr' or 'pdp'). If both data are available, which one to prefer
 	 * @param string    $flowId 		Flow identifier source of the thirdparty.
-	 * @return array{res:int, message:string, actioncode:string|null, actionurl:string|null, action:string|null}   Returns array with 'res' (ID of the synchronized or created thirdparty, -1 on error) with a 'message' and an optional 'actioncode', 'actionurl', and 'action'.
+	 * @return array{res:int, message:string, actioncode:string|null, actionurl:string|null, action:string|null}   Returns array with 'res' (ID of the synchronized or created/updated thirdparty, -1 on error) with a 'message' and an optional 'actioncode', 'actionurl', and 'action'.
 	 */
 	private function _syncOrCreateThirdpartyFromEInvoiceSeller($sellerInfo, $priority = 'dolibarr', $flowId = '')
 	{
@@ -332,20 +490,38 @@ trait CommonProtocol
 
 		// Step 3: If not found, try to find by findNearest function
 		if ($thirdpartyId < 0) {
-			$result = $thirdparty->findNearest(
-				0,
-				$sellerInfo['sellername'] ?? '',
-				$sellerInfo['sellername'] ?? '',
-				'',
-				'',
-				'',
-				'',
-				'',
-				'',
-				'',
-				$sellerInfo['sellercontactemailaddr'] ?? '',
-				$sellerInfo['sellername'] ?? ''
-			); // TODO: we can add phone, address and vat number to improve matching
+			if (method_exists($thirdparty, 'findNearest')) {
+				$result = $thirdparty->findNearest(
+					0,
+					$sellerInfo['sellername'] ?? '',
+					$sellerInfo['sellername'] ?? '',
+					'',
+					'',
+					'',
+					'',
+					'',
+					'',
+					'',
+					$sellerInfo['sellercontactemailaddr'] ?? '',
+					$sellerInfo['sellername'] ?? ''
+				); // TODO: we can add phone, address and vat number to improve matching
+			} else {	// Compat method for old versions
+				$result = findNearest(
+					0,
+					$sellerInfo['sellername'] ?? '',
+					$sellerInfo['sellername'] ?? '',
+					'',
+					'',
+					'',
+					'',
+					'',
+					'',
+					'',
+					$sellerInfo['sellercontactemailaddr'] ?? '',
+					$sellerInfo['sellername'] ?? ''
+				);
+			}
+
 			if ($result > 0) {
 				$thirdpartyId = $thirdparty->id;
 				dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Found thirdparty by findNearest: ' . $thirdpartyId);
@@ -651,11 +827,11 @@ trait CommonProtocol
 
 		$pdpconnectfr = new PdpConnectFr($db);
 
-		// Search in product supplier prices table using prodsellerid
+		// Search in product supplier prices table using prodsellerid (the ref of product of the vendor)
 		$sql = "SELECT p.rowid ";
 		$sql .= " FROM " . MAIN_DB_PREFIX . "product as p ";
 		$sql .= " INNER JOIN " . MAIN_DB_PREFIX . "product_fournisseur_price as pfp ON pfp.fk_product = p.rowid ";
-		$sql .= " WHERE pfp.product_supplier_id = '" . $db->escape($lineData['prodsellerid']) . "' ";
+		$sql .= " WHERE pfp.ref_fourn = '" . $db->escape($lineData['prodsellerid']) . "' ";
 		$sql .= " AND pfp.fk_soc = " . intval($lineData['supplierId']) . " ";
 		$sql .= " AND p.entity IN (" . getEntity('product') . ")";
 		$sql .= " LIMIT 1";
@@ -811,6 +987,7 @@ trait CommonProtocol
 			$prodSupplierRef = trim($lineData['prodsellerid'] ?? '');
 			$prodName = trim($lineData['prodname'] ?? '');
 			$prodDesc = trim($lineData['proddesc'] ?? '');
+			$vendorId = $lineData['supplierId'];
 
 			$errorDetails = [];
 			$createParams = [];
@@ -823,9 +1000,13 @@ trait CommonProtocol
 
 				$createParams['ref_ext'] = $prodRef;
 			}
+			if (!empty($vendorId)) {
+				$errorDetails[] = 'Vendor id: ' . $vendorId;
+				$createParams['socid'] = $vendorId;							// TODO Dolibarr must be able to handle this parameter
+			}
 			if (!empty($prodSupplierRef)) {
 				$errorDetails[] = 'Supplier ref: ' . $prodSupplierRef;
-				$createParams['supplierref'] = $prodSupplierRef;
+				$createParams['supplierref'] = $prodSupplierRef;			// TODO Dolibarr must be able to handle this parameter
 			}
 			if (!empty($prodName)) {
 				$errorDetails[] = 'Name: ' . $prodName;
@@ -859,10 +1040,21 @@ trait CommonProtocol
 			$message = 'Unable to find product' . $detailsStr . '. Auto-creation of products is disabled in settings.';
 
 			$action = $langs->trans('CreateProductManually') . ' ';
-			$action .= '<a class="butAction small" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
+			$action .= '<a class="butAction smallpaddingimp" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
 			$action .= '<i class="fas fa-plus-circle"></i> ';
-			$action .= $langs->trans('CreateProduct');
+			$action .= $langs->trans('CreateTheProduct');
 			$action .= '</a>';
+
+			/*
+			$createSupplierRefUrl = 'todo';
+			$sellerName ='xxx';
+
+			$action .= $langs->trans("or");
+			$action .= '<a class="butAction smallpaddingimp" href="' . dol_escape_htmltag($createSupplierRefUrl) . '" target="_blank">';
+			$action .= '<i class="fas fa-plus-circle"></i> ';
+			$action .= $langs->trans('CreateSupplierRef').' '.dol_trunc($prodSupplierRef, 8).' for '.dol_trunc($sellerName, 8);
+			$action .= '</a>';
+			*/
 
 			return array(
 				'res' => -1,
@@ -936,6 +1128,243 @@ trait CommonProtocol
 		}
 
 		// Fallback = service
+		return 0;
+	}
+
+	/**
+	 * Get a timestamp and return a php DateTime object
+	 *
+	 * @param	int		$ts			Timestamp
+	 * @return 	\DateTime|null 		DateTime object or null if $ts is empty
+	 */
+	private function _tsToDateTime($ts)
+	{
+		dol_syslog("call _tsToDateTime for {$ts} ...");
+		if (empty($ts)) {
+			return null;
+		}
+		$dt = new \DateTime();
+		$dt->setTimestamp($ts);
+		return $dt;
+	}
+
+	/**
+	 * Check if a given VAT rate is valid for a specific country based on the c_tva table in the database.
+	 *
+	 * @param 	string	$vatrate		Vat rate to check (e.g. '20' for 20%)
+	 * @param 	string	$countryCode	Country code to check the VAT rate against (e.g. 'FR' for France)
+	 * @return 	boolean					Returns true if the VAT rate is valid for the given country, false otherwise.
+	 */
+	public function checkIfVatRateIsValid($vatrate, $countryCode)
+	{
+		if ($countryCode == 'FR') {
+			// Check rule BR-FR-16 For AFNOR Einvoice - List in XP-Z12-012
+			$validRatesString = ['0', '10', '13', '20', '8.5', '19.6', '2.1', '5.5', '7', '20.6', '1.05', '0.9', '1.75', '9.2', '9.6'];
+			//$valtotest = price2num((float) $vatrate, '', 1);
+			if (!in_array($vatrate, $validRatesString)) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Get the category of the VAT rate and the VATEX code and reason.
+	 *
+	 * @param 	CommonInvoiceLine		$line			Invoice line
+	 * @param 	Societe 				$seller			Seller
+	 * @param 	Societe					$buyer			Buyer
+	 * @return 	array<string,string>					array('categoryVAT' => Category of VAT rate ('S', 'K', 'E', 'G'), 'ExemptionReason' => '', 'ExemptionReasonCode => '')
+	 */
+	public function getCategoryRate($line, $seller, $buyer)
+	{
+		global $langs;
+
+		$vat_rate = $line->tva_tx;
+		$vat_src_code = $line->vat_src_code;
+		$id = $line->id;
+
+		$errormsg = '';
+
+		$exemptionReason = null;		// BT-120
+		$exemptionReasonCode = null;	// BT-121 - Mut contains a VATEX code. https://docs.peppol.eu/poacc/billing/3.0/codelist/vatex/
+
+		if ($vat_rate > 0) {
+			$categoryVAT = 'S';
+
+			if (empty($seller->tva_intra)) {
+				throw new Exception('BADVATNUMBER: The VAT number of the thirdparty ' . $buyer->thirdparty->name . ' is mandatory when there is a non null VAT on at least on line.');
+			}
+			if (!$this->checkIfVatRateIsValid($vat_rate, $seller->country_code)) {
+				throw new Exception('BADVATRATE[BR-FR-16]: The VAT rate ' . $vat_rate . ($id ? ' on line ' . $id : '') . ' is not a valid string value for country ' . $seller->country_code . '.');
+			}
+		} else {
+			if ($seller->isInEEC()) {
+				$categoryVAT = 'K';
+
+				if (empty($seller->tva_assuj)) {
+					// Can be $categoryVAT = E (VAT exempted) or AE (Autoliquidation)
+					if (1 == 2) {	// Autoliquidation (the VAT is declared by the customer that pay it directly to the government). TODO Not implemented.
+						// Note: the option ACCOUNTING_FORCE_ENABLE_VAT_REVERSE_CHARGE is for purchase invoices only and is used to dispatch vat differently in accounting..
+						$categoryVAT = 'AE';	// Autoliquidation
+						$exemptionReasonCode = 'VATEX-'.($seller->country_code == 'FR' ? 'FR' : 'EU').'-AE';	// VATEX-EU-AE or VATEX-FR-AE
+						$exemptionReason = 'Autoliquidation';
+					} else {
+						$categoryVAT = 'E';		// Exempt from VAT (self-entrepreneurs, doctor, ...)
+						$exemptionReasonCode = getDolGlobalString('MAIN_INFO_SOCIETE_VAT_EXEMPTION_CODE');
+						$exemptionReason = getDolGlobalString('MAIN_INFO_SOCIETE_VAT_EXEMPTION_REASON');
+						if ($seller->country_code == 'FR') {
+							// List of VATEX: https://docs.peppol.eu/poacc/billing/3.0/codelist/vatex/
+							// TVA non applicable article 293B CGI (auto-entrepreneurs, volume sous seuil, defined into setup of company):   VATEX-FR-FRANCHISE (rule BR-FR-CO-16), the default one
+							$exemptionReasonCode = getDolGlobalString('MAIN_INFO_SOCIETE_VAT_EXEMPTION_CODE', 'VATEX-FR-FRANCHISE');		// VATEX-FR-FRANCHISE, VATEX-FR-CGI261-1, VATEX-FR-CGI261-4, VATEX-EU-79-C...
+							$exemptionReason = getDolGlobalString('MAIN_INFO_SOCIETE_VAT_EXEMPTION_REASON', 'Tax exempted - TVA en franchise');
+						}
+						if (empty($exemptionReasonCode)) {
+							if ((float) DOl_VERSION < 24.0) {
+								throw new Exception('MISSINGSETUP: Your organization is configured to not use VAT. In this case, you must enter into the constant MAIN_INFO_SOCIETE_VAT_EXEMPTION_CODE the reason code of exemption (VATEX-FR-CGI261-1, VATEX-FR-CGI261-4, VATEX-EU-79C.');
+							} else {
+								throw new Exception('MISSINGSETUP: Your organization is configured to not use VAT. In this case, you must enter into the reason code of exemption in the setup of your organization (VATEX-FR-CGI261-1, VATEX-FR-CGI261-4, VATEX-EU-79C.');
+							}
+						}
+					}
+				} elseif (!$buyer->thirdparty->isInEEC()) {
+					$categoryVAT = 'G';
+					$exemptionReasonCode = 'VATEX-EU-G';
+					$exemptionReason = 'Exportation outside UE';
+				} elseif ($buyer->thirdparty->isInEEC() && $seller->country_code != $buyer->thirdparty->country_code) {
+					$categoryVAT = 'K';		// Intra communautary VAT
+					$exemptionReasonCode = 'VATEX-EU-IC';
+					$exemptionReason = 'Intracommunautary VAT';
+				} else {
+					$categoryVAT = 'E';		// Exempt from VAT (product).
+
+					// The sell is from an EU country to the same country, reason depends on the product line itself (reason saved into the VAT rate/code used)
+					if ((float) DOL_VERSION < 24.0) {
+						// We must use the reason found in the constant MAIN_VAT_EXEMPTION_CODE_FOR_0.00_XXXX
+						// List of VATEX: https://docs.peppol.eu/poacc/billing/3.0/codelist/vatex/
+						// TVA non applicable article 261-4 CGI (nature non soumis à TVA, comme médecin): VATEX-FR-CGI261-4
+						// TVA non applicable - Vente objet art :       VATEX-FR-I
+						// TVA non applicable - Vente objet antiquité : VATEX-FR-J
+						// TVA non applicable - Vente agence voyage:    VATEX-EU-D
+						// TVA non applicable - Debours (VAT paid by customer):  VATEX-EU-79-C
+						$vatex = '';
+
+						// We try to find code in the vat code definition in the dictionnary table (code only because einvoice_vatex does not exists).
+						global $db, $mysoc;
+
+						$sql = "SELECT code FROM ".MAIN_DB_PREFIX."c_tva";
+						$sql .= " WHERE taux = ".((float) $vat_rate);
+						$sql .= " AND active = 1";
+						$sql .= " AND fk_pays = ".((int) $mysoc->country_id);
+						$sql .= " AND (code = '".$db->escape($vat_src_code)."')";
+						$resql = $db->query($sql);
+						if ($resql) {
+							$obj = $db->fetch_object($resql);
+							if ($obj) {
+								if (preg_match('/^VATEX/i', $obj->code)) {
+									$vatex = strtoupper((string) $obj->code);
+								}
+							}
+						}
+
+						$vat_rate = price2num($vat_rate, 2);
+
+						if (empty($vatex)) {
+							$constantforvatex = "MAIN_VAT_EXEMPTION_CODE_FOR_" . $vat_rate.($vat_src_code ? "_". $vat_src_code : '');
+							$vatex = strtoupper(getDolGlobalString($constantforvatex));
+						}
+
+						if (empty($vatex)) {
+							$errormsg = $langs->trans("UnknownVATEX1", $id, '0', $vat_src_code);
+							$errormsg .= '<br>'.$langs->trans("UnknownVATEX2a", '0', ($vat_src_code ? $vat_src_code : "''"), $constantforvatex);
+							//$exemptionReason .= ' '.$langs->trans("ClickHere", $constantforvatex);		// Go on other setup page
+
+							throw new Exception('MISSINGSETUP: '.$errormsg);
+						} else {
+							$exemptionReasonCode = $vatex;
+							$exemptionReason = '';
+						}
+					} else {
+						$vatex = '';
+
+						// We try to find code in the vat code definition in the dictionnary table (einvoice_vatex else code).
+						global $db, $mysoc;
+
+						$sql = "SELECT code, einvoice_vatex FROM ".MAIN_DB_PREFIX."c_tva";
+						$sql .= " WHERE taux = ".((float) $vat_rate);
+						$sql .= " AND active = 1";
+						$sql .= " AND fk_pays = ".((int) $mysoc->country_id);
+						$sql .= " AND (code = '".$db->escape($vat_src_code)."')";
+						$resql = $db->query($sql);
+						if ($resql) {
+							$obj = $db->fetch_object($resql);
+							if ($obj) {
+								$vatex = strtoupper((string) $obj->einvoice_vatex);
+								if (empty($vatex) && preg_match('/^VATEX/i', $obj->code)) {
+									$vatex = strtoupper((string) $obj->code);
+								}
+							}
+						}
+
+						if (empty($vatex)) {
+							$urltovatdic = DOL_URL_ROOT.'/admin/dict.php?id=10';
+							$errormsg = $langs->trans("UnknownVATEX1", $id, '0', $vat_src_code);
+							$errormsg .= '<br>'.$langs->trans("UnknownVATEX2b", '0', ($vat_src_code ? $vat_src_code : "''"), $urltovatdic);
+							//$errormsg .= ' '.$langs->trans("ClickHere", $constantforvatex);		// Go on dictionary page
+
+							throw new Exception('MISSINGSETUP: '.$errormsg);
+						} else {
+							$exemptionReasonCode = $vatex;
+							$exemptionReason = '';
+						}
+					}
+				}
+			} else {
+				$categoryVAT = 'Z';		// Seller is not in EU
+			}
+		}
+
+		return array('categoryVAT' => $categoryVAT, 'ExemptionReason' => $exemptionReason, 'ExemptionReasonCode' => $exemptionReasonCode);
+	}
+
+
+	/************************************************
+	 *    Check line type from external module ?
+	 *
+	 * @param  object $line       line we work on
+	 * @param  string $element    line object element (for special case like shipping)
+	 * @param  string $searchName module name we look for
+	 * @return boolean                        true if the line is a special one and was created by the module we ask for
+	 ************************************************/
+	private function _isLineFromExternalModule($line, $element, $searchName)
+	{
+		global $db;
+		if ($element == 'shipping' || $element == 'delivery') {
+			$fk_origin_line = $line->fk_origin_line;
+			$line = new OrderLine($db);
+			$line->fetch($fk_origin_line);
+		}
+		if ($line->product_type == 9 && $line->special_code == $this->_getModNumber($searchName)) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	/**
+	 * Find module number
+	 *
+	 * @param  string 	$modName 	Module name we look for
+	 * @return integer              -1 if KO, 0 not found or module number if Ok
+	 */
+	private function _getModNumber($modName)
+	{
+		global $db;
+		if (class_exists($modName)) {
+			$objMod = new $modName($db);
+			return $objMod->numero;
+		}
 		return 0;
 	}
 }

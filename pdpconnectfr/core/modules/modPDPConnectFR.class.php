@@ -76,7 +76,7 @@ class modPDPConnectFR extends DolibarrModules
 		$this->editor_squarred_logo = '';					// Must be image filename into the module/img directory followed with @modulename. Example: 'myimage.png@pdpconnectfr'
 
 		// Possible values for version are: 'development', 'experimental', 'dolibarr', 'dolibarr_deprecated', 'experimental_deprecated' or a version string like 'x.y.z'
-		$this->version = '1.0';
+		$this->version = '1.0.1';
 		// Url to the file with your last numberversion of this module
 		//$this->url_last_version = 'http://www.example.com/versionmodule.txt';
 
@@ -152,7 +152,7 @@ class modPDPConnectFR extends DolibarrModules
 		// Prerequisites
 		$this->phpmin = array(7, 2); // Minimum version of PHP required by module
 		// $this->phpmax = array(8, 0); // Maximum version of PHP required by module
-		$this->need_dolibarr_version = array(21, -3); // Minimum version of Dolibarr required by module
+		$this->need_dolibarr_version = array(18, -3); // Minimum version of Dolibarr required by module
 		// $this->max_dolibarr_version = array(19, -3); // Maximum version of Dolibarr required by module
 		$this->need_javascript_ajax = 0;
 
@@ -170,7 +170,7 @@ class modPDPConnectFR extends DolibarrModules
 		$this->const = array(
 			1 => array('PDPCONNECTFR_EINVOICE_IN_REAL_TIME', 'chaine', '1', 0),
 			2 => array('PDPCONNECTFR_FLOWS_SYNC_CALL_LIMIT', 'chaine', '1', 0),
-			3 => array('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS_HELP', 'chaine', '12', 0),
+			3 => array('PDPCONNECTFR_SYNC_MARGIN_TIME_HOURS', 'chaine', '12', 0),
 			4 => array('PDPCONNECTFR_FLOWS_SYNC_CALL_SIZE', 'chaine', '100', 0),
 		);
 
@@ -196,7 +196,7 @@ class modPDPConnectFR extends DolibarrModules
 		/* END MODULEBUILDER TABS */
 		// Example:
 		// To add a new tab identified by code tabname1
-		// $this->tabs[] = array('data' => 'objecttype:+tabname1:Title1:mylangfile@pdpconnectfr:$user->hasRight('pdpconnectfr', 'call', 'read'):/pdpconnectfr/mynewtab1.php?id=__ID__');
+		// $this->tabs[] = array('data' => 'objecttype:+tabname1:Title1:mylangfile@pdpconnectfr:$user->hasRight('pdpconnectfr', 'document', 'read'):/pdpconnectfr/mynewtab1.php?id=__ID__');
 		// To add another new tab identified by code tabname2. Label will be result of calling all substitution functions on 'Title2' key.
 		// $this->tabs[] = array('data' => 'objecttype:+tabname2:SUBSTITUTION_Title2:mylangfile@pdpconnectfr:$user->hasRight('othermodule', 'otherobject', 'read'):/pdpconnectfr/mynewtab2.php?id=__ID__',
 		// To remove an existing tab identified by code tabname
@@ -313,32 +313,17 @@ class modPDPConnectFR extends DolibarrModules
 		// Add here entries to declare new permissions
 		/* BEGIN MODULEBUILDER PERMISSIONS */
 		$this->rights[$r][0] = $this->numero . sprintf('%02d', (0 * 10) + 0 + 1);
-		$this->rights[$r][1] = 'Read Call object of PDPConnectFR';
-		$this->rights[$r][4] = 'call';
+		$this->rights[$r][1] = 'Read synchronized documents and logs';
+		$this->rights[$r][4] = 'document';
 		$this->rights[$r][5] = 'read';
 		$r++;
 		$this->rights[$r][0] = $this->numero . sprintf('%02d', (0 * 10) + 1 + 1);
-		$this->rights[$r][1] = 'Create/Update Call object of PDPConnectFR';
-		$this->rights[$r][4] = 'call';
+		$this->rights[$r][1] = 'Create/Run/Update synchronization of documentes';
+		$this->rights[$r][4] = 'document';
 		$this->rights[$r][5] = 'write';
 		$r++;
 		$this->rights[$r][0] = $this->numero . sprintf('%02d', (0 * 10) + 2 + 1);
-		$this->rights[$r][1] = 'Delete Call object of PDPConnectFR';
-		$this->rights[$r][4] = 'call';
-		$this->rights[$r][5] = 'delete';
-		$r++;
-		$this->rights[$r][0] = $this->numero . sprintf('%02d', (1 * 10) + 0 + 1);
-		$this->rights[$r][1] = 'Read Document object of PDPConnectFR';
-		$this->rights[$r][4] = 'document';
-		$this->rights[$r][5] = 'read';
-		$r++;
-		$this->rights[$r][0] = $this->numero . sprintf('%02d', (1 * 10) + 1 + 1);
-		$this->rights[$r][1] = 'Create/Update Document object of PDPConnectFR';
-		$this->rights[$r][4] = 'document';
-		$this->rights[$r][5] = 'write';
-		$r++;
-		$this->rights[$r][0] = $this->numero . sprintf('%02d', (1 * 10) + 2 + 1);
-		$this->rights[$r][1] = 'Delete Document object of PDPConnectFR';
+		$this->rights[$r][1] = 'Delete synchronization document or logs';
 		$this->rights[$r][4] = 'document';
 		$this->rights[$r][5] = 'delete';
 		$r++;
@@ -398,8 +383,8 @@ class modPDPConnectFR extends DolibarrModules
 			'url' => '/pdpconnectfr/document_list.php',
 			'langs' => 'pdpconnectfr@pdpconnectfr',
 			'position' => 1001,
-			'enabled' => 'isModEnabled(pdpconnectfr)',
-			'perms' => '$user->hasRight(facture, lire)',
+			'enabled' => 'isModEnabled("pdpconnectfr")',
+			'perms' => '$user->hasRight("facture", "lire")',
 			'target' => '',
 			'user' => 2,
 			'object' => '',

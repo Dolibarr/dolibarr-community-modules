@@ -15,13 +15,13 @@ packages:
         de: 'Fügt dolibarr die Fähigkeit hinzu, Rechnungen im Format XRechnung (Elektronische Rechnung) zu erstellen: Die PDF-Datei wird um eine eingebettete XML-Datei erweitert.'
       status: 'enabled'
       created_at: '2024-12-10'
-      last_updated_at: "2026-03-31"
+      last_updated_at: "2026-05-07"
       # The git url, stable branch and system to get the sources and guess all auto value
       git: 'https://inligit.fr/cap-rel/dolibarr/plugin-facturx.git'
       git-branch: 'master'
       git-system: 'gitlab'
       cover: 'https://www.dolistore.com/wrapper.php?hashp=KOkM9ktPixXZY62rjv7J4oKjKV86704r'
-      current_version: "1.6.102"
+      current_version: "1.6.112"
       dolibarrmin: "10.0"
       dolibarrmax: "23.0"
       phpmin: "7.3"
@@ -44,15 +44,15 @@ packages:
       description:
         fr: 'Offre une solution pour réaliser un paiement en ligne pour toute cotisation d’adhésion à une association, don, facture client ou commande client via l’API HelloAsso. Offre aussi une possibilité de synchroniser les adhérents.'
         en: 'Provides a way to make an online checkout of any membership dues, donation, customer invoice or customer order with the HelloAsso API. Also offer an option to synchronize membership.'
-      status: 'enabled'		
+      status: 'enabled'
       created_at: '2024-12-10'
-      last_updated_at: "2026-03-31"
+      last_updated_at: "2026-05-19"
       category: '68, 67'
       git: 'https://github.com/Dolibarr/dolibarr-community-modules/tree/main/helloasso'
       git-branch: 'main'
       git-system: 'github'
       cover: 'https://raw.githubusercontent.com/Dolibarr/dolibarr-community-modules/main/helloasso/cover.png'
-      current_version: "2.0"
+      current_version: "2.1.0"
       dolibarrmin: "21.0"
       dolibarrmax: "24.0"
       phpmin: "7.1"
@@ -66,23 +66,25 @@ packages:
       dolistore-download: https://www.dolistore.com/product.php?id=2332
 
 
-    - modulename: 'KSEF' # Matches modKSEF class name
+    - modulename: 'KSEF'
       author: 'InPoint Automation'
       author_url: 'https://inpointautomation.com'
+      maintener_email: 'kontakt@inpointautomation.com'
       label:
-          en: 'KSeF Integration (by InPoint Automation)'
-          pl: 'Integracja KSeF (przez InPoint Automation)'
+        en: 'KSeF Integration (by InPoint Automation)'
+        pl: 'Integracja KSeF (przez InPoint Automation)'
       description:
-          en: 'Integrates Dolibarr with KSeF (Krajowy System e-Faktur), the Polish National e-Invoice System. Generates FA(3) XML invoices, signs and submits them to KSeF, downloads UPO receipts, and automatically adds QR codes to PDF invoices.'
-          pl: 'Integruje Dolibarr z KSeF (Krajowy System e-Faktur), polskim systemem e-faktur. Generuje faktury XML FA(3), podpisuje i przesyła je do KSeF, pobiera potwierdzenia UPO oraz automatycznie dodaje kody QR do faktur PDF.'
+        en: 'Integrates Dolibarr with KSeF (Krajowy System e-Faktur), the Polish National e-Invoice System. Generates FA(3) XML invoices, signs and submits them to KSeF, downloads UPO receipts, and automatically adds QR codes to PDF invoices.'
+        pl: 'Integruje Dolibarr z KSeF (Krajowy System e-Faktur), polskim systemem e-faktur. Generuje faktury XML FA(3), podpisuje i przesyła je do KSeF, pobiera potwierdzenia UPO oraz automatycznie dodaje kody QR do faktur PDF.'
       status: 'enabled'
       created_at: '2025-12-04'
-      last_updated_at: "2026-03-29"
+      last_updated_at: "2026-05-07"
+      category: '74'
       git: 'https://github.com/InPoint-Automation/Dolibarr-KSeF-Module.git'
       git-branch: 'main'
       git-system: 'github'
-      cover: 'https://github.com/InPoint-Automation/Dolibarr-KSeF-Module/blob/e674e8fa72162db968c774b8ef7857d8a2f6c038/img/ksef.png'
-      current_version: "1.3.4"
+      cover: 'https://raw.githubusercontent.com/InPoint-Automation/Dolibarr-KSeF-Module/refs/heads/main/img/ksef.png'
+      current_version: "1.3.7"
       dolibarrmin: "14.0"
       dolibarrmax: "23.0"
       phpmin: '7.4'
@@ -101,9 +103,9 @@ packages:
         fr: 'PDP Connect (France)'
         en: 'PDP Connect (France)'
       description:
-        fr: 'Offre une solution pour connecter votre Dolibarr à une Plateforme de Dématérialisé Partenaire (aussi appelé Plateforme Agréée) afin d’’envoyer et recevoir les factures au format Electronique. Inclut la lecture et génération de factures au format FacturX.'
-        en: 'Offers a solution to connect your Dolibarr to a Partner Dematerialized Platform (also called Approved Platform) in order to send and receive invoices in electronic format. Includes reading and generation of invoices in FacturX format.'
-      status: 'soon'	
+        fr: "Offre une solution de facturation électronique pour connecter votre Dolibarr à une Plateforme de Dématérialisation Partenaire (aussi appelé Plateforme Agréée) afin de générer, d''envoyer et de recevoir les factures au format Electronique (e-invoice au format FacturX ou CII)."
+        en: "Offers an e-invoice solution to connect your Dolibarr to a Partner Dematerialized Platform (also called Approved Platform) in order to send and receive invoices in electronic format. Includes reading and generation of invoices in FacturX format."
+      status: 'soon'
       git: 'https://github.com/Dolibarr/dolibarr-community-modules/tree/main/pdpconnectfr'
       git-branch: 'main'
       git-system: 'github'
@@ -115,7 +117,7 @@ packages:
       phpmax: ""
       price: 0
       created_at: '2025-10-10'
-      last_updated_at: "2026-03-31"
+      last_updated_at: "2026-05-19"
       # direct-download is yes if we can download the module to install it in application
       direct-download: no
       # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
@@ -138,13 +140,13 @@ packages:
         en: 'Adds to Dolibarr the ability to generate and receive electronic invoices in Peppol BIS 3 (UBL) format via the Peppol network.'
       status: 'enabled'
       created_at: '2024-12-10'
-      last_updated_at: "2026-03-27"
+      last_updated_at: "2026-05-19"
       # The git url, stable branch and system to get the sources and guess all auto value
       git: 'https://inligit.fr/cap-rel/dolibarr/plugin-peppol.git'
       git-branch: 'master'
       git-system: 'gitlab'
       cover: 'https://www.dolistore.com/wrapper.php?hashp=7TBpGJTTra9b4051Lv9ltKaD8qQk6J5i'
-      current_version: "1.2.120"
+      current_version: "1.2.134"
       dolibarrmin: "10.0"
       dolibarrmax: "23.0"
       phpmin: "7.1"
@@ -172,13 +174,13 @@ packages:
       git-branch: 'master'
       git-system: 'gitlab'
       cover: 'https://inligit.fr/cap-rel/dolibarr/plugin-stancer/-/raw/master/img/object_stancer.png?ref_type=heads&inline=false'
-      current_version: "2.0.6"
+      current_version: "2.0.10"
       dolibarrmin: "15.0"
       dolibarrmax: "23.0"
       phpmin: "7.4"
       phpmax: ""
       created_at: '2026-03-20'
-      last_updated_at: "2026-03-31"
+      last_updated_at: "2026-05-18"
       # direct-download is yes if we can download the module to install it in application
       direct-download: no
       # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
@@ -186,5 +188,3 @@ packages:
       # dolistore-download is url of product page for download if module can also be found on dolistore.com
       # Example: https://www.dolistore.com/product.php?id=xxx
       dolistore-download: 'https://www.dolistore.com/product.php?id=623'
-
-

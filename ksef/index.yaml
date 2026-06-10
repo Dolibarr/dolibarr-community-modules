@@ -17,13 +17,13 @@ packages:
     git: 'https://github.com/InPoint-Automation/Dolibarr-KSeF-Module.git'
     git-branch: 'main'
     git-system: 'github'
-    cover: 'https://github.com/InPoint-Automation/Dolibarr-KSeF-Module/blob/main/img/ksef.png'
+    cover: 'https://raw.githubusercontent.com/InPoint-Automation/Dolibarr-KSeF-Module/refs/heads/main/img/ksef.png'
     current_version: 'auto'
     dolibarrmin: 'auto'
     dolibarrmax: 'auto'
     phpmin: '7.4'
     phpmax: 'auto'
     price: 0
-    direct-download: yes
+    direct-download: no
     dolistore-upload: 'no'
     dolistore-download: ''

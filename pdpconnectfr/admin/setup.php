@@ -227,7 +227,15 @@ if (preg_match('/call'.$prefix.'HEALTHCHECK/i', $action, $reg)) {
 
 // Generate a sample invoice and try to send it
 if (preg_match('/make'.$prefix.'sampleinvoice/i', $action, $reg)) {
-	$result = $provider->sendSampleInvoice();
+	$result = $provider->sendSampleInvoice(1);
+	if ($result) {
+		setEventMessages('', $result, 'mesgs');
+	} else {
+		setEventMessages($provider->error, $provider->errors, 'errors');
+	}
+}
+if (preg_match('/makesend'.$prefix.'sampleinvoice/i', $action, $reg)) {
+	$result = $provider->sendSampleInvoice(0);
 	if ($result) {
 		setEventMessages('', $result, 'mesgs');
 	} else {
@@ -339,23 +347,59 @@ print info_admin($langs->trans("PDPConnectInfo").'<br>'.$langs->trans("PDPConnec
  }
  */
 
+/**
+ * Render a FormSetup with a section title and v18/v19 visual parity with v20+.
+ *
+ * @param FormSetup $formSetupInstance Form setup instance
+ * @param string    $title             Section title to display in the first column header
+ * @return string                      HTML output
+ */
+$pdpRenderFormSetup = function ($formSetupInstance, $title) use ($langs) {
+	if ((float) DOL_VERSION >= 20) {
+		// Native multi-arg signature available since Dolibarr 20.0.0
+		return $formSetupInstance->generateOutput(true, false, $title, 'titlefieldmiddle');
+	}
+
+	// v18/v19 fallback: generateOutput() accepts only $editMode and always renders a Cancel button.
+	// Capture the HTML and rewrite the header row + suppress the Cancel link to mimic v20+ rendering.
+	$html = $formSetupInstance->generateOutput(true);
+
+	$titleEscaped = htmlspecialchars($title, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+	$parameterLabel = $langs->trans('Parameter');
+	$valueLabel = $langs->trans('Value');
+
+	// Replace the default "Parameter / Value" header with the section title (v20+ behavior)
+	$html = preg_replace(
+		'#<tr class="liste_titre">\s*<td>'.preg_quote($parameterLabel, '#').'</td>\s*<td>'.preg_quote($valueLabel, '#').'</td>\s*</tr>#',
+		'<tr class="liste_titre"><td class="titlefieldmiddle">'.$titleEscaped.'</td><td></td></tr>',
+		$html,
+		1
+	);
+
+	// Suppress the Cancel button to mimic v20+ rendering (Cancel was commented out upstream)
+	$html = preg_replace(
+		'#&nbsp;&nbsp;\s*<a class="button button-cancel"[^>]*>[^<]*</a>#',
+		'',
+		$html
+	);
+
+	return $html;
+};
+
 if (!empty($formSetup->items)) {
-	print $formSetup->generateOutput(3, false, $langs->transnoentitiesnoconv('PlatformPartner'), 'titlefieldmiddle');
+	print $pdpRenderFormSetup($formSetup, $langs->transnoentitiesnoconv('PlatformPartner'));
 }
 
 if (!empty($provider) && !empty($formSetup2->items)) {
 	print $provider->helpToGetCredentials;
-	print '<br>';
 }
 
 if ($stringwarning) {
 	print $stringwarning;
-} else {
-	print '<br>';
 }
 
 if (!empty($formSetup2->items)) {
-	print $formSetup2->generateOutput(true, false, $langs->transnoentitiesnoconv('PDPConnectionSetup'), 'titlefieldmiddle');
+	print $pdpRenderFormSetup($formSetup2, $langs->transnoentitiesnoconv('PDPConnectionSetup'));
 	print '<br>';
 }
 

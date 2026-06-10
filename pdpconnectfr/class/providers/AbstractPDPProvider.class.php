@@ -146,17 +146,21 @@ abstract class AbstractPDPProvider
 	 */
 	public function getApiUrl($mode = 'api')
 	{
-		$prod = getDolGlobalString('PDPCONNECTFR_LIVE', '');
+		// Use getDolGlobalInt so that PDPCONNECTFR_LIVE = "0" is correctly treated as test mode.
+		// A previous "$prod != ''" comparison was incorrect because '0' != '' is true in PHP,
+		// which made the module hit the production endpoint as soon as the user had ever toggled
+		// the "real mode" switch (the const gets stored as "0" instead of being deleted).
+		$prod = getDolGlobalInt('PDPCONNECTFR_LIVE');
 
 		if ($mode === 'auth') {
 			$url = $this->config['test_auth_url'];
-			if ($prod != '') {
+			if (!empty($prod)) {
 				$url = $this->config['prod_auth_url'];
 			}
 			return $url;
 		} else {
 			$url = $this->config['test_api_url'];
-			if ($prod != '') {
+			if (!empty($prod)) {
 				$url = $this->config['prod_api_url'];
 			}
 		}
@@ -200,12 +204,12 @@ abstract class AbstractPDPProvider
 
 	/**
 	 * Send a sample electronic invoice for testing purposes.
-	 *
 	 * This function generates a sample invoice and sends it to PDP
 	 *
-	 * @return array|string True if the invoice was successfully sent, false otherwise.
+	 * @param 	int 			$onlymake		1=to only make the sample
+	 * @return 	array|string 					True if the invoice was successfully sent, false otherwise.
 	 */
-	abstract public function sendSampleInvoice();
+	abstract public function sendSampleInvoice($onlymake = 0);
 
 
 	/**

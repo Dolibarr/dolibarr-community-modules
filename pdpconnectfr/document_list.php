@@ -1,7 +1,8 @@
 <?php
-/* Copyright (C) 2007-2017  Laurent Destailleur     <eldy@users.sourceforge.net>
- * Copyright (C) 2024       Frédéric France         <frederic.france@free.fr>
- * Copyright (C) 2025		SuperAdmin					<daoud.mouhamed@gmail.com>
+/* Copyright (C) 2007-2017  Laurent Destailleur         <eldy@users.sourceforge.net>
+ * Copyright (C) 2024       Frédéric France             <frederic.france@free.fr>
+ * Copyright (C) 2025       SuperAdmin                  <daoud.mouhamed@gmail.com>
+ * Copyright (C) 2026       Alexandre Spangaro          <alexandre@inovea-conseil.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -735,7 +736,7 @@ if (file_exists($filePathFacturX)) {
 	$urlOriginalFile = DOL_URL_ROOT . '/document.php?modulepart=pdpconnectfr&file=' . urlencode('temp/facturx.pdf');
 	$urlConvertedFile = DOL_URL_ROOT . '/document.php?modulepart=pdpconnectfr&file=' . urlencode('temp/facturx_readable.pdf');
 
-	$last_supplier_invoice_error = '<span class="opacitylowx">'.img_picto('', 'times', 'class="pictofixedwidth" style="color:red;"');
+	$last_supplier_invoice_error = '<span class="opacitylowx">'.img_picto('', 'times', 'class="pictofixedwidth"');
 	$last_supplier_invoice_error .= ' ' . $langs->trans("LastSupplierInvoiceCouldNotBeProcessed");
 	$last_supplier_invoice_error .= '<i class="fas fa-info-circle em088 opacityhigh classfortooltip" title="'. $langs->trans("LastSupplierInvoiceCouldNotBeProcessedInfo") .'"></i>';
 	$last_supplier_invoice_error .= ' : </span>';
@@ -747,7 +748,7 @@ if (file_exists($filePathFacturX)) {
 if (file_exists($filePathCII)) {
 	$urlOriginalFile = DOL_URL_ROOT . '/document.php?modulepart=pdpconnectfr&file=' . urlencode('temp/einvoice.xml');
 
-	$last_supplier_invoice_error = '<span class="opacitylowx">'.img_picto('', 'times', 'class="pictofixedwidth" style="color:red;"');
+	$last_supplier_invoice_error = '<span class="opacitylowx">'.img_picto('', 'times', 'class="pictofixedwidth"');
 	$last_supplier_invoice_error .= ' ' . $langs->trans("LastSupplierInvoiceCouldNotBeProcessed");
 	$last_supplier_invoice_error .= '<i class="fas fa-info-circle em088 opacityhigh classfortooltip" title="'. $langs->trans("LastSupplierInvoiceCouldNotBeProcessedInfo") .'"></i>';
 	$last_supplier_invoice_error .= ' : </span>';
@@ -1250,12 +1251,14 @@ while ($i < $imaxinloop) {
 				}
 				print '>';
 				if ($key == 'flow_direction') {
-					if ($object->flow_direction == 'Out') {
-						print '<span class="stockmovementexit">';
-					} else {
-						print '<span class="stockmovemententry">';
-					}
-					print $object->flow_direction;
+					$isOut = ($object->flow_direction === 'Out');
+					$label = $isOut ? $langs->trans('Output') : $langs->trans('Input');
+					$picto = $isOut ? '1uparrow' : '1downarrow';
+					$class = $isOut ? 'stockmovementexit' : 'stockmovemententry';
+
+					print '<span class="' . $class . ' nowrap" title="' . $label . '">';
+					print img_picto($label, $picto, 'class="paddingrightonly"');
+					print $label;
 					print '</span>';
 				} elseif ($key == 'status') {
 					print $object->getLibStatut(5);

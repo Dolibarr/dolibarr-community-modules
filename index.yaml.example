@@ -55,7 +55,8 @@ packages:
       price: 0
       created_at: '2025-03-05'
       last_updated_at: "2026-03-16"
-      # direct-download is yes if we can download the module to install it in application
+      # direct-download is yes if we can download the module to install it in application.
+      # If set to yes, a package named module_<modulename>-x.y[.z].zip must be available in the repository.
       direct-download: no
       # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
       dolistore-upload: 'manual'

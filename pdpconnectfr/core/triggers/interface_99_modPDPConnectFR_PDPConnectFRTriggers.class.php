@@ -40,7 +40,7 @@ class InterfacePDPConnectFRTriggers extends DolibarrTriggers
 		parent::__construct($db);
 		$this->family = "pdpconnectfr";
 		$this->description = "PDPConnectFR triggers.";
-		$this->version = self::VERSIONS['dev'];
+		$this->version = 'development';
 		$this->picto = 'pdpconnectfr@pdpconnectfr';
 	}
 
@@ -72,27 +72,41 @@ class InterfacePDPConnectFRTriggers extends DolibarrTriggers
 		}
 
 		if ($action == 'BILL_CREATE') {
-			//When invoice is created
+			$pdpConnectFr = new PdpConnectFr($db);
+
+			// When invoice is created
+			$result = $pdpConnectFr->setEInvoiceStatus($object, GETPOST('seteinvoicestatus'), '');
+			if ($result < 0) {
+				$this->errors[] = $pdpConnectFr->errors;
+				return -1;
+			}
 		}
 
 		if ($action == 'BILL_VALIDATE') {
 			$pdpConnectFr = new PdpConnectFr($db);
 
-			$statustouse = $pdpConnectFr::STATUS_IGNORE;
+			$result = $pdpConnectFr->fetchLastknownInvoiceStatus($object->id);
 
-			// Test if invoice need to be managed by EInvoice
-			$needEinvoice = $pdpConnectFr->needEInvoiceManagement($object);
-			if ($needEinvoice) {
-				$statustouse = $pdpConnectFr::STATUS_NOT_GENERATED;
-			}
+			// If $result is $pdpConnectFr::STATUS_IGNORE, we do nothing.
 
-			$newobject = dol_clone($object, 2);
-			$newobject->ref = $object->newref;
+			// If einvoice was set to $pdpConnectFr::STATUS_NOT_GENERATED or $pdpConnectFr::STATUS_UNKNOWN, we set it to STATUS_IGNORE (if not qualified for einvoice) or STATUS_NOT_GENERATED (if qualified for einvoice)
+			if ($result['code'] == $pdpConnectFr::STATUS_NOT_GENERATED || $result['code'] == $pdpConnectFr::STATUS_UNKNOWN) {
+				// By default, we set status to ignore
+				$statustouse = $pdpConnectFr::STATUS_IGNORE;
+				// Test if invoice need to be managed by EInvoice
+				$needEinvoice = $pdpConnectFr->needEInvoiceManagement($object);
+				if ($needEinvoice) {
+					$statustouse = $needEinvoice;
+				}
 
-			$result = $pdpConnectFr->setEInvoiceStatus($newobject, $statustouse, '');
-			if ($result < 0) {
-				$this->errors[] = $pdpConnectFr->errors;
-				return -1;
+				$newobject = dol_clone($object, 2);
+				$newobject->ref = $object->newref;
+
+				$result = $pdpConnectFr->setEInvoiceStatus($newobject, $statustouse, '');
+				if ($result < 0) {
+					$this->errors[] = $pdpConnectFr->errors;
+					return -1;
+				}
 			}
 		}
 

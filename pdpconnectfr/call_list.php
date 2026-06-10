@@ -211,9 +211,9 @@ $arrayfields = dol_sort_array($arrayfields, 'position');
 // Set $enablepermissioncheck to 1 to enable a minimum low level of checks
 $enablepermissioncheck = getDolGlobalInt('PDPCONNECTFR_ENABLE_PERMISSION_CHECK');
 if ($enablepermissioncheck) {
-	$permissiontoread = $user->hasRight('pdpconnectfr', 'call', 'read');
-	$permissiontoadd = $user->hasRight('pdpconnectfr', 'call', 'write');
-	$permissiontodelete = $user->hasRight('pdpconnectfr', 'call', 'delete');
+	$permissiontoread = $user->hasRight('pdpconnectfr', 'document', 'read');
+	$permissiontoadd = $user->hasRight('pdpconnectfr', 'document', 'write');
+	$permissiontodelete = $user->hasRight('pdpconnectfr', 'document', 'delete');
 } else {
 	$permissiontoread = 1;
 	$permissiontoadd = 1;
