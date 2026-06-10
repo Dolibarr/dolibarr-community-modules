@@ -140,7 +140,7 @@ class Document extends CommonObject
 		"document_body" => array("type" => "text", "label" => "document_body", "enabled" => "1", 'position' => 110, 'notnull' => 0, "visible" => "0", "comment" => "Full document content XML"),
 		"fk_element_type" => array("type" => "varchar(100)", "label" => "fk_element_type", "enabled" => "1", 'position' => 120, 'notnull' => 0, "visible" => "1",),
 		"fk_element_id" => array("type" => "integer", "label" => "fk_element_id", "enabled" => "1", 'position' => 130, 'notnull' => 0, "visible" => "-1",),
-		"tracking_idref" => array("type" => "varchar(255)", "label" => "RefObject", "enabled" => "1", 'position' => 135, 'notnull' => 0, "visible" => "1", "comment" => "Document tracking identifier"),
+		"tracking_idref" => array("type" => "varchar(255)", "label" => "RefObject", "enabled" => "1", 'position' => 135, 'notnull' => 0, "visible" => "1", "comment" => "Document tracking identifier", "csslist" => "nowrap"),
 		"submittedat" => array("type" => "datetime", "label" => "submittedAt", "enabled" => "1", 'position' => 140, 'notnull' => 1, "visible" => "-1", "comment" => "submittedAt (PDP Date)"),
 		"updatedat" => array("type" => "datetime", "label" => "updatedAt", "enabled" => "1", 'position' => 150, 'notnull' => 0, "visible" => "1", "comment" => "updatedAt (PDP Date)"),
 		"entity" => array("type" => "integer", "label" => "entity", "enabled" => "1", 'position' => 170, 'notnull' => 0, "visible" => "0", "comment" => "Multi-entity support"),
