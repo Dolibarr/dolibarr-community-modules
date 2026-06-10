@@ -180,7 +180,7 @@ $oauthserverurl .= (preg_match('/\/$/', $oauthserverurl) ? '' : '/').'authorize?
 $save_redirect_uri = GETPOST('redirect_uri');
 // TODO Test that redirect_uri match an allowed url/domain
 
-$redirect_uri = dol_buildpath('/custom/pdpconnectfr/public/proxy_oauthcallback.php', 3);
+$redirect_uri = dol_buildpath('pdpconnectfr/public/proxy_oauthcallback.php', 3);
 $oauthserverurl .= '&redirect_uri='.urlencode($redirect_uri);
 
 
@@ -251,7 +251,7 @@ if (empty($code) && !GETPOST('error')) {
 				$oauthserverurl = $providerconfig['prod_auth_url'];
 				$oauthserverurl .= (preg_match('/\/$/', $oauthserverurl) ? '' : '/').'token';
 
-				$redirect_uri = dol_buildpath('/custom/pdpconnectfr/public/proxy_oauthcallback.php', 3);
+				$redirect_uri = dol_buildpath('pdpconnectfr/public/proxy_oauthcallback.php', 3);
 
 				$params = [
 					"client_id" => getDolGlobalString($keyforparamid),

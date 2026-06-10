@@ -148,9 +148,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 					$this->helpToGetCredentials .= '</div>';
 				}
 			} else {
-				global $dolibarr_main_url_root;
-
-				$urlforproxy = $dolibarr_main_url_root . '/custom/pdpconnectfr/public/proxy_oauthcallback.php';
+				$urlforproxy =  dol_buildpath('pdpconnectfr/public/proxy_oauthcallback.php', 3);
 
 				$this->helpToGetCredentials = '<div class="green greenborder">';
 				$this->helpToGetCredentials .= 'You are on the proxy for SuperPDP Access Point registration.<br><br>';

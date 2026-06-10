@@ -370,9 +370,8 @@ if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 
 		print '<br>';
 
-		global $dolibarr_main_url_root;
 
-		$urlforproxy = $dolibarr_main_url_root.'/custom/pdpconnectfr/public/proxy_oauthcallback.php';
+		$urlforproxy = dol_buildpath('pdpconnectfr/public/proxy_oauthcallback.php', 3);
 
 
 		if (getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER') == 'proxy') {
