@@ -145,8 +145,8 @@ if ($id > 0 || !empty($ref)) {
 // Set $enablepermissioncheck to 1 to enable a minimum low level of checks
 $enablepermissioncheck = getDolGlobalInt('PDPCONNECTFR_ENABLE_PERMISSION_CHECK');
 if ($enablepermissioncheck) {
-	$permissiontoread = $user->hasRight('pdpconnectfr', 'document', 'read');
-	$permissiontoadd  = $user->hasRight('pdpconnectfr', 'document', 'write'); // Used by the include of actions_addupdatedelete.inc.php and actions_linkedfiles.inc.php
+	$permissiontoread = $user->hasRight('pdpconnectfr', 'read');
+	$permissiontoadd  = $user->hasRight('pdpconnectfr', 'write'); // Used by the include of actions_addupdatedelete.inc.php and actions_linkedfiles.inc.php
 } else {
 	$permissiontoread = 1;
 	$permissiontoadd  = 1;
