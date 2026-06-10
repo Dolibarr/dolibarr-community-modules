@@ -346,7 +346,7 @@ if (getDolGlobalString('PDPCONNECTFR_PDP')) {
 		print '<br>';
 
 
-		$urlforproxy = dol_buildpath('pdpconnectfr/public/proxy_oauthcallback.php',3);
+		$urlforproxy = dol_buildpath('pdpconnectfr/public/proxy_oauthcallback.php', 3);
 
 
 		if (getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER') == 'proxy') {
