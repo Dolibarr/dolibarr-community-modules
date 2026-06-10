@@ -1749,7 +1749,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 
 		$pdpconnectfr = new PdpConnectFr($db);
-		$availableStatuses = $pdpconnectfr->getEinvoiceStatusOptions(1, 1, 1);
+		$availableStatuses = $object->element === 'invoice_supplier'
+			? $pdpconnectfr->getEinvoiceStatusOptions(1, 1, 1)
+			: [$pdpconnectfr::STATUS_PAID => $pdpconnectfr::STATUS_LABEL_KEYS[$pdpconnectfr::STATUS_PAID]];	// Required to send the new status of customer invoices. We may need to consider a new method for obtaining these statuses or update the current method.
 		if (!array_key_exists($statusCode, $availableStatuses)) {
 			$res = -1;
 			$message = 'SendStatusMessage Unsupported status code: ' . $statusCode;

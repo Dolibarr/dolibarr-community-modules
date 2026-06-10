@@ -218,7 +218,7 @@ class CdarHandler
 
 		// Id format: {SupplierRef}_{StatusCode}_{CreationDate}#{DocType}_{CreationDate} as defined in documentation
 		// TODO: map DOC_INVOICE with $object type
-		$ID = $object->ref_supplier . '_' . $statusCode . '_' . date('YmdHis', $object->date_creation) . '#' . CdarHandler::DOC_INVOICE . '_' . date('Ymd', $object->date_creation);
+		$ID = ($statusCode == 212 ? $object->ref : $object->ref_supplier) . '_' . $statusCode . '_' . date('YmdHis', $object->date_creation) . '#' . CdarHandler::DOC_INVOICE . '_' . date('Ymd', $object->date_creation);
 
 		// We use same as ID for Name as its not required to be different
 		$Name = $ID;
@@ -227,10 +227,14 @@ class CdarHandler
 		$mysocGlobalID = idprof($mysoc);
 
 		// Issuer SIREN (0002)
-		$InvoiceIssuerGlobalID = thirdpartyidprof($object);
+		$InvoiceIssuerGlobalID = $statusCode == 212	// Customer invoices management (Only 212 for now)
+			? idprof($mysoc)
+			: thirdpartyidprof($object);
 
 		// Invoice reference
-		$IssuerAssignedID = $object->ref_supplier;
+		$IssuerAssignedID = $statusCode == 212	// Customer invoices management (Only 212 for now)
+			? $object->ref
+			: $object->ref_supplier;
 
 		/**
 		 * MDT-88
