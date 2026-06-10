@@ -321,3 +321,10 @@ PDPCONNECTFR_SUPERPDP_HELP_CREDENTIAL_VIA_PARTNER=Pour pouvoir utiliser la factu
 
 # Reasons
 ReasonUnknownTransaction=Transaction inconnue
+
+# Erreurs génération FacturX — virement bancaire
+ErrorFailedToRegeneratePDF=Le fichier PDF de la facture est introuvable et sa régénération a échoué. Veuillez regénérer le PDF depuis la fiche facture avant de relancer la génération de la facture électronique.
+IBANForSellerMandatoryOnCreditTransferButNotBankAcount=Le mode de paiement est configuré sur virement bancaire, mais aucun compte bancaire par défaut n'a été défini.
+IBANForSellerMandatoryOnCreditTransferButNotBankAcount2=Définissez un compte bancaire par défaut dans la configuration du module factures OU dans la facture elle-même (et vérifiez que ce compte bancaire possède un numéro IBAN).
+IBANForSellerMandatoryOnCreditTransferButNotBAN=Le mode de paiement est configuré sur virement bancaire, mais le compte bancaire par défaut sélectionné ne possède pas de numéro IBAN.
+IBANForSellerMandatoryOnCreditTransferButNotBAN2=Renseignez un numéro IBAN sur le compte bancaire.

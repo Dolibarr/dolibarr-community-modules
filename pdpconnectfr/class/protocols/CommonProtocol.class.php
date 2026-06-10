@@ -630,6 +630,13 @@ trait CommonProtocol
 					$thirdparty->tva_assuj = 1;
 				}
 			}
+			// Si le tiers n'est pas encore fournisseur, on le marque comme tel
+			// (ex. prospect/client qui reçoit sa 1ère facture fournisseur).
+			if (!$thirdparty->fournisseur) {
+				$thirdparty->fournisseur = 1;
+				$thirdparty->code_fournisseur = 'auto';
+			}
+
 			$result = $thirdparty->update(0, $user);
 			if ($result < 0) {
 				$this->error = $thirdparty->error;

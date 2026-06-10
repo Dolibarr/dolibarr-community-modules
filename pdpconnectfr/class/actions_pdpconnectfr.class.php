@@ -241,7 +241,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 					$url_button[] = array(
 						'lang' => 'pdpconnectfr',
 						'enabled' => 1,
-						'perm' => (bool) $user->hasRight("pdpconnectfr", "document", "write"),
+						'perm' => (bool) $user->hasRight("pdpconnectfr", "document", "write") && ($currentStatusDetails['file'] == 1),
 						'label' => $langs->trans('sendToPDP'),
 						//'help' => $langs->trans('SendToPDPHelp'),
 						'url' => '/compta/facture/card.php?id=' . $object->id . '&action=send_to_pdp&token=' . newToken()

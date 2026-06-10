@@ -256,6 +256,7 @@ ConfirmSendStatusMessage=Are you sure you want to update the status of invoice %
 SelectStatusReason=Reason
 TryToIncreaseStartDateOrMax=No new flow processed. Try to increase the "%s"
 ErrorGeneratingXML=Error when generating the e-invoice XML file
+ErrorFailedToRegeneratePDF=The invoice PDF file is missing and could not be regenerated. Please regenerate the PDF from the invoice card before retrying e-invoice generation.
 pdpconnectfrLastSentStatus=Last sent status
 pdpconnectfrInvoiceReason=E-invoicing status reason
 PDPCONNECTFR_PMT=Notice for recovery fees
