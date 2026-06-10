@@ -152,7 +152,7 @@ function idprof($thirdparty)
 			if (!empty($thirdparty->idprof1)) {
 				$retour = removeAllSpaces($thirdparty->idprof1); // SIREN
 			} else {
-				$retour = substr(removeAllSpaces($thirdparty->idprof2, 9); // 9 first chars of SIRET
+				$retour = substr(removeAllSpaces($thirdparty->idprof2), 9); // 9 first chars of SIRET
 			}
 			break;
 		default:
