@@ -136,30 +136,30 @@ function idprof($thirdparty)
 	$retour = "";
 	switch ($thirdparty->country_code) {
 		case 'BE':
-			$retour = $thirdparty->idprof1;
+			$retour = removeAllSpaces($thirdparty->idprof1);
 			break;
 		case 'DE':
 			if (!empty($thirdparty->idprof6)) {
-				$retour = $thirdparty->idprof6;
+				$retour = removeAllSpaces($thirdparty->idprof6);
 				break;
 			} elseif (!empty($thirdparty->idprof2) && !empty($thirdparty->idprof3)) {
-				$retour = $thirdparty->idprof2 . $thirdparty->idprof3;
+				$retour = removeAllSpaces($thirdparty->idprof2 . $thirdparty->idprof3);
 			} else {
-				$retour = $thirdparty->idprof1;
+				$retour = removeAllSpaces($thirdparty->idprof1);
 			}
 			break;
 		case 'FR':
 			if (!empty($thirdparty->idprof1)) {
-				$retour = $thirdparty->idprof1; // SIREN
+				$retour = removeAllSpaces($thirdparty->idprof1); // SIREN
 			} else {
-				$retour = substr($thirdparty->idprof2, 9); // 9 first chars of SIRET
+				$retour = substr(removeAllSpaces($thirdparty->idprof2), 9); // 9 first chars of SIRET
 			}
 			break;
 		default:
-			$retour = $thirdparty->idprof1 ? $thirdparty->idprof1 : $thirdparty->idprof2;
+			$retour = removeAllSpaces($thirdparty->idprof1 ? $thirdparty->idprof1 : $thirdparty->idprof2);
 	}
 
-	return preg_replace('/\\s+/', '', $retour);
+	return $retour;
 }
 
 /**
@@ -174,6 +174,38 @@ function thirdpartyidprof($object)
 	return idprof($object->thirdparty);
 }
 
+/**
+ * removeAllSpaces
+ *
+ * @param  string $str string to be cleaned
+ * @param  ?string $original_encoding original encoding
+ * @return string
+ */
+function removeAllSpaces(string $str, ?string $original_encoding = null)
+{
+	// find encoding
+	if ($original_encoding === null) {
+		$original_encoding = mb_detect_encoding($str, mb_detect_order(), true) ?: 'UTF-8';
+	}
+
+	$is_utf8 = (strtoupper($original_encoding) === 'UTF-8');
+	if (!$is_utf8) {
+		$str = mb_convert_encoding($str, 'UTF-8', $original_encoding);
+	}
+
+	// this transform '&nbsp;', '&ensp;', '&emsp;', '&thinsp;' etc. in real spaces Unicode
+	$str = html_entity_decode($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+	// suppress via Regex
+	$str = preg_replace('/[\p{Z}\s\x{200B}-\x{200D}\x{FEFF}]+/u', '', $str);
+
+	// restore encoding
+	if (!$is_utf8) {
+		$str = mb_convert_encoding($str, $original_encoding, 'UTF-8');
+	}
+
+	return $str;
+}
 
 
 // Compatibility functions
