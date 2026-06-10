@@ -184,7 +184,7 @@ trait CommonProtocol
 			CommonInvoice::TYPE_SITUATION       => '380',				// Process situation invoice as common invoice
 		];
 
-		// TODO Manage the credit note of a deposit invoice
+		// TODO Manage the credit note of a deposit invoice ?
 
 		return $map[$object->type] ?? null;
 	}
@@ -233,12 +233,170 @@ trait CommonProtocol
 
 
 	/**
+	 * Generate a sample E-invoice for demonstration or testing purposes (for Dolibarr version >= 24.0)
+	 *
+	 * This method creates a dummy invoice with representative data
+	 * to illustrate the E-invoice structure without using real business information.
+	 *
+	 * @param	PdpConnectFr			$pdpconnectfr			PDPConnectFR
+	 * @param   Societe|null			$thirdpartySeller		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
+	 * @param   Societe|null			$thirdpartyBuyer		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
+	 * @param   array<string,mixed>		$options				More options
+	 * @return 	-1|array<string,string> 							Path or content of the generated sample invoice.
+	 */
+	public function generateSampleInvoice($pdpconnectfr, $thirdpartySeller = null, $thirdpartyBuyer = null, $options = array())
+	{
+		global $conf, $langs, $mysoc;
+
+		dol_mkdir($conf->pdpconnectfr->dir_temp);
+
+		$outputlangs = $langs;		// TODO Use the target language
+
+		require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
+		$tmpinvoice = new Facture($this->db);
+		$tmpinvoice->initAsSpecimen('nolines');
+
+		$tmpinvoice->ref .= '-' . dol_print_date(dol_now(), '%y%m%d-%H%M%S');
+		if (!empty($options['invoicetype'])) {
+			$tmpinvoice->type = $options['invoicetype'];
+		}
+
+		// Reference of original invoice in case of credit note
+		if ($tmpinvoice->type == Facture::TYPE_CREDIT_NOTE) {
+			$tmpinvoice->fk_facture_source = $options['referencedinvoice'] ?? 'FA0000-SPECIMEN';
+		}
+
+		$line = new FactureLigne($this->db);
+		$line->desc = $langs->trans("Description") . " 1";
+		$line->qty = 5;
+		$line->subprice = 100.05;		// unit price (no discount yet)
+		$line->tva_tx = get_default_tva($thirdpartySeller, $thirdpartyBuyer);
+		$line->localtax1_tx = 0;
+		$line->localtax2_tx = 0;
+		$line->remise_percent = 10;
+		$line->fk_product = 0;
+
+		include_once DOL_DOCUMENT_ROOT.'/core/lib/price.lib.php';
+		// Force MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY, so we are sure sample is valid at the initial object.
+		// TODO Make this sample generation working with any configuration of discount.
+		$conf->global->MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY = 2;
+
+		$tmp = calcul_price_total($line->qty, $line->subprice, $line->remise_percent, $line->tva_tx, 0, 0, 0, 'HT', 0, 0);
+
+		$line->total_ht = $tmp[0];
+		$line->total_ttc = $tmp[2];
+		$line->total_tva = $tmp[1];
+		$line->multicurrency_tx = 2;
+		$line->multicurrency_total_ht = 2 * $line->total_ht;
+		$line->multicurrency_total_ttc = 2 * $line->total_ttc;
+		$line->multicurrency_total_tva = 2 * $line->total_tva;
+
+		$tmpinvoice->lines[] = $line;
+
+		$tmpinvoice->total_ht       += $line->total_ht;
+		$tmpinvoice->total_tva      += $line->total_tva;
+		$tmpinvoice->total_ttc      += $line->total_ttc;
+
+		$tmpinvoice->multicurrency_total_ht       += $line->multicurrency_total_ht;
+		$tmpinvoice->multicurrency_total_tva      += $line->multicurrency_total_tva;
+		$tmpinvoice->multicurrency_total_ttc      += $line->multicurrency_total_ttc;
+
+
+		require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
+
+
+		// Set $mysoc if seller is not myself (when we want to generate a sample invoice for a purchase).
+		$keyforconst = 'PDPCONNECTFR_' . getDolGlobalString('PDPCONNECTFR_PDP') . '_ROUTING_ID';
+		$savmysoc = null;
+		$savPDPCONNECTFR_ROUTING_ID = null;
+		if ($thirdpartySeller instanceof Societe) {
+			$savmysoc = $mysoc;
+			$savPDPCONNECTFR_ROUTING_ID = getDolGlobalString($keyforconst);
+
+			$mysoc = $thirdpartySeller;
+			$conf->global->PDPCONNECTFR_SUPERPDP_ROUTING_ID = idprof($thirdpartySeller);
+		} else {
+			$thirdpartySeller = $mysoc;
+		}
+		//var_dump(($savmysoc ? $savmysoc->name : ''), $mysoc->name, $thirdpartyBuyer->name);
+
+
+		if ($thirdpartyBuyer instanceof Societe) {
+			$tmpthirdparty = $thirdpartyBuyer;
+		} else {
+			$tmpthirdparty = new Societe($this->db);
+			$tmpthirdparty->initAsSpecimen();
+			if ($thirdpartySeller->idprof1 == "000000001") {
+				// Example Burger Queen on SuperPDP Network
+				$tmpthirdparty->idprof1 = '000000002';
+				$tmpthirdparty->idprof2 = '00000000200010';
+				$tmpthirdparty->tva_intra = 'FR12000000002';
+				define('PDPCONNECT_FORCE_BUYER_EID', getDolGlobalString('PDPCONNECT_DEMO_ROUTING_BURGER_QUEEN', '315143296_1940')); // vary into demo accounts
+			} else {
+				// Example Tricatel on SuperPDP Network
+				$tmpthirdparty->idprof1 = '000000001';
+				$tmpthirdparty->idprof2 = '00000000100010';
+				$tmpthirdparty->tva_intra = 'FR12000000001';
+				define('PDPCONNECT_FORCE_BUYER_EID', getDolGlobalString('PDPCONNECT_DEMO_ROUTING_TRICATEL', '315143296_1939'));
+			}
+		}
+		$tmpinvoice->thirdparty = $tmpthirdparty;
+		$tmpinvoice->socid = $tmpthirdparty->id;			// 0 for specimen
+
+		require_once DOL_DOCUMENT_ROOT . '/contact/class/contact.class.php';
+		$tmpcontact = new Contact($this->db);
+		$tmpcontact->initAsSpecimen();
+		$tmpcontact->socid = $tmpthirdparty->id;			// 0 for specimen
+		$tmpinvoice->contact = $tmpcontact;
+
+
+		// Generate the Dolibarr PDF of the invoice
+		$tmpinvoice->generateDocument($tmpinvoice->model_pdf, $outputlangs);
+
+		// For invoice with ->specimen=1, the file is SPECIMEN.pdf so we rename it into ref
+		$dir = $conf->invoice->multidir_output[$conf->entity];
+		$srcfile = $dir . '/SPECIMEN.pdf';
+		$destfile = $dir . '/' . dol_sanitizeFileName($tmpinvoice->ref) . '.pdf';
+
+		dol_move($srcfile, $destfile, '0', 1);
+
+
+		// Generate the EInvoice file
+		$pathOfEInvoice = $this->generateInvoice($tmpinvoice, $outputlangs);
+
+		// Restore switched variables if we changed $mysoc for generation of the sample invoice
+		if (!empty($savmysoc)) {
+			$mysoc = $savmysoc;
+			$conf->global->$keyforconst = $savPDPCONNECTFR_ROUTING_ID;
+
+			$savmysoc = null;
+			$savPDPCONNECTFR_ROUTING_ID = null;
+		}
+
+		// Restore name SPECIMEN.pdf
+		dol_move($destfile, $srcfile, '0', 1);
+
+		// Move EInvoice file into the temp directory
+		if (is_numeric($pathOfEInvoice) && $pathOfEInvoice < 0) {
+			$result = $pathOfEInvoice;
+		} else {
+			$newPathOfEInvoice = $dir . '/temp/' . basename($pathOfEInvoice);
+			dol_move($pathOfEInvoice, $newPathOfEInvoice, '0', 1);
+
+			$result = array('path' => $newPathOfEInvoice, 'ref' => $tmpinvoice->ref);
+		}
+
+		return $result;
+	}
+
+
+	/**
 	 * Synchronize or create a Dolibarr thirdparty based on E-invoice seller information.
 	 *
 	 * @param array     $sellerInfo 	Array containing seller information extracted from E-invoice
 	 * @param string    $priority 		Fill priority ('dolibarr' or 'pdp'). If both data are available, which one to prefer
 	 * @param string    $flowId 		Flow identifier source of the thirdparty.
-	 * @return array{res:int, message:string, actioncode:string|null, actionurl:string|null, action:string|null}   Returns array with 'res' (ID of the synchronized or created thirdparty, -1 on error) with a 'message' and an optional 'actioncode', 'actionurl', and 'action'.
+	 * @return array{res:int, message:string, actioncode:string|null, actionurl:string|null, action:string|null}   Returns array with 'res' (ID of the synchronized or created/updated thirdparty, -1 on error) with a 'message' and an optional 'actioncode', 'actionurl', and 'action'.
 	 */
 	private function _syncOrCreateThirdpartyFromEInvoiceSeller($sellerInfo, $priority = 'dolibarr', $flowId = '')
 	{
@@ -676,11 +834,11 @@ trait CommonProtocol
 
 		$pdpconnectfr = new PdpConnectFr($db);
 
-		// Search in product supplier prices table using prodsellerid
+		// Search in product supplier prices table using prodsellerid (the ref of product of the vendor)
 		$sql = "SELECT p.rowid ";
 		$sql .= " FROM " . MAIN_DB_PREFIX . "product as p ";
 		$sql .= " INNER JOIN " . MAIN_DB_PREFIX . "product_fournisseur_price as pfp ON pfp.fk_product = p.rowid ";
-		$sql .= " WHERE pfp.product_supplier_id = '" . $db->escape($lineData['prodsellerid']) . "' ";
+		$sql .= " WHERE pfp.ref_fourn = '" . $db->escape($lineData['prodsellerid']) . "' ";
 		$sql .= " AND pfp.fk_soc = " . intval($lineData['supplierId']) . " ";
 		$sql .= " AND p.entity IN (" . getEntity('product') . ")";
 		$sql .= " LIMIT 1";
@@ -836,6 +994,7 @@ trait CommonProtocol
 			$prodSupplierRef = trim($lineData['prodsellerid'] ?? '');
 			$prodName = trim($lineData['prodname'] ?? '');
 			$prodDesc = trim($lineData['proddesc'] ?? '');
+			$vendorId = $lineData['supplierId'];
 
 			$errorDetails = [];
 			$createParams = [];
@@ -848,9 +1007,13 @@ trait CommonProtocol
 
 				$createParams['ref_ext'] = $prodRef;
 			}
+			if (!empty($vendorId)) {
+				$errorDetails[] = 'Vendor id: ' . $vendorId;
+				$createParams['socid'] = $vendorId;							// TODO Dolibarr must be able to handle this parameter
+			}
 			if (!empty($prodSupplierRef)) {
 				$errorDetails[] = 'Supplier ref: ' . $prodSupplierRef;
-				$createParams['supplierref'] = $prodSupplierRef;
+				$createParams['supplierref'] = $prodSupplierRef;			// TODO Dolibarr must be able to handle this parameter
 			}
 			if (!empty($prodName)) {
 				$errorDetails[] = 'Name: ' . $prodName;
@@ -884,10 +1047,21 @@ trait CommonProtocol
 			$message = 'Unable to find product' . $detailsStr . '. Auto-creation of products is disabled in settings.';
 
 			$action = $langs->trans('CreateProductManually') . ' ';
-			$action .= '<a class="butAction small" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
+			$action .= '<a class="butAction smallpaddingimp" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
 			$action .= '<i class="fas fa-plus-circle"></i> ';
-			$action .= $langs->trans('CreateProduct');
+			$action .= $langs->trans('CreateTheProduct');
 			$action .= '</a>';
+
+			/*
+			$createSupplierRefUrl = 'todo';
+			$sellerName ='xxx';
+
+			$action .= $langs->trans("or");
+			$action .= '<a class="butAction smallpaddingimp" href="' . dol_escape_htmltag($createSupplierRefUrl) . '" target="_blank">';
+			$action .= '<i class="fas fa-plus-circle"></i> ';
+			$action .= $langs->trans('CreateSupplierRef').' '.dol_trunc($prodSupplierRef, 8).' for '.dol_trunc($sellerName, 8);
+			$action .= '</a>';
+			*/
 
 			return array(
 				'res' => -1,
@@ -1038,7 +1212,8 @@ trait CommonProtocol
 
 				if (empty($seller->tva_assuj)) {
 					// Can be $categoryVAT = E (VAT exempted) or AE (Autoliquidation)
-					if (1 == 2) {	// Autoliquidation (the VAT is declared by the customer that pay it directly to the government). TODO Not yet managed.
+					if (1 == 2) {	// Autoliquidation (the VAT is declared by the customer that pay it directly to the government). TODO Not implemented.
+						// Note: the option ACCOUNTING_FORCE_ENABLE_VAT_REVERSE_CHARGE is for purchase invoices only and is used to dispatch vat differently in accounting..
 						$categoryVAT = 'AE';	// Autoliquidation
 						$exemptionReasonCode = 'VATEX-'.($seller->country_code == 'FR' ? 'FR' : 'EU').'-AE';	// VATEX-EU-AE or VATEX-FR-AE
 						$exemptionReason = 'Autoliquidation';

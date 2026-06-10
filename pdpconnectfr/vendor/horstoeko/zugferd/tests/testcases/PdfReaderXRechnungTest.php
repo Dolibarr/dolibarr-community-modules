@@ -69,12 +69,12 @@ class PdfReaderXRechnungTest extends TestCase
         $this->assertEquals("Rechnung gemäß Bestellung vom 01.03.2018.", $notes[0]["content"]);
         $this->assertEquals("", $notes[1]["contentcode"]);
         $this->assertEquals("REG", $notes[1]["subjectcode"]);
-        $this->assertStringContainsString("Lieferant GmbH", $notes[1]["content"]);
-        $this->assertStringContainsString("Lieferantenstraße 20", $notes[1]["content"]);
-        $this->assertStringContainsString("80333 München", $notes[1]["content"]);
-        $this->assertStringContainsString("Deutschland", $notes[1]["content"]);
-        $this->assertStringContainsString("Geschäftsführer: Hans Muster", $notes[1]["content"]);
-        $this->assertStringContainsString("Handelsregisternummer: H A 123", $notes[1]["content"]);
+        $this->assertStringContainsString("Lieferant GmbH", (string) $notes[1]["content"]);
+        $this->assertStringContainsString("Lieferantenstraße 20", (string) $notes[1]["content"]);
+        $this->assertStringContainsString("80333 München", (string) $notes[1]["content"]);
+        $this->assertStringContainsString("Deutschland", (string) $notes[1]["content"]);
+        $this->assertStringContainsString("Geschäftsführer: Hans Muster", (string) $notes[1]["content"]);
+        $this->assertStringContainsString("Handelsregisternummer: H A 123", (string) $notes[1]["content"]);
     }
 
     public function testDocumentGeneralPaymentInformation(): void

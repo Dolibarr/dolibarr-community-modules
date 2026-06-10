@@ -88,18 +88,18 @@ class ReaderEn16931AllowanceChargeTest extends TestCase
         $this->assertArrayHasKey("contentcode", $notes[2]);
         $this->assertEquals("", $notes[0]["contentcode"]);
         $this->assertEquals("", $notes[0]["subjectcode"]);
-        $this->assertStringContainsString("Rechnung gemäß Bestellung Nr. 2018-471331 vom 01.03.2018.", $notes[0]["content"]);
+        $this->assertStringContainsString("Rechnung gemäß Bestellung Nr. 2018-471331 vom 01.03.2018.", (string) $notes[0]["content"]);
         $this->assertEquals("", $notes[1]["contentcode"]);
         $this->assertEquals("AAK", $notes[1]["subjectcode"]);
-        $this->assertStringContainsString("Es bestehen Rabatt- und Bonusvereinbarungen.", $notes[1]["content"]);
+        $this->assertStringContainsString("Es bestehen Rabatt- und Bonusvereinbarungen.", (string) $notes[1]["content"]);
         $this->assertEquals("", $notes[2]["contentcode"]);
         $this->assertEquals("REG", $notes[2]["subjectcode"]);
-        $this->assertStringContainsString("Lieferant GmbH", $notes[2]["content"]);
-        $this->assertStringContainsString("Lieferantenstraße 20", $notes[2]["content"]);
-        $this->assertStringContainsString("80333 München", $notes[2]["content"]);
-        $this->assertStringContainsString("Deutschland", $notes[2]["content"]);
-        $this->assertStringContainsString("Geschäftsführer: Hans Muster", $notes[2]["content"]);
-        $this->assertStringContainsString("Handelsregisternummer: H A 123", $notes[2]["content"]);
+        $this->assertStringContainsString("Lieferant GmbH", (string) $notes[2]["content"]);
+        $this->assertStringContainsString("Lieferantenstraße 20", (string) $notes[2]["content"]);
+        $this->assertStringContainsString("80333 München", (string) $notes[2]["content"]);
+        $this->assertStringContainsString("Deutschland", (string) $notes[2]["content"]);
+        $this->assertStringContainsString("Geschäftsführer: Hans Muster", (string) $notes[2]["content"]);
+        $this->assertStringContainsString("Handelsregisternummer: H A 123", (string) $notes[2]["content"]);
     }
 
     public function testDocumentGeneralPaymentInformation(): void
@@ -1276,7 +1276,7 @@ class ReaderEn16931AllowanceChargeTest extends TestCase
         $this->assertSame("", $linestatusreasoncode);
 
         self::$document->getDocumentPositionProductDetails($prodname, $proddesc, $prodsellerid, $prodbuyerid, $prodglobalidtype, $prodglobalid);
-        $this->assertStringContainsString("Mineralwasser Medium 12 x 1,0l PET", $prodname);
+        $this->assertStringContainsString("Mineralwasser Medium 12 x 1,0l PET", (string) $prodname);
         $this->assertSame("", $proddesc);
         $this->assertSame("GTRWA5", $prodsellerid);
         $this->assertSame("", $prodbuyerid);
@@ -1389,7 +1389,7 @@ class ReaderEn16931AllowanceChargeTest extends TestCase
         $this->assertSame("", $linestatusreasoncode);
 
         self::$document->getDocumentPositionProductDetails($prodname, $proddesc, $prodsellerid, $prodbuyerid, $prodglobalidtype, $prodglobalid);
-        $this->assertStringContainsString("Pfand", $prodname);
+        $this->assertStringContainsString("Pfand", (string) $prodname);
         $this->assertSame("", $proddesc);
         $this->assertSame("PFA5", $prodsellerid);
         $this->assertSame("", $prodbuyerid);

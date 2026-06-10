@@ -192,6 +192,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 			$currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus(0, $object->ref);
 
 			$url_button = array();
+
 			if ($object->status == Facture::STATUS_VALIDATED || $object->status == Facture::STATUS_CLOSED) {
 				// if E-invoice is not generated, show button to generate e-invoice
 				if (
@@ -209,44 +210,56 @@ class ActionsPdpconnectfr extends CommonHookActions
 				}
 
 				// If the e-invoice is generated but not sent, or if it was sent and a validation error was received,
-				// display the button to regenerate the e-invoice and the button to send the e-invoice.
+				// display the button to regenerate the e-invoice
 				if (in_array($currentStatusDetails['code'], [
 					$pdpConnectFr::STATUS_GENERATED,
 					$pdpConnectFr::STATUS_ERROR,
 					$pdpConnectFr::STATUS_UNKNOWN
 				])) {
+					$perm = (bool) $user->hasRight("facture", "creer");
+				} else {
+					$perm = false;
+				}
+				$url_button[] = array(
+					'lang' => 'pdpconnectfr',
+					'enabled' => 1,
+					'perm' => $perm,
+					'label' => $langs->trans('RegenerateEinvoice'),
+					//'help' => $langs->trans('RegenerateEinvoiceHelp'),
+					'url' => '/compta/facture/card.php?id=' . $object->id . '&action=generate_einvoice&token=' . newToken()
+				);
+
+				// If the e-invoice is generated but not sent, or if it was sent and a validation error was received,
+				// display the button to regenerate the e-invoice
+				if (in_array($currentStatusDetails['code'], [
+					$pdpConnectFr::STATUS_GENERATED,
+					$pdpConnectFr::STATUS_ERROR,
+					$pdpConnectFr::STATUS_UNKNOWN,
+					$pdpConnectFr::STATUS_AWAITING_VALIDATION,		// We may retry to resend. We should get an error if we do, but it is interesting to test the retry.
+					$pdpConnectFr::STATUS_AWAITING_ACK				// We may retry to resend. We should get an error if we do, but it is interesting to test the retry.
+				])) {
 					$url_button[] = array(
 						'lang' => 'pdpconnectfr',
 						'enabled' => 1,
-						'perm' => (bool) $user->hasRight("facture", "creer"),
-						'label' => $langs->trans('RegenerateEinvoice'),
-						//'help' => $langs->trans('RegenerateEinvoiceHelp'),
-						'url' => '/compta/facture/card.php?id=' . $object->id . '&action=generate_einvoice&token=' . newToken()
+						'perm' => (bool) $user->hasRight("pdpconnectfr", "document", "write") && ($currentStatusDetails['file'] == 1),
+						'label' => $langs->trans('sendToPDP'),
+						//'help' => $langs->trans('SendToPDPHelp'),
+						'url' => '/compta/facture/card.php?id=' . $object->id . '&action=send_to_pdp&token=' . newToken()
 					);
-
-					// Le bouton d'envoi n'est affiché que si le fichier FacturX a bien été généré.
-					if ($currentStatusDetails['file'] == 1) {
-						$url_button[] = array(
-							'lang' => 'pdpconnectfr',
-							'enabled' => 1,
-							'perm' => (bool) $user->hasRight("facture", "creer"),
-							'label' => $langs->trans('sendToPDP'),
-							//'help' => $langs->trans('SendToPDPHelp'),
-							'url' => '/compta/facture/card.php?id=' . $object->id . '&action=send_to_pdp&token=' . newToken()
-						);
-					}
 				}
 			}
 
-			print '<!-- Current AP: ' . getDolGlobalString('PDPCONNECTFR_PDP') . ' -->';
-			if (!empty($url_button)) {
-				// Pass the visible label as the 1st arg ($label), not the 2nd ($text). On Dolibarr 18/19
-				// the dropdown <a> renders only $label; v22+ falls back to $text when $label is empty,
-				// but to keep behavior consistent across versions we always use $label.
-				if ((float) DOL_VERSION < 22) {
-					print dolGetButtonAction($langs->trans('einvoice'), '', 'default', $url_button, '', true);
-				} else {
-					print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true);
+			if (!empty($parameters['context']) && !preg_match('/takepospay/', $parameters['context'])) {
+				print '<!-- Current AP: ' . getDolGlobalString('PDPCONNECTFR_PDP') . ' -->';
+				if (!empty($url_button)) {
+					// Pass the visible label as the 1st arg ($label), not the 2nd ($text). On Dolibarr 18/19
+					// the dropdown <a> renders only $label; v22+ falls back to $text when $label is empty,
+					// but to keep behavior consistent across versions we always use $label.
+					if ((float) DOL_VERSION < 22) {
+						print dolGetButtonAction($langs->trans('einvoice'), '', 'default', $url_button, '', true);
+					} else {
+						print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true);
+					}
 				}
 			}
 		}
@@ -283,7 +296,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 							'enabled' => 1,
 							'perm' => (bool) $user->hasRight("facture", "creer"),
 							'label' => $label,
-							'url' => '/fourn/facture/card.php?id=' . $object->id . '&action=sendStatusMessage&pdpstatuscode=' . $code . '&token=' . newToken()
+							'url' => dol_buildpath('/fourn/facture/card.php?id=' . $object->id . '&action=sendStatusMessage&pdpstatuscode=' . $code . '&token=' . newToken(), 1)
 						);
 					}
 

@@ -1,7 +1,8 @@
 <?php
-/* Copyright (C) 2007-2017  Laurent Destailleur     <eldy@users.sourceforge.net>
- * Copyright (C) 2024       Frédéric France         <frederic.france@free.fr>
- * Copyright (C) 2025		SuperAdmin					<daoud.mouhamed@gmail.com>
+/* Copyright (C) 2007-2017  Laurent Destailleur         <eldy@users.sourceforge.net>
+ * Copyright (C) 2024       Frédéric France             <frederic.france@free.fr>
+ * Copyright (C) 2025       SuperAdmin                  <daoud.mouhamed@gmail.com>
+ * Copyright (C) 2026       Alexandre Spangaro          <alexandre@inovea-conseil.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -225,9 +226,9 @@ $arrayfields = dol_sort_array($arrayfields, 'position');
 // Set $enablepermissioncheck to 1 to enable a minimum low level of checks
 $enablepermissioncheck = getDolGlobalInt('PDPCONNECTFR_ENABLE_PERMISSION_CHECK');
 if ($enablepermissioncheck) {
-	$permissiontoread = $user->hasRight('pdpconnectfr', 'document', 'read');
-	$permissiontoadd = $user->hasRight('pdpconnectfr', 'document', 'write');
-	$permissiontodelete = $user->hasRight('pdpconnectfr', 'document', 'delete');
+	$permissiontoread = $user->hasRight('pdpconnectfr', 'read');
+	$permissiontoadd = $user->hasRight('pdpconnectfr', 'write');
+	$permissiontodelete = $user->hasRight('pdpconnectfr', 'delete');
 } else {
 	$permissiontoread = 1;
 	$permissiontoadd = 1;
@@ -735,7 +736,7 @@ if (file_exists($filePathFacturX)) {
 	$urlOriginalFile = DOL_URL_ROOT . '/document.php?modulepart=pdpconnectfr&file=' . urlencode('temp/facturx.pdf');
 	$urlConvertedFile = DOL_URL_ROOT . '/document.php?modulepart=pdpconnectfr&file=' . urlencode('temp/facturx_readable.pdf');
 
-	$last_supplier_invoice_error = '<span class="opacitylowx">'.img_picto('', 'times', 'class="pictofixedwidth" style="color:red;"');
+	$last_supplier_invoice_error = '<span class="opacitylowx">'.img_picto('', 'times', 'class="pictofixedwidth"');
 	$last_supplier_invoice_error .= ' ' . $langs->trans("LastSupplierInvoiceCouldNotBeProcessed");
 	$last_supplier_invoice_error .= '<i class="fas fa-info-circle em088 opacityhigh classfortooltip" title="'. $langs->trans("LastSupplierInvoiceCouldNotBeProcessedInfo") .'"></i>';
 	$last_supplier_invoice_error .= ' : </span>';
@@ -747,7 +748,7 @@ if (file_exists($filePathFacturX)) {
 if (file_exists($filePathCII)) {
 	$urlOriginalFile = DOL_URL_ROOT . '/document.php?modulepart=pdpconnectfr&file=' . urlencode('temp/einvoice.xml');
 
-	$last_supplier_invoice_error = '<span class="opacitylowx">'.img_picto('', 'times', 'class="pictofixedwidth" style="color:red;"');
+	$last_supplier_invoice_error = '<span class="opacitylowx">'.img_picto('', 'times', 'class="pictofixedwidth"');
 	$last_supplier_invoice_error .= ' ' . $langs->trans("LastSupplierInvoiceCouldNotBeProcessed");
 	$last_supplier_invoice_error .= '<i class="fas fa-info-circle em088 opacityhigh classfortooltip" title="'. $langs->trans("LastSupplierInvoiceCouldNotBeProcessedInfo") .'"></i>';
 	$last_supplier_invoice_error .= ' : </span>';
@@ -1250,17 +1251,45 @@ while ($i < $imaxinloop) {
 				}
 				print '>';
 				if ($key == 'flow_direction') {
-					if ($object->flow_direction == 'Out') {
-						print '<span class="stockmovementexit">';
-					} else {
-						print '<span class="stockmovemententry">';
-					}
-					print $object->flow_direction;
+					$isOut = ($object->flow_direction === 'Out');
+					$label = $isOut ? $langs->trans('Output') : $langs->trans('Input');
+					$picto = $isOut ? '1uparrow' : '1downarrow';
+					$class = $isOut ? 'stockmovementexit' : 'stockmovemententry';
+
+					print '<span class="' . $class . ' nowrap" title="' . $label . '">';
+					print img_picto($label, $picto, 'class="paddingrightonly"');
+					print $label;
 					print '</span>';
 				} elseif ($key == 'status') {
 					print $object->getLibStatut(5);
 				} elseif ($key == 'rowid') {
 					print $object->showOutputField($val, $key, (string) $object->id, '');
+				} elseif ($key == 'tracking_idref') {
+					$out = dol_escape_htmltag($object->tracking_idref);
+
+					if (!empty($object->fk_element_type) && !empty($object->fk_element_id)) {
+						if ($object->fk_element_type === 'Facture') {
+							require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
+							$linkedobj = new Facture($db);
+
+							if ($linkedobj->fetch((int) $object->fk_element_id) > 0) {
+								$out = $linkedobj->getNomUrl(1);
+							}
+						} elseif ($object->fk_element_type === 'FactureFournisseur') {
+							require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';
+							$linkedobj = new FactureFournisseur($db);
+
+							if ($linkedobj->fetch((int) $object->fk_element_id) > 0) {
+								$out = $linkedobj->getNomUrl(1);
+							}
+						}
+					}
+
+					if (strpos($out, '<a ') !== false) {
+						$out = preg_replace('/<a /', '<a target="_blank" rel="noopener noreferrer" ', $out, 1);
+					}
+
+					print $out;
 				} else {
 					if ($val['type'] == 'html' || $val['type'] == 'text') {
 						print '<div class="small minwidth150 lineheightsmall threelinesmax-normallineheight classfortooltip" title="'.dolPrintHTMLForAttribute((string) $object->$key).'">';

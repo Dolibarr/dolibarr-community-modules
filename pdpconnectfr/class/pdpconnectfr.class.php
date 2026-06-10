@@ -62,8 +62,8 @@ class PdpConnectFr
 
 	public const STATUS_NOT_GENERATED       = 5;		// To sync
 	public const STATUS_GENERATED           = 10;
-	public const STATUS_AWAITING_VALIDATION = 15;
-	public const STATUS_AWAITING_ACK        = 20;
+	public const STATUS_AWAITING_VALIDATION = 15;		// Einvoice received but not yet analyzed by your AP
+	public const STATUS_AWAITING_ACK        = 20;		// Einvoice received and analyzed by your AP. Next step happen when doing sync.
 	public const STATUS_ERROR               = 25;
 
 	public const STATUS_IGNORE              = 99;		// Never sync
@@ -1299,7 +1299,9 @@ class PdpConnectFr
 		}
 
 		// JavaScript for AJAX call to update status if current status is pending
-		if ((int) $currentStatusInfo['code'] === self::STATUS_AWAITING_VALIDATION) {
+		if ((int) $currentStatusInfo['code'] === self::STATUS_AWAITING_VALIDATION
+			// || (int) $currentStatusInfo['code'] === self::STATUS_AWAITING_ACK			// If we want to call the checkinvoicestatus to get next steps...
+			) {
 			$urlajax = dol_buildpath('pdpconnectfr/ajax/checkinvoicestatus.php', 1);
 
 			$resprints .= '
@@ -1307,17 +1309,21 @@ class PdpConnectFr
             (function() {
 				var countCheckInvoiceStatus = 1;
                 function checkInvoiceStatus() {
-					console.log("checkInvoiceStatus Checking invoice status ("+countCheckInvoiceStatus+")...");
+					console.log(\'checkInvoiceStatus Checking invoice status (try \'+countCheckInvoiceStatus+\') to url '.dol_escape_js($urlajax).'...\');
                     // alert("Checking invoice status...");
                     $.get("' . $urlajax . '", {
                         token: "' . currentToken() . '",
                         ref: "' . dol_escape_js($object->ref) . '"
                     }, function (data) {
-						/* code is executed here if response is valid json */
-                        if (!data || typeof data.code === "undefined") {
-							console.log("checkInvoiceStatus no data returned");
-                            return;
-                        }
+    					if (typeof data === "string") {
+	        				try {
+	            				data = JSON.parse(data); // Convert into object if valid JSON
+	        				} catch (e) {
+	            				console.error("Error : Answer is not a JSON content:", data);
+	            				return;
+	        				}
+						}
+
 						console.log(data.status);
 
                         // Update UI
@@ -1335,11 +1341,14 @@ class PdpConnectFr
                             	setTimeout(checkInvoiceStatus, 10000);
 							}
                         }
-                    }, "json");
+                    }, "text")		/* We force text to avoid that js parse automatically the json response and try to convert it into a js object */
+					.fail(function(jqXHR) {
+    					console.error("Error AJAX :", jqXHR.status, jqXHR.statusText);
+					});
                 }
 
                 // First call
-				console.log("checkInvoiceStatus Invoice has status pending, so we add a timer to run checkInvoiceStatus in few seconds...");
+				console.log("checkInvoiceStatus Invoice has status pending, so we add a timer to run checkInvoiceStatus in 2.5 seconds...");
                 setTimeout(checkInvoiceStatus, 2500);
 
             })();
@@ -2279,9 +2288,6 @@ class PdpConnectFr
 
 		$obj = $db->fetch_object($resql);
 		$routing_id =  (string) $obj->routing_id;
-		if (!empty($obj->info)) {
-			$routing_id .= '_' . $obj->info;
-		}
 
 		return $routing_id;
 	}
@@ -2489,19 +2495,19 @@ class PdpConnectFr
 	 * Update validation information of an existing lifecycle status message.
 	 *
 	 * @param 	Object	$object		Object
-	 * @return 	int 				1 if the invoice object need management of EInvoicing, 0 if not.
+	 * @return 	int 				self::STATUS_NOT_GENERATED if the invoice object need management of EInvoicing, self::STATUS_IGNORE if not.
 	 */
 	public function needEInvoiceManagement($object)
 	{
 		$return = 0;	// By default, no einvoicing.
 
 		if ($object->thirdparty->country_code == 'FR') {	// We need to sync invoice if for french customer
-			$return = 1;
+			$return = self::STATUS_NOT_GENERATED;
 		}
 		if ($object->module_source == 'takepos') {			// Force to ignore for all invoices generated from TakePOS
 			// If invoice is generated from TakePOS, we must not make any e-invoice sync.
 			// We will do a Z sync instead from the cash closing feature.
-			$return = 0;
+			$return = getDolGlobalInt('PDPCONNECTFR_DEFAULT_EINVOICE_STATUS_FOR_TAKEPOS', self::STATUS_IGNORE);
 		}
 
 		// TODO More tests to do...

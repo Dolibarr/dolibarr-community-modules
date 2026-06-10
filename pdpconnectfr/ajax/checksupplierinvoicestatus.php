@@ -96,7 +96,7 @@ $objectID = GETPOSTINT('id');
 // $value = GETPOST('value', 'aZ09');
 
 // Security check
-if (!$user->hasRight('pdpconnectfr', 'document', 'write')) {
+if (!$user->hasRight('pdpconnectfr', 'write')) {
 	accessforbidden();
 }
 

@@ -149,11 +149,11 @@ include DOL_DOCUMENT_ROOT.'/core/actions_fetchobject.inc.php'; // Must be 'inclu
 // Set $enablepermissioncheck to 1 to enable a minimum low level of checks
 $enablepermissioncheck = getDolGlobalInt('PDPCONNECTFR_ENABLE_PERMISSION_CHECK');
 if ($enablepermissioncheck) {
-	$permissiontoread = $user->hasRight('pdpconnectfr', 'document', 'read');
-	$permissiontoadd = $user->hasRight('pdpconnectfr', 'document', 'write'); // Used by the include of actions_addupdatedelete.inc.php and actions_lineupdown.inc.php
-	$permissiontodelete = $user->hasRight('pdpconnectfr', 'document', 'delete') || ($permissiontoadd && isset($object->status) && $object->status == $object::STATUS_DRAFT);
-	$permissionnote = $user->hasRight('pdpconnectfr', 'document', 'write'); // Used by the include of actions_setnotes.inc.php
-	$permissiondellink = $user->hasRight('pdpconnectfr', 'document', 'write'); // Used by the include of actions_dellink.inc.php
+	$permissiontoread = $user->hasRight('pdpconnectfr', 'read');
+	$permissiontoadd = $user->hasRight('pdpconnectfr', 'write'); // Used by the include of actions_addupdatedelete.inc.php and actions_lineupdown.inc.php
+	$permissiontodelete = $user->hasRight('pdpconnectfr', 'delete') || ($permissiontoadd && isset($object->status) && $object->status == $object::STATUS_DRAFT);
+	$permissionnote = $user->hasRight('pdpconnectfr', 'write'); // Used by the include of actions_setnotes.inc.php
+	$permissiondellink = $user->hasRight('pdpconnectfr', 'write'); // Used by the include of actions_dellink.inc.php
 } else {
 	$permissiontoread = 1;
 	$permissiontoadd = 1; // Used by the include of actions_addupdatedelete.inc.php and actions_lineupdown.inc.php
@@ -277,7 +277,7 @@ if ($action == 'create') {
 
 	print load_fiche_titre($title, '', $object->picto);
 
-	print '<form method="POST" action="'.dol_buildpath($_SERVER["PHP_SELF"]).'">';
+	print '<form method="POST" action="'.dol_buildpath($_SERVER["PHP_SELF"], 1).'">';
 	print '<input type="hidden" name="token" value="'.newToken().'">';
 	print '<input type="hidden" name="action" value="add">';
 	if ($backtopage) {
@@ -316,7 +316,7 @@ if ($action == 'create') {
 if (($id || $ref) && $action == 'edit') {
 	print load_fiche_titre($langs->trans("Document"), '', $object->picto);
 
-	print '<form method="POST" action="'.dol_buildpath($_SERVER["PHP_SELF"]).'">';
+	print '<form method="POST" action="'.dol_buildpath($_SERVER["PHP_SELF"], 1).'">';
 	print '<input type="hidden" name="token" value="'.newToken().'">';
 	print '<input type="hidden" name="action" value="update">';
 	print '<input type="hidden" name="id" value="'.$object->id.'">';

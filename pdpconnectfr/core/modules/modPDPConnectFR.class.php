@@ -1,7 +1,7 @@
 <?php
 /* Copyright (C) 2004-2018	Laurent Destailleur			<eldy@users.sourceforge.net>
  * Copyright (C) 2018-2019	Nicolas ZABOURI				<info@inovea-conseil.com>
- * Copyright (C) 2019-2024	Frédéric France				<frederic.france@free.fr>
+ * Copyright (C) 2019-2026	Frédéric France				<frederic.france@free.fr>
  * Copyright (C) 2025		SuperAdmin					<daoud.mouhamed@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -76,7 +76,7 @@ class modPDPConnectFR extends DolibarrModules
 		$this->editor_squarred_logo = '';					// Must be image filename into the module/img directory followed with @modulename. Example: 'myimage.png@pdpconnectfr'
 
 		// Possible values for version are: 'development', 'experimental', 'dolibarr', 'dolibarr_deprecated', 'experimental_deprecated' or a version string like 'x.y.z'
-		$this->version = '1.0';
+		$this->version = '1.0.1';
 		// Url to the file with your last numberversion of this module
 		//$this->url_last_version = 'http://www.example.com/versionmodule.txt';
 
@@ -312,20 +312,20 @@ class modPDPConnectFR extends DolibarrModules
 		$r = 0;
 		// Add here entries to declare new permissions
 		/* BEGIN MODULEBUILDER PERMISSIONS */
-		$this->rights[$r][0] = $this->numero . sprintf('%02d', (0 * 10) + 0 + 1);
+		$this->rights[$r][0] = $this->numero . sprintf('%02d', 1);
 		$this->rights[$r][1] = 'Read synchronized documents and logs';
-		$this->rights[$r][4] = 'documents';
-		$this->rights[$r][5] = 'read';
+		$this->rights[$r][4] = 'read';
+		$this->rights[$r][5] = '';
 		$r++;
-		$this->rights[$r][0] = $this->numero . sprintf('%02d', (0 * 10) + 1 + 1);
-		$this->rights[$r][1] = 'Create/Run/Update synchronization of documentes';
-		$this->rights[$r][4] = 'documents';
-		$this->rights[$r][5] = 'write';
+		$this->rights[$r][0] = $this->numero . sprintf('%02d', 2);
+		$this->rights[$r][1] = 'Create/Run/Update synchronization of documents and logs';
+		$this->rights[$r][4] = 'write';
+		$this->rights[$r][5] = '';
 		$r++;
-		$this->rights[$r][0] = $this->numero . sprintf('%02d', (0 * 10) + 2 + 1);
-		$this->rights[$r][1] = 'Delete synchronization document or logs';
-		$this->rights[$r][4] = 'documents';
-		$this->rights[$r][5] = 'delete';
+		$this->rights[$r][0] = $this->numero . sprintf('%02d', 3);
+		$this->rights[$r][1] = 'Delete synchronization documents and logs';
+		$this->rights[$r][4] = 'delete';
+		$this->rights[$r][5] = '';
 		$r++;
 
 		/* END MODULEBUILDER PERMISSIONS */

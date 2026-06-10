@@ -118,8 +118,15 @@ $schemeIdProf      = $this->getIEC6523Code($object->thirdparty->country_code);
 $globalIdProf      = thirdpartyidprof($object) ?? '';
 $schemeGlobalIdProf = $this->getIEC6523Code($object->thirdparty->country_code, 1);
 $uri               = $pdpconnectfr->getBuyerCommunicationURI($object->thirdparty, $object);
-$schemeUri         = $this->getIEC6523Code($object->thirdparty->country_code, 2);
+$reg = array();
+if (preg_match('/(\d+):(.+)/', $uri, $reg)) {
+	$uri		= $reg[2];
+	$schemeUri  = $reg[1];
+} else {
+	$schemeUri  = $this->getIEC6523Code($object->thirdparty->country_code, 2);
+}
 // In case of sample tests, we may have this const defined to overwrite buyer Einvoice address ID.
+// In common case, this should not be used
 if (defined('PDPCONNECT_FORCE_BUYER_EID')) {
 	$uri               = constant('PDPCONNECT_FORCE_BUYER_EID');
 	$schemeUri         = "0225";
@@ -192,18 +199,31 @@ if ($object->type == $object::TYPE_CREDIT_NOTE && !empty($object->fk_facture_sou
 		];
 		dol_syslog(get_class($this) . '::generateXML Set source invoice reference ' . $sourceFact->ref . ' for credit note ' . $object->ref);
 	} else {
-		dol_syslog(get_class($this) . '::generateXML Cannot fetch source invoice id=' . $object->fk_facture_source . ' for credit note ' . $object->ref, LOG_WARNING);
+		if ($object->id == 0) { // Specimen case.
+			$specimenRefDoc = $object->fk_facture_source ?? 'FA0000-SPECIMEN';
+			$sourceFactDate = new DateTime(dol_print_date(dol_now() - 100, 'dayrfc'));
+			$invoiceRefDocs[] = [
+				'ref' => $specimenRefDoc,
+				'date' => $sourceFactDate,
+				'type' => '381' 				// 381 = Credit note
+			];
+			dol_syslog(get_class($this) . '::generateXML Set source invoice reference ' . $specimenRefDoc . ' for credit note specimen ' . $object->ref);
+		} else {
+			dol_syslog(get_class($this) . '::generateXML Cannot fetch source invoice id=' . $object->fk_facture_source . ' for credit note ' . $object->ref, LOG_WARNING);
+		}
 	}
 }
 
 // Collect lines into $linesData array
-$linesData         = [];
-$taxBreakdown            = [];
-$grand_total_ht    = $grand_total_tva = $grand_total_ttc = 0;
-$prepaidAmount     = 0;
-$depositlines      = [];
-$billing_period    = [];
-$numligne          = 1;
+$linesData         	= [];
+$taxBreakdown		= [];
+$lines_total_ht 	= $lines_total_tva = $lines_total_ttc = 0;
+$grand_total_ht    	= $grand_total_tva = $grand_total_ttc = 0;
+$prepaidAmount     	= 0;
+$depositlines      	= [];
+$globalDiscounts	= [];
+$billing_period    	= [];
+$numligne          	= 1;
 
 foreach ($object->lines as $line) {
 	$isDepositLine = 0;
@@ -223,6 +243,13 @@ foreach ($object->lines as $line) {
 		$line->total_tva    = abs($line->total_tva);
 		$line->qty          = abs($line->qty);
 	}
+
+	// VAT category and exemption reason of the line
+	$tmparray = $this->getCategoryRate($line, $mysoc, $object);
+
+	$categoryVAT = $tmparray['categoryVAT'];
+	$exemptionReason = $tmparray['ExemptionReason'];
+	$exemptionReasonCode = $tmparray['ExemptionReasonCode'];
 
 	// if ($line->subprice < 0 || $line->subprice_ttc < 0) {
 	// 	throw new Exception("NEGATIVE_UNIT_PRICE_NOT_ALLOWED: Unit price in lines can't be negative. Try to edit the line with ID " . $line->id);
@@ -269,6 +296,45 @@ foreach ($object->lines as $line) {
 		];
 	}
 
+	// Discount line (Amount) - When fk_remise_except > 0 this is a global discount.
+	if ($line->desc != '(DEPOSIT)' && $line->fk_remise_except > 0) {
+		$isDiscountLine = 1;
+
+		$discount    = new DiscountAbsolute($this->db);
+		$resdiscount = $discount->fetch($line->fk_remise_except);
+		dol_syslog("Fetch discount " . $line->fk_remise_except . ", res=" . $resdiscount, LOG_DEBUG);
+
+		$globalDiscounts[] = array(
+			'value' => (float) $discount->total_ht,
+			'reason' => $discount->description ?? 'REMISE',
+			'taxRate' => (float) $discount->tva_tx,
+			'categoryVAT' => $categoryVAT,
+		);
+
+		// Add (or update) VAT rate to $taxBreakdown
+		if (!isset($taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')])) {
+			$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')] = ['tva_tx' => '', 'vat_src_code' => '', 'categoryVAT' => '', 'ExemptionReasonCode' => '', 'ExemptionReason' => '', 'totalHT' => 0, 'totalTVA' => 0];
+		}
+		$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['tva_tx'] = $line->tva_tx;
+		$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['vat_src_code'] = $line->vat_src_code;
+		$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['categoryVAT'] = $categoryVAT;
+		$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['ExemptionReasonCode'] = $exemptionReasonCode;
+		$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['ExemptionReason'] = $exemptionReason;
+
+		$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['totalHT']  -= $discount->total_ht;
+		$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['totalTVA'] -= $discount->total_tva;
+
+
+		$grand_total_ht  -= $discount->total_ht;
+		$grand_total_ttc -= $discount->total_ttc;
+		$grand_total_tva -= $discount->total_tva;
+
+		continue;	// We don't want to add this line into linesData as it is not a real line but a global discount. It will be added into the headerAllowancesCharges section.
+	}
+
+	// Discount line (Percent) - When remise_percent > 0.
+	$LineDiscountPercent = (float) ($line->remise_percent ?? 0);
+
 	// Product labels (multilangs)
 	$libelle = $description = "";
 	if ($newlang != "") {
@@ -302,13 +368,6 @@ foreach ($object->lines as $line) {
 			$description = "";
 		}
 	}
-
-	// VAT category and exemption reason of the line
-	$tmparray = $this->getCategoryRate($line, $mysoc, $object);
-
-	$categoryVAT = $tmparray['categoryVAT'];
-	$exemptionReason = $tmparray['ExemptionReason'];
-	$exemptionReasonCode = $tmparray['ExemptionReasonCode'];
 
 	// Billing period of the line
 	$linePeriodStart = null;
@@ -369,6 +428,10 @@ foreach ($object->lines as $line) {
 	$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['totalHT']  += $line_total_ht;
 	$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['totalTVA'] += $line_total_tva;
 
+	$lines_total_ht  += $line_total_ht;
+	$lines_total_ttc += $line_total_ttc;
+	$lines_total_tva += $line_total_tva;
+
 	$grand_total_ht  += $line_total_ht;
 	$grand_total_ttc += $line_total_ttc;
 	$grand_total_tva += $line_total_tva;
@@ -398,8 +461,8 @@ foreach ($object->lines as $line) {
 		// $line_unit_price_with_discount
 		// or
 		//$line_unit_price but we must add block TradeAllowanceCharge
-		'netpriceamount'            => $line_unit_price_with_discount,		// BT-148 / BT-146
-		//'netpriceamount'            => $line_unit_price,		// BT-148 / BT-146
+		//'netpriceamount'            => $line_unit_price_with_discount,		// BT-148 / BT-146
+		'netpriceamount'            => $line_unit_price,		// BT-148 / BT-146
 		'netpricebasisquantity'     => null,
 		'netpricebasisquantityunitcode' => null,
 
@@ -441,13 +504,11 @@ foreach ($object->lines as $line) {
 		'parentDocumentNo'          => null,
 		'is_deposit'                => $isDepositLine,
 		'fk_remise'                 => $line->fk_remise_except ?? null,
+
+		'discountPercent'       	=> $LineDiscountPercent,
 	];
 
 
-	// For block TradeAllowanceCharge
-	// We must add this to add the section TradeAllowanceCharge if we defined a netpriceamount with $line_unit_price instead of $line_unit_price_with_discount
-	$linesData[$numligne]['allowancebasisamount'] = $line_unit_price;
-	$linesData[$numligne]['allowanceactualamount'] = $amountdiscount;
 
 	// If a unit price inluding tax is known (rarely)
 	if ($line_unit_price_ttc) {
@@ -461,10 +522,39 @@ foreach ($object->lines as $line) {
 	$numligne++;
 }
 
+// already used credit note amount
+$usedcreditnoteamount = 0;
+$usedcreditnote = array();
+$sql = "SELECT re.rowid, re.amount_ht, re.amount_tva, re.amount_ttc,";
+$sql .= " re.description, re.fk_facture_source";
+$sql .= " FROM ".MAIN_DB_PREFIX."societe_remise_except as re";
+$sql .= " WHERE fk_facture = ".((int) $object->id) ." AND description = '(CREDIT_NOTE)'";
+$resql = $db->query($sql);
+if ($resql) {
+	while ($obj = $db->fetch_object($resql)) {
+		$usedcreditnoteamount += abs($obj->amount_ttc);
+
+		// Add used credit note into reference documents of invoice
+		$usedCreditNoteFact = new Facture($this->db);
+		if ($usedCreditNoteFact->fetch($obj->fk_facture_source) > 0) {
+			$usedCreditNoteFactDate = new DateTime(dol_print_date($usedCreditNoteFact->date, 'dayrfc'));
+			$invoiceRefDocs[] = [
+				'ref' => $usedCreditNoteFact->ref,
+				'date' => $usedCreditNoteFactDate,
+				'type' => '381'
+			];
+		} else {
+			dol_syslog("Error " . $db->error() . " when looking for credit note linked to invoice to calculate prepaid amount for invoice " . $object->id, LOG_WARNING);
+		}
+	}
+} else {
+	dol_syslog("Error " . $db->error() . " when looking for credit note linked to invoice to calculate prepaid amount for invoice " . $object->id, LOG_WARNING);
+}
+
 // Already paid deposits
 $getAlreadyPaid = $object->getSommePaiement();
-// $prepaidAmount  = $object->sumpayed + $prepaidAmount;
-$prepaidAmount  = $object->sumpayed + $getAlreadyPaid;
+
+$prepaidAmount  = $object->sumpayed + $getAlreadyPaid + $usedcreditnoteamount;
 
 // Delivery date
 $deliveryDate = !empty($deliveryDateList)
@@ -561,9 +651,9 @@ $invoiceData = [
 	// Totals parts
 	'grandTotalAmount'          => $grand_total_ttc,
 	'duePayableAmount'          => $grand_total_ttc - $prepaidAmount,
-	'lineTotalAmount'           => $grand_total_ht,
+	'lineTotalAmount'           => $lines_total_ht,
 	'chargeTotalAmount'         => 0.0,
-	'allowanceTotalAmount'      => 0.0,
+	'allowanceTotalAmount'      => array_sum(array_column($globalDiscounts, 'value')), // We sum all global discounts defined in the invoice
 	'taxBasisTotalAmount'       => $grand_total_ht,
 	'taxTotalAmount'            => $grand_total_tva,
 	'roundingAmount'            => null,
@@ -594,6 +684,7 @@ $invoiceData = [
 	// Internal data (useful for the builder)
 	'_chorus'                   => $chorus,
 	'_depositlines'             => $depositlines,
+	'_globalDiscounts'          => $globalDiscounts,
 	'_customerOrderReferenceList' => $customerOrderReferenceList,
 	'_project'                  => ($object->project instanceof Project) ? $object->project : null,
 ];
