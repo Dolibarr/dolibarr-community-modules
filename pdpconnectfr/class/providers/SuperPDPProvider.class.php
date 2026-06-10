@@ -148,7 +148,6 @@ class SuperPDPProvider extends AbstractPDPProvider
 					$this->helpToGetCredentials .= '</div>';
 				}
 			} else {
-
 				$urlforproxy =  dol_buildpath('pdpconnectfr/public/proxy_oauthcallback.php', 3);
 
 				$this->helpToGetCredentials = '<div class="green greenborder">';
