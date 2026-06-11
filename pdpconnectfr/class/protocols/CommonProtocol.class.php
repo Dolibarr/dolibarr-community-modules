@@ -412,7 +412,7 @@ trait CommonProtocol
 		 *
 		 * 3. If still not found, create new thirdparty with provided data
 		 */
-		global $db, $langs, $user;
+		global $db, $langs, $user, $conf;
 		require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
 
 		$thirdparty = new Societe($db);
@@ -462,7 +462,7 @@ trait CommonProtocol
 		// Step 2: Try to find using VAT number if not found by global IDs
 		if ($thirdpartyId < 0) {
 			if (!empty($sellerInfo['sellerTaxRegistations']['VA'])) {
-				$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "societe WHERE REPLACE(tva_intra, ' ', '') = '" . $db->escape($pdpconnectfr->removeSpaces($sellerInfo['sellerTaxRegistations']['VA'])) . "'";
+				$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "societe WHERE REPLACE(tva_intra, ' ', '') = '" . $db->escape($pdpconnectfr->removeSpaces($sellerInfo['sellerTaxRegistations']['VA'])) . "' AND entity = ".$conf->entity;
 				$resql = $db->query($sql);
 				if ($resql) {
 					if ($db->num_rows($resql) > 1) {

@@ -387,7 +387,7 @@ class CIIProtocol extends AbstractProtocol
 
 		// Set status of einvoice
 		$pdpConnectFr = new PdpConnectFr($db);
-		$result = $pdpConnectFr->fetchLastknownInvoiceStatus($invoice->id);
+		$result = $pdpConnectFr->fetchLastknownInvoiceStatus($invoice->id, $invoice->ref);
 
 		if (
 			isset($result['code']) &&
