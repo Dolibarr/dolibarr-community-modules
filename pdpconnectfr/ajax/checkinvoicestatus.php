@@ -153,7 +153,7 @@ if ($objectRef) {
 	$provider = $PDPManager->getProvider(getDolGlobalString('PDPCONNECTFR_PDP'));
 
 
-	$tmparray = $pdpconnectfr->fetchLastknownInvoiceStatus($invoice->id);
+	$tmparray = $pdpconnectfr->fetchLastknownInvoiceStatus($invoice->id, $invoice->ref);
 	if ($tmparray['code'] == $pdpconnectfr::STATUS_AWAITING_ACK) {
 		// We have reached the status Ok for the AP. Now we need to check the status 200+
 		// TODO ...
@@ -186,7 +186,7 @@ if ($objectRef) {
 			$syncStatus = $pdpconnectfr->getDolibarrStatusCodeFromPdpLabel($ack_statusLabel);
 		}
 
-		$tmparray = $pdpconnectfr->fetchLastknownInvoiceStatus($invoice->id);
+		$tmparray = $pdpconnectfr->fetchLastknownInvoiceStatus($invoice->id, $invoice->ref);
 
 		$syncRef = $flowData['trackingId'] ?? '';
 		$syncComment = $flowData['acknowledgement']['details'][0]['reasonMessage'] ?? '';
@@ -214,7 +214,7 @@ if ($objectRef) {
 		// Refresh current status info
 		require_once "../class/pdpconnectfr.class.php";
 		$pdpconnectfr = new PdpConnectFr($db);
-		$currentStatusInfo = $pdpconnectfr->fetchLastknownInvoiceStatus(0, $invoice->ref);
+		$currentStatusInfo = $pdpconnectfr->fetchLastknownInvoiceStatus($invoice->id, $invoice->ref);
 
 		print json_encode($currentStatusInfo);
 	} else {

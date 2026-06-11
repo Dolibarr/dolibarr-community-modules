@@ -2638,7 +2638,7 @@ class PdpConnectFr
 
 		// If an invoice is provided, check for an invoice-level routing override first
 		if ($invoice !== null && !empty($invoice->id)) {
-			$statusInfo = $this->fetchLastknownInvoiceStatus($invoice->id, $invoice->ref);
+			$statusInfo = $this->fetchLastknownInvoiceStatus($invoice->id, $object->ref);
 			if (!empty($statusInfo['override_routing_id'])) {
 				return $this->removeSpaces($statusInfo['override_routing_id']);
 			}

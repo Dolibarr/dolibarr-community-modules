@@ -87,7 +87,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 			$thirdpartyCountryCode = $invoiceObject->thirdparty->country_code;
 
 			// Get current status of e-invoice
-			$currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus($invoiceObject->id);
+			$currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus($invoiceObject->id, $invoiceObject->ref);
 
 			if ($thirdpartyCountryCode === 'FR' && (!isset($currentStatusDetails['code']) || $currentStatusDetails['code'] != $pdpConnectFr::STATUS_IGNORE)) {
 				/** @var Facture $invoiceObject */
@@ -189,7 +189,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 		// Add buttons in invoice card
 		if (in_array($object->element, ['facture']) && !getDolGlobalString('PDPCONNECTFR_DISABLE_SYNC_DOLI_TO_AP')) {
 			// Get current status of e-invoice
-			$currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus(0, $object->ref);
+			$currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus($object->id, $object->ref);
 
 			$url_button = array();
 
@@ -241,7 +241,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 					$url_button[] = array(
 						'lang' => 'pdpconnectfr',
 						'enabled' => 1,
-						'perm' => (bool) $user->hasRight("pdpconnectfr", "document", "write") && ($currentStatusDetails['file'] == 1),
+						'perm' => (bool) $user->hasRight("pdpconnectfr", "write") && ($currentStatusDetails['file'] == 1),
 						'label' => $langs->trans('sendToPDP'),
 						//'help' => $langs->trans('SendToPDPHelp'),
 						'url' => '/compta/facture/card.php?id=' . $object->id . '&action=send_to_pdp&token=' . newToken()
@@ -351,7 +351,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 				// On create, we can do nothing here. We will update the einvoice status into the CREATE trigger.
 			} else {
 				// Get current status of e-invoice
-				$currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus(0, $object->ref);
+				$currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus($object->id, $object->ref);
 				// Action to set the E-invoice status manually
 				if ($action == 'seteinvoicestatus' && $permissiontoedit) {
 					$result = $pdpConnectFr->setEInvoiceStatus($object, GETPOSTINT('seteinvoicestatus'), '');
@@ -1029,7 +1029,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 
 			// E-invoice generation status
 			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
-				$tmparray = $pdpConnectFr->fetchLastknownInvoiceStatus(0, $obj->ref);
+				$tmparray = $pdpConnectFr->fetchLastknownInvoiceStatus($obj->id, $obj->ref);
 				$einvoiceGenerated = $tmparray['file'];
 				print '<td class="center tdoverflowmax100">';
 				if ($einvoiceGenerated) {
@@ -1105,7 +1105,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 		}
 
 		$pdpConnectFr = new PdpConnectFr($db);
-		$currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus(0, $object->ref);
+		$currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus($object->id, $object->ref);
 
 		// Block modification if invoice is already transmitted to PDP
 		if ($currentStatusDetails['transmitted'] == 1) {
