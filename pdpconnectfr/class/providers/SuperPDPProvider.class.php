@@ -117,7 +117,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 		// Set content of the help page
 		if (getDolGlobalString('PDPCONNECTFR_PDP') == 'SUPERPDPViaPartner') {
-			if (getDolGlobalString("PDPCONNTECTFR_SUPERPDP_VIAPARTNER") != 'proxy') {
+			if (getDolGlobalString("PDPCONNECTFR_SUPERPDP_VIAPARTNER") != 'proxy') {
 				/*
 				// Define $urlwithroot
 				global $dolibarr_main_url_root;
@@ -130,10 +130,10 @@ class SuperPDPProvider extends AbstractPDPProvider
 				$externalrooturl = getRootURLFromURL($urlwithroot);
 				*/
 
-				$urltogeneratetoken = getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER_OAUTH_URL');
+				$urltogeneratetoken = getDolGlobalString('PDPCONNECTFR_SUPERPDP_VIAPARTNER_OAUTH_URL');
 				$urltogeneratetoken .= '?proxy=superpdp&state=none&response_type=code&redirect_uri=' . urlencode(dol_buildpath('/pdpconnectfr/admin/setup.php', 2));
 
-				$urltoshow = $langs->trans("PDPCONNECTFR_LINK_CREATE_ACCOUNTVia", getDolGlobalString("PDPCONNTECTFR_SUPERPDP_VIAPARTNER"));
+				$urltoshow = $langs->trans("PDPCONNECTFR_LINK_CREATE_ACCOUNTVia", getDolGlobalString("PDPCONNECTFR_SUPERPDP_VIAPARTNER"));
 
 				if (empty($tokenData['token'])) {
 					$this->helpToGetCredentials = str_replace('{s1}', '<br><br><center>' . img_picto('', 'url', 'class="pictofixedwidth"') . '<a href="' . $urltogeneratetoken . '" target="_new">' . $urltoshow . '</a></center>', $this->helpToGetCredentials);
@@ -206,7 +206,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		// $item->cssClass = 'minwidth500';
 		// $item->fieldParams['trClass'] = 'advancedoption';
 
-		if (getDolGlobalString('PDPCONNECTFR_PDP') != 'SUPERPDPViaPartner' || getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER') == 'proxy') {
+		if (getDolGlobalString('PDPCONNECTFR_PDP') != 'SUPERPDPViaPartner' || getDolGlobalString('PDPCONNECTFR_SUPERPDP_VIAPARTNER') == 'proxy') {
 			// Username
 			$item = $formSetup->newItem($prefix.'CLIENT_ID'.(getDolGlobalInt('PDPCONNECTFR_LIVE') ? '_PROD' : ''));
 			$item->nameText = $langs->trans('PDPCONNECTFR_CLIENT_ID');
@@ -231,13 +231,13 @@ class SuperPDPProvider extends AbstractPDPProvider
 		//$item->cssClass = 'minwidth500';
 
 		// Token
-		if (getDolGlobalString('PDPCONNECTFR_PDP') != 'SUPERPDPViaPartner' || getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER') != 'proxy') {
+		if (getDolGlobalString('PDPCONNECTFR_PDP') != 'SUPERPDPViaPartner' || getDolGlobalString('PDPCONNECTFR_SUPERPDP_VIAPARTNER') != 'proxy') {
 			if ((getDolGlobalString('PDPCONNECTFR_PDP') == 'SUPERPDP' || getDolGlobalString('PDPCONNECTFR_PDP') == 'SUPERPDPViaPartner')) {	// When we are on a proxy server, no token need to be generated here.
 				$texttoshow = '';
 				$urltogeneratetoken = '';
-				if (getDolGlobalString('PDPCONNECTFR_PDP') == 'SUPERPDPViaPartner' && getDolGlobalString("PDPCONNTECTFR_SUPERPDP_VIAPARTNER")) {
-					$texttoshow = $langs->trans('ConnectTo').' ('.$langs->trans('generateAccessToken') . ' via ' . getDolGlobalString("PDPCONNTECTFR_SUPERPDP_VIAPARTNER").')';
-					$urltogeneratetoken = getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER_OAUTH_URL');
+				if (getDolGlobalString('PDPCONNECTFR_PDP') == 'SUPERPDPViaPartner' && getDolGlobalString("PDPCONNECTFR_SUPERPDP_VIAPARTNER")) {
+					$texttoshow = $langs->trans('ConnectTo').' ('.$langs->trans('generateAccessToken') . ' via ' . getDolGlobalString("PDPCONNECTFR_SUPERPDP_VIAPARTNER").')';
+					$urltogeneratetoken = getDolGlobalString('PDPCONNECTFR_SUPERPDP_VIAPARTNER_OAUTH_URL');
 					$urltogeneratetoken .= '?state=none&response_type=code&redirect_uri=' . urlencode(dol_buildpath('/pdpconnectfr/admin/setup.php', 2));
 				} elseif (getDolGlobalString($prefix . 'CLIENT_ID'.(getDolGlobalInt('PDPCONNECTFR_LIVE') ? '_PROD' : '')) && getDolGlobalString($prefix . 'CLIENT_SECRET'.(getDolGlobalInt('PDPCONNECTFR_LIVE') ? '_PROD' : ''))) {
 					$texttoshow = $langs->trans('ConnectTo').' ('.$langs->trans('generateAccessToken').')';
@@ -270,7 +270,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				}
 			}
 
-			if (getDolGlobalString('PDPCONNECTFR_PDP') != 'SUPERPDPViaPartner' || getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER') != 'proxy') {	// When we are on a proxy server, no token need to be generated here.
+			if (getDolGlobalString('PDPCONNECTFR_PDP') != 'SUPERPDPViaPartner' || getDolGlobalString('PDPCONNECTFR_SUPERPDP_VIAPARTNER') != 'proxy') {	// When we are on a proxy server, no token need to be generated here.
 				if (!empty($tokenData['token'])) {
 					// Actions
 					$item = $formSetup->newItem($prefix . 'ACTIONS');
