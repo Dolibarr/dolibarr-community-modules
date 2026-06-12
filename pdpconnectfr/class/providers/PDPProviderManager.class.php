@@ -71,9 +71,9 @@ class PDPProviderManager
 			),
 			'SUPERPDP' => array(
 				'class' => 'SuperPDPProvider',
-				'position' => getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER') ? 2: 20,
+				'position' => getDolGlobalString('PDPCONNECTFR_SUPERPDP_VIAPARTNER') ? 2: 20,
 				'provider_countries' => array('all'),
-				'provider_name' => picto_from_langcode('FR').' SuperPDP'.(getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER') ? ' <span class="opacitymedium">('.$langs->trans("UsingYourOwnBillingAccount").")</span>" : ""),
+				'provider_name' => picto_from_langcode('FR').' SuperPDP'.(getDolGlobalString('PDPCONNECTFR_SUPERPDP_VIAPARTNER') ? ' <span class="opacitymedium">('.$langs->trans("UsingYourOwnBillingAccount").")</span>" : ""),
 				'description' => 'SuperPDP Integration',
 				'note' => 'Use "client_credentials" mode',
 				//'is_enabled' => getDolGlobalString('PDPCONNECTFR_TEST_SUPERPDP'),
@@ -94,13 +94,13 @@ class PDPProviderManager
 		);
 
 		// Add entry to use SuperPDP via OAuth delegation.
-		if (getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER')) {
+		if (getDolGlobalString('PDPCONNECTFR_SUPERPDP_VIAPARTNER')) {
 			$urltorenew = $urlwithroot.'/core/modules/oauth/generic_oauthcallback.php';	// This one is the one used for test when native using Oauth module.
-			if (getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER_OAUTH_URL')) {	// This one is to use your own redirect URI knowing its ownn client id/secret
+			if (getDolGlobalString('PDPCONNECTFR_SUPERPDP_VIAPARTNER_OAUTH_URL')) {	// This one is to use your own redirect URI knowing its ownn client id/secret
 				$shortscope = 'none';
 				$state = 'none';
 
-				$redirecturl = getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER_OAUTH_URL');
+				$redirecturl = getDolGlobalString('PDPCONNECTFR_SUPERPDP_VIAPARTNER_OAUTH_URL');
 
 				$urltorenew = $redirecturl;
 				$urltodelete = $redirecturl;
@@ -113,7 +113,7 @@ class PDPProviderManager
 				'class' => 'SuperPDPProvider',
 				'position' => 1,
 				'provider_countries' => array('all'),
-				'provider_name' => picto_from_langcode('FR').' SuperPDP  <span class="opacitymedium">(Free and easy setup via '.getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER').' - '.$langs->trans("Recommended").')</span>',
+				'provider_name' => picto_from_langcode('FR').' SuperPDP  <span class="opacitymedium">(Free and easy setup via '.getDolGlobalString('PDPCONNECTFR_SUPERPDP_VIAPARTNER').' - '.$langs->trans("Recommended").')</span>',
 				'description' => 'SuperPDP Integration',
 				'note' => 'Use "authorization_code" mode',
 				//'is_enabled' => getDolGlobalString('PDPCONNECTFR_TEST_SUPERPDP'),
@@ -123,7 +123,7 @@ class PDPProviderManager
 			);
 		}
 
-		if (getDolGlobalString("PDPCONNTECTFR_SUPERPDP_VIAPARTNER") == 'proxy') {
+		if (getDolGlobalString("PDPCONNECTFR_SUPERPDP_VIAPARTNER") == 'proxy') {
 			$this->providersList['SUPERPDPViaPartner'] = array(
 				'class' => 'SuperPDPProvider',
 				'position' => 1,

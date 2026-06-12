@@ -116,15 +116,15 @@ if ($state) {
 }
 
 $providertouse = getDolGlobalString('PDPCONNECTFR_PDP');
-if (GETPOSt('proxy') && getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER') == 'proxy') {	// If using a proxy is requested and we are on a server proxy
+if (GETPOSt('proxy') && getDolGlobalString('PDPCONNECTFR_SUPERPDP_VIAPARTNER') == 'proxy') {	// If using a proxy is requested and we are on a server proxy
 	$providertouse = strtoupper(GETPOST('proxy', 'aZ09'));
 }
 
 
 // Security checks
 
-if (getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER') != 'proxy') {
-	accessforbidden('Setup of service is not correct to use the proxy page. The option PDPCONNTECTFR_SUPERPDP_VIAPARTNER to enable the proxy was not set to "proxy".');
+if (getDolGlobalString('PDPCONNECTFR_SUPERPDP_VIAPARTNER') != 'proxy') {
+	accessforbidden('Setup of service is not correct to use the proxy page. The option PDPCONNECTFR_SUPERPDP_VIAPARTNER to enable the proxy was not set to "proxy".');
 }
 
 $pdpprovider = new PDPProviderManager($db);
@@ -245,7 +245,7 @@ if (empty($code) && !GETPOST('error')) {
 			//var_dump($apiService);      // OAuth\OAuth2\Service\Generic
 			dol_syslog("We received a code=".$code." or error=".GETPOST('error'));
 
-			if (getDolGlobalString('PDPCONNTECTFR_SUPERPDP_VIAPARTNER') == 'proxy') {
+			if (getDolGlobalString('PDPCONNECTFR_SUPERPDP_VIAPARTNER') == 'proxy') {
 				// Ask the token
 
 				$oauthserverurl = $providerconfig['prod_auth_url'];
