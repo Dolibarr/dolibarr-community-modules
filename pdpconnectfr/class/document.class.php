@@ -1249,9 +1249,10 @@ class Document extends CommonObject
 			// Sync all flows
 			$sync_result = $provider->syncFlows($syncFromDate, $maxflows);
 
-			if (!empty($sync_result['syncedFlows']) && $sync_result['syncedFlows'] > 0) {
-				$this->output = $langs->trans("DocumentsSyncedSuccessfully", $sync_result['syncedFlows']);
+			if (!empty($sync_result['messages'])) {
+				$this->output = implode('<br>', $sync_result['messages']);
 			}
+
 			if ($sync_result['res'] <= 0) {
 				$error++;
 				$errortype = 'errors';
