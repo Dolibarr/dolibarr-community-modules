@@ -1,0 +1,226 @@
+<?php
+/* Copyright (C) 2022       Laurent Destailleur     <eldy@users.sourceforge.net>
+ * Copyright (C) 2024       Frédéric France         <frederic.france@free.fr>
+ * Copyright (C) 2025		SuperAdmin					<daoud.mouhamed@gmail.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+/**
+ *       \file       htdocs/einvoicing/ajax/checkinvoicestatus.php
+ *       \brief      File to return Ajax response on document list request
+ */
+
+if (!defined('NOTOKENRENEWAL')) {
+	define('NOTOKENRENEWAL', 1); // Disables token renewal
+}
+if (!defined('NOREQUIREMENU')) {
+	define('NOREQUIREMENU', '1');
+}
+if (!defined('NOREQUIREHTML')) {
+	define('NOREQUIREHTML', '1');
+}
+if (!defined('NOREQUIREAJAX')) {
+	define('NOREQUIREAJAX', '1');
+}
+if (!defined('NOREQUIRESOC')) {
+	define('NOREQUIRESOC', '1');
+}
+if (!defined('NOCSRFCHECK')) {
+	define('NOCSRFCHECK', '1');
+}
+if (!defined('NOREQUIREHTML')) {
+	define('NOREQUIREHTML', '1');
+}
+
+// Load Dolibarr environment
+$res = 0;
+// Try main.inc.php into web root known defined into CONTEXT_DOCUMENT_ROOT (not always defined)
+if (!$res && !empty($_SERVER["CONTEXT_DOCUMENT_ROOT"])) {
+	$res = @include $_SERVER["CONTEXT_DOCUMENT_ROOT"]."/main.inc.php";
+}
+// Try main.inc.php into web root detected using web root calculated from SCRIPT_FILENAME
+$tmp = empty($_SERVER['SCRIPT_FILENAME']) ? '' : $_SERVER['SCRIPT_FILENAME'];
+$tmp2 = realpath(__FILE__);
+$i = strlen($tmp) - 1;
+$j = strlen($tmp2) - 1;
+while ($i > 0 && $j > 0 && isset($tmp[$i]) && isset($tmp2[$j]) && $tmp[$i] == $tmp2[$j]) {
+	$i--;
+	$j--;
+}
+if (!$res && $i > 0 && file_exists(substr($tmp, 0, ($i + 1))."/main.inc.php")) {
+	$res = @include substr($tmp, 0, ($i + 1))."/main.inc.php";
+}
+if (!$res && $i > 0 && file_exists(dirname(substr($tmp, 0, ($i + 1)))."/main.inc.php")) {
+	$res = @include dirname(substr($tmp, 0, ($i + 1)))."/main.inc.php";
+}
+// Try main.inc.php using relative path
+if (!$res && file_exists("../../main.inc.php")) {
+	$res = @include "../../main.inc.php";
+}
+if (!$res && file_exists("../../../main.inc.php")) {
+	$res = @include "../../../main.inc.php";
+}
+if (!$res && file_exists("../../../../main.inc.php")) {
+	$res = @include "../../../../main.inc.php";
+}
+if (!$res && file_exists("../../../../../main.inc.php")) {
+	$res = @include "../../../../../main.inc.php";
+}
+if (!$res) {
+	http_response_code(500);
+	die("Include of main fails");
+}
+/**
+ * @var Conf $conf
+ * @var DoliDB $db
+ * @var HookManager $hookmanager
+ * @var Translate $langs
+ * @var User $user
+ */
+
+//$mode = GETPOST('mode', 'aZ09');
+$objectRef = GETPOST('ref', 'aZ09');
+// $field = GETPOST('field', 'aZ09');
+// $value = GETPOST('value', 'aZ09');
+
+// Security check
+if (!$user->hasRight('einvoicing', 'write')) {
+	accessforbidden();
+}
+
+/*
+ * View
+ */
+
+dol_syslog("Call ajax einvoicing/ajax/checkinvoicestatus.php");
+$langs->load('einvoicing@einvoicing');
+
+top_httphead();
+
+// Update the object field with the new value
+if ($objectRef) {
+	dol_include_once('einvoicing/class/einvoicing.class.php');
+	$einvoicing = new PdpConnectFr($db);
+
+	// Load object
+	require_once DOL_DOCUMENT_ROOT."/compta/facture/class/facture.class.php";
+
+	$invoice = new Facture($db);
+	$invoice->fetch(0, $objectRef);
+	if ($invoice->id <= 0) {
+		print json_encode(['status' => 'error', 'message' => 'Error loading invoice with ref '. $objectRef]);
+		exit;
+	}
+
+	// Get flowId from linked document log
+	$flowId = '';
+	$sql = "SELECT flow_id";
+	$sql .= " FROM ".MAIN_DB_PREFIX."einvoicing_extlinks";
+	$sql .= " WHERE element_type = '".$db->escape($invoice->element)."'";
+	$sql .= " AND syncref = '".$db->escape($invoice->ref)."'";
+
+	$resql = $db->query($sql);
+	if ($resql) {
+		if ($db->num_rows($resql) > 0) {
+			$obj = $db->fetch_object($resql);
+			$flowId = $obj->flow_id;
+		}
+	} else {
+		print json_encode(['status' => 'error', 'message' => 'Error retrieving flowId for invoice ref '. $invoice->ref]);
+		exit;
+	}
+
+	if (empty($flowId)) {
+		print json_encode(['status' => 'N/A', 'message' => 'No einvoice status recorded yet for the invoice ref '. $invoice->ref]);
+		exit;
+	}
+
+	// make a call to get validation result from AP
+	require_once "../class/providers/PDPProviderManager.class.php";
+	$PDPManager = new PDPProviderManager($db);
+	$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+
+
+	$tmparray = $einvoicing->fetchLastknownInvoiceStatus($invoice->id, $invoice->ref);
+	if ($tmparray['code'] == $einvoicing::STATUS_AWAITING_ACK) {
+		// We have reached the status Ok for the AP. Now we need to check the status 200+
+		// TODO ...
+		//print json_encode(['code' => -1, 'info' => 'We have reached the status Ok for the AP. Now we need to check the status 200+ by running the sync']);
+		print json_encode(['code' => -1, 'info' => 'The file has been accepted by your Access Point as valid. Next step need to wait you run the synchronization from menu Invoice - Synchronize']);
+		exit;
+	}
+
+	$resource = 'flows/' . $flowId;
+	$urlparams = array(
+		'docType' => 'Metadata',
+	);
+	$resource .= '?' . http_build_query($urlparams);
+	$response = $provider->callApi(
+		$resource,
+		"GET",
+		false,
+		['Accept' => 'application/octet-stream'],
+		'check_invoice_validation'
+	);
+
+	if ($response['status_code'] == 200 || $response['status_code'] == 202) {
+		$flowData = json_decode($response['response'], true);
+
+		$syncStatus = $einvoicing::STATUS_UNKNOWN;
+		$ack_statusLabel = $flowData['acknowledgement']['status'] ?? '';			// May be 'Ok', 'Pending', ...
+		// Here, with SuperPDP, we receive Ok, but the invoice was validated (200), Sent to customer AP (201), and accepted by customer platform (202)
+		// TODO How to get the 200, 201, 202 ?
+		if ($ack_statusLabel) {
+			$syncStatus = $einvoicing->getDolibarrStatusCodeFromPdpLabel($ack_statusLabel);
+		}
+
+		$tmparray = $einvoicing->fetchLastknownInvoiceStatus($invoice->id, $invoice->ref);
+
+		$syncRef = $flowData['trackingId'] ?? '';
+		$syncComment = $flowData['acknowledgement']['details'][0]['reasonMessage'] ?? '';
+		$einvoicing->insertOrUpdateExtLink($invoice->id, $invoice->element, $flowId, $syncStatus, $syncRef, $syncComment);
+
+		// Log an event in the invoice timeline
+		$eventLabel = "EINVOICING - Status: " . $ack_statusLabel;
+		$eventMessage = "EINVOICING - Status: " . $ack_statusLabel . (!empty($syncComment) ? " - " . $syncComment : "");
+
+		// We add an event only if somethiing has changed
+		$addevent = 1;
+		if ($syncStatus == $einvoicing::STATUS_UNKNOWN) {						// Do not add event if status of invoice is unknown (failed to retrieve it ?)
+			$addevent = 0;
+		}
+		if (!empty($tmparray['code']) && $syncStatus == $tmparray['code']) {	// Do not add event if status has not changed
+			$addevent = 0;
+		}
+		if ($addevent) {
+			$resLogEvent = $provider->addEvent('STATUS', $eventLabel, $eventMessage, $invoice);
+			if ($resLogEvent < 0) {
+				dol_syslog(__METHOD__ . " Failed to log event for flowId: {$flowId}", LOG_WARNING);
+			}
+		}
+
+		// Refresh current status info
+		require_once "../class/einvoicing.class.php";
+		$einvoicing = new PdpConnectFr($db);
+		$currentStatusInfo = $einvoicing->fetchLastknownInvoiceStatus($invoice->id, $invoice->ref);
+
+		print json_encode($currentStatusInfo);
+	} else {
+		print json_encode(['code' => -1, 'info' => 'Error retrieving validation status from PDP for invoice ref '. $invoice->ref]);
+		exit;
+	}
+}
+
+$db->close();
