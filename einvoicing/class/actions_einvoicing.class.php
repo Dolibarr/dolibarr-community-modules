@@ -36,7 +36,7 @@ dol_include_once('/einvoicing/class/providers/PDPProviderManager.class.php');
 /**
  * Class for hooks of module
  */
-class ActionsPdpconnectfr extends CommonHookActions
+class ActionsEInvoicing extends CommonHookActions
 {
 	/**
 	 * systemMessage
@@ -72,8 +72,8 @@ class ActionsPdpconnectfr extends CommonHookActions
 		// Invoice pdf path
 		$pdfPath = $parameters['file'];
 
-		$pdpConnectFr = new PdpConnectFr($db);
-		$checkConfig = $pdpConnectFr->checkModulePrerequisites();
+		$einvoicing = new EInvoicing($db);
+		$checkConfig = $einvoicing->checkModulePrerequisites();
 		if ($checkConfig < 0) {
 			dol_syslog(__METHOD__ . "EINVOICING Module is not correctly configured.");
 			return 0;
@@ -87,9 +87,9 @@ class ActionsPdpconnectfr extends CommonHookActions
 			$thirdpartyCountryCode = $invoiceObject->thirdparty->country_code;
 
 			// Get current status of e-invoice
-			$currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus($invoiceObject->id, $invoiceObject->ref);
+			$currentStatusDetails = $einvoicing->fetchLastknownInvoiceStatus($invoiceObject->id, $invoiceObject->ref);
 
-			if ($thirdpartyCountryCode === 'FR' && (!isset($currentStatusDetails['code']) || $currentStatusDetails['code'] != $pdpConnectFr::STATUS_IGNORE)) {
+			if ($thirdpartyCountryCode === 'FR' && (!isset($currentStatusDetails['code']) || $currentStatusDetails['code'] != $einvoicing::STATUS_IGNORE)) {
 				/** @var Facture $invoiceObject */
 				if (//$invoiceObject->status != $invoiceObject::STATUS_DRAFT &&
 					!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')
@@ -102,7 +102,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 					$protocol = $ProtocolManager->getProtocol($usedProtocols);
 
 					// Check configuration
-					$result = $pdpConnectFr->checkRequiredinformations($invoiceObject);
+					$result = $einvoicing->checkRequiredinformations($invoiceObject);
 					if ($result['res'] < 0) {			// Error case
 						$message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
 
@@ -179,8 +179,8 @@ class ActionsPdpconnectfr extends CommonHookActions
 		global $db, $langs, $user;
 
 		$langs->load("einvoicing@einvoicing");
-		$pdpConnectFr = new PdpConnectFr($db);
-		$checkConfig = $pdpConnectFr->checkModulePrerequisites();
+		$einvoicing = new EInvoicing($db);
+		$checkConfig = $einvoicing->checkModulePrerequisites();
 		if ($checkConfig < 0) {
 			dol_syslog(__METHOD__ . "EINVOICING Module is not correctly configured.");
 			return 0;
@@ -189,15 +189,15 @@ class ActionsPdpconnectfr extends CommonHookActions
 		// Add buttons in invoice card
 		if (in_array($object->element, ['facture']) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 			// Get current status of e-invoice
-			$currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus($object->id, $object->ref);
+			$currentStatusDetails = $einvoicing->fetchLastknownInvoiceStatus($object->id, $object->ref);
 
 			$url_button = array();
 
 			if ($object->status == Facture::STATUS_VALIDATED || $object->status == Facture::STATUS_CLOSED) {
 				// if E-invoice is not generated, show button to generate e-invoice
 				if (
-					$currentStatusDetails['code'] == $pdpConnectFr::STATUS_NOT_GENERATED
-					|| !array_key_exists($currentStatusDetails['code'], $pdpConnectFr::STATUS_LABEL_KEYS)
+					$currentStatusDetails['code'] == $einvoicing::STATUS_NOT_GENERATED
+					|| !array_key_exists($currentStatusDetails['code'], $einvoicing::STATUS_LABEL_KEYS)
 				) {
 					$url_button[] = array(
 						'lang' => 'einvoicing',
@@ -212,9 +212,9 @@ class ActionsPdpconnectfr extends CommonHookActions
 				// If the e-invoice is generated but not sent, or if it was sent and a validation error was received,
 				// display the button to regenerate the e-invoice
 				if (in_array($currentStatusDetails['code'], [
-					$pdpConnectFr::STATUS_GENERATED,
-					$pdpConnectFr::STATUS_ERROR,
-					$pdpConnectFr::STATUS_UNKNOWN
+					$einvoicing::STATUS_GENERATED,
+					$einvoicing::STATUS_ERROR,
+					$einvoicing::STATUS_UNKNOWN
 				])) {
 					$perm = (bool) $user->hasRight("facture", "creer");
 				} else {
@@ -232,11 +232,11 @@ class ActionsPdpconnectfr extends CommonHookActions
 				// If the e-invoice is generated but not sent, or if it was sent and a validation error was received,
 				// display the button to regenerate the e-invoice
 				if (in_array($currentStatusDetails['code'], [
-					$pdpConnectFr::STATUS_GENERATED,
-					$pdpConnectFr::STATUS_ERROR,
-					$pdpConnectFr::STATUS_UNKNOWN,
-					$pdpConnectFr::STATUS_AWAITING_VALIDATION,		// We may retry to resend. We should get an error if we do, but it is interesting to test the retry.
-					$pdpConnectFr::STATUS_AWAITING_ACK				// We may retry to resend. We should get an error if we do, but it is interesting to test the retry.
+					$einvoicing::STATUS_GENERATED,
+					$einvoicing::STATUS_ERROR,
+					$einvoicing::STATUS_UNKNOWN,
+					$einvoicing::STATUS_AWAITING_VALIDATION,		// We may retry to resend. We should get an error if we do, but it is interesting to test the retry.
+					$einvoicing::STATUS_AWAITING_ACK				// We may retry to resend. We should get an error if we do, but it is interesting to test the retry.
 				])) {
 					$url_button[] = array(
 						'lang' => 'einvoicing',
@@ -281,14 +281,14 @@ class ActionsPdpconnectfr extends CommonHookActions
 				$sqlFinal .= " WHERE element_id = " . (int) $object->id;
 				$sqlFinal .= " AND element_type = '" . $db->escape($object->element) . "'";
 				$sqlFinal .= " AND direction = 'out'";
-				$sqlFinal .= " AND lc_status IN (" . (int) PdpConnectFr::STATUS_APPROVED . ", " . (int) PdpConnectFr::STATUS_REFUSED . ")";
+				$sqlFinal .= " AND lc_status IN (" . (int) EInvoicing::STATUS_APPROVED . ", " . (int) EInvoicing::STATUS_REFUSED . ")";
 				$sqlFinal .= " AND lc_validation_status = 'Ok'";
 				$sqlFinal .= " LIMIT 1";
 				$resqlFinal = $db->query($sqlFinal);
 				$hasFinalLifecycle = ($resqlFinal && $db->num_rows($resqlFinal) > 0);
 
 				if (!$hasFinalLifecycle) {
-					$availableStatuses = $pdpConnectFr->getEinvoiceStatusOptions(1, 1, 1);
+					$availableStatuses = $einvoicing->getEinvoiceStatusOptions(1, 1, 1);
 					$url_button = array();
 					foreach ($availableStatuses as $code => $label) {
 						$url_button[] = array(
@@ -329,8 +329,8 @@ class ActionsPdpconnectfr extends CommonHookActions
 
 		//dol_syslog(__METHOD__ . " Hook doActions called for object " . get_class($object) . " action=" . $action);
 
-		$pdpConnectFr = new PdpConnectFr($db);
-		$checkConfig = $pdpConnectFr->checkModulePrerequisites();
+		$einvoicing = new EInvoicing($db);
+		$checkConfig = $einvoicing->checkModulePrerequisites();
 		if ($checkConfig < 0) {
 			dol_syslog(__METHOD__ . "EINVOICING Module is not correctly configured.");
 			return 0;
@@ -351,13 +351,13 @@ class ActionsPdpconnectfr extends CommonHookActions
 				// On create, we can do nothing here. We will update the einvoice status into the CREATE trigger.
 			} else {
 				// Get current status of e-invoice
-				$currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus($object->id, $object->ref);
+				$currentStatusDetails = $einvoicing->fetchLastknownInvoiceStatus($object->id, $object->ref);
 				// Action to set the E-invoice status manually
 				if ($action == 'seteinvoicestatus' && $permissiontoedit) {
-					$result = $pdpConnectFr->setEInvoiceStatus($object, GETPOSTINT('seteinvoicestatus'), '');
+					$result = $einvoicing->setEInvoiceStatus($object, GETPOSTINT('seteinvoicestatus'), '');
 					if ($result < 0) {
 						$error++;
-						$this->errors = array_merge($this->errors, $pdpConnectFr->errors);
+						$this->errors = array_merge($this->errors, $einvoicing->errors);
 					}
 				}
 			}
@@ -365,10 +365,10 @@ class ActionsPdpconnectfr extends CommonHookActions
 			// Action to set an invoice-level routing ID override
 			if ($action == 'setoverriderouting' && $permissiontoedit) {
 				$overrideRoutingId = GETPOST('override_routing_id', 'alphanohtml');
-				$result = $pdpConnectFr->insertOrUpdateExtLink($object->id, $object->element, '', $currentStatusDetails['code'], $object->ref, $currentStatusDetails['info'], $overrideRoutingId);
+				$result = $einvoicing->insertOrUpdateExtLink($object->id, $object->element, '', $currentStatusDetails['code'], $object->ref, $currentStatusDetails['info'], $overrideRoutingId);
 				if ($result < 0) {
 					$error++;
-					$this->errors = array_merge($this->errors, $pdpConnectFr->errors);
+					$this->errors = array_merge($this->errors, $einvoicing->errors);
 				}
 			}
 
@@ -377,14 +377,14 @@ class ActionsPdpconnectfr extends CommonHookActions
 				$action == 'send_to_pdp' && $permissiontoedit
 				&& $currentStatusDetails['file'] == 1
 				&& in_array($currentStatusDetails['code'], [
-					$pdpConnectFr::STATUS_GENERATED,
-					$pdpConnectFr::STATUS_ERROR,
-					$pdpConnectFr::STATUS_UNKNOWN
+					$einvoicing::STATUS_GENERATED,
+					$einvoicing::STATUS_ERROR,
+					$einvoicing::STATUS_UNKNOWN
 				])
 			) {
 				// Validate thirdparty data before sending to Access Point
 				$object->fetch_thirdparty();
-				$checkResult = $pdpConnectFr->checkRequiredinformations($object);
+				$checkResult = $einvoicing->checkRequiredinformations($object);
 				if ($checkResult['res'] < 0) {
 					$message = $langs->trans("InvoiceNotSentToPDPDueToThirdpartyIssues") . ': <br>' . $checkResult['message'];
 					dol_syslog(__METHOD__ . " " . strip_tags($message));
@@ -431,7 +431,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 				$protocol = $ProtocolManager->getProtocol($usedProtocols);
 
 				// Check configuration
-				$result = $pdpConnectFr->checkRequiredinformations($invoiceObject);
+				$result = $einvoicing->checkRequiredinformations($invoiceObject);
 				if ($result['res'] < 0) {			// Blocking error, message contains at least one error and may also have warnings
 					$message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
 
@@ -504,30 +504,30 @@ class ActionsPdpconnectfr extends CommonHookActions
 				// Thirdparty routing ID
 				$routingId = GETPOST('routing_id', 'alphanohtml');
 				if ($routingId !== '') {
-					$existing = $pdpConnectFr->fetchDefaultRouting($socId, 'thirdparty');
+					$existing = $einvoicing->fetchDefaultRouting($socId, 'thirdparty');
 					if (empty($existing)) {
-						$result = $pdpConnectFr->addRouting($socId, $routingId, '', 'thirdparty');
+						$result = $einvoicing->addRouting($socId, $routingId, '', 'thirdparty');
 					} else {
-						$result = $pdpConnectFr->setDefaultRouting($socId, $routingId, '', '', '', 'thirdparty');
+						$result = $einvoicing->setDefaultRouting($socId, $routingId, '', '', '', 'thirdparty');
 					}
 					if ($result < 0) {
 						$error++;
-						setEventMessages($langs->trans('FailedToSaveRoutingID').' '.$pdpConnectFr->error, null, 'errors');
+						setEventMessages($langs->trans('FailedToSaveRoutingID').' '.$einvoicing->error, null, 'errors');
 					}
 				}
 
 				// Default product for import
 				$routingProductId = GETPOST('routing_product_id', 'aZ09');
 				if ($routingProductId !== '' && $routingProductId !== '-1') {
-					$existing = $pdpConnectFr->fetchDefaultRouting($socId, 'product');
+					$existing = $einvoicing->fetchDefaultRouting($socId, 'product');
 					if (empty($existing)) {
-						$result = $pdpConnectFr->addRouting($socId, $routingProductId, '', 'product');
+						$result = $einvoicing->addRouting($socId, $routingProductId, '', 'product');
 					} else {
-						$result = $pdpConnectFr->setDefaultRouting($socId, $routingProductId, '', '', '', 'product');
+						$result = $einvoicing->setDefaultRouting($socId, $routingProductId, '', '', '', 'product');
 					}
 					if ($result < 0) {
 						$error++;
-						setEventMessages($langs->trans('FailedToSaveRoutingID').' '.$pdpConnectFr->error, null, 'errors');
+						setEventMessages($langs->trans('FailedToSaveRoutingID').' '.$einvoicing->error, null, 'errors');
 					}
 				}
 			}
@@ -537,10 +537,10 @@ class ActionsPdpconnectfr extends CommonHookActions
 				$newRoutingId = GETPOST('new_routing_id', 'alphanohtml');
 				$newRoutingInfo = GETPOST('new_routing_info', 'alphanohtml');
 				if (!empty($newRoutingId)) {
-					$result = $pdpConnectFr->addRouting($socId, $newRoutingId, $newRoutingInfo, 'thirdparty');
+					$result = $einvoicing->addRouting($socId, $newRoutingId, $newRoutingInfo, 'thirdparty');
 					if ($result < 0) {
 						$error++;
-						setEventMessages($langs->trans('FailedToSaveRoutingID').' '.$pdpConnectFr->error, null, 'errors');
+						setEventMessages($langs->trans('FailedToSaveRoutingID').' '.$einvoicing->error, null, 'errors');
 					}
 				}
 			}
@@ -549,10 +549,10 @@ class ActionsPdpconnectfr extends CommonHookActions
 			if ($action == 'pdp_deleterouting' && !empty($socId) && $permissiontoedit) {
 				$routingRowid = GETPOSTINT('routing_rowid');
 				if ($routingRowid > 0) {
-					$result = $pdpConnectFr->deleteRouting($routingRowid, $socId);
+					$result = $einvoicing->deleteRouting($routingRowid, $socId);
 					if ($result < 0) {
 						$error++;
-						setEventMessages($langs->trans('FailedToDeleteRoutingID').' '.$pdpConnectFr->error, null, 'errors');
+						setEventMessages($langs->trans('FailedToDeleteRoutingID').' '.$einvoicing->error, null, 'errors');
 					}
 				}
 			}
@@ -561,10 +561,10 @@ class ActionsPdpconnectfr extends CommonHookActions
 			if ($action == 'pdp_setdefaultrouting' && !empty($socId) && $permissiontoedit) {
 				$routingRowid = GETPOSTINT('routing_rowid');
 				if ($routingRowid > 0) {
-					$result = $pdpConnectFr->setRoutingAsDefault($routingRowid, $socId);
+					$result = $einvoicing->setRoutingAsDefault($routingRowid, $socId);
 					if ($result < 0) {
 						$error++;
-						setEventMessages($langs->trans('FailedToSetDefaultRoutingID').' '.$pdpConnectFr->error, null, 'errors');
+						setEventMessages($langs->trans('FailedToSetDefaultRoutingID').' '.$einvoicing->error, null, 'errors');
 					}
 				}
 			}
@@ -596,8 +596,8 @@ class ActionsPdpconnectfr extends CommonHookActions
 			return 0;
 		}
 
-		$pdpConnectFr = new PdpConnectFr($db);
-		$checkConfig = $pdpConnectFr->checkModulePrerequisites();
+		$einvoicing = new EInvoicing($db);
+		$checkConfig = $einvoicing->checkModulePrerequisites();
 		if ($checkConfig < 0) {
 			dol_syslog(__METHOD__ . "EINVOICING Module is not correctly configured.");
 			return 0;
@@ -611,14 +611,14 @@ class ActionsPdpconnectfr extends CommonHookActions
 				$pdpstatuscode = GETPOST('pdpstatuscode', 'alpha');
 
 				$formquestion = array();
-				if (in_array($pdpstatuscode, array_values($pdpConnectFr::STATUS_REQUIRING_REASONS))) {
+				if (in_array($pdpstatuscode, array_values($einvoicing::STATUS_REQUIRING_REASONS))) {
 					$formquestion = array(
 						'array' => [
 							'type' => 'select',
 							'name' => 'statusRaison',
 							'label' => $langs->trans("SelectStatusReason"),
 							'value' => '',
-							'values' => $pdpConnectFr->getReasonsByStatus($pdpstatuscode, 1)
+							'values' => $einvoicing->getReasonsByStatus($pdpstatuscode, 1)
 						]
 					);
 				}
@@ -626,7 +626,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 				$formconfirm = $form->formconfirm(
 					DOL_URL_ROOT . "/fourn/facture/card.php?id={$object->id}&action=confirm_sendStatusMessage&pdpstatuscode={$pdpstatuscode}",
 					$langs->trans('SendStatusMessage'),
-					$langs->trans('ConfirmSendStatusMessage', $object->ref, $pdpConnectFr->getStatusLabel($pdpstatuscode)),
+					$langs->trans('ConfirmSendStatusMessage', $object->ref, $einvoicing->getStatusLabel($pdpstatuscode)),
 					'confirm_sendStatusMessage',
 					$formquestion,
 					'yes',
@@ -660,8 +660,8 @@ class ActionsPdpconnectfr extends CommonHookActions
 		//     return 0;
 		// }
 
-		$pdpConnectFr = new PdpConnectFr($db);
-		$checkConfig = $pdpConnectFr->checkModulePrerequisites();
+		$einvoicing = new EInvoicing($db);
+		$checkConfig = $einvoicing->checkModulePrerequisites();
 		if ($checkConfig < 0) {
 			dol_syslog(__METHOD__ . "EINVOICING Module is not correctly configured.");
 			return 0;
@@ -672,22 +672,22 @@ class ActionsPdpconnectfr extends CommonHookActions
 		if (empty($parameters['tpl_context'])) {	// Do not show the new fields when we are in the public form to register a thirdparty.
 			// Add block in invoice card
 			if (in_array($object->element, ['facture']) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
-				$this->resprints .= $pdpConnectFr->EInvoiceCardBlock($object, $action, $parameters);		// Output fields in card, including js for refreshing state
+				$this->resprints .= $einvoicing->EInvoiceCardBlock($object, $action, $parameters);		// Output fields in card, including js for refreshing state
 			}
 
 			// Add block in supplier invoice card
 			if (in_array($object->element, ['invoice_supplier']) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
-				$this->resprints .= $pdpConnectFr->supplierInvoiceCardBlock($object, $action, $parameters);		// Output fields in card, including js for refreshing state
+				$this->resprints .= $einvoicing->supplierInvoiceCardBlock($object, $action, $parameters);		// Output fields in card, including js for refreshing state
 			}
 
 			// Add block in product/service card
 			if (in_array($object->element, ['product']) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI'))) {
-				$this->resprints .= $pdpConnectFr->productServiceCardBlock($object, $action, $parameters);		// Output fields in card, including js for refreshing state
+				$this->resprints .= $einvoicing->productServiceCardBlock($object, $action, $parameters);		// Output fields in card, including js for refreshing state
 			}
 
 			// Add block in thirdparty card
 			if (in_array($object->element, ['societe']) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI'))) {
-				$this->resprints .= $pdpConnectFr->thirdpartyCardBlock($object, $action, $parameters);		// Output fields in card
+				$this->resprints .= $einvoicing->thirdpartyCardBlock($object, $action, $parameters);		// Output fields in card
 			}
 		}
 
@@ -868,8 +868,8 @@ class ActionsPdpconnectfr extends CommonHookActions
 		global $form, $db;
 
 		if (in_array('invoicelist', explode(':', $parameters['context'])) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
-			$pdpConnectFr = new PdpConnectFr($db);
-			$checkConfig = $pdpConnectFr->checkModulePrerequisites();
+			$einvoicing = new EInvoicing($db);
+			$checkConfig = $einvoicing->checkModulePrerequisites();
 			if ($checkConfig < 0) {
 				dol_syslog(__METHOD__ . "EINVOICING Module is not correctly configured.");
 				return 0;
@@ -884,15 +884,15 @@ class ActionsPdpconnectfr extends CommonHookActions
 			// Sync status
 			if (empty($parameters['arrayfields']['pdp_syncstatus']) || !empty($parameters['arrayfields']['pdp_syncstatus']['checked'])) {
 				print '<td class="liste_titre pdp_syncstatus">';
-				$listofoptions = $pdpConnectFr->getEinvoiceStatusOptions(0, 0, 0, 0, 1, 0, 1);
+				$listofoptions = $einvoicing->getEinvoiceStatusOptions(0, 0, 0, 0, 1, 0, 1);
 
 				// Remove option related to E-invoice generation status
-				//unset($listofoptions[$pdpConnectFr::STATUS_NOT_GENERATED]);
-				//unset($listofoptions[$pdpConnectFr::STATUS_GENERATED]);
+				//unset($listofoptions[$einvoicing::STATUS_NOT_GENERATED]);
+				//unset($listofoptions[$einvoicing::STATUS_GENERATED]);
 
 				// Remove unknow status because "unknown" means there is no status set so we can't search on it.
 				//if (in_array($action, array('add', 'create', 'edit', 'save'))) {
-					unset($listofoptions[$pdpConnectFr::STATUS_UNKNOWN]);
+					unset($listofoptions[$einvoicing::STATUS_UNKNOWN]);
 				//}
 
 				print $form->selectarray(
@@ -967,8 +967,8 @@ class ActionsPdpconnectfr extends CommonHookActions
 		global $db, $langs;
 
 		if (in_array('invoicelist', explode(':', $parameters['context'])) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
-			$pdpConnectFr = new PdpConnectFr($db);
-			$checkConfig = $pdpConnectFr->checkModulePrerequisites();
+			$einvoicing = new EInvoicing($db);
+			$checkConfig = $einvoicing->checkModulePrerequisites();
 			if ($checkConfig < 0) {
 				dol_syslog(__METHOD__ . "EINVOICING Module is not correctly configured.");
 				return 0;
@@ -1020,8 +1020,8 @@ class ActionsPdpconnectfr extends CommonHookActions
 		if (in_array('invoicelist', explode(':', $parameters['context'])) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 			$obj = $parameters['obj'];
 
-			$pdpConnectFr = new PdpConnectFr($db);
-			$checkConfig = $pdpConnectFr->checkModulePrerequisites();
+			$einvoicing = new EInvoicing($db);
+			$checkConfig = $einvoicing->checkModulePrerequisites();
 			if ($checkConfig < 0) {
 				dol_syslog(__METHOD__ . "EINVOICING Module is not correctly configured.");
 				return 0;
@@ -1029,7 +1029,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 
 			// E-invoice generation status
 			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
-				$tmparray = $pdpConnectFr->fetchLastknownInvoiceStatus($obj->id, $obj->ref);
+				$tmparray = $einvoicing->fetchLastknownInvoiceStatus($obj->id, $obj->ref);
 				$einvoiceGenerated = $tmparray['file'];
 				print '<td class="center tdoverflowmax100">';
 				if ($einvoiceGenerated) {
@@ -1043,7 +1043,7 @@ class ActionsPdpconnectfr extends CommonHookActions
 
 			// E-invoice sync status
 			if (empty($parameters['arrayfields']['pdp_syncstatus']) || !empty($parameters['arrayfields']['pdp_syncstatus']['checked'])) {
-				$currentStatusDetails = $obj->pdp_syncstatus ? $pdpConnectFr->getStatusLabel($obj->pdp_syncstatus) : '-';
+				$currentStatusDetails = $obj->pdp_syncstatus ? $einvoicing->getStatusLabel($obj->pdp_syncstatus) : '-';
 				print '<td class="center tdoverflowmax100" title="' . dolPrintHTMLForAttribute($currentStatusDetails) . '">';
 				print $currentStatusDetails;
 				print '</td>';
@@ -1104,8 +1104,8 @@ class ActionsPdpconnectfr extends CommonHookActions
 			return 0;
 		}
 
-		$pdpConnectFr = new PdpConnectFr($db);
-		$currentStatusDetails = $pdpConnectFr->fetchLastknownInvoiceStatus($object->id, $object->ref);
+		$einvoicing = new EInvoicing($db);
+		$currentStatusDetails = $einvoicing->fetchLastknownInvoiceStatus($object->id, $object->ref);
 
 		// Block modification if invoice is already transmitted to PDP
 		if ($currentStatusDetails['transmitted'] == 1) {

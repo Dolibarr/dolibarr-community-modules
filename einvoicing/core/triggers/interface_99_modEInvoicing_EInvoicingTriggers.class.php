@@ -72,29 +72,29 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		}
 
 		if ($action == 'BILL_CREATE') {
-			$pdpConnectFr = new PdpConnectFr($db);
+			$einvoicing = new EInvoicing($db);
 
 			// When invoice is created
-			$result = $pdpConnectFr->setEInvoiceStatus($object, GETPOST('seteinvoicestatus'), '');
+			$result = $einvoicing->setEInvoiceStatus($object, GETPOST('seteinvoicestatus'), '');
 			if ($result < 0) {
-				$this->errors[] = $pdpConnectFr->errors;
+				$this->errors[] = $einvoicing->errors;
 				return -1;
 			}
 		}
 
 		if ($action == 'BILL_VALIDATE') {
-			$pdpConnectFr = new PdpConnectFr($db);
+			$einvoicing = new EInvoicing($db);
 
-			$result = $pdpConnectFr->fetchLastknownInvoiceStatus($object->id, $object->ref);
+			$result = $einvoicing->fetchLastknownInvoiceStatus($object->id, $object->ref);
 
-			// If $result is $pdpConnectFr::STATUS_IGNORE, we do nothing.
+			// If $result is $einvoicing::STATUS_IGNORE, we do nothing.
 
-			// If einvoice was set to $pdpConnectFr::STATUS_NOT_GENERATED or $pdpConnectFr::STATUS_UNKNOWN, we set it to STATUS_IGNORE (if not qualified for einvoice) or STATUS_NOT_GENERATED (if qualified for einvoice)
-			if ($result['code'] == $pdpConnectFr::STATUS_NOT_GENERATED || $result['code'] == $pdpConnectFr::STATUS_UNKNOWN) {
+			// If einvoice was set to $einvoicing::STATUS_NOT_GENERATED or $einvoicing::STATUS_UNKNOWN, we set it to STATUS_IGNORE (if not qualified for einvoice) or STATUS_NOT_GENERATED (if qualified for einvoice)
+			if ($result['code'] == $einvoicing::STATUS_NOT_GENERATED || $result['code'] == $einvoicing::STATUS_UNKNOWN) {
 				// By default, we set status to ignore
-				$statustouse = $pdpConnectFr::STATUS_IGNORE;
+				$statustouse = $einvoicing::STATUS_IGNORE;
 				// Test if invoice need to be managed by EInvoice
-				$needEinvoice = $pdpConnectFr->needEInvoiceManagement($object);
+				$needEinvoice = $einvoicing->needEInvoiceManagement($object);
 				if ($needEinvoice) {
 					$statustouse = $needEinvoice;
 				}
@@ -102,31 +102,31 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 				$newobject = dol_clone($object, 2);
 				$newobject->ref = $object->newref;
 
-				$result = $pdpConnectFr->setEInvoiceStatus($newobject, $statustouse, '');
+				$result = $einvoicing->setEInvoiceStatus($newobject, $statustouse, '');
 				if ($result < 0) {
-					$this->errors[] = $pdpConnectFr->errors;
+					$this->errors[] = $einvoicing->errors;
 					return -1;
 				}
 			}
 		}
 
 		if ($action == 'BILL_UNVALIDATE') {
-			$pdpConnectFr = new PdpConnectFr($db);
-			$result = $pdpConnectFr->fetchLastknownInvoiceStatus($object->id, $object->ref);
+			$einvoicing = new EInvoicing($db);
+			$result = $einvoicing->fetchLastknownInvoiceStatus($object->id, $object->ref);
 
 			// If einvoice has been transmitted, we must check that we don't try to modify some fields
-			if (is_array($result) && !in_array($result['code'], array($pdpConnectFr::STATUS_UNKNOWN, $pdpConnectFr::STATUS_IGNORE, $pdpConnectFr::STATUS_NOT_GENERATED, $pdpConnectFr::STATUS_GENERATED))) {
+			if (is_array($result) && !in_array($result['code'], array($einvoicing::STATUS_UNKNOWN, $einvoicing::STATUS_IGNORE, $einvoicing::STATUS_NOT_GENERATED, $einvoicing::STATUS_GENERATED))) {
 				$this->errors[] = 'You try to modify the status of an invoice that is locked once the invoice has been transmitted to the Access Point';
 				return -3;
 			}
 		}
 
 		if ($action == 'BILL_MODIFY') {
-			$pdpConnectFr = new PdpConnectFr($db);
-			$result = $pdpConnectFr->fetchLastknownInvoiceStatus($object->id, $object->ref);
+			$einvoicing = new EInvoicing($db);
+			$result = $einvoicing->fetchLastknownInvoiceStatus($object->id, $object->ref);
 
 			// If einvoice has been transmitted, we must check that we don't try to modify some fields
-			if (is_array($result) && !in_array($result['code'], array($pdpConnectFr::STATUS_UNKNOWN, $pdpConnectFr::STATUS_IGNORE, $pdpConnectFr::STATUS_NOT_GENERATED, $pdpConnectFr::STATUS_GENERATED))) {
+			if (is_array($result) && !in_array($result['code'], array($einvoicing::STATUS_UNKNOWN, $einvoicing::STATUS_IGNORE, $einvoicing::STATUS_NOT_GENERATED, $einvoicing::STATUS_GENERATED))) {
 				// Fields that are locked after transmission.
 				$lockedFields = array(
 					'ref',
@@ -158,37 +158,37 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		}
 
 		if ($action == 'COMPANY_CREATE') {
-			$pdpConnectFr = new PdpConnectFr($db);
+			$einvoicing = new EInvoicing($db);
 
 			$socId = $object->socid;
 
 			// Thirdparty routing ID
 			$routingId = GETPOST('routing_id', 'alphanohtml');
 			if ($routingId !== '') {
-				$existing = $pdpConnectFr->fetchDefaultRouting($socId, 'thirdparty');
+				$existing = $einvoicing->fetchDefaultRouting($socId, 'thirdparty');
 				if (empty($existing)) {
-					$result = $pdpConnectFr->addRouting($socId, $routingId, '', 'thirdparty');
+					$result = $einvoicing->addRouting($socId, $routingId, '', 'thirdparty');
 				} else {
-					$result = $pdpConnectFr->setDefaultRouting($socId, $routingId, '', '', '', 'thirdparty');
+					$result = $einvoicing->setDefaultRouting($socId, $routingId, '', '', '', 'thirdparty');
 				}
 				if ($result < 0) {
 					$error++;
-					$this->errors[] = $langs->trans('FailedToSaveRoutingID').' '.$pdpConnectFr->error;
+					$this->errors[] = $langs->trans('FailedToSaveRoutingID').' '.$einvoicing->error;
 				}
 			}
 
 			// Default product for import
 			$routingProductId = GETPOST('routing_product_id', 'aZ09');
 			if ($routingProductId !== '' && $routingProductId !== '-1') {
-				$existing = $pdpConnectFr->fetchDefaultRouting($socId, 'product');
+				$existing = $einvoicing->fetchDefaultRouting($socId, 'product');
 				if (empty($existing)) {
-					$result = $pdpConnectFr->addRouting($socId, $routingProductId, '', 'product');
+					$result = $einvoicing->addRouting($socId, $routingProductId, '', 'product');
 				} else {
-					$result = $pdpConnectFr->setDefaultRouting($socId, $routingProductId, '', '', '', 'product');
+					$result = $einvoicing->setDefaultRouting($socId, $routingProductId, '', '', '', 'product');
 				}
 				if ($result < 0) {
 					$error++;
-					$this->errors[] = $langs->trans('FailedToSaveRoutingID').' '.$pdpConnectFr->error;
+					$this->errors[] = $langs->trans('FailedToSaveRoutingID').' '.$einvoicing->error;
 				}
 			}
 

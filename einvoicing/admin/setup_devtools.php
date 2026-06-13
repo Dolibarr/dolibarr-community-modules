@@ -103,7 +103,7 @@ if (!$user->admin) {
 	accessforbidden();
 }
 
-$einvoicing = new PdpConnectFr($db);
+$einvoicing = new EInvoicing($db);
 $PDPManager = new PDPProviderManager($db);
 
 // If Access Point is selected, show parameters for it
@@ -205,7 +205,7 @@ print dol_get_fiche_head($head, 'devtools', $langs->trans($title), -1, "einvoici
 //print '<span class="opacitymedium">'.$langs->trans("EInvoicingSetupPage").'</span><br>';
 
 // Alert mysoc configuration is not complete
-$einvoicing = new PdpConnectFr($db);
+$einvoicing = new EInvoicing($db);
 
 $stringwarning = pdpShowWarning($einvoicing);
 print $stringwarning;

@@ -238,7 +238,7 @@ trait CommonProtocol
 	 * This method creates a dummy invoice with representative data
 	 * to illustrate the E-invoice structure without using real business information.
 	 *
-	 * @param	PdpConnectFr			$einvoicing			EInvoicing
+	 * @param	EInvoicing			$einvoicing			EInvoicing
 	 * @param   Societe|null			$thirdpartySeller		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
 	 * @param   Societe|null			$thirdpartyBuyer		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
 	 * @param   array<string,mixed>		$options				More options
@@ -416,7 +416,7 @@ trait CommonProtocol
 		require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
 
 		$thirdparty = new Societe($db);
-		$einvoicing = new PdpConnectFr($db);
+		$einvoicing = new EInvoicing($db);
 		$thirdpartyId = -1;
 
 		$sellerCountryCode = $sellerInfo['sellercountry'] ?? '';
@@ -832,7 +832,7 @@ trait CommonProtocol
 		 */
 		global $db, $user, $langs;
 
-		$einvoicing = new PdpConnectFr($db);
+		$einvoicing = new EInvoicing($db);
 
 		// Search in product supplier prices table using prodsellerid (the ref of product of the vendor)
 		$sql = "SELECT p.rowid ";

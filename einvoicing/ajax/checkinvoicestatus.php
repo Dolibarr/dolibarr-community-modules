@@ -112,7 +112,7 @@ top_httphead();
 // Update the object field with the new value
 if ($objectRef) {
 	dol_include_once('einvoicing/class/einvoicing.class.php');
-	$einvoicing = new PdpConnectFr($db);
+	$einvoicing = new EInvoicing($db);
 
 	// Load object
 	require_once DOL_DOCUMENT_ROOT."/compta/facture/class/facture.class.php";
@@ -213,7 +213,7 @@ if ($objectRef) {
 
 		// Refresh current status info
 		require_once "../class/einvoicing.class.php";
-		$einvoicing = new PdpConnectFr($db);
+		$einvoicing = new EInvoicing($db);
 		$currentStatusInfo = $einvoicing->fetchLastknownInvoiceStatus($invoice->id, $invoice->ref);
 
 		print json_encode($currentStatusInfo);

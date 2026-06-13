@@ -39,7 +39,7 @@ dol_include_once('einvoicing/lib/einvoicing.lib.php');
  * @return array{res:int, message:string}       Returns array with 'res' (1 on success, -1 on failure) and info 'message'
  */
 
-class PdpConnectFr
+class EInvoicing
 {
 	/**
 	 * @var DoliDB Database handler.

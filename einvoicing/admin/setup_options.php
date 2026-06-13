@@ -316,7 +316,7 @@ print dol_get_fiche_head($head, 'options', $langs->trans($title), -1, "einvoicin
 //print '<span class="opacitymedium">'.$langs->trans("EInvoicingSetupPage").'</span><br>';
 
 // Alert mysoc configuration is not complete
-$einvoicing = new PdpConnectFr($db);
+$einvoicing = new EInvoicing($db);
 
 //$stringwarning = pdpShowWarning($einvoicing);
 //print $stringwarning;

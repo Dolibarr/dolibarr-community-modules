@@ -69,7 +69,7 @@ abstract class AbstractProtocol
 	 * Each protocol should provide a representative sample
 	 * illustrating its structure and data format.
 	 *
-	 * @param	PdpConnectFr			$einvoicing			EInvoicing
+	 * @param	EInvoicing			$einvoicing			EInvoicing
 	 * @param   Societe|null			$thirdpartySeller		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
 	 * @param   Societe|null			$thirdpartyBuyer		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
 	 * @param   array<string,mixed>		$options				More options
@@ -84,7 +84,7 @@ abstract class AbstractProtocol
 	 * Each protocol should provide a representative sample
 	 * illustrating its structure and data format.
 	 *
-	 * @param	PdpConnectFr			$einvoicing			EInvoicing
+	 * @param	EInvoicing			$einvoicing			EInvoicing
 	 * @param   Societe|null			$thirdpartySeller		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
 	 * @param   Societe|null			$thirdpartyBuyer		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
 	 * @param   array<string,mixed>		$options				More options

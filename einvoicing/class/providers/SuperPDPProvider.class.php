@@ -297,7 +297,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 						$item->fieldOverride .= '<i class="fa fa-list-alt pictofixedwidth centerimp"></i>'.$langs->trans('CheckYourIDInEInvoiceAnnuary');
 
-						$einvoicing = new PdPConnectFr($this->db);
+						$einvoicing = new EInvoicing($this->db);
 						$idtocheck = $einvoicing->getSellerCommunicationURI(0);
 
 						if (getDolGlobalString('EINVOICING_LIVE')) {
@@ -528,8 +528,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 			 **/
 
 			// Update einvoice status with awaiting validation
-			$einvoicing = new PdpConnectFr($this->db);
-			$einvoicing->insertOrUpdateExtLink($object->id, Facture::class, $flowId, PdpConnectFr::STATUS_AWAITING_VALIDATION, $object->ref);
+			$einvoicing = new EInvoicing($this->db);
+			$einvoicing->insertOrUpdateExtLink($object->id, Facture::class, $flowId, EInvoicing::STATUS_AWAITING_VALIDATION, $object->ref);
 
 			// Call the API to retrieve flow details and check the validation status.
 			// A short delay is applied to allow the PDP time to process the document.
@@ -611,7 +611,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$outputLog = array(); // Feedback to display
 
 		// Generate sample invoice
-		$einvoicing = new PdpConnectFr($this->db);
+		$einvoicing = new EInvoicing($this->db);
 
 		try {
 			if ((float) DOL_VERSION < 24.0) {
@@ -1144,7 +1144,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		global $db, $conf, $user;
 
 		dol_include_once('einvoicing/class/document.class.php');
-		$einvoicing = new PdpConnectFr($db);
+		$einvoicing = new EInvoicing($db);
 
 		// call API to get flow details
 		$flowResource = 'flows/' . $flowId;
@@ -1748,7 +1748,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		}
 
 
-		$einvoicing = new PdpConnectFr($db);
+		$einvoicing = new EInvoicing($db);
 		$availableStatuses = $object->element === 'invoice_supplier'
 			? $einvoicing->getEinvoiceStatusOptions(1, 1, 1)
 			: [$einvoicing::STATUS_PAID => $einvoicing::STATUS_LABEL_KEYS[$einvoicing::STATUS_PAID]];	// Required to send the new status of customer invoices. We may need to consider a new method for obtaining these statuses or update the current method.
@@ -1805,8 +1805,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 				$flowId = $response['response']['flowId'];
 
 				// Update einvoice status with awaiting validation
-				$einvoicing = new PdpConnectFr($db);
-				//$einvoicing->insertOrUpdateExtLink($object->id, $object->element, $flowId, PdpConnectFr::STATUS_AWAITING_VALIDATION, $object->ref);
+				$einvoicing = new EInvoicing($db);
+				//$einvoicing->insertOrUpdateExtLink($object->id, $object->element, $flowId, EInvoicing::STATUS_AWAITING_VALIDATION, $object->ref);
 				$resStoreStatus = $einvoicing->storeStatusMessage($object->id, $object->element, $statusCode, '', 'out', $flowId, '', '', '', $reasonCode);
 
 				// Call the API to retrieve flow details and check the validation status.

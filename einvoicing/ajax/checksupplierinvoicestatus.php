@@ -111,7 +111,7 @@ top_httphead();
 // Update the object field with the new value
 if ($objectID) {
 	dol_include_once('einvoicing/class/einvoicing.class.php');
-	$einvoicing = new PdpConnectFr($db);
+	$einvoicing = new EInvoicing($db);
 
 	// Load object
 	require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';

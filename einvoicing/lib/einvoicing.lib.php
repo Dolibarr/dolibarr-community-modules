@@ -99,7 +99,7 @@ function einvoicingAdminPrepareHead()
 /**
  * Show a warning if setup not correct.
  *
- * @param 	PdpConnectFr $einvoicing	Object PdpConnectFr
+ * @param 	EInvoicing $einvoicing	Object EInvoicing
  * @return	string						Return string with warning (or '')
  */
 function pdpShowWarning($einvoicing)

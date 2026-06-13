@@ -252,8 +252,8 @@ class CdarHandler
 
 		// Label for ProcessCondition (Label of status code) we get it from class einvoicing
 		dol_include_once('/einvoicing/class/providers/PDPProviderManager.class.php');
-		$pdpConnectFr = new PdpConnectFr($this->db);
-		$ProcessCondition = $pdpConnectFr->getStatusLabel($statusCode);
+		$einvoicing = new EInvoicing($this->db);
+		$ProcessCondition = $einvoicing->getStatusLabel($statusCode);
 		$ProcessCondition = str_replace(' ', '_', $ProcessCondition);
 		$ProcessCondition = preg_replace('/[^A-Za-z0-9_]/', '', $ProcessCondition); // Clean special chars
 

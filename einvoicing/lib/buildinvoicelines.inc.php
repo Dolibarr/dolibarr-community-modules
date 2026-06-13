@@ -41,7 +41,7 @@ if (empty($outputlangs) || ! ($outputlangs instanceof Translate)) {
 $newlang = '';
 
 // Load EInvoicing class
-$einvoicing = new PdpConnectFr($db);
+$einvoicing = new EInvoicing($db);
 
 
 $outputlang = $langs->defaultlang;

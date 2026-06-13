@@ -222,7 +222,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				}
 			}
 
-			$einvoicing = new PdPConnectFr($this->db);
+			$einvoicing = new EInvoicing($this->db);
 			$idtocheck = $einvoicing->getSellerCommunicationURI(0);
 
 			// Check your ID in French E-Invoice Annuary
@@ -438,8 +438,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			 **/
 
 			// Update einvoice status with awaiting validation
-			$einvoicing = new PdpConnectFr($this->db);
-			$einvoicing->insertOrUpdateExtLink($object->id, Facture::class, $flowId, PdpConnectFr::STATUS_AWAITING_VALIDATION, $object->ref);
+			$einvoicing = new EInvoicing($this->db);
+			$einvoicing->insertOrUpdateExtLink($object->id, Facture::class, $flowId, EInvoicing::STATUS_AWAITING_VALIDATION, $object->ref);
 
 			// Call the API to retrieve flow details and check the validation status.
 			// A short delay is applied to allow the PDP time to process the document.
@@ -520,7 +520,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$outputLog = array(); // Feedback to display
 
 		// Generate sample invoice
-		$einvoicing = new PdpConnectFr($this->db);
+		$einvoicing = new EInvoicing($this->db);
 
 		try {
 			if ((float) DOL_VERSION < 24.0) {
@@ -1062,7 +1062,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		global $db, $conf, $user;
 
 		dol_include_once('einvoicing/class/document.class.php');
-		$einvoicing = new PdpConnectFr($db);
+		$einvoicing = new EInvoicing($db);
 
 		// call API to get flow details
 		$flowResource = 'flows/' . $flowId;
@@ -1563,7 +1563,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		}
 
 
-		$einvoicing = new PdpConnectFr($db);
+		$einvoicing = new EInvoicing($db);
 		$availableStatuses = $einvoicing->getEinvoiceStatusOptions(1, 1, 1);
 		if (!array_key_exists($statusCode, $availableStatuses)) {
 			$res = -1;
@@ -1618,8 +1618,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				$flowId = $response['response']['flowId'];
 
 				// Update einvoice status with awaiting validation
-				$einvoicing = new PdpConnectFr($db);
-				//$einvoicing->insertOrUpdateExtLink($object->id, $object->element, $flowId, PdpConnectFr::STATUS_AWAITING_VALIDATION, $object->ref);
+				$einvoicing = new EInvoicing($db);
+				//$einvoicing->insertOrUpdateExtLink($object->id, $object->element, $flowId, EInvoicing::STATUS_AWAITING_VALIDATION, $object->ref);
 				$resStoreStatus = $einvoicing->storeStatusMessage($object->id, $object->element, $statusCode, '', 'out', $flowId, '', '', '', $reasonCode);
 
 				// Call the API to retrieve flow details and check the validation status.

@@ -109,7 +109,7 @@ if (!$user->admin) {
 }
 
 
-$einvoicing = new PdpConnectFr($db);
+$einvoicing = new EInvoicing($db);
 $PDPManager = new PDPProviderManager($db);
 $providersConfig = $PDPManager->getAllProviders();
 

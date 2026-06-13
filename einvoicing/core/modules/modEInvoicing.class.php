@@ -579,7 +579,7 @@ class modEInvoicing extends DolibarrModules
 		*/
 		// $result = $extrafields->addExtraField(
 		// 	'einvoicing_source',
-		// 	$langs->trans('PdpConnectFRProductSource'),
+		// 	$langs->trans('EInvoicingProductSource'),
 		// 	'varchar',
 		// 	95022,
 		// 	100,

@@ -861,7 +861,7 @@ if ($provider) {
 	print "</script>\n";
 } else {
 	// Message to check module configuration
-	print info_admin($langs->transnoentities("checkPdpConnectFrModuleConfiguration"), 0, 0, '1', '', '', 'warning');
+	print info_admin($langs->transnoentities("checkEInvoicingModuleConfiguration"), 0, 0, '1', '', '', 'warning');
 }
 
 
