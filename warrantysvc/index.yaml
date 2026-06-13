@@ -1,0 +1,23 @@
+packages:
+    - modulename: 'WarrantySvc'
+      author: 'Zachary Melo'
+      author_url: 'https://github.com/zacharymelo'
+      maintener_email: 'contact@zachmelo.com'
+      label:
+        en: 'Warranty & Service Management'
+      description:
+        en: 'RMA (Return Merchandise Authorization) and Warranty Management for serialized equipment. Tracks warranties by serial number, manages service requests, and automates warranty creation on shipment.'
+      status: 'enabled'
+      created_at: '2026-03-22'
+      last_updated_at: 'auto'
+      git: 'https://github.com/zacharymelo/Dolibarr-Warranties'
+      git-branch: 'main'
+      git-system: 'github'
+      current_version: 'auto'
+      dolibarrmin: 'auto'
+      dolibarrmax: 'auto'
+      phpmin: 'auto'
+      phpmax: 'auto'
+      price: 0
+      direct-download: no
+      dolistore-upload: 'manual'
