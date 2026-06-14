@@ -23,10 +23,10 @@ require __DIR__ . "/00_ExampleHelpers.php";
 $documentBuilder = ZugferdDocumentBuilder::createNew(ZugferdProfiles::PROFILE_EN16931);
 
 $documentBuilder->setDocumentInformation(
-    'R-2024/00001',                                     // Invoice Number (BT-1)
-    ZugferdInvoiceType::INVOICE,                        // Type "Invoice" (BT-3)
-    DateTime::createFromFormat("Ymd", "20241231"),      // Invoice Date (BT-2)
-    ZugferdCurrencyCodes::EURO                          // Invoice currency is EUR (Euro) (BT-5)
+	'R-2024/00001',                                     // Invoice Number (BT-1)
+	ZugferdInvoiceType::INVOICE,                        // Type "Invoice" (BT-3)
+	DateTime::createFromFormat("Ymd", "20241231"),      // Invoice Date (BT-2)
+	ZugferdCurrencyCodes::EURO                          // Invoice currency is EUR (Euro) (BT-5)
 );
 
 $documentBuilder->addDocumentNote('Lieferant GmbH' . PHP_EOL . 'Lieferantenstraße 20' . PHP_EOL . '80333 München' . PHP_EOL . 'Deutschland' . PHP_EOL . 'Geschäftsführer: Hans Muster' . PHP_EOL . 'Handelsregisternummer: H A 123' . PHP_EOL . PHP_EOL, null, 'REG');
@@ -182,23 +182,23 @@ $zugferdDocumentPdfBuilder->saveDocument($newPdfFilename);
 
 $zugferdDocumentPdfBuilder = ZugferdDocumentPdfBuilder::fromPdfFile($documentBuilder, $existingPdfFilename);
 $zugferdDocumentPdfBuilder->setMetaInformationCallback(
-    function ($which) {
-        if ($which === 'title') {
-            return "DummyTitle";
-        }
-        
-        if ($which === 'author') {
-            return "DummyAuthor";
-        }
-        
-        if ($which === 'subject') {
-            return "DummySubject";
-        }
-        
-        if ($which === 'keywords') {
-            return "DummyKeywords";
-        }
-    }
+	function ($which) {
+		if ($which === 'title') {
+			return "DummyTitle";
+		}
+
+		if ($which === 'author') {
+			return "DummyAuthor";
+		}
+
+		if ($which === 'subject') {
+			return "DummySubject";
+		}
+
+		if ($which === 'keywords') {
+			return "DummyKeywords";
+		}
+	}
 );
 $zugferdDocumentPdfBuilder->generateDocument();
 $zugferdDocumentPdfBuilder->saveDocument($newPdfFilename);

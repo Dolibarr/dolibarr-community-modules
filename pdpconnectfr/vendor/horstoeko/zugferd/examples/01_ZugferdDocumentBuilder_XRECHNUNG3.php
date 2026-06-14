@@ -198,4 +198,3 @@ $someStringVariable = $documentBuilder->getContent();
 $validationResult = validateUsingKositValidator($documentBuilder);
 
 echo $validationResult === 0 ? 'Validation is disabled' : ($validationResult == 1 ? 'The document is valid' : 'The document is not valid');
-

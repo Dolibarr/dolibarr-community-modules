@@ -10,7 +10,7 @@ use horstoeko\zugferd\ZugferdKositValidator;
  */
 function validationEnabled(): bool
 {
-    return true;
+	return true;
 }
 
 /**
@@ -20,7 +20,7 @@ function validationEnabled(): bool
  */
 function getKositValidatorRemoteHost(): string
 {
-    return "127.0.0.1";
+	return "127.0.0.1";
 }
 
 /**
@@ -30,7 +30,7 @@ function getKositValidatorRemoteHost(): string
  */
 function getKositValidatorRemotePort(): int
 {
-    return 8081;
+	return 8081;
 }
 
 /**
@@ -45,18 +45,18 @@ function getKositValidatorRemotePort(): int
  */
 function validateUsingKositValidator(ZugferdDocument $zugferdDocument): int
 {
-    if (!validationEnabled()) {
-        return 0;
-    }
+	if (!validationEnabled()) {
+		return 0;
+	}
 
-    $kositValidator = new ZugferdKositValidator();
-    $kositValidator->setDocument($zugferdDocument);
-    $kositValidator->enableRemoteMode();
-    $kositValidator->setRemoteModeHost(getKositValidatorRemoteHost());
-    $kositValidator->setRemoteModePort(getKositValidatorRemotePort());
-    $kositValidator->validate();
+	$kositValidator = new ZugferdKositValidator();
+	$kositValidator->setDocument($zugferdDocument);
+	$kositValidator->enableRemoteMode();
+	$kositValidator->setRemoteModeHost(getKositValidatorRemoteHost());
+	$kositValidator->setRemoteModePort(getKositValidatorRemotePort());
+	$kositValidator->validate();
 
-    return $kositValidator->hasNoValidationErrors() ? 1 : 2;
+	return $kositValidator->hasNoValidationErrors() ? 1 : 2;
 }
 
 /**
@@ -68,11 +68,11 @@ function validateUsingKositValidator(ZugferdDocument $zugferdDocument): int
  */
 function writeLnToCli(string $message, ...$args): void
 {
-    $output = sprintf($message, ...$args);
+	$output = sprintf($message, ...$args);
 
-    if (trim($output) !== '' && trim($output) !== '0') {
-        echo $output . PHP_EOL;
-    }
+	if (trim($output) !== '' && trim($output) !== '0') {
+		echo $output . PHP_EOL;
+	}
 }
 
 /**
@@ -82,7 +82,7 @@ function writeLnToCli(string $message, ...$args): void
  */
 function writeNewLineToCli(): void
 {
-    echo PHP_EOL;
+	echo PHP_EOL;
 }
 
 /**
@@ -94,11 +94,11 @@ function writeNewLineToCli(): void
  */
 function implodeAssocArray(string $separator, array $array): string
 {
-    return
-        implode(
-            $separator,
-            array_map(function ($key, $value) {
-                return sprintf("%s=%s", $key, $value);
-            }, array_keys($array), $array)
-        );
+	return
+		implode(
+			$separator,
+			array_map(function ($key, $value) {
+				return sprintf("%s=%s", $key, $value);
+			}, array_keys($array), $array)
+		);
 }

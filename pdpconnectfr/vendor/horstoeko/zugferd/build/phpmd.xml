@@ -17,4 +17,3 @@
     <!--<rule ref="rulesets/codesize.xml/CyclomaticComplexity"/>
     <rule ref="rulesets/codesize.xml/ExcessiveParameterList"/>-->
 </ruleset>
-
