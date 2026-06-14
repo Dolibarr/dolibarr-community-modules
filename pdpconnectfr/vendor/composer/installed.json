@@ -468,8 +468,8 @@
         },
         {
             "name": "horstoeko/zugferd",
-            "version": "v1.0.122",
-            "version_normalized": "1.0.122.0",
+            "version": "v1.0.117",
+            "version_normalized": "1.0.117.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/horstoeko/zugferd.git",
