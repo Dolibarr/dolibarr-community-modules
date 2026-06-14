@@ -806,17 +806,12 @@ class ZugferdKositValidator
             }
 
             $responseStatusCode = curl_getinfo($httpConnection, CURLINFO_HTTP_CODE);
-            $responseError = curl_error($httpConnection);
 
-            if (PHP_VERSION_ID >= 80000) {
-                unset($httpConnection);
-            } else {
-                curl_close($httpConnection);
-            }
+            curl_close($httpConnection);
 
             if (($responseStatusCode < 200) || ($responseStatusCode >= 400)) {
                 $this->addToMessageBag("Failed to connect to the host where the Validator is running in daemon mode");
-                $this->addToMessageBag($responseError);
+                $this->addToMessageBag(curl_error($httpConnection));
                 return false;
             }
         } catch (Throwable $throwable) {
@@ -907,7 +902,7 @@ class ZugferdKositValidator
             }
         }
 
-        if ($numFilesExists === $zipArchive->numFiles) {
+        if ($numFilesExists == $zipArchive->numFiles) {
             return true;
         }
 
@@ -1008,11 +1003,7 @@ class ZugferdKositValidator
 
             $responseStatusCode = curl_getinfo($httpConnection, CURLINFO_HTTP_CODE);
 
-            if (PHP_VERSION_ID >= 80000) {
-                unset($httpConnection);
-            } else {
-                curl_close($httpConnection);
-            }
+            curl_close($httpConnection);
 
             if (($responseStatusCode < 200) || ($responseStatusCode >= 400)) {
                 if (preg_match('/<\?xml.*?\?>.*<\/.+>/s', $response, $matches)) {

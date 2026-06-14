@@ -583,7 +583,7 @@ abstract class ZugferdDocumentPdfBuilderAbstract
 
         // Set flag to always show the attachment pane
 
-        if ($this->getAttachmentPaneIsVisible()) {
+        if ($this->getAttachmentPaneIsVisible() === true) {
             $this->pdfWriter->openAttachmentPane();
         }
 

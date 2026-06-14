@@ -906,17 +906,6 @@ class ObjectHelperEn16931Test extends TestCase
         $this->assertEquals("name", $fincard->getCardholderName());
     }
 
-    public function testGetTradeSettlementFinancialCardType4DigitValue(): void
-    {
-        /**
-         * @var \horstoeko\zugferd\entities\en16931\ram\TradeSettlementFinancialCardType
-         */
-        $fincard = self::$objectHelper->getTradeSettlementFinancialCardType("type", "8453", "name");
-        $this->assertEquals("type", $fincard->getID()->getSchemeID());
-        $this->assertEquals("8453", $fincard->getID());
-        $this->assertEquals("name", $fincard->getCardholderName());
-    }
-
     public function testGetTradeSettlementFinancialCardTypeAllNull(): void
     {
         /**
@@ -1385,7 +1374,7 @@ class ObjectHelperEn16931Test extends TestCase
         $this->assertNotInstanceOf(\DateTime::class, self::$objectHelper->toDateTime(null, null));
         $this->assertNotInstanceOf(\DateTime::class, self::$objectHelper->toDateTime("", null));
         $this->assertNotInstanceOf(\DateTime::class, self::$objectHelper->toDateTime(null, ""));
-        $this->assertNotInstanceOf(\DateTime::class, self::$objectHelper->toDateTime(null, null));
+        $this->assertNull(self::$objectHelper->toDateTime(null, null));
         $this->expectException(ZugferdUnknownDateFormatException::class);
         $this->expectExceptionMessage("Invalid date format 999");
         $this->assertNotInstanceOf(\DateTime::class, self::$objectHelper->toDateTime("20200202", "999"));
