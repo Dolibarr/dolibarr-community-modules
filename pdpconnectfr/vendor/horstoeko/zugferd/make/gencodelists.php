@@ -84,7 +84,7 @@ function strIdentifier(string $str, bool $shortIdentifier, int $partLength = 4):
 	$str = preg_replace("/[^A-Za-z0-9\s]/", "", $str);
 
 	$strArray = explode(" ", $str);
-	if (count($strArray) === 1) {
+	if (count($strArray) == 1) {
 		$strNew = $strArray[0];
 	} else {
 		foreach ($strArray as $item) {
@@ -495,7 +495,7 @@ function createCodeClassFromCsv(array $fileToDownload): void
 			$downloadedContentObjectData = [];
 
 			if (($handle = fopen($fileToDownload[DOWNLOADDEF_KEY_TOFILE][$idx], "r")) !== false) {
-				while (($row = fgetcsv($handle, null, "|", '"', "\\")) !== false) {
+				while (($row = fgetcsv($handle, null, "|")) !== false) {
 					$downloadedContentObjectData[] = $row;
 				}
 

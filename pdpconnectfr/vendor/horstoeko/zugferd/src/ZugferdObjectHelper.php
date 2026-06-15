@@ -11,7 +11,6 @@ namespace horstoeko\zugferd;
 
 use DateTime;
 use DateTimeInterface;
-use finfo;
 use horstoeko\mimedb\MimeDb;
 use horstoeko\stringmanagement\FileUtils;
 use horstoeko\stringmanagement\StringUtils;
@@ -54,6 +53,7 @@ class ZugferdObjectHelper
 		"text/csv",
 		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 		"application/vnd.oasis.opendocument.spreadsheet",
+		"application/xml",
 	];
 
 	/**
@@ -496,10 +496,9 @@ class ZugferdObjectHelper
 	 * @param  string|null            $refTypeCode
 	 * @param  DateTimeInterface|null $issueDate
 	 * @param  string|null            $binaryDataFilename
-	 * @param  string|null            $base64EncodedData
 	 * @return object|null
 	 */
-	public function getReferencedDocumentType(?string $issuerAssignedId = null, ?string $uriId = null, ?string $lineId = null, ?string $typeCode = null, $name = null, ?string $refTypeCode = null, ?DateTimeInterface $issueDate = null, ?string $binaryDataFilename = null, ?string $base64EncodedData = null): ?object
+	public function getReferencedDocumentType(?string $issuerAssignedId = null, ?string $uriId = null, ?string $lineId = null, ?string $typeCode = null, $name = null, ?string $refTypeCode = null, ?DateTimeInterface $issueDate = null, ?string $binaryDataFilename = null): ?object
 	{
 		if (self::isAllNullOrEmpty(func_get_args())) {
 			return null;
@@ -518,79 +517,24 @@ class ZugferdObjectHelper
 			$this->tryCallAll($referencedDocumentType, ['addToName', 'setName'], $this->getTextType($name));
 		}
 
-		$loadedFromBase64 = false;
-
-		if (
-			StringUtils::stringIsNullOrEmpty($binaryDataFilename) === false &&
-			StringUtils::stringIsNullOrEmpty($base64EncodedData) === false &&
-			base64_encode($base64EncodedData) !== false
-		) {
-			$finfo = new finfo();
-			$mimetype = $finfo->buffer(base64_decode($base64EncodedData), FILEINFO_MIME_TYPE);
-			if ($mimetype === false) {
-				throw new ZugferdUnsupportedMimetype('of ' . $binaryDataFilename);
-			}
-
-			$fileExtension = FileUtils::getFileExtension($binaryDataFilename);
-			if ($mimetype === 'text/plain' && strtolower($fileExtension) === 'csv') {
-				$mimetype = 'text/csv';
-			}
-
-			/**
-			 * PHP 8.0 may misdetect CSV files as "application/csv"; normalize to the standard "text/csv"
-			 */
-			if (PHP_VERSION_ID >= 80000 && PHP_VERSION_ID < 81000 && $mimetype === 'application/csv') {
-				$mimetype = 'text/csv';
-			}
-
-			if (!in_array($mimetype, self::SUPPORTEDTMIMETYPES)) {
-				throw new ZugferdUnsupportedMimetype($mimetype);
-			}
-
-			$fileExtension = (new MimeDb())->findFirstFileExtensionByMimeType($mimetype);
-			if (is_null($fileExtension)) {
-				throw new ZugferdUnsupportedMimetype($mimetype);
-			}
-
-			$this->tryCall(
-				$referencedDocumentType,
-				'setAttachmentBinaryObject',
-				$this->getBinaryObjectType(
-					$base64EncodedData,
-					$mimetype,
-					FileUtils::getFilenameWithExtension(
-						FileUtils::changeFileExtension(
-							FileUtils::getFilenameWithExtension($binaryDataFilename),
-							$fileExtension,
-						),
-					),
-				),
-			);
-			$loadedFromBase64 = true;
-		}
-
-		if (
-			$loadedFromBase64 === false &&
-			StringUtils::stringIsNullOrEmpty($binaryDataFilename) === false &&
-			FileUtils::fileExists($binaryDataFilename)
-		) {
+		if (StringUtils::stringIsNullOrEmpty($binaryDataFilename) === false && FileUtils::fileExists($binaryDataFilename)) {
 			$mimeDb = new MimeDb();
 			$mimeTypes = $mimeDb->findAllMimeTypesByExtension(FileUtils::getFileExtension($binaryDataFilename));
-			if (is_null($mimeTypes)) {
-				throw new ZugferdUnsupportedMimetype('of ' . $binaryDataFilename);
+			if (!is_null($mimeTypes)) {
+				$mimeTypesSupported = array_intersect($mimeTypes, self::SUPPORTEDTMIMETYPES);
+				if ($mimeTypesSupported !== []) {
+					$content = FileUtils::fileToBase64($binaryDataFilename);
+					$this->tryCall(
+						$referencedDocumentType,
+						'setAttachmentBinaryObject',
+						$this->getBinaryObjectType($content, $mimeTypesSupported[0], FileUtils::getFilenameWithExtension($binaryDataFilename))
+					);
+				} else {
+					throw new ZugferdUnsupportedMimetype();
+				}
+			} else {
+				throw new ZugferdUnsupportedMimetype();
 			}
-
-			$mimeTypesSupported = array_intersect($mimeTypes, self::SUPPORTEDTMIMETYPES);
-			if ($mimeTypesSupported === []) {
-				throw new ZugferdUnsupportedMimetype(implode(', ', $mimeTypes));
-			}
-
-			$content = FileUtils::fileToBase64($binaryDataFilename);
-			$this->tryCall(
-				$referencedDocumentType,
-				'setAttachmentBinaryObject',
-				$this->getBinaryObjectType($content, $mimeTypesSupported[0], FileUtils::getFilenameWithExtension($binaryDataFilename))
-			);
 		}
 
 		return $referencedDocumentType;
@@ -913,7 +857,7 @@ class ZugferdObjectHelper
 		// At the moment PCI Security Standards Council has defined that the first 6 digits and
 		// last 4 digits are the maximum number of digits to be shown.
 
-		$id = strlen($id) > 4 ? substr($id, 0, 6) . substr($id, -4) : $id;
+		$id = substr($id, 0, 6) . substr($id, -4);
 
 		$tradeSettlementFinancialCardType = $this->createClassInstance('ram\TradeSettlementFinancialCardType');
 
@@ -1309,7 +1253,7 @@ class ZugferdObjectHelper
 		$this->tryCall($supplyChainTradeLineItemType, "setAssociatedDocumentLineDocument", $doclinedoc);
 		$this->tryCall($doclinedoc, "setLineStatusCode", $this->getCodeType($lineStatusCode));
 		$this->tryCall($doclinedoc, "setLineStatusReasonCode", $this->getCodeType($lineStatusReasonCode));
-		if ($isTextPosition === false) {
+		if ($isTextPosition == false) {
 			$this->tryCall($supplyChainTradeLineItemType, "setSpecifiedLineTradeAgreement", $lineTradeAgreementType);
 			$this->tryCall($supplyChainTradeLineItemType, "setSpecifiedLineTradeDelivery", $lineTradeDeliveryType);
 		}
@@ -1689,7 +1633,7 @@ class ZugferdObjectHelper
 		$methods = explode(".", $methods);
 
 		foreach ($methods as $index => $method) {
-			if ($index === count($methods) - 1) {
+			if ($index == count($methods) - 1) {
 				$this->tryCall($instance, $method, $value);
 			} else {
 				$instance = $this->tryCallAndReturn($instance, $method);

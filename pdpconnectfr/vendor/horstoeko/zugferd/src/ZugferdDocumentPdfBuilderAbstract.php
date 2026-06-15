@@ -53,16 +53,6 @@ abstract class ZugferdDocumentPdfBuilderAbstract
 	public const AF_RELATIONSHIP_UNSPECIFIED = "Unspecified";
 
 	/**
-	 * Constants for PDF Conformance Levels
-	 * 'Accessible', 'Basic', 'Unicode
-	 */
-	public const PDFA_CONFORMANCE_LEVEL_ACCESSIBLE = "A";
-
-	public const PDFA_CONFORMANCE_LEVEL_BASIC = "B";
-
-	public const PDFA_CONFORMANCE_LEVEL_UNICODE = "U";
-
-	/**
 	 * Additional creator tool (e.g. the ERP software that called the PHP library)
 	 *
 	 * @var string
@@ -138,13 +128,6 @@ abstract class ZugferdDocumentPdfBuilderAbstract
 	 * @var boolean
 	 */
 	private $attachmentPaneVisibility = true;
-
-	/**
-	 * Internal status of PDF/A conformance level
-	 *
-	 * @var string
-	 */
-	private $pdfAConformanceLevel = "B";
 
 	/**
 	 * Constructor
@@ -291,63 +274,6 @@ abstract class ZugferdDocumentPdfBuilderAbstract
 	public function setAttachmentRelationshipTypeToSource()
 	{
 		return $this->setAttachmentRelationshipType(static::AF_RELATIONSHIP_SOURCE);
-	}
-
-	/**
-	 * Set the PDF/A Conformance Level. Valid values are "A", "B" and "U"
-	 *
-	 * @param  string $pdfAConformanceLevel
-	 * @return static
-	 */
-	public function setPdfAConformanceLevel(string $pdfAConformanceLevel)
-	{
-		if (!in_array($pdfAConformanceLevel, [self::PDFA_CONFORMANCE_LEVEL_ACCESSIBLE, self::PDFA_CONFORMANCE_LEVEL_BASIC, self::PDFA_CONFORMANCE_LEVEL_UNICODE])) {
-			$pdfAConformanceLevel = self::PDFA_CONFORMANCE_LEVEL_BASIC;
-		}
-
-		$this->pdfAConformanceLevel = $pdfAConformanceLevel;
-
-		return $this;
-	}
-
-	/**
-	 * Returns the PDF/A Conformance Level. This will return "A", "B" or "U"
-	 *
-	 * @return string
-	 */
-	public function getPdfAConformanceLevel(): string
-	{
-		return $this->pdfAConformanceLevel;
-	}
-
-	/**
-	 * Set the PDF/A Conformane Level to "Accessible" (A)
-	 *
-	 * @return static
-	 */
-	public function setPdfAConformanceLevelToAccessible()
-	{
-		return $this->setPdfAConformanceLevel(self::PDFA_CONFORMANCE_LEVEL_ACCESSIBLE);
-	}
-
-	/**
-	 * Set the PDF/A Conformane Level to "Basic" (B)
-	 *
-	 * @return static
-	 */
-	public function setPdfAConformanceLevelToBasic()
-	{
-		return $this->setPdfAConformanceLevel(self::PDFA_CONFORMANCE_LEVEL_BASIC);
-	}
-
-	/**
-	 * Set the PDF/A Conformane Level to "Unicode" (U)
-	 *
-	 * @return static
-	 */
-	public function setPdfAConformanceLevelToUnicode()
-	{
-		return $this->setPdfAConformanceLevel(self::PDFA_CONFORMANCE_LEVEL_UNICODE);
 	}
 
 	/**
@@ -657,7 +583,7 @@ abstract class ZugferdDocumentPdfBuilderAbstract
 
 		// Set flag to always show the attachment pane
 
-		if ($this->getAttachmentPaneIsVisible()) {
+		if ($this->getAttachmentPaneIsVisible() === true) {
 			$this->pdfWriter->openAttachmentPane();
 		}
 
@@ -704,7 +630,6 @@ abstract class ZugferdDocumentPdfBuilderAbstract
 		$this->pdfWriter->addMetadataDescriptionNode($descriptionNodes[1]->asXML());
 
 		$descPdfAid = $descriptionNodes[2];
-		$descPdfAid->children('pdfaid', true)->{'conformance'} = $this->getPdfAConformanceLevel();
 		$this->pdfWriter->addMetadataDescriptionNode($descPdfAid->asXML());
 
 		$descDc = $descriptionNodes[3];
