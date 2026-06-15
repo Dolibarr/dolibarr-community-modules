@@ -601,7 +601,7 @@ class ObjectHelperEn16931Test extends TestCase
 		/**
 		 * @var \horstoeko\zugferd\entities\en16931\ram\ReferencedDocumentType
 		 */
-		$refdoctype = self::$objectHelper->getReferencedDocumentType("issuerid", "uriid", "lineid", "typecode", "name", "reftypcode", new \DateTime(), __DIR__ . "/../assets/xml_en16931_2.xml");
+		$refdoctype = self::$objectHelper->getReferencedDocumentType("issuerid", "uriid", "lineid", "typecode", "name", "reftypcode", new \DateTime(), __DIR__ . "/../assets/dummy_picture.jpg");
 		$this->assertEquals("issuerid", $refdoctype->getIssuerAssignedID()->value());
 		$this->assertEquals("uriid", $refdoctype->getURIID()->value());
 		$this->assertEquals("lineid", $refdoctype->getLineID()->value());
@@ -903,6 +903,17 @@ class ObjectHelperEn16931Test extends TestCase
 		$fincard = self::$objectHelper->getTradeSettlementFinancialCardType("type", "6759 6498 2643 8453", "name");
 		$this->assertEquals("type", $fincard->getID()->getSchemeID());
 		$this->assertEquals("6759 68453", $fincard->getID());
+		$this->assertEquals("name", $fincard->getCardholderName());
+	}
+
+	public function testGetTradeSettlementFinancialCardType4DigitValue(): void
+	{
+		/**
+		 * @var \horstoeko\zugferd\entities\en16931\ram\TradeSettlementFinancialCardType
+		 */
+		$fincard = self::$objectHelper->getTradeSettlementFinancialCardType("type", "8453", "name");
+		$this->assertEquals("type", $fincard->getID()->getSchemeID());
+		$this->assertEquals("8453", $fincard->getID());
 		$this->assertEquals("name", $fincard->getCardholderName());
 	}
 
@@ -1374,7 +1385,7 @@ class ObjectHelperEn16931Test extends TestCase
 		$this->assertNotInstanceOf(\DateTime::class, self::$objectHelper->toDateTime(null, null));
 		$this->assertNotInstanceOf(\DateTime::class, self::$objectHelper->toDateTime("", null));
 		$this->assertNotInstanceOf(\DateTime::class, self::$objectHelper->toDateTime(null, ""));
-		$this->assertNull(self::$objectHelper->toDateTime(null, null));
+		$this->assertNotInstanceOf(\DateTime::class, self::$objectHelper->toDateTime(null, null));
 		$this->expectException(ZugferdUnknownDateFormatException::class);
 		$this->expectExceptionMessage("Invalid date format 999");
 		$this->assertNotInstanceOf(\DateTime::class, self::$objectHelper->toDateTime("20200202", "999"));

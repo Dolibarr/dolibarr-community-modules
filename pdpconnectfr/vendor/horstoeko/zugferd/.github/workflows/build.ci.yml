@@ -14,6 +14,7 @@ on:
   pull_request:
     types:
       - opened
+      - synchronize
     branches:
       - "master"
   workflow_dispatch:
@@ -43,7 +44,7 @@ jobs:
 
     steps:
       - name: Checkout Sources
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Setup PHP with PECL extension
         uses: shivammathur/setup-php@v2
@@ -63,7 +64,7 @@ jobs:
         run: |
           echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ${{ steps.composer-cache.outputs.dir }}
           key: ${{ runner.os }}-${{ matrix.phpversion }}-composer-${{ hashFiles('**/composer.json') }}
@@ -151,7 +152,7 @@ jobs:
 
       - name: Cache Application (Schematron)
         id: cache-validator
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ env.VALIDATORPATH }}
           key: ${{ runner.os }}-${{ matrix.phpversion }}-validator-${{ steps.hash-validator.outputs.hash }}
@@ -183,7 +184,7 @@ jobs:
 
       - name: Cache Application (VeraPDF)
         id: cache-verapdf
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ env.VERAPDFPATH }}
           key: ${{ runner.os }}-${{ matrix.phpversion }}-verapdf-${{ steps.hash-verapdf.outputs.hash }}
@@ -238,12 +239,14 @@ jobs:
       - name: Publish Unit Test Results
         uses: EnricoMi/publish-unit-test-result-action@v2
         if: github.event_name != 'pull_request'
+        continue-on-error: true
         with:
           files: "build/logs/junit.xml"
           comment_mode: ${{ ((github.event.workflow_run && github.event.workflow_run.event == 'pull_request') || github.event_name == 'pull_request') && 'failures' || 'always' }}
 
       - name: Publish Build Logs
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
+        continue-on-error: true
         with:
           name: Build log artifacts for ${{ matrix.operating-system }} PHP ${{ matrix.phpversion }}
           path: build/logs

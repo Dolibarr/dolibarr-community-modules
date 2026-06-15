@@ -94,17 +94,17 @@ class ReaderExtendedTest extends TestCase
 		$this->assertEquals("Der Verkäufer bleibt Eigentümer der Waren bis zur vollständigen Erfüllung der Kaufpreisforderung.", $notes[1]["content"]);
 		$this->assertEquals("", $notes[2]["contentcode"]);
 		$this->assertEquals("REG", $notes[2]["subjectcode"]);
-		$this->assertStringContainsString("MUSTERLIEFERANT GMBH", $notes[2]["content"]);
-		$this->assertStringContainsString("BAHNHOFSTRASSE 99", $notes[2]["content"]);
-		$this->assertStringContainsString("99199 MUSTERHAUSEN", $notes[2]["content"]);
-		$this->assertStringContainsString("Geschäftsführung:", $notes[2]["content"]);
-		$this->assertStringContainsString("Max Mustermann", $notes[2]["content"]);
-		$this->assertStringContainsString("USt-IdNr: DE123456789", $notes[2]["content"]);
-		$this->assertStringContainsString("Telefon: +49 932 431 0", $notes[2]["content"]);
-		$this->assertStringContainsString("www.musterlieferant.de", $notes[2]["content"]);
-		$this->assertStringContainsString("HRB Nr. 372876", $notes[2]["content"]);
-		$this->assertStringContainsString("Amtsgericht Musterstadt", $notes[2]["content"]);
-		$this->assertStringContainsString("GLN 4304171000002", $notes[2]["content"]);
+		$this->assertStringContainsString("MUSTERLIEFERANT GMBH", (string) $notes[2]["content"]);
+		$this->assertStringContainsString("BAHNHOFSTRASSE 99", (string) $notes[2]["content"]);
+		$this->assertStringContainsString("99199 MUSTERHAUSEN", (string) $notes[2]["content"]);
+		$this->assertStringContainsString("Geschäftsführung:", (string) $notes[2]["content"]);
+		$this->assertStringContainsString("Max Mustermann", (string) $notes[2]["content"]);
+		$this->assertStringContainsString("USt-IdNr: DE123456789", (string) $notes[2]["content"]);
+		$this->assertStringContainsString("Telefon: +49 932 431 0", (string) $notes[2]["content"]);
+		$this->assertStringContainsString("www.musterlieferant.de", (string) $notes[2]["content"]);
+		$this->assertStringContainsString("HRB Nr. 372876", (string) $notes[2]["content"]);
+		$this->assertStringContainsString("Amtsgericht Musterstadt", (string) $notes[2]["content"]);
+		$this->assertStringContainsString("GLN 4304171000002", (string) $notes[2]["content"]);
 	}
 
 	public function testDocumentGeneralPaymentInformation(): void
@@ -902,7 +902,7 @@ class ReaderExtendedTest extends TestCase
 	public function testGetDocumentAdditionalReferencedDocument(): void
 	{
 		$this->assertTrue(self::$document->firstDocumentAdditionalReferencedDocument());
-		self::$document->getDocumentAdditionalReferencedDocument($issuerassignedid, $typecode, $uriid, $name, $reftypecode, $issueddate, $binarydatafilename);
+		self::$document->getDocumentAdditionalReferencedDocument($issuerassignedid, $typecode, $uriid, $name, $reftypecode, $issueddate, $binarydatafilename, $binarymimecode, $binaryfilename);
 		$this->assertSame("A777123", $issuerassignedid);
 		$this->assertSame("130", $typecode);
 		$this->assertSame("", $uriid);
@@ -911,6 +911,8 @@ class ReaderExtendedTest extends TestCase
 		$this->assertSame("", $reftypecode);
 		$this->assertNotInstanceOf(\DateTime::class, $issueddate);
 		$this->assertSame("", $binarydatafilename);
+		$this->assertNull($binarymimecode);
+		$this->assertNull($binaryfilename);
 	}
 
 	public function testDocumentInvoiceReferencedDocumentLoop(): void

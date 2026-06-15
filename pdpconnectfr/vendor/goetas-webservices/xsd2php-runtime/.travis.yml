@@ -9,7 +9,10 @@ php:
   - 7.2
   - 7.3
   - 7.4
-  - 8.0  
+  - 8.0
+  - 8.1
+  - 8.2
+  - 8.3
 
 matrix:
   include:
@@ -28,4 +31,3 @@ script: vendor/phpunit/phpunit/phpunit $PHPUNIT_FLAGS
 after_script:
   - wget https://scrutinizer-ci.com/ocular.phar
   - if [[ $TRAVIS_PHP_VERSION = '7.1' ]]; then php ocular.phar code-coverage:upload --format=php-clover coverage.clover; fi
-

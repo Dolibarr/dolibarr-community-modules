@@ -22,13 +22,17 @@ use Throwable;
  */
 class ZugferdUnsupportedMimetype extends ZugferdBaseException
 {
-    /**
-     * Constructor
-     *
-     * @param Throwable|null $previous
-     */
-    public function __construct(?Throwable $previous = null)
-    {
-        parent::__construct("Mimetype not supported", ZugferdExceptionCodes::UNSUPPORTEDMIMETYPE, $previous);
-    }
+	/**
+	 * Constructor
+	 *
+	 * @param Throwable|null $previous
+	 */
+	public function __construct(string $mimetype, ?Throwable $previous = null)
+	{
+		parent::__construct(
+			sprintf('Mimetype %s is not supported', $mimetype),
+			ZugferdExceptionCodes::UNSUPPORTEDMIMETYPE,
+			$previous,
+		);
+	}
 }
