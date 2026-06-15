@@ -249,7 +249,7 @@ class ActionsEInvoicing extends CommonHookActions
 				}
 			}
 
-			if (!empty($parameters['context']) && !preg_match('/takepospay/', $parameters['context'])) {
+			if (empty($parameters['context']) || !preg_match('/takepospay/', $parameters['context'])) {
 				print '<!-- Current AP: ' . getDolGlobalString('EINVOICING_PDP') . ' -->';
 				if (!empty($url_button)) {
 					// Pass the visible label as the 1st arg ($label), not the 2nd ($text). On Dolibarr 18/19
