@@ -180,7 +180,9 @@ deprecations triggered during the test suite execution.
 ```
 
 Note that you can still trigger Deprecations in your code, provided you use the
-`#[IgnoreDeprecations]` to ignore them for tests that call it.
+`#[WithoutErrorHandler]` attribute to disable PHPUnit's error handler for tests
+that call it. Be wary that this will disable all error handling, meaning it
+will mask any warnings or errors that would otherwise be caught by PHPUnit.
 
 At the moment, it is not possible to disable deduplication with an environment
 variable, but you can use a bootstrap file to achieve that:
