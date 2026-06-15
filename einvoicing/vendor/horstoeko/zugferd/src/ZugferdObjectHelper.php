@@ -54,7 +54,6 @@ class ZugferdObjectHelper
         "text/csv",
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "application/vnd.oasis.opendocument.spreadsheet",
-        "application/xml",
     ];
 
     /**
@@ -528,27 +527,46 @@ class ZugferdObjectHelper
         ) {
             $finfo = new finfo();
             $mimetype = $finfo->buffer(base64_decode($base64EncodedData), FILEINFO_MIME_TYPE);
-            if ($mimetype !== false) {
-                if (in_array($mimetype, self::SUPPORTEDTMIMETYPES)) {
-                    $fileExtension = (new MimeDb())->findFirstFileExtensionByMimeType($mimetype);
-                    if (!is_null($fileExtension)) {
-                        $this->tryCall(
-                            $referencedDocumentType,
-                            'setAttachmentBinaryObject',
-                            $this->getBinaryObjectType(
-                                $base64EncodedData,
-                                $mimetype,
-                                FileUtils::getFilenameWithExtension(FileUtils::changeFileExtension(FileUtils::getFilenameWithExtension($binaryDataFilename), $fileExtension))));
-                        $loadedFromBase64 = true;
-                    } else {
-                        throw new ZugferdUnsupportedMimetype();
-                    }
-                } else {
-                    throw new ZugferdUnsupportedMimetype();
-                }
-            } else {
-                throw new ZugferdUnsupportedMimetype();
+            if ($mimetype === false) {
+                throw new ZugferdUnsupportedMimetype('of ' . $binaryDataFilename);
             }
+
+            $fileExtension = FileUtils::getFileExtension($binaryDataFilename);
+            if ($mimetype === 'text/plain' && strtolower($fileExtension) === 'csv') {
+                $mimetype = 'text/csv';
+            }
+
+            /**
+             * PHP 8.0 may misdetect CSV files as "application/csv"; normalize to the standard "text/csv"
+             */
+            if (PHP_VERSION_ID >= 80000 && PHP_VERSION_ID < 81000 && $mimetype === 'application/csv') {
+                $mimetype = 'text/csv';
+            }
+
+            if (!in_array($mimetype, self::SUPPORTEDTMIMETYPES)) {
+                throw new ZugferdUnsupportedMimetype($mimetype);
+            }
+
+            $fileExtension = (new MimeDb())->findFirstFileExtensionByMimeType($mimetype);
+            if (is_null($fileExtension)) {
+                throw new ZugferdUnsupportedMimetype($mimetype);
+            }
+
+            $this->tryCall(
+                $referencedDocumentType,
+                'setAttachmentBinaryObject',
+                $this->getBinaryObjectType(
+                    $base64EncodedData,
+                    $mimetype,
+                    FileUtils::getFilenameWithExtension(
+                        FileUtils::changeFileExtension(
+                            FileUtils::getFilenameWithExtension($binaryDataFilename),
+                            $fileExtension,
+                        ),
+                    ),
+                ),
+            );
+            $loadedFromBase64 = true;
         }
 
         if (
@@ -558,21 +576,21 @@ class ZugferdObjectHelper
         ) {
             $mimeDb = new MimeDb();
             $mimeTypes = $mimeDb->findAllMimeTypesByExtension(FileUtils::getFileExtension($binaryDataFilename));
-            if (!is_null($mimeTypes)) {
-                $mimeTypesSupported = array_intersect($mimeTypes, self::SUPPORTEDTMIMETYPES);
-                if ($mimeTypesSupported !== []) {
-                    $content = FileUtils::fileToBase64($binaryDataFilename);
-                    $this->tryCall(
-                        $referencedDocumentType,
-                        'setAttachmentBinaryObject',
-                        $this->getBinaryObjectType($content, $mimeTypesSupported[0], FileUtils::getFilenameWithExtension($binaryDataFilename))
-                    );
-                } else {
-                    throw new ZugferdUnsupportedMimetype();
-                }
-            } else {
-                throw new ZugferdUnsupportedMimetype();
+            if (is_null($mimeTypes)) {
+                throw new ZugferdUnsupportedMimetype('of ' . $binaryDataFilename);
             }
+
+            $mimeTypesSupported = array_intersect($mimeTypes, self::SUPPORTEDTMIMETYPES);
+            if ($mimeTypesSupported === []) {
+                throw new ZugferdUnsupportedMimetype(implode(', ', $mimeTypes));
+            }
+
+            $content = FileUtils::fileToBase64($binaryDataFilename);
+            $this->tryCall(
+                $referencedDocumentType,
+                'setAttachmentBinaryObject',
+                $this->getBinaryObjectType($content, $mimeTypesSupported[0], FileUtils::getFilenameWithExtension($binaryDataFilename))
+            );
         }
 
         return $referencedDocumentType;

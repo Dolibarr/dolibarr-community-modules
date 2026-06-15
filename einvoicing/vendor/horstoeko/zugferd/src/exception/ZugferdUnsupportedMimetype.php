@@ -27,8 +27,12 @@ class ZugferdUnsupportedMimetype extends ZugferdBaseException
      *
      * @param Throwable|null $previous
      */
-    public function __construct(?Throwable $previous = null)
+    public function __construct(string $mimetype, ?Throwable $previous = null)
     {
-        parent::__construct("Mimetype not supported", ZugferdExceptionCodes::UNSUPPORTEDMIMETYPE, $previous);
+        parent::__construct(
+            sprintf('Mimetype %s is not supported', $mimetype),
+            ZugferdExceptionCodes::UNSUPPORTEDMIMETYPE,
+            $previous,
+        );
     }
 }

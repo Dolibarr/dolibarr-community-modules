@@ -1,0 +1,14 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<root>
+    <users>
+        <user>
+            <id>1</id>
+            <name>Max Mustermann</name>
+            <email>max.mustermann@example.com</email>
+            <city>Berlin</city>
+            <created_at>2026-01-01</created_at>
+            <status>active</status>
+            <amount_eur>129.90</amount_eur>
+        </user>
+    </users>
+</root>
