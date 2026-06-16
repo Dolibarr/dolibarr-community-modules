@@ -131,8 +131,8 @@ $pdpprovider = new PDPProviderManager($db);
 $setupprovider = $pdpprovider->getProvider($providertouse);
 
 
-$keyforparamid = 'EINVOICING_'.strtoupper($providertouse).'_CLIENT_ID';
-$keyforparamsecret = 'EINVOICING_'.strtoupper($providertouse).'_CLIENT_SECRET';
+$keyforparamid = 'EINVOICING_'.strtoupper($providertouse).'_CLIENT_ID'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '');
+$keyforparamsecret = 'EINVOICING_'.strtoupper($providertouse).'_CLIENT_SECRET'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '');
 if (!getDolGlobalString($keyforparamid)) {
 	accessforbidden('Setup of service '.$keyforparamid.' is not complete. Customer ID is missing');
 }
