@@ -1304,18 +1304,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 				// Retreive Original file
 				$receivedFile = null;
-				$flowResource = 'flows/' . $flowId;
-				$flowUrlparams = array(
-					'docType' => 'Original', 						// docType can be 'Metadata' (JSON), 'Original', 'Converted' or 'ReadableView'
-				);
-				$flowResource .= '?' . http_build_query($flowUrlparams);
-				$flowResponse = $this->callApi(
-					$flowResource,
-					"GET",
-					false,
-					['Accept' => 'application/octet-stream'],
-					'get_flow_for_supplier_invoice'
-				);
+				$flowResponse = $this->fetchFlowData($flowId, 'Original', 'get_flow_for_supplier_invoice');
 
 				if ($flowResponse['status_code'] != 200) {
 					return array('res' => -1, 'message' => "ERROR_FLOW_GETORIG Failed to retrieve 'Original' document for SupplierInvoice flow (flowId: " . $flowId . ")" . (empty($flowResponse['errorMessage']) ? '' : ' - ' . $flowResponse['errorMessage']));
@@ -1356,6 +1345,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 						$resFetch = $suplierInvoiceObj->fetch($res['res']);
 						$document->fk_element_id = !empty($suplierInvoiceObj->id) ? $suplierInvoiceObj->id : 0;
 						$document->tracking_idref = !empty($suplierInvoiceObj->ref) ? $suplierInvoiceObj->ref : 'Error'; // Should always be found here
+						if (!empty($res['xml_data']) && Document::checkXmlDataMaxSize($res['xml_data'])) {
+							$document->xml_data = !empty($res['xml_data']) ? $res['xml_data'] : null;
+						}
 
 						//return array('res' => 0, 'message' => "supplier invoice already exists for flowId: " . $flowId . ". " . $res['message']);
 						$returnRes = 1;		// If invoice did already exists, we process one more line from list of flows, so we must return 1, even if nothing was done.

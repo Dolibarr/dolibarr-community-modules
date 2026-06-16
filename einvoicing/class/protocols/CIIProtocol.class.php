@@ -938,7 +938,7 @@ class CIIProtocol extends AbstractProtocol
 			}
 
 			// TODO : Save receivedFile in supplier invoice attachments
-			return ['res' => $supplierInvoiceId, 'message' => implode("\n", $return_messages)];
+			return ['res' => $supplierInvoiceId, 'message' => implode("\n", $return_messages), 'xml_data' => $file];
 		}
 	}
 

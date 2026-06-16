@@ -202,6 +202,35 @@ abstract class AbstractPDPProvider
 		return $this->config;
 	}
 
+
+	/**
+	 * Try to get a flow data from its id and doc type, using API
+	 *
+	 * @return array{status_code:int,response:null|string|array<string,mixed>,?errorCode:string,?errorMessage:string,?id:int,?call_id:string}
+	 */
+	public function fetchFlowData($flowId, $docType, $callType = '')
+	{
+		if (!in_array($docType, ['Metadata', 'Original', 'Converted', 'ReadableView'])) {
+			$docType = 'Converted';
+		}
+
+		// Retrieve the PDF file converted by Access Point
+		$flowResource = 'flows/' . $flowId;
+		$flowUrlparams = array(
+			'docType' => $docType,
+		);
+		$flowResource .= '?' . http_build_query($flowUrlparams);
+		$flowResponse = $this->callApi(
+			$flowResource,
+			"GET",
+			false,
+			['Accept' => 'application/octet-stream'],
+			$callType
+		);
+
+		return $flowResponse;
+	}
+
 	/**
 	 * Send a sample electronic invoice for testing purposes.
 	 * This function generates a sample invoice and sends it to PDP

@@ -158,6 +158,7 @@ class Document extends CommonObject
 		"fk_user_creat" => array("type" => "integer:User:user/class/user.class.php", "label" => "UserAuthor", "picto" => "user", "enabled" => "1", 'position' => 510, 'notnull' => 1, "visible" => "-2", "csslist" => "tdoverflowmax150",),
 		"fk_user_modif" => array("type" => "integer:User:user/class/user.class.php", "label" => "UserModif", "picto" => "user", "enabled" => "1", 'position' => 511, 'notnull' => -1, "visible" => "-2", "csslist" => "tdoverflowmax150",),
 		"response_for_debug" => array("type" => "text", "label" => "RetreivedMessage", "enabled" => "1", 'position' => 700, 'notnull' => 0, "visible" => "-1", "comment" => "Full response body (JSON) of flow"),
+		"xml_data" => array("type" => "text", "label" => "XmlData", "enabled" => "1", 'position' => 701, 'notnull' => 0, "visible" => "0", "comment" => "Document XML data (without PDF)"),
 		//"status" => array("type" => "integer", "label" => "Status", "enabled" => "1", 'position' => 2000, 'notnull' => 1, "visible" => "0", "index" => "1", "arrayofkeyval" => array("0" => "Brouillon", "1" => "Valid&eacute;", "9" => "Annul&eacute;"), "validate" => "1",),
 	);
 	public $rowid;
@@ -190,6 +191,8 @@ class Document extends CommonObject
 	public $cdar_reason_desc;
 	public $cdar_reason_detail;
 	// END MODULEBUILDER PROPERTIES
+
+	public $xml_data;
 
 
 	// If this object has a subtable with lines
@@ -1271,6 +1274,17 @@ class Document extends CommonObject
 		dol_syslog(__METHOD__." end", LOG_INFO);
 
 		return $error ?: 0;
+	}
+
+	/**
+	 * Return true if given XML data can be stored in Database (size < 16Mo)
+	 * @param string $xmlData
+	 * @return bool
+	 */
+	public static function checkXmlDataMaxSize(string &$xmlData): bool
+	{
+		// 16Mo for MEDIUMTEXT
+		return (strlen($xmlData) <= 16777215);
 	}
 }
 

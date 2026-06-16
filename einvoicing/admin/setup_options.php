@@ -261,6 +261,14 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
 	$item->helpText = $langs->transnoentities('EINVOICING_SYNC_MARGIN_TIME_HOURS_HELP');
 	$item->fieldAttr['placeholder'] = $langs->transnoentities('Hours');
 	$item->cssClass = 'maxwidth100';
+
+	$item = $formSetup->newItem('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION');
+	$item->helpText = $langs->transnoentities('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION_HELP');
+	$item->setAsYesNo();
+
+	$item = $formSetup->newItem('EINVOICING_SUPPLIER_INVOICE_COMPARISON_ROUND_PRECISION');
+	$item->setAsNumber(2, 10, 1);
+	$item->defaultFieldValue = 3;
 }
 
 

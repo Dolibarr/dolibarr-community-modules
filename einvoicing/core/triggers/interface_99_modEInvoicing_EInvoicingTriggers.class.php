@@ -23,6 +23,7 @@
  */
 
 require_once DOL_DOCUMENT_ROOT.'/core/triggers/dolibarrtriggers.class.php';
+require_once DOL_DOCUMENT_ROOT.'/custom/einvoicing/class/helpers/SupplierInvoiceHelper.class.php';
 
 
 /**
@@ -153,6 +154,21 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 						}
 					}
 					return 1; // Return >0 if OK.
+				}
+			}
+		}
+
+		if ($action == 'BILL_SUPPLIER_VALIDATE') {
+			if (getDolGlobalInt('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION') && SupplierInvoiceHelper::isEInvoice($object->id)) {
+				// Ensure e-invoice and dol-invoice contains consistent data
+				dol_include_once('pdpconnectfr/class/helpers/SupplierInvoiceHelper.class.php');
+				$resComparison = SupplierInvoiceHelper::checkDolInvoiceAndEInvoiceConsistency($object);
+				if (!$resComparison['identical']) {
+					$this->errors[] = $langs->trans('EInvoiceAndDolInvoiceComparisonFailed');
+					foreach ($resComparison['errors'] as $errorMsg) {
+						$this->errors[] = '- ' . $errorMsg;
+					}
+					return -1;
 				}
 			}
 		}
