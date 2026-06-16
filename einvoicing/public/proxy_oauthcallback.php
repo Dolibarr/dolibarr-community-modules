@@ -261,6 +261,12 @@ if (empty($code) && !GETPOST('error')) {
 					"consumer_key" => getDolGlobalString($keyforparamid),
 					"redirect_uri" => $redirect_uri
 				];
+				if (GETPOSTISSET('superpdp_company_number') && GETPOSTISSET('superpdp_company_number_scheme')) {
+					$params += [
+						'superpdp_company_number' => GETPOST('superpdp_company_number', 'aZ09'),
+						'superpdp_company_number_scheme' => GETPOST('superpdp_company_number_scheme', 'aZ09'),
+					];
+				}
 
 				$resultget = getURLContent($oauthserverurl, 'POST', $params);
 
