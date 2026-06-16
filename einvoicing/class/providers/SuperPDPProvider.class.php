@@ -143,7 +143,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 						'superpdp_company_number_scheme' => 'fr_siren', // sandbox, fr_siren_ be_numero_entreprise
 					];
 				}
-				$urltogeneratetoken .= http_build_query($query);
+				$urltogeneratetoken .= '?' . http_build_query($query);
 				$urltoshow = $langs->trans("EINVOICING_LINK_CREATE_ACCOUNTVia", getDolGlobalString("EINVOICING_SUPERPDP_VIAPARTNER"));
 
 				if (empty($tokenData['token'])) {
@@ -261,7 +261,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 							'superpdp_company_number_scheme' => 'fr_siren', // sandbox, fr_siren_ be_numero_entreprise
 						];
 					}
-					$urltogeneratetoken .= http_build_query($query);
+					$urltogeneratetoken .= '?' . http_build_query($query);
 				} elseif (getDolGlobalString($prefix . 'CLIENT_ID'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '')) && getDolGlobalString($prefix . 'CLIENT_SECRET'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''))) {
 					$texttoshow = $langs->trans('ConnectTo').' ('.$langs->trans('generateAccessToken').')';
 					$urltogeneratetoken = $_SERVER["PHP_SELF"] . "?action=set" . $prefix . "TOKEN&token=" . newToken();
