@@ -205,14 +205,19 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 
 		if ($action == 'BILL_PAYED') {
 			/** @var Facture $object */
-			$PDPManager = new PDPProviderManager($db);
-			$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
-			$result = $provider->sendStatusMessage($object, 212); // Send status message
+			// Check if the invoice is transmitted to EInvoicing.
+			$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."einvoicing_extlinks WHERE element_id = ".((int) $object->id)." AND element_type = '" . $object->element . "'";
+			$resql = $db->query($sql);
+			if ($resql && $db->num_rows($resql) > 0) {
+				$PDPManager = new PDPProviderManager($db);
+				$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+				$result = $provider->sendStatusMessage($object, 212); // Send status message
 
-			if ($result['res'] > 0) {
-				setEventMessage('PDP Connect : '.$langs->trans('EInvStatus212Paid'), 'mesgs');
-			} else {
-				setEventMessage('PDP Connect : '.$result['message'], 'errors');
+				if ($result['res'] > 0) {
+					setEventMessage('PDP Connect : '.$langs->trans('EInvStatus212Paid'), 'mesgs');
+				} else {
+					setEventMessage('PDP Connect : '.$result['message'], 'errors');
+				}
 			}
 		}
 
