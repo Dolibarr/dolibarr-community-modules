@@ -205,6 +205,9 @@ abstract class AbstractPDPProvider
 
 	/**
 	 * Try to get a flow data from its id and doc type, using API
+	 * @param $flowId 		The id of the flow
+	 * @param $docType 		The type of document we want to return
+	 * @param $callType		The type of call to use when calling API
 	 *
 	 * @return array{status_code:int,response:null|string|array<string,mixed>,?errorCode:string,?errorMessage:string,?id:int,?call_id:string}
 	 */
@@ -391,9 +394,9 @@ abstract class AbstractPDPProvider
 
 		// Prepare SQL
 		$sql = "SELECT tokenstring, tokenstring_refresh, expire_at
-                FROM ".MAIN_DB_PREFIX."oauth_token
-                WHERE service = '".$db->escape($serviceName)."'
-                AND entity = ".((int) $conf->entity)." LIMIT 1";
+				FROM ".MAIN_DB_PREFIX."oauth_token
+				WHERE service = '".$db->escape($serviceName)."'
+				AND entity = ".((int) $conf->entity)." LIMIT 1";
 
 		$resql = $db->query($sql);
 		if (!$resql) {
@@ -429,8 +432,8 @@ abstract class AbstractPDPProvider
 
 		// Check if a token already exists for this service
 		$sql_check = "DELETE FROM ".MAIN_DB_PREFIX."oauth_token
-                        WHERE service = '".$db->escape($serviceName)."'
-                        AND entity = ".((int) $conf->entity);
+						WHERE service = '".$db->escape($serviceName)."'
+						AND entity = ".((int) $conf->entity);
 
 		$resql = $db->query($sql_check);
 		if (!$resql) {
