@@ -57,8 +57,6 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 	 */
 	public function runTrigger($action, $object, User $user, Translate $langs, Conf $conf)
 	{
-		global $db;
-
 		if (!isModEnabled('einvoicing')) {
 			return 0;
 		}
@@ -67,7 +65,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 
 		if ($action == 'COMPANY_CREATE') {
 			/** @var Societe $object */
-			$einvoicing = new EInvoicing($db);
+			$einvoicing = new EInvoicing($this->db);
 
 			$socId = $object->socid;
 
@@ -116,7 +114,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 
 		if ($action == 'BILL_CREATE') {
 			/** @var Facture $object */
-			$einvoicing = new EInvoicing($db);
+			$einvoicing = new EInvoicing($this->db);
 
 			// When invoice is created
 			$result = $einvoicing->setEInvoiceStatus($object, GETPOST('seteinvoicestatus'), '');
@@ -128,7 +126,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 
 		if ($action == 'BILL_VALIDATE') {
 			/** @var Facture $object */
-			$einvoicing = new EInvoicing($db);
+			$einvoicing = new EInvoicing($this->db);
 
 			$result = $einvoicing->fetchLastknownInvoiceStatus($object->id, $object->ref);
 
@@ -157,7 +155,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 
 		if ($action == 'BILL_UNVALIDATE') {
 			/** @var Facture $object */
-			$einvoicing = new EInvoicing($db);
+			$einvoicing = new EInvoicing($this->db);
 			$result = $einvoicing->fetchLastknownInvoiceStatus($object->id, $object->ref);
 
 			// If einvoice has been transmitted, we must check that we don't try to modify some fields
@@ -169,7 +167,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 
 		if ($action == 'BILL_MODIFY') {
 			/** @var Facture $object */
-			$einvoicing = new EInvoicing($db);
+			$einvoicing = new EInvoicing($this->db);
 			$result = $einvoicing->fetchLastknownInvoiceStatus($object->id, $object->ref);
 
 			// If einvoice has been transmitted, we must check that we don't try to modify some fields
@@ -190,8 +188,8 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 
 				// Check if the invoice is transmitted to EInvoicing.
 				$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."einvoicing_extlinks WHERE element_id = ".((int) $object->id)." AND element_type = '" . $object->element . "'";
-				$resql = $db->query($sql);
-				if ($resql && $db->num_rows($resql) > 0) {
+				$resql = $this->db->query($sql);
+				if ($resql && $this->db->num_rows($resql) > 0) {
 					// If invoice is transmitted, check if any locked field is modified.;
 					foreach ($lockedFields as $field) {
 						if ($object->$field != $object->oldcopy->$field) {
@@ -208,9 +206,9 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			/** @var Facture $object */
 			// Check if the invoice is transmitted to EInvoicing.
 			$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."einvoicing_extlinks WHERE element_id = ".((int) $object->id)." AND element_type = '" . $object->element . "'";
-			$resql = $db->query($sql);
-			if ($resql && $db->num_rows($resql) > 0) {
-				$PDPManager = new PDPProviderManager($db);
+			$resql = $this->db->query($sql);
+			if ($resql && $this->db->num_rows($resql) > 0) {
+				$PDPManager = new PDPProviderManager($this->db);
 				$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
 				$result = $provider->sendStatusMessage($object, 212); // Send status message
 
