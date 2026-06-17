@@ -142,6 +142,11 @@ class SuperPDPProvider extends AbstractPDPProvider
 						'superpdp_company_number' => removeAllSpaces($mysoc->idprof1), // siren to register
 						'superpdp_company_number_scheme' => 'fr_siren', // sandbox, fr_siren_ be_numero_entreprise
 					];
+				} elseif ($mysoc->country_code == 'BE' && !empty($mysoc->idprof1)) {
+					$query += [
+						'superpdp_company_number' => removeAllSpaces($mysoc->idprof1), // siren to register
+						'superpdp_company_number_scheme' => 'be_numero_entreprise', // sandbox, fr_siren_ be_numero_entreprise
+					];
 				}
 				$urltogeneratetoken .= '?' . http_build_query($query);
 				$urltoshow = $langs->trans("EINVOICING_LINK_CREATE_ACCOUNTVia", getDolGlobalString("EINVOICING_SUPERPDP_VIAPARTNER"));
@@ -259,6 +264,11 @@ class SuperPDPProvider extends AbstractPDPProvider
 						$query += [
 							'superpdp_company_number' => $mysoc->idprof1, // siren to register
 							'superpdp_company_number_scheme' => 'fr_siren', // sandbox, fr_siren_ be_numero_entreprise
+						];
+					} elseif ($mysoc->country_code == 'BE' && !empty($mysoc->idprof1)) {
+						$query += [
+							'superpdp_company_number' => removeAllSpaces($mysoc->idprof1), // siren to register
+							'superpdp_company_number_scheme' => 'be_numero_entreprise', // sandbox, fr_siren_ be_numero_entreprise
 						];
 					}
 					$urltogeneratetoken .= '?' . http_build_query($query);
