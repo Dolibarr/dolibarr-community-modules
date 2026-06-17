@@ -72,6 +72,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		}
 
 		if ($action == 'BILL_CREATE') {
+			/** @var Facture $object */
 			$einvoicing = new EInvoicing($db);
 
 			// When invoice is created
@@ -83,6 +84,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		}
 
 		if ($action == 'BILL_VALIDATE') {
+			/** @var Facture $object */
 			$einvoicing = new EInvoicing($db);
 
 			$result = $einvoicing->fetchLastknownInvoiceStatus($object->id, $object->ref);
