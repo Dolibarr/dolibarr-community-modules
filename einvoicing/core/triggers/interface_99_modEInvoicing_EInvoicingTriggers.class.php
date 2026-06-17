@@ -64,7 +64,49 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 
 		$error = 0;
 
-		if ($action == 'THIRDPARTY_MODIFY') {
+		if ($action == 'COMPANY_CREATE') {
+			/** @var Societe $object */
+			$einvoicing = new EInvoicing($db);
+
+			$socId = $object->socid;
+
+			// Thirdparty routing ID
+			$routingId = GETPOST('routing_id', 'alphanohtml');
+			if ($routingId !== '') {
+				$existing = $einvoicing->fetchDefaultRouting($socId, 'thirdparty');
+				if (empty($existing)) {
+					$result = $einvoicing->addRouting($socId, $routingId, '', 'thirdparty');
+				} else {
+					$result = $einvoicing->setDefaultRouting($socId, $routingId, '', '', '', 'thirdparty');
+				}
+				if ($result < 0) {
+					$error++;
+					$this->errors[] = $langs->trans('FailedToSaveRoutingID').' '.$einvoicing->error;
+				}
+			}
+
+			// Default product for import
+			$routingProductId = GETPOST('routing_product_id', 'aZ09');
+			if ($routingProductId !== '' && $routingProductId !== '-1') {
+				$existing = $einvoicing->fetchDefaultRouting($socId, 'product');
+				if (empty($existing)) {
+					$result = $einvoicing->addRouting($socId, $routingProductId, '', 'product');
+				} else {
+					$result = $einvoicing->setDefaultRouting($socId, $routingProductId, '', '', '', 'product');
+				}
+				if ($result < 0) {
+					$error++;
+					$this->errors[] = $langs->trans('FailedToSaveRoutingID').' '.$einvoicing->error;
+				}
+			}
+
+			if ($error) {
+				return -4;
+			}
+		}
+
+		if ($action == 'COMPANY_MODIFY') {
+			/** @var Societe $object */
 			// If we modify the country of a thirdparty, we update status of invoice
 			// FR->other: status must be modified from "To generate" into "To ignore"
 			// Other->FR: status must be modified from "To ignore" into "To generate"
@@ -113,6 +155,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		}
 
 		if ($action == 'BILL_UNVALIDATE') {
+			/** @var Facture $object */
 			$einvoicing = new EInvoicing($db);
 			$result = $einvoicing->fetchLastknownInvoiceStatus($object->id, $object->ref);
 
@@ -124,6 +167,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		}
 
 		if ($action == 'BILL_MODIFY') {
+			/** @var Facture $object */
 			$einvoicing = new EInvoicing($db);
 			$result = $einvoicing->fetchLastknownInvoiceStatus($object->id, $object->ref);
 
@@ -159,47 +203,8 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			}
 		}
 
-		if ($action == 'COMPANY_CREATE') {
-			$einvoicing = new EInvoicing($db);
-
-			$socId = $object->socid;
-
-			// Thirdparty routing ID
-			$routingId = GETPOST('routing_id', 'alphanohtml');
-			if ($routingId !== '') {
-				$existing = $einvoicing->fetchDefaultRouting($socId, 'thirdparty');
-				if (empty($existing)) {
-					$result = $einvoicing->addRouting($socId, $routingId, '', 'thirdparty');
-				} else {
-					$result = $einvoicing->setDefaultRouting($socId, $routingId, '', '', '', 'thirdparty');
-				}
-				if ($result < 0) {
-					$error++;
-					$this->errors[] = $langs->trans('FailedToSaveRoutingID').' '.$einvoicing->error;
-				}
-			}
-
-			// Default product for import
-			$routingProductId = GETPOST('routing_product_id', 'aZ09');
-			if ($routingProductId !== '' && $routingProductId !== '-1') {
-				$existing = $einvoicing->fetchDefaultRouting($socId, 'product');
-				if (empty($existing)) {
-					$result = $einvoicing->addRouting($socId, $routingProductId, '', 'product');
-				} else {
-					$result = $einvoicing->setDefaultRouting($socId, $routingProductId, '', '', '', 'product');
-				}
-				if ($result < 0) {
-					$error++;
-					$this->errors[] = $langs->trans('FailedToSaveRoutingID').' '.$einvoicing->error;
-				}
-			}
-
-			if ($error) {
-				return -4;
-			}
-		}
-
 		if ($action == 'BILL_PAYED') {
+			/** @var Facture $object */
 			$PDPManager = new PDPProviderManager($db);
 			$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
 			$result = $provider->sendStatusMessage($object, 212); // Send status message
