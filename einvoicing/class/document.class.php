@@ -1278,7 +1278,7 @@ class Document extends CommonObject
 
 	/**
 	 * Return true if given XML data can be stored in Database (size < 16Mo)
-	 * @param string $xmlData
+	 * @param string $xmlData The XML data to check
 	 * @return bool
 	 */
 	public static function checkXmlDataMaxSize(string &$xmlData): bool

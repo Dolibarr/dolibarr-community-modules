@@ -18,7 +18,7 @@ class SupplierInvoiceHelper
 	 *
 	 * @param float $amount1    The first amount to compare
 	 * @param float $amount2    The second amount to compare
-	 * @param int $roundPrecision
+	 * @param int $roundPrecision The number of digits after coma to apply round()
 	 * @return bool
 	 */
 	public static function areAmountsEqual($amount1, $amount2, ?int $roundPrecision = null): bool
@@ -125,7 +125,7 @@ class SupplierInvoiceHelper
 	/**
 	 * Return VAT details (by VAT rate) from a supplier invoice
 	 *
-	 * @param FactureFournisseur $supplierInvoice
+	 * @param FactureFournisseur $supplierInvoice The supplier invoice object
 	 * @return array<array|array{vat_amount: int, vat_basis_amount: int>}
 	 */
 	public static function getVatDetails(FactureFournisseur $supplierInvoice)
@@ -151,7 +151,7 @@ class SupplierInvoiceHelper
 	 * - first, try to get data from database
 	 * - if data not found in database, try to get data from AP
 	 *
-	 * @param int $supplierInvoiceId
+	 * @param int $supplierInvoiceId The id of the supplier invoice
 	 * @throws Exception
 	 * @return ?string The XML data if available or null if can't get it
 	 */
@@ -167,7 +167,6 @@ class SupplierInvoiceHelper
 		$resql = $db->query($sql);
 		if ($resql) {
 			if ($db->num_rows($resql) == 1) {
-
 				$foundDocument = $db->fetch_object($resql);
 
 				$document = new Document($db);
@@ -207,7 +206,7 @@ class SupplierInvoiceHelper
 	/**
 	 * Allow to known if a supplier invoice is an e-invoice or not
 	 *
-	 * @param int $supplierInvoiceId
+	 * @param int $supplierInvoiceId The id of the supplier invoice
 	 * @throws Exception
 	 * @return bool
 	 */
