@@ -64,6 +64,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 
 		$error = 0;
 
+		// THIRD PARTIES
 		if ($action == 'COMPANY_CREATE') {
 			/** @var Societe $object */
 			$einvoicing = new EInvoicing($this->db);
@@ -113,6 +114,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			// TODO
 		}
 
+		// INVOICES AND PAYMENT
 		if ($action == 'BILL_CREATE') {
 			/** @var Facture $object */
 			$einvoicing = new EInvoicing($this->db);
@@ -221,6 +223,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			}
 		}
 
+		// SUPPLIER INVOICES AND PAYMENTS
 		if ($action == 'BILL_SUPPLIER_VALIDATE') {
 			if (getDolGlobalInt('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION') && SupplierInvoiceHelper::isEInvoice($object->id)) {
 				// Ensure e-invoice and dol-invoice contains consistent data
