@@ -139,8 +139,13 @@ class SuperPDPProvider extends AbstractPDPProvider
 				];
 				if ($mysoc->country_code == 'FR' && !empty($mysoc->idprof1)) {
 					$query += [
-						'superpdp_company_number' => $mysoc->idprof1, // siren to register
+						'superpdp_company_number' => removeAllSpaces($mysoc->idprof1), // siren to register
 						'superpdp_company_number_scheme' => 'fr_siren', // sandbox, fr_siren_ be_numero_entreprise
+					];
+				} elseif ($mysoc->country_code == 'BE' && !empty($mysoc->idprof1)) {
+					$query += [
+						'superpdp_company_number' => removeAllSpaces($mysoc->idprof1), // siren to register
+						'superpdp_company_number_scheme' => 'be_numero_entreprise', // sandbox, fr_siren_ be_numero_entreprise
 					];
 				}
 				$urltogeneratetoken .= '?' . http_build_query($query);
@@ -257,8 +262,13 @@ class SuperPDPProvider extends AbstractPDPProvider
 					];
 					if ($mysoc->country_code == 'FR' && !empty($mysoc->idprof1)) {
 						$query += [
-							'superpdp_company_number' => $mysoc->idprof1, // siren to register
+							'superpdp_company_number' => removeAllSpaces($mysoc->idprof1), // siren to register
 							'superpdp_company_number_scheme' => 'fr_siren', // sandbox, fr_siren_ be_numero_entreprise
+						];
+					} elseif ($mysoc->country_code == 'BE' && !empty($mysoc->idprof1)) {
+						$query += [
+							'superpdp_company_number' => removeAllSpaces($mysoc->idprof1), // siren to register
+							'superpdp_company_number_scheme' => 'be_numero_entreprise', // sandbox, fr_siren_ be_numero_entreprise
 						];
 					}
 					$urltogeneratetoken .= '?' . http_build_query($query);

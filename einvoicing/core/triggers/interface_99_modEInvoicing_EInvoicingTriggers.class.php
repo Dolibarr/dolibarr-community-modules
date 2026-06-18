@@ -1,6 +1,7 @@
 <?php
 /* Copyright (C) 2023		Laurent Destailleur			<eldy@users.sourceforge.net>
- * Copyright (C) 2026		SuperAdmin					<daoud.mouhamed@gmail.com>
+ * Copyright (C) 2026		Mohamed DAOUD				<daoud.mouhamed@gmail.com>
+ * Copyright (C) 2026		Frédéric France				<frederic.france@free.fr>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -57,124 +58,16 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 	 */
 	public function runTrigger($action, $object, User $user, Translate $langs, Conf $conf)
 	{
-		global $db;
-
 		if (!isModEnabled('einvoicing')) {
 			return 0;
 		}
 
 		$error = 0;
 
-		if ($action == 'THIRDPARTY_MODIFY') {
-			// If we modify the country of a thirdparty, we update status of invoice
-			// FR->other: status must be modified from "To generate" into "To ignore"
-			// Other->FR: status must be modified from "To ignore" into "To generate"
-			// TODO
-		}
-
-		if ($action == 'BILL_CREATE') {
-			$einvoicing = new EInvoicing($db);
-
-			// When invoice is created
-			$result = $einvoicing->setEInvoiceStatus($object, GETPOST('seteinvoicestatus'), '');
-			if ($result < 0) {
-				$this->errors[] = $einvoicing->errors;
-				return -1;
-			}
-		}
-
-		if ($action == 'BILL_VALIDATE') {
-			$einvoicing = new EInvoicing($db);
-
-			$result = $einvoicing->fetchLastknownInvoiceStatus($object->id, $object->ref);
-
-			// If $result is $einvoicing::STATUS_IGNORE, we do nothing.
-
-			// If einvoice was set to $einvoicing::STATUS_NOT_GENERATED or $einvoicing::STATUS_UNKNOWN, we set it to STATUS_IGNORE (if not qualified for einvoice) or STATUS_NOT_GENERATED (if qualified for einvoice)
-			if ($result['code'] == $einvoicing::STATUS_NOT_GENERATED || $result['code'] == $einvoicing::STATUS_UNKNOWN) {
-				// By default, we set status to ignore
-				$statustouse = $einvoicing::STATUS_IGNORE;
-				// Test if invoice need to be managed by EInvoice
-				$needEinvoice = $einvoicing->needEInvoiceManagement($object);
-				if ($needEinvoice) {
-					$statustouse = $needEinvoice;
-				}
-
-				$newobject = dol_clone($object, 2);
-				$newobject->ref = $object->newref;
-
-				$result = $einvoicing->setEInvoiceStatus($newobject, $statustouse, '');
-				if ($result < 0) {
-					$this->errors[] = $einvoicing->errors;
-					return -1;
-				}
-			}
-		}
-
-		if ($action == 'BILL_UNVALIDATE') {
-			$einvoicing = new EInvoicing($db);
-			$result = $einvoicing->fetchLastknownInvoiceStatus($object->id, $object->ref);
-
-			// If einvoice has been transmitted, we must check that we don't try to modify some fields
-			if (is_array($result) && !in_array($result['code'], array($einvoicing::STATUS_UNKNOWN, $einvoicing::STATUS_IGNORE, $einvoicing::STATUS_NOT_GENERATED, $einvoicing::STATUS_GENERATED))) {
-				$this->errors[] = 'You try to modify the status of an invoice that is locked once the invoice has been transmitted to the Access Point';
-				return -3;
-			}
-		}
-
-		if ($action == 'BILL_MODIFY') {
-			$einvoicing = new EInvoicing($db);
-			$result = $einvoicing->fetchLastknownInvoiceStatus($object->id, $object->ref);
-
-			// If einvoice has been transmitted, we must check that we don't try to modify some fields
-			if (is_array($result) && !in_array($result['code'], array($einvoicing::STATUS_UNKNOWN, $einvoicing::STATUS_IGNORE, $einvoicing::STATUS_NOT_GENERATED, $einvoicing::STATUS_GENERATED))) {
-				// Fields that are locked after transmission.
-				$lockedFields = array(
-					'ref',
-					'date',
-					'date_lim_reglement',
-					'multicurrency_code',
-					'total_ht',
-					'total_tva',
-					'total_ttc',
-					'fk_soc',
-					'cond_reglement_id',
-					'mode_reglement_id'
-				);
-
-				// Check if the invoice is transmitted to EInvoicing.
-				$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."einvoicing_extlinks WHERE element_id = ".((int) $object->id)." AND element_type = '" . $object->element . "'";
-				$resql = $db->query($sql);
-				if ($resql && $db->num_rows($resql) > 0) {
-					// If invoice is transmitted, check if any locked field is modified.;
-					foreach ($lockedFields as $field) {
-						if ($object->$field != $object->oldcopy->$field) {
-							$this->errors[] = 'You try to modify a property that is locked once the invoice has been transmitted to the Access Point';
-							return -2;
-						}
-					}
-					return 1; // Return >0 if OK.
-				}
-			}
-		}
-
-		if ($action == 'BILL_SUPPLIER_VALIDATE') {
-			if (getDolGlobalInt('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION') && SupplierInvoiceHelper::isEInvoice($object->id)) {
-				// Ensure e-invoice and dol-invoice contains consistent data
-				dol_include_once('pdpconnectfr/class/helpers/SupplierInvoiceHelper.class.php');
-				$resComparison = SupplierInvoiceHelper::checkDolInvoiceAndEInvoiceConsistency($object);
-				if (!$resComparison['identical']) {
-					$this->errors[] = $langs->trans('EInvoiceAndDolInvoiceComparisonFailed');
-					foreach ($resComparison['errors'] as $errorMsg) {
-						$this->errors[] = '- ' . $errorMsg;
-					}
-					return -1;
-				}
-			}
-		}
-
+		// THIRD PARTIES
 		if ($action == 'COMPANY_CREATE') {
-			$einvoicing = new EInvoicing($db);
+			/** @var Societe $object */
+			$einvoicing = new EInvoicing($this->db);
 
 			$socId = $object->socid;
 
@@ -213,15 +106,136 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			}
 		}
 
-		if ($action == 'BILL_PAYED') {
-			$PDPManager = new PDPProviderManager($db);
-			$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
-			$result = $provider->sendStatusMessage($object, 212); // Send status message
+		if ($action == 'COMPANY_MODIFY') {
+			/** @var Societe $object */
+			// If we modify the country of a thirdparty, we update status of invoice
+			// FR->other: status must be modified from "To generate" into "To ignore"
+			// Other->FR: status must be modified from "To ignore" into "To generate"
+			// TODO
+		}
 
-			if ($result['res'] > 0) {
-				setEventMessage('PDP Connect : '.$langs->trans('EInvStatus212Paid'), 'mesgs');
-			} else {
-				setEventMessage('PDP Connect : '.$result['message'], 'errors');
+		// INVOICES AND PAYMENT
+		if ($action == 'BILL_CREATE') {
+			/** @var Facture $object */
+			$einvoicing = new EInvoicing($this->db);
+
+			// When invoice is created
+			$result = $einvoicing->setEInvoiceStatus($object, GETPOST('seteinvoicestatus'), '');
+			if ($result < 0) {
+				$this->errors[] = $einvoicing->errors;
+				return -1;
+			}
+		}
+
+		if ($action == 'BILL_VALIDATE') {
+			/** @var Facture $object */
+			$einvoicing = new EInvoicing($this->db);
+
+			$result = $einvoicing->fetchLastknownInvoiceStatus($object->id, $object->ref);
+
+			// If $result is $einvoicing::STATUS_IGNORE, we do nothing.
+
+			// If einvoice was set to $einvoicing::STATUS_NOT_GENERATED or $einvoicing::STATUS_UNKNOWN, we set it to STATUS_IGNORE (if not qualified for einvoice) or STATUS_NOT_GENERATED (if qualified for einvoice)
+			if ($result['code'] == $einvoicing::STATUS_NOT_GENERATED || $result['code'] == $einvoicing::STATUS_UNKNOWN) {
+				// By default, we set status to ignore
+				$statustouse = $einvoicing::STATUS_IGNORE;
+				// Test if invoice need to be managed by EInvoice
+				$needEinvoice = $einvoicing->needEInvoiceManagement($object);
+				if ($needEinvoice) {
+					$statustouse = $needEinvoice;
+				}
+
+				$newobject = dol_clone($object, 2);
+				$newobject->ref = $object->newref;
+
+				$result = $einvoicing->setEInvoiceStatus($newobject, $statustouse, '');
+				if ($result < 0) {
+					$this->errors[] = $einvoicing->errors;
+					return -1;
+				}
+			}
+		}
+
+		if ($action == 'BILL_UNVALIDATE') {
+			/** @var Facture $object */
+			$einvoicing = new EInvoicing($this->db);
+			$result = $einvoicing->fetchLastknownInvoiceStatus($object->id, $object->ref);
+
+			// If einvoice has been transmitted, we must check that we don't try to modify some fields
+			if (is_array($result) && !in_array($result['code'], array($einvoicing::STATUS_UNKNOWN, $einvoicing::STATUS_IGNORE, $einvoicing::STATUS_NOT_GENERATED, $einvoicing::STATUS_GENERATED))) {
+				$this->errors[] = 'You try to modify the status of an invoice that is locked once the invoice has been transmitted to the Access Point';
+				return -3;
+			}
+		}
+
+		if ($action == 'BILL_MODIFY') {
+			/** @var Facture $object */
+			$einvoicing = new EInvoicing($this->db);
+			$result = $einvoicing->fetchLastknownInvoiceStatus($object->id, $object->ref);
+
+			// If einvoice has been transmitted, we must check that we don't try to modify some fields
+			if (is_array($result) && !in_array($result['code'], array($einvoicing::STATUS_UNKNOWN, $einvoicing::STATUS_IGNORE, $einvoicing::STATUS_NOT_GENERATED, $einvoicing::STATUS_GENERATED))) {
+				// Fields that are locked after transmission.
+				$lockedFields = array(
+					'ref',
+					'date',
+					'date_lim_reglement',
+					'multicurrency_code',
+					'total_ht',
+					'total_tva',
+					'total_ttc',
+					'fk_soc',
+					'cond_reglement_id',
+					'mode_reglement_id'
+				);
+
+				// Check if the invoice is transmitted to EInvoicing.
+				$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."einvoicing_extlinks WHERE element_id = ".((int) $object->id)." AND element_type = '" . $object->element . "'";
+				$resql = $this->db->query($sql);
+				if ($resql && $this->db->num_rows($resql) > 0) {
+					// If invoice is transmitted, check if any locked field is modified.;
+					foreach ($lockedFields as $field) {
+						if ($object->$field != $object->oldcopy->$field) {
+							$this->errors[] = 'You try to modify a property that is locked once the invoice has been transmitted to the Access Point';
+							return -2;
+						}
+					}
+					return 1; // Return >0 if OK.
+				}
+			}
+		}
+
+		if ($action == 'BILL_PAYED') {
+			/** @var Facture $object */
+			// Check if the invoice is transmitted to EInvoicing.
+			$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."einvoicing_extlinks WHERE element_id = ".((int) $object->id)." AND element_type = '" . $object->element . "'";
+			$resql = $this->db->query($sql);
+			if ($resql && $this->db->num_rows($resql) > 0) {
+				$PDPManager = new PDPProviderManager($this->db);
+				$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+				$result = $provider->sendStatusMessage($object, 212); // Send status message
+
+				if ($result['res'] > 0) {
+					setEventMessage('PDP Connect : '.$langs->trans('EInvStatus212Paid'), 'mesgs');
+				} else {
+					setEventMessage('PDP Connect : '.$result['message'], 'errors');
+				}
+			}
+		}
+
+		// SUPPLIER INVOICES AND PAYMENTS
+		if ($action == 'BILL_SUPPLIER_VALIDATE') {
+			if (getDolGlobalInt('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION') && SupplierInvoiceHelper::isEInvoice($object->id)) {
+				// Ensure e-invoice and dol-invoice contains consistent data
+				dol_include_once('pdpconnectfr/class/helpers/SupplierInvoiceHelper.class.php');
+				$resComparison = SupplierInvoiceHelper::checkDolInvoiceAndEInvoiceConsistency($object);
+				if (!$resComparison['identical']) {
+					$this->errors[] = $langs->trans('EInvoiceAndDolInvoiceComparisonFailed');
+					foreach ($resComparison['errors'] as $errorMsg) {
+						$this->errors[] = '- ' . $errorMsg;
+					}
+					return -1;
+				}
 			}
 		}
 
