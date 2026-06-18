@@ -182,14 +182,15 @@ class SupplierInvoiceHelper
 					}
 
 					$xmlData = ZugferdDocumentPdfReaderExt::getInvoiceDocumentContentFromContent($flowResponse['response']);
-					if (Document::checkXmlDataMaxSize($xmlData)) {
-						$document->xml_data = $xmlData;
+					$cleanedXmlData = Document::cleanXmlData($xmlData);
+					if (Document::checkXmlDataMaxSize($cleanedXmlData)) {
+						$document->xml_data = $cleanedXmlData;
 						$document->update($user);
 					} else {
 						dol_syslog(__METHOD__. " : xml_data content is too big and can't be stored in database (16Mo max for MEDIUMTEXT)", LOG_ERR);
 					}
 
-					return $xmlData;
+					return $cleanedXmlData;
 				}
 
 				return $foundDocument->xml_data;

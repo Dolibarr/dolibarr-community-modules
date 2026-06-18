@@ -1208,8 +1208,9 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 					$resFetch = $suplierInvoiceObj->fetch($res['res']);
 					$document->fk_element_id = !empty($suplierInvoiceObj->id) ? $suplierInvoiceObj->id : 0;
 					$document->tracking_idref = !empty($suplierInvoiceObj->ref) ? $suplierInvoiceObj->ref : 'Error'; // Should always be found here
-					if (!empty($res['xml_data']) && Document::checkXmlDataMaxSize($res['xml_data'])) {
-						$document->xml_data = $res['xml_data'];
+					$cleanedXmlData = Document::cleanXmlData($res['xml_data'] ?? '');
+					if (!empty($cleanedXmlData) && Document::checkXmlDataMaxSize($cleanedXmlData)) {
+						$document->xml_data = $cleanedXmlData;
 					}
 
 					//return array('res' => 0, 'message' => "supplier invoice already exists for flowId: " . $flowId . ". " . $res['message']);

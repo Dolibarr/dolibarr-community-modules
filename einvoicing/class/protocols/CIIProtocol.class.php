@@ -2341,4 +2341,36 @@ class CIIProtocol extends AbstractProtocol
 
 		return $result;
 	}
+
+	/**
+	 * Remove attachment nodes to get a smaller XML
+	 * @param string $xmlData The XML data to process
+	 * @return string Cleaned XML
+	 */
+	public static function removeAttachmentFromXml(string $xmlData): string
+	{
+		$xmlDoc = new DOMDocument();
+		if (!$xmlDoc->loadXML($xmlData)) {
+			throw new Exception(__METHOD__ . " : failed to load XML data");
+		}
+
+		// Remove AttachedDocument nodes
+		$xpath = new DOMXPath($xmlDoc);
+		// Voluntary use non namespace specific path (to not have to manage different CII namespaces)
+		$attachedDocumentNodes = $xpath->query('//*[local-name()="AdditionalReferencedDocument"]/*[local-name()="AttachmentBinaryObject"]');
+
+		if (count($attachedDocumentNodes) >= 1) {
+			foreach ($attachedDocumentNodes as $attachedDocumentNode) {
+				// Just replace node value
+				$attachedDocumentNode->nodeValue = '[Removed to get a smaller XML]';
+				// Or completely remove node if you prefer :
+				// if ($attachedDocumentNode && isset($attachedDocumentNode->parentNode)) {
+				// 	$attachedDocumentNode->parentNode->removeChild($attachedDocumentNode);
+				// }
+			}
+			return $xmlDoc->saveXML();
+		}
+
+		return $xmlData;
+	}
 }

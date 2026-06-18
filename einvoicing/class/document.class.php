@@ -192,6 +192,8 @@ class Document extends CommonObject
 	public $cdar_reason_detail;
 	// END MODULEBUILDER PROPERTIES
 
+	// Contains raw XML content (/!\ may not be identical to original XML content from AP file because it can be partially cleaned (like attachment files) to preserve XML size stored in database)
+	// It allows to work on XML data (even if AP is down) but will not suit for all usages (be aware of limitations)
 	public $xml_data;
 
 
@@ -1285,6 +1287,34 @@ class Document extends CommonObject
 	{
 		// 16Mo for MEDIUMTEXT
 		return (strlen($xmlData) <= 16777215);
+	}
+
+	/**
+	 * Clean XML data by removing or replacing specific contents like :
+	 * - attachments
+	 *
+	 * @param ?string $xmlData The XML data to clean
+	 * @return string The cleaned XML data
+	 */
+	public static function cleanXmlData(?string $xmlData): string
+	{
+		global $db;
+
+		if (!isset($xmlData) || $xmlData === '') {
+			return $xmlData;
+		}
+
+		$protocolManager = new ProtocolManager($db);
+		$detectedProtocolName = $protocolManager->detectProtocolFromContent($xmlData);
+		if (!isset($detectedProtocolName)) {
+			throw new Exception(__METHOD__ . " : protocol not detected for XML data");
+		}
+		$protocol = $protocolManager->getProtocol($detectedProtocolName);
+		$protocolClassName = get_class($protocol);
+
+		$cleanedXmlData = $protocolClassName::removeAttachmentFromXml($xmlData);
+
+		return $cleanedXmlData;
 	}
 }
 
