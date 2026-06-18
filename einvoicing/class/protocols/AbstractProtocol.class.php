@@ -91,4 +91,11 @@ abstract class AbstractProtocol
 	 * @return 	-1|array<string,string>							Path or content of the generated sample invoice.
 	 */
 	abstract public function generateSampleInvoice($einvoicing, $thirdpartySeller = null, $thirdpartyBuyer = null, $options = array());
+
+	/**
+	 * Remove attachment nodes to get a smaller XML
+	 * @param string $xmlData The XML data to process
+	 * @return string Cleaned XML
+	 */
+	abstract public static function removeAttachmentFromXml(string $xmlData): string;
 }

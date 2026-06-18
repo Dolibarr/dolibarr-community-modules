@@ -24,6 +24,7 @@
  */
 
 require_once DOL_DOCUMENT_ROOT.'/core/triggers/dolibarrtriggers.class.php';
+require_once DOL_DOCUMENT_ROOT.'/custom/einvoicing/class/helpers/SupplierInvoiceHelper.class.php';
 
 
 /**
@@ -202,6 +203,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			}
 		}
 
+
 		if ($action == 'BILL_PAYED') {
 			/** @var Facture $object */
 			// Check if the invoice is transmitted to EInvoicing.
@@ -214,6 +216,52 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 
 				if ($result['res'] > 0) {
 					setEventMessage('PDP Connect : '.$langs->trans('EInvStatus212Paid'), 'mesgs');
+        } else {
+          setEventMessage('PDP Connect : '.$result['message'], 'errors');
+        }
+		}
+
+		if ($action == 'BILL_SUPPLIER_VALIDATE') {
+			if (getDolGlobalInt('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION') && SupplierInvoiceHelper::isEInvoice($object->id)) {
+				// Ensure e-invoice and dol-invoice contains consistent data
+				dol_include_once('pdpconnectfr/class/helpers/SupplierInvoiceHelper.class.php');
+				$resComparison = SupplierInvoiceHelper::checkDolInvoiceAndEInvoiceConsistency($object);
+				if (!$resComparison['identical']) {
+					$this->errors[] = $langs->trans('EInvoiceAndDolInvoiceComparisonFailed');
+					foreach ($resComparison['errors'] as $errorMsg) {
+						$this->errors[] = '- ' . $errorMsg;
+					}
+					return -1;
+				}
+			}
+		}
+
+		if ($action == 'COMPANY_CREATE') {
+			$einvoicing = new EInvoicing($db);
+
+			$socId = $object->socid;
+
+			// Thirdparty routing ID
+			$routingId = GETPOST('routing_id', 'alphanohtml');
+			if ($routingId !== '') {
+				$existing = $einvoicing->fetchDefaultRouting($socId, 'thirdparty');
+				if (empty($existing)) {
+					$result = $einvoicing->addRouting($socId, $routingId, '', 'thirdparty');
+				} else {
+					$result = $einvoicing->setDefaultRouting($socId, $routingId, '', '', '', 'thirdparty');
+				}
+				if ($result < 0) {
+					$error++;
+					$this->errors[] = $langs->trans('FailedToSaveRoutingID').' '.$einvoicing->error;
+				}
+			}
+
+			// Default product for import
+			$routingProductId = GETPOST('routing_product_id', 'aZ09');
+			if ($routingProductId !== '' && $routingProductId !== '-1') {
+				$existing = $einvoicing->fetchDefaultRouting($socId, 'product');
+				if (empty($existing)) {
+					$result = $einvoicing->addRouting($socId, $routingProductId, '', 'product');
 				} else {
 					setEventMessage('PDP Connect : '.$result['message'], 'errors');
 				}

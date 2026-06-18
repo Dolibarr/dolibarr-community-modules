@@ -301,6 +301,17 @@ CantFindThirdpartyFromTheImportedInvoice=Le tiers fournisseur de la facture impo
 CantFindProductFromTheImportedInvoice=Le produit figurant sur la facture importée (%s) est introuvable dans votre base de données. La création automatique de produits étant désactivée, vous devez le créer manuellement. Voir la ligne suivante…
 DisabledInProductionMode=Désactivé en mode production.
 ConnectTo=Se connecter
+EINVOICING_SUPPLIER_INVOICE_COMPARISON_ROUND_PRECISION=Nombre de chiffres après la virgule pour la comparaison des montants entre e-facture et facture fournisseur Dolibarr (valeur par défaut : 3)
+EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION=Empêcher la validation d'une facture fournisseur si les données de la facture électronique et de la facture Dolibarr ne sont pas cohérentes
+EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION_HELP=Données comparées : la devise, le montant total TTC, le montant total HT, le montant total de TVA, le montant de base et le montant de TVA pour chaque taux de TVA
+EInvoiceAndDolInvoiceComparisonFailed=La facture fournisseur ne peut pas être validée car l'e-facture et la facture Dolibarr ne sont pas identiques :
+SupplierInvoiceComparisonCurrencyDifference=différence de devise (e-facture : %s / facture Dolibarr : %s)
+SupplierInvoiceComparisonTotalVatExclDifference=différence de total HT (e-facture : %s / facture Dolibarr : %s)
+SupplierInvoiceComparisonTotalVatInclDifference=différence de total TTC (e-facture : %s / facture Dolibarr : %s)
+SupplierInvoiceComparisonTotalVatDifference=différence de total de TVA (e-facture : %s / facture Dolibarr : %s)
+SupplierInvoiceComparisonVatBasisDifference=différence de montant de base pour la TVA %s%% (e-facture : %s / facture Dolibarr : %s)
+SupplierInvoiceComparisonVatRateDifference=différence de montant de TVA %s%% (e-facture : %s / facture Dolibarr : %s)
+SupplierInvoiceComparisonVatRateNotFound=taux de TVA à %s%% non trouvé dans la facture Dolibarr
 
 EINVOICING_CLIENT_ID=Client ID
 EINVOICING_CLIENT_SECRET=Client Secret
