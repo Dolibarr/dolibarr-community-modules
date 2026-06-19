@@ -323,6 +323,7 @@ SupplierInvoiceComparisonTotalVatDifference=Difference in total VAT (e-invoice: 
 SupplierInvoiceComparisonVatBasisDifference=Difference in VAT basis amount %s%% (e-invoice: %s / Dolibarr invoice: %s)
 SupplierInvoiceComparisonVatRateDifference=Difference in VAT amount %s%% (e-invoice: %s / Dolibarr invoice: %s)
 SupplierInvoiceComparisonVatRateNotFound=VAT rate of %s%% not found in the Dolibarr invoice
+SupplierInvoiceComparisonSuggestVatCalculationMode=recalculate invoice using Mode %s to get VAT amounts corresponding to e-invoice
 
 EINVOICING_CLIENT_ID=Client ID
 EINVOICING_CLIENT_SECRET=Client secret
