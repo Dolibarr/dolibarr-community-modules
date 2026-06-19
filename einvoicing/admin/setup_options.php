@@ -157,8 +157,8 @@ if (getDolGlobalString('EINVOICING_PDP') && !getDolGlobalString('EINVOICING_PROT
 }
 
 if ($action == 'savesyncoptions') {
-	dolibarr_set_const($db, "EINVOICING_DISABLE_SYNC_AP_TO_DOLI", !GETPOSTINT("EINVOICING_DISABLE_SYNC_AP_TO_DOLI"));
-	dolibarr_set_const($db, "EINVOICING_DISABLE_SYNC_DOLI_TO_AP", !GETPOSTINT("EINVOICING_DISABLE_SYNC_DOLI_TO_AP"));
+	dolibarr_set_const($db, "EINVOICING_DISABLE_SYNC_AP_TO_DOLI", !GETPOSTINT("EINVOICING_DISABLE_SYNC_AP_TO_DOLI"), 'chaine', 0, '', $conf->entity);
+	dolibarr_set_const($db, "EINVOICING_DISABLE_SYNC_DOLI_TO_AP", !GETPOSTINT("EINVOICING_DISABLE_SYNC_DOLI_TO_AP"), 'chaine', 0, '', $conf->entity);
 }
 
 
