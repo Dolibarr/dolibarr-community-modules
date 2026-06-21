@@ -421,6 +421,18 @@ trait CommonProtocol
 
 		$sellerCountryCode = $sellerInfo['sellercountry'] ?? '';
 
+		// The legal id (e.g. SIREN) is often carried only in the SpecifiedLegalOrganization
+		// (sellerLegalOrgId/Scheme) and left out of sellerGlobalIds. Merge it in so the lookup,
+		// update and creation steps below all populate the matching idprof field (e.g. idprof1).
+		if (!empty($sellerInfo['sellerLegalOrgId']) && !empty($sellerInfo['sellerLegalOrgScheme'])) {
+			if (empty($sellerInfo['sellerGlobalIds']) || !is_array($sellerInfo['sellerGlobalIds'])) {
+				$sellerInfo['sellerGlobalIds'] = array();
+			}
+			if (empty($sellerInfo['sellerGlobalIds'][$sellerInfo['sellerLegalOrgScheme']])) {
+				$sellerInfo['sellerGlobalIds'][$sellerInfo['sellerLegalOrgScheme']] = $sellerInfo['sellerLegalOrgId'];
+			}
+		}
+
 		// Step 1: Try to find thirdparty by global IDs
 		if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
 			foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
