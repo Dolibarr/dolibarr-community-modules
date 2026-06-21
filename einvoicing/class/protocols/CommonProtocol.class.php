@@ -523,7 +523,8 @@ trait CommonProtocol
 			}
 
 			if ($result > 0) {
-				$thirdpartyId = $thirdparty->id;
+				// findNearest() RETURNS the rowid (it does not populate $thirdparty->id).
+				$thirdpartyId = $result;
 				dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Found thirdparty by findNearest: ' . $thirdpartyId);
 			}
 		}
