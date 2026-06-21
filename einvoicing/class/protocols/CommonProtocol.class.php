@@ -270,7 +270,11 @@ trait CommonProtocol
 		$line->desc = $langs->trans("Description") . " 1";
 		$line->qty = 5;
 		$line->subprice = 100.05;		// unit price (no discount yet)
-		$line->tva_tx = get_default_tva($thirdpartySeller, $thirdpartyBuyer);
+		// get_default_tva() requires Societe objects (strictly typed in core, no null allowed on PHP 8+).
+		// For the specimen, fall back to our own company ($mysoc) when no third party is provided.
+		$sampleSeller = ($thirdpartySeller instanceof Societe) ? $thirdpartySeller : $mysoc;
+		$sampleBuyer = ($thirdpartyBuyer instanceof Societe) ? $thirdpartyBuyer : $mysoc;
+		$line->tva_tx = get_default_tva($sampleSeller, $sampleBuyer);
 		$line->localtax1_tx = 0;
 		$line->localtax2_tx = 0;
 		$line->remise_percent = 10;
