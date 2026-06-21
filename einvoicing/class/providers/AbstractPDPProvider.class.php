@@ -518,7 +518,8 @@ abstract class AbstractPDPProvider
 		if (!isset($object->thirdparty->id)) {
 			$object->fetch_thirdparty();
 		}
-		$actioncomm->socid = $object->thirdparty->id;
+		// $object->thirdparty may still be null (e.g. document/flow with no resolvable socid)
+		$actioncomm->socid = is_object($object->thirdparty ?? null) ? $object->thirdparty->id : 0;
 		$actioncomm->label = $eventLabel;
 		$actioncomm->note_private = $eventMesg;
 		$actioncomm->fk_project = $object->fk_project;
