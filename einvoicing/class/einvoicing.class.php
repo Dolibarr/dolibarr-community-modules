@@ -1138,6 +1138,25 @@ class EInvoicing
 		// Force value for test
 		//$currentStatusInfo['code'] = 2;
 
+		// On invoice creation there is no stored status yet, so the dropdown would default to its first
+		// option ("Ne pas gérer" / STATUS_IGNORE) and persist it at BILL_CREATE — silently disabling
+		// e-invoicing for eligible (FR) invoices. Pre-select the qualified default instead: "À générer"
+		// (STATUS_NOT_GENERATED) for invoices that must be managed, "Ne pas gérer" otherwise.
+		if ($mode == 'create' || $action == 'create') {
+			// At creation the hook receives a blank Facture object: its socid is NOT set yet (the
+			// selected thirdparty lives in a local var of card.php and is passed via $parameters['socid'],
+			// with GETPOST('socid') as fallback). Resolve it so we can load the thirdparty and decide.
+			if (!is_object($object->thirdparty ?? null)) {
+				$socid = !empty($object->socid) ? (int) $object->socid : (int) ($parameters['socid'] ?? GETPOSTINT('socid'));
+				if ($socid > 0) {
+					$object->socid = $socid;
+					$object->fetch_thirdparty();
+				}
+			}
+			$need = is_object($object->thirdparty ?? null) ? $this->needEInvoiceManagement($object) : 0;
+			$currentStatusInfo['code'] = $need ? $need : self::STATUS_IGNORE;
+		}
+
 		$resprints = '';
 
 		// Set $extrafield_collapse_display_value (do we have to collapse/expand the group after the separator)
