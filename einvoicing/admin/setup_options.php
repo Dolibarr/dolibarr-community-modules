@@ -215,6 +215,12 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->defaultFieldValue = 0;
 	$item->cssClass = 'minwidth500';
 	$item->fieldParams['forcereload'] = 0;
+
+	// Setup conf to automatically transmit the e-invoice to the PA right after it is generated (on validation)
+	$item = $formSetup->newItem('EINVOICING_AUTO_SEND_ON_GENERATION')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('EINVOICING_AUTO_SEND_ON_GENERATION_HELP');
+	$item->defaultFieldValue = 0;
+	$item->cssClass = 'minwidth500';
 }
 
 
