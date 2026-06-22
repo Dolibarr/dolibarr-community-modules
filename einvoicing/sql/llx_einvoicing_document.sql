@@ -45,6 +45,7 @@ CREATE TABLE llx_einvoicing_document(
 	cdar_reason_code varchar(50), 
 	cdar_reason_desc varchar(255), 
 	cdar_reason_detail text,
-	response_for_debug text					-- To store response if debug is on
+	response_for_debug text,				-- To store response if debug is on
+	xml_data mediumtext DEFAULT NULL		-- Full XML invoice data (without PDF)
 	-- END MODULEBUILDER FIELDS
 ) ENGINE=innodb;

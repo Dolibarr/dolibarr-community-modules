@@ -20,7 +20,3 @@ ALTER TABLE llx_einvoicing_document ADD INDEX idx_einvoicing_document_callid (ca
 ALTER TABLE llx_einvoicing_document ADD INDEX idx_einvoicing_document_date_creation (date_creation);
 ALTER TABLE llx_einvoicing_document ADD INDEX idx_einvoicing_document_status (status);
 -- END MODULEBUILDER INDEXES
-
---ALTER TABLE llx_einvoicing_document ADD UNIQUE INDEX uk_einvoicing_document_fieldxy(fieldx, fieldy);
-
---ALTER TABLE llx_einvoicing_document ADD CONSTRAINT llx_einvoicing_document_fk_field FOREIGN KEY (fk_field) REFERENCES llx_einvoicing_myotherobject(rowid);
