@@ -462,7 +462,7 @@ trait CommonProtocol
 		// Step 2: Try to find using VAT number if not found by global IDs
 		if ($thirdpartyId < 0) {
 			if (!empty($sellerInfo['sellerTaxRegistations']['VA'])) {
-				$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "societe WHERE REPLACE(tva_intra, ' ', '') = '" . $db->escape($einvoicing->removeSpaces($sellerInfo['sellerTaxRegistations']['VA'])) . "' AND entity = ".$conf->entity;
+				$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "societe WHERE REPLACE(tva_intra, ' ', '') = '" . $db->escape($einvoicing->removeSpaces($sellerInfo['sellerTaxRegistations']['VA'])) . "' AND entity IN (". getEntity('societe').")";
 				$resql = $db->query($sql);
 				if ($resql) {
 					if ($db->num_rows($resql) > 1) {
