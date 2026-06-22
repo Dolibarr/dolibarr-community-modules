@@ -546,28 +546,33 @@ class SuperPDPProvider extends AbstractPDPProvider
 		}
 
 		// Company prefill (number + scheme are an indissociable pair). Sandbox scheme when not in live mode.
+		$companyscheme = '';
 		if (!empty($mysoc->idprof1)) {
 			if (empty($providerconfig['live'])) {
-				$query['superpdp_company_number'] = removeAllSpaces($mysoc->idprof1);
-				$query['superpdp_company_number_scheme'] = 'sandbox';
+				$companyscheme = 'sandbox';
 			} elseif ($mysoc->country_code == 'FR') {
-				$query['superpdp_company_number'] = removeAllSpaces($mysoc->idprof1);
-				$query['superpdp_company_number_scheme'] = 'fr_siren';
+				$companyscheme = 'fr_siren';
 			} elseif ($mysoc->country_code == 'BE') {
+				$companyscheme = 'be_numero_entreprise';
+			}
+			if ($companyscheme) {
 				$query['superpdp_company_number'] = removeAllSpaces($mysoc->idprof1);
-				$query['superpdp_company_number_scheme'] = 'be_numero_entreprise';
+				$query['superpdp_company_number_scheme'] = $companyscheme;
 			}
 		}
 
-		// Optional directory options.
-		if (getDolGlobalString('EINVOICING_SUPERPDP_DIRECTORY_ENTRY_IDENTIFIER')) {
-			$query['superpdp_directory_entry_identifier'] = getDolGlobalString('EINVOICING_SUPERPDP_DIRECTORY_ENTRY_IDENTIFIER');
-		}
+		// Optional directory options. directory_entry_identifier and only_future are fr_siren-specific
+		// (per SuperPDP docs) — do not send them for the sandbox/be schemes.
 		if (getDolGlobalString('EINVOICING_SUPERPDP_SEND_AND_RECEIVE')) {
 			$query['superpdp_send_and_receive'] = getDolGlobalString('EINVOICING_SUPERPDP_SEND_AND_RECEIVE');
 		}
-		if (getDolGlobalInt('EINVOICING_SUPERPDP_ONLY_FUTURE')) {
-			$query['superpdp_only_future'] = 'true';
+		if ($companyscheme === 'fr_siren') {
+			if (getDolGlobalString('EINVOICING_SUPERPDP_DIRECTORY_ENTRY_IDENTIFIER')) {
+				$query['superpdp_directory_entry_identifier'] = getDolGlobalString('EINVOICING_SUPERPDP_DIRECTORY_ENTRY_IDENTIFIER');
+			}
+			if (getDolGlobalInt('EINVOICING_SUPERPDP_ONLY_FUTURE')) {
+				$query['superpdp_only_future'] = 'true';
+			}
 		}
 
 		return $authbase . 'authorize?' . http_build_query($query);
