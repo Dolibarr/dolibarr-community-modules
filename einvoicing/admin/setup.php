@@ -292,6 +292,25 @@ if (GETPOST('error')) {
 }
 
 
+if (GETPOST('code') && GETPOST('state') && $provider instanceof AbstractPDPProvider && method_exists($provider, 'exchangeAuthorizationCode')) {
+	// Return of the OAuth 2.1 Authorization Code flow: verify the anti-CSRF state, then exchange the code.
+	if (GETPOST('state') !== (isset($_SESSION['einvoicing_superpdp_oauth_state']) ? $_SESSION['einvoicing_superpdp_oauth_state'] : '')) {
+		setEventMessages($langs->trans('EINVOICING_SUPERPDP_OAUTH_STATE_MISMATCH'), null, 'errors');
+	} else {
+		unset($_SESSION['einvoicing_superpdp_oauth_state']);
+		$token = $provider->exchangeAuthorizationCode(GETPOST('code'));
+		if ($token) {
+			setEventMessages("Token generated successfully", null, 'mesgs');
+		} else {
+			setEventMessages($provider->error, $provider->errors, 'errors');
+		}
+	}
+
+	header("Location: ".$_SERVER["PHP_SELF"]);
+	exit;
+}
+
+
 if (GETPOST('accesstoken') && $provider instanceof AbstractPDPProvider) {
 	// We are in the return of an OAUT proxy authorize+token callback
 

@@ -223,6 +223,17 @@ class SuperPDPProvider extends AbstractPDPProvider
 		// $item->fieldParams['trClass'] = 'advancedoption';
 
 		if (getDolGlobalString('EINVOICING_PDP') != 'SUPERPDPViaPartner' || getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER') == 'proxy') {
+			// OAuth grant type: client_credentials (own account, paste credentials) or
+			// authorization_code (delegated authorization / onboarding of a third party).
+			$item = $formSetup->newItem($prefix.'GRANT_TYPE')->setAsSelect(array(
+				'client_credentials' => $langs->trans('EINVOICING_SUPERPDP_GRANT_CLIENT_CREDENTIALS'),
+				'authorization_code' => $langs->trans('EINVOICING_SUPERPDP_GRANT_AUTHORIZATION_CODE'),
+			));
+			$item->nameText = $langs->trans('EINVOICING_SUPERPDP_GRANT_TYPE');
+			$item->helpText = $langs->transnoentities('EINVOICING_SUPERPDP_GRANT_TYPE_HELP');
+			$item->defaultFieldValue = 'client_credentials';
+			$item->cssClass = 'minwidth500';
+
 			// Username
 			$item = $formSetup->newItem($prefix.'CLIENT_ID'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''));
 			$item->nameText = $langs->trans('EINVOICING_CLIENT_ID');
@@ -240,6 +251,36 @@ class SuperPDPProvider extends AbstractPDPProvider
 			}
 			$item->nameText = $langs->trans('EINVOICING_CLIENT_SECRET');
 			$item->cssClass = 'minwidth500';
+
+			// Authorization Code specific settings
+			if (getDolGlobalString($prefix.'GRANT_TYPE') == 'authorization_code') {
+				// Redirect URI to register in the SuperPDP interface (must match exactly)
+				$item = $formSetup->newItem($prefix.'REDIRECT_URI_INFO');
+				$item->nameText = $langs->trans('EINVOICING_SUPERPDP_REDIRECT_URI');
+				$item->fieldOverride = '<span class="opacitymedium">'.dol_escape_htmltag($this->callbackurl).'</span>';
+				$item->helpText = $langs->transnoentities('EINVOICING_SUPERPDP_REDIRECT_URI_HELP');
+				$item->cssClass = 'minwidth500';
+
+				// Directory registration UI behaviour during onboarding
+				$item = $formSetup->newItem($prefix.'SEND_AND_RECEIVE')->setAsSelect(array(
+					'any' => 'any', 'send' => 'send', 'receive' => 'receive',
+				));
+				$item->nameText = $langs->trans('EINVOICING_SUPERPDP_SEND_AND_RECEIVE');
+				$item->helpText = $langs->transnoentities('EINVOICING_SUPERPDP_SEND_AND_RECEIVE_HELP');
+				$item->defaultFieldValue = 'any';
+				$item->cssClass = 'minwidth500';
+
+				$item = $formSetup->newItem($prefix.'ONLY_FUTURE')->setAsYesNo();
+				$item->nameText = $langs->trans('EINVOICING_SUPERPDP_ONLY_FUTURE');
+				$item->helpText = $langs->transnoentities('EINVOICING_SUPERPDP_ONLY_FUTURE_HELP');
+				$item->defaultFieldValue = 0;
+				$item->cssClass = 'minwidth500';
+
+				$item = $formSetup->newItem($prefix.'DIRECTORY_ENTRY_IDENTIFIER');
+				$item->nameText = $langs->trans('EINVOICING_SUPERPDP_DIRECTORY_ENTRY_IDENTIFIER');
+				$item->helpText = $langs->transnoentities('EINVOICING_SUPERPDP_DIRECTORY_ENTRY_IDENTIFIER_HELP');
+				$item->cssClass = 'minwidth500';
+			}
 		}
 
 		// API_KEY
@@ -273,8 +314,14 @@ class SuperPDPProvider extends AbstractPDPProvider
 					}
 					$urltogeneratetoken .= '?' . http_build_query($query);
 				} elseif (getDolGlobalString($prefix . 'CLIENT_ID'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '')) && getDolGlobalString($prefix . 'CLIENT_SECRET'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''))) {
-					$texttoshow = $langs->trans('ConnectTo').' ('.$langs->trans('generateAccessToken').')';
-					$urltogeneratetoken = $_SERVER["PHP_SELF"] . "?action=set" . $prefix . "TOKEN&token=" . newToken();
+					if (getDolGlobalString($prefix . 'GRANT_TYPE') == 'authorization_code') {
+						// OAuth 2.1 Authorization Code: redirect the user to SuperPDP's authorize endpoint.
+						$texttoshow = $langs->trans('ConnectTo').' ('.$langs->trans('EINVOICING_SUPERPDP_GRANT_AUTHORIZATION_CODE').')';
+						$urltogeneratetoken = $this->getAuthorizationCodeUrl();
+					} else {
+						$texttoshow = $langs->trans('ConnectTo').' ('.$langs->trans('generateAccessToken').')';
+						$urltogeneratetoken = $_SERVER["PHP_SELF"] . "?action=set" . $prefix . "TOKEN&token=" . newToken();
+					}
 				}
 
 				if ($urltogeneratetoken && (getDolGlobalString('EINVOICING_PDP') != 'SUPERPDPViaPartner' || !empty($tokenData['token']))) {
@@ -459,6 +506,106 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 		// No refresh token (e.g. Client Credentials grant, which issues none) or refresh failed: re-authenticate.
 		return $this->getAccessToken();
+	}
+
+	/**
+	 * Build the OAuth 2.1 Authorization Code authorize URL (delegated authorization / onboarding).
+	 *
+	 * Generates and stores an anti-CSRF state in the session, then returns the SuperPDP authorize URL with
+	 * the client_id, redirect_uri and optional prefill parameters (company number, login hint, directory
+	 * options). No PKCE: SuperPDP's reference example uses a random state and a confidential client.
+	 *
+	 * @return string 	Authorize URL to redirect the user to (empty string if client_id is missing)
+	 */
+	public function getAuthorizationCodeUrl()
+	{
+		global $user, $mysoc;
+
+		$providerconfig = $this->getConf();
+		if (empty($providerconfig['client_id'])) {
+			return '';
+		}
+
+		$authbase = $providerconfig['live'] ? $providerconfig['prod_auth_url'] : $providerconfig['test_auth_url'];
+
+		// Anti-CSRF state, stored in session and verified on the callback.
+		$state = bin2hex(random_bytes(16));
+		$_SESSION['einvoicing_superpdp_oauth_state'] = $state;
+
+		$query = array(
+			'response_type' => 'code',
+			'client_id'     => $providerconfig['client_id'],
+			'redirect_uri'  => $this->callbackurl,
+			'scope'         => '',				// SuperPDP: leave empty
+			'state'         => $state,
+		);
+
+		if (!empty($user->email)) {
+			$query['login_hint'] = $user->email;
+		}
+
+		// Company prefill (number + scheme are an indissociable pair). Sandbox scheme when not in live mode.
+		if (!empty($mysoc->idprof1)) {
+			if (empty($providerconfig['live'])) {
+				$query['superpdp_company_number'] = removeAllSpaces($mysoc->idprof1);
+				$query['superpdp_company_number_scheme'] = 'sandbox';
+			} elseif ($mysoc->country_code == 'FR') {
+				$query['superpdp_company_number'] = removeAllSpaces($mysoc->idprof1);
+				$query['superpdp_company_number_scheme'] = 'fr_siren';
+			} elseif ($mysoc->country_code == 'BE') {
+				$query['superpdp_company_number'] = removeAllSpaces($mysoc->idprof1);
+				$query['superpdp_company_number_scheme'] = 'be_numero_entreprise';
+			}
+		}
+
+		// Optional directory options.
+		if (getDolGlobalString('EINVOICING_SUPERPDP_DIRECTORY_ENTRY_IDENTIFIER')) {
+			$query['superpdp_directory_entry_identifier'] = getDolGlobalString('EINVOICING_SUPERPDP_DIRECTORY_ENTRY_IDENTIFIER');
+		}
+		if (getDolGlobalString('EINVOICING_SUPERPDP_SEND_AND_RECEIVE')) {
+			$query['superpdp_send_and_receive'] = getDolGlobalString('EINVOICING_SUPERPDP_SEND_AND_RECEIVE');
+		}
+		if (getDolGlobalInt('EINVOICING_SUPERPDP_ONLY_FUTURE')) {
+			$query['superpdp_only_future'] = 'true';
+		}
+
+		return $authbase . 'authorize?' . http_build_query($query);
+	}
+
+	/**
+	 * Exchange an OAuth 2.1 authorization code for an access token + refresh token, and store them.
+	 *
+	 * @param 	string 			$code 	Authorization code received on the redirect callback
+	 * @return 	string|null 			Access token on success, null on failure (errors filled)
+	 */
+	public function exchangeAuthorizationCode($code)
+	{
+		global $langs;
+
+		$providerconfig = $this->getConf();
+
+		$param = array(
+			'grant_type'    => 'authorization_code',
+			'code'          => $code,
+			'redirect_uri'  => $this->callbackurl,
+			'client_id'     => $providerconfig['client_id'],
+			'client_secret' => $providerconfig['client_secret'],
+		);
+		$paramstring = http_build_query($param);
+		$extraHeaders = array('Content-Type' => 'application/x-www-form-urlencoded');
+
+		$response = $this->callApi("token", "POST", $paramstring, $extraHeaders, 'authorization_code');
+		$status_code = $response['status_code'] ?? 0;
+		$body = $response['response'] ?? null;
+
+		if ($status_code == 200 && is_array($body) && isset($body['access_token']) && isset($body['expires_in'])) {
+			$this->saveOAuthTokenDB($body['access_token'], $body['refresh_token'] ?? '', $body['expires_in']);
+			$this->tokenData = $this->fetchOAuthTokenDB();
+			return $body['access_token'];
+		}
+
+		$this->errors[] = $langs->trans("FailedToRetrieveAccessToken");
+		return null;
 	}
 
 	/**

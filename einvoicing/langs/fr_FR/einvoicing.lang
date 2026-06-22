@@ -318,6 +318,19 @@ SupplierInvoiceComparisonSuggestVatCalculationMode=recalculer la TVA en Mode %s 
 
 EINVOICING_CLIENT_ID=Client ID
 EINVOICING_CLIENT_SECRET=Client Secret
+EINVOICING_SUPERPDP_GRANT_TYPE=Type d'authentification OAuth
+EINVOICING_SUPERPDP_GRANT_TYPE_HELP=Client Credentials : vous collez vos identifiants pour votre propre compte. Authorization Code : délégation d'autorisation (l'utilisateur final donne accès à son compte SUPER PDP via un tunnel de connexion) — requis pour l'embarquement de tiers (marque grise).
+EINVOICING_SUPERPDP_GRANT_CLIENT_CREDENTIALS=Client Credentials (mon propre compte)
+EINVOICING_SUPERPDP_GRANT_AUTHORIZATION_CODE=Authorization Code (délégation / tiers)
+EINVOICING_SUPERPDP_REDIRECT_URI=URL de redirection (Redirect URI)
+EINVOICING_SUPERPDP_REDIRECT_URI_HELP=Cette URL doit être enregistrée À L'IDENTIQUE dans l'interface SUPER PDP de votre application OAuth, sinon la connexion échouera.
+EINVOICING_SUPERPDP_SEND_AND_RECEIVE=Inscription à l'annuaire (send_and_receive)
+EINVOICING_SUPERPDP_SEND_AND_RECEIVE_HELP=Comportement de l'interface lors de l'embarquement : any = l'utilisateur choisit ; send = masque l'inscription en réception ; receive = force l'inscription d'une adresse de réception.
+EINVOICING_SUPERPDP_ONLY_FUTURE=Date officielle uniquement (only_future)
+EINVOICING_SUPERPDP_ONLY_FUTURE_HELP=Si Oui, empêche l'utilisateur de participer à la « phase pilote » : seule la date officielle du 1er septembre 2026 sera proposée pour l'inscription d'une ligne d'annuaire (entreprises fr_siren).
+EINVOICING_SUPERPDP_DIRECTORY_ENTRY_IDENTIFIER=Adresse de facturation électronique (directory_entry_identifier)
+EINVOICING_SUPERPDP_DIRECTORY_ENTRY_IDENTIFIER_HELP=Optionnel (fr_siren) : identifiant d'adresse de facturation électronique créé si l'utilisateur active la réception des factures.
+EINVOICING_SUPERPDP_OAUTH_STATE_MISMATCH=Échec de connexion : le paramètre de sécurité « state » ne correspond pas (session expirée ou tentative invalide). Veuillez relancer la connexion.
 EINVOICING_API_KEY=Clé API
 
 # AP EsaLink
