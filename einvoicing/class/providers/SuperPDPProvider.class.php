@@ -428,10 +428,37 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 */
 	public function refreshAccessToken()
 	{
-		// Get access token from OAUth server and save it into database.
-		$result = $this->getAccessToken();
+		// OAuth 2.1: when a refresh_token is available (Authorization Code grant), renew the access token
+		// with grant_type=refresh_token instead of re-authenticating from scratch. A full re-auth opens a
+		// new session on the PA each time, whereas refreshing does not. The refresh token is rotated on each
+		// use, so we must persist the new one returned by the server.
+		if (!empty($this->tokenData['refresh_token'])) {
+			$providerconfig = $this->getConf();
 
-		return $result;
+			$param = array(
+				'grant_type'    => 'refresh_token',
+				'refresh_token' => $this->tokenData['refresh_token'],
+				'client_id'     => $providerconfig['client_id'],
+				'client_secret' => $providerconfig['client_secret'],
+			);
+			$paramstring = http_build_query($param);
+			$extraHeaders = array('Content-Type' => 'application/x-www-form-urlencoded');
+
+			$response = $this->callApi("token", "POST", $paramstring, $extraHeaders, 'refresh_access_token');
+			$status_code = $response['status_code'] ?? 0;
+			$body = $response['response'] ?? null;
+
+			if ($status_code == 200 && is_array($body) && isset($body['access_token']) && isset($body['expires_in'])) {
+				// Persist the rotated refresh_token (keep the previous one if the server did not rotate it).
+				$this->saveOAuthTokenDB($body['access_token'], $body['refresh_token'] ?? $this->tokenData['refresh_token'], $body['expires_in']);
+				$this->tokenData = $this->fetchOAuthTokenDB();
+				return $body['access_token'];
+			}
+			// Refresh failed (refresh token expired or already rotated away): fall through to a full re-auth.
+		}
+
+		// No refresh token (e.g. Client Credentials grant, which issues none) or refresh failed: re-authenticate.
+		return $this->getAccessToken();
 	}
 
 	/**
