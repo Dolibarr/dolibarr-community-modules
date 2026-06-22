@@ -965,6 +965,8 @@ class CIIProtocol extends AbstractProtocol
 		$xpath->registerNamespace('rsm', 'urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100');
 		$xpath->registerNamespace('ram', 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100');
 		$xpath->registerNamespace('udt', 'urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100');
+		// qdt is used by some date paths (e.g. ram:FormattedIssueDateTime/qdt:DateTimeString); without it those xpath queries return empty.
+		$xpath->registerNamespace('qdt', 'urn:un:unece:uncefact:data:standard:QualifiedDataType:100');
 
 		return [$doc, $xpath];
 	}
@@ -1604,12 +1606,15 @@ class CIIProtocol extends AbstractProtocol
 
 		$terms->appendChild($doc->createElement('ram:Description', $invoiceData['paymentTermsText']));
 
-		$dtNode = $doc->createElement('ram:DueDateDateTime');
-		$str = $doc->createElement('udt:DateTimeString', $invoiceData['paymentDueDate']->format('Ymd'));
-		$str->setAttribute('format', '102');
-		$dtNode->appendChild($str);
+		// Due date is optional (e.g. immediate payment); guard against a null date to avoid a fatal on ->format().
+		if (!empty($invoiceData['paymentDueDate'])) {
+			$dtNode = $doc->createElement('ram:DueDateDateTime');
+			$str = $doc->createElement('udt:DateTimeString', $invoiceData['paymentDueDate']->format('Ymd'));
+			$str->setAttribute('format', '102');
+			$dtNode->appendChild($str);
 
-		$terms->appendChild($dtNode);
+			$terms->appendChild($dtNode);
+		}
 
 		// Totals
 
