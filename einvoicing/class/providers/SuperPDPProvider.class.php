@@ -815,7 +815,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 		require_once DOL_DOCUMENT_ROOT . '/core/lib/geturl.lib.php';
 
-		$url = $this->getApiUrl(($callType == 'get_access_token') ? 'auth' : 'api') . $resource;
+		// The OAuth token endpoint lives on the auth base (/oauth2/), not the Flow API base. This applies to
+		// every token grant: client_credentials, authorization_code and refresh_token.
+		$url = $this->getApiUrl(($resource == 'token' || $callType == 'get_access_token') ? 'auth' : 'api') . $resource;
 
 		if (!isset($extraHeaders['Content-Type'])) {
 			$httpheader[] = 'Content-Type: application/json';
