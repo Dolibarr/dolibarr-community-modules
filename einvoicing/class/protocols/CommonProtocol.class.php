@@ -1087,6 +1087,7 @@ trait CommonProtocol
 		$map = [
 			'0002' => 'idprof1',	// SIREN
 			'0225' => 'idprof1',	// SIREN
+			'0009' => 'idprof2',	// SIRET
 		];
 
 		return $map[$scheme] ?? '';
