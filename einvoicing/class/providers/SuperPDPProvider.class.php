@@ -1289,6 +1289,18 @@ class SuperPDPProvider extends AbstractPDPProvider
 				// --- Fetch received documents (Einvoice)
 				$document->fk_element_type = FactureFournisseur::class;
 
+				// AFNOR XP Z12-013: a supplier invoice to book is an INCOMING flow (issued by the
+				// platform to us). An outgoing/errored "SupplierInvoice" flow is NOT a received
+				// invoice and must not be imported as a facture fournisseur — otherwise lifecycle
+				// actions (e.g. a refusal) fail on the PDP side with "no matching invoices found".
+				if ($document->flow_direction !== 'In') {
+					$document->fk_element_id = 0;
+					$returnRes = 1;		// mark the flow as processed, just do not create an invoice
+					$returnMessage = "Skipped SupplierInvoice flow " . $flowId . " (flowDirection=" . ($document->flow_direction ?: 'null') . ", not an incoming invoice)";
+					dol_syslog(__METHOD__ . " " . $returnMessage, LOG_WARNING, 0, "_einvoicing");
+					break;
+				}
+
 				// Retrieve the PDF file converted by Access Point
 				$receivedFile = null;
 				/*
