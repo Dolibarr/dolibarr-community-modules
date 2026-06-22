@@ -532,11 +532,12 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$state = bin2hex(random_bytes(16));
 		$_SESSION['einvoicing_superpdp_oauth_state'] = $state;
 
+		// SuperPDP: scopes must be left empty — the parameter is OMITTED, not sent as scope='' (which the
+		// authorize endpoint rejects with invalid_request, like the reference golang.org/x/oauth2 example).
 		$query = array(
 			'response_type' => 'code',
 			'client_id'     => $providerconfig['client_id'],
 			'redirect_uri'  => $this->callbackurl,
-			'scope'         => '',				// SuperPDP: leave empty
 			'state'         => $state,
 		);
 
