@@ -870,13 +870,13 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		// Clean already processed flows from the list
 		$alreadyProcessedFlowIds = [];
 		$flowIds = array_column($response['response']['results'], 'flowId');
-		$escapedFlowIds = array();
+		$sanitizedFlowIds = array();
 		foreach ($flowIds as $flowId) {
-			$escapedFlowIds[] = "'" . $db->escape($flowId) . "'";
+			$sanitizedFlowIds[] = "'" . $db->escape($flowId) . "'";
 		}
-		if (count($escapedFlowIds)) {
+		if (count($sanitizedFlowIds)) {
 			$sql = "SELECT flow_id FROM " . MAIN_DB_PREFIX . "einvoicing_document";
-			$sql .= " WHERE flow_id IN (" . implode(',', $escapedFlowIds) . ")";
+			$sql .= " WHERE flow_id IN (" . implode(',', $sanitizedFlowIds) . ")";
 			$resql = $db->query($sql);
 			if ($resql) {
 				while ($obj = $db->fetch_object($resql)) {

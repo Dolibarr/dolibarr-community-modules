@@ -844,7 +844,7 @@ class ActionsHelloAsso extends CommonHookActions
 										$sql = "SELECT COUNT(s.rowid) as nb";
 										$sql .= " FROM ".MAIN_DB_PREFIX."socpeople as s";
 										$sql .= " WHERE s.fk_soc = ".((int) $tmptag["CUS"]);
-										$sql .= " AND s.entity = ".$conf->entity;
+										$sql .= " AND s.entity = ".((int) $conf->entity);
 										$sql .= " AND s.firstname = '".$db->escape($payer->firstName)."'";
 										$sql .= " AND s.lastname = '".$db->escape($payer->lastName)."'";
 										$sql .= " AND s.email = '".$db->escape($payer->email)."'";
@@ -1024,7 +1024,7 @@ class ActionsHelloAsso extends CommonHookActions
 			$arrayfields = $parameters["arrayfields"];
 			$param = $parameters["param"];
 			$sortfield = $parameters["sortfield"];
-			$sortorder = $parameters["sortorder"];
+			$sortorder = $parameters["sortorder"];  // @phan-suppress-current-line SqlInjection
 			if (!empty($arrayfields["hmember.status"]['checked'])) {
 				$this->resprints = getTitleFieldOfList($arrayfields['hmember.status']['label'], 0, $_SERVER["PHP_SELF"], 'hmember.statut', '', $param, '', $sortfield, $sortorder);
 				$parameters["totalarray"]['nbfield']++;
