@@ -6,8 +6,8 @@ packages:
       author_url: 'https://www.dolibarr.org'
       maintener_email: 'mdaoud@dolicloud.com'
       label:
-        fr: 'PDP Connect (France)'
-        en: 'PDP Connect (France)'
+        fr: 'EInvoicing (Generic, FR)'
+        en: 'EInvoicing (Generic, FR)'
       description:
         fr: "Offre une solution de facturation électronique pour connecter votre Dolibarr à une Plateforme de Dématérialisation Partenaire (aussi appelé Plateforme Agréée) afin de générer, d''envoyer et de recevoir les factures au format Electronique (e-invoice au format FacturX ou CII)."
         en: "Offers an e-invoice solution to connect your Dolibarr to a Partner Dematerialized Platform (also called Approved Platform) in order to send and receive invoices in electronic format. Includes reading and generation of invoices in FacturX format."

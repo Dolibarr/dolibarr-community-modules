@@ -131,8 +131,24 @@ class SuperPDPProvider extends AbstractPDPProvider
 				*/
 
 				$urltogeneratetoken = getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER_OAUTH_URL');
-				$urltogeneratetoken .= '?proxy=superpdp&state=none&response_type=code&redirect_uri=' . urlencode(dol_buildpath('/einvoicing/admin/setup.php', 2));
-
+				// $urltogeneratetoken .= '?proxy=superpdp&state=none&response_type=code&redirect_uri=' . urlencode(dol_buildpath('/einvoicing/admin/setup.php', 2));
+				$query = [
+					'state' => 'none',
+					'response_type' => 'code',
+					'redirect_uri' => dol_buildpath('/einvoicing/admin/setup.php', 2)
+				];
+				if ($mysoc->country_code == 'FR' && !empty($mysoc->idprof1)) {
+					$query += [
+						'superpdp_company_number' => removeAllSpaces($mysoc->idprof1), // siren to register
+						'superpdp_company_number_scheme' => 'fr_siren', // sandbox, fr_siren_ be_numero_entreprise
+					];
+				} elseif ($mysoc->country_code == 'BE' && !empty($mysoc->idprof1)) {
+					$query += [
+						'superpdp_company_number' => removeAllSpaces($mysoc->idprof1), // siren to register
+						'superpdp_company_number_scheme' => 'be_numero_entreprise', // sandbox, fr_siren_ be_numero_entreprise
+					];
+				}
+				$urltogeneratetoken .= '?' . http_build_query($query);
 				$urltoshow = $langs->trans("EINVOICING_LINK_CREATE_ACCOUNTVia", getDolGlobalString("EINVOICING_SUPERPDP_VIAPARTNER"));
 
 				if (empty($tokenData['token'])) {
@@ -238,7 +254,24 @@ class SuperPDPProvider extends AbstractPDPProvider
 				if (getDolGlobalString('EINVOICING_PDP') == 'SUPERPDPViaPartner' && getDolGlobalString("EINVOICING_SUPERPDP_VIAPARTNER")) {
 					$texttoshow = $langs->trans('ConnectTo').' ('.$langs->trans('generateAccessToken') . ' via ' . getDolGlobalString("EINVOICING_SUPERPDP_VIAPARTNER").')';
 					$urltogeneratetoken = getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER_OAUTH_URL');
-					$urltogeneratetoken .= '?state=none&response_type=code&redirect_uri=' . urlencode(dol_buildpath('/einvoicing/admin/setup.php', 2));
+					// $urltogeneratetoken .= '?state=none&response_type=code&redirect_uri=' . urlencode(dol_buildpath('/einvoicing/admin/setup.php', 2));
+					$query = [
+						'state' => 'none',
+						'response_type' => 'code',
+						'redirect_uri' => dol_buildpath('/einvoicing/admin/setup.php', 2)
+					];
+					if ($mysoc->country_code == 'FR' && !empty($mysoc->idprof1)) {
+						$query += [
+							'superpdp_company_number' => removeAllSpaces($mysoc->idprof1), // siren to register
+							'superpdp_company_number_scheme' => 'fr_siren', // sandbox, fr_siren_ be_numero_entreprise
+						];
+					} elseif ($mysoc->country_code == 'BE' && !empty($mysoc->idprof1)) {
+						$query += [
+							'superpdp_company_number' => removeAllSpaces($mysoc->idprof1), // siren to register
+							'superpdp_company_number_scheme' => 'be_numero_entreprise', // sandbox, fr_siren_ be_numero_entreprise
+						];
+					}
+					$urltogeneratetoken .= '?' . http_build_query($query);
 				} elseif (getDolGlobalString($prefix . 'CLIENT_ID'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '')) && getDolGlobalString($prefix . 'CLIENT_SECRET'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''))) {
 					$texttoshow = $langs->trans('ConnectTo').' ('.$langs->trans('generateAccessToken').')';
 					$urltogeneratetoken = $_SERVER["PHP_SELF"] . "?action=set" . $prefix . "TOKEN&token=" . newToken();
