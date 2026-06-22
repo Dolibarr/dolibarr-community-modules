@@ -7,9 +7,9 @@ source_file = helloasso/langs/en_US/helloasso.lang
 source_lang = en_US
 type        = MOZILLAPROPERTIES
 
-[o:dolibarr-association:p:dolibarr-community-modules:r:pdpconnectfr]
-file_filter = pdpconnectfr/langs/<lang>/pdpconnectfr.lang
-source_file = pdpconnectfr/langs/en_US/pdpconnectfr.lang
+[o:dolibarr-association:p:dolibarr-community-modules:r:einvoicing]
+file_filter = einvoicing/langs/<lang>/einvoicing.lang
+source_file = einvoicing/langs/en_US/einvoicing.lang
 source_lang = en_US
 type        = MOZILLAPROPERTIES
 
