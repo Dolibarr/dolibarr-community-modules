@@ -69,7 +69,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			/** @var Societe $object */
 			$einvoicing = new EInvoicing($this->db);
 
-			$socId = $object->socid;
+			$socId = $object->id;
 
 			// Thirdparty routing ID
 			$routingId = GETPOST('routing_id', 'alphanohtml');
