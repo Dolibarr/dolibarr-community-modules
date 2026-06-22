@@ -1573,7 +1573,7 @@ class FacturXProtocol extends AbstractProtocol
 			}
 
 			// TODO : Save receivedFile in supplier invoice attachments
-			return ['res' => $supplierInvoiceId, 'message' => implode("\n", $return_messages)];
+			return ['res' => $supplierInvoiceId, 'message' => implode("\n", $return_messages), 'xml_data' => $embeddedXml];
 		}
 	}
 
@@ -1770,5 +1770,16 @@ class FacturXProtocol extends AbstractProtocol
 		}
 
 		return array('res' => 1, 'message' => 'Attachment saved successfully ' . $dest_path);
+	}
+
+	/**
+	 * Remove attachment nodes to get a smaller XML
+	 * @param string $xmlData The XML data to process
+	 * @return string Cleaned XML
+	 */
+	public static function removeAttachmentFromXml(string $xmlData): string
+	{
+		// FacturX uses CII format for its embedded XML.
+		return CIIProtocol::removeAttachmentFromXml($xmlData);
 	}
 }

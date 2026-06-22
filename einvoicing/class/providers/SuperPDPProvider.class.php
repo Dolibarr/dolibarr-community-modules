@@ -131,8 +131,24 @@ class SuperPDPProvider extends AbstractPDPProvider
 				*/
 
 				$urltogeneratetoken = getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER_OAUTH_URL');
-				$urltogeneratetoken .= '?proxy=superpdp&state=none&response_type=code&redirect_uri=' . urlencode(dol_buildpath('/einvoicing/admin/setup.php', 2));
-
+				// $urltogeneratetoken .= '?proxy=superpdp&state=none&response_type=code&redirect_uri=' . urlencode(dol_buildpath('/einvoicing/admin/setup.php', 2));
+				$query = [
+					'state' => 'none',
+					'response_type' => 'code',
+					'redirect_uri' => dol_buildpath('/einvoicing/admin/setup.php', 2)
+				];
+				if ($mysoc->country_code == 'FR' && !empty($mysoc->idprof1)) {
+					$query += [
+						'superpdp_company_number' => removeAllSpaces($mysoc->idprof1), // siren to register
+						'superpdp_company_number_scheme' => 'fr_siren', // sandbox, fr_siren_ be_numero_entreprise
+					];
+				} elseif ($mysoc->country_code == 'BE' && !empty($mysoc->idprof1)) {
+					$query += [
+						'superpdp_company_number' => removeAllSpaces($mysoc->idprof1), // siren to register
+						'superpdp_company_number_scheme' => 'be_numero_entreprise', // sandbox, fr_siren_ be_numero_entreprise
+					];
+				}
+				$urltogeneratetoken .= '?' . http_build_query($query);
 				$urltoshow = $langs->trans("EINVOICING_LINK_CREATE_ACCOUNTVia", getDolGlobalString("EINVOICING_SUPERPDP_VIAPARTNER"));
 
 				if (empty($tokenData['token'])) {
@@ -238,7 +254,24 @@ class SuperPDPProvider extends AbstractPDPProvider
 				if (getDolGlobalString('EINVOICING_PDP') == 'SUPERPDPViaPartner' && getDolGlobalString("EINVOICING_SUPERPDP_VIAPARTNER")) {
 					$texttoshow = $langs->trans('ConnectTo').' ('.$langs->trans('generateAccessToken') . ' via ' . getDolGlobalString("EINVOICING_SUPERPDP_VIAPARTNER").')';
 					$urltogeneratetoken = getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER_OAUTH_URL');
-					$urltogeneratetoken .= '?state=none&response_type=code&redirect_uri=' . urlencode(dol_buildpath('/einvoicing/admin/setup.php', 2));
+					// $urltogeneratetoken .= '?state=none&response_type=code&redirect_uri=' . urlencode(dol_buildpath('/einvoicing/admin/setup.php', 2));
+					$query = [
+						'state' => 'none',
+						'response_type' => 'code',
+						'redirect_uri' => dol_buildpath('/einvoicing/admin/setup.php', 2)
+					];
+					if ($mysoc->country_code == 'FR' && !empty($mysoc->idprof1)) {
+						$query += [
+							'superpdp_company_number' => removeAllSpaces($mysoc->idprof1), // siren to register
+							'superpdp_company_number_scheme' => 'fr_siren', // sandbox, fr_siren_ be_numero_entreprise
+						];
+					} elseif ($mysoc->country_code == 'BE' && !empty($mysoc->idprof1)) {
+						$query += [
+							'superpdp_company_number' => removeAllSpaces($mysoc->idprof1), // siren to register
+							'superpdp_company_number_scheme' => 'be_numero_entreprise', // sandbox, fr_siren_ be_numero_entreprise
+						];
+					}
+					$urltogeneratetoken .= '?' . http_build_query($query);
 				} elseif (getDolGlobalString($prefix . 'CLIENT_ID'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '')) && getDolGlobalString($prefix . 'CLIENT_SECRET'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''))) {
 					$texttoshow = $langs->trans('ConnectTo').' ('.$langs->trans('generateAccessToken').')';
 					$urltogeneratetoken = $_SERVER["PHP_SELF"] . "?action=set" . $prefix . "TOKEN&token=" . newToken();
@@ -1304,18 +1337,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 				// Retreive Original file
 				$receivedFile = null;
-				$flowResource = 'flows/' . $flowId;
-				$flowUrlparams = array(
-					'docType' => 'Original', 						// docType can be 'Metadata' (JSON), 'Original', 'Converted' or 'ReadableView'
-				);
-				$flowResource .= '?' . http_build_query($flowUrlparams);
-				$flowResponse = $this->callApi(
-					$flowResource,
-					"GET",
-					false,
-					['Accept' => 'application/octet-stream'],
-					'get_flow_for_supplier_invoice'
-				);
+				$flowResponse = $this->fetchFlowData($flowId, 'Original', 'get_flow_for_supplier_invoice');
 
 				if ($flowResponse['status_code'] != 200) {
 					return array('res' => -1, 'message' => "ERROR_FLOW_GETORIG Failed to retrieve 'Original' document for SupplierInvoice flow (flowId: " . $flowId . ")" . (empty($flowResponse['errorMessage']) ? '' : ' - ' . $flowResponse['errorMessage']));
@@ -1356,6 +1378,10 @@ class SuperPDPProvider extends AbstractPDPProvider
 						$resFetch = $suplierInvoiceObj->fetch($res['res']);
 						$document->fk_element_id = !empty($suplierInvoiceObj->id) ? $suplierInvoiceObj->id : 0;
 						$document->tracking_idref = !empty($suplierInvoiceObj->ref) ? $suplierInvoiceObj->ref : 'Error'; // Should always be found here
+						$cleanedXmlData = Document::cleanXmlData($res['xml_data'] ?? '');
+						if (!empty($cleanedXmlData) && Document::checkXmlDataMaxSize($cleanedXmlData)) {
+							$document->xml_data = $cleanedXmlData;
+						}
 
 						//return array('res' => 0, 'message' => "supplier invoice already exists for flowId: " . $flowId . ". " . $res['message']);
 						$returnRes = 1;		// If invoice did already exists, we process one more line from list of flows, so we must return 1, even if nothing was done.

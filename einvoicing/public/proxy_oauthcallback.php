@@ -131,8 +131,8 @@ $pdpprovider = new PDPProviderManager($db);
 $setupprovider = $pdpprovider->getProvider($providertouse);
 
 
-$keyforparamid = 'EINVOICING_'.strtoupper($providertouse).'_CLIENT_ID';
-$keyforparamsecret = 'EINVOICING_'.strtoupper($providertouse).'_CLIENT_SECRET';
+$keyforparamid = 'EINVOICING_'.strtoupper($providertouse).'_CLIENT_ID'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '');
+$keyforparamsecret = 'EINVOICING_'.strtoupper($providertouse).'_CLIENT_SECRET'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '');
 if (!getDolGlobalString($keyforparamid)) {
 	accessforbidden('Setup of service '.$keyforparamid.' is not complete. Customer ID is missing');
 }
@@ -223,7 +223,10 @@ if (empty($code) && !GETPOST('error')) {
 	// Add more param
 	$url .= '&nonce='.bin2hex(random_bytes(64 / 8));
 
-	//var_dump($keyforurl, $url, $statewithscopeonly, $origin_state);exit;
+	if (GETPOSTISSET('superpdp_company_number') && GETPOSTISSET('superpdp_company_number_scheme')) {
+		$url .= '&superpdp_company_number=' . GETPOST('superpdp_company_number', 'aZ09');
+		$url .= '&superpdp_company_number_scheme=' . GETPOST('superpdp_company_number_scheme', 'aZ09');
+	}
 
 	// we go on oauth provider authorization page, we will then go back on this page but into the other branch of the if (!GETPOST('code'))
 	header('Location: '.$url);

@@ -167,19 +167,6 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$itemtitle->setAsTitle();
 	$itemtitle->nameText = '<b>'.$langs->trans("EINVOICING_SYNC_TO_PA").'</b>';
 
-	// Setup conf to enable third-party validation via government APIs (SIREN via data.gouv.fr and VAT via VIES)
-	$item = $formSetup->newItem('EINVOICING_ENABLE_API_VALIDATION')->setAsYesNo();
-	$item->helpText = $langs->transnoentities('EINVOICING_ENABLE_API_VALIDATION_HELP');
-	$item->defaultFieldValue = 0;
-	$item->cssClass = 'minwidth500';
-
-	// Setup conf to choose to block generation/send of an invoice if no routing ID is found for the third party otherwise use SIREN
-	$item = $formSetup->newItem('EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID')->setAsYesNo();
-	$item->helpText = $langs->transnoentities('EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID_HELP');
-	$item->defaultFieldValue = 0;
-	$item->cssClass = 'minwidth500';
-	$item->fieldParams['forcereload'] = 0;
-
 	$item = $formSetup->newItem('EINVOICING_PROTOCOL')->setAsSelect($TFieldProtocols);
 	$item->helpText = $langs->transnoentities('EINVOICING_PROTOCOL_HELP');
 	$item->defaultFieldValue = 'FACTURX';
@@ -192,6 +179,13 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->defaultFieldValue = 0;
 	$item->cssClass = 'minwidth500';
 	$item->fieldParams['forcereload'] = 1;
+
+	// Setup conf to enable third-party validation via government APIs (SIREN via data.gouv.fr and VAT via VIES)
+	$item = $formSetup->newItem('EINVOICING_ENABLE_API_VALIDATION')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('EINVOICING_ENABLE_API_VALIDATION_HELP');
+	$item->defaultFieldValue = 0;
+	$item->cssClass = 'minwidth500';
+
 
 	if (getDolGlobalString('EINVOICING_EINVOICE_IN_REAL_TIME')) {
 		$item = $formSetup->newItem('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS')->setAsYesNo();
@@ -214,6 +208,13 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item = $formSetup->newItem('EINVOICING_AAB');
 	$item->helpText = $langs->transnoentities('EINVOICING_AAB_HELP');
 	$item->cssClass = 'minwidth500';
+
+	// Setup conf to choose to block generation/send of an invoice if no routing ID is found for the third party otherwise use SIREN
+	$item = $formSetup->newItem('EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID_HELP');
+	$item->defaultFieldValue = 0;
+	$item->cssClass = 'minwidth500';
+	$item->fieldParams['forcereload'] = 0;
 }
 
 
@@ -261,6 +262,14 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
 	$item->helpText = $langs->transnoentities('EINVOICING_SYNC_MARGIN_TIME_HOURS_HELP');
 	$item->fieldAttr['placeholder'] = $langs->transnoentities('Hours');
 	$item->cssClass = 'maxwidth100';
+
+	$item = $formSetup->newItem('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION');
+	$item->helpText = $langs->transnoentities('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION_HELP');
+	$item->setAsYesNo();
+
+	$item = $formSetup->newItem('EINVOICING_SUPPLIER_INVOICE_COMPARISON_ROUND_PRECISION');
+	$item->setAsNumber(2, 10, 1);
+	$item->defaultFieldValue = 3;
 }
 
 
