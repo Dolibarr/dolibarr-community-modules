@@ -89,6 +89,7 @@ return [
 	// with the plugin's implementation (e.g. 'vendor/phan/phan/dev/tools/phan/plugins/AlwaysReturnPlugin.php')
 	'plugins' => [
 		__DIR__.'/plugins/SqlInjectionPlugin.php',
+		__DIR__.'/plugins/NoVarDumpPlugin.php',
 		// checks if a function, closure or method unconditionally returns.
 		// can also be written as 'vendor/phan/phan/dev/tools/phan/plugins/AlwaysReturnPlugin.php'
 		'DeprecateAliasPlugin',
