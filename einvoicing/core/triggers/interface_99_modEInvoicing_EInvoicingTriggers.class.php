@@ -227,7 +227,6 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		if ($action == 'BILL_SUPPLIER_VALIDATE') {
 			if (getDolGlobalInt('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION') && SupplierInvoiceHelper::isEInvoice($object->id)) {
 				// Ensure e-invoice and dol-invoice contains consistent data
-				dol_include_once('pdpconnectfr/class/helpers/SupplierInvoiceHelper.class.php');
 				$resComparison = SupplierInvoiceHelper::checkDolInvoiceAndEInvoiceConsistency($object);
 				if (!$resComparison['identical']) {
 					$this->errors[] = $langs->trans('EInvoiceAndDolInvoiceComparisonFailed');

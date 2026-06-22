@@ -81,40 +81,84 @@ class SupplierInvoiceHelper
 			$errors[] = $langs->trans('SupplierInvoiceComparisonCurrencyDifference', $parsedHeader['invoiceCurrency'], $currencyCode);
 		}
 
-		// VAT excl. total
-		if (!self::areAmountsEqual(floatval($dolSupplierInvoice->total_ht), $parsedHeader['lineTotalAmount'])) {
-			$errors[] = $langs->trans('SupplierInvoiceComparisonTotalVatExclDifference', $parsedHeader['lineTotalAmount'], floatval($dolSupplierInvoice->total_ht));
-		}
+		// -----------------------------------------------------------------
+		// 		Compare amount depending VAT calculation mode 1 & 2
+		// -----------------------------------------------------------------
 
-		// TODO manage VAT mode 1 & 2 in comparisons
-		// VAT incl. total
-		if (!self::areAmountsEqual(floatval($dolSupplierInvoice->total_ttc), $parsedHeader['grandTotalAmount'])) {
-			$errors[] = $langs->trans('SupplierInvoiceComparisonTotalVatInclDifference', $parsedHeader['grandTotalAmount'], floatval($dolSupplierInvoice->total_ttc));
-		}
+		// Mode 1 : round VAT amount of each line and then sum rounded amounts
+		// Mode 2 : sum VAT amount of each line and then round total
 
-		// VAT total
-		if (!self::areAmountsEqual(floatval($dolSupplierInvoice->total_tva), $parsedHeader['taxTotalAmount'])) {
-			$errors[] = $langs->trans('SupplierInvoiceComparisonTotalVatDifference', $parsedHeader['taxTotalAmount'], floatval($dolSupplierInvoice->total_tva));
-		}
+		// ? Start transaction to be able to calculate VAT amounts in 2 differents modes :
+		// ? - do it this way because VAT calculation is directly made in update_price() method which also update database, but in our case, we don't want to update database
+		// ? - our need here is to calculate in mode 1 and mode 2 without to have to rewrite all VAT calculation logic
+		$db->begin();
 
-		$dolSupplierInvoiceVatDetails = self::getVatDetails($dolSupplierInvoice);
-		foreach ($parsedHeader['taxBreakdown'] as $taxDetailsByRate) {
-			if ($taxDetailsByRate['typeCode'] === 'VAT') {
-				if (array_key_exists((string) $taxDetailsByRate['rateApplicablePercent'], $dolSupplierInvoiceVatDetails)) {
-					$dolVatAmount = floatval($dolSupplierInvoiceVatDetails[(string) $taxDetailsByRate['rateApplicablePercent']]['vat_amount']);
-					$dolVatBasis   = floatval($dolSupplierInvoiceVatDetails[(string) $taxDetailsByRate['rateApplicablePercent']]['vat_basis_amount']);
+		$calculationRules = [
+			'current',
+			'totalofround',
+			'roundoftotal',
+		];
 
-					if (!self::areAmountsEqual($dolVatBasis, $taxDetailsByRate['basisAmount'])) {
-						$errors[] = $langs->trans('SupplierInvoiceComparisonVatBasisDifference',  $taxDetailsByRate['rateApplicablePercent'], $taxDetailsByRate['basisAmount'], $dolVatBasis);
+		$amountErrors = [];
+
+		foreach ($calculationRules as $calculationRule) {
+			if ($calculationRule != 'current') {
+				$noDatabaseUpdate = 0;
+				$dolSupplierInvoice->update_price(0, (($calculationRule == 'totalofround') ? '0' : '1'), $noDatabaseUpdate, $dolSupplierInvoice->thirdparty);
+				$dolSupplierInvoice->fetch($dolSupplierInvoice->id);
+			}
+
+			// VAT excl. total
+			if (!self::areAmountsEqual(floatval($dolSupplierInvoice->total_ht), $parsedHeader['lineTotalAmount'])) {
+				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatExclDifference', $parsedHeader['lineTotalAmount'], floatval($dolSupplierInvoice->total_ht));
+			}
+
+			// VAT incl. total
+			if (!self::areAmountsEqual(floatval($dolSupplierInvoice->total_ttc), $parsedHeader['grandTotalAmount'])) {
+				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatInclDifference', $parsedHeader['grandTotalAmount'], floatval($dolSupplierInvoice->total_ttc));
+			}
+
+			// VAT total
+			if (!self::areAmountsEqual(floatval($dolSupplierInvoice->total_tva), $parsedHeader['taxTotalAmount'])) {
+				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatDifference', $parsedHeader['taxTotalAmount'], floatval($dolSupplierInvoice->total_tva));
+			}
+
+			$dolSupplierInvoiceVatDetails = self::getVatDetails($dolSupplierInvoice);
+			foreach ($parsedHeader['taxBreakdown'] as $taxDetailsByRate) {
+				if ($taxDetailsByRate['typeCode'] === 'VAT') {
+					if (array_key_exists((string) $taxDetailsByRate['rateApplicablePercent'], $dolSupplierInvoiceVatDetails)) {
+						$dolVatAmount = floatval($dolSupplierInvoiceVatDetails[(string) $taxDetailsByRate['rateApplicablePercent']]['vat_amount']);
+						$dolVatBasis   = floatval($dolSupplierInvoiceVatDetails[(string) $taxDetailsByRate['rateApplicablePercent']]['vat_basis_amount']);
+
+						if (!self::areAmountsEqual($dolVatBasis, $taxDetailsByRate['basisAmount'])) {
+							$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonVatBasisDifference',  $taxDetailsByRate['rateApplicablePercent'], $taxDetailsByRate['basisAmount'], $dolVatBasis);
+						}
+						if (!self::areAmountsEqual($dolVatAmount, $taxDetailsByRate['calculatedAmount'])) {
+							$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonVatRateDifference',  $taxDetailsByRate['rateApplicablePercent'], $taxDetailsByRate['calculatedAmount'], $dolVatAmount);
+						}
+					} else {
+						$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonVatRateNotFound', $taxDetailsByRate['rateApplicablePercent']);
 					}
-					if (!self::areAmountsEqual($dolVatAmount, $taxDetailsByRate['calculatedAmount'])) {
-						$errors[] = $langs->trans('SupplierInvoiceComparisonVatRateDifference',  $taxDetailsByRate['rateApplicablePercent'], $taxDetailsByRate['calculatedAmount'], $dolVatAmount);
-					}
-				} else {
-					$errors[] = $langs->trans('SupplierInvoiceComparisonVatRateNotFound', $taxDetailsByRate['rateApplicablePercent']);
 				}
 			}
+
+			if (count($amountErrors['current']) == 0) {
+				break;
+			}
 		}
+
+		if (count($amountErrors['current']) > 0) {
+			$errors = array_merge($errors, $amountErrors['current']);
+
+			if ($amountErrors['current'] == $amountErrors['totalofround'] && count($amountErrors['roundoftotal']) === 0) {
+				$errors[] = '💡' . $langs->trans('SupplierInvoiceComparisonSuggestVatCalculationMode', 2);
+			} elseif ($amountErrors['current'] == $amountErrors['roundoftotal'] && count($amountErrors['totalofround']) === 0) {
+				$errors[] = '💡' . $langs->trans('SupplierInvoiceComparisonSuggestVatCalculationMode', 1);
+			}
+		}
+
+		// Rollback because we don't want to persist in database the changes made by the different calls to update_price() (see comment before the $db->begin() for more details)
+		$db->rollback();
 
 		return [
 			'identical' => (count($errors) == 0),
