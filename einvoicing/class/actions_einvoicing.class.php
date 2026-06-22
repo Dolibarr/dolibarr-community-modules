@@ -91,8 +91,11 @@ class ActionsEInvoicing extends CommonHookActions
 
 			if ($thirdpartyCountryCode === 'FR' && (!isset($currentStatusDetails['code']) || $currentStatusDetails['code'] != $einvoicing::STATUS_IGNORE)) {
 				/** @var Facture $invoiceObject */
-				if (//$invoiceObject->status != $invoiceObject::STATUS_DRAFT &&
-					!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')
+				// Never generate/transmit an e-invoice for a DRAFT: regenerating a draft PDF (e.g. after
+				// adding a line) must NOT push anything to the PA. At validation the invoice is already
+				// VALIDATED when Dolibarr regenerates the final PDF, so the legitimate flow is preserved.
+				if ($invoiceObject->status != $invoiceObject::STATUS_DRAFT
+					&& !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')
 					&& getDolGlobalString('EINVOICING_EINVOICE_IN_REAL_TIME')) {
 					// Call function to create Factur-X document
 					require_once __DIR__ . '/protocols/ProtocolManager.class.php';
