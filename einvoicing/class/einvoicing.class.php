@@ -1831,15 +1831,25 @@ class EInvoicing
 			$resprints .= '<tr class="treinvoicing_collapseseparator '.($expand_display ? '' : 'hidden').'">';
 			$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
 			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) -1).'"').'>';
-
-			if ($product_id != '' && $product_id != '-1') {
-				if (preg_match('/^idprod/', $product_id)) {
-					$new_product_id = str_replace('idprod_', '', $product_id);
-					$tmpproduct = new Product($this->db);
-					$tmpproduct->fetch($new_product_id);
-					$resprints .= $tmpproduct->getNomUrl(1);
+			if ($mode == 'edit') {
+				if (version_compare(DOL_VERSION, '22.0.0', '<')) {
+					// Before v22, select_produits_fournisseurs() uses print instead of return
+					ob_start();
+					$form->select_produits_fournisseurs($object->id, $product_id, 'routing_product_id', '', '', array(), 0, 1);
+					$resprints .= ob_get_clean();
 				} else {
-					// TODO Show ref of product price
+					$resprints .= $form->select_produits_fournisseurs($object->id, $product_id, 'routing_product_id', '', '', array(), 0, 1, '', '', 1);
+				}
+			} else {
+				if ($product_id != '' && $product_id != '-1') {
+					if (preg_match('/^idprod/', $product_id)) {
+						$new_product_id = str_replace('idprod_', '', $product_id);
+						$tmpproduct = new Product($this->db);
+						$tmpproduct->fetch($new_product_id);
+						$resprints .= $tmpproduct->getNomUrl(1);
+					} else {
+						// TODO Show ref of product price
+					}
 				}
 			}
 			$resprints .= '</td>';
