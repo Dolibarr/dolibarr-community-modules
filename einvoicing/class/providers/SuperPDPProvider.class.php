@@ -482,6 +482,38 @@ class SuperPDPProvider extends AbstractPDPProvider
 		if (!empty($this->tokenData['refresh_token'])) {
 			$providerconfig = $this->getConf();
 
+			// "Via partner" (grey-label) client: it holds no client_secret, so it cannot run the
+			// refresh_token grant against the PA directly. Route the refresh through the operator's
+			// proxy, which holds the secret and performs the grant on our behalf, then returns the
+			// rotated tokens. Mirrors the delegated enrolment flow (proxy_oauthcallback.php).
+			$proxyurl = getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER_OAUTH_URL');
+			if (getDolGlobalString('EINVOICING_PDP') == 'SUPERPDPViaPartner'
+				&& getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER') != 'proxy'
+				&& !empty($proxyurl)) {
+				require_once DOL_DOCUMENT_ROOT.'/core/lib/geturl.lib.php';
+
+				$param = array(
+					'action'        => 'refresh',
+					'grant_type'    => 'refresh_token',
+					'refresh_token' => $this->tokenData['refresh_token'],
+				);
+				$resultget = getURLContent($proxyurl, 'POST', http_build_query($param), 1, array('Content-Type: application/x-www-form-urlencoded'));
+
+				$httpcode = empty($resultget['http_code']) ? 0 : $resultget['http_code'];
+				if (empty($resultget['curl_error_no']) && $httpcode == 200) {
+					$body = json_decode($resultget['content'], true);
+					if (is_array($body) && !empty($body['access_token']) && isset($body['expires_in'])) {
+						$this->saveOAuthTokenDB($body['access_token'], $body['refresh_token'] ?? $this->tokenData['refresh_token'], $body['expires_in']);
+						$this->tokenData = $this->fetchOAuthTokenDB();
+						return $body['access_token'];
+					}
+				}
+				// Proxy refresh failed: a via-partner client has no secret to fall back on, so we stop here.
+				dol_syslog(__METHOD__." refresh via partner proxy failed http_code=".$httpcode, LOG_WARNING, 0, "_einvoicing");
+				$this->errors[] = 'FailedToRefreshAccessTokenViaProxy';
+				return null;
+			}
+
 			$param = array(
 				'grant_type'    => 'refresh_token',
 				'refresh_token' => $this->tokenData['refresh_token'],
