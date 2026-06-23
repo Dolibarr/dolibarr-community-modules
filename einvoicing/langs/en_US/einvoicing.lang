@@ -63,6 +63,7 @@ ChorusId=Transmission Chorus ID
 FxCheckError = FacturX compliance errors or warnings:
 FxCheckErrorAddress = Your company address is empty
 FxCheckErrorCountry = Your company country is empty
+FxCheckErrorVATnumberFormat= Your company VAT number format is invalid (expected format for France: FR + 2 characters + 9 digits).
 FxCheckErrorCustomerAddress = The customer address is empty
 FxCheckErrorCustomerCountry = The customer country is not provided
 FxCheckErrorCustomerIDPROF1 = The customer does not have a pro ID (SIREN)
