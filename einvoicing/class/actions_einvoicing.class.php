@@ -56,24 +56,23 @@ class ActionsEInvoicing extends CommonHookActions
 	/**
 	 * Hook called during HTML <head> generation
 	 *
-	 * @param mixed $parameters
-	 * @param mixed $object
-	 * @param mixed $action
-	 * @param mixed $hookmanager
-	 * @return int
+	 * @param mixed $parameters		Array of parameters
+	 * @param mixed $object			Object invoice
+	 * @param mixed $action			Code action
+	 * @param mixed $hookmanager	Hookmanager
+	 * @return int					Result
 	 */
 	public function addHtmlHeader($parameters, &$object, &$action, $hookmanager): int
 	{
 		global $langs;
 
 		if (in_array('invoicesuppliercard', $hookmanager->contextarray) && $object->status == FactureFournisseur::STATUS_DRAFT) {
-
 			// Translations
 			$supplierPricesTranslations = [
 				'confirm_button_validate' => 'Validate',
 				'confirm_button_cancel' => 'Cancel',
 			];
-			$supplierPricesTranslations = array_map(function($labelId) use($langs) {
+			$supplierPricesTranslations = array_map(function ($labelId) use ($langs) {
 				return html_entity_decode($langs->trans($labelId));
 			}, $supplierPricesTranslations);
 
@@ -375,11 +374,11 @@ class ActionsEInvoicing extends CommonHookActions
 
 	/**
 	 * Hook called before HTML </body> closing markup generation
-	 * @param mixed $parameters
-	 * @param mixed $object
-	 * @param mixed $action
-	 * @param mixed $hookmanager
-	 * @return int
+	 * @param mixed $parameters		Array of parameters
+	 * @param mixed $object			Object invoice
+	 * @param mixed $action			Code action
+	 * @param mixed $hookmanager	Hookmanager
+	 * @return int					Result
 	 */
 	public function beforeBodyClose($parameters, &$object, &$action, $hookmanager): int
 	{
@@ -655,9 +654,9 @@ class ActionsEInvoicing extends CommonHookActions
 				$createInvoiceLinesParams = [];
 				if ($extractionType == 1) {
 					// mode automatic
-				} else if ($extractionType == 2) {
+				} elseif ($extractionType == 2) {
 					$createInvoiceLinesParams['free_lines'] = true;
-				} else if ($extractionType == 3) {
+				} elseif ($extractionType == 3) {
 					$product = new Product($db);
 					$resproduct = $product->fetch((int) $targetFkProduct);
 
