@@ -42,7 +42,7 @@ class SupplierInvoiceHelper
 	 * @param FactureFournisseur $dolSupplierInvoice   The Dolibarr object to compare to e-invoice
 	 *
 	 * @return	array{identical:bool,errors:array}|false
-	*/
+	 */
 	public static function checkDolInvoiceAndEInvoiceConsistency(FactureFournisseur $dolSupplierInvoice)
 	{
 		global $conf, $db, $langs;
@@ -70,7 +70,7 @@ class SupplierInvoiceHelper
 			case 'CII':
 				$parsedHeader = $protocol->parseInvoiceXML($xmlData);
 				break;
-			// Another format can be added here
+				// Another format can be added here
 			default:
 				throw new Exception('Format ' . $detectedProtocolName . ' not available for comparison');
 		}
@@ -131,10 +131,10 @@ class SupplierInvoiceHelper
 						$dolVatBasis   = floatval($dolSupplierInvoiceVatDetails[(string) $taxDetailsByRate['rateApplicablePercent']]['vat_basis_amount']);
 
 						if (!self::areAmountsEqual($dolVatBasis, $taxDetailsByRate['basisAmount'])) {
-							$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonVatBasisDifference',  $taxDetailsByRate['rateApplicablePercent'], $taxDetailsByRate['basisAmount'], $dolVatBasis);
+							$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonVatBasisDifference', $taxDetailsByRate['rateApplicablePercent'], $taxDetailsByRate['basisAmount'], $dolVatBasis);
 						}
 						if (!self::areAmountsEqual($dolVatAmount, $taxDetailsByRate['calculatedAmount'])) {
-							$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonVatRateDifference',  $taxDetailsByRate['rateApplicablePercent'], $taxDetailsByRate['calculatedAmount'], $dolVatAmount);
+							$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonVatRateDifference', $taxDetailsByRate['rateApplicablePercent'], $taxDetailsByRate['calculatedAmount'], $dolVatAmount);
 						}
 					} else {
 						$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonVatRateNotFound', $taxDetailsByRate['rateApplicablePercent']);
@@ -170,7 +170,7 @@ class SupplierInvoiceHelper
 	 * Return VAT details (by VAT rate) from a supplier invoice
 	 *
 	 * @param FactureFournisseur $supplierInvoice The supplier invoice object
-	 * @return array<array|array{vat_amount: int, vat_basis_amount: int>}
+	 * @return array<array{vat_amount: float, vat_basis_amount: float}>
 	 */
 	public static function getVatDetails(FactureFournisseur $supplierInvoice)
 	{

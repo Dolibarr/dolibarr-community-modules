@@ -651,7 +651,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	 * @param array<string, string>         $extraHeaders   Optional additional headers
 	 * @param string|null                   $callType       Functional type of the API call for logging purposes (e.g., 'sync_flows', 'send_invoice')
 	 *
-	 * @return array{status_code:int,response:null|string|array<string,mixed>,?errorCode:string,?errorMessage:string,?id:int,?call_id:string}
+	 * @return array{status_code:int,response:null|string|array<string,mixed>,errorCode?:string,errorMessage?:string,id?:int,call_id?:string}
 	 */
 	public function callApi($resource, $method, $params = false, $extraHeaders = [], $callType = '')
 	{
