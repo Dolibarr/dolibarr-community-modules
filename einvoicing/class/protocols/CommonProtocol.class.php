@@ -1429,9 +1429,10 @@ trait CommonProtocol
 	/**
 	 * Add lines to the supplier invoice from CII xml lines.
 	 *
-	 * @param  FactureFournisseur 			$supplierInvoice        Supplier invoice object
-	 * @param  array				 		$parsedLines        	The list of lines we want to add to the supplier invoice
-	 * @param  int 							$flowId                 Flow identifier source of the invoice.
+	 * @param  FactureFournisseur 									$supplierInvoice        Supplier invoice object
+	 * @param  array				 								$parsedLines        	The list of lines we want to add to the supplier invoice
+	 * @param  int 													$flowId                 Flow identifier source of the invoice.
+	 * @param  array{free_lines:bool,target_fk_product:int}			$params                 Params used in case of manual import
 	 * @return array{res:int, message:string, action:string|null}   Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and an optional 'action'.
 	 */
 	public function createSupplierInvoiceLinesFromSource(&$supplierInvoice, $parsedLines, $flowId = '', $params = []): array

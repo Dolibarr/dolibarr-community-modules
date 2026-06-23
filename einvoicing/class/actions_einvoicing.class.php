@@ -385,7 +385,6 @@ class ActionsEInvoicing extends CommonHookActions
 		global $db, $form, $langs, $user;
 
 		if (in_array('invoicesuppliercard', $hookmanager->contextarray) && $object->status == FactureFournisseur::STATUS_DRAFT && $user->hasRight('facture', 'write')) {
-
 			// Get all products in the default target category (see einvoicing module setup parameters)
 			$categoryId = getDolGlobalInt('EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_CATEGORY_OF_TARGET_IMPORT_PRODUCT_LIST');
 
@@ -431,11 +430,11 @@ class ActionsEInvoicing extends CommonHookActions
 						<label for="extraction-to-product"><input type="radio" name="extraction_type" id="extraction-to-product" value="3">'.$langs->trans('ExtractToAProduct') . (isset($category) ? ' ('.$langs->trans('SupplierInvoiceLinesImportProductsFromCategory'). ' <strong>' . $category->label .'</strong>)' : '');'</label>
 					</div>';
 			print   '<div id="extraction-target-product-choice" style="display: none; margin-top: 0.5rem; margin-left: 2rem;">';
-						if ($categoryId > 0) {
-							print $selectProduct;
-						} else {
-							print '⚠️ ' . $langs->trans('SupplierInvoiceLinesImportPleaseSetDefaultCategoryInSettings') . '<br>';
-						}
+			if ($categoryId > 0) {
+				print $selectProduct;
+			} else {
+				print '⚠️ ' . $langs->trans('SupplierInvoiceLinesImportPleaseSetDefaultCategoryInSettings') . '<br>';
+			}
 			print 	'</div>';
 			print '</form>';
 			print '</div>';
@@ -627,7 +626,6 @@ class ActionsEInvoicing extends CommonHookActions
 
 
 			if ($action == 'reimportLines' && $permissiontoedit && $object->status == FactureFournisseur::STATUS_DRAFT && !SupplierInvoiceHelper::isSupplierImportInvoiceLinesAuto($object->socid)) {
-
 				$xmlData = SupplierInvoiceHelper::getXmlData($object->id);
 
 				dol_include_once('einvoicing/class/protocols/ProtocolManager.class.php');
