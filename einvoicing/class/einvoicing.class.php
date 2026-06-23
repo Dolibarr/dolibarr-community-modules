@@ -1898,12 +1898,12 @@ class EInvoicing
 		global $conf;
 
 		// Default status is unknown until invoice is validated
-		$status = array('code' => self::STATUS_UNKNOWN, 'status' => $this->getStatusLabel(self::STATUS_UNKNOWN), 'info' => '', 'file' => '0', 'transmitted' => 0, 'override_routing_id' => '');
+		$status = array('code' => self::STATUS_UNKNOWN, 'status' => $this->getStatusLabel(self::STATUS_UNKNOWN), 'info' => '', 'file' => '0', 'transmitted' => 0, 'everTransmitted' => 0, 'flow_id' => '', 'override_routing_id' => '');
 
 		$provider = getDolGlobalString('EINVOICING_PDP');
 
 		// Get last status from einvoicing_extlinks table (table contain dolibarr object received or sent to PDP)
-		$sql = "SELECT syncstatus, synccomment, override_routing_id"; // Validation message of einvoice sent.
+		$sql = "SELECT syncstatus, synccomment, flow_id, override_routing_id"; // Validation message of einvoice sent.
 		$sql .= " FROM " . MAIN_DB_PREFIX . "einvoicing_extlinks";
 		$sql .= " WHERE element_type = '" . $this->db->escape('facture') . "'";
 		$sql .= " AND provider = '" . $this->db->escape($provider) . "'";
@@ -1920,12 +1920,19 @@ class EInvoicing
 				$status['code'] = (int) $obj->syncstatus;
 				$status['status'] = $this->getStatusLabel((int) $obj->syncstatus);
 				$status['info'] = $obj->synccomment ?? '';
+				$status['flow_id'] = $obj->flow_id ?? '';
 				$status['override_routing_id'] = $obj->override_routing_id ?? '';
 				if (!in_array((int) $obj->syncstatus, array(self::STATUS_UNKNOWN, self::STATUS_IGNORE, self::STATUS_NOT_GENERATED, self::STATUS_GENERATED))) {
 					$status['transmitted'] = 1;
 				} else {
 					$status['transmitted'] = 0;
 				}
+				// 'transmitted' above reflects the CURRENT Dolibarr syncstatus, which is reset to GENERATED
+				// when the e-invoice is regenerated. 'everTransmitted' reflects the REAL PA state: a flow_id
+				// is assigned (by any provider, via insertOrUpdateExtLink) on the first successful submission
+				// and is never cleared, so it survives a regenerate/re-open and tells us the invoice already
+				// exists at the PA (re-sending it would be refused / would create a duplicate).
+				$status['everTransmitted'] = !empty($obj->flow_id) ? 1 : 0;
 			} else {
 				dol_syslog("No entry found in einvoicing_extlinks table for invoiceRef: " . $invoiceRef);
 			}
@@ -1974,6 +1981,28 @@ class EInvoicing
 		}
 
 		return $status;
+	}
+
+	/**
+	 * Whether an invoice is locked because it was already transmitted to the Access Point.
+	 *
+	 * Based on the REAL PA state (a flow_id was assigned on the first successful submission and is never
+	 * cleared), not on the Dolibarr syncstatus which is reset to GENERATED when the e-invoice is
+	 * regenerated. A transmitted invoice is immutable (you correct it with a credit note / corrective
+	 * invoice), so by default we block re-sending, regenerating and re-editing it. The operator can opt
+	 * out (e.g. to test PA retry behaviour) by setting EINVOICING_ALLOW_RESEND_TRANSMITTED.
+	 *
+	 * @param 	int 	$invoiceId 	Invoice id
+	 * @param 	string 	$invoiceRef Invoice ref (fallback if id is 0)
+	 * @return 	bool 				True if the invoice must be treated as locked (already transmitted).
+	 */
+	public function isTransmittedLockActive($invoiceId = 0, $invoiceRef = '')
+	{
+		if (getDolGlobalString('EINVOICING_ALLOW_RESEND_TRANSMITTED')) {
+			return false;
+		}
+		$status = $this->fetchLastknownInvoiceStatus($invoiceId, $invoiceRef);
+		return !empty($status['everTransmitted']);
 	}
 
 	/**

@@ -360,3 +360,9 @@ IBANForSellerMandatoryOnCreditTransferButNotBankAcount=Le mode de paiement est c
 IBANForSellerMandatoryOnCreditTransferButNotBankAcount2=Définissez un compte bancaire par défaut dans la configuration du module factures OU dans la facture elle-même (et vérifiez que ce compte bancaire possède un numéro IBAN).
 IBANForSellerMandatoryOnCreditTransferButNotBAN=Le mode de paiement est configuré sur virement bancaire, mais le compte bancaire par défaut sélectionné ne possède pas de numéro IBAN.
 IBANForSellerMandatoryOnCreditTransferButNotBAN2=Renseignez un numéro IBAN sur le compte bancaire.
+# Verrouillage d'une facture déjà transmise
+EInvoiceAlreadyTransmittedLocked=Cette facture a déjà été transmise à la plateforme (flux %s). Une facture transmise est immuable : émettez un avoir ou une facture rectificative pour la corriger. Vous pouvez activer le renvoi dans la configuration du module pour tester le comportement de renvoi de la plateforme.
+EINVOICING_ALLOW_RESEND_TRANSMITTED=Autoriser le renvoi d'une facture déjà transmise
+EINVOICING_ALLOW_RESEND_TRANSMITTED_HELP=Désactivé par défaut. Une facture transmise est immuable ; corrigez-la par un avoir ou une facture rectificative. À activer uniquement pour tester volontairement le renvoi vers la plateforme (le renvoi sera refusé comme doublon).
+EINVOICING_ENABLE_DEV_CII_REGEN=Autoriser la régénération de la facture électronique d'une facture transmise (dev)
+EINVOICING_ENABLE_DEV_CII_REGEN_HELP=Désactivé par défaut. Dev/inspection uniquement : conserve le bouton et l'action « Régénérer la facture électronique » sur une facture transmise afin de reconstruire le CII/Factur-X et d'en inspecter le XML. Le renvoi reste verrouillé.
