@@ -366,3 +366,4 @@ EINVOICING_ALLOW_RESEND_TRANSMITTED=Autoriser le renvoi d'une facture déjà tra
 EINVOICING_ALLOW_RESEND_TRANSMITTED_HELP=Désactivé par défaut. Une facture transmise est immuable ; corrigez-la par un avoir ou une facture rectificative. À activer uniquement pour tester volontairement le renvoi vers la plateforme (le renvoi sera refusé comme doublon).
 EINVOICING_ENABLE_DEV_CII_REGEN=Autoriser la régénération de la facture électronique d'une facture transmise (dev)
 EINVOICING_ENABLE_DEV_CII_REGEN_HELP=Désactivé par défaut. Dev/inspection uniquement : conserve le bouton et l'action « Régénérer la facture électronique » sur une facture transmise afin de reconstruire le CII/Factur-X et d'en inspecter le XML. Le renvoi reste verrouillé.
+EInvoiceTransmittedModifyDisabled=Cette facture a été transmise à la plateforme et n'est plus modifiable. Émettez un avoir ou une facture rectificative pour la corriger.

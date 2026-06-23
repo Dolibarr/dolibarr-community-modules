@@ -302,6 +302,19 @@ class ActionsEInvoicing extends CommonHookActions
 						print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true);
 					}
 				}
+
+				// Once transmitted to the PA, the invoice is immutable. The BILL_UNVALIDATE / BILL_MODIFY
+				// triggers already refuse the change server-side, but the core "Modify" (re-open) button
+				// stays clickable and would just throw an error. There is no clean hook to remove a single
+				// core button, so neutralize it client-side (disable + tooltip) for a clear UX. The trigger
+				// remains the real enforcement (defense in depth). Honors EINVOICING_ALLOW_RESEND_TRANSMITTED.
+				if ($locked && (empty($parameters['context']) || !preg_match('/takepospay/', $parameters['context']))) {
+					print "\n<!-- einvoicing: lock core Modify button (transmitted invoice) -->\n";
+					// Match by href (action=modif) so it works regardless of the button class / Dolibarr
+					// version (top-level butAction or v22+ dropdown item).
+					$jsmsg = json_encode($langs->trans('EInvoiceTransmittedModifyDisabled'));
+					print '<script>jQuery(function($){var t=' . $jsmsg . ';$("div.tabsAction a[href*=\'action=modif\']").each(function(){$(this).removeClass("butAction").addClass("butActionRefused").removeAttr("href").css("cursor","not-allowed").attr("title",t).on("click",function(e){e.preventDefault();e.stopImmediatePropagation();return false;});});});</script>';
+				}
 			}
 		}
 
