@@ -7,3 +7,13 @@ UPDATE llx_einvoicing_document SET fk_element_type = 'invoice_supplier' WHERE fk
 
 UPDATE llx_einvoicing_extlinks SET element_type = 'facture' WHERE element_type = 'Facture';
 UPDATE llx_einvoicing_extlinks SET element_type = 'invoice_supplier' WHERE element_type = 'FactureFournisseur';
+
+-- Issue #259: llx_einvoicing_call.entity was created as varchar(50) but is queried as an integer
+-- (WHERE entity IN (n)), which breaks on PostgreSQL. Normalize it to integer like
+-- llx_einvoicing_document.entity. Done in place to preserve existing data and indexes.
+-- One of the two statements below applies per database driver, the other is a harmless no-op:
+--   - MySQL/MariaDB accept the plain MODIFY and cast varchar -> int implicitly.
+--   - PostgreSQL (via Dolibarr's SQL converter) needs the explicit USING cast.
+ALTER TABLE llx_einvoicing_call MODIFY COLUMN entity integer DEFAULT 1;
+ALTER TABLE llx_einvoicing_call MODIFY COLUMN entity integer USING (entity::integer);
+ALTER TABLE llx_einvoicing_call ALTER COLUMN entity SET DEFAULT 1;

@@ -34,6 +34,6 @@ CREATE TABLE llx_einvoicing_call(
 	response text, 
 	processing_result text, 
 	provider varchar(50) NOT NULL, 
-	entity varchar(50) DEFAULT 1
+	entity integer DEFAULT 1
 	-- END MODULEBUILDER FIELDS
 ) ENGINE=innodb;
