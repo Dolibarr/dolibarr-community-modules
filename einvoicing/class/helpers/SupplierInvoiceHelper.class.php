@@ -4,6 +4,7 @@ use horstoeko\zugferd\ZugferdDocumentPdfReaderExt;
 
 dol_include_once('einvoicing/class/protocols/ProtocolManager.class.php');
 dol_include_once('einvoicing/class/document.class.php');
+dol_include_once('fourn/class/fournisseur.facture.class.php');
 
 /**
  * \file    einvoicing/class/helpers/SupplierInvoiceHelper.class.php
@@ -252,10 +253,11 @@ class SupplierInvoiceHelper
 	 * Allow to known if a supplier invoice is an e-invoice or not
 	 *
 	 * @param int $supplierInvoiceId The id of the supplier invoice
+	 * @param bool $checkLinkedDolObjectExistance Also check if linked Dol object really exists or not
 	 * @throws Exception
 	 * @return bool
 	 */
-	public static function isEInvoice(int $supplierInvoiceId): bool
+	public static function isEInvoice(int $supplierInvoiceId, bool $checkLinkedDolObjectExistance = false): bool
 	{
 		global $db;
 
@@ -267,7 +269,10 @@ class SupplierInvoiceHelper
 		$resql = $db->query($sql);
 		if ($resql) {
 			if ($db->num_rows($resql) == 1) {
-				return true;
+				$factureFournisseur = new FactureFournisseur($db);
+				if ($checkLinkedDolObjectExistance && $factureFournisseur->fetch((int) $supplierInvoiceId) > 0) {
+					return true;
+				}
 			} elseif ($db->num_rows($resql) > 1) {
 				throw new Exception('Duplicate entry in einvoicing_document for supplier invoice with id '.$supplierInvoiceId);
 			}

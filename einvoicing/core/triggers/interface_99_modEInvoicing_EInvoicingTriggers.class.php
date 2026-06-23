@@ -238,6 +238,14 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			}
 		}
 
+		// EINVOICING DOCUMENTS
+		if ($action == 'DOCUMENT_DELETE') {
+			if ($object->fk_element_type == 'invoice_supplier' && SupplierInvoiceHelper::isEInvoice($object->fk_element_id, true)) {
+				$this->errors[] = $langs->trans('EinvoicingCantDeleteADocumentLinkedToAnExistingSupplierInvoice', $object->id, $object->fk_element_id);
+				return -1;
+			}
+		}
+
 		return 0;
 	}
 }
