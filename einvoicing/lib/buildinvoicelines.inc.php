@@ -697,6 +697,43 @@ if ($object->mode_reglement_code) {
 }
 
 
+// Delivery address (CII ShipToTradeParty / BG-15)
+// If an external "SHIPPING" contact is attached to the invoice, expose its address so the CII
+// builder can emit a dedicated deliver-to party. The builder (ShipToTradePartyBuilder::build)
+// only emits it when the shipping address actually differs from the buyer (bill-to) address and
+// carries a country code; otherwise it falls back to the buyer party. No SHIPPING contact => keys
+// stay unset => current behaviour (ship-to = buyer) is preserved.
+if (method_exists($object, 'liste_contact')) {
+	$shipContacts = $object->liste_contact(-1, 'external', 0, 'SHIPPING');
+	if (is_array($shipContacts) && count($shipContacts) > 0) {
+		if (count($shipContacts) > 1) {
+			dol_syslog('einvoicing: invoice ' . $object->id . ' has ' . count($shipContacts) . ' external SHIPPING contacts; using the first (contact id ' . $shipContacts[0]['id'] . ')', LOG_WARNING);
+		}
+		require_once DOL_DOCUMENT_ROOT . '/contact/class/contact.class.php';
+		$shipContact = new Contact($db);
+		if ($shipContact->fetch($shipContacts[0]['id']) > 0) {
+			$shipName = trim($shipContact->getFullName($outputlangs));
+			if ($shipName === '') {
+				$shipName = $object->thirdparty->name;
+			}
+			$invoiceData['_shipFromContactBill'] = array(
+				'address' => $object->thirdparty->address,
+				'zip'     => $object->thirdparty->zip,
+				'town'    => $object->thirdparty->town,
+				'country' => $object->thirdparty->country_code,
+			);
+			$invoiceData['_shipFromContactShip'] = array(
+				'name'    => $shipName,
+				'address' => $shipContact->address,
+				'zip'     => $shipContact->zip,
+				'town'    => $shipContact->town,
+				'country' => $shipContact->country_code,
+			);
+		}
+	}
+}
+
+
 // Section to control data and throw errors in case of problem, to avoid generating non compliant XML
 // --------------------------------------------------------------------------------------------------
 if (empty($idprof)) {

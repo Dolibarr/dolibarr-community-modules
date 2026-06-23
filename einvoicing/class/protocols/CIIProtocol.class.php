@@ -35,6 +35,7 @@ require_once DOL_DOCUMENT_ROOT . '/core/lib/files.lib.php';
 
 dol_include_once('einvoicing/class/protocols/AbstractProtocol.class.php');
 dol_include_once('einvoicing/class/protocols/CommonProtocol.class.php');
+dol_include_once('einvoicing/class/protocols/ShipToTradePartyBuilder.class.php');
 dol_include_once('einvoicing/class/einvoicing.class.php');
 dol_include_once('einvoicing/class/utils/XmlPatcher.class.php');
 dol_include_once('einvoicing/lib/einvoicing.lib.php');
@@ -1493,9 +1494,24 @@ class CIIProtocol extends AbstractProtocol
 		// Add the ship to trade party (mandatory when using intracommunity delivery)
 		// ShipToTradeParty is itself a TradePartyType — populate it directly without
 		// wrapping it in another BuyerTradeParty (which would break XSD validation).
-		$shiptotrade = $doc->createElement('ram:ShipToTradeParty');
-		$delivery->appendChild($shiptotrade);
-		$this->buildParty($doc, $shiptotrade, $invoiceData, 'buyer', false);
+		// When an external SHIPPING contact with a distinct address is attached to the invoice
+		// (keys filled by buildinvoicelines.inc.php), emit a dedicated deliver-to party (BG-15);
+		// otherwise fall back to the buyer party so the node stays present (upstream behaviour).
+		$shiptotrade = null;
+		if (!empty($invoiceData['_shipFromContactShip'])) {
+			$shiptotrade = ShipToTradePartyBuilder::build(
+				$doc,
+				$invoiceData['_shipFromContactBill'] ?? array(),
+				$invoiceData['_shipFromContactShip']
+			);
+		}
+		if ($shiptotrade !== null) {
+			$delivery->appendChild($shiptotrade);
+		} else {
+			$shiptotrade = $doc->createElement('ram:ShipToTradeParty');
+			$delivery->appendChild($shiptotrade);
+			$this->buildParty($doc, $shiptotrade, $invoiceData, 'buyer', false);
+		}
 
 
 		if (!empty($invoiceData['documentDeliveryDate'])) {
