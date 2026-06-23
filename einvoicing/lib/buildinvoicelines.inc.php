@@ -230,9 +230,9 @@ $numligne          	= 1;
 foreach ($object->lines as $line) {
 	$isDepositLine = 0;
 
-	// Skip subtotal lines
-	$isSubTotalLine = $this->_isLineFromExternalModule($line, $object->element, 'modSubtotal');
-	if ($isSubTotalLine) {
+	// Skip title / subtotal / page-break lines (product type 9). These are not real invoice lines and carry no VAT,
+	// so they must not be sent to getCategoryRate() (would trigger a VATEX exemption error on rate 0 / no code).
+	if ((int) $line->product_type == 9) {
 		continue;
 	}
 
