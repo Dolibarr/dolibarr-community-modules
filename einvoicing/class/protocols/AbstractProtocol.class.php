@@ -64,6 +64,16 @@ abstract class AbstractProtocol
 	abstract public function createSupplierInvoiceFromSource($file, $ReadableViewFile = null, $flowId = '');
 
 	/**
+	 * Add lines to a supplier invoice from e-invoice parsed lines
+	 * @param FactureFournisseur $supplierInvoice
+	 * @param array $parsedLines
+	 * @param string $flowId
+	 * @param array $params
+	 * @return array
+	 */
+	abstract public function createSupplierInvoiceLinesFromSource(&$supplierInvoice, $parsedLines, $flowId = '', $params = []): array;
+
+	/**
 	 * Generate a sample invoice for testing or demonstration purposes (for Dolibarr version < 24.0)
 	 *
 	 * Each protocol should provide a representative sample
@@ -91,6 +101,22 @@ abstract class AbstractProtocol
 	 * @return 	-1|array<string,string>							Path or content of the generated sample invoice.
 	 */
 	abstract public function generateSampleInvoice($einvoicing, $thirdpartySeller = null, $thirdpartyBuyer = null, $options = array());
+
+	/**
+	 * Parse the invoice header from input content.
+	 *
+	 * @param  string $rawContent Raw XML content
+	 * @return array<string,mixed>
+	 */
+	abstract public function parseInvoiceHeader(string $rawContent);
+
+	/**
+	 * Parse all invoice line items from input content.
+	 *
+	 * @param  string $rawContent Raw content
+	 * @return array<int,array<string,mixed>>
+	 */
+	abstract public function parseInvoiceLines(string $rawContent);
 
 	/**
 	 * Remove attachment nodes to get a smaller XML

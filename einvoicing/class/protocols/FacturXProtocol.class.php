@@ -968,7 +968,7 @@ class FacturXProtocol extends AbstractProtocol
 			$ProtocolManager = new ProtocolManager($db);
 			$CII = $ProtocolManager->getProtocol('CII');
 
-			$parsedHeader = $CII->parseInvoiceXML($embeddedXml);
+			$parsedHeader = $CII->parseInvoiceHeader($embeddedXml);
 			$parsedLines  = $CII->parseInvoiceLines($embeddedXml);
 		} else {
 			$document->getDocumentInformation($documentno, $documenttypecode, $documentdate, $invoiceCurrency, $taxCurrency, $documentname, $documentlanguage, $effectiveSpecifiedPeriod);
@@ -1223,179 +1223,6 @@ class FacturXProtocol extends AbstractProtocol
 
 		$remise_already_used_line_level_ids = array();
 
-		// Add invoice lines
-		foreach ($parsedLines as $parsedLine) {
-			// Add supplier ID to line for later use in product sync
-			$parsedLine['supplierId'] = $socId;
-
-			$is_deposit_line = 0;
-			$fk_remise = 0;
-			// --------------------------------------------------
-			// Loop on linked documents at line level
-			// --------------------------------------------------
-			if (!empty($parsedLine['additionalRefDocs']) && is_array($parsedLine['additionalRefDocs'])) {
-				foreach ($parsedLine['additionalRefDocs'] as $refDoc) {
-					$lineRefDocId = $refDoc['IssuerAssignedID'] ?? null;
-					$lineRefDocType = $refDoc['typeCode'] ?? null;
-					$lineRefDocDate = $refDoc['issueDate'] ?? null;
-
-					$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "facture_fourn WHERE ref_supplier = '" . $db->escape($lineRefDocId) . "' LIMIT 1";
-					$resql = $db->query($sql);
-					if ($db->num_rows($resql) != 1) {
-						return [
-							'res' => -1,
-							'message' => 'Document "' . $lineRefDocId . '" linked to line ' . $parsedLine['lineid'] . ' was not found in Dolibarr. Please verify why this document is missing (deleted, not imported, or not provided by the supplier). To resolve this issue, you must manually create the invoice using the supplier invoice reference "' . $lineRefDocId . '".'
-						];
-						// TODO: Add a check before sending a final invoice after deposit to ensure that the deposit invoice has been properly sent to the PDP and successfully received.
-					}
-
-					// Load linked supplier invoice
-					$linkedObject = new FactureFournisseur($db);
-					$linkedObjectId = $db->fetch_object($resql)->rowid;
-					$resFetchLinkedObject = $linkedObject->fetch($linkedObjectId);
-					if ($resFetchLinkedObject > 0) {
-						/*
-						* --------------------------------------------------
-						* Deposit handling
-						* --------------------------------------------------
-						* Deposits may be referenced:
-						*  - at document level
-						*  - at line level
-						*
-						* If the deposit is referenced at line level:
-						*   → we create the discount before creating the invoice line,
-						*     so it can be linked later.
-						*
-						* If the same deposit appears both at line and document level:
-						*    line-level handling takes priority to avoid duplicates.
-						*
-						* If the deposit exists only at document level:
-						*   → a discount line will be created later after all invoice
-						*     lines are generated.
-						*/
-						if ($linkedObject->type == FactureFournisseur::TYPE_DEPOSIT) {
-							$is_deposit_line = 1;
-
-							// Check if deposit line is already converted to a reduction otherwise we convert it
-							//require_once DOL_DOCUMENT_ROOT.'/core/class/discount.class.php';
-							$discountcheck = new DiscountAbsolute($db);
-							$result = $discountcheck->fetch(0, 0, $linkedObject->id);
-							if ($result <= 0) {
-								// Loop on each vat rate
-								$amount_ht = $amount_tva = $amount_ttc = array();
-								$multicurrency_amount_ht = $multicurrency_amount_tva = $multicurrency_amount_ttc = array();
-								$i = 0;
-								foreach ($linkedObject->lines as $line) {
-									if ($line->product_type < 9 && $line->total_ht != 0) { // Remove lines with product_type greater than or equal to 9 and no need to create discount if amount is null
-										$keyforvatrate = $line->tva_tx . ($line->vat_src_code ? ' (' . $line->vat_src_code . ')' : '');
-
-										$amount_ht[$keyforvatrate] += $line->total_ht;
-										$amount_tva[$keyforvatrate] += $line->total_tva;
-										$amount_ttc[$keyforvatrate] += $line->total_ttc;
-										$multicurrency_amount_ht[$keyforvatrate] += $line->multicurrency_total_ht;
-										$multicurrency_amount_tva[$keyforvatrate] += $line->multicurrency_total_tva;
-										$multicurrency_amount_ttc[$keyforvatrate] += $line->multicurrency_total_ttc;
-										$i++;
-									}
-								}
-
-								$discount = new DiscountAbsolute($db);
-								$discount->description = '(DEPOSIT)';
-								$discount->discount_type = 1; // Supplier discount
-								$discount->fk_soc = $linkedObject->socid;
-								$discount->socid = $linkedObject->socid;
-								$discount->fk_invoice_supplier_source = $linkedObject->id;
-								foreach ($amount_ht as $tva_tx => $xxx) {
-									$discount->amount_ht = abs((float) $amount_ht[$tva_tx]);
-									$discount->amount_tva = abs((float) $amount_tva[$tva_tx]);
-									$discount->amount_ttc = abs((float) $amount_ttc[$tva_tx]);
-									$discount->multicurrency_amount_ht = abs((float) $multicurrency_amount_ht[$tva_tx]);
-									$discount->multicurrency_amount_tva = abs((float) $multicurrency_amount_tva[$tva_tx]);
-									$discount->multicurrency_amount_ttc = abs((float) $multicurrency_amount_ttc[$tva_tx]);
-
-									// Clean vat code
-									$reg = array();
-									$vat_src_code = '';
-									if (preg_match('/\((.*)\)/', $tva_tx, $reg)) {
-										$vat_src_code = $reg[1];
-										$tva_tx = preg_replace('/\s*\(.*\)/', '', $tva_tx); // Remove code into vatrate.
-									}
-
-									$discount->tva_tx = abs((float) $tva_tx);
-									$discount->vat_src_code = $vat_src_code;
-
-									$result = $discount->create($user);
-									if ($result < 0) {
-										return ['res' => -1, 'message' => 'Failed to create discount for deposit line: ' . $discount->error];
-										break;
-									}
-									$fk_remise = $result;
-								}
-							} else {
-								// Deposit already converted so reuse existing discount
-								$is_deposit_line = 1;
-								$fk_remise = $discountcheck->id;
-							}
-						}
-
-						/*
-						* --------------------------------------------------
-						* Other linked document types
-						* --------------------------------------------------
-						* Additional logic may be added here for other
-						* document types such as credit notes, etc.
-						*/
-					} else {
-						return ['res' => -1, 'message' => 'Document : ' . $lineRefDocId . ' linked to line ' . $parsedLine['lineid'] . ' not found in Dolibarr'];
-					}
-				}
-			}
-
-			$productId = 0;
-			if (!$is_deposit_line) {
-				// Sync or create product
-				$res = $this->_findOrCreateProductFromEinvoiceLine($parsedLine, $flowId);
-				$return_messages[] = $res['message'];
-				if ($res['res'] < 0) {
-					return [
-						'res' => -1,
-						'message' => 'Product sync or creation error: ' . implode("<br>\n", $return_messages),
-						'actioncode' => $res['actioncode'] ?? '',
-						'actionurl' => $res['actionurl'] ?? '',
-						'action' => $res['action'] ?? null,
-						'actiondata' => $res['actiondata'] ?? ''
-					];
-				}
-				$productId = $res['res'];
-			}
-
-
-			// Add line to invoice
-			$line = new SupplierInvoiceLine($db);
-			//$line->desc = $prodname . (!empty($proddesc) ? "\n" . $proddesc : '');
-			if (!empty($productId)) {
-				$line->fk_product = $productId;
-			}
-			if ($is_deposit_line && !empty($fk_remise)) {
-				$line->fk_remise_except = $fk_remise;
-				$line->info_bits = 2;
-				$line->desc = '(DEPOSIT)';
-				$line->rang = -1;
-
-				$remise_already_used_line_level_ids[] = $fk_remise;
-			}
-			$line->qty = $parsedLine['billedquantity'];
-			$line->subprice = $parsedLine['netpriceamount'];
-			$line->tva_tx = $parsedLine['rateApplicablePercent'];
-			$line->total_ht = $parsedLine['lineTotalAmount'];
-			$line->total_tva = $parsedLine['calculatedAmount'] ?? 0;
-			$line->total_ttc = $parsedLine['lineTotalAmount'] + ($parsedLine['calculatedAmount'] ?? 0);
-
-			$supplierInvoice->lines[] = $line;
-		}
-
-		//return ['res' => 1, 'message' => 'Not implemented yet' ];
-
 		// Set invoice totals
 		$supplierInvoice->total_ht = $parsedHeader['taxBasisTotalAmount'] ?? 0;
 		$supplierInvoice->total_tva = $parsedHeader['taxTotalAmount'] ?? 0;
@@ -1412,6 +1239,17 @@ class FacturXProtocol extends AbstractProtocol
 		if ($supplierInvoiceId < 0) {
 			return ['res' => -1, 'message' => 'Invoice creation error: ' . $supplierInvoice->error];
 		} else {
+			// --------------------------------------------------
+			// Add supplier invoice lines
+			// --------------------------------------------------
+
+			if (SupplierInvoiceHelper::isSupplierImportInvoiceLinesAuto($socId)) {
+				$res = $this->createSupplierInvoiceLinesFromSource($supplierInvoice, $parsedLines, $flowId);
+				if ($res['res'] < 0) {
+					return $res;
+				}
+			}
+
 			$create_deposit_line = 0;
 			$fk_remise_for_deposit = 0;
 			// --------------------------------------------------
@@ -1576,7 +1414,6 @@ class FacturXProtocol extends AbstractProtocol
 			return ['res' => $supplierInvoiceId, 'message' => implode("\n", $return_messages), 'xml_data' => $embeddedXml];
 		}
 	}
-
 
 	/**
 	 * Determines the delivery dates and the corresponding order numbers within two arrays

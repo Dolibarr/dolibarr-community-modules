@@ -58,22 +58,17 @@ class SupplierInvoiceHelper
 		}
 
 		// Detect protocol
-		$protocolManager = new ProtocolManager($db);
-		$detectedProtocolName = $protocolManager->detectProtocolFromContent($xmlData);
-		if (!isset($detectedProtocolName)) {
-			return false;
+		$protocol = ProtocolManager::getProtocolFromContent($xmlData);
+		if (!isset($protocol)) {
+			$errors[] = $langs->trans('EinvoiceFailedToDetectXmlFormat');
+			return [
+				'identical' => false,
+				'errors' => $errors,
+			];
 		}
-		$protocol = $protocolManager->getProtocol($detectedProtocolName);
 
 		// Extract XML header data
-		switch ($detectedProtocolName) {
-			case 'CII':
-				$parsedHeader = $protocol->parseInvoiceXML($xmlData);
-				break;
-			// Another format can be added here
-			default:
-				throw new Exception('Format ' . $detectedProtocolName . ' not available for comparison');
-		}
+		$parsedHeader = $protocol->parseInvoiceHeader($xmlData);
 
 		// Currency
 		$currencyCode = $dolSupplierInvoice->multicurrency_code ?? $conf->currency;
@@ -272,6 +267,31 @@ class SupplierInvoiceHelper
 				throw new Exception('Duplicate entry in einvoicing_document for supplier invoice with id '.$supplierInvoiceId);
 			}
 		}
+		return false;
+	}
+
+	/**
+	 * Indicates if the type of import for supplier invoice lines is auto or not :
+	 * - first try to get import type from societe
+	 * - if not set, then use default module parameter
+	 * @param int $socId
+	 * @return bool
+	 */
+	public static function isSupplierImportInvoiceLinesAuto($socId)
+	{
+		global $db;
+
+		$soc = new Societe($db);
+
+		if ($socId > 0) {
+			$res = $soc->fetch($socId);
+			if ($res > 0 && isset($soc->array_options['options_einvoicing_supplier_invoice_lines_import_type']) && $soc->array_options['options_einvoicing_supplier_invoice_lines_import_type'] > 0) {
+				return $soc->array_options['options_einvoicing_supplier_invoice_lines_import_type'] == Einvoicing::SUPPLIER_INVOICE_LINES_IMPORT_AUTO;
+			} else {
+				return getDolGlobalInt('EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_TYPE') == Einvoicing::SUPPLIER_INVOICE_LINES_IMPORT_AUTO;
+			}
+		}
+
 		return false;
 	}
 }

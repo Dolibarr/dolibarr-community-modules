@@ -97,6 +97,25 @@ function einvoicingAdminPrepareHead()
 }
 
 /**
+ * Methode to get einvoicing module version directly from main module class.
+ *
+ * @return string
+ */
+function einvoicingGetModuleVersion(): string
+{
+	static $version = null;
+
+	if (isset($version)) {
+		return $version;
+	} else {
+		global $db;
+		require_once DOL_DOCUMENT_ROOT . '/custom/einvoicing/core/modules/modEInvoicing.class.php';
+		$mod = new modEinvoicing($db);
+		return $mod->version;
+	}
+}
+
+/**
  * Show a warning if setup not correct.
  *
  * @param 	EInvoicing $einvoicing	Object EInvoicing

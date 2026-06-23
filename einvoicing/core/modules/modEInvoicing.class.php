@@ -118,7 +118,9 @@ class modEInvoicing extends DolibarrModules
 			// Set here all hooks context managed by module. To find available hook context, make a "grep -r '>initHooks(' *" on source code. You can also set hook context to 'all'
 			/* BEGIN MODULEBUILDER HOOKSCONTEXTS */
 			'hooks' => [
-				'all', 'invoicecard'
+				'all',
+				'invoicecard',
+				'invoicesuppliercard',
 			],
 			/* END MODULEBUILDER HOOKSCONTEXTS */
 			// Set this to 1 if features of module are opened to external users
@@ -599,6 +601,10 @@ class modEInvoicing extends DolibarrModules
 		// 	0,
 		// 	1
 		// );
+
+		// Societe extrafields
+		// Use a <select> to have the default null value (falling back to default supplier invoice import type parameter set in the module settings)
+		$result = $extrafields->addExtraField('einvoicing_supplier_invoice_lines_import_type', $langs->trans('SupplierInvoiceLinesImportType'), 'select', 150, 255, 'societe', 0, 0, null, 'a:1:{s:7:"options";a:2:{i:1;s:11:"automatique";i:2;s:6:"manuel";}}', 1, '', 1, 0, '', '', 'einvoicing@einvoicing', 1, 0, 0);
 
 		// Invoice extrafields
 		// Chorus fields

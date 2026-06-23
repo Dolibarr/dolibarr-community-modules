@@ -269,6 +269,15 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
 	$item->fieldAttr['placeholder'] = $langs->transnoentities('Hours');
 	$item->cssClass = 'maxwidth100';
 
+	$item = $formSetup->newItem('EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_TYPE');
+	$item->setAsSelect([
+		1 => $langs->trans('EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_TYPE1'),
+		2 => $langs->trans('EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_TYPE2'),
+	]);
+
+	$item = $formSetup->newItem('EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_CATEGORY_OF_TARGET_IMPORT_PRODUCT_LIST');
+	$item->setAsCategory('product');
+
 	$item = $formSetup->newItem('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION');
 	$item->helpText = $langs->transnoentities('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION_HELP');
 	$item->setAsYesNo();

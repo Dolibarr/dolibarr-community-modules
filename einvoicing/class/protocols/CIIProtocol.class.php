@@ -471,7 +471,7 @@ class CIIProtocol extends AbstractProtocol
 
 
 		// Read using native parser
-		$parsedHeader = $this->parseInvoiceXML($file);
+		$parsedHeader = $this->parseInvoiceHeader($file);
 		$parsedLines = $this->parseInvoiceLines($file);
 
 		// Check if this invoice has already been imported
@@ -691,7 +691,7 @@ class CIIProtocol extends AbstractProtocol
 				if ($res['res'] < 0) {
 					return [
 						'res' => -1,
-						'message' => 'Product sync or creation error: ' . implode("<br>\n", $return_messages),
+						'message' => $langs->trans('ErrorProductSyncOrCreationFailed') . implode("<br>\n", $return_messages),
 						'actioncode' => $res['actioncode'] ?? '',
 						'actionurl' => $res['actionurl'] ?? '',
 						'action' => $res['action'] ?? null,
@@ -942,11 +942,6 @@ class CIIProtocol extends AbstractProtocol
 		}
 	}
 
-
-
-
-
-
 	/* =====================================================================================
 	 XML parsing methods
 	======================================================================================== */
@@ -1093,129 +1088,6 @@ class CIIProtocol extends AbstractProtocol
 			return null;
 		$v = str_replace(',', '.', trim($v));
 		return is_numeric($v) ? (float) $v : null;
-	}
-
-
-	/**
-	 * Parse the invoice header from CII XML.
-	 *
-	 * Special prefixes in $invoiceTemplate:
-	 *   '__MULTI__<xpath>'     → returns array of child node data
-	 *   '__ATTRPAIRS__<xpath>' → returns ['schemeID' => 'value', …]
-	 *
-	 * @param  string $xml Raw XML content
-	 * @return array<string,mixed>
-	 */
-	public function parseInvoiceXML($xml)
-	{
-		list(, $xpath) = $this->initXPath($xml);
-
-		$data = [];
-
-		foreach ($this->invoiceTemplate as $key => $expr) {
-			// Skip PHP-native placeholders
-			if (is_array($expr) || $expr === false || $expr === null) {
-				$data[$key] = is_array($expr) ? [] : $expr;
-				continue;
-			}
-
-			// Multi-value nodes
-			if (strpos($expr, '__MULTI__') === 0) {
-				$realExpr = substr($expr, strlen('__MULTI__'));
-				$data[$key] = $this->parseMultiNodes($xpath, $realExpr, $key);
-				continue;
-			}
-
-			// Attribute-keyed pairs
-			if (strpos($expr, '__ATTRPAIRS__') === 0) {
-				$realExpr = substr($expr, strlen('__ATTRPAIRS__'));
-				$data[$key] = $this->getXPathAttrPairs($xpath, $realExpr);
-				continue;
-			}
-
-			// Scalar values (including /@attr)
-			$data[$key] = $this->getXPathValue($xpath, $expr);
-		}
-
-		// Type normalisation
-		foreach (['documentdate', 'documentDeliveryDate', 'invoicingPeriodStart', 'invoicingPeriodEnd', 'paymentDueDate'] as $f) {
-			if (isset($data[$f]))
-				$data[$f] = $this->normDate($data[$f]);
-		}
-		foreach (['grandTotalAmount', 'duePayableAmount', 'lineTotalAmount', 'chargeTotalAmount', 'allowanceTotalAmount', 'taxBasisTotalAmount', 'taxTotalAmount', 'roundingAmount', 'totalPrepaidAmount'] as $f) {
-			if (isset($data[$f]))
-				$data[$f] = $this->toFloat($data[$f]);
-		}
-
-		return $data;
-	}
-
-	/**
-	 * Parse all invoice line items from CII XML.
-	 *
-	 * @param  string $xml Raw XML content
-	 * @return array<int,array<string,mixed>>
-	 */
-	public function parseInvoiceLines($xml)
-	{
-		list(, $xpath) = $this->initXPath($xml);
-
-		// Grab header documentno once so we can fill parentDocumentNo on each line
-		$parentDocNo = $this->getXPathValue(
-			$xpath,
-			'/rsm:CrossIndustryInvoice/rsm:ExchangedDocument/ram:ID'
-		);
-
-		$lines = [];
-		$nodes = $xpath->query('//ram:IncludedSupplyChainTradeLineItem');
-
-		foreach ($nodes as $node) {
-			$line = [];
-
-			foreach ($this->lineTemplate as $key => $expr) {
-				// PHP-native placeholders
-				if (is_array($expr) || $expr === false) {
-					$line[$key] = is_array($expr) ? [] : $expr;
-					continue;
-				}
-				if ($key === 'parentDocumentNo') {
-					$line[$key] = $parentDocNo;
-					continue;
-				}
-				if ($key === 'is_deposit') {
-					$line[$key] = 0;
-					continue;
-				}
-				if ($key === 'fk_remise') {
-					$line[$key] = null;
-					continue;
-				}
-
-				// Multi-value at line level
-				if (is_string($expr) && strpos($expr, '__MULTI__') === 0) {
-					$realExpr = substr($expr, strlen('__MULTI__'));
-					$line[$key] = $this->parseMultiNodes($xpath, $realExpr, $key, $node);
-					continue;
-				}
-
-				$line[$key] = $this->getXPathValue($xpath, $expr, $node);
-			}
-
-			// Type normalisation
-			foreach (['linePeriodStart', 'linePeriodEnd'] as $f) {
-				if (isset($line[$f]))
-					$line[$f] = $this->normDate($line[$f]);
-			}
-			foreach (['grosspriceamount', 'grosspricebasisquantity', 'netpriceamount', 'netpricebasisquantity', 'billedquantity', 'chargeFreeQuantity', 'packageQuantity', 'lineTotalAmount', 'totalAllowanceChargeAmount', 'rateApplicablePercent', 'calculatedAmount'] as $f) {
-				if (isset($line[$f]))
-					$line[$f] = $this->toFloat($line[$f]);
-			}
-			$line['isDepositLine'] = (bool) ($line['isDepositLine'] ?? false);
-
-			$lines[] = $line;
-		}
-
-		return $lines;
 	}
 
 	/**
@@ -2355,37 +2227,5 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		return $result;
-	}
-
-	/**
-	 * Remove attachment nodes to get a smaller XML
-	 * @param string $xmlData The XML data to process
-	 * @return string Cleaned XML
-	 */
-	public static function removeAttachmentFromXml(string $xmlData): string
-	{
-		$xmlDoc = new DOMDocument();
-		if (!$xmlDoc->loadXML($xmlData)) {
-			throw new Exception(__METHOD__ . " : failed to load XML data");
-		}
-
-		// Remove AttachedDocument nodes
-		$xpath = new DOMXPath($xmlDoc);
-		// Voluntary use non namespace specific path (to not have to manage different CII namespaces)
-		$attachedDocumentNodes = $xpath->query('//*[local-name()="AdditionalReferencedDocument"]/*[local-name()="AttachmentBinaryObject"]');
-
-		if (count($attachedDocumentNodes) >= 1) {
-			foreach ($attachedDocumentNodes as $attachedDocumentNode) {
-				// Just replace node value
-				$attachedDocumentNode->nodeValue = '[Removed to get a smaller XML]';
-				// Or completely remove node if you prefer :
-				// if ($attachedDocumentNode && isset($attachedDocumentNode->parentNode)) {
-				// 	$attachedDocumentNode->parentNode->removeChild($attachedDocumentNode);
-				// }
-			}
-			return $xmlDoc->saveXML();
-		}
-
-		return $xmlData;
 	}
 }

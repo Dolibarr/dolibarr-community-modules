@@ -31,6 +31,7 @@ if ((float) DOL_VERSION < 19) {
 }
 require_once __DIR__ . "/einvoicing.class.php";
 dol_include_once('/einvoicing/class/providers/PDPProviderManager.class.php');
+dol_include_once('/einvoicing/class/helpers/SupplierInvoiceHelper.class.php');
 
 
 /**
@@ -49,6 +50,40 @@ class ActionsEInvoicing extends CommonHookActions
 	 */
 	public function messageOfTheDay($parameters, $object, &$action, $hookmanager)
 	{
+		return 0;
+	}
+
+	/**
+	 * Hook called during HTML <head> generation
+	 *
+	 * @param mixed $parameters
+	 * @param mixed $object
+	 * @param mixed $action
+	 * @param mixed $hookmanager
+	 * @return int
+	 */
+	public function addHtmlHeader($parameters, &$object, &$action, $hookmanager): int
+	{
+		global $langs;
+
+		if (in_array('invoicesuppliercard', $hookmanager->contextarray) && $object->status == FactureFournisseur::STATUS_DRAFT) {
+
+			// Translations
+			$supplierPricesTranslations = [
+				'confirm_button_validate' => 'Validate',
+				'confirm_button_cancel' => 'Cancel',
+			];
+			$supplierPricesTranslations = array_map(function($labelId) use($langs) {
+				return html_entity_decode($langs->trans($labelId));
+			}, $supplierPricesTranslations);
+
+			print '<script>';
+			print "const einvoicingTranslations = JSON.parse('".addslashes(json_encode($supplierPricesTranslations))."');";
+			print '</script>';
+
+			print '<script defer src="'. dol_buildpath('/custom/einvoicing/assets/js/supplier_invoice.js?v='.einvoicingGetModuleVersion(), 1) . '"></script>';
+		}
+
 		return 0;
 	}
 
@@ -324,11 +359,87 @@ class ActionsEInvoicing extends CommonHookActions
 						);
 					}
 
+					if ($object->status == FactureFournisseur::STATUS_DRAFT && $user->hasRight('facture', 'write') && !SupplierInvoiceHelper::isSupplierImportInvoiceLinesAuto($object->socid)) {
+						print dolGetButtonAction($langs->trans('EinvoiceImportLines'), '', 'default', dol_buildpath('/fourn/facture/card.php?id=' . $object->id . '&action=reimportLines&token=' . newToken(), 1), 'einvoicing_import_lines_button', true);
+					}
+
 					if (!empty($url_button)) {
 						print dolGetButtonAction($langs->trans('einvoice'), '', 'default', $url_button, '', true);
 					}
 				}
 			}
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Hook called before HTML </body> closing markup generation
+	 * @param mixed $parameters
+	 * @param mixed $object
+	 * @param mixed $action
+	 * @param mixed $hookmanager
+	 * @return int
+	 */
+	public function beforeBodyClose($parameters, &$object, &$action, $hookmanager): int
+	{
+		global $db, $form, $langs, $user;
+
+		if (in_array('invoicesuppliercard', $hookmanager->contextarray) && $object->status == FactureFournisseur::STATUS_DRAFT && $user->hasRight('facture', 'write')) {
+
+			// Get all products in the default target category (see einvoicing module setup parameters)
+			$categoryId = getDolGlobalInt('EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_CATEGORY_OF_TARGET_IMPORT_PRODUCT_LIST');
+
+			$category = new Categorie($db);
+			$category->fetch($categoryId);
+
+			// Build SQL to get products by category
+			$sql = "SELECT p.rowid, p.ref, p.label FROM " . $db->prefix() . "product as p";
+			$sql .= " INNER JOIN " . $db->prefix() . "categorie_product as cp ON p.rowid = cp.fk_product";
+			$sql .= " WHERE cp.fk_categorie = " . (int) $categoryId;
+			$sql .= " ORDER BY p.label ASC";
+
+			// Execute query and build array
+			$result = $db->query($sql);
+			$select_products_array = array();
+			while ($obj = $db->fetch_object($result)) {
+				$select_products_array[$obj->rowid] = $obj->ref.' - '.$obj->label;
+			}
+
+			// Generate form field with selectarray
+			$selectProduct = $form->selectarray(
+				'target_fk_product',	// HTML name of the field
+				$select_products_array,	// Array of products [id => display_text]
+				0,   // Currently selected value
+				$langs->trans('SupplierInvoiceLinesImportTargetProduct'),     // Placeholder text
+				0,	// key_in_label (0 = key not in label)
+				0,	// value_as_key
+				'',	// moreparam
+				0,	// translate
+				0,	// maxlen
+				0,	// disabled
+				'', // sort
+				'minwidth300'	// morecss (CSS class for styling)
+			);
+
+			// Modal allowing to reimport supplier invoice lines
+			print '<div id="einvoicing-dialog-import-lines-form" title="'.$langs->trans('EinvoiceImportLines').'" style="display: none;">';
+			print '<form id="einvoicing-import-lines-form" method="post" action="'.dol_buildpath('fourn/facture/card.php', 1).'?facid='.$object->id.'&action=reimportLines&token='.newtoken().'">';
+			print 	'<p style="color: #e11717; font-weight: bold;">❗ ' . $langs->trans('SupplierInvoiceExtractLinesWarning').'</p>';
+			print 	'<div style="display: flex; flex-direction: column; margin-left: 2rem; gap: 0.2rem;">
+						<label for="extraction-all-prices"><input type="radio" name="extraction_type" id="extraction-all-prices" checked="checked" value="1">'.$langs->trans('ExtractAllLines').'</label>
+						<label for="extraction-to-free-line"><input type="radio" name="extraction_type" id="extraction-to-free-line" value="2">'.$langs->trans('ExtractToFreeLine').'</label>
+						<label for="extraction-to-product"><input type="radio" name="extraction_type" id="extraction-to-product" value="3">'.$langs->trans('ExtractToAProduct') . (isset($category) ? ' ('.$langs->trans('SupplierInvoiceLinesImportProductsFromCategory'). ' <strong>' . $category->label .'</strong>)' : '');'</label>
+					</div>';
+			print   '<div id="extraction-target-product-choice" style="display: none; margin-top: 0.5rem; margin-left: 2rem;">';
+						if ($categoryId > 0) {
+							print $selectProduct;
+						} else {
+							print '⚠️ ' . $langs->trans('SupplierInvoiceLinesImportPleaseSetDefaultCategoryInSettings') . '<br>';
+						}
+			print 	'</div>';
+			print '</form>';
+			print '</div>';
 		}
 
 		return 0;
@@ -513,6 +624,87 @@ class ActionsEInvoicing extends CommonHookActions
 					$this->errors = array_merge($this->errors, $provider->errors);
 					setEventMessages($result['message'], $provider->errors, 'errors');
 				}
+			}
+
+
+			if ($action == 'reimportLines' && $permissiontoedit && $object->status == FactureFournisseur::STATUS_DRAFT && !SupplierInvoiceHelper::isSupplierImportInvoiceLinesAuto($object->socid)) {
+
+				$xmlData = SupplierInvoiceHelper::getXmlData($object->id);
+
+				dol_include_once('einvoicing/class/protocols/ProtocolManager.class.php');
+
+				// Build the $exchangeProtocol factory for the format of supplier invoice
+				$exchangeProtocol = ProtocolManager::getProtocolFromContent($xmlData);
+				if (!isset($exchangeProtocol)) {
+					setEventMessage($langs->trans('EinvoiceFailedToDetectXmlFormat'), 'errors');
+					$db->rollback();
+					return -1;
+				}
+				$parsedHeader = $exchangeProtocol->parseInvoiceHeader($xmlData);
+				$parsedLines  = $exchangeProtocol->parseInvoiceLines($xmlData);
+
+				// Delete existing lines
+				foreach ($object->lines as $i => $val) {
+					$object->lines[$i]->delete($user);
+					unset($object->lines[$i]);
+				}
+
+				// Detect/manage reimport type
+				$extractionType = GETPOST('extraction_type');
+				$targetFkProduct = GETPOST('target_fk_product');
+				$createInvoiceLinesParams = [];
+				if ($extractionType == 1) {
+					// mode automatic
+				} else if ($extractionType == 2) {
+					$createInvoiceLinesParams['free_lines'] = true;
+				} else if ($extractionType == 3) {
+					$product = new Product($db);
+					$resproduct = $product->fetch((int) $targetFkProduct);
+
+					if ($resproduct > 0) {
+						// Reduce lines to one line by VAT rate
+						$outputParsedLines = [];
+						$amountByVat = [];
+						foreach ($parsedLines as $line) {
+							$vatRate = (string) $line['rateApplicablePercent'];
+							if (!isset($outputParsedLines[$vatRate])) {
+								$outputParsedLines[$vatRate] = $line;
+								$outputParsedLines[$vatRate]['billedquantity'] = 1;
+								$outputParsedLines[$vatRate]['netpriceamount'] = 0;
+								$outputParsedLines[$vatRate]['lineTotalAmount'] = 0;
+								$outputParsedLines[$vatRate]['calculatedAmount'] = 0;
+								$outputParsedLines[$vatRate]['rateApplicablePercent'] = $vatRate;
+							}
+							// $outputParsedLines[$vatRate]['netpriceamount'] += $line['lineTotalAmount'];
+							$outputParsedLines[$vatRate]['netpriceamount'] += $line['netpriceamount'] * $line['billedquantity'];
+							$outputParsedLines[$vatRate]['calculatedAmount'] += $line['netpriceamount'] * $line['billedquantity'];
+						}
+
+						$parsedLines = [];
+						foreach ($outputParsedLines as $outputParsedLine) {
+							$parsedLines[] = $outputParsedLine;
+						}
+
+						$createInvoiceLinesParams['target_fk_product'] = $targetFkProduct;
+					} else {
+						setEventMessage($langs->trans('EinvoiceReimportLinesMissingTargetFkProduct'), 'errors');
+						$db->rollback();
+						return -1;
+					}
+				}
+
+				// Add lines to supplier invoice from eInvoice XML data
+				$res = $exchangeProtocol->createSupplierInvoiceLinesFromSource($object, $parsedLines, $flowId ?? '', $createInvoiceLinesParams);
+				if ($res['res'] < 0) {
+					$db->rollback();
+					$this->error = $langs->trans('EinvoiceReimportLinesError') . $res['message'];
+					return $res['res'];
+				}
+
+				$db->commit();
+
+				header('Location: '.dol_buildpath('/fourn/facture/card.php?facid='.$object->id, 1));
+				exit();
 			}
 		}
 
