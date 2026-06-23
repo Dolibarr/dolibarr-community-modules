@@ -138,6 +138,18 @@ class PDPProviderManager
 			);
 		}
 
+		// Grey-label "via partner only": when an operator ships the module pre-configured for delegated
+		// onboarding, hide every direct provider so the client is only offered the via-partner tunnel.
+		// Generic boolean flag: it points nowhere. The operator sets it (and the proxy URL) through its
+		// own deployment SQL, not in the module source.
+		if (getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER_ONLY') && isset($this->providersList['SUPERPDPViaPartner'])) {
+			foreach (array_keys($this->providersList) as $providerkey) {
+				if ($providerkey !== 'SUPERPDPViaPartner') {
+					$this->providersList[$providerkey]['is_enabled'] = 0;
+				}
+			}
+		}
+
 		// Sort list by position
 		$this->providersList = dol_sort_array($this->providersList, 'position');
 	}
