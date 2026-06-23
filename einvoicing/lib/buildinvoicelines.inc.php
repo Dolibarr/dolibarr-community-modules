@@ -425,6 +425,24 @@ foreach ($object->lines as $line) {
 	$line_total_ttc = $line->total_ttc;
 	*/
 
+	// Progress / situation invoices (facture de situation): Dolibarr keeps the FULL (100%) line
+	// amount in subprice*qty, while the amount actually billed for THIS situation - already net of
+	// the progress billed by previous situations - lives in $line->total_ht (the value shown on the
+	// PDF). Without correction the e-invoice would bill 100% of every line (issue #258). We fold the
+	// progress fraction into the unit price (BT-146) and keep the real billed quantity (BT-129), so
+	// BT-146 * BT-129 stays consistent with the line net amount BT-131. Unit price and quantity are
+	// both emitted with 2 decimals, so scaling the price - not the quantity - preserves that
+	// consistency even for non-round progress percentages (e.g. 33.33%).
+	if ($object->type == $object::TYPE_SITUATION) {
+		$line_full_ht = $line_total_ht;	// = $line_unit_price_with_discount * $line->qty (100% of the line)
+		$progress_ratio = ($line_full_ht != 0.0) ? ((float) $line->total_ht / $line_full_ht) : 0.0;
+
+		$line_unit_price = price2num($line_unit_price * $progress_ratio, 2);
+		$line_total_ht   = price2num($line_unit_price_with_discount * $progress_ratio * $line->qty, 2);
+		$line_total_tva  = price2num($line_total_ht * ($line->tva_tx > 0 ? number_format($line->tva_tx, 2, '.', '') / 100 : 0), 2);
+		$line_total_ttc  = price2num($line_total_ht + $line_total_tva, 2);
+	}
+
 	// Add (or update) VAT rate to $taxBreakdown
 	if (!isset($taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')])) {
 		$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')] = ['tva_tx' => '', 'vat_src_code' => '', 'categoryVAT' => '', 'ExemptionReasonCode' => '', 'ExemptionReason' => '', 'totalHT' => 0, 'totalTVA' => 0];
