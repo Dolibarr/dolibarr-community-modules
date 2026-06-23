@@ -137,16 +137,23 @@ class SuperPDPProvider extends AbstractPDPProvider
 					'response_type' => 'code',
 					'redirect_uri' => dol_buildpath('/einvoicing/admin/setup.php', 2)
 				];
-				if ($mysoc->country_code == 'FR' && !empty($mysoc->idprof1)) {
-					$query += [
-						'superpdp_company_number' => removeAllSpaces($mysoc->idprof1), // siren to register
-						'superpdp_company_number_scheme' => 'fr_siren', // sandbox, fr_siren_ be_numero_entreprise
-					];
-				} elseif ($mysoc->country_code == 'BE' && !empty($mysoc->idprof1)) {
-					$query += [
-						'superpdp_company_number' => removeAllSpaces($mysoc->idprof1), // siren to register
-						'superpdp_company_number_scheme' => 'be_numero_entreprise', // sandbox, fr_siren_ be_numero_entreprise
-					];
+				// Company prefill (number + scheme are an indissociable pair). Sandbox scheme off-live,
+				// otherwise fr_siren / be_numero_entreprise by country.
+				if (!empty($mysoc->idprof1)) {
+					$companyscheme = '';
+					if (!getDolGlobalInt('EINVOICING_LIVE')) {
+						$companyscheme = 'sandbox';
+					} elseif ($mysoc->country_code == 'FR') {
+						$companyscheme = 'fr_siren';
+					} elseif ($mysoc->country_code == 'BE') {
+						$companyscheme = 'be_numero_entreprise';
+					}
+					if ($companyscheme) {
+						$query += [
+							'superpdp_company_number' => removeAllSpaces($mysoc->idprof1),
+							'superpdp_company_number_scheme' => $companyscheme,
+						];
+					}
 				}
 				$urltogeneratetoken .= '?' . http_build_query($query);
 				$urltoshow = $langs->trans("EINVOICING_LINK_CREATE_ACCOUNTVia", getDolGlobalString("EINVOICING_SUPERPDP_VIAPARTNER"));
@@ -301,16 +308,23 @@ class SuperPDPProvider extends AbstractPDPProvider
 						'response_type' => 'code',
 						'redirect_uri' => dol_buildpath('/einvoicing/admin/setup.php', 2)
 					];
-					if ($mysoc->country_code == 'FR' && !empty($mysoc->idprof1)) {
-						$query += [
-							'superpdp_company_number' => removeAllSpaces($mysoc->idprof1), // siren to register
-							'superpdp_company_number_scheme' => 'fr_siren', // sandbox, fr_siren_ be_numero_entreprise
-						];
-					} elseif ($mysoc->country_code == 'BE' && !empty($mysoc->idprof1)) {
-						$query += [
-							'superpdp_company_number' => removeAllSpaces($mysoc->idprof1), // siren to register
-							'superpdp_company_number_scheme' => 'be_numero_entreprise', // sandbox, fr_siren_ be_numero_entreprise
-						];
+					// Company prefill (number + scheme are an indissociable pair). Sandbox scheme off-live,
+					// otherwise fr_siren / be_numero_entreprise by country.
+					if (!empty($mysoc->idprof1)) {
+						$companyscheme = '';
+						if (!getDolGlobalInt('EINVOICING_LIVE')) {
+							$companyscheme = 'sandbox';
+						} elseif ($mysoc->country_code == 'FR') {
+							$companyscheme = 'fr_siren';
+						} elseif ($mysoc->country_code == 'BE') {
+							$companyscheme = 'be_numero_entreprise';
+						}
+						if ($companyscheme) {
+							$query += [
+								'superpdp_company_number' => removeAllSpaces($mysoc->idprof1),
+								'superpdp_company_number_scheme' => $companyscheme,
+							];
+						}
 					}
 					$urltogeneratetoken .= '?' . http_build_query($query);
 				} elseif (getDolGlobalString($prefix . 'CLIENT_ID'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '')) && getDolGlobalString($prefix . 'CLIENT_SECRET'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''))) {

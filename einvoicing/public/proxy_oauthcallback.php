@@ -307,7 +307,9 @@ if (empty($code) && !GETPOST('error')) {
 					"redirect_uri" => $redirect_uri
 				];
 
-				$resultget = getURLContent($oauthserverurl, 'POST', $params);
+				// Send as application/x-www-form-urlencoded (the OAuth 2.0 standard for the token endpoint),
+				// not multipart/form-data which an array param would produce.
+				$resultget = getURLContent($oauthserverurl, 'POST', http_build_query($params), 1, array('Content-Type: application/x-www-form-urlencoded'));
 
 				$reg = array();
 				$origin_redirect_uri = '';
