@@ -274,7 +274,7 @@ class SupplierInvoiceHelper
 	 * Indicates if the type of import for supplier invoice lines is auto or not :
 	 * - first try to get import type from societe
 	 * - if not set, then use default module parameter
-	 * @param int $socId
+	 * @param int $socId The soc id to test
 	 * @return bool
 	 */
 	public static function isSupplierImportInvoiceLinesAuto($socId)

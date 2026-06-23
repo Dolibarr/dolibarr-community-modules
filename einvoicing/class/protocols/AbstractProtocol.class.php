@@ -65,10 +65,10 @@ abstract class AbstractProtocol
 
 	/**
 	 * Add lines to a supplier invoice from e-invoice parsed lines
-	 * @param FactureFournisseur $supplierInvoice
-	 * @param array $parsedLines
-	 * @param string $flowId
-	 * @param array $params
+	 * @param FactureFournisseur $supplierInvoice	The supplier invoice to add lines on
+	 * @param array $parsedLines					The parsed lines data (previously extracted from e-invoice)
+	 * @param string $flowId						The concerned flowId
+	 * @param array $params							Additional parameters used in case of manual import
 	 * @return array
 	 */
 	abstract public function createSupplierInvoiceLinesFromSource(&$supplierInvoice, $parsedLines, $flowId = '', $params = []): array;

@@ -16,14 +16,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+dol_include_once('einvoicing/class/providers/AbstractPDPProvider.class.php');
 
 /**
  * \file    einvoicing/class/protocols/CommonProtocol.class.php
  * \ingroup einvoicing
  * \brief   Common methods for all AP protocols.
  */
-
-dol_include_once('einvoicing/class/providers/AbstractPDPProvider.class.php');
 
 trait CommonProtocol
 {
@@ -1441,11 +1440,11 @@ trait CommonProtocol
 
 		$reshook = $hookmanager->executeHooks('createSupplierInvoiceLinesFromSource', ['parsed_lines' => $parsedLines, 'flow_id' => $flowId, 'params' => $params], $supplierInvoice);
 
-        if (!empty($reshook)) {
+		if (!empty($reshook)) {
 			return [
 				'res' => $reshook
 			];
-        }
+		}
 
 		$freeLines = (isset($params['free_lines']) && $params['free_lines'] == true);
 		$targetFkProduct = (isset($params['target_fk_product']) ? $params['target_fk_product'] : 0);
@@ -1646,7 +1645,7 @@ trait CommonProtocol
 
 	/**
 	 * Create/insert supplier invoice lines in DB using $lines property of the supplier invoice object
-	 * @param FactureFournisseur $supplierInvoice
+	 * @param FactureFournisseur $supplierInvoice The supplier invoice to add lines
 	 * @return bool
 	 */
 	public function createSupplierInvoiceLinesIntoDatabase(FactureFournisseur $supplierInvoice): bool
