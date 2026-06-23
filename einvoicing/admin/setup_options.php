@@ -221,6 +221,14 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->helpText = $langs->transnoentities('EINVOICING_AUTO_SEND_ON_GENERATION_HELP');
 	$item->defaultFieldValue = 0;
 	$item->cssClass = 'minwidth500';
+
+	// Setup conf for maximum e-invoice file size (warning if exceeded)
+	$item = $formSetup->newItem('EINVOICING_MAX_FILE_SIZE_MB');
+	$item->helpText = $langs->transnoentities('EINVOICING_MAX_FILE_SIZE_MB_HELP');
+	$item->cssClass = 'maxwidth100';
+	$item->fieldAttr['type'] = 'number';
+	$item->fieldAttr['min'] = '0';
+	$item->fieldAttr['step'] = '0.1';
 }
 
 

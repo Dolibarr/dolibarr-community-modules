@@ -142,6 +142,11 @@ class ActionsEInvoicing extends CommonHookActions
 						// No error
 						setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
 
+						// Forward non-blocking size warning from the protocol if any
+						if (!empty($protocol->warnings)) {
+							setEventMessages($langs->trans("InvoiceGeneratedWithWarnings"), $protocol->warnings, 'warnings');
+						}
+
 						// Optionally transmit to the Access Point right after generation (opt-in + idempotent).
 						// Without this, validation only generates the Factur-X; the invoice is never sent to the
 						// PA (transmission was a manual "send_to_pdp" click only). The 'transmitted' guard prevents
@@ -475,6 +480,10 @@ class ActionsEInvoicing extends CommonHookActions
 					if ($result && (!is_numeric($result) || $result > 0)) {
 						// No error
 						dol_syslog(__METHOD__ . " Invoice generated successfully for invoice ID " . $invoiceObject->id);
+						// Merge non-blocking size warnings from the protocol
+						if (!empty($protocol->warnings)) {
+							$this->warnings = array_merge($this->warnings, (array) $protocol->warnings);
+						}
 						if (!empty($this->warnings)) {
 							setEventMessages($langs->trans("InvoiceGeneratedWithWarnings"), $this->warnings, 'warnings');
 						} else {
