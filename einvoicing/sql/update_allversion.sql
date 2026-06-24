@@ -15,6 +15,7 @@ UPDATE llx_const SET name = 'MAIN_MODULE_EINVOICING' WHERE name = 'MAIN_MODULE_P
 
 -- Rename all module config constants (PDPCONNECTFR_* -> EINVOICING_*)
 UPDATE llx_const SET name = REPLACE(name, 'PDPCONNECTFR_', 'EINVOICING_') WHERE name LIKE 'PDPCONNECTFR_%';
+UPDATE llx_const SET name = REPLACE(name, 'PDPCONNTECTFR_', 'EINVOICING_') WHERE name LIKE 'PDPCONNTECTFR_%';
 
 -- Rename module-level admin constant (e.g. MODULE_PDPCONNECTFR_DISABLED -> MODULE_EINVOICING_DISABLED)
 UPDATE llx_const SET name = REPLACE(name, 'MODULE_PDPCONNECTFR_', 'MODULE_EINVOICING_') WHERE name LIKE 'MODULE_PDPCONNECTFR_%';
@@ -26,3 +27,5 @@ UPDATE llx_rights_def SET module = 'einvoicing' WHERE module = 'pdpconnectfr';
 UPDATE llx_menu SET module = 'einvoicing' WHERE module = 'pdpconnectfr';
 UPDATE llx_menu SET mainmenu = 'einvoicing' WHERE mainmenu = 'pdpconnectfr';
 UPDATE llx_menu SET leftmenu = REPLACE(leftmenu, 'pdpconnectfr', 'einvoicing') WHERE leftmenu LIKE '%pdpconnectfr%';
+
+UPDATE llx_const SET value = REPLACE(name, 'pdpconnectfr_', 'einvoicing_') WHERE name LIKE 'EINVOICING_SUPERPDP_VIAPARTNER_OAUTH_URL' and name like '%pdpconnectfr_%';
