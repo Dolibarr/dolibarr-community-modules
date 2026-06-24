@@ -224,7 +224,7 @@ class HelloAssoMemberUtils
 		$assoslug = str_replace('_', '-', dol_string_nospecial(strtolower(dol_string_unaccent($this->organization_slug)), '-'));
 		$formslug = str_replace('_', '-', dol_string_nospecial(strtolower(dol_string_unaccent($this->form_slug)), '-'));
 		$urlforform = "https://".urlencode($this->helloasso_url)."/v5/organizations/".urlencode($assoslug)."/forms/Membership/".urlencode($formslug).'/public';
-		dol_syslog("Send Get to url=".$urlforform.", to get HelloAsso Member type informations", LOG_DEBUG);
+		dol_syslog("Send Get to url=".$urlforform.", to get HelloAsso Member type information", LOG_DEBUG);
 
 		$ret = getURLContent($urlforform, 'GET', "", 1, $headers);
 		if ($ret["http_code"] != 200) {
@@ -584,7 +584,7 @@ class HelloAssoMemberUtils
 	}
 
 	/**
-	 * Set array of correspondance between HelloAsso and Dolibarr member type
+	 * Set array of correspondence between HelloAsso and Dolibarr member type
 	 *
 	 * @param   int   $dolibarrmembertype     Id of member type in Dolibarr
 	 * @param   int   $helloassomembertype    Id of member type in HelloAsso
@@ -618,9 +618,9 @@ class HelloAssoMemberUtils
 	}
 
 	 /**
-	 * Set array of correspondance between HelloAsso custom fields and Dolibarr fields
+	 * Set array of correspondence between HelloAsso custom fields and Dolibarr fields
 	 *
-	 * @param   string   $dolibarrfield          Dolibar field of member object
+	 * @param   string   $dolibarrfield          Dolibarr field of member object
 	 * @param   string   $helloassofield         HelloAsso custom field name
 	 *
 	 * @return  int   >0 if Ok, <0 if Ko

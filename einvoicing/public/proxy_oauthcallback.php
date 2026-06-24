@@ -223,7 +223,10 @@ if (empty($code) && !GETPOST('error')) {
 	// Add more param
 	$url .= '&nonce='.bin2hex(random_bytes(64 / 8));
 
-	//var_dump($keyforurl, $url, $statewithscopeonly, $origin_state);exit;
+	if (GETPOSTISSET('superpdp_company_number') && GETPOSTISSET('superpdp_company_number_scheme')) {
+		$url .= '&superpdp_company_number=' . GETPOST('superpdp_company_number', 'aZ09');
+		$url .= '&superpdp_company_number_scheme=' . GETPOST('superpdp_company_number_scheme', 'aZ09');
+	}
 
 	// we go on oauth provider authorization page, we will then go back on this page but into the other branch of the if (!GETPOST('code'))
 	header('Location: '.$url);
@@ -261,12 +264,6 @@ if (empty($code) && !GETPOST('error')) {
 					"consumer_key" => getDolGlobalString($keyforparamid),
 					"redirect_uri" => $redirect_uri
 				];
-				if (GETPOSTISSET('superpdp_company_number') && GETPOSTISSET('superpdp_company_number_scheme')) {
-					$params += [
-						'superpdp_company_number' => GETPOST('superpdp_company_number', 'aZ09'),
-						'superpdp_company_number_scheme' => GETPOST('superpdp_company_number_scheme', 'aZ09'),
-					];
-				}
 
 				$resultget = getURLContent($oauthserverurl, 'POST', $params);
 

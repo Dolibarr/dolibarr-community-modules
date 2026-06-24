@@ -938,7 +938,7 @@ class CIIProtocol extends AbstractProtocol
 			}
 
 			// TODO : Save receivedFile in supplier invoice attachments
-			return ['res' => $supplierInvoiceId, 'message' => implode("\n", $return_messages)];
+			return ['res' => $supplierInvoiceId, 'message' => implode("\n", $return_messages), 'xml_data' => $file];
 		}
 	}
 
@@ -965,6 +965,8 @@ class CIIProtocol extends AbstractProtocol
 		$xpath->registerNamespace('rsm', 'urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100');
 		$xpath->registerNamespace('ram', 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100');
 		$xpath->registerNamespace('udt', 'urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100');
+		// qdt is used by some date paths (e.g. ram:FormattedIssueDateTime/qdt:DateTimeString); without it those xpath queries return empty.
+		$xpath->registerNamespace('qdt', 'urn:un:unece:uncefact:data:standard:QualifiedDataType:100');
 
 		return [$doc, $xpath];
 	}
@@ -1604,12 +1606,15 @@ class CIIProtocol extends AbstractProtocol
 
 		$terms->appendChild($doc->createElement('ram:Description', $invoiceData['paymentTermsText']));
 
-		$dtNode = $doc->createElement('ram:DueDateDateTime');
-		$str = $doc->createElement('udt:DateTimeString', $invoiceData['paymentDueDate']->format('Ymd'));
-		$str->setAttribute('format', '102');
-		$dtNode->appendChild($str);
+		// Due date is optional (e.g. immediate payment); guard against a null date to avoid a fatal on ->format().
+		if (!empty($invoiceData['paymentDueDate'])) {
+			$dtNode = $doc->createElement('ram:DueDateDateTime');
+			$str = $doc->createElement('udt:DateTimeString', $invoiceData['paymentDueDate']->format('Ymd'));
+			$str->setAttribute('format', '102');
+			$dtNode->appendChild($str);
 
-		$terms->appendChild($dtNode);
+			$terms->appendChild($dtNode);
+		}
 
 		// Totals
 
@@ -1823,32 +1828,42 @@ class CIIProtocol extends AbstractProtocol
 		);
 
 		// Contact
-		if (!empty($data[$prefix . 'contactpersonname'])) {
+		// ram:DefinedTradeContact is the wrapper for all contact sub-fields. Only create it when at
+		// least one sub-field is present, otherwise $contact stays null and appendChild() fatals
+		// (e.g. specimen seller with a phone but no contact person name).
+		if (!empty($data[$prefix . 'contactpersonname'])
+			|| !empty($data[$prefix . 'contactdepartmentname'])
+			|| !empty($data[$prefix . 'contactphoneno'])
+			|| !empty($data[$prefix . 'contactfaxno'])
+			|| !empty($data[$prefix . 'contactemailaddr'])) {
 			$contact = $doc->createElement('ram:DefinedTradeContact');
 			$node->appendChild($contact);
-			$contact->appendChild($doc->createElement('ram:PersonName', htmlspecialchars($data[$prefix . 'contactpersonname'])));
-		}
 
-		if (!empty($data[$prefix . 'contactdepartmentname'])) {
-			$contact->appendChild($doc->createElement('ram:DepartmentName', htmlspecialchars($data[$prefix . 'contactdepartmentname'])));
-		}
+			if (!empty($data[$prefix . 'contactpersonname'])) {
+				$contact->appendChild($doc->createElement('ram:PersonName', htmlspecialchars($data[$prefix . 'contactpersonname'])));
+			}
 
-		if (!empty($data[$prefix . 'contactphoneno'])) {
-			$phone = $doc->createElement('ram:TelephoneUniversalCommunication');
-			$contact->appendChild($phone);
-			$phone->appendChild($doc->createElement('ram:CompleteNumber', $data[$prefix . 'contactphoneno']));
-		}
+			if (!empty($data[$prefix . 'contactdepartmentname'])) {
+				$contact->appendChild($doc->createElement('ram:DepartmentName', htmlspecialchars($data[$prefix . 'contactdepartmentname'])));
+			}
 
-		if (!empty($data[$prefix . 'contactfaxno'])) {
-			$fax = $doc->createElement('ram:FaxUniversalCommunication');
-			$contact->appendChild($fax);
-			$fax->appendChild($doc->createElement('ram:CompleteNumber', $data[$prefix . 'contactfaxno']));
-		}
+			if (!empty($data[$prefix . 'contactphoneno'])) {
+				$phone = $doc->createElement('ram:TelephoneUniversalCommunication');
+				$contact->appendChild($phone);
+				$phone->appendChild($doc->createElement('ram:CompleteNumber', $data[$prefix . 'contactphoneno']));
+			}
 
-		if (!empty($data[$prefix . 'contactemailaddr'])) {
-			$email = $doc->createElement('ram:EmailURIUniversalCommunication');
-			$contact->appendChild($email);
-			$email->appendChild($doc->createElement('ram:URIID', $data[$prefix . 'contactemailaddr']));
+			if (!empty($data[$prefix . 'contactfaxno'])) {
+				$fax = $doc->createElement('ram:FaxUniversalCommunication');
+				$contact->appendChild($fax);
+				$fax->appendChild($doc->createElement('ram:CompleteNumber', $data[$prefix . 'contactfaxno']));
+			}
+
+			if (!empty($data[$prefix . 'contactemailaddr'])) {
+				$email = $doc->createElement('ram:EmailURIUniversalCommunication');
+				$contact->appendChild($email);
+				$email->appendChild($doc->createElement('ram:URIID', $data[$prefix . 'contactemailaddr']));
+			}
 		}
 
 
@@ -2340,5 +2355,37 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		return $result;
+	}
+
+	/**
+	 * Remove attachment nodes to get a smaller XML
+	 * @param string $xmlData The XML data to process
+	 * @return string Cleaned XML
+	 */
+	public static function removeAttachmentFromXml(string $xmlData): string
+	{
+		$xmlDoc = new DOMDocument();
+		if (!$xmlDoc->loadXML($xmlData)) {
+			throw new Exception(__METHOD__ . " : failed to load XML data");
+		}
+
+		// Remove AttachedDocument nodes
+		$xpath = new DOMXPath($xmlDoc);
+		// Voluntary use non namespace specific path (to not have to manage different CII namespaces)
+		$attachedDocumentNodes = $xpath->query('//*[local-name()="AdditionalReferencedDocument"]/*[local-name()="AttachmentBinaryObject"]');
+
+		if (count($attachedDocumentNodes) >= 1) {
+			foreach ($attachedDocumentNodes as $attachedDocumentNode) {
+				// Just replace node value
+				$attachedDocumentNode->nodeValue = '[Removed to get a smaller XML]';
+				// Or completely remove node if you prefer :
+				// if ($attachedDocumentNode && isset($attachedDocumentNode->parentNode)) {
+				// 	$attachedDocumentNode->parentNode->removeChild($attachedDocumentNode);
+				// }
+			}
+			return $xmlDoc->saveXML();
+		}
+
+		return $xmlData;
 	}
 }
