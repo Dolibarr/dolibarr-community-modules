@@ -141,10 +141,12 @@ if (!empty($usercontacts) && $object->fetch_user($usercontacts[0]) > 0) {
 	$salerepresentative_office_fax    = $object->user->office_fax;
 	$salerepresentative_email         = $object->user->email;
 } else {
-	$salerepresentative_name          = $user->getFullName($outputlangs);
-	$salerepresentative_office_phone  = $user->office_phone;
-	$salerepresentative_office_fax    = $user->office_fax;
-	$salerepresentative_email         = $user->email;
+	// No sales representative assigned to the invoice: the seller contact (BG-6) must describe the
+	// seller, so fall back to the emitting company ($mysoc), not the logged-in user. See issue #252.
+	$salerepresentative_name          = $mysoc->name;
+	$salerepresentative_office_phone  = $mysoc->phone;
+	$salerepresentative_office_fax    = $mysoc->fax;
+	$salerepresentative_email         = $mysoc->email;
 }
 if (empty($salerepresentative_office_phone)) {
 	$salerepresentative_office_phone = $mysoc->phone;
