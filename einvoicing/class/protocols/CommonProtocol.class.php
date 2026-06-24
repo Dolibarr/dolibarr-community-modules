@@ -1465,11 +1465,18 @@ trait CommonProtocol
 			$line = new OrderLine($db);
 			$line->fetch($fk_origin_line);
 		}
-		if ($line->product_type == 9 && $line->special_code == $this->_getModNumber($searchName)) {
-			return true;
-		} else {
+		if ((int) $line->product_type != 9) {
 			return false;
 		}
+		// Legacy: line created by the given external module, matched on its special_code.
+		if ($line->special_code == $this->_getModNumber($searchName)) {
+			return true;
+		}
+		// The title / subtotal feature is now part of the Dolibarr core (htdocs/subtotals, trait
+		// CommonSubtotal with $PRODUCT_TYPE = 9 and special_code = SUBTOTALS_SPECIAL_CODE). Such lines
+		// no longer carry the legacy modSubtotal module number, but any product_type 9 line is a
+		// title / subtotal / page-break pseudo-line, so we treat them all as subtotal lines.
+		return $searchName == 'modSubtotal';
 	}
 
 	/**
