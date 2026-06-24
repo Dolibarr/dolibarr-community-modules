@@ -2171,7 +2171,7 @@ class EInvoicing
 		$sql .= (int) $fk_soc . ", 'manual', ";
 		$sql .= "'" . $db->escape($routing_id) . "', ";
 		$sql .= ($info !== '' ? "'" . $db->escape($info) . "'" : "NULL") . ", ";
-		$sql .= "1, " . $isDefault . ", NOW(), " . (int) $user->id.", ";
+		$sql .= "1, " . ((int) $isDefault) . ", NOW(), " . (int) $user->id.", ";
 		$sql .= "'" . $db->escape($routing_type) . "'";
 		$sql .= ")";
 
@@ -2415,7 +2415,7 @@ class EInvoicing
 		$sql .= "'" . $db->escape($statusMessage) . "', ";
 		$sql .= "'" . $db->escape($validationStatus) . "', ";
 		$sql .= "'" . $db->escape($validationMessage) . "', ";
-		$sql .= "'" . $date_creation . "', ";
+		$sql .= "'" . $db->escape($date_creation) . "', ";
 		$sql .= (int) $user->id . ", ";
 		$sql .= "'" . $db->escape($reasonCode) . "'";
 		$sql .= ")";

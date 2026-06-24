@@ -209,7 +209,7 @@ abstract class AbstractPDPProvider
 	 * @param $docType 		The type of document we want to return
 	 * @param $callType		The type of call to use when calling API
 	 *
-	 * @return array{status_code:int,response:null|string|array<string,mixed>,?errorCode:string,?errorMessage:string,?id:int,?call_id:string}
+	 * @return array{status_code:int,response:null|string|array<string,mixed>,errorCode?:string,errorMessage?:string,id?:int,call_id?:string}
 	 */
 	public function fetchFlowData($flowId, $docType, $callType = '')
 	{
@@ -253,7 +253,7 @@ abstract class AbstractPDPProvider
 	 * @param array<string, string>         $extraHeaders   Optional additional headers
 	 * @param string|null                   $callType       Functional type of the API call for logging purposes (e.g., 'sync_flows', 'send_invoice')
 	 *
-	 * @return array{status_code:int,response:null|string|array<string,mixed>,call_id:null|string}
+	 * @return array{status_code:int,response:null|string|array<string,mixed|array<string,mixed>>,call_id:null|string}
 	 */
 	abstract public function callApi($resource, $method, $options = false, $extraHeaders = [], $callType = '');
 
