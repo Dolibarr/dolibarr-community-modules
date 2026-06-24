@@ -1493,7 +1493,7 @@ class CIIProtocol extends AbstractProtocol
 		// wrapping it in another BuyerTradeParty (which would break XSD validation).
 		$shiptotrade = $doc->createElement('ram:ShipToTradeParty');
 		$delivery->appendChild($shiptotrade);
-		$this->buildParty($doc, $shiptotrade, $invoiceData, 'buyer', false);
+		$this->buildParty($doc, $shiptotrade, $invoiceData, 'shipto', false);
 
 
 		if (!empty($invoiceData['documentDeliveryDate'])) {

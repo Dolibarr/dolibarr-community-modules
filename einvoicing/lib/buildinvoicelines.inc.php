@@ -562,6 +562,54 @@ $deliveryDate = !empty($deliveryDateList)
 	: new DateTime(dol_print_date($object->date, 'dayrfc'));
 
 
+// =====================================================================
+// Delivery (ship-to) address resolution
+// Priority: invoice "Delivery" contact -> linked shipment delivery address -> customer (buyer) address
+// =====================================================================
+require_once DOL_DOCUMENT_ROOT . '/contact/class/contact.class.php';
+
+// Default to the customer main address (same fallback values as the buyer block)
+$shiptoname     = $object->thirdparty->name         ?? 'CUSTOMER';
+$shiptolineone  = $object->thirdparty->address      ?? 'ADDRESS';
+$shiptopostcode = $object->thirdparty->zip          ?? 'ZIP';
+$shiptocity     = $object->thirdparty->town         ?? 'TOWN';
+$shiptocountry  = $object->thirdparty->country_code ?? 'COUNTRY';
+
+$deliverycontact = null;
+
+// 1) Delivery contact set directly on the invoice
+$idaddressshipping = $object->getIdContact('external', 'SHIPPING');
+if (!empty($idaddressshipping[0])) {
+	$tmpcontact = new Contact($db);
+	if ($tmpcontact->fetch($idaddressshipping[0]) > 0) {
+		$deliverycontact = $tmpcontact;
+	}
+}
+
+// 2) Fallback: delivery address carried by a linked shipment (expedition)
+if ($deliverycontact === null && !empty($object->linkedObjectsIds['shipping']) && is_array($object->linkedObjectsIds['shipping'])) {
+	require_once DOL_DOCUMENT_ROOT . '/expedition/class/expedition.class.php';
+	foreach ($object->linkedObjectsIds['shipping'] as $expeditionId) {
+		$tmpexpedition = new Expedition($db);
+		if ($tmpexpedition->fetch($expeditionId) > 0 && !empty($tmpexpedition->fk_delivery_address)) {
+			$tmpcontact = new Contact($db);
+			if ($tmpcontact->fetch($tmpexpedition->fk_delivery_address) > 0) {
+				$deliverycontact = $tmpcontact;
+				break;
+			}
+		}
+	}
+}
+
+// Override the postal address only when a specific delivery contact carries its own address.
+// The ship-to party name stays the customer name (same legal entity, different delivery site).
+if ($deliverycontact !== null && (!empty($deliverycontact->address) || !empty($deliverycontact->town) || !empty($deliverycontact->zip))) {
+	$shiptolineone  = $deliverycontact->address ?: $shiptolineone;
+	$shiptopostcode = $deliverycontact->zip     ?: $shiptopostcode;
+	$shiptocity     = $deliverycontact->town    ?: $shiptocity;
+	$shiptocountry  = !empty($deliverycontact->country_code) ? $deliverycontact->country_code : $shiptocountry;
+}
+
 
 // Filling $invoiceData (based on $invoiceTemplate)
 $invoiceData = [
@@ -647,6 +695,32 @@ $invoiceData = [
 	'buyercontactpersonname'    => null,
 	'buyercontactemailaddr'     => null,
 	'buyercontactphoneno'       => null,
+
+	// Ship-to (delivery) part — identity mirrors the buyer (same legal entity); only the address may differ
+	'shiptoname'                => $shiptoname,
+	'shiptoids'                 => $idprof ?: 'IDPROF',
+
+	'shiptolineone'             => $shiptolineone,
+	'shiptolinetwo'             => "",
+	'shiptolinethree'           => "",
+	'shiptopostcode'            => $shiptopostcode,
+	'shiptocity'                => $shiptocity,
+	'shiptocountry'             => $shiptocountry,
+	'shiptosubdivision'         => null,
+
+	'shiptovatnumber'           => $object->thirdparty->tva_intra ?? '',
+	'shiptoGlobalIds'           => [['schemeID' => $schemeGlobalIdProf, 'value' => $globalIdProf]],
+
+	'shiptoLegalOrgId'          => $idprof,
+	'shiptoLegalOrgScheme'      => $schemeIdProf,
+	'shiptoTradingName'         => $object->thirdparty->name,
+
+	'shiptoCommunicationUriScheme' => $schemeUri,
+	'shiptoCommunicationUri'    => $uri,
+
+	'shiptocontactpersonname'   => null,
+	'shiptocontactemailaddr'    => null,
+	'shiptocontactphoneno'      => null,
 
 	// Totals parts
 	'grandTotalAmount'          => $grand_total_ttc,
