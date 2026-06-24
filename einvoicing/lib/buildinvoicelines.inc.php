@@ -698,11 +698,14 @@ if ($object->mode_reglement_code) {
 
 
 // Delivery address (CII ShipToTradeParty / BG-15)
-// If an external "SHIPPING" contact is attached to the invoice, expose its address so the CII
-// builder can emit a dedicated deliver-to party. The builder (ShipToTradePartyBuilder::build)
-// only emits it when the shipping address actually differs from the buyer (bill-to) address and
-// carries a country code; otherwise it falls back to the buyer party. No SHIPPING contact => keys
-// stay unset => current behaviour (ship-to = buyer) is preserved.
+// Resolve a deliver-to address and expose it so the CII builder can emit a dedicated deliver-to
+// party. Resolution priority:
+//   1) external "SHIPPING" contact attached to the invoice;
+//   2) fallback: delivery address carried by a linked shipment (expedition.fk_delivery_address).
+// The builder (ShipToTradePartyBuilder::build) only emits the node when the resolved address
+// actually differs from the buyer (bill-to) address and carries a country code; otherwise it falls
+// back to the buyer party. Nothing resolved => keys stay unset => ship-to = buyer is preserved.
+$shipAddress = null;
 if (method_exists($object, 'liste_contact')) {
 	$shipContacts = $object->liste_contact(-1, 'external', 0, 'SHIPPING');
 	if (is_array($shipContacts) && count($shipContacts) > 0) {
@@ -716,13 +719,7 @@ if (method_exists($object, 'liste_contact')) {
 			if ($shipName === '') {
 				$shipName = $object->thirdparty->name;
 			}
-			$invoiceData['_shipFromContactBill'] = array(
-				'address' => $object->thirdparty->address,
-				'zip'     => $object->thirdparty->zip,
-				'town'    => $object->thirdparty->town,
-				'country' => $object->thirdparty->country_code,
-			);
-			$invoiceData['_shipFromContactShip'] = array(
+			$shipAddress = array(
 				'name'    => $shipName,
 				'address' => $shipContact->address,
 				'zip'     => $shipContact->zip,
@@ -731,6 +728,42 @@ if (method_exists($object, 'liste_contact')) {
 			);
 		}
 	}
+}
+
+// Fallback: a linked shipment may carry a distinct delivery address (no SHIPPING contact needed).
+if ($shipAddress === null && !empty($object->linkedObjectsIds['shipping']) && is_array($object->linkedObjectsIds['shipping'])) {
+	require_once DOL_DOCUMENT_ROOT . '/expedition/class/expedition.class.php';
+	require_once DOL_DOCUMENT_ROOT . '/contact/class/contact.class.php';
+	foreach ($object->linkedObjectsIds['shipping'] as $expeditionId) {
+		$tmpexpedition = new Expedition($db);
+		if ($tmpexpedition->fetch($expeditionId) > 0 && !empty($tmpexpedition->fk_delivery_address)) {
+			$shipContact = new Contact($db);
+			if ($shipContact->fetch($tmpexpedition->fk_delivery_address) > 0) {
+				$shipName = trim($shipContact->getFullName($outputlangs));
+				if ($shipName === '') {
+					$shipName = $object->thirdparty->name;
+				}
+				$shipAddress = array(
+					'name'    => $shipName,
+					'address' => $shipContact->address,
+					'zip'     => $shipContact->zip,
+					'town'    => $shipContact->town,
+					'country' => $shipContact->country_code,
+				);
+				break;
+			}
+		}
+	}
+}
+
+if ($shipAddress !== null) {
+	$invoiceData['_shipFromContactBill'] = array(
+		'address' => $object->thirdparty->address,
+		'zip'     => $object->thirdparty->zip,
+		'town'    => $object->thirdparty->town,
+		'country' => $object->thirdparty->country_code,
+	);
+	$invoiceData['_shipFromContactShip'] = $shipAddress;
 }
 
 
