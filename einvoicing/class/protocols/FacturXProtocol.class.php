@@ -1662,7 +1662,7 @@ class FacturXProtocol extends AbstractProtocol
 		 * 211 – Demande de paiement intermédiaire (une facture de situation?)
 		 * 386 – Facture d’acompte
 		 * 381 – Avoir / Note de crédit sur facture standard
-		 * 384 – Facture corrective / remplacement
+		 * 384 – Facture corrective / replacement
 		 * 380 – Facture standard
 		 * 503 - Avoir / Note de crédit sur une facture d'acompte
 		 *

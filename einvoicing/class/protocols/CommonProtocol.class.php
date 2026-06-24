@@ -120,7 +120,7 @@ trait CommonProtocol
 	/************************************************
 	 * Find paymentMean number
 	 *
-	 * @param  object 	$invoice 			object name we look for
+	 * @param  CommonInvoice 	$invoice 			object name we look for
 	 * @return integer                      paymentMeanId for HorstOeko libs
 	 ************************************************/
 	private function _getPaymentMeanNumber($invoice)
@@ -1305,7 +1305,7 @@ trait CommonProtocol
 		);
 
 		$exemptionReason = null;		// BT-120
-		$exemptionReasonCode = null;	// BT-121 - Mut contains a VATEX code. https://docs.peppol.eu/poacc/billing/3.0/codelist/vatex/
+		$exemptionReasonCode = null;	// BT-121 - Must contain a VATEX code. https://docs.peppol.eu/poacc/billing/3.0/codelist/vatex/
 
 		if ($vat_rate > 0) {
 			$categoryVAT = 'S';
@@ -1367,7 +1367,7 @@ trait CommonProtocol
 						// TVA non applicable - Debours (VAT paid by customer):  VATEX-EU-79-C
 						$vatex = '';
 
-						// We try to find code in the vat code definition in the dictionnary table (code only because einvoice_vatex does not exists).
+						// We try to find code in the vat code definition in the dictionary table (code only because einvoice_vatex does not exists).
 						global $db, $mysoc;
 
 						$sql = "SELECT code FROM ".MAIN_DB_PREFIX."c_tva";
@@ -1405,7 +1405,7 @@ trait CommonProtocol
 					} else {
 						$vatex = '';
 
-						// We try to find code in the vat code definition in the dictionnary table (einvoice_vatex else code).
+						// We try to find code in the vat code definition in the dictionary table (einvoice_vatex else code).
 						global $db, $mysoc;
 
 						$sql = "SELECT code, einvoice_vatex FROM ".MAIN_DB_PREFIX."c_tva";

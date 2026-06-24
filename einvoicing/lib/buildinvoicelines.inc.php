@@ -510,7 +510,7 @@ foreach ($object->lines as $line) {
 
 
 
-	// If a unit price inluding tax is known (rarely)
+	// If a unit price including tax is known (rarely)
 	if ($line_unit_price_ttc) {
 		// This section seems not required.
 		// It can be used if the price base is including tax (TTC) and without discount (= Catalog public unit price for individual customers)

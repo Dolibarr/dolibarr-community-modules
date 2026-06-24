@@ -333,7 +333,7 @@ if ($action == 'confirm_sync' && getDolGlobalString('EINVOICING_PDP') && $confir
 			dol_delete_file($filePathFacturX);
 
 			if (!empty($sync_result['syncedFlows']) && $sync_result['syncedFlows'] > 0) {
-				// If sync was successful and we processed 1 new record, we clear the submited date so a new one will be suggested from the last record in db.
+				// If sync was successful and we processed 1 new record, we clear the submitted date so a new one will be suggested from the last record in db.
 				$syncfromdate = 0;
 			}
 		}
@@ -980,7 +980,7 @@ if ($action == 'confirm_sync' && getDolGlobalString('EINVOICING_PDP') && $confir
 
 		// If error but no suggested action (should not happen) and debug mode is off, show a message to ask to enable debug mode (in case of)
 		if ($sync_result['res'] < 0 && empty($sync_result['actions']) && !getDolGlobalInt('EINVOICING_DEBUG_MODE')) {
-			print '<!-- message to recommand to enable debug mode -->'."\n";
+			print '<!-- message to recommend to enable debug mode -->'."\n";
 			print '<div class="wordbreak warning clearboth">';
 			print '<strong><u>'.$langs->trans("SuggestedActions").' :</u></strong></br>';
 			print $langs->trans("EnableDebugModeToSeeMoreDetails");
