@@ -19,7 +19,7 @@
 #
 
 # Module label 'ModuleHelloAssoName'
-ModuleHelloAssoName = HelloAsso
+ModuleHelloAssoName = BonjourAsso
 # Module description 'ModuleHelloAssoDesc'
 ModuleHelloAssoDesc = Proposez à vos clients une page de paiement en ligne HelloAsso (cartes bancaires). Celle-ci leur permettra d'effectuer des paiements ponctuels ou liés à un objet Dolibarr spécifique (facture, commande, etc.).
 

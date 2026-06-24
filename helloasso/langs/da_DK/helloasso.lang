@@ -1,0 +1,132 @@
+# Copyright (C) 2023 Alice Adminson
+# Copyright (C) 2025 	   Pablo Lagrave           <contact@devlandes.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see .
+
+#
+# Generic
+#
+
+# Module label 'ModuleHelloAssoName'
+ModuleHelloAssoName = HejAsso
+# Module description 'ModuleHelloAssoDesc'
+ModuleHelloAssoDesc = Tilbyd kunderne en HelloAsso online betalingsside (kredit-/betalingskort). Denne kan bruges til at give dine kunder mulighed for at foretage ad hoc-betalinger eller betalinger relateret til et specifikt Dolibarr-objekt (faktura, ordre osv.)
+
+#
+# Admin page
+#
+HelloAssoSetup = HelloAsso-opsætning
+Settings = Indstillinger
+SettingsMember=Medlemskabsindstillinger
+
+HELLOASSO_LIVE = HelloAsso er i produktionstilstand (ellers i test-/sandkassetilstand)
+HELLOASSO_TEST_CLIENT_ID=Test klientidentifikationsnøgle
+HELLOASSO_TEST_CLIENT_ID_HELP=Testklient-ID-nøglen fra din Helloasso API-konfiguration
+HELLOASSO_TEST_CLIENT_SECRET=Test klientens hemmelige nøgle
+HELLOASSO_TEST_SECRET_HELP=Testklient-ID'ets hemmelige nøgle fra din Helloasso API-konfiguration
+HELLOASSO_TEST_CLIENT_ORGANISATION=Organisationsnavn for testtilstand
+HELLOASSO_TEST_CLIENT_ORGANISATION_HELP=Navnet på organisationen til testtilstand. Skal matche det navn, der er defineret i HelloAsso-kontoen.
+
+HELLOASSO_CLIENT_ID=Identifikationsnøgle til produktionsklient
+HELLOASSO_CLIENT_ID_HELP=Klient-ID'et for produktionstilstand, som angivet i din Helloasso API-konfiguration
+HELLOASSO_CLIENT_SECRET=Klientens hemmelige nøgle til produktionstilstand
+HELLOASSO_SECRET_HELP=Det hemmelige klient-ID for produktionstilstanden, genereret af din Helloasso API-konfiguration
+HELLOASSO_CLIENT_ORGANISATION=Organisationsnavn for produktionstilstanden
+HELLOASSO_CLIENT_ORGANISATION_HELP=Navnet på organisationen for produktionstilstand. Skal matche det navn, der er defineret i HelloAsso-kontoen.
+HELLOASSO_BANK_ACCOUNT_FOR_PAYMENTS=Bankkonto til betalinger
+HELLOASSO_SHOW_ONLINE_PAYMENTS=Vis online betalingsside
+HELLOASSO_STANDAR_BTN = Aktivér den grafiske stil HelloAsso for betalingsknappen
+HELLOASSO_STANDAR_BTN_HELP = Aktiver denne indstilling for at indlæse HelloAsso CSS-filen, som erstatter Dolibarrs standardstil med et design, der er harmoniseret med HelloAssos visuelle identitet (knapper, farver osv.).
+
+ExampleOfTestCreditCardHelloAsso=Eksempel på kreditkort kan findes på denne URL:
+TestConnectionHelloasso=Testforbindelse
+SuccessfullyConnected=Forbindelse vellykket
+TestGetMembersHelloasso=Prøv at indsamle donationer via HelloAsso
+
+HELLOASSO_FORM_MEMBERSHIP_SLUG=Navn på medlemsformular til produktionstilstand
+HELLOASSO_FORM_MEMBERSHIP_SLUG_HELP=Navnet på den live medlemskabsformular, som informationen skal hentes fra. Skal matche webadressen på din formular i HelloAsso-kontoen.
+HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG=Navn på testmedlemskabsformular
+HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG_HELP=Navnet på prøvemedlemskabsformularen, hvorfra oplysningerne skal hentes. Skal matche webadressen på din formular i din HelloAsso-konto.
+HELLOASSO_FORM_PAGINATION_PAGES_SIZE=Maksimalt antal medlemsgebyrer, der skal hentes pr. side
+HELLOASSO_FORM_PAGINATION_PAGES_SIZE_HELP=Det maksimale antal bidrag, der hentes af siderne, når medlemmer importeres fra HelloAsso.
+HELLOASSO_MAX_FORM_PAGINATION_PAGES=Maksimalt antal sider med medlemsgebyrer, der skal hentes
+HELLOASSO_MAX_FORM_PAGINATION_PAGES_HELP=Det maksimale antal sider, der skal hentes, når medlemsgebyret importeres fra HelloAsso.
+HELLOASSO_FORM_CREATE_THIRDPARTY=Opret og link en tredjepart til et nyt medlem
+HELLOASSO_FORM_CREATE_THIRDPARTY_HELP=Når et nyt medlemsgebyr synkroniseres, skal du oprette en ny tredjepart for dette medlem og tilknytte den.
+
+HelloAssoMemberTypeDictionary=Kortlægning mellem HelloAsso-medlemstypeordbogen og Dolibarr
+HelloAssoMemberCustomFieldDictionary=Ordbog over HelloAsso brugerdefinerede felter og Dolibarr-feltkorrespondance
+
+HelloAssoDolibarrMemberTypeID=Dolibarr-medlemstype-id
+HelloAssoMemberTypeID=HelloAsso medlemstype-id
+ErrorHelloAssoBadParameter=Forkert parameter %s
+
+ErrorHelloAssoMemberTypeAlreadySet=Medlemstype allerede defineret
+ErrorHelloAssoAddingMemberType=Fejl ved forsøg på at tilføje medlemstype
+ErrorHelloAssoRemovingMemberType=Fejl ved forsøg på at fjerne medlemstype
+HelloAssoMemberTypeDictionaryAddedSucesfully=Medlemstype tilføjet
+HelloAssoMemberTypeDictionaryRemovedSucesfully=Medlemstypen er blevet fjernet
+
+ErrorHelloAssoCustomFieldAlreadySet=Brugerdefineret felt er allerede angivet
+ErrorHelloAssoAddingCustomField=Fejl ved forsøg på at tilføje et brugerdefineret felt
+ErrorHelloAssoRemovingCustomField=Fejl ved forsøg på at fjerne et brugerdefineret felt
+HelloAssoCustomFieldDictionaryAddedSucesfully=Brugerdefineret felt er blevet tilføjet
+HelloAssoCustomFieldDictionaryRemovedSucesfully=Brugerdefineret felt er blevet fjernet
+
+HelloAssoRecordNotFound=Optagelse ikke fundet
+
+HelloAssoMembersNothingDone=%s Medlemsgebyr(er) blev behandlet, men intet blev gjort (prøvetest). Der var en fejl i %s medlemsgebyr(er).
+HelloAssoMembersAddedSucessfully=%s Medlemsgebyr(er) er blevet tilføjet
+HelloAssoDolibarrCorrespondenceParameters=Korrespondanceparametre mellem HelloAsso og Dolibarr
+HelloAssoFormParameters=Indstillinger for HelloAsso-formular
+HelloAssoMemberTypeIdTitle=ID for den tilsvarende medlemstype i HelloAsso
+HelloAssoMemberTypeId=HelloAsso medlemstype-ID
+HelloAssoCustomField=HelloAsso brugerdefineret felt-slug
+HelloAssoCustomFieldTitle=Slug af tilsvarende brugerdefineret felt i HelloAsso
+HelloAssoSelectMemberType=Vælg en dolibarr-medlemstype
+HelloAssoSelectMemberField=Vælg et dolibarr-medlemsfelt
+HelloAssoMemberTypeDictionaryHelp=Kortlægning af ordbog mellem medlemstyperne HelloAsso og Dolibarr. Hvis ordbogen er tom, oprettes en ny medlemstype i Dolibarr. For at finde HelloAsso-medlems-ID'et skal du følge proceduren beskrevet i HelloAsso-modulwikien.
+HelloAssoMemberCustomFieldDictionaryHelp=Ordbog over HelloAsso brugerdefinerede felter og Dolibarr-feltkorrespondance.<br>For at konfigurere et nyt brugerdefineret felt. Vælg et felt i Dolibarr-medlemsobjektet, og angiv navnet på det tilsvarende HelloAsso-felt i inputfeltet.
+ModuleHelloAssoMemberSyncDesc=Synkroniser HelloAsso medlemsgebyrer i Dolibarr-databasen ved at oprette medlemmer og medlemsgebyrer.
+HelloAssoSyncButtonDesc=Test for at synkronisere dine medlemsgebyrer med din applikation uden at ændre dine data. <br>Når konfigurationen er ok, kan du automatisere synkroniseringen i modulet Planlagte job med HelloAssoGetNewMembers job.
+HELLOASSO_SUBSCRIPTION_COMPLEMENTARYACTIONS=Supplerende handling vedrørende synkronisering af medlemsgebyrer
+HELLOASSO_SUBSCRIPTION_COMPLEMENTARYACTIONS_HELP=Supplerende handling ved synkronisering af medlemsgebyrer. <br>Flere supplerende handlinger kan indstilles, hvis oprettelse af tredjepart er aktiveret ved synkronisering.
+
+# About page
+#
+About = Om
+HelloAssoAboutPage = HejAsso om siden
+
+#
+# Sample page
+#
+HelloAssoArea = Hjem HelloAsso
+
+HelloAssoDoPayment = Betal med HelloAsso
+
+ErrorBadValueAmount=Venligst revidér dit kurvbeløb. Det skal være gratis eller større end €0,50 for at godkende din betaling.
+ErrorValueFinalPaymentDiffers= Værdien af den endelige betaling (%s) afviger fra den forventede værdi for medlemskab (%s).
+ErrorBadClientIdOrSecret=Ugyldigt klient-ID eller hemmelighed
+
+HelloAssoExplanatoryText=At blive medlem af HelloAsso betyder at blive medlem af et solidaritetsbaseret system, <b>finansieret af frivillige bidrag fra brugere</b>, for at tilbyde gratis onlinetjenester af høj kvalitet til alle foreninger<br> Så ved at blive medlem drager du fordel af denne solidaritetsbaserede model, der gør det muligt at opkræve onlinebetalinger gratis.<br>Det er derfor vigtigt at kommunikere om denne model for at informere dine brugere om omfanget af deres betalinger.<br><br><b>For at acceptere betalinger med HelloAsso skal du have en konto på HelloAsso.</b>
+HelloAssoExplanatoryText2=Du har ikke en konto på HelloAsso, <a href="https://auth.helloasso.com/inscription" target="_blank">Opret din konto på et par minutter her.</a></strong><br><i>Hvis du støder på problemer, så tøv ikke med at besøge <a href="https://centredaide.helloasso.com/s/" target="_blank">vores hjælpecenter</a> eller for at <a href="https://www.helloasso.com/contactez-nous" target="_blank">kontakte os</a> direkte.</i>
+HelloAssoExplanatoryText3=For at få en HelloAsso-testkonto skal du <a href="https://auth.helloasso.com/inscription" target="_blank">oprette en anden konto her</a>
+Connected=Forbundet.
+LastRecordedToken=Sidst optagede token
+HelloAssoMembershipStatus=Medlemskabsstatus
+HelloAssoMemberPaymentLabel=HelloAsso abonnementsbetalingsnr. %s
+ErrorHelloAssoCode=Der er opstået en %s-fejl. Kontroller venligst, at slugs, formularnavne og nøgle er gyldige i HelloAsso-modulkonfigurationen.
+ErrorHelloassoMissingFirstNameOrLastName=Der opstod en fejl under hentning af medlemmets oplysninger. Fornavn eller efternavn mangler for mindst ét medlem.
+ErrorHelloAssoMembershipPost=Der opstod en fejl under behandling af medlemsgebyrposten med oplysningerne %s og fejlene %s.
+HelloAssoMembersError=%s registreringer af medlemsgebyr(er) er fejlbehæftede
