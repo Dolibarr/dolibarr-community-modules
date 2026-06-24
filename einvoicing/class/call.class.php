@@ -1226,7 +1226,7 @@ class Call extends CommonObject
 
 		$prefix = 'Call-';
 
-		$sql = "SELECT MAX(CAST(SUBSTRING(call_id, ".(strlen($prefix) + 1).") AS UNSIGNED)) AS maxref";
+		$sql = "SELECT MAX(CAST(SUBSTRING(call_id, ".(strlen($prefix) + 1).") AS SIGNED)) AS maxref";
 		$sql .= " FROM ".MAIN_DB_PREFIX.$this->table_element;
 		$sql .= " WHERE call_id LIKE '".$db->escape($prefix)."%'";
 
