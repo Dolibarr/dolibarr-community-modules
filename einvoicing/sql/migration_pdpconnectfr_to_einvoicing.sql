@@ -1,6 +1,11 @@
 --
 -- Migration script: rename module from pdpconnectfr to einvoicing.
--- Run this script AFTER disabling the pdpconnectfr module and BEFORE enabling einvoicing.
+-- Run this script MANUALLY, AFTER disabling the pdpconnectfr module and BEFORE enabling einvoicing.
+--
+-- IMPORTANT: this file is intentionally NOT named update_*.sql so that Dolibarr's
+-- _load_tables() does NOT auto-run it on every module activation. The RENAME TABLE
+-- statements below would otherwise fail on a fresh install (no llx_pdpconnectfr_* tables).
+-- Only relevant when upgrading an existing pdpconnectfr installation.
 --
 
 -- Rename tables

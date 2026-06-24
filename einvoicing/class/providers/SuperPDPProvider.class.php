@@ -139,8 +139,13 @@ class SuperPDPProvider extends AbstractPDPProvider
 				];
 				if ($mysoc->country_code == 'FR' && !empty($mysoc->idprof1)) {
 					$query += [
-						'superpdp_company_number' => $mysoc->idprof1, // siren to register
+						'superpdp_company_number' => removeAllSpaces($mysoc->idprof1), // siren to register
 						'superpdp_company_number_scheme' => 'fr_siren', // sandbox, fr_siren_ be_numero_entreprise
+					];
+				} elseif ($mysoc->country_code == 'BE' && !empty($mysoc->idprof1)) {
+					$query += [
+						'superpdp_company_number' => removeAllSpaces($mysoc->idprof1), // siren to register
+						'superpdp_company_number_scheme' => 'be_numero_entreprise', // sandbox, fr_siren_ be_numero_entreprise
 					];
 				}
 				$urltogeneratetoken .= '?' . http_build_query($query);
@@ -257,8 +262,13 @@ class SuperPDPProvider extends AbstractPDPProvider
 					];
 					if ($mysoc->country_code == 'FR' && !empty($mysoc->idprof1)) {
 						$query += [
-							'superpdp_company_number' => $mysoc->idprof1, // siren to register
+							'superpdp_company_number' => removeAllSpaces($mysoc->idprof1), // siren to register
 							'superpdp_company_number_scheme' => 'fr_siren', // sandbox, fr_siren_ be_numero_entreprise
+						];
+					} elseif ($mysoc->country_code == 'BE' && !empty($mysoc->idprof1)) {
+						$query += [
+							'superpdp_company_number' => removeAllSpaces($mysoc->idprof1), // siren to register
+							'superpdp_company_number_scheme' => 'be_numero_entreprise', // sandbox, fr_siren_ be_numero_entreprise
 						];
 					}
 					$urltogeneratetoken .= '?' . http_build_query($query);
@@ -552,7 +562,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 			// Update einvoice status with awaiting validation
 			$einvoicing = new EInvoicing($this->db);
-			$einvoicing->insertOrUpdateExtLink($object->id, Facture::class, $flowId, EInvoicing::STATUS_AWAITING_VALIDATION, $object->ref);
+			$einvoicing->insertOrUpdateExtLink($object->id, $object->element, $flowId, EInvoicing::STATUS_AWAITING_VALIDATION, $object->ref);
 
 			// Call the API to retrieve flow details and check the validation status.
 			// A short delay is applied to allow the PDP time to process the document.
@@ -590,7 +600,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 			}
 			$syncRef = $flowData['trackingId'] ?? '';
 			$syncComment = $flowData['acknowledgement']['details'][0]['reasonMessage'] ?? '';
-			$einvoicing->insertOrUpdateExtLink($object->id, Facture::class, $flowId, $syncStatus, $syncRef, $syncComment);
+			$einvoicing->insertOrUpdateExtLink($object->id, $object->element, $flowId, $syncStatus, $syncRef, $syncComment);
 
 			// Log an event in the invoice timeline
 			$eventLabel = "EINVOICING - Status: " . $ack_statusLabel;
@@ -1125,7 +1135,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$processingResult .= "<br>----------------------<br>" . implode("<br>", $messages);
 		$processingResult = "Processing result:<br>" . $processingResult;
 
-		// Save sync recap
+		// Save sync recap (only when this sync is attached to a Call row; otherwise $sql would be undefined/stale)
 		if ($call_id) {
 			$sql = "UPDATE " . MAIN_DB_PREFIX . "einvoicing_call";
 			$sql .= " SET totalflow = " . (is_null($totalFlows) ? "null" : ((int) $totalFlows)) . ",
@@ -1135,9 +1145,8 @@ class SuperPDPProvider extends AbstractPDPProvider
                 processing_result = '" . $db->escape($processingResult) . "',
                     fk_user_modif = " . ((int) $user->id) . "
             WHERE call_id = '" . $db->escape($call_id) . "'";
+			$db->query($sql);
 		}
-
-		$db->query($sql);
 
 		// Return result
 		// 'actions' contains the action to do (in case of business error)
@@ -1243,8 +1252,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 			case "CustomerInvoice":
 				// 1. link flow to customer invoice
 				require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
-				$document->fk_element_type = Facture::class;
 				$factureObj = new Facture($this->db);
+				$document->fk_element_type = $factureObj->element;
 				if (!empty($document->tracking_idref)) {
 					$res = $factureObj->fetch(0, $document->tracking_idref);
 					if ($res < 0) {
@@ -1277,7 +1286,19 @@ class SuperPDPProvider extends AbstractPDPProvider
 			// SupplierInvoice
 			case "SupplierInvoice":
 				// --- Fetch received documents (Einvoice)
-				$document->fk_element_type = FactureFournisseur::class;
+				$document->fk_element_type = 'invoice_supplier';
+
+				// AFNOR XP Z12-013: a supplier invoice to book is an INCOMING flow (issued by the
+				// platform to us). An outgoing/errored "SupplierInvoice" flow is NOT a received
+				// invoice and must not be imported as a facture fournisseur — otherwise lifecycle
+				// actions (e.g. a refusal) fail on the PDP side with "no matching invoices found".
+				if ($document->flow_direction !== 'In') {
+					$document->fk_element_id = 0;
+					$returnRes = 1;		// mark the flow as processed, just do not create an invoice
+					$returnMessage = "Skipped SupplierInvoice flow " . $flowId . " (flowDirection=" . ($document->flow_direction ?: 'null') . ", not an incoming invoice)";
+					dol_syslog(__METHOD__ . " " . $returnMessage, LOG_WARNING, 0, "_einvoicing");
+					break;
+				}
 
 				// Retrieve the PDF file converted by Access Point
 				$receivedFile = null;
@@ -1327,18 +1348,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 				// Retreive Original file
 				$receivedFile = null;
-				$flowResource = 'flows/' . $flowId;
-				$flowUrlparams = array(
-					'docType' => 'Original', 						// docType can be 'Metadata' (JSON), 'Original', 'Converted' or 'ReadableView'
-				);
-				$flowResource .= '?' . http_build_query($flowUrlparams);
-				$flowResponse = $this->callApi(
-					$flowResource,
-					"GET",
-					false,
-					['Accept' => 'application/octet-stream'],
-					'get_flow_for_supplier_invoice'
-				);
+				$flowResponse = $this->fetchFlowData($flowId, 'Original', 'get_flow_for_supplier_invoice');
 
 				if ($flowResponse['status_code'] != 200) {
 					return array('res' => -1, 'message' => "ERROR_FLOW_GETORIG Failed to retrieve 'Original' document for SupplierInvoice flow (flowId: " . $flowId . ")" . (empty($flowResponse['errorMessage']) ? '' : ' - ' . $flowResponse['errorMessage']));
@@ -1379,6 +1389,10 @@ class SuperPDPProvider extends AbstractPDPProvider
 						$resFetch = $suplierInvoiceObj->fetch($res['res']);
 						$document->fk_element_id = !empty($suplierInvoiceObj->id) ? $suplierInvoiceObj->id : 0;
 						$document->tracking_idref = !empty($suplierInvoiceObj->ref) ? $suplierInvoiceObj->ref : 'Error'; // Should always be found here
+						$cleanedXmlData = Document::cleanXmlData($res['xml_data'] ?? '');
+						if (!empty($cleanedXmlData) && Document::checkXmlDataMaxSize($cleanedXmlData)) {
+							$document->xml_data = $cleanedXmlData;
+						}
 
 						//return array('res' => 0, 'message' => "supplier invoice already exists for flowId: " . $flowId . ". " . $res['message']);
 						$returnRes = 1;		// If invoice did already exists, we process one more line from list of flows, so we must return 1, even if nothing was done.
@@ -1405,8 +1419,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 				// This part seems useless:, if invoice ref not found we continue the same way if found
 				/*
-				$document->fk_element_type = Facture::class;
 				$factureObj = new Facture($this->db);
+				$document->fk_element_type = $factureObj->element;
 
 				$refinvoice = $document->tracking_idref;
 
@@ -1457,8 +1471,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 						return array('res' => -1, 'message' => "FlowId: " . $flowId . " - Failed to parse CDAR document");
 					}
 
-					$document->fk_element_type = Facture::class;	// 'Facture', 'FactureFournisseur'
 					$factureObj = new Facture($this->db);
+					$document->fk_element_type = $factureObj->element;
 
 					// Get Invoice Reference from CDAR
 					$issuerAssignedID = $cdarDocument['AcknowledgementDocument']['ReferenceReferencedDocument']['IssuerAssignedID'];
@@ -1503,7 +1517,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 								$syncStatus = $einvoicing::STATUS_ERROR;
 								$syncComment = $document->ack_info;
 							}
-							$einvoicing->insertOrUpdateExtLink($factureObj->id, Facture::class, $flowId, $syncStatus, $factureObj->ref, $syncComment);
+							$einvoicing->insertOrUpdateExtLink($factureObj->id, $factureObj->element, $flowId, $syncStatus, $factureObj->ref, $syncComment);
 
 							$einvoicing->storeStatusMessage($document->fk_element_id, $document->fk_element_type, $document->cdar_lifecycle_code, $syncComment, $document->flow_direction, $flowId, $syncValidationStatus, $syncValidationComment, $document->submittedat, $document->cdar_reason_code);
 						} else {
@@ -1592,7 +1606,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				// Since we trigger an AJAX every X seconds to get validation response while validation of sent LC message remains in the "Pending" status after sending. That will be a double check of validation of sent LC message in case ajax call it not triggered or failed for some reason.
 
 				require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
-				$document->fk_element_type = FactureFournisseur::class;
+				$document->fk_element_type = 'invoice_supplier';
 
 				// Fetch the linked supplier invoice using flowId stored in einvoicing_lifecycle_msg table when the LC message was sent
 				$resFetchStatusMessages = $einvoicing->fetchStatusMessages($flowId);
@@ -1645,7 +1659,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				// - If trackingId is null, we try to retrieve the linked invoice using the flowId
 				//   stored in the einvoicing_extlinks table when the invoice was sent.
 
-				$document->fk_element_type = Facture::class;
+				$document->fk_element_type = 'facture';
 				if (empty($document->tracking_idref)) {
 					// Try to get tracking_idref from einvoicing_extlinks table
 					$sql = "SELECT d.syncref as tracking_idref";
@@ -1701,7 +1715,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 							$db->begin();
 
 							try {
-								$einvoicing->insertOrUpdateExtLink($factureObj->id, Facture::class, $flowId, $einvoicing::STATUS_ERROR, $factureObj->ref, $document->ack_info);
+								$einvoicing->insertOrUpdateExtLink($factureObj->id, $factureObj->element, $flowId, $einvoicing::STATUS_ERROR, $factureObj->ref, $document->ack_info);
 
 								// Log an event in the invoice timeline
 								$statusLabel = $document->ack_status;

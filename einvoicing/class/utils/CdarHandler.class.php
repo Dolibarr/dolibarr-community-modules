@@ -384,6 +384,25 @@ class CdarHandler
 	// ==================== PRIVATE HELPERS ====================
 
 	/**
+	 * Register the known CDAR namespaces on the given element so that prefixed
+	 * XPath queries resolve. Must be done on every element (root AND sub-nodes
+	 * returned by xpath()), otherwise libxml raises "Undefined namespace prefix"
+	 * and the query silently returns false.
+	 *
+	 * @param  SimpleXMLElement $xml xml element
+	 * @return SimpleXMLElement       same element, for chaining
+	 */
+	private function registerNamespaces($xml)
+	{
+		if ($xml instanceof SimpleXMLElement) {
+			foreach ($this->namespaces as $prefix => $uri) {
+				$xml->registerXPathNamespace($prefix, $uri);
+			}
+		}
+		return $xml;
+	}
+
+	/**
 	 * getXpathValue
 	 *
 	 * @param  SimpleXmlElement $xml xml
@@ -393,6 +412,7 @@ class CdarHandler
 	 */
 	private function getXpathValue($xml, $path, $default = '')
 	{
+		$this->registerNamespaces($xml);
 		$result = $xml->xpath($path);
 
 		return !empty($result) ? (string) $result[0] : $default;
@@ -409,6 +429,7 @@ class CdarHandler
 	 */
 	private function getXpathAttribute($xml, $path, $attribute, $default = '')
 	{
+		$this->registerNamespaces($xml);
 		$result = $xml->xpath($path);
 
 		return !empty($result) ? (string) $result[0][$attribute] : $default;
@@ -584,13 +605,13 @@ class CdarHandler
 			]
 		];
 
-		$statusNodes = $xml->xpath('//ram:ReferenceReferencedDocument/ram:SpecifiedDocumentStatus');
+		$statusNodes = $this->registerNamespaces($xml)->xpath('//ram:ReferenceReferencedDocument/ram:SpecifiedDocumentStatus');
 		if (!empty($statusNodes)) {
 			$status = $statusNodes[0];
 			$result['StatusReasonCode'] = $this->getXpathValue($status, 'ram:ReasonCode');
 			$result['StatusReason'] = $this->getXpathValue($status, 'ram:Reason');
 
-			$seqResult = $status->xpath('ram:SequenceNumeric');
+			$seqResult = $this->registerNamespaces($status)->xpath('ram:SequenceNumeric');
 			if (!empty($seqResult)) {
 				$result['StatusSequenceNumeric'] = (int) $seqResult[0];
 			}
@@ -598,7 +619,7 @@ class CdarHandler
 			// Collect all note contents from all SpecifiedDocumentStatus nodes
 			$allContents = [];
 			foreach ($statusNodes as $statusNode) {
-				$contentNodes = $statusNode->xpath('ram:IncludedNote/ram:Content');
+				$contentNodes = $this->registerNamespaces($statusNode)->xpath('ram:IncludedNote/ram:Content');
 				if (!empty($contentNodes)) {
 					foreach ($contentNodes as $node) {
 						$content = trim((string) $node);

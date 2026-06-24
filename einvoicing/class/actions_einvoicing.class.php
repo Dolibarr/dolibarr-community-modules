@@ -91,8 +91,11 @@ class ActionsEInvoicing extends CommonHookActions
 
 			if ($thirdpartyCountryCode === 'FR' && (!isset($currentStatusDetails['code']) || $currentStatusDetails['code'] != $einvoicing::STATUS_IGNORE)) {
 				/** @var Facture $invoiceObject */
-				if (//$invoiceObject->status != $invoiceObject::STATUS_DRAFT &&
-					!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')
+				// Never generate/transmit an e-invoice for a DRAFT: regenerating a draft PDF (e.g. after
+				// adding a line) must NOT push anything to the PA. At validation the invoice is already
+				// VALIDATED when Dolibarr regenerates the final PDF, so the legitimate flow is preserved.
+				if ($invoiceObject->status != $invoiceObject::STATUS_DRAFT
+					&& !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')
 					&& getDolGlobalString('EINVOICING_EINVOICE_IN_REAL_TIME')) {
 					// Call function to create Factur-X document
 					require_once __DIR__ . '/protocols/ProtocolManager.class.php';
@@ -138,6 +141,27 @@ class ActionsEInvoicing extends CommonHookActions
 					if ($result && (!is_numeric($result) || $result > 0)) {
 						// No error
 						setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
+
+						// Optionally transmit to the Access Point right after generation (opt-in + idempotent).
+						// Without this, validation only generates the Factur-X; the invoice is never sent to the
+						// PA (transmission was a manual "send_to_pdp" click only). The 'transmitted' guard prevents
+						// re-sending (and creating duplicate flows) when the PDF is regenerated later.
+						if (getDolGlobalString('EINVOICING_AUTO_SEND_ON_GENERATION') && empty($currentStatusDetails['transmitted'])) {
+							require_once __DIR__ . '/providers/PDPProviderManager.class.php';
+							$PDPManager = new PDPProviderManager($db);
+							$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+							if (is_object($provider)) {
+								$sendres = $provider->sendInvoice($invoiceObject);
+								if ($sendres) {
+									setEventMessages($langs->trans("InvoiceSuccessfullySentToPDP") . ' - ' . $langs->trans("FlowId") . ': ' . $sendres, null, 'mesgs');
+								} else {
+									// Don't block validation if auto-send fails: the e-invoice is generated and can still be sent manually.
+									$senderrors = $provider->errors ?: array($provider->error);
+									$this->warnings = array_merge($this->warnings, (array) $senderrors);
+									dol_syslog(__METHOD__ . " auto-send to PA failed: " . implode('; ', (array) $senderrors), LOG_WARNING, 0, "_einvoicing");
+								}
+							}
+						}
 					} else {
 						if (getDolGlobalString('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
 							// If einvoice fails here, it must be always an error
