@@ -159,7 +159,7 @@ class HelloAssoMemberUtilsTest extends CommonClassTest
 
 		$customfield = new stdClass();
 		$customfield->name = "Member email";
-		$customfield->answer = "test.adherent@exemple.com";
+		$customfield->answer = "test.adherent@example.com";
 		$newmember->customFields = array();
 		$newmember->customFields[] = $customfield;
 
