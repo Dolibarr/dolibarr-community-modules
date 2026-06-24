@@ -316,6 +316,7 @@ SupplierInvoiceComparisonVatBasisDifference=différence de montant de base pour 
 SupplierInvoiceComparisonVatRateDifference=différence de montant de TVA %s%% (e-facture : %s / facture Dolibarr : %s)
 SupplierInvoiceComparisonVatRateNotFound=taux de TVA à %s%% non trouvé dans la facture Dolibarr
 SupplierInvoiceComparisonSuggestVatCalculationMode=recalculer la TVA en Mode %s pour avoir des montants de TVA correspondant à l'e-facture d'origine
+EinvoicingCantDeleteADocumentLinkedToAnExistingSupplierInvoice=Le document n° %s ne peut pas être supprimé car il est lié à la facture fournisseur Dolibarr n° %s
 
 EINVOICING_CLIENT_ID=Client ID
 EINVOICING_CLIENT_SECRET=Client Secret
