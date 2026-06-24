@@ -330,6 +330,19 @@ SupplierInvoiceComparisonSuggestVatCalculationMode=recalculate invoice using Mod
 
 EINVOICING_CLIENT_ID=Client ID
 EINVOICING_CLIENT_SECRET=Client secret
+EINVOICING_SUPERPDP_GRANT_TYPE=OAuth grant type
+EINVOICING_SUPERPDP_GRANT_TYPE_HELP=Client Credentials: paste your own credentials for your own account. Authorization Code: delegated authorization (the end user grants access to their SUPER PDP account through a login tunnel) — required to onboard third parties (white-label).
+EINVOICING_SUPERPDP_GRANT_CLIENT_CREDENTIALS=Client Credentials (my own account)
+EINVOICING_SUPERPDP_GRANT_AUTHORIZATION_CODE=Authorization Code (delegation / third party)
+EINVOICING_SUPERPDP_REDIRECT_URI=Redirect URI
+EINVOICING_SUPERPDP_REDIRECT_URI_HELP=This URL must be registered EXACTLY as shown in your OAuth application in the SUPER PDP interface, otherwise the connection will fail.
+EINVOICING_SUPERPDP_SEND_AND_RECEIVE=Directory registration (send_and_receive)
+EINVOICING_SUPERPDP_SEND_AND_RECEIVE_HELP=Onboarding UI behaviour: any = user chooses; send = hides the receiving-address registration; receive = forces registering a receiving address.
+EINVOICING_SUPERPDP_ONLY_FUTURE=Official date only (only_future)
+EINVOICING_SUPERPDP_ONLY_FUTURE_HELP=If Yes, prevents the user from joining the "pilot phase": only the official date of 1 September 2026 is offered for registering a directory entry (fr_siren companies).
+EINVOICING_SUPERPDP_DIRECTORY_ENTRY_IDENTIFIER=E-invoicing address (directory_entry_identifier)
+EINVOICING_SUPERPDP_DIRECTORY_ENTRY_IDENTIFIER_HELP=Optional (fr_siren): e-invoicing routing identifier created if the user enables invoice reception.
+EINVOICING_SUPERPDP_OAUTH_STATE_MISMATCH=Connection failed: the "state" security parameter does not match (expired session or invalid attempt). Please restart the connection.
 EINVOICING_API_KEY=API key
 
 # AP EsaLink

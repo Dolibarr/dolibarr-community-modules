@@ -141,6 +141,48 @@ if (!getDolGlobalString($keyforparamsecret)) {
 }
 
 
+// Server-to-server token refresh for "via partner" (grey-label) clients.
+// A delegated client holds a refresh_token but NOT the client_secret, so it cannot run the
+// refresh_token grant by itself. It POSTs its refresh_token here; this proxy (which holds the
+// secret) performs the grant against the PA and returns the rotated tokens as JSON. This is a
+// background machine-to-machine call: no browser, no session/state, no redirect.
+if (GETPOST('action', 'aZ09') == 'refresh' && GETPOST('grant_type', 'aZ09') == 'refresh_token') {
+	header('Content-Type: application/json; charset=UTF-8');
+
+	$refresh_token = preg_replace('/[^A-Za-z0-9._\-]/', '', (string) GETPOST('refresh_token', 'restricthtml'));
+	if (empty($refresh_token)) {
+		http_response_code(400);
+		echo json_encode(array('error' => 'invalid_request', 'error_description' => 'refresh_token is missing'));
+		exit;
+	}
+
+	$providerconfig = $setupprovider->getConf();
+	$oauthtokenurl = $providerconfig['prod_auth_url'];
+	$oauthtokenurl .= (preg_match('/\/$/', $oauthtokenurl) ? '' : '/').'token';
+
+	$params = array(
+		'grant_type'    => 'refresh_token',
+		'refresh_token' => $refresh_token,
+		'client_id'     => getDolGlobalString($keyforparamid),
+		'client_secret' => getDolGlobalString($keyforparamsecret),
+	);
+
+	require_once DOL_DOCUMENT_ROOT.'/core/lib/geturl.lib.php';
+	$resultget = getURLContent($oauthtokenurl, 'POST', http_build_query($params), 1, array('Content-Type: application/x-www-form-urlencoded'));
+
+	$httpcode = empty($resultget['http_code']) ? 0 : $resultget['http_code'];
+	if (empty($resultget['curl_error_no']) && $httpcode == 200) {
+		// Pass the PA response (access_token, refresh_token, expires_in, ...) straight back to the client.
+		echo $resultget['content'];
+	} else {
+		dol_syslog("proxy_oauthcallback refresh failed http_code=".$httpcode, LOG_WARNING);
+		http_response_code($httpcode ? $httpcode : 502);
+		echo !empty($resultget['content']) ? $resultget['content'] : json_encode(array('error' => 'proxy_refresh_failed'));
+	}
+	exit;
+}
+
+
 /*
  * Actions
  */
@@ -265,7 +307,9 @@ if (empty($code) && !GETPOST('error')) {
 					"redirect_uri" => $redirect_uri
 				];
 
-				$resultget = getURLContent($oauthserverurl, 'POST', $params);
+				// Send as application/x-www-form-urlencoded (the OAuth 2.0 standard for the token endpoint),
+				// not multipart/form-data which an array param would produce.
+				$resultget = getURLContent($oauthserverurl, 'POST', http_build_query($params), 1, array('Content-Type: application/x-www-form-urlencoded'));
 
 				$reg = array();
 				$origin_redirect_uri = '';
