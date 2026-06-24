@@ -147,7 +147,7 @@ function completAutoTags($content, $modulePath)
 	$gitbranch = '';
 	$gitsystem = '';
 
-	// We extract data fro mthe YAML file
+	// We extract data from the YAML file
 	$reg = array();
 	if (preg_match('/git:\s*[\'"]([^\'"]+)[\'"]/', $content, $reg)) {
 		$git = $reg[1];
@@ -181,7 +181,7 @@ function completAutoTags($content, $modulePath)
 			$urltoget = preg_replace('/\.git$/', '/-/raw/'.$gitbranch, $git);
 			$urltoget .= '/core/modules/mod'.$modulename.'.class.php';
 			$urltoget .= '?inline=false';
-			// Example: 'https://mydomain.com/accoun/project/repo/-/blob/master/core/modules/modFacturx.class.php?ref_type=heads'
+			// Example: 'https://mydomain.com/account/project/repo/-/blob/master/core/modules/modFacturx.class.php?ref_type=heads'
 		}
 
 		print "Try to get remote content of descriptor file ".$urltoget." (url guessed from ".$git.")\n";
@@ -246,9 +246,9 @@ function completAutoTags($content, $modulePath)
 			}
 		}
 
-		// Now udate the created_at
+		// Now update the created_at
 
-		// Now udate the last_updated_at
+		// Now update the last_updated_at
 		$tag = 'last_updated_at';
 		if (preg_match('/(' . preg_quote($tag) . ':\s*)["\']?auto["\']?/', $content)) {	// If the key: is 'auto'
 			$value = "";
@@ -262,7 +262,7 @@ function completAutoTags($content, $modulePath)
 			} elseif ($gitsystem == 'gitlab') {
 				$urltoget = preg_replace('/\.git$/', '/-/commits/'.$gitbranch.'?format=atom', $git);
 				//$urltoget = ' https://inligit.fr/cap-rel/dolibarr/plugin-peppol/-/raw/master/core/modules/modPeppol.class.php?inline=false https://gitlab.com/api/v4/projects/cap-rel/repository/commits?per_page=1&ref_name=$branch";
-				// Example: 'https://mydomain.com/accoun/project/repo/-/blob/master/core/modules/modFacturx.class.php?ref_type=heads'
+				// Example: 'https://mydomain.com/account/project/repo/-/blob/master/core/modules/modFacturx.class.php?ref_type=heads'
 			}
 
 			$commitContent = '';
@@ -375,7 +375,7 @@ function buildModulePackages()
 			print "[fail] This repository does not contain a valid module sources, skipped.\n";
 			print "--------------------------------------------------------------\n";
 			continue;
-			// TODO : Try to retreive zip from Dolistore or make a git clone and then generate the build from sources.
+			// TODO : Try to retrieve zip from Dolistore or make a git clone and then generate the build from sources.
 		}
 
 		//  Define the name of the output zip file and remove it if already exists
@@ -660,7 +660,7 @@ if (!extension_loaded('zip')) {
 
 if (empty($argv[1])) {
 	print "Usage:   ".$script_file." index|makezip|pushdolistore\n";
-	print "Example: ".$script_file." index      	to rebuild the index.yaml file (used by Dolibarr to retreive list of community modules)\n";
+	print "Example: ".$script_file." index      	to rebuild the index.yaml file (used by Dolibarr to retrieve list of community modules)\n";
 	print "Example: ".$script_file." makezip      	to regenerate zip of packages \n";
 	print "Example: ".$script_file." pushdolistore  to regenerate zip of packages and publish them on dolistore (TODO)\n";
 	print "\n";
