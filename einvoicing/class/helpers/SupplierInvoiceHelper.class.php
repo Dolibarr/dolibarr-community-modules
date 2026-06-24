@@ -204,7 +204,7 @@ class SupplierInvoiceHelper
 		global $db, $user;
 
 		$sql = "SELECT `rowid`, `flow_id`, `provider`, `xml_data` FROM " . MAIN_DB_PREFIX . "einvoicing_document";
-		$sql .= " WHERE fk_element_type = '" . $db->escape('FactureFournisseur') . "'";
+		$sql .= " WHERE fk_element_type = '" . $db->escape('invoice_supplier') . "'";
 		$sql .= " AND fk_element_id = " . (int) $supplierInvoiceId;
 		$sql .= " LIMIT 2";
 
@@ -249,7 +249,7 @@ class SupplierInvoiceHelper
 	}
 
 	/**
-	 * Allow to known if a supplier invoice is an e-invoice or not
+	 * Allow to know if a supplier invoice is an e-invoice or not
 	 *
 	 * @param int $supplierInvoiceId The id of the supplier invoice
 	 * @throws Exception
@@ -260,7 +260,7 @@ class SupplierInvoiceHelper
 		global $db;
 
 		$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "einvoicing_document";
-		$sql .= " WHERE fk_element_type = '" . $db->escape('FactureFournisseur') . "'";
+		$sql .= " WHERE fk_element_type = '" . $db->escape('invoice_supplier') . "'";
 		$sql .= " AND fk_element_id = " . (int) $supplierInvoiceId;
 		$sql .= " LIMIT 2";
 

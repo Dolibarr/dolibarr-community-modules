@@ -62,6 +62,7 @@ ChorusId=Identification du chœur de transmission
 FxCheckError = Erreurs ou avertissements de conformité FacturX :
 FxCheckErrorAddress = L'adresse de votre entreprise est vide.
 FxCheckErrorCountry = Le pays de votre entreprise est vide.
+FxCheckErrorVATnumberFormat=Le format du numéro de TVA de votre entreprise est invalide (format attendu pour la France : FR + 2 caractères + 9 chiffres).
 FxCheckErrorCustomerAddress = L'adresse du client est vide.
 FxCheckErrorCustomerCountry = Le pays du client n'est pas indiqué.
 FxCheckErrorCustomerIDPROF1 = Le client ne possède pas d'identifiant professionnel (SIREN).

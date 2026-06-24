@@ -768,6 +768,9 @@ class EInvoicing
 		if (empty($mysoc->tva_intra)) {
 			$baseWarnings[] = $langs->trans("FxCheckErrorVATnumber");
 		}
+		if (!empty($mysoc->tva_intra) && !preg_match('/^[A-Z]{2}[A-Z0-9]{2,12}$/', $this->removeSpaces($mysoc->tva_intra))) { // Check VAT number format: 2-letter country code + 2 to 12 alphanumeric characters
+			$baseErrors[] = $langs->trans("FxCheckErrorVATnumberFormat");
+		}
 		if (empty($mysoc->address)) {
 			$baseWarnings[] = $langs->trans("FxCheckErrorAddress");
 		}
