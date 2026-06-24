@@ -200,9 +200,9 @@ $item->helpText = $langs->transnoentities('EINVOICING_ALLOW_RESEND_TRANSMITTED_H
 
 // Dev-only: keep the "Regenerate e-invoice" button/action available on a transmitted-locked invoice
 // (rebuild the CII/Factur-X to inspect the XML). Re-sending stays locked. Off by default.
-$item = $formSetup->newItem('EINVOICING_ENABLE_DEV_CII_REGEN')->setAsYesNo();
+$item = $formSetup->newItem('EINVOICING_ALLOW_REGEN_TRANSMITTED')->setAsYesNo();
 $item->defaultFieldValue = '0';
-$item->helpText = $langs->transnoentities('EINVOICING_ENABLE_DEV_CII_REGEN_HELP');
+$item->helpText = $langs->transnoentities('EINVOICING_ALLOW_REGEN_TRANSMITTED_HELP');
 
 // End of selection of platform partner
 
