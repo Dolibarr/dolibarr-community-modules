@@ -28,4 +28,4 @@ UPDATE llx_menu SET module = 'einvoicing' WHERE module = 'pdpconnectfr';
 UPDATE llx_menu SET mainmenu = 'einvoicing' WHERE mainmenu = 'pdpconnectfr';
 UPDATE llx_menu SET leftmenu = REPLACE(leftmenu, 'pdpconnectfr', 'einvoicing') WHERE leftmenu LIKE '%pdpconnectfr%';
 
-UPDATE llx_const SET value = REPLACE(name, 'pdpconnectfr_', 'einvoicing_') WHERE name LIKE 'EINVOICING_SUPERPDP_VIAPARTNER_OAUTH_URL' and name like '%pdpconnectfr_%';
+UPDATE llx_const SET value = REPLACE(value, 'pdpconnectfr_', 'einvoicing_') WHERE name LIKE 'EINVOICING_SUPERPDP_VIAPARTNER_OAUTH_URL' and name like '%pdpconnectfr_%';
