@@ -14,6 +14,6 @@ UPDATE llx_einvoicing_extlinks SET element_type = 'invoice_supplier' WHERE eleme
 -- One of the two statements below applies per database driver, the other is a harmless no-op:
 --   - MySQL/MariaDB accept the plain MODIFY and cast varchar -> int implicitly.
 --   - PostgreSQL (via Dolibarr's SQL converter) needs the explicit USING cast.
-ALTER TABLE llx_einvoicing_call MODIFY COLUMN entity integer DEFAULT 1;
-ALTER TABLE llx_einvoicing_call MODIFY COLUMN entity integer USING (entity::integer);
+-- VMYSQL4.3 ALTER TABLE llx_einvoicing_call MODIFY COLUMN entity integer DEFAULT 1;
+-- VPGSQL8.2 ALTER TABLE llx_einvoicing_call MODIFY COLUMN entity integer USING (entity::integer);
 ALTER TABLE llx_einvoicing_call ALTER COLUMN entity SET DEFAULT 1;
