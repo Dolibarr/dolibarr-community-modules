@@ -148,7 +148,7 @@ class Call extends CommonObject
 		"status" => array("type" => "integer", "label" => "Status", "enabled" => "1", 'position' => 2000, 'notnull' => 1, "visible" => "1", "index" => "1", "arrayofkeyval" => array("0" => "success", "1" => "error", "9" => "warning"), "validate" => "1",),
 		"request_body" => array("type" => "text", "label" => "Request", "enabled" => "1", 'position' => 200, 'notnull' => 0, "visible" => "-1", "comment" => "Request body (JSON)"),
 		"response" => array("type" => "text", "label" => "RetreivedMessage", "enabled" => "1", 'position' => 201, 'notnull' => 0, "visible" => "-1", "comment" => "Full response body (JSON)", "help" => "Saved only if Debug mode is on"),
-		"entity" => array("type" => "varchar(50)", "label" => "entity", "enabled" => "1", 'position' => 1900, 'notnull' => 0, "visible" => "0", "comment" => "Multi-entity support"),
+		"entity" => array("type" => "integer", "label" => "entity", "enabled" => "1", 'position' => 1900, 'notnull' => 0, "visible" => "0", "comment" => "Multi-entity support"),
 	);
 	public $rowid;
 	public $call_id;
