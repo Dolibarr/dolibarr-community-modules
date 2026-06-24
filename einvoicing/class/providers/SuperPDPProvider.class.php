@@ -232,14 +232,23 @@ class SuperPDPProvider extends AbstractPDPProvider
 		if (getDolGlobalString('EINVOICING_PDP') != 'SUPERPDPViaPartner' || getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER') == 'proxy') {
 			// OAuth grant type: client_credentials (own account, paste credentials) or
 			// authorization_code (delegated authorization / onboarding of a third party).
-			$item = $formSetup->newItem($prefix.'GRANT_TYPE')->setAsSelect(array(
-				'client_credentials' => $langs->trans('EINVOICING_SUPERPDP_GRANT_CLIENT_CREDENTIALS'),
-				'authorization_code' => $langs->trans('EINVOICING_SUPERPDP_GRANT_AUTHORIZATION_CODE'),
-			));
-			$item->nameText = $langs->trans('EINVOICING_SUPERPDP_GRANT_TYPE');
-			$item->helpText = $langs->transnoentities('EINVOICING_SUPERPDP_GRANT_TYPE_HELP');
-			$item->defaultFieldValue = 'client_credentials';
-			$item->cssClass = 'minwidth500';
+
+			/* If module is on a customer client instance not using proxy (getDolGlobalString('EINVOICING_PDP') == 'SUPERPDP'), he use the grant type client_credentials
+			 * If module is on a customer client instance to use proxy (getDolGlobalString('EINVOICING_PDP') == 'SUPERPDPViaPartner'), he use the grant type authorization_code
+			 * If module is the proxy instance (getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER') =='proxy'), we use grant type client_credentials but we may use both so we add the option
+			 */
+
+			if (getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER') == 'proxy') {
+				$item = $formSetup->newItem($prefix.'GRANT_TYPE')->setAsSelect(array(
+					'client_credentials' => $langs->trans('EINVOICING_SUPERPDP_GRANT_CLIENT_CREDENTIALS'),
+					'authorization_code' => $langs->trans('EINVOICING_SUPERPDP_GRANT_AUTHORIZATION_CODE'),
+				));
+
+				$item->nameText = $langs->trans('EINVOICING_SUPERPDP_GRANT_TYPE');
+				$item->helpText = $langs->transnoentities('EINVOICING_SUPERPDP_GRANT_TYPE_HELP');
+				$item->defaultFieldValue = 'client_credentials';
+				$item->cssClass = 'minwidth500';
+			}
 
 			// Username
 			$item = $formSetup->newItem($prefix.'CLIENT_ID'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''));
@@ -260,7 +269,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 			$item->cssClass = 'minwidth500';
 
 			// Authorization Code specific settings
-			if (getDolGlobalString($prefix.'GRANT_TYPE') == 'authorization_code') {
+			// We suggest all these options if we are on the proxy.
+			if (getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER') == 'proxy') {
 				// Redirect URI to register in the SuperPDP interface (must match exactly)
 				$item = $formSetup->newItem($prefix.'REDIRECT_URI_INFO');
 				$item->nameText = $langs->trans('EINVOICING_SUPERPDP_REDIRECT_URI');
@@ -614,6 +624,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 		}
 		if ($companyscheme === 'fr_siren') {
 			if (getDolGlobalString('EINVOICING_SUPERPDP_DIRECTORY_ENTRY_IDENTIFIER')) {
+				// TODO The EINVOICING_SUPERPDP_DIRECTORY_ENTRY_IDENTIFIER should be a prefix only
+				// and superpdp_directory_entry_identifier should be removeAllSpaces($mysoc->idprof1).'_'.getDolGlobalString('EINVOICING_SUPERPDP_DIRECTORY_ENTRY_IDENTIFIER');
+				// or it should be a param on the end client side, not on proxy ?
 				$query['superpdp_directory_entry_identifier'] = getDolGlobalString('EINVOICING_SUPERPDP_DIRECTORY_ENTRY_IDENTIFIER');
 			}
 			if (getDolGlobalInt('EINVOICING_SUPERPDP_ONLY_FUTURE')) {
