@@ -1060,7 +1060,7 @@ class CIIProtocol extends AbstractProtocol
 	 *   - YYYYMMDDHHmm => 2025-06-30  (date part only)
 	 *
 	 * @param  string|null 	$raw	Raw date string
-	 * @return string|null  YYYY-MM-DD or null if input is null/empty/unparseable
+	 * @return string|null  YYYY-MM-DD or null if input is null/empty/unparsable
 	 */
 	private function normDate(?string $raw): ?string
 	{
@@ -2071,7 +2071,7 @@ class CIIProtocol extends AbstractProtocol
 		 * 211 – Demande de paiement intermédiaire (une facture de situation?)
 		 * 386 – Facture d’acompte
 		 * 381 – Avoir / Note de crédit sur facture standard
-		 * 384 – Facture corrective / remplacement
+		 * 384 – Facture corrective / replacement
 		 * 380 – Facture standard
 		 * 503 - Avoir / Note de crédit sur une facture d'acompte
 		 *

@@ -1375,7 +1375,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				}
 				*/
 
-				// Retreive Original file
+				// Retrieve Original file
 				$receivedFile = null;
 				$flowResponse = $this->fetchFlowData($flowId, 'Original', 'get_flow_for_supplier_invoice');
 

@@ -88,8 +88,8 @@ class SupplierInvoiceHelper
 		// Mode 1 : round VAT amount of each line and then sum rounded amounts
 		// Mode 2 : sum VAT amount of each line and then round total
 
-		// ? Start transaction to be able to calculate VAT amounts in 2 differents modes :
-		// ? - do it this way because VAT calculation is directly made in update_price() method which also update database, but in our case, we don't want to update database
+		// ? Start transaction to be able to calculate VAT amounts in 2 different modes :
+		// ? - do it this way because VAT calculation is directly made in update_price() method which also updates database, but in our case, we don't want to update database
 		// ? - our need here is to calculate in mode 1 and mode 2 without to have to rewrite all VAT calculation logic
 		$db->begin();
 
