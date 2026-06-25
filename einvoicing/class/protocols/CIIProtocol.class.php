@@ -35,7 +35,6 @@ require_once DOL_DOCUMENT_ROOT . '/core/lib/files.lib.php';
 
 dol_include_once('einvoicing/class/protocols/AbstractProtocol.class.php');
 dol_include_once('einvoicing/class/protocols/CommonProtocol.class.php');
-dol_include_once('einvoicing/class/protocols/ShipToTradePartyBuilder.class.php');
 dol_include_once('einvoicing/class/einvoicing.class.php');
 dol_include_once('einvoicing/class/utils/XmlPatcher.class.php');
 dol_include_once('einvoicing/lib/einvoicing.lib.php');
@@ -1508,7 +1507,7 @@ class CIIProtocol extends AbstractProtocol
 		// otherwise fall back to the buyer party so the node stays present (upstream behaviour).
 		$shiptotrade = null;
 		if (!empty($invoiceData['_shipFromContactShip'])) {
-			$shiptotrade = ShipToTradePartyBuilder::build(
+			$shiptotrade = $this->buildShipToTradeParty(
 				$doc,
 				$invoiceData['_shipFromContactBill'] ?? array(),
 				$invoiceData['_shipFromContactShip']
@@ -1920,6 +1919,66 @@ class CIIProtocol extends AbstractProtocol
 			$tax->appendChild($id);
 			$node->appendChild($tax);
 		}
+	}
+
+	/**
+	 * Build a <ram:ShipToTradeParty> element when the shipping address actually differs from the
+	 * billing (buyer) address and carries a resolvable country code.
+	 *
+	 * Returns null when no distinct ship-to party must be emitted, in which case the caller is
+	 * expected to fall back to the upstream behaviour (ship-to = buyer), keeping the
+	 * ApplicableHeaderTradeDelivery/ShipToTradeParty node always present (intracommunity requirement).
+	 *
+	 * @param DOMDocument $doc   Document to create nodes in
+	 * @param array       $bill  Billing address: keys address, zip, town, country (alpha-2)
+	 * @param array       $ship  Shipping address: keys name, address, zip, town, country (alpha-2)
+	 * @return DOMElement|null   The ShipToTradeParty node, or null to fall back to the buyer party
+	 */
+	private function buildShipToTradeParty(DOMDocument $doc, array $bill, array $ship)
+	{
+		// BR-57: a postal address present in the XML must carry a non-empty CountryID. Without a
+		// resolvable country we cannot emit a valid BG-15, so we skip the contact ship-to entirely.
+		if (empty($ship['country'])) {
+			return null;
+		}
+
+		// Normalized comparison (case / whitespace) to avoid false positives that would emit a
+		// redundant BG-15 identical to the buyer address.
+		$norm = function ($s) {
+			$s = preg_replace('/\s+/', ' ', trim((string) ($s ?? '')));
+			return function_exists('mb_strtoupper') ? mb_strtoupper($s, 'UTF-8') : strtoupper($s);
+		};
+		$billKey = array($norm($bill['address'] ?? ''), $norm($bill['zip'] ?? ''), $norm($bill['town'] ?? ''), $norm($bill['country'] ?? ''));
+		$shipKey = array($norm($ship['address'] ?? ''), $norm($ship['zip'] ?? ''), $norm($ship['town'] ?? ''), $norm($ship['country'] ?? ''));
+		if ($billKey === $shipKey) {
+			return null;
+		}
+
+		$node = $doc->createElement('ram:ShipToTradeParty');
+
+		// BT-70 Deliver-to party name (optional).
+		if (!empty($ship['name'])) {
+			$node->appendChild($doc->createElement('ram:Name', htmlspecialchars($ship['name'])));
+		}
+
+		// BG-15 Deliver-to address.
+		$addr = $doc->createElement('ram:PostalTradeAddress');
+		$node->appendChild($addr);
+
+		// CII XSD order for PostalTradeAddress: PostcodeCode BEFORE LineOne (counter-intuitive).
+		if (!empty($ship['zip'])) {
+			$addr->appendChild($doc->createElement('ram:PostcodeCode', $ship['zip']));
+		}
+		if (!empty($ship['address'])) {
+			$addr->appendChild($doc->createElement('ram:LineOne', htmlspecialchars($ship['address'])));
+		}
+		if (!empty($ship['town'])) {
+			$addr->appendChild($doc->createElement('ram:CityName', htmlspecialchars($ship['town'])));
+		}
+		// CountryID is mandatory whenever the address block exists (BR-57). Guaranteed non-empty here.
+		$addr->appendChild($doc->createElement('ram:CountryID', $ship['country']));
+
+		return $node;
 	}
 
 	/**

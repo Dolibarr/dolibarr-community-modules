@@ -503,7 +503,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		// with grant_type=refresh_token instead of re-authenticating from scratch. A full re-auth opens a
 		// new session on the PA each time, whereas refreshing does not. The refresh token is rotated on each
 		// use, so we must persist the new one returned by the server.
-		if (!empty($this->tokenData['refresh_token'])) {
+		if (!empty($this->tokenData['refresh_token'])) { // Refresh token is available only for Authorization Code grant, not for Client Credentials grant.
 			$providerconfig = $this->getConf();
 
 			// "Via partner" (grey-label) client: it holds no client_secret, so it cannot run the
