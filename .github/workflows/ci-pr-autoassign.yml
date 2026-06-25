@@ -73,7 +73,7 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          echo "Adding label '$V18_LABEL' to PR #${PR_NUMBER}"
+          echo "Adding label '$LABEL' to PR #${PR_NUMBER}"
           response=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
             -H "Authorization: Bearer ${GH_TOKEN}" \
             -H "Accept: application/vnd.github+json" \
