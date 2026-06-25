@@ -1009,8 +1009,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 * Call the provider API.
 	 *
 	 * @param string 						$resource 	    Resource relative URL ('token', 'healthcheck', 'Flows', or others)
-	 * @param string                        $method         HTTP method ('GET', 'POST', etc.)
-	 * @param array<string, mixed>|false 	$params 	    Options for the request
+	 * @param 'POST'|'GET'|'HEAD'|'PUT'|'PUTALREADYFORMATED'|'POSTALREADYFORMATED'|'DELETE' $method         HTTP method (dolibarr's types)
+	 * @param string|false 	$params 	    Options for the request (JSON encoded)
 	 * @param array<string, string>         $extraHeaders   Optional additional headers
 	 * @param string|null                   $callType       Functional type of the API call for logging purposes (e.g., 'sync_flows', 'send_invoice')
 	 *
@@ -1124,7 +1124,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 *
 	 * @param   int   $syncFromDate     Timestamp from which to start synchronization. If 0, begins from epoch (1970-01-01).
 	 * @param   int   $limit            Maximum number of flows to synchronize. 0 means no limit.
-	 * @return 	bool|array{res:int, messages:array<string>, details:array<string>, actions:array<string>} 	True on success, false on failure along with messages, details for debugging, and suggested optional actions.
+	 * @return 	bool|array{res:int<-1,1>, messages:array<string>, details?:array<string>, actions?:array<string>} 	True on success, false on failure along with messages, details for debugging, and suggested optional actions.
 	 */
 	public function syncFlows($syncFromDate = 0, $limit = 0)
 	{
@@ -1410,7 +1410,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 *
 	 * @param string 		$flowId        	FlowId
 	 * @param string|null 	$call_id  		Call ID for logging purposes
-	 * @return array{res:int, message:string, actioncode:string|null, actionurl:string|null, action:string|null} Returns array with 'res' (1 on success, 0 if exists or already processed, -1 on failure) with a 'message' and for business errors an optional 'actioncode', 'actionurl' and 'action'.
+	 * @return array{res:int<-1,1>, message:string, actioncode?:string|null, actionurl?:string|null, action?:string|null} Returns array with 'res' (1 on success, 0 if exists or already processed, -1 on failure) with a 'message' and for business errors an optional 'actioncode', 'actionurl' and 'action'.
 	 */
 	public function syncFlow($flowId, $call_id = null)
 	{
@@ -1721,7 +1721,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 					$res = $factureObj->fetch(0, $issuerAssignedID);
 					if ($res < 0) {
 						return array(
-							'res' => '-1',
+							'res' => -1,
 							'message' => "FlowId " . $flowId . " - Failed to fetch customer invoice using CDAR IssuerAssignedID/ref: " . $issuerAssignedID
 						);
 					}
@@ -1833,7 +1833,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 					}
 				} catch (Exception $e) {
 					return array(
-						'res' => '-1',
+						'res' => -1,
 						'message' => "FlowId " . $flowId . " - Error processing CDAR document - " . $e->getMessage()
 					);
 				}

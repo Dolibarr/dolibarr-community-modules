@@ -173,6 +173,7 @@ return [
 		'PhanPluginPossiblyStaticPublicMethod',
 		'PhanPluginPossiblyStaticPrivateMethod',
 		//'PhanPluginPossiblyStaticProtectedMethod',
+		'PhanPluginPossiblyStaticClosure',
 
 		'PhanPluginNonBoolInLogicalArith',
 		'PhanPluginConstantVariableScalar',
