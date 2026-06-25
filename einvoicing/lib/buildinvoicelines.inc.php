@@ -33,6 +33,11 @@
  * @var Facture    	$invoice
  * @var CIIProtocol|FacturXProtocol	$this
  */
+'
+@phan-var-force Translate 	$outputlangs
+@phan-var-force Facture   	$invoice
+@phan-var-force CIIProtocol|FacturXProtocol	$this
+';
 
 // Use customer language
 if (empty($outputlangs) || ! ($outputlangs instanceof Translate)) {

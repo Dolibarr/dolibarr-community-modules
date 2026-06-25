@@ -9,18 +9,18 @@
  */
 return [
     // # Issue statistics:
-    // PhanUndeclaredProperty : 80+ occurrences
+    // PhanUndeclaredProperty : 85+ occurrences
     // PhanTypeMismatchArgument : 60+ occurrences
     // PhanUndeclaredVariable : 50+ occurrences
     // PhanTypeArraySuspiciousNullable : 45+ occurrences
     // PhanTypeArraySuspiciousNull : 40+ occurrences
     // PhanTypeInvalidDimOffset : 40+ occurrences
     // PhanTypeMismatchReturn : 30+ occurrences
-    // PhanUndeclaredThis : 20+ occurrences
     // PhanPluginMoreSpecificActualReturnType : 15+ occurrences
     // PhanPossiblyUndeclaredVariable : 15+ occurrences
     // PhanTypeMismatchArgumentProbablyReal : 15+ occurrences
     // PhanTypeMismatchProperty : 15+ occurrences
+    // PhanAccessMethodPrivate : 10+ occurrences
     // PhanDeprecatedProperty : 10+ occurrences
     // PhanRedefineFunction : 10+ occurrences
     // PhanTypeMismatchArgumentNullable : 10+ occurrences
@@ -47,7 +47,6 @@ return [
     // PhanTypeSuspiciousEcho : 5 occurrences
     // PhanEmptyForeach : 4 occurrences
     // PhanPluginUnreachableCode : 4 occurrences
-    // PhanUndeclaredGlobalVariable : 4 occurrences
     // PhanPluginBothLiteralsBinaryOp : 3 occurrences
     // PhanPluginLoopVariableReuse : 3 occurrences
     // PhanTypeMismatchPropertyProbablyReal : 3 occurrences
@@ -115,7 +114,7 @@ return [
         'einvoicing/document_card.php' => ['PhanPluginBothLiteralsBinaryOp', 'PhanTypeMismatchArgumentNullable', 'PhanUndeclaredProperty'],
         'einvoicing/document_document.php' => ['PhanTypeMismatchArgumentNullable'],
         'einvoicing/document_list.php' => ['PhanPossiblyUndeclaredGlobalVariable', 'PhanTypeArraySuspiciousNullable', 'PhanTypeInvalidDimOffset', 'PhanTypeSuspiciousEcho', 'PhanUndeclaredProperty'],
-        'einvoicing/lib/buildinvoicelines.inc.php' => ['PhanDeprecatedProperty', 'PhanTypeInvalidLeftOperandOfAdd', 'PhanTypeInvalidLeftOperandOfNumericOp', 'PhanTypeInvalidRightOperandOfAdd', 'PhanTypeInvalidRightOperandOfNumericOp', 'PhanTypeMismatchArgumentNullable', 'PhanTypeMismatchPropertyProbablyReal', 'PhanUndeclaredGlobalVariable', 'PhanUndeclaredProperty', 'PhanUndeclaredThis'],
+        'einvoicing/lib/buildinvoicelines.inc.php' => ['PhanAccessMethodPrivate', 'PhanDeprecatedProperty', 'PhanTypeInvalidLeftOperandOfAdd', 'PhanTypeInvalidLeftOperandOfNumericOp', 'PhanTypeInvalidRightOperandOfAdd', 'PhanTypeInvalidRightOperandOfNumericOp', 'PhanTypeMismatchArgument', 'PhanTypeMismatchArgumentNullable', 'PhanTypeMismatchPropertyProbablyReal', 'PhanUndeclaredProperty'],
         'einvoicing/lib/einvoicing.lib.php' => ['PhanRedefineFunction', 'PhanUndeclaredVariableDim'],
         'einvoicing/public/proxy_oauthcallback.php' => ['PhanTypeArraySuspiciousNullable'],
         'helloasso/admin/setup.php' => ['PhanEmptyFQSENInClasslike', 'PhanTypeExpectedObjectOrClassName', 'PhanTypeMismatchArgument', 'PhanTypeMismatchArgumentNullableInternal', 'PhanUndeclaredClassMethod', 'PhanUndeclaredVariableDim'],
