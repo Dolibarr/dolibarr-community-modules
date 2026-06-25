@@ -628,11 +628,19 @@ class ActionsEInvoicing extends CommonHookActions
 			if ($action == 'reimportLines' && $permissiontoedit && $object->status == FactureFournisseur::STATUS_DRAFT && !SupplierInvoiceHelper::isSupplierImportInvoiceLinesAuto($object->socid)) {
 				$xmlData = SupplierInvoiceHelper::getXmlData($object->id);
 
+				if ($xmlData === null || $xmlData === '') {
+					setEventMessage($langs->trans('EinvoiceCantReimportLines'), 'errors');
+					setEventMessage($langs->trans('EinvoiceXmlDataNotFound'), 'errors');
+					$db->rollback();
+					return -1;
+				}
+
 				dol_include_once('einvoicing/class/protocols/ProtocolManager.class.php');
 
 				// Build the $exchangeProtocol factory for the format of supplier invoice
 				$exchangeProtocol = ProtocolManager::getProtocolFromContent($xmlData);
 				if (!isset($exchangeProtocol)) {
+					setEventMessage($langs->trans('EinvoiceCantReimportLines'), 'errors');
 					setEventMessage($langs->trans('EinvoiceFailedToDetectXmlFormat'), 'errors');
 					$db->rollback();
 					return -1;

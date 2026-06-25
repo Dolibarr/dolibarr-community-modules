@@ -217,7 +217,8 @@ class SupplierInvoiceHelper
 					$flowResponse = $provider->fetchFlowData($document->flow_id, 'Converted');
 
 					if ($flowResponse['status_code'] != 200) {
-						throw new Exception('Failed to get flow data for flow id n° ' . $document->flow_id . ' and for supplier invoice id n° ' . $supplierInvoiceId);
+						dol_syslog(__METHOD__ . ' : failed to get flow data for flow id n° ' . $document->flow_id . ' and for supplier invoice id n° ' . $supplierInvoiceId, LOG_ERR);
+						return null;
 					}
 
 					$xmlData = ZugferdDocumentPdfReaderExt::getInvoiceDocumentContentFromContent($flowResponse['response']);
@@ -234,9 +235,9 @@ class SupplierInvoiceHelper
 
 				return $foundDocument->xml_data;
 			} elseif ($db->num_rows($resql) > 1) {
-				throw new Exception('Duplicate entry in einvoicing_document for supplier invoice with id '.$supplierInvoiceId);
+				dol_syslog('Duplicate entry in einvoicing_document for supplier invoice with id '.$supplierInvoiceId, LOG_ERR);
 			} elseif ($db->num_rows($resql) == 0) {
-				throw new Exception('No result found when searching for supplier invoice with id '.$supplierInvoiceId . ' in einvoicing_document');
+				dol_syslog('No result found when searching for supplier invoice with id '.$supplierInvoiceId . ' in einvoicing_document', LOG_ERR);
 			}
 		}
 

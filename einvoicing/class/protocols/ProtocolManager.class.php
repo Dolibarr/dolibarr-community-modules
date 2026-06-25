@@ -140,7 +140,7 @@ class ProtocolManager
 	 * @param 	string 		$content 	File content of the invoice (PDF or XML)
 	 * @return AbstractProtocol|null
 	 */
-	public static function getProtocolFromContent(string $content)
+	public static function getProtocolFromContent(?string $content)
 	{
 		global $db;
 

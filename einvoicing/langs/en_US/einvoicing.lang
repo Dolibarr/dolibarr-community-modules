@@ -339,7 +339,9 @@ EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_TYPE=Supplier invoice lines import type
 EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_TYPE1=Auto
 EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_TYPE2=Manual
 EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_CATEGORY_OF_TARGET_IMPORT_PRODUCT_LIST=Filter with this category the product select list when importing supplier invoice lines to a target product
-EinvoiceFailedToDetectXmlFormat=Failed to detect e-invoice XML format
+EinvoiceFailedToDetectXmlFormat=Failed to detect e-invoice XML format (more information in logs)
+EinvoiceXmlDataNotFound=E-invoice XML data not found
+EinvoiceCantReimportLines=Can't reimport lines
 EinvoiceReimportLinesMissingTargetFkProduct=Invoice lines can't be reimported when target product is missing
 EinvoiceReimportLinesError=Failed to create supplier invoice lines from E-invoice document: %s
 
