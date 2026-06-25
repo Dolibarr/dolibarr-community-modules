@@ -135,9 +135,11 @@ jobs:
           current_reviewers=""
           current_path=""
 
+          echo "Process each line of the MAINTENERS file"
           while IFS= read -r line; do
-            ```
+            #echo Process line $line
             if [[ "$line" =~ ^M:[[:space:]].*/[[:space:]]*([A-Za-z0-9_-]+)$ ]]; then
+              #echo "Found user ${BASH_REMATCH[1]}"
               github_user="${BASH_REMATCH[1]}"
               current_reviewers="${current_reviewers},${github_user}"
             fi
@@ -147,11 +149,14 @@ jobs:
 
               while IFS= read -r changed; do
                 if [[ "$changed" == "$current_path"* ]]; then
+                  echo "current_path=$current_path - current_reviewers=$current_reviewers changed=$changed"
+
                   IFS=',' read -ra USERS <<< "$current_reviewers"
                   for u in "${USERS[@]}"; do
                     u="$(echo "$u" | xargs)"
                     [ -z "$u" ] && continue
                     [ "$u" = "$AUTHOR" ] && continue
+                    echo Assign the use $u in the REVIEWERS array
                     REVIEWERS["$u"]=1
                   done
                 fi
@@ -159,8 +164,6 @@ jobs:
 
               current_reviewers=""
             fi
-            ```
-
           done < MAINTAINERS
 
           FINAL=$(printf '%s\n' "${!REVIEWERS[@]}" | sort -u | paste -sd, -)
