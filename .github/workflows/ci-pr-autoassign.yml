@@ -121,11 +121,11 @@ jobs:
           AUTHOR="${{ github.event.pull_request.user.login }}"
 
           # List of modified files
-          curl -s
-          -H "Authorization: Bearer ${{ steps.generate-token.outputs.token }}"
-          -H "Accept: application/vnd.github+json"
-          "${{ github.api_url }}/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files?per_page=100"
-          | jq -r '.[].filename' > changed_files.txt
+          curl -s \
+            -H "Authorization: Bearer ${{ steps.generate-token.outputs.token }}" \
+            -H "Accept: application/vnd.github+json" \
+            "${{ github.api_url }}/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files?per_page=100" \
+            | jq -r '.[].filename' > changed_files.txt
 
           echo "Changed files:"
           cat changed_files.txt
