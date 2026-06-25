@@ -74,7 +74,7 @@ abstract class AbstractProtocol
 	 * @param  array{free_lines:bool,target_fk_product:?int} $params	Params used in case of manual import
 	 * @return array{res:int, message:string, actioncode:string|null, actionurl:string, action:string, actiondata:mixed}   Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and additional data about the action.
 	 */
-	abstract public function createSupplierInvoiceLinesFromSource(&$supplierInvoice, $parsedLines, $flowId = '', $params = []): array;
+	abstract public function createSupplierInvoiceLinesFromSource(&$supplierInvoice, $parsedLines, $flowId = '', $params = ['free_lines' => false, 'target_fk_product' => null]): array;
 
 	/**
 	 * Generate a sample invoice for testing or demonstration purposes (for Dolibarr version < 24.0)

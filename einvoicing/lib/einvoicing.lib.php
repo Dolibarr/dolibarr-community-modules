@@ -99,7 +99,7 @@ function einvoicingAdminPrepareHead()
 /**
  * Methode to get einvoicing module version directly from main module class.
  *
- * @return string
+ * @return string The current version of the module
  */
 function einvoicingGetModuleVersion(): string
 {

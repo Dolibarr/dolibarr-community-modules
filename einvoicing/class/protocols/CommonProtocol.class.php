@@ -1656,7 +1656,6 @@ trait CommonProtocol
 									$result = $discount->create($user);
 									if ($result < 0) {
 										return ['res' => -1, 'message' => 'Failed to create discount for deposit line: ' . $discount->error];
-										break;
 									}
 									$fk_remise = $result;
 								}
