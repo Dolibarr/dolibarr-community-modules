@@ -638,13 +638,20 @@ class ActionsEInvoicing extends CommonHookActions
 				dol_include_once('einvoicing/class/protocols/ProtocolManager.class.php');
 
 				// Build the $exchangeProtocol factory for the format of supplier invoice
-				$exchangeProtocol = ProtocolManager::getProtocolFromContent($xmlData);
-				if (!isset($exchangeProtocol)) {
+				$resProtocol = ProtocolManager::getProtocolFromContent($xmlData);
+				if ($resProtocol['success']) {
+					$exchangeProtocol = $resProtocol['protocol_object'];
+				} else {
 					setEventMessage($langs->trans('EinvoiceCantReimportLines'), 'errors');
-					setEventMessage($langs->trans('EinvoiceFailedToDetectXmlFormat'), 'errors');
+					if ($resProtocol['error_code'] === ProtocolManager::EXCEPTION_UNSUPPORTED_FORMAT) {
+						setEventMessage($langs->trans('EinvoiceFormatNotSupported', $resProtocol['detected_protocol_name']), 'errors');
+					} elseif ($resProtocol['error_code'] === ProtocolManager::EXCEPTION_UNKNOWN_FORMAT) {
+						setEventMessage($langs->trans('EinvoiceFailedToDetectXmlFormat'), 'errors');
+					}
 					$db->rollback();
 					return -1;
 				}
+
 				$parsedHeader = $exchangeProtocol->parseInvoiceHeader($xmlData);
 				$parsedLines  = $exchangeProtocol->parseInvoiceLines($xmlData);
 

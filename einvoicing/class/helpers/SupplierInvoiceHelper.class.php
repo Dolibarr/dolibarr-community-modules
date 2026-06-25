@@ -58,9 +58,15 @@ class SupplierInvoiceHelper
 		}
 
 		// Detect protocol
-		$protocol = ProtocolManager::getProtocolFromContent($xmlData);
-		if (!isset($protocol)) {
-			$errors[] = $langs->trans('EinvoiceFailedToDetectXmlFormat');
+		$resProtocol = ProtocolManager::getProtocolFromContent($xmlData);
+		if ($resProtocol['success']) {
+			$protocol = $resProtocol['protocol_object'];
+		} else {
+			if ($resProtocol['error_code'] === ProtocolManager::EXCEPTION_UNSUPPORTED_FORMAT) {
+				setEventMessage($langs->trans('EinvoiceFormatNotSupported', $resProtocol['detected_protocol_name']), 'errors');
+			} elseif ($resProtocol['error_code'] === ProtocolManager::EXCEPTION_UNKNOWN_FORMAT) {
+				setEventMessage($langs->trans('EinvoiceFailedToDetectXmlFormat'), 'errors');
+			}
 			return [
 				'identical' => false,
 				'errors' => $errors,
