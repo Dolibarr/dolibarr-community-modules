@@ -165,6 +165,7 @@ jobs:
               current_reviewers=""
             fi
           done < MAINTAINERS
+          echo "REVIEWERS=${!REVIEWERS[@]}"
 
           FINAL=$(printf '%s\n' "${!REVIEWERS[@]}" | sort -u | paste -sd, -)
 
