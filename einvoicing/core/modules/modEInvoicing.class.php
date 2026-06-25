@@ -27,6 +27,7 @@
  *  \brief      Description and activation file for module EInvoicing
  */
 include_once DOL_DOCUMENT_ROOT.'/core/modules/DolibarrModules.class.php';
+dol_include_once('einvoicing/class/einvoicing.class.php');
 
 
 /**
@@ -174,6 +175,7 @@ class modEInvoicing extends DolibarrModules
 			2 => array('EINVOICING_FLOWS_SYNC_CALL_LIMIT', 'chaine', '1', 0),
 			3 => array('EINVOICING_SYNC_MARGIN_TIME_HOURS', 'chaine', '12', 0),
 			4 => array('EINVOICING_FLOWS_SYNC_CALL_SIZE', 'chaine', '100', 0),
+			5 => array('EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_TYPE', 'int', EInvoicing::SUPPLIER_INVOICE_LINES_IMPORT_AUTO, 0),
 		);
 
 		// Some keys to add into the overwriting translation tables
@@ -604,7 +606,7 @@ class modEInvoicing extends DolibarrModules
 
 		// Societe extrafields
 		// Use a <select> to have the default null value (falling back to default supplier invoice import type parameter set in the module settings)
-		$result = $extrafields->addExtraField('einvoicing_supplier_invoice_lines_import_type', $langs->trans('SupplierInvoiceLinesImportType'), 'select', 150, 255, 'societe', 0, 0, null, 'a:1:{s:7:"options";a:2:{i:1;s:11:"automatique";i:2;s:6:"manuel";}}', 1, '', 1, 0, '', '', 'einvoicing@einvoicing', 1, 0, 0);
+		$result = $extrafields->addExtraField('einvoicing_supplier_invoice_lines_import_type', $langs->trans('SupplierInvoiceLinesImportType'), 'select', 150, 255, 'societe', 0, 0, null, 'a:1:{s:7:"options";a:2:{i:'.Einvoicing::SUPPLIER_INVOICE_LINES_IMPORT_AUTO.';s:11:"automatique";i:'.Einvoicing::SUPPLIER_INVOICE_LINES_IMPORT_MANUAL.';s:6:"manuel";}}', 1, '', 1, 0, '', '', 'einvoicing@einvoicing', 1, 0, 0);
 
 		// Invoice extrafields
 		// Chorus fields
