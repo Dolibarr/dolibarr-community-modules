@@ -527,7 +527,7 @@ class FacturXProtocol extends AbstractProtocol
 			// Generate the PDF including the XML using the TCPDF library.
 			// Bugged version that include the factur-x.xml file twice in the PDF. Only Acrobat Reader show there is 2 files, other PDF reader works correctly showing one file.
 			// But it works with Esalink and is the only solution when Dolibarr < 24.0 because such version have a class FPDF provided by default in Dolibarr
-			// that is in conflict with the class FPDF provided bu the module einvoicing and the library horstoeko/zugferd.
+			// that is in conflict with the class FPDF provided by the module einvoicing and the library horstoeko/zugferd.
 			$pdf = pdf_getInstance();
 			$pagecount = $pdf->setSourceFile($pathfacturxpdf);
 
