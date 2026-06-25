@@ -80,7 +80,7 @@ class ActionsEInvoicing extends CommonHookActions
 			print "const einvoicingTranslations = JSON.parse('".addslashes(json_encode($supplierPricesTranslations))."');";
 			print '</script>';
 
-			print '<script defer src="'. dol_buildpath('/custom/einvoicing/js/supplier_invoice.js?v='.einvoicingGetModuleVersion(), 1) . '"></script>';
+			print '<script defer src="'. dol_buildpath('einvoicing/js/supplier_invoice.js?v='.einvoicingGetModuleVersion(), 1) . '"></script>';
 		}
 
 		return 0;
