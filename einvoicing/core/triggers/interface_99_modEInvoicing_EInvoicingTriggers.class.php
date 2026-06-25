@@ -245,6 +245,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			 */
 			'@phan-var-force Document $object';
 			if ($object->fk_element_type == 'invoice_supplier' && SupplierInvoiceHelper::isEInvoice($object->fk_element_id, true)) {
+				// @phan-suppress-next-line PhanUndeclaredProperty
 				$this->errors[] = $langs->trans('EinvoicingCantDeleteADocumentLinkedToAnExistingSupplierInvoice', $object->id, $object->fk_element_id);
 				return -1;
 			}
