@@ -707,7 +707,7 @@ if ($object->mode_reglement_code) {
 // party. Resolution priority:
 //   1) external "SHIPPING" contact attached to the invoice;
 //   2) fallback: delivery address carried by a linked shipment (expedition.fk_delivery_address).
-// The builder (ShipToTradePartyBuilder::build) only emits the node when the resolved address
+// buildShipToTradePartyBuilder function only emits the node when the resolved address
 // actually differs from the buyer (bill-to) address and carries a country code; otherwise it falls
 // back to the buyer party. Nothing resolved => keys stay unset => ship-to = buyer is preserved.
 $shipAddress = null;
