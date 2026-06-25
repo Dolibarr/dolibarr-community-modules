@@ -37,7 +37,7 @@ class SupplierInvoiceHelper
 	 *
 	 * @param float $amount1    The first amount to compare
 	 * @param float $amount2    The second amount to compare
-	 * @param int $roundPrecision The number of digits after coma to apply round()
+	 * @param ?int $roundPrecision The number of digits after coma to apply round()
 	 * @return bool
 	 */
 	private static function areAmountsEqual($amount1, $amount2, ?int $roundPrecision = null): bool
