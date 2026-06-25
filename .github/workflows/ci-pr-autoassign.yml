@@ -85,6 +85,7 @@ jobs:
           cat changed_files.txt
 
           echo "Process each line of the changed_files to detect which LABEL to assign"
+          LABELS=""
           while read -r file; do
             if [[ "$file" == einvoice/* ]]; then
               LABELS+="Module: Einvoicing Generic (FR...)|"
