@@ -68,10 +68,10 @@ abstract class AbstractProtocol
 
 	/**
 	 * Add lines to a supplier invoice from e-invoice parsed lines
-	 * @param FactureFournisseur $supplierInvoice	The supplier invoice to add lines on
-	 * @param array $parsedLines					The parsed lines data (previously extracted from e-invoice)
-	 * @param string $flowId						The concerned flowId
-	 * @param array $params							Additional parameters used in case of manual import
+	 * @param FactureFournisseur $supplierInvoice						The supplier invoice to add lines on
+	 * @param array $parsedLines										The parsed lines data (previously extracted from e-invoice)
+	 * @param string $flowId											The concerned flowId
+	 * @param  array{free_lines:bool,target_fk_product:?int} $params	Params used in case of manual import
 	 * @return array{res:int, message:string, actioncode:string|null, actionurl:string, action:string, actiondata:mixed}   Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and additional data about the action.
 	 */
 	abstract public function createSupplierInvoiceLinesFromSource(&$supplierInvoice, $parsedLines, $flowId = '', $params = []): array;
@@ -82,7 +82,7 @@ abstract class AbstractProtocol
 	 * Each protocol should provide a representative sample
 	 * illustrating its structure and data format.
 	 *
-	 * @param	EInvoicing			$einvoicing			EInvoicing
+	 * @param	EInvoicing				$einvoicing				EInvoicing
 	 * @param   Societe|null			$thirdpartySeller		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
 	 * @param   Societe|null			$thirdpartyBuyer		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
 	 * @param   array<string,mixed>		$options				More options
@@ -97,7 +97,7 @@ abstract class AbstractProtocol
 	 * Each protocol should provide a representative sample
 	 * illustrating its structure and data format.
 	 *
-	 * @param	EInvoicing			$einvoicing			EInvoicing
+	 * @param	EInvoicing				$einvoicing				EInvoicing
 	 * @param   Societe|null			$thirdpartySeller		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
 	 * @param   Societe|null			$thirdpartyBuyer		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
 	 * @param   array<string,mixed>		$options				More options
