@@ -148,7 +148,7 @@ class Call extends CommonObject
 		"status" => array("type" => "integer", "label" => "Status", "enabled" => "1", 'position' => 2000, 'notnull' => 1, "visible" => "1", "index" => "1", "arrayofkeyval" => array("0" => "success", "1" => "error", "9" => "warning"), "validate" => "1",),
 		"request_body" => array("type" => "text", "label" => "Request", "enabled" => "1", 'position' => 200, 'notnull' => 0, "visible" => "-1", "comment" => "Request body (JSON)"),
 		"response" => array("type" => "text", "label" => "RetreivedMessage", "enabled" => "1", 'position' => 201, 'notnull' => 0, "visible" => "-1", "comment" => "Full response body (JSON)", "help" => "Saved only if Debug mode is on"),
-		"entity" => array("type" => "varchar(50)", "label" => "entity", "enabled" => "1", 'position' => 1900, 'notnull' => 0, "visible" => "0", "comment" => "Multi-entity support"),
+		"entity" => array("type" => "integer", "label" => "entity", "enabled" => "1", 'position' => 1900, 'notnull' => 0, "visible" => "0", "comment" => "Multi-entity support"),
 	);
 	public $rowid;
 	public $call_id;
@@ -436,7 +436,7 @@ class Call extends CommonObject
 			$sql .= " WHERE t.entity IN (".getEntity($this->element).")";
 		} elseif (preg_match('/^\w+@\w+$/', (string) $this->ismultientitymanaged)) {
 			$tmparray = explode('@', (string) $this->ismultientitymanaged);
-			$sql .= " LEFT JOIN ".$this->db->prefix().$tmparray[1]." as pt ON t.".$this->db->sanitize($tmparray[0])." = pt.rowid";
+			$sql .= " LEFT JOIN ".$this->db->prefix().$tmparray[1]." as pt ON t.".$this->db->sanitize($tmparray[0])." = pt.rowid";  // @phan-suppress-current-line SqlInjection
 			$sql .= " WHERE pt.entity IN (".getEntity($this->element).")";
 		} else {
 			$sql .= " WHERE 1 = 1";
@@ -605,14 +605,14 @@ class Call extends CommonObject
 			if (preg_match('/^[\(]?PROV/i', $this->ref)) {
 				// Now we rename also files into index
 				$sql = 'UPDATE '.$this->db->prefix()."ecm_files set filename = CONCAT('".$this->db->escape($this->newref)."', SUBSTR(filename, ".(strlen($this->ref) + 1).")), filepath = 'call/".$this->db->escape($this->newref)."'";
-				$sql .= " WHERE filename LIKE '".$this->db->escape($this->ref)."%' AND filepath = 'call/".$this->db->escape($this->ref)."' and entity = ".$conf->entity;
+				$sql .= " WHERE filename LIKE '".$this->db->escape($this->ref)."%' AND filepath = 'call/".$this->db->escape($this->ref)."' and entity = ".((int) $conf->entity);
 				$resql = $this->db->query($sql);
 				if (!$resql) {
 					$error++;
 					$this->error = $this->db->lasterror();
 				}
 				$sql = 'UPDATE '.$this->db->prefix()."ecm_files set filepath = 'call/".$this->db->escape($this->newref)."'";
-				$sql .= " WHERE filepath = 'call/".$this->db->escape($this->ref)."' and entity = ".$conf->entity;
+				$sql .= " WHERE filepath = 'call/".$this->db->escape($this->ref)."' and entity = ".((int) $conf->entity);
 				$resql = $this->db->query($sql);
 				if (!$resql) {
 					$error++;
@@ -1226,7 +1226,7 @@ class Call extends CommonObject
 
 		$prefix = 'Call-';
 
-		$sql = "SELECT MAX(CAST(SUBSTRING(call_id, ".(strlen($prefix) + 1).") AS UNSIGNED)) AS maxref";
+		$sql = "SELECT MAX(CAST(SUBSTRING(call_id, ".(strlen($prefix) + 1).") AS SIGNED)) AS maxref";
 		$sql .= " FROM ".MAIN_DB_PREFIX.$this->table_element;
 		$sql .= " WHERE call_id LIKE '".$db->escape($prefix)."%'";
 

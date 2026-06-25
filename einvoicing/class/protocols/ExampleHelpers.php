@@ -37,8 +37,8 @@ function getKositValidatorRemotePort(): int
  * Helper functiom for validation using KOSiT-Validator.
  * Returns the following values
  * - 0 = Validation is disabled
- * - 1 = Validation was successfull
- * - 2 = Validation was not successfull
+ * - 1 = Validation was successful
+ * - 2 = Validation was not successful
  *
  * @param  ZugferdDocument $zugferdDocument zugfer document
  * @return int

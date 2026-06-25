@@ -173,7 +173,7 @@ if ($objectID) {
 
 		// Log an event in the invoice timeline
 		$CurrentLCStatusLabel = $einvoicing->getStatusLabel($obj->lc_status);
-		$currentLCReasonLabel = $einvoicing->getRaisonsByStatuS($obj->lc_status)[$obj->lc_reason_code]['label'] ?? $obj->lc_reason_code;
+		$currentLCReasonLabel = $einvoicing->getReasonsByStatus($obj->lc_status)[$obj->lc_reason_code]['label'] ?? $obj->lc_reason_code;
 		$eventLabel = "EINVOICING - Send status " . $CurrentLCStatusLabel . " : " . $statusvalidationlabel;
 		$eventMessage = "EINVOICING - Send status " . $CurrentLCStatusLabel . " : " . $statusvalidationlabel . (!empty($statusvalidationinfo) ? " - " . $statusvalidationinfo : "") . (!empty($lcReasonCode) ? " - Reason: " . $currentLCReasonLabel : "");
 		$resLogEvent = $provider->addEvent('STATUS', $eventLabel, $eventMessage, $invoice);

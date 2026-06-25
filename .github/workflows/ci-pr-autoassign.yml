@@ -1,0 +1,252 @@
+# Action to prepare the GitHub Action
+# Prerequisites (create in the organization / repo):
+# - Create a Github app with name "The DoliBear bot for ..." and no special options
+# - Generate a client secret for this Github app
+# - Set Read access to actions, administration, code, custom organization roles, custom repository roles, members, and metadata
+# - Set Read and write access to discussions, issues, merge queues, pull requests, and repository projects
+# - Set permission of the Github app for the repository of sources
+# - Create the secret: PR18_SECRET_KEY (private key generated for the GitHub App) with permission for the repository of sources and value of Github app secret
+# - Variable: PR18_APP_ID (GitHub App ID) with value of the GitHub App ID
+#
+# Behavior:
+# - On pull_request_target (opened, synchronize, reopened) against branch main:
+#     - Generate a GitHub App token
+#     - Add a label to the PR (error-tolerant)
+#     - Assign the reviewers listed below, excluding the PR author
+#       -> attempt per reviewer (if a reviewer fails, log and continue)
+#       -> the step fails only if no reviewer could be added
+# - On push: workflow runs but PR-specific actions are skipped
+#
+name: Set reviewer and label according to module
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+    branches:
+      - "main"
+  push:
+    branches:
+      - "main"
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  assign-and-label:
+    runs-on: ubuntu-latest
+
+    # Mergeers / reviewers list: edit here as needed (comma-separated)
+    env:
+      REVIEWERS: "eldy"
+      # Label name to apply
+      LABEL: "test"
+
+    steps:
+      # 1) Generate a GitHub App token (via actions/create-github-app-token)
+      - name: Generate GitHub App token
+        id: generate-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.PR18_APP_ID }}
+          private-key: ${{ secrets.PR18_SECRET_KEY }}
+
+      # 2) Checkout repository (useful if repo content is needed later)
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      # Debug information (useful for diagnostics)
+      - name: Debug info
+        run: |
+          echo "Event: $GITHUB_EVENT_NAME"
+          echo "Ref: $GITHUB_REF"
+          echo "Run id: $GITHUB_RUN_ID"
+          echo "Reviewers configured: $REVIEWERS"
+
+      # 3) Add the label to the PR (PR events only)
+      #    -> tolerant to errors: log on failure but do not fail the job
+      - name: Add label to PR (pull_request events only)
+        if: ${{ github.event_name == 'pull_request_target' }}
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          LABEL: ${{ env.LABEL }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # List of modified files
+          curl -s \
+            -H "Authorization: Bearer ${{ steps.generate-token.outputs.token }}" \
+            -H "Accept: application/vnd.github+json" \
+            "${{ github.api_url }}/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files?per_page=100" \
+            | jq -r '.[].filename' > changed_files.txt
+
+          echo "Changed files:"
+          cat changed_files.txt
+
+          echo "Process each line of the changed_files to detect which LABEL to assign"
+          LABELS=""
+          while read -r file; do
+            if [[ "$file" == einvoicing/* ]]; then
+              LABELS+="Module: Einvoicing Generic (FR...)|"
+            fi
+            if [[ "$file" == helloasso/* ]]; then
+              LABELS+="Module: HelloAsso|"
+            fi
+          done < changed_files.txt
+
+          # dedup + format CSV
+          echo "Store LABELS into FINALJS"
+          FINAL=$(echo $LABELS | tr '|' '\n' | grep -v '^$' | sort -u | paste -sd, -)
+          FINALJS=$(echo "$FINAL" | jq -R 'split(",")')
+
+          echo "Adding labels '$FINALJS' to PR #${PR_NUMBER}"
+          response=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${REPO}/issues/${PR_NUMBER}/labels" \
+            -d "{\"labels\": $FINALJS}")
+
+          if [ "$response" -eq 200 ]; then
+            echo "Labels added successfully."
+          else
+            echo "Warning: failed to add label '$LABEL' to PR #${PR_NUMBER} (HTTP $response). Continuing."
+          fi
+
+      # 4) Compute final reviewers list excluding the PR author
+      #- name: Compute reviewers (exclude PR author)
+      #  if: ${{ github.event_name == 'pull_request_target' }}
+      #  id: set-reviewers
+      #  run: |
+      #    set -euo pipefail
+      #    IFS=',' read -ra ALL_REVIEWERS <<< "${REVIEWERS}"
+      #    AUTHOR="${{ github.event.pull_request.user.login }}"
+      #    FINAL=()
+      #    for r in "${ALL_REVIEWERS[@]}"; do
+      #      r_trimmed="$(echo "$r" | xargs)"
+      #      if [ -z "$r_trimmed" ]; then
+      #        continue
+      #      fi
+      #      if [ "$r_trimmed" != "$AUTHOR" ]; then
+      #        FINAL+=("$r_trimmed")
+      #      fi
+      #    done
+      #    if [ ${#FINAL[@]} -eq 0 ]; then
+      #      echo "reviewers=" >> $GITHUB_OUTPUT
+      #    else
+      #      reviewers_csv="$(IFS=, ; echo "${FINAL[*]}")"
+      #      echo "reviewers=${reviewers_csv}" >> $GITHUB_OUTPUT
+      #    fi
+      #    echo "author=$AUTHOR" >> $GITHUB_OUTPUT
+      #    echo "Computed reviewers: ${reviewers_csv:-<none>}"
+
+      - name: Compute reviewers from MAINTAINERS
+        if: ${{ github.event_name == 'pull_request_target' }}
+        id: set-reviewers
+        run: |
+          set -euo pipefail
+          AUTHOR="${{ github.event.pull_request.user.login }}"
+
+          # List of modified files
+          curl -s \
+            -H "Authorization: Bearer ${{ steps.generate-token.outputs.token }}" \
+            -H "Accept: application/vnd.github+json" \
+            "${{ github.api_url }}/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files?per_page=100" \
+            | jq -r '.[].filename' > changed_files.txt
+
+          echo "Changed files:"
+          cat changed_files.txt
+
+          declare -A REVIEWERS
+
+          current_reviewers=""
+          current_path=""
+
+          echo "Process each line of the MAINTENERS file"
+          while IFS= read -r line; do
+            #echo Process line $line
+            if [[ "$line" =~ ^M:[[:space:]].*/[[:space:]]*([A-Za-z0-9_-]+)$ ]]; then
+              #echo "Found user ${BASH_REMATCH[1]}"
+              github_user="${BASH_REMATCH[1]}"
+              current_reviewers="${current_reviewers},${github_user}"
+            fi
+
+            if [[ "$line" =~ ^F:[[:space:]]*(.+)$ ]]; then
+              current_path="${BASH_REMATCH[1]}"
+
+              while IFS= read -r changed; do
+                if [[ "$changed" == "$current_path"* ]]; then
+                  echo "current_path=$current_path - current_reviewers=$current_reviewers changed=$changed"
+
+                  IFS=',' read -ra USERS <<< "$current_reviewers"
+                  for u in "${USERS[@]}"; do
+                    u="$(echo "$u" | xargs)"
+                    [ -z "$u" ] && continue
+                    [ "$u" = "$AUTHOR" ] && continue
+                    echo Assign the user $u in the REVIEWERS array
+                    REVIEWERS["$u"]=1
+                  done
+                fi
+              done < changed_files.txt
+
+              current_reviewers=""
+            fi
+          done < MAINTAINERS
+          echo "REVIEWERS=${!REVIEWERS[@]}"
+
+          FINAL=$(printf '%s\n' "${!REVIEWERS[@]}" | sort -u | grep -v "^0$" | paste -sd, -)
+
+          echo "Reviewers found: ${FINAL:-<none>}"
+
+          echo "reviewers=${FINAL}" >> "$GITHUB_OUTPUT"
+          echo "author=${AUTHOR}" >> "$GITHUB_OUTPUT"
+
+
+      # 5) Assign reviewers one-by-one with fine-grained error handling
+      #    - try each reviewer, track successes and failures
+      #    - fail the step only if none could be added
+      #    - succeed if at least one was added (but log failures)
+      - name: Assign reviewers on PR (per-reviewer, tolerant errors)
+        if: ${{ github.event_name == 'pull_request_target' && steps.set-reviewers.outputs.reviewers != '' }}
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REVIEWERS_CSV: ${{ steps.set-reviewers.outputs.reviewers }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -uo pipefail
+          IFS=',' read -ra TO_ADD <<< "${REVIEWERS_CSV}"
+          SUCCESS=0
+          FAILED=()
+          for r in "${TO_ADD[@]}"; do
+            r_trimmed="$(echo "$r" | xargs)"
+            if [ -z "$r_trimmed" ]; then
+              continue
+            fi
+            echo "Attempting to add reviewer: $r_trimmed"
+            response=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${REPO}/pulls/${PR_NUMBER}/requested_reviewers" \
+              -d "{\"reviewers\": [\"${r_trimmed}\"]}")
+
+            if [ "$response" -eq 201 ] || [ "$response" -eq 200 ]; then
+              echo "Added reviewer: $r_trimmed"
+              SUCCESS=$((SUCCESS+1))
+            else
+              echo "Warning: failed to add reviewer: $r_trimmed (HTTP $response)"
+              FAILED+=("$r_trimmed")
+            fi
+          done
+          if [ $SUCCESS -eq 0 ]; then
+            echo "Error: none of the configured reviewers could be added: ${FAILED[*]:-<none>}"
+            exit 1
+          else
+            echo "Reviewers added: ${SUCCESS}. Failed to add: ${FAILED[*]:-none}"
+          fi
+
+      # 6) Push event notice (no PR-specific actions performed)
+      - name: Push event notice
+        if: ${{ github.event_name == 'push' }}
+        run: |
+          echo "Triggered by push on branch. No PR-specific actions performed."

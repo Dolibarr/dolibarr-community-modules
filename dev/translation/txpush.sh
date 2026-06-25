@@ -8,7 +8,7 @@
 #------------------------------------------------------
 
 
-export project='dolimods'
+export project='dolibarr-community-modules'
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd $DIR/../..
@@ -32,9 +32,9 @@ fi
 if [ "x$1" = "xsource" ]
 then
 	echo "tx push -s $2 $3"
-	tx push -s $2 $3 
+	tx push -s $2 $3
 else
-	for file in `find htdocs/*/langs/$1/*.lang -type f`
+	for file in `find */langs/$1/*.lang -type f`
 	do
 		export basefile=`basename $file | sed -s s/\.lang//g`
 		echo "tx push --skip -r $project.$basefile -t -l $1 $2 $3 $4"

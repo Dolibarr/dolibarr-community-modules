@@ -116,7 +116,7 @@ class ActionsEInvoicing extends CommonHookActions
 		$invoiceObject = $parameters['object'];
 
 		// Check if it's an invoice
-		if ($invoiceObject instanceOf Facture) {
+		if ($invoiceObject instanceof Facture) {
 			$invoiceObject->fetch_thirdparty();
 			$thirdpartyCountryCode = $invoiceObject->thirdparty->country_code;
 
@@ -175,6 +175,11 @@ class ActionsEInvoicing extends CommonHookActions
 					if ($result && (!is_numeric($result) || $result > 0)) {
 						// No error
 						setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
+
+						// Forward non-blocking size warning from the protocol if any
+						if (!empty($protocol->warnings)) {
+							setEventMessages($langs->trans("InvoiceGeneratedWithWarnings"), $protocol->warnings, 'warnings');
+						}
 
 						// Optionally transmit to the Access Point right after generation (opt-in + idempotent).
 						// Without this, validation only generates the Factur-X; the invoice is never sent to the
@@ -333,8 +338,8 @@ class ActionsEInvoicing extends CommonHookActions
 
 			$resql = $db->query($sql);
 			if ($resql && $db->num_rows($resql) > 0) {
-				// Vérifier si un statut final (approuvé ou refusé) a déjà été envoyé et validé
-				// → dans ce cas, le cycle de vie est terminé, on masque le bouton
+				// Check if a final status (approved or rejected) has already been sent and validated
+				// → in this case, the lifecycle is complete, so we hide the button
 				$sqlFinal = "SELECT rowid FROM " . MAIN_DB_PREFIX . "einvoicing_lifecycle_msg";
 				$sqlFinal .= " WHERE element_id = " . (int) $object->id;
 				$sqlFinal .= " AND element_type = '" . $db->escape($object->element) . "'";
@@ -584,6 +589,10 @@ class ActionsEInvoicing extends CommonHookActions
 					if ($result && (!is_numeric($result) || $result > 0)) {
 						// No error
 						dol_syslog(__METHOD__ . " Invoice generated successfully for invoice ID " . $invoiceObject->id);
+						// Merge non-blocking size warnings from the protocol
+						if (!empty($protocol->warnings)) {
+							$this->warnings = array_merge($this->warnings, (array) $protocol->warnings);
+						}
 						if (!empty($this->warnings)) {
 							setEventMessages($langs->trans("InvoiceGeneratedWithWarnings"), $this->warnings, 'warnings');
 						} else {
@@ -593,8 +602,9 @@ class ActionsEInvoicing extends CommonHookActions
 						// If there is an error, we move warnings into error message
 						// Cast to array to avoid TypeError on PHP 8 when property is null
 						$this->errors = array_merge($this->errors, (array) $protocol->errors);
-						if (!empty($this->warnings))
+						if (!empty($this->warnings)) {
 							$this->errors = array_merge($this->errors, (array) $this->warnings);
+						}
 						$this->warnings = array();
 						dol_syslog(__METHOD__ . " " . implode(',', (array) $protocol->errors));
 						$error++;
@@ -727,7 +737,7 @@ class ActionsEInvoicing extends CommonHookActions
 			$socId = !empty($object->id) ? (int) $object->id : GETPOSTINT('id');
 
 			// Save einvoice ID from creation formonly
-			// (action=update excludes intentionnally : in edit mode, we are using the routing edit array)
+			// (action=update excludes intentionally : in edit mode, we are using the routing edit array)
 			if ($action == 'add' && !empty($socId) && $permissiontoedit) {
 				// Thirdparty routing ID
 				$routingId = GETPOST('routing_id', 'alphanohtml');
@@ -1118,9 +1128,9 @@ class ActionsEInvoicing extends CommonHookActions
 				//unset($listofoptions[$einvoicing::STATUS_NOT_GENERATED]);
 				//unset($listofoptions[$einvoicing::STATUS_GENERATED]);
 
-				// Remove unknow status because "unknown" means there is no status set so we can't search on it.
+				// Remove unknown status because "unknown" means there is no status set so we can't search on it.
 				//if (in_array($action, array('add', 'create', 'edit', 'save'))) {
-					unset($listofoptions[$einvoicing::STATUS_UNKNOWN]);
+				unset($listofoptions[$einvoicing::STATUS_UNKNOWN]);
 				//}
 
 				print $form->selectarray(

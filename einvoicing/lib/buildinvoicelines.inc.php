@@ -141,10 +141,12 @@ if (!empty($usercontacts) && $object->fetch_user($usercontacts[0]) > 0) {
 	$salerepresentative_office_fax    = $object->user->office_fax;
 	$salerepresentative_email         = $object->user->email;
 } else {
-	$salerepresentative_name          = $user->getFullName($outputlangs);
-	$salerepresentative_office_phone  = $user->office_phone;
-	$salerepresentative_office_fax    = $user->office_fax;
-	$salerepresentative_email         = $user->email;
+	// No sales representative assigned to the invoice: the seller contact (BG-6) must describe the
+	// seller, so fall back to the emitting company ($mysoc), not the logged-in user. See issue #252.
+	$salerepresentative_name          = $mysoc->name;
+	$salerepresentative_office_phone  = $mysoc->phone;
+	$salerepresentative_office_fax    = $mysoc->fax;
+	$salerepresentative_email         = $mysoc->email;
 }
 if (empty($salerepresentative_office_phone)) {
 	$salerepresentative_office_phone = $mysoc->phone;
@@ -228,7 +230,10 @@ $numligne          	= 1;
 foreach ($object->lines as $line) {
 	$isDepositLine = 0;
 
-	// Skip subtotal lines
+	// Skip title / subtotal / page-break lines. These are product_type 9 pseudo-lines that carry no VAT, so
+	// they must not reach getCategoryRate() (would trigger a VATEX exemption error on rate 0 / no code).
+	// Detection is centralized in _isLineFromExternalModule(), which covers both the legacy modSubtotal
+	// module and the native core subtotal feature.
 	$isSubTotalLine = $this->_isLineFromExternalModule($line, $object->element, 'modSubtotal');
 	if ($isSubTotalLine) {
 		continue;
@@ -510,7 +515,7 @@ foreach ($object->lines as $line) {
 
 
 
-	// If a unit price inluding tax is known (rarely)
+	// If a unit price including tax is known (rarely)
 	if ($line_unit_price_ttc) {
 		// This section seems not required.
 		// It can be used if the price base is including tax (TTC) and without discount (= Catalog public unit price for individual customers)
@@ -694,6 +699,76 @@ $invoiceData = [
 if ($object->mode_reglement_code) {
 	$invoiceData['paymentMeansCode'] = $this->_getPaymentMeanNumber($object);
 	$invoiceData['paymentMeansText'] = $langs->transnoentitiesnoconv("PaymentType" . $object->mode_reglement_code);
+}
+
+
+// Delivery address (CII ShipToTradeParty / BG-15)
+// Resolve a deliver-to address and expose it so the CII builder can emit a dedicated deliver-to
+// party. Resolution priority:
+//   1) external "SHIPPING" contact attached to the invoice;
+//   2) fallback: delivery address carried by a linked shipment (expedition.fk_delivery_address).
+// The builder (ShipToTradePartyBuilder::build) only emits the node when the resolved address
+// actually differs from the buyer (bill-to) address and carries a country code; otherwise it falls
+// back to the buyer party. Nothing resolved => keys stay unset => ship-to = buyer is preserved.
+$shipAddress = null;
+if (method_exists($object, 'liste_contact')) {
+	$shipContacts = $object->liste_contact(-1, 'external', 0, 'SHIPPING');
+	if (is_array($shipContacts) && count($shipContacts) > 0) {
+		if (count($shipContacts) > 1) {
+			dol_syslog('einvoicing: invoice ' . $object->id . ' has ' . count($shipContacts) . ' external SHIPPING contacts; using the first (contact id ' . $shipContacts[0]['id'] . ')', LOG_WARNING);
+		}
+		require_once DOL_DOCUMENT_ROOT . '/contact/class/contact.class.php';
+		$shipContact = new Contact($db);
+		if ($shipContact->fetch($shipContacts[0]['id']) > 0) {
+			$shipName = trim($shipContact->getFullName($outputlangs));
+			if ($shipName === '') {
+				$shipName = $object->thirdparty->name;
+			}
+			$shipAddress = array(
+				'name'    => $shipName,
+				'address' => $shipContact->address,
+				'zip'     => $shipContact->zip,
+				'town'    => $shipContact->town,
+				'country' => $shipContact->country_code,
+			);
+		}
+	}
+}
+
+// Fallback: a linked shipment may carry a distinct delivery address (no SHIPPING contact needed).
+if ($shipAddress === null && !empty($object->linkedObjectsIds['shipping']) && is_array($object->linkedObjectsIds['shipping'])) {
+	require_once DOL_DOCUMENT_ROOT . '/expedition/class/expedition.class.php';
+	require_once DOL_DOCUMENT_ROOT . '/contact/class/contact.class.php';
+	foreach ($object->linkedObjectsIds['shipping'] as $expeditionId) {
+		$tmpexpedition = new Expedition($db);
+		if ($tmpexpedition->fetch($expeditionId) > 0 && !empty($tmpexpedition->fk_delivery_address)) {
+			$shipContact = new Contact($db);
+			if ($shipContact->fetch($tmpexpedition->fk_delivery_address) > 0) {
+				$shipName = trim($shipContact->getFullName($outputlangs));
+				if ($shipName === '') {
+					$shipName = $object->thirdparty->name;
+				}
+				$shipAddress = array(
+					'name'    => $shipName,
+					'address' => $shipContact->address,
+					'zip'     => $shipContact->zip,
+					'town'    => $shipContact->town,
+					'country' => $shipContact->country_code,
+				);
+				break;
+			}
+		}
+	}
+}
+
+if ($shipAddress !== null) {
+	$invoiceData['_shipFromContactBill'] = array(
+		'address' => $object->thirdparty->address,
+		'zip'     => $object->thirdparty->zip,
+		'town'    => $object->thirdparty->town,
+		'country' => $object->thirdparty->country_code,
+	);
+	$invoiceData['_shipFromContactShip'] = $shipAddress;
 }
 
 

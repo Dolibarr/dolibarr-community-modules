@@ -37,6 +37,9 @@ abstract class AbstractProtocol
 	/** @var array Error messages */
 	public $errors = [];
 
+	/** @var array Non-blocking warning messages */
+	public $warnings = [];
+
 	/**
 	 * Generate the XML content for a given invoice.
 	 *
@@ -124,4 +127,28 @@ abstract class AbstractProtocol
 	 * @return string Cleaned XML
 	 */
 	abstract public static function removeAttachmentFromXml(string $xmlData): string;
+
+	/**
+	 * Check if the generated e-invoice file exceeds the configured size limit.
+	 * Adds a non-blocking warning to $this->warnings[] if the limit is exceeded.
+	 *
+	 * @param	string	$filepath	Path to the generated e-invoice file
+	 * @return	void
+	 */
+	protected function checkFileSizeLimit($filepath)
+	{
+		global $langs;
+
+		$maxMB = (float) getDolGlobalString('EINVOICING_MAX_FILE_SIZE_MB');
+		if ($maxMB <= 0 || !file_exists($filepath)) {
+			return;
+		}
+
+		$sizeMB = filesize($filepath) / (1024 * 1024);
+		if ($sizeMB > $maxMB) {
+			$langs->load('einvoicing@einvoicing');
+			$this->warnings[] = $langs->trans('EInvoiceFileSizeExceedsLimit', number_format($sizeMB, 2), number_format($maxMB, 2));
+			dol_syslog(get_class($this) . '::checkFileSizeLimit ' . basename($filepath) . ' size ' . number_format($sizeMB, 2) . ' MB exceeds configured limit of ' . number_format($maxMB, 2) . ' MB', LOG_WARNING);
+		}
+	}
 }
