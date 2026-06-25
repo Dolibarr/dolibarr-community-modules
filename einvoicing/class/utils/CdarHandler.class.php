@@ -123,7 +123,7 @@ class CdarHandler
 	 * readFromString
 	 *
 	 * @param  string $xmlString xml string
-	 * @return void
+	 * @return array{GuidelineID:string,ExchangedDocument:array,AcknowledgementDocument:array}
 	 */
 	public function readFromString($xmlString)
 	{
@@ -195,7 +195,7 @@ class CdarHandler
 	 * @param int                           $statusCode     Status code to send
 	 * @param string                        $reasonCode Reason code to send (optional)
 	 *
-	 * @return  array{res:int, message:string, file:string}   Returns array with 'res' (1 on success, -1 on failure) with a 'message' and 'file' with the path.
+	 * @return  array{res:int<-1,1>, message:string, file?:string}   Returns array with 'res' (1 on success, -1 on failure) with a 'message' and 'file' with the path.
 	 */
 	public function generateCdarFile($object, $statusCode, $reasonCode = '')
 	{

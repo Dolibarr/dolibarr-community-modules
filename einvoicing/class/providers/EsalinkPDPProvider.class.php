@@ -939,7 +939,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 							$infostring = '';
 							foreach ($res['actiondata'] as $datakey => $dataval) {
 								if ($datakey && $dataval) {
-									$infostring .= ($infostring ? ', ': '').$datakey.': '.$dataval;
+									$infostring .= ($infostring ? ', ' : '').$datakey.': '.$dataval;
 								}
 							}
 							$actions[$rescode]['businessmessage'] = $langs->trans("CantFindThirdpartyFromTheImportedInvoice", $infostring);
@@ -950,7 +950,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 							$infostring = '';
 							foreach ($res['actiondata'] as $datakey => $dataval) {
 								if ($datakey && $dataval) {
-									$infostring .= ($infostring ? ', ': '').$datakey.': '.$dataval;
+									$infostring .= ($infostring ? ', ' : '').$datakey.': '.$dataval;
 								}
 							}
 							$actions[$rescode]['businessmessage'] = $langs->trans("CantFindProductFromTheImportedInvoice", $infostring);
@@ -1155,7 +1155,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				$document->tracking_idref = !empty($factureObj->ref) ? $factureObj->ref : $document->tracking_idref . ' (NOTFOUND)'; // Probably the customer invoice was sent from another system that use the same PDP account
 
 				break;
-			// SupplierInvoice
+				// SupplierInvoice
 			case "SupplierInvoice":
 				// --- Fetch received documents (Einvoice)
 				$document->fk_element_type = 'invoice_supplier';
@@ -1219,7 +1219,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				}
 				break;
 
-			// Customer Invoice LC (life cycle)
+				// Customer Invoice LC (life cycle)
 			case "CustomerInvoiceLC":
 				// 1. link flow document to customer invoice
 				require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
@@ -1287,7 +1287,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 					$res = $factureObj->fetch(0, $issuerAssignedID);
 					if ($res < 0) {
 						return array(
-							'res' => '-1',
+							'res' => -1,
 							'message' => "FlowId " . $flowId . " - Failed to fetch customer invoice using CDAR IssuerAssignedID/ref: " . $issuerAssignedID
 						);
 					}
@@ -1392,7 +1392,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 				break;
 
-			// Supplier Invoice LC (life cycle)
+				// Supplier Invoice LC (life cycle)
 			case "SupplierInvoiceLC":
 				// This is a supplier invoice lifecycle message that we sent to PDP.
 				// We link it to the supplier invoice in dolibarr and we check validation response.
