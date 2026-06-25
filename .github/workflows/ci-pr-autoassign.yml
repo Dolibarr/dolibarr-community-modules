@@ -73,15 +73,41 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          echo "Adding label '$LABEL' to PR #${PR_NUMBER}"
+
+          # List of modified files
+          curl -s \
+            -H "Authorization: Bearer ${{ steps.generate-token.outputs.token }}" \
+            -H "Accept: application/vnd.github+json" \
+            "${{ github.api_url }}/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files?per_page=100" \
+            | jq -r '.[].filename' > changed_files.txt
+
+          echo "Changed files:"
+          cat changed_files.txt
+
+          echo "Process each line of the changed_files to detect which LABEL to assign"
+          while read -r file; do
+            if [[ "$file" == einvoice/* ]]; then
+              LABELS+="Module: Einvoicing Generic (FR...)|"
+            fi
+            if [[ "$file" == helloasso/* ]]; then
+              LABELS+="Module: HelloAsso|"
+            fi
+          fi
+          done < changed_files.txt
+
+          # dedup + format CSV
+          FINAL=$(echo $LABELS | tr '|' '\n' | grep -v '^$' | sort -u | paste -sd, -)
+          FINALJS=$(echo "$FINAL" | jq -R 'split(",")')
+
+          echo "Adding labels '$FINALJS' to PR #${PR_NUMBER}"
           response=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
             -H "Authorization: Bearer ${GH_TOKEN}" \
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/${REPO}/issues/${PR_NUMBER}/labels" \
-            -d "{\"labels\": [\"${LABEL}\"]}")
+            -d "{\"labels\": $FINALJS}")
 
           if [ "$response" -eq 200 ]; then
-            echo "Label added successfully."
+            echo "Labels added successfully."
           else
             echo "Warning: failed to add label '$LABEL' to PR #${PR_NUMBER} (HTTP $response). Continuing."
           fi
