@@ -87,7 +87,7 @@ jobs:
           echo "Process each line of the changed_files to detect which LABEL to assign"
           LABELS=""
           while read -r file; do
-            if [[ "$file" == einvoice/* ]]; then
+            if [[ "$file" == einvoicing/* ]]; then
               LABELS+="Module: Einvoicing Generic (FR...)|"
             fi
             if [[ "$file" == helloasso/* ]]; then
@@ -96,6 +96,7 @@ jobs:
           done < changed_files.txt
 
           # dedup + format CSV
+          echo "Store LABELS into FINALJS"
           FINAL=$(echo $LABELS | tr '|' '\n' | grep -v '^$' | sort -u | paste -sd, -)
           FINALJS=$(echo "$FINAL" | jq -R 'split(",")')
 
