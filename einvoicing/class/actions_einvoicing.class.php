@@ -423,7 +423,7 @@ class ActionsEInvoicing extends CommonHookActions
 			// Modal allowing to reimport supplier invoice lines
 			print '<div id="einvoicing-dialog-import-lines-form" title="'.$langs->trans('EinvoiceImportLines').'" style="display: none;">';
 			print '<form id="einvoicing-import-lines-form" method="post" action="'.dol_buildpath('fourn/facture/card.php', 1).'?facid='.$object->id.'&action=reimportLines&token='.newtoken().'">';
-			print 	'<p style="color: #e11717; font-weight: bold;">❗ ' . $langs->trans('SupplierInvoiceExtractLinesWarning').'</p>';
+			print 	'<p style="color: #e11717; font-weight: bold;">! '.$langs->trans('SupplierInvoiceExtractLinesWarning').'</p>';
 			print 	'<div style="display: flex; flex-direction: column; margin-left: 2rem; gap: 0.2rem;">
 						<label for="extraction-all-prices"><input type="radio" name="extraction_type" id="extraction-all-prices" checked="checked" value="1">'.$langs->trans('ExtractAllLines').'</label>
 						<label for="extraction-to-free-line"><input type="radio" name="extraction_type" id="extraction-to-free-line" value="2">'.$langs->trans('ExtractToFreeLine').'</label>
@@ -433,7 +433,7 @@ class ActionsEInvoicing extends CommonHookActions
 			if ($categoryId > 0) {
 				print $selectProduct;
 			} else {
-				print '⚠️ ' . $langs->trans('SupplierInvoiceLinesImportPleaseSetDefaultCategoryInSettings') . '<br>';
+				print img_picto('','warning') . ' ' . $langs->trans('SupplierInvoiceLinesImportPleaseSetDefaultCategoryInSettings') . '<br>';
 			}
 			print 	'</div>';
 			print '</form>';
