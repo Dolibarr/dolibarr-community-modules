@@ -432,13 +432,13 @@ class ActionsEInvoicing extends CommonHookActions
 			print 	'<div style="display: flex; flex-direction: column; margin-left: 2rem; gap: 0.2rem;">
 						<label for="extraction-all-prices"><input type="radio" name="extraction_type" id="extraction-all-prices" checked="checked" value="1">'.$langs->trans('ExtractAllLines').'</label>
 						<label for="extraction-to-free-line"><input type="radio" name="extraction_type" id="extraction-to-free-line" value="2">'.$langs->trans('ExtractToFreeLine').'</label>
-						<label for="extraction-to-product"><input type="radio" name="extraction_type" id="extraction-to-product" value="3">'.$langs->trans('ExtractToAProduct') . (isset($category) ? ' ('.$langs->trans('SupplierInvoiceLinesImportProductsFromCategory'). ' <strong>' . $category->label .'</strong>)' : '');'</label>
+						<label for="extraction-to-product"><input type="radio" name="extraction_type" id="extraction-to-product" value="3">'.$langs->trans('ExtractToAProduct') . (isset($category) ? ' ('.$langs->trans('SupplierInvoiceLinesImportProductsFromCategory'). ' <strong>' . $category->label .'</strong>)' : '').'</label>
 					</div>';
 			print   '<div id="extraction-target-product-choice" style="display: none; margin-top: 0.5rem; margin-left: 2rem;">';
 			if ($categoryId > 0) {
 				print $selectProduct;
 			} else {
-				print img_picto('','warning') . ' ' . $langs->trans('SupplierInvoiceLinesImportPleaseSetDefaultCategoryInSettings') . '<br>';
+				print img_picto('', 'warning') . ' ' . $langs->trans('SupplierInvoiceLinesImportPleaseSetDefaultCategoryInSettings') . '<br>';
 			}
 			print 	'</div>';
 			print '</form>';
@@ -716,7 +716,7 @@ class ActionsEInvoicing extends CommonHookActions
 				}
 
 				// Add lines to supplier invoice from eInvoice XML data
-				$res = $exchangeProtocol->createSupplierInvoiceLinesFromSource($object, $parsedLines, $flowId ?? '', $createInvoiceLinesParams);
+				$res = $exchangeProtocol->createSupplierInvoiceLinesFromSource($object, $parsedLines, '', $createInvoiceLinesParams);
 				if ($res['res'] < 0) {
 					$db->rollback();
 					$this->error = $langs->trans('EinvoiceReimportLinesError') . $res['message'];

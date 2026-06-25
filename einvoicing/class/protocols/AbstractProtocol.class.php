@@ -72,7 +72,7 @@ abstract class AbstractProtocol
 	 * @param array $parsedLines					The parsed lines data (previously extracted from e-invoice)
 	 * @param string $flowId						The concerned flowId
 	 * @param array $params							Additional parameters used in case of manual import
-	 * @return array
+	 * @return array{res:int, message:string, actioncode:string|null, actionurl:string, action:string, actiondata:mixed}   Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and additional data about the action.
 	 */
 	abstract public function createSupplierInvoiceLinesFromSource(&$supplierInvoice, $parsedLines, $flowId = '', $params = []): array;
 

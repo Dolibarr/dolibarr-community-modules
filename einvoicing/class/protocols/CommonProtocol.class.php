@@ -1535,7 +1535,7 @@ trait CommonProtocol
 	 * @param  array				 								$parsedLines        	The list of lines we want to add to the supplier invoice
 	 * @param  int 													$flowId                 Flow identifier source of the invoice.
 	 * @param  array{free_lines:bool,target_fk_product:int}			$params                 Params used in case of manual import
-	 * @return array{res:int, message:string, action:string|null}   Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and an optional 'action'.
+	 * @return array{res:int, message:string, actioncode:string|null, actionurl:string, action:string, actiondata:mixed}   Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and additional data about the action.
 	 */
 	public function createSupplierInvoiceLinesFromSource(&$supplierInvoice, $parsedLines, $flowId = '', $params = []): array
 	{

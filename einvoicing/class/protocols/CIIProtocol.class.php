@@ -438,7 +438,7 @@ class CIIProtocol extends AbstractProtocol
 	 */
 	public function createSupplierInvoiceFromSource($file, $ReadableViewFile = null, $flowId = '')
 	{
-		global $conf, $db, $user;
+		global $conf, $db, $langs, $user;
 
 		$einvoicing = new EInvoicing($db);
 		$return_messages = array();
