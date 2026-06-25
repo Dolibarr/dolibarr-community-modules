@@ -92,7 +92,6 @@ jobs:
             if [[ "$file" == helloasso/* ]]; then
               LABELS+="Module: HelloAsso|"
             fi
-          fi
           done < changed_files.txt
 
           # dedup + format CSV
