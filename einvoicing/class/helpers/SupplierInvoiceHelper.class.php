@@ -4,6 +4,7 @@ use horstoeko\zugferd\ZugferdDocumentPdfReaderExt;
 
 dol_include_once('einvoicing/class/protocols/ProtocolManager.class.php');
 dol_include_once('einvoicing/class/document.class.php');
+dol_include_once('fourn/class/fournisseur.facture.class.php');
 
 /**
  * \file    einvoicing/class/helpers/SupplierInvoiceHelper.class.php
@@ -42,7 +43,7 @@ class SupplierInvoiceHelper
 	 * @param FactureFournisseur $dolSupplierInvoice   The Dolibarr object to compare to e-invoice
 	 *
 	 * @return	array{identical:bool,errors:array}|false
-	*/
+	 */
 	public static function checkDolInvoiceAndEInvoiceConsistency(FactureFournisseur $dolSupplierInvoice)
 	{
 		global $conf, $db, $langs;
@@ -70,7 +71,7 @@ class SupplierInvoiceHelper
 			case 'CII':
 				$parsedHeader = $protocol->parseInvoiceXML($xmlData);
 				break;
-			// Another format can be added here
+				// Another format can be added here
 			default:
 				throw new Exception('Format ' . $detectedProtocolName . ' not available for comparison');
 		}
@@ -88,8 +89,8 @@ class SupplierInvoiceHelper
 		// Mode 1 : round VAT amount of each line and then sum rounded amounts
 		// Mode 2 : sum VAT amount of each line and then round total
 
-		// ? Start transaction to be able to calculate VAT amounts in 2 differents modes :
-		// ? - do it this way because VAT calculation is directly made in update_price() method which also update database, but in our case, we don't want to update database
+		// ? Start transaction to be able to calculate VAT amounts in 2 different modes :
+		// ? - do it this way because VAT calculation is directly made in update_price() method which also updates database, but in our case, we don't want to update database
 		// ? - our need here is to calculate in mode 1 and mode 2 without to have to rewrite all VAT calculation logic
 		$db->begin();
 
@@ -131,10 +132,10 @@ class SupplierInvoiceHelper
 						$dolVatBasis   = floatval($dolSupplierInvoiceVatDetails[(string) $taxDetailsByRate['rateApplicablePercent']]['vat_basis_amount']);
 
 						if (!self::areAmountsEqual($dolVatBasis, $taxDetailsByRate['basisAmount'])) {
-							$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonVatBasisDifference',  $taxDetailsByRate['rateApplicablePercent'], $taxDetailsByRate['basisAmount'], $dolVatBasis);
+							$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonVatBasisDifference', $taxDetailsByRate['rateApplicablePercent'], $taxDetailsByRate['basisAmount'], $dolVatBasis);
 						}
 						if (!self::areAmountsEqual($dolVatAmount, $taxDetailsByRate['calculatedAmount'])) {
-							$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonVatRateDifference',  $taxDetailsByRate['rateApplicablePercent'], $taxDetailsByRate['calculatedAmount'], $dolVatAmount);
+							$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonVatRateDifference', $taxDetailsByRate['rateApplicablePercent'], $taxDetailsByRate['calculatedAmount'], $dolVatAmount);
 						}
 					} else {
 						$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonVatRateNotFound', $taxDetailsByRate['rateApplicablePercent']);
@@ -170,7 +171,7 @@ class SupplierInvoiceHelper
 	 * Return VAT details (by VAT rate) from a supplier invoice
 	 *
 	 * @param FactureFournisseur $supplierInvoice The supplier invoice object
-	 * @return array<array|array{vat_amount: int, vat_basis_amount: int>}
+	 * @return array<array{vat_amount: float, vat_basis_amount: float}>
 	 */
 	public static function getVatDetails(FactureFournisseur $supplierInvoice)
 	{
@@ -252,10 +253,11 @@ class SupplierInvoiceHelper
 	 * Allow to know if a supplier invoice is an e-invoice or not
 	 *
 	 * @param int $supplierInvoiceId The id of the supplier invoice
+	 * @param bool $checkLinkedDolObjectExistance Also check if linked Dol object really exists or not
 	 * @throws Exception
 	 * @return bool
 	 */
-	public static function isEInvoice(int $supplierInvoiceId): bool
+	public static function isEInvoice(int $supplierInvoiceId, bool $checkLinkedDolObjectExistance = false): bool
 	{
 		global $db;
 
@@ -267,7 +269,10 @@ class SupplierInvoiceHelper
 		$resql = $db->query($sql);
 		if ($resql) {
 			if ($db->num_rows($resql) == 1) {
-				return true;
+				$factureFournisseur = new FactureFournisseur($db);
+				if ($checkLinkedDolObjectExistance && $factureFournisseur->fetch((int) $supplierInvoiceId) > 0) {
+					return true;
+				}
 			} elseif ($db->num_rows($resql) > 1) {
 				throw new Exception('Duplicate entry in einvoicing_document for supplier invoice with id '.$supplierInvoiceId);
 			}

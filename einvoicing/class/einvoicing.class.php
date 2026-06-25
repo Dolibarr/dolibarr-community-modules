@@ -1143,7 +1143,7 @@ class EInvoicing
 
 		// On invoice creation there is no stored status yet, so the dropdown would default to its first
 		// option ("Ne pas gérer" / STATUS_IGNORE) and persist it at BILL_CREATE — silently disabling
-		// e-invoicing for eligible (FR) invoices. Pre-select the qualified default instead: "À générer"
+		// e-invoicing for eligible (FR) invoices. Preselect the qualified default instead: "À générer"
 		// (STATUS_NOT_GENERATED) for invoices that must be managed, "Ne pas gérer" otherwise.
 		if ($mode == 'create' || $action == 'create') {
 			// At creation the hook receives a blank Facture object: its socid is NOT set yet (the
@@ -2171,7 +2171,7 @@ class EInvoicing
 		$sql .= (int) $fk_soc . ", 'manual', ";
 		$sql .= "'" . $db->escape($routing_id) . "', ";
 		$sql .= ($info !== '' ? "'" . $db->escape($info) . "'" : "NULL") . ", ";
-		$sql .= "1, " . $isDefault . ", NOW(), " . (int) $user->id.", ";
+		$sql .= "1, " . ((int) $isDefault) . ", NOW(), " . (int) $user->id.", ";
 		$sql .= "'" . $db->escape($routing_type) . "'";
 		$sql .= ")";
 
@@ -2415,7 +2415,7 @@ class EInvoicing
 		$sql .= "'" . $db->escape($statusMessage) . "', ";
 		$sql .= "'" . $db->escape($validationStatus) . "', ";
 		$sql .= "'" . $db->escape($validationMessage) . "', ";
-		$sql .= "'" . $date_creation . "', ";
+		$sql .= "'" . $db->escape($date_creation) . "', ";
 		$sql .= (int) $user->id . ", ";
 		$sql .= "'" . $db->escape($reasonCode) . "'";
 		$sql .= ")";

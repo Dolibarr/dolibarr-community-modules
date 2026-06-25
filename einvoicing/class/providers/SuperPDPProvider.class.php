@@ -1014,7 +1014,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 * @param array<string, string>         $extraHeaders   Optional additional headers
 	 * @param string|null                   $callType       Functional type of the API call for logging purposes (e.g., 'sync_flows', 'send_invoice')
 	 *
-	 * @return array{status_code:int,response:null|string|array<string,mixed>,?errorCode:string,?errorMessage:string,?id:int,?call_id:string}
+	 * @return array{status_code:int,response:null|string|array<string,mixed>,errorCode?:string,errorMessage?:string,id?:int,call_id?:string}
 	 */
 	public function callApi($resource, $method, $params = false, $extraHeaders = [], $callType = '')
 	{
@@ -1233,13 +1233,13 @@ class SuperPDPProvider extends AbstractPDPProvider
 		// Clean already processed flows from the list
 		$alreadyProcessedFlowIds = [];
 		$flowIds = array_column($response['response']['results'], 'flowId');
-		$escapedFlowIds = array();
+		$sanitizedFlowIds = array();
 		foreach ($flowIds as $flowId) {
-			$escapedFlowIds[] = "'" . $db->escape($flowId) . "'";
+			$sanitizedFlowIds[] = "'" . $db->escape($flowId) . "'";
 		}
-		if (count($escapedFlowIds)) {
+		if (count($sanitizedFlowIds)) {
 			$sql = "SELECT flow_id FROM " . MAIN_DB_PREFIX . "einvoicing_document";
-			$sql .= " WHERE flow_id IN (" . implode(',', $escapedFlowIds) . ")";
+			$sql .= " WHERE flow_id IN (" . implode(',', $sanitizedFlowIds) . ")";
 			$resql = $db->query($sql);
 			if ($resql) {
 				while ($obj = $db->fetch_object($resql)) {
@@ -1587,7 +1587,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				}
 				*/
 
-				// Retreive Original file
+				// Retrieve Original file
 				$receivedFile = null;
 				$flowResponse = $this->fetchFlowData($flowId, 'Original', 'get_flow_for_supplier_invoice');
 

@@ -1,0 +1,9 @@
+[extend]
+useDefault = true
+
+[allowlist]
+paths = [
+	'''dev/tools/phan/stubs/''',
+	#'''path/to/directory/''',
+	#'''.*\.log'''
+]

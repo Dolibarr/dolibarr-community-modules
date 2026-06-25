@@ -120,7 +120,7 @@ trait CommonProtocol
 	/************************************************
 	 * Find paymentMean number
 	 *
-	 * @param  object 	$invoice 			object name we look for
+	 * @param  CommonInvoice 	$invoice 			object name we look for
 	 * @return integer                      paymentMeanId for HorstOeko libs
 	 ************************************************/
 	private function _getPaymentMeanNumber($invoice)
@@ -131,35 +131,35 @@ trait CommonProtocol
 			case 'CB':
 				$paymentMeanId = 54;
 				break;
-			//Credit Card
+				//Credit Card
 			case 'CHQ':
 				$paymentMeanId = 20;
 				break;
-			//Check
+				//Check
 			case 'FAC':
 				$paymentMeanId = 1;
 				break;
-			//Local payment method
+				//Local payment method
 			case 'LIQ':
 				$paymentMeanId = 10;
 				break;
-			//Cash
+				//Cash
 			case 'PRE':
 				$paymentMeanId = 59;
 				break;
-			//SEPA direct debit
+				//SEPA direct debit
 			case 'TIP':
 				$paymentMeanId = 45;
 				break;
-			//Bank Transfer with document
+				//Bank Transfer with document
 			case 'TRA':
 				$paymentMeanId = 23;
 				break;
-			//Check
+				//Check
 			case 'VAD':
 				$paymentMeanId = 68;
 				break;
-			//Online Payment
+				//Online Payment
 			case 'VIR':
 				$paymentMeanId = 30;
 				break;
@@ -1213,7 +1213,7 @@ trait CommonProtocol
 		$errormsg = '';
 
 		// List of VATEX codes and reasons imported from https://docs.peppol.eu/poacc/billing/3.0/codelist/vatex/
-		$VATEX_CODE_LIST = array (
+		$VATEX_CODE_LIST = array(
 			'VATEX-EU-79-C' => array('reason' => 'Exempt based on article 79, point c of Council Directive 2006/112/EC', 'details' => 'Exemptions relating to repayment of expenditures. Remark, Repayment of expenditure is not an exemption in the sense of the VAT Directive but may be handled as such in the context of the EN16931.'),
 			'VATEX-EU-132' => array('reason' => 'Exempt based on article 132 of Council Directive 2006/112/EC', 'details' => 'Exemptions for certain activities in public interest.'),
 			'VATEX-EU-132-1A' => array('reason' => 'Exempt based on article 132, section 1 (a) of Council Directive 2006/112/EC', 'details' => 'The supply by the public postal services of services other than passenger transport and telecommunications services, and the supply of goods incidental thereto.'),
@@ -1305,7 +1305,7 @@ trait CommonProtocol
 		);
 
 		$exemptionReason = null;		// BT-120
-		$exemptionReasonCode = null;	// BT-121 - Mut contains a VATEX code. https://docs.peppol.eu/poacc/billing/3.0/codelist/vatex/
+		$exemptionReasonCode = null;	// BT-121 - Must contain a VATEX code. https://docs.peppol.eu/poacc/billing/3.0/codelist/vatex/
 
 		if ($vat_rate > 0) {
 			$categoryVAT = 'S';
@@ -1367,7 +1367,7 @@ trait CommonProtocol
 						// TVA non applicable - Debours (VAT paid by customer):  VATEX-EU-79-C
 						$vatex = '';
 
-						// We try to find code in the vat code definition in the dictionnary table (code only because einvoice_vatex does not exists).
+						// We try to find code in the vat code definition in the dictionary table (code only because einvoice_vatex does not exists).
 						global $db, $mysoc;
 
 						$sql = "SELECT code FROM ".MAIN_DB_PREFIX."c_tva";
@@ -1405,7 +1405,7 @@ trait CommonProtocol
 					} else {
 						$vatex = '';
 
-						// We try to find code in the vat code definition in the dictionnary table (einvoice_vatex else code).
+						// We try to find code in the vat code definition in the dictionary table (einvoice_vatex else code).
 						global $db, $mysoc;
 
 						$sql = "SELECT code, einvoice_vatex FROM ".MAIN_DB_PREFIX."c_tva";
@@ -1443,7 +1443,7 @@ trait CommonProtocol
 		}
 
 		// If we have a code but no reason, we try to find the reason in the list of VATEX codes, otherwise we use the code as reason.
-		$exemptionReason = $exemptionReason ?: ($VATEX_CODE_LIST[$exemptionReasonCode]['reason'] ?? $exemptionReasonCode);
+		$exemptionReason = $exemptionReason ?: ($VATEX_CODE_LIST[(string) $exemptionReasonCode]['reason'] ?? $exemptionReasonCode);
 
 		return array('categoryVAT' => $categoryVAT, 'ExemptionReason' => $exemptionReason, 'ExemptionReasonCode' => $exemptionReasonCode);
 	}
