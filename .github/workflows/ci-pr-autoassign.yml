@@ -156,7 +156,7 @@ jobs:
                     u="$(echo "$u" | xargs)"
                     [ -z "$u" ] && continue
                     [ "$u" = "$AUTHOR" ] && continue
-                    echo Assign the use $u in the REVIEWERS array
+                    echo Assign the user $u in the REVIEWERS array
                     REVIEWERS["$u"]=1
                   done
                 fi
@@ -167,7 +167,7 @@ jobs:
           done < MAINTAINERS
           echo "REVIEWERS=${!REVIEWERS[@]}"
 
-          FINAL=$(printf '%s\n' "${!REVIEWERS[@]}" | sort -u | paste -sd, -)
+          FINAL=$(printf '%s\n' "${!REVIEWERS[@]}" | sort -u | grep -v "^0$" | paste -sd, -)
 
           echo "Reviewers found: ${FINAL:-<none>}"
 
