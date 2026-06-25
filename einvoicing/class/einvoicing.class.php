@@ -484,7 +484,7 @@ class EInvoicing
 	 *  3. Computes an integrity hash of the payload for later verification in triggers (e.g. BILL_UPDATE) to prevent unauthorized modifications after sending to PDP/PA.
 	 *
 	 * @param Facture $invoice Fully loaded Dolibarr invoice object
-	 * @return array Normalized e-invoice payload
+	 * @return array{payload:array<string,array<string,mixed>>,integrity_hash:string} Normalized e-invoice payload
 	 */
 	public function buildEInvoicePayloadFromInvoice($invoice): array
 	{
@@ -1901,7 +1901,7 @@ class EInvoicing
 	 *
 	 * @param int			$invoiceId		Invoice ID
 	 * @param string		$invoiceRef		Invoice ref
-	 * @return string[]|float[]|mixed[][]|mixed[]
+	 * @return array<string,int|string>
 	 */
 	public function fetchLastknownInvoiceStatus($invoiceId = 0, $invoiceRef = '')
 	{

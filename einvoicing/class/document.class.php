@@ -438,7 +438,7 @@ class Document extends CommonObject
 	 * @param	string		$filtermode	No longer used
 	 * @return	array<int,self>|int<-1,-1>	 <0 if KO, array of pages if OK
 	 */
-	public function fetchAll($sortorder = '', $sortfield = '', $limit = 1000, $offset = 0, string $filter = '', $filtermode = 'AND')
+	public function fetchAll($sortorder = '', $sortfield = '', $limit = 1000, $offset = 0, string $filter = '', $filtermode = 'AND') // @phan-suppress-current-line PhanPluginMoreSpecificActualReturnType
 	{
 		dol_syslog(__METHOD__, LOG_DEBUG);
 
