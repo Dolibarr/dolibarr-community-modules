@@ -87,31 +87,89 @@ jobs:
           fi
 
       # 4) Compute final reviewers list excluding the PR author
-      - name: Compute reviewers (exclude PR author)
+      #- name: Compute reviewers (exclude PR author)
+      #  if: ${{ github.event_name == 'pull_request_target' }}
+      #  id: set-reviewers
+      #  run: |
+      #    set -euo pipefail
+      #    IFS=',' read -ra ALL_REVIEWERS <<< "${REVIEWERS}"
+      #    AUTHOR="${{ github.event.pull_request.user.login }}"
+      #    FINAL=()
+      #    for r in "${ALL_REVIEWERS[@]}"; do
+      #      r_trimmed="$(echo "$r" | xargs)"
+      #      if [ -z "$r_trimmed" ]; then
+      #        continue
+      #      fi
+      #      if [ "$r_trimmed" != "$AUTHOR" ]; then
+      #        FINAL+=("$r_trimmed")
+      #      fi
+      #    done
+      #    if [ ${#FINAL[@]} -eq 0 ]; then
+      #      echo "reviewers=" >> $GITHUB_OUTPUT
+      #    else
+      #      reviewers_csv="$(IFS=, ; echo "${FINAL[*]}")"
+      #      echo "reviewers=${reviewers_csv}" >> $GITHUB_OUTPUT
+      #    fi
+      #    echo "author=$AUTHOR" >> $GITHUB_OUTPUT
+      #    echo "Computed reviewers: ${reviewers_csv:-<none>}"
+
+      - name: Compute reviewers from MAINTAINERS
         if: ${{ github.event_name == 'pull_request_target' }}
         id: set-reviewers
         run: |
           set -euo pipefail
-          IFS=',' read -ra ALL_REVIEWERS <<< "${REVIEWERS}"
           AUTHOR="${{ github.event.pull_request.user.login }}"
-          FINAL=()
-          for r in "${ALL_REVIEWERS[@]}"; do
-            r_trimmed="$(echo "$r" | xargs)"
-            if [ -z "$r_trimmed" ]; then
-              continue
+
+          # List of modified files
+          curl -s
+          -H "Authorization: Bearer ${{ steps.generate-token.outputs.token }}"
+          -H "Accept: application/vnd.github+json"
+          "${{ github.api_url }}/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files?per_page=100"
+          | jq -r '.[].filename' > changed_files.txt
+
+          echo "Changed files:"
+          cat changed_files.txt
+
+          declare -A REVIEWERS
+
+          current_reviewers=""
+          current_path=""
+
+          while IFS= read -r line; do
+            ```
+            if [[ "$line" =~ ^M:[[:space:]].*/[[:space:]]*([A-Za-z0-9_-]+)$ ]]; then
+              github_user="${BASH_REMATCH[1]}"
+              current_reviewers="${current_reviewers},${github_user}"
             fi
-            if [ "$r_trimmed" != "$AUTHOR" ]; then
-              FINAL+=("$r_trimmed")
+
+            if [[ "$line" =~ ^F:[[:space:]]*(.+)$ ]]; then
+              current_path="${BASH_REMATCH[1]}"
+
+              while IFS= read -r changed; do
+                if [[ "$changed" == "$current_path"* ]]; then
+                  IFS=',' read -ra USERS <<< "$current_reviewers"
+                  for u in "${USERS[@]}"; do
+                    u="$(echo "$u" | xargs)"
+                    [ -z "$u" ] && continue
+                    [ "$u" = "$AUTHOR" ] && continue
+                    REVIEWERS["$u"]=1
+                  done
+                fi
+              done < changed_files.txt
+
+              current_reviewers=""
             fi
-          done
-          if [ ${#FINAL[@]} -eq 0 ]; then
-            echo "reviewers=" >> $GITHUB_OUTPUT
-          else
-            reviewers_csv="$(IFS=, ; echo "${FINAL[*]}")"
-            echo "reviewers=${reviewers_csv}" >> $GITHUB_OUTPUT
-          fi
-          echo "author=$AUTHOR" >> $GITHUB_OUTPUT
-          echo "Computed reviewers: ${reviewers_csv:-<none>}"
+            ```
+
+          done < MAINTAINERS
+
+          FINAL=$(printf '%s\n' "${!REVIEWERS[@]}" | sort -u | paste -sd, -)
+
+          echo "Reviewers found: ${FINAL:-<none>}"
+
+          echo "reviewers=${FINAL}" >> "$GITHUB_OUTPUT"
+          echo "author=${AUTHOR}" >> "$GITHUB_OUTPUT"
+
 
       # 5) Assign reviewers one-by-one with fine-grained error handling
       #    - try each reviewer, track successes and failures
