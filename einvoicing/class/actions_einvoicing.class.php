@@ -370,6 +370,7 @@ class ActionsEInvoicing extends CommonHookActions
 		$outputlangs = $langs;
 
 		$error = 0;
+		$dbRollBackOnError = true;
 
 		$db->begin();
 
@@ -443,6 +444,7 @@ class ActionsEInvoicing extends CommonHookActions
 						$error++;
 						$this->error = $provider->error;
 						$this->errors = array_merge($this->errors, $provider->errors);
+						$dbRollBackOnError = false;
 					}
 				}
 			}
@@ -605,7 +607,11 @@ class ActionsEInvoicing extends CommonHookActions
 		}
 
 		if ($error) {
-			$db->rollback();
+			if ($dbRollBackOnError) {
+				$db->rollback();
+			} else {
+				$db->commit();
+			}
 			return -1;
 		} else {
 			$db->commit();
