@@ -322,7 +322,7 @@ class SupplierInvoiceHelper
 						return true;
 					}
 				}
-			} 
+			}
 			//elseif ($db->num_rows($resql) > 1) {
 			//	throw new Exception('Duplicate entry in einvoicing_document for supplier invoice with id '.$supplierInvoiceId);
 			//}
