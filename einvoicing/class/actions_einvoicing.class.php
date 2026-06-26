@@ -220,6 +220,11 @@ class ActionsEInvoicing extends CommonHookActions
 			// Get current status of e-invoice
 			$currentStatusDetails = $einvoicing->fetchLastknownInvoiceStatus($object->id, $object->ref);
 
+			$forcedisabling = '';
+			if (!empty($currentStatusDetails['otherprovider'])) {
+				$forcedisabling = $langs->trans("WarningEinvoicingInvoiceStatusDifferentProvider", $currentStatusDetails['otherprovider']);
+			}
+
 			$url_button = array();
 
 			if ($object->status == Facture::STATUS_VALIDATED || $object->status == Facture::STATUS_CLOSED) {
@@ -231,7 +236,7 @@ class ActionsEInvoicing extends CommonHookActions
 					$url_button[] = array(
 						'lang' => 'einvoicing',
 						'enabled' => 1,
-						'perm' => (bool) $user->hasRight("facture", "creer"),
+						'perm' => ($forcedisabling ? -1 : ((bool) $user->hasRight("facture", "creer"))),
 						'label' => $langs->trans('GenerateEinvoice'),
 						//'help' => $langs->trans('GenerateEinvoiceHelp'),
 						'url' => '/compta/facture/card.php?id=' . $object->id . '&action=generate_einvoice&token=' . newToken()
@@ -252,8 +257,9 @@ class ActionsEInvoicing extends CommonHookActions
 				$url_button[] = array(
 					'lang' => 'einvoicing',
 					'enabled' => 1,
-					'perm' => $perm,
+					'perm' => ($forcedisabling ? -1 : $perm),
 					'label' => $langs->trans('RegenerateEinvoice'),
+					'text' => $forcedisabling,
 					//'help' => $langs->trans('RegenerateEinvoiceHelp'),
 					'url' => '/compta/facture/card.php?id=' . $object->id . '&action=generate_einvoice&token=' . newToken()
 				);
@@ -270,8 +276,9 @@ class ActionsEInvoicing extends CommonHookActions
 					$url_button[] = array(
 						'lang' => 'einvoicing',
 						'enabled' => 1,
-						'perm' => (bool) $user->hasRight("einvoicing", "write") && ($currentStatusDetails['file'] == 1),
+						'perm' => ($forcedisabling ? -1 : ((bool) $user->hasRight("einvoicing", "write") && ($currentStatusDetails['file'] == 1))),
 						'label' => $langs->trans('sendToPDP'),
+						'text' => $forcedisabling,
 						//'help' => $langs->trans('SendToPDPHelp'),
 						'url' => '/compta/facture/card.php?id=' . $object->id . '&action=send_to_pdp&token=' . newToken()
 					);
@@ -323,14 +330,18 @@ class ActionsEInvoicing extends CommonHookActions
 						$url_button[] = array(
 							'lang' => 'einvoicing',
 							'enabled' => 1,
-							'perm' => (bool) $user->hasRight("facture", "creer"),
+							'perm' => ($forcedisabling ? -1 : ((bool) $user->hasRight("facture", "creer") && empty($forcedisabling))),
 							'label' => (string) $label,
 							'url' => dol_buildpath('/fourn/facture/card.php?id=' . $object->id . '&action=sendStatusMessage&pdpstatuscode=' . $code . '&token=' . newToken(), 1)
 						);
 					}
 
 					if (!empty($url_button)) {
-						print dolGetButtonAction($langs->trans('einvoice'), '', 'default', $url_button, '', true);
+						if ((float) DOL_VERSION < 22) {
+							print dolGetButtonAction($langs->trans('einvoice'), '', 'default', $url_button, '', true);
+						} else {
+							print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true);
+						}
 					}
 				}
 			}

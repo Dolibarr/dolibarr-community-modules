@@ -1253,6 +1253,9 @@ class EInvoicing
 				$resprints .=  '</form>';
 			}
 		} else {
+			if (!empty($currentStatusInfo['otherprovider'])) {
+				$resprints .=  '<span class="small">'.img_warning().' '.$langs->trans("WarningEinvoicingInvoiceStatusDifferentProvider", $currentStatusInfo['otherprovider']).'</span><br>';
+			}
 			$resprints .= '<span id="einvoice-status">';
 			if ($currentStatusInfo['code'] == self::STATUS_NOT_GENERATED) {
 				$resprints .= '<span class="opacitymedium">' . $currentStatusInfo['status'] . '</span>';
@@ -1908,35 +1911,78 @@ class EInvoicing
 		global $conf;
 
 		// Default status is unknown until invoice is validated
-		$status = array('code' => self::STATUS_UNKNOWN, 'status' => $this->getStatusLabel(self::STATUS_UNKNOWN), 'info' => '', 'file' => '0', 'transmitted' => 0, 'override_routing_id' => '');
+		$status = array(
+			'rowid' => 0,
+			'code' => self::STATUS_UNKNOWN,
+			'status' => $this->getStatusLabel(self::STATUS_UNKNOWN),
+			'info' => '',
+			'file' => '0',
+			'transmitted' => 0,
+			'override_routing_id' => '',
+			'otherprovider' => ''
+		);
 
 		$provider = getDolGlobalString('EINVOICING_PDP');
+		$providersanitized = preg_replace('/ViaPartner$/', '', $provider);
 
 		// Get last status from einvoicing_extlinks table (table contain dolibarr object received or sent to PDP)
-		$sql = "SELECT syncstatus, synccomment, override_routing_id"; // Validation message of einvoice sent.
+		$sql = "SELECT rowid, syncstatus, synccomment, override_routing_id, provider"; // Validation message of einvoice sent.
 		$sql .= " FROM " . MAIN_DB_PREFIX . "einvoicing_extlinks";
 		$sql .= " WHERE element_type = '" . $this->db->escape('facture') . "'";
-		$sql .= " AND provider = '" . $this->db->escape($provider) . "'";
+		//$sql .= " AND provider = '" . $this->db->escape($provider) . "'";
 		if ($invoiceId > 0) {
 			$sql .= " AND element_id = " . ((int) $invoiceId);
 		} else {
 			$sql .= " AND syncref = '" . $this->db->escape($invoiceRef) . "'";	// Using id is more reliable.
 		}
 
+		$foundforcurrentprovider = 0;
+		$foundforanotherprovider = 0;
+		$tmpstatus = array();
+
 		$resql = $this->db->query($sql);
 		if ($resql) {
-			if ($this->db->num_rows($resql) > 0) {
-				$obj = $this->db->fetch_object($resql);
-				$status['code'] = (int) $obj->syncstatus;
-				$status['status'] = $this->getStatusLabel((int) $obj->syncstatus);
-				$status['info'] = $obj->synccomment ?? '';
-				$status['override_routing_id'] = $obj->override_routing_id ?? '';
-				if (!in_array((int) $obj->syncstatus, array(self::STATUS_UNKNOWN, self::STATUS_IGNORE, self::STATUS_NOT_GENERATED, self::STATUS_GENERATED))) {
-					$status['transmitted'] = 1;
+			while ($obj = $this->db->fetch_object($resql)) {
+				$providerindb = $obj->provider;
+				$providerindbsanitized = preg_replace('/ViaPartner$/', '', $providerindb);
+				if ($providerindbsanitized != $providersanitized) {
+					if (empty($tmpstatus)) {	// If not found yet
+						$tmpstatus['rowid'] = (int) $obj->rowid;
+						$tmpstatus['code'] = (int) $obj->syncstatus;
+						$tmpstatus['status'] = $this->getStatusLabel((int) $obj->syncstatus);
+						$tmpstatus['info'] = $obj->synccomment ?? '';
+						$tmpstatus['override_routing_id'] = $obj->override_routing_id ?? '';
+						if (!in_array((int) $obj->syncstatus, array(self::STATUS_UNKNOWN, self::STATUS_IGNORE, self::STATUS_NOT_GENERATED, self::STATUS_GENERATED))) {
+							$tmpstatus['transmitted'] = 1;
+						} else {
+							$tmpstatus['transmitted'] = 0;
+						}
+						$tmpstatus['otherprovider'] = $providerindbsanitized;
+					}
+					$foundforanotherprovider++;
+					continue;
 				} else {
-					$status['transmitted'] = 0;
+					$foundforcurrentprovider++;
 				}
-			} else {
+
+				$tmpstatus['rowid'] = (int) $obj->rowid;
+				$tmpstatus['code'] = (int) $obj->syncstatus;
+				$tmpstatus['status'] = $this->getStatusLabel((int) $obj->syncstatus);
+				$tmpstatus['info'] = $obj->synccomment ?? '';
+				$tmpstatus['override_routing_id'] = $obj->override_routing_id ?? '';
+				if (!in_array((int) $obj->syncstatus, array(self::STATUS_UNKNOWN, self::STATUS_IGNORE, self::STATUS_NOT_GENERATED, self::STATUS_GENERATED))) {
+					$tmpstatus['transmitted'] = 1;
+				} else {
+					$tmpstatus['transmitted'] = 0;
+				}
+				$tmpstatus['otherprovider'] = '';
+			}
+
+			if (!empty($tmpstatus)) {
+				$status = $tmpstatus;
+			}
+
+			if (empty($foundforanotherprovider) && empty($foundforanotherprovider)) {
 				dol_syslog("No entry found in einvoicing_extlinks table for invoiceRef: " . $invoiceRef);
 			}
 		} else {
@@ -1959,7 +2005,7 @@ class EInvoicing
 			dol_print_error($this->db);
 		}
 
-		// Check if there is an e-invoice file generated
+		// Check if there is an e-invoice file generated on disk
 		$filename = dol_sanitizeFileName($invoiceRef);
 		$filedir = $conf->invoice->multidir_output[$conf->entity] . '/' . dol_sanitizeFileName($invoiceRef);
 		if (getDolGlobalString('EINVOICING_PROTOCOL') == 'FACTURX') {
