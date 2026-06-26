@@ -480,7 +480,7 @@ class CIIProtocol extends AbstractProtocol
 
 
 		// Read using native parser
-		$parsedHeader = $this->parseInvoiceXML($file);
+		$parsedHeader = $this->parseInvoiceHeader($file);
 		$parsedLines = $this->parseInvoiceLines($file);
 
 		// Check if this invoice has already been imported
@@ -1115,7 +1115,7 @@ class CIIProtocol extends AbstractProtocol
 	 * @param  string $xml Raw XML content
 	 * @return array<string,mixed>
 	 */
-	public function parseInvoiceXML($xml)
+	public function parseInvoiceHeader($xml)
 	{
 		list(, $xpath) = $this->initXPath($xml);
 
