@@ -1923,7 +1923,7 @@ class EInvoicing
 		);
 
 		$provider = getDolGlobalString('EINVOICING_PDP');
-		$providersanitized = preg_replace('/ViaPartner$/', '', $provider);
+		$providershort = preg_replace('/ViaPartner$/', '', $provider);
 
 		// Get last status from einvoicing_extlinks table (table contain dolibarr object received or sent to PDP)
 		$sql = "SELECT rowid, syncstatus, synccomment, override_routing_id, provider"; // Validation message of einvoice sent.
@@ -1944,8 +1944,8 @@ class EInvoicing
 		if ($resql) {
 			while ($obj = $this->db->fetch_object($resql)) {
 				$providerindb = $obj->provider;
-				$providerindbsanitized = preg_replace('/ViaPartner$/', '', $providerindb);
-				if ($providerindbsanitized != $providersanitized) {
+				$providerindbshort = preg_replace('/ViaPartner$/', '', $providerindb);
+				if ($providerindbshort != $providershort) {
 					if (empty($tmpstatus)) {	// If not found yet
 						$tmpstatus['rowid'] = (int) $obj->rowid;
 						$tmpstatus['code'] = (int) $obj->syncstatus;
@@ -1957,7 +1957,7 @@ class EInvoicing
 						} else {
 							$tmpstatus['transmitted'] = 0;
 						}
-						$tmpstatus['otherprovider'] = $providerindbsanitized;
+						$tmpstatus['otherprovider'] = $providerindbshort;
 					}
 					$foundforanotherprovider++;
 					continue;
