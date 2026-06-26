@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2026       solauv
+
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -314,16 +315,17 @@ class SupplierInvoiceHelper
 
 		$resql = $db->query($sql);
 		if ($resql) {
-			if ($db->num_rows($resql) == 1) {
+			if ($db->num_rows($resql) > 0) {
 				if ($checkLinkedDolObjectExistance) {
 					$factureFournisseur = new FactureFournisseur($db);
 					if ($factureFournisseur->fetch((int) $supplierInvoiceId) > 0) {
 						return true;
 					}
 				}
-			} elseif ($db->num_rows($resql) > 1) {
-				throw new Exception('Duplicate entry in einvoicing_document for supplier invoice with id '.$supplierInvoiceId);
-			}
+			} 
+			//elseif ($db->num_rows($resql) > 1) {
+			//	throw new Exception('Duplicate entry in einvoicing_document for supplier invoice with id '.$supplierInvoiceId);
+			//}
 		}
 		return false;
 	}
