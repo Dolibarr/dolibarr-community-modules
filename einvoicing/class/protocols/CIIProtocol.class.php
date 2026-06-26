@@ -306,9 +306,10 @@ class CIIProtocol extends AbstractProtocol
 	 *
 	 * @param 	int|Object 	$invoice_id    	Invoice ID or Invoice Object to be processed.
 	 * @param	?Translate	$outputlangs	Output language
+	 * @param	string		$sourceFilePath	Source document path (unused: CII output is a standalone XML, independent of the visual PDF). Kept for a uniform protocol signature.
 	 * @return 	-1|string       			-1 if ko, path if ok.
 	 */
-	public function generateInvoice($invoice_id, $outputlangs = null)
+	public function generateInvoice($invoice_id, $outputlangs = null, $sourceFilePath = '')
 	{
 		// Global variables declaration (typical for Dolibarr environment)
 		global $langs, $db;
