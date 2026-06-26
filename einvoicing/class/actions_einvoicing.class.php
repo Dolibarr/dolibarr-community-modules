@@ -132,7 +132,7 @@ class ActionsEInvoicing extends CommonHookActions
 						//setEventMessages($message, array(), $messagecss);
 					}
 
-					$result = $protocol->generateInvoice($invoiceObject, $outputlangs);		// Generate E-invoice
+					$result = $protocol->generateInvoice($invoiceObject, $outputlangs, $pdfPath);		// Generate E-invoice (embed into the real generated file)
 
 					if ($result >= 0) {
 						setEventMessages($message, array(), $messagecss);
@@ -191,6 +191,24 @@ class ActionsEInvoicing extends CommonHookActions
 		}
 
 		return 0;
+	}
+
+	/**
+	 * Hook called after an ODT/ODS document is created.
+	 *
+	 * Invoice templates rendered from an ODT model emit `afterODTCreation` (not `afterPDFCreation`),
+	 * so the e-invoice generation must be triggered here too. Same logic as afterPDFCreation:
+	 * $parameters['file'] then points to the .odt, and the protocol derives the matching PDF rendition.
+	 *
+	 * @param 	array   		$parameters 	Hook parameters
+	 * @param 	CommonObject 	$object 		The object related to the document (invoice, order, etc.)
+	 * @param 	string  		$action     	Current action
+	 * @param 	HookManager 	$hookmanager 	Hook manager instance
+	 * @return 	int    			0 or 1
+	 */
+	public function afterODTCreation($parameters, &$object, &$action, $hookmanager)
+	{
+		return $this->afterPDFCreation($parameters, $object, $action, $hookmanager);
 	}
 
 
