@@ -17,7 +17,7 @@
 #       -> the step fails only if no reviewer could be added
 # - On push: workflow runs but PR-specific actions are skipped
 #
-name: Set reviewer and label according to module
+name: Set reviewer and label according to module MAINTENERS
 on:
   pull_request_target:
     types: [opened, synchronize, reopened]
