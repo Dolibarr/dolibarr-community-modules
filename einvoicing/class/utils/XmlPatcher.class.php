@@ -78,14 +78,14 @@ class XmlPatcher
 	 *
 	 * @param string|int            $lineId         Line identifier as set with setDocumentPositionId()
 	 * @param string                $invoiceRef     Deposit invoice number
-	 * @param \DateTimeInterface    $invoiceDate    Deposit invoice date
+	 * @param DateTimeInterface    $invoiceDate    Deposit invoice date
 	 *
 	 * @return void
 	 */
 	public function addDepositLineReference(
 		$lineId,
 		string $invoiceRef,
-		\DateTimeInterface $invoiceDate
+		DateTimeInterface $invoiceDate
 	): self {
 		$this->depositRefs[] = [
 			'lineId'      => (string) $lineId,
@@ -154,7 +154,7 @@ class XmlPatcher
 	 *
 	 * @return void
 	 */
-	private static function patchGuidelineId(\DOMXPath $xpath): void
+	private static function patchGuidelineId(DOMXPath $xpath): void
 	{
 		$nodes = $xpath->query(
 			'//rsm:ExchangedDocumentContext/ram:GuidelineSpecifiedDocumentContextParameter/ram:ID'
@@ -191,11 +191,11 @@ class XmlPatcher
 	 * @return void
 	 */
 	private static function injectDepositLineRef(
-		\DOMDocument $dom,
-		\DOMXPath $xpath,
+		DOMDocument $dom,
+		DOMXPath $xpath,
 		string $lineId,
 		string $invoiceRef,
-		\DateTimeInterface $invoiceDate
+		DateTimeInterface $invoiceDate
 	): void {
 		// Find the SpecifiedLineTradeSettlement for this LineID
 		$query = sprintf(
@@ -260,7 +260,7 @@ class XmlPatcher
 	 *
 	 * @param string|int $lineid        Line ID to look up
 	 *
-	 * @return array
+	 * @return array<array{IssuerAssignedID:?string,typeCode:?string,issueDate:?string}>
 	 */
 	public function getLineAdditionalReferencedDocuments($lineid): array
 	{
