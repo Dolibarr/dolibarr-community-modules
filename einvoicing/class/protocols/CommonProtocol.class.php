@@ -117,7 +117,7 @@ trait CommonProtocol
 		}
 	}
 
-	/************************************************
+	/**
 	 * Find paymentMean number
 	 *
 	 * @param  CommonInvoice 	$invoice 			object name we look for
@@ -1449,7 +1449,7 @@ trait CommonProtocol
 	}
 
 
-	/************************************************
+	/**
 	 *    Check line type from external module ?
 	 *
 	 * @param  object $line       line we work on
