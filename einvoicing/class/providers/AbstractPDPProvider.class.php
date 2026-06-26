@@ -41,7 +41,7 @@ abstract class AbstractPDPProvider
 	/** @var array Provider configuration parameters */
 	protected $config = [];
 
-	/** @var array OAuth token information */
+	/** @var array<string,null|int|string> OAuth token information */
 	protected $tokenData = [];
 
 	/** @var AbstractProtocol Exchange protocol */
@@ -92,7 +92,7 @@ abstract class AbstractPDPProvider
 	/**
 	 * Get current token in memory (loaded by fetchOAuthTokenDB in constructor)
 	 *
-	 * @return mixed	Token
+	 * @return array<string,null|int|string>	Token
 	 */
 	public function getTokenData()
 	{
@@ -366,7 +366,7 @@ abstract class AbstractPDPProvider
 	/**
 	 * Retrieve OAuth token for the given PDP service.
 	 *
-	 * @return array|false   Array with keys 'access_token', 'refresh_token', 'expire_at', or false if not found
+	 * @return array{token:string,refresh_token:string,token_expires_at:string}|false   Array with keys 'access_token', 'refresh_token', 'expire_at', or false if not found
 	 */
 	public function fetchOAuthTokenDB()
 	{
@@ -411,9 +411,9 @@ abstract class AbstractPDPProvider
 		$obj = $db->fetch_object($resql);
 
 		return [
-			'token' => $obj->tokenstring,
-			'refresh_token' => $obj->tokenstring_refresh,
-			'token_expires_at' => $db->jdate($obj->expire_at, 'gmt')
+			'token' => (string) $obj->tokenstring,
+			'refresh_token' => (string) $obj->tokenstring_refresh,
+			'token_expires_at' => (string) $db->jdate($obj->expire_at, 'gmt')
 		];
 	}
 

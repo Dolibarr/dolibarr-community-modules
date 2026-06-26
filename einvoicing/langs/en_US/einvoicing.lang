@@ -263,6 +263,7 @@ SelectStatusReason=Reason
 TryToIncreaseStartDateOrMax=No new flow processed. Try to increase the "%s"
 ErrorGeneratingXML=Error when generating the e-invoice XML file
 ErrorFailedToRegeneratePDF=The invoice PDF file is missing and could not be regenerated. Please regenerate the PDF from the invoice card before retrying e-invoice generation.
+ErrorEInvoiceRequiresPdfEnableMainOdtAsPdf=This invoice uses an ODT/ODS template but no PDF rendition was produced, so the Factur-X cannot be built. Enable the option MAIN_ODT_AS_PDF so the ODT template is also exported as PDF, or use a PDF invoice model.
 einvoicingLastSentStatus=Last sent status
 einvoicingInvoiceReason=E-invoicing status reason
 EINVOICING_PMT=Notice for recovery fees

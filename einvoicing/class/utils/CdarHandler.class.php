@@ -109,7 +109,7 @@ class CdarHandler
 	 * readFromFile
 	 *
 	 * @param  string $xmlFile xml file
-	 * @return void
+	 * @return array{GuidelineID:string,ExchangedDocument:array,AcknowledgementDocument:array}
 	 */
 	public function readFromFile($xmlFile)
 	{
@@ -536,7 +536,7 @@ class CdarHandler
 	 * parseExchangedDocument
 	 *
 	 * @param  SimpleXmlElement $xml xml
-	 * @return array
+	 * @return array<string,string|array<string,string>>
 	 */
 	private function parseExchangedDocument($xml)
 	{
@@ -565,7 +565,7 @@ class CdarHandler
 	 *
 	 * @param  SimpleXmlElement $xml xml
 	 *
-	 * @return array
+	 * @return array<string,bool|string|array<string,string>>
 	 */
 	private function parseAcknowledgementDocument($xml)
 	{
@@ -587,7 +587,7 @@ class CdarHandler
 	 *
 	 * @param  SimpleXmlElement $xml xml
 	 *
-	 * @return array
+	 * @return array<string,int|string|array<string,string>>
 	 */
 	private function parseReferencedDocument($xml)
 	{

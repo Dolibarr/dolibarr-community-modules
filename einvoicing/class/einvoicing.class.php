@@ -484,7 +484,7 @@ class EInvoicing
 	 *  3. Computes an integrity hash of the payload for later verification in triggers (e.g. BILL_UPDATE) to prevent unauthorized modifications after sending to PDP/PA.
 	 *
 	 * @param Facture $invoice Fully loaded Dolibarr invoice object
-	 * @return array Normalized e-invoice payload
+	 * @return array{payload:array<string,array<string,mixed>>,integrity_hash:string} Normalized e-invoice payload
 	 */
 	public function buildEInvoicePayloadFromInvoice($invoice): array
 	{
@@ -1904,7 +1904,7 @@ class EInvoicing
 	 *
 	 * @param int			$invoiceId		Invoice ID
 	 * @param string		$invoiceRef		Invoice ref
-	 * @return string[]|float[]|mixed[][]|mixed[]
+	 * @return array<string,int|string>
 	 */
 	public function fetchLastknownInvoiceStatus($invoiceId = 0, $invoiceRef = '')
 	{
@@ -1923,7 +1923,7 @@ class EInvoicing
 		);
 
 		$provider = getDolGlobalString('EINVOICING_PDP');
-		$providersanitized = preg_replace('/ViaPartner$/', '', $provider);
+		$providershort = preg_replace('/ViaPartner$/', '', $provider);
 
 		// Get last status from einvoicing_extlinks table (table contain dolibarr object received or sent to PDP)
 		$sql = "SELECT rowid, syncstatus, synccomment, override_routing_id, provider"; // Validation message of einvoice sent.
@@ -1944,8 +1944,8 @@ class EInvoicing
 		if ($resql) {
 			while ($obj = $this->db->fetch_object($resql)) {
 				$providerindb = $obj->provider;
-				$providerindbsanitized = preg_replace('/ViaPartner$/', '', $providerindb);
-				if ($providerindbsanitized != $providersanitized) {
+				$providerindbshort = preg_replace('/ViaPartner$/', '', $providerindb);
+				if ($providerindbshort != $providershort) {
 					if (empty($tmpstatus)) {	// If not found yet
 						$tmpstatus['rowid'] = (int) $obj->rowid;
 						$tmpstatus['code'] = (int) $obj->syncstatus;
@@ -1957,7 +1957,7 @@ class EInvoicing
 						} else {
 							$tmpstatus['transmitted'] = 0;
 						}
-						$tmpstatus['otherprovider'] = $providerindbsanitized;
+						$tmpstatus['otherprovider'] = $providerindbshort;
 					}
 					$foundforanotherprovider++;
 					continue;
@@ -1982,7 +1982,7 @@ class EInvoicing
 				$status = $tmpstatus;
 			}
 
-			if (empty($foundforanotherprovider) && empty($foundforanotherprovider)) {
+			if (empty($foundforanotherprovider) && empty($foundforcurrentprovider)) {
 				dol_syslog("No entry found in einvoicing_extlinks table for invoiceRef: " . $invoiceRef);
 			}
 		} else {

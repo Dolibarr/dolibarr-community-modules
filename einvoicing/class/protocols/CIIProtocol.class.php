@@ -306,9 +306,10 @@ class CIIProtocol extends AbstractProtocol
 	 *
 	 * @param 	int|Object 	$invoice_id    	Invoice ID or Invoice Object to be processed.
 	 * @param	?Translate	$outputlangs	Output language
+	 * @param	string		$sourceFilePath	Source document path (unused: CII output is a standalone XML, independent of the visual PDF). Kept for a uniform protocol signature.
 	 * @return 	-1|string       			-1 if ko, path if ok.
 	 */
-	public function generateInvoice($invoice_id, $outputlangs = null)
+	public function generateInvoice($invoice_id, $outputlangs = null, $sourceFilePath = '')
 	{
 		// Global variables declaration (typical for Dolibarr environment)
 		global $langs, $db;
@@ -480,7 +481,7 @@ class CIIProtocol extends AbstractProtocol
 
 
 		// Read using native parser
-		$parsedHeader = $this->parseInvoiceXML($file);
+		$parsedHeader = $this->parseInvoiceHeader($file);
 		$parsedLines = $this->parseInvoiceLines($file);
 
 		// Check if this invoice has already been imported
@@ -1113,9 +1114,9 @@ class CIIProtocol extends AbstractProtocol
 	 *   '__ATTRPAIRS__<xpath>' → returns ['schemeID' => 'value', …]
 	 *
 	 * @param  string $xml Raw XML content
-	 * @return array<string,mixed>
+	 * @return array<string,float|string>|false
 	 */
-	public function parseInvoiceXML($xml)
+	public function parseInvoiceHeader($xml)
 	{
 		list(, $xpath) = $this->initXPath($xml);
 
@@ -1163,7 +1164,7 @@ class CIIProtocol extends AbstractProtocol
 	 * Parse all invoice line items from CII XML.
 	 *
 	 * @param  string $xml Raw XML content
-	 * @return array<int,array<string,mixed>>
+	 * @return array<int,array<string,null|bool|float|string|array<mixed>>>
 	 */
 	public function parseInvoiceLines($xml)
 	{
@@ -1691,13 +1692,13 @@ class CIIProtocol extends AbstractProtocol
 	/**
 	 * Build a single line item node.
 	 *
-	 * @param \DOMDocument 		$doc		Document to create nodes in
+	 * @param DOMDocument 		$doc		Document to create nodes in
 	 * @param array 			$line 		Line data
 	 * @param string 			$profile 	Profile (used to conditionally include certain nodes)
 	 *
-	 * @return \DOMElement
+	 * @return DOMElement
 	 */
-	private function buildLineItem(\DOMDocument $doc, array $line, string $profile)
+	private function buildLineItem(DOMDocument $doc, array $line, string $profile)
 	{
 		$el = $doc->createElement('ram:IncludedSupplyChainTradeLineItem');
 
@@ -2394,10 +2395,10 @@ class CIIProtocol extends AbstractProtocol
 	 * Only processes allowances (indicator = "false"), ignores charges (indicator = "true").
 	 * Returns array of created fk_remise_except IDs.
 	 *
-	 * @param array  $headerAllowancesCharges  	parsed headerAllowancesCharges array
+	 * @param array<int,array{indicator?:?string,rateApplicablePercent?:?float,reason?:?string}>  $headerAllowancesCharges  	parsed headerAllowancesCharges array
 	 * @param int    $fk_soc                  	supplier ID
 	 * @param string $description             	invoice number or any reference
-	 * @return array							[ originalIndex => fk_remise_except_id ] or '-1' on error
+	 * @return array{-1:string}|array<int,int>	[ originalIndex => fk_remise_except_id ] or '-1' on error
 	 */
 	private function _createHeaderDiscounts(array $headerAllowancesCharges, int $fk_soc, string $description): array
 	{
