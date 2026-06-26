@@ -97,14 +97,13 @@ jobs:
 
           # dedup + format CSV
           echo "Store LABELS=$LABELS into FINALJS"
-          FINAL=$(echo $LABELS | tr '|' '\n' | grep -v '^$' | sort -u | paste -sd, -)
-          FINALJS=$(echo "$FINAL" | jq -R 'split(",")')
-          echo "FINALJS=$FINALJS"
-
-          if [ "$FINALJS" = "[]" ]; then
+          if [ "x$LABELS" = "x" ]; then
             echo "No labels detected for changed files. Skipping."
             exit 0
           fi
+
+          FINAL=$(echo $LABELS | tr '|' '\n' | grep -v '^$' | sort -u | paste -sd, -)
+          FINALJS=$(echo "$FINAL" | jq -R 'split(",")')
 
           echo "Adding labels '$FINALJS' to PR #${PR_NUMBER}"
           response=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
