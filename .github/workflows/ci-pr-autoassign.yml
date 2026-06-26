@@ -96,7 +96,7 @@ jobs:
           done < changed_files.txt
 
           # dedup + format CSV
-          echo "Store LABELS into FINALJS"
+          echo "Store LABELS=$LABELS into FINALJS"
           FINAL=$(echo $LABELS | tr '|' '\n' | grep -v '^$' | sort -u | paste -sd, -)
           FINALJS=$(echo "$FINAL" | jq -R 'split(",")')
           echo "FINALJS=$FINALJS"
