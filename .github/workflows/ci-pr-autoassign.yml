@@ -99,6 +99,7 @@ jobs:
           echo "Store LABELS into FINALJS"
           FINAL=$(echo $LABELS | tr '|' '\n' | grep -v '^$' | sort -u | paste -sd, -)
           FINALJS=$(echo "$FINAL" | jq -R 'split(",")')
+          echo "FINALJS=$FINALJS"
 
           if [ "$FINALJS" = "[]" ]; then
             echo "No labels detected for changed files. Skipping."
