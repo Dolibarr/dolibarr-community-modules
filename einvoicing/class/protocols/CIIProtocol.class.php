@@ -545,7 +545,7 @@ class CIIProtocol extends AbstractProtocol
 
 		// Set supplier reference
 		$supplierInvoice->socid = $socId;
-		$supplierInvoice->ref_supplier = $parsedHeader['documentno'] ?? null;
+		$supplierInvoice->ref_supplier = $parsedHeader['documentno'] ?? '';
 
 		// Set basic invoice information (type, date)
 		$supplierInvoice->type = $this->_getDolibarrInvoiceType($parsedHeader['documenttypecode'] ?? null);
