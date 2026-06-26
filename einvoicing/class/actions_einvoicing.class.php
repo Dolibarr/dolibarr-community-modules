@@ -350,7 +350,7 @@ class ActionsEInvoicing extends CommonHookActions
 							'enabled' => 1,
 							'perm' => ($forcedisabling ? -1 : ((bool) $user->hasRight("facture", "creer") && empty($forcedisabling))),
 							'label' => (string) $label,
-							'url' => dol_buildpath('/fourn/facture/card.php?id=' . $object->id . '&action=sendStatusMessage&pdpstatuscode=' . $code . '&token=' . newToken(), 1)
+							'url' => '/fourn/facture/card.php?id=' . $object->id . '&action=sendStatusMessage&pdpstatuscode=' . $code . '&token=' . newToken()
 						);
 					}
 
