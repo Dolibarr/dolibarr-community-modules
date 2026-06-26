@@ -1982,7 +1982,7 @@ class EInvoicing
 				$status = $tmpstatus;
 			}
 
-			if (empty($foundforanotherprovider) && empty($foundforanotherprovider)) {
+			if (empty($foundforanotherprovider) && empty($foundforcurrentprovider)) {
 				dol_syslog("No entry found in einvoicing_extlinks table for invoiceRef: " . $invoiceRef);
 			}
 		} else {
