@@ -198,7 +198,7 @@ jobs:
             fi
           done < MAINTAINERS
           echo "REVIEWERS=${!REVIEWERS[@]}"
-          if [ "x$REVIEWERS" = "x0" ]; then
+          if [ "x${!REVIEWERS[@]}" = "x0" ]; then
             echo "No reviewers detected for changed files. Skipping."
             exit 0
           fi
