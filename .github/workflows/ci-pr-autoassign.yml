@@ -100,6 +100,11 @@ jobs:
           FINAL=$(echo $LABELS | tr '|' '\n' | grep -v '^$' | sort -u | paste -sd, -)
           FINALJS=$(echo "$FINAL" | jq -R 'split(",")')
 
+          if [ "$FINALJS" = "[]" ]; then
+            echo "No labels detected for changed files. Skipping."
+            exit 0
+          fi
+
           echo "Adding labels '$FINALJS' to PR #${PR_NUMBER}"
           response=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
             -H "Authorization: Bearer ${GH_TOKEN}" \
