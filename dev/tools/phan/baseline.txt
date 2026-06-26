@@ -120,7 +120,7 @@ return [
         'helloasso/admin/setup_member.php' => ['PhanPluginSimplifyExpressionBool', 'PhanTypeMismatchArgument', 'PhanTypeMismatchProperty'],
         'helloasso/class/actions_helloasso.class.php' => ['PhanPluginEmptyStatementForeachLoop', 'PhanPluginEmptyStatementIf', 'PhanRedefinedExtendedClass', 'PhanTypeMismatchArgumentInternal'],
         'helloasso/class/helloassomemberutils.class.php' => ['PhanDeprecatedProperty', 'PhanPluginDuplicateExpressionAssignmentOperation', 'PhanPluginLoopVariableReuse', 'PhanPossiblyUndeclaredVariable', 'PhanTypeArraySuspiciousNullable', 'PhanTypeExpectedObjectPropAccessButGotNull', 'PhanTypeMagicVoidWithReturn', 'PhanTypeMismatchArgumentInternal', 'PhanTypeMismatchProperty', 'PhanTypeMismatchReturnProbablyReal', 'PhanUndeclaredVariable', 'PhanUndeclaredVariableDim'],
-        'helloasso/lib/helloasso.lib.php' => ['PhanDeprecatedProperty', 'PhanPluginMoreSpecificActualReturnType', 'PhanTypeMismatchArgument', 'PhanTypeMismatchArgumentProbablyReal', 'PhanUndeclaredClassMethod', 'PhanUndeclaredTypeReturnType'],
+        'helloasso/lib/helloasso.lib.php' => ['PhanDeprecatedProperty', 'PhanTypeMismatchArgument', 'PhanTypeMismatchArgumentProbablyReal', 'PhanUndeclaredClassMethod', 'PhanUndeclaredTypeReturnType'],
     ],
     // 'directory_suppressions' => ['src/directory_name' => ['PhanIssueName1', 'PhanIssueName2']] can be manually added if needed.
     // (directory_suppressions will currently be ignored by subsequent calls to --save-baseline, but may be preserved in future Phan releases)
