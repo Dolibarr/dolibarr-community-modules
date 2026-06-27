@@ -382,4 +382,3 @@ ReasonRecipientError=Erreur du destinataire
 ReasonUnknownTransaction=Transaction inconnue
 ReasonUnknownIssuer=Émetteur inconnu
 ReasonAntivirusControl=Contrôle antivirus
-EINVOICING_TRANSMITTED_NOT_FOR_PROD=Attention : ne doit pas être utilisé en production, enfreint les contrats AFNOR/PA/PDP
