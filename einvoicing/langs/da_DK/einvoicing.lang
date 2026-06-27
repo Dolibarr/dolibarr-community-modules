@@ -377,4 +377,3 @@ ReasonRecipientError=Modtagerfejl
 ReasonUnknownTransaction=Ukendt transaktion
 ReasonUnknownIssuer=Ukendt udsteder
 ReasonAntivirusControl=Antiviruskontrol
-EINVOICING_TRANSMITTED_NOT_FOR_PROD=Advarsel: må ikke bruges i produktion, overtræder AFNOR/PA/PDP-kontrakterne
