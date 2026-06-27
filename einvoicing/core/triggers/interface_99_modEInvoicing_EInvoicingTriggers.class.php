@@ -65,7 +65,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		$error = 0;
 
 		// THIRD PARTIES
-		if ($action == 'COMPANY_CREATE') {
+		if ($action == 'COMPANY_CREATE' || $action == 'COMPANY_MODIFY') {
 			/** @var Societe $object */
 			$einvoicing = new EInvoicing($this->db);
 

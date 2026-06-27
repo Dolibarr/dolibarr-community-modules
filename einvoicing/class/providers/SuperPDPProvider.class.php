@@ -48,6 +48,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 	public $helpToGetCredentials = '';
 
 
+	/** @var string Callback url - url to come back to after remote call */
+	public $callbackurl;
+
 	/**
 	 * Constructor
 	 *
@@ -290,7 +293,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				$item = $formSetup->newItem($prefix.'ONLY_FUTURE')->setAsYesNo();
 				$item->nameText = $langs->trans('EINVOICING_SUPERPDP_ONLY_FUTURE');
 				$item->helpText = $langs->transnoentities('EINVOICING_SUPERPDP_ONLY_FUTURE_HELP');
-				$item->defaultFieldValue = 0;
+				$item->defaultFieldValue = '0';
 				$item->cssClass = 'minwidth500';
 
 				$item = $formSetup->newItem($prefix.'DIRECTORY_ENTRY_IDENTIFIER');
@@ -396,13 +399,14 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 					// Check your ID in E-Invoice Annuary
 					$showannuary = 0;
+					$idtocheck = '';
 					if ($mysoc->country_code == 'FR') {
 						$showannuary++;
 
 						$item->fieldOverride .= '<i class="fa fa-list-alt pictofixedwidth centerimp"></i>'.$langs->trans('CheckYourIDInEInvoiceAnnuary');
 
 						$einvoicing = new EInvoicing($this->db);
-						$idtocheck = $einvoicing->getSellerCommunicationURI(0);
+						$idtocheck = (string) $einvoicing->getSellerCommunicationURI(0);
 
 						if (getDolGlobalString('EINVOICING_LIVE')) {
 							$item->fieldOverride .= ': <a class="reposition" href="https://facturation.chorus-pro.gouv.fr/annuaire/#/" target="_blank">' . $langs->trans('FrenchGovAnnuary') . '</a>';
@@ -442,7 +446,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				$langs->loadLangs(array("main", "oauth"));
 				$error[] = $langs->trans('ErrorFieldRequired', $langs->transnoentities('EINVOICING_CLIENT_SECRET'));
 			}
-		} elseif ($mode == 1) {
+		} elseif ($mode == 1) {  // @phan-suppress-current-line PhanPluginEmptyStatementIf
 			// Not used
 		}
 
@@ -503,7 +507,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		// with grant_type=refresh_token instead of re-authenticating from scratch. A full re-auth opens a
 		// new session on the PA each time, whereas refreshing does not. The refresh token is rotated on each
 		// use, so we must persist the new one returned by the server.
-		if (!empty($this->tokenData['refresh_token'])) {
+		if (!empty($this->tokenData['refresh_token'])) { // Refresh token is available only for Authorization Code grant, not for Client Credentials grant.
 			$providerconfig = $this->getConf();
 
 			// "Via partner" (grey-label) client: it holds no client_secret, so it cannot run the
@@ -694,6 +698,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		global $langs;
 
 		$response = $this->callApi("healthcheck", "GET", false, [], 'healthcheck');		// This include the refresh of token
+		$returnarray = array();
 
 		if ($response['status_code'] === 200) {
 			$returnarray['status_code'] = true;
@@ -715,7 +720,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 * This function send an invoice to PDP
 	 *
 	 * @param	Facture		$object 	Invoice object
-	 * @return 	string   				flowId if the invoice was successfully sent, false otherwise.
+	 * @return 	string|array{res:int<-1,1>,message:string}|0|false			flowId if the invoice was successfully sent, false otherwise.
 	 */
 	public function sendInvoice($object)
 	{
@@ -783,7 +788,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$response = $this->callApi("flows", "POSTALREADYFORMATED", $params, $extraHeaders, 'send_invoice');
 
 		if ($response['status_code'] == 200 || $response['status_code'] == 202) {
-			$flowId = $response['response']['flowId'];
+			$flowId = $response['response']['flowId'] ?? '';
 			$callId = $response['id'];
 			$callRef = $response['call_id'];
 
@@ -873,8 +878,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 * Send a sample electronic invoice for testing purposes.
 	 * This function generates a sample invoice and sends it to PDP
 	 *
-	 * @param 	int 			$onlymake		1=to only make the sample
-	 * @return 	array|string 					True if the invoice was successfully sent, false otherwise.
+	 * @param 	int<0,1>		$onlymake		1=to only make the sample
+	 * @return 	string[]|0	 					True if the invoice was successfully sent, false otherwise.
 	 */
 	public function sendSampleInvoice($onlymake = 0)
 	{
@@ -1009,8 +1014,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 * Call the provider API.
 	 *
 	 * @param string 						$resource 	    Resource relative URL ('token', 'healthcheck', 'Flows', or others)
-	 * @param string                        $method         HTTP method ('GET', 'POST', etc.)
-	 * @param array<string, mixed>|false 	$params 	    Options for the request
+	 * @param 'POST'|'GET'|'HEAD'|'PUT'|'PUTALREADYFORMATED'|'POSTALREADYFORMATED'|'DELETE' $method         HTTP method (dolibarr's types)
+	 * @param string|false 	$params 	    Options for the request (JSON encoded)
 	 * @param array<string, string>         $extraHeaders   Optional additional headers
 	 * @param string|null                   $callType       Functional type of the API call for logging purposes (e.g., 'sync_flows', 'send_invoice')
 	 *
@@ -1031,6 +1036,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		// every token grant: client_credentials, authorization_code and refresh_token.
 		$url = $this->getApiUrl(($resource == 'token' || $callType == 'get_access_token') ? 'auth' : 'api') . $resource;
 
+		$httpheader = array();
 		if (!isset($extraHeaders['Content-Type'])) {
 			$httpheader[] = 'Content-Type: application/json';
 			$httpheader[] = 'Accept: application/json';
@@ -1124,7 +1130,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 *
 	 * @param   int   $syncFromDate     Timestamp from which to start synchronization. If 0, begins from epoch (1970-01-01).
 	 * @param   int   $limit            Maximum number of flows to synchronize. 0 means no limit.
-	 * @return 	bool|array{res:int, messages:array<string>, details:array<string>, actions:array<string>} 	True on success, false on failure along with messages, details for debugging, and suggested optional actions.
+	 * @return 	bool|array{res:int<-1,1>, messages:array<string>, details?:array<string>, actions?:array<string>} 	True on success, false on failure along with messages, details for debugging, and suggested optional actions.
 	 */
 	public function syncFlows($syncFromDate = 0, $limit = 0)
 	{
@@ -1226,13 +1232,13 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 		// Since AP may not return flows in the order they want (by updatedAt ASC), we sort them here
 		dol_syslog(__METHOD__ . " Sort the flows per updatedAt", LOG_DEBUG, 0, "_einvoicing");
-		usort($response['response']['results'], function ($a, $b) {
+		usort($response['response']['results'], static function ($a, $b) {
 			return strtotime($a['updatedAt']) <=> strtotime($b['updatedAt']);
 		});
 
 		// Clean already processed flows from the list
 		$alreadyProcessedFlowIds = [];
-		$flowIds = array_column($response['response']['results'], 'flowId');
+		$flowIds = array_column($response['response']['results'] ?? [], 'flowId');
 		$sanitizedFlowIds = array();
 		foreach ($flowIds as $flowId) {
 			$sanitizedFlowIds[] = "'" . $db->escape($flowId) . "'";
@@ -1267,7 +1273,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 		// Loop on each flow received in list
 		$i = 0;
-		foreach ($response['response']['results'] as $flow) {
+		foreach ($response['response']['results'] ?? [] as $flow) {
 			$i++;
 			if (in_array($flow['flowId'], $alreadyProcessedFlowIds)) {
 				dol_syslog(__METHOD__ . " #" . $i . " Flow " . $flow['flowId'] . " already processed, discard it.", LOG_DEBUG, 0, "_einvoicing");
@@ -1297,9 +1303,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 						if ($rescode == 'THIRDPARTY_NOT_FOUND') {
 							$infostring = '';
-							foreach ($res['actiondata'] as $datakey => $dataval) {
+							foreach ($res['actiondata'] ?? [] as $datakey => $dataval) {
 								if ($datakey && $dataval) {
-									$infostring .= ($infostring ? ', ': '').$datakey.': '.$dataval;
+									$infostring .= ($infostring ? ', ' : '').$datakey.': '.$dataval;
 								}
 							}
 							$actions[$rescode]['businessmessage'] = $langs->trans("CantFindThirdpartyFromTheImportedInvoice", $infostring);
@@ -1308,9 +1314,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 						}
 						if ($rescode == 'PRODUCT_NOT_FOUND') {
 							$infostring = '';
-							foreach ($res['actiondata'] as $datakey => $dataval) {
+							foreach ($res['actiondata'] ?? [] as $datakey => $dataval) {
 								if ($datakey && $dataval) {
-									$infostring .= ($infostring ? ', ': '').$datakey.': '.$dataval;
+									$infostring .= ($infostring ? ', ' : '').$datakey.': '.$dataval;
 								}
 							}
 							$actions[$rescode]['businessmessage'] = $langs->trans("CantFindProductFromTheImportedInvoice", $infostring);
@@ -1354,7 +1360,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 		$globalres = ($error > 0 ? -1 : 1);
 
-		$globalresultmessage = ($globalres == 1) ? $langs->trans("SyncCompletedSuccessfuly") . ($batchlimit > 0 ? ' <span class="opacitylow">(' . $langs->trans("maxNumberToProcess") . ': ' . $batchlimit . ")</span>" : "")  : ($langs->trans("SyncAborted", $i, $limit, ($flow['flowId'] ?? 'N/A')));
+		$globalresultmessage = ($globalres == 1) ? $langs->trans("SyncCompletedSuccessfuly") . ($batchlimit > 0 ? ' <span class="opacitylow">(' . $langs->trans("maxNumberToProcess") . ': ' . $batchlimit . ")</span>" : "") : ($langs->trans("SyncAborted", $i, $limit, ($flow['flowId'] ?? 'N/A')));
 
 		dol_syslog(__METHOD__ . " syncFlows end : " . $globalresultmessage, LOG_DEBUG, 0, "_einvoicing");
 
@@ -1410,7 +1416,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 *
 	 * @param string 		$flowId        	FlowId
 	 * @param string|null 	$call_id  		Call ID for logging purposes
-	 * @return array{res:int, message:string, actioncode:string|null, actionurl:string|null, action:string|null} Returns array with 'res' (1 on success, 0 if exists or already processed, -1 on failure) with a 'message' and for business errors an optional 'actioncode', 'actionurl' and 'action'.
+	 * @return array{res:int<-1,1>, message:string, actioncode?:string|null, actionurl?:string|null, action?:string|null} Returns array with 'res' (1 on success, 0 if exists or already processed, -1 on failure) with a 'message' and for business errors an optional 'actioncode', 'actionurl' and 'action'.
 	 */
 	public function syncFlow($flowId, $call_id = null)
 	{
@@ -1524,7 +1530,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				$document->tracking_idref = !empty($factureObj->ref) ? $factureObj->ref : $document->tracking_idref . ' (NOTFOUND)'; // Probably the customer invoice was sent from another system that use the same PDP account
 
 				break;
-			// SupplierInvoice
+				// SupplierInvoice
 			case "SupplierInvoice":
 				// --- Fetch received documents (Einvoice)
 				$document->fk_element_type = 'invoice_supplier';
@@ -1626,10 +1632,10 @@ class SuperPDPProvider extends AbstractPDPProvider
 						return $retarray;
 					} else {
 						// Complete the document object with the created supplier invoice details
-						$suplierInvoiceObj = new FactureFournisseur($this->db);
-						$resFetch = $suplierInvoiceObj->fetch($res['res']);
-						$document->fk_element_id = !empty($suplierInvoiceObj->id) ? $suplierInvoiceObj->id : 0;
-						$document->tracking_idref = !empty($suplierInvoiceObj->ref) ? $suplierInvoiceObj->ref : 'Error'; // Should always be found here
+						$supplierInvoiceObj = new FactureFournisseur($this->db);
+						$resFetch = $supplierInvoiceObj->fetch($res['res']);
+						$document->fk_element_id = !empty($supplierInvoiceObj->id) ? $supplierInvoiceObj->id : 0;
+						$document->tracking_idref = !empty($supplierInvoiceObj->ref) ? $supplierInvoiceObj->ref : 'Error'; // Should always be found here
 						$cleanedXmlData = Document::cleanXmlData($res['xml_data'] ?? '');
 						if (!empty($cleanedXmlData) && Document::checkXmlDataMaxSize($cleanedXmlData)) {
 							$document->xml_data = $cleanedXmlData;
@@ -1637,7 +1643,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 						//return array('res' => 0, 'message' => "supplier invoice already exists for flowId: " . $flowId . ". " . $res['message']);
 						$returnRes = 1;		// If invoice did already exists, we process one more line from list of flows, so we must return 1, even if nothing was done.
-						$returnMessage = "Supplier invoice " . $suplierInvoiceObj->ref . " created or already existing for flowId: " . $flowId . ". " . $res['message'];
+						$returnMessage = "Supplier invoice " . $supplierInvoiceObj->ref . " created or already existing for flowId: " . $flowId . ". " . $res['message'];
 
 						$db->commit();
 					}
@@ -1653,7 +1659,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 				break;
 
-			// Customer Invoice LC (life cycle)
+				// Customer Invoice LC (life cycle)
 			case "CustomerInvoiceLC":
 				// 1. link flow document to customer invoice
 				require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
@@ -1721,7 +1727,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 					$res = $factureObj->fetch(0, $issuerAssignedID);
 					if ($res < 0) {
 						return array(
-							'res' => '-1',
+							'res' => -1,
 							'message' => "FlowId " . $flowId . " - Failed to fetch customer invoice using CDAR IssuerAssignedID/ref: " . $issuerAssignedID
 						);
 					}
@@ -1833,14 +1839,14 @@ class SuperPDPProvider extends AbstractPDPProvider
 					}
 				} catch (Exception $e) {
 					return array(
-						'res' => '-1',
+						'res' => -1,
 						'message' => "FlowId " . $flowId . " - Error processing CDAR document - " . $e->getMessage()
 					);
 				}
 
 				break;
 
-			// Supplier Invoice LC (life cycle)
+				// Supplier Invoice LC (life cycle)
 			case "SupplierInvoiceLC":
 				// This is a supplier invoice lifecycle message that we sent to PDP.
 				// We link it to the supplier invoice in dolibarr and we check validation response.
@@ -1851,19 +1857,19 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 				// Fetch the linked supplier invoice using flowId stored in einvoicing_lifecycle_msg table when the LC message was sent
 				$resFetchStatusMessages = $einvoicing->fetchStatusMessages($flowId);
-				if ($resFetchStatusMessages < 0 || empty($resFetchStatusMessages)) {
+				if (!is_array($resFetchStatusMessages) /* || $resFetchStatusMessages < 0 */ || empty($resFetchStatusMessages)) {
 					$returnRes = 0;
 					$returnMessage = "Failed to fetch status messages for flowId: " . $flowId;
 				} else {
 					// Fetch ref and id to link the document to supplier invoice
-					$suplierInvoiceObj = new FactureFournisseur($this->db);
-					$resFetch = $suplierInvoiceObj->fetch($resFetchStatusMessages['element_id']);
+					$supplierInvoiceObj = new FactureFournisseur($this->db);
+					$resFetch = $supplierInvoiceObj->fetch($resFetchStatusMessages['element_id']);
 					if ($resFetch <= 0) {
 						$returnRes = 0;
 						$returnMessage = "Failed to fetch supplier invoice for flowId: " . $flowId . " using rowid from einvoicing_lifecycle_msg table: " . $resFetchStatusMessages['rowid'];
 					} else {
-						$document->fk_element_id = !empty($suplierInvoiceObj->id) ? $suplierInvoiceObj->id : 0;
-						$document->tracking_idref = !empty($suplierInvoiceObj->ref) ? $suplierInvoiceObj->ref : '(NOTFOUND)'; // Should always be found here
+						$document->fk_element_id = !empty($supplierInvoiceObj->id) ? $supplierInvoiceObj->id : 0;
+						$document->tracking_idref = !empty($supplierInvoiceObj->ref) ? $supplierInvoiceObj->ref : '(NOTFOUND)'; // Should always be found here
 					}
 
 					// Update LC message status in einvoicing_lifecycle_msg table based on validation response
@@ -1920,7 +1926,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 					}
 				}
 
-				if (!empty($document->tracking_idref)) {
+				if (!empty($document->tracking_idref) && is_object($obj)) {
 					require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
 					$factureObj = new Facture($this->db);
 					$res = $factureObj->fetch(0, $document->tracking_idref);
@@ -2080,7 +2086,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				 * If no response is available yet, we wait for the next synchronization.
 				 **/
 
-				$flowId = $response['response']['flowId'];
+				$flowId = $response['response']['flowId'] ?? '';
 
 				// Update einvoice status with awaiting validation
 				$einvoicing = new EInvoicing($db);

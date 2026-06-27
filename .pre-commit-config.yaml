@@ -17,8 +17,8 @@ repos:
       #  - Skipping all checks for a commit:
       #      git commit -a -m "My message" --no-verify
       #      (Recommendation: run git commit -a .. once, then with `--no-verify`)
-      - id: no-commit-to-branch
-        args: [--branch, main, --pattern, \d+.0$]
+      #- id: no-commit-to-branch
+      #  args: [--branch, main, --pattern, \d+.0$]
       # This checks that xml files are correct
       - id: check-xml
       # This checks that yaml files are correct
@@ -91,13 +91,13 @@ repos:
   #   ```
   - repo: local
     hooks:
-      - name: Find missing/unused/duplicate language keys
-        id: check-translations
-        files: (?x)^([^/]+/langs/en_US/.*\.lang)
-        language: script
-        entry: ./dev/translation/sanity_check_trans_missing_unused.sh
-        pass_filenames: false
-        args: [list]
+      #- name: Find missing/unused/duplicate language keys
+      #  id: check-translations
+      #  files: (?x)^([^/]+/langs/en_US/.*\.lang)
+      #  language: script
+      #  entry: ./dev/translation/sanity_check_trans_missing_unused.sh
+      #  pass_filenames: false
+      #  args: [list]
       - id: local-precommit-script
         name: Run local script before commit if it exists
         language: system

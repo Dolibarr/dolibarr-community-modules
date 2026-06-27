@@ -139,7 +139,7 @@ function delTree($dir)
  *
  * @param   string  $path  full path to delete
  *
- * @return bool true on success ($path does not exists at the end of process), else exit
+ * @return true|never true on success ($path does not exists at the end of process), else exit
  */
 function secureUnlink($path)
 {
@@ -164,7 +164,7 @@ function secureUnlink($path)
  *
  * @param   string  $path  path to make
  *
- * @return bool true on success ($path exists at the end of process), else exit
+ * @return true|never true on success ($path exists at the end of process), else exit
  */
 function mkdirAndCheck($path)
 {

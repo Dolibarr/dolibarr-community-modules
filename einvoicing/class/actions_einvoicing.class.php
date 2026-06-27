@@ -132,7 +132,7 @@ class ActionsEInvoicing extends CommonHookActions
 						//setEventMessages($message, array(), $messagecss);
 					}
 
-					$result = $protocol->generateInvoice($invoiceObject, $outputlangs);		// Generate E-invoice
+					$result = $protocol->generateInvoice($invoiceObject, $outputlangs, $pdfPath);		// Generate E-invoice (embed into the real generated file)
 
 					if ($result >= 0) {
 						setEventMessages($message, array(), $messagecss);
@@ -193,6 +193,24 @@ class ActionsEInvoicing extends CommonHookActions
 		return 0;
 	}
 
+	/**
+	 * Hook called after an ODT/ODS document is created.
+	 *
+	 * Invoice templates rendered from an ODT model emit `afterODTCreation` (not `afterPDFCreation`),
+	 * so the e-invoice generation must be triggered here too. Same logic as afterPDFCreation:
+	 * $parameters['file'] then points to the .odt, and the protocol derives the matching PDF rendition.
+	 *
+	 * @param 	array   		$parameters 	Hook parameters
+	 * @param 	CommonObject 	$object 		The object related to the document (invoice, order, etc.)
+	 * @param 	string  		$action     	Current action
+	 * @param 	HookManager 	$hookmanager 	Hook manager instance
+	 * @return 	int    			0 or 1
+	 */
+	public function afterODTCreation($parameters, &$object, &$action, $hookmanager)
+	{
+		return $this->afterPDFCreation($parameters, $object, $action, $hookmanager);
+	}
+
 
 	/**
 	 * Overload the addMoreActionsButtons function : replacing the parent's function with the one below
@@ -225,6 +243,11 @@ class ActionsEInvoicing extends CommonHookActions
 			// EINVOICING_ALLOW_RESEND_TRANSMITTED.
 			$locked = $einvoicing->isTransmittedLockActive($object->id, $object->ref);
 
+			$forcedisabling = '';
+			if (!empty($currentStatusDetails['otherprovider'])) {
+				$forcedisabling = $langs->trans("WarningEinvoicingInvoiceStatusDifferentProvider", $currentStatusDetails['otherprovider']);
+			}
+
 			$url_button = array();
 
 			if ($object->status == Facture::STATUS_VALIDATED || $object->status == Facture::STATUS_CLOSED) {
@@ -236,7 +259,7 @@ class ActionsEInvoicing extends CommonHookActions
 					$url_button[] = array(
 						'lang' => 'einvoicing',
 						'enabled' => 1,
-						'perm' => (bool) $user->hasRight("facture", "creer"),
+						'perm' => ($forcedisabling ? -1 : ((bool) $user->hasRight("facture", "creer"))),
 						'label' => $langs->trans('GenerateEinvoice'),
 						//'help' => $langs->trans('GenerateEinvoiceHelp'),
 						'url' => '/compta/facture/card.php?id=' . $object->id . '&action=generate_einvoice&token=' . newToken()
@@ -261,8 +284,9 @@ class ActionsEInvoicing extends CommonHookActions
 				$url_button[] = array(
 					'lang' => 'einvoicing',
 					'enabled' => 1,
-					'perm' => $perm,
+					'perm' => ($forcedisabling ? -1 : $perm),
 					'label' => $langs->trans('RegenerateEinvoice'),
+					'text' => $forcedisabling,
 					//'help' => $langs->trans('RegenerateEinvoiceHelp'),
 					'url' => '/compta/facture/card.php?id=' . $object->id . '&action=generate_einvoice&token=' . newToken()
 				);
@@ -282,8 +306,9 @@ class ActionsEInvoicing extends CommonHookActions
 					$url_button[] = array(
 						'lang' => 'einvoicing',
 						'enabled' => 1,
-						'perm' => (bool) $user->hasRight("einvoicing", "write") && ($currentStatusDetails['file'] == 1),
+						'perm' => ($forcedisabling ? -1 : ((bool) $user->hasRight("einvoicing", "write") && ($currentStatusDetails['file'] == 1))),
 						'label' => $langs->trans('sendToPDP'),
+						'text' => $forcedisabling,
 						//'help' => $langs->trans('SendToPDPHelp'),
 						'url' => '/compta/facture/card.php?id=' . $object->id . '&action=send_to_pdp&token=' . newToken()
 					);
@@ -348,14 +373,18 @@ class ActionsEInvoicing extends CommonHookActions
 						$url_button[] = array(
 							'lang' => 'einvoicing',
 							'enabled' => 1,
-							'perm' => (bool) $user->hasRight("facture", "creer"),
-							'label' => $label,
-							'url' => dol_buildpath('/fourn/facture/card.php?id=' . $object->id . '&action=sendStatusMessage&pdpstatuscode=' . $code . '&token=' . newToken(), 1)
+							'perm' => ($forcedisabling ? -1 : ((bool) $user->hasRight("facture", "creer") && empty($forcedisabling))),
+							'label' => (string) $label,
+							'url' => '/fourn/facture/card.php?id=' . $object->id . '&action=sendStatusMessage&pdpstatuscode=' . $code . '&token=' . newToken()
 						);
 					}
 
 					if (!empty($url_button)) {
-						print dolGetButtonAction($langs->trans('einvoice'), '', 'default', $url_button, '', true);
+						if ((float) DOL_VERSION < 22) {
+							print dolGetButtonAction($langs->trans('einvoice'), '', 'default', $url_button, '', true);
+						} else {
+							print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true);
+						}
 					}
 				}
 			}

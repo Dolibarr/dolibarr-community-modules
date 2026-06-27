@@ -33,6 +33,11 @@
  * @var Facture    	$invoice
  * @var CIIProtocol|FacturXProtocol	$this
  */
+'
+@phan-var-force Translate 	$outputlangs
+@phan-var-force Facture   	$invoice
+@phan-var-force CIIProtocol|FacturXProtocol	$this
+';
 
 // Use customer language
 if (empty($outputlangs) || ! ($outputlangs instanceof Translate)) {
@@ -230,7 +235,10 @@ $numligne          	= 1;
 foreach ($object->lines as $line) {
 	$isDepositLine = 0;
 
-	// Skip subtotal lines
+	// Skip title / subtotal / page-break lines. These are product_type 9 pseudo-lines that carry no VAT, so
+	// they must not reach getCategoryRate() (would trigger a VATEX exemption error on rate 0 / no code).
+	// Detection is centralized in _isLineFromExternalModule(), which covers both the legacy modSubtotal
+	// module and the native core subtotal feature.
 	$isSubTotalLine = $this->_isLineFromExternalModule($line, $object->element, 'modSubtotal');
 	if ($isSubTotalLine) {
 		continue;
@@ -704,7 +712,7 @@ if ($object->mode_reglement_code) {
 // party. Resolution priority:
 //   1) external "SHIPPING" contact attached to the invoice;
 //   2) fallback: delivery address carried by a linked shipment (expedition.fk_delivery_address).
-// The builder (ShipToTradePartyBuilder::build) only emits the node when the resolved address
+// buildShipToTradePartyBuilder function only emits the node when the resolved address
 // actually differs from the buyer (bill-to) address and carries a country code; otherwise it falls
 // back to the buyer party. Nothing resolved => keys stay unset => ship-to = buyer is preserved.
 $shipAddress = null;

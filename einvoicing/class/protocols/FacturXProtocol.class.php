@@ -419,9 +419,10 @@ class FacturXProtocol extends AbstractProtocol
 	 *
 	 * @param 	int|Object 	$invoice_id    	Invoice ID or Invoice Object to be processed.
 	 * @param	?Translate	$outputlangs	Output language
+	 * @param	string		$sourceFilePath	Full path of the source document produced by the doc generator (PDF, or ODT/ODS whose PDF rendition is reused). Empty = resolve from the output directory.
 	 * @return 	-1|string       			-1 if ko, path if ok.
 	 */
-	public function generateInvoice($invoice_id, $outputlangs = null)
+	public function generateInvoice($invoice_id, $outputlangs = null, $sourceFilePath = '')
 	{
 		// Global variables declaration (typical for Dolibarr environment)
 		global $langs, $db;
@@ -474,10 +475,53 @@ class FacturXProtocol extends AbstractProtocol
 
 		$filename = dol_sanitizeFileName($invoice->ref);
 		$filedir = getMultidirOutputCompat($invoice, '', 1);		// Example '/mydolibarr/documents/facture/FAYYMM-XXXX'
-		$orig_pdf = $filedir . '/' . $filename . '.pdf';
 
-		// Si le PDF source n'existe plus (supprimé manuellement), on le regénère avant d'embarquer le XML.
+		// Resolve the source PDF into which the Factur-X XML will be embedded.
+		// Priority:
+		//   1. $sourceFilePath provided by the generation hook (afterPDFCreation / afterODTCreation).
+		//      ODT/ODS models hand over the .odt path; the PDF rendition (MAIN_ODT_AS_PDF) shares the basename.
+		//   2. the most recent <ref>*.pdf already present in the output dir (manual generation, ODT output
+		//      like <ref>_Template.pdf for which last_main_doc is not maintained), excluding our own output.
+		//   3. legacy <ref>.pdf, regenerated with the default PDF model if missing.
+		$orig_pdf = '';
+		$fromodt = false;
+		if (!empty($sourceFilePath)) {
+			if (preg_match('/\.(odt|ods)$/i', $sourceFilePath)) {
+				$fromodt = true;
+				$orig_pdf = preg_replace('/\.(odt|ods)$/i', '.pdf', $sourceFilePath);
+			} else {
+				$orig_pdf = $sourceFilePath;
+			}
+		} else {
+			$candidates = dol_dir_list($filedir, 'files', 0, '', '', 'date', SORT_DESC);
+			foreach ($candidates as $cand) {
+				if (!preg_match('/\.pdf$/i', $cand['name'])) {
+					continue;
+				}
+				if (preg_match('/_facturx\.pdf$/i', $cand['name'])) {		// skip our own Factur-X output
+					continue;
+				}
+				if (strpos($cand['name'], $filename) !== 0) {				// must belong to this invoice ref
+					continue;
+				}
+				$orig_pdf = $cand['fullname'];								// list is sorted by date desc: newest first
+				break;
+			}
+		}
+		if (empty($orig_pdf)) {
+			$orig_pdf = $filedir . '/' . $filename . '.pdf';				// legacy default
+		}
+
+		// If the source PDF is missing, decide whether we can recover.
 		if (!file_exists($orig_pdf)) {
+			if ($fromodt && !getDolGlobalString('MAIN_ODT_AS_PDF')) {
+				// ODT invoice template without a PDF rendition: there is no PDF carrier for Factur-X.
+				dol_syslog(get_class($this) . "::generateInvoice ODT template without MAIN_ODT_AS_PDF, no PDF carrier for Factur-X, invoice id=" . $invoice_id, LOG_ERR);
+				$this->error = $langs->trans("ErrorEInvoiceRequiresPdfEnableMainOdtAsPdf");
+				$this->errors[] = $this->error;
+				return -1;
+			}
+			// Source PDF deleted or never generated: regenerate it with the default PDF model before embedding.
 			$modelname = getDolGlobalString('FACTURE_ADDON_PDF') ?: 'crabe';
 			$resultpdf = $invoice->generateDocument($modelname, $langs);
 			if ($resultpdf < 0) {
@@ -486,6 +530,7 @@ class FacturXProtocol extends AbstractProtocol
 				$this->errors[] = $this->error;
 				return -1;
 			}
+			$orig_pdf = $filedir . '/' . $filename . '.pdf';				// generateDocument writes <ref>.pdf
 		}
 
 		// Make a copy of the original PDF file
@@ -527,7 +572,7 @@ class FacturXProtocol extends AbstractProtocol
 			// Generate the PDF including the XML using the TCPDF library.
 			// Bugged version that include the factur-x.xml file twice in the PDF. Only Acrobat Reader show there is 2 files, other PDF reader works correctly showing one file.
 			// But it works with Esalink and is the only solution when Dolibarr < 24.0 because such version have a class FPDF provided by default in Dolibarr
-			// that is in conflict with the class FPDF provided bu the module einvoicing and the library horstoeko/zugferd.
+			// that is in conflict with the class FPDF provided by the module einvoicing and the library horstoeko/zugferd.
 			$pdf = pdf_getInstance();
 			$pagecount = $pdf->setSourceFile($pathfacturxpdf);
 
@@ -918,7 +963,7 @@ class FacturXProtocol extends AbstractProtocol
 	 * @param  string 			$file                       		Source string file (PDF string). We use this file to get data of supplier invoice.
 	 * @param  string|null 		$ReadableViewFile        			Readable view file (PDP Generated readable PDF). We only store it if available.
 	 * @param  string 			$flowId                       		Flow identifier source of the invoice.
-	 * @return array{res:int, message:string, action:string|null}   Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and an optional 'action'.
+	 * @return array{res:int<-1,1>, message:string, action?:string|null}   Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and an optional 'action'.
 	 */
 	public function createSupplierInvoiceFromSource($file, $ReadableViewFile = null, $flowId = '')
 	{
@@ -971,7 +1016,7 @@ class FacturXProtocol extends AbstractProtocol
 			$ProtocolManager = new ProtocolManager($db);
 			$CII = $ProtocolManager->getProtocol('CII');
 
-			$parsedHeader = $CII->parseInvoiceXML($embeddedXml);
+			$parsedHeader = $CII->parseInvoiceHeader($embeddedXml);
 			$parsedLines  = $CII->parseInvoiceLines($embeddedXml);
 		} else {
 			$document->getDocumentInformation($documentno, $documenttypecode, $documentdate, $invoiceCurrency, $taxCurrency, $documentname, $documentlanguage, $effectiveSpecifiedPeriod);
