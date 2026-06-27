@@ -1918,8 +1918,8 @@ class EInvoicing
 			'info' => '',
 			'file' => '0',
 			'transmitted' => 0,
-      'everTransmitted' => 0,
-      'flow_id' => ''
+			'everTransmitted' => 0,
+			'flow_id' => ''
 			'override_routing_id' => '',
 			'otherprovider' => ''
 		);
@@ -1953,14 +1953,14 @@ class EInvoicing
 						$tmpstatus['code'] = (int) $obj->syncstatus;
 						$tmpstatus['status'] = $this->getStatusLabel((int) $obj->syncstatus);
 						$tmpstatus['info'] = $obj->synccomment ?? '';
-            $tmpstatus['flow_id'] = $obj->flow_id ?? '';
+						$tmpstatus['flow_id'] = $obj->flow_id ?? '';
 						$tmpstatus['override_routing_id'] = $obj->override_routing_id ?? '';
 						if (!in_array((int) $obj->syncstatus, array(self::STATUS_UNKNOWN, self::STATUS_IGNORE, self::STATUS_NOT_GENERATED, self::STATUS_GENERATED))) {
 							$tmpstatus['transmitted'] = 1;
 						} else {
 							$tmpstatus['transmitted'] = 0;
 						}
-            $tmpstatus['everTransmitted'] = !empty($obj->flow_id) ? 1 : 0;
+						$tmpstatus['everTransmitted'] = !empty($obj->flow_id) ? 1 : 0;
 						$tmpstatus['otherprovider'] = $providerindbshort;
 					}
 					$foundforanotherprovider++;
@@ -1973,7 +1973,7 @@ class EInvoicing
 				$tmpstatus['code'] = (int) $obj->syncstatus;
 				$tmpstatus['status'] = $this->getStatusLabel((int) $obj->syncstatus);
 				$tmpstatus['info'] = $obj->synccomment ?? '';
-        $tmpstatus['flow_id'] = $obj->flow_id ?? '';
+				$tmpstatus['flow_id'] = $obj->flow_id ?? '';
 				$tmpstatus['override_routing_id'] = $obj->override_routing_id ?? '';
 				if (!in_array((int) $obj->syncstatus, array(self::STATUS_UNKNOWN, self::STATUS_IGNORE, self::STATUS_NOT_GENERATED, self::STATUS_GENERATED))) {
 					$tmpstatus['transmitted'] = 1;
