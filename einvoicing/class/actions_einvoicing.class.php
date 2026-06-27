@@ -238,6 +238,11 @@ class ActionsEInvoicing extends CommonHookActions
 			// Get current status of e-invoice
 			$currentStatusDetails = $einvoicing->fetchLastknownInvoiceStatus($object->id, $object->ref);
 
+			// Already transmitted to the PA (persistent flow_id): regenerate/re-send are locked by default
+			// (immutable invoice; correct with a credit note / corrective invoice). Opt out with
+			// EINVOICING_ALLOW_RESEND_TRANSMITTED.
+			$locked = $einvoicing->isTransmittedLockActive($object->id, $object->ref);
+
 			$forcedisabling = '';
 			if (!empty($currentStatusDetails['otherprovider'])) {
 				$forcedisabling = $langs->trans("WarningEinvoicingInvoiceStatusDifferentProvider", $currentStatusDetails['otherprovider']);
@@ -262,8 +267,12 @@ class ActionsEInvoicing extends CommonHookActions
 				}
 
 				// If the e-invoice is generated but not sent, or if it was sent and a validation error was received,
-				// display the button to regenerate the e-invoice
-				if (in_array($currentStatusDetails['code'], [
+				// display the button to regenerate the e-invoice.
+				// EINVOICING_ALLOW_REGEN_TRANSMITTED forces the regenerate button even on a transmitted-locked
+				// invoice (dev only: lets you rebuild the CII/Factur-X to inspect the XML; nothing is re-sent).
+				if (getDolGlobalString('EINVOICING_ALLOW_REGEN_TRANSMITTED')) {
+					$perm = (bool) $user->hasRight("facture", "creer");
+				} elseif (!$locked && in_array($currentStatusDetails['code'], [
 					$einvoicing::STATUS_GENERATED,
 					$einvoicing::STATUS_ERROR,
 					$einvoicing::STATUS_UNKNOWN
@@ -284,12 +293,15 @@ class ActionsEInvoicing extends CommonHookActions
 
 				// If the e-invoice is generated but not sent, or if it was sent and a validation error was received,
 				// display the button to regenerate the e-invoice
-				if (in_array($currentStatusDetails['code'], [
+				// Re-send is offered for not-yet-transmitted states, plus AWAITING_* as a deliberate retry
+				// affordance. Once REALLY transmitted (persistent flow_id), it is locked by default unless
+				// EINVOICING_ALLOW_RESEND_TRANSMITTED is set ($locked already accounts for that opt-out).
+				if (!$locked && in_array($currentStatusDetails['code'], [
 					$einvoicing::STATUS_GENERATED,
 					$einvoicing::STATUS_ERROR,
 					$einvoicing::STATUS_UNKNOWN,
-					$einvoicing::STATUS_AWAITING_VALIDATION,		// We may retry to resend. We should get an error if we do, but it is interesting to test the retry.
-					$einvoicing::STATUS_AWAITING_ACK				// We may retry to resend. We should get an error if we do, but it is interesting to test the retry.
+					$einvoicing::STATUS_AWAITING_VALIDATION,		// retry affordance (PA will refuse a duplicate)
+					$einvoicing::STATUS_AWAITING_ACK				// retry affordance (PA will refuse a duplicate)
 				])) {
 					$url_button[] = array(
 						'lang' => 'einvoicing',
@@ -314,6 +326,19 @@ class ActionsEInvoicing extends CommonHookActions
 					} else {
 						print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true);
 					}
+				}
+
+				// Once transmitted to the PA, the invoice is immutable. The BILL_UNVALIDATE / BILL_MODIFY
+				// triggers already refuse the change server-side, but the core "Modify" (re-open) button
+				// stays clickable and would just throw an error. There is no clean hook to remove a single
+				// core button, so neutralize it client-side (disable + tooltip) for a clear UX. The trigger
+				// remains the real enforcement (defense in depth). Honors EINVOICING_ALLOW_RESEND_TRANSMITTED.
+				if ($locked && (empty($parameters['context']) || !preg_match('/takepospay/', $parameters['context']))) {
+					print "\n<!-- einvoicing: lock core Modify button (transmitted invoice) -->\n";
+					// Match by href (action=modif) so it works regardless of the button class / Dolibarr
+					// version (top-level butAction or v22+ dropdown item).
+					$jsmsg = json_encode($langs->trans('EInvoiceTransmittedModifyDisabled'));
+					print '<script>jQuery(function($){var t=' . $jsmsg . ';$("div.tabsAction a[href*=\'action=modif\']").each(function(){$(this).removeClass("butAction").addClass("butActionRefused").removeAttr("href").css("cursor","not-allowed").attr("title",t).on("click",function(e){e.preventDefault();e.stopImmediatePropagation();return false;});});});</script>';
 				}
 			}
 		}
@@ -430,6 +455,22 @@ class ActionsEInvoicing extends CommonHookActions
 				}
 			}
 
+			// An invoice already transmitted to the Access Point (a flow_id is assigned, by any provider) is
+			// immutable: re-sending it makes the PA refuse a duplicate, and regenerating it would only reset
+			// the local status and re-open that trap. Block both by default; correct a transmitted invoice
+			// with a credit note / corrective invoice. The operator can opt in (e.g. to test PA retry) via
+			// EINVOICING_ALLOW_RESEND_TRANSMITTED. Based on the persistent flow_id, not the resettable status.
+			// EINVOICING_ALLOW_REGEN_TRANSMITTED keeps regenerate (generate_einvoice) available on a
+			// transmitted-locked invoice for dev/inspection; re-sending (send_to_pdp) stays locked.
+			$lockedActions = getDolGlobalString('EINVOICING_ALLOW_REGEN_TRANSMITTED')
+				? array('send_to_pdp')
+				: array('send_to_pdp', 'generate_einvoice');
+			if (in_array($action, $lockedActions) && isset($currentStatusDetails)
+				&& $einvoicing->isTransmittedLockActive($object->id, $object->ref)) {
+				setEventMessages($langs->trans('EInvoiceAlreadyTransmittedLocked', $currentStatusDetails['flow_id']), null, 'warnings');
+				$action = '';
+			}
+
 			// Action to send invoice to Access Point
 			if (
 				$action == 'send_to_pdp' && $permissiontoedit
@@ -466,8 +507,9 @@ class ActionsEInvoicing extends CommonHookActions
 						$messages[] = $langs->trans("InvoiceSuccessfullySentToPDP");
 						$messages[] = $langs->trans("FlowId") . ": " . $result;
 						setEventMessages('', $messages, 'mesgs');
-						// TODO: Review and update the invoice workflow.
-						// The "Modify" button may need to be disabled once the E-invoice has been sent and distributed by the PDP.
+						// Once transmitted, the invoice is locked from re-edit/regenerate/re-send: the
+						// BILL_UNVALIDATE / BILL_MODIFY triggers and the guards above key on the persistent
+						// flow_id (EInvoicing::isTransmittedLockActive), overridable via EINVOICING_ALLOW_RESEND_TRANSMITTED.
 					} else {
 						$error++;
 						$this->error = $provider->error;
