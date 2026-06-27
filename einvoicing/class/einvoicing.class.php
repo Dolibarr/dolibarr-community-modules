@@ -1919,7 +1919,7 @@ class EInvoicing
 			'file' => '0',
 			'transmitted' => 0,
 			'everTransmitted' => 0,
-			'flow_id' => ''
+			'flow_id' => '',
 			'override_routing_id' => '',
 			'otherprovider' => ''
 		);
