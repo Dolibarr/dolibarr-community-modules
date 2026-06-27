@@ -1986,7 +1986,6 @@ class EInvoicing
 				// and is never cleared, so it survives a regenerate/re-open and tells us the invoice already
 				// exists at the PA (re-sending it would be refused / would create a duplicate).
 				$tmpstatus['everTransmitted'] = !empty($obj->flow_id) ? 1 : 0;
-			} else {
 				$tmpstatus['otherprovider'] = '';
 			}
 
