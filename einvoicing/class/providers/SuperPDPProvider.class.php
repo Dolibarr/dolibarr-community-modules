@@ -242,12 +242,12 @@ class SuperPDPProvider extends AbstractPDPProvider
 			 */
 
 			if (getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER') == 'proxy') {
+				/* This option seems useless, see previous comment
 				$item = $formSetup->newItem($prefix.'GRANT_TYPE')->setAsSelect(array(
 					'client_credentials' => $langs->trans('EINVOICING_SUPERPDP_GRANT_CLIENT_CREDENTIALS'),
 					'authorization_code' => $langs->trans('EINVOICING_SUPERPDP_GRANT_AUTHORIZATION_CODE'),
 				));
 
-				/* This option seems useless
 				$item->nameText = $langs->trans('EINVOICING_SUPERPDP_GRANT_TYPE');
 				$item->helpText = $langs->transnoentities('EINVOICING_SUPERPDP_GRANT_TYPE_HELP');
 				$item->defaultFieldValue = 'client_credentials';
