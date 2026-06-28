@@ -385,7 +385,13 @@ if (getDolGlobalString('EINVOICING_PDP')) {
 			print '<div class="neutral">';
 			print 'You are a Proxy for <b>SuperPDP Access Point registration</b> (EINVOICING_SUPERPDP_VIAPARTNER = "proxy").<br>';
 			print '<div class="marginbottomonly inline-block">To have customer instances using this server as a proxy for SuperPDP registration:</div><br>';
-			print '- on this instance, you must have set the Client ID and Client Secret of reseller account on the "Access Point setup" tab for proxy mode: '.((getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_CLIENT_ID') && getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_CLIENT_SECRET')) ? '<span class="ok">'.img_picto('', 'tick').' OK</span>' : '<span class="error">KO</span>').'.<br>';
+			print '- on this instance, you must have set the Client ID and Client Secret of reseller account on the "Access Point setup" tab for proxy mode: ';
+			if (getDolGlobalString('EINVOICING_LIVE')) {
+				print ((getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_CLIENT_ID_PROD') && getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_CLIENT_SECRET_PROD')) ? '<span class="ok">'.img_picto('', 'tick').' OK</span>' : '<span class="error">KO</span>').'.<br>';
+			} else {
+				print ((getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_CLIENT_ID') && getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_CLIENT_SECRET')) ? '<span class="ok">'.img_picto('', 'tick').' OK</span>' : '<span class="error">KO</span>').'.<br>';
+			}
+
 			print '- on the <a href="'.$urlproxyadmin.'" target=_blank">SuperPDP Access Point admin dashboard '.img_picto('', 'url').'</a>, for the account of your company, the callback url must be set to <input type="text" id="idproxyurl" class="width300" value="'.$urlforproxy.'" spellcheck="false">';
 			print ajax_autoselect("idproxyurl");
 			print '<br>';
