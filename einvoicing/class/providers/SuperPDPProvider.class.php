@@ -275,7 +275,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 			// Authorization Code specific settings
 			// We suggest all these options if we are on the proxy.
-			if (getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER') == 'proxy') {
+			if (getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER') == 'proxy' && preg_match('/ViaPartner/', getDolGlobalString('EINVOICING_PDP'))) {
 				// Redirect URI to register in the SuperPDP interface (must match exactly)
 				$item = $formSetup->newItem($prefix.'REDIRECT_URI_INFO');
 				$item->nameText = $langs->trans('EINVOICING_SUPERPDP_REDIRECT_URI');
