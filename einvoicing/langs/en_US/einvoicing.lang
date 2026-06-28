@@ -382,3 +382,11 @@ ReasonRecipientError=Recipient error
 ReasonUnknownTransaction=Unknown transaction
 ReasonUnknownIssuer=Unknown issuer
 ReasonAntivirusControl=Antivirus control
+# Lock of an already-transmitted invoice
+EInvoiceAlreadyTransmittedLocked=This invoice has already been transmitted to the Access Point (flow %s). A transmitted invoice is immutable: issue a credit note or a corrective invoice to amend it. You can enable re-sending in the module setup to test the platform retry behaviour.
+EINVOICING_ALLOW_RESEND_TRANSMITTED=Allow re-sending an already transmitted invoice
+EINVOICING_ALLOW_RESEND_TRANSMITTED_HELP=Off by default. A transmitted invoice is immutable; correct it with a credit note or a corrective invoice. Enable only to deliberately test the Access Point retry behaviour (re-sending will be refused as a duplicate).
+EINVOICING_ALLOW_REGEN_TRANSMITTED=Allow regenerating the e-invoice of a transmitted invoice (dev)
+EINVOICING_ALLOW_REGEN_TRANSMITTED_HELP=Off by default. Dev/inspection only: keeps the "Regenerate e-invoice" button and action available on a transmitted invoice so you can rebuild the CII/Factur-X and inspect the XML. Re-sending stays locked.
+EINVOICING_TRANSMITTED_NOT_FOR_PROD=Warning: must not be used in production, breaks the AFNOR/PA/PDP contracts
+EInvoiceTransmittedModifyDisabled=This invoice has been transmitted to the Access Point and can no longer be modified. Issue a credit note or a corrective invoice to amend it.

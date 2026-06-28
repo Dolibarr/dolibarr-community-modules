@@ -376,3 +376,4 @@ ReasonRecipientError=Recipient error
 ReasonUnknownTransaction=Unknown transaction
 ReasonUnknownIssuer=Unknown issuer
 ReasonAntivirusControl=Antivirus control
+EINVOICING_TRANSMITTED_NOT_FOR_PROD=Upozorenje: ne smije se koristiti u produkciji, krši ugovore AFNOR/PA/PDP
