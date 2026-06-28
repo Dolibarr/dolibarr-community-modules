@@ -294,17 +294,22 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
 	$item->fieldAttr['placeholder'] = $langs->transnoentities('Hours');
 	$item->cssClass = 'maxwidth100';
 
+	/* Keep this option as hidden as it is too bugged and not really useful
+	// Setup conf to enable or not the consistency check on supplier invoice validation
 	$item = $formSetup->newItem('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION');
 	$item->helpText = $langs->transnoentities('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION_HELP');
 	$item->setAsYesNo();
+	*/
 
-	$item = $formSetup->newItem('EINVOICING_SUPPLIER_INVOICE_COMPARISON_ROUND_PRECISION');
-	// $item->setAsNumber(2, 10, 1); // not in < v22
-	$item->fieldAttr['type'] = 'number';
-	$item->fieldAttr['min'] = 2;
-	$item->fieldAttr['max'] = 10;
-	$item->fieldAttr['step'] = 1;
-	$item->defaultFieldValue = 3;
+	if (getDolGlobalString('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION')) {
+		$item = $formSetup->newItem('EINVOICING_SUPPLIER_INVOICE_COMPARISON_ROUND_PRECISION');
+		// $item->setAsNumber(2, 10, 1); // not in < v22
+		$item->fieldAttr['type'] = 'number';
+		$item->fieldAttr['min'] = 2;
+		$item->fieldAttr['max'] = 10;
+		$item->fieldAttr['step'] = 1;
+		$item->defaultFieldValue = 3;
+	}
 }
 
 
