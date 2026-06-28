@@ -247,10 +247,12 @@ class SuperPDPProvider extends AbstractPDPProvider
 					'authorization_code' => $langs->trans('EINVOICING_SUPERPDP_GRANT_AUTHORIZATION_CODE'),
 				));
 
+				/* This option seems useless
 				$item->nameText = $langs->trans('EINVOICING_SUPERPDP_GRANT_TYPE');
 				$item->helpText = $langs->transnoentities('EINVOICING_SUPERPDP_GRANT_TYPE_HELP');
 				$item->defaultFieldValue = 'client_credentials';
 				$item->cssClass = 'minwidth500';
+				*/
 			}
 
 			// Username
