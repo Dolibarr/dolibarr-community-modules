@@ -79,7 +79,7 @@ require_once "../class/einvoicing.class.php";
 
 
 // Translations
-$langs->loadLangs(array("admin", "einvoicing@einvoicing", "other"));
+$langs->loadLangs(array("admin", "bills", "einvoicing@einvoicing", "other"));
 
 // Initialize a technical object to manage hooks of page. Note that conf->hooks_modules contains an array of hook context
 /** @var HookManager $hookmanager */
