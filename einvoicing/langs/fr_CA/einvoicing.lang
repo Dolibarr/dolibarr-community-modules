@@ -108,7 +108,6 @@ checkCustomerData= Vérifier le client
 checkInvoiceData= Vérifier la facture
 InvoiceSuccessfullySentToPDP=Facture envoyée avec succès au point d'accès aux factures électroniques.
 ErrorSendingInvoiceToPDP=Une erreur s'est produite lors de l'envoi de la facture au point d'accès aux factures électroniques.
-pdpExchange=PDP Connect France
 EInvoiceManagement=Gestion des factures électroniques
 EInvoiceSynchronization=Synchronisation des factures électroniques
 PdpDocuments=Flux échangés

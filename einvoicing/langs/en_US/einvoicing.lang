@@ -111,7 +111,6 @@ checkCustomerData= Check Customer
 checkInvoiceData= Check Invoice
 InvoiceSuccessfullySentToPDP=Invoice successfully sent to the E-invoice Access Point.
 ErrorSendingInvoiceToPDP=An error occurred while sending the invoice to the E-invoice Access Point.
-pdpExchange=PDP Connect France
 EInvoiceManagement=E-invoice Management
 EInvoiceSynchronization=E-invoice Synchronization
 PdpDocuments=Exchanged Flows

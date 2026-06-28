@@ -216,9 +216,9 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 				$result = $provider->sendStatusMessage($object, 212); // Send status message
 
 				if ($result['res'] > 0) {
-					setEventMessage('PDP Connect : '.$langs->trans('EInvStatus212Paid'), 'mesgs');
+					setEventMessage($langs->trans("ModuleEInvoicingName").' : '.$langs->trans('EInvStatus212Paid'), 'mesgs');
 				} else {
-					setEventMessage('PDP Connect : '.$result['message'], 'errors');
+					setEventMessage($langs->trans("ModuleEInvoicingName").' : '.$result['message'], 'errors');
 				}
 			}
 		}

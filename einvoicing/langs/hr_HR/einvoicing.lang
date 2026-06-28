@@ -108,7 +108,6 @@ checkCustomerData= Provjerite kupca
 checkInvoiceData= Provjerite fakturu
 InvoiceSuccessfullySentToPDP=Račun uspješno poslan na Pristupnu točku za e-račun.
 ErrorSendingInvoiceToPDP=Došlo je do pogreške prilikom slanja računa na Pristupnu točku za e-račun.
-pdpExchange=PDP Connect France
 EInvoiceManagement=Upravljanje e-računima
 EInvoiceSynchronization=Sinkronizacija e-računa
 PdpDocuments=Izmijenjeni tokovi
