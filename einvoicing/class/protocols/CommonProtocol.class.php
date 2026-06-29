@@ -1606,4 +1606,84 @@ trait CommonProtocol
 		}
 		return 0;
 	}
+
+
+	/**
+	 * Link an inbound supplier invoice to its Dolibarr purchase order (commande fournisseur).
+	 *
+	 * Uses the purchase order reference (BT-13, BuyerOrderReferencedDocument/IssuerAssignedID) carried by
+	 * the invoice. The lookup is reference-exact (after trimming) AND scoped to the resolved supplier, so a
+	 * matching reference belonging to another supplier is never linked. The link is only created on a single
+	 * unambiguous match; several matches are flagged (no auto-link) and the absence of a match is silent.
+	 *
+	 * This is internal ERP reconciliation logic and must NEVER block import. See issue #303.
+	 *
+	 * @param 	FactureFournisseur 	$supplierInvoice 	Freshly created supplier invoice (must expose ->id)
+	 * @param 	int 				$socId 				Resolved supplier third party id
+	 * @param 	string 				$orderReference 	BT-13 purchase order reference carried by the invoice
+	 * @return 	string 									Status message for the import log ('' when nothing was done)
+	 */
+	private function _linkSupplierInvoiceToPurchaseOrder($supplierInvoice, $socId, $orderReference)
+	{
+		global $db, $langs;
+
+		$orderReference = trim((string) $orderReference);
+		if ($orderReference === '' || empty($supplierInvoice->id) || (int) $socId <= 0) {
+			return '';
+		}
+
+		require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.commande.class.php';
+
+		// Reference-exact, supplier-scoped, entity-aware lookup to avoid false positives
+		$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "commande_fournisseur";
+		$sql .= " WHERE ref = '" . $db->escape($orderReference) . "'";
+		$sql .= " AND fk_soc = " . ((int) $socId);
+		$sql .= " AND entity IN (" . getEntity('supplier_order') . ")";
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			dol_syslog(get_class($this) . '::_linkSupplierInvoiceToPurchaseOrder DB error: ' . $db->lasterror(), LOG_ERR);
+			return '';
+		}
+
+		$num = $db->num_rows($resql);
+
+		if ($num == 0) {
+			// No order for this supplier. Surface a warning only if the reference exists for another supplier
+			// (likely mis-reference), otherwise stay silent (unchanged behaviour).
+			$sqlOther = "SELECT rowid FROM " . MAIN_DB_PREFIX . "commande_fournisseur";
+			$sqlOther .= " WHERE ref = '" . $db->escape($orderReference) . "'";
+			$sqlOther .= " AND fk_soc <> " . ((int) $socId);
+			$sqlOther .= " AND entity IN (" . getEntity('supplier_order') . ")";
+			$resqlOther = $db->query($sqlOther);
+			if ($resqlOther && $db->num_rows($resqlOther) > 0) {
+				$warn = $langs->trans('EInvoiceSupplierOrderRefWrongSupplier', $orderReference);
+				dol_syslog(get_class($this) . '::_linkSupplierInvoiceToPurchaseOrder ' . $warn, LOG_WARNING);
+				setEventMessages($warn, null, 'warnings');
+				return $warn;
+			}
+			dol_syslog(get_class($this) . '::_linkSupplierInvoiceToPurchaseOrder No supplier order "' . $orderReference . '" for socid ' . ((int) $socId), LOG_DEBUG);
+			return '';
+		}
+
+		if ($num > 1) {
+			// Ambiguous: do not auto-link, flag for manual resolution
+			$warn = $langs->trans('EInvoiceSupplierOrderLinkAmbiguous', $orderReference);
+			dol_syslog(get_class($this) . '::_linkSupplierInvoiceToPurchaseOrder ' . $warn, LOG_WARNING);
+			setEventMessages($warn, null, 'warnings');
+			return $warn;
+		}
+
+		$orderId = (int) $db->fetch_object($resql)->rowid;
+
+		$res = $supplierInvoice->add_object_linked('order_supplier', $orderId);
+		if ($res > 0) {
+			$msg = $langs->trans('EInvoiceSupplierInvoiceLinkedToOrder', $orderReference);
+			dol_syslog(get_class($this) . '::_linkSupplierInvoiceToPurchaseOrder ' . $msg, LOG_DEBUG);
+			return $msg;
+		}
+
+		dol_syslog(get_class($this) . '::_linkSupplierInvoiceToPurchaseOrder Failed to link order ' . $orderId . ' to invoice ' . $supplierInvoice->id . ': ' . $supplierInvoice->error, LOG_ERR);
+		return '';
+	}
 }
