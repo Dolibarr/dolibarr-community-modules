@@ -1206,6 +1206,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		global $form;
 
 		if (!is_object($form)) {
+			require_once DOL_DOCUMENT_ROOT . '/core/class/html.form.class.php';
 			$form = new Form($db);
 		}
 

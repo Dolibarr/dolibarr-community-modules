@@ -26,7 +26,9 @@
 if (!defined('NOLOGIN')) {
 	define("NOLOGIN", 1); // This means this output page does not require to be logged.
 }
-
+if (!defined('NOCSRFCHECK')) {
+	define("NOCSRFCHECK", 1);
+}
 // Load Dolibarr environment
 $res = 0;
 // Try main.inc.php into web root known defined into CONTEXT_DOCUMENT_ROOT (not always defined)
