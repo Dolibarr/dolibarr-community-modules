@@ -139,9 +139,9 @@ abstract class AbstractPDPProvider
 	abstract public function checkHealth();
 
 	/**
-	 * Get the base API URL for Esalink PDP
+	 * Get the base API URL for provider depending on the mode (authentication or regular API calls).
 	 *
-	 * @param string 	$mode 		'authent' or 'api'
+	 * @param string 	$mode 		'auth', 'api' or 'ap_api'
 	 * @return string				URL of the endpoint to call depending on the mode (authentication or regular API calls)
 	 */
 	public function getApiUrl($mode = 'api')
@@ -152,20 +152,36 @@ abstract class AbstractPDPProvider
 		// the "real mode" switch (the const gets stored as "0" instead of being deleted).
 		$prod = getDolGlobalInt('EINVOICING_LIVE');
 
+		$url = '';
 		if ($mode === 'auth') {
 			$url = $this->config['test_auth_url'];
 			if (!empty($prod)) {
 				$url = $this->config['prod_auth_url'];
 			}
 			return $url;
-		} else {
+		} elseif ($mode === 'api') {
 			$url = $this->config['test_api_url'];
 			if (!empty($prod)) {
 				$url = $this->config['prod_api_url'];
 			}
+		} elseif ($mode === 'ap_api') {
+			$url = $this->config['ap_api_url'];
+			if (!empty($prod)) {
+				$url = $this->config['ap_api_url'];
+			}
 		}
 
 		return $url;
+	}
+
+	/**
+	 * Check if the provider has a validator endpoint.
+	 *
+	 * @return bool True if the provider has a validator endpoint, false otherwise.
+	 */
+	public function hasValidator(): bool
+	{
+		return !empty($this->config['has_validator']);
 	}
 
 
@@ -242,6 +258,16 @@ abstract class AbstractPDPProvider
 	 * @return 	array|string 					True if the invoice was successfully sent, false otherwise.
 	 */
 	abstract public function sendSampleInvoice($onlymake = 0);
+
+
+	/**
+	 * Validate an electronic invoice file using the provider's validation service.
+	 *
+	 * @param 	int 	$idinvoice 	ID of the invoice to check
+	 * @param 	string 	$filePath 	Path to the invoice file to validate
+	 * @return 	array|string 		Validation result or error message.
+	 */
+	abstract public function validateEInvoiceFile($idinvoice, $filePath);
 
 
 	/**

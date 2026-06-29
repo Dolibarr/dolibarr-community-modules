@@ -70,9 +70,11 @@ class SuperPDPProvider extends AbstractPDPProvider
 			'test_auth_url' => 'https://api.superpdp.tech/oauth2/',
 			'prod_api_url'  => 'https://api.superpdp.tech/afnor-flow/v1/',
 			'test_api_url'  => 'https://api.superpdp.tech/afnor-flow/v1/',
+			'ap_api_url' 	=> 'https://api.superpdp.tech/v1.beta/',
 			'client_id'     => getDolGlobalString('EINVOICING_SUPERPDP_CLIENT_ID'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '')),
 			'client_secret' => getDolGlobalString('EINVOICING_SUPERPDP_CLIENT_SECRET'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '')),
 			'dol_prefix'    => getDolGlobalString('EINVOICING_PDP') == 'SUPERPDPViaPartner' ? 'EINVOICING_SUPERPDPVIAPARTNER' : 'EINVOICING_SUPERPDP',
+			'has_validator' => 1,
 			'live' => getDolGlobalInt('EINVOICING_LIVE', 0)
 		);
 
@@ -715,6 +717,67 @@ class SuperPDPProvider extends AbstractPDPProvider
 		return $returnarray;
 	}
 
+	/**
+	 * Validate an electronic invoice file using the superPDP validation service.
+	 *
+	 * @param 	int 	$idinvoice 	ID of the invoice to validate
+	 * @param 	string 	$filePath 	Path to the invoice file to validate
+	 *
+	 * @return 	array|string 		Validation result or error message.
+	 */
+	public function validateEInvoiceFile($idinvoice, $filePath)
+	{
+		global $langs;
+
+		if (empty($this->config['has_validator']) || $this->config['has_validator'] != 1) {
+			return array('res' => -1, 'message' => $langs->trans('NoAvailableValidatorforThisAccessPoint'));
+		}
+
+		if (empty($filePath) || !is_string($filePath)) {
+			return array('res' => -1, 'message' => 'Invalid file path provided for validation');
+		}
+
+		if (!file_exists($filePath)) {
+			return array('res' => -1, 'message' => "E-invoice file not found: " . $filePath);
+		}
+
+		$mimeType = mime_content_type($filePath) ?: 'application/octet-stream';
+
+		$params = [
+			'file' => new CURLFile($filePath, $mimeType, basename($filePath)),
+		];
+
+		// Extra headers
+		$extraHeaders = [
+			'Content-Type' => 'multipart/form-data'
+		];
+
+		$response = $this->callApi("validation_reports", "POSTALREADYFORMATED", $params, $extraHeaders, 'precheck_invoice');
+
+		if (empty($response) || !isset($response['response']['data']['0'])) {
+			return array('res' => -1, 'message' => 'Invalid response from validation service');
+		}
+
+		$report = $response['response']['data']['0'] ?? null;
+		$isValid = !empty($report['is_valid']);
+
+		$report_details = [];
+		if (!empty($report['error'])) {
+			$report_details['error'] = $report['error'];
+		}
+		if (!empty($report['subreports'])) {
+			$report_details['subreports'] = $report['subreports'];
+		}
+
+		// Save the validation report and status
+		$einvoicing = new EInvoicing($this->db);
+		$einvoicing->insertOrUpdateExtLink($idinvoice, 'facture', '', 0, '', '', null, ($isValid ? 'passed' : 'failed'), json_encode($report_details));
+
+		return array(
+			'res'     => $isValid ? 1 : -1,
+			'message' => ''
+		);
+	}
 
 	/**
 	 * Send an electronic invoice.
@@ -1037,6 +1100,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 		// The OAuth token endpoint lives on the auth base (/oauth2/), not the Flow API base. This applies to
 		// every token grant: client_credentials, authorization_code and refresh_token.
 		$url = $this->getApiUrl(($resource == 'token' || $callType == 'get_access_token') ? 'auth' : 'api') . $resource;
+		if ($resource == 'validation_reports') {
+			$url = $this->getApiUrl('ap_api') . $resource;
+		}
 
 		$httpheader = array();
 		if (!isset($extraHeaders['Content-Type'])) {

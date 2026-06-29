@@ -17,3 +17,5 @@ UPDATE llx_einvoicing_extlinks SET element_type = 'invoice_supplier' WHERE eleme
 -- VMYSQL4.3 ALTER TABLE llx_einvoicing_call MODIFY COLUMN entity integer DEFAULT 1;
 -- VPGSQL8.2 ALTER TABLE llx_einvoicing_call MODIFY COLUMN entity integer USING (entity::integer);
 ALTER TABLE llx_einvoicing_call ALTER COLUMN entity SET DEFAULT 1;
+ALTER TABLE llx_einvoicing_extlinks ADD COLUMN ap_precheck_status varchar(50) DEFAULT NULL;
+ALTER TABLE llx_einvoicing_extlinks ADD COLUMN ap_precheck_result text DEFAULT NULL;
