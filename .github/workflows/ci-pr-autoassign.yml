@@ -17,7 +17,7 @@
 #       -> the step fails only if no reviewer could be added
 # - On push: workflow runs but PR-specific actions are skipped
 #
-name: Set reviewer and label according to module
+name: Set reviewers and label according to module MAINTENERS
 on:
   pull_request_target:
     types: [opened, synchronize, reopened]
@@ -95,8 +95,13 @@ jobs:
             fi
           done < changed_files.txt
 
+          echo "Store LABELS=$LABELS into FINALJS"
+          if [ "x$LABELS" = "x" ]; then
+            echo "No labels detected for changed files. Skipping."
+            exit 0
+          fi
+
           # dedup + format CSV
-          echo "Store LABELS into FINALJS"
           FINAL=$(echo $LABELS | tr '|' '\n' | grep -v '^$' | sort -u | paste -sd, -)
           FINALJS=$(echo "$FINAL" | jq -R 'split(",")')
 
@@ -193,6 +198,10 @@ jobs:
             fi
           done < MAINTAINERS
           echo "REVIEWERS=${!REVIEWERS[@]}"
+          if [ "x${!REVIEWERS[@]}" = "x0" ]; then
+            echo "No reviewers detected for changed files. Skipping."
+            exit 0
+          fi
 
           FINAL=$(printf '%s\n' "${!REVIEWERS[@]}" | sort -u | grep -v "^0$" | paste -sd, -)
 

@@ -108,7 +108,6 @@ checkCustomerData= Tjek kunde
 checkInvoiceData= Tjek faktura
 InvoiceSuccessfullySentToPDP=Faktura sendt til e-fakturaadgangspunktet.
 ErrorSendingInvoiceToPDP=Der opstod en fejl under afsendelse af fakturaen til adgangspunktet for e-fakturaer.
-pdpExchange=PDP Connect Frankrig
 EInvoiceManagement=E-fakturahåndtering
 EInvoiceSynchronization=Synkronisering af e-fakturaer
 PdpDocuments=Udvekslede strømme

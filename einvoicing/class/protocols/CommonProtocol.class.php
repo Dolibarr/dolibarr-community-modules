@@ -117,7 +117,7 @@ trait CommonProtocol
 		}
 	}
 
-	/************************************************
+	/**
 	 * Find paymentMean number
 	 *
 	 * @param  CommonInvoice 	$invoice 			object name we look for
@@ -1085,8 +1085,8 @@ trait CommonProtocol
 				'message' => $message,
 				'actioncode' => 'PRODUCT_NOT_FOUND',
 				'actionurl' => $createUrl,
-				'action' => $action,
-				'actiondata' => $actiondata
+				'action' => $action,				// label of sentence to make action
+				'actiondata' => $actiondata			// array of paramto use for URL to make action
 			);
 		}
 	}
@@ -1449,7 +1449,7 @@ trait CommonProtocol
 	}
 
 
-	/************************************************
+	/**
 	 *    Check line type from external module ?
 	 *
 	 * @param  object $line       line we work on

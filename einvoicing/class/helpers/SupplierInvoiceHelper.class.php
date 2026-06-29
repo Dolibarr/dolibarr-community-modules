@@ -88,7 +88,7 @@ class SupplierInvoiceHelper
 		// Extract XML header data
 		switch ($detectedProtocolName) {
 			case 'CII':
-				$parsedHeader = $protocol->parseInvoiceXML($xmlData);
+				$parsedHeader = $protocol->parseInvoiceHeader($xmlData);
 				break;
 				// Another format can be added here
 			default:

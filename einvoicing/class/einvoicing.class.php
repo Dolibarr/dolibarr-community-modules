@@ -484,7 +484,7 @@ class EInvoicing
 	 *  3. Computes an integrity hash of the payload for later verification in triggers (e.g. BILL_UPDATE) to prevent unauthorized modifications after sending to PDP/PA.
 	 *
 	 * @param Facture $invoice Fully loaded Dolibarr invoice object
-	 * @return array Normalized e-invoice payload
+	 * @return array{payload:array<string,array<string,mixed>>,integrity_hash:string} Normalized e-invoice payload
 	 */
 	public function buildEInvoicePayloadFromInvoice($invoice): array
 	{
@@ -749,6 +749,7 @@ class EInvoicing
 				if ($mysoc->country_code == 'FR') {
 					// Get seller Einvoice ID
 					$provider = getDolGlobalString('EINVOICING_PDP');
+					//$providershort = preg_replace('/ViaPartner/', '', $provider);	// If provider is XXX or XXXViaPartner it must be saved as XXX so if we change method, data still match the situation.
 
 					$uriConf = 'EINVOICING_' . strtoupper($provider) . '_ROUTING_ID';
 					$einvoiceid = getDolGlobalString($uriConf);
@@ -1904,7 +1905,7 @@ class EInvoicing
 	 *
 	 * @param int			$invoiceId		Invoice ID
 	 * @param string		$invoiceRef		Invoice ref
-	 * @return string[]|float[]|mixed[][]|mixed[]
+	 * @return array<string,int|string>
 	 */
 	public function fetchLastknownInvoiceStatus($invoiceId = 0, $invoiceRef = '')
 	{
@@ -1918,15 +1919,17 @@ class EInvoicing
 			'info' => '',
 			'file' => '0',
 			'transmitted' => 0,
+			'everTransmitted' => 0,
+			'flow_id' => '',
 			'override_routing_id' => '',
 			'otherprovider' => ''
 		);
 
 		$provider = getDolGlobalString('EINVOICING_PDP');
-		$providersanitized = preg_replace('/ViaPartner$/', '', $provider);
+		$providershort = preg_replace('/ViaPartner$/', '', $provider);
 
 		// Get last status from einvoicing_extlinks table (table contain dolibarr object received or sent to PDP)
-		$sql = "SELECT rowid, syncstatus, synccomment, override_routing_id, provider"; // Validation message of einvoice sent.
+		$sql = "SELECT rowid, syncstatus, synccomment, flow_id, override_routing_id, provider"; // Validation message of einvoice sent.
 		$sql .= " FROM " . MAIN_DB_PREFIX . "einvoicing_extlinks";
 		$sql .= " WHERE element_type = '" . $this->db->escape('facture') . "'";
 		//$sql .= " AND provider = '" . $this->db->escape($provider) . "'";
@@ -1944,20 +1947,23 @@ class EInvoicing
 		if ($resql) {
 			while ($obj = $this->db->fetch_object($resql)) {
 				$providerindb = $obj->provider;
-				$providerindbsanitized = preg_replace('/ViaPartner$/', '', $providerindb);
-				if ($providerindbsanitized != $providersanitized) {
+				$providerindbshort = preg_replace('/ViaPartner$/', '', $providerindb);
+
+				if ($providerindbshort != $providershort) {
 					if (empty($tmpstatus)) {	// If not found yet
 						$tmpstatus['rowid'] = (int) $obj->rowid;
 						$tmpstatus['code'] = (int) $obj->syncstatus;
 						$tmpstatus['status'] = $this->getStatusLabel((int) $obj->syncstatus);
 						$tmpstatus['info'] = $obj->synccomment ?? '';
+						$tmpstatus['flow_id'] = $obj->flow_id ?? '';
 						$tmpstatus['override_routing_id'] = $obj->override_routing_id ?? '';
 						if (!in_array((int) $obj->syncstatus, array(self::STATUS_UNKNOWN, self::STATUS_IGNORE, self::STATUS_NOT_GENERATED, self::STATUS_GENERATED))) {
 							$tmpstatus['transmitted'] = 1;
 						} else {
 							$tmpstatus['transmitted'] = 0;
 						}
-						$tmpstatus['otherprovider'] = $providerindbsanitized;
+						$tmpstatus['everTransmitted'] = !empty($obj->flow_id) ? 1 : 0;
+						$tmpstatus['otherprovider'] = $providerindbshort;
 					}
 					$foundforanotherprovider++;
 					continue;
@@ -1969,12 +1975,19 @@ class EInvoicing
 				$tmpstatus['code'] = (int) $obj->syncstatus;
 				$tmpstatus['status'] = $this->getStatusLabel((int) $obj->syncstatus);
 				$tmpstatus['info'] = $obj->synccomment ?? '';
+				$tmpstatus['flow_id'] = $obj->flow_id ?? '';
 				$tmpstatus['override_routing_id'] = $obj->override_routing_id ?? '';
 				if (!in_array((int) $obj->syncstatus, array(self::STATUS_UNKNOWN, self::STATUS_IGNORE, self::STATUS_NOT_GENERATED, self::STATUS_GENERATED))) {
 					$tmpstatus['transmitted'] = 1;
 				} else {
 					$tmpstatus['transmitted'] = 0;
 				}
+				// 'transmitted' above reflects the CURRENT Dolibarr syncstatus, which is reset to GENERATED
+				// when the e-invoice is regenerated. 'everTransmitted' reflects the REAL PA state: a flow_id
+				// is assigned (by any provider, via insertOrUpdateExtLink) on the first successful submission
+				// and is never cleared, so it survives a regenerate/re-open and tells us the invoice already
+				// exists at the PA (re-sending it would be refused / would create a duplicate).
+				$tmpstatus['everTransmitted'] = !empty($obj->flow_id) ? 1 : 0;
 				$tmpstatus['otherprovider'] = '';
 			}
 
@@ -1982,7 +1995,7 @@ class EInvoicing
 				$status = $tmpstatus;
 			}
 
-			if (empty($foundforanotherprovider) && empty($foundforanotherprovider)) {
+			if (empty($foundforanotherprovider) && empty($foundforcurrentprovider)) {
 				dol_syslog("No entry found in einvoicing_extlinks table for invoiceRef: " . $invoiceRef);
 			}
 		} else {
@@ -2033,6 +2046,28 @@ class EInvoicing
 	}
 
 	/**
+	 * Whether an invoice is locked because it was already transmitted to the Access Point.
+	 *
+	 * Based on the REAL PA state (a flow_id was assigned on the first successful submission and is never
+	 * cleared), not on the Dolibarr syncstatus which is reset to GENERATED when the e-invoice is
+	 * regenerated. A transmitted invoice is immutable (you correct it with a credit note / corrective
+	 * invoice), so by default we block re-sending, regenerating and re-editing it. The operator can opt
+	 * out (e.g. to test PA retry behaviour) by setting EINVOICING_ALLOW_RESEND_TRANSMITTED.
+	 *
+	 * @param 	int 	$invoiceId 	Invoice id
+	 * @param 	string 	$invoiceRef Invoice ref (fallback if id is 0)
+	 * @return 	bool 				True if the invoice must be treated as locked (already transmitted).
+	 */
+	public function isTransmittedLockActive($invoiceId = 0, $invoiceRef = '')
+	{
+		if (getDolGlobalString('EINVOICING_ALLOW_RESEND_TRANSMITTED')) {
+			return false;
+		}
+		$status = $this->fetchLastknownInvoiceStatus($invoiceId, $invoiceRef);
+		return !empty($status['everTransmitted']);
+	}
+
+	/**
 	 * Insert or update external link record
 	 *
 	 * @param int       $elementId      	Linked Element ID
@@ -2049,6 +2084,7 @@ class EInvoicing
 		global $db, $user;
 
 		$provider = getDolGlobalString('EINVOICING_PDP');
+		$providershort = preg_replace('/ViaPartner/', '', $provider);	// If provider is XXX or XXXViaPartner it must be saved as XXX so if we change method, data still match the situation.
 
 		if (empty($provider) || $provider === '-1') {
 			dol_syslog("Error: E-invoice Access Point is not defined");
@@ -2059,7 +2095,7 @@ class EInvoicing
 		$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "einvoicing_extlinks";
 		$sql .= " WHERE element_id = " . (int) $elementId;
 		$sql .= " AND element_type = '" . $db->escape($elementType) . "'";
-		$sql .= " AND provider = '" . $db->escape($provider) . "'";
+		$sql .= " AND provider = '" . $db->escape($providershort) . "'";
 
 		$resql = $db->query($sql);
 		if (!$resql) {
@@ -2086,12 +2122,12 @@ class EInvoicing
 			$sql .= ", fk_user_modif = " . (int) $user->id;
 			$sql .= " WHERE element_id = " . (int) $elementId;
 			$sql .= " AND element_type = '" . $db->escape($elementType) . "'";
-			$sql .= " AND provider = '" . $db->escape($provider) . "'";
+			$sql .= " AND provider = '" . $db->escape($providershort) . "'";
 		} else {
 			// Insert new record
 			$sql = "INSERT INTO " . MAIN_DB_PREFIX . "einvoicing_extlinks";
 			$sql .= " (element_id, element_type, provider, date_creation, fk_user_creat, syncstatus, syncref, synccomment, flow_id, override_routing_id)";
-			$sql .= " VALUES (" . (int) $elementId . ", '" . $db->escape($elementType) . "', '" . $db->escape($provider) . "'";
+			$sql .= " VALUES (" . (int) $elementId . ", '" . $db->escape($elementType) . "', '" . $db->escape($providershort) . "'";
 			$sql .= ", NOW(), " . (int) $user->id . ", " . (int) $syncStatus;
 			$sql .= ", " . ($syncRef ? "'" . $db->escape($syncRef) . "'" : "NULL");
 			$sql .= ", " . ($syncComment ? "'" . $db->escape($syncComment) . "'" : "NULL");
@@ -2440,6 +2476,7 @@ class EInvoicing
 		global $db, $user;
 
 		$provider = getDolGlobalString('EINVOICING_PDP');
+		$providershort = preg_replace('/ViaPartner/', '', $provider);	// If provider is XXX or XXXViaPartner it must be saved as XXX so if we change method, data still match the situation.
 
 		if (empty($provider) || $provider === '-1') {
 			dol_syslog("Error: E-invoice Access Point is not defined");
@@ -2464,7 +2501,7 @@ class EInvoicing
 		$sql .= ") VALUES (";
 		$sql .= (int) $elementId . ", ";
 		$sql .= "'" . $db->escape($elementType) . "', ";
-		$sql .= "'" . $db->escape($provider) . "', ";
+		$sql .= "'" . $db->escape($providershort) . "', ";
 		$sql .= ($flowId ? "'" . $db->escape($flowId) . "'" : "NULL") . ", ";
 		$sql .= "'" . $db->escape($direction) . "', ";
 		$sql .= (int) $statusCode . ", ";
@@ -2570,14 +2607,18 @@ class EInvoicing
 
 
 	/**
-	 * Update validation information of an existing lifecycle status message.
+	 * Return if an invoice need EInvoicing management.
 	 *
-	 * @param 	Object	$object		Object
-	 * @return 	int 				self::STATUS_NOT_GENERATED if the invoice object need management of EInvoicing, self::STATUS_IGNORE if not.
+	 * @param 	Facture|FactureRec		$object		Object
+	 * @return 	int 								self::STATUS_NOT_GENERATED if the invoice object need management of EInvoicing, self::STATUS_IGNORE if not.
 	 */
 	public function needEInvoiceManagement($object)
 	{
 		$return = 0;	// By default, no einvoicing.
+
+		if (empty($object->thirdparty->country_code)) {
+			$object->fetch_thirdparty();
+		}
 
 		if ($object->thirdparty->country_code == 'FR') {	// We need to sync invoice if for french customer
 			$return = self::STATUS_NOT_GENERATED;
@@ -2671,6 +2712,7 @@ class EInvoicing
 
 		// Get seller Einvoice ID
 		$provider = getDolGlobalString('EINVOICING_PDP');
+		//$providershort = preg_replace('/ViaPartner/', '', $provider);	// If provider is XXX or XXXViaPartner it must be saved as XXX so if we change method, data still match the situation.
 
 		if (empty($provider) || $provider === '-1') {
 			dol_syslog("Error: E-invoice Access Point is not defined");

@@ -242,6 +242,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 			 */
 
 			if (getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER') == 'proxy') {
+				/* This option seems useless, see previous comment
 				$item = $formSetup->newItem($prefix.'GRANT_TYPE')->setAsSelect(array(
 					'client_credentials' => $langs->trans('EINVOICING_SUPERPDP_GRANT_CLIENT_CREDENTIALS'),
 					'authorization_code' => $langs->trans('EINVOICING_SUPERPDP_GRANT_AUTHORIZATION_CODE'),
@@ -251,6 +252,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				$item->helpText = $langs->transnoentities('EINVOICING_SUPERPDP_GRANT_TYPE_HELP');
 				$item->defaultFieldValue = 'client_credentials';
 				$item->cssClass = 'minwidth500';
+				*/
 			}
 
 			// Username
@@ -273,7 +275,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 			// Authorization Code specific settings
 			// We suggest all these options if we are on the proxy.
-			if (getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER') == 'proxy') {
+			if (getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER') == 'proxy' && preg_match('/ViaPartner/', getDolGlobalString('EINVOICING_PDP'))) {
 				// Redirect URI to register in the SuperPDP interface (must match exactly)
 				$item = $formSetup->newItem($prefix.'REDIRECT_URI_INFO');
 				$item->nameText = $langs->trans('EINVOICING_SUPERPDP_REDIRECT_URI');
