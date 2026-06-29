@@ -2603,14 +2603,18 @@ class EInvoicing
 
 
 	/**
-	 * Update validation information of an existing lifecycle status message.
+	 * Return if an invoice need EInvoicing management.
 	 *
-	 * @param 	Object	$object		Object
-	 * @return 	int 				self::STATUS_NOT_GENERATED if the invoice object need management of EInvoicing, self::STATUS_IGNORE if not.
+	 * @param 	Facture|FactureRec		$object		Object
+	 * @return 	int 								self::STATUS_NOT_GENERATED if the invoice object need management of EInvoicing, self::STATUS_IGNORE if not.
 	 */
 	public function needEInvoiceManagement($object)
 	{
 		$return = 0;	// By default, no einvoicing.
+
+		if (empty($object->thirdparty->country_code)) {
+			$object->fetch_thirdparty();
+		}
 
 		if ($object->thirdparty->country_code == 'FR') {	// We need to sync invoice if for french customer
 			$return = self::STATUS_NOT_GENERATED;

@@ -83,109 +83,109 @@ class ActionsEInvoicing extends CommonHookActions
 
 		// Check if it's an invoice
 		if ($invoiceObject instanceof Facture) {
-			$invoiceObject->fetch_thirdparty();
-			$thirdpartyCountryCode = $invoiceObject->thirdparty->country_code;
+			/** @var Facture $invoiceObject */
 
-			// Get current status of e-invoice
-			$currentStatusDetails = $einvoicing->fetchLastknownInvoiceStatus($invoiceObject->id, $invoiceObject->ref);
+			$needEinvoice = $einvoicing->needEInvoiceManagement($object);
+			if ($needEinvoice) {
+				// Get current status of e-invoice
+				$currentStatusDetails = $einvoicing->fetchLastknownInvoiceStatus($invoiceObject->id, $invoiceObject->ref);
 
-			// TODO Add a test "needEinvoicingSync()" (if thirdparty is FR for example)
-			if ($thirdpartyCountryCode === 'FR' && (!isset($currentStatusDetails['code']) || $currentStatusDetails['code'] != $einvoicing::STATUS_IGNORE)) {
-				/** @var Facture $invoiceObject */
-				// Never generate/transmit an e-invoice for a DRAFT: regenerating a draft PDF (e.g. after
-				// adding a line) must NOT push anything to the PA. At validation the invoice is already
-				// VALIDATED when Dolibarr regenerates the final PDF, so the legitimate flow is preserved.
-				if ($invoiceObject->status != $invoiceObject::STATUS_DRAFT
-					&& !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')
-					&& getDolGlobalString('EINVOICING_EINVOICE_IN_REAL_TIME')) {
-					// Call function to create Factur-X document
-					require_once __DIR__ . '/protocols/ProtocolManager.class.php';
+				if (!isset($currentStatusDetails['code']) || $currentStatusDetails['code'] != $einvoicing::STATUS_IGNORE) {
+					// Never generate/transmit an e-invoice for a DRAFT: regenerating a draft PDF (e.g. after
+					// adding a line) must NOT push anything to the PA. At validation the invoice is already
+					// VALIDATED when Dolibarr regenerates the final PDF, so the legitimate flow is preserved.
+					if ($invoiceObject->status != $invoiceObject::STATUS_DRAFT
+						&& !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')
+						&& getDolGlobalString('EINVOICING_EINVOICE_IN_REAL_TIME')) {
+						// Call function to create Factur-X document
+						require_once __DIR__ . '/protocols/ProtocolManager.class.php';
 
-					$usedProtocols = getDolGlobalString('EINVOICING_PROTOCOL');
-					$ProtocolManager = new ProtocolManager($db);
-					$protocol = $ProtocolManager->getProtocol($usedProtocols);
+						$usedProtocols = getDolGlobalString('EINVOICING_PROTOCOL');
+						$ProtocolManager = new ProtocolManager($db);
+						$protocol = $ProtocolManager->getProtocol($usedProtocols);
 
-					// Check configuration
-					$result = $einvoicing->checkRequiredinformations($invoiceObject);
-					if ($result['res'] < 0) {			// Error case
-						$message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
+						// Check configuration
+						$result = $einvoicing->checkRequiredinformations($invoiceObject);
+						if ($result['res'] < 0) {			// Error case
+							$message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
 
-						dol_syslog(__METHOD__ . " " . $message);
+							dol_syslog(__METHOD__ . " " . $message);
 
-						if (getDolGlobalString('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
-							// Add more conditions like thirdparty nature to avoid blocking invoice creation for non FR companies
-							// or for thirdparties that are not subject to E-invoicing obligation
-							$messagecss = 'errors';
-							setEventMessages($message, array(), $messagecss);
-							return -1;
-						} else {
-							$messagecss = 'warnings';
-							setEventMessages($message, array(), $messagecss);
-							$this->warnings[] = $message;
-							return 0;
-						}
-					} elseif ($result['res'] == 0) {	// Warning case
-						$message = $langs->trans("InvoiceGeneratedWithWarnings") . ': <br>' . $result['message'];
-						$this->warnings[] = $message;
-
-						dol_syslog(__METHOD__ . " " . $message);
-						$messagecss = 'warnings';
-						//setEventMessages($message, array(), $messagecss);
-					}
-
-					$result = $protocol->generateInvoice($invoiceObject, $outputlangs, $pdfPath);		// Generate E-invoice (embed into the real generated file)
-
-					if ($result >= 0) {
-						setEventMessages($message, array(), $messagecss);
-					}
-
-					if ($result && (!is_numeric($result) || $result > 0)) {
-						// No error
-						setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
-
-						// Forward non-blocking size warning from the protocol if any
-						if (!empty($protocol->warnings)) {
-							setEventMessages($langs->trans("InvoiceGeneratedWithWarnings"), $protocol->warnings, 'warnings');
-						}
-
-						// Optionally transmit to the Access Point right after generation (opt-in + idempotent) and if not yet generated.
-						// Without this, validation only generates the Factur-X; the invoice is never sent to the
-						// PA (transmission was a manual "send_to_pdp" click only). The 'transmitted' guard prevents
-						// re-sending (and creating duplicate flows) when the PDF is regenerated later.
-						if (getDolGlobalString('EINVOICING_AUTO_SEND_ON_GENERATION') && empty($currentStatusDetails['transmitted'])) {
-							dol_syslog("actions_einvoicing: Invoice seems not yet transmitted and EINVOICING_AUTO_SEND_ON_GENERATION is on, so we try to send it");
-
-							require_once __DIR__ . '/providers/PDPProviderManager.class.php';
-							$PDPManager = new PDPProviderManager($db);
-							$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
-							if (is_object($provider)) {
-								$sendres = $provider->sendInvoice($invoiceObject);
-								if ($sendres) {
-									setEventMessages($langs->trans("InvoiceSuccessfullySentToPDP") . ' - ' . $langs->trans("FlowId") . ': ' . $sendres, null, 'mesgs');
-								} else {
-									// Don't block validation if auto-send fails: the e-invoice is generated and can still be sent manually.
-									$senderrors = $provider->errors ?: array($provider->error);
-									$this->warnings = array_merge($this->warnings, (array) $senderrors);
-									dol_syslog(__METHOD__ . " auto-send to PA failed: " . implode('; ', (array) $senderrors), LOG_WARNING, 0, "_einvoicing");
-								}
-							}
-						}
-					} else {
-						if (getDolGlobalString('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
-							// If einvoice fails here, it must be always an error
-							$this->errors = array_merge($this->errors, $protocol->errors);
-							return -1;
-						} else {
-							if ($result < 0) {
-								if ((float) DOL_VERSION < 24.0) {
-									$this->errors = array_merge($this->errors, $protocol->errors);
-									$this->warnings = array();	// We remove warning array to keep only the error array, because only errors array is managed with version < 24.0 of Dolibarr.
-								} else {
-									$this->warnings = array_merge($this->errors, $protocol->errors);	// We want to return the error as a warning.
-								}
+							if (getDolGlobalString('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
+								// Add more conditions like thirdparty nature to avoid blocking invoice creation for non FR companies
+								// or for thirdparties that are not subject to E-invoicing obligation
+								$messagecss = 'errors';
+								setEventMessages($message, array(), $messagecss);
 								return -1;
 							} else {
+								$messagecss = 'warnings';
+								setEventMessages($message, array(), $messagecss);
+								$this->warnings[] = $message;
 								return 0;
+							}
+						} elseif ($result['res'] == 0) {	// Warning case
+							$message = $langs->trans("InvoiceGeneratedWithWarnings") . ': <br>' . $result['message'];
+							$this->warnings[] = $message;
+
+							dol_syslog(__METHOD__ . " " . $message);
+							$messagecss = 'warnings';
+							//setEventMessages($message, array(), $messagecss);
+						}
+
+						$result = $protocol->generateInvoice($invoiceObject, $outputlangs, $pdfPath);		// Generate E-invoice (embed into the real generated file)
+
+						if ($result >= 0) {
+							setEventMessages($message, array(), $messagecss);
+						}
+
+						if ($result && (!is_numeric($result) || $result > 0)) {
+							// No error
+							setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
+
+							// Forward non-blocking size warning from the protocol if any
+							if (!empty($protocol->warnings)) {
+								setEventMessages($langs->trans("InvoiceGeneratedWithWarnings"), $protocol->warnings, 'warnings');
+							}
+
+							// Optionally transmit to the Access Point right after generation (opt-in + idempotent) and if not yet generated.
+							// Without this, validation only generates the Factur-X; the invoice is never sent to the
+							// PA (transmission was a manual "send_to_pdp" click only). The 'transmitted' guard prevents
+							// re-sending (and creating duplicate flows) when the PDF is regenerated later.
+							if (getDolGlobalString('EINVOICING_AUTO_SEND_ON_GENERATION') && empty($currentStatusDetails['transmitted'])) {
+								dol_syslog("actions_einvoicing: Invoice seems not yet transmitted and EINVOICING_AUTO_SEND_ON_GENERATION is on, so we try to send it");
+
+								require_once __DIR__ . '/providers/PDPProviderManager.class.php';
+								$PDPManager = new PDPProviderManager($db);
+								$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+								if (is_object($provider)) {
+									$sendres = $provider->sendInvoice($invoiceObject);
+									if ($sendres) {
+										setEventMessages($langs->trans("InvoiceSuccessfullySentToPDP") . ' - ' . $langs->trans("FlowId") . ': ' . $sendres, null, 'mesgs');
+									} else {
+										// Don't block validation if auto-send fails: the e-invoice is generated and can still be sent manually.
+										$senderrors = $provider->errors ?: array($provider->error);
+										$this->warnings = array_merge($this->warnings, (array) $senderrors);
+										dol_syslog(__METHOD__ . " auto-send to PA failed: " . implode('; ', (array) $senderrors), LOG_WARNING, 0, "_einvoicing");
+									}
+								}
+							}
+						} else {
+							if (getDolGlobalString('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
+								// If einvoice fails here, it must be always an error
+								$this->errors = array_merge($this->errors, $protocol->errors);
+								return -1;
+							} else {
+								if ($result < 0) {
+									if ((float) DOL_VERSION < 24.0) {
+										$this->errors = array_merge($this->errors, $protocol->errors);
+										$this->warnings = array();	// We remove warning array to keep only the error array, because only errors array is managed with version < 24.0 of Dolibarr.
+									} else {
+										$this->warnings = array_merge($this->errors, $protocol->errors);	// We want to return the error as a warning.
+									}
+									return -1;
+								} else {
+									return 0;
+								}
 							}
 						}
 					}
@@ -761,12 +761,6 @@ class ActionsEInvoicing extends CommonHookActions
 	public function formObjectOptions($parameters, &$object, &$action, $hookmanager)
 	{
 		global $db, $langs;
-
-		// $object->fetch_thirdparty();
-		// $thirdpartyCountryCode = $object->thirdparty->country_code;
-		// if (!in_array($object->element, ['facture']) || $thirdpartyCountryCode !== 'FR') {
-		//     return 0;
-		// }
 
 		$einvoicing = new EInvoicing($db);
 		$checkConfig = $einvoicing->checkModulePrerequisites();

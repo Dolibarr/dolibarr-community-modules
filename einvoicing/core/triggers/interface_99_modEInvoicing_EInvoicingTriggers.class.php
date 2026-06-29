@@ -121,13 +121,19 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		// INVOICES AND PAYMENT
 		if ($action == 'BILL_CREATE') {
 			/** @var Facture $object */
-			$einvoicing = new EInvoicing($this->db);
 
-			// When invoice is created
-			$result = $einvoicing->setEInvoiceStatus($object, GETPOST('seteinvoicestatus'), '');
-			if ($result < 0) {
-				$this->errors[] = $einvoicing->errors;
-				return -1;
+			if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {		// If sync Dolibarr to AP is on
+				$einvoicing = new EInvoicing($this->db);
+
+				$needEinvoice = $einvoicing->needEInvoiceManagement($object);
+				if ($needEinvoice) {
+					// When invoice is created
+					$result = $einvoicing->setEInvoiceStatus($object, GETPOST('seteinvoicestatus'), '');
+					if ($result < 0) {
+						$this->errors[] = $einvoicing->errors;
+						return -1;
+					}
+				}
 			}
 		}
 
@@ -143,6 +149,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			if ($result['code'] == $einvoicing::STATUS_NOT_GENERATED || $result['code'] == $einvoicing::STATUS_UNKNOWN) {
 				// By default, we set status to ignore
 				$statustouse = $einvoicing::STATUS_IGNORE;
+
 				// Test if invoice need to be managed by EInvoice
 				$needEinvoice = $einvoicing->needEInvoiceManagement($object);
 				if ($needEinvoice) {
@@ -217,16 +224,17 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 				// Test on $close_code that are closing code to say we really accept the payment
 				if ($object->close_code == $object::CLOSECODE_BANKCHARGE ||
 					$object->close_code == $object::CLOSECODE_WITHHOLDINGTAX) {
-					$thirdpartyCountryCode = $object->thirdparty->country_code;
+					// Test if invoice need EInvoicing
+					$einvoicing = new EInvoicing($this->db);
 
-					$PDPManager = new PDPProviderManager($this->db);
-					$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+					$needEinvoice = $einvoicing->needEInvoiceManagement($object);
+					if ($needEinvoice) {
+						$currentStatusDetails = $einvoicing->fetchLastknownInvoiceStatus($object->id, $object->ref);
 
-					$currentStatusDetails = $einvoicing->fetchLastknownInvoiceStatus($object->id, $object->ref);
-
-					// TODO Add a test on needEinvoiceingSync()
-					if ($thirdpartyCountryCode === 'FR') {
 						if ($currentStatusDetails['transmitted'] == 1) {	// If invoice already transmitted
+							$PDPManager = new PDPProviderManager($this->db);
+							$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+
 							$result = $provider->sendStatusMessage($object, 212); 		// Send status message
 
 							if ($result['res'] > 0) {
