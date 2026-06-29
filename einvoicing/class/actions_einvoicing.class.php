@@ -85,7 +85,7 @@ class ActionsEInvoicing extends CommonHookActions
 		if ($invoiceObject instanceof Facture) {
 			/** @var Facture $invoiceObject */
 
-			$needEinvoice = $einvoicing->needEInvoiceManagement($object);
+			$needEinvoice = $einvoicing->needEInvoiceManagement($invoiceObject);
 			if ($needEinvoice) {
 				// Get current status of e-invoice
 				$currentStatusDetails = $einvoicing->fetchLastknownInvoiceStatus($invoiceObject->id, $invoiceObject->ref);
