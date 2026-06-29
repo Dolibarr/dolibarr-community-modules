@@ -91,6 +91,7 @@ FxCheckWarnSIRENClosed=The company associated with SIREN %s is closed according 
 FxCheckWarnNameMismatch=The company name on record (%s) does not match the name in the French national business registry (%s).
 FxCheckWarnZIPMismatch=The ZIP code on record (%s) does not match the one in the French national business registry (%s).
 FxCheckWarnTownMismatch=The town on record (%s) does not match the one in the French national business registry (%s).
+EInvoiceSupplierNameMismatchWarning=The supplier name on the received e-invoice (%s) does not match the linked third party (%s). The invoice was attached using the structured identifier (SIREN/SIRET/VAT); please check the attachment and update the third party if needed.
 FxCheckErrorCreditNoteNoSource=This credit note has no source invoice linked. Please link the source invoice before generating the e-invoice.
 InvoiceNotSentToPDPDueToThirdpartyIssues=The invoice was not sent to the Access Point due to errors in the third-party data
 EINVOICING_ENABLE_API_VALIDATION=Enable third-party data validation via government APIs (SIREN, VAT)
