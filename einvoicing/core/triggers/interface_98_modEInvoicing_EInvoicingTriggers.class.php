@@ -121,6 +121,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		// INVOICES AND PAYMENT
 		if ($action == 'BILL_CREATE') {
 			/** @var Facture $object */
+			'@phan-var-force Facture $object';
 
 			if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {		// If sync Dolibarr to AP is on
 				$einvoicing = new EInvoicing($this->db);
@@ -142,6 +143,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 
 		if ($action == 'BILL_VALIDATE') {
 			/** @var Facture $object */
+			'@phan-var-force Facture $object';
 
 			if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {		// If sync Dolibarr to AP is on
 				$einvoicing = new EInvoicing($this->db);
@@ -175,6 +177,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 
 		if ($action == 'BILL_UNVALIDATE') {
 			/** @var Facture $object */
+			'@phan-var-force Facture $object';
 			$einvoicing = new EInvoicing($this->db);
 
 			// Lock on the REAL PA state (persistent flow_id), not the Dolibarr syncstatus which is reset to
@@ -188,6 +191,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 
 		if ($action == 'BILL_MODIFY') {
 			/** @var Facture $object */
+			'@phan-var-force Facture $object';
 			$einvoicing = new EInvoicing($this->db);
 
 			// Lock on the REAL PA state (persistent flow_id), see BILL_UNVALIDATE above.
@@ -224,6 +228,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 
 		if ($action == 'BILL_PAYED') {
 			/** @var Facture $object */
+			'@phan-var-force Facture $object';
 			// Check if the invoice is transmitted to EInvoicing and confirm we have received the payment if yes.
 
 			if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {		// If sync Dolibarr to AP is on
