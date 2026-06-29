@@ -152,6 +152,7 @@ abstract class AbstractPDPProvider
 		// the "real mode" switch (the const gets stored as "0" instead of being deleted).
 		$prod = getDolGlobalInt('EINVOICING_LIVE');
 
+		$url = '';
 		if ($mode === 'auth') {
 			$url = $this->config['test_auth_url'];
 			if (!empty($prod)) {

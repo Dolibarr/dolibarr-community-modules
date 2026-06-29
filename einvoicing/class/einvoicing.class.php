@@ -1297,9 +1297,9 @@ class EInvoicing
 			$popupId = 'precheck_popup_' . $object->id;
 
 			if ($precheckStatus === 'passed') {
-				$statusHtml = '<span>' . img_picto('', 'tick', 'class="color-green"') . ' passed' . '</span>';
+				$statusHtml = '<span>' . img_picto('', 'tick', 'class="color-green"') . ' passed</span>';
 			} else {
-				$statusHtml = '<a href="#" onclick="jQuery(\'#' . $popupId . '\').dialog(\'open\'); return false;">' . img_picto('', 'error', 'class="color-red"') . ' failed' . '</a>';
+				$statusHtml = '<a href="#" onclick="jQuery(\'#' . $popupId . '\').dialog(\'open\'); return false;">' . img_picto('', 'error', 'class="color-red"') . ' failed</a>';
 			}
 
 			$popupContent = '<pre>' . json_encode(json_decode($currentStatusInfo['ap_precheck_result']), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</pre>';

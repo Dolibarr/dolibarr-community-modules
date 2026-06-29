@@ -720,7 +720,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 	/**
 	 * Validate an electronic invoice file using the superPDP validation service.
 	 *
+	 * @param 	int 	$idinvoice 	ID of the invoice to validate
 	 * @param 	string 	$filePath 	Path to the invoice file to validate
+	 *
 	 * @return 	array|string 		Validation result or error message.
 	 */
 	public function validateEInvoiceFile($idinvoice, $filePath)
