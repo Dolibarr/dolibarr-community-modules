@@ -28,5 +28,7 @@ CREATE TABLE llx_einvoicing_extlinks (
 	syncstatus integer,							-- If the object has a status into the einvoice external system
 	syncref varchar(255),						-- If the object has a given reference into the einvoice external system
 	synccomment text,						-- If we want to store a message for the last sync action try
+	ap_precheck_status varchar(50),			-- Status of the PDP pre-check (passed or failed)
+	ap_precheck_result text,				-- Result/details of the PDP pre-check
 	override_routing_id varchar(255)		-- Optional routing ID override for this specific invoice (overrides thirdparty default routing)
 ) ENGINE = innodb;

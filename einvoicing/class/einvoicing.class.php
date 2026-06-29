@@ -595,6 +595,28 @@ class EInvoicing
 	}
 
 	/**
+	 * Get the path of the e-invoice file for a given invoice reference.
+	 *
+	 * @param 	string 	$invoiceRef 	The reference of the invoice.
+	 * @return 	string 					The full file path of the e-invoice file.
+	 */
+	public function getEInvoiceFilePath($invoiceRef)
+	{
+		global $conf;
+
+		$filename = dol_sanitizeFileName($invoiceRef);
+		$filedir = $conf->invoice->multidir_output[$conf->entity] . '/' . dol_sanitizeFileName($invoiceRef);
+		$einvoicefilepath = '';
+		if (getDolGlobalString('EINVOICING_PROTOCOL') == 'FACTURX') {
+			$einvoicefilepath = $filedir . '/' . $filename . '_facturx.pdf';
+		} elseif (getDolGlobalString('EINVOICING_PROTOCOL') == 'CII') {
+			$einvoicefilepath = $filedir . '/' . $filename . '_cii.xml';
+		}
+
+		return $einvoicefilepath;
+	}
+
+	/**
 	 * Get internal Dolibarr status code from PDP/PA status label (only for validation statuses 'Error', 'Pending', 'Ok', other status like lifecycle codes are normalized and with the same code in both systems)
 	 *
 	 * @param string $label PDP/PA status label can be 'Error', 'Pending', 'Ok', etc.
@@ -1269,6 +1291,38 @@ class EInvoicing
 		$resprints .= '</td>';
 		$resprints .= '</tr>';
 
+		// Display precheck result if errors or warnings
+		if (!empty($currentStatusInfo['ap_precheck_result'])) {
+			$precheckStatus = $currentStatusInfo['ap_precheck_status'] ?? '';
+			$popupId = 'precheck_popup_' . $object->id;
+
+			if ($precheckStatus === 'passed') {
+				$statusHtml = '<span>' . img_picto('', 'tick', 'class="color-green"') . ' passed' . '</span>';
+			} else {
+				$statusHtml = '<a href="#" onclick="jQuery(\'#' . $popupId . '\').dialog(\'open\'); return false;">' . img_picto('', 'error', 'class="color-red"') . ' failed' . '</a>';
+			}
+
+			$popupContent = '<pre>' . json_encode(json_decode($currentStatusInfo['ap_precheck_result']), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</pre>';
+
+			$popupHtml = '<div id="' . $popupId . '" title="' . $langs->trans("InvoicePrecheckResult") . '" style="display:none;">'	. $popupContent	. '</div>';
+			$popupHtml .= '<script>
+				jQuery(document).ready(function() {
+					jQuery("#' . $popupId . '").dialog({
+						autoOpen: false,
+						modal: true,
+						width: Math.min(window.innerWidth * 0.85, 1200),
+						maxHeight: Math.round(window.innerHeight * 0.8),
+						closeOnEscape: true
+					});
+				});
+			</script>';
+
+			$resprints .= '<tr class="treinvoicing_collapseseparator">';
+			$resprints .= '<td>' . $form->textwithpicto($langs->trans("InvoicePrecheckResult"), $langs->trans("InvoicePrecheckResultHelp")) . '</td>';
+			$resprints .= '<td>' . $statusHtml . $popupHtml . '</td>';
+			$resprints .= '</tr>';
+		}
+
 		// Invoice-level routing ID override (BT-49)
 		if ($object->element == 'facture' || $object->element == 'invoice') {
 			$currentOverrideRouting = $currentStatusInfo['override_routing_id'] ?? '';
@@ -1922,14 +1976,16 @@ class EInvoicing
 			'everTransmitted' => 0,
 			'flow_id' => '',
 			'override_routing_id' => '',
-			'otherprovider' => ''
+			'otherprovider' => '',
+			'ap_precheck_status' => '',
+			'ap_precheck_result' => ''
 		);
 
 		$provider = getDolGlobalString('EINVOICING_PDP');
 		$providershort = preg_replace('/ViaPartner$/', '', $provider);
 
 		// Get last status from einvoicing_extlinks table (table contain dolibarr object received or sent to PDP)
-		$sql = "SELECT rowid, syncstatus, synccomment, flow_id, override_routing_id, provider"; // Validation message of einvoice sent.
+		$sql = "SELECT rowid, syncstatus, synccomment, flow_id, override_routing_id, provider, ap_precheck_status, ap_precheck_result"; // Validation message of einvoice sent.
 		$sql .= " FROM " . MAIN_DB_PREFIX . "einvoicing_extlinks";
 		$sql .= " WHERE element_type = '" . $this->db->escape('facture') . "'";
 		//$sql .= " AND provider = '" . $this->db->escape($provider) . "'";
@@ -1957,6 +2013,9 @@ class EInvoicing
 						$tmpstatus['info'] = $obj->synccomment ?? '';
 						$tmpstatus['flow_id'] = $obj->flow_id ?? '';
 						$tmpstatus['override_routing_id'] = $obj->override_routing_id ?? '';
+						$tmpstatus['ap_precheck_status'] = $obj->ap_precheck_status ?? '';
+						$tmpstatus['ap_precheck_result'] = $obj->ap_precheck_result ?? '';
+
 						if (!in_array((int) $obj->syncstatus, array(self::STATUS_UNKNOWN, self::STATUS_IGNORE, self::STATUS_NOT_GENERATED, self::STATUS_GENERATED))) {
 							$tmpstatus['transmitted'] = 1;
 						} else {
@@ -1977,6 +2036,8 @@ class EInvoicing
 				$tmpstatus['info'] = $obj->synccomment ?? '';
 				$tmpstatus['flow_id'] = $obj->flow_id ?? '';
 				$tmpstatus['override_routing_id'] = $obj->override_routing_id ?? '';
+				$tmpstatus['ap_precheck_status'] = $obj->ap_precheck_status ?? '';
+				$tmpstatus['ap_precheck_result'] = $obj->ap_precheck_result ?? '';
 				if (!in_array((int) $obj->syncstatus, array(self::STATUS_UNKNOWN, self::STATUS_IGNORE, self::STATUS_NOT_GENERATED, self::STATUS_GENERATED))) {
 					$tmpstatus['transmitted'] = 1;
 				} else {
@@ -2019,26 +2080,13 @@ class EInvoicing
 		}
 
 		// Check if there is an e-invoice file generated on disk
-		$filename = dol_sanitizeFileName($invoiceRef);
-		$filedir = $conf->invoice->multidir_output[$conf->entity] . '/' . dol_sanitizeFileName($invoiceRef);
-		if (getDolGlobalString('EINVOICING_PROTOCOL') == 'FACTURX') {
-			$pathfacturxpdf = $filedir . '/' . $filename . '_facturx.pdf';
-			if (is_readable($pathfacturxpdf)) {
-				$status['file'] = '1';
-				if ($status['code'] == self::STATUS_NOT_GENERATED) {
-					$status['code'] = self::STATUS_GENERATED;
-					$status['status'] = $this->getStatusLabel(self::STATUS_GENERATED);
-				}
-			}
-		}
-		if (getDolGlobalString('EINVOICING_PROTOCOL') == 'CII') {
-			$patheinvoice = $filedir . '/' . $filename . '_cii.xml';
-			if (is_readable($patheinvoice)) {
-				$status['file'] = '1';
-				if ($status['code'] == self::STATUS_NOT_GENERATED) {
-					$status['code'] = self::STATUS_GENERATED;
-					$status['status'] = $this->getStatusLabel(self::STATUS_GENERATED);
-				}
+
+		$einvoicefilepath = $this->getEInvoiceFilePath($invoiceRef);
+		if ($einvoicefilepath && is_readable($einvoicefilepath)) {
+			$status['file'] = '1';
+			if ($status['code'] == self::STATUS_NOT_GENERATED) {
+				$status['code'] = self::STATUS_GENERATED;
+				$status['status'] = $this->getStatusLabel(self::STATUS_GENERATED);
 			}
 		}
 
@@ -2077,9 +2125,11 @@ class EInvoicing
 	 * @param string    $syncRef        	If the object has a given reference into the einvoice external system
 	 * @param string    $syncComment    	If we want to store a message for the last sync action try
 	 * @param string    $overrideRoutingId	Forced routing ID
+	 * @param string    $precheckStatus  	Precheck status from the AP system
+	 * @param string    $precheckResult  	Precheck result from the AP system
 	 * @return int 							-1 on error, 0 if nothing done, rowid on success
 	 */
-	public function insertOrUpdateExtLink($elementId, $elementType, $flowId = '', $syncStatus = 0, $syncRef = '', $syncComment = '', $overrideRoutingId = null)
+	public function insertOrUpdateExtLink($elementId, $elementType, $flowId = '', $syncStatus = 0, $syncRef = '', $syncComment = '', $overrideRoutingId = null, $precheckStatus = '', $precheckResult = '')
 	{
 		global $db, $user;
 
@@ -2107,8 +2157,13 @@ class EInvoicing
 		if ($exists) {
 			// Update existing record
 			$sql = "UPDATE " . MAIN_DB_PREFIX . "einvoicing_extlinks SET";
-			$sql .= " syncstatus = " . (int) $syncStatus;
-			$sql .= ", synccomment = '" . $db->escape($syncComment) . "'";
+			$sql .= " fk_user_modif = " . (int) $user->id;
+			if (!empty($syncStatus)) {
+				$sql .= ", syncstatus = " . (int) $syncStatus;
+			}
+			if (!empty($syncComment)) {
+				$sql .= ", synccomment = '" . $db->escape($syncComment) . "'";
+			}
 			if (!empty($syncRef)) {
 				$sql .= ", syncref = '" . $db->escape($syncRef) . "'";
 			}
@@ -2119,20 +2174,27 @@ class EInvoicing
 			if ($overrideRoutingId !== null) {
 				$sql .= ", override_routing_id = " . ($overrideRoutingId !== '' ? "'" . $db->escape($overrideRoutingId) . "'" : "NULL");
 			}
-			$sql .= ", fk_user_modif = " . (int) $user->id;
+			if (!empty($precheckStatus)) {
+				$sql .= ", ap_precheck_status = '" . $db->escape($precheckStatus) . "'";
+			}
+			if (!empty($precheckResult)) {
+				$sql .= ", ap_precheck_result = '" . $db->escape($precheckResult) . "'";
+			}
 			$sql .= " WHERE element_id = " . (int) $elementId;
 			$sql .= " AND element_type = '" . $db->escape($elementType) . "'";
 			$sql .= " AND provider = '" . $db->escape($providershort) . "'";
 		} else {
 			// Insert new record
 			$sql = "INSERT INTO " . MAIN_DB_PREFIX . "einvoicing_extlinks";
-			$sql .= " (element_id, element_type, provider, date_creation, fk_user_creat, syncstatus, syncref, synccomment, flow_id, override_routing_id)";
+			$sql .= " (element_id, element_type, provider, date_creation, fk_user_creat, syncstatus, syncref, synccomment, flow_id, override_routing_id, ap_precheck_status, ap_precheck_result)";
 			$sql .= " VALUES (" . (int) $elementId . ", '" . $db->escape($elementType) . "', '" . $db->escape($providershort) . "'";
 			$sql .= ", NOW(), " . (int) $user->id . ", " . (int) $syncStatus;
 			$sql .= ", " . ($syncRef ? "'" . $db->escape($syncRef) . "'" : "NULL");
 			$sql .= ", " . ($syncComment ? "'" . $db->escape($syncComment) . "'" : "NULL");
 			$sql .= ", " . ($flowId ? "'" . $db->escape($flowId) . "'" : "NULL");
-			$sql .= ", " . ($overrideRoutingId !== null && $overrideRoutingId !== '' ? "'" . $db->escape($overrideRoutingId) . "'" : "NULL") . ")";
+			$sql .= ", " . ($overrideRoutingId !== null && $overrideRoutingId !== '' ? "'" . $db->escape($overrideRoutingId) . "'" : "NULL");
+			$sql .= ", " . ($precheckStatus ? "'" . $db->escape($precheckStatus) . "'" : "NULL");
+			$sql .= ", " . ($precheckResult ? "'" . $db->escape($precheckResult) . "'" : "NULL") . ")";
 		}
 
 		$resql = $db->query($sql);
