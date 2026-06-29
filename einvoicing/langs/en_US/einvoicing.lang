@@ -333,6 +333,9 @@ SupplierInvoiceComparisonVatRateDifference=Difference in VAT amount %s%% (e-invo
 SupplierInvoiceComparisonVatRateNotFound=VAT rate of %s%% not found in the Dolibarr invoice
 SupplierInvoiceComparisonSuggestVatCalculationMode=recalculate invoice using Mode %s to get VAT amounts corresponding to e-invoice
 EinvoicingCantDeleteADocumentLinkedToAnExistingSupplierInvoice=Document n° %s can't be deleted because it is linked to the Dolibarr supplier invoice n° %s
+EInvoiceSupplierInvoiceLinkedToOrder=The supplier invoice was automatically linked to purchase order %s (matching order reference BT-13).
+EInvoiceSupplierOrderLinkAmbiguous=Several purchase orders match the order reference %s for this supplier; the invoice was not auto-linked. Please link it manually.
+EInvoiceSupplierOrderRefWrongSupplier=A purchase order with reference %s exists but belongs to a different supplier; the invoice was not linked.
 WarningEinvoicingInvoiceStatusDifferentProvider=Invoice generated or sent for another Access Point %s.
 
 EINVOICING_CLIENT_ID=Client ID

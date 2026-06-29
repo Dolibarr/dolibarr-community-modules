@@ -331,6 +331,9 @@ SupplierInvoiceComparisonVatRateDifference=différence de montant de TVA %s%% (e
 SupplierInvoiceComparisonVatRateNotFound=taux de TVA à %s%% non trouvé dans la facture Dolibarr
 SupplierInvoiceComparisonSuggestVatCalculationMode=recalculer la TVA en Mode %s pour avoir des montants de TVA correspondant à l'e-facture d'origine
 EinvoicingCantDeleteADocumentLinkedToAnExistingSupplierInvoice=Le document n° %s ne peut pas être supprimé car il est lié à la facture fournisseur Dolibarr n° %s
+EInvoiceSupplierInvoiceLinkedToOrder=La facture fournisseur a été automatiquement liée à la commande fournisseur %s (référence de commande BT-13 correspondante).
+EInvoiceSupplierOrderLinkAmbiguous=Plusieurs commandes fournisseur correspondent à la référence de commande %s pour ce fournisseur ; la facture n'a pas été liée automatiquement. Veuillez la lier manuellement.
+EInvoiceSupplierOrderRefWrongSupplier=Une commande fournisseur portant la référence %s existe mais appartient à un autre fournisseur ; la facture n'a pas été liée.
 
 EINVOICING_CLIENT_ID=Client ID
 EINVOICING_CLIENT_SECRET=Client Secret
