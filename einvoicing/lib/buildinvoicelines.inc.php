@@ -81,7 +81,8 @@ if (getDolGlobalInt('EINVOICING_USE_CHORUS')) {
 }
 $promise_code = $object->array_options['options_d4d_promise_code'] ?? '';
 if ($promise_code == '') {
-	$promise_code = $object->ref_customer ?? '';
+	// Dolibarr "Réf. client" (ref_client) holds the customer's purchase order number -> BT-13 (see issue #302)
+	$promise_code = $object->ref_client ?? '';
 }
 if ($promise_code == '' && !empty($customerOrderReferenceList)) {
 	$promise_code = $customerOrderReferenceList[0];
