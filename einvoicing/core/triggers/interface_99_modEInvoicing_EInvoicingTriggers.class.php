@@ -201,9 +201,9 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 				);
 
 				// Check if the invoice is transmitted to EInvoicing.
-				$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."einvoicing_extlinks WHERE element_id = ".((int) $object->id)." AND element_type = '" . $object->element . "'";
-				$resql = $this->db->query($sql);
-				if ($resql && $this->db->num_rows($resql) > 0) {
+				$currentStatusDetails = $einvoicing->fetchLastknownInvoiceStatus($object->id, $object->ref);
+
+				if ($currentStatusDetails['transmitted'] == 1) {	// If invoice already transmitted
 					// If invoice is transmitted, check if any locked field is modified.;
 					foreach ($lockedFields as $field) {
 						if ($object->$field != $object->oldcopy->$field) {

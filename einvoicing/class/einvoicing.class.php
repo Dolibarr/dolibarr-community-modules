@@ -749,6 +749,7 @@ class EInvoicing
 				if ($mysoc->country_code == 'FR') {
 					// Get seller Einvoice ID
 					$provider = getDolGlobalString('EINVOICING_PDP');
+					//$providershort = preg_replace('/ViaPartner/', '', $provider);	// If provider is XXX or XXXViaPartner it must be saved as XXX so if we change method, data still match the situation.
 
 					$uriConf = 'EINVOICING_' . strtoupper($provider) . '_ROUTING_ID';
 					$einvoiceid = getDolGlobalString($uriConf);
@@ -1947,6 +1948,7 @@ class EInvoicing
 			while ($obj = $this->db->fetch_object($resql)) {
 				$providerindb = $obj->provider;
 				$providerindbshort = preg_replace('/ViaPartner$/', '', $providerindb);
+
 				if ($providerindbshort != $providershort) {
 					if (empty($tmpstatus)) {	// If not found yet
 						$tmpstatus['rowid'] = (int) $obj->rowid;
@@ -2082,6 +2084,7 @@ class EInvoicing
 		global $db, $user;
 
 		$provider = getDolGlobalString('EINVOICING_PDP');
+		$providershort = preg_replace('/ViaPartner/', '', $provider);	// If provider is XXX or XXXViaPartner it must be saved as XXX so if we change method, data still match the situation.
 
 		if (empty($provider) || $provider === '-1') {
 			dol_syslog("Error: E-invoice Access Point is not defined");
@@ -2092,7 +2095,7 @@ class EInvoicing
 		$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "einvoicing_extlinks";
 		$sql .= " WHERE element_id = " . (int) $elementId;
 		$sql .= " AND element_type = '" . $db->escape($elementType) . "'";
-		$sql .= " AND provider = '" . $db->escape($provider) . "'";
+		$sql .= " AND provider = '" . $db->escape($providershort) . "'";
 
 		$resql = $db->query($sql);
 		if (!$resql) {
@@ -2119,12 +2122,12 @@ class EInvoicing
 			$sql .= ", fk_user_modif = " . (int) $user->id;
 			$sql .= " WHERE element_id = " . (int) $elementId;
 			$sql .= " AND element_type = '" . $db->escape($elementType) . "'";
-			$sql .= " AND provider = '" . $db->escape($provider) . "'";
+			$sql .= " AND provider = '" . $db->escape($providershort) . "'";
 		} else {
 			// Insert new record
 			$sql = "INSERT INTO " . MAIN_DB_PREFIX . "einvoicing_extlinks";
 			$sql .= " (element_id, element_type, provider, date_creation, fk_user_creat, syncstatus, syncref, synccomment, flow_id, override_routing_id)";
-			$sql .= " VALUES (" . (int) $elementId . ", '" . $db->escape($elementType) . "', '" . $db->escape($provider) . "'";
+			$sql .= " VALUES (" . (int) $elementId . ", '" . $db->escape($elementType) . "', '" . $db->escape($providershort) . "'";
 			$sql .= ", NOW(), " . (int) $user->id . ", " . (int) $syncStatus;
 			$sql .= ", " . ($syncRef ? "'" . $db->escape($syncRef) . "'" : "NULL");
 			$sql .= ", " . ($syncComment ? "'" . $db->escape($syncComment) . "'" : "NULL");
@@ -2473,6 +2476,7 @@ class EInvoicing
 		global $db, $user;
 
 		$provider = getDolGlobalString('EINVOICING_PDP');
+		$providershort = preg_replace('/ViaPartner/', '', $provider);	// If provider is XXX or XXXViaPartner it must be saved as XXX so if we change method, data still match the situation.
 
 		if (empty($provider) || $provider === '-1') {
 			dol_syslog("Error: E-invoice Access Point is not defined");
@@ -2497,7 +2501,7 @@ class EInvoicing
 		$sql .= ") VALUES (";
 		$sql .= (int) $elementId . ", ";
 		$sql .= "'" . $db->escape($elementType) . "', ";
-		$sql .= "'" . $db->escape($provider) . "', ";
+		$sql .= "'" . $db->escape($providershort) . "', ";
 		$sql .= ($flowId ? "'" . $db->escape($flowId) . "'" : "NULL") . ", ";
 		$sql .= "'" . $db->escape($direction) . "', ";
 		$sql .= (int) $statusCode . ", ";
@@ -2708,6 +2712,7 @@ class EInvoicing
 
 		// Get seller Einvoice ID
 		$provider = getDolGlobalString('EINVOICING_PDP');
+		//$providershort = preg_replace('/ViaPartner/', '', $provider);	// If provider is XXX or XXXViaPartner it must be saved as XXX so if we change method, data still match the situation.
 
 		if (empty($provider) || $provider === '-1') {
 			dol_syslog("Error: E-invoice Access Point is not defined");
