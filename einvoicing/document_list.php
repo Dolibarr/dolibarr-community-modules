@@ -328,10 +328,8 @@ if ($action == 'confirm_sync' && getDolGlobalString('EINVOICING_PDP') && $confir
 			}
 			//setEventMessages($langs->trans("FailedToSyncADocument").($errortype ? '<br>'.$langs->trans("FailedToSyncADocumentMore") : ''), null, $errortype);
 		} else {
-			// If sync is successful, we delete the old cached files that could not be processed
-			dol_delete_file($filePathCII);
-			dol_delete_file($filePathFacturX);
-
+			// The "last invoice that could not be processed" diagnostic files are managed by the sync
+			// itself (cleared at the start of syncFlows(), re-created per failed flow), not here.
 			if (!empty($sync_result['syncedFlows']) && $sync_result['syncedFlows'] > 0) {
 				// If sync was successful and we processed 1 new record, we clear the submitted date so a new one will be suggested from the last record in db.
 				$syncfromdate = 0;

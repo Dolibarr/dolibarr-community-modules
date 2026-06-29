@@ -1209,6 +1209,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 			$form = new Form($db);
 		}
 
+		// Start the run with a clean "last unprocessed invoice" diagnostic; failed flows re-create it.
+		$this->clearIncomingDiagnosticFiles();
+
 		$results_messages = array();	// result message (technical error)
 		$actions = array();				// business message (manual action to do)
 

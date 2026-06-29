@@ -317,7 +317,8 @@ class CdarHandler
 			dol_mkdir($tempDir);
 		}
 
-		$filename = $tempDir . '/cdar_' . $ProcessCondition . '.xml';
+		// Unique per-call name so two concurrent status sends of the same condition cannot collide (#226).
+		$filename = $tempDir . '/cdar_' . $ProcessCondition . '_' . bin2hex(random_bytes(8)) . '.xml';
 
 		$result = $this->saveToFile($data, $filename);
 		if ($result === false) {
