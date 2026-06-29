@@ -125,44 +125,50 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {		// If sync Dolibarr to AP is on
 				$einvoicing = new EInvoicing($this->db);
 
-				$needEinvoice = $einvoicing->needEInvoiceManagement($object);
-				if ($needEinvoice) {
-					// When invoice is created
-					$result = $einvoicing->setEInvoiceStatus($object, GETPOST('seteinvoicestatus'), '');
-					if ($result < 0) {
-						$this->errors[] = $einvoicing->errors;
-						return -1;
-					}
+				if (GETPOSTISSET('seteinvoicestatus')) {
+					$statustouse = GETPOST('seteinvoicestatus');
+				} else {
+					$statustouse = $einvoicing->needEInvoiceManagement($object);
+				}
+
+				// When invoice is created
+				$result = $einvoicing->setEInvoiceStatus($object, $statustouse, '');
+				if ($result < 0) {
+					$this->errors[] = $einvoicing->errors;
+					return -1;
 				}
 			}
 		}
 
 		if ($action == 'BILL_VALIDATE') {
 			/** @var Facture $object */
-			$einvoicing = new EInvoicing($this->db);
 
-			$result = $einvoicing->fetchLastknownInvoiceStatus($object->id, $object->ref);
+			if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {		// If sync Dolibarr to AP is on
+				$einvoicing = new EInvoicing($this->db);
 
-			// If $result is $einvoicing::STATUS_IGNORE, we do nothing.
+				$result = $einvoicing->fetchLastknownInvoiceStatus($object->id, $object->ref);
 
-			// If einvoice was set to $einvoicing::STATUS_NOT_GENERATED or $einvoicing::STATUS_UNKNOWN, we set it to STATUS_IGNORE (if not qualified for einvoice) or STATUS_NOT_GENERATED (if qualified for einvoice)
-			if ($result['code'] == $einvoicing::STATUS_NOT_GENERATED || $result['code'] == $einvoicing::STATUS_UNKNOWN) {
-				// By default, we set status to ignore
-				$statustouse = $einvoicing::STATUS_IGNORE;
+				// If $result is $einvoicing::STATUS_IGNORE, we do nothing.
 
-				// Test if invoice need to be managed by EInvoice
-				$needEinvoice = $einvoicing->needEInvoiceManagement($object);
-				if ($needEinvoice) {
-					$statustouse = $needEinvoice;
-				}
+				// If einvoice was set to $einvoicing::STATUS_NOT_GENERATED or $einvoicing::STATUS_UNKNOWN, we set it to STATUS_IGNORE (if not qualified for einvoice) or STATUS_NOT_GENERATED (if qualified for einvoice)
+				if ($result['code'] == $einvoicing::STATUS_NOT_GENERATED || $result['code'] == $einvoicing::STATUS_UNKNOWN) {
+					// By default, we set status to ignore
+					$statustouse = $einvoicing::STATUS_IGNORE;
 
-				$newobject = dol_clone($object, 2);
-				$newobject->ref = $object->newref;
+					// Test if invoice need to be managed by EInvoice
+					$needEinvoice = $einvoicing->needEInvoiceManagement($object);
+					if ($needEinvoice) {
+						$statustouse = $needEinvoice;
+					}
 
-				$result = $einvoicing->setEInvoiceStatus($newobject, $statustouse, '');
-				if ($result < 0) {
-					$this->errors[] = $einvoicing->errors;
-					return -1;
+					$newobject = dol_clone($object, 2);
+					$newobject->ref = $object->newref;
+
+					$result = $einvoicing->setEInvoiceStatus($newobject, $statustouse, '');
+					if ($result < 0) {
+						$this->errors[] = $einvoicing->errors;
+						return -1;
+					}
 				}
 			}
 		}
