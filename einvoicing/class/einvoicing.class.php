@@ -2639,10 +2639,10 @@ class EInvoicing
 	/**
 	 * Update validation information of an existing lifecycle status message.
 	 *
-	 * @param 	Object	$object		Object
-	 * @param 	string 	$status     Status
-	 * @param	string	$comment	Comment
-	 * @return 	int 				Rowid on success, 0 if nothing done, -1 on error
+	 * @param 	Object		$object		Object
+	 * @param 	int|string 	$status     Status (numeric self::STATUS_* code or string)
+	 * @param	string		$comment	Comment
+	 * @return 	int 					Rowid on success, 0 if nothing done, -1 on error
 	 */
 	public function setEInvoiceStatus($object, $status, $comment)
 	{

@@ -241,8 +241,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 			 * If module is the proxy instance (getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER') =='proxy'), we use grant type client_credentials but we may use both so we add the option
 			 */
 
+			/* This option seems useless, see previous comment
 			if (getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER') == 'proxy') {
-				/* This option seems useless, see previous comment
 				$item = $formSetup->newItem($prefix.'GRANT_TYPE')->setAsSelect(array(
 					'client_credentials' => $langs->trans('EINVOICING_SUPERPDP_GRANT_CLIENT_CREDENTIALS'),
 					'authorization_code' => $langs->trans('EINVOICING_SUPERPDP_GRANT_AUTHORIZATION_CODE'),
@@ -252,8 +252,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 				$item->helpText = $langs->transnoentities('EINVOICING_SUPERPDP_GRANT_TYPE_HELP');
 				$item->defaultFieldValue = 'client_credentials';
 				$item->cssClass = 'minwidth500';
-				*/
 			}
+			*/
 
 			// Username
 			$item = $formSetup->newItem($prefix.'CLIENT_ID'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''));
