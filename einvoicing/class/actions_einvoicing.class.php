@@ -89,6 +89,7 @@ class ActionsEInvoicing extends CommonHookActions
 			// Get current status of e-invoice
 			$currentStatusDetails = $einvoicing->fetchLastknownInvoiceStatus($invoiceObject->id, $invoiceObject->ref);
 
+			// TODO Add a test "needEinvoicingSync()" (if thirdparty is FR for example)
 			if ($thirdpartyCountryCode === 'FR' && (!isset($currentStatusDetails['code']) || $currentStatusDetails['code'] != $einvoicing::STATUS_IGNORE)) {
 				/** @var Facture $invoiceObject */
 				// Never generate/transmit an e-invoice for a DRAFT: regenerating a draft PDF (e.g. after
@@ -147,11 +148,13 @@ class ActionsEInvoicing extends CommonHookActions
 							setEventMessages($langs->trans("InvoiceGeneratedWithWarnings"), $protocol->warnings, 'warnings');
 						}
 
-						// Optionally transmit to the Access Point right after generation (opt-in + idempotent).
+						// Optionally transmit to the Access Point right after generation (opt-in + idempotent) and if not yet generated.
 						// Without this, validation only generates the Factur-X; the invoice is never sent to the
 						// PA (transmission was a manual "send_to_pdp" click only). The 'transmitted' guard prevents
 						// re-sending (and creating duplicate flows) when the PDF is regenerated later.
 						if (getDolGlobalString('EINVOICING_AUTO_SEND_ON_GENERATION') && empty($currentStatusDetails['transmitted'])) {
+							dol_syslog("actions_einvoicing: Invoice seems not yet transmitted and EINVOICING_AUTO_SEND_ON_GENERATION is on, so we try to send it");
+
 							require_once __DIR__ . '/providers/PDPProviderManager.class.php';
 							$PDPManager = new PDPProviderManager($db);
 							$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
@@ -269,7 +272,7 @@ class ActionsEInvoicing extends CommonHookActions
 				// If the e-invoice is generated but not sent, or if it was sent and a validation error was received,
 				// display the button to regenerate the e-invoice.
 				// EINVOICING_ALLOW_REGEN_TRANSMITTED forces the regenerate button even on a transmitted-locked
-				// invoice (dev only: lets you rebuild the CII/Factur-X to inspect the XML; nothing is re-sent).
+				// invoice (dev only: let's you rebuild the CII/Factur-X to inspect the XML; nothing is re-sent).
 				if (getDolGlobalString('EINVOICING_ALLOW_REGEN_TRANSMITTED')) {
 					$perm = (bool) $user->hasRight("facture", "creer");
 				} elseif (!$locked && in_array($currentStatusDetails['code'], [

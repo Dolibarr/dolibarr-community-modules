@@ -1085,8 +1085,8 @@ trait CommonProtocol
 				'message' => $message,
 				'actioncode' => 'PRODUCT_NOT_FOUND',
 				'actionurl' => $createUrl,
-				'action' => $action,
-				'actiondata' => $actiondata
+				'action' => $action,				// label of sentence to make action
+				'actiondata' => $actiondata			// array of paramto use for URL to make action
 			);
 		}
 	}

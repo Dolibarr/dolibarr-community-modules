@@ -64,6 +64,10 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 
 		$error = 0;
 
+		dol_syslog("Trigger '".$this->name."' for action '".$action."' launched by ".__FILE__.". id=".$object->id);
+
+		// Note: Option EINVOICING_AUTO_SEND_ON_GENERATION is managed in hook afterPDFCreation().
+
 		// THIRD PARTIES
 		if ($action == 'COMPANY_CREATE' || $action == 'COMPANY_MODIFY') {
 			/** @var Societe $object */
@@ -108,7 +112,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 
 		if ($action == 'COMPANY_MODIFY') {
 			/** @var Societe $object */
-			// If we modify the country of a thirdparty, we update status of invoice
+			// If we modify the country of a thirdparty, we can update status of its invoice
 			// FR->other: status must be modified from "To generate" into "To ignore"
 			// Other->FR: status must be modified from "To ignore" into "To generate"
 			// TODO
@@ -207,18 +211,31 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 
 		if ($action == 'BILL_PAYED') {
 			/** @var Facture $object */
-			// Check if the invoice is transmitted to EInvoicing.
-			$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."einvoicing_extlinks WHERE element_id = ".((int) $object->id)." AND element_type = '" . $object->element . "'";
-			$resql = $this->db->query($sql);
-			if ($resql && $this->db->num_rows($resql) > 0) {
-				$PDPManager = new PDPProviderManager($this->db);
-				$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
-				$result = $provider->sendStatusMessage($object, 212); // Send status message
+			// Check if the invoice is transmitted to EInvoicing and confirm we have received the payment if yes.
 
-				if ($result['res'] > 0) {
-					setEventMessage($langs->trans("ModuleEInvoicingName").' : '.$langs->trans('EInvStatus212Paid'), 'mesgs');
-				} else {
-					setEventMessage($langs->trans("ModuleEInvoicingName").' : '.$result['message'], 'errors');
+			if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {		// If sync Dolibarr to AP is on
+				// Test on $close_code that are closing code to say we really accept the payment
+				if ($object->close_code == $object::CLOSECODE_BANKCHARGE ||
+					$object->close_code == $object::CLOSECODE_WITHHOLDINGTAX) {
+					$thirdpartyCountryCode = $object->thirdparty->country_code;
+
+					$PDPManager = new PDPProviderManager($this->db);
+					$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+
+					$currentStatusDetails = $einvoicing->fetchLastknownInvoiceStatus($object->id, $object->ref);
+
+					// TODO Add a test on needEinvoiceingSync()
+					if ($thirdpartyCountryCode === 'FR') {
+						if ($currentStatusDetails['transmitted'] == 1) {	// If invoice already transmitted
+							$result = $provider->sendStatusMessage($object, 212); 		// Send status message
+
+							if ($result['res'] > 0) {
+								setEventMessage($langs->trans("ModuleEInvoicingName").' : '.$langs->trans('EInvStatus212Paid'), 'mesgs');
+							} else {
+								setEventMessage($langs->trans("ModuleEInvoicingName").' : '.$result['message'], 'errors');
+							}
+						}
+					}
 				}
 			}
 		}
