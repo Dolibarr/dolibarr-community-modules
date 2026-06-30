@@ -2688,20 +2688,13 @@ class EInvoicing
 
 		// B2C (private individuals) is out of the e-invoicing scope: it falls under e-reporting, not e-invoice
 		// transmission. Opt-in (off by default): when EINVOICING_SKIP_B2C is set, skip e-invoicing for third
-		// parties whose entity type (typent_code) is in EINVOICING_B2C_TYPENT_CODES (CSV, default 'TE_PRIVATE').
-		// We only skip on an explicit positive marker, never on missing data (e.g. an empty SIREN), so a company
-		// that is not yet fully filled in is still handled rather than silently ignored.
+		// parties detected as private individuals. Detection is delegated to Societe::isACompany(), which already
+		// has its own options (tva_intra, typent_code, professional ids, MAIN_UNKNOWN_CUSTOMERS_ARE_COMPANIES) to
+		// tell a company from an individual, so we do not duplicate that logic here.
 		if ($return == self::STATUS_NOT_GENERATED && getDolGlobalInt('EINVOICING_SKIP_B2C')) {
-			$b2cTypes = array_filter(array_map('trim', explode(',', getDolGlobalString('EINVOICING_B2C_TYPENT_CODES', 'TE_PRIVATE'))));
-			$typentCode = $object->thirdparty->typent_code;
-			if (!empty($typentCode) && in_array($typentCode, $b2cTypes, true)) {
-				// Explicitly flagged as out of scope (e.g. a private individual): no e-invoicing.
+			if (!$object->thirdparty->isACompany()) {
+				// Detected as a private individual: out of the e-invoicing scope, no e-invoicing.
 				$return = self::STATUS_IGNORE;
-			} elseif (empty($typentCode) || $typentCode == 'TE_UNKNOWN') {
-				// Entity type not classified: we cannot tell B2B from B2C, so we keep e-invoicing (in-scope by
-				// default) but warn so the third party gets classified. Never block: emission is not even
-				// mandatory before 2027-09 for TPE/PME.
-				dol_syslog(__METHOD__.': third party '.((int) $object->thirdparty->id).' has no entity type (typent_code) while EINVOICING_SKIP_B2C is enabled; keeping e-invoicing, it should be classified to confirm it is in scope', LOG_WARNING);
 			}
 		}
 
