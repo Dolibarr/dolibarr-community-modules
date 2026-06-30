@@ -70,9 +70,11 @@ class SuperPDPProvider extends AbstractPDPProvider
 			'test_auth_url' => 'https://api.superpdp.tech/oauth2/',
 			'prod_api_url'  => 'https://api.superpdp.tech/afnor-flow/v1/',
 			'test_api_url'  => 'https://api.superpdp.tech/afnor-flow/v1/',
+			'ap_api_url' 	=> 'https://api.superpdp.tech/v1.beta/',
 			'client_id'     => getDolGlobalString('EINVOICING_SUPERPDP_CLIENT_ID'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '')),
 			'client_secret' => getDolGlobalString('EINVOICING_SUPERPDP_CLIENT_SECRET'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '')),
 			'dol_prefix'    => getDolGlobalString('EINVOICING_PDP') == 'SUPERPDPViaPartner' ? 'EINVOICING_SUPERPDPVIAPARTNER' : 'EINVOICING_SUPERPDP',
+			'has_validator' => 1,
 			'live' => getDolGlobalInt('EINVOICING_LIVE', 0)
 		);
 
@@ -241,8 +243,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 			 * If module is the proxy instance (getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER') =='proxy'), we use grant type client_credentials but we may use both so we add the option
 			 */
 
+			/* This option seems useless, see previous comment
 			if (getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER') == 'proxy') {
-				/* This option seems useless, see previous comment
 				$item = $formSetup->newItem($prefix.'GRANT_TYPE')->setAsSelect(array(
 					'client_credentials' => $langs->trans('EINVOICING_SUPERPDP_GRANT_CLIENT_CREDENTIALS'),
 					'authorization_code' => $langs->trans('EINVOICING_SUPERPDP_GRANT_AUTHORIZATION_CODE'),
@@ -252,8 +254,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 				$item->helpText = $langs->transnoentities('EINVOICING_SUPERPDP_GRANT_TYPE_HELP');
 				$item->defaultFieldValue = 'client_credentials';
 				$item->cssClass = 'minwidth500';
-				*/
 			}
+			*/
 
 			// Username
 			$item = $formSetup->newItem($prefix.'CLIENT_ID'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''));
@@ -715,6 +717,67 @@ class SuperPDPProvider extends AbstractPDPProvider
 		return $returnarray;
 	}
 
+	/**
+	 * Validate an electronic invoice file using the superPDP validation service.
+	 *
+	 * @param 	int 	$idinvoice 	ID of the invoice to validate
+	 * @param 	string 	$filePath 	Path to the invoice file to validate
+	 *
+	 * @return 	array|string 		Validation result or error message.
+	 */
+	public function validateEInvoiceFile($idinvoice, $filePath)
+	{
+		global $langs;
+
+		if (empty($this->config['has_validator']) || $this->config['has_validator'] != 1) {
+			return array('res' => -1, 'message' => $langs->trans('NoAvailableValidatorforThisAccessPoint'));
+		}
+
+		if (empty($filePath) || !is_string($filePath)) {
+			return array('res' => -1, 'message' => 'Invalid file path provided for validation');
+		}
+
+		if (!file_exists($filePath)) {
+			return array('res' => -1, 'message' => "E-invoice file not found: " . $filePath);
+		}
+
+		$mimeType = mime_content_type($filePath) ?: 'application/octet-stream';
+
+		$params = [
+			'file' => new CURLFile($filePath, $mimeType, basename($filePath)),
+		];
+
+		// Extra headers
+		$extraHeaders = [
+			'Content-Type' => 'multipart/form-data'
+		];
+
+		$response = $this->callApi("validation_reports", "POSTALREADYFORMATED", $params, $extraHeaders, 'precheck_invoice');
+
+		if (empty($response) || !isset($response['response']['data']['0'])) {
+			return array('res' => -1, 'message' => 'Invalid response from validation service');
+		}
+
+		$report = $response['response']['data']['0'] ?? null;
+		$isValid = !empty($report['is_valid']);
+
+		$report_details = [];
+		if (!empty($report['error'])) {
+			$report_details['error'] = $report['error'];
+		}
+		if (!empty($report['subreports'])) {
+			$report_details['subreports'] = $report['subreports'];
+		}
+
+		// Save the validation report and status
+		$einvoicing = new EInvoicing($this->db);
+		$einvoicing->insertOrUpdateExtLink($idinvoice, 'facture', '', 0, '', '', null, ($isValid ? 'passed' : 'failed'), json_encode($report_details));
+
+		return array(
+			'res'     => $isValid ? 1 : -1,
+			'message' => ''
+		);
+	}
 
 	/**
 	 * Send an electronic invoice.
@@ -1037,6 +1100,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 		// The OAuth token endpoint lives on the auth base (/oauth2/), not the Flow API base. This applies to
 		// every token grant: client_credentials, authorization_code and refresh_token.
 		$url = $this->getApiUrl(($resource == 'token' || $callType == 'get_access_token') ? 'auth' : 'api') . $resource;
+		if ($resource == 'validation_reports') {
+			$url = $this->getApiUrl('ap_api') . $resource;
+		}
 
 		$httpheader = array();
 		if (!isset($extraHeaders['Content-Type'])) {
@@ -1101,27 +1167,12 @@ class SuperPDPProvider extends AbstractPDPProvider
 			}
 		}
 
-		// Log the API call if we have the functional type
-		if (!empty($callType)) { // TODO : Add a parameter in module configuration to enable/disable logging
-			$call = new Call($this->db);
-			$call->call_id = $call->getNextCallId();
-			$call->call_type = $callType ?: '';
-			$call->method = ($method == 'POSTALREADYFORMATED' ? 'POST' : $method);
-			$call->endpoint = '/' . $resource;
-			$call->request_body = is_array($params) ? json_encode($params) : $params;
-			$call->response = is_array($returnarray['response']) ? json_encode($returnarray['response']) : $returnarray['response'];
-			$call->provider = $this->name;
-			$call->entity = $conf->entity;
-			$call->status = ($returnarray['status_code'] == 200 || $returnarray['status_code'] == 202) ? 1 : 0;
-
-			$result = $call->create($user);
-
-			if ($result > 0) {
-				$returnarray['id'] = $call->id;
-				$returnarray['call_id'] = $call->call_id;
-			} else {
-				dol_syslog(__METHOD__ . " Failed to log API call to PDP provider: " . $call->error . " - " . implode(',', $call->errors), LOG_ERR);
-			}
+		// Log the API call through an independent connection so the trace survives a
+		// rollback of the caller's transaction on error (see logCall(), issue #291).
+		$logged = $this->logCall($callType, $resource, $method, $params, $returnarray['response'], $returnarray['status_code']);
+		if ($logged !== null) {
+			$returnarray['id'] = $logged['id'];
+			$returnarray['call_id'] = $logged['call_id'];
 		}
 
 		return $returnarray;
@@ -1140,6 +1191,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		global $form;
 
 		if (!is_object($form)) {
+			require_once DOL_DOCUMENT_ROOT . '/core/class/html.form.class.php';
 			$form = new Form($db);
 		}
 

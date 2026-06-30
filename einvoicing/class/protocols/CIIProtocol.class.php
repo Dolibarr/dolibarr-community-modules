@@ -773,6 +773,13 @@ class CIIProtocol extends AbstractProtocol
 		if ($supplierInvoiceId < 0) {
 			return ['res' => -1, 'message' => 'Invoice creation error: ' . $supplierInvoice->error];
 		} else {
+			// Link the invoice to its purchase order (commande fournisseur) when the order reference
+			// (BT-13) matches a single order for the same supplier. Non-blocking. See issue #303.
+			$orderLinkMessage = $this->_linkSupplierInvoiceToPurchaseOrder($supplierInvoice, $socId, $parsedHeader['orderReference'] ?? '');
+			if ($orderLinkMessage !== '') {
+				$return_messages[] = $orderLinkMessage;
+			}
+
 			$create_deposit_line = 0;
 			$fk_remise_for_deposit = 0;
 			// --------------------------------------------------

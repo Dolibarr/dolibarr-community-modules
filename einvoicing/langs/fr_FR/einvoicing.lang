@@ -91,6 +91,7 @@ FxCheckWarnSIRENClosed=L'entreprise associée à SIREN %s est fermée selon le r
 FxCheckWarnNameMismatch=Le nom de l'entreprise enregistré (%s) ne correspond pas au nom figurant dans le registre national des entreprises français (%s).
 FxCheckWarnZIPMismatch=Le code postal enregistré (%s) ne correspond pas à celui du registre national des entreprises français (%s).
 FxCheckWarnTownMismatch=La ville enregistrée (%s) ne correspond pas à celle du registre national des entreprises français (%s).
+EInvoiceSupplierNameMismatchWarning=Le nom du fournisseur figurant sur la facture électronique reçue (%s) ne correspond pas au tiers lié (%s). La facture a été rattachée via l'identifiant structuré (SIREN/SIRET/TVA) ; veuillez vérifier le rattachement et mettre à jour le tiers si nécessaire.
 FxCheckErrorCreditNoteNoSource=Cette note de crédit ne comporte aucune facture source. Veuillez ajouter la facture source avant de générer la facture électronique.
 InvoiceNotSentToPDPDueToThirdpartyIssues=La facture n'a pas été envoyée au point d'accès en raison d'erreurs dans les données tierces.
 EINVOICING_ENABLE_API_VALIDATION=Activer la validation des données des tiers via les API gouvernementales (SIREN, TVA)
@@ -331,6 +332,9 @@ SupplierInvoiceComparisonVatRateDifference=différence de montant de TVA %s%% (e
 SupplierInvoiceComparisonVatRateNotFound=taux de TVA à %s%% non trouvé dans la facture Dolibarr
 SupplierInvoiceComparisonSuggestVatCalculationMode=recalculer la TVA en Mode %s pour avoir des montants de TVA correspondant à l'e-facture d'origine
 EinvoicingCantDeleteADocumentLinkedToAnExistingSupplierInvoice=Le document n° %s ne peut pas être supprimé car il est lié à la facture fournisseur Dolibarr n° %s
+EInvoiceSupplierInvoiceLinkedToOrder=La facture fournisseur a été automatiquement liée à la commande fournisseur %s (référence de commande BT-13 correspondante).
+EInvoiceSupplierOrderLinkAmbiguous=Plusieurs commandes fournisseur correspondent à la référence de commande %s pour ce fournisseur ; la facture n'a pas été liée automatiquement. Veuillez la lier manuellement.
+EInvoiceSupplierOrderRefWrongSupplier=Une commande fournisseur portant la référence %s existe mais appartient à un autre fournisseur ; la facture n'a pas été liée.
 
 EINVOICING_CLIENT_ID=Client ID
 EINVOICING_CLIENT_SECRET=Client Secret

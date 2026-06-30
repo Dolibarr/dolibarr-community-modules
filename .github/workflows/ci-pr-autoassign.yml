@@ -33,6 +33,10 @@ permissions:
 
 jobs:
   assign-and-label:
+    # Only run on the upstream repo where the GitHub App secrets/vars exist.
+    # On forks PR18_APP_ID / PR18_SECRET_KEY are unset, so the token step fails;
+    # skip the whole job there to avoid a red (but harmless) run.
+    if: ${{ github.repository == 'Dolibarr/dolibarr-community-modules' }}
     runs-on: ubuntu-latest
 
     # Mergeers / reviewers list: edit here as needed (comma-separated)

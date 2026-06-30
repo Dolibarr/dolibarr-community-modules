@@ -72,6 +72,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			'password' => getDolGlobalString('EINVOICING_ESALINK_PASSWORD'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '')),
 			'api_key'  => getDolGlobalString('EINVOICING_ESALINK_API_KEY'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '')),
 			'dol_prefix' => 'EINVOICING_ESALINK',
+			'has_validator' => 0,
 			'live' => getDolGlobalInt('EINVOICING_LIVE', 0)
 		);
 
@@ -347,6 +348,24 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		}
 
 		return $returnarray;
+	}
+
+	/**
+	 * Validate an electronic invoice file using the Esalink validation service.
+	 *
+	 * @param 	int 	$idinvoice 	ID of the invoice to check
+	 * @param 	string 	$filePath 	Path to the invoice file to validate
+	 * @return 	array|string 		Validation result or error message.
+	 */
+	public function validateEInvoiceFile($idinvoice, $filePath)
+	{
+		global $langs;
+
+		if (empty($this->config['has_validator']) || $this->config['has_validator'] != 1) {
+			return array('res' => -1, 'message' => $langs->trans('NoAvailableValidatorforThisAccessPoint'));
+		}
+
+		return array('res' => 0, 'message' => $langs->trans('skipped'));
 	}
 
 	/**
@@ -731,27 +750,12 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			}
 		}
 
-		// Log the API call if we have the functional type
-		if (!empty($callType)) { // TODO : Add a parameter in module configuration to enable/disable logging
-			$call = new Call($this->db);
-			$call->call_id = $call->getNextCallId();
-			$call->call_type = $callType ?: '';
-			$call->method = ($method == 'POSTALREADYFORMATED' ? 'POST' : $method);
-			$call->endpoint = '/' . $resource;
-			$call->request_body = is_array($params) ? json_encode($params) : $params;
-			$call->response = is_array($returnarray['response']) ? json_encode($returnarray['response']) : $returnarray['response'];
-			$call->provider = $this->name;
-			$call->entity = $conf->entity;
-			$call->status = ($returnarray['status_code'] == 200 || $returnarray['status_code'] == 202) ? 1 : 0;
-
-			$result = $call->create($user);
-
-			if ($result > 0) {
-				$returnarray['id'] = $call->id;
-				$returnarray['call_id'] = $call->call_id;
-			} else {
-				dol_syslog(__METHOD__ . " Failed to log API call to PDP provider: " . $call->error . " - " . implode(',', $call->errors), LOG_ERR);
-			}
+		// Log the API call through an independent connection so the trace survives a
+		// rollback of the caller's transaction on error (see logCall(), issue #291).
+		$logged = $this->logCall($callType, $resource, $method, $params, $returnarray['response'], $returnarray['status_code']);
+		if ($logged !== null) {
+			$returnarray['id'] = $logged['id'];
+			$returnarray['call_id'] = $logged['call_id'];
 		}
 
 		return $returnarray;

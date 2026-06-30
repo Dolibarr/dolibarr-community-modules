@@ -50,6 +50,9 @@ abstract class AbstractPDPProvider
 	/** @var string Provider name */
 	public $providerName;
 
+	/** @var string Short provider code, defined by each concrete provider (e.g. 'SuperPDP', 'Esalink') */
+	public $name;
+
 	/** @var string Help message to guide users in obtaining credentials for this provider */
 	public $helpToGetCredentials;
 
@@ -139,9 +142,9 @@ abstract class AbstractPDPProvider
 	abstract public function checkHealth();
 
 	/**
-	 * Get the base API URL for Esalink PDP
+	 * Get the base API URL for provider depending on the mode (authentication or regular API calls).
 	 *
-	 * @param string 	$mode 		'authent' or 'api'
+	 * @param string 	$mode 		'auth', 'api' or 'ap_api'
 	 * @return string				URL of the endpoint to call depending on the mode (authentication or regular API calls)
 	 */
 	public function getApiUrl($mode = 'api')
@@ -152,20 +155,36 @@ abstract class AbstractPDPProvider
 		// the "real mode" switch (the const gets stored as "0" instead of being deleted).
 		$prod = getDolGlobalInt('EINVOICING_LIVE');
 
+		$url = '';
 		if ($mode === 'auth') {
 			$url = $this->config['test_auth_url'];
 			if (!empty($prod)) {
 				$url = $this->config['prod_auth_url'];
 			}
 			return $url;
-		} else {
+		} elseif ($mode === 'api') {
 			$url = $this->config['test_api_url'];
 			if (!empty($prod)) {
 				$url = $this->config['prod_api_url'];
 			}
+		} elseif ($mode === 'ap_api') {
+			$url = $this->config['ap_api_url'];
+			if (!empty($prod)) {
+				$url = $this->config['ap_api_url'];
+			}
 		}
 
 		return $url;
+	}
+
+	/**
+	 * Check if the provider has a validator endpoint.
+	 *
+	 * @return bool True if the provider has a validator endpoint, false otherwise.
+	 */
+	public function hasValidator(): bool
+	{
+		return !empty($this->config['has_validator']);
 	}
 
 
@@ -242,6 +261,16 @@ abstract class AbstractPDPProvider
 	 * @return 	array|string 					True if the invoice was successfully sent, false otherwise.
 	 */
 	abstract public function sendSampleInvoice($onlymake = 0);
+
+
+	/**
+	 * Validate an electronic invoice file using the provider's validation service.
+	 *
+	 * @param 	int 	$idinvoice 	ID of the invoice to check
+	 * @param 	string 	$filePath 	Path to the invoice file to validate
+	 * @return 	array|string 		Validation result or error message.
+	 */
+	abstract public function validateEInvoiceFile($idinvoice, $filePath);
 
 
 	/**
@@ -502,6 +531,61 @@ abstract class AbstractPDPProvider
 		}
 
 		return $LastSyncDate;
+	}
+
+	/**
+	 * Log an API call into llx_einvoicing_call using a SEPARATE database connection.
+	 *
+	 * The call trace must survive even when the caller's main transaction is rolled
+	 * back on error (see issue #291): a failed send_invoice rolls back the doActions()
+	 * transaction, which would otherwise wipe the very log we need to diagnose it.
+	 * Writing the log through an independent connection ($dbhistory) decouples it from
+	 * the business transaction, so it is committed whether the action succeeds or fails,
+	 * without ever forcing a commit on the rest. Same approach as the webhook logging.
+	 *
+	 * @param   string                      $callType   Functional type of the call (empty = do not log)
+	 * @param   string                      $resource   API resource/endpoint (without leading slash)
+	 * @param   string                      $method     HTTP method (POSTALREADYFORMATED is normalized to POST)
+	 * @param   string|array<mixed>         $params     Request body
+	 * @param   string|array<mixed>         $response   Response payload
+	 * @param   int                         $statusCode HTTP status code of the response
+	 * @return  ?array{id:int,call_id:string}           Created log identifiers, or null if not logged
+	 */
+	protected function logCall($callType, $resource, $method, $params, $response, $statusCode)
+	{
+		global $conf, $user, $dolibarr_main_db_pass, $dbhistory;
+
+		if (empty($callType)) { // TODO : Add a parameter in module configuration to enable/disable logging
+			return null;
+		}
+
+		// Reuse a process-wide independent connection so the trace is not bound to the
+		// caller's transaction and persists even if that transaction is rolled back.
+		if (empty($dbhistory)) {
+			$dbhistory = getDoliDBInstance($conf->db->type, $conf->db->host, (string) $conf->db->user, $dolibarr_main_db_pass, (string) $conf->db->name, (int) $conf->db->port);
+		}
+
+		$dbhistory->begin();
+
+		$call = new Call($dbhistory);
+		$call->call_id = $call->getNextCallId();
+		$call->call_type = $callType;
+		$call->method = ($method == 'POSTALREADYFORMATED' ? 'POST' : $method);
+		$call->endpoint = '/' . $resource;
+		$call->request_body = is_array($params) ? json_encode($params) : $params;
+		$call->response = is_array($response) ? json_encode($response) : $response;
+		$call->provider = $this->name;
+		$call->entity = $conf->entity;
+		$call->status = ($statusCode == 200 || $statusCode == 202) ? 1 : 0;
+
+		if ($call->create($user) > 0) {
+			$dbhistory->commit();
+			return array('id' => $call->id, 'call_id' => $call->call_id);
+		}
+
+		$dbhistory->rollback();
+		dol_syslog(__METHOD__ . " Failed to log API call to PDP provider: " . $call->error . " - " . implode(',', $call->errors), LOG_ERR);
+		return null;
 	}
 
 	/**
