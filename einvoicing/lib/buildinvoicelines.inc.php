@@ -416,13 +416,13 @@ foreach ($object->lines as $line) {
 	$line_total_ttc = price2num($line_total_ht + $line_total_tva, 2);
 
 	// Uncomment for test using the most accurate possible calculation (but not following the e-invoice rule to round to 2 digit at each step of calculation)
-	/*
-	$line_unit_price = $line->subprice;								// Note, 4 digits seems common accuracy for unit price with einvoice but default dolibarr setup is 5.
-	$line_unit_price_with_discount = price2num($line->subprice * (1 - $line->remise_percent / 100), 'MU');
-	$line_total_ht = $line->total_ht;
-	$line_total_tva = $line->total_tva;
-	$line_total_ttc = $line->total_ttc;
-	*/
+	if (getDolGlobalInt('EINVOICING_USE_DOLIBARR_ALREADY_CALCULATED_AMOUNTS')) {
+		$line_unit_price = $line->subprice;								// Note, 4 digits seems common accuracy for unit price with einvoice but default dolibarr setup is 5.
+		$line_unit_price_with_discount = price2num($line->subprice * (1 - $line->remise_percent / 100), 'MU');
+		$line_total_ht = $line->total_ht;
+		$line_total_tva = $line->total_tva;
+		$line_total_ttc = $line->total_ttc;
+	}
 
 	// Add (or update) VAT rate to $taxBreakdown
 	if (!isset($taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')])) {
