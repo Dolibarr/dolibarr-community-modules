@@ -2683,7 +2683,11 @@ class EInvoicing
 		}
 
 		if ($object->thirdparty->country_code == 'FR') {	// We need to sync invoice if for french customer
-			$return = self::STATUS_NOT_GENERATED;
+			if ($object->typent_code == 'TE_PRIVATE') {
+				$return = self::STATUS_IGNORE;
+			} else {
+				$return = self::STATUS_NOT_GENERATED;
+			}
 		}
 		if ($object->module_source == 'takepos') {			// Force to ignore for all invoices generated from TakePOS
 			// If invoice is generated from TakePOS, we must not make any e-invoice sync.
