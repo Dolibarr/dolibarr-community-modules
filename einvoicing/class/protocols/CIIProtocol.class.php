@@ -2250,7 +2250,7 @@ class CIIProtocol extends AbstractProtocol
 
 		// Register file in database index
 		$res = addFileIntoDatabaseIndex(
-			$dest_path,
+			$upload_dir,
 			$filename,
 			$filename,
 			'generated',
