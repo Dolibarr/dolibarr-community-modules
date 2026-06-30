@@ -2683,7 +2683,7 @@ class EInvoicing
 		}
 
 		if ($object->thirdparty->country_code == 'FR') {	// We need to sync invoice if for french customer
-			if ($object->typent_code == 'TE_PRIVATE') {
+			if ($object->thirdparty->typent_code == 'TE_PRIVATE') {
 				$return = self::STATUS_IGNORE;
 			} else {
 				$return = self::STATUS_NOT_GENERATED;
