@@ -402,7 +402,7 @@ foreach ($object->lines as $line) {
 
 	$line_unit_price_with_discount = $line_unit_price;
 	if ($line->remise_percent) {
-		$line_unit_price_with_discount = price2num($line_unit_price * (1 - $line->remise_percent / 100), getDolGlobalInt('MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY', 'MU'));
+		$line_unit_price_with_discount = price2num($line_unit_price * (1 - $line->remise_percent / 100), getDolGlobalString('MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY', 'MU'));
 	}
 
 	// We need to recalculate the total using the Unit price rounded after discount percent (netpriceamount)and the Quantity, and rounding all temporary calculations after to 2
