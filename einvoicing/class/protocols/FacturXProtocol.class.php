@@ -967,32 +967,54 @@ class FacturXProtocol extends AbstractProtocol
 	 */
 	public function createSupplierInvoiceFromSource($file, $ReadableViewFile = null, $flowId = '')
 	{
-		global $conf, $db, $user;
+		global $conf;
 
-		$einvoicing = new EInvoicing($db);
-		$return_messages = array();
-
-		// Save uploaded file to temporary directory
 		$tempDir = $conf->einvoicing->dir_temp;
 		if (!dol_is_dir($tempDir)) {
 			dol_mkdir($tempDir);
 		}
 
-		// If tmp dir in not empty, clean it
-		$files = scandir($tempDir);
-		foreach ($files as $f) {
-			if ($f != '.' && $f != '..') {
-				dol_delete_file($tempDir . '/' . $f);
-			}
+		// Use a unique per-call working file so two concurrent syncs cannot overwrite each other and
+		// parse the wrong invoice (#226). The fixed facturx.pdf slot is only the downloadable
+		// "last invoice that could not be processed" diagnostic, managed in cleanupIncomingTempFiles().
+		$uid = bin2hex(random_bytes(8));
+		$tempFile = $tempDir . '/in_' . $uid . '.pdf';
+		$tempFileReadableView = $tempDir . '/in_' . $uid . '_readable.pdf';
+
+		$result = ['res' => -1, 'message' => 'Unexpected error while creating supplier invoice'];
+		try {
+			$result = $this->doCreateSupplierInvoiceFromSource($file, $ReadableViewFile, $flowId, $tempFile, $tempFileReadableView);
+		} finally {
+			$failed = !is_array($result) || !isset($result['res']) || $result['res'] < 0;
+			$this->cleanupIncomingTempFiles($tempDir, $tempFile, $tempFileReadableView, 'facturx.pdf', 'facturx_readable.pdf', $failed);
 		}
 
-		$tempFile = $tempDir . '/facturx.pdf';
+		return $result;
+	}
+
+	/**
+	 * Build the supplier invoice from a received Factur-X document written to a per-call working file.
+	 * The temp-file lifecycle is owned by createSupplierInvoiceFromSource() (the public wrapper).
+	 *
+	 * @param  string			$file                 Raw Factur-X PDF content
+	 * @param  string|null		$ReadableViewFile     Optional readable view (PDP-generated readable PDF)
+	 * @param  string			$flowId               Source flow identifier
+	 * @param  string			$tempFile             Unique working file for the received PDF
+	 * @param  string			$tempFileReadableView Unique working file for the readable view
+	 * @return array{res:int<-1,1>, message:string, action?:string|null}
+	 */
+	private function doCreateSupplierInvoiceFromSource($file, $ReadableViewFile, $flowId, $tempFile, $tempFileReadableView)
+	{
+		global $conf, $db, $user;
+
+		$einvoicing = new EInvoicing($db);
+		$return_messages = array();
+
 		if (file_put_contents($tempFile, $file) === false) {
 			return ['res' => -1, 'message' => 'Failed to save Factur-X file to temporary location'];
 		}
 
 		if ($ReadableViewFile) {
-			$tempFileReadableView = $tempDir . '/facturx_readable.pdf';
 			if (file_put_contents($tempFileReadableView, $ReadableViewFile) === false) {
 				return ['res' => -1, 'message' => 'Failed to save readable view file to temporary location'];
 			}

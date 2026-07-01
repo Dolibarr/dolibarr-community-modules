@@ -125,4 +125,45 @@ abstract class AbstractProtocol
 			dol_syslog(get_class($this) . '::checkFileSizeLimit ' . basename($filepath) . ' size ' . number_format($sizeMB, 2) . ' MB exceeds configured limit of ' . number_format($maxMB, 2) . ' MB', LOG_WARNING);
 		}
 	}
+
+	/**
+	 * Clean up the per-call working temp files of an inbound invoice, while preserving the
+	 * "last invoice that could not be processed" diagnostic shown (and downloadable) in the
+	 * document list view.
+	 *
+	 * Each inbound sync writes the received document to its own unique working file, so two
+	 * concurrent syncs can no longer overwrite each other and parse the wrong invoice (#226).
+	 * On failure, the working file is promoted to the fixed diagnostic slot (overwriting the
+	 * previous one) so it stays downloadable; on success, the working files are simply removed.
+	 *
+	 * @param	string	$tempDir			Module temp directory
+	 * @param	string	$workFile			Unique working file for the received document
+	 * @param	string	$workReadable		Unique working file for the readable view (may not exist)
+	 * @param	string	$diagName			Fixed diagnostic filename for the received document
+	 * @param	string	$diagReadableName	Fixed diagnostic filename for the readable view
+	 * @param	bool	$failed				True if processing failed (keep the diagnostic), false otherwise
+	 * @return	void
+	 */
+	protected function cleanupIncomingTempFiles($tempDir, $workFile, $workReadable, $diagName, $diagReadableName, $failed)
+	{
+		if ($failed) {
+			// Keep the failed file(s) as the downloadable "last unprocessed invoice" diagnostic.
+			if (file_exists($workFile)) {
+				dol_delete_file($tempDir . '/' . $diagName);
+				dol_copy($workFile, $tempDir . '/' . $diagName, '0', 1);
+			}
+			if (file_exists($workReadable)) {
+				dol_delete_file($tempDir . '/' . $diagReadableName);
+				dol_copy($workReadable, $tempDir . '/' . $diagReadableName, '0', 1);
+			}
+		}
+
+		// Always drop the per-call working files.
+		if (file_exists($workFile)) {
+			dol_delete_file($workFile);
+		}
+		if (file_exists($workReadable)) {
+			dol_delete_file($workReadable);
+		}
+	}
 }
