@@ -395,10 +395,10 @@ foreach ($object->lines as $line) {
 	// Set amounts for the line
 
 	$line_unit_price = $line->subprice;
-	//$line_unit_price = price2num($line_unit_price, 4);			// Note, 4 digits seems common accuracy for unit price with einvoice, but default dolibarr setup is 5.
+	//$line_unit_price = price2num($line_unit_price, 4);			// Note, 4 digits seems common accuracy for unit price with einvoice, but default dolibarr setup is 'MU' so 5.
 
 	$line_unit_price_ttc = $line->subprice_ttc;
-	//$line_unit_price_ttc = price2num($line_unit_price_ttc, 4);	// Note, 4 digits seems common accuracy for unit price with einvoice, but default dolibarr setup is 5.
+	//$line_unit_price_ttc = price2num($line_unit_price_ttc, 4);	// Note, 4 digits seems common accuracy for unit price with einvoice, but default dolibarr setup is 'MU' so 5.
 
 	$line_unit_price_with_discount = $line_unit_price;
 	if ($line->remise_percent) {
@@ -432,14 +432,14 @@ foreach ($object->lines as $line) {
 	// BT-146 * BT-129 stays consistent with the line net amount BT-131. Unit price and quantity are
 	// both emitted with 2 decimals, so scaling the price - not the quantity - preserves that
 	// consistency even for non-round progress percentages (e.g. 33.33%).
-	if ($object->type == $object::TYPE_SITUATION) {
-		$line_full_ht = $line_total_ht;	// = $line_unit_price_with_discount * $line->qty (100% of the line)
-		$progress_ratio = ($line_full_ht != 0.0) ? ((float) $line->total_ht / $line_full_ht) : 0.0;
+	if ($object->type == $object::TYPE_SITUATION && getDolGlobalString('INVOICE_USE_SITUATION') == 2) {
+		$progress_ratio = (float) $line->situation_percent / 100;
 
-		$line_unit_price = price2num($line_unit_price * $progress_ratio, 2);
-		$line_total_ht   = price2num($line_unit_price_with_discount * $progress_ratio * $line->qty, 2);
-		$line_total_tva  = price2num($line_total_ht * ($line->tva_tx > 0 ? number_format($line->tva_tx, 2, '.', '') / 100 : 0), 2);
+		$line_unit_price_with_discount_and_situation = price2num($line_unit_price_with_discount * $progress_ratio, 'MU');
+		// $line_unit_price = price2num($line_unit_price_with_discount * $progress_ratio, 4);		// Note, 4 digits seems common accuracy for unit price with einvoice, but default dolibarr setup is 'MU' so 5.
+		$line_total_ht   = price2num($line_unit_price_with_discount_and_situation * $line->qty, 2);
 		$line_total_ttc  = price2num($line_total_ht + $line_total_tva, 2);
+		$line_total_tva  = price2num($line_total_ttc - $line_total_ht, 2);
 	}
 
 	// Add (or update) VAT rate to $taxBreakdown
