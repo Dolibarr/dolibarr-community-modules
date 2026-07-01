@@ -404,7 +404,7 @@ foreach ($object->lines as $line) {
 	if ($line->remise_percent) {
 		$line_unit_price_with_discount = $line_unit_price * (1 - $line->remise_percent / 100);
 	}
-	if ($object->type == $object::TYPE_SITUATION && getDolGlobalString('INVOICE_USE_SITUATION') == 2 && $line->situation_percent) {
+	if ($object->type == $object::TYPE_SITUATION && $line->situation_percent) {
 		$line_unit_price_with_discount = $line_unit_price_with_discount * $line->situation_percent / 100;
 	}
 	$line_unit_price_with_discount = price2num($line_unit_price_with_discount, getDolGlobalString('MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY', 'MU'));
