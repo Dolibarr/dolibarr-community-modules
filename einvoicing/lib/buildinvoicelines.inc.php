@@ -409,14 +409,15 @@ foreach ($object->lines as $line) {
 	}
 	$line_unit_price_with_discount = price2num($line_unit_price_with_discount, getDolGlobalString('MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY', 'MU'));
 
-	// We need to recalculate the total using the Unit price rounded after discount percent (netpriceamount)and the Quantity, and rounding all temporary calculations after to 2
+	// We need to recalculate the total using the Unit price rounded after discount percent (netpriceamount) and the quantity, and rounding all temporary calculations after to 2
 	// according to EN16931 rules. This is a not accurate rule but it is the rule to follow for e-invoice.
 	// This means we may get a different result than Dolibarr default calculation if:
 	// - There is a discount percent AND the option MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY was not set or set to a value != MU
 	// or if
 	// - There is no discount percent but currency accuracy for total (MAIN_MAX_DECIMALS_UNIT) was not set to 2.
+	// TODO Use calculate_price() with a mode to round to 2 after each temporary calculation.
 	$line_total_ht = price2num($line_unit_price_with_discount * $line->qty, 2);				// Need to round to 2 as defined by EN16931 rules after each calculation.
-	$line_total_tva = price2num($line_unit_price_with_discount * $line->qty * ($line->tva_tx > 0 ? number_format($line->tva_tx, 2, '.', '') / 100 : 0), 2);
+	$line_total_tva = price2num($line_unit_price_with_discount * $line->qty * ($line->tva_tx > 0 ? $line->tva_tx / 100 : 0), 2);
 	$line_total_ttc = price2num($line_total_ht + $line_total_tva, 2);
 
 	// Uncomment for test using the most accurate possible calculation (but not following the e-invoice rule to round to 2 digit at each step of calculation)
