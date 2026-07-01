@@ -1497,6 +1497,18 @@ class CIIProtocol extends AbstractProtocol
 
 		$this->buildParty($doc, $agreement, $invoiceData, 'buyer');
 
+		// Buyer order reference (BT-13): customer purchase order number (Dolibarr "Réf. client").
+		// Emitted only when non-empty to avoid empty tags / cardinality issues. See issue #302.
+		// Position follows the CII schema sequence (after BuyerTradeParty).
+		if (!empty($invoiceData['orderReference'])) {
+			$comment = $doc->createComment('Buyer order reference (BT-13)');
+			$agreement->appendChild($comment);
+
+			$buyerOrderRef = $doc->createElement('ram:BuyerOrderReferencedDocument');
+			$agreement->appendChild($buyerOrderRef);
+			$buyerOrderRef->appendChild($doc->createElement('ram:IssuerAssignedID', htmlspecialchars($invoiceData['orderReference'])));
+		}
+
 
 		// DELIVERY
 
