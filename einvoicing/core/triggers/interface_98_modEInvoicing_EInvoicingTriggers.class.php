@@ -150,12 +150,11 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 
 				$result = $einvoicing->fetchLastknownInvoiceStatus($object->id, (string) $object->ref);
 
-				// If $result is $einvoicing::STATUS_IGNORE, we do nothing.
+				// If $result is $einvoicing::STATUS_IGNORE or STATUS_IGNORE_2, we do nothing.
 
 				// If einvoice was set to $einvoicing::STATUS_NOT_GENERATED or $einvoicing::STATUS_UNKNOWN, we set it to STATUS_IGNORE (if not qualified for einvoice) or STATUS_NOT_GENERATED (if qualified for einvoice)
 				if ($result['code'] == $einvoicing::STATUS_NOT_GENERATED || $result['code'] == $einvoicing::STATUS_UNKNOWN) {
-					// By default, we set status to ignore
-					$statustouse = $einvoicing::STATUS_IGNORE;
+					$statustouse = $einvoicing::STATUS_IGNORE;	// default status to use if none of following rules match
 
 					// Test if invoice need to be managed by EInvoice
 					$needEinvoice = $einvoicing->needEInvoiceManagement($object);

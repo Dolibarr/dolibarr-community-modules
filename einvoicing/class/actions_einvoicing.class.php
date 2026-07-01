@@ -90,11 +90,9 @@ class ActionsEInvoicing extends CommonHookActions
 				// Get current status of e-invoice
 				$currentStatusDetails = $einvoicing->fetchLastknownInvoiceStatus($invoiceObject->id, $invoiceObject->ref);
 
-				if (!isset($currentStatusDetails['code']) || $currentStatusDetails['code'] != $einvoicing::STATUS_IGNORE) {
-					// Never generate/transmit an e-invoice for a DRAFT: regenerating a draft PDF (e.g. after
-					// adding a line) must NOT push anything to the PA. At validation the invoice is already
-					// VALIDATED when Dolibarr regenerates the final PDF, so the legitimate flow is preserved.
-					if ($invoiceObject->status != $invoiceObject::STATUS_DRAFT
+				if (!isset($currentStatusDetails['code']) ||
+					($currentStatusDetails['code'] != $einvoicing::STATUS_IGNORE && $currentStatusDetails['code'] != $einvoicing::STATUS_IGNORE_2)) {
+					if ($invoiceObject->status != $invoiceObject::STATUS_DRAFT	// Never generate/transmit an e-invoice for a DRAFT (note: at validation the invoice has already status VALIDATED when Dolibarr regenerates the final PDF, so the legitimate flow is preserved).
 						&& !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')
 						&& getDolGlobalString('EINVOICING_EINVOICE_IN_REAL_TIME')) {
 						// Call function to create Factur-X document

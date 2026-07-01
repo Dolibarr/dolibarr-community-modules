@@ -66,6 +66,7 @@ class EInvoicing
 	public const STATUS_AWAITING_ACK        = 20;		// Einvoice received and analyzed by your AP. Next step happen when doing sync.
 	public const STATUS_ERROR               = 25;
 
+	public const STATUS_IGNORE_2            = 98;		// Never sync (for another reason than ereporting, not used yet)
 	public const STATUS_IGNORE              = 99;		// Never sync
 
 	// PDP / PA normalized statuses
@@ -185,7 +186,8 @@ class EInvoicing
 	public const STATUS_LABEL_KEYS = [
 		// Dolibarr
 		self::STATUS_UNKNOWN             => 'EInvStatusUnknown',
-		self::STATUS_IGNORE              => 'EInvStatusDoNotSync',		// To exclude invoice from einvoice sync
+		self::STATUS_IGNORE              => 'EInvStatusDoNotSync',		// To exclude invoice from einvoice sync (ereporting)
+		//self::STATUS_IGNORE_2            => 'EInvStatusDoNotSync2',		// To exclude invoice from einvoice sync (for other reason, not used yet)
 		self::STATUS_NOT_GENERATED       => 'EInvStatusNotGenerated',
 		self::STATUS_ERROR               => 'EInvStatusError',			// Error in generation by Dolibarr
 		self::STATUS_GENERATED           => 'EInvStatusGenerated',
@@ -676,6 +678,7 @@ class EInvoicing
 			// Remove Dolibarr internal statuses
 			unset($options[self::STATUS_UNKNOWN]);
 			unset($options[self::STATUS_IGNORE]);
+			unset($options[self::STATUS_IGNORE_2]);
 			unset($options[self::STATUS_NOT_GENERATED]);
 		}
 		if ($onlyPdpStatuses || $onlySendable || $onlyCreate) {
@@ -1165,9 +1168,9 @@ class EInvoicing
 		//$currentStatusInfo['code'] = 2;
 
 		// On invoice creation there is no stored status yet, so the dropdown would default to its first
-		// option ("Ne pas gérer" / STATUS_IGNORE) and persist it at BILL_CREATE — silently disabling
-		// e-invoicing for eligible (FR) invoices. Preselect the qualified default instead: "À générer"
-		// (STATUS_NOT_GENERATED) for invoices that must be managed, "Ne pas gérer" otherwise.
+		// option ("Do not manage (ereporting) / STATUS_IGNORE" or "Do not manage (other reason) /STATUS_IGNORE_2") and persist it at BILL_CREATE — silently disabling
+		// e-invoicing for eligible (FR) invoices. Preselect the qualified default instead: "To generate / STATUS_NOT_GENERATED" for invoices that must be managed,
+		// "Do not manage" otherwise.
 		if ($mode == 'create' || $action == 'create') {
 			// At creation the hook receives a blank Facture object: its socid is NOT set yet (the
 			// selected thirdparty lives in a local var of card.php and is passed via $parameters['socid'],
@@ -2016,7 +2019,7 @@ class EInvoicing
 						$tmpstatus['ap_precheck_status'] = $obj->ap_precheck_status ?? '';
 						$tmpstatus['ap_precheck_result'] = $obj->ap_precheck_result ?? '';
 
-						if (!in_array((int) $obj->syncstatus, array(self::STATUS_UNKNOWN, self::STATUS_IGNORE, self::STATUS_NOT_GENERATED, self::STATUS_GENERATED))) {
+						if (!in_array((int) $obj->syncstatus, array(self::STATUS_UNKNOWN, self::STATUS_IGNORE, self::STATUS_IGNORE_2, self::STATUS_NOT_GENERATED, self::STATUS_GENERATED))) {
 							$tmpstatus['transmitted'] = 1;
 						} else {
 							$tmpstatus['transmitted'] = 0;
@@ -2038,7 +2041,7 @@ class EInvoicing
 				$tmpstatus['override_routing_id'] = $obj->override_routing_id ?? '';
 				$tmpstatus['ap_precheck_status'] = $obj->ap_precheck_status ?? '';
 				$tmpstatus['ap_precheck_result'] = $obj->ap_precheck_result ?? '';
-				if (!in_array((int) $obj->syncstatus, array(self::STATUS_UNKNOWN, self::STATUS_IGNORE, self::STATUS_NOT_GENERATED, self::STATUS_GENERATED))) {
+				if (!in_array((int) $obj->syncstatus, array(self::STATUS_UNKNOWN, self::STATUS_IGNORE, self::STATUS_IGNORE_2, self::STATUS_NOT_GENERATED, self::STATUS_GENERATED))) {
 					$tmpstatus['transmitted'] = 1;
 				} else {
 					$tmpstatus['transmitted'] = 0;
@@ -2672,7 +2675,7 @@ class EInvoicing
 	 * Return if an invoice need EInvoicing management.
 	 *
 	 * @param 	Facture|FactureRec		$object		Object
-	 * @return 	int 								self::STATUS_NOT_GENERATED if the invoice object need management of EInvoicing, self::STATUS_IGNORE if not.
+	 * @return 	int 								self::STATUS_NOT_GENERATED if the invoice object need management of EInvoicing, self::STATUS_IGNORE or self::self::STATUS_IGNORE_2 if not.
 	 */
 	public function needEInvoiceManagement($object)
 	{
