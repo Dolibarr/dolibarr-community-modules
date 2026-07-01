@@ -10,29 +10,28 @@
 return [
     // # Issue statistics:
     // PhanUndeclaredProperty : 60+ occurrences
-    // PhanTypeMismatchArgument : 55+ occurrences
+    // PhanTypeMismatchArgument : 50+ occurrences
     // PhanUndeclaredVariable : 50+ occurrences
     // PhanDeprecatedProperty : 40+ occurrences
     // PhanTypeArraySuspiciousNull : 40+ occurrences
     // PhanTypeInvalidDimOffset : 35+ occurrences
     // PhanTypeArraySuspiciousNullable : 30+ occurrences
-    // PhanTypeMismatchArgumentNullable : 30+ occurrences
-    // PhanTypeMismatchProperty : 25+ occurrences
+    // PhanTypeMismatchArgumentNullable : 25+ occurrences
+    // PhanTypeMismatchArgumentProbablyReal : 20+ occurrences
+    // PhanTypeMismatchProperty : 20+ occurrences
     // PhanPossiblyUndeclaredVariable : 15+ occurrences
     // PhanRedefineFunction : 15+ occurrences
-    // PhanTypeMismatchArgumentProbablyReal : 15+ occurrences
     // PhanAccessMethodPrivate : 10+ occurrences
     // PhanTypeMismatchArgumentNullableInternal : 10+ occurrences
     // PhanTypeMismatchArgumentReal : 10+ occurrences
     // PhanUndeclaredMethod : 10+ occurrences
-    // PhanTypeMismatchArgumentSuperType : 8 occurrences
+    // PhanTypeMismatchArgumentSuperType : 7 occurrences
     // PhanUndeclaredVariableDim : 7 occurrences
     // PhanPossiblyNullTypeMismatchProperty : 6 occurrences
     // PhanTypeMismatchReturn : 6 occurrences
     // PhanTypeObjectUnsetDeclaredProperty : 6 occurrences
     // PhanUndeclaredClassMethod : 6 occurrences
     // PhanPossiblyUndeclaredGlobalVariable : 5 occurrences
-    // PhanTypeInvalidLeftOperandOfNumericOp : 5 occurrences
     // PhanTypeMismatchArgumentInternal : 5 occurrences
     // PhanTypeSuspiciousEcho : 5 occurrences
     // PhanEmptyForeach : 4 occurrences
@@ -67,8 +66,8 @@ return [
     // PhanRedefineClass : 1 occurrence
     // PhanRedundantArrayValuesCall : 1 occurrence
     // PhanTypeInvalidLeftOperandOfAdd : 1 occurrence
+    // PhanTypeInvalidLeftOperandOfNumericOp : 1 occurrence
     // PhanTypeInvalidRightOperandOfAdd : 1 occurrence
-    // PhanTypeInvalidRightOperandOfNumericOp : 1 occurrence
     // PhanTypeMagicVoidWithReturn : 1 occurrence
     // PhanTypeMismatchDeclaredReturn : 1 occurrence
     // PhanTypeMismatchDimAssignment : 1 occurrence
@@ -91,7 +90,7 @@ return [
         'einvoicing/class/document.class.php' => ['PhanPluginRedundantReturnComment', 'PhanTypeMismatchArgument', 'PhanTypeMismatchReturnNullable', 'PhanTypeObjectUnsetDeclaredProperty', 'PhanUndeclaredClassMethod', 'PhanUndeclaredClassProperty', 'PhanUndeclaredProperty'],
         'einvoicing/class/einvoicing.class.php' => ['PhanInvalidCommentForDeclarationType', 'PhanTypeMismatchArgument', 'PhanTypeMismatchArgumentInternal', 'PhanTypeMismatchArgumentNullable', 'PhanTypeMismatchReturnProbablyReal'],
         'einvoicing/class/helpers/SupplierInvoiceHelper.class.php' => ['PhanPluginRedundantReturnComment', 'PhanTypeMismatchArgumentNullableInternal', 'PhanUndeclaredMethod'],
-        'einvoicing/class/protocols/CIIProtocol.class.php' => ['PhanDeprecatedClassConstant', 'PhanDeprecatedProperty', 'PhanEmptyForeach', 'PhanParamTooMany', 'PhanPluginDuplicateExpressionAssignmentOperation', 'PhanPluginUnreachableCode', 'PhanPossiblyUndeclaredVariable', 'PhanRedundantArrayValuesCall', 'PhanTypeInvalidDimOffset', 'PhanTypeMismatchArgument', 'PhanTypeMismatchArgumentNullable', 'PhanTypeMismatchArgumentReal', 'PhanTypeMismatchProperty', 'PhanUndeclaredProperty', 'PhanUndeclaredVariable'],
+        'einvoicing/class/protocols/CIIProtocol.class.php' => ['PhanDeprecatedClassConstant', 'PhanDeprecatedProperty', 'PhanEmptyForeach', 'PhanParamTooMany', 'PhanPluginDuplicateExpressionAssignmentOperation', 'PhanPluginUnreachableCode', 'PhanPossiblyUndeclaredVariable', 'PhanRedundantArrayValuesCall', 'PhanTypeInvalidDimOffset', 'PhanTypeMismatchArgumentNullable', 'PhanTypeMismatchArgumentReal', 'PhanTypeMismatchProperty', 'PhanUndeclaredProperty', 'PhanUndeclaredVariable'],
         'einvoicing/class/protocols/CommonProtocol.class.php' => ['PhanPluginBothLiteralsBinaryOp', 'PhanPluginDuplicateIfStatements', 'PhanTypeMismatchArgumentNullable', 'PhanTypeMismatchProperty', 'PhanUndeclaredConstant', 'PhanUndeclaredMethod', 'PhanUndeclaredProperty'],
         'einvoicing/class/protocols/FacturXProtocol.class.php' => ['PhanDeprecatedClassConstant', 'PhanDeprecatedFunction', 'PhanDeprecatedProperty', 'PhanEmptyForeach', 'PhanNonClassMethodCall', 'PhanPluginSimplifyExpressionBool', 'PhanPluginUnreachableCode', 'PhanPossiblyNullTypeMismatchProperty', 'PhanPossiblyUndeclaredVariable', 'PhanTypeArraySuspiciousNull', 'PhanTypeArraySuspiciousNullable', 'PhanTypeExpectedObjectPropAccessButGotNull', 'PhanTypeInvalidDimOffset', 'PhanTypeMismatchArgument', 'PhanTypeMismatchArgumentInternal', 'PhanTypeMismatchArgumentNullable', 'PhanTypeMismatchArgumentProbablyReal', 'PhanTypeMismatchArgumentReal', 'PhanTypeMismatchDimAssignment', 'PhanTypeMismatchDimFetch', 'PhanTypeMismatchDimFetchNullable', 'PhanTypeMismatchForeach', 'PhanTypeMismatchPropertyProbablyReal', 'PhanTypeSuspiciousNonTraversableForeach', 'PhanUndeclaredMethod', 'PhanUndeclaredProperty', 'PhanUndeclaredVariable', 'PhanUndeclaredVariableDim', 'PhanUnreferencedUseNormal'],
         'einvoicing/class/protocols/ProtocolManager.class.php' => ['PhanPossiblyUndeclaredVariable'],
@@ -103,10 +102,9 @@ return [
         'einvoicing/compat/commonhookactions.class.php' => ['PhanRedefineClass'],
         'einvoicing/compat/profid.lib.php' => ['PhanRedefineFunction', 'PhanTypeInvalidDimOffset'],
         'einvoicing/core/modules/modEInvoicing.class.php' => ['PhanTypeMismatchArgument', 'PhanTypeMismatchArgumentProbablyReal', 'PhanTypeMismatchProperty'],
-        'einvoicing/core/triggers/interface_99_modEInvoicing_EInvoicingTriggers.class.php' => ['PhanTypeMismatchArgument', 'PhanTypeMismatchArgumentNullable', 'PhanTypeMismatchArgumentSuperType', 'PhanTypeMismatchProperty'],
         'einvoicing/document_card.php' => ['PhanPluginBothLiteralsBinaryOp', 'PhanTypeMismatchArgumentNullable', 'PhanUndeclaredProperty'],
         'einvoicing/document_list.php' => ['PhanPossiblyUndeclaredGlobalVariable', 'PhanTypeInvalidDimOffset', 'PhanTypeSuspiciousEcho', 'PhanUndeclaredProperty'],
-        'einvoicing/lib/buildinvoicelines.inc.php' => ['PhanAccessMethodPrivate', 'PhanDeprecatedFunction', 'PhanDeprecatedProperty', 'PhanTypeArraySuspiciousNullable', 'PhanTypeInvalidLeftOperandOfAdd', 'PhanTypeInvalidLeftOperandOfNumericOp', 'PhanTypeInvalidRightOperandOfAdd', 'PhanTypeInvalidRightOperandOfNumericOp', 'PhanTypeMismatchArgument', 'PhanTypeMismatchArgumentNullable', 'PhanUndeclaredProperty'],
+        'einvoicing/lib/buildinvoicelines.inc.php' => ['PhanAccessMethodPrivate', 'PhanDeprecatedFunction', 'PhanDeprecatedProperty', 'PhanTypeArraySuspiciousNullable', 'PhanTypeInvalidLeftOperandOfAdd', 'PhanTypeInvalidLeftOperandOfNumericOp', 'PhanTypeInvalidRightOperandOfAdd', 'PhanTypeMismatchArgument', 'PhanTypeMismatchArgumentNullable', 'PhanUndeclaredProperty'],
         'einvoicing/lib/einvoicing.lib.php' => ['PhanRedefineFunction', 'PhanTypeMismatchArgumentNullable', 'PhanUndeclaredVariableDim'],
         'einvoicing/public/proxy_oauthcallback.php' => ['PhanTypeArraySuspiciousNullable'],
         'helloasso/admin/setup.php' => ['PhanEmptyFQSENInClasslike', 'PhanTypeExpectedObjectOrClassName', 'PhanTypeMismatchArgument', 'PhanTypeMismatchArgumentNullableInternal', 'PhanUndeclaredClassMethod', 'PhanUndeclaredVariableDim'],
