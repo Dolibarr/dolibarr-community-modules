@@ -402,8 +402,12 @@ foreach ($object->lines as $line) {
 
 	$line_unit_price_with_discount = $line_unit_price;
 	if ($line->remise_percent) {
-		$line_unit_price_with_discount = price2num($line_unit_price * (1 - $line->remise_percent / 100), getDolGlobalString('MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY', 'MU'));
+		$line_unit_price_with_discount = $line_unit_price * (1 - $line->remise_percent / 100);
 	}
+	if ($object->type == $object::TYPE_SITUATION && getDolGlobalString('INVOICE_USE_SITUATION') == 2) {
+		$line_unit_price_with_discount = $line_unit_price_with_discount * $line->situation_percent / 100;
+	}
+	$line_unit_price_with_discount = price2num($line_unit_price_with_discount, getDolGlobalString('MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY', 'MU'));
 
 	// We need to recalculate the total using the Unit price rounded after discount percent (netpriceamount)and the Quantity, and rounding all temporary calculations after to 2
 	// according to EN16931 rules. This is a not accurate rule but it is the rule to follow for e-invoice.
@@ -422,24 +426,6 @@ foreach ($object->lines as $line) {
 		$line_total_ht = $line->total_ht;
 		$line_total_tva = $line->total_tva;
 		$line_total_ttc = $line->total_ttc;
-	}
-
-	// Progress / situation invoices (facture de situation): Dolibarr keeps the FULL (100%) line
-	// amount in subprice*qty, while the amount actually billed for THIS situation - already net of
-	// the progress billed by previous situations - lives in $line->total_ht (the value shown on the
-	// PDF). Without correction the e-invoice would bill 100% of every line (issue #258). We fold the
-	// progress fraction into the unit price (BT-146) and keep the real billed quantity (BT-129), so
-	// BT-146 * BT-129 stays consistent with the line net amount BT-131. Unit price and quantity are
-	// both emitted with 2 decimals, so scaling the price - not the quantity - preserves that
-	// consistency even for non-round progress percentages (e.g. 33.33%).
-	if ($object->type == $object::TYPE_SITUATION && getDolGlobalString('INVOICE_USE_SITUATION') == 2) {
-		$progress_ratio = (float) $line->situation_percent / 100;
-
-		$line_unit_price_with_discount_and_situation = price2num($line_unit_price_with_discount * $progress_ratio, 'MU');
-		// $line_unit_price = price2num($line_unit_price_with_discount * $progress_ratio, 4);		// Note, 4 digits seems common accuracy for unit price with einvoice, but default dolibarr setup is 'MU' so 5.
-		$line_total_ht   = price2num($line_unit_price_with_discount_and_situation * $line->qty, 2);
-		$line_total_ttc  = price2num($line_total_ht + $line_total_tva, 2);
-		$line_total_tva  = price2num($line_total_ttc - $line_total_ht, 2);
 	}
 
 	// Add (or update) VAT rate to $taxBreakdown
