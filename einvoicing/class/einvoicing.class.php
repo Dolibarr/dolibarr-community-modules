@@ -2685,6 +2685,19 @@ class EInvoicing
 		if ($object->thirdparty->country_code == 'FR') {	// We need to sync invoice if for french customer
 			$return = self::STATUS_NOT_GENERATED;
 		}
+
+		// B2C (private individuals) is out of the e-invoicing scope: it falls under e-reporting, not e-invoice
+		// transmission. Opt-in (off by default): when EINVOICING_SKIP_B2C is set, skip e-invoicing for third
+		// parties detected as private individuals. Detection is delegated to Societe::isACompany(), which already
+		// has its own options (tva_intra, typent_code, professional ids, MAIN_UNKNOWN_CUSTOMERS_ARE_COMPANIES) to
+		// tell a company from an individual, so we do not duplicate that logic here.
+		if ($return == self::STATUS_NOT_GENERATED && getDolGlobalInt('EINVOICING_SKIP_B2C')) {
+			if (!$object->thirdparty->isACompany()) {
+				// Detected as a private individual: out of the e-invoicing scope, no e-invoicing.
+				$return = self::STATUS_IGNORE;
+			}
+		}
+
 		if ($object->module_source == 'takepos') {			// Force to ignore for all invoices generated from TakePOS
 			// If invoice is generated from TakePOS, we must not make any e-invoice sync.
 			// We will do a Z sync instead from the cash closing feature.

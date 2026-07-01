@@ -216,6 +216,14 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->cssClass = 'minwidth500';
 	$item->fieldParams['forcereload'] = 0;
 
+	// Setup conf to skip e-invoicing for B2C third parties (private individuals): out of the e-invoicing
+	// scope (e-reporting applies instead). Off by default. Company vs individual detection is delegated to
+	// Societe::isACompany() (and its own options), so there is nothing extra to configure here.
+	$item = $formSetup->newItem('EINVOICING_SKIP_B2C')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('EINVOICING_SKIP_B2C_HELP');
+	$item->defaultFieldValue = 0;
+	$item->cssClass = 'minwidth500';
+
 	// Setup conf to automatically transmit the e-invoice to the PA right after it is generated (on validation)
 	$item = $formSetup->newItem('EINVOICING_AUTO_SEND_ON_GENERATION')->setAsYesNo();
 	$item->helpText = $langs->transnoentities('EINVOICING_AUTO_SEND_ON_GENERATION_HELP');
