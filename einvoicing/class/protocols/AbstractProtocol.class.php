@@ -111,7 +111,7 @@ abstract class AbstractProtocol
 	 * @param  string $rawContent Raw XML content
 	 * @return array<string,mixed>
 	 */
-	abstract public function parseInvoiceHeader(string $rawContent);
+	abstract public function parseInvoiceXML(string $rawContent);
 
 	/**
 	 * Parse all invoice line items from input content.

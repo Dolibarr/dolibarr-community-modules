@@ -1635,12 +1635,24 @@ trait CommonProtocol
 								$discount->socid = $linkedObject->socid;
 								$discount->fk_invoice_supplier_source = $linkedObject->id;
 								foreach ($amount_ht as $tva_tx => $xxx) {
-									$discount->amount_ht = abs((float) $amount_ht[$tva_tx]);
-									$discount->amount_tva = abs((float) $amount_tva[$tva_tx]);
-									$discount->amount_ttc = abs((float) $amount_ttc[$tva_tx]);
-									$discount->multicurrency_amount_ht = abs((float) $multicurrency_amount_ht[$tva_tx]);
-									$discount->multicurrency_amount_tva = abs((float) $multicurrency_amount_tva[$tva_tx]);
-									$discount->multicurrency_amount_ttc = abs((float) $multicurrency_amount_ttc[$tva_tx]);
+									if (isset($amount_ht[$tva_tx])) {
+										$discount->amount_ht = abs((float) $amount_ht[$tva_tx]);
+									}
+									if (isset($amount_tva[$tva_tx])) {
+										$discount->amount_tva = abs((float) $amount_tva[$tva_tx]);
+									}
+									if (isset($amount_ttc[$tva_tx])) {
+										$discount->amount_ttc = abs((float) $amount_ttc[$tva_tx]);
+									}
+									if (isset($multicurrency_amount_ht[$tva_tx])) {
+										$discount->multicurrency_amount_ht = abs((float) $multicurrency_amount_ht[$tva_tx]);
+									}
+									if (isset($multicurrency_amount_tva[$tva_tx])) {
+										$discount->multicurrency_amount_tva = abs((float) $multicurrency_amount_tva[$tva_tx]);
+									}
+									if (isset($multicurrency_amount_ttc[$tva_tx])) {
+										$discount->multicurrency_amount_ttc = abs((float) $multicurrency_amount_ttc[$tva_tx]);
+									}
 
 									// Clean vat code
 									$reg = array();
@@ -1799,7 +1811,7 @@ trait CommonProtocol
 	 * @param  string $rawContent Raw XML content
 	 * @return array<string,mixed>
 	 */
-	public function parseInvoiceHeader(string $rawContent)
+	public function parseInvoiceXML(string $rawContent)
 	{
 		list(, $xpath) = $this->initXPath($rawContent);
 

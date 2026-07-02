@@ -662,7 +662,7 @@ class ActionsEInvoicing extends CommonHookActions
 					return -1;
 				}
 
-				$parsedHeader = $exchangeProtocol->parseInvoiceHeader($xmlData);
+				$parsedHeader = $exchangeProtocol->parseInvoiceXML($xmlData);
 				$parsedLines  = $exchangeProtocol->parseInvoiceLines($xmlData);
 
 				// Delete existing lines

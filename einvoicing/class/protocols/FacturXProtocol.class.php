@@ -971,7 +971,7 @@ class FacturXProtocol extends AbstractProtocol
 			$ProtocolManager = new ProtocolManager($db);
 			$CII = $ProtocolManager->getProtocol('CII');
 
-			$parsedHeader = $CII->parseInvoiceHeader($embeddedXml);
+			$parsedHeader = $CII->parseInvoiceXML($embeddedXml);
 			$parsedLines  = $CII->parseInvoiceLines($embeddedXml);
 		} else {
 			$document->getDocumentInformation($documentno, $documenttypecode, $documentdate, $invoiceCurrency, $taxCurrency, $documentname, $documentlanguage, $effectiveSpecifiedPeriod);

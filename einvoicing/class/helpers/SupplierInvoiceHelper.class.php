@@ -75,7 +75,7 @@ class SupplierInvoiceHelper
 		}
 
 		// Extract XML header data
-		$parsedHeader = $protocol->parseInvoiceHeader($xmlData);
+		$parsedHeader = $protocol->parseInvoiceXML($xmlData);
 
 		// Currency
 		$currencyCode = $dolSupplierInvoice->multicurrency_code ?? $conf->currency;
