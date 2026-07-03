@@ -34,11 +34,8 @@ require_once DOL_DOCUMENT_ROOT . '/core/lib/geturl.lib.php';
 dol_include_once('einvoicing/lib/einvoicing.lib.php');
 
 /**
- * Validate mysoc configuration
- *
- * @return array{res:int, message:string}       Returns array with 'res' (1 on success, -1 on failure) and info 'message'
+ * Base class for all functions to manage EINVOICING Module.
  */
-
 class EInvoicing
 {
 	/**
@@ -1542,9 +1539,9 @@ class EInvoicing
 		$resprints .= '<td>';
 		if ($action != 'create') {
 			if ($object->element == 'facture' || $object->element == 'invoice') {
-				$url = DOL_URL_ROOT . '/compta/facture/agenda.php?id=' . urlencode($object->id) . '&search_agenda_label=EINVOICING';
+				$url = DOL_URL_ROOT . '/compta/facture/agenda.php?id=' . ((int) $object->id) . '&search_agenda_label=EINVOICING';
 			} else {
-				$url = DOL_URL_ROOT . '/fourn/facture/agenda.php?id=' . urlencode($object->id) . '&search_agenda_label=EINVOICING';
+				$url = DOL_URL_ROOT . '/fourn/facture/agenda.php?id=' . ((int) $object->id) . '&search_agenda_label=EINVOICING';
 			}
 
 			$resprints .= '<a href="' . $url . '">' . $langs->trans("History") . '<i class="marginleftonly fas fa-calendar-alt infobox-action"></i></a>';
@@ -1907,7 +1904,7 @@ class EInvoicing
 			} else {
 				if ($product_id != '' && $product_id != '-1') {
 					if (preg_match('/^idprod/', $product_id)) {
-						$new_product_id = str_replace('idprod_', '', $product_id);
+						$new_product_id = (int) str_replace('idprod_', '', $product_id);
 						$tmpproduct = new Product($this->db);
 						$tmpproduct->fetch($new_product_id);
 						$resprints .= $tmpproduct->getNomUrl(1);
@@ -2440,8 +2437,8 @@ class EInvoicing
 	 * Fetch default routing for a thirdparty
 	 *
 	 * @param 	int 		$fk_soc   		Thirdparty ID
-	 * @param 	string 		$routing_type	Routing type ('thirdparty' to get the routing ID for a thirdparty when exporting invoice, 'product' to get internal ID of product to use as default product on invoice import)
-	 * @return 	string|int   				Routing ID string if found, 0 if not found, -1 if error
+	 * @param 	'thirdparty'|'product' 		$routing_type	Routing type ('thirdparty' to get the routing ID for a thirdparty when exporting invoice, 'product' to get internal ID of product to use as default product on invoice import)
+	 * @return 	string|int<-1,0>   				Routing ID string if found, 0 if not found, -1 if error
 	 */
 	public function fetchDefaultRouting($fk_soc, $routing_type = 'thirdparty')
 	{
@@ -2476,9 +2473,9 @@ class EInvoicing
 	 * Fetch all active routings for a thirdparty
 	 *
 	 * @param  	int    	$fk_soc   		Thirdparty ID
-	 * @param 	string 	$routing_type	Routing type ('thirdparty' to get the routing ID for a thirdparty when exporting invoice, 'product' to get internal ID of product to use as default product on invoice import)
-	 * @param	int		$active			1=only active routings
-	 * @return 	array            		Array of routing rows (assoc), empty array if none, -1 if error
+	 * @param 	'thirdparty'|'product' 	$routing_type	Routing type ('thirdparty' to get the routing ID for a thirdparty when exporting invoice, 'product' to get internal ID of product to use as default product on invoice import)
+	 * @param	int<0,1>	$active			1=only active routings
+	 * @return 	-1|array<array{rowid:int,routing_id:string,source:string,info:?string,is_default:int}>            		Array of routing rows (assoc), empty array if none, -1 if error
 	 */
 	public function fetchAllRoutings($fk_soc, $routing_type = 'thirdparty', $active = 1)
 	{
@@ -2504,9 +2501,9 @@ class EInvoicing
 			if (!empty($obj->rowid) && !empty($obj->routing_id)) {
 				$routings[] = array(
 					'rowid'      => (int) $obj->rowid,
-					'routing_id' => $obj->routing_id,
-					'source'     => $obj->source,
-					'info'       => $obj->info,
+					'routing_id' => (string) $obj->routing_id,
+					'source'     => (string) $obj->source,
+					'info'       => $obj->info !== null ? (string) $obj->info : null,
 					'is_default' => (int) $obj->is_default,
 				);
 			}
@@ -2590,8 +2587,8 @@ class EInvoicing
 	/**
 	 * Fetch lifecycle status messages linked to a given flow ID.
 	 *
-	 * @param	int		$flowId		Flow ID
-	 * @return	int					Return
+	 * @param	string		$flowId		Flow ID (UUID)
+	 * @return	-1|array{rowid?:int,element_id?:int,element_type?:string,provider?:string,flow_id?:string,direction?:string,lc_status?:int,lc_status_message?:string,lc_validation_status?:string,lc_validation_message?:string,date_creation?:int}					Return
 	 */
 	public function fetchStatusMessages($flowId)
 	{
@@ -2624,15 +2621,15 @@ class EInvoicing
 			$messages = [
 				'rowid' => (int) $obj->rowid,
 				'element_id' => (int) $obj->element_id,
-				'element_type' => $obj->element_type,
-				'provider' => $obj->provider,
-				'flow_id' => $obj->flow_id,
-				'direction' => $obj->direction,
+				'element_type' => (string) $obj->element_type,
+				'provider' => (string) $obj->provider,
+				'flow_id' => (string) $obj->flow_id,
+				'direction' => (string) $obj->direction,
 				'lc_status' => (int) $obj->lc_status,
-				'lc_status_message' => $obj->lc_status_message,
-				'lc_validation_status' => $obj->lc_validation_status,
-				'lc_validation_message' => $obj->lc_validation_message,
-				'date_creation' => $db->jdate($obj->date_creation),
+				'lc_status_message' => (string) $obj->lc_status_message,
+				'lc_validation_status' => (string) $obj->lc_validation_status,
+				'lc_validation_message' => (string) $obj->lc_validation_message,
+				'date_creation' => (int) $db->jdate($obj->date_creation),
 			];
 		}
 
