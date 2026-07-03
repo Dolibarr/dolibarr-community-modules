@@ -1734,7 +1734,7 @@ trait CommonProtocol
 		// Payment Terms (derived from Invoice date <-> Payment due on)
 		//---------------------------------------------------------------
 		if ($dueDate && !empty($supplierInvoice->date)) {
-			$invoiceDateTimestamp = is_numeric($supplierInvoice->date) ? $supplierInvoice->date : dol_stringtotime((string)$supplierInvoice->date);
+			$invoiceDateTimestamp = is_numeric($supplierInvoice->date) ? $supplierInvoice->date : dol_stringtotime((string) $supplierInvoice->date);
 
 			if ($invoiceDateTimestamp) {
 				$nbDays = (int) round(($dueDate - $invoiceDateTimestamp) / 86400);
