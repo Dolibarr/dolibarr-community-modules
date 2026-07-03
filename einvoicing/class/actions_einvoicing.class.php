@@ -394,7 +394,7 @@ class ActionsEInvoicing extends CommonHookActions
 						$url_button[] = array(
 							'lang' => 'einvoicing',
 							'enabled' => 1,
-							'perm' => ($forcedisabling ? -1 : ((bool) $user->hasRight("facture", "creer") && empty($forcedisabling))),
+							'perm' => ($forcedisabling ? -1 : ((bool) $user->hasRight("fournisseur", "facture", "creer") && empty($forcedisabling))),
 							'label' => (string) $label,
 							'url' => '/fourn/facture/card.php?id=' . $object->id . '&action=sendStatusMessage&pdpstatuscode=' . $code . '&token=' . newToken()
 						);
