@@ -654,4 +654,26 @@ abstract class AbstractPDPProvider
 	 * @return array{res:int, message:string}       Returns array with 'res' (1 on success, -1 on failure) with a 'message'.
 	 */
 	abstract public function sendStatusMessage($object, $statusCode, $reasonCode = '');
+
+	/**
+	 * Clear the fixed "last invoice that could not be processed" diagnostic files at the start of a
+	 * sync run, so the diagnostic shown in the document list reflects the latest run. Each failed flow
+	 * during the run re-creates its slot (see AbstractProtocol::cleanupIncomingTempFiles()). Call this
+	 * from syncFlows() (the batch), not from syncFlow(), so a later flow does not erase an earlier
+	 * failure within the same run.
+	 *
+	 * @return void
+	 */
+	protected function clearIncomingDiagnosticFiles()
+	{
+		global $conf;
+
+		$tempDir = $conf->einvoicing->dir_temp;
+		$diagFiles = array('facturx.pdf', 'facturx_readable.pdf', 'einvoice.xml', 'einvoice_readable.pdf');
+		foreach ($diagFiles as $f) {
+			if (file_exists($tempDir . '/' . $f)) {
+				dol_delete_file($tempDir . '/' . $f);
+			}
+		}
+	}
 }
