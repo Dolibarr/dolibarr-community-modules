@@ -1687,7 +1687,7 @@ trait CommonProtocol
 	/**
 	 * Map of UNTDID 4461 payment means codes (BT-81, ram:TypeCode under
 	 * SpecifiedTradeSettlementPaymentMeans) to Dolibarr's paiement.code.
-	 * @var array<string,string>
+	 * @var array<int|'ZZZ',string>
 	 */
 	private static $UNTDID4461_TO_DOLIBARR_PAIEMENT_CODE = [
 		'10' => 'LIQ',	// Cash
@@ -1734,7 +1734,7 @@ trait CommonProtocol
 		// Payment Terms (derived from Invoice date <-> Payment due on)
 		//---------------------------------------------------------------
 		if ($dueDate && !empty($supplierInvoice->date)) {
-			$invoiceDateTimestamp = is_int($supplierInvoice->date) ? $supplierInvoice->date : dol_stringtotime($supplierInvoice->date);
+			$invoiceDateTimestamp = is_numeric($supplierInvoice->date) ? $supplierInvoice->date : dol_stringtotime((string)$supplierInvoice->date);
 
 			if ($invoiceDateTimestamp) {
 				$nbDays = (int) round(($dueDate - $invoiceDateTimestamp) / 86400);
