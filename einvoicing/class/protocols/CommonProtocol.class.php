@@ -1683,4 +1683,111 @@ trait CommonProtocol
 		dol_syslog(get_class($this) . '::_linkSupplierInvoiceToPurchaseOrder Failed to link order ' . $orderId . ' to invoice ' . $supplierInvoice->id . ': ' . $supplierInvoice->error, LOG_ERR);
 		return '';
 	}
+
+	/**
+	 * Map of UNTDID 4461 payment means codes (BT-81, ram:TypeCode under
+	 * SpecifiedTradeSettlementPaymentMeans) to Dolibarr's paiement.code.
+	 * @var array<string,string>
+	 */
+	private static $UNTDID4461_TO_DOLIBARR_PAIEMENT_CODE = [
+		'10' => 'LIQ',	// Cash
+		'20' => 'CHQ',	// Check
+		'23' => 'TRA',	// Banque check
+		'30' => 'VIR',	// Bank transfer
+		'45' => 'TIP',	// Referenced home-banking credit transfer
+		'54' => 'CB',	// Credit card
+		'59' => 'PRE',	// SEPA direct debit
+		'68' => 'VAD',	// Online payment
+		'1' => 'FAC',	// local payment method | not defined
+	];
+
+	/**
+	 * Fill Payment due on (date_echeance), Payment Terms (cond_reglement_id) and
+	 * Payment method (mode_reglement_id) on a Dolibarr supplier invoice from data parsed
+	 * out of a received CII/Factur-X document.
+	 *
+	 * @param  FactureFournisseur 	$supplierInvoice 	Supplier invoice being built (modified by reference)
+	 * @param  array 				$parsedHeader 		Parsed CII header data (see CIIProtocol::parseInvoiceHeader())
+	 * @return array{message:string} 					Informational messages about what could/could not be applied (never blocking)
+	 */
+	private function _applyPaymentInfoToSupplierInvoice(FactureFournisseur $supplierInvoice, array $parsedHeader)
+	{
+		global $db;
+
+		$messages = array();
+
+		//------------------------
+		// Payment due on (BT-9)
+		//------------------------
+		$dueDate = null;
+		if (!empty($parsedHeader['paymentDueDate'])) {
+			$dueDateTimestamp = dol_stringtotime($parsedHeader['paymentDueDate']);
+			if ($dueDateTimestamp) {
+				$dueDate = $dueDateTimestamp;
+				$supplierInvoice->date_echeance = $dueDate;
+			} else {
+				$messages[] = 'Payment due date "' . $parsedHeader['paymentDueDate'] . '" could not be parsed, left empty.';
+			}
+		}
+
+		//---------------------------------------------------------------
+		// Payment Terms (derived from Invoice date <-> Payment due on)
+		//---------------------------------------------------------------
+		if ($dueDate && !empty($supplierInvoice->date)) {
+			$invoiceDateTimestamp = is_int($supplierInvoice->date) ? $supplierInvoice->date : dol_stringtotime($supplierInvoice->date);
+
+			if ($invoiceDateTimestamp) {
+				$nbDays = (int) round(($dueDate - $invoiceDateTimestamp) / 86400);
+
+				if ($nbDays >= 0) {
+					$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "c_payment_term";
+					$sql .= " WHERE nbjour = " . ((int) $nbDays);
+					$sql .= " AND type_cdr = 0"; // fixed number of days only (no end of month)
+					$sql .= " AND active = 1";
+					$sql .= " ORDER BY rowid ASC"; // deterministic pick if duplicates
+					$sql .= " LIMIT 1";
+
+					$resql = $db->query($sql);
+					if ($resql && $db->num_rows($resql) == 1) {
+						$obj = $db->fetch_object($resql);
+						$supplierInvoice->cond_reglement_id = (int) $obj->rowid;
+						$messages[] = 'Payment Terms matched dictionary entry for ' . $nbDays . ' day(s).';
+					} else {
+						$messages[] = 'No matching Payment Terms dictionary entry found for ' . $nbDays . ' day(s) between invoice date and due date, left empty.';
+					}
+				} else {
+					$messages[] = 'Payment due date is before invoice date, cannot derive Payment Terms, left empty.';
+				}
+			}
+		}
+
+		//-------------------------------------
+		// Payment method (BT-81, UNTDID 4461)
+		// ------------------------------------
+		if (!empty($parsedHeader['paymentMeansCode'])) {
+			$untdidCode = trim((string) $parsedHeader['paymentMeansCode']);
+
+			if (isset(self::$UNTDID4461_TO_DOLIBARR_PAIEMENT_CODE[$untdidCode])) {
+				$dolibarrPaymentCode = self::$UNTDID4461_TO_DOLIBARR_PAIEMENT_CODE[$untdidCode];
+
+				$sql = "SELECT id FROM " . MAIN_DB_PREFIX . "c_paiement";
+				$sql .= " WHERE code = '" . $db->escape($dolibarrPaymentCode) . "'";
+				$sql .= " AND active = 1";
+				$sql .= " LIMIT 1";
+
+				$resql = $db->query($sql);
+				if ($resql && $db->num_rows($resql) == 1) {
+					$obj = $db->fetch_object($resql);
+					$supplierInvoice->mode_reglement_id = (int) $obj->id;
+					$messages[] = 'Payment method mapped from UNTDID 4461 code ' . $untdidCode . ' to Dolibarr code ' . $dolibarrPaymentCode . '.';
+				} else {
+					$messages[] = 'Payment method code ' . $dolibarrPaymentCode . ' (from UNTDID 4461 code ' . $untdidCode . ') not found or not active in Dolibarr dictionary, left empty.';
+				}
+			} else {
+				$messages[] = 'UNTDID 4461 payment means code ' . $untdidCode . ' has no known Dolibarr mapping, left empty.';
+			}
+		}
+
+		return array('message' => implode("<br>\n", $messages));
+	}
 }
