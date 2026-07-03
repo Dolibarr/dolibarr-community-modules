@@ -23,6 +23,9 @@
  * \brief   Common methods for all AP protocols.
  */
 
+/**
+ * @mixin AbstractProtocol
+ */
 trait CommonProtocol
 {
 	/**
@@ -220,13 +223,7 @@ trait CommonProtocol
 				}
 				break;
 			default:
-				if ($global == 1 || $global == 2) {
-					$retour = "0060";	// DUNS
-					// $retour = "EM";	// Emails
-				} else {
-					$retour = "0060";	// DUNS
-					// $retour = "EM";	// Emails
-				}
+				$retour = "0060";	// DUNS
 		}
 		return $retour;
 	}
@@ -287,9 +284,9 @@ trait CommonProtocol
 
 		$tmp = calcul_price_total($line->qty, $line->subprice, $line->remise_percent, $line->tva_tx, 0, 0, 0, 'HT', 0, 0);
 
-		$line->total_ht = $tmp[0];
-		$line->total_ttc = $tmp[2];
-		$line->total_tva = $tmp[1];
+		$line->total_ht = (float) $tmp[0];
+		$line->total_ttc = (float) $tmp[2];
+		$line->total_tva = (float) $tmp[1];
 		$line->multicurrency_tx = 2;
 		$line->multicurrency_total_ht = 2 * $line->total_ht;
 		$line->multicurrency_total_ttc = 2 * $line->total_ttc;
@@ -977,7 +974,7 @@ trait CommonProtocol
 
 		// If no match found after all steps: Create new product
 		if (getDolGlobalInt('EINVOICING_PRODUCTS_AUTO_GENERATION')) {
-			// Auto-create prouct
+			// Auto-create product
 			$product = new Product($db);
 			$product->type 		= $this->_detectProductTypeFromEinvoiceLine($lineData);
 			$product->ref 		= 'EI-' . dol_sanitizeFileName(!empty($lineData['prodsellerid'] && $lineData['prodsellerid'] !== "0000") ? $lineData['prodsellerid'] : uniqid());
@@ -1434,7 +1431,7 @@ trait CommonProtocol
 
 				if (empty($seller->tva_assuj)) {
 					// Can be $categoryVAT = E (VAT exempted) or AE (Autoliquidation)
-					if (1 == 2) {	// Autoliquidation (the VAT is declared by the customer that pay it directly to the government). TODO Not implemented.
+					if (1 == 2) {	// Autoliquidation (the VAT is declared by the customer that pay it directly to the government). TODO Not implemented. @phan-suppress-current-line PhanPluginBothLiteralsBinaryOp
 						// Note: the option ACCOUNTING_FORCE_ENABLE_VAT_REVERSE_CHARGE is for purchase invoices only and is used to dispatch vat differently in accounting..
 						$categoryVAT = 'AE';	// Autoliquidation
 						$exemptionReasonCode = 'VATEX-'.($seller->country_code == 'FR' ? 'FR' : 'EU').'-AE';	// VATEX-EU-AE or VATEX-FR-AE
@@ -1450,7 +1447,7 @@ trait CommonProtocol
 							$exemptionReason = getDolGlobalString('MAIN_INFO_SOCIETE_VAT_EXEMPTION_REASON', 'Tax exempted - TVA en franchise');
 						}
 						if (empty($exemptionReasonCode)) {
-							if ((float) DOl_VERSION < 24.0) {
+							if ((float) DOL_VERSION < 24.0) {
 								throw new Exception('MISSINGSETUP: Your organization is configured to not use VAT. In this case, you must enter into the constant MAIN_INFO_SOCIETE_VAT_EXEMPTION_CODE the reason code of exemption (VATEX-FR-CGI261-1, VATEX-FR-CGI261-4, VATEX-EU-79C.');
 							} else {
 								throw new Exception('MISSINGSETUP: Your organization is configured to not use VAT. In this case, you must enter into the reason code of exemption in the setup of your organization (VATEX-FR-CGI261-1, VATEX-FR-CGI261-4, VATEX-EU-79C.');

@@ -61,19 +61,16 @@ return [
     // PhanNonClassMethodCall : 1 occurrence
     // PhanParamTooMany : 1 occurrence
     // PhanPluginDuplicateIfCondition : 1 occurrence
-    // PhanPluginDuplicateIfStatements : 1 occurrence
     // PhanPluginEmptyStatementForeachLoop : 1 occurrence
     // PhanRedefineClass : 1 occurrence
     // PhanRedundantArrayValuesCall : 1 occurrence
     // PhanTypeInvalidLeftOperandOfAdd : 1 occurrence
-    // PhanTypeInvalidLeftOperandOfNumericOp : 1 occurrence
     // PhanTypeInvalidRightOperandOfAdd : 1 occurrence
     // PhanTypeMagicVoidWithReturn : 1 occurrence
     // PhanTypeMismatchDeclaredReturn : 1 occurrence
     // PhanTypeMismatchDimAssignment : 1 occurrence
     // PhanTypeMismatchDimFetch : 1 occurrence
     // PhanTypeMismatchDimFetchNullable : 1 occurrence
-    // PhanUndeclaredConstant : 1 occurrence
     // PhanUndeclaredTypeReturnType : 1 occurrence
 
     // Currently, file_suppressions and directory_suppressions are the only supported suppressions
@@ -91,7 +88,7 @@ return [
         'einvoicing/class/einvoicing.class.php' => ['PhanInvalidCommentForDeclarationType', 'PhanTypeMismatchArgument', 'PhanTypeMismatchArgumentInternal', 'PhanTypeMismatchArgumentNullable', 'PhanTypeMismatchReturnProbablyReal'],
         'einvoicing/class/helpers/SupplierInvoiceHelper.class.php' => ['PhanPluginRedundantReturnComment', 'PhanTypeMismatchArgumentNullableInternal', 'PhanUndeclaredMethod'],
         'einvoicing/class/protocols/CIIProtocol.class.php' => ['PhanDeprecatedClassConstant', 'PhanDeprecatedProperty', 'PhanEmptyForeach', 'PhanParamTooMany', 'PhanPluginDuplicateExpressionAssignmentOperation', 'PhanPluginUnreachableCode', 'PhanPossiblyUndeclaredVariable', 'PhanRedundantArrayValuesCall', 'PhanTypeInvalidDimOffset', 'PhanTypeMismatchArgumentNullable', 'PhanTypeMismatchArgumentReal', 'PhanTypeMismatchProperty', 'PhanUndeclaredProperty', 'PhanUndeclaredVariable'],
-        'einvoicing/class/protocols/CommonProtocol.class.php' => ['PhanPluginBothLiteralsBinaryOp', 'PhanPluginDuplicateIfStatements', 'PhanTypeMismatchArgumentNullable', 'PhanTypeMismatchProperty', 'PhanUndeclaredConstant', 'PhanUndeclaredMethod', 'PhanUndeclaredProperty'],
+        'einvoicing/class/protocols/CommonProtocol.class.php' => ['PhanTypeMismatchArgumentNullable', 'PhanUndeclaredMethod', 'PhanUndeclaredProperty'],
         'einvoicing/class/protocols/FacturXProtocol.class.php' => ['PhanDeprecatedClassConstant', 'PhanDeprecatedFunction', 'PhanDeprecatedProperty', 'PhanEmptyForeach', 'PhanNonClassMethodCall', 'PhanPluginSimplifyExpressionBool', 'PhanPluginUnreachableCode', 'PhanPossiblyNullTypeMismatchProperty', 'PhanPossiblyUndeclaredVariable', 'PhanTypeArraySuspiciousNull', 'PhanTypeArraySuspiciousNullable', 'PhanTypeExpectedObjectPropAccessButGotNull', 'PhanTypeInvalidDimOffset', 'PhanTypeMismatchArgument', 'PhanTypeMismatchArgumentInternal', 'PhanTypeMismatchArgumentNullable', 'PhanTypeMismatchArgumentProbablyReal', 'PhanTypeMismatchArgumentReal', 'PhanTypeMismatchDimAssignment', 'PhanTypeMismatchDimFetch', 'PhanTypeMismatchDimFetchNullable', 'PhanTypeMismatchForeach', 'PhanTypeMismatchPropertyProbablyReal', 'PhanTypeSuspiciousNonTraversableForeach', 'PhanUndeclaredMethod', 'PhanUndeclaredProperty', 'PhanUndeclaredVariable', 'PhanUndeclaredVariableDim', 'PhanUnreferencedUseNormal'],
         'einvoicing/class/protocols/ProtocolManager.class.php' => ['PhanPossiblyUndeclaredVariable'],
         'einvoicing/class/providers/AbstractPDPProvider.class.php' => ['PhanTypeMismatchPropertyProbablyReal'],
