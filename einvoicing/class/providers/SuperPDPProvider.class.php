@@ -951,6 +951,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		global $langs;
 
 		$outputLog = array(); // Feedback to display
+		$invoice_path = null;
 
 		// Generate sample invoice
 		$einvoicing = new EInvoicing($this->db);
@@ -965,7 +966,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				$this->errors[] = $this->exchangeProtocol->error;
 				return 0;
 			}
-			$invoice_path = $resarray['path'];
+			$invoice_path = (string) $resarray['path'];
 			$ref = $resarray['ref'];
 		} catch (Exception $e) {
 			$this->errors[] = $e->getMessage();
@@ -977,8 +978,10 @@ class SuperPDPProvider extends AbstractPDPProvider
 			return 0;
 		}
 
+
 		// invoice_path is something like "/.../documents/einvoicing/temp/..." or "/.../documents/facture/temp/..."
 
+		$invoice_path = (string) $invoice_path;  // Phan workaround
 		if ($invoice_path) {
 			$outputLog[] = "Sample invoice generated successfully.";
 		}
@@ -1963,6 +1966,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				// - If trackingId is null, we try to retrieve the linked invoice using the flowId
 				//   stored in the einvoicing_extlinks table when the invoice was sent.
 
+				$obj = null;
 				$document->fk_element_type = 'facture';
 				if (empty($document->tracking_idref)) {
 					// Try to get tracking_idref from einvoicing_extlinks table

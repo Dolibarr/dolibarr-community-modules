@@ -1384,7 +1384,7 @@ class EInvoicing
 		// JavaScript for AJAX call to update status if current status is pending
 		if ((int) $currentStatusInfo['code'] === self::STATUS_AWAITING_VALIDATION
 			// || (int) $currentStatusInfo['code'] === self::STATUS_AWAITING_ACK			// If we want to call the checkinvoicestatus to get next steps...
-			) {
+		) {
 			$urlajax = dol_buildpath('einvoicing/ajax/checkinvoicestatus.php', 1);
 
 			$resprints .= '
@@ -1775,7 +1775,7 @@ class EInvoicing
 		if ($mode == 'create') {
 			$resprints .= '<tr class="treinvoicing_collapseseparator trrouting_id '.($expand_display ? '' : 'hidden').'">';
 			$resprints .= '<td class="">' . $form->textwithpicto($langs->trans("RoutingIdFieldShort"), $langs->trans("SpecificRoutingFieldHelp")) . '</td>';
-			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) -1).'"').'>';
+			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
 			$resprints .= '<input type="text" name="routing_id" ';
 			$resprints .= 'value="' . dolPrintHTML($routing_id ?? '') . '" ';
 			$resprints .= 'class="flat minwidth300" spellcheck="false" />';
@@ -1785,7 +1785,7 @@ class EInvoicing
 			// Add a line for the Default product for thirdparty (to use when importing vendor invoice and no product found)
 			$resprints .= '<tr class="treinvoicing_collapseseparator trrouting_product_id '.($expand_display ? '' : 'hidden').'">';
 			$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
-			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) -1).'"').'>';
+			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
 			if (version_compare(DOL_VERSION, '22.0.0', '<')) {
 				// Before v22, select_produits_fournisseurs() uses print instead of return
 				ob_start();
@@ -1810,7 +1810,7 @@ class EInvoicing
 			$obj = $this->db->fetch_object($resql);
 			$resprints .= '<tr class="treinvoicing_collapseseparator '.($expand_display ? '' : 'hidden').'">';
 			$resprints .= '<td>' . $langs->trans("einvoicingSourceTitle") . '</td>';
-			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) -1).'"').'>';
+			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
 			$resprints .= dolPrintHTML($obj->provider);
 			$resprints .= '</td>';
 			$resprints .= '</tr>';
@@ -1826,7 +1826,7 @@ class EInvoicing
 		$resprints .= '<td class="tdtop">' . $form->textwithpicto($langs->trans("RoutingIdFieldShort"), $langs->trans("SpecificRoutingFieldHelp"));
 		$resprints .= ' '.img_picto('', 'add', 'onclick="javascript:jQuery(\'.addroutingsection\').toggle();"', 0, 0, 0, $langs->transnoentitiesnoconv("Add"), 'valignmiddle cursorpointer');
 		$resprints .= '</td>';
-		$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) -1).'"').'>';
+		$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
 
 		// Existing routing list
 		if (!empty($allRoutings)) {
@@ -1894,7 +1894,7 @@ class EInvoicing
 		if ($object->fournisseur > 0) {
 			$resprints .= '<tr class="treinvoicing_collapseseparator '.($expand_display ? '' : 'hidden').'">';
 			$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
-			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) -1).'"').'>';
+			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
 			if ($mode == 'edit') {
 				if (version_compare(DOL_VERSION, '22.0.0', '<')) {
 					// Before v22, select_produits_fournisseurs() uses print instead of return
@@ -2127,7 +2127,7 @@ class EInvoicing
 	 * @param int       $syncStatus     	If the object has a status into the einvoice external system
 	 * @param string    $syncRef        	If the object has a given reference into the einvoice external system
 	 * @param string    $syncComment    	If we want to store a message for the last sync action try
-	 * @param string    $overrideRoutingId	Forced routing ID
+	 * @param ?string   $overrideRoutingId	Forced routing ID
 	 * @param string    $precheckStatus  	Precheck status from the AP system
 	 * @param string    $precheckResult  	Precheck result from the AP system
 	 * @return int 							-1 on error, 0 if nothing done, rowid on success
