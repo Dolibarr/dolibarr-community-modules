@@ -648,12 +648,13 @@ $newcardbutton = '';
 //$newcardbutton .= dolGetButtonTitle($langs->trans('New'), '', 'fa fa-plus-circle', dol_buildpath('/einvoicing/document_card.php', 1).'?action=create&backtopage='.urlencode($_SERVER['PHP_SELF']), '', $permissiontoadd);
 
 
+$providershort = '';
 if ($provider) {
-	$title = $langs->trans("EInvoiceSynchronizationHelp", $provider->providerName);
+	$providershort = preg_replace('/ViaPartner$/', '', $provider->providerName);
+	$title = $langs->trans("EInvoiceSynchronizationHelp", $providershort);
 }
 
 print_barre_liste($title, $page, $_SERVER["PHP_SELF"], $param, $sortfield, $sortorder, $massactionbutton, $num, $nbtotalofrecords, $object->picto, 0, $newcardbutton, '', $limit, 0, 0, 1);
-
 
 
 // Add code for pre mass action (confirmation or email presend form)
@@ -707,7 +708,7 @@ $last_sync_info = '<span class="opacitylowx">'.img_picto('', 'long-arrow-alt-rig
 
 $Lastsyncinfosql = "SELECT flow_id, updatedat";
 $Lastsyncinfosql .= " FROM ".MAIN_DB_PREFIX."einvoicing_document";
-$Lastsyncinfosql .= " WHERE provider = '".$db->escape($provider->providerName)."'";
+$Lastsyncinfosql .= " WHERE provider = '".$db->escape($providershort)."'";
 $Lastsyncinfosql .= " AND entity = ".((int) $conf->entity);		// Do not use getentity here, must always be on 1 entity.
 $Lastsyncinfosql .= $db->order("updatedat", "DESC");
 $Lastsyncinfosql .= $db->plimit(1);
