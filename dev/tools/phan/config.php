@@ -172,7 +172,7 @@ return [
 		//'PhanPluginRedundantClosureComment',
 		'PhanPluginPossiblyStaticPublicMethod',
 		'PhanPluginPossiblyStaticPrivateMethod',
-		//'PhanPluginPossiblyStaticProtectedMethod',
+		'PhanPluginPossiblyStaticProtectedMethod',
 		'PhanPluginPossiblyStaticClosure',
 
 		'PhanPluginNonBoolInLogicalArith',
