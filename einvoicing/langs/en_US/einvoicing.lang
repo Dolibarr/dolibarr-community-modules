@@ -23,7 +23,7 @@ About = About
 EInvoicingAbout = About EInvoicing
 EInvoicingAboutPage = EInvoicing about page
 
-
+AccessPoint=Access Point
 Synchronization = Synchronization
 PlatformPartner=Platform partner
 EINVOICING_LIVE=Live mode enabled (otherwise test/sandbox mode)

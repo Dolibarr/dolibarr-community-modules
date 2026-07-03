@@ -1253,7 +1253,8 @@ while ($i < $imaxinloop) {
 					$isOut = ($object->flow_direction === 'Out');
 					$label = $isOut ? $langs->trans('Output') : $langs->trans('Input');
 					$picto = $isOut ? '1uparrow' : '1downarrow';
-					$class = $isOut ? 'stockmovementexit' : 'stockmovemententry';
+					//$class = $isOut ? 'stockmovementexit' : 'stockmovemententry';
+					$class = $isOut ? 'badge badge-primary' : 'badge badge-secondary';
 
 					print '<span class="' . $class . ' nowrap" title="' . $label . '">';
 					print img_picto($label, $picto, 'class="paddingrightonly"');
@@ -1289,9 +1290,17 @@ while ($i < $imaxinloop) {
 					}
 
 					print $out;
+				} elseif ($key == 'fk_element_type') {
+					print '<span class="nowraponall">';
+					if ((string) $object->$key == 'Facture') {
+						print img_picto('', 'bill', 'class="pictofixedwidth"').$langs->trans("Invoice");
+					} elseif ((string) $object->$key == 'FactureFournisseur') {
+						print img_picto('', 'supplier_invoice', 'class="pictofixedwidth"').$langs->trans("SupplierInvoice");
+					}
+					print  '</span>';
 				} else {
 					if ($val['type'] == 'html' || $val['type'] == 'text') {
-						print '<div class="small minwidth150 lineheightsmall threelinesmax-normallineheight classfortooltip" title="'.dolPrintHTMLForAttribute((string) $object->$key).'">';
+						print '<div class="small minwidth150 lineheightsmall twolinesmax-normallineheight classfortooltip" title="'.dolPrintHTMLForAttribute((string) $object->$key).'">';
 					}
 					print $object->showOutputField($val, $key, (string) $object->$key, '');
 					if ($val['type'] == 'html' || $val['type'] == 'text') {
