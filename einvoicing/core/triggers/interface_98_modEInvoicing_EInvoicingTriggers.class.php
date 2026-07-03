@@ -275,6 +275,15 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			}
 		}
 
+		if ($action == 'BILL_SUPPLIER_DELETE') {
+			/** @var FactureFournisseur $object */
+			'@phan-var-force FactureFournisseur $object';
+			if (SupplierInvoiceHelper::isEInvoice($object->id, true)) {
+				$this->errors[] = $langs->trans('EinvoicingCantDeleteASupplierInvoice');
+				return -1;
+			}
+		}
+
 		// EINVOICING DOCUMENTS
 		if ($action == 'DOCUMENT_DELETE') {
 			/**
