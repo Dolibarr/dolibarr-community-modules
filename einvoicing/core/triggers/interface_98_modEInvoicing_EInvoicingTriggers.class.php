@@ -231,9 +231,12 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			// Check if the invoice is transmitted to EInvoicing and confirm we have received the payment if yes.
 
 			if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {		// If sync Dolibarr to AP is on
-				// Test on $close_code that are closing code to say we really accept the payment
-				if ($object->close_code == $object::CLOSECODE_BANKCHARGE ||
-					$object->close_code == $object::CLOSECODE_WITHHOLDINGTAX) {
+				// fr:212 (Encaissee) means the invoice was cashed in: report it whenever an actual payment was
+				// received. A normal full payment leaves close_code empty, so the previous test on close_code
+				// (BANKCHARGE/WITHHOLDINGTAX only) missed the common case. Keying on the received amount also
+				// avoids reporting "cashed in" for a write-off with no payment (abandon / bad debt), where
+				// BILL_PAYED still fires but nothing was received.
+				if ($object->getSommePaiement() > 0) {
 					// Test if invoice need EInvoicing
 					$einvoicing = new EInvoicing($this->db);
 
