@@ -1323,6 +1323,39 @@ class EInvoicing
 			$resprints .= '</tr>';
 		}
 
+		// Recipient reachability in the Approved Platforms directory (annuaire PA), checked before sending.
+		// This is a read-only lookup surfaced on the card so the user sees whether the recipient can receive
+		// an e-invoice, instead of discovering a routing rejection (fr:213) only after transmission.
+		if (($object->element == 'facture' || $object->element == 'invoice') && $action != 'create' && getDolGlobalInt('EINVOICING_PRECHECK_DIRECTORY', 1)) {
+			if (!is_object($object->thirdparty ?? null) && !empty($object->socid)) {
+				$object->fetch_thirdparty();
+			}
+			$directorySiren = is_object($object->thirdparty ?? null) ? preg_replace('/[^0-9]/', '', (string) $object->thirdparty->idprof1) : '';
+			if ($directorySiren !== '') {
+				$urlajaxdir = dol_buildpath('einvoicing/ajax/checkdirectory.php', 1);
+				// Auto-run once in the pre-send window (validated, not yet really transmitted to the AP).
+				$autorun = ((int) $object->status === Facture::STATUS_VALIDATED && empty($currentStatusInfo['everTransmitted'])) ? 1 : 0;
+				$resprints .= '<tr class="treinvoicing_collapseseparator">';
+				$resprints .= '<td>' . $form->textwithpicto($langs->trans("EInvoicingDirectoryCheck"), $langs->trans("EInvoicingDirectoryCheckHelp")) . '</td>';
+				$resprints .= '<td><span id="einvoice-directory" class="opacitymedium">' . ($autorun ? dol_escape_htmltag($langs->trans("EInvoicingDirectoryChecking")) : '-') . '</span>';
+				$resprints .= ' <a href="#" id="einvoice-directory-check" class="paddingleft">' . img_picto('', 'refresh', 'class="paddingright"') . $langs->trans("EInvoicingDirectoryCheckButton") . '</a>';
+				$resprints .= '</td></tr>';
+				$resprints .= '<script type="text/javascript">
+				(function(){
+					function einvoiceCheckDirectory(){
+						$("#einvoice-directory").html("' . dol_escape_js($langs->trans("EInvoicingDirectoryChecking")) . '").addClass("opacitymedium");
+						$.get("' . $urlajaxdir . '", { token: "' . currentToken() . '", ref: "' . dol_escape_js($object->ref) . '" }, function(data){
+							if (typeof data === "string") { try { data = JSON.parse(data); } catch(e){ console.error("checkdirectory: not JSON", data); return; } }
+							$("#einvoice-directory").html(data.html || "").removeClass("opacitymedium");
+						}, "text").fail(function(x){ console.error("checkdirectory ajax", x.status, x.statusText); });
+					}
+					$("#einvoice-directory-check").click(function(e){ e.preventDefault(); einvoiceCheckDirectory(); });
+					' . ($autorun ? 'setTimeout(einvoiceCheckDirectory, 1200);' : '') . '
+				})();
+				</script>';
+			}
+		}
+
 		// Invoice-level routing ID override (BT-49)
 		if ($object->element == 'facture' || $object->element == 'invoice') {
 			$currentOverrideRouting = $currentStatusInfo['override_routing_id'] ?? '';
