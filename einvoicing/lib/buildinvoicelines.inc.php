@@ -601,9 +601,9 @@ $invoiceData = [
 
 	// Notes
 	'documentNotePublic'   => $object->note_public ?: "",
-	'documentNotePMT'      => getDolGlobalString('EINVOICING_PMT') ?: $outputlangs->trans("NoInvoiceCollectionFees"),
-	'documentNotePMD'      => getDolGlobalString('EINVOICING_PMD') ?: $outputlangs->trans('NoLatePaymentFees'),
-	'documentNoteAAB'      => getDolGlobalString('EINVOICING_AAB') ?: $outputlangs->trans('NoEarlyPaymentDiscount'),
+	'documentNotePMT'      => getDolGlobalString('EINVOICING_PMT') ?: $outputlangs->transnoentities("NoInvoiceCollectionFees"),
+	'documentNotePMD'      => getDolGlobalString('EINVOICING_PMD') ?: $outputlangs->transnoentities('NoLatePaymentFees'),
+	'documentNoteAAB'      => getDolGlobalString('EINVOICING_AAB') ?: $outputlangs->transnoentities('NoEarlyPaymentDiscount'),
 	'documentNotes'        => [],
 
 	// Seller part
