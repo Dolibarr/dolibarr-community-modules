@@ -418,3 +418,8 @@ EInvoicingDirectoryInactive=Not reachable: recipient (SIREN %s) is in the direct
 EInvoicingDirectoryUnsupported=Directory lookup is not available for the current platform
 EInvoicingDirectoryError=Directory check failed: %s
 EInvoicingDirectoryNoSiren=No SIREN set on the recipient third party: cannot check the directory
+# Require routable recipient before generating/sending (opt-in enforcement)
+EINVOICING_REQUIRE_ROUTABLE_RECIPIENT=Require the recipient to be reachable before generating or sending
+EINVOICING_REQUIRE_ROUTABLE_RECIPIENT_HELP=Off by default (opt-in). When on, the e-invoice cannot be generated or transmitted if the recipient is absent from the Approved Platforms directory, or present without an active routing line, since transmission would be rejected with a routing error (fr:213). The check never blocks when the directory lookup is unavailable, errors, or the recipient has no SIREN. Note: the sandbox directory is incomplete, so enabling this in test mode can block recipients that are actually reachable in production.
+EInvoiceNotGeneratedRecipientNotRoutable=E-invoice not generated: the recipient cannot receive electronic invoices
+EInvoiceNotSentRecipientNotRoutable=Invoice not sent: the recipient cannot receive electronic invoices

@@ -2149,6 +2149,59 @@ class EInvoicing
 	}
 
 	/**
+	 * Gate generation/transmission on the recipient being reachable in the Approved Platforms directory.
+	 *
+	 * Only enforced when EINVOICING_REQUIRE_ROUTABLE_RECIPIENT is on (off by default, opt-in). A recipient
+	 * that is absent from the directory, or present without an active routing line, would be rejected by the
+	 * platform with a routing error (fr:213): blocking generation/sending avoids reaching that error state.
+	 *
+	 * Fails open (ok=1) whenever the check cannot be trusted, so it never blocks unexpectedly: option off,
+	 * provider without a directory lookup (status unsupported), directory call error, or a recipient with no
+	 * SIREN (handled by the standard required-information checks).
+	 *
+	 * @param 	Facture 	$object 	Invoice
+	 * @return 	array{ok:int,status:string,message:string}	ok=0 only when the recipient is confirmed not routable.
+	 */
+	public function checkRecipientRoutableForSend($object)
+	{
+		global $langs;
+
+		$res = array('ok' => 1, 'status' => '', 'message' => '');
+
+		if (!getDolGlobalInt('EINVOICING_REQUIRE_ROUTABLE_RECIPIENT')) {
+			return $res;	// opt-in, off by default
+		}
+
+		if (!is_object($object->thirdparty ?? null)) {
+			$object->fetch_thirdparty();
+		}
+		$siren = is_object($object->thirdparty ?? null) ? preg_replace('/[^0-9]/', '', (string) $object->thirdparty->idprof1) : '';
+		if ($siren === '') {
+			return $res;	// no SIREN: the standard required-information checks handle this
+		}
+
+		require_once __DIR__ . '/providers/PDPProviderManager.class.php';
+		$PDPManager = new PDPProviderManager($this->db);
+		$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+		if (!is_object($provider)) {
+			return $res;
+		}
+
+		$dir = $provider->checkRecipientDirectory($siren);
+		$res['status'] = isset($dir['status']) ? $dir['status'] : 'error';
+		if ($res['status'] === 'absent') {
+			$res['ok'] = 0;
+			$res['message'] = $langs->trans('EInvoicingDirectoryAbsent', $siren);
+		} elseif ($res['status'] === 'inactive') {
+			$res['ok'] = 0;
+			$res['message'] = $langs->trans('EInvoicingDirectoryInactive', $siren);
+		}
+		// routable / error / unsupported => ok stays 1 (fail-open)
+
+		return $res;
+	}
+
+	/**
 	 * Insert or update external link record
 	 *
 	 * @param int       $elementId      	Linked Element ID
