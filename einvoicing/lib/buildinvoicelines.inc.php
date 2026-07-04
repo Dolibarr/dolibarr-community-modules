@@ -570,7 +570,10 @@ if ($resql) {
 // Already paid deposits
 $getAlreadyPaid = $object->getSommePaiement();
 
-$prepaidAmount  = $object->sumpayed + $getAlreadyPaid + $usedcreditnoteamount;
+// getSommePaiement() (called just above) already assigns its return value to $object->sumpayed.
+// Adding both $object->sumpayed and $getAlreadyPaid counted the paid amount twice, doubling
+// TotalPrepaidAmount (BT-113) and producing a wrong / negative DuePayableAmount (BR-CO-16).
+$prepaidAmount  = $getAlreadyPaid + $usedcreditnoteamount;
 
 // Delivery date
 $deliveryDate = !empty($deliveryDateList)
