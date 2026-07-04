@@ -596,8 +596,8 @@ class EInvoicing
 	/**
 	 * Get the path of the e-invoice file for a given invoice reference.
 	 *
-	 * @param 	string 	$invoiceRef 	The reference of the invoice.
-	 * @return 	string 					The full file path of the e-invoice file.
+	 * @param 	?string 	$invoiceRef 	The reference of the invoice.
+	 * @return 	string						The full file path of the e-invoice file.
 	 */
 	public function getEInvoiceFilePath($invoiceRef)
 	{
@@ -1958,10 +1958,10 @@ class EInvoicing
 	 * fetchLastknownInvoiceStatus
 	 *
 	 * @param int			$invoiceId		Invoice ID
-	 * @param string		$invoiceRef		Invoice ref
+	 * @param ?string		$invoiceRef		Invoice ref
 	 * @return array<string,int|string>
 	 */
-	public function fetchLastknownInvoiceStatus($invoiceId = 0, $invoiceRef = '')
+	public function fetchLastknownInvoiceStatus($invoiceId = 0, $invoiceRef = null)
 	{
 		global $conf;
 
@@ -1992,7 +1992,7 @@ class EInvoicing
 		if ($invoiceId > 0) {
 			$sql .= " AND element_id = " . ((int) $invoiceId);
 		} else {
-			$sql .= " AND syncref = '" . $this->db->escape($invoiceRef) . "'";	// Using id is more reliable.
+			$sql .= " AND syncref = '" . $this->db->escape((string) $invoiceRef) . "'";	// Using id is more reliable.
 		}
 
 		$foundforcurrentprovider = 0;
@@ -2103,10 +2103,10 @@ class EInvoicing
 	 * out (e.g. to test PA retry behaviour) by setting EINVOICING_ALLOW_RESEND_TRANSMITTED.
 	 *
 	 * @param 	int 	$invoiceId 	Invoice id
-	 * @param 	string 	$invoiceRef Invoice ref (fallback if id is 0)
+	 * @param 	?string $invoiceRef Invoice ref (fallback if id is 0)
 	 * @return 	bool 				True if the invoice must be treated as locked (already transmitted).
 	 */
-	public function isTransmittedLockActive($invoiceId = 0, $invoiceRef = '')
+	public function isTransmittedLockActive($invoiceId = 0, $invoiceRef = null)
 	{
 		if (getDolGlobalString('EINVOICING_ALLOW_RESEND_TRANSMITTED')) {
 			return false;

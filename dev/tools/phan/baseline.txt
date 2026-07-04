@@ -80,7 +80,7 @@ return [
         'einvoicing/build/buildzip.php' => ['PhanRedefineFunction'],
         'einvoicing/call_card.php' => ['PhanUndeclaredProperty'],
         'einvoicing/call_list.php' => ['PhanPluginDuplicateIfCondition'],
-        'einvoicing/class/actions_einvoicing.class.php' => ['PhanPluginEmptyStatementIf', 'PhanPossiblyUndeclaredVariable', 'PhanRedefinedExtendedClass', 'PhanTypeArraySuspiciousNullable', 'PhanTypeMismatchArgument', 'PhanTypeMismatchArgumentNullable', 'PhanTypeMismatchArgumentSuperType', 'PhanTypeSuspiciousEcho', 'PhanUndeclaredMethod', 'PhanUndeclaredProperty'],
+        'einvoicing/class/actions_einvoicing.class.php' => ['PhanUndeclaredMethod', 'PhanUndeclaredProperty'],
         'einvoicing/class/call.class.php' => ['PhanTypeMismatchReturnProbablyReal', 'PhanTypeObjectUnsetDeclaredProperty', 'PhanUndeclaredClassMethod', 'PhanUndeclaredClassProperty', 'PhanUndeclaredProperty'],
         'einvoicing/class/document.class.php' => ['PhanPluginRedundantReturnComment', 'PhanTypeMismatchArgument', 'PhanTypeMismatchReturnNullable', 'PhanTypeObjectUnsetDeclaredProperty', 'PhanUndeclaredClassMethod', 'PhanUndeclaredClassProperty', 'PhanUndeclaredProperty'],
         'einvoicing/class/einvoicing.class.php' => ['PhanTypeMismatchArgumentNullable'],
