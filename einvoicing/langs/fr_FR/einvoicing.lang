@@ -26,7 +26,7 @@ EInvoicingAboutPage = Page À propos de EInvoicing
 
 Synchronization = Synchronisation
 PlatformPartner=Plateforme partenaire
-EINVOICING_LIVE=Mode réel activé (sinon mode test/bac à sable)
+EINVOICING_LIVE=Mode réel activé (sinon bac à sable)
 EINVOICING_PDP=Sélectionnez votre plateforme Point d'accès à la facturation électronique (PA)
 EINVOICING_PDP_HELP=Seules les plateformes de Points d'accès de facturation électronique compatibles sont visibles ici.
 EINVOICING_PDP_HELP2=Selon la plateforme choisie, les prix peuvent être gratuits, forfaitaires ou facturés à la facture. Il est conseillé de comparer les offres avant de faire votre choix.

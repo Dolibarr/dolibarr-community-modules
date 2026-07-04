@@ -81,6 +81,16 @@ class PDPProviderManager
 				'prod_account_admin_url' => 'https://www.superpdp.tech/app/users/create',
 				'test_account_admin_url' => 'https://www.superpdp.tech/app/users/create',
 			),
+			'PDPLIBRE' => array(
+				'class'                   => 'PDPlibrePDPProvider',
+				'position'                => 15,
+				'provider_countries'      => array('FR'),
+				'provider_name'           => picto_from_langcode('FR').' PDPlibre <span class="opacitymedium">(proxy)</span>',
+				'description'             => 'PDPlibre PA Integration (AFNOR XP_Z12-013)',
+				'is_enabled'              => 1,
+				'prod_account_admin_url'  => 'https://pdplibre.org/',
+				'test_account_admin_url'  => 'https://pdplibre.org/',
+			),
 			'TESTPDP' => array(
 				'class' => 'TestPDPProvider',
 				'position' => 100,

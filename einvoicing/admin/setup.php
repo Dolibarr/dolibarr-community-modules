@@ -190,6 +190,9 @@ $item->cssClass = 'minwidth500';
 
 $item = $formSetup->newItem('EINVOICING_LIVE')->setAsYesNo();
 $item->fieldParams['forcereload'] = 1;
+if (getDolGlobalString('EINVOICING_PDP') === 'PDPLIBRE') {
+	$item->helpText = 'Sandbox (test) : <b>https://pp.esalink.pdplibre.org/</b><br>Production : <b>https://esalink.pdplibre.org/</b>';
+}
 
 // End of selection of platform partner
 
