@@ -543,7 +543,7 @@ abstract class AbstractPDPProvider
 	 * the business transaction, so it is committed whether the action succeeds or fails,
 	 * without ever forcing a commit on the rest. Same approach as the webhook logging.
 	 *
-	 * @param   string                      $callType   Functional type of the call (empty = do not log)
+	 * @param   ?string                     $callType   Functional type of the call (empty/null = do not log)
 	 * @param   string                      $resource   API resource/endpoint (without leading slash)
 	 * @param   string                      $method     HTTP method (POSTALREADYFORMATED is normalized to POST)
 	 * @param   string|array<mixed>         $params     Request body
@@ -551,7 +551,7 @@ abstract class AbstractPDPProvider
 	 * @param   int                         $statusCode HTTP status code of the response
 	 * @return  ?array{id:int,call_id:string}           Created log identifiers, or null if not logged
 	 */
-	protected function logCall($callType, $resource, $method, $params, $response, $statusCode)
+	protected function logCall(?string $callType, $resource, $method, $params, $response, $statusCode)
 	{
 		global $conf, $user, $dolibarr_main_db_pass, $dbhistory;
 
