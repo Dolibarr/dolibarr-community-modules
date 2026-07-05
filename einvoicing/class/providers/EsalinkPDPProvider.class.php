@@ -766,7 +766,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	 *
 	 * @param   int   $syncFromDate     Timestamp from which to start synchronization. If 0, begins from epoch (1970-01-01).
 	 * @param   int   $limit            Maximum number of flows to synchronize. 0 means no limit.
-	 * @return 	bool|array{res:int, messages:array<string>, details?:array<string>, actions?:array<string>} 	True on success, false on failure along with messages, details for debugging, and suggested optional actions.
+	 * @return 	bool|array{res:int, messages:string[], totalFlows?:?int, alreadyExist?:int, syncedFlows?:int, batchlimit?:int, actions?:array<string,array{actionurl:string,actioncode:string,action:string,businessmessage:string}>, details?:string[]} 	True on success, false on failure along with messages, details for debugging, and suggested optional actions.
 	 */
 	public function syncFlows($syncFromDate = 0, $limit = 0)
 	{
