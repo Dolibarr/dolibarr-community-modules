@@ -171,7 +171,8 @@ function idprof($thirdparty)
 function thirdpartyidprof($object)
 {
 	$object->fetch_thirdparty();
-	return idprof($object->thirdparty);
+	$thirdparty = $object->thirdparty;
+	return $thirdparty ? idprof($object->thirdparty) : '';
 }
 
 /**
@@ -323,7 +324,7 @@ if (!function_exists("getMultidirTemp")) {
 	 * @param	int				$forobject	Return the more complete path for the given object instead of for the module only.
 	 * @return 	string|null					The path of the relative temp directory of the module
 	 */
-	function getMultidirTemp($object, $module = '', $forobject = 0)
+	function getMultidirTemp($object, $module = '', $forobject = 0)  // @phan-suppress-current-line PhanRedefineFunction
 	{
 		return getMultidirOutputCompat($object, $module, $forobject, 'temp');
 	}
@@ -339,7 +340,7 @@ if (!function_exists("getMultidirVersion")) {
 	 * @param	int				$forobject	Return the more complete path for the given object instead of for the module only.
 	 * @return string|null					The path of the relative version directory of the module
 	 */
-	function getMultidirVersion($object, $module = '', $forobject = 0)
+	function getMultidirVersion($object, $module = '', $forobject = 0)  // @phan-suppress-current-line PhanRedefineFunction
 	{
 		return getMultidirOutputCompat($object, $module, $forobject, 'version');
 	}
@@ -359,7 +360,7 @@ if (!function_exists("GETPOSTFLOAT")) {
 	 *  @return float                           Value converted into float
 	 *  @since	Dolibarr V20
 	 */
-	function GETPOSTFLOAT($paramname, $rounding = '', $option = 2)
+	function GETPOSTFLOAT($paramname, $rounding = '', $option = 2)  // @phan-suppress-current-line PhanRedefineFunction
 	{
 		// price2num() can be used to round to an expected accuracy and/or to sanitize any valid user input (such as "1 234.5", "1 234,5", "1'234,5", "1·234,5", "1,234.5", etc.)
 		return (float) price2num(GETPOST($paramname), $rounding, $option);
@@ -374,7 +375,7 @@ if (!function_exists('dolPrintHTML')) {
 	 * @param	string	$s		String to print
 	 * @return	string			String ready for HTML output
 	 */
-	function dolPrintHTML($s)
+	function dolPrintHTML($s)  // @phan-suppress-current-line PhanRedefineFunction
 	{
 		return dol_escape_htmltag(dol_htmlwithnojs(dol_string_onlythesehtmltags(dol_htmlentitiesbr($s), 1, 1, 1)), 1, 1, 'common', 0, 1);
 	}
@@ -391,7 +392,7 @@ if (!function_exists('dolPrintHTMLForAttribute')) {
 	 * @return	string								String ready for HTML output
 	 * @see dolPrintHTML(), dolPrintHTMLFortextArea()
 	 */
-	function dolPrintHTMLForAttribute($s, $escapeonlyhtmltags = 0, $allowothertags = array())
+	function dolPrintHTMLForAttribute($s, $escapeonlyhtmltags = 0, $allowothertags = array())  // @phan-suppress-current-line PhanRedefineFunction
 	{
 		$allowedtags = array('br', 'b', 'font', 'hr', 'span');
 		if (!empty($allowothertags) && is_array($allowothertags)) {
@@ -437,6 +438,8 @@ if (!method_exists('Societe', 'findNearest')) {
 		if ($rowid) {
 			return $rowid;
 		}
+
+		$errors = array();
 
 		dol_syslog("findNearest", LOG_DEBUG);
 		$tmpthirdparty = new Societe($db);
