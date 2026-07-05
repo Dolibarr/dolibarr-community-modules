@@ -35,7 +35,7 @@ class PDPProviderManager
 	public $db;
 
 	/**
-	 * @var mixed provider list
+	 * @var array<string,array{class:string,position:int,provider_countries:string[],provider_name:string,description:string,is_enabled:int<0,1>,prod_account_admin_url:?string,test_account_admin_url:?string}>	Provider list
 	 */
 	private $providersList;
 
@@ -54,11 +54,15 @@ class PDPProviderManager
 		$urlwithouturlroot = preg_replace('/'.preg_quote(DOL_URL_ROOT, '/').'$/i', '', trim($dolibarr_main_url_root));
 		$urlwithroot = $urlwithouturlroot.DOL_URL_ROOT; // This is to use external domain name found into config file
 		//$urlwithroot=DOL_MAIN_URL_ROOT;					// This is to use same domain name than current
+		$urltorenew = null;
+		$urltodelete = null;
+		$state = '';
+		$shortscope = '';
 
 
 		// TODO May be we can keep only the provider name, country scope, and description in the array of available providers.
 		// Rest of data could be into the XXXPDPPRovider.class.php file.
-		$this->providersList = array (
+		$this->providersList = array(
 			'ESALINK' => array(
 				'class' => 'EsalinkPDPProvider',
 				'position' => 10,
@@ -71,7 +75,7 @@ class PDPProviderManager
 			),
 			'SUPERPDP' => array(
 				'class' => 'SuperPDPProvider',
-				'position' => getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER') ? 2: 20,
+				'position' => getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER') ? 2 : 20,
 				'provider_countries' => array('all'),
 				'provider_name' => picto_from_langcode('FR').' SuperPDP'.(getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER') ? ' <span class="opacitymedium">('.$langs->trans("UsingYourOwnBillingAccount").")</span>" : ""),
 				'description' => 'SuperPDP Integration',
@@ -143,11 +147,11 @@ class PDPProviderManager
 		// Generic boolean flag: it points nowhere. The operator sets it (and the proxy URL) through its
 		// own deployment SQL, not in the module source.
 		if (getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER_ONLY') && isset($this->providersList['SUPERPDPViaPartner'])) {
-			foreach (array_keys($this->providersList) as $providerkey) {
-				if ($providerkey !== 'SUPERPDPViaPartner') {
-					$this->providersList[$providerkey]['is_enabled'] = 0;
+			array_walk($this->providersList, function (&$provider, $key) {
+				if ($key !== 'SUPERPDPViaPartner') {
+					$provider['is_enabled'] = 0;
 				}
-			}
+			});
 		}
 
 		// Sort list by position
@@ -157,7 +161,7 @@ class PDPProviderManager
 	/**
 	 * Get all registered providers configuration.
 	 *
-	 * @return array
+	 * @return array<string,array{class:string,position:int,provider_countries:string[],provider_name:string,description:string,is_enabled:int<0,1>,prod_account_admin_url:?string,test_account_admin_url:?string}>	Provider list
 	 */
 	public function getAllProviders()
 	{
@@ -179,7 +183,11 @@ class PDPProviderManager
 		}
 
 
-		$classnametouse = $this->providersList[$name]['class'];
+		$classnametouse = $this->providersList[$name]['class'] ?? null;
+
+		if (empty($classnametouse)) {
+			return null;
+		}
 
 		$resultinclude = dol_include_once('/einvoicing/class/providers/'.$classnametouse.'.class.php');
 
