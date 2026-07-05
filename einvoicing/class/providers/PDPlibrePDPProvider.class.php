@@ -340,15 +340,15 @@ class PDPlibrePDPProvider extends AbstractPDPProvider
 			return $flowId;
 		}
 
-		$this->error = $langs->trans('ErrorSendingInvoiceToPDP') . '<br>HTTP ' . $response['status_code'];
+		$errormsg = $langs->trans('ErrorSendingInvoiceToPDP') . '<br>HTTP ' . $response['status_code'];
 		if (!empty($response['errorCode'])) {
-			$this->error .= ' - ' . $response['errorCode'] . (empty($response['errorMessage']) ? '' : ' - ' . $response['errorMessage']);
+			$errormsg .= ' - ' . $response['errorCode'] . (empty($response['errorMessage']) ? '' : ' - ' . $response['errorMessage']);
 		}
 		if (!empty($response['curl_error_no'])) {
-			$this->error .= ' - Curl error ' . $response['curl_error_no'] . (empty($response['curl_error_msg']) ? '' : ' - ' . $response['curl_error_msg']);
+			$errormsg .= ' - Curl error ' . $response['curl_error_no'] . (empty($response['curl_error_msg']) ? '' : ' - ' . $response['curl_error_msg']);
 		}
-		$this->errors[] = $this->error;
-		return 0;
+		$this->errors[] = $errormsg;
+		return false;
 	}
 
 
@@ -373,18 +373,18 @@ class PDPlibrePDPProvider extends AbstractPDPProvider
 			}
 			if ($resarray === -1) {
 				$this->errors[] = $this->exchangeProtocol->error;
-				return 0;
+				return '';
 			}
 			$invoice_path = $resarray['path'];
 			$ref          = $resarray['ref'];
 		} catch (Exception $e) {
 			$this->errors[] = $e->getMessage();
-			return 0;
+			return '';
 		}
 
 		if (empty($ref) || empty($invoice_path)) {
 			$this->errors[] = 'Failed to generate the sample invoice';
-			return 0;
+			return '';
 		}
 
 		$outputLog[] = 'Sample invoice generated successfully.';
@@ -428,7 +428,7 @@ class PDPlibrePDPProvider extends AbstractPDPProvider
 			}
 
 			$this->errors[] = 'Failed to retrieve sample invoice.';
-			return 0;
+			return '';
 		}
 
 		$errormsg = $langs->trans('ErrorSendingInvoiceToPDP') . '<br>HTTP ' . $response['status_code'];
@@ -438,9 +438,8 @@ class PDPlibrePDPProvider extends AbstractPDPProvider
 		if (!empty($response['curl_error_no'])) {
 			$errormsg .= ' - Curl error ' . $response['curl_error_no'] . (empty($response['curl_error_msg']) ? '' : ' - ' . $response['curl_error_msg']);
 		}
-		$this->error   = $errormsg;
 		$this->errors[] = $errormsg;
-		return 0;
+		return $errormsg;
 	}
 
 
@@ -449,11 +448,11 @@ class PDPlibrePDPProvider extends AbstractPDPProvider
 	 * Auth: RFC6750 Bearer token (API key sent directly, no OAuth exchange).
 	 * If EINVOICING_PDPLIBRE_PROXY_URL is set, it overrides prod/test URL.
 	 *
-	 * @param string       $resource     Resource relative URL
-	 * @param string       $method       HTTP method
-	 * @param string|false $params       Request body (JSON encoded or array for multipart)
-	 * @param array        $extraHeaders Additional headers
-	 * @param string|null  $callType     Functional type for logging
+	 * @param string                    $resource     Resource relative URL
+	 * @param string                    $method       HTTP method
+	 * @param string|false|array<string,mixed> $params Request body (JSON string, false, or array for multipart)
+	 * @param array<string,string>      $extraHeaders Additional headers
+	 * @param string|null               $callType     Functional type for logging
 	 * @return array
 	 */
 	public function callApi($resource, $method, $params = false, $extraHeaders = [], $callType = '')
@@ -539,12 +538,12 @@ class PDPlibrePDPProvider extends AbstractPDPProvider
 	 *
 	 * @param  string       $flowId   Flow identifier
 	 * @param  string|null  $call_id  Call ID for logging
-	 * @return array{res:int, message:string}
+	 * @return array{res:int, message:string, action:string|null}
 	 */
 	public function syncFlow($flowId, $call_id = null)
 	{
 		// TODO: implémenter la synchronisation unitaire d'un flux PDPlibre.
-		return array('res' => 0, 'message' => 'syncFlow not yet implemented for PDPlibre');
+		return array('res' => 0, 'message' => 'syncFlow not yet implemented for PDPlibre', 'action' => null);
 	}
 
 
