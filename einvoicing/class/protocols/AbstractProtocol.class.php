@@ -26,6 +26,11 @@
 abstract class AbstractProtocol
 {
 	/**
+	 * @var DoliDB Db
+	 */
+	public $db;
+
+	/**
 	 * Invoice object
 	 * @var Facture
 	 */
@@ -39,6 +44,14 @@ abstract class AbstractProtocol
 
 	/** @var array Non-blocking warning messages */
 	public $warnings = [];
+
+	/**
+	 * @param DoliDB $db Db
+	 */
+	public function __construct($db)
+	{
+		$this->db = $db;
+	}
 
 	/**
 	 * Generate the XML content for a given invoice.
