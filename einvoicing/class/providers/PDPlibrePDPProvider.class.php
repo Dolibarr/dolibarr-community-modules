@@ -205,7 +205,7 @@ class PDPlibrePDPProvider extends AbstractPDPProvider
 	/**
 	 * Delete access token (no-op for static API key).
 	 *
-	 * @return bool
+	 * @return true
 	 */
 	public function deleteAccessToken()
 	{
