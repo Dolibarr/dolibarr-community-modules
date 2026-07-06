@@ -9,22 +9,22 @@
  */
 return [
     // # Issue statistics:
-    // PhanUndeclaredProperty : 60+ occurrences
-    // PhanTypeMismatchArgument : 50+ occurrences
+    // PhanUndeclaredProperty : 55+ occurrences
     // PhanUndeclaredVariable : 50+ occurrences
+    // PhanTypeMismatchArgument : 45+ occurrences
     // PhanDeprecatedProperty : 40+ occurrences
     // PhanTypeArraySuspiciousNull : 40+ occurrences
     // PhanTypeInvalidDimOffset : 35+ occurrences
     // PhanTypeArraySuspiciousNullable : 30+ occurrences
     // PhanTypeMismatchArgumentNullable : 25+ occurrences
     // PhanTypeMismatchArgumentProbablyReal : 20+ occurrences
-    // PhanTypeMismatchProperty : 20+ occurrences
     // PhanPossiblyUndeclaredVariable : 15+ occurrences
     // PhanRedefineFunction : 15+ occurrences
     // PhanAccessMethodPrivate : 10+ occurrences
-    // PhanTypeMismatchArgumentNullableInternal : 10+ occurrences
     // PhanTypeMismatchArgumentReal : 10+ occurrences
     // PhanUndeclaredMethod : 10+ occurrences
+    // PhanTypeMismatchArgumentNullableInternal : 9 occurrences
+    // PhanTypeMismatchProperty : 8 occurrences
     // PhanTypeMismatchArgumentSuperType : 7 occurrences
     // PhanUndeclaredVariableDim : 7 occurrences
     // PhanPossiblyNullTypeMismatchProperty : 6 occurrences
@@ -32,25 +32,26 @@ return [
     // PhanTypeObjectUnsetDeclaredProperty : 6 occurrences
     // PhanUndeclaredClassMethod : 6 occurrences
     // PhanPossiblyUndeclaredGlobalVariable : 5 occurrences
-    // PhanTypeMismatchArgumentInternal : 5 occurrences
     // PhanTypeSuspiciousEcho : 5 occurrences
     // PhanEmptyForeach : 4 occurrences
     // PhanPluginEmptyStatementIf : 4 occurrences
     // PhanPluginRedundantReturnComment : 4 occurrences
     // PhanPluginUnreachableCode : 4 occurrences
-    // PhanTypeMismatchReturnProbablyReal : 4 occurrences
-    // PhanPluginBothLiteralsBinaryOp : 3 occurrences
     // PhanPluginLoopVariableReuse : 3 occurrences
     // PhanTypeExpectedObjectPropAccessButGotNull : 3 occurrences
+    // PhanTypeMismatchArgumentInternal : 3 occurrences
     // PhanTypeMismatchForeach : 3 occurrences
     // PhanDeprecatedClassConstant : 2 occurrences
     // PhanDeprecatedFunction : 2 occurrences
+    // PhanPluginBothLiteralsBinaryOp : 2 occurrences
     // PhanPluginDuplicateExpressionAssignmentOperation : 2 occurrences
     // PhanPluginSimplifyExpressionBool : 2 occurrences
     // PhanRedefinedExtendedClass : 2 occurrences
     // PhanTypeExpectedObjectOrClassName : 2 occurrences
+    // PhanTypeInvalidLeftOperandOfNumericOp : 2 occurrences
     // PhanTypeMismatchPropertyProbablyReal : 2 occurrences
     // PhanTypeMismatchReturnNullable : 2 occurrences
+    // PhanTypeMismatchReturnProbablyReal : 2 occurrences
     // PhanTypeSuspiciousNonTraversableForeach : 2 occurrences
     // PhanUndeclaredClassProperty : 2 occurrences
     // PhanUndeclaredMagicConstant : 2 occurrences
@@ -74,7 +75,6 @@ return [
     // Currently, file_suppressions and directory_suppressions are the only supported suppressions
     'file_suppressions' => [
         'einvoicing/admin/setup.php' => ['PhanTypeMismatchArgument', 'PhanUndeclaredMethod', 'PhanUndeclaredProperty'],
-        'einvoicing/admin/setup_options.php' => ['PhanTypeMismatchArgument', 'PhanTypeMismatchProperty'],
         'einvoicing/ajax/checkinvoicestatus.php' => ['PhanUndeclaredMagicConstant'],
         'einvoicing/ajax/checksupplierinvoicestatus.php' => ['PhanPossiblyUndeclaredGlobalVariable', 'PhanUndeclaredMagicConstant'],
         'einvoicing/build/buildzip.php' => ['PhanRedefineFunction'],
