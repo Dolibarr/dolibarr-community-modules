@@ -985,13 +985,15 @@ class EInvoicing
 		$warnings = [];
 
 		// Check company via the French National Business Registry API (data.gouv.fr)
-		// Search by company name, then cross-check the returned SIREN against idprof1
+		// Search by SIREN (unique and exact), then cross-check the returned name and address against
+		// the third party record. Searching by name would miss a company registered under an acronym
+		// or a trade name (a third party named after its brand rather than its legal name).
 		if (
 			!empty($thirdparty->country_code) && $thirdparty->country_code === 'FR'
 			&& !empty($thirdparty->name) && !empty($thirdparty->idprof1)
 		) {
 			$siren = substr(preg_replace('/\s+/', '', $thirdparty->idprof1), 0, 9);
-			$apiUrl = 'https://recherche-entreprises.api.gouv.fr/search?q=' . urlencode($thirdparty->name) . '&per_page=5';
+			$apiUrl = 'https://recherche-entreprises.api.gouv.fr/search?q=' . urlencode($siren) . '&per_page=5';
 
 			$response = getURLContent($apiUrl, 'GET', '', 1, ['Accept: application/json']);
 
@@ -1013,7 +1015,9 @@ class EInvoicing
 				}
 
 				if ($matchedCompany === null) {
-					// No result matched the name + SIREN combination
+					// The SIREN itself is unknown to the registry. The third party name is still passed as the
+					// second argument so the translations that have not yet dropped it (until the next Transifex
+					// sync of the reworded en_US source) keep rendering without an empty placeholder.
 					$warnings[] = $langs->trans("FxCheckWarnSIRENNotFound", $siren, $thirdparty->name);
 				} else {
 					// Check that the matched company is not closed
