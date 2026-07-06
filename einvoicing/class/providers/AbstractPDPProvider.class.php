@@ -172,6 +172,13 @@ abstract class AbstractPDPProvider
 			if (!empty($prod)) {
 				$url = $this->config['ap_api_url'];
 			}
+		} elseif ($mode === 'afnor_directory') {
+			// Base of the standardized AFNOR Directory Service (XP Z12-013). Only providers that expose
+			// it set the config keys; the others return an empty string and skip the standardized check.
+			$url = !empty($this->config['test_afnor_directory_url']) ? $this->config['test_afnor_directory_url'] : '';
+			if (!empty($prod) && !empty($this->config['prod_afnor_directory_url'])) {
+				$url = $this->config['prod_afnor_directory_url'];
+			}
 		}
 
 		return $url;
@@ -207,7 +214,64 @@ abstract class AbstractPDPProvider
 	 */
 	public function checkRecipientDirectory($idprof1)
 	{
-		return array('status' => 'unsupported', 'reachable' => -1, 'entries' => 0, 'active' => 0, 'identifier' => '', 'message' => '', 'httpcode' => 0);
+		$result = array('status' => 'unsupported', 'reachable' => -1, 'entries' => 0, 'active' => 0, 'identifier' => '', 'message' => '', 'httpcode' => 0);
+
+		// The standardized route check uses the AFNOR Directory Service (XP Z12-013), so any conformant
+		// Approved Platform is supported. A provider that does not expose that base keeps the
+		// 'unsupported' status (it may still override this method with its own directory lookup).
+		$base = $this->getApiUrl('afnor_directory');
+		if (empty($base) || !method_exists($this, 'callApi')) {
+			return $result;
+		}
+
+		$siren = preg_replace('/[^0-9]/', '', (string) $idprof1);
+		if (!preg_match('/^[0-9]{9}$/', (string) $siren)) {
+			$result['status'] = 'error';
+			$result['message'] = 'EInvoicingDirectoryNoSiren';
+			return $result;
+		}
+
+		// 1) Search the directory lines for a reception address declared for this SIREN.
+		$body = json_encode(array('filters' => array('siren' => array('op' => 'strict', 'value' => $siren))));
+		$response = $this->callApi('afnor-directory/v1/directory-line/search', 'POST', $body, array(), 'precheck_directory');
+		$result['httpcode'] = (int) (isset($response['status_code']) ? $response['status_code'] : 0);
+
+		if ($result['httpcode'] != 200) {
+			$result['status'] = 'error';
+			$result['message'] = isset($response['errorMessage']) ? $response['errorMessage'] : ('HTTP ' . $result['httpcode']);
+			return $result;
+		}
+
+		$lines = array();
+		if (isset($response['response']['results']) && is_array($response['response']['results'])) {
+			$lines = $response['response']['results'];
+		}
+		$result['entries'] = count($lines);
+
+		if ($result['entries'] > 0) {
+			// At least one directory line: the recipient has a reception address on an Approved Platform.
+			$result['active'] = $result['entries'];
+			$result['status'] = 'routable';
+			$result['reachable'] = 1;
+			foreach ($lines as $line) {
+				if ($result['identifier'] === '' && !empty($line['addressingIdentifier'])) {
+					$result['identifier'] = (string) $line['addressingIdentifier'];
+				}
+			}
+			return $result;
+		}
+
+		// 2) No directory line: tell apart a legal unit known to the directory but not able to receive
+		//    yet (inactive) from a SIREN that is unknown to the directory (absent).
+		$consult = $this->callApi('afnor-directory/v1/siren/code-insee:' . urlencode($siren), 'GET', false, array(), 'precheck_directory');
+		$consultcode = (int) (isset($consult['status_code']) ? $consult['status_code'] : 0);
+		if ($consultcode == 200 && !empty($consult['response']['siren'])) {
+			$result['status'] = 'inactive';
+		} else {
+			$result['status'] = 'absent';
+		}
+		$result['reachable'] = 0;
+		return $result;
 	}
 
 	/**

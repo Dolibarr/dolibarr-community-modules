@@ -71,6 +71,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 			'prod_api_url'  => 'https://api.superpdp.tech/afnor-flow/v1/',
 			'test_api_url'  => 'https://api.superpdp.tech/afnor-flow/v1/',
 			'ap_api_url' 	=> 'https://api.superpdp.tech/v1.beta/',
+			'prod_afnor_directory_url' => 'https://api.superpdp.tech/afnor-directory/',
+			'test_afnor_directory_url' => 'https://api.superpdp.tech/afnor-directory/',
 			'client_id'     => getDolGlobalString('EINVOICING_SUPERPDP_CLIENT_ID'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '')),
 			'client_secret' => getDolGlobalString('EINVOICING_SUPERPDP_CLIENT_SECRET'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '')),
 			'dol_prefix'    => getDolGlobalString('EINVOICING_PDP') == 'SUPERPDPViaPartner' ? 'EINVOICING_SUPERPDPVIAPARTNER' : 'EINVOICING_SUPERPDP',
@@ -1107,6 +1109,11 @@ class SuperPDPProvider extends AbstractPDPProvider
 			// validation_reports and the French directory lookup both live on the AP API base (v1.beta).
 			$url = $this->getApiUrl('ap_api') . $resource;
 		}
+		if (strpos($resource, 'afnor-directory/') === 0) {
+			// Standardized AFNOR Directory Service (XP Z12-013) lives on its own base. The 'afnor-directory/'
+			// prefix is only a routing marker and is stripped before appending the real resource path.
+			$url = $this->getApiUrl('afnor_directory') . substr($resource, strlen('afnor-directory/'));
+		}
 
 		$httpheader = array();
 		if (!isset($extraHeaders['Content-Type'])) {
@@ -1183,13 +1190,34 @@ class SuperPDPProvider extends AbstractPDPProvider
 	}
 
 	/**
-	 * Check whether a recipient (SIREN) has an active reception address in the French directory
-	 * of Approved Platforms, using the SuperPDP directory endpoint (GET french_directory/entries).
+	 * Check whether a recipient (SIREN) is routable, preferring the standardized AFNOR Directory
+	 * Service (XP Z12-013) handled by the parent, and falling back to the SuperPDP specific
+	 * french_directory endpoint only when the standardized lookup is not available.
 	 *
 	 * @param 	string 	$idprof1 	Recipient SIREN (idprof1)
 	 * @return 	array{status:string,reachable:int,entries:int,active:int,identifier:string,message:string,httpcode:int}
 	 */
 	public function checkRecipientDirectory($idprof1)
+	{
+		// Standardized AFNOR directory check first (works for any conformant Approved Platform).
+		$result = parent::checkRecipientDirectory($idprof1);
+		if (in_array($result['status'], array('routable', 'inactive', 'absent'), true)) {
+			return $result;
+		}
+
+		// Standardized lookup unavailable or errored: fall back to the SuperPDP specific endpoint.
+		return $this->checkRecipientDirectoryLegacy($idprof1);
+	}
+
+	/**
+	 * Legacy fallback: check the recipient reception address through the SuperPDP specific directory
+	 * endpoint (GET french_directory/entries on the v1.beta base). Kept for platforms or environments
+	 * where the standardized AFNOR Directory Service is not reachable.
+	 *
+	 * @param 	string 	$idprof1 	Recipient SIREN (idprof1)
+	 * @return 	array{status:string,reachable:int,entries:int,active:int,identifier:string,message:string,httpcode:int}
+	 */
+	private function checkRecipientDirectoryLegacy($idprof1)
 	{
 		$result = array('status' => 'error', 'reachable' => -1, 'entries' => 0, 'active' => 0, 'identifier' => '', 'message' => '', 'httpcode' => 0);
 
