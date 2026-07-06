@@ -188,6 +188,18 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			}
 		}
 
+		if ($action == 'BILL_DELETE') {
+			/** @var Facture $object */
+			'@phan-var-force Facture $object';
+			$einvoicing = new EInvoicing($this->db);
+
+			// Lock on the REAL PA state (persistent flow_id), see BILL_UNVALIDATE above.
+			if ($einvoicing->isTransmittedLockActive($object->id, (string) $object->ref)) {
+				$this->errors[] = $langs->trans('EinvoicingCantDeleteATransmittedInvoice');
+				return -1;
+			}
+		}
+
 		if ($action == 'BILL_MODIFY') {
 			/** @var Facture $object */
 			'@phan-var-force Facture $object';

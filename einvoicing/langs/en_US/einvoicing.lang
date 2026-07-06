@@ -338,6 +338,7 @@ SupplierInvoiceComparisonVatRateNotFound=VAT rate of %s%% not found in the Dolib
 SupplierInvoiceComparisonSuggestVatCalculationMode=recalculate invoice using Mode %s to get VAT amounts corresponding to e-invoice
 EinvoicingCantDeleteADocumentLinkedToAnExistingSupplierInvoice=Document n° %s can't be deleted because it is linked to the Dolibarr supplier invoice n° %s
 EinvoicingCantDeleteASupplierInvoice=A supplier EInvoice can't be deleted. Please approve or reject this invoice
+EinvoicingCantDeleteATransmittedInvoice=You try to delete an invoice that is locked once the invoice has been transmitted to the Access Point
 EInvoiceSupplierInvoiceLinkedToOrder=The supplier invoice was automatically linked to purchase order %s (matching order reference BT-13).
 EInvoiceSupplierOrderLinkAmbiguous=Several purchase orders match the order reference %s for this supplier; the invoice was not auto-linked. Please link it manually.
 EInvoiceSupplierOrderRefWrongSupplier=A purchase order with reference %s exists but belongs to a different supplier; the invoice was not linked.
