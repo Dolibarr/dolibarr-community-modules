@@ -130,20 +130,15 @@ class ActionsEInvoicing extends CommonHookActions
 							//setEventMessages($message, array(), $messagecss);
 						}
 
-						// Gate on recipient directory reachability (opt-in): do not auto-generate an e-invoice
-						// that the platform would reject for a routing error (fr:213).
+						// Recipient directory reachability (opt-in): a recipient that is not routable does not make
+						// the e-invoice document invalid, only undeliverable, so keep generating it and only warn.
+						// The actual transmission is what gets blocked, by the send_to_pdp gate below.
 						$routecheck = $einvoicing->checkRecipientRoutableForSend($invoiceObject);
 						if (!$routecheck['ok']) {
-							$message = $langs->trans("EInvoiceNotGeneratedRecipientNotRoutable") . ': <br>' . $routecheck['message'];
-							dol_syslog(__METHOD__ . " " . strip_tags($message), LOG_WARNING);
-							if (getDolGlobalString('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
-								setEventMessages($message, array(), 'errors');
-								return -1;
-							} else {
-								setEventMessages($message, array(), 'warnings');
-								$this->warnings[] = $message;
-								return 0;
-							}
+							$warnmsg = $langs->trans("EInvoiceGeneratedButRecipientNotRoutable") . ': <br>' . $routecheck['message'];
+							dol_syslog(__METHOD__ . " " . strip_tags($warnmsg), LOG_WARNING);
+							setEventMessages($warnmsg, array(), 'warnings');
+							$this->warnings[] = $warnmsg;
 						}
 
 						$result = $protocol->generateInvoice($invoiceObject, $outputlangs, $pdfPath);		// Generate E-invoice (embed into the real generated file)
@@ -592,13 +587,14 @@ class ActionsEInvoicing extends CommonHookActions
 					dol_syslog(__METHOD__ . " " . $result['message']);
 				}
 
-				// Gate on recipient directory reachability (opt-in): do not generate an e-invoice that the
-				// platform would reject for a routing error (fr:213).
+				// Recipient directory reachability (opt-in): a recipient that is not routable does not make the
+				// e-invoice document invalid, only undeliverable, so keep generating it and only warn. The
+				// actual transmission is what gets blocked, by the send_to_pdp gate.
 				if (!$error) {
 					$routecheck = $einvoicing->checkRecipientRoutableForSend($invoiceObject);
 					if (!$routecheck['ok']) {
-						setEventMessages($langs->trans("EInvoiceNotGeneratedRecipientNotRoutable") . ': <br>' . $routecheck['message'], array(), 'errors');
-						$error++;
+						setEventMessages($langs->trans("EInvoiceGeneratedButRecipientNotRoutable") . ': <br>' . $routecheck['message'], array(), 'warnings');
+						$this->warnings[] = $routecheck['message'];
 					}
 				}
 
