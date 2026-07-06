@@ -127,6 +127,49 @@ abstract class AbstractProtocol
 	}
 
 	/**
+	 * Check the generated CII XML against a subset of the EN 16931 business rules (BR, BR-CO, BR-FR).
+	 *
+	 * Local safety net run at generation time, before the file is stored: it catches arithmetic
+	 * inconsistencies (totals, VAT breakdown, prepaid/due) with an explicit message quoting the
+	 * official rule id, without a network call and for any PDP provider. The official Schematron
+	 * applied by the Approved Platform remains the reference.
+	 *
+	 * Controlled by EINVOICING_BR_CHECK, a three-value option: "nocheck" skips the check,
+	 * "warning_only" (default) reports violations as non-blocking warnings, and "blocking" aborts
+	 * the generation (the exception is caught by generateInvoice() which returns -1 with the messages).
+	 *
+	 * @param	string	$xmlcontent		Generated CII XML content
+	 * @return	void
+	 * @throws	Exception				When violations are found and mode is "blocking"
+	 */
+	protected function checkBusinessRules($xmlcontent)
+	{
+		global $langs;
+
+		$brMode = getDolGlobalString('EINVOICING_BR_CHECK', 'warning_only');
+		if ($brMode === 'nocheck') {
+			return;
+		}
+
+		dol_include_once('einvoicing/class/utils/En16931Validator.class.php');
+		$validator = new En16931Validator();
+		$violations = $validator->validate($xmlcontent);
+		if (empty($violations)) {
+			return;
+		}
+
+		dol_syslog(get_class($this) . '::checkBusinessRules ' . count($violations) . ' violation(s): ' . implode(' | ', $violations), LOG_WARNING, 0, '_einvoicing');
+
+		if ($brMode === 'blocking') {
+			$this->errors = array_merge((array) $this->errors, $violations);
+			$langs->load('einvoicing@einvoicing');
+			throw new Exception($langs->trans('EInvoiceBusinessRulesViolations', (string) count($violations)) . ' - ' . implode(' | ', $violations));
+		}
+
+		$this->warnings = array_merge((array) $this->warnings, $violations);
+	}
+
+	/**
 	 * Clean up the per-call working temp files of an inbound invoice, while preserving the
 	 * "last invoice that could not be processed" diagnostic shown (and downloadable) in the
 	 * document list view.
