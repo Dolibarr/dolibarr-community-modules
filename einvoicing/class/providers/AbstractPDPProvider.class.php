@@ -187,6 +187,28 @@ abstract class AbstractPDPProvider
 		return !empty($this->config['has_validator']);
 	}
 
+	/**
+	 * Check whether a recipient has an active reception address in the Approved Platforms
+	 * directory (annuaire des Plateformes Agreees) before attempting to send an e-invoice.
+	 *
+	 * A recipient that is absent from the directory, or present but without any active routing
+	 * line, cannot receive electronic invoices: sending would be rejected by the platform with
+	 * a routing error (lifecycle fr:213). Checking beforehand lets the caller warn the user with
+	 * a clear message instead of the opaque platform rejection.
+	 *
+	 * Providers that do not expose a directory lookup keep the default 'unsupported' status so
+	 * the feature degrades gracefully and never blocks them.
+	 *
+	 * @param 	string 	$idprof1 	Recipient professional id 1 (SIREN for France)
+	 * @return 	array{status:string,reachable:int,entries:int,active:int,identifier:string,message:string,httpcode:int}
+	 *								status: unsupported|error|absent|inactive|routable ;
+	 *								reachable: 1 routable, 0 not routable, -1 unknown ;
+	 *								identifier: first active electronic address found (if any).
+	 */
+	public function checkRecipientDirectory($idprof1)
+	{
+		return array('status' => 'unsupported', 'reachable' => -1, 'entries' => 0, 'active' => 0, 'identifier' => '', 'message' => '', 'httpcode' => 0);
+	}
 
 	/**
 	 * Generate a UUID used to correlate logs between Dolibarr and PDP.

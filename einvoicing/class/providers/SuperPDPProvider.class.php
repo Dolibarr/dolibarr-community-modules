@@ -1103,7 +1103,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 		// The OAuth token endpoint lives on the auth base (/oauth2/), not the Flow API base. This applies to
 		// every token grant: client_credentials, authorization_code and refresh_token.
 		$url = $this->getApiUrl(($resource == 'token' || $callType == 'get_access_token') ? 'auth' : 'api') . $resource;
-		if ($resource == 'validation_reports') {
+		if ($resource == 'validation_reports' || strpos($resource, 'french_directory') === 0) {
+			// validation_reports and the French directory lookup both live on the AP API base (v1.beta).
 			$url = $this->getApiUrl('ap_api') . $resource;
 		}
 
@@ -1179,6 +1180,62 @@ class SuperPDPProvider extends AbstractPDPProvider
 		}
 
 		return $returnarray;
+	}
+
+	/**
+	 * Check whether a recipient (SIREN) has an active reception address in the French directory
+	 * of Approved Platforms, using the SuperPDP directory endpoint (GET french_directory/entries).
+	 *
+	 * @param 	string 	$idprof1 	Recipient SIREN (idprof1)
+	 * @return 	array{status:string,reachable:int,entries:int,active:int,identifier:string,message:string,httpcode:int}
+	 */
+	public function checkRecipientDirectory($idprof1)
+	{
+		$result = array('status' => 'error', 'reachable' => -1, 'entries' => 0, 'active' => 0, 'identifier' => '', 'message' => '', 'httpcode' => 0);
+
+		$siren = preg_replace('/[^0-9]/', '', (string) $idprof1);
+		if ($siren === '') {
+			$result['message'] = 'EInvoicingDirectoryNoSiren';
+			return $result;
+		}
+
+		$resource = 'french_directory/entries?number=' . urlencode($siren);
+		$response = $this->callApi($resource, 'GET', false, array(), 'precheck_directory');
+		$result['httpcode'] = (int) (isset($response['status_code']) ? $response['status_code'] : 0);
+
+		if ($result['httpcode'] != 200) {
+			$result['message'] = isset($response['errorMessage']) ? $response['errorMessage'] : ('HTTP ' . $result['httpcode']);
+			return $result;
+		}
+
+		$data = array();
+		if (isset($response['response']['data']) && is_array($response['response']['data'])) {
+			$data = $response['response']['data'];
+		}
+		$result['entries'] = count($data);
+		foreach ($data as $entry) {
+			if (!empty($entry['is_active'])) {
+				$result['active']++;
+				if ($result['identifier'] === '' && !empty($entry['identifier'])) {
+					$result['identifier'] = $entry['identifier'];
+				}
+			}
+		}
+
+		if ($result['entries'] == 0) {
+			// Recipient not present in the directory at all.
+			$result['status'] = 'absent';
+			$result['reachable'] = 0;
+		} elseif ($result['active'] == 0) {
+			// Present but no active routing line (reason NON_TRANSMISE): still cannot receive.
+			$result['status'] = 'inactive';
+			$result['reachable'] = 0;
+		} else {
+			$result['status'] = 'routable';
+			$result['reachable'] = 1;
+		}
+
+		return $result;
 	}
 
 	/**

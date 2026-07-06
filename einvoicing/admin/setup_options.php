@@ -216,6 +216,20 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->cssClass = 'minwidth500';
 	$item->fieldParams['forcereload'] = 0;
 
+	// Setup conf to check the recipient reachability in the Approved Platforms directory (annuaire PA) before
+	// sending, and surface it on the invoice card. On by default. A read-only directory lookup: it never blocks.
+	$item = $formSetup->newItem('EINVOICING_PRECHECK_DIRECTORY')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('EINVOICING_PRECHECK_DIRECTORY_HELP');
+	$item->defaultFieldValue = 1;
+	$item->cssClass = 'minwidth500';
+
+	// Setup conf to REQUIRE the recipient to be routable in the directory before generating/sending. Off by
+	// default (opt-in enforcement on top of the read-only pre-check above): blocks reaching a routing reject.
+	$item = $formSetup->newItem('EINVOICING_REQUIRE_ROUTABLE_RECIPIENT')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('EINVOICING_REQUIRE_ROUTABLE_RECIPIENT_HELP');
+	$item->defaultFieldValue = 0;
+	$item->cssClass = 'minwidth500';
+
 	// Setup conf to skip e-invoicing for B2C third parties (private individuals): out of the e-invoicing
 	// scope (e-reporting applies instead). Off by default. Company vs individual detection is delegated to
 	// Societe::isACompany() (and its own options), so there is nothing extra to configure here.

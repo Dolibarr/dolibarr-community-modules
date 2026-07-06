@@ -1327,6 +1327,39 @@ class EInvoicing
 			$resprints .= '</tr>';
 		}
 
+		// Recipient reachability in the Approved Platforms directory (annuaire PA), checked before sending.
+		// This is a read-only lookup surfaced on the card so the user sees whether the recipient can receive
+		// an e-invoice, instead of discovering a routing rejection (fr:213) only after transmission.
+		if (($object->element == 'facture' || $object->element == 'invoice') && $action != 'create' && getDolGlobalInt('EINVOICING_PRECHECK_DIRECTORY', 1)) {
+			if (!is_object($object->thirdparty ?? null) && !empty($object->socid)) {
+				$object->fetch_thirdparty();
+			}
+			$directorySiren = is_object($object->thirdparty ?? null) ? preg_replace('/[^0-9]/', '', (string) $object->thirdparty->idprof1) : '';
+			if ($directorySiren !== '') {
+				$urlajaxdir = dol_buildpath('einvoicing/ajax/checkdirectory.php', 1);
+				// Auto-run once in the pre-send window (validated, not yet really transmitted to the AP).
+				$autorun = ((int) $object->status === Facture::STATUS_VALIDATED && empty($currentStatusInfo['everTransmitted'])) ? 1 : 0;
+				$resprints .= '<tr class="treinvoicing_collapseseparator">';
+				$resprints .= '<td>' . $form->textwithpicto($langs->trans("EInvoicingDirectoryCheck"), $langs->trans("EInvoicingDirectoryCheckHelp")) . '</td>';
+				$resprints .= '<td><span id="einvoice-directory" class="opacitymedium">' . ($autorun ? dol_escape_htmltag($langs->trans("EInvoicingDirectoryChecking")) : '-') . '</span>';
+				$resprints .= ' <a href="#" id="einvoice-directory-check" class="paddingleft">' . img_picto('', 'refresh', 'class="paddingright"') . $langs->trans("EInvoicingDirectoryCheckButton") . '</a>';
+				$resprints .= '</td></tr>';
+				$resprints .= '<script type="text/javascript">
+				(function(){
+					function einvoiceCheckDirectory(){
+						$("#einvoice-directory").html("' . dol_escape_js($langs->trans("EInvoicingDirectoryChecking")) . '").addClass("opacitymedium");
+						$.get("' . $urlajaxdir . '", { token: "' . currentToken() . '", ref: "' . dol_escape_js($object->ref) . '" }, function(data){
+							if (typeof data === "string") { try { data = JSON.parse(data); } catch(e){ console.error("checkdirectory: not JSON", data); return; } }
+							$("#einvoice-directory").html(data.html || "").removeClass("opacitymedium");
+						}, "text").fail(function(x){ console.error("checkdirectory ajax", x.status, x.statusText); });
+					}
+					$("#einvoice-directory-check").click(function(e){ e.preventDefault(); einvoiceCheckDirectory(); });
+					' . ($autorun ? 'setTimeout(einvoiceCheckDirectory, 1200);' : '') . '
+				})();
+				</script>';
+			}
+		}
+
 		// Invoice-level routing ID override (BT-49)
 		if ($object->element == 'facture' || $object->element == 'invoice') {
 			$currentOverrideRouting = $currentStatusInfo['override_routing_id'] ?? '';
@@ -2117,6 +2150,59 @@ class EInvoicing
 		}
 		$status = $this->fetchLastknownInvoiceStatus($invoiceId, $invoiceRef);
 		return !empty($status['everTransmitted']);
+	}
+
+	/**
+	 * Gate generation/transmission on the recipient being reachable in the Approved Platforms directory.
+	 *
+	 * Only enforced when EINVOICING_REQUIRE_ROUTABLE_RECIPIENT is on (off by default, opt-in). A recipient
+	 * that is absent from the directory, or present without an active routing line, would be rejected by the
+	 * platform with a routing error (fr:213): blocking generation/sending avoids reaching that error state.
+	 *
+	 * Fails open (ok=1) whenever the check cannot be trusted, so it never blocks unexpectedly: option off,
+	 * provider without a directory lookup (status unsupported), directory call error, or a recipient with no
+	 * SIREN (handled by the standard required-information checks).
+	 *
+	 * @param 	Facture 	$object 	Invoice
+	 * @return 	array{ok:int,status:string,message:string}	ok=0 only when the recipient is confirmed not routable.
+	 */
+	public function checkRecipientRoutableForSend($object)
+	{
+		global $langs;
+
+		$res = array('ok' => 1, 'status' => '', 'message' => '');
+
+		if (!getDolGlobalInt('EINVOICING_REQUIRE_ROUTABLE_RECIPIENT')) {
+			return $res;	// opt-in, off by default
+		}
+
+		if (!is_object($object->thirdparty ?? null)) {
+			$object->fetch_thirdparty();
+		}
+		$siren = is_object($object->thirdparty ?? null) ? preg_replace('/[^0-9]/', '', (string) $object->thirdparty->idprof1) : '';
+		if ($siren === '') {
+			return $res;	// no SIREN: the standard required-information checks handle this
+		}
+
+		require_once __DIR__ . '/providers/PDPProviderManager.class.php';
+		$PDPManager = new PDPProviderManager($this->db);
+		$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+		if (!is_object($provider)) {
+			return $res;
+		}
+
+		$dir = $provider->checkRecipientDirectory($siren);
+		$res['status'] = isset($dir['status']) ? $dir['status'] : 'error';
+		if ($res['status'] === 'absent') {
+			$res['ok'] = 0;
+			$res['message'] = $langs->trans('EInvoicingDirectoryAbsent', $siren);
+		} elseif ($res['status'] === 'inactive') {
+			$res['ok'] = 0;
+			$res['message'] = $langs->trans('EInvoicingDirectoryInactive', $siren);
+		}
+		// routable / error / unsupported => ok stays 1 (fail-open)
+
+		return $res;
 	}
 
 	/**
