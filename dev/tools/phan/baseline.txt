@@ -96,7 +96,7 @@ return [
         'einvoicing/class/utils/XmlPatcher.class.php' => ['PhanPluginRedundantReturnComment', 'PhanTypeMismatchDeclaredReturn'],
         'einvoicing/compat/commonhookactions.class.php' => ['PhanRedefineClass'],
         'einvoicing/compat/profid.lib.php' => ['PhanRedefineFunction', 'PhanTypeInvalidDimOffset'],
-        'einvoicing/core/modules/modEInvoicing.class.php' => ['PhanTypeMismatchArgument', 'PhanTypeMismatchArgumentProbablyReal', 'PhanTypeMismatchProperty'],
+        'einvoicing/core/modules/modEInvoicing.class.php' => ['PhanTypeMismatchProperty'],
         'einvoicing/document_card.php' => ['PhanPluginBothLiteralsBinaryOp', 'PhanTypeMismatchArgumentNullable', 'PhanUndeclaredProperty'],
         'einvoicing/document_list.php' => ['PhanPossiblyUndeclaredGlobalVariable', 'PhanTypeInvalidDimOffset', 'PhanTypeSuspiciousEcho', 'PhanUndeclaredProperty'],
         'einvoicing/lib/buildinvoicelines.inc.php' => ['PhanAccessMethodPrivate', 'PhanDeprecatedFunction', 'PhanDeprecatedProperty', 'PhanTypeArraySuspiciousNullable', 'PhanTypeInvalidLeftOperandOfAdd', 'PhanTypeInvalidLeftOperandOfNumericOp', 'PhanTypeInvalidRightOperandOfAdd', 'PhanTypeMismatchArgument', 'PhanTypeMismatchArgumentNullable', 'PhanUndeclaredProperty'],
