@@ -85,14 +85,14 @@ function helloassoAdminPrepareHead()
 
 /**
  * Refresh connection token
- * @param  mixed $storage storage
- * @param  mixed $service service
- * @param  mixed $tokenobj tokenobj
- * @param  mixed $client_id client_id
+ * @param  DoliStorage $storage storage
+ * @param  string $service service
+ * @param  \OAuth\Common\Storage\TokenInterface $tokenobj tokenobj
+ * @param  string $client_id client_id
  * @param  string $urltocall url to call
  *
  * @throws Exception
- * @return TokenInterface|int	Token if OK
+ * @return \OAuth\Common\Storage\TokenInterface	Token if OK
  */
 function helloassoRefreshToken($storage, $service, $tokenobj, $client_id, $urltocall)
 {
@@ -170,7 +170,7 @@ function helloassoDeleteToken()
 /**
  * Connect to helloasso database
  *
- * @return array<string,mixed>|int 	An array with the token_type and the access_token defined if OK or -1 if KO
+ * @return array{token_type:string,access_token:string}|-1	An array with the token_type and the access_token defined if OK or -1 if KO
  */
 function helloassoDoConnection()
 {
@@ -246,12 +246,14 @@ function helloassoDoConnection()
 /**
  * Get data form an object
  *
- * @param	$source 		The type of the object
- * @param	$ref			The ref of the object
- * @param	$mode			The mode to use for the function (amount or payer)
- * @param	$payerarray		An array to fill the payer information (Must be set with payer mode)
+ * @param	string $source 		The type of the object
+ * @param	int|string $ref			The ref of the object
+ * @param	'amount'|'payer'	$mode				The mode to use for the function (amount or payer)
+ * @param	array{}	$payerarray		An array to fill the payer information (Must be set with payer mode) @phan-output-reference
+ * @phan-param	array{firstName:string,lastName:string,email:string,address?:string,city?:string,zipCode?:string,companyName?:string,dateOfBirth?:string}	$payerarray  @phan-output-reference
+ * @phpstan-param-out	array{firstName:string,lastName:string,email:string,address?:string,city?:string,zipCode?:string,companyName?:string,dateOfBirth?:string}	$payerarray
  *
- * @return	int				The amount to pay if mode amount or fill $payerarray for payer mode
+ * @return	float				The amount to pay if mode amount or fill $payerarray for payer mode
  */
 function helloassoGetDataFromObjects($source, $ref, $mode = 'amount', &$payerarray = null)
 {
@@ -284,7 +286,7 @@ function helloassoGetDataFromObjects($source, $ref, $mode = 'amount', &$payerarr
 	}
 	switch ($source) {
 		case 'donation':
-			$result = $don->fetch($ref);
+			$result = $don->fetch((int) $ref);
 			if ($result <= 0) {
 				$errors[] = $don->error;
 				$error++;
@@ -308,7 +310,7 @@ function helloassoGetDataFromObjects($source, $ref, $mode = 'amount', &$payerarr
 			break;
 
 		case 'member':
-			$result = $member->fetch('', $ref);
+			$result = $member->fetch(0, $ref);
 			if ($result <= 0) {
 				$errors[] = $member->error;
 				$error++;
@@ -342,7 +344,7 @@ function helloassoGetDataFromObjects($source, $ref, $mode = 'amount', &$payerarr
 			break;
 
 		case 'contractline':
-			$result = $contractline->fetch('', $ref);
+			$result = $contractline->fetch(0, $ref);
 			if ($result <= 0) {
 				$errors[] = $contractline->error;
 				$error++;
@@ -386,7 +388,7 @@ function helloassoGetDataFromObjects($source, $ref, $mode = 'amount', &$payerarr
 			break;
 
 		case 'invoice':
-			$result = $invoice->fetch('', $ref);
+			$result = $invoice->fetch(0, $ref);
 			if ($result <= 0) {
 				$errors[] = $invoice->error;
 				$error++;
@@ -418,7 +420,7 @@ function helloassoGetDataFromObjects($source, $ref, $mode = 'amount', &$payerarr
 			break;
 
 		case 'order':
-			$result = $order->fetch('', $ref);
+			$result = $order->fetch(0, (string) $ref);
 			if ($result <= 0) {
 				$errors[] = $order->error;
 				$error++;
@@ -450,7 +452,7 @@ function helloassoGetDataFromObjects($source, $ref, $mode = 'amount', &$payerarr
 			break;
 
 		default:
-			$resultinvoice = $invoice->fetch($ref);
+			$resultinvoice = $invoice->fetch((int) $ref);
 			if ($resultinvoice <= 0) {
 				$errors[] = $invoice->errors;
 				$error++;

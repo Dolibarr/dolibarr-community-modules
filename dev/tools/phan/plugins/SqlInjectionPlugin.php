@@ -788,7 +788,7 @@ class SqlInjectionVisitor extends \Phan\PluginV3\PluginAwarePostAnalysisVisitor
 				if (!is_string($methodName) || !in_array($methodName, self::SAFE_METHODS, true)) {
 					return false;
 				}
-				// Method is ok, if DoliDb
+				// Method is ok, if DoliDB
 				return $this->isDoliDB($obj, ['this', 'db']);
 			}
 		}
