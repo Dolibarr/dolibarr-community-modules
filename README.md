@@ -5,3 +5,5 @@ The file index.yaml is automatically generated from the index.yaml of each modul
 
 It is the file that is downloaded by Dolibarr to show the list of external community modules available for direct installation from the Dolibarr modules setup page.
 
+The subdirectory must be compliant with the rules defined here : 
+[Rules for community modules](https://wiki.dolibarr.org/index.php/Modules_-_Rules_for_community_modules)
