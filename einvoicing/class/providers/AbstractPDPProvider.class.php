@@ -221,6 +221,37 @@ abstract class AbstractPDPProvider
 		return $this->config;
 	}
 
+	/**
+	 * Try to get a flow XML from its id using API
+	 * @param string $flowId 		The id of the flow to fetch
+	 * @param bool	 $cleanXml 		Whether you need to remove (attachments presents in XML content...)
+	 *
+	 * @return string
+	 */
+	public function fetchFlowXml($flowId, $cleanXml)
+	{
+		$flowResponse = $this->fetchFlowData($flowId, 'Original', 'get_flow_xml');
+
+		if ($flowResponse['status_code'] != 200) {
+			throw new Exception('Failed to get flow XML for flow id n° ' . $flowId);
+		}
+
+		// $receivedFileContent may be a CII file (common) or Factur-X file (not common), or ...
+		$receivedFileContent = $flowResponse['response'];
+
+		$resProtocol = ProtocolManager::getProtocolFromContent($receivedFileContent);
+		if ($resProtocol['success']) {
+			$protocol = $resProtocol['protocol_object'];
+
+			$xmlData = $protocol->extractXmlFromFileContent($receivedFileContent);
+
+			if ($cleanXml) {
+				$xmlData = Document::cleanXmlData($xmlData);
+			}
+		}
+
+		return $xmlData;
+	}
 
 	/**
 	 * Try to get a flow data from its id and doc type, using API

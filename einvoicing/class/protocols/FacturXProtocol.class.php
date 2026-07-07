@@ -1947,4 +1947,16 @@ class FacturXProtocol extends AbstractProtocol
 		// FacturX uses CII format for its embedded XML.
 		return CIIProtocol::removeAttachmentFromXml($xmlData);
 	}
+
+	/**
+	 * Extract XML from an input file content and return it
+	 *
+	 * @param  string $fileContent Raw file content
+	 * @return string The extracted XML content
+	 */
+	public function extractXmlFromFileContent($fileContent)
+	{
+		$xmlData = ZugferdDocumentPdfReaderExt::getInvoiceDocumentContentFromContent($fileContent);
+		return $xmlData;
+	}
 }

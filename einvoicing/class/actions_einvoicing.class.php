@@ -744,7 +744,7 @@ class ActionsEInvoicing extends CommonHookActions
 				$permissiontoedit &&
 				$object->status == FactureFournisseur::STATUS_DRAFT &&
 				!SupplierInvoiceHelper::isSupplierImportInvoiceLinesAuto($object->socid)) {
-				$xmlData = SupplierInvoiceHelper::getXmlData($object->id);
+				$xmlData = SupplierInvoiceHelper::getXmlData($object->id, true);
 
 				if ($xmlData === null || $xmlData === '') {
 					setEventMessage($langs->trans('EinvoiceCantReimportLines'), 'errors');

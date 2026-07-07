@@ -193,4 +193,18 @@ abstract class AbstractProtocol
 	 * @return array<int,array<string,null|bool|float|string|array<mixed>>>
 	 */
 	abstract public function parseInvoiceLines($xml);
+
+	/**
+	 * Extract XML from an input file content and return it
+	 * - if input is already an XML (CII, UBL), directly return file content (no extraction needed)
+	 * - if input is a FactorX PDF, extract XML part and return only XML
+	 * - ...
+	 *
+	 * @param  string $fileContent Raw file content
+	 * @return string The extracted XML content
+	 */
+	public function extractXmlFromFileContent($fileContent)
+	{
+		return $fileContent;
+	}
 }

@@ -69,7 +69,7 @@ class SupplierInvoiceHelper
 		$errors = [];
 
 		// Get supplier invoice XML data
-		$xmlData = SupplierInvoiceHelper::getXmlData($dolSupplierInvoice->id);
+		$xmlData = SupplierInvoiceHelper::getXmlData($dolSupplierInvoice->id, true);
 
 		// Can't check consistency if there is no XML content
 		if (!isset($xmlData) || $xmlData === '') {
@@ -223,10 +223,11 @@ class SupplierInvoiceHelper
 	 * - if data not found in database, try to re-get data from AP
 	 *
 	 * @param	int 		$supplierInvoiceId 		The id of the supplier invoice
+	 * @param 	bool 		$fetchXmlIfEmpty		Whether the XML data should be fetch again (if currently empty in database)
 	 * @return 	?string 							The XML data if available or null if can't get it
 	 * @throws 	Exception
 	 */
-	public static function getXmlData(int $supplierInvoiceId): ?string
+	public static function getXmlData(int $supplierInvoiceId, bool $fetchXmlIfEmpty = false): ?string
 	{
 		global $db, $user;
 
@@ -243,45 +244,20 @@ class SupplierInvoiceHelper
 				$document = new Document($db);
 				$resdoc = $document->fetch($foundDocument->rowid);
 
-				if (empty($resdoc) || is_null($document->xml_data) || $document->xml_data == '') {
+				if ((empty($resdoc) || is_null($document->xml_data) || $document->xml_data == '') && $fetchXmlIfEmpty === true) {
 					$providerManager = new PDPProviderManager($db);
 					$provider = $providerManager->getProvider(strtoupper($document->provider));
 
-					/* FIXME Disabled: Create a lof of regressions and problems:
-					- We must never a dependency (like ZugferdDocumentPdfReaderExt) when common use of code does not need it.
-					  This introduces regression because lib that does not work on most cases (PHP version, Dolibarr version, ...)
-					- To get content of an invoice, message should not use fetchFlowData($document->flow_id, 'Converted'), because
-					  result of 'Converted' is not predictable by code, it depends on your AP setup on your account.
-					  So we should use code that depends on AP like we have into syncFlow() for SupplierInvoice, with a detection of
-					  the type of doc received by using $detectedProtocol = $tmpProtocolManager->detectProtocolFromContent($receivedFile).
+					$xmlData = $provider->fetchFlowXml($document->flow_id, true);
 
-					  Solution: Move this method into the provider class.
-					*/
-					/*
-					$flowResponse = $provider->fetchFlowData($document->flow_id, 'Converted', 'get_flow_for_supplier_invoice_by_getxmldata');
-
-					if ($flowResponse['status_code'] != 200) {
-						throw new Exception('Failed to get flow data for flow id n° ' . $document->flow_id . ' and for supplier invoice id n° ' . $supplierInvoiceId);
-					}
-
-					// $receivedFile may be a CII file (common) or Factur-X file (not common), or ...
-					$receivedFile = $flowResponse['response'];
-
-					// FIXME Bug here: $flowResponse['response'] should contains a CII file not a Factur-x file (except if your Provider was not correctly setup).
-					// Having a factur-x here happen only if using the not recommended setup (recommended CII, not recommended Factur-x).
-					// Note: As it may vary on setup, the type of einvoice must be guessed with "$detectedProtocol = $tmpProtocolManager->detectProtocolFromContent($receivedFile);"
-					// so all the code of the getXMLData() should be moved into the provider class and must return always a XML.
-					$xmlData = ZugferdDocumentPdfReaderExt::getInvoiceDocumentContentFromContent($receivedFile);
-					$cleanedXmlData = Document::cleanXmlData($xmlData);
-					if (Document::checkXmlDataMaxSize($cleanedXmlData)) {
-						$document->xml_data = $cleanedXmlData;
+					if (Document::checkXmlDataMaxSize($xmlData)) {
+						$document->xml_data = $xmlData;
 						$document->update($user);
 					} else {
 						dol_syslog(__METHOD__. " : xml_data content is too big and can't be stored in database (16Mo max for MEDIUMTEXT)", LOG_ERR);
 					}
 
-					return $cleanedXmlData;
-					*/
+					return $xmlData;
 				}
 
 				return $foundDocument->xml_data;
