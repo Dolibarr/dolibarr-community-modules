@@ -147,11 +147,11 @@ include DOL_DOCUMENT_ROOT.'/core/actions_fetchobject.inc.php'; // Must be 'inclu
 
 // There is several ways to check permission.
 // Set $enablepermissioncheck to 1 to enable a minimum low level of checks
-$enablepermissioncheck = getDolGlobalInt('EINVOICING_ENABLE_PERMISSION_CHECK');
+$enablepermissioncheck = getDolGlobalInt('EINVOICING_ENABLE_PERMISSION_CHECK', 0);
 if ($enablepermissioncheck) {
 	$permissiontoread = $user->hasRight('einvoicing', 'read');
 	$permissiontoadd = $user->hasRight('einvoicing', 'write'); // Used by the include of actions_addupdatedelete.inc.php and actions_lineupdown.inc.php
-	$permissiontodelete = $user->hasRight('einvoicing', 'delete') || ($permissiontoadd && isset($object->status) && $object->status == $object::STATUS_DRAFT);
+	$permissiontodelete = (int) ($user->hasRight('einvoicing', 'delete') || ($permissiontoadd && isset($object->status) && $object->status == $object::STATUS_DRAFT));
 	$permissionnote = $user->hasRight('einvoicing', 'write'); // Used by the include of actions_setnotes.inc.php
 	$permissiondellink = $user->hasRight('einvoicing', 'write'); // Used by the include of actions_dellink.inc.php
 } else {
@@ -271,7 +271,7 @@ llxHeader('', $title, $help_url, '', 0, 0, '', '', '', 'mod-einvoicing page-card
 
 // Part to create
 if ($action == 'create') {
-	if (empty($permissiontoadd)) {
+	if (!$permissiontoadd) {
 		accessforbidden('NotEnoughPermissions', 0, 1);
 	}
 
@@ -527,7 +527,8 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 
 	// Buttons for actions
 
-	if ($action != 'presend' && $action != 'editline' && 1 == 0) {
+	if ($action != 'presend' && $action != 'editline' && 1 == 0) {  // @phan-suppress-current-line PhanPluginBothLiteralsBinaryOp
+		$permissiontoadd = (int) $permissiontoadd;  // workaround for Phan
 		print '<div class="tabsAction">'."\n";
 		$parameters = array();
 		$reshook = $hookmanager->executeHooks('addMoreActionsButtons', $parameters, $object, $action); // Note that $action and $object may have been modified by hook
@@ -601,7 +602,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 		$action = 'presend';
 	}
 
-	if ($action != 'presend' && 1 == 0) {
+	if ($action != 'presend' && 1 == 0) {  // @phan-suppress-current-line PhanPluginBothLiteralsBinaryOp
 		print '<div class="fichecenter"><div class="fichehalfleft">';
 		print '<a name="builddoc"></a>'; // ancre
 
@@ -614,8 +615,8 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 			$filedir = $conf->einvoicing->dir_output.'/'.$object->element.'/'.$objref;
 			$urlsource = $_SERVER["PHP_SELF"]."?id=".$object->id;
 			$genallowed = $permissiontoread; // If you can read, you can build the PDF to read content
-			$delallowed = $permissiontoadd; // If you can create/edit, you can remove a file on card
-			print $formfile->showdocuments('einvoicing:Document', $object->element.'/'.$objref, $filedir, $urlsource, $genallowed, $delallowed, $object->model_pdf, 1, 0, 0, 28, 0, '', '', '', $langs->defaultlang);
+			$delallowed = (int) $permissiontoadd; // If you can create/edit, you can remove a file on card
+			print $formfile->showdocuments('einvoicing:Document', $object->element.'/'.$objref, $filedir, $urlsource, $genallowed, $delallowed, (string) $object->model_pdf, 1, 0, 0, 28, 0, '', '', '', $langs->defaultlang);
 		}
 
 		// Show links to link elements

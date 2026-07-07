@@ -62,7 +62,7 @@ if (! $TEMP || ! -d $TEMP) {
 	print "$PROG.$Extension aborted.\n";
     sleep 2;
     exit 2;
-} 
+}
 $BUILDROOT="$TEMP/dolibarr-buildroot";
 
 
@@ -73,8 +73,8 @@ for (0..@ARGV-1) {
 	if ($ARGV[$_] =~ /^-*target=(\w+)/i)   { $target=$1; $batch=1; }
 	if ($ARGV[$_] =~ /^-*desti=(.+)/i)     { $DESTI=$1; }
     if ($ARGV[$_] =~ /^-*prefix=(.+)/i)    {
-    	$PREFIX=$1; 
-    	$FILENAMESNAPSHOT.="-".$PREFIX; 
+    	$PREFIX=$1;
+    	$FILENAMESNAPSHOT.="-".$PREFIX;
     }
 }
 $SOURCE="$DIR/../..";
@@ -104,7 +104,7 @@ if ($PROJECTINPUT eq "all")
     closedir(DIR);
     foreach my $xxx (0..@rv-1) {
     	if ($rv[$xxx] =~ /^makepack\-(.*)\.conf$/)
-    	{ 
+    	{
     	   @PROJECTLIST[$xxx]=$1;
     	}
     }
@@ -117,9 +117,9 @@ else
 
 # Loop on each projects
 foreach my $PROJECT (@PROJECTLIST) {
-	
+
 	$PROJECTLC=lc($PROJECT);
-	
+
 	if (! -f "makepack-".$PROJECT.".conf")
 	{
 	    print "Error: can't open conf file makepack-".$PROJECT.".conf\n";
@@ -130,7 +130,7 @@ foreach my $PROJECT (@PROJECTLIST) {
 	    sleep 2;
 	    exit 2;
 	}
-	
+
 	# Get version $MAJOR, $MINOR and $BUILD
 	print "Version detected for module ".$PROJECT.": ";
 	$result=open(IN,"<".$SOURCE."/".$PROJECTLC."/core/modules/mod".$PROJECT.".class.php");
@@ -149,7 +149,7 @@ foreach my $PROJECT (@PROJECTLIST) {
 	    $MINOR=<STDIN>;
 	    chomp($MINOR);
 	}
-		
+
 	$FILENAME="$PROJECTLC";
 	$FILENAMETGZ="module_$PROJECTLC-$MAJOR.$MINOR".($BUILD ne ''?".$BUILD":"");
 	$FILENAMEZIP="module_$PROJECTLC-$MAJOR.$MINOR".($BUILD ne ''?".$BUILD":"");
@@ -161,29 +161,29 @@ foreach my $PROJECT (@PROJECTLIST) {
 	    # mandrake
 	    $RPMDIR="/usr/src/RPM";
 	}
-	
-	
+
+
 	# Choose package targets
 	#-----------------------
 	$target="ZIP";    # Dolibarr modules are this format
 	$CHOOSEDTARGET{uc($target)}=1;
-	
-	
+
+
 	# Test if requirement is ok
 	#--------------------------
 	foreach my $target (keys %CHOOSEDTARGET) {
 	    foreach my $req (split(/[,\s]/,$REQUIREMENTTARGET{$target})) {
-	        # Test    
+	        # Test
 	        print "Test requirement for target $target: Search '$req'... ";
 	        $ret=`"$req" 2>&1`;
 	        $coderetour=$?; $coderetour2=$coderetour>>8;
-	        if ($coderetour != 0 && (($coderetour2 == 1 && $OS =~ /windows/ && $ret !~ /Usage/i) || ($coderetour2 == 127 && $OS !~ /windows/)) && $PROGPATH) { 
+	        if ($coderetour != 0 && (($coderetour2 == 1 && $OS =~ /windows/ && $ret !~ /Usage/i) || ($coderetour2 == 127 && $OS !~ /windows/)) && $PROGPATH) {
 	            # Not found error, we try in PROGPATH
 	            $ret=`"$PROGPATH/$ALTERNATEPATH{$req}/$req\" 2>&1`;
 	            $coderetour=$?; $coderetour2=$coderetour>>8;
 	            $REQUIREMENTTARGET{$target}="$PROGPATH/$ALTERNATEPATH{$req}/$req";
-	        }    
-	
+	        }
+
 	        if ($coderetour != 0 && (($coderetour2 == 1 && $OS =~ /windows/ && $ret !~ /Usage/i) || ($coderetour2 == 127 && $OS !~ /windows/))) {
 	            # Not found error
 	            print "Not found\nCan't build target $target. Requirement '$req' not found in PATH\n";
@@ -195,9 +195,9 @@ foreach my $PROJECT (@PROJECTLIST) {
 	        }
 	    }
 	}
-	
+
 	print "\n";
-	
+
 	# Check if there is at least on target to build
 	#----------------------------------------------
 	$nboftargetok=0;
@@ -205,7 +205,7 @@ foreach my $PROJECT (@PROJECTLIST) {
 	$nboftargetneedcvs=0;
 	foreach my $target (keys %CHOOSEDTARGET) {
 	    if ($CHOOSEDTARGET{$target} < 0) { next; }
-		if ($target ne 'EXE' && $target ne 'EXEDOLIWAMP') 
+		if ($target ne 'EXE' && $target ne 'EXEDOLIWAMP')
 		{
 			$nboftargetneedbuildroot++;
 		}
@@ -215,9 +215,9 @@ foreach my $PROJECT (@PROJECTLIST) {
 		}
 		$nboftargetok++;
 	}
-	
+
 	if ($nboftargetok) {
-	
+
 	    # Update CVS if required
 	    #-----------------------
 	    if ($nboftargetneedcvs)
@@ -229,7 +229,7 @@ foreach my $PROJECT (@PROJECTLIST) {
 	    	$ret=`cvs update -P -d 2>&1`;
 	    	chdir("$olddir");
 		}
-		
+
 	    # Update buildroot if required
 	    #-----------------------------
 	    if ($nboftargetneedbuildroot)
@@ -237,18 +237,18 @@ foreach my $PROJECT (@PROJECTLIST) {
 		    if (! $copyalreadydone) {
 		    	print "Delete directory $BUILDROOT\n";
 		    	$ret=`rm -fr "$BUILDROOT"`;
-	
+
 		    	mkdir "$BUILDROOT";
 		    	mkdir "$BUILDROOT/$PROJECTLC";
-		    	
+
 				$result=open(IN,"<makepack-".$PROJECT.".conf");
 				if (! $result) { die "Error: Can't open conf file makepack-".$PROJECT.".conf for reading.\n"; }
 			    while(<IN>)
 			    {
 			    	$entry=$_;
-			    	
+
 			    	if ($entry =~ /^#/) { next; }	# Do not process comments
-					
+
 					$entry =~ s/\n//;
 
 			    	if ($entry =~ /^!(.*)$/)		# Exclude so remove file/dir
@@ -256,9 +256,9 @@ foreach my $PROJECT (@PROJECTLIST) {
 			    		print "Remove $BUILDROOT/$PROJECTLC/$1\n";
 			    		$ret=`rm -fr "$BUILDROOT/$PROJECTLC/"$1`;
 		    		    if ($? != 0) { die "Failed to delete a file to exclude declared into makepack-".$PROJECT.".conf file (Fails on line ".$entry.")\n"; }
-		    		    next; 
+		    		    next;
 			    	}
-					
+
 					$entry =~ /^(.*)\/[^\/]+/;
 			    	print "Create directory $BUILDROOT/$PROJECTLC/$1\n";
 			    	$ret=`mkdir -p "$BUILDROOT/$PROJECTLC/$1"`;
@@ -267,17 +267,17 @@ foreach my $PROJECT (@PROJECTLIST) {
 			    	    print "Copy $SOURCE/$entry into $BUILDROOT/$PROJECTLC/$entry\n";
 		    		    $ret=`cp -pr "$SOURCE/$entry" "$BUILDROOT/$PROJECTLC/$entry"`;
 		    		    if ($? != 0) { die "Failed to make copy of a file declared into makepack-".$PROJECT.".conf file (Fails on line ".$entry.")\n"; }
-		    		    
+
 						@timearray=localtime(time());
 						$fulldate=($timearray[5]+1900).'-'.($timearray[4]+1).'-'.$timearray[3].' '.$timearray[2].':'.$timearray[1];
 						open(VF,">$BUILDROOT/$PROJECTLC/$entry/version-".$PROJECTLC.".txt");
-				
+
 						print "Create version file $BUILDROOT/$PROJECTLC/$entry/version-".$PROJECTLC.".txt with date ".$fulldate."\n";
 						print VF "Version: ".$MAJOR.".".$MINOR.($BUILD ne ''?".$BUILD":"")."\n";
 						print VF "Build  : ".$fulldate."\n";
 						close VF;
 			    	}
-				}	
+				}
 				close IN;
 		    }
 		    print "Clean $BUILDROOT\n";
@@ -297,18 +297,18 @@ foreach my $PROJECT (@PROJECTLIST) {
 		    $ret=`rm -fr $BUILDROOT/$PROJECTLC/test`;
 		    $ret=`rm -fr $BUILDROOT/$PROJECTLC/Thumbs.db $BUILDROOT/$PROJECTLC/*/Thumbs.db $BUILDROOT/$PROJECTLC/*/*/Thumbs.db $BUILDROOT/$PROJECTLC/*/*/*/Thumbs.db $BUILDROOT/$PROJECTLC/*/*/*/*/Thumbs.db`;
 		    $ret=`rm -fr $BUILDROOT/$PROJECTLC/CVS* $BUILDROOT/$PROJECTLC/*/CVS* $BUILDROOT/$PROJECTLC/*/*/CVS* $BUILDROOT/$PROJECTLC/*/*/*/CVS* $BUILDROOT/$PROJECTLC/*/*/*/*/CVS* $BUILDROOT/$PROJECTLC/*/*/*/*/*/CVS*`;
-		}    
-	    
+		}
+
 	    # Build package for each target
 	    #------------------------------
 	    foreach my $target (keys %CHOOSEDTARGET) {
 	        if ($CHOOSEDTARGET{$target} < 0) { next; }
-	    
+
 	        print "\nBuild package for target $target\n";
-	        
+
 	    	if ($target eq 'TGZ') {
 	    		$NEWDESTI=$DESTI;
-				if (-d $DESTI.'/../modules') { $NEWDESTI=$DESTI.'/../modules'; } 
+				if (-d $DESTI.'/../modules') { $NEWDESTI=$DESTI.'/../modules'; }
 
 	    		print "Remove target $FILENAMETGZ.tgz...\n";
 	    		unlink("$NEWDESTI/$FILENAMETGZ.tgz");
@@ -325,15 +325,15 @@ foreach my $PROJECT (@PROJECTLIST) {
 	            }
 	            next;
 	    	}
-	
+
 	    	if ($target eq 'ZIP') {
 	    		$NEWDESTI=$DESTI;
 				if (-d $DESTI.'/../modules') { $NEWDESTI=$DESTI.'/../modules'; }
-				 
+
 	    		print "Remove target $FILENAMEZIP.zip...\n";
 	    		unlink "$NEWDESTI/$FILENAMEZIP.zip";
 	    		print "Compress $FILENAMEZIP into $FILENAMEZIP.zip...\n";
-	
+
 	            print "Go to directory $BUILDROOT/$PROJECTLC\n";
 	     		$olddir=getcwd();
 	     		chdir("$BUILDROOT/$PROJECTLC");
@@ -341,13 +341,13 @@ foreach my $PROJECT (@PROJECTLIST) {
 				print $cmd."\n";
 				$ret= `$cmd`;
 	            chdir("$olddir");
-	
+
 	            print "Move $FILENAMEZIP.zip to $NEWDESTI/$FILENAMEZIP.zip\n";
 	            $ret=`mv "$BUILDROOT/$FILENAMEZIP.zip" "$NEWDESTI/$FILENAMEZIP.zip"`;
 	            $ret=`chown $OWNER:$GROUP "$NEWDESTI/$FILENAMEZIP.zip"`;
 	    		next;
 	    	}
-	    
+
 	    	if ($target eq 'EXE') {
 	    		$NEWDESTI=$DESTI;
 				if (-d $DESTI.'/../modules') { $NEWDESTI=$DESTI.'/../modules'; }
@@ -362,11 +362,11 @@ foreach my $PROJECT (@PROJECTLIST) {
 	    		rename("$SOURCE\\dev\\build\\exe\\$FILENAMEEXE.exe","$NEWDESTI/$FILENAMEEXE.exe");
 	    		next;
 	    	}
-	    
+
 	    }
-	
+
 	}
-	
+
 	print "\n----- Summary -----\n";
 	foreach my $target (keys %CHOOSEDTARGET) {
 	    if ($CHOOSEDTARGET{$target} < 0) {

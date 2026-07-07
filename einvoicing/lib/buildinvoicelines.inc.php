@@ -290,7 +290,6 @@ foreach ($object->lines as $line) {
 				$depositFactDate = new DateTime(dol_print_date($origFact->date, 'dayrfc'));
 			}
 		}
-		$prepaidAmount += abs($line->total_ttc);
 		$line->qty      = -$line->qty;				// For a deposit, ->qty should be -1.
 		$line->subprice = abs($line->subprice);
 

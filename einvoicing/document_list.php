@@ -98,7 +98,7 @@ $groupby = GETPOST('groupby', 'aZ09');	// Example: $groupby = 'p.fk_opp_status' 
 
 $id = GETPOSTINT('id');
 $ref = GETPOST('ref', 'alpha');
-$sync_result = '';
+$sync_result = array();
 $maxflows = GETPOSTINT('maxflows');
 $syncFromDate = GETPOSTINT('syncfromdate');
 
@@ -133,6 +133,7 @@ $object = new Document($db);
 $extrafields = new ExtraFields($db);
 $diroutputmassaction = $conf->einvoicing->dir_output.'/temp/massgeneration/'.$user->id;
 $hookmanager->initHooks(array($contextpage)); 	// Note that conf->hooks_modules contains array of activated contexes
+$provider = null;
 
 // Fetch optionals attributes and labels
 $extrafields->fetch_name_optionals_label($object->table_element);
@@ -1163,8 +1164,8 @@ while ($i < $imaxinloop) {
 	if ($object->cdar_reason_code) {
 		$object->recap .= 'CDAR Reason Code: '.$object->cdar_reason_code.'<br>';
 	}
-	if ($object->cdar_reason_description) {
-		$object->recap .= 'CDAR Reason Description: '.$object->cdar_reason_description.'<br>';
+	if ($object->cdar_reason_desc) {
+		$object->recap .= 'CDAR Reason Description: '.$object->cdar_reason_desc.'<br>';
 	}
 	if ($object->cdar_reason_detail) {
 		$object->recap .= 'CDAR Reason Detail: '.$object->cdar_reason_detail.'<br>';
