@@ -233,7 +233,7 @@ abstract class AbstractPDPProvider
 	public function fetchFlowData($flowId, $docType, $callType = '')
 	{
 		if (!in_array($docType, ['Metadata', 'Original', 'Converted', 'ReadableView'])) {
-			$docType = 'Converted';
+			$docType = 'Original';
 		}
 
 		// Retrieve the PDF file converted by Access Point

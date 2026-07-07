@@ -465,6 +465,8 @@ class EInvoicing
 		self::STATUS_SUSPENDED
 	];
 
+	public const SUPPLIER_INVOICE_LINES_IMPORT_AUTO = 1;
+	public const SUPPLIER_INVOICE_LINES_IMPORT_MANUAL = 2;
 
 	/**
 	 * Constructor

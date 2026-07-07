@@ -33,6 +33,9 @@ class ProtocolManager
 	 */
 	private $protocolsList;
 
+	public const EXCEPTION_UNSUPPORTED_FORMAT = -100;
+	public const EXCEPTION_UNKNOWN_FORMAT = -101;
+
 
 	/**
 	 * Initialize available protocols.
@@ -118,7 +121,7 @@ class ProtocolManager
 	 * This function analyzes the provided string to identify
 	 * which e-invoicing protocol it conforms to (e.g., FACTURX, CII, UBL).
 	 *
-	 * @param 	string 		$content 	XML content of the invoice.
+	 * @param 	string 		$content 	File content of the invoice (PDF or XML)
 	 * @return 	string|null 			Returns the name of the detected protocol or null if unknown.
 	 */
 	public function detectProtocolFromContent($content)
@@ -133,5 +136,38 @@ class ProtocolManager
 			return 'UBL';
 		}
 		return null; // Unknown protocol
+	}
+
+	/**
+	 * Allow to directly get a procotol object from a file content
+	 * @param ?string $content 	File content of the invoice (PDF or XML)
+	 * @return array{protocol_object:AbstractProtocol|null, detected_protocol_name:string, success:bool, error_code:int}
+	 */
+	public static function getProtocolFromContent(?string $content)
+	{
+		global $db;
+
+		$protocol = null;
+		$res = 0;
+
+		$protocolManager = new ProtocolManager($db);
+		$detectedProtocolName = $protocolManager->detectProtocolFromContent($content);
+		if (isset($detectedProtocolName)) {
+			$protocol = $protocolManager->getProtocol($detectedProtocolName);
+			if (is_object($protocol) && is_subclass_of($protocol, AbstractProtocol::class, false)) {
+				$res = 1;
+			} else {
+				$res = self::EXCEPTION_UNSUPPORTED_FORMAT;
+			}
+		} else {
+			$res = self::EXCEPTION_UNKNOWN_FORMAT;
+		}
+
+		return [
+			'protocol_object' => $protocol,
+			'detected_protocol_name' => $detectedProtocolName,
+			'success' => $res > 0,
+			'error_code' => $res,
+		];
 	}
 }

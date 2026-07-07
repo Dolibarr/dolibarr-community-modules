@@ -16,6 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+dol_include_once('einvoicing/class/providers/AbstractPDPProvider.class.php');
 
 /**
  * \file    einvoicing/class/protocols/CommonProtocol.class.php
@@ -1685,5 +1686,50 @@ trait CommonProtocol
 
 		dol_syslog(get_class($this) . '::_linkSupplierInvoiceToPurchaseOrder Failed to link order ' . $orderId . ' to invoice ' . $supplierInvoice->id . ': ' . $supplierInvoice->error, LOG_ERR);
 		return '';
+
+	}
+
+	/**
+	 * Create/insert supplier invoice lines in DB using $lines property of the supplier invoice object
+	 * @param FactureFournisseur $supplierInvoice The supplier invoice to add lines
+	 * @return bool
+	 */
+	public function createSupplierInvoiceLinesIntoDatabase(FactureFournisseur $supplierInvoice): bool
+	{
+		foreach ($supplierInvoice->lines as $i => $val) {
+			$sql = 'INSERT INTO '.MAIN_DB_PREFIX.'facture_fourn_det (fk_facture_fourn, special_code, fk_remise_except)';
+			$sql .= " VALUES (".((int) $supplierInvoice->id).", ".((int) $supplierInvoice->lines[$i]->special_code).", ".($supplierInvoice->lines[$i]->fk_remise_except > 0 ? ((int) $supplierInvoice->lines[$i]->fk_remise_except) : 'NULL').')';
+
+			$resql_insert = $this->db->query($sql);
+			if ($resql_insert) {
+				$idligne = $this->db->last_insert_id(MAIN_DB_PREFIX.'facture_fourn_det');
+
+				$res = $supplierInvoice->updateline(
+					$idligne,
+					$supplierInvoice->lines[$i]->desc ? $supplierInvoice->lines[$i]->desc : $supplierInvoice->lines[$i]->description,
+					$supplierInvoice->lines[$i]->subprice,
+					$supplierInvoice->lines[$i]->tva_tx.($supplierInvoice->lines[$i]->vat_src_code ? ' ('.$supplierInvoice->lines[$i]->vat_src_code.')' : ''),
+					$supplierInvoice->lines[$i]->localtax1_tx,
+					$supplierInvoice->lines[$i]->localtax2_tx,
+					$supplierInvoice->lines[$i]->qty,
+					$supplierInvoice->lines[$i]->fk_product,
+					'HT',
+					(!empty($supplierInvoice->lines[$i]->info_bits) ? $supplierInvoice->lines[$i]->info_bits : ''),
+					$supplierInvoice->lines[$i]->product_type,
+					$supplierInvoice->lines[$i]->remise_percent,
+					0,
+					$supplierInvoice->lines[$i]->date_start,
+					$supplierInvoice->lines[$i]->date_end,
+					$supplierInvoice->lines[$i]->array_options,
+					$supplierInvoice->lines[$i]->fk_unit,
+					$supplierInvoice->lines[$i]->multicurrency_subprice,
+					$supplierInvoice->lines[$i]->ref_supplier
+				);
+			} else {
+				return false;
+			}
+		}
+
+		return true;
 	}
 }

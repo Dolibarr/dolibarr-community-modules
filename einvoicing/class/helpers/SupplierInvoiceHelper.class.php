@@ -327,4 +327,29 @@ class SupplierInvoiceHelper
 		}
 		return false;
 	}
+
+	/**
+	 * Indicates if the type of import for supplier invoice lines is auto or not :
+	 * - first try to get import type from societe
+	 * - if not set, then use default module parameter
+	 * @param int $socId The soc id to test
+	 * @return bool
+	 */
+	public static function isSupplierImportInvoiceLinesAuto($socId)
+	{
+		global $db;
+
+		$soc = new Societe($db);
+
+		if ($socId > 0) {
+			$res = $soc->fetch($socId);
+			if ($res > 0 && isset($soc->array_options['options_einvoicing_supplier_invoice_lines_import_type']) && $soc->array_options['options_einvoicing_supplier_invoice_lines_import_type'] > 0) {
+				return $soc->array_options['options_einvoicing_supplier_invoice_lines_import_type'] == Einvoicing::SUPPLIER_INVOICE_LINES_IMPORT_AUTO;
+			} else {
+				return getDolGlobalInt('EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_TYPE') == Einvoicing::SUPPLIER_INVOICE_LINES_IMPORT_AUTO;
+			}
+		}
+
+		return false;
+	}
 }
