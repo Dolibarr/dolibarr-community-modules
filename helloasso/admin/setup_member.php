@@ -113,10 +113,10 @@ $item = $formSetup->newItem('HELLOASSO_FORM_MEMBERSHIP_SLUG');
 $item->helpText = $langs->transnoentities('HELLOASSO_FORM_MEMBERSHIP_SLUG_HELP');
 $item = $formSetup->newItem('HELLOASSO_FORM_PAGINATION_PAGES_SIZE');
 $item->helpText = $langs->transnoentities('HELLOASSO_FORM_PAGINATION_PAGES_SIZE_HELP');
-$item->defaultFieldValue = 20;
+$item->defaultFieldValue = '20';
 $item = $formSetup->newItem('HELLOASSO_MAX_FORM_PAGINATION_PAGES');
 $item->helpText = $langs->transnoentities('HELLOASSO_MAX_FORM_PAGINATION_PAGES_HELP');
-$item->defaultFieldValue = 100;
+$item->defaultFieldValue = '100';
 $item = $formSetup->newItem('HELLOASSO_FORM_CREATE_THIRDPARTY')->setAsYesNo();
 $item->helpText = $langs->transnoentities('HELLOASSO_FORM_CREATE_THIRDPARTY_HELP');
 $item->fieldParams['forcereload'] = "1";
@@ -131,7 +131,7 @@ if (getDolGlobalInt("HELLOASSO_FORM_CREATE_THIRDPARTY")) {
 }
 $item = $formSetup->newItem('HELLOASSO_SUBSCRIPTION_COMPLEMENTARYACTIONS')->setAsSelect($complementaryarray);
 $item->helpText = $langs->transnoentities('HELLOASSO_SUBSCRIPTION_COMPLEMENTARYACTIONS_HELP');
-$item->defaultFieldValue = 0;
+$item->defaultFieldValue = '0';
 $setupnotempty += count($formSetup->items);
 
 $dirmodels = array_merge(array('/'), (array) $conf->modules_parts['models']);
@@ -148,12 +148,12 @@ if ($action == 'test') {
 	$helloassomemberutils->helloassoSyncMembersToDolibarr(1, "test");
 	header("Location: ".$_SERVER["PHP_SELF"]);
 } elseif ($action == 'addmembertype') {
-	$dolibarrmembertype = GETPOST("select_mapdolibarrhelloassomember", 'int');
+	$dolibarrmembertype = (int) GETPOST("select_mapdolibarrhelloassomember", 'int');
 	if (empty($dolibarrmembertype)) {
 		setEventMessages($langs->transnoentities("ErrorHelloAssoBadParameter", $langs->transnoentities("HelloAssoDolibarrMemberTypeID")), null, 'errors');
 		$error++;
 	}
-	$helloassomembertype = GETPOST("input_mapdolibarrhelloassomember", 'int');
+	$helloassomembertype = (int) GETPOST("input_mapdolibarrhelloassomember", 'int');
 	if (empty($helloassomembertype)) {
 		setEventMessages($langs->transnoentities("ErrorHelloAssoBadParameter", $langs->transnoentities("HelloAssoMemberTypeID")), null, 'errors');
 		$error++;
@@ -319,7 +319,7 @@ $membertypes = $staticmembertype->liste_array(1);
 print '<select id="select_mapdolibarrhelloassomember" class="flat minwidth300" name="select_mapdolibarrhelloassomember">';
 print '<option value="-1">'.$langs->trans("HelloAssoSelectMemberType").'</option>';
 foreach ($membertypes as $key => $membertype) {
-	$disabled = in_array($key, $helloassomemberutils->helloasso_member_types) ? true : false;
+	$disabled = in_array($key, $helloassomemberutils->helloasso_member_types);
 	$selected = GETPOST("select_mapdolibarrhelloassomember", 'int') == $key;
 	print '<option value="'.$key.'" '.($disabled ? 'disabled="disabled"' : '').' '.($selected ? "selected" : "").'>'.$membertype.'</option>';
 }

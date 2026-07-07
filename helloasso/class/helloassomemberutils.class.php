@@ -76,7 +76,7 @@ class HelloAssoMemberUtils
 	/**
 	 *  Constructor
 	 *
-	 *  @param	DoliDb		$db      Database handler
+	 *  @param	DoliDB		$db      Database handler
 	 */
 	public function __construct($db)
 	{
@@ -106,8 +106,6 @@ class HelloAssoMemberUtils
 		$this->helloasso_date_last_fetch = getDolGlobalString("HELLOASSO_DATE_LAST_MEMBER_FETCH");
 
 		$this->helloasso_tokens = helloassoDoConnection();
-
-		return 1;
 	}
 
 	/**
@@ -144,13 +142,13 @@ class HelloAssoMemberUtils
 
 		//Error management with errorPosts
 		if (!empty($this->errorPosts)) {
-			foreach ($this->errorPosts as $key => $err) {
+			foreach ($this->errorPosts as $err) {
 				$firstname = $err["member"]->user->firstName;
 				$lastname = $err["member"]->user->lastName;
 				if (!empty($this->customfields['email'])) {
 					$email = "";
 					foreach ($err["member"]->customFields as $key => $field) {
-						if ($field->name == $this->customfields['email']) {
+						if ($field->name == ($this->customfields['email'] ?? '')) {
 							$email = $field->answer;
 							break;
 						}
@@ -163,7 +161,7 @@ class HelloAssoMemberUtils
 
 		$nberrors = count($this->errorPosts);
 		if ($dryrun == 1) {
-			$mesg = $langs->transnoentities("HelloAssoMembersNothingDone", $this->nbPosts, $nberrors);
+			$mesg = $langs->transnoentities("HelloAssoMembersNothingDone", (string) $this->nbPosts, (string) $nberrors);
 			if ($mode != "cron") {
 				setEventMessages($mesg, null, 'warnings');
 				dol_syslog(get_class($this)."::helloassoSyncMembersToDolibarr ended setEventMessage with mesg = ".$mesg, LOG_DEBUG);
@@ -180,7 +178,7 @@ class HelloAssoMemberUtils
 			}
 		} else {
 			if ($mode != "cron") {
-				$mesg = $langs->transnoentities("HelloAssoMembersAddedSucessfully", $this->nbPosts);
+				$mesg = $langs->transnoentities("HelloAssoMembersAddedSucessfully", (string) $this->nbPosts);
 				if ($this->nbPosts == 0 && $nberrors == 0) {
 					$mesg = $langs->transnoentities("HelloAssoMembersNoNewMembers");
 				}
@@ -191,7 +189,7 @@ class HelloAssoMemberUtils
 				}
 				dol_syslog(get_class($this)."::helloassoSyncMembersToDolibarr ended with setEventMessage with mesg = ".$mesg, LOG_DEBUG);
 			} else {
-				$mesg = $langs->transnoentities("HelloAssoMembersAddedSucessfully", $this->nbPosts);
+				$mesg = $langs->transnoentities("HelloAssoMembersAddedSucessfully", (string) $this->nbPosts);
 				if ($this->nbPosts == 0 && $nberrors == 0) {
 					$mesg = $langs->transnoentities("HelloAssoMembersNoNewMembers");
 				} else {
@@ -217,6 +215,7 @@ class HelloAssoMemberUtils
 		$datelastfetch = 0;
 		dol_syslog(get_class($this)."::helloassoPostMembersToDolibarr ", LOG_DEBUG);
 
+		$headers = array();
 		$headers[] = "Authorization: ".ucfirst($this->helloasso_tokens["token_type"])." ".$this->helloasso_tokens["access_token"];
 		$headers[] = "Accept: application/json";
 		$headers[] = "Content-Type: application/json";
@@ -225,11 +224,12 @@ class HelloAssoMemberUtils
 		$formslug = str_replace('_', '-', dol_string_nospecial(strtolower(dol_string_unaccent($this->form_slug)), '-'));
 		$urlforform = "https://".urlencode($this->helloasso_url)."/v5/organizations/".urlencode($assoslug)."/forms/Membership/".urlencode($formslug).'/public';
 		dol_syslog("Send Get to url=".$urlforform.", to get HelloAsso Member type information", LOG_DEBUG);
+		$date_start_subscription = 0;
 
 		$ret = getURLContent($urlforform, 'GET', "", 1, $headers);
 		if ($ret["http_code"] != 200) {
 			$arrayofmessage = array();
-			if (!empty($ret2['content'])) {
+			if (!empty($ret['content'])) {
 				$arrayofmessage = json_decode($ret['content'], true);
 			}
 			if (!empty($arrayofmessage['message'])) {
@@ -295,10 +295,10 @@ class HelloAssoMemberUtils
 				}
 			}
 			if (!$error) {
-				$membertype->fetch($this->helloasso_member_types[$newmember->tierId]);
+				$membertype->fetch($this->helloasso_member_types[$newmember->tierId] ?? 0);
 
 				// Try to find dolibarr member linked to HelloAsso member
-				$dolibarrmembertype = $this->helloasso_member_types[$newmember->tierId];
+				$dolibarrmembertype = $this->helloasso_member_types[$newmember->tierId] ?? '';
 				$sql = "SELECT rowid as id";
 				$sql .= " FROM ".MAIN_DB_PREFIX."adherent as a";
 				$sql .= " WHERE a.firstname = '".$db->escape($newmember->user->firstName)."'";
@@ -307,8 +307,8 @@ class HelloAssoMemberUtils
 				$sql .= " AND entity IN (".getEntity($member->element).")";
 				if (!empty($this->customfields['email'])) {
 					$email = "";
-					foreach ($newmember->customFields as $key => $field) {
-						if ($field->name == $this->customfields['email']) {
+					foreach ($newmember->customFields as $field) {
+						if ($field->name == ($this->customfields['email'] ?? '')) {
 							$email = $field->answer;
 							break;
 						}
@@ -351,7 +351,7 @@ class HelloAssoMemberUtils
 						$newthirdparty = new Societe($db);
 						$newthirdparty->name = $member->getFullName($langs);
 						$newthirdparty->client = 1;
-						$newthirdparty->code_client = -1;
+						$newthirdparty->code_client = '-1';
 						$newthirdpartyid = $newthirdparty->create($user);
 						if ($newthirdpartyid <= 0) {
 							$this->error = $newthirdparty->error;
@@ -414,7 +414,7 @@ class HelloAssoMemberUtils
 									$subscriptioncomplementaryaction = "none";
 									break;
 							}
-							foreach ($newmember->payments as $key => $payment) {
+							foreach ($newmember->payments as $payment) {
 								$paymentmethod = "";
 								switch ($payment->paymentMeans) {
 									case 'BankTransfer':
@@ -435,7 +435,7 @@ class HelloAssoMemberUtils
 								}
 								$label = $langs->transnoentitiesnoconv("HelloAssoMemberPaymentLabel", $payment->id);
 								$paymentamount = $payment->amount /100;
-								$result = $member->subscriptionComplementaryActions($subscriptionid, $subscriptioncomplementaryaction, $bankaccountid, $date_start_subscription, $payment->date, $paymentmethod, $label, $paymentamount, '');
+								$result = $member->subscriptionComplementaryActions($subscriptionid, $subscriptioncomplementaryaction, $bankaccountid, (int) $date_start_subscription, $payment->date, $paymentmethod, $label, $paymentamount, '');
 								if ($result <= 0) {
 									$this->error = $member->error;
 									$this->errors = array_merge($member->errors, $this->errors);
@@ -493,14 +493,16 @@ class HelloAssoMemberUtils
 		$maxmemberpages = getDolGlobalInt("HELLOASSO_MAX_FORM_PAGINATION_PAGES", 100);
 		$pagesize = getDolGlobalInt("HELLOASSO_FORM_PAGINATION_PAGES_SIZE", 20);
 
+		$headers = array();
 		$headers[] = "Authorization: ".ucfirst($this->helloasso_tokens["token_type"])." ".$this->helloasso_tokens["access_token"];
 		$headers[] = "Accept: application/json";
 		$headers[] = "Content-Type: application/json";
 
 		$assoslug = str_replace('_', '-', dol_string_nospecial(strtolower(dol_string_unaccent($this->organization_slug)), '-'));
 		$formslug = str_replace('_', '-', dol_string_nospecial(strtolower(dol_string_unaccent($this->form_slug)), '-'));
-		$parambase = '?pageSize='.urlencode($pagesize).'&pageIndex=1&withDetails=true';
+		$parambase = '?pageSize='.urlencode((string) $pagesize).'&pageIndex=1&withDetails=true';
 		$paramfrom = "";
+		$helloasso_date_last_fetch_tms = 0;  // Initialise
 		if ($helloasso_date_last_fetch != "") {
 			$helloasso_date_last_fetch_tms = dol_stringtotime($helloasso_date_last_fetch);
 			$datefromtimestamp = dol_get_first_hour($helloasso_date_last_fetch_tms);
@@ -671,7 +673,7 @@ class HelloAssoMemberUtils
 		$validitytype = $object->validityType;
 		$duration_value = "1";
 		$duration_unit = "y";
-		$subscription = 1;
+		$subscription = '1';
 		switch ($validitytype) {
 			case 'Custom':
 				$duration_value = num_between_day(dol_stringtotime($object->startDate), dol_stringtotime($object->endDate), 1);
@@ -681,13 +683,13 @@ class HelloAssoMemberUtils
 			case 'Illimited':
 				$duration_value = "";
 				$duration_unit = "";
-				$subscription = 0;
+				$subscription = '0';
 				break;
 
 			default:
 				$duration_value = "1";
 				$duration_unit = "y";
-				$subscription = 1;
+				$subscription = '1';
 				break;
 		}
 		$amount = $object->tiers[0]->price / 100;
@@ -752,7 +754,7 @@ class HelloAssoMemberUtils
 				if ($num_rows > 0) {
 					$obja = $db->fetch_object($resql);
 					if ($obja->nbmembers > 0) {
-						$login = $login.((string) ($obja->nbmembers + 1));
+						$login .= ((string) ($obja->nbmembers + 1));
 					}
 				}
 			} else {
@@ -768,7 +770,7 @@ class HelloAssoMemberUtils
 			$newthirdparty = new Societe($db);
 			$newthirdparty->name = $createmember->getFullName($langs);
 			$newthirdparty->client = 1;
-			$newthirdparty->code_client = -1;
+			$newthirdparty->code_client = '-1';
 			$newthirdpartyid = $newthirdparty->create($user);
 			if ($newthirdpartyid <= 0) {
 				$this->error = $newthirdparty->error;

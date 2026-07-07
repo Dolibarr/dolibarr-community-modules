@@ -29,7 +29,7 @@ require_once DOL_DOCUMENT_ROOT.'/core/class/commonhookactions.class.php';
 /**
  * Class ActionsHelloAsso
  */
-class ActionsHelloAsso extends CommonHookActions
+class ActionsHelloAsso extends CommonHookActions  // @phan-suppress-current-line PhanRedefinedExtendedClass
 {
 	/**
 	 * @var DoliDB Database handler.
@@ -117,7 +117,7 @@ class ActionsHelloAsso extends CommonHookActions
 	/**
 	 * Overloading the doMassActions function : replacing the parent's function with the one below
 	 *
-	 * @param   array           $parameters     Hook metadatas (context, etc...)
+	 * @param   array<string,mixed|array<mixed>>	$parameters     Hook metadatas (context, etc...)
 	 * @param   CommonObject    $object         The object to process (an invoice if you are in invoice module, a propale in propale's module, etc...)
 	 * @param   string          $action         Current action (if set). Generally create or edit or null
 	 * @param   HookManager     $hookmanager    Hook manager propagated to allow calling another hook
@@ -129,7 +129,7 @@ class ActionsHelloAsso extends CommonHookActions
 
 		/* print_r($parameters); print_r($object); echo "action: " . $action; */
 		if (in_array($parameters['currentcontext'], array('somecontext1', 'somecontext2'))) {		// do something only for the context 'somecontext1' or 'somecontext2'
-			foreach ($parameters['toselect'] as $objectid) {
+			foreach ($parameters['toselect'] as $objectid) {  // @phan-suppress-current-line PhanPluginEmptyStatementForeachLoop
 				// Do action on each object id
 			}
 
@@ -193,7 +193,7 @@ class ActionsHelloAsso extends CommonHookActions
 		dol_syslog(get_class($this).'::executeHooks action='.$action);
 
 		/* print_r($parameters); print_r($object); echo "action: " . $action; */
-		if (in_array($parameters['currentcontext'], array('somecontext1', 'somecontext2'))) {
+		if (in_array($parameters['currentcontext'], array('somecontext1', 'somecontext2'))) {  // @phan-suppress-current-line  PhanPluginEmptyStatementIf
 			// do something only for the context 'somecontext1' or 'somecontext2'
 		}
 
@@ -216,7 +216,7 @@ class ActionsHelloAsso extends CommonHookActions
 		dol_syslog(get_class($this).'::executeHooks action='.$action);
 
 		/* print_r($parameters); print_r($object); echo "action: " . $action; */
-		if (in_array($parameters['currentcontext'], array('somecontext1', 'somecontext2'))) {
+		if (in_array($parameters['currentcontext'], array('somecontext1', 'somecontext2'))) {  // @phan-suppress-current-line  PhanPluginEmptyStatementIf
 			// do something only for the context 'somecontext1' or 'somecontext2'
 		}
 
@@ -538,7 +538,7 @@ class ActionsHelloAsso extends CommonHookActions
 		$amount = price2num(GETPOST("amount", 'alpha'));
 		$newamount = price2num(GETPOST("newamount", 'alpha'));
 		if ((float) $newamount != (int) $newamount) {
-			$newamount = strval(round($newamount, 2));
+			$newamount = strval(round((float) $newamount, 2));
 		} else {
 			$newamount = strval((int) $newamount);
 		}
