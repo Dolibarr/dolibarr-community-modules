@@ -296,6 +296,8 @@ class SupplierInvoiceHelper
 					if ($factureFournisseur->fetch((int) $supplierInvoiceId) > 0) {
 						return true;
 					}
+				} else {
+					return true;
 				}
 			} elseif ($db->num_rows($resql) > 1) {
 				throw new Exception('Duplicate entry in einvoicing_document for supplier invoice with id '.$supplierInvoiceId);
