@@ -331,7 +331,6 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
 			$item->defaultFieldValue = '3';
 		}
 	}
-
 }
 
 

@@ -149,7 +149,7 @@ class SupplierInvoiceHelper
 					$currentRate = (string) $taxDetailsByRate['rateApplicablePercent'];
 					if (array_key_exists($currentRate, $dolSupplierInvoiceVatDetails)) {
 						$dolVatAmount = floatval($dolSupplierInvoiceVatDetails[$currentRate]['vat_amount']);
-						$dolVatBasis   = floatval($dolSupplierInvoiceVatDetails[$currentRate]['vat_basis_amount']);
+						$dolVatBasis = floatval($dolSupplierInvoiceVatDetails[$currentRate]['vat_basis_amount']);
 
 						if (!self::areAmountsEqual($dolVatBasis, $taxDetailsByRate['basisAmount'])) {
 							$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonVatBasisDifference', $currentRate, $taxDetailsByRate['basisAmount'], $dolVatBasis);
@@ -170,7 +170,7 @@ class SupplierInvoiceHelper
 		}
 
 		if (count($amountErrors['current']) > 0) {
-			$errors = array_unique($errors + ($amountErrors['totalofround'] ?? []) + ($amountErrors['roundoftotal'] ?? []));
+			$errors = array_merge($errors, $amountErrors['totalofround'] ?? [], $amountErrors['roundoftotal'] ?? []);
 
 			if ($amountErrors['current'] == $amountErrors['totalofround'] && count($amountErrors['roundoftotal']) === 0) {
 				$errors[] = $langs->trans('SupplierInvoiceComparisonSuggestVatCalculationMode', 2);
@@ -188,8 +188,9 @@ class SupplierInvoiceHelper
 	/**
 	 * Return supplier invoice details used to compare dol supplier invoice and e-invoice
 	 *
-	 * @param FactureFournisseur $supplierInvoice The supplier invoice object
-	 * @return array<array{vat_amount: float, vat_basis_amount: float}>
+	 * @param FactureFournisseur 	$supplierInvoice 	The supplier invoice object
+	 * @param int 					$vatComputeMode 	The VAT mode used to calculate VAT amounts
+	 * @return array{total_ht: float, total_ttc: float, total_tva: float, vat_by_rate: array{vat_amount: float, vat_basis_amount: float}}
 	 */
 	private static function getInvoiceDetailsForComparison(FactureFournisseur $supplierInvoice, $vatComputeMode)
 	{
@@ -225,7 +226,7 @@ class SupplierInvoiceHelper
 
 			$lineVatBasisAmountWithoutDiscount = ($line->pu_ht * $line->qty);
 			$lineDiscountAmount = $lineVatBasisAmountWithoutDiscount * $line->remise_percent / 100;
-			$lineVatAmount = $line->pu_ht * $rate / 100;
+			$lineVatAmount = $line->pu_ht * floatval($rate) / 100;
 			if ($vatComputeMode == 1) {
 				$lineVatAmount = self::round($lineVatAmount, $roundPrecision);
 			}
@@ -245,9 +246,9 @@ class SupplierInvoiceHelper
 			$details['vat_by_rate'][$rate]['vat_amount'] = self::round($details['vat_by_rate'][$rate]['vat_amount'], $roundPrecision);
 		}
 
-		$details['total_ht'] = self::round($details['total_ht'], 2);
-		$details['total_ttc'] = self::round($details['total_ttc'], 2);
-		$details['total_tva'] = self::round($details['total_tva'], 2);
+		$details['total_ht'] = self::round($details['total_ht'], $roundPrecision);
+		$details['total_ttc'] = self::round($details['total_ttc'], $roundPrecision);
+		$details['total_tva'] = self::round($details['total_tva'], $roundPrecision);
 
  		return $details;
 	}
@@ -256,9 +257,9 @@ class SupplierInvoiceHelper
 	 * Return VAT details (by VAT rate) from a supplier invoice
 	 *
 	 * @param FactureFournisseur $supplierInvoice The supplier invoice object
-	 * @return array<array{vat_amount: float, vat_basis_amount: float}>
+	 * @return array{vat_amount: float, vat_basis_amount: float}
 	 */
-	public static function getVatDetails(FactureFournisseur $supplierInvoice)
+	public static function getVatDetails(FactureFournisseur $supplierInvoice): array
 	{
 		$vatByRate = array();
 
