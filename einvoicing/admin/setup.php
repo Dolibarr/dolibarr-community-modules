@@ -191,8 +191,9 @@ $item->cssClass = 'minwidth500';
 $item = $formSetup->newItem('EINVOICING_LIVE')->setAsYesNo();
 $item->fieldParams['forcereload'] = 1;
 $currentPdp = getDolGlobalString('EINVOICING_PDP');
-if (!empty($providersConfig[$currentPdp]['live_help_text'])) {
-	$item->helpText = $providersConfig[$currentPdp]['live_help_text'];
+$liveHelpText = (string) ($providersConfig[$currentPdp]['live_help_text'] ?? '');
+if ($liveHelpText !== '') {
+	$item->helpText = $liveHelpText;
 }
 
 // End of selection of platform partner

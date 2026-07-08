@@ -68,6 +68,7 @@ class PDPProviderManager
 				'is_enabled' => 1,
 				'prod_account_admin_url' => 'https://www.esalink.com/contact/',
 				'test_account_admin_url' => 'https://www.esalink.com/contact/',
+				'live_help_text' => '',
 			),
 			'SUPERPDP' => array(
 				'class' => 'SuperPDPProvider',
@@ -80,6 +81,7 @@ class PDPProviderManager
 				'is_enabled' => 1,
 				'prod_account_admin_url' => 'https://www.superpdp.tech/app/users/create',
 				'test_account_admin_url' => 'https://www.superpdp.tech/app/users/create',
+				'live_help_text' => '',
 			),
 			'PDPLIBRE' => array(
 				'class'                   => 'PDPlibrePDPProvider',
@@ -87,7 +89,7 @@ class PDPProviderManager
 				'provider_countries'      => array('FR'),
 				'provider_name'           => picto_from_langcode('FR').' PDPlibre <span class="opacitymedium">(proxy)</span>',
 				'description'             => 'PDPlibre PA Integration (AFNOR XP_Z12-013)',
-				'is_enabled'              => getDolGlobalString('EINVOICING_ENABLE_PDPLIBRE'),
+				'is_enabled'              => (int) getDolGlobalString('EINVOICING_ENABLE_PDPLIBRE'),
 				'prod_account_admin_url'  => 'https://pdplibre.org/',
 				'test_account_admin_url'  => 'https://pdplibre.org/',
 				'live_help_text'          => 'Sandbox (test) : <b>https://pp.esalink.pdplibre.org/</b><br>Production : <b>https://esalink.pdplibre.org/</b>',
@@ -101,6 +103,7 @@ class PDPProviderManager
 				'is_enabled' => 0,
 				'prod_account_admin_url' => 'https://example.com',
 				'test_account_admin_url' => 'https://example.com',
+				'live_help_text' => '',
 			)
 		);
 
@@ -131,6 +134,7 @@ class PDPProviderManager
 				'is_enabled' => 1,
 				'prod_account_admin_url' => $urltorenew,
 				'test_account_admin_url' => $urltorenew,
+				'live_help_text' => '',
 			);
 		}
 
@@ -146,6 +150,7 @@ class PDPProviderManager
 				'is_enabled' => 1,
 				'prod_account_admin_url' => $urltorenew,
 				'test_account_admin_url' => $urltorenew,
+				'live_help_text' => '',
 			);
 		}
 
