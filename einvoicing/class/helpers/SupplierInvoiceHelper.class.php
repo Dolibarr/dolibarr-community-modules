@@ -33,17 +33,17 @@ dol_include_once('fourn/class/fournisseur.facture.class.php');
 class SupplierInvoiceHelper
 {
 	/**
-	 * Compare amounts according to a number of digit after coma and return true if they are equal.
+	 * Compare amounts according to a number of digits after decimal point and return true if they are equal.
 	 *
 	 * @param float $amount1    The first amount to compare
 	 * @param float $amount2    The second amount to compare
-	 * @param ?int $roundPrecision The number of digits after coma to apply round()
+	 * @param ?int $roundPrecision The number of digits after decimal point to apply round()
 	 * @return bool
 	 */
 	private static function areAmountsEqual($amount1, $amount2, ?int $roundPrecision = null): bool
 	{
 		if (!isset($roundPrecision)) {
-			$roundPrecision = getDolGlobalInt('einvoicing_SUPPLIER_INVOICE_COMPARISON_ROUND_PRECISION', 3);
+			$roundPrecision = getDolGlobalInt('EINVOICING_SUPPLIER_INVOICE_COMPARISON_ROUND_PRECISION', 3);
 		}
 
 		return (round($amount1, $roundPrecision) === round($amount2, $roundPrecision));
@@ -107,72 +107,70 @@ class SupplierInvoiceHelper
 		// Mode 1 : round VAT amount of each line and then sum rounded amounts
 		// Mode 2 : sum VAT amount of each line and then round total
 
-		// ? Start transaction to be able to calculate VAT amounts in 2 different modes :
-		// ? - do it this way because VAT calculation is directly made in update_price() method which also updates database, but in our case, we don't want to update database
-		// ? - our need here is to calculate in mode 1 and mode 2 without to have to rewrite all VAT calculation logic
+		// ? Have to recode calculation of mode 1 & mode 2 because there is currently no Dolibarr function allowing to properly
+		// ? apply VAT mode 1 or 2 only on the supplier object without updating database.
+		// ? Previously tried with CommonObject::update_price(), but it was not appropriate because it always refetch data from lines
+		// ? instead of using current object ones.
 
-		/* FIXME Disabled. Generates critical problem. Adding a rollback inside a more global transaction break all workflows. On Postgresql, it also cancel any following commits.
-		 * A check to compare data is a readonly operation and should NEVER open transaction and try to modify data.
-		 */
-		/*
-		$db->begin();
-
+		// As we can't know if VAT of supplier invoice has been calculated in mode 1 or 2)
+		// we need to calculate VAT in 3 different modes to be able to suggest the good mode (if differences are detected) :
+		// - current : if current supplier invoice data are identical to e-invoice, no need to suggest to switch VAT mode
+		// - totalofround (mode 1) : round VAT amount of each line then sum rounded amounts
+		// - roundoftotal (mode 2) : sum VAT amount of each line then round total
 		$calculationRules = [
-			'current',
-			'totalofround',
-			'roundoftotal',
+			'current' => 0,
+			'totalofround' => 1,
+			'roundoftotal' => 2,
 		];
 
 		$amountErrors = [];
 
-		foreach ($calculationRules as $calculationRule) {
-			if ($calculationRule != 'current') {
-				$noDatabaseUpdate = 0;
-				$dolSupplierInvoice->update_price(0, (($calculationRule == 'totalofround') ? '0' : '1'), $noDatabaseUpdate, $dolSupplierInvoice->thirdparty);
-				$dolSupplierInvoice->fetch($dolSupplierInvoice->id);
-			}
+		foreach ($calculationRules as $calculationRule => $vatComputeMode) {
+			$details = self::getInvoiceDetailsForComparison($dolSupplierInvoice, $vatComputeMode);
 
 			// VAT excl. total
-			if (!self::areAmountsEqual(floatval($dolSupplierInvoice->total_ht), $parsedHeader['lineTotalAmount'])) {
+			if (!self::areAmountsEqual(floatval($details['total_ht']), $parsedHeader['lineTotalAmount'])) {
 				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatExclDifference', $parsedHeader['lineTotalAmount'], floatval($dolSupplierInvoice->total_ht));
 			}
 
 			// VAT incl. total
-			if (!self::areAmountsEqual(floatval($dolSupplierInvoice->total_ttc), $parsedHeader['grandTotalAmount'])) {
+			if (!self::areAmountsEqual(floatval($details['total_ttc']), $parsedHeader['grandTotalAmount'])) {
 				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatInclDifference', $parsedHeader['grandTotalAmount'], floatval($dolSupplierInvoice->total_ttc));
 			}
 
 			// VAT total
-			if (!self::areAmountsEqual(floatval($dolSupplierInvoice->total_tva), $parsedHeader['taxTotalAmount'])) {
+			if (!self::areAmountsEqual(floatval($details['total_tva']), $parsedHeader['taxTotalAmount'])) {
 				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatDifference', $parsedHeader['taxTotalAmount'], floatval($dolSupplierInvoice->total_tva));
 			}
 
-			$dolSupplierInvoiceVatDetails = self::getVatDetails($dolSupplierInvoice);
+			$dolSupplierInvoiceVatDetails = $details['vat_by_rate'];
 			foreach ($parsedHeader['taxBreakdown'] as $taxDetailsByRate) {
 				if ($taxDetailsByRate['typeCode'] === 'VAT') {
-					if (array_key_exists((string) $taxDetailsByRate['rateApplicablePercent'], $dolSupplierInvoiceVatDetails)) {
-						$dolVatAmount = floatval($dolSupplierInvoiceVatDetails[(string) $taxDetailsByRate['rateApplicablePercent']]['vat_amount']);
-						$dolVatBasis   = floatval($dolSupplierInvoiceVatDetails[(string) $taxDetailsByRate['rateApplicablePercent']]['vat_basis_amount']);
+					$currentRate = (string) $taxDetailsByRate['rateApplicablePercent'];
+					if (array_key_exists($currentRate, $dolSupplierInvoiceVatDetails)) {
+						$dolVatAmount = floatval($dolSupplierInvoiceVatDetails[$currentRate]['vat_amount']);
+						$dolVatBasis   = floatval($dolSupplierInvoiceVatDetails[$currentRate]['vat_basis_amount']);
 
 						if (!self::areAmountsEqual($dolVatBasis, $taxDetailsByRate['basisAmount'])) {
-							$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonVatBasisDifference', $taxDetailsByRate['rateApplicablePercent'], $taxDetailsByRate['basisAmount'], $dolVatBasis);
+							$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonVatBasisDifference', $currentRate, $taxDetailsByRate['basisAmount'], $dolVatBasis);
 						}
 						if (!self::areAmountsEqual($dolVatAmount, $taxDetailsByRate['calculatedAmount'])) {
-							$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonVatRateDifference', $taxDetailsByRate['rateApplicablePercent'], $taxDetailsByRate['calculatedAmount'], $dolVatAmount);
+							$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonVatRateDifference', $currentRate, $taxDetailsByRate['calculatedAmount'], $dolVatAmount);
 						}
 					} else {
-						$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonVatRateNotFound', $taxDetailsByRate['rateApplicablePercent']);
+						$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonVatRateNotFound', $currentRate);
 					}
 				}
 			}
 
 			if (count($amountErrors['current']) == 0) {
+				// Don't need to calculate VAT mode 1 & 2 if supplier invoice and e-invoice are identical with current mode
 				break;
 			}
 		}
 
 		if (count($amountErrors['current']) > 0) {
-			$errors = array_merge($errors, $amountErrors['current']);
+			$errors = array_unique($errors + ($amountErrors['totalofround'] ?? []) + ($amountErrors['roundoftotal'] ?? []));
 
 			if ($amountErrors['current'] == $amountErrors['totalofround'] && count($amountErrors['roundoftotal']) === 0) {
 				$errors[] = $langs->trans('SupplierInvoiceComparisonSuggestVatCalculationMode', 2);
@@ -181,14 +179,77 @@ class SupplierInvoiceHelper
 			}
 		}
 
-		// Rollback because we don't want to persist in database the changes made by the different calls to update_price() (see comment before the $db->begin() for more details)
-		$db->rollback();
-		*/
-
 		return [
 			'identical' => (count($errors) == 0),
 			'errors' => $errors,
 		];
+	}
+
+	/**
+	 * Return supplier invoice details used to compare dol supplier invoice and e-invoice
+	 *
+	 * @param FactureFournisseur $supplierInvoice The supplier invoice object
+	 * @return array<array{vat_amount: float, vat_basis_amount: float}>
+	 */
+	private static function getInvoiceDetailsForComparison(FactureFournisseur $supplierInvoice, $vatComputeMode)
+	{
+		// If mode 0 => use current supplier invoice data
+		if ($vatComputeMode == 0) {
+			$details = array(
+				'total_ht' => $supplierInvoice->total_ht,
+				'total_ttc' => $supplierInvoice->total_ttc,
+				'total_tva' => $supplierInvoice->total_tva,
+				'vat_by_rate' => self::getVatDetails($supplierInvoice)
+			);
+
+			return $details;
+		}
+
+		// Manage mode 1 (roundoftotal) & mode 2 (totalofround)
+		$details = array(
+			'total_ht' => 0,
+			'total_ttc' => 0,
+			'total_tva' => 0,
+		);
+		$roundPrecision = 2;
+
+		foreach ($supplierInvoice->lines as $line) {
+			$rate = (string) price2num($line->tva_tx);
+
+			if (!isset($details['vat_by_rate'][$rate])) {
+				$details['vat_by_rate'][$rate] = array(
+					'vat_basis_amount' => 0,
+					'vat_amount' => 0
+				);
+			}
+
+			$lineVatBasisAmountWithoutDiscount = ($line->pu_ht * $line->qty);
+			$lineDiscountAmount = $lineVatBasisAmountWithoutDiscount * $line->remise_percent / 100;
+			$lineVatAmount = $line->pu_ht * $rate / 100;
+			if ($vatComputeMode == 1) {
+				$lineVatAmount = self::round($lineVatAmount, $roundPrecision);
+			}
+
+			$lineTotalHt = $lineVatBasisAmountWithoutDiscount - $lineDiscountAmount;
+			$lineTotalTtc = $lineVatBasisAmountWithoutDiscount - $lineDiscountAmount + $lineVatAmount;
+
+			$details['vat_by_rate'][$rate]['vat_basis_amount'] += $lineTotalHt;
+			$details['vat_by_rate'][$rate]['vat_amount'] += $lineVatAmount;
+
+			$details['total_ht'] += $lineTotalHt;
+			$details['total_ttc'] += $lineTotalTtc;
+			$details['total_tva'] += $lineVatAmount;
+		}
+
+		foreach ($details['vat_by_rate'] as $rate => $rateDetails) {
+			$details['vat_by_rate'][$rate]['vat_amount'] = self::round($details['vat_by_rate'][$rate]['vat_amount'], $roundPrecision);
+		}
+
+		$details['total_ht'] = self::round($details['total_ht'], 2);
+		$details['total_ttc'] = self::round($details['total_ttc'], 2);
+		$details['total_tva'] = self::round($details['total_tva'], 2);
+
+ 		return $details;
 	}
 
 	/**
@@ -320,11 +381,29 @@ class SupplierInvoiceHelper
 					if ($factureFournisseur->fetch((int) $supplierInvoiceId) > 0) {
 						return true;
 					}
+				} else {
+					return true;
 				}
 			} elseif ($db->num_rows($resql) > 1) {
 				throw new Exception('Duplicate entry in einvoicing_document for supplier invoice with id '.$supplierInvoiceId);
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * Round an amount according to a number of digits after decimal point and return it.
+	 *
+	 * @param float $amount    		The amount to round
+	 * @param ?int $roundPrecision 	The number of digits after decimal point to apply round()
+	 * @return float
+	 */
+	private static function round($amount, ?int $roundPrecision = null): float
+	{
+		if (!isset($roundPrecision)) {
+			$roundPrecision = getDolGlobalInt('EINVOICING_SUPPLIER_INVOICE_COMPARISON_ROUND_PRECISION', 3);
+		}
+
+		return round($amount, $roundPrecision);
 	}
 }
