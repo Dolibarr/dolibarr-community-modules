@@ -1921,7 +1921,8 @@ class FacturXProtocol extends AbstractProtocol
 	 * @param  string $xml Raw XML content
 	 * @return array<string,float|string>|false
 	 */
-	public function parseInvoiceHeader($xml) {
+	public function parseInvoiceHeader($xml)
+	{
 		$ciiProtocol = new CIIProtocol($this->db);
 		return $ciiProtocol->parseInvoiceHeader($xml);
 	}
@@ -1932,7 +1933,8 @@ class FacturXProtocol extends AbstractProtocol
 	 * @param  string $xml Raw XML content
 	 * @return array<int,array<string,null|bool|float|string|array<mixed>>>
 	 */
-	public function parseInvoiceLines($xml) {
+	public function parseInvoiceLines($xml)
+	{
 		$ciiProtocol = new CIIProtocol($this->db);
 		return $ciiProtocol->parseInvoiceHeader($xml);
 	}

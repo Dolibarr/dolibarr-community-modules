@@ -1686,7 +1686,6 @@ trait CommonProtocol
 
 		dol_syslog(get_class($this) . '::_linkSupplierInvoiceToPurchaseOrder Failed to link order ' . $orderId . ' to invoice ' . $supplierInvoice->id . ': ' . $supplierInvoice->error, LOG_ERR);
 		return '';
-
 	}
 
 	/**

@@ -437,7 +437,6 @@ class ActionsEInvoicing extends CommonHookActions
 			!SupplierInvoiceHelper::isSupplierImportInvoiceLinesAuto($object->socid) &&
 			$object->status == FactureFournisseur::STATUS_DRAFT &&
 			$user->hasRight('facture', 'write')) {
-
 			// ---------------------------------------------------------------
 			// Modal reimport lines
 			// ---------------------------------------------------------------
