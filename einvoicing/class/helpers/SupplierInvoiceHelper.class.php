@@ -245,7 +245,7 @@ class SupplierInvoiceHelper
 
 				if (empty($resdoc) || is_null($document->xml_data) || $document->xml_data == '') {
 					$providerManager = new PDPProviderManager($db);
-					$provider = $providerManager->getProvider(strtoupper($document->provider));
+					$provider = $providerManager->getProvider(strtoupper((string) $document->provider));
 
 					/* FIXME Disabled: Create a lof of regressions and problems:
 					- We must never a dependency (like ZugferdDocumentPdfReaderExt) when common use of code does not need it.

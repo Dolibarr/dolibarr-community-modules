@@ -807,7 +807,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				$formconfirm = $form->formconfirm(
 					DOL_URL_ROOT . "/fourn/facture/card.php?id={$object->id}&action=confirm_sendStatusMessage&pdpstatuscode={$pdpstatuscode}",
 					$langs->trans('SendStatusMessage'),
-					$langs->trans('ConfirmSendStatusMessage', $object->ref, $einvoicing->getStatusLabel($pdpstatuscode)),
+					$langs->trans('ConfirmSendStatusMessage', (string) $object->ref, (string) $einvoicing->getStatusLabel($pdpstatuscode)),
 					'confirm_sendStatusMessage',
 					$formquestion,
 					'yes',
