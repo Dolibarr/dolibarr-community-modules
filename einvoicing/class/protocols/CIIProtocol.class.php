@@ -574,7 +574,7 @@ class CIIProtocol extends AbstractProtocol
 		if ($supplierInvoice->type === '-1') {
 			return ['res' => -1, 'message' => 'Unfounded dolibarr corresponding Invoice code for document type code: ' . ($parsedHeader['documenttypecode'] ?? 'NA')];
 		}
-		$supplierInvoice->date = isset($parsedHeader['documentdate']) && $parsedHeader['documentdate'] instanceof DateTime ? $parsedHeader['documentdate']->format('Y-m-d') : null;
+		$supplierInvoice->date = !empty($parsedHeader['documentdate']) ? dol_stringtotime($parsedHeader['documentdate']) : null;
 
 
 		// Set currency
@@ -582,6 +582,12 @@ class CIIProtocol extends AbstractProtocol
 
 		// Set import_key
 		$supplierInvoice->import_key = AbstractPDPProvider::$EINVOICING_LAST_IMPORT_KEY;
+
+		// Set payment due date, payment terms and payment method
+		$paymentInfoRes = $this->_applyPaymentInfoToSupplierInvoice($supplierInvoice, $parsedHeader);
+		if (!empty($paymentInfoRes['message'])) {
+			dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource ' . $paymentInfoRes['message'], LOG_DEBUG, 0, '_einvoicing');
+		}
 
 
 		$remise_already_used_line_level_ids = array();

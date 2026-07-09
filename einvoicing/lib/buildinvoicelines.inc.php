@@ -21,6 +21,9 @@
  * \brief   Code to generate the array of invoice and lines
  */
 
+/**
+ * @phan-file-suppress PhanAccessMethodPrivate
+ */
 
 /**
  * @var Conf 		$conf
@@ -34,13 +37,14 @@
  * @var CIIProtocol|FacturXProtocol	$this
  */
 '
+@phan-var-force Translate 	$langs
 @phan-var-force Translate 	$outputlangs
 @phan-var-force Facture   	$invoice
 @phan-var-force CIIProtocol|FacturXProtocol	$this
 ';
 
 // Use customer language
-if (empty($outputlangs) || ! ($outputlangs instanceof Translate)) {
+if (!isset($outputlangs) || !($outputlangs instanceof Translate)) {
 	$outputlangs = $langs;
 }
 $newlang = '';
@@ -92,7 +96,7 @@ if ($promise_code == '' && !empty($customerOrderReferenceList)) {
 // Bank account
 $account = new Account($db);
 if ($object->fk_account > 0) {
-	$account->fetch($object->fk_account);
+	$account->fetch((int) $object->fk_account);
 } elseif (getDolGlobalInt('FACTURE_RIB_NUMBER')) {
 	$account->fetch(getDolGlobalInt('FACTURE_RIB_NUMBER'));
 }
@@ -173,6 +177,7 @@ if (isset($object->thirdparty->default_lang)) {
 }
 // @phan-suppress-next-line PhanUndeclaredProperty
 if (isset($object->default_lang)) {
+	// @phan-suppress-next-line PhanUndeclaredProperty
 	$newlang = $object->default_lang;
 }
 if (GETPOST('lang_id', 'alphanohtml') != "") {
@@ -233,7 +238,7 @@ $depositlines      	= [];
 $globalDiscounts	= [];
 $billing_period    	= [];
 $numligne          	= 1;
-
+// @phan-suppress-current-line PhanTypeArraySuspiciousNullable
 foreach ($object->lines as $line) {
 	$isDepositLine = 0;
 
@@ -290,7 +295,6 @@ foreach ($object->lines as $line) {
 				$depositFactDate = new DateTime(dol_print_date($origFact->date, 'dayrfc'));
 			}
 		}
-		$prepaidAmount += abs($line->total_ttc);
 		$line->qty      = -$line->qty;				// For a deposit, ->qty should be -1.
 		$line->subprice = abs($line->subprice);
 
@@ -364,8 +368,8 @@ foreach ($object->lines as $line) {
 			}
 		}
 		if (isset($line->multilangs)) {
-			$libelle     = $line->multilangs[$newlang]["label"];
-			$description = $line->multilangs[$newlang]["description"];
+			$libelle     = $line->multilangs[$newlang]["label"];  // @phan-suppress-current-line PhanTypeArraySuspiciousNullable
+			$description = $line->multilangs[$newlang]["description"];  // @phan-suppress-current-line PhanTypeArraySuspiciousNullable
 		}
 	}
 	if (empty($libelle)) {
@@ -418,9 +422,9 @@ foreach ($object->lines as $line) {
 	// or if
 	// - There is no discount percent but currency accuracy for total (MAIN_MAX_DECIMALS_UNIT) was not set to 2.
 	// TODO Use calculate_price() with a mode to round to 2 after each temporary calculation.
-	$line_total_ht = price2num($line_unit_price_with_discount * $line->qty, 2);				// Need to round to 2 as defined by EN16931 rules after each calculation.
-	$line_total_tva = price2num($line_unit_price_with_discount * $line->qty * ($line->tva_tx > 0 ? $line->tva_tx / 100 : 0), 2);
-	$line_total_ttc = price2num($line_total_ht + $line_total_tva, 2);
+	$line_total_ht = price2num((float) $line_unit_price_with_discount * $line->qty, 2);				// Need to round to 2 as defined by EN16931 rules after each calculation.
+	$line_total_tva = price2num((float) $line_unit_price_with_discount * $line->qty * ($line->tva_tx > 0 ? $line->tva_tx / 100 : 0), 2);
+	$line_total_ttc = price2num((float) $line_total_ht + (float) $line_total_tva, 2);
 
 	// Uncomment for test using the most accurate possible calculation (but not following the e-invoice rule to round to 2 digit at each step of calculation)
 	if (getDolGlobalInt('EINVOICING_USE_DOLIBARR_ALREADY_CALCULATED_AMOUNTS')) {
@@ -601,9 +605,9 @@ $invoiceData = [
 
 	// Notes
 	'documentNotePublic'   => $object->note_public ?: "",
-	'documentNotePMT'      => getDolGlobalString('EINVOICING_PMT') ?: $outputlangs->trans("NoInvoiceCollectionFees"),
-	'documentNotePMD'      => getDolGlobalString('EINVOICING_PMD') ?: $outputlangs->trans('NoLatePaymentFees'),
-	'documentNoteAAB'      => getDolGlobalString('EINVOICING_AAB') ?: $outputlangs->trans('NoEarlyPaymentDiscount'),
+	'documentNotePMT'      => getDolGlobalString('EINVOICING_PMT') ?: $outputlangs->transnoentities("NoInvoiceCollectionFees"),
+	'documentNotePMD'      => getDolGlobalString('EINVOICING_PMD') ?: $outputlangs->transnoentities('NoLatePaymentFees'),
+	'documentNoteAAB'      => getDolGlobalString('EINVOICING_AAB') ?: $outputlangs->transnoentities('NoEarlyPaymentDiscount'),
 	'documentNotes'        => [],
 
 	// Seller part
@@ -754,7 +758,7 @@ if ($shipAddress === null && !empty($object->linkedObjectsIds['shipping']) && is
 		$tmpexpedition = new Expedition($db);
 		if ($tmpexpedition->fetch($expeditionId) > 0 && !empty($tmpexpedition->fk_delivery_address)) {
 			$shipContact = new Contact($db);
-			if ($shipContact->fetch($tmpexpedition->fk_delivery_address) > 0) {
+			if ($shipContact->fetch((int) $tmpexpedition->fk_delivery_address) > 0) {
 				$shipName = trim($shipContact->getFullName($outputlangs));
 				if ($shipName === '') {
 					$shipName = $object->thirdparty->name;

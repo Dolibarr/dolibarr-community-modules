@@ -71,6 +71,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 			'prod_api_url'  => 'https://api.superpdp.tech/afnor-flow/v1/',
 			'test_api_url'  => 'https://api.superpdp.tech/afnor-flow/v1/',
 			'ap_api_url' 	=> 'https://api.superpdp.tech/v1.beta/',
+			'prod_afnor_directory_url' => 'https://api.superpdp.tech/afnor-directory/',
+			'test_afnor_directory_url' => 'https://api.superpdp.tech/afnor-directory/',
 			'client_id'     => getDolGlobalString('EINVOICING_SUPERPDP_CLIENT_ID'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '')),
 			'client_secret' => getDolGlobalString('EINVOICING_SUPERPDP_CLIENT_SECRET'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '')),
 			'dol_prefix'    => getDolGlobalString('EINVOICING_PDP') == 'SUPERPDPViaPartner' ? 'EINVOICING_SUPERPDPVIAPARTNER' : 'EINVOICING_SUPERPDP',
@@ -951,6 +953,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		global $langs;
 
 		$outputLog = array(); // Feedback to display
+		$invoice_path = null;
 
 		// Generate sample invoice
 		$einvoicing = new EInvoicing($this->db);
@@ -965,7 +968,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				$this->errors[] = $this->exchangeProtocol->error;
 				return 0;
 			}
-			$invoice_path = $resarray['path'];
+			$invoice_path = (string) $resarray['path'];
 			$ref = $resarray['ref'];
 		} catch (Exception $e) {
 			$this->errors[] = $e->getMessage();
@@ -977,8 +980,10 @@ class SuperPDPProvider extends AbstractPDPProvider
 			return 0;
 		}
 
+
 		// invoice_path is something like "/.../documents/einvoicing/temp/..." or "/.../documents/facture/temp/..."
 
+		$invoice_path = (string) $invoice_path;  // Phan workaround
 		if ($invoice_path) {
 			$outputLog[] = "Sample invoice generated successfully.";
 		}
@@ -1100,8 +1105,14 @@ class SuperPDPProvider extends AbstractPDPProvider
 		// The OAuth token endpoint lives on the auth base (/oauth2/), not the Flow API base. This applies to
 		// every token grant: client_credentials, authorization_code and refresh_token.
 		$url = $this->getApiUrl(($resource == 'token' || $callType == 'get_access_token') ? 'auth' : 'api') . $resource;
-		if ($resource == 'validation_reports') {
+		if ($resource == 'validation_reports' || strpos($resource, 'french_directory') === 0) {
+			// validation_reports and the French directory lookup both live on the AP API base (v1.beta).
 			$url = $this->getApiUrl('ap_api') . $resource;
+		}
+		if (strpos($resource, 'afnor-directory/') === 0) {
+			// Standardized AFNOR Directory Service (XP Z12-013) lives on its own base. The 'afnor-directory/'
+			// prefix is only a routing marker and is stripped before appending the real resource path.
+			$url = $this->getApiUrl('afnor_directory') . substr($resource, strlen('afnor-directory/'));
 		}
 
 		$httpheader = array();
@@ -1179,11 +1190,88 @@ class SuperPDPProvider extends AbstractPDPProvider
 	}
 
 	/**
+	 * Check whether a recipient (SIREN) is routable, preferring the standardized AFNOR Directory
+	 * Service (XP Z12-013) handled by the parent, and falling back to the SuperPDP specific
+	 * french_directory endpoint only when the standardized lookup is not available.
+	 *
+	 * @param 	string 	$idprof1 	Recipient SIREN (idprof1)
+	 * @return 	array{status:string,reachable:int,entries:int,active:int,identifier:string,message:string,httpcode:int}
+	 */
+	public function checkRecipientDirectory($idprof1)
+	{
+		// Standardized AFNOR directory check first (works for any conformant Approved Platform).
+		$result = parent::checkRecipientDirectory($idprof1);
+		if (in_array($result['status'], array('routable', 'inactive', 'absent'), true)) {
+			return $result;
+		}
+
+		// Standardized lookup unavailable or errored: fall back to the SuperPDP specific endpoint.
+		return $this->checkRecipientDirectoryLegacy($idprof1);
+	}
+
+	/**
+	 * Legacy fallback: check the recipient reception address through the SuperPDP specific directory
+	 * endpoint (GET french_directory/entries on the v1.beta base). Kept for platforms or environments
+	 * where the standardized AFNOR Directory Service is not reachable.
+	 *
+	 * @param 	string 	$idprof1 	Recipient SIREN (idprof1)
+	 * @return 	array{status:string,reachable:int,entries:int,active:int,identifier:string,message:string,httpcode:int}
+	 */
+	private function checkRecipientDirectoryLegacy($idprof1)
+	{
+		$result = array('status' => 'error', 'reachable' => -1, 'entries' => 0, 'active' => 0, 'identifier' => '', 'message' => '', 'httpcode' => 0);
+
+		$siren = preg_replace('/[^0-9]/', '', (string) $idprof1);
+		if ($siren === '') {
+			$result['message'] = 'EInvoicingDirectoryNoSiren';
+			return $result;
+		}
+
+		$resource = 'french_directory/entries?number=' . urlencode($siren);
+		$response = $this->callApi($resource, 'GET', false, array(), 'precheck_directory');
+		$result['httpcode'] = (int) (isset($response['status_code']) ? $response['status_code'] : 0);
+
+		if ($result['httpcode'] != 200) {
+			$result['message'] = isset($response['errorMessage']) ? $response['errorMessage'] : ('HTTP ' . $result['httpcode']);
+			return $result;
+		}
+
+		$data = array();
+		if (isset($response['response']['data']) && is_array($response['response']['data'])) {
+			$data = $response['response']['data'];
+		}
+		$result['entries'] = count($data);
+		foreach ($data as $entry) {
+			if (!empty($entry['is_active'])) {
+				$result['active']++;
+				if ($result['identifier'] === '' && !empty($entry['identifier'])) {
+					$result['identifier'] = $entry['identifier'];
+				}
+			}
+		}
+
+		if ($result['entries'] == 0) {
+			// Recipient not present in the directory at all.
+			$result['status'] = 'absent';
+			$result['reachable'] = 0;
+		} elseif ($result['active'] == 0) {
+			// Present but no active routing line (reason NON_TRANSMISE): still cannot receive.
+			$result['status'] = 'inactive';
+			$result['reachable'] = 0;
+		} else {
+			$result['status'] = 'routable';
+			$result['reachable'] = 1;
+		}
+
+		return $result;
+	}
+
+	/**
 	 * Synchronize flows with Access Point.
 	 *
 	 * @param   int   $syncFromDate     Timestamp from which to start synchronization. If 0, begins from epoch (1970-01-01).
 	 * @param   int   $limit            Maximum number of flows to synchronize. 0 means no limit.
-	 * @return 	bool|array{res:int<-1,1>, messages:array<string>, details?:array<string>, actions?:array<string>} 	True on success, false on failure along with messages, details for debugging, and suggested optional actions.
+	 * @return 	bool|array{res:int, messages:string[], totalFlows?:?int, alreadyExist?:int, syncedFlows?:int, batchlimit?:int, actions?:array<string,array{actionurl:string,actioncode:string,action:string,businessmessage:string}>, details?:string[]} 	True on success, false on failure along with messages, details for debugging, and suggested optional actions.
 	 */
 	public function syncFlows($syncFromDate = 0, $limit = 0)
 	{
@@ -1963,6 +2051,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				// - If trackingId is null, we try to retrieve the linked invoice using the flowId
 				//   stored in the einvoicing_extlinks table when the invoice was sent.
 
+				$obj = null;
 				$document->fk_element_type = 'facture';
 				if (empty($document->tracking_idref)) {
 					// Try to get tracking_idref from einvoicing_extlinks table

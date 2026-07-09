@@ -371,7 +371,7 @@ class modEInvoicing extends DolibarrModules
 			'langs' => 'einvoicing@einvoicing',
 			'position' => 1000,
 			'enabled' => 'isModEnabled("einvoicing")',
-			'perms' => '$user->hasRight("invoice", "read") || $user->hasRight("supplier_invoice", "read")',
+			'perms' => '$user->hasRight("einvoicing", "read")',
 			'target' => '',
 			'user' => 2,
 			'object' => '',
@@ -388,7 +388,7 @@ class modEInvoicing extends DolibarrModules
 			'langs' => 'einvoicing@einvoicing',
 			'position' => 1001,
 			'enabled' => 'isModEnabled("einvoicing")',
-			'perms' => '$user->hasRight("invoice", "read") || $user->hasRight("supplier_invoice", "read")',
+			'perms' => '$user->hasRight("einvoicing", "write")',
 			'target' => '',
 			'user' => 2,
 			'object' => '',
@@ -422,7 +422,7 @@ class modEInvoicing extends DolibarrModules
 			'langs' => 'einvoicing@einvoicing',
 			'position' => 1003,
 			'enabled' => 'isModEnabled("einvoicing")',
-			'perms' => '$user->hasRight("invoice", "read") || $user->hasRight("supplier_invoice", "read")',
+			'perms' => '$user->hasRight("einvoicing", "read")',
 			'target' => '',
 			'user' => 2,
 			'object' => '',
@@ -611,17 +611,17 @@ class modEInvoicing extends DolibarrModules
 		// Invoice extrafields
 		// Chorus fields
 		// TODO : Remove Chorus extrafields and move them to einvoicing_extlinks table
-		$result = $extrafields->addExtraField('d4d_separator', $langs->trans('ChorusSeparator'), 'separate', 95024, '', 'facture', 0, 1, '', $param, 1, '', 1, 0, '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")');
-		$result = $extrafields->addExtraField('d4d_service_code', $langs->trans('ChorusServiceCode'), 'varchar', 95026, 100, 'facture', 0, 0, '', null, 1, '', 1, 0, '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 1);
-		$result = $extrafields->addExtraField('d4d_contract_number', $langs->trans('ChorusContractNumber'), 'varchar', 95028, 50, 'facture', 0, 0, '', null, 1, '', 1, 0, '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 1);
-		$result = $extrafields->addExtraField('d4d_promise_code', $langs->trans('ChorusPromiseCode'), 'varchar', 95030, 50, 'facture', 0, 0, '', null, 1, '', 1, 0, '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 1);
-		$result = $extrafields->addExtraField('d4d_chorus_id', $langs->trans('ChorusId'), 'varchar', 95032, 36, 'facture', 0, 0, '', null, 1, '', 1, 0, '$object->array_options["options_chorus_id"]', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 1);
+		$result = $extrafields->addExtraField('d4d_separator', $langs->trans('ChorusSeparator'), 'separate', 95024, '', 'facture', 0, 1, '', $param, 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")');
+		$result = $extrafields->addExtraField('d4d_service_code', $langs->trans('ChorusServiceCode'), 'varchar', 95026, '100', 'facture', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 1);
+		$result = $extrafields->addExtraField('d4d_contract_number', $langs->trans('ChorusContractNumber'), 'varchar', 95028, '50', 'facture', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 1);
+		$result = $extrafields->addExtraField('d4d_promise_code', $langs->trans('ChorusPromiseCode'), 'varchar', 95030, '50', 'facture', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 1);
+		$result = $extrafields->addExtraField('d4d_chorus_id', $langs->trans('ChorusId'), 'varchar', 95032, '36', 'facture', 0, 0, '', '', 1, '', '1', '0', '$object->array_options["options_chorus_id"]', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 1);
 
 		// Same fields for orders
-		$result = $extrafields->addExtraField('d4d_separator', $langs->trans('ChorusSeparator'), 'separate', 95042, '', 'commande', 0, 1, '', $param, 1, '', 1, 0, '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")');
-		$result = $extrafields->addExtraField('d4d_service_code', $langs->trans('ChorusServiceCode'), 'varchar', 95044, 100, 'commande', 0, 0, '', null, 1, '', 1, 0, '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 1);
-		$result = $extrafields->addExtraField('d4d_contract_number', $langs->trans('ChorusContractNumber'), 'varchar', 95046, 50, 'commande', 0, 0, '', null, 1, '', 1, 0, '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 1);
-		$result = $extrafields->addExtraField('d4d_promise_code', $langs->trans('ChorusPromiseCode'), 'varchar', 95048, 50, 'commande', 0, 0, '', null, 1, '', 1, 0, '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 1);
+		$result = $extrafields->addExtraField('d4d_separator', $langs->trans('ChorusSeparator'), 'separate', 95042, '', 'commande', 0, 1, '', $param, 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")');
+		$result = $extrafields->addExtraField('d4d_service_code', $langs->trans('ChorusServiceCode'), 'varchar', 95044, '100', 'commande', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 1);
+		$result = $extrafields->addExtraField('d4d_contract_number', $langs->trans('ChorusContractNumber'), 'varchar', 95046, '50', 'commande', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 1);
+		$result = $extrafields->addExtraField('d4d_promise_code', $langs->trans('ChorusPromiseCode'), 'varchar', 95048, '50', 'commande', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 1);
 
 		// Fix condition of extrafields for old installations
 		$sql = array_merge(
@@ -637,16 +637,16 @@ class modEInvoicing extends DolibarrModules
 			'd4d_chorus_id', //$attrname
 			$langs->trans('ChorusId'), //$label
 			'varchar', //$type
-			95050, //$length
+			'95050', //$length
 			'facture', //$elementtype
 			0, //$unique
 			0, //$required
 			1112, //$pos
-			null, //$param
+			array(), //$param
 			1, //$alwayseditable
 			'', //$perms
-			1, //$list
-			0, //$help
+			'1', //$list
+			'0', //$help
 			'', //$default
 			'', //$computerd
 			'', //$entity
@@ -657,51 +657,51 @@ class modEInvoicing extends DolibarrModules
 			array() //$moreparams
 		);
 
-			/*
-			CREATE TABLE llx_einvoicing_call(
-				-- BEGIN MODULEBUILDER FIELDS
-				rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL,
-				date_creation datetime NOT NULL,
-				tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-				fk_user_creat integer NOT NULL,
-				fk_user_modif integer,
-				status integer NOT NULL, 			-- Status of the call
-				call_type varchar(50) NOT NULL, 	-- Type of API call
-				method varchar(10), 				-- HTTP method
-				endpoint varchar(255) NOT NULL, 	-- API endpoint URL
-				request_body text, 					-- Request body content (JSON)
-				response text, 						-- Response content (JSON)
-				entity integer DEFAULT 1, 			-- Entity
-				fk_provider integer NOT NULL 		-- Foreign key to provider (EsaLink...)
-				-- END MODULEBUILDER FIELDS
-			) ENGINE=innodb;
+		/*
+		CREATE TABLE llx_einvoicing_call(
+			-- BEGIN MODULEBUILDER FIELDS
+			rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL,
+			date_creation datetime NOT NULL,
+			tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			fk_user_creat integer NOT NULL,
+			fk_user_modif integer,
+			status integer NOT NULL, 			-- Status of the call
+			call_type varchar(50) NOT NULL, 	-- Type of API call
+			method varchar(10), 				-- HTTP method
+			endpoint varchar(255) NOT NULL, 	-- API endpoint URL
+			request_body text, 					-- Request body content (JSON)
+			response text, 						-- Response content (JSON)
+			entity integer DEFAULT 1, 			-- Entity
+			fk_provider integer NOT NULL 		-- Foreign key to provider (EsaLink...)
+			-- END MODULEBUILDER FIELDS
+		) ENGINE=innodb;
 
-			CREATE TABLE llx_einvoicing_document(
-				-- BEGIN MODULEBUILDER FIELDS
-				rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL,
-				date_creation datetime NOT NULL,
-				tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-				fk_user_creat integer NOT NULL,
-				fk_user_modif integer,
-				fk_element_id integer,
-				fk_element_type varchar(50),
-				status integer NOT NULL, 			-- Status of the document
-				fk_call integer,		 			-- Reference to the original call
-				flow_id integer, 					-- PDP Flow identifier
-				tracking_id integer, 				-- Document tracking identifier
-				flow_type varchar(255), 			-- Type of flow (CustomerInvoice, etc.)
-				flow_direction varchar(10), 		-- Direction of flow (In/Out)
-				flow_syntax varchar(50), 			-- Document syntax (Factur-X, CII, UBL, etc.)
-				flow_profile varchar(50), 			-- Profile used (Basic, Cius, etc.)
-				ack_status varchar(50), 			-- Acknowledgment status (Success, Error, Pending)
-				ack_reason_code varchar(255), 		-- Reason code for acknowledgment
-				ack_info text, 						-- Additional acknowledgment information
-				document_body text, 				-- Full document content XML
-				entity integer DEFAULT 1 			-- Entity identifier
-				-- END MODULEBUILDER FIELDS
-			) ENGINE=innodb;
+		CREATE TABLE llx_einvoicing_document(
+			-- BEGIN MODULEBUILDER FIELDS
+			rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL,
+			date_creation datetime NOT NULL,
+			tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			fk_user_creat integer NOT NULL,
+			fk_user_modif integer,
+			fk_element_id integer,
+			fk_element_type varchar(50),
+			status integer NOT NULL, 			-- Status of the document
+			fk_call integer,		 			-- Reference to the original call
+			flow_id integer, 					-- PDP Flow identifier
+			tracking_id integer, 				-- Document tracking identifier
+			flow_type varchar(255), 			-- Type of flow (CustomerInvoice, etc.)
+			flow_direction varchar(10), 		-- Direction of flow (In/Out)
+			flow_syntax varchar(50), 			-- Document syntax (Factur-X, CII, UBL, etc.)
+			flow_profile varchar(50), 			-- Profile used (Basic, Cius, etc.)
+			ack_status varchar(50), 			-- Acknowledgment status (Success, Error, Pending)
+			ack_reason_code varchar(255), 		-- Reason code for acknowledgment
+			ack_info text, 						-- Additional acknowledgment information
+			document_body text, 				-- Full document content XML
+			entity integer DEFAULT 1 			-- Entity identifier
+			-- END MODULEBUILDER FIELDS
+		) ENGINE=innodb;
 
-			*/
+		*/
 
 		//$result0=$extrafields->addExtraField('einvoicing_separator1', "Separator 1", 'separator', 1,  0, 'thirdparty',   0, 0, '', array('options'=>array(1=>1)), 1, '', 1, 0, '', '', 'einvoicing@einvoicing', 'isModEnabled("einvoicing")');
 		//$result1=$extrafields->addExtraField('einvoicing_myattr1', "New Attr 1 label", 'boolean', 1,  3, 'thirdparty',   0, 0, '', '', 1, '', -1, 0, '', '', 'einvoicing@einvoicing', 'isModEnabled("einvoicing")');

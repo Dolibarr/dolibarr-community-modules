@@ -24,6 +24,9 @@ dol_include_once('einvoicing/class/providers/AbstractPDPProvider.class.php');
  * \brief   Common methods for all AP protocols.
  */
 
+/**
+ * @mixin AbstractProtocol
+ */
 trait CommonProtocol
 {
 	/**
@@ -221,13 +224,7 @@ trait CommonProtocol
 				}
 				break;
 			default:
-				if ($global == 1 || $global == 2) {
-					$retour = "0060";	// DUNS
-					// $retour = "EM";	// Emails
-				} else {
-					$retour = "0060";	// DUNS
-					// $retour = "EM";	// Emails
-				}
+				$retour = "0060";	// DUNS
 		}
 		return $retour;
 	}
@@ -288,9 +285,9 @@ trait CommonProtocol
 
 		$tmp = calcul_price_total($line->qty, $line->subprice, $line->remise_percent, $line->tva_tx, 0, 0, 0, 'HT', 0, 0);
 
-		$line->total_ht = $tmp[0];
-		$line->total_ttc = $tmp[2];
-		$line->total_tva = $tmp[1];
+		$line->total_ht = (float) $tmp[0];
+		$line->total_ttc = (float) $tmp[2];
+		$line->total_tva = (float) $tmp[1];
 		$line->multicurrency_tx = 2;
 		$line->multicurrency_total_ht = 2 * $line->total_ht;
 		$line->multicurrency_total_ttc = 2 * $line->total_ttc;
@@ -978,7 +975,7 @@ trait CommonProtocol
 
 		// If no match found after all steps: Create new product
 		if (getDolGlobalInt('EINVOICING_PRODUCTS_AUTO_GENERATION')) {
-			// Auto-create prouct
+			// Auto-create product
 			$product = new Product($db);
 			$product->type 		= $this->_detectProductTypeFromEinvoiceLine($lineData);
 			$product->ref 		= 'EI-' . dol_sanitizeFileName(!empty($lineData['prodsellerid'] && $lineData['prodsellerid'] !== "0000") ? $lineData['prodsellerid'] : uniqid());
@@ -1435,7 +1432,7 @@ trait CommonProtocol
 
 				if (empty($seller->tva_assuj)) {
 					// Can be $categoryVAT = E (VAT exempted) or AE (Autoliquidation)
-					if (1 == 2) {	// Autoliquidation (the VAT is declared by the customer that pay it directly to the government). TODO Not implemented.
+					if (1 == 2) {	// Autoliquidation (the VAT is declared by the customer that pay it directly to the government). TODO Not implemented. @phan-suppress-current-line PhanPluginBothLiteralsBinaryOp
 						// Note: the option ACCOUNTING_FORCE_ENABLE_VAT_REVERSE_CHARGE is for purchase invoices only and is used to dispatch vat differently in accounting..
 						$categoryVAT = 'AE';	// Autoliquidation
 						$exemptionReasonCode = 'VATEX-'.($seller->country_code == 'FR' ? 'FR' : 'EU').'-AE';	// VATEX-EU-AE or VATEX-FR-AE
@@ -1451,7 +1448,7 @@ trait CommonProtocol
 							$exemptionReason = getDolGlobalString('MAIN_INFO_SOCIETE_VAT_EXEMPTION_REASON', 'Tax exempted - TVA en franchise');
 						}
 						if (empty($exemptionReasonCode)) {
-							if ((float) DOl_VERSION < 24.0) {
+							if ((float) DOL_VERSION < 24.0) {
 								throw new Exception('MISSINGSETUP: Your organization is configured to not use VAT. In this case, you must enter into the constant MAIN_INFO_SOCIETE_VAT_EXEMPTION_CODE the reason code of exemption (VATEX-FR-CGI261-1, VATEX-FR-CGI261-4, VATEX-EU-79C.');
 							} else {
 								throw new Exception('MISSINGSETUP: Your organization is configured to not use VAT. In this case, you must enter into the reason code of exemption in the setup of your organization (VATEX-FR-CGI261-1, VATEX-FR-CGI261-4, VATEX-EU-79C.');
@@ -1730,5 +1727,112 @@ trait CommonProtocol
 		}
 
 		return true;
+  }
+  
+  /**
+	 * Map of UNTDID 4461 payment means codes (BT-81, ram:TypeCode under
+	 * SpecifiedTradeSettlementPaymentMeans) to Dolibarr's paiement.code.
+	 * @var array<int|'ZZZ',string>
+	 */
+	private static $UNTDID4461_TO_DOLIBARR_PAIEMENT_CODE = [
+		'10' => 'LIQ',	// Cash
+		'20' => 'CHQ',	// Check
+		'23' => 'TRA',	// Banque check
+		'30' => 'VIR',	// Bank transfer
+		'45' => 'TIP',	// Referenced home-banking credit transfer
+		'54' => 'CB',	// Credit card
+		'59' => 'PRE',	// SEPA direct debit
+		'68' => 'VAD',	// Online payment
+		'1' => 'FAC',	// local payment method | not defined
+	];
+
+	/**
+	 * Fill Payment due on (date_echeance), Payment Terms (cond_reglement_id) and
+	 * Payment method (mode_reglement_id) on a Dolibarr supplier invoice from data parsed
+	 * out of a received CII/Factur-X document.
+	 *
+	 * @param  FactureFournisseur 	$supplierInvoice 	Supplier invoice being built (modified by reference)
+	 * @param  array 				$parsedHeader 		Parsed CII header data (see CIIProtocol::parseInvoiceHeader())
+	 * @return array{message:string} 					Informational messages about what could/could not be applied (never blocking)
+	 */
+	private function _applyPaymentInfoToSupplierInvoice(FactureFournisseur $supplierInvoice, array $parsedHeader)
+	{
+		global $db;
+
+		$messages = array();
+
+		//------------------------
+		// Payment due on (BT-9)
+		//------------------------
+		$dueDate = null;
+		if (!empty($parsedHeader['paymentDueDate'])) {
+			$dueDateTimestamp = dol_stringtotime($parsedHeader['paymentDueDate']);
+			if ($dueDateTimestamp) {
+				$dueDate = $dueDateTimestamp;
+				$supplierInvoice->date_echeance = $dueDate;
+			} else {
+				$messages[] = 'Payment due date "' . $parsedHeader['paymentDueDate'] . '" could not be parsed, left empty.';
+			}
+		}
+
+		//---------------------------------------------------------------
+		// Payment Terms (derived from Invoice date <-> Payment due on)
+		//---------------------------------------------------------------
+		if ($dueDate && !empty($supplierInvoice->date)) {
+			$invoiceDateTimestamp = is_numeric($supplierInvoice->date) ? $supplierInvoice->date : dol_stringtotime((string) $supplierInvoice->date);
+
+			if ($invoiceDateTimestamp) {
+				$nbDays = (int) round(($dueDate - $invoiceDateTimestamp) / 86400);
+
+				if ($nbDays >= 0) {
+					$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "c_payment_term";
+					$sql .= " WHERE nbjour = " . ((int) $nbDays);
+					$sql .= " AND type_cdr = 0"; // fixed number of days only (no end of month)
+					$sql .= " AND active = 1";
+					$sql .= " ORDER BY rowid ASC"; // deterministic pick if duplicates
+					$sql .= " LIMIT 1";
+
+					$resql = $db->query($sql);
+					if ($resql && $db->num_rows($resql) == 1) {
+						$obj = $db->fetch_object($resql);
+						$supplierInvoice->cond_reglement_id = (int) $obj->rowid;
+						$messages[] = 'Payment Terms matched dictionary entry for ' . $nbDays . ' day(s).';
+					} else {
+						$messages[] = 'No matching Payment Terms dictionary entry found for ' . $nbDays . ' day(s) between invoice date and due date, left empty.';
+					}
+				} else {
+					$messages[] = 'Payment due date is before invoice date, cannot derive Payment Terms, left empty.';
+				}
+			}
+		}
+
+		//-------------------------------------
+		// Payment method (BT-81, UNTDID 4461)
+		// ------------------------------------
+		if (!empty($parsedHeader['paymentMeansCode'])) {
+			$untdidCode = trim((string) $parsedHeader['paymentMeansCode']);
+
+			if (isset(self::$UNTDID4461_TO_DOLIBARR_PAIEMENT_CODE[$untdidCode])) {
+				$dolibarrPaymentCode = self::$UNTDID4461_TO_DOLIBARR_PAIEMENT_CODE[$untdidCode];
+
+				$sql = "SELECT id FROM " . MAIN_DB_PREFIX . "c_paiement";
+				$sql .= " WHERE code = '" . $db->escape($dolibarrPaymentCode) . "'";
+				$sql .= " AND active = 1";
+				$sql .= " LIMIT 1";
+
+				$resql = $db->query($sql);
+				if ($resql && $db->num_rows($resql) == 1) {
+					$obj = $db->fetch_object($resql);
+					$supplierInvoice->mode_reglement_id = (int) $obj->id;
+					$messages[] = 'Payment method mapped from UNTDID 4461 code ' . $untdidCode . ' to Dolibarr code ' . $dolibarrPaymentCode . '.';
+				} else {
+					$messages[] = 'Payment method code ' . $dolibarrPaymentCode . ' (from UNTDID 4461 code ' . $untdidCode . ') not found or not active in Dolibarr dictionary, left empty.';
+				}
+			} else {
+				$messages[] = 'UNTDID 4461 payment means code ' . $untdidCode . ' has no known Dolibarr mapping, left empty.';
+			}
+		}
+
+		return array('message' => implode("<br>\n", $messages));
 	}
 }

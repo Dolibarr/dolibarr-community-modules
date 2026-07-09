@@ -34,11 +34,8 @@ require_once DOL_DOCUMENT_ROOT . '/core/lib/geturl.lib.php';
 dol_include_once('einvoicing/lib/einvoicing.lib.php');
 
 /**
- * Validate mysoc configuration
- *
- * @return array{res:int, message:string}       Returns array with 'res' (1 on success, -1 on failure) and info 'message'
+ * Base class for all functions to manage EINVOICING Module.
  */
-
 class EInvoicing
 {
 	/**
@@ -601,8 +598,8 @@ class EInvoicing
 	/**
 	 * Get the path of the e-invoice file for a given invoice reference.
 	 *
-	 * @param 	string 	$invoiceRef 	The reference of the invoice.
-	 * @return 	string 					The full file path of the e-invoice file.
+	 * @param 	?string 	$invoiceRef 	The reference of the invoice.
+	 * @return 	string						The full file path of the e-invoice file.
 	 */
 	public function getEInvoiceFilePath($invoiceRef)
 	{
@@ -990,13 +987,15 @@ class EInvoicing
 		$warnings = [];
 
 		// Check company via the French National Business Registry API (data.gouv.fr)
-		// Search by company name, then cross-check the returned SIREN against idprof1
+		// Search by SIREN (unique and exact), then cross-check the returned name and address against
+		// the third party record. Searching by name would miss a company registered under an acronym
+		// or a trade name (a third party named after its brand rather than its legal name).
 		if (
 			!empty($thirdparty->country_code) && $thirdparty->country_code === 'FR'
 			&& !empty($thirdparty->name) && !empty($thirdparty->idprof1)
 		) {
 			$siren = substr(preg_replace('/\s+/', '', $thirdparty->idprof1), 0, 9);
-			$apiUrl = 'https://recherche-entreprises.api.gouv.fr/search?q=' . urlencode($thirdparty->name) . '&per_page=5';
+			$apiUrl = 'https://recherche-entreprises.api.gouv.fr/search?q=' . urlencode($siren) . '&per_page=5';
 
 			$response = getURLContent($apiUrl, 'GET', '', 1, ['Accept: application/json']);
 
@@ -1018,7 +1017,9 @@ class EInvoicing
 				}
 
 				if ($matchedCompany === null) {
-					// No result matched the name + SIREN combination
+					// The SIREN itself is unknown to the registry. The third party name is still passed as the
+					// second argument so the translations that have not yet dropped it (until the next Transifex
+					// sync of the reworded en_US source) keep rendering without an empty placeholder.
 					$warnings[] = $langs->trans("FxCheckWarnSIRENNotFound", $siren, $thirdparty->name);
 				} else {
 					// Check that the matched company is not closed
@@ -1328,6 +1329,39 @@ class EInvoicing
 			$resprints .= '</tr>';
 		}
 
+		// Recipient reachability in the Approved Platforms directory (annuaire PA), checked before sending.
+		// This is a read-only lookup surfaced on the card so the user sees whether the recipient can receive
+		// an e-invoice, instead of discovering a routing rejection (fr:213) only after transmission.
+		if (($object->element == 'facture' || $object->element == 'invoice') && $action != 'create' && getDolGlobalInt('EINVOICING_PRECHECK_DIRECTORY', 1)) {
+			if (!is_object($object->thirdparty ?? null) && !empty($object->socid)) {
+				$object->fetch_thirdparty();
+			}
+			$directorySiren = is_object($object->thirdparty ?? null) ? preg_replace('/[^0-9]/', '', (string) $object->thirdparty->idprof1) : '';
+			if ($directorySiren !== '') {
+				$urlajaxdir = dol_buildpath('einvoicing/ajax/checkdirectory.php', 1);
+				// Auto-run once in the pre-send window (validated, not yet really transmitted to the AP).
+				$autorun = ((int) $object->status === Facture::STATUS_VALIDATED && empty($currentStatusInfo['everTransmitted'])) ? 1 : 0;
+				$resprints .= '<tr class="treinvoicing_collapseseparator">';
+				$resprints .= '<td>' . $form->textwithpicto($langs->trans("EInvoicingDirectoryCheck"), $langs->trans("EInvoicingDirectoryCheckHelp")) . '</td>';
+				$resprints .= '<td><span id="einvoice-directory" class="opacitymedium">' . ($autorun ? dol_escape_htmltag($langs->trans("EInvoicingDirectoryChecking")) : '-') . '</span>';
+				$resprints .= ' <a href="#" id="einvoice-directory-check" class="paddingleft">' . img_picto('', 'refresh', 'class="paddingright"') . $langs->trans("EInvoicingDirectoryCheckButton") . '</a>';
+				$resprints .= '</td></tr>';
+				$resprints .= '<script type="text/javascript">
+				(function(){
+					function einvoiceCheckDirectory(){
+						$("#einvoice-directory").html("' . dol_escape_js($langs->trans("EInvoicingDirectoryChecking")) . '").addClass("opacitymedium");
+						$.get("' . $urlajaxdir . '", { token: "' . currentToken() . '", ref: "' . dol_escape_js($object->ref) . '" }, function(data){
+							if (typeof data === "string") { try { data = JSON.parse(data); } catch(e){ console.error("checkdirectory: not JSON", data); return; } }
+							$("#einvoice-directory").html(data.html || "").removeClass("opacitymedium");
+						}, "text").fail(function(x){ console.error("checkdirectory ajax", x.status, x.statusText); });
+					}
+					$("#einvoice-directory-check").click(function(e){ e.preventDefault(); einvoiceCheckDirectory(); });
+					' . ($autorun ? 'setTimeout(einvoiceCheckDirectory, 1200);' : '') . '
+				})();
+				</script>';
+			}
+		}
+
 		// Invoice-level routing ID override (BT-49)
 		if ($object->element == 'facture' || $object->element == 'invoice') {
 			$currentOverrideRouting = $currentStatusInfo['override_routing_id'] ?? '';
@@ -1386,7 +1420,7 @@ class EInvoicing
 		// JavaScript for AJAX call to update status if current status is pending
 		if ((int) $currentStatusInfo['code'] === self::STATUS_AWAITING_VALIDATION
 			// || (int) $currentStatusInfo['code'] === self::STATUS_AWAITING_ACK			// If we want to call the checkinvoicestatus to get next steps...
-			) {
+		) {
 			$urlajax = dol_buildpath('einvoicing/ajax/checkinvoicestatus.php', 1);
 
 			$resprints .= '
@@ -1544,9 +1578,9 @@ class EInvoicing
 		$resprints .= '<td>';
 		if ($action != 'create') {
 			if ($object->element == 'facture' || $object->element == 'invoice') {
-				$url = DOL_URL_ROOT . '/compta/facture/agenda.php?id=' . urlencode($object->id) . '&search_agenda_label=EINVOICING';
+				$url = DOL_URL_ROOT . '/compta/facture/agenda.php?id=' . ((int) $object->id) . '&search_agenda_label=EINVOICING';
 			} else {
-				$url = DOL_URL_ROOT . '/fourn/facture/agenda.php?id=' . urlencode($object->id) . '&search_agenda_label=EINVOICING';
+				$url = DOL_URL_ROOT . '/fourn/facture/agenda.php?id=' . ((int) $object->id) . '&search_agenda_label=EINVOICING';
 			}
 
 			$resprints .= '<a href="' . $url . '">' . $langs->trans("History") . '<i class="marginleftonly fas fa-calendar-alt infobox-action"></i></a>';
@@ -1777,7 +1811,7 @@ class EInvoicing
 		if ($mode == 'create') {
 			$resprints .= '<tr class="treinvoicing_collapseseparator trrouting_id '.($expand_display ? '' : 'hidden').'">';
 			$resprints .= '<td class="">' . $form->textwithpicto($langs->trans("RoutingIdFieldShort"), $langs->trans("SpecificRoutingFieldHelp")) . '</td>';
-			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) -1).'"').'>';
+			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
 			$resprints .= '<input type="text" name="routing_id" ';
 			$resprints .= 'value="' . dolPrintHTML($routing_id ?? '') . '" ';
 			$resprints .= 'class="flat minwidth300" spellcheck="false" />';
@@ -1787,7 +1821,7 @@ class EInvoicing
 			// Add a line for the Default product for thirdparty (to use when importing vendor invoice and no product found)
 			$resprints .= '<tr class="treinvoicing_collapseseparator trrouting_product_id '.($expand_display ? '' : 'hidden').'">';
 			$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
-			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) -1).'"').'>';
+			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
 			if (version_compare(DOL_VERSION, '22.0.0', '<')) {
 				// Before v22, select_produits_fournisseurs() uses print instead of return
 				ob_start();
@@ -1812,7 +1846,7 @@ class EInvoicing
 			$obj = $this->db->fetch_object($resql);
 			$resprints .= '<tr class="treinvoicing_collapseseparator '.($expand_display ? '' : 'hidden').'">';
 			$resprints .= '<td>' . $langs->trans("einvoicingSourceTitle") . '</td>';
-			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) -1).'"').'>';
+			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
 			$resprints .= dolPrintHTML($obj->provider);
 			$resprints .= '</td>';
 			$resprints .= '</tr>';
@@ -1828,7 +1862,7 @@ class EInvoicing
 		$resprints .= '<td class="tdtop">' . $form->textwithpicto($langs->trans("RoutingIdFieldShort"), $langs->trans("SpecificRoutingFieldHelp"));
 		$resprints .= ' '.img_picto('', 'add', 'onclick="javascript:jQuery(\'.addroutingsection\').toggle();"', 0, 0, 0, $langs->transnoentitiesnoconv("Add"), 'valignmiddle cursorpointer');
 		$resprints .= '</td>';
-		$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) -1).'"').'>';
+		$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
 
 		// Existing routing list
 		if (!empty($allRoutings)) {
@@ -1896,7 +1930,7 @@ class EInvoicing
 		if ($object->fournisseur > 0) {
 			$resprints .= '<tr class="treinvoicing_collapseseparator '.($expand_display ? '' : 'hidden').'">';
 			$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
-			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) -1).'"').'>';
+			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
 			if ($mode == 'edit') {
 				if (version_compare(DOL_VERSION, '22.0.0', '<')) {
 					// Before v22, select_produits_fournisseurs() uses print instead of return
@@ -1909,7 +1943,7 @@ class EInvoicing
 			} else {
 				if ($product_id != '' && $product_id != '-1') {
 					if (preg_match('/^idprod/', $product_id)) {
-						$new_product_id = str_replace('idprod_', '', $product_id);
+						$new_product_id = (int) str_replace('idprod_', '', $product_id);
 						$tmpproduct = new Product($this->db);
 						$tmpproduct->fetch($new_product_id);
 						$resprints .= $tmpproduct->getNomUrl(1);
@@ -1963,10 +1997,10 @@ class EInvoicing
 	 * fetchLastknownInvoiceStatus
 	 *
 	 * @param int			$invoiceId		Invoice ID
-	 * @param string		$invoiceRef		Invoice ref
+	 * @param ?string		$invoiceRef		Invoice ref
 	 * @return array<string,int|string>
 	 */
-	public function fetchLastknownInvoiceStatus($invoiceId = 0, $invoiceRef = '')
+	public function fetchLastknownInvoiceStatus($invoiceId = 0, $invoiceRef = null)
 	{
 		global $conf;
 
@@ -1997,7 +2031,7 @@ class EInvoicing
 		if ($invoiceId > 0) {
 			$sql .= " AND element_id = " . ((int) $invoiceId);
 		} else {
-			$sql .= " AND syncref = '" . $this->db->escape($invoiceRef) . "'";	// Using id is more reliable.
+			$sql .= " AND syncref = '" . $this->db->escape((string) $invoiceRef) . "'";	// Using id is more reliable.
 		}
 
 		$foundforcurrentprovider = 0;
@@ -2108,16 +2142,69 @@ class EInvoicing
 	 * out (e.g. to test PA retry behaviour) by setting EINVOICING_ALLOW_RESEND_TRANSMITTED.
 	 *
 	 * @param 	int 	$invoiceId 	Invoice id
-	 * @param 	string 	$invoiceRef Invoice ref (fallback if id is 0)
+	 * @param 	?string $invoiceRef Invoice ref (fallback if id is 0)
 	 * @return 	bool 				True if the invoice must be treated as locked (already transmitted).
 	 */
-	public function isTransmittedLockActive($invoiceId = 0, $invoiceRef = '')
+	public function isTransmittedLockActive($invoiceId = 0, $invoiceRef = null)
 	{
 		if (getDolGlobalString('EINVOICING_ALLOW_RESEND_TRANSMITTED')) {
 			return false;
 		}
 		$status = $this->fetchLastknownInvoiceStatus($invoiceId, $invoiceRef);
 		return !empty($status['everTransmitted']);
+	}
+
+	/**
+	 * Gate generation/transmission on the recipient being reachable in the Approved Platforms directory.
+	 *
+	 * Only enforced when EINVOICING_REQUIRE_ROUTABLE_RECIPIENT is on (off by default, opt-in). A recipient
+	 * that is absent from the directory, or present without an active routing line, would be rejected by the
+	 * platform with a routing error (fr:213): blocking generation/sending avoids reaching that error state.
+	 *
+	 * Fails open (ok=1) whenever the check cannot be trusted, so it never blocks unexpectedly: option off,
+	 * provider without a directory lookup (status unsupported), directory call error, or a recipient with no
+	 * SIREN (handled by the standard required-information checks).
+	 *
+	 * @param 	Facture 	$object 	Invoice
+	 * @return 	array{ok:int,status:string,message:string}	ok=0 only when the recipient is confirmed not routable.
+	 */
+	public function checkRecipientRoutableForSend($object)
+	{
+		global $langs;
+
+		$res = array('ok' => 1, 'status' => '', 'message' => '');
+
+		if (!getDolGlobalInt('EINVOICING_REQUIRE_ROUTABLE_RECIPIENT')) {
+			return $res;	// opt-in, off by default
+		}
+
+		if (!is_object($object->thirdparty ?? null)) {
+			$object->fetch_thirdparty();
+		}
+		$siren = is_object($object->thirdparty ?? null) ? preg_replace('/[^0-9]/', '', (string) $object->thirdparty->idprof1) : '';
+		if ($siren === '') {
+			return $res;	// no SIREN: the standard required-information checks handle this
+		}
+
+		require_once __DIR__ . '/providers/PDPProviderManager.class.php';
+		$PDPManager = new PDPProviderManager($this->db);
+		$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+		if (!is_object($provider)) {
+			return $res;
+		}
+
+		$dir = $provider->checkRecipientDirectory($siren);
+		$res['status'] = isset($dir['status']) ? $dir['status'] : 'error';
+		if ($res['status'] === 'absent') {
+			$res['ok'] = 0;
+			$res['message'] = $langs->trans('EInvoicingDirectoryAbsent', $siren);
+		} elseif ($res['status'] === 'inactive') {
+			$res['ok'] = 0;
+			$res['message'] = $langs->trans('EInvoicingDirectoryInactive', $siren);
+		}
+		// routable / error / unsupported => ok stays 1 (fail-open)
+
+		return $res;
 	}
 
 	/**
@@ -2129,7 +2216,7 @@ class EInvoicing
 	 * @param int       $syncStatus     	If the object has a status into the einvoice external system
 	 * @param string    $syncRef        	If the object has a given reference into the einvoice external system
 	 * @param string    $syncComment    	If we want to store a message for the last sync action try
-	 * @param string    $overrideRoutingId	Forced routing ID
+	 * @param ?string   $overrideRoutingId	Forced routing ID
 	 * @param string    $precheckStatus  	Precheck status from the AP system
 	 * @param string    $precheckResult  	Precheck result from the AP system
 	 * @return int 							-1 on error, 0 if nothing done, rowid on success
@@ -2442,8 +2529,8 @@ class EInvoicing
 	 * Fetch default routing for a thirdparty
 	 *
 	 * @param 	int 		$fk_soc   		Thirdparty ID
-	 * @param 	string 		$routing_type	Routing type ('thirdparty' to get the routing ID for a thirdparty when exporting invoice, 'product' to get internal ID of product to use as default product on invoice import)
-	 * @return 	string|int   				Routing ID string if found, 0 if not found, -1 if error
+	 * @param 	'thirdparty'|'product' 		$routing_type	Routing type ('thirdparty' to get the routing ID for a thirdparty when exporting invoice, 'product' to get internal ID of product to use as default product on invoice import)
+	 * @return 	string|int<-1,0>   				Routing ID string if found, 0 if not found, -1 if error
 	 */
 	public function fetchDefaultRouting($fk_soc, $routing_type = 'thirdparty')
 	{
@@ -2478,9 +2565,9 @@ class EInvoicing
 	 * Fetch all active routings for a thirdparty
 	 *
 	 * @param  	int    	$fk_soc   		Thirdparty ID
-	 * @param 	string 	$routing_type	Routing type ('thirdparty' to get the routing ID for a thirdparty when exporting invoice, 'product' to get internal ID of product to use as default product on invoice import)
-	 * @param	int		$active			1=only active routings
-	 * @return 	array            		Array of routing rows (assoc), empty array if none, -1 if error
+	 * @param 	'thirdparty'|'product' 	$routing_type	Routing type ('thirdparty' to get the routing ID for a thirdparty when exporting invoice, 'product' to get internal ID of product to use as default product on invoice import)
+	 * @param	int<0,1>	$active			1=only active routings
+	 * @return 	-1|array<array{rowid:int,routing_id:string,source:string,info:?string,is_default:int}>            		Array of routing rows (assoc), empty array if none, -1 if error
 	 */
 	public function fetchAllRoutings($fk_soc, $routing_type = 'thirdparty', $active = 1)
 	{
@@ -2506,9 +2593,9 @@ class EInvoicing
 			if (!empty($obj->rowid) && !empty($obj->routing_id)) {
 				$routings[] = array(
 					'rowid'      => (int) $obj->rowid,
-					'routing_id' => $obj->routing_id,
-					'source'     => $obj->source,
-					'info'       => $obj->info,
+					'routing_id' => (string) $obj->routing_id,
+					'source'     => (string) $obj->source,
+					'info'       => $obj->info !== null ? (string) $obj->info : null,
 					'is_default' => (int) $obj->is_default,
 				);
 			}
@@ -2592,8 +2679,8 @@ class EInvoicing
 	/**
 	 * Fetch lifecycle status messages linked to a given flow ID.
 	 *
-	 * @param	int		$flowId		Flow ID
-	 * @return	int					Return
+	 * @param	string		$flowId		Flow ID (UUID)
+	 * @return	-1|array{rowid?:int,element_id?:int,element_type?:string,provider?:string,flow_id?:string,direction?:string,lc_status?:int,lc_status_message?:string,lc_validation_status?:string,lc_validation_message?:string,date_creation?:int}					Return
 	 */
 	public function fetchStatusMessages($flowId)
 	{
@@ -2626,15 +2713,15 @@ class EInvoicing
 			$messages = [
 				'rowid' => (int) $obj->rowid,
 				'element_id' => (int) $obj->element_id,
-				'element_type' => $obj->element_type,
-				'provider' => $obj->provider,
-				'flow_id' => $obj->flow_id,
-				'direction' => $obj->direction,
+				'element_type' => (string) $obj->element_type,
+				'provider' => (string) $obj->provider,
+				'flow_id' => (string) $obj->flow_id,
+				'direction' => (string) $obj->direction,
 				'lc_status' => (int) $obj->lc_status,
-				'lc_status_message' => $obj->lc_status_message,
-				'lc_validation_status' => $obj->lc_validation_status,
-				'lc_validation_message' => $obj->lc_validation_message,
-				'date_creation' => $db->jdate($obj->date_creation),
+				'lc_status_message' => (string) $obj->lc_status_message,
+				'lc_validation_status' => (string) $obj->lc_validation_status,
+				'lc_validation_message' => (string) $obj->lc_validation_message,
+				'date_creation' => (int) $db->jdate($obj->date_creation),
 			];
 		}
 
