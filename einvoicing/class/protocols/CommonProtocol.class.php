@@ -1727,9 +1727,9 @@ trait CommonProtocol
 		}
 
 		return true;
-  }
-  
-  /**
+	}
+
+	/**
 	 * Map of UNTDID 4461 payment means codes (BT-81, ram:TypeCode under
 	 * SpecifiedTradeSettlementPaymentMeans) to Dolibarr's paiement.code.
 	 * @var array<int|'ZZZ',string>
