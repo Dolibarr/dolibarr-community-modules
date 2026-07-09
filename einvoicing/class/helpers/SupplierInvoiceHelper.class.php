@@ -250,7 +250,7 @@ class SupplierInvoiceHelper
 		$details['total_ttc'] = self::round($details['total_ttc'], $roundPrecision);
 		$details['total_tva'] = self::round($details['total_tva'], $roundPrecision);
 
-	return $details;
+		return $details;
 	}
 
 	/**
