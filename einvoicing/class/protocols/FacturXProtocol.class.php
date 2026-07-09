@@ -1283,6 +1283,24 @@ class FacturXProtocol extends AbstractProtocol
 		// documentdate est déjà formaté en 'Y-m-d' par les parseurs ZugFerd et CII
 		$supplierInvoice->date = !empty($parsedHeader['documentdate']) ? dol_stringtotime($parsedHeader['documentdate']) : null;
 
+		// For credit notes, link to the source invoice via fk_facture_source (BT-25)
+		if ($supplierInvoice->type == FactureFournisseur::TYPE_CREDIT_NOTE && !empty($parsedHeader['invoiceRefDocs']) && is_array($parsedHeader['invoiceRefDocs'])) {
+			$firstRefDoc = reset($parsedHeader['invoiceRefDocs']);
+			$refSourceSupplier = !empty($firstRefDoc['IssuerAssignedID']) ? (string) $firstRefDoc['IssuerAssignedID'] : '';
+			if ($refSourceSupplier !== '') {
+				$sqlSource = "SELECT rowid FROM " . MAIN_DB_PREFIX . "facture_fourn WHERE ref_supplier = '" . $db->escape($refSourceSupplier) . "' LIMIT 1";
+				$resqlSource = $db->query($sqlSource);
+				if ($resqlSource) {
+					$objSource = $db->fetch_object($resqlSource);
+					if ($objSource) {
+						$supplierInvoice->fk_facture_source = (int) $objSource->rowid;
+						dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource Credit note linked to source invoice id=' . $supplierInvoice->fk_facture_source, LOG_DEBUG);
+					} else {
+						dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource Source invoice ref_supplier="' . $refSourceSupplier . '" not found for credit note ' . ($parsedHeader['documentno'] ?? ''), LOG_WARNING);
+					}
+				}
+			}
+		}
 
 		// Set currency
 		$supplierInvoice->multicurrency_code = $parsedHeader['invoiceCurrency'];
@@ -1298,6 +1316,7 @@ class FacturXProtocol extends AbstractProtocol
 
 
 		$remise_already_used_line_level_ids = array();
+		$supplierPriceEntries = array(); // Collect product/price data to create supplier prices after invoice creation
 
 		// Add invoice lines
 		foreach ($parsedLines as $parsedLine) {
@@ -1443,6 +1462,16 @@ class FacturXProtocol extends AbstractProtocol
 					];
 				}
 				$productId = $res['res'];
+
+				// Collect supplier price data to be created after invoice is saved
+				if ($productId > 0) {
+					$supplierPriceEntries[] = [
+						'productId' => $productId,
+						'unitPrice' => (float) $parsedLine['netpriceamount'],
+						'refFourn'  => (!empty($parsedLine['prodsellerid']) && $parsedLine['prodsellerid'] !== '0000') ? (string) $parsedLine['prodsellerid'] : '',
+						'tvaTx'     => (float) ($parsedLine['rateApplicablePercent'] ?? 0),
+					];
+				}
 			}
 
 
@@ -1613,7 +1642,29 @@ class FacturXProtocol extends AbstractProtocol
 				$supplier->update($supplier->id, $user);
 			}
 
-			// TODO : Add supplier price for products (all lines of the invoice)
+			// Create or update supplier prices for imported products
+			if (!empty($supplierPriceEntries)) {
+				require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.product.class.php';
+				foreach ($supplierPriceEntries as $entry) {
+					$productFourn = new ProductFournisseur($db);
+					$productFourn->id = $entry['productId'];
+					$result = $productFourn->update_buyprice(
+						1,                    // qty min
+						$entry['unitPrice'],  // prix unitaire HT
+						$user,
+						'HT',
+						$supplier,
+						0,                    // availability
+						$entry['refFourn'],   // ref fournisseur
+						$entry['tvaTx']
+					);
+					if ($result < 0) {
+						dol_syslog(__METHOD__ . ' Failed to create supplier price for product id=' . $entry['productId'] . ': ' . $productFourn->error, LOG_WARNING);
+					} else {
+						dol_syslog(__METHOD__ . ' Supplier price created/updated for product id=' . $entry['productId'], LOG_DEBUG);
+					}
+				}
+			}
 
 			// Set import_key
 			$sql = 'UPDATE ' . MAIN_DB_PREFIX . "facture_fourn SET import_key = '" . $db->escape($supplierInvoice->import_key) . "'";
