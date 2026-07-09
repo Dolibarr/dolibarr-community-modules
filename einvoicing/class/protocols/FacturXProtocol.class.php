@@ -139,6 +139,10 @@ class FacturXProtocol extends AbstractProtocol
 			dol_delete_file($xmlfile);
 
 			$xmlcontent = $CII->buildXML($invoiceData, $linesData, 'EXTENDED', $outputlangs);
+
+			// Local EN 16931 business rules safety net (warnings, or abort in strict mode)
+			$this->checkBusinessRules($xmlcontent);
+
 			file_put_contents($xmlfile, $xmlcontent);
 
 			dolChmod($xmlfile);
@@ -404,6 +408,10 @@ class FacturXProtocol extends AbstractProtocol
 				$patchedXml = $patcher->patchXmlString($xmlfile, $invoiceData['_depositlines']);
 				file_put_contents($xmlfile, $patchedXml);
 			}
+
+			// Local EN 16931 business rules safety net on the final XML (warnings, or abort in strict mode),
+			// same as the native builder branch above, so the external builder is covered too.
+			$this->checkBusinessRules(file_get_contents($xmlfile));
 
 			dolChmod($xmlfile);
 

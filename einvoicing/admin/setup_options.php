@@ -186,6 +186,19 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->defaultFieldValue = '0';
 	$item->cssClass = 'minwidth500';
 
+	// Local EN 16931 business rules check (BR, BR-CO, BR-FR subset) on the generated XML.
+	// Single option with three modes: no check, check and warn only (default), or check and
+	// block the generation on any violation. The official Schematron of the Approved Platform
+	// stays the reference.
+	$item = $formSetup->newItem('EINVOICING_BR_CHECK')->setAsSelect(array(
+		'nocheck' => $langs->transnoentities('EINVOICING_BR_CHECK_NOCHECK'),
+		'warning_only' => $langs->transnoentities('EINVOICING_BR_CHECK_WARNING_ONLY'),
+		'blocking' => $langs->transnoentities('EINVOICING_BR_CHECK_BLOCKING'),
+	));
+	$item->helpText = $langs->transnoentities('EINVOICING_BR_CHECK_HELP');
+	$item->defaultFieldValue = 'warning_only';
+	$item->cssClass = 'minwidth500';
+
 
 	if (getDolGlobalString('EINVOICING_EINVOICE_IN_REAL_TIME')) {
 		$item = $formSetup->newItem('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS')->setAsYesNo();
