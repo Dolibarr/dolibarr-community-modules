@@ -190,7 +190,7 @@ class SupplierInvoiceHelper
 	 *
 	 * @param FactureFournisseur 	$supplierInvoice 	The supplier invoice object
 	 * @param int 					$vatComputeMode 	The VAT mode used to calculate VAT amounts
-	 * @return array{total_ht: float, total_ttc: float, total_tva: float, vat_by_rate: array{vat_amount: float, vat_basis_amount: float}}
+	 * @return array{total_ht: float, total_ttc: float, total_tva: float, vat_by_rate: array<string, array{vat_amount: float, vat_basis_amount: float}>}
 	 */
 	private static function getInvoiceDetailsForComparison(FactureFournisseur $supplierInvoice, $vatComputeMode)
 	{
@@ -257,7 +257,7 @@ class SupplierInvoiceHelper
 	 * Return VAT details (by VAT rate) from a supplier invoice
 	 *
 	 * @param FactureFournisseur $supplierInvoice The supplier invoice object
-	 * @return array{vat_amount: float, vat_basis_amount: float}
+	 * @return array<string, array{vat_amount: float, vat_basis_amount: float}>
 	 */
 	public static function getVatDetails(FactureFournisseur $supplierInvoice): array
 	{
