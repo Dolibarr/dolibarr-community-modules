@@ -3,6 +3,7 @@
  * Copyright (C) 2024       Frédéric France             <frederic.france@free.fr>
  * Copyright (C) 2025       SuperAdmin                  <daoud.mouhamed@gmail.com>
  * Copyright (C) 2026       Alexandre Spangaro          <alexandre@inovea-conseil.com>
+ * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -649,7 +650,7 @@ $newcardbutton = '';
 
 $providershort = '';
 if ($provider) {
-	$providershort = preg_replace('/ViaPartner$/', '', $provider->providerName);
+	$providershort = preg_replace('/ViaPartner$/', '', (string) $provider->providerName);
 	$title = $langs->trans("EInvoiceSynchronizationHelp", $providershort);
 }
 

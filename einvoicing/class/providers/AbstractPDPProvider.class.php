@@ -1,6 +1,7 @@
 <?php
 /* Copyright (C) 2025       Laurent Destailleur         <eldy@users.sourceforge.net>
  * Copyright (C) 2025       Mohamed DAOUD               <mdaoud@dolicloud.com>
+ * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -47,7 +48,7 @@ abstract class AbstractPDPProvider
 	/** @var AbstractProtocol Exchange protocol */
 	public $exchangeProtocol;
 
-	/** @var string Provider name */
+	/** @var ?string Provider name */
 	public $providerName;
 
 	/** @var string Short provider code, defined by each concrete provider (e.g. 'SuperPDP', 'Esalink') */
@@ -635,7 +636,7 @@ abstract class AbstractPDPProvider
 	 * @param   string|array<mixed>         $params     Request body
 	 * @param   string|array<mixed>         $response   Response payload
 	 * @param   int                         $statusCode HTTP status code of the response
-	 * @return  ?array{id:int,call_id:string}           Created log identifiers, or null if not logged
+	 * @return  ?array{id:int,call_id:?string}           Created log identifiers, or null if not logged
 	 */
 	protected function logCall($callType, $resource, $method, $params, $response, $statusCode)
 	{

@@ -2,6 +2,7 @@
 /* Copyright (C) 2017       Laurent Destailleur      <eldy@users.sourceforge.net>
  * Copyright (C) 2023-2025  Frédéric France          <frederic.france@free.fr>
  * Copyright (C) 2025		SuperAdmin					<daoud.mouhamed@gmail.com>
+ * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -330,7 +331,7 @@ class Document extends CommonObject
 			$object->ref = empty($this->fields['ref']['default']) ? "Copy_Of_".$object->ref : $this->fields['ref']['default'];
 		}
 		if (property_exists($object, 'label')) {
-			$object->label = empty($this->fields['label']['default']) ? $langs->trans("CopyOf")." ".$object->label : $this->fields['label']['default'];
+			$object->label = empty($this->fields['label']['default']) ? $langs->trans("CopyOf")." ".$object->label : $this->fields['label']['default']; // @phan-suppress-current-line PhanUndeclaredProperty
 		}
 		if (property_exists($object, 'status')) {
 			$object->status = self::STATUS_DRAFT;
@@ -912,7 +913,7 @@ class Document extends CommonObject
 		}
 		if (property_exists($this, 'amount')) {
 			$return .= '<br>';
-			$return .= '<span class="info-box-label amount">'.price($this->amount, 0, $langs, 1, -1, -1, $conf->currency).'</span>';
+			$return .= '<span class="info-box-label amount">'.price($this->amount, 0, $langs, 1, -1, -1, $conf->currency).'</span>'; // @phan-suppress-current-line PhanUndeclaredProperty
 		}
 		if (method_exists($this, 'getLibStatut')) {
 			$return .= '<br><div class="info-box-status">'.$this->getLibStatut(3).'</div>';
@@ -1249,7 +1250,7 @@ class Document extends CommonObject
 
 		if (isset($provider)) {
 			$syncFromDate = $provider->getLastSyncDate();
-			$maxflows = getDolGlobalString('EINVOICING_MAX_SYNC_FLOWS', 0);
+			$maxflows = (int) getDolGlobalString('EINVOICING_MAX_SYNC_FLOWS', 0);
 
 			// Sync all flows
 			$sync_result = $provider->syncFlows($syncFromDate, $maxflows);
@@ -1281,7 +1282,7 @@ class Document extends CommonObject
 	/**
 	 * Return true if given XML data can be stored in Database (size < 16Mo)
 	 * @param string $xmlData The XML data to check
-	 * @return bool
+	 * @return bool True if xmlData is within size bounds
 	 */
 	public static function checkXmlDataMaxSize(string &$xmlData): bool
 	{
@@ -1294,9 +1295,9 @@ class Document extends CommonObject
 	 * - attachments
 	 *
 	 * @param ?string $xmlData The XML data to clean
-	 * @return string The cleaned XML data
+	 * @return ?string The cleaned XML data
 	 */
-	public static function cleanXmlData(?string $xmlData): string
+	public static function cleanXmlData(?string $xmlData): ?string
 	{
 		global $db;
 

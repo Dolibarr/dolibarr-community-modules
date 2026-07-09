@@ -2,6 +2,7 @@
 /* Copyright (C) 2007-2017  Laurent Destailleur     <eldy@users.sourceforge.net>
  * Copyright (C) 2024       Frédéric France         <frederic.france@free.fr>
  * Copyright (C) 2025		SuperAdmin					<daoud.mouhamed@gmail.com>
+ * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -826,10 +827,9 @@ while ($i < $imaxinloop) {
 				print '>';
 				if ($key == 'rowid') {
 					print $object->getNomUrl(1, '', 0, '', 1);
+					// print $object->showOutputField($val, $key, (string) $object->id, '');
 				} elseif ($key == 'status') {
 					print $object->getLibStatut(6);
-				} elseif ($key == 'rowid') {
-					print $object->showOutputField($val, $key, (string) $object->id, '');
 				} else {
 					if ($val['type'] == 'html' || $val['type'] == 'text') {
 						print '<div class="small lineheightsmall twolinesmax-normallineheight classfortooltip" title="'.dolPrintHTMLForAttribute((string) $object->$key).'">';

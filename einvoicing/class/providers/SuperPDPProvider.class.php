@@ -1,6 +1,7 @@
 <?php
 /* Copyright (C) 2025       Laurent Destailleur         <eldy@users.sourceforge.net>
  * Copyright (C) 2025       Mohamed DAOUD               <mdaoud@dolicloud.com>
+ * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -1089,7 +1090,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 * @param array<string, string>         $extraHeaders   Optional additional headers
 	 * @param string|null                   $callType       Functional type of the API call for logging purposes (e.g., 'sync_flows', 'send_invoice')
 	 *
-	 * @return array{status_code:int,response:null|string|array<string,mixed>,errorCode?:string,errorMessage?:string,id?:int,call_id?:string}
+	 * @return array{status_code:int,response:null|string|array<string,mixed>|mixed,errorCode?:string,errorMessage?:string,id?:int,call_id?:?string,curl_error_no?:int,curl_error_msg?:string}
 	 */
 	public function callApi($resource, $method, $params = false, $extraHeaders = [], $callType = '')
 	{
@@ -1173,8 +1174,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 				$returnarray['curl_error_msg'] = $response['curl_error_msg'];
 			}
 			if ($contentarray = json_decode((string) $response['content'], true)) {
-				$returnarray['errorCode'] = $contentarray['errorCode'];
-				$returnarray['errorMessage'] = $contentarray['errorMessage'];
+				$returnarray['errorCode'] = (string) $contentarray['errorCode'];
+				$returnarray['errorMessage'] = (string) $contentarray['errorMessage'];
 			}
 		}
 
