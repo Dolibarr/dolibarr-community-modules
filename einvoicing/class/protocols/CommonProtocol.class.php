@@ -1,6 +1,7 @@
 <?php
 /* Copyright (C) 2025-2026       Laurent Destailleur         <eldy@users.sourceforge.net>
  * Copyright (C) 2025-2026       Mohamed DAOUD               <mdaoud@dolicloud.com>
+ * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -1495,6 +1496,7 @@ trait CommonProtocol
 						}
 
 						$vat_rate = price2num($vat_rate, 2);
+						$constantforvatex = '';
 
 						if (empty($vatex)) {
 							$constantforvatex = "MAIN_VAT_EXEMPTION_CODE_FOR_" . $vat_rate.($vat_src_code ? "_". $vat_src_code : '');
