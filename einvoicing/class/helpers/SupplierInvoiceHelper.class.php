@@ -224,9 +224,9 @@ class SupplierInvoiceHelper
 				);
 			}
 
-			$lineVatBasisAmountWithoutDiscount = ($line->pu_ht * $line->qty);
+			$lineVatBasisAmountWithoutDiscount = ($line->subprice * $line->qty);
 			$lineDiscountAmount = $lineVatBasisAmountWithoutDiscount * $line->remise_percent / 100;
-			$lineVatAmount = $line->pu_ht * floatval($rate) / 100;
+			$lineVatAmount = $line->subprice * floatval($rate) / 100;
 			if ($vatComputeMode == 1) {
 				$lineVatAmount = self::round($lineVatAmount, $roundPrecision);
 			}
@@ -250,7 +250,7 @@ class SupplierInvoiceHelper
 		$details['total_ttc'] = self::round($details['total_ttc'], $roundPrecision);
 		$details['total_tva'] = self::round($details['total_tva'], $roundPrecision);
 
- 		return $details;
+	return $details;
 	}
 
 	/**
