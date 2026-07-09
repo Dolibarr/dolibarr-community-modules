@@ -97,7 +97,6 @@ return [
         'einvoicing/document_card.php' => ['PhanUndeclaredProperty'],
         'einvoicing/lib/buildinvoicelines.inc.php' => ['PhanDeprecatedFunction', 'PhanDeprecatedProperty', 'PhanTypeMismatchArgument', 'PhanUndeclaredProperty'],
         'einvoicing/lib/einvoicing.lib.php' => ['PhanTypeMismatchArgumentNullable'],
-        'einvoicing/public/proxy_oauthcallback.php' => ['PhanTypeArraySuspiciousNullable'],
         'helloasso/admin/setup.php' => ['PhanTypeMismatchArgument', 'PhanUndeclaredClassMethod'],
         'helloasso/class/helloassomemberutils.class.php' => ['PhanDeprecatedProperty'],
         'helloasso/lib/helloasso.lib.php' => ['PhanDeprecatedProperty', 'PhanUndeclaredClassMethod', 'PhanUndeclaredTypeParameter', 'PhanUndeclaredTypeReturnType'],
