@@ -1477,9 +1477,11 @@ class FacturXProtocol extends AbstractProtocol
 
 			// Add line to invoice
 			$line = new SupplierInvoiceLine($db);
-			//$line->desc = $prodname . (!empty($proddesc) ? "\n" . $proddesc : '');
 			if (!empty($productId)) {
 				$line->fk_product = $productId;
+			} elseif (!$is_deposit_line) {
+				// Free line: no product linked, description set from XML data
+				$line->desc = trim($parsedLine['prodname'] ?? '') . (!empty($parsedLine['proddesc']) ? "\n" . trim($parsedLine['proddesc']) : '');
 			}
 			if ($is_deposit_line && !empty($fk_remise)) {
 				$line->fk_remise_except = $fk_remise;
