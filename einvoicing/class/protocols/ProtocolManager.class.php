@@ -144,7 +144,7 @@ class ProtocolManager
 	/**
 	 * Allow to directly get a procotol object from a file content
 	 * @param ?string $content 	File content of the invoice (PDF or XML)
-	 * @return array{protocol_object:AbstractProtocol|null, detected_protocol_name:string, success:bool, error_code:int}
+	 * @return array{protocol_object:AbstractProtocol|null, detected_protocol_name:?string, success:bool, error_code:int}
 	 */
 	public static function getProtocolFromContent(?string $content)
 	{
