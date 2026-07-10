@@ -1,6 +1,7 @@
 <?php
 /* Copyright (C) 2026       Laurent Destailleur         <eldy@users.sourceforge.net>
  * Copyright (C) 2026       Mohamed DAOUD               <mdaoud@dolicloud.com>
+ * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
  *
  * This program is free software: you can redistribute it and/or modify
@@ -606,7 +607,7 @@ class CIIProtocol extends AbstractProtocol
 		// Create document level discounts (allowances) as discounts in Dolibarr
 		$globalDiscountIds = array();
 		if (!empty($parsedHeader['headerAllowancesCharges'])) {
-			$headerDiscountIds = $this->_createHeaderDiscounts($parsedHeader['headerAllowancesCharges'], $socId, 	$parsedHeader['documentno']);
+			$headerDiscountIds = $this->_createHeaderDiscounts($parsedHeader['headerAllowancesCharges'], $socId, $parsedHeader['documentno']);
 			if (!empty($headerDiscountIds[-1])) {
 				return ['res' => -1, 'message' => $headerDiscountIds[-1]];
 			} else {
@@ -825,7 +826,7 @@ class CIIProtocol extends AbstractProtocol
 	 * @param 	array 				$remise_already_used_line_level_ids		The list of ids for remise already used
 	 * @param 	string 				$flowId									The concerned flowId
 	 * @param 	array{free_lines:bool,target_fk_product:?int} $params		Params used in case of manual import
-	 * @return 	array{res:int, message:string, actioncode:string|null, actionurl:string, action:string, actiondata:mixed}   Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and additional data about the action.
+	 * @return 	array{res:int<-1,1>, message?:string, actioncode?:string|null, actionurl?:string, action?:?string, actiondata?:''|array{ref:string,supplierref:string,name:string}}   Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and additional data about the action.
 	 */
 	public function createSupplierInvoiceLinesFromSource(&$supplierInvoice, $parsedLines, &$remise_already_used_line_level_ids = [], $flowId = '', $params = ['free_lines' => false, 'target_fk_product' => null]): array
 	{
@@ -924,13 +925,13 @@ class CIIProtocol extends AbstractProtocol
 								$discount->fk_soc = $linkedObject->socid;
 								$discount->socid = $linkedObject->socid;
 								$discount->fk_invoice_supplier_source = $linkedObject->id;
-								foreach ($amount_ht as $tva_tx => $xxx) {
-									$discount->amount_ht = abs((float) $amount_ht[$tva_tx]);
-									$discount->amount_tva = abs((float) $amount_tva[$tva_tx]);
-									$discount->amount_ttc = abs((float) $amount_ttc[$tva_tx]);
-									$discount->multicurrency_amount_ht = abs((float) $multicurrency_amount_ht[$tva_tx]);
-									$discount->multicurrency_amount_tva = abs((float) $multicurrency_amount_tva[$tva_tx]);
-									$discount->multicurrency_amount_ttc = abs((float) $multicurrency_amount_ttc[$tva_tx]);
+								foreach ($amount_ht as $tva_tx => $xxx) {  // @phan-suppress-current-line PhanEmptyForeach
+									$discount->amount_ht = abs((float) $amount_ht[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
+									$discount->amount_tva = abs((float) $amount_tva[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
+									$discount->amount_ttc = abs((float) $amount_ttc[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
+									$discount->multicurrency_amount_ht = abs((float) $multicurrency_amount_ht[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
+									$discount->multicurrency_amount_tva = abs((float) $multicurrency_amount_tva[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
+									$discount->multicurrency_amount_ttc = abs((float) $multicurrency_amount_ttc[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
 
 									// Clean vat code
 									$reg = array();
@@ -946,7 +947,6 @@ class CIIProtocol extends AbstractProtocol
 									$result = $discount->create($user);
 									if ($result < 0) {
 										return ['res' => -1, 'message' => 'Failed to create discount for deposit line: ' . $discount->error];
-										break;
 									}
 									$fk_remise = $result;
 								}
@@ -971,6 +971,7 @@ class CIIProtocol extends AbstractProtocol
 			}
 
 			$productId = 0;
+			$return_messages = array();
 			if (!$is_deposit_line && !$freeLines) {
 				// Sync or create product
 				$res = $this->_findOrCreateProductFromEinvoiceLine($parsedLine, $flowId);
@@ -989,7 +990,7 @@ class CIIProtocol extends AbstractProtocol
 						];
 					}
 				} elseif ($targetFkProduct > 0) {
-						$productId = $targetFkProduct;
+					$productId = $targetFkProduct;
 				} else {
 					$productId = $res['res'];
 				}
@@ -1080,12 +1081,14 @@ class CIIProtocol extends AbstractProtocol
 	 */
 	private function getXPathValue($xpath, $expr, $contextNode = null)
 	{
-		if ($expr === 'NA' || empty($expr))
+		if ($expr === 'NA' || empty($expr)) {
 			return null;
+		}
 
 		$nodes = $xpath->query($expr, $contextNode);
-		if (!$nodes || $nodes->length === 0)
+		if (!$nodes || $nodes->length === 0) {
 			return null;
+		}
 
 		$node = $nodes->item(0);
 		$value = trim($node->nodeValue);
@@ -1102,16 +1105,18 @@ class CIIProtocol extends AbstractProtocol
 	 */
 	private function getXPathValues($xpath, $expr, $contextNode = null)
 	{
-		if ($expr === 'NA' || empty($expr))
+		if ($expr === 'NA' || empty($expr)) {
 			return [];
+		}
 
 		$nodes = $xpath->query($expr, $contextNode);
 		$result = [];
 		if ($nodes) {
 			foreach ($nodes as $node) {
 				$v = trim($node->nodeValue);
-				if ($v !== '')
+				if ($v !== '') {
 					$result[] = $v;
+				}
 			}
 		}
 		return $result;
@@ -1131,8 +1136,9 @@ class CIIProtocol extends AbstractProtocol
 	 */
 	private function getXPathAttrPairs($xpath, $expr, $attrName = 'schemeID', $contextNode = null)
 	{
-		if ($expr === 'NA' || empty($expr))
+		if ($expr === 'NA' || empty($expr)) {
 			return [];
+		}
 
 		$nodes = $xpath->query($expr, $contextNode);
 		$result = [];
@@ -1161,8 +1167,9 @@ class CIIProtocol extends AbstractProtocol
 	 */
 	private function normDate(?string $raw): ?string
 	{
-		if ($raw === null || trim($raw) === '')
+		if ($raw === null || trim($raw) === '') {
 			return null;
+		}
 		$raw = trim($raw);
 
 		// YYYY-MM-DD — already the target format
@@ -1186,8 +1193,9 @@ class CIIProtocol extends AbstractProtocol
 	 */
 	private function toFloat(?string $v): ?float
 	{
-		if ($v === null || $v === '')
+		if ($v === null || $v === '') {
 			return null;
+		}
 		$v = str_replace(',', '.', trim($v));
 		return is_numeric($v) ? (float) $v : null;
 	}
@@ -1236,12 +1244,14 @@ class CIIProtocol extends AbstractProtocol
 
 		// Type normalisation
 		foreach (['documentdate', 'documentDeliveryDate', 'invoicingPeriodStart', 'invoicingPeriodEnd', 'paymentDueDate'] as $f) {
-			if (isset($data[$f]))
+			if (isset($data[$f])) {
 				$data[$f] = $this->normDate($data[$f]);
+			}
 		}
 		foreach (['grandTotalAmount', 'duePayableAmount', 'lineTotalAmount', 'chargeTotalAmount', 'allowanceTotalAmount', 'taxBasisTotalAmount', 'taxTotalAmount', 'roundingAmount', 'totalPrepaidAmount'] as $f) {
-			if (isset($data[$f]))
+			if (isset($data[$f])) {
 				$data[$f] = $this->toFloat($data[$f]);
+			}
 		}
 
 		return $data;
@@ -1300,12 +1310,14 @@ class CIIProtocol extends AbstractProtocol
 
 			// Type normalisation
 			foreach (['linePeriodStart', 'linePeriodEnd'] as $f) {
-				if (isset($line[$f]))
+				if (isset($line[$f])) {
 					$line[$f] = $this->normDate($line[$f]);
+				}
 			}
 			foreach (['grosspriceamount', 'grosspricebasisquantity', 'netpriceamount', 'netpricebasisquantity', 'billedquantity', 'chargeFreeQuantity', 'packageQuantity', 'lineTotalAmount', 'totalAllowanceChargeAmount', 'rateApplicablePercent', 'calculatedAmount'] as $f) {
-				if (isset($line[$f]))
+				if (isset($line[$f])) {
 					$line[$f] = $this->toFloat($line[$f]);
+				}
 			}
 			$line['isDepositLine'] = (bool) ($line['isDepositLine'] ?? false);
 
@@ -1328,8 +1340,9 @@ class CIIProtocol extends AbstractProtocol
 	private function parseMultiNodes($xpath, $expr, $fieldKey, $contextNode = null)
 	{
 		$nodes = $xpath->query($expr, $contextNode);
-		if (!$nodes || $nodes->length === 0)
+		if (!$nodes || $nodes->length === 0) {
 			return [];
+		}
 
 		$result = [];
 
@@ -1483,7 +1496,7 @@ class CIIProtocol extends AbstractProtocol
 			'MINIMUM'  => 'urn:factur-x.eu:1p0:minimum', 	// Factur-X profile
 			'BASICWL'  => 'urn:factur-x.eu:1p0:basicwl', 	// Factur-X profile
 			'BASIC'    => 'urn:factur-x.eu:1p0:basic', 		// Factur-X profile
-			'EN16931'=> 'urn:cen.eu:en16931:2017', 		// CII Profile.
+			'EN16931' => 'urn:cen.eu:en16931:2017', 		// CII Profile.
 			//'EN16931'  => 'urn:cen.eu:en16931:2017#conformant#urn.cpro.gouv.fr:1p0:extended-ctc-fr',	// CII Profile.
 			'EXTENDED' => 'urn:cen.eu:en16931:2017#conformant#urn:factur-x.eu:1p0:extended', 			// Factur-X profile
 		];

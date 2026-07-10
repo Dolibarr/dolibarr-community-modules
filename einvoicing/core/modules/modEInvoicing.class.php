@@ -3,6 +3,7 @@
  * Copyright (C) 2018-2019	Nicolas ZABOURI				<info@inovea-conseil.com>
  * Copyright (C) 2019-2026	Frédéric France				<frederic.france@free.fr>
  * Copyright (C) 2025		SuperAdmin					<daoud.mouhamed@gmail.com>
+ * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -171,11 +172,11 @@ class modEInvoicing extends DolibarrModules
 		//                             2 => array('EINVOICING_MYNEWCONST2', 'chaine', 'myvalue', 'This is another constant to add', 0, 'current', 1)
 		// );
 		$this->const = array(
-			1 => array('EINVOICING_EINVOICE_IN_REAL_TIME', 'chaine', '1', 0),
-			2 => array('EINVOICING_FLOWS_SYNC_CALL_LIMIT', 'chaine', '1', 0),
-			3 => array('EINVOICING_SYNC_MARGIN_TIME_HOURS', 'chaine', '12', 0),
-			4 => array('EINVOICING_FLOWS_SYNC_CALL_SIZE', 'chaine', '100', 0),
-			5 => array('EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_TYPE', 'int', EInvoicing::SUPPLIER_INVOICE_LINES_IMPORT_AUTO, 0),
+			1 => array('EINVOICING_EINVOICE_IN_REAL_TIME', 'chaine', '1', '0'),
+			2 => array('EINVOICING_FLOWS_SYNC_CALL_LIMIT', 'chaine', '1', '0'),
+			3 => array('EINVOICING_SYNC_MARGIN_TIME_HOURS', 'chaine', '12', '0'),
+			4 => array('EINVOICING_FLOWS_SYNC_CALL_SIZE', 'chaine', '100', '0'),
+			5 => array('EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_TYPE', 'int', EInvoicing::SUPPLIER_INVOICE_LINES_IMPORT_AUTO, '0'),
 		);
 
 		// Some keys to add into the overwriting translation tables
@@ -606,7 +607,7 @@ class modEInvoicing extends DolibarrModules
 
 		// Societe extrafields
 		// Use a <select> to have the default null value (falling back to default supplier invoice import type parameter set in the module settings)
-		$result = $extrafields->addExtraField('einvoicing_supplier_invoice_lines_import_type', $langs->trans('SupplierInvoiceLinesImportType'), 'select', 150, 255, 'societe', 0, 0, null, 'a:1:{s:7:"options";a:2:{i:'.Einvoicing::SUPPLIER_INVOICE_LINES_IMPORT_AUTO.';s:11:"automatique";i:'.Einvoicing::SUPPLIER_INVOICE_LINES_IMPORT_MANUAL.';s:6:"manuel";}}', 1, '', 1, 0, '', '', 'einvoicing@einvoicing', 1, 0, 0);
+		$result = $extrafields->addExtraField('einvoicing_supplier_invoice_lines_import_type', $langs->trans('SupplierInvoiceLinesImportType'), 'select', 150, '255', 'societe', 0, 0, '', 'a:1:{s:7:"options";a:2:{i:'.Einvoicing::SUPPLIER_INVOICE_LINES_IMPORT_AUTO.';s:11:"automatique";i:'.Einvoicing::SUPPLIER_INVOICE_LINES_IMPORT_MANUAL.';s:6:"manuel";}}', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', '1', 0, 0);
 
 		// Invoice extrafields
 		// Chorus fields

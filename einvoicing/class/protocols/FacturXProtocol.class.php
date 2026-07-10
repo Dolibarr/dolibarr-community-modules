@@ -2,6 +2,7 @@
 /* Copyright (c) 2025       Eric Seigne                 <eric.seigne@cap-rel.fr>
  * Copyright (C) 2025       Laurent Destailleur         <eldy@users.sourceforge.net>
  * Copyright (C) 2025       Mohamed DAOUD               <mdaoud@dolicloud.com>
+ * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
  *
  * This program is free software: you can redistribute it and/or modify
@@ -1505,7 +1506,7 @@ class FacturXProtocol extends AbstractProtocol
 	 * @param 	array 				$remise_already_used_line_level_ids		The list of ids for remise already used
 	 * @param 	string 				$flowId									The concerned flowId
 	 * @param 	array{free_lines:bool,target_fk_product:?int} $params		Params used in case of manual import
-	 * @return 	array{res:int, message:string, actioncode:string|null, actionurl:string, action:string, actiondata:mixed}   Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and additional data about the action.
+	 * @return 	array{res:int<-1,1>, message?:string, actioncode?:string|null, actionurl?:string, action?:?string, actiondata?:''|array{ref:string,supplierref:string,name:string}}   Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and additional data about the action.
 	 */
 	public function createSupplierInvoiceLinesFromSource(&$supplierInvoice, $parsedLines, &$remise_already_used_line_level_ids = [], $flowId = '', $params = ['free_lines' => false, 'target_fk_product' => null]): array
 	{
@@ -1662,6 +1663,7 @@ class FacturXProtocol extends AbstractProtocol
 			}
 
 			$productId = 0;
+			$return_messages = array();
 			if (!$is_deposit_line && !$freeLines) {
 				// Sync or create product
 				$res = $this->_findOrCreateProductFromEinvoiceLine($parsedLine, $flowId);
@@ -1673,9 +1675,9 @@ class FacturXProtocol extends AbstractProtocol
 						return [
 							'res' => -1,
 							'message' => $langs->trans('ErrorProductSyncOrCreationFailed') . ' ' . implode("<br>\n", $return_messages),
-							'actioncode' => $res['actioncode'] ?? '',
-							'actionurl' => $res['actionurl'] ?? '',
-							'action' => $res['action'] ?? null,
+							'actioncode' => (string) $res['actioncode'] ?? '',
+							'actionurl' => (string) $res['actionurl'] ?? '',
+							'action' => (string) $res['action'] ?? null,
 							'actiondata' => $res['actiondata'] ?? ''
 						];
 					}
@@ -1717,10 +1719,10 @@ class FacturXProtocol extends AbstractProtocol
 			return [
 				'res' => -1,
 				'message' => 'Supplier invoice line creation error',
-				'actioncode' => $res['actioncode'] ?? '',
-				'actionurl' => $res['actionurl'] ?? '',
-				'action' => $res['action'] ?? null,
-				'actiondata' => $res['actiondata'] ?? ''
+				'actioncode' => (string) $res['actioncode'] ?? '',
+				'actionurl' => (string) $res['actionurl'] ?? '',
+				'action' => (string) $res['action'] ?? null,
+				'actiondata' =>  $res['actiondata'] ?? ''
 			];
 		}
 
@@ -1937,7 +1939,7 @@ class FacturXProtocol extends AbstractProtocol
 	 * Parse all invoice lines from XML.
 	 *
 	 * @param  string $xml Raw XML content
-	 * @return array<int,array<string,null|bool|float|string|array<mixed>>>
+	 * @return array<string,float|string>|false
 	 */
 	public function parseInvoiceLines($xml)
 	{

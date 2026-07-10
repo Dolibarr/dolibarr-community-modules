@@ -1,6 +1,7 @@
 <?php
 /* Copyright (C) 2025-2026       Laurent Destailleur         <eldy@users.sourceforge.net>
  * Copyright (C) 2025-2026       Mohamed DAOUD               <mdaoud@dolicloud.com>
+ * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -842,7 +843,7 @@ trait CommonProtocol
 	 * @param array $lineData Array containing invoice line data extracted from XML
 	 * @param string $flowId Flow identifier source of the product. Used for logging purposes.
 	 *
-	 * @return array{res:int, message:string, actioncode:string|null, actionurl:string|null, action:string|null}   Returns array with 'res' (ID of the found or created product, -1 on error) with a 'message' and an optional 'action'.
+	 * @return array{res:int, message:string, actioncode?:string|null, actionurl?:string|null, action?:string|null, actiondata?: ''|array{ref:string,supplierref:string,name:string}}   Returns array with 'res' (ID of the found or created product, -1 on error) with a 'message' and an optional 'action'.
 	 */
 	private function _findOrCreateProductFromEinvoiceLine($lineData, $flowId = '')
 	{
@@ -1688,7 +1689,7 @@ trait CommonProtocol
 	/**
 	 * Create/insert supplier invoice lines in DB using $lines property of the supplier invoice object
 	 * @param FactureFournisseur $supplierInvoice The supplier invoice to add lines
-	 * @return bool
+	 * @return bool  True if success
 	 */
 	public function createSupplierInvoiceLinesIntoDatabase(FactureFournisseur $supplierInvoice): bool
 	{

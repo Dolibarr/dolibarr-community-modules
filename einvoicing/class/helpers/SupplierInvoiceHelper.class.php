@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2026       solauv
+ * Copyright (C) 2026		MDW	<mdeweerd@users.noreply.github.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -244,7 +245,7 @@ class SupplierInvoiceHelper
 				$document = new Document($db);
 				$resdoc = $document->fetch($foundDocument->rowid);
 
-				if ((empty($resdoc) || is_null($document->xml_data) || $document->xml_data == '') && $fetchXmlIfEmpty === true) {
+				if ((empty($resdoc) || is_null($document->xml_data) || $document->xml_data == '') && $fetchXmlIfEmpty) {
 					$providerManager = new PDPProviderManager($db);
 					$provider = $providerManager->getProvider(strtoupper($document->provider));
 

@@ -3,6 +3,7 @@
  * Copyright (C) 2025		Laurent Destailleur		<eldy@users.sourceforge.net>
  * Copyright (C) 2026		Charlene Benke			<charlene@patas-monkey.com>
  * Copyright (C) 2026       Frédéric France         <frederic.france@free.fr>
+ * Copyright (C) 2026		MDW						<mdeweerd@users.noreply.github.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -757,6 +758,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 
 		if (isset($object->element) && in_array($object->element, ['invoice_supplier']) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
+			'@phan-var-force FactureFournisseur $object';
 			$permissiontoedit = $user->hasRight('fournisseur', 'facture', 'creer');
 
 			if ($action == 'confirm_sendStatusMessage' && $permissiontoedit) {
@@ -860,7 +862,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				}
 
 				// Add lines to supplier invoice from eInvoice XML data
-				$$remise_already_used_line_level_ids = [];
+				$remise_already_used_line_level_ids = [];
 				$res = $exchangeProtocol->createSupplierInvoiceLinesFromSource($object, $parsedLines, $remise_already_used_line_level_ids, '', $createInvoiceLinesParams);
 				if ($res['res'] < 0) {
 					$db->rollback();
