@@ -1,6 +1,7 @@
 <?php
 /* Copyright (C) 2026       Laurent Destailleur         <eldy@users.sourceforge.net>
  * Copyright (C) 2026       Mohamed DAOUD               <mdaoud@dolicloud.com>
+ * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
  *
  * This program is free software: you can redistribute it and/or modify
@@ -271,16 +272,169 @@ class CIIProtocol extends AbstractProtocol
 		// Call page to generate the invoice variables ($invoiceData, ...)
 		include dol_buildpath('einvoicing/lib/buildinvoicelines.inc.php');
 		/**
-		 * @var Facture 			$object			The $invoice object used in entry on inc file, but completed.
-		 * @var array<mixed,mixed> 	$invoiceData
-		 * @var array<mixed,mixed> 	$linesData
+		 * From include:
+		 * @var Facture 			$object			The `$invoice` object used in entry on inc file, but completed.
+		 * @var array{
+		 *   documentno: string,
+		 *   documenttypecode: null|string,
+		 *   documentdate: DateTimeInterface,
+		 *   invoiceCurrency: string|list<string>,
+		 *   taxCurrency: null,
+		 *   documentname: null,
+		 *   documentlanguage: string,
+		 *   effectiveSpecifiedPeriod: 'NA',
+		 *   documentDeliveryDate: DateTimeInterface,
+		 *   invoicingPeriodStart: null,
+		 *   invoicingPeriodEnd: null,
+		 *   businessProcessId: string,
+		 *   isTestDocument: bool,
+		 *   documentNotePublic: string,
+		 *   documentNotePMT: string,
+		 *   documentNotePMD: string,
+		 *   documentNoteAAB: string,
+		 *   documentNotes: array,
+		 *   sellername: string,
+		 *   sellerids: string,
+		 *   sellerlineone: string,
+		 *   sellerlinetwo: string,
+		 *   sellerlinethree: string,
+		 *   sellerpostcode: string,
+		 *   sellercity: string,
+		 *   sellercountry: string,
+		 *   sellersubdivision: null,
+		 *   sellercontactpersonname: string,
+		 *   sellercontactdepartmentname: null,
+		 *   sellercontactphoneno: string,
+		 *   sellercontactfaxno: string,
+		 *   sellercontactemailaddr: string,
+		 *   sellerCommunicationUriScheme: string,
+		 *   sellerCommunicationUri: string,
+		 *   sellerGlobalIds: list<array{schemeID: string, value: string}>,
+		 *   sellerTaxRegistrations: list<array{type: string, value: string}>,
+		 *   sellervatnumber: string,
+		 *   sellerLegalOrgId: string,
+		 *   sellerLegalOrgScheme: string,
+		 *   sellerTradingName: string,
+		 *   buyername: string,
+		 *   buyerids: string,
+		 *   buyerlineone: string,
+		 *   buyerlinetwo: string,
+		 *   buyerlinethree: string,
+		 *   buyerpostcode: string,
+		 *   buyercity: string,
+		 *   buyercountry: string,
+		 *   buyersubdivision: null,
+		 *   buyervatnumber: string,
+		 *   buyerGlobalIds: list<array{schemeID: string, value: string}>,
+		 *   buyerLegalOrgId: string,
+		 *   buyerLegalOrgScheme: string,
+		 *   buyerTradingName: string,
+		 *   buyerReference: null|string,
+		 *   buyerCommunicationUriScheme: string,
+		 *   buyerCommunicationUri: string,
+		 *   buyercontactpersonname: null,
+		 *   buyercontactemailaddr: null,
+		 *   buyercontactphoneno: null,
+		 *   grandTotalAmount: float|int,
+		 *   duePayableAmount: float|int,
+		 *   lineTotalAmount: float|int,
+		 *   chargeTotalAmount: float,
+		 *   allowanceTotalAmount: float|int,
+		 *   taxBasisTotalAmount: float|int,
+		 *   taxTotalAmount: float|int,
+		 *   roundingAmount: null,
+		 *   totalPrepaidAmount: float|int,
+		 *   iban_id: int,
+		 *   iban: string,
+		 *   bic: string,
+		 *   accountName: string,
+		 *   accountRef: string,
+		 *   accountLabel: string,
+		 *   paymentDueDate: DateTimeInterface,
+		 *   paymentTermsText: string,
+		 *   headerAllowancesCharges: array,
+		 *   invoiceRefDocs: array|list<array{ref: string|int, date: \DateTimeInterface, type: string}>,
+		 *   orderReference: string,
+		 *   contractReference: null|string,
+		 *   despatchAdviceRef: null,
+		 *   taxBreakdown: array|list<array<string, array>>,
+		 *   _chorus: bool,
+		 *   _depositlines: array|list<array{lineId: int, invoiceRef: string, invoiceDate: DateTimeInterface}>,
+		 *   _globalDiscounts: array|list<array{value: float, reason: string, taxRate: float, categoryVAT: string}>,
+		 *   _customerOrderReferenceList: string[],
+		 *   _project: \Project|null,
+		 *   paymentMeansCode?: int,
+		 *   paymentMeansText?: string,
+		 *   _shipFromContactBill?: array{address: null|string, zip: null|string, town: null|string, country: string},
+		 *   _shipFromContactShip?: array{name: string, address: null|string, zip: null|string, town: null|string, country: string}
+		 * }	$invoiceData
+		 * @var array<int, array{
+		 *   lineid: int,
+		 *   linestatuscode: 'NA',
+		 *   linestatusreasoncode: 'NA',
+		 *   lineNote: null,
+		 *   prodname: string,
+		 *   proddesc: string,
+		 *   prodsellerid: string,
+		 *   prodbuyerid: null|string,
+		 *   prodglobalidtype: null|string,
+		 *   prodglobalid: null|string,
+		 *   prodmultilangs: array,
+		 *   prodClassificationCode: null|string,
+		 *   prodClassificationScheme: null|string,
+		 *   prodOriginCountry: null|string,
+		 *   netpriceamount: float,
+		 *   netpricebasisquantity: null|float,
+		 *   netpricebasisquantityunitcode: null|string,
+		 *   billedquantity: float,
+		 *   billedquantityunitcode: string,
+		 *   chargeFreeQuantity: null|float,
+		 *   chargeFreeQuantityunitcode: null|string,
+		 *   packageQuantity: null|float,
+		 *   packageQuantityunitcode: null|string,
+		 *   lineTotalAmount: float|string,
+		 *   totalAllowanceChargeAmount: null|float,
+		 *   categoryCode: string,
+		 *   typeCode: 'VAT',
+		 *   rateApplicablePercent: string,
+		 *   tva_tx: float|string,
+		 *   vat_src_code: string,
+		 *   ExemptionReason: string,
+		 *   ExemptionReasonCode: string,
+		 *   calculatedAmount: null|float,
+		 *   lineAllowances: array,
+		 *   lineGrossPriceAllowances: array,
+		 *   lineremisepercent: 'NA'|float,
+		 *   linePeriodStart: ?\DateTimeInterface,
+		 *   linePeriodEnd: ?\DateTimeInterface,
+		 *   additionalRefDocs: array,
+		 *   isDepositLine: bool,
+		 *   depositInvoiceRef: null|string,
+		 *   depositInvoiceDate: ?DateTimeInterface,
+		 *   parentDocumentNo: null|string,
+		 *   is_deposit: int<0,1>,
+		 *   fk_remise: null|int,
+		 *   discountPercent: float,
+		 *   grosspriceamount: null|float,
+		 *   grosspricebasisquantity: null|float,
+		 *   grosspricebasisquantityunitcode: null|string
+		 * }> $linesData
 		 * @var string 				$outputlang		Value of $outputlangs->defaultlang
-		 * @var Societe 			$mysoc
 		 * @var Account				$account
-		 * @var EInvoicing		$einvoicing
-		 * @var string 				$schemdUri		Buyer scheme uri
+		 * @var EInvoicing			$einvoicing
+		 * @var string 				$schemeUri		Buyer scheme uri
 		 * @var string 				$uri			Buyer uri
 		 */
+		'
+		@phan-var-force Facture 			$object			The $invoice object used in entry on inc file, but completed.
+		@phan-var-force array{documentno:string,documenttypecode:null|string,documentdate:DateTimeInterface,invoiceCurrency:string|array<string>,taxCurrency:null,documentname:null,documentlanguage:string,effectiveSpecifiedPeriod:\'NA\',documentDeliveryDate:DateTimeInterface,invoicingPeriodStart:null,invoicingPeriodEnd:null,businessProcessId:string,isTestDocument:bool,documentNotePublic:string,documentNotePMT:string,documentNotePMD:string,documentNoteAAB:string,documentNotes:array,sellername:string,sellerids:string,sellerlineone:string,sellerlinetwo:string,sellerlinethree:string,sellerpostcode:string,sellercity:string,sellercountry:string,sellersubdivision:null,sellercontactpersonname:string,sellercontactdepartmentname:null,sellercontactphoneno:string,sellercontactfaxno:string,sellercontactemailaddr:string,sellerCommunicationUriScheme:string,sellerCommunicationUri:string,sellerGlobalIds:array<array{schemeID:string,value:string}>,sellerTaxRegistrations:array<array{type:string,value:string}>,sellervatnumber:string,sellerLegalOrgId:string,sellerLegalOrgScheme:string,sellerTradingName:string,buyername:string,buyerids:string,buyerlineone:string,buyerlinetwo:string,buyerlinethree:string,buyerpostcode:string,buyercity:string,buyercountry:string,buyersubdivision:null,buyervatnumber:string,buyerGlobalIds:array<array{schemeID:string,value:string}>,buyerLegalOrgId:string,buyerLegalOrgScheme:string,buyerTradingName:string,buyerReference:null|string,buyerCommunicationUriScheme:string,buyerCommunicationUri:string,buyercontactpersonname:null,buyercontactemailaddr:null,buyercontactphoneno:null,grandTotalAmount:float|int,duePayableAmount:float|int,lineTotalAmount:float|int,chargeTotalAmount:float,allowanceTotalAmount:float|int,taxBasisTotalAmount:float|int,taxTotalAmount:float|int,roundingAmount:null,totalPrepaidAmount:float|int,iban_id:int,iban:string,bic:string,accountName:string,accountRef:string,accountLabel:string,paymentDueDate:DateTimeInterface,paymentTermsText:string,headerAllowancesCharges:array,invoiceRefDocs:array|array<array{ref:string|int,date:DateTimeInterface,type:string}>,orderReference:string,contractReference:null|string,despatchAdviceRef:null,taxBreakdown:array|array<array<string,array>>,_chorus:bool,_depositlines:array|array<array{lineId:int,invoiceRef:string,invoiceDate:DateTimeInterface}>,_globalDiscounts:array|array<array{value:float,reason:string,taxRate:float,categoryVAT:string}>,_customerOrderReferenceList:string[],_project:Project|null,paymentMeansCode?:int,paymentMeansText?:string,_shipFromContactBill?:array{address:null|string,zip:null|string,town:null|string,country:string},_shipFromContactShip?:array{name:string,address:null|string,zip:null|string,town:null|string,country:string}} $invoiceData
+		@phan-var-force array<int,array{lineid:int,linestatuscode:\'NA\',linestatusreasoncode:\'NA\',lineNote:null,prodname:string,proddesc:string,prodsellerid:string,prodbuyerid:null|string,prodglobalidtype:null|string,prodglobalid:null|string,prodmultilangs:array,prodClassificationCode:null|string,prodClassificationScheme:null|string,prodOriginCountry:null|string,netpriceamount:float,netpricebasisquantity:null|float,netpricebasisquantityunitcode:null|string,billedquantity:float,billedquantityunitcode:string,chargeFreeQuantity:null|float,chargeFreeQuantityunitcode:null|string,packageQuantity:null|float,packageQuantityunitcode:null|string,lineTotalAmount:float|string,totalAllowanceChargeAmount:null|float,categoryCode:string,typeCode:\'VAT\',rateApplicablePercent:string,tva_tx:float|string,vat_src_code:string,ExemptionReason:string,ExemptionReasonCode:string,calculatedAmount:null|float,lineAllowances:array,lineGrossPriceAllowances:array,lineremisepercent:\'NA\'|float,linePeriodStart:?DateTimeInterface,linePeriodEnd:?DateTimeInterface,additionalRefDocs:array,isDepositLine:bool,depositInvoiceRef:null|string,depositInvoiceDate:?DateTimeInterface,parentDocumentNo:null|string,is_deposit:int<0,1>,fk_remise:null|int,discountPercent:float,grosspriceamount:null|float,grosspricebasisquantity:null|float,grosspricebasisquantityunitcode:null|string}> $linesData
+		@phan-var-force string 				$outputlang		Value of $outputlangs->defaultlang
+		@phan-var-force Account				$account
+		@phan-var-force EInvoicing			$einvoicing
+		@phan-var-force string 				$schemeUri		Buyer scheme uri
+		@phan-var-force string 				$uri			Buyer uri
+		';
 
 		// Generate the XML file
 		$filename = dol_sanitizeFileName($invoice->ref);
@@ -697,13 +851,13 @@ class CIIProtocol extends AbstractProtocol
 								$discount->fk_soc = $linkedObject->socid;
 								$discount->socid = $linkedObject->socid;
 								$discount->fk_invoice_supplier_source = $linkedObject->id;
-								foreach ($amount_ht as $tva_tx => $xxx) {
-									$discount->amount_ht = abs((float) $amount_ht[$tva_tx]);
-									$discount->amount_tva = abs((float) $amount_tva[$tva_tx]);
-									$discount->amount_ttc = abs((float) $amount_ttc[$tva_tx]);
-									$discount->multicurrency_amount_ht = abs((float) $multicurrency_amount_ht[$tva_tx]);
-									$discount->multicurrency_amount_tva = abs((float) $multicurrency_amount_tva[$tva_tx]);
-									$discount->multicurrency_amount_ttc = abs((float) $multicurrency_amount_ttc[$tva_tx]);
+								foreach ($amount_ht as $tva_tx => $xxx) {  // @phan-suppress-current-line PhanEmptyForeach
+									$discount->amount_ht = abs((float) $amount_ht[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
+									$discount->amount_tva = abs((float) $amount_tva[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
+									$discount->amount_ttc = abs((float) $amount_ttc[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
+									$discount->multicurrency_amount_ht = abs((float) $multicurrency_amount_ht[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
+									$discount->multicurrency_amount_tva = abs((float) $multicurrency_amount_tva[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
+									$discount->multicurrency_amount_ttc = abs((float) $multicurrency_amount_ttc[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
 
 									// Clean vat code
 									$reg = array();
@@ -719,7 +873,6 @@ class CIIProtocol extends AbstractProtocol
 									$result = $discount->create($user);
 									if ($result < 0) {
 										return ['res' => -1, 'message' => 'Failed to create discount for deposit line: ' . $discount->error];
-										break;
 									}
 									$fk_remise = $result;
 								}
@@ -900,13 +1053,13 @@ class CIIProtocol extends AbstractProtocol
 								$discount->fk_soc = $linkedObject->socid;
 								$discount->socid = $linkedObject->socid;
 								$discount->fk_invoice_supplier_source = $linkedObject->id;
-								foreach ($amount_ht as $tva_tx => $xxx) {
-									$discount->amount_ht = abs((float) $amount_ht[$tva_tx]);
-									$discount->amount_tva = abs((float) $amount_tva[$tva_tx]);
-									$discount->amount_ttc = abs((float) $amount_ttc[$tva_tx]);
-									$discount->multicurrency_amount_ht = abs((float) $multicurrency_amount_ht[$tva_tx]);
-									$discount->multicurrency_amount_tva = abs((float) $multicurrency_amount_tva[$tva_tx]);
-									$discount->multicurrency_amount_ttc = abs((float) $multicurrency_amount_ttc[$tva_tx]);
+								foreach ($amount_ht as $tva_tx => $xxx) {  // @phan-suppress-current-line PhanEmptyForeach
+									$discount->amount_ht = abs((float) $amount_ht[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
+									$discount->amount_tva = abs((float) $amount_tva[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
+									$discount->amount_ttc = abs((float) $amount_ttc[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
+									$discount->multicurrency_amount_ht = abs((float) $multicurrency_amount_ht[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
+									$discount->multicurrency_amount_tva = abs((float) $multicurrency_amount_tva[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
+									$discount->multicurrency_amount_ttc = abs((float) $multicurrency_amount_ttc[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
 
 									// Clean vat code
 									$reg = array();
@@ -922,7 +1075,6 @@ class CIIProtocol extends AbstractProtocol
 									$result = $discount->create($user);
 									if ($result < 0) {
 										return ['res' => -1, 'message' => 'Failed to create discount for deposit line: ' . $discount->error];
-										break;
 									}
 									$fk_remise_for_deposit = $result;
 								}
@@ -2249,7 +2401,7 @@ class CIIProtocol extends AbstractProtocol
 	/**
 	 * Map document type code to Dolibarr invoice type
 	 *
-	 * @param string $documenttypecode Document type code
+	 * @param ?string $documenttypecode Document type code
 	 * @return int|'-1' Dolibarr invoice type or '-1' if unknown
 	 */
 	private function _getDolibarrInvoiceType($documenttypecode)
@@ -2280,7 +2432,7 @@ class CIIProtocol extends AbstractProtocol
 
 		/** @var array<string,int> $map */
 		$map = [
-			'325' => CommonInvoice::TYPE_PROFORMA,
+			'325' => CommonInvoice::TYPE_PROFORMA,  // @phan-suppress-current-line PhanDeprecatedClassConstant
 			'211' => CommonInvoice::TYPE_SITUATION,
 
 			'380' => CommonInvoice::TYPE_STANDARD,
@@ -2464,8 +2616,6 @@ class CIIProtocol extends AbstractProtocol
 		if (empty($allowances)) {
 			return false;
 		}
-
-		$allowances = array_values($allowances);
 
 		// Base used for percent calculation — basisAmount of first entry, fallback to lineTotalAmount
 		$base = $allowances[0]['basisAmount'] ?? $lineTotalAmount;
