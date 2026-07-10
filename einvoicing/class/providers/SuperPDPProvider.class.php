@@ -144,8 +144,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 					'response_type' => 'code',
 					'redirect_uri' => dol_buildpath('/einvoicing/admin/setup.php', 2)
 				];
-				// Company prefill (number + scheme are an indissociable pair). Sandbox scheme off-live,
-				// otherwise fr_siren / be_numero_entreprise by country.
+				// Prefill company information: number and scheme must be paired together.
+				// Use 'sandbox' scheme for non-live environment, otherwise use country-specific scheme (fr_siren for France, be_numero_entreprise for Belgium).
 				if (!empty($mysoc->idprof1)) {
 					$companyscheme = '';
 					if (!getDolGlobalInt('EINVOICING_LIVE')) {
@@ -155,6 +155,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 					} elseif ($mysoc->country_code == 'BE') {
 						$companyscheme = 'be_numero_entreprise';
 					}
+					// Include company number (idprof1/SIREN) in request only if a valid scheme is available.
+					// Invalid company numbers will cause the onboarding process to fail.
 					if ($companyscheme) {
 						$query += [
 							'superpdp_company_number' => removeAllSpaces($mysoc->idprof1),
@@ -340,7 +342,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 						}
 						if ($companyscheme) {
 							$query += [
-								'superpdp_company_number' => removeAllSpaces($mysoc->idprof1),
+								'superpdp_company_number' => removeAllSpaces($mysoc->idprof1), // The number (idprof1) must be valid, otherwise onboarding will fail.
 								'superpdp_company_number_scheme' => $companyscheme,
 							];
 						}
@@ -622,7 +624,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				$companyscheme = 'be_numero_entreprise';
 			}
 			if ($companyscheme) {
-				$query['superpdp_company_number'] = removeAllSpaces($mysoc->idprof1);
+				$query['superpdp_company_number'] = removeAllSpaces($mysoc->idprof1); // The number (idprof1) must be valid, otherwise onboarding will fail.
 				$query['superpdp_company_number_scheme'] = $companyscheme;
 			}
 		}
