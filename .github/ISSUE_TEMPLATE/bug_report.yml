@@ -23,6 +23,7 @@ body:
       description: Concerned module
       multiple: false
       options:
+        - --Please select--
         - einvoicing
         - helloasso
         - other
