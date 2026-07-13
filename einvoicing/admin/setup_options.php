@@ -223,11 +223,13 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->cssClass = 'minwidth500';
 
 	// Setup conf to choose to block generation/send of an invoice if no routing ID is found for the third party otherwise use SIREN
+	/* Option no more useful due to other added option that are more accurate, but we can still use it as hidden option
 	$item = $formSetup->newItem('EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID')->setAsYesNo();
 	$item->helpText = $langs->transnoentities('EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID_HELP');
 	$item->defaultFieldValue = '0';
 	$item->cssClass = 'minwidth500';
 	$item->fieldParams['forcereload'] = 0;
+	*/
 
 	// Setup conf to check the recipient reachability in the Approved Platforms directory (annuaire PA) before
 	// sending, and surface it on the invoice card. On by default. A read-only directory lookup: it never blocks.
