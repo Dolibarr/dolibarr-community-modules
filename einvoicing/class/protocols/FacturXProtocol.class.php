@@ -2000,7 +2000,7 @@ class FacturXProtocol extends AbstractProtocol
 		];
 
 
-		if (isset($map[$documenttypecode])) {
+		if (!isset($map[$documenttypecode])) {
 			dol_syslog(get_class($this) . '::_getDolibarrInvoiceType Unknown document type code: ' . $documenttypecode, LOG_WARNING);
 			return '-1';
 		}
