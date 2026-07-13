@@ -350,7 +350,11 @@ print dol_get_fiche_head($head, 'settings', $langs->trans($title), -1, "einvoici
 
 
 // Setup page goes here
-print info_admin($langs->trans("EInvoicingInfo").'<br>'.$langs->trans("EInvoicingInfo2"));
+$EInvoicingInfoProxy = '';
+if (getDolGlobalString("EINVOICING_SUPERPDP_VIAPARTNER")) {
+	$EInvoicingInfoProxy .= $langs->trans("EInvoicingInfoProxy", getDolGlobalString("EINVOICING_SUPERPDP_VIAPARTNER"));
+}
+print info_admin($langs->trans("EInvoicingInfo", $EInvoicingInfoProxy).'<br>'.$langs->trans("EInvoicingInfo2"));
 
 //print '<span class="opacitymedium">'.$langs->trans("EInvoicingSetupPage").'</span><br><br>';
 

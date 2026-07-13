@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2023 Laurent Destailleur  <eldy@users.sourceforge.net>
+ * Copyright (C) 2026		MDW						<mdeweerd@users.noreply.github.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,6 +22,7 @@
  *	\brief      File of parent class of all other hook actions classes
  */
 
+// @phan-suppress-file PhanRedefineClass
 
 /**
  *	Parent class of all other hook actions classes

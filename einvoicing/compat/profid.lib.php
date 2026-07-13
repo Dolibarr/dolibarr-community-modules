@@ -1,7 +1,7 @@
 <?php
 /* Copyright (C) 2006-2011	Laurent Destailleur		<eldy@users.sourceforge.net>
  * Copyright (C) 2022		Frédéric France			<frederic.france@netlogic.fr>
- * Copyright (C) 2024		MDW							<mdeweerd@users.noreply.github.com>
+ * Copyright (C) 2024-2026	MDW							<mdeweerd@users.noreply.github.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,6 +23,7 @@
  *  \brief		Set of functions for professional identifiers
  */
 
+// @phan-file-suppress PhanRedefineFunction
 
 /**
  *  Check if a string passes the Luhn algorithm test.
@@ -189,6 +190,7 @@ function isValidTinForES($str)
 	for ($i = 0; $i < 9; $i++) {
 		$num[$i] = substr($str, $i, 1);
 	}
+	'@phan-var-force array<int<0,8>,string> $num';
 
 	//Check NIF
 	if (preg_match('/(^[0-9]{8}[A-Z]{1}$)/', $str)) {

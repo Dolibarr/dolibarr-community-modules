@@ -98,6 +98,7 @@ class SqlInjectionVisitor extends \Phan\PluginV3\PluginAwarePostAnalysisVisitor
 		'plimit',  // Safe, limits are casted to int
 		'idate',  // Safe uses dol_print_date
 		'jdate',  // Safe uses dol_mktime
+		'order',  // Sanitizes arguments
 		// 'order',  // Not safe - fields are not checked
 		'regexpsql', // Partially safe - $subject is not escaped if $sqlstring is 0
 		'encrypt',  // Safe, results in string
@@ -168,6 +169,7 @@ class SqlInjectionVisitor extends \Phan\PluginV3\PluginAwarePostAnalysisVisitor
 	 * @var string[]
 	 */
 	private const TRUSTED_PROPERTIES = [
+		'database_name', // DoliDB
 		'table_element', 'table', 'table2', 'fk_element', 'element', 'join', 'where', 'sortorder', 'table_element_line',
 		'MAP_CAT_FK', 'MAP_CAT_TABLE', 'MAP_OBJ_TABLE',
 		'field', 'field_line', 'field_date',
@@ -180,12 +182,13 @@ class SqlInjectionVisitor extends \Phan\PluginV3\PluginAwarePostAnalysisVisitor
 	/**
 	 * Emit a debug message with file and line context
 	 *
-	 * @param string $message Debug message
+	 * @param string	$message	Debug message
+	 * @param bool		$forceMsg	When true, always report messaga
 	 * @return void
 	 */
-	private function debug(string $message): void
+	private function debug(string $message, $forceMsg = false): void
 	{
-		if (!SqlInjectionPlugin::$debugEnabled) {
+		if (!SqlInjectionPlugin::$debugEnabled || !$forceMsg) {
 			return;
 		}
 
@@ -198,7 +201,7 @@ class SqlInjectionVisitor extends \Phan\PluginV3\PluginAwarePostAnalysisVisitor
 		$this->emitPluginIssue(
 			$this->code_base, // @phpstan-ignore property.notFound
 			$this->context, // @phpstan-ignore property.notFound
-			'SqlInjectionDebug',
+			$forceMsg ? 'SqlInjectionDebugAlways' : 'SqlInjectionDebug',
 			"[DEBUG {$shortFile}:{$line}] %s",
 			[$message]
 		);
@@ -350,7 +353,7 @@ class SqlInjectionVisitor extends \Phan\PluginV3\PluginAwarePostAnalysisVisitor
 
 		if ($node->kind === \ast\AST_VAR) {
 			$name = $node->children['name'] ?? null;
-			$lowername = (string) strtolower((string) $name);
+			$lowername = is_string($name) ? (string) strtolower((string) $name) : 'not_a_string';
 			$result = false;
 			if (
 				is_string($name) // Must be a string
@@ -788,7 +791,7 @@ class SqlInjectionVisitor extends \Phan\PluginV3\PluginAwarePostAnalysisVisitor
 				if (!is_string($methodName) || !in_array($methodName, self::SAFE_METHODS, true)) {
 					return false;
 				}
-				// Method is ok, if DoliDB
+				// Method is ok, if DoliDb
 				return $this->isDoliDB($obj, ['this', 'db']);
 			}
 		}
