@@ -26,7 +26,6 @@ body:
         - einvoicing
         - helloasso
         - other
-      placeholder: einvoicing, helloasso, ...
     validations:
       required: true
 
