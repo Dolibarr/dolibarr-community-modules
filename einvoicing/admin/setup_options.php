@@ -186,6 +186,19 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->defaultFieldValue = '0';
 	$item->cssClass = 'minwidth500';
 
+	// Local EN 16931 business rules check (BR, BR-CO, BR-FR subset) on the generated XML.
+	// Single option with three modes: no check, check and warn only (default), or check and
+	// block the generation on any violation. The official Schematron of the Approved Platform
+	// stays the reference.
+	$item = $formSetup->newItem('EINVOICING_BR_CHECK')->setAsSelect(array(
+		'nocheck' => $langs->transnoentities('EINVOICING_BR_CHECK_NOCHECK'),
+		'warning_only' => $langs->transnoentities('EINVOICING_BR_CHECK_WARNING_ONLY'),
+		'blocking' => $langs->transnoentities('EINVOICING_BR_CHECK_BLOCKING'),
+	));
+	$item->helpText = $langs->transnoentities('EINVOICING_BR_CHECK_HELP');
+	$item->defaultFieldValue = 'warning_only';
+	$item->cssClass = 'minwidth500';
+
 
 	if (getDolGlobalString('EINVOICING_EINVOICE_IN_REAL_TIME')) {
 		$item = $formSetup->newItem('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS')->setAsYesNo();
@@ -280,6 +293,12 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
 	// Setup conf to choose use of auto generation or not of products
 	$item = $formSetup->newItem('EINVOICING_PRODUCTS_AUTO_GENERATION')->setAsYesNo();
 	$item->helpText = $langs->transnoentities('EINVOICING_PRODUCTS_AUTO_GENERATION_HELP');
+	$item->defaultFieldValue = '0';
+	$item->cssClass = 'minwidth500';
+
+	// Setup conf to import lines as free description lines when no product is found
+	$item = $formSetup->newItem('EINVOICING_IMPORT_AS_FREE_LINES')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('EINVOICING_IMPORT_AS_FREE_LINES_HELP');
 	$item->defaultFieldValue = '0';
 	$item->cssClass = 'minwidth500';
 

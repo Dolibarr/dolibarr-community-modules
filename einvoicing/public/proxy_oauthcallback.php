@@ -328,10 +328,10 @@ if (empty($code) && !GETPOST('error')) {
 
 					$content = json_decode($resultget['content'], true);
 
-					$access_token = $content['access_token'];
-					$expires_in = $content['expires_in'];
-					$refresh_token = $content['refresh_token'];
-					$scope = $content['scope'];
+					$access_token = $content['access_token'] ?? '';
+					$expires_in = $content['expires_in'] ?? '';
+					$refresh_token = $content['refresh_token'] ?? '';
+					$scope = $content['scope'] ?? '';
 
 					$origin_redirect_uri .= '?accesstoken='.urlencode($access_token);
 					$origin_redirect_uri .= '&expires_in='.urlencode($expires_in);

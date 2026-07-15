@@ -135,6 +135,8 @@ EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS=Cancel invoice recording if the aut
 EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS2=By default, the invoice creation is done even if E-invoice generation fails. in such a case, you can re-generate this E-invoice later.
 EINVOICING_PRODUCTS_AUTO_GENERATION=Automatic generation of missing products
 EINVOICING_PRODUCTS_AUTO_GENERATION_HELP=When importing a supplier invoice, if the bought product can't be found in database, and if there is no default product to use on the supplier card, enabling this option will automatically create missing products during Access Point synchronization, otherwise the synchronization process is stopped until the product has been created manually or a default product for import is set on the vendor card.
+EINVOICING_IMPORT_AS_FREE_LINES=Import lines without product as free description lines
+EINVOICING_IMPORT_AS_FREE_LINES_HELP=When importing a supplier invoice, if no matching product is found and automatic product creation is disabled, enabling this option will import the line as a free description line (using the XML label and description) without linking any product. If disabled, the synchronisation is stopped until the product is resolved manually.
 EINVOICING_THIRDPARTIES_AUTO_GENERATION=Automatic generation of missing third parties
 EINVOICING_THIRDPARTIES_AUTO_GENERATION_HELP=Automatically create missing third parties during Access Point synchronization, otherwise stop the process until the thirdparty has been created manually.
 EINVOICING_DEBUG=Debug
@@ -399,6 +401,13 @@ InvoicePrecheckResult=AP Pre-validation Result
 InvoicePrecheckResultHelp=Result of the e-invoice file validation performed using your Access Point (AP) validator.
 InvoicePrecheckSuccessful=AP validator pre-check passed.
 InvoicePrecheckFailed=AP validator pre-check failed.
+# Local EN 16931 business rules check
+EINVOICING_BR_CHECK=EN 16931 business rules check on the generated XML
+EINVOICING_BR_CHECK_HELP=After generating the e-invoice XML, checks a subset of the EN 16931 business rules locally (totals arithmetic BR-CO-10 to BR-CO-17, line rules, VAT category and rate coherence, seller SIREN format), quoting the official rule id. Choose "No check" to disable it, "Warning only" (default) to report violations as warnings, or "Blocking" to abort the generation on any violation. This is a fast local safety net for any platform; the official Schematron validation of the Approved Platform remains the reference.
+EINVOICING_BR_CHECK_NOCHECK=No check
+EINVOICING_BR_CHECK_WARNING_ONLY=Warning only
+EINVOICING_BR_CHECK_BLOCKING=Blocking (abort generation on violation)
+EInvoiceBusinessRulesViolations=%s EN 16931 business rule violation(s) found in the generated e-invoice
 # Lock of an already-transmitted invoice
 EInvoiceAlreadyTransmittedLocked=This invoice has already been transmitted to the Access Point (flow %s). A transmitted invoice is immutable: issue a credit note or a corrective invoice to amend it. You can enable re-sending in the module setup to test the platform retry behaviour.
 EINVOICING_ALLOW_RESEND_TRANSMITTED=Allow re-sending an already transmitted invoice
