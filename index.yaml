@@ -17,12 +17,12 @@ packages:
     cover: 'https://raw.githubusercontent.com/Dolibarr/dolibarr-community-modules/refs/heads/main/einvoicing/img/object_einvoicing.png'
     current_version: '0.0.1'
     dolibarrmin: "18.0"
-    dolibarrmax: "23.0"
+    dolibarrmax: "24.0"
     phpmin: "7.2"
     phpmax: ""
     price: 0
     created_at: '2025-10-10'
-    last_updated_at: "2026-07-13"
+    last_updated_at: "2026-07-15"
     # direct-download is yes if we can download the module to install it in application
     direct-download: no
     # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
@@ -44,7 +44,7 @@ packages:
       en: 'Provides a way to make an online checkout of any membership dues, donation, customer invoice or customer order with the HelloAsso API. Also offer an option to synchronize membership.'
     status: 'enabled'
     created_at: '2024-12-10'
-    last_updated_at: "2026-07-13"
+    last_updated_at: "2026-07-15"
     category: '68, 67'
     git: 'https://github.com/Dolibarr/dolibarr-community-modules/tree/main/helloasso'
     git-branch: 'main'
@@ -52,7 +52,7 @@ packages:
     cover: 'https://raw.githubusercontent.com/Dolibarr/dolibarr-community-modules/main/helloasso/cover.png'
     current_version: "2.1.1"
     dolibarrmin: "21.0"
-    dolibarrmax: "23.0"
+    dolibarrmax: "24.0"
     phpmin: "7.1"
     phpmax: "8.4"
     price: 0
@@ -84,7 +84,7 @@ packages:
     cover: 'https://raw.githubusercontent.com/InPoint-Automation/Dolibarr-KSeF-Module/refs/heads/main/img/ksef.png'
     current_version: "1.4.4"
     dolibarrmin: "14.0"
-    dolibarrmax: "23.0"
+    dolibarrmax: "24.0"
     phpmin: '7.4'
     phpmax: ""
     price: 0
