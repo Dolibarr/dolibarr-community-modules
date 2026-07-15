@@ -206,7 +206,7 @@ class SupplierInvoiceHelper
 			return $details;
 		}
 
-		// Manage mode 1 (roundoftotal) & mode 2 (totalofround)
+		// Manage mode 1 (totalofround) & mode 2 (roundoftotal)
 		$details = array(
 			'total_ht' => 0,
 			'total_ttc' => 0,
