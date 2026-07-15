@@ -124,17 +124,17 @@ class SupplierInvoiceHelper
 			$details = self::getInvoiceDetailsForComparison($dolSupplierInvoice, $vatComputeMode);
 
 			// VAT excl. total
-			if (!self::areAmountsEqual(floatval($details['total_ht']), $parsedHeader['lineTotalAmount'])) {
+			if (!self::areAmountsEqual($details['total_ht'], $parsedHeader['lineTotalAmount'])) {
 				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatExclDifference', $parsedHeader['lineTotalAmount'], floatval($dolSupplierInvoice->total_ht));
 			}
 
 			// VAT incl. total
-			if (!self::areAmountsEqual(floatval($details['total_ttc']), $parsedHeader['grandTotalAmount'])) {
+			if (!self::areAmountsEqual($details['total_ttc'], $parsedHeader['grandTotalAmount'])) {
 				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatInclDifference', $parsedHeader['grandTotalAmount'], floatval($dolSupplierInvoice->total_ttc));
 			}
 
 			// VAT total
-			if (!self::areAmountsEqual(floatval($details['total_tva']), $parsedHeader['taxTotalAmount'])) {
+			if (!self::areAmountsEqual($details['total_tva'], $parsedHeader['taxTotalAmount'])) {
 				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatDifference', $parsedHeader['taxTotalAmount'], floatval($dolSupplierInvoice->total_tva));
 			}
 
@@ -143,8 +143,8 @@ class SupplierInvoiceHelper
 				if ($taxDetailsByRate['typeCode'] === 'VAT') {
 					$currentRate = (string) $taxDetailsByRate['rateApplicablePercent'];
 					if (array_key_exists($currentRate, $dolSupplierInvoiceVatDetails)) {
-						$dolVatAmount = floatval($dolSupplierInvoiceVatDetails[$currentRate]['vat_amount']);
-						$dolVatBasis = floatval($dolSupplierInvoiceVatDetails[$currentRate]['vat_basis_amount']);
+						$dolVatAmount = $dolSupplierInvoiceVatDetails[$currentRate]['vat_amount'];
+						$dolVatBasis = $dolSupplierInvoiceVatDetails[$currentRate]['vat_basis_amount'];
 
 						if (!self::areAmountsEqual($dolVatBasis, $taxDetailsByRate['basisAmount'])) {
 							$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonVatBasisDifference', $currentRate, $taxDetailsByRate['basisAmount'], $dolVatBasis);
@@ -165,7 +165,12 @@ class SupplierInvoiceHelper
 		}
 
 		if (count($amountErrors['current']) > 0) {
-			$errors = array_merge($errors, $amountErrors['totalofround'] ?? [], $amountErrors['roundoftotal'] ?? []);
+			// If there are errors in both VAT modes (totalofround and roundoftotal), then return only the errors occured with roundoftotal
+			if (count($amountErrors['totalofround'] ?? []) > 0 && count($amountErrors['roundoftotal'] ?? [] > 0)) {
+				$errors = array_merge($errors, $amountErrors['roundoftotal'] ?? []);
+			} else {
+				$errors = array_merge($errors, $amountErrors['totalofround'] ?? [], $amountErrors['roundoftotal'] ?? []);
+			}
 
 			if ($amountErrors['current'] == $amountErrors['totalofround'] && count($amountErrors['roundoftotal']) === 0) {
 				$errors[] = $langs->trans('SupplierInvoiceComparisonSuggestVatCalculationMode', 2);
@@ -216,7 +221,7 @@ class SupplierInvoiceHelper
 			throw new Exception('Seller not found for id : ' . $supplierInvoice->socid);
 		}
 
-		$forceRoundingTotalsPrecision = $vatComputeMode == 1 ? 'MT' : 'MU';
+		$forceRoundingTotalsPrecision = ($vatComputeMode == 1 ? 'MT' : 'MU');
 
 		foreach ($supplierInvoice->lines as $line) {
 			$rate = (string) price2num($line->tva_tx);
@@ -274,9 +279,11 @@ class SupplierInvoiceHelper
 		$roundPrecision = 'MT';
 
 		foreach ($details['vat_by_rate'] as $rate => $rateDetails) {
+			// Use floatval() to cast to float because parsed data from einvoice are of type 'float'
 			$details['vat_by_rate'][$rate]['vat_amount'] = floatval(price2num($details['vat_by_rate'][$rate]['vat_amount'], $roundPrecision));
 		}
 
+		// Use floatval() to cast to float because parsed data from einvoice are of type 'float'
 		$details['total_ht'] = floatval(price2num($details['total_ht'], $roundPrecision));
 		$details['total_ttc'] = floatval(price2num($details['total_ttc'], $roundPrecision));
 		$details['total_tva'] = floatval(price2num($details['total_tva'], $roundPrecision));
