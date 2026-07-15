@@ -1,5 +1,9 @@
 <?php
 
+/**
+ * Class PriceHelper
+ */
+
 class PriceHelper
 {
 	/**
@@ -35,7 +39,7 @@ class PriceHelper
 	 *		@param  float	$multicurrency_tx           Currency rate (1 by default)
 	 * 		@param  float	$pu_devise					Amount in currency
 	 *      @param  string  $multicurrency_code			Value of the foreign currency if multicurrency is used ('EUR', 'USD', ...). It will be used for rounding according to currency.
-	 *      @param	'MT'|'MU' $forceRoundingTotalsPrecision
+	 *      @param	'MT'|'MU' $forceRoundingTotalsPrecision Allow to force rounding of totals to 'MU' if wanted (default is 'MT')
 	 *													'MT'=Round to Max for totals with Tax (MAIN_MAX_DECIMALS_TOT) (default)
 	 *													'MU'=Round to Max unit price (MAIN_MAX_DECIMALS_UNIT)
 	 *		@return array{}|array<int<0,26>,string>		Array

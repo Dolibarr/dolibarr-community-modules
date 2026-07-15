@@ -40,7 +40,7 @@ class SupplierInvoiceHelper
 	 * @param float $amount1    The first amount to compare
 	 * @param float $amount2    The second amount to compare
 	 * @param ?int $roundPrecision The number of digits after decimal point to apply round()
-	 * @return bool
+	 * @return bool Whether the amounts are equal or not
 	 */
 	private static function areAmountsEqual($amount1, $amount2, ?int $roundPrecision = null): bool
 	{
@@ -167,7 +167,7 @@ class SupplierInvoiceHelper
 
 		if (count($amountErrors['current']) > 0) {
 			// If there are errors in both VAT modes (totalofround and roundoftotal), then return only the errors occured with roundoftotal
-			if (count($amountErrors['totalofround'] ?? []) > 0 && count($amountErrors['roundoftotal'] ?? [] > 0)) {
+			if (count($amountErrors['totalofround'] ?? []) > 0 && count($amountErrors['roundoftotal'] ?? []) > 0) {
 				$errors = array_merge($errors, $amountErrors['roundoftotal'] ?? []);
 			} else {
 				$errors = array_merge($errors, $amountErrors['totalofround'] ?? [], $amountErrors['roundoftotal'] ?? []);
@@ -436,7 +436,7 @@ class SupplierInvoiceHelper
 	 *
 	 * @param float $amount    		The amount to round
 	 * @param ?int $roundPrecision 	The number of digits after decimal point to apply round()
-	 * @return float
+	 * @return float The rounded amount
 	 */
 	private static function round($amount, ?int $roundPrecision = null): float
 	{
