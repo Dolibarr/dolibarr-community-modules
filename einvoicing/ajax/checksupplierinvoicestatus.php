@@ -2,6 +2,7 @@
 /* Copyright (C) 2022       Laurent Destailleur     <eldy@users.sourceforge.net>
  * Copyright (C) 2024       Frédéric France         <frederic.france@free.fr>
  * Copyright (C) 2025		SuperAdmin					<daoud.mouhamed@gmail.com>
+ * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -131,14 +132,12 @@ if ($objectID) {
 	$sql .= " ORDER BY rowid DESC LIMIT 1";
 
 	$resql = $db->query($sql);
-	if ($resql) {
-		if ($db->num_rows($resql) > 0) {
-			$obj = $db->fetch_object($resql);
-			$lcId = $obj->rowid;
-			$flowId = $obj->flow_id;
-			$lcStatus = $obj->lc_status;
-			$lcReasonCode = $obj->lc_reason_code;
-		}
+	if ($resql && ($db->num_rows($resql) > 0)) {
+		$obj = $db->fetch_object($resql);
+		$lcId = $obj->rowid;
+		$flowId = $obj->flow_id;
+		$lcStatus = $obj->lc_status;
+		$lcReasonCode = $obj->lc_reason_code;
 	} else {
 		print json_encode(['status' => 'error', 'message' => 'Error retrieving flowId for supplier invoice ref '. $invoice->ref]);
 		exit;
@@ -178,10 +177,11 @@ if ($objectID) {
 		$eventMessage = "EINVOICING - Send status " . $CurrentLCStatusLabel . " : " . $statusvalidationlabel . (!empty($statusvalidationinfo) ? " - " . $statusvalidationinfo : "") . (!empty($lcReasonCode) ? " - Reason: " . $currentLCReasonLabel : "");
 		$resLogEvent = $provider->addEvent('STATUS', $eventLabel, $eventMessage, $invoice);
 		if ($resLogEvent < 0) {
-			dol_syslog(__METHOD__ . " Failed to log event for flowId: {$flowId}", LOG_WARNING);
+			dol_syslog(__FILE__ . " Failed to log event for flowId: {$flowId}", LOG_WARNING);
 		}
 
 		// Prepare validation status to be displayed in the supplier invoice card
+		$picto = '';
 		if ($statusvalidationlabel === 'Pending') {
 			$picto = img_picto('', 'timespent');
 		} elseif ($statusvalidationlabel === 'Error') {

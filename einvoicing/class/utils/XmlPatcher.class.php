@@ -1,6 +1,7 @@
 <?php
 /* Copyright (C) 2025       Laurent Destailleur         <eldy@users.sourceforge.net>
  * Copyright (C) 2025       Mohamed DAOUD               <mdaoud@dolicloud.com>
+ * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -80,7 +81,7 @@ class XmlPatcher
 	 * @param string                $invoiceRef     Deposit invoice number
 	 * @param DateTimeInterface    $invoiceDate    Deposit invoice date
 	 *
-	 * @return void
+	 * @return self This object
 	 */
 	public function addDepositLineReference(
 		$lineId,
@@ -152,7 +153,7 @@ class XmlPatcher
 	 * Replace the GuidelineSpecifiedDocumentContextParameter ID value.
 	 * @param DOMXPath $xpath xpath
 	 *
-	 * @return void
+	 * @return void  No value return
 	 */
 	private static function patchGuidelineId(DOMXPath $xpath): void
 	{
@@ -188,7 +189,7 @@ class XmlPatcher
 	 * @param string $invoiceRef invoice ref
 	 * @param DateTimeInterface $invoiceDate invoice date
 	 *
-	 * @return void
+	 * @return void  No value return
 	 */
 	private static function injectDepositLineRef(
 		DOMDocument $dom,

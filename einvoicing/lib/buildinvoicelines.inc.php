@@ -571,10 +571,13 @@ if ($resql) {
 	dol_syslog("Error " . $db->error() . " when looking for credit note linked to invoice to calculate prepaid amount for invoice " . $object->id, LOG_WARNING);
 }
 
-// Already paid deposits
+// Amount already received for this invoice: direct payments + used credit notes.
+// getSommePaiement() returns the sum of payments; on Dolibarr <= 22 it also stores that same
+// value into $object->sumpayed, so adding both double-counted the payment (#372: a fully paid
+// invoice reported TotalPrepaidAmount = 2x the amount and a negative DuePayableAmount).
 $getAlreadyPaid = $object->getSommePaiement();
 
-$prepaidAmount  = $object->sumpayed + $getAlreadyPaid + $usedcreditnoteamount;
+$prepaidAmount  = $getAlreadyPaid + $usedcreditnoteamount;
 
 // Delivery date
 $deliveryDate = !empty($deliveryDateList)

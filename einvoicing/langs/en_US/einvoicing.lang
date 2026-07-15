@@ -167,7 +167,8 @@ ack_status=Acknowledgement status
 ack_reason_code=Acknowledgement reason code
 ack_info=Acknowledgement details
 PASettings=Access Point Settings (PA, PDP...)
-EInvoicingInfo=As part of the French electronic invoicing law, any invoicing software must allow the sending and receiving of invoices. This is achieved through communication with an approved private partner called a PA (formerly PDP). This module enables bi-directional synchronization between your Dolibarr and a PA. The module is free, but the PA you choose will most likely charge subscription fees (The contract is drawn up directly with the PA).
+EInvoicingInfo=As part of the French electronic invoicing law, any invoicing software must allow the sending and receiving of invoices. This is achieved through communication with an approved private partner called a PA (formerly PDP). This module enables bi-directional synchronization between your Dolibarr and a PA. The module is free, but the PA you choose will most likely charge subscription fees (The contract is drawn up directly with the PA %s).
+EInvoicingInfoProxy= Or via %s
 EInvoicingInfo2=Start by configuring your Access Point among the list of compatible platforms.
 EInvoicingConnectionSetup=Setup for Access Point connection
 EINVOICING_LINK_CREATE_ACCOUNT=Link to create an account and get connection credentials
@@ -368,7 +369,7 @@ EINVOICING_API_KEY=API key
 EINVOICING_ESALINK_TOKEN=Access token
 EINVOICING_ESALINK_ACTIONS=Actions
 EINVOICING_ESALINKP_HELP_CREDENTIAL1=To use the <b>EsaLink Access Point</b> as your official Access Point for E-invoicing, you must follow the following steps:
-EINVOICING_ESALINKP_HELP_CREDENTIAL2=...Create account on %s. Next steps will be described later once feature is available...
+EINVOICING_ESALINKP_HELP_CREDENTIAL2=Contact a PDP Libre distributor member who will offer you a subscription to the group contract negotiated by PDP Libre. %s
 
 # AP SuperPDP
 EINVOICING_SUPERPDP_HELP_CREDENTIAL1=To use the <b>SuperPDP Access Point</b> as your official Access Point for E-invoicing, you must follow the following steps:
@@ -417,7 +418,7 @@ EINVOICING_ALLOW_REGEN_TRANSMITTED_HELP=Off by default. Dev/inspection only: kee
 EINVOICING_TRANSMITTED_NOT_FOR_PROD=Warning: must not be used in production, breaks the AFNOR/PA/PDP contracts
 EInvoiceTransmittedModifyDisabled=This invoice has been transmitted to the Access Point and can no longer be modified. Issue a credit note or a corrective invoice to amend it.
 # Recipient directory pre-check (annuaire des Plateformes Agreees)
-EINVOICING_PRECHECK_DIRECTORY=Check recipient reachability in the directory
+EINVOICING_PRECHECK_DIRECTORY=Remote check the recipient reachability in the directory on the invoice screen
 EINVOICING_PRECHECK_DIRECTORY_HELP=On by default. On the invoice card, checks that the recipient (its SIREN) has an active reception address in the Approved Platforms directory. A recipient absent from the directory, or present but without an active routing line, cannot receive electronic invoices (sending would be rejected with a routing error). This is a read-only lookup and never blocks. Note: the sandbox directory is incomplete, so results are only indicative in test mode.
 EInvoicingDirectoryCheck=Recipient reachability (directory)
 EInvoicingDirectoryCheckHelp=Whether the recipient (its SIREN) has an active reception address in the Approved Platforms directory (annuaire). A recipient that is absent, or present with no active routing line, cannot receive electronic invoices and sending would be rejected with a routing error.
