@@ -1,8 +1,8 @@
 #!/usr/bin/env php
 <?php
 /*
- * Copyright (C) 2025  Mohamed Daoud           <mdaoud@dolicloud.com>
- * Copyright (C) 2025  Laurent Destailleur     <eldy@users.sourceforge.net>
+ * Copyright (C) 2025-2026  Mohamed Daoud           <mdaoud@dolicloud.com>
+ * Copyright (C) 2025-2026  Laurent Destailleur     <eldy@users.sourceforge.net>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -314,7 +314,6 @@ function completAutoTags($content, $modulePath)
  */
 function buildModulePackages()
 {
-
 	// list of files & dirs to include into the zip
 	$listOfModuleContent = [
 		'admin',
@@ -355,17 +354,18 @@ function buildModulePackages()
 		$content = file_get_contents($yamlFile);
 		$reg = array();
 		if (preg_match('/modulename:\s*[\'"]([^\'"]+)[\'"]/', $content, $reg)) {
-			$projects[] = $reg[1];
+			$projects[] = strtolower($reg[1]);
 		} else {
 			print "Can't extract module name from yaml file: ".$yamlFile."\n";
 			continue;
 		}
 	}
 
+	print "\n";
 
 	// For each module, we generate the zip file
 	foreach ($projects as $project) {
-		print "----------- Build package for project: ".$project."\n";
+		print "*** Build package for project: ".$project." in directory ".$directoryToSearch . DIRECTORY_SEPARATOR . $project."\n";
 
 		// Change current dir to module dir, we will execute all next operations from this dir
 		chdir($directoryToSearch . DIRECTORY_SEPARATOR . $project);
@@ -373,7 +373,7 @@ function buildModulePackages()
 		list($mod, $version) = detectModule();
 		if ($mod == "" || $version == "") {
 			print "[fail] This repository does not contain a valid module sources, skipped.\n";
-			print "--------------------------------------------------------------\n";
+			print "\n";
 			continue;
 			// TODO : Try to retrieve zip from Dolistore or make a git clone and then generate the build from sources.
 		}
@@ -396,7 +396,7 @@ function buildModulePackages()
 				if (!rcopy($entry, $dst . '/' . $entry)) {
 					print "[fail]  Error on copy " . $entry . " to " . $dst . "/" . $entry . " for project: ".$project."\n";
 					print "Please take time to analyze the problem and fix the bug\n";
-					print "--------------------------------------------------------------\n";
+					print "\n";
 					continue 3; // Skip to the next project if copy fails.
 				}
 			}
@@ -409,11 +409,11 @@ function buildModulePackages()
 		delTree($tmpdir);
 		if (file_exists($outzip)) {
 			print "[success] module archive is ready : $outzip ...\n";
-			print "--------------------------------------------------------------\n";
+			print "\n";
 		} else {
 			print "[fail] build zip error\n";
 			continue;
-			print "--------------------------------------------------------------\n";
+			print "\n";
 		}
 	}
 }

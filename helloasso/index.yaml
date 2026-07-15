@@ -1,33 +1,33 @@
 # This is the YAML file to describe the location of a module
 
 packages:
-    - modulename: 'HelloAsso'
-      author: 'Dolicloud'
-      author_url: 'https://www.dolicloud.com'
-      maintener_email: 'contact@dolicloud.com'
-      label:
-        fr: "HelloAsso (par DoliCloud)"
-        en: "HelloAsso (by DoliCloud)"
-      description:
-        fr: "Offre une solution pour réaliser un paiement en ligne pour toute cotisation d'adhésion à une association, don, facture client ou commande client via l'API HelloAsso. Offre aussi une possibilité de synchroniser les adhérents."
-        en: "Provides a way to make an online checkout of any membership dues, donation, customer invoice or customer order with the HelloAsso API. Also offer an option to synchronize membership."
-      status: 'enabled'		
-      created_at: '2024-12-10'
-      last_updated_at: 'auto'
-      category: '68, 67'
-      git: 'https://github.com/Dolibarr/dolibarr-community-modules/tree/main/helloasso'
-      git-branch: 'main'
-      git-system: 'github'
-      cover: 'https://raw.githubusercontent.com/Dolibarr/dolibarr-community-modules/main/helloasso/cover.png'
-      current_version: 'auto'
-      dolibarrmin: 'auto'
-      dolibarrmax: 'auto'
-      phpmin: 'auto'
-      phpmax: 'auto'
-      price: 0
-      # direct-download is yes if we can download the module to install it in application
-      direct-download: yes
-      # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
-      dolistore-upload: 'auto'
-      # dolistore-download is url of product page for download if module can also be found on dolistore.com
-      dolistore-download: https://www.dolistore.com/product.php?id=2332
+  - modulename: 'HelloAsso'
+    author: 'Dolicloud'
+    author_url: 'https://www.dolicloud.com'
+    maintener_email: 'contact@dolicloud.com'
+    label:
+      fr: "HelloAsso (par DoliCloud)"
+      en: "HelloAsso (by DoliCloud)"
+    description:
+      fr: "Offre une solution pour réaliser un paiement en ligne pour toute cotisation d'adhésion à une association, don, facture client ou commande client via l'API HelloAsso. Offre aussi une possibilité de synchroniser les adhérents."
+      en: "Provides a way to make an online checkout of any membership dues, donation, customer invoice or customer order with the HelloAsso API. Also offer an option to synchronize membership."
+    status: 'enabled'
+    created_at: '2024-12-10'
+    last_updated_at: 'auto'
+    category: '68, 67'
+    git: 'https://github.com/Dolibarr/dolibarr-community-modules/tree/main/helloasso'
+    git-branch: 'main'
+    git-system: 'github'
+    cover: 'https://raw.githubusercontent.com/Dolibarr/dolibarr-community-modules/main/helloasso/cover.png'
+    current_version: 'auto'
+    dolibarrmin: 'auto'
+    dolibarrmax: 'auto'
+    phpmin: 'auto'
+    phpmax: 'auto'
+    price: 0
+    # direct-download is yes if we can download the module to install it in application
+    direct-download: yes
+    # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
+    dolistore-upload: 'auto'
+    # dolistore-download is url of product page for download if module can also be found on dolistore.com
+    dolistore-download: https://www.dolistore.com/product.php?id=2332
