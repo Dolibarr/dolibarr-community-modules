@@ -25,6 +25,7 @@
 
 dol_include_once('einvoicing/class/protocols/ProtocolManager.class.php');
 dol_include_once('einvoicing/class/document.class.php');
+dol_include_once('einvoicing/class/helpers/PriceHelper.class.php');
 dol_include_once('fourn/class/fournisseur.facture.class.php');
 
 /**
@@ -100,19 +101,17 @@ class SupplierInvoiceHelper
 		// 		Compare amount depending VAT calculation mode 1 & 2
 		// -----------------------------------------------------------------
 
-		// Mode 1 : round VAT amount of each line and then sum rounded amounts
-		// Mode 2 : sum VAT amount of each line and then round total
+		// ? As we can't know if VAT of supplier invoice has been calculated in mode 1 or 2,
+		// ? we need to calculate VAT in 3 different modes to be able to suggest the good one (can suggest only if differences are detected) :
+		// ? - 'current' : if current supplier invoice data are identical to e-invoice, no need to suggest to switch VAT mode
+		// ? - 'totalofround' (mode 1) : round VAT amount of each line then sum rounded amounts
+		// ? - 'roundoftotal' (mode 2) : sum VAT amount of each line then round total
 
-		// ? Have to recode calculation of mode 1 & mode 2 because there is currently no Dolibarr function allowing to properly
-		// ? apply VAT mode 1 or 2 only on the supplier object without updating database.
-		// ? Previously tried with CommonObject::update_price(), but it was not appropriate because it always refetch data from lines
+		// ? NOTE : Have to recode calculation of mode 1 & mode 2 because there is currently no Dolibarr function allowing to properly
+		// ? apply VAT mode 1 or 2 on the supplier object without updating database.
+		// ? Previously tried with CommonObject::update_price(), but it was not appropriate because it always refetch lines data from database
 		// ? instead of using current object ones.
 
-		// As we can't know if VAT of supplier invoice has been calculated in mode 1 or 2)
-		// we need to calculate VAT in 3 different modes to be able to suggest the good mode (if differences are detected) :
-		// - current : if current supplier invoice data are identical to e-invoice, no need to suggest to switch VAT mode
-		// - totalofround (mode 1) : round VAT amount of each line then sum rounded amounts
-		// - roundoftotal (mode 2) : sum VAT amount of each line then round total
 		$calculationRules = [
 			'current' => 0,
 			'totalofround' => 1,
@@ -190,6 +189,8 @@ class SupplierInvoiceHelper
 	 */
 	private static function getInvoiceDetailsForComparison(FactureFournisseur $supplierInvoice, $vatComputeMode)
 	{
+		global $db;
+
 		// If mode 0 => use current supplier invoice data
 		if ($vatComputeMode == 0) {
 			$details = array(
@@ -208,7 +209,14 @@ class SupplierInvoiceHelper
 			'total_ttc' => 0,
 			'total_tva' => 0,
 		);
-		$roundPrecision = 2;
+
+		$seller = new Societe($db);
+		$resseller = $seller->fetch($supplierInvoice->socid);
+		if ($resseller <= 0) {
+			throw new Exception('Seller not found for id : ' . $supplierInvoice->socid);
+		}
+
+		$forceRoundingTotalsPrecision = $vatComputeMode == 1 ? 'MT' : 'MU';
 
 		foreach ($supplierInvoice->lines as $line) {
 			$rate = (string) price2num($line->tva_tx);
@@ -220,15 +228,40 @@ class SupplierInvoiceHelper
 				);
 			}
 
-			$lineVatBasisAmountWithoutDiscount = ($line->subprice * $line->qty);
-			$lineDiscountAmount = $lineVatBasisAmountWithoutDiscount * $line->remise_percent / 100;
-			$lineVatAmount = $line->subprice * floatval($rate) / 100;
-			if ($vatComputeMode == 1) {
-				$lineVatAmount = self::round($lineVatAmount, $roundPrecision);
-			}
+			$useLocalTax1 = 1;
+			$useLocalTax2 = 1;
+			$remisePercentGlobal = 0;
+			$priceBaseType = 'HT';
+			$infoBits = 0;
+			$localTaxes = array($line->localtax1_type, $line->localtax1_tx, $line->localtax2_type, $line->localtax2_tx);
+			$progress = (isset($line->situation_percent) ? $line->situation_percent : 100);
+			$multiCurrencyTx = !empty($line->multicurrency_tx) ? $line->multicurrency_tx : 1;
+			$puDevise = 0;
+			$multicurrencyCode = '';
 
-			$lineTotalHt = $lineVatBasisAmountWithoutDiscount - $lineDiscountAmount;
-			$lineTotalTtc = $lineVatBasisAmountWithoutDiscount - $lineDiscountAmount + $lineVatAmount;
+			$lineTotals = PriceHelper::calculatePriceTotal(
+				$line->qty,
+				$line->subprice,
+				$line->remise_percent,
+				floatval($rate),
+				$useLocalTax1,
+				$useLocalTax2,
+				$remisePercentGlobal,
+				$priceBaseType,
+				$infoBits,
+				$line->product_type,
+				$seller,
+				$localTaxes,
+				$progress,
+				$multiCurrencyTx,
+				$puDevise,
+				$multicurrencyCode,
+				$forceRoundingTotalsPrecision
+			);
+
+			$lineTotalHt = floatval($lineTotals[0]);
+			$lineVatAmount = floatval($lineTotals[1]);
+			$lineTotalTtc = floatval($lineTotals[2]);
 
 			$details['vat_by_rate'][$rate]['vat_basis_amount'] += $lineTotalHt;
 			$details['vat_by_rate'][$rate]['vat_amount'] += $lineVatAmount;
@@ -238,13 +271,15 @@ class SupplierInvoiceHelper
 			$details['total_tva'] += $lineVatAmount;
 		}
 
+		$roundPrecision = 'MT';
+
 		foreach ($details['vat_by_rate'] as $rate => $rateDetails) {
-			$details['vat_by_rate'][$rate]['vat_amount'] = self::round($details['vat_by_rate'][$rate]['vat_amount'], $roundPrecision);
+			$details['vat_by_rate'][$rate]['vat_amount'] = floatval(price2num($details['vat_by_rate'][$rate]['vat_amount'], $roundPrecision));
 		}
 
-		$details['total_ht'] = self::round($details['total_ht'], $roundPrecision);
-		$details['total_ttc'] = self::round($details['total_ttc'], $roundPrecision);
-		$details['total_tva'] = self::round($details['total_tva'], $roundPrecision);
+		$details['total_ht'] = floatval(price2num($details['total_ht'], $roundPrecision));
+		$details['total_ttc'] = floatval(price2num($details['total_ttc'], $roundPrecision));
+		$details['total_tva'] = floatval(price2num($details['total_tva'], $roundPrecision));
 
 		return $details;
 	}
