@@ -1029,6 +1029,17 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			}
 		}
 
+		// Supplier invoice lines to bind to accountancy : always exclude invoices abandoned
+		// because their refusal was confirmed by the e-invoicing platform (PDP/PA), they must
+		// never be transferred to accountancy.
+		if (in_array('accountancysupplierlist', $contexts)) {
+			require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
+			dol_include_once('einvoicing/class/helpers/SupplierInvoiceHelper.class.php');
+
+			$this->resprints .= ' AND NOT (f.fk_statut = ' . FactureFournisseur::STATUS_ABANDONED
+				. " AND f.close_code = '" . SupplierInvoiceHelper::CLOSECODE_PDPREFUSED . "')";
+		}
+
 		return 0;
 	}
 

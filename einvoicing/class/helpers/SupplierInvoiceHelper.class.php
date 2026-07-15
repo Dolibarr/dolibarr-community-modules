@@ -34,6 +34,13 @@ dol_include_once('fourn/class/fournisseur.facture.class.php');
 class SupplierInvoiceHelper
 {
 	/**
+	 * Close code set on a Dolibarr supplier invoice abandoned because its refusal was confirmed
+	 * by the e-invoicing platform (PDP/PA). Distinct from the standard close codes (abandon,
+	 * replaced, ...) so it can be reliably excluded from the accountancy transfer screen.
+	 */
+	public const CLOSECODE_PDPREFUSED = 'pdp_refused';
+
+	/**
 	 * Compare amounts according to a number of digit after comma and return true if they are equal.
 	 *
 	 * @param float $amount1    The first amount to compare
@@ -327,5 +334,101 @@ class SupplierInvoiceHelper
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * Abandon a Dolibarr supplier invoice because its refusal has been confirmed by the
+	 * e-invoicing platform (PDP/PA). Validates the invoice first if it is still a draft, then
+	 * cancels it with a dedicated close code so it can be excluded from the accountancy
+	 * transfer screen (see ActionsEinvoicing::printFieldListWhere()).
+	 *
+	 * Idempotent: calling this again on an invoice already abandoned by this same rule is a
+	 * no-op. A paid invoice is never touched. This idempotence check reads $object->status and
+	 * $object->close_code from the in-memory object: $object must reflect the current database
+	 * state (i.e. freshly fetched) for it to be reliable.
+	 *
+	 * The validation step runs BILL_SUPPLIER_VALIDATE normally, including the e-invoice/Dolibarr
+	 * consistency check when EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION is
+	 * enabled: if that check rejects the invoice, this method fails too (returns -1) rather than
+	 * abandoning it.
+	 *
+	 * @param	FactureFournisseur	$object			Supplier invoice to abandon
+	 * @param	User				$user			User (or system user, when called from a cron) triggering the change
+	 * @param	string				$reasonLabel	Label of the refusal reason, stored as the invoice close note
+	 * @return	int									1 if abandoned, 0 if already abandoned by this rule (no-op), -1 on error (see $object->errors)
+	 */
+	public static function abandonRefusedSupplierInvoice(FactureFournisseur $object, User $user, $reasonLabel = '')
+	{
+		if (!empty($object->paye) || $object->status == FactureFournisseur::STATUS_CLOSED) {
+			$object->errors[] = 'Can not abandon supplier invoice id ' . $object->id . ' : invoice is already paid';
+			dol_syslog(__METHOD__ . ' Can not abandon supplier invoice id ' . $object->id . ' : invoice is already paid', LOG_ERR);
+			return -1;
+		}
+
+		if ($object->status == FactureFournisseur::STATUS_ABANDONED && $object->close_code == self::CLOSECODE_PDPREFUSED) {
+			// Already abandoned by this same rule on a previous call (ex: AJAX confirmation followed
+			// by the hourly cron re-processing the same platform confirmation).
+			return 0;
+		}
+
+		if ($object->status == FactureFournisseur::STATUS_DRAFT) {
+			$resValidate = $object->validate($user);
+			if ($resValidate < 0) {
+				dol_syslog(__METHOD__ . ' Failed to validate supplier invoice id ' . $object->id . ' before abandon : ' . implode(', ', $object->errors), LOG_ERR);
+				return -1;
+			}
+		}
+
+		$resCancel = $object->setCanceled($user, self::CLOSECODE_PDPREFUSED, $reasonLabel);
+		if ($resCancel < 0) {
+			dol_syslog(__METHOD__ . ' Failed to abandon supplier invoice id ' . $object->id . ' : ' . implode(', ', $object->errors), LOG_ERR);
+			return -1;
+		}
+
+		return 1;
+	}
+
+	/**
+	 * Callback to invoke once an outbound lifecycle status message has been validated (confirmed
+	 * or rejected by the e-invoicing platform). This is a no-op unless the message is a
+	 * confirmed ('Ok') refusal (EInvoicing::STATUS_REFUSED) of a supplier invoice, in which case
+	 * it abandons the corresponding Dolibarr supplier invoice (see abandonRefusedSupplierInvoice()).
+	 *
+	 * Errors are logged but never thrown: this callback must never break the caller that is
+	 * persisting the platform confirmation (see EInvoicing::updateStatusMessageValidation()).
+	 *
+	 * @param	DoliDB	$db					Database handler
+	 * @param	User	$user				User (or system user, when called from a cron) triggering the change
+	 * @param	int		$elementId			Id of the Dolibarr supplier invoice (einvoicing_lifecycle_msg.element_id)
+	 * @param	int		$lcStatus			PDP/PA status code that was sent (einvoicing_lifecycle_msg.lc_status)
+	 * @param	?string	$lcReasonCode		Reason code that was sent, if any (einvoicing_lifecycle_msg.lc_reason_code)
+	 * @param	string	$validationStatus	Validation status just confirmed by the platform: 'Ok', 'Pending' or 'Error'
+	 * @return	int							1 if abandoned, 0 if not applicable / already done, -1 on error (logged, not blocking)
+	 */
+	public static function onOutboundStatusMessageValidated($db, User $user, int $elementId, int $lcStatus, ?string $lcReasonCode, string $validationStatus)
+	{
+		global $langs;
+
+		if ($validationStatus !== 'Ok' || $lcStatus !== EInvoicing::STATUS_REFUSED) {
+			return 0;
+		}
+
+		$object = new FactureFournisseur($db);
+		$resFetch = $object->fetch($elementId);
+		if ($resFetch <= 0) {
+			dol_syslog(__METHOD__ . ' Failed to fetch supplier invoice id ' . $elementId, LOG_ERR);
+			return -1;
+		}
+
+		$langs->load('einvoicing@einvoicing');
+		$einvoicing = new EInvoicing($db);
+		$reasons = $einvoicing->getReasonsByStatus(EInvoicing::STATUS_REFUSED, 0);
+		$reasonLabel = (!empty($lcReasonCode) && is_array($reasons) && isset($reasons[$lcReasonCode]))
+			? $langs->trans($reasons[$lcReasonCode]['label'])
+			: (string) $lcReasonCode;
+
+		// abandonRefusedSupplierInvoice() already logs the specific failure reason (validate or
+		// setCanceled) - not logged again here to avoid duplicate log entries for the same error.
+		return self::abandonRefusedSupplierInvoice($object, $user, $reasonLabel);
 	}
 }
