@@ -104,7 +104,7 @@ function combineYamlFiles($files, $outputFile)
 function completAutoTags($content, $modulePath)
 {
 	// Look for missing auto tags in the module's core class file
-	$DOLIBARRMAXBYDEFAULT = '23.0';
+	$DOLIBARRMAXBYDEFAULT = '24.0';
 
 	$tagsToExtractFromDescriptor = array(
 		'current_version'   => 'version',
