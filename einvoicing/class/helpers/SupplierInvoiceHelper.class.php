@@ -42,11 +42,7 @@ class SupplierInvoiceHelper
 	 */
 	private static function areAmountsEqual($amount1, $amount2, ?int $roundPrecision = null): bool
 	{
-		if (!isset($roundPrecision)) {
-			$roundPrecision = getDolGlobalInt('EINVOICING_SUPPLIER_INVOICE_COMPARISON_ROUND_PRECISION', 3);
-		}
-
-		return (round($amount1, $roundPrecision) === round($amount2, $roundPrecision));
+		return (self::round($amount1, $roundPrecision) === self::round($amount2, $roundPrecision));
 	}
 
 	/**
@@ -402,7 +398,7 @@ class SupplierInvoiceHelper
 	private static function round($amount, ?int $roundPrecision = null): float
 	{
 		if (!isset($roundPrecision)) {
-			$roundPrecision = getDolGlobalInt('EINVOICING_SUPPLIER_INVOICE_COMPARISON_ROUND_PRECISION', 3);
+			$roundPrecision = getDolGlobalInt('MAIN_MAX_DECIMALS_TOT', 2);
 		}
 
 		return round($amount, $roundPrecision);
