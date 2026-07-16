@@ -45,6 +45,15 @@ abstract class AbstractProtocol
 	/** @var array Non-blocking warning messages */
 	public $warnings = [];
 
+	/** @const string Invoice file extension (without the dot, example 'xml') */
+	protected const INVOICE_FILE_EXTENSION = self::INVOICE_FILE_EXTENSION;
+
+	/** @const string Generated invoice XML file name*/
+	protected const GENERATED_INVOICE_XML_FILE_NAME = self::GENERATED_INVOICE_XML_FILE_NAME;
+
+	/** @const string The profile used to generate XML */
+	protected const BUILD_XML_PROFILE = self::BUILD_XML_PROFILE;
+
 	/**
 	 * @param DoliDB $db Db
 	 */
