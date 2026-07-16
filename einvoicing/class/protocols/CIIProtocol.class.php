@@ -51,6 +51,15 @@ class CIIProtocol extends AbstractProtocol
 {
 	use CommonProtocol;
 
+	/** @const string Invoice file extension (without the dot, example 'xml') */
+	protected const INVOICE_FILE_EXTENSION = 'xml';
+
+	/** @const string Generated invoice file name */
+	protected const GENERATED_INVOICE_XML_FILE_NAME = 'einvoice.xml';
+
+	/** @const string The profile used to generate XML */
+	protected const BUILD_XML_PROFILE = 'EN16931';
+
 	/**
 	 * @var array<string,string>
 	 */
@@ -439,12 +448,12 @@ class CIIProtocol extends AbstractProtocol
 		// Generate the XML file
 		$filename = dol_sanitizeFileName($invoice->ref);
 		$filedir = getMultidirOutputCompat($invoice, '', 1, 'temp');    // Example '/mydolibarr/documents/facture/temp/FAYYMM-XXXX'
-		$xmlfile = $filedir . '/' . $filename . '/einvoice.xml';
+		$xmlfile = $filedir . '/' . $filename . '/' .  static::GENERATED_INVOICE_XML_FILE_NAME;
 
 		dol_mkdir(dirname($xmlfile));
 		dol_delete_file($xmlfile);
 
-		$xmlcontent = $this->buildXML($invoiceData, $linesData, 'EN16931', $outputlangs);
+		$xmlcontent = $this->buildXML($invoiceData, $linesData, static::BUILD_XML_PROFILE, $outputlangs);
 
 		// Local EN 16931 business rules safety net (warnings, or abort in strict mode)
 		$this->checkBusinessRules($xmlcontent);
@@ -519,7 +528,7 @@ class CIIProtocol extends AbstractProtocol
 		// Make a copy of the XML file into the final destination
 		$filename = dol_sanitizeFileName($invoice->ref);
 		$filedir = getMultidirOutputCompat($invoice, '', 1);      // Example '/mydolibarr/documents/facture/FAYYMM-XXXX'
-		$einvoice_path = $filedir . '/' . $filename . '_cii.xml';
+		$einvoice_path = $filedir . '/' . $filename . '_cii.' . self::INVOICE_FILE_EXTENSION;
 
 		if (dol_copy($xmlfile, $einvoice_path) > 0) {
 			dol_syslog(get_class($this) . "::generateInvoice copied XML file to " . $einvoice_path);
@@ -591,10 +600,10 @@ class CIIProtocol extends AbstractProtocol
 
 
 	/**
-	 * Create a supplier invoice from a CII Xml file and attach the file (and readable file if exists) to the document.
+	 * Create a supplier invoice from the e-invoice file and attach the file (and readable file if exists) to the document.
 	 * This may create the Supplier and the Product depending on setup.
 	 *
-	 * @param  string 			$file                       		Source string file (XML string). We use this file to get data of supplier invoice.
+	 * @param  string 			$file                       		Source string file (XML or PDF string). We use this file to get data of supplier invoice.
 	 * @param  string|null 		$ReadableViewFile        			Readable view file (PDP Generated readable PDF). We only store it if available.
 	 * @param  string 			$flowId                       		Flow identifier source of the invoice.
 	 * @return array{res:int<-1,1>, message:string, actioncode?: string|null, actionurl?: string|null, action?:string|null}   Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and an optional 'actioncode' and 'action'.
@@ -609,10 +618,10 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		// Use a unique per-call working file so two concurrent syncs cannot overwrite each other and
-		// parse the wrong invoice (#226). The fixed einvoice.xml slot is only the downloadable
+		// parse the wrong invoice (#226). The fixed einvoice.[pdf|xml] file slot is only the downloadable
 		// "last invoice that could not be processed" diagnostic, managed in cleanupIncomingTempFiles().
 		$uid = bin2hex(random_bytes(8));
-		$tempFile = $tempDir . '/in_' . $uid . '.xml';
+		$tempFile = $tempDir . '/in_' . $uid . '.' . self::INVOICE_FILE_EXTENSION;
 		$tempFileReadableView = $tempDir . '/in_' . $uid . '_readable.pdf';
 
 		$result = ['res' => -1, 'message' => 'Unexpected error while creating supplier invoice'];
@@ -620,7 +629,7 @@ class CIIProtocol extends AbstractProtocol
 			$result = $this->doCreateSupplierInvoiceFromSource($file, $ReadableViewFile, $flowId, $tempFile, $tempFileReadableView);
 		} finally {
 			$failed = !is_array($result) || !isset($result['res']) || $result['res'] < 0;
-			$this->cleanupIncomingTempFiles($tempDir, $tempFile, $tempFileReadableView, 'einvoice.xml', 'einvoice_readable.pdf', $failed);
+			$this->cleanupIncomingTempFiles($tempDir, $tempFile, $tempFileReadableView, 'einvoice.' . self::INVOICE_FILE_EXTENSION, 'einvoice_readable.pdf', $failed);
 		}
 
 		return $result;
@@ -637,7 +646,7 @@ class CIIProtocol extends AbstractProtocol
 	 * @param  string			$tempFileReadableView Unique working file for the readable view
 	 * @return array{res:int<-1,1>, message:string, action?:string|null}
 	 */
-	private function doCreateSupplierInvoiceFromSource($file, $ReadableViewFile, $flowId, $tempFile, $tempFileReadableView)
+	protected function doCreateSupplierInvoiceFromSource($file, $ReadableViewFile, $flowId, $tempFile, $tempFileReadableView)
 	{
 		global $conf, $db, $user;
 
@@ -727,7 +736,7 @@ class CIIProtocol extends AbstractProtocol
 		$supplierInvoice->ref_supplier = $parsedHeader['documentno'] ?? '';
 
 		// Set basic invoice information (type, date)
-		$supplierInvoice->type = $this->_getDolibarrInvoiceType($parsedHeader['documenttypecode'] ?? null);
+		$supplierInvoice->type = $this->getDolibarrInvoiceType($parsedHeader['documenttypecode'] ?? null);
 		if ($supplierInvoice->type === '-1') {
 			return ['res' => -1, 'message' => 'Unfounded dolibarr corresponding Invoice code for document type code: ' . ($parsedHeader['documenttypecode'] ?? 'NA')];
 		}
@@ -1166,7 +1175,7 @@ class CIIProtocol extends AbstractProtocol
 
 			// Save original invoice in supplier invoice attachments
 			if ($tempFile && file_exists($tempFile)) {
-				$res = $this->_saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempFile);
+				$res = $this->saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempFile);
 
 				if ($res['res'] < 0) {
 					$return_messages[] = 'Failed to save Einvoice file as attachment: ' . $res['message'];
@@ -1180,7 +1189,7 @@ class CIIProtocol extends AbstractProtocol
 
 			// Save readable view file in supplier invoice attachments
 			if ($ReadableViewFile && $tempFileReadableView && file_exists($tempFileReadableView)) {
-				$res = $this->_saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempFileReadableView, getDolGlobalString('EINVOICING_PDP', 'PDP'));
+				$res = $this->saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempFileReadableView, getDolGlobalString('EINVOICING_PDP', 'PDP'));
 
 				if ($res['res'] < 0) {
 					$return_messages[] = 'Failed to save readable view file as attachment: ' . $res['message'];
@@ -2404,9 +2413,14 @@ class CIIProtocol extends AbstractProtocol
 	 * @param ?string $documenttypecode Document type code
 	 * @return int|'-1' Dolibarr invoice type or '-1' if unknown
 	 */
-	private function _getDolibarrInvoiceType($documenttypecode)
+	protected function getDolibarrInvoiceType($documenttypecode)
 	{
+		if ($documenttypecode === null) {
+			return '-1';
+		}
+
 		/**
+		 * @var array<string,int>
 		 * Codes UNTDID 1001 utilisés par EN16931 pour le type de facture (InvoiceTypeCode BT-3).
 		 * 325 – Facture pro-forma (a ignorer, n'est pas une facture mais une commande)
 		 * 211 – Demande de paiement intermédiaire (une facture de situation?)
@@ -2444,7 +2458,7 @@ class CIIProtocol extends AbstractProtocol
 
 
 		if (!isset($map[$documenttypecode])) {
-			dol_syslog(get_class($this) . '::_getDolibarrInvoiceType Unknown document type code: ' . $documenttypecode, LOG_WARNING);
+			dol_syslog(get_class($this) . '::getDolibarrInvoiceType Unknown document type code: ' . $documenttypecode, LOG_WARNING);
 			return '-1';
 		}
 
@@ -2460,7 +2474,7 @@ class CIIProtocol extends AbstractProtocol
 	 * @param string                $suffix          	Optional suffix for the saved file name
 	 * @return array{res:int, message:string}   		Returns array with 'res' (1 on success, -1 on error) and info 'message'
 	 */
-	private function _saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $filePath, $suffix = 'einvoice')
+	protected function saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $filePath, $suffix = 'einvoice')
 	{
 		global $conf;
 
@@ -2477,7 +2491,7 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		// Prepare destination filename with optional prefix
-		$filename = dol_sanitizeFileName($supplierInvoice->ref_supplier . (empty($suffix) ? '' : '_' . $suffix) . '.xml');
+		$filename = dol_sanitizeFileName($supplierInvoice->ref_supplier . (empty($suffix) ? '' : '_' . $suffix) . '.' . self::INVOICE_FILE_EXTENSION);
 
 		$dest_path = $upload_dir . '/' . $filename;
 
@@ -2526,12 +2540,12 @@ class CIIProtocol extends AbstractProtocol
 	/**
 	 * Determines the delivery dates and the corresponding order numbers within two arrays
 	 *
-	 * @param 	array   $customerOrderReferenceList  	array to store the corresponding order ids as strings
-	 * @param 	array   $deliveryDateList            	array to store the corresponding delivery dates as string in format YYYY-MM-DD
-	 * @param 	Facture $object 						invoice object
+	 * @param 	string[]   	$customerOrderReferenceList  	array to store the corresponding order ids as strings
+	 * @param 	string[]   	$deliveryDateList            	array to store the corresponding delivery dates as string in format YYYY-MM-DD
+	 * @param 	Facture 	$object 						invoice object
 	 * @return	void
 	 */
-	private function _determineDeliveryDatesAndCustomerOrderNumbers(&$customerOrderReferenceList, &$deliveryDateList, $object)
+	protected function determineDeliveryDatesAndCustomerOrderNumbers(&$customerOrderReferenceList, &$deliveryDateList, $object)
 	{
 		// TODO: move this function to class utils
 		$object->fetchObjectLinked();

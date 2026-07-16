@@ -281,7 +281,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		global $langs;
 
 		// OAuth2 client_credentials — RFC 6749, application/x-www-form-urlencoded
-		// Remplace l'ancien POST /v1/token (JSON username/password) désactivé depuis v1.2.6 (juillet 2026).
+		// Replace old POST /v1/token (JSON username/password) disabled since v1.2.6 (2026-07).
 		$param = http_build_query(array(
 			'grant_type'    => 'client_credentials',
 			'client_id'     => $this->config['username'],
