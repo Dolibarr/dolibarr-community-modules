@@ -300,7 +300,7 @@ class CdarHandler
 					'SpecifiedDocumentStatus' => !empty($reasonCode) ? [
 						'ReasonCode' => $reasonCode,
 						//'Reason' => 'Taux de TVA erroné',
-						//'SequenceNumeric' => 1
+						'SequenceNumeric' => 1
 					] : [],
 
 					'IssuerTradeParty' => [
@@ -731,14 +731,14 @@ class CdarHandler
 				);
 			}
 
-			/*if (isset($doc['SpecifiedDocumentStatus']['SequenceNumeric'])) {
+			if (isset($doc['SpecifiedDocumentStatus']['SequenceNumeric'])) {
 				$status->appendChild(
 					$dom->createElement(
 						'ram:SequenceNumeric',
-						(int) $doc['SpecifiedDocumentStatus']['SequenceNumeric']
+						(string) $doc['SpecifiedDocumentStatus']['SequenceNumeric']
 					)
 				);
-			}*/
+			}
 
 			$ref->appendChild($status);
 		}
