@@ -539,12 +539,12 @@ class SupplierInvoiceHelper
 	 * @param ?int $roundPrecision 	The number of digits after decimal point to apply round()
 	 * @return float The rounded amount
 	 */
-	private static function round($amount, int $roundPrecision): float
+	private static function round($amount, $roundPrecision = null): float
 	{
 		if (!isset($roundPrecision)) {
 			$roundPrecision = getDolGlobalInt('MAIN_MAX_DECIMALS_TOT', 2);
 		}
 
-		return round($amount, $roundPrecision);
+		return round($amount, (int) $roundPrecision);
 	}
 }
