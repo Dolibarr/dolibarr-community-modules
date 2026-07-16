@@ -2735,6 +2735,12 @@ class EInvoicing
 	/**
 	 * Update validation information of an existing lifecycle status message.
 	 *
+	 * If the message being validated is an outbound "Refused" status message for a supplier
+	 * invoice, confirmed as accepted ('Ok') by the platform, this also triggers the abandon of
+	 * the related Dolibarr supplier invoice (see SupplierInvoiceHelper::onOutboundStatusMessageValidated()).
+	 * This side effect is best-effort: any failure in it is logged but never changes the return
+	 * value of this method, whose only responsibility is to persist the validation information.
+	 *
 	 * @param int    $rowid					ID
 	 * @param string $statusMessage         Optional detailed status message or comment
 	 * @param string $validationStatus      Validation status: OK, PENDING or ERROR, if status is sent by dolibarr to PDP
@@ -2746,6 +2752,20 @@ class EInvoicing
 	{
 		global $db, $user;
 
+		// Read the message row before the update to know what it relates to (element_type/element_id/lc_status/lc_reason_code
+		// are not modified by the update below, so reading it before or after the update is equivalent).
+		$sql = "SELECT element_type, element_id, lc_status, lc_reason_code";
+		$sql .= " FROM " . MAIN_DB_PREFIX . "einvoicing_lifecycle_msg";
+		$sql .= " WHERE rowid = " . (int) $rowid;
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			// Not fatal: the dispatch below is best-effort, so this is logged but does not
+			// prevent the update (and the persistence of the platform confirmation) below.
+			dol_syslog(__METHOD__ . ' SQL error while reading lifecycle message before dispatch: ' . $db->lasterror(), LOG_ERR);
+		}
+		$lcMessageRow = ($resql && $db->num_rows($resql) > 0) ? $db->fetch_object($resql) : null;
+
 		$sql = "UPDATE " . MAIN_DB_PREFIX . "einvoicing_lifecycle_msg SET ";
 		$sql .= "lc_status_message = '" . $db->escape($statusMessage) . "', ";
 		$sql .= "lc_validation_status = '" . $db->escape($validationStatus) . "', ";
@@ -2756,6 +2776,18 @@ class EInvoicing
 		if (!$db->query($sql)) {
 			dol_syslog(__METHOD__ . ' SQL error: ' . $db->lasterror(), LOG_ERR);
 			return -1;
+		}
+
+		if ($lcMessageRow && $lcMessageRow->element_type === 'invoice_supplier') {
+			dol_include_once('einvoicing/class/helpers/SupplierInvoiceHelper.class.php');
+			SupplierInvoiceHelper::onOutboundStatusMessageValidated(
+				$db,
+				$user,
+				(int) $lcMessageRow->element_id,
+				(int) $lcMessageRow->lc_status,
+				$lcMessageRow->lc_reason_code,
+				$validationStatus
+			);
 		}
 
 		return 1;

@@ -1210,6 +1210,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 */
 	public function printFieldListWhere($parameters, $object, &$action, $hookmanager)
 	{
+		global $db;
+
 		if (in_array('invoicelist', explode(':', $parameters['context']))) {
 			if (GETPOST('search_pdp_syncstatus', 'alpha') !== '' && GETPOST('search_pdp_syncstatus', 'alpha') != -2) {
 				$this->resprints .= ' AND ext.syncstatus = ' . ((int) GETPOST('search_pdp_syncstatus'));
@@ -1218,17 +1220,25 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		// Supplier invoice list, Product list, Soc list
 		$contexts = explode(':', $parameters['context']);
-		if (array_intersect(
-			$contexts,
-			['supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist']
-		)) {
+		if (array_intersect($contexts, ['supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist'])) {
 			if (GETPOST('search_pdplinked', 'alpha') !== '' && GETPOST('search_pdplinked', 'alpha') == getDolGlobalString('EINVOICING_PDP')) {
-				$this->resprints .= ' AND ext.provider = "' . getDolGlobalString('EINVOICING_PDP') . '"';
+				$this->resprints .= " AND ext.provider = '" . $db->escape(getDolGlobalString('EINVOICING_PDP')) . "'";
 			}
 
 			if (GETPOST('search_routing_id', 'alpha') !== '' && GETPOST('search_routing_id', 'alpha') != "") {
-				$this->resprints .= ' AND ext.routing_id = "' . GETPOST('search_routing_id', 'alpha') . '"';
+				$this->resprints .= " AND ext.routing_id = '" . $db->escape(GETPOST('search_routing_id', 'alpha')) . "'";
 			}
+		}
+
+		// Supplier invoice lines to bind to accountancy : always exclude invoices abandoned
+		// because their refusal was confirmed by the e-invoicing platform (PDP/PA), they must
+		// never be transferred to accountancy.
+		if (in_array('accountancysupplierlist', $contexts)) {
+			require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
+			dol_include_once('einvoicing/class/helpers/SupplierInvoiceHelper.class.php');
+
+			$this->resprints .= ' AND NOT (f.fk_statut = ' . ((int) FactureFournisseur::STATUS_ABANDONED)
+				. " AND f.close_code = '" . $db->escape(SupplierInvoiceHelper::CLOSECODE_PDPREFUSED) . "')";
 		}
 
 		return 0;
