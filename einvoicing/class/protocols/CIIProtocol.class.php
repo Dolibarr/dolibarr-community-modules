@@ -2415,7 +2415,12 @@ class CIIProtocol extends AbstractProtocol
 	 */
 	protected function _getDolibarrInvoiceType($documenttypecode)
 	{
+		if ($documenttypecode === null) {
+			return '-1';
+		}
+
 		/**
+		 * @var array<string,int>
 		 * Codes UNTDID 1001 utilisés par EN16931 pour le type de facture (InvoiceTypeCode BT-3).
 		 * 325 – Facture pro-forma (a ignorer, n'est pas une facture mais une commande)
 		 * 211 – Demande de paiement intermédiaire (une facture de situation?)
@@ -2535,12 +2540,12 @@ class CIIProtocol extends AbstractProtocol
 	/**
 	 * Determines the delivery dates and the corresponding order numbers within two arrays
 	 *
-	 * @param 	array   $customerOrderReferenceList  	array to store the corresponding order ids as strings
-	 * @param 	array   $deliveryDateList            	array to store the corresponding delivery dates as string in format YYYY-MM-DD
-	 * @param 	Facture $object 						invoice object
+	 * @param 	string[]   	$customerOrderReferenceList  	array to store the corresponding order ids as strings
+	 * @param 	string[]   	$deliveryDateList            	array to store the corresponding delivery dates as string in format YYYY-MM-DD
+	 * @param 	Facture 	$object 						invoice object
 	 * @return	void
 	 */
-	private function _determineDeliveryDatesAndCustomerOrderNumbers(&$customerOrderReferenceList, &$deliveryDateList, $object)
+	protected function _determineDeliveryDatesAndCustomerOrderNumbers(&$customerOrderReferenceList, &$deliveryDateList, $object)
 	{
 		// TODO: move this function to class utils
 		$object->fetchObjectLinked();
