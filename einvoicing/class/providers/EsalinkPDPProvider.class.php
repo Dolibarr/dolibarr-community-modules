@@ -280,15 +280,17 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	{
 		global $langs;
 
-		$param = json_encode(array(
-			'username' => $this->config['username'],
-			'password' => $this->config['password']
+		// OAuth2 client_credentials — RFC 6749, application/x-www-form-urlencoded
+		// Replace old POST /v1/token (JSON username/password) disabled since v1.2.6 (2026-07).
+		$param = http_build_query(array(
+			'grant_type'    => 'client_credentials',
+			'client_id'     => $this->config['username'],
+			'client_secret' => $this->config['password'],
 		));
 
-		$extraHeaders = array();
+		$extraHeaders = array('Content-Type' => 'application/x-www-form-urlencoded');
 
-		// We call /token api of Esalink with username and pass. May be they are just client_id / client_secret that were renamed ?
-		$response = $this->callApi("token", "POSTALREADYFORMATED", $param, $extraHeaders, 'get_access_token');
+		$response = $this->callApi("oauth2/token", "POSTALREADYFORMATED", $param, $extraHeaders, 'get_access_token');
 
 		$status_code = $response['status_code'];
 		$body = $response['response'];
@@ -699,7 +701,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		}
 
 		// check or get access token
-		if ($resource != 'token') {
+		if ($callType != 'get_access_token') {
 			if (!empty($this->tokenData['token'])) {
 				if ($this->isTokenExpired()) {
 					$this->refreshAccessToken(); // This will fill again $this->tokenData['token'] and save it in database
@@ -710,7 +712,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		}
 
 		// Add Authorization header if we have a token
-		if (!empty($this->tokenData['token']) && $resource != 'token') {
+		if (!empty($this->tokenData['token']) && $callType != 'get_access_token') {
 			$httpheader[] = 'Authorization: Bearer ' . $this->tokenData['token'];
 		}
 

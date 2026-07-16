@@ -1,6 +1,7 @@
 <?php
 /* Copyright (C) 2025       Laurent Destailleur         <eldy@users.sourceforge.net>
  * Copyright (C) 2025       Mohamed DAOUD               <mdaoud@dolicloud.com>
+ * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -91,6 +92,8 @@ class ProtocolManager
 		if (!isset($this->protocolsList[$name]) || !$this->protocolsList[$name]['is_enabled']) {
 			return null;
 		}
+
+		$protocol = null;
 
 		$codename = strtoupper(str_replace('-', '', $name));
 

@@ -780,7 +780,9 @@ class EInvoicing
 
 					//EINVOICING_LIVE
 					if (!preg_match('/^' . preg_replace('/\s+/', '', $mysoc->idprof1) . '/', $this->removeSpaces($einvoiceid))) {
-						$baseWarnings[] = $langs->trans("FxCheckErrorRoutingIDFR", $einvoiceid);	// Your company profid must match the routing ID
+						//if (!empty($provider)) {
+							$baseWarnings[] = $langs->trans("FxCheckErrorRoutingIDFR", $einvoiceid);	// Your company profid must match the routing ID
+						//}
 					} else {
 						$baseErrors[] = $langs->trans("FxCheckErrorRoutingID");	// Your company does not have a valid prof id
 					}

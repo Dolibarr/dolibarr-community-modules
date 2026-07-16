@@ -186,6 +186,19 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->defaultFieldValue = '0';
 	$item->cssClass = 'minwidth500';
 
+	// Local EN 16931 business rules check (BR, BR-CO, BR-FR subset) on the generated XML.
+	// Single option with three modes: no check, check and warn only (default), or check and
+	// block the generation on any violation. The official Schematron of the Approved Platform
+	// stays the reference.
+	$item = $formSetup->newItem('EINVOICING_BR_CHECK')->setAsSelect(array(
+		'nocheck' => $langs->transnoentities('EINVOICING_BR_CHECK_NOCHECK'),
+		'warning_only' => $langs->transnoentities('EINVOICING_BR_CHECK_WARNING_ONLY'),
+		'blocking' => $langs->transnoentities('EINVOICING_BR_CHECK_BLOCKING'),
+	));
+	$item->helpText = $langs->transnoentities('EINVOICING_BR_CHECK_HELP');
+	$item->defaultFieldValue = 'warning_only';
+	$item->cssClass = 'minwidth500';
+
 
 	if (getDolGlobalString('EINVOICING_EINVOICE_IN_REAL_TIME')) {
 		$item = $formSetup->newItem('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS')->setAsYesNo();
@@ -210,11 +223,13 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->cssClass = 'minwidth500';
 
 	// Setup conf to choose to block generation/send of an invoice if no routing ID is found for the third party otherwise use SIREN
+	/* Option no more useful due to other added option that are more accurate, but we can still use it as hidden option
 	$item = $formSetup->newItem('EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID')->setAsYesNo();
 	$item->helpText = $langs->transnoentities('EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID_HELP');
 	$item->defaultFieldValue = '0';
 	$item->cssClass = 'minwidth500';
 	$item->fieldParams['forcereload'] = 0;
+	*/
 
 	// Setup conf to check the recipient reachability in the Approved Platforms directory (annuaire PA) before
 	// sending, and surface it on the invoice card. On by default. A read-only directory lookup: it never blocks.
@@ -283,6 +298,12 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
 	$item->defaultFieldValue = '0';
 	$item->cssClass = 'minwidth500';
 
+	// Setup conf to import lines as free description lines when no product is found
+	$item = $formSetup->newItem('EINVOICING_IMPORT_AS_FREE_LINES')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('EINVOICING_IMPORT_AS_FREE_LINES_HELP');
+	$item->defaultFieldValue = '0';
+	$item->cssClass = 'minwidth500';
+
 	// Setup conf to choose use of auto generation or not of third parties
 	$item = $formSetup->newItem('EINVOICING_THIRDPARTIES_AUTO_GENERATION')->setAsYesNo();
 	$item->helpText = $langs->transnoentities('EINVOICING_THIRDPARTIES_AUTO_GENERATION_HELP');
@@ -325,21 +346,11 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
 	$item = $formSetup->newItem('EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_CATEGORY_OF_TARGET_IMPORT_PRODUCT_LIST');
 	$item->setAsCategory('product');
 
-	/* Keep this option as hidden as it is too bugged and not really useful
-	// Setup conf to enable or not the consistency check on supplier invoice validation
-	$item = $formSetup->newItem('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION');
-	$item->helpText = $langs->transnoentities('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION_HELP');
-	$item->setAsYesNo();
-	*/
-
-	if (getDolGlobalString('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION')) {
-		$item = $formSetup->newItem('EINVOICING_SUPPLIER_INVOICE_COMPARISON_ROUND_PRECISION');
-		// $item->setAsNumber(2, 10, 1); // not in < v22
-		$item->fieldAttr['type'] = 'number';
-		$item->fieldAttr['min'] = 2;
-		$item->fieldAttr['max'] = 10;
-		$item->fieldAttr['step'] = 1;
-		$item->defaultFieldValue = '3';
+	if (getDolGlobalBool('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION_AVAILABLE')) {
+		// Setup conf to enable or not the consistency check on supplier invoice validation
+		$item = $formSetup->newItem('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION');
+		$item->helpText = $langs->transnoentities('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION_HELP');
+		$item->setAsYesNo();
 	}
 }
 

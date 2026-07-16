@@ -1,6 +1,7 @@
 <?php
 /* Copyright (C) 2025-2026       Laurent Destailleur         <eldy@users.sourceforge.net>
  * Copyright (C) 2025-2026       Mohamed DAOUD               <mdaoud@dolicloud.com>
+ * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -1033,6 +1034,12 @@ trait CommonProtocol
 			// Suggest manual creation of product
 			dol_syslog(get_class($this) . '::_findOrCreateProductFromEinvoiceLine Auto-creation of products is disabled', LOG_ERR);
 
+			// Free line mode: import the line without linking any product (res=0 signals the protocol to set desc from XML)
+			if (getDolGlobalInt('EINVOICING_IMPORT_AS_FREE_LINES')) {
+				dol_syslog(get_class($this) . '::_findOrCreateProductFromEinvoiceLine Free line mode: importing without product link', LOG_DEBUG);
+				return array('res' => 0, 'message' => 'Product not found, line imported as free description line (no product link)');
+			}
+
 			$prodRef = trim($lineData['prodbuyerid'] ?? '');
 			$prodSupplierRef = trim($lineData['prodsellerid'] ?? '');
 			$prodName = trim($lineData['prodname'] ?? '');
@@ -1496,6 +1503,7 @@ trait CommonProtocol
 						}
 
 						$vat_rate = price2num($vat_rate, 2);
+						$constantforvatex = '';
 
 						if (empty($vatex)) {
 							$constantforvatex = "MAIN_VAT_EXEMPTION_CODE_FOR_" . $vat_rate.($vat_src_code ? "_". $vat_src_code : '');
