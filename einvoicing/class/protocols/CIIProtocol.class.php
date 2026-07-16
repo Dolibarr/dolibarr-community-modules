@@ -783,7 +783,7 @@ class CIIProtocol extends AbstractProtocol
 		// --------------------------------------------------
 
 		if (SupplierInvoiceHelper::isSupplierImportInvoiceLinesAuto($socId)) {
-			$res = $this->createSupplierInvoiceLinesFromSource($supplierInvoice, $parsedLines, $remise_already_used_line_level_ids, $flowId);
+			$res = $this->createSupplierInvoiceLinesFromSource($supplierInvoice, $parsedLines, $remise_already_used_line_level_ids, $supplierPriceEntries, $flowId);
 			if ($res['res'] < 0) {
 				return $res;
       }
@@ -1030,11 +1030,12 @@ class CIIProtocol extends AbstractProtocol
 	 * @param 	FactureFournisseur 	$supplierInvoice						The supplier invoice to add lines on
 	 * @param 	array 				$parsedLines							The parsed lines data (previously extracted from e-invoice)
 	 * @param 	array 				$remise_already_used_line_level_ids		The list of ids for remise already used
+	 * @param 	array 				$supplierPriceEntries					The list of entries for supplier prices
 	 * @param 	string 				$flowId									The concerned flowId
 	 * @param 	array{free_lines:bool,target_fk_product:?int} $params		Params used in case of manual import
 	 * @return 	array{res:int, message:string, actioncode:string|null, actionurl:string, action:string, actiondata:mixed}   Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and additional data about the action.
 	 */
-	public function createSupplierInvoiceLinesFromSource(&$supplierInvoice, $parsedLines, &$remise_already_used_line_level_ids = [], $flowId = '', $params = ['free_lines' => false, 'target_fk_product' => null]): array
+	public function createSupplierInvoiceLinesFromSource(&$supplierInvoice, $parsedLines, &$remise_already_used_line_level_ids = [], &$supplierPriceEntries = [], $flowId = '', $params = ['free_lines' => false, 'target_fk_product' => null]): array
 	{
 		global $db, $hookmanager, $langs, $user;
 
@@ -1138,7 +1139,7 @@ class CIIProtocol extends AbstractProtocol
 									$discount->multicurrency_amount_ht = abs((float) $multicurrency_amount_ht[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
 									$discount->multicurrency_amount_tva = abs((float) $multicurrency_amount_tva[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
 									$discount->multicurrency_amount_ttc = abs((float) $multicurrency_amount_ttc[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
-                  
+
 									// Clean vat code
 									$reg = array();
 									$vat_src_code = '';
@@ -1200,7 +1201,7 @@ class CIIProtocol extends AbstractProtocol
 				} else {
 					$productId = $res['res'];
 				}
-        
+
         // Collect supplier price data to be created after invoice is saved
 				if ($productId > 0) {
 					$supplierPriceEntries[] = [

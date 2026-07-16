@@ -860,8 +860,9 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				}
 
 				// Add lines to supplier invoice from eInvoice XML data
-				$$remise_already_used_line_level_ids = [];
-				$res = $exchangeProtocol->createSupplierInvoiceLinesFromSource($object, $parsedLines, $remise_already_used_line_level_ids, '', $createInvoiceLinesParams);
+				$remise_already_used_line_level_ids = [];
+				$supplierPriceEntries = [];
+				$res = $exchangeProtocol->createSupplierInvoiceLinesFromSource($object, $parsedLines, $remise_already_used_line_level_ids, $supplierPriceEntries, '', $createInvoiceLinesParams);
 				if ($res['res'] < 0) {
 					$db->rollback();
 					$this->error = $langs->trans('EinvoiceReimportLinesError') . $res['message'];
