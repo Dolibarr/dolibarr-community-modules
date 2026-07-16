@@ -42,7 +42,6 @@ return [
         'einvoicing/class/call.class.php' => ['PhanTypeObjectUnsetDeclaredProperty', 'PhanUndeclaredClassMethod', 'PhanUndeclaredClassProperty', 'PhanUndeclaredProperty'],
         'einvoicing/class/document.class.php' => ['PhanTypeObjectUnsetDeclaredProperty', 'PhanUndeclaredClassMethod', 'PhanUndeclaredClassProperty', 'PhanUndeclaredProperty'],
         'einvoicing/class/einvoicing.class.php' => ['PhanTypeMismatchArgumentNullable'],
-        'einvoicing/class/helpers/SupplierInvoiceHelper.class.php' => ['PhanUndeclaredMethod'],
         'einvoicing/class/protocols/CIIProtocol.class.php' => ['PhanDeprecatedProperty', 'PhanParamTooMany', 'PhanPluginDuplicateExpressionAssignmentOperation', 'PhanTypeMismatchArgumentNullable'],
         'einvoicing/class/protocols/CommonProtocol.class.php' => ['PhanTypeMismatchArgumentNullable', 'PhanUndeclaredMethod'],
         'einvoicing/class/protocols/FacturXProtocol.class.php' => ['PhanDeprecatedFunction', 'PhanDeprecatedProperty', 'PhanParamTooMany', 'PhanTypeMismatchArgumentProbablyReal', 'PhanTypeMismatchPropertyProbablyReal'],

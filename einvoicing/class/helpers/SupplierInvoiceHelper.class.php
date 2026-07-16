@@ -352,7 +352,7 @@ class SupplierInvoiceHelper
 				$document = new Document($db);
 				$resdoc = $document->fetch($foundDocument->rowid);
 
-				if ((empty($resdoc) || is_null($document->xml_data) || $document->xml_data == '') && $fetchXmlIfEmpty === true) {
+				if ((empty($resdoc) || is_null($document->xml_data) || $document->xml_data == '') && $fetchXmlIfEmpty) {
 					$providerManager = new PDPProviderManager($db);
 					$provider = $providerManager->getProvider(strtoupper((string) $document->provider));
 

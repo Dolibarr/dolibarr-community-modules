@@ -313,7 +313,7 @@ abstract class AbstractPDPProvider
 	 * @param string $flowId 		The id of the flow to fetch
 	 * @param bool	 $cleanXml 		Whether you need to remove (attachments presents in XML content...)
 	 *
-	 * @return string
+	 * @return ?string
 	 */
 	public function fetchFlowXml($flowId, $cleanXml)
 	{
@@ -322,6 +322,8 @@ abstract class AbstractPDPProvider
 		if ($flowResponse['status_code'] != 200) {
 			throw new Exception('Failed to get flow XML for flow id n° ' . $flowId);
 		}
+
+		$xmlData = null;
 
 		// $receivedFileContent may be a CII file (common) or Factur-X file (not common), or ...
 		$receivedFileContent = $flowResponse['response'];
