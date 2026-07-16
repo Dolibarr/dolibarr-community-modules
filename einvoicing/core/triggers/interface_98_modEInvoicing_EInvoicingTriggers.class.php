@@ -24,7 +24,7 @@
  */
 
 require_once DOL_DOCUMENT_ROOT.'/core/triggers/dolibarrtriggers.class.php';
-require_once DOL_DOCUMENT_ROOT.'/custom/einvoicing/class/helpers/SupplierInvoiceHelper.class.php';
+dol_include_once('einvoicing/class/helpers/SupplierInvoiceHelper.class.php');
 
 
 /**
