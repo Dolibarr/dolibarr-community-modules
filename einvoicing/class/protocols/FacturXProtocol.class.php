@@ -1361,7 +1361,7 @@ class FacturXProtocol extends CIIProtocol
 		$supplierInvoice->ref_supplier = $parsedHeader['documentno'] ?? '';
 
 		// Set basic invoice information (type, date)
-		$supplierInvoice->type = $this->_getDolibarrInvoiceType($parsedHeader['documenttypecode'] ?? null);
+		$supplierInvoice->type = $this->getDolibarrInvoiceType($parsedHeader['documenttypecode'] ?? null);
 		if ($supplierInvoice->type === '-1') {
 			return ['res' => -1, 'message' => 'Unfounded dolibarr corresponding Invoice code for document type code: ' . ($parsedHeader['documenttypecode'] ?? 'NA')];
 		}
@@ -1774,7 +1774,7 @@ class FacturXProtocol extends CIIProtocol
 
 			// Save original invoice in supplier invoice attachments
 			if ($tempFile && file_exists($tempFile)) {
-				$res = $this->_saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempFile);
+				$res = $this->saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempFile);
 
 				if ($res['res'] < 0) {
 					$return_messages[] = 'Failed to save Einvoice file as attachment: ' . $res['message'];
@@ -1788,7 +1788,7 @@ class FacturXProtocol extends CIIProtocol
 
 			// Save readable view file in supplier invoice attachments
 			if ($ReadableViewFile && $tempFileReadableView && file_exists($tempFileReadableView)) {
-				$res = $this->_saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempFileReadableView, getDolGlobalString('EINVOICING_PDP', 'PDP'));
+				$res = $this->saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempFileReadableView, getDolGlobalString('EINVOICING_PDP', 'PDP'));
 
 				if ($res['res'] < 0) {
 					$return_messages[] = 'Failed to save readable view file as attachment: ' . $res['message'];

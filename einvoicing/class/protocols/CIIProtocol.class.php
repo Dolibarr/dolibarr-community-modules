@@ -736,7 +736,7 @@ class CIIProtocol extends AbstractProtocol
 		$supplierInvoice->ref_supplier = $parsedHeader['documentno'] ?? '';
 
 		// Set basic invoice information (type, date)
-		$supplierInvoice->type = $this->_getDolibarrInvoiceType($parsedHeader['documenttypecode'] ?? null);
+		$supplierInvoice->type = $this->getDolibarrInvoiceType($parsedHeader['documenttypecode'] ?? null);
 		if ($supplierInvoice->type === '-1') {
 			return ['res' => -1, 'message' => 'Unfounded dolibarr corresponding Invoice code for document type code: ' . ($parsedHeader['documenttypecode'] ?? 'NA')];
 		}
@@ -1175,7 +1175,7 @@ class CIIProtocol extends AbstractProtocol
 
 			// Save original invoice in supplier invoice attachments
 			if ($tempFile && file_exists($tempFile)) {
-				$res = $this->_saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempFile);
+				$res = $this->saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempFile);
 
 				if ($res['res'] < 0) {
 					$return_messages[] = 'Failed to save Einvoice file as attachment: ' . $res['message'];
@@ -1189,7 +1189,7 @@ class CIIProtocol extends AbstractProtocol
 
 			// Save readable view file in supplier invoice attachments
 			if ($ReadableViewFile && $tempFileReadableView && file_exists($tempFileReadableView)) {
-				$res = $this->_saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempFileReadableView, getDolGlobalString('EINVOICING_PDP', 'PDP'));
+				$res = $this->saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempFileReadableView, getDolGlobalString('EINVOICING_PDP', 'PDP'));
 
 				if ($res['res'] < 0) {
 					$return_messages[] = 'Failed to save readable view file as attachment: ' . $res['message'];
@@ -2413,7 +2413,7 @@ class CIIProtocol extends AbstractProtocol
 	 * @param ?string $documenttypecode Document type code
 	 * @return int|'-1' Dolibarr invoice type or '-1' if unknown
 	 */
-	protected function _getDolibarrInvoiceType($documenttypecode)
+	protected function getDolibarrInvoiceType($documenttypecode)
 	{
 		if ($documenttypecode === null) {
 			return '-1';
@@ -2458,7 +2458,7 @@ class CIIProtocol extends AbstractProtocol
 
 
 		if (!isset($map[$documenttypecode])) {
-			dol_syslog(get_class($this) . '::_getDolibarrInvoiceType Unknown document type code: ' . $documenttypecode, LOG_WARNING);
+			dol_syslog(get_class($this) . '::getDolibarrInvoiceType Unknown document type code: ' . $documenttypecode, LOG_WARNING);
 			return '-1';
 		}
 
@@ -2474,7 +2474,7 @@ class CIIProtocol extends AbstractProtocol
 	 * @param string                $suffix          	Optional suffix for the saved file name
 	 * @return array{res:int, message:string}   		Returns array with 'res' (1 on success, -1 on error) and info 'message'
 	 */
-	protected function _saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $filePath, $suffix = 'einvoice')
+	protected function saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $filePath, $suffix = 'einvoice')
 	{
 		global $conf;
 
@@ -2545,7 +2545,7 @@ class CIIProtocol extends AbstractProtocol
 	 * @param 	Facture 	$object 						invoice object
 	 * @return	void
 	 */
-	protected function _determineDeliveryDatesAndCustomerOrderNumbers(&$customerOrderReferenceList, &$deliveryDateList, $object)
+	protected function determineDeliveryDatesAndCustomerOrderNumbers(&$customerOrderReferenceList, &$deliveryDateList, $object)
 	{
 		// TODO: move this function to class utils
 		$object->fetchObjectLinked();

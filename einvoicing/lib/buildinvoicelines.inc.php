@@ -76,7 +76,7 @@ if (!is_object($object->thirdparty)) {
 // Customer references and delivery dates
 $customerOrderReferenceList = [];
 $deliveryDateList = [];
-$this->_determineDeliveryDatesAndCustomerOrderNumbers($customerOrderReferenceList, $deliveryDateList, $object);
+$this->determineDeliveryDatesAndCustomerOrderNumbers($customerOrderReferenceList, $deliveryDateList, $object);
 
 // Chorus
 $chorus = false;
