@@ -63,6 +63,9 @@ if (!$res && file_exists("../../../main.inc.php")) {
 if (!$res && file_exists("../../../../main.inc.php")) {
 	$res = @include "../../../../main.inc.php";
 }
+if (!$res && file_exists("../../../../../main.inc.php")) {
+	$res = @include "../../../../../main.inc.php";
+}
 if (!$res) {
 	die("Include of main fails");
 }
@@ -106,7 +109,7 @@ $statewithscopeonly = '';
 $statewithanticsrfonly = '';
 
 $requestedpermissionsarray = array();
-if ($state) {
+if ($state) { // Used to stoe scope and anti-csrf value. The scope is stored in the first part of the state, before the first dash. The anti-csrf value is stored in the second part of the state, after the first dash (exemple: scope1,scope2,scope3-jetonAntiCSRF)
 	// 'state' parameter is standard to store a hash value and can also be used to retrieve some parameters back
 	$statewithscopeonly = preg_replace('/\-.*$/', '', $state);
 	if ($statewithscopeonly != 'none') {
@@ -189,12 +192,15 @@ if (GETPOST('action', 'aZ09') == 'refresh' && GETPOST('grant_type', 'aZ09') == '
  * Actions
  */
 
-// Add a test to check that the state parameter is provided into URL when we make the first call to ask the redirect or when we receive the callback,
-// but NOT when callback was ok and we recall the page
+// Validate state parameter and permissions during OAuth flow
+// Check that state parameter is provided in URL when requesting redirect or receiving callback,
+// but NOT when callback was successful and page is recalled
 if ($action != 'delete' && !GETPOST('afteroauthloginreturn') && (empty($statewithscopeonly) || empty($requestedpermissionsarray)) && !preg_match('/^none/', $state)) {
+	// Handle OAuth error from provider
 	if (GETPOST('error') || GETPOST('error_description')) {
 		setEventMessages($langs->trans("Error").' '.GETPOST('error_description'), null, 'errors');
 	} else {
+		// State or permissions are missing - log and redirect with error
 		dol_syslog("state or statewithscopeonly and/or requestedpermissionsarray are empty");
 
 		$backtourl = GETPOST('redirect_uri').(strpos(GETPOST('redirect_uri'), '?') !== false ? '&' : '?').'error=scopeundefined';
@@ -279,6 +285,35 @@ if (empty($code) && !GETPOST('error')) {
 	// We are coming from the return of an OAuth2 provider page.
 	dol_syslog(basename(__FILE__)." We are coming from the oauth provider page keyforprovider=".$keyforprovider." code=".dol_trunc(GETPOST('code'), 5));
 
+	// Check if the OAuth provider returned an error before we try to get the token. If so, we redirect to the origin page with error message.
+	if (GETPOST('error')) {
+		dol_syslog("OAuth provider returned an error: ".GETPOST('error')." - ".GETPOST('error_description'), LOG_WARNING);
+
+		$mode = getDolGlobalInt('EINVOICING_LIVE') ? 'prod' : 'sandbox';
+		print '<center>';
+		print '<br>';
+		print 'Error in OAuth authorize step...<br>';
+		print '<br>';
+		print 'Mode: <b>'.dol_escape_htmltag($mode).'</b><br>'; // useful for debugging
+		print dol_escape_htmltag(GETPOST('error')).' - '.dol_escape_htmltag(GETPOST('error_description'));
+		print '<br>';
+		print '<br>';
+
+		$reg = array();
+		$origin_redirect_uri = '';
+		if (preg_match('/^[a-z0-9]+\-(.*)/', $state, $reg)) {
+			$origin_redirect_uri = urldecode($reg[1]);
+		}
+		if ($origin_redirect_uri) {
+			// TODO Test that origin_redirect_uri start with the allowed domain
+			print '<a href="'.dol_escape_htmltag($origin_redirect_uri).'">Go back to setup page...</a>';
+			print '<br>';
+		}
+
+		print '</center>';
+		exit;
+	}
+
 	// We must validate that the $state is the same than the one into $_SESSION['oauthstateanticsrf'], return error if not.
 	if (!isset($_SESSION['oauthstateanticsrf']) || $state != $_SESSION['oauthstateanticsrf']) {
 		//var_dump($_SESSION['oauthstateanticsrf']);exit;
@@ -328,10 +363,10 @@ if (empty($code) && !GETPOST('error')) {
 
 					$content = json_decode($resultget['content'], true);
 
-					$access_token = $content['access_token'];
-					$expires_in = $content['expires_in'];
-					$refresh_token = $content['refresh_token'];
-					$scope = $content['scope'];
+					$access_token = $content['access_token'] ?? '';
+					$expires_in = $content['expires_in'] ?? '';
+					$refresh_token = $content['refresh_token'] ?? '';
+					$scope = $content['scope'] ?? '';
 
 					$origin_redirect_uri .= '?accesstoken='.urlencode($access_token);
 					$origin_redirect_uri .= '&expires_in='.urlencode($expires_in);

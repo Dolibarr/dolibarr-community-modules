@@ -53,7 +53,7 @@ $newlang = '';
 $einvoicing = new EInvoicing($db);
 
 
-$outputlang = $langs->defaultlang;
+$outputlang = (string) $langs->defaultlang;
 
 if (!is_object($invoice->thirdparty)) {
 	$invoice->fetch_thirdparty();
@@ -131,15 +131,15 @@ $schemeGlobalIdProf = $this->getIEC6523Code($object->thirdparty->country_code, 1
 $uri               = $einvoicing->getBuyerCommunicationURI($object->thirdparty, $object);
 $reg = array();
 if (preg_match('/(\d+):(.+)/', $uri, $reg)) {
-	$uri		= $reg[2];
-	$schemeUri  = $reg[1];
+	$uri		= (string) $reg[2];
+	$schemeUri  = (string) $reg[1];
 } else {
 	$schemeUri  = $this->getIEC6523Code($object->thirdparty->country_code, 2);
 }
 // In case of sample tests, we may have this const defined to overwrite buyer Einvoice address ID.
 // In common case, this should not be used
 if (defined('EINVOICING_FORCE_BUYER_EID')) {
-	$uri               = constant('EINVOICING_FORCE_BUYER_EID');
+	$uri               = (string) constant('EINVOICING_FORCE_BUYER_EID');
 	$schemeUri         = "0225";
 }
 
@@ -571,10 +571,13 @@ if ($resql) {
 	dol_syslog("Error " . $db->error() . " when looking for credit note linked to invoice to calculate prepaid amount for invoice " . $object->id, LOG_WARNING);
 }
 
-// Already paid deposits
+// Amount already received for this invoice: direct payments + used credit notes.
+// getSommePaiement() returns the sum of payments; on Dolibarr <= 22 it also stores that same
+// value into $object->sumpayed, so adding both double-counted the payment (#372: a fully paid
+// invoice reported TotalPrepaidAmount = 2x the amount and a negative DuePayableAmount).
 $getAlreadyPaid = $object->getSommePaiement();
 
-$prepaidAmount  = $object->sumpayed + $getAlreadyPaid + $usedcreditnoteamount;
+$prepaidAmount  = $getAlreadyPaid + $usedcreditnoteamount;
 
 // Delivery date
 $deliveryDate = !empty($deliveryDateList)
@@ -713,7 +716,7 @@ $invoiceData = [
 // Payment mode
 if ($object->mode_reglement_code) {
 	$invoiceData['paymentMeansCode'] = $this->_getPaymentMeanNumber($object);
-	$invoiceData['paymentMeansText'] = $langs->transnoentitiesnoconv("PaymentType" . $object->mode_reglement_code);
+	$invoiceData['paymentMeansText'] = (string) $langs->transnoentitiesnoconv("PaymentType" . $object->mode_reglement_code);
 }
 
 

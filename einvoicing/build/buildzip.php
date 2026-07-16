@@ -4,6 +4,7 @@
  * buildzip.php
  *
  * Copyright (c) 2023-2025 Eric Seigne <eric.seigne@cap-rel.fr>
+ * Copyright (C) 2026		MDW	<mdeweerd@users.noreply.github.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,6 +24,8 @@
    The goal of that php CLI script is to make zip package of your module
    as an alternative to web "build zip" or "perl script makepack"
 */
+
+/** @phan-file-suppress PhanRedefineFunction */
 
 // ============================================= configuration
 

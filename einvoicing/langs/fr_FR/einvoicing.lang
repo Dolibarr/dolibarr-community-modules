@@ -357,7 +357,7 @@ EINVOICING_API_KEY=Clé API
 EINVOICING_ESALINK_TOKEN=Jeton d'accès
 EINVOICING_ESALINK_ACTIONS=Actes
 EINVOICING_ESALINKP_HELP_CREDENTIAL1=Pour utiliser le <b>point d'accès EsaLink</b> comme plateforme de facturation électronique, vous devez suivre les étapes suivantes.
-EINVOICING_ESALINKP_HELP_CREDENTIAL2=Créez un compte sur %s. Les étapes suivantes seront décrites ultérieurement, une fois la fonctionnalité disponible.
+EINVOICING_ESALINKP_HELP_CREDENTIAL2=Contacter un membre distributeur de PDP Libre qui vous proposera un contrat de souscription au contrat groupe négocié par PDP Libre. %s
 
 # AP SuperPDP
 EINVOICING_SUPERPDP_HELP_CREDENTIAL1=Pour utiliser le <b>point d'accès SuperPDP</b> comme point d'accès officiel pour la facturation électronique, vous devez suivre les étapes suivantes :

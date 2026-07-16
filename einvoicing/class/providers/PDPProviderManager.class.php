@@ -70,8 +70,8 @@ class PDPProviderManager
 				'provider_name' => picto_from_langcode('FR').' ESALINK <span class="opacitymedium">('.$langs->trans("NeedASubscriptionTo", "PDPLibre").')</span>',
 				'description' => 'Esalink PDP Integration',
 				'is_enabled' => 1,
-				'prod_account_admin_url' => 'https://www.esalink.com/contact/',
-				'test_account_admin_url' => 'https://www.esalink.com/contact/',
+				'prod_account_admin_url' => 'https://pdplibre.org/solutions/',
+				'test_account_admin_url' => 'https://pdplibre.org/solutions/',
 			),
 			'SUPERPDP' => array(
 				'class' => 'SuperPDPProvider',

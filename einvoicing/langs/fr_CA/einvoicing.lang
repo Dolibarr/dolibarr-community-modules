@@ -348,7 +348,7 @@ EINVOICING_API_KEY=API key
 EINVOICING_ESALINK_TOKEN=Access token
 EINVOICING_ESALINK_ACTIONS=Actions
 EINVOICING_ESALINKP_HELP_CREDENTIAL1=To use the <b>EsaLink Access Point</b> as your official Access Point for E-invoicing, you must follow the following steps:
-EINVOICING_ESALINKP_HELP_CREDENTIAL2=...Create account on %s. Next steps will be described later once feature is available...
+EINVOICING_ESALINKP_HELP_CREDENTIAL2=Contacter un membre distributeur de PDP Libre qui vous proposera un contrat de souscription au contrat groupe négocié par PDP Libre. %s
 
 # AP SuperPDP
 EINVOICING_SUPERPDP_HELP_CREDENTIAL1=To use the <b>SuperPDP Access Point</b> as your official Access Point for E-invoicing, you must follow the following steps:

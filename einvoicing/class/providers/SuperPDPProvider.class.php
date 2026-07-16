@@ -1,6 +1,7 @@
 <?php
 /* Copyright (C) 2025       Laurent Destailleur         <eldy@users.sourceforge.net>
  * Copyright (C) 2025       Mohamed DAOUD               <mdaoud@dolicloud.com>
+ * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -144,8 +145,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 					'response_type' => 'code',
 					'redirect_uri' => dol_buildpath('/einvoicing/admin/setup.php', 2)
 				];
-				// Company prefill (number + scheme are an indissociable pair). Sandbox scheme off-live,
-				// otherwise fr_siren / be_numero_entreprise by country.
+				// Prefill company information: number and scheme must be paired together.
+				// Use 'sandbox' scheme for non-live environment, otherwise use country-specific scheme (fr_siren for France, be_numero_entreprise for Belgium).
 				if (!empty($mysoc->idprof1)) {
 					$companyscheme = '';
 					if (!getDolGlobalInt('EINVOICING_LIVE')) {
@@ -155,6 +156,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 					} elseif ($mysoc->country_code == 'BE') {
 						$companyscheme = 'be_numero_entreprise';
 					}
+					// Include company number (idprof1/SIREN) in request only if a valid scheme is available.
+					// Invalid company numbers will cause the onboarding process to fail.
 					if ($companyscheme) {
 						$query += [
 							'superpdp_company_number' => removeAllSpaces($mysoc->idprof1),
@@ -340,7 +343,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 						}
 						if ($companyscheme) {
 							$query += [
-								'superpdp_company_number' => removeAllSpaces($mysoc->idprof1),
+								'superpdp_company_number' => removeAllSpaces($mysoc->idprof1), // The number (idprof1) must be valid, otherwise onboarding will fail.
 								'superpdp_company_number_scheme' => $companyscheme,
 							];
 						}
@@ -622,7 +625,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				$companyscheme = 'be_numero_entreprise';
 			}
 			if ($companyscheme) {
-				$query['superpdp_company_number'] = removeAllSpaces($mysoc->idprof1);
+				$query['superpdp_company_number'] = removeAllSpaces($mysoc->idprof1); // The number (idprof1) must be valid, otherwise onboarding will fail.
 				$query['superpdp_company_number_scheme'] = $companyscheme;
 			}
 		}
@@ -1089,7 +1092,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 * @param array<string, string>         $extraHeaders   Optional additional headers
 	 * @param string|null                   $callType       Functional type of the API call for logging purposes (e.g., 'sync_flows', 'send_invoice')
 	 *
-	 * @return array{status_code:int,response:null|string|array<string,mixed>,errorCode?:string,errorMessage?:string,id?:int,call_id?:string}
+	 * @return array{status_code:int,response:null|string|array<string,mixed>|mixed,errorCode?:string,errorMessage?:string,id?:int,call_id?:?string,curl_error_no?:int,curl_error_msg?:string}
 	 */
 	public function callApi($resource, $method, $params = false, $extraHeaders = [], $callType = '')
 	{
@@ -1173,8 +1176,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 				$returnarray['curl_error_msg'] = $response['curl_error_msg'];
 			}
 			if ($contentarray = json_decode((string) $response['content'], true)) {
-				$returnarray['errorCode'] = $contentarray['errorCode'];
-				$returnarray['errorMessage'] = $contentarray['errorMessage'];
+				$returnarray['errorCode'] = (string) $contentarray['errorCode'];
+				$returnarray['errorMessage'] = (string) $contentarray['errorMessage'];
 			}
 		}
 

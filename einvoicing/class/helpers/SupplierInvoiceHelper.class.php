@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2026       solauv
+ * Copyright (C) 2026		MDW	<mdeweerd@users.noreply.github.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -33,12 +34,12 @@ dol_include_once('fourn/class/fournisseur.facture.class.php');
 class SupplierInvoiceHelper
 {
 	/**
-	 * Compare amounts according to a number of digit after coma and return true if they are equal.
+	 * Compare amounts according to a number of digit after comma and return true if they are equal.
 	 *
 	 * @param float $amount1    The first amount to compare
 	 * @param float $amount2    The second amount to compare
 	 * @param ?int $roundPrecision The number of digits after coma to apply round()
-	 * @return bool
+	 * @return bool True if amounts are equal
 	 */
 	private static function areAmountsEqual($amount1, $amount2, ?int $roundPrecision = null): bool
 	{
@@ -245,7 +246,7 @@ class SupplierInvoiceHelper
 
 				if (empty($resdoc) || is_null($document->xml_data) || $document->xml_data == '') {
 					$providerManager = new PDPProviderManager($db);
-					$provider = $providerManager->getProvider(strtoupper($document->provider));
+					$provider = $providerManager->getProvider(strtoupper((string) $document->provider));
 
 					/* FIXME Disabled: Create a lof of regressions and problems:
 					- We must never a dependency (like ZugferdDocumentPdfReaderExt) when common use of code does not need it.

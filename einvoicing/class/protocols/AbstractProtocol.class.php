@@ -26,6 +26,11 @@
 abstract class AbstractProtocol
 {
 	/**
+	 * @var DoliDB Db
+	 */
+	public $db;
+
+	/**
 	 * Invoice object
 	 * @var Facture
 	 */
@@ -48,6 +53,14 @@ abstract class AbstractProtocol
 
 	/** @const string The profile used to generate XML */
 	protected const BUILD_XML_PROFILE = self::BUILD_XML_PROFILE;
+
+	/**
+	 * @param DoliDB $db Db
+	 */
+	public function __construct($db)
+	{
+		$this->db = $db;
+	}
 
 	/**
 	 * Generate the XML content for a given invoice.
