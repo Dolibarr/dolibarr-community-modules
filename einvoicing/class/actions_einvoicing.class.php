@@ -311,7 +311,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				$PDPManager = new PDPProviderManager($db);
 				$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
 				$precheckAvailable = $provider->hasValidator();
-				if ($currentStatusDetails['file'] == 1 && $precheckAvailable) {
+				if (!empty($currentStatusDetails['file']) && $currentStatusDetails['file'] == 1 && $precheckAvailable) {
 					$url_button[] = array(
 						'lang' => 'einvoicing',
 						'enabled' => true,
