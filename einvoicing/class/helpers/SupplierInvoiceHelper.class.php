@@ -525,9 +525,7 @@ class SupplierInvoiceHelper
 		$langs->load('einvoicing@einvoicing');
 		$einvoicing = new EInvoicing($db);
 		$reasons = $einvoicing->getReasonsByStatus(EInvoicing::STATUS_REFUSED, 0);
-		$reasonLabel = (!empty($lcReasonCode) && is_array($reasons) && isset($reasons[$lcReasonCode]))
-			? $langs->trans($reasons[$lcReasonCode]['label'])
-			: (string) $lcReasonCode;
+		$reasonLabel = (!empty($lcReasonCode) && is_array($reasons) && isset($reasons[$lcReasonCode])) ? $langs->trans($reasons[$lcReasonCode]['label']) : (string) $lcReasonCode;
 
 		// abandonRefusedSupplierInvoice() already logs the specific failure reason (validate or
 		// setCanceled) - not logged again here to avoid duplicate log entries for the same error.
