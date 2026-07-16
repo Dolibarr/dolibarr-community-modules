@@ -226,7 +226,7 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 
 		// Simulate a fully paid invoice without going through a real payment workflow: the
 		// helper only reads these in-memory properties to take its decision.
-		$localobject->paye = 1;
+		$localobject->paid = 1;
 		$localobject->status = FactureFournisseur::STATUS_CLOSED;
 
 		$result = SupplierInvoiceHelper::abandonRefusedSupplierInvoice($localobject, $user, 'Should not apply');

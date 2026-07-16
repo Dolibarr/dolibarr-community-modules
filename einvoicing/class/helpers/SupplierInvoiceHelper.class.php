@@ -359,7 +359,7 @@ class SupplierInvoiceHelper
 	 */
 	public static function abandonRefusedSupplierInvoice(FactureFournisseur $object, User $user, $reasonLabel = '')
 	{
-		if (!empty($object->paye) || $object->status == FactureFournisseur::STATUS_CLOSED) {
+		if (!empty($object->paid) || $object->status == FactureFournisseur::STATUS_CLOSED) {
 			$object->errors[] = 'Can not abandon supplier invoice id ' . $object->id . ' : invoice is already paid';
 			dol_syslog(__METHOD__ . ' Can not abandon supplier invoice id ' . $object->id . ' : invoice is already paid', LOG_ERR);
 			return -1;
