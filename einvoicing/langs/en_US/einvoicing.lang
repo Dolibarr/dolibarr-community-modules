@@ -327,7 +327,6 @@ IBANForSellerMandatoryOnCreditTransferButNotBankAcount2=Set a default bank accou
 IBANForSellerMandatoryOnCreditTransferButNotBAN=A payment mode was set to pay with credit transfer, but the selected default bank account has no BAN number defined.
 IBANForSellerMandatoryOnCreditTransferButNotBAN2=Set a BAN number on the bank account.
 CreateTheProduct=Create the product
-EINVOICING_SUPPLIER_INVOICE_COMPARISON_ROUND_PRECISION=Number of decimals after coma, used by invoice comparison of e-invoice amounts VS Dolibarr supplier invoice amounts (default value : 3)
 EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION=Forbid supplier invoice validation if Dolibarr invoice data are not consitent with e-invoice data
 EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION_HELP=Comparative data: currency, total amount including tax, total amount excluding tax, total VAT amount, base amount and VAT amount for each VAT rate
 EInvoiceAndDolInvoiceComparisonFailed=The supplier invoice cannot be approved because the e-invoice and the Dolibarr invoice do not match:

@@ -219,6 +219,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$item->nameText = $langs->transnoentities('EINVOICING_ROUTING_ID');
 		$item->helpText = $langs->transnoentities('EINVOICING_ROUTING_ID_HELP');
 		$item->helpText .= '<br><br>'.img_picto('', 'warning').' '.$langs->trans('WarningIfYouSetAnIDItMustExistsInAnnuary');
+		// @phan-suppress-next-line PhanTypeMismatchArgumentNullable
 		$item->fieldAttr['placeholder'] = idprof($mysoc);
 		$item->fieldParams['isMandatory'] = 0;
 		$item->cssClass = 'minwidth300';
