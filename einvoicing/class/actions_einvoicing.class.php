@@ -1009,7 +1009,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	public function printFieldListWhere($parameters, $object, &$action, $hookmanager)
 	{
 		global $db;
-		
+
 		if (in_array('invoicelist', explode(':', $parameters['context']))) {
 			if (GETPOST('search_pdp_syncstatus', 'alpha') !== '' && GETPOST('search_pdp_syncstatus', 'alpha') != -2) {
 				$this->resprints .= ' AND ext.syncstatus = ' . ((int) GETPOST('search_pdp_syncstatus'));
