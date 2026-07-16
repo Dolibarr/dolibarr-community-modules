@@ -530,9 +530,9 @@ class SupplierInvoiceHelper
 		// abandonRefusedSupplierInvoice() already logs the specific failure reason (validate or
 		// setCanceled) - not logged again here to avoid duplicate log entries for the same error.
 		return self::abandonRefusedSupplierInvoice($object, $user, $reasonLabel);
-  }
-  
-  /**
+	}
+
+	/**
 	 * Round an amount according to a number of digits after decimal point and return it.
 	 *
 	 * @param float $amount    		The amount to round
