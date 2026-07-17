@@ -1334,7 +1334,9 @@ class EInvoicing
 		// Recipient reachability in the Approved Platforms directory (annuaire PA), checked before sending.
 		// This is a read-only lookup surfaced on the card so the user sees whether the recipient can receive
 		// an e-invoice, instead of discovering a routing rejection (fr:213) only after transmission.
-		if (($object->element == 'facture' || $object->element == 'invoice') && $action != 'create' && getDolGlobalInt('EINVOICING_PRECHECK_DIRECTORY', 1)) {
+		// Only for live mode, not for test mode (no directory check in test mode)
+		// Only for invoices not yet transmitted
+		if (($object->element == 'facture' || $object->element == 'invoice') && $action != 'create' && getDolGlobalInt('EINVOICING_PRECHECK_DIRECTORY', 1) && !empty(getDolGlobalString('EINVOICING_LIVE')) && empty($currentStatusInfo['transmitted'])) {
 			if (!is_object($object->thirdparty ?? null) && !empty($object->socid)) {
 				$object->fetch_thirdparty();
 			}
