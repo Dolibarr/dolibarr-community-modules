@@ -1579,8 +1579,14 @@ class FacturXProtocol extends CIIProtocol
 			if (!empty($parsedLine['lineAllowances'])) {
 				$discount = $this->_resolveLineDiscountPercent($parsedLine['lineAllowances'], $parsedLine['lineTotalAmount']);
 				if ($discount !== false) {
-					$line->remise_percent  = $discount['percent'];
-					$line->subprice = round($discount['priceWithoutDiscount'] / $parsedLine['billedquantity'], 8);
+					$line->remise_percent = $discount['percent'];
+					if (!empty($parsedLine['billedquantity'])) {
+						$line->subprice = round($discount['priceWithoutDiscount'] / $parsedLine['billedquantity'], 8);
+					} else {
+						// Avoid a fatal DivisionByZeroError on a zero/empty billed quantity (e.g. a free
+						// sample line): keep the discount percent, let subprice fall back to netpriceamount below.
+						dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource line ' . ($parsedLine['lineid'] ?? '?') . ' has a discount but billedquantity is zero/empty, skipping subprice adjustment', LOG_WARNING);
+					}
 				}
 			}
 			$line->qty = (float) $parsedLine['billedquantity'];
