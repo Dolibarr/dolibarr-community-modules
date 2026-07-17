@@ -654,7 +654,7 @@ class CIIProtocol extends AbstractProtocol
 		$return_messages = array();
 
 		if (file_put_contents($tempFile, $file) === false) {
-			return ['res' => -1, 'message' => 'Failed to save CII file to temporary location'];
+			return ['res' => -1, 'message' => 'Failed to save EInvoice file to temporary location'];
 		}
 
 		if ($ReadableViewFile) {
@@ -740,6 +740,7 @@ class CIIProtocol extends AbstractProtocol
 		if ($supplierInvoice->type === '-1') {
 			return ['res' => -1, 'message' => 'Unfounded dolibarr corresponding Invoice code for document type code: ' . ($parsedHeader['documenttypecode'] ?? 'NA')];
 		}
+		// documentdate is already formatted into 'Y-m-d' by the parser ZugFerd and CII
 		$supplierInvoice->date = !empty($parsedHeader['documentdate']) ? dol_stringtotime($parsedHeader['documentdate']) : null;
 
 		// For credit notes, link to the source invoice via fk_facture_source (BT-25)
@@ -763,7 +764,7 @@ class CIIProtocol extends AbstractProtocol
 
 
 		// Set currency
-		$supplierInvoice->multicurrency_code = $parsedHeader['invoiceCurrency'];
+		$supplierInvoice->multicurrency_code = (string) $parsedHeader['invoiceCurrency'];
 
 		// Set import_key
 		$supplierInvoice->import_key = AbstractPDPProvider::$EINVOICING_LAST_IMPORT_KEY;

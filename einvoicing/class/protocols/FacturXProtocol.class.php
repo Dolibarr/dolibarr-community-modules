@@ -1091,11 +1091,14 @@ class FacturXProtocol extends CIIProtocol
 	{
 		global $conf, $db, $user;
 
+		// Duplicate code with doCreateSupplierInvoiceFromSource in CIIProtocol.class.php
+		// TODO Merge tis code with the one into CIIProtocol.class.php to avoid duplicate
+
 		$einvoicing = new EInvoicing($db);
 		$return_messages = array();
 
 		if (file_put_contents($tempFile, $file) === false) {
-			return ['res' => -1, 'message' => 'Failed to save Factur-X file to temporary location'];
+			return ['res' => -1, 'message' => 'Failed to save EInvoice file to temporary location'];
 		}
 
 		if ($ReadableViewFile) {
@@ -1305,7 +1308,7 @@ class FacturXProtocol extends CIIProtocol
 		if ($resql) {
 			if ($db->num_rows($resql) > 0) {
 				$supplierInvoiceId = $db->fetch_object($resql)->id;
-				$einvoicing->cleanUpTemporaryFiles(); // Clean up temp files to remove retrieved Factur-X file since invoice already exists
+				$einvoicing->cleanUpTemporaryFiles(); // Clean up temp files to remove retrieved Einvoice file since invoice already exists
 
 				// FIXME supplierinvoice already found but may be that documents are not linked (this is done later but only after creating invoice,
 				// may be we should also do it in this case to fix inconsistent data).
@@ -1366,7 +1369,7 @@ class FacturXProtocol extends CIIProtocol
 		if ($supplierInvoice->type === '-1') {
 			return ['res' => -1, 'message' => 'Unfounded dolibarr corresponding Invoice code for document type code: ' . ($parsedHeader['documenttypecode'] ?? 'NA')];
 		}
-		// documentdate est déjà formaté en 'Y-m-d' par les parseurs ZugFerd et CII
+		// documentdate is already formatted into 'Y-m-d' by the parser ZugFerd and CII
 		$supplierInvoice->date = !empty($parsedHeader['documentdate']) ? dol_stringtotime($parsedHeader['documentdate']) : null;
 
 		// For credit notes, link to the source invoice via fk_facture_source (BT-25)
