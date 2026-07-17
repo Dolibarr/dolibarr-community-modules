@@ -46,6 +46,7 @@ require __DIR__ . "/../../vendor/autoload.php";
 
 dol_include_once('einvoicing/class/protocols/CIIProtocol.class.php');
 dol_include_once('einvoicing/class/protocols/CommonProtocol.class.php');
+dol_include_once('einvoicing/class/utils/XmlPatcher.class.php');
 
 
 /**
