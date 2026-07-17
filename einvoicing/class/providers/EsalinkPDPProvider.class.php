@@ -1038,7 +1038,6 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			$db->query($sql);
 		}
 
-
 		// Return result
 		// 'actions' contains the action to do (in case of business error)
 		// 'details' will contain all technical error (for Log)
