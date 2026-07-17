@@ -265,6 +265,13 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 							if ($result['res'] > 0) {
 								setEventMessage($langs->trans("ModuleEInvoicingName").' : '.$langs->trans('EInvStatus212Paid'), 'mesgs');
 							} else {
+								// Not escalated to $this->errors/return -1 on purpose: a negative return here
+								// would make Facture::setPaid() roll back the payment it just recorded (see
+								// compta/facture/class/facture.class.php) - a platform notification failure
+								// must never undo a real payment. dol_syslog is the only channel that reliably
+								// surfaces this outside an interactive session (cron, API, bank import, ...),
+								// since setEventMessage() only shows up on the next HTML page render.
+								dol_syslog(__METHOD__ . ' Failed to send paid status (212) to platform for invoice id=' . $object->id . ' : ' . $result['message'], LOG_ERR);
 								setEventMessage($langs->trans("ModuleEInvoicingName").' : '.$result['message'], 'errors');
 							}
 						}
