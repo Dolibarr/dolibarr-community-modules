@@ -124,6 +124,10 @@ if ($objectID) {
 		exit;
 	}
 
+	// Authorize the fetched invoice with the standard supplier invoice/third-party access rules:
+	// the e-invoicing write right alone must not expose an invoice the user cannot otherwise read.
+	restrictedArea($user, 'fournisseur', $invoice->id, 'facture_fourn', 'facture', 'fk_soc', 'rowid');
+
 	// Get flowId from linked document log
 	$flowId = '';
 	$sql = "SELECT rowid, flow_id, lc_status, lc_reason_code FROM ".MAIN_DB_PREFIX."einvoicing_lifecycle_msg";
