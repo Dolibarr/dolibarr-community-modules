@@ -1092,11 +1092,14 @@ class FacturXProtocol extends CIIProtocol
 	{
 		global $conf, $db, $user;
 
+		// Duplicate code with doCreateSupplierInvoiceFromSource in CIIProtocol.class.php
+		// TODO Merge tis code with the one into CIIProtocol.class.php to avoid duplicate
+
 		$einvoicing = new EInvoicing($db);
 		$return_messages = array();
 
 		if (file_put_contents($tempFile, $file) === false) {
-			return ['res' => -1, 'message' => 'Failed to save Factur-X file to temporary location'];
+			return ['res' => -1, 'message' => 'Failed to save EInvoice file to temporary location'];
 		}
 
 		if ($ReadableViewFile) {
@@ -1118,7 +1121,7 @@ class FacturXProtocol extends CIIProtocol
 
 		$parsedHeader = [];
 		$parsedLines = [];
-		if (!getDolGlobalInt('EINVOICING_USE_EXTERNAL_FACTURX_READER')) { // Force use of internal CII reader for testing and development.
+		if (!getDolGlobalInt('EINVOICING_USE_EXTERNAL_FACTURX_READER')) { // The default is to use the same parser than the CII one.
 			dol_include_once('einvoicing/class/protocols/ProtocolManager.class.php');
 			$ProtocolManager = new ProtocolManager($db);
 			$CII = $ProtocolManager->getProtocol('CII');
@@ -1127,6 +1130,7 @@ class FacturXProtocol extends CIIProtocol
 			$parsedHeader = $CII->parseInvoiceHeader($embeddedXml);
 			$parsedLines  = $CII->parseInvoiceLines($embeddedXml);
 		} else {
+			// Use a duplicate parser (for test or dev tests)
 			$document->getDocumentInformation($documentno, $documenttypecode, $documentdate, $invoiceCurrency, $taxCurrency, $documentname, $documentlanguage, $effectiveSpecifiedPeriod);
 
 			$document->getDocumentSupplyChainEvent(
@@ -1305,7 +1309,7 @@ class FacturXProtocol extends CIIProtocol
 		if ($resql) {
 			if ($db->num_rows($resql) > 0) {
 				$supplierInvoiceId = $db->fetch_object($resql)->id;
-				$einvoicing->cleanUpTemporaryFiles(); // Clean up temp files to remove retrieved Factur-X file since invoice already exists
+				$einvoicing->cleanUpTemporaryFiles(); // Clean up temp files to remove retrieved Einvoice file since invoice already exists
 
 				// FIXME supplierinvoice already found but may be that documents are not linked (this is done later but only after creating invoice,
 				// may be we should also do it in this case to fix inconsistent data).
@@ -1366,7 +1370,7 @@ class FacturXProtocol extends CIIProtocol
 		if ($supplierInvoice->type === '-1') {
 			return ['res' => -1, 'message' => 'Unfounded dolibarr corresponding Invoice code for document type code: ' . ($parsedHeader['documenttypecode'] ?? 'NA')];
 		}
-		// documentdate est déjà formaté en 'Y-m-d' par les parseurs ZugFerd et CII
+		// documentdate is already formatted into 'Y-m-d' by the parser ZugFerd and CII
 		$supplierInvoice->date = !empty($parsedHeader['documentdate']) ? dol_stringtotime($parsedHeader['documentdate']) : null;
 
 		// For credit notes, link to the source invoice via fk_facture_source (BT-25)
@@ -1403,6 +1407,20 @@ class FacturXProtocol extends CIIProtocol
 
 		$remise_already_used_line_level_ids = array();
 		$supplierPriceEntries = array(); // Collect product/price data to create supplier prices after invoice creation
+
+
+		// Create document level discounts (allowances) as discounts in Dolibarr
+		$globalDiscountIds = array();
+		if (!empty($parsedHeader['headerAllowancesCharges'])) {
+			$headerDiscountIds = $this->createHeaderDiscounts($parsedHeader['headerAllowancesCharges'], $socId, (string) $parsedHeader['documentno']);
+			if (!empty($headerDiscountIds[-1])) {
+				return ['res' => -1, 'message' => $headerDiscountIds[-1]];
+			} else {
+				$globalDiscountIds = $headerDiscountIds;
+			}
+		}
+
+		//return ['res' => 1, 'message' => 'Not implemented yet' ];
 
 		// Set invoice totals
 		$supplierInvoice->total_ht = $parsedHeader['taxBasisTotalAmount'] ?? 0;
@@ -1561,6 +1579,20 @@ class FacturXProtocol extends CIIProtocol
 				$supplier->fournisseur = 1;
 				$supplier->code_fournisseur = 'auto';
 				$supplier->update($supplier->id, $user);
+			}
+
+			// Insert global discounts (allowances) as lines in this supplier invoice
+			if (!empty($globalDiscountIds)) {
+				foreach ($globalDiscountIds as $fk_remise_except) {
+					$currentSupplierInvoice = new FactureFournisseur($db);
+					$currentSupplierInvoice->fetch($supplierInvoiceId);
+					$result = $currentSupplierInvoice->insert_discount($fk_remise_except);
+					if ($result < 0) {
+						return ['res' => -1, 'message' => 'Failed to insert global discount into supplier invoice: ' . $currentSupplierInvoice->error];
+					} else {
+						dol_syslog('Global discount inserted into supplier invoice with line id: ' . $result);
+					}
+				}
 			}
 
 			// Create or update supplier prices for imported products

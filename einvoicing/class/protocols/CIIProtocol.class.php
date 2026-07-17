@@ -654,7 +654,7 @@ class CIIProtocol extends AbstractProtocol
 		$return_messages = array();
 
 		if (file_put_contents($tempFile, $file) === false) {
-			return ['res' => -1, 'message' => 'Failed to save CII file to temporary location'];
+			return ['res' => -1, 'message' => 'Failed to save EInvoice file to temporary location'];
 		}
 
 		if ($ReadableViewFile) {
@@ -740,6 +740,7 @@ class CIIProtocol extends AbstractProtocol
 		if ($supplierInvoice->type === '-1') {
 			return ['res' => -1, 'message' => 'Unfounded dolibarr corresponding Invoice code for document type code: ' . ($parsedHeader['documenttypecode'] ?? 'NA')];
 		}
+		// documentdate is already formatted into 'Y-m-d' by the parser ZugFerd and CII
 		$supplierInvoice->date = !empty($parsedHeader['documentdate']) ? dol_stringtotime($parsedHeader['documentdate']) : null;
 
 		// For credit notes, link to the source invoice via fk_facture_source (BT-25)
@@ -763,7 +764,7 @@ class CIIProtocol extends AbstractProtocol
 
 
 		// Set currency
-		$supplierInvoice->multicurrency_code = $parsedHeader['invoiceCurrency'];
+		$supplierInvoice->multicurrency_code = (string) $parsedHeader['invoiceCurrency'];
 
 		// Set import_key
 		$supplierInvoice->import_key = AbstractPDPProvider::$EINVOICING_LAST_IMPORT_KEY;
@@ -778,21 +779,10 @@ class CIIProtocol extends AbstractProtocol
 		$remise_already_used_line_level_ids = array();
 		$supplierPriceEntries = array(); // Collect product/price data to create supplier prices after invoice creation
 
-		// --------------------------------------------------
-		// Add supplier invoice lines
-		// --------------------------------------------------
-
-		if (SupplierInvoiceHelper::isSupplierImportInvoiceLinesAuto($socId)) {
-			$res = $this->createSupplierInvoiceLinesFromSource($supplierInvoice, $parsedLines, $remise_already_used_line_level_ids, $supplierPriceEntries, $flowId);
-			if ($res['res'] < 0) {
-				return $res;
-			}
-		}
-
 		// Create document level discounts (allowances) as discounts in Dolibarr
 		$globalDiscountIds = array();
 		if (!empty($parsedHeader['headerAllowancesCharges'])) {
-			$headerDiscountIds = $this->_createHeaderDiscounts($parsedHeader['headerAllowancesCharges'], $socId, $parsedHeader['documentno']);
+			$headerDiscountIds = $this->createHeaderDiscounts($parsedHeader['headerAllowancesCharges'], $socId, (string) $parsedHeader['documentno']);
 			if (!empty($headerDiscountIds[-1])) {
 				return ['res' => -1, 'message' => $headerDiscountIds[-1]];
 			} else {
@@ -818,6 +808,17 @@ class CIIProtocol extends AbstractProtocol
 		if ($supplierInvoiceId < 0) {
 			return ['res' => -1, 'message' => 'Invoice creation error: ' . $supplierInvoice->error];
 		} else {
+			// --------------------------------------------------
+			// Add supplier invoice lines
+			// --------------------------------------------------
+
+			if (SupplierInvoiceHelper::isSupplierImportInvoiceLinesAuto($socId)) {
+				$res = $this->createSupplierInvoiceLinesFromSource($supplierInvoice, $parsedLines, $remise_already_used_line_level_ids, $supplierPriceEntries, $flowId);
+				if ($res['res'] < 0) {
+					return $res;
+				}
+			}
+
 			// Link the invoice to its purchase order (commande fournisseur) when the order reference
 			// (BT-13) matches a single order for the same supplier. Non-blocking. See issue #303.
 			$orderLinkMessage = $this->_linkSupplierInvoiceToPurchaseOrder($supplierInvoice, $socId, $parsedHeader['orderReference'] ?? '');
@@ -859,6 +860,14 @@ class CIIProtocol extends AbstractProtocol
 							$result = $discountcheck->fetch(0, 0, $linkedObject->id);
 							if ($result <= 0) {
 								// Loop on each vat rate
+								'
+								@phan-var-force array<string,float> $amount_ht
+								@phan-var-force array<string,float> $amount_tva
+								@phan-var-force array<string,float> $amount_ttc
+								@phan-var-force array<string,float> $multicurrency_amount_ht
+								@phan-var-force array<string,float> $multicurrency_amount_tva
+								@phan-var-force array<string,float> $multicurrency_amount_ttc
+								';
 								$amount_ht = $amount_tva = $amount_ttc = array();
 								$multicurrency_amount_ht = $multicurrency_amount_tva = $multicurrency_amount_ttc = array();
 								$i = 0;
@@ -1231,7 +1240,7 @@ class CIIProtocol extends AbstractProtocol
 			}
 			// handle line-level discount if exists and update amounts
 			if (!empty($parsedLine['lineAllowances'])) {
-				$discount = $this->_resolveLineDiscountPercent($parsedLine['lineAllowances'], $parsedLine['lineTotalAmount']);
+				$discount = $this->resolveLineDiscountPercent($parsedLine['lineAllowances'], $parsedLine['lineTotalAmount']);
 				if ($discount !== false) {
 					$line->remise_percent = $discount['percent'];
 					if (!empty($parsedLine['billedquantity'])) {
@@ -1247,10 +1256,10 @@ class CIIProtocol extends AbstractProtocol
 				$line->description = $parsedLine['prodname'];
 			}
 			$line->qty = $parsedLine['billedquantity'];
-			$line->subprice = $line->subprice ?? $parsedLine['netpriceamount'];
-			$line->tva_tx = $parsedLine['rateApplicablePercent'];
-			$line->total_ht = $parsedLine['lineTotalAmount'];
-			$line->total_tva = $parsedLine['calculatedAmount'] ?? 0;
+			$line->subprice = $line->subprice ?? (float) $parsedLine['netpriceamount'];
+			$line->tva_tx = (float) $parsedLine['rateApplicablePercent'];
+			$line->total_ht = (float) $parsedLine['lineTotalAmount'];
+			$line->total_tva = (float) $parsedLine['calculatedAmount'] ?? 0;
 			$line->total_ttc = $parsedLine['lineTotalAmount'] + ($parsedLine['calculatedAmount'] ?? 0);
 
 			$supplierInvoice->lines[] = $line;
@@ -2689,7 +2698,7 @@ class CIIProtocol extends AbstractProtocol
 	 * @param float|null $lineTotalAmount BT-131 net line amount (base ht)
 	 * @return false|array{percent: float, base: float, discountAmount: float, priceWithoutDiscount: float}
 	 */
-	private function _resolveLineDiscountPercent(array $lineAllowances, ?float $lineTotalAmount)
+	protected function resolveLineDiscountPercent(array $lineAllowances, ?float $lineTotalAmount)
 	{
 		// Keep only allowances (indicator = "false"), ignore charges (indicator = "true")
 		$allowances = array();
@@ -2740,7 +2749,7 @@ class CIIProtocol extends AbstractProtocol
 	 * @param string $description             	invoice number or any reference
 	 * @return array{-1:string}|array<int,int>	[ originalIndex => fk_remise_except_id ] or '-1' on error
 	 */
-	private function _createHeaderDiscounts(array $headerAllowancesCharges, int $fk_soc, string $description): array
+	protected function createHeaderDiscounts(array $headerAllowancesCharges, int $fk_soc, string $description): array
 	{
 		global $db, $user;
 
