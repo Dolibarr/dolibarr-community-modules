@@ -154,7 +154,7 @@ class ProtocolManager
 		$res = 0;
 
 		$protocolManager = new ProtocolManager($db);
-		$detectedProtocolName = $protocolManager->detectProtocolFromContent($content);
+		$detectedProtocolName = $protocolManager->detectProtocolFromContent($content ?? '');
 		if (isset($detectedProtocolName)) {
 			$protocol = $protocolManager->getProtocol($detectedProtocolName);
 			if (is_object($protocol) && is_subclass_of($protocol, AbstractProtocol::class, false)) {

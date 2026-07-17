@@ -1432,7 +1432,7 @@ class FacturXProtocol extends CIIProtocol
 			// --------------------------------------------------
 
 			if (SupplierInvoiceHelper::isSupplierImportInvoiceLinesAuto($socId)) {
-				$res = $this->createSupplierInvoiceLinesFromSource($supplierInvoice, $parsedLines, $remise_already_used_line_level_ids, $flowId);
+				$res = $this->createSupplierInvoiceLinesFromSource($supplierInvoice, $parsedLines, $remise_already_used_line_level_ids, $supplierPriceEntries, $flowId);
 				if ($res['res'] < 0) {
 					return $res;
 				}

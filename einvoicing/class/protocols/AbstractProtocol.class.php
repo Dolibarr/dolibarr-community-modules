@@ -97,7 +97,7 @@ abstract class AbstractProtocol
 	 * @param 	array 				$supplierPriceEntries					The list of entries for supplier prices
 	 * @param 	string 				$flowId									The concerned flowId
 	 * @param 	array{free_lines:bool,target_fk_product:?int} $params		Params used in case of manual import
-	 * @return 	array{res:int, message?:string, actioncode?:string|null, actionurl?:string, action?:?string, actiondata?:''|array{ref:string,supplierref:string,name:string}}   Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and additional data about the action.
+	 * @return 	array	Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and additional data about the action.
 	 */
 	abstract public function createSupplierInvoiceLinesFromSource(&$supplierInvoice, $parsedLines, &$remise_already_used_line_level_ids = [], &$supplierPriceEntries = [], $flowId = '', $params = ['free_lines' => false, 'target_fk_product' => null]): array;
 
@@ -249,7 +249,7 @@ abstract class AbstractProtocol
 	 * Parse the invoice header from XML.
 	 *
 	 * @param  string $xml Raw XML content
-	 * @return array<string,float|string>|false
+	 * @return array<string,null|bool|float|string|array<mixed>>|false
 	 */
 	abstract public function parseInvoiceHeader($xml);
 

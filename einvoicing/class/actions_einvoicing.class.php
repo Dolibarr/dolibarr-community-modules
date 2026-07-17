@@ -801,7 +801,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				} else {
 					setEventMessage($langs->trans('EinvoiceCantReimportLines'), 'errors');
 					if ($resProtocol['error_code'] === ProtocolManager::EXCEPTION_UNSUPPORTED_FORMAT) {
-						setEventMessage($langs->trans('EinvoiceFormatNotSupported', $resProtocol['detected_protocol_name']), 'errors');
+						setEventMessage($langs->trans('EinvoiceFormatNotSupported', $resProtocol['detected_protocol_name'] ?? ''), 'errors');
 					} elseif ($resProtocol['error_code'] === ProtocolManager::EXCEPTION_UNKNOWN_FORMAT) {
 						setEventMessage($langs->trans('EinvoiceFailedToDetectXmlFormat'), 'errors');
 					}

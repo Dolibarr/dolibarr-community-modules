@@ -786,7 +786,7 @@ class CIIProtocol extends AbstractProtocol
 			$res = $this->createSupplierInvoiceLinesFromSource($supplierInvoice, $parsedLines, $remise_already_used_line_level_ids, $supplierPriceEntries, $flowId);
 			if ($res['res'] < 0) {
 				return $res;
-      }
+			}
 		}
 
 		// Create document level discounts (allowances) as discounts in Dolibarr
@@ -1033,7 +1033,7 @@ class CIIProtocol extends AbstractProtocol
 	 * @param 	array 				$supplierPriceEntries					The list of entries for supplier prices
 	 * @param 	string 				$flowId									The concerned flowId
 	 * @param 	array{free_lines:bool,target_fk_product:?int} $params		Params used in case of manual import
-	 * @return 	array{res:int<-1,1>, message?:string, actioncode?:string|null, actionurl?:string, action?:?string, actiondata?:''|array{ref:string,supplierref:string,name:string}}   Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and additional data about the action.
+	 * @return 	array	Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and additional data about the action.
 	 */
 	public function createSupplierInvoiceLinesFromSource(&$supplierInvoice, $parsedLines, &$remise_already_used_line_level_ids = [], &$supplierPriceEntries = [], $flowId = '', $params = ['free_lines' => false, 'target_fk_product' => null]): array
 	{
@@ -1202,7 +1202,7 @@ class CIIProtocol extends AbstractProtocol
 					$productId = $res['res'];
 				}
 
-        // Collect supplier price data to be created after invoice is saved
+				// Collect supplier price data to be created after invoice is saved
 				if ($productId > 0) {
 					$supplierPriceEntries[] = [
 						'productId' => $productId,

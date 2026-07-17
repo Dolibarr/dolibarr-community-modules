@@ -1702,6 +1702,7 @@ trait CommonProtocol
 	{
 		foreach ($supplierInvoice->lines as $i => $val) {
 			$sql = 'INSERT INTO '.MAIN_DB_PREFIX.'facture_fourn_det (fk_facture_fourn, special_code, fk_remise_except)';
+			/** @phan-suppress-next-line PhanUndeclaredProperty */
 			$sql .= " VALUES (".((int) $supplierInvoice->id).", ".((int) $supplierInvoice->lines[$i]->special_code).", ".($supplierInvoice->lines[$i]->fk_remise_except > 0 ? ((int) $supplierInvoice->lines[$i]->fk_remise_except) : 'NULL').')';
 
 			$resql_insert = $this->db->query($sql);
@@ -1710,6 +1711,7 @@ trait CommonProtocol
 
 				$res = $supplierInvoice->updateline(
 					$idligne,
+					/** @phan-suppress-next-line PhanDeprecatedProperty */
 					$supplierInvoice->lines[$i]->desc ? $supplierInvoice->lines[$i]->desc : $supplierInvoice->lines[$i]->description,
 					$supplierInvoice->lines[$i]->subprice,
 					$supplierInvoice->lines[$i]->tva_tx.($supplierInvoice->lines[$i]->vat_src_code ? ' ('.$supplierInvoice->lines[$i]->vat_src_code.')' : ''),
@@ -1722,11 +1724,14 @@ trait CommonProtocol
 					$supplierInvoice->lines[$i]->product_type,
 					$supplierInvoice->lines[$i]->remise_percent,
 					0,
+					/** @phan-suppress-next-line PhanUndeclaredProperty */
 					$supplierInvoice->lines[$i]->date_start,
+					/** @phan-suppress-next-line PhanUndeclaredProperty */
 					$supplierInvoice->lines[$i]->date_end,
 					$supplierInvoice->lines[$i]->array_options,
 					$supplierInvoice->lines[$i]->fk_unit,
 					$supplierInvoice->lines[$i]->multicurrency_subprice,
+					/** @phan-suppress-next-line PhanUndeclaredProperty */
 					$supplierInvoice->lines[$i]->ref_supplier
 				);
 			} else {

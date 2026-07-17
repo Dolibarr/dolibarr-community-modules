@@ -102,7 +102,7 @@ class SupplierInvoiceHelper
 		// Currency
 		$currencyCode = $dolSupplierInvoice->multicurrency_code ?? $conf->currency;
 		if ($currencyCode != $parsedHeader['invoiceCurrency']) {
-			$errors[] = $langs->trans('SupplierInvoiceComparisonCurrencyDifference', $parsedHeader['invoiceCurrency'], $currencyCode);
+			$errors[] = $langs->trans('SupplierInvoiceComparisonCurrencyDifference', $parsedHeader['invoiceCurrency'] ?? '', $currencyCode);
 		}
 
 		// -----------------------------------------------------------------
@@ -132,18 +132,18 @@ class SupplierInvoiceHelper
 			$details = self::getInvoiceDetailsForComparison($dolSupplierInvoice, $vatComputeMode);
 
 			// VAT excl. total
-			if (!self::areAmountsEqual($details['total_ht'], $parsedHeader['lineTotalAmount'])) {
-				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatExclDifference', $parsedHeader['lineTotalAmount'], floatval($dolSupplierInvoice->total_ht));
+			if (!self::areAmountsEqual($details['total_ht'], (float) $parsedHeader['lineTotalAmount'])) {
+				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatExclDifference', $parsedHeader['lineTotalAmount'] ?? '', floatval($dolSupplierInvoice->total_ht));
 			}
 
 			// VAT incl. total
-			if (!self::areAmountsEqual($details['total_ttc'], $parsedHeader['grandTotalAmount'])) {
-				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatInclDifference', $parsedHeader['grandTotalAmount'], floatval($dolSupplierInvoice->total_ttc));
+			if (!self::areAmountsEqual($details['total_ttc'], (float) $parsedHeader['grandTotalAmount'])) {
+				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatInclDifference', $parsedHeader['grandTotalAmount'] ?? '', floatval($dolSupplierInvoice->total_ttc));
 			}
 
 			// VAT total
-			if (!self::areAmountsEqual($details['total_tva'], $parsedHeader['taxTotalAmount'])) {
-				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatDifference', $parsedHeader['taxTotalAmount'], floatval($dolSupplierInvoice->total_tva));
+			if (!self::areAmountsEqual($details['total_tva'], (float) $parsedHeader['taxTotalAmount'])) {
+				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatDifference', $parsedHeader['taxTotalAmount'] ?? '', floatval($dolSupplierInvoice->total_tva));
 			}
 
 			$dolSupplierInvoiceVatDetails = $details['vat_by_rate'];
@@ -435,11 +435,10 @@ class SupplierInvoiceHelper
 				return getDolGlobalInt('EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_TYPE') == Einvoicing::SUPPLIER_INVOICE_LINES_IMPORT_AUTO;
 			}
 		}
+		return false;
+	}
 
-    return false;
-  }
-
-  /**
+	/**
 	 * Abandon a Dolibarr supplier invoice because its refusal has been confirmed by the
 	 * e-invoicing platform (PDP/PA). Validates the invoice first if it is still a draft, then
 	 * cancels it with a dedicated close code so it can be excluded from the accountancy
