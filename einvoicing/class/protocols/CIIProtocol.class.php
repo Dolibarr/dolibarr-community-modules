@@ -966,10 +966,10 @@ class CIIProtocol extends AbstractProtocol
 					}
 				}
 			}
-			$line->qty = $parsedLine['billedquantity'];
-			$line->subprice = $line->subprice ?? $parsedLine['netpriceamount'];
-			$line->tva_tx = $parsedLine['rateApplicablePercent'];
-			$line->total_ht = $parsedLine['lineTotalAmount'];
+			$line->qty = (float) $parsedLine['billedquantity'];
+			$line->subprice = $line->subprice ?? (float) $parsedLine['netpriceamount'];
+			$line->tva_tx = (float) $parsedLine['rateApplicablePercent'];
+			$line->total_ht = (float) $parsedLine['lineTotalAmount'];
 			$line->total_tva = $parsedLine['calculatedAmount'] ?? 0;
 			$line->total_ttc = $parsedLine['lineTotalAmount'] + ($parsedLine['calculatedAmount'] ?? 0);
 
@@ -979,7 +979,7 @@ class CIIProtocol extends AbstractProtocol
 		// Create document level discounts (allowances) as discounts in Dolibarr
 		$globalDiscountIds = array();
 		if (!empty($parsedHeader['headerAllowancesCharges'])) {
-			$headerDiscountIds = $this->createHeaderDiscounts($parsedHeader['headerAllowancesCharges'], $socId, 	$parsedHeader['documentno']);
+			$headerDiscountIds = $this->createHeaderDiscounts($parsedHeader['headerAllowancesCharges'], $socId, (string) $parsedHeader['documentno']);
 			if (!empty($headerDiscountIds[-1])) {
 				return ['res' => -1, 'message' => $headerDiscountIds[-1]];
 			} else {
@@ -1046,6 +1046,14 @@ class CIIProtocol extends AbstractProtocol
 							$result = $discountcheck->fetch(0, 0, $linkedObject->id);
 							if ($result <= 0) {
 								// Loop on each vat rate
+								'
+								@phan-var-force array<string,float> $amount_ht
+								@phan-var-force array<string,float> $amount_tva
+								@phan-var-force array<string,float> $amount_ttc
+								@phan-var-force array<string,float> $multicurrency_amount_ht
+								@phan-var-force array<string,float> $multicurrency_amount_tva
+								@phan-var-force array<string,float> $multicurrency_amount_ttc
+								';
 								$amount_ht = $amount_tva = $amount_ttc = array();
 								$multicurrency_amount_ht = $multicurrency_amount_tva = $multicurrency_amount_ttc = array();
 								$i = 0;
