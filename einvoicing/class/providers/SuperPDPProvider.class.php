@@ -1760,6 +1760,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 				}
 
 				$exchangeProtocol = $tmpProtocolManager->getProtocol($detectedProtocol);
+				if (empty($exchangeProtocol)) {
+					return array('res' => -1, 'message' => "ERROR_FLOW_NOT_SUPPORTED_PROTOCOL detected protocol ".$detectedProtocol." not supported for flowId: " . $flowId);
+				}
 
 				$exceptionmessage = '';
 				$db->begin();
