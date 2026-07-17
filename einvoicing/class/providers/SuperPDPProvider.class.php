@@ -18,7 +18,6 @@
  */
 
 
-
 /**
  * \file    einvoicing/class/providers/SuperPDPProvider.class.php
  * \ingroup einvoicing
@@ -61,7 +60,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 */
 	public function __construct($db)
 	{
-		global $conf, $langs;
+		global $langs;
 
 		parent::__construct($db);
 
@@ -1273,6 +1272,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 	/**
 	 * Synchronize flows with Access Point.
 	 *
+	 * TODO Code very similar with syncFlows of other providers
+	 *
 	 * @param   int   $syncFromDate     Timestamp from which to start synchronization. If 0, begins from epoch (1970-01-01).
 	 * @param   int   $limit            Maximum number of flows to synchronize. 0 means no limit.
 	 * @return 	bool|array{res:int, messages:string[], totalFlows?:?int, alreadyExist?:int, syncedFlows?:int, batchlimit?:int, actions?:array<string,array{actionurl:string,actioncode:string,action:string,businessmessage:string}>, details?:string[]} 	True on success, false on failure along with messages, details for debugging, and suggested optional actions.
@@ -1381,7 +1382,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 		// Since AP may not return flows in the order they want (by updatedAt ASC), we sort them here
 		dol_syslog(__METHOD__ . " Sort the flows per updatedAt", LOG_DEBUG, 0, "_einvoicing");
-		usort($response['response']['results'], static function ($a, $b) {
+		usort($response['response']['results'], function ($a, $b) {
 			return strtotime($a['updatedAt']) <=> strtotime($b['updatedAt']);
 		});
 
@@ -2048,7 +2049,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				// This is likely a validation response for an invoice that was previously sent, and not a lifecycle message.
 				// Since we trigger an AJAX every X seconds to get validation response while an invoice remains in the "Pending" status after sending, we should not
 				// need to handle this case and to store all validation responses in document table.
-				// TODO: Move all this case or condition into a function. Weshould also call this int the Ajax component that update the status of an einvoice sent.
+				// TODO: Move all this case or condition into a function. We should also call this into the Ajax component that update the status of an einvoice sent.
 
 				// In this case, the trackingId may be null.
 				// - If trackingId is set, it is used to find the invoice as usual.
