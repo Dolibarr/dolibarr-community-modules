@@ -928,6 +928,22 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 
 	/**
+	 * Build the sub query returning the last lifecycle status validated by the Access Point for a supplier invoice.
+	 * Same selection rule as the one used by EInvoicing::supplierInvoiceCardBlock() so list and card always agree.
+	 *
+	 * @return string								SQL sub query (without the surrounding parenthesis), correlated on f.rowid
+	 */
+	protected static function getSupplierLifecycleStatusSubQuery()
+	{
+		$sql = 'SELECT lc.lc_status FROM ' . MAIN_DB_PREFIX . 'einvoicing_lifecycle_msg as lc';
+		$sql .= " WHERE lc.element_type = 'invoice_supplier' AND lc.element_id = f.rowid";
+		$sql .= " AND lc.lc_validation_status = 'Ok'";
+		$sql .= ' ORDER BY lc.rowid DESC LIMIT 1';
+
+		return $sql;
+	}
+
+	/**
 	 * Add SELECT fields
 	 *
 	 * @param array<string,mixed> 	$parameters		Array of parameters
@@ -946,6 +962,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		// Supplier invoice list, Product list, Soc list
 		if (in_array('supplierinvoicelist', explode(':', $parameters['context']))) {
 			$this->resprints .= ', ext.rowid AS pdplink_id, ext.provider AS pdp_provider';
+			// Last known lifecycle status accepted by the Access Point, same source as the one shown on the invoice card
+			$this->resprints .= ', (' . self::getSupplierLifecycleStatusSubQuery() . ') AS pdp_lcstatus';
 		}
 
 		if (in_array('thirdpartylist', explode(':', $parameters['context']))) {
@@ -1026,6 +1044,10 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			if (GETPOST('search_routing_id', 'alpha') !== '' && GETPOST('search_routing_id', 'alpha') != "") {
 				$this->resprints .= " AND ext.routing_id = '" . $db->escape(GETPOST('search_routing_id', 'alpha')) . "'";
 			}
+		}
+
+		if (in_array('supplierinvoicelist', $contexts) && GETPOST('search_pdp_lcstatus', 'alpha') !== '' && GETPOST('search_pdp_lcstatus', 'alpha') != -2) {
+			$this->resprints .= ' AND (' . self::getSupplierLifecycleStatusSubQuery() . ') = ' . GETPOSTINT('search_pdp_lcstatus');
 		}
 
 		// Supplier invoice lines to bind to accountancy : always exclude invoices abandoned
@@ -1123,6 +1145,25 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				'width100 '
 			);
 			print '</td>';
+
+			// E-invoice status of the supplier invoice into the Access Point system
+			$einvoicing = new EInvoicing($db);
+			print '<td class="liste_titre pdp_lcstatus">';
+			print $form->selectarray(
+				'search_pdp_lcstatus',
+				$einvoicing->getEinvoiceStatusOptions(0, 1),
+				GETPOST('search_pdp_lcstatus', 'alpha'),
+				-2,
+				0,
+				0,
+				'',
+				0,
+				0,
+				0,
+				'',
+				'width100 '
+			);
+			print '</td>';
 		}
 
 
@@ -1178,6 +1219,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		// Supplier invoice list, Product list, Soc list
 		if (in_array('supplierinvoicelist', explode(':', $parameters['context'])) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
 			print_liste_field_titre($langs->transnoentitiesnoconv('einvoicingSourceTitle'));
+			print_liste_field_titre($langs->transnoentitiesnoconv('einvoicingInvoiceStatus'), '', '', '', $parameters['param'] ?? '', '', '', '', 'center ');
 		}
 
 		if (in_array('thirdpartylist', explode(':', $parameters['context'])) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI'))) {
@@ -1259,6 +1301,16 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			if ($obj->pdplink_id) {
 				print dolPrintHTML($obj->pdp_provider);
 			}
+			print '</td>';
+			if (isset($parameters['i']) && empty($parameters['i'])) {
+				$parameters['totalarray']['nbfield']++;
+			}
+
+			// E-invoice status of the supplier invoice into the Access Point system
+			$einvoicing = new EInvoicing($db);
+			$currentStatusDetails = $obj->pdp_lcstatus ? $einvoicing->getStatusLabel((int) $obj->pdp_lcstatus) : '-';
+			print '<td class="center tdoverflowmax100" title="' . dolPrintHTMLForAttribute($currentStatusDetails) . '">';
+			print $currentStatusDetails;
 			print '</td>';
 			if (isset($parameters['i']) && empty($parameters['i'])) {
 				$parameters['totalarray']['nbfield']++;
