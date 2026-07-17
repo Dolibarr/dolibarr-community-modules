@@ -1663,10 +1663,10 @@ class CIIProtocol extends AbstractProtocol
 		$profileGuidelines = [
 			'MINIMUM'  => 'urn:factur-x.eu:1p0:minimum', 	// Factur-X profile
 			'BASICWL'  => 'urn:factur-x.eu:1p0:basicwl', 	// Factur-X profile
-			'BASIC'    => 'urn:factur-x.eu:1p0:basic', 		// Factur-X profile
-			'EN16931'=> 'urn:cen.eu:en16931:2017', 		// CII Profile.
-			//'EN16931'  => 'urn:cen.eu:en16931:2017#conformant#urn.cpro.gouv.fr:1p0:extended-ctc-fr',	// CII Profile.
-			'EXTENDED' => 'urn:cen.eu:en16931:2017#conformant#urn:factur-x.eu:1p0:extended', 			// Factur-X profile
+			'BASIC'    => 'urn:factur-x.eu:1p0:basic', 		// Factur-X profile (flowProfile = BASIC)
+			'EN16931'=> 'urn:cen.eu:en16931:2017', 		// CII Profile (PDP flowProfile => CIUS)
+			'EXTENDED' => 'urn:cen.eu:en16931:2017#conformant#urn:factur-x.eu:1p0:extended', // Factur-X profile (flowProfile = Extended-CTC-FR)
+			'EXTENDEDFR' => 'urn:cen.eu:en16931:2017#conformant#urn.cpro.gouv.fr:1p0:extended-ctc-fr', 			// Factur-X and CII profile (Only France) (flowProfile = Extended-CTC-FR)
 		];
 
 		if (!isset($profileGuidelines[$profile])) {
@@ -1799,7 +1799,7 @@ class CIIProtocol extends AbstractProtocol
 		} else {
 			$shiptotrade = $doc->createElement('ram:ShipToTradeParty');
 			$delivery->appendChild($shiptotrade);
-			$this->buildParty($doc, $shiptotrade, $invoiceData, 'buyer', false);
+			$this->buildParty($doc, $shiptotrade, $invoiceData, 'buyer', false, true);
 		}
 
 
@@ -2095,10 +2095,11 @@ class CIIProtocol extends AbstractProtocol
 	 * @param array       		$data      		Invoice data array
 	 * @param string      		$type      		'seller' or 'buyer'
 	 * @param bool        		$wrap			Whether to wrap in SellerTradeParty/BuyerTradeParty (true for main parties, false for ship to party)
+	 * @param bool        		$minimal		Whether to emit only mandatory fields (used for building the ShipToTradeParty)
 	 *
 	 * @return void
 	 */
-	private function buildParty($doc, $agreement, $data, $type, $wrap = true)
+	private function buildParty($doc, $agreement, $data, $type, $wrap = true, $minimal = false)
 	{
 		if ($wrap) {
 			$tag = $type === 'seller' ? 'ram:SellerTradeParty' : 'ram:BuyerTradeParty';
@@ -2109,28 +2110,31 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		$prefix = $type;
-		$node->appendChild($doc->createElement('ram:ID', $data[$prefix . 'ids']));
 
-		// GlobalID
+		// ID / GlobalID — only one of the two may be present. If GlobalID is present, omit the ID to avoid XSD validation errors
 		if (!empty($data[$prefix . 'GlobalIds'])) {
 			foreach ($data[$prefix . 'GlobalIds'] as $globalId) {
 				$g = $doc->createElement('ram:GlobalID', $globalId['value']);
 				$g->setAttribute('schemeID', $globalId['schemeID']);
 				$node->appendChild($g);
 			}
+		} else {
+			$node->appendChild($doc->createElement('ram:ID', $data[$prefix . 'ids']));
 		}
 
 		$node->appendChild($doc->createElement('ram:Name', htmlspecialchars($data[$prefix . 'name'])));
 
 		// Legal org
-		$legal = $doc->createElement('ram:SpecifiedLegalOrganization');
-		$node->appendChild($legal);
-		$id = $doc->createElement('ram:ID', $data[$prefix . 'LegalOrgId']);
-		$id->setAttribute('schemeID', $data[$prefix . 'LegalOrgScheme']);
-		$legal->appendChild($id);
-		$legal->appendChild(
-			$doc->createElement('ram:TradingBusinessName', $data[$prefix . 'TradingName'])
-		);
+		if (!$minimal) {
+			$legal = $doc->createElement('ram:SpecifiedLegalOrganization');
+			$node->appendChild($legal);
+			$id = $doc->createElement('ram:ID', $data[$prefix . 'LegalOrgId']);
+			$id->setAttribute('schemeID', $data[$prefix . 'LegalOrgScheme']);
+			$legal->appendChild($id);
+			$legal->appendChild(
+				$doc->createElement('ram:TradingBusinessName', $data[$prefix . 'TradingName'])
+			);
+		}
 
 		// Contact
 		// ram:DefinedTradeContact is the wrapper for all contact sub-fields. Only create it when at
@@ -2184,7 +2188,7 @@ class CIIProtocol extends AbstractProtocol
 		$addr->appendChild($doc->createElement('ram:CountryID', $data[$prefix . 'country']));
 
 		// URIUniversalCommunication
-		if (!empty($data[$prefix . 'CommunicationUriScheme']) && !empty($data[$prefix . 'CommunicationUri'])) {
+		if (!$minimal && !empty($data[$prefix . 'CommunicationUriScheme']) && !empty($data[$prefix . 'CommunicationUri'])) {
 			$uri = $doc->createElement('ram:URIUniversalCommunication');
 			$node->appendChild($uri);
 			$uriid = $doc->createElement('ram:URIID', $data[$prefix . 'CommunicationUri']);			// Example 315143296_1939
@@ -2193,7 +2197,7 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		// VAT
-		if (!empty($data[$prefix . 'vatnumber'])) {
+		if (!$minimal && !empty($data[$prefix . 'vatnumber'])) {
 			$tax = $doc->createElement('ram:SpecifiedTaxRegistration');
 			$id = $doc->createElement('ram:ID', $data[$prefix . 'vatnumber']);
 			$id->setAttribute('schemeID', 'VA');
