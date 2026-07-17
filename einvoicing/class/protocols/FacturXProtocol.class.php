@@ -1602,7 +1602,7 @@ class FacturXProtocol extends CIIProtocol
 		// Create document level discounts (allowances) as discounts in Dolibarr
 		$globalDiscountIds = array();
 		if (!empty($parsedHeader['headerAllowancesCharges'])) {
-			$headerDiscountIds = $this->_createHeaderDiscounts($parsedHeader['headerAllowancesCharges'], $socId, $parsedHeader['documentno']);
+			$headerDiscountIds = $this->_createHeaderDiscounts($parsedHeader['headerAllowancesCharges'], $socId, (string) $parsedHeader['documentno']);
 			if (!empty($headerDiscountIds[-1])) {
 				return ['res' => -1, 'message' => $headerDiscountIds[-1]];
 			} else {
