@@ -1577,7 +1577,7 @@ class FacturXProtocol extends CIIProtocol
 			}
 			// handle line-level discount if exists and update amounts
 			if (!empty($parsedLine['lineAllowances'])) {
-				$discount = $this->_resolveLineDiscountPercent($parsedLine['lineAllowances'], $parsedLine['lineTotalAmount']);
+				$discount = $this->resolveLineDiscountPercent($parsedLine['lineAllowances'], $parsedLine['lineTotalAmount']);
 				if ($discount !== false) {
 					$line->remise_percent = $discount['percent'];
 					if (!empty($parsedLine['billedquantity'])) {
@@ -1602,7 +1602,7 @@ class FacturXProtocol extends CIIProtocol
 		// Create document level discounts (allowances) as discounts in Dolibarr
 		$globalDiscountIds = array();
 		if (!empty($parsedHeader['headerAllowancesCharges'])) {
-			$headerDiscountIds = $this->_createHeaderDiscounts($parsedHeader['headerAllowancesCharges'], $socId, (string) $parsedHeader['documentno']);
+			$headerDiscountIds = $this->createHeaderDiscounts($parsedHeader['headerAllowancesCharges'], $socId, (string) $parsedHeader['documentno']);
 			if (!empty($headerDiscountIds[-1])) {
 				return ['res' => -1, 'message' => $headerDiscountIds[-1]];
 			} else {
