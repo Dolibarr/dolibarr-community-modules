@@ -393,7 +393,7 @@ if (empty($code) && !GETPOST('error')) {
 
 					print '<br>';
 					print '<br>';
-					print '<a href="'.$origin_redirect_uri.'">Go back to setup page...</a>';
+					print '<a href="'.dol_escape_htmltag($origin_redirect_uri).'">Go back to setup page...</a>';
 					print '<br>';
 
 					print '</center>';
