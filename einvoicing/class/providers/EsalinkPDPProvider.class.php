@@ -1028,7 +1028,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$processingResult .= "<br>----------------------<br>" . implode("<br>", $messages);
 		$processingResult = "Processing result:<br>" . $processingResult;
 
-		// Save sync recap
+		// Save sync recap (only when this sync is attached to a Call row; otherwise $sql would be undefined/stale)
 		if ($call_id) {
 			$sql = "UPDATE " . MAIN_DB_PREFIX . "einvoicing_call";
 			$sql .= " SET totalflow = " . (is_null($totalFlows) ? "null" : ((int) $totalFlows)) . ",
@@ -1038,9 +1038,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
                 processing_result = '" . $db->escape($processingResult) . "',
                     fk_user_modif = " . ((int) $user->id) . "
             WHERE call_id = '" . $db->escape($call_id) . "'";
+			$db->query($sql);
 		}
-
-		$db->query($sql);
 
 		// Return result
 		// 'actions' contains the action to do (in case of business error)
