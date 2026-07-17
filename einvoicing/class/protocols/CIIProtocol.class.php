@@ -2623,7 +2623,7 @@ class CIIProtocol extends AbstractProtocol
 	 * @param float|null $lineTotalAmount BT-131 net line amount (base ht)
 	 * @return false|array{percent: float, base: float, discountAmount: float, priceWithoutDiscount: float}
 	 */
-	private function _resolveLineDiscountPercent(array $lineAllowances, ?float $lineTotalAmount)
+	protected function _resolveLineDiscountPercent(array $lineAllowances, ?float $lineTotalAmount)
 	{
 		// Keep only allowances (indicator = "false"), ignore charges (indicator = "true")
 		$allowances = array();
@@ -2674,7 +2674,7 @@ class CIIProtocol extends AbstractProtocol
 	 * @param string $description             	invoice number or any reference
 	 * @return array{-1:string}|array<int,int>	[ originalIndex => fk_remise_except_id ] or '-1' on error
 	 */
-	private function _createHeaderDiscounts(array $headerAllowancesCharges, int $fk_soc, string $description): array
+	protected function _createHeaderDiscounts(array $headerAllowancesCharges, int $fk_soc, string $description): array
 	{
 		global $db, $user;
 

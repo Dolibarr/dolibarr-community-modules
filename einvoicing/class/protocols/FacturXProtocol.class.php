@@ -1575,14 +1575,33 @@ class FacturXProtocol extends CIIProtocol
 
 				$remise_already_used_line_level_ids[] = $fk_remise;
 			}
+			// handle line-level discount if exists and update amounts
+			if (!empty($parsedLine['lineAllowances'])) {
+				$discount = $this->_resolveLineDiscountPercent($parsedLine['lineAllowances'], $parsedLine['lineTotalAmount']);
+				if ($discount !== false) {
+					$line->remise_percent  = $discount['percent'];
+					$line->subprice = round($discount['priceWithoutDiscount'] / $parsedLine['billedquantity'], 8);
+				}
+			}
 			$line->qty = (float) $parsedLine['billedquantity'];
-			$line->subprice = (float) $parsedLine['netpriceamount'];
+			$line->subprice = $line->subprice ?? (float) $parsedLine['netpriceamount'];
 			$line->tva_tx = (float) $parsedLine['rateApplicablePercent'];
 			$line->total_ht = (float) $parsedLine['lineTotalAmount'];
 			$line->total_tva = $parsedLine['calculatedAmount'] ?? 0;
 			$line->total_ttc = $parsedLine['lineTotalAmount'] + ($parsedLine['calculatedAmount'] ?? 0);
 
 			$supplierInvoice->lines[] = $line;
+		}
+
+		// Create document level discounts (allowances) as discounts in Dolibarr
+		$globalDiscountIds = array();
+		if (!empty($parsedHeader['headerAllowancesCharges'])) {
+			$headerDiscountIds = $this->_createHeaderDiscounts($parsedHeader['headerAllowancesCharges'], $socId, $parsedHeader['documentno']);
+			if (!empty($headerDiscountIds[-1])) {
+				return ['res' => -1, 'message' => $headerDiscountIds[-1]];
+			} else {
+				$globalDiscountIds = $headerDiscountIds;
+			}
 		}
 
 		//return ['res' => 1, 'message' => 'Not implemented yet' ];
@@ -1733,6 +1752,20 @@ class FacturXProtocol extends CIIProtocol
 				$supplier->fournisseur = 1;
 				$supplier->code_fournisseur = 'auto';
 				$supplier->update($supplier->id, $user);
+			}
+
+			// Insert global discounts (allowances) as lines in this supplier invoice
+			if (!empty($globalDiscountIds)) {
+				foreach ($globalDiscountIds as $fk_remise_except) {
+					$currentSupplierInvoice = new FactureFournisseur($db);
+					$currentSupplierInvoice->fetch($supplierInvoiceId);
+					$result = $currentSupplierInvoice->insert_discount($fk_remise_except);
+					if ($result < 0) {
+						return ['res' => -1, 'message' => 'Failed to insert global discount into supplier invoice: ' . $currentSupplierInvoice->error];
+					} else {
+						dol_syslog('Global discount inserted into supplier invoice with line id: ' . $result);
+					}
+				}
 			}
 
 			// Create or update supplier prices for imported products
