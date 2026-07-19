@@ -32,3 +32,17 @@ CREATE TABLE llx_einvoicing_extlinks (
 	ap_precheck_result text,				-- Result/details of the PDP pre-check
 	override_routing_id varchar(255)		-- Optional routing ID override for this specific invoice (overrides thirdparty default routing)
 ) ENGINE = innodb;
+
+-- Migrations for installations created before these columns existed.
+-- The CREATE TABLE above is a no-op on an existing table, and dolibarr_allversions.sql is played
+-- only when the Dolibarr core itself is upgraded, never on a module-only upgrade. Without the
+-- statements below, such an installation keeps a table missing these columns while the code already
+-- selects and inserts them, which breaks any invoice creation with
+-- "Unknown column 'ap_precheck_status' in 'field list'" (see issue #354).
+-- These are replayed at each module activation: _load_tables() runs every llx_*.sql file, and
+-- run_sql() accepts DB_ERROR_COLUMN_ALREADY_EXISTS as a non blocking error, so they are idempotent.
+-- Keep them in sync with dolibarr_allversions.sql.
+ALTER TABLE llx_einvoicing_extlinks ADD COLUMN provider_sender_routing_id varchar(50) NULL;
+ALTER TABLE llx_einvoicing_extlinks ADD COLUMN ap_precheck_status varchar(50) DEFAULT NULL;
+ALTER TABLE llx_einvoicing_extlinks ADD COLUMN ap_precheck_result text DEFAULT NULL;
+ALTER TABLE llx_einvoicing_extlinks ADD COLUMN override_routing_id varchar(255) NULL DEFAULT NULL;
