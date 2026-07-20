@@ -31,6 +31,7 @@
  * @var Societe    	$mysoc
  * @var Translate 	$langs
  * @var User       	$user
+ * @var Societe 	$buyerParty 
  *
  * @var Translate 	$outputlangs
  * @var Facture    	$invoice
@@ -130,7 +131,6 @@ $mySchemeUri       = $this->getIEC6523Code($mysoc->country_code, 2);
 //   - Case B: the contact belongs to a different thirdparty (distinct legal entity) -> rebuild the
 //     whole buyer (name, address, SIREN/SIRET, VAT, routing) from that thirdparty.
 //   - Case A: same thirdparty -> keep its SIREN/VAT/routing, only override name/address.
-/** @var Societe $buyerParty */
 $buyerParty        = $object->thirdparty;	// Societe used for legal id / VAT / routing
 $buyerName         = $object->thirdparty->name;
 $buyerAddress      = $object->thirdparty->address;
