@@ -62,7 +62,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		parent::__construct($db);
 
 		$this->config = array(
-			'provider_url' => 'https://ppd.hubtimize.fr',
+			'provider_url' => 'https://hubtimize.fr',
 			'prod_auth_url' => 'https://hubtimize.fr/api/orchestrator/v1/',
 			'prod_api_url' => 'https://hubtimize.fr/api/orchestrator/v1/',
 			'test_auth_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/',
