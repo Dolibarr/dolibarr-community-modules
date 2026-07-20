@@ -32,6 +32,7 @@
  * @var Translate 	$langs
  * @var User       	$user
  * @var Societe 	$buyerParty
+ * @var Facture 	$object
  *
  * @var Translate 	$outputlangs
  * @var Facture    	$invoice
@@ -39,6 +40,7 @@
  */
 '
 @phan-var-force Translate 	$langs
+@phan-var-force Societe 	$buyerParty
 @phan-var-force Translate 	$outputlangs
 @phan-var-force Facture   	$invoice
 @phan-var-force CIIProtocol|FacturXProtocol	$this
@@ -179,7 +181,6 @@ if (getDolGlobalInt('EINVOICING_USE_BILLING_CONTACT_AS_BUYER')) {
 		dol_syslog('einvoicing: EINVOICING_USE_BILLING_CONTACT_AS_BUYER is on but no usable BILLING contact found, using invoice thirdparty as buyer', LOG_NOTICE);
 	}
 }
-assert($buyerParty instanceof Societe);
 // Buyer identifiers (resolved buyer party: invoice thirdparty or billing-contact recipient)
 $idprof            = idprof($buyerParty) ?? '';
 $schemeIdProf      = $this->getIEC6523Code($buyerParty->country_code);
