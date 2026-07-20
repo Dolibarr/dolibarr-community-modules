@@ -534,7 +534,15 @@ class SuperPDPProvider extends AbstractPDPProvider
 					'grant_type'    => 'refresh_token',
 					'refresh_token' => $this->tokenData['refresh_token'],
 				);
-				$resultget = getURLContent($proxyurl, 'POST', http_build_query($param), 1, array('Content-Type: application/x-www-form-urlencoded'));
+
+				// Allow HTTP and local URLs for testing only if the configuration allows it. Otherwise, only HTTPS is allowed.
+				$allowedprotocols = array('https');
+				$allowlocalurl = 0;
+				if (!empty(getDolGlobalInt('EINVOICING_ALLOW_LOCAL_URL'))) {
+					$allowlocalurl = 2;
+					$allowedprotocols[] = 'http';
+				}
+				$resultget = getURLContent($proxyurl, 'POST', http_build_query($param), 1, array('Content-Type: application/x-www-form-urlencoded'), $allowedprotocols, $allowlocalurl);
 
 				$httpcode = empty($resultget['http_code']) ? 0 : $resultget['http_code'];
 				if (empty($resultget['curl_error_no']) && $httpcode == 200) {
@@ -546,8 +554,10 @@ class SuperPDPProvider extends AbstractPDPProvider
 					}
 				}
 				// Proxy refresh failed: a via-partner client has no secret to fall back on, so we stop here.
-				dol_syslog(__METHOD__." refresh via partner proxy failed http_code=".$httpcode, LOG_WARNING, 0, "_einvoicing");
-				$this->errors[] = 'FailedToRefreshAccessTokenViaProxy';
+				dol_syslog(__METHOD__." refresh via partner proxy failed http_code=".$httpcode . " error=".$resultget['curl_error_msg'], LOG_WARNING, 0, "_einvoicing");
+				// Return a generic error message to avoid leaking the proxy URL in the logs.
+				setEventMessages('FailedToRetrieveAccessToken', null, 'errors');
+				$this->errors[] = 'FailedToRetrieveAccessToken';
 				return null;
 			}
 
