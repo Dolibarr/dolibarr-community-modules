@@ -40,7 +40,6 @@
  */
 '
 @phan-var-force Translate 	$langs
-@phan-var-force Societe 	$buyerParty
 @phan-var-force Translate 	$outputlangs
 @phan-var-force Facture   	$invoice
 @phan-var-force CIIProtocol|FacturXProtocol	$this
@@ -182,6 +181,7 @@ if (getDolGlobalInt('EINVOICING_USE_BILLING_CONTACT_AS_BUYER')) {
 	}
 }
 // Buyer identifiers (resolved buyer party: invoice thirdparty or billing-contact recipient)
+/** @phan-var-force Societe $buyerParty */
 $idprof            = idprof($buyerParty) ?? '';
 $schemeIdProf      = $this->getIEC6523Code($buyerParty->country_code);
 $globalIdProf      = idprof($buyerParty) ?? '';
