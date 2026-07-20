@@ -61,6 +61,29 @@ class CIIProtocol extends AbstractProtocol
 	protected const BUILD_XML_PROFILE = 'EN16931';
 
 	/**
+	 * Maximum number of decimals allowed for the unit prices: Item net price (BT-146),
+	 * Item price discount (BT-147) and Item gross price (BT-148).
+	 *
+	 * EN 16931 sets no limit on these (BT-146 only carries BR-26 and BR-27), but the French
+	 * CTC layer does: rule BR-FR-DEC-03 of the FNFE-MPE CTC-FR Schematron rejects, with a
+	 * "fatal" flag, any value matching more than 6 decimals ('^[-]?\d{1,19}(\.\d{1,6})?$').
+	 * Note this is NOT the 2 decimals limit of the amounts (BR-DEC-* / BR-FR-DEC-01): a unit
+	 * price is not an amount, and no rule checks that the line net amount (BT-131) derives
+	 * arithmetically from the unit price.
+	 *
+	 * @const int
+	 */
+	protected const MAX_DECIMALS_UNIT_PRICE = 6;
+
+	/**
+	 * Maximum number of decimals allowed for the quantities: Invoiced quantity (BT-129) and
+	 * Item price base quantity (BT-149), per rule BR-FR-DEC-02 of the CTC-FR Schematron ("fatal").
+	 *
+	 * @const int
+	 */
+	protected const MAX_DECIMALS_QUANTITY = 4;
+
+	/**
 	 * @var array<string,string>
 	 */
 	protected $invoiceTemplate;
@@ -68,6 +91,23 @@ class CIIProtocol extends AbstractProtocol
 	 * @var array<string,null|false|int|string|array>
 	 */
 	protected $lineTemplate;
+	/**
+	 * Return the number of decimals to use for a unit price (BT-146, BT-147, BT-148).
+	 *
+	 * Follows the Dolibarr unit price accuracy, so a price is transmitted as accurately as it is
+	 * stored, but never above what the norm accepts (see self::MAX_DECIMALS_UNIT_PRICE): an
+	 * instance configured with a higher accuracy would otherwise produce invoices rejected by the
+	 * Access Point. Never goes below 2, which is the accuracy of an amount.
+	 *
+	 * @return	int							Number of decimals
+	 */
+	protected static function getUnitPriceDecimals()
+	{
+		$decimals = getDolGlobalInt('MAIN_MAX_DECIMALS_UNIT', 5);
+
+		return max(2, min($decimals, self::MAX_DECIMALS_UNIT_PRICE));
+	}
+
 	/**
 	 * Initialize available protocols.
 	 *
@@ -2009,21 +2049,21 @@ class CIIProtocol extends AbstractProtocol
 		if (isset($line['grosspriceamount'])) {
 			$gross = $doc->createElement('ram:GrossPriceProductTradePrice');
 			$price->appendChild($gross);
-			$gross->appendChild($doc->createElement('ram:ChargeAmount', number_format($line['grosspriceamount'], 2, '.', '')));
+			$gross->appendChild($doc->createElement('ram:ChargeAmount', number_format($line['grosspriceamount'], self::getUnitPriceDecimals(), '.', '')));
 		}
 
 		// Mandatory by Factur-X, EN 16931
 		// This is the unit price excluding tax. If it does not contains the discount, the discount must be declared into AllowanceCharge.
 		$net = $doc->createElement('ram:NetPriceProductTradePrice');
 		$price->appendChild($net);
-		$net->appendChild($doc->createElement('ram:ChargeAmount', number_format($line['netpriceamount'], 2, '.', '')));
+		$net->appendChild($doc->createElement('ram:ChargeAmount', number_format($line['netpriceamount'], self::getUnitPriceDecimals(), '.', '')));
 
 
 		// Quantity
 		$deliv = $doc->createElement('ram:SpecifiedLineTradeDelivery');
 		$el->appendChild($deliv);
 
-		$qty = $doc->createElement('ram:BilledQuantity', number_format($line['billedquantity'], 2, '.', ''));
+		$qty = $doc->createElement('ram:BilledQuantity', number_format($line['billedquantity'], self::MAX_DECIMALS_QUANTITY, '.', ''));
 		$qty->setAttribute('unitCode', $line['billedquantityunitcode']);
 		$deliv->appendChild($qty);
 

@@ -36,6 +36,7 @@ use horstoeko\zugferd\codelists\ZugferdVatCategoryCodes;
 use horstoeko\zugferd\codelists\ZugferdVatTypeCodes;
 use horstoeko\zugferd\ZugferdDocumentBuilder;
 use horstoeko\zugferd\ZugferdProfiles;
+use horstoeko\zugferd\ZugferdSettings;
 use horstoeko\zugferd\ZugferdDocumentPdfBuilder;
 use horstoeko\zugferd\ZugferdDocumentValidator;
 use horstoeko\zugferd\ZugferdDocumentPdfReader;
@@ -76,6 +77,35 @@ class FacturXProtocol extends CIIProtocol
 
 	/** @const string The profile used to generate XML */
 	protected const BUILD_XML_PROFILE = 'EXTENDED';
+
+	/** @const string Path of the line unit price nodes, relative to the line item node */
+	private const NODE_LINE_ITEM = '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem';
+
+	/**
+	 * Tell the lib how many decimals the norm allows on the nodes where its default of 2 is wrong.
+	 *
+	 * The lib serializes every AmountType and QuantityType with 2 decimals unless a node is
+	 * declared here. That default is right for the amounts, but not for the unit prices
+	 * (BT-146/BT-148, up to 6 decimals) nor for the invoiced quantity (BT-129, up to 4): rounding
+	 * those to 2 loses the accuracy the receiver needs to recalculate the line amount.
+	 *
+	 * @return	void
+	 */
+	protected static function applyNormDecimalPlaces()
+	{
+		ZugferdSettings::addSpecialDecimalPlacesMap(
+			self::NODE_LINE_ITEM . '/ram:SpecifiedLineTradeAgreement/ram:NetPriceProductTradePrice/ram:ChargeAmount',
+			self::getUnitPriceDecimals()
+		);
+		ZugferdSettings::addSpecialDecimalPlacesMap(
+			self::NODE_LINE_ITEM . '/ram:SpecifiedLineTradeAgreement/ram:GrossPriceProductTradePrice/ram:ChargeAmount',
+			self::getUnitPriceDecimals()
+		);
+		ZugferdSettings::addSpecialDecimalPlacesMap(
+			self::NODE_LINE_ITEM . '/ram:SpecifiedLineTradeDelivery/ram:BilledQuantity',
+			self::MAX_DECIMALS_QUANTITY
+		);
+	}
 
 	/**
 	 * Generate the XML content for a given invoice according to the Factur-X standard.
@@ -267,6 +297,11 @@ class FacturXProtocol extends CIIProtocol
 			// =====================================================================
 			// Use horstoeko lib to build the XML
 			// =====================================================================
+
+			// The lib serializes every amount and quantity with 2 decimals, which is the accuracy of an
+			// amount, not of a unit price: it would truncate the unit price and make the receiver
+			// recalculate a wrong line amount. Ask for the accuracy the norm allows on these nodes.
+			self::applyNormDecimalPlaces();
 
 			// Initialize ZugferdDocumentBuilder (FacturX XML)
 			dol_syslog(get_class($this) . '::executeHooks create new XML document based on PROFILE_EN16931 (CIUS-FR)');
