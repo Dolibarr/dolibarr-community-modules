@@ -18,7 +18,7 @@
  */
 
 /**
- * \file    core/triggers/interface_99_modEInvoicing_EInvoicingTriggers.class.php
+ * \file    core/triggers/interface_98_modEInvoicing_EInvoicingTriggers.class.php
  * \ingroup einvoicing
  * \brief   Triggers for EInvoicing module
  */
