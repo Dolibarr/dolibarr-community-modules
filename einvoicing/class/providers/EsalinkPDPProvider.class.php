@@ -339,13 +339,14 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 		$response = $this->callApi("healthcheck", "GET", false, [], 'healthcheck');		// This include the refresh of token
 
+		$nameOfAccessPoint = getDolGlobalString('EINVOICING_PDP');
+
 		if ($response['status_code'] === 200) {
 			$returnarray['status_code'] = true;
-			$nameOfAccessPoint = getDolGlobalString('EINVOICING_PDP');
-
 			$returnarray['message'] = $langs->trans('APApiReachable', $nameOfAccessPoint);
 		} else {
 			$returnarray['status_code'] = false;
+			$returnarray['message'] = $langs->trans('APApiNotReachable', $nameOfAccessPoint) . ' (HTTP ' . ($response['status_code'] ?? 'N/A') . ')' . (!empty($response['response']) ? ' - ' . $response['response'] : '');
 		}
 
 		return $returnarray;

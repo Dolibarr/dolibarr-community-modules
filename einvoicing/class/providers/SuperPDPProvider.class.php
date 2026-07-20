@@ -709,14 +709,15 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$response = $this->callApi("healthcheck", "GET", false, [], 'healthcheck');		// This include the refresh of token
 		$returnarray = array();
 
+		$nameOfAccessPoint = getDolGlobalString('EINVOICING_PDP');
+		$nameOfAccessPoint = preg_replace('/ViaPartner/', '', $nameOfAccessPoint);
+
 		if ($response['status_code'] === 200) {
 			$returnarray['status_code'] = true;
-			$nameOfAccessPoint = getDolGlobalString('EINVOICING_PDP');
-			$nameOfAccessPoint = preg_replace('/ViaPartner/', '', $nameOfAccessPoint);
-
 			$returnarray['message'] = $langs->trans('APApiReachable', $nameOfAccessPoint);
 		} else {
 			$returnarray['status_code'] = false;
+			$returnarray['message'] = $langs->trans('APApiNotReachable', $nameOfAccessPoint) . ' (HTTP ' . ($response['status_code'] ?? 'N/A') . ')' . (!empty($response['response']) ? ' - ' . $response['response'] : '');
 		}
 
 		return $returnarray;
