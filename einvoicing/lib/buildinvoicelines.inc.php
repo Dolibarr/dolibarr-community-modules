@@ -181,7 +181,9 @@ if (getDolGlobalInt('EINVOICING_USE_BILLING_CONTACT_AS_BUYER')) {
 	}
 }
 // Buyer identifiers (resolved buyer party: invoice thirdparty or billing-contact recipient)
-/** @phan-var-force Societe $buyerParty */
+if (!($buyerParty instanceof Societe)) {
+	throw new \RuntimeException('einvoicing: invoice thirdparty is not a valid Societe (invoice id=' . $object->id . ')');
+}
 $idprof            = idprof($buyerParty) ?? '';
 $schemeIdProf      = $this->getIEC6523Code($buyerParty->country_code);
 $globalIdProf      = idprof($buyerParty) ?? '';
