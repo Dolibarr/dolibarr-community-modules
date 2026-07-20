@@ -39,6 +39,9 @@ EINVOICING_AUTO_SEND_ON_GENERATION_HELP=Si activé, la facture électronique est
 EINVOICING_MAX_FILE_SIZE_MB=Taille maximale du fichier e-facture (Mo)
 EINVOICING_MAX_FILE_SIZE_MB_HELP=Si renseigné, un avertissement non bloquant est affiché lorsque le fichier e-facture généré (XML ou PDF/A-3) dépasse cette taille. Laisser vide ou à 0 pour désactiver le contrôle. Certains Points d'Accès limitent la taille des fichiers acceptés (ex. 10 Mo pour Chorus Pro).
 EInvoiceFileSizeExceedsLimit=Le fichier e-facture généré (%s Mo) dépasse la taille limite configurée (%s Mo). Il est possible que votre Point d'Accès refuse ce fichier.
+
+EINVOICING_USE_BILLING_CONTACT_AS_BUYER=Utiliser le contact de facturation comme acheteur de la facture électronique
+EINVOICING_USE_BILLING_CONTACT_AS_BUYER_HELP=Pour les factures françaises uniquement. Lorsque cette option est activée, si la facture possède un contact de facturation (contact de type « Contact client facturation / BILLING »), ce contact est utilisé comme acheteur dans le XML généré, à la place du tiers de la facture. <br> Si le contact appartient à un autre tiers (par exemple si le siège social est une personne morale distincte), l'ensemble de l'acheteur - nom, adresse, SIREN/SIRET, numéro de TVA et identifiant de routage - est reconstruit à partir de ce tiers. <br> Si le contact appartient au même tiers, seuls le nom et l'adresse de l'acheteur sont remplacés, tandis que le SIREN, le numéro de TVA et le routage restent ceux du tiers de la facture. <br> Désactivée par défaut. Remarque : l'acheteur du XML sera alors différent du tiers affiché sur la facture Dolibarr.
 generateAccessToken=Générer le jeton d'accès
 reGenerateAccessToken=Régénérer le jeton d'accès
 testConnection=Test de connexion
