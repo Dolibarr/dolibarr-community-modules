@@ -462,9 +462,18 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		$error = 0;
 		$currentStatusDetails = null;
 
+		$isFactureContext = isset($object->element) && in_array($object->element, ['facture']) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP');
+		$isSupplierInvoiceContext = isset($object->element) && in_array($object->element, ['invoice_supplier']) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI');
+		$isThirdpartyContext = array_intersect(['thirdpartycard', 'thirdpartycomm'], $contexts) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI'));
+
+		if (!$isFactureContext && !$isSupplierInvoiceContext && !$isThirdpartyContext) {
+			// Nothing relevant to this hook call for the current object/context: skip the transaction entirely.
+			return 0;
+		}
+
 		$db->begin();
 
-		if (isset($object->element) && in_array($object->element, ['facture']) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
+		if ($isFactureContext) {
 			'@phan-var-force Facture $object';
 			$permissiontoedit = $user->hasRight('facture', 'write');
 
@@ -654,7 +663,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		}
 
 
-		if (isset($object->element) && in_array($object->element, ['invoice_supplier']) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
+		if ($isSupplierInvoiceContext) {
 			$permissiontoedit = $user->hasRight('fournisseur', 'facture', 'creer');
 
 			if ($action == 'confirm_sendStatusMessage' && $permissiontoedit) {
@@ -675,7 +684,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			}
 		}
 
-		if (array_intersect(['thirdpartycard', 'thirdpartycomm'], $contexts) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI'))) {
+		if ($isThirdpartyContext) {
 			$permissiontoedit = $user->hasRight('societe', 'creer');
 
 			// $object->id may be empty at hook time if core hasn't fetched the object yet
