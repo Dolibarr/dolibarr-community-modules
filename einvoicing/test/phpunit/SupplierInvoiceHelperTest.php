@@ -79,10 +79,37 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 		$localobject = new FactureFournisseur($db);
 		$localobject->initAsSpecimen();
 		$localobject->ref_supplier = 'SUPPLIER_REF_SPECIMEN_' . uniqid();
+		// initAsSpecimen() hardcodes socid = 1, which only exists on an instance still carrying the
+		// demo data. Anywhere else the insert fails on the fk_facture_fourn_fk_soc foreign key, so
+		// resolve an existing third party instead of assuming that id.
+		$localobject->socid = $this->getAnyThirdpartyId();
 		$result = $localobject->create($user);
 		$this->assertGreaterThan(0, $result, $localobject->errorsToString());
 
 		return $localobject;
+	}
+
+	/**
+	 * Return the id of any existing third party, so the specimen fixtures do not depend on the
+	 * demo data being present.
+	 *
+	 * @return int	Id of an existing third party
+	 */
+	private function getAnyThirdpartyId()
+	{
+		global $db;
+
+		$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "societe";
+		$sql .= " WHERE entity IN (" . getEntity('societe') . ")";
+		$sql .= $db->plimit(1);
+
+		$resql = $db->query($sql);
+		$this->assertNotEquals(false, $resql, 'Cannot query third parties: ' . $db->lasterror());
+
+		$obj = $db->fetch_object($resql);
+		$this->assertNotEquals(null, $obj, 'No third party in database, cannot build the fixture');
+
+		return (int) $obj->rowid;
 	}
 
 	/**
