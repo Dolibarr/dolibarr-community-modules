@@ -1521,7 +1521,7 @@ class EInvoicing
 
 		// Check if this invoice is present into einvoicing_extlinks table to know if it is an imported object
 		$provider = '';
-		$sql = "SELECT rowid, provider FROM " . MAIN_DB_PREFIX . "einvoicing_extlinks";
+		$sql = "SELECT rowid, provider FROM " . $this->db->prefix() . "einvoicing_extlinks";
 		$sql .= " WHERE element_type = '" . $this->db->escape($object->element) . "'";
 		$sql .= " AND element_id = " . (int) $object->id;
 		$sql .= " LIMIT 1";
@@ -1531,6 +1531,7 @@ class EInvoicing
 
 			$provider = $obj->provider;
 		}
+		$this->db->free($resql);
 
 		// Add block only for imported invoices
 
@@ -1600,7 +1601,7 @@ class EInvoicing
 		if ($provider) {
 			// Get current status
 			$currentStatus = '-';
-			$sql = "SELECT lc_status, lc_reason_code FROM " . MAIN_DB_PREFIX . "einvoicing_lifecycle_msg";
+			$sql = "SELECT lc_status, lc_reason_code FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
 			$sql .= " WHERE element_type = '" . $this->db->escape($object->element) . "'";
 			$sql .= " AND element_id = " . (int) $object->id;
 			$sql .= " AND lc_validation_status = 'Ok'";
@@ -1610,6 +1611,7 @@ class EInvoicing
 				$obj = $this->db->fetch_object($resql);
 				$currentStatus = $this->getStatusLabel($obj->lc_status);
 			}
+			$this->db->free($resql);
 			// Current status
 			$resprints .= '<tr class="treinvoicing_collapseseparator">';
 			$resprints .= '<td class="">' . $langs->trans("einvoicingInvoiceStatus") . '</td>';
@@ -1630,7 +1632,7 @@ class EInvoicing
 
 			// Get last sent status to know if we need to add the JavaScript for real time update of status and to display last sent status validation if it is pending or in error
 			$lastSentStatus = array();
-			$sql = "SELECT lc_status, lc_status_message, lc_validation_status, lc_validation_message FROM " . MAIN_DB_PREFIX . "einvoicing_lifecycle_msg";
+			$sql = "SELECT lc_status, lc_status_message, lc_validation_status, lc_validation_message FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
 			$sql .= " WHERE element_type = '" . $this->db->escape($object->element) . "'";
 			$sql .= " AND element_id = " . (int) $object->id;
 			$sql .= " ORDER BY rowid DESC LIMIT 1";
@@ -1644,6 +1646,7 @@ class EInvoicing
 					'lc_validation_message' => $obj->lc_validation_message
 				];
 			}
+			$this->db->free($resql);
 
 			if (!empty($lastSentStatus) && ($lastSentStatus['lc_validation_status'] == 'Pending' || $lastSentStatus['lc_validation_status'] == 'Error')) {
 				$statusLabel = $this->getStatusLabel($lastSentStatus['lc_status']);
@@ -1839,7 +1842,7 @@ class EInvoicing
 		}
 
 		// Check if this thirdparty is present into einvoicing_extlinks table to know if it is an imported object
-		$sql = "SELECT rowid, provider FROM " . MAIN_DB_PREFIX . "einvoicing_extlinks";
+		$sql = "SELECT rowid, provider FROM " . $this->db->prefix() . "einvoicing_extlinks";
 		$sql .= " WHERE element_type = '" . $this->db->escape($object->element) . "'";
 		$sql .= " AND element_id = " . (int) $object->id;
 		$sql .= " LIMIT 1";
@@ -1853,6 +1856,7 @@ class EInvoicing
 			$resprints .= '</td>';
 			$resprints .= '</tr>';
 		}
+		$this->db->free($resql);
 
 		// Routing list management block (view mode)
 		$allRoutings = $this->fetchAllRoutings($object->id);
@@ -1976,7 +1980,7 @@ class EInvoicing
 		$resprints = '';
 
 		// Check if this product or service is present into einvoicing_extlinks table to know if it is an imported object
-		$sql = "SELECT rowid, provider FROM " . MAIN_DB_PREFIX . "einvoicing_extlinks";
+		$sql = "SELECT rowid, provider FROM " . $this->db->prefix() . "einvoicing_extlinks";
 		$sql .= " WHERE element_type = '" . $this->db->escape($object->element) . "'";
 		$sql .= " AND element_id = " . (int) $object->id;
 		$sql .= " LIMIT 1";
@@ -1991,6 +1995,7 @@ class EInvoicing
 			$resprints .= '<td>' . $obj->provider . '</td>';
 			$resprints .= '</tr>';
 		}
+		$this->db->free($resql);
 
 		return $resprints;
 	}
@@ -2027,7 +2032,7 @@ class EInvoicing
 
 		// Get last status from einvoicing_extlinks table (table contain dolibarr object received or sent to PDP)
 		$sql = "SELECT rowid, syncstatus, synccomment, flow_id, override_routing_id, provider, ap_precheck_status, ap_precheck_result"; // Validation message of einvoice sent.
-		$sql .= " FROM " . MAIN_DB_PREFIX . "einvoicing_extlinks";
+		$sql .= " FROM " . $this->db->prefix() . "einvoicing_extlinks";
 		$sql .= " WHERE element_type = '" . $this->db->escape('facture') . "'";
 		//$sql .= " AND provider = '" . $this->db->escape($provider) . "'";
 		if ($invoiceId > 0) {
@@ -2103,9 +2108,10 @@ class EInvoicing
 		} else {
 			dol_print_error($this->db);
 		}
+		$this->db->free($resql);
 
 		// Fetch last status message from einvoicing_lifecycle_msg table to get more details on current status of the invoice into the PDP system
-		$sql = "SELECT lc_status, lc_reason_code FROM " . MAIN_DB_PREFIX . "einvoicing_lifecycle_msg";
+		$sql = "SELECT lc_status, lc_reason_code FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
 		$sql .= " WHERE element_type = '" . $this->db->escape('facture') . "'";
 		$sql .= " AND element_id = " . (int) $invoiceId;
 		$sql .= " ORDER BY rowid DESC LIMIT 1";
@@ -2119,6 +2125,7 @@ class EInvoicing
 		} else {
 			dol_print_error($this->db);
 		}
+		$this->db->free($resql);
 
 		// Check if there is an e-invoice file generated on disk
 
@@ -2236,7 +2243,7 @@ class EInvoicing
 		}
 
 		// Check if record exists
-		$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "einvoicing_extlinks";
+		$sql = "SELECT rowid FROM " . $db->prefix() . "einvoicing_extlinks";
 		$sql .= " WHERE element_id = " . (int) $elementId;
 		$sql .= " AND element_type = '" . $db->escape($elementType) . "'";
 		$sql .= " AND provider = '" . $db->escape($providershort) . "'";
@@ -2248,9 +2255,10 @@ class EInvoicing
 		}
 
 		$exists = $db->num_rows($resql) > 0;
+		$db->free($resql);
 		if ($exists) {
 			// Update existing record
-			$sql = "UPDATE " . MAIN_DB_PREFIX . "einvoicing_extlinks SET";
+			$sql = "UPDATE " . $db->prefix() . "einvoicing_extlinks SET";
 			$sql .= " fk_user_modif = " . (int) $user->id;
 			if (!empty($syncStatus)) {
 				$sql .= ", syncstatus = " . (int) $syncStatus;
@@ -2279,7 +2287,7 @@ class EInvoicing
 			$sql .= " AND provider = '" . $db->escape($providershort) . "'";
 		} else {
 			// Insert new record
-			$sql = "INSERT INTO " . MAIN_DB_PREFIX . "einvoicing_extlinks";
+			$sql = "INSERT INTO " . $db->prefix() . "einvoicing_extlinks";
 			$sql .= " (element_id, element_type, provider, date_creation, fk_user_creat, syncstatus, syncref, synccomment, flow_id, override_routing_id, ap_precheck_status, ap_precheck_result)";
 			$sql .= " VALUES (" . (int) $elementId . ", '" . $db->escape($elementType) . "', '" . $db->escape($providershort) . "'";
 			$sql .= ", NOW(), " . (int) $user->id . ", " . (int) $syncStatus;
@@ -2297,7 +2305,7 @@ class EInvoicing
 			return -1;
 		}
 
-		return $exists ? 1 : $db->last_insert_id(MAIN_DB_PREFIX . "einvoicing_extlinks");
+		return $exists ? 1 : $db->last_insert_id($db->prefix() . "einvoicing_extlinks");
 	}
 
 
@@ -2332,7 +2340,7 @@ class EInvoicing
 		$db->begin();
 
 		// Delete existing routing(s) for this thirdparty (1→1 logic)
-		$sql = "DELETE FROM " . MAIN_DB_PREFIX . "einvoicing_routing";
+		$sql = "DELETE FROM " . $db->prefix() . "einvoicing_routing";
 		$sql .= " WHERE fk_soc = " . (int) $fk_soc;
 		$sql .= " AND routing_type = '" . $db->escape($routing_type) . "'";
 
@@ -2350,7 +2358,7 @@ class EInvoicing
 		}
 
 		// Insert new default routing
-		$sql = "INSERT INTO " . MAIN_DB_PREFIX . "einvoicing_routing (";
+		$sql = "INSERT INTO " . $db->prefix() . "einvoicing_routing (";
 		$sql .= "fk_soc, source, routing_id, info, syncflowid, active, is_default, date_creation, fk_user_creat, routing_type";
 		$sql .= ") VALUES (";
 		$sql .= (int) $fk_soc . ", ";
@@ -2369,7 +2377,7 @@ class EInvoicing
 			return -1;
 		}
 
-		$rowid = (int) $db->last_insert_id(MAIN_DB_PREFIX . 'einvoicing_routing');
+		$rowid = (int) $db->last_insert_id($db->prefix() . 'einvoicing_routing');
 
 		$db->commit();
 
@@ -2402,7 +2410,7 @@ class EInvoicing
 		$db->begin();
 
 		// Determine if this will be the first routing (auto-default)
-		$sql = "SELECT COUNT(*) AS cnt FROM " . MAIN_DB_PREFIX . "einvoicing_routing";
+		$sql = "SELECT COUNT(*) AS cnt FROM " . $db->prefix() . "einvoicing_routing";
 		$sql .= " WHERE fk_soc = " . (int) $fk_soc . " AND active = 1";
 		$sql .= " AND routing_type = '" . $db->escape($routing_type) . "'";
 		$resql = $db->query($sql);
@@ -2412,8 +2420,9 @@ class EInvoicing
 		}
 		$obj = $db->fetch_object($resql);
 		$isDefault = ($obj->cnt == 0) ? 1 : 0;
+		$db->free($resql);
 
-		$sql = "INSERT INTO " . MAIN_DB_PREFIX . "einvoicing_routing (";
+		$sql = "INSERT INTO " . $db->prefix() . "einvoicing_routing (";
 		$sql .= "fk_soc, source, routing_id, info, active, is_default, date_creation, fk_user_creat, routing_type";
 		$sql .= ") VALUES (";
 		$sql .= (int) $fk_soc . ", 'manual', ";
@@ -2430,7 +2439,7 @@ class EInvoicing
 			return -1;
 		}
 
-		$rowid = (int) $db->last_insert_id(MAIN_DB_PREFIX . 'einvoicing_routing');
+		$rowid = (int) $db->last_insert_id($db->prefix() . 'einvoicing_routing');
 		$db->commit();
 
 		return $rowid;
@@ -2451,7 +2460,7 @@ class EInvoicing
 		$db->begin();
 
 		// Check if this entry was the default
-		$sql = "SELECT is_default FROM " . MAIN_DB_PREFIX . "einvoicing_routing";
+		$sql = "SELECT is_default FROM " . $db->prefix() . "einvoicing_routing";
 		$sql .= " WHERE rowid = " . (int) $rowid;
 		$resql = $db->query($sql);
 		if (!$resql) {
@@ -2461,8 +2470,9 @@ class EInvoicing
 		}
 		$obj = $db->fetch_object($resql);
 		$wasDefault = $obj ? (int) $obj->is_default : 0;
+		$db->free($resql);
 
-		$sql = "DELETE FROM " . MAIN_DB_PREFIX . "einvoicing_routing";
+		$sql = "DELETE FROM " . $db->prefix() . "einvoicing_routing";
 		$sql .= " WHERE rowid = " . (int) $rowid;
 		if (!$db->query($sql)) {
 			$db->rollback();
@@ -2472,7 +2482,7 @@ class EInvoicing
 
 		// Reassign default to oldest remaining entry if needed
 		if ($wasDefault) {
-			$sql = "UPDATE " . MAIN_DB_PREFIX . "einvoicing_routing";
+			$sql = "UPDATE " . $db->prefix() . "einvoicing_routing";
 			$sql .= " SET is_default = 1";
 			$sql .= " WHERE fk_soc = " . (int) $fk_soc . " AND active = 1";
 			$sql .= " ORDER BY rowid ASC LIMIT 1";
@@ -2500,7 +2510,7 @@ class EInvoicing
 		$db->begin();
 
 		// Clear default on all entries for this thirdparty
-		$sql = "UPDATE " . MAIN_DB_PREFIX . "einvoicing_routing";
+		$sql = "UPDATE " . $db->prefix() . "einvoicing_routing";
 		$sql .= " SET is_default = 0";
 		$sql .= " WHERE fk_soc = " . (int) $fk_soc;
 		$sql .= " AND routing_type = '" . $db->escape($routing_type) . "'";
@@ -2512,7 +2522,7 @@ class EInvoicing
 		}
 
 		// Set new default
-		$sql = "UPDATE " . MAIN_DB_PREFIX . "einvoicing_routing";
+		$sql = "UPDATE " . $db->prefix() . "einvoicing_routing";
 		$sql .= " SET is_default = 1 WHERE rowid = " . (int) $rowid;
 		$sql .= " AND routing_type = '" . $db->escape($routing_type) . "'";
 
@@ -2539,7 +2549,7 @@ class EInvoicing
 		global $db;
 
 		$sql = "SELECT rowid, fk_soc, source, routing_id, info, syncflowid";
-		$sql .= " FROM " . MAIN_DB_PREFIX . "einvoicing_routing";
+		$sql .= " FROM " . $db->prefix() . "einvoicing_routing";
 		$sql .= " WHERE fk_soc = " . (int) $fk_soc;
 		$sql .= " AND routing_type = '" . $db->escape($routing_type) . "'";
 		$sql .= " AND active = 1";
@@ -2553,11 +2563,13 @@ class EInvoicing
 		}
 
 		if ($db->num_rows($resql) === 0) {
+			$db->free($resql);
 			return 0;
 		}
 
 		$obj = $db->fetch_object($resql);
 		$routing_id =  (string) $obj->routing_id;
+		$db->free($resql);
 
 		return $routing_id;
 	}
@@ -2576,7 +2588,7 @@ class EInvoicing
 		global $db;
 
 		$sql = "SELECT rowid, routing_id, source, info, is_default";
-		$sql .= " FROM " . MAIN_DB_PREFIX . "einvoicing_routing";
+		$sql .= " FROM " . $db->prefix() . "einvoicing_routing";
 		$sql .= " WHERE fk_soc = " . (int) $fk_soc;
 		$sql .= " AND routing_type = '" . $db->escape($routing_type) . "'";
 		if ($active) {
@@ -2602,6 +2614,7 @@ class EInvoicing
 				);
 			}
 		}
+		$db->free($resql);
 
 		return $routings;
 	}
@@ -2641,7 +2654,7 @@ class EInvoicing
 
 		$date_creation = $date_creation ? $db->idate($date_creation) : $db->idate(dol_now());
 
-		$sql = "INSERT INTO " . MAIN_DB_PREFIX . "einvoicing_lifecycle_msg (";
+		$sql = "INSERT INTO " . $db->prefix() . "einvoicing_lifecycle_msg (";
 		$sql .= "element_id, ";
 		$sql .= "element_type, ";
 		$sql .= "provider, ";
@@ -2675,7 +2688,7 @@ class EInvoicing
 			return -1;
 		}
 
-		return (int) $db->last_insert_id(MAIN_DB_PREFIX . 'einvoicing_lifecycle_msg');
+		return (int) $db->last_insert_id($db->prefix() . 'einvoicing_lifecycle_msg');
 	}
 
 	/**
@@ -2689,7 +2702,7 @@ class EInvoicing
 		global $db;
 
 		$sql = "SELECT rowid, element_id, element_type, provider, flow_id, direction, lc_status, lc_status_message, lc_validation_status, lc_validation_message, date_creation";
-		$sql .= " FROM " . MAIN_DB_PREFIX . "einvoicing_lifecycle_msg";
+		$sql .= " FROM " . $db->prefix() . "einvoicing_lifecycle_msg";
 		$sql .= " WHERE flow_id = '" . $db->escape($flowId) . "'";
 
 		$resql = $db->query($sql);
@@ -2700,12 +2713,14 @@ class EInvoicing
 
 		// If no message is found, we return an empty array
 		if ($db->num_rows($resql) === 0) {
+			$db->free($resql);
 			return -1;
 		}
 
 		// If more than 1 message is returned, we return an error
 		if ($db->num_rows($resql) > 1) {
 			dol_syslog(__METHOD__ . ' Error: more than 1 message found for flow_id ' . $flowId, LOG_ERR);
+			$db->free($resql);
 			return -1;
 		}
 
@@ -2726,6 +2741,7 @@ class EInvoicing
 				'date_creation' => (int) $db->jdate($obj->date_creation),
 			];
 		}
+		$db->free($resql);
 
 		return $messages;
 	}
@@ -2755,7 +2771,7 @@ class EInvoicing
 		// Read the message row before the update to know what it relates to (element_type/element_id/lc_status/lc_reason_code
 		// are not modified by the update below, so reading it before or after the update is equivalent).
 		$sql = "SELECT element_type, element_id, lc_status, lc_reason_code";
-		$sql .= " FROM " . MAIN_DB_PREFIX . "einvoicing_lifecycle_msg";
+		$sql .= " FROM " . $db->prefix() . "einvoicing_lifecycle_msg";
 		$sql .= " WHERE rowid = " . (int) $rowid;
 
 		$resql = $db->query($sql);
@@ -2765,8 +2781,9 @@ class EInvoicing
 			dol_syslog(__METHOD__ . ' SQL error while reading lifecycle message before dispatch: ' . $db->lasterror(), LOG_ERR);
 		}
 		$lcMessageRow = ($resql && $db->num_rows($resql) > 0) ? $db->fetch_object($resql) : null;
+		$db->free($resql);
 
-		$sql = "UPDATE " . MAIN_DB_PREFIX . "einvoicing_lifecycle_msg SET ";
+		$sql = "UPDATE " . $db->prefix() . "einvoicing_lifecycle_msg SET ";
 		$sql .= "lc_status_message = '" . $db->escape($statusMessage) . "', ";
 		$sql .= "lc_validation_status = '" . $db->escape($validationStatus) . "', ";
 		$sql .= "lc_validation_message = '" . $db->escape($validationMessage) . "', ";
