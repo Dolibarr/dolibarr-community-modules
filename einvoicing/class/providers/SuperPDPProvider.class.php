@@ -1760,6 +1760,10 @@ class SuperPDPProvider extends AbstractPDPProvider
 				}
 
 				$exchangeProtocol = $tmpProtocolManager->getProtocol($detectedProtocol);
+				// if protocol not supported (like ubl), we skeep it
+				if (empty($exchangeProtocol)) {
+					return array('res' => 0, 'message' => "ERROR_FLOW_NOT_SUPPORTED_PROTOCOL detected protocol ".$detectedProtocol." not supported for flowId: " . $flowId);
+				}
 
 				$exceptionmessage = '';
 				$db->begin();
