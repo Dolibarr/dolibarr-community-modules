@@ -194,15 +194,13 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->defaultFieldValue = 'warning_only';
 	$item->cssClass = 'minwidth500';
 
-	// Setup conf to choose to precheck the e-invoice with the Access Point validation service if available.
+	// Setup conf to precheck the e-invoice with the Access Point validation service if available.
 	if (getDolGlobalString('EINVOICING_PDP')) {
 		$PDPManager = new PDPProviderManager($db);
 		$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
 		$providerconfig  = $provider->getConf();
 		$hasValidator = $providerconfig['has_validator'];
 		if ($hasValidator) {
-			// No check
-			// apres generation du einvoice.
 			$item = $formSetup->newItem('EINVOICING_AP_PRECHECK')->setAsSelect(array(
 				'nocheck' => $langs->transnoentities('EINVOICING_AP_PRECHECK_NOCHECK'),
 				'manuel' => $langs->transnoentities('EINVOICING_AP_PRECHECK_MANUEL'),
