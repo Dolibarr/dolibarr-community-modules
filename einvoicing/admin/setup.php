@@ -192,11 +192,17 @@ $item = $formSetup->newItem('EINVOICING_LIVE')->setAsYesNo();
 $item->fieldParams['forcereload'] = 1;
 
 // Setup conf to use the invoice billing contact (external BILLING contact) as the XML buyer instead of the invoice thirdparty
+// This option is very dangerous and a vey bad practice. The invoiced thirdparty should always be the thirdparty (if we invoice a parent company,
+// invoice should be on parent company).
+// If linking an invoice to another thirdparty than the one the is invoiced and using the alternative contact to define the invoiced thirdparty
+// will lead to false accountancy and a lot of other troubles. So this option may be reserved to integrators only and not be suggested to end users.
+/*
 $item = $formSetup->newItem('EINVOICING_USE_BILLING_CONTACT_AS_BUYER')->setAsYesNo();
 $item->helpText = $langs->transnoentities('EINVOICING_USE_BILLING_CONTACT_AS_BUYER_HELP');
 $item->defaultFieldValue = '0';
 $item->cssClass = 'minwidth500';
 $item->fieldParams['trClass'] = 'advancedoption';
+*/
 
 // End of selection of platform partner
 
