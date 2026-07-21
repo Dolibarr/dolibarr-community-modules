@@ -1157,13 +1157,8 @@ class FacturXProtocol extends CIIProtocol
 		$parsedHeader = [];
 		$parsedLines = [];
 		if (!getDolGlobalInt('EINVOICING_USE_EXTERNAL_FACTURX_READER')) { // The default is to use the same parser than the CII one.
-			dol_include_once('einvoicing/class/protocols/ProtocolManager.class.php');
-			$ProtocolManager = new ProtocolManager($db);
-			$CII = $ProtocolManager->getProtocol('CII');
-			'@phan-var-force CIIProtocol $CII';
-
-			$parsedHeader = $CII->parseInvoiceHeader($embeddedXml);
-			$parsedLines  = $CII->parseInvoiceLines($embeddedXml);
+			$parsedHeader = $this->parseInvoiceHeader($embeddedXml);
+			$parsedLines  = $this->parseInvoiceLines($embeddedXml);
 		} else {
 			// Use a duplicate parser (for test or dev tests)
 			$document->getDocumentInformation($documentno, $documenttypecode, $documentdate, $invoiceCurrency, $taxCurrency, $documentname, $documentlanguage, $effectiveSpecifiedPeriod);
