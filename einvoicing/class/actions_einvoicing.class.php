@@ -158,11 +158,30 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 								setEventMessages($langs->trans("InvoiceGeneratedWithWarnings"), $protocol->warnings, 'warnings');
 							}
 
+							// If the precheck is set to auto, we call the precheck function.
+							$precheckresult = 0; // 0 = skipped , 1 = success, -1 = failed
+							if (getDolGlobalString('EINVOICING_PDP') && getDolGlobalString('EINVOICING_AP_PRECHECK') === 'auto') {
+								$PDPManager = new PDPProviderManager($db);
+								$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+								$precheckAvailable = $provider->hasValidator();
+								if (!empty($currentStatusDetails['file']) && $currentStatusDetails['file'] == 1 && $precheckAvailable) {
+									$einvoiceFilePath = $einvoicing->getEInvoiceFilePath($invoiceObject->ref);
+									$result = $provider->validateEInvoiceFile($invoiceObject->id, $einvoiceFilePath);
+									if ($result['res'] > 0) {
+										$precheckresult = 1;
+										setEventMessages($langs->trans("InvoicePrecheckSuccessful"), array(), 'mesgs');
+									} else {
+										$precheckresult = -1;
+										setEventMessages($langs->trans("InvoicePrecheckFailed"), array(), 'errors');
+									}
+								}
+							}
+
 							// Optionally transmit to the Access Point right after generation (opt-in + idempotent) and if not yet generated.
 							// Without this, validation only generates the Factur-X; the invoice is never sent to the
 							// PA (transmission was a manual "send_to_pdp" click only). The 'transmitted' guard prevents
 							// re-sending (and creating duplicate flows) when the PDF is regenerated later.
-							if (getDolGlobalString('EINVOICING_AUTO_SEND_ON_GENERATION') && empty($currentStatusDetails['transmitted'])) {
+							if (getDolGlobalString('EINVOICING_AUTO_SEND_ON_GENERATION') && empty($currentStatusDetails['transmitted']) && $precheckresult >= 0) {
 								dol_syslog("actions_einvoicing: Invoice seems not yet transmitted and EINVOICING_AUTO_SEND_ON_GENERATION is on, so we try to send it");
 
 								require_once __DIR__ . '/providers/PDPProviderManager.class.php';
@@ -308,17 +327,19 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				);
 
 				// If the e-invoice is generated, display the button to precheck the e-invoice with the Access Point validation service if available.
-				$PDPManager = new PDPProviderManager($db);
-				$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
-				$precheckAvailable = $provider->hasValidator();
-				if (!empty($currentStatusDetails['file']) && $currentStatusDetails['file'] == 1 && $precheckAvailable) {
-					$url_button[] = array(
-						'lang' => 'einvoicing',
-						'enabled' => true,
-						'perm' => (bool) $user->hasRight("facture", "creer"),
-						'label' => $langs->trans('PrecheckEinvoice'),
-						'url' => '/compta/facture/card.php?id=' . $object->id . '&action=precheck_einvoice&token=' . newToken()
-					);
+				if (getDolGlobalString('EINVOICING_PDP') && getDolGlobalString('EINVOICING_AP_PRECHECK') === 'manuel') {
+					$PDPManager = new PDPProviderManager($db);
+					$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+					$precheckAvailable = $provider->hasValidator();
+					if (!empty($currentStatusDetails['file']) && $currentStatusDetails['file'] == 1 && $precheckAvailable) {
+						$url_button[] = array(
+							'lang' => 'einvoicing',
+							'enabled' => true,
+							'perm' => (bool) $user->hasRight("facture", "creer"),
+							'label' => $langs->trans('PrecheckEinvoice'),
+							'url' => '/compta/facture/card.php?id=' . $object->id . '&action=precheck_einvoice&token=' . newToken()
+						);
+					}
 				}
 
 				// If the e-invoice is generated but not sent, or if it was sent and a validation error was received,
@@ -617,6 +638,22 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 							setEventMessages($langs->trans("InvoiceGeneratedWithWarnings"), $this->warnings, 'warnings');
 						} else {
 							setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
+						}
+
+						// Precheck the e-invoice with the Access Point validation service if available.
+						if (getDolGlobalString('EINVOICING_PDP') && getDolGlobalString('EINVOICING_AP_PRECHECK') === 'auto') {
+							$PDPManager = new PDPProviderManager($db);
+							$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+							if (is_object($provider) && $provider->hasValidator()) {
+								$einvoiceFilePath = $einvoicing->getEInvoiceFilePath($invoiceObject->ref);
+								$result = $provider->validateEInvoiceFile($invoiceObject->id, $einvoiceFilePath);
+								if ($result['res'] > 0) {
+									setEventMessages($langs->trans("InvoicePrecheckSuccessful"), array(), 'mesgs');
+								} else {
+									setEventMessages($langs->trans("InvoicePrecheckFailed"), array(), 'errors');
+									dol_syslog(__METHOD__ . " Invoice precheck failed for invoice ID " . $invoiceObject->id);
+								}
+							}
 						}
 					} else {
 						// If there is an error, we move warnings into error message
