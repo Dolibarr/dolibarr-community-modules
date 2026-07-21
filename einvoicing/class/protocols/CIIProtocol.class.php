@@ -661,7 +661,7 @@ class CIIProtocol extends AbstractProtocol
 		// parse the wrong invoice (#226). The fixed einvoice.[pdf|xml] file slot is only the downloadable
 		// "last invoice that could not be processed" diagnostic, managed in cleanupIncomingTempFiles().
 		$uid = bin2hex(random_bytes(8));
-		$tempFile = $tempDir . '/in_' . $uid . '.' . self::INVOICE_FILE_EXTENSION;
+		$tempFile = $tempDir . '/in_' . $uid . '.' . static::INVOICE_FILE_EXTENSION;
 		$tempFileReadableView = $tempDir . '/in_' . $uid . '_readable.pdf';
 
 		$result = ['res' => -1, 'message' => 'Unexpected error while creating supplier invoice'];
@@ -669,7 +669,7 @@ class CIIProtocol extends AbstractProtocol
 			$result = $this->doCreateSupplierInvoiceFromSource($file, $ReadableViewFile, $flowId, $tempFile, $tempFileReadableView);
 		} finally {
 			$failed = !is_array($result) || !isset($result['res']) || $result['res'] < 0;
-			$this->cleanupIncomingTempFiles($tempDir, $tempFile, $tempFileReadableView, 'einvoice.' . self::INVOICE_FILE_EXTENSION, 'einvoice_readable.pdf', $failed);
+			$this->cleanupIncomingTempFiles($tempDir, $tempFile, $tempFileReadableView, 'einvoice.' . static::INVOICE_FILE_EXTENSION, 'einvoice_readable.pdf', $failed);
 		}
 
 		return $result;
@@ -2434,7 +2434,7 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		// Prepare destination filename with optional prefix
-		$filename = dol_sanitizeFileName($supplierInvoice->ref_supplier . (empty($suffix) ? '' : '_' . $suffix) . '.' . self::INVOICE_FILE_EXTENSION);
+		$filename = dol_sanitizeFileName($supplierInvoice->ref_supplier . (empty($suffix) ? '' : '_' . $suffix) . '.' . static::INVOICE_FILE_EXTENSION);
 
 		$dest_path = $upload_dir . '/' . $filename;
 
