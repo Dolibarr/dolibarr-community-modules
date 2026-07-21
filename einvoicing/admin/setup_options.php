@@ -146,12 +146,7 @@ foreach ($protocolsList as $key => $protocolconfig) {
 
 // Set the default protocol when no default value is specified
 if (getDolGlobalString('EINVOICING_PDP') && !getDolGlobalString('EINVOICING_PROTOCOL')) {
-	if (getDolGlobalString('EINVOICING_PDP') == 'ESALINK') {
-		// Default protocol for ESALINK is Factur-x. TODO Change to CII ?
-		dolibarr_set_const($db, 'EINVOICING_PROTOCOL', 'FACTURX', 'chaine', 0, '', $conf->entity);
-	} else {
-		dolibarr_set_const($db, 'EINVOICING_PROTOCOL', 'CII', 'chaine', 0, '', $conf->entity);
-	}
+	dolibarr_set_const($db, 'EINVOICING_PROTOCOL', 'CII', 'chaine', 0, '', $conf->entity);
 	header("Location: ".$_SERVER["PHP_SELF"]);
 	exit;
 }
@@ -169,7 +164,7 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 
 	$item = $formSetup->newItem('EINVOICING_PROTOCOL')->setAsSelect($TFieldProtocols);
 	$item->helpText = $langs->transnoentities('EINVOICING_PROTOCOL_HELP');
-	$item->defaultFieldValue = 'FACTURX';
+	$item->defaultFieldValue = 'CII';
 	$item->cssClass = 'minwidth500';
 	$item->fieldParams['trClass'] = 'advancedoption';
 
@@ -199,6 +194,26 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->defaultFieldValue = 'warning_only';
 	$item->cssClass = 'minwidth500';
 
+	// Setup conf to choose to precheck the e-invoice with the Access Point validation service if available.
+	if (getDolGlobalString('EINVOICING_PDP')) {
+		$PDPManager = new PDPProviderManager($db);
+		$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+		$providerconfig  = $provider->getConf();
+		$hasValidator = $providerconfig['has_validator'];
+		if ($hasValidator) {
+			// No check
+			// apres generation du einvoice.
+			$item = $formSetup->newItem('EINVOICING_AP_PRECHECK')->setAsSelect(array(
+				'nocheck' => $langs->transnoentities('EINVOICING_AP_PRECHECK_NOCHECK'),
+				'manuel' => $langs->transnoentities('EINVOICING_AP_PRECHECK_MANUEL'),
+				'auto' => $langs->transnoentities('EINVOICING_AP_PRECHECK_AUTO'),
+			));
+			$item->helpText = $langs->transnoentities('EINVOICING_AP_PRECHECK_HELP');
+			$item->defaultFieldValue = 'nocheck';
+			$item->cssClass = 'minwidth500';
+		}
+	}
+
 
 	if (getDolGlobalString('EINVOICING_EINVOICE_IN_REAL_TIME')) {
 		$item = $formSetup->newItem('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS')->setAsYesNo();
@@ -206,21 +221,6 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 		$item->defaultFieldValue = '0';
 		$item->cssClass = 'minwidth500';
 	}
-
-	// Setup conf for PMT - Mention regarding recovery fees
-	$item = $formSetup->newItem('EINVOICING_PMT');
-	$item->helpText = $langs->transnoentities('EINVOICING_PMT_HELP');
-	$item->cssClass = 'minwidth500';
-
-	// Setup conf for PMD - Mention regarding late payment penalties
-	$item = $formSetup->newItem('EINVOICING_PMD');
-	$item->helpText = $langs->transnoentities('EINVOICING_PMD_HELP');
-	$item->cssClass = 'minwidth500';
-
-	// Setup conf for AAB - Mention regarding absence of discount for early payment
-	$item = $formSetup->newItem('EINVOICING_AAB');
-	$item->helpText = $langs->transnoentities('EINVOICING_AAB_HELP');
-	$item->cssClass = 'minwidth500';
 
 	// Setup conf to choose to block generation/send of an invoice if no routing ID is found for the third party otherwise use SIREN
 	/* Option no more useful due to other added option that are more accurate, but we can still use it as hidden option
@@ -283,6 +283,21 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->fieldAttr['type'] = 'number';
 	$item->fieldAttr['min'] = '0';
 	$item->fieldAttr['step'] = '0.1';
+
+	// Setup conf for PMT - Mention regarding recovery fees
+	$item = $formSetup->newItem('EINVOICING_PMT');
+	$item->helpText = $langs->transnoentities('EINVOICING_PMT_HELP');
+	$item->cssClass = 'minwidth500';
+
+	// Setup conf for PMD - Mention regarding late payment penalties
+	$item = $formSetup->newItem('EINVOICING_PMD');
+	$item->helpText = $langs->transnoentities('EINVOICING_PMD_HELP');
+	$item->cssClass = 'minwidth500';
+
+	// Setup conf for AAB - Mention regarding absence of discount for early payment
+	$item = $formSetup->newItem('EINVOICING_AAB');
+	$item->helpText = $langs->transnoentities('EINVOICING_AAB_HELP');
+	$item->cssClass = 'minwidth500';
 }
 
 
