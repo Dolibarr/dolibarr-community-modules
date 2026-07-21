@@ -90,14 +90,7 @@ class SupplierInvoiceHelper
 		$protocol = $protocolManager->getProtocol($detectedProtocolName);
 
 		// Extract XML header data
-		switch ($detectedProtocolName) {
-			case 'CII':
-				$parsedHeader = $protocol->parseInvoiceHeader($xmlData);
-				break;
-				// Another format can be added here
-			default:
-				throw new Exception('Format ' . $detectedProtocolName . ' not available for comparison');
-		}
+		$parsedHeader = $protocol->parseInvoiceHeader($xmlData);
 
 		// Currency
 		$currencyCode = $dolSupplierInvoice->multicurrency_code ?? $conf->currency;

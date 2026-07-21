@@ -118,6 +118,22 @@ abstract class AbstractProtocol
 	abstract public function generateSampleInvoice($einvoicing, $thirdpartySeller = null, $thirdpartyBuyer = null, $options = array());
 
 	/**
+	 * Parse the invoice header from raw file content.
+	 *
+	 * @param  string $rawContent Raw file content
+	 * @return array<string,float|string|array>
+	 */
+	abstract public function parseInvoiceHeader(string $rawContent);
+
+	/**
+	 * Parse all invoice line items from raw file content.
+	 *
+	 * @param  string $rawContent Raw file content
+	 * @return array<int,array<string,mixed>>
+	 */
+	abstract public function parseInvoiceLines(string $rawContent);
+
+	/**
 	 * Remove attachment nodes to get a smaller XML
 	 * @param string $xmlData The XML data to process
 	 * @return string Cleaned XML

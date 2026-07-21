@@ -1305,12 +1305,12 @@ class CIIProtocol extends AbstractProtocol
 	 *   '__MULTI__<xpath>'     → returns array of child node data
 	 *   '__ATTRPAIRS__<xpath>' → returns ['schemeID' => 'value', …]
 	 *
-	 * @param  string $xml Raw XML content
-	 * @return array<string,float|string>|false
+	 * @param  string $rawContent Raw XML content
+	 * @return array<string,float|string|array>
 	 */
-	public function parseInvoiceHeader($xml)
+	public function parseInvoiceHeader(string $rawContent)
 	{
-		list(, $xpath) = $this->initXPath($xml);
+		list(, $xpath) = $this->initXPath($rawContent);
 
 		$data = [];
 
@@ -1355,12 +1355,13 @@ class CIIProtocol extends AbstractProtocol
 	/**
 	 * Parse all invoice line items from CII XML.
 	 *
-	 * @param  string $xml Raw XML content
+	 * @param  string $rawContent Raw file content
 	 * @return array<int,array<string,null|bool|float|string|array<mixed>>>
 	 */
-	public function parseInvoiceLines($xml)
+	public function parseInvoiceLines(string $rawContent)
 	{
-		list(, $xpath) = $this->initXPath($xml);
+		// $rawContent is XML content
+		list(, $xpath) = $this->initXPath($rawContent);
 
 		// Grab header documentno once so we can fill parentDocumentNo on each line
 		$parentDocNo = $this->getXPathValue(
