@@ -191,6 +191,13 @@ $item->cssClass = 'minwidth500';
 $item = $formSetup->newItem('EINVOICING_LIVE')->setAsYesNo();
 $item->fieldParams['forcereload'] = 1;
 
+// Setup conf to use the invoice billing contact (external BILLING contact) as the XML buyer instead of the invoice thirdparty
+$item = $formSetup->newItem('EINVOICING_USE_BILLING_CONTACT_AS_BUYER')->setAsYesNo();
+$item->helpText = $langs->transnoentities('EINVOICING_USE_BILLING_CONTACT_AS_BUYER_HELP');
+$item->defaultFieldValue = '0';
+$item->cssClass = 'minwidth500';
+$item->fieldParams['trClass'] = 'advancedoption';
+
 // End of selection of platform partner
 
 

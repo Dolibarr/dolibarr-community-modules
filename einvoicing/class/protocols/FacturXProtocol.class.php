@@ -416,6 +416,16 @@ class FacturXProtocol extends CIIProtocol
 				$invoiceData['sellercontactemailaddr']
 			);
 
+			// Set Buyer Trade Contact details (e.g. invoice billing contact). Only emitted when a contact person is known.
+			if (!empty($invoiceData['buyercontactpersonname'])) {
+				$facturxpdf->setDocumentBuyerContact(
+					$invoiceData['buyercontactpersonname'],
+					"",
+					$invoiceData['buyercontactphoneno'],
+					"",
+					$invoiceData['buyercontactemailaddr']
+				);
+			}
 			// Set Buyer Reference (Service Code for Chorus)
 			if (!empty($invoiceData['buyerReference'])) {
 				$facturxpdf->setDocumentBuyerReference($invoiceData['buyerReference']);
