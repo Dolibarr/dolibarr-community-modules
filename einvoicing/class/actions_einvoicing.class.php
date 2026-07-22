@@ -1421,4 +1421,41 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		return 0;
 	}
+
+	/**
+	 * Called by Societe::mergeCompany() when two thirdparties are merged, so the e-invoicing
+	 * routing IDs registered on the absorbed thirdparty (llx_einvoicing_routing.fk_soc) are not
+	 * silently orphaned and lost on the surviving one.
+	 *
+	 * @param array{soc_origin:int,soc_dest:int} 	$parameters		Array of parameters (soc_origin = absorbed thirdparty id, soc_dest = surviving thirdparty id)
+	 * @param CommonObject							$object			Destination thirdparty object
+	 * @param string								$action			Code action
+	 * @param Hookmanager							$hookmanager	Hookmanager
+	 * @return int									0 on success/nothing to do, -1 on error (sets $this->error/$this->errors)
+	 */
+	public function replaceThirdparty($parameters, $object, &$action, $hookmanager)
+	{
+		global $db;
+
+		$socOrigin = (int) ($parameters['soc_origin'] ?? 0);
+		$socDest = (int) ($parameters['soc_dest'] ?? 0);
+
+		if ($socOrigin <= 0 || $socDest <= 0) {
+			return 0;
+		}
+
+		$sql = "UPDATE " . $db->prefix() . "einvoicing_routing";
+		$sql .= " SET fk_soc = " . $socDest;
+		$sql .= " WHERE fk_soc = " . $socOrigin;
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . " Failed to reassign einvoicing_routing.fk_soc from " . $socOrigin . " to " . $socDest . ": " . $db->lasterror(), LOG_ERR);
+			$this->error = $db->lasterror();
+			$this->errors[] = $this->error;
+			return -1;
+		}
+
+		return 0;
+	}
 }
