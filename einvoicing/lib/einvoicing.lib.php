@@ -393,7 +393,7 @@ if (!function_exists('einvoicingDolGetButtonActionDropdown')) {
 	 *
 	 *  @param	string	$label			Dropdown toggle visible label
 	 *  @param	array	$urlButtons		List of sub-buttons, same format as the native $url array
-	 *  									(each entry: 'lang', 'enabled', 'perm', 'label', 'url')
+	 *                                  (each entry: 'lang', 'enabled', 'perm', 'label', 'url')
 	 *  @param	array	$params			Extra params (only 'backtopage' is honored, like the core function)
 	 *  @return	string					Dropdown HTML
 	 *  @since	Dolibarr V18
