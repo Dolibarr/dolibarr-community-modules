@@ -621,6 +621,67 @@ abstract class AbstractPDPProvider
 	}
 
 	/**
+	 * Keys whose value must never be persisted in clear in the API call log (llx_einvoicing_call),
+	 * whatever request/response they appear in (OAuth token exchanges in particular).
+	 *
+	 * @var array<int,string>
+	 */
+	private const LOGCALL_SENSITIVE_KEYS = array('client_secret', 'access_token', 'refresh_token', 'id_token', 'password');
+
+	/**
+	 * Redact known sensitive fields (@see LOGCALL_SENSITIVE_KEYS) from a value before it is
+	 * persisted in the API call log, whatever its shape: PHP array, application/x-www-form-urlencoded
+	 * string (OAuth token requests), JSON string, or plain text (left untouched in that last case).
+	 *
+	 * @param  array<mixed>|string|null $value Value to redact
+	 * @return array<mixed>|string|null Redacted value, same shape as the input
+	 */
+	private static function redactSensitiveData($value)
+	{
+		if (is_array($value)) {
+			$redacted = array();
+			foreach ($value as $key => $item) {
+				if (is_string($key) && in_array(strtolower($key), self::LOGCALL_SENSITIVE_KEYS, true)) {
+					$redacted[$key] = '[REDACTED]';
+				} else {
+					$redacted[$key] = is_array($item) ? self::redactSensitiveData($item) : $item;
+				}
+			}
+			return $redacted;
+		}
+
+		if (is_string($value)) {
+			// application/x-www-form-urlencoded body, e.g. "grant_type=...&client_secret=..."
+			if (preg_match('/^[a-zA-Z0-9_.\[\]]+=/', $value)) {
+				parse_str($value, $parsed);
+				if (is_array($parsed) && !empty($parsed)) {
+					$changed = false;
+					foreach (self::LOGCALL_SENSITIVE_KEYS as $sensitiveKey) {
+						if (isset($parsed[$sensitiveKey])) {
+							$parsed[$sensitiveKey] = '[REDACTED]';
+							$changed = true;
+						}
+					}
+					if ($changed) {
+						return http_build_query($parsed);
+					}
+				}
+			}
+
+			// JSON body
+			$decoded = json_decode($value, true);
+			if (is_array($decoded)) {
+				$redacted = self::redactSensitiveData($decoded);
+				if ($redacted !== $decoded) {
+					return json_encode($redacted);
+				}
+			}
+		}
+
+		return $value;
+	}
+
+	/**
 	 * Log an API call into llx_einvoicing_call using a SEPARATE database connection.
 	 *
 	 * The call trace must survive even when the caller's main transaction is rolled
@@ -629,6 +690,10 @@ abstract class AbstractPDPProvider
 	 * Writing the log through an independent connection ($dbhistory) decouples it from
 	 * the business transaction, so it is committed whether the action succeeds or fails,
 	 * without ever forcing a commit on the rest. Same approach as the webhook logging.
+	 *
+	 * Request/response payloads are redacted (@see redactSensitiveData()) before being
+	 * persisted: this log is readable by any user with the 'einvoicing' read right, so
+	 * OAuth secrets and tokens must never end up in llx_einvoicing_call in clear.
 	 *
 	 * @param   ?string                     $callType   Functional type of the call (empty/null = do not log)
 	 * @param   string                      $resource   API resource/endpoint (without leading slash)
@@ -653,6 +718,9 @@ abstract class AbstractPDPProvider
 		}
 
 		$dbhistory->begin();
+
+		$params = self::redactSensitiveData($params);
+		$response = self::redactSensitiveData($response);
 
 		$call = new Call($dbhistory);
 		$call->call_id = $call->getNextCallId();
