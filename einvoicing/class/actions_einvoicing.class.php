@@ -1220,7 +1220,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		if (in_array('thirdpartylist', explode(':', $parameters['context'])) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI'))) {
 			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
 				print '<td class="liste_titre">';
-				print '<input type="text" name="search_routing_id" value="' . GETPOST('search_routing_id', 'alpha') . '" class="minwidth50 maxwidth100">';
+				print '<input type="text" name="search_routing_id" value="' . dolPrintHTMLForAttribute(GETPOST('search_routing_id', 'alpha')) . '" class="minwidth50 maxwidth100">';
 				print '</td>';
 			}
 		}
