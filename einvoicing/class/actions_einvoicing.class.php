@@ -402,16 +402,17 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		// Add buttons in supplier invoice card
 		if (in_array($object->element, ['invoice_supplier']) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
 			// Check if this invoice is present into einvoicing_extlinks table to know if it is an imported invoice from PDP or not
-			$sql = "SELECT rowid, provider FROM " . MAIN_DB_PREFIX . "einvoicing_extlinks";
+			$sql = "SELECT rowid, provider FROM " . $db->prefix() . "einvoicing_extlinks";
 			$sql .= " WHERE element_type = '" . $db->escape($object->element) . "'";
 			$sql .= " AND element_id = " . (int) $object->id;
 			$sql .= " LIMIT 1";
 
 			$resql = $db->query($sql);
 			if ($resql && $db->num_rows($resql) > 0) {
+				$db->free($resql);
 				// Check if a final status (approved or rejected) has already been sent and validated
 				// → in this case, the lifecycle is complete, so we hide the button
-				$sqlFinal = "SELECT rowid FROM " . MAIN_DB_PREFIX . "einvoicing_lifecycle_msg";
+				$sqlFinal = "SELECT rowid FROM " . $db->prefix() . "einvoicing_lifecycle_msg";
 				$sqlFinal .= " WHERE element_id = " . (int) $object->id;
 				$sqlFinal .= " AND element_type = '" . $db->escape($object->element) . "'";
 				$sqlFinal .= " AND direction = 'out'";
@@ -420,6 +421,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				$sqlFinal .= " LIMIT 1";
 				$resqlFinal = $db->query($sqlFinal);
 				$hasFinalLifecycle = ($resqlFinal && $db->num_rows($resqlFinal) > 0);
+				$db->free($resqlFinal);
 
 				if (!$hasFinalLifecycle) {
 					$availableStatuses = $einvoicing->getEinvoiceStatusOptions(1, 1, 1);
@@ -481,9 +483,18 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		$error = 0;
 		$currentStatusDetails = null;
 
+		$isFactureContext = isset($object->element) && in_array($object->element, ['facture']) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP');
+		$isSupplierInvoiceContext = isset($object->element) && in_array($object->element, ['invoice_supplier']) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI');
+		$isThirdpartyContext = array_intersect(['thirdpartycard', 'thirdpartycomm'], $contexts) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI'));
+
+		if (!$isFactureContext && !$isSupplierInvoiceContext && !$isThirdpartyContext) {
+			// Nothing relevant to this hook call for the current object/context: skip the transaction entirely.
+			return 0;
+		}
+
 		$db->begin();
 
-		if (isset($object->element) && in_array($object->element, ['facture']) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
+		if ($isFactureContext) {
 			'@phan-var-force Facture $object';
 			$permissiontoedit = $user->hasRight('facture', 'write');
 
@@ -689,7 +700,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		}
 
 
-		if (isset($object->element) && in_array($object->element, ['invoice_supplier']) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
+		if ($isSupplierInvoiceContext) {
 			$permissiontoedit = $user->hasRight('fournisseur', 'facture', 'creer');
 
 			if ($action == 'confirm_sendStatusMessage' && $permissiontoedit) {
@@ -710,7 +721,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			}
 		}
 
-		if (array_intersect(['thirdpartycard', 'thirdpartycomm'], $contexts) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI'))) {
+		if ($isThirdpartyContext) {
 			$permissiontoedit = $user->hasRight('societe', 'creer');
 
 			// $object->id may be empty at hook time if core hasn't fetched the object yet
@@ -1027,8 +1038,10 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 */
 	public function printFieldListFrom($parameters, $object, &$action, $hookmanager)
 	{
+		global $db;
+
 		if (in_array('invoicelist', explode(':', $parameters['context']))) {
-			$this->resprints .= " LEFT JOIN " . MAIN_DB_PREFIX . "einvoicing_extlinks as ext ON ext.element_id = f.rowid AND ext.element_type = 'facture'";
+			$this->resprints .= " LEFT JOIN " . $db->prefix() . "einvoicing_extlinks as ext ON ext.element_id = f.rowid AND ext.element_type = 'facture'";
 		}
 
 		// Supplier invoice list, Product list, Soc list
@@ -1036,16 +1049,16 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		if (array_intersect($contexts, ['supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist'])) {
 			if (in_array('thirdpartylist', $contexts, true)) {
-				$this->resprints .= ' LEFT JOIN ' . MAIN_DB_PREFIX . "einvoicing_extlinks as ext ON ext.element_id = s.rowid AND ext.element_type = 'societe'";
-				$this->resprints .= ' LEFT JOIN ' . MAIN_DB_PREFIX . "einvoicing_routing rt ON rt.fk_soc = s.rowid";
+				$this->resprints .= ' LEFT JOIN ' . $db->prefix() . "einvoicing_extlinks as ext ON ext.element_id = s.rowid AND ext.element_type = 'societe'";
+				$this->resprints .= ' LEFT JOIN ' . $db->prefix() . "einvoicing_routing rt ON rt.fk_soc = s.rowid";
 			}
 
 			if (in_array('supplierinvoicelist', $contexts, true)) {
-				$this->resprints .= ' LEFT JOIN ' . MAIN_DB_PREFIX . "einvoicing_extlinks as ext ON ext.element_id = f.rowid AND ext.element_type = 'invoice_supplier'";
+				$this->resprints .= ' LEFT JOIN ' . $db->prefix() . "einvoicing_extlinks as ext ON ext.element_id = f.rowid AND ext.element_type = 'invoice_supplier'";
 			}
 
 			if (in_array('productservicelist', $contexts, true)) {
-				$this->resprints .= ' LEFT JOIN ' . MAIN_DB_PREFIX . "einvoicing_extlinks as ext ON ext.element_id = p.rowid AND ext.element_type = 'product'";
+				$this->resprints .= ' LEFT JOIN ' . $db->prefix() . "einvoicing_extlinks as ext ON ext.element_id = p.rowid AND ext.element_type = 'product'";
 			}
 		}
 

@@ -331,7 +331,7 @@ class SupplierInvoiceHelper
 	{
 		global $db, $user;
 
-		$sql = "SELECT rowid, flow_id, provider, xml_data FROM " . MAIN_DB_PREFIX . "einvoicing_document";
+		$sql = "SELECT rowid, flow_id, provider, xml_data FROM " . $db->prefix() . "einvoicing_document";
 		$sql .= " WHERE fk_element_type = '" . $db->escape('invoice_supplier') . "'";
 		$sql .= " AND fk_element_id = " . (int) $supplierInvoiceId;
 		$sql .= " LIMIT 2";
@@ -340,6 +340,7 @@ class SupplierInvoiceHelper
 		if ($resql) {
 			if ($db->num_rows($resql) == 1) {
 				$foundDocument = $db->fetch_object($resql);
+				$db->free($resql);
 
 				$document = new Document($db);
 				$resdoc = $document->fetch($foundDocument->rowid);
@@ -387,8 +388,10 @@ class SupplierInvoiceHelper
 
 				return $foundDocument->xml_data;
 			} elseif ($db->num_rows($resql) > 1) {
+				$db->free($resql);
 				throw new Exception('Duplicate entry in einvoicing_document for supplier invoice with id '.$supplierInvoiceId);
 			} elseif ($db->num_rows($resql) == 0) {
+				$db->free($resql);
 				throw new Exception('No result found when searching for supplier invoice with id '.$supplierInvoiceId . ' in einvoicing_document');
 			}
 		}
@@ -408,7 +411,7 @@ class SupplierInvoiceHelper
 	{
 		global $db;
 
-		$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "einvoicing_document";
+		$sql = "SELECT rowid FROM " . $db->prefix() . "einvoicing_document";
 		$sql .= " WHERE fk_element_type = '" . $db->escape('invoice_supplier') . "'";
 		$sql .= " AND fk_element_id = " . (int) $supplierInvoiceId;
 		$sql .= " LIMIT 2";
@@ -416,6 +419,7 @@ class SupplierInvoiceHelper
 		$resql = $db->query($sql);
 		if ($resql) {
 			if ($db->num_rows($resql) == 1) {
+				$db->free($resql);
 				if ($checkLinkedDolObjectExistance) {
 					$factureFournisseur = new FactureFournisseur($db);
 					if ($factureFournisseur->fetch((int) $supplierInvoiceId) > 0) {
@@ -425,7 +429,10 @@ class SupplierInvoiceHelper
 					return true;
 				}
 			} elseif ($db->num_rows($resql) > 1) {
+				$db->free($resql);
 				throw new Exception('Duplicate entry in einvoicing_document for supplier invoice with id '.$supplierInvoiceId);
+			} else {
+				$db->free($resql);
 			}
 		}
 		return false;
