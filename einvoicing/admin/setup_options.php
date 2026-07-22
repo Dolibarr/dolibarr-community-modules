@@ -146,12 +146,7 @@ foreach ($protocolsList as $key => $protocolconfig) {
 
 // Set the default protocol when no default value is specified
 if (getDolGlobalString('EINVOICING_PDP') && !getDolGlobalString('EINVOICING_PROTOCOL')) {
-	if (getDolGlobalString('EINVOICING_PDP') == 'ESALINK') {
-		// Default protocol for ESALINK is Factur-x. TODO Change to CII ?
-		dolibarr_set_const($db, 'EINVOICING_PROTOCOL', 'FACTURX', 'chaine', 0, '', $conf->entity);
-	} else {
-		dolibarr_set_const($db, 'EINVOICING_PROTOCOL', 'CII', 'chaine', 0, '', $conf->entity);
-	}
+	dolibarr_set_const($db, 'EINVOICING_PROTOCOL', 'CII', 'chaine', 0, '', $conf->entity);
 	header("Location: ".$_SERVER["PHP_SELF"]);
 	exit;
 }
@@ -169,7 +164,7 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 
 	$item = $formSetup->newItem('EINVOICING_PROTOCOL')->setAsSelect($TFieldProtocols);
 	$item->helpText = $langs->transnoentities('EINVOICING_PROTOCOL_HELP');
-	$item->defaultFieldValue = 'FACTURX';
+	$item->defaultFieldValue = 'CII';
 	$item->cssClass = 'minwidth500';
 	$item->fieldParams['trClass'] = 'advancedoption';
 
@@ -199,6 +194,24 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->defaultFieldValue = 'warning_only';
 	$item->cssClass = 'minwidth500';
 
+	// Setup conf to precheck the e-invoice with the Access Point validation service if available.
+	if (getDolGlobalString('EINVOICING_PDP')) {
+		$PDPManager = new PDPProviderManager($db);
+		$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+		$providerconfig  = $provider->getConf();
+		$hasValidator = $providerconfig['has_validator'];
+		if ($hasValidator) {
+			$item = $formSetup->newItem('EINVOICING_AP_PRECHECK')->setAsSelect(array(
+				'nocheck' => $langs->transnoentities('EINVOICING_AP_PRECHECK_NOCHECK'),
+				'manuel' => $langs->transnoentities('EINVOICING_AP_PRECHECK_MANUEL'),
+				'auto' => $langs->transnoentities('EINVOICING_AP_PRECHECK_AUTO'),
+			));
+			$item->helpText = $langs->transnoentities('EINVOICING_AP_PRECHECK_HELP');
+			$item->defaultFieldValue = 'nocheck';
+			$item->cssClass = 'minwidth500';
+		}
+	}
+
 
 	if (getDolGlobalString('EINVOICING_EINVOICE_IN_REAL_TIME')) {
 		$item = $formSetup->newItem('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS')->setAsYesNo();
@@ -206,21 +219,6 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 		$item->defaultFieldValue = '0';
 		$item->cssClass = 'minwidth500';
 	}
-
-	// Setup conf for PMT - Mention regarding recovery fees
-	$item = $formSetup->newItem('EINVOICING_PMT');
-	$item->helpText = $langs->transnoentities('EINVOICING_PMT_HELP');
-	$item->cssClass = 'minwidth500';
-
-	// Setup conf for PMD - Mention regarding late payment penalties
-	$item = $formSetup->newItem('EINVOICING_PMD');
-	$item->helpText = $langs->transnoentities('EINVOICING_PMD_HELP');
-	$item->cssClass = 'minwidth500';
-
-	// Setup conf for AAB - Mention regarding absence of discount for early payment
-	$item = $formSetup->newItem('EINVOICING_AAB');
-	$item->helpText = $langs->transnoentities('EINVOICING_AAB_HELP');
-	$item->cssClass = 'minwidth500';
 
 	// Setup conf to choose to block generation/send of an invoice if no routing ID is found for the third party otherwise use SIREN
 	/* Option no more useful due to other added option that are more accurate, but we can still use it as hidden option
@@ -283,6 +281,21 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->fieldAttr['type'] = 'number';
 	$item->fieldAttr['min'] = '0';
 	$item->fieldAttr['step'] = '0.1';
+
+	// Setup conf for PMT - Mention regarding recovery fees
+	$item = $formSetup->newItem('EINVOICING_PMT');
+	$item->helpText = $langs->transnoentities('EINVOICING_PMT_HELP');
+	$item->cssClass = 'minwidth500';
+
+	// Setup conf for PMD - Mention regarding late payment penalties
+	$item = $formSetup->newItem('EINVOICING_PMD');
+	$item->helpText = $langs->transnoentities('EINVOICING_PMD_HELP');
+	$item->cssClass = 'minwidth500';
+
+	// Setup conf for AAB - Mention regarding absence of discount for early payment
+	$item = $formSetup->newItem('EINVOICING_AAB');
+	$item->helpText = $langs->transnoentities('EINVOICING_AAB_HELP');
+	$item->cssClass = 'minwidth500';
 }
 
 
@@ -297,12 +310,16 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
 	$item->helpText = $langs->transnoentities('EINVOICING_PRODUCTS_AUTO_GENERATION_HELP');
 	$item->defaultFieldValue = '0';
 	$item->cssClass = 'minwidth500';
+	$item->fieldParams['forcereload'] = 1;
 
-	// Setup conf to import lines as free description lines when no product is found
-	$item = $formSetup->newItem('EINVOICING_IMPORT_AS_FREE_LINES')->setAsYesNo();
-	$item->helpText = $langs->transnoentities('EINVOICING_IMPORT_AS_FREE_LINES_HELP');
-	$item->defaultFieldValue = '0';
-	$item->cssClass = 'minwidth500';
+	// Setup conf to import lines as free description lines when no product is found and no default product exist on supplier
+	// TODO This option is exclusive with EINVOICING_PRODUCTS_AUTO_GENERATION so should be disabled if EINVOICING_PRODUCTS_AUTO_GENERATION is on
+	if (!getDolGlobalString("EINVOICING_PRODUCTS_AUTO_GENERATION")) {
+		$item = $formSetup->newItem('EINVOICING_IMPORT_AS_FREE_LINES')->setAsYesNo();
+		$item->helpText = $langs->transnoentities('EINVOICING_IMPORT_AS_FREE_LINES_HELP');
+		$item->defaultFieldValue = '0';
+		$item->cssClass = 'minwidth500';
+	}
 
 	// Setup conf to choose use of auto generation or not of third parties
 	$item = $formSetup->newItem('EINVOICING_THIRDPARTIES_AUTO_GENERATION')->setAsYesNo();
@@ -317,19 +334,21 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
 	$item->cssClass = 'minwidth500';
 
 	// Setup conf to to enable a limit of flows to synchronize per one synchronization call
+	/* This option is useless, should be always on. Disabling it is possible by editing hidden cosntant
 	$item = $formSetup->newItem('EINVOICING_FLOWS_SYNC_CALL_LIMIT')->setAsYesNo();
 	$item->helpText = $langs->transnoentities('EINVOICING_FLOWS_SYNC_CALL_LIMIT_HELP');
 	$item->defaultFieldValue = '1';
 	$item->cssClass = 'minwidth500';
 	$item->fieldParams['forcereload'] = 1;
+	*/
 
-	if (getDolGlobalString('EINVOICING_FLOWS_SYNC_CALL_LIMIT')) {
+	//if (getDolGlobalString('EINVOICING_FLOWS_SYNC_CALL_LIMIT')) {
 		// Setup conf to to define the number of flows to synchronize per one synchronization call
 		$item = $formSetup->newItem('EINVOICING_FLOWS_SYNC_CALL_SIZE');
 		$item->helpText = $langs->transnoentities('EINVOICING_FLOWS_SYNC_CALL_SIZE_HELP');
 		$item->defaultFieldValue = '100';
 		$item->cssClass = 'maxwidth100';
-	}
+	//}
 
 	// Setup conf to define a time margin in hours to go back from the current date of the last synchronization
 	$item = $formSetup->newItem('EINVOICING_SYNC_MARGIN_TIME_HOURS');
@@ -337,7 +356,7 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
 	$item->fieldAttr['placeholder'] = $langs->transnoentities('Hours');
 	$item->cssClass = 'maxwidth100';
 
-	if (getDolGlobalBool('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION_AVAILABLE')) {
+	if (getDolGlobalString('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION_AVAILABLE')) {
 		// Setup conf to enable or not the consistency check on supplier invoice validation
 		$item = $formSetup->newItem('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION');
 		$item->helpText = $langs->transnoentities('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION_HELP');

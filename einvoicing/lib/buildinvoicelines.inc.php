@@ -31,6 +31,8 @@
  * @var Societe    	$mysoc
  * @var Translate 	$langs
  * @var User       	$user
+ * @var Societe 	$buyerParty
+ * @var Facture 	$object
  *
  * @var Translate 	$outputlangs
  * @var Facture    	$invoice
@@ -123,18 +125,76 @@ $mySchemeGlobalIdProf = $this->getIEC6523Code($mysoc->country_code, 1);
 $myUri             = $einvoicing->getSellerCommunicationURI(0);
 $mySchemeUri       = $this->getIEC6523Code($mysoc->country_code, 2);
 
-// Buyer identifiers (thirdparty)
-$idprof            = thirdpartyidprof($object) ?? '';
-$schemeIdProf      = $this->getIEC6523Code($object->thirdparty->country_code);
-$globalIdProf      = thirdpartyidprof($object) ?? '';
-$schemeGlobalIdProf = $this->getIEC6523Code($object->thirdparty->country_code, 1);
-$uri               = $einvoicing->getBuyerCommunicationURI($object->thirdparty, $object);
+// Buyer party resolution.
+// By default the buyer is the invoice thirdparty. When EINVOICING_USE_BILLING_CONTACT_AS_BUYER
+// is enabled and a billing contact (external BILLING contact) is set on a French invoice, this
+// contact can become the XML buyer (e.g. invoice addressed to the head office / "siège social").
+//   - Case B: the contact belongs to a different thirdparty (distinct legal entity) -> rebuild the
+//     whole buyer (name, address, SIREN/SIRET, VAT, routing) from that thirdparty.
+//   - Case A: same thirdparty -> keep its SIREN/VAT/routing, only override name/address.
+$buyerParty        = $object->thirdparty;	// Societe used for legal id / VAT / routing
+$buyerName         = $object->thirdparty->name;
+$buyerAddress      = $object->thirdparty->address;
+$buyerZip          = $object->thirdparty->zip;
+$buyerTown         = $object->thirdparty->town;
+$buyerCountryCode  = $object->thirdparty->country_code;
+$buyerContactName  = null;
+$buyerContactEmail = null;
+$buyerContactPhone = null;
+
+if (getDolGlobalInt('EINVOICING_USE_BILLING_CONTACT_AS_BUYER')) {
+	$billingContactIds = $object->getIdContact('external', 'BILLING');
+	if (!empty($billingContactIds) && $object->fetch_contact($billingContactIds[0]) > 0 && is_object($object->contact)) {
+		$billingContact = $object->contact;
+
+		// Buyer contact person fields (BG-9), filled in every case
+		$tmpcontactname    = trim($billingContact->getFullName($outputlangs));
+		$buyerContactName  = ($tmpcontactname !== '') ? $tmpcontactname : null;
+		$buyerContactEmail = !empty($billingContact->email) ? $billingContact->email : null;
+		$buyerContactPhone = !empty($billingContact->phone_pro) ? $billingContact->phone_pro : (!empty($billingContact->phone_mobile) ? $billingContact->phone_mobile : null);
+
+		$contactSocId = !empty($billingContact->fk_soc) ? $billingContact->fk_soc : $billingContact->socid;
+
+		// Case B: billing contact attached to a different thirdparty (distinct legal entity)
+		if (!empty($contactSocId) && $contactSocId != $object->socid) {
+			require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
+			$recipientSoc = new Societe($db);
+			if ($recipientSoc->fetch($contactSocId) > 0 && idprof($recipientSoc) !== '') {
+				// Compute intra VAT if missing, same as for the invoice thirdparty
+				if ($recipientSoc->tva_assuj && empty($recipientSoc->tva_intra)) {
+					$recipientSoc->tva_intra = $einvoicing->thirdpartyCalcVATIntra($recipientSoc);
+				}
+				$buyerParty       = $recipientSoc;
+				$buyerName        = $recipientSoc->name;
+				$buyerAddress     = $recipientSoc->address;
+				$buyerZip         = $recipientSoc->zip;
+				$buyerTown        = $recipientSoc->town;
+				$buyerCountryCode = $recipientSoc->country_code;
+				dol_syslog('einvoicing: buyer overridden by billing contact thirdparty id=' . $contactSocId . ' (distinct legal entity)', LOG_NOTICE);
+			} else {
+				dol_syslog('einvoicing: billing contact thirdparty id=' . $contactSocId . ' has no usable professional id, keeping invoice thirdparty as buyer', LOG_NOTICE);
+				$contactSocId = 0;	// fall back to case A handling
+			}
+		}
+	} else {
+		dol_syslog('einvoicing: EINVOICING_USE_BILLING_CONTACT_AS_BUYER is on but no usable BILLING contact found, using invoice thirdparty as buyer', LOG_NOTICE);
+	}
+}
+// Buyer identifiers (resolved buyer party: invoice thirdparty or billing-contact recipient)
+if (!($buyerParty instanceof Societe)) {
+	throw new \RuntimeException('einvoicing: invoice thirdparty is not a valid Societe (invoice id=' . $object->id . ')');
+}
+$idprof            = idprof($buyerParty) ?? '';
+$schemeIdProf      = $this->getIEC6523Code($buyerParty->country_code);
+$globalIdProf      = idprof($buyerParty) ?? '';
+$schemeGlobalIdProf = $this->getIEC6523Code($buyerParty->country_code, 1);
+$uri               = $einvoicing->getBuyerCommunicationURI($buyerParty, $object);
 $reg = array();
 if (preg_match('/(\d+):(.+)/', $uri, $reg)) {
 	$uri		= (string) $reg[2];
 	$schemeUri  = (string) $reg[1];
 } else {
-	$schemeUri  = $this->getIEC6523Code($object->thirdparty->country_code, 2);
+	$schemeUri  = $schemeUri  = $this->getIEC6523Code($buyerParty->country_code, 2);
 }
 // In case of sample tests, we may have this const defined to overwrite buyer Einvoice address ID.
 // In common case, this should not be used
@@ -643,23 +703,23 @@ $invoiceData = [
 	'sellerTradingName'         => $mysoc->name ?? 'SPECIMEN',
 
 	// Buyer part
-	'buyername'                 => $object->thirdparty->name ?? 'CUSTOMER',
+	'buyername'                 =>  $buyerName ?: 'CUSTOMER',
 	'buyerids'                  => $idprof ?: 'IDPROF',
 
-	'buyerlineone'              => $object->thirdparty->address      ?? 'ADDRESS',
+	'buyerlineone'              => $buyerAddress     ?: 'ADDRESS',
 	'buyerlinetwo'              => "",
 	'buyerlinethree'            => "",
-	'buyerpostcode'             => $object->thirdparty->zip          ?? 'ZIP',
-	'buyercity'                 => $object->thirdparty->town         ?? 'TOWN',
-	'buyercountry'              => $object->thirdparty->country_code ?? 'COUNTRY',
+	'buyerpostcode'             => $buyerZip         ?: 'ZIP',
+	'buyercity'                 => $buyerTown        ?: 'TOWN',
+	'buyercountry'              => $buyerCountryCode ?: 'COUNTRY',
 	'buyersubdivision'          => null,
 
-	'buyervatnumber'            => $object->thirdparty->tva_intra ?? '',
+	'buyervatnumber'            => $buyerParty->tva_intra ?? '',
 	'buyerGlobalIds'            => [['schemeID' => $schemeGlobalIdProf, 'value' => $globalIdProf]],
 
 	'buyerLegalOrgId'           => $idprof,
 	'buyerLegalOrgScheme'       => $schemeIdProf,
-	'buyerTradingName'          => $object->thirdparty->name,
+	'buyerTradingName'          => $buyerName,
 
 	'buyerReference'            => $object->array_options['options_d4d_service_code'] ?? null,
 
@@ -667,9 +727,9 @@ $invoiceData = [
 	'buyerCommunicationUriScheme' => $schemeUri,
 	'buyerCommunicationUri'    	=> $uri,
 
-	'buyercontactpersonname'    => null,
-	'buyercontactemailaddr'     => null,
-	'buyercontactphoneno'       => null,
+	'buyercontactpersonname'    => $buyerContactName,
+	'buyercontactemailaddr'     => $buyerContactEmail,
+	'buyercontactphoneno'       => $buyerContactPhone,
 
 	// Totals parts
 	'grandTotalAmount'          => $grand_total_ttc,
@@ -793,7 +853,7 @@ if ($shipAddress !== null) {
 // Section to control data and throw errors in case of problem, to avoid generating non compliant XML
 // --------------------------------------------------------------------------------------------------
 if (empty($idprof)) {
-	throw new Exception('BADTHIRDPARTYPROFID: The main professional ID of the thirdparty ' . $object->name . ' is empty.');
+	throw new Exception('BADTHIRDPARTYPROFID: The main professional ID of the buyer ' . $buyerParty->name . ' is empty.');
 }
 if (empty($myidprof)) {
 	throw new Exception('BADPROFID: The professional ID of your company is empty. Fix this in your company or module setup page.');
@@ -806,16 +866,16 @@ if ($mysoc->country_code == 'FR' && !empty($mysoc->idprof1) && !empty($mysoc->id
 		throw new Exception('BADVALUEFORSIRENORSIRET: The seller has both a SIREN and SIRET but SIRET does not start with value of SIREN.');
 	}
 }
-if ($object->thirdparty->country_code == 'FR' && !empty($object->thirdparty->idprof1) && !empty($object->thirdparty->idprof2)) {
-	if (strpos(preg_replace('/\s+/', '', $object->thirdparty->idprof2), preg_replace('/\s+/', '', $object->thirdparty->idprof1)) !== 0) {
-		throw new Exception('BADVALUEFORSIRENORSIRET: The buyer has both a SIREN "' . $object->thirdparty->idprof1 . '" and SIRET "' . $object->thirdparty->idprof2 . '" but SIRET does not start with value of SIREN.');
+if ($buyerParty->country_code == 'FR' && !empty($buyerParty->idprof1) && !empty($buyerParty->idprof2)) {
+	if (strpos(preg_replace('/\s+/', '', $buyerParty->idprof2), preg_replace('/\s+/', '', $buyerParty->idprof1)) !== 0) {
+		throw new Exception('BADVALUEFORSIRENORSIRET: The buyer has both a SIREN "' . $buyerParty->idprof1 . '" and SIRET "' . $buyerParty->idprof2 . '" but SIRET does not start with value of SIREN.');
 	}
 }
 if (!empty($mysoc->tva_intra) && !empty($mysoc->country_code) && substr($mysoc->tva_intra, 0, 2) != $mysoc->country_code) {
 	throw new Exception('BADVATNUMBER: The VAT number of your company must start with your country code.');
 }
-if (!empty($object->thirdparty->tva_intra) && !empty($object->thirdparty->country_code) && substr($object->thirdparty->tva_intra, 0, 2) != $object->thirdparty->country_code) {
-	throw new Exception('BADVATNUMBER: The VAT number of the thirdparty ' . $object->thirdparty->name . ' must start with its 2 letter country code.');
+if (!empty($buyerParty->tva_intra) && !empty($buyerParty->country_code) && substr($buyerParty->tva_intra, 0, 2) != $buyerParty->country_code) {
+	throw new Exception('BADVATNUMBER: The VAT number of the thirdparty ' . $buyerParty->name . ' must start with its 2 letter country code.');
 }
 
 

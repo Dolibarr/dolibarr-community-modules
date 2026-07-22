@@ -2819,7 +2819,24 @@ class EInvoicing
 	 */
 	public function needEInvoiceManagement($object)
 	{
+		global $db;
 		$return = 0;	// By default, no einvoicing.
+
+		if (getDolGlobalInt('EINVOICING_USE_BILLING_CONTACT_AS_BUYER')) {
+			$billingContactIds = $object->getIdContact('external', 'BILLING');
+			if (!empty($billingContactIds) && $object->fetch_contact($billingContactIds[0]) > 0 && is_object($object->contact)) {
+				$billingContact = $object->contact;
+				$contactSocId = !empty($billingContact->fk_soc) ? $billingContact->fk_soc : $billingContact->socid;
+
+				if (!empty($contactSocId) && $contactSocId != $object->socid) {
+					require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
+					$recipientSoc = new Societe($db);
+					if ($recipientSoc->fetch($contactSocId) > 0 && idprof($recipientSoc) !== '') {
+						$object->thirdparty = $recipientSoc;
+					}
+				}
+			}
+		}
 
 		if (empty($object->thirdparty->country_code)) {
 			$object->fetch_thirdparty();

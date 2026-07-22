@@ -36,6 +36,7 @@ use horstoeko\zugferd\codelists\ZugferdVatCategoryCodes;
 use horstoeko\zugferd\codelists\ZugferdVatTypeCodes;
 use horstoeko\zugferd\ZugferdDocumentBuilder;
 use horstoeko\zugferd\ZugferdProfiles;
+use horstoeko\zugferd\ZugferdSettings;
 use horstoeko\zugferd\ZugferdDocumentPdfBuilder;
 use horstoeko\zugferd\ZugferdDocumentValidator;
 use horstoeko\zugferd\ZugferdDocumentPdfReader;
@@ -46,6 +47,7 @@ require __DIR__ . "/../../vendor/autoload.php";
 
 dol_include_once('einvoicing/class/protocols/CIIProtocol.class.php');
 dol_include_once('einvoicing/class/protocols/CommonProtocol.class.php');
+dol_include_once('einvoicing/class/utils/XmlPatcher.class.php');
 
 
 /**
@@ -75,6 +77,35 @@ class FacturXProtocol extends CIIProtocol
 
 	/** @const string The profile used to generate XML */
 	protected const BUILD_XML_PROFILE = 'EXTENDED';
+
+	/** @const string Path of the line unit price nodes, relative to the line item node */
+	private const NODE_LINE_ITEM = '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem';
+
+	/**
+	 * Tell the lib how many decimals the norm allows on the nodes where its default of 2 is wrong.
+	 *
+	 * The lib serializes every AmountType and QuantityType with 2 decimals unless a node is
+	 * declared here. That default is right for the amounts, but not for the unit prices
+	 * (BT-146/BT-148, up to 6 decimals) nor for the invoiced quantity (BT-129, up to 4): rounding
+	 * those to 2 loses the accuracy the receiver needs to recalculate the line amount.
+	 *
+	 * @return	void
+	 */
+	protected static function applyNormDecimalPlaces()
+	{
+		ZugferdSettings::addSpecialDecimalPlacesMap(
+			self::NODE_LINE_ITEM . '/ram:SpecifiedLineTradeAgreement/ram:NetPriceProductTradePrice/ram:ChargeAmount',
+			self::getUnitPriceDecimals()
+		);
+		ZugferdSettings::addSpecialDecimalPlacesMap(
+			self::NODE_LINE_ITEM . '/ram:SpecifiedLineTradeAgreement/ram:GrossPriceProductTradePrice/ram:ChargeAmount',
+			self::getUnitPriceDecimals()
+		);
+		ZugferdSettings::addSpecialDecimalPlacesMap(
+			self::NODE_LINE_ITEM . '/ram:SpecifiedLineTradeDelivery/ram:BilledQuantity',
+			self::MAX_DECIMALS_QUANTITY
+		);
+	}
 
 	/**
 	 * Generate the XML content for a given invoice according to the Factur-X standard.
@@ -267,6 +298,11 @@ class FacturXProtocol extends CIIProtocol
 			// Use horstoeko lib to build the XML
 			// =====================================================================
 
+			// The lib serializes every amount and quantity with 2 decimals, which is the accuracy of an
+			// amount, not of a unit price: it would truncate the unit price and make the receiver
+			// recalculate a wrong line amount. Ask for the accuracy the norm allows on these nodes.
+			self::applyNormDecimalPlaces();
+
 			// Initialize ZugferdDocumentBuilder (FacturX XML)
 			dol_syslog(get_class($this) . '::executeHooks create new XML document based on PROFILE_EN16931 (CIUS-FR)');
 			$profile = getDolGlobalString('EINVOICING_PROFILE');
@@ -380,6 +416,16 @@ class FacturXProtocol extends CIIProtocol
 				$invoiceData['sellercontactemailaddr']
 			);
 
+			// Set Buyer Trade Contact details (e.g. invoice billing contact). Only emitted when a contact person is known.
+			if (!empty($invoiceData['buyercontactpersonname'])) {
+				$facturxpdf->setDocumentBuyerContact(
+					$invoiceData['buyercontactpersonname'],
+					"",
+					$invoiceData['buyercontactphoneno'],
+					"",
+					$invoiceData['buyercontactemailaddr']
+				);
+			}
 			// Set Buyer Reference (Service Code for Chorus)
 			if (!empty($invoiceData['buyerReference'])) {
 				$facturxpdf->setDocumentBuyerReference($invoiceData['buyerReference']);
@@ -1121,13 +1167,8 @@ class FacturXProtocol extends CIIProtocol
 		$parsedHeader = [];
 		$parsedLines = [];
 		if (!getDolGlobalInt('EINVOICING_USE_EXTERNAL_FACTURX_READER')) { // The default is to use the same parser than the CII one.
-			dol_include_once('einvoicing/class/protocols/ProtocolManager.class.php');
-			$ProtocolManager = new ProtocolManager($db);
-			$CII = $ProtocolManager->getProtocol('CII');
-			'@phan-var-force CIIProtocol $CII';
-
-			$parsedHeader = $CII->parseInvoiceHeader($embeddedXml);
-			$parsedLines  = $CII->parseInvoiceLines($embeddedXml);
+			$parsedHeader = $this->parseInvoiceHeader($embeddedXml);
+			$parsedLines  = $this->parseInvoiceLines($embeddedXml);
 		} else {
 			// Use a duplicate parser (for test or dev tests)
 			$document->getDocumentInformation($documentno, $documenttypecode, $documentdate, $invoiceCurrency, $taxCurrency, $documentname, $documentlanguage, $effectiveSpecifiedPeriod);
@@ -1407,200 +1448,9 @@ class FacturXProtocol extends CIIProtocol
 		$remise_already_used_line_level_ids = array();
 		$supplierPriceEntries = array(); // Collect product/price data to create supplier prices after invoice creation
 
-		// Add invoice lines
-		foreach ($parsedLines as $parsedLine) {
-			// Add supplier ID to line for later use in product sync
-			$parsedLine['supplierId'] = $socId;
-
-			$is_deposit_line = 0;
-			$fk_remise = 0;
-			// --------------------------------------------------
-			// Loop on linked documents at line level
-			// --------------------------------------------------
-			if (!empty($parsedLine['additionalRefDocs']) && is_array($parsedLine['additionalRefDocs'])) {
-				foreach ($parsedLine['additionalRefDocs'] as $refDoc) {
-					$lineRefDocId = $refDoc['IssuerAssignedID'] ?? null;
-					$lineRefDocType = $refDoc['typeCode'] ?? null;
-					$lineRefDocDate = $refDoc['issueDate'] ?? null;
-
-					$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "facture_fourn WHERE ref_supplier = '" . $db->escape($lineRefDocId) . "' LIMIT 1";
-					$resql = $db->query($sql);
-					if ($db->num_rows($resql) != 1) {
-						return [
-							'res' => -1,
-							'message' => 'Document "' . $lineRefDocId . '" linked to line ' . $parsedLine['lineid'] . ' was not found in Dolibarr. Please verify why this document is missing (deleted, not imported, or not provided by the supplier). To resolve this issue, you must manually create the invoice using the supplier invoice reference "' . $lineRefDocId . '".'
-						];
-						// TODO: Add a check before sending a final invoice after deposit to ensure that the deposit invoice has been properly sent to the PDP and successfully received.
-					}
-
-					// Load linked supplier invoice
-					$linkedObject = new FactureFournisseur($db);
-					$linkedObjectId = $db->fetch_object($resql)->rowid;
-					$resFetchLinkedObject = $linkedObject->fetch($linkedObjectId);
-					if ($resFetchLinkedObject > 0) {
-						/*
-						* --------------------------------------------------
-						* Deposit handling
-						* --------------------------------------------------
-						* Deposits may be referenced:
-						*  - at document level
-						*  - at line level
-						*
-						* If the deposit is referenced at line level:
-						*   → we create the discount before creating the invoice line,
-						*     so it can be linked later.
-						*
-						* If the same deposit appears both at line and document level:
-						*    line-level handling takes priority to avoid duplicates.
-						*
-						* If the deposit exists only at document level:
-						*   → a discount line will be created later after all invoice
-						*     lines are generated.
-						*/
-						if ($linkedObject->type == FactureFournisseur::TYPE_DEPOSIT) {
-							$is_deposit_line = 1;
-
-							// Check if deposit line is already converted to a reduction otherwise we convert it
-							//require_once DOL_DOCUMENT_ROOT.'/core/class/discount.class.php';
-							$discountcheck = new DiscountAbsolute($db);
-							$result = $discountcheck->fetch(0, 0, $linkedObject->id);
-							if ($result <= 0) {
-								// Loop on each vat rate
-								$amount_ht = $amount_tva = $amount_ttc = array();
-								$multicurrency_amount_ht = $multicurrency_amount_tva = $multicurrency_amount_ttc = array();
-								$i = 0;
-								foreach ($linkedObject->lines as $line) {
-									if ($line->product_type < 9 && $line->total_ht != 0) { // Remove lines with product_type greater than or equal to 9 and no need to create discount if amount is null
-										$keyforvatrate = $line->tva_tx . ($line->vat_src_code ? ' (' . $line->vat_src_code . ')' : '');
-
-										$amount_ht[$keyforvatrate] += $line->total_ht;
-										$amount_tva[$keyforvatrate] += $line->total_tva;
-										$amount_ttc[$keyforvatrate] += $line->total_ttc;
-										$multicurrency_amount_ht[$keyforvatrate] += $line->multicurrency_total_ht;
-										$multicurrency_amount_tva[$keyforvatrate] += $line->multicurrency_total_tva;
-										$multicurrency_amount_ttc[$keyforvatrate] += $line->multicurrency_total_ttc;
-										$i++;
-									}
-								}
-
-								$discount = new DiscountAbsolute($db);
-								$discount->description = '(DEPOSIT)';
-								$discount->discount_type = 1; // Supplier discount
-								$discount->fk_soc = $linkedObject->socid;
-								$discount->socid = $linkedObject->socid;
-								$discount->fk_invoice_supplier_source = $linkedObject->id;
-								foreach ($amount_ht as $tva_tx => $xxx) {  // @phan-suppress-current-line PhanEmptyForeach
-									$discount->amount_ht = abs((float) $amount_ht[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
-									$discount->amount_tva = abs((float) $amount_tva[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
-									$discount->amount_ttc = abs((float) $amount_ttc[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
-									$discount->multicurrency_amount_ht = abs((float) $multicurrency_amount_ht[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
-									$discount->multicurrency_amount_tva = abs((float) $multicurrency_amount_tva[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
-									$discount->multicurrency_amount_ttc = abs((float) $multicurrency_amount_ttc[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
-
-									// Clean vat code
-									$reg = array();
-									$vat_src_code = '';
-									if (preg_match('/\((.*)\)/', $tva_tx, $reg)) {
-										$vat_src_code = $reg[1];
-										$tva_tx = preg_replace('/\s*\(.*\)/', '', $tva_tx); // Remove code into vatrate.
-									}
-
-									$discount->tva_tx = abs((float) $tva_tx);
-									$discount->vat_src_code = $vat_src_code;
-
-									$result = $discount->create($user);
-									if ($result < 0) {
-										return ['res' => -1, 'message' => 'Failed to create discount for deposit line: ' . $discount->error];
-									}
-									$fk_remise = $result;
-								}
-							} else {
-								// Deposit already converted so reuse existing discount
-								$is_deposit_line = 1;
-								$fk_remise = $discountcheck->id;
-							}
-						}
-
-						/*
-						* --------------------------------------------------
-						* Other linked document types
-						* --------------------------------------------------
-						* Additional logic may be added here for other
-						* document types such as credit notes, etc.
-						*/
-					} else {
-						return ['res' => -1, 'message' => 'Document : ' . $lineRefDocId . ' linked to line ' . $parsedLine['lineid'] . ' not found in Dolibarr'];
-					}
-				}
-			}
-
-			$productId = 0;
-			if (!$is_deposit_line) {
-				// Sync or create product
-				$res = $this->_findOrCreateProductFromEinvoiceLine($parsedLine, $flowId);
-				$return_messages[] = $res['message'];
-				if ($res['res'] < 0) {
-					return [
-						'res' => -1,
-						'message' => 'Product sync or creation error: ' . implode("<br>\n", $return_messages),
-						'actioncode' => $res['actioncode'] ?? '',
-						'actionurl' => $res['actionurl'] ?? '',
-						'action' => $res['action'] ?? null,
-						'actiondata' => $res['actiondata'] ?? ''
-					];
-				}
-				$productId = $res['res'];
-
-				// Collect supplier price data to be created after invoice is saved
-				if ($productId > 0) {
-					$supplierPriceEntries[] = [
-						'productId' => $productId,
-						'unitPrice' => (float) $parsedLine['netpriceamount'],
-						'refFourn'  => (!empty($parsedLine['prodsellerid']) && $parsedLine['prodsellerid'] !== '0000') ? (string) $parsedLine['prodsellerid'] : '',
-						'tvaTx'     => (float) ($parsedLine['rateApplicablePercent'] ?? 0),
-					];
-				}
-			}
-
-
-			// Add line to invoice
-			$line = new SupplierInvoiceLine($db);
-			if (!empty($productId)) {
-				$line->fk_product = $productId;
-			} elseif (!$is_deposit_line) {
-				// Free line: no product linked, description set from XML data
-				$line->desc = trim($parsedLine['prodname'] ?? '') . (!empty($parsedLine['proddesc']) ? "\n" . trim($parsedLine['proddesc']) : '');
-			}
-			if ($is_deposit_line && !empty($fk_remise)) {
-				$line->fk_remise_except = $fk_remise;
-				$line->info_bits = 2;
-				$line->desc = '(DEPOSIT)';
-				$line->rang = -1;
-
-				$remise_already_used_line_level_ids[] = $fk_remise;
-			}
-			// handle line-level discount if exists and update amounts
-			if (!empty($parsedLine['lineAllowances'])) {
-				$discount = $this->resolveLineDiscountPercent($parsedLine['lineAllowances'], $parsedLine['lineTotalAmount']);
-				if ($discount !== false) {
-					$line->remise_percent = $discount['percent'];
-					if (!empty($parsedLine['billedquantity'])) {
-						$line->subprice = round($discount['priceWithoutDiscount'] / $parsedLine['billedquantity'], 8);
-					} else {
-						// Avoid a fatal DivisionByZeroError on a zero/empty billed quantity (e.g. a free
-						// sample line): keep the discount percent, let subprice fall back to netpriceamount below.
-						dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource line ' . ($parsedLine['lineid'] ?? '?') . ' has a discount but billedquantity is zero/empty, skipping subprice adjustment', LOG_WARNING);
-					}
-				}
-			}
-			$line->qty = (float) $parsedLine['billedquantity'];
-			$line->subprice = $line->subprice ?? (float) $parsedLine['netpriceamount'];
-			$line->tva_tx = (float) $parsedLine['rateApplicablePercent'];
-			$line->total_ht = (float) $parsedLine['lineTotalAmount'];
-			$line->total_tva = $parsedLine['calculatedAmount'] ?? 0;
-			$line->total_ttc = $parsedLine['lineTotalAmount'] + ($parsedLine['calculatedAmount'] ?? 0);
-
-			$supplierInvoice->lines[] = $line;
+		$res = $this->createSupplierInvoiceLinesFromSource($supplierInvoice, $parsedLines, $remise_already_used_line_level_ids, $supplierPriceEntries, $return_messages, $flowId);
+		if ($res['res'] < 0) {
+			return $res;
 		}
 
 		// Create document level discounts (allowances) as discounts in Dolibarr
@@ -1650,7 +1500,7 @@ class FacturXProtocol extends CIIProtocol
 					$dateDoc = $doc['FormattedIssueDateTime'] ?? null;
 					$typeDoc = $doc['TypeCode'] ?? null;
 
-					$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "facture_fourn WHERE ref_supplier = '" . $db->escape($lineRefDocId) . "' LIMIT 1";
+					$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "facture_fourn WHERE ref_supplier = '" . $db->escape($refDoc) . "' LIMIT 1";
 					$resql = $db->query($sql);
 					if ($db->num_rows($resql) != 1) {
 						return ['res' => -1, 'message' => 'Document : ' . $refDoc . ' linked to document ' . $parsedHeader['documentno'] . ' not found in Dolibarr'];
@@ -1667,73 +1517,11 @@ class FacturXProtocol extends CIIProtocol
 						if ($linkedObject->type == FactureFournisseur::TYPE_DEPOSIT) {
 							$create_deposit_line = 1;
 
-							// Check if deposit line is already converted to a reduction otherwise we convert it
-							//require_once DOL_DOCUMENT_ROOT.'/core/class/discount.class.php';
-							$discountcheck = new DiscountAbsolute($db);
-							$result = $discountcheck->fetch(0, 0, $linkedObject->id);
-							if ($result <= 0) {
-								// Loop on each vat rate
-								'
-								@phan-var-force array<string,float> $amount_ht
-								@phan-var-force array<string,float> $amount_tva
-								@phan-var-force array<string,float> $amount_ttc
-								@phan-var-force array<string,float> $multicurrency_amount_ht
-								@phan-var-force array<string,float> $multicurrency_amount_tva
-								@phan-var-force array<string,float> $multicurrency_amount_ttc
-								';
-								$amount_ht = $amount_tva = $amount_ttc = array();
-								$multicurrency_amount_ht = $multicurrency_amount_tva = $multicurrency_amount_ttc = array();
-								$i = 0;
-								foreach ($linkedObject->lines as $line) {
-									if ($line->product_type < 9 && $line->total_ht != 0) { // Remove lines with product_type greater than or equal to 9 and no need to create discount if amount is null
-										$keyforvatrate = $line->tva_tx . ($line->vat_src_code ? ' (' . $line->vat_src_code . ')' : '');
-
-										$amount_ht[$keyforvatrate] += $line->total_ht;
-										$amount_tva[$keyforvatrate] += $line->total_tva;
-										$amount_ttc[$keyforvatrate] += $line->total_ttc;
-										$multicurrency_amount_ht[$keyforvatrate] += $line->multicurrency_total_ht;
-										$multicurrency_amount_tva[$keyforvatrate] += $line->multicurrency_total_tva;
-										$multicurrency_amount_ttc[$keyforvatrate] += $line->multicurrency_total_ttc;
-										$i++;
-									}
-								}
-
-								$discount = new DiscountAbsolute($db);
-								$discount->description = '(DEPOSIT)';
-								$discount->discount_type = 1; // Supplier discount
-								$discount->fk_soc = $linkedObject->socid;
-								$discount->socid = $linkedObject->socid;
-								$discount->fk_invoice_supplier_source = $linkedObject->id;
-								foreach ($amount_ht as $tva_tx => $xxx) {  // @phan-suppress-current-line PhanEmptyForeach
-									$discount->amount_ht = abs((float) $amount_ht[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
-									$discount->amount_tva = abs((float) $amount_tva[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
-									$discount->amount_ttc = abs((float) $amount_ttc[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
-									$discount->multicurrency_amount_ht = abs((float) $multicurrency_amount_ht[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
-									$discount->multicurrency_amount_tva = abs((float) $multicurrency_amount_tva[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
-									$discount->multicurrency_amount_ttc = abs((float) $multicurrency_amount_ttc[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
-
-									// Clean vat code
-									$reg = array();
-									$vat_src_code = '';
-									if (preg_match('/\((.*)\)/', $tva_tx, $reg)) {
-										$vat_src_code = $reg[1];
-										$tva_tx = preg_replace('/\s*\(.*\)/', '', $tva_tx); // Remove code into vatrate.
-									}
-
-									$discount->tva_tx = abs((float) $tva_tx);
-									$discount->vat_src_code = $vat_src_code;
-
-									$result = $discount->create($user);
-									if ($result < 0) {
-										return ['res' => -1, 'message' => 'Failed to create discount for deposit line: ' . $discount->error];
-									}
-									$fk_remise_for_deposit = $result;
-								}
-							} else {
-								// Deposit already converted so reuse existing discount
-								$create_deposit_line = 1;
-								$fk_remise_for_deposit = $discountcheck->id;
+							$depositDiscountRes = $this->getOrCreateDepositDiscount($linkedObject);
+							if ($depositDiscountRes['res'] < 0) {
+								return $depositDiscountRes;
 							}
+							$fk_remise_for_deposit = $depositDiscountRes['fkRemise'];
 
 							// After creating the discount for the deposit, we create a line in the invoice to link it to the deposit
 							if ($create_deposit_line && !empty($fk_remise_for_deposit)) {

@@ -608,7 +608,9 @@ class modEInvoicing extends DolibarrModules
 		$result = $extrafields->addExtraField('d4d_service_code', $langs->trans('ChorusServiceCode'), 'varchar', 95026, '100', 'facture', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 1);
 		$result = $extrafields->addExtraField('d4d_contract_number', $langs->trans('ChorusContractNumber'), 'varchar', 95028, '50', 'facture', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 1);
 		$result = $extrafields->addExtraField('d4d_promise_code', $langs->trans('ChorusPromiseCode'), 'varchar', 95030, '50', 'facture', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 1);
-		$result = $extrafields->addExtraField('d4d_chorus_id', $langs->trans('ChorusId'), 'varchar', 95032, '36', 'facture', 0, 0, '', '', 1, '', '1', '0', '$object->array_options["options_chorus_id"]', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 1);
+		// No computed formula here: the field must stay editable (see openDSI note below). A formula
+		// pointing at options_chorus_id also warns on every render, that extrafield belongs to openDSI.
+		$result = $extrafields->addExtraField('d4d_chorus_id', $langs->trans('ChorusId'), 'varchar', 95032, '36', 'facture', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 1);
 
 		// Same fields for orders
 		$result = $extrafields->addExtraField('d4d_separator', $langs->trans('ChorusSeparator'), 'separate', 95042, '', 'commande', 0, 1, '', $param, 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")');
@@ -621,7 +623,10 @@ class modEInvoicing extends DolibarrModules
 			$sql,
 			array(
 				"UPDATE " . MAIN_DB_PREFIX . "extrafields SET enabled='getDolGlobalInt(\"EINVOICING_USE_CHORUS\")' WHERE enabled = '\$conf->einvoicing->enabled'",
-				"UPDATE " . MAIN_DB_PREFIX . "extrafields SET enabled='getDolGlobalInt(\"EINVOICING_USE_CHORUS\")' WHERE enabled = '\$conf->global->EINVOICING_USE_CHORUS'"
+				"UPDATE " . MAIN_DB_PREFIX . "extrafields SET enabled='getDolGlobalInt(\"EINVOICING_USE_CHORUS\")' WHERE enabled = '\$conf->global->EINVOICING_USE_CHORUS'",
+				// Drop the stale computed formula on d4d_chorus_id: it targets options_chorus_id (openDSI),
+				// which raises a PHP warning on every invoice render and makes the field read-only.
+				"UPDATE " . MAIN_DB_PREFIX . "extrafields SET fieldcomputed = '' WHERE name = 'd4d_chorus_id' AND fieldcomputed LIKE '%options_chorus_id%'"
 			)
 		);
 
@@ -630,11 +635,11 @@ class modEInvoicing extends DolibarrModules
 			'd4d_chorus_id', //$attrname
 			$langs->trans('ChorusId'), //$label
 			'varchar', //$type
-			'95050', //$length
+			'36', //$length
 			'facture', //$elementtype
 			0, //$unique
 			0, //$required
-			1112, //$pos
+			95032, //$pos
 			array(), //$param
 			1, //$alwayseditable
 			'', //$perms

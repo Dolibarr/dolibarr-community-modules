@@ -534,7 +534,15 @@ class SuperPDPProvider extends AbstractPDPProvider
 					'grant_type'    => 'refresh_token',
 					'refresh_token' => $this->tokenData['refresh_token'],
 				);
-				$resultget = getURLContent($proxyurl, 'POST', http_build_query($param), 1, array('Content-Type: application/x-www-form-urlencoded'));
+
+				// Allow HTTP and local URLs for testing only if the configuration allows it. Otherwise, only HTTPS is allowed.
+				$allowedprotocols = array('https');
+				$allowlocalurl = 0;
+				if (!empty(getDolGlobalInt('EINVOICING_ALLOW_LOCAL_URL'))) {
+					$allowlocalurl = 2;
+					$allowedprotocols[] = 'http';
+				}
+				$resultget = getURLContent($proxyurl, 'POST', http_build_query($param), 1, array('Content-Type: application/x-www-form-urlencoded'), $allowedprotocols, $allowlocalurl);
 
 				$httpcode = empty($resultget['http_code']) ? 0 : $resultget['http_code'];
 				if (empty($resultget['curl_error_no']) && $httpcode == 200) {
@@ -546,8 +554,10 @@ class SuperPDPProvider extends AbstractPDPProvider
 					}
 				}
 				// Proxy refresh failed: a via-partner client has no secret to fall back on, so we stop here.
-				dol_syslog(__METHOD__." refresh via partner proxy failed http_code=".$httpcode, LOG_WARNING, 0, "_einvoicing");
-				$this->errors[] = 'FailedToRefreshAccessTokenViaProxy';
+				dol_syslog(__METHOD__." refresh via partner proxy failed http_code=".$httpcode . " error=".$resultget['curl_error_msg'], LOG_WARNING, 0, "_einvoicing");
+				// Return a generic error message to avoid leaking the proxy URL in the logs.
+				setEventMessages('FailedToRetrieveAccessToken', null, 'errors');
+				$this->errors[] = 'FailedToRetrieveAccessToken';
 				return null;
 			}
 
@@ -1746,7 +1756,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 				// Retrieve Original file
 				$receivedFile = null;
-				$flowResponse = $this->fetchFlowData($flowId, 'Original', 'get_flow_for_supplier_invoice');
+				$flowResponse = $this->fetchFlowData($flowId, 'Converted', 'get_flow_for_supplier_invoice');
 
 				if ($flowResponse['status_code'] != 200) {
 					return array('res' => -1, 'message' => "ERROR_FLOW_GETORIG Failed to retrieve 'Original' document for SupplierInvoice flow (flowId: " . $flowId . ")" . (empty($flowResponse['errorMessage']) ? '' : ' - ' . $flowResponse['errorMessage']));
@@ -1761,6 +1771,10 @@ class SuperPDPProvider extends AbstractPDPProvider
 				}
 
 				$exchangeProtocol = $tmpProtocolManager->getProtocol($detectedProtocol);
+				// if protocol not supported (like ubl), we skeep it
+				if (empty($exchangeProtocol)) {
+					return array('res' => -1, 'message' => "ERROR_FLOW_NOT_SUPPORTED_PROTOCOL detected protocol ".$detectedProtocol." not supported for flowId: " . $flowId);
+				}
 
 				$exceptionmessage = '';
 				$db->begin();

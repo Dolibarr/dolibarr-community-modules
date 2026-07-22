@@ -158,11 +158,30 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 								setEventMessages($langs->trans("InvoiceGeneratedWithWarnings"), $protocol->warnings, 'warnings');
 							}
 
+							// If the precheck is set to auto, we call the precheck function.
+							$precheckresult = 0; // 0 = skipped , 1 = success, -1 = failed
+							if (getDolGlobalString('EINVOICING_PDP') && getDolGlobalString('EINVOICING_AP_PRECHECK') === 'auto') {
+								$PDPManager = new PDPProviderManager($db);
+								$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+								$precheckAvailable = $provider->hasValidator();
+								if (!empty($currentStatusDetails['file']) && $currentStatusDetails['file'] == 1 && $precheckAvailable) {
+									$einvoiceFilePath = $einvoicing->getEInvoiceFilePath($invoiceObject->ref);
+									$result = $provider->validateEInvoiceFile($invoiceObject->id, $einvoiceFilePath);
+									if ($result['res'] > 0) {
+										$precheckresult = 1;
+										setEventMessages($langs->trans("InvoicePrecheckSuccessful"), array(), 'mesgs');
+									} else {
+										$precheckresult = -1;
+										setEventMessages($langs->trans("InvoicePrecheckFailed"), array(), 'errors');
+									}
+								}
+							}
+
 							// Optionally transmit to the Access Point right after generation (opt-in + idempotent) and if not yet generated.
 							// Without this, validation only generates the Factur-X; the invoice is never sent to the
 							// PA (transmission was a manual "send_to_pdp" click only). The 'transmitted' guard prevents
 							// re-sending (and creating duplicate flows) when the PDF is regenerated later.
-							if (getDolGlobalString('EINVOICING_AUTO_SEND_ON_GENERATION') && empty($currentStatusDetails['transmitted'])) {
+							if (getDolGlobalString('EINVOICING_AUTO_SEND_ON_GENERATION') && empty($currentStatusDetails['transmitted']) && $precheckresult >= 0) {
 								dol_syslog("actions_einvoicing: Invoice seems not yet transmitted and EINVOICING_AUTO_SEND_ON_GENERATION is on, so we try to send it");
 
 								require_once __DIR__ . '/providers/PDPProviderManager.class.php';
@@ -308,17 +327,19 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				);
 
 				// If the e-invoice is generated, display the button to precheck the e-invoice with the Access Point validation service if available.
-				$PDPManager = new PDPProviderManager($db);
-				$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
-				$precheckAvailable = $provider->hasValidator();
-				if (!empty($currentStatusDetails['file']) && $currentStatusDetails['file'] == 1 && $precheckAvailable) {
-					$url_button[] = array(
-						'lang' => 'einvoicing',
-						'enabled' => true,
-						'perm' => (bool) $user->hasRight("facture", "creer"),
-						'label' => $langs->trans('PrecheckEinvoice'),
-						'url' => '/compta/facture/card.php?id=' . $object->id . '&action=precheck_einvoice&token=' . newToken()
-					);
+				if (getDolGlobalString('EINVOICING_PDP') && getDolGlobalString('EINVOICING_AP_PRECHECK') === 'manuel') {
+					$PDPManager = new PDPProviderManager($db);
+					$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+					$precheckAvailable = $provider->hasValidator();
+					if (!empty($currentStatusDetails['file']) && $currentStatusDetails['file'] == 1 && $precheckAvailable) {
+						$url_button[] = array(
+							'lang' => 'einvoicing',
+							'enabled' => true,
+							'perm' => (bool) $user->hasRight("facture", "creer"),
+							'label' => $langs->trans('PrecheckEinvoice'),
+							'url' => '/compta/facture/card.php?id=' . $object->id . '&action=precheck_einvoice&token=' . newToken()
+						);
+					}
 				}
 
 				// If the e-invoice is generated but not sent, or if it was sent and a validation error was received,
@@ -628,6 +649,22 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 							setEventMessages($langs->trans("InvoiceGeneratedWithWarnings"), $this->warnings, 'warnings');
 						} else {
 							setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
+						}
+
+						// Precheck the e-invoice with the Access Point validation service if available.
+						if (getDolGlobalString('EINVOICING_PDP') && getDolGlobalString('EINVOICING_AP_PRECHECK') === 'auto') {
+							$PDPManager = new PDPProviderManager($db);
+							$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+							if (is_object($provider) && $provider->hasValidator()) {
+								$einvoiceFilePath = $einvoicing->getEInvoiceFilePath($invoiceObject->ref);
+								$result = $provider->validateEInvoiceFile($invoiceObject->id, $einvoiceFilePath);
+								if ($result['res'] > 0) {
+									setEventMessages($langs->trans("InvoicePrecheckSuccessful"), array(), 'mesgs');
+								} else {
+									setEventMessages($langs->trans("InvoicePrecheckFailed"), array(), 'errors');
+									dol_syslog(__METHOD__ . " Invoice precheck failed for invoice ID " . $invoiceObject->id);
+								}
+							}
 						}
 					} else {
 						// If there is an error, we move warnings into error message
@@ -939,6 +976,22 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 
 	/**
+	 * Build the sub query returning the last lifecycle status validated by the Access Point for a supplier invoice.
+	 * Same selection rule as the one used by EInvoicing::supplierInvoiceCardBlock() so list and card always agree.
+	 *
+	 * @return string								SQL sub query (without the surrounding parenthesis), correlated on f.rowid
+	 */
+	protected static function getSupplierLifecycleStatusSubQuery()
+	{
+		$sql = 'SELECT lc.lc_status FROM ' . MAIN_DB_PREFIX . 'einvoicing_lifecycle_msg as lc';
+		$sql .= " WHERE lc.element_type = 'invoice_supplier' AND lc.element_id = f.rowid";
+		$sql .= " AND lc.lc_validation_status = 'Ok'";
+		$sql .= ' ORDER BY lc.rowid DESC LIMIT 1';
+
+		return $sql;
+	}
+
+	/**
 	 * Add SELECT fields
 	 *
 	 * @param array<string,mixed> 	$parameters		Array of parameters
@@ -957,6 +1010,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		// Supplier invoice list, Product list, Soc list
 		if (in_array('supplierinvoicelist', explode(':', $parameters['context']))) {
 			$this->resprints .= ', ext.rowid AS pdplink_id, ext.provider AS pdp_provider';
+			// Last known lifecycle status accepted by the Access Point, same source as the one shown on the invoice card
+			$this->resprints .= ', (' . self::getSupplierLifecycleStatusSubQuery() . ') AS pdp_lcstatus';
 		}
 
 		if (in_array('thirdpartylist', explode(':', $parameters['context']))) {
@@ -1039,6 +1094,10 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			if (GETPOST('search_routing_id', 'alpha') !== '' && GETPOST('search_routing_id', 'alpha') != "") {
 				$this->resprints .= " AND ext.routing_id = '" . $db->escape(GETPOST('search_routing_id', 'alpha')) . "'";
 			}
+		}
+
+		if (in_array('supplierinvoicelist', $contexts) && GETPOST('search_pdp_lcstatus', 'alpha') !== '' && GETPOST('search_pdp_lcstatus', 'alpha') != -2) {
+			$this->resprints .= ' AND (' . self::getSupplierLifecycleStatusSubQuery() . ') = ' . GETPOSTINT('search_pdp_lcstatus');
 		}
 
 		// Supplier invoice lines to bind to accountancy : always exclude invoices abandoned
@@ -1136,6 +1195,25 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				'width100 '
 			);
 			print '</td>';
+
+			// E-invoice status of the supplier invoice into the Access Point system
+			$einvoicing = new EInvoicing($db);
+			print '<td class="liste_titre pdp_lcstatus">';
+			print $form->selectarray(
+				'search_pdp_lcstatus',
+				$einvoicing->getEinvoiceStatusOptions(0, 1),
+				GETPOST('search_pdp_lcstatus', 'alpha'),
+				-2,
+				0,
+				0,
+				'',
+				0,
+				0,
+				0,
+				'',
+				'width100 '
+			);
+			print '</td>';
 		}
 
 
@@ -1191,6 +1269,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		// Supplier invoice list, Product list, Soc list
 		if (in_array('supplierinvoicelist', explode(':', $parameters['context'])) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
 			print_liste_field_titre($langs->transnoentitiesnoconv('einvoicingSourceTitle'));
+			print_liste_field_titre($langs->transnoentitiesnoconv('einvoicingInvoiceStatus'), '', '', '', $parameters['param'] ?? '', '', '', '', 'center ');
 		}
 
 		if (in_array('thirdpartylist', explode(':', $parameters['context'])) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI'))) {
@@ -1272,6 +1351,16 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			if ($obj->pdplink_id) {
 				print dolPrintHTML($obj->pdp_provider);
 			}
+			print '</td>';
+			if (isset($parameters['i']) && empty($parameters['i'])) {
+				$parameters['totalarray']['nbfield']++;
+			}
+
+			// E-invoice status of the supplier invoice into the Access Point system
+			$einvoicing = new EInvoicing($db);
+			$currentStatusDetails = $obj->pdp_lcstatus ? $einvoicing->getStatusLabel((int) $obj->pdp_lcstatus) : '-';
+			print '<td class="center tdoverflowmax100" title="' . dolPrintHTMLForAttribute($currentStatusDetails) . '">';
+			print $currentStatusDetails;
 			print '</td>';
 			if (isset($parameters['i']) && empty($parameters['i'])) {
 				$parameters['totalarray']['nbfield']++;
