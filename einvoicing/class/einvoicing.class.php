@@ -731,12 +731,14 @@ class EInvoicing
 			return null;
 		}
 
+        global $langs;
+
 		$reasons = [];
 		foreach (self::REASONS_CODE_FOR_STATUS[$status] as $code) {
 			if (isset(self::REASONS[$code])) {
 				$reasons[$code] = [
 					'code' => $code,
-					'label' => self::REASONS[$code]['label']
+					'label' => $langs->trans(self::REASONS[$code]['label'])
 				];
 				if ($withDetails === 1) {
 					$reasons[$code]['desc'] = self::REASONS[$code]['desc'];
