@@ -121,7 +121,7 @@ class ProtocolManager
 	 * This function analyzes the provided string to identify
 	 * which e-invoicing protocol it conforms to (e.g., FACTURX, CII, UBL).
 	 *
-	 * @param 	string 		$content 	XML content of the invoice.
+	 * @param 	string 		$content 	File content of the invoice (PDF or XML)
 	 * @return 	string|null 			Returns the name of the detected protocol or null if unknown.
 	 */
 	public function detectProtocolFromContent($content)

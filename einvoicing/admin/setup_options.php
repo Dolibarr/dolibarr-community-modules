@@ -356,6 +356,15 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
 	$item->fieldAttr['placeholder'] = $langs->transnoentities('Hours');
 	$item->cssClass = 'maxwidth100';
 
+	$item = $formSetup->newItem('EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_TYPE');
+	$item->setAsSelect([
+		Einvoicing::SUPPLIER_INVOICE_LINES_IMPORT_AUTO => $langs->trans('EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_TYPE_AUTO'),
+		Einvoicing::SUPPLIER_INVOICE_LINES_IMPORT_MANUAL => $langs->trans('EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_TYPE_MANUAL'),
+	]);
+
+	$item = $formSetup->newItem('EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_CATEGORY_OF_TARGET_IMPORT_PRODUCT_LIST');
+	$item->setAsCategory('product');
+
 	if (getDolGlobalString('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION_AVAILABLE')) {
 		// Setup conf to enable or not the consistency check on supplier invoice validation
 		$item = $formSetup->newItem('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION');
