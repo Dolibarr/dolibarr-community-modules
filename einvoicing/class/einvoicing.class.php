@@ -521,6 +521,15 @@ class EInvoicing
 	 */
 	public const EXTRAFIELD_BUYER_ORDER_REFERENCE = 'buyer_order_reference';
 
+	/**
+	 * When invoice is in import type "auto", it directly uses the e-invoice lines data to create Dolibarr supplier invoice lines
+	 */
+	public const SUPPLIER_INVOICE_LINES_IMPORT_AUTO = 1;
+
+	/**
+	 * When invoice is in import type "manual", user can choose how to create Dolibarr supplier invoice lines (free lines or target product)
+	 */
+	public const SUPPLIER_INVOICE_LINES_IMPORT_MANUAL = 2;
 
 	/**
 	 * Constructor

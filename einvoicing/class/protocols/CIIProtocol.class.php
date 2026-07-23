@@ -1158,18 +1158,21 @@ class CIIProtocol extends AbstractProtocol
 
 	/**
 	 * Add lines to a supplier invoice from e-invoice parsed lines
-	 *
-	 * @param 	FactureFournisseur 	$supplierInvoice						The supplier invoice to add lines on
-	 * @param 	array 				$parsedLines							The parsed lines data (previously extracted from e-invoice)
-	 * @param 	array 				$remise_already_used_line_level_ids		The list of ids for remise already used
-	 * @param 	array 				$supplierPriceEntries					The list of entries for supplier prices
-	 * @param 	array 				$return_messages						The list of return messages to complete if necessary
-	 * @param 	string 				$flowId									The concerned flowId
+	 * @param 	FactureFournisseur 	$supplierInvoice								The supplier invoice to add lines on
+	 * @param 	array 				$parsedLines									The parsed lines data (previously extracted from e-invoice)
+	 * @param 	array 				$remise_already_used_line_level_ids				The list of ids for remise already used
+	 * @param 	array 				$supplierPriceEntries							The list of entries for supplier prices
+	 * @param 	array 				$return_messages								The list of return messages to complete if necessary
+	 * @param 	string 				$flowId											The concerned flowId
+	 * @param 	array{free_lines:bool,target_fk_product:?int} $manualImportParams 	Params used in case of manual import
 	 * @return 	array{res:int,message?:string,actioncode?:string|null,actionurl?:string|null,action?:string|null,actiondata?:string|null}	Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and additional data about the action.
 	 */
-	public function createSupplierInvoiceLinesFromSource(&$supplierInvoice, $parsedLines, &$remise_already_used_line_level_ids, &$supplierPriceEntries, &$return_messages, $flowId = ''): array
+	public function createSupplierInvoiceLinesFromSource(&$supplierInvoice, $parsedLines, &$remise_already_used_line_level_ids, &$supplierPriceEntries, &$return_messages, $flowId = '', $manualImportParams = ['free_lines' => false, 'target_fk_product' => null]): array
 	{
 		global $db;
+
+		$freeLines = (isset($manualImportParams['free_lines']) && $manualImportParams['free_lines'] == true);
+		$targetFkProduct = (isset($manualImportParams['target_fk_product']) ? $manualImportParams['target_fk_product'] : 0);
 
 		// Add invoice lines
 		foreach ($parsedLines as $parsedLine) {
@@ -1247,37 +1250,40 @@ class CIIProtocol extends AbstractProtocol
 
 			$productId = 0;
 			$productMatchType = '';
-			if (!$is_deposit_line) {
-				// Sync or create product
-				$res = $this->_findOrCreateProductFromEinvoiceLine($parsedLine, $flowId);
+			if (!$is_deposit_line && !$freeLines) {
+				if ($targetFkProduct > 0) {
+					$productId = $targetFkProduct;
+				} else {
+					// Sync or create product
+					$res = $this->_findOrCreateProductFromEinvoiceLine($parsedLine, $flowId);
 
-				$return_messages[] = $res['message'];
-				if ($res['res'] < 0) {
-					return [
-						'res' => -1,
-						'message' => 'Product sync or creation error: ' . implode("<br>\n", $return_messages),
-						'actioncode' => $res['actioncode'] ?? '',
-						'actionurl' => $res['actionurl'] ?? '',
-						'action' => $res['action'] ?? null,
-						'actiondata' => $res['actiondata'] ?? ''
-					];
-				}
-				$productId = $res['res'];
-				$productMatchType = (string) ($res['matchtype'] ?? '');
+					$return_messages[] = $res['message'];
+					if ($res['res'] < 0) {
+						return [
+							'res' => -1,
+							'message' => 'Product sync or creation error: ' . implode("<br>\n", $return_messages),
+							'actioncode' => $res['actioncode'] ?? '',
+							'actionurl' => $res['actionurl'] ?? '',
+							'action' => $res['action'] ?? null,
+							'actiondata' => $res['actiondata'] ?? ''
+						];
+					}
+					$productId = $res['res'];
+					$productMatchType = (string) ($res['matchtype'] ?? '');
 
-				// Collect supplier price data to be created after invoice is saved.
-				// Not for a default routing product: it is a catch-all, so gluing the vendor reference of
-				// the line onto it would make every next invoice match it instead of the real product.
-				if ($productId > 0 && $productMatchType != 'defaultrouting' && !empty($parsedLine['prodsellerid'])) {
-					$supplierPriceEntries[] = [
-						'productId' => $productId,
-						'unitPrice' => (float) $parsedLine['netpriceamount'],
-						'refFourn'  => (string) $parsedLine['prodsellerid'],
-						'tvaTx'     => (float) ($parsedLine['rateApplicablePercent'] ?? 0),
-					];
+					// Collect supplier price data to be created after invoice is saved.
+					// Not for a default routing product: it is a catch-all, so gluing the vendor reference of
+					// the line onto it would make every next invoice match it instead of the real product.
+					if ($productId > 0 && $productMatchType != 'defaultrouting' && !empty($parsedLine['prodsellerid'])) {
+						$supplierPriceEntries[] = [
+							'productId' => $productId,
+							'unitPrice' => (float) $parsedLine['netpriceamount'],
+							'refFourn'  => (string) $parsedLine['prodsellerid'],
+							'tvaTx'     => (float) ($parsedLine['rateApplicablePercent'] ?? 0),
+						];
+					}
 				}
 			}
-
 
 			// Add line to invoice
 			$line = new SupplierInvoiceLine($db);
@@ -1322,6 +1328,9 @@ class CIIProtocol extends AbstractProtocol
 						dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource line ' . ($parsedLine['lineid'] ?? '?') . ' has a discount but billedquantity is zero/empty, skipping subprice adjustment', LOG_WARNING);
 					}
 				}
+			}
+			if ($freeLines) {
+				$line->desc = trim($parsedLine['prodname'] ?? '') . (!empty($parsedLine['proddesc']) ? "\n" . trim($parsedLine['proddesc']) : '');
 			}
 			$line->qty = (float) $parsedLine['billedquantity'];
 			$line->subprice = $line->subprice ?? (float) $parsedLine['netpriceamount'];
