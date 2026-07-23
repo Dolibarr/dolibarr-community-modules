@@ -159,13 +159,13 @@ class SupplierInvoiceHelper
 				}
 			}
 
-			if (count($amountErrors['current']) == 0) {
+			if (count($amountErrors['current']  ?? []) == 0) {
 				// Don't need to calculate VAT mode 1 & 2 if supplier invoice and e-invoice are identical with current mode
 				break;
 			}
 		}
 
-		if (count($amountErrors['current']) > 0) {
+		if (count($amountErrors['current'] ?? [])  > 0) {
 			// If there are errors in both VAT modes (totalofround and roundoftotal), then return only the errors occured with roundoftotal
 			if (count($amountErrors['totalofround'] ?? []) > 0 && count($amountErrors['roundoftotal'] ?? []) > 0) {
 				$errors = array_merge($errors, $amountErrors['roundoftotal'] ?? []);
@@ -173,9 +173,9 @@ class SupplierInvoiceHelper
 				$errors = array_merge($errors, $amountErrors['totalofround'] ?? [], $amountErrors['roundoftotal'] ?? []);
 			}
 
-			if ($amountErrors['current'] == $amountErrors['totalofround'] && count($amountErrors['roundoftotal']) === 0) {
+			if (($amountErrors['current'] ?? [] )  == $amountErrors['totalofround'] && count($amountErrors['roundoftotal'] ?? []) === 0) {
 				$errors[] = $langs->trans('SupplierInvoiceComparisonSuggestVatCalculationMode', 2);
-			} elseif ($amountErrors['current'] == $amountErrors['roundoftotal'] && count($amountErrors['totalofround']) === 0) {
+			} elseif (($amountErrors['current']  ?? [] )== $amountErrors['roundoftotal'] && count($amountErrors['totalofround'] ?? []) === 0) {
 				$errors[] = $langs->trans('SupplierInvoiceComparisonSuggestVatCalculationMode', 1);
 			}
 		}
