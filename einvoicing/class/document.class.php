@@ -1281,13 +1281,16 @@ class Document extends CommonObject
 
 	/**
 	 * Return true if given XML data can be stored in Database (size < 16Mo)
-	 * @param string $xmlData The XML data to check
+	 * @param ?string $xmlData The XML data to check
 	 * @return bool True if xmlData is within size bounds
 	 */
-	public static function checkXmlDataMaxSize(string &$xmlData): bool
+	public static function checkXmlDataMaxSize(?string &$xmlData): bool
 	{
-		// 16Mo for MEDIUMTEXT
-		return (strlen($xmlData) <= 16777215);
+		if (isset($xmlData)) {
+			// 16Mo for MEDIUMTEXT
+			return (strlen($xmlData) <= 16777215);
+		}
+		return true;
 	}
 
 	/**
