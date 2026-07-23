@@ -1445,8 +1445,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		}
 
 		$sql = "UPDATE " . $db->prefix() . "einvoicing_routing";
-		$sql .= " SET fk_soc = " . $socDest;
-		$sql .= " WHERE fk_soc = " . $socOrigin;
+		$sql .= " SET fk_soc = " . (int) $socDest;
+		$sql .= " WHERE fk_soc = " . (int) $socOrigin;
 
 		$resql = $db->query($sql);
 		if (!$resql) {
