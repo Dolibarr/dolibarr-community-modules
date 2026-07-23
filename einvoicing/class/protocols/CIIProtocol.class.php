@@ -914,7 +914,7 @@ class CIIProtocol extends AbstractProtocol
 
 			$res = $this->createSupplierInvoiceLinesFromSource($supplierInvoice, $parsedLines, $remise_already_used_line_level_ids, $supplierPriceEntries, $return_messages, $flowId);
 			if ($res['res'] < 0) {
-				return $res;
+				return $res;  // Return the full result array because it may contain additional information like actioncode, actionurl...
 			}
 
 			$create_deposit_line = 0;
