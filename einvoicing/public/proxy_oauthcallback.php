@@ -325,7 +325,7 @@ if (empty($code) && !GETPOST('error')) {
 		// This was a callback request from service, get the token
 		try {
 			//var_dump($apiService);      // OAuth\OAuth2\Service\Generic
-			dol_syslog("We received a code=".$code." or error=".GETPOST('error'));
+			dol_syslog("We received a code=".dol_trunc($code, 5)." or error=".GETPOST('error'));
 
 			if (getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER') == 'proxy') {
 				// Ask the token
@@ -376,7 +376,9 @@ if (empty($code) && !GETPOST('error')) {
 
 					//var_dump($origin_redirect_uri);	exit;
 
-					dol_syslog("Redirect now on origin_redirect_uri=".$origin_redirect_uri);
+					// Log only the destination without its query string: the query string carries
+					// the freshly issued access_token/refresh_token and must never reach the logs in clear.
+					dol_syslog("Redirect now on origin_redirect_uri=".strtok($origin_redirect_uri, '?'));
 
 					header('Location: '.$origin_redirect_uri);
 					exit();
