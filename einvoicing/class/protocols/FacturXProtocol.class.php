@@ -1634,4 +1634,16 @@ class FacturXProtocol extends CIIProtocol
 			return ['res' => $supplierInvoiceId, 'message' => implode("\n", $return_messages), 'xml_data' => $embeddedXml];
 		}
 	}
+
+	/**
+	 * Extract XML from an input file content and return it
+	 *
+	 * @param  string $fileContent Raw file content
+	 * @return string The extracted XML content
+	 */
+	public function extractXmlFromFileContent(string $fileContent)
+	{
+		$extractedXml = ZugferdDocumentPdfReaderExt::getInvoiceDocumentContentFromContent($fileContent);
+		return $extractedXml;
+	}
 }
