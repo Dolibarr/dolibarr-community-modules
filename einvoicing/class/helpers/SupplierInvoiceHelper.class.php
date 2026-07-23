@@ -121,8 +121,20 @@ class SupplierInvoiceHelper
 
 		$amountErrors = [];
 
+		$isCreditNote = ($dolSupplierInvoice->type == FactureFournisseur::TYPE_CREDIT_NOTE);
+
 		foreach ($calculationRules as $calculationRule => $vatComputeMode) {
 			$details = self::getInvoiceDetailsForComparison($dolSupplierInvoice, $vatComputeMode);
+
+			if ($isCreditNote) {
+				$details['total_ht'] = abs($details['total_ht']);
+				$details['total_ttc'] = abs($details['total_ttc']);
+				$details['total_tva'] = abs($details['total_tva']);
+				foreach ($details['vat_by_rate'] as $rate => $rateDetails) {
+					$details['vat_by_rate'][$rate]['vat_amount'] = abs($rateDetails['vat_amount']);
+					$details['vat_by_rate'][$rate]['vat_basis_amount'] = abs($rateDetails['vat_basis_amount']);
+				}
+			}
 
 			// VAT excl. total
 			if (!self::areAmountsEqual($details['total_ht'], $parsedHeader['lineTotalAmount'])) {
