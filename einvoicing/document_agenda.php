@@ -146,16 +146,8 @@ if ($id > 0 || !empty($ref)) {
 	$upload_dir = $conf->einvoicing->multidir_output[!empty($object->entity) ? $object->entity : $conf->entity]."/".$object->id;
 }
 
-// There is several ways to check permission.
-// Set $enablepermissioncheck to 1 to enable a minimum low level of checks
-$enablepermissioncheck = getDolGlobalInt('EINVOICING_ENABLE_PERMISSION_CHECK');
-if ($enablepermissioncheck) {
-	$permissiontoread = $user->hasRight('einvoicing', 'read');
-	$permissiontoadd = $user->hasRight('einvoicing', 'write');
-} else {
-	$permissiontoread = 1;
-	$permissiontoadd = 1;
-}
+$permissiontoread = $user->hasRight('einvoicing', 'read');
+$permissiontoadd = $user->hasRight('einvoicing', 'write');
 
 // Security check (enable the most restrictive one)
 //if ($user->socid > 0) accessforbidden();

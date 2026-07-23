@@ -93,16 +93,8 @@ $extrafields->fetch_name_optionals_label($object->table_element);
 // Load object
 include DOL_DOCUMENT_ROOT.'/core/actions_fetchobject.inc.php'; // Must be 'include', not 'include_once'. Include fetch and fetch_thirdparty but not fetch_optionals
 
-// There is several ways to check permission.
-// Set $enablepermissioncheck to 1 to enable a minimum low level of checks
-$enablepermissioncheck = getDolGlobalInt('EINVOICING_ENABLE_PERMISSION_CHECK');
-if ($enablepermissioncheck) {
-	$permissiontoread = $user->hasRight('einvoicing', 'read');
-	$permissiontoadd = $user->hasRight('einvoicing', 'write');
-} else {
-	$permissiontoread = 1;
-	$permissiontoadd = 1;
-}
+$permissiontoread = $user->hasRight('einvoicing', 'read');
+$permissiontoadd = $user->hasRight('einvoicing', 'write');
 
 // Security check (enable the most restrictive one)
 //if ($user->socid > 0) accessforbidden();
