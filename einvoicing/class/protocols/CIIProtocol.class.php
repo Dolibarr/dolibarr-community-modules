@@ -676,6 +676,59 @@ class CIIProtocol extends AbstractProtocol
 	}
 
 	/**
+	 * Create/insert supplier invoice lines in DB using $lines property of the supplier invoice object
+	 * @param FactureFournisseur $supplierInvoice The supplier invoice to add lines
+	 * @return bool  True if success
+	 */
+	public function createSupplierInvoiceLinesIntoDatabase(FactureFournisseur $supplierInvoice): bool
+	{
+		foreach ($supplierInvoice->lines as $i => $val) {
+			$sql = 'INSERT INTO '.MAIN_DB_PREFIX.'facture_fourn_det (fk_facture_fourn, special_code, fk_remise_except)';
+			/** @phan-suppress-next-line PhanUndeclaredProperty */
+			$sql .= " VALUES (".((int) $supplierInvoice->id).", ".((int) $supplierInvoice->lines[$i]->special_code).", ".($supplierInvoice->lines[$i]->fk_remise_except > 0 ? ((int) $supplierInvoice->lines[$i]->fk_remise_except) : 'NULL').')';
+
+			$resql_insert = $this->db->query($sql);
+			if ($resql_insert) {
+				$idligne = $this->db->last_insert_id(MAIN_DB_PREFIX.'facture_fourn_det');
+
+				$res = $supplierInvoice->updateline(
+					$idligne,
+					/** @phan-suppress-next-line PhanDeprecatedProperty */
+					$supplierInvoice->lines[$i]->desc ? $supplierInvoice->lines[$i]->desc : $supplierInvoice->lines[$i]->description,
+					$supplierInvoice->lines[$i]->subprice,
+					(float) ($supplierInvoice->lines[$i]->tva_tx.($supplierInvoice->lines[$i]->vat_src_code ? ' ('.$supplierInvoice->lines[$i]->vat_src_code.')' : '')),
+					$supplierInvoice->lines[$i]->localtax1_tx,
+					$supplierInvoice->lines[$i]->localtax2_tx,
+					$supplierInvoice->lines[$i]->qty,
+					$supplierInvoice->lines[$i]->fk_product,
+					'HT',
+					(!empty($supplierInvoice->lines[$i]->info_bits) ? $supplierInvoice->lines[$i]->info_bits : ''),
+					$supplierInvoice->lines[$i]->product_type,
+					$supplierInvoice->lines[$i]->remise_percent,
+					0,
+					/** @phan-suppress-next-line PhanUndeclaredProperty */
+					$supplierInvoice->lines[$i]->date_start,
+					/** @phan-suppress-next-line PhanUndeclaredProperty */
+					$supplierInvoice->lines[$i]->date_end,
+					$supplierInvoice->lines[$i]->array_options,
+					$supplierInvoice->lines[$i]->fk_unit,
+					$supplierInvoice->lines[$i]->multicurrency_subprice,
+					/** @phan-suppress-next-line PhanUndeclaredProperty */
+					$supplierInvoice->lines[$i]->ref_supplier
+				);
+
+				if ($res < 0) {
+					return false;
+				}
+			} else {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
 	 * Build the supplier invoice from a received CII document written to a per-call working file.
 	 * The temp-file lifecycle is owned by createSupplierInvoiceFromSource() (the public wrapper).
 	 *
@@ -819,11 +872,6 @@ class CIIProtocol extends AbstractProtocol
 		$remise_already_used_line_level_ids = array();
 		$supplierPriceEntries = array(); // Collect product/price data to create supplier prices after invoice creation
 
-		$res = $this->createSupplierInvoiceLinesFromSource($supplierInvoice, $parsedLines, $remise_already_used_line_level_ids, $supplierPriceEntries, $return_messages, $flowId);
-		if ($res['res'] < 0) {
-			return ['res' => -1, 'message' => $res['message']];
-		}
-
 		// Create document level discounts (allowances) as discounts in Dolibarr
 		$globalDiscountIds = array();
 		if (!empty($parsedHeader['headerAllowancesCharges'])) {
@@ -858,6 +906,15 @@ class CIIProtocol extends AbstractProtocol
 			$orderLinkMessage = $this->_linkSupplierInvoiceToPurchaseOrder($supplierInvoice, $socId, $parsedHeader['orderReference'] ?? '');
 			if ($orderLinkMessage !== '') {
 				$return_messages[] = $orderLinkMessage;
+			}
+
+			// --------------------------------------------------
+			// Create supplier invoice lines
+			// --------------------------------------------------
+
+			$res = $this->createSupplierInvoiceLinesFromSource($supplierInvoice, $parsedLines, $remise_already_used_line_level_ids, $supplierPriceEntries, $return_messages, $flowId);
+			if ($res['res'] < 0) {
+				return $res;
 			}
 
 			$create_deposit_line = 0;
@@ -1162,6 +1219,17 @@ class CIIProtocol extends AbstractProtocol
 			$line->total_ttc = $parsedLine['lineTotalAmount'] + ($parsedLine['calculatedAmount'] ?? 0);
 
 			$supplierInvoice->lines[] = $line;
+		}
+
+		if (!$this->createSupplierInvoiceLinesIntoDatabase($supplierInvoice)) {
+			return [
+				'res' => -1,
+				'message' => 'Supplier invoice line creation error',
+				'actioncode' => $res['actioncode'] ?? '',
+				'actionurl' => $res['actionurl'] ?? '',
+				'action' => $res['action'] ?? null,
+				'actiondata' => $res['actiondata'] ?? ''
+			];
 		}
 
 		return ['res' => 1];
