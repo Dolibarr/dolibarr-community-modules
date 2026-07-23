@@ -373,10 +373,14 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			if (empty($parameters['context']) || !preg_match('/takepospay/', $parameters['context'])) {
 				print '<!-- Current AP: ' . getDolGlobalString('EINVOICING_PDP') . ' -->';
 				if (!empty($url_button)) {
+					// dolGetButtonAction() only supports an array $url (dropdown mode) since Dolibarr 18;
+					// use our own polyfill below that version.
 					// Pass the visible label as the 1st arg ($label), not the 2nd ($text). On Dolibarr 18/19
 					// the dropdown <a> renders only $label; v22+ falls back to $text when $label is empty,
 					// but to keep behavior consistent across versions we always use $label.
-					if ((float) DOL_VERSION < 22) {
+					if ((float) DOL_VERSION < 18) {
+						print einvoicingDolGetButtonActionDropdown($langs->trans('einvoice'), $url_button);
+					} elseif ((float) DOL_VERSION < 22) {
 						print dolGetButtonAction($langs->trans('einvoice'), '', 'default', $url_button, '', true);
 					} else {
 						print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true);
@@ -437,7 +441,9 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					}
 
 					if (!empty($url_button)) {
-						if ((float) DOL_VERSION < 22) {
+						if ((float) DOL_VERSION < 18) {
+							print einvoicingDolGetButtonActionDropdown($langs->trans('einvoice'), $url_button);
+						} elseif ((float) DOL_VERSION < 22) {
 							print dolGetButtonAction($langs->trans('einvoice'), '', 'default', $url_button, '', true);
 						} else {
 							print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true);
