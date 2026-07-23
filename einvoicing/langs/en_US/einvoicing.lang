@@ -443,3 +443,4 @@ EINVOICING_REQUIRE_ROUTABLE_RECIPIENT_HELP=Off by default (opt-in). When on, the
 EInvoiceNotGeneratedRecipientNotRoutable=E-invoice not generated: the recipient cannot receive electronic invoices
 EInvoiceGeneratedButRecipientNotRoutable=E-invoice generated, but the recipient cannot receive it yet, so its transmission will be blocked
 EInvoiceNotSentRecipientNotRoutable=Invoice not sent: the recipient cannot receive electronic invoices
+EINVOICING_JOB_MANUAL_ACTION_REQUIRED=Manual action is required. The job has been interrupted.

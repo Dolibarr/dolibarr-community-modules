@@ -1264,6 +1264,12 @@ class Document extends CommonObject
 				$errortype = 'errors';
 				if (!empty($sync_result['actions'])) {
 					$errortype = 'warnings';
+					$this->output .= '<br>' . $langs->trans("EINVOICING_JOB_MANUAL_ACTION_REQUIRED") . '<br>';
+					foreach ($sync_result['actions'] as $action) {
+						$this->output .= "---<br>";
+						$this->output .= $action['businessmessage'] . '<br>';
+					}
+					$this->output = rtrim($this->output, '<br>');
 				}
 				//$this->output = $langs->trans("FailedToSyncADocument").($errortype ? '<br>'.$langs->trans("FailedToSyncADocumentMore") : '');
 			}
