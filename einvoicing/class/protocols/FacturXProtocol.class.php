@@ -1342,43 +1342,12 @@ class FacturXProtocol extends CIIProtocol
 			}
 		}
 
-		// Check if this invoice has already been imported
-		$sql = "SELECT rowid as id FROM " . MAIN_DB_PREFIX . "facture_fourn";
-		$sql .= " WHERE ref_supplier = '" . $db->escape($parsedHeader['documentno']) . "'";
-		$resql = $db->query($sql);
-		if ($resql) {
-			if ($db->num_rows($resql) > 0) {
-				$supplierInvoiceId = $db->fetch_object($resql)->id;
-				$einvoicing->cleanUpTemporaryFiles(); // Clean up temp files to remove retrieved Einvoice file since invoice already exists
-
-				// FIXME supplierinvoice already found but may be that documents are not linked (this is done later but only after creating invoice,
-				// may be we should also do it in this case to fix inconsistent data).
-
-				return ['res' => $supplierInvoiceId, 'message' => 'Supplier Invoice with reference ' . $parsedHeader['documentno'] . ' already exists'];
-			}
-		} else {
-			return ['res' => -1, 'message' => 'Database error while checking existing supplier invoice: ' . $db->lasterror()];
-		}
-
-		// Check if all referenced documents in the invoice exist in Dolibarr, if not return with error since we need them for correct linking in the invoice
-		if (!empty($parsedHeader['invoiceRefDocs']) && is_array($parsedHeader['invoiceRefDocs'])) {
-			foreach ($parsedHeader['invoiceRefDocs'] as $invoiceRefDoc) {
-				$refDoc = $invoiceRefDoc['IssuerAssignedID'] ?? null;
-				$dateDoc = $invoiceRefDoc['FormattedIssueDateTime'] ?? null;
-				$typeDoc = $invoiceRefDoc['TypeCode'] ?? null;
-
-				$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "facture_fourn WHERE ref_supplier = '" . $db->escape($refDoc) . "' LIMIT 1";
-				$resql = $db->query($sql);
-				if ($db->num_rows($resql) != 1) {
-					return ['res' => -1, 'message' => 'Document : ' . $refDoc . ' linked to document ' . $parsedHeader['documentno'] . ' not found in Dolibarr'];
-				}
-			}
-		}
-
 		dol_syslog(get_class($this) . '::createSupplierInvoiceFromSource parsedHeader: ' . json_encode($parsedHeader), LOG_DEBUG);
 		dol_syslog(get_class($this) . '::createSupplierInvoiceFromSource parsedHeader: ' . json_encode($parsedHeader), LOG_DEBUG, 0, '_einvoicing');
 
-		// Sync or create supplier based on seller info
+		// Sync or create supplier based on seller info.
+		// Done before the duplicate/ref-docs checks below so those checks can be scoped to this supplier
+		// (ref_supplier is only unique per supplier, not globally - see issue about cross-supplier collisions).
 		$syncSocRes = $this->_syncOrCreateThirdpartyFromEInvoiceSeller($parsedHeader, 'dolibarr', $flowId);
 
 		$socId = $syncSocRes['res'];
@@ -1401,6 +1370,41 @@ class FacturXProtocol extends CIIProtocol
 			return ['res' => -1, 'message' => 'Failed to load supplier id ' . $socId];
 		}
 
+		// Check if this invoice has already been imported for this supplier
+		$sql = "SELECT rowid as id FROM " . MAIN_DB_PREFIX . "facture_fourn";
+		$sql .= " WHERE ref_supplier = '" . $db->escape($parsedHeader['documentno']) . "'";
+		$sql .= " AND fk_soc = " . ((int) $socId);
+		$sql .= " AND entity IN (" . getEntity('facture_fourn') . ")";
+		$resql = $db->query($sql);
+		if ($resql) {
+			if ($db->num_rows($resql) > 0) {
+				$supplierInvoiceId = $db->fetch_object($resql)->id;
+				$einvoicing->cleanUpTemporaryFiles(); // Clean up temp files to remove retrieved Einvoice file since invoice already exists
+
+				// FIXME supplierinvoice already found but may be that documents are not linked (this is done later but only after creating invoice,
+				// may be we should also do it in this case to fix inconsistent data).
+
+				return ['res' => $supplierInvoiceId, 'message' => 'Supplier Invoice with reference ' . $parsedHeader['documentno'] . ' already exists'];
+			}
+		} else {
+			return ['res' => -1, 'message' => 'Database error while checking existing supplier invoice: ' . $db->lasterror()];
+		}
+
+		// Check if all referenced documents in the invoice exist in Dolibarr for the same supplier, if not return with error since we need them for correct linking in the invoice
+		if (!empty($parsedHeader['invoiceRefDocs']) && is_array($parsedHeader['invoiceRefDocs'])) {
+			foreach ($parsedHeader['invoiceRefDocs'] as $invoiceRefDoc) {
+				$refDoc = $invoiceRefDoc['IssuerAssignedID'] ?? null;
+				$dateDoc = $invoiceRefDoc['FormattedIssueDateTime'] ?? null;
+				$typeDoc = $invoiceRefDoc['TypeCode'] ?? null;
+
+				$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "facture_fourn WHERE ref_supplier = '" . $db->escape($refDoc) . "' AND fk_soc = " . ((int) $socId) . " AND entity IN (" . getEntity('facture_fourn') . ") LIMIT 1";
+				$resql = $db->query($sql);
+				if ($db->num_rows($resql) != 1) {
+					return ['res' => -1, 'message' => 'Document : ' . $refDoc . ' linked to document ' . $parsedHeader['documentno'] . ' not found in Dolibarr'];
+				}
+			}
+		}
+
 		// Set supplier reference
 		$supplierInvoice->socid = $socId;
 		$supplierInvoice->ref_supplier = $parsedHeader['documentno'] ?? '';
@@ -1418,7 +1422,7 @@ class FacturXProtocol extends CIIProtocol
 			$firstRefDoc = reset($parsedHeader['invoiceRefDocs']);
 			$refSourceSupplier = !empty($firstRefDoc['IssuerAssignedID']) ? (string) $firstRefDoc['IssuerAssignedID'] : '';
 			if ($refSourceSupplier !== '') {
-				$sqlSource = "SELECT rowid FROM " . MAIN_DB_PREFIX . "facture_fourn WHERE ref_supplier = '" . $db->escape($refSourceSupplier) . "' LIMIT 1";
+				$sqlSource = "SELECT rowid FROM " . MAIN_DB_PREFIX . "facture_fourn WHERE ref_supplier = '" . $db->escape($refSourceSupplier) . "' AND fk_soc = " . ((int) $socId) . " AND entity IN (" . getEntity('facture_fourn') . ") LIMIT 1";
 				$resqlSource = $db->query($sqlSource);
 				if ($resqlSource) {
 					$objSource = $db->fetch_object($resqlSource);
@@ -1500,7 +1504,7 @@ class FacturXProtocol extends CIIProtocol
 					$dateDoc = $doc['FormattedIssueDateTime'] ?? null;
 					$typeDoc = $doc['TypeCode'] ?? null;
 
-					$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "facture_fourn WHERE ref_supplier = '" . $db->escape($refDoc) . "' LIMIT 1";
+					$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "facture_fourn WHERE ref_supplier = '" . $db->escape($refDoc) . "' AND fk_soc = " . ((int) $socId) . " AND entity IN (" . getEntity('facture_fourn') . ") LIMIT 1";
 					$resql = $db->query($sql);
 					if ($db->num_rows($resql) != 1) {
 						return ['res' => -1, 'message' => 'Document : ' . $refDoc . ' linked to document ' . $parsedHeader['documentno'] . ' not found in Dolibarr'];
