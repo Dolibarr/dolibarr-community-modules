@@ -125,8 +125,8 @@ class SupplierInvoiceHelper
 			$details = self::getInvoiceDetailsForComparison($dolSupplierInvoice, $vatComputeMode);
 
 			// VAT excl. total
-			if (!self::areAmountsEqual($details['total_ht'], $parsedHeader['lineTotalAmount'])) {
-				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatExclDifference', $parsedHeader['lineTotalAmount'], floatval($dolSupplierInvoice->total_ht));
+			if (!self::areAmountsEqual($details['total_ht'], $parsedHeader['taxBasisTotalAmount'])) {
+				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatExclDifference', $parsedHeader['taxBasisTotalAmount'], floatval($dolSupplierInvoice->total_ht));
 			}
 
 			// VAT incl. total
