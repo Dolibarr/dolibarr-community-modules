@@ -123,6 +123,7 @@ class SupplierInvoiceHelper
 
 		foreach ($calculationRules as $calculationRule => $vatComputeMode) {
 			$details = self::getInvoiceDetailsForComparison($dolSupplierInvoice, $vatComputeMode);
+			$amountErrors[$calculationRule] = [];
 
 			// VAT excl. total
 			if (!self::areAmountsEqual($details['total_ht'], $parsedHeader['taxBasisTotalAmount'])) {
