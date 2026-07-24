@@ -92,18 +92,12 @@ if (!empty($user->socid) && $user->socid > 0) {
 //$hookmanager->initHooks(array($object->element.'index'));
 
 // Security check (enable the most restrictive one)
-//if ($user->socid > 0) accessforbidden();
-//if ($user->socid > 0) $socid = $user->socid;
-//if (!isModEnabled('einvoicing')) {
-//	accessforbidden('Module not enabled');
-//}
-//if (! $user->hasRight('einvoicing', 'myobject', 'read')) {
-//	accessforbidden();
-//}
-//restrictedArea($user, 'einvoicing', 0, 'einvoicing_myobject', 'myobject', '', 'rowid');
-//if (empty($user->admin)) {
-//	accessforbidden('Must be admin');
-//}
+if (!isModEnabled('einvoicing')) {
+	accessforbidden('Module not enabled');
+}
+if (!$user->hasRight('einvoicing', 'read')) {
+	accessforbidden();
+}
 
 
 /*
