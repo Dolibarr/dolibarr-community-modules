@@ -455,7 +455,7 @@ class Document extends CommonObject
 			$sql .= " WHERE t.entity IN (".getEntity($this->element).")";
 		} elseif (preg_match('/^\w+@\w+$/', (string) $this->ismultientitymanaged)) {
 			$tmparray = explode('@', (string) $this->ismultientitymanaged);
-			$sql .= " LEFT JOIN ".$this->db->prefix().$tmparray[1]." as pt ON t.".$this->db->sanitize($tmparray[0])." = pt.rowid";  // @phan-suppress-current-line SqlInjection
+			$sql .= " LEFT JOIN ".$this->db->prefix().$this->db->sanitize($tmparray[1])." as pt ON t.".$this->db->sanitize($tmparray[0])." = pt.rowid";
 			$sql .= " WHERE pt.entity IN (".getEntity($this->element).")";
 		} else {
 			$sql .= " WHERE 1 = 1";
