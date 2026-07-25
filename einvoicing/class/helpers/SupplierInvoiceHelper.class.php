@@ -336,6 +336,7 @@ class SupplierInvoiceHelper
 		$sql = "SELECT rowid, flow_id, provider, xml_data FROM " . $db->prefix() . "einvoicing_document";
 		$sql .= " WHERE fk_element_type = '" . $db->escape('invoice_supplier') . "'";
 		$sql .= " AND fk_element_id = " . (int) $supplierInvoiceId;
+		$sql .= " AND flow_type = '" . $db->escape('SupplierInvoice') . "'";
 		$sql .= " LIMIT 2";
 
 		$resql = $db->query($sql);
@@ -391,6 +392,7 @@ class SupplierInvoiceHelper
 		$sql = "SELECT rowid FROM " . $db->prefix() . "einvoicing_document";
 		$sql .= " WHERE fk_element_type = '" . $db->escape('invoice_supplier') . "'";
 		$sql .= " AND fk_element_id = " . (int) $supplierInvoiceId;
+		$sql .= " AND flow_type = '" . $db->escape('SupplierInvoice') . "'";
 		$sql .= " LIMIT 2";
 
 		$resql = $db->query($sql);
