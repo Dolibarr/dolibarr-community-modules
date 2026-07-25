@@ -2033,7 +2033,7 @@ class EInvoicing
 		// Get last status from einvoicing_extlinks table (table contain dolibarr object received or sent to PDP)
 		$sql = "SELECT rowid, syncstatus, synccomment, flow_id, override_routing_id, provider, ap_precheck_status, ap_precheck_result"; // Validation message of einvoice sent.
 		$sql .= " FROM " . $this->db->prefix() . "einvoicing_extlinks";
-		$sql .= " WHERE element_type = '" . $this->db->escape('facture') . "'";
+		$sql .= " WHERE element_type = 'facture'";
 		//$sql .= " AND provider = '" . $this->db->escape($provider) . "'";
 		if ($invoiceId > 0) {
 			$sql .= " AND element_id = " . ((int) $invoiceId);
@@ -2112,7 +2112,7 @@ class EInvoicing
 
 		// Fetch last status message from einvoicing_lifecycle_msg table to get more details on current status of the invoice into the PDP system
 		$sql = "SELECT lc_status, lc_reason_code FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
-		$sql .= " WHERE element_type = '" . $this->db->escape('facture') . "'";
+		$sql .= " WHERE element_type = 'facture'";
 		$sql .= " AND element_id = " . (int) $invoiceId;
 		$sql .= " ORDER BY rowid DESC LIMIT 1";
 
