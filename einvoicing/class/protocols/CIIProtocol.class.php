@@ -2064,6 +2064,29 @@ class CIIProtocol extends AbstractProtocol
 		// Note that the $line['ExemptionReasonCode'] and $line['ExemptionReasonCode'] is added into the section ApplicableHeaderTradeSettlement
 		// that is a vat breakdown array and not inside each line.
 
+		// Billing period for the line (BG-26 / BT-134 / BT-135). Must be placed after ApplicableTradeTax
+		// and before SpecifiedTradeAllowanceCharge (discount below) per the CII D22B schema sequence.
+		if ($line['linePeriodStart'] !== null || $line['linePeriodEnd'] !== null) {
+			$period = $doc->createElement('ram:BillingSpecifiedPeriod');
+			$sett->appendChild($period);
+
+			if ($line['linePeriodStart'] !== null) {
+				$start = $doc->createElement('ram:StartDateTime');
+				$startStr = $doc->createElement('udt:DateTimeString', $line['linePeriodStart']->format('Ymd'));
+				$startStr->setAttribute('format', '102');
+				$start->appendChild($startStr);
+				$period->appendChild($start);
+			}
+
+			if ($line['linePeriodEnd'] !== null) {
+				$end = $doc->createElement('ram:EndDateTime');
+				$endStr = $doc->createElement('udt:DateTimeString', $line['linePeriodEnd']->format('Ymd'));
+				$endStr->setAttribute('format', '102');
+				$end->appendChild($endStr);
+				$period->appendChild($end);
+			}
+		}
+
 		if ($line['discountPercent']) {
 			$discount = [
 				'basis' => $line['netpriceamount'] * $line['billedquantity'],	// The base amount for the discount is the line net price * quantity.
