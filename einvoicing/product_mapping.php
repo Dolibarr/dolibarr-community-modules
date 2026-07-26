@@ -128,18 +128,26 @@ if (!empty($flowid)) {
 			if (empty($flowResponse['status_code']) || $flowResponse['status_code'] != 200) {
 				$loaderror = $langs->trans("FailedToGetFlowContent", $flowid).(empty($flowResponse['errorMessage']) ? '' : ' - '.$flowResponse['errorMessage']);
 			} else {
-				$resProtocol = ProtocolManager::getProtocolFromContent($flowResponse['response']);
-				if (empty($resProtocol['success'])) {
+				$flowContent = $flowResponse['response'];
+
+				$protocolManager = new ProtocolManager($db);
+				$detectedProtocol = $protocolManager->detectProtocolFromContent($flowContent);
+				$protocol = empty($detectedProtocol) ? null : $protocolManager->getProtocol($detectedProtocol);
+
+				if (!is_object($protocol)) {
 					$loaderror = $langs->trans("FailedToDetectProtocolOfFlow", $flowid);
 				} else {
-					$protocol = $resProtocol['protocol_object'];
-					$xmlData = $protocol->extractXmlFromFileContent($flowResponse['response']);
+					// A Factur-X document is a PDF embedding the XML, so we may have to extract it first.
+					$xmlData = method_exists($protocol, 'extractXmlFromFileContent') ? $protocol->extractXmlFromFileContent($flowContent) : $flowContent;
 
 					// The extracted content is a pure XML (CII for a Factur-X PDF), so we may have to
 					// switch to the protocol able to parse it.
-					$resProtocolXml = ProtocolManager::getProtocolFromContent($xmlData);
-					if (!empty($resProtocolXml['success'])) {
-						$protocol = $resProtocolXml['protocol_object'];
+					$detectedXmlProtocol = $protocolManager->detectProtocolFromContent($xmlData);
+					if (!empty($detectedXmlProtocol) && $detectedXmlProtocol != $detectedProtocol) {
+						$xmlProtocol = $protocolManager->getProtocol($detectedXmlProtocol);
+						if (is_object($xmlProtocol)) {
+							$protocol = $xmlProtocol;
+						}
 					}
 
 					try {
