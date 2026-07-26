@@ -638,6 +638,10 @@ $newcardbutton = '';
 //$newcardbutton .= dolGetButtonTitleSeparator();
 //$newcardbutton .= dolGetButtonTitle($langs->trans('New'), '', 'fa fa-plus-circle', dol_buildpath('/einvoicing/document_card.php', 1).'?action=create&backtopage='.urlencode($_SERVER['PHP_SELF']), '', $permissiontoadd);
 
+// Manual mapping of the vendor products of a flow onto existing Dolibarr products (useful when the automatic
+// creation of products is disabled and a synchronization is blocked on an unknown product).
+$newcardbutton .= dolGetButtonTitle($langs->trans('MapEInvoiceProducts'), '', 'fa fa-link', dol_buildpath('/einvoicing/product_mapping.php', 1), '', $permissiontoadd);
+
 
 $providershort = '';
 if ($provider) {
