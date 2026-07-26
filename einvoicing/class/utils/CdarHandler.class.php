@@ -224,16 +224,24 @@ class CdarHandler
 		// We use same as ID for Name as its not required to be different
 		$Name = $ID;
 
+		// 212 (Encaissee) is the only status we send on one of OUR OWN invoices: we are then the seller and
+		// the CDAR is addressed to our customer. Every other status is sent on a supplier invoice, where we
+		// are the buyer and the CDAR goes back to the vendor. Getting those two parties the wrong way round
+		// makes the platform answer "no matching invoices found": it cannot find the invoice the status is
+		// about. See the XP Z12-012 annex B examples, UC1 205/211 (issued by the buyer) versus UC1 212
+		// (issued by the seller).
+		$isOurOwnInvoice = ($statusCode == CdarHandler::PROC_PAID);
+
 		// SIREN (0002)
 		$mysocGlobalID = idprof($mysoc);
 
-		// Issuer SIREN (0002)
-		$InvoiceIssuerGlobalID = $statusCode == 212	// Customer invoices management (Only 212 for now)
-			? idprof($mysoc)
+		// Issuer SIREN (0002) of the invoice the status is about: us when we sell, the vendor otherwise
+		$InvoiceIssuerGlobalID = $isOurOwnInvoice
+			? $mysocGlobalID
 			: thirdpartyidprof($object);
 
 		// Invoice reference
-		$IssuerAssignedID = $statusCode == 212	// Customer invoices management (Only 212 for now)
+		$IssuerAssignedID = $isOurOwnInvoice
 			? $object->ref
 			: $object->ref_supplier;
 
@@ -249,7 +257,7 @@ class CdarHandler
 		 * 46 (Under Query) = En litige
 		 * 1 (accepted) = Approuvée
 		 */
-		$StatusCodeCdar = '45';
+		$StatusCodeCdar = $isOurOwnInvoice ? '47' : '45';	// 47 (Paid) for the cash-in, as in the XP Z12-012 example
 
 		// Label for ProcessCondition (Label of status code) we get it from class einvoicing
 		dol_include_once('/einvoicing/class/providers/PDPProviderManager.class.php');
@@ -279,6 +287,39 @@ class CdarHandler
 			$SpecifiedDocumentStatus['SequenceNumeric'] = 1;
 		}
 
+		if ($isOurOwnInvoice) {
+			// We issue the status as the SELLER, and it is addressed to the buyer of the invoice
+			$CdarIssuerTradeParty = [
+				'GlobalID' => $mysocGlobalID,
+				'SchemeID' => CdarHandler::SCHEME_SIREN_0002,
+				'RoleCode' => CdarHandler::ROLE_SE
+			];
+
+			$buyerGlobalID = thirdpartyidprof($object);
+			$buyerURIID = $einvoicing->getBuyerCommunicationURI($object->thirdparty, $object);
+			$CdarRecipientTradeParty = [
+				'GlobalID'     => $buyerGlobalID,
+				'SchemeID'     => CdarHandler::SCHEME_SIREN_0002,
+				'RoleCode'     => CdarHandler::ROLE_BY,
+				'URIID'        => $buyerURIID !== '' ? $buyerURIID : $buyerGlobalID,
+				'URISchemeID'  => CdarHandler::SCHEME_SIREN_0225
+			];
+		} else {
+			// We issue the status as the BUYER of a supplier invoice, and it goes back to the vendor
+			$CdarIssuerTradeParty = [
+				'GlobalID' => $mysocGlobalID, // GlobalID of CDAR SENDER
+				'RoleCode' => CdarHandler::ROLE_BY
+			];
+
+			$CdarRecipientTradeParty = [
+				'GlobalID'     => $InvoiceIssuerGlobalID, // GlobalID of CDAR RECIPIENT
+				'SchemeID'     => CdarHandler::SCHEME_SIREN_0002,
+				'RoleCode'     => CdarHandler::ROLE_SE,
+				'URIID'        => $InvoiceIssuerGlobalID,
+				'URISchemeID'  => CdarHandler::SCHEME_SIREN_0225
+			];
+		}
+
 		$data = [
 			'GuidelineID' => 'urn.cpro.gouv.fr:1p0:CDV:invoice',
 
@@ -291,18 +332,9 @@ class CdarHandler
 					'RoleCode' => CdarHandler::ROLE_WK
 				],
 
-				'IssuerTradeParty' => [
-					'GlobalID' => $mysocGlobalID, // GlobalID of CDAR SENDER
-					'RoleCode' => CdarHandler::ROLE_BY
-				],
+				'IssuerTradeParty' => $CdarIssuerTradeParty,
 
-				'RecipientTradeParty' => [
-					'GlobalID'     => $InvoiceIssuerGlobalID, // GlobalID of CDAR RECIPIENT
-					'SchemeID'     => CdarHandler::SCHEME_SIREN_0002,
-					'RoleCode'     => CdarHandler::ROLE_SE,
-					'URIID'        => $InvoiceIssuerGlobalID,
-					'URISchemeID'  => CdarHandler::SCHEME_SIREN_0225
-				]
+				'RecipientTradeParty' => $CdarRecipientTradeParty
 			],
 
 			'AcknowledgementDocument' => [
@@ -314,7 +346,10 @@ class CdarHandler
 					'IssuerAssignedID' => $IssuerAssignedID,
 					'StatusCode' => $StatusCodeCdar,
 					'TypeCode' => CdarHandler::DOC_INVOICE, // TODO: map DOC_INVOICE with $object type
-					'FormattedIssueDateTime' => date('YmdHis', $object->date),
+					// The reference example of a cash-in dates the invoice with a plain date (format 102),
+					// the supplier invoice statuses keep the datetime form they are already accepted with.
+					'FormattedIssueDateTime' => $isOurOwnInvoice ? date('Ymd', $object->date) : date('YmdHis', $object->date),
+					'FormattedIssueDateTimeFormat' => $isOurOwnInvoice ? CdarHandler::FORMAT_DATE : CdarHandler::FORMAT_DATETIME,
 					'ProcessConditionCode' => $statusCode,
 					'ProcessCondition' => $ProcessCondition,
 
@@ -810,7 +845,7 @@ class CdarHandler
 
 		$formattedDateTime = $dom->createElement('ram:FormattedIssueDateTime');
 		$dateTimeStr = $dom->createElement('qdt:DateTimeString', $doc['FormattedIssueDateTime']);
-		$dateTimeStr->setAttribute('format', self::FORMAT_DATETIME);
+		$dateTimeStr->setAttribute('format', empty($doc['FormattedIssueDateTimeFormat']) ? self::FORMAT_DATETIME : $doc['FormattedIssueDateTimeFormat']);
 		$formattedDateTime->appendChild($dateTimeStr);
 		$ref->appendChild($formattedDateTime);
 
