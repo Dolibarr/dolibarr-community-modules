@@ -805,10 +805,11 @@ abstract class AbstractPDPProvider
 	 * @param mixed $object Invoice object (CustomerInvoice or SupplierInvoice)
 	 * @param int $statusCode   Status code to send (see class constants for available codes)
 	 * @param string $reasonCode Reason code to send (optional)
+	 * @param array{amount?:float,breakdown?:array<array{vatrate:float,amount:float}>} $paymentData Cashed amount (TTC) for status 212 (Encaissee), mandatory content of the CDAR (rule BR-FR-CDV-14)
 	 *
 	 * @return array{res:int, message:string}       Returns array with 'res' (1 on success, -1 on failure) with a 'message'.
 	 */
-	abstract public function sendStatusMessage($object, $statusCode, $reasonCode = '');
+	abstract public function sendStatusMessage($object, $statusCode, $reasonCode = '', $paymentData = array());
 
 	/**
 	 * Clear the fixed "last invoice that could not be processed" diagnostic files at the start of a

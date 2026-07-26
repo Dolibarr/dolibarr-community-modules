@@ -5,6 +5,17 @@
 FIX: The triggers no longer fail with "Class EInvoicing / PDPProviderManager not found" when the action
 comes from a context that never went through the module screens (cron, CLI, REST API, bank import).
 
+FIX: The "Cashed in" (212) status sent to the platform now carries the cashed amount broken down by
+VAT rate (MDG-43 blocks with MDT-207 = MEN, MDT-215 amount and MDT-224 rate) and the status detail
+sequence number, as required by the rules BR-FR-CDV-14 and BR-FR-CDV-16. Without them the platform
+rejected the CDAR with a HTTP 400.
+
+NEW: The cash-in is now reported on every customer payment instead of once when the invoice becomes
+fully paid, so partial payments are reported too (each one with its own amount), as the reform
+expects. Two new options frame the scope: EINVOICING_VAT_ON_DEBITS (seller who opted for the "TVA
+d'après les débits" scheme: no payment data to report at all) and EINVOICING_PAID_STATUS_SERVICES_ONLY
+(restrict the status to the operations whose VAT is due on collection: services and down payments).
+
 NEW: When the e-invoicing platform (PDP/PA) confirms the refusal of a received supplier invoice,
 the corresponding Dolibarr supplier invoice is automatically validated then abandoned (with a
 dedicated close code, keeping the refusal and its reason as trace) and is excluded from the

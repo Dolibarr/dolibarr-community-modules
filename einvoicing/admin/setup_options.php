@@ -251,6 +251,21 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->defaultFieldValue = '0';
 	$item->cssClass = 'minwidth500';
 
+	// The seller opted for the "TVA d'apres les debits" scheme: VAT falls due on invoicing, so the cash-in
+	// data are not reported at all and no 212 (Encaissee) status is sent. Off by default.
+	$item = $formSetup->newItem('EINVOICING_VAT_ON_DEBITS')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('EINVOICING_VAT_ON_DEBITS_HELP');
+	$item->defaultFieldValue = '0';
+	$item->cssClass = 'minwidth500';
+
+	// Restrict the 212 (Encaissee) status to the invoices that really owe it (services and down payments,
+	// whose VAT is due on collection). Off by default: sending it on a goods invoice is allowed and never
+	// penalised, whereas missing one is, and a free text line typed as a product would be silently skipped.
+	$item = $formSetup->newItem('EINVOICING_PAID_STATUS_SERVICES_ONLY')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('EINVOICING_PAID_STATUS_SERVICES_ONLY_HELP');
+	$item->defaultFieldValue = '0';
+	$item->cssClass = 'minwidth500';
+
 	// Setup conf to automatically transmit the e-invoice to the PA right after it is generated (on validation)
 	$item = $formSetup->newItem('EINVOICING_AUTO_SEND_ON_GENERATION')->setAsYesNo();
 	$item->helpText = $langs->transnoentities('EINVOICING_AUTO_SEND_ON_GENERATION_HELP');
