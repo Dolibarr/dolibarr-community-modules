@@ -5,6 +5,11 @@
 FIX: The triggers no longer fail with "Class EInvoicing / PDPProviderManager not found" when the action
 comes from a context that never went through the module screens (cron, CLI, REST API, bank import).
 
+FIX: The "Cashed in" (212) status is now issued as the seller of the invoice and addressed to its
+buyer, instead of reusing the supplier invoice mapping (us as the buyer, addressed to ourselves) which
+made the platform answer "no matching invoices found". Its referenced document status code (47, Paid)
+and issue date format follow the XP Z12-012 reference example as well.
+
 FIX: The "Cashed in" (212) status sent to the platform now carries the cashed amount broken down by
 VAT rate (MDG-43 blocks with MDT-207 = MEN, MDT-215 amount and MDT-224 rate) and the status detail
 sequence number, as required by the rules BR-FR-CDV-14 and BR-FR-CDV-16. Without them the platform
