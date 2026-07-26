@@ -322,6 +322,7 @@ IBANForSellerMandatoryOnCreditTransferButNotBankAcount2=Définissez un compte ba
 IBANForSellerMandatoryOnCreditTransferButNotBAN=Le mode de paiement est configuré sur virement bancaire, mais le compte bancaire par défaut sélectionné ne possède pas de numéro IBAN.
 IBANForSellerMandatoryOnCreditTransferButNotBAN2=Renseignez un numéro IBAN sur le compte bancaire.
 CreateTheProduct=Créer le produit
+CreateTheService=Créer le service
 EINVOICING_SUPPLIER_INVOICE_COMPARISON_ROUND_PRECISION=Nombre de chiffres après la virgule pour la comparaison des montants entre e-facture et facture fournisseur Dolibarr (valeur par défaut : 3)
 EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION=Empêcher la validation d'une facture fournisseur si les données de la facture électronique et de la facture Dolibarr ne sont pas cohérentes
 EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION_HELP=Données comparées : la devise, le montant total TTC, le montant total HT, le montant total de TVA, le montant de base et le montant de TVA pour chaque taux de TVA

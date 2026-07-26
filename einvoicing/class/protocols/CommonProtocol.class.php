@@ -1073,8 +1073,12 @@ trait CommonProtocol
 				$createParams['desc'] = $prodDesc;
 			}
 
-			// Detect product type to prefill form
-			$createParams['type'] = $this->_detectProductTypeFromEinvoiceLine($lineData);
+			// Detect type to prefill form (0 = product, 1 = service). Fallback on product if the service module is not enabled.
+			$prodType = $this->_detectProductTypeFromEinvoiceLine($lineData);
+			if ($prodType == 1 && !isModEnabled('service')) {
+				$prodType = 0;
+			}
+			$createParams['type'] = $prodType;
 			$createParams['tva_tx'] = (float) ($lineData['rateApplicablePercent'] ?? 0);
 			$createParams['status'] = 1; // Active
 			if (!empty($lineData['prodglobalid']) && !empty($lineData['prodglobalidtype']) && in_array($lineData['prodglobalidtype'], ['0160', '0011'])) {
@@ -1098,7 +1102,7 @@ trait CommonProtocol
 			$action = $langs->trans('CreateProductManually') . ' ';
 			$action .= '<a class="butAction smallpaddingimp" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
 			$action .= '<i class="fas fa-plus-circle"></i> ';
-			$action .= $langs->trans('CreateTheProduct');
+			$action .= $langs->trans($prodType == 1 ? 'CreateTheService' : 'CreateTheProduct');
 			$action .= '</a>';
 
 			/*
@@ -1268,7 +1272,7 @@ trait CommonProtocol
 			}
 		}
 
-		// Fallback = service
+		// Fallback = product
 		return 0;
 	}
 
