@@ -19,6 +19,9 @@ the seller alone. A customer whose professional id was not a 9 digit SIREN went 
 the invoice was refused by the platform (BR-FR-32), without the operator being told which party was at
 fault (issue #473).
 
+FIX: A French thirdparty recorded with a SIRET but no SIREN was identified in the generated invoice by
+the 5 digit establishment number instead of its SIREN, an identifier the platform refuses (BR-FR-32).
+
 NEW: The generated invoices now tell when the VAT falls due, hence from when the buyer may deduct it:
 BT-8 is set to 72 (payment date) as soon as the invoice carries a service, and to 5 (invoice date) for a
 seller who opted for the "TVA d'après les débits" scheme (EINVOICING_VAT_ON_DEBITS), whose legal mention
