@@ -333,11 +333,17 @@ class CdarHandler
 				'RoleCode' => CdarHandler::ROLE_BY
 			];
 
+			// The electronic address (MDT-73) of the recipient is its routing ID, which is only the same
+			// as its SIREN when the platform happens to know it under that address. Sending the SIREN
+			// blindly gets the CDAR refused with "L'adresse électronique (MDT-73) est invalide".
+			// getBuyerCommunicationURI() reads the routing of the third party it is given, whichever
+			// side of the invoice that third party sits on.
+			$vendorURIID = is_object($object->thirdparty) ? $einvoicing->getBuyerCommunicationURI($object->thirdparty) : '';
 			$CdarRecipientTradeParty = [
 				'GlobalID'     => $InvoiceIssuerGlobalID, // GlobalID of CDAR RECIPIENT
 				'SchemeID'     => CdarHandler::SCHEME_SIREN_0002,
 				'RoleCode'     => CdarHandler::ROLE_SE,
-				'URIID'        => $InvoiceIssuerGlobalID,
+				'URIID'        => $vendorURIID !== '' ? $vendorURIID : $InvoiceIssuerGlobalID,
 				'URISchemeID'  => CdarHandler::SCHEME_SIREN_0225
 			];
 		}
