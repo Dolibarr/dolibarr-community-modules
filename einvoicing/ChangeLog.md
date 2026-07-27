@@ -38,6 +38,22 @@ FIX: The deliver-to party (ShipToTradeParty) of the generated XML no longer repe
 contact. That party is a stripped-down copy of the buyer and the CII syntax binding forbids a
 contact on it (CII-SR-312), just like the legal organization that was already left out (issue #463).
 
+FIX: The scheduled job "EInvoicingDocumentSync" died on a fatal error ("Class PDPProviderManager not
+found") as soon as it was enabled, because the scheduler only loads the class file holding the job
+method. Flow synchronization could therefore only be run by hand from the interface.
+
+FIX: The reachability precheck of the recipient in the directory (annuaire) reported "routable" as
+soon as the recipient had a directory line, whatever its state. A line that is only declared and not
+open yet ("Upcoming"), or closed, is no longer counted as an active reception address. When
+EINVOICING_REQUIRE_ROUTABLE_RECIPIENT is enabled, such a recipient is now blocked before
+transmission instead of being rejected by the platform with a routing error (fr:213).
+
+NEW: The profile used to build the XML can be set with EINVOICING_XML_PROFILE, which accepts
+MINIMUM, BASICWL, BASIC, EN16931, EXTENDED and EXTENDEDFR. The default does not change (EN16931 for
+CII, EXTENDED for Factur-X). Setting EXTENDEDFR switches the document to EXTENDED-CTC-FR, the
+profile the French mandate expects, including on the Factur-X path whose PDF/A-3 attachment step
+used to refuse that guideline.
+
 NEW: When the e-invoicing platform (PDP/PA) confirms the refusal of a received supplier invoice,
 the corresponding Dolibarr supplier invoice is automatically validated then abandoned (with a
 dedicated close code, keeping the refusal and its reason as trace) and is excluded from the
