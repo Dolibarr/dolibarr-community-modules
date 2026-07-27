@@ -838,42 +838,18 @@ trait CommonProtocol
 	}
 
 	/**
-	 * Find or create a Dolibarr product based on Einvoice line data
-	 * @param array $lineData Array containing invoice line data extracted from XML
-	 * @param string $flowId Flow identifier source of the product. Used for logging purposes.
+	 * Search an existing Dolibarr product matching an e-invoice line. Read only: nothing is created.
 	 *
-	 * @return array{res:int, message:string, actioncode:string|null, actionurl:string|null, action:string|null}   Returns array with 'res' (ID of the found or created product, -1 on error) with a 'message' and an optional 'action'.
+	 * Note: this is the matching part (steps 1 to 4 + default routing) of _findOrCreateProductFromEinvoiceLine().
+	 * It is public so a manual mapping screen (see einvoicing/product_mapping.php) can show, for each line of a
+	 * flow, if the line is already resolved or not, without importing anything.
+	 *
+	 * @param 	array 	$lineData 	Array containing invoice line data extracted from XML
+	 * @return 	array{res:int, message:string}   'res' = ID of the product found, 0 if no product found
 	 */
-	private function _findOrCreateProductFromEinvoiceLine($lineData, $flowId = '')
+	public function findProductFromEinvoiceLine($lineData)
 	{
-		/*
-		 * PRODUCT MATCHING FOR SUPPLIER INVOICE (XML invoice line => Dolibarr product)
-		 *
-		 * This matching strategy attempts to find or create a product based on
-		 * XML invoice line data, following a priority-based approach.
-		 *
-		 * 1. Search in product supplier prices table using prodsellerid
-		 *    - Ok if match found
-		 *    - ko, continue to step 2
-		 *
-		 * 2. Global ID (prodglobalid + prodglobalidtype) and prodglobalidtype = '0160' search by barcode
-		 *    - ok if match found
-		 *    - KO if Other schemes or no match, continue to step 3
-		 *
-		 * 3. if Buyer Reference (prodbuyerid) is available search prodbuyerid = internal product reference
-		 *    - ok if match found
-		 *    - ko, continue to step 4
-		 *
-		 * 4. Text Search using prodname
-		 *    - ok if match found
-		 *    - ko if multiple matches or no match, continue to create product
-		 *
-		 * 5. If no match found after all steps:
-		 *    - Automatic product creation (with extrafield source=Einvoice and to be verified tag)
-		 *    - Use this product for supplier invoice line (with extrafield to be verified tag)
-		 *    - Add supplier price information (if not added automatically by Dolibarr)
-		 */
-		global $db, $user, $langs;
+		global $db;
 
 		$einvoicing = new EInvoicing($db);
 
@@ -881,14 +857,14 @@ trait CommonProtocol
 		$sql = "SELECT p.rowid ";
 		$sql .= " FROM " . MAIN_DB_PREFIX . "product as p ";
 		$sql .= " INNER JOIN " . MAIN_DB_PREFIX . "product_fournisseur_price as pfp ON pfp.fk_product = p.rowid ";
-		$sql .= " WHERE pfp.ref_fourn = '" . $db->escape($lineData['prodsellerid']) . "' ";
-		$sql .= " AND pfp.fk_soc = " . intval($lineData['supplierId']) . " ";
+		$sql .= " WHERE pfp.ref_fourn = '" . $db->escape($lineData['prodsellerid'] ?? '') . "' ";
+		$sql .= " AND pfp.fk_soc = " . intval($lineData['supplierId'] ?? 0) . " ";
 		$sql .= " AND p.entity IN (" . getEntity('product') . ")";
 		$sql .= " LIMIT 1";
 		$resql = $db->query($sql);
 		if ($resql && $db->num_rows($resql) > 0) {
 			$obj = $db->fetch_object($resql);
-			dol_syslog(get_class($this) . '::_findOrCreateProductFromEinvoiceLine Found product by prodsellerid: ' . $obj->rowid);
+			dol_syslog(__METHOD__ . ' Found product by prodsellerid: ' . $obj->rowid);
 			return array('res' => $obj->rowid, 'message' => 'Product found by prodsellerid');
 			// No match found, continue to next step
 		}
@@ -905,7 +881,7 @@ trait CommonProtocol
 			$resql = $db->query($sql);
 			if ($resql && $db->num_rows($resql) > 0) {
 				$obj = $db->fetch_object($resql);
-				dol_syslog(get_class($this) . '::_findOrCreateProductFromEinvoiceLine Found product by prodbuyerid: ' . $obj->rowid);
+				dol_syslog(__METHOD__ . ' Found product by prodbuyerid: ' . $obj->rowid);
 				return array('res' => $obj->rowid, 'message' => 'Product found by prodbuyerid');
 			}
 		}
@@ -919,26 +895,26 @@ trait CommonProtocol
 			$resql = $db->query($sql);
 			if ($resql && $db->num_rows($resql) > 0) {
 				$obj = $db->fetch_object($resql);
-				dol_syslog(get_class($this) . '::_findOrCreateProductFromEinvoiceLine Found product by prodsellerid with EI- prefix: ' . $obj->rowid);
+				dol_syslog(__METHOD__ . ' Found product by prodsellerid with EI- prefix: ' . $obj->rowid);
 				return array('res' => $obj->rowid, 'message' => 'Product found by prodsellerid with EI- prefix');
 			}
 		}
 
 		// Text Search using prodname
 		$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product";
-		$sql .= " WHERE label = '" . $db->escape($lineData['prodname']) . "'";
+		$sql .= " WHERE label = '" . $db->escape($lineData['prodname'] ?? '') . "'";
 		$sql .= " AND entity IN (" . getEntity('product') . ")";
 		$resql = $db->query($sql);
 		if ($resql) {
 			if ($db->num_rows($resql) === 1) {
 				$obj = $db->fetch_object($resql);
-				dol_syslog(get_class($this) . '::_findOrCreateProductFromEinvoiceLine Found product by text search: ' . $obj->rowid);
+				dol_syslog(__METHOD__ . ' Found product by text search: ' . $obj->rowid);
 				return array('res' => $obj->rowid, 'message' => 'Product found by text search');
 			}
 		}
 
 		// If not found, we check by using the default product ID on thirdpary level
-		$resFetchP = $einvoicing->fetchDefaultRouting($lineData['supplierId'], 'product');
+		$resFetchP = $einvoicing->fetchDefaultRouting($lineData['supplierId'] ?? 0, 'product');
 		if (!empty($resFetchP) && $resFetchP != '-1') {
 			$product_id = (string) $resFetchP;		// Can be 'idprod_123' (product id) or '456' (supplier ref id)
 			if (preg_match('/^idprod_/', $product_id)) {
@@ -950,7 +926,7 @@ trait CommonProtocol
 				$resql = $db->query($sql);
 				if ($resql && $db->num_rows($resql) > 0) {
 					$obj = $db->fetch_object($resql);
-					dol_syslog(get_class($this) . '::_findOrCreateProductFromEinvoiceLine Default routing product found for supplier=' . $lineData['supplierId'] . ' product=' . $obj->rowid);
+					dol_syslog(__METHOD__ . ' Default routing product found for supplier=' . $lineData['supplierId'] . ' product=' . $obj->rowid);
 					return array('res' => $obj->rowid, 'message' => 'Line product not found, but a default routing product ID was found for this supplier');
 				}
 			} else {
@@ -966,12 +942,48 @@ trait CommonProtocol
 				$resql = $db->query($sql);
 				if ($resql && $db->num_rows($resql) > 0) {
 					$obj = $db->fetch_object($resql);
-					dol_syslog(get_class($this) . '::_findOrCreateProductFromEinvoiceLine Default routing product found for supplier=' . $lineData['supplierId'] . ' product=' . $obj->fk_product);
+					dol_syslog(__METHOD__ . ' Default routing product found for supplier=' . $lineData['supplierId'] . ' product=' . $obj->fk_product);
 					return array('res' => $obj->fk_product, 'message' => 'Line product not found, but a default routing product was found for this supplier');
 				}
 			}
 		}
 
+		return array('res' => 0, 'message' => 'No product found for this e-invoice line');
+	}
+
+	/**
+	 * Find or create a Dolibarr product based on Einvoice line data
+	 * @param array $lineData Array containing invoice line data extracted from XML
+	 * @param string $flowId Flow identifier source of the product. Used for logging purposes.
+	 *
+	 * @return array{res:int, message:string, actioncode:string|null, actionurl:string|null, action:string|null}   Returns array with 'res' (ID of the found or created product, -1 on error) with a 'message' and an optional 'action'.
+	 */
+	private function _findOrCreateProductFromEinvoiceLine($lineData, $flowId = '')
+	{
+		/*
+		 * PRODUCT MATCHING FOR SUPPLIER INVOICE (XML invoice line => Dolibarr product)
+		 *
+		 * This matching strategy attempts to find or create a product based on
+		 * XML invoice line data, following a priority-based approach.
+		 *
+		 * 1 to 4. Search of an existing product, see findProductFromEinvoiceLine()
+		 *
+		 * 5. If no match found after all steps:
+		 *    - Automatic product creation (with extrafield source=Einvoice and to be verified tag)
+		 *    - Use this product for supplier invoice line (with extrafield to be verified tag)
+		 *    - Add supplier price information (if not added automatically by Dolibarr)
+		 *    - Or, if auto creation is disabled, suggest a manual action (create the product or map it
+		 *      to an existing one with einvoicing/product_mapping.php)
+		 */
+		global $db, $user, $langs;
+
+		$einvoicing = new EInvoicing($db);
+
+		// Steps 1 to 4: try to find an existing product
+		$resFind = $this->findProductFromEinvoiceLine($lineData);
+		if ($resFind['res'] > 0) {
+			return $resFind;
+		}
 
 		// If no match found after all steps: Create new product
 		if (getDolGlobalInt('EINVOICING_PRODUCTS_AUTO_GENERATION')) {
@@ -1073,8 +1085,12 @@ trait CommonProtocol
 				$createParams['desc'] = $prodDesc;
 			}
 
-			// Detect product type to prefill form
-			$createParams['type'] = $this->_detectProductTypeFromEinvoiceLine($lineData);
+			// Detect type to prefill form (0 = product, 1 = service). Fallback on product if the service module is not enabled.
+			$prodType = $this->_detectProductTypeFromEinvoiceLine($lineData);
+			if ($prodType == 1 && !isModEnabled('service')) {
+				$prodType = 0;
+			}
+			$createParams['type'] = $prodType;
 			$createParams['tva_tx'] = (float) ($lineData['rateApplicablePercent'] ?? 0);
 			$createParams['status'] = 1; // Active
 			if (!empty($lineData['prodglobalid']) && !empty($lineData['prodglobalidtype']) && in_array($lineData['prodglobalidtype'], ['0160', '0011'])) {
@@ -1098,19 +1114,25 @@ trait CommonProtocol
 			$action = $langs->trans('CreateProductManually') . ' ';
 			$action .= '<a class="butAction smallpaddingimp" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
 			$action .= '<i class="fas fa-plus-circle"></i> ';
-			$action .= $langs->trans('CreateTheProduct');
+			$action .= $langs->trans($prodType == 1 ? 'CreateTheService' : 'CreateTheProduct');
 			$action .= '</a>';
 
-			/*
-			$createSupplierRefUrl = 'todo';
-			$sellerName ='xxx';
+			// Second choice: map the vendor product reference(s) of this flow onto existing Dolibarr products.
+			// This creates the vendor reference (llx_product_fournisseur_price) that the matching uses at step 1,
+			// so the next synchronization will find the product without creating a new one.
+			if (!empty($flowId)) {
+				$mappingUrl = dol_buildpath('/einvoicing/product_mapping.php', 1);
+				$mappingUrl .= '?flowid=' . urlencode($flowId);
+				if (!empty($vendorId)) {
+					$mappingUrl .= '&socid=' . ((int) $vendorId);
+				}
 
-			$action .= $langs->trans("or");
-			$action .= '<a class="butAction smallpaddingimp" href="' . dol_escape_htmltag($createSupplierRefUrl) . '" target="_blank">';
-			$action .= '<i class="fas fa-plus-circle"></i> ';
-			$action .= $langs->trans('CreateSupplierRef').' '.dol_trunc($prodSupplierRef, 8).' for '.dol_trunc($sellerName, 8);
-			$action .= '</a>';
-			*/
+				$action .= ' ' . $langs->trans("or") . ' ';
+				$action .= '<a class="butAction smallpaddingimp" href="' . dol_escape_htmltag($mappingUrl) . '" target="_blank">';
+				$action .= '<i class="fas fa-link"></i> ';
+				$action .= $langs->trans('MapToAnExistingProduct');
+				$action .= '</a>';
+			}
 
 			return array(
 				'res' => -1,
@@ -1268,7 +1290,7 @@ trait CommonProtocol
 			}
 		}
 
-		// Fallback = service
+		// Fallback = product
 		return 0;
 	}
 
