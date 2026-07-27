@@ -10,6 +10,10 @@ the corresponding Dolibarr supplier invoice is automatically validated then aban
 dedicated close code, keeping the refusal and its reason as trace) and is excluded from the
 accountancy transfer screen (issue #286).
 
+FIX: The document status code (MDT-88) of a lifecycle message now follows the lifecycle status it goes
+with (deposited, received, made available, taken over, approved, paid), instead of always announcing
+"in process", and the referenced invoice date is sent as a plain date, as in the XP Z12-012 examples.
+
 ## 1.0.0
 
 Initial version
