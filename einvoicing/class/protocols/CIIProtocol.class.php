@@ -2252,11 +2252,13 @@ class CIIProtocol extends AbstractProtocol
 		// (e.g. specimen seller with a phone but no contact person name).
 		// Skipped in minimal mode: the deliver-to party is a stripped-down copy of the buyer, and the
 		// CII syntax binding forbids a contact there (CII-SR-312), as it does a legal organization.
+		// The fax number is deliberately not part of this list: EN16931 has no business term for it
+		// and the CII syntax binding forbids ram:FaxUniversalCommunication (CII-SR-236 / CII-SR-265),
+		// so a party known only by its fax gets no contact block at all.
 		if (!$minimal
 			&& (!empty($data[$prefix . 'contactpersonname'])
 			|| !empty($data[$prefix . 'contactdepartmentname'])
 			|| !empty($data[$prefix . 'contactphoneno'])
-			|| !empty($data[$prefix . 'contactfaxno'])
 			|| !empty($data[$prefix . 'contactemailaddr']))) {
 			$contact = $doc->createElement('ram:DefinedTradeContact');
 			$node->appendChild($contact);
@@ -2275,11 +2277,9 @@ class CIIProtocol extends AbstractProtocol
 				$phone->appendChild($doc->createElement('ram:CompleteNumber', $data[$prefix . 'contactphoneno']));
 			}
 
-			if (!empty($data[$prefix . 'contactfaxno'])) {
-				$fax = $doc->createElement('ram:FaxUniversalCommunication');
-				$contact->appendChild($fax);
-				$fax->appendChild($doc->createElement('ram:CompleteNumber', $data[$prefix . 'contactfaxno']));
-			}
+			// No ram:FaxUniversalCommunication here on purpose, see the comment above. The
+			// 'contactfaxno' key is still filled and still read back from incoming invoices
+			// (CommonProtocol::...), it is only never written out.
 
 			if (!empty($data[$prefix . 'contactemailaddr'])) {
 				$email = $doc->createElement('ram:EmailURIUniversalCommunication');
