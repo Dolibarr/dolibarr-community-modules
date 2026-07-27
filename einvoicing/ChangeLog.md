@@ -39,6 +39,15 @@ EN16931 / Factur-X EXTENDED one, so it matches the `flowProfile` the module decl
 platform. As a side effect a credit note now carries the type and the issue date of the invoice
 it corrects (BT-3 / BT-26), which fixes a BR-FR-CO-05 validation failure (issue #395).
 
+NEW: The profile used to build the XML can be changed with EINVOICING_XML_PROFILE, which accepts
+MINIMUM, BASICWL, BASIC, EN16931, EXTENDED and EXTENDEDFR. The default does not change (EN16931 for
+CII, EXTENDED for Factur-X); setting EXTENDEDFR switches the whole document to EXTENDED-CTC-FR, the
+profile the French mandate expects, including on the Factur-X path whose PDF/A-3 attachment step
+used to refuse that guideline (issue #395).
+
+FIX: A credit note now carries the issue date of the invoice it corrects (BT-26), which was only
+emitted on the EXTENDED profile and is required by BR-FR-CO-05 on every profile.
+
 NEW: When the e-invoicing platform (PDP/PA) confirms the refusal of a received supplier invoice,
 the corresponding Dolibarr supplier invoice is automatically validated then abandoned (with a
 dedicated close code, keeping the refusal and its reason as trace) and is excluded from the

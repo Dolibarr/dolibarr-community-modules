@@ -41,13 +41,13 @@ use horstoeko\zugferd\ZugferdDocumentPdfBuilder;
 use horstoeko\zugferd\ZugferdDocumentValidator;
 use horstoeko\zugferd\ZugferdDocumentPdfReader;
 use horstoeko\zugferd\ZugferdDocumentPdfReaderExt;
-use horstoeko\zugferd\ZugferdDocumentPdfMerger;
 
 require __DIR__ . "/../../vendor/autoload.php";
 
 dol_include_once('einvoicing/class/protocols/CIIProtocol.class.php');
 dol_include_once('einvoicing/class/protocols/CommonProtocol.class.php');
 dol_include_once('einvoicing/class/utils/XmlPatcher.class.php');
+dol_include_once('einvoicing/class/utils/CtcFrPdfMerger.class.php');
 
 
 /**
@@ -75,8 +75,8 @@ class FacturXProtocol extends CIIProtocol
 	/** @const string Generated invoice file name */
 	protected const GENERATED_INVOICE_XML_FILE_NAME = 'factur-x.xml';
 
-	/** @const string The profile used to generate XML */
-	protected const BUILD_XML_PROFILE = 'EXTENDEDFR';
+	/** @const string Default profile used to generate XML, overridable with EINVOICING_XML_PROFILE */
+	protected const BUILD_XML_PROFILE = 'EXTENDED';
 
 	/** @const string Path of the line unit price nodes, relative to the line item node */
 	private const NODE_LINE_ITEM = '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem';
@@ -811,7 +811,10 @@ class FacturXProtocol extends CIIProtocol
 				$creator = (string) pdfExtractMetadata($orig_pdf, 'Creator');
 			}
 
-			$merger = new ZugferdDocumentPdfMerger($xmlfile, $orig_pdf);
+			// CtcFrPdfMerger behaves exactly like ZugferdDocumentPdfMerger, except that it can still
+			// supply the attachment and XMP parameters when the guideline URN is one the library does
+			// not know — which is the case of EXTENDED-CTC-FR.
+			$merger = new CtcFrPdfMerger($xmlfile, $orig_pdf);
 
 			$merger->setKeywordTemplate($keywords);
 			$merger->setSubjectTemplate($subject);

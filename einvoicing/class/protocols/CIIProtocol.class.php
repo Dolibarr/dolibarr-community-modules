@@ -57,8 +57,11 @@ class CIIProtocol extends AbstractProtocol
 	/** @const string Generated invoice file name */
 	protected const GENERATED_INVOICE_XML_FILE_NAME = 'einvoice.xml';
 
-	/** @const string The profile used to generate XML */
-	protected const BUILD_XML_PROFILE = 'EXTENDEDFR';
+	/** @const string Default profile used to generate XML, overridable with EINVOICING_XML_PROFILE */
+	protected const BUILD_XML_PROFILE = 'EN16931';
+
+	/** @var string[] Profiles buildXML() knows how to emit, and accepted values of EINVOICING_XML_PROFILE */
+	public const SUPPORTED_XML_PROFILES = ['MINIMUM', 'BASICWL', 'BASIC', 'EN16931', 'EXTENDED', 'EXTENDEDFR'];
 
 	/**
 	 * Maximum number of decimals allowed for the unit prices: Item net price (BT-146),
@@ -495,7 +498,7 @@ class CIIProtocol extends AbstractProtocol
 		dol_mkdir(dirname($xmlfile));
 		dol_delete_file($xmlfile);
 
-		$xmlcontent = $this->buildXML($invoiceData, $linesData, static::BUILD_XML_PROFILE, $outputlangs);
+		$xmlcontent = $this->buildXML($invoiceData, $linesData, $this->getBuildXmlProfile(), $outputlangs);
 
 		// Local EN 16931 business rules safety net (warnings, or abort in strict mode)
 		$this->checkBusinessRules($xmlcontent);
@@ -1663,6 +1666,35 @@ class CIIProtocol extends AbstractProtocol
 	// =====================================================================
 
 	/**
+	 * Profile actually used to build the XML.
+	 *
+	 * Defaults to the protocol's own BUILD_XML_PROFILE (EN16931 for CII, EXTENDED for Factur-X) and
+	 * can be overridden with EINVOICING_XML_PROFILE, so the whole EXTENDED-CTC-FR handling can be
+	 * turned on with a single setting once the French mandate requires it. An unknown value is
+	 * ignored, with a trace, rather than aborting the generation.
+	 *
+	 * Note for EXTENDEDFR on the Factur-X protocol: horstoeko/zugferd does not know the CTC-FR
+	 * guideline URN, hence CtcFrPdfMerger which supplies the attachment/XMP parameters itself.
+	 *
+	 * @return 	string 		Profile name, uppercased
+	 */
+	protected function getBuildXmlProfile()
+	{
+		$configured = getDolGlobalString('EINVOICING_XML_PROFILE');
+		if ($configured === '') {
+			return static::BUILD_XML_PROFILE;
+		}
+
+		$configured = strtoupper(trim($configured));
+		if (!in_array($configured, self::SUPPORTED_XML_PROFILES, true)) {
+			dol_syslog(get_class($this).'::getBuildXmlProfile unknown EINVOICING_XML_PROFILE "'.$configured.'", falling back to '.static::BUILD_XML_PROFILE, LOG_WARNING);
+			return static::BUILD_XML_PROFILE;
+		}
+
+		return $configured;
+	}
+
+	/**
 	 * Tell whether a profile allows the EXTENDED-level fields (BT-X-* extensions).
 	 *
 	 * EXTENDED-CTC-FR is a conformant extension of EN16931 built on top of the Factur-X EXTENDED
@@ -1671,7 +1703,7 @@ class CIIProtocol extends AbstractProtocol
 	 * @param 	string 	$profile 	Profile name, uppercased
 	 * @return 	bool 				True if EXTENDED-level fields may be emitted
 	 */
-	private function isExtendedProfile(string $profile)
+	protected function isExtendedProfile(string $profile)
 	{
 		return in_array($profile, ['EXTENDED', 'EXTENDEDFR'], true);
 	}
@@ -2021,11 +2053,15 @@ class CIIProtocol extends AbstractProtocol
 				$refNode = $doc->createElement('ram:InvoiceReferencedDocument');
 
 				$refNode->appendChild($doc->createElement('ram:IssuerAssignedID', $refDoc['ref']));
+
+				// BT-3 of the referenced document is an EXTENDED-level field: EN16931 forbids it here (CII-DT-018).
 				if ($this->isExtendedProfile($profile)) {
 					$refNode->appendChild($doc->createElement('ram:TypeCode', $refDoc['type']));
 				}
 
-				if (!empty($refDoc['date']) && $this->isExtendedProfile($profile)) {
+				// BT-26 on the other hand is core EN16931 and is required by BR-FR-CO-05 on a credit note,
+				// so it is emitted whatever the profile.
+				if (!empty($refDoc['date'])) {
 					$dateNode = $doc->createElement('ram:FormattedIssueDateTime');
 					$str = $doc->createElement('qdt:DateTimeString', $refDoc['date']->format('Ymd'));
 					$str->setAttribute('format', '102');
