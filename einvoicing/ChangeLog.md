@@ -33,9 +33,16 @@ BT-8 is set to 72 (payment date) as soon as the invoice carries a service, and t
 seller who opted for the "TVA d'après les débits" scheme (EINVOICING_VAT_ON_DEBITS), whose legal mention
 is also added to the invoice as a TXD note. A goods-only invoice sends nothing: its VAT falls due on the
 delivery it already dates.
+
 FIX: The scheduled job "EInvoicingDocumentSync" died on a fatal error ("Class PDPProviderManager not
 found") as soon as it was enabled, because the scheduler only loads the class file holding the job
 method. Flow synchronization could therefore only be run by hand from the interface.
+
+FIX: The reachability precheck of the recipient in the directory (annuaire) reported "routable" as
+soon as the recipient had a directory line, whatever its state. A line that is only declared and not
+open yet ("Upcoming"), or closed, is no longer counted as an active reception address. When
+EINVOICING_REQUIRE_ROUTABLE_RECIPIENT is enabled, such a recipient is now blocked before
+transmission instead of being rejected by the platform with a routing error (fr:213).
 
 NEW: When the e-invoicing platform (PDP/PA) confirms the refusal of a received supplier invoice,
 the corresponding Dolibarr supplier invoice is automatically validated then abandoned (with a
