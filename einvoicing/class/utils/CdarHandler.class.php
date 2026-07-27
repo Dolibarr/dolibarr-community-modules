@@ -84,8 +84,25 @@ class CdarHandler
 	const STATUS_ACCEPTED = '1';
 	const STATUS_REJECTED = '8';
 	const STATUS_RECEIVED = '43';
+	const STATUS_IN_PROCESS = '45';
 	const STATUS_PAID = '47';
 	const STATUS_ACKNOWLEDGED = '48';
+	const STATUS_DEPOSITED = '10';
+
+	/**
+	 * Document status code (MDT-88) that goes with a lifecycle status (MDT-105), as read from the
+	 * XP Z12-012 annex B reference examples. The lifecycle statuses those examples do not cover
+	 * (refusal, dispute, suspension...) keep the historical "in process", which the platforms accept.
+	 */
+	const STATUS_CODE_PER_PROCESS_CONDITION = [
+		self::PROC_DEPOSITED           => self::STATUS_DEPOSITED,
+		self::PROC_RECEIVED            => self::STATUS_RECEIVED,
+		self::PROC_AVAILABLE           => self::STATUS_ACKNOWLEDGED,
+		self::PROC_TAKEN_OVER          => self::STATUS_IN_PROCESS,
+		self::PROC_APPROVED            => self::STATUS_ACCEPTED,
+		self::PROC_PAYMENT_TRANSMITTED => self::STATUS_PAID,
+		self::PROC_PAID                => self::STATUS_PAID,
+	];
 
 	// XML Namespaces
 	private $namespaces = [
@@ -238,17 +255,15 @@ class CdarHandler
 
 		/**
 		 * MDT-88
-		 * TODO: Map status codes from Dolibarr to CDAR status codes
-		 * 45 (In Process) = Prise en charge
+		 * TODO: the lifecycle statuses with no reference example still fall back on "in process":
 		 * 39 (on hold) = Suspendue
 		 * 37 (Complete) = Complétée
 		 * 50 (Rejected / Refused) = Refusée (by C4)
 		 * 49 (Conditionally accepted) = Approuvée Partiellement
-		 * 47 (Paid) = Paiement Transmis ET Encaissée
 		 * 46 (Under Query) = En litige
-		 * 1 (accepted) = Approuvée
 		 */
-		$StatusCodeCdar = '45';
+		// The keys of the map are numeric strings, which PHP stores as integer array keys
+		$StatusCodeCdar = CdarHandler::STATUS_CODE_PER_PROCESS_CONDITION[(int) $statusCode] ?? CdarHandler::STATUS_IN_PROCESS;
 
 		// Label for ProcessCondition (Label of status code) we get it from class einvoicing
 		dol_include_once('/einvoicing/class/providers/PDPProviderManager.class.php');
@@ -293,7 +308,8 @@ class CdarHandler
 					'IssuerAssignedID' => $IssuerAssignedID,
 					'StatusCode' => $StatusCodeCdar,
 					'TypeCode' => CdarHandler::DOC_INVOICE, // TODO: map DOC_INVOICE with $object type
-					'FormattedIssueDateTime' => date('YmdHis', $object->date),
+					// Every XP Z12-012 reference example dates the referenced invoice with a plain date
+					'FormattedIssueDateTime' => date('Ymd', $object->date),
 					'ProcessConditionCode' => $statusCode,
 					'ProcessCondition' => $ProcessCondition,
 
@@ -706,7 +722,7 @@ class CdarHandler
 
 		$formattedDateTime = $dom->createElement('ram:FormattedIssueDateTime');
 		$dateTimeStr = $dom->createElement('qdt:DateTimeString', $doc['FormattedIssueDateTime']);
-		$dateTimeStr->setAttribute('format', self::FORMAT_DATETIME);
+		$dateTimeStr->setAttribute('format', self::FORMAT_DATE);
 		$formattedDateTime->appendChild($dateTimeStr);
 		$ref->appendChild($formattedDateTime);
 
