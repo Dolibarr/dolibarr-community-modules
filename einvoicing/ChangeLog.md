@@ -6,6 +6,12 @@ FIX: The flowProfile declared to the platform is now read from the guideline URN
 being transmitted instead of being hardcoded, so the declaration and the file can no longer
 contradict each other. A profile with no AFNOR flowProfile omits the field (issue #395).
 
+FIX: A lifecycle message sent on a supplier invoice is now addressed (MDT-73) to the routing ID
+recorded for its vendor - the same address the module already uses to reach that third party - instead
+of its SIREN, which the platform only accepts when the vendor happens to be registered under it
+("L'adresse électronique (MDT-73) est invalide" otherwise). Vendors with no routing recorded keep the
+SIREN, as before (issue #410).
+
 FIX: The triggers no longer fail with "Class EInvoicing / PDPProviderManager not found" when the action
 comes from a context that never went through the module screens (cron, CLI, REST API, bank import).
 
