@@ -5,6 +5,16 @@
 FIX: The triggers no longer fail with "Class EInvoicing / PDPProviderManager not found" when the action
 comes from a context that never went through the module screens (cron, CLI, REST API, bank import).
 
+NEW: The "Payment transmitted" (211) status can now be sent automatically to tell the vendor that a
+supplier invoice received through the platform has been paid, as soon as Dolibarr classifies it as paid.
+It carries the amount paid and its date, and is sent once per invoice. Optional status of the reform, so
+it is off by default and enabled with EINVOICING_SEND_PAYMENT_SENT_STATUS. It can also be sent by hand
+from the supplier invoice card, where it was missing from the list of sendable statuses.
+
+FIX: The document status code (MDT-88) of a lifecycle message now follows the lifecycle status it goes
+with (deposited, received, made available, taken over, approved, paid), instead of always announcing
+"in process", and the referenced invoice date is sent as a plain date, as in the XP Z12-012 examples.
+
 FIX: The "Cashed in" (212) status is now issued as the seller of the invoice and addressed to its
 buyer, instead of reusing the supplier invoice mapping (us as the buyer, addressed to ourselves) which
 made the platform answer "no matching invoices found". Its referenced document status code (47, Paid)

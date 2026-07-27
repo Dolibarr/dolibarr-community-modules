@@ -286,6 +286,42 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			}
 		}
 
+		// fr:211 (Paiement transmis) is what we, as the buyer, tell the vendor once we have paid one of
+		// its invoices. Nothing in the reform makes it mandatory and it costs a platform flow, so it is
+		// sent only when EINVOICING_SEND_PAYMENT_SENT_STATUS is on, and only once per invoice: a payment
+		// deleted then recorded anew makes Dolibarr classify the invoice paid a second time.
+		if ($action == 'BILL_SUPPLIER_PAYED') {
+			/** @var FactureFournisseur $object */
+			'@phan-var-force FactureFournisseur $object';
+
+			if (getDolGlobalInt('EINVOICING_SEND_PAYMENT_SENT_STATUS') && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
+				$paidAmount = (float) $object->getSommePaiement();
+
+				// Nothing to tell on a write-off (nothing was paid), nor on an invoice that never came
+				// from the platform: the vendor would not know the status we are answering to.
+				if ($paidAmount > 0 && SupplierInvoiceHelper::isEInvoice($object->id)) {
+					$einvoicing = new EInvoicing($this->db);
+
+					if (!$einvoicing->hasSentStatusMessage($object->id, $object->element, EInvoicing::STATUS_PAYMENT_SENT)) {
+						$PDPManager = new PDPProviderManager($this->db);
+						$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+
+						$result = $provider->sendStatusMessage($object, EInvoicing::STATUS_PAYMENT_SENT, '', array('amount' => $paidAmount, 'date' => dol_now()));
+
+						if ($result['res'] > 0) {
+							setEventMessage($langs->trans("ModuleEInvoicingName").' : '.$langs->trans('EInvStatus211PaymentTransmitted'), 'mesgs');
+						} else {
+							// Never escalated to $this->errors / a negative return: that would roll back the
+							// payment Dolibarr just recorded, and a platform notification failure must not
+							// undo a real payment (see sendCashedInStatus() for the same reasoning).
+							dol_syslog(__METHOD__ . ' Failed to send payment transmitted status (211) to platform for supplier invoice id=' . $object->id . ' : ' . $result['message'], LOG_ERR);
+							setEventMessage($langs->trans("ModuleEInvoicingName").' : '.$result['message'], 'errors');
+						}
+					}
+				}
+			}
+		}
+
 		if ($action == 'BILL_SUPPLIER_DELETE') {
 			/** @var FactureFournisseur $object */
 			'@phan-var-force FactureFournisseur $object';

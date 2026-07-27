@@ -84,8 +84,25 @@ class CdarHandler
 	const STATUS_ACCEPTED = '1';
 	const STATUS_REJECTED = '8';
 	const STATUS_RECEIVED = '43';
+	const STATUS_IN_PROCESS = '45';
 	const STATUS_PAID = '47';
 	const STATUS_ACKNOWLEDGED = '48';
+	const STATUS_DEPOSITED = '10';
+
+	/**
+	 * Document status code (MDT-88) that goes with a lifecycle status (MDT-105), as read from the
+	 * XP Z12-012 annex B reference examples. The lifecycle statuses those examples do not cover
+	 * (refusal, dispute, suspension...) keep the historical "in process", which the platforms accept.
+	 */
+	const STATUS_CODE_PER_PROCESS_CONDITION = [
+		self::PROC_DEPOSITED           => self::STATUS_DEPOSITED,
+		self::PROC_RECEIVED            => self::STATUS_RECEIVED,
+		self::PROC_AVAILABLE           => self::STATUS_ACKNOWLEDGED,
+		self::PROC_TAKEN_OVER          => self::STATUS_IN_PROCESS,
+		self::PROC_APPROVED            => self::STATUS_ACCEPTED,
+		self::PROC_PAYMENT_TRANSMITTED => self::STATUS_PAID,
+		self::PROC_PAID                => self::STATUS_PAID,
+	];
 
 	// XML Namespaces
 	private $namespaces = [
@@ -247,17 +264,15 @@ class CdarHandler
 
 		/**
 		 * MDT-88
-		 * TODO: Map status codes from Dolibarr to CDAR status codes
-		 * 45 (In Process) = Prise en charge
+		 * TODO: the lifecycle statuses with no reference example still fall back on "in process":
 		 * 39 (on hold) = Suspendue
 		 * 37 (Complete) = Complétée
 		 * 50 (Rejected / Refused) = Refusée (by C4)
 		 * 49 (Conditionally accepted) = Approuvée Partiellement
-		 * 47 (Paid) = Paiement Transmis ET Encaissée
 		 * 46 (Under Query) = En litige
-		 * 1 (accepted) = Approuvée
 		 */
-		$StatusCodeCdar = $isOurOwnInvoice ? '47' : '45';	// 47 (Paid) for the cash-in, as in the XP Z12-012 example
+		// The keys of the map are numeric strings, which PHP stores as integer array keys
+		$StatusCodeCdar = CdarHandler::STATUS_CODE_PER_PROCESS_CONDITION[(int) $statusCode] ?? CdarHandler::STATUS_IN_PROCESS;
 
 		// Label for ProcessCondition (Label of status code) we get it from class einvoicing
 		dol_include_once('/einvoicing/class/providers/PDPProviderManager.class.php');
@@ -281,6 +296,13 @@ class CdarHandler
 				return array('res' => -1, 'message' => 'Cannot compute the cashed amount (MEN) per VAT rate for invoice ' . $object->ref);
 			}
 			$SpecifiedDocumentStatus['SpecifiedDocumentCharacteristic'] = $cashedAmounts;
+		} elseif ($statusCode == CdarHandler::PROC_PAYMENT_TRANSMITTED) {
+			// "Paiement transmis" tells the vendor what was paid and when (MDG-43 block MDT-207 = MPA).
+			// No rule makes it mandatory, so a status with no known amount is still sent, just bare.
+			$paidAmounts = $this->getPaymentSentCharacteristics($object, $paymentData);
+			if (!empty($paidAmounts)) {
+				$SpecifiedDocumentStatus['SpecifiedDocumentCharacteristic'] = $paidAmounts;
+			}
 		}
 		if (!empty($SpecifiedDocumentStatus)) {
 			// Rule BR-FR-CDV-16: any status detail block must be numbered (MDT-124-2). Only one block is sent.
@@ -346,10 +368,8 @@ class CdarHandler
 					'IssuerAssignedID' => $IssuerAssignedID,
 					'StatusCode' => $StatusCodeCdar,
 					'TypeCode' => CdarHandler::DOC_INVOICE, // TODO: map DOC_INVOICE with $object type
-					// The reference example of a cash-in dates the invoice with a plain date (format 102),
-					// the supplier invoice statuses keep the datetime form they are already accepted with.
-					'FormattedIssueDateTime' => $isOurOwnInvoice ? date('Ymd', $object->date) : date('YmdHis', $object->date),
-					'FormattedIssueDateTimeFormat' => $isOurOwnInvoice ? CdarHandler::FORMAT_DATE : CdarHandler::FORMAT_DATETIME,
+					// Every XP Z12-012 reference example dates the referenced invoice with a plain date
+					'FormattedIssueDateTime' => date('Ymd', $object->date),
 					'ProcessConditionCode' => $statusCode,
 					'ProcessCondition' => $ProcessCondition,
 
@@ -379,6 +399,42 @@ class CdarHandler
 		//echo "CDAR file generated: " . $filename;
 
 		return array('res' => 1, 'message' => 'CDAR file generated successfully', 'file' => $filename);
+	}
+
+	/**
+	 * Build the MDG-43 "paid amount" (MPA) block of a status 211 (Paiement transmis) CDAR.
+	 *
+	 * That status tells the vendor of a supplier invoice that its payment has been sent: the block holds
+	 * how much was paid (MDT-215) and when (MDT-217), as in the XP Z12-012 annex B example. Unlike the
+	 * cash-in, no rule makes it mandatory, hence an empty return when no amount is known.
+	 *
+	 * @param  FactureFournisseur|Facture $object      Invoice that has been paid
+	 * @param  array{amount?:float,date?:int}          $paymentData Amount paid (TTC, company currency) and its date as a timestamp. Both default to the payments recorded on the invoice.
+	 * @return array<array{TypeCode:string,ValueAmount:string,CurrencyID:string,ValueDateTime:string}>  MPA block, empty if no amount is known
+	 */
+	public function getPaymentSentCharacteristics($object, $paymentData = array())
+	{
+		global $conf;
+
+		$paidAmount = isset($paymentData['amount']) ? (float) $paymentData['amount'] : 0.0;
+		if (empty($paidAmount) && method_exists($object, 'getSommePaiement')) {
+			$paidAmount = (float) $object->getSommePaiement();
+		}
+		if ($paidAmount <= 0) {
+			dol_syslog(__METHOD__ . ' No paid amount found for invoice id=' . $object->id, LOG_WARNING, 0, '_einvoicing');
+			return array();
+		}
+
+		$paidDate = empty($paymentData['date']) ? dol_now() : $paymentData['date'];
+
+		return array(
+			array(
+				'TypeCode' => 'MPA',
+				'ValueAmount' => number_format($paidAmount, 2, '.', ''),
+				'CurrencyID' => $conf->currency,
+				'ValueDateTime' => dol_print_date($paidDate, '%Y%m%d')
+			)
+		);
 	}
 
 	/**
@@ -845,7 +901,7 @@ class CdarHandler
 
 		$formattedDateTime = $dom->createElement('ram:FormattedIssueDateTime');
 		$dateTimeStr = $dom->createElement('qdt:DateTimeString', $doc['FormattedIssueDateTime']);
-		$dateTimeStr->setAttribute('format', empty($doc['FormattedIssueDateTimeFormat']) ? self::FORMAT_DATETIME : $doc['FormattedIssueDateTimeFormat']);
+		$dateTimeStr->setAttribute('format', self::FORMAT_DATE);
 		$formattedDateTime->appendChild($dateTimeStr);
 		$ref->appendChild($formattedDateTime);
 
@@ -892,6 +948,10 @@ class CdarHandler
 							$amountElement->setAttribute('currencyID', $characteristic['CurrencyID']);
 						}
 						$characteristicElement->appendChild($amountElement);
+					}
+
+					if (isset($characteristic['ValueDateTime'])) {
+						$this->addDateTimeElement($dom, $characteristicElement, 'ram:ValueDateTime', $characteristic['ValueDateTime'], self::FORMAT_DATE);
 					}
 
 					if (isset($characteristic['ValuePercent'])) {
