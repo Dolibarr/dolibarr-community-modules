@@ -9,6 +9,11 @@ contradict each other. A profile with no AFNOR flowProfile omits the field (issu
 FIX: The triggers no longer fail with "Class EInvoicing / PDPProviderManager not found" when the action
 comes from a context that never went through the module screens (cron, CLI, REST API, bank import).
 
+FIX: A discount on an invoice line no longer emits a ram:CategoryTradeTax inside its
+allowance block. That element belongs to a document-level allowance or charge and the CII syntax
+binding forbids it on a line (CII-SR-191); the VAT of the discount is already carried by the line
+itself (issue #471).
+
 FIX: The local check of the SIREN format now covers every party of the generated document instead of
 the seller alone. A customer whose professional id was not a 9 digit SIREN went through untouched and
 the invoice was refused by the platform (BR-FR-32), without the operator being told which party was at

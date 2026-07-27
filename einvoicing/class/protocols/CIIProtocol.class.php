@@ -2400,6 +2400,9 @@ class CIIProtocol extends AbstractProtocol
 	 * @param string|null       $reasonCode 	Code for the reason (optional, can be used instead of reason or together with reason)
 	 * @param string            $taxCategory 	Tax category code
 	 * @param float             $taxRate 		Tax rate applicable to this discount/charge
+	 * @param bool              $withCategoryTradeTax	Whether to emit ram:CategoryTradeTax. Mandatory on a document-level
+	 *                                                  allowance/charge (BT-95/BT-96, BT-102/BT-103), forbidden on a
+	 *                                                  line-level one (CII-SR-191)
 	 *
 	 * @return \DOMElement
 	 */
@@ -2412,7 +2415,8 @@ class CIIProtocol extends AbstractProtocol
 		$reason = null,
 		$reasonCode = null,
 		$taxCategory = 'S',
-		$taxRate = 20.0
+		$taxRate = 20.0,
+		$withCategoryTradeTax = true
 	) {
 		$node = $doc->createElement('ram:SpecifiedTradeAllowanceCharge');
 
@@ -2447,14 +2451,17 @@ class CIIProtocol extends AbstractProtocol
 			$node->appendChild($doc->createElement('ram:Reason', $reason));
 		}
 
-		// Tax (important Factur-X)
-		$taxNode = $doc->createElement('ram:CategoryTradeTax');
+		// Tax (important Factur-X). Document level only: on a line the VAT of the discount is already
+		// carried by the line's own ram:ApplicableTradeTax, and CII-SR-191 forbids it here.
+		if ($withCategoryTradeTax) {
+			$taxNode = $doc->createElement('ram:CategoryTradeTax');
 
-		$taxNode->appendChild($doc->createElement('ram:TypeCode', 'VAT'));
-		$taxNode->appendChild($doc->createElement('ram:CategoryCode', $taxCategory));
-		$taxNode->appendChild($doc->createElement('ram:RateApplicablePercent', number_format($taxRate, 2, '.', '')));
+			$taxNode->appendChild($doc->createElement('ram:TypeCode', 'VAT'));
+			$taxNode->appendChild($doc->createElement('ram:CategoryCode', $taxCategory));
+			$taxNode->appendChild($doc->createElement('ram:RateApplicablePercent', number_format($taxRate, 2, '.', '')));
 
-		$node->appendChild($taxNode);
+			$node->appendChild($taxNode);
+		}
 
 		return $node;
 	}
@@ -2480,7 +2487,8 @@ class CIIProtocol extends AbstractProtocol
 			$discount['reason'] ?? null,
 			$discount['code'] ?? null,
 			$discount['taxCategory'] ?? 'S',
-			$discount['taxRate'] ?? 20.0
+			$discount['taxRate'] ?? 20.0,
+			false			// No ram:CategoryTradeTax on a line-level allowance (CII-SR-191)
 		);
 
 		$lineTradeAgreement->appendChild($node);
