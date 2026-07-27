@@ -1271,20 +1271,20 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				*/
 
 				// 2. Read CDAR and update status of linked customer invoice
-				$flowResource = 'flows/' . $flowId;
-				$flowUrlparams = array(
-					'docType' => 'Original', // docType can be 'Metadata', 'Original', 'Converted' or 'ReadableView'
-				);
-				$flowResource .= '?' . http_build_query($flowUrlparams);
-				$flowResponse = $this->callApi(
-					$flowResource,
-					"GET",
-					false,
-					['Accept' => 'application/octet-stream']
-				);
+				// The CDAR is normally read as the "Original" document. Some flows have no original on the
+				// platform, only the converted copy, and the synchronization then stops on that flow and on
+				// every flow behind it with no way to go past it. Both documents carry the same CDAR, so fall
+				// back on the converted one rather than blocking. docType can be 'Metadata', 'Original',
+				// 'Converted' or 'ReadableView'.
+				$flowResponse = $this->fetchFlowData($flowId, 'Original');
 
 				if ($flowResponse['status_code'] != 200) {
-					return array('res' => -1, 'message' => "Failed to retrieve flow details for flowId: " . $flowId);
+					dol_syslog(__METHOD__ . " No 'Original' document for flowId: " . $flowId . " (HTTP " . $flowResponse['status_code'] . "), reading the CDAR from the 'Converted' document instead", LOG_WARNING);
+					$flowResponse = $this->fetchFlowData($flowId, 'Converted');
+				}
+
+				if ($flowResponse['status_code'] != 200) {
+					return array('res' => -1, 'message' => "Failed to retrieve flow details (neither 'Original' nor 'Converted' document) for flowId: " . $flowId);
 				}
 				$cdarXml = $flowResponse['response'];
 
