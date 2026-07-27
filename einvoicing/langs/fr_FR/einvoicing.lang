@@ -296,6 +296,7 @@ EInvoicingDocumentSyncDescription=Cette tâche lance automatiquement la synchron
 NoInvoiceCollectionFees=Aucuns frais de recouvrement de factures
 NoLatePaymentFees=Aucuns frais de retard de paiement
 NoEarlyPaymentDiscount=Aucune ristourne pour paiement anticipé
+VATOnDebitsMention=Option pour le paiement de la TVA d'après les débits
 CurrentAP=Point d'accès actuel : %s
 CreatedManually=Créé manuellement
 DevTools=Outils de développement
