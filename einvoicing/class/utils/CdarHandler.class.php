@@ -211,10 +211,11 @@ class CdarHandler
 	 * @param Facture|FactureFournisseur    $object       Invoice object (CustomerInvoice or SupplierInvoice)
 	 * @param int                           $statusCode     Status code to send
 	 * @param string                        $reasonCode Reason code to send (optional)
+	 * @param array{amount?:float,breakdown?:array<array{vatrate:float,amount:float}>}  $paymentData  Cashed amount (TTC, in the company currency) for status 212, with an optional ready-made breakdown by VAT rate
 	 *
 	 * @return  array{res:int<-1,1>, message:string, file?:string}   Returns array with 'res' (1 on success, -1 on failure) with a 'message' and 'file' with the path.
 	 */
-	public function generateCdarFile($object, $statusCode, $reasonCode = '')
+	public function generateCdarFile($object, $statusCode, $reasonCode = '', $paymentData = array())
 	{
 		global $conf, $mysoc;
 
@@ -240,16 +241,24 @@ class CdarHandler
 		// We use same as ID for Name as its not required to be different
 		$Name = $ID;
 
+		// 212 (Encaissee) is the only status we send on one of OUR OWN invoices: we are then the seller and
+		// the CDAR is addressed to our customer. Every other status is sent on a supplier invoice, where we
+		// are the buyer and the CDAR goes back to the vendor. Getting those two parties the wrong way round
+		// makes the platform answer "no matching invoices found": it cannot find the invoice the status is
+		// about. See the XP Z12-012 annex B examples, UC1 205/211 (issued by the buyer) versus UC1 212
+		// (issued by the seller).
+		$isOurOwnInvoice = ($statusCode == CdarHandler::PROC_PAID);
+
 		// SIREN (0002)
 		$mysocGlobalID = idprof($mysoc);
 
-		// Issuer SIREN (0002)
-		$InvoiceIssuerGlobalID = $statusCode == 212	// Customer invoices management (Only 212 for now)
-			? idprof($mysoc)
+		// Issuer SIREN (0002) of the invoice the status is about: us when we sell, the vendor otherwise
+		$InvoiceIssuerGlobalID = $isOurOwnInvoice
+			? $mysocGlobalID
 			: thirdpartyidprof($object);
 
 		// Invoice reference
-		$IssuerAssignedID = $statusCode == 212	// Customer invoices management (Only 212 for now)
+		$IssuerAssignedID = $isOurOwnInvoice
 			? $object->ref
 			: $object->ref_supplier;
 
@@ -288,6 +297,60 @@ class CdarHandler
 			}
 		}
 
+		// MDG-43 blocks. Rule BR-FR-CDV-14: a "Encaissee" status (212) must carry at least one block with
+		// MDT-207 = MEN, and every MEN block must hold both an amount (MDT-215) and a VAT rate (MDT-224).
+		// Without them the platform rejects the CDAR with a 400.
+		$SpecifiedDocumentStatus = array();
+		if (!empty($reasonCode)) {
+			$SpecifiedDocumentStatus['ReasonCode'] = $reasonCode;
+			//$SpecifiedDocumentStatus['Reason'] = 'Taux de TVA erroné';
+		}
+		if ($statusCode == CdarHandler::PROC_PAID) {
+			$cashedAmounts = $this->getCashedAmountCharacteristics($object, $paymentData);
+			if (empty($cashedAmounts)) {
+				// Better to fail here than to have the platform reject the CDAR on BR-FR-CDV-14.
+				return array('res' => -1, 'message' => 'Cannot compute the cashed amount (MEN) per VAT rate for invoice ' . $object->ref);
+			}
+			$SpecifiedDocumentStatus['SpecifiedDocumentCharacteristic'] = $cashedAmounts;
+		}
+		if (!empty($SpecifiedDocumentStatus)) {
+			// Rule BR-FR-CDV-16: any status detail block must be numbered (MDT-124-2). Only one block is sent.
+			$SpecifiedDocumentStatus['SequenceNumeric'] = 1;
+		}
+
+		if ($isOurOwnInvoice) {
+			// We issue the status as the SELLER, and it is addressed to the buyer of the invoice
+			$CdarIssuerTradeParty = [
+				'GlobalID' => $mysocGlobalID,
+				'SchemeID' => CdarHandler::SCHEME_SIREN_0002,
+				'RoleCode' => CdarHandler::ROLE_SE
+			];
+
+			$buyerGlobalID = thirdpartyidprof($object);
+			$buyerURIID = $einvoicing->getBuyerCommunicationURI($object->thirdparty, $object);
+			$CdarRecipientTradeParty = [
+				'GlobalID'     => $buyerGlobalID,
+				'SchemeID'     => CdarHandler::SCHEME_SIREN_0002,
+				'RoleCode'     => CdarHandler::ROLE_BY,
+				'URIID'        => $buyerURIID !== '' ? $buyerURIID : $buyerGlobalID,
+				'URISchemeID'  => CdarHandler::SCHEME_SIREN_0225
+			];
+		} else {
+			// We issue the status as the BUYER of a supplier invoice, and it goes back to the vendor
+			$CdarIssuerTradeParty = [
+				'GlobalID' => $mysocGlobalID, // GlobalID of CDAR SENDER
+				'RoleCode' => CdarHandler::ROLE_BY
+			];
+
+			$CdarRecipientTradeParty = [
+				'GlobalID'     => $InvoiceIssuerGlobalID, // GlobalID of CDAR RECIPIENT
+				'SchemeID'     => CdarHandler::SCHEME_SIREN_0002,
+				'RoleCode'     => CdarHandler::ROLE_SE,
+				'URIID'        => $RecipientURIID,	// The routing of the vendor, its SIREN when none is recorded
+				'URISchemeID'  => CdarHandler::SCHEME_SIREN_0225
+			];
+		}
+
 		$data = [
 			'GuidelineID' => 'urn.cpro.gouv.fr:1p0:CDV:invoice',
 
@@ -300,18 +363,9 @@ class CdarHandler
 					'RoleCode' => CdarHandler::ROLE_WK
 				],
 
-				'IssuerTradeParty' => [
-					'GlobalID' => $mysocGlobalID, // GlobalID of CDAR SENDER
-					'RoleCode' => CdarHandler::ROLE_BY
-				],
+				'IssuerTradeParty' => $CdarIssuerTradeParty,
 
-				'RecipientTradeParty' => [
-					'GlobalID'     => $InvoiceIssuerGlobalID, // GlobalID of CDAR RECIPIENT
-					'SchemeID'     => CdarHandler::SCHEME_SIREN_0002,
-					'RoleCode'     => CdarHandler::ROLE_SE,
-					'URIID'        => $RecipientURIID,
-					'URISchemeID'  => CdarHandler::SCHEME_SIREN_0225
-				]
+				'RecipientTradeParty' => $CdarRecipientTradeParty
 			],
 
 			'AcknowledgementDocument' => [
@@ -328,11 +382,7 @@ class CdarHandler
 					'ProcessConditionCode' => $statusCode,
 					'ProcessCondition' => $ProcessCondition,
 
-					'SpecifiedDocumentStatus' => !empty($reasonCode) ? [
-						'ReasonCode' => $reasonCode,
-						//'Reason' => 'Taux de TVA erroné',
-						'SequenceNumeric' => 1
-					] : [],
+					'SpecifiedDocumentStatus' => $SpecifiedDocumentStatus,
 
 					'IssuerTradeParty' => [
 						'GlobalID' => $InvoiceIssuerGlobalID, // GlobalID of invoice sender (Supplier)
@@ -358,6 +408,93 @@ class CdarHandler
 		//echo "CDAR file generated: " . $filename;
 
 		return array('res' => 1, 'message' => 'CDAR file generated successfully', 'file' => $filename);
+	}
+
+	/**
+	 * Build the MDG-43 "cashed amount" (MEN) blocks of a status 212 (Encaissee) CDAR.
+	 *
+	 * The reform asks the seller to declare what was actually cashed, broken down by VAT rate: one block per
+	 * rate, holding the TTC amount (MDT-215) and the rate itself (MDT-224). Dolibarr only records a payment as
+	 * a single TTC amount, so the amount is spread over the VAT rates of the invoice proportionally to their
+	 * TTC weight: exact for a fully paid invoice, prorata otherwise (a partial payment is not attached to
+	 * given lines in Dolibarr). Rounding differences are absorbed by the largest block so the blocks always
+	 * sum up to the cashed amount.
+	 *
+	 * @param  Facture|FactureFournisseur $object       Invoice the payment belongs to
+	 * @param  array{amount?:float,breakdown?:array<array{vatrate:float,amount:float}>}  $paymentData  Cashed amount (TTC, company currency) and/or a ready-made breakdown. Defaults to the sum of the payments of the invoice.
+	 * @return array<array{TypeCode:string,ValueAmount:string,CurrencyID:string,ValuePercent:string}>  MEN blocks, empty if they cannot be computed
+	 */
+	public function getCashedAmountCharacteristics($object, $paymentData = array())
+	{
+		global $conf;
+
+		$breakdown = array();
+
+		if (!empty($paymentData['breakdown'])) {
+			$breakdown = $paymentData['breakdown'];
+		} else {
+			$cashedAmount = isset($paymentData['amount']) ? (float) $paymentData['amount'] : 0.0;
+			if (empty($cashedAmount) && method_exists($object, 'getSommePaiement')) {
+				$cashedAmount = (float) $object->getSommePaiement();
+			}
+			if ($cashedAmount <= 0) {
+				dol_syslog(__METHOD__ . ' No cashed amount found for invoice id=' . $object->id, LOG_WARNING, 0, '_einvoicing');
+				return array();
+			}
+
+			if (empty($object->lines)) {
+				$object->fetch_lines();
+			}
+
+			// TTC weight of each VAT rate of the invoice
+			$totalPerRate = array();
+			foreach ($object->lines as $line) {
+				$rate = (string) price2num($line->tva_tx, 'MU');
+				if (!isset($totalPerRate[$rate])) {
+					$totalPerRate[$rate] = 0.0;
+				}
+				$totalPerRate[$rate] += (float) $line->total_ttc;
+			}
+
+			$totalTtc = array_sum($totalPerRate);
+			if ($totalTtc <= 0) {
+				dol_syslog(__METHOD__ . ' Cannot split the cashed amount, invoice id=' . $object->id . ' has no positive TTC total', LOG_WARNING, 0, '_einvoicing');
+				return array();
+			}
+
+			$ratio = $cashedAmount / $totalTtc;
+			$rounded = 0.0;
+			$biggest = null;
+			foreach ($totalPerRate as $rate => $amountTtc) {
+				$amount = (float) price2num($amountTtc * $ratio, 'MT');
+				$rounded += $amount;
+				$breakdown[$rate] = array('vatrate' => (float) $rate, 'amount' => $amount);
+				if (is_null($biggest) || $amount > $breakdown[$biggest]['amount']) {
+					$biggest = $rate;
+				}
+			}
+
+			// Keep the sum of the blocks equal to what was really cashed
+			$residual = (float) price2num($cashedAmount - $rounded, 'MT');
+			if (!empty($residual) && !is_null($biggest)) {
+				$breakdown[$biggest]['amount'] = (float) price2num($breakdown[$biggest]['amount'] + $residual, 'MT');
+			}
+		}
+
+		$characteristics = array();
+		foreach ($breakdown as $entry) {
+			if (empty($entry['amount'])) {	// A rate that cashed nothing brings no information
+				continue;
+			}
+			$characteristics[] = array(
+				'TypeCode' => 'MEN',
+				'ValueAmount' => number_format((float) $entry['amount'], 2, '.', ''),
+				'CurrencyID' => $conf->currency,
+				'ValuePercent' => number_format((float) $entry['vatrate'], 2, '.', '')
+			);
+		}
+
+		return $characteristics;
 	}
 
 
@@ -769,6 +906,29 @@ class CdarHandler
 						(string) $doc['SpecifiedDocumentStatus']['SequenceNumeric']
 					)
 				);
+			}
+
+			// MDG-43 blocks (cashed amount per VAT rate for status 212). Element order follows the D22B
+			// DocumentCharacteristicType sequence: TypeCode, then ValueAmount, then ValuePercent.
+			if (!empty($doc['SpecifiedDocumentStatus']['SpecifiedDocumentCharacteristic'])) {
+				foreach ($doc['SpecifiedDocumentStatus']['SpecifiedDocumentCharacteristic'] as $characteristic) {
+					$characteristicElement = $dom->createElement('ram:SpecifiedDocumentCharacteristic');
+					$characteristicElement->appendChild($dom->createElement('ram:TypeCode', $characteristic['TypeCode']));
+
+					if (isset($characteristic['ValueAmount'])) {
+						$amountElement = $dom->createElement('ram:ValueAmount', (string) $characteristic['ValueAmount']);
+						if (!empty($characteristic['CurrencyID'])) {
+							$amountElement->setAttribute('currencyID', $characteristic['CurrencyID']);
+						}
+						$characteristicElement->appendChild($amountElement);
+					}
+
+					if (isset($characteristic['ValuePercent'])) {
+						$characteristicElement->appendChild($dom->createElement('ram:ValuePercent', (string) $characteristic['ValuePercent']));
+					}
+
+					$status->appendChild($characteristicElement);
+				}
 			}
 
 			$ref->appendChild($status);
