@@ -250,15 +250,32 @@ abstract class AbstractPDPProvider
 		$result['entries'] = count($lines);
 
 		if ($result['entries'] > 0) {
-			// At least one directory line: the recipient has a reception address on an Approved Platform.
-			$result['active'] = $result['entries'];
-			$result['status'] = 'routable';
-			$result['reachable'] = 1;
+			// A directory line exists, but only an enabled one can actually receive: the annuaire also
+			// carries lines that are declared and not open yet ('Upcoming'), or closed. Counting every
+			// returned line as active would report 'routable' for a recipient the platform then refuses
+			// with a routing error (fr:213). A line that carries no status at all is left as trusted
+			// (the field is optional in the search answer), so the check keeps failing open.
 			foreach ($lines as $line) {
+				$linestatus = isset($line['directoryLineStatus']) ? (string) $line['directoryLineStatus'] : '';
+				if ($linestatus !== '' && strtolower($linestatus) != 'enabled') {
+					continue;
+				}
+				$result['active']++;
 				if ($result['identifier'] === '' && !empty($line['addressingIdentifier'])) {
 					$result['identifier'] = (string) $line['addressingIdentifier'];
 				}
 			}
+
+			if ($result['active'] > 0) {
+				// The recipient has an enabled reception address on an Approved Platform.
+				$result['status'] = 'routable';
+				$result['reachable'] = 1;
+			} else {
+				// Declared in the annuaire but no line able to receive yet.
+				$result['status'] = 'inactive';
+				$result['reachable'] = 0;
+			}
+
 			return $result;
 		}
 
