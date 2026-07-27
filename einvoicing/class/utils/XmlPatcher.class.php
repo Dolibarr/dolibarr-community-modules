@@ -130,7 +130,9 @@ class XmlPatcher
 
 		$xpath = new \DOMXPath($dom);
 
-		// 1. Patch the GuidelineSpecifiedDocumentContextParameter ID to switch from EXTENDED to EXTENDED-CTC-FR
+		// 1. Patch the GuidelineSpecifiedDocumentContextParameter ID to switch from EXTENDED to EXTENDED-CTC-FR.
+		// Only needed on the deprecated external builder path (horstoeko/zugferd hardcodes the URN from its own
+		// profile enum). The native builder emits the EXTENDED-CTC-FR URN directly, see CIIProtocol::buildXML().
 		// self::patchGuidelineId($xpath);
 
 		// 2. Inject AdditionalReferencedDocument on each deposit line if it is a final invoice after a deposit

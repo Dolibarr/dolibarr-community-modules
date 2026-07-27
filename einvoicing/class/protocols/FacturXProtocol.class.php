@@ -76,7 +76,7 @@ class FacturXProtocol extends CIIProtocol
 	protected const GENERATED_INVOICE_XML_FILE_NAME = 'factur-x.xml';
 
 	/** @const string The profile used to generate XML */
-	protected const BUILD_XML_PROFILE = 'EXTENDED';
+	protected const BUILD_XML_PROFILE = 'EXTENDEDFR';
 
 	/** @const string Path of the line unit price nodes, relative to the line item node */
 	private const NODE_LINE_ITEM = '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem';
