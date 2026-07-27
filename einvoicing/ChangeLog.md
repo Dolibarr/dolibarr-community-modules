@@ -11,9 +11,12 @@ It carries the amount paid and its date, and is sent once per invoice. Optional 
 it is off by default and enabled with EINVOICING_SEND_PAYMENT_SENT_STATUS. It can also be sent by hand
 from the supplier invoice card, where it was missing from the list of sendable statuses.
 
-FIX: The electronic address (MDT-73) of a lifecycle message sent on a supplier invoice is now the
-routing ID of the vendor instead of its SIREN, which the platform only accepts when both happen to be
-the same ("L'adresse électronique (MDT-73) est invalide" otherwise).
+FIX: A lifecycle message sent on a supplier invoice is now addressed (MDT-73) to where its vendor
+exchanges from, instead of its SIREN which the platform only accepts when the vendor happens to be
+registered under it ("L'adresse électronique (MDT-73) est invalide" otherwise). In order: the routing
+recorded for the vendor in Dolibarr, then the electronic address (BT-34) carried by the e-invoice it
+sent us, then the address it declares in the platform directory, and only then the SIREN, saying so in
+the log.
 
 FIX: The document status code (MDT-88) of a lifecycle message now follows the lifecycle status it goes
 with (deposited, received, made available, taken over, approved, paid), instead of always announcing

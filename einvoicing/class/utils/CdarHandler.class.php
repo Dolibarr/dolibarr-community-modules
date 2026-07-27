@@ -336,9 +336,43 @@ class CdarHandler
 			// The electronic address (MDT-73) of the recipient is its routing ID, which is only the same
 			// as its SIREN when the platform happens to know it under that address. Sending the SIREN
 			// blindly gets the CDAR refused with "L'adresse électronique (MDT-73) est invalide".
-			// getBuyerCommunicationURI() reads the routing of the third party it is given, whichever
-			// side of the invoice that third party sits on.
-			$vendorURIID = is_object($object->thirdparty) ? $einvoicing->getBuyerCommunicationURI($object->thirdparty) : '';
+			//
+			// The status is a reply, so the address to reply to is the one the vendor exchanges under:
+			//   1. a routing recorded in Dolibarr for that vendor, which is a deliberate choice of ours;
+			//   2. otherwise the electronic address (BT-34) carried by the e-invoice we received, which
+			//      is the vendor telling us where it exchanges from;
+			//   3. otherwise the platform directory, which may list another address of the same SIREN;
+			//   4. otherwise the SIREN guessed by getBuyerCommunicationURI(), which the platform accepts
+			//      only when the vendor really is registered under it.
+			$vendorRouting = is_object($object->thirdparty) ? $einvoicing->fetchDefaultRouting($object->thirdparty->id) : 0;
+			$vendorURIID = ($vendorRouting > 0) ? $einvoicing->removeSpaces((string) $vendorRouting) : '';	// 0 when none is recorded, -1 on error
+
+			if ($vendorURIID === '') {
+				$vendorURIID = $einvoicing->removeSpaces($this->getVendorAddressFromReceivedInvoice($object));
+				if ($vendorURIID !== '') {
+					dol_syslog(__METHOD__ . ' no routing ID recorded for vendor SIREN ' . $InvoiceIssuerGlobalID . ', replying to the electronic address of the invoice it sent us: ' . $vendorURIID, LOG_NOTICE);
+				}
+			}
+
+			if ($vendorURIID === '' && $InvoiceIssuerGlobalID !== '') {
+				// checkRecipientDirectory() returns the first active reception address declared for that
+				// SIREN, and degrades to an empty identifier on the providers that expose no directory.
+				$PDPManager = new PDPProviderManager($this->db);
+				$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+				if (is_object($provider)) {
+					$directory = $provider->checkRecipientDirectory($InvoiceIssuerGlobalID);
+					if (!empty($directory['identifier'])) {
+						$vendorURIID = $einvoicing->removeSpaces($directory['identifier']);
+						dol_syslog(__METHOD__ . ' nothing known about how to reach vendor SIREN ' . $InvoiceIssuerGlobalID . ', using the address the directory declares for it: ' . $vendorURIID, LOG_NOTICE);
+					} else {
+						dol_syslog(__METHOD__ . ' nothing known about how to reach vendor SIREN ' . $InvoiceIssuerGlobalID . ' and the directory returned none (' . $directory['status'] . '), falling back on the SIREN as electronic address: the platform will refuse the status if it does not know the vendor under that address', LOG_WARNING);
+					}
+				}
+			}
+
+			if ($vendorURIID === '' && is_object($object->thirdparty)) {
+				$vendorURIID = $einvoicing->getBuyerCommunicationURI($object->thirdparty);
+			}
 			$CdarRecipientTradeParty = [
 				'GlobalID'     => $InvoiceIssuerGlobalID, // GlobalID of CDAR RECIPIENT
 				'SchemeID'     => CdarHandler::SCHEME_SIREN_0002,
@@ -405,6 +439,53 @@ class CdarHandler
 		//echo "CDAR file generated: " . $filename;
 
 		return array('res' => 1, 'message' => 'CDAR file generated successfully', 'file' => $filename);
+	}
+
+	/**
+	 * Electronic address (BT-34) the vendor carried on the e-invoice we received from it.
+	 *
+	 * A lifecycle status is a reply to that invoice, so this is the address it goes back to: the vendor
+	 * named it itself, which no other source can contradict. It is read from the e-invoice already
+	 * stored for that supplier invoice, never fetched from the platform again.
+	 *
+	 * @param  FactureFournisseur|Facture $object  Supplier invoice received through the platform
+	 * @return string                              Electronic address, '' when the invoice did not come from the platform or carries none
+	 */
+	private function getVendorAddressFromReceivedInvoice($object)
+	{
+		if (empty($object->id) || $object->element !== 'invoice_supplier') {
+			return '';
+		}
+
+		dol_include_once('/einvoicing/class/helpers/SupplierInvoiceHelper.class.php');
+
+		$xmlData = '';
+		try {
+			// false: an invoice with no e-invoice stored is a normal case (keyed by hand), and addressing
+			// a status is no reason to call the platform back.
+			$xmlData = (string) SupplierInvoiceHelper::getXmlData((int) $object->id, false);
+		} catch (Exception $e) {
+			dol_syslog(__METHOD__ . ' no e-invoice stored for supplier invoice id ' . $object->id . ': ' . $e->getMessage(), LOG_DEBUG);
+			return '';
+		}
+		if ($xmlData === '') {
+			return '';
+		}
+
+		$xml = @simplexml_load_string($xmlData);
+		if ($xml === false) {
+			dol_syslog(__METHOD__ . ' the e-invoice stored for supplier invoice id ' . $object->id . ' is not parsable XML', LOG_WARNING);
+			return '';
+		}
+
+		// Only ram: is needed, so the same read works on a CII and on the XML extracted from a Factur-X
+		$xml->registerXPathNamespace('ram', 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100');
+		$found = $xml->xpath('//ram:SellerTradeParty/ram:URIUniversalCommunication/ram:URIID');
+		if (empty($found)) {
+			return '';
+		}
+
+		return trim((string) $found[0]);
 	}
 
 	/**
