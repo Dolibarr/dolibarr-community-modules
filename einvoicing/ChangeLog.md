@@ -34,6 +34,12 @@ seller who opted for the "TVA d'après les débits" scheme (EINVOICING_VAT_ON_DE
 is also added to the invoice as a TXD note. A goods-only invoice sends nothing: its VAT falls due on the
 delivery it already dates.
 
+NEW: The profile used to build the XML can be set with EINVOICING_XML_PROFILE, which accepts
+MINIMUM, BASICWL, BASIC, EN16931, EXTENDED and EXTENDEDFR. The default does not change (EN16931 for
+CII, EXTENDED for Factur-X). Setting EXTENDEDFR switches the document to EXTENDED-CTC-FR, the
+profile the French mandate expects, including on the Factur-X path whose PDF/A-3 attachment step
+used to refuse that guideline.
+
 NEW: When the e-invoicing platform (PDP/PA) confirms the refusal of a received supplier invoice,
 the corresponding Dolibarr supplier invoice is automatically validated then abandoned (with a
 dedicated close code, keeping the refusal and its reason as trace) and is excluded from the
