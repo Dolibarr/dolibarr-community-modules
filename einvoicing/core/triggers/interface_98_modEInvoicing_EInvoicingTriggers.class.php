@@ -136,11 +136,21 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 					$statustouse = $einvoicing->needEInvoiceManagement($object);
 				}
 
-				// When invoice is created
+				// When invoice is created.
+				// A failure here must not abort the creation of the invoice: what is recorded is the
+				// e-invoice status of a draft, which BILL_VALIDATE computes again when the invoice is
+				// validated (an unknown or not-generated status is resolved there). Refusing the
+				// creation instead leaves Dolibarr unable to create any invoice at all -- that is what
+				// a database left un-migrated after a module update does, the module SQL then having a
+				// column the table does not have yet (issue #354). Log it loudly and let the invoice be.
 				$result = $einvoicing->setEInvoiceStatus($object, $statustouse, '');
 				if ($result < 0) {
-					$this->errors = array_merge($this->errors, $einvoicing->errors);
-					return -1;
+					$einvoicingerrors = array_filter(array_merge($einvoicing->errors, array($einvoicing->error)));
+					dol_syslog(
+						get_class($this) . '::runTrigger ' . $action . ' failed to record the e-invoice status of invoice id=' . $object->id
+						. ', the invoice is created anyway: ' . implode(', ', $einvoicingerrors),
+						LOG_ERR
+					);
 				}
 			}
 		}
