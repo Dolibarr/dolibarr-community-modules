@@ -303,6 +303,7 @@ EInvoicingDocumentSyncDescription=This job automatically launches the documents 
 NoInvoiceCollectionFees=No invoice collection fee
 NoLatePaymentFees=No late payment fees
 NoEarlyPaymentDiscount=No early payment discounts
+VATOnDebitsMention=Option for the payment of VAT on debits
 CurrentAP=Current access point: %s
 CreatedManually=Created manually
 DevTools=Dev tools

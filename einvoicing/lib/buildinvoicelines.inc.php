@@ -298,6 +298,7 @@ $depositlines      	= [];
 $globalDiscounts	= [];
 $billing_period    	= [];
 $numligne          	= 1;
+$hasServiceLine		= false;	// Drives the VAT point date code (BT-8): VAT on services falls due on collection
 // @phan-suppress-current-line PhanTypeArraySuspiciousNullable
 foreach ($object->lines as $line) {
 	$isDepositLine = 0;
@@ -309,6 +310,10 @@ foreach ($object->lines as $line) {
 	$isSubTotalLine = $this->_isLineFromExternalModule($line, $object->element, 'modSubtotal');
 	if ($isSubTotalLine) {
 		continue;
+	}
+
+	if ($line->product_type == 1) {		// Product::TYPE_SERVICE
+		$hasServiceLine = true;
 	}
 
 	// For credit notes EN16931 requires positive amounts
@@ -671,7 +676,17 @@ $invoiceData = [
 	'documentNotePMT'      => getDolGlobalString('EINVOICING_PMT') ?: $outputlangs->transnoentities("NoInvoiceCollectionFees"),
 	'documentNotePMD'      => getDolGlobalString('EINVOICING_PMD') ?: $outputlangs->transnoentities('NoLatePaymentFees'),
 	'documentNoteAAB'      => getDolGlobalString('EINVOICING_AAB') ?: $outputlangs->transnoentities('NoEarlyPaymentDiscount'),
+	// Legal mention that goes with the "TVA d'après les débits" option, mandatory on the invoices of a
+	// seller who took it. The structured form of the same information is the VAT point date code below.
+	'documentNoteTXD'      => getDolGlobalInt('EINVOICING_VAT_ON_DEBITS') ? $outputlangs->transnoentities('VATOnDebitsMention') : '',
 	'documentNotes'        => [],
+
+	// BT-8 (VAT point date code), which tells the buyer when the VAT falls due, hence from when it can be
+	// deducted. UNTDID 2475 restricted to 5 (invoice date), 29 (delivery date) and 72 (payment date) by
+	// BR-CL-06, and mutually exclusive with BT-7 (BR-CO-03). VAT on services falls due on collection,
+	// unless the seller opted for the "TVA d'après les débits" scheme, where it falls due on invoicing.
+	// Nothing is sent for a goods-only invoice: its due date is the delivery date the invoice already carries.
+	'vatDueDateTypeCode'   => getDolGlobalInt('EINVOICING_VAT_ON_DEBITS') ? '5' : ($hasServiceLine ? '72' : ''),
 
 	// Seller part
 	'sellername'                => $mysoc->name,
