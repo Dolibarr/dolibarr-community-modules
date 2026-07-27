@@ -25,6 +25,10 @@
 
 require_once DOL_DOCUMENT_ROOT.'/core/triggers/dolibarrtriggers.class.php';
 dol_include_once('einvoicing/class/helpers/SupplierInvoiceHelper.class.php');
+// The classes below happen to be already loaded when the action comes from the module screens, but not
+// when a trigger fires from a context that never went through them: cron, CLI, REST API, bank import...
+dol_include_once('einvoicing/class/einvoicing.class.php');
+dol_include_once('einvoicing/class/providers/PDPProviderManager.class.php');
 
 
 /**
