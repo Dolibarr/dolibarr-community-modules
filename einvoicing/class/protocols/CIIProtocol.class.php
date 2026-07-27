@@ -2221,11 +2221,14 @@ class CIIProtocol extends AbstractProtocol
 		// ram:DefinedTradeContact is the wrapper for all contact sub-fields. Only create it when at
 		// least one sub-field is present, otherwise $contact stays null and appendChild() fatals
 		// (e.g. specimen seller with a phone but no contact person name).
-		if (!empty($data[$prefix . 'contactpersonname'])
+		// Skipped in minimal mode: the deliver-to party is a stripped-down copy of the buyer, and the
+		// CII syntax binding forbids a contact there (CII-SR-312), as it does a legal organization.
+		if (!$minimal
+			&& (!empty($data[$prefix . 'contactpersonname'])
 			|| !empty($data[$prefix . 'contactdepartmentname'])
 			|| !empty($data[$prefix . 'contactphoneno'])
 			|| !empty($data[$prefix . 'contactfaxno'])
-			|| !empty($data[$prefix . 'contactemailaddr'])) {
+			|| !empty($data[$prefix . 'contactemailaddr']))) {
 			$contact = $doc->createElement('ram:DefinedTradeContact');
 			$node->appendChild($contact);
 
