@@ -1243,6 +1243,11 @@ class Document extends CommonObject
 
 		dol_syslog(__METHOD__." start", LOG_INFO);
 
+		// Run from the scheduler, nothing has loaded the provider classes yet: the cron runner only
+		// includes this class file. Without this the job dies on "Class PDPProviderManager not found",
+		// a fatal the scheduler reports as a plain failed job.
+		require_once __DIR__ . '/providers/PDPProviderManager.class.php';
+
 		if (getDolGlobalString('EINVOICING_PDP')) {
 			$providerManager = new PDPProviderManager($this->db);
 			$provider = $providerManager->getProvider(getDolGlobalString('EINVOICING_PDP'));

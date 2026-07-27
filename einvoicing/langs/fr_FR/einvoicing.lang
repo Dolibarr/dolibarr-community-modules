@@ -411,6 +411,7 @@ NbOfProductsMapped=%s produit(s) associé(s)
 NoProductMapped=Aucun produit associé
 FailedToMapProduct=Échec de l'association de la référence fournisseur %s
 NoPDPDefined=Aucune Plateforme Agréée définie dans la configuration du module
+NoPDPProviderConfigured=Aucune Plateforme Agréée configurée : rien à synchroniser
 FailedToGetProvider=Impossible d'instancier la Plateforme Agréée %s
 FailedToGetFlowContent=Impossible de récupérer le contenu du flux %s
 FailedToDetectProtocolOfFlow=Impossible de détecter le format du document du flux %s
