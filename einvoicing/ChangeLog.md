@@ -11,6 +11,10 @@ It carries the amount paid and its date, and is sent once per invoice. Optional 
 it is off by default and enabled with EINVOICING_SEND_PAYMENT_SENT_STATUS. It can also be sent by hand
 from the supplier invoice card, where it was missing from the list of sendable statuses.
 
+FIX: The electronic address (MDT-73) of a lifecycle message sent on a supplier invoice is now the
+routing ID of the vendor instead of its SIREN, which the platform only accepts when both happen to be
+the same ("L'adresse électronique (MDT-73) est invalide" otherwise).
+
 FIX: The document status code (MDT-88) of a lifecycle message now follows the lifecycle status it goes
 with (deposited, received, made available, taken over, approved, paid), instead of always announcing
 "in process", and the referenced invoice date is sent as a plain date, as in the XP Z12-012 examples.
