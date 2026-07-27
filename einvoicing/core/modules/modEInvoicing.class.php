@@ -77,7 +77,7 @@ class modEInvoicing extends DolibarrModules
 		$this->editor_squarred_logo = '';					// Must be image filename into the module/img directory followed with @modulename. Example: 'myimage.png@einvoicing'
 
 		// Possible values for version are: 'development', 'experimental', 'dolibarr', 'dolibarr_deprecated', 'experimental_deprecated' or a version string like 'x.y.z'
-		$this->version = '1.0.4';
+		$this->version = '1.0.3';
 		// Url to the file with your last numberversion of this module
 		//$this->url_last_version = 'http://www.example.com/versionmodule.txt';
 
@@ -153,7 +153,7 @@ class modEInvoicing extends DolibarrModules
 		// Prerequisites
 		$this->phpmin = array(7, 2); // Minimum version of PHP required by module
 		// $this->phpmax = array(8, 0); // Maximum version of PHP required by module
-		$this->need_dolibarr_version = array(18, -3); // Minimum version of Dolibarr required by module
+		$this->need_dolibarr_version = array(17, -3); // Minimum version of Dolibarr required by module
 		// $this->max_dolibarr_version = array(19, -3); // Maximum version of Dolibarr required by module
 		$this->need_javascript_ajax = 0;
 
@@ -391,6 +391,23 @@ class modEInvoicing extends DolibarrModules
 			'object' => '',
 		);
 		/* END MODULEBUILDER LEFTMENU PDPDOCUMENTS */
+		/* BEGIN MODULEBUILDER LEFTMENU PDPPRODUCTMAPPING */
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=billing,fk_leftmenu=einvoicing_documents',
+			'type' => 'left',
+			'titre' => 'MapEInvoiceProducts',
+			'mainmenu' => 'billing',
+			'leftmenu' => 'einvoicing_product_mapping',
+			'url' => '/einvoicing/product_mapping.php',
+			'langs' => 'einvoicing@einvoicing',
+			'position' => 1002,
+			'enabled' => 'isModEnabled("einvoicing")',
+			'perms' => '$user->hasRight("einvoicing", "write")',
+			'target' => '',
+			'user' => 2,
+			'object' => '',
+		);
+		/* END MODULEBUILDER LEFTMENU PDPPRODUCTMAPPING */
 		/* BEGIN MODULEBUILDER LEFTMENU PDPSOCIETIES */
 		// $this->menu[$r++] = array(
 		// 	'fk_menu' => 'fk_mainmenu=billing,fk_leftmenu=einvoicing_billing',

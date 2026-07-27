@@ -719,14 +719,15 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$response = $this->callApi("healthcheck", "GET", false, [], 'healthcheck');		// This include the refresh of token
 		$returnarray = array();
 
+		$nameOfAccessPoint = getDolGlobalString('EINVOICING_PDP');
+		$nameOfAccessPoint = preg_replace('/ViaPartner/', '', $nameOfAccessPoint);
+
 		if ($response['status_code'] === 200) {
 			$returnarray['status_code'] = true;
-			$nameOfAccessPoint = getDolGlobalString('EINVOICING_PDP');
-			$nameOfAccessPoint = preg_replace('/ViaPartner/', '', $nameOfAccessPoint);
-
 			$returnarray['message'] = $langs->trans('APApiReachable', $nameOfAccessPoint);
 		} else {
 			$returnarray['status_code'] = false;
+			$returnarray['message'] = $langs->trans('APApiNotReachable', $nameOfAccessPoint) . ' (HTTP ' . ($response['status_code'] ?? 'N/A') . ')' . (!empty($response['response']) ? ' - ' . $response['response'] : '');
 		}
 
 		return $returnarray;
@@ -1770,7 +1771,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				}
 
 				$exchangeProtocol = $tmpProtocolManager->getProtocol($detectedProtocol);
-				// if protocol not supported (like ubl), we skeep it
+				// if protocol not supported (like ubl), we skip it
 				if (empty($exchangeProtocol)) {
 					return array('res' => -1, 'message' => "ERROR_FLOW_NOT_SUPPORTED_PROTOCOL detected protocol ".$detectedProtocol." not supported for flowId: " . $flowId);
 				}

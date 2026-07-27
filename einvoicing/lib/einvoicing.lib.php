@@ -367,6 +367,59 @@ if (!function_exists("GETPOSTFLOAT")) {
 	}
 }
 
+if (!function_exists('getDolGlobalFloat')) {
+	/**
+	 *  Return a Dolibarr global constant value, converted into float.
+	 *  Provided as a polyfill for Dolibarr < 21, where this function does not exist yet.
+	 *
+	 *  @param  string  $key        Name of the constant
+	 *  @param  float   $default    Default value if constant is not defined
+	 *  @return float               Value converted into float
+	 *  @since  Dolibarr V21
+	 */
+	function getDolGlobalFloat($key, $default = 0)  // @phan-suppress-current-line PhanRedefineFunction
+	{
+		global $conf;
+		return (float) (isset($conf->global->$key) ? $conf->global->$key : $default);
+	}
+}
+
+if (!function_exists('einvoicingDolGetButtonActionDropdown')) {
+	/**
+	 *  Build a dropdown action button from a list of sub-buttons.
+	 *  Polyfill for Dolibarr < 18, where dolGetButtonAction() does not support an array as $url
+	 *  (dropdown mode). Mirrors, line for line, the array-mode HTML built natively by
+	 *  dolGetButtonAction() since Dolibarr 18, so the rendered dropdown is identical.
+	 *
+	 *  @param	string	$label			Dropdown toggle visible label
+	 *  @param	array	$urlButtons		List of sub-buttons, same format as the native $url array
+	 *                                  (each entry: 'lang', 'enabled', 'perm', 'label', 'url')
+	 *  @param	array	$params			Extra params (only 'backtopage' is honored, like the core function)
+	 *  @return	string					Dropdown HTML
+	 *  @since	Dolibarr V18
+	 */
+	function einvoicingDolGetButtonActionDropdown($label, array $urlButtons, array $params = array())  // @phan-suppress-current-line PhanRedefineFunction
+	{
+		global $langs;
+
+		$out = '<div class="dropdown inline-block dropdown-holder">';
+		$out .= '<a style="margin-right: auto;" class="dropdown-toggle butAction" data-toggle="dropdown">' . $label . '</a>';
+		$out .= '<div class="dropdown-content">';
+		foreach ($urlButtons as $subbutton) {
+			if (!empty($subbutton['enabled']) && !empty($subbutton['perm'])) {
+				if (!empty($subbutton['lang'])) {
+					$langs->load($subbutton['lang']);
+				}
+				$out .= dolGetButtonAction('', $langs->trans($subbutton['label']), 'default', DOL_URL_ROOT . $subbutton['url'] . (empty($params['backtopage']) ? '' : '&amp;backtopage=' . urlencode($params['backtopage'])), '', 1);
+			}
+		}
+		$out .= '</div>';
+		$out .= '</div>';
+
+		return $out;
+	}
+}
+
 if (!function_exists('dolPrintHTML')) {
 	/**
 	 * Return a string ready to be output on HTML page

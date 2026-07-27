@@ -24,6 +24,13 @@
  *		\brief      Test scripts
  */
 
+// This script must only be run from the command line: it emulates an OAuth
+// token exchange and would otherwise expose the PDP client_secret over HTTP.
+if (PHP_SAPI !== 'cli') {
+	echo "Error: this script must be run from the command line (CLI), not through a web server.\n";
+	exit(1);
+}
+
 // Load Dolibarr environment
 $res = 0;
 // Try main.inc.php into web root known defined into CONTEXT_DOCUMENT_ROOT (not always defined)
@@ -88,10 +95,9 @@ $param = array(
 
 $paramstring = http_build_query($param);
 
-$user = new User($db);
-$user->id = 0;
-
-print json_encode($providerconfig);
+// $user is the empty system user (id=0) created by master.inc.php. Nothing on this code path
+// (getConf(), callApi(), saveOAuthTokenDB()) checks hasRight()/isModEnabled(), so it does not
+// need to be a real, named user — only logCall() reads its id, to attribute the logged API call.
 
 $extraHeaders = array(
 	'Content-Type' => 'application/x-www-form-urlencoded'
@@ -100,10 +106,8 @@ $extraHeaders = array(
 
 $response = $provider->callApi("oauth2/token", "POST", $paramstring, $extraHeaders, 'get_access_token');
 
-// var_dump($response);
-
 $status_code = $response['status_code'];
-$body = $response['response'];
+$body = json_decode($response['response'], true);
 
 if ($status_code == 200 && isset($body['access_token']) && isset($body['refresh_token']) && isset($body['expires_in'])) {
 	$provider->saveOAuthTokenDB($body['access_token'], $body['refresh_token'], $body['expires_in']);

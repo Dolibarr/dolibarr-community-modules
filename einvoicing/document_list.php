@@ -224,18 +224,9 @@ include DOL_DOCUMENT_ROOT.'/core/tpl/extrafields_list_array_fields.tpl.php';
 $object->fields = dol_sort_array($object->fields, 'position');
 $arrayfields = dol_sort_array($arrayfields, 'position');
 
-// There is several ways to check permission.
-// Set $enablepermissioncheck to 1 to enable a minimum low level of checks
-$enablepermissioncheck = getDolGlobalInt('EINVOICING_ENABLE_PERMISSION_CHECK');
-if ($enablepermissioncheck) {
-	$permissiontoread = $user->hasRight('einvoicing', 'read');
-	$permissiontoadd = $user->hasRight('einvoicing', 'write');
-	$permissiontodelete = $user->hasRight('einvoicing', 'delete');
-} else {
-	$permissiontoread = 1;
-	$permissiontoadd = 1;
-	$permissiontodelete = 1;
-}
+$permissiontoread = $user->hasRight('einvoicing', 'read');
+$permissiontoadd = $user->hasRight('einvoicing', 'write');
+$permissiontodelete = $user->hasRight('einvoicing', 'delete');
 
 // Security check (enable the most restrictive one)
 if ($user->socid > 0) {
@@ -389,7 +380,7 @@ if (!empty($object->ismultientitymanaged) && (int) $object->ismultientitymanaged
 	$sql .= " WHERE t.entity IN (".getEntity($object->element, (GETPOSTINT('search_current_entity') ? 0 : 1)).")";
 } elseif (preg_match('/^\w+@\w+$/', (string) $object->ismultientitymanaged)) {
 	$tmparray = explode('@', (string) $object->ismultientitymanaged);
-	$sql .= " LEFT JOIN ".$object->db->prefix().$tmparray[1]." as pt ON t.".$db->sanitize($tmparray[0])." = pt.rowid";  // @phan-suppress-current-line SqlInjection
+	$sql .= " LEFT JOIN ".$object->db->prefix().$db->sanitize($tmparray[1])." as pt ON t.".$db->sanitize($tmparray[0])." = pt.rowid";
 	$sql .= " WHERE pt.entity IN (".getEntity($object->element, (GETPOSTINT('search_current_entity') ? 0 : 1)).")";
 } else {
 	$sql .= " WHERE 1 = 1";
@@ -646,6 +637,10 @@ $newcardbutton = '';
 //$newcardbutton .= dolGetButtonTitle($langs->trans('HierarchicView'), '', 'fa fa-stream paddingleft imgforviewmode', $_SERVER["PHP_SELF"].'?mode=hierarchy'.preg_replace('/(&|\?)*(mode|groupby)=[^&]+/', '', $param), '', (($mode == 'hierarchy') ? 2 : 1), array('morecss' => 'reposition'));
 //$newcardbutton .= dolGetButtonTitleSeparator();
 //$newcardbutton .= dolGetButtonTitle($langs->trans('New'), '', 'fa fa-plus-circle', dol_buildpath('/einvoicing/document_card.php', 1).'?action=create&backtopage='.urlencode($_SERVER['PHP_SELF']), '', $permissiontoadd);
+
+// Manual mapping of the vendor products of a flow onto existing Dolibarr products (useful when the automatic
+// creation of products is disabled and a synchronization is blocked on an unknown product).
+$newcardbutton .= dolGetButtonTitle($langs->trans('MapEInvoiceProducts'), '', 'fa fa-link', dol_buildpath('/einvoicing/product_mapping.php', 1), '', $permissiontoadd);
 
 
 $providershort = '';

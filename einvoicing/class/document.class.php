@@ -455,7 +455,7 @@ class Document extends CommonObject
 			$sql .= " WHERE t.entity IN (".getEntity($this->element).")";
 		} elseif (preg_match('/^\w+@\w+$/', (string) $this->ismultientitymanaged)) {
 			$tmparray = explode('@', (string) $this->ismultientitymanaged);
-			$sql .= " LEFT JOIN ".$this->db->prefix().$tmparray[1]." as pt ON t.".$this->db->sanitize($tmparray[0])." = pt.rowid";  // @phan-suppress-current-line SqlInjection
+			$sql .= " LEFT JOIN ".$this->db->prefix().$this->db->sanitize($tmparray[1])." as pt ON t.".$this->db->sanitize($tmparray[0])." = pt.rowid";
 			$sql .= " WHERE pt.entity IN (".getEntity($this->element).")";
 		} else {
 			$sql .= " WHERE 1 = 1";
@@ -1264,6 +1264,12 @@ class Document extends CommonObject
 				$errortype = 'errors';
 				if (!empty($sync_result['actions'])) {
 					$errortype = 'warnings';
+					$this->output .= '<br>' . $langs->trans("EINVOICING_JOB_MANUAL_ACTION_REQUIRED") . '<br>';
+					foreach ($sync_result['actions'] as $action) {
+						$this->output .= "---<br>";
+						$this->output .= $action['businessmessage'] . '<br>';
+					}
+					$this->output = rtrim($this->output, '<br>');
 				}
 				//$this->output = $langs->trans("FailedToSyncADocument").($errortype ? '<br>'.$langs->trans("FailedToSyncADocumentMore") : '');
 			}
@@ -1281,13 +1287,16 @@ class Document extends CommonObject
 
 	/**
 	 * Return true if given XML data can be stored in Database (size < 16Mo)
-	 * @param string $xmlData The XML data to check
+	 * @param ?string $xmlData The XML data to check
 	 * @return bool True if xmlData is within size bounds
 	 */
-	public static function checkXmlDataMaxSize(string &$xmlData): bool
+	public static function checkXmlDataMaxSize(?string &$xmlData): bool
 	{
-		// 16Mo for MEDIUMTEXT
-		return (strlen($xmlData) <= 16777215);
+		if (isset($xmlData)) {
+			// 16Mo for MEDIUMTEXT
+			return (strlen($xmlData) <= 16777215);
+		}
+		return true;
 	}
 
 	/**

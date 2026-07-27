@@ -310,12 +310,16 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
 	$item->helpText = $langs->transnoentities('EINVOICING_PRODUCTS_AUTO_GENERATION_HELP');
 	$item->defaultFieldValue = '0';
 	$item->cssClass = 'minwidth500';
+	$item->fieldParams['forcereload'] = 1;
 
-	// Setup conf to import lines as free description lines when no product is found
-	$item = $formSetup->newItem('EINVOICING_IMPORT_AS_FREE_LINES')->setAsYesNo();
-	$item->helpText = $langs->transnoentities('EINVOICING_IMPORT_AS_FREE_LINES_HELP');
-	$item->defaultFieldValue = '0';
-	$item->cssClass = 'minwidth500';
+	// Setup conf to import lines as free description lines when no product is found and no default product exist on supplier
+	// TODO This option is exclusive with EINVOICING_PRODUCTS_AUTO_GENERATION so should be disabled if EINVOICING_PRODUCTS_AUTO_GENERATION is on
+	if (!getDolGlobalString("EINVOICING_PRODUCTS_AUTO_GENERATION")) {
+		$item = $formSetup->newItem('EINVOICING_IMPORT_AS_FREE_LINES')->setAsYesNo();
+		$item->helpText = $langs->transnoentities('EINVOICING_IMPORT_AS_FREE_LINES_HELP');
+		$item->defaultFieldValue = '0';
+		$item->cssClass = 'minwidth500';
+	}
 
 	// Setup conf to choose use of auto generation or not of third parties
 	$item = $formSetup->newItem('EINVOICING_THIRDPARTIES_AUTO_GENERATION')->setAsYesNo();
@@ -330,19 +334,21 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
 	$item->cssClass = 'minwidth500';
 
 	// Setup conf to to enable a limit of flows to synchronize per one synchronization call
+	/* This option is useless, should be always on. Disabling it is possible by editing hidden cosntant
 	$item = $formSetup->newItem('EINVOICING_FLOWS_SYNC_CALL_LIMIT')->setAsYesNo();
 	$item->helpText = $langs->transnoentities('EINVOICING_FLOWS_SYNC_CALL_LIMIT_HELP');
 	$item->defaultFieldValue = '1';
 	$item->cssClass = 'minwidth500';
 	$item->fieldParams['forcereload'] = 1;
+	*/
 
-	if (getDolGlobalString('EINVOICING_FLOWS_SYNC_CALL_LIMIT')) {
+	//if (getDolGlobalString('EINVOICING_FLOWS_SYNC_CALL_LIMIT')) {
 		// Setup conf to to define the number of flows to synchronize per one synchronization call
 		$item = $formSetup->newItem('EINVOICING_FLOWS_SYNC_CALL_SIZE');
 		$item->helpText = $langs->transnoentities('EINVOICING_FLOWS_SYNC_CALL_SIZE_HELP');
 		$item->defaultFieldValue = '100';
 		$item->cssClass = 'maxwidth100';
-	}
+	//}
 
 	// Setup conf to define a time margin in hours to go back from the current date of the last synchronization
 	$item = $formSetup->newItem('EINVOICING_SYNC_MARGIN_TIME_HOURS');
