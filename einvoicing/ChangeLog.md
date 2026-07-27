@@ -33,6 +33,7 @@ BT-8 is set to 72 (payment date) as soon as the invoice carries a service, and t
 seller who opted for the "TVA d'après les débits" scheme (EINVOICING_VAT_ON_DEBITS), whose legal mention
 is also added to the invoice as a TXD note. A goods-only invoice sends nothing: its VAT falls due on the
 delivery it already dates.
+
 FIX: The generated CII and Factur-X XML now carries the EXTENDED-CTC-FR guideline URN
 (`urn:cen.eu:en16931:2017#conformant#urn.cpro.gouv.fr:1p0:extended-ctc-fr`) instead of the generic
 EN16931 / Factur-X EXTENDED one, so it matches the `flowProfile` the module declares to the
@@ -45,8 +46,14 @@ CII, EXTENDED for Factur-X); setting EXTENDEDFR switches the whole document to E
 profile the French mandate expects, including on the Factur-X path whose PDF/A-3 attachment step
 used to refuse that guideline (issue #395).
 
-FIX: A credit note now carries the issue date of the invoice it corrects (BT-26), which was only
-emitted on the EXTENDED profile and is required by BR-FR-CO-05 on every profile.
+FIX: A credit note now carries the issue date of the invoice it corrects (BT-26). It was only
+emitted on the EXTENDED profile while BR-FR-CO-05 requires it on every profile, so credit notes
+generated with the default profile were refused by the French schematron (issue #395).
+
+NEW: The EXTENDED-CTC-FR profile of the French mandate is now handled everywhere the XML builder
+branches on the profile, so switching CIIProtocol::BUILD_XML_PROFILE to 'EXTENDEDFR' is enough to
+emit it. The default does not change, and the Factur-X protocol needs one more step (its PDF
+attachment stage does not accept that guideline yet).
 
 NEW: When the e-invoicing platform (PDP/PA) confirms the refusal of a received supplier invoice,
 the corresponding Dolibarr supplier invoice is automatically validated then abandoned (with a

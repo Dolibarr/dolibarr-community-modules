@@ -618,7 +618,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				"trackingId" => $ref,
 				"name" => "Invoice_" . $ref,
 				"flowSyntax" => "Factur-X",
-				"flowProfile" => "Extended-CTC-FR",	// Must match the guideline URN the module puts into the XML
+				"flowProfile" => "CIUS",
 				"sha256" => hash_file('sha256', $invoice_path)
 			]),
 			'file' => new CURLFile($invoice_path, $mime_type, basename($invoice_path))
