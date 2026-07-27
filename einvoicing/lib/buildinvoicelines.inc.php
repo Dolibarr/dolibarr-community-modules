@@ -126,9 +126,11 @@ $myUri             = $einvoicing->getSellerCommunicationURI(0);
 $mySchemeUri       = $this->getIEC6523Code($mysoc->country_code, 2);
 
 // Buyer party resolution.
-// By default the buyer is the invoice thirdparty. When EINVOICING_USE_BILLING_CONTACT_AS_BUYER
-// is enabled and a billing contact (external BILLING contact) is set on a French invoice, this
-// contact can become the XML buyer (e.g. invoice addressed to the head office / "siège social").
+// The billing contact of the invoice (external BILLING contact) always describes the buyer contact
+// group (BG-9): it is the point of contact the customer declared for its invoices, and nothing else
+// fills that group. Whether that contact also *replaces* the buyer party itself is another matter,
+// and stays opt-in behind EINVOICING_USE_BILLING_CONTACT_AS_BUYER (e.g. invoice addressed to the head
+// office / "siège social"):
 //   - Case B: the contact belongs to a different thirdparty (distinct legal entity) -> rebuild the
 //     whole buyer (name, address, SIREN/SIRET, VAT, routing) from that thirdparty.
 //   - Case A: same thirdparty -> keep its SIREN/VAT/routing, only override name/address.
@@ -142,17 +144,17 @@ $buyerContactName  = null;
 $buyerContactEmail = null;
 $buyerContactPhone = null;
 
-if (getDolGlobalInt('EINVOICING_USE_BILLING_CONTACT_AS_BUYER')) {
-	$billingContactIds = $object->getIdContact('external', 'BILLING');
-	if (!empty($billingContactIds) && $object->fetch_contact($billingContactIds[0]) > 0 && is_object($object->contact)) {
-		$billingContact = $object->contact;
+$billingContactIds = $object->getIdContact('external', 'BILLING');
+if (!empty($billingContactIds) && $object->fetch_contact($billingContactIds[0]) > 0 && is_object($object->contact)) {
+	$billingContact = $object->contact;
 
-		// Buyer contact person fields (BG-9), filled in every case
-		$tmpcontactname    = trim($billingContact->getFullName($outputlangs));
-		$buyerContactName  = ($tmpcontactname !== '') ? $tmpcontactname : null;
-		$buyerContactEmail = !empty($billingContact->email) ? $billingContact->email : null;
-		$buyerContactPhone = !empty($billingContact->phone_pro) ? $billingContact->phone_pro : (!empty($billingContact->phone_mobile) ? $billingContact->phone_mobile : null);
+	// Buyer contact person fields (BG-9): name (BT-56), phone (BT-57) and email (BT-58)
+	$tmpcontactname    = trim($billingContact->getFullName($outputlangs));
+	$buyerContactName  = ($tmpcontactname !== '') ? $tmpcontactname : null;
+	$buyerContactEmail = !empty($billingContact->email) ? $billingContact->email : null;
+	$buyerContactPhone = !empty($billingContact->phone_pro) ? $billingContact->phone_pro : (!empty($billingContact->phone_mobile) ? $billingContact->phone_mobile : null);
 
+	if (getDolGlobalInt('EINVOICING_USE_BILLING_CONTACT_AS_BUYER')) {
 		$contactSocId = !empty($billingContact->fk_soc) ? $billingContact->fk_soc : $billingContact->socid;
 
 		// Case B: billing contact attached to a different thirdparty (distinct legal entity)
@@ -176,9 +178,9 @@ if (getDolGlobalInt('EINVOICING_USE_BILLING_CONTACT_AS_BUYER')) {
 				$contactSocId = 0;	// fall back to case A handling
 			}
 		}
-	} else {
-		dol_syslog('einvoicing: EINVOICING_USE_BILLING_CONTACT_AS_BUYER is on but no usable BILLING contact found, using invoice thirdparty as buyer', LOG_NOTICE);
 	}
+} elseif (getDolGlobalInt('EINVOICING_USE_BILLING_CONTACT_AS_BUYER')) {
+	dol_syslog('einvoicing: EINVOICING_USE_BILLING_CONTACT_AS_BUYER is on but no usable BILLING contact found, using invoice thirdparty as buyer', LOG_NOTICE);
 }
 // Buyer identifiers (resolved buyer party: invoice thirdparty or billing-contact recipient)
 if (!($buyerParty instanceof Societe)) {
