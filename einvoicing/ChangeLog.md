@@ -2,6 +2,10 @@
 
 ## 1.0.3
 
+FIX: The flowProfile declared to the platform is now read from the guideline URN of the document
+being transmitted instead of being hardcoded, so the declaration and the file can no longer
+contradict each other. A profile with no AFNOR flowProfile omits the field (issue #395).
+
 FIX: The triggers no longer fail with "Class EInvoicing / PDPProviderManager not found" when the action
 comes from a context that never went through the module screens (cron, CLI, REST API, bank import).
 
@@ -10,10 +14,25 @@ allowance block. That element belongs to a document-level allowance or charge an
 binding forbids it on a line (CII-SR-191); the VAT of the discount is already carried by the line
 itself (issue #471).
 
+FIX: The local check of the SIREN format now covers every party of the generated document instead of
+the seller alone. A customer whose professional id was not a 9 digit SIREN went through untouched and
+the invoice was refused by the platform (BR-FR-32), without the operator being told which party was at
+fault (issue #473).
+
+NEW: The generated invoices now tell when the VAT falls due, hence from when the buyer may deduct it:
+BT-8 is set to 72 (payment date) as soon as the invoice carries a service, and to 5 (invoice date) for a
+seller who opted for the "TVA d'après les débits" scheme (EINVOICING_VAT_ON_DEBITS), whose legal mention
+is also added to the invoice as a TXD note. A goods-only invoice sends nothing: its VAT falls due on the
+delivery it already dates.
+
 NEW: When the e-invoicing platform (PDP/PA) confirms the refusal of a received supplier invoice,
 the corresponding Dolibarr supplier invoice is automatically validated then abandoned (with a
 dedicated close code, keeping the refusal and its reason as trace) and is excluded from the
 accountancy transfer screen (issue #286).
+
+FIX: The document status code (MDT-88) of a lifecycle message now follows the lifecycle status it goes
+with (deposited, received, made available, taken over, approved, paid), instead of always announcing
+"in process", and the referenced invoice date is sent as a plain date, as in the XP Z12-012 examples.
 
 ## 1.0.0
 

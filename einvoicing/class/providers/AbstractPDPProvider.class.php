@@ -865,4 +865,82 @@ abstract class AbstractPDPProvider
 
 		return $xmlData;
 	}
+
+	/**
+	 * AFNOR flowProfile to declare for a given CII guideline URN.
+	 *
+	 * The values are the ones the platforms actually accept: anything outside their enumeration is
+	 * answered with a HTTP 400 "invalid flowProfile". Profiles with no AFNOR equivalent (MINIMUM,
+	 * BASIC WL, and the generic Factur-X EXTENDED) are deliberately absent, so the field is omitted
+	 * for them, which both platforms accept.
+	 *
+	 * @var array<string,string>
+	 */
+	protected const FLOW_PROFILE_BY_GUIDELINE = array(
+		'urn:factur-x.eu:1p0:basic' => 'Basic',
+		'urn:cen.eu:en16931:2017' => 'CIUS',
+		'urn:cen.eu:en16931:2017#conformant#urn.cpro.gouv.fr:1p0:extended-ctc-fr' => 'Extended-CTC-FR',
+	);
+
+	/**
+	 * Read the guideline URN (BT-24) carried by the e-invoice about to be sent.
+	 *
+	 * Works on a standalone CII XML and on a Factur-X PDF, whose embedded XML is extracted first.
+	 *
+	 * @param	string		$invoicePath	Path of the file that will be transmitted
+	 * @return	string						Guideline URN, empty string when it cannot be read
+	 */
+	protected function readGuidelineUrn($invoicePath)
+	{
+		if (!is_readable($invoicePath)) {
+			return '';
+		}
+
+		$content = '';
+		if (strtolower(pathinfo($invoicePath, PATHINFO_EXTENSION)) === 'pdf') {
+			// Factur-X: the CII lives as a PDF/A-3 attachment
+			try {
+				require_once __DIR__ . '/../../vendor/autoload.php';
+				$content = (string) \horstoeko\zugferd\ZugferdDocumentPdfReaderExt::getInvoiceDocumentContentFromFile($invoicePath);
+			} catch (\Throwable $e) {
+				dol_syslog(get_class($this) . '::readGuidelineUrn could not extract the XML from ' . basename($invoicePath) . ': ' . $e->getMessage(), LOG_WARNING);
+				return '';
+			}
+		} else {
+			$content = (string) file_get_contents($invoicePath);
+		}
+
+		$reg = array();
+		if (preg_match('#GuidelineSpecifiedDocumentContextParameter>\s*<[^:>]*:?ID>([^<]*)<#', $content, $reg)) {
+			return trim($reg[1]);
+		}
+
+		return '';
+	}
+
+	/**
+	 * flowProfile to declare to the platform for the e-invoice about to be sent.
+	 *
+	 * Derived from what the document actually contains rather than hardcoded, so the declaration and
+	 * the transmitted file can never contradict each other (issue #395).
+	 *
+	 * @param	string		$invoicePath	Path of the file that will be transmitted
+	 * @return	string						AFNOR flowProfile, empty string when the field must be omitted
+	 */
+	public function resolveFlowProfile($invoicePath)
+	{
+		$guideline = $this->readGuidelineUrn($invoicePath);
+
+		if ($guideline === '') {
+			dol_syslog(get_class($this) . '::resolveFlowProfile no guideline found in ' . basename($invoicePath) . ', flowProfile omitted', LOG_WARNING);
+			return '';
+		}
+
+		if (!isset(self::FLOW_PROFILE_BY_GUIDELINE[$guideline])) {
+			dol_syslog(get_class($this) . '::resolveFlowProfile no AFNOR flowProfile for guideline "' . $guideline . '", field omitted', LOG_NOTICE);
+			return '';
+		}
+
+		return self::FLOW_PROFILE_BY_GUIDELINE[$guideline];
+	}
 }
