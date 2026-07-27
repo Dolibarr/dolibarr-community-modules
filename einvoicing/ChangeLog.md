@@ -34,6 +34,10 @@ seller who opted for the "TVA d'après les débits" scheme (EINVOICING_VAT_ON_DE
 is also added to the invoice as a TXD note. A goods-only invoice sends nothing: its VAT falls due on the
 delivery it already dates.
 
+FIX: The deliver-to party (ShipToTradeParty) of the generated XML no longer repeats the buyer
+contact. That party is a stripped-down copy of the buyer and the CII syntax binding forbids a
+contact on it (CII-SR-312), just like the legal organization that was already left out (issue #463).
+
 FIX: The scheduled job "EInvoicingDocumentSync" died on a fatal error ("Class PDPProviderManager not
 found") as soon as it was enabled, because the scheduler only loads the class file holding the job
 method. Flow synchronization could therefore only be run by hand from the interface.
