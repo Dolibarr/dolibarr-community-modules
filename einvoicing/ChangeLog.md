@@ -44,6 +44,12 @@ open yet ("Upcoming"), or closed, is no longer counted as an active reception ad
 EINVOICING_REQUIRE_ROUTABLE_RECIPIENT is enabled, such a recipient is now blocked before
 transmission instead of being rejected by the platform with a routing error (fr:213).
 
+NEW: The profile used to build the XML can be set with EINVOICING_XML_PROFILE, which accepts
+MINIMUM, BASICWL, BASIC, EN16931, EXTENDED and EXTENDEDFR. The default does not change (EN16931 for
+CII, EXTENDED for Factur-X). Setting EXTENDEDFR switches the document to EXTENDED-CTC-FR, the
+profile the French mandate expects, including on the Factur-X path whose PDF/A-3 attachment step
+used to refuse that guideline.
+
 NEW: When the e-invoicing platform (PDP/PA) confirms the refusal of a received supplier invoice,
 the corresponding Dolibarr supplier invoice is automatically validated then abandoned (with a
 dedicated close code, keeping the refusal and its reason as trace) and is excluded from the

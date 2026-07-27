@@ -41,13 +41,13 @@ use horstoeko\zugferd\ZugferdDocumentPdfBuilder;
 use horstoeko\zugferd\ZugferdDocumentValidator;
 use horstoeko\zugferd\ZugferdDocumentPdfReader;
 use horstoeko\zugferd\ZugferdDocumentPdfReaderExt;
-use horstoeko\zugferd\ZugferdDocumentPdfMerger;
 
 require __DIR__ . "/../../vendor/autoload.php";
 
 dol_include_once('einvoicing/class/protocols/CIIProtocol.class.php');
 dol_include_once('einvoicing/class/protocols/CommonProtocol.class.php');
 dol_include_once('einvoicing/class/utils/XmlPatcher.class.php');
+dol_include_once('einvoicing/class/utils/CtcFrPdfMerger.class.php');
 
 
 /**
@@ -811,7 +811,10 @@ class FacturXProtocol extends CIIProtocol
 				$creator = (string) pdfExtractMetadata($orig_pdf, 'Creator');
 			}
 
-			$merger = new ZugferdDocumentPdfMerger($xmlfile, $orig_pdf);
+			// CtcFrPdfMerger behaves exactly like ZugferdDocumentPdfMerger, except that it can still
+			// supply the attachment and XMP parameters when the guideline URN is one the library does
+			// not know — which is the case of EXTENDED-CTC-FR.
+			$merger = new CtcFrPdfMerger($xmlfile, $orig_pdf);
 
 			$merger->setKeywordTemplate($keywords);
 			$merger->setSubjectTemplate($subject);
