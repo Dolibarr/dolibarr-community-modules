@@ -272,6 +272,21 @@ class CdarHandler
 		$ProcessCondition = str_replace(' ', '_', $ProcessCondition);
 		$ProcessCondition = preg_replace('/[^A-Za-z0-9_]/', '', $ProcessCondition); // Clean special chars
 
+		// Electronic address (MDT-73) of the CDAR recipient. Every status but the cash-in (212) is sent on a
+		// supplier invoice: we are the buyer and the CDAR goes back to the vendor, so it is addressed with
+		// the routing the module already resolves for that third party - the one recorded for it, its
+		// SIREN otherwise. Sending the SIREN blindly only works when the platform happens to know the
+		// vendor under that very address, and gets the message refused with "L'adresse electronique
+		// (MDT-73) est invalide" otherwise. getBuyerCommunicationURI() is called on the third party alone:
+		// the invoice-level routing override it also knows about is looked up among the customer invoices
+		// (element_type = 'facture'), which a supplier invoice must not read.
+		$RecipientURIID = $InvoiceIssuerGlobalID;
+		if ($statusCode != 212 && $object->thirdparty instanceof Societe) {
+			$vendorURIID = $einvoicing->getBuyerCommunicationURI($object->thirdparty);
+			if ($vendorURIID !== '') {	// Empty with EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID and no routing: keep the SIREN, an empty MDT-73 is worse
+				$RecipientURIID = $vendorURIID;
+			}
+		}
 
 		$data = [
 			'GuidelineID' => 'urn.cpro.gouv.fr:1p0:CDV:invoice',
@@ -294,7 +309,7 @@ class CdarHandler
 					'GlobalID'     => $InvoiceIssuerGlobalID, // GlobalID of CDAR RECIPIENT
 					'SchemeID'     => CdarHandler::SCHEME_SIREN_0002,
 					'RoleCode'     => CdarHandler::ROLE_SE,
-					'URIID'        => $InvoiceIssuerGlobalID,
+					'URIID'        => $RecipientURIID,
 					'URISchemeID'  => CdarHandler::SCHEME_SIREN_0225
 				]
 			],
