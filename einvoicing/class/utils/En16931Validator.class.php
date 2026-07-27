@@ -255,15 +255,43 @@ class En16931Validator
 		}
 
 		// ---------------------------------------------------------------
-		// CTC-FR: BR-FR-10 seller SIREN format (scheme 0002 = 9 digits)
+		// CTC-FR SIREN format, as published in the FNFE "BR-FR-Flux2-Schematron-CII" V1.4.0:
+		//  - BR-FR-10/BT-30 targets the seller SIREN,
+		//  - BR-FR-32/LEGALID targets the legal identifier (scheme 0002) of ANY party,
+		//  - BR-FR-32/GLOBALID targets any party identifier with scheme 0002 or 0231.
+		// The platform reports each of them separately, so the same value can raise both a
+		// BR-FR-10 and a BR-FR-32 message: this mirrors the report the operator will get back.
+		// BR-FR-10 also makes the seller SIREN mandatory, which only holds for a French seller
+		// (the module also serves other countries) and an empty professional id is already
+		// refused when the invoice data is built, so only the format is checked here.
 		// ---------------------------------------------------------------
-		$sellerLegalIds = $xp->query('//ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:SpecifiedLegalOrganization/ram:ID');
-		if ($sellerLegalIds !== false) {
-			foreach ($sellerLegalIds as $node) {
-				/** @var DOMElement $node */
-				if ($node->getAttribute('schemeID') === '0002' && !preg_match('/^\d{9}$/', trim($node->textContent))) {
-					$violations[] = 'BR-FR-10: seller legal registration identifier (scheme 0002) must be a 9 digit SIREN, found "'.trim($node->textContent).'"';
+		$sellerSirens = $xp->query('//ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:SpecifiedLegalOrganization/ram:ID[@schemeID="0002"]');
+		if ($sellerSirens !== false) {
+			foreach ($sellerSirens as $node) {
+				$value = trim($node->textContent);
+				if (!preg_match('/^\d{9}$/', $value)) {
+					$violations[] = 'BR-FR-10/BT-30: the seller SIREN (scheme 0002) must be exactly 9 digits, found "'.$value.'"';
 				}
+			}
+		}
+
+		$partySirens = $xp->query('//ram:SpecifiedLegalOrganization/ram:ID[@schemeID="0002"] | //ram:GlobalID[@schemeID="0002" or @schemeID="0231"]');
+		if ($partySirens !== false) {
+			foreach ($partySirens as $node) {
+				/** @var DOMElement $node */
+				$value = trim($node->textContent);
+				if (preg_match('/^\d{9}$/', $value)) {
+					continue;
+				}
+				// Name the party at fault: the identifier hangs either directly under the party
+				// (GlobalID) or under its SpecifiedLegalOrganization wrapper (ID).
+				$party = '';
+				$parent = $node->parentNode;
+				if ($parent !== null) {
+					$party = ($parent->localName === 'SpecifiedLegalOrganization' && $parent->parentNode !== null) ? $parent->parentNode->localName : $parent->localName;
+				}
+				$assert = ($node->localName === 'GlobalID') ? 'GLOBALID' : 'LEGALID';
+				$violations[] = 'BR-FR-32/'.$assert.': the identifier (scheme '.$node->getAttribute('schemeID').') of '.($party !== '' ? $party : 'a party').' must be exactly 9 digits, found "'.$value.'"';
 			}
 		}
 

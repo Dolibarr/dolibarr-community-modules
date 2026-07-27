@@ -5,6 +5,11 @@
 FIX: The triggers no longer fail with "Class EInvoicing / PDPProviderManager not found" when the action
 comes from a context that never went through the module screens (cron, CLI, REST API, bank import).
 
+FIX: The local check of the SIREN format now covers every party of the generated document instead of
+the seller alone. A customer whose professional id was not a 9 digit SIREN went through untouched and
+the invoice was refused by the platform (BR-FR-32), without the operator being told which party was at
+fault (issue #473).
+
 NEW: The generated invoices now tell when the VAT falls due, hence from when the buyer may deduct it:
 BT-8 is set to 72 (payment date) as soon as the invoice carries a service, and to 5 (invoice date) for a
 seller who opted for the "TVA d'après les débits" scheme (EINVOICING_VAT_ON_DEBITS), whose legal mention
