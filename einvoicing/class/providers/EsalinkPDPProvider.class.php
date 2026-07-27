@@ -427,14 +427,24 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		];
 
 		// Params
+		// The profile is declared from what the document actually carries, never hardcoded, so the
+		// declaration cannot contradict the transmitted file (issue #395). Empty means "omit it",
+		// which both platforms accept and which is the only correct answer for a profile that has
+		// no AFNOR flowProfile of its own.
+		$flowInfo = [
+			"flowSyntax" => $flowSyntax,			// CII or Factur-X
+			"trackingId" => $object->ref,
+			"name" => "Invoice_" . $object->ref,
+			"sha256" => hash_file('sha256', $invoice_path)
+		];
+
+		$flowProfile = $this->resolveFlowProfile($invoice_path);
+		if ($flowProfile !== '') {
+			$flowInfo = array("flowProfile" => $flowProfile) + $flowInfo;
+		}
+
 		$params = [
-			'flowInfo' => json_encode([
-				"flowProfile" => "Extended-CTC-FR",
-				"flowSyntax" => $flowSyntax,			// CII or Factur-X
-				"trackingId" => $object->ref,
-				"name" => "Invoice_" . $object->ref,
-				"sha256" => hash_file('sha256', $invoice_path)
-			]),
+			'flowInfo' => json_encode($flowInfo),
 			'file' => new CURLFile($invoice_path, $mime_type, basename($invoice_path))
 		];
 

@@ -2,6 +2,10 @@
 
 ## 1.0.3
 
+FIX: The flowProfile declared to the platform is now read from the guideline URN of the document
+being transmitted instead of being hardcoded, so the declaration and the file can no longer
+contradict each other. A profile with no AFNOR flowProfile omits the field (issue #395).
+
 FIX: The triggers no longer fail with "Class EInvoicing / PDPProviderManager not found" when the action
 comes from a context that never went through the module screens (cron, CLI, REST API, bank import).
 
