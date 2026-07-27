@@ -325,18 +325,9 @@ if (GETPOST('error')) {
 
 
 if (GETPOST('accesstoken') && $provider instanceof AbstractPDPProvider) {
-	// We are in the return of an OAuth proxy authorize+token callback.
-	// The state must match the one we generated when building the "via partner" authorize link
-	// (see SuperPDPProvider::initFormSetup()), otherwise anyone could POST/GET an arbitrary token
-	// here and have it saved as our production PDP credential.
-	if (GETPOST('state', 'restricthtml') !== (isset($_SESSION['einvoicing_superpdp_viapartner_oauth_state']) ? $_SESSION['einvoicing_superpdp_viapartner_oauth_state'] : '')) {
-		setEventMessages($langs->trans('EINVOICING_SUPERPDP_OAUTH_STATE_MISMATCH'), null, 'errors');
-		header("Location: ".$_SERVER["PHP_SELF"]);
-		exit;
-	}
-	unset($_SESSION['einvoicing_superpdp_viapartner_oauth_state']);
+	// We are in the return of an OAUT proxy authorize+token callback
 
-	$result = $provider->saveOAuthTokenDB(GETPOST('accesstoken', 'restricthtml'), GETPOST('refresh_token', 'restricthtml'), GETPOSTINT('expires_in'));
+	$result = $provider->saveOAuthTokenDB(GETPOST('accesstoken'), GETPOST('refresh_token'), GETPOSTINT('expires_in'));
 
 	if ($result) {
 		setEventMessages("Token generated successfully", null, 'mesgs');

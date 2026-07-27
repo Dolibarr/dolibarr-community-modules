@@ -122,15 +122,6 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 		$langs->load("oauth");
 
-		// Anti-CSRF state for the "via partner" (grey-label) authorization flow, checked back in
-		// admin/setup.php against $_SESSION['einvoicing_superpdp_viapartner_oauth_state'] before any
-		// accesstoken/refresh_token returned by the proxy is saved. The 'none-' prefix is kept so the
-		// proxy still parses it as "no scope requested" (see proxy_oauthcallback.php scope handling).
-		// Computed once and reused below so both links built in this method stay consistent (only the
-		// last value written to the session would validate otherwise).
-		$viaPartnerState = 'none-' . bin2hex(random_bytes(16));
-		$_SESSION['einvoicing_superpdp_viapartner_oauth_state'] = $viaPartnerState;
-
 		// Set content of the help page
 		if (getDolGlobalString('EINVOICING_PDP') == 'SUPERPDPViaPartner') {
 			if (getDolGlobalString("EINVOICING_SUPERPDP_VIAPARTNER") != 'proxy') {
@@ -149,7 +140,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				$urltogeneratetoken = getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER_OAUTH_URL');
 				// $urltogeneratetoken .= '?proxy=superpdp&state=none&response_type=code&redirect_uri=' . urlencode(dol_buildpath('/einvoicing/admin/setup.php', 2));
 				$query = [
-					'state' => $viaPartnerState,
+					'state' => 'none',
 					'response_type' => 'code',
 					'redirect_uri' => dol_buildpath('/einvoicing/admin/setup.php', 2)
 				];
@@ -335,7 +326,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 					$urltogeneratetoken = getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER_OAUTH_URL');
 					// $urltogeneratetoken .= '?state=none&response_type=code&redirect_uri=' . urlencode(dol_buildpath('/einvoicing/admin/setup.php', 2));
 					$query = [
-						'state' => $viaPartnerState,
+						'state' => 'none',
 						'response_type' => 'code',
 						'redirect_uri' => dol_buildpath('/einvoicing/admin/setup.php', 2)
 					];
@@ -1780,7 +1771,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				}
 
 				$exchangeProtocol = $tmpProtocolManager->getProtocol($detectedProtocol);
-				// if protocol not supported (like ubl), we skeep it
+				// if protocol not supported (like ubl), we skip it
 				if (empty($exchangeProtocol)) {
 					return array('res' => -1, 'message' => "ERROR_FLOW_NOT_SUPPORTED_PROTOCOL detected protocol ".$detectedProtocol." not supported for flowId: " . $flowId);
 				}
