@@ -408,7 +408,7 @@ InvoicePrecheckSuccessful=AP validator pre-check passed.
 InvoicePrecheckFailed=AP validator pre-check failed.
 # Local EN 16931 business rules check
 EINVOICING_BR_CHECK=Local validation of the generated e-invoice file
-EINVOICING_BR_CHECK_HELP=After generating the e-invoice XML, checks a subset of the EN 16931 business rules locally (totals arithmetic BR-CO-10 to BR-CO-17, line rules, VAT category and rate coherence, seller SIREN format), quoting the official rule id. Choose "No check" to disable it, "Warning only" (default) to report violations as warnings, or "Blocking" to abort the generation on any violation. This is a fast local safety net for any platform; the official Schematron validation of the Approved Platform remains the reference.
+EINVOICING_BR_CHECK_HELP=After generating the e-invoice XML, checks a subset of the EN 16931 business rules locally (totals arithmetic BR-CO-10 to BR-CO-17, line rules, VAT category and rate coherence, SIREN format of every party BR-FR-10 and BR-FR-32), quoting the official rule id. Choose "No check" to disable it, "Warning only" (default) to report violations as warnings, or "Blocking" to abort the generation on any violation. This is a fast local safety net for any platform; the official Schematron validation of the Approved Platform remains the reference.
 EINVOICING_BR_CHECK_NOCHECK=No check
 EINVOICING_BR_CHECK_WARNING_ONLY=Warning only
 EINVOICING_BR_CHECK_BLOCKING=Blocking (abort generation on violation)
