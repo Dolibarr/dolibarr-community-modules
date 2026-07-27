@@ -1198,8 +1198,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				$exchangeProtocol = $tmpProtocolManager->getProtocol($detectedProtocol);
 
 				$exceptionmessage = '';
-				$db->begin();
 
+				// No transaction opened here: createSupplierInvoiceFromSource() owns it. It synchronizes
+				// the vendor first, out of transaction, then imports the invoice atomically - so a business
+				// error on the invoice (product not found, ...) no longer rolls back the created thirdparty.
 				try {
 					// Try to create the supplier + product + invoice
 					$res = $exchangeProtocol->createSupplierInvoiceFromSource($receivedFile, $ReadableViewFile, $flowId);
@@ -1213,7 +1215,6 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 						$retarray['action'] = $res['action'] ?? null;
 						$retarray['actiondata'] = $res['actiondata'] ?? null;
 
-						$db->rollback();
 						return $retarray;
 					} else {
 						// Complete the document object with the created supplier invoice details
@@ -1229,13 +1230,9 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 						//return array('res' => 0, 'message' => "supplier invoice already exists for flowId: " . $flowId . ". " . $res['message']);
 						$returnRes = 1;		// If invoice did already exists, we process one more line from list of flows, so we must return 1, even if nothing was done.
 						$returnMessage = "Supplier invoice " . $supplierInvoiceObj->ref . " created or already existing for flowId: " . $flowId . ". " . $res['message'];
-
-						$db->commit();
 					}
 				} catch (Exception $e) {
 					$exceptionmessage = $e->getMessage();
-
-					$db->rollback();
 				}
 
 				if ($exceptionmessage) {

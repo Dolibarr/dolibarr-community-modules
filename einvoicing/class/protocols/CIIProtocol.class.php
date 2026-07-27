@@ -650,7 +650,11 @@ class CIIProtocol extends AbstractProtocol
 	 */
 	public function createSupplierInvoiceFromSource($file, $ReadableViewFile = null, $flowId = '')
 	{
-		global $conf;
+		global $conf, $db;
+
+		// Transaction level before the import, to close only the transaction opened by
+		// doCreateSupplierInvoiceFromSource() and never one owned by a caller.
+		$transactionLevel = $db->transaction_opened;
 
 		$tempDir = $conf->einvoicing->dir_temp;
 		if (!dol_is_dir($tempDir)) {
@@ -670,6 +674,17 @@ class CIIProtocol extends AbstractProtocol
 		} finally {
 			$failed = !is_array($result) || !isset($result['res']) || $result['res'] < 0;
 			$this->cleanupIncomingTempFiles($tempDir, $tempFile, $tempFileReadableView, 'einvoice.' . static::INVOICE_FILE_EXTENSION, 'einvoice_readable.pdf', $failed);
+
+			// The invoice import transaction is opened by doCreateSupplierInvoiceFromSource() once the
+			// vendor has been synchronized. Close it here so every early return - and any exception -
+			// leaves a clean transaction state.
+			if ($db->transaction_opened > $transactionLevel) {
+				if ($failed) {
+					$db->rollback();
+				} else {
+					$db->commit();
+				}
+			}
 		}
 
 		return $result;
@@ -731,6 +746,8 @@ class CIIProtocol extends AbstractProtocol
 	/**
 	 * Build the supplier invoice from a received CII document written to a per-call working file.
 	 * The temp-file lifecycle is owned by createSupplierInvoiceFromSource() (the public wrapper).
+	 * The vendor synchronization runs in its own transaction, opened and closed here. The invoice
+	 * import transaction is opened here too, right after, but closed by that same wrapper.
 	 *
 	 * @param  string			$file                 Raw CII XML content
 	 * @param  string|null		$ReadableViewFile     Optional readable view (PDP-generated readable PDF)
@@ -771,11 +788,21 @@ class CIIProtocol extends AbstractProtocol
 		// Sync or create supplier based on seller info.
 		// Done before the duplicate/ref-docs checks below so those checks can be scoped to this supplier
 		// (ref_supplier is only unique per supplier, not globally - see issue about cross-supplier collisions).
+		//
+		// The vendor is reference data, not part of the invoice: it gets its own transaction, committed
+		// before the import starts. A business error raised further down - a product that cannot be
+		// auto-created, a referenced document missing - must not roll back the thirdparty the operator is
+		// precisely being asked to complete: the "create the product" and "map the product" links returned
+		// with that error carry its socid, so a rolled back vendor makes them point to a thirdparty that
+		// never existed.
+		$db->begin();
+
 		$syncSocRes = $this->_syncOrCreateThirdpartyFromEInvoiceSeller($parsedHeader, 'dolibarr', $flowId);
 
 		$socId = $syncSocRes['res'];
 		$return_messages[] = $syncSocRes['message'];
 		if ($socId < 0) {
+			$db->rollback();
 			return [
 				'res' => -1,
 				'message' => 'Thirdparty sync or creation error: ' . implode("<br>\n", $return_messages),
@@ -785,6 +812,13 @@ class CIIProtocol extends AbstractProtocol
 				'actiondata' => $syncSocRes['actiondata'] ?? null
 			];
 		}
+
+		$db->commit();
+
+		// From this point on, everything belongs to the invoice import (products, invoice, lines) and
+		// stays atomic. This second transaction is closed (commit or rollback) by
+		// createSupplierInvoiceFromSource(), the public wrapper.
+		$db->begin();
 
 		// Load supplier (thirdparty)
 		require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.class.php';

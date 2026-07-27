@@ -1125,6 +1125,8 @@ class FacturXProtocol extends CIIProtocol
 	/**
 	 * Build the supplier invoice from a received Factur-X document written to a per-call working file.
 	 * The temp-file lifecycle is owned by createSupplierInvoiceFromSource() (the public wrapper).
+	 * The vendor synchronization runs in its own transaction, opened and closed here. The invoice
+	 * import transaction is opened here too, right after, but closed by that same wrapper.
 	 *
 	 * @param  string			$file                 Raw Factur-X PDF content
 	 * @param  string|null		$ReadableViewFile     Optional readable view (PDP-generated readable PDF)
@@ -1348,11 +1350,21 @@ class FacturXProtocol extends CIIProtocol
 		// Sync or create supplier based on seller info.
 		// Done before the duplicate/ref-docs checks below so those checks can be scoped to this supplier
 		// (ref_supplier is only unique per supplier, not globally - see issue about cross-supplier collisions).
+		//
+		// The vendor is reference data, not part of the invoice: it gets its own transaction, committed
+		// before the import starts. A business error raised further down - a product that cannot be
+		// auto-created, a referenced document missing - must not roll back the thirdparty the operator is
+		// precisely being asked to complete: the "create the product" and "map the product" links returned
+		// with that error carry its socid, so a rolled back vendor makes them point to a thirdparty that
+		// never existed.
+		$db->begin();
+
 		$syncSocRes = $this->_syncOrCreateThirdpartyFromEInvoiceSeller($parsedHeader, 'dolibarr', $flowId);
 
 		$socId = $syncSocRes['res'];
 		$return_messages[] = $syncSocRes['message'];
 		if ($socId < 0) {
+			$db->rollback();
 			return [
 				'res' => -1,
 				'message' => 'Thirdparty sync or creation error: ' . implode("<br>\n", $return_messages),
@@ -1362,6 +1374,13 @@ class FacturXProtocol extends CIIProtocol
 				'actiondata' => $syncSocRes['actiondata'] ?? null
 			];
 		}
+
+		$db->commit();
+
+		// From this point on, everything belongs to the invoice import (products, invoice, lines) and
+		// stays atomic. This second transaction is closed (commit or rollback) by
+		// createSupplierInvoiceFromSource(), the public wrapper.
+		$db->begin();
 
 		// Load supplier (thirdparty)
 		require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.class.php';
