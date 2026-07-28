@@ -1827,14 +1827,7 @@ class EInvoicing
 			$resprints .= '<tr class="treinvoicing_collapseseparator trrouting_product_id '.($expand_display ? '' : 'hidden').'">';
 			$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
 			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
-			if (version_compare(DOL_VERSION, '22.0.0', '<')) {
-				// Before v22, select_produits_fournisseurs() uses print instead of return
-				ob_start();
-				$form->select_produits_fournisseurs($object->id, $product_id, 'routing_product_id', '', '', array(), 0, 1);
-				$resprints .= ob_get_clean();
-			} else {
-				$resprints .= $form->select_produits_fournisseurs($object->id, $product_id, 'routing_product_id', '', '', array(), 0, 1, '', '', 1);
-			}
+			$resprints .= $this->selectVendorProduct($form, $object->id, $product_id, 'routing_product_id');
 			$resprints .= '</td>';
 			$resprints .= '</tr>';
 
@@ -1938,14 +1931,7 @@ class EInvoicing
 			$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
 			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
 			if ($mode == 'edit') {
-				if (version_compare(DOL_VERSION, '22.0.0', '<')) {
-					// Before v22, select_produits_fournisseurs() uses print instead of return
-					ob_start();
-					$form->select_produits_fournisseurs($object->id, $product_id, 'routing_product_id', '', '', array(), 0, 1);
-					$resprints .= ob_get_clean();
-				} else {
-					$resprints .= $form->select_produits_fournisseurs($object->id, $product_id, 'routing_product_id', '', '', array(), 0, 1, '', '', 1);
-				}
+				$resprints .= $this->selectVendorProduct($form, $object->id, $product_id, 'routing_product_id');
 			} else {
 				if ($product_id != '' && $product_id != '-1') {
 					if (preg_match('/^idprod/', $product_id)) {
@@ -1963,6 +1949,42 @@ class EInvoicing
 		}
 
 		return $resprints;
+	}
+
+	/**
+	 * Combo of the products of a vendor, to pick the default product of an import.
+	 *
+	 * A product bought from a vendor has to be flagged "to buy"; whether it is on sale is none of our
+	 * business, and a product created by a previous import never is. select_produits_fournisseurs()
+	 * filters on that purchase status, but reads it from the global $status, which the calling page is
+	 * free to have set to anything: force it here, and give it back, so the combo cannot silently come
+	 * back empty.
+	 *
+	 * @param	Form	$form		Form handler
+	 * @param	int		$socid		Vendor id
+	 * @param	string	$selected	Product currently selected
+	 * @param	string	$htmlname	Name of the html field
+	 * @return	string				HTML content of the combo
+	 */
+	private function selectVendorProduct($form, $socid, $selected, $htmlname)
+	{
+		global $status;
+
+		$savstatus = isset($status) ? $status : null;
+		$status = 1; // Products to buy
+
+		if (version_compare(DOL_VERSION, '22.0.0', '<')) {
+			// Before v22, select_produits_fournisseurs() uses print instead of return
+			ob_start();
+			$form->select_produits_fournisseurs($socid, $selected, $htmlname, '', '', array(), 0, 1);
+			$out = ob_get_clean();
+		} else {
+			$out = $form->select_produits_fournisseurs($socid, $selected, $htmlname, '', '', array(), 0, 1, '', '', 1);
+		}
+
+		$status = $savstatus;
+
+		return (string) $out;
 	}
 
 	/**
