@@ -670,7 +670,10 @@ $invoiceData = [
 	'invoicingPeriodStart' => null,
 	'invoicingPeriodEnd'   => null,
 
-	'businessProcessId'    => $this->getBillingProcessID($object),		// B1, B2, B3, B4 / S1, S2, S3, S4 / M1, M2, M3, M4
+	// $prepaidAmount is what the document reports in BT-113, and BR-FR-CO-09 ties the "already paid"
+	// frames to it, so the frame has to be decided from the same figure.
+	// Values allowed by BR-FR-08: B1, S1, M1, B2, S2, M2, S3, B4, S4, M4, S5, S6, B7, S7, B8, S8, M8, B9, S9, M9
+	'businessProcessId'    => $this->getBillingProcessID($object, $prepaidAmount),
 	'isTestDocument'       => !empty($object->specimen),
 
 	// Notes
