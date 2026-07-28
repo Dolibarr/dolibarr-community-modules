@@ -2182,10 +2182,11 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 * @param mixed $object Invoice object (CustomerInvoice or SupplierInvoice)
 	 * @param int $statusCode   Status code to send (see class constants for available codes)
 	 * @param string $reasonCode Reason code to send (optional)
+	 * @param array{amount?:float,breakdown?:array<array{vatrate:float,amount:float}>} $paymentData Cashed amount (TTC) for status 212 (Encaissee), mandatory content of the CDAR (rule BR-FR-CDV-14)
 	 *
 	 * @return array{res:int, message:string}       Returns array with 'res' (1 on success, -1 on failure) with a 'message'.
 	 */
-	public function sendStatusMessage($object, $statusCode, $reasonCode = '')
+	public function sendStatusMessage($object, $statusCode, $reasonCode = '', $paymentData = array())
 	{
 		global $langs, $db;
 
@@ -2217,7 +2218,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 		dol_include_once('/einvoicing/class/utils/CdarHandler.class.php');
 		$cdarHandler = new CdarHandler($db);
-		$result = $cdarHandler->generateCdarFile($object, $statusCode, $reasonCode);
+		$result = $cdarHandler->generateCdarFile($object, $statusCode, $reasonCode, $paymentData);
 		if ($result['res'] < 0) {
 			$res = -1;
 			$message = 'Failed to generate CDAR file: ' . $result['message'];
