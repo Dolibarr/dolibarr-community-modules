@@ -321,7 +321,9 @@ foreach ($object->lines as $line) {
 	// For credit notes EN16931 requires positive amounts
 	if ($object->type == $object::TYPE_CREDIT_NOTE) {
 		$line->subprice     = abs($line->subprice);
-		$line->subprice_ttc = abs($line->subprice_ttc);
+		if (isset($line->subprice_ttc)) {	// See the note on BT-148 below: usually not set at all
+			$line->subprice_ttc = abs($line->subprice_ttc);
+		}
 		$line->total_ht     = abs($line->total_ht);
 		$line->total_ttc    = abs($line->total_ttc);
 		$line->total_tva    = abs($line->total_tva);
@@ -470,7 +472,12 @@ foreach ($object->lines as $line) {
 	$line_unit_price = $line->subprice;
 	//$line_unit_price = price2num($line_unit_price, 4);			// Note, 4 digits seems common accuracy for unit price with einvoice, but default dolibarr setup is 'MU' so 5.
 
-	$line_unit_price_ttc = $line->subprice_ttc;
+	// BT-148 gross unit price. subprice_ttc is not a declared property of FactureLigne in any
+	// Dolibarr version: compta/facture/card.php sets it dynamically on the line being edited, and
+	// nothing else does, so on a line read back from the database or built in memory it is simply
+	// absent. Reading it unguarded raised "Undefined property", which PHPUnit turns into an error.
+	// Absent means the gross unit price is unknown, which the test at the bottom already handles.
+	$line_unit_price_ttc = $line->subprice_ttc ?? 0;
 	//$line_unit_price_ttc = price2num($line_unit_price_ttc, 4);	// Note, 4 digits seems common accuracy for unit price with einvoice, but default dolibarr setup is 'MU' so 5.
 
 	$line_unit_price_with_discount = $line_unit_price;
