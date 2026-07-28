@@ -19,15 +19,15 @@
       <ram:Content>This is a comment (public)</ram:Content>
     </ram:IncludedNote>
     <ram:IncludedNote>
-      <ram:Content>Aucuns frais de recouvrement de factures</ram:Content>
+      <ram:Content>No invoice collection fee</ram:Content>
       <ram:SubjectCode>PMT</ram:SubjectCode>
     </ram:IncludedNote>
     <ram:IncludedNote>
-      <ram:Content>Aucuns frais de retard de paiement</ram:Content>
+      <ram:Content>No late payment fees</ram:Content>
       <ram:SubjectCode>PMD</ram:SubjectCode>
     </ram:IncludedNote>
     <ram:IncludedNote>
-      <ram:Content>Aucune ristourne pour paiement anticipé</ram:Content>
+      <ram:Content>No early payment discounts</ram:Content>
       <ram:SubjectCode>AAB</ram:SubjectCode>
     </ram:IncludedNote>
   </rsm:ExchangedDocument>
@@ -64,11 +64,6 @@
           <ram:BasisAmount>500.25</ram:BasisAmount>
           <ram:ActualAmount>50.03</ram:ActualAmount>
           <ram:ReasonCode>95</ram:ReasonCode>
-          <ram:CategoryTradeTax>
-            <ram:TypeCode>VAT</ram:TypeCode>
-            <ram:CategoryCode>S</ram:CategoryCode>
-            <ram:RateApplicablePercent>20.00</ram:RateApplicablePercent>
-          </ram:CategoryTradeTax>
         </ram:SpecifiedTradeAllowanceCharge>
         <ram:SpecifiedTradeSettlementLineMonetarySummation>
           <ram:LineTotalAmount>450.25</ram:LineTotalAmount>
@@ -90,9 +85,6 @@
           <ram:TelephoneUniversalCommunication>
             <ram:CompleteNumber>0909090901</ram:CompleteNumber>
           </ram:TelephoneUniversalCommunication>
-          <ram:FaxUniversalCommunication>
-            <ram:CompleteNumber>0909090909</ram:CompleteNumber>
-          </ram:FaxUniversalCommunication>
           <ram:EmailURIUniversalCommunication>
             <ram:URIID>specimen@specimen.com</ram:URIID>
           </ram:EmailURIUniversalCommunication>
@@ -163,7 +155,7 @@
       </ram:ApplicableTradeTax>
       <!--Payment terms-->
       <ram:SpecifiedTradePaymentTerms>
-        <ram:Description>Conditions de règlement: A réception</ram:Description>
+        <ram:Description>Payment Terms: Due Upon Receipt</ram:Description>
         <ram:DueDateDateTime>
           <udt:DateTimeString format="102">20000101</udt:DateTimeString>
         </ram:DueDateDateTime>
@@ -181,6 +173,9 @@
       </ram:SpecifiedTradeSettlementHeaderMonetarySummation>
       <ram:InvoiceReferencedDocument>
         <ram:IssuerAssignedID>FA0000-SPECIMEN-STANDARD</ram:IssuerAssignedID>
+        <ram:FormattedIssueDateTime>
+          <qdt:DateTimeString format="102">20000101</qdt:DateTimeString>
+        </ram:FormattedIssueDateTime>
       </ram:InvoiceReferencedDocument>
     </ram:ApplicableHeaderTradeSettlement>
   </rsm:SupplyChainTradeTransaction>

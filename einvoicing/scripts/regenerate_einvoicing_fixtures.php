@@ -1,3 +1,4 @@
+#!/usr/bin/env php
 <?php
 /* Copyright (C) 2025       Laurent Destailleur         <eldy@users.sourceforge.net>
  * Copyright (C) 2025       Mohamed DAOUD               <mdaoud@dolicloud.com>

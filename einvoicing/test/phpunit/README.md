@@ -8,3 +8,7 @@ export DOLIBARR_HTDOCS=/pathto/htdocs
 
 - Run phpunit
 phpunit htdocs/custom/einvoicing/test/phpunit/[NameOfFileTest].php
+
+
+- To regenerate reference invoices
+scripts/regenerate_einvoicing_fixtures.php
