@@ -246,6 +246,12 @@ print '</div>';
 print '<input type="submit" class="button small" value="'.$langs->trans("Refresh").'">';
 print '</form>';
 
+// The mappings saved here are only visible product by product afterwards, so point to the list of them.
+$vendorrefsurl = dol_buildpath('/einvoicing/vendorref_list.php', 1).($socid > 0 ? '?search_socid='.((int) $socid) : '');
+print '<div class="paddingtop">';
+print '<a class="button small" href="'.$vendorrefsurl.'">'.$langs->trans("SeeMappedVendorRefs").'</a>';
+print '</div>';
+
 print '<br>';
 
 if ($loaderror) {

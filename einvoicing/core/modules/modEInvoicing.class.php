@@ -408,6 +408,23 @@ class modEInvoicing extends DolibarrModules
 			'object' => '',
 		);
 		/* END MODULEBUILDER LEFTMENU PDPPRODUCTMAPPING */
+		/* BEGIN MODULEBUILDER LEFTMENU PDPMAPPEDVENDORREFS */
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=billing,fk_leftmenu=einvoicing_documents',
+			'type' => 'left',
+			'titre' => 'MappedVendorRefs',
+			'mainmenu' => 'billing',
+			'leftmenu' => 'einvoicing_vendorrefs',
+			'url' => '/einvoicing/vendorref_list.php',
+			'langs' => 'einvoicing@einvoicing',
+			'position' => 1003,
+			'enabled' => 'isModEnabled("einvoicing")',
+			'perms' => '$user->hasRight("einvoicing", "read")',
+			'target' => '',
+			'user' => 2,
+			'object' => '',
+		);
+		/* END MODULEBUILDER LEFTMENU PDPMAPPEDVENDORREFS */
 		/* BEGIN MODULEBUILDER LEFTMENU PDPSOCIETIES */
 		// $this->menu[$r++] = array(
 		// 	'fk_menu' => 'fk_mainmenu=billing,fk_leftmenu=einvoicing_billing',
