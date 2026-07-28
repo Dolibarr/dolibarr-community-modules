@@ -3046,4 +3046,149 @@ class EInvoicing
 		// TODO: move this function to class utils
 		return preg_replace('/\\s+/', '', $str);
 	}
+
+	/**
+	 * Generates the deposit, standard and credit note CII sample-invoice chain and returns the normalized XML of each.
+	 *
+	 * Generates three sample invoices (deposit, standard, and credit note) using fixed specimen
+	 * third parties to ensure consistent, deterministic output across test runs. The XML output
+	 * is normalized to exclude non-deterministic parts like timestamps and dates.
+	 *
+	 * @used-by	regenerate_einvoicing_fixtures.php For fixture generation
+	 * @used-by	EInvoicingSamplesTest.php For comparison and regression testing
+	 *
+	 * @return	array<string, string>	Array with keys 'deposit', 'standard', and 'creditnote',
+	 *                                  each containing normalized XML of the respective invoice type
+	 */
+	public static function generateSampleEInvoicesForTests()
+	{
+		global $conf, $db;
+		require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
+		require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
+
+		// Two fixed specimen third parties, so the XML never depends on this instance's real $mysoc.
+		$seller = new Societe($db);
+		$seller->initAsSpecimen();
+		$seller->name = 'EINVOICING TEST SELLER';
+		$seller->address = '1 rue du Test';
+		$seller->zip = '75000';
+		$seller->town = 'Paris';
+		$seller->country_code = 'FR';
+		$seller->idprof1 = '000000001';
+		$seller->idprof2 = '00000000100010';
+		$seller->tva_intra = 'FR12000000001';
+
+		$buyer = new Societe($db);
+		$buyer->initAsSpecimen();
+		$buyer->name = 'EINVOICING TEST BUYER';
+		$buyer->address = '2 rue du Test';
+		$buyer->zip = '75000';
+		$buyer->town = 'Paris';
+		$buyer->country_code = 'FR';
+		$buyer->idprof1 = '000000002';
+		$buyer->idprof2 = '00000000200010';
+		$buyer->tva_intra = 'FR12000000002';
+
+		// Force fixed provider and routing ID to ensure consistent specimen XML across instances.
+		// Restore original EINVOICING_PDP and EINVOICING_SPECIMEN_ROUTING_ID after generation.
+		$savEinvoicingPdp = getDolGlobalString('EINVOICING_PDP');
+		$savEinvoicingRoutingId = getDolGlobalString('EINVOICING_SPECIMEN_ROUTING_ID');
+		$conf->global->EINVOICING_PDP = 'SPECIMEN';
+		$conf->global->EINVOICING_SPECIMEN_ROUTING_ID = $seller->idprof2;
+
+		try {
+			$depositXml = self::generateSampleInvoiceXml($seller, $buyer, array(
+				'invoiceformat' => 'CII',
+				'invoicetype' => Facture::TYPE_DEPOSIT,
+				'referencedinvoice' => '',
+			));
+
+			$standardXml = self::generateSampleInvoiceXml($seller, $buyer, array(
+				'invoiceformat' => 'CII',
+				'invoicetype' => Facture::TYPE_STANDARD,
+				'referencedinvoice' => 'FA0000-SPECIMEN-DEPOSIT',
+			));
+
+			$creditnoteXml = self::generateSampleInvoiceXml($seller, $buyer, array(
+				'invoiceformat' => 'CII',
+				'invoicetype' => Facture::TYPE_CREDIT_NOTE,
+				'referencedinvoice' => 'FA0000-SPECIMEN-STANDARD',
+			));
+		} finally {
+			$conf->global->EINVOICING_PDP = $savEinvoicingPdp;
+			$conf->global->EINVOICING_SPECIMEN_ROUTING_ID = $savEinvoicingRoutingId;
+		}
+
+		return array(
+			'deposit' => self::normalizeSampleInvoiceXml($depositXml),
+			'standard' => self::normalizeSampleInvoiceXml($standardXml),
+			'creditnote' => self::normalizeSampleInvoiceXml($creditnoteXml),
+		);
+	}
+
+	/**
+	 * Calls the right generation method (mirroring admin/setup_devtools.php) and returns the raw XML.
+	 *
+	 * @param	Societe				$seller			Specimen seller
+	 * @param	Societe				$buyer			Specimen buyer
+	 * @param	array<string,mixed>	$options		Options forwarded as-is to the generation method
+	 *
+	 * @return	string				Raw (non-normalized) generated XML content
+	 */
+	private static function generateSampleInvoiceXml($seller, $buyer, $options)
+	{
+		global $db;
+
+		dol_include_once('einvoicing/class/protocols/ProtocolManager.class.php');
+
+		$protocolManager = new ProtocolManager($db);
+		$protocol = $protocolManager->getProtocol('CII'); // The CII protocol is the only one currently supported (FacturX use CII as well)
+
+		$useOld = ((float) DOL_VERSION < 24.0);
+		$einvoicing = new EInvoicing($db);
+		$resarray = $useOld
+			? $protocol->generateSampleInvoiceOld($einvoicing, $seller, $buyer, $options)
+			: $protocol->generateSampleInvoice($einvoicing, $seller, $buyer, $options);
+
+		if (!is_array($resarray) || empty($resarray['path']) || !file_exists($resarray['path'])) {
+			$err = is_object($protocol) ? ($protocol->error . ' ' . implode(', ', (array) $protocol->errors)) : '';
+			throw new \RuntimeException('EInvoicing::generateSampleInvoiceXml: sample invoice generation failed for options ' . json_encode($options) . ' - ' . $err);
+		}
+
+		return (string) file_get_contents($resarray['path']);
+	}
+
+	/**
+	 * Normalize the generated sample invoice XML by removing non-deterministic parts like timestamps and dates, and pretty-printing the XML.
+	 *
+	 * @param	string	$xml	Raw XML content
+	 * @return	string	Normalized, pretty-printed XML
+	 */
+	private static function normalizeSampleInvoiceXml($xml)
+	{
+		// Remove Dolibarr version and timestamp from the root comment
+		$xml = preg_replace('/-\d{6}-\d{6}/', '-NORMALIZEDTS', $xml);
+
+		$doc = new \DOMDocument();
+		$doc->preserveWhiteSpace = false;
+		$doc->formatOutput = true;
+		if (!$doc->loadXML($xml)) {
+			throw new \RuntimeException('EInvoicing::normalizeSampleInvoiceXml: failed to parse generated XML');
+		}
+
+		$xpath = new \DOMXPath($doc);
+		// Normalize all DateTimeString elements to a fixed value
+		foreach ($xpath->query('//*[local-name()="DateTimeString"]') as $node) {
+			$node->nodeValue = '20000101';
+		}
+
+		// The root comment carries the Dolibarr version and generation timestamp, both irrelevant here.
+		foreach ($xpath->query('//comment()') as $commentNode) {
+			if (strpos($commentNode->data, 'Einvoice XML generated by Dolibarr') === 0) {
+				$commentNode->data = 'Einvoice XML generated by Dolibarr NORMALIZED';
+			}
+		}
+
+		return (string) $doc->saveXML();
+	}
 }
