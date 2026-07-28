@@ -106,6 +106,10 @@ débits" legal mention, which used to depend on the module option EINVOICING_VAT
 option is gone: an instance that had set it must make sure the VAT mode of the Tax/VAT module says
 the same thing.
 
+FIX: The product picker of the screen mapping the products of an e-invoice no longer filters on the
+sale status. A product bought from a vendor only needs to be flagged "to buy", and a product created by
+a previous import never is on sale, so that screen offered an empty list of products.
+
 FIX: The flowProfile declared to the platform is now read from the guideline URN of the document
 being transmitted instead of being hardcoded, so the declaration and the file can no longer
 contradict each other. A profile with no AFNOR flowProfile omits the field (issue #395).

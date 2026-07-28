@@ -1,5 +1,5 @@
 <?php
-/* Copyright (C) 2026		Pierre Grumbach				<da.grumpf@gmail.com>
+/* Copyright (C) 2026		Pierre Grasswill				<da.grumpf@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -327,7 +327,9 @@ if (!empty($parsedLines)) {
 			// Without a vendor reference, the mapping has nothing to be stored on
 			print $form->textwithpicto('<span class="opacitymedium">'.$langs->trans("NotMappable").'</span>', $langs->trans("NotMappableBecauseNoVendorRef"), 1, 'warning');
 		} elseif ($permissiontoadd) {
-			print $form->select_produits(0, 'idprod_'.$idx, '', 0, 0, 1, 2, '', 0, array(), 0, '1', 0, 'maxwidth300');
+			// Filter on the purchase status (tobuy): the product of a supplier invoice line is bought, and a
+			// product created by a previous import is not on sale, so filtering on tosell hides them all.
+			print $form->select_produits(0, 'idprod_'.$idx, '', 0, 0, -1, 2, '', 0, array(), 0, '1', 0, 'maxwidth300', 0, '', null, 0, 1);
 		} else {
 			print '<span class="opacitymedium">'.$langs->trans("NotEnoughPermissions").'</span>';
 		}
