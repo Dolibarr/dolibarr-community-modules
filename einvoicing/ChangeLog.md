@@ -2,6 +2,13 @@
 
 ## 1.0.3
 
+FIX: The reference a credit note makes to the invoice it corrects now carries that invoice issue date
+(BT-26) whatever the profile, and no longer only in EXTENDED. The date is allowed by EN 16931
+(CII-DT-027) and required by the French rule BR-FR-CO-05, which rejects a credit note whose reference
+has none - so every credit note generated with the default profile was refused by the platform. The
+document type code, which EN 16931 forbids there (CII-DT-018), stays reserved to the EXTENDED and
+EXTENDED-CTC-FR profiles (issue #485).
+
 FIX: The flowProfile declared to the platform is now read from the guideline URN of the document
 being transmitted instead of being hardcoded, so the declaration and the file can no longer
 contradict each other. A profile with no AFNOR flowProfile omits the field (issue #395).
