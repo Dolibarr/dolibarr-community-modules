@@ -10,6 +10,14 @@ EN 16931 offers no way to declare a VAT that is not claimed - the total with VAT
 the VAT total (BR-CO-15) - so the line is now issued exempt (category E, rate 0, no VAT amount) with the
 reason code the standard reserves for that article, VATEX-FR-CGI295 (issue #508).
 
+FIX: The amounts of a line are now asked to the core function that computed the invoice
+(calcul_price_total()) instead of being computed a second time in the module. The second
+implementation rounded the unit price after discount in every case, where the core only rounds it when
+the instance asks for it, so a discounted line could state a few cents less than the invoice it stands
+for - and an instance running a Dolibarr that does not know that option diverged by more, the module
+honouring a setting its core ignores. Nothing reported it: the document stayed internally consistent
+and the platform accepted it (issue #505).
+
 
 ## 1.0.3
 
