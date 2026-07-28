@@ -288,7 +288,13 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		if ($action == 'BILL_SUPPLIER_VALIDATE') {
 			/** @var FactureFournisseur $object */
 			'@phan-var-force FactureFournisseur $object';
-			if (getDolGlobalInt('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION') && SupplierInvoiceHelper::isEInvoice($object->id)) {
+			$duplicate = false;
+			if (getDolGlobalInt('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION') && SupplierInvoiceHelper::isEInvoice($object->id, false, $duplicate)) {
+				if ($duplicate) {
+					// Comparing against one of two conflicting e-invoicing documents would be meaningless
+					$this->errors[] = $langs->trans('EinvoicingDuplicateDocumentForSupplierInvoice', $object->id);
+					return -1;
+				}
 				// Ensure e-invoice and dol-invoice contains consistent data
 				$resComparison = SupplierInvoiceHelper::checkDolInvoiceAndEInvoiceConsistency($object);
 				if (!$resComparison['identical']) {
@@ -304,8 +310,11 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		if ($action == 'BILL_SUPPLIER_DELETE') {
 			/** @var FactureFournisseur $object */
 			'@phan-var-force FactureFournisseur $object';
-			if (SupplierInvoiceHelper::isEInvoice($object->id, true)) {
-				$this->errors[] = $langs->trans('EinvoicingCantDeleteASupplierInvoice');
+			$duplicate = false;
+			if (SupplierInvoiceHelper::isEInvoice($object->id, true, $duplicate)) {
+				$this->errors[] = $duplicate
+					? $langs->trans('EinvoicingDuplicateDocumentForSupplierInvoice', $object->id)
+					: $langs->trans('EinvoicingCantDeleteASupplierInvoice');
 				return -1;
 			}
 		}
@@ -316,8 +325,11 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			 * @var Document $object
 			 */
 			'@phan-var-force Document $object';
-			if ($object->fk_element_type == 'invoice_supplier' && SupplierInvoiceHelper::isEInvoice($object->fk_element_id, true)) {
-				$this->errors[] = $langs->trans('EinvoicingCantDeleteADocumentLinkedToAnExistingSupplierInvoice', $object->id, $object->fk_element_id);
+			$duplicate = false;
+			if ($object->fk_element_type == 'invoice_supplier' && SupplierInvoiceHelper::isEInvoice($object->fk_element_id, true, $duplicate)) {
+				$this->errors[] = $duplicate
+					? $langs->trans('EinvoicingDuplicateDocumentForSupplierInvoice', $object->fk_element_id)
+					: $langs->trans('EinvoicingCantDeleteADocumentLinkedToAnExistingSupplierInvoice', $object->id, $object->fk_element_id);
 				return -1;
 			}
 		}
