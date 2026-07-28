@@ -619,6 +619,29 @@ foreach ($object->lines as $line) {
 	$numligne++;
 }
 
+// Rounding convention of the totals.
+// Dolibarr sums the amounts already rounded on each line ("total of round", the default), unless
+// MAIN_ROUNDOFTOTAL_NOT_TOTALOFROUND is set, in which case it rounds the sum instead ("round of
+// total"). update_price() then writes the difference back onto the last line of the VAT rate, so on
+// such an instance the invoice recorded, printed, booked and paid carries the second convention.
+// The loop above always applied the first one, so the document transmitted claimed a cent less (or
+// more) than the invoice it stands for, and nothing reported it: the document stays internally
+// consistent, and the tolerance BR-CO-17 allows absorbs the gap (issue #378).
+// Only the VAT is concerned: on a document priced without tax update_price() never adjusts the net
+// amount of a line, so the line net amounts (BT-131) and their sum (BT-106) are the same either way.
+$roundTotalConstName = 'MAIN_ROUNDOFTOTAL_NOT_TOTALOFROUND';
+if (in_array($object->element, array('facture_fourn', 'invoice_supplier'))) {
+	$roundTotalConstName .= '_SUPPLIER';
+}
+if (getDolGlobalString($roundTotalConstName) == '1') {		// Same comparison as update_price(), which only treats '1' as "round of total"
+	$grand_total_tva = 0;
+	foreach ($taxBreakdown as $keyforvatrate => $vals) {
+		$taxBreakdown[$keyforvatrate]['totalTVA'] = (float) price2num((float) $vals['totalHT'] * (float) $vals['tva_tx'] / 100, 2);
+		$grand_total_tva += $taxBreakdown[$keyforvatrate]['totalTVA'];
+	}
+	$grand_total_ttc = (float) price2num($grand_total_ht + $grand_total_tva, 2);
+}
+
 // already used credit note amount
 $usedcreditnoteamount = 0;
 $usedcreditnote = array();

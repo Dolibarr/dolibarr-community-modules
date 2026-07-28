@@ -2,6 +2,14 @@
 
 ## 1.0.3
 
+FIX: The totals of the generated document now follow the rounding convention of the instance. Dolibarr
+sums the amounts already rounded on each line, unless MAIN_ROUNDOFTOTAL_NOT_TOTALOFROUND (or its
+_SUPPLIER variant) asks it to round the sum instead, and the invoice recorded, printed, booked and paid
+then carries that second convention. The module always applied the first one, so on such an instance the
+document transmitted claimed a cent less (or more) than the invoice it stands for. Nothing reported it:
+the document stayed internally consistent and the tolerance BR-CO-17 allows absorbs the gap, so the
+platform accepted it (issue #378).
+
 FIX: The reference a credit note makes to the invoice it corrects now carries that invoice issue date
 (BT-26) whatever the profile, and no longer only in EXTENDED. The date is allowed by EN 16931
 (CII-DT-027) and required by the French rule BR-FR-CO-05, which rejects a credit note whose reference
