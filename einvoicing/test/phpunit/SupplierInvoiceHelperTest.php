@@ -155,6 +155,83 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 	}
 
 	/**
+	 * Insert an e-invoicing document row pointing at a supplier invoice. The whole class runs inside
+	 * the transaction opened by CommonClassTest::setUpBeforeClass(), so nothing survives the run.
+	 *
+	 * @param	int		$supplierInvoiceId	Id of the supplier invoice the document describes
+	 * @return	void
+	 */
+	private function addEInvoicingDocument($supplierInvoiceId)
+	{
+		global $db;
+
+		$now = $db->idate(dol_now());
+
+		$sql = "INSERT INTO " . MAIN_DB_PREFIX . "einvoicing_document";
+		$sql .= " (fk_element_type, fk_element_id, flow_type, date_creation, fk_user_creat, status, submittedat, provider)";
+		$sql .= " VALUES ('invoice_supplier', " . ((int) $supplierInvoiceId) . ", 'SupplierInvoice', '" . $now . "', 1, 0, '" . $now . "', 'PHPUNIT')";
+
+		$this->assertNotFalse($db->query($sql), (string) $db->lasterror());
+	}
+
+	/**
+	 * A supplier invoice with no e-invoicing document is not an e-invoice, and nothing is reported.
+	 *
+	 * @return void
+	 */
+	public function testNoEInvoicingDocumentIsNotAnEInvoice()
+	{
+		$invoice = $this->createSpecimenSupplierInvoice();
+
+		$duplicate = false;
+		$this->assertFalse(SupplierInvoiceHelper::isEInvoice($invoice->id, false, $duplicate));
+		$this->assertFalse($duplicate);
+	}
+
+	/**
+	 * One e-invoicing document: the answer is yes, with or without the existence check, and no
+	 * duplicate is reported. The variant without the existence check is the one that used to fall
+	 * through to false in the change this replaces.
+	 *
+	 * @return void
+	 */
+	public function testSingleEInvoicingDocumentIsAnEInvoice()
+	{
+		$invoice = $this->createSpecimenSupplierInvoice();
+		$this->addEInvoicingDocument($invoice->id);
+
+		$duplicate = false;
+		$this->assertTrue(SupplierInvoiceHelper::isEInvoice($invoice->id, false, $duplicate));
+		$this->assertFalse($duplicate);
+
+		$duplicate = false;
+		$this->assertTrue(SupplierInvoiceHelper::isEInvoice($invoice->id, true, $duplicate));
+		$this->assertFalse($duplicate);
+	}
+
+	/**
+	 * Two e-invoicing documents for the same supplier invoice: still an e-invoice - the question the
+	 * predicate is asked has not changed - and the duplicate is reported so the caller can refuse the
+	 * operation with an actionable message instead of the predicate throwing from inside a trigger.
+	 *
+	 * @return void
+	 */
+	public function testDuplicateEInvoicingDocumentsAreReported()
+	{
+		$invoice = $this->createSpecimenSupplierInvoice();
+		$this->addEInvoicingDocument($invoice->id);
+		$this->addEInvoicingDocument($invoice->id);
+
+		$duplicate = false;
+		$this->assertTrue(SupplierInvoiceHelper::isEInvoice($invoice->id, false, $duplicate));
+		$this->assertTrue($duplicate);
+
+		$duplicate = false;
+		$this->assertTrue(SupplierInvoiceHelper::isEInvoice($invoice->id, true, $duplicate));
+		$this->assertTrue($duplicate);
+	}
+
+	/**
 	 * A draft invoice, once refused and confirmed, is validated then abandoned with the
 	 * dedicated close code and the refusal reason kept as the close note.
 	 *

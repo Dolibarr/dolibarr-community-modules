@@ -394,12 +394,15 @@ class SupplierInvoiceHelper
 	 *
 	 * @param int 	$supplierInvoiceId 				The id of the supplier invoice
 	 * @param bool 	$checkLinkedDolObjectExistance 	Also check if linked Dol object really exists or not
-	 * @throws Exception
+	 * @param bool 	$duplicate 						Set to true when several e-invoicing documents describe the
+	 *												same supplier invoice, so the caller can refuse the operation
 	 * @return bool									True if invoice found.
 	 */
-	public static function isEInvoice(int $supplierInvoiceId, bool $checkLinkedDolObjectExistance = false): bool
+	public static function isEInvoice(int $supplierInvoiceId, bool $checkLinkedDolObjectExistance = false, bool &$duplicate = false): bool
 	{
 		global $db;
+
+		$duplicate = false;
 
 		$sql = "SELECT rowid FROM " . $db->prefix() . "einvoicing_document";
 		$sql .= " WHERE fk_element_type = 'invoice_supplier'";
@@ -408,25 +411,35 @@ class SupplierInvoiceHelper
 		$sql .= " LIMIT 2";
 
 		$resql = $db->query($sql);
-		if ($resql) {
-			if ($db->num_rows($resql) == 1) {
-				$db->free($resql);
-				if ($checkLinkedDolObjectExistance) {
-					$factureFournisseur = new FactureFournisseur($db);
-					if ($factureFournisseur->fetch((int) $supplierInvoiceId) > 0) {
-						return true;
-					}
-				} else {
-					return true;
-				}
-			} elseif ($db->num_rows($resql) > 1) {
-				$db->free($resql);
-				throw new Exception('Duplicate entry in einvoicing_document for supplier invoice with id '.$supplierInvoiceId);
-			} else {
-				$db->free($resql);
-			}
+		if (!$resql) {
+			return false;
 		}
-		return false;
+
+		$num = $db->num_rows($resql);
+		$db->free($resql);
+
+		if ($num > 1) {
+			// Several e-invoicing documents for the same supplier invoice is a data integrity problem that
+			// needs a manual fix in database: the same invoice may hold diverging statuses coming from two
+			// access points. The answer to "is this an e-invoice" is still yes, so this predicate says yes
+			// and reports the duplicate. Throwing from here would not help: run_triggers() calls runTrigger()
+			// without a try/catch, so the exception used to surface as an uncaught PHP fatal instead of the
+			// message the user needs. Refusing the operation belongs to the caller.
+			$duplicate = true;
+			dol_syslog(__METHOD__ . ' duplicate entry in einvoicing_document for supplier invoice with id ' . $supplierInvoiceId, LOG_ERR);
+		}
+
+		if ($num <= 0) {
+			return false;
+		}
+
+		if ($checkLinkedDolObjectExistance) {
+			$factureFournisseur = new FactureFournisseur($db);
+
+			return ($factureFournisseur->fetch((int) $supplierInvoiceId) > 0);
+		}
+
+		return true;
 	}
 
 	/**
