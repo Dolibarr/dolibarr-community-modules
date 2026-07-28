@@ -13,11 +13,11 @@ return [
     // PhanDeprecatedProperty : 20+ occurrences
     // PhanTypeMismatchArgumentProbablyReal : 8 occurrences
     // PhanUndeclaredClassMethod : 7 occurrences
-    // PhanTypeMismatchArgument : 6 occurrences
     // PhanTypeMismatchReturn : 6 occurrences
     // PhanTypeObjectUnsetDeclaredProperty : 6 occurrences
     // PhanUndeclaredMethod : 6 occurrences
     // PhanTypeArraySuspiciousNullable : 5 occurrences
+    // PhanTypeMismatchArgument : 5 occurrences
     // PhanTypeMismatchArgumentNullable : 5 occurrences
     // PhanDeprecatedFunction : 2 occurrences
     // PhanUndeclaredClassProperty : 2 occurrences
@@ -32,7 +32,7 @@ return [
 
     // Currently, file_suppressions and directory_suppressions are the only supported suppressions
     'file_suppressions' => [
-        'einvoicing/admin/setup.php' => ['PhanTypeMismatchArgument', 'PhanUndeclaredMethod', 'PhanUndeclaredProperty'],
+        'einvoicing/admin/setup.php' => ['PhanUndeclaredMethod', 'PhanUndeclaredProperty'],
         'einvoicing/call_card.php' => ['PhanUndeclaredProperty'],
         'einvoicing/class/actions_einvoicing.class.php' => ['PhanUndeclaredMethod', 'PhanUndeclaredProperty'],
         'einvoicing/class/call.class.php' => ['PhanTypeObjectUnsetDeclaredProperty', 'PhanUndeclaredClassMethod', 'PhanUndeclaredClassProperty', 'PhanUndeclaredProperty'],
