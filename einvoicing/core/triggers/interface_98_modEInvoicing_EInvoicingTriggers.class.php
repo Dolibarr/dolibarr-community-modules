@@ -46,7 +46,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		parent::__construct($db);
 		$this->family = "einvoicing";
 		$this->description = "EInvoicing triggers.";
-		$this->version = 'development';
+		$this->version = 'dolibarr';
 		$this->picto = 'einvoicing@einvoicing';
 	}
 
