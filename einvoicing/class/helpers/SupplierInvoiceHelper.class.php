@@ -74,7 +74,7 @@ class SupplierInvoiceHelper
 		$errors = [];
 
 		// Get supplier invoice XML data
-		$xmlData = SupplierInvoiceHelper::getXmlData($dolSupplierInvoice->id);
+		$xmlData = SupplierInvoiceHelper::getXmlData($dolSupplierInvoice->id, true);
 
 		// Can't check consistency if there is no XML content
 		if (!isset($xmlData) || $xmlData === '') {
@@ -121,12 +121,25 @@ class SupplierInvoiceHelper
 
 		$amountErrors = [];
 
+		$isCreditNote = ($dolSupplierInvoice->type == FactureFournisseur::TYPE_CREDIT_NOTE);
+
 		foreach ($calculationRules as $calculationRule => $vatComputeMode) {
 			$details = self::getInvoiceDetailsForComparison($dolSupplierInvoice, $vatComputeMode);
+			$amountErrors[$calculationRule] = [];
+
+			if ($isCreditNote) {
+				$details['total_ht'] = abs($details['total_ht']);
+				$details['total_ttc'] = abs($details['total_ttc']);
+				$details['total_tva'] = abs($details['total_tva']);
+				foreach ($details['vat_by_rate'] as $rate => $rateDetails) {
+					$details['vat_by_rate'][$rate]['vat_amount'] = abs($rateDetails['vat_amount']);
+					$details['vat_by_rate'][$rate]['vat_basis_amount'] = abs($rateDetails['vat_basis_amount']);
+				}
+			}
 
 			// VAT excl. total
-			if (!self::areAmountsEqual($details['total_ht'], $parsedHeader['lineTotalAmount'])) {
-				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatExclDifference', $parsedHeader['lineTotalAmount'], floatval($dolSupplierInvoice->total_ht));
+			if (!self::areAmountsEqual($details['total_ht'], $parsedHeader['taxBasisTotalAmount'])) {
+				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatExclDifference', $parsedHeader['taxBasisTotalAmount'], floatval($dolSupplierInvoice->total_ht));
 			}
 
 			// VAT incl. total
@@ -324,16 +337,18 @@ class SupplierInvoiceHelper
 	 * - if data not found in database, try to re-get data from AP
 	 *
 	 * @param	int 		$supplierInvoiceId 		The id of the supplier invoice
+	 * @param 	bool 		$fetchXmlIfEmpty		Whether the XML data should be fetch again (if currently empty in database)
 	 * @return 	?string 							The XML data if available or null if can't get it
 	 * @throws 	Exception
 	 */
-	public static function getXmlData(int $supplierInvoiceId): ?string
+	public static function getXmlData(int $supplierInvoiceId, bool $fetchXmlIfEmpty = false): ?string
 	{
 		global $db, $user;
 
 		$sql = "SELECT rowid, flow_id, provider, xml_data FROM " . $db->prefix() . "einvoicing_document";
-		$sql .= " WHERE fk_element_type = '" . $db->escape('invoice_supplier') . "'";
+		$sql .= " WHERE fk_element_type = 'invoice_supplier'";
 		$sql .= " AND fk_element_id = " . (int) $supplierInvoiceId;
+		$sql .= " AND flow_type = 'SupplierInvoice'";
 		$sql .= " LIMIT 2";
 
 		$resql = $db->query($sql);
@@ -345,36 +360,12 @@ class SupplierInvoiceHelper
 				$document = new Document($db);
 				$resdoc = $document->fetch($foundDocument->rowid);
 
-				if (empty($resdoc) || is_null($document->xml_data) || $document->xml_data == '') {
+				if ((empty($resdoc) || is_null($document->xml_data) || $document->xml_data == '') && $fetchXmlIfEmpty) {
 					$providerManager = new PDPProviderManager($db);
 					$provider = $providerManager->getProvider(strtoupper((string) $document->provider));
 
-					/* FIXME Disabled: Create a lof of regressions and problems:
-					- We must never a dependency (like ZugferdDocumentPdfReaderExt) when common use of code does not need it.
-					  This introduces regression because lib that does not work on most cases (PHP version, Dolibarr version, ...)
-					- To get content of an invoice, message should not use fetchFlowData($document->flow_id, 'Converted'), because
-					  result of 'Converted' is not predictable by code, it depends on your AP setup on your account.
-					  So we should use code that depends on AP like we have into syncFlow() for SupplierInvoice, with a detection of
-					  the type of doc received by using $detectedProtocol = $tmpProtocolManager->detectProtocolFromContent($receivedFile).
+					$cleanedXmlData = $provider->fetchFlowXml($document->flow_id, true);
 
-					  Solution: Move this method into the provider class.
-					*/
-					/*
-					$flowResponse = $provider->fetchFlowData($document->flow_id, 'Converted', 'get_flow_for_supplier_invoice_by_getxmldata');
-
-					if ($flowResponse['status_code'] != 200) {
-						throw new Exception('Failed to get flow data for flow id n° ' . $document->flow_id . ' and for supplier invoice id n° ' . $supplierInvoiceId);
-					}
-
-					// $receivedFile may be a CII file (common) or Factur-X file (not common), or ...
-					$receivedFile = $flowResponse['response'];
-
-					// FIXME Bug here: $flowResponse['response'] should contains a CII file not a Factur-x file (except if your Provider was not correctly setup).
-					// Having a factur-x here happen only if using the not recommended setup (recommended CII, not recommended Factur-x).
-					// Note: As it may vary on setup, the type of einvoice must be guessed with "$detectedProtocol = $tmpProtocolManager->detectProtocolFromContent($receivedFile);"
-					// so all the code of the getXMLData() should be moved into the provider class and must return always a XML.
-					$xmlData = ZugferdDocumentPdfReaderExt::getInvoiceDocumentContentFromContent($receivedFile);
-					$cleanedXmlData = Document::cleanXmlData($xmlData);
 					if (Document::checkXmlDataMaxSize($cleanedXmlData)) {
 						$document->xml_data = $cleanedXmlData;
 						$document->update($user);
@@ -383,7 +374,6 @@ class SupplierInvoiceHelper
 					}
 
 					return $cleanedXmlData;
-					*/
 				}
 
 				return $foundDocument->xml_data;
@@ -412,8 +402,9 @@ class SupplierInvoiceHelper
 		global $db;
 
 		$sql = "SELECT rowid FROM " . $db->prefix() . "einvoicing_document";
-		$sql .= " WHERE fk_element_type = '" . $db->escape('invoice_supplier') . "'";
+		$sql .= " WHERE fk_element_type = 'invoice_supplier'";
 		$sql .= " AND fk_element_id = " . (int) $supplierInvoiceId;
+		$sql .= " AND flow_type = 'SupplierInvoice'";
 		$sql .= " LIMIT 2";
 
 		$resql = $db->query($sql);

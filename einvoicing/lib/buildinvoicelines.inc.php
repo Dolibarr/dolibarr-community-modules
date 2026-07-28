@@ -126,9 +126,11 @@ $myUri             = $einvoicing->getSellerCommunicationURI(0);
 $mySchemeUri       = $this->getIEC6523Code($mysoc->country_code, 2);
 
 // Buyer party resolution.
-// By default the buyer is the invoice thirdparty. When EINVOICING_USE_BILLING_CONTACT_AS_BUYER
-// is enabled and a billing contact (external BILLING contact) is set on a French invoice, this
-// contact can become the XML buyer (e.g. invoice addressed to the head office / "siège social").
+// The billing contact of the invoice (external BILLING contact) always describes the buyer contact
+// group (BG-9): it is the point of contact the customer declared for its invoices, and nothing else
+// fills that group. Whether that contact also *replaces* the buyer party itself is another matter,
+// and stays opt-in behind EINVOICING_USE_BILLING_CONTACT_AS_BUYER (e.g. invoice addressed to the head
+// office / "siège social"):
 //   - Case B: the contact belongs to a different thirdparty (distinct legal entity) -> rebuild the
 //     whole buyer (name, address, SIREN/SIRET, VAT, routing) from that thirdparty.
 //   - Case A: same thirdparty -> keep its SIREN/VAT/routing, only override name/address.
@@ -142,17 +144,17 @@ $buyerContactName  = null;
 $buyerContactEmail = null;
 $buyerContactPhone = null;
 
-if (getDolGlobalInt('EINVOICING_USE_BILLING_CONTACT_AS_BUYER')) {
-	$billingContactIds = $object->getIdContact('external', 'BILLING');
-	if (!empty($billingContactIds) && $object->fetch_contact($billingContactIds[0]) > 0 && is_object($object->contact)) {
-		$billingContact = $object->contact;
+$billingContactIds = $object->getIdContact('external', 'BILLING');
+if (!empty($billingContactIds) && $object->fetch_contact($billingContactIds[0]) > 0 && is_object($object->contact)) {
+	$billingContact = $object->contact;
 
-		// Buyer contact person fields (BG-9), filled in every case
-		$tmpcontactname    = trim($billingContact->getFullName($outputlangs));
-		$buyerContactName  = ($tmpcontactname !== '') ? $tmpcontactname : null;
-		$buyerContactEmail = !empty($billingContact->email) ? $billingContact->email : null;
-		$buyerContactPhone = !empty($billingContact->phone_pro) ? $billingContact->phone_pro : (!empty($billingContact->phone_mobile) ? $billingContact->phone_mobile : null);
+	// Buyer contact person fields (BG-9): name (BT-56), phone (BT-57) and email (BT-58)
+	$tmpcontactname    = trim($billingContact->getFullName($outputlangs));
+	$buyerContactName  = ($tmpcontactname !== '') ? $tmpcontactname : null;
+	$buyerContactEmail = !empty($billingContact->email) ? $billingContact->email : null;
+	$buyerContactPhone = !empty($billingContact->phone_pro) ? $billingContact->phone_pro : (!empty($billingContact->phone_mobile) ? $billingContact->phone_mobile : null);
 
+	if (getDolGlobalInt('EINVOICING_USE_BILLING_CONTACT_AS_BUYER')) {
 		$contactSocId = !empty($billingContact->fk_soc) ? $billingContact->fk_soc : $billingContact->socid;
 
 		// Case B: billing contact attached to a different thirdparty (distinct legal entity)
@@ -176,9 +178,9 @@ if (getDolGlobalInt('EINVOICING_USE_BILLING_CONTACT_AS_BUYER')) {
 				$contactSocId = 0;	// fall back to case A handling
 			}
 		}
-	} else {
-		dol_syslog('einvoicing: EINVOICING_USE_BILLING_CONTACT_AS_BUYER is on but no usable BILLING contact found, using invoice thirdparty as buyer', LOG_NOTICE);
 	}
+} elseif (getDolGlobalInt('EINVOICING_USE_BILLING_CONTACT_AS_BUYER')) {
+	dol_syslog('einvoicing: EINVOICING_USE_BILLING_CONTACT_AS_BUYER is on but no usable BILLING contact found, using invoice thirdparty as buyer', LOG_NOTICE);
 }
 // Buyer identifiers (resolved buyer party: invoice thirdparty or billing-contact recipient)
 if (!($buyerParty instanceof Societe)) {
@@ -298,6 +300,7 @@ $depositlines      	= [];
 $globalDiscounts	= [];
 $billing_period    	= [];
 $numligne          	= 1;
+$hasServiceLine		= false;	// Drives the VAT point date code (BT-8): VAT on services falls due on collection
 // @phan-suppress-current-line PhanTypeArraySuspiciousNullable
 foreach ($object->lines as $line) {
 	$isDepositLine = 0;
@@ -309,6 +312,10 @@ foreach ($object->lines as $line) {
 	$isSubTotalLine = $this->_isLineFromExternalModule($line, $object->element, 'modSubtotal');
 	if ($isSubTotalLine) {
 		continue;
+	}
+
+	if ($line->product_type == 1) {		// Product::TYPE_SERVICE
+		$hasServiceLine = true;
 	}
 
 	// For credit notes EN16931 requires positive amounts
@@ -671,7 +678,17 @@ $invoiceData = [
 	'documentNotePMT'      => getDolGlobalString('EINVOICING_PMT') ?: $outputlangs->transnoentities("NoInvoiceCollectionFees"),
 	'documentNotePMD'      => getDolGlobalString('EINVOICING_PMD') ?: $outputlangs->transnoentities('NoLatePaymentFees'),
 	'documentNoteAAB'      => getDolGlobalString('EINVOICING_AAB') ?: $outputlangs->transnoentities('NoEarlyPaymentDiscount'),
+	// Legal mention that goes with the "TVA d'après les débits" option, mandatory on the invoices of a
+	// seller who took it. The structured form of the same information is the VAT point date code below.
+	'documentNoteTXD'      => getDolGlobalInt('EINVOICING_VAT_ON_DEBITS') ? $outputlangs->transnoentities('VATOnDebitsMention') : '',
 	'documentNotes'        => [],
+
+	// BT-8 (VAT point date code), which tells the buyer when the VAT falls due, hence from when it can be
+	// deducted. UNTDID 2475 restricted to 5 (invoice date), 29 (delivery date) and 72 (payment date) by
+	// BR-CL-06, and mutually exclusive with BT-7 (BR-CO-03). VAT on services falls due on collection,
+	// unless the seller opted for the "TVA d'après les débits" scheme, where it falls due on invoicing.
+	// Nothing is sent for a goods-only invoice: its due date is the delivery date the invoice already carries.
+	'vatDueDateTypeCode'   => getDolGlobalInt('EINVOICING_VAT_ON_DEBITS') ? '5' : ($hasServiceLine ? '72' : ''),
 
 	// Seller part
 	'sellername'                => $mysoc->name,

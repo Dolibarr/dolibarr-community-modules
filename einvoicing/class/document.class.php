@@ -455,7 +455,7 @@ class Document extends CommonObject
 			$sql .= " WHERE t.entity IN (".getEntity($this->element).")";
 		} elseif (preg_match('/^\w+@\w+$/', (string) $this->ismultientitymanaged)) {
 			$tmparray = explode('@', (string) $this->ismultientitymanaged);
-			$sql .= " LEFT JOIN ".$this->db->prefix().$tmparray[1]." as pt ON t.".$this->db->sanitize($tmparray[0])." = pt.rowid";  // @phan-suppress-current-line SqlInjection
+			$sql .= " LEFT JOIN ".$this->db->prefix().$this->db->sanitize($tmparray[1])." as pt ON t.".$this->db->sanitize($tmparray[0])." = pt.rowid";
 			$sql .= " WHERE pt.entity IN (".getEntity($this->element).")";
 		} else {
 			$sql .= " WHERE 1 = 1";
@@ -1243,6 +1243,11 @@ class Document extends CommonObject
 
 		dol_syslog(__METHOD__." start", LOG_INFO);
 
+		// Run from the scheduler, nothing has loaded the provider classes yet: the cron runner only
+		// includes this class file. Without this the job dies on "Class PDPProviderManager not found",
+		// a fatal the scheduler reports as a plain failed job.
+		require_once __DIR__ . '/providers/PDPProviderManager.class.php';
+
 		if (getDolGlobalString('EINVOICING_PDP')) {
 			$providerManager = new PDPProviderManager($this->db);
 			$provider = $providerManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
@@ -1287,13 +1292,16 @@ class Document extends CommonObject
 
 	/**
 	 * Return true if given XML data can be stored in Database (size < 16Mo)
-	 * @param string $xmlData The XML data to check
+	 * @param ?string $xmlData The XML data to check
 	 * @return bool True if xmlData is within size bounds
 	 */
-	public static function checkXmlDataMaxSize(string &$xmlData): bool
+	public static function checkXmlDataMaxSize(?string &$xmlData): bool
 	{
-		// 16Mo for MEDIUMTEXT
-		return (strlen($xmlData) <= 16777215);
+		if (isset($xmlData)) {
+			// 16Mo for MEDIUMTEXT
+			return (strlen($xmlData) <= 16777215);
+		}
+		return true;
 	}
 
 	/**

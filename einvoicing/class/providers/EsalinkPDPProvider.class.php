@@ -427,14 +427,24 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		];
 
 		// Params
+		// The profile is declared from what the document actually carries, never hardcoded, so the
+		// declaration cannot contradict the transmitted file (issue #395). Empty means "omit it",
+		// which both platforms accept and which is the only correct answer for a profile that has
+		// no AFNOR flowProfile of its own.
+		$flowInfo = [
+			"flowSyntax" => $flowSyntax,			// CII or Factur-X
+			"trackingId" => $object->ref,
+			"name" => "Invoice_" . $object->ref,
+			"sha256" => hash_file('sha256', $invoice_path)
+		];
+
+		$flowProfile = $this->resolveFlowProfile($invoice_path);
+		if ($flowProfile !== '') {
+			$flowInfo = array("flowProfile" => $flowProfile) + $flowInfo;
+		}
+
 		$params = [
-			'flowInfo' => json_encode([
-				"flowProfile" => "Extended-CTC-FR",
-				"flowSyntax" => $flowSyntax,			// CII or Factur-X
-				"trackingId" => $object->ref,
-				"name" => "Invoice_" . $object->ref,
-				"sha256" => hash_file('sha256', $invoice_path)
-			]),
+			'flowInfo' => json_encode($flowInfo),
 			'file' => new CURLFile($invoice_path, $mime_type, basename($invoice_path))
 		];
 
@@ -1198,8 +1208,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				$exchangeProtocol = $tmpProtocolManager->getProtocol($detectedProtocol);
 
 				$exceptionmessage = '';
-				$db->begin();
 
+				// No transaction opened here: createSupplierInvoiceFromSource() owns it. It synchronizes
+				// the vendor first, out of transaction, then imports the invoice atomically - so a business
+				// error on the invoice (product not found, ...) no longer rolls back the created thirdparty.
 				try {
 					// Try to create the supplier + product + invoice
 					$res = $exchangeProtocol->createSupplierInvoiceFromSource($receivedFile, $ReadableViewFile, $flowId);
@@ -1213,7 +1225,6 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 						$retarray['action'] = $res['action'] ?? null;
 						$retarray['actiondata'] = $res['actiondata'] ?? null;
 
-						$db->rollback();
 						return $retarray;
 					} else {
 						// Complete the document object with the created supplier invoice details
@@ -1229,13 +1240,9 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 						//return array('res' => 0, 'message' => "supplier invoice already exists for flowId: " . $flowId . ". " . $res['message']);
 						$returnRes = 1;		// If invoice did already exists, we process one more line from list of flows, so we must return 1, even if nothing was done.
 						$returnMessage = "Supplier invoice " . $supplierInvoiceObj->ref . " created or already existing for flowId: " . $flowId . ". " . $res['message'];
-
-						$db->commit();
 					}
 				} catch (Exception $e) {
 					$exceptionmessage = $e->getMessage();
-
-					$db->rollback();
 				}
 
 				if ($exceptionmessage) {
@@ -1271,20 +1278,20 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				*/
 
 				// 2. Read CDAR and update status of linked customer invoice
-				$flowResource = 'flows/' . $flowId;
-				$flowUrlparams = array(
-					'docType' => 'Original', // docType can be 'Metadata', 'Original', 'Converted' or 'ReadableView'
-				);
-				$flowResource .= '?' . http_build_query($flowUrlparams);
-				$flowResponse = $this->callApi(
-					$flowResource,
-					"GET",
-					false,
-					['Accept' => 'application/octet-stream']
-				);
+				// The CDAR is normally read as the "Original" document. Some flows have no original on the
+				// platform, only the converted copy, and the synchronization then stops on that flow and on
+				// every flow behind it with no way to go past it. Both documents carry the same CDAR, so fall
+				// back on the converted one rather than blocking. docType can be 'Metadata', 'Original',
+				// 'Converted' or 'ReadableView'.
+				$flowResponse = $this->fetchFlowData($flowId, 'Original');
 
 				if ($flowResponse['status_code'] != 200) {
-					return array('res' => -1, 'message' => "Failed to retrieve flow details for flowId: " . $flowId);
+					dol_syslog(__METHOD__ . " No 'Original' document for flowId: " . $flowId . " (HTTP " . $flowResponse['status_code'] . "), reading the CDAR from the 'Converted' document instead", LOG_WARNING);
+					$flowResponse = $this->fetchFlowData($flowId, 'Converted');
+				}
+
+				if ($flowResponse['status_code'] != 200) {
+					return array('res' => -1, 'message' => "Failed to retrieve flow details (neither 'Original' nor 'Converted' document) for flowId: " . $flowId);
 				}
 				$cdarXml = $flowResponse['response'];
 
@@ -1597,10 +1604,11 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	 * @param mixed $object Invoice object (CustomerInvoice or SupplierInvoice)
 	 * @param int $statusCode   Status code to send (see class constants for available codes)
 	 * @param string $reasonCode Reason code to send (optional)
+	 * @param array{amount?:float,breakdown?:array<array{vatrate:float,amount:float}>} $paymentData Cashed amount (TTC) for status 212 (Encaissee), mandatory content of the CDAR (rule BR-FR-CDV-14)
 	 *
 	 * @return array{res:int, message:string}       Returns array with 'res' (1 on success, -1 on failure) with a 'message'.
 	 */
-	public function sendStatusMessage($object, $statusCode, $reasonCode = '')
+	public function sendStatusMessage($object, $statusCode, $reasonCode = '', $paymentData = array())
 	{
 		global $langs, $db;
 
@@ -1632,7 +1640,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 		dol_include_once('/einvoicing/class/utils/CdarHandler.class.php');
 		$cdarHandler = new CdarHandler($db);
-		$result = $cdarHandler->generateCdarFile($object, $statusCode, $reasonCode);
+		$result = $cdarHandler->generateCdarFile($object, $statusCode, $reasonCode, $paymentData);
 		if ($result['res'] < 0) {
 			$res = -1;
 			$message = 'Failed to generate CDAR file: ' . $result['message'];

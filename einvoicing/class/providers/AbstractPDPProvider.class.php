@@ -250,15 +250,32 @@ abstract class AbstractPDPProvider
 		$result['entries'] = count($lines);
 
 		if ($result['entries'] > 0) {
-			// At least one directory line: the recipient has a reception address on an Approved Platform.
-			$result['active'] = $result['entries'];
-			$result['status'] = 'routable';
-			$result['reachable'] = 1;
+			// A directory line exists, but only an enabled one can actually receive: the annuaire also
+			// carries lines that are declared and not open yet ('Upcoming'), or closed. Counting every
+			// returned line as active would report 'routable' for a recipient the platform then refuses
+			// with a routing error (fr:213). A line that carries no status at all is left as trusted
+			// (the field is optional in the search answer), so the check keeps failing open.
 			foreach ($lines as $line) {
+				$linestatus = isset($line['directoryLineStatus']) ? (string) $line['directoryLineStatus'] : '';
+				if ($linestatus !== '' && strtolower($linestatus) != 'enabled') {
+					continue;
+				}
+				$result['active']++;
 				if ($result['identifier'] === '' && !empty($line['addressingIdentifier'])) {
 					$result['identifier'] = (string) $line['addressingIdentifier'];
 				}
 			}
+
+			if ($result['active'] > 0) {
+				// The recipient has an enabled reception address on an Approved Platform.
+				$result['status'] = 'routable';
+				$result['reachable'] = 1;
+			} else {
+				// Declared in the annuaire but no line able to receive yet.
+				$result['status'] = 'inactive';
+				$result['reachable'] = 0;
+			}
+
 			return $result;
 		}
 
@@ -621,6 +638,67 @@ abstract class AbstractPDPProvider
 	}
 
 	/**
+	 * Keys whose value must never be persisted in clear in the API call log (llx_einvoicing_call),
+	 * whatever request/response they appear in (OAuth token exchanges in particular).
+	 *
+	 * @var array<int,string>
+	 */
+	private const LOGCALL_SENSITIVE_KEYS = array('client_secret', 'access_token', 'refresh_token', 'id_token', 'password');
+
+	/**
+	 * Redact known sensitive fields (@see LOGCALL_SENSITIVE_KEYS) from a value before it is
+	 * persisted in the API call log, whatever its shape: PHP array, application/x-www-form-urlencoded
+	 * string (OAuth token requests), JSON string, or plain text (left untouched in that last case).
+	 *
+	 * @param  array<mixed>|string|null $value Value to redact
+	 * @return array<mixed>|string|null Redacted value, same shape as the input
+	 */
+	private static function redactSensitiveData($value)
+	{
+		if (is_array($value)) {
+			$redacted = array();
+			foreach ($value as $key => $item) {
+				if (is_string($key) && in_array(strtolower($key), self::LOGCALL_SENSITIVE_KEYS, true)) {
+					$redacted[$key] = '[REDACTED]';
+				} else {
+					$redacted[$key] = is_array($item) ? self::redactSensitiveData($item) : $item;
+				}
+			}
+			return $redacted;
+		}
+
+		if (is_string($value)) {
+			// application/x-www-form-urlencoded body, e.g. "grant_type=...&client_secret=..."
+			if (preg_match('/^[a-zA-Z0-9_.\[\]]+=/', $value)) {
+				parse_str($value, $parsed);
+				if (is_array($parsed) && !empty($parsed)) {
+					$changed = false;
+					foreach (self::LOGCALL_SENSITIVE_KEYS as $sensitiveKey) {
+						if (isset($parsed[$sensitiveKey])) {
+							$parsed[$sensitiveKey] = '[REDACTED]';
+							$changed = true;
+						}
+					}
+					if ($changed) {
+						return http_build_query($parsed);
+					}
+				}
+			}
+
+			// JSON body
+			$decoded = json_decode($value, true);
+			if (is_array($decoded)) {
+				$redacted = self::redactSensitiveData($decoded);
+				if ($redacted !== $decoded) {
+					return json_encode($redacted);
+				}
+			}
+		}
+
+		return $value;
+	}
+
+	/**
 	 * Log an API call into llx_einvoicing_call using a SEPARATE database connection.
 	 *
 	 * The call trace must survive even when the caller's main transaction is rolled
@@ -629,6 +707,10 @@ abstract class AbstractPDPProvider
 	 * Writing the log through an independent connection ($dbhistory) decouples it from
 	 * the business transaction, so it is committed whether the action succeeds or fails,
 	 * without ever forcing a commit on the rest. Same approach as the webhook logging.
+	 *
+	 * Request/response payloads are redacted (@see redactSensitiveData()) before being
+	 * persisted: this log is readable by any user with the 'einvoicing' read right, so
+	 * OAuth secrets and tokens must never end up in llx_einvoicing_call in clear.
 	 *
 	 * @param   ?string                     $callType   Functional type of the call (empty/null = do not log)
 	 * @param   string                      $resource   API resource/endpoint (without leading slash)
@@ -653,6 +735,9 @@ abstract class AbstractPDPProvider
 		}
 
 		$dbhistory->begin();
+
+		$params = self::redactSensitiveData($params);
+		$response = self::redactSensitiveData($response);
 
 		$call = new Call($dbhistory);
 		$call->call_id = $call->getNextCallId();
@@ -737,10 +822,11 @@ abstract class AbstractPDPProvider
 	 * @param mixed $object Invoice object (CustomerInvoice or SupplierInvoice)
 	 * @param int $statusCode   Status code to send (see class constants for available codes)
 	 * @param string $reasonCode Reason code to send (optional)
+	 * @param array{amount?:float,breakdown?:array<array{vatrate:float,amount:float}>} $paymentData Cashed amount (TTC) for status 212 (Encaissee), mandatory content of the CDAR (rule BR-FR-CDV-14)
 	 *
 	 * @return array{res:int, message:string}       Returns array with 'res' (1 on success, -1 on failure) with a 'message'.
 	 */
-	abstract public function sendStatusMessage($object, $statusCode, $reasonCode = '');
+	abstract public function sendStatusMessage($object, $statusCode, $reasonCode = '', $paymentData = array());
 
 	/**
 	 * Clear the fixed "last invoice that could not be processed" diagnostic files at the start of a
@@ -762,5 +848,117 @@ abstract class AbstractPDPProvider
 				dol_delete_file($tempDir . '/' . $f);
 			}
 		}
+	}
+
+	/**
+	 * Try to get a flow XML from its id using API
+	 * @param string $flowId 		The id of the flow to fetch
+	 * @param bool	 $cleanXml 		Whether you need to remove (attachments presents in XML content...)
+	 *
+	 * @return ?string
+	 */
+	public function fetchFlowXml($flowId, $cleanXml)
+	{
+		$flowResponse = $this->fetchFlowData($flowId, 'Original', 'get_flow_xml');
+
+		if ($flowResponse['status_code'] != 200) {
+			throw new Exception('Failed to get flow XML for flow id n° ' . $flowId);
+		}
+
+		$xmlData = null;
+
+		// $receivedFileContent may be an XML file (CII, UBL...) or a PDF file (FacturX), or ...
+		$receivedFileContent = $flowResponse['response'];
+
+		$resProtocol = ProtocolManager::getProtocolFromContent($receivedFileContent);
+		if ($resProtocol['success']) {
+			$protocol = $resProtocol['protocol_object'];
+
+			$xmlData = $protocol->extractXmlFromFileContent($receivedFileContent);
+
+			if ($cleanXml) {
+				$xmlData = Document::cleanXmlData($xmlData);
+			}
+		}
+
+		return $xmlData;
+	}
+
+	/**
+	 * AFNOR flowProfile to declare for a given CII guideline URN.
+	 *
+	 * The values are the ones the platforms actually accept: anything outside their enumeration is
+	 * answered with a HTTP 400 "invalid flowProfile". Profiles with no AFNOR equivalent (MINIMUM,
+	 * BASIC WL, and the generic Factur-X EXTENDED) are deliberately absent, so the field is omitted
+	 * for them, which both platforms accept.
+	 *
+	 * @var array<string,string>
+	 */
+	protected const FLOW_PROFILE_BY_GUIDELINE = array(
+		'urn:factur-x.eu:1p0:basic' => 'Basic',
+		'urn:cen.eu:en16931:2017' => 'CIUS',
+		'urn:cen.eu:en16931:2017#conformant#urn.cpro.gouv.fr:1p0:extended-ctc-fr' => 'Extended-CTC-FR',
+	);
+
+	/**
+	 * Read the guideline URN (BT-24) carried by the e-invoice about to be sent.
+	 *
+	 * Works on a standalone CII XML and on a Factur-X PDF, whose embedded XML is extracted first.
+	 *
+	 * @param	string		$invoicePath	Path of the file that will be transmitted
+	 * @return	string						Guideline URN, empty string when it cannot be read
+	 */
+	protected function readGuidelineUrn($invoicePath)
+	{
+		if (!is_readable($invoicePath)) {
+			return '';
+		}
+
+		$content = '';
+		if (strtolower(pathinfo($invoicePath, PATHINFO_EXTENSION)) === 'pdf') {
+			// Factur-X: the CII lives as a PDF/A-3 attachment
+			try {
+				require_once __DIR__ . '/../../vendor/autoload.php';
+				$content = (string) \horstoeko\zugferd\ZugferdDocumentPdfReaderExt::getInvoiceDocumentContentFromFile($invoicePath);
+			} catch (\Throwable $e) {
+				dol_syslog(get_class($this) . '::readGuidelineUrn could not extract the XML from ' . basename($invoicePath) . ': ' . $e->getMessage(), LOG_WARNING);
+				return '';
+			}
+		} else {
+			$content = (string) file_get_contents($invoicePath);
+		}
+
+		$reg = array();
+		if (preg_match('#GuidelineSpecifiedDocumentContextParameter>\s*<[^:>]*:?ID>([^<]*)<#', $content, $reg)) {
+			return trim($reg[1]);
+		}
+
+		return '';
+	}
+
+	/**
+	 * flowProfile to declare to the platform for the e-invoice about to be sent.
+	 *
+	 * Derived from what the document actually contains rather than hardcoded, so the declaration and
+	 * the transmitted file can never contradict each other (issue #395).
+	 *
+	 * @param	string		$invoicePath	Path of the file that will be transmitted
+	 * @return	string						AFNOR flowProfile, empty string when the field must be omitted
+	 */
+	public function resolveFlowProfile($invoicePath)
+	{
+		$guideline = $this->readGuidelineUrn($invoicePath);
+
+		if ($guideline === '') {
+			dol_syslog(get_class($this) . '::resolveFlowProfile no guideline found in ' . basename($invoicePath) . ', flowProfile omitted', LOG_WARNING);
+			return '';
+		}
+
+		if (!isset(self::FLOW_PROFILE_BY_GUIDELINE[$guideline])) {
+			dol_syslog(get_class($this) . '::resolveFlowProfile no AFNOR flowProfile for guideline "' . $guideline . '", field omitted', LOG_NOTICE);
+			return '';
+		}
+
+		return self::FLOW_PROFILE_BY_GUIDELINE[$guideline];
 	}
 }

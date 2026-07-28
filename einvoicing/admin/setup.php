@@ -327,7 +327,7 @@ if (GETPOST('error')) {
 if (GETPOST('accesstoken') && $provider instanceof AbstractPDPProvider) {
 	// We are in the return of an OAUT proxy authorize+token callback
 
-	$result = $provider->saveOAuthTokenDB(GETPOST('accesstoken'), GETPOST('refresh_token'), GETPOST('expires_in'));
+	$result = $provider->saveOAuthTokenDB(GETPOST('accesstoken'), GETPOST('refresh_token'), GETPOSTINT('expires_in'));
 
 	if ($result) {
 		setEventMessages("Token generated successfully", null, 'mesgs');
