@@ -42,7 +42,16 @@ global $conf,$user,$langs,$db;
 //define('TEST_DB_FORCE_TYPE','mysql'); // This is to force using mysql driver
 //require_once 'PHPUnit/Autoload.php';
 
-require_once dirname(__FILE__).'/../../htdocs/master.inc.php';
+$dolibarrHtdocs = getenv('DOLIBARR_HTDOCS');
+if (!$dolibarrHtdocs) {
+	$dolibarrHtdocs = dirname(__FILE__) . '/../../htdocs';
+}
+if (!file_exists($dolibarrHtdocs . '/master.inc.php')) {
+	throw new \RuntimeException('Could not locate master.inc.php under "' . $dolibarrHtdocs . '/". Set the environment variable (export DOLIBARR_HTDOCS=...) to the htdocs directory of the Dolibarr instance to test against.');
+}
+
+require_once $dolibarrHtdocs . '/master.inc.php';
+
 print 'DOL_MAIN_URL_ROOT='.DOL_MAIN_URL_ROOT."\n";  // constant will be used by other tests
 
 if ($langs->defaultlang != 'en_US') {
@@ -57,10 +66,6 @@ if (!isModEnabled('member')) {
 	print "Error: Module member must be enabled to have significant results.\n";
 	exit(1);
 }
-if (isModEnabled('ldap')) {
-	print "Error: LDAP module should not be enabled.\n";
-	exit(1);
-}
 if (isModEnabled('google')) {
 	print "Warning: Google module should not be enabled.\n";
 }
@@ -73,17 +78,8 @@ $conf->global->MAIN_DISABLE_ALL_MAILS = 1;
 $conf->global->MAIN_UMASK = '666';
 $now = dol_now();
 
-require_once dirname(__FILE__).'/../../htdocs/core/lib/admin.lib.php';
-dolibarr_set_const($db, 'API_ENABLE_LOGIN_API', 1);
+require_once DOL_DOCUMENT_ROOT . '/core/lib/admin.lib.php';
 
-
-dolibarr_set_const($db, 'MAIN_FIRST_REGISTRATION_OK_DATE', dol_print_date($now, 'dayhourlog', 'gmt'));
-dolibarr_set_const($db, 'BLOCKEDLOG_REGISTRATION_NAME', 'MyBigCompanyByPHPUnit');
-dolibarr_set_const($db, 'BLOCKEDLOG_REGISTRATION_EMAIL', 'mybigcompany@example.com');
-dolibarr_set_const($db, 'MAIN_INFO_SIREN', 'phpunit123');
-dolibarr_set_const($db, 'MAIN_INFO_SIRET', 'phpunit12312345');
-$sql = "DELETE FROM ".MAIN_DB_PREFIX."const WHERE name = 'blockedlog-1.end'";
-$db->query($sql);
 
 // Test there is no webhook enabled
 // TODO
