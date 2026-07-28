@@ -280,111 +280,111 @@ class EInvoicing
 			"desc" => "Purchase Order (PO) number is incorrect, non-existent, or already invoiced. This reason can only be used with a 'REFUSED' status if the PO number was provided by the BUYER PRIOR TO INVOICING."
 		],
 		"ADR_ERR" => [
-			"label" => "L'adresse de facturation électronique erronée",
+			"label" => "ReasonInvalidElectronicInvoicingAddress",
 			"desc" => "L'adresse de facturation électronique du destinataire (BT-49 ou BT-34) est absente ou erronée"
 		],
 		"SIRET_ERR" => [
-			"label" => "Incorrect or missing SIRET",
+			"label" => "ReasonIncorrectOrMissingSiret",
 			"desc" => "Le SIRET du destinataire est erroné ou absent si exigé"
 		],
 		"CODE_ROUTAGE_ERR" => [
-			"label" => "Missing or Incorrect ROUTING CODE",
+			"label" => "ReasonIncorrectOrMissingRoutingCode",
 			"desc" => "Le CODE_ROUTAGE du destinataire est erroné ou absent si exigé"
 		],
 		"REF_CT_ABSENT" => [
-			"label" => "Missing contractual reference required for invoice processing",
+			"label" => "ReasonMissingContractualReference",
 			"desc" => "A contractually required reference is missing (list to be defined) and must be identified in the Lifecycle: BT-12 (Contract Reference), Delivery Note No. (BT-16), Buyer Reference (BT-10), Invoiced Object (BT-18), Project Reference (BT-11), Preceding Invoice (BG-3), etc."
 		],
 		"REF_ERR" => [
-			"label" => "Incorrect reference",
+			"label" => "ReasonIncorrectReference",
 			"desc" => "A préciser dans les autres données du CDV de quelle référence il s'agit"
 		],
 		"PU_ERR" => [
-			"label" => "Incorrect Unit Prices",
+			"label" => "ReasonIncorrectUnitPrice",
 			"desc" => "Un prix Unitaire n'est pas celui attendu"
 		],
 		"REM_ERR" => [
-			"label" => "Incorrect discount",
+			"label" => "ReasonIncorrectDiscount",
 			"desc" => "A discount is missing or does not match the expected value"
 		],
 		"QTE_ERR" => [
-			"label" => "Incorrect billed quantity",
+			"label" => "ReasonIncorrectBilledQuantity",
 			"desc" => "Invoiced quantity does not match the expected quantity."
 		],
 		"ART_ERR" => [
-			"label" => "Incorrect billed article",
+			"label" => "ReasonIncorrectBilledArticle",
 			"desc" => "Un article facturé n'est pas le bon ou est erroné"
 		],
 		"MODPAI_ERR" => [
-			"label" => "Incorrect payment terms",
+			"label" => "ReasonIncorrectPaymentTerms",
 			"desc" => "The payment terms (due date, for example) do not match the expected terms."
 		],
 		"QUALITE_ERR" => [
-			"label" => "Qualité d'article livré incorrecte",
+			"label" => "ReasonIncorrectDeliveredArticleQuality",
 			"desc" => "Un des articles livré est défectueux"
 		],
 		"LIVR_INCOMP" => [
-			"label" => "Delivery issue",
+			"label" => "ReasonIncompleteOrNonConformDelivery",
 			"desc" => "Livraison incomplète, non conforme"
 		],
 		"REJ_SEMAN" => [
-			"label" => "Rejection for semantic error",
+			"label" => "ReasonRejectionSemanticError",
 			"desc" => "Analyse du format sémantique"
 		],
 		"REJ_UNI" => [
-			"label" => "Rejection on uniqueness control",
+			"label" => "ReasonRejectionUniquenessControl",
 			"desc" => "Contrôle d'unicité"
 		],
 		"REJ_COH" => [
-			"label" => "Rejection on data consistency control",
+			"label" => "ReasonRejectionDataConsistencyControl",
 			"desc" => "Contrôle cohérence de données (les balises et les référentiels)"
 		],
 		"REJ_ADR" => [
-			"label" => "Rejet sur Contrôle d'adressage",
+			"label" => "ReasonRejectionAddressingControl",
 			"desc" => "Contrôle d'adressage"
 		],
 		"REJ_CONT_B2G" => [
-			"label" => "Rejection on B2G Business Controls",
+			"label" => "ReasonRejectionB2GBusinessControls",
 			"desc" => "Contrôles B2G (vérification du n° d'engagement…)"
 		],
 		"REJ_REF_PJ" => [
-			"label" => "Rejection on Attachment Reference",
+			"label" => "ReasonRejectionAttachmentReference",
 			"desc" => "Référence de PJ"
 		],
 		"REJ_ASS_PJ" => [
-			"label" => "Rejet sur Erreur d'association de la PJ",
+			"label" => "ReasonRejectionAttachmentAssociationError",
 			"desc" => "Erreur d'association de la PJ"
 		],
 		"IRR_VIDE_F" => [
-			"label" => "Non-empty control on flow files",
+			"label" => "ReasonNonEmptyFlowFileControl",
 			"desc" => "Non-empty control on flow files"
 		],
 		"IRR_TYPE_F" => [
-			"label" => "Control of type and extension of flow files",
+			"label" => "ReasonFlowFileTypeControl",
 			"desc" => "Control of type and extension of flow files"
 		],
 		"IRR_SYNTAX" => [
-			"label" => "Syntax control of flow files",
+			"label" => "ReasonFlowFileSyntaxControl",
 			"desc" => "Syntax control of flow files"
 		],
 		"IRR_TAILLE_PJ" => [
-			"label" => "Control of size of attachments in each flow file",
+			"label" => "ReasonAttachmentSizeControl",
 			"desc" => "Control of size of attachments in each flow file"
 		],
 		"IRR_NOM_PJ" => [
-			"label" => "Control of attachment names in each flow file (absence of forbidden characters)",
+			"label" => "ReasonAttachmentNameControl",
 			"desc" => "Control of attachment names in each flow file (absence of forbidden characters)"
 		],
 		"IRR_VID_PJ" => [
-			"label" => "Control of non-empty attachment in each flow file",
+			"label" => "ReasonNonEmptyAttachmentControl",
 			"desc" => "Control of non-empty attachment in each flow file"
 		],
 		"IRR_EXT_DOC" => [
-			"label" => "Contrôle de l'extension des PJ de chaque fichier du flux",
+			"label" => "ReasonAttachmentExtensionControl",
 			"desc" => "Contrôle de l'extension des PJ de chaque fichier du flux"
 		],
 		"IRR_TAILLE_F" => [
-			"label" => "Control of max size of files contained in the flow",
+			"label" => "ReasonFlowFileMaxSizeControl",
 			"desc" => "Control of max size of files contained in the flow"
 		],
 		"IRR_ANTIVIRUS" => [
