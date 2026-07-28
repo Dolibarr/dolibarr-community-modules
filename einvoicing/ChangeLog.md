@@ -54,6 +54,10 @@ CII, EXTENDED for Factur-X). Setting EXTENDEDFR switches the document to EXTENDE
 profile the French mandate expects, including on the Factur-X path whose PDF/A-3 attachment step
 used to refuse that guideline.
 
+FIX: The seller fax number is no longer written into the generated XML. EN16931 has no business
+term for a fax and the CII syntax binding forbids the element (CII-SR-236), so any instance with a
+fax filled in the company setup was emitting a non-conformant document (issue #462).
+
 NEW: When the e-invoicing platform (PDP/PA) confirms the refusal of a received supplier invoice,
 the corresponding Dolibarr supplier invoice is automatically validated then abandoned (with a
 dedicated close code, keeping the refusal and its reason as trace) and is excluded from the
