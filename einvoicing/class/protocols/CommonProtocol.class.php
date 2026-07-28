@@ -69,10 +69,13 @@ trait CommonProtocol
 	 *     S = Services
 	 *     M = Mixed (products + services non-accessory)
 	 *
-	 * @param  Facture $invoice Dolibarr invoice object
+	 * @param  Facture 		$invoice 		Dolibarr invoice object
+	 * @param  float|null	$alreadyPaid	Amount already received that the document will report as
+	 *                                      BT-113 (payments + used credit notes). Null recomputes the
+	 *                                      payments alone, which is enough for a standalone call.
 	 * @return string  BillingProcessID
 	 */
-	public function getBillingProcessID($invoice)
+	public function getBillingProcessID($invoice, $alreadyPaid = null)
 	{
 		$hasProduct  = false;
 		$hasService  = false;
@@ -101,7 +104,27 @@ trait CommonProtocol
 		}
 
 		// Determine suffix 1 (initial invoice) or 2 (already paid invoice) according to invoice status and payment information and if the invoice contain a line a deposit (prepayment) so final invoice after deposit then suffix is 4
-		if ($invoice->status == Facture::STATUS_CLOSED && empty($invoice->close_code)) {
+		//
+		// BT-23 describes the billing case of the document, it is not a payment status: in the AFNOR
+		// nominal use case (XP Z12-012 annexe B, UC1_F202500003) the invoice is issued in frame S1 and
+		// stays S1 while the CDAR lifecycle reports 211 "Paiement transmis" then 212 "Encaissée" — the
+		// document is never re-issued in S2. So "already paid" only covers an invoice whose amount was
+		// already received when it was issued, and BR-FR-CO-09 makes that concrete and mandatory:
+		// with B2/S2/M2 the amount already paid (BT-113) must equal the total (BT-112) and the amount
+		// due (BT-115) must be 0, both fatal.
+		//
+		// Deriving the suffix from Facture::STATUS_CLOSED alone broke that: an invoice closed as paid
+		// without matching payment records — what "Classify as paid" does, and what the deposit turned
+		// into a discount does — still reports BT-113 = 0, so the document declared itself already paid
+		// while claiming the full amount was due, and was rejected. Claim the frame only when the
+		// amount the document will actually carry in BT-113 covers the total.
+		$totalTtc = (float) price2num($invoice->total_ttc, 'MT');
+		if ($alreadyPaid === null) {
+			$alreadyPaid = (float) $invoice->getSommePaiement();
+		}
+		$isFullyPaid = ($totalTtc != 0.0 && abs((float) $alreadyPaid - $totalTtc) < 0.005);
+
+		if ($invoice->status == Facture::STATUS_CLOSED && empty($invoice->close_code) && $isFullyPaid) {
 			return $prefix . '2';
 		} else {
 			// Check if the invoice contains a deposit (prepayment) line
