@@ -845,7 +845,7 @@ trait CommonProtocol
 	 * flow, if the line is already resolved or not, without importing anything.
 	 *
 	 * @param 	array 	$lineData 	Array containing invoice line data extracted from XML
-	 * @return 	array{res:int, message:string}   'res' = ID of the product found, 0 if no product found
+	 * @return 	array{res:int, message:string, matchtype?:string}   'res' = ID of the product found, 0 if no product found. 'matchtype' tells how it was resolved ('defaultrouting' when the line fell back on the default product of the vendor).
 	 */
 	public function findProductFromEinvoiceLine($lineData)
 	{
@@ -927,7 +927,7 @@ trait CommonProtocol
 				if ($resql && $db->num_rows($resql) > 0) {
 					$obj = $db->fetch_object($resql);
 					dol_syslog(__METHOD__ . ' Default routing product found for supplier=' . $lineData['supplierId'] . ' product=' . $obj->rowid);
-					return array('res' => $obj->rowid, 'message' => 'Line product not found, but a default routing product ID was found for this supplier');
+					return array('res' => $obj->rowid, 'message' => 'Line product not found, but a default routing product ID was found for this supplier', 'matchtype' => 'defaultrouting');
 				}
 			} else {
 				// We search in product supplier prices table.
@@ -943,7 +943,7 @@ trait CommonProtocol
 				if ($resql && $db->num_rows($resql) > 0) {
 					$obj = $db->fetch_object($resql);
 					dol_syslog(__METHOD__ . ' Default routing product found for supplier=' . $lineData['supplierId'] . ' product=' . $obj->fk_product);
-					return array('res' => $obj->fk_product, 'message' => 'Line product not found, but a default routing product was found for this supplier');
+					return array('res' => $obj->fk_product, 'message' => 'Line product not found, but a default routing product was found for this supplier', 'matchtype' => 'defaultrouting');
 				}
 			}
 		}
