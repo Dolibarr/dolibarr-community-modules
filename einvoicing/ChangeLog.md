@@ -2,6 +2,12 @@
 
 ## 1.0.3
 
+FIX: The combo used to pick the default product of a vendor, on the thirdparty card, no longer depends
+on a global left behind by the calling page. select_produits_fournisseurs() reads the purchase status
+it filters on from the global $status, so any page or hook setting that variable for its own purpose
+could make the combo come back empty, with nothing to explain why. The purchase status is now forced
+before the call and the global given back untouched.
+
 FIX: The "Cashed in" (212) status sent to the platform now carries the cashed amount broken down by
 VAT rate (MDG-43 blocks with MDT-207 = MEN, MDT-215 amount and MDT-224 rate) and the status detail
 sequence number, as required by the rules BR-FR-CDV-14 and BR-FR-CDV-16. Without them the platform
