@@ -2,6 +2,13 @@
 
 ## 1.0.3
 
+FIX: The reference a credit note makes to the invoice it corrects now carries that invoice issue date
+(BT-26) whatever the profile, and no longer only in EXTENDED. The date is allowed by EN 16931
+(CII-DT-027) and required by the French rule BR-FR-CO-05, which rejects a credit note whose reference
+has none - so every credit note generated with the default profile was refused by the platform. The
+document type code, which EN 16931 forbids there (CII-DT-018), stays reserved to the EXTENDED and
+EXTENDED-CTC-FR profiles (issue #485).
+
 FIX: The combo used to pick the default product of a vendor, on the thirdparty card, no longer depends
 on a global left behind by the calling page. select_produits_fournisseurs() reads the purchase status
 it filters on from the global $status, so any page or hook setting that variable for its own purpose
