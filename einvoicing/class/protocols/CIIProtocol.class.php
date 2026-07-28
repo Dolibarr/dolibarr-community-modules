@@ -1195,6 +1195,7 @@ class CIIProtocol extends AbstractProtocol
 			}
 
 			$productId = 0;
+			$productMatchType = '';
 			if (!$is_deposit_line) {
 				// Sync or create product
 				$res = $this->_findOrCreateProductFromEinvoiceLine($parsedLine, $flowId);
@@ -1211,9 +1212,12 @@ class CIIProtocol extends AbstractProtocol
 					];
 				}
 				$productId = $res['res'];
+				$productMatchType = (string) ($res['matchtype'] ?? '');
 
-				// Collect supplier price data to be created after invoice is saved
-				if ($productId > 0) {
+				// Collect supplier price data to be created after invoice is saved.
+				// Not for a default routing product: it is a catch-all, so gluing the vendor reference of
+				// the line onto it would make every next invoice match it instead of the real product.
+				if ($productId > 0 && $productMatchType != 'defaultrouting') {
 					$supplierPriceEntries[] = [
 						'productId' => $productId,
 						'unitPrice' => (float) $parsedLine['netpriceamount'],
@@ -1228,6 +1232,12 @@ class CIIProtocol extends AbstractProtocol
 			$line = new SupplierInvoiceLine($db);
 			if (!empty($productId)) {
 				$line->fk_product = $productId;
+				if ($productMatchType == 'defaultrouting') {
+					// The default routing product is a catch-all shared by all the unresolved lines of the
+					// vendor: without the wording of the XML, every line of the invoice would show the same
+					// label. Keep the description of the vendor on top of the product link.
+					$line->desc = trim($parsedLine['prodname'] ?? '') . (!empty($parsedLine['proddesc']) ? "\n" . trim($parsedLine['proddesc']) : '');
+				}
 			} elseif (!$is_deposit_line) {
 				// Free line: no product linked, description set from XML data
 				$line->desc = trim($parsedLine['prodname'] ?? '') . (!empty($parsedLine['proddesc']) ? "\n" . trim($parsedLine['proddesc']) : '');
@@ -2252,11 +2262,13 @@ class CIIProtocol extends AbstractProtocol
 		// (e.g. specimen seller with a phone but no contact person name).
 		// Skipped in minimal mode: the deliver-to party is a stripped-down copy of the buyer, and the
 		// CII syntax binding forbids a contact there (CII-SR-312), as it does a legal organization.
+		// The fax number is deliberately not part of this list: EN16931 has no business term for it
+		// and the CII syntax binding forbids ram:FaxUniversalCommunication (CII-SR-236 / CII-SR-265),
+		// so a party known only by its fax gets no contact block at all.
 		if (!$minimal
 			&& (!empty($data[$prefix . 'contactpersonname'])
 			|| !empty($data[$prefix . 'contactdepartmentname'])
 			|| !empty($data[$prefix . 'contactphoneno'])
-			|| !empty($data[$prefix . 'contactfaxno'])
 			|| !empty($data[$prefix . 'contactemailaddr']))) {
 			$contact = $doc->createElement('ram:DefinedTradeContact');
 			$node->appendChild($contact);
@@ -2275,11 +2287,9 @@ class CIIProtocol extends AbstractProtocol
 				$phone->appendChild($doc->createElement('ram:CompleteNumber', $data[$prefix . 'contactphoneno']));
 			}
 
-			if (!empty($data[$prefix . 'contactfaxno'])) {
-				$fax = $doc->createElement('ram:FaxUniversalCommunication');
-				$contact->appendChild($fax);
-				$fax->appendChild($doc->createElement('ram:CompleteNumber', $data[$prefix . 'contactfaxno']));
-			}
+			// No ram:FaxUniversalCommunication here on purpose, see the comment above. The
+			// 'contactfaxno' key is still filled and still read back from incoming invoices
+			// (CommonProtocol::...), it is only never written out.
 
 			if (!empty($data[$prefix . 'contactemailaddr'])) {
 				$email = $doc->createElement('ram:EmailURIUniversalCommunication');

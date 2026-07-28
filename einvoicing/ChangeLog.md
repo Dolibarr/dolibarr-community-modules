@@ -60,6 +60,10 @@ CII, EXTENDED for Factur-X). Setting EXTENDEDFR switches the document to EXTENDE
 profile the French mandate expects, including on the Factur-X path whose PDF/A-3 attachment step
 used to refuse that guideline.
 
+FIX: The seller fax number is no longer written into the generated XML. EN16931 has no business
+term for a fax and the CII syntax binding forbids the element (CII-SR-236), so any instance with a
+fax filled in the company setup was emitting a non-conformant document (issue #462).
+
 NEW: When the e-invoicing platform (PDP/PA) confirms the refusal of a received supplier invoice,
 the corresponding Dolibarr supplier invoice is automatically validated then abandoned (with a
 dedicated close code, keeping the refusal and its reason as trace) and is excluded from the
@@ -68,6 +72,12 @@ accountancy transfer screen (issue #286).
 FIX: The document status code (MDT-88) of a lifecycle message now follows the lifecycle status it goes
 with (deposited, received, made available, taken over, approved, paid), instead of always announcing
 "in process", and the referenced invoice date is sent as a plain date, as in the XP Z12-012 examples.
+
+FIX: A supplier invoice line that falls back on the default product of the vendor now keeps the label and
+the description carried by the XML. That product is a catch-all shared by every unresolved line, so all of
+them used to show the same wording ("Misc purchases") and the text sent by the vendor was lost. Such a line
+no longer registers a vendor price on the catch-all either, which used to glue the vendor reference of the
+line onto it and make every next invoice match it instead of the real product.
 
 ## 1.0.0
 

@@ -410,12 +410,14 @@ class FacturXProtocol extends CIIProtocol
 				}
 			}
 
-			// Set Trade Contact details (sale representative)
+			// Set Trade Contact details (sale representative). No fax: EN16931 has no business term
+			// for it and the CII syntax binding forbids ram:FaxUniversalCommunication (CII-SR-236),
+			// same as for the buyer contact below.
 			$facturxpdf->setDocumentSellerContact(
 				$invoiceData['sellercontactpersonname'],
 				"",
 				$invoiceData['sellercontactphoneno'],
-				$invoiceData['sellercontactfaxno'],
+				"",
 				$invoiceData['sellercontactemailaddr']
 			);
 
