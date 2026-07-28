@@ -61,6 +61,18 @@ dol_include_once('einvoicing/class/einvoicing.class.php');
 require_once DOL_DOCUMENT_ROOT . '/../test/phpunit/CommonClassTest.class.php';
 
 
+/**
+ * Class EInvoicingSamplesTest
+ *
+ * This test class ensures that the generated XML output for different invoice types remains
+ * consistent and matches the committed reference fixtures. It validates three invoice types:
+ * - Deposit invoices
+ * - Standard invoices
+ * - Credit notes
+ *
+ * Generated XML is compared against the reference fixtures stored in
+ * test/phpunit/fixtures/einvoicing_samples/ using semantic XML comparison.
+ */
 class EInvoicingSamplesTest extends CommonClassTest
 {
 
