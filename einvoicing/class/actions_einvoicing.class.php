@@ -853,7 +853,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 							'name' => 'statusRaison',
 							'label' => $langs->trans("SelectStatusReason"),
 							'value' => '',
-							'values' => $einvoicing->getReasonsByStatus($pdpstatuscode, 1)
+							'values' => $einvoicing->getReasonsByStatus($pdpstatuscode, 1),
+							'select_translate' => 1
 						]
 					);
 				}

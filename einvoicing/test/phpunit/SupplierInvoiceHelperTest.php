@@ -46,12 +46,17 @@ require_once $dolibarrHtdocs . '/master.inc.php';
 require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';
 dol_include_once('einvoicing/class/einvoicing.class.php');
 dol_include_once('einvoicing/class/helpers/SupplierInvoiceHelper.class.php');
-require_once DOL_DOCUMENT_ROOT . '/../test/phpunit/CommonClassTest.class.php';
+require_once __DIR__ . '/CommonClassTestCompat.inc.php';
 
 if (empty($user->id)) {
 	print "Load permissions for admin user nb 1\n";
 	$user->fetch(1);
-	$user->loadRights();
+	// User::loadRights() only exists from Dolibarr 19 on, older versions name it getrights()
+	if (method_exists($user, 'loadRights')) {
+		$user->loadRights();
+	} else {
+		$user->getrights();
+	}
 }
 $conf->global->MAIN_DISABLE_ALL_MAILS = 1;
 

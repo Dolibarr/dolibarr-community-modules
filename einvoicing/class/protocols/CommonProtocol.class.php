@@ -295,6 +295,8 @@ trait CommonProtocol
 
 		$tmpinvoice->lines[] = $line;
 
+		// TODO Add a second line (deposit) to illustrate the final invoice after deposit scenario.
+
 		$tmpinvoice->total_ht       += $line->total_ht;
 		$tmpinvoice->total_tva      += $line->total_tva;
 		$tmpinvoice->total_ttc      += $line->total_ttc;
