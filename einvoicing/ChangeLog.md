@@ -22,6 +22,16 @@ rejected the CDAR with a HTTP 400. It is also issued as the seller of the invoic
 buyer, instead of reusing the supplier invoice mapping (us as the buyer, addressed to ourselves) which
 made the platform answer "no matching invoices found".
 
+NEW: The cash-in is now reported on every customer payment instead of once when the invoice becomes
+fully paid, so partial payments are reported too (each one with its own amount), as the reform
+expects. Its scope is the operations whose VAT is due on collection, which the module no longer asks
+for: it reads the VAT mode already held by the Tax/VAT module setup (TAX_MODE_SELL_PRODUCT and
+TAX_MODE_SELL_SERVICE). The einvoicing setup page reminds the current value and links to the page
+that owns it. The same source now drives the VAT point date code (BT-8) and the "TVA d'après les
+débits" legal mention, which used to depend on the module option EINVOICING_VAT_ON_DEBITS. That
+option is gone: an instance that had set it must make sure the VAT mode of the Tax/VAT module says
+the same thing.
+
 FIX: The flowProfile declared to the platform is now read from the guideline URN of the document
 being transmitted instead of being hardcoded, so the declaration and the file can no longer
 contradict each other. A profile with no AFNOR flowProfile omits the field (issue #395).
