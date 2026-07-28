@@ -47,7 +47,7 @@ if (!file_exists($dolibarrHtdocs . '/master.inc.php')) {
 
 require_once $dolibarrHtdocs . '/master.inc.php';
 dol_include_once('einvoicing/class/protocols/CIIProtocol.class.php');
-require_once DOL_DOCUMENT_ROOT . '/../test/phpunit/CommonClassTest.class.php';
+require_once __DIR__ . '/CommonClassTestCompat.inc.php';
 
 /**
  * Class for PHPUnit tests
