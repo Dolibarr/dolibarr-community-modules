@@ -26,8 +26,7 @@
  */
 
 
-// This script must only be run from the command line: it emulates an OAuth
-// token exchange and would otherwise expose the PDP client_secret over HTTP.
+// This script must only be run from the command line.
 if (PHP_SAPI !== 'cli') {
 	echo "Error: this script must be run from the command line (CLI), not through a web server.\n";
 	exit(1);
@@ -116,9 +115,7 @@ class EInvoicingSamplesTest extends CommonClassTest
 		$this->assertXmlStringEqualsXmlString(
 			$expectedXml,
 			$actualXml,
-			'Generated CII XML no longer matches ' . $expectedFixtureFile . '. '
-			. 'If this change is intentional, regenerate the reference invoices with: '
-			. 'scripts/regenerate_einvoicing_fixtures.php, review the diff, then commit the updated fixture.'
+			'Generated CII XML no longer matches ' . $expectedFixtureFile . '. If this change is intentional, regenerate the reference invoices with: scripts/regenerate_einvoicing_fixtures.php, review the diff, then commit the updated fixture.'
 		);
 	}
 

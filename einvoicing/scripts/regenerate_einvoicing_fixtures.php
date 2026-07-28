@@ -100,7 +100,7 @@ $files = array(
 );
 
 try {
-	$xmls = EInvoicing::generateSampleEInvoicesForTests($db);
+	$xmls = EInvoicing::generateSampleEInvoicesForTests();
 
 	foreach ($files as $key => $path) {
 		$previous = file_exists($path) ? file_get_contents($path) : null;

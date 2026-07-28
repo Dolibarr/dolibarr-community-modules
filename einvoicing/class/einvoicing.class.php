@@ -3096,6 +3096,10 @@ class EInvoicing
 		$conf->global->EINVOICING_PDP = 'SPECIMEN';
 		$conf->global->EINVOICING_SPECIMEN_ROUTING_ID = $seller->idprof2;
 
+		$depositXml = '';
+		$standardXml = '';
+		$creditnoteXml = '';
+
 		try {
 			$depositXml = self::generateSampleInvoiceXml($seller, $buyer, array(
 				'invoiceformat' => 'CII',
