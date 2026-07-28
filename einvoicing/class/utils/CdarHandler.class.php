@@ -312,6 +312,13 @@ class CdarHandler
 				return array('res' => -1, 'message' => 'Cannot compute the cashed amount (MEN) per VAT rate for invoice ' . $object->ref);
 			}
 			$SpecifiedDocumentStatus['SpecifiedDocumentCharacteristic'] = $cashedAmounts;
+		} elseif ($statusCode == CdarHandler::PROC_PAYMENT_TRANSMITTED) {
+			// "Paiement transmis" tells the vendor what was paid and when (MDG-43 block MDT-207 = MPA).
+			// No rule makes it mandatory, so a status with no known amount is still sent, just bare.
+			$paidAmounts = $this->getPaymentSentCharacteristics($object, $paymentData);
+			if (!empty($paidAmounts)) {
+				$SpecifiedDocumentStatus['SpecifiedDocumentCharacteristic'] = $paidAmounts;
+			}
 		}
 		if (!empty($SpecifiedDocumentStatus)) {
 			// Rule BR-FR-CDV-16: any status detail block must be numbered (MDT-124-2). Only one block is sent.
@@ -408,6 +415,42 @@ class CdarHandler
 		//echo "CDAR file generated: " . $filename;
 
 		return array('res' => 1, 'message' => 'CDAR file generated successfully', 'file' => $filename);
+	}
+
+	/**
+	 * Build the MDG-43 "paid amount" (MPA) block of a status 211 (Paiement transmis) CDAR.
+	 *
+	 * That status tells the vendor of a supplier invoice that its payment has been sent: the block holds
+	 * how much was paid (MDT-215) and when (MDT-217), as in the XP Z12-012 annex B example. Unlike the
+	 * cash-in, no rule makes it mandatory, hence an empty return when no amount is known.
+	 *
+	 * @param  FactureFournisseur|Facture $object      Invoice that has been paid
+	 * @param  array{amount?:float,date?:int}          $paymentData Amount paid (TTC, company currency) and its date as a timestamp. Both default to the payments recorded on the invoice.
+	 * @return array<array{TypeCode:string,ValueAmount:string,CurrencyID:string,ValueDateTime:string}>  MPA block, empty if no amount is known
+	 */
+	public function getPaymentSentCharacteristics($object, $paymentData = array())
+	{
+		global $conf;
+
+		$paidAmount = isset($paymentData['amount']) ? (float) $paymentData['amount'] : 0.0;
+		if (empty($paidAmount) && method_exists($object, 'getSommePaiement')) {
+			$paidAmount = (float) $object->getSommePaiement();
+		}
+		if ($paidAmount <= 0) {
+			dol_syslog(__METHOD__ . ' No paid amount found for invoice id=' . $object->id, LOG_WARNING, 0, '_einvoicing');
+			return array();
+		}
+
+		$paidDate = empty($paymentData['date']) ? dol_now() : $paymentData['date'];
+
+		return array(
+			array(
+				'TypeCode' => 'MPA',
+				'ValueAmount' => number_format($paidAmount, 2, '.', ''),
+				'CurrencyID' => $conf->currency,
+				'ValueDateTime' => dol_print_date($paidDate, '%Y%m%d')
+			)
+		);
 	}
 
 	/**
@@ -921,6 +964,10 @@ class CdarHandler
 							$amountElement->setAttribute('currencyID', $characteristic['CurrencyID']);
 						}
 						$characteristicElement->appendChild($amountElement);
+					}
+
+					if (isset($characteristic['ValueDateTime'])) {
+						$this->addDateTimeElement($dom, $characteristicElement, 'ram:ValueDateTime', $characteristic['ValueDateTime'], self::FORMAT_DATE);
 					}
 
 					if (isset($characteristic['ValuePercent'])) {

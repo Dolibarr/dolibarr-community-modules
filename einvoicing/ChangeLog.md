@@ -93,6 +93,12 @@ them used to show the same wording ("Misc purchases") and the text sent by the v
 no longer registers a vendor price on the catch-all either, which used to glue the vendor reference of the
 line onto it and make every next invoice match it instead of the real product.
 
+NEW: The "Payment transmitted" (211) status can now be sent automatically to tell the vendor that a
+supplier invoice received through the platform has been paid, as soon as Dolibarr classifies it as paid.
+It carries the amount paid and its date, and is sent once per invoice. Optional status of the reform, so
+it is off by default and enabled with EINVOICING_SEND_PAYMENT_SENT_STATUS. It can also be sent by hand
+from the supplier invoice card, where it was missing from the list of sendable statuses.
+
 ## 1.0.0
 
 Initial version

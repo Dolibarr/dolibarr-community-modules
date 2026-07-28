@@ -700,6 +700,11 @@ class EInvoicing
 			unset($options[self::STATUS_DISPUTED]);
 			unset($options[self::STATUS_PARTIALLY_APPROVED]);
 			unset($options[self::STATUS_SUSPENDED]);
+		}
+
+		if ($onlyCreate) {
+			// "Payment transmitted" is something we send once a supplier invoice is paid, never an
+			// initial status of an invoice being created.
 			unset($options[self::STATUS_PAYMENT_SENT]);
 		}
 
@@ -2711,6 +2716,38 @@ class EInvoicing
 		}
 
 		return (int) $db->last_insert_id($db->prefix() . 'einvoicing_lifecycle_msg');
+	}
+
+	/**
+	 * Tell whether a lifecycle status was already sent to the platform for an object.
+	 *
+	 * Used to keep an automatic status (the payment ones) from being sent twice when the invoice goes
+	 * through "paid" again, for example after a payment is deleted then recorded anew.
+	 *
+	 * @param	int		$elementId		Id of the invoice
+	 * @param	string	$elementType	Element type ('facture', 'invoice_supplier')
+	 * @param	int		$statusCode		Lifecycle status looked for (200 to 213)
+	 * @return	bool					True if that status has already been sent
+	 */
+	public function hasSentStatusMessage($elementId, $elementType, $statusCode)
+	{
+		$sql = "SELECT rowid FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
+		$sql .= " WHERE element_type = '" . $this->db->escape($elementType) . "'";
+		$sql .= " AND element_id = " . (int) $elementId;
+		$sql .= " AND lc_status = " . (int) $statusCode;
+		$sql .= " AND LOWER(direction) = 'out'";
+		$sql .= " LIMIT 1";
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . ' SQL error: ' . $this->db->lasterror(), LOG_ERR);
+			return false;
+		}
+
+		$found = ($this->db->num_rows($resql) > 0);
+		$this->db->free($resql);
+
+		return $found;
 	}
 
 	/**

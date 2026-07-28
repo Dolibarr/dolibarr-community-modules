@@ -257,6 +257,14 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->defaultFieldValue = '0';
 	$item->cssClass = 'minwidth500';
 
+	// Tell the vendor of a supplier invoice that its payment has been sent (status 211), as soon as the
+	// invoice is classified paid in Dolibarr. Optional status of the reform, hence off by default: it is
+	// a courtesy to the vendor and it costs one platform flow per invoice.
+	$item = $formSetup->newItem('EINVOICING_SEND_PAYMENT_SENT_STATUS')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('EINVOICING_SEND_PAYMENT_SENT_STATUS_HELP');
+	$item->defaultFieldValue = '0';
+	$item->cssClass = 'minwidth500';
+
 	// Allow re-sending / re-editing an invoice already transmitted to the Access Point. Off by default:
 	// a transmitted invoice is immutable (correct it with a credit note / corrective invoice), and re-sending
 	// makes the PA refuse a duplicate. Turn on only to deliberately test PA retry behaviour.
