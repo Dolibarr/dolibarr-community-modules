@@ -2,6 +2,12 @@
 
 ## 1.0.3
 
+FIX: The combo used to pick the default product of a vendor, on the thirdparty card, no longer depends
+on a global left behind by the calling page. select_produits_fournisseurs() reads the purchase status
+it filters on from the global $status, so any page or hook setting that variable for its own purpose
+could make the combo come back empty, with nothing to explain why. The purchase status is now forced
+before the call and the global given back untouched.
+
 FIX: The flowProfile declared to the platform is now read from the guideline URN of the document
 being transmitted instead of being hardcoded, so the declaration and the file can no longer
 contradict each other. A profile with no AFNOR flowProfile omits the field (issue #395).
