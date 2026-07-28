@@ -63,6 +63,12 @@ FIX: The document status code (MDT-88) of a lifecycle message now follows the li
 with (deposited, received, made available, taken over, approved, paid), instead of always announcing
 "in process", and the referenced invoice date is sent as a plain date, as in the XP Z12-012 examples.
 
+FIX: A supplier invoice line that falls back on the default product of the vendor now keeps the label and
+the description carried by the XML. That product is a catch-all shared by every unresolved line, so all of
+them used to show the same wording ("Misc purchases") and the text sent by the vendor was lost. Such a line
+no longer registers a vendor price on the catch-all either, which used to glue the vendor reference of the
+line onto it and make every next invoice match it instead of the real product.
+
 ## 1.0.0
 
 Initial version
