@@ -354,7 +354,12 @@ trait CommonProtocol
 		$tmpinvoice->contact = $tmpcontact;
 
 
-		// Generate the Dolibarr PDF of the invoice
+		// Generate the Dolibarr PDF of the invoice.
+		// The PDF models reach ExtraFields through CommonDocGenerator::getExtrafieldsInHtml(), and the
+		// core only autoloads that class on the paths that go through a real invoice card. Reached
+		// from a CLI script or a test that only included master.inc.php, the call fatals with
+		// 'Class "ExtraFields" not found', so require it explicitly here.
+		require_once DOL_DOCUMENT_ROOT . '/core/class/extrafields.class.php';
 		$tmpinvoice->generateDocument($tmpinvoice->model_pdf, $outputlangs);
 
 		// For invoice with ->specimen=1, the file is SPECIMEN.pdf so we rename it into ref

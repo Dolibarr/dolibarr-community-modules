@@ -3062,7 +3062,7 @@ class EInvoicing
 	 */
 	public static function generateSampleEInvoicesForTests()
 	{
-		global $conf, $db;
+		global $conf, $db, $langs;
 		require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
 		require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
 
@@ -3096,6 +3096,17 @@ class EInvoicing
 		$conf->global->EINVOICING_PDP = 'SPECIMEN';
 		$conf->global->EINVOICING_SPECIMEN_ROUTING_ID = $seller->idprof2;
 
+		// Same reason for the language: CommonProtocol::generateSampleInvoice() builds the specimen
+		// with the ambient $langs, so the free text it carries (BT-20 payment terms, BT-22 notes,
+		// line descriptions) follows whatever language the instance runs in. The reference fixtures
+		// would then match only on an instance set to the language of whoever generated them.
+		// Pin en_US here, so the specimen is the same everywhere; the interactive sample generation
+		// keeps following the user language, it does not go through this method.
+		$savLangs = $langs;
+		$langs = new Translate('', $conf);
+		$langs->setDefaultLang('en_US');
+		$langs->loadLangs(array('main', 'dict', 'companies', 'bills', 'products', 'einvoicing@einvoicing'));
+
 		$depositXml = '';
 		$standardXml = '';
 		$creditnoteXml = '';
@@ -3121,6 +3132,7 @@ class EInvoicing
 		} finally {
 			$conf->global->EINVOICING_PDP = $savEinvoicingPdp;
 			$conf->global->EINVOICING_SPECIMEN_ROUTING_ID = $savEinvoicingRoutingId;
+			$langs = $savLangs;
 		}
 
 		return array(
