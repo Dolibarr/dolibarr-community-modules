@@ -890,7 +890,7 @@ class FacturXProtocol extends CIIProtocol
 
 		require __DIR__ . "/ExampleHelpers.php";
 
-		$existingPdfFilename = __DIR__ . "/../../assets/00_ZugferdDocumentPdfBuilder_PrintLayout.pdf";
+		$existingPdfFilename = __DIR__ . "/../../doc/00_ZugferdDocumentPdfBuilder_PrintLayout.pdf";
 		$newPdfFilename = $conf->einvoicing->dir_temp . "/INVTEST-".dol_print_date(dol_now(), '%y%m%d-%H%M%S').".pdf";
 		//$AdditionalDocument = __DIR__ . "/../../assets/00_AdditionalDocument.csv";
 

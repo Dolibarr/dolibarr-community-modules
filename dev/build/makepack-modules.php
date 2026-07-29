@@ -339,24 +339,25 @@ function buildModulePackages($action, $modulename)
 	$listOfModuleContent = [
 		'admin',
 		'ajax',
-		'assets',
-		'public',
-		'scripts',
-		'vendor',
 		'backport',
 		'class',
 		'css',
-		'COPYING',
 		'core',
 		'img',
 		'js',
 		'langs',
 		'lib',
+		'public',
+		'scripts',
 		'sql',
 		'tpl',
+		'vendor',
 		'*.md',
 		'*.json',
 		'*.php',
+		'*.yaml',
+		'COPYING',
+		'COPYRIGHT',
 		'modulebuilder.txt',
 	];
 
@@ -477,6 +478,19 @@ function buildModulePackages($action, $modulename)
 				}
 			}
 		}
+
+		// TODO dir to exclude to store somewhere
+		$dirsToExclude = array(
+			'einvoicing/vendor/horstoeko/zugferd/tests',
+			'einvoicing/vendor/horstoeko/zugferd/examples'
+		);
+		foreach ($dirsToExclude as $dirToExclude) {
+			if (is_dir($tmpdir . '/' . $dirToExclude)) {
+				print "Delete dir $tmpdir/$dirToExclude\n";
+				delTree($tmpdir . '/' . $dirToExclude);
+			}
+		}
+
 
 		$z = new ZipArchive();
 		$z->open($outzip, ZIPARCHIVE::CREATE);
