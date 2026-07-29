@@ -2,6 +2,14 @@
 
 ## 1.0.3
 
+FIX: The totals of the generated document now follow the rounding convention of the instance. Dolibarr
+sums the amounts already rounded on each line, unless MAIN_ROUNDOFTOTAL_NOT_TOTALOFROUND (or its
+_SUPPLIER variant) asks it to round the sum instead, and the invoice recorded, printed, booked and paid
+then carries that second convention. The module always applied the first one, so on such an instance the
+document transmitted claimed a cent less (or more) than the invoice it stands for. Nothing reported it:
+the document stayed internally consistent and the tolerance BR-CO-17 allows absorbs the gap, so the
+platform accepted it (issue #378).
+
 FIX: The reference a credit note makes to the invoice it corrects now carries that invoice issue date
 (BT-26) whatever the profile, and no longer only in EXTENDED. The date is allowed by EN 16931
 (CII-DT-027) and required by the French rule BR-FR-CO-05, which rejects a credit note whose reference
@@ -21,6 +29,16 @@ sequence number, as required by the rules BR-FR-CDV-14 and BR-FR-CDV-16. Without
 rejected the CDAR with a HTTP 400. It is also issued as the seller of the invoice and addressed to its
 buyer, instead of reusing the supplier invoice mapping (us as the buyer, addressed to ourselves) which
 made the platform answer "no matching invoices found".
+
+NEW: The cash-in is now reported on every customer payment instead of once when the invoice becomes
+fully paid, so partial payments are reported too (each one with its own amount), as the reform
+expects. Its scope is the operations whose VAT is due on collection, which the module no longer asks
+for: it reads the VAT mode already held by the Tax/VAT module setup (TAX_MODE_SELL_PRODUCT and
+TAX_MODE_SELL_SERVICE). The einvoicing setup page reminds the current value and links to the page
+that owns it. The same source now drives the VAT point date code (BT-8) and the "TVA d'après les
+débits" legal mention, which used to depend on the module option EINVOICING_VAT_ON_DEBITS. That
+option is gone: an instance that had set it must make sure the VAT mode of the Tax/VAT module says
+the same thing.
 
 FIX: The flowProfile declared to the platform is now read from the guideline URN of the document
 being transmitted instead of being hardcoded, so the declaration and the file can no longer
@@ -92,6 +110,12 @@ the description carried by the XML. That product is a catch-all shared by every 
 them used to show the same wording ("Misc purchases") and the text sent by the vendor was lost. Such a line
 no longer registers a vendor price on the catch-all either, which used to glue the vendor reference of the
 line onto it and make every next invoice match it instead of the real product.
+
+NEW: The "Payment transmitted" (211) status can now be sent automatically to tell the vendor that a
+supplier invoice received through the platform has been paid, as soon as Dolibarr classifies it as paid.
+It carries the amount paid and its date, and is sent once per invoice. Optional status of the reform, so
+it is off by default and enabled with EINVOICING_SEND_PAYMENT_SENT_STATUS. It can also be sent by hand
+from the supplier invoice card, where it was missing from the list of sendable statuses.
 
 ## 1.0.0
 

@@ -300,7 +300,8 @@ $depositlines      	= [];
 $globalDiscounts	= [];
 $billing_period    	= [];
 $numligne          	= 1;
-$hasServiceLine		= false;	// Drives the VAT point date code (BT-8): VAT on services falls due on collection
+$hasServiceLine		= false;	// With the VAT mode below, drives the VAT point date code (BT-8)
+$hasProductLine		= false;
 // @phan-suppress-current-line PhanTypeArraySuspiciousNullable
 foreach ($object->lines as $line) {
 	$isDepositLine = 0;
@@ -316,6 +317,8 @@ foreach ($object->lines as $line) {
 
 	if ($line->product_type == 1) {		// Product::TYPE_SERVICE
 		$hasServiceLine = true;
+	} else {
+		$hasProductLine = true;
 	}
 
 	// For credit notes EN16931 requires positive amounts
@@ -616,6 +619,29 @@ foreach ($object->lines as $line) {
 	$numligne++;
 }
 
+// Rounding convention of the totals.
+// Dolibarr sums the amounts already rounded on each line ("total of round", the default), unless
+// MAIN_ROUNDOFTOTAL_NOT_TOTALOFROUND is set, in which case it rounds the sum instead ("round of
+// total"). update_price() then writes the difference back onto the last line of the VAT rate, so on
+// such an instance the invoice recorded, printed, booked and paid carries the second convention.
+// The loop above always applied the first one, so the document transmitted claimed a cent less (or
+// more) than the invoice it stands for, and nothing reported it: the document stays internally
+// consistent, and the tolerance BR-CO-17 allows absorbs the gap (issue #378).
+// Only the VAT is concerned: on a document priced without tax update_price() never adjusts the net
+// amount of a line, so the line net amounts (BT-131) and their sum (BT-106) are the same either way.
+$roundTotalConstName = 'MAIN_ROUNDOFTOTAL_NOT_TOTALOFROUND';
+if (in_array($object->element, array('facture_fourn', 'invoice_supplier'))) {
+	$roundTotalConstName .= '_SUPPLIER';
+}
+if (getDolGlobalString($roundTotalConstName) == '1') {		// Same comparison as update_price(), which only treats '1' as "round of total"
+	$grand_total_tva = 0;
+	foreach ($taxBreakdown as $keyforvatrate => $vals) {
+		$taxBreakdown[$keyforvatrate]['totalTVA'] = (float) price2num((float) $vals['totalHT'] * (float) $vals['tva_tx'] / 100, 2);
+		$grand_total_tva += $taxBreakdown[$keyforvatrate]['totalTVA'];
+	}
+	$grand_total_ttc = (float) price2num($grand_total_ht + $grand_total_tva, 2);
+}
+
 // already used credit note amount
 $usedcreditnoteamount = 0;
 $usedcreditnote = array();
@@ -660,6 +686,15 @@ $deliveryDate = !empty($deliveryDateList)
 
 
 
+// VAT exigibility scheme of the seller, as set in the Tax/VAT module (Home - Setup - Modules - Tax/VAT,
+// "VAT mode"). "TVA d'après les débits" is TAX_MODE 1, which puts both sell modes on 'invoice'.
+// Conf::setValues() always populates the two constants, defaulting to the French standard scheme.
+$sellProductOnPayment = (getDolGlobalString('TAX_MODE_SELL_PRODUCT') == 'payment');
+$sellServiceOnPayment = (getDolGlobalString('TAX_MODE_SELL_SERVICE') == 'payment');
+$vatOnDebits = (!$sellProductOnPayment && !$sellServiceOnPayment);
+// Does this invoice carry at least one line whose VAT falls due on collection?
+$vatDueOnPayment = ($sellServiceOnPayment && $hasServiceLine) || ($sellProductOnPayment && $hasProductLine);
+
 // Filling $invoiceData (based on $invoiceTemplate)
 $invoiceData = [
 	// Document part
@@ -690,7 +725,9 @@ $invoiceData = [
 	'documentNoteAAB'      => getDolGlobalString('EINVOICING_AAB') ?: $outputlangs->transnoentities('NoEarlyPaymentDiscount'),
 	// Legal mention that goes with the "TVA d'après les débits" option, mandatory on the invoices of a
 	// seller who took it. The structured form of the same information is the VAT point date code below.
-	'documentNoteTXD'      => getDolGlobalInt('EINVOICING_VAT_ON_DEBITS') ? $outputlangs->transnoentities('VATOnDebitsMention') : '',
+	// The scheme is read from the setup of the Tax/VAT module, which already holds it: TAX_MODE 1 sets both
+	// TAX_MODE_SELL_* to 'invoice'. Conf::setValues() always populates them.
+	'documentNoteTXD'      => $vatOnDebits ? $outputlangs->transnoentities('VATOnDebitsMention') : '',
 	'documentNotes'        => [],
 
 	// BT-8 (VAT point date code), which tells the buyer when the VAT falls due, hence from when it can be
@@ -698,7 +735,7 @@ $invoiceData = [
 	// BR-CL-06, and mutually exclusive with BT-7 (BR-CO-03). VAT on services falls due on collection,
 	// unless the seller opted for the "TVA d'après les débits" scheme, where it falls due on invoicing.
 	// Nothing is sent for a goods-only invoice: its due date is the delivery date the invoice already carries.
-	'vatDueDateTypeCode'   => getDolGlobalInt('EINVOICING_VAT_ON_DEBITS') ? '5' : ($hasServiceLine ? '72' : ''),
+	'vatDueDateTypeCode'   => $vatOnDebits ? '5' : ($vatDueOnPayment ? '72' : ''),
 
 	// Seller part
 	'sellername'                => $mysoc->name,

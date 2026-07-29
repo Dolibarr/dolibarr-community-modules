@@ -251,9 +251,30 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->defaultFieldValue = '0';
 	$item->cssClass = 'minwidth500';
 
+	// The "Cashed in" (212) status is only sent for the operations whose VAT is due on collection. That
+	// scheme is not a setting of this module: Dolibarr already holds it in the setup of the Tax/VAT module,
+	// and the trigger reads TAX_MODE_SELL_PRODUCT / TAX_MODE_SELL_SERVICE from there. Remind it here, with
+	// its current value and a link to the page that owns it, so nothing is duplicated.
+	$vatexigibility = $langs->trans(getDolGlobalString('TAX_MODE_SELL_PRODUCT') == 'payment' ? 'OnPayment' : 'OnInvoice');
+	$vatexigibility .= ' / ';
+	$vatexigibility .= $langs->trans(getDolGlobalString('TAX_MODE_SELL_SERVICE') == 'payment' ? 'OnPayment' : 'OnInvoice');
+	$itemtitle = $formSetup->newItem('EINVOICING_VAT_EXIGIBILITY');
+	$itemtitle->setAsTitle();
+	$itemtitle->nameText = '<span class="opacitymedium">'.$langs->trans('EINVOICING_VAT_EXIGIBILITY_HELP').'</span> <b>'
+		.dol_escape_htmltag($vatexigibility)
+		.'</b> <a href="'.DOL_URL_ROOT.'/admin/taxes.php">'.$langs->trans('Setup').'</a>';
+
 	// Setup conf to automatically transmit the e-invoice to the PA right after it is generated (on validation)
 	$item = $formSetup->newItem('EINVOICING_AUTO_SEND_ON_GENERATION')->setAsYesNo();
 	$item->helpText = $langs->transnoentities('EINVOICING_AUTO_SEND_ON_GENERATION_HELP');
+	$item->defaultFieldValue = '0';
+	$item->cssClass = 'minwidth500';
+
+	// Tell the vendor of a supplier invoice that its payment has been sent (status 211), as soon as the
+	// invoice is classified paid in Dolibarr. Optional status of the reform, hence off by default: it is
+	// a courtesy to the vendor and it costs one platform flow per invoice.
+	$item = $formSetup->newItem('EINVOICING_SEND_PAYMENT_SENT_STATUS')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('EINVOICING_SEND_PAYMENT_SENT_STATUS_HELP');
 	$item->defaultFieldValue = '0';
 	$item->cssClass = 'minwidth500';
 
