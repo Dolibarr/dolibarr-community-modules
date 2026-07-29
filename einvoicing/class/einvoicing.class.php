@@ -770,27 +770,31 @@ class EInvoicing
 
 		// Error message if we failed to found the einvoiceid
 		if (empty($einvoiceid)) {
-			if (empty($mysoc->idprof1)) {
-				$baseErrors[] = $langs->trans("FxCheckErrorIDPROF1");
-			} else {
-				if ($mysoc->country_code == 'FR') {
-					// Get seller Einvoice ID
-					$provider = getDolGlobalString('EINVOICING_PDP');
-					//$providershort = preg_replace('/ViaPartner/', '', $provider);	// If provider is XXX or XXXViaPartner it must be saved as XXX so if we change method, data still match the situation.
-
-					$uriConf = 'EINVOICING_' . strtoupper($provider) . '_ROUTING_ID';
-					$einvoiceid = getDolGlobalString($uriConf);
-
-					//EINVOICING_LIVE
-					if (!preg_match('/^' . preg_replace('/\s+/', '', $mysoc->idprof1) . '/', $this->removeSpaces($einvoiceid))) {
-						//if (!empty($provider)) {
-							$baseWarnings[] = $langs->trans("FxCheckErrorRoutingIDFR", $einvoiceid);	// Your company profid must match the routing ID
-						//}
-					} else {
-						$baseErrors[] = $langs->trans("FxCheckErrorRoutingID");	// Your company does not have a valid prof id
-					}
+			$provider = getDolGlobalString('EINVOICING_PDP');
+			//$providershort = preg_replace('/ViaPartner/', '', $provider);	// If provider is XXX or XXXViaPartner it must be saved as XXX so if we change method, data still match the situation.
+			if (!empty($provider) && $provider !== '-1') {
+				if (empty($mysoc->idprof1)) {
+					$baseErrors[] = $langs->trans("FxCheckErrorIDPROF1");
 				} else {
-					$baseErrors[] = $langs->trans("FxCheckErrorRoutingID");
+					if ($mysoc->country_code == 'FR') {
+						// Get seller Einvoice ID
+						$provider = getDolGlobalString('EINVOICING_PDP');
+						//$providershort = preg_replace('/ViaPartner/', '', $provider);	// If provider is XXX or XXXViaPartner it must be saved as XXX so if we change method, data still match the situation.
+
+						$uriConf = 'EINVOICING_' . strtoupper($provider) . '_ROUTING_ID';
+						$einvoiceid = getDolGlobalString($uriConf);
+
+						//EINVOICING_LIVE
+						if (!preg_match('/^' . preg_replace('/\s+/', '', $mysoc->idprof1) . '/', $this->removeSpaces($einvoiceid))) {
+							//if (!empty($provider)) {
+								$baseWarnings[] = $langs->trans("FxCheckErrorRoutingIDFR", $einvoiceid);	// Your company profid must match the routing ID
+							//}
+						} else {
+							$baseErrors[] = $langs->trans("FxCheckErrorRoutingID");	// Your company does not have a valid prof id
+						}
+					} else {
+						$baseErrors[] = $langs->trans("FxCheckErrorRoutingID");
+					}
 				}
 			}
 		}
