@@ -197,11 +197,11 @@ abstract class AbstractPDPProvider
 
 	/**
 	 * Check whether a recipient has an active reception address in the Approved Platforms
-	 * directory (annuaire des Plateformes Agreees) before attempting to send an e-invoice.
+	 * directory before attempting to send an e-invoice.
 	 *
 	 * A recipient that is absent from the directory, or present but without any active routing
 	 * line, cannot receive electronic invoices: sending would be rejected by the platform with
-	 * a routing error (lifecycle fr:213). Checking beforehand lets the caller warn the user with
+	 * a routing error (lifecycle fr:213). Checking beforehand let the caller warn the user with
 	 * a clear message instead of the opaque platform rejection.
 	 *
 	 * Providers that do not expose a directory lookup keep the default 'unsupported' status so
@@ -328,10 +328,10 @@ abstract class AbstractPDPProvider
 
 	/**
 	 * Try to get a flow data from its id and doc type, using API
-	 * @param $flowId 		The id of the flow
-	 * @param $docType 		The type of document we want to return
-	 * @param $callType		The type of call to use when calling API
 	 *
+	 * @param string	$flowId 		The id of the flow
+	 * @param string	$docType 		The type of document we want to return
+	 * @param string	$callType		The type of call to use when calling API
 	 * @return array{status_code:int,response:null|string|array<string,mixed>,errorCode?:string,errorMessage?:string,id?:int,call_id?:string}
 	 */
 	public function fetchFlowData($flowId, $docType, $callType = '')
