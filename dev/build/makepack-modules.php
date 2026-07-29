@@ -407,11 +407,19 @@ function buildModulePackages($modulename)
 		$outzip = $directoryToSearch . DIRECTORY_SEPARATOR . $project . DIRECTORY_SEPARATOR . "module_" . $mod . "-" . $version . ".zip";
 		$outzipothers = $directoryToSearch . DIRECTORY_SEPARATOR . $project . DIRECTORY_SEPARATOR . "module_" . $mod . "-*.zip";
 		if (file_exists($outzip)) {
-			print "Found an existing file, we delete file $outzip\n";
-			secureUnlink($outzip);	// We remove the existing zip, may be the new one will be the same.
+			print "Found an existing file, we delete all files $outzipothers\n";
+			//secureUnlink($outzipothers);	// We remove the existing zip, may be the new one will be the same.
+			//dol_delete_file($outzipothers);
+			foreach (glob($outzipothers) as $file) {
+				unlink($file);
+			}
 		} else {
-			print "Delete other files like $outzipothers\n";
-			dol_delete_file($outzipothers);
+			print "Delete all files like $outzipothers\n";
+			//secureUnlink($outzipothers);	// We remove the existing zip, may be the new one will be the same.
+			//dol_delete_file($outzipothers);
+			foreach (glob($outzipothers) as $file) {
+				unlink($file);
+			}
 		}
 
 		//copy all sources into system temp directory
