@@ -198,6 +198,8 @@ function completAutoTags($content, $modulePath)
 
 
 	if ($coreClassContent) {
+		$version = '';
+
 		// Update tags with a corresponding value found into the descriptor file
 		foreach ($tagsToExtractFromDescriptor as $tag => $property) {
 			if (preg_match('/(' . preg_quote($tag) . ':\s*)["\']?auto["\']?/', $content)) {	// If the key: is 'auto'
@@ -213,7 +215,11 @@ function completAutoTags($content, $modulePath)
 				} elseif (preg_match('/\$this->' . preg_quote($property) . '\s*=\s*[\'"]([^\'"]+)[\'"]/', $coreClassContent, $matches)) {
 					// Case where the value is a simple string
 					$value = trim($matches[1]);
-					print "Found string value for '$property': $value\n";
+					print "Found string value for '$tag/$property': $value\n";
+
+					if ($tag == 'current_version') {
+						$version = $value;
+					}
 				}
 
 				// Clean version x.y.z into x.y
@@ -245,6 +251,19 @@ function completAutoTags($content, $modulePath)
 				// Nothing done, we keep value as in source file
 			}
 		}
+
+
+		if (!empty($tagsToExtractFromDescriptor['current_version'])) {
+			$directoryToSearch = realpath(__DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . '..'); // We are in dev/build, we want to go to root of repository
+			$outzip = $directoryToSearch . DIRECTORY_SEPARATOR . strtolower($modulename) . DIRECTORY_SEPARATOR . "module_" . strtolower($modulename) . "-" . $version . ".zip";
+			print "We check if zip file for module ".$modulename.", with name ".$outzip." exists\n";
+			if (file_exists($outzip)) {
+				// File already exists, nothing is done.
+			} else {
+				// File does not exists, we can build it.
+			}
+		}
+
 
 		// Now update the created_at
 
@@ -310,32 +329,35 @@ function completAutoTags($content, $modulePath)
 /**
  * build modules zip file if module sources are available into the repository.
  *
- * @return void
+ * @param	string	$action			Action code
+ * @param	string 	$modulename		Force build of one given module.
+ * @return 	void
  */
-function buildModulePackages()
+function buildModulePackages($action, $modulename)
 {
 	// list of files & dirs to include into the zip
 	$listOfModuleContent = [
 		'admin',
 		'ajax',
-		'assets',
-		'public',
-		'scripts',
-		'vendor',
 		'backport',
 		'class',
 		'css',
-		'COPYING',
 		'core',
 		'img',
 		'js',
 		'langs',
 		'lib',
+		'public',
+		'scripts',
 		'sql',
 		'tpl',
+		'vendor',
 		'*.md',
 		'*.json',
 		'*.php',
+		'*.yaml',
+		'COPYING',
+		'COPYRIGHT',
 		'modulebuilder.txt',
 	];
 
@@ -349,19 +371,24 @@ function buildModulePackages()
 
 	// Get module lists from yaml files
 	$projects = [];
-	foreach ($yamlFiles as $yamlFile) {
-		// Parse YAML file to get the name of the module
-		$content = file_get_contents($yamlFile);
-		$reg = array();
-		if (preg_match('/modulename:\s*[\'"]([^\'"]+)[\'"]/', $content, $reg)) {
-			$projects[] = strtolower($reg[1]);
-		} else {
-			print "Can't extract module name from yaml file: ".$yamlFile."\n";
-			continue;
+	if ($modulename) {
+		$projects[] = strtolower($modulename);
+	} else {
+		foreach ($yamlFiles as $yamlFile) {
+			// Parse YAML file to get the name of the module
+			$content = file_get_contents($yamlFile);
+			$reg = array();
+			if (preg_match('/modulename:\s*[\'"]([^\'"]+)[\'"]/', $content, $reg)) {
+				$projects[] = strtolower($reg[1]);
+			} else {
+				print "Can't extract module name from yaml file: ".$yamlFile."\n";
+				continue;
+			}
 		}
 	}
 
 	print "\n";
+
 
 	// For each module, we generate the zip file
 	foreach ($projects as $project) {
@@ -380,8 +407,58 @@ function buildModulePackages()
 
 		//  Define the name of the output zip file and remove it if already exists
 		$outzip = $directoryToSearch . DIRECTORY_SEPARATOR . $project . DIRECTORY_SEPARATOR . "module_" . $mod . "-" . $version . ".zip";
+		$outzipothers = $directoryToSearch . DIRECTORY_SEPARATOR . $project . DIRECTORY_SEPARATOR . "module_" . $mod . "-*.zip";
 		if (file_exists($outzip)) {
-			secureUnlink($outzip);
+			print "A zip file already exists with this name/version: $outzip\n";
+
+			// Test if a tag exists with version $version. If yes, we cancel this
+			$tag = $project.'_'.$version;
+
+			$output = '';
+			$returnCode = 0;
+			$command = sprintf('git rev-parse -q --verify %s^{tag} 2>/dev/null', escapeshellarg($tag));
+			print $command."\n";
+			exec(
+				$command,
+				$output,
+				$returnCode
+			);
+			$exists = ($returnCode === 0);
+			if ($exists) {
+				print "The tag ".$tag." exists, so we cancel action on this module. Change first the version if you want to regenerate the zip/tag of module.\n";
+				continue;
+			} else {
+				print "The tag ".$tag." does not exists and action=$action.\n";
+				if ($action == 'makeziptag') {
+					$output = '';
+					$returnCode = 0;
+					$repo = $directoryToSearch . DIRECTORY_SEPARATOR . $project;
+					$command = sprintf('git -C %s tag %s 2>&1', escapeshellarg($repo), escapeshellarg($tag));
+					print "YOU MUST COMMIT ALL FILES AND CREATE A TAG WITH COMMAND:\n";
+					print $command."\n";
+					/*exec(
+						$command,
+						$output,
+						$returnCode
+					);*/
+				} else {
+					print "No tag creation requested.\n";
+				}
+			}
+
+			print "Delete all files like $outzipothers\n";
+			//secureUnlink($outzipothers);	// We remove the existing zip, may be the new one will be the same.
+			//dol_delete_file($outzipothers);
+			foreach (glob($outzipothers) as $file) {
+				unlink($file);
+			}
+		} else {
+			print "Delete all files like $outzipothers\n";
+			//secureUnlink($outzipothers);	// We remove the existing zip, may be the new one will be the same.
+			//dol_delete_file($outzipothers);
+			foreach (glob($outzipothers) as $file) {
+				unlink($file);
+			}
 		}
 
 		//copy all sources into system temp directory
@@ -401,6 +478,19 @@ function buildModulePackages()
 				}
 			}
 		}
+
+		// TODO dir to exclude to store somewhere
+		$dirsToExclude = array(
+			'einvoicing/vendor/horstoeko/zugferd/tests',
+			'einvoicing/vendor/horstoeko/zugferd/examples'
+		);
+		foreach ($dirsToExclude as $dirToExclude) {
+			if (is_dir($tmpdir . '/' . $dirToExclude)) {
+				print "Delete dir $tmpdir/$dirToExclude\n";
+				delTree($tmpdir . '/' . $dirToExclude);
+			}
+		}
+
 
 		$z = new ZipArchive();
 		$z->open($outzip, ZIPARCHIVE::CREATE);
@@ -431,6 +521,8 @@ function detectModule()
 		print "[fail] Error on auto detect data : there is no mod*.class.php file into core/modules dir\n";
 		return ["", ""];
 	}
+
+	$matches = array();
 	if (count($tab) == 1) {
 		$file = $tab[0];
 		$pattern = "/.*mod(?<mod>.*)\.class\.php/";
@@ -660,9 +752,9 @@ if (!extension_loaded('zip')) {
 
 if (empty($argv[1])) {
 	print "Usage:   ".$script_file." index|makezip|pushdolistore\n";
-	print "Example: ".$script_file." index      	to rebuild the index.yaml file (used by Dolibarr to retrieve list of community modules)\n";
-	print "Example: ".$script_file." makezip      	to regenerate zip of packages \n";
-	print "Example: ".$script_file." pushdolistore  to regenerate zip of packages and publish them on dolistore (TODO)\n";
+	print "Example: ".$script_file." index      						to rebuild the index.yaml file (used by Dolibarr to retrieve list of community modules)\n";
+	print "Example: ".$script_file." makezip|makeziptag [modulename]   	to regenerate zip of packages \n";
+	print "Example: ".$script_file." pushdolistore 		[modulename]	to regenerate zip of packages and publish them on dolistore (TODO)\n";
 	print "\n";
 	exit(1);
 }
@@ -695,9 +787,9 @@ if ($argv[1] == 'dolistore') {
 	// Scan all modules, for each one, call the makepack.pl to regenerate the zip file then publish the file using the api key.
 }
 
-if ($argv[1] == 'makezip') {
+if ($argv[1] == 'makezip' || $argv[1] == 'makeziptag') {
 	// For each module, we generate the zip file
-	buildModulePackages();
+	buildModulePackages($argv[1], $argv[2] ?? '');
 	print "All done.\n";
 }
 

@@ -22,7 +22,7 @@
 
 /*
    The goal of that php CLI script is to make zip package of your module
-   as an alternative to web "build zip" or "perl script makepack"
+   as an alternative to web "build zip"
 */
 
 /** @phan-file-suppress PhanRedefineFunction */

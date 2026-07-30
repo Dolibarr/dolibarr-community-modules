@@ -1,5 +1,16 @@
 # CHANGELOG MODULE EINVOICING FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.0.4
+
+FIX: A line carrying recoverable non-collected VAT ("TVA non perçue récupérable", the overseas
+departments scheme of article 295 of the CGI) no longer makes the document claim a VAT the invoice does
+not charge. Dolibarr makes the total including tax of such a line equal to its net amount, where the
+module added the VAT on top, so the document asked the buyer for the whole rate more than the invoice.
+EN 16931 offers no way to declare a VAT that is not claimed - the total with VAT is the net total plus
+the VAT total (BR-CO-15) - so the line is now issued exempt (category E, rate 0, no VAT amount) with the
+reason code the standard reserves for that article, VATEX-FR-CGI295 (issue #508).
+
+
 ## 1.0.3
 
 FIX: The totals of the generated document now follow the rounding convention of the instance. Dolibarr
@@ -117,13 +128,15 @@ It carries the amount paid and its date, and is sent once per invoice. Optional 
 it is off by default and enabled with EINVOICING_SEND_PAYMENT_SENT_STATUS. It can also be sent by hand
 from the supplier invoice card, where it was missing from the list of sendable statuses.
 
-FIX: A line carrying recoverable non-collected VAT ("TVA non perçue récupérable", the overseas
-departments scheme of article 295 of the CGI) no longer makes the document claim a VAT the invoice does
-not charge. Dolibarr makes the total including tax of such a line equal to its net amount, where the
-module added the VAT on top, so the document asked the buyer for the whole rate more than the invoice.
-EN 16931 offers no way to declare a VAT that is not claimed - the total with VAT is the net total plus
-the VAT total (BR-CO-15) - so the line is now issued exempt (category E, rate 0, no VAT amount) with the
-reason code the standard reserves for that article, VATEX-FR-CGI295 (issue #508).
+NEW: The local check run at generation time now also verifies that the generated document claims the
+amount the invoice claims, and says so when it does not. No rule of the standard can catch that: the
+rules relate the amounts of the document to each other, so a document wrong by a cent is as consistent
+as a correct one and the platform accepts it without a word. The remaining known cause is a currency
+accuracy for totals (MAIN_MAX_DECIMALS_TOT) other than 2, which puts a third decimal on the invoice
+where EN 16931 allows two on every amount, the rounding amount (BT-114) included: no computation can
+make the two equal, so the operator is told rather than left with a document quietly claiming something
+else. It follows EINVOICING_BR_CHECK like the other checks, so it warns by default and aborts on an
+instance set to "blocking" (issue #506).
 
 ## 1.0.0
 

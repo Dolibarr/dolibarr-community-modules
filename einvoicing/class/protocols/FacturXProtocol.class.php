@@ -576,7 +576,7 @@ class FacturXProtocol extends CIIProtocol
 
 			// Local EN 16931 business rules safety net on the final XML (warnings, or abort in strict mode),
 			// same as the native builder branch above, so the external builder is covered too.
-			$this->checkBusinessRules(file_get_contents($xmlfile));
+			$this->checkBusinessRules(file_get_contents($xmlfile), $invoice);
 
 			dolChmod($xmlfile);
 
@@ -890,7 +890,7 @@ class FacturXProtocol extends CIIProtocol
 
 		require __DIR__ . "/ExampleHelpers.php";
 
-		$existingPdfFilename = __DIR__ . "/../../assets/00_ZugferdDocumentPdfBuilder_PrintLayout.pdf";
+		$existingPdfFilename = __DIR__ . "/../../doc/00_ZugferdDocumentPdfBuilder_PrintLayout.pdf";
 		$newPdfFilename = $conf->einvoicing->dir_temp . "/INVTEST-".dol_print_date(dol_now(), '%y%m%d-%H%M%S').".pdf";
 		//$AdditionalDocument = __DIR__ . "/../../assets/00_AdditionalDocument.csv";
 

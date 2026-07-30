@@ -189,11 +189,16 @@ abstract class AbstractProtocol
 	 * "warning_only" (default) reports violations as non-blocking warnings, and "blocking" aborts
 	 * the generation (the exception is caught by generateInvoice() which returns -1 with the messages).
 	 *
-	 * @param	string	$xmlcontent		Generated CII XML content
+	 * The check also covers what no rule of the standard can see: that the document claims the amount
+	 * the invoice claims. A document can be perfectly conformant and still state another total than the
+	 * invoice it stands for, and the platform accepts it without a word.
+	 *
+	 * @param	string			$xmlcontent		Generated CII XML content
+	 * @param	?CommonInvoice	$invoice		Invoice the document was built from, to compare the amounts
 	 * @return	void
 	 * @throws	Exception				When violations are found and mode is "blocking"
 	 */
-	protected function checkBusinessRules($xmlcontent)
+	protected function checkBusinessRules($xmlcontent, $invoice = null)
 	{
 		global $langs;
 
@@ -205,6 +210,7 @@ abstract class AbstractProtocol
 		dol_include_once('einvoicing/class/utils/En16931Validator.class.php');
 		$validator = new En16931Validator();
 		$violations = $validator->validate($xmlcontent);
+		$violations = array_merge($violations, $this->checkDocumentClaimsTheInvoiceAmount($xmlcontent, $invoice));
 		if (empty($violations)) {
 			return;
 		}
@@ -218,6 +224,52 @@ abstract class AbstractProtocol
 		}
 
 		$this->warnings = array_merge((array) $this->warnings, $violations);
+	}
+
+	/**
+	 * Check that the generated document claims the amount the invoice claims.
+	 *
+	 * No rule of the standard can catch this: the rules relate the amounts of the document to each
+	 * other, and a document whose totals are wrong by a cent is as consistent as a correct one. The
+	 * platform therefore accepts it, and the discrepancy only surfaces later, on payment
+	 * reconciliation or on the buyer's side.
+	 *
+	 * The known cause left is a currency accuracy for totals (MAIN_MAX_DECIMALS_TOT) other than 2: the
+	 * invoice then carries a third decimal, and EN 16931 caps every amount at two, the rounding amount
+	 * (BT-114) included (BR-DEC-09 to BR-DEC-23). No computation can make the two equal, so the
+	 * operator is told instead of being left with a document that quietly claims something else
+	 * (issue #506).
+	 *
+	 * @param	string			$xmlcontent		Generated CII XML content
+	 * @param	?CommonInvoice	$invoice		Invoice the document was built from
+	 * @return	string[]						Violation messages, empty when the two agree
+	 */
+	protected function checkDocumentClaimsTheInvoiceAmount($xmlcontent, $invoice)
+	{
+		if (!is_object($invoice) || !isset($invoice->total_ttc)) {
+			return array();
+		}
+		if (!preg_match('#<ram:GrandTotalAmount[^>]*>([^<]*)</ram:GrandTotalAmount>#', $xmlcontent, $reg)) {
+			return array();
+		}
+
+		$claimedByDocument = (float) trim($reg[1]);
+		// A credit note is issued with positive amounts, where Dolibarr holds the invoice negative.
+		$claimedByInvoice = ((int) $invoice->type === $invoice::TYPE_CREDIT_NOTE) ? abs((float) $invoice->total_ttc) : (float) $invoice->total_ttc;
+
+		if (abs($claimedByInvoice - $claimedByDocument) < 0.0001) {
+			return array();
+		}
+
+		$message = 'The document claims '.price2num($claimedByDocument, 'MT').' where the invoice claims '.price2num($claimedByInvoice, 'MT')
+			.': the amount transmitted is not the amount invoiced';
+		$decimals = getDolGlobalInt('MAIN_MAX_DECIMALS_TOT', 2);
+		if ($decimals != 2) {
+			$message .= '. The currency accuracy for totals (MAIN_MAX_DECIMALS_TOT) is set to '.$decimals
+				.' decimals, where EN 16931 allows 2 on every amount, the rounding amount (BT-114) included';
+		}
+
+		return array($message);
 	}
 
 	/**
