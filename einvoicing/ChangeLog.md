@@ -1,5 +1,16 @@
 # CHANGELOG MODULE EINVOICING FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.0.4
+
+FIX: A line carrying recoverable non-collected VAT ("TVA non perçue récupérable", the overseas
+departments scheme of article 295 of the CGI) no longer makes the document claim a VAT the invoice does
+not charge. Dolibarr makes the total including tax of such a line equal to its net amount, where the
+module added the VAT on top, so the document asked the buyer for the whole rate more than the invoice.
+EN 16931 offers no way to declare a VAT that is not claimed - the total with VAT is the net total plus
+the VAT total (BR-CO-15) - so the line is now issued exempt (category E, rate 0, no VAT amount) with the
+reason code the standard reserves for that article, VATEX-FR-CGI295 (issue #508).
+
+
 ## 1.0.3
 
 FIX: The totals of the generated document now follow the rounding convention of the instance. Dolibarr

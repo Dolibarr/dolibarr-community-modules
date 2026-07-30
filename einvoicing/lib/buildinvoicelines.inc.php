@@ -333,6 +333,18 @@ foreach ($object->lines as $line) {
 		$line->qty          = abs($line->qty);
 	}
 
+	// A line carrying recoverable non-collected VAT (TVA NPR) is issued exempt: getCategoryRate() reads
+	// info_bits and answers category E with the reason of article 295 of the CGI, and the rate the line
+	// states must go with it, since EN 16931 requires 0 there (BR-E-05) and no VAT amount (BR-E-09).
+	// Dolibarr already makes the total including tax of such a line equal to its net amount, so this is
+	// what makes the document claim the amount the invoice claims (issue #508).
+	if (!empty($line->info_bits) && ((int) $line->info_bits & 1)) {
+		$line->tva_tx = 0;
+		$line->vat_src_code = '';
+		$line->total_tva = 0;
+		$line->total_ttc = $line->total_ht;
+	}
+
 	// VAT category and exemption reason of the line
 	$tmparray = $this->getCategoryRate($line, $mysoc, $object);
 
