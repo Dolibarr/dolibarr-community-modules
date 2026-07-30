@@ -67,6 +67,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			'prod_api_url' => 'https://hubtimize.fr/api/orchestrator/v1/',
 			'test_auth_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/',
 			'test_api_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/',
+			// The AFNOR Directory Service (XP Z12-013) is served from the same base as the flows on this
+			// platform, so the recipient reachability pre-check of AbstractPDPProvider works here too.
+			'prod_afnor_directory_url' => 'https://hubtimize.fr/api/orchestrator/v1/',
+			'test_afnor_directory_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/',
 			'username' => getDolGlobalString('EINVOICING_ESALINK_USERNAME'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '')),
 			'password' => getDolGlobalString('EINVOICING_ESALINK_PASSWORD'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '')),
 			'api_key'  => getDolGlobalString('EINVOICING_ESALINK_API_KEY'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '')),
@@ -698,6 +702,13 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		require_once DOL_DOCUMENT_ROOT . '/core/lib/geturl.lib.php';
 
 		$url = $this->getApiUrl(($callType == 'get_access_token') ? 'auth' : 'api') . $resource;
+		if (strpos($resource, 'afnor-directory/v1/') === 0) {
+			// Standardized AFNOR Directory Service (XP Z12-013). The 'afnor-directory/v1/' prefix is only a
+			// routing marker used by AbstractPDPProvider::checkRecipientDirectory(): this platform serves the
+			// directory from its regular versioned base, so the marker is stripped instead of appended (the
+			// prefixed path itself answers 403 here).
+			$url = $this->getApiUrl('afnor_directory') . substr($resource, strlen('afnor-directory/v1/'));
+		}
 
 		$httpheader = array(
 			'hubtimize-api-key: ' . $this->config['api_key']
