@@ -2,6 +2,11 @@
 
 ## 1.0.4
 
+FIX: The error raised when a "Standard rated" line has no seller VAT number no longer names the
+customer. The test is on the seller (BR-S-02 requires the Seller VAT identifier, BT-31), but the
+message read "The VAT number of the thirdparty <customer> is mandatory", so the operator went looking
+for the missing number on the customer record while it was missing from their own company.
+
 FIX: A line carrying recoverable non-collected VAT ("TVA non perçue récupérable", the overseas
 departments scheme of article 295 of the CGI) no longer makes the document claim a VAT the invoice does
 not charge. Dolibarr makes the total including tax of such a line equal to its net amount, where the
