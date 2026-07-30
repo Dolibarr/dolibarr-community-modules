@@ -238,7 +238,13 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 
 	// Setup conf to REQUIRE the recipient to be routable in the directory before generating/sending. Off by
 	// default (opt-in enforcement on top of the read-only pre-check above): blocks reaching a routing reject.
-	$item = $formSetup->newItem('EINVOICING_REQUIRE_ROUTABLE_RECIPIENT')->setAsYesNo();
+	// Value 2 blocks the non-conclusive directory answer too (recipient known, status of its reception
+	// address not reported). Formerly a yes/no, whose two values keep their meaning here.
+	$item = $formSetup->newItem('EINVOICING_REQUIRE_ROUTABLE_RECIPIENT')->setAsSelect(array(
+		'0' => $langs->transnoentities('EINVOICING_REQUIRE_ROUTABLE_RECIPIENT_OFF'),
+		'1' => $langs->transnoentities('EINVOICING_REQUIRE_ROUTABLE_RECIPIENT_ON'),
+		'2' => $langs->transnoentities('EINVOICING_REQUIRE_ROUTABLE_RECIPIENT_STRICT'),
+	));
 	$item->helpText = $langs->transnoentities('EINVOICING_REQUIRE_ROUTABLE_RECIPIENT_HELP');
 	$item->defaultFieldValue = '0';
 	$item->cssClass = 'minwidth500';

@@ -137,7 +137,10 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 						// The actual transmission is what gets blocked, by the send_to_pdp gate below.
 						$routecheck = $einvoicing->checkRecipientRoutableForSend($invoiceObject);
 						if (!$routecheck['ok']) {
-							$warnmsg = $langs->trans("EInvoiceGeneratedButRecipientNotRoutable") . ': <br>' . $routecheck['message'];
+							// "not routable" is only said when the directory proved it: an unconfirmed answer gets
+							// its own wording, or the message would claim more than the directory reported.
+							$warnkey = ($routecheck['status'] === 'undetermined') ? "EInvoiceGeneratedButRecipientReachabilityUnconfirmed" : "EInvoiceGeneratedButRecipientNotRoutable";
+							$warnmsg = $langs->trans($warnkey) . ': <br>' . $routecheck['message'];
 							dol_syslog(__METHOD__ . " " . strip_tags($warnmsg), LOG_WARNING);
 							setEventMessages($warnmsg, array(), 'warnings');
 							$this->warnings[] = $warnmsg;
@@ -575,7 +578,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				if (!$error) {
 					$routecheck = $einvoicing->checkRecipientRoutableForSend($object);
 					if (!$routecheck['ok']) {
-						setEventMessages($langs->trans("EInvoiceNotSentRecipientNotRoutable") . ': <br>' . $routecheck['message'], array(), 'errors');
+						$errkey = ($routecheck['status'] === 'undetermined') ? "EInvoiceNotSentRecipientReachabilityUnconfirmed" : "EInvoiceNotSentRecipientNotRoutable";
+						setEventMessages($langs->trans($errkey) . ': <br>' . $routecheck['message'], array(), 'errors');
 						$error++;
 					}
 				}
@@ -636,7 +640,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				if (!$error) {
 					$routecheck = $einvoicing->checkRecipientRoutableForSend($invoiceObject);
 					if (!$routecheck['ok']) {
-						setEventMessages($langs->trans("EInvoiceGeneratedButRecipientNotRoutable") . ': <br>' . $routecheck['message'], array(), 'warnings');
+						$warnkey = ($routecheck['status'] === 'undetermined') ? "EInvoiceGeneratedButRecipientReachabilityUnconfirmed" : "EInvoiceGeneratedButRecipientNotRoutable";
+						setEventMessages($langs->trans($warnkey) . ': <br>' . $routecheck['message'], array(), 'warnings');
 						$this->warnings[] = $routecheck['message'];
 					}
 				}
