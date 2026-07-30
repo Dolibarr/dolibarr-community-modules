@@ -576,7 +576,7 @@ class FacturXProtocol extends CIIProtocol
 
 			// Local EN 16931 business rules safety net on the final XML (warnings, or abort in strict mode),
 			// same as the native builder branch above, so the external builder is covered too.
-			$this->checkBusinessRules(file_get_contents($xmlfile));
+			$this->checkBusinessRules(file_get_contents($xmlfile), $invoice);
 
 			dolChmod($xmlfile);
 
