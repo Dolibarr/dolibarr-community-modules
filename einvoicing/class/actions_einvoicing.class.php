@@ -179,9 +179,14 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 							// Optionally transmit to the Access Point right after generation (opt-in + idempotent) and if not yet generated.
 							// Without this, validation only generates the Factur-X; the invoice is never sent to the
-							// PA (transmission was a manual "send_to_pdp" click only). The 'transmitted' guard prevents
-							// re-sending (and creating duplicate flows) when the PDF is regenerated later.
-							if (getDolGlobalString('EINVOICING_AUTO_SEND_ON_GENERATION') && empty($currentStatusDetails['transmitted']) && $precheckresult >= 0) {
+							// PA (transmission was a manual "send_to_pdp" click only).
+							// Two guards, because one is not enough: 'transmitted' reads the syncstatus, which
+							// generateInvoice() just reset to GENERATED a few lines above, so it stops seeing a
+							// transmission from the second regeneration on. isTransmittedLockActive() reads the
+							// flow_id, which the first submission assigned and nothing clears, so it holds for good
+							// (and honors EINVOICING_ALLOW_RESEND_TRANSMITTED like the manual send does).
+							if (getDolGlobalString('EINVOICING_AUTO_SEND_ON_GENERATION') && empty($currentStatusDetails['transmitted'])
+								&& !$einvoicing->isTransmittedLockActive($invoiceObject->id, $invoiceObject->ref) && $precheckresult >= 0) {
 								dol_syslog("actions_einvoicing: Invoice seems not yet transmitted and EINVOICING_AUTO_SEND_ON_GENERATION is on, so we try to send it");
 
 								require_once __DIR__ . '/providers/PDPProviderManager.class.php';
