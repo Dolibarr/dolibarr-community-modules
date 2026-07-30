@@ -222,9 +222,8 @@ class CIIProfileShapeTest extends CommonClassTest
 		return $doc->getElementsByTagName(explode(':', $tag)[1])->length;
 	}
 
-	/** @var string[] Elements the MINIMUM and BASIC WL schemas do not declare at all */
-	private static $headerOnlyForbidden = [
-		'ram:IncludedSupplyChainTradeLineItem',					// BG-25
+	/** @var string[] Elements only the EN16931 schema and its extensions declare */
+	private static $en16931Only = [
 		'ram:DefinedTradeContact',								// BG-6 / BG-9
 		'ram:Information',										// BT-82
 		'ram:AccountName',										// BT-85
@@ -232,46 +231,142 @@ class CIIProfileShapeTest extends CommonClassTest
 	];
 
 	/**
-	 * The header-only profiles must carry none of the groups their XSD does not declare.
+	 * The invoice lines (BG-25) exist from BASIC up: MINIMUM and BASIC WL ("without lines") do not
+	 * declare ram:IncludedSupplyChainTradeLineItem at all.
 	 *
 	 * @return void
 	 */
-	public function testHeaderOnlyProfilesCarryNoneOfTheForbiddenGroups()
+	public function testLinesFollowTheProfileSchema()
 	{
 		global $db;
 
 		$protocol = new CIIProtocol($db);
 
-		foreach (['MINIMUM', 'BASICWL'] as $profile) {
+		foreach (CIIProtocol::SUPPORTED_XML_PROFILES as $profile) {
 			$xml = $protocol->buildXML($this->baseInvoiceData(), $this->baseLinesData(), $profile);
+			$count = $this->countTag($xml, 'ram:IncludedSupplyChainTradeLineItem');
 
-			foreach (self::$headerOnlyForbidden as $tag) {
-				$this->assertSame(0, $this->countTag($xml, $tag), $profile . ' must not carry ' . $tag);
+			if (in_array($profile, ['MINIMUM', 'BASICWL'], true)) {
+				$this->assertSame(0, $count, $profile . ' does not declare the invoice lines');
+			} else {
+				$this->assertSame(1, $count, $profile . ' must carry the invoice line');
 			}
-			// BT-84 does exist there and must survive
-			$this->assertSame(1, $this->countTag($xml, 'ram:IBANID'), $profile . ' must keep the payment account IBAN');
 		}
 	}
 
 	/**
-	 * Every profile from BASIC upwards keeps those groups: the fix for the header-only profiles
-	 * must not strip them everywhere.
+	 * The party contact and the payment detail exist only from EN16931 up. BASIC declares the invoice
+	 * lines but reduces those, so it cannot be lumped with the profiles that carry everything.
 	 *
 	 * @return void
 	 */
-	public function testOtherProfilesKeepTheFullGroups()
+	public function testEn16931OnlyGroupsFollowTheProfileSchema()
 	{
 		global $db;
 
 		$protocol = new CIIProtocol($db);
 
-		foreach (['BASIC', 'EN16931', 'EXTENDED', 'EXTENDEDFR'] as $profile) {
+		foreach (CIIProtocol::SUPPORTED_XML_PROFILES as $profile) {
 			$xml = $protocol->buildXML($this->baseInvoiceData(), $this->baseLinesData(), $profile);
+			$full = in_array($profile, ['EN16931', 'EXTENDED', 'EXTENDEDFR'], true);
 
-			$this->assertSame(1, $this->countTag($xml, 'ram:IncludedSupplyChainTradeLineItem'), $profile . ' must carry the invoice line');
-			foreach (['ram:DefinedTradeContact', 'ram:Information', 'ram:AccountName', 'ram:PayeeSpecifiedCreditorFinancialInstitution'] as $tag) {
-				$this->assertGreaterThan(0, $this->countTag($xml, $tag), $profile . ' must carry ' . $tag);
+			foreach (self::$en16931Only as $tag) {
+				if ($full) {
+					$this->assertGreaterThan(0, $this->countTag($xml, $tag), $profile . ' must carry ' . $tag);
+				} else {
+					$this->assertSame(0, $this->countTag($xml, $tag), $profile . ' does not declare ' . $tag);
+				}
 			}
+		}
+	}
+
+	/**
+	 * MINIMUM is not a reduced EN 16931 but a much smaller document: no note, no identifier on the
+	 * parties, an address down to its country, an empty delivery group, and a settlement holding only
+	 * the currency and four amounts.
+	 *
+	 * @return void
+	 */
+	public function testMinimumCarriesOnlyWhatItsSchemaDeclares()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+		$xml = $protocol->buildXML($this->baseInvoiceData(), $this->baseLinesData(), 'MINIMUM');
+
+		foreach ([
+			'ram:IncludedNote',								// ExchangedDocumentType stops at IssueDateTime
+			'ram:GlobalID',									// TradePartyType starts at ram:Name
+			'ram:TradingBusinessName',						// LegalOrganizationType is reduced to ram:ID
+			'ram:URIUniversalCommunication',				// BT-34 / BT-49
+			'ram:PostcodeCode',								// TradeAddressType keeps only the country
+			'ram:CityName',
+			'ram:SpecifiedTradeSettlementPaymentMeans',		// BG-16
+			'ram:ApplicableTradeTax',						// BG-23
+			'ram:SpecifiedTradePaymentTerms',				// BT-20
+			'ram:LineTotalAmount',							// BT-106
+			'ram:ChargeTotalAmount',						// BT-108
+			'ram:AllowanceTotalAmount',						// BT-107
+			'ram:TotalPrepaidAmount',						// BT-113
+		] as $tag) {
+			$this->assertSame(0, $this->countTag($xml, $tag), 'MINIMUM does not declare ' . $tag);
+		}
+
+		// What it does declare must still be there
+		foreach (['ram:CountryID', 'ram:InvoiceCurrencyCode', 'ram:TaxBasisTotalAmount', 'ram:GrandTotalAmount', 'ram:DuePayableAmount'] as $tag) {
+			$this->assertGreaterThan(0, $this->countTag($xml, $tag), 'MINIMUM must carry ' . $tag);
+		}
+
+		// HeaderTradeDeliveryType is declared empty: the element must have no child at all
+		$doc = new DOMDocument();
+		$doc->loadXML($xml);
+		$delivery = $doc->getElementsByTagName('ApplicableHeaderTradeDelivery')->item(0);
+		$this->assertNotNull($delivery, 'the delivery group stays present');
+		$this->assertFalse($delivery->hasChildNodes(), 'MINIMUM declares an empty HeaderTradeDeliveryType');
+	}
+
+	/**
+	 * Every profile must produce a document its own Factur-X schema accepts. The schemas are the ones
+	 * shipped with horstoeko/zugferd, which are the FNFE-MPE ones verbatim (compared on the profiles
+	 * France_RFE publishes: only the schemaLocation file names differ).
+	 *
+	 * @return void
+	 */
+	public function testEveryProfileValidatesAgainstItsSchema()
+	{
+		global $db;
+
+		$schemaDir = dol_buildpath('/einvoicing/vendor/horstoeko/zugferd/src/schema', 0);
+		$xsd = [
+			'MINIMUM' => 'FACTUR-X_MINIMUM.xsd',
+			'BASICWL' => 'FACTUR-X_BASIC-WL.xsd',
+			'BASIC' => 'FACTUR-X_BASIC.xsd',
+			'EN16931' => 'FACTUR-X_EN16931.xsd',
+			'EXTENDED' => 'FACTUR-X_EXTENDED.xsd',
+			'EXTENDEDFR' => 'FACTUR-X_EXTENDED.xsd',	// conformant extension of EXTENDED
+		];
+
+		$protocol = new CIIProtocol($db);
+
+		foreach (CIIProtocol::SUPPORTED_XML_PROFILES as $profile) {
+			$this->assertArrayHasKey($profile, $xsd, 'no schema mapped for profile ' . $profile);
+			$path = $schemaDir . '/' . $xsd[$profile];
+			$this->assertFileExists($path);
+
+			$doc = new DOMDocument();
+			$this->assertTrue($doc->loadXML($protocol->buildXML($this->invoiceDataWithReferences(), $this->baseLinesData(), $profile)));
+
+			$previous = libxml_use_internal_errors(true);
+			libxml_clear_errors();
+			$valid = $doc->schemaValidate($path);
+			$errors = libxml_get_errors();
+			libxml_use_internal_errors($previous);
+
+			$detail = [];
+			foreach (array_slice($errors, 0, 5) as $error) {
+				$detail[] = trim($error->message);
+			}
+			$this->assertTrue($valid, $profile . ' must validate against ' . $xsd[$profile] . ":\n" . implode("\n", $detail));
 		}
 	}
 

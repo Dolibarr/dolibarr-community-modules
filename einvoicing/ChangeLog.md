@@ -2,6 +2,15 @@
 
 ## 1.0.4
 
+FIX: The documents generated on the MINIMUM and BASIC profiles now validate against their own Factur-X
+schema, which neither did. BASIC was treated as a full EN 16931 document, so it carried the party
+contacts (BG-6 / BG-9), the payment means label (BT-82), the account holder (BT-85) and the BIC (BT-86),
+none of which its schema declares - it declares the invoice lines, which is what set it apart from
+MINIMUM and BASIC WL, but not those. MINIMUM is not a reduced EN 16931 at all but a much smaller
+document: no note, no identifier on the parties, no trading name, no electronic address, an address
+reduced to its country, an empty delivery group, and a settlement holding only the currency and four
+amounts. It is now emitted as its schema declares it. The other profiles are untouched.
+
 FIX: A document generated as CII now carries the buyer reference (BT-10), the project reference (BT-11)
 and the contract reference (BT-12), which only the Factur-X path was writing. The three were read from
 the invoice, handed to the generator and silently dropped, so the same invoice produced a different
