@@ -2,6 +2,13 @@
 
 ## 1.0.4
 
+FIX: A lifecycle message sent to a vendor with no routing recorded no longer falls straight back on its
+SIREN, which the platform accepts only when the vendor happens to be registered under it. The status is a
+reply, so it now looks for the address the vendor exchanges under, in order: the routing recorded in
+Dolibarr, then the electronic address (BT-34) carried by the e-invoice it sent us, then the address the
+platform directory declares for its SIREN, and only then the SIREN itself, saying in the log which one it
+settled on.
+
 FIX: A line carrying recoverable non-collected VAT ("TVA non perçue récupérable", the overseas
 departments scheme of article 295 of the CGI) no longer makes the document claim a VAT the invoice does
 not charge. Dolibarr makes the total including tax of such a line equal to its net amount, where the
