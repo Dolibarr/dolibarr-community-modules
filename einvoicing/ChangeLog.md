@@ -2,6 +2,13 @@
 
 ## 1.0.4
 
+FIX: A document generated as CII now carries the buyer reference (BT-10), the project reference (BT-11)
+and the contract reference (BT-12), which only the Factur-X path was writing. The three were read from
+the invoice, handed to the generator and silently dropped, so the same invoice produced a different
+document depending on the protocol - and the CII one lost the "service exécutant" a public buyer needs
+to route it. Each is emitted only on the profiles whose schema declares it: BT-10 everywhere, BT-12 from
+BASIC WL up, BT-11 from EN16931 up.
+
 FIX: A line carrying recoverable non-collected VAT ("TVA non perçue récupérable", the overseas
 departments scheme of article 295 of the CGI) no longer makes the document claim a VAT the invoice does
 not charge. Dolibarr makes the total including tax of such a line equal to its net amount, where the

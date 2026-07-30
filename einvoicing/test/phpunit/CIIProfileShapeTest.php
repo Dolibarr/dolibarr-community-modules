@@ -304,4 +304,167 @@ class CIIProfileShapeTest extends CommonClassTest
 			$this->assertSame($va->nodeValue, $vb->nodeValue, $tag . ' must not depend on the line nodes');
 		}
 	}
+
+	/**
+	 * Invoice data carrying the three header references, on top of the base fixture.
+	 *
+	 * @return	array<string,mixed>
+	 */
+	private function invoiceDataWithReferences()
+	{
+		require_once DOL_DOCUMENT_ROOT . '/projet/class/project.class.php';
+
+		global $db;
+
+		$project = new Project($db);
+		$project->ref = 'PJ2607-0042';
+		$project->title = 'Refonte du quai de brassage';
+
+		$data = $this->baseInvoiceData();
+		$data['buyerReference'] = 'SERVICE-EXEC-01';		// BT-10
+		$data['contractReference'] = 'CTR-2026-118';		// BT-12
+		$data['_project'] = $project;						// BT-11
+
+		return $data;
+	}
+
+	/**
+	 * Read the text of the first occurrence of an element.
+	 *
+	 * Only ever called on elements that carry text directly: the document is generated with
+	 * formatOutput, so the nodeValue of a wrapper would also hold the indentation of its children.
+	 *
+	 * @param	string	$xml	Generated XML
+	 * @param	string	$tag	Qualified tag name, e.g. 'ram:BuyerReference'
+	 * @return	?string			Its text, null when the element is absent
+	 */
+	private function tagValue(string $xml, string $tag)
+	{
+		$doc = new DOMDocument();
+		$this->assertTrue($doc->loadXML($xml), 'generated document is not well-formed XML');
+		$node = $doc->getElementsByTagName(explode(':', $tag)[1])->item(0);
+
+		return $node === null ? null : $node->nodeValue;
+	}
+
+	/**
+	 * The buyer reference (BT-10) is declared by every profile, MINIMUM included.
+	 *
+	 * @return void
+	 */
+	public function testBuyerReferenceIsEmittedOnEveryProfile()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		foreach (CIIProtocol::SUPPORTED_XML_PROFILES as $profile) {
+			$xml = $protocol->buildXML($this->invoiceDataWithReferences(), $this->baseLinesData(), $profile);
+
+			$this->assertSame('SERVICE-EXEC-01', $this->tagValue($xml, 'ram:BuyerReference'), $profile . ' must carry BT-10');
+		}
+	}
+
+	/**
+	 * The contract reference (BT-12) is absent from the MINIMUM schema and declared everywhere else.
+	 *
+	 * @return void
+	 */
+	public function testContractReferenceFollowsTheProfileSchema()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		foreach (CIIProtocol::SUPPORTED_XML_PROFILES as $profile) {
+			$xml = $protocol->buildXML($this->invoiceDataWithReferences(), $this->baseLinesData(), $profile);
+			$count = $this->countTag($xml, 'ram:ContractReferencedDocument');
+
+			if ($profile === 'MINIMUM') {
+				$this->assertSame(0, $count, 'MINIMUM does not declare ram:ContractReferencedDocument');
+			} else {
+				$this->assertSame(1, $count, $profile . ' must carry BT-12');
+				// ram:ContractReferencedDocument is a wrapper: the reference sits on its IssuerAssignedID
+				$doc = new DOMDocument();
+				$doc->loadXML($xml);
+				$node = $doc->getElementsByTagName('ContractReferencedDocument')->item(0);
+				$this->assertNotNull($node);
+				$this->assertSame('CTR-2026-118', $node->getElementsByTagName('IssuerAssignedID')->item(0)->nodeValue, $profile . ' BT-12 value');
+			}
+		}
+	}
+
+	/**
+	 * The project reference (BT-11) only exists from EN16931 up, and its type makes both ram:ID and
+	 * ram:Name mandatory.
+	 *
+	 * @return void
+	 */
+	public function testProjectReferenceFollowsTheProfileSchema()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		foreach (CIIProtocol::SUPPORTED_XML_PROFILES as $profile) {
+			$xml = $protocol->buildXML($this->invoiceDataWithReferences(), $this->baseLinesData(), $profile);
+			$count = $this->countTag($xml, 'ram:SpecifiedProcuringProject');
+
+			if (in_array($profile, ['EN16931', 'EXTENDED', 'EXTENDEDFR'], true)) {
+				$this->assertSame(1, $count, $profile . ' must carry BT-11');
+
+				$doc = new DOMDocument();
+				$doc->loadXML($xml);
+				$node = $doc->getElementsByTagName('SpecifiedProcuringProject')->item(0);
+				$this->assertNotNull($node);
+				$this->assertSame('PJ2607-0042', $node->getElementsByTagName('ID')->item(0)->nodeValue);
+				// ram:Name is mandatory in ProcuringProjectType, an empty one would break the schema
+				$this->assertSame('Refonte du quai de brassage', $node->getElementsByTagName('Name')->item(0)->nodeValue);
+			} else {
+				$this->assertSame(0, $count, $profile . ' does not declare ram:SpecifiedProcuringProject');
+			}
+		}
+	}
+
+	/**
+	 * A project with no title still yields a schema-valid BT-11: ram:Name falls back on the reference.
+	 *
+	 * @return void
+	 */
+	public function testProjectWithoutTitleStillCarriesAName()
+	{
+		global $db;
+
+		$data = $this->invoiceDataWithReferences();
+		$data['_project']->title = '';
+
+		$protocol = new CIIProtocol($db);
+		$xml = $protocol->buildXML($data, $this->baseLinesData(), 'EN16931');
+
+		$doc = new DOMDocument();
+		$doc->loadXML($xml);
+		$node = $doc->getElementsByTagName('SpecifiedProcuringProject')->item(0);
+		$this->assertNotNull($node);
+		$this->assertSame('PJ2607-0042', $node->getElementsByTagName('Name')->item(0)->nodeValue);
+	}
+
+	/**
+	 * Nothing is emitted when the invoice carries none of the three: no empty element is left behind.
+	 *
+	 * @return void
+	 */
+	public function testNoReferenceEmittedWhenTheInvoiceHasNone()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		foreach (CIIProtocol::SUPPORTED_XML_PROFILES as $profile) {
+			$xml = $protocol->buildXML($this->baseInvoiceData(), $this->baseLinesData(), $profile);
+
+			$this->assertSame(0, $this->countTag($xml, 'ram:BuyerReference'), $profile . ' must not carry an empty BT-10');
+			$this->assertSame(0, $this->countTag($xml, 'ram:ContractReferencedDocument'), $profile . ' must not carry an empty BT-12');
+			$this->assertSame(0, $this->countTag($xml, 'ram:SpecifiedProcuringProject'), $profile . ' must not carry an empty BT-11');
+		}
+	}
 }
