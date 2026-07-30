@@ -21,8 +21,9 @@
  *      \ingroup    test
  *      \brief      PHPUnit test for AbstractPDPProvider::checkRecipientDirectory(), the AFNOR
  *                  Directory Service (XP Z12-013) reachability precheck: which directory lines
- *                  count as an active reception address, and the routable/inactive/absent/error
- *                  statuses derived from them.
+ *                  count as an active reception address, and the
+ *                  routable/inactive/undetermined/absent/error statuses derived from them, plus the
+ *                  SuperPDP legacy french_directory fallback that only sees a boolean 'is_active'.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 
@@ -44,6 +45,7 @@ if (!file_exists($dolibarrHtdocs . '/master.inc.php')) {
 
 require_once $dolibarrHtdocs . '/master.inc.php';
 dol_include_once('einvoicing/class/providers/AbstractPDPProvider.class.php');
+dol_include_once('einvoicing/class/providers/SuperPDPProvider.class.php');
 require_once __DIR__ . '/CommonClassTestCompat.inc.php';
 
 if (empty($user->id)) {
@@ -207,6 +209,51 @@ class FakeDirectoryPDPProvider extends AbstractPDPProvider
 
 
 /**
+ * Provider double for the SuperPDP legacy fallback: answers the french_directory lookup from a canned
+ * queue, and leaves the AFNOR directory base empty so checkRecipientDirectory() finds the standardized
+ * lookup unsupported and falls back to that legacy endpoint, which is what these tests exercise.
+ */
+class FakeLegacySuperPDPProvider extends SuperPDPProvider
+{
+	/** @var array<int,array<string,mixed>> Canned answers, consumed in order by callApi() */
+	public $cannedResponses = [];
+
+	/** @var array<int,string> Resources requested so far, in order */
+	public $calledResources = [];
+
+	/**
+	 * Constructor. The real one loads the OAuth token from database and instantiates the protocol
+	 * manager: the directory path uses neither, so it is deliberately not called.
+	 *
+	 * @param DoliDB $db Database handler
+	 */
+	public function __construct($db)
+	{
+		$this->db = $db;
+	}
+
+	/**
+	 * Return the next canned answer instead of calling a platform.
+	 *
+	 * @param 	string 			$resource 		Resource path
+	 * @param 	string 			$method 		HTTP method
+	 * @param 	array|string|false $params	 	Request body
+	 * @param 	array 			$extraHeaders 	Extra HTTP headers
+	 * @param 	string 			$callType 		Call type used for logging
+	 * @return 	array{status_code:int,response:mixed}
+	 */
+	public function callApi($resource, $method, $params = false, $extraHeaders = [], $callType = '')
+	{
+		$this->calledResources[] = $resource;
+
+		$next = array_shift($this->cannedResponses);
+
+		return $next !== null ? $next : array('status_code' => 500, 'response' => '');
+	}
+}
+
+
+/**
  * Class for PHPUnit tests
  *
  * @backupGlobals disabled
@@ -241,7 +288,7 @@ class RecipientDirectoryTest extends CommonClassTest
 	public function testEnabledLinesAreRoutable()
 	{
 		$provider = $this->providerReturningLines(array(
-			array('addressingIdentifier' => '899047773', 'directoryLineStatus' => 'Enabled', 'siren' => '899047773'),
+			array('addressingIdentifier' => '899047773', 'directoryLineStatus' => 'Enabled', 'platformType' => 'WK', 'siren' => '899047773'),
 			array('addressingIdentifier' => '899047773_89904777300036', 'directoryLineStatus' => 'Enabled', 'siren' => '899047773'),
 		));
 
@@ -252,6 +299,9 @@ class RecipientDirectoryTest extends CommonClassTest
 		$this->assertSame(2, $result['entries']);
 		$this->assertSame(2, $result['active']);
 		$this->assertSame('899047773', $result['identifier']);
+		// Provenance of the positive answer, displayed next to the address on the invoice card.
+		$this->assertSame('Enabled', $result['linestatus']);
+		$this->assertSame('WK', $result['platform']);
 	}
 
 	/**
@@ -285,7 +335,7 @@ class RecipientDirectoryTest extends CommonClassTest
 	public function testNoEnabledLineIsInactive()
 	{
 		$provider = $this->providerReturningLines(array(
-			array('addressingIdentifier' => '552081317_ACHATPUB', 'directoryLineStatus' => 'Upcoming', 'siren' => '552081317'),
+			array('addressingIdentifier' => '552081317_ACHATPUB', 'directoryLineStatus' => 'Upcoming', 'platformType' => 'WK', 'siren' => '552081317'),
 		));
 
 		$result = $provider->checkRecipientDirectory('552081317');
@@ -295,16 +345,21 @@ class RecipientDirectoryTest extends CommonClassTest
 		$this->assertSame(1, $result['entries']);
 		$this->assertSame(0, $result['active']);
 		$this->assertSame('', $result['identifier']);
+		// Why it is not reachable: the line waits for its effective date, it is not a closed line.
+		$this->assertSame('Upcoming', $result['linestatus']);
+		$this->assertSame('WK', $result['platform']);
 		$this->assertCount(1, $provider->calledResources);
 	}
 
 	/**
-	 * directoryLineStatus is optional in the search answer: a line that carries none is trusted, so
-	 * a platform that does not fill the field never sees every recipient turned unroutable.
+	 * directoryLineStatus cannot be requested (the search only accepts addressingIdentifier, siren,
+	 * siret and addressingSuffix in 'fields'), so a platform may answer without it. Such a line proves
+	 * nothing: an enabled address and one that only takes effect later are indistinguishable, so the
+	 * check stays non-conclusive instead of reporting the recipient as reachable.
 	 *
 	 * @return void
 	 */
-	public function testLineWithoutStatusIsTrusted()
+	public function testLineWithoutStatusIsUndetermined()
 	{
 		$provider = $this->providerReturningLines(array(
 			array('addressingIdentifier' => '393078647', 'siren' => '393078647'),
@@ -313,8 +368,31 @@ class RecipientDirectoryTest extends CommonClassTest
 
 		$result = $provider->checkRecipientDirectory('393078647');
 
+		$this->assertSame('undetermined', $result['status']);
+		$this->assertSame(-1, $result['reachable']);
+		$this->assertSame(0, $result['active']);
+		$this->assertSame(2, $result['unknown']);
+		$this->assertSame('393078647', $result['identifier']);
+	}
+
+	/**
+	 * A line without status alongside an enabled one does not hold the answer back: the enabled line
+	 * is enough to conclude, and it is the address handed back.
+	 *
+	 * @return void
+	 */
+	public function testEnabledLineWinsOverLineWithoutStatus()
+	{
+		$provider = $this->providerReturningLines(array(
+			array('addressingIdentifier' => '393078647_1', 'siren' => '393078647'),
+			array('addressingIdentifier' => '393078647', 'directoryLineStatus' => 'Enabled', 'siren' => '393078647'),
+		));
+
+		$result = $provider->checkRecipientDirectory('393078647');
+
 		$this->assertSame('routable', $result['status']);
-		$this->assertSame(2, $result['active']);
+		$this->assertSame(1, $result['active']);
+		$this->assertSame(1, $result['unknown']);
 		$this->assertSame('393078647', $result['identifier']);
 	}
 
@@ -399,5 +477,120 @@ class RecipientDirectoryTest extends CommonClassTest
 
 		$this->assertSame('error', $result['status']);
 		$this->assertSame(-1, $result['reachable']);
+	}
+
+	/**
+	 * Build a SuperPDP double whose legacy french_directory lookup answers the given entries.
+	 *
+	 * @param	array<int,array<string,mixed>>	$entries	Entries returned by french_directory/entries
+	 * @return	FakeLegacySuperPDPProvider
+	 */
+	private function legacyProviderReturningEntries($entries)
+	{
+		global $db;
+
+		$provider = new FakeLegacySuperPDPProvider($db);
+		$provider->cannedResponses = array(
+			array('status_code' => 200, 'response' => array('data' => $entries)),
+		);
+
+		return $provider;
+	}
+
+	/**
+	 * The legacy endpoint only exposes a boolean 'is_active', which the annuaire also sets on an address
+	 * that merely takes effect later: it must not conclude 'routable' on that alone, or the invoice card
+	 * shows a green badge for a recipient whose transmission will come back as a routing error (fr:213).
+	 *
+	 * @return void
+	 */
+	public function testLegacyActiveEntryWithoutDateIsUndetermined()
+	{
+		$provider = $this->legacyProviderReturningEntries(array(
+			array('identifier' => '824369342', 'is_active' => true),
+		));
+
+		$result = $provider->checkRecipientDirectory('824369342');
+
+		$this->assertSame('undetermined', $result['status']);
+		$this->assertSame(-1, $result['reachable']);
+		$this->assertSame(0, $result['active']);
+		$this->assertSame(1, $result['unknown']);
+		$this->assertSame('824369342', $result['identifier']);
+		// The legacy endpoint is what was called: the standardized base is not configured on the double.
+		$this->assertSame(array('french_directory/entries?number=824369342'), $provider->calledResources);
+	}
+
+	/**
+	 * When the legacy payload does date the entry and that date is still ahead, the recipient cannot
+	 * receive yet: that is 'inactive', with the date to display.
+	 *
+	 * @return void
+	 */
+	public function testLegacyActiveEntryWithFutureDateIsInactive()
+	{
+		$provider = $this->legacyProviderReturningEntries(array(
+			array('identifier' => '824369342', 'is_active' => true, 'start_date' => '07-08-2216'),
+		));
+
+		$result = $provider->checkRecipientDirectory('824369342');
+
+		$this->assertSame('inactive', $result['status']);
+		$this->assertSame(0, $result['reachable']);
+		$this->assertSame(0, $result['active']);
+		$this->assertSame('Upcoming', $result['linestatus']);
+		$this->assertGreaterThan(dol_now(), $result['effectivedate']);
+	}
+
+	/**
+	 * An entry that is active and whose effective date has passed is genuinely reachable.
+	 *
+	 * @return void
+	 */
+	public function testLegacyActiveEntryWithPastDateIsRoutable()
+	{
+		$provider = $this->legacyProviderReturningEntries(array(
+			array('identifier' => '824369342', 'is_active' => true, 'startDate' => '2024-01-15'),
+		));
+
+		$result = $provider->checkRecipientDirectory('824369342');
+
+		$this->assertSame('routable', $result['status']);
+		$this->assertSame(1, $result['reachable']);
+		$this->assertSame(1, $result['active']);
+		$this->assertSame('824369342', $result['identifier']);
+	}
+
+	/**
+	 * Entries that are not flagged active at all stay 'inactive', as before.
+	 *
+	 * @return void
+	 */
+	public function testLegacyInactiveEntryIsInactive()
+	{
+		$provider = $this->legacyProviderReturningEntries(array(
+			array('identifier' => '824369342', 'is_active' => false),
+		));
+
+		$result = $provider->checkRecipientDirectory('824369342');
+
+		$this->assertSame('inactive', $result['status']);
+		$this->assertSame(0, $result['reachable']);
+		$this->assertSame(1, $result['entries']);
+	}
+
+	/**
+	 * An empty legacy answer still means the recipient is absent from the directory.
+	 *
+	 * @return void
+	 */
+	public function testLegacyEmptyAnswerIsAbsent()
+	{
+		$provider = $this->legacyProviderReturningEntries(array());
+
+		$result = $provider->checkRecipientDirectory('123456789');
+
+		$this->assertSame('absent', $result['status']);
+		$this->assertSame(0, $result['reachable']);
 	}
 }
