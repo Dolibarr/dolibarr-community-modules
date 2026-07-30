@@ -1218,13 +1218,17 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 * french_directory endpoint only when the standardized lookup is not available.
 	 *
 	 * @param 	string 	$idprof1 	Recipient SIREN (idprof1)
-	 * @return 	array{status:string,reachable:int,entries:int,active:int,identifier:string,message:string,httpcode:int}
+	 * @return 	array{status:string,reachable:int,entries:int,active:int,unknown:int,identifier:string,linestatus:string,platform:string,effectivedate:int,message:string,httpcode:int}
 	 */
 	public function checkRecipientDirectory($idprof1)
 	{
 		// Standardized AFNOR directory check first (works for any conformant Approved Platform).
+		// 'undetermined' also ends the check: the annuaire did answer with lines for that SIREN, only
+		// without their status. Falling back to the legacy endpoint there could contradict it with a
+		// worse answer ('absent' when the standardized annuaire holds a line), and only the AFNOR
+		// annuaire carries the effective date that decides reachability.
 		$result = parent::checkRecipientDirectory($idprof1);
-		if (in_array($result['status'], array('routable', 'inactive', 'absent'), true)) {
+		if (in_array($result['status'], array('routable', 'inactive', 'absent', 'undetermined'), true)) {
 			return $result;
 		}
 
@@ -1237,12 +1241,16 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 * endpoint (GET french_directory/entries on the v1.beta base). Kept for platforms or environments
 	 * where the standardized AFNOR Directory Service is not reachable.
 	 *
+	 * This endpoint only exposes a boolean 'is_active', which does not tell an open reception address
+	 * from one that is merely declared with a future effective date: it cannot conclude 'routable' on
+	 * its own, see below.
+	 *
 	 * @param 	string 	$idprof1 	Recipient SIREN (idprof1)
-	 * @return 	array{status:string,reachable:int,entries:int,active:int,identifier:string,message:string,httpcode:int}
+	 * @return 	array{status:string,reachable:int,entries:int,active:int,unknown:int,identifier:string,linestatus:string,platform:string,effectivedate:int,message:string,httpcode:int}
 	 */
 	private function checkRecipientDirectoryLegacy($idprof1)
 	{
-		$result = array('status' => 'error', 'reachable' => -1, 'entries' => 0, 'active' => 0, 'identifier' => '', 'message' => '', 'httpcode' => 0);
+		$result = array('status' => 'error', 'reachable' => -1, 'entries' => 0, 'active' => 0, 'unknown' => 0, 'identifier' => '', 'linestatus' => '', 'platform' => '', 'effectivedate' => 0, 'message' => '', 'httpcode' => 0);
 
 		$siren = preg_replace('/[^0-9]/', '', (string) $idprof1);
 		if ($siren === '') {
@@ -1264,12 +1272,35 @@ class SuperPDPProvider extends AbstractPDPProvider
 			$data = $response['response']['data'];
 		}
 		$result['entries'] = count($data);
+		$upcoming = 0;
+		$upcomingdate = 0;
 		foreach ($data as $entry) {
-			if (!empty($entry['is_active'])) {
-				$result['active']++;
-				if ($result['identifier'] === '' && !empty($entry['identifier'])) {
-					$result['identifier'] = $entry['identifier'];
+			if (empty($entry['is_active'])) {
+				continue;
+			}
+			// 'is_active' says the entry is declared, not that it can receive today: the annuaire also
+			// holds addresses bound to a platform with a future effective date ('Upcoming' in the
+			// standardized directory). When the entry carries such a date, honour it.
+			$startdate = $this->getDirectoryEntryStartDate($entry);
+			if (!empty($startdate) && $startdate > dol_now()) {
+				$upcoming++;
+				if (empty($upcomingdate) || $startdate < $upcomingdate) {
+					$upcomingdate = $startdate;
 				}
+				continue;
+			}
+			if (empty($startdate)) {
+				// No effective date at all in the payload: an open address and one that only opens later
+				// are indistinguishable, so this entry cannot support a positive answer.
+				$result['unknown']++;
+				if ($result['identifier'] === '' && !empty($entry['identifier'])) {
+					$result['identifier'] = (string) $entry['identifier'];
+				}
+				continue;
+			}
+			$result['active']++;
+			if ($result['identifier'] === '' && !empty($entry['identifier'])) {
+				$result['identifier'] = (string) $entry['identifier'];
 			}
 		}
 
@@ -1277,16 +1308,67 @@ class SuperPDPProvider extends AbstractPDPProvider
 			// Recipient not present in the directory at all.
 			$result['status'] = 'absent';
 			$result['reachable'] = 0;
-		} elseif ($result['active'] == 0) {
+		} elseif ($result['active'] > 0) {
+			$result['status'] = 'routable';
+			$result['reachable'] = 1;
+		} elseif ($result['unknown'] > 0) {
+			// Entries exist and are flagged active, but nothing in the payload dates them: stay
+			// non-conclusive (the caller keeps failing open) instead of showing the recipient as
+			// reachable, which is the one answer that lets a doomed transmission through.
+			$result['status'] = 'undetermined';
+			$result['reachable'] = -1;
+			$result['message'] = 'EInvoicingDirectoryNoLineStatus';
+		} elseif ($upcoming > 0) {
+			// Declared, with an effective date still in the future: cannot receive yet.
+			$result['status'] = 'inactive';
+			$result['reachable'] = 0;
+			$result['linestatus'] = 'Upcoming';
+			$result['effectivedate'] = $upcomingdate;
+		} else {
 			// Present but no active routing line (reason NON_TRANSMISE): still cannot receive.
 			$result['status'] = 'inactive';
 			$result['reachable'] = 0;
-		} else {
-			$result['status'] = 'routable';
-			$result['reachable'] = 1;
 		}
 
 		return $result;
+	}
+
+	/**
+	 * Read the effective date of a legacy french_directory entry, when the payload carries one.
+	 *
+	 * The endpoint is not covered by XP Z12-013 and its entries have been seen with only the boolean
+	 * 'is_active', so the date is looked up under the names the SuperPDP payloads and the AFNOR
+	 * vocabulary use for it. Nothing is guessed from the value alone: an unparsable or absent date
+	 * returns 0, which the caller treats as "not datable" rather than as "open now".
+	 *
+	 * @param 	array<string,mixed> 	$entry 	One entry of the french_directory answer
+	 * @return 	int 							Timestamp of the effective date, 0 if the entry has none
+	 */
+	private function getDirectoryEntryStartDate($entry)
+	{
+		$candidates = array('start_date', 'startDate', 'date_start', 'effective_date', 'effectiveDate', 'activation_date', 'activationDate', 'valid_from', 'validFrom');
+
+		foreach ($candidates as $key) {
+			if (empty($entry[$key]) || !is_string($entry[$key])) {
+				continue;
+			}
+			$value = trim($entry[$key]);
+			// The platform answers dates both ISO ('2026-08-07') and French ('07-08-2026', '07/08/2026'),
+			// which are ambiguous for strtotime(), hence the explicit formats.
+			foreach (array('Y-m-d', 'd-m-Y', 'd/m/Y') as $format) {
+				$date = DateTime::createFromFormat($format . '|', $value, new DateTimeZone('UTC'));
+				if ($date instanceof DateTime && $date->format($format) === $value) {
+					return (int) $date->getTimestamp();
+				}
+			}
+			// Timestamps with a time part or a timezone (ISO 8601) are left to the generic parser.
+			$parsed = strtotime($value);
+			if ($parsed !== false && preg_match('/^[0-9]{4}-[0-9]{2}-[0-9]{2}[T ]/', $value)) {
+				return (int) $parsed;
+			}
+		}
+
+		return 0;
 	}
 
 	/**

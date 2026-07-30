@@ -109,15 +109,48 @@ function einvoicing_directory_html($r, $siren)
 	$status = $r['status'] ?? 'error';
 	switch ($status) {
 		case 'routable':
+			// Show where the green answer comes from: the address, its directory line status and the
+			// platform type. A reachable badge with no provenance cannot be told from a fail-open one.
 			$txt = $langs->trans("EInvoicingDirectoryRoutable");
+			$details = array();
 			if (!empty($r['identifier'])) {
-				$txt .= ' <span class="opacitymedium small">('.dol_escape_htmltag($r['identifier']).')</span>';
+				$details[] = dol_escape_htmltag($r['identifier']);
+			}
+			if (!empty($r['linestatus'])) {
+				$details[] = $langs->trans("EInvoicingDirectoryLineStatus").': '.dol_escape_htmltag($r['linestatus']);
+			}
+			if (!empty($r['platform'])) {
+				$details[] = $langs->trans("EInvoicingDirectoryPlatformType").': '.dol_escape_htmltag($r['platform']);
+			}
+			if (!empty($details)) {
+				$txt .= ' <span class="opacitymedium small">('.implode(' - ', $details).')</span>';
 			}
 			return img_picto('', 'tick', 'class="color-green paddingright"').$txt;
 		case 'absent':
 			return img_picto('', 'error', 'class="color-red paddingright"').$langs->trans("EInvoicingDirectoryAbsent", $siren);
 		case 'inactive':
-			return img_picto('', 'warning', 'class="paddingright"').$langs->trans("EInvoicingDirectoryInactive", $siren);
+			// An address declared and not open yet is the common case: say so, with the effective date
+			// when the platform gave one, instead of the flat "no active routing line". The standardized
+			// search answer carries the status but no date, hence the two wordings.
+			if (!empty($r['effectivedate'])) {
+				$txt = $langs->trans("EInvoicingDirectoryUpcoming", $siren, dol_print_date((int) $r['effectivedate'], 'day'));
+			} elseif (strtolower((string) ($r['linestatus'] ?? '')) === 'upcoming') {
+				$txt = $langs->trans("EInvoicingDirectoryUpcomingNoDate", $siren);
+			} else {
+				$txt = $langs->trans("EInvoicingDirectoryInactive", $siren);
+			}
+			if (!empty($r['linestatus'])) {
+				$txt .= ' <span class="opacitymedium small">('.$langs->trans("EInvoicingDirectoryLineStatus").': '.dol_escape_htmltag($r['linestatus']).')</span>';
+			}
+			return img_picto('', 'warning', 'class="paddingright"').$txt;
+		case 'undetermined':
+			// Neutral on purpose: a line exists but its status was not communicated, so the check fails
+			// open without asserting anything. Green here is what let an undeliverable invoice be sent.
+			$txt = $langs->trans("EInvoicingDirectoryUndetermined", $siren);
+			if (!empty($r['identifier'])) {
+				$txt .= ' <span class="opacitymedium small">('.dol_escape_htmltag($r['identifier']).')</span>';
+			}
+			return '<span class="opacitymedium">'.img_picto('', 'info', 'class="paddingright"').$txt.'</span>';
 		case 'unsupported':
 			return '<span class="opacitymedium">'.img_picto('', 'info', 'class="paddingright"').$langs->trans("EInvoicingDirectoryUnsupported").'</span>';
 		default:

@@ -2202,8 +2202,9 @@ class EInvoicing
 	 * platform with a routing error (fr:213): blocking generation/sending avoids reaching that error state.
 	 *
 	 * Fails open (ok=1) whenever the check cannot be trusted, so it never blocks unexpectedly: option off,
-	 * provider without a directory lookup (status unsupported), directory call error, or a recipient with no
-	 * SIREN (handled by the standard required-information checks).
+	 * provider without a directory lookup (status unsupported), directory call error, a directory answer that
+	 * does not report the line status (status undetermined), or a recipient with no SIREN (handled by the
+	 * standard required-information checks).
 	 *
 	 * @param 	Facture 	$object 	Invoice
 	 * @return 	array{ok:int,status:string,message:string}	ok=0 only when the recipient is confirmed not routable.
@@ -2242,7 +2243,7 @@ class EInvoicing
 			$res['ok'] = 0;
 			$res['message'] = $langs->trans('EInvoicingDirectoryInactive', $siren);
 		}
-		// routable / error / unsupported => ok stays 1 (fail-open)
+		// routable / error / unsupported / undetermined => ok stays 1 (fail-open)
 
 		return $res;
 	}
