@@ -51,6 +51,10 @@ if (!isset($outputlangs) || !($outputlangs instanceof Translate)) {
 }
 $newlang = '';
 
+// calcul_price_total(), used below to get the amounts of a line from the same place the invoice got
+// them. The protocols reach this file from several entry points, not all of which load the library.
+require_once DOL_DOCUMENT_ROOT.'/core/lib/price.lib.php';
+
 // Load EInvoicing class
 $einvoicing = new EInvoicing($db);
 
@@ -504,15 +508,21 @@ foreach ($object->lines as $line) {
 	}
 	$line_unit_price_with_discount = price2num($line_unit_price_with_discount, getDolGlobalString('MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY', 'MU'));
 
-	// We need to recalculate the total using the Unit price rounded after discount percent (netpriceamount) and the quantity, and rounding all temporary calculations after to 2
-	// according to EN16931 rules. This is a not accurate rule but it is the rule to follow for e-invoice.
-	// This means we may get a different result than Dolibarr default calculation if:
-	// - There is a discount percent AND the option MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY was not set or set to a value != MU
-	// or if
-	// - There is no discount percent but currency accuracy for total (MAIN_MAX_DECIMALS_UNIT) was not set to 2.
-	// TODO Use calculate_price() with a mode to round to 2 after each temporary calculation.
-	$line_total_ht = price2num((float) $line_unit_price_with_discount * $line->qty, 2);				// Need to round to 2 as defined by EN16931 rules after each calculation.
-	$line_total_tva = price2num((float) $line_unit_price_with_discount * $line->qty * ($line->tva_tx > 0 ? $line->tva_tx / 100 : 0), 2);
+	// Progress of the line, which only a situation invoice carries: calcul_price_total() applies it
+	// after the discount, exactly like the amounts of the invoice were computed.
+	$line_progress = ($object->type == $object::TYPE_SITUATION && $line->situation_percent) ? $line->situation_percent : 100;
+
+	// The amounts of the line are asked to the very function that computed the invoice
+	// (calcul_price_total(), the one update_price() calls), instead of being computed a second time
+	// here: the document has to state the amount the invoice states, and a second implementation
+	// misses the accuracies and the options of the instance, silently, by a few cents (issue #505).
+	// They are then rounded to the two decimals EN 16931 allows on an amount, which is a no-op on an
+	// instance keeping the default currency accuracy.
+	$localtaxes_array = array($line->localtax1_type, $line->localtax1_tx, $line->localtax2_type, $line->localtax2_tx);
+	$tmpcal = calcul_price_total($line->qty, $line->subprice, $line->remise_percent, $line->tva_tx, $line->localtax1_tx, $line->localtax2_tx, 0, 'HT', $line->info_bits, $line->product_type, $mysoc, $localtaxes_array, $line_progress);
+
+	$line_total_ht = price2num((float) $tmpcal[0], 2);
+	$line_total_tva = price2num((float) $tmpcal[1], 2);
 	$line_total_ttc = price2num((float) $line_total_ht + (float) $line_total_tva, 2);
 
 	// Uncomment for test using the most accurate possible calculation (but not following the e-invoice rule to round to 2 digit at each step of calculation)
