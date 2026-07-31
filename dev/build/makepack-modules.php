@@ -65,7 +65,7 @@ function combineYamlFiles($files, $outputFile)
 {
 	$combinedContent = '';
 	foreach ($files as $file) {
-		print "--- Process file ".$file."\n";
+		print "\n-- Process file ".$file."\n";
 		$content = file_get_contents($file);
 
 		if ($content) {
@@ -233,6 +233,19 @@ function completAutoTags($content, $modulePath)
 					}
 				}
 
+				// If we process tag version and it was not found inside the descriptor file, we try to get it from VERSION file
+				if ($tag == 'current_version' && empty($version)) {
+					$directoryToSearch = realpath(__DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . '..'); // We are in dev/build, we want to go to root of repository
+					$versionfile = $directoryToSearch . DIRECTORY_SEPARATOR . strtolower($modulename) . DIRECTORY_SEPARATOR . "VERSION";
+					print "Try to guess version from VERSION file ".$versionfile."\n";
+					if (file_exists($versionfile)) {
+						$version = file_get_contents($versionfile);
+						$version = trim($version);
+						$value = $version;
+						print "Found version into VERSION file: ".$version."\n";
+					}
+				}
+
 				if (!empty($value)) {
 					// Replace "auto" with the found value
 					$content = preg_replace('/(' . preg_quote($tag) . ':\s*)["\']?auto["\']?/', "$1\"$value\"", $content);
@@ -252,10 +265,9 @@ function completAutoTags($content, $modulePath)
 			}
 		}
 
-
 		if (!empty($tagsToExtractFromDescriptor['current_version'])) {
 			$directoryToSearch = realpath(__DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . '..'); // We are in dev/build, we want to go to root of repository
-			$outzip = $directoryToSearch . DIRECTORY_SEPARATOR . strtolower($modulename) . DIRECTORY_SEPARATOR . "module_" . strtolower($modulename) . "-" . $version . ".zip";
+			$outzip = $directoryToSearch . DIRECTORY_SEPARATOR . 'dev/build/bin/' . DIRECTORY_SEPARATOR . "module_" . strtolower($modulename) . "-" . $version . ".zip";
 			print "We check if zip file for module ".$modulename.", with name ".$outzip." exists\n";
 			if (file_exists($outzip)) {
 				// File already exists, nothing is done.
