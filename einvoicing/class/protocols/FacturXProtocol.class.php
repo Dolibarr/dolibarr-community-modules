@@ -1367,6 +1367,7 @@ class FacturXProtocol extends CIIProtocol
 		// with that error carry its socid, so a rolled back vendor makes them point to a thirdparty that
 		// never existed.
 		$db->begin();
+		$this->openedTransactions++;
 
 		$syncSocRes = $this->_syncOrCreateThirdpartyFromEInvoiceSeller($parsedHeader, 'dolibarr', $flowId);
 
@@ -1374,6 +1375,7 @@ class FacturXProtocol extends CIIProtocol
 		$return_messages[] = $syncSocRes['message'];
 		if ($socId < 0) {
 			$db->rollback();
+			$this->openedTransactions--;
 			return [
 				'res' => -1,
 				'message' => 'Thirdparty sync or creation error: ' . implode("<br>\n", $return_messages),
@@ -1385,11 +1387,13 @@ class FacturXProtocol extends CIIProtocol
 		}
 
 		$db->commit();
+		$this->openedTransactions--;
 
 		// From this point on, everything belongs to the invoice import (products, invoice, lines) and
 		// stays atomic. This second transaction is closed (commit or rollback) by
 		// createSupplierInvoiceFromSource(), the public wrapper.
 		$db->begin();
+		$this->openedTransactions++;
 
 		// Load supplier (thirdparty)
 		require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.class.php';
