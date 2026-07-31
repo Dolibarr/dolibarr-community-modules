@@ -2,6 +2,16 @@
 
 ## 1.0.4
 
+NEW: A "Mapped vendor references" screen (Billing > E-invoice synchronization) lists every vendor
+product reference recorded on the products, i.e. the mappings the import of a supplier invoice relies
+on to find the product of a line. Until now they could only be read product by product, in the
+"Supplier prices" tab of each one. A reference can be reassigned to another product or dropped
+directly from the list.
+
+FIX: The product picker of the screen mapping the products of an e-invoice no longer filters on the
+sale status. A product bought from a vendor only needs to be flagged "to buy", and a product created by
+a previous import never is on sale, so that screen offered an empty list of products.
+
 FIX: The error raised when a "Standard rated" line has no seller VAT number no longer names the
 customer. The test is on the seller (BR-S-02 requires the Seller VAT identifier, BT-31), but the
 message read "The VAT number of the thirdparty <customer> is mandatory", so the operator went looking
