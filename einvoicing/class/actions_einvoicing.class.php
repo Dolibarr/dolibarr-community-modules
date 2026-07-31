@@ -137,7 +137,10 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 						// The actual transmission is what gets blocked, by the send_to_pdp gate below.
 						$routecheck = $einvoicing->checkRecipientRoutableForSend($invoiceObject);
 						if (!$routecheck['ok']) {
-							$warnmsg = $langs->trans("EInvoiceGeneratedButRecipientNotRoutable") . ': <br>' . $routecheck['message'];
+							// "not routable" is only said when the directory proved it: an unconfirmed answer gets
+							// its own wording, or the message would claim more than the directory reported.
+							$warnkey = ($routecheck['status'] === 'undetermined') ? "EInvoiceGeneratedButRecipientReachabilityUnconfirmed" : "EInvoiceGeneratedButRecipientNotRoutable";
+							$warnmsg = $langs->trans($warnkey) . ': <br>' . $routecheck['message'];
 							dol_syslog(__METHOD__ . " " . strip_tags($warnmsg), LOG_WARNING);
 							setEventMessages($warnmsg, array(), 'warnings');
 							$this->warnings[] = $warnmsg;
@@ -179,9 +182,14 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 							// Optionally transmit to the Access Point right after generation (opt-in + idempotent) and if not yet generated.
 							// Without this, validation only generates the Factur-X; the invoice is never sent to the
-							// PA (transmission was a manual "send_to_pdp" click only). The 'transmitted' guard prevents
-							// re-sending (and creating duplicate flows) when the PDF is regenerated later.
-							if (getDolGlobalString('EINVOICING_AUTO_SEND_ON_GENERATION') && empty($currentStatusDetails['transmitted']) && $precheckresult >= 0) {
+							// PA (transmission was a manual "send_to_pdp" click only).
+							// Two guards, because one is not enough: 'transmitted' reads the syncstatus, which
+							// generateInvoice() just reset to GENERATED a few lines above, so it stops seeing a
+							// transmission from the second regeneration on. isTransmittedLockActive() reads the
+							// flow_id, which the first submission assigned and nothing clears, so it holds for good
+							// (and honors EINVOICING_ALLOW_RESEND_TRANSMITTED like the manual send does).
+							if (getDolGlobalString('EINVOICING_AUTO_SEND_ON_GENERATION') && empty($currentStatusDetails['transmitted'])
+								&& !$einvoicing->isTransmittedLockActive($invoiceObject->id, $invoiceObject->ref) && $precheckresult >= 0) {
 								dol_syslog("actions_einvoicing: Invoice seems not yet transmitted and EINVOICING_AUTO_SEND_ON_GENERATION is on, so we try to send it");
 
 								require_once __DIR__ . '/providers/PDPProviderManager.class.php';
@@ -575,7 +583,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				if (!$error) {
 					$routecheck = $einvoicing->checkRecipientRoutableForSend($object);
 					if (!$routecheck['ok']) {
-						setEventMessages($langs->trans("EInvoiceNotSentRecipientNotRoutable") . ': <br>' . $routecheck['message'], array(), 'errors');
+						$errkey = ($routecheck['status'] === 'undetermined') ? "EInvoiceNotSentRecipientReachabilityUnconfirmed" : "EInvoiceNotSentRecipientNotRoutable";
+						setEventMessages($langs->trans($errkey) . ': <br>' . $routecheck['message'], array(), 'errors');
 						$error++;
 					}
 				}
@@ -636,7 +645,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				if (!$error) {
 					$routecheck = $einvoicing->checkRecipientRoutableForSend($invoiceObject);
 					if (!$routecheck['ok']) {
-						setEventMessages($langs->trans("EInvoiceGeneratedButRecipientNotRoutable") . ': <br>' . $routecheck['message'], array(), 'warnings');
+						$warnkey = ($routecheck['status'] === 'undetermined') ? "EInvoiceGeneratedButRecipientReachabilityUnconfirmed" : "EInvoiceGeneratedButRecipientNotRoutable";
+						setEventMessages($langs->trans($warnkey) . ': <br>' . $routecheck['message'], array(), 'warnings');
 						$this->warnings[] = $routecheck['message'];
 					}
 				}

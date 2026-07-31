@@ -2200,11 +2200,12 @@ class EInvoicing
 	 * Only enforced when EINVOICING_REQUIRE_ROUTABLE_RECIPIENT is on (off by default, opt-in). A recipient
 	 * that is absent from the directory, or present without an active routing line, would be rejected by the
 	 * platform with a routing error (fr:213): blocking generation/sending avoids reaching that error state.
+	 * That option has a second, stricter, value (2) that also blocks a non-conclusive directory answer.
 	 *
 	 * Fails open (ok=1) whenever the check cannot be trusted, so it never blocks unexpectedly: option off,
 	 * provider without a directory lookup (status unsupported), directory call error, a directory answer that
-	 * does not report the line status (status undetermined), or a recipient with no SIREN (handled by the
-	 * standard required-information checks).
+	 * does not report the line status (status undetermined, unless the option is set to its strict value), or
+	 * a recipient with no SIREN (handled by the standard required-information checks).
 	 *
 	 * @param 	Facture 	$object 	Invoice
 	 * @return 	array{ok:int,status:string,message:string}	ok=0 only when the recipient is confirmed not routable.
@@ -2215,7 +2216,8 @@ class EInvoicing
 
 		$res = array('ok' => 1, 'status' => '', 'message' => '');
 
-		if (!getDolGlobalInt('EINVOICING_REQUIRE_ROUTABLE_RECIPIENT')) {
+		$require = getDolGlobalInt('EINVOICING_REQUIRE_ROUTABLE_RECIPIENT');
+		if (!$require) {
 			return $res;	// opt-in, off by default
 		}
 
@@ -2242,8 +2244,16 @@ class EInvoicing
 		} elseif ($res['status'] === 'inactive') {
 			$res['ok'] = 0;
 			$res['message'] = $langs->trans('EInvoicingDirectoryInactive', $siren);
+		} elseif ($res['status'] === 'undetermined' && $require >= 2) {
+			// Strict value of the option: the directory answered for this recipient but did not report the
+			// status of its reception address, and that status cannot be requested, so an open address and
+			// one that only takes effect later are indistinguishable. Transmitting may come back as a
+			// routing error (fr:213). Whoever prefers that risk over a blocked invoice stays on value 1.
+			$res['ok'] = 0;
+			$res['message'] = $langs->trans('EInvoicingDirectoryUndetermined', $siren);
 		}
-		// routable / error / unsupported / undetermined => ok stays 1 (fail-open)
+		// routable / error / unsupported => ok stays 1 (fail-open), and undetermined too unless the
+		// option is set to its strict value.
 
 		return $res;
 	}

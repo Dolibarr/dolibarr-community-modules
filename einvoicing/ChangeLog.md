@@ -6,6 +6,23 @@ FIX: The error raised when a "Standard rated" line has no seller VAT number no l
 customer. The test is on the seller (BR-S-02 requires the Seller VAT identifier, BT-31), but the
 message read "The VAT number of the thirdparty <customer> is mandatory", so the operator went looking
 for the missing number on the customer record while it was missing from their own company.
+  
+FIX: A lifecycle message sent to a vendor with no routing recorded no longer falls straight back on its
+SIREN, which the platform accepts only when the vendor happens to be registered under it. The status is a
+reply, so it now looks for the address the vendor exchanges under, in order: the routing recorded in
+Dolibarr, then the electronic address (BT-34) carried by the e-invoice it sent us, then the address the
+platform directory declares for its SIREN, and only then the SIREN itself, saying in the log which one it
+settled on.
+
+FIX: Regenerating the document of an invoice already transmitted no longer sends it to the platform a
+second time. Automatic transmission on generation stopped at the sync status, which generateInvoice()
+resets to "generated" every time it runs, so from the second regeneration on the invoice looked as if it
+had never been sent. It was, and the platform, which registers a flow under the invoice reference,
+answered the duplicate with an HTTP 400 and no flow: an error raised to the operator on an invoice that
+was in fact transmitted and, when the first submission was still awaiting its outcome, a second useless
+call for every regeneration. The transmission now reads the flow identifier the platform assigned on the
+first submission, which nothing clears, exactly like the manual send button already did - and it honours
+the same EINVOICING_ALLOW_RESEND_TRANSMITTED opt-out.
 
 FIX: A line carrying recoverable non-collected VAT ("TVA non perçue récupérable", the overseas
 departments scheme of article 295 of the CGI) no longer makes the document claim a VAT the invoice does
@@ -14,6 +31,23 @@ module added the VAT on top, so the document asked the buyer for the whole rate 
 EN 16931 offers no way to declare a VAT that is not claimed - the total with VAT is the net total plus
 the VAT total (BR-CO-15) - so the line is now issued exempt (category E, rate 0, no VAT amount) with the
 reason code the standard reserves for that article, VATEX-FR-CGI295 (issue #508).
+
+NEW: The option that requires the recipient to be reachable before transmission now offers a third
+choice, which blocks the doubt as well: the directory (annuaire) answered for the recipient but did
+not report the status of its reception address. That status cannot be asked for - the directory
+search only accepts the address identifier, SIREN, SIRET and address suffix - so on a platform that
+leaves it out, an address that is open and one that only takes effect later are indistinguishable,
+and the invoice used to go out and possibly come back rejected with a routing error (fr:213).
+EINVOICING_REQUIRE_ROUTABLE_RECIPIENT, formerly a yes/no, now takes those three values, the first two
+keeping their meaning: an instance that already required reachability is unchanged.
+
+FIX: The amounts of a line are now asked to the core function that computed the invoice
+(calcul_price_total()) instead of being computed a second time in the module. The second
+implementation rounded the unit price after discount in every case, where the core only rounds it when
+the instance asks for it, so a discounted line could state a few cents less than the invoice it stands
+for - and an instance running a Dolibarr that does not know that option diverged by more, the module
+honouring a setting its core ignores. Nothing reported it: the document stayed internally consistent
+and the platform accepted it (issue #505).
 
 
 ## 1.0.3
