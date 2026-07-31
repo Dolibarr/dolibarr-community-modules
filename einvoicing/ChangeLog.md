@@ -20,6 +20,15 @@ EN 16931 offers no way to declare a VAT that is not claimed - the total with VAT
 the VAT total (BR-CO-15) - so the line is now issued exempt (category E, rate 0, no VAT amount) with the
 reason code the standard reserves for that article, VATEX-FR-CGI295 (issue #508).
 
+NEW: The option that requires the recipient to be reachable before transmission now offers a third
+choice, which blocks the doubt as well: the directory (annuaire) answered for the recipient but did
+not report the status of its reception address. That status cannot be asked for - the directory
+search only accepts the address identifier, SIREN, SIRET and address suffix - so on a platform that
+leaves it out, an address that is open and one that only takes effect later are indistinguishable,
+and the invoice used to go out and possibly come back rejected with a routing error (fr:213).
+EINVOICING_REQUIRE_ROUTABLE_RECIPIENT, formerly a yes/no, now takes those three values, the first two
+keeping their meaning: an instance that already required reachability is unchanged.
+
 FIX: The amounts of a line are now asked to the core function that computed the invoice
 (calcul_price_total()) instead of being computed a second time in the module. The second
 implementation rounded the unit price after discount in every case, where the core only rounds it when
