@@ -409,7 +409,7 @@ class RecipientDirectoryTest extends CommonClassTest
 		$provider = new FakeDirectoryPDPProvider($db);
 		$provider->cannedResponses = array(
 			array('status_code' => 200, 'response' => array('results' => array(), 'totalNumberOfResults' => 0)),
-			array('status_code' => 200, 'response' => array('siren' => '552081317', 'businessName' => 'RENAULT')),
+			array('status_code' => 200, 'response' => array('results' => array(array('siren' => '552081317', 'businessName' => 'RENAULT')), 'totalNumberOfResults' => 1)),
 		);
 
 		$result = $provider->checkRecipientDirectory('552081317');
@@ -417,10 +417,12 @@ class RecipientDirectoryTest extends CommonClassTest
 		$this->assertSame('inactive', $result['status']);
 		$this->assertSame(0, $result['reachable']);
 		$this->assertSame(0, $result['entries']);
+		// The consultation goes through the search form, the only one every platform serves.
+		$this->assertSame('afnor-directory/v1/siren/search', $provider->calledResources[1]);
 	}
 
 	/**
-	 * No directory line and a SIREN unknown to the annuaire.
+	 * No directory line and a SIREN unknown to the annuaire, on a platform that says so with a 404.
 	 *
 	 * @return void
 	 */
@@ -432,6 +434,27 @@ class RecipientDirectoryTest extends CommonClassTest
 		$provider->cannedResponses = array(
 			array('status_code' => 200, 'response' => array('results' => array(), 'totalNumberOfResults' => 0)),
 			array('status_code' => 404, 'response' => ''),
+		);
+
+		$result = $provider->checkRecipientDirectory('123456789');
+
+		$this->assertSame('absent', $result['status']);
+		$this->assertSame(0, $result['reachable']);
+	}
+
+	/**
+	 * Same, on a platform that answers the consultation with an empty result set instead of a 404.
+	 *
+	 * @return void
+	 */
+	public function testNoLineAndEmptyConsultationIsAbsent()
+	{
+		global $db;
+
+		$provider = new FakeDirectoryPDPProvider($db);
+		$provider->cannedResponses = array(
+			array('status_code' => 200, 'response' => array('results' => array(), 'total_number_results' => 0)),
+			array('status_code' => 200, 'response' => array('results' => array(), 'total_number_results' => 0)),
 		);
 
 		$result = $provider->checkRecipientDirectory('123456789');

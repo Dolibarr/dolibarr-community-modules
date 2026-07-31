@@ -1,6 +1,4 @@
 <?php
-use Stripe\OAuthErrorObject;
-
 /* Copyright (C) 2025       Laurent Destailleur         <eldy@users.sourceforge.net>
  * Copyright (C) 2025       Mohamed DAOUD               <mdaoud@dolicloud.com>
  * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
@@ -28,6 +26,11 @@ use Stripe\OAuthErrorObject;
 
 /**
  * XmlPatcher
+ *
+ * This class must stay free of any composer import: CIIProtocol includes it, and the CII protocol
+ * works on an instance where the php prerequisites of the module were never installed. Patching is
+ * done with the native DOM extension only, and the horstoeko builder is received as a plain object
+ * from the caller (FacturXProtocol), which is the one loading vendor/autoload.php.
  */
 class XmlPatcher
 {
