@@ -2107,6 +2107,20 @@ class SuperPDPProvider extends AbstractPDPProvider
 				require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
 				$document->fk_element_type = 'invoice_supplier';
 
+				// An incoming one is a different thing entirely: it is a status the VENDOR issues about
+				// one of its own invoices - "Cashed in" (212) above all, which is the answer to the
+				// payment we reported with a 211. We never sent it, so it has no row in
+				// einvoicing_lifecycle_msg and the flowId lookup below cannot resolve it: it used to end
+				// up stored with neither its lifecycle code nor its supplier invoice, so nothing ever
+				// surfaced on the invoice.
+				if ($document->flow_direction == 'In') {
+					$resIncoming = $this->processIncomingSupplierInvoiceStatus($flowId, $document, $einvoicing);
+
+					$returnRes = $resIncoming['res'];
+					$returnMessage = $resIncoming['message'];
+					break;
+				}
+
 				// Fetch the linked supplier invoice using flowId stored in einvoicing_lifecycle_msg table when the LC message was sent
 				$resFetchStatusMessages = $einvoicing->fetchStatusMessages($flowId);
 				if (!is_array($resFetchStatusMessages) /* || $resFetchStatusMessages < 0 */ || empty($resFetchStatusMessages)) {
@@ -2255,6 +2269,171 @@ class SuperPDPProvider extends AbstractPDPProvider
 		}
 
 		return array('res' => $returnRes, 'message' => $returnMessage);
+	}
+
+	/**
+	 * Record a lifecycle status the vendor issued about one of its invoices, onto the supplier
+	 * invoice it refers to.
+	 *
+	 * This is the mirror of what the CustomerInvoiceLC case does for the statuses our own customers
+	 * send us: read the CDAR, resolve the invoice it points at, and store the status on it.
+	 *
+	 * Never returns a negative result for a status it cannot attach: a vendor may perfectly well
+	 * report on an invoice this Dolibarr does not hold (the invoice was refused, or the same access
+	 * point account is shared with another system), and failing the flow would stall the whole
+	 * synchronization on it, run after run. The flow is stored either way, so nothing is lost.
+	 *
+	 * @param	string		$flowId			Flow identifier of the lifecycle message
+	 * @param	Document	$document		Flow document being built, completed here with the CDAR data
+	 * @param	EInvoicing	$einvoicing		E-invoicing helper of the running synchronization
+	 * @return	array{res:int, message:string}	1 when the status was attached, 0 when it was only stored
+	 */
+	private function processIncomingSupplierInvoiceStatus($flowId, $document, $einvoicing)
+	{
+		global $db;
+
+		require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
+		dol_include_once('einvoicing/class/utils/CdarHandler.class.php');
+
+		$flowResource = 'flows/' . $flowId . '?' . http_build_query(array('docType' => 'Original'));
+		$flowResponse = $this->callApi($flowResource, "GET", false, array('Accept' => 'application/octet-stream'));
+		if ($flowResponse['status_code'] != 200) {
+			return array('res' => -1, 'message' => "Failed to retrieve flow details for flowId: " . $flowId);
+		}
+
+		$cdarHandler = new CdarHandler($db);
+		$cdarDocument = $cdarHandler->readFromString($flowResponse['response']);
+		if (empty($cdarDocument) || empty($cdarDocument['AcknowledgementDocument']['ReferenceReferencedDocument'])) {
+			return array('res' => -1, 'message' => "FlowId: " . $flowId . " - Failed to parse CDAR document");
+		}
+
+		$refDoc = $cdarDocument['AcknowledgementDocument']['ReferenceReferencedDocument'];
+
+		$document->cdar_lifecycle_code = $refDoc['ProcessConditionCode'];
+		$document->cdar_lifecycle_label = isset($refDoc['ProcessCondition']) ? $refDoc['ProcessCondition'] : '';
+		$document->cdar_reason_code = isset($refDoc['StatusReasonCode']) ? $refDoc['StatusReasonCode'] : '';
+		$document->cdar_reason_desc = isset($refDoc['StatusReason']) ? $refDoc['StatusReason'] : '';
+		$document->cdar_reason_detail = isset($refDoc['StatusIncludedNoteContent']) ? $refDoc['StatusIncludedNoteContent'] : '';
+
+		// The referenced document is the vendor invoice, identified the way its issuer numbered it:
+		// that is our ref_supplier, and the issuing party is the vendor it belongs to.
+		$vendorReference = isset($refDoc['IssuerAssignedID']) ? (string) $refDoc['IssuerAssignedID'] : '';
+		$vendorLegalId = isset($refDoc['IssuerTradeParty']['GlobalID']) ? (string) $refDoc['IssuerTradeParty']['GlobalID'] : '';
+
+		$document->tracking_idref = $vendorReference;
+
+		if ($vendorReference === '') {
+			dol_syslog(__METHOD__ . " FlowId " . $flowId . " carries no IssuerAssignedID, nothing to attach the status to", LOG_WARNING);
+			return array('res' => 0, 'message' => "FlowId " . $flowId . " - Vendor lifecycle status with no invoice reference");
+		}
+
+		$supplierInvoiceId = $this->findSupplierInvoiceByVendorReference($vendorReference, $vendorLegalId);
+		if ($supplierInvoiceId <= 0) {
+			dol_syslog(__METHOD__ . " No supplier invoice found for vendor reference " . $vendorReference . " (vendor " . $vendorLegalId . "), flowId " . $flowId, LOG_WARNING);
+			return array('res' => 0, 'message' => "FlowId " . $flowId . " - No supplier invoice matching the vendor reference " . $vendorReference);
+		}
+
+		$supplierInvoice = new FactureFournisseur($this->db);
+		if ($supplierInvoice->fetch($supplierInvoiceId) <= 0) {
+			return array('res' => 0, 'message' => "FlowId " . $flowId . " - Failed to load supplier invoice id " . $supplierInvoiceId);
+		}
+
+		$document->fk_element_id = $supplierInvoice->id;
+		$document->tracking_idref = $supplierInvoice->ref;
+
+		$statusComment = $document->cdar_reason_detail ? $document->cdar_reason_detail : $document->cdar_reason_desc;
+
+		$exceptionmessage = '';
+		$db->begin();
+
+		try {
+			// The flow_id of the link is left alone on purpose: on a supplier invoice it points at the
+			// received invoice document, which stays the source of its XML. Only the status moves.
+			$einvoicing->insertOrUpdateExtLink($supplierInvoice->id, $supplierInvoice->element, '', $document->cdar_lifecycle_code, '', $statusComment);
+
+			$einvoicing->storeStatusMessage(
+				$supplierInvoice->id,
+				$supplierInvoice->element,
+				$document->cdar_lifecycle_code,
+				$statusComment,
+				$document->flow_direction,
+				$flowId,
+				$document->ack_status,
+				$document->ack_info,
+				$document->submittedat,
+				$document->cdar_reason_code
+			);
+
+			$db->commit();
+		} catch (Exception $e) {
+			$exceptionmessage = $e->getMessage();
+
+			$db->rollback();
+		}
+
+		if ($exceptionmessage) {
+			throw new Exception($exceptionmessage);
+		}
+
+		$statusLabel = $document->cdar_lifecycle_label ? $document->cdar_lifecycle_label : $document->cdar_lifecycle_code;
+		$reasonDetail = $document->cdar_reason_detail ? " - " . $document->cdar_reason_detail : '';
+		$this->addEvent('STATUS', "EINVOICING - Status: " . $statusLabel, "EINVOICING - Status: " . $statusLabel . $reasonDetail, $supplierInvoice);
+
+		return array('res' => 1, 'message' => "FlowId " . $flowId . " - Vendor status " . $document->cdar_lifecycle_code . " recorded on supplier invoice " . $supplierInvoice->ref);
+	}
+
+	/**
+	 * Find the supplier invoice a vendor lifecycle status refers to.
+	 *
+	 * A vendor reference is only unique per vendor, never globally, so it is only trusted alone when
+	 * it matches exactly one invoice. When several vendors happen to use the same numbering, the
+	 * legal identifier carried by the CDAR settles it; when it cannot, no invoice is returned rather
+	 * than the wrong one.
+	 *
+	 * @param	string	$vendorReference	Invoice number as assigned by the vendor (BT-1 of the referenced invoice)
+	 * @param	string	$vendorLegalId		Legal identifier of the issuing party, empty when the CDAR carries none
+	 * @return	int							Supplier invoice id, 0 when there is no single certain match
+	 */
+	private function findSupplierInvoiceByVendorReference($vendorReference, $vendorLegalId)
+	{
+		global $db;
+
+		$sql = "SELECT f.rowid, s.siren, s.siret, s.tva_intra";
+		$sql .= " FROM " . $db->prefix() . "facture_fourn as f";
+		$sql .= " INNER JOIN " . $db->prefix() . "societe as s ON s.rowid = f.fk_soc";
+		$sql .= " WHERE f.ref_supplier = '" . $db->escape($vendorReference) . "'";
+		$sql .= " AND f.entity IN (" . getEntity('facture_fourn') . ")";
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . " " . $db->lasterror(), LOG_ERR);
+			return 0;
+		}
+
+		$candidates = array();
+		while ($obj = $db->fetch_object($resql)) {
+			$candidates[] = $obj;
+		}
+		$db->free($resql);
+
+		if (count($candidates) == 1) {
+			return (int) $candidates[0]->rowid;
+		}
+		if (empty($candidates) || $vendorLegalId === '') {
+			return 0;
+		}
+
+		// Several invoices carry that number: only the one whose vendor is the issuer of the status.
+		$matches = array();
+		foreach ($candidates as $candidate) {
+			if ($vendorLegalId === (string) $candidate->siren
+				|| $vendorLegalId === (string) $candidate->siret
+				|| $vendorLegalId === (string) $candidate->tva_intra) {
+				$matches[] = (int) $candidate->rowid;
+			}
+		}
+
+		return count($matches) == 1 ? $matches[0] : 0;
 	}
 
 	/**
