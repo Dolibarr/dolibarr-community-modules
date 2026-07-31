@@ -2,6 +2,11 @@
 
 ## 1.0.4
 
+FIX: The error raised when a "Standard rated" line has no seller VAT number no longer names the
+customer. The test is on the seller (BR-S-02 requires the Seller VAT identifier, BT-31), but the
+message read "The VAT number of the thirdparty <customer> is mandatory", so the operator went looking
+for the missing number on the customer record while it was missing from their own company.
+  
 FIX: The documents generated on the MINIMUM and BASIC profiles now validate against their own Factur-X
 schema, which neither did. BASIC was treated as a full EN 16931 document, so it carried the party
 contacts (BG-6 / BG-9), the payment means label (BT-82), the account holder (BT-85) and the BIC (BT-86),
