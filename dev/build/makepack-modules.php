@@ -787,6 +787,11 @@ if ($argv[1] == 'index') {
 
 	combineYamlFiles($yamlFiles, $outputFile);
 
+	// Remove last CR+LF lines
+	$content = file_get_contents($outputFile);
+	$content = preg_replace('/\n+$/', "\n", $content);
+	file_put_contents($outputFile, $content);
+
 	print "\n";
 	print "The combined index.yaml file was created at: " . $outputFile;
 	syslog(LOG_INFO, "The combined index.yaml file was created at: " . $outputFile);
