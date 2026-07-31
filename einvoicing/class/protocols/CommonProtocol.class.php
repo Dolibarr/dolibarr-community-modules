@@ -1475,6 +1475,27 @@ trait CommonProtocol
 		$exemptionReason = null;		// BT-120
 		$exemptionReasonCode = null;	// BT-121 - Must contain a VATEX code. https://docs.peppol.eu/poacc/billing/3.0/codelist/vatex/
 
+		// A line carrying recoverable non-collected VAT ("TVA non perçue récupérable", the overseas
+		// departments scheme of article 295 of the CGI) states a VAT rate, but that VAT is not collected:
+		// Dolibarr makes the total including tax of such a line equal to its net amount, and the amount
+		// due of the invoice follows. EN 16931 offers no way to declare a VAT that is not claimed - the
+		// total with VAT is the net total plus the VAT total (BR-CO-15), so anything declared here would
+		// be claimed from the buyer. The line is therefore issued exempt, which the standard covers with
+		// a reason code of its own for that very article (issue #508).
+		if (!empty($line->info_bits) && ((int) $line->info_bits & 1)) {
+			$categoryVAT = 'E';
+			if ($seller->country_code == 'FR') {
+				$exemptionReasonCode = 'VATEX-FR-CGI295';
+			} else {
+				// The scheme is French; for any other seller there is no code to quote, and BR-E-10 is
+				// satisfied by the reason text alone.
+				$exemptionReason = 'VAT not collected';
+			}
+			$exemptionReason = $exemptionReason ?: ($VATEX_CODE_LIST[(string) $exemptionReasonCode]['reason'] ?? $exemptionReasonCode);
+
+			return array('categoryVAT' => $categoryVAT, 'ExemptionReason' => $exemptionReason, 'ExemptionReasonCode' => $exemptionReasonCode);
+		}
+
 		if ($vat_rate > 0) {
 			$categoryVAT = 'S';
 

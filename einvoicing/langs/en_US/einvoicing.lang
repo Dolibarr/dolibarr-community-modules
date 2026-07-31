@@ -468,15 +468,25 @@ EInvoicingDirectoryChecking=Checking the directory...
 EInvoicingDirectoryRoutable=Reachable: an active reception address was found in the directory
 EInvoicingDirectoryAbsent=Not reachable: recipient (SIREN %s) is absent from the Approved Platforms directory
 EInvoicingDirectoryInactive=Not reachable: recipient (SIREN %s) is in the directory but has no active routing line
+EInvoicingDirectoryUpcoming=Not reachable yet: recipient (SIREN %s) has a reception address in the directory that only takes effect on %s
+EInvoicingDirectoryUpcomingNoDate=Not reachable yet: recipient (SIREN %s) has a reception address declared in the directory that has not taken effect yet
+EInvoicingDirectoryUndetermined=Undetermined: recipient (SIREN %s) has a reception address in the directory, but the platform did not report its line status, so it cannot be told from an address that only takes effect later. Reachability is unconfirmed: transmission may still come back as a routing error
+EInvoicingDirectoryLineStatus=Line status
+EInvoicingDirectoryPlatformType=Platform
 EInvoicingDirectoryUnsupported=Directory lookup is not available for the current platform
 EInvoicingDirectoryError=Directory check failed: %s
 EInvoicingDirectoryNoSiren=No SIREN set on the recipient third party: cannot check the directory
 # Require routable recipient before transmission (opt-in enforcement)
 EINVOICING_REQUIRE_ROUTABLE_RECIPIENT=Require the recipient to be reachable before transmission
-EINVOICING_REQUIRE_ROUTABLE_RECIPIENT_HELP=Off by default (opt-in). When on, the e-invoice is still generated (a recipient that is not routable does not make the document invalid) but its transmission to the Approved Platform is blocked if the recipient is absent from the directory, or present without an active routing line, since transmission would be rejected with a routing error (fr:213). The check never blocks when the directory lookup is unavailable, errors, or the recipient has no SIREN. Note: the sandbox directory is incomplete, so enabling this in test mode can flag recipients that are actually reachable in production.
+EINVOICING_REQUIRE_ROUTABLE_RECIPIENT_OFF=No
+EINVOICING_REQUIRE_ROUTABLE_RECIPIENT_ON=Yes, block a recipient the directory reports as unreachable
+EINVOICING_REQUIRE_ROUTABLE_RECIPIENT_STRICT=Yes, and also block when reachability could not be confirmed
+EINVOICING_REQUIRE_ROUTABLE_RECIPIENT_HELP=No by default (opt-in). When required, the e-invoice is still generated (a recipient that is not routable does not make the document invalid) but its transmission to the Approved Platform is blocked if the recipient is absent from the directory, or present without an active routing line, since transmission would be rejected with a routing error (fr:213). The check never blocks when the directory lookup is unavailable, errors, or the recipient has no SIREN. The third choice also blocks the doubt: the directory answered for the recipient but did not report the status of its reception address. That status cannot be requested (the directory search only accepts the address identifier, SIREN, SIRET and address suffix), so on a platform that leaves it out an address that is open and one that only takes effect later are indistinguishable, and transmitting may still come back as a routing error (fr:213). Beware that on a platform that never reports the status, that choice blocks every recipient. Note: the sandbox directory is incomplete, so requiring reachability in test mode can flag recipients that are actually reachable in production.
 EInvoiceNotGeneratedRecipientNotRoutable=E-invoice not generated: the recipient cannot receive electronic invoices
 EInvoiceGeneratedButRecipientNotRoutable=E-invoice generated, but the recipient cannot receive it yet, so its transmission will be blocked
 EInvoiceNotSentRecipientNotRoutable=Invoice not sent: the recipient cannot receive electronic invoices
+EInvoiceGeneratedButRecipientReachabilityUnconfirmed=E-invoice generated, but the recipient reachability could not be confirmed, so its transmission will be blocked
+EInvoiceNotSentRecipientReachabilityUnconfirmed=Invoice not sent: the recipient reachability could not be confirmed
 EINVOICING_JOB_MANUAL_ACTION_REQUIRED=Manual action is required. The job has been interrupted.
 NoPDPProviderConfigured=No Approved Platform configured: nothing to synchronize
 

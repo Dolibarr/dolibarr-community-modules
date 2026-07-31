@@ -500,8 +500,9 @@ class CIIProtocol extends AbstractProtocol
 
 		$xmlcontent = $this->buildXML($invoiceData, $linesData, $this->getBuildXmlProfile(), $outputlangs);
 
-		// Local EN 16931 business rules safety net (warnings, or abort in strict mode)
-		$this->checkBusinessRules($xmlcontent);
+		// Local EN 16931 business rules safety net, and check that the document claims the amount the
+		// invoice claims (warnings, or abort in strict mode)
+		$this->checkBusinessRules($xmlcontent, $invoice);
 
 		file_put_contents($xmlfile, $xmlcontent);
 
