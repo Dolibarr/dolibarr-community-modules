@@ -31,7 +31,6 @@ dol_include_once('einvoicing/class/einvoicing.class.php');
 dol_include_once('einvoicing/lib/einvoicing.lib.php');
 require_once DOL_DOCUMENT_ROOT . '/core/lib/admin.lib.php';
 
-
 /**
  * Class to manage SuperPDP PDP provider integration.
  */

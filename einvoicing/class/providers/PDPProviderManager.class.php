@@ -199,7 +199,9 @@ class PDPProviderManager
 			dol_syslog("Include provider class was done, but class is still not found: ".$classnametouse, LOG_ERR);
 			return null;
 		}
+
 		$provider = new $classnametouse($db);
+
 		if ($provider) {
 			$provider->providerName = $name;
 		}

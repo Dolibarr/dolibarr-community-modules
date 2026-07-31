@@ -150,6 +150,7 @@ if (getDolGlobalString('EINVOICING_PDP')) {
 	// Note: Token may have been expired
 	$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
 	// Now we load the conf
+
 	$providerconfig  = $provider->getConf();
 
 	$prefix = $providerconfig['dol_prefix'].'_';
