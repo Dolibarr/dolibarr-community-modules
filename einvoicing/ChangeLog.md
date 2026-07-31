@@ -2,6 +2,13 @@
 
 ## 1.0.4
 
+FIX: A document generated as CII now carries the buyer reference (BT-10), the project reference (BT-11)
+and the contract reference (BT-12), which only the Factur-X path was writing. The three were read from
+the invoice, handed to the generator and silently dropped, so the same invoice produced a different
+document depending on the protocol - and the CII one lost the "service exécutant" a public buyer needs
+to route it. Each is emitted only on the profiles whose schema declares it: BT-10 everywhere, BT-12 from
+BASIC WL up, BT-11 from EN16931 up.
+
 FIX: A lifecycle message sent to a vendor with no routing recorded no longer falls straight back on its
 SIREN, which the platform accepts only when the vendor happens to be registered under it. The status is a
 reply, so it now looks for the address the vendor exchanges under, in order: the routing recorded in
