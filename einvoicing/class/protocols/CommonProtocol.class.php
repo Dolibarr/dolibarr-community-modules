@@ -1367,7 +1367,7 @@ trait CommonProtocol
 	 *
 	 * @param 	CommonInvoiceLine		$line			Invoice line
 	 * @param 	Societe 				$seller			Seller
-	 * @param 	Societe					$buyer			Buyer
+	 * @param 	CommonInvoice			$buyer			Invoice the line belongs to, whose ->thirdparty is the buyer. Not a Societe: the single caller passes the invoice, and the buyer is read through it below.
 	 * @return 	array<string,string>					array('categoryVAT' => Category of VAT rate ('S', 'K', 'E', 'G'), 'ExemptionReason' => '', 'ExemptionReasonCode => '')
 	 */
 	public function getCategoryRate($line, $seller, $buyer)
@@ -1500,7 +1500,10 @@ trait CommonProtocol
 			$categoryVAT = 'S';
 
 			if (empty($seller->tva_intra)) {
-				throw new Exception('BADVATNUMBER: The VAT number of the thirdparty ' . $buyer->thirdparty->name . ' is mandatory when there is a non null VAT on at least on line.');
+				// BR-S-02: a "Standard rated" line requires the Seller VAT identifier (BT-31). The test is
+				// on the seller, so the message must name the seller - naming the customer sends the
+				// operator looking for the missing number in the wrong record.
+				throw new Exception('BADVATNUMBER[BR-S-02]: The VAT number of the seller ' . $seller->name . ' is mandatory when there is a non null VAT on at least one line.');
 			}
 			if (!$this->checkIfVatRateIsValid($vat_rate, $seller->country_code)) {
 				throw new Exception('BADVATRATE[BR-FR-16]: The VAT rate ' . $vat_rate . ($id ? ' on line ' . $id : '') . ' is not a valid string value for country ' . $seller->country_code . '.');
