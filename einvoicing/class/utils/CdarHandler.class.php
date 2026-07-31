@@ -282,16 +282,50 @@ class CdarHandler
 		$ProcessCondition = preg_replace('/[^A-Za-z0-9_]/', '', $ProcessCondition); // Clean special chars
 
 		// Electronic address (MDT-73) of the CDAR recipient. Every status but the cash-in (212) is sent on a
-		// supplier invoice: we are the buyer and the CDAR goes back to the vendor, so it is addressed with
-		// the routing the module already resolves for that third party - the one recorded for it, its
-		// SIREN otherwise. Sending the SIREN blindly only works when the platform happens to know the
-		// vendor under that very address, and gets the message refused with "L'adresse electronique
-		// (MDT-73) est invalide" otherwise. getBuyerCommunicationURI() is called on the third party alone:
-		// the invoice-level routing override it also knows about is looked up among the customer invoices
-		// (element_type = 'facture'), which a supplier invoice must not read.
+		// supplier invoice: we are the buyer and the CDAR goes back to the vendor. Sending its SIREN blindly
+		// only works when the platform happens to know the vendor under that very address, and gets the
+		// message refused with "L'adresse electronique (MDT-73) est invalide" otherwise.
+		//
+		// The status is a reply, so the address to reply to is the one the vendor exchanges under:
+		//   1. a routing recorded in Dolibarr for that vendor, which is a deliberate choice of ours;
+		//   2. otherwise the electronic address (BT-34) carried by the e-invoice we received, which is the
+		//      vendor telling us where it exchanges from;
+		//   3. otherwise the platform directory, which may list another address of the same SIREN;
+		//   4. otherwise the SIREN guessed by getBuyerCommunicationURI(). It is called on the third party
+		//      alone: the invoice-level routing override it also knows about is looked up among the customer
+		//      invoices (element_type = 'facture'), which a supplier invoice must not read.
 		$RecipientURIID = $InvoiceIssuerGlobalID;
 		if ($statusCode != 212 && $object->thirdparty instanceof Societe) {
-			$vendorURIID = $einvoicing->getBuyerCommunicationURI($object->thirdparty);
+			$vendorRouting = $einvoicing->fetchDefaultRouting($object->thirdparty->id);
+			$vendorURIID = ($vendorRouting > 0) ? $einvoicing->removeSpaces((string) $vendorRouting) : '';	// 0 when none is recorded, -1 on error
+
+			if ($vendorURIID === '') {
+				$vendorURIID = $einvoicing->removeSpaces($this->getVendorAddressFromReceivedInvoice($object));
+				if ($vendorURIID !== '') {
+					dol_syslog(__METHOD__ . ' no routing ID recorded for vendor SIREN ' . $InvoiceIssuerGlobalID . ', replying to the electronic address of the invoice it sent us: ' . $vendorURIID, LOG_NOTICE);
+				}
+			}
+
+			if ($vendorURIID === '' && $InvoiceIssuerGlobalID !== '') {
+				// checkRecipientDirectory() returns the first active reception address declared for that
+				// SIREN, and degrades to an empty identifier on the providers that expose no directory.
+				$PDPManager = new PDPProviderManager($this->db);
+				$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+				if (is_object($provider)) {
+					$directory = $provider->checkRecipientDirectory($InvoiceIssuerGlobalID);
+					if (!empty($directory['identifier'])) {
+						$vendorURIID = $einvoicing->removeSpaces($directory['identifier']);
+						dol_syslog(__METHOD__ . ' nothing known about how to reach vendor SIREN ' . $InvoiceIssuerGlobalID . ', using the address the directory declares for it: ' . $vendorURIID, LOG_NOTICE);
+					} else {
+						dol_syslog(__METHOD__ . ' nothing known about how to reach vendor SIREN ' . $InvoiceIssuerGlobalID . ' and the directory returned none (' . $directory['status'] . '), falling back on the SIREN as electronic address: the platform will refuse the status if it does not know the vendor under that address', LOG_WARNING);
+					}
+				}
+			}
+
+			if ($vendorURIID === '') {
+				$vendorURIID = $einvoicing->getBuyerCommunicationURI($object->thirdparty);
+			}
+
 			if ($vendorURIID !== '') {	// Empty with EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID and no routing: keep the SIREN, an empty MDT-73 is worse
 				$RecipientURIID = $vendorURIID;
 			}
@@ -451,6 +485,54 @@ class CdarHandler
 				'ValueDateTime' => dol_print_date($paidDate, '%Y%m%d')
 			)
 		);
+	}
+
+	/**
+	 * Electronic address (BT-34) the vendor put on the e-invoice we received from it.
+	 *
+	 * That address is the vendor saying where it exchanges from, so it is the natural place to send a
+	 * status back to when no routing was recorded for it in Dolibarr. Read from the e-invoice stored with
+	 * the supplier invoice, never by calling the platform back: addressing a status is no reason for a
+	 * network round trip, and an invoice keyed by hand simply has none.
+	 *
+	 * @param  FactureFournisseur $object  Supplier invoice the status is sent on
+	 * @return string                      The address, '' when there is no stored e-invoice to read it from
+	 */
+	private function getVendorAddressFromReceivedInvoice($object)
+	{
+		if (empty($object->id) || $object->element !== 'invoice_supplier') {
+			return '';
+		}
+
+		dol_include_once('/einvoicing/class/helpers/SupplierInvoiceHelper.class.php');
+
+		$xmlData = '';
+		try {
+			// false: an invoice with no e-invoice stored is a normal case (keyed by hand), and addressing
+			// a status is no reason to call the platform back.
+			$xmlData = (string) SupplierInvoiceHelper::getXmlData((int) $object->id, false);
+		} catch (Exception $e) {
+			dol_syslog(__METHOD__ . ' no e-invoice stored for supplier invoice id ' . $object->id . ': ' . $e->getMessage(), LOG_DEBUG);
+			return '';
+		}
+		if ($xmlData === '') {
+			return '';
+		}
+
+		$xml = @simplexml_load_string($xmlData);
+		if ($xml === false) {
+			dol_syslog(__METHOD__ . ' the e-invoice stored for supplier invoice id ' . $object->id . ' is not parsable XML', LOG_WARNING);
+			return '';
+		}
+
+		// Only ram: is needed, so the same read works on a CII and on the XML extracted from a Factur-X
+		$xml->registerXPathNamespace('ram', 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100');
+		$found = $xml->xpath('//ram:SellerTradeParty/ram:URIUniversalCommunication/ram:URIID');
+		if (empty($found)) {
+			return '';
+		}
+
+		return trim((string) $found[0]);
 	}
 
 	/**
