@@ -51,6 +51,17 @@ class SuperPDPProvider extends AbstractPDPProvider
 	public $callbackurl;
 
 	/**
+	 * Highest number of search batches a single synchronization walks through.
+	 *
+	 * A backstop, not a business rule: the loop already stops on its own as soon as a batch comes
+	 * back short. This only bounds a run when the window holds far more flows than a session should
+	 * chew through in one go, and it is reported rather than applied silently.
+	 *
+	 * @const int
+	 */
+	const MAX_SYNC_BATCHES = 50;
+
+	/**
 	 * Constructor
 	 *
 	 * Load setup properties and last token.
@@ -1466,162 +1477,224 @@ class SuperPDPProvider extends AbstractPDPProvider
 		}
 		*/
 
-		// Make a call to get all flows
-		if ($limit) {
-			$params['limit'] = $limit;
-		}
-		$jsonparams = json_encode($params);
-		$response = $this->callApi($resource, "POST", $jsonparams, [], "synchronization");	// This will also create the Call entry
-
-		if ($response['status_code'] != 200) {
-			$this->errors[] = "Failed to retrieve flows for synchronization." . ' (HTTP ' . $response['status_code'] . ')';
-			$results_messages[] = "Failed to retrieve flows for synchronization." . ' (HTTP ' . $response['status_code'] . ')';
-
-			dol_syslog(__METHOD__ . " Failed to retrieve the list of flows for synchronization.", LOG_DEBUG, 0, "_einvoicing");
-			return array('res' => 0, 'messages' => $results_messages);
+		// This search endpoint does not paginate: it ignores offset and page, caps a batch at 100 rows
+		// and reports no total. Left to itself it also applies its own default of 25, so a synchronization
+		// only ever saw the 25 oldest flows of the window - and once those had all been processed it kept
+		// reporting "25 skipped, 0 new" run after run while recent flows sat just behind them, out of
+		// reach for good. The single cursor this API offers is updatedAfter, so the batches walk it.
+		$batchlimit = $limit;						// What the operator asked for, kept for the recap
+		$maxToProcess = $limit;						// Ceiling on flows actually synchronized, 0 for none
+		$batchSize = getDolGlobalInt('EINVOICING_FLOWS_SYNC_CALL_SIZE', 100);
+		if ($batchSize <= 0) {
+			$batchSize = 100;
 		}
 
-		// Some AP returns nb of lines into "total", others returns into "limit"
-		$totalFlows = ($response['response']['total'] ?? null);		// If not defined (not into the spec), we set it to null
-		$limitFlows = ($response['response']['limit'] ?? 0);
-
-		$batchlimit = $limit; // Set batch limit for logging purposes
-		$limit = (($limit > 0 && $limitFlows > 0) ? min($limit, $limitFlows) : ($limitFlows ? $limitFlows : $limit));
-
-		if ($limit == 0) {
-			dol_syslog(__METHOD__ . " No flows to synchronize.", LOG_DEBUG);
-			dol_syslog(__METHOD__ . " No flows to synchronize.", LOG_DEBUG, 0, "_einvoicing");
-
-			$results_messages[] = "No flows to synchronize.";
-			return array('res' => 1, 'messages' => $results_messages);
-		}
-
-		// Since AP may not return flows in the order they want (by updatedAt ASC), we sort them here
-		dol_syslog(__METHOD__ . " Sort the flows per updatedAt", LOG_DEBUG, 0, "_einvoicing");
-		usort($response['response']['results'], function ($a, $b) {
-			return strtotime($a['updatedAt']) <=> strtotime($b['updatedAt']);
-		});
-
-		// Clean already processed flows from the list
-		$alreadyProcessedFlowIds = [];
-		$flowIds = array_column($response['response']['results'] ?? [], 'flowId');
-		$sanitizedFlowIds = array();
-		foreach ($flowIds as $flowId) {
-			$sanitizedFlowIds[] = "'" . $db->escape($flowId) . "'";
-		}
-		if (count($sanitizedFlowIds)) {
-			$sql = "SELECT flow_id FROM " . MAIN_DB_PREFIX . "einvoicing_document";
-			$sql .= " WHERE flow_id IN (" . implode(',', $sanitizedFlowIds) . ")";
-			$resql = $db->query($sql);
-			if ($resql) {
-				while ($obj = $db->fetch_object($resql)) {
-					$alreadyProcessedFlowIds[$obj->flow_id] = $obj->flow_id;
-				}
-			} else {
-				$this->errors[] = "Failed to retrieve from database the list of flows already processed. ".$this->db->lasterror();
-				$results_messages[] = "Failed to retrieve from database the list of flows already processed. ".$this->db->lasterror();
-
-				dol_syslog(__METHOD__ . " Failed to retrieve flows already processed among the list of flows received. ".$this->db->lasterror(), LOG_DEBUG, 0, "_einvoicing");
-				return array('res' => 0, 'messages' => $results_messages);
-			}
-		}
-
-		// Update totalFlows after filtering
-		// $totalFlows = count($response['response']['results']); // TODO : VERIFY IF NEEDED
+		$totalFlows = null;							// Not part of the answer of this API
 		$error = 0;
 		$alreadyExist = 0;
 		$syncedFlows = 0;
-
-		// Call ID for logging purposes
-		$call_id = $response['call_id'] ?? null;
-
-		//$lastsuccessfullSyncronizedFlow = null;
-
-		// Loop on each flow received in list
+		$call_id = null;
 		$i = 0;
-		foreach ($response['response']['results'] ?? [] as $flow) {
-			$i++;
-			if (in_array($flow['flowId'], $alreadyProcessedFlowIds)) {
-				dol_syslog(__METHOD__ . " #" . $i . " Flow " . $flow['flowId'] . " already processed, discard it.", LOG_DEBUG, 0, "_einvoicing");
-				$alreadyExist++;
-				continue;
+		$flow = null;
+		$batchNumber = 0;
+		$cursor = dol_print_date($dateafter, '%Y-%m-%dT%H:%M:%S.000Z', 'gmt');
+
+		while (true) {
+			$batchNumber++;
+			if ($batchNumber > self::MAX_SYNC_BATCHES) {
+				// Said out loud rather than stopping quietly: the window is not exhausted, and the operator
+				// has to run the synchronization again to walk further.
+				$results_messages[] = "Stopped after " . self::MAX_SYNC_BATCHES . " batches, the window still holds flows. Run the synchronization again to continue.";
+				break;
 			}
 
-			$rescode = '';
-			try {
-				// Process flow
+			$params['where']['updatedAfter'] = $cursor;
+			$params['limit'] = $batchSize;
 
-				dol_syslog(__METHOD__ . " #" . $i . " Process flow " . $flow['flowId'], LOG_DEBUG, 0, "_einvoicing");
+			// Only the first call is typed as a synchronization: it is the one creating the Call row the
+			// whole run is reported on, and one run must stay one line of history.
+			$response = $this->callApi($resource, "POST", json_encode($params), [], ($batchNumber == 1 ? "synchronization" : ""));
 
-				// Do a unitary sync of flow $flow['flowId'] instead the global transaction $call_id
-				$res = $this->syncFlow($flow['flowId'], $call_id);
+			if ($response['status_code'] != 200) {
+				$this->errors[] = "Failed to retrieve flows for synchronization." . ' (HTTP ' . $response['status_code'] . ')';
+				$results_messages[] = "Failed to retrieve flows for synchronization." . ' (HTTP ' . $response['status_code'] . ')';
 
-				// If res < 0, rollback
-				if ($res['res'] < 0) {
-					if (isset($res['action']) && $res['action'] != '') {	// Save business errors if it is
-						$rescode = $res['actioncode'] ?? '0';
-						// Set the result code and label into array $actions.
-						$actions[$rescode] = array(
-							'actionurl' => $res['actionurl'],
-							'actioncode' => ($res['actioncode'] ?? '0'),
-							'action' => $res['action']
-						);
+				dol_syslog(__METHOD__ . " Failed to retrieve the list of flows for synchronization.", LOG_DEBUG, 0, "_einvoicing");
+				return array('res' => 0, 'messages' => $results_messages);
+			}
 
-						if ($rescode == 'THIRDPARTY_NOT_FOUND') {
-							$infostring = '';
-							foreach ($res['actiondata'] ?? [] as $datakey => $dataval) {
-								if ($datakey && $dataval) {
-									$infostring .= ($infostring ? ', ' : '').$datakey.': '.$dataval;
-								}
-							}
-							$actions[$rescode]['businessmessage'] = $langs->trans("CantFindThirdpartyFromTheImportedInvoice", $infostring);
-							// Add technical message in tooltip on the picto
-							$actions[$rescode]['businessmessage'] .= $form->textwithpicto('', "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], 1, 'help', '', 0, 2, 'help');
-						}
-						if ($rescode == 'PRODUCT_NOT_FOUND') {
-							$infostring = '';
-							foreach ($res['actiondata'] ?? [] as $datakey => $dataval) {
-								if ($datakey && $dataval) {
-									$infostring .= ($infostring ? ', ' : '').$datakey.': '.$dataval;
-								}
-							}
-							$actions[$rescode]['businessmessage'] = $langs->trans("CantFindProductFromTheImportedInvoice", $infostring);
-							// Add technical message in tooltip on the picto
-							$actions[$rescode]['businessmessage'] .= $form->textwithpicto('', "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], 1, 'help', '', 0, 2, 'help');
-						}
+			if ($batchNumber == 1) {
+				$call_id = $response['call_id'] ?? null;
+			}
+
+			$results = $response['response']['results'] ?? array();
+			if (empty($results)) {
+				break;
+			}
+
+			// The batch really returned may be smaller than the one asked for, the API caps it.
+			$effectiveLimit = (int) ($response['response']['limit'] ?? $batchSize);
+
+			// Since AP may not return flows in the order they want (by updatedAt ASC), we sort them here.
+			// On the sub-second key, because the cursor moves along it.
+			dol_syslog(__METHOD__ . " Sort the flows per updatedAt", LOG_DEBUG, 0, "_einvoicing");
+			usort($results, function ($a, $b) {
+				return strcmp(self::updatedAtSortKey($a['updatedAt'] ?? ''), self::updatedAtSortKey($b['updatedAt'] ?? ''));
+			});
+
+			// Clean already processed flows from the list
+			$alreadyProcessedFlowIds = [];
+			$flowIds = array_column($results, 'flowId');
+			$sanitizedFlowIds = array();
+			foreach ($flowIds as $flowId) {
+				$sanitizedFlowIds[] = "'" . $db->escape($flowId) . "'";
+			}
+			if (count($sanitizedFlowIds)) {
+				$sql = "SELECT flow_id FROM " . MAIN_DB_PREFIX . "einvoicing_document";
+				$sql .= " WHERE flow_id IN (" . implode(',', $sanitizedFlowIds) . ")";
+				$resql = $db->query($sql);
+				if ($resql) {
+					while ($obj = $db->fetch_object($resql)) {
+						$alreadyProcessedFlowIds[$obj->flow_id] = $obj->flow_id;
 					}
-					dol_syslog(__METHOD__ . " Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], LOG_DEBUG, 0, "_einvoicing");
-					$results_messages[] = "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'];
+				} else {
+					$this->errors[] = "Failed to retrieve from database the list of flows already processed. ".$this->db->lasterror();
+					$results_messages[] = "Failed to retrieve from database the list of flows already processed. ".$this->db->lasterror();
 
+					dol_syslog(__METHOD__ . " Failed to retrieve flows already processed among the list of flows received. ".$this->db->lasterror(), LOG_DEBUG, 0, "_einvoicing");
+					return array('res' => 0, 'messages' => $results_messages);
+				}
+			}
+
+			// Loop on each flow received in list
+			$i = 0;
+			foreach ($response['response']['results'] ?? [] as $flow) {
+				$i++;
+				if (in_array($flow['flowId'], $alreadyProcessedFlowIds)) {
+					dol_syslog(__METHOD__ . " #" . $i . " Flow " . $flow['flowId'] . " already processed, discard it.", LOG_DEBUG, 0, "_einvoicing");
+					$alreadyExist++;
+					continue;
+				}
+
+				$rescode = '';
+				try {
+					// Process flow
+
+					dol_syslog(__METHOD__ . " #" . $i . " Process flow " . $flow['flowId'], LOG_DEBUG, 0, "_einvoicing");
+
+					// Do a unitary sync of flow $flow['flowId'] instead the global transaction $call_id
+					$res = $this->syncFlow($flow['flowId'], $call_id);
+
+					// If res < 0, rollback
+					if ($res['res'] < 0) {
+						if (isset($res['action']) && $res['action'] != '') {	// Save business errors if it is
+							$rescode = $res['actioncode'] ?? '0';
+							// Set the result code and label into array $actions.
+							$actions[$rescode] = array(
+								'actionurl' => $res['actionurl'],
+								'actioncode' => ($res['actioncode'] ?? '0'),
+								'action' => $res['action']
+							);
+
+							if ($rescode == 'THIRDPARTY_NOT_FOUND') {
+								$infostring = '';
+								foreach ($res['actiondata'] ?? [] as $datakey => $dataval) {
+									if ($datakey && $dataval) {
+										$infostring .= ($infostring ? ', ' : '').$datakey.': '.$dataval;
+									}
+								}
+								$actions[$rescode]['businessmessage'] = $langs->trans("CantFindThirdpartyFromTheImportedInvoice", $infostring);
+								// Add technical message in tooltip on the picto
+								$actions[$rescode]['businessmessage'] .= $form->textwithpicto('', "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], 1, 'help', '', 0, 2, 'help');
+							}
+							if ($rescode == 'PRODUCT_NOT_FOUND') {
+								$infostring = '';
+								foreach ($res['actiondata'] ?? [] as $datakey => $dataval) {
+									if ($datakey && $dataval) {
+										$infostring .= ($infostring ? ', ' : '').$datakey.': '.$dataval;
+									}
+								}
+								$actions[$rescode]['businessmessage'] = $langs->trans("CantFindProductFromTheImportedInvoice", $infostring);
+								// Add technical message in tooltip on the picto
+								$actions[$rescode]['businessmessage'] .= $form->textwithpicto('', "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], 1, 'help', '', 0, 2, 'help');
+							}
+						}
+						dol_syslog(__METHOD__ . " Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], LOG_DEBUG, 0, "_einvoicing");
+						$results_messages[] = "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'];
+
+						$error++;
+					}
+
+					// If res == 0, commit but count it as already existed
+					if ($res['res'] == 0) {
+						$results_messages[] = "<span class=\"opacitylow\">Flow " . $flow['flowId'] . " skipped: " . $res['message'] . "</span>";
+						$alreadyExist++;
+						//$lastsuccessfullSyncronizedFlow = $flow['flowId'];
+					}
+
+					// If res == 1, commit and count as synced
+					if ($res['res'] > 0) {
+						$syncedFlows++;
+						//$lastsuccessfullSyncronizedFlow = $flow['flowId'];
+					}
+				} catch (Exception $e) {
+					$results_messages[] = "Exception occurred while synchronizing flow " . $flow['flowId'] . ": " . $e->getMessage();
 					$error++;
 				}
 
-				// If res == 0, commit but count it as already existed
-				if ($res['res'] == 0) {
-					$results_messages[] = "<span class=\"opacitylow\">Flow " . $flow['flowId'] . " skipped: " . $res['message'] . "</span>";
-					$alreadyExist++;
-					//$lastsuccessfullSyncronizedFlow = $flow['flowId'];
+				if ($error > 0) {
+					if (in_array($rescode, array('THIRDPARTY_NOT_FOUND','PRODUCT_NOT_FOUND'))) {
+						$results_messages[] = "Aborting synchronization due to a business error. There is a manual action to do.";
+					} else {
+						$results_messages[] = "Aborting synchronization due to errors.";
+					}
+					break;
 				}
 
-				// If res == 1, commit and count as synced
-				if ($res['res'] > 0) {
-					$syncedFlows++;
-					//$lastsuccessfullSyncronizedFlow = $flow['flowId'];
+				// The ceiling counts flows, not batches: a batch holds up to a hundred of them, so
+				// checking it only between batches would blow straight past what was asked for.
+				if ($maxToProcess > 0 && $syncedFlows >= $maxToProcess) {
+					break;
 				}
-			} catch (Exception $e) {
-				$results_messages[] = "Exception occurred while synchronizing flow " . $flow['flowId'] . ": " . $e->getMessage();
-				$error++;
 			}
 
 			if ($error > 0) {
-				if (in_array($rescode, array('THIRDPARTY_NOT_FOUND','PRODUCT_NOT_FOUND'))) {
-					$results_messages[] = "Aborting synchronization due to a business error. There is a manual action to do.";
-				} else {
-					$results_messages[] = "Aborting synchronization due to errors.";
-				}
 				break;
 			}
+			if ($maxToProcess > 0 && $syncedFlows >= $maxToProcess) {
+				break;
+			}
+			if (count($results) < $effectiveLimit) {		// Short batch: the window is exhausted
+				break;
+			}
+
+			// updatedAfter is exclusive and several flows share the very same updatedAt, so the cursor
+			// stops just before the last timestamp of the batch instead of on it: those flows come back in
+			// the next batch, this time with the siblings that did not fit, and the ones already handled
+			// are discarded by the lookup above. Costs one overlap, never skips a flow.
+			$sortKeys = array();
+			foreach ($results as $resultFlow) {
+				$sortKeys[] = self::updatedAtSortKey($resultFlow['updatedAt'] ?? '');
+			}
+			$lastKey = end($sortKeys);
+			$previousCursor = '';
+			foreach ($results as $resultFlow) {
+				if (self::updatedAtSortKey($resultFlow['updatedAt'] ?? '') < $lastKey) {
+					$previousCursor = $resultFlow['updatedAt'];
+				}
+			}
+
+			if ($previousCursor !== '') {
+				$cursor = $previousCursor;
+			} else {
+				// A full batch sharing one single timestamp cannot be stepped back from without standing
+				// still. Moving onto it is the only way forward, and it is worth saying.
+				dol_syslog(__METHOD__ . " A whole batch of " . count($results) . " flows shares updatedAt " . $results[0]['updatedAt'] . ", moving the cursor onto it: flows sharing that timestamp beyond the batch cannot be reached.", LOG_WARNING, 0, "_einvoicing");
+				$results_messages[] = "A whole batch shares the timestamp " . $results[0]['updatedAt'] . ", raise EINVOICING_FLOWS_SYNC_CALL_SIZE if flows are missing.";
+				$cursor = end($results)['updatedAt'];
+			}
 		}
+
 
 
 		$globalres = ($error > 0 ? -1 : 1);
@@ -1674,6 +1747,26 @@ class SuperPDPProvider extends AbstractPDPProvider
 			'actions' => $actions,
 			'details' => $results_messages
 		];
+	}
+
+	/**
+	 * Comparable key for the updatedAt of a flow.
+	 *
+	 * The platform does not pad the fractional seconds to a fixed width - '.47288Z' and '.626638Z'
+	 * both occur - so the raw strings cannot be compared to each other, and strtotime() drops the
+	 * fraction entirely, which is precisely what the cursor needs. Padding it to six digits gives a
+	 * key that sorts on the microsecond.
+	 *
+	 * @param	string	$updatedAt	Timestamp as returned by the platform
+	 * @return	string				Key to sort and compare on
+	 */
+	private static function updatedAtSortKey($updatedAt)
+	{
+		if (!preg_match('/^([^.Z]+)(?:\.(\d+))?/', (string) $updatedAt, $reg)) {
+			return (string) $updatedAt;
+		}
+
+		return $reg[1] . '.' . str_pad(substr(isset($reg[2]) ? $reg[2] : '', 0, 6), 6, '0');
 	}
 
 	/**
