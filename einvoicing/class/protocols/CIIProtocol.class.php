@@ -95,6 +95,17 @@ class CIIProtocol extends AbstractProtocol
 	 */
 	protected $lineTemplate;
 	/**
+	 * Number of transactions opened by doCreateSupplierInvoiceFromSource() and not closed by it yet.
+	 * Drained (committed or rolled back) by createSupplierInvoiceFromSource(), the public wrapper.
+	 *
+	 * We count what we open instead of reading $db->transaction_opened: that property belongs to the
+	 * database handler and is not readable when $db is a wrapper around it (it then stays null, and
+	 * the transaction was silently left open - see issue #524).
+	 *
+	 * @var int
+	 */
+	protected $openedTransactions = 0;
+	/**
 	 * Return the number of decimals to use for a unit price (BT-146, BT-147, BT-148).
 	 *
 	 * Follows the Dolibarr unit price accuracy, so a price is transmitted as accurately as it is
@@ -658,9 +669,9 @@ class CIIProtocol extends AbstractProtocol
 	{
 		global $conf, $db;
 
-		// Transaction level before the import, to close only the transaction opened by
-		// doCreateSupplierInvoiceFromSource() and never one owned by a caller.
-		$transactionLevel = $db->transaction_opened;
+		// Only the transactions opened by doCreateSupplierInvoiceFromSource() are ours to close,
+		// never one owned by a caller: it counts them in $this->openedTransactions.
+		$this->openedTransactions = 0;
 
 		$tempDir = $conf->einvoicing->dir_temp;
 		if (!dol_is_dir($tempDir)) {
@@ -683,8 +694,13 @@ class CIIProtocol extends AbstractProtocol
 
 			// The invoice import transaction is opened by doCreateSupplierInvoiceFromSource() once the
 			// vendor has been synchronized. Close it here so every early return - and any exception -
-			// leaves a clean transaction state.
-			if ($db->transaction_opened > $transactionLevel) {
+			// leaves a clean transaction state. A transaction left open would be rolled back by
+			// Dolibarr at the end of the request, taking the imported invoices AND the synchronization
+			// history down with it (issue #524).
+			// One commit/rollback per opened level: nested levels only decrement the counter of the
+			// database handler, the real COMMIT/ROLLBACK is issued on the last one.
+			while ($this->openedTransactions > 0) {
+				$this->openedTransactions--;
 				if ($failed) {
 					$db->rollback();
 				} else {
@@ -802,6 +818,7 @@ class CIIProtocol extends AbstractProtocol
 		// with that error carry its socid, so a rolled back vendor makes them point to a thirdparty that
 		// never existed.
 		$db->begin();
+		$this->openedTransactions++;
 
 		$syncSocRes = $this->_syncOrCreateThirdpartyFromEInvoiceSeller($parsedHeader, 'dolibarr', $flowId);
 
@@ -809,6 +826,7 @@ class CIIProtocol extends AbstractProtocol
 		$return_messages[] = $syncSocRes['message'];
 		if ($socId < 0) {
 			$db->rollback();
+			$this->openedTransactions--;
 			return [
 				'res' => -1,
 				'message' => 'Thirdparty sync or creation error: ' . implode("<br>\n", $return_messages),
@@ -820,11 +838,13 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		$db->commit();
+		$this->openedTransactions--;
 
 		// From this point on, everything belongs to the invoice import (products, invoice, lines) and
 		// stays atomic. This second transaction is closed (commit or rollback) by
 		// createSupplierInvoiceFromSource(), the public wrapper.
 		$db->begin();
+		$this->openedTransactions++;
 
 		// Load supplier (thirdparty)
 		require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.class.php';
