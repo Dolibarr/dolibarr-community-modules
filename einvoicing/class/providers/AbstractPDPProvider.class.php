@@ -318,9 +318,15 @@ abstract class AbstractPDPProvider
 
 		// 2) No directory line: tell apart a legal unit known to the directory but not able to receive
 		//    yet (inactive) from a SIREN that is unknown to the directory (absent).
-		$consult = $this->callApi('afnor-directory/v1/siren/code-insee:' . urlencode($siren), 'GET', false, array(), 'precheck_directory');
+		//    The search form is used rather than the 'siren/code-insee:<siren>' consultation: both are
+		//    part of the same standardized service, but the consultation is not served by every Approved
+		//    Platform (one answers 404 on it while answering the search with the legal unit), so the
+		//    search is what keeps this second step meaningful everywhere. An unknown SIREN comes back
+		//    either as a 404 or as an empty result set depending on the platform, and both mean absent.
+		$consultbody = json_encode(array('filters' => array('siren' => array('op' => 'strict', 'value' => $siren))));
+		$consult = $this->callApi('afnor-directory/v1/siren/search', 'POST', $consultbody, array(), 'precheck_directory');
 		$consultcode = (int) (isset($consult['status_code']) ? $consult['status_code'] : 0);
-		if ($consultcode == 200 && !empty($consult['response']['siren'])) {
+		if ($consultcode == 200 && !empty($consult['response']['results'][0]['siren'])) {
 			$result['status'] = 'inactive';
 		} else {
 			$result['status'] = 'absent';
