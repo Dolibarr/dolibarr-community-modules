@@ -2,6 +2,16 @@
 
 ## 1.0.4
 
+FIX: Regenerating the document of an invoice already transmitted no longer sends it to the platform a
+second time. Automatic transmission on generation stopped at the sync status, which generateInvoice()
+resets to "generated" every time it runs, so from the second regeneration on the invoice looked as if it
+had never been sent. It was, and the platform, which registers a flow under the invoice reference,
+answered the duplicate with an HTTP 400 and no flow: an error raised to the operator on an invoice that
+was in fact transmitted and, when the first submission was still awaiting its outcome, a second useless
+call for every regeneration. The transmission now reads the flow identifier the platform assigned on the
+first submission, which nothing clears, exactly like the manual send button already did - and it honours
+the same EINVOICING_ALLOW_RESEND_TRANSMITTED opt-out.
+
 FIX: A line carrying recoverable non-collected VAT ("TVA non perçue récupérable", the overseas
 departments scheme of article 295 of the CGI) no longer makes the document claim a VAT the invoice does
 not charge. Dolibarr makes the total including tax of such a line equal to its net amount, where the
