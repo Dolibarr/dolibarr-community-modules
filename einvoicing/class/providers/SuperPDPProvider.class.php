@@ -1170,11 +1170,16 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 		$response = getURLContent($url, $method, $params, 1, $httpheader, array('http', 'https'), 0, -1, 0, 0, array(), '_einvoicing');
 
-		$status_code = $response['http_code'];
+		// Neither key is guaranteed: getURLContent() sets 'content' only when the body is not empty
+		// (an Access Point answering 200 with no body, as a healthcheck does, has none), and on a curl
+		// failure - timeout, DNS, refused connection - it returns the error keys without 'http_code'.
+		// Reading them raw turned those two ordinary situations into PHP warnings.
+		$status_code = $response['http_code'] ?? 0;
+		$content = $response['content'] ?? '';
 		$body = 'Error';
 
 		if ($status_code == 200 || $status_code == 202) {
-			$body = $response['content'];
+			$body = $content;
 			if (!isset($extraHeaders['Accept'])) { // Json if default format
 				$body = json_decode($body, true);
 			}
@@ -1186,7 +1191,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		} else {
 			$returnarray = array(
 				'status_code' => $status_code,
-				'response' => 'Error ' . $status_code . ' - ' . (string) $response['content']
+				'response' => 'Error ' . $status_code . ' - ' . (string) $content
 			);
 			if (!empty($response['curl_error_no'])) {
 				$returnarray['curl_error_no'] = $response['curl_error_no'];
@@ -1194,9 +1199,19 @@ class SuperPDPProvider extends AbstractPDPProvider
 			if (!empty($response['curl_error_msg'])) {
 				$returnarray['curl_error_msg'] = $response['curl_error_msg'];
 			}
-			if ($contentarray = json_decode((string) $response['content'], true)) {
-				$returnarray['errorCode'] = (string) $contentarray['errorCode'];
-				$returnarray['errorMessage'] = (string) $contentarray['errorMessage'];
+			// An error body is not always the {errorCode, errorMessage} pair this expects: a plain JSON
+			// string decodes into a string, and indexing that is a fatal on PHP 8, not a warning.
+			// Each key is set only when the body really carries it: callers tell "no message" from
+			// "empty message" with isset(), and would otherwise report an empty error instead of
+			// falling back on the HTTP code.
+			$contentarray = json_decode((string) $content, true);
+			if (is_array($contentarray)) {
+				if (isset($contentarray['errorCode'])) {
+					$returnarray['errorCode'] = (string) $contentarray['errorCode'];
+				}
+				if (isset($contentarray['errorMessage'])) {
+					$returnarray['errorMessage'] = (string) $contentarray['errorMessage'];
+				}
 			}
 		}
 
