@@ -35,7 +35,7 @@ class PDPProviderManager
 	public $db;
 
 	/**
-	 * @var array<string,array{class:string,position:int,provider_countries:string[],provider_name:string,description:string,is_enabled:int<0,1>,prod_account_admin_url:?string,test_account_admin_url:?string}>	Provider list
+	 * @var array<string,array{class:string,classpath?:string,position:int,provider_countries:string[],provider_name:string,description:string,is_enabled:int<0,1>,prod_account_admin_url:?string,test_account_admin_url:?string}>	Provider list
 	 */
 	private $providersList;
 
@@ -85,13 +85,15 @@ class PDPProviderManager
 				'prod_account_admin_url' => 'https://www.superpdp.tech/app/users/create',
 				'test_account_admin_url' => 'https://www.superpdp.tech/app/users/create',
 			),
+			// Reference implementation, to copy when integrating a new platform. It talks to no platform,
+			// so it is only offered when the developer tools of the module are enabled.
 			'TESTPDP' => array(
 				'class' => 'TestPDPProvider',
 				'position' => 100,
 				'provider_countries' => array('all'),
-				'provider_name' => 'TESTPDP',
-				'description' => 'Another TESTPDP Integration',
-				'is_enabled' => 0,
+				'provider_name' => 'TESTPDP <span class="opacitymedium">(sample provider, sends nothing)</span>',
+				'description' => 'Sample PDP Integration',
+				'is_enabled' => getDolGlobalInt('EINVOICING_ALLOW_DEVTOOLS') ? 1 : 0,
 				'prod_account_admin_url' => 'https://example.com',
 				'test_account_admin_url' => 'https://example.com',
 			)
@@ -142,6 +144,11 @@ class PDPProviderManager
 			);
 		}
 
+		// Complete the list with the providers brought by external modules. Done before the "via partner
+		// only" filter below, so that filter covers them too: it is meant to leave one single tunnel
+		// offered to the client, whoever declared the other entries.
+		$this->addProvidersFromHooks();
+
 		// Grey-label "via partner only": when an operator ships the module pre-configured for delegated
 		// onboarding, hide every direct provider so the client is only offered the via-partner tunnel.
 		// Generic boolean flag: it points nowhere. The operator sets it (and the proxy URL) through its
@@ -159,9 +166,74 @@ class PDPProviderManager
 	}
 
 	/**
+	 * Complete the list of providers with the ones declared by external modules.
+	 *
+	 * An external module declares the hook context 'einvoicingproviders' in its descriptor
+	 * ($this->module_parts['hooks'] = array('einvoicingproviders');) and implements a method
+	 * addPDPProviders() into its /mymodule/class/actions_mymodule.class.php. The method fills
+	 * $this->results with entries keyed by the provider code, each one holding at least a 'class'
+	 * (a class extending AbstractPDPProvider) and a 'classpath' (directory of the class file,
+	 * relative to the Dolibarr document root).
+	 * See einvoicing/doc/ADD-A-PDP-PROVIDER.md for the complete contract.
+	 *
+	 * A hook is used rather than a scan of the module directories because it lists only the providers
+	 * of the modules that are enabled, it costs nothing when no module implements it, and it lets the
+	 * module build its own entry (position, urls, label translated in the language of the user).
+	 *
+	 * @return void
+	 */
+	private function addProvidersFromHooks()
+	{
+		require_once DOL_DOCUMENT_ROOT.'/core/class/hookmanager.class.php';
+
+		// A dedicated hook manager and not the global $hookmanager: this class is also instantiated from
+		// inside hook methods (actions_einvoicing.class.php), so adding a context to the global manager
+		// would change the hooks executed by the caller afterwards.
+		$hookmanager = new HookManager($this->db);
+		$hookmanager->initHooks(array('einvoicingproviders'));
+
+		$parameters = array('providersList' => $this->providersList);
+		$object = null;
+		$action = '';
+		$hookmanager->executeHooks('addPDPProviders', $parameters, $object, $action);
+
+		if (empty($hookmanager->resArray) || !is_array($hookmanager->resArray)) {
+			return;
+		}
+
+		foreach ($hookmanager->resArray as $key => $entry) {
+			if (!is_string($key) || !is_array($entry)) {
+				continue;
+			}
+			if (isset($this->providersList[$key])) {
+				// A provider of the module is never redefined by an external module.
+				dol_syslog("A hook tried to redefine the existing PDP provider ".$key.". Entry ignored.", LOG_WARNING);
+				continue;
+			}
+			// Note: 'class' or 'classpath' is an array instead of a string when two modules declared the
+			// same provider code, because the hook manager merges the results of the hooks recursively.
+			if (empty($entry['class']) || !is_string($entry['class']) || empty($entry['classpath']) || !is_string($entry['classpath'])) {
+				dol_syslog("A hook declared the PDP provider ".$key." without a valid 'class' or 'classpath'. Entry ignored.", LOG_WARNING);
+				continue;
+			}
+
+			// Complete the entry with the defaults, so a provider declared with the 2 mandatory keys works.
+			$this->providersList[$key] = $entry + array(
+				'position' => 500,
+				'provider_countries' => array('all'),
+				'provider_name' => $key,
+				'description' => '',
+				'is_enabled' => 1,
+				'prod_account_admin_url' => null,
+				'test_account_admin_url' => null,
+			);
+		}
+	}
+
+	/**
 	 * Get all registered providers configuration.
 	 *
-	 * @return array<string,array{class:string,position:int,provider_countries:string[],provider_name:string,description:string,is_enabled:int<0,1>,prod_account_admin_url:?string,test_account_admin_url:?string}>	Provider list
+	 * @return array<string,array{class:string,classpath?:string,position:int,provider_countries:string[],provider_name:string,description:string,is_enabled:int<0,1>,prod_account_admin_url:?string,test_account_admin_url:?string}>	Provider list
 	 */
 	public function getAllProviders()
 	{
@@ -189,7 +261,11 @@ class PDPProviderManager
 			return null;
 		}
 
-		$resultinclude = dol_include_once('/einvoicing/class/providers/'.$classnametouse.'.class.php');
+		// The class of a provider brought by an external module lives in the directory of that module.
+		// The default keeps the providers of this module, declared without a 'classpath', working.
+		$classpath = $this->providersList[$name]['classpath'] ?? '/einvoicing/class/providers/';
+
+		$resultinclude = dol_include_once(rtrim($classpath, '/').'/'.$classnametouse.'.class.php');
 
 		if (!$resultinclude) {
 			dol_syslog("Failed to include provider class file for provider: ".$name, LOG_ERR);
@@ -197,6 +273,12 @@ class PDPProviderManager
 		}
 		if (!class_exists($classnametouse)) {
 			dol_syslog("Include provider class was done, but class is still not found: ".$classnametouse, LOG_ERR);
+			return null;
+		}
+		if (!is_subclass_of($classnametouse, 'AbstractPDPProvider')) {
+			// The rest of the module calls the methods of AbstractPDPProvider on this object, so a class
+			// that does not extend it would break later, far from the declaration that is at fault.
+			dol_syslog("Provider class ".$classnametouse." does not extend AbstractPDPProvider", LOG_ERR);
 			return null;
 		}
 
