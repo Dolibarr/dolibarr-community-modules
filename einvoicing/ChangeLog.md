@@ -2,6 +2,15 @@
 
 ## 1.0.4
 
+FIX: The setup page no longer dies on a fatal error when the selected Access point cannot be
+instantiated - the case of a provider disabled after being selected, "SuperPDP via partner only" being
+the way it happens today, since that option disables every other entry including the one already
+recorded in EINVOICING_PDP. The page read the configuration of a provider it did not have, so it
+answered nothing at all and the setup could no longer be reached to select another one. It now says
+which Access point is unavailable and offers the ones that remain. The actions of the provider block
+(token, health check, sample invoice) are skipped in that state instead of being matched on an empty
+prefix.
+
 FIX: A synchronization no longer raises a PHP warning for every flow whose source invoice is not in
 this database. Such a flow is the ordinary case on a platform account shared with another system -
 the customer invoice behind it simply lives somewhere else - and syncFlow() notes it in a message

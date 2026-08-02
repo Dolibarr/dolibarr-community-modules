@@ -57,6 +57,7 @@ CheckPdpConfiguration=Please verify the Access Point provider configuration.
 FailedToRetrieveAccessToken=Failed to obtain access token from the Access Point provider.
 APApiReachable=Connection successful: The Access point %s is reachable.
 APApiNotReachable=Connection failed: The Access point %s is not reachable.
+SelectedAccessPointNotAvailable=The selected Access point (%s) is not available anymore. The module that provides it may have been disabled. Select another Access point.
 EINVOICING_PROTOCOL=Select the exchange protocol (for generating and sending invoices)
 EINVOICING_PROTOCOL_HELP=Available protocols are listed here.
 generateSampleInvoice=Generate a sample invoice
