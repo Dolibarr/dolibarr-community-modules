@@ -2,6 +2,15 @@
 
 ## 1.0.4
 
+FIX: A synchronization no longer raises a PHP warning for every flow whose source invoice is not in
+this database. Such a flow is the ordinary case on a platform account shared with another system -
+the customer invoice behind it simply lives somewhere else - and syncFlow() notes it in a message
+built from $document->flowId, while the document object carries flow_id. On a Dolibarr whose
+CommonObject has no magic getter to absorb the miss (18) that logged "Undefined property:
+Document::$flowId" once per flow; from 20 on the getter swallows it. The message itself, which the
+caller discards today since the flow counts as synchronized, also lost the one identifier it exists
+to carry.
+
 NEW: A "Mapped vendor references" screen (Billing > E-invoice synchronization) lists every vendor
 product reference recorded on the products, i.e. the mappings the import of a supplier invoice relies
 on to find the product of a line. Until now they could only be read product by product, in the
