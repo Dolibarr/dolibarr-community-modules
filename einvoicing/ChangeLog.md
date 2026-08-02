@@ -11,6 +11,16 @@ which Access point is unavailable and offers the ones that remain. The actions o
 (token, health check, sample invoice) are skipped in that state instead of being matched on an empty
 prefix.
 
+FIX: Two fields declared in the ->fields of an object had no property on the class, which the core
+notices for us: it reads $this->{$field} to build the INSERT, and the comment next to that line says
+a miss means "a bug into definition of ->fields or a missing declaration of property". Document
+declared response_for_debug in its fields only, so every document recorded logged "Undefined property:
+Document::$response_for_debug" on 18, where CommonObject has no magic getter (from 20 on the getter
+swallows it). Call is worse: its fields declare provider, its properties declared fk_provider - a
+column the table never had - so the provider name of every logged API call was written through a
+property PHP creates on the fly, which is deprecated since 8.2 and warns on all four versions.
+Both properties are now declared, and the stale fk_provider is gone.
+
 FIX: A synchronization no longer raises a PHP warning for every flow whose source invoice is not in
 this database. Such a flow is the ordinary case on a platform account shared with another system -
 the customer invoice behind it simply lives somewhere else - and syncFlow() notes it in a message
