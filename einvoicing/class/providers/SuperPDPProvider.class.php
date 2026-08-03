@@ -95,6 +95,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$this->helpToGetCredentials .= '<div class="margintoponly">' . $langs->trans("EINVOICING_SUPERPDP_HELP_CREDENTIAL2", '{s1}') . '</div>';
 		$this->helpToGetCredentials .= '<div class="margintoponly">' . $langs->trans("EINVOICING_SUPERPDP_HELP_CREDENTIAL3", '{s2}') . '</div>';
 		$this->helpToGetCredentials .= '<div class="margintoponly">' . $langs->trans("EINVOICING_SUPERPDP_HELP_CREDENTIAL4", '{s3}', '{s4}', '{s5}', '{s6}') . '</div>';
+		// Stated apart from the steps: this one setting decides whether received invoices can be read at all
+		$this->helpToGetCredentials .= '<div class="margintoponly warning">' . img_picto('', 'warning') . ' ' . $langs->trans("EINVOICING_SUPERPDP_HELP_CREDENTIAL_CONVERSION") . '</div>';
 
 		if (getDolGlobalString('EINVOICING_PDP') == 'SUPERPDPViaPartner') {
 			$this->helpToGetCredentials = '<div class="">' . $langs->trans("EINVOICING_SUPERPDP_HELP_CREDENTIAL_VIA_PARTNER", '{s1}') . '</div>';
@@ -2003,7 +2005,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 					);
 				}
 
-				$receivedFile = $importable['file'];
+				// Both are set together, the guard above is what guarantees the file is there
+				$receivedFile = (string) $importable['file'];
 				$exchangeProtocol = $importable['protocol'];
 
 				$exceptionmessage = '';
