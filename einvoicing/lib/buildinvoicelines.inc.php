@@ -267,17 +267,26 @@ if (! ($object->project instanceof Project)) {
 
 $invoiceRefDocs = [];
 
-// Source invoice (credit note)
-if ($object->type == $object::TYPE_CREDIT_NOTE && !empty($object->fk_facture_source)) {
+// Source invoice (credit note, replacement invoice)
+// A replacement invoice (BT-3 = 384) references the invoice it corrects in the same BG-3 slot as a
+// credit note does, and BR-FR-CO-04 makes that reference mandatory for it, with a "fatal" flag: one
+// sent without it is refused by the access point, and a receiver has nothing to attach it to.
+$refDocTypeCode = '';
+if ($object->type == $object::TYPE_CREDIT_NOTE) {
+	$refDocTypeCode = '381';			// 381 = Credit note
+} elseif ($object->type == $object::TYPE_REPLACEMENT) {
+	$refDocTypeCode = '384';			// 384 = Corrected invoice
+}
+if ($refDocTypeCode !== '' && !empty($object->fk_facture_source)) {
 	$sourceFact = new Facture($this->db);
 	if ($sourceFact->fetch($object->fk_facture_source) > 0) {
 		$sourceFactDate = new DateTime(dol_print_date($sourceFact->date, 'dayrfc'));
 		$invoiceRefDocs[] = [
 			'ref' => $sourceFact->ref,
 			'date' => $sourceFactDate,
-			'type' => '381' 				// 381 = Credit note
+			'type' => $refDocTypeCode
 		];
-		dol_syslog(get_class($this) . '::generateXML Set source invoice reference ' . $sourceFact->ref . ' for credit note ' . $object->ref);
+		dol_syslog(get_class($this) . '::generateXML Set source invoice reference ' . $sourceFact->ref . ' for ' . $object->ref);
 	} else {
 		if ($object->id == 0) { // Specimen case.
 			$specimenRefDoc = $object->fk_facture_source ?? 'FA0000-SPECIMEN';
@@ -285,11 +294,11 @@ if ($object->type == $object::TYPE_CREDIT_NOTE && !empty($object->fk_facture_sou
 			$invoiceRefDocs[] = [
 				'ref' => $specimenRefDoc,
 				'date' => $sourceFactDate,
-				'type' => '381' 				// 381 = Credit note
+				'type' => $refDocTypeCode
 			];
-			dol_syslog(get_class($this) . '::generateXML Set source invoice reference ' . $specimenRefDoc . ' for credit note specimen ' . $object->ref);
+			dol_syslog(get_class($this) . '::generateXML Set source invoice reference ' . $specimenRefDoc . ' for specimen ' . $object->ref);
 		} else {
-			dol_syslog(get_class($this) . '::generateXML Cannot fetch source invoice id=' . $object->fk_facture_source . ' for credit note ' . $object->ref, LOG_WARNING);
+			dol_syslog(get_class($this) . '::generateXML Cannot fetch source invoice id=' . $object->fk_facture_source . ' for ' . $object->ref, LOG_WARNING);
 		}
 	}
 }
