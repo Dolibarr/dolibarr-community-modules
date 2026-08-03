@@ -913,6 +913,11 @@ if ($action == 'confirm_sync' && getDolGlobalString('EINVOICING_PDP') && $confir
 					$cssclass = 'warning';
 					$sync_result['actions']['LIMIT_TOO_LOW'] = array('action' => $langs->trans("TryToIncreaseStartDateOrMax", $langs->transnoentitiesnoconv("maxNumberToProcess")));
 				}
+			} elseif (!empty($sync_result['actions'])) {
+				// The run went through, but some flows still need a manual action before they can be
+				// imported: keep the panel on a warning so the recommended actions below are not read
+				// as a plain informational note.
+				$cssclass = 'warning';
 			} else {
 				$cssclass = 'info';
 			}

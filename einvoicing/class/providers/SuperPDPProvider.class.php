@@ -1493,6 +1493,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$error = 0;
 		$alreadyExist = 0;
 		$syncedFlows = 0;
+		$postponedFlows = 0;	// Flows left unread on purpose, retried on the next run (see 'postponeflow')
 		$call_id = null;
 		$i = 0;
 		$flow = null;
@@ -1587,6 +1588,26 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 					// If res < 0, rollback
 					if ($res['res'] < 0) {
+						if (!empty($res['postponeflow'])) {
+							// This flow could not be read, but nothing was stored for it: it stays pending and
+							// the next synchronization will try it again, so no invoice is lost. Report it with
+							// the action to do and carry on, instead of stalling this batch - and every flow
+							// behind it - on a problem that has to be fixed on the access point side anyway.
+							$actions[$res['actioncode']] = array(
+								'actionurl' => ($res['actionurl'] ?? ''),
+								'actioncode' => $res['actioncode'],
+								'action' => $res['action'],
+								'businessmessage' => $langs->trans("CantReadTheDocumentOfTheImportedInvoice", $flow['flowId'])
+									. $form->textwithpicto('', "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], 1, 'help', '', 0, 2, 'help')
+							);
+
+							dol_syslog(__METHOD__ . " Flow " . $flow['flowId'] . " postponed: " . $res['message'], LOG_WARNING, 0, "_einvoicing");
+							$results_messages[] = "Flow " . $flow['flowId'] . " postponed, it will be retried on the next synchronization: " . $res['message'];
+
+							$postponedFlows++;
+							continue;
+						}
+
 						if (isset($res['action']) && $res['action'] != '') {	// Save business errors if it is
 							$rescode = $res['actioncode'] ?? '0';
 							// Set the result code and label into array $actions.
@@ -1712,6 +1733,10 @@ class SuperPDPProvider extends AbstractPDPProvider
 			}
 		}
 		$messages[] = $langs->trans("TotalSkippedSync") . ": <b>" . $alreadyExist . "</b> - " . $langs->trans("TotalNewSync") . ": <b>" . $syncedFlows . "</b>";
+		if ($postponedFlows > 0) {
+			// Counted apart from the skipped ones: those flows were not stored, they come back next run
+			$messages[] = $langs->trans("TotalPostponedSync") . ": <b>" . $postponedFlows . "</b>";
+		}
 
 		// Processing result that will be saved in DB
 		$processingResult = '';
@@ -1775,11 +1800,11 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 *
 	 * @param string 		$flowId        	FlowId
 	 * @param string|null 	$call_id  		Call ID for logging purposes
-	 * @return array{res:int<-1,1>, message:string, actioncode?:string|null, actionurl?:string|null, action?:string|null} Returns array with 'res' (1 on success, 0 if exists or already processed, -1 on failure) with a 'message' and for business errors an optional 'actioncode', 'actionurl' and 'action'.
+	 * @return array{res:int<-1,1>, message:string, postponeflow?:int, actioncode?:string|null, actionurl?:string|null, action?:string|null} Returns array with 'res' (1 on success, 0 if exists or already processed, -1 on failure) with a 'message' and for business errors an optional 'actioncode', 'actionurl' and 'action'. 'postponeflow' marks a failure that stored nothing, so the batch may go on and the flow be retried later.
 	 */
 	public function syncFlow($flowId, $call_id = null)
 	{
-		global $db, $conf, $user;
+		global $db, $conf, $user, $langs;
 
 		dol_include_once('einvoicing/class/document.class.php');
 		$einvoicing = new EInvoicing($db);
@@ -1952,27 +1977,34 @@ class SuperPDPProvider extends AbstractPDPProvider
 				}
 				*/
 
-				// Retrieve Original file
-				$receivedFile = null;
-				$flowResponse = $this->fetchFlowData($flowId, 'Converted', 'get_flow_for_supplier_invoice');
-
-				if ($flowResponse['status_code'] != 200) {
-					return array('res' => -1, 'message' => "ERROR_FLOW_GETORIG Failed to retrieve 'Original' document for SupplierInvoice flow (flowId: " . $flowId . ")" . (empty($flowResponse['errorMessage']) ? '' : ' - ' . $flowResponse['errorMessage']));
-				}
-				$receivedFile = $flowResponse['response'];
-
-				// Build the $exchangeProtocol factory for the format of supplier invoice
+				// Retrieve the invoice document, in whichever shape this module is able to read
 				$tmpProtocolManager = new ProtocolManager($this->db);
-				$detectedProtocol = $tmpProtocolManager->detectProtocolFromContent($receivedFile);
-				if (empty($detectedProtocol)) {
-					return array('res' => -1, 'message' => "ERROR_FLOW_DETECTPROTOCOL Failed to detect protocol from received document for flowId: " . $flowId);
+				$importable = $this->fetchImportableFlowDocument($flowId, $tmpProtocolManager);
+
+				if (empty($importable['protocol'])) {
+					// Nothing readable in this flow. Return without storing the document, so the flow stays
+					// pending and a later synchronization imports it once the access point side is fixed:
+					// a received invoice must never be silently dropped.
+					$errorcode = ($importable['fetched'] > 0 ? 'ERROR_FLOW_NOT_SUPPORTED_PROTOCOL' : 'ERROR_FLOW_GETDOC');
+
+					$action = $langs->trans('SetTheAccessPointConversionFormat');
+					if ($importable['client_not_configured']) {
+						$action = $langs->trans('AccessPointConversionFormatNotSet') . ' ' . $action;
+					}
+
+					return array(
+						'res' => -1,
+						'postponeflow' => 1,
+						'message' => $errorcode . " No document this module can read for SupplierInvoice flow (flowId: " . $flowId . ") - " . implode(' | ', $importable['attempts']),
+						'actioncode' => 'CONVERSION_FORMAT_NOT_SUPPORTED',
+						'actionurl' => '',
+						'action' => $action,
+						'actiondata' => array()
+					);
 				}
 
-				$exchangeProtocol = $tmpProtocolManager->getProtocol($detectedProtocol);
-				// if protocol not supported (like ubl), we skip it
-				if (empty($exchangeProtocol)) {
-					return array('res' => -1, 'message' => "ERROR_FLOW_NOT_SUPPORTED_PROTOCOL detected protocol ".$detectedProtocol." not supported for flowId: " . $flowId);
-				}
+				$receivedFile = $importable['file'];
+				$exchangeProtocol = $importable['protocol'];
 
 				$exceptionmessage = '';
 
@@ -2377,6 +2409,79 @@ class SuperPDPProvider extends AbstractPDPProvider
 		}
 
 		return array('res' => $returnRes, 'message' => $returnMessage);
+	}
+
+	/**
+	 * Pick, among the documents the access point holds for a flow, the first one this module can read.
+	 *
+	 * A flow carries its invoice in several shapes: 'Converted' is the invoice rewritten into the
+	 * syntax configured on the access point account, 'Original' is what the issuer really sent, and
+	 * 'ReadableView' is the human readable copy - which, on an access point that builds it as a
+	 * Factur-X PDF, carries the same data again.
+	 *
+	 * 'Converted' comes first because it is the one that shields the import from an issuer emitting a
+	 * syntax this module does not read - UBL, in particular, belongs to the French socle but has no
+	 * implementation here. But it depends on a setting that lives on the access point account, outside
+	 * Dolibarr: left unset, the platform refuses to produce the document at all; set to a syntax this
+	 * module does not support, it produces one that cannot be imported. Neither case says anything
+	 * about the other documents of the same flow, so they are tried in turn rather than failing the
+	 * flow on the first miss.
+	 *
+	 * @param	string			$flowId				Identifier of the flow to read
+	 * @param	ProtocolManager	$protocolManager	Protocol factory used to recognize the documents
+	 * @return	array{file:?string,protocol:?AbstractProtocol,protocol_name:string,doc_type:string,fetched:int,attempts:string[],client_not_configured:bool}	The importable document, or a null protocol and the reason each shape was rejected
+	 */
+	private function fetchImportableFlowDocument($flowId, $protocolManager)
+	{
+		$result = array(
+			'file' => null,
+			'protocol' => null,
+			'protocol_name' => '',
+			'doc_type' => '',
+			'fetched' => 0,				// nb of documents the access point did return, whatever their syntax
+			'attempts' => array(),
+			'client_not_configured' => false
+		);
+
+		foreach (array('Converted', 'Original', 'ReadableView') as $docType) {
+			$flowResponse = $this->fetchFlowData($flowId, $docType, 'get_flow_for_supplier_invoice');
+
+			if ($flowResponse['status_code'] != 200) {
+				if (isset($flowResponse['errorCode']) && $flowResponse['errorCode'] == 'CLIENT_NOT_CONFIGURED') {
+					// The access point has no conversion syntax configured for this client
+					$result['client_not_configured'] = true;
+				}
+				$result['attempts'][] = $docType . ": HTTP " . $flowResponse['status_code'] . (empty($flowResponse['errorMessage']) ? '' : ' - ' . $flowResponse['errorMessage']);
+				continue;
+			}
+
+			$result['fetched']++;
+
+			$content = (string) $flowResponse['response'];
+			$protocolName = $protocolManager->detectProtocolFromContent($content);
+			if (empty($protocolName)) {
+				$result['attempts'][] = $docType . ": unrecognized syntax";
+				continue;
+			}
+
+			$protocol = $protocolManager->getProtocol($protocolName);
+			if (empty($protocol)) {
+				$result['attempts'][] = $docType . ": " . $protocolName . " is not supported";
+				continue;
+			}
+
+			if ($docType != 'Converted') {
+				dol_syslog(__METHOD__ . " No usable 'Converted' document for flowId " . $flowId . " (" . implode(' | ', $result['attempts']) . "), reading the '" . $docType . "' one instead", LOG_WARNING, 0, "_einvoicing");
+			}
+
+			$result['file'] = $content;
+			$result['protocol'] = $protocol;
+			$result['protocol_name'] = $protocolName;
+			$result['doc_type'] = $docType;
+			break;
+		}
+
+		return $result;
 	}
 
 	/**
