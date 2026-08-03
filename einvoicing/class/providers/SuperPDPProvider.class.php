@@ -1861,7 +1861,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 				// Retrieve Original file
 				$receivedFile = null;
-				$flowResponse = $this->fetchFlowData($flowId, 'Converted', 'get_flow_for_supplier_invoice');
+				$flowResponse = $this->fetchFlowData($flowId, 'Original', 'get_flow_for_supplier_invoice');
 
 				if ($flowResponse['status_code'] != 200) {
 					return array('res' => -1, 'message' => "ERROR_FLOW_GETORIG Failed to retrieve 'Original' document for SupplierInvoice flow (flowId: " . $flowId . ")" . (empty($flowResponse['errorMessage']) ? '' : ' - ' . $flowResponse['errorMessage']));
