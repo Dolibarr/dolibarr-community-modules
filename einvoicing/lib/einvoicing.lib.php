@@ -636,3 +636,144 @@ if (!method_exists('Societe', 'findNearest')) {
 		return $result;
 	}
 }
+
+
+/**
+ * Tell whether the seller reports the VAT on debits ("TVA d'apres les debits").
+ *
+ * That option makes the VAT of a service fall due when the invoice is issued instead of when it is
+ * collected, and the seller who took it must carry the corresponding legal mention on its invoices.
+ * The scheme itself is not a setting of this module: Dolibarr already holds it in the setup of the
+ * Tax/VAT module (Home - Setup - Modules - Tax/VAT, "VAT mode"), where "TVA d'apres les debits" is
+ * TAX_MODE 1, the one that puts both sell modes on 'invoice'. Conf::setValues() always populates the
+ * two constants, defaulting to the French standard scheme.
+ *
+ * EINVOICING_VAT_POINT_DATE_CODE overrides it for a seller whose regime the Tax/VAT setup does not
+ * express. Declaring an invoice date (5) or a delivery date (29) is declaring the debits option -
+ * XP Z12-012 annexe A reads them as "date de la facture (TVA sur DEBITS)" and "date de livraison
+ * (TVA sur DEBITS)" - while declaring a payment date (72) is declaring the seller did not take it.
+ *
+ * @return bool		True when the invoices must carry the "VAT on debits" mention
+ */
+function einvoicingVatOnDebits()
+{
+	$forced = getDolGlobalString('EINVOICING_VAT_POINT_DATE_CODE');
+	if (in_array($forced, array('5', '29', '72'), true)) {
+		return ($forced !== '72');
+	}
+
+	return (getDolGlobalString('TAX_MODE_SELL_PRODUCT') != 'payment' && getDolGlobalString('TAX_MODE_SELL_SERVICE') != 'payment');
+}
+
+/**
+ * VAT point date code (BT-8) the generated document has to declare.
+ *
+ * BT-8 tells the buyer when the VAT falls due, hence from when it may be deducted. BR-CL-06 restricts
+ * it to a subset of UNTDID 2475 - 5 (invoice date), 29 (delivery date) and 72 (payment date) - and
+ * BR-CO-03 makes it mutually exclusive with BT-7, the VAT point date itself. In CII the code lives in
+ * the VAT breakdown (BG-23), which repeats per rate, but only one distinct value may appear in the
+ * whole document (CII-SR-462): it is a document-level decision.
+ *
+ * What the French socle asks of it is narrower than the semantics of the codes, and it is what this
+ * function follows. XP Z12-012 annexe A introduces BT-8 as the "champ permettant de specifier l'option
+ * pour le paiement de la taxe d'apres les debits", reads its three values as "5 : date de la facture
+ * (TVA sur DEBITS)", "29 : date de livraison (TVA sur DEBITS)" and "72 : date de paiement (TVA sur
+ * ENCAISSEMENTS)", and carries two rules on it:
+ *
+ *   G1.43        "Le BT-8 ne sera obligatoire que si l'entreprise a opte pour la TVA sur les debits
+ *                 et le specifie au moyen du code 5 (CII)"
+ *   BR-FR-MAP-03 "BT-8 est obligatoire pour les factures de service des lors que l'assujetti Vendeur
+ *                 a opte pour les debits"
+ *
+ * So 5 is not "this invoice is payable now", it is "I took the debits option", and a seller who did
+ * not take it must not send it. That is why a goods invoice of a seller under the standard scheme
+ * declares nothing: it has no option to signal, and its VAT falls due on a delivery the document
+ * already dates. 72 is not mandatory anywhere, but it is true of an operation taxed on collection and
+ * the annexe B examples carry it on every services invoice, so it is sent.
+ *
+ *   TAX_MODE 0, the French default   products on invoice, services on payment  -> 72 on a service line
+ *   TAX_MODE 1, "d'apres les debits" everything on invoice                     -> 5
+ *   TAX_MODE 2                       everything on payment                     -> 72
+ *
+ * 29 is never derived. It says the same thing as 5 and BR-FR-MAP-29 states that "le PPF attend
+ * uniquement 5", a 29 having to be reported as 5 to the public portal, so it is only ever sent when
+ * the seller asked for it explicitly (issue #419).
+ *
+ * @param  bool		$hasProductLine		The document carries at least one goods line
+ * @param  bool		$hasServiceLine		The document carries at least one service line
+ * @param  bool		$isDeposit			The document is a down payment invoice
+ * @return string						'5', '29', '72', or '' to leave BT-8 out
+ */
+function einvoicingVatPointDateCode($hasProductLine, $hasServiceLine, $isDeposit = false)
+{
+	// A down payment is the one case the socle settles on its own, and it settles it against every
+	// other rule here: XP Z12-014 annexe A reads "La TVA est exigible a l'encaissement de l'acompte
+	// pour les livraisons de biens comme pour les prestations de service, meme avec option sur les
+	// debits". So it is decided first, before the declared regime and before the VAT mode. Dolibarr
+	// builds every down payment line as a goods line, so without this the document would say nothing
+	// while its cash-in is reported to the platform with the status 212 for that very reason.
+	if ($isDeposit) {
+		return '72';
+	}
+
+	// An explicitly declared regime is a statement about the seller, not about one document.
+	$forced = getDolGlobalString('EINVOICING_VAT_POINT_DATE_CODE');
+	if (in_array($forced, array('5', '29', '72'), true)) {
+		return $forced;
+	}
+
+	// The debits option is general and prevails over every invoice issued (G1.43), so it is declared
+	// before anything the document itself could say.
+	if (einvoicingVatOnDebits()) {
+		return '5';
+	}
+
+	$sellProductOnPayment = (getDolGlobalString('TAX_MODE_SELL_PRODUCT') == 'payment');
+	$sellServiceOnPayment = (getDolGlobalString('TAX_MODE_SELL_SERVICE') == 'payment');
+
+	// Nothing is sent when no operation of the document is taxed on collection. The socle reads that
+	// silence: XP Z12-014 annexe A describes a VAT due on collection as "avec BT-8 absent, ou bien
+	// present et signifiant a l'encaissement (72)", making the two equivalent.
+	if (($sellServiceOnPayment && $hasServiceLine) || ($sellProductOnPayment && $hasProductLine)) {
+		return '72';
+	}
+	if ($sellProductOnPayment && $sellServiceOnPayment) {
+		return '72';
+	}
+
+	return '';
+}
+
+/**
+ * Tell whether the VAT of this document falls due on collection, i.e. whether a cash-in on it has to
+ * be reported to the platform with the status 212.
+ *
+ * Close to the question BT-8 answers, but not the same one: BT-8 is what the French socle makes of it,
+ * the declaration of the debits option, while this is the plain fact of when the VAT falls due. They
+ * part company on the down payment of a seller who took the option, whose document declares 5 because
+ * the option is general (G1.43), while the down payment itself is still taxed on collection - the
+ * option "ne peut avoir pour effet de retarder l'exigibilite".
+ *
+ * @param  bool		$hasProductLine		The document carries at least one goods line
+ * @param  bool		$hasServiceLine		The document carries at least one service line
+ * @return bool							True when the cash-in has to be reported
+ */
+function einvoicingVatDueOnCollection($hasProductLine, $hasServiceLine)
+{
+	$forced = getDolGlobalString('EINVOICING_VAT_POINT_DATE_CODE');
+	if (in_array($forced, array('5', '29', '72'), true)) {
+		return ($forced === '72');
+	}
+
+	$sellProductOnPayment = (getDolGlobalString('TAX_MODE_SELL_PRODUCT') == 'payment');
+	$sellServiceOnPayment = (getDolGlobalString('TAX_MODE_SELL_SERVICE') == 'payment');
+
+	if ($sellProductOnPayment && $sellServiceOnPayment) {
+		return true;
+	}
+	if (!$sellProductOnPayment && !$sellServiceOnPayment) {
+		return false;
+	}
+
+	return (($sellServiceOnPayment && $hasServiceLine) || ($sellProductOnPayment && $hasProductLine));
+}

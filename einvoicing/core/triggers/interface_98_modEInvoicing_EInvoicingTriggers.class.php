@@ -407,46 +407,39 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 	 * Tell whether a cash-in on this invoice has to be reported with the status 212 (Encaissee).
 	 *
 	 * The reform only requires the payment data for the operations whose VAT is due on collection, which is
-	 * exactly what the VAT exigibility scheme of the company says. Dolibarr already holds it, in the setup of
-	 * the Tax/VAT module (Home - Setup - Modules - Tax/VAT, "VAT mode"), so there is nothing to configure
-	 * here: TAX_MODE_SELL_PRODUCT and TAX_MODE_SELL_SERVICE are read directly. Both are always populated,
-	 * Conf::setValues() defaults them to 'invoice' and 'payment' when the setup page was never saved.
-	 *
-	 *   TAX_MODE 0, the French default   products on invoice, services on payment  -> due on a service line
-	 *   TAX_MODE 1, "d'apres les debits" everything on invoice                     -> never due
-	 *   TAX_MODE 2                       everything on payment                     -> always due
+	 * exactly what the VAT exigibility scheme of the company says. einvoicingVatDueOnCollection() answers
+	 * that from the VAT mode of the Tax/VAT module setup, or from the regime the seller declared explicitly
+	 * in the module setup, and the generated document answers the neighbouring question in BT-8.
 	 *
 	 * @param  Facture $invoice Invoice that has been cashed in
 	 * @return bool             True if the status has to be sent
 	 */
 	private function needCashedInStatus($invoice)
 	{
-		// VAT on a down payment falls due when the down payment is collected, whatever the scheme
+		// VAT on a down payment falls due when the down payment is collected, whatever the scheme: the
+		// debits option is set aside by a payment received before the debit, and it may not delay the
+		// exigibility anyway (CGI art. 269-2).
 		if ($invoice->type == Facture::TYPE_DEPOSIT) {
 			return true;
 		}
 
-		$productOnPayment = (getDolGlobalString('TAX_MODE_SELL_PRODUCT') == 'payment');
-		$serviceOnPayment = (getDolGlobalString('TAX_MODE_SELL_SERVICE') == 'payment');
-
-		if ($productOnPayment && $serviceOnPayment) {
-			return true;
-		}
-		if (!$productOnPayment && !$serviceOnPayment) {
-			return false;
-		}
-
-		// Mixed scheme: due as soon as the invoice carries one line of the kind taxed on collection
-		$typeOnPayment = $serviceOnPayment ? 1 : 0;		// Product::TYPE_SERVICE / TYPE_PRODUCT, without requiring the class here
 		if (empty($invoice->lines)) {
 			$invoice->fetch_lines();
 		}
+
+		// Product::TYPE_PRODUCT / TYPE_SERVICE, without requiring the class here. Anything else is a
+		// pseudo-line carrying no VAT (title, subtotal, page break) and is not a kind of operation:
+		// the document builder leaves those out of the same decision.
+		$hasProductLine = false;
+		$hasServiceLine = false;
 		foreach ($invoice->lines as $line) {
-			if ($line->product_type == $typeOnPayment) {
-				return true;
+			if ((int) $line->product_type === 1) {
+				$hasServiceLine = true;
+			} elseif ((int) $line->product_type === 0) {
+				$hasProductLine = true;
 			}
 		}
 
-		return false;
+		return einvoicingVatDueOnCollection($hasProductLine, $hasServiceLine);
 	}
 }

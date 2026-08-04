@@ -2,6 +2,20 @@
 
 ## 1.0.4
 
+FIX: A down payment invoice now declares in BT-8 that its VAT falls due on collection, whatever the
+VAT mode of the instance, which is already why its cash-in is reported to the platform with the status
+212. Dolibarr builds every down payment line as a goods line, so the document used to say nothing at
+all while its lifecycle said otherwise.
+
+NEW: The VAT regime the generated documents declare in BT-8 can now be set explicitly, in the module
+setup, for a seller whose regime the VAT mode of the Tax/VAT module cannot express. That mode still
+decides by default and nothing changes for an instance that leaves the setting alone. An explicit
+value applies to every document and drives the "VAT on debits" legal mention and the scope of the
+"Cashed in" (212) status with it. It is also the only way to declare the exigibility at the delivery
+(29), a value the automatic derivation never produces: it says the same thing as 5, and the public
+portal only expects 5 (BR-FR-MAP-29). The setting completes the VAT mode rather than duplicating it,
+unlike the option dropped earlier in this version (issue #419).
+
 FIX: The setup page no longer dies on a fatal error when the selected Access point cannot be
 instantiated - the case of a provider disabled after being selected, "SuperPDP via partner only" being
 the way it happens today, since that option disables every other entry including the one already
