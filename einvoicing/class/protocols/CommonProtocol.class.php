@@ -821,18 +821,22 @@ trait CommonProtocol
 			$createUrl .= '&backtopage=' . urlencode(dol_buildpath('/einvoicing/document_list.php', 1));
 
 			$errorDetails = [];
+			// The caller renders $actiondata as "key: value" pairs, the flat shape the PRODUCT_NOT_FOUND
+			// case returns. Building it as a list of one-entry arrays made every value reach the message
+			// as the string "Array", and dropped the first pair altogether, its key being the falsy
+			// index 0 - so the vendor name never made it there.
 			$actiondata = [];
 			if (!empty($sellername)) {
 				$errorDetails[] = 'Supplier: ' . $sellername;
-				$actiondata[] = array('name' => $sellername);
+				$actiondata['name'] = $sellername;
 			}
 			if (!empty($selleremail)) {
 				$errorDetails[] = 'Email: ' . $selleremail;
-				$actiondata[] = array('email' => $selleremail);
+				$actiondata['email'] = $selleremail;
 			}
 			if (!empty($sellervat)) {
 				$errorDetails[] = 'Vat number: ' . $sellervat;
-				$actiondata[] = array('vatnumber' => $sellervat);
+				$actiondata['vatnumber'] = $sellervat;
 			}
 			if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
 				foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
@@ -840,7 +844,7 @@ trait CommonProtocol
 						$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode);
 						if (!empty($idprofField)) {
 							$errorDetails[] = $idprofField.': ' . $globalId;
-							$actiondata[] = array($idprofField => $globalId);
+							$actiondata[$idprofField] = $globalId;
 						}
 					}
 				}
