@@ -302,11 +302,21 @@ trait CommonProtocol
 		$line->fk_product = 0;
 
 		include_once DOL_DOCUMENT_ROOT.'/core/lib/price.lib.php';
-		// Force MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY, so we are sure sample is valid at the initial object.
-		// TODO Make this sample generation working with any configuration of discount.
-		$conf->global->MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY = 2;
+		// The specimen has to read the same everywhere, so the discount rounding is pinned instead of
+		// following the instance. It is pinned to the default convention - round the line total - and
+		// not to 2, "round the discounted unit price first", because no two supported cores agree on
+		// what 2 means: 18 and 20 do not implement the option at all and round the total, 23 rounds the
+		// unit price up and 24 rounds it down. On the line below (5 x 100.05 less 10%) that is three
+		// different totals, 450.23 / 450.25 / 450.20, for one specimen. The default is the one value
+		// the four of them return.
+		// Restored right after: this is a specimen, it has no business changing how the rest of the
+		// request computes its prices.
+		$savRoundDiscountOnUnitPrice = getDolGlobalString('MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY');
+		$conf->global->MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY = '0';
 
 		$tmp = calcul_price_total($line->qty, $line->subprice, $line->remise_percent, $line->tva_tx, 0, 0, 0, 'HT', 0, 0);
+
+		$conf->global->MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY = $savRoundDiscountOnUnitPrice;
 
 		$line->total_ht = (float) $tmp[0];
 		$line->total_ttc = (float) $tmp[2];

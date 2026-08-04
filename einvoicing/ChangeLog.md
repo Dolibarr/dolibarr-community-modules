@@ -20,6 +20,16 @@ Document::$flowId" once per flow; from 20 on the getter swallows it. The message
 caller discards today since the flow counts as synchronized, also lost the one identifier it exists
 to carry.
 
+FIX: The sample invoice no longer pins a discount rounding that no two Dolibarr versions agree on.
+It forced MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY to 2 - round the
+discounted unit price, then multiply - but 18 and 20 do not implement that option and round the line
+total instead, 23 rounds the unit price up and 24 rounds it down, so its single line (5 x 100.05 less
+10%) came out at 450.23, 450.25 or 450.20 depending on the core. The specimen is now computed with the
+default convention, the one all four return, and the setting of the instance is restored afterwards
+instead of being left changed for the rest of the request. The reference fixtures are updated
+accordingly, and EInvoicingSamplesTest, which passed on only one of the four versions tested, now
+passes on all of them, 18.0.10 to 24.0.0.
+
 NEW: A "Mapped vendor references" screen (Billing > E-invoice synchronization) lists every vendor
 product reference recorded on the products, i.e. the mappings the import of a supplier invoice relies
 on to find the product of a line. Until now they could only be read product by product, in the

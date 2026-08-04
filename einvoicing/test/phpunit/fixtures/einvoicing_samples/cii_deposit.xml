@@ -66,7 +66,7 @@
           <ram:ReasonCode>95</ram:ReasonCode>
         </ram:SpecifiedTradeAllowanceCharge>
         <ram:SpecifiedTradeSettlementLineMonetarySummation>
-          <ram:LineTotalAmount>450.25</ram:LineTotalAmount>
+          <ram:LineTotalAmount>450.23</ram:LineTotalAmount>
         </ram:SpecifiedTradeSettlementLineMonetarySummation>
       </ram:SpecifiedLineTradeSettlement>
     </ram:IncludedSupplyChainTradeLineItem>
@@ -147,9 +147,9 @@
       <ram:InvoiceCurrencyCode>EUR</ram:InvoiceCurrencyCode>
       <!--VAT rate: 20, VAT src code: , ExemptionReasonCode: -->
       <ram:ApplicableTradeTax>
-        <ram:CalculatedAmount>90.05</ram:CalculatedAmount>
+        <ram:CalculatedAmount>90.04</ram:CalculatedAmount>
         <ram:TypeCode>VAT</ram:TypeCode>
-        <ram:BasisAmount>450.25</ram:BasisAmount>
+        <ram:BasisAmount>450.23</ram:BasisAmount>
         <ram:CategoryCode>S</ram:CategoryCode>
         <ram:RateApplicablePercent>20.00</ram:RateApplicablePercent>
       </ram:ApplicableTradeTax>
@@ -162,14 +162,14 @@
       </ram:SpecifiedTradePaymentTerms>
       <!--Totals-->
       <ram:SpecifiedTradeSettlementHeaderMonetarySummation>
-        <ram:LineTotalAmount>450.25</ram:LineTotalAmount>
+        <ram:LineTotalAmount>450.23</ram:LineTotalAmount>
         <ram:ChargeTotalAmount>0.00</ram:ChargeTotalAmount>
         <ram:AllowanceTotalAmount>0.00</ram:AllowanceTotalAmount>
-        <ram:TaxBasisTotalAmount>450.25</ram:TaxBasisTotalAmount>
-        <ram:TaxTotalAmount currencyID="EUR">90.05</ram:TaxTotalAmount>
-        <ram:GrandTotalAmount>540.30</ram:GrandTotalAmount>
+        <ram:TaxBasisTotalAmount>450.23</ram:TaxBasisTotalAmount>
+        <ram:TaxTotalAmount currencyID="EUR">90.04</ram:TaxTotalAmount>
+        <ram:GrandTotalAmount>540.27</ram:GrandTotalAmount>
         <ram:TotalPrepaidAmount>0.00</ram:TotalPrepaidAmount>
-        <ram:DuePayableAmount>540.30</ram:DuePayableAmount>
+        <ram:DuePayableAmount>540.27</ram:DuePayableAmount>
       </ram:SpecifiedTradeSettlementHeaderMonetarySummation>
     </ram:ApplicableHeaderTradeSettlement>
   </rsm:SupplyChainTradeTransaction>
