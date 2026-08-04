@@ -1893,7 +1893,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 						return array('res' => -1, 'message' => "ERROR_FETCH_INVOICE Failed to fetch customer invoice for flowId: " . $flowId);
 					} elseif ($res == 0) {
 						$returnRes = 1;
-						$returnMessage = 'Source invoice not found for '.$document->flowId;
+						$returnMessage = 'Source invoice not found for '.$document->flow_id;
 					} else {
 						// TODO: save received converted document as attachment to customer invoice
 						/*
@@ -1909,7 +1909,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 					}
 				} else {
 					$returnRes = 1;
-					$returnMessage = 'Source invoice not found for '.$document->flowId;
+					$returnMessage = 'Source invoice not found for '.$document->flow_id;
 				}
 
 				$document->fk_element_id = !empty($factureObj->id) ? $factureObj->id : 0;
