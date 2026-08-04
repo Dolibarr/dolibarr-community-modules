@@ -483,6 +483,7 @@ EInvoicingDirectoryInactive=Not reachable: recipient (SIREN %s) is in the direct
 EInvoicingDirectoryUpcoming=Not reachable yet: recipient (SIREN %s) has a reception address in the directory that only takes effect on %s
 EInvoicingDirectoryUpcomingNoDate=Not reachable yet: recipient (SIREN %s) has a reception address declared in the directory that has not taken effect yet
 EInvoicingDirectoryUndetermined=Undetermined: recipient (SIREN %s) has a reception address in the directory, but the platform did not report its line status, so it cannot be told from an address that only takes effect later. Reachability is unconfirmed: transmission may still come back as a routing error
+EInvoicingDirectoryStatusFromPlatform=status read from the platform own directory, which the standardized answer did not report
 EInvoicingDirectoryLineStatus=Line status
 EInvoicingDirectoryPlatformType=Platform
 EInvoicingDirectoryUnsupported=Directory lookup is not available for the current platform
