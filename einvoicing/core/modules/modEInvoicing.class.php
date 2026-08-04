@@ -635,6 +635,10 @@ class modEInvoicing extends DolibarrModules
 		// 	1
 		// );
 
+		// Societe extrafields
+		// Use a <select> to have the default null value (falling back to default supplier invoice import type parameter set in the module settings)
+		$result = $extrafields->addExtraField('einvoicing_supplier_invoice_lines_import_type', $langs->trans('SupplierInvoiceLinesImportType'), 'select', 150, '255', 'societe', 0, 0, '', 'a:1:{s:7:"options";a:2:{i:'.Einvoicing::SUPPLIER_INVOICE_LINES_IMPORT_AUTO.';s:11:"automatique";i:'.Einvoicing::SUPPLIER_INVOICE_LINES_IMPORT_MANUAL.';s:6:"manuel";}}', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', '1', 0, 0);
+
 		// Invoice extrafields
 		// Chorus fields
 		// TODO : Remove Chorus extrafields and move them to einvoicing_extlinks table
