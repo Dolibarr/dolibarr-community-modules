@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2025		SuperAdmin					<daoud.mouhamed@gmail.com>
+ * Copyright (C) 2026		Jose Martinez				<jose.martinez@pichinov.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -182,8 +183,12 @@ function thirdpartyidprof($object)
  * @param  ?string $original_encoding original encoding
  * @return string
  */
-function removeAllSpaces(string $str, ?string $original_encoding = null)
+function removeAllSpaces(?string $str, ?string $original_encoding = null)
 {
+	// Tolerate a null identifier (e.g. a party without any professional id): treat it as empty.
+	if ($str === null) {
+		$str = '';
+	}
 	// find encoding
 	if ($original_encoding === null) {
 		$original_encoding = mb_detect_encoding($str, mb_detect_order(), true) ?: 'UTF-8';
