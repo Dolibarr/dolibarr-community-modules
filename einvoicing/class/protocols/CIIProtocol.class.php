@@ -2,6 +2,7 @@
 /* Copyright (C) 2026       Laurent Destailleur         <eldy@users.sourceforge.net>
  * Copyright (C) 2026       Mohamed DAOUD               <mdaoud@dolicloud.com>
  * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
+ * Copyright (C) 2026		Jose Martinez				<jose.martinez@pichinov.com>
  *
  *
  * This program is free software: you can redistribute it and/or modify
@@ -1253,6 +1254,10 @@ class CIIProtocol extends AbstractProtocol
 
 			// Add line to invoice
 			$line = new SupplierInvoiceLine($db);
+			// Supplier's product reference (BT-155 SellerAssignedID) -> shown as "Ref. fournisseur" on the line.
+			if (!empty($parsedLine['prodsellerid']) && $parsedLine['prodsellerid'] !== '0000') {
+				$line->ref_supplier = trim($parsedLine['prodsellerid']);
+			}
 			if (!empty($productId)) {
 				$line->fk_product = $productId;
 				if ($productMatchType == 'defaultrouting') {
@@ -1260,6 +1265,10 @@ class CIIProtocol extends AbstractProtocol
 					// vendor: without the wording of the XML, every line of the invoice would show the same
 					// label. Keep the description of the vendor on top of the product link.
 					$line->desc = trim($parsedLine['prodname'] ?? '') . (!empty($parsedLine['proddesc']) ? "\n" . trim($parsedLine['proddesc']) : '');
+				} elseif (!empty($parsedLine['proddesc'])) {
+					// Keep the XML line-level description even when a real product is linked:
+					// it is often project-specific and not carried by the product's own label/description.
+					$line->desc = trim($parsedLine['proddesc']);
 				}
 			} elseif (!$is_deposit_line) {
 				// Free line: no product linked, description set from XML data
