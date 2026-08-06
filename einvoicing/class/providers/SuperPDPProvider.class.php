@@ -2,6 +2,7 @@
 /* Copyright (C) 2025       Laurent Destailleur         <eldy@users.sourceforge.net>
  * Copyright (C) 2025       Mohamed DAOUD               <mdaoud@dolicloud.com>
  * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
+ * Copyright (C) 2026		Jose Martinez				<jose.martinez@pichinov.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -2446,7 +2447,12 @@ class SuperPDPProvider extends AbstractPDPProvider
 			'client_not_configured' => false
 		);
 
-		foreach (array('Converted', 'Original', 'ReadableView') as $docType) {
+		// EINVOICING_PREFER_ORIGINAL: fetch the issuer's Original document (its Factur-X, which carries
+		// the human-readable PDF) before the Converted one, so the created supplier invoice keeps the PDF.
+		$docTypeOrder = getDolGlobalString('EINVOICING_PREFER_ORIGINAL')
+			? array('Original', 'Converted', 'ReadableView')
+			: array('Converted', 'Original', 'ReadableView');
+		foreach ($docTypeOrder as $docType) {
 			$flowResponse = $this->fetchFlowData($flowId, $docType, 'get_flow_for_supplier_invoice');
 
 			if ($flowResponse['status_code'] != 200) {
