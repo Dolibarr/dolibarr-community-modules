@@ -24,6 +24,7 @@ the file that needs them, instead of being looked up through dol_buildpath(). A 
 resolve - a deployment that does not sit where the module expects, which is what a container install
 can produce - only wrote a line in the log and returned false, so the polyfill was silently absent and
 the next call to it was a fatal "Call to undefined function isValidSiren" (issue #565).
+
 FIX: Below Dolibarr 24, a Factur-X invoice was produced as a plain PDF with the XML attached to it,
 without the document level /AF entry nor the PDF/A-3 output intent a Factur-X reader looks for, and
 with the XML embedded twice. Nothing said so, and the file was refused further down the line: the

@@ -58,7 +58,7 @@ class ProtocolManager
 			),
 			'FACTURX' => array(
 				'protocol_name' => 'FACTURX',
-				'description' =>'Factur-X is a French-German hybrid e-invoicing format combining a readable PDF invoice with embedded XML data for seamless automated processing.',
+				'description' => 'Factur-X is a French-German hybrid e-invoicing format combining a readable PDF invoice with embedded XML data for seamless automated processing.',
 				'is_enabled' => $facturexIsOk
 			),
 			'UBL' => array(
