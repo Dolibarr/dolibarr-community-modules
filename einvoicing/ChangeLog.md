@@ -2,6 +2,10 @@
 
 ## 1.0.4
 
+FIX: Generating two Factur-X sample invoices in the same request no longer ends on a PHP fatal error.
+The generator loaded its helper file with require rather than require_once, so the second call
+redeclared its functions - and a fatal error is not something the calling code can catch and report.
+
 FIX: A down payment invoice now declares in BT-8 that its VAT falls due on collection, whatever the
 VAT mode of the instance, which is already why its cash-in is reported to the platform with the status
 212. Dolibarr builds every down payment line as a goods line, so the document used to say nothing at
