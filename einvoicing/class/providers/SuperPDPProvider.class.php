@@ -1250,17 +1250,77 @@ class SuperPDPProvider extends AbstractPDPProvider
 	public function checkRecipientDirectory($idprof1)
 	{
 		// Standardized AFNOR directory check first (works for any conformant Approved Platform).
-		// 'undetermined' also ends the check: the annuaire did answer with lines for that SIREN, only
-		// without their status. Falling back to the legacy endpoint there could contradict it with a
-		// worse answer ('absent' when the standardized annuaire holds a line), and only the AFNOR
-		// annuaire carries the effective date that decides reachability.
 		$result = parent::checkRecipientDirectory($idprof1);
-		if (in_array($result['status'], array('routable', 'inactive', 'absent', 'undetermined'), true)) {
+		if (in_array($result['status'], array('routable', 'inactive', 'absent'), true)) {
+			// The standardized answer carried the line status: it decides, and nothing else may
+			// override it. This is what keeps the specific endpoint from re-introducing a wrong
+			// positive on a line the annuaire reports as not open.
 			return $result;
+		}
+		if ($result['status'] === 'undetermined') {
+			// Lines exist for that SIREN but the platform did not report their status, and it cannot be
+			// asked for it. Its own directory endpoint does carry that information: use it to settle the
+			// answer instead of leaving the user with a shrug.
+			return $this->settleUndeterminedDirectory($idprof1, $result);
 		}
 
 		// Standardized lookup unavailable or errored: fall back to the SuperPDP specific endpoint.
 		return $this->checkRecipientDirectoryLegacy($idprof1);
+	}
+
+	/**
+	 * Settle a standardized directory answer that came back without line statuses, using the SuperPDP
+	 * specific french_directory endpoint as a tie-breaker.
+	 *
+	 * The status is missing from some standardized answers of this platform (observed on the lines
+	 * addressed by the bare SIREN and not open yet), and it cannot be requested: 'directoryLineStatus'
+	 * is not one of the values the search accepts in 'fields', and reading the line on its own omits it
+	 * as well. The platform's own endpoint answers about the very same lines, at the same moment, and
+	 * does carry the flag: on every line where both answers report it, the boolean matches the
+	 * standardized status (true for 'Enabled', false for 'Upcoming'). So it is used here to conclude,
+	 * and only here:
+	 * - it settles a non-conclusive answer, it never overrides a status the standardized answer gave ;
+	 * - it stays silent (the answer remains non-conclusive) when it knows nothing of that SIREN or
+	 *   fails, since the standardized annuaire does hold lines for it.
+	 *
+	 * The boolean does not tell a line waiting for its effective date from a closed one, so a negative
+	 * verdict says the recipient cannot receive without claiming which of the two it is.
+	 *
+	 * @param 	string 	$idprof1 	Recipient SIREN (idprof1)
+	 * @param 	array{status:string,reachable:int,entries:int,active:int,unknown:int,identifier:string,linestatus:string,platform:string,effectivedate:int,message:string,httpcode:int} 	$result 	Non-conclusive result of the standardized check
+	 * @return 	array{status:string,reachable:int,entries:int,active:int,unknown:int,identifier:string,linestatus:string,platform:string,effectivedate:int,message:string,httpcode:int}
+	 */
+	private function settleUndeterminedDirectory($idprof1, $result)
+	{
+		$legacy = $this->checkRecipientDirectoryLegacy($idprof1);
+
+		if ($legacy['entries'] == 0 || $legacy['status'] === 'error') {
+			// Nothing to settle with: the specific endpoint failed, or knows no entry for a SIREN the
+			// standardized annuaire holds lines for. Keep the non-conclusive answer rather than
+			// contradicting the standardized one.
+			return $result;
+		}
+
+		// 'active' counts entries flagged as able to receive with an effective date already reached,
+		// 'unknown' those flagged the same way with no date in the payload: both are entries this
+		// platform reports as receiving, which is exactly the status the standardized answer dropped.
+		if ($legacy['active'] > 0 || $legacy['unknown'] > 0) {
+			$result['status'] = 'routable';
+			$result['reachable'] = 1;
+			if (!empty($legacy['identifier'])) {
+				$result['identifier'] = $legacy['identifier'];
+			}
+		} else {
+			$result['status'] = 'inactive';
+			$result['reachable'] = 0;
+			$result['linestatus'] = $legacy['linestatus'];
+			$result['effectivedate'] = $legacy['effectivedate'];
+		}
+		// Provenance: this verdict does not come from the standardized answer displayed by the annuaire
+		// consultation, so a user comparing the two must be able to tell where it comes from.
+		$result['message'] = 'EInvoicingDirectoryStatusFromPlatform';
+
+		return $result;
 	}
 
 	/**

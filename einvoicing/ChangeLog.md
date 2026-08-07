@@ -139,6 +139,17 @@ for - and an instance running a Dolibarr that does not know that option diverged
 honouring a setting its core ignores. Nothing reported it: the document stayed internally consistent
 and the platform accepted it (issue #505).
 
+FIX: The recipient reachability pre-check no longer answers "undetermined" on SuperPDP when the
+platform can tell. Some lines of its standardized directory answer come back without their status,
+and that status cannot be requested, so the check stayed non-conclusive; its own directory endpoint,
+already used when the standardized lookup is unavailable, does report it for the very same lines, and
+it now settles those answers. Only those: a status the standardized answer did give is never
+overridden, and an endpoint that fails or knows nothing of the recipient settles nothing. The two
+recipients seen with that gap - both declared and not open yet - are now reported as not reachable
+instead of undetermined, and the option that requires a reachable recipient blocks them at its first
+value. Where the verdict was read is displayed next to it, since the directory consulted by hand
+shows no status for that line.
+
 
 ## 1.0.3
 
