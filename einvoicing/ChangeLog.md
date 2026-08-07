@@ -2,6 +2,13 @@
 
 ## 1.0.4
 
+FIX: Validating a replacement supplier invoice now closes the invoice it replaces, with the close
+code the core reserves for that, instead of leaving it validated and open for payment with nothing
+saying it had been superseded. Dolibarr does it on the customer side and not on the supplier one, so
+a replaced supplier e-invoice could still be paid a second time. Only the invoices exchanged through
+the platform are concerned; one that is already paid, or still a draft, is left untouched (issue
+#549).
+
 FIX: A down payment invoice now declares in BT-8 that its VAT falls due on collection, whatever the
 VAT mode of the instance, which is already why its cash-in is reported to the platform with the status
 212. Dolibarr builds every down payment line as a goods line, so the document used to say nothing at

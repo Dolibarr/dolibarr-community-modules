@@ -495,6 +495,72 @@ class SupplierInvoiceHelper
 	}
 
 	/**
+	 * Close the supplier invoice that a newly validated replacement invoice replaces.
+	 *
+	 * Dolibarr does this on the customer side - Facture::validate() cancels the replaced invoice with
+	 * the close code "replaced" - but FactureFournisseur::validate() does not, so a replaced supplier
+	 * invoice stayed validated, with nothing saying it had been superseded and nothing stopping it
+	 * from being paid a second time (issue #549).
+	 *
+	 * Scope. Only the invoices this module is responsible for are touched, i.e. those exchanged
+	 * through the platform: either the replacement or the invoice it replaces has to be an e-invoice.
+	 * A replacement recorded by hand between two ordinary supplier invoices is left to the core.
+	 *
+	 * Three states are deliberately left alone:
+	 * - a paid replaced invoice, because abandoning it would contradict the payment already recorded;
+	 * - a draft one, which cannot be paid nor transferred to accountancy anyway, and which validating
+	 *   just to cancel would give a reference it never earned;
+	 * - one already closed by this same rule, so the method is idempotent.
+	 *
+	 * @param	FactureFournisseur	$replacement	Replacement invoice that has just been validated
+	 * @param	User				$user			User validating it
+	 * @return	int									1 if the replaced invoice was closed, 0 if there was nothing to do, -1 on error
+	 */
+	public static function closeReplacedSupplierInvoice(FactureFournisseur $replacement, User $user)
+	{
+		global $db;
+
+		if ((int) $replacement->type !== FactureFournisseur::TYPE_REPLACEMENT || empty($replacement->fk_facture_source)) {
+			return 0;
+		}
+
+		$sourceId = (int) $replacement->fk_facture_source;
+
+		if (!self::isEInvoice((int) $replacement->id) && !self::isEInvoice($sourceId)) {
+			return 0;
+		}
+
+		$source = new FactureFournisseur($db);
+		if ($source->fetch($sourceId) <= 0) {
+			dol_syslog(__METHOD__ . ' Cannot load the supplier invoice id ' . $sourceId . ' replaced by id ' . $replacement->id, LOG_ERR, 0, '_einvoicing');
+			return -1;
+		}
+
+		if ($source->status == FactureFournisseur::STATUS_ABANDONED && $source->close_code == FactureFournisseur::CLOSECODE_REPLACED) {
+			return 0;
+		}
+
+		if (!empty($source->paid) || $source->status == FactureFournisseur::STATUS_CLOSED) {
+			dol_syslog(__METHOD__ . ' Supplier invoice id ' . $sourceId . ' is replaced by id ' . $replacement->id . ' but is already paid: left as it is', LOG_WARNING, 0, '_einvoicing');
+			return 0;
+		}
+
+		if ($source->status == FactureFournisseur::STATUS_DRAFT) {
+			dol_syslog(__METHOD__ . ' Supplier invoice id ' . $sourceId . ' is replaced by id ' . $replacement->id . ' but is still a draft: left as it is', LOG_INFO, 0, '_einvoicing');
+			return 0;
+		}
+
+		if ($source->setCanceled($user, FactureFournisseur::CLOSECODE_REPLACED, '') < 0) {
+			dol_syslog(__METHOD__ . ' Failed to close the supplier invoice id ' . $sourceId . ' replaced by id ' . $replacement->id . ' : ' . implode(', ', (array) $source->errors), LOG_ERR, 0, '_einvoicing');
+			return -1;
+		}
+
+		dol_syslog(__METHOD__ . ' Supplier invoice id ' . $sourceId . ' closed as replaced by id ' . $replacement->id, LOG_DEBUG, 0, '_einvoicing');
+
+		return 1;
+	}
+
+	/**
 	 * Callback to invoke once an outbound lifecycle status message has been validated (confirmed
 	 * or rejected by the e-invoicing platform). This is a no-op unless the message is a
 	 * confirmed ('Ok') refusal (EInvoicing::STATUS_REFUSED) of a supplier invoice, in which case
