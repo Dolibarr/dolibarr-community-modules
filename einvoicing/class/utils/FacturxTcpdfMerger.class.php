@@ -382,7 +382,7 @@ class FacturxTcpdfMerger extends TcpdfFpdi
 		$facturxProperties->children('fx', true)->{'Version'} = $this->xmpVersion;
 		$facturxProperties->children('fx', true)->{'DocumentFileName'} = $this->attachmentName;
 
-		return "\t\t" . $facturxProperties->asXML() . "\n" . "\t\t" . $descriptions[1]->asXML() . "\n";
+		return "\t\t" . $facturxProperties->asXML() . "\n\t\t" . $descriptions[1]->asXML() . "\n";
 	}
 
 	/**
@@ -406,7 +406,7 @@ class FacturxTcpdfMerger extends TcpdfFpdi
 	 * @param  string $s Object body about to be written
 	 * @return void
 	 */
-	public function _out($s)		// phpcs:ignore PSR2.Methods.MethodDeclaration.Underscore
+	public function _out($s)		// phpcs:ignore PEAR.NamingConventions.ValidFunctionName.PublicUnderscore
 	{
 		if (strpos($s, '/Type /Filespec') !== false) {
 			$s = str_replace('/AFRelationship /Source', '/AFRelationship /' . $this->relationship, $s);
