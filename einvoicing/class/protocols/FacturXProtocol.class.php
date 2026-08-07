@@ -48,6 +48,10 @@ dol_include_once('einvoicing/class/protocols/CIIProtocol.class.php');
 dol_include_once('einvoicing/class/protocols/CommonProtocol.class.php');
 dol_include_once('einvoicing/class/utils/XmlPatcher.class.php');
 dol_include_once('einvoicing/class/utils/CtcFrPdfMerger.class.php');
+// FacturxTcpdfMerger is NOT included here: it descends from TCPDF, which the core only loads when a
+// PDF is actually rendered. Requiring it at load time would make every page that instantiates this
+// protocol die on "Class TCPDF not found". It is included where it is used, which is precisely the
+// branch where the core has already loaded TCPDF.
 
 
 /**
@@ -739,86 +743,47 @@ class FacturXProtocol extends CIIProtocol
 		clearstatcache(true);
 
 
-		// Embed the XML file $xmlfile into the file $pathfacturxpdf (that was copied from $orig_pdf) using FPDI and overwrite it.
-		// 2 methods are provided depending on the version of Dolibarr.
-		// TODO A third method can be tried using the atgp/factur-x library.
+		// Embed the XML file $xmlfile into the file $pathfacturxpdf (that was copied from $orig_pdf) and overwrite it.
+		// 2 mergers are provided, both producing a PDF/A-3 file carrying the XML as an associated file.
+		// They differ only by the PDF engine they can use, which depends on what already holds the
+		// global class FPDF in this PHP request - see FacturxTcpdfMerger for the whole story.
 
-		if (class_exists('FPDF', false) && is_subclass_of('FPDF', 'TCPDF')) {
-			// Generate the PDF including the XML using the TCPDF library.
-			// Bugged version that include the factur-x.xml file twice in the PDF. Only Acrobat Reader show there is 2 files, other PDF reader works correctly showing one file.
-			// But it works with Esalink and is the only solution when Dolibarr < 24.0 because such version have a class FPDF provided by default in Dolibarr
-			// that is in conflict with the class FPDF provided by the module einvoicing and the library horstoeko/zugferd.
-			$pdf = pdf_getInstance();
-			$pagecount = $pdf->setSourceFile($pathfacturxpdf);
+		if (!file_exists($orig_pdf)) {
+			throw new \Exception("XML and/or PDF does not exist");
+		}
 
-			// import all pages of the original PDF
-			for ($i = 1; $i <= $pagecount; $i++) {
-				$tpl = $pdf->importPage($i);
-				$pdf->addPage();
-				$pdf->useTemplate($tpl);
+		// Restore metadata from original PDF.
+		// The merger setters require non-null strings, so default to '' for Dolibarr versions that do
+		// not ship pdfExtractMetadata() (v18 / v19); v22+ overwrites these with the actual values
+		// parsed from the source PDF.
+		$keywords = '';
+		$subject = '';
+		$author = '';
+		$creator = '';
+		if (function_exists('pdfExtractMetadata')) {	// From Dolibarr v22
+			// Now we get the metadata keywords from the $sourcefile PDF (by parsing the binary PDF file)
+			$keywords = (string) pdfExtractMetadata($orig_pdf, 'Keywords');
+			$subject = (string) pdfExtractMetadata($orig_pdf, 'Subject');
+			$author = (string) pdfExtractMetadata($orig_pdf, 'Author');
+			$creator = (string) pdfExtractMetadata($orig_pdf, 'Creator');
+		}
+
+		try {
+			if (class_exists('FPDF', false) && is_subclass_of('FPDF', 'TCPDF')) {
+				// Below Dolibarr 24, htdocs/includes/tcpdi/tcpdi.php declares "class FPDF extends TCPDF {}"
+				// as soon as any PDF is rendered in the request - the invoice PDF produced at validation,
+				// right before this hook runs. The horstoeko/zugferd writer then inherits from TCPDF instead
+				// of the real FPDF and dies on ZugferdPdfWriter::_getpagesize(). Merge with TCPDF itself,
+				// which needs no FPDF at all and supports PDF/A-3 natively. Reaching this branch means
+				// the core has loaded TCPDF, which is what the merger descends from.
+				dol_include_once('einvoicing/class/utils/FacturxTcpdfMerger.class.php');
+				$merger = new FacturxTcpdfMerger($xmlfile, $orig_pdf);
+			} else {
+				// CtcFrPdfMerger behaves exactly like ZugferdDocumentPdfMerger, except that it can still
+				// supply the attachment and XMP parameters when the guideline URN is one the library does
+				// not know — which is the case of EXTENDED-CTC-FR.
+				$merger = new CtcFrPdfMerger($xmlfile, $orig_pdf);
 			}
-
-			// Embed the XML file as a file attachment in the PDF
-			if (file_exists($xmlfile)) {
-				$pdf->Annotation(10, 10, 5, 5, 'factur-x.xml', array(
-					'Subtype' => 'FileAttachment',
-					'Name' => 'PushPin',
-					'FS' => $xmlfile
-				));
-			}
-
-			// Restore metadata from original PDF.
-			if (function_exists('pdfExtractMetadata')) {	// From Dolibarr v22
-				// Now we get the metadata keywords from the $sourcefile PDF (by parsing the binary PDF file)
-				$keywords = pdfExtractMetadata($pathfacturxpdf, 'Keywords');
-				$subject = pdfExtractMetadata($pathfacturxpdf, 'Subject');
-				$author = pdfExtractMetadata($pathfacturxpdf, 'Author');
-				$creator = pdfExtractMetadata($pathfacturxpdf, 'Creator');
-
-				if (!preg_match('/^ERROR/', $keywords)) {
-					$pdf->setKeywords($keywords);
-				}
-				if (!preg_match('/^ERROR/', $subject)) {
-					$pdf->setSubject($subject);
-				}
-				if (!preg_match('/^ERROR/', $author)) {
-					$pdf->setAuthor($author);
-				}
-				if (!preg_match('/^ERROR/', $creator)) {
-					$pdf->setCreator($creator);
-				}
-			}
-
-			// Save the final PDF with the embedded XML
-			$pdf->Output($pathfacturxpdf, 'F');
-		} else {
-			// Generate the PDF including the XML using the horstoeko/zugferd library.
-			// This can works with Dolibarr 24.0+ only, because the previous version of Dolibarr was already including a FPDF class that is
-			// in conflict with the one provided by horstoeko/zugferd library.
-			if (!file_exists($orig_pdf)) {
-				throw new \Exception("XML and/or PDF does not exist");
-			}
-
-			// Restore metadata from original PDF.
-			// horstoeko/zugferd setters require non-null strings, so default to '' for Dolibarr
-			// versions that do not ship pdfExtractMetadata() (v18 / v19); v22+ overwrites these
-			// with the actual values parsed from the source PDF.
-			$keywords = '';
-			$subject = '';
-			$author = '';
-			$creator = '';
-			if (function_exists('pdfExtractMetadata')) {	// From Dolibarr v22
-				// Now we get the metadata keywords from the $sourcefile PDF (by parsing the binary PDF file)
-				$keywords = (string) pdfExtractMetadata($orig_pdf, 'Keywords');
-				$subject = (string) pdfExtractMetadata($orig_pdf, 'Subject');
-				$author = (string) pdfExtractMetadata($orig_pdf, 'Author');
-				$creator = (string) pdfExtractMetadata($orig_pdf, 'Creator');
-			}
-
-			// CtcFrPdfMerger behaves exactly like ZugferdDocumentPdfMerger, except that it can still
-			// supply the attachment and XMP parameters when the guideline URN is one the library does
-			// not know — which is the case of EXTENDED-CTC-FR.
-			$merger = new CtcFrPdfMerger($xmlfile, $orig_pdf);
 
 			$merger->setKeywordTemplate($keywords);
 			$merger->setSubjectTemplate($subject);
@@ -828,7 +793,21 @@ class FacturXProtocol extends CIIProtocol
 			$merger->generateDocument();
 
 			$merger->saveDocument($pathfacturxpdf);
+		} catch (Throwable $e) {
+			// A carrier PDF the merger cannot read (truncated, encrypted, not a PDF) used to let the
+			// exception escape to whoever validated the invoice, and to leave behind the copy of the
+			// carrier under the Factur-X name - a file that looks like the e-invoice and is not one.
+			if (file_exists($pathfacturxpdf)) {
+				dol_delete_file($pathfacturxpdf, 0, 1);
+			}
+			dol_syslog(get_class($this) . '::generateInvoice cannot embed the XML into ' . basename($orig_pdf) . ' : ' . $e->getMessage(), LOG_ERR, 0, '_einvoicing');
+			$this->error = $langs->trans('ErrorEInvoiceCannotEmbedXmlIntoPdf', basename($orig_pdf), $e->getMessage());
+			$this->errors[] = $this->error;
+			return -1;
 		}
+
+		// Whichever merger ran, do not hand over a file that only looks like a Factur-X one.
+		$this->checkFacturxStructure($pathfacturxpdf);
 
 
 		// Clean up the temporary XML file
@@ -865,6 +844,54 @@ class FacturXProtocol extends CIIProtocol
 		$this->checkFileSizeLimit($pathfacturxpdf);
 
 		return $pathfacturxpdf;		// Name of generated Einvoice
+	}
+
+
+	/**
+	 * Check that the produced PDF really is a Factur-X file, and not a PDF with an attachment.
+	 *
+	 * Nothing in the standard makes the difference visible to the eye: both carry the XML and both
+	 * open normally. What a reader and a platform validator look for is the document level /AF array
+	 * and the PDF/A-3 output intent, and a file that has the embedded stream but neither of those is
+	 * refused - after being sent, which is the expensive moment to find out (issue #554).
+	 *
+	 * The check is on the produced file rather than on the code path that produced it, so it also
+	 * covers a merger that silently degrades for another reason.
+	 *
+	 * @param	string	$pathfacturxpdf		Full path of the generated Factur-X PDF
+	 * @return	void
+	 */
+	private function checkFacturxStructure($pathfacturxpdf)
+	{
+		global $langs;
+
+		if (!file_exists($pathfacturxpdf)) {
+			return;
+		}
+
+		$content = (string) file_get_contents($pathfacturxpdf);
+
+		$missing = array();
+		if (!preg_match('#/Type\s*/EmbeddedFile#', $content)) {
+			$missing[] = 'embedded XML';
+		}
+		if (!preg_match('#/AF\s*\[#', $content)) {
+			$missing[] = '/AF';
+		}
+		if (!preg_match('#/OutputIntent#', $content)) {
+			$missing[] = 'PDF/A-3 output intent';
+		}
+
+		if (empty($missing)) {
+			return;
+		}
+
+		$langs->load('einvoicing@einvoicing');
+		$message = $langs->trans('EInvoiceFacturxStructureIncomplete', basename($pathfacturxpdf), implode(', ', $missing));
+
+		dol_syslog(get_class($this) . '::checkFacturxStructure ' . basename($pathfacturxpdf) . ' is missing: ' . implode(', ', $missing), LOG_WARNING, 0, '_einvoicing');
+
+		$this->warnings[] = $message;
 	}
 
 
@@ -1120,11 +1147,24 @@ class FacturXProtocol extends CIIProtocol
 		// - the keywords .... INV-TEST, Invoice, Lieferant GmbH, 2024-12-31
 
 		// This rebuild the PDF including the XML and added PDF metadata.
-		$zugferdDocumentPdfBuilder = ZugferdDocumentPdfBuilder::fromPdfFile($documentBuilder, $existingPdfFilename);
-		$zugferdDocumentPdfBuilder->setAuthorTemplate('Issued by %3$s');
-		$zugferdDocumentPdfBuilder->setTitleTemplate('%3$s : %2$s SPECIMEN %1$s');
-		$zugferdDocumentPdfBuilder->setSubjectTemplate('%2$s-Document, Issued by %3$s - Dolibarr ' . DOL_VERSION);
-		$zugferdDocumentPdfBuilder->setKeywordTemplate('%1$s, %2$s, %3$s, %4$s, Dolibarr');
+		// Same choice of engine as generateInvoice(): once the core has declared its own FPDF - which
+		// any page that already rendered a PDF has done - the horstoeko/zugferd writer cannot even be
+		// declared, and the sample generation died on a PHP fatal error instead of producing anything.
+		if (class_exists('FPDF', false) && is_subclass_of('FPDF', 'TCPDF')) {
+			dol_include_once('einvoicing/class/utils/FacturxTcpdfMerger.class.php');
+			$zugferdDocumentPdfBuilder = new FacturxTcpdfMerger($documentBuilder->getContent(), $existingPdfFilename);
+			// The templates below are resolved by horstoeko/zugferd from the XML it parses; this merger
+			// takes plain values, and the sample invoice knows what they are.
+			$zugferdDocumentPdfBuilder->setAuthorTemplate($mysoc->name);
+			$zugferdDocumentPdfBuilder->setSubjectTemplate('Invoice-Document SPECIMEN, Issued by ' . $mysoc->name . ' - Dolibarr ' . DOL_VERSION);
+			$zugferdDocumentPdfBuilder->setKeywordTemplate('SPECIMEN, Invoice, ' . $mysoc->name . ', Dolibarr');
+		} else {
+			$zugferdDocumentPdfBuilder = ZugferdDocumentPdfBuilder::fromPdfFile($documentBuilder, $existingPdfFilename);
+			$zugferdDocumentPdfBuilder->setAuthorTemplate('Issued by %3$s');
+			$zugferdDocumentPdfBuilder->setTitleTemplate('%3$s : %2$s SPECIMEN %1$s');
+			$zugferdDocumentPdfBuilder->setSubjectTemplate('%2$s-Document, Issued by %3$s - Dolibarr ' . DOL_VERSION);
+			$zugferdDocumentPdfBuilder->setKeywordTemplate('%1$s, %2$s, %3$s, %4$s, Dolibarr');
+		}
 		// If you would like to brand the merged PDF with the name of you own solution you can call
 		// the method setAdditionalCreatorTool. Before calling this method the creator of the PDF is identified as 'Factur-X library 1.x.x by HorstOeko'.
 		// After calling this method you get 'MyERPSolution 1.0 / Factur-X PHP library 1.x.x by HorstOeko' as the creator

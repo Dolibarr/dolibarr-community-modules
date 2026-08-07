@@ -24,6 +24,19 @@ the file that needs them, instead of being looked up through dol_buildpath(). A 
 resolve - a deployment that does not sit where the module expects, which is what a container install
 can produce - only wrote a line in the log and returned false, so the polyfill was silently absent and
 the next call to it was a fatal "Call to undefined function isValidSiren" (issue #565).
+FIX: Below Dolibarr 24, a Factur-X invoice was produced as a plain PDF with the XML attached to it,
+without the document level /AF entry nor the PDF/A-3 output intent a Factur-X reader looks for, and
+with the XML embedded twice. Nothing said so, and the file was refused further down the line: the
+public validator answers "the file does not contain one and only one factur-x.xml". The cause was a
+class name collision - the core declares its own FPDF below v24, which the writer of
+horstoeko/zugferd cannot then inherit from - and the fallback silently degraded the output instead.
+Such a file is now built with TCPDF, which the collision does not concern and which supports PDF/A-3
+natively, so every supported Dolibarr version produces the same structure. The produced file is also
+checked before being handed over, so an incomplete one is reported instead of being sent, a carrier
+PDF that cannot be read aborts the generation with an explicit message rather than dying on a parser
+error, and Factur-X no longer announces itself as needing Dolibarr 24. The sample invoice of the
+setup page was hit by the same collision, from a page that had already rendered a PDF: it died on a
+PHP fatal error, which no error handling can catch, and the setup page came back blank (issue #554).
 
 FIX: A line billed over a period that has only a start date, or only an end date, now carries that
 period in the Factur-X document as it already did in the CII one. The Factur-X path asked for both
