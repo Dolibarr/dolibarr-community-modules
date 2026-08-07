@@ -35,6 +35,18 @@ column the table never had - so the provider name of every logged API call was w
 property PHP creates on the fly, which is deprecated since 8.2 and warns on all four versions.
 Both properties are now declared, and the stale fk_provider is gone.
 
+NEW: Another module can add its own PDP / Access Point provider, without patching this one. It
+declares the hook context 'einvoicingproviders' and returns its entries from an addPDPProviders()
+method; the entry names the class and the directory it lives in ('classpath'), which until now was
+hardcoded to einvoicing/class/providers/, so a provider class could only exist inside this module. A
+hook rather than a scan of the module directories: it only exposes the providers of the modules that
+are enabled, and it costs nothing when no module implements it. An entry whose code is already taken
+by a provider of the module is ignored, and a class that does not extend AbstractPDPProvider is
+refused when it is loaded rather than failing later on a missing method. The TESTPDP entry, which
+pointed to a class that did not exist, is now the documented reference implementation: it calls
+nothing over the network and is offered only when the developer tools are enabled. The contract to
+implement is written down in einvoicing/doc/ADD-A-PDP-PROVIDER.md.
+
 FIX: A synchronization no longer raises a PHP warning for every flow whose source invoice is not in
 this database. Such a flow is the ordinary case on a platform account shared with another system -
 the customer invoice behind it simply lives somewhere else - and syncFlow() notes it in a message
