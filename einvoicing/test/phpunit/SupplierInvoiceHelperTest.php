@@ -347,6 +347,186 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 	}
 
 	/**
+	 * Build a replacement supplier invoice pointing at a source invoice.
+	 *
+	 * The type and the source are set on the object rather than written back: they are what the
+	 * validation trigger hands over, and what the helper reads to take its decision.
+	 *
+	 * @param	int	$sourceId	Id of the invoice it replaces
+	 * @return	FactureFournisseur
+	 */
+	private function createReplacementFor($sourceId)
+	{
+		$replacement = $this->createSpecimenSupplierInvoice();
+		$replacement->type = FactureFournisseur::TYPE_REPLACEMENT;
+		$replacement->fk_facture_source = $sourceId;
+
+		return $replacement;
+	}
+
+	/**
+	 * The invoice a replacement e-invoice replaces is closed with the close code the core reserves
+	 * for it, so the card stops offering to pay it (issue #549).
+	 *
+	 * @return void
+	 */
+	public function testReplacedEInvoiceIsClosed()
+	{
+		global $conf, $user, $langs, $db;
+		$conf = $this->savconf;
+		$user = $this->savuser;
+		$langs = $this->savlangs;
+		$db = $this->savdb;
+
+		$source = $this->createSpecimenSupplierInvoice();
+		$this->addEInvoicingDocument($source->id);
+		$this->assertGreaterThan(0, $source->validate($user), $source->errorsToString());
+
+		$replacement = $this->createReplacementFor($source->id);
+
+		$this->assertEquals(1, SupplierInvoiceHelper::closeReplacedSupplierInvoice($replacement, $user));
+
+		$source->fetch($source->id);
+		$this->assertEquals(FactureFournisseur::STATUS_ABANDONED, $source->status);
+		$this->assertEquals(FactureFournisseur::CLOSECODE_REPLACED, $source->close_code);
+	}
+
+	/**
+	 * A replacement recorded between two ordinary supplier invoices is none of this module's
+	 * business and is left exactly as the core leaves it.
+	 *
+	 * @return void
+	 */
+	public function testReplacedPlainSupplierInvoiceIsLeftAlone()
+	{
+		global $conf, $user, $langs, $db;
+		$conf = $this->savconf;
+		$user = $this->savuser;
+		$langs = $this->savlangs;
+		$db = $this->savdb;
+
+		$source = $this->createSpecimenSupplierInvoice();
+		$this->assertGreaterThan(0, $source->validate($user), $source->errorsToString());
+
+		$replacement = $this->createReplacementFor($source->id);
+
+		$this->assertEquals(0, SupplierInvoiceHelper::closeReplacedSupplierInvoice($replacement, $user));
+
+		$source->fetch($source->id);
+		$this->assertEquals(FactureFournisseur::STATUS_VALIDATED, $source->status);
+	}
+
+	/**
+	 * An invoice that has been paid is never closed: abandoning it would contradict the payment
+	 * already recorded against it.
+	 *
+	 * @return void
+	 */
+	public function testReplacedPaidInvoiceIsLeftAlone()
+	{
+		global $conf, $user, $langs, $db;
+		$conf = $this->savconf;
+		$user = $this->savuser;
+		$langs = $this->savlangs;
+		$db = $this->savdb;
+
+		$source = $this->createSpecimenSupplierInvoice();
+		$this->addEInvoicingDocument($source->id);
+		$this->assertGreaterThan(0, $source->validate($user), $source->errorsToString());
+		$this->assertGreaterThan(0, $source->setPaid($user), $source->errorsToString());
+
+		$replacement = $this->createReplacementFor($source->id);
+
+		$this->assertEquals(0, SupplierInvoiceHelper::closeReplacedSupplierInvoice($replacement, $user));
+
+		$source->fetch($source->id);
+		$this->assertNotEquals(FactureFournisseur::STATUS_ABANDONED, $source->status);
+	}
+
+	/**
+	 * A draft cannot be paid nor transferred to accountancy, so it is left as it is rather than
+	 * being validated only to be cancelled.
+	 *
+	 * @return void
+	 */
+	public function testReplacedDraftInvoiceIsLeftAlone()
+	{
+		global $conf, $user, $langs, $db;
+		$conf = $this->savconf;
+		$user = $this->savuser;
+		$langs = $this->savlangs;
+		$db = $this->savdb;
+
+		$source = $this->createSpecimenSupplierInvoice();
+		$this->addEInvoicingDocument($source->id);
+
+		$replacement = $this->createReplacementFor($source->id);
+
+		$this->assertEquals(0, SupplierInvoiceHelper::closeReplacedSupplierInvoice($replacement, $user));
+
+		$source->fetch($source->id);
+		$this->assertEquals(FactureFournisseur::STATUS_DRAFT, $source->status);
+	}
+
+	/**
+	 * An invoice that is not a replacement, or one with no source recorded, has nothing to close.
+	 *
+	 * @return void
+	 */
+	public function testNonReplacementInvoiceClosesNothing()
+	{
+		global $conf, $user, $langs, $db;
+		$conf = $this->savconf;
+		$user = $this->savuser;
+		$langs = $this->savlangs;
+		$db = $this->savdb;
+
+		$source = $this->createSpecimenSupplierInvoice();
+		$this->addEInvoicingDocument($source->id);
+		$this->assertGreaterThan(0, $source->validate($user), $source->errorsToString());
+
+		// Standard type, even though it does carry a source.
+		$standard = $this->createSpecimenSupplierInvoice();
+		$standard->fk_facture_source = $source->id;
+		$this->assertEquals(0, SupplierInvoiceHelper::closeReplacedSupplierInvoice($standard, $user));
+
+		// Replacement type, but no source recorded.
+		$orphan = $this->createSpecimenSupplierInvoice();
+		$orphan->type = FactureFournisseur::TYPE_REPLACEMENT;
+		$this->assertEquals(0, SupplierInvoiceHelper::closeReplacedSupplierInvoice($orphan, $user));
+
+		$source->fetch($source->id);
+		$this->assertEquals(FactureFournisseur::STATUS_VALIDATED, $source->status);
+	}
+
+	/**
+	 * Closing the same replaced invoice a second time changes nothing.
+	 *
+	 * @return void
+	 */
+	public function testCloseReplacedIsIdempotent()
+	{
+		global $conf, $user, $langs, $db;
+		$conf = $this->savconf;
+		$user = $this->savuser;
+		$langs = $this->savlangs;
+		$db = $this->savdb;
+
+		$source = $this->createSpecimenSupplierInvoice();
+		$this->addEInvoicingDocument($source->id);
+		$this->assertGreaterThan(0, $source->validate($user), $source->errorsToString());
+
+		$replacement = $this->createReplacementFor($source->id);
+
+		$this->assertEquals(1, SupplierInvoiceHelper::closeReplacedSupplierInvoice($replacement, $user));
+		$this->assertEquals(0, SupplierInvoiceHelper::closeReplacedSupplierInvoice($replacement, $user));
+
+		$source->fetch($source->id);
+		$this->assertEquals(FactureFournisseur::STATUS_ABANDONED, $source->status);
+		$this->assertEquals(FactureFournisseur::CLOSECODE_REPLACED, $source->close_code);
+	}
+
+	/**
 	 * A 'Pending' validation status is not a confirmation: it must never trigger the abandon.
 	 *
 	 * @return void

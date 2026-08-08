@@ -290,6 +290,15 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 					return -1;
 				}
 			}
+
+			// A validated replacement invoice supersedes the one it replaces, which must not stay open
+			// for payment. The core does exactly that on the customer side and nothing on the supplier
+			// side, so a replaced supplier invoice used to keep every action of an ordinary one
+			// (issue #549). Never escalated to $this->errors: a failure here must not undo a validation
+			// the operator asked for, and the log carries the reason.
+			if (SupplierInvoiceHelper::closeReplacedSupplierInvoice($object, $user) > 0) {
+				setEventMessage($langs->trans("ModuleEInvoicingName") . ' : ' . $langs->trans('EInvoiceReplacedSupplierInvoiceClosed', $object->ref), 'mesgs');
+			}
 		}
 
 		// fr:211 (Paiement transmis) is what we, as the buyer, tell the vendor once we have paid one of
