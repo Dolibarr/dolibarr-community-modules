@@ -303,6 +303,28 @@ if ($refDocTypeCode !== '' && !empty($object->fk_facture_source)) {
 	}
 }
 
+// Situation invoice: BT-25/BT-26 — reference to the immediately preceding situation invoice.
+// XP Z12-012 requires each situation invoice (counter > 1) to carry the reference of the previous
+// one in the same cycle so the receiver can reconstruct the chain and verify the cumulated amounts.
+// The first situation (counter = 1) has no predecessor and no BG-3 block.
+if ($object->type == $object::TYPE_SITUATION && !empty($object->situation_counter) && $object->situation_counter > 1 && !empty($object->situation_cycle_ref)) {
+	$object->fetchPreviousNextSituationInvoice();
+	if (!empty($object->tab_previous_situation_invoice)) {
+		// tab_previous_situation_invoice is ordered ASC by situation_counter: last element is the immediate predecessor
+		$prevSituation = end($object->tab_previous_situation_invoice);
+		reset($object->tab_previous_situation_invoice);
+		if ($prevSituation && !empty($prevSituation->ref)) {
+			$prevSituationDate = new DateTime(dol_print_date($prevSituation->date, 'dayrfc'));
+			$invoiceRefDocs[] = [
+				'ref'  => $prevSituation->ref,
+				'date' => $prevSituationDate,
+				'type' => '380'		// Situation invoices are transmitted as standard invoices (380)
+			];
+			dol_syslog(get_class($this) . '::generateXML Set preceding situation invoice reference ' . $prevSituation->ref . ' for situation invoice ' . $object->ref);
+		}
+	}
+}
+
 // Collect lines into $linesData array
 $linesData         	= [];
 $taxBreakdown		= [];
