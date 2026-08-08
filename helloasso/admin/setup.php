@@ -1,6 +1,7 @@
 <?php
 /* Copyright (C) 2024 Laurent Destailleur  <eldy@users.sourceforge.net>
  * Copyright (C) 2025 	   Pablo Lagrave           <contact@devlandes.com>
+ * Copyright (C) 2026		MDW						<mdeweerd@users.noreply.github.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -31,7 +32,10 @@ if (!$res && !empty($_SERVER["CONTEXT_DOCUMENT_ROOT"])) {
 	$res = @include $_SERVER["CONTEXT_DOCUMENT_ROOT"]."/main.inc.php";
 }
 // Try main.inc.php into web root detected using web root calculated from SCRIPT_FILENAME
-$tmp = empty($_SERVER['SCRIPT_FILENAME']) ? '' : $_SERVER['SCRIPT_FILENAME']; $tmp2 = realpath(__FILE__); $i = strlen($tmp) - 1; $j = strlen($tmp2) - 1;
+$tmp = empty($_SERVER['SCRIPT_FILENAME']) ? '' : $_SERVER['SCRIPT_FILENAME'];
+$tmp2 = realpath(__FILE__);
+$i = strlen($tmp) - 1;
+$j = strlen($tmp2) - 1;
 while ($i > 0 && $j > 0 && isset($tmp[$i]) && isset($tmp2[$j]) && $tmp[$i] == $tmp2[$j]) {
 	$i--;
 	$j--;
@@ -245,7 +249,7 @@ if ($action == 'updateMask') {
 } elseif ($action == 'testconnect') {
 	$res = helloassoDoConnection();	// Name of association is not used here, only client_id and client_secret.
 	if ($res <= 0) {
-		setEventMessages("", $langs->trans("ErrorBadClientIdOrSecret"), 'errors');
+		setEventMessages("", array($langs->trans("ErrorBadClientIdOrSecret")), 'errors');
 	} else {
 		include_once DOL_DOCUMENT_ROOT.'/core/lib/geturl.lib.php';
 
@@ -268,7 +272,7 @@ if ($action == 'updateMask') {
 		$url = "https://".urlencode($helloassourl)."/v5/organizations/".urlencode($assoslug);
 		$ret2 = getURLContent($url, 'GET', '', 1, $headers);
 		if ($ret2["http_code"] == 200) {
-			setEventMessages("", $langs->trans("SuccessfullyConnected"));
+			setEventMessages("", array($langs->trans("SuccessfullyConnected")));
 		} else {
 			$errors = array();
 			$arrayofmessage = array();
@@ -296,9 +300,9 @@ if ($action == 'updateMask') {
 } elseif ($action == 'deletetoken') {
 	$res = helloassoDeleteToken();
 	if ($res <= 0) {
-		setEventMessages("", $langs->trans("ErrorBadClientIdOrSecret"), 'errors');
+		setEventMessages("", array($langs->trans("ErrorBadClientIdOrSecret")), 'errors');
 	} else {
-		setEventMessages("", $langs->trans("TokenDeleted"));
+		setEventMessages("", array($langs->trans("TokenDeleted")));
 	}
 }
 
@@ -351,7 +355,7 @@ if ($action == 'edit') {
 $moduledir = 'helloasso';
 $myTmpObjects = array();
 // TODO Scan list of objects
-$myTmpObjects['myobject'] = array('label'=>'MyObject', 'includerefgeneration'=>0, 'includedocgeneration'=>0, 'class'=>'MyObject');
+$myTmpObjects['myobject'] = array('label' => 'MyObject', 'includerefgeneration' => 0, 'includedocgeneration' => 0, 'class' => 'MyObject');
 
 
 foreach ($myTmpObjects as $myTmpObjectKey => $myTmpObjectArray) {

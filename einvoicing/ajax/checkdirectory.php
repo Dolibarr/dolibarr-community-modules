@@ -122,6 +122,12 @@ function einvoicing_directory_html($r, $siren)
 			if (!empty($r['platform'])) {
 				$details[] = $langs->trans("EInvoicingDirectoryPlatformType").': '.dol_escape_htmltag($r['platform']);
 			}
+			// Where the status was read, when it did not come from the standardized directory answer:
+			// the annuaire consulted by hand then shows no status for that line, and the difference
+			// must be explainable without reading the code.
+			if (!empty($r['message'])) {
+				$details[] = dol_escape_htmltag($langs->trans($r['message']));
+			}
 			if (!empty($details)) {
 				$txt .= ' <span class="opacitymedium small">('.implode(' - ', $details).')</span>';
 			}
@@ -139,8 +145,15 @@ function einvoicing_directory_html($r, $siren)
 			} else {
 				$txt = $langs->trans("EInvoicingDirectoryInactive", $siren);
 			}
+			$details = array();
 			if (!empty($r['linestatus'])) {
-				$txt .= ' <span class="opacitymedium small">('.$langs->trans("EInvoicingDirectoryLineStatus").': '.dol_escape_htmltag($r['linestatus']).')</span>';
+				$details[] = $langs->trans("EInvoicingDirectoryLineStatus").': '.dol_escape_htmltag($r['linestatus']);
+			}
+			if (!empty($r['message'])) {
+				$details[] = dol_escape_htmltag($langs->trans($r['message']));
+			}
+			if (!empty($details)) {
+				$txt .= ' <span class="opacitymedium small">('.implode(' - ', $details).')</span>';
 			}
 			return img_picto('', 'warning', 'class="paddingright"').$txt;
 		case 'undetermined':

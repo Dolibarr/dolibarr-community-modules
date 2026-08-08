@@ -254,6 +254,30 @@ class FakeLegacySuperPDPProvider extends SuperPDPProvider
 
 
 /**
+ * Provider double for the SuperPDP tie-breaker: the AFNOR directory base is configured, so
+ * checkRecipientDirectory() runs the standardized lookup first and only then, when that answer holds
+ * no line status, the specific french_directory endpoint. Both answers come from the same canned
+ * queue, in that order.
+ */
+class FakeDirectorySuperPDPProvider extends FakeLegacySuperPDPProvider
+{
+	/**
+	 * Constructor
+	 *
+	 * @param DoliDB $db Database handler
+	 */
+	public function __construct($db)
+	{
+		parent::__construct($db);
+
+		// Both keys set: getApiUrl('afnor_directory') then answers whatever EINVOICING_LIVE is.
+		$this->config['test_afnor_directory_url'] = 'https://example.invalid/afnor-directory/';
+		$this->config['prod_afnor_directory_url'] = 'https://example.invalid/afnor-directory/';
+	}
+}
+
+
+/**
  * Class for PHPUnit tests
  *
  * @backupGlobals disabled
@@ -615,5 +639,159 @@ class RecipientDirectoryTest extends CommonClassTest
 
 		$this->assertSame('absent', $result['status']);
 		$this->assertSame(0, $result['reachable']);
+	}
+
+	/**
+	 * Build a SuperPDP double that answers the standardized search with the given lines, then the
+	 * specific french_directory lookup with the given entries.
+	 *
+	 * @param	array<int,array<string,mixed>>	$lines		Directory lines returned by the standardized search
+	 * @param	?array<int,array<string,mixed>>	$entries	Entries returned by french_directory/entries, null for a failing call
+	 * @return	FakeDirectorySuperPDPProvider
+	 */
+	private function superPdpReturningLinesThenEntries($lines, $entries)
+	{
+		global $db;
+
+		$provider = new FakeDirectorySuperPDPProvider($db);
+		$provider->cannedResponses = array(
+			array('status_code' => 200, 'response' => array('results' => $lines, 'totalNumberOfResults' => count($lines))),
+			$entries === null ? array('status_code' => 500, 'response' => '') : array('status_code' => 200, 'response' => array('data' => $entries)),
+		);
+
+		return $provider;
+	}
+
+	/**
+	 * The standardized answer of this platform drops the line status on some lines, and the status
+	 * cannot be requested. Its own directory endpoint does report it: a line it does not flag as
+	 * receiving makes the recipient not reachable, instead of leaving a shrug on the invoice card.
+	 *
+	 * @return void
+	 */
+	public function testLineWithoutStatusIsSettledInactiveByTheSpecificDirectory()
+	{
+		$provider = $this->superPdpReturningLinesThenEntries(
+			array(array('addressingIdentifier' => '824369342', 'platformType' => 'WK', 'siren' => '824369342')),
+			array(array('identifier' => '824369342', 'is_active' => false))
+		);
+
+		$result = $provider->checkRecipientDirectory('824369342');
+
+		$this->assertSame('inactive', $result['status']);
+		$this->assertSame(0, $result['reachable']);
+		// The verdict comes from the specific endpoint, not from the standardized answer: said so on
+		// screen, or the annuaire consulted by hand (no status at all) looks like it contradicts it.
+		$this->assertSame('EInvoicingDirectoryStatusFromPlatform', $result['message']);
+		$this->assertSame(
+			array('afnor-directory/v1/directory-line/search', 'french_directory/entries?number=824369342'),
+			$provider->calledResources
+		);
+	}
+
+	/**
+	 * Same lookup, on a recipient the specific endpoint does flag as receiving: the standardized answer
+	 * was simply incomplete, the recipient is reachable and the address it reports is handed back.
+	 *
+	 * @return void
+	 */
+	public function testLineWithoutStatusIsSettledRoutableByTheSpecificDirectory()
+	{
+		$provider = $this->superPdpReturningLinesThenEntries(
+			array(array('addressingIdentifier' => '892304189', 'platformType' => 'WK', 'siren' => '892304189')),
+			array(array('identifier' => '892304189', 'is_active' => true))
+		);
+
+		$result = $provider->checkRecipientDirectory('892304189');
+
+		$this->assertSame('routable', $result['status']);
+		$this->assertSame(1, $result['reachable']);
+		$this->assertSame('892304189', $result['identifier']);
+		$this->assertSame('EInvoicingDirectoryStatusFromPlatform', $result['message']);
+	}
+
+	/**
+	 * The tie-breaker only settles an answer that reported no status: a status the standardized
+	 * directory did give is never overridden, which is what kept the original wrong positive from
+	 * coming back through the other end.
+	 *
+	 * @return void
+	 */
+	public function testExplicitStandardizedStatusIsNotOverriddenBySpecificDirectory()
+	{
+		$provider = $this->superPdpReturningLinesThenEntries(
+			array(array('addressingIdentifier' => '824369342_82436934200020', 'directoryLineStatus' => 'Upcoming', 'platformType' => 'WK', 'siren' => '824369342')),
+			array(array('identifier' => '824369342_82436934200020', 'is_active' => true))
+		);
+
+		$result = $provider->checkRecipientDirectory('824369342');
+
+		$this->assertSame('inactive', $result['status']);
+		$this->assertSame('Upcoming', $result['linestatus']);
+		$this->assertSame('', $result['message']);
+		// The specific endpoint is not even called: the standardized answer already concluded.
+		$this->assertSame(array('afnor-directory/v1/directory-line/search'), $provider->calledResources);
+	}
+
+	/**
+	 * A failing tie-breaker settles nothing: the answer stays non-conclusive (the caller keeps failing
+	 * open) rather than turning a platform outage into a verdict.
+	 *
+	 * @return void
+	 */
+	public function testUndeterminedStaysWhenTheSpecificDirectoryFails()
+	{
+		$provider = $this->superPdpReturningLinesThenEntries(
+			array(array('addressingIdentifier' => '824369342', 'siren' => '824369342')),
+			null
+		);
+
+		$result = $provider->checkRecipientDirectory('824369342');
+
+		$this->assertSame('undetermined', $result['status']);
+		$this->assertSame(-1, $result['reachable']);
+		$this->assertSame('EInvoicingDirectoryNoLineStatus', $result['message']);
+	}
+
+	/**
+	 * Same when the specific endpoint knows no entry for that SIREN while the standardized annuaire
+	 * holds lines for it: the two answers disagree on the recipient even existing, so the tie-breaker
+	 * has nothing to settle and must not conclude 'absent'.
+	 *
+	 * @return void
+	 */
+	public function testUndeterminedStaysWhenTheSpecificDirectoryKnowsNothing()
+	{
+		$provider = $this->superPdpReturningLinesThenEntries(
+			array(array('addressingIdentifier' => '824369342', 'siren' => '824369342')),
+			array()
+		);
+
+		$result = $provider->checkRecipientDirectory('824369342');
+
+		$this->assertSame('undetermined', $result['status']);
+		$this->assertSame(-1, $result['reachable']);
+		$this->assertSame(1, $result['entries']);
+	}
+
+	/**
+	 * When the tie-breaker does date the entry and that date is still ahead, the recipient cannot
+	 * receive yet and the date is reported with the verdict.
+	 *
+	 * @return void
+	 */
+	public function testSettledInactiveCarriesTheEffectiveDateWhenTheSpecificDirectoryHasOne()
+	{
+		$provider = $this->superPdpReturningLinesThenEntries(
+			array(array('addressingIdentifier' => '824369342', 'siren' => '824369342')),
+			array(array('identifier' => '824369342', 'is_active' => true, 'start_date' => '07-08-2216'))
+		);
+
+		$result = $provider->checkRecipientDirectory('824369342');
+
+		$this->assertSame('inactive', $result['status']);
+		$this->assertSame(0, $result['reachable']);
+		$this->assertSame('Upcoming', $result['linestatus']);
+		$this->assertGreaterThan(dol_now(), $result['effectivedate']);
 	}
 }

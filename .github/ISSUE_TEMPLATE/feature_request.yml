@@ -16,6 +16,20 @@ body:
     validations:
       required: true
 
+  - type: dropdown
+    id: module
+    attributes:
+      label: Module
+      description: Concerned module
+      multiple: false
+      options:
+        - --Please select a module--
+        - einvoicing
+        - helloasso
+        - other
+    validations:
+      required: true
+
   - type: textarea
     id: use-case
     attributes:

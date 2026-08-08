@@ -888,7 +888,10 @@ class FacturXProtocol extends CIIProtocol
 		$outputlangs = $langs;		// TODO Use the target language
 		$outputlangs->load("einvoicing@einvoicing");
 
-		require __DIR__ . "/ExampleHelpers.php";
+		// require_once, not require: this file declares plain functions, so loading it a second time
+		// in the same PHP request is a fatal redeclare - which is what happens as soon as two samples
+		// are generated in one request, and a fatal error is not something the caller can catch.
+		require_once __DIR__ . "/ExampleHelpers.php";
 
 		$existingPdfFilename = __DIR__ . "/../../doc/00_ZugferdDocumentPdfBuilder_PrintLayout.pdf";
 		$newPdfFilename = $conf->einvoicing->dir_temp . "/INVTEST-".dol_print_date(dol_now(), '%y%m%d-%H%M%S').".pdf";

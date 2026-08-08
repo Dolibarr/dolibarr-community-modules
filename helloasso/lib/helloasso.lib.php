@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2024      Lucas Marcouiller    <lmarcouiller@dolicloud.com>
+ * Copyright (C) 2026		MDW						<mdeweerd@users.noreply.github.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -336,7 +337,7 @@ function helloassoGetDataFromObjects($source, $ref, $mode = 'amount', &$payerarr
 				} elseif ($mode == 'payer' && !is_null($payerarray)) {
 					$payerarray['firstName'] = $member->firstname;
 					$payerarray['lastName'] = $member->lastname;
-					$payerarray['companyName'] = $member->societe;
+					$payerarray['companyName'] = $member->company;
 					$payerarray['email'] = $member->email;
 					$payerarray['dateOfBirth'] = dol_print_date($member->birth, 'dayrfc');
 				}

@@ -301659,7 +301659,7 @@ namespace {
          * Note: Calling dol_htmloutput_events is done into pages by standard llxFooter() function.
          *
          * @param	string|string[]	$mesgs	Message string or array
-         * @param	string			$style	Which style to use ('mesgs' by default, 'warnings', 'errors')
+         * @param	''|'mesgs'|'warnings'|'errors'	$style	Which style to use ('mesgs' by default, 'warnings', 'errors')
          * @return	void
          */
         public function setEventMessage($mesgs, $style = 'mesgs')
@@ -301670,8 +301670,8 @@ namespace {
          * Note: Calling dol_htmloutput_events is done into pages by standard llxFooter() function.
          *
          * @param	string		$mesg	Message string
-         * @param	array|null	$mesgs	Message array
-         * @param	string		$style	Which style to use ('mesgs' by default, 'warnings', 'errors')
+         * @param	string[]|null	$mesgs	Message array
+         * @param	''|'mesgs'|'warnings'|'errors'	$style	Which style to use ('mesgs' by default, 'warnings', 'errors')
          * @return	void
          */
         public function setEventMessages($mesg, $mesgs, $style = 'mesgs')
@@ -321467,7 +321467,7 @@ namespace {
      *  Note: Prefer to use setEventMessages instead.
      *
      *	@param	string|string[] $mesgs			Message string or array
-     *  @param  string          $style      	Which style to use ('mesgs' by default, 'warnings', 'errors')
+     *  @param  ''|'mesgs'|'warnings'|'errors'	$style 	Which style to use ('mesgs' by default, 'warnings', 'errors')
      *  @param	int				$noduplicate	1 means we do not add the message if already present in session stack
      *  @param	int				$attop			Add the message in the top of the stack (at bottom by default)
      *  @return	void
@@ -321482,7 +321482,7 @@ namespace {
      *
      *	@param	string|null		$mesg			Message string
      *	@param	string[]|null	$mesgs			Message array
-     *  @param  string			$style     		Which style to use ('mesgs' by default, 'warnings', 'errors')
+     *  @param  ''|'mesgs'|'warnings'|'errors'	$style  Which style to use ('mesgs' by default, 'warnings', 'errors')
      *  @param	string			$messagekey		A key to be used to allow the feature "Never show this message during this session again"
      *  @param	int				$noduplicate	1 means we do not add the message if already present in session stack
      *  @param	int				$attop			Add the message in the top of the stack (at bottom by default)
