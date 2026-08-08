@@ -125,6 +125,8 @@ class AllTests
 		$suite->addTestSuite('TransmittedLockTest');
 		require_once dirname(__FILE__).'/VatPointDateCodeTest.php';
 		$suite->addTestSuite('VatPointDateCodeTest');
+		require_once dirname(__FILE__).'/SellerVatRegimeTest.php';
+		$suite->addTestSuite('SellerVatRegimeTest');
 
 		return $suite;
 	}

@@ -343,7 +343,14 @@ class FacturXProtocol extends CIIProtocol
 
 				// ---------------- Seller ----------------
 				->setDocumentSeller($invoiceData['sellername'], $invoiceData['sellerids'])
-				->addDocumentSellerTaxRegistration("VA", $invoiceData['sellervatnumber'])
+				// BT-31 or BT-32, whichever the VAT regime of the seller calls for: a seller that charges
+				// no VAT declares its SIREN under the scheme FC where one that does declares its VAT
+				// number under VA. Writing VA unconditionally left a "Non assujetti a la TVA" company
+				// with no tax registration at all and every exempt line tripped BR-E-02 (issue #560).
+				->addDocumentSellerTaxRegistration(
+					$invoiceData['sellerTaxRegistations'][0]['type'] ?? 'VA',
+					$invoiceData['sellerTaxRegistations'][0]['value'] ?? $invoiceData['sellervatnumber']
+				)
 				->setDocumentSellerLegalOrganisation(
 					$invoiceData['sellerLegalOrgId'],
 					$invoiceData['sellerLegalOrgScheme'],

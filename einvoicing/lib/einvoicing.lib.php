@@ -777,3 +777,76 @@ function einvoicingVatDueOnCollection($hasProductLine, $hasServiceLine)
 
 	return (($sellServiceOnPayment && $hasServiceLine) || ($sellProductOnPayment && $hasProductLine));
 }
+
+/**
+ * VAT regime of the seller, as far as the identifier it declares on its invoices is concerned.
+ *
+ * EN 16931 lets a seller identify itself for tax purposes in two ways, and a document carries the one
+ * that matches its regime:
+ *
+ *   BT-31  Seller VAT identifier            ram:SpecifiedTaxRegistration/ram:ID[@schemeID='VA']
+ *   BT-32  Seller tax registration identif. ram:SpecifiedTaxRegistration/ram:ID[@schemeID='FC']
+ *
+ * A seller that charges VAT declares BT-31. A seller that does not - franchise en base de TVA of the
+ * micro-entrepreneur, and more generally the "Non assujetti a la TVA" setup of Dolibarr - has no VAT
+ * identifier to declare, and BT-32 is what the standard leaves it: in France, its SIREN. Without one
+ * or the other, every exempt line of the document trips BR-E-02 and the platform refuses it, which is
+ * the whole of issue #560.
+ *
+ * The regime is not a setting of this module either: Dolibarr already holds it in the setup of the
+ * company (Home - Setup - Company/Organization, the "VAT is used / is not used" radio, which
+ * admin/company.php writes into FACTURE_TVAOPTION as 1 or 0). Nothing is re-derived from that constant
+ * here: Societe::setMysoc() already turns it into ->tva_assuj, and getCategoryRate() already decides
+ * from that same ->tva_assuj whether a line is exempt. Reading the property the core computed is what
+ * keeps the two from ever disagreeing - a document declaring an exempt line while claiming a VAT
+ * registration, or the reverse.
+ *
+ * EINVOICING_SELLER_VAT_REGIME overrides it for a seller whose regime that setup does not express, the
+ * same way EINVOICING_VAT_POINT_DATE_CODE overrides the VAT mode for BT-8. Declaring 'franchise' is
+ * declaring that the invoices carry no VAT identifier; declaring 'standard' is declaring they do.
+ *
+ * @param	Societe		$seller		Selling company, normally $mysoc
+ * @return	string					'standard' (the seller charges VAT, BT-31) or 'franchise' (it does not, BT-32)
+ */
+function einvoicingSellerVatRegime($seller)
+{
+	$forced = getDolGlobalString('EINVOICING_SELLER_VAT_REGIME');
+	if (in_array($forced, array('standard', 'franchise'), true)) {
+		return $forced;
+	}
+
+	// 'auto'. The reading of tva_assuj is the one the core makes of it in get_default_tva(): for
+	// $mysoc it is always the int of FACTURE_TVAOPTION, but the column of a thirdparty also holds the
+	// literal forms, and there is no reason for this to answer differently from the core.
+	$assuj = $seller->tva_assuj;
+	$subjectToVat = !((is_numeric($assuj) && !$assuj) || (!is_numeric($assuj) && $assuj == 'franchise'));
+
+	return $subjectToVat ? 'standard' : 'franchise';
+}
+
+/**
+ * Tax registrations (BT-31 / BT-32) the seller declares, in the shape the two writers consume.
+ *
+ * One entry, because the two identifiers answer the same question and a document that carried both
+ * would be claiming a VAT registration it does not use. Which one is decided by the regime rather
+ * than by "is a VAT number recorded": a seller subject to VAT that simply left the field empty must
+ * keep getting the explicit BADVATNUMBER message that names what to fill in, not a silent fallback on
+ * its SIREN (issue #560).
+ *
+ * @param	Societe		$seller		Selling company, normally $mysoc
+ * @return	array<array{type:string,value:string}>	Registrations to write, possibly empty
+ */
+function einvoicingSellerTaxRegistrations($seller)
+{
+	if (einvoicingSellerVatRegime($seller) === 'franchise') {
+		// BT-32. In France the tax registration identifier of a company with no VAT number is its
+		// SIREN, which idprof1 holds; it is already what BT-30 carries under the scheme 0002.
+		$taxId = trim((string) ($seller->idprof1 ?? ''));
+
+		return $taxId !== '' ? array(array('type' => 'FC', 'value' => $taxId)) : array();
+	}
+
+	$vatNumber = trim((string) ($seller->tva_intra ?? ''));
+
+	return $vatNumber !== '' ? array(array('type' => 'VA', 'value' => $vatNumber)) : array();
+}

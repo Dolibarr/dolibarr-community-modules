@@ -2534,12 +2534,32 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		// VAT
-		if (!$minimal && !empty($data[$prefix . 'vatnumber'])) {
-			$tax = $doc->createElement('ram:SpecifiedTaxRegistration');
-			$id = $doc->createElement('ram:ID', $data[$prefix . 'vatnumber']);
-			$id->setAttribute('schemeID', 'VA');
-			$tax->appendChild($id);
-			$node->appendChild($tax);
+		// The party declares the tax registrations built for it, which is how a seller that charges no
+		// VAT declares its SIREN as BT-32 (schemeID FC) where a seller that does declares its VAT number
+		// as BT-31 (schemeID VA). Writing only the latter left the party of a "Non assujetti a la TVA"
+		// company with no tax registration at all, and every exempt line then tripped BR-E-02 (issue
+		// #560). Parties built without that list - the buyer, which has no BT-32 in EN 16931 - keep
+		// being written from their VAT number alone.
+		if (!$minimal) {
+			$registrations = array();
+			if (!empty($data[$prefix . 'TaxRegistations']) && is_array($data[$prefix . 'TaxRegistations'])) {
+				foreach ($data[$prefix . 'TaxRegistations'] as $registration) {
+					if (is_array($registration) && !empty($registration['type']) && !empty($registration['value'])) {
+						$registrations[] = $registration;
+					}
+				}
+			}
+			if (empty($registrations) && !empty($data[$prefix . 'vatnumber'])) {
+				$registrations[] = array('type' => 'VA', 'value' => $data[$prefix . 'vatnumber']);
+			}
+
+			foreach ($registrations as $registration) {
+				$tax = $doc->createElement('ram:SpecifiedTaxRegistration');
+				$id = $doc->createElement('ram:ID', $registration['value']);
+				$id->setAttribute('schemeID', $registration['type']);
+				$tax->appendChild($id);
+				$node->appendChild($tax);
+			}
 		}
 	}
 

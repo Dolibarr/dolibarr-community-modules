@@ -24,6 +24,19 @@ the file that needs them, instead of being looked up through dol_buildpath(). A 
 resolve - a deployment that does not sit where the module expects, which is what a container install
 can produce - only wrote a line in the log and returned false, so the polyfill was silently absent and
 the next call to it was a fatal "Call to undefined function isValidSiren" (issue #565).
+FIX: A seller that charges no VAT now identifies itself on the documents it generates. A company set
+as "Non assujetti a la TVA" has no VAT number, and the writer only ever emitted one, so the seller
+carried no tax registration at all: every exempt line then broke BR-E-02, which wants the seller VAT
+identifier (BT-31), the seller tax registration identifier (BT-32) or the tax representative one, and
+the platform refused the invoice. Recording an exemption reason code did not help, that one answers
+BR-E-10. The seller now declares whichever identifier its VAT regime calls for - its VAT number under
+the scheme VA, or its SIREN under the scheme FC (BT-32) when it charges no VAT - and the regime
+follows the sales tax type of the company setup, the same setting the VAT category of each line is
+already derived from. The new setup option states it explicitly for a seller that setting cannot
+describe. A seller subject to VAT that simply left the field empty keeps getting the message naming
+what to fill in, rather than a silent fallback on its SIREN, and an exportation or an intracommunity
+supply now stops with an explicit message when no VAT number is recorded: BR-G-02 and BR-IC-02 accept
+the VAT identifier alone, so nothing can stand in for it there (issue #560).
 
 FIX: Generating two Factur-X sample invoices in the same request no longer ends on a PHP fatal error.
 The generator loaded its helper file with require rather than require_once, so the second call
