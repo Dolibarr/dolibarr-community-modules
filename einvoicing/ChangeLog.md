@@ -2,6 +2,20 @@
 
 ## 1.0.4
 
+FIX: Below Dolibarr 24, a Factur-X invoice was produced as a plain PDF with the XML attached to it,
+without the document level /AF entry nor the PDF/A-3 output intent a Factur-X reader looks for, and
+with the XML embedded twice. Nothing said so, and the file was refused further down the line: the
+public validator answers "the file does not contain one and only one factur-x.xml". The cause was a
+class name collision - the core declares its own FPDF below v24, which the writer of
+horstoeko/zugferd cannot then inherit from - and the fallback silently degraded the output instead.
+Such a file is now built with TCPDF, which the collision does not concern and which supports PDF/A-3
+natively, so every supported Dolibarr version produces the same structure. The produced file is also
+checked before being handed over, so an incomplete one is reported instead of being sent, a carrier
+PDF that cannot be read aborts the generation with an explicit message rather than dying on a parser
+error, and Factur-X no longer announces itself as needing Dolibarr 24. The sample invoice of the
+setup page was hit by the same collision, from a page that had already rendered a PDF: it died on a
+PHP fatal error, which no error handling can catch, and the setup page came back blank (issue #554).
+
 FIX: Generating two Factur-X sample invoices in the same request no longer ends on a PHP fatal error.
 The generator loaded its helper file with require rather than require_once, so the second call
 redeclared its functions - and a fatal error is not something the calling code can catch and report.
