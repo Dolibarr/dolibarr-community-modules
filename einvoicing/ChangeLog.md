@@ -2,6 +2,10 @@
 
 ## 1.0.4
 
+FIX: Generating two Factur-X sample invoices in the same request no longer ends on a PHP fatal error.
+The generator loaded its helper file with require rather than require_once, so the second call
+redeclared its functions - and a fatal error is not something the calling code can catch and report.
+
 FIX: Validating a replacement supplier invoice now closes the invoice it replaces, with the close
 code the core reserves for that, instead of leaving it validated and open for payment with nothing
 saying it had been superseded. Dolibarr does it on the customer side and not on the supplier one, so
