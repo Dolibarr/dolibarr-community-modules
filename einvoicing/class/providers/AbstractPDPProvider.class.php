@@ -472,8 +472,12 @@ abstract class AbstractPDPProvider
 		// Build service name depending on environment
 		$serviceName = $this->config['dol_prefix'] . '_' . ($this->config['live'] ? 'PROD' : 'TEST');
 
-		// For backward compatibility with Dolibarr versions < 23.0.0
-		if (version_compare(DOL_VERSION, '23.0.0-alpha', '<')) {
+		// For backward compatibility with Dolibarr versions < 23.0.0.
+		// The bound is '23.0.0' and not '23.0.0-alpha': version_compare() orders a pre-release below
+		// its release, so the two readers below - which compare against '23.0.0' - take the constants
+		// branch on a 23.0.0-alpha or -beta while this writer would take the table one, and the token
+		// just written would never be found again.
+		if (version_compare(DOL_VERSION, '23.0.0', '<')) {
 			dolibarr_set_const($db, $serviceName.'_TOKEN', $accessToken, 'chaine', 0, '', $conf->entity);
 
 			if ($refreshToken !== null) {

@@ -2,6 +2,13 @@
 
 ## 1.0.4
 
+FIX: On a Dolibarr 23 pre-release, the access token obtained from the Access point was stored in one
+place and looked for in another, so every call re-authenticated and the stored row was never cleaned.
+The three sites that pick between the llx_oauth_token columns added in 23 and the constants used
+before did not use the same bound: the writer compared against '23.0.0-alpha' and the reader and the
+delete against '23.0.0', and version_compare() orders a pre-release below its release. All three
+compare against '23.0.0' now. Released versions were never affected.
+
 FIX: Generating two Factur-X sample invoices in the same request no longer ends on a PHP fatal error.
 The generator loaded its helper file with require rather than require_once, so the second call
 redeclared its functions - and a fatal error is not something the calling code can catch and report.
