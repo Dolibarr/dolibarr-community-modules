@@ -489,11 +489,16 @@ class FacturXProtocol extends CIIProtocol
 					$facturxpdf->addDocumentPositionGrossPriceAllowanceCharge(abs($lineData['grosspriceamount']) * $lineData['billedquantity'], false, null, null, "Discount");
 				}
 
-				// VAT information (Line Tax)
+				// VAT information (Line Tax). The exemption reason is carried on the line too, and not
+				// only in the VAT breakdown: BR-FXEXT-E-08 only counts a line towards its exempt
+				// breakdown when the line repeats the same reason code and text - see the same point in
+				// CIIProtocol::buildLineNode(). horstoeko takes them as the 5th and 6th arguments.
+				$lineExemptionReason = ((string) ($lineData['ExemptionReason'] ?? '') !== '' ? (string) $lineData['ExemptionReason'] : null);
+				$lineExemptionReasonCode = ((string) ($lineData['ExemptionReasonCode'] ?? '') !== '' ? (string) $lineData['ExemptionReasonCode'] : null);
 				if ($lineData['rateApplicablePercent'] > 0) {
-					$facturxpdf->addDocumentPositionTax($lineData['categoryCode'], 'VAT', (empty($lineData['rateApplicablePercent']) ? null : (float) $lineData['rateApplicablePercent']));
+					$facturxpdf->addDocumentPositionTax($lineData['categoryCode'], 'VAT', (empty($lineData['rateApplicablePercent']) ? null : (float) $lineData['rateApplicablePercent']), null, $lineExemptionReason, $lineExemptionReasonCode);
 				} else {
-					$facturxpdf->addDocumentPositionTax($lineData['categoryCode'], 'VAT', 0.00);
+					$facturxpdf->addDocumentPositionTax($lineData['categoryCode'], 'VAT', 0.00, null, $lineExemptionReason, $lineExemptionReasonCode);
 				}
 
 				// Discount percentage on a line

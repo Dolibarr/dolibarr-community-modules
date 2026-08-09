@@ -2341,11 +2341,25 @@ class CIIProtocol extends AbstractProtocol
 
 
 		$tax->appendChild($doc->createElement('ram:TypeCode', 'VAT'));
-		$tax->appendChild($doc->createElement('ram:CategoryCode', $line['categoryCode']));
-		$tax->appendChild($doc->createElement('ram:RateApplicablePercent', $line['rateApplicablePercent']));
 
-		// Note that the $line['ExemptionReasonCode'] and $line['ExemptionReasonCode'] is added into the section ApplicableHeaderTradeSettlement
-		// that is a vat breakdown array and not inside each line.
+		// The exemption reason is repeated on the line, not only in the VAT breakdown it also feeds.
+		// BR-FXEXT-E-08 reconciles the taxable amount of an exempt breakdown (BT-116) with the sum of
+		// the net amounts of the lines it covers, and it only counts a line whose own reason code and
+		// reason text equal those of the breakdown. Writing them on the breakdown alone made it count
+		// zero lines, so an exempt invoice was reported as unbalanced - "basisAmount : 100, SumBT131 :
+		// 0, NBlines : 0" - and refused by the platform validator. The reader of this class already
+		// expects both at line level, so this closes the loop rather than opening a new one.
+		// Order follows the CII D22B sequence of TradeTaxType, which is not the order of the getters.
+		$lineExemptionReason = (string) ($line['ExemptionReason'] ?? '');
+		$lineExemptionReasonCode = (string) ($line['ExemptionReasonCode'] ?? '');
+		if ($lineExemptionReason !== '') {
+			$tax->appendChild($doc->createElement('ram:ExemptionReason', htmlspecialchars($lineExemptionReason)));
+		}
+		$tax->appendChild($doc->createElement('ram:CategoryCode', $line['categoryCode']));
+		if ($lineExemptionReasonCode !== '') {
+			$tax->appendChild($doc->createElement('ram:ExemptionReasonCode', $lineExemptionReasonCode));
+		}
+		$tax->appendChild($doc->createElement('ram:RateApplicablePercent', $line['rateApplicablePercent']));
 
 		// Billing period for the line (BG-26 / BT-134 / BT-135). Must be placed after ApplicableTradeTax
 		// and before SpecifiedTradeAllowanceCharge (discount below) per the CII D22B schema sequence.
