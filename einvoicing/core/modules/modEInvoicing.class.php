@@ -674,7 +674,11 @@ class modEInvoicing extends DolibarrModules
 			0, //$unique
 			0, //$required
 			95032, //$pos
-			array(), //$param
+			// '' and not array(): the empty array is only tolerated from Dolibarr 18, which added an
+			// "elseif (is_array($param))" branch to ExtraFields::update_label(). On 17 an empty array
+			// falls through to strlen($param) and kills the whole module installation on PHP 8. Both
+			// forms store exactly the same thing - an empty parameter string - on every version.
+			'', //$param
 			1, //$alwayseditable
 			'', //$perms
 			'1', //$list
