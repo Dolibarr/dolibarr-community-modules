@@ -2,6 +2,12 @@
 
 ## 1.0.4
 
+FIX: The compatibility files the module ships for the older cores are loaded from a path relative to
+the file that needs them, instead of being looked up through dol_buildpath(). A lookup that does not
+resolve - a deployment that does not sit where the module expects, which is what a container install
+can produce - only wrote a line in the log and returned false, so the polyfill was silently absent and
+the next call to it was a fatal "Call to undefined function isValidSiren" (issue #565).
+
 FIX: Generating two Factur-X sample invoices in the same request no longer ends on a PHP fatal error.
 The generator loaded its helper file with require rather than require_once, so the second call
 redeclared its functions - and a fatal error is not something the calling code can catch and report.

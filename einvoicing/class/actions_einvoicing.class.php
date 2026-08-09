@@ -25,7 +25,9 @@
  */
 
 if ((float) DOL_VERSION < 19) {
-	dol_include_once('/einvoicing/compat/commonhookactions.class.php');
+	// Relative to this file rather than through dol_buildpath(), for the reason given in
+	// einvoicing.class.php: a resolution that fails is silent, and the class would just be missing.
+	require_once __DIR__ . '/../compat/commonhookactions.class.php';
 } else {
 	require_once DOL_DOCUMENT_ROOT . '/core/class/commonhookactions.class.php';
 }
