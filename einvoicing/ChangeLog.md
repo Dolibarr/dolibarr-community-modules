@@ -32,6 +32,14 @@ entirely - and the same invoice produced two different documents depending on th
 One date alone is a period the norm accepts: BR-CO-20 asks for the start date or the end date, "or
 both".
 
+FIX: The Access point setup page carries the title of each of its sections again on Dolibarr 18 to 22.
+FormSetup::generateOutput() did not grow its arguments all at once - $editMode alone up to 19, plus
+$hideTitle from 20, and only from 23 the $title and $cssfirstcolumn the page passes - and PHP discards
+the surplus arguments of a user function without a word, so from 20 on the page asked for a title the
+core never read and printed the default "Parameter / Value" header instead. The rewrite that supplies
+the title below that version is used up to 22 now, and it matches the header row on its shape rather
+than on the "Value" label, which 22 leaves empty.
+
 FIX: Generating two Factur-X sample invoices in the same request no longer ends on a PHP fatal error.
 The generator loaded its helper file with require rather than require_once, so the second call
 redeclared its functions - and a fatal error is not something the calling code can catch and report.

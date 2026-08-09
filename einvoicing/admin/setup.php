@@ -399,22 +399,28 @@ print info_admin($langs->trans("EInvoicingInfo", $EInvoicingInfoProxy).'<br>'.$l
  * @return string                      HTML output
  */
 $pdpRenderFormSetup = function ($formSetupInstance, $title) use ($langs) {
-	if ((float) DOL_VERSION >= 20) {
-		// Native multi-arg signature available since Dolibarr 20.0.0
+	// FormSetup::generateOutput() did not grow its arguments all at once, and the title is the third
+	// of them: $editMode alone up to 19.0, ($editMode, $hideTitle) from 20.0, and only from 23.0 the
+	// ($editMode, $hideTitle, $title, $cssfirstcolumn) this call needs. PHP discards the surplus
+	// arguments of a user function without a word, so asking for the native rendering below 23 simply
+	// dropped the section title and printed the default "Parameter / Value" header instead.
+	if ((float) DOL_VERSION >= 23) {
 		return $formSetupInstance->generateOutput(true, false, $title, 'titlefieldmiddle');
 	}
 
-	// v18/v19 fallback: generateOutput() accepts only $editMode and always renders a Cancel button.
-	// Capture the HTML and rewrite the header row + suppress the Cancel link to mimic v20+ rendering.
+	// Up to 22.0 the title has to be written into the produced HTML: capture it, rewrite the header
+	// row and suppress the Cancel link, which those versions render and 23+ do not.
 	$html = $formSetupInstance->generateOutput(true);
 
 	$titleEscaped = htmlspecialchars($title, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 	$parameterLabel = $langs->trans('Parameter');
-	$valueLabel = $langs->trans('Value');
 
-	// Replace the default "Parameter / Value" header with the section title (v20+ behavior)
+	// Replace the default header row with the section title, the way 23+ renders it natively. The
+	// second cell is matched on its shape rather than on its text: it holds the "Value" label up to
+	// 21.0 and is left empty from 22.0, and requiring the label made the substitution silently miss
+	// on 22.0 - which is the version where the title was needed most, the native call ignoring it.
 	$html = preg_replace(
-		'#<tr class="liste_titre">\s*<td>'.preg_quote($parameterLabel, '#').'</td>\s*<td>'.preg_quote($valueLabel, '#').'</td>\s*</tr>#',
+		'#<tr class="liste_titre">\s*<td>'.preg_quote($parameterLabel, '#').'</td>\s*<td>[^<]*</td>\s*</tr>#',
 		'<tr class="liste_titre"><td class="titlefieldmiddle">'.$titleEscaped.'</td><td></td></tr>',
 		$html,
 		1
