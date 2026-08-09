@@ -158,6 +158,41 @@ class SellerVatRegimeTest extends CommonClassTest
 	}
 
 	/**
+	 * setMysoc() does not hand over the same type on every supported core, and the module supports
+	 * Dolibarr 17 and up. Up to 19 it assigns the constant as it is read from the database:
+	 *
+	 *   17 / 18 / 19    $this->tva_assuj = $conf->global->FACTURE_TVAOPTION;   ->  the string '0' / '1'
+	 *   20 and above    $this->tva_assuj = getDolGlobalInt('FACTURE_TVAOPTION'); ->  the int 0 / 1
+	 *
+	 * Both forms are pinned here rather than left to whichever core happens to run the suite, since
+	 * the answer must not depend on it.
+	 *
+	 * @return void
+	 */
+	public function testBothTypesSetMysocHandsOverAreUnderstood()
+	{
+		$this->setRegime();
+
+		// Dolibarr 17 to 19.
+		$this->assertSame('franchise', einvoicingSellerVatRegime($this->seller('0', '')));
+		$this->assertSame('standard', einvoicingSellerVatRegime($this->seller('1', 'FR87892304189')));
+
+		// Dolibarr 20 and above.
+		$this->assertSame('franchise', einvoicingSellerVatRegime($this->seller(0, '')));
+		$this->assertSame('standard', einvoicingSellerVatRegime($this->seller(1, 'FR87892304189')));
+
+		// And the registration that follows from each, which is the point of the derivation.
+		$this->assertSame(
+			array(array('type' => 'FC', 'value' => '000000001')),
+			einvoicingSellerTaxRegistrations($this->seller('0', ''))
+		);
+		$this->assertSame(
+			array(array('type' => 'VA', 'value' => 'FR87892304189')),
+			einvoicingSellerTaxRegistrations($this->seller('1', 'FR87892304189'))
+		);
+	}
+
+	/**
 	 * admin/company.php only ever writes 1 or 0, but the tva_assuj of a thirdparty also holds the
 	 * literal forms and get_default_tva() reads them. This must answer the same as the core does.
 	 *

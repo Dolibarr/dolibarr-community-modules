@@ -24,6 +24,7 @@ the file that needs them, instead of being looked up through dol_buildpath(). A 
 resolve - a deployment that does not sit where the module expects, which is what a container install
 can produce - only wrote a line in the log and returned false, so the polyfill was silently absent and
 the next call to it was a fatal "Call to undefined function isValidSiren" (issue #565).
+
 FIX: A seller that charges no VAT now identifies itself on the documents it generates. A company set
 as "Non assujetti a la TVA" has no VAT number, and the writer only ever emitted one, so the seller
 carried no tax registration at all: every exempt line then broke BR-E-02, which wants the seller VAT
