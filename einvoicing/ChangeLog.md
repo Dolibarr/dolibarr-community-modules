@@ -38,6 +38,14 @@ what to fill in, rather than a silent fallback on its SIREN, and an exportation 
 supply now stops with an explicit message when no VAT number is recorded: BR-G-02 and BR-IC-02 accept
 the VAT identifier alone, so nothing can stand in for it there (issue #560).
 
+FIX: An exempt invoice line now carries the exemption reason it is counted against, and not only the
+VAT breakdown does. BR-FXEXT-E-08 reconciles the taxable amount of an exempt breakdown with the sum of
+the net amounts of the lines it covers, and only counts a line whose own reason code and reason text
+equal those of the breakdown - so with the reason on the breakdown alone the rule counted zero lines,
+reported the invoice as unbalanced, and the reference validator returned it as invalid whatever else
+the document got right. Both the CII and the Factur-X writers now repeat them on the line; a line with
+nothing to declare is unchanged.
+
 FIX: Generating two Factur-X sample invoices in the same request no longer ends on a PHP fatal error.
 The generator loaded its helper file with require rather than require_once, so the second call
 redeclared its functions - and a fatal error is not something the calling code can catch and report.
