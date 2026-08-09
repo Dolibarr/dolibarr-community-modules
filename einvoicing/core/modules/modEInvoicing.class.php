@@ -141,7 +141,7 @@ class modEInvoicing extends DolibarrModules
 		// A condition to hide module
 		$this->hidden = getDolGlobalInt('MODULE_EINVOICING_DISABLED'); // A condition to disable module;
 		// List of module class names that must be enabled if this module is enabled. Example: array('always'=>array('modModuleToEnable1','modModuleToEnable2'), 'FR'=>array('modModuleToEnableFR')...)
-		$this->depends = array();
+		$this->depends = array('always'=>array('modFacture', 'modFournisseur'));
 		// List of module class names to disable if this one is disabled. Example: array('modModuleToDisable1', ...)
 		$this->requiredby = array();
 		// List of module class names this module is in conflict with. Example: array('modModuleToDisable1', ...)
