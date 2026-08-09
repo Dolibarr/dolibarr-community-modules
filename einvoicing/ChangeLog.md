@@ -2,6 +2,14 @@
 
 ## 1.0.4
 
+FIX: On Dolibarr 23, a failed e-invoice generation was reported as an error where the core was able to
+carry it as a warning, so validating an invoice showed a red message for something that does not stop
+the validation. The module kept everything as an error below 24, but the chain a hook needs to report
+a warning - HookManager collecting the warnings of the hook instance, the document generator copying
+them, and commonGenerateDocument() copying them onto the object - is whole in 23 and absent in 22. The
+bound is 23 now. Nothing changes on 22 and below, where the warning would be reported nowhere, nor on
+24 and above.
+
 FIX: Generating two Factur-X sample invoices in the same request no longer ends on a PHP fatal error.
 The generator loaded its helper file with require rather than require_once, so the second call
 redeclared its functions - and a fatal error is not something the calling code can catch and report.
