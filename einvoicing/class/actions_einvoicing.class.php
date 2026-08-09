@@ -39,6 +39,22 @@ dol_include_once('/einvoicing/class/providers/PDPProviderManager.class.php');
 class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-line PhanRedefinedExtendedClass
 {
 	/**
+	 * @var string[] Errors the hook reports back to whoever executed it.
+	 *
+	 * Declared here rather than relied upon from the parent: CommonHookActions only declares ->errors
+	 * from Dolibarr 21 and ->warnings from 23, and the compat class this module ships for the versions
+	 * before 19 declares neither. Writing to an undeclared property is a deprecation on PHP 8.2, and
+	 * reading one back into array_merge() is a fatal TypeError - which is what a failed generation did
+	 * on 17 to 20.
+	 */
+	public $errors = array();
+
+	/**
+	 * @var string[] Warnings the hook reports back, on the versions whose core carries them
+	 */
+	public $warnings = array();
+
+	/**
 	 * systemMessage
 	 *
 	 * @param array<string,mixed> 	$parameters		Array of parameters
