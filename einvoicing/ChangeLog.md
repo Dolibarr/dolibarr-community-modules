@@ -2,6 +2,15 @@
 
 ## 1.0.4
 
+FIX: The module works on Dolibarr 17 again, the version its own descriptor declares as the minimum it
+supports. Two things stood in the way and neither of them failed quietly. Installing it died on a PHP
+TypeError: init() passed an empty array() where ExtraFields::update() expects a parameter string, and
+the branch that tolerates an empty array was only added to the core in 18, so activateModule() never
+completed. Generating a document died on "Call to undefined function dolChmod()", that helper having
+arrived in the core in 18 as well, while both writers call it on the XML they have just produced. The
+first is passed as '' now, which stores the same thing everywhere, and the second is supplied by a
+compat file alongside the two the module already ships for that version.
+
 FIX: On Dolibarr 23, a failed e-invoice generation was reported as an error where the core was able to
 carry it as a warning, so validating an invoice showed a red message for something that does not stop
 the validation. The module kept everything as an error below 24, but the chain a hook needs to report

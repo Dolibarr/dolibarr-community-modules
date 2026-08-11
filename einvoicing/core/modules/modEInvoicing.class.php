@@ -665,8 +665,14 @@ class modEInvoicing extends DolibarrModules
 		);
 
 		// Update extrafield par rapport au module openDSI, il faut pouvoir éditer le champ ChorusId
+		// The $param below is '' and not array(): the empty array is only tolerated from Dolibarr 18,
+		// which added an "elseif (is_array($param))" branch to ExtraFields::update_label(). On 17 an
+		// empty array falls through to strlen($param) and kills the whole module installation on PHP 8.
+		// Both forms store exactly the same thing - an empty parameter string - on every version, and
+		// the parameter was itself declared as '' up to 19 before becoming array() in 20, which is the
+		// signature the phan stub carries and the reason for the suppression.
 		$result = $extrafields->update(
-			'd4d_chorus_id', //$attrname
+			'd4d_chorus_id', //$attrname	// @phan-suppress-current-line PhanTypeMismatchArgumentProbablyReal
 			$langs->trans('ChorusId'), //$label
 			'varchar', //$type
 			'36', //$length
@@ -674,7 +680,7 @@ class modEInvoicing extends DolibarrModules
 			0, //$unique
 			0, //$required
 			95032, //$pos
-			array(), //$param
+			'', //$param
 			1, //$alwayseditable
 			'', //$perms
 			'1', //$list
