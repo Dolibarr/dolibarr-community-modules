@@ -24,6 +24,14 @@ starting after it ends - one line open from March next to another closed in Janu
 period at all rather than a pair BR-29 refuses, which would have the whole document rejected for a field
 nobody filled in (issue #572).
 
+FIX: Importing a received e-invoice now keeps the billing period of its lines (BT-134 / BT-135), where a
+service line billed over a period used to arrive with no period at all. The two dates were read from the
+document and then went nowhere: the line built for the supplier invoice never carried them, although the
+call that saves it has always passed its date_start and date_end on to the core. A period with only one
+of the two dates keeps that one, as the norm allows (BR-CO-20). A document declaring a period that ends
+before it starts - which BR-30 refuses, and which the core refuses too - is imported without that period
+rather than failing the whole invoice over it (issue #576).
+
 FIX: The module works on Dolibarr 17 again, the version its own descriptor declares as the minimum it
 supports. Two things stood in the way and neither of them failed quietly. Installing it died on a PHP
 TypeError: init() passed an empty array() where ExtraFields::update() expects a parameter string, and
