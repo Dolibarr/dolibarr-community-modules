@@ -352,8 +352,8 @@ class CIIProtocol extends AbstractProtocol
 		 *   documentlanguage: string,
 		 *   effectiveSpecifiedPeriod: 'NA',
 		 *   documentDeliveryDate: DateTimeInterface,
-		 *   invoicingPeriodStart: null,
-		 *   invoicingPeriodEnd: null,
+		 *   invoicingPeriodStart: ?DateTimeInterface,
+		 *   invoicingPeriodEnd: ?DateTimeInterface,
 		 *   businessProcessId: string,
 		 *   isTestDocument: bool,
 		 *   documentNotePublic: string,
@@ -497,7 +497,7 @@ class CIIProtocol extends AbstractProtocol
 		 */
 		'
 		@phan-var-force Facture 			$object			The $invoice object used in entry on inc file, but completed.
-		@phan-var-force array{documentno:string,documenttypecode:null|string,documentdate:DateTimeInterface,invoiceCurrency:string|array<string>,taxCurrency:null,documentname:null,documentlanguage:string,effectiveSpecifiedPeriod:\'NA\',documentDeliveryDate:DateTimeInterface,invoicingPeriodStart:null,invoicingPeriodEnd:null,businessProcessId:string,isTestDocument:bool,documentNotePublic:string,documentNotePMT:string,documentNotePMD:string,documentNoteAAB:string,documentNoteTXD:string,documentNotes:array,vatDueDateTypeCode:string,sellername:string,sellerids:string,sellerlineone:string,sellerlinetwo:string,sellerlinethree:string,sellerpostcode:string,sellercity:string,sellercountry:string,sellersubdivision:null,sellercontactpersonname:string,sellercontactdepartmentname:null,sellercontactphoneno:string,sellercontactfaxno:string,sellercontactemailaddr:string,sellerCommunicationUriScheme:string,sellerCommunicationUri:string,sellerGlobalIds:array<array{schemeID:string,value:string}>,sellerTaxRegistrations:array<array{type:string,value:string}>,sellervatnumber:string,sellerLegalOrgId:string,sellerLegalOrgScheme:string,sellerTradingName:string,buyername:string,buyerids:string,buyerlineone:string,buyerlinetwo:string,buyerlinethree:string,buyerpostcode:string,buyercity:string,buyercountry:string,buyersubdivision:null,buyervatnumber:string,buyerGlobalIds:array<array{schemeID:string,value:string}>,buyerLegalOrgId:string,buyerLegalOrgScheme:string,buyerTradingName:string,buyerReference:null|string,buyerCommunicationUriScheme:string,buyerCommunicationUri:string,buyercontactpersonname:null,buyercontactemailaddr:null,buyercontactphoneno:null,grandTotalAmount:float|int,duePayableAmount:float|int,lineTotalAmount:float|int,chargeTotalAmount:float,allowanceTotalAmount:float|int,taxBasisTotalAmount:float|int,taxTotalAmount:float|int,roundingAmount:null,totalPrepaidAmount:float|int,iban_id:int,iban:string,bic:string,accountName:string,accountRef:string,accountLabel:string,paymentDueDate:DateTimeInterface,paymentTermsText:string,headerAllowancesCharges:array,invoiceRefDocs:array|array<array{ref:string|int,date:DateTimeInterface,type:string}>,orderReference:string,contractReference:null|string,despatchAdviceRef:null,taxBreakdown:array|array<array<string,array>>,_chorus:bool,_depositlines:array|array<array{lineId:int,invoiceRef:string,invoiceDate:DateTimeInterface}>,_globalDiscounts:array|array<array{value:float,reason:string,taxRate:float,categoryVAT:string}>,_customerOrderReferenceList:string[],_project:Project|null,paymentMeansCode?:int,paymentMeansText?:string,_shipFromContactBill?:array{address:null|string,zip:null|string,town:null|string,country:string},_shipFromContactShip?:array{name:string,address:null|string,zip:null|string,town:null|string,country:string}} $invoiceData
+		@phan-var-force array{documentno:string,documenttypecode:null|string,documentdate:DateTimeInterface,invoiceCurrency:string|array<string>,taxCurrency:null,documentname:null,documentlanguage:string,effectiveSpecifiedPeriod:\'NA\',documentDeliveryDate:DateTimeInterface,invoicingPeriodStart:?DateTimeInterface,invoicingPeriodEnd:?DateTimeInterface,businessProcessId:string,isTestDocument:bool,documentNotePublic:string,documentNotePMT:string,documentNotePMD:string,documentNoteAAB:string,documentNoteTXD:string,documentNotes:array,vatDueDateTypeCode:string,sellername:string,sellerids:string,sellerlineone:string,sellerlinetwo:string,sellerlinethree:string,sellerpostcode:string,sellercity:string,sellercountry:string,sellersubdivision:null,sellercontactpersonname:string,sellercontactdepartmentname:null,sellercontactphoneno:string,sellercontactfaxno:string,sellercontactemailaddr:string,sellerCommunicationUriScheme:string,sellerCommunicationUri:string,sellerGlobalIds:array<array{schemeID:string,value:string}>,sellerTaxRegistrations:array<array{type:string,value:string}>,sellervatnumber:string,sellerLegalOrgId:string,sellerLegalOrgScheme:string,sellerTradingName:string,buyername:string,buyerids:string,buyerlineone:string,buyerlinetwo:string,buyerlinethree:string,buyerpostcode:string,buyercity:string,buyercountry:string,buyersubdivision:null,buyervatnumber:string,buyerGlobalIds:array<array{schemeID:string,value:string}>,buyerLegalOrgId:string,buyerLegalOrgScheme:string,buyerTradingName:string,buyerReference:null|string,buyerCommunicationUriScheme:string,buyerCommunicationUri:string,buyercontactpersonname:null,buyercontactemailaddr:null,buyercontactphoneno:null,grandTotalAmount:float|int,duePayableAmount:float|int,lineTotalAmount:float|int,chargeTotalAmount:float,allowanceTotalAmount:float|int,taxBasisTotalAmount:float|int,taxTotalAmount:float|int,roundingAmount:null,totalPrepaidAmount:float|int,iban_id:int,iban:string,bic:string,accountName:string,accountRef:string,accountLabel:string,paymentDueDate:DateTimeInterface,paymentTermsText:string,headerAllowancesCharges:array,invoiceRefDocs:array|array<array{ref:string|int,date:DateTimeInterface,type:string}>,orderReference:string,contractReference:null|string,despatchAdviceRef:null,taxBreakdown:array|array<array<string,array>>,_chorus:bool,_depositlines:array|array<array{lineId:int,invoiceRef:string,invoiceDate:DateTimeInterface}>,_globalDiscounts:array|array<array{value:float,reason:string,taxRate:float,categoryVAT:string}>,_customerOrderReferenceList:string[],_project:Project|null,paymentMeansCode?:int,paymentMeansText?:string,_shipFromContactBill?:array{address:null|string,zip:null|string,town:null|string,country:string},_shipFromContactShip?:array{name:string,address:null|string,zip:null|string,town:null|string,country:string}} $invoiceData
 		@phan-var-force array<int,array{lineid:int,linestatuscode:\'NA\',linestatusreasoncode:\'NA\',lineNote:null,prodname:string,proddesc:string,prodsellerid:string,prodbuyerid:null|string,prodglobalidtype:null|string,prodglobalid:null|string,prodmultilangs:array,prodClassificationCode:null|string,prodClassificationScheme:null|string,prodOriginCountry:null|string,netpriceamount:float,netpricebasisquantity:null|float,netpricebasisquantityunitcode:null|string,billedquantity:float,billedquantityunitcode:string,chargeFreeQuantity:null|float,chargeFreeQuantityunitcode:null|string,packageQuantity:null|float,packageQuantityunitcode:null|string,lineTotalAmount:float|string,totalAllowanceChargeAmount:null|float,categoryCode:string,typeCode:\'VAT\',rateApplicablePercent:string,tva_tx:float|string,vat_src_code:string,ExemptionReason:string,ExemptionReasonCode:string,calculatedAmount:null|float,lineAllowances:array,lineGrossPriceAllowances:array,lineremisepercent:\'NA\'|float,linePeriodStart:?DateTimeInterface,linePeriodEnd:?DateTimeInterface,additionalRefDocs:array,isDepositLine:bool,depositInvoiceRef:null|string,depositInvoiceDate:?DateTimeInterface,parentDocumentNo:null|string,is_deposit:int<0,1>,fk_remise:null|int,discountPercent:float,grosspriceamount:null|float,grosspricebasisquantity:null|float,grosspricebasisquantityunitcode:null|string}> $linesData
 		@phan-var-force string 				$outputlang		Value of $outputlangs->defaultlang
 		@phan-var-force Account				$account
@@ -2161,6 +2161,21 @@ class CIIProtocol extends AbstractProtocol
 				);
 			}
 
+			// Invoicing period of the document (BG-14 / BT-73 / BT-74), derived from the periods of the
+			// lines by einvoicingInvoicingPeriodFromLines(). Placed after the ApplicableTradeTax nodes
+			// and before SpecifiedTradeAllowanceCharge (the global discounts below), which is where
+			// HeaderTradeSettlementType declares it in every schema from BASIC WL upwards; MINIMUM does
+			// not declare it at all, and the enclosing condition already excludes that profile (issue
+			// #572).
+			if ($invoiceData['invoicingPeriodStart'] !== null || $invoiceData['invoicingPeriodEnd'] !== null) {
+				$comment = $doc->createComment('Invoicing period');
+				$settlement->appendChild($comment);
+
+				$settlement->appendChild(
+					$this->buildBillingPeriodNode($doc, $invoiceData['invoicingPeriodStart'], $invoiceData['invoicingPeriodEnd'])
+				);
+			}
+
 			// Discounts
 			if (!empty($invoiceData['_globalDiscounts'])) {
 				$comment = $doc->createComment('Global discounts');
@@ -2350,24 +2365,7 @@ class CIIProtocol extends AbstractProtocol
 		// Billing period for the line (BG-26 / BT-134 / BT-135). Must be placed after ApplicableTradeTax
 		// and before SpecifiedTradeAllowanceCharge (discount below) per the CII D22B schema sequence.
 		if ($line['linePeriodStart'] !== null || $line['linePeriodEnd'] !== null) {
-			$period = $doc->createElement('ram:BillingSpecifiedPeriod');
-			$sett->appendChild($period);
-
-			if ($line['linePeriodStart'] !== null) {
-				$start = $doc->createElement('ram:StartDateTime');
-				$startStr = $doc->createElement('udt:DateTimeString', $line['linePeriodStart']->format('Ymd'));
-				$startStr->setAttribute('format', '102');
-				$start->appendChild($startStr);
-				$period->appendChild($start);
-			}
-
-			if ($line['linePeriodEnd'] !== null) {
-				$end = $doc->createElement('ram:EndDateTime');
-				$endStr = $doc->createElement('udt:DateTimeString', $line['linePeriodEnd']->format('Ymd'));
-				$endStr->setAttribute('format', '102');
-				$end->appendChild($endStr);
-				$period->appendChild($end);
-			}
+			$sett->appendChild($this->buildBillingPeriodNode($doc, $line['linePeriodStart'], $line['linePeriodEnd']));
 		}
 
 		if ($line['discountPercent']) {
@@ -2601,6 +2599,43 @@ class CIIProtocol extends AbstractProtocol
 		$addr->appendChild($doc->createElement('ram:CountryID', $ship['country']));
 
 		return $node;
+	}
+
+	/**
+	 * Build a ram:BillingSpecifiedPeriod node.
+	 *
+	 * The same type serves the two levels the norm has for a period: BT-73/BT-74 under
+	 * ApplicableHeaderTradeSettlement (BG-14, the period the invoice covers) and BT-134/BT-135 under
+	 * SpecifiedLineTradeSettlement (BG-26, the period a line covers). One side alone is a period the
+	 * norm accepts - BR-CO-19 asks for the start date or the end date - so each date is written only
+	 * if it is there.
+	 *
+	 * @param \DOMDocument 			$doc 	Document to create nodes in
+	 * @param ?\DateTimeInterface	$start 	Start of the period, null to leave BT-73 / BT-134 out
+	 * @param ?\DateTimeInterface	$end 	End of the period, null to leave BT-74 / BT-135 out
+	 * @return \DOMElement
+	 */
+	private function buildBillingPeriodNode($doc, $start, $end)
+	{
+		$period = $doc->createElement('ram:BillingSpecifiedPeriod');
+
+		if ($start !== null) {
+			$startNode = $doc->createElement('ram:StartDateTime');
+			$startStr = $doc->createElement('udt:DateTimeString', $start->format('Ymd'));
+			$startStr->setAttribute('format', '102');
+			$startNode->appendChild($startStr);
+			$period->appendChild($startNode);
+		}
+
+		if ($end !== null) {
+			$endNode = $doc->createElement('ram:EndDateTime');
+			$endStr = $doc->createElement('udt:DateTimeString', $end->format('Ymd'));
+			$endStr->setAttribute('format', '102');
+			$endNode->appendChild($endStr);
+			$period->appendChild($endNode);
+		}
+
+		return $period;
 	}
 
 	/**
