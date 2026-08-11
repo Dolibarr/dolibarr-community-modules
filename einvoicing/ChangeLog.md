@@ -2,6 +2,14 @@
 
 ## 1.0.4
 
+FIX: On Dolibarr 23, a failed e-invoice generation was reported as an error where the core was able to
+carry it as a warning, so validating an invoice showed a red message for something that does not stop
+the validation. The module kept everything as an error below 24, but the chain a hook needs to report
+a warning - HookManager collecting the warnings of the hook instance, the document generator copying
+them, and commonGenerateDocument() copying them onto the object - is whole in 23 and absent in 22. The
+bound is 23 now. Nothing changes on 22 and below, where the warning would be reported nowhere, nor on
+24 and above.
+
 FIX: The compatibility files the module ships for the older cores are loaded from a path relative to
 the file that needs them, instead of being looked up through dol_buildpath(). A lookup that does not
 resolve - a deployment that does not sit where the module expects, which is what a container install
