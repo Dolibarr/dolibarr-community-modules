@@ -471,8 +471,10 @@ class FacturXProtocol extends CIIProtocol
 					$facturxpdf->setDocumentInvoiceReferencedDocument($lineData['depositInvoiceRef'], ZugferdInvoiceType::PREPAYMENTINVOICE, $lineData['depositInvoiceDate']);
 				}
 
-				// Set billing period for the line
-				if ($lineData['linePeriodStart'] !== null && $lineData['linePeriodEnd'] !== null) {
+				// Set billing period for the line (BG-26 / BT-134 / BT-135). One date alone is a valid
+				// period: BR-CO-20 asks for the start date or the end date, "or both". The builder
+				// leaves out the side it is given as null, so the same condition as the CII path applies.
+				if ($lineData['linePeriodStart'] !== null || $lineData['linePeriodEnd'] !== null) {
 					$facturxpdf->setDocumentPositionBillingPeriod($lineData['linePeriodStart'], $lineData['linePeriodEnd']);
 				}
 
