@@ -47,6 +47,13 @@ reported the invoice as unbalanced, and the reference validator returned it as i
 the document got right. Both the CII and the Factur-X writers now repeat them on the line; a line with
 nothing to declare is unchanged.
 
+FIX: A line billed over a period that has only a start date, or only an end date, now carries that
+period in the Factur-X document as it already did in the CII one. The Factur-X path asked for both
+dates before writing anything, so a service line left open on one side lost its BT-134/BT-135
+entirely - and the same invoice produced two different documents depending on the protocol selected.
+One date alone is a period the norm accepts: BR-CO-20 asks for the start date or the end date, "or
+both".
+
 FIX: Generating two Factur-X sample invoices in the same request no longer ends on a PHP fatal error.
 The generator loaded its helper file with require rather than require_once, so the second call
 redeclared its functions - and a fatal error is not something the calling code can catch and report.
