@@ -793,31 +793,23 @@ function einvoicingVatDueOnCollection($hasProductLine, $hasServiceLine)
  * or the other, every exempt line of the document trips BR-E-02 and the platform refuses it, which is
  * the whole of issue #560.
  *
- * The regime is not a setting of this module either: Dolibarr already holds it in the setup of the
- * company (Home - Setup - Company/Organization, the "VAT is used / is not used" radio, which
- * admin/company.php writes into FACTURE_TVAOPTION as 1 or 0). Nothing is re-derived from that constant
- * here: Societe::setMysoc() already turns it into ->tva_assuj, and getCategoryRate() already decides
- * from that same ->tva_assuj whether a line is exempt. Reading the property the core computed is what
- * keeps the two from ever disagreeing - a document declaring an exempt line while claiming a VAT
- * registration, or the reverse.
- *
- * EINVOICING_SELLER_VAT_REGIME overrides it for a seller whose regime that setup does not express, the
- * same way EINVOICING_VAT_POINT_DATE_CODE overrides the VAT mode for BT-8. Declaring 'franchise' is
- * declaring that the invoices carry no VAT identifier; declaring 'standard' is declaring they do.
+ * This is deliberately not a setting of this module, and there is no option to override it: Dolibarr
+ * already holds the regime in the setup of the company (Home - Setup - Company/Organization, the "VAT
+ * is used / is not used" radio, which admin/company.php writes into FACTURE_TVAOPTION as 1 or 0), and a
+ * second place to state the same thing is a second place for it to be stated differently. Nothing is
+ * re-derived from that constant here either: Societe::setMysoc() already turns it into ->tva_assuj, and
+ * getCategoryRate() already decides from that same ->tva_assuj whether a line is exempt. Reading the
+ * property the core computed is what keeps the two from ever disagreeing - a document declaring an
+ * exempt line while claiming a VAT registration, or the reverse.
  *
  * @param	Societe		$seller		Selling company, normally $mysoc
  * @return	string					'standard' (the seller charges VAT, BT-31) or 'franchise' (it does not, BT-32)
  */
 function einvoicingSellerVatRegime($seller)
 {
-	$forced = getDolGlobalString('EINVOICING_SELLER_VAT_REGIME');
-	if (in_array($forced, array('standard', 'franchise'), true)) {
-		return $forced;
-	}
-
-	// 'auto'. The reading of tva_assuj is the one the core makes of it in get_default_tva(): for
-	// $mysoc it is always the int of FACTURE_TVAOPTION, but the column of a thirdparty also holds the
-	// literal forms, and there is no reason for this to answer differently from the core.
+	// The reading of tva_assuj is the one the core makes of it in get_default_tva(): for $mysoc it is
+	// always the int of FACTURE_TVAOPTION, but the column of a thirdparty also holds the literal forms,
+	// and there is no reason for this to answer differently from the core.
 	$assuj = $seller->tva_assuj;
 	$subjectToVat = !((is_numeric($assuj) && !$assuj) || (!is_numeric($assuj) && $assuj == 'franchise'));
 

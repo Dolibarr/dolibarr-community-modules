@@ -52,53 +52,6 @@ require_once __DIR__ . '/CommonClassTestCompat.inc.php';
  */
 class SellerVatRegimeTest extends CommonClassTest
 {
-	/** @var array<string,string|null> Constants this test overwrites, as they were before */
-	private $savedconstants = array();
-
-	/**
-	 * CommonClassTest keeps a reference to $conf, not a copy, so the constants written here would
-	 * survive the class and reach whatever runs next. Give them back their initial value.
-	 *
-	 * @return void
-	 */
-	protected function tearDown(): void
-	{
-		global $conf;
-
-		foreach ($this->savedconstants as $key => $value) {
-			if ($value === null) {
-				unset($conf->global->$key);
-			} else {
-				$conf->global->$key = $value;
-			}
-		}
-		$this->savedconstants = array();
-
-		parent::tearDown();
-	}
-
-	/**
-	 * Set the module override, the only constant this decision reads.
-	 *
-	 * @param	string	$forced		Value of the module option, '' to leave it unset
-	 * @return	void
-	 */
-	private function setRegime($forced = '')
-	{
-		global $conf;
-
-		$key = 'EINVOICING_SELLER_VAT_REGIME';
-		if (!array_key_exists($key, $this->savedconstants)) {
-			$this->savedconstants[$key] = isset($conf->global->$key) ? $conf->global->$key : null;
-		}
-
-		if ($forced === '') {
-			unset($conf->global->$key);
-		} else {
-			$conf->global->$key = $forced;
-		}
-	}
-
 	/**
 	 * A seller, described the way Societe::setMysoc() describes $mysoc.
 	 *
@@ -121,14 +74,13 @@ class SellerVatRegimeTest extends CommonClassTest
 	}
 
 	/**
-	 * Left alone, the module follows what the core made of the company setup: a seller subject to VAT
-	 * declares its VAT number, and nothing about the existing documents changes.
+	 * The module follows what the core made of the company setup: a seller subject to VAT declares its
+	 * VAT number, and nothing about the existing documents changes.
 	 *
 	 * @return void
 	 */
-	public function testAutomaticFollowsTheCompanySetupWhenSubjectToVat()
+	public function testTheCompanySetupDecidesWhenSubjectToVat()
 	{
-		$this->setRegime();
 		$seller = $this->seller(1, 'FR87892304189');
 
 		$this->assertSame('standard', einvoicingSellerVatRegime($seller));
@@ -145,9 +97,8 @@ class SellerVatRegimeTest extends CommonClassTest
 	 *
 	 * @return void
 	 */
-	public function testAutomaticDeclaresTheSirenWhenNotSubjectToVat()
+	public function testTheSirenIsDeclaredWhenNotSubjectToVat()
 	{
-		$this->setRegime();
 		$seller = $this->seller(0, '');
 
 		$this->assertSame('franchise', einvoicingSellerVatRegime($seller));
@@ -171,8 +122,6 @@ class SellerVatRegimeTest extends CommonClassTest
 	 */
 	public function testBothTypesSetMysocHandsOverAreUnderstood()
 	{
-		$this->setRegime();
-
 		// Dolibarr 17 to 19.
 		$this->assertSame('franchise', einvoicingSellerVatRegime($this->seller('0', '')));
 		$this->assertSame('standard', einvoicingSellerVatRegime($this->seller('1', 'FR87892304189')));
@@ -200,46 +149,30 @@ class SellerVatRegimeTest extends CommonClassTest
 	 */
 	public function testTheLiteralFormsAreReadTheWayTheCoreReadsThem()
 	{
-		$this->setRegime();
-
 		$this->assertSame('franchise', einvoicingSellerVatRegime($this->seller('franchise', '')));
 		$this->assertSame('standard', einvoicingSellerVatRegime($this->seller('reel', 'FR87892304189')));
 	}
 
 	/**
-	 * An explicit value wins over the company setup, for a regime that setup cannot express - the
-	 * same contract as EINVOICING_VAT_POINT_DATE_CODE for BT-8.
+	 * The company setup is the only thing that decides, and no setting of this module can contradict
+	 * it. A second place to state the regime would be a second place for it to be stated differently -
+	 * a document declaring exempt lines while claiming a VAT registration, or the reverse - since the
+	 * VAT category of each line is derived from the same ->tva_assuj by getCategoryRate(). Any constant
+	 * left over from a version that offered the choice is ignored.
 	 *
 	 * @return void
 	 */
-	public function testAnExplicitRegimeOverridesTheCompanySetup()
+	public function testNoModuleSettingCanContradictTheCompanySetup()
 	{
-		$this->setRegime('franchise');
-		$seller = $this->seller(1, 'FR87892304189');
+		global $conf;
 
-		$this->assertSame('franchise', einvoicingSellerVatRegime($seller));
-		$this->assertSame(
-			array(array('type' => 'FC', 'value' => '000000001')),
-			einvoicingSellerTaxRegistrations($seller)
-		);
+		$conf->global->EINVOICING_SELLER_VAT_REGIME = 'franchise';
+		$this->assertSame('standard', einvoicingSellerVatRegime($this->seller(1, 'FR87892304189')));
 
-		$this->setRegime('standard');
-		$this->assertSame('standard', einvoicingSellerVatRegime($this->seller(0, 'FR87892304189')));
-	}
-
-	/**
-	 * A value that means nothing - 'auto', which is what the selector stores for "Automatic", or
-	 * anything left over from another version - is not a regime, and the company setup decides.
-	 *
-	 * @return void
-	 */
-	public function testAnUnknownExplicitValueFallsBackOnTheCompanySetup()
-	{
-		$this->setRegime('auto');
+		$conf->global->EINVOICING_SELLER_VAT_REGIME = 'standard';
 		$this->assertSame('franchise', einvoicingSellerVatRegime($this->seller(0, '')));
 
-		$this->setRegime('whatever');
-		$this->assertSame('standard', einvoicingSellerVatRegime($this->seller(1, 'FR87892304189')));
+		unset($conf->global->EINVOICING_SELLER_VAT_REGIME);
 	}
 
 	/**
@@ -252,8 +185,6 @@ class SellerVatRegimeTest extends CommonClassTest
 	 */
 	public function testASellerSubjectToVatWithNoNumberDeclaresNothing()
 	{
-		$this->setRegime();
-
 		$this->assertSame(array(), einvoicingSellerTaxRegistrations($this->seller(1, '')));
 	}
 
@@ -265,8 +196,6 @@ class SellerVatRegimeTest extends CommonClassTest
 	 */
 	public function testNoRegistrationIsBuiltWithoutAnIdentifierToPutInIt()
 	{
-		$this->setRegime();
-
 		$this->assertSame(array(), einvoicingSellerTaxRegistrations($this->seller(0, '', '')));
 	}
 }

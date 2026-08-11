@@ -283,18 +283,6 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->defaultFieldValue = 'auto';
 	$item->cssClass = 'minwidth500';
 
-	// Which tax identifier the seller declares, BT-31 or BT-32. Left to the "Sales tax type" of the
-	// company setup by default; an explicit value is for a seller whose regime it cannot express
-	// (issue #560).
-	$item = $formSetup->newItem('EINVOICING_SELLER_VAT_REGIME')->setAsSelect(array(
-		'auto'      => $langs->transnoentities('EINVOICING_SELLER_VAT_REGIME_AUTO'),
-		'standard'  => $langs->transnoentities('EINVOICING_SELLER_VAT_REGIME_STANDARD'),
-		'franchise' => $langs->transnoentities('EINVOICING_SELLER_VAT_REGIME_FRANCHISE'),
-	));
-	$item->helpText = $langs->transnoentities('EINVOICING_SELLER_VAT_REGIME_HELP');
-	$item->defaultFieldValue = 'auto';
-	$item->cssClass = 'minwidth500';
-
 	// Setup conf to automatically transmit the e-invoice to the PA right after it is generated (on validation)
 	$item = $formSetup->newItem('EINVOICING_AUTO_SEND_ON_GENERATION')->setAsYesNo();
 	$item->helpText = $langs->transnoentities('EINVOICING_AUTO_SEND_ON_GENERATION_HELP');
