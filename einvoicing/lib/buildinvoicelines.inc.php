@@ -732,6 +732,13 @@ $getAlreadyPaid = $object->getSommePaiement();
 
 $prepaidAmount  = $getAlreadyPaid + $usedcreditnoteamount;
 
+// Invoicing period of the document (BG-14): the earliest start and the latest end of the periods its
+// lines carry, Dolibarr having no such field at invoice level. See einvoicingInvoicingPeriodFromLines()
+// for why it is derived rather than left empty, and for the case it refuses to derive (issue #572).
+$invoicingPeriod = einvoicingInvoicingPeriodFromLines($billing_period);
+$invoicingPeriodStart = $invoicingPeriod['start'] !== null ? $this->_tsToDateTime($invoicingPeriod['start']) : null;
+$invoicingPeriodEnd = $invoicingPeriod['end'] !== null ? $this->_tsToDateTime($invoicingPeriod['end']) : null;
+
 // Delivery date
 $deliveryDate = !empty($deliveryDateList)
 	? new DateTime(dol_print_date($deliveryDateList[0], 'dayrfc'))
@@ -759,8 +766,8 @@ $invoiceData = [
 
 	'documentDeliveryDate' => $deliveryDate,
 
-	'invoicingPeriodStart' => null,
-	'invoicingPeriodEnd'   => null,
+	'invoicingPeriodStart' => $invoicingPeriodStart,										// BT-73
+	'invoicingPeriodEnd'   => $invoicingPeriodEnd,										// BT-74
 
 	// $prepaidAmount is what the document reports in BT-113, and BR-FR-CO-09 ties the "already paid"
 	// frames to it, so the frame has to be decided from the same figure.
