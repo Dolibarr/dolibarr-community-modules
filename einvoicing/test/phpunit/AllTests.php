@@ -66,6 +66,10 @@ if (!isModEnabled('member')) {
 	print "Error: Module member must be enabled to have significant results.\n";
 	exit(1);
 }
+if (!isModEnabled('einvoicing')) {
+	print "Error: Module einvoicing must be enabled to have significant results.\n";
+	exit(1);
+}
 if (isModEnabled('google')) {
 	print "Warning: Google module should not be enabled.\n";
 }
@@ -80,6 +84,7 @@ $now = dol_now();
 
 require_once DOL_DOCUMENT_ROOT . '/core/lib/admin.lib.php';
 
+print "dolibarrHtdocs=".$dolibarrHtdocs."\n";
 
 // Test there is no webhook enabled
 // TODO
