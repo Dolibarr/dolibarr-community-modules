@@ -2,6 +2,17 @@
 
 ## 1.0.4
 
+NEW: Validating a supplier invoice received through the platform now answers its vendor with the
+"Approved" (205) status, instead of waiting for someone to remember the button on the invoice card.
+Validating a received invoice is the act of accepting it - it leaves the draft state to enter the accounts
+and become payable - and 205 is the answer the buyer owes on an invoice it accepts; a vendor left without
+one cannot tell an accepted invoice from a forgotten one. It is sent once per invoice, never on an invoice
+already answered with "Approved" or "Refused", and never on an invoice that did not come from the platform.
+A failure to send is reported and logged but never undoes the validation, and the status can still be sent
+by hand afterwards. Set EINVOICING_DISABLE_SEND_APPROVED_ON_VALIDATION, in the module setup, on an instance
+where validating an invoice does not mean approving it: nothing is sent automatically then and the manual
+button is unchanged.
+
 FIX: The module works on Dolibarr 17 again, the version its own descriptor declares as the minimum it
 supports. Two things stood in the way and neither of them failed quietly. Installing it died on a PHP
 TypeError: init() passed an empty array() where ExtraFields::update() expects a parameter string, and
