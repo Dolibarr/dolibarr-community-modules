@@ -402,7 +402,7 @@ if (!function_exists('einvoicingDolGetButtonActionDropdown')) {
 	{
 		global $langs;
 
-		$out = '<div class="dropdown inline-block dropdown-holder">';
+		$out = '<div id="einvoicing_button_dropdown" class="dropdown inline-block dropdown-holder">';
 		$out .= '<a style="margin-right: auto;" class="dropdown-toggle butAction" data-toggle="dropdown">' . $label . '</a>';
 		$out .= '<div class="dropdown-content">';
 		foreach ($urlButtons as $subbutton) {
