@@ -310,13 +310,13 @@ class FacturXProtocol extends CIIProtocol
 			$profile = getDolGlobalString('EINVOICING_PROFILE');
 			switch ($profile) {
 				case 'EN16931':
-					$used_profile = ZugferdProfiles::PROFILE_EXTENDED;
-					$facturxpdf = ZugferdDocumentBuilder::createNew($used_profile);
-					// no break
+					$used_profile = ZugferdProfiles::PROFILE_EN16931;
+					break;
 				default:
 					$used_profile = ZugferdProfiles::PROFILE_EXTENDED;
-					$facturxpdf = ZugferdDocumentBuilder::createNew($used_profile);
+					break;
 			}
+			$facturxpdf = ZugferdDocumentBuilder::createNew($used_profile);
 			dol_syslog(get_class($this) . '::executeHooks create new XML document based on ' . $used_profile);
 
 			// Get the type of invoice in FacturX nomenclature
