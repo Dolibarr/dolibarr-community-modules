@@ -213,6 +213,16 @@ instead of undetermined, and the option that requires a reachable recipient bloc
 value. Where the verdict was read is displayed next to it, since the directory consulted by hand
 shows no status for that line.
 
+FIX: Synchronizing incoming documents no longer stops on a vendor whose thirdparty code is missing.
+On an instance where the code is mandatory - MAIN_COMPANY_CODE_ALWAYS_REQUIRED, or a numbering module
+that refuses an empty code - a thirdparty saved without one, as an import or a provisioning script
+leaves it, is refused by the core on every update: Societe::verify() answers ErrorSupplierCodeRequired
+and the synchronization aborts there, leaving the remaining flows untouched. The module now asks for a
+generated code, the way the thirdparty card does when it saves that same thirdparty, and only where
+the numbering module allows the code to be set. The customer code is treated the same, because the core
+checks both on any update and reports only the last of the two, which made the customer half invisible
+behind the vendor error. Marking a thirdparty as a vendor also stores its new code now, which passing
+the code alone never did: update() writes the code columns only when it is allowed to modify them.
 
 ## 1.0.3
 

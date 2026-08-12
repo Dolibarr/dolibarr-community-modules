@@ -713,14 +713,29 @@ trait CommonProtocol
 					$thirdparty->tva_assuj = 1;
 				}
 			}
-			// Si le tiers n'est pas encore fournisseur, on le marque comme tel
-			// (ex. prospect/client qui reçoit sa 1ère facture fournisseur).
+			// Flag the thirdparty as a vendor if it is not one yet
+			// (ex: a prospect or customer receiving its first supplier invoice).
 			if (!$thirdparty->fournisseur) {
 				$thirdparty->fournisseur = 1;
-				$thirdparty->code_fournisseur = 'auto';
 			}
 
-			$result = $thirdparty->update(0, $user);
+			// A thirdparty code may be mandatory (MAIN_COMPANY_CODE_ALWAYS_REQUIRED, or a numbering
+			// module refusing an empty code): verify() then refuses every update of a thirdparty saved
+			// without one, and the whole synchronization stops on it. Ask for a generated code when the
+			// numbering module allows it. The allowmod flags are required twice over: update() checks
+			// them before writing the code columns, and it is also how the thirdparty card saves a code.
+			$allowmodcodeclient = 0;
+			$allowmodcodefournisseur = 0;
+			if (empty($thirdparty->code_fournisseur) && $thirdparty->codefournisseur_modifiable()) {
+				$thirdparty->code_fournisseur = 'auto';
+				$allowmodcodefournisseur = 1;
+			}
+			if (!empty($thirdparty->client) && empty($thirdparty->code_client) && $thirdparty->codeclient_modifiable()) {
+				$thirdparty->code_client = 'auto';
+				$allowmodcodeclient = 1;
+			}
+
+			$result = $thirdparty->update(0, $user, 1, $allowmodcodeclient, $allowmodcodefournisseur);
 			if ($result < 0) {
 				$this->error = $thirdparty->error;
 				$this->errors = $thirdparty->errors;
