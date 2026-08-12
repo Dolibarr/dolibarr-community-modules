@@ -562,4 +562,189 @@ class CIIProfileShapeTest extends CommonClassTest
 			$this->assertSame(0, $this->countTag($xml, 'ram:SpecifiedProcuringProject'), $profile . ' must not carry an empty BT-11');
 		}
 	}
+
+	/**
+	 * Invoice data carrying an invoicing period (BG-14), and lines carrying their own (BG-26).
+	 *
+	 * @return	array{0: array<string,mixed>, 1: array<int,array<string,mixed>>}
+	 */
+	private function invoiceDataWithPeriod()
+	{
+		$data = $this->invoiceDataWithReferences();
+		$data['invoicingPeriodStart'] = new DateTime('2026-06-01');		// BT-73
+		$data['invoicingPeriodEnd'] = new DateTime('2026-06-30');		// BT-74
+
+		$lines = $this->baseLinesData();
+		$lines[0]['linePeriodStart'] = new DateTime('2026-06-01');		// BT-134
+		$lines[0]['linePeriodEnd'] = new DateTime('2026-06-30');			// BT-135
+
+		return [$data, $lines];
+	}
+
+	/**
+	 * The invoicing period of the document (BG-14) exists from BASIC WL up: MINIMUM declares no
+	 * ram:BillingSpecifiedPeriod under its HeaderTradeSettlementType, which holds ram:InvoiceCurrencyCode
+	 * and the monetary summation and nothing else (issue #572).
+	 *
+	 * @return void
+	 */
+	public function testInvoicingPeriodFollowsTheProfileSchema()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+		list($data, $lines) = $this->invoiceDataWithPeriod();
+
+		foreach (CIIProtocol::SUPPORTED_XML_PROFILES as $profile) {
+			$doc = new DOMDocument();
+			$this->assertTrue($doc->loadXML($protocol->buildXML($data, $lines, $profile)));
+
+			$settlement = $doc->getElementsByTagName('ApplicableHeaderTradeSettlement')->item(0);
+			$this->assertNotNull($settlement, $profile . ' must carry the settlement group');
+
+			$periods = [];
+			foreach ($settlement->childNodes as $child) {
+				if ($child instanceof DOMElement && $child->localName === 'BillingSpecifiedPeriod') {
+					$periods[] = $child;
+				}
+			}
+
+			if ($profile === 'MINIMUM') {
+				$this->assertSame(0, count($periods), 'MINIMUM does not declare ram:BillingSpecifiedPeriod');
+				continue;
+			}
+
+			$this->assertSame(1, count($periods), $profile . ' must carry BG-14 once');
+			$this->assertSame('20260601', $periods[0]->getElementsByTagName('DateTimeString')->item(0)->nodeValue, $profile . ' BT-73');
+			$this->assertSame('102', $periods[0]->getElementsByTagName('DateTimeString')->item(0)->getAttribute('format'));
+			$this->assertSame('20260630', $periods[0]->getElementsByTagName('DateTimeString')->item(1)->nodeValue, $profile . ' BT-74');
+		}
+	}
+
+	/**
+	 * Where BG-14 sits in the settlement group is not decoration: HeaderTradeSettlementType is a
+	 * sequence, and a ram:BillingSpecifiedPeriod written before the ram:ApplicableTradeTax nodes or
+	 * after the payment terms fails schema validation whatever it contains.
+	 *
+	 * @return void
+	 */
+	public function testInvoicingPeriodSitsWhereTheSchemaSequenceExpectsIt()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+		list($data, $lines) = $this->invoiceDataWithPeriod();
+
+		$doc = new DOMDocument();
+		$this->assertTrue($doc->loadXML($protocol->buildXML($data, $lines, 'EN16931')));
+
+		$settlement = $doc->getElementsByTagName('ApplicableHeaderTradeSettlement')->item(0);
+		$order = [];
+		foreach ($settlement->childNodes as $child) {
+			if ($child instanceof DOMElement) {
+				$order[] = $child->localName;
+			}
+		}
+
+		$period = array_search('BillingSpecifiedPeriod', $order, true);
+		$this->assertNotFalse($period, 'BG-14 missing from the settlement group');
+
+		$lastTax = array_keys($order, 'ApplicableTradeTax', true);
+		$this->assertNotEmpty($lastTax, 'no VAT breakdown to place BG-14 after');
+		$this->assertGreaterThan(end($lastTax), $period, 'BG-14 comes after every ram:ApplicableTradeTax');
+
+		$terms = array_search('SpecifiedTradePaymentTerms', $order, true);
+		$this->assertNotFalse($terms, 'no payment terms to place BG-14 before');
+		$this->assertLessThan($terms, $period, 'BG-14 comes before ram:SpecifiedTradePaymentTerms');
+	}
+
+	/**
+	 * A document with a period must still validate against the schema of each profile, which is what
+	 * proves the placement above rather than the assertion on the order of the siblings alone.
+	 *
+	 * @return void
+	 */
+	public function testAProfileWithAnInvoicingPeriodValidatesAgainstItsSchema()
+	{
+		global $db;
+
+		$schemaDir = dol_buildpath('/einvoicing/vendor/horstoeko/zugferd/src/schema', 0);
+		$xsd = [
+			'MINIMUM' => 'FACTUR-X_MINIMUM.xsd',
+			'BASICWL' => 'FACTUR-X_BASIC-WL.xsd',
+			'BASIC' => 'FACTUR-X_BASIC.xsd',
+			'EN16931' => 'FACTUR-X_EN16931.xsd',
+			'EXTENDED' => 'FACTUR-X_EXTENDED.xsd',
+			'EXTENDEDFR' => 'FACTUR-X_EXTENDED.xsd',	// conformant extension of EXTENDED
+		];
+
+		$protocol = new CIIProtocol($db);
+		list($data, $lines) = $this->invoiceDataWithPeriod();
+
+		foreach (CIIProtocol::SUPPORTED_XML_PROFILES as $profile) {
+			$doc = new DOMDocument();
+			$this->assertTrue($doc->loadXML($protocol->buildXML($data, $lines, $profile)));
+
+			$previous = libxml_use_internal_errors(true);
+			libxml_clear_errors();
+			$valid = $doc->schemaValidate($schemaDir . '/' . $xsd[$profile]);
+			$errors = libxml_get_errors();
+			libxml_use_internal_errors($previous);
+
+			$detail = [];
+			foreach (array_slice($errors, 0, 5) as $error) {
+				$detail[] = trim($error->message);
+			}
+			$this->assertTrue($valid, $profile . ' with a period must validate against ' . $xsd[$profile] . ":\n" . implode("\n", $detail));
+		}
+	}
+
+	/**
+	 * One side of the period alone is what the norm accepts (BR-CO-19 asks for the start date or the
+	 * end date), and the missing side leaves no empty element behind.
+	 *
+	 * @return void
+	 */
+	public function testOneSideOfTheInvoicingPeriodIsEnough()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+		list($data, $lines) = $this->invoiceDataWithPeriod();
+		$data['invoicingPeriodEnd'] = null;
+
+		$doc = new DOMDocument();
+		$this->assertTrue($doc->loadXML($protocol->buildXML($data, $lines, 'EN16931')));
+
+		$settlement = $doc->getElementsByTagName('ApplicableHeaderTradeSettlement')->item(0);
+		$period = null;
+		foreach ($settlement->childNodes as $child) {
+			if ($child instanceof DOMElement && $child->localName === 'BillingSpecifiedPeriod') {
+				$period = $child;
+			}
+		}
+
+		$this->assertNotNull($period, 'a start date alone is still a period');
+		$this->assertSame(1, $period->getElementsByTagName('StartDateTime')->length);
+		$this->assertSame(0, $period->getElementsByTagName('EndDateTime')->length, 'no empty BT-74');
+	}
+
+	/**
+	 * An invoice with no period on any line carries no header period either, and in particular no
+	 * empty group - which is also what every document generated before this existed looked like.
+	 *
+	 * @return void
+	 */
+	public function testNoInvoicingPeriodEmittedWhenTheInvoiceHasNone()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		foreach (CIIProtocol::SUPPORTED_XML_PROFILES as $profile) {
+			$xml = $protocol->buildXML($this->baseInvoiceData(), $this->baseLinesData(), $profile);
+
+			$this->assertSame(0, $this->countTag($xml, 'ram:BillingSpecifiedPeriod'), $profile . ' must not carry an empty BG-14');
+		}
+	}
 }

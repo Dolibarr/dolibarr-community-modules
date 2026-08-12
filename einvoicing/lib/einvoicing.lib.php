@@ -842,3 +842,43 @@ function einvoicingSellerTaxRegistrations($seller)
 
 	return $vatNumber !== '' ? array(array('type' => 'VA', 'value' => $vatNumber)) : array();
 }
+
+/**
+ * Invoicing period of the document (BG-14 / BT-73 / BT-74), derived from the periods of its lines.
+ *
+ * Dolibarr has no invoicing period at invoice level: the period lives on the line, as the date_start
+ * and date_end a service line carries. EN 16931 has both - BT-134/BT-135 on the line, BT-73/BT-74 on
+ * the header - and says nothing about deriving one from the other, so the derivation is a decision:
+ * the document covers everything its lines cover, hence the earliest start and the latest end (issue
+ * #572, option 1, chosen by the maintainer because most receiving software only reads the header).
+ *
+ * A period that would be its own contradiction is not emitted. One line billed from March with another
+ * billed until January derives a start after its end, which BR-29 refuses ("The Invoicing period end
+ * date shall be later or equal to the Invoicing period start date") - and a document refused whole for
+ * a header the operator never filled in would be worse than not deriving anything. The lines keep
+ * their own periods in that case, which is what happened before this existed.
+ *
+ * The argument is the accumulator buildinvoicelines.inc.php fills as it walks the lines:
+ * ['start' => [<numligne> => <timestamp>, ...], 'end' => [...]], either key absent when no line has
+ * that side.
+ *
+ * @param	array<string,array<int,int>>	$billingPeriod	Line periods collected from the invoice
+ * @return	array{start: ?int, end: ?int}					BT-73 and BT-74, null when there is none
+ */
+function einvoicingInvoicingPeriodFromLines($billingPeriod)
+{
+	$starts = array_filter(array_map('intval', (array) ($billingPeriod['start'] ?? array())));
+	$ends = array_filter(array_map('intval', (array) ($billingPeriod['end'] ?? array())));
+
+	$start = $starts ? min($starts) : null;
+	$end = $ends ? max($ends) : null;
+
+	if ($start !== null && $end !== null && $start > $end) {
+		dol_syslog('einvoicingInvoicingPeriodFromLines: the lines derive a period starting ' . dol_print_date($start, 'day')
+			. ' and ending ' . dol_print_date($end, 'day') . ', which BR-29 refuses; BT-73/BT-74 are left out', LOG_WARNING);
+
+		return array('start' => null, 'end' => null);
+	}
+
+	return array('start' => $start, 'end' => $end);
+}

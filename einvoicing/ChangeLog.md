@@ -2,6 +2,28 @@
 
 ## 1.0.4
 
+NEW: Validating a supplier invoice received through the platform now answers its vendor with the
+"Approved" (205) status, instead of waiting for someone to remember the button on the invoice card.
+Validating a received invoice is the act of accepting it - it leaves the draft state to enter the accounts
+and become payable - and 205 is the answer the buyer owes on an invoice it accepts; a vendor left without
+one cannot tell an accepted invoice from a forgotten one. It is sent once per invoice, never on an invoice
+already answered with "Approved" or "Refused", and never on an invoice that did not come from the platform.
+A failure to send is reported and logged but never undoes the validation, and the status can still be sent
+by hand afterwards. Set EINVOICING_DISABLE_SEND_APPROVED_ON_VALIDATION, in the module setup, on an instance
+where validating an invoice does not mean approving it: nothing is sent automatically then and the manual
+button is unchanged.
+
+FIX: The generated documents now declare the period the invoice covers (BG-14, BT-73 and BT-74), which
+neither the CII nor the Factur-X path ever wrote. Dolibarr holds a period on the line and not on the
+invoice, so the header period is the one covering every line: the earliest start date and the latest end
+date of the lines that carry one. The line periods (BT-134/BT-135) are unchanged and still emitted; this
+adds the header the receiving software mostly reads, since a majority of tools only handle a period at
+invoice level. An invoice whose lines carry no period declares none, one side alone is enough
+(BR-CO-19 asks for the start date or the end date), and a set of lines that would derive a period
+starting after it ends - one line open from March next to another closed in January - declares no header
+period at all rather than a pair BR-29 refuses, which would have the whole document rejected for a field
+nobody filled in (issue #572).
+
 FIX: The module works on Dolibarr 17 again, the version its own descriptor declares as the minimum it
 supports. Two things stood in the way and neither of them failed quietly. Installing it died on a PHP
 TypeError: init() passed an empty array() where ExtraFields::update() expects a parameter string, and
