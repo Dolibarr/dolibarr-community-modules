@@ -746,9 +746,9 @@ $deliveryDate = !empty($deliveryDateList)
 
 
 
-// VAT exigibility scheme of the seller: the VAT mode of the Tax/VAT module setup, unless the seller
-// declared its regime explicitly with EINVOICING_VAT_POINT_DATE_CODE. It decides the VAT point date
-// code the document carries (BT-8) and the legal mention that goes with the debits option.
+// VAT exigibility scheme of the seller, which is the VAT mode of the Tax/VAT module setup and nothing
+// else. It decides the VAT point date code the document carries (BT-8) and the legal mention that goes
+// with the debits option.
 $vatOnDebits      = einvoicingVatOnDebits();
 $vatPointDateCode = einvoicingVatPointDateCode($hasProductLine, $hasServiceLine, $object->type == $object::TYPE_DEPOSIT);
 

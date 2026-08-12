@@ -443,8 +443,8 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 	 *
 	 * The reform only requires the payment data for the operations whose VAT is due on collection, which is
 	 * exactly what the VAT exigibility scheme of the company says. einvoicingVatDueOnCollection() answers
-	 * that from the VAT mode of the Tax/VAT module setup, or from the regime the seller declared explicitly
-	 * in the module setup, and the generated document answers the neighbouring question in BT-8.
+	 * that from the VAT mode of the Tax/VAT module setup, the one place that holds it, and the generated
+	 * document answers the neighbouring question in BT-8.
 	 *
 	 * @param  Facture $invoice Invoice that has been cashed in
 	 * @return bool             True if the status has to be sent

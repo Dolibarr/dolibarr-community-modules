@@ -271,18 +271,6 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 		.dol_escape_htmltag($vatexigibility)
 		.'</b> <a href="'.DOL_URL_ROOT.'/admin/taxes.php">'.$langs->trans('Setup').'</a>';
 
-	// The VAT regime the generated documents declare in BT-8. Left to the VAT mode above by default;
-	// an explicit value is for a seller whose regime that mode cannot express (issue #419).
-	$item = $formSetup->newItem('EINVOICING_VAT_POINT_DATE_CODE')->setAsSelect(array(
-		'auto' => $langs->transnoentities('EINVOICING_VAT_POINT_DATE_CODE_AUTO'),
-		'5'    => $langs->transnoentities('EINVOICING_VAT_POINT_DATE_CODE_5'),
-		'29'   => $langs->transnoentities('EINVOICING_VAT_POINT_DATE_CODE_29'),
-		'72'   => $langs->transnoentities('EINVOICING_VAT_POINT_DATE_CODE_72'),
-	));
-	$item->helpText = $langs->transnoentities('EINVOICING_VAT_POINT_DATE_CODE_HELP');
-	$item->defaultFieldValue = 'auto';
-	$item->cssClass = 'minwidth500';
-
 	// Setup conf to automatically transmit the e-invoice to the PA right after it is generated (on validation)
 	$item = $formSetup->newItem('EINVOICING_AUTO_SEND_ON_GENERATION')->setAsYesNo();
 	$item->helpText = $langs->transnoentities('EINVOICING_AUTO_SEND_ON_GENERATION_HELP');
