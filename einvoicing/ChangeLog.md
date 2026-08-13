@@ -24,6 +24,14 @@ starting after it ends - one line open from March next to another closed in Janu
 period at all rather than a pair BR-29 refuses, which would have the whole document rejected for a field
 nobody filled in (issue #572).
 
+FIX: Importing a received e-invoice now keeps the billing period of its lines (BT-134 / BT-135), where a
+service line billed over a period used to arrive with no period at all. The two dates were read from the
+document and then went nowhere: the line built for the supplier invoice never carried them, although the
+call that saves it has always passed its date_start and date_end on to the core. A period with only one
+of the two dates keeps that one, as the norm allows (BR-CO-20). A document declaring a period that ends
+before it starts - which BR-30 refuses, and which the core refuses too - is imported without that period
+rather than failing the whole invoice over it (issue #576).
+
 FIX: The module works on Dolibarr 17 again, the version its own descriptor declares as the minimum it
 supports. Two things stood in the way and neither of them failed quietly. Installing it died on a PHP
 TypeError: init() passed an empty array() where ExtraFields::update() expects a parameter string, and
@@ -70,6 +78,19 @@ equal those of the breakdown - so with the reason on the breakdown alone the rul
 reported the invoice as unbalanced, and the reference validator returned it as invalid whatever else
 the document got right. Both the CII and the Factur-X writers now repeat them on the line; a line with
 nothing to declare is unchanged.
+FIX: Below Dolibarr 24, a Factur-X invoice was produced as a plain PDF with the XML attached to it,
+without the document level /AF entry nor the PDF/A-3 output intent a Factur-X reader looks for, and
+with the XML embedded twice. Nothing said so, and the file was refused further down the line: the
+public validator answers "the file does not contain one and only one factur-x.xml". The cause was a
+class name collision - the core declares its own FPDF below v24, which the writer of
+horstoeko/zugferd cannot then inherit from - and the fallback silently degraded the output instead.
+Such a file is now built with TCPDF, which the collision does not concern and which supports PDF/A-3
+natively, so every supported Dolibarr version produces the same structure. The produced file is also
+checked before being handed over, so an incomplete one is reported instead of being sent, a carrier
+PDF that cannot be read aborts the generation with an explicit message rather than dying on a parser
+error, and Factur-X no longer announces itself as needing Dolibarr 24. The sample invoice of the
+setup page was hit by the same collision, from a page that had already rendered a PDF: it died on a
+PHP fatal error, which no error handling can catch, and the setup page came back blank (issue #554).
 
 FIX: A line billed over a period that has only a start date, or only an end date, now carries that
 period in the Factur-X document as it already did in the CII one. The Factur-X path asked for both

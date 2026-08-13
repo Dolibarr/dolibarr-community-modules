@@ -67,7 +67,7 @@ class PDPProviderManager
 				'class' => 'EsalinkPDPProvider',
 				'position' => 10,
 				'provider_countries' => array('FR'),
-				'provider_name' => picto_from_langcode('FR').' ESALINK <span class="opacitymedium">('.$langs->trans("NeedASubscriptionTo", "PDPLibre").')</span>',
+				'provider_name' => picto_from_langcode('FR', 'style="width: 16px"').' ESALINK <span class="opacitymedium">('.$langs->trans("NeedASubscriptionTo", "PDPLibre").')</span>',
 				'description' => 'Esalink PDP Integration',
 				'is_enabled' => 1,
 				'prod_account_admin_url' => 'https://pdplibre.org/solutions/',
@@ -77,7 +77,7 @@ class PDPProviderManager
 				'class' => 'SuperPDPProvider',
 				'position' => getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER') ? 2 : 20,
 				'provider_countries' => array('all'),
-				'provider_name' => picto_from_langcode('FR').' SuperPDP'.(getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER') ? ' <span class="opacitymedium">('.$langs->trans("UsingYourOwnBillingAccount").")</span>" : ""),
+				'provider_name' => picto_from_langcode('FR', 'style="width: 16px"').' SuperPDP'.(getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER') ? ' <span class="opacitymedium">('.$langs->trans("UsingYourOwnBillingAccount").")</span>" : ""),
 				'description' => 'SuperPDP Integration',
 				'note' => 'Use "client_credentials" mode',
 				//'is_enabled' => getDolGlobalString('EINVOICING_TEST_SUPERPDP'),
@@ -91,11 +91,11 @@ class PDPProviderManager
 				'class' => 'TestPDPProvider',
 				'position' => 100,
 				'provider_countries' => array('all'),
-				'provider_name' => 'TESTPDP <span class="opacitymedium">(sample provider, sends nothing)</span>',
-				'description' => 'Sample PDP Integration',
-				'is_enabled' => getDolGlobalInt('EINVOICING_ALLOW_DEVTOOLS') ? 1 : 0,
-				'prod_account_admin_url' => 'https://example.com',
-				'test_account_admin_url' => 'https://example.com',
+				'provider_name' => img_picto('', 'generic', 'style="width: 16px"').' None <span class="opacitymedium">(Einvoice generation only, no send/receive)</span>',
+				'description' => 'EInvoice generation only',
+				'is_enabled' => 1,
+				'prod_account_admin_url' => '',
+				'test_account_admin_url' => '',
 			)
 		);
 
@@ -177,7 +177,7 @@ class PDPProviderManager
 	 * See einvoicing/doc/ADD-A-PDP-PROVIDER.md for the complete contract.
 	 *
 	 * A hook is used rather than a scan of the module directories because it lists only the providers
-	 * of the modules that are enabled, it costs nothing when no module implements it, and it lets the
+	 * of the modules that are enabled, it costs nothing when no module implements it, and it let the
 	 * module build its own entry (position, urls, label translated in the language of the user).
 	 *
 	 * @return void

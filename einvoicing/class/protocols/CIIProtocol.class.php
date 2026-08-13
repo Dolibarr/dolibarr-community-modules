@@ -34,6 +34,7 @@ require_once DOL_DOCUMENT_ROOT . '/core/class/translate.class.php';
 require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
 require_once DOL_DOCUMENT_ROOT . '/core/class/discount.class.php';
 require_once DOL_DOCUMENT_ROOT . '/core/lib/files.lib.php';
+require_once DOL_DOCUMENT_ROOT . '/core/lib/date.lib.php';
 // dolChmod() only exists from Dolibarr 18, and both writers call it on the XML they just produced.
 if ((float) DOL_VERSION < 18) {
 	dol_include_once('/einvoicing/compat/files.lib.php');
@@ -1307,6 +1308,18 @@ class CIIProtocol extends AbstractProtocol
 			$line->total_tva = $parsedLine['calculatedAmount'] ?? 0;
 			$line->total_ttc = $parsedLine['lineTotalAmount'] + ($parsedLine['calculatedAmount'] ?? 0);
 
+			// Billing period of the line (BT-134 / BT-135). The two dates were read from the document and
+			// then went nowhere: createSupplierInvoiceLinesIntoDatabase() has always handed
+			// $line->date_start / ->date_end to updateline(), but nothing ever set them, so a service line
+			// billed over a period arrived without one (issue #576). See resolveLinePeriod().
+			$linePeriod = $this->resolveLinePeriod($parsedLine);
+			if ($linePeriod['start'] !== null) {
+				$line->date_start = $linePeriod['start'];
+			}
+			if ($linePeriod['end'] !== null) {
+				$line->date_end = $linePeriod['end'];
+			}
+
 			$supplierInvoice->lines[] = $line;
 		}
 
@@ -1471,6 +1484,46 @@ class CIIProtocol extends AbstractProtocol
 			return null;
 		$v = str_replace(',', '.', trim($v));
 		return is_numeric($v) ? (float) $v : null;
+	}
+
+	/**
+	 * Billing period of a received line (BG-26 / BT-134 / BT-135), as the timestamps a Dolibarr line holds.
+	 *
+	 * parseInvoiceLines() hands the two dates as 'Y-m-d' strings, normDate() having already reduced whatever the
+	 * document carried to that shape, and a supplier invoice line stores a timestamp: updateline() passes
+	 * date_start / date_end to idate() on every supported core. dol_stringtotime() is the conversion the
+	 * import already makes for the invoice date itself, so the line periods are read the same way rather
+	 * than through a second convention (issue #576).
+	 *
+	 * One side alone is kept: BR-CO-20 accepts a period with a start date or an end date, "or both", and
+	 * facture_fourn_det holds one without the other.
+	 *
+	 * A period that ends before it starts is dropped, keeping the line. Such a document breaks BR-30 and
+	 * should not exist, but it comes from outside, and updateline() answers -1 on that pair
+	 * (ErrorStartDateGreaterEnd) - which would fail the whole import over a period, where dropping it
+	 * imports the invoice as it always did.
+	 *
+	 * @param	array<string,mixed>				$parsedLine		One line as parseInvoiceLines() returns it
+	 * @return	array{start: ?int, end: ?int}					Timestamps to store, null for a side with nothing
+	 */
+	private function resolveLinePeriod(array $parsedLine)
+	{
+		$start = !empty($parsedLine['linePeriodStart']) ? dol_stringtotime((string) $parsedLine['linePeriodStart']) : null;
+		$end = !empty($parsedLine['linePeriodEnd']) ? dol_stringtotime((string) $parsedLine['linePeriodEnd']) : null;
+
+		// dol_stringtotime() answers false or '' on something it cannot read, and that must not reach idate().
+		$start = is_int($start) && $start > 0 ? $start : null;
+		$end = is_int($end) && $end > 0 ? $end : null;
+
+		if ($start !== null && $end !== null && $start > $end) {
+			dol_syslog(get_class($this) . '::resolveLinePeriod line ' . ($parsedLine['lineid'] ?? '?')
+				. ' declares a period from ' . dol_print_date($start, 'day') . ' to ' . dol_print_date($end, 'day')
+				. ', which BR-30 refuses; the line is imported without its period', LOG_WARNING);
+
+			return array('start' => null, 'end' => null);
+		}
+
+		return array('start' => $start, 'end' => $end);
 	}
 
 

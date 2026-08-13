@@ -83,7 +83,7 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 
 		parent::setUp();
 
-		$conf->global->EINVOICING_DISABLE_SEND_APPROVED_ON_VALIDATION = '1';
+		$conf->global->EINVOICING_SEND_APPROVED_ON_VALIDATION = '0';
 	}
 
 	/**
@@ -698,7 +698,7 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 	{
 		global $conf, $db;
 
-		unset($conf->global->EINVOICING_DISABLE_SEND_APPROVED_ON_VALIDATION);	// the default, which setUp() switched off
+		$conf->global->EINVOICING_SEND_APPROVED_ON_VALIDATION = '1';
 
 		$invoice = $this->createSpecimenSupplierInvoice();
 		$this->addEInvoicingDocument($invoice->id);
@@ -717,7 +717,7 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 	{
 		global $conf, $db;
 
-		unset($conf->global->EINVOICING_DISABLE_SEND_APPROVED_ON_VALIDATION);
+		$conf->global->EINVOICING_SEND_APPROVED_ON_VALIDATION = '1';
 
 		$invoice = $this->createSpecimenSupplierInvoice();
 
@@ -735,7 +735,7 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 	{
 		global $conf, $db;
 
-		unset($conf->global->EINVOICING_DISABLE_SEND_APPROVED_ON_VALIDATION);
+		$conf->global->EINVOICING_SEND_APPROVED_ON_VALIDATION = '1';
 
 		$invoice = $this->createSpecimenSupplierInvoice();
 		$this->addEInvoicingDocument($invoice->id);
@@ -755,7 +755,7 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 	{
 		global $conf, $db;
 
-		unset($conf->global->EINVOICING_DISABLE_SEND_APPROVED_ON_VALIDATION);
+		$conf->global->EINVOICING_SEND_APPROVED_ON_VALIDATION = '1';
 
 		$invoice = $this->createSpecimenSupplierInvoice();
 		$this->addEInvoicingDocument($invoice->id);
@@ -779,9 +779,9 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 		$this->addEInvoicingDocument($invoice->id);
 		$einvoicing = new EInvoicing($db);
 
-		$conf->global->EINVOICING_DISABLE_SEND_APPROVED_ON_VALIDATION = '1';
+		$conf->global->EINVOICING_SEND_APPROVED_ON_VALIDATION = '0';
 		$this->assertFalse(SupplierInvoiceHelper::shouldSendApprovedOnValidation($einvoicing, (int) $invoice->id, 'invoice_supplier'));
-		unset($conf->global->EINVOICING_DISABLE_SEND_APPROVED_ON_VALIDATION);		// back to the default
+		$conf->global->EINVOICING_SEND_APPROVED_ON_VALIDATION = '1';
 
 		$conf->global->EINVOICING_DISABLE_SYNC_DOLI_TO_AP = '1';
 		$this->assertFalse(SupplierInvoiceHelper::shouldSendApprovedOnValidation($einvoicing, (int) $invoice->id, 'invoice_supplier'));

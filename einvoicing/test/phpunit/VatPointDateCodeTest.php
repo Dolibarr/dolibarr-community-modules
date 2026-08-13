@@ -173,9 +173,9 @@ class VatPointDateCodeTest extends CommonClassTest
 	}
 
 	/**
-	 * "La TVA est exigible a l'encaissement de l'acompte pour les livraisons de biens comme pour les
-	 * prestations de service, meme avec option sur les debits" (XP Z12-014 annexe A). So a down payment
-	 * declares the payment date whatever the VAT mode and whatever regime the seller declared, and
+	 * @phpcs:ignore
+	 * "La TVA est exigible a l'encaissement de l'acompte pour les livraisons de biens comme pour les prestations de service, meme avec option sur les debits" (XP Z12-014 annexe A).
+	 * So a down payment declares the payment date whatever the VAT mode and whatever regime the seller declared, and
 	 * Dolibarr building every down payment line as a goods line is why it has to be said explicitly.
 	 *
 	 * @return void

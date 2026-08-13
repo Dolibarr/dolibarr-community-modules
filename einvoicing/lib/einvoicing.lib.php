@@ -680,8 +680,10 @@ function einvoicingVatOnDebits()
  * (TVA sur DEBITS)", "29 : date de livraison (TVA sur DEBITS)" and "72 : date de paiement (TVA sur
  * ENCAISSEMENTS)", and carries two rules on it:
  *
+ * @phpcs:ignore
  *   G1.43        "Le BT-8 ne sera obligatoire que si l'entreprise a opte pour la TVA sur les debits
  *                 et le specifie au moyen du code 5 (CII)"
+ * @phpcs:ignore
  *   BR-FR-MAP-03 "BT-8 est obligatoire pour les factures de service des lors que l'assujetti Vendeur
  *                 a opte pour les debits"
  *
@@ -706,10 +708,10 @@ function einvoicingVatOnDebits()
  */
 function einvoicingVatPointDateCode($hasProductLine, $hasServiceLine, $isDeposit = false)
 {
-	// A down payment is the one case the socle settles on its own, and it settles it against every
-	// other rule here: XP Z12-014 annexe A reads "La TVA est exigible a l'encaissement de l'acompte
-	// pour les livraisons de biens comme pour les prestations de service, meme avec option sur les
-	// debits". So it is decided first, before the declared regime and before the VAT mode. Dolibarr
+	// A down payment is the one case the socle settles on its own, and it settles it against every other rule here: XP Z12-014 annexe A reads
+	// @phpcs:ignore
+	// "La TVA est exigible a l'encaissement de l'acompte pour les livraisons de biens comme pour les prestations de service, meme avec option sur les debits".
+	// So it is decided first, before the declared regime and before the VAT mode. Dolibarr
 	// builds every down payment line as a goods line, so without this the document would say nothing
 	// while its cash-in is reported to the platform with the status 212 for that very reason.
 	if ($isDeposit) {
@@ -732,8 +734,8 @@ function einvoicingVatPointDateCode($hasProductLine, $hasServiceLine, $isDeposit
 	$sellServiceOnPayment = (getDolGlobalString('TAX_MODE_SELL_SERVICE') == 'payment');
 
 	// Nothing is sent when no operation of the document is taxed on collection. The socle reads that
-	// silence: XP Z12-014 annexe A describes a VAT due on collection as "avec BT-8 absent, ou bien
-	// present et signifiant a l'encaissement (72)", making the two equivalent.
+	// silence: XP Z12-014 annexe A describes a VAT due on collection as
+	// "avec BT-8 absent, ou bien present et signifiant a l'encaissement (72)", making the two equivalent.
 	if (($sellServiceOnPayment && $hasServiceLine) || ($sellProductOnPayment && $hasProductLine)) {
 		return '72';
 	}
