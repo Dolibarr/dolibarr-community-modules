@@ -818,7 +818,7 @@ trait CommonProtocol
 			$sellerzip = trim($sellerInfo['sellerpostcode'] ?? '');
 			$sellertown = trim($sellerInfo['sellercity'] ?? '');
 			$sellercountrycode = trim($sellerInfo['sellercountry'] ?? '');
-			$selleraddress = trim($sellerInfo['sellerlienone'] ?? '');
+			$selleraddress = trim($sellerInfo['sellerlineone'] ?? '');
 			if (!empty($sellerInfo['sellerlinetwo'])) {
 				$selleraddress .= "\n" . $sellerInfo['sellerlinetwo'];
 			}
@@ -858,7 +858,10 @@ trait CommonProtocol
 				$createParams['town'] = $sellertown;
 			}
 			if (!empty($sellercountrycode)) {
-				$createParams['country_id'] = dol_getIdFromCode($this->db, $sellercountrycode, 'c_country');
+				$countryid = dol_getIdFromCode($this->db, $sellercountrycode, 'c_country');
+				if ($countryid > 0) {
+					$createParams['country_id'] = $countryid;
+				}
 			}
 
 
