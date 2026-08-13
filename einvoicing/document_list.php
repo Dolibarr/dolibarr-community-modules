@@ -244,12 +244,15 @@ if (!$permissiontoread) {
 	accessforbidden();
 }
 
+
+
 // Fixed slots of the "last invoice that could not be processed" diagnostic, written by
 // AbstractProtocol::cleanupIncomingTempFiles(): one per protocol (einvoice.xml for a CII flow,
 // einvoice.pdf for a Factur-X one), plus the readable view when the platform provided one.
 $protocolManager = new ProtocolManager($db);
 $diagFileNames = $protocolManager->getIncomingDiagnosticFileNames();
 $diagReadableFileName = AbstractProtocol::INCOMING_DIAGNOSTIC_READABLE_FILE_NAME;
+
 
 
 /*

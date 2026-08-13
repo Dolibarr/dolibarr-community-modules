@@ -1146,6 +1146,8 @@ trait CommonProtocol
 			$prodDesc = trim($lineData['proddesc'] ?? '');
 			$vendorId = $lineData['supplierId'];
 
+			$langs->loadLangs(array("product", "einvoicing@einvoicing"));
+
 			$errorDetails = [];
 			$createParams = [];
 			$actiondata = ['ref' => $prodRef, 'supplierref' => $prodSupplierRef, 'name' => $prodName];
@@ -1166,7 +1168,7 @@ trait CommonProtocol
 				$createParams['supplierref'] = $prodSupplierRef;			// TODO Dolibarr must be able to handle this parameter
 			}
 			if (!empty($prodName)) {
-				$errorDetails[] = 'Name: ' . $prodName;
+				$errorDetails[] = $langs->trans("Name").': ' . $prodName;
 				$createParams['label'] = $prodName;
 			}
 			if (!empty($prodDesc)) {
@@ -1206,6 +1208,7 @@ trait CommonProtocol
 			$action .= $langs->trans($prodType == 1 ? 'CreateTheService' : 'CreateTheProduct');
 			$action .= '</a>';
 
+
 			// Second choice: map the vendor product reference(s) of this flow onto existing Dolibarr products.
 			// This creates the vendor reference (llx_product_fournisseur_price) that the matching uses at step 1,
 			// so the next synchronization will find the product without creating a new one.
@@ -1218,10 +1221,11 @@ trait CommonProtocol
 
 				$action .= ' ' . $langs->trans("or") . ' ';
 				$action .= '<a class="butAction smallpaddingimp" href="' . dol_escape_htmltag($mappingUrl) . '" target="_blank">';
-				$action .= '<i class="fas fa-link"></i> ';
+				$action .= '<i class="fas fa-link unsetcolor"></i> ';
 				$action .= $langs->trans('MapToAnExistingProduct');
 				$action .= '</a>';
 			}
+
 
 			return array(
 				'res' => -1,
