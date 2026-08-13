@@ -1044,7 +1044,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	{
 		// Invoice list
 		if (in_array('invoicelist', explode(':', $parameters['context']))) {
-			$this->resprints .= ', ext.syncstatus  AS pdp_syncstatus';
+			$this->resprints .= ', ext.rowid AS pdplink_id, ext.provider AS pdp_provider';
+			$this->resprints .= ', ext.syncstatus AS pdp_syncstatus';
 		}
 
 		// Supplier invoice list, Product list, Soc list
@@ -1080,17 +1081,17 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	{
 		global $db;
 
-		if (in_array('invoicelist', explode(':', $parameters['context']))) {
-			$this->resprints .= " LEFT JOIN " . $db->prefix() . "einvoicing_extlinks as ext ON ext.element_id = f.rowid AND ext.element_type = 'facture'";
-		}
-
 		// Supplier invoice list, Product list, Soc list
 		$contexts = explode(':', $parameters['context']);
 
-		if (array_intersect($contexts, ['supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist'])) {
+		if (array_intersect($contexts, ['invoicelist', 'supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist'])) {
 			if (in_array('thirdpartylist', $contexts, true)) {
 				$this->resprints .= ' LEFT JOIN ' . $db->prefix() . "einvoicing_extlinks as ext ON ext.element_id = s.rowid AND ext.element_type = 'societe'";
 				$this->resprints .= ' LEFT JOIN ' . $db->prefix() . "einvoicing_routing rt ON rt.fk_soc = s.rowid";
+			}
+
+			if (in_array('invoicelist', explode(':', $parameters['context']))) {
+				$this->resprints .= " LEFT JOIN " . $db->prefix() . "einvoicing_extlinks as ext ON ext.element_id = f.rowid AND ext.element_type = 'facture'";
 			}
 
 			if (in_array('supplierinvoicelist', $contexts, true)) {
@@ -1118,15 +1119,9 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	{
 		global $db;
 
-		if (in_array('invoicelist', explode(':', $parameters['context']))) {
-			if (GETPOST('search_pdp_syncstatus', 'alpha') !== '' && GETPOST('search_pdp_syncstatus', 'alpha') != -2) {
-				$this->resprints .= ' AND ext.syncstatus = ' . ((int) GETPOST('search_pdp_syncstatus'));
-			}
-		}
-
-		// Supplier invoice list, Product list, Soc list
 		$contexts = explode(':', $parameters['context']);
-		if (array_intersect($contexts, ['supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist'])) {
+
+		if (array_intersect($contexts, ['invoicelist', 'supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist'])) {
 			if (GETPOST('search_pdplinked', 'alpha') !== '' && GETPOST('search_pdplinked', 'alpha') == getDolGlobalString('EINVOICING_PDP')) {
 				$this->resprints .= " AND ext.provider = '" . $db->escape(getDolGlobalString('EINVOICING_PDP')) . "'";
 			}
@@ -1136,7 +1131,13 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			}
 		}
 
-		if (in_array('supplierinvoicelist', $contexts) && GETPOST('search_pdp_lcstatus', 'alpha') !== '' && GETPOST('search_pdp_lcstatus', 'alpha') != -2) {
+		if (in_array('invoicelist', $contexts) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
+			if (GETPOST('search_pdp_syncstatus', 'alpha') !== '' && GETPOST('search_pdp_syncstatus', 'alpha') != -2) {
+				$this->resprints .= ' AND ext.syncstatus = ' . ((int) GETPOST('search_pdp_syncstatus'));
+			}
+		}
+
+		if (in_array('supplierinvoicelist', $contexts) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI') && GETPOST('search_pdp_lcstatus', 'alpha') !== '' && GETPOST('search_pdp_lcstatus', 'alpha') != -2) {
 			$this->resprints .= ' AND (' . self::getSupplierLifecycleStatusSubQuery() . ') = ' . GETPOSTINT('search_pdp_lcstatus');
 		}
 
@@ -1176,13 +1177,30 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				return 0;
 			}
 
-			// Einvoice generated or not
-			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
-				print '<td class="liste_titre einvoicegenerated">';
-				print '</td>';
-			}
+			$tmpeinvoicingpartner = preg_replace('/ViaPartner/i', '', getDolGlobalString('EINVOICING_PDP'));
+			$listofoptions = array(
+				$tmpeinvoicingpartner => $tmpeinvoicingpartner,
+			);
 
-			// Sync status
+			// AP platform
+			print '<td class="liste_titre">';
+			print $form->selectarray(
+				'search_pdplinked',
+				$listofoptions,
+				GETPOST('search_pdplinked', 'alpha'),
+				-2,
+				0,
+				0,
+				'',
+				0,
+				0,
+				0,
+				'',
+				'width100 '
+			);
+			print '</td>';
+
+			// E-invoice status
 			if (empty($parameters['arrayfields']['pdp_syncstatus']) || !empty($parameters['arrayfields']['pdp_syncstatus']['checked'])) {
 				print '<td class="liste_titre pdp_syncstatus">';
 				$listofoptions = $einvoicing->getEinvoiceStatusOptions(0, 0, 0, 0, 1, 0, 1);
@@ -1196,6 +1214,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				unset($listofoptions[$einvoicing::STATUS_UNKNOWN]);
 				//}
 
+				// Einvoice status
 				print $form->selectarray(
 					'search_pdp_syncstatus',
 					$listofoptions,
@@ -1216,9 +1235,12 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		// Supplier invoice list, Product list, Soc list
 		if (in_array('supplierinvoicelist', explode(':', $parameters['context'])) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
+			$tmpeinvoicingpartner = preg_replace('/ViaPartner/i', '', getDolGlobalString('EINVOICING_PDP'));
 			$listofoptions = array(
-				getDolGlobalString('EINVOICING_PDP') => getDolGlobalString('EINVOICING_PDP'),
+				$tmpeinvoicingpartner => $tmpeinvoicingpartner,
 			);
+
+			// AP platform
 			print '<td class="liste_titre">';
 			print $form->selectarray(
 				'search_pdplinked',
@@ -1287,13 +1309,17 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	{
 		global $db, $langs;
 
-		if (in_array('invoicelist', explode(':', $parameters['context'])) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
+		$contexts = explode(':', $parameters['context']);
+
+		if (in_array('invoicelist', $contexts) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 			$einvoicing = new EInvoicing($db);
 			$checkConfig = $einvoicing->checkModulePrerequisites();
 			if ($checkConfig < 0) {
 				dol_syslog(__METHOD__ . "EINVOICING Module is not correctly configured.");
 				return 0;
 			}
+
+			print_liste_field_titre($langs->transnoentitiesnoconv('einvoicingSourceTitle'));
 
 			// Einvoice generated or not
 			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
@@ -1307,19 +1333,19 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		}
 
 		// Supplier invoice list, Product list, Soc list
-		if (in_array('supplierinvoicelist', explode(':', $parameters['context'])) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
+		if (in_array('supplierinvoicelist', $contexts) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
 			print_liste_field_titre($langs->transnoentitiesnoconv('einvoicingSourceTitle'));
 			print_liste_field_titre($langs->transnoentitiesnoconv('einvoicingInvoiceStatus'), '', '', '', $parameters['param'] ?? '', '', '', '', 'center ');
 		}
 
-		if (in_array('thirdpartylist', explode(':', $parameters['context'])) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI'))) {
+		if (in_array('thirdpartylist', $contexts) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI'))) {
 			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
 				print_liste_field_titre($langs->transnoentitiesnoconv('einvoicingThirdPartyRoutingTitle'));
 			}
 		}
 
 		// @phan-suppress-next-line PhanPluginEmptyStatementIf
-		if (in_array('productlist', explode(':', $parameters['context'])) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI'))) {
+		if (in_array('productlist', $contexts) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI'))) {
 			// None yet
 		}
 
@@ -1340,14 +1366,25 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	{
 		global $db, $langs;
 
-		if (in_array('invoicelist', explode(':', $parameters['context'])) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
-			$obj = $parameters['obj'];
+		$contexts = explode(':', $parameters['context']);
 
+		if (in_array('invoicelist', $contexts) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 			$einvoicing = new EInvoicing($db);
 			$checkConfig = $einvoicing->checkModulePrerequisites();
 			if ($checkConfig < 0) {
 				dol_syslog(__METHOD__ . "EINVOICING Module is not correctly configured.");
 				return 0;
+			}
+
+			$obj = $parameters['obj'];
+
+			print '<td class="tdoverflowmax100">';
+			if ($obj->pdplink_id) {
+				print dolPrintHTML($obj->pdp_provider);
+			}
+			print '</td>';
+			if (isset($parameters['i']) && empty($parameters['i'])) {
+				$parameters['totalarray']['nbfield']++;
 			}
 
 			// E-invoice generation status
@@ -1384,7 +1421,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		}
 
 		// Supplier invoice list, Product list, Soc list
-		if (in_array('supplierinvoicelist', explode(':', $parameters['context'])) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
+		if (in_array('supplierinvoicelist', $contexts) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
 			$obj = $parameters['obj'];
 
 			print '<td class="tdoverflowmax100">';
