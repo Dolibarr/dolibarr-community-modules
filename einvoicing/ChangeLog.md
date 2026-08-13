@@ -99,6 +99,14 @@ entirely - and the same invoice produced two different documents depending on th
 One date alone is a period the norm accepts: BR-CO-20 asks for the start date or the end date, "or
 both".
 
+FIX: The Access point setup page carries the title of each of its sections again on Dolibarr 18 to 22.
+FormSetup::generateOutput() did not grow its arguments all at once - $editMode alone up to 19, plus
+$hideTitle from 20, and only from 23 the $title and $cssfirstcolumn the page passes - and PHP discards
+the surplus arguments of a user function without a word, so from 20 on the page asked for a title the
+core never read and printed the default "Parameter / Value" header instead. The rewrite that supplies
+the title below that version is used up to 22 now, and it matches the header row on its shape rather
+than on the "Value" label, which 22 leaves empty.
+
 FIX: Generating two Factur-X sample invoices in the same request no longer ends on a PHP fatal error.
 The generator loaded its helper file with require rather than require_once, so the second call
 redeclared its functions - and a fatal error is not something the calling code can catch and report.
@@ -266,6 +274,26 @@ the numbering module allows the code to be set. The customer code is treated the
 checks both on any update and reports only the last of the two, which made the customer half invisible
 behind the vendor error. Marking a thirdparty as a vendor also stores its new code now, which passing
 the code alone never did: update() writes the code columns only when it is allowed to modify them.
+
+FIX: The same invoice no longer produces two different documents depending on the button that generated
+it. The comment opening the XML names the instance it was produced on, and that name comes from
+getHashUniqueIdOfRegistration(), a function of the blockedlog library that only the paths going through
+the PDF builder happen to load - so generating from the attached files carried the hash, while
+regenerating from the e-invoicing menu, which calls the writer directly, silently dropped it. The
+library is now loaded where the comment is written. Nothing changes below Dolibarr 23, where that
+function does not exist yet, and nothing changes on the PDF path (issue #581).
+  
+FIX: Approving a received invoice no longer takes away the statuses that come after it. The einvoice
+button group of the supplier invoice card disappeared as soon as an "Approved" (205) or a "Refused"
+(210) status had been accepted by the platform, on the assumption that either of them closes the
+lifecycle. Only the refusal does - an invoice sent back to its vendor is not going to be paid - while
+an approved one is, and "Payment transmitted" (211) is what reports it. Since the normal order of
+things is to approve an invoice and then pay it, the manual 211 was already unreachable by the time
+anyone would want it, and re-opening the invoice did not bring it back: the condition never looked at
+the Dolibarr status of the invoice, only at what had been sent. The card now offers what the exchange
+still allows - a status the platform accepted is not proposed a second time, a refusal leaves nothing,
+and an approval only takes the refusal away with it. The query it replaces also compared the direction
+and the validation status against their stored case, which matches nothing on PostgreSQL (issue #548).
 
 ## 1.0.3
 
