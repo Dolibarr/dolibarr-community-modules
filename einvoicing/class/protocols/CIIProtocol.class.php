@@ -34,9 +34,6 @@ require_once DOL_DOCUMENT_ROOT . '/core/class/translate.class.php';
 require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
 require_once DOL_DOCUMENT_ROOT . '/core/class/discount.class.php';
 require_once DOL_DOCUMENT_ROOT . '/core/lib/files.lib.php';
-// dol_stringtotime() reads the dates of a received document, on the import path. master.inc.php does not
-// load this library - only main.inc.php does, and only for a web request - so a caller outside a request
-// (the cron that synchronizes, a script) was reaching it by chance until now.
 require_once DOL_DOCUMENT_ROOT . '/core/lib/date.lib.php';
 // dolChmod() only exists from Dolibarr 18, and both writers call it on the XML they just produced.
 if ((float) DOL_VERSION < 18) {
