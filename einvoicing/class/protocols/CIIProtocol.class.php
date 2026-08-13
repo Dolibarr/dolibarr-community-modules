@@ -1899,6 +1899,14 @@ class CIIProtocol extends AbstractProtocol
 		$doc->appendChild($root);
 
 		// Add comment
+		// getHashUniqueIdOfRegistration() lives in the blockedlog library, which only the paths going through
+		// the PDF builder happen to include (pdf.lib.php). Load it here as well, otherwise the very same invoice
+		// is stamped with the instance hash or not depending on the button that triggered the generation.
+		// The library ships with older versions too, but the function itself only appeared in Dolibarr 23,
+		// so both guards stay: nothing is stamped below 23, exactly as before.
+		if (!function_exists('getHashUniqueIdOfRegistration') && file_exists(DOL_DOCUMENT_ROOT.'/blockedlog/lib/blockedlog.lib.php')) {
+			include_once DOL_DOCUMENT_ROOT.'/blockedlog/lib/blockedlog.lib.php';
+		}
 		$hash_unique_id = '';
 		if (function_exists('getHashUniqueIdOfRegistration')) {
 			$algo = 'sha256';

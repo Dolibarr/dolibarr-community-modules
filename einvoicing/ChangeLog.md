@@ -267,6 +267,14 @@ checks both on any update and reports only the last of the two, which made the c
 behind the vendor error. Marking a thirdparty as a vendor also stores its new code now, which passing
 the code alone never did: update() writes the code columns only when it is allowed to modify them.
 
+FIX: The same invoice no longer produces two different documents depending on the button that generated
+it. The comment opening the XML names the instance it was produced on, and that name comes from
+getHashUniqueIdOfRegistration(), a function of the blockedlog library that only the paths going through
+the PDF builder happen to load - so generating from the attached files carried the hash, while
+regenerating from the e-invoicing menu, which calls the writer directly, silently dropped it. The
+library is now loaded where the comment is written. Nothing changes below Dolibarr 23, where that
+function does not exist yet, and nothing changes on the PDF path (issue #581).
+
 ## 1.0.3
 
 FIX: The totals of the generated document now follow the rounding convention of the instance. Dolibarr
