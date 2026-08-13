@@ -320,6 +320,12 @@ class SuperPDPProvider extends AbstractPDPProvider
 				$item->defaultFieldValue = '0';
 				$item->cssClass = 'minwidth500';
 
+				$item = $formSetup->newItem($prefix.'ONLY_DOMAIN');
+				$item->nameText = $langs->trans('EINVOICING_SUPERPDP_ONLY_DOMAIN');
+				$item->helpText = $langs->transnoentities('EINVOICING_SUPERPDP_ONLY_DOMAIN_HELP');
+				$item->defaultFieldValue = '';
+				$item->cssClass = 'minwidth500';
+
 				$item = $formSetup->newItem($prefix.'DIRECTORY_ENTRY_IDENTIFIER');
 				$item->nameText = $langs->trans('EINVOICING_SUPERPDP_DIRECTORY_ENTRY_IDENTIFIER');
 				$item->helpText = $langs->transnoentities('EINVOICING_SUPERPDP_DIRECTORY_ENTRY_IDENTIFIER_HELP');

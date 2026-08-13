@@ -207,6 +207,8 @@ if ($action != 'delete' && !GETPOST('afteroauthloginreturn') && (empty($statewit
 		$backtourl = GETPOST('redirect_uri').(strpos(GETPOST('redirect_uri'), '?') !== false ? '&' : '?').'error=scopeundefined';
 
 		// TODO Test that backtourl start with the allowed domain
+		//var_dump($backtourl);exit;
+
 
 		header('Location: '.$backtourl);
 		exit();
@@ -236,7 +238,26 @@ if (getDolGlobalInt('EINVOICING_SUPERPDPVIAPARTNER_ONLY_FUTURE')) {
 }
 
 $save_redirect_uri = GETPOST('redirect_uri');
-// TODO Test that redirect_uri match an allowed url/domain
+
+// Test that redirect_uri match an allowed url/domain
+if (getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN')) {		// Example: domainofproxycompany.com
+	$domainofuser = getDomainFromURL($save_redirect_uri, 2);
+	$alloweddomains = explode(',', getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN'));
+	$allowed = 0;
+	foreach ($alloweddomains as $allowedomain) {
+		if (preg_match('/'.preg_quote($allowedomain, '/').'$/', $domainofuser)) {
+			$allowed = 1;
+			break;
+		}
+	}
+	if (!$allowed) {
+		print 'Error, the domain of the requester ('.$domainofuser.') extracted from redirect_uri ('.$save_redirect_uri.') is not among allowed domains.';
+		exit;
+	}
+}
+
+
+
 
 $redirect_uri = dol_buildpath('einvoicing/public/proxy_oauthcallback.php', 3);
 $oauthserverurl .= '&redirect_uri='.urlencode($redirect_uri);

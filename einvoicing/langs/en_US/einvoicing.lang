@@ -381,8 +381,10 @@ EINVOICING_SUPERPDP_SEND_AND_RECEIVE=Directory registration (send_and_receive)
 EINVOICING_SUPERPDP_SEND_AND_RECEIVE_HELP=Onboarding UI behaviour: any = user chooses; send = hides the receiving-address registration; receive = forces registering a receiving address.
 EINVOICING_SUPERPDP_ONLY_FUTURE=Official date only (only_future)
 EINVOICING_SUPERPDP_ONLY_FUTURE_HELP=If Yes, prevents the user from joining the "pilot phase": only the official date of 1 September 2026 is offered for registering a directory entry (fr_siren companies).
+EINVOICING_SUPERPDP_ONLY_DOMAIN=Only from url in this domain
+EINVOICING_SUPERPDP_ONLY_DOMAIN_HELP=Only application with a domain name ending with this domain can use the proxy to register to SuperPDP.
 EINVOICING_SUPERPDP_DIRECTORY_ENTRY_IDENTIFIER=E-invoicing address (directory_entry_identifier)
-EINVOICING_SUPERPDP_DIRECTORY_ENTRY_IDENTIFIER_HELP=Optional (fr_siren): e-invoicing routing identifier created if the user enables invoice reception.
+EINVOICING_SUPERPDP_DIRECTORY_ENTRY_IDENTIFIER_HELP=Optional (fr_siren): e-invoicing routing identifier created if the user enables invoice reception. Example: domainofcustomers.com
 EINVOICING_SUPERPDP_OAUTH_STATE_MISMATCH=Connection failed: the "state" security parameter does not match (expired session or invalid attempt). Please restart the connection.
 EINVOICING_API_KEY=API key
 
