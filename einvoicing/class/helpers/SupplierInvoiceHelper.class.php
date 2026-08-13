@@ -179,7 +179,7 @@ class SupplierInvoiceHelper
 		}
 
 		if (count($amountErrors['current']) > 0) {
-			// If there are errors in both VAT modes (totalofround and roundoftotal), then return only the errors occured with roundoftotal
+			// If there are errors in both VAT modes (totalofround and roundoftotal), then return only the errors occurred with roundoftotal
 			if (count($amountErrors['totalofround'] ?? []) > 0 && count($amountErrors['roundoftotal'] ?? []) > 0) {
 				$errors = array_merge($errors, $amountErrors['roundoftotal'] ?? []);
 			} else {
@@ -567,8 +567,8 @@ class SupplierInvoiceHelper
 	 * enter the accounts and become payable - so it is what the buyer answers 205 for. Four things can
 	 * make the answer no:
 	 *
-	 *   - EINVOICING_DISABLE_SEND_APPROVED_ON_VALIDATION, for an instance where validating an invoice
-	 *     does not mean approving it. The status stays available by hand from the invoice card.
+	 *   - EINVOICING_SEND_APPROVED_ON_VALIDATION, for an instance where validating an invoice
+	 *     mean approving it. The status stays available by hand from the invoice card.
 	 *   - EINVOICING_DISABLE_SYNC_DOLI_TO_AP, which switches off everything this module sends.
 	 *   - an invoice that never came from the platform: its vendor is not waiting for any status.
 	 *   - a lifecycle already closed by a 205 or a 210 sent earlier: neither is repeated, and a refusal
@@ -582,7 +582,7 @@ class SupplierInvoiceHelper
 	 */
 	public static function shouldSendApprovedOnValidation($einvoicing, int $supplierInvoiceId, string $elementType = 'invoice_supplier'): bool
 	{
-		if (getDolGlobalString('EINVOICING_DISABLE_SEND_APPROVED_ON_VALIDATION')) {
+		if (!getDolGlobalString('EINVOICING_SEND_APPROVED_ON_VALIDATION')) {
 			return false;
 		}
 		if (getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {

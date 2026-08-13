@@ -122,6 +122,7 @@ if ($object->thirdparty->tva_assuj && empty($object->thirdparty->tva_intra)) {
 }
 
 // Seller identifiers (mysoc)
+$sellerTaxRegistrations = einvoicingSellerTaxRegistrations($mysoc);
 $myidprof          = idprof($mysoc);
 $mySchemeIdProf    = $this->getIEC6523Code($mysoc->country_code);
 $myGlobalIdProf    = idprof($mysoc);
@@ -811,7 +812,10 @@ $invoiceData = [
 	'sellerCommunicationUri'    => $myUri,
 
 	'sellerGlobalIds'           => [['schemeID' => $mySchemeGlobalIdProf, 'value' => $myGlobalIdProf]],
-	'sellerTaxRegistations'     => [['type' => 'VA', 'value' => $mysoc->tva_intra ?? 'FRSPECIMEN']],
+	// BT-31 or BT-32, whichever the VAT regime of the seller calls for - see
+	// einvoicingSellerTaxRegistrations(). A seller that does not charge VAT has no BT-31 to declare and
+	// must still identify itself, or every exempt line trips BR-E-02 (issue #560).
+	'sellerTaxRegistations'     => $sellerTaxRegistrations,
 	'sellervatnumber'           => $mysoc->tva_intra ?? 'FRSPECIMEN',
 
 	'sellerLegalOrgId'          => $myidprof,

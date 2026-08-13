@@ -19,13 +19,16 @@
 /**
  *      \file       test/phpunit/CIIProtocolTest.php
  *      \ingroup    test
- *      \brief      PHPUnit test for the line billing period export (issue #435):
- *                  CIIProtocol::buildLineItem() must map the line date_start/date_end
- *                  (already parsed upstream into linePeriodStart/linePeriodEnd) to the
- *                  BillingSpecifiedPeriod block (EN 16931 BG-26 / BT-134 / BT-135), placed
- *                  between ApplicableTradeTax and SpecifiedTradeAllowanceCharge/
- *                  SpecifiedTradeSettlementLineMonetarySummation as required by the CII
- *                  D22B schema sequence.
+ *      \brief      PHPUnit test for the line billing period (EN 16931 BG-26 / BT-134 / BT-135), in
+ *                  both directions.
+ *                  Export (issue #435): CIIProtocol::buildLineItem() must map the line
+ *                  date_start/date_end (already parsed upstream into linePeriodStart/linePeriodEnd)
+ *                  to the BillingSpecifiedPeriod block, placed between ApplicableTradeTax and
+ *                  SpecifiedTradeAllowanceCharge/SpecifiedTradeSettlementLineMonetarySummation as
+ *                  required by the CII D22B schema sequence.
+ *                  Import (issue #576): CIIProtocol::resolveLinePeriod() must turn what the parser
+ *                  read back into the timestamps a supplier invoice line stores, keeping one side
+ *                  alone and refusing a period that ends before it starts.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 
@@ -265,5 +268,168 @@ class CIIProtocolTest extends CommonClassTest
 			['ram:ApplicableTradeTax', 'ram:BillingSpecifiedPeriod', 'ram:SpecifiedTradeAllowanceCharge', 'ram:SpecifiedTradeSettlementLineMonetarySummation'],
 			$this->childElementNames($sett)
 		);
+	}
+
+	/**
+	 * Call the private CIIProtocol::resolveLinePeriod() through reflection, the same convention as
+	 * callBuildLineItem() above: it reads nothing but its argument and touches no database.
+	 *
+	 * @param	CIIProtocol		$protocol	Protocol instance
+	 * @param	array			$parsedLine	One line, as parseInvoiceLines() returns it
+	 * @return	array{start: ?int, end: ?int}
+	 */
+	private function callResolveLinePeriod(CIIProtocol $protocol, array $parsedLine): array
+	{
+		$method = new ReflectionMethod(CIIProtocol::class, 'resolveLinePeriod');
+		$method->setAccessible(true);
+
+		return $method->invoke($protocol, $parsedLine);
+	}
+
+	/**
+	 * A received line with both dates gives the two timestamps the supplier invoice line stores. The
+	 * assertion is on the date, not on the exact second: what matters is the day the document declared.
+	 *
+	 * @return void
+	 */
+	public function testAReceivedPeriodBecomesTheLineDates()
+	{
+		global $db;
+
+		$period = $this->callResolveLinePeriod(new CIIProtocol($db), [
+			'lineid' => '1',
+			'linePeriodStart' => '2026-06-01',
+			'linePeriodEnd' => '2026-06-30',
+		]);
+
+		$this->assertIsInt($period['start']);
+		$this->assertIsInt($period['end']);
+		$this->assertSame('2026-06-01', dol_print_date($period['start'], '%Y-%m-%d', 'gmt'));
+		$this->assertSame('2026-06-30', dol_print_date($period['end'], '%Y-%m-%d', 'gmt'));
+	}
+
+	/**
+	 * One side alone is a period BR-CO-20 accepts, and facture_fourn_det holds one date without the
+	 * other, so the side that is there is kept rather than the whole period dropped.
+	 *
+	 * @return void
+	 */
+	public function testOneSideAloneIsImported()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		$startOnly = $this->callResolveLinePeriod($protocol, ['linePeriodStart' => '2026-06-01', 'linePeriodEnd' => null]);
+		$this->assertSame('2026-06-01', dol_print_date($startOnly['start'], '%Y-%m-%d', 'gmt'));
+		$this->assertNull($startOnly['end']);
+
+		$endOnly = $this->callResolveLinePeriod($protocol, ['linePeriodStart' => null, 'linePeriodEnd' => '2026-06-30']);
+		$this->assertNull($endOnly['start']);
+		$this->assertSame('2026-06-30', dol_print_date($endOnly['end'], '%Y-%m-%d', 'gmt'));
+	}
+
+	/**
+	 * A line with no period declares none: no date is invented from the invoice date, and the keys may
+	 * be absent altogether since the parser only sets what the document carried.
+	 *
+	 * @return void
+	 */
+	public function testALineWithoutAPeriodGetsNoDates()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		$this->assertSame(['start' => null, 'end' => null], $this->callResolveLinePeriod($protocol, []));
+		$this->assertSame(['start' => null, 'end' => null], $this->callResolveLinePeriod($protocol, ['linePeriodStart' => null, 'linePeriodEnd' => null]));
+		$this->assertSame(['start' => null, 'end' => null], $this->callResolveLinePeriod($protocol, ['linePeriodStart' => '', 'linePeriodEnd' => '']));
+	}
+
+	/**
+	 * A period that ends before it starts breaks BR-30 and must not reach updateline(), which answers
+	 * -1 on that pair (ErrorStartDateGreaterEnd) and would fail the import of the whole invoice. The
+	 * line is imported without its period instead.
+	 *
+	 * @return void
+	 */
+	public function testAnInvertedPeriodIsDroppedRatherThanFailingTheImport()
+	{
+		global $db;
+
+		$period = $this->callResolveLinePeriod(new CIIProtocol($db), [
+			'lineid' => '2',
+			'linePeriodStart' => '2026-03-01',
+			'linePeriodEnd' => '2026-01-31',
+		]);
+
+		$this->assertSame(['start' => null, 'end' => null], $period);
+	}
+
+	/**
+	 * Something unreadable where a date was expected must not reach idate() either: dol_stringtotime()
+	 * answers a value that is not a usable timestamp, and the line is imported without the period.
+	 *
+	 * @return void
+	 */
+	public function testAnUnreadableDateIsIgnored()
+	{
+		global $db;
+
+		$period = $this->callResolveLinePeriod(new CIIProtocol($db), [
+			'linePeriodStart' => 'not a date',
+			'linePeriodEnd' => 'NA',
+		]);
+
+		$this->assertSame(['start' => null, 'end' => null], $period);
+	}
+
+	/**
+	 * The shape resolveLinePeriod() expects is not an assumption: this reads a document back through
+	 * parseInvoiceLines() and checks the parser hands the two dates as 'Y-m-d' strings, then that the pair
+	 * resolves to the days the document declared.
+	 *
+	 * @return void
+	 */
+	public function testWhatTheParserHandsOverIsWhatTheImportReads()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		$xml = '<?xml version="1.0" encoding="UTF-8"?>
+<rsm:CrossIndustryInvoice xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100" xmlns:ram="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100" xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100">
+  <rsm:SupplyChainTradeTransaction>
+    <ram:IncludedSupplyChainTradeLineItem>
+      <ram:AssociatedDocumentLineDocument><ram:LineID>1</ram:LineID></ram:AssociatedDocumentLineDocument>
+      <ram:SpecifiedTradeProduct><ram:Name>Prestation</ram:Name></ram:SpecifiedTradeProduct>
+      <ram:SpecifiedLineTradeAgreement>
+        <ram:NetPriceProductTradePrice><ram:ChargeAmount>100.00</ram:ChargeAmount></ram:NetPriceProductTradePrice>
+      </ram:SpecifiedLineTradeAgreement>
+      <ram:SpecifiedLineTradeDelivery><ram:BilledQuantity unitCode="C62">1</ram:BilledQuantity></ram:SpecifiedLineTradeDelivery>
+      <ram:SpecifiedLineTradeSettlement>
+        <ram:ApplicableTradeTax>
+          <ram:TypeCode>VAT</ram:TypeCode>
+          <ram:CategoryCode>S</ram:CategoryCode>
+          <ram:RateApplicablePercent>20.00</ram:RateApplicablePercent>
+        </ram:ApplicableTradeTax>
+        <ram:BillingSpecifiedPeriod>
+          <ram:StartDateTime><udt:DateTimeString format="102">20260601</udt:DateTimeString></ram:StartDateTime>
+          <ram:EndDateTime><udt:DateTimeString format="102">20260630</udt:DateTimeString></ram:EndDateTime>
+        </ram:BillingSpecifiedPeriod>
+        <ram:SpecifiedTradeSettlementLineMonetarySummation><ram:LineTotalAmount>100.00</ram:LineTotalAmount></ram:SpecifiedTradeSettlementLineMonetarySummation>
+      </ram:SpecifiedLineTradeSettlement>
+    </ram:IncludedSupplyChainTradeLineItem>
+  </rsm:SupplyChainTradeTransaction>
+</rsm:CrossIndustryInvoice>';
+
+		$lines = $protocol->parseInvoiceLines($xml);
+		$this->assertCount(1, $lines);
+		$this->assertSame('2026-06-01', $lines[0]['linePeriodStart'], 'the parser normalises BT-134 to Y-m-d');
+		$this->assertSame('2026-06-30', $lines[0]['linePeriodEnd'], 'the parser normalises BT-135 to Y-m-d');
+
+		$period = $this->callResolveLinePeriod($protocol, $lines[0]);
+		$this->assertSame('2026-06-01', dol_print_date($period['start'], '%Y-%m-%d', 'gmt'));
+		$this->assertSame('2026-06-30', dol_print_date($period['end'], '%Y-%m-%d', 'gmt'));
 	}
 }

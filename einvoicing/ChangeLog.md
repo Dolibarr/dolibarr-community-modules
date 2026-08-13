@@ -24,6 +24,14 @@ starting after it ends - one line open from March next to another closed in Janu
 period at all rather than a pair BR-29 refuses, which would have the whole document rejected for a field
 nobody filled in (issue #572).
 
+FIX: Importing a received e-invoice now keeps the billing period of its lines (BT-134 / BT-135), where a
+service line billed over a period used to arrive with no period at all. The two dates were read from the
+document and then went nowhere: the line built for the supplier invoice never carried them, although the
+call that saves it has always passed its date_start and date_end on to the core. A period with only one
+of the two dates keeps that one, as the norm allows (BR-CO-20). A document declaring a period that ends
+before it starts - which BR-30 refuses, and which the core refuses too - is imported without that period
+rather than failing the whole invoice over it (issue #576).
+
 FIX: The module works on Dolibarr 17 again, the version its own descriptor declares as the minimum it
 supports. Two things stood in the way and neither of them failed quietly. Installing it died on a PHP
 TypeError: init() passed an empty array() where ExtraFields::update() expects a parameter string, and
@@ -46,6 +54,43 @@ the file that needs them, instead of being looked up through dol_buildpath(). A 
 resolve - a deployment that does not sit where the module expects, which is what a container install
 can produce - only wrote a line in the log and returned false, so the polyfill was silently absent and
 the next call to it was a fatal "Call to undefined function isValidSiren" (issue #565).
+
+FIX: A seller that charges no VAT now identifies itself on the documents it generates. A company set
+as "Non assujetti a la TVA" has no VAT number, and the writer only ever emitted one, so the seller
+carried no tax registration at all: every exempt line then broke BR-E-02, which wants the seller VAT
+identifier (BT-31), the seller tax registration identifier (BT-32) or the tax representative one, and
+the platform refused the invoice. Recording an exemption reason code did not help, that one answers
+BR-E-10. The seller now declares whichever identifier its VAT regime calls for - its VAT number under
+the scheme VA, or its SIREN under the scheme FC (BT-32) when it charges no VAT - and the regime
+follows the sales tax type of the company setup, the same setting the VAT category of each line is
+already derived from. No option of this module states it: a second place to declare the regime is a
+second place for it to disagree with Dolibarr, and a document carrying exempt lines while claiming a VAT
+registration is what that disagreement produces. A seller subject to VAT that simply left the field
+empty keeps getting the message naming what to fill in, rather than a silent fallback on its SIREN, and
+an exportation or an intracommunity supply now stops with an explicit message when no VAT number is
+recorded: BR-G-02 and BR-IC-02 accept the VAT identifier alone, so nothing can stand in for it there
+(issue #560).
+
+FIX: An exempt invoice line now carries the exemption reason it is counted against, and not only the
+VAT breakdown does. BR-FXEXT-E-08 reconciles the taxable amount of an exempt breakdown with the sum of
+the net amounts of the lines it covers, and only counts a line whose own reason code and reason text
+equal those of the breakdown - so with the reason on the breakdown alone the rule counted zero lines,
+reported the invoice as unbalanced, and the reference validator returned it as invalid whatever else
+the document got right. Both the CII and the Factur-X writers now repeat them on the line; a line with
+nothing to declare is unchanged.
+FIX: Below Dolibarr 24, a Factur-X invoice was produced as a plain PDF with the XML attached to it,
+without the document level /AF entry nor the PDF/A-3 output intent a Factur-X reader looks for, and
+with the XML embedded twice. Nothing said so, and the file was refused further down the line: the
+public validator answers "the file does not contain one and only one factur-x.xml". The cause was a
+class name collision - the core declares its own FPDF below v24, which the writer of
+horstoeko/zugferd cannot then inherit from - and the fallback silently degraded the output instead.
+Such a file is now built with TCPDF, which the collision does not concern and which supports PDF/A-3
+natively, so every supported Dolibarr version produces the same structure. The produced file is also
+checked before being handed over, so an incomplete one is reported instead of being sent, a carrier
+PDF that cannot be read aborts the generation with an explicit message rather than dying on a parser
+error, and Factur-X no longer announces itself as needing Dolibarr 24. The sample invoice of the
+setup page was hit by the same collision, from a page that had already rendered a PDF: it died on a
+PHP fatal error, which no error handling can catch, and the setup page came back blank (issue #554).
 
 FIX: A line billed over a period that has only a start date, or only an end date, now carries that
 period in the Factur-X document as it already did in the CII one. The Factur-X path asked for both
@@ -211,6 +256,16 @@ instead of undetermined, and the option that requires a reachable recipient bloc
 value. Where the verdict was read is displayed next to it, since the directory consulted by hand
 shows no status for that line.
 
+FIX: Synchronizing incoming documents no longer stops on a vendor whose thirdparty code is missing.
+On an instance where the code is mandatory - MAIN_COMPANY_CODE_ALWAYS_REQUIRED, or a numbering module
+that refuses an empty code - a thirdparty saved without one, as an import or a provisioning script
+leaves it, is refused by the core on every update: Societe::verify() answers ErrorSupplierCodeRequired
+and the synchronization aborts there, leaving the remaining flows untouched. The module now asks for a
+generated code, the way the thirdparty card does when it saves that same thirdparty, and only where
+the numbering module allows the code to be set. The customer code is treated the same, because the core
+checks both on any update and reports only the last of the two, which made the customer half invisible
+behind the vendor error. Marking a thirdparty as a vendor also stores its new code now, which passing
+the code alone never did: update() writes the code columns only when it is allowed to modify them.
 
 ## 1.0.3
 
