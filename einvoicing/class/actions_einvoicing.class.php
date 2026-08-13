@@ -445,40 +445,30 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			$resql = $db->query($sql);
 			if ($resql && $db->num_rows($resql) > 0) {
 				$db->free($resql);
-				// Check if a final status (approved or rejected) has already been sent and validated
-				// → in this case, the lifecycle is complete, so we hide the button
-				$sqlFinal = "SELECT rowid FROM " . $db->prefix() . "einvoicing_lifecycle_msg";
-				$sqlFinal .= " WHERE element_id = " . (int) $object->id;
-				$sqlFinal .= " AND element_type = '" . $db->escape($object->element) . "'";
-				$sqlFinal .= " AND direction = 'out'";
-				$sqlFinal .= " AND lc_status IN (" . (int) EInvoicing::STATUS_APPROVED . ", " . (int) EInvoicing::STATUS_REFUSED . ")";
-				$sqlFinal .= " AND lc_validation_status = 'Ok'";
-				$sqlFinal .= " LIMIT 1";
-				$resqlFinal = $db->query($sqlFinal);
-				$hasFinalLifecycle = ($resqlFinal && $db->num_rows($resqlFinal) > 0);
-				$db->free($resqlFinal);
+				// Offer what the exchange still allows, rather than closing it on the first final status:
+				// the button group used to disappear as soon as an "Approved" (205) was accepted, while
+				// the payment - and the "Payment transmitted" (211) that reports it - necessarily comes
+				// after the approval (issue #548).
+				$availableStatuses = $einvoicing->getSendableStatusesForReceivedInvoice($object->id, $object->element);
 
-				if (!$hasFinalLifecycle) {
-					$availableStatuses = $einvoicing->getEinvoiceStatusOptions(1, 1, 1);
-					$url_button = array();
-					foreach ($availableStatuses as $code => $label) {
-						$url_button[] = array(
-							'lang' => 'einvoicing',
-							'enabled' => true,
-							'perm' => ($forcedisabling ? -1 : ((bool) $user->hasRight("fournisseur", "facture", "creer") && empty($forcedisabling))),
-							'label' => (string) $label,
-							'url' => '/fourn/facture/card.php?id=' . $object->id . '&action=sendStatusMessage&pdpstatuscode=' . $code . '&token=' . newToken()
-						);
-					}
+				$url_button = array();
+				foreach ($availableStatuses as $code => $label) {
+					$url_button[] = array(
+						'lang' => 'einvoicing',
+						'enabled' => true,
+						'perm' => ($forcedisabling ? -1 : ((bool) $user->hasRight("fournisseur", "facture", "creer") && empty($forcedisabling))),
+						'label' => (string) $label,
+						'url' => '/fourn/facture/card.php?id=' . $object->id . '&action=sendStatusMessage&pdpstatuscode=' . $code . '&token=' . newToken()
+					);
+				}
 
-					if (!empty($url_button)) {
-						if ((float) DOL_VERSION < 18) {
-							print einvoicingDolGetButtonActionDropdown($langs->trans('einvoice'), $url_button);
-						} elseif ((float) DOL_VERSION < 22) {
-							print dolGetButtonAction($langs->trans('einvoice'), '', 'default', $url_button, '', true);
-						} else {
-							print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true);
-						}
+				if (!empty($url_button)) {
+					if ((float) DOL_VERSION < 18) {
+						print einvoicingDolGetButtonActionDropdown($langs->trans('einvoice'), $url_button);
+					} elseif ((float) DOL_VERSION < 22) {
+						print dolGetButtonAction($langs->trans('einvoice'), '', 'default', $url_button, '', true);
+					} else {
+						print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true);
 					}
 				}
 			}
