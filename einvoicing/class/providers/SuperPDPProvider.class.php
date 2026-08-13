@@ -110,9 +110,11 @@ class SuperPDPProvider extends AbstractPDPProvider
 		// Retrieve and complete the OAuth token information from the database
 		$this->tokenData = $this->fetchOAuthTokenDB();
 
+		/*
 		$exchangeProtocolConf = getDolGlobalString('EINVOICING_PROTOCOL');
 		$ProtocolManager = new ProtocolManager($this->db);
 		$this->exchangeProtocol = $ProtocolManager->getProtocol($exchangeProtocolConf);
+		*/
 	}
 
 
@@ -995,6 +997,12 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$einvoicing = new EInvoicing($this->db);
 
 		try {
+			if (empty($this->exchangeProtocol)) {
+				$exchangeProtocolConf = getDolGlobalString('EINVOICING_PROTOCOL');
+				$ProtocolManager = new ProtocolManager($this->db);
+				$this->exchangeProtocol = $ProtocolManager->getProtocol($exchangeProtocolConf);
+			}
+
 			if ((float) DOL_VERSION < 24.0) {
 				$resarray = $this->exchangeProtocol->generateSampleInvoiceOld($einvoicing);
 			} else {

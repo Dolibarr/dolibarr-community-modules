@@ -119,12 +119,16 @@ foreach ($protocolsList as $key => $protocolconfig) {
 	if ($protocolconfig['is_enabled'] == 0) {
 		continue;
 	}
-	$TFieldProtocols[$key] = array('label' => $protocolconfig['protocol_name']);
+	$TFieldProtocols[$key] = array('label' => $protocolconfig['protocol_name'], 'data-html' => $protocolconfig['protocol_label'] ?? $protocolconfig['protocol_name']);
 	if (!empty($protocolconfig['protocol_dol_min'])) {
-		$TFieldProtocols[$key]['data-html'] = $protocolconfig['protocol_name'].' <span class="opacitymedium">(Dolibarr '.$protocolconfig['protocol_dol_min'].'+)</span>';
+		$TFieldProtocols[$key]['data-html'] .= ' <span class="opacitymedium">(Dolibarr '.$protocolconfig['protocol_dol_min'].'+)</span>';
 	}
 	if ($protocolconfig['protocol_name'] == 'CII') {
-		$TFieldProtocols[$key]['data-html'] = $protocolconfig['protocol_name'].' <span class="opacitymedium">('.$langs->trans("Recommended").')</span>';
+		$TFieldProtocols[$key]['data-html'] .= ' <span class="opacitymedium">('.$langs->trans("Recommended").')</span>';
+	}
+	if (!empty($protocolconfig['is_greyed'])) {
+		$TFieldProtocols[$key]['disabled'] = 1;
+		$TFieldProtocols[$key]['data-html'] .= ' <span class="opacitymedium">('.$protocolconfig['is_greyed'].')</span>';
 	}
 }
 
@@ -200,8 +204,11 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	// Setup conf to precheck the e-invoice with the Access Point validation service if available.
 	if (getDolGlobalString('EINVOICING_PDP')) {
 		$PDPManager = new PDPProviderManager($db);
+
 		$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+
 		$providerconfig  = $provider->getConf();
+
 		$hasValidator = $providerconfig['has_validator'];
 		if ($hasValidator) {
 			$item = $formSetup->newItem('EINVOICING_AP_PRECHECK')->setAsSelect(array(
