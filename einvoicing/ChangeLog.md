@@ -267,6 +267,18 @@ checks both on any update and reports only the last of the two, which made the c
 behind the vendor error. Marking a thirdparty as a vendor also stores its new code now, which passing
 the code alone never did: update() writes the code columns only when it is allowed to modify them.
 
+FIX: Approving a received invoice no longer takes away the statuses that come after it. The einvoice
+button group of the supplier invoice card disappeared as soon as an "Approved" (205) or a "Refused"
+(210) status had been accepted by the platform, on the assumption that either of them closes the
+lifecycle. Only the refusal does - an invoice sent back to its vendor is not going to be paid - while
+an approved one is, and "Payment transmitted" (211) is what reports it. Since the normal order of
+things is to approve an invoice and then pay it, the manual 211 was already unreachable by the time
+anyone would want it, and re-opening the invoice did not bring it back: the condition never looked at
+the Dolibarr status of the invoice, only at what had been sent. The card now offers what the exchange
+still allows - a status the platform accepted is not proposed a second time, a refusal leaves nothing,
+and an approval only takes the refusal away with it. The query it replaces also compared the direction
+and the validation status against their stored case, which matches nothing on PostgreSQL (issue #548).
+
 ## 1.0.3
 
 FIX: The totals of the generated document now follow the rounding convention of the instance. Dolibarr
