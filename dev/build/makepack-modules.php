@@ -542,7 +542,7 @@ function detectModule()
 			$name = strtolower(reset($matches['mod']));
 		}
 
-		print "extract data from $file\n";
+		print "extract data from ".$file." in ".getcwd()."\n";
 		if (!file_exists($file) || $name == "") {
 			print "[fail] Error on auto detect data\n";
 			return ["", ""];
@@ -559,6 +559,13 @@ function detectModule()
 	// search, and store all matching occurrences in $matches
 	if (preg_match_all($pattern, $contents, $matches)) {
 		$version = reset($matches['version']);
+	}
+
+	if (empty($version)) {
+		// Try from VERSION file
+		print "search version in VERSION file\n";
+		$fileversion = getcwd().'/VERSION';
+		$version = trim(file_get_contents($fileversion));
 	}
 
 	if (version_compare($version, '0.0.1', '>=') != 1) {
@@ -764,9 +771,9 @@ if (!extension_loaded('zip')) {
 
 if (empty($argv[1])) {
 	print "Usage:   ".$script_file." index|makezip|pushdolistore\n";
-	print "Example: ".$script_file." index      						to rebuild the index.yaml file (used by Dolibarr to retrieve list of community modules)\n";
-	print "Example: ".$script_file." makezip|makeziptag [modulename]   	to regenerate zip of packages \n";
-	print "Example: ".$script_file." pushdolistore 		[modulename]	to regenerate zip of packages and publish them on dolistore (TODO)\n";
+	print "Example: ".$script_file." index                           to rebuild the index.yaml file (used by Dolibarr to retrieve list of community modules)\n";
+	print "Example: ".$script_file." makezip|makeziptag [modulename] to regenerate zip of packages (and set Tag of version)\n";
+	print "Example: ".$script_file." pushdolistore      [modulename] to regenerate zip of packages and publish them on dolistore (TODO)\n";
 	print "\n";
 	exit(1);
 }
