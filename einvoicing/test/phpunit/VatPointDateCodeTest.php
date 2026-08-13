@@ -89,10 +89,9 @@ class VatPointDateCodeTest extends CommonClassTest
 	 *
 	 * @param	string	$product	'invoice' or 'payment'
 	 * @param	string	$service	'invoice' or 'payment'
-	 * @param	string	$forced		Value of the module option, '' to leave it unset
 	 * @return	void
 	 */
-	private function setVatMode($product, $service, $forced = '')
+	private function setVatMode($product, $service)
 	{
 		global $conf;
 
@@ -104,12 +103,7 @@ class VatPointDateCodeTest extends CommonClassTest
 
 		$conf->global->TAX_MODE_SELL_PRODUCT = $product;
 		$conf->global->TAX_MODE_SELL_SERVICE = $service;
-
-		if ($forced === '') {
-			unset($conf->global->EINVOICING_VAT_POINT_DATE_CODE);
-		} else {
-			$conf->global->EINVOICING_VAT_POINT_DATE_CODE = $forced;
-		}
+		unset($conf->global->EINVOICING_VAT_POINT_DATE_CODE);
 	}
 
 	/**
@@ -190,11 +184,6 @@ class VatPointDateCodeTest extends CommonClassTest
 
 		$this->setVatMode('invoice', 'invoice');
 		$this->assertSame('72', einvoicingVatPointDateCode(true, false, true));
-
-		$this->setVatMode('invoice', 'payment', '5');
-		$this->assertSame('72', einvoicingVatPointDateCode(true, false, true));
-
-		$this->setVatMode('invoice', 'payment', '29');
 		$this->assertSame('72', einvoicingVatPointDateCode(false, true, true));
 	}
 
@@ -212,46 +201,26 @@ class VatPointDateCodeTest extends CommonClassTest
 	}
 
 	/**
-	 * An explicit regime wins over the VAT mode, whatever the document carries and whatever it is:
-	 * it is a statement about the seller. 29 is only reachable this way, the automatic derivation
-	 * never producing it, and it declares the debits option just like 5 does.
+	 * The exigibility scheme is Dolibarr's, and no setting of this module can contradict it: the same
+	 * TAX_MODE the document reads is what the VAT report of the core declares on, so a module override
+	 * would have the invoice tell the buyer one regime while its seller declares under another. A
+	 * constant left over from the version that offered the choice is ignored, whatever value it holds.
 	 *
 	 * @return void
 	 */
-	public function testExplicitRegimeOverridesTheVatMode()
+	public function testNoModuleSettingCanContradictTheVatMode()
 	{
-		$this->setVatMode('invoice', 'payment', '5');
-		$this->assertSame('5', einvoicingVatPointDateCode(false, true));
-		$this->assertSame('5', einvoicingVatPointDateCode(true, true));
-		$this->assertTrue(einvoicingVatOnDebits());
-		$this->assertFalse(einvoicingVatDueOnCollection(false, true));
+		global $conf;
 
-		$this->setVatMode('invoice', 'invoice', '72');
-		$this->assertSame('72', einvoicingVatPointDateCode(true, false));
-		$this->assertFalse(einvoicingVatOnDebits());
-		$this->assertTrue(einvoicingVatDueOnCollection(true, false));
+		foreach (array('5', '29', '72', 'auto', '3') as $leftover) {
+			$this->setVatMode('invoice', 'payment');
+			$conf->global->EINVOICING_VAT_POINT_DATE_CODE = $leftover;
 
-		$this->setVatMode('invoice', 'payment', '29');
-		$this->assertSame('29', einvoicingVatPointDateCode(true, false));
-		$this->assertSame('29', einvoicingVatPointDateCode(false, true));
-		$this->assertTrue(einvoicingVatOnDebits());
-		$this->assertFalse(einvoicingVatDueOnCollection(false, true));
-	}
-
-	/**
-	 * "Automatic", and any value outside the code list BR-CL-06 restricts BT-8 to, leaves the
-	 * decision to the VAT mode instead of reaching the document.
-	 *
-	 * @return void
-	 */
-	public function testAutomaticAndUnknownValuesFallBackToTheVatMode()
-	{
-		$this->setVatMode('invoice', 'payment', 'auto');
-		$this->assertSame('72', einvoicingVatPointDateCode(false, true));
-		$this->assertSame('', einvoicingVatPointDateCode(true, false));
-
-		$this->setVatMode('invoice', 'invoice', '3');		// UBL code list, not the CII one
-		$this->assertSame('5', einvoicingVatPointDateCode(true, false));
-		$this->assertTrue(einvoicingVatOnDebits());
+			$this->assertSame('', einvoicingVatPointDateCode(true, false), 'leftover '.$leftover);
+			$this->assertSame('72', einvoicingVatPointDateCode(false, true), 'leftover '.$leftover);
+			$this->assertFalse(einvoicingVatOnDebits(), 'leftover '.$leftover);
+			$this->assertFalse(einvoicingVatDueOnCollection(true, false), 'leftover '.$leftover);
+			$this->assertTrue(einvoicingVatDueOnCollection(false, true), 'leftover '.$leftover);
+		}
 	}
 }

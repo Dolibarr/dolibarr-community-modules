@@ -648,20 +648,14 @@ if (!method_exists('Societe', 'findNearest')) {
  * TAX_MODE 1, the one that puts both sell modes on 'invoice'. Conf::setValues() always populates the
  * two constants, defaulting to the French standard scheme.
  *
- * EINVOICING_VAT_POINT_DATE_CODE overrides it for a seller whose regime the Tax/VAT setup does not
- * express. Declaring an invoice date (5) or a delivery date (29) is declaring the debits option -
- * XP Z12-012 annexe A reads them as "date de la facture (TVA sur DEBITS)" and "date de livraison
- * (TVA sur DEBITS)" - while declaring a payment date (72) is declaring the seller did not take it.
+ * There is no option of this module to override it, deliberately: the same two constants are what the
+ * VAT report of Dolibarr declares on (compta/tva/, through tax.lib.php), so an override would make the
+ * document tell the buyer one regime while the seller declares its VAT under another.
  *
  * @return bool		True when the invoices must carry the "VAT on debits" mention
  */
 function einvoicingVatOnDebits()
 {
-	$forced = getDolGlobalString('EINVOICING_VAT_POINT_DATE_CODE');
-	if (in_array($forced, array('5', '29', '72'), true)) {
-		return ($forced !== '72');
-	}
-
 	return (getDolGlobalString('TAX_MODE_SELL_PRODUCT') != 'payment' && getDolGlobalString('TAX_MODE_SELL_SERVICE') != 'payment');
 }
 
@@ -697,9 +691,15 @@ function einvoicingVatOnDebits()
  *   TAX_MODE 1, "d'apres les debits" everything on invoice                     -> 5
  *   TAX_MODE 2                       everything on payment                     -> 72
  *
- * 29 is never derived. It says the same thing as 5 and BR-FR-MAP-29 states that "le PPF attend
- * uniquement 5", a 29 having to be reported as 5 to the public portal, so it is only ever sent when
- * the seller asked for it explicitly (issue #419).
+ * 29 is never sent. It says the same thing as 5, BR-FR-MAP-29 states that "le PPF attend uniquement 5"
+ * - a 29 having to be reported as 5 to the public portal - and Dolibarr has nothing to derive it from
+ * anyway: its own setup reads the goods delivery as "OnDelivery (SupposedToBeInvoiceDate)".
+ *
+ * None of this is a setting of this module. Dolibarr holds the scheme once, in admin/taxes.php, and
+ * that same setting decides how its VAT report is built, so a second place to state it would be a
+ * second place to state it differently: a document declaring the debits option to the buyer while the
+ * seller declares its VAT on collection, or the reverse. This is the same reason there is no option
+ * for the VAT regime of the seller (BT-31 / BT-32) - see einvoicingSellerVatRegime().
  *
  * @param  bool		$hasProductLine		The document carries at least one goods line
  * @param  bool		$hasServiceLine		The document carries at least one service line
@@ -716,12 +716,6 @@ function einvoicingVatPointDateCode($hasProductLine, $hasServiceLine, $isDeposit
 	// while its cash-in is reported to the platform with the status 212 for that very reason.
 	if ($isDeposit) {
 		return '72';
-	}
-
-	// An explicitly declared regime is a statement about the seller, not about one document.
-	$forced = getDolGlobalString('EINVOICING_VAT_POINT_DATE_CODE');
-	if (in_array($forced, array('5', '29', '72'), true)) {
-		return $forced;
 	}
 
 	// The debits option is general and prevails over every invoice issued (G1.43), so it is declared
@@ -762,11 +756,6 @@ function einvoicingVatPointDateCode($hasProductLine, $hasServiceLine, $isDeposit
  */
 function einvoicingVatDueOnCollection($hasProductLine, $hasServiceLine)
 {
-	$forced = getDolGlobalString('EINVOICING_VAT_POINT_DATE_CODE');
-	if (in_array($forced, array('5', '29', '72'), true)) {
-		return ($forced === '72');
-	}
-
 	$sellProductOnPayment = (getDolGlobalString('TAX_MODE_SELL_PRODUCT') == 'payment');
 	$sellServiceOnPayment = (getDolGlobalString('TAX_MODE_SELL_SERVICE') == 'payment');
 
