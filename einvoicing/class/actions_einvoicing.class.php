@@ -1368,6 +1368,18 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		$contexts = explode(':', $parameters['context']);
 
+		// Every block below counts the cells it prints into the caller's column counter, which sizes the
+		// footer of the list. A hook is not guaranteed to receive that counter already built, so make sure
+		// of it once, before the first increment rather than after it. Only create the key when it is
+		// missing: the caller passes its own counter by reference (list.php builds 'totalarray' =>
+		// &$totalarray), so replacing an existing one would write through that reference and reset the
+		// count it has already accumulated.
+		if (!array_key_exists('totalarray', $parameters)) {
+			$parameters['totalarray'] = array('nbfield' => 0);
+		} elseif (!array_key_exists('nbfield', $parameters['totalarray'])) {
+			$parameters['totalarray']['nbfield'] = 0;
+		}
+
 		if (in_array('invoicelist', $contexts) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 			$einvoicing = new EInvoicing($db);
 			$checkConfig = $einvoicing->checkModulePrerequisites();
@@ -1397,13 +1409,6 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				}
 				print '</td>';
 				if (isset($parameters['i']) && empty($parameters['i'])) {
-					if (!array_key_exists('totalarray', $parameters)) {
-						$parameters['totalarray'] = array('nbfield' => 0);
-					} elseif (!array_key_exists('nbfield', $parameters['totalarray'])) {
-						$parameters['totalarray']['nbfield'] = 0;
-					}
-
-					$parameters['totalarray']['nbfield']++;
 					$parameters['totalarray']['nbfield']++;
 				}
 			}
