@@ -121,10 +121,7 @@ foreach ($protocolsList as $key => $protocolconfig) {
 	}
 	$TFieldProtocols[$key] = array('label' => $protocolconfig['protocol_name']);
 	if (!empty($protocolconfig['protocol_dol_min'])) {
-		// With Esalink, we can use the Factur-X even on version lower than v24 because it accepts duplicate factur-x.xml inside the PDF.
-		if ($protocolconfig['protocol_name'] != 'FACTURX' || getDolGlobalString('EINVOICING_PDP') != 'ESALINK') {
-			$TFieldProtocols[$key]['data-html'] = $protocolconfig['protocol_name'].' <span class="opacitymedium">(Dolibarr '.$protocolconfig['protocol_dol_min'].'+)</span>';
-		}
+		$TFieldProtocols[$key]['data-html'] = $protocolconfig['protocol_name'].' <span class="opacitymedium">(Dolibarr '.$protocolconfig['protocol_dol_min'].'+)</span>';
 	}
 	if ($protocolconfig['protocol_name'] == 'CII') {
 		$TFieldProtocols[$key]['data-html'] = $protocolconfig['protocol_name'].' <span class="opacitymedium">('.$langs->trans("Recommended").')</span>';
