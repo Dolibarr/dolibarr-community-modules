@@ -748,6 +748,8 @@ class FacturXProtocol extends CIIProtocol
 		// They differ only by the PDF engine they can use, which depends on what already holds the
 		// global class FPDF in this PHP request - see FacturxTcpdfMerger for the whole story.
 
+		// TODO A third method can be tried using the atgp/factur-x library.
+		
 		if (!file_exists($orig_pdf)) {
 			throw new \Exception("XML and/or PDF does not exist");
 		}
