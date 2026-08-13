@@ -347,7 +347,14 @@ class FacturXProtocol extends CIIProtocol
 
 				// ---------------- Seller ----------------
 				->setDocumentSeller($invoiceData['sellername'], $invoiceData['sellerids'])
-				->addDocumentSellerTaxRegistration("VA", $invoiceData['sellervatnumber'])
+				// BT-31 or BT-32, whichever the VAT regime of the seller calls for: a seller that charges
+				// no VAT declares its SIREN under the scheme FC where one that does declares its VAT
+				// number under VA. Writing VA unconditionally left a "Non assujetti a la TVA" company
+				// with no tax registration at all and every exempt line tripped BR-E-02 (issue #560).
+				->addDocumentSellerTaxRegistration(
+					$invoiceData['sellerTaxRegistations'][0]['type'] ?? 'VA',
+					$invoiceData['sellerTaxRegistations'][0]['value'] ?? $invoiceData['sellervatnumber']
+				)
 				->setDocumentSellerLegalOrganisation(
 					$invoiceData['sellerLegalOrgId'],
 					$invoiceData['sellerLegalOrgScheme'],
@@ -496,11 +503,16 @@ class FacturXProtocol extends CIIProtocol
 					$facturxpdf->addDocumentPositionGrossPriceAllowanceCharge(abs($lineData['grosspriceamount']) * $lineData['billedquantity'], false, null, null, "Discount");
 				}
 
-				// VAT information (Line Tax)
+				// VAT information (Line Tax). The exemption reason is carried on the line too, and not
+				// only in the VAT breakdown: BR-FXEXT-E-08 only counts a line towards its exempt
+				// breakdown when the line repeats the same reason code and text - see the same point in
+				// CIIProtocol::buildLineNode(). horstoeko takes them as the 5th and 6th arguments.
+				$lineExemptionReason = ((string) ($lineData['ExemptionReason'] ?? '') !== '' ? (string) $lineData['ExemptionReason'] : null);
+				$lineExemptionReasonCode = ((string) ($lineData['ExemptionReasonCode'] ?? '') !== '' ? (string) $lineData['ExemptionReasonCode'] : null);
 				if ($lineData['rateApplicablePercent'] > 0) {
-					$facturxpdf->addDocumentPositionTax($lineData['categoryCode'], 'VAT', (empty($lineData['rateApplicablePercent']) ? null : (float) $lineData['rateApplicablePercent']));
+					$facturxpdf->addDocumentPositionTax($lineData['categoryCode'], 'VAT', (empty($lineData['rateApplicablePercent']) ? null : (float) $lineData['rateApplicablePercent']), null, $lineExemptionReason, $lineExemptionReasonCode);
 				} else {
-					$facturxpdf->addDocumentPositionTax($lineData['categoryCode'], 'VAT', 0.00);
+					$facturxpdf->addDocumentPositionTax($lineData['categoryCode'], 'VAT', 0.00, null, $lineExemptionReason, $lineExemptionReasonCode);
 				}
 
 				// Discount percentage on a line
