@@ -738,7 +738,9 @@ class EInvoicing
 	 *
 	 * @param	int		$elementId		Id of the invoice
 	 * @param	string	$elementType	Element type ('invoice_supplier')
-	 * @return	array<int,string>		Status code => label, empty when the exchange is over
+	 * @return	array<string|int,array{label:string,data-html:string,disable?:int,css?:string}>	The sendable
+	 *									statuses of getEinvoiceStatusOptions() minus the ones the history rules
+	 *									out, so the same shape as that method; empty when the exchange is over
 	 */
 	public function getSendableStatusesForReceivedInvoice($elementId, $elementType)
 	{
