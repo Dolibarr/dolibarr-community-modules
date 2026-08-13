@@ -860,6 +860,7 @@ trait CommonProtocol
 				$actiondata['email'] = $selleremail;
 			}
 			if (!empty($sellervat)) {
+				$langs->load("companies");
 				$errorDetails['vatnumber'] = $langs->trans("VATIntra").': ' . $sellervat;
 				$actiondata['vatnumber'] = $sellervat;
 			}
@@ -877,7 +878,7 @@ trait CommonProtocol
 
 			$detailsStr = !empty($errorDetails) ? ' [' . implode(' - ', $errorDetails) . ']' : '';
 
-			$message = 'Unable to find supplier' . $detailsStr . ".\n".'Auto-creation of thirdparties is disabled in settings.';
+			$message = 'Unable to find supplier' . $detailsStr . ". \n".'Auto-creation of thirdparties is disabled in settings.';
 
 			$action = $langs->trans('CreateSupplierManually');
 			$action .= '<a class="butAction small" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
