@@ -825,7 +825,7 @@ trait CommonProtocol
 				$createParams['email'] = $selleremail;
 			}
 			if (!empty($sellervat)) {
-				$createParams['vatnumber'] = $sellervat;
+				$createParams['tva_intra'] = $sellervat;
 			}
 			if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
 				foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
@@ -852,15 +852,15 @@ trait CommonProtocol
 			// index 0 - so the vendor name never made it there.
 			$actiondata = [];
 			if (!empty($sellername)) {
-				$errorDetails[] = 'Supplier: ' . $sellername;
+				$errorDetails['name'] = $langs->trans("Supplier").': ' . $sellername;
 				$actiondata['name'] = $sellername;
 			}
 			if (!empty($selleremail)) {
-				$errorDetails[] = 'Email: ' . $selleremail;
+				$errorDetails['email'] = $langs->trans("Email").': ' . $selleremail;
 				$actiondata['email'] = $selleremail;
 			}
 			if (!empty($sellervat)) {
-				$errorDetails[] = 'Vat number: ' . $sellervat;
+				$errorDetails['vatnumber'] = $langs->trans("VATIntra").': ' . $sellervat;
 				$actiondata['vatnumber'] = $sellervat;
 			}
 			if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
@@ -868,7 +868,7 @@ trait CommonProtocol
 					if (!empty($globalId)) {
 						$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode);
 						if (!empty($idprofField)) {
-							$errorDetails[] = $idprofField.': ' . $globalId;
+							$errorDetails[$idprofField] = $langs->trans($idprofField).': ' . $globalId;
 							$actiondata[$idprofField] = $globalId;
 						}
 					}
@@ -877,7 +877,7 @@ trait CommonProtocol
 
 			$detailsStr = !empty($errorDetails) ? ' [' . implode(' - ', $errorDetails) . ']' : '';
 
-			$message = 'Unable to find supplier' . $detailsStr . '. Auto-creation of thirdparties is disabled in settings.';
+			$message = 'Unable to find supplier' . $detailsStr . ".\n".'Auto-creation of thirdparties is disabled in settings.';
 
 			$action = $langs->trans('CreateSupplierManually');
 			$action .= '<a class="butAction small" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';

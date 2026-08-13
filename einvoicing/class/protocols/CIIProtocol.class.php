@@ -835,7 +835,7 @@ class CIIProtocol extends AbstractProtocol
 			$this->openedTransactions--;
 			return [
 				'res' => -1,
-				'message' => 'Thirdparty sync or creation error: ' . implode("<br>\n", $return_messages),
+				'message' => "Thirdparty sync or creation error:<br>\n" . implode("<br>\n", $return_messages),
 				'actioncode' => $syncSocRes['actioncode'] ?? '',
 				'actionurl' => $syncSocRes['actionurl'] ?? '',
 				'action' => $syncSocRes['action'] ?? null,
