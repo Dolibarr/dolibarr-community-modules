@@ -845,6 +845,8 @@ trait CommonProtocol
 			}
 			$createUrl .= '&backtopage=' . urlencode(dol_buildpath('/einvoicing/document_list.php', 1));
 
+			$langs->loadLangs(array("companies", "einvoicing@einvoicing"));
+
 			$errorDetails = [];
 			// The caller renders $actiondata as "key: value" pairs, the flat shape the PRODUCT_NOT_FOUND
 			// case returns. Building it as a list of one-entry arrays made every value reach the message
@@ -860,7 +862,6 @@ trait CommonProtocol
 				$actiondata['email'] = $selleremail;
 			}
 			if (!empty($sellervat)) {
-				$langs->load("companies");
 				$errorDetails['vatnumber'] = $langs->trans("VATIntra").': ' . $sellervat;
 				$actiondata['vatnumber'] = $sellervat;
 			}
@@ -878,7 +879,8 @@ trait CommonProtocol
 
 			$detailsStr = !empty($errorDetails) ? ' [' . implode(' - ', $errorDetails) . ']' : '';
 
-			$message = 'Unable to find supplier' . $detailsStr . ". \n".'Auto-creation of thirdparties is disabled in settings.';
+			$message = $langs->trans("FailedToFindSupplier"). ' ' . $detailsStr . ". \n";
+			$message .= $langs->trans("AutoCreateThirdPartyOffCreateItManually");
 
 			$action = $langs->trans('CreateSupplierManually');
 			$action .= '<a class="butAction small" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
