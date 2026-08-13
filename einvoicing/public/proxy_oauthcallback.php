@@ -236,6 +236,9 @@ if (getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_SEND_AND_RECEIVE')) {
 if (getDolGlobalInt('EINVOICING_SUPERPDPVIAPARTNER_ONLY_FUTURE')) {
 	$oauthserverurl .= '&superpdp_only_future=true';
 }
+if (getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_DIRECTORY_ENTRY_IDENTIFIER')) {
+	$oauthserverurl .= '&directory_entry_identifier='.urlencode(getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_DIRECTORY_ENTRY_IDENTIFIER'));
+}
 
 $save_redirect_uri = GETPOST('redirect_uri');
 
