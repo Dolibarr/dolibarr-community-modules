@@ -295,6 +295,17 @@ still allows - a status the platform accepted is not proposed a second time, a r
 and an approval only takes the refusal away with it. The query it replaces also compared the direction
 and the validation status against their stored case, which matches nothing on PostgreSQL (issue #548).
 
+FIX: A synchronization interrupted on a Factur-X invoice lets you download the document that stopped it
+again. The document list offers the last invoice that could not be processed under a fixed name, and it
+kept asking for facturx.pdf, a name nobody has written since the Factur-X reception was merged into the
+CII protocol: the received document is promoted to a slot named after the protocol file extension, so it
+lands in einvoice.pdf and the page pointed at nothing. The name is now asked of the protocols themselves,
+both by the page and by the clean-up that empties the slots at the start of a run - which was leaving the
+Factur-X one behind, too - so a protocol added later gets its slot without a page to update. The readable
+view that comes with some flows follows the same rule: it is offered when it exists, where it used to be
+offered on a Factur-X failure although its file is never written under that name, and never on a CII one
+although it is written there (issue #588).
+
 ## 1.0.3
 
 FIX: The totals of the generated document now follow the rounding convention of the instance. Dolibarr
