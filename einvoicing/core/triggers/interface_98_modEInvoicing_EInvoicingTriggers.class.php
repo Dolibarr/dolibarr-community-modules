@@ -299,6 +299,32 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			if (SupplierInvoiceHelper::closeReplacedSupplierInvoice($object, $user) > 0) {
 				setEventMessage($langs->trans("ModuleEInvoicingName") . ' : ' . $langs->trans('EInvoiceReplacedSupplierInvoiceClosed', $object->ref), 'mesgs');
 			}
+
+			// fr:205 (Approuvée) is the answer the buyer owes its vendor on a received invoice, and
+			// validating that invoice in Dolibarr is the act of accepting it: it leaves the draft state to
+			// enter the accounts and become payable. So the status is sent here rather than waiting for
+			// someone to remember the button on the card, which is how it was reported until now - and a
+			// vendor left without an answer has no way to tell an accepted invoice from a forgotten one.
+			// Unlike 211, this one is on by default; EINVOICING_DISABLE_SEND_APPROVED_ON_VALIDATION turns
+			// it off for an operator whose validation does not mean approval, and the button stays.
+			$einvoicing = new EInvoicing($this->db);
+			if (SupplierInvoiceHelper::shouldSendApprovedOnValidation($einvoicing, (int) $object->id, $object->element)) {
+				$PDPManager = new PDPProviderManager($this->db);
+				$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+
+				$result = $provider->sendStatusMessage($object, EInvoicing::STATUS_APPROVED);
+
+				if ($result['res'] > 0) {
+					setEventMessage($langs->trans("ModuleEInvoicingName") . ' : ' . $langs->trans('EInvStatus205Approved'), 'mesgs');
+				} else {
+					// Never escalated to $this->errors / a negative return: that would roll back the
+					// validation the operator asked for, and the status can still be sent by hand from the
+					// card afterwards. dol_syslog is the only channel that reliably surfaces this outside
+					// an interactive session (cron, API, mass validation, ...).
+					dol_syslog(__METHOD__ . ' Failed to send approved status (205) to platform for supplier invoice id=' . $object->id . ' : ' . $result['message'], LOG_ERR);
+					setEventMessage($langs->trans("ModuleEInvoicingName") . ' : ' . $result['message'], 'errors');
+				}
+			}
 		}
 
 		// fr:211 (Paiement transmis) is what we, as the buyer, tell the vendor once we have paid one of

@@ -102,3 +102,6 @@ alltime
 # other
 blacklists
 confirmactionxxx
+
+# String in french text to keep
+signifiant

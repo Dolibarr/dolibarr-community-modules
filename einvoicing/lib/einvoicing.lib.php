@@ -680,8 +680,10 @@ function einvoicingVatOnDebits()
  * (TVA sur DEBITS)", "29 : date de livraison (TVA sur DEBITS)" and "72 : date de paiement (TVA sur
  * ENCAISSEMENTS)", and carries two rules on it:
  *
+ * @phpcs:ignore
  *   G1.43        "Le BT-8 ne sera obligatoire que si l'entreprise a opte pour la TVA sur les debits
  *                 et le specifie au moyen du code 5 (CII)"
+ * @phpcs:ignore
  *   BR-FR-MAP-03 "BT-8 est obligatoire pour les factures de service des lors que l'assujetti Vendeur
  *                 a opte pour les debits"
  *
@@ -706,10 +708,10 @@ function einvoicingVatOnDebits()
  */
 function einvoicingVatPointDateCode($hasProductLine, $hasServiceLine, $isDeposit = false)
 {
-	// A down payment is the one case the socle settles on its own, and it settles it against every
-	// other rule here: XP Z12-014 annexe A reads "La TVA est exigible a l'encaissement de l'acompte
-	// pour les livraisons de biens comme pour les prestations de service, meme avec option sur les
-	// debits". So it is decided first, before the declared regime and before the VAT mode. Dolibarr
+	// A down payment is the one case the socle settles on its own, and it settles it against every other rule here: XP Z12-014 annexe A reads
+	// @phpcs:ignore
+	// "La TVA est exigible a l'encaissement de l'acompte pour les livraisons de biens comme pour les prestations de service, meme avec option sur les debits".
+	// So it is decided first, before the declared regime and before the VAT mode. Dolibarr
 	// builds every down payment line as a goods line, so without this the document would say nothing
 	// while its cash-in is reported to the platform with the status 212 for that very reason.
 	if ($isDeposit) {
@@ -732,8 +734,8 @@ function einvoicingVatPointDateCode($hasProductLine, $hasServiceLine, $isDeposit
 	$sellServiceOnPayment = (getDolGlobalString('TAX_MODE_SELL_SERVICE') == 'payment');
 
 	// Nothing is sent when no operation of the document is taxed on collection. The socle reads that
-	// silence: XP Z12-014 annexe A describes a VAT due on collection as "avec BT-8 absent, ou bien
-	// present et signifiant a l'encaissement (72)", making the two equivalent.
+	// silence: XP Z12-014 annexe A describes a VAT due on collection as
+	// "avec BT-8 absent, ou bien present et signifiant a l'encaissement (72)", making the two equivalent.
 	if (($sellServiceOnPayment && $hasServiceLine) || ($sellProductOnPayment && $hasProductLine)) {
 		return '72';
 	}
@@ -776,4 +778,44 @@ function einvoicingVatDueOnCollection($hasProductLine, $hasServiceLine)
 	}
 
 	return (($sellServiceOnPayment && $hasServiceLine) || ($sellProductOnPayment && $hasProductLine));
+}
+
+/**
+ * Invoicing period of the document (BG-14 / BT-73 / BT-74), derived from the periods of its lines.
+ *
+ * Dolibarr has no invoicing period at invoice level: the period lives on the line, as the date_start
+ * and date_end a service line carries. EN 16931 has both - BT-134/BT-135 on the line, BT-73/BT-74 on
+ * the header - and says nothing about deriving one from the other, so the derivation is a decision:
+ * the document covers everything its lines cover, hence the earliest start and the latest end (issue
+ * #572, option 1, chosen by the maintainer because most receiving software only reads the header).
+ *
+ * A period that would be its own contradiction is not emitted. One line billed from March with another
+ * billed until January derives a start after its end, which BR-29 refuses ("The Invoicing period end
+ * date shall be later or equal to the Invoicing period start date") - and a document refused whole for
+ * a header the operator never filled in would be worse than not deriving anything. The lines keep
+ * their own periods in that case, which is what happened before this existed.
+ *
+ * The argument is the accumulator buildinvoicelines.inc.php fills as it walks the lines:
+ * ['start' => [<numligne> => <timestamp>, ...], 'end' => [...]], either key absent when no line has
+ * that side.
+ *
+ * @param	array<string,array<int,int>>	$billingPeriod	Line periods collected from the invoice
+ * @return	array{start: ?int, end: ?int}					BT-73 and BT-74, null when there is none
+ */
+function einvoicingInvoicingPeriodFromLines($billingPeriod)
+{
+	$starts = array_filter(array_map('intval', (array) ($billingPeriod['start'] ?? array())));
+	$ends = array_filter(array_map('intval', (array) ($billingPeriod['end'] ?? array())));
+
+	$start = $starts ? min($starts) : null;
+	$end = $ends ? max($ends) : null;
+
+	if ($start !== null && $end !== null && $start > $end) {
+		dol_syslog('einvoicingInvoicingPeriodFromLines: the lines derive a period starting ' . dol_print_date($start, 'day')
+			. ' and ending ' . dol_print_date($end, 'day') . ', which BR-29 refuses; BT-73/BT-74 are left out', LOG_WARNING);
+
+		return array('start' => null, 'end' => null);
+	}
+
+	return array('start' => $start, 'end' => $end);
 }

@@ -294,6 +294,15 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->defaultFieldValue = '0';
 	$item->cssClass = 'minwidth500';
 
+	// Tell the vendor that its invoice is approved (status 205) when the supplier invoice is validated.
+	// On by default, unlike 211: this one is the answer the reform expects from the buyer, and validating
+	// a received invoice is what accepting it means. Stated as a "disable" so that an instance whose
+	// validation does not mean approval can turn it off without changing the meaning of the default.
+	$item = $formSetup->newItem('EINVOICING_DISABLE_SEND_APPROVED_ON_VALIDATION')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('EINVOICING_DISABLE_SEND_APPROVED_ON_VALIDATION_HELP');
+	$item->defaultFieldValue = '0';
+	$item->cssClass = 'minwidth500';
+
 	// Allow re-sending / re-editing an invoice already transmitted to the Access Point. Off by default:
 	// a transmitted invoice is immutable (correct it with a credit note / corrective invoice), and re-sending
 	// makes the PA refuse a duplicate. Turn on only to deliberately test PA retry behaviour.
