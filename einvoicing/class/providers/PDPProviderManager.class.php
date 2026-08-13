@@ -47,7 +47,7 @@ class PDPProviderManager
 	{
 		// Access point declaration
 		// You can enter entry for a new access point here.
-		global $langs;
+		global $langs, $mysoc;
 		global $dolibarr_main_url_root;
 
 		// Define $urlwithroot
@@ -84,10 +84,12 @@ class PDPProviderManager
 				'is_enabled' => 1,
 				'prod_account_admin_url' => 'https://www.superpdp.tech/app/users/create',
 				'test_account_admin_url' => 'https://www.superpdp.tech/app/users/create',
-			),
-			// Reference implementation, to copy when integrating a new platform. It talks to no platform,
-			// so it is only offered when the developer tools of the module are enabled.
-			'TESTPDP' => array(
+			)
+		);
+
+		// An implementation that only generate documents (no network access). It talks to no platform. This can be used by some countries like Germany or user that push files to a platformmanually.
+		if ($mysoc->country_code != 'FR' || getDolGlobalString('EINVOICING_ALLOW_DEVTOOLS')) {
+			$this->providersList['TESTPDP'] = array(
 				'class' => 'TestPDPProvider',
 				'position' => 100,
 				'provider_countries' => array('all'),
@@ -96,8 +98,8 @@ class PDPProviderManager
 				'is_enabled' => 1,
 				'prod_account_admin_url' => '',
 				'test_account_admin_url' => '',
-			)
-		);
+			);
+		}
 
 		// Add entry to use SuperPDP via OAuth delegation.
 		if (getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER')) {
