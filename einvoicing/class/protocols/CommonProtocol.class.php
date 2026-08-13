@@ -815,6 +815,17 @@ trait CommonProtocol
 			$sellername = trim($sellerInfo['sellername'] ?? '');
 			$selleremail = trim($sellerInfo['sellercontactemailaddr'] ?? '');
 			$sellervat = trim($sellerInfo['sellerTaxRegistations']['VA'] ?? '');
+			$sellerzip = trim($sellerInfo['sellerpostcode'] ?? '');
+			$sellertown = trim($sellerInfo['sellercity'] ?? '');
+			$sellercountrycode = trim($sellerInfo['sellercountry'] ?? '');
+			$selleraddress = trim($sellerInfo['sellerlienone'] ?? '');
+			if (!empty($sellerInfo['sellerlinetwo'])) {
+				$selleraddress .= "\n" . $sellerInfo['sellerlinetwo'];
+			}
+			if (!empty($sellerInfo['sellerlinethree'])) {
+				$selleraddress .= "\n" . $sellerInfo['sellerlinethree'];
+			}
+
 
 			$createParams = [];
 
@@ -837,6 +848,19 @@ trait CommonProtocol
 					}
 				}
 			}
+			if (!empty($selleraddress)) {
+				$createParams['address'] = $selleraddress;
+			}
+			if (!empty($sellerzip)) {
+				$createParams['zipcode'] = $sellerzip;
+			}
+			if (!empty($sellertown)) {
+				$createParams['town'] = $sellertown;
+			}
+			if (!empty($sellercountrycode)) {
+				$createParams['country_id'] = dol_getIdFromCode($this->db, $sellercountrycode, 'c_country');
+			}
+
 
 			// Create URL to prefill thirdparty creation form
 			$createUrl = DOL_URL_ROOT . '/societe/card.php?action=create&type=f';
