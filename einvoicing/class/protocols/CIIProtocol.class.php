@@ -696,7 +696,7 @@ class CIIProtocol extends AbstractProtocol
 			$result = $this->doCreateSupplierInvoiceFromSource($file, $ReadableViewFile, $flowId, $tempFile, $tempFileReadableView);
 		} finally {
 			$failed = !is_array($result) || !isset($result['res']) || $result['res'] < 0;
-			$this->cleanupIncomingTempFiles($tempDir, $tempFile, $tempFileReadableView, 'einvoice.' . static::INVOICE_FILE_EXTENSION, 'einvoice_readable.pdf', $failed);
+			$this->cleanupIncomingTempFiles($tempDir, $tempFile, $tempFileReadableView, $failed);
 
 			// The invoice import transaction is opened by doCreateSupplierInvoiceFromSource() once the
 			// vendor has been synchronized. Close it here so every early return - and any exception -

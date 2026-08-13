@@ -885,7 +885,15 @@ abstract class AbstractPDPProvider
 		global $conf;
 
 		$tempDir = $conf->einvoicing->dir_temp;
-		$diagFiles = array('facturx.pdf', 'facturx_readable.pdf', 'einvoice.xml', 'einvoice_readable.pdf');
+
+		$protocolManager = new ProtocolManager($this->db);
+		$diagFiles = $protocolManager->getIncomingDiagnosticFileNames();
+		$diagFiles[] = AbstractProtocol::INCOMING_DIAGNOSTIC_READABLE_FILE_NAME;
+		// Names used before the Factur-X reception was merged into CIIProtocol: no longer written, only
+		// cleaned up here so an installation upgraded with such a leftover does not keep it forever.
+		$diagFiles[] = 'facturx.pdf';
+		$diagFiles[] = 'facturx_readable.pdf';
+
 		foreach ($diagFiles as $f) {
 			if (file_exists($tempDir . '/' . $f)) {
 				dol_delete_file($tempDir . '/' . $f);

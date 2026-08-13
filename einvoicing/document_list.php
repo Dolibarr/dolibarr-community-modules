@@ -75,6 +75,7 @@ include_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php';
 include_once DOL_DOCUMENT_ROOT.'/core/lib/company.lib.php';
 include_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
 include_once __DIR__.'/class/providers/PDPProviderManager.class.php';
+include_once __DIR__.'/class/protocols/ProtocolManager.class.php';
 
 // load module libraries
 include_once __DIR__.'/class/document.class.php';
@@ -243,8 +244,12 @@ if (!$permissiontoread) {
 	accessforbidden();
 }
 
-$filePathFacturX = $conf->einvoicing->dir_temp . '/facturx.pdf';
-$filePathCII = $conf->einvoicing->dir_temp . '/einvoice.xml';
+// Fixed slots of the "last invoice that could not be processed" diagnostic, written by
+// AbstractProtocol::cleanupIncomingTempFiles(): one per protocol (einvoice.xml for a CII flow,
+// einvoice.pdf for a Factur-X one), plus the readable view when the platform provided one.
+$protocolManager = new ProtocolManager($db);
+$diagFileNames = $protocolManager->getIncomingDiagnosticFileNames();
+$diagReadableFileName = AbstractProtocol::INCOMING_DIAGNOSTIC_READABLE_FILE_NAME;
 
 
 /*
@@ -728,27 +733,33 @@ $last_sync_info .= '</span>';
 // Last supplier invoice that could not be processed by the system
 $last_supplier_invoice_error = '';
 
-if (file_exists($filePathFacturX)) {
-	$urlOriginalFile = DOL_URL_ROOT . '/document.php?modulepart=einvoicing&file=' . urlencode('temp/facturx.pdf');
-	$urlConvertedFile = DOL_URL_ROOT . '/document.php?modulepart=einvoicing&file=' . urlencode('temp/facturx_readable.pdf');
-
-	$last_supplier_invoice_error = '<span class="opacitylowx">'.img_picto('', 'times', 'class="pictofixedwidth"');
-	$last_supplier_invoice_error .= ' ' . $langs->trans("LastSupplierInvoiceCouldNotBeProcessed");
-	$last_supplier_invoice_error .= '<i class="fas fa-info-circle em088 opacityhigh classfortooltip" title="'. $langs->trans("LastSupplierInvoiceCouldNotBeProcessedInfo") .'"></i>';
-	$last_supplier_invoice_error .= ' : </span>';
-	$last_supplier_invoice_error .= '<a href="'.$urlOriginalFile.'">' . $langs->trans("facturXDownloadOriginal") . ' ' . img_picto('', 'download', 'class="pictofixedwidth"') . '</a>';
-	$last_supplier_invoice_error .= ' <span class="opacitylow">|</span> ';
-	$last_supplier_invoice_error .= '<a href="'.$urlConvertedFile.'">' . $langs->trans("facturXDownloadConverted") . ' ' . img_picto('', 'download', 'class="pictofixedwidth"') . '</a>';
+// Keep the most recent slot: a run may have failed on a CII flow and on a Factur-X one.
+$diagFileName = '';
+$diagFileDate = 0;
+foreach ($diagFileNames as $f) {
+	$diagFilePath = $conf->einvoicing->dir_temp . '/' . $f;
+	if (file_exists($diagFilePath) && filemtime($diagFilePath) >= $diagFileDate) {
+		$diagFileName = $f;
+		$diagFileDate = filemtime($diagFilePath);
+	}
 }
 
-if (file_exists($filePathCII)) {
-	$urlOriginalFile = DOL_URL_ROOT . '/document.php?modulepart=einvoicing&file=' . urlencode('temp/einvoice.xml');
+if ($diagFileName) {
+	$urlOriginalFile = DOL_URL_ROOT . '/document.php?modulepart=einvoicing&file=' . urlencode('temp/' . $diagFileName);
 
 	$last_supplier_invoice_error = '<span class="opacitylowx">'.img_picto('', 'times', 'class="pictofixedwidth"');
 	$last_supplier_invoice_error .= ' ' . $langs->trans("LastSupplierInvoiceCouldNotBeProcessed");
 	$last_supplier_invoice_error .= '<i class="fas fa-info-circle em088 opacityhigh classfortooltip" title="'. $langs->trans("LastSupplierInvoiceCouldNotBeProcessedInfo") .'"></i>';
 	$last_supplier_invoice_error .= ' : </span>';
 	$last_supplier_invoice_error .= '<a href="'.$urlOriginalFile.'">' . $langs->trans("facturXDownloadOriginal") . ' ' . img_picto('', 'download', 'class="pictofixedwidth"') . '</a>';
+
+	// The readable view is only stored when the platform provided one with the flow
+	if (file_exists($conf->einvoicing->dir_temp . '/' . $diagReadableFileName)) {
+		$urlConvertedFile = DOL_URL_ROOT . '/document.php?modulepart=einvoicing&file=' . urlencode('temp/' . $diagReadableFileName);
+
+		$last_supplier_invoice_error .= ' <span class="opacitylow">|</span> ';
+		$last_supplier_invoice_error .= '<a href="'.$urlConvertedFile.'">' . $langs->trans("facturXDownloadConverted") . ' ' . img_picto('', 'download', 'class="pictofixedwidth"') . '</a>';
+	}
 }
 
 // Form for sync action

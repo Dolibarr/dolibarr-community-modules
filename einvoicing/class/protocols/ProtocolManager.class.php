@@ -80,6 +80,29 @@ class ProtocolManager
 	}
 
 	/**
+	 * File names of the "last invoice that could not be processed" diagnostic slots, one per enabled
+	 * protocol (the readable view has a single name, AbstractProtocol::INCOMING_DIAGNOSTIC_READABLE_FILE_NAME).
+	 * Asking the protocols keeps the pages that display or clear the diagnostic in step with the names
+	 * the reception actually writes.
+	 *
+	 * @return list<string>		File names, relative to the module temp directory
+	 */
+	public function getIncomingDiagnosticFileNames()
+	{
+		dol_include_once('/einvoicing/class/protocols/AbstractProtocol.class.php');
+
+		$names = array();
+		foreach (array_keys($this->protocolsList) as $name) {
+			$protocol = $this->getProtocol($name);
+			if ($protocol instanceof AbstractProtocol) {
+				$names[] = $protocol::getIncomingDiagnosticFileName();
+			}
+		}
+
+		return array_values(array_unique($names));
+	}
+
+	/**
 	 * Get protocol instance by name.
 	 *
 	 * @param string 	$name 			Name of the protocol to retrieve ('FACTURX', 'CII', 'UBL').

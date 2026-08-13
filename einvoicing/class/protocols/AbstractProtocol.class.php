@@ -54,6 +54,9 @@ abstract class AbstractProtocol
 	/** @const string The profile used to generate XML */
 	protected const BUILD_XML_PROFILE = ''; // Must be overridden by subclasses
 
+	/** @const string Fixed file name of the readable view of the last invoice that could not be processed */
+	public const INCOMING_DIAGNOSTIC_READABLE_FILE_NAME = 'einvoice_readable.pdf';
+
 	/**
 	 * @param DoliDB $db Db
 	 */
@@ -273,6 +276,20 @@ abstract class AbstractProtocol
 	}
 
 	/**
+	 * Fixed file name of the "last invoice that could not be processed" diagnostic of this protocol,
+	 * relative to the module temp directory. Derived from the protocol file extension, so a received
+	 * CII document lands in einvoice.xml and a Factur-X one in einvoice.pdf. The pages that offer the
+	 * diagnostic for download must ask for the name here rather than hardcode it, otherwise a protocol
+	 * whose extension differs writes a slot nobody looks at (#588).
+	 *
+	 * @return	string		File name (no directory part)
+	 */
+	public static function getIncomingDiagnosticFileName()
+	{
+		return 'einvoice.' . static::INVOICE_FILE_EXTENSION;
+	}
+
+	/**
 	 * Clean up the per-call working temp files of an inbound invoice, while preserving the
 	 * "last invoice that could not be processed" diagnostic shown (and downloadable) in the
 	 * document list view.
@@ -285,13 +302,14 @@ abstract class AbstractProtocol
 	 * @param	string	$tempDir			Module temp directory
 	 * @param	string	$workFile			Unique working file for the received document
 	 * @param	string	$workReadable		Unique working file for the readable view (may not exist)
-	 * @param	string	$diagName			Fixed diagnostic filename for the received document
-	 * @param	string	$diagReadableName	Fixed diagnostic filename for the readable view
 	 * @param	bool	$failed				True if processing failed (keep the diagnostic), false otherwise
 	 * @return	void
 	 */
-	protected function cleanupIncomingTempFiles($tempDir, $workFile, $workReadable, $diagName, $diagReadableName, $failed)
+	protected function cleanupIncomingTempFiles($tempDir, $workFile, $workReadable, $failed)
 	{
+		$diagName = static::getIncomingDiagnosticFileName();
+		$diagReadableName = static::INCOMING_DIAGNOSTIC_READABLE_FILE_NAME;
+
 		if ($failed) {
 			// Keep the failed file(s) as the downloadable "last unprocessed invoice" diagnostic.
 			if (file_exists($workFile)) {
