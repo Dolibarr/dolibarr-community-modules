@@ -265,7 +265,6 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	// cash-in has to be reported with the status 212. Dolibarr already holds that scheme in the setup of
 	// the Tax/VAT module (TAX_MODE_SELL_PRODUCT / TAX_MODE_SELL_SERVICE), so it is not duplicated here:
 	// remind its current value, with a link to the page that owns it.
-	
 	// The VAT regime the generated documents declare in BT-8. Left to the VAT mode above by default;
 	// an explicit value is for a seller whose regime that mode cannot express (issue #419).
 	$item = $formSetup->newItem('EINVOICING_VAT_POINT_DATE_CODE')->setAsSelect(array(
