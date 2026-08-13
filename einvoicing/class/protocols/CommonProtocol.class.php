@@ -1392,6 +1392,36 @@ trait CommonProtocol
 	}
 
 	/**
+	 * Refuse to build a line whose VAT category requires a Seller VAT identifier the seller has not got.
+	 *
+	 * BR-E-02 and its siblings BR-S-02, BR-Z-02 and BR-AE-02 are satisfied by either the Seller VAT
+	 * identifier (BT-31, schemeID VA) or the Seller tax registration identifier (BT-32, schemeID FC),
+	 * which is why a seller charging no VAT can identify itself with its SIREN. BR-G-02 and BR-IC-02
+	 * are not: their assertion reads schemeID = 'VA' alone, so an exportation or an intracommunity
+	 * supply demands a real VAT number and no fallback can stand in for it.
+	 *
+	 * Without this the document is built, sent, and refused by the platform on a rule the operator has
+	 * no way to connect to a missing field - the same reason BR-S-02 is reported here rather than left
+	 * to the platform (issue #560).
+	 *
+	 * @param	Societe		$seller		Selling company
+	 * @param	string		$rule		Business rule that will be broken, for the message
+	 * @param	string		$operation	What the invoice does, in words, for the message
+	 * @return	void
+	 * @throws	Exception				When the seller has no VAT number to declare
+	 */
+	private function assertSellerVatIdentifier($seller, $rule, $operation)
+	{
+		if (!empty($seller->tva_intra)) {
+			return;
+		}
+
+		$why = ': that rule accepts the seller VAT identifier (BT-31) only, not the tax registration identifier (BT-32) a seller charging no VAT would declare.';
+
+		throw new Exception('BADVATNUMBER[' . $rule . ']: The VAT number of the seller ' . $seller->name . ' is mandatory on ' . $operation . $why);
+	}
+
+	/**
 	 * Get the category of the VAT rate and the VATEX code and reason.
 	 *
 	 * @param 	CommonInvoiceLine		$line			Invoice line
@@ -1567,10 +1597,12 @@ trait CommonProtocol
 						}
 					}
 				} elseif (!$buyer->thirdparty->isInEEC()) {
+					$this->assertSellerVatIdentifier($seller, 'BR-G-02', 'an exportation outside the EU');
 					$categoryVAT = 'G';
 					$exemptionReasonCode = 'VATEX-EU-G';
 					$exemptionReason = 'Exportation outside UE';
 				} elseif ($buyer->thirdparty->isInEEC() && $seller->country_code != $buyer->thirdparty->country_code) {
+					$this->assertSellerVatIdentifier($seller, 'BR-IC-02', 'an intracommunity supply');
 					$categoryVAT = 'K';		// Intra communautary VAT
 					$exemptionReasonCode = 'VATEX-EU-IC';
 					$exemptionReason = 'Intracommunautary VAT';
