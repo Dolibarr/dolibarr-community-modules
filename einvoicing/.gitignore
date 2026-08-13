@@ -21,3 +21,4 @@
 /.gitattributes
 /composer.json
 /composer.lock
+/.phpunit.result.cache

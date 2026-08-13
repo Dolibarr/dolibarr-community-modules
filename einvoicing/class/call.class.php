@@ -169,7 +169,7 @@ class Call extends CommonObject
 	public $response;
 
 	public $processing_result;
-	public $fk_provider;
+	public $provider;
 	public $entity;
 	// END MODULEBUILDER PROPERTIES
 

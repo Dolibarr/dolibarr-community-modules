@@ -290,6 +290,41 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 					return -1;
 				}
 			}
+
+			// A validated replacement invoice supersedes the one it replaces, which must not stay open
+			// for payment. The core does exactly that on the customer side and nothing on the supplier
+			// side, so a replaced supplier invoice used to keep every action of an ordinary one
+			// (issue #549). Never escalated to $this->errors: a failure here must not undo a validation
+			// the operator asked for, and the log carries the reason.
+			if (SupplierInvoiceHelper::closeReplacedSupplierInvoice($object, $user) > 0) {
+				setEventMessage($langs->trans("ModuleEInvoicingName") . ' : ' . $langs->trans('EInvoiceReplacedSupplierInvoiceClosed', $object->ref), 'mesgs');
+			}
+
+			// fr:205 (Approuvée) is the answer the buyer owes its vendor on a received invoice, and
+			// validating that invoice in Dolibarr is the act of accepting it: it leaves the draft state to
+			// enter the accounts and become payable. So the status is sent here rather than waiting for
+			// someone to remember the button on the card, which is how it was reported until now - and a
+			// vendor left without an answer has no way to tell an accepted invoice from a forgotten one.
+			// Unlike 211, this one is on by default; EINVOICING_DISABLE_SEND_APPROVED_ON_VALIDATION turns
+			// it off for an operator whose validation does not mean approval, and the button stays.
+			$einvoicing = new EInvoicing($this->db);
+			if (SupplierInvoiceHelper::shouldSendApprovedOnValidation($einvoicing, (int) $object->id, $object->element)) {
+				$PDPManager = new PDPProviderManager($this->db);
+				$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+
+				$result = $provider->sendStatusMessage($object, EInvoicing::STATUS_APPROVED);
+
+				if ($result['res'] > 0) {
+					setEventMessage($langs->trans("ModuleEInvoicingName") . ' : ' . $langs->trans('EInvStatus205Approved'), 'mesgs');
+				} else {
+					// Never escalated to $this->errors / a negative return: that would roll back the
+					// validation the operator asked for, and the status can still be sent by hand from the
+					// card afterwards. dol_syslog is the only channel that reliably surfaces this outside
+					// an interactive session (cron, API, mass validation, ...).
+					dol_syslog(__METHOD__ . ' Failed to send approved status (205) to platform for supplier invoice id=' . $object->id . ' : ' . $result['message'], LOG_ERR);
+					setEventMessage($langs->trans("ModuleEInvoicingName") . ' : ' . $result['message'], 'errors');
+				}
+			}
 		}
 
 		// fr:211 (Paiement transmis) is what we, as the buyer, tell the vendor once we have paid one of
@@ -407,46 +442,39 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 	 * Tell whether a cash-in on this invoice has to be reported with the status 212 (Encaissee).
 	 *
 	 * The reform only requires the payment data for the operations whose VAT is due on collection, which is
-	 * exactly what the VAT exigibility scheme of the company says. Dolibarr already holds it, in the setup of
-	 * the Tax/VAT module (Home - Setup - Modules - Tax/VAT, "VAT mode"), so there is nothing to configure
-	 * here: TAX_MODE_SELL_PRODUCT and TAX_MODE_SELL_SERVICE are read directly. Both are always populated,
-	 * Conf::setValues() defaults them to 'invoice' and 'payment' when the setup page was never saved.
-	 *
-	 *   TAX_MODE 0, the French default   products on invoice, services on payment  -> due on a service line
-	 *   TAX_MODE 1, "d'apres les debits" everything on invoice                     -> never due
-	 *   TAX_MODE 2                       everything on payment                     -> always due
+	 * exactly what the VAT exigibility scheme of the company says. einvoicingVatDueOnCollection() answers
+	 * that from the VAT mode of the Tax/VAT module setup, or from the regime the seller declared explicitly
+	 * in the module setup, and the generated document answers the neighbouring question in BT-8.
 	 *
 	 * @param  Facture $invoice Invoice that has been cashed in
 	 * @return bool             True if the status has to be sent
 	 */
 	private function needCashedInStatus($invoice)
 	{
-		// VAT on a down payment falls due when the down payment is collected, whatever the scheme
+		// VAT on a down payment falls due when the down payment is collected, whatever the scheme: the
+		// debits option is set aside by a payment received before the debit, and it may not delay the
+		// exigibility anyway (CGI art. 269-2).
 		if ($invoice->type == Facture::TYPE_DEPOSIT) {
 			return true;
 		}
 
-		$productOnPayment = (getDolGlobalString('TAX_MODE_SELL_PRODUCT') == 'payment');
-		$serviceOnPayment = (getDolGlobalString('TAX_MODE_SELL_SERVICE') == 'payment');
-
-		if ($productOnPayment && $serviceOnPayment) {
-			return true;
-		}
-		if (!$productOnPayment && !$serviceOnPayment) {
-			return false;
-		}
-
-		// Mixed scheme: due as soon as the invoice carries one line of the kind taxed on collection
-		$typeOnPayment = $serviceOnPayment ? 1 : 0;		// Product::TYPE_SERVICE / TYPE_PRODUCT, without requiring the class here
 		if (empty($invoice->lines)) {
 			$invoice->fetch_lines();
 		}
+
+		// Product::TYPE_PRODUCT / TYPE_SERVICE, without requiring the class here. Anything else is a
+		// pseudo-line carrying no VAT (title, subtotal, page break) and is not a kind of operation:
+		// the document builder leaves those out of the same decision.
+		$hasProductLine = false;
+		$hasServiceLine = false;
 		foreach ($invoice->lines as $line) {
-			if ($line->product_type == $typeOnPayment) {
-				return true;
+			if ((int) $line->product_type === 1) {
+				$hasServiceLine = true;
+			} elseif ((int) $line->product_type === 0) {
+				$hasProductLine = true;
 			}
 		}
 
-		return false;
+		return einvoicingVatDueOnCollection($hasProductLine, $hasServiceLine);
 	}
 }

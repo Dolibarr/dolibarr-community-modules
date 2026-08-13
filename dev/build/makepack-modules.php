@@ -353,6 +353,7 @@ function buildModulePackages($action, $modulename)
 		'ajax',
 		'backport',
 		'class',
+		'compat',
 		'css',
 		'core',
 		'img',
@@ -370,6 +371,7 @@ function buildModulePackages($action, $modulename)
 		'*.yaml',
 		'COPYING',
 		'COPYRIGHT',
+		'VERSION',
 		'modulebuilder.txt',
 	];
 
@@ -559,6 +561,9 @@ function detectModule()
 	// search, and store all matching occurrences in $matches
 	if (preg_match_all($pattern, $contents, $matches)) {
 		$version = reset($matches['version']);
+	} elseif (file_exists('VERSION')) {
+		// The descriptor may read its version from the VERSION file of the module instead of hardcoding it
+		$version = trim((string) file_get_contents('VERSION'));
 	}
 
 	if (empty($version)) {

@@ -70,6 +70,23 @@ $conf->global->MAIN_DISABLE_ALL_MAILS = 1;
 class SupplierInvoiceHelperTest extends CommonClassTest
 {
 	/**
+	 * Several fixtures of this class validate a supplier invoice, and validating one that came from the
+	 * platform now answers its vendor with the "Approved" (205) status - a real call to the Access Point
+	 * configured on the instance the suite runs against. None of those tests is about that status, so it
+	 * is switched off here; the tests that ARE about it turn it back on explicitly.
+	 *
+	 * @return void
+	 */
+	protected function setUp(): void
+	{
+		global $conf;
+
+		parent::setUp();
+
+		$conf->global->EINVOICING_DISABLE_SEND_APPROVED_ON_VALIDATION = '1';
+	}
+
+	/**
 	 * Create a draft specimen supplier invoice. ref_supplier is made unique per call: several
 	 * test methods each create their own specimen inside the same class-wide transaction (see
 	 * CommonClassTest::setUpBeforeClass()), and FactureFournisseur::initAsSpecimen() otherwise
@@ -347,6 +364,186 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 	}
 
 	/**
+	 * Build a replacement supplier invoice pointing at a source invoice.
+	 *
+	 * The type and the source are set on the object rather than written back: they are what the
+	 * validation trigger hands over, and what the helper reads to take its decision.
+	 *
+	 * @param	int	$sourceId	Id of the invoice it replaces
+	 * @return	FactureFournisseur
+	 */
+	private function createReplacementFor($sourceId)
+	{
+		$replacement = $this->createSpecimenSupplierInvoice();
+		$replacement->type = FactureFournisseur::TYPE_REPLACEMENT;
+		$replacement->fk_facture_source = $sourceId;
+
+		return $replacement;
+	}
+
+	/**
+	 * The invoice a replacement e-invoice replaces is closed with the close code the core reserves
+	 * for it, so the card stops offering to pay it (issue #549).
+	 *
+	 * @return void
+	 */
+	public function testReplacedEInvoiceIsClosed()
+	{
+		global $conf, $user, $langs, $db;
+		$conf = $this->savconf;
+		$user = $this->savuser;
+		$langs = $this->savlangs;
+		$db = $this->savdb;
+
+		$source = $this->createSpecimenSupplierInvoice();
+		$this->addEInvoicingDocument($source->id);
+		$this->assertGreaterThan(0, $source->validate($user), $source->errorsToString());
+
+		$replacement = $this->createReplacementFor($source->id);
+
+		$this->assertEquals(1, SupplierInvoiceHelper::closeReplacedSupplierInvoice($replacement, $user));
+
+		$source->fetch($source->id);
+		$this->assertEquals(FactureFournisseur::STATUS_ABANDONED, $source->status);
+		$this->assertEquals(FactureFournisseur::CLOSECODE_REPLACED, $source->close_code);
+	}
+
+	/**
+	 * A replacement recorded between two ordinary supplier invoices is none of this module's
+	 * business and is left exactly as the core leaves it.
+	 *
+	 * @return void
+	 */
+	public function testReplacedPlainSupplierInvoiceIsLeftAlone()
+	{
+		global $conf, $user, $langs, $db;
+		$conf = $this->savconf;
+		$user = $this->savuser;
+		$langs = $this->savlangs;
+		$db = $this->savdb;
+
+		$source = $this->createSpecimenSupplierInvoice();
+		$this->assertGreaterThan(0, $source->validate($user), $source->errorsToString());
+
+		$replacement = $this->createReplacementFor($source->id);
+
+		$this->assertEquals(0, SupplierInvoiceHelper::closeReplacedSupplierInvoice($replacement, $user));
+
+		$source->fetch($source->id);
+		$this->assertEquals(FactureFournisseur::STATUS_VALIDATED, $source->status);
+	}
+
+	/**
+	 * An invoice that has been paid is never closed: abandoning it would contradict the payment
+	 * already recorded against it.
+	 *
+	 * @return void
+	 */
+	public function testReplacedPaidInvoiceIsLeftAlone()
+	{
+		global $conf, $user, $langs, $db;
+		$conf = $this->savconf;
+		$user = $this->savuser;
+		$langs = $this->savlangs;
+		$db = $this->savdb;
+
+		$source = $this->createSpecimenSupplierInvoice();
+		$this->addEInvoicingDocument($source->id);
+		$this->assertGreaterThan(0, $source->validate($user), $source->errorsToString());
+		$this->assertGreaterThan(0, $source->setPaid($user), $source->errorsToString());
+
+		$replacement = $this->createReplacementFor($source->id);
+
+		$this->assertEquals(0, SupplierInvoiceHelper::closeReplacedSupplierInvoice($replacement, $user));
+
+		$source->fetch($source->id);
+		$this->assertNotEquals(FactureFournisseur::STATUS_ABANDONED, $source->status);
+	}
+
+	/**
+	 * A draft cannot be paid nor transferred to accountancy, so it is left as it is rather than
+	 * being validated only to be cancelled.
+	 *
+	 * @return void
+	 */
+	public function testReplacedDraftInvoiceIsLeftAlone()
+	{
+		global $conf, $user, $langs, $db;
+		$conf = $this->savconf;
+		$user = $this->savuser;
+		$langs = $this->savlangs;
+		$db = $this->savdb;
+
+		$source = $this->createSpecimenSupplierInvoice();
+		$this->addEInvoicingDocument($source->id);
+
+		$replacement = $this->createReplacementFor($source->id);
+
+		$this->assertEquals(0, SupplierInvoiceHelper::closeReplacedSupplierInvoice($replacement, $user));
+
+		$source->fetch($source->id);
+		$this->assertEquals(FactureFournisseur::STATUS_DRAFT, $source->status);
+	}
+
+	/**
+	 * An invoice that is not a replacement, or one with no source recorded, has nothing to close.
+	 *
+	 * @return void
+	 */
+	public function testNonReplacementInvoiceClosesNothing()
+	{
+		global $conf, $user, $langs, $db;
+		$conf = $this->savconf;
+		$user = $this->savuser;
+		$langs = $this->savlangs;
+		$db = $this->savdb;
+
+		$source = $this->createSpecimenSupplierInvoice();
+		$this->addEInvoicingDocument($source->id);
+		$this->assertGreaterThan(0, $source->validate($user), $source->errorsToString());
+
+		// Standard type, even though it does carry a source.
+		$standard = $this->createSpecimenSupplierInvoice();
+		$standard->fk_facture_source = $source->id;
+		$this->assertEquals(0, SupplierInvoiceHelper::closeReplacedSupplierInvoice($standard, $user));
+
+		// Replacement type, but no source recorded.
+		$orphan = $this->createSpecimenSupplierInvoice();
+		$orphan->type = FactureFournisseur::TYPE_REPLACEMENT;
+		$this->assertEquals(0, SupplierInvoiceHelper::closeReplacedSupplierInvoice($orphan, $user));
+
+		$source->fetch($source->id);
+		$this->assertEquals(FactureFournisseur::STATUS_VALIDATED, $source->status);
+	}
+
+	/**
+	 * Closing the same replaced invoice a second time changes nothing.
+	 *
+	 * @return void
+	 */
+	public function testCloseReplacedIsIdempotent()
+	{
+		global $conf, $user, $langs, $db;
+		$conf = $this->savconf;
+		$user = $this->savuser;
+		$langs = $this->savlangs;
+		$db = $this->savdb;
+
+		$source = $this->createSpecimenSupplierInvoice();
+		$this->addEInvoicingDocument($source->id);
+		$this->assertGreaterThan(0, $source->validate($user), $source->errorsToString());
+
+		$replacement = $this->createReplacementFor($source->id);
+
+		$this->assertEquals(1, SupplierInvoiceHelper::closeReplacedSupplierInvoice($replacement, $user));
+		$this->assertEquals(0, SupplierInvoiceHelper::closeReplacedSupplierInvoice($replacement, $user));
+
+		$source->fetch($source->id);
+		$this->assertEquals(FactureFournisseur::STATUS_ABANDONED, $source->status);
+		$this->assertEquals(FactureFournisseur::CLOSECODE_REPLACED, $source->close_code);
+	}
+
+	/**
 	 * A 'Pending' validation status is not a confirmation: it must never trigger the abandon.
 	 *
 	 * @return void
@@ -488,5 +685,109 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 		$einvoicing = new EInvoicing($db);
 		$result = $einvoicing->updateStatusMessageValidation($lcId, '', 'Ok', '');
 		$this->assertEquals(1, $result);
+	}
+
+	/**
+	 * A received e-invoice with nothing answered yet: validating it has to tell the vendor "Approved"
+	 * (205), which is what the buyer owes on an invoice it accepts (issue #572 follow-up, 205 on
+	 * validation).
+	 *
+	 * @return void
+	 */
+	public function testValidatingAReceivedEInvoiceAnswersApproved()
+	{
+		global $conf, $db;
+
+		unset($conf->global->EINVOICING_DISABLE_SEND_APPROVED_ON_VALIDATION);	// the default, which setUp() switched off
+
+		$invoice = $this->createSpecimenSupplierInvoice();
+		$this->addEInvoicingDocument($invoice->id);
+
+		$einvoicing = new EInvoicing($db);
+		$this->assertTrue(SupplierInvoiceHelper::shouldSendApprovedOnValidation($einvoicing, (int) $invoice->id, 'invoice_supplier'));
+	}
+
+	/**
+	 * An invoice that never came from the platform has no vendor waiting for a status: nothing is sent,
+	 * whatever the setup says.
+	 *
+	 * @return void
+	 */
+	public function testValidatingAPlainSupplierInvoiceAnswersNothing()
+	{
+		global $conf, $db;
+
+		unset($conf->global->EINVOICING_DISABLE_SEND_APPROVED_ON_VALIDATION);
+
+		$invoice = $this->createSpecimenSupplierInvoice();
+
+		$einvoicing = new EInvoicing($db);
+		$this->assertFalse(SupplierInvoiceHelper::shouldSendApprovedOnValidation($einvoicing, (int) $invoice->id, 'invoice_supplier'));
+	}
+
+	/**
+	 * The status is sent once. A second validation - a draft reopened and validated again - must not
+	 * repeat it, since the lifecycle is already closed on the platform side.
+	 *
+	 * @return void
+	 */
+	public function testApprovedIsNotSentTwice()
+	{
+		global $conf, $db;
+
+		unset($conf->global->EINVOICING_DISABLE_SEND_APPROVED_ON_VALIDATION);
+
+		$invoice = $this->createSpecimenSupplierInvoice();
+		$this->addEInvoicingDocument($invoice->id);
+		$this->insertLifecycleMessageFixture($invoice->id, 'invoice_supplier', EInvoicing::STATUS_APPROVED, '');
+
+		$einvoicing = new EInvoicing($db);
+		$this->assertFalse(SupplierInvoiceHelper::shouldSendApprovedOnValidation($einvoicing, (int) $invoice->id, 'invoice_supplier'));
+	}
+
+	/**
+	 * An invoice already refused is not approved afterwards by a validation: 205 and 210 both close the
+	 * lifecycle, and answering both would contradict what the vendor was already told.
+	 *
+	 * @return void
+	 */
+	public function testARefusedInvoiceIsNotApprovedLater()
+	{
+		global $conf, $db;
+
+		unset($conf->global->EINVOICING_DISABLE_SEND_APPROVED_ON_VALIDATION);
+
+		$invoice = $this->createSpecimenSupplierInvoice();
+		$this->addEInvoicingDocument($invoice->id);
+		$this->insertLifecycleMessageFixture($invoice->id, 'invoice_supplier', EInvoicing::STATUS_REFUSED, 'REJ_LIT');
+
+		$einvoicing = new EInvoicing($db);
+		$this->assertFalse(SupplierInvoiceHelper::shouldSendApprovedOnValidation($einvoicing, (int) $invoice->id, 'invoice_supplier'));
+	}
+
+	/**
+	 * The two switches that turn it off: the dedicated one, for an instance where validating an invoice
+	 * does not mean approving it, and the general "do not send anything to the platform".
+	 *
+	 * @return void
+	 */
+	public function testTheSetupCanTurnTheAnswerOff()
+	{
+		global $conf, $db;
+
+		$invoice = $this->createSpecimenSupplierInvoice();
+		$this->addEInvoicingDocument($invoice->id);
+		$einvoicing = new EInvoicing($db);
+
+		$conf->global->EINVOICING_DISABLE_SEND_APPROVED_ON_VALIDATION = '1';
+		$this->assertFalse(SupplierInvoiceHelper::shouldSendApprovedOnValidation($einvoicing, (int) $invoice->id, 'invoice_supplier'));
+		unset($conf->global->EINVOICING_DISABLE_SEND_APPROVED_ON_VALIDATION);		// back to the default
+
+		$conf->global->EINVOICING_DISABLE_SYNC_DOLI_TO_AP = '1';
+		$this->assertFalse(SupplierInvoiceHelper::shouldSendApprovedOnValidation($einvoicing, (int) $invoice->id, 'invoice_supplier'));
+		unset($conf->global->EINVOICING_DISABLE_SYNC_DOLI_TO_AP);
+
+		// And back to the default, to be sure the two lines above are what changed the answer.
+		$this->assertTrue(SupplierInvoiceHelper::shouldSendApprovedOnValidation($einvoicing, (int) $invoice->id, 'invoice_supplier'));
 	}
 }

@@ -142,8 +142,8 @@ class FacturXProtocol extends CIIProtocol
 			 *   documentlanguage: string,
 			 *   effectiveSpecifiedPeriod: 'NA',
 			 *   documentDeliveryDate: DateTimeInterface,
-			 *   invoicingPeriodStart: null,
-			 *   invoicingPeriodEnd: null,
+			 *   invoicingPeriodStart: ?DateTimeInterface,
+			 *   invoicingPeriodEnd: ?DateTimeInterface,
 			 *   businessProcessId: string,
 			 *   isTestDocument: bool,
 			 *   documentNotePublic: string,
@@ -287,7 +287,7 @@ class FacturXProtocol extends CIIProtocol
 			 */
 			'
 			@phan-var-force Facture 			$object			The $invoice object used in entry on inc file, but completed.
-			@phan-var-force array{documentno:string,documenttypecode:null|string,documentdate:DateTimeInterface,invoiceCurrency:string|array<string>,taxCurrency:null,documentname:null,documentlanguage:string,effectiveSpecifiedPeriod:\'NA\',documentDeliveryDate:DateTimeInterface,invoicingPeriodStart:null,invoicingPeriodEnd:null,businessProcessId:string,isTestDocument:bool,documentNotePublic:string,documentNotePMT:string,documentNotePMD:string,documentNoteAAB:string,documentNoteTXD:string,documentNotes:array,vatDueDateTypeCode:string,sellername:string,sellerids:string,sellerlineone:string,sellerlinetwo:string,sellerlinethree:string,sellerpostcode:string,sellercity:string,sellercountry:string,sellersubdivision:null,sellercontactpersonname:string,sellercontactdepartmentname:null,sellercontactphoneno:string,sellercontactfaxno:string,sellercontactemailaddr:string,sellerCommunicationUriScheme:string,sellerCommunicationUri:string,sellerGlobalIds:array<array{schemeID:string,value:string}>,sellerTaxRegistrations:array<array{type:string,value:string}>,sellervatnumber:string,sellerLegalOrgId:string,sellerLegalOrgScheme:string,sellerTradingName:string,buyername:string,buyerids:string,buyerlineone:string,buyerlinetwo:string,buyerlinethree:string,buyerpostcode:string,buyercity:string,buyercountry:string,buyersubdivision:null,buyervatnumber:string,buyerGlobalIds:array<array{schemeID:string,value:string}>,buyerLegalOrgId:string,buyerLegalOrgScheme:string,buyerTradingName:string,buyerReference:null|string,buyerCommunicationUriScheme:string,buyerCommunicationUri:string,buyercontactpersonname:null,buyercontactemailaddr:null,buyercontactphoneno:null,grandTotalAmount:float|int,duePayableAmount:float|int,lineTotalAmount:float|int,chargeTotalAmount:float,allowanceTotalAmount:float|int,taxBasisTotalAmount:float|int,taxTotalAmount:float|int,roundingAmount:null,totalPrepaidAmount:float|int,iban_id:int,iban:string,bic:string,accountName:string,accountRef:string,accountLabel:string,paymentDueDate:DateTimeInterface,paymentTermsText:string,headerAllowancesCharges:array,invoiceRefDocs:array|array<array{ref:string|int,date:DateTimeInterface,type:string}>,orderReference:string,contractReference:null|string,despatchAdviceRef:null,taxBreakdown:array|array<array<string,array>>,_chorus:bool,_depositlines:array|array<array{lineId:int,invoiceRef:string,invoiceDate:DateTimeInterface}>,_globalDiscounts:array|array<array{value:float,reason:string,taxRate:float,categoryVAT:string}>,_customerOrderReferenceList:string[],_project:Project|null,paymentMeansCode?:int,paymentMeansText?:string,_shipFromContactBill?:array{address:null|string,zip:null|string,town:null|string,country:string},_shipFromContactShip?:array{name:string,address:null|string,zip:null|string,town:null|string,country:string}} $invoiceData
+			@phan-var-force array{documentno:string,documenttypecode:null|string,documentdate:DateTimeInterface,invoiceCurrency:string|array<string>,taxCurrency:null,documentname:null,documentlanguage:string,effectiveSpecifiedPeriod:\'NA\',documentDeliveryDate:DateTimeInterface,invoicingPeriodStart:?DateTimeInterface,invoicingPeriodEnd:?DateTimeInterface,businessProcessId:string,isTestDocument:bool,documentNotePublic:string,documentNotePMT:string,documentNotePMD:string,documentNoteAAB:string,documentNoteTXD:string,documentNotes:array,vatDueDateTypeCode:string,sellername:string,sellerids:string,sellerlineone:string,sellerlinetwo:string,sellerlinethree:string,sellerpostcode:string,sellercity:string,sellercountry:string,sellersubdivision:null,sellercontactpersonname:string,sellercontactdepartmentname:null,sellercontactphoneno:string,sellercontactfaxno:string,sellercontactemailaddr:string,sellerCommunicationUriScheme:string,sellerCommunicationUri:string,sellerGlobalIds:array<array{schemeID:string,value:string}>,sellerTaxRegistrations:array<array{type:string,value:string}>,sellervatnumber:string,sellerLegalOrgId:string,sellerLegalOrgScheme:string,sellerTradingName:string,buyername:string,buyerids:string,buyerlineone:string,buyerlinetwo:string,buyerlinethree:string,buyerpostcode:string,buyercity:string,buyercountry:string,buyersubdivision:null,buyervatnumber:string,buyerGlobalIds:array<array{schemeID:string,value:string}>,buyerLegalOrgId:string,buyerLegalOrgScheme:string,buyerTradingName:string,buyerReference:null|string,buyerCommunicationUriScheme:string,buyerCommunicationUri:string,buyercontactpersonname:null,buyercontactemailaddr:null,buyercontactphoneno:null,grandTotalAmount:float|int,duePayableAmount:float|int,lineTotalAmount:float|int,chargeTotalAmount:float,allowanceTotalAmount:float|int,taxBasisTotalAmount:float|int,taxTotalAmount:float|int,roundingAmount:null,totalPrepaidAmount:float|int,iban_id:int,iban:string,bic:string,accountName:string,accountRef:string,accountLabel:string,paymentDueDate:DateTimeInterface,paymentTermsText:string,headerAllowancesCharges:array,invoiceRefDocs:array|array<array{ref:string|int,date:DateTimeInterface,type:string}>,orderReference:string,contractReference:null|string,despatchAdviceRef:null,taxBreakdown:array|array<array<string,array>>,_chorus:bool,_depositlines:array|array<array{lineId:int,invoiceRef:string,invoiceDate:DateTimeInterface}>,_globalDiscounts:array|array<array{value:float,reason:string,taxRate:float,categoryVAT:string}>,_customerOrderReferenceList:string[],_project:Project|null,paymentMeansCode?:int,paymentMeansText?:string,_shipFromContactBill?:array{address:null|string,zip:null|string,town:null|string,country:string},_shipFromContactShip?:array{name:string,address:null|string,zip:null|string,town:null|string,country:string}} $invoiceData
 			@phan-var-force array<int,array{lineid:int,linestatuscode:\'NA\',linestatusreasoncode:\'NA\',lineNote:null,prodname:string,proddesc:string,prodsellerid:string,prodbuyerid:null|string,prodglobalidtype:null|string,prodglobalid:null|string,prodmultilangs:array,prodClassificationCode:null|string,prodClassificationScheme:null|string,prodOriginCountry:null|string,netpriceamount:float,netpricebasisquantity:null|float,netpricebasisquantityunitcode:null|string,billedquantity:float,billedquantityunitcode:string,chargeFreeQuantity:null|float,chargeFreeQuantityunitcode:null|string,packageQuantity:null|float,packageQuantityunitcode:null|string,lineTotalAmount:float|string,totalAllowanceChargeAmount:null|float,categoryCode:string,typeCode:\'VAT\',rateApplicablePercent:string,tva_tx:float|string,vat_src_code:string,ExemptionReason:string,ExemptionReasonCode:string,calculatedAmount:null|float,lineAllowances:array,lineGrossPriceAllowances:array,lineremisepercent:\'NA\'|float,linePeriodStart:?DateTimeInterface,linePeriodEnd:?DateTimeInterface,additionalRefDocs:array,isDepositLine:bool,depositInvoiceRef:null|string,depositInvoiceDate:?DateTimeInterface,parentDocumentNo:null|string,is_deposit:int<0,1>,fk_remise:null|int,discountPercent:float,grosspriceamount:null|float,grosspricebasisquantity:null|float,grosspricebasisquantityunitcode:null|string}> $linesData
 			@phan-var-force string 				$outputlang		Value of $outputlangs->defaultlang
 			@phan-var-force Account				$account
@@ -310,13 +310,13 @@ class FacturXProtocol extends CIIProtocol
 			$profile = getDolGlobalString('EINVOICING_PROFILE');
 			switch ($profile) {
 				case 'EN16931':
-					$used_profile = ZugferdProfiles::PROFILE_EXTENDED;
-					$facturxpdf = ZugferdDocumentBuilder::createNew($used_profile);
-					// no break
+					$used_profile = ZugferdProfiles::PROFILE_EN16931;
+					break;
 				default:
 					$used_profile = ZugferdProfiles::PROFILE_EXTENDED;
-					$facturxpdf = ZugferdDocumentBuilder::createNew($used_profile);
+					break;
 			}
+			$facturxpdf = ZugferdDocumentBuilder::createNew($used_profile);
 			dol_syslog(get_class($this) . '::executeHooks create new XML document based on ' . $used_profile);
 
 			// Get the type of invoice in FacturX nomenclature
@@ -396,6 +396,14 @@ class FacturXProtocol extends CIIProtocol
 			// Add delivery date for section ApplicableHeaderTradeDelivery
 			$facturxpdf->setDocumentSupplyChainEvent($invoiceData['documentDeliveryDate']);
 
+			// Invoicing period of the document (BG-14 / BT-73 / BT-74), derived from the periods of the
+			// lines - see einvoicingInvoicingPeriodFromLines(). The builder writes whichever side it is
+			// given, so the same single condition as the CII path applies (issue #572). The third
+			// argument is the obsolete BT-X-264 description, which nothing should carry.
+			if ($invoiceData['invoicingPeriodStart'] !== null || $invoiceData['invoicingPeriodEnd'] !== null) {
+				$facturxpdf->setDocumentBillingPeriod($invoiceData['invoicingPeriodStart'], $invoiceData['invoicingPeriodEnd'], null);
+			}
+
 			// Add data of project if invoice is into a project
 			if ($invoiceData['_project'] instanceof Project) {
 				$facturxpdf->setDocumentProcuringProject((string) $invoiceData['_project']->ref, $invoiceData['_project']->title);
@@ -471,8 +479,10 @@ class FacturXProtocol extends CIIProtocol
 					$facturxpdf->setDocumentInvoiceReferencedDocument($lineData['depositInvoiceRef'], ZugferdInvoiceType::PREPAYMENTINVOICE, $lineData['depositInvoiceDate']);
 				}
 
-				// Set billing period for the line
-				if ($lineData['linePeriodStart'] !== null && $lineData['linePeriodEnd'] !== null) {
+				// Set billing period for the line (BG-26 / BT-134 / BT-135). One date alone is a valid
+				// period: BR-CO-20 asks for the start date or the end date, "or both". The builder
+				// leaves out the side it is given as null, so the same condition as the CII path applies.
+				if ($lineData['linePeriodStart'] !== null || $lineData['linePeriodEnd'] !== null) {
 					$facturxpdf->setDocumentPositionBillingPeriod($lineData['linePeriodStart'], $lineData['linePeriodEnd']);
 				}
 
@@ -888,7 +898,10 @@ class FacturXProtocol extends CIIProtocol
 		$outputlangs = $langs;		// TODO Use the target language
 		$outputlangs->load("einvoicing@einvoicing");
 
-		require __DIR__ . "/ExampleHelpers.php";
+		// require_once, not require: this file declares plain functions, so loading it a second time
+		// in the same PHP request is a fatal redeclare - which is what happens as soon as two samples
+		// are generated in one request, and a fatal error is not something the caller can catch.
+		require_once __DIR__ . "/ExampleHelpers.php";
 
 		$existingPdfFilename = __DIR__ . "/../../doc/00_ZugferdDocumentPdfBuilder_PrintLayout.pdf";
 		$newPdfFilename = $conf->einvoicing->dir_temp . "/INVTEST-".dol_print_date(dol_now(), '%y%m%d-%H%M%S').".pdf";
@@ -1367,6 +1380,7 @@ class FacturXProtocol extends CIIProtocol
 		// with that error carry its socid, so a rolled back vendor makes them point to a thirdparty that
 		// never existed.
 		$db->begin();
+		$this->openedTransactions++;
 
 		$syncSocRes = $this->_syncOrCreateThirdpartyFromEInvoiceSeller($parsedHeader, 'dolibarr', $flowId);
 
@@ -1374,6 +1388,7 @@ class FacturXProtocol extends CIIProtocol
 		$return_messages[] = $syncSocRes['message'];
 		if ($socId < 0) {
 			$db->rollback();
+			$this->openedTransactions--;
 			return [
 				'res' => -1,
 				'message' => 'Thirdparty sync or creation error: ' . implode("<br>\n", $return_messages),
@@ -1385,11 +1400,13 @@ class FacturXProtocol extends CIIProtocol
 		}
 
 		$db->commit();
+		$this->openedTransactions--;
 
 		// From this point on, everything belongs to the invoice import (products, invoice, lines) and
 		// stays atomic. This second transaction is closed (commit or rollback) by
 		// createSupplierInvoiceFromSource(), the public wrapper.
 		$db->begin();
+		$this->openedTransactions++;
 
 		// Load supplier (thirdparty)
 		require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.class.php';
@@ -1445,8 +1462,10 @@ class FacturXProtocol extends CIIProtocol
 		// documentdate is already formatted into 'Y-m-d' by the parser ZugFerd and CII
 		$supplierInvoice->date = !empty($parsedHeader['documentdate']) ? dol_stringtotime($parsedHeader['documentdate']) : null;
 
-		// For credit notes, link to the source invoice via fk_facture_source (BT-25)
-		if ($supplierInvoice->type == FactureFournisseur::TYPE_CREDIT_NOTE && !empty($parsedHeader['invoiceRefDocs']) && is_array($parsedHeader['invoiceRefDocs'])) {
+		// For credit notes and replacement invoices, link to the source invoice via fk_facture_source
+		// (BT-25). A replacement invoice (BT-3 = 384) corrects the invoice it references just as a credit
+		// note cancels it, and Dolibarr stores that source in the same field for both.
+		if (in_array($supplierInvoice->type, array(FactureFournisseur::TYPE_CREDIT_NOTE, FactureFournisseur::TYPE_REPLACEMENT)) && !empty($parsedHeader['invoiceRefDocs']) && is_array($parsedHeader['invoiceRefDocs'])) {
 			$firstRefDoc = reset($parsedHeader['invoiceRefDocs']);
 			$refSourceSupplier = !empty($firstRefDoc['IssuerAssignedID']) ? (string) $firstRefDoc['IssuerAssignedID'] : '';
 			if ($refSourceSupplier !== '') {
@@ -1456,9 +1475,9 @@ class FacturXProtocol extends CIIProtocol
 					$objSource = $db->fetch_object($resqlSource);
 					if ($objSource) {
 						$supplierInvoice->fk_facture_source = (int) $objSource->rowid;
-						dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource Credit note linked to source invoice id=' . $supplierInvoice->fk_facture_source, LOG_DEBUG);
+						dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource Linked to source invoice id=' . $supplierInvoice->fk_facture_source, LOG_DEBUG);
 					} else {
-						dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource Source invoice ref_supplier="' . $refSourceSupplier . '" not found for credit note ' . ($parsedHeader['documentno'] ?? ''), LOG_WARNING);
+						dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource Source invoice ref_supplier="' . $refSourceSupplier . '" not found for ' . ($parsedHeader['documentno'] ?? ''), LOG_WARNING);
 					}
 				}
 			}

@@ -2,6 +2,151 @@
 
 ## 1.0.4
 
+NEW: Validating a supplier invoice received through the platform now answers its vendor with the
+"Approved" (205) status, instead of waiting for someone to remember the button on the invoice card.
+Validating a received invoice is the act of accepting it - it leaves the draft state to enter the accounts
+and become payable - and 205 is the answer the buyer owes on an invoice it accepts; a vendor left without
+one cannot tell an accepted invoice from a forgotten one. It is sent once per invoice, never on an invoice
+already answered with "Approved" or "Refused", and never on an invoice that did not come from the platform.
+A failure to send is reported and logged but never undoes the validation, and the status can still be sent
+by hand afterwards. Set EINVOICING_DISABLE_SEND_APPROVED_ON_VALIDATION, in the module setup, on an instance
+where validating an invoice does not mean approving it: nothing is sent automatically then and the manual
+button is unchanged.
+
+FIX: The generated documents now declare the period the invoice covers (BG-14, BT-73 and BT-74), which
+neither the CII nor the Factur-X path ever wrote. Dolibarr holds a period on the line and not on the
+invoice, so the header period is the one covering every line: the earliest start date and the latest end
+date of the lines that carry one. The line periods (BT-134/BT-135) are unchanged and still emitted; this
+adds the header the receiving software mostly reads, since a majority of tools only handle a period at
+invoice level. An invoice whose lines carry no period declares none, one side alone is enough
+(BR-CO-19 asks for the start date or the end date), and a set of lines that would derive a period
+starting after it ends - one line open from March next to another closed in January - declares no header
+period at all rather than a pair BR-29 refuses, which would have the whole document rejected for a field
+nobody filled in (issue #572).
+
+FIX: Importing a received e-invoice now keeps the billing period of its lines (BT-134 / BT-135), where a
+service line billed over a period used to arrive with no period at all. The two dates were read from the
+document and then went nowhere: the line built for the supplier invoice never carried them, although the
+call that saves it has always passed its date_start and date_end on to the core. A period with only one
+of the two dates keeps that one, as the norm allows (BR-CO-20). A document declaring a period that ends
+before it starts - which BR-30 refuses, and which the core refuses too - is imported without that period
+rather than failing the whole invoice over it (issue #576).
+
+FIX: The module works on Dolibarr 17 again, the version its own descriptor declares as the minimum it
+supports. Two things stood in the way and neither of them failed quietly. Installing it died on a PHP
+TypeError: init() passed an empty array() where ExtraFields::update() expects a parameter string, and
+the branch that tolerates an empty array was only added to the core in 18, so activateModule() never
+completed. Generating a document died on "Call to undefined function dolChmod()", that helper having
+arrived in the core in 18 as well, while both writers call it on the XML they have just produced. The
+first is passed as '' now, which stores the same thing everywhere, and the second is supplied by a
+compat file alongside the two the module already ships for that version.
+
+FIX: On Dolibarr 23, a failed e-invoice generation was reported as an error where the core was able to
+carry it as a warning, so validating an invoice showed a red message for something that does not stop
+the validation. The module kept everything as an error below 24, but the chain a hook needs to report
+a warning - HookManager collecting the warnings of the hook instance, the document generator copying
+them, and commonGenerateDocument() copying them onto the object - is whole in 23 and absent in 22. The
+bound is 23 now. Nothing changes on 22 and below, where the warning would be reported nowhere, nor on
+24 and above.
+
+FIX: The compatibility files the module ships for the older cores are loaded from a path relative to
+the file that needs them, instead of being looked up through dol_buildpath(). A lookup that does not
+resolve - a deployment that does not sit where the module expects, which is what a container install
+can produce - only wrote a line in the log and returned false, so the polyfill was silently absent and
+the next call to it was a fatal "Call to undefined function isValidSiren" (issue #565).
+
+FIX: A line billed over a period that has only a start date, or only an end date, now carries that
+period in the Factur-X document as it already did in the CII one. The Factur-X path asked for both
+dates before writing anything, so a service line left open on one side lost its BT-134/BT-135
+entirely - and the same invoice produced two different documents depending on the protocol selected.
+One date alone is a period the norm accepts: BR-CO-20 asks for the start date or the end date, "or
+both".
+
+FIX: Generating two Factur-X sample invoices in the same request no longer ends on a PHP fatal error.
+The generator loaded its helper file with require rather than require_once, so the second call
+redeclared its functions - and a fatal error is not something the calling code can catch and report.
+
+FIX: Validating a replacement supplier invoice now closes the invoice it replaces, with the close
+code the core reserves for that, instead of leaving it validated and open for payment with nothing
+saying it had been superseded. Dolibarr does it on the customer side and not on the supplier one, so
+a replaced supplier e-invoice could still be paid a second time. Only the invoices exchanged through
+the platform are concerned; one that is already paid, or still a draft, is left untouched (issue
+#549).
+
+FIX: A down payment invoice now declares in BT-8 that its VAT falls due on collection, whatever the
+VAT mode of the instance, which is already why its cash-in is reported to the platform with the status
+212. Dolibarr builds every down payment line as a goods line, so the document used to say nothing at
+all while its lifecycle said otherwise.
+
+NEW: The VAT regime the generated documents declare in BT-8 can now be set explicitly, in the module
+setup, for a seller whose regime the VAT mode of the Tax/VAT module cannot express. That mode still
+decides by default and nothing changes for an instance that leaves the setting alone. An explicit
+value applies to every document and drives the "VAT on debits" legal mention and the scope of the
+"Cashed in" (212) status with it. It is also the only way to declare the exigibility at the delivery
+(29), a value the automatic derivation never produces: it says the same thing as 5, and the public
+portal only expects 5 (BR-FR-MAP-29). The setting completes the VAT mode rather than duplicating it,
+unlike the option dropped earlier in this version (issue #419).
+
+FIX: The setup page no longer dies on a fatal error when the selected Access point cannot be
+instantiated - the case of a provider disabled after being selected, "SuperPDP via partner only" being
+the way it happens today, since that option disables every other entry including the one already
+recorded in EINVOICING_PDP. The page read the configuration of a provider it did not have, so it
+answered nothing at all and the setup could no longer be reached to select another one. It now says
+which Access point is unavailable and offers the ones that remain. The actions of the provider block
+(token, health check, sample invoice) are skipped in that state instead of being matched on an empty
+prefix.
+
+FIX: Two fields declared in the ->fields of an object had no property on the class, which the core
+notices for us: it reads $this->{$field} to build the INSERT, and the comment next to that line says
+a miss means "a bug into definition of ->fields or a missing declaration of property". Document
+declared response_for_debug in its fields only, so every document recorded logged "Undefined property:
+Document::$response_for_debug" on 18, where CommonObject has no magic getter (from 20 on the getter
+swallows it). Call is worse: its fields declare provider, its properties declared fk_provider - a
+column the table never had - so the provider name of every logged API call was written through a
+property PHP creates on the fly, which is deprecated since 8.2 and warns on all four versions.
+Both properties are now declared, and the stale fk_provider is gone.
+
+NEW: Another module can add its own PDP / Access Point provider, without patching this one. It
+declares the hook context 'einvoicingproviders' and returns its entries from an addPDPProviders()
+method; the entry names the class and the directory it lives in ('classpath'), which until now was
+hardcoded to einvoicing/class/providers/, so a provider class could only exist inside this module. A
+hook rather than a scan of the module directories: it only exposes the providers of the modules that
+are enabled, and it costs nothing when no module implements it. An entry whose code is already taken
+by a provider of the module is ignored, and a class that does not extend AbstractPDPProvider is
+refused when it is loaded rather than failing later on a missing method. The TESTPDP entry, which
+pointed to a class that did not exist, is now the documented reference implementation: it calls
+nothing over the network and is offered only when the developer tools are enabled. The contract to
+implement is written down in einvoicing/doc/ADD-A-PDP-PROVIDER.md.
+
+FIX: A synchronization no longer raises a PHP warning for every flow whose source invoice is not in
+this database. Such a flow is the ordinary case on a platform account shared with another system -
+the customer invoice behind it simply lives somewhere else - and syncFlow() notes it in a message
+built from $document->flowId, while the document object carries flow_id. On a Dolibarr whose
+CommonObject has no magic getter to absorb the miss (18) that logged "Undefined property:
+Document::$flowId" once per flow; from 20 on the getter swallows it. The message itself, which the
+caller discards today since the flow counts as synchronized, also lost the one identifier it exists
+to carry.
+
+FIX: The sample invoice no longer pins a discount rounding that no two Dolibarr versions agree on.
+It forced MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY to 2 - round the
+discounted unit price, then multiply - but 18 and 20 do not implement that option and round the line
+total instead, 23 rounds the unit price up and 24 rounds it down, so its single line (5 x 100.05 less
+10%) came out at 450.23, 450.25 or 450.20 depending on the core. The specimen is now computed with the
+default convention, the one all four return, and the setting of the instance is restored afterwards
+instead of being left changed for the rest of the request. The reference fixtures are updated
+accordingly, and EInvoicingSamplesTest, which passed on only one of the four versions tested, now
+passes on all of them, 18.0.10 to 24.0.0.
+
+NEW: A "Mapped vendor references" screen (Billing > E-invoice synchronization) lists every vendor
+product reference recorded on the products, i.e. the mappings the import of a supplier invoice relies
+on to find the product of a line. Until now they could only be read product by product, in the
+"Supplier prices" tab of each one. A reference can be reassigned to another product or dropped
+directly from the list.
+
+FIX: The product picker of the screen mapping the products of an e-invoice no longer filters on the
+sale status. A product bought from a vendor only needs to be flagged "to buy", and a product created by
+a previous import never is on sale, so that screen offered an empty list of products.
+
 FIX: The error raised when a "Standard rated" line has no seller VAT number no longer names the
 customer. The test is on the seller (BR-S-02 requires the Seller VAT identifier, BT-31), but the
 message read "The VAT number of the thirdparty <customer> is mandatory", so the operator went looking
@@ -64,6 +209,17 @@ the instance asks for it, so a discounted line could state a few cents less than
 for - and an instance running a Dolibarr that does not know that option diverged by more, the module
 honouring a setting its core ignores. Nothing reported it: the document stayed internally consistent
 and the platform accepted it (issue #505).
+
+FIX: The recipient reachability pre-check no longer answers "undetermined" on SuperPDP when the
+platform can tell. Some lines of its standardized directory answer come back without their status,
+and that status cannot be requested, so the check stayed non-conclusive; its own directory endpoint,
+already used when the standardized lookup is unavailable, does report it for the very same lines, and
+it now settles those answers. Only those: a status the standardized answer did give is never
+overridden, and an endpoint that fails or knows nothing of the recipient settles nothing. The two
+recipients seen with that gap - both declared and not open yet - are now reported as not reachable
+instead of undetermined, and the option that requires a reachable recipient blocks them at its first
+value. Where the verdict was read is displayed next to it, since the directory consulted by hand
+shows no status for that line.
 
 
 ## 1.0.3

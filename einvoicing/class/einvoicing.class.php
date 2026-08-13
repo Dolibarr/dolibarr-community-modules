@@ -25,7 +25,11 @@
  */
 
 if ((float) DOL_VERSION < 20) {
-	dol_include_once('/einvoicing/compat/profid.lib.php');
+	// require_once on a path relative to this file, not dol_include_once: the latter resolves the
+	// module through dol_buildpath() and, when that resolution fails, only writes a line in the log
+	// and returns false. The polyfill was then simply absent and the first isValidSiren() below was
+	// a fatal "Call to undefined function" (issue #565). The compat directory sits next to this one.
+	require_once __DIR__ . '/../compat/profid.lib.php';
 } else {
 	require_once DOL_DOCUMENT_ROOT . '/core/lib/profid.lib.php';
 }
@@ -3148,6 +3152,16 @@ class EInvoicing
 		$conf->global->EINVOICING_PDP = 'SPECIMEN';
 		$conf->global->EINVOICING_SPECIMEN_ROUTING_ID = $seller->idprof2;
 
+		// Same reason for the VAT exigibility scheme, which decides the VAT point date code (BT-8) the
+		// specimen declares: pin the French standard scheme and the absence of a declared regime, so
+		// the fixtures do not depend on the VAT mode of whoever generates them.
+		$savTaxModeSellProduct = getDolGlobalString('TAX_MODE_SELL_PRODUCT');
+		$savTaxModeSellService = getDolGlobalString('TAX_MODE_SELL_SERVICE');
+		$savVatPointDateCode = getDolGlobalString('EINVOICING_VAT_POINT_DATE_CODE');
+		$conf->global->TAX_MODE_SELL_PRODUCT = 'invoice';
+		$conf->global->TAX_MODE_SELL_SERVICE = 'payment';
+		$conf->global->EINVOICING_VAT_POINT_DATE_CODE = 'auto';
+
 		// Same reason for the language: CommonProtocol::generateSampleInvoice() builds the specimen
 		// with the ambient $langs, so the free text it carries (BT-20 payment terms, BT-22 notes,
 		// line descriptions) follows whatever language the instance runs in. The reference fixtures
@@ -3184,6 +3198,9 @@ class EInvoicing
 		} finally {
 			$conf->global->EINVOICING_PDP = $savEinvoicingPdp;
 			$conf->global->EINVOICING_SPECIMEN_ROUTING_ID = $savEinvoicingRoutingId;
+			$conf->global->TAX_MODE_SELL_PRODUCT = $savTaxModeSellProduct;
+			$conf->global->TAX_MODE_SELL_SERVICE = $savTaxModeSellService;
+			$conf->global->EINVOICING_VAT_POINT_DATE_CODE = $savVatPointDateCode;
 			$langs = $savLangs;
 		}
 

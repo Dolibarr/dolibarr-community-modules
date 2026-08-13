@@ -25,7 +25,9 @@
  */
 
 if ((float) DOL_VERSION < 19) {
-	dol_include_once('/einvoicing/compat/commonhookactions.class.php');
+	// Relative to this file rather than through dol_buildpath(), for the reason given in
+	// einvoicing.class.php: a resolution that fails is silent, and the class would just be missing.
+	require_once __DIR__ . '/../compat/commonhookactions.class.php';
 } else {
 	require_once DOL_DOCUMENT_ROOT . '/core/class/commonhookactions.class.php';
 }
@@ -38,6 +40,22 @@ dol_include_once('/einvoicing/class/providers/PDPProviderManager.class.php');
  */
 class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-line PhanRedefinedExtendedClass
 {
+	/**
+	 * @var string[] Errors the hook reports back to whoever executed it.
+	 *
+	 * Declared here rather than relied upon from the parent: CommonHookActions only declares ->errors
+	 * from Dolibarr 21 and ->warnings from 23, and the compat class this module ships for the versions
+	 * before 19 declares neither. Writing to an undeclared property is a deprecation on PHP 8.2, and
+	 * reading one back into array_merge() is a fatal TypeError - which is what a failed generation did
+	 * on 17 to 20.
+	 */
+	public $errors = array();
+
+	/**
+	 * @var string[] Warnings the hook reports back, on the versions whose core carries them
+	 */
+	public $warnings = array();
+
 	/**
 	 * systemMessage
 	 *
@@ -214,9 +232,14 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 								return -1;
 							} else {
 								if ($result < 0) {
-									if ((float) DOL_VERSION < 24.0) {
+									// A hook can only report a warning where the core carries one back. That chain -
+									// HookManager collecting $actionclassinstance->warnings, the document generator
+									// copying $hookmanager->warnings, and commonGenerateDocument() copying $obj->warnings
+									// onto the object - appears whole in Dolibarr 23 and is absent in 22. Below it the
+									// warning would be reported nowhere, so the failure is raised as an error instead.
+									if ((float) DOL_VERSION < 23) {
 										$this->errors = array_merge($this->errors, $protocol->errors);
-										$this->warnings = array();	// We remove warning array to keep only the error array, because only errors array is managed with version < 24.0 of Dolibarr.
+										$this->warnings = array();
 									} else {
 										$this->warnings = array_merge($this->errors, $protocol->errors);	// We want to return the error as a warning.
 									}

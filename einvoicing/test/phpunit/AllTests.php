@@ -66,6 +66,10 @@ if (!isModEnabled('member')) {
 	print "Error: Module member must be enabled to have significant results.\n";
 	exit(1);
 }
+if (!isModEnabled('einvoicing')) {
+	print "Error: Module einvoicing must be enabled to have significant results.\n";
+	exit(1);
+}
 if (isModEnabled('google')) {
 	print "Warning: Google module should not be enabled.\n";
 }
@@ -80,6 +84,7 @@ $now = dol_now();
 
 require_once DOL_DOCUMENT_ROOT . '/core/lib/admin.lib.php';
 
+print "dolibarrHtdocs=".$dolibarrHtdocs."\n";
 
 // Test there is no webhook enabled
 // TODO
@@ -110,12 +115,18 @@ class AllTests
 		$suite->addTestSuite('CIIProtocolTest');
 		require_once dirname(__FILE__).'/EInvoicingSamplesTest.php';
 		$suite->addTestSuite('EInvoicingSamplesTest');
+		require_once dirname(__FILE__).'/InvoicingPeriodTest.php';
+		$suite->addTestSuite('InvoicingPeriodTest');
+		require_once dirname(__FILE__).'/PDPProviderManagerTest.php';
+		$suite->addTestSuite('PDPProviderManagerTest');
 		require_once dirname(__FILE__).'/RecipientDirectoryTest.php';
 		$suite->addTestSuite('RecipientDirectoryTest');
 		require_once dirname(__FILE__).'/SupplierInvoiceHelperTest.php';
 		$suite->addTestSuite('SupplierInvoiceHelperTest');
 		require_once dirname(__FILE__).'/TransmittedLockTest.php';
 		$suite->addTestSuite('TransmittedLockTest');
+		require_once dirname(__FILE__).'/VatPointDateCodeTest.php';
+		$suite->addTestSuite('VatPointDateCodeTest');
 
 		return $suite;
 	}

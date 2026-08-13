@@ -257,10 +257,11 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->defaultFieldValue = '0';
 	$item->cssClass = 'minwidth500';
 
-	// The "Cashed in" (212) status is only sent for the operations whose VAT is due on collection. That
-	// scheme is not a setting of this module: Dolibarr already holds it in the setup of the Tax/VAT module,
-	// and the trigger reads TAX_MODE_SELL_PRODUCT / TAX_MODE_SELL_SERVICE from there. Remind it here, with
-	// its current value and a link to the page that owns it, so nothing is duplicated.
+	// The VAT exigibility scheme decides when the VAT of an invoice falls due, hence the VAT point date
+	// code (BT-8) the document declares, the "VAT on debits" legal mention it carries, and whether a
+	// cash-in has to be reported with the status 212. Dolibarr already holds that scheme in the setup of
+	// the Tax/VAT module (TAX_MODE_SELL_PRODUCT / TAX_MODE_SELL_SERVICE), so it is not duplicated here:
+	// remind its current value, with a link to the page that owns it.
 	$vatexigibility = $langs->trans(getDolGlobalString('TAX_MODE_SELL_PRODUCT') == 'payment' ? 'OnPayment' : 'OnInvoice');
 	$vatexigibility .= ' / ';
 	$vatexigibility .= $langs->trans(getDolGlobalString('TAX_MODE_SELL_SERVICE') == 'payment' ? 'OnPayment' : 'OnInvoice');
@@ -269,6 +270,18 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$itemtitle->nameText = '<span class="opacitymedium">'.$langs->trans('EINVOICING_VAT_EXIGIBILITY_HELP').'</span> <b>'
 		.dol_escape_htmltag($vatexigibility)
 		.'</b> <a href="'.DOL_URL_ROOT.'/admin/taxes.php">'.$langs->trans('Setup').'</a>';
+
+	// The VAT regime the generated documents declare in BT-8. Left to the VAT mode above by default;
+	// an explicit value is for a seller whose regime that mode cannot express (issue #419).
+	$item = $formSetup->newItem('EINVOICING_VAT_POINT_DATE_CODE')->setAsSelect(array(
+		'auto' => $langs->transnoentities('EINVOICING_VAT_POINT_DATE_CODE_AUTO'),
+		'5'    => $langs->transnoentities('EINVOICING_VAT_POINT_DATE_CODE_5'),
+		'29'   => $langs->transnoentities('EINVOICING_VAT_POINT_DATE_CODE_29'),
+		'72'   => $langs->transnoentities('EINVOICING_VAT_POINT_DATE_CODE_72'),
+	));
+	$item->helpText = $langs->transnoentities('EINVOICING_VAT_POINT_DATE_CODE_HELP');
+	$item->defaultFieldValue = 'auto';
+	$item->cssClass = 'minwidth500';
 
 	// Setup conf to automatically transmit the e-invoice to the PA right after it is generated (on validation)
 	$item = $formSetup->newItem('EINVOICING_AUTO_SEND_ON_GENERATION')->setAsYesNo();
@@ -281,6 +294,15 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	// a courtesy to the vendor and it costs one platform flow per invoice.
 	$item = $formSetup->newItem('EINVOICING_SEND_PAYMENT_SENT_STATUS')->setAsYesNo();
 	$item->helpText = $langs->transnoentities('EINVOICING_SEND_PAYMENT_SENT_STATUS_HELP');
+	$item->defaultFieldValue = '0';
+	$item->cssClass = 'minwidth500';
+
+	// Tell the vendor that its invoice is approved (status 205) when the supplier invoice is validated.
+	// On by default, unlike 211: this one is the answer the reform expects from the buyer, and validating
+	// a received invoice is what accepting it means. Stated as a "disable" so that an instance whose
+	// validation does not mean approval can turn it off without changing the meaning of the default.
+	$item = $formSetup->newItem('EINVOICING_DISABLE_SEND_APPROVED_ON_VALIDATION')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('EINVOICING_DISABLE_SEND_APPROVED_ON_VALIDATION_HELP');
 	$item->defaultFieldValue = '0';
 	$item->cssClass = 'minwidth500';
 

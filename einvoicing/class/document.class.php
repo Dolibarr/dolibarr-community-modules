@@ -191,6 +191,7 @@ class Document extends CommonObject
 	public $cdar_reason_code;
 	public $cdar_reason_desc;
 	public $cdar_reason_detail;
+	public $response_for_debug;
 	// END MODULEBUILDER PROPERTIES
 
 	// Contains raw XML content (/!\ may not be identical to original XML content from AP file because it can be partially cleaned (like attachment files) to preserve XML size stored in database)

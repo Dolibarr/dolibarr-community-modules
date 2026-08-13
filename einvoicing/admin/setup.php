@@ -149,11 +149,18 @@ if (getDolGlobalString('EINVOICING_PDP')) {
 	// Generate a $provider (this call the constructor that load the token with fetchOAuthTokenDB() and save it in the memory var $provider->tokenData)
 	// Note: Token may have been expired
 	$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
-	// Now we load the conf
 
-	$providerconfig  = $provider->getConf();
+	if ($provider instanceof AbstractPDPProvider) {
+		// Now we load the conf
+		$providerconfig  = $provider->getConf();
 
-	$prefix = $providerconfig['dol_prefix'].'_';
+		$prefix = $providerconfig['dol_prefix'].'_';
+	} else {
+		// The selected provider is not available anymore: the module that brought it has been disabled,
+		// or its entry has been removed. Without this the page ends on a fatal error and the setup can
+		// no longer be reached to select another provider.
+		setEventMessages($langs->trans("SelectedAccessPointNotAvailable", getDolGlobalString('EINVOICING_PDP')), null, 'warnings');
+	}
 }
 
 // Return of the OAuth 2.1 Authorization Code flow (?code&state). Handled here, BEFORE the form is
@@ -236,7 +243,7 @@ if ($action == 'update' && GETPOSTISSET('EINVOICING_PDP') && GETPOST('EINVOICING
 }
 
 // Action to get/generate a token
-if (preg_match('/set'.$prefix.'TOKEN/i', $action, $reg)) {
+if ($prefix && preg_match('/set'.$prefix.'TOKEN/i', $action, $reg)) {
 	$token = $provider->getAccessToken();	// Get access token from provider and save it into database
 
 	if ($token) {
@@ -249,7 +256,7 @@ if (preg_match('/set'.$prefix.'TOKEN/i', $action, $reg)) {
 }
 
 // Action healthcheck
-if (preg_match('/call'.$prefix.'HEALTHCHECK/i', $action, $reg)) {
+if ($prefix && preg_match('/call'.$prefix.'HEALTHCHECK/i', $action, $reg)) {
 	$statusPDP = $provider->checkHealth();
 	if ($statusPDP['status_code'] == 200) {
 		setEventMessages($statusPDP['message'], null, 'mesgs');
@@ -259,7 +266,7 @@ if (preg_match('/call'.$prefix.'HEALTHCHECK/i', $action, $reg)) {
 }
 
 // Generate a sample invoice and try to send it
-if (preg_match('/make'.$prefix.'sampleinvoice/i', $action, $reg)) {
+if ($prefix && preg_match('/make'.$prefix.'sampleinvoice/i', $action, $reg)) {
 	$result = $provider->sendSampleInvoice(1);
 	if ($result) {
 		setEventMessages('', $result, 'mesgs');
@@ -267,7 +274,7 @@ if (preg_match('/make'.$prefix.'sampleinvoice/i', $action, $reg)) {
 		setEventMessages($provider->error, $provider->errors, 'errors');
 	}
 }
-if (preg_match('/makesend'.$prefix.'sampleinvoice/i', $action, $reg)) {
+if ($prefix && preg_match('/makesend'.$prefix.'sampleinvoice/i', $action, $reg)) {
 	$result = $provider->sendSampleInvoice(0);
 	if ($result) {
 		setEventMessages('', $result, 'mesgs');
@@ -276,7 +283,7 @@ if (preg_match('/makesend'.$prefix.'sampleinvoice/i', $action, $reg)) {
 	}
 }
 
-if (preg_match('/delete'.$prefix.'TOKEN/i', $action, $reg)) {
+if ($prefix && preg_match('/delete'.$prefix.'TOKEN/i', $action, $reg)) {
 	// Delete token
 	$result = $provider->deleteAccessToken();
 
@@ -289,7 +296,7 @@ if (preg_match('/delete'.$prefix.'TOKEN/i', $action, $reg)) {
 	}
 }
 
-if (getDolGlobalString('EINVOICING_PDP')) {
+if (getDolGlobalString('EINVOICING_PDP') && $provider instanceof AbstractPDPProvider) {
 	// Link to get the Credentials
 	$prefixenv = getDolGlobalString('EINVOICING_LIVE') ? 'prod' : 'test';
 

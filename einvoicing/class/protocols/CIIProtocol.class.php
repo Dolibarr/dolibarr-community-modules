@@ -2,6 +2,7 @@
 /* Copyright (C) 2026       Laurent Destailleur         <eldy@users.sourceforge.net>
  * Copyright (C) 2026       Mohamed DAOUD               <mdaoud@dolicloud.com>
  * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
+ * Copyright (C) 2026		Jose Martinez				<jose.martinez@pichinov.com>
  *
  *
  * This program is free software: you can redistribute it and/or modify
@@ -33,6 +34,11 @@ require_once DOL_DOCUMENT_ROOT . '/core/class/translate.class.php';
 require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
 require_once DOL_DOCUMENT_ROOT . '/core/class/discount.class.php';
 require_once DOL_DOCUMENT_ROOT . '/core/lib/files.lib.php';
+require_once DOL_DOCUMENT_ROOT . '/core/lib/date.lib.php';
+// dolChmod() only exists from Dolibarr 18, and both writers call it on the XML they just produced.
+if ((float) DOL_VERSION < 18) {
+	dol_include_once('/einvoicing/compat/files.lib.php');
+}
 
 dol_include_once('einvoicing/class/protocols/AbstractProtocol.class.php');
 dol_include_once('einvoicing/class/protocols/CommonProtocol.class.php');
@@ -94,6 +100,17 @@ class CIIProtocol extends AbstractProtocol
 	 * @var array<string,null|false|int|string|array>
 	 */
 	protected $lineTemplate;
+	/**
+	 * Number of transactions opened by doCreateSupplierInvoiceFromSource() and not closed by it yet.
+	 * Drained (committed or rolled back) by createSupplierInvoiceFromSource(), the public wrapper.
+	 *
+	 * We count what we open instead of reading $db->transaction_opened: that property belongs to the
+	 * database handler and is not readable when $db is a wrapper around it (it then stays null, and
+	 * the transaction was silently left open - see issue #524).
+	 *
+	 * @var int
+	 */
+	protected $openedTransactions = 0;
 	/**
 	 * Return the number of decimals to use for a unit price (BT-146, BT-147, BT-148).
 	 *
@@ -336,8 +353,8 @@ class CIIProtocol extends AbstractProtocol
 		 *   documentlanguage: string,
 		 *   effectiveSpecifiedPeriod: 'NA',
 		 *   documentDeliveryDate: DateTimeInterface,
-		 *   invoicingPeriodStart: null,
-		 *   invoicingPeriodEnd: null,
+		 *   invoicingPeriodStart: ?DateTimeInterface,
+		 *   invoicingPeriodEnd: ?DateTimeInterface,
 		 *   businessProcessId: string,
 		 *   isTestDocument: bool,
 		 *   documentNotePublic: string,
@@ -481,7 +498,7 @@ class CIIProtocol extends AbstractProtocol
 		 */
 		'
 		@phan-var-force Facture 			$object			The $invoice object used in entry on inc file, but completed.
-		@phan-var-force array{documentno:string,documenttypecode:null|string,documentdate:DateTimeInterface,invoiceCurrency:string|array<string>,taxCurrency:null,documentname:null,documentlanguage:string,effectiveSpecifiedPeriod:\'NA\',documentDeliveryDate:DateTimeInterface,invoicingPeriodStart:null,invoicingPeriodEnd:null,businessProcessId:string,isTestDocument:bool,documentNotePublic:string,documentNotePMT:string,documentNotePMD:string,documentNoteAAB:string,documentNoteTXD:string,documentNotes:array,vatDueDateTypeCode:string,sellername:string,sellerids:string,sellerlineone:string,sellerlinetwo:string,sellerlinethree:string,sellerpostcode:string,sellercity:string,sellercountry:string,sellersubdivision:null,sellercontactpersonname:string,sellercontactdepartmentname:null,sellercontactphoneno:string,sellercontactfaxno:string,sellercontactemailaddr:string,sellerCommunicationUriScheme:string,sellerCommunicationUri:string,sellerGlobalIds:array<array{schemeID:string,value:string}>,sellerTaxRegistrations:array<array{type:string,value:string}>,sellervatnumber:string,sellerLegalOrgId:string,sellerLegalOrgScheme:string,sellerTradingName:string,buyername:string,buyerids:string,buyerlineone:string,buyerlinetwo:string,buyerlinethree:string,buyerpostcode:string,buyercity:string,buyercountry:string,buyersubdivision:null,buyervatnumber:string,buyerGlobalIds:array<array{schemeID:string,value:string}>,buyerLegalOrgId:string,buyerLegalOrgScheme:string,buyerTradingName:string,buyerReference:null|string,buyerCommunicationUriScheme:string,buyerCommunicationUri:string,buyercontactpersonname:null,buyercontactemailaddr:null,buyercontactphoneno:null,grandTotalAmount:float|int,duePayableAmount:float|int,lineTotalAmount:float|int,chargeTotalAmount:float,allowanceTotalAmount:float|int,taxBasisTotalAmount:float|int,taxTotalAmount:float|int,roundingAmount:null,totalPrepaidAmount:float|int,iban_id:int,iban:string,bic:string,accountName:string,accountRef:string,accountLabel:string,paymentDueDate:DateTimeInterface,paymentTermsText:string,headerAllowancesCharges:array,invoiceRefDocs:array|array<array{ref:string|int,date:DateTimeInterface,type:string}>,orderReference:string,contractReference:null|string,despatchAdviceRef:null,taxBreakdown:array|array<array<string,array>>,_chorus:bool,_depositlines:array|array<array{lineId:int,invoiceRef:string,invoiceDate:DateTimeInterface}>,_globalDiscounts:array|array<array{value:float,reason:string,taxRate:float,categoryVAT:string}>,_customerOrderReferenceList:string[],_project:Project|null,paymentMeansCode?:int,paymentMeansText?:string,_shipFromContactBill?:array{address:null|string,zip:null|string,town:null|string,country:string},_shipFromContactShip?:array{name:string,address:null|string,zip:null|string,town:null|string,country:string}} $invoiceData
+		@phan-var-force array{documentno:string,documenttypecode:null|string,documentdate:DateTimeInterface,invoiceCurrency:string|array<string>,taxCurrency:null,documentname:null,documentlanguage:string,effectiveSpecifiedPeriod:\'NA\',documentDeliveryDate:DateTimeInterface,invoicingPeriodStart:?DateTimeInterface,invoicingPeriodEnd:?DateTimeInterface,businessProcessId:string,isTestDocument:bool,documentNotePublic:string,documentNotePMT:string,documentNotePMD:string,documentNoteAAB:string,documentNoteTXD:string,documentNotes:array,vatDueDateTypeCode:string,sellername:string,sellerids:string,sellerlineone:string,sellerlinetwo:string,sellerlinethree:string,sellerpostcode:string,sellercity:string,sellercountry:string,sellersubdivision:null,sellercontactpersonname:string,sellercontactdepartmentname:null,sellercontactphoneno:string,sellercontactfaxno:string,sellercontactemailaddr:string,sellerCommunicationUriScheme:string,sellerCommunicationUri:string,sellerGlobalIds:array<array{schemeID:string,value:string}>,sellerTaxRegistrations:array<array{type:string,value:string}>,sellervatnumber:string,sellerLegalOrgId:string,sellerLegalOrgScheme:string,sellerTradingName:string,buyername:string,buyerids:string,buyerlineone:string,buyerlinetwo:string,buyerlinethree:string,buyerpostcode:string,buyercity:string,buyercountry:string,buyersubdivision:null,buyervatnumber:string,buyerGlobalIds:array<array{schemeID:string,value:string}>,buyerLegalOrgId:string,buyerLegalOrgScheme:string,buyerTradingName:string,buyerReference:null|string,buyerCommunicationUriScheme:string,buyerCommunicationUri:string,buyercontactpersonname:null,buyercontactemailaddr:null,buyercontactphoneno:null,grandTotalAmount:float|int,duePayableAmount:float|int,lineTotalAmount:float|int,chargeTotalAmount:float,allowanceTotalAmount:float|int,taxBasisTotalAmount:float|int,taxTotalAmount:float|int,roundingAmount:null,totalPrepaidAmount:float|int,iban_id:int,iban:string,bic:string,accountName:string,accountRef:string,accountLabel:string,paymentDueDate:DateTimeInterface,paymentTermsText:string,headerAllowancesCharges:array,invoiceRefDocs:array|array<array{ref:string|int,date:DateTimeInterface,type:string}>,orderReference:string,contractReference:null|string,despatchAdviceRef:null,taxBreakdown:array|array<array<string,array>>,_chorus:bool,_depositlines:array|array<array{lineId:int,invoiceRef:string,invoiceDate:DateTimeInterface}>,_globalDiscounts:array|array<array{value:float,reason:string,taxRate:float,categoryVAT:string}>,_customerOrderReferenceList:string[],_project:Project|null,paymentMeansCode?:int,paymentMeansText?:string,_shipFromContactBill?:array{address:null|string,zip:null|string,town:null|string,country:string},_shipFromContactShip?:array{name:string,address:null|string,zip:null|string,town:null|string,country:string}} $invoiceData
 		@phan-var-force array<int,array{lineid:int,linestatuscode:\'NA\',linestatusreasoncode:\'NA\',lineNote:null,prodname:string,proddesc:string,prodsellerid:string,prodbuyerid:null|string,prodglobalidtype:null|string,prodglobalid:null|string,prodmultilangs:array,prodClassificationCode:null|string,prodClassificationScheme:null|string,prodOriginCountry:null|string,netpriceamount:float,netpricebasisquantity:null|float,netpricebasisquantityunitcode:null|string,billedquantity:float,billedquantityunitcode:string,chargeFreeQuantity:null|float,chargeFreeQuantityunitcode:null|string,packageQuantity:null|float,packageQuantityunitcode:null|string,lineTotalAmount:float|string,totalAllowanceChargeAmount:null|float,categoryCode:string,typeCode:\'VAT\',rateApplicablePercent:string,tva_tx:float|string,vat_src_code:string,ExemptionReason:string,ExemptionReasonCode:string,calculatedAmount:null|float,lineAllowances:array,lineGrossPriceAllowances:array,lineremisepercent:\'NA\'|float,linePeriodStart:?DateTimeInterface,linePeriodEnd:?DateTimeInterface,additionalRefDocs:array,isDepositLine:bool,depositInvoiceRef:null|string,depositInvoiceDate:?DateTimeInterface,parentDocumentNo:null|string,is_deposit:int<0,1>,fk_remise:null|int,discountPercent:float,grosspriceamount:null|float,grosspricebasisquantity:null|float,grosspricebasisquantityunitcode:null|string}> $linesData
 		@phan-var-force string 				$outputlang		Value of $outputlangs->defaultlang
 		@phan-var-force Account				$account
@@ -658,9 +675,9 @@ class CIIProtocol extends AbstractProtocol
 	{
 		global $conf, $db;
 
-		// Transaction level before the import, to close only the transaction opened by
-		// doCreateSupplierInvoiceFromSource() and never one owned by a caller.
-		$transactionLevel = $db->transaction_opened;
+		// Only the transactions opened by doCreateSupplierInvoiceFromSource() are ours to close,
+		// never one owned by a caller: it counts them in $this->openedTransactions.
+		$this->openedTransactions = 0;
 
 		$tempDir = $conf->einvoicing->dir_temp;
 		if (!dol_is_dir($tempDir)) {
@@ -683,8 +700,13 @@ class CIIProtocol extends AbstractProtocol
 
 			// The invoice import transaction is opened by doCreateSupplierInvoiceFromSource() once the
 			// vendor has been synchronized. Close it here so every early return - and any exception -
-			// leaves a clean transaction state.
-			if ($db->transaction_opened > $transactionLevel) {
+			// leaves a clean transaction state. A transaction left open would be rolled back by
+			// Dolibarr at the end of the request, taking the imported invoices AND the synchronization
+			// history down with it (issue #524).
+			// One commit/rollback per opened level: nested levels only decrement the counter of the
+			// database handler, the real COMMIT/ROLLBACK is issued on the last one.
+			while ($this->openedTransactions > 0) {
+				$this->openedTransactions--;
 				if ($failed) {
 					$db->rollback();
 				} else {
@@ -802,6 +824,7 @@ class CIIProtocol extends AbstractProtocol
 		// with that error carry its socid, so a rolled back vendor makes them point to a thirdparty that
 		// never existed.
 		$db->begin();
+		$this->openedTransactions++;
 
 		$syncSocRes = $this->_syncOrCreateThirdpartyFromEInvoiceSeller($parsedHeader, 'dolibarr', $flowId);
 
@@ -809,6 +832,7 @@ class CIIProtocol extends AbstractProtocol
 		$return_messages[] = $syncSocRes['message'];
 		if ($socId < 0) {
 			$db->rollback();
+			$this->openedTransactions--;
 			return [
 				'res' => -1,
 				'message' => 'Thirdparty sync or creation error: ' . implode("<br>\n", $return_messages),
@@ -820,11 +844,13 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		$db->commit();
+		$this->openedTransactions--;
 
 		// From this point on, everything belongs to the invoice import (products, invoice, lines) and
 		// stays atomic. This second transaction is closed (commit or rollback) by
 		// createSupplierInvoiceFromSource(), the public wrapper.
 		$db->begin();
+		$this->openedTransactions++;
 
 		// Load supplier (thirdparty)
 		require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.class.php';
@@ -880,8 +906,10 @@ class CIIProtocol extends AbstractProtocol
 		// documentdate is already formatted into 'Y-m-d' by the parser ZugFerd and CII
 		$supplierInvoice->date = !empty($parsedHeader['documentdate']) ? dol_stringtotime($parsedHeader['documentdate']) : null;
 
-		// For credit notes, link to the source invoice via fk_facture_source (BT-25)
-		if ($supplierInvoice->type == FactureFournisseur::TYPE_CREDIT_NOTE && !empty($parsedHeader['invoiceRefDocs']) && is_array($parsedHeader['invoiceRefDocs'])) {
+		// For credit notes and replacement invoices, link to the source invoice via fk_facture_source
+		// (BT-25). A replacement invoice (BT-3 = 384) corrects the invoice it references just as a credit
+		// note cancels it, and Dolibarr stores that source in the same field for both.
+		if (in_array($supplierInvoice->type, array(FactureFournisseur::TYPE_CREDIT_NOTE, FactureFournisseur::TYPE_REPLACEMENT)) && !empty($parsedHeader['invoiceRefDocs']) && is_array($parsedHeader['invoiceRefDocs'])) {
 			$firstRefDoc = reset($parsedHeader['invoiceRefDocs']);
 			$refSourceSupplier = !empty($firstRefDoc['IssuerAssignedID']) ? (string) $firstRefDoc['IssuerAssignedID'] : '';
 			if ($refSourceSupplier !== '') {
@@ -891,9 +919,9 @@ class CIIProtocol extends AbstractProtocol
 					$objSource = $db->fetch_object($resqlSource);
 					if ($objSource) {
 						$supplierInvoice->fk_facture_source = (int) $objSource->rowid;
-						dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource Credit note linked to source invoice id=' . $supplierInvoice->fk_facture_source, LOG_DEBUG);
+						dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource Linked to source invoice id=' . $supplierInvoice->fk_facture_source, LOG_DEBUG);
 					} else {
-						dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource Source invoice ref_supplier="' . $refSourceSupplier . '" not found for credit note ' . ($parsedHeader['documentno'] ?? ''), LOG_WARNING);
+						dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource Source invoice ref_supplier="' . $refSourceSupplier . '" not found for ' . ($parsedHeader['documentno'] ?? ''), LOG_WARNING);
 					}
 				}
 			}
@@ -1231,6 +1259,10 @@ class CIIProtocol extends AbstractProtocol
 
 			// Add line to invoice
 			$line = new SupplierInvoiceLine($db);
+			// Supplier's product reference (BT-155 SellerAssignedID) -> shown as "Ref. fournisseur" on the line.
+			if (!empty($parsedLine['prodsellerid']) && $parsedLine['prodsellerid'] !== '0000') {
+				$line->ref_supplier = trim($parsedLine['prodsellerid']);
+			}
 			if (!empty($productId)) {
 				$line->fk_product = $productId;
 				if ($productMatchType == 'defaultrouting') {
@@ -1238,6 +1270,10 @@ class CIIProtocol extends AbstractProtocol
 					// vendor: without the wording of the XML, every line of the invoice would show the same
 					// label. Keep the description of the vendor on top of the product link.
 					$line->desc = trim($parsedLine['prodname'] ?? '') . (!empty($parsedLine['proddesc']) ? "\n" . trim($parsedLine['proddesc']) : '');
+				} elseif (!empty($parsedLine['proddesc'])) {
+					// Keep the XML line-level description even when a real product is linked:
+					// it is often project-specific and not carried by the product's own label/description.
+					$line->desc = trim($parsedLine['proddesc']);
 				}
 			} elseif (!$is_deposit_line) {
 				// Free line: no product linked, description set from XML data
@@ -1271,6 +1307,18 @@ class CIIProtocol extends AbstractProtocol
 			$line->total_ht = (float) $parsedLine['lineTotalAmount'];
 			$line->total_tva = $parsedLine['calculatedAmount'] ?? 0;
 			$line->total_ttc = $parsedLine['lineTotalAmount'] + ($parsedLine['calculatedAmount'] ?? 0);
+
+			// Billing period of the line (BT-134 / BT-135). The two dates were read from the document and
+			// then went nowhere: createSupplierInvoiceLinesIntoDatabase() has always handed
+			// $line->date_start / ->date_end to updateline(), but nothing ever set them, so a service line
+			// billed over a period arrived without one (issue #576). See resolveLinePeriod().
+			$linePeriod = $this->resolveLinePeriod($parsedLine);
+			if ($linePeriod['start'] !== null) {
+				$line->date_start = $linePeriod['start'];
+			}
+			if ($linePeriod['end'] !== null) {
+				$line->date_end = $linePeriod['end'];
+			}
 
 			$supplierInvoice->lines[] = $line;
 		}
@@ -1436,6 +1484,46 @@ class CIIProtocol extends AbstractProtocol
 			return null;
 		$v = str_replace(',', '.', trim($v));
 		return is_numeric($v) ? (float) $v : null;
+	}
+
+	/**
+	 * Billing period of a received line (BG-26 / BT-134 / BT-135), as the timestamps a Dolibarr line holds.
+	 *
+	 * parseInvoiceLines() hands the two dates as 'Y-m-d' strings, normDate() having already reduced whatever the
+	 * document carried to that shape, and a supplier invoice line stores a timestamp: updateline() passes
+	 * date_start / date_end to idate() on every supported core. dol_stringtotime() is the conversion the
+	 * import already makes for the invoice date itself, so the line periods are read the same way rather
+	 * than through a second convention (issue #576).
+	 *
+	 * One side alone is kept: BR-CO-20 accepts a period with a start date or an end date, "or both", and
+	 * facture_fourn_det holds one without the other.
+	 *
+	 * A period that ends before it starts is dropped, keeping the line. Such a document breaks BR-30 and
+	 * should not exist, but it comes from outside, and updateline() answers -1 on that pair
+	 * (ErrorStartDateGreaterEnd) - which would fail the whole import over a period, where dropping it
+	 * imports the invoice as it always did.
+	 *
+	 * @param	array<string,mixed>				$parsedLine		One line as parseInvoiceLines() returns it
+	 * @return	array{start: ?int, end: ?int}					Timestamps to store, null for a side with nothing
+	 */
+	private function resolveLinePeriod(array $parsedLine)
+	{
+		$start = !empty($parsedLine['linePeriodStart']) ? dol_stringtotime((string) $parsedLine['linePeriodStart']) : null;
+		$end = !empty($parsedLine['linePeriodEnd']) ? dol_stringtotime((string) $parsedLine['linePeriodEnd']) : null;
+
+		// dol_stringtotime() answers false or '' on something it cannot read, and that must not reach idate().
+		$start = is_int($start) && $start > 0 ? $start : null;
+		$end = is_int($end) && $end > 0 ? $end : null;
+
+		if ($start !== null && $end !== null && $start > $end) {
+			dol_syslog(get_class($this) . '::resolveLinePeriod line ' . ($parsedLine['lineid'] ?? '?')
+				. ' declares a period from ' . dol_print_date($start, 'day') . ' to ' . dol_print_date($end, 'day')
+				. ', which BR-30 refuses; the line is imported without its period', LOG_WARNING);
+
+			return array('start' => null, 'end' => null);
+		}
+
+		return array('start' => $start, 'end' => $end);
 	}
 
 
@@ -2126,6 +2214,21 @@ class CIIProtocol extends AbstractProtocol
 				);
 			}
 
+			// Invoicing period of the document (BG-14 / BT-73 / BT-74), derived from the periods of the
+			// lines by einvoicingInvoicingPeriodFromLines(). Placed after the ApplicableTradeTax nodes
+			// and before SpecifiedTradeAllowanceCharge (the global discounts below), which is where
+			// HeaderTradeSettlementType declares it in every schema from BASIC WL upwards; MINIMUM does
+			// not declare it at all, and the enclosing condition already excludes that profile (issue
+			// #572).
+			if ($invoiceData['invoicingPeriodStart'] !== null || $invoiceData['invoicingPeriodEnd'] !== null) {
+				$comment = $doc->createComment('Invoicing period');
+				$settlement->appendChild($comment);
+
+				$settlement->appendChild(
+					$this->buildBillingPeriodNode($doc, $invoiceData['invoicingPeriodStart'], $invoiceData['invoicingPeriodEnd'])
+				);
+			}
+
 			// Discounts
 			if (!empty($invoiceData['_globalDiscounts'])) {
 				$comment = $doc->createComment('Global discounts');
@@ -2315,24 +2418,7 @@ class CIIProtocol extends AbstractProtocol
 		// Billing period for the line (BG-26 / BT-134 / BT-135). Must be placed after ApplicableTradeTax
 		// and before SpecifiedTradeAllowanceCharge (discount below) per the CII D22B schema sequence.
 		if ($line['linePeriodStart'] !== null || $line['linePeriodEnd'] !== null) {
-			$period = $doc->createElement('ram:BillingSpecifiedPeriod');
-			$sett->appendChild($period);
-
-			if ($line['linePeriodStart'] !== null) {
-				$start = $doc->createElement('ram:StartDateTime');
-				$startStr = $doc->createElement('udt:DateTimeString', $line['linePeriodStart']->format('Ymd'));
-				$startStr->setAttribute('format', '102');
-				$start->appendChild($startStr);
-				$period->appendChild($start);
-			}
-
-			if ($line['linePeriodEnd'] !== null) {
-				$end = $doc->createElement('ram:EndDateTime');
-				$endStr = $doc->createElement('udt:DateTimeString', $line['linePeriodEnd']->format('Ymd'));
-				$endStr->setAttribute('format', '102');
-				$end->appendChild($endStr);
-				$period->appendChild($end);
-			}
+			$sett->appendChild($this->buildBillingPeriodNode($doc, $line['linePeriodStart'], $line['linePeriodEnd']));
 		}
 
 		if ($line['discountPercent']) {
@@ -2566,6 +2652,43 @@ class CIIProtocol extends AbstractProtocol
 		$addr->appendChild($doc->createElement('ram:CountryID', $ship['country']));
 
 		return $node;
+	}
+
+	/**
+	 * Build a ram:BillingSpecifiedPeriod node.
+	 *
+	 * The same type serves the two levels the norm has for a period: BT-73/BT-74 under
+	 * ApplicableHeaderTradeSettlement (BG-14, the period the invoice covers) and BT-134/BT-135 under
+	 * SpecifiedLineTradeSettlement (BG-26, the period a line covers). One side alone is a period the
+	 * norm accepts - BR-CO-19 asks for the start date or the end date - so each date is written only
+	 * if it is there.
+	 *
+	 * @param \DOMDocument 			$doc 	Document to create nodes in
+	 * @param ?\DateTimeInterface	$start 	Start of the period, null to leave BT-73 / BT-134 out
+	 * @param ?\DateTimeInterface	$end 	End of the period, null to leave BT-74 / BT-135 out
+	 * @return \DOMElement
+	 */
+	private function buildBillingPeriodNode($doc, $start, $end)
+	{
+		$period = $doc->createElement('ram:BillingSpecifiedPeriod');
+
+		if ($start !== null) {
+			$startNode = $doc->createElement('ram:StartDateTime');
+			$startStr = $doc->createElement('udt:DateTimeString', $start->format('Ymd'));
+			$startStr->setAttribute('format', '102');
+			$startNode->appendChild($startStr);
+			$period->appendChild($startNode);
+		}
+
+		if ($end !== null) {
+			$endNode = $doc->createElement('ram:EndDateTime');
+			$endStr = $doc->createElement('udt:DateTimeString', $end->format('Ymd'));
+			$endStr->setAttribute('format', '102');
+			$endNode->appendChild($endStr);
+			$period->appendChild($endNode);
+		}
+
+		return $period;
 	}
 
 	/**
