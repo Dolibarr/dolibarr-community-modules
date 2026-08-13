@@ -275,6 +275,14 @@ checks both on any update and reports only the last of the two, which made the c
 behind the vendor error. Marking a thirdparty as a vendor also stores its new code now, which passing
 the code alone never did: update() writes the code columns only when it is allowed to modify them.
 
+FIX: The same invoice no longer produces two different documents depending on the button that generated
+it. The comment opening the XML names the instance it was produced on, and that name comes from
+getHashUniqueIdOfRegistration(), a function of the blockedlog library that only the paths going through
+the PDF builder happen to load - so generating from the attached files carried the hash, while
+regenerating from the e-invoicing menu, which calls the writer directly, silently dropped it. The
+library is now loaded where the comment is written. Nothing changes below Dolibarr 23, where that
+function does not exist yet, and nothing changes on the PDF path (issue #581).
+  
 FIX: Approving a received invoice no longer takes away the statuses that come after it. The einvoice
 button group of the supplier invoice card disappeared as soon as an "Approved" (205) or a "Refused"
 (210) status had been accepted by the platform, on the assumption that either of them closes the
