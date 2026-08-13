@@ -179,7 +179,7 @@ class SupplierInvoiceHelper
 		}
 
 		if (count($amountErrors['current']) > 0) {
-			// If there are errors in both VAT modes (totalofround and roundoftotal), then return only the errors occured with roundoftotal
+			// If there are errors in both VAT modes (totalofround and roundoftotal), then return only the errors occurred with roundoftotal
 			if (count($amountErrors['totalofround'] ?? []) > 0 && count($amountErrors['roundoftotal'] ?? []) > 0) {
 				$errors = array_merge($errors, $amountErrors['roundoftotal'] ?? []);
 			} else {
@@ -558,6 +558,47 @@ class SupplierInvoiceHelper
 		dol_syslog(__METHOD__ . ' Supplier invoice id ' . $sourceId . ' closed as replaced by id ' . $replacement->id, LOG_DEBUG, 0, '_einvoicing');
 
 		return 1;
+	}
+
+	/**
+	 * Tell whether validating this supplier invoice has to answer its vendor with "Approved" (fr:205).
+	 *
+	 * Validating a received invoice in Dolibarr is the act of accepting it - it leaves the draft state to
+	 * enter the accounts and become payable - so it is what the buyer answers 205 for. Four things can
+	 * make the answer no:
+	 *
+	 *   - EINVOICING_SEND_APPROVED_ON_VALIDATION, for an instance where validating an invoice
+	 *     mean approving it. The status stays available by hand from the invoice card.
+	 *   - EINVOICING_DISABLE_SYNC_DOLI_TO_AP, which switches off everything this module sends.
+	 *   - an invoice that never came from the platform: its vendor is not waiting for any status.
+	 *   - a lifecycle already closed by a 205 or a 210 sent earlier: neither is repeated, and a refusal
+	 *     is not silently turned into an approval by a later validation. Same rule as the card, which
+	 *     stops offering the buttons once one of the two has been sent and confirmed.
+	 *
+	 * @param	EInvoicing	$einvoicing		Module object, for the lifecycle message lookup
+	 * @param	int			$supplierInvoiceId	Id of the supplier invoice being validated
+	 * @param	string		$elementType	Element type of that invoice ('invoice_supplier')
+	 * @return	bool						True when the status has to be sent
+	 */
+	public static function shouldSendApprovedOnValidation($einvoicing, int $supplierInvoiceId, string $elementType = 'invoice_supplier'): bool
+	{
+		if (!getDolGlobalString('EINVOICING_SEND_APPROVED_ON_VALIDATION')) {
+			return false;
+		}
+		if (getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
+			return false;
+		}
+		if (!self::isEInvoice($supplierInvoiceId)) {
+			return false;
+		}
+		if ($einvoicing->hasSentStatusMessage($supplierInvoiceId, $elementType, EInvoicing::STATUS_APPROVED)) {
+			return false;
+		}
+		if ($einvoicing->hasSentStatusMessage($supplierInvoiceId, $elementType, EInvoicing::STATUS_REFUSED)) {
+			return false;
+		}
+
+		return true;
 	}
 
 	/**

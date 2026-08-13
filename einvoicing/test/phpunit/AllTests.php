@@ -115,10 +115,14 @@ class AllTests
 		$suite->addTestSuite('CIIProtocolTest');
 		require_once dirname(__FILE__).'/EInvoicingSamplesTest.php';
 		$suite->addTestSuite('EInvoicingSamplesTest');
+		require_once dirname(__FILE__).'/InvoicingPeriodTest.php';
+		$suite->addTestSuite('InvoicingPeriodTest');
 		require_once dirname(__FILE__).'/PDPProviderManagerTest.php';
 		$suite->addTestSuite('PDPProviderManagerTest');
 		require_once dirname(__FILE__).'/RecipientDirectoryTest.php';
 		$suite->addTestSuite('RecipientDirectoryTest');
+		require_once dirname(__FILE__).'/SellerVatRegimeTest.php';
+		$suite->addTestSuite('SellerVatRegimeTest');
 		require_once dirname(__FILE__).'/SupplierInvoiceHelperTest.php';
 		$suite->addTestSuite('SupplierInvoiceHelperTest');
 		require_once dirname(__FILE__).'/TransmittedLockTest.php';

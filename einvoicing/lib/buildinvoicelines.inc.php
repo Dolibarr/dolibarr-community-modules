@@ -122,6 +122,7 @@ if ($object->thirdparty->tva_assuj && empty($object->thirdparty->tva_intra)) {
 }
 
 // Seller identifiers (mysoc)
+$sellerTaxRegistrations = einvoicingSellerTaxRegistrations($mysoc);
 $myidprof          = idprof($mysoc);
 $mySchemeIdProf    = $this->getIEC6523Code($mysoc->country_code);
 $myGlobalIdProf    = idprof($mysoc);
@@ -732,6 +733,13 @@ $getAlreadyPaid = $object->getSommePaiement();
 
 $prepaidAmount  = $getAlreadyPaid + $usedcreditnoteamount;
 
+// Invoicing period of the document (BG-14): the earliest start and the latest end of the periods its
+// lines carry, Dolibarr having no such field at invoice level. See einvoicingInvoicingPeriodFromLines()
+// for why it is derived rather than left empty, and for the case it refuses to derive (issue #572).
+$invoicingPeriod = einvoicingInvoicingPeriodFromLines($billing_period);
+$invoicingPeriodStart = $invoicingPeriod['start'] !== null ? $this->_tsToDateTime($invoicingPeriod['start']) : null;
+$invoicingPeriodEnd = $invoicingPeriod['end'] !== null ? $this->_tsToDateTime($invoicingPeriod['end']) : null;
+
 // Delivery date
 $deliveryDate = !empty($deliveryDateList)
 	? new DateTime(dol_print_date($deliveryDateList[0], 'dayrfc'))
@@ -739,9 +747,9 @@ $deliveryDate = !empty($deliveryDateList)
 
 
 
-// VAT exigibility scheme of the seller: the VAT mode of the Tax/VAT module setup, unless the seller
-// declared its regime explicitly with EINVOICING_VAT_POINT_DATE_CODE. It decides the VAT point date
-// code the document carries (BT-8) and the legal mention that goes with the debits option.
+// VAT exigibility scheme of the seller, which is the VAT mode of the Tax/VAT module setup and nothing
+// else. It decides the VAT point date code the document carries (BT-8) and the legal mention that goes
+// with the debits option.
 $vatOnDebits      = einvoicingVatOnDebits();
 $vatPointDateCode = einvoicingVatPointDateCode($hasProductLine, $hasServiceLine, $object->type == $object::TYPE_DEPOSIT);
 
@@ -759,8 +767,8 @@ $invoiceData = [
 
 	'documentDeliveryDate' => $deliveryDate,
 
-	'invoicingPeriodStart' => null,
-	'invoicingPeriodEnd'   => null,
+	'invoicingPeriodStart' => $invoicingPeriodStart,										// BT-73
+	'invoicingPeriodEnd'   => $invoicingPeriodEnd,										// BT-74
 
 	// $prepaidAmount is what the document reports in BT-113, and BR-FR-CO-09 ties the "already paid"
 	// frames to it, so the frame has to be decided from the same figure.
@@ -804,7 +812,10 @@ $invoiceData = [
 	'sellerCommunicationUri'    => $myUri,
 
 	'sellerGlobalIds'           => [['schemeID' => $mySchemeGlobalIdProf, 'value' => $myGlobalIdProf]],
-	'sellerTaxRegistations'     => [['type' => 'VA', 'value' => $mysoc->tva_intra ?? 'FRSPECIMEN']],
+	// BT-31 or BT-32, whichever the VAT regime of the seller calls for - see
+	// einvoicingSellerTaxRegistrations(). A seller that does not charge VAT has no BT-31 to declare and
+	// must still identify itself, or every exempt line trips BR-E-02 (issue #560).
+	'sellerTaxRegistations'     => $sellerTaxRegistrations,
 	'sellervatnumber'           => $mysoc->tva_intra ?? 'FRSPECIMEN',
 
 	'sellerLegalOrgId'          => $myidprof,

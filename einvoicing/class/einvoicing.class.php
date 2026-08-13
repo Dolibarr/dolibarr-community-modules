@@ -728,6 +728,40 @@ class EInvoicing
 	}
 
 	/**
+	 * Statuses a user may still send by hand on an invoice received through the platform.
+	 *
+	 * The sendable list is narrowed by what the platform already accepted for that invoice. A status
+	 * it accepted is not proposed again. "Refused" (210) ends the exchange - an invoice sent back to
+	 * its vendor is not going to be paid, so nothing else is owed on it. "Approved" (205) ends nothing:
+	 * the normal order of things is to approve an invoice and then pay it, and "Payment transmitted"
+	 * (211) is precisely what is sent afterwards. An approved invoice can no longer be refused either.
+	 *
+	 * @param	int		$elementId		Id of the invoice
+	 * @param	string	$elementType	Element type ('invoice_supplier')
+	 * @return	array<string|int,array{label:string,data-html:string,disable?:int,css?:string}>	The sendable
+	 *									statuses of getEinvoiceStatusOptions() minus the ones the history rules
+	 *									out, so the same shape as that method; empty when the exchange is over
+	 */
+	public function getSendableStatusesForReceivedInvoice($elementId, $elementType)
+	{
+		if ($this->hasSentStatusMessage($elementId, $elementType, self::STATUS_REFUSED, 1)) {
+			return array();
+		}
+
+		$statuses = $this->getEinvoiceStatusOptions(1, 1, 1);
+		if ($this->hasSentStatusMessage($elementId, $elementType, self::STATUS_APPROVED, 1)) {
+			unset($statuses[self::STATUS_REFUSED]);
+		}
+		foreach (array_keys($statuses) as $code) {
+			if ($this->hasSentStatusMessage($elementId, $elementType, (int) $code, 1)) {
+				unset($statuses[$code]);
+			}
+		}
+
+		return $statuses;
+	}
+
+	/**
 	 * Get reasons for a given status that will be used when sending supplier invoice status updates to PDP/PA (for statuses Refused, Disputed, Partially Approved, Suspended)
 	 *
 	 * @param int $status		Status ID
@@ -2746,15 +2780,21 @@ class EInvoicing
 	 * @param	int		$elementId		Id of the invoice
 	 * @param	string	$elementType	Element type ('facture', 'invoice_supplier')
 	 * @param	int		$statusCode		Lifecycle status looked for (200 to 213)
+	 * @param	int		$onlyAccepted	1 to count only the sends the platform accepted, 0 (default) to count any attempt
 	 * @return	bool					True if that status has already been sent
 	 */
-	public function hasSentStatusMessage($elementId, $elementType, $statusCode)
+	public function hasSentStatusMessage($elementId, $elementType, $statusCode, $onlyAccepted = 0)
 	{
 		$sql = "SELECT rowid FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
 		$sql .= " WHERE element_type = '" . $this->db->escape($elementType) . "'";
 		$sql .= " AND element_id = " . (int) $elementId;
 		$sql .= " AND lc_status = " . (int) $statusCode;
 		$sql .= " AND LOWER(direction) = 'out'";
+		if ($onlyAccepted) {
+			// Stored as 'Ok', but compared lowercased like the direction above: on PostgreSQL an equality
+			// on the stored case is a comparison that silently matches nothing.
+			$sql .= " AND LOWER(lc_validation_status) = 'ok'";
+		}
 		$sql .= " LIMIT 1";
 
 		$resql = $this->db->query($sql);
@@ -3153,14 +3193,12 @@ class EInvoicing
 		$conf->global->EINVOICING_SPECIMEN_ROUTING_ID = $seller->idprof2;
 
 		// Same reason for the VAT exigibility scheme, which decides the VAT point date code (BT-8) the
-		// specimen declares: pin the French standard scheme and the absence of a declared regime, so
-		// the fixtures do not depend on the VAT mode of whoever generates them.
+		// specimen declares: pin the French standard scheme, so the fixtures do not depend on the VAT
+		// mode of whoever generates them.
 		$savTaxModeSellProduct = getDolGlobalString('TAX_MODE_SELL_PRODUCT');
 		$savTaxModeSellService = getDolGlobalString('TAX_MODE_SELL_SERVICE');
-		$savVatPointDateCode = getDolGlobalString('EINVOICING_VAT_POINT_DATE_CODE');
 		$conf->global->TAX_MODE_SELL_PRODUCT = 'invoice';
 		$conf->global->TAX_MODE_SELL_SERVICE = 'payment';
-		$conf->global->EINVOICING_VAT_POINT_DATE_CODE = 'auto';
 
 		// Same reason for the language: CommonProtocol::generateSampleInvoice() builds the specimen
 		// with the ambient $langs, so the free text it carries (BT-20 payment terms, BT-22 notes,
@@ -3200,7 +3238,6 @@ class EInvoicing
 			$conf->global->EINVOICING_SPECIMEN_ROUTING_ID = $savEinvoicingRoutingId;
 			$conf->global->TAX_MODE_SELL_PRODUCT = $savTaxModeSellProduct;
 			$conf->global->TAX_MODE_SELL_SERVICE = $savTaxModeSellService;
-			$conf->global->EINVOICING_VAT_POINT_DATE_CODE = $savVatPointDateCode;
 			$langs = $savLangs;
 		}
 

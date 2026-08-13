@@ -131,9 +131,11 @@ class TestPDPProvider extends AbstractPDPProvider
 
 		// Credentials. The '_PROD' suffix keeps the production credentials apart from the test ones, so
 		// switching EINVOICING_LIVE does not make the module talk to a platform with the wrong keys.
+		/*
 		$item = $formSetup->newItem($prefix.'API_KEY'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''));
 		$item->nameText = $langs->transnoentities('EINVOICING_API_KEY');
 		$item->cssClass = 'minwidth500';
+		*/
 
 		// Token. The link triggers the action set<prefix>TOKEN read by admin/setup.php, which calls
 		// getAccessToken() below.

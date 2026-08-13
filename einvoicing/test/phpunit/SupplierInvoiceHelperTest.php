@@ -70,6 +70,23 @@ $conf->global->MAIN_DISABLE_ALL_MAILS = 1;
 class SupplierInvoiceHelperTest extends CommonClassTest
 {
 	/**
+	 * Several fixtures of this class validate a supplier invoice, and validating one that came from the
+	 * platform now answers its vendor with the "Approved" (205) status - a real call to the Access Point
+	 * configured on the instance the suite runs against. None of those tests is about that status, so it
+	 * is switched off here; the tests that ARE about it turn it back on explicitly.
+	 *
+	 * @return void
+	 */
+	protected function setUp(): void
+	{
+		global $conf;
+
+		parent::setUp();
+
+		$conf->global->EINVOICING_SEND_APPROVED_ON_VALIDATION = '0';
+	}
+
+	/**
 	 * Create a draft specimen supplier invoice. ref_supplier is made unique per call: several
 	 * test methods each create their own specimen inside the same class-wide transaction (see
 	 * CommonClassTest::setUpBeforeClass()), and FactureFournisseur::initAsSpecimen() otherwise
@@ -668,5 +685,109 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 		$einvoicing = new EInvoicing($db);
 		$result = $einvoicing->updateStatusMessageValidation($lcId, '', 'Ok', '');
 		$this->assertEquals(1, $result);
+	}
+
+	/**
+	 * A received e-invoice with nothing answered yet: validating it has to tell the vendor "Approved"
+	 * (205), which is what the buyer owes on an invoice it accepts (issue #572 follow-up, 205 on
+	 * validation).
+	 *
+	 * @return void
+	 */
+	public function testValidatingAReceivedEInvoiceAnswersApproved()
+	{
+		global $conf, $db;
+
+		$conf->global->EINVOICING_SEND_APPROVED_ON_VALIDATION = '1';
+
+		$invoice = $this->createSpecimenSupplierInvoice();
+		$this->addEInvoicingDocument($invoice->id);
+
+		$einvoicing = new EInvoicing($db);
+		$this->assertTrue(SupplierInvoiceHelper::shouldSendApprovedOnValidation($einvoicing, (int) $invoice->id, 'invoice_supplier'));
+	}
+
+	/**
+	 * An invoice that never came from the platform has no vendor waiting for a status: nothing is sent,
+	 * whatever the setup says.
+	 *
+	 * @return void
+	 */
+	public function testValidatingAPlainSupplierInvoiceAnswersNothing()
+	{
+		global $conf, $db;
+
+		$conf->global->EINVOICING_SEND_APPROVED_ON_VALIDATION = '1';
+
+		$invoice = $this->createSpecimenSupplierInvoice();
+
+		$einvoicing = new EInvoicing($db);
+		$this->assertFalse(SupplierInvoiceHelper::shouldSendApprovedOnValidation($einvoicing, (int) $invoice->id, 'invoice_supplier'));
+	}
+
+	/**
+	 * The status is sent once. A second validation - a draft reopened and validated again - must not
+	 * repeat it, since the lifecycle is already closed on the platform side.
+	 *
+	 * @return void
+	 */
+	public function testApprovedIsNotSentTwice()
+	{
+		global $conf, $db;
+
+		$conf->global->EINVOICING_SEND_APPROVED_ON_VALIDATION = '1';
+
+		$invoice = $this->createSpecimenSupplierInvoice();
+		$this->addEInvoicingDocument($invoice->id);
+		$this->insertLifecycleMessageFixture($invoice->id, 'invoice_supplier', EInvoicing::STATUS_APPROVED, '');
+
+		$einvoicing = new EInvoicing($db);
+		$this->assertFalse(SupplierInvoiceHelper::shouldSendApprovedOnValidation($einvoicing, (int) $invoice->id, 'invoice_supplier'));
+	}
+
+	/**
+	 * An invoice already refused is not approved afterwards by a validation: 205 and 210 both close the
+	 * lifecycle, and answering both would contradict what the vendor was already told.
+	 *
+	 * @return void
+	 */
+	public function testARefusedInvoiceIsNotApprovedLater()
+	{
+		global $conf, $db;
+
+		$conf->global->EINVOICING_SEND_APPROVED_ON_VALIDATION = '1';
+
+		$invoice = $this->createSpecimenSupplierInvoice();
+		$this->addEInvoicingDocument($invoice->id);
+		$this->insertLifecycleMessageFixture($invoice->id, 'invoice_supplier', EInvoicing::STATUS_REFUSED, 'REJ_LIT');
+
+		$einvoicing = new EInvoicing($db);
+		$this->assertFalse(SupplierInvoiceHelper::shouldSendApprovedOnValidation($einvoicing, (int) $invoice->id, 'invoice_supplier'));
+	}
+
+	/**
+	 * The two switches that turn it off: the dedicated one, for an instance where validating an invoice
+	 * does not mean approving it, and the general "do not send anything to the platform".
+	 *
+	 * @return void
+	 */
+	public function testTheSetupCanTurnTheAnswerOff()
+	{
+		global $conf, $db;
+
+		$invoice = $this->createSpecimenSupplierInvoice();
+		$this->addEInvoicingDocument($invoice->id);
+		$einvoicing = new EInvoicing($db);
+
+		$conf->global->EINVOICING_SEND_APPROVED_ON_VALIDATION = '0';
+		$this->assertFalse(SupplierInvoiceHelper::shouldSendApprovedOnValidation($einvoicing, (int) $invoice->id, 'invoice_supplier'));
+		$conf->global->EINVOICING_SEND_APPROVED_ON_VALIDATION = '1';
+
+		$conf->global->EINVOICING_DISABLE_SYNC_DOLI_TO_AP = '1';
+		$this->assertFalse(SupplierInvoiceHelper::shouldSendApprovedOnValidation($einvoicing, (int) $invoice->id, 'invoice_supplier'));
+		unset($conf->global->EINVOICING_DISABLE_SYNC_DOLI_TO_AP);
+
+		// And back to the default, to be sure the two lines above are what changed the answer.
+		$this->assertTrue(SupplierInvoiceHelper::shouldSendApprovedOnValidation($einvoicing, (int) $invoice->id, 'invoice_supplier'));
 	}
 }
