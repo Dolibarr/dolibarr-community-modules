@@ -420,8 +420,8 @@ function buildModulePackages($action, $modulename)
 		}
 
 		//  Define the name of the output zip file and remove it if already exists
-		$outzip = $directoryToSearch . DIRECTORY_SEPARATOR . $project . DIRECTORY_SEPARATOR . "module_" . $mod . "-" . $version . ".zip";
-		$outzipothers = $directoryToSearch . DIRECTORY_SEPARATOR . $project . DIRECTORY_SEPARATOR . "module_" . $mod . "-*.zip";
+		$outzip = $directoryToSearch . DIRECTORY_SEPARATOR . 'dev/build/bin/' . "module_" . $mod . "-" . $version . ".zip";
+		$outzipothers = $directoryToSearch . DIRECTORY_SEPARATOR . 'dev/build/bin/' . DIRECTORY_SEPARATOR . "module_" . $mod . "-*.zip";
 		if (file_exists($outzip)) {
 			print "A zip file already exists with this name/version: $outzip\n";
 
