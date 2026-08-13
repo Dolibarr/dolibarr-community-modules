@@ -109,7 +109,8 @@ $statewithscopeonly = '';
 $statewithanticsrfonly = '';
 
 $requestedpermissionsarray = array();
-if ($state) { // Used to stoe scope and anti-csrf value. The scope is stored in the first part of the state, before the first dash. The anti-csrf value is stored in the second part of the state, after the first dash (exemple: scope1,scope2,scope3-jetonAntiCSRF)
+if ($state) { // Used to store scope and anti-csrf value. The scope is stored in the first part of the state, before the first dash.
+	// The anti-csrf value is stored in the second part of the state, after the first dash (example: scope1,scope2,scope3-jetonAntiCSRF)
 	// 'state' parameter is standard to store a hash value and can also be used to retrieve some parameters back
 	$statewithscopeonly = preg_replace('/\-.*$/', '', $state);
 	if ($statewithscopeonly != 'none') {
@@ -226,6 +227,13 @@ if ($keyforurl) {
 
 $oauthserverurl = $providerconfig['prod_auth_url'];
 $oauthserverurl .= (preg_match('/\/$/', $oauthserverurl) ? '' : '/').'authorize?client_id='.urlencode(getDolGlobalString($keyforparamid)).'&response_type=code&state='.urlencode($state);
+
+if (getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_SEND_AND_RECEIVE')) {
+	$oauthserverurl .= '&superpdp_send_and_receive='.getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_SEND_AND_RECEIVE');
+}
+if (getDolGlobalInt('EINVOICING_SUPERPDPVIAPARTNER_ONLY_FUTURE')) {
+	$oauthserverurl .= '&superpdp_only_future=true';
+}
 
 $save_redirect_uri = GETPOST('redirect_uri');
 // TODO Test that redirect_uri match an allowed url/domain
