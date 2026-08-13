@@ -85,7 +85,7 @@ class ProtocolManager
 	 * Asking the protocols keeps the pages that display or clear the diagnostic in step with the names
 	 * the reception actually writes.
 	 *
-	 * @return string[]		File names, relative to the module temp directory
+	 * @return list<string>		File names, relative to the module temp directory
 	 */
 	public function getIncomingDiagnosticFileNames()
 	{
