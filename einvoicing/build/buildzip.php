@@ -87,6 +87,7 @@ function detectModule()
 	if (count($tab) == 1) {
 		$file = $tab[0];
 		$pattern = "/.*mod(?<mod>.*)\.class\.php/";
+		$matches = array();
 		if (preg_match_all($pattern, $file, $matches)) {
 			$name = strtolower(reset($matches['mod']));
 		}
