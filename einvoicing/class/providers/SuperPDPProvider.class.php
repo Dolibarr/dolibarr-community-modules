@@ -1914,6 +1914,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 			return array('res' => -1, 'message' => "ERROR_FLOW_METADATA Failed to parse the json answer for flowId: " . $flowId);
 		}
 
+		$provider = getDolGlobalString('EINVOICING_PDP');
+		$providershort = preg_replace('/ViaPartner$/', '', $provider);
+
 		$document = new Document($this->db);
 		$document->date_creation        = dol_now();
 		$document->fk_user_creat        = $user->id;
@@ -1945,7 +1948,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		} else {
 			$document->updatedat = null;
 		}
-		$document->provider             = getDolGlobalString('EINVOICING_PDP') ?? null;
+		$document->provider             = $providershort ?: null;
 		$document->entity               = $conf->entity;
 		$document->flow_uiid            = $flowData['uuid'] ?? null;
 

@@ -654,9 +654,15 @@ abstract class AbstractPDPProvider
 		// Future enhancement: Individual document sync may be possible when
 		// the PDP provider API supports it.
 
+		$provider = (string) $this->providerName;
+		$providershort = '';
+		if ($provider) {
+			$providershort = preg_replace('/ViaPartner$/', '', $provider);
+		}
+
 		$LastSyncDateSql = "SELECT MAX(t.updatedat) as last_sync_date";
 		$LastSyncDateSql .= " FROM ".MAIN_DB_PREFIX."einvoicing_document as t";
-		$LastSyncDateSql .= " WHERE t.provider = '".$db->escape($this->providerName)."'";
+		$LastSyncDateSql .= " WHERE t.provider = '".$db->escape($providershort)."'";
 		$LastSyncDateSql .= " AND entity = ".((int) $conf->entity);		// Do not use getentity here, must always be on 1 entity.
 
 		$resql = $db->query($LastSyncDateSql);

@@ -2103,7 +2103,7 @@ class EInvoicing
 		$sql = "SELECT rowid, syncstatus, synccomment, flow_id, override_routing_id, provider, ap_precheck_status, ap_precheck_result"; // Validation message of einvoice sent.
 		$sql .= " FROM " . $this->db->prefix() . "einvoicing_extlinks";
 		$sql .= " WHERE element_type = 'facture'";
-		//$sql .= " AND provider = '" . $this->db->escape($provider) . "'";
+		//$sql .= " AND provider = '" . $this->db->escape($providershort) . "'";
 		if ($invoiceId > 0) {
 			$sql .= " AND element_id = " . ((int) $invoiceId);
 		} else {
