@@ -121,7 +121,7 @@ class PDPProviderManager
 				'class' => 'SuperPDPProvider',
 				'position' => 1,
 				'provider_countries' => array('all'),
-				'provider_name' => picto_from_langcode('FR').' SuperPDP  <span class="opacitymedium">(Free and easy setup via '.getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER').' - '.$langs->trans("Recommended").')</span>',
+				'provider_name' => picto_from_langcode('FR').' SuperPDP  <span class="opacitymedium">('.$langs->trans("FreeAndEasySetupVia", getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER')).' - '.$langs->trans("Recommended").')</span>',
 				'description' => 'SuperPDP Integration',
 				'note' => 'Use "authorization_code" mode',
 				//'is_enabled' => getDolGlobalString('EINVOICING_TEST_SUPERPDP'),

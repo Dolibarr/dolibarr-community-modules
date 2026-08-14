@@ -532,6 +532,7 @@ FailedToDetectProtocolOfFlow=Failed to detect the format of the document of flow
 FailedToParseFlowContent=Failed to read the content of flow %s
 FailedToFindSupplier=Failed to find the supplier
 AutoCreateThirdPartyOffCreateItManually=Auto-creation of thirdparties is disabled in settings (good choice) so third party must be created manually.
+FreeAndEasySetupVia=Free and easy setup via %s
 
 # List of the vendor references already mapped (vendorref_list.php)
 MappedVendorRefs=Mapped vendor references
