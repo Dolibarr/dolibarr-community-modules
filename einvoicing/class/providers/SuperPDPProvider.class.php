@@ -643,7 +643,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 			'state'         => $state,
 		);
 
-		if (!empty($user->email)) {
+		if ($mysoc->email) {
+			$query['login_hint'] = $mysoc->email;
+		} elseif (!empty($user->email)) {
 			$query['login_hint'] = $user->email;
 		}
 

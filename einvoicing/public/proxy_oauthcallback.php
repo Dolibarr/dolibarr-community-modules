@@ -230,14 +230,21 @@ if ($keyforurl) {
 $oauthserverurl = $providerconfig['prod_auth_url'];
 $oauthserverurl .= (preg_match('/\/$/', $oauthserverurl) ? '' : '/').'authorize?client_id='.urlencode(getDolGlobalString($keyforparamid)).'&response_type=code&state='.urlencode($state);
 
+// Params from the proxy
 if (getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_SEND_AND_RECEIVE')) {
-	$oauthserverurl .= '&superpdp_send_and_receive='.getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_SEND_AND_RECEIVE');
+	$oauthserverurl .= '&superpdp_send_and_receive='.urlencode(getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_SEND_AND_RECEIVE'));
 }
 if (getDolGlobalInt('EINVOICING_SUPERPDPVIAPARTNER_ONLY_FUTURE')) {
 	$oauthserverurl .= '&superpdp_only_future=true';
 }
 if (getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_DIRECTORY_ENTRY_IDENTIFIER')) {
 	$oauthserverurl .= '&directory_entry_identifier='.urlencode(getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_DIRECTORY_ENTRY_IDENTIFIER'));
+}
+
+// Params coming from the client that want to use the proxy
+$emailregistration = GETPOST('login_hint', 'aZ09arobase');
+if ($emailregistration) {
+	$oauthserverurl .= '&login_hint='.urlencode($emailregistration);
 }
 
 $save_redirect_uri = GETPOST('redirect_uri');
