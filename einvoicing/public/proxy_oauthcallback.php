@@ -250,7 +250,7 @@ if ($emailregistration) {
 $save_redirect_uri = GETPOST('redirect_uri');
 
 // Test that redirect_uri match an allowed url/domain
-if (getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN')) {		// Example: domainofproxycompany.com
+if ($save_redirect_uri && getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN')) {		// Example: domainofproxycompany.com
 	$domainofuser = getDomainFromURL($save_redirect_uri, 2);
 	$alloweddomains = explode(',', getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN'));
 	$allowed = 0;
