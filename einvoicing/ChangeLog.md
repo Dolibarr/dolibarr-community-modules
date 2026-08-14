@@ -2,6 +2,22 @@
 
 ## 1.0.4
 
+FIX: The Factur-X files the module produces are now valid PDF/A-3, which they had never been - and a
+Factur-X file that is not a PDF/A-3 file is not a conformant Factur-X, whatever its XML says (veraPDF
+1.30.2 rejected every one of them, on Dolibarr 17 to 24 alike). The cause that belongs to the module is
+only below Dolibarr 24, where the merger built on TCPDF is used: the Factur-X XMP extension schema was
+added as a description of its own next to the one TCPDF had already written, repeating one property of
+one subject, which the XMP specification forbids. The packet stopped parsing there, and a reader that
+gives up sees no PDF/A identification either, so the file was not even recognised as PDF/A. The Factur-X
+schema is now declared inside the bag the core writer produces.
+
+The other cause is a setting of Dolibarr, not of the module, so the module only reports it: the invoice
+PDF the merger carries over is drawn with the Standard 14 fonts unless the PDF format of Dolibarr is
+PDF/A, and ISO 19005-3 requires every font used for rendering to be embedded. Generating an e-invoice
+in Factur-X while "PDF documents format" is not PDF/A-3b now warns, on the setup page of the module and
+on the invoice, that the recommended format is CII - which needs no PDF at all - and that keeping
+Factur-X means setting PDF/A-3b for the whole Dolibarr, in Home - Setup - PDF.
+
 NEW: Validating a supplier invoice received through the platform now answers its vendor with the
 "Approved" (205) status, instead of waiting for someone to remember the button on the invoice card.
 Validating a received invoice is the act of accepting it - it leaves the draft state to enter the accounts

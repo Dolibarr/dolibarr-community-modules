@@ -93,6 +93,11 @@ class FacturxTcpdfMerger extends TcpdfFpdi
 	private $relationship = 'Data';
 
 	/**
+	 * @var string The rdf:li declaring the Factur-X schema, to graft into the extension schema bag TCPDF writes
+	 */
+	private $facturxSchemaEntry = '';
+
+	/**
 	 * @var string Keywords copied from the source PDF
 	 */
 	private $keywordTemplate = '';
@@ -321,10 +326,10 @@ class FacturxTcpdfMerger extends TcpdfFpdi
 	/**
 	 * Set the document information dictionary and the Factur-X part of the XMP block.
 	 *
-	 * TCPDF writes the dc, pdf, xmp and pdfaid descriptions itself, so only the two Factur-X ones are
-	 * added: the properties, and the PDF/A extension schema that declares them - the second is what
-	 * makes the first legal in a PDF/A file. Both are read from the template shipped by
-	 * horstoeko/zugferd so the two paths cannot drift apart.
+	 * TCPDF writes the dc, pdf, xmp and pdfaid descriptions itself, so only the Factur-X properties are
+	 * added here. What declares them - the PDF/A extension schema, which is what makes them legal in a
+	 * PDF/A file - cannot be a description of its own: see _out(). Both are read from the template
+	 * shipped by horstoeko/zugferd so the two paths cannot drift apart.
 	 *
 	 * @return void
 	 */
@@ -347,7 +352,7 @@ class FacturxTcpdfMerger extends TcpdfFpdi
 	}
 
 	/**
-	 * Build the two rdf:Description blocks that make a PDF/A-3 file a Factur-X file.
+	 * Build the rdf:Description that makes a PDF/A-3 file a Factur-X file, and set aside its declaration.
 	 *
 	 * @return string	XMP fragment to insert inside rdf:RDF, empty if the template cannot be read
 	 */
@@ -382,7 +387,61 @@ class FacturxTcpdfMerger extends TcpdfFpdi
 		$facturxProperties->children('fx', true)->{'Version'} = $this->xmpVersion;
 		$facturxProperties->children('fx', true)->{'DocumentFileName'} = $this->attachmentName;
 
-		return "\t\t" . $facturxProperties->asXML() . "\n\t\t" . $descriptions[1]->asXML() . "\n";
+		// Only the schema entry of [1] is kept: _out() grafts it into the bag TCPDF writes, because a
+		// second description carrying pdfaExtension:schemas would repeat a property of the same subject.
+		$schemaEntries = $descriptions[1]->children('pdfaExtension', true)->{'schemas'};
+		if (isset($schemaEntries->children('rdf', true)->{'Bag'})) {
+			foreach ($schemaEntries->children('rdf', true)->{'Bag'}->children('rdf', true)->{'li'} as $entry) {
+				$this->facturxSchemaEntry .= $entry->asXML();
+			}
+		}
+
+		return "\t\t" . $facturxProperties->asXML() . "\n";
+	}
+
+	/**
+	 * Graft the Factur-X schema entry into the PDF/A extension schema bag TCPDF writes.
+	 *
+	 * The properties added by setExtraXMPRDF() are external to PDF/A, so PDF/A-3 (ISO 19005-3, 6.6.2.3)
+	 * only accepts them when an extension schema declares them. The template shipped by
+	 * horstoeko/zugferd carries that declaration as a rdf:Description of its own, which is right for
+	 * the v24 path - horstoeko/zugferd writes the whole XMP block and writes none of its own - and
+	 * wrong here: TCPDF has already written a pdfaExtension:schemas for the pdf, xmpMM and pdfaid
+	 * schemas, on the same rdf:about="" subject. Two descriptions then repeat one property of one
+	 * subject, which the XMP specification forbids, and the packet stops parsing: a reader that gives
+	 * up there sees no pdfaid either, so the file is no longer even identified as PDF/A (veraPDF
+	 * 1.30.2 on the output of this class: clauses 6.6.2.1 and 6.6.4). One bag, one entry more.
+	 *
+	 * @param  string $s Body of the metadata object about to be written
+	 * @return string	 The same body, with the entry grafted and the stream length brought back in line
+	 */
+	private function graftFacturxSchemaEntry($s)
+	{
+		if ($this->facturxSchemaEntry === '') {
+			return $s;
+		}
+
+		$schemas = strpos($s, '</pdfaExtension:schemas>');
+		if ($schemas === false) {
+			return $s;
+		}
+
+		$bag = strrpos(substr($s, 0, $schemas), '</rdf:Bag>');
+		if ($bag === false) {
+			return $s;
+		}
+
+		$s = substr($s, 0, $bag) . "\t\t\t\t\t" . $this->facturxSchemaEntry . "\n\t\t\t\t" . substr($s, $bag);
+
+		// The header of the object was written with the length of the packet before the graft.
+		$start = strpos($s, "stream\n");
+		$end = strrpos($s, "\nendstream");
+		if ($start === false || $end === false) {
+			return $s;
+		}
+		$length = $end - ($start + strlen("stream\n"));
+
+		return preg_replace('|/Length \d+|', '/Length ' . $length, $s, 1);
 	}
 
 	/**
@@ -397,6 +456,8 @@ class FacturxTcpdfMerger extends TcpdfFpdi
 	 *   an ordinary attachment and the document is not a Factur-X file.
 	 * - the file specification gets /AFRelationship /Data. TCPDF hardcodes /Source, and the v24 path
 	 *   emits /Data, so this keeps the two outputs comparable.
+	 * - the metadata stream gets the Factur-X entry grafted into its extension schema bag, see
+	 *   graftFacturxSchemaEntry().
 	 * - the embedded file stream gets its /Filter back. In PDF/A-3 mode TCPDF overwrites the filter
 	 *   entry with the /Subtype of the attachment instead of adding it, so a compressed attachment is
 	 *   written deflated and declared as plain: readers then hand over binary noise instead of the
@@ -414,6 +475,10 @@ class FacturxTcpdfMerger extends TcpdfFpdi
 
 		if ($this->compress && strpos($s, '/Type /EmbeddedFile') !== false && strpos($s, '/Filter') === false) {
 			$s = str_replace('/Type /EmbeddedFile', '/Type /EmbeddedFile /Filter /FlateDecode', $s);
+		}
+
+		if (strpos($s, '/Type /Metadata') !== false) {
+			$s = $this->graftFacturxSchemaEntry($s);
 		}
 
 		if (strpos($s, '/Type /Catalog') !== false && strpos($s, '/AF ') === false) {
