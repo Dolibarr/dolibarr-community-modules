@@ -713,7 +713,7 @@ $Lastsyncinfosql = "SELECT flow_id, updatedat";
 $Lastsyncinfosql .= " FROM ".MAIN_DB_PREFIX."einvoicing_document";
 $Lastsyncinfosql .= " WHERE provider = '".$db->escape($providershort)."'";
 $Lastsyncinfosql .= " AND entity = ".((int) $conf->entity);		// Do not use getentity here, must always be on 1 entity.
-$Lastsyncinfosql .= $db->order("updatedat", "DESC");
+$Lastsyncinfosql .= $db->order("updatedat,rowid", "DESC");
 $Lastsyncinfosql .= $db->plimit(1);
 
 $last_sync_db = 0;
