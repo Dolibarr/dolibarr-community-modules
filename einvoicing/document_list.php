@@ -1308,9 +1308,9 @@ while ($i < $imaxinloop) {
 					print $out;
 				} elseif ($key == 'fk_element_type') {
 					print '<span class="nowraponall">';
-					if ((string) $object->$key == 'Facture') {
+					if ((string) $object->$key == 'Facture' || (string) $object->$key == 'invoice') {
 						print img_picto('', 'bill', 'class="pictofixedwidth"').$langs->trans("Invoice");
-					} elseif ((string) $object->$key == 'FactureFournisseur') {
+					} elseif ((string) $object->$key == 'FactureFournisseur' || (string) $object->$key == 'invoice_supplier') {
 						print img_picto('', 'supplier_invoice', 'class="pictofixedwidth"').$langs->trans("SupplierInvoice");
 					}
 					print  '</span>';
