@@ -131,7 +131,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 */
 	public function initFormSetup(&$formSetup, $prefix, $prefixenv, $providersConfig, $TFieldProtocols, $TFieldProfiles)
 	{
-		global $langs, $mysoc;
+		global $langs, $mysoc, $user;
 
 		$tokenData = $this->getTokenData();
 
@@ -159,6 +159,13 @@ class SuperPDPProvider extends AbstractPDPProvider
 					'response_type' => 'code',
 					'redirect_uri' => dol_buildpath('/einvoicing/admin/setup.php', 2)
 				];
+
+				if ($mysoc->email) {
+					$query['login_hint'] = $mysoc->email;
+				} elseif (!empty($user->email)) {
+					$query['login_hint'] = $user->email;
+				}
+
 				// Prefill company information: number and scheme must be paired together.
 				// Use 'sandbox' scheme for non-live environment, otherwise use country-specific scheme (fr_siren for France, be_numero_entreprise for Belgium).
 				if (!empty($mysoc->idprof1)) {
