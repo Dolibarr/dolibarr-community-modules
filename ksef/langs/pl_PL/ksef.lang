@@ -1,0 +1,1733 @@
+# Module KSEF - Tłumaczenie polskie
+
+# ============================================
+# Module General
+# ============================================
+KSEF_Module=Integracja KSeF
+KSEF_ModuleInformation=Informacje o module
+KSEF_Version=Wersja
+KSEF_Publisher=Wydawca
+KSEF_AndTheDolibarrCommunity=oraz społeczność Dolibarr
+KSEF_CheckForUpdates=Sprawdź aktualizacje
+KSEF_UpdateAvailable=Dostępna jest nowa wersja: <b>%s</b> (posiadasz %s).
+KSEF_UpToDate=Używasz najnowszej wersji (%s).
+KSEF_UpdateCheckFailed=Nie udało się sprawdzić aktualizacji: %s.
+KSEF_UpdateCheckParseError=Nie udało się odczytać najnowszej wersji z GitHub.
+KSEF_DownloadUpdate=Pobierz aktualizację
+KSEF_UpdatesTitle=Aktualizacje
+KSEF_UpdateBannerTitle=Dostępna aktualizacja.
+KSEF_UpdateBannerDesc=Dostępna jest wersja %s modułu KSeF (posiadasz %s).
+KSEF_UpdateDownloadConfirm=Pobrać moduł KSeF w wersji %s (.zip) z GitHub? Po pobraniu zainstaluj go przez Strona główna > Ustawienia > Moduły > Wdróż/zainstaluj moduł zewnętrzny.
+KSEF_NeedHelp=Potrzebujesz pomocy?
+KSEF_Support_Intro=Masz problem lub pytanie? Tutaj uzyskasz pomoc:
+KSEF_Support_Issues=Zgłoś błąd lub zaproponuj funkcję
+KSEF_Support_IssuesDesc=otwórz zgłoszenie na GitHub
+KSEF_Support_Forum=Zapytaj na forum Dolibarr
+KSEF_Support_ForumDesc=wątek dyskusyjny o module KSeF
+KSEF_Support_DocsEN=Dokumentacja (angielska)
+KSEF_Support_DocsPL=Dokumentacja (polska)
+KSEF_Support_Releases=Wydania i lista zmian
+KSEF_Setup=Ustawienia modułu
+KSEF_SetupPage=Konfiguracja integracji KSeF, certyfikatu i opcji przesyłania
+KSEF_About=O module
+KSEF_HowToUse=Jak używać
+KSEF_BackToModuleList=Powrót do listy modułów
+KSEF_Enabled=Włączony
+KSEF_Active=Aktywny
+KSEF_Add=Dodaj
+KSEF_Save=Zapisz
+KSEF_UpdateToken=Aktualizuj token
+KSEF_Value=Wartość
+KSEF_Parameter=Parametr
+KSEF_ActionRequired=Wymagana akcja
+
+# ============================================
+# Menu & Navigation
+# ============================================
+KSEF_Area=KSeF
+KSEF_Dashboard=Panel KSeF
+KSEF_Settings=Konfiguracja KSeF
+KSEF_Status=Status wysyłki KSeF
+
+# ============================================
+# Configuration Groups
+# ============================================
+KSEF_AUTH_CONFIG=Uwierzytelnianie
+KSEF_UI_CONFIG=Interfejs użytkownika
+KSEF_IMPORTING_CONFIG=Importowanie
+KSEF_BATCH_AUTO_CREATE_SUPPLIERS_SETTING=Automatyczne tworzenie dostawców podczas importu zbiorczego
+KSEF_BATCH_AUTO_CREATE_SUPPLIERS_SETTING_Help=Gdy włączone, dostawcy którzy nie mogą być dopasowani do istniejącego kontrahenta zostaną automatycznie utworzeni podczas importu zbiorczego. Dopasowanie odbywa się po NIP lub numerze VAT UE. Nowi dostawcy są tworzeni z danymi z faktury KSeF (nazwa, adres, identyfikatory podatkowe). To ustawienie jest domyślną wartością dla importu zbiorczego i jest zapamiętywane z ostatniego importu.
+KSEF_BATCH_AUTO_CREATE_PRODUCTS_SETTING=Automatyczne tworzenie produktów podczas importu zbiorczego
+KSEF_BATCH_AUTO_CREATE_PRODUCTS_SETTING_Help=Gdy włączone, produkty które nie mogą być dopasowane do istniejącego produktu zostaną automatycznie utworzone podczas importu zbiorczego. Dopasowanie jest próbowane po referencji produktu, referencji dostawcy i kodzie kreskowym/GTIN. Nowe produkty są tworzone z opisem, referencją, ceną, stawką VAT i kodem kreskowym z linii faktury. Jeśli nie potrzebujesz śledzić produktów ani łączyć pozycji faktur z katalogiem produktów, możesz zostawić tę opcję wyłączoną - wszystkie niedopasowane pozycje zostaną zaimportowane jako opisy tekstowe. To ustawienie jest domyślną wartością dla importu zbiorczego i jest zapamiętywane z ostatniego importu.
+KSEF_PRODUCT_REF_USE_INDEKS_SETTING=Użyj kodu produktu dostawcy (indeks) jako referencji przy automatycznym tworzeniu
+KSEF_PRODUCT_REF_USE_INDEKS_SETTING_Help=Gdy włączone, kod indeksu produktu dostawcy z linii faktury jest używany jako referencja produktu przy automatycznym tworzeniu nowych produktów. Gdy wyłączone, używana jest automatyczna numeracja Dolibarr.
+KSEF_CUSTOMIZATION_CONFIG=Dostosowanie
+KSEF_CUSTOMER_EXCLUSIONS=Wykluczenia kontrahentów
+KSEF_Configuration=Konfiguracja KSeF
+
+# ============================================
+# Environment Settings
+# ============================================
+KSEF_ENV_DEMO=Demo
+KSEF_ENV_PRODUCTION=Produkcja
+KSEF_ENV_TEST=Test
+KSEF_ENVIRONMENT=Środowisko
+KSEF_ENVIRONMENT_Help=Wybierz TEST do testowania, PRODUKCJA dla rzeczywistych faktur
+
+# ============================================
+# Authentication & Token
+# ============================================
+KSEF_AUTH_TOKEN_Help=Token alfanumeryczny z portalu KSeF
+KSEF_AUTH_TOKEN=Token uwierzytelniający
+KSEF_TOKEN_STATUS=Status tokenu
+KSEF_TOKEN_OBTAIN_INFO=Uzyskaj token logując się do portalu KSeF z kwalifikowaną pieczęcią/podpisem
+KSEF_PasteTokenHere=Wklej tutaj swój token
+KSEF_EnterNewTokenToReplace=Wprowadź nowy token aby zastąpić istniejący
+KSEF_TOKEN_SAVED=Token został zapisany pomyślnie
+KSEF_TOKEN_TOO_SHORT=Token jest za krótki
+KSEF_TOKEN_INVALID_FORMAT=Token ma nieprawidłowy format
+KSEF_NoTokenConfigured=Brak skonfigurowanego tokenu
+KSEF_NotConfigured=Nie skonfigurowany
+KSEF_Configured=Skonfigurowany
+KSEF_WARNING_NO_TOKEN=Uwaga: Brak skonfigurowanego tokenu
+KSEF_GetToken=Uzyskaj token
+KSEF_GenerateTokenInPortal=Wygeneruj token w portalu w zakładce Zarządzanie tokenami
+KSEF_VisitKSEFPortal=Odwiedź Portal KSeF
+KSEF_AuthMethodAutoSwitchedToCert=Metoda uwierzytelniania została automatycznie przełączona na Certyfikat (nie skonfigurowano tokena)
+KSEF_AuthMethodAutoSwitchedToToken=Metoda uwierzytelniania została automatycznie przełączona na Token (nie skonfigurowano certyfikatu)
+KSEF_PURGE_ON_DISABLE=Usuń dane konfiguracyjne przy wyłączeniu modułu
+KSEF_PURGE_ON_DISABLE_Help=Po włączeniu tej opcji wszystkie dane konfiguracyjne (NIP, tokeny, certyfikaty, środowisko itp.) zostaną trwale usunięte w momencie wyłączenia modułu. Po wyłączeniu tej opcji (domyślnie) wszystkie ustawienia są zachowywane między cyklami wyłączania i włączania modułu.
+
+# ============================================
+# NIP & Company Data
+# ============================================
+KSEF_COMPANY_NIP=NIP firmy
+KSEF_COMPANY_NIP_Help=Wypełniane automatycznie ze skonfigurowanego pola źródłowego. Jeśli pole jest puste, pobierany z numeru VAT.
+KSEF_AutoPopulatedFromCompany=Wypełniane automatycznie
+KSEF_WARNING_NO_NIP=Uwaga: Brak NIP firmy
+KSEF_EnterNIPAndToken=Wprowadź swój NIP i wklej token
+KSEF_CustomerExcludedFromKSEF=Kontrahent wykluczony z KSeF
+KSEF_CustomerRemovedFromKSEFExclusions=Kontrahent usunięty z wykluczeń KSeF
+KSEF_EXCLUDED_CUSTOMERS=Wykluczeni kontrahenci
+KSEF_EXCLUDED_CUSTOMERS_Help=Lista kontrahentów wykluczonych z wysyłki do KSeF
+KSEF_EXCLUDED_CUSTOMERS_INFO=Lista ID kontrahentów oddzielonych przecinkami
+KSEF_SelectCustomer=Wybierz kontrahenta
+KSEF_PleaseSelectCustomer=Proszę wybrać kontrahenta
+KSEF_COMPANY_KRS=KRS firmy
+KSEF_COMPANY_KRS_Help=Automatycznie pobierane ze skonfigurowanego pola źródłowego. Numer Krajowego Rejestru Sądowego.
+KSEF_COMPANY_REGON=REGON firmy
+KSEF_COMPANY_REGON_Help=Automatycznie pobierane ze skonfigurowanego pola źródłowego. Numer identyfikacyjny REGON.
+KSEF_COMPANY_BDO=BDO firmy
+KSEF_COMPANY_BDO_Help=Automatycznie pobierane ze skonfigurowanego pola źródłowego. Numer rejestrowy BDO.
+KSEF_COMPANY_EORI=EORI firmy
+KSEF_COMPANY_EORI_Help=Automatycznie pobierane ze skonfigurowanego pola źródłowego. Numer EORI do celów handlu/celnictwa UE.
+KSEF_Optional=Opcjonalne
+KSEF_FIELD_SOURCE=Pole źródłowe
+KSEF_FIELD_NONE=Nieużywane
+KSEF_FIELD_VATID=Numer VAT UE
+KSEF_FIELD_VATID_Help=Numer identyfikacyjny VAT UE jest zawsze pobierany z pola VAT (tva_intra). Nie można tego zmienić.
+KSEF_FIELD_VATID_ALWAYS=zawsze używa tego pola
+KSEF_NIP_FROM_VATID_NOTE=NIP zostanie wyodrębniony przez usunięcie prefiksu kraju
+KSEF_PRODUCTION_WARNING=Środowisko produkcyjne - wysyłaj tylko oficjalne faktury. Wysłanych faktur nie można cofnąć.
+
+# ============================================
+# Features
+# ============================================
+KSEF_ADD_QR=Dodaj kod QR do PDF
+KSEF_ADD_QR_Help=Dołącz kod QR weryfikacyjny na fakturach PDF
+KSEF_EnableBarcodeModuleForQR=Włącz moduł Kod kreskowy aby generować kody QR
+KSEF_TCPDFRequiredForQR=Biblioteka TCPDF jest wymagana dla kodów QR
+KSEF_SomeOptionalFeaturesUnavailable=Niektóre opcjonalne funkcje są niedostępne
+KSEF_AutoSubmit=Automatyczne wysyłanie przy zatwierdzeniu
+KSEF_AUTO_SUBMIT_Help=Automatycznie wysyłaj faktury do KSeF po zatwierdzeniu
+KSEF_ExcludeFromKSEF=Wyklucz z KSeF
+KSEF_ExcludeFromKSEFHelp=Nie wysyłaj faktur dla tego kontrahenta do KSeF
+KSEF_NotApplicableNotCustomer=Nie dotyczy - ten kontrahent nie jest klientem. Wykluczenie z KSeF dotyczy tylko klientów, którym wystawiasz faktury.
+KSEF_EnableMulticurrencyForForeignInvoices=Włącz moduł Wielowalutowość, aby obsługiwać faktury w walutach obcych z kursami NBP
+KSEF_EnableCSRFProtection=Włącz ochronę tokenem CSRF (ustaw MAIN_SECURITY_CSRF_WITH_TOKEN w Strona główna - Ustawienia - Inne)
+
+# ============================================
+# UI Settings
+# ============================================
+KSEF_BUTTON_COLOR=Kolor przycisku
+KSEF_BUTTON_COLOR_Help=Kolor przycisku akcji KSeF na fakturach
+KSEF_Blue=Niebieski
+KSEF_Red=Czerwony
+KSEF_Green=Zielony
+KSEF_Yellow=Żółty
+KSEF_Orange=Pomarańczowy
+KSEF_Purple=Fioletowy
+KSEF_Cyan=Cyjan
+
+# ============================================
+# FA3 Optional Fields
+# ============================================
+KSEF_FA3_OPTIONAL_FIELDS=Opcjonalne pola FA(3)
+KSEF_FA3_INCLUDE_NRKLIENTA=Dołącz kod klienta
+KSEF_FA3_INCLUDE_NRKLIENTA_Help=Dołącz kod klienta z Dolibarr do pliku XML faktury FA3.
+KSEF_FA3_INCLUDE_INDEKS=Dołącz kod indeksu produktu
+KSEF_FA3_INCLUDE_INDEKS_Help=Dołącz kod referencyjny produktu w pozycjach faktury.
+KSEF_FA3_INCLUDE_GTIN=Dołącz kod GTIN/EAN
+KSEF_FA3_INCLUDE_GTIN_Help=Dołącz kody kreskowe produktów jako GTIN w pozycjach faktury. Włącz tylko jeśli Twoje kody kreskowe to prawidłowe kody GTIN/EAN (nie kody wewnętrzne).
+KSEF_FA3_INCLUDE_UNIT=Dołącz jednostkę miary
+KSEF_FA3_INCLUDE_UNIT_Help=Dołącz jednostkę miary produktów w pozycjach faktury.
+KSEF_FA3_INCLUDE_BANK_DESC=Dołącz opis rachunku bankowego
+KSEF_FA3_INCLUDE_BANK_DESC_Help=Dołącz etykietę/opis rachunku bankowego w sekcji płatności. Włącz tylko jeśli nazwy rachunków są odpowiednie do widoczności zewnętrznej (nie nazwy tylko do użytku wewnętrznego).
+KSEF_FA3_INCLUDE_CONTACT=Dołącz dane kontaktowe nabywcy
+KSEF_FA3_INCLUDE_CONTACT_Help=Dołącz e-mail i telefon nabywcy na fakturach KSeF. Wyłącz, aby pominąć je dla wszystkich; poszczególnych nabywców można też wykluczyć na ich karcie.
+KSEF_ExtraFieldHideContact=Ukryj dane kontaktowe na fakturze KSeF
+KSEF_ExtraFieldHideContactHelp=Pomiń e-mail i telefon tego nabywcy na fakturach KSeF, nawet jeśli włączone globalnie. Dane pozostają w Dolibarr.
+KSEF_ExtraFieldHideEori=Ukryj EORI na fakturze KSeF
+KSEF_ExtraFieldHideEoriHelp=Pomiń numer EORI tego nabywcy na fakturach KSeF. Dane pozostają w Dolibarr.
+KSEF_ConfigureOfflineCertificate=Skonfiguruj certyfikat podpisu offline dla trybu awaryjnego KSeF
+KSEF_FA3_PLACE_OF_ISSUE=Miejsce wystawienia
+KSEF_FA3_PLACE_OF_ISSUE_Help=Opcjonalne pole wskazujące miasto/lokalizację wystawienia faktury.
+KSEF_FA3_PLACE_OF_ISSUE_DISABLED=Wyłączone
+KSEF_FA3_PLACE_OF_ISSUE_COMPANY=Z adresu firmy (miasto)
+KSEF_FA3_PLACE_OF_ISSUE_CUSTOM=Wartość niestandardowa
+KSEF_FA3_PLACE_OF_ISSUE_CUSTOM_Placeholder=Wpisz nazwę miasta...
+KSEF_FA3_SALE_DATE_SOURCE=Domyślne źródło daty sprzedaży
+KSEF_FA3_SALE_DATE_SOURCE_Help=Określa, jak automatycznie wypełniane jest pole daty sprzedaży. "Z powiązanych dokumentów" ustawi w kolejności priorytetów: datę wysyłki, datę dostawy z zamówienia, datę zamówienia, a na końcu datę faktury. "Data wystawienia faktury" zawsze użyje daty faktury. Pole można później zmienić ręcznie.
+KSEF_FA3_SALE_DATE_SOURCE_INVOICE=Data wystawienia faktury
+KSEF_FA3_SALE_DATE_SOURCE_DELIVERY=Z powiązanych dokumentów (domyślnie)
+
+# Uwagi i pola niestandardowe faktury (DodatkowyOpis w XML KSeF)
+KSEF_DODATKOWY_OPIS_SECTION=Uwagi i pola niestandardowe faktury
+KSEF_DODATKOWY_OPIS_NOTE_MODE=Tryb pola Uwaga (publiczna)
+KSEF_DODATKOWY_OPIS_NOTE_MODE_Help=Kontroluje sposób dołączenia Uwagi (publicznej) faktury do XML KSeF.<br><b>Prosty - Stopka</b> wysyła notatkę jako zwykły tekst w stopce faktury. To jest domyślne ustawienie.<br><b>Prosty - Dodatkowy opis</b> wysyła całą treść jako wpis klucz-wartość z kluczem "Uwagi", dzieląc na fragmenty po 256 znaków jeśli to konieczne.<br><b>Klucz:Wartość - Dodatkowy opis</b> parsuje każdą linię przy pierwszym dwukropku na oddzielne wpisy klucz-wartość.<br><b>Wyłączone</b> pomija notatkę w XML KSeF.
+KSEF_DODATKOWY_OPIS_NOTE_MODE_DISABLED=Wyłączone (notatka nie jest dołączana)
+KSEF_DODATKOWY_OPIS_NOTE_MODE_SIMPLE=Prosty (cała treść jako jeden wpis)
+KSEF_DODATKOWY_OPIS_NOTE_MODE_KEYVALUE=Klucz:Wartość (parsowanie linii)
+KSEF_NOTE_COMBINED_SIMPLE_STOPKA=Prosty - Stopka Faktury (stopka jako tekst dowolny)
+KSEF_NOTE_COMBINED_SIMPLE_DODATKOWY=Prosty - Dodatkowy Opis (dodatkowy opis jako wpis "Uwagi")
+KSEF_NOTE_COMBINED_KEYVALUE_DODATKOWY=Klucz:Wartość - Dodatkowy Opis (parsowanie linii notatki na wpisy klucz-wartość)
+KSEF_DODATKOWY_OPIS_EXTRAFIELDS=Dołącz pola dodatkowe
+KSEF_DODATKOWY_OPIS_EXTRAFIELDS_Help=Wybierz, które pola niestandardowe mają być dołączone do XML KSeF. Pola mogą trafiać do dodatkowego opisu (pary klucz-wartość) lub stopki faktury (tekst stopki faktury). Klucz i wartość są obcinane do 256 znaków.
+KSEF_DODATKOWY_OPIS_NO_EXTRAFIELDS=Brak dostępnych pól dodatkowych (znaleziono tylko pola systemowe KSeF). Utwórz pola dodatkowe w konfiguracji Dolibarr, aby korzystać z tej funkcji.
+KSEF_DODATKOWY_OPIS_FACTURE_TITLE=Pola faktury
+KSEF_DODATKOWY_OPIS_FACTURE_SUBTITLE=Pola dodatkowe na karcie faktury. Wprowadzone wartości są dołączane do XML KSeF jako notatki (etykieta -> Klucz, wartość -> Wartosc). Wybierz miejsce docelowe dla każdego pola.
+KSEF_DODATKOWY_OPIS_FACTURE_NO_EXTRAFIELDS=Brak pól dodatkowych faktury. Utwórz pola dodatkowe faktury w ustawieniach Dolibarr lub użyj formularza poniżej.
+KSEF_DODATKOWY_OPIS_DET_TITLE=Pola pozycji faktury
+KSEF_DODATKOWY_OPIS_DET_SUBTITLE=Pola dodatkowe na pozycjach faktury. Wartości są dołączane do XML KSeF jako notatki powiązane z pozycją przez numer wiersza (etykieta -> Klucz, wartość -> Wartosc). Zawsze jako dodatkowy opis.
+KSEF_DODATKOWY_OPIS_DET_NO_EXTRAFIELDS=Brak pól dodatkowych pozycji faktury. Utwórz pola dodatkowe pozycji w ustawieniach Dolibarr lub użyj formularza poniżej.
+KSEF_DODATKOWY_OPIS_PRODUCT_TITLE=Pola produktu
+KSEF_DODATKOWY_OPIS_PRODUCT_SUBTITLE=Pola dodatkowe na kartach produktów/usług. Wartości są dołączane do XML KSeF jako notatki powiązane z pozycją przez numer wiersza (etykieta -> Klucz, wartość -> Wartosc). Zawsze jako dodatkowy opis.
+KSEF_DODATKOWY_OPIS_PRODUCT_NO_EXTRAFIELDS=Brak pól dodatkowych produktów. Utwórz pola dodatkowe produktów w ustawieniach Dolibarr lub użyj formularza poniżej.
+KSEF_DODATKOWY_OPIS_SOCIETE_TITLE=Pola kontrahenta
+KSEF_DODATKOWY_OPIS_SOCIETE_SUBTITLE=Pola dodatkowe na karcie kontrahenta, pobierane od klienta na każdej fakturze. Wartości są dołączane do XML KSeF jako notatki (etykieta -> Klucz, wartość -> Wartosc). Wybierz miejsce docelowe dla każdego pola.
+KSEF_DODATKOWY_OPIS_SOCIETE_NO_EXTRAFIELDS=Brak pól dodatkowych kontrahenta. Utwórz pola dodatkowe kontrahenta w ustawieniach Dolibarr lub użyj formularza poniżej.
+KSEF_DODATKOWY_OPIS_PROJECT_TITLE=Pola projektu
+KSEF_DODATKOWY_OPIS_PROJECT_SUBTITLE=Pola dodatkowe na karcie projektu, pobierane z powiązanego projektu. Wartości są dołączane do XML KSeF jako notatki (etykieta -> Klucz, wartość -> Wartosc). Wybierz miejsce docelowe dla każdego pola.
+KSEF_DODATKOWY_OPIS_PROJECT_NO_EXTRAFIELDS=Brak pól dodatkowych projektu. Utwórz pola dodatkowe projektu w ustawieniach Dolibarr lub użyj formularza poniżej.
+KSEF_ENTITY_BOXES_INTRO=Skonfiguruj, które dane z faktur, kontrahentów, produktów i innych obiektów Dolibarr są uwzględniane w fakturach KSeF.
+KSEF_ENTITY_BOX_FIELD_SOURCES=Źródła pól KSeF
+KSEF_ENTITY_BOX_NOTES=Notatki (dodatkowy opis / stopka faktury)
+KSEF_ENTITY_BOX_EXTRAFIELDS=Pola dodatkowe
+KSEF_ENTITY_BOX_EXTRAFIELDS_INVOICE=Pola dodatkowe faktury
+KSEF_ENTITY_BOX_EXTRAFIELDS_THIRDPARTY=Pola dodatkowe kontrahenta
+KSEF_ENTITY_BOX_EXTRAFIELDS_PRODUCT=Pola dodatkowe produktu
+KSEF_ENTITY_BOX_EXTRAFIELDS_INVOICELINE=Pola dodatkowe pozycji faktury
+KSEF_ENTITY_BOX_EXTRAFIELDS_PROJECT=Pola dodatkowe projektu
+KSEF_ENTITY_BOX_CREATE_FIELD=Utwórz nowe pole dodatkowe...
+KSEF_NOTE_SETTINGS_SECTION=Ustawienia notatek
+KSEF_DODATKOWY_OPIS_TARGET_COLUMN=Cel
+KSEF_DODATKOWY_OPIS_TARGET_DODATKOWY=Dodatkowy opis
+KSEF_DODATKOWY_OPIS_TARGET_STOPKA=Stopka faktury
+KSEF_DODATKOWY_OPIS_PREVIEW=Podgląd uwag
+KSEF_DODATKOWY_OPIS_PREVIEW_ENTRIES=Rozwiń aby zobaczyć
+KSEF_DODATKOWY_OPIS_PREVIEW_NRWIERSZA=Numer wiersza
+KSEF_DODATKOWY_OPIS_PREVIEW_KEY=Klucz
+KSEF_DODATKOWY_OPIS_PREVIEW_VALUE=Wartość
+KSEF_DODATKOWY_OPIS_HINT_SIMPLE=<b>Tryb prosty:</b> Uwaga (publiczna) zostanie wysłana jako pojedynczy wpis z kluczem "Uwagi". Jeśli tekst przekracza 256 znaków, zostanie podzielony na numerowane wpisy (Uwagi, Uwagi 2, Uwagi 3, ...).
+KSEF_DODATKOWY_OPIS_HINT_KEYVALUE=<b>Tryb Klucz:Wartość:</b> każda linia jest parsowana przy pierwszym dwukropku. Przykład: <code>Numer zamówienia: ZAM/2026/001</code><br>Linie bez dwukropka są ignorowane. Zarówno "Klucz:Wartość" jak i "Klucz: Wartość" (ze spacją) działają.
+KSEF_DODATKOWY_OPIS_HINT_EXTRAFIELDS=Dodatkowo %s pól dodatkowych skonfigurowanych w ustawieniach modułu również zostanie dołączone.
+KSEF_DODATKOWY_OPIS_CHARS_LABEL=znaków
+KSEF_DODATKOWY_OPIS_NOTE_NO_ENTRIES=Brak wpisów. Zacznij wpisywać, aby zobaczyć szczegóły.
+KSEF_DODATKOWY_OPIS_NOTE_TRUNCATED=obcięte
+KSEF_DODATKOWY_OPIS_PREVIEW_FROM_NOTE=Z pola Uwaga (publiczna)
+KSEF_DODATKOWY_OPIS_PREVIEW_FROM_EXTRAFIELDS=Z pól dodatkowych
+KSEF_DODATKOWY_OPIS_PREVIEW_EMPTY_SECTION=(brak wpisów)
+KSEF_DODATKOWY_OPIS_PREVIEW_OVERRIDDEN=nadpisano: %s
+KSEF_DODATKOWY_OPIS_CREATE_FIELD=Utwórz nowe pole niestandardowe
+KSEF_DODATKOWY_OPIS_CREATE_FIELD_TARGET=Dotyczy
+KSEF_DODATKOWY_OPIS_TARGET_FACTURE=Faktura (jedna wartość na fakturę)
+KSEF_DODATKOWY_OPIS_TARGET_FACTUREDET=Pozycja faktury (jedna wartość na pozycję, z numerem wiersza)
+KSEF_DODATKOWY_OPIS_TARGET_SOCIETE=Kontrahent (jedna wartość na klienta)
+KSEF_DODATKOWY_OPIS_TARGET_PRODUCT=Produkt (jedna wartość na produkt - pobierana per pozycja)
+KSEF_DODATKOWY_OPIS_TARGET_PROJECT=Projekt (jedna wartość per powiązany projekt)
+KSEF_NR_UMOWY_NO_EXTRAFIELDS=Brak odpowiednich pól dodatkowych. Utwórz pole kontrahenta (automatyczne pobieranie od klienta) lub pole faktury (ręczny wpis per fakturę) w formularzu "Utwórz nowe pole dodatkowe" w sekcji Notatki i pola dodatkowe poniżej.
+KSEF_DODATKOWY_OPIS_CREATE_FIELD_LABEL=Etykieta (pokazywana jako Klucz w XML KSeF)
+KSEF_DODATKOWY_OPIS_CREATE_FIELD_CODE=Kod pola (nazwa wewnętrzna)
+KSEF_DODATKOWY_OPIS_CREATE_FIELD_TYPE=Typ
+KSEF_DODATKOWY_OPIS_CREATE_FIELD_OPTIONS=Opcje (jedna na linię, format: kod|Etykieta lub tylko Etykieta)
+KSEF_DODATKOWY_OPIS_CREATE_FIELD_SUBMIT=Utwórz pole
+KSEF_DODATKOWY_OPIS_EDIT_FIELD_SUBMIT=Zapisz zmiany
+KSEF_DODATKOWY_OPIS_DELETE_CONFIRM=Usunąć pole dodatkowe "%s"? Spowoduje to usunięcie pola i wszystkich wartości zapisanych na istniejących fakturach.
+KSEF_DODATKOWY_OPIS_TYPE_VARCHAR=Tekst (do 255 znaków)
+KSEF_DODATKOWY_OPIS_TYPE_TEXT=Długi tekst
+KSEF_DODATKOWY_OPIS_TYPE_INT=Liczba całkowita
+KSEF_DODATKOWY_OPIS_TYPE_DOUBLE=Liczba dziesiętna
+KSEF_DODATKOWY_OPIS_TYPE_DATE=Data
+KSEF_DODATKOWY_OPIS_TYPE_DATETIME=Data i czas
+KSEF_DODATKOWY_OPIS_TYPE_SELECT=Lista wyboru
+KSEF_DODATKOWY_OPIS_CREATE_FIELD_SUCCESS=Pole niestandardowe "%s" utworzone i dołączone do listy uwag
+KSEF_DODATKOWY_OPIS_UPDATE_SUCCESS=Pole dodatkowe "%s" zaktualizowane
+KSEF_DODATKOWY_OPIS_DELETE_SUCCESS=Pole dodatkowe "%s" usunięte
+KSEF_DODATKOWY_OPIS_CREATE_FIELD_ERROR_LABEL=Etykieta jest wymagana
+KSEF_DODATKOWY_OPIS_CREATE_FIELD_ERROR_CODE=Kod pola musi zawierać tylko małe litery, cyfry i podkreślenia, i musi zaczynać się od litery.
+KSEF_DODATKOWY_OPIS_CREATE_FIELD_ERROR_TYPE=Nieprawidłowy typ pola
+KSEF_DODATKOWY_OPIS_CREATE_FIELD_ERROR_RESERVED=Kod pola nie może zaczynać się od "ksef_" (zarezerwowane dla pól systemowych modułu)
+KSEF_DODATKOWY_OPIS_CREATE_FIELD_ERROR_DUPLICATE=Pole o tym kodzie już istnieje
+KSEF_DODATKOWY_OPIS_CREATE_FIELD_ERROR_DUP_LABEL=Pole niestandardowe o tej etykiecie już istnieje
+KSEF_DODATKOWY_OPIS_INTERNAL_CODE=Kod wewnętrzny
+KSEF_EXTRAFIELD_EXTERNAL=Utworzone poza modułem KSeF
+KSEF_DODATKOWY_OPIS_OVERRIDE_SAVED=Zapisano nadpisanie trybu uwag
+KSEF_MODULE_NEEDS_REACTIVATION=Moduł zaktualizowany, ale nie aktywowany ponownie
+KSEF_MODULE_NEEDS_REACTIVATION_Desc=Moduł KSeF został zaktualizowany z wersji %s do wersji %s. Niektóre funkcje mogą nie działać, dopóki nie wyłączysz i ponownie włączysz moduł na liście modułów.
+KSEF_VERSION_UNKNOWN=nieznanej
+KSEF_GOTO_MODULES_LIST=Przejdź do listy modułów
+KSEF_DODATKOWY_OPIS_CREATE_FIELD_ERROR_NOT_FOUND=Pole dodatkowe nie znalezione
+
+# ============================================
+# Connection & Testing
+# ============================================
+KSEF_TEST_CONNECTION=Testuj połączenie
+KSEF_TEST_TOKEN_AUTH=Testuj uwierzytelnianie tokenu
+KSEF_CONNECTION_SUCCESS=Połączenie udane
+KSEF_CONNECTION_FAILED=Połączenie nieudane
+KSEF_CONNECTION_ERROR=Błąd połączenia
+KSEF_AUTH_SUCCESS=Uwierzytelnianie udane
+KSEF_AUTH_FAILED=Uwierzytelnianie nieudane
+KSEF_AUTH_ERROR=Błąd uwierzytelniania
+KSEF_Diagnostics=Diagnostyka
+KSEF_Test=Test
+KSEF_Details=Szczegóły
+KSEF_TestEnvironment=Środowisko testowe
+
+# ============================================
+# System Requirements & Health
+# ============================================
+KSEF_SystemInformation=Informacje systemowe
+KSEF_SystemInformationDesc=Informacje o środowisku systemowym
+KSEF_SystemRequirements=Wymagania systemowe
+KSEF_CriticalIssues=Krytyczne problemy
+KSEF_Warnings=Ostrzeżenia
+KSEF_AllRequirementsMet=Wszystkie wymagania spełnione
+KSEF_Required=Wymagane
+KSEF_OK=OK
+KSEF_Missing=Brak
+KSEF_FileNotFound=Nie znaleziono pliku
+KSEF_TableExists=Tabela istnieje
+KSEF_TableMissing=Brak tabeli
+KSEF_RunSQLScripts=Uruchom skrypty SQL aby naprawić
+KSEF_FixAndRetry=Napraw problem i spróbuj ponownie
+KSEF_CriticalRequirementsNotMet=Krytyczne wymagania nie zostały spełnione
+
+# ============================================
+# Requirement Checks
+# ============================================
+KSEF_Test_PHPExtensions=Rozszerzenia PHP
+KSEF_Test_Certificate=Certyfikat
+KSEF_Test_DatabaseTable=Tabela bazy danych
+KSEF_Test_NIPConfigured=NIP skonfigurowany
+KSEF_Test_NIPInvalid=NIP nieprawidłowy
+
+# ============================================
+# Dashboard / Home (ksefindex.php)
+# ============================================
+KSEF_Statistics=Statystyki
+KSEF_Last30Days=Ostatnie 30 dni
+KSEF_TotalSubmissions=Całkowita liczba wysyłek
+KSEF_Accepted=Zaakceptowane
+KSEF_Pending=Oczekujące
+KSEF_Failed=Nieudane
+KSEF_SuccessRate=Wskaźnik sukcesu
+KSEF_RecentSubmissions=Ostatnie wysyłki
+KSEF_NoRecentSubmissions=Brak ostatnich wysyłek
+KSEF_CreateInvoice=Utwórz fakturę
+KSEF_SetupRequired=Wymagana konfiguracja
+KSEF_SetupRequiredDesc=Skonfiguruj NIP firmy i uwierzytelnianie przed użyciem KSeF
+KSEF_MandatoryWarning=Powiadomienie o obowiązku KSeF
+KSEF_MandatoryWarningDesc=KSeF będzie obowiązkowy za %d dni. Skonfiguruj system teraz.
+KSEF_OutgoingInvoices=Faktury wychodzące
+KSEF_Sent=Wysłane
+KSEF_Ready=Gotowy
+KSEF_CertificateExpiresInDays=Certyfikat wygasa za %d dni
+KSEF_NeedsAttention=Wymaga uwagi
+KSEF_OfflineDeadlineSoon=Faktury offline - zbliża się termin
+KSEF_FailedCanRetry=Nieudane - można ponowić
+KSEF_AwaitingConfirmation=Oczekuje na potwierdzenie
+KSEF_NewToReview=Nowe faktury do przeglądu
+KSEF_ImportErrors=Błędy importu
+KSEF_RecentIncoming=Ostatnie przychodzące
+KSEF_ViewAll=Zobacz wszystkie
+
+# ============================================
+# How to Use
+# ============================================
+
+# Quick Start Section
+KSEF_HowToUse=Jak używać
+KSEF_HowToUsePage=Instrukcja obsługi
+KSEF_QuickStartGuide=Szybki start
+KSEF_GetCredentials=Uzyskaj dane uwierzytelniające
+KSEF_GetCredentialsDesc=Potrzebujesz tokena autoryzacyjnego lub certyfikatu kwalifikowanego z portalu KSeF. Certyfikaty są preferowane - tokeny tracą ważność pod koniec 2026, a certyfikat i tak będzie potrzebny do wystawiania faktur offline.
+KSEF_Portals=Portale KSeF
+KSEF_CurrentEnvironment=aktywny
+KSEF_Important=Ważne
+KSEF_PermissionsWarning=Po wygenerowaniu tokena lub rejestracji certyfikatu, skonfiguruj odpowiednie uprawnienia w portalu KSeF w sekcji "Uprawnienia". Same dane uwierzytelniające nie wystarczą - musisz mieć przypisane uprawnienia do wysyłania i pobierania faktur. To częsty błąd prowadzący do problemów z autoryzacją.
+
+KSEF_ConfigureModule=Konfiguracja modułu
+KSEF_ConfigureModuleDesc=NIP znajduje się na zakładce Ogólne. Tokeny i certyfikaty są na zakładce Uwierzytelnianie, zapisywane osobno dla każdego środowiska.
+KSEF_DefaultEnvironmentNote=Moduł domyślnie działa w środowisku Demo, aby zapobiec przypadkowemu wysłaniu oficjalnych faktur podczas testów. Przełącz na Produkcję (i wgraj certyfikaty produkcyjne) gdy wszystko działa poprawnie.
+KSEF_ModuleSetup=Ustawienia modułu
+KSEF_GoToSetup=Przejdź do ustawień
+
+KSEF_TestConnection=Test połączenia
+KSEF_TestConnectionDesc=Użyj przycisków testowych aby sprawdzić połączenie i uwierzytelnianie przed wysłaniem pierwszej faktury.
+KSEF_TestNow=Testuj teraz
+
+KSEF_SubmitFirstInvoice=Wyślij pierwszą fakturę
+KSEF_SubmitFirstInvoiceDesc=Otwórz zatwierdzoną fakturę i kliknij przycisk KSeF. Jeśli status zmieni się na ACCEPTED z numerem KSeF, wszystko działa. Możesz wyświetlić wysłany XML, UPO oraz wygenerować PDF w stylu Dolibarr lub w stylu aplikacji KSeF.
+
+# Configuration Section
+KSEF_ConfigurationSection=Konfiguracja
+KSEF_Environments=Środowiska
+KSEF_ENV_TEST_FullDesc=Wysyłaj fikcyjne faktury do fikcyjnych firm z fikcyjnymi danymi (np. NIP 9999999999) używając niezabezpieczonego certyfikatu lub tokena z publicznego portalu testowego. Służy do nauki systemu.
+KSEF_ENV_DEMO_FullDesc=Wysyłaj fikcyjne faktury do fikcyjnych firm używając prawdziwych danych firmy i certyfikatu/tokena Demo. Służy do testowania i weryfikacji działania. Faktury nie są prawnie wiążące.
+KSEF_ENV_PRODUCTION_FullDesc=Wysyłaj prawdziwe faktury z prawdziwymi danymi firmy i certyfikatem/tokenem produkcyjnym. Te faktury są prawnie wiążące.
+
+KSEF_Authentication=Uwierzytelnianie
+KSEF_AuthenticationDesc=Certyfikaty są lepszym wyborem, ale tokeny działają do końca 2026. Faktury offline wymagają certyfikatu offline niezależnie od wybranej metody.
+
+KSEF_HowTo_Config_PerEnvAuth=Dane uwierzytelniające per środowisko
+KSEF_HowTo_Config_PerEnvAuthDesc=Każde środowisko (TEST/DEMO/PRODUKCJA) przechowuje własny token i certyfikat. Przełączenie środowiska automatycznie używa zapisanych danych tego środowiska. Konfiguracja na zakładce Uwierzytelnianie.
+
+KSEF_HowTo_Config_PaymentDefaults=Domyślne ustawienia płatności
+KSEF_HowTo_Config_PaymentDefaultsDesc=Ustaw domyślne warunki płatności, metodę i konto bankowe na zakładce Faktury wychodzące. Wypełniają się automatycznie przy tworzeniu faktur, gdy kontrahent nie ma własnych ustawień. Wartości kontrahenta i powiązane dokumenty źródłowe (zamówienia/propozycje) mają priorytet.
+
+KSEF_OptionalFields=Pola opcjonalne
+KSEF_OptionalFieldsDesc=Na zakładce Faktury wychodzące można włączyć opcjonalne pola FA(3) takie jak kody klientów, indeksy produktów, GTIN i jednostki miary. Włącz je jeśli masz te dane w Dolibarr i chcesz je uwzględniać w wysyłkach do KSeF.
+
+KSEF_HowTo_Config_Notes=Uwagi i pola niestandardowe faktury
+KSEF_HowTo_Config_NotesIntro=Dołącz dodatkową treść do XML KSeF z pola Uwaga (publiczna) faktury i pól niestandardowych faktury. Skonfiguruj oba na zakładce Faktury wychodzące w sekcji "Uwagi i pola niestandardowe faktury".
+KSEF_HowTo_Config_NotesModes=Tryb Uwagi (publicznej) kontroluje gdzie i jak notatka jest dołączana do XML KSeF. <b>Prosty - Stopka</b> (domyślnie) wysyła notatkę jako zwykły tekst w stopce faktury. <b>Prosty - Dodatkowy Opis</b> wysyła jako wpis klucz-wartość z kluczem "Uwagi", dzieląc na numerowane wpisy jeśli przekracza 256 znaków. <b>Klucz:Wartość - Dodatkowy Opis</b> parsuje każdą linię przy pierwszym dwukropku jako osobny wpis. Linie bez dwukropka są pomijane. Przykład:
+KSEF_HowTo_Config_NotesKeyValueExample1=Numer zamówienia: ZAM/2026/001
+KSEF_HowTo_Config_NotesKeyValueExample2=Uwagi specjalne: Ostrożnie, kruche
+KSEF_HowTo_Config_CustomFields=Pola dodatkowe z pieciu typow obiektow moga byc dolaczone: <b>Faktura</b> (dotyczy calej faktury), <b>Pozycja faktury</b> (powiazane z pozycja przez numer wiersza), <b>Produkt</b> (pobierane z produktu per pozycja, z numerem wiersza), <b>Kontrahent</b> (pobierane od klienta) i <b>Projekt</b> (pobierane z powiazanego projektu). Utwórz nowe pole formularzem na dole sekcji lub włącz istniejące pola dodatkowe zaznaczając checkboxy.
+KSEF_HowTo_Config_CustomFieldsTarget=Dla pól Faktury, Kontrahenta i Projektu można wybrać, czy pole trafia do <b>dodatkowego opisu</b> (pary klucz-wartość w XML) czy do <b>stopki faktury</b> (dopisywane jako tekst "Etykieta: Wartość" w stopce faktury). Pola Pozycji faktury i Produktu zawsze trafiają do dodatkowego opisu, ponieważ wymagają powiązania z numerem wiersza.
+KSEF_HowTo_Config_Limits=Klucze i wartości są ograniczone do 256 znaków. Tryb prosty dzieli dłuższe notatki na numerowane wpisy. Wartości Klucz:Wartość i pól niestandardowych powyżej 256 znaków są obcinane. Tekst stopki faktury jest ograniczony do 3500 znaków na wpis.
+KSEF_HowTo_Sending_Notes=Uwagi i pola niestandardowe faktury
+KSEF_HowTo_Sending_NotesEditing=Uwagi edytuje się na zakładce Notatki faktury. Pod polem tekstowym pojawia się pole pomocnicze pokazujące aktualny tryb, rozbicie wpisów z licznikami znaków oraz pola niestandardowe, które zostaną dołączone.
+KSEF_HowTo_Sending_NotesPreview=Zakładka Notatki i karta faktury pokazują panel podglądu z dokładną zawartością wysyłaną do KSeF, pogrupowaną według źródła. Panel odzwierciedla ostatni zapisany stan.
+KSEF_HowTo_Sending_NotesOverride=Na zakładce Notatki lista rozwijana "Tryb uwag (ta faktura)" nadpisuje globalne ustawienie dla jednej faktury. Każda opcja kontroluje zarówno gdzie trafia notatka, jak i jej format. Skonfigurowane pola niestandardowe nadal są dołączane. Wyłączone pomija wszystko dla tej faktury - notatki i pola niestandardowe są usuwane zarówno ze stopki faktury jak i z dodatkowego opisu (tekst stały stopki i rejestry nie są modyfikowane).
+
+KSEF_HowTo_Sending_PDFPreview=Podgląd PDF
+KSEF_HowTo_Sending_PDFPreviewDesc=Podgląd PDF w stylu KSeF jest dostępny dla faktur roboczych i zatwierdzonych przed wysłaniem. Użyj go aby sprawdzić jak faktura będzie wyglądać w formacie KSeF bez faktycznego wysyłania.
+
+KSEF_HowTo_Config_OrderContract=Numery zamówień i umów
+KSEF_HowTo_Config_OrderContractDesc=<b>Numer zamówienia</b> może pochodzić z: Referencji klienta (ref_client, domyślnie), numeru powiązanego zamówienia sprzedaży lub pola dodatkowego faktury. Wiele powiązanych zamówień na jednej fakturze daje wiele numerów zamówień. <b>Numer umowy</b> może pochodzić z pola dodatkowego kontrahenta (automatycznie z karty klienta) lub pola dodatkowego faktury (ręcznie per faktura). Opcjonalnie włącz <b>parsowanie prefiksu daty</b>, aby odczytać datę z początku wartości numeru umowy do pola daty umowy i usunąć ją z numeru. Konfiguracja na zakładce Faktury wychodzące.
+
+KSEF_HowTo_Config_Boilerplate=Tekst stały stopki
+KSEF_HowTo_Config_BoilerplateDesc=Pole tekstowe na zakładce Faktury wychodzące, którego treść pojawia się w stopce każdej faktury. Używaj do KRS, klauzul prawnych, RODO. Maksymalnie 3500 znaków. Nie jest modyfikowane przez nadpisania trybu notatek per faktura.
+
+KSEF_CompanyIdentifiers=Identyfikatory firmy
+KSEF_CompanyIdentifiersDesc=NIP jest wymagany. KRS, REGON i BDO są opcjonalne i uzupełnią się automatycznie z ustawień firmy, jeśli zostały tam skonfigurowane.
+KSEF_TranslationOverrides=Nadpisania tłumaczeń
+KSEF_ApplyTransOverrides=Zastosuj nadpisania tłumaczeń
+KSEF_RemoveTransOverrides=Usuń nadpisania tłumaczeń
+KSEF_TransOverridesApplied=Nadpisania tłumaczeń zastosowane pomyślnie dla: %s
+KSEF_TransOverridesRemoved=Nadpisania tłumaczeń usunięte pomyślnie dla: %s
+KSEF_TransOverridesError=Błąd podczas aktualizacji nadpisań tłumaczeń
+KSEF_TransOverridesNoLang=Proszę wybrać co najmniej jeden język
+KSEF_TransOverridesDesc=Synchronizuj etykiety pól Dolibarr (ProfId, VATIntra) z mapowaniami identyfikatorów skonfigurowanymi powyżej. Zapisuje do tabeli nadpisań tłumaczeń używanej w Strona główna > Ustawienia > Tłumaczenia.
+KSEF_TransOverridesCurrent=Aktualne nadpisania tłumaczeń
+KSEF_TransOverridesPreview=Nadpisania na podstawie aktualnych mapowań
+KSEF_TransOverridesNone=Brak aktualnych nadpisań tłumaczeń
+KSEF_TransOverridesField=Pole
+KSEF_TransOverridesLabel=Etykieta
+KSEF_ConfirmRemoveTransOverrides=Czy na pewno chcesz usunąć wszystkie nadpisania tłumaczeń?
+
+# Sending Invoices Section
+KSEF_SendingInvoices=Wysyłanie faktur
+KSEF_UsingTheModule=Korzystanie z modułu
+KSEF_SubmitInvoice=Wyślij fakturę
+KSEF_SubmittingInvoices=Wysyłanie faktur
+KSEF_TheWorkflow=Proces wysyłki
+KSEF_Workflow_Step1=Utwórz lub otwórz fakturę
+KSEF_Workflow_Step2=Uzupełnij pola w razie potrzeby
+KSEF_Workflow_Step3=Kliknij przycisk KSeF
+KSEF_Workflow_Step4=Poczekaj na potwierdzenie
+KSEF_SubmitInvoiceSteps=Kroki wysyłki faktury
+KSEF_OpenAnyInvoice=Otwórz dowolną fakturę (data powinna być dzisiejsza)
+KSEF_OpenInvoiceCard=Otwórz kartę faktury
+KSEF_OpenValidatedInvoice=Otwórz zatwierdzoną fakturę
+KSEF_ClickKSEFButton=Kliknij przycisk "Zatwierdź i wyślij do KSeF"
+KSEF_ClickRedKSEFButton=Kliknij czerwony przycisk KSeF
+KSEF_WaitForConfirmation=Poczekaj na potwierdzenie
+
+KSEF_ValidateAndUpload_Desc=Dla faktur w wersji roboczej - zatwierdza i wysyła w jednym kroku. Można ukryć w ustawieniach jeśli preferujesz poniższy tryb z płatnością
+KSEF_UploadToKSEF_Desc=Dla zatwierdzonych, opłaconych lub zamkniętych faktur - wysyła do KSeF
+
+KSEF_HowTo_Sending_PaymentFirst=Tryb z płatnością przed wysyłką
+KSEF_HowTo_Sending_PaymentFirstDesc=Jeśli chcesz uwzględnić dane płatności w XML KSeF: najpierw zatwierdź fakturę, wprowadź płatność(ci), a następnie kliknij Wyślij do KSeF. XML będzie zawierał status płatności, datę i kwotę. Aby zachęcić do tego trybu, wyłącz przycisk "Zatwierdź i wyślij" na zakładce Faktury wychodzące - usunie to skrót jednym kliknięciem, aby oddzielne kroki były bardziej widoczne.
+
+KSEF_Statuses=Statusy
+KSEF_STATUS_ACCEPTED_Desc=Faktura otrzymała numer KSeF, gotowe
+KSEF_STATUS_PENDING_Desc=Wciąż przetwarzana, sprawdź za chwilę
+KSEF_STATUS_REJECTED_Desc=Sprawdź szczegóły błędu i spróbuj ponownie
+KSEF_STATUS_OFFLINE_Desc=KSeF był niedostępny, faktura zapisana lokalnie z terminem wysyłki online
+
+KSEF_ForeignCurrencyInvoices=Faktury walutowe
+KSEF_ForeignCurrencyDesc=Dla faktur w EUR lub innych walutach obcych musisz pobrać kurs NBP przed wysłaniem i mieć włączony moduł wielowalutowy. Na karcie faktury pojawi się przycisk pobierający kurs z ostatniego dnia roboczego przed datą faktury. Wysyłka jest zablokowana do czasu pobrania kursu NBP. W ustawieniach możesz wybrać czy przy różnicy kursu zmieniać kwotę PLN czy walutową.
+
+KSEF_BankAccountOnInvoice=Numer rachunku bankowego na fakturze
+KSEF_BankAccountOnInvoiceDesc=Jeśli wysyłasz faktury z płatnością przelewem i chcesz, aby dane rachunku bankowego (IBAN) pojawiły się na fakturze, musisz przypisać rachunek bankowy do faktury. Dolibarr może uzupełniać go automatycznie.
+KSEF_BankAccount_Step1=Wejdź w Bank/Kasa i upewnij się, że rachunek ma uzupełniony numer IBAN (SWIFT/BIC i nazwa banku są opcjonalne, ale zalecane)
+KSEF_BankAccount_Step2=Na karcie kontrahenta ustaw domyślny rachunek bankowy - będzie automatycznie podpowiadany przy tworzeniu nowych faktur dla tego kontrahenta
+KSEF_BankAccount_Step3=Przy tworzeniu faktury z płatnością przelewem sprawdź, czy w polu Rachunek bankowy wybrany jest właściwy rachunek
+KSEF_BankAccount_Step4=Jeśli rachunek jest przypisany, a metoda płatności to przelew, IBAN zostanie automatycznie dołączony do XML-a KSeF
+
+KSEF_AfterAcceptance=Po akceptacji
+KSEF_AfterAcceptanceDesc=Po zaakceptowaniu możesz wygenerować PDF w stylu KSeF z karty faktury. Jeśli masz włączone kody QR w ustawieniach, numer KSeF pojawi się również na standardowych PDF-ach faktur.
+
+KSEF_CheckingStatusDesc=Zakładka KSeF na karcie faktury pokazuje wszystkie próby wysyłki danej faktury. Strona Status pokazuje wysyłki wszystkich faktur i najczęstsze błędy:
+
+# PDF Generation
+KSEF_GenerateKSeFPDF=Generuj PDF w stylu KSeF
+KSEF_PDFRequiresSubmission=Faktura musi być najpierw wysłana do KSeF
+KSEF_PDFRequiresAccepted=Faktura musi mieć status ACCEPTED w KSeF
+KSEF_PDFRequiresOnline=Faktura musi być wysłana online (nie w trybie offline)
+KSEF_PDFGeneratedSuccess=PDF w stylu KSeF wygenerowany pomyślnie: %s
+KSEF_PDFGenerationError=Błąd generowania PDF w stylu KSeF
+KSEF_PreviewXMLBuildError=Nie można wygenerować podglądu KSeF - błąd budowy XML
+KSEF_PreviewXMLValidationWarnings=Ostrzeżenia walidacji XML KSeF (podgląd wygenerowany)
+KSEF_PreviewPDFGenerated=Wygenerowano podgląd PDF KSeF: %s
+KSEF_QRVerificationInstruction=Nie możesz zeskanować kodu z obrazu? Kliknij link weryfikacyjny aby zweryfikować fakturę!
+KSEF_QRCodeII=Kod QR II
+KSEF_QRCodeIIUnavailable=Niedostępny - brak skonfigurowanego certyfikatu
+
+# Receiving Invoices Section
+KSEF_ReceivingInvoices=Odbieranie faktur
+KSEF_ReceivingInvoicesDesc=Faktury wysłane przez dostawców przez KSeF można zsynchronizować z Dolibarr.
+KSEF_Receiving_Step1=Przejdź do strony Faktury przychodzące:
+KSEF_Receiving_Step2=Kliknij "Synchronizuj z KSeF"
+KSEF_Receiving_Step3=Nowe faktury pojawią się na liście
+KSEF_ReceivingActions=Dla każdej faktury możesz wyświetlić szczegóły, pobrać oryginalny XML, pobrać PDF lub sprawdzić na portalu KSeF.
+
+KSEF_ImportingToDolibarr=Import do Dolibarr
+KSEF_ImportingToDolibarrDesc=Faktury przychodzące mogą być importowane jako faktury dostawców w Dolibarr. Moduł automatycznie dopasowuje dostawców po numerach identyfikacji podatkowej (NIP, EU VAT lub innych identyfikatorach profesjonalnych skonfigurowanych w Dolibarr) oraz pozycje po referencji produktu, referencji dostawcy lub kodzie kreskowym (GTIN).
+KSEF_Importing_HowItWorks=Jak to działa
+KSEF_Importing_Step1=Zsynchronizuj faktury przychodzące z KSeF (ręcznie lub przez zaplanowane zadanie)
+KSEF_Importing_Step2=Importuj faktury pojedynczo z zakładki "Import do Dolibarr" na karcie faktury, lub użyj importu zbiorczego z listy faktur przychodzących
+KSEF_Importing_Step3=Moduł automatycznie dopasowuje dostawcę i próbuje dopasować każdą pozycję do istniejącego produktu - najpierw po referencji produktu, potem po referencji dostawcy, a następnie po kodzie kreskowym
+KSEF_Importing_Step4=Pozycje bez dopasowania do produktu są importowane jako tekst na fakturze dostawcy. Jeśli w ustawieniach modułu włączona jest opcja "Automatycznie twórz produkty gdy nie znaleziono dopasowania", zamiast tego tworzone są nowe produkty
+KSEF_Importing_Individual=Import pojedynczy
+KSEF_Importing_IndividualDesc=Import pojedynczy pozwala na przegląd każdej faktury przed importem. Możesz wybrać lub utworzyć dostawcę (wstępnie wypełnionego danymi z faktury) i wybrać produkt do powiązania z każdą pozycją. Przycisk "+" obok każdej pozycji pozwala utworzyć nowy produkt wstępnie wypełniony referencją, opisem, ceną, stawką VAT i kodem kreskowym z faktury.
+KSEF_Importing_Batch=Import zbiorczy
+KSEF_Importing_BatchDesc=Import zbiorczy przetwarza wiele faktur jednocześnie z listy faktur przychodzących. Automatycznie dopasowuje dostawców i produkty tam, gdzie to możliwe.
+KSEF_Importing_StockNote=Import faktury nie wpływa automatycznie na stany magazynowe. Ruchy magazynowe następują dopiero po zatwierdzeniu zaimportowanej faktury dostawcy i tylko jeśli w ustawieniach modułu Stany magazynowe włączona jest opcja "Zwiększ stany rzeczywiste przy walidacji faktury dostawcy/noty kredytowej":
+KSEF_Importing_StockNoteLink=Ustawienia modułu Stany magazynowe
+KSEF_Importing_StockNoteFreeText=Pozycje zaimportowane jako tekst (bez powiązanego produktu) nie wpłyną na stany magazynowe niezależnie od tego ustawienia.
+
+# Customer Exclusions Section
+KSEF_CustomerExclusions=Wykluczenia klientów
+KSEF_CustomerExclusionsDesc=Niektórzy klienci nie potrzebują faktur wysyłanych do KSeF. Możesz wykluczyć wybranych klientów w ustawieniach modułu lub bezpośrednio na karcie kontrahenta używając pola wykluczenia.
+
+# Troubleshooting Section
+KSEF_Troubleshooting=Rozwiązywanie problemów
+KSEF_FindingErrorDetails=Szukanie szczegółów błędu
+KSEF_FindingErrorDetailsDesc=Otwórz fakturę, przejdź do zakładki KSeF i sprawdź kod i treść błędu. Strona Status pokazuje też najczęstsze błędy z ostatnich 30 dni:
+KSEF_ViewingErrorDetails=Przeglądanie szczegółów błędu
+KSEF_ErrorDetailsLocation=Aby zobaczyć szczegóły błędu
+KSEF_ClickInfoIcon=Kliknij ikonę informacji
+KSEF_ScrollToKSEFSection=Przewiń do sekcji KSeF
+KSEF_ConfigureNow=Konfiguruj teraz
+
+KSEF_CommonIssues=Częste problemy
+
+KSEF_Issue_DuplicateNumber=Duplikat numeru faktury (Błąd 440)
+KSEF_Issue_DuplicateNumber_Desc=Ten numer faktury był już użyty w KSeF. Częste w środowiskach test/demo gdzie dane się zachowują między sesjami. Zmień numer faktury i spróbuj ponownie.
+
+KSEF_Issue_AuthFailed_Desc=Najpierw sprawdź czy token lub certyfikat nie wygasł. Jeśli dane są poprawne, najczęstszą przyczyną są brakujące uprawnienia w portalu KSeF. Wejdź w "Moje uprawnienia" w aplikacji KSeF i sprawdź czy masz skonfigurowane uprawnienia do wysyłania i pobierania. Samo uwierzytelnienie nie wystarczy - uprawnienia muszą być jawnie przypisane.
+
+KSEF_Issue_NBPMissing=Brak kursu NBP
+KSEF_Issue_NBPMissing_Desc=Faktura walutowa bez kursu wymiany. Użyj przycisku pobierania kursu na karcie faktury.
+
+KSEF_Issue_Timeout_Desc=KSeF nie odpowiedział w czasie (błąd: "Curl error: Operation timed out after X milliseconds"). Domyślny limit czasu to 7 sekund. Możesz go zwiększyć w Ustawienia > Inne ustawienia, zmieniając wartość KSEF_TIMEOUT. Wysyłka może wciąż być przetwarzana po stronie KSeF, sprawdź status lub spróbuj ponownie.
+
+KSEF_RetryLimits=Limity ponawiania
+KSEF_RetryLimitsDesc=Nieudane wysyłki można ponawiać do 30 razy zanim zostaną oznaczone jako trwale nieudane. Każda próba jest zapisywana w historii wysyłki.
+
+
+# ============================================
+# Invoice Tab (tab_ksef.php)
+# ============================================
+KSEF_Tab=KSeF
+KSEF_SubmissionHistory=Historia wysyłek KSeF
+KSEF_Number=Numer KSeF
+KSEF_DownloadFA3XML=Pobierz XML FA(3)
+KSEF_DownloadUPO=Pobierz UPO
+KSEF_SubmittedOn=Wysłano dnia
+
+# ============================================
+# Status List Page (status.php)
+# ============================================
+KSEF_ErrorDetails=Szczegóły błędu
+KSEF_ErrorCode=Kod błędu
+KSEF_TechnicalDetails=Szczegóły techniczne
+KSEF_UPONotAvailable=Plik UPO niedostępny
+KSEF_CommonErrors=Typowe błędy
+KSEF_StatusUpdated=Status zaktualizowany
+KSEF_VerifyOnKSEFPortal=Zweryfikuj w portalu KSeF
+KSEF_ViewAllAttemptsOnInvoice=Zobacz wszystkie próby dla tej faktury
+KSEF_ViewAllSubmissions=Zobacz wszystkie wysyłki
+KSEF_CheckStatus=Sprawdź status
+KSEF_ViewErrorDetails=Zobacz szczegóły błędu
+KSEF_DownloadKSEFZip=Pobierz faktury z danymi KSeF (ZIP)
+KSEF_Attempts=Próby
+KSEF_SubmissionRetried=Wysyłka ponowiona
+
+# ============================================
+# Status Badge Values (ksef.lib.php)
+# ============================================
+KSEF_STATUS_PENDING=Oczekujący
+KSEF_STATUS_SUBMITTED=Wysłany
+KSEF_STATUS_ACCEPTED=Zaakceptowany
+KSEF_STATUS_REJECTED=Odrzucony
+KSEF_STATUS_FAILED=Nieudany
+KSEF_STATUS_TIMEOUT=Przekroczono limit czasu
+
+# ============================================
+# Actions & Buttons (actions_ksef.class.php)
+# ============================================
+KSEF_SubmitToKSEF=Wyślij do KSeF
+KSEF_ValidateAndUpload=Zatwierdź i wyślij do KSeF
+KSEF_ValidatingAndSubmitting=Zatwierdzanie i wysyłanie do KSeF
+KSEF_SubmittingToKSEF=Wysyłanie do KSeF
+KSEF_ViewSubmissionDetails=Zobacz szczegóły
+KSEF_ViewXML=Zobacz XML FA(3)
+
+# ============================================
+# Success Messages
+# ============================================
+KSEF_SubmissionSuccess=Faktura pomyślnie wysłana do KSeF
+KSEF_AcceptanceSuccess=Faktura zaakceptowana przez KSeF
+KSEF_UPODownloaded=Potwierdzenie UPO pobrane
+KSEF_InvoiceAccepted=Faktura zaakceptowana
+KSEF_SubmissionStatus=Status wysyłki
+KSEF_CheckingStatus=Sprawdzanie statusu
+KSEF_BeingProcessed=W trakcie przetwarzania
+KSEF_Updated=Zaktualizowany
+
+# ============================================
+# Invoice Messages
+# ============================================
+KSEF_SubmissionPending=Faktura wysłana - oczekiwanie na potwierdzenie KSeF
+KSEF_SubmissionRejected=Faktura odrzucona przez KSeF
+KSEF_SubmissionFailed=Nie udało się wysłać faktury do KSeF
+KSEF_CustomerExcluded=Ten kontrahent jest wykluczony z wysyłki KSeF
+KSEF_CustomerExcludedInfo=Ten kontrahent jest wykluczony z KSeF - faktura nie zostanie wysłana
+KSEF_AlreadySubmitted=Faktura już wysłana do KSeF
+KSEF_XMLGenerationFailed=Nie udało się wygenerować XML FA(3)
+KSEF_SubmissionRecordFailed=Wysyłka udana, ale nie udało się zapisać rekordu
+KSEF_IncludedInPDF=Numer KSeF zostanie uwzględniony w PDF
+
+# ============================================
+# Extrafields
+# ============================================
+KSEF_KSEFNumber=Numer KSeF
+KSEF_KSEFStatus=Status KSeF
+KSEF_KSEFSubmissionDate=Data wysyłki KSeF
+KSEF_KSEFReference=Referencja KSeF
+KSEF_ExtraFieldNumber=Numer KSeF
+KSEF_ExtraFieldStatus=Status KSeF
+KSEF_ExtraFieldSubmissionDate=Data wysłania do KSeF
+KSEF_StatusPending=Oczekująca
+KSEF_StatusAccepted=Zaakceptowana
+KSEF_StatusRejected=Odrzucona
+KSEF_StatusFailed=Błąd
+KSEF_StatusOffline=Tryb offline
+KSEF_StatusValidationFailed=Błąd walidacji
+KSEF_ExtraFieldSaleDate=Data sprzedaży
+KSEF_ExtraFieldSaleDateHelp=Data sprzedaży/dostawy. Automatycznie uzupełniana z daty dostawy zamówienia lub daty faktury. Można nadpisać ręcznie.
+KSEF_ExtraFieldDodatkowyOpisMode=Tryb uwag (ta faktura)
+KSEF_ExtraFieldDodatkowyOpisModeHelp=Nadpisz globalne ustawienie uwag tylko dla tej faktury. "Domyślnie" używa globalnych ustawień modułu. "Prosty" lub "Klucz:Wartość" wymusza Uwagę w tym trybie; skonfigurowane pola niestandardowe nadal są dołączane. "Wyłączone" pomija zarówno notatki jak i pola niestandardowe w XML KSeF tej faktury (tekst stały stopki nie jest modyfikowany).
+KSEF_DodatkowyOpisMode_Default=Domyślnie (użyj ustawień modułu)
+KSEF_DodatkowyOpisMode_SimpleStopka=Prosty - Stopka Faktury (stopka jako tekst)
+KSEF_DodatkowyOpisMode_SimpleDodatkowy=Prosty - Dodatkowy Opis (jako wpis "Uwagi")
+KSEF_DodatkowyOpisMode_KeyValueDodatkowy=Klucz:Wartość - Dodatkowy Opis (parsuj linie)
+KSEF_DodatkowyOpisMode_Disabled=Wyłączone (bez uwag i pól niestandardowych)
+KSEF_NotSubmitted=Brak w KSeF
+
+# ============================================
+# Currency
+# ============================================
+KSEF_ExtraFieldKursData=Data kursu NBP
+KSEF_ExtraFieldKursDataHelp=Data kursu wymiany NBP dla faktury w walucie obcej (ostatni dzień roboczy przed datą sprzedaży)
+KSEF_NBPRate=Kurs NBP
+KSEF_NBPRateFromDate=z dnia %s
+KSEF_NBPRateRequired=Brak kursu NBP dla faktury w walucie obcej. Pobierz kurs przed wysłaniem do KSeF.
+KSEF_NBPCurrencyNotSupported=Waluta %s nie jest obsługiwana przez NBP
+KSEF_NBPNoRateForDate=Brak kursu NBP dla podanej daty
+KSEF_NBPRateMissing=Brak kursu
+KSEF_RefreshNBPRate=Odśwież
+KSEF_FetchNBPRate=Pobierz kurs NBP
+KSEF_RefreshNBPRateTooltip=Pobierz aktualny kurs NBP dla daty faktury
+KSEF_FetchNBPRateTooltip=Pobierz kurs wymiany z Narodowego Banku Polskiego
+KSEF_NBPRateNotNeeded=Kurs NBP nie jest wymagany dla faktur w PLN
+KSEF_NBPRateFetched=Kurs NBP pobrany pomyślnie: %s z dnia %s
+KSEF_NBPRateFetchError=Nie udało się pobrać kursu NBP: %s
+KSEF_MULTICURRENCY_CONFIG=Wielowalutowość / Ustawienia NBP
+KSEF_NBP_RATE_MODE=Tryb stosowania kursu NBP
+KSEF_NBP_RATE_MODE_KEEP_BASE=Zachowaj kwoty w walucie bazowej (PLN) - przelicz walutę obcą (EUR/etc)
+KSEF_NBP_RATE_MODE_KEEP_FOREIGN=Zachowaj kwoty w walucie obcej (EUR/etc) - przelicz PLN
+KSEF_NBP_SYNC_CURRENCIES=Waluty do synchronizacji (cron NBP)
+KSEF_NBP_SYNC_CURRENCIES_Help=Waluty włączone w module Wielowalutowość. Pozostaw puste, aby zsynchronizować wszystkie, lub wybierz konkretne dla codziennego cronu NBP.
+KSEF_NBP_SYNC_CURRENCIES_All=Wszystkie waluty
+KSEF_MulticurrencyRefreshDisabled=Wyłączone dla KSeF - Użyj przycisku "Pobierz kurs NBP" w polu Data kursu NBP
+
+# ============================================
+# Domyślne ustawienia płatności faktur
+# ============================================
+KSEF_ZWOLNIENIE_PODSTAWA=Podstawa zwolnienia z VAT
+KSEF_ZWOLNIENIE_PODSTAWA_Help=Podstawa prawna zwolnienia z VAT, emitowana gdy faktura zawiera pozycje ze stawką VAT 0%% z kodem ZW ustawionym w słowniku stawek VAT. Przykład: "art. 43 ust. 1 pkt 18 ustawy o VAT". Dotyczy tylko produktów/usług ze stawką 0%% VAT z kodem ZW. Po wyłączeniu, faktury z pozycjami ZW zostaną wysłane bez podstawy zwolnienia.
+KSEF_ZWOLNIENIE_PODSTAWA_Placeholder=np. art. 43 ust. 1 pkt 18 ustawy o VAT
+KSEF_ZWOLNIENIE_TYPE_DISABLED=Wyłączone (brak podstawy zwolnienia)
+KSEF_ZWOLNIENIE_TYPE_P19A=Ustawa polska
+KSEF_ZWOLNIENIE_TYPE_P19B=Dyrektywa UE
+KSEF_ZWOLNIENIE_TYPE_P19C=Inna podstawa prawna
+KSEF_ZWOLNIENIE_PRODUCT_FIELD=Podstawa zwolnienia z produktu
+KSEF_ZWOLNIENIE_PRODUCT_FIELD_Help=Pole dodatkowe produktu zawierające podstawę prawną zwolnienia. Gdy ustawione, pozycje ZW na fakturze używają podstawy z produktu zamiast domyślnej globalnej powyżej. Różne produkty mogą mieć różne podstawy zwolnienia (np. art. 43 pkt 18 dla usług medycznych, art. 43 pkt 26 dla edukacji). Wymagany typ pola dodatkowego: varchar, text lub select.
+KSEF_ZWOLNIENIE_PRODUCT_FIELD_DISABLED=Wyłączone (tylko globalna wartość domyślna)
+KSEF_NR_ZAMOWIENIA_SOURCE=Numer zamówienia - źródło
+KSEF_NR_ZAMOWIENIA_SOURCE_Help=Skąd pobierany jest numer zamówienia: referencja klienta (domyślnie), powiązane zamówienie sprzedaży lub pole dodatkowe faktury. Typ pola: varchar/text/int.
+KSEF_NR_ZAMOWIENIA_SOURCE_REF_CLIENT=Referencja klienta (ref_client)
+KSEF_NR_ZAMOWIENIA_SOURCE_LINKED_ORDER=Numer powiązanego zamówienia sprzedaży
+KSEF_NR_ZAMOWIENIA_SOURCE_DISABLED=Wyłączony
+KSEF_NR_ZAMOWIENIA_SOURCE_EXTRAFIELD=Pole dodatkowe
+KSEF_NR_UMOWY_SOURCE=Numer umowy - źródło
+KSEF_NR_UMOWY_SOURCE_Help=Skąd pobierany jest numer umowy: pole dodatkowe kontrahenta (autouzupełnianie z karty klienta) lub pole dodatkowe faktury (per fakturę). Typ pola: varchar/text/int.
+KSEF_NR_UMOWY_SOURCE_DISABLED=Wyłączony
+KSEF_NR_UMOWY_SOURCE_EXTRAFIELD=Pole dodatkowe faktury
+KSEF_NR_UMOWY_SOURCE_THIRDPARTY_EXTRAFIELD=Pole dodatkowe kontrahenta
+KSEF_NR_UMOWY_PARSE_DATE=Odczytaj datę z numeru umowy
+KSEF_NR_UMOWY_PARSE_DATE_Help=Data na początku pola umowy staje się datą umowy i jest usuwana z numeru. Format dzień/miesiąc/rok, np. "01.12.2026 Umowa o współpracy" lub "1/12/26 - Umowa o współpracy" daje datę 2026-12-01 i numer "Umowa o współpracy".
+KSEF_NOTE_PUBLIC_TARGET=Cel notatki publicznej
+KSEF_NOTE_PUBLIC_TARGET_Help=Wybierz, gdzie treść notatki publicznej trafia w XML KSeF. Dodatkowy opis: pary klucz-wartość (dotychczasowe zachowanie). Stopka faktury: blok tekstowy stopki. Pola dodatkowe (extrafields) zawsze trafiają do dodatkowego opisu niezależnie od tego ustawienia.
+KSEF_NOTE_PUBLIC_TARGET_DODATKOWY_OPIS=Dodatkowy opis (klucz/wartość)
+KSEF_NOTE_PUBLIC_TARGET_STOPKA_FAKTURY=Stopka faktury (tekst dowolny)
+KSEF_STOPKA_FAKTURY_SECTION=Stopka faktury
+KSEF_STOPKA_BOILERPLATE=Tekst stały stopki faktury
+KSEF_STOPKA_BOILERPLATE_Help=Stały tekst dołączany do stopki każdej faktury wychodzącej. Typowa treść: wpis KRS, klauzula RODO, informacje o kapitale, zastrzeżenia prawne. Maksymalnie 3500 znaków zgodnie ze schematem FA(3).
+KSEF_STOPKA_BOILERPLATE_Limit=Maksymalnie 3500 znaków
+
+KSEF_DEFAULT_PAYMENT_CONFIG=Domyślne ustawienia płatności faktur
+KSEF_DEFAULT_PAYMENT_TERM=Domyślne warunki płatności
+KSEF_DEFAULT_PAYMENT_TERM_Help=Wstępne wypełnienie warunków płatności przy tworzeniu nowej faktury. Używane gdy kontrahent nie ma skonfigurowanych warunków płatności i nie jest powiązany dokument źródłowy (zamówienie/oferta). Można zmienić dla każdej faktury.
+KSEF_DEFAULT_PAYMENT_METHOD=Domyślna metoda płatności
+KSEF_DEFAULT_PAYMENT_METHOD_Help=Wstępne wypełnienie metody płatności przy tworzeniu nowej faktury. Używane gdy kontrahent nie ma skonfigurowanej metody płatności i nie jest powiązany dokument źródłowy. Można zmienić dla każdej faktury.
+KSEF_DEFAULT_BANK_ACCOUNT=Domyślne konto bankowe
+KSEF_DEFAULT_BANK_ACCOUNT_Help=Wstępne wypełnienie konta bankowego przy tworzeniu nowej faktury. Używane gdy kontrahent nie ma skonfigurowanego konta bankowego i nie jest powiązany dokument źródłowy. Można zmienić dla każdej faktury.
+
+KSEF_VAT_DICTIONARY_HELPER=Kody stawek VAT dla KSeF
+KSEF_VAT_DICTIONARY_HELPER_Help=KSeF używa specyficznych kodów do rozróżniania typów stawki 0%% VAT (zwolnione, odwrotne obciążenie, niepodlegające, WDT, eksport). Włącz kody potrzebne Twojej firmie - pojawią się w liście stawek VAT przy tworzeniu pozycji faktur. Standardowe 0%% (bez kodu) jest zawsze dostępne i automatycznie wykrywane na podstawie kraju nabywcy.
+KSEF_VAT_DICTIONARY_HELPER_Desc=Włącz lub wyłącz dostępne stawki VAT na fakturach
+KSEF_VAT_CODE_ZW=Zwolniony - usługi medyczne, edukacyjne, finansowe, mały podatnik (art. 43/113)
+KSEF_VAT_CODE_RC=Odwrotne obciążenie (art. 17 ust. 1 pkt 7/8)
+KSEF_VAT_CODE_NP=Niepodlegające - towary/usługi poza terytorium kraju
+KSEF_VAT_CODE_NP2=Niepodlegające II - usługi wewnątrzwspólnotowe (art. 100 ust. 1 pkt 4)
+KSEF_VAT_CODE_WDT=Wewnątrzwspólnotowa dostawa towarów (WDT)
+KSEF_VAT_CODE_EX=Eksport towarów
+KSEF_VAT_CODE_COLUMN=Kod
+KSEF_VAT_CODE_DESC_COLUMN=Opis
+KSEF_VAT_CODE_GLOBAL=Zarządzane globalnie - przełącz w słowniku Dolibarr
+KSEF_VAT_IN_DROPDOWN=W liście
+KSEF_VAT_CODE_DICT_LINK=Otwórz słownik stawek VAT (zaawansowane)
+
+# ============================================
+# Issue Solutions
+# ============================================
+KSEF_Issue_CertNotFound=Nie znaleziono certyfikatu
+KSEF_Issue_CertNotFound_Solution=Sprawdź czy plik certyfikatu istnieje w podanej ścieżce.
+KSEF_Issue_AuthFailed=Uwierzytelnianie nieudane
+KSEF_Issue_AuthFailed_Solution=Zweryfikuj swój token i NIP. Upewnij się, że token został wygenerowany dla właściwego środowiska (Test/Prod).
+KSEF_Issue_Timeout=Przekroczono limit czasu połączenia
+KSEF_Issue_Timeout_Solution=Zwiększ KSEF_TIMEOUT w Ustawienia > Inne ustawienia (np. na 15). Sprawdź również połączenie internetowe i ustawienia zapory sieciowej.
+KSEF_Issue_InvalidNIP=Nieprawidłowy NIP
+KSEF_Issue_InvalidNIP_Solution=Upewnij się, że NIP firmy zawiera tylko cyfry i jest prawidłowy.
+KSEF_Issue_XMLValidation=Błąd walidacji XML
+KSEF_Issue_XMLValidation_Solution=Wygenerowany XML nie pasuje do schematu KSeF. Sprawdź dane faktury.
+
+# ============================================
+# Info Fields (Support Page)
+# ============================================
+KSEF_SOC_NAME=Nazwa firmy
+KSEF_SOC_MAIL=Email firmy
+KSEF_SOC_NIP=NIP firmy
+KSEF_MOD_NAME=Nazwa modułu
+KSEF_MOD_VERSION=Wersja modułu
+KSEF_DOL_VERSION=Wersja Dolibarr
+KSEF_PHP_VERSION=Wersja PHP
+KSEF_SERVER_OS=System operacyjny serwera
+KSEF_DATABASE=Baza danych
+KSEF_USER_AGENT=Agent użytkownika
+KSEF_CERT_STATUS=Status certyfikatu
+KSEF_PHP_OPENSSL=Rozszerzenie OpenSSL
+KSEF_PHP_CURL=Rozszerzenie cURL
+KSEF_PHP_DOM=Rozszerzenie DOM
+KSEF_STATS_TOTAL=Całkowita liczba wysyłek
+KSEF_STATS_ACCEPTED=Zaakceptowane
+KSEF_STATS_PENDING=Oczekujące
+KSEF_STATS_FAILED=Nieudane
+KSEF_STATS_SUCCESS_RATE=Wskaźnik sukcesu
+KSEF_DESCRIPTION=Opis
+
+# ============================================
+# Offline Mode & Deadlines
+# ============================================
+KSEF_OfflineMode=Tryb Offline
+KSEF_MODE_OFFLINE=Offline
+KSEF_MODE_OFFLINE_SYSTEM=System Offline
+KSEF_MODE_AWARYJNY=Tryb Awaryjny
+KSEF_OfflineDeadline=Termin Wysłania
+KSEF_DeadlinePassed=Termin Minął
+KSEF_DeadlineUrgent=PILNE
+KSEF_HoursRemaining=Pozostało %s godzin
+KSEF_OfflineDeadlinePassed=Termin wysłania faktury offline minął - nie można już wysłać faktury
+KSEF_STATUS_OFFLINE=Offline (Oczekuje na Wysłanie)
+KSEF_OfflineNumberNotYetSubmitted=To jest numer faktury offline - nie została jeszcze wysłana do KSeF
+
+# ============================================
+# Offline Confirmation Dialog
+# ============================================
+KSEF_OfflineConfirmTitle=Wymagany Tryb Offline
+KSEF_OfflineConfirmMessage=Data faktury jest wstecz o %s dni. Faktura zostanie wysłana w trybie OFFLINE.
+KSEF_OfflineConfirmInfo=W trybie offline faktura musi zostać wysłana do KSeF przed terminem pokazanym powyżej. Do PDF-a zostaną dodane dwa kody QR.
+KSEF_ConfirmOfflineSubmit=Wyślij w Trybie Offline
+KSEF_OfflineBackdatedTitle=Wykryto Fakturę Wsteczną
+KSEF_OfflineBackdatedMessage=Faktura jest datowana %d dni wstecz i wymaga trybu offline.
+KSEF_OfflineConnectionTitle=Wykryto Problem z Połączeniem
+KSEF_OfflineConnectionMessage=Nie można połączyć się z KSeF. Możesz utworzyć fakturę offline.
+KSEF_OfflineExplanation=Faktura zostanie zapisana lokalnie i musi być wysłana do KSeF przed terminem.
+
+# ============================================
+# Technical Correction
+# ============================================
+KSEF_TechnicalCorrection=Korekta Techniczna
+KSEF_TechnicalCorrectionSubmitted=Korekta techniczna wysłana pomyślnie
+KSEF_TechnicalCorrectionFailed=Wysłanie korekty technicznej nie powiodło się
+
+# ============================================
+# Certificate Configuration (Common)
+# ============================================
+KSEF_Certificate=Certyfikat
+KSEF_PrivateKey=Klucz Prywatny
+KSEF_Password=Hasło
+KSEF_CertificateFile=Plik Certyfikatu
+KSEF_PrivateKeyFile=Plik Klucza Prywatnego
+KSEF_PrivateKeyPassword=Hasło Klucza Prywatnego
+KSEF_PrivateKeyPassword_Help=Hasło używane do odszyfrowania zaszyfrowanego klucza prywatnego (plik .key)
+KSEF_OrPasteContent=Lub wklej zawartość
+KSEF_LeaveEmptyToKeep=Pozostaw puste, aby zachować obecne
+KSEF_EnterPassword=Wprowadź hasło
+KSEF_CertSerial=Numer Seryjny
+KSEF_ValidUntil=Ważny Do
+KSEF_CertificateReady=Certyfikat Gotowy
+KSEF_CertificateIncomplete=Konfiguracja Niekompletna
+KSEF_CertificateActive=Certyfikat Aktywny
+KSEF_CertificateExpired=Certyfikat Wygasł
+KSEF_CertificateExpiresSoon=Certyfikat wygasa w ciągu 30 dni
+KSEF_ExpiresSoon=Wkrótce Wygasa
+KSEF_RemoveAll=Usuń Wszystko
+KSEF_RemoveCertificate=Usuń Certyfikat
+KSEF_UpdateCertificate=Aktualizuj Certyfikat
+KSEF_CertificateSaved=Certyfikat zapisany pomyślnie
+KSEF_PrivateKeySaved=Klucz prywatny zapisany pomyślnie (zaszyfrowany)
+KSEF_PrivateKeyValidated=Klucz prywatny zwalidowany pomyślnie
+KSEF_PrivateKeyInvalid=Nieprawidłowy format klucza prywatnego
+KSEF_PrivateKeyPasswordMismatch=Uwaga: Hasło nie pasuje do klucza prywatnego
+KSEF_CertificateRemoved=Konfiguracja certyfikatu usunięta
+KSEF_CertificateParseError=Nie udało się przetworzyć certyfikatu
+KSEF_CertificateInvalid=Nieprawidłowy format certyfikatu
+KSEF_NoCertificateConfigured=Nie skonfigurowano certyfikatu
+KSEF_CertificateNotConfigured=Certyfikat nie jest skonfigurowany
+
+# ============================================
+# Offline Certificate Configuration
+# ============================================
+KSEF_OFFLINE_CERTIFICATE_CONFIG=Konfiguracja Certyfikatu Offline (Kod QR II)
+KSEF_OFFLINE_CERTIFICATE=Certyfikat Offline
+KSEF_OFFLINE_CERTIFICATE_Help=Certyfikat używany do podpisywania Kodu QR II na fakturach wystawionych w trybie offline. Potrzebujesz zarówno certyfikatu (.crt) jak i zaszyfrowanego klucza prywatnego (.key), który został użyty do wygenerowania żądania certyfikatu.
+KSEF_OFFLINE_PRIVATE_KEY=Klucz Prywatny Certyfikatu Offline
+KSEF_OFFLINE_PRIVATE_KEY_Help=Klucz prywatny odpowiadający certyfikatowi offline. Zostanie zapisany w formie zaszyfrowanej.
+KSEF_SaveOfflineCertificate=Zapisz Certyfikat Offline
+KSEF_OfflineCertificateSaved=Certyfikat offline zapisany
+KSEF_OfflinePrivateKeySaved=Klucz prywatny offline zapisany
+KSEF_OfflinePasswordSaved=Hasło certyfikatu offline zapisane
+KSEF_OfflineCertificateRemoved=Konfiguracja certyfikatu offline usunięta
+KSEF_ConfirmRemoveOfflineCert=Czy na pewno chcesz usunąć konfigurację certyfikatu offline?
+KSEF_CertificateRequiredForOffline=Certyfikat jest wymagany do generowania Kodu QR II w trybie offline
+KSEF_OfflineCertificateRequired=Wymagany Certyfikat Offline
+KSEF_OfflineCertificateRequiredExplanation=Aby tworzyć faktury offline, musisz skonfigurować certyfikat offline w ustawieniach modułu KSeF.
+KSEF_OfflineCertificateMissingItems=Brakująca konfiguracja
+KSEF_Missing_certificate=Certyfikat offline (plik .crt)
+KSEF_Missing_private_key=Klucz prywatny offline (plik .key)
+KSEF_Missing_password=Hasło klucza prywatnego
+KSEF_QR_CertNotConfigured=Certyfikat nie skonfigurowany
+
+# ============================================
+# Authentication Certificate Configuration
+# ============================================
+KSEF_ConfigureCertificateBelow=Poniżej możesz skonfigurować Certyfikat Online
+KSEF_ForAPIAuthentication=Certyfikat Online
+KSEF_ForQRCodeSigning=Certyfikat Offline
+KSEF_AUTH_CERTIFICATE_CONFIG=Konfiguracja Certyfikatu Uwierzytelniania
+KSEF_AUTH_CERTIFICATE=Certyfikat Uwierzytelniania
+KSEF_AUTH_CERTIFICATE_Help=Certyfikat używany do uwierzytelniania w API KSeF poprzez podpis XAdES. Potrzebujesz zarówno certyfikatu (.crt) jak i zaszyfrowanego klucza prywatnego (.key), który został użyty do wygenerowania żądania certyfikatu.
+KSEF_SaveAuthCertificate=Zapisz Certyfikat Uwierzytelniania
+KSEF_AuthCertificateSaved=Certyfikat uwierzytelniania zapisany
+KSEF_AuthPrivateKeySaved=Klucz prywatny uwierzytelniania zapisany
+KSEF_AuthPasswordSaved=Hasło certyfikatu uwierzytelniania zapisane
+KSEF_AuthCertificateRemoved=Konfiguracja certyfikatu uwierzytelniania usunięta
+KSEF_ConfirmRemoveAuthCert=Czy na pewno chcesz usunąć konfigurację certyfikatu uwierzytelniania?
+KSEF_NoAuthCertificateConfigured=Nie skonfigurowano certyfikatu uwierzytelniania
+KSEF_AuthCertificateInfo=Certyfikaty uwierzytelniania można uzyskać z portalu KSeF. Umożliwiają uwierzytelnianie za pomocą podpisu cyfrowego zamiast tokenów.
+KSEF_ConfigureCertificateFirst=Najpierw musisz skonfigurować certyfikat uwierzytelniania
+KSEF_WARNING_NO_AUTH_CERTIFICATE=Wybrano uwierzytelnianie certyfikatem, ale certyfikat nie jest w pełni skonfigurowany
+
+# ============================================
+# Authentication Method
+# ============================================
+KSEF_AUTH_METHOD_SELECT=Metoda Uwierzytelniania
+KSEF_AUTH_METHOD_SELECT_Help=Wybierz, czy uwierzytelniać się za pomocą tokenu KSeF, czy certyfikatu KSeF. Uwierzytelnianie certyfikatem wymaga ważnego certyfikatu wydanego przez KSeF z plikami .crt i .key.
+KSEF_AUTH_METHOD_TOKEN=Uwierzytelnianie Tokenem
+KSEF_AUTH_METHOD_CERTIFICATE=Uwierzytelnianie Certyfikatem
+KSEF_AuthMethodUpdated=Metoda uwierzytelniania zaktualizowana
+KSEF_NO_AUTH_CONFIGURED=Brak Skonfigurowanego Uwierzytelniania
+KSEF_ConfigureAuthBelow=Skonfiguruj token lub certyfikat poniżej, aby włączyć wysyłanie do KSeF
+KSEF_WARNING_NO_AUTH=Nie skonfigurowano metody uwierzytelniania
+KSEF_WARNING_CONFIGURE_TOKEN_OR_CERT=Musisz skonfigurować token lub certyfikat, aby wysyłać faktury do KSeF
+KSEF_WARNING_AUTH_CERT_INCOMPLETE=Certyfikat uwierzytelniający jest niekompletny
+KSEF_WARNING_AUTH_CERT_MISSING_PARTS=Brakuje: %s
+KSEF_TEST_CERT_AUTH=Testuj Uwierzytelnianie Certyfikatem
+KSEF_CERT_AUTH_SUCCESS=Uwierzytelnianie certyfikatem powiodło się
+KSEF_CERT_AUTH_FAILED=Uwierzytelnianie certyfikatem nie powiodło się
+KSEF_CERT_AUTH_ERROR=Błąd uwierzytelniania certyfikatem
+
+# ============================================
+# Token Configuration
+# ============================================
+KSEF_TOKEN_CONFIG=Konfiguracja Tokenu
+KSEF_TokenConfigured=Token Skonfigurowany
+KSEF_TokenNotConfigured=Token nie skonfigurowany
+KSEF_ConfigureTokenBelow=Skonfiguruj w sekcji Token poniżej
+KSEF_ConfigureTokenFirst=Najpierw musisz skonfigurować token uwierzytelniania
+
+# ============================================
+# Offline Submission & Retry
+# ============================================
+KSEF_SubmissionInProgress=Trwa wysyłanie...
+KSEF_RetrySubmission=Ponów Wysłanie
+KSEF_RetryingSubmission=Ponowne wysyłanie
+KSEF_RetryFailed=Ponowienie nie powiodło się
+KSEF_RetryOnlineHelp=Spróbuj wysłać tę fakturę offline do KSeF online (przed terminem)
+KSEF_CreateOfflineInvoice=Utwórz Fakturę Offline
+KSEF_CreatingOfflineInvoice=Tworzenie faktury offline
+KSEF_OfflineInvoiceCreated=Faktura offline utworzona pomyślnie
+KSEF_OfflineCreationFailed=Nie udało się utworzyć faktury offline
+KSEF_SubmitOnline=Wyślij Online
+KSEF_TryAgain=Spróbuj Ponownie
+KSEF_AlreadyAccepted=Faktura została już zaakceptowana w KSeF
+KSEF_TooManyRetries=Zbyt wiele prób ponowienia
+KSEF_InvalidStatusForUpload=Faktura nie ma statusu offline
+KSEF_NoSubmissionFound=Nie znaleziono rekordu wysyłki dla tej faktury
+
+# ============================================
+# Upload Status
+# ============================================
+KSEF_UploadToKSEF=Wyślij do KSeF
+KSEF_UploadingToKSEF=Wysyłanie do KSeF
+KSEF_UploadSuccess=Pomyślnie wysłano do KSeF
+KSEF_UploadFailed=Wysłanie do KSeF nie powiodło się
+KSEF_UploadPending=Wysłano, oczekiwanie na potwierdzenie
+KSEF_OnlineSubmissionSuccess=Wysyłka online powiodła się
+KSEF_OnlineRetryFailed=Ponowienie online nie powiodło się, faktura offline pozostaje ważna
+KSEF_DuplicateInvoiceNumber=Duplikat numeru faktury
+KSEF_InvoiceNumberUsedBy=Ten numer faktury został już użyty przez
+KSEF_Retries=Próby
+
+# ============================================
+# Failure Dialog
+# ============================================
+KSEF_ConnectionFailed=Błąd Połączenia z KSeF
+KSEF_ConnectionErrorExplanation=Nie można połączyć się z serwerem KSeF. Może to być spowodowane problemami z siecią, konserwacją serwera lub ustawieniami firewall. Możesz spróbować ponownie lub utworzyć fakturę offline.
+KSEF_OfflineOptionAvailable=Utworzyć Fakturę Offline?
+KSEF_OfflineOptionExplanation=Ponieważ nie możemy wysłać do KSeF, możemy utworzyć fakturę Offline. Jeśli problem jest po Twojej stronie, masz czas do następnego dnia roboczego na wysłanie faktury do KSeF (Termin pokazany poniżej). Możesz również sprawdzić stronę Ministerstwa Finansów (https://www.gov.pl/web/finanse) w poszukiwaniu komunikatów, które mogą przedłużyć ten termin.
+
+# ============================================
+# Modification Warnings
+# ============================================
+KSEF_ModifyWarningTitle=Ostrzeżenie KSeF
+KSEF_ModifyWarningKSeF=Ta faktura została już wysłana do KSeF z numerem %s. Modyfikacja NIE zaktualizuje wpisu w KSeF. Może być konieczne wystawienie faktury korygującej.
+KSEF_ModifyWarningOffline=Dla tego dokumentu została wygenerowana faktura offline. Modyfikacja unieważni kody QR na wydrukowanym PDF i może spowodować problemy z zgodnością.
+KSEF_ModifyInfoFailed=Poprzednia próba wysłania do KSeF nie powiodła się. Modyfikacja faktury będzie wymagała nowego wysłania.
+
+# ============================================
+# Incoming Invoices - General
+# ============================================
+KSEF_IncomingInvoices=Faktury przychodzące
+KSEF_IncomingInvoice=Faktura przychodząca
+KSEF_NoIncomingInvoices=Nie znaleziono faktur przychodzących
+KSEF_TopSellers=Główni dostawcy
+
+# ============================================
+# Incoming Invoices - Fetch & Sync
+# ============================================
+KSEF_FetchFromKSeF=Pobierz z KSeF
+KSEF_DateFrom=Data od
+KSEF_DateTo=Data do
+KSEF_DateType=Typ daty
+KSEF_DateTypeIssue=Data wystawienia
+KSEF_DateTypeInvoicing=Data przyjęcia w KSeF
+KSEF_FetchInvoices=Pobierz faktury
+KSEF_FetchResults=Znaleziono %s faktur: %s nowych, %s już w systemie
+KSEF_FetchErrors=Błędy podczas pobierania
+KSEF_SyncFromKSeF=Synchronizuj z KSeF
+KSEF_SyncNow=Synchronizuj teraz
+KSEF_SyncContinuationPoint=Punkt kontynuacji
+KSEF_LastSync=Ostatnia synchronizacja
+KSEF_LastSyncResult=Ostatni wynik
+KSEF_SyncNotInitialized=Synchronizacja nie została zainicjowana. Kliknij „Synchronizuj teraz", aby rozpocząć.
+KSEF_SyncResults=Zsynchronizowano %s nowych, %s istniejących (z %s łącznie)
+KSEF_SyncResultShort=+%s nowych, %s istniejących (%s łącznie)
+KSEF_SyncTruncated=Dostępne są kolejne dane - synchronizuj ponownie, aby kontynuować.
+KSEF_SyncErrors=Błędów podczas synchronizacji: %s
+KSEF_RateLimitActive=Limit zapytań: odczekaj %s
+KSEF_ResetSyncState=Resetuj synchronizację
+KSEF_ConfirmResetSync=Zresetować stan synchronizacji? Spowoduje to zresetowanie punktu synchronizacji do 31 sty 2026 (dzień przed uruchomieniem KSeF) i ponowne pobranie wszystkich faktur od początku.
+KSEF_SyncStateReset=Stan synchronizacji zresetowany. Następna synchronizacja pobierze wszystkie faktury od uruchomienia KSeF.
+KSEF_SyncProgress=Pokrycie synchronizacji
+KSEF_SyncProgressStart=Start KSeF
+KSEF_SyncProgressHWM=Zsynchronizowano do
+KSEF_SyncProgressUpToDate=Na bieżąco
+KSEF_SyncProgressPartial=Częściowo zsynchronizowano
+KSEF_SyncProgressBehind=Synchronizacja opóźniona
+KSEF_SyncNotStarted=Jeszcze nie zsynchronizowano
+KSEF_FetchInProgress=Pobieranie faktur z KSeF...
+KSEF_FetchCompleted=Pobieranie zakończone
+KSEF_FetchFailed=Pobieranie nie powiodło się
+KSEF_FetchAlreadyInProgress=Pobieranie już trwa
+KSEF_FetchReset=Stan pobierania zresetowany
+KSEF_ElapsedTime=Czas
+KSEF_NewInvoices=Nowe
+KSEF_ExistingInvoices=Istniejące
+KSEF_ConfirmCancelFetch=Anulować bieżące pobieranie?
+KSEF_ResetAndRetry=Resetuj i spróbuj ponownie
+KSEF_Downloading=Pobieranie faktur...
+KSEF_ProcessingBatches=Przetwarzanie faktur
+KSEF_ReadyToProcess=Pobieranie gotowe, uruchamianie...
+KSEF_CurrentStatus=Aktualny status
+KSEF_PhaseWaitingKSeF=Oczekiwanie na przygotowanie eksportu przez KSeF...
+KSEF_PhaseReadyToProcess=Pobieranie gotowe, uruchamianie...
+KSEF_PhaseDownloading=Pobieranie faktur...
+KSEF_PhaseProcessingBatches=Przetwarzanie faktur (%s/%s)...
+NotSet=Nie ustawiono
+
+# ============================================
+# Incoming Invoices - Invoice Details
+# ============================================
+KSEF_InvoiceDetails=Szczegóły faktury
+KSEF_Seller=Sprzedawca
+KSEF_Buyer=Nabywca (my)
+KSEF_KSEFInformation=Informacje KSeF
+KSEF_Information=Informacje KSeF
+KSEF_FetchedOn=Pobrano
+KSEF_XMLCreated=Data utworzenia XML
+KSEF_SystemInfo=Informacje systemowe
+KSEF_SaleDate=Data sprzedaży
+KSEF_Totals=Podsumowanie
+KSEF_Net=Netto
+KSEF_NetExempt=Netto (zwolnione)
+KSEF_LineItems=Pozycje faktury
+KSEF_VatSummary=Podsumowanie VAT
+KSEF_VATBreakdown=Zestawienie VAT
+KSEF_VATExempt=Zwolnione
+KSEF_VATDomestic=krajowe
+KSEF_VATExport=eksport
+KSEF_VATNotSubject=Niepodlegające
+KSEF_VATReverseCharge=Odwrotne obciążenie
+KSEF_PaymentInfo=Informacje o płatności
+KSEF_CorrectsInvoice=Koryguje fakturę
+KSEF_CorrectsKsefNr=Koryguje nr KSeF
+KSEF_OriginalKsefNumber=Oryginalny numer KSeF
+KSEF_VendorRef=Nr faktury dostawcy
+KSEF_ImportedAs=Zaimportowano jako
+KSEF_CorrectsXInvoices=Koryguje %s faktur (szczegóły w tabeli po prawej)
+KSEF_CorrectedInvoices=Faktury korygowane
+KSEF_CorrectionReason=Przyczyna korekty
+
+# ============================================
+# Incoming Invoices - Actions & Status
+# ============================================
+KSEF_ImportStatus=Status importu
+KSEF_ImportStatusNEW=Nowa
+KSEF_ImportStatusIMPORTED=Zaimportowana
+KSEF_ImportStatusSKIPPED=Pominięta
+KSEF_ImportStatusERROR=Błąd
+KSEF_SkipInvoice=Pomiń fakturę
+KSEF_UnskipInvoice=Oznacz jako nową
+KSEF_ImportToDolibarr=Importuj do Dolibarr
+KSEF_ImportFeatureComingSoon=Funkcja importu wkrótce dostępna
+KSEF_ImportFeatureDescription=Możliwość automatycznego importu faktur przychodzących z KSeF jako faktur zakupowych w Dolibarr będzie dostępna w przyszłej wersji. Na razie możesz przeglądać szczegóły faktur i ręcznie tworzyć odpowiadające im faktury zakupowe.
+KSEF_ImportComingSoon=Ta funkcja będzie dostępna w przyszłej wersji
+KSEF_ViewLinkedInvoice=Zobacz powiązaną fakturę
+KSEF_AlreadyImported=Już zaimportowana do Dolibarr
+KSEF_ComingSoon=Dostępne w przyszłej wersji
+KSEF_ViewRawXml=Zobacz XML
+KSEF_DownloadXml=Pobierz XML
+KSEF_XMLMetadata=Metadane XML
+KSEF_DownloadPdf=Generuj PDF
+KSEF_DownloadPdfTooltip=Generuj podgląd PDF z kodem QR
+KSEF_VisualizationError=Nie udało się wygenerować podglądu faktury
+KSEF_ViewOnPortal=Zobacz w portalu KSeF
+KSEF_ClearAll=Usuń wszystkie rekordy
+KSEF_ConfirmClearAll=Usunąć WSZYSTKIE faktury przychodzące dla środowiska %s? Tej operacji nie można cofnąć.
+KSEF_ClearedRecords=Usunięto %s rekordów faktur przychodzących ze środowiska %s
+RecordsDeleted=Usunięto %s rekordów
+ConfirmDeleteIncomingInvoice=Usunąć fakturę przychodzącą %s?
+NotInSystem=brak w systemie
+
+
+KSEF_BASIC_CONFIG=Podstawowa konfiguracja
+KSEF_MenuSubmissionStatus=Status wysyłki
+KSEF_MenuConfiguration=Konfiguracja
+
+# ============================================
+# About Page - System Requirements
+# ============================================
+KSEF_Note=Uwaga
+
+# Requirement Labels
+KSEF_Req_PHPVersion=Wersja PHP
+KSEF_Req_PHPVersionDesc=Wymagany PHP 7.4 lub nowszy
+KSEF_Req_OpenSSL=Rozszerzenie OpenSSL
+KSEF_Req_OpenSSLDesc=Wymagane do szyfrowania i bezpiecznej komunikacji
+KSEF_Req_cURL=Rozszerzenie cURL
+KSEF_Req_cURLDesc=Wymagane do komunikacji API z KSeF
+KSEF_Req_DOM=Rozszerzenie DOM
+KSEF_Req_DOMDesc=Wymagane do przetwarzania XML
+KSEF_Req_Mbstring=Rozszerzenie Multibyte String
+KSEF_Req_MbstringDesc=Wymagane do obsługi danych faktur i polskich znaków
+KSEF_Req_JSON=Rozszerzenie JSON
+KSEF_Req_JSONDesc=Wymagane do przetwarzania żądań/odpowiedzi API KSeF
+KSEF_Req_Zip=Rozszerzenie Zip
+KSEF_Req_ZipDesc=Wymagane do rozpakowywania paczek faktur przychodzących z KSeF (ZipArchive)
+KSEF_Req_phpseclib=Biblioteka phpseclib
+KSEF_Req_phpseclibDesc=Biblioteka kryptograficzna do szyfrowania RSA, dołączona do modułu
+KSEF_Req_TCPDF=Biblioteka TCPDF
+KSEF_Req_TCPDFDesc=Wymagana do generowania kodów QR na PDF
+KSEF_Req_TCPDF2DMissing=(brak obsługi kodów 2D)
+KSEF_Req_BarcodeModule=Moduł Barcode
+KSEF_Req_BarcodeModuleDesc=Moduł kodów kreskowych Dolibarr (zalecany dla kodów QR)
+KSEF_Req_MulticurrencyModule=Moduł Multicurrency
+KSEF_Req_MulticurrencyModuleDesc=Moduł wielowalutowy Dolibarr (wymagany dla faktur walutowych z kursami NBP)
+KSEF_Req_CompanyNIP=NIP firmy
+KSEF_Req_CompanyNIPDesc=Numer identyfikacji podatkowej
+KSEF_Req_KSeFAuth=Uwierzytelnianie KSeF
+KSEF_Req_KSeFAuthDesc=Wymagany token lub ważny certyfikat do dostępu API
+KSEF_Req_OfflineCert=Certyfikat podpisu offline
+KSEF_Req_OfflineCertDesc=Wymagany do wystawiania faktur podczas niedostępności KSeF (tryb awaryjny)
+KSEF_Req_Environment=Środowisko
+KSEF_Req_EnvironmentDesc=Aktualne środowisko KSeF
+KSEF_Req_CSRF=Ochrona CSRF
+KSEF_Req_CSRFDesc=Ochrona tokenem przed Cross-Site Request Forgery (zalecana dla bezpieczeństwa)
+
+# Authentication Values
+KSEF_AuthValue_Token=Token
+KSEF_AuthValue_Certificate=Certyfikat
+KSEF_AuthValue_TokenAndCert=Token + Certyfikat
+KSEF_AuthValue_CertExpires=(certyfikat wygasa: %s)
+KSEF_AuthValue_Expired=(WYGASŁ: %s)
+KSEF_AuthValue_Expires=(wygasa: %s)
+
+# Certificate Status Values
+KSEF_CertValue_ValidUntil=Ważny do: %s
+KSEF_CertValue_Expired=WYGASŁ: %s
+KSEF_CertValue_Configured=Skonfigurowany
+KSEF_CertValue_NotConfigured=Nie skonfigurowany
+
+# ============================================
+# Import faktur przychodzących
+# ============================================
+KSEF_Import=Importuj
+KSEF_ImportDesc=Importuj fakturę jako fakturę dostawcy. Pozycje z wybranymi produktami zostaną powiązane, pozostałe będą zaimportowane jako tekst.
+KSEF_ImportConfirmTitle=Czy na pewno chcesz zaimportować tę fakturę?
+KSEF_ImportAsFreeText=tekst (bez powiązania z produktem)
+KSEF_ImportLinkedTo=powiązano z
+KSEF_ImportSkip=Pomiń
+KSEF_ImportSkipDesc=Oznacz tę fakturę jako pominiętą - nie będzie importowana
+KSEF_ImportSkipConfirm=Czy na pewno chcesz pominąć tę fakturę?
+KSEF_ImportSuccess=Faktura pomyślnie zaimportowana jako faktura dostawcy %s
+KSEF_ImportErrorNoSupplier=Proszę wybrać dostawcę przed importem
+KSEF_ImportErrorAlreadyImported=Ta faktura została już zaimportowana
+KSEF_SupplierAutoMatched=Dostawca dopasowany automatycznie po NIP
+KSEF_SupplierNotFound=Nie znaleziono dostawcy o identyfikatorze %s - proszę wybrać ręcznie
+KSEF_SupplierChangeSelection=Zmień
+KSEF_CreateProduct=Utwórz nowy produkt
+KSEF_CreateSupplier=Utwórz nowego dostawcę
+KSEF_ImportedInvoice=Zaimportowana faktura dostawcy
+KSEF_ReopenForImport=Otwórz ponownie do importu
+KSEF_InvoiceSkipped=Ta faktura została oznaczona jako pominięta
+KSEF_ProductColumn=Produkt (opcjonalnie)
+
+# ============================================
+# Import zbiorczy i Szybki import
+# ============================================
+KSEF_BatchImport=Import zbiorczy
+KSEF_BatchImportTitle=Podgląd importu zbiorczego
+KSEF_BatchImportConfirm=Importuj zaznaczone
+KSEF_BatchImporting=Importowanie...
+KSEF_BatchImportResults=Wyniki importu
+KSEF_BatchImportSuccessLine=Zaimportowano pomyślnie
+KSEF_BatchSupplierMatched=Dopasowany
+KSEF_BatchSupplierWillCreate=Zostanie utworzony
+KSEF_BatchProductsMatched=dopasowanych
+KSEF_BatchAutoCreateSuppliers=Automatycznie twórz dostawców gdy nie znaleziono dopasowania
+KSEF_BatchAutoCreateSuppliers_Help=Gdy zaznaczone, dostawcy którzy nie mogą być dopasowani po NIP lub numerze VAT UE do istniejącego kontrahenta zostaną automatycznie utworzeni z danymi z faktury KSeF (nazwa, adres, identyfikatory podatkowe). Gdy odznaczone, faktury z niedopasowanymi dostawcami zostaną pominięte podczas importu zbiorczego.
+KSEF_BatchAutoCreateProducts=Automatycznie twórz produkty gdy nie znaleziono dopasowania
+KSEF_BatchAutoCreateProducts_Help=Gdy zaznaczone, pozycje faktur które nie mogą być dopasowane do istniejącego produktu (po referencji produktu, referencji dostawcy lub kodzie kreskowym/GTIN) zostaną automatycznie utworzone jako nowe produkty. Gdy odznaczone, niedopasowane pozycje są importowane jako wolny tekst na fakturze dostawcy. Jeśli nie potrzebujesz śledzić produktów ani łączyć pozycji faktur z katalogiem produktów, możesz zostawić tę opcję wyłączoną - wszystkie pozycje zostaną zaimportowane jako opisy tekstowe.
+KSEF_BatchNoImportable=Brak faktur do importu w zaznaczeniu (tylko faktury o statusie NOWA/BŁĄD mogą być importowane)
+KSEF_BatchProductWillCreate=Zostanie utworzony
+KSEF_MatchedByRef=Dopasowano po ref. produktu
+KSEF_MatchedBySupplierRef=Dopasowano po ref. dostawcy
+KSEF_MatchedByBarcode=Dopasowano po kodzie kreskowym
+KSEF_MatchMethod=Metoda dopasowania
+KSEF_QuickImport=Szybki import
+KSEF_QuickImportAutoComplete=Faktura zaimportowana automatycznie (dostawca i wszystkie produkty dopasowane)
+
+# ============================================
+# Reset statusu importu
+# ============================================
+KSEF_ResetImportStatus=Resetuj status importu
+KSEF_LinkedInvoiceDeleted=Powiązana faktura dostawcy została usunięta
+KSEF_ImportStatusReset=Status importu został zresetowany. Możesz ponownie zaimportować tę fakturę.
+KSEF_LinkedInvoiceStillExists=Nie można zresetować - powiązana faktura dostawcy nadal istnieje
+KSEF_ConfirmResetImport=Powiązana faktura dostawcy już nie istnieje. Czy zresetować status tej faktury, aby umożliwić ponowny import?
+
+# ============================================
+# Stany magazynowe / Informacje
+# ============================================
+KSEF_StockWillIncrease=Stany magazynowe dopasowanych produktów zostaną zwiększone przy walidacji faktury
+KSEF_StockWillNotIncrease=Stany magazynowe dopasowanych produktów nie zostaną zwiększone przy walidacji faktury
+KSEF_StockAutoIncreaseEnabled=Stany magazynowe zostaną zaktualizowane po zatwierdzeniu zaimportowanej faktury. Zostaniesz poproszony o wybór magazynu. Pozycje zaimportowane jako tekst (bez powiązanego produktu) nie wpłyną na stany magazynowe.
+KSEF_StockAutoIncreaseDisabled=Automatyczne zwiększanie stanów magazynowych przy walidacji faktury jest wyłączone. Możesz je włączyć w ustawieniach modułu Stany magazynowe: "Zwiększ stany rzeczywiste przy walidacji faktury dostawcy/noty kredytowej". Pozycje zaimportowane jako tekst (bez powiązanego produktu) nie wpłyną na stany magazynowe.
+KSEF_ImportConfirmSupplier=Dostawca
+
+# ============================================
+# Import faktur korygujących
+# ============================================
+KSEF_ImportErrorOriginalNotImported=Nie można zaimportować faktury korygującej - najpierw należy zaimportować fakturę oryginalną. Proszę najpierw zaimportować "%s".
+KSEF_ImportErrorNoCorrectionsReference=Nie można zaimportować faktury korygującej - brak odniesienia do faktury korygowanej w danych XML
+KSEF_CorrectionNoReferenceData=Ta faktura korygująca nie zawiera odniesień do faktur korygowanych w danych XML
+KSEF_CorrectionChooseStrategy=Ta korekta dotyczy wielu faktur. Wybierz sposób importu:
+KSEF_CorrectionStandalone=Samodzielna nota kredytowa (bez powiązania z fakturą źródłową)
+KSEF_CorrectionStandaloneDesc=Wszystkie odniesienia do faktur korygowanych zostaną umieszczone w notatce
+KSEF_CorrectionLinkTo=Powiąż notę kredytową z: %s
+KSEF_CorrectionOverride=Zezwól na import bez wszystkich faktur oryginalnych
+KSEF_CorrectionNotAllImported=Nie wszystkie faktury korygowane zostały jeszcze zaimportowane do Dolibarr
+KSEF_CorrectionOriginalNotImported=Jeszcze nie zaimportowano
+KSEF_CorrectionStandaloneNoteText=Faktury korygowane: %s
+KSEF_UpwardCorrection=Ta korekta zwiększa kwotę faktury
+KSEF_UpwardCorrectionChoose=Wybierz sposób obsługi korekty w górę:
+KSEF_UpwardCorrectionDifference=Faktura uzupełniająca tylko na różnicę
+KSEF_UpwardCorrectionDifferenceDesc=Tworzy fakturę standardową na dodatkową kwotę (%s)
+KSEF_UpwardCorrectionReplace=Wyzeruj oryginał i utwórz fakturę korygującą
+KSEF_UpwardCorrectionReplaceDesc=Tworzy notę kredytową zerującą oryginał oraz nową fakturę z poprawioną kwotą
+KSEF_UpwardCorrectionReplaceRequiresLink=Wymaga powiązania z fakturą oryginalną
+KSEF_UpwardCorrectionCreditNoteRef=Wyzerowanie: %s (korekta KSeF %s)
+KSEF_CorrectionSummaryLine=Korekta - stawka VAT %s
+KSEF_CorrectionItemDetail=netto: %s, ilość: %s %s
+KSEF_OriginalNotImported=Faktura oryginalna nie została jeszcze zaimportowana
+KSEF_ImportOriginalFirst=Najpierw zaimportuj fakturę oryginalną
+KSEF_OriginalNotInSystem=Faktura oryginalna nie została znaleziona w rekordach KSeF
+KSEF_LinkedInvoice=Powiązana faktura
+KSEF_CorrectedKsefNumberSameAsOwn=Numery KSeF faktury korygowanej i korygującej są identyczne - prawdopodobnie błąd wystawcy
+KSEF_InvoiceNumber=Numer faktury
+KSEF_BatchCorrectionBlocked=Faktura korygująca - nie można zaimportować w trybie zbiorczym
+KSEF_BatchCorrectionOriginalNotImported=Faktura oryginalna nie została jeszcze zaimportowana - najpierw zaimportuj ją przez import indywidualny
+KSEF_BatchCorrectionSelfReference=Numer KSeF faktury korygowanej jest identyczny z numerem KSeF tej faktury
+KSEF_BatchCorrectionOriginalNotInSystem=Faktura oryginalna nie została znaleziona w rekordach KSeF
+KSEF_BatchCorrectionNoReference=Faktura korygująca nie zawiera odniesienia do faktur korygowanych
+KSEF_BatchCorrectionUseIndividualImport=Użyj strony importu indywidualnego aby pominąć to ograniczenie
+KSEF_BatchSupplierNotMatched=Nie dopasowano dostawcy - włącz automatyczne tworzenie lub użyj importu indywidualnego
+KSEF_BatchSupplierNoMatch=Brak dopasowania
+KSEF_BatchProductFreeText=Wolny tekst
+KSEF_BatchProductsFreeTextWarning=Niedopasowane pozycje zostaną zaimportowane jako wolny tekst
+KSEF_ReplaceCreditNote=Nota korygująca (zerowanie oryginału)
+KSEF_ReplaceCreditNoteDesc=Zeruje oryginalną fakturę %s
+KSEF_ReplaceCreditNoteCardDesc=Nota korygująca zerująca oryginalną fakturę
+KSEF_ReplaceCreditNoteDesc_Source=Zeruje fakturę
+KSEF_ReplaceNewInvoice=Faktura korygująca
+KSEF_ReplaceNewInvoiceDesc=Nowa faktura z poprawioną kwotą całkowitą
+KSEF_ViewCreditNote=Pokaż notę korygującą
+KSEF_ViewReplacementInvoice=Pokaż fakturę korygującą
+KSEF_ImportMode=Tryb importu
+KSEF_SyncErrorsExist=%s faktur miało błędy podczas ostatniej synchronizacji i nie zostało zaimportowanych
+KSEF_ViewErrors=Pokaż błędy
+KSEF_HideErrors=Ukryj błędy
+KSEF_ErrorKsefNumber=Numer KSeF
+KSEF_ErrorMessage=Błąd
+KSEF_WARNING_NO_TRANS_OVERRIDES=Nadpisania tłumaczeń nie zostały zastosowane. Pola takie jak REGON/BDO nie pojawią się na karcie kontrahenta. Przewiń do sekcji "Nadpisania tłumaczeń" i kliknij "Zastosuj nadpisania tłumaczeń".
+KSEF_WARNING_DUPLICATE_FIELD=Identyfikatory %s są zmapowane do tego samego pola źródłowego (%s). Każdy identyfikator powinien używać unikalnego pola.
+KSEF_CountryRequirement=Kraj kontrahenta
+KSEF_CountryRequirementDesc=Każdy kontrahent (klient/dostawca) powinien mieć poprawnie ustawiony kraj. Moduł używa kraju do określenia sposobu identyfikacji nabywcy w XML KSeF: polscy nabywcy używają NIP, nabywcy z UE używają numeru VAT UE, a nabywcy spoza UE używają zagranicznego numeru identyfikacji podatkowej. Jeśli kraj nie jest ustawiony, moduł spróbuje go wywnioskować z prefiksu numeru VAT (np. "DE" z "DE123456789"), w przeciwnym razie domyślnie przyjmie Polskę.
+KSEF_TranslationOverridesHowTo=Nadpisania tłumaczeń (etykiety pól)
+KSEF_TranslationOverridesHowToDesc=Domyślnie Dolibarr nie wyświetla wszystkich pól profesjonalnych ID (idprof3-6) dla polskich firm. Moduł może nadpisać etykiety pól, aby NIP, KRS, REGON i BDO wyświetlały się prawidłowo na karcie kontrahenta. Przejdź do ustawień modułu, przewiń do sekcji "Nadpisania tłumaczeń" i kliknij "Zastosuj nadpisania tłumaczeń" dla wybranych języków. Wystarczy to zrobić raz (lub ponownie po zmianie mapowań pól).
+KSEF_HowTo_Config_VatRates=Kody stawek VAT dla KSeF
+KSEF_HowTo_Config_VatRatesIntro=KSeF używa specyficznych kodów do rozróżniania typów stawki 0%% VAT (zwolnione, odwrotne obciążenie, niepodlegające, WDT, eksport). Moduł automatycznie tworzy te wpisy w słowniku stawek VAT Dolibarr przy pierwszej aktywacji, ale są <b>domyślnie wyłączone</b>, aby lista stawek VAT na fakturze była czytelna. Włącz tylko kody potrzebne Twojej firmie w ustawieniach modułu.
+KSEF_HowTo_Config_VatRatesCodes_Intro=Jak włączyć kody stawek VAT:
+KSEF_HowTo_Config_VatRatesCodes_Step1=Przejdź do ustawień modułu KSeF
+KSEF_HowTo_Config_VatRatesCodes_Step2=W sekcji <b>Pola opcjonalne</b> znajdź tabelę <b>Kody stawek VAT dla KSeF</b>
+KSEF_HowTo_Config_VatRatesCodes_Step3=Zaznacz potrzebne kody (np. ZW dla usług zwolnionych, WDT dla dostaw wewnątrzwspólnotowych)
+KSEF_HowTo_Config_VatRatesCodes_Step4=Kliknij Zapisz - włączone kody pojawią się w liście stawek VAT przy tworzeniu pozycji faktur
+KSEF_HowTo_Config_VatRatesCodes_Outro=Standardowa stawka 0%% (bez kodu) jest zawsze dostępna i automatycznie wykrywa krajowe/WDT/eksport na podstawie kraju nabywcy. Obsługiwane kody:
+KSEF_HowTo_Config_VatRatesTable_ColCode=Kod
+KSEF_HowTo_Config_VatRatesTable_ColUse=Zastosowanie
+KSEF_HowTo_Config_VatRatesTable_None=(brak)
+KSEF_HowTo_Config_VatRatesTable_NoneUse=Standardowe 0%% - zawsze dostępne. Moduł automatycznie wybiera odpowiedni typ KSeF (krajowy, WDT lub eksport) na podstawie kraju nabywcy.
+KSEF_HowTo_Config_VatRatesTable_ZWUse=Zwolniony z VAT - usługi medyczne/dentystyczne (art. 43), edukacyjne, finansowe, zwolnienie podmiotowe (art. 113)
+KSEF_HowTo_Config_VatRatesTable_RCUse=Odwrotne obciążenie (art. 17 ust. 1 pkt 7/8)
+KSEF_HowTo_Config_VatRatesTable_NPUse=Niepodlegające - towary/usługi poza terytorium kraju
+KSEF_HowTo_Config_VatRatesTable_NP2Use=Niepodlegające II - usługi wewnątrzwspólnotowe (art. 100 ust. 1 pkt 4)
+KSEF_HowTo_Config_VatRatesTable_WDTUse=Wewnątrzwspólnotowa dostawa towarów - gdy auto-wykrywanie nie wystarczy
+KSEF_HowTo_Config_VatRatesTable_EXUse=Eksport towarów - gdy auto-wykrywanie nie wystarczy
+KSEF_HowTo_Config_VatRatesSetup=<b>Przy tworzeniu pozycji faktur</b> wybierz odpowiednią stawkę VAT z listy rozwijanej. Na przykład gabinet dentystyczny powinien wybrać <b>0%% (ZW)</b> dla usług zwolnionych, natomiast zwykła sprzedaż krajowa to standardowe 23%%. Jeśli potrzebujesz kodu, którego nie ma na liście powyżej, możesz dodać niestandardowe wpisy przez <b>Strona główna > Ustawienia > Słowniki > Stawki VAT</b>.
+KSEF_HowTo_Config_VatExemptSetup=Faktury zwolnione z VAT (ZW) - dodatkowa konfiguracja
+KSEF_HowTo_Config_VatExemptIntro=Przy wystawianiu faktur zwolnionych z VAT (kod ZW), KSeF wymaga podania podstawy prawnej zwolnienia. Moduł udostępnia dwa sposoby ustawienia tego - globalną wartość domyślną i nadpisanie per produkt.
+KSEF_HowTo_Config_VatExemptSteps_S1Title=Krok 1: Ustaw globalną wartość domyślną (wymagane)
+KSEF_HowTo_Config_VatExemptSteps_S1_1=W ustawieniach modułu KSeF, w sekcji <b>Pola opcjonalne</b>, znajdź <b>Podstawa zwolnienia z VAT</b>
+KSEF_HowTo_Config_VatExemptSteps_S1_2=Wybierz typ podstawy - <b>ustawa polska</b> jest poprawny dla większości polskich zwolnień
+KSEF_HowTo_Config_VatExemptSteps_S1_3=Wpisz podstawę prawną, np. <b>art. 43 ust. 1 pkt 18 ustawy o VAT</b> (usługi medyczne/dentystyczne)
+KSEF_HowTo_Config_VatExemptSteps_S1Outro=Ta wartość jest używana dla wszystkich pozycji ZW na fakturze, chyba że zostanie nadpisana na poziomie produktu.
+KSEF_HowTo_Config_VatExemptSteps_S2Title=Krok 2: Nadpisanie per produkt (opcjonalne - dla firm z wieloma typami zwolnień)
+KSEF_HowTo_Config_VatExemptSteps_S2_1=Utwórz pole dodatkowe produktu/usługi, np. przejdź do <b>Strona główna > Ustawienia > Pozostałe ustawienia > Pola dodatkowe</b>, wybierz zakładkę <b>Produkty/Usługi</b> i utwórz nowe pole tekstowe (np. "zwolnienie_podstawa")
+KSEF_HowTo_Config_VatExemptSteps_S2_2=Na karcie każdego zwolnionego produktu wypełnij odpowiednią podstawę prawną
+KSEF_HowTo_Config_VatExemptSteps_S2_3=W ustawieniach modułu KSeF ustaw <b>Podstawa zwolnienia z produktu</b> wskazując na nowe pole dodatkowe
+KSEF_HowTo_Config_VatExemptSteps_S2Outro=Gdy faktura zawiera pozycje ZW, moduł najpierw sprawdza podstawę z produktu. Jeśli znaleziona, wartości z produktów są używane (różne podstawy łączone są przecinkami). Jeśli nie znaleziono podstawy z produktu, używana jest globalna wartość domyślna.
+KSEF_CannotModifySubmitted=Ta faktura została przesłana do KSeF i nie może być modyfikowana
+KSEF_PaymentStatus=Status płatności
+KSEF_SellerMarkedPaid=Zapłacona (wg XML)
+KSEF_SellerMarkedPaidInstallments=Zapłacona w częściach (wg XML)
+KSEF_SellerMarkedPartial=Częściowo zapłacona (wg XML)
+KSEF_PaymentMethod=Metoda płatności
+KSEF_PaymentDate=Data płatności
+KSEF_PaymentAmount=Kwota
+KSEF_NotSpecifiedInXml=Nie określono w XML
+KSEF_ValidateAndPay=Zatwierdź i dodaj płatność
+KSEF_PaymentConfirmed=Faktura zatwierdzona i płatność potwierdzona na podstawie danych KSeF
+KSEF_PaymentConfirmError=Nie udało się potwierdzić płatności
+#
+# Latarnia - Status Systemu KSeF
+#
+KSEF_LATARNIA_AVAILABLE=Dostępny
+KSEF_LATARNIA_MAINTENANCE=Przerwa serwisowa
+KSEF_LATARNIA_FAILURE=Awaria
+KSEF_LATARNIA_TOTAL_FAILURE=Awaria całkowita
+KSEF_LATARNIA_UNREACHABLE=Nieosiągalny
+KSEF_LATARNIA_UNKNOWN=Nieznany
+KSEF_SystemStatus=Status Systemu KSeF
+KSEF_LastChecked=Ostatnie sprawdzenie
+KSEF_CheckNow=Sprawdź Teraz
+KSEF_CheckLatarnia=Sprawdź Latarnię KSeF
+KSEF_NeverChecked=Nigdy nie sprawdzano
+KSEF_LatarniaUnreachableWarning=Nie udało się połączyć z serwisem statusu KSeF (Latarnia). Dostępność KSeF jest nieznana.
+KSEF_MaintenancePlanned=Planowana przerwa serwisowa: %s
+KSEF_MaintenanceOngoing=Trwa przerwa serwisowa od %s
+KSEF_SystemDownFailure=KSeF doświadcza awarii od %s
+KSEF_SystemDownTotalFailure=KSeF doświadcza całkowitej awarii od %s
+KSEF_SystemDownWarning=System KSeF jest obecnie niedostępny. Faktury mogą być wystawiane w trybie offline.
+KSEF_LatarniaCheckSuccess=Status systemu KSeF: %s
+KSEF_LatarniaCheckError=Nie udało się sprawdzić statusu systemu KSeF: %s
+KSEF_DeadlineFailure7Days=7 dni roboczych od zakończenia awarii
+KSEF_DeadlineTotalFailureNone=Brak terminu (awaria całkowita - brak obowiązku ponownego wysłania)
+KSEF_DeadlinePendingOutageEnd=Termin zostanie obliczony po zakończeniu awarii
+KSEF_LatarniaMessages=Komunikaty
+KSEF_Start=Początek
+KSEF_End=Koniec
+KSEF_Published=Opublikowano
+KSEF_LATARNIA_TYPE_FAILURE_START=Rozpoczęcie awarii
+KSEF_LATARNIA_TYPE_FAILURE_END=Zakończenie awarii
+KSEF_LATARNIA_TYPE_MAINTENANCE_ANNOUNCEMENT=Ogłoszenie przerwy serwisowej
+KSEF_NothingToReport=Brak problemów
+
+
+KSEF_DISABLE_VALIDATE_AND_UPLOAD=Wyłącz przycisk "Zatwierdź i wyślij"
+KSEF_DISABLE_VALIDATE_AND_UPLOAD_Help=Po włączeniu, połączony przycisk "Zatwierdź i wyślij do KSeF" jest ukryty na fakturach w wersji roboczej. Wymusza to krokowy tryb pracy: najpierw zatwierdź fakturę (opcjonalnie zarejestruj płatność), a następnie wyślij do KSeF osobno. Przydatne, gdy musisz zarejestrować płatność przed wysłaniem do KSeF.
+KSEF_CONFIRM_BEFORE_UPLOAD=Potwierdzenie przed wysłaniem do KSeF
+KSEF_CONFIRM_BEFORE_UPLOAD_Help=Po włączeniu, przed wysłaniem faktury do KSeF wyświetlane jest okno potwierdzenia z podglądem PDF KSeF. Pozwala to na sprawdzenie faktury przed wysłaniem. Domyślnie włączone.
+KSEF_ConfirmUploadTitle=Potwierdź wysłanie do KSeF
+KSEF_ConfirmUploadValidatedTitle=Faktura zatwierdzona - potwierdź wysłanie do KSeF
+KSEF_ConfirmUploadText=Zamierzasz wysłać fakturę %s do KSeF.
+KSEF_ConfirmUploadSubmit=Wyślij do KSeF
+KSEF_ConfirmUploadCancel=Anuluj
+KSEF_ConfirmUploadNote=Numer KSeF i kod QR zostaną dodane do PDF po wysłaniu i potwierdzeniu odbioru.
+KSEF_ConfirmLatarniaWarning=Wykryto problem ze statusem systemu KSeF:
+KSEF_ConfirmXMLWarnings=Ostrzeżenia walidacji XML
+KSEF_SHOW_PDF_AFTER_UPLOAD=Pokaż PDF po wysłaniu do KSeF
+KSEF_SHOW_PDF_AFTER_UPLOAD_Help=Po włączeniu, po pomyślnym wysłaniu do KSeF wyświetlane jest okno z finalnym PDF (zawierającym numer KSeF i kod QR). Umożliwia szybki wydruk lub zapis. Domyślnie włączone.
+KSEF_PostUploadTitle=Faktura wysłana do KSeF
+KSEF_PostUploadText=Faktura %s została pomyślnie wysłana do KSeF.
+KSEF_PostUploadKsefNumber=Numer KSeF
+KSEF_PostUploadClose=Zamknij
+KSEF_PostUploadSave=Zapisz na dysk
+KSEF_PostUploadPrint=Drukuj
+KSEF_CONFIRM_PDF_TEMPLATE=Szablon PDF podglądu potwierdzenia
+KSEF_CONFIRM_PDF_TEMPLATE_Help=Wybierz szablon PDF wyświetlany w oknie potwierdzenia wysyłki. "PDF KSeF" pokazuje podgląd faktury w stylu KSeF. Szablony Dolibarr (Sponge, Crabe itp.) pokazują standardowy PDF faktury Dolibarr.
+KSEF_CONFIRM_PDF_TEMPLATE_KSEF=PDF KSeF
+KSEF_Tab_General=Ogólne
+KSEF_Tab_Authentication=Uwierzytelnianie
+KSEF_Tab_Outgoing=Faktury wychodzące
+KSEF_Tab_Incoming=Faktury przychodzące
+KSEF_WarningFixOnTab=Napraw na zakładce <a href="%s">%s</a>
+KSEF_WARNING_MISSING_EXTENSIONS=Brak wymaganych rozszerzeń PHP: %s
+KSEF_WARNING_AUTH_CERT_EXPIRED=Certyfikat uwierzytelniający wygasł dla aktywnego środowiska
+KSEF_WARNING_OFFLINE_CERT_EXPIRED=Certyfikat offline wygasł dla aktywnego środowiska
+KSEF_EnvSection_TEST=Środowisko TEST
+KSEF_EnvSection_DEMO=Środowisko DEMO
+KSEF_EnvSection_PRODUCTION=Środowisko PRODUKCYJNE
+KSEF_EnvSection_Active=(aktywne)
+KSEF_EnvStatusToken=Token
+KSEF_EnvStatusCert=Certyfikat
+KSEF_EnvStatusMethod=Metoda
+KSEF_EnvStatusOffline=Cert. Offline
+KSEF_Configured=Skonfigurowany
+KSEF_NotConfigured=Nieskonfigurowany
+KSEF_Expired=Wygasły
+KSEF_TestsAgainstActiveEnv=Testy wykonywane dla aktywnego środowiska (%s)
+KSEF_WARNING_ENV_NO_AUTH=Przełączono na środowisko %s, które nie ma skonfigurowanego uwierzytelniania. Operacje KSeF nie będą działać do czasu skonfigurowania tokena lub certyfikatu.
+KSEF_AuthPageInfo=Wszystkie 3 certyfikaty środowiskowe mogą być skonfigurowane i przechowywane. Aktualnie wybrane środowisko jest podświetlone na zielono. Pozostałe środowiska można rozwinąć klikając na ich nagłówek, aby dodać tam certyfikaty.
+KSEF_CertificateConfigured=Certyfikat skonfigurowany
+KSEF_LINE_ITEM_FIELDS=Pola pozycji faktury
+KSEF_INVOICE_HEADER_FIELDS=Pola faktury
+KSEF_VAT_EXEMPTION_SECTION=Zwolnienie z VAT
+KSEF_SUBMISSION_PDF_SECTION=Wysyłka i ustawienia PDF
+KSEF_EXTRAFIELD_CREATE_EXPLANATION=Pola dodatkowe to niestandardowe pola danych w Dolibarr. Utworzenie pola tutaj dodaje nowe pole wejściowe na karcie wybranego obiektu (faktura, produkt, kontrahent itp.). Po utworzeniu przypisz je w tabeli pól dodatkowych powyżej: jako notatkę (opis dodatkowy lub stopka faktury) lub jako źródło konkretnego pola KSeF (numer zamówienia, GTU itp.). Istniejące pola dodatkowe Dolibarr pojawiają się automatycznie.
+KSEF_ASSIGN_NONE=(nie przypisano)
+KSEF_ASSIGN_DODATKOWY=Opis dodatkowy (notatka)
+KSEF_ASSIGN_STOPKA=Stopka faktury (notatka)
+KSEF_ASSIGN_NR_ZAMOWIENIA=Numer zamówienia
+KSEF_ASSIGN_NR_UMOWY=Numer umowy
+KSEF_ASSIGN_TP=TP (podmiot powiązany)
+KSEF_ASSIGN_IDNABYWCY=Identyfikator nabywcy
+KSEF_ASSIGN_NREORI=Numer EORI nabywcy
+KSEF_ASSIGN_GTU=GTU (oznaczenie towarów/usług)
+KSEF_ASSIGN_PROCEDURA=Procedura (oznaczenie procedury)
+KSEF_ASSIGN_ZWOLNIENIE=Podstawa zwolnienia z VAT
+KSEF_ASSIGN_COLUMN=Przypisanie
+
+# ============================================
+# Correction Invoices
+# ============================================
+KSEF_CorrectionInvoicesSection=Faktury korygujące
+KSEF_CorrectionInvoicesDesc=Zarówno noty kredytowe, jak i faktury zastępcze są wysyłane do KSeF jako korekty (KOR) z odniesieniem do oryginału. Oryginał musi być najpierw w KSeF. Noty kredytowe obsługują tylko zmniejszenia. Faktury zastępcze obsługują dowolne zmiany i umożliwiają korektę opłaconych faktur z automatycznym przeniesieniem płatności.
+KSEF_ExtraFieldCorrectionReason=Przyczyna korekty
+KSEF_ExtraFieldCorrectionType=Typ korekty
+KSEF_CorrectionReason=Przyczyna korekty
+KSEF_CorrectionReasonHelp=Tekstowy opis przyczyny korekty. Zalecany przez polskie prawo podatkowe (art. 106j ustawy o VAT), ale niewymagany przez schemat KSeF.
+KSEF_CorrectionReasonPlaceholder=np. Korekta stawki VAT, aktualizacja adresu...
+KSEF_CorrectionDetails=Szczegóły korekty
+KSEF_CorrectionType=Typ korekty
+KSEF_CorrectionType1=1 - Skutek na datę faktury pierwotnej
+KSEF_CorrectionType2=2 - Skutek na datę faktury korygującej
+KSEF_CorrectionType3=3 - Skutek na inną datę
+KSEF_StatusCorrected=Skorygowana
+KSEF_StatusCorrectedLong=Skorygowana (KSeF)
+KSEF_StatusCorrectedTooltip=Ta faktura została zastąpiona fakturą korygującą wysłaną do KSeF
+KSEF_DefaultCorrectionReason=Domyślna przyczyna korekty
+KSEF_DefaultCorrectionReasonHelp=Wstępnie wypełniana przyczyna korekty dla nowych faktur korygujących. Użytkownicy mogą ją zmienić dla każdej faktury. Pozostaw puste, aby nie ustawiać domyślnej wartości.
+KSEF_DefaultCorrectionType=Domyślny typ korekty
+KSEF_DefaultCorrectionTypeHelp=Wstępnie wypełniany typ korekty dla nowych faktur korygujących. Użytkownicy mogą go zmienić dla każdej faktury. Pozostaw puste, aby nie ustawiać domyślnej wartości.
+KSEF_KOR_LINE_METHOD=Metoda wierszy korekty
+KSEF_KOR_LINE_METHOD_Help=Sposób prezentacji wierszy faktury korygującej w XML FA(3). Noty kredytowe zawsze używają metody różnicowej niezależnie od tego ustawienia (odtworzenie stanu przed/po z noty kredytowej nie jest obsługiwane). Domyślnie: Przed/Po.
+KSEF_KOR_LINE_METHOD_DIFFERENTIAL=Różnicowa - tylko wiersze z różnicami
+KSEF_KOR_LINE_METHOD_STANPRZED=Przed/Po - pełne szczegóły wierszy (zalecana)
+KSEF_ENTITY_FIELDS_SECTION=Pola podmiotów
+KSEF_IDNABYWCY_SOURCE=Źródło ID nabywcy
+KSEF_IDNABYWCY_SOURCE_Help=Opcjonalny identyfikator nabywcy, utrzymujący rozpoznanie nabywcy w korektach przy zmianie jego danych. Źródło: kod klienta lub pole dodatkowe kontrahenta. Typ pola: varchar/text/int.
+KSEF_IDNABYWCY_SOURCE_DISABLED=Wyłączone
+KSEF_IDNABYWCY_SOURCE_CODE_CLIENT=Kod klienta (code_client)
+KSEF_IDNABYWCY_SOURCE_EXTRAFIELD=Pole dodatkowe kontrahenta
+KSEF_LINE_FIELDS_SECTION=Pola pozycji
+KSEF_GTU_SOURCE=Źródło oznaczenia GTU
+KSEF_GTU_SOURCE_Help=Źródło oznaczeń GTU per wiersz (GTU_01 do GTU_13, klasyfikacja typu towarów/usług). Wybierz pole dodatkowe produktu przechowujące kod GTU. Wspiera zgodność z JPK_VAT. Wymagany typ pola dodatkowego: varchar, select lub text.
+KSEF_GTU_SOURCE_DISABLED=Wyłączone
+KSEF_GTU_SOURCE_PRODUCT_EXTRAFIELD=Pole dodatkowe produktu
+KSEF_PROCEDURA_SOURCE=Źródło oznaczenia Procedura
+KSEF_PROCEDURA_SOURCE_Help=Źródło oznaczeń Procedura per wiersz (WSTO_EE, IED, TT_D, I_42, I_63, B_SPV, B_SPV_DOSTAWA, B_MPV_PROWIZJA, MPP). Wybierz pole dodatkowe produktu przechowujące kod procedury. Wymagany typ pola dodatkowego: varchar, select lub text.
+KSEF_PROCEDURA_SOURCE_DISABLED=Wyłączone
+KSEF_PROCEDURA_SOURCE_PRODUCT_EXTRAFIELD=Pole dodatkowe produktu
+KSEF_FA3_INCLUDE_UU_ID=Dołącz UUID wiersza
+KSEF_FA3_INCLUDE_UU_ID_Help=Emituje unikalny identyfikator per wiersz faktury w XML FA(3). Przydatne do niezawodnego dopasowywania wierszy w fakturach korygujących. Uwaga: to pole jest widoczne na wizualizacji PDF KSeF jako kolumna "Unikalny numer wiersza", co może mylić odbiorców faktur.
+KSEF_ExtraFieldUUID=UUID wiersza KSeF
+KSEF_INVOICE_FLAGS_SECTION=Znaczniki faktury
+KSEF_FA3_INCLUDE_FP=Znacznik FP (art. 109 ust. 3d)
+KSEF_FA3_INCLUDE_FP_Help=Emituj FP=1 na fakturach. Dotyczy faktur podatników, którzy utracili zwolnienie z VAT (art. 109 ust. 3d ustawy o VAT). Włącz tylko jeśli dotyczy Twojej działalności.
+KSEF_TP_SOURCE=Źródło znacznika powiązań
+KSEF_TP_SOURCE_Help=Oznacza transakcje z podmiotami powiązanymi (TP). Źródło: pole dodatkowe kontrahenta lub faktury wskazujące powiązanie. Typ pola: boolean/select/varchar/int.
+KSEF_TP_SOURCE_DISABLED=Wyłączone
+KSEF_TP_SOURCE_THIRDPARTY_EXTRAFIELD=Pole dodatkowe kontrahenta
+KSEF_TP_SOURCE_EXTRAFIELD=Pole dodatkowe faktury
+# Źródła znaczników Adnotacje na poziomie faktury (#29)
+KSEF_FA3_MPP_SOURCE=Źródło mechanizmu podzielonej płatności (MPP)
+KSEF_FA3_MPP_SOURCE_Help=Emituje znacznik podzielonej płatności i wymaganą adnotację. Dla towarów z zał. nr 15, brutto co najmniej 15 000 zł. Ustaw na poziomie faktury przez pole dodatkowe. Typ pola: boolean/select/varchar/int.
+KSEF_FA3_MPP_SOURCE_DISABLED=Wyłączone
+KSEF_FA3_MPP_SOURCE_EXTRAFIELD=Pole dodatkowe faktury
+KSEF_FA3_MPP_SOURCE_ALWAYS_ON=Zawsze włączone
+KSEF_FA3_FP_SOURCE=Źródło znacznika FP (art. 109 ust. 3d)
+KSEF_FA3_FP_SOURCE_Help=Emituje FP (faktura do paragonu). Ustaw na poziomie faktury przez pole dodatkowe. Typ pola: boolean/select/varchar/int.
+KSEF_FA3_FP_SOURCE_DISABLED=Wyłączone
+KSEF_FA3_FP_SOURCE_EXTRAFIELD=Pole dodatkowe faktury
+KSEF_FA3_FP_SOURCE_ALWAYS_ON=Zawsze włączone
+KSEF_P17_SOURCE=Samofakturowanie - źródło na poziomie faktury
+KSEF_P17_SOURCE_Help=Emituje znacznik samofakturowania. To pole na poziomie faktury albo domyślne ustawienie kontrahenta poniżej włącza flagę (którekolwiek jest ustawione); pole faktury nie wyłączy domyślnego ustawienia kontrahenta. Źródło: pole dodatkowe faktury. Typ pola: boolean/select/varchar/int.
+KSEF_P17_SOURCE_DISABLED=Wyłączone
+KSEF_P17_SOURCE_EXTRAFIELD=Pole dodatkowe faktury
+KSEF_P17_SOURCE_ALWAYS_ON=Zawsze włączone
+KSEF_P17_TP_SOURCE=Samofakturowanie - domyślnie dla kontrahenta
+KSEF_P17_TP_SOURCE_Help=Domyślne samofakturowanie dla kontrahenta (nabywcy, z którymi masz umowę o samofakturowanie). Włącza samofakturowanie dla wszystkich ich faktur, niezależnie od pola faktury powyżej. Źródło: pole dodatkowe kontrahenta. Typ pola: boolean/select/varchar/int.
+KSEF_P17_TP_SOURCE_DISABLED=Wyłączone
+KSEF_P17_TP_SOURCE_THIRDPARTY_EXTRAFIELD=Pole dodatkowe kontrahenta
+KSEF_P16_SOURCE=Źródło metody kasowej
+KSEF_P16_SOURCE_Help=Emituje znacznik metody kasowej. Poziom podatnika, zwykle Zawsze włączone; wyłącz, jeśli nie stosujesz metody kasowej.
+KSEF_P16_SOURCE_DISABLED=Wyłączone
+KSEF_P16_SOURCE_ALWAYS_ON=Zawsze włączone
+KSEF_P18_SOURCE=Źródło odwrotnego obciążenia - na poziomie faktury
+KSEF_P18_SOURCE_Help=Emituje znacznik odwrotnego obciążenia dla dostaw transgranicznych/wewnątrzunijnych. To pole na poziomie faktury albo domyślne ustawienie kontrahenta poniżej włącza flagę (którekolwiek jest ustawione); pole faktury nie wyłączy domyślnego ustawienia kontrahenta. Pole dodatkowe faktury lub zawsze włączone. Typ pola: boolean/select/varchar/int.
+KSEF_P18_SOURCE_DISABLED=Wyłączone
+KSEF_P18_SOURCE_EXTRAFIELD=Pole dodatkowe faktury
+KSEF_P18_SOURCE_ALWAYS_ON=Zawsze włączone
+KSEF_P18_TP_SOURCE=Odwrotne obciążenie - domyślnie dla kontrahenta
+KSEF_P18_TP_SOURCE_Help=Domyślne odwrotne obciążenie dla kontrahenta. Włącza odwrotne obciążenie dla wszystkich faktur tego kontrahenta, niezależnie od pola faktury powyżej. Źródło: pole dodatkowe kontrahenta. Typ pola: boolean/select/varchar/int.
+KSEF_P18_TP_SOURCE_DISABLED=Wyłączone
+KSEF_P18_TP_SOURCE_THIRDPARTY_EXTRAFIELD=Pole dodatkowe kontrahenta
+KSEF_ASSIGN_MPP=Podzielona płatność (MPP)
+KSEF_ASSIGN_FP=FP (faktura do paragonu)
+KSEF_ASSIGN_P17=Samofakturowanie
+KSEF_ASSIGN_P18=Odwrotne obciążenie
+# Podmiot trzeci (#28)
+KSEF_PODMIOT3_SOURCE=Podmiot trzeci
+KSEF_PODMIOT3_SOURCE_Help=Dodaje selektor podmiotu trzeciego na zakładce KSeF każdej faktury, dla podmiotu innego niż sprzedawca i nabywca, najczęściej płatnika innego niż nabywca. Rozliczenie pozostaje ręczne.
+KSEF_PODMIOT3_ROLE=Domyślna rola podmiotu trzeciego
+KSEF_PODMIOT3_ROLE_Help=Rola wstępnie wybrana w selektorze; można zmienić per fakturę. Najczęściej płatnik.
+KSEF_Podmiot3_Field=Podmiot trzeci KSeF
+KSEF_Podmiot3_Field_Help=Pole pomocnicze dla wyboru podmiotu trzeciego KSeF. Ustaw je przez selektor na zakładce KSeF, nie tutaj.
+KSEF_Podmiot3_Role_Field=Rola podmiotu trzeciego KSeF
+KSEF_Podmiot3_Role_Field_Help=Pole pomocnicze dla kodu roli podmiotu trzeciego KSeF. Ustaw je przez selektor na zakładce KSeF, nie tutaj.
+KSEF_Podmiot3_Details=Podmiot trzeci
+KSEF_Podmiot3_Details_Help=Emituj dodatkowy podmiot FA(3) dla tej faktury, np. płatnika innego niż nabywca. Wybierz kontrahenta i jego rolę. Pozostaw kontrahenta pustego, aby nic nie emitować.
+KSEF_Podmiot3_Party=Podmiot trzeci
+KSEF_Podmiot3_Role=Rola
+KSEF_Podmiot3_Saved=Zapisano podmiot trzeci
+KSEF_Podmiot3_Locked=Faktura została już wysłana do KSeF, nie można zmienić podmiotu trzeciego
+KSEF_Podmiot3_Add=Dodaj podmiot inny
+KSEF_Podmiot3_SaveAddAnother=Zapisz i dodaj kolejny
+KSEF_Podmiot3_Remove=Usuń
+KSEF_Podmiot3_Max=Maksymalnie 20 podmiotów innych na fakturę
+KSEF_Podmiot3_Role2=Odbiorca (jednostka wewnętrzna)
+KSEF_Podmiot3_Role3=Podmiot pierwotny
+KSEF_Podmiot3_Role4=Dodatkowy nabywca
+KSEF_Podmiot3_Role5=Wystawca faktury
+KSEF_Podmiot3_Role6=Dokonujący płatności (płatnik)
+KSEF_Podmiot3_Role7=JST wystawca
+KSEF_Podmiot3_Role8=JST odbiorca
+KSEF_Podmiot3_Role9=Członek grupy VAT (wystawca)
+KSEF_Podmiot3_Role10=Członek grupy VAT (odbiorca)
+KSEF_Podmiot3_Role11=Pracownik
+KSEF_Podmiot3_Role1=Faktor
+KSEF_Podmiot3_Udzial=Udział %%
+KSEF_Podmiot3_Udzial_Help=Opcjonalnie. Puste pole oznacza równe udziały nabywców.
+KSEF_Podmiot3_FactorNoBank=Faktor nie ma przypisanego rachunku bankowego: %s. Dodaj rachunek bankowy do podmiotu, w przeciwnym razie rachunek bankowy faktora zostanie pominięty w pliku XML faktury.
+KSEF_ASSIGN_IDWEW=IDWew (identyfikator wewnętrzny)
+KSEF_IDWEW_SOURCE=Źródło IDWew (identyfikator wewnętrzny)
+KSEF_IDWEW_SOURCE_Help=Opcjonalne. Mapuje pole dodatkowe kontrahenta z identyfikatorem wewnętrznym (IDWew) dla oddziałów/jednostek/pracowników bez własnego NIP. Format: NIP-12345 (np. 1234567890-00001). Emitowany zamiast NIP, gdy ustawiony. Typ pola: varchar/text.
+KSEF_IDWEW_SOURCE_DISABLED=Wyłączone
+KSEF_IDWEW_SOURCE_THIRDPARTY_EXTRAFIELD=Pole dodatkowe kontrahenta
+KSEF_HintCreditNote=Korekta KSeF: użyj tylko do zmniejszenia kwot (zwroty, korekty ilości, rabaty). Faktura pierwotna musi być najpierw wysłana do KSeF.
+KSEF_HintReplacement=Korekta KSeF: użyj do dowolnych zmian, w tym zwiększenia lub zmniejszenia kwot, zmiany stawek VAT, adresów lub pozycji. Faktura pierwotna musi być najpierw wysłana do KSeF.
+KSEF_CorrectionInvoice=Faktura korygująca
+KSEF_CorrectionInvoiceFor=Korekta faktury
+KSEF_CorrectionInvoiceAsk=Faktura korygująca do faktury
+KSEF_CorrectionInvoiceDesc=<b>Faktura korygująca</b> jest wysyłana do KSeF jako korekta KOR z odniesieniem do oryginału. Zmienia kwoty, stawki VAT, adresy lub pozycje. Opłacone faktury również mogą być korygowane z automatycznym przeniesieniem płatności.
+KSEF_ReplacedByCorrectionInvoice=Skorygowana fakturą
+KSEF_CreateCorrection=Utwórz korektę
+KSEF_KorektaOfKorekta=Korekta KSeF - korekta korekty
+KSEF_CorrectionOriginalHT=Kwota netto faktury pierwotnej
+KSEF_CorrectionOriginalTVA=Kwota VAT faktury pierwotnej
+KSEF_CorrectionOriginalTTC=Kwota brutto faktury pierwotnej
+KSEF_CorrectionDiscountId=ID rekordu rabatu korekty
+KSEF_CorrectionSummary=Podsumowanie korekty
+KSEF_CorrectionOf=Korekta do
+KSEF_OriginalAmount=Kwota pierwotna
+KSEF_CorrectedAmount=Kwota skorygowana
+KSEF_CorrectionDifference=Różnica
+KSEF_CorrectionChainBlocked=Nie można cofnąć walidacji lub usunąć: ta faktura jest korygowana przez %s
+KSEF_CorrectionDiscountDescription=Korekta %s - kwota pierwotna zastosowana do faktury korygującej
+KSEF_CorrectionRemainToRefund=Kwota pozostała do zwrotu
+KSEF_CorrectionDraftHint=Ta korekta zastępuje oryginał. Edytuj pozycje, aby odzwierciedlały docelową zawartość faktury po korekcie - system automatycznie obliczy różnice.
+KSEF_CreditNoteDraftHint=Ta korekta odejmuje od oryginału. Wprowadź tylko kwoty do zmniejszenia lub zwrotu.
+KSEF_CorrectionOriginalNoKsef=Faktura pierwotna nie zostala wyslana do KSeF. Korekta bedzie odwolywal sie tylko do numeru faktury, a nie do numeru KSeF.
+KSEF_CorrectionReasonPreset_return=Zwrot towaru
+KSEF_CorrectionReasonPreset_qty=Błędna ilość
+KSEF_CorrectionReasonPreset_price=Błędna cena
+KSEF_CorrectionReasonPreset_vat=Błędna stawka VAT
+KSEF_CorrectionReasonPreset_discount=Rabat potransakcyjny
+KSEF_CorrectionReasonPreset_skonto=Skonto
+KSEF_CorrectionReasonPreset_advance=Zwrot zaliczki
+KSEF_CorrectionReasonPreset_buyer=Błędne dane nabywcy
+KSEF_CorrectionReasonPreset_other=Inne - wpisz tekst
+KSEF_CorrectionDetailsSaved=Szczegóły korekty zostały zapisane
+KSEF_CorrectionDetailsLocked=Szczegóły korekty nie mogą być zmienione po zaakceptowaniu faktury przez KSeF lub utworzeniu w trybie offline
+KSEF_NotSet=(nie ustawiono)
+KSEF_CorrectionReasonAlwaysPolishHelp=Przyczyna korekty jest zawsze zapisywana po polsku zgodnie z wymaganiami KSeF. Jeśli wybierzesz "Inne", wpisz tekst po polsku.
+KSEF_CorrectionReasonCustomPlaceholder=Wpisz przyczynę korekty...
+KSEF_CorrectionChain=Łańcuch korekt
+KSEF_CorrectionChainInvoice=Faktura
+KSEF_CorrectionChainExclTax=Netto
+KSEF_CorrectionChainTax=VAT
+KSEF_CorrectionChainInclTax=Brutto
+KSEF_CorrectionChainDiff=Różnica
+KSEF_CorrectionChainStatus=Status
+KSEF_CorrectionChainCorrected=Skorygowana
+KSEF_CorrectionChainCurrent=Bieżąca
+KSEF_CorrectionChainTotalPaid=Suma wpłat w łańcuchu
+KSEF_CorrectionChainCurrentAmount=Kwota bieżącej faktury
+KSEF_CorrectionChainRemainToRefund=Pozostało do zwrotu
+KSEF_CorrectionChainRemainToCollect=Pozostało do zapłaty
+KSEF_CorrectionChainSettled=Rozliczono
+KSEF_CorrectionChainCorrectedNote=Ta faktura została skorygowana - płatności są śledzone na ostatniej korekcie w łańcuchu.
+KSEF_CorrectionChainCurrentNote=To jest najnowsza korekta w łańcuchu - płatności są śledzone tutaj.
+KSEF_CorrectionChainSuperseded=Zastąpiona
+
+
+KSEF_HowTo_Corrections=Faktury korygujące
+KSEF_HowTo_Corrections_Intro=Polskie prawo podatkowe stosuje jedno pojęcie dla korekt: <b>faktura korygująca</b>. Dolibarr ma dwa typy faktur, które temu służą. Oba wysyłane do KSeF jako korekty KOR z odniesieniem do oryginału, który musi być najpierw w KSeF.
+KSEF_HowTo_Corrections_WhenTitle=Kiedy użyć którego typu
+KSEF_HowTo_Corrections_CreditNote=<b>Nota kredytowa</b> (Dolibarr "avoir") tworzy fakturę ujemną. Użyj tylko do zmniejszeń: zwroty, korekty ilości, rabaty potransakcyjne.
+KSEF_HowTo_Corrections_Replacement=<b>Faktura korygująca</b> (Dolibarr "zastępcza") zastępuje oryginał w całości. Użyj do dowolnych zmian: kwoty, stawki VAT, adresy, pozycje. Opłacone faktury również mogą być korygowane w ten sposób.
+KSEF_HowTo_Corrections_CreateTitle=Tworzenie korekty
+KSEF_HowTo_Corrections_CreateButton=Po zaakceptowaniu faktury w KSeF na karcie pojawia się przycisk <b>Utwórz korektę</b>. Otwiera stronę tworzenia z typem korekty i fakturą źródłową już wybranymi.
+KSEF_HowTo_Corrections_CreateRadio=Korektę można też utworzyć ze strony tworzenia faktury, wybierając opcję faktury korygującej i wskazując fakturę źródłową.
+KSEF_HowTo_Corrections_PaidInvoice=Dla opłaconych faktur rabat jest automatycznie stosowany do rozliczenia korekty podczas walidacji. Oryginał zostaje przywrócony do statusu Opłacona/Zamknięta (nie anulowana).
+KSEF_HowTo_Corrections_DetailsTitle=Szczegóły korekty
+KSEF_HowTo_Corrections_Reason=<b>Przyczyna korekty</b> - tekstowa przyczyna korekty. Zalecane przez prawo podatkowe, ale nie wymagane przez schemat KSeF. Wybierz z gotowych przyczyn lub wpisz własny tekst. Zawsze zapisywana po polsku. Domyślną przyczynę można ustawić na zakładce Faktury wychodzące.
+KSEF_HowTo_Corrections_Type=<b>Typ korekty</b> - kiedy korekta wchodzi w życie: data faktury pierwotnej, data korekty lub inna data. Opcjonalne.
+KSEF_HowTo_Corrections_KsefTitle=Co jest wysyłane do KSeF
+KSEF_HowTo_Corrections_KsefXml=XML KOR odwołuje się do oryginału po numerze KSeF. Metoda pozycji konfigurowalna na zakładce Faktury wychodzące:
+KSEF_HowTo_Corrections_MethodDiff=<b>Różnicowa</b> - tylko pozycje delta pokazujące zmianę
+KSEF_HowTo_Corrections_MethodStan=<b>Przed/Po</b> (stan przed, domyślna) - stan pierwotny i skorygowany dla każdej pozycji
+KSEF_HowTo_Corrections_CreditNoteDiff=Noty kredytowe zawsze używają metody różnicowej, niezależnie od tego ustawienia.
+KSEF_HowTo_Corrections_ChainTitle=Łańcuchy korekt
+KSEF_HowTo_Corrections_Chain=Faktura korygująca może być sama korygowana (korekta korekty). Każda korekta w łańcuchu odwołuje się do poprzedniej. Nie można cofnąć walidacji ani usunąć faktury, która została skorygowana.
+KSEF_HowTo_Corrections_ConfigTitle=Konfiguracja
+KSEF_HowTo_Corrections_Config=Ustawienia korekt znajdują się na zakładce <b>Faktury wychodzące</b> w sekcji <b>Faktury korygujące</b>: domyślna przyczyna korekty i metoda prezentacji pozycji (Różnicowa / Przed-Po).
+
+
+KSEF_HowTo_AdvancedFields=Zaawansowane pola FA(3)
+KSEF_HowTo_AdvancedFields_Intro=Opcjonalne pola dodające dane do XML FA(3). Konfiguracja na zakładce <b>Faktury wychodzące</b>, z wyjątkiem pola EORI sprzedawcy, które znajduje się na zakładce <b>Ogólne</b>.
+KSEF_HowTo_EntityFields=Pola podmiotu (Podmiot)
+KSEF_HowTo_EntityFields_IDNabywcy=<b>ID nabywcy (IDNabywcy)</b> - stabilny identyfikator nabywcy używany w korektach gdy dane nabywcy się zmieniają. Źródło z kodu klienta lub pola dodatkowego kontrahenta. Opcjonalne.
+KSEF_HowTo_EntityFields_EORI=<b>Numery EORI</b> - identyfikator celny UE. EORI sprzedawcy w ustawieniach ogólnych. EORI nabywcy odczytywane z pola identyfikatora zawodowego kontrahenta wskazanego w ustawieniu pola EORI (ustawienia ogólne, domyślnie idprof5). Tylko dla operacji celnych UE.
+KSEF_HowTo_LineFields=Pola pozycji (wiersz faktury)
+KSEF_HowTo_LineFields_GTU=<b>Oznaczenia GTU</b> - klasyfikacja towarów/usług (GTU_01 do GTU_13) per pozycja. Źródło z pola dodatkowego produktu. Wspomaga zgodność z JPK_VAT.
+KSEF_HowTo_LineFields_Procedura=<b>Oznaczenia Procedura</b> - kody procedur per pozycja (WSTO_EE, IED, TT_D, MPP, itp.). Źródło z pola dodatkowego produktu.
+KSEF_HowTo_LineFields_UUID=<b>Unikalny identyfikator pozycji (UUID)</b> - unikalny identyfikator per pozycja do dopasowania pozycji w korektach. Uwaga: widoczny na wizualizacji PDF KSeF, co może dezorientować odbiorców.
+KSEF_HowTo_InvoiceFlags=Flagi faktury
+KSEF_HowTo_InvoiceFlags_FP=<b>FP (faktura do paragonu)</b> - faktura wystawiona do wcześniejszego paragonu fiskalnego. Ustaw na poziomie faktury z pola dodatkowego faktury w ustawieniach faktur wychodzących (brak automatycznego wykrywania POS, ponieważ POS wystawia również zwykłe faktury). Nie przenosi się na korekty.
+KSEF_HowTo_InvoiceFlags_TP=<b>Flaga TP</b> - transakcje z podmiotami powiązanymi (art. 32 ust. 2 pkt 1). Źródło z pola dodatkowego kontrahenta lub faktury. Wspomaga zgodność z JPK_VAT.
+KSEF_HowTo_InvoiceFlags_MPP=<b>MPP (mechanizm podzielonej płatności)</b> - ustaw na poziomie faktury przez pole dodatkowe faktury. Drukuje wymaganą adnotację „Mechanizm podzielonej płatności" na PDF. <b>Dziedziczone</b> na faktury korygujące. Brak automatyzacji księgowej: po stronie sprzedawcy MPP to po prostu dwie płatności częściowe (netto na zwykły rachunek, VAT na rachunek VAT) wprowadzane przez rachunek bankowy każdej płatności.
+KSEF_HowTo_InvoiceFlags_P16=<b>Metoda kasowa</b> - status na poziomie podatnika, więc zwykle ustawiany na „zawsze włączone" w ustawieniach faktur wychodzących.
+KSEF_HowTo_InvoiceFlags_P17=<b>Samofakturowanie</b> - oznacza fakturę wystawioną w procedurze samofakturowania. Cecha na poziomie dokumentu: ustaw na poziomie faktury przez pole dodatkowe faktury lub jako domyślną dla kontrahenta przez pole dodatkowe kontrahenta.
+KSEF_HowTo_InvoiceFlags_P18=<b>Odwrotne obciążenie</b> - dotyczy dostaw transgranicznych / wewnątrzunijnych objętych odwrotnym obciążeniem (krajowe odwrotne obciążenie zniesiono w PL w 2019 r.). Źródła łączone są operatorem OR - ustawienie któregokolwiek emituje flagę, więc pole na poziomie faktury nie wyłączy domyślnego ustawienia kontrahenta: domyślne dla kontrahenta (pole dodatkowe kontrahenta, np. kontrahent wewnątrzunijny zawsze z odwrotnym obciążeniem), pole dodatkowe faktury lub zawsze włączone. Nie przenosi się na korekty - ustaw je również na korekcie, jeśli korygowana dostawa była objęta odwrotnym obciążeniem.
+# Podmiot trzeci (#28)
+KSEF_HowTo_Podmiot3=Podmiot trzeci
+KSEF_HowTo_Podmiot3_Intro=FA(3) pozwala zadeklarować dodatkowy podmiot obok sprzedawcy i nabywcy, „podmiot trzeci". Najczęstszy przypadek to <b>płatnik (rola 6)</b> inny niż nabywca, ale obejmuje też wewnętrzną jednostkę odbiorczą, dodatkowego nabywcę, wystawcę faktury, członków JST/grupy VAT oraz pracownika. Włącz to w <b>ustawieniach faktur wychodzących</b>, a następnie dla każdej faktury:
+KSEF_HowTo_Podmiot3_Step1=Włącz <b>Podmiot trzeci</b> w ustawieniach i wybierz <b>domyślną rolę</b> (można zmienić dla każdej faktury).
+KSEF_HowTo_Podmiot3_Step2=Otwórz <b>zakładkę KSeF</b> faktury; pojawi się selektor podmiotu trzeciego. Wybierz kontrahenta i jego rolę.
+KSEF_HowTo_Podmiot3_Step3=Zapisz. W XML FA(3) dodawany jest jeden podmiot trzeci, widoczny też na PDF KSeF. Pozostaw kontrahenta pustego, aby nic nie emitować. Korekty emitują podmiot trzeci od nowa (schemat nie ma dla niego węzła korekty).
+KSEF_HowTo_Podmiot3_Reconciliation=<b>Rozliczenie jest ręczne.</b> Wpływ bankowy płatnika (rola 6) jest ręcznie dopasowywany do należności nabywcy; należność pozostaje na koncie nabywcy (art. 356 KC). W tym wydaniu nie ma automatyzacji księgowej.
+KSEF_HowTo_Podmiot3_JSTGV_Title=Role JST / grupy VAT (7/8/9/10)
+KSEF_HowTo_Podmiot3_JSTGV=Markery po stronie wystawcy (role 7 JST / 9 wystawca grupy VAT) nie wymagają niczego dodatkowego; sam kod roli na podmiocie trzecim je deklaruje. Markery po stronie nabywcy (role 8 JST / 10 odbiorca grupy VAT) wymagają dodatkowo oznaczenia <b>nabywcy</b>. Moduł nie tworzy tych flag: dodaj boolowskie pole dodatkowe <code>societe</code> o nazwie <code>is_jst</code> i/lub <code>is_vat_group</code>, zaznacz je u nabywcy, a następnie wybierz rolę 8/10 na fakturze. Element JST / grupy VAT nabywcy zostanie wtedy wyemitowany automatycznie.
+KSEF_HowTo_Podmiot3_IDWew_Title=IDWew (oddziały / jednostki wewnętrzne / pracownicy)
+KSEF_HowTo_Podmiot3_IDWew_What=<b>Czym jest IDWew?</b> „Identyfikator wewnętrzny" to kod, który firma generuje w KSeF dla swojego oddziału/zakładu, jednostki wewnętrznej lub pracownika traktowanego jako odrębna jednostka. Format to NIP firmy, myślnik i 5 cyfr, np. <code>1234567890-00001</code>. KSeF używa go do uprawnień dostępu: osoby upoważnione dla danej jednostki mogą wystawiać/widzieć tylko faktury, w których jednostka występuje jako podmiot trzeci. Zwykle jest potrzebny, gdy podmiot trzeci jest jednostką wewnętrzną <b>bez własnego NIP</b> (role 2 i 11).
+KSEF_HowTo_Podmiot3_IDWew_How=<b>Jak go użyć (opcjonalnie):</b> utwórz dowolne pole dodatkowe <code>societe</code> (varchar/text) na tę wartość, wpisz identyfikator wewnętrzny u podmiotu trzeciego, a następnie zmapuj swoje pole w ustawieniach przez listę <b>Źródło identyfikatora wewnętrznego</b>. Moduł wyemituje wtedy identyfikator wewnętrzny zamiast NIP. Bez zmapowanego źródła (lub przy pustej wartości) używany jest własny NIP podmiotu, albo oznaczenie braku identyfikatora dla pracownika bez NIP.
+KSEF_HowTo_Podmiot3_Limits_Title=Ograniczenia w tym wydaniu
+KSEF_HowTo_Podmiot3_Faktor=<b>Rola 1 (Faktor):</b> w pełni obsługiwana, łącznie z rachunkami bankowymi faktora - wprowadź je na podmiocie trzecim.
+KSEF_HowTo_Podmiot3_Role4=<b>Rola 4 (dodatkowy nabywca):</b> wprowadź udział współnabywcy w polu Udział (0-100%); puste pole oznacza równe udziały. Na fakturach korygujących współnabywca jest emitowany jako nowy podmiot trzeci, a nie przenoszony w bloku nabywcy sprzed korekty. Odpowiednie dla pojedynczego nabywcy; pełne powiązanie korekt wielu nabywców jest odłożone.
+
+# ============================================
+# GUS / REGON Lookup
+# ============================================
+KSEF_GusSectionTitle=Wyszukiwanie GUS / REGON
+KSEF_GusSectionDesc=Pobierz dane polskiej firmy z rejestru GUS REGON po numerze NIP, aby automatycznie wypełnić kartę klienta.
+KSEF_GusEnabled=Włącz wyszukiwanie GUS
+KSEF_GusEnv=Środowisko
+KSEF_GusEnvTest=Testowe
+KSEF_GusEnvProd=Produkcyjne
+KSEF_GusApiKey=Klucz użytkownika GUS
+KSEF_GusApiKeyHelp=Środowisko produkcyjne wymaga bezpłatnego klucza użytkownika z GUS. Środowisko testowe używa klucza publicznego automatycznie.
+KSEF_GusNameStyle=Format nazwy organizacji
+KSEF_GusNameStyleFull=Tak jak zwraca GUS (np. KOWALSKI TRANSPORT SPÓŁKA Z OGRANICZONĄ ODPOWIEDZIALNOŚCIĄ)
+KSEF_GusNameStyleUpper=Skróty wielkimi literami (np. KOWALSKI TRANSPORT SP. Z O.O.)
+KSEF_GusNameStyleMixed=Skróty małymi literami (np. KOWALSKI TRANSPORT Sp. z o.o.)
+KSEF_GusSetupRequiredBanner=Wyszukiwanie GUS wymaga wcześniejszego zastosowania etykiet pól KSeF, aby pola NIP/REGON/KRS były poprawnie skonfigurowane. Zastosuj nadpisania tłumaczeń powyżej, a następnie włącz GUS.
+KSEF_GusTestConnection=Testuj połączenie
+KSEF_GusTestOk=Połączenie z GUS udane.
+KSEF_GusTestFail=Połączenie z GUS nieudane: %s
+KSEF_GusFetch=Pobierz z GUS
+KSEF_GusFetching=Pobieranie z GUS...
+KSEF_GusSetupRequired=Uruchom konfigurację pól KSeF przed użyciem wyszukiwania GUS
+KSEF_GusRunSetup=Otwórz konfigurację
+KSEF_GusConflictTitle=GUS zwrócił inne wartości. Zaznacz pola do nadpisania:
+KSEF_GusApply=Zastosuj zaznaczone
+KSEF_GusDismiss=Anuluj
+KSEF_GusSelectAll=Zaznacz wszystkie
+KSEF_GusFilled=Wypełniono %s pól z GUS.
+KSEF_GusNoChanges=Dane GUS są zgodne z bieżącymi polami; nie ma czego wypełniać.
+KSEF_GusNipCancelled=Uwaga: ten NIP jest oznaczony w rejestrze jako nieaktywny (%s).
+KSEF_GusInactiveWarn=Uwaga: ten podmiot wydaje się nieaktywny w rejestrze.
+KSEF_GusErrForbidden=Brak uprawnień do wyszukiwania firm.
+KSEF_GusErrDisabled=Wyszukiwanie GUS jest wyłączone.
+KSEF_GusErrSetupRequired=Wyszukiwanie GUS nie jest skonfigurowane. Najpierw uruchom konfigurację pól KSeF.
+KSEF_GusErrInvalidNip=Podaj poprawny 10-cyfrowy NIP.
+KSEF_GusErrNoKey=Nie skonfigurowano klucza użytkownika GUS.
+KSEF_GusNotConfiguredWarning=Wyszukiwanie firm w GUS nie jest włączone.
+KSEF_GusErrRateLimited=Zbyt wiele zapytań do GUS w krótkim czasie. Odczekaj chwilę i spróbuj ponownie.
+KSEF_GusErrNotFound=Nie znaleziono firmy dla NIP %s.
+KSEF_GusErrUnsupportedType=Ten typ podmiotu nie jest obsługiwany (jednostka lokalna / oddział). Podaj NIP podmiotu nadrzędnego.
+KSEF_GusErrSession=Błąd sesji GUS. Spróbuj ponownie.
+KSEF_GusErrTransport=Nie można połączyć się z usługą GUS. Spróbuj ponownie.
+KSEF_GusError=Wyszukiwanie GUS nie powiodło się.
+KSEF_GusFetchSuppliers=Pobierz dane dostawcy z GUS
+KSEF_GusFetchSuppliers_Help=Podczas automatycznego tworzenia dostawców wyszukaj każdy polski NIP w GUS i użyj oficjalnej nazwy oraz adresu z rejestru. Przed utworzeniem dostawców potwierdzisz wszelkie zmiany.
+KSEF_GusOverrideTitle=Potwierdź dane dostawcy z GUS
+KSEF_GusOverrideIntro=Poniżsi dostawcy zostaną utworzeni z danymi z rejestru GUS, zastępując wartości z faktury:
+KSEF_GusOverrideProceed=Utwórz z danymi GUS
+KSEF_GusPreviewFailed=Wyszukiwanie dostawcy w GUS nie powiodło się lub przekroczyło limit czasu. Zaimportować mimo to, używając danych z faktury?
+KSEF_GusPreviewTruncated=%s dostawców nie zostało wyszukanych w GUS, ponieważ osiągnięto limit na partię; zostaną zaimportowani na podstawie danych z faktury. Kontynuować?
+KSEF_GusRequestKeyTitle=Uzyskanie klucza produkcyjnego
+KSEF_GusNoKeyBanner=Nie skonfigurowano klucza produkcyjnego. Aby korzystać z wyszukiwania GUS w środowisku produkcyjnym, poproś GUS o bezpłatny klucz.
+KSEF_GusKeyHelpTitle=Jak uzyskać i zastosować klucz GUS
+KSEF_GusKeyApplyStep1=Wyślij poniższą wiadomość na adres regon_bir@stat.gov.pl.
+KSEF_GusKeyApplyStep2=GUS odeśle Klucz Użytkownika.
+KSEF_GusKeyApplyStep3=Wklej klucz w pole klucza GUS na zakładce Uwierzytelnianie.
+KSEF_GusKeyApplyStep4=Ustaw środowisko na Produkcyjne i zapisz.
+KSEF_GusHowTo_Title=Wyszukiwanie danych firmy po NIP
+KSEF_GusHowTo_Intro=Podczas tworzenia lub edycji polskiego klienta wpisz jego NIP i kliknij <b>Pobierz z GUS</b>, aby pobrać nazwę i adres firmy z oficjalnego rejestru REGON i wypełnić formularz. Istniejące wartości nie są nigdy nadpisywane bez Twojego potwierdzenia.
+KSEF_GusHowTo_KeyTest=<b>Środowisko testowe:</b> działa od razu przy użyciu publicznego klucza testowego (dane są zamrożone i zanonimizowane, tylko do celów integracji). Na przykład wypróbuj NIP 5261040828.
+KSEF_GusHowTo_KeyProd=<b>Produkcja:</b> poproś o bezpłatny klucz użytkownika, wysyłając zwykłą wiadomość e-mail na adres regon_bir@stat.gov.pl. Wklej klucz w sekcji GUS w ustawieniach modułu i przełącz środowisko na Produkcyjne.
+KSEF_GusHowTo_Step1=Zastosuj etykiety pól KSeF w ustawieniach, aby pola NIP/REGON/KRS były skonfigurowane.
+KSEF_GusHowTo_Step2=Włącz wyszukiwanie GUS i wybierz środowisko.
+KSEF_GusHowTo_Step3=Na karcie klienta wpisz NIP i kliknij <b>Pobierz z GUS</b>.
+KSEF_GusHowTo_Step4=Sprawdź wartości, zaznacz pola do nadpisania, a następnie zapisz.
+KSEF_GusHowTo_EmailLabel=Przykładowa wiadomość e-mail z prośbą o klucz produkcyjny (wypełniona danymi z Ustawienia->Firma/Organizacja):

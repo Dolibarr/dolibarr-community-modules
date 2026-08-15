@@ -1,0 +1,95 @@
+name: Sync back from community repo
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "17 6 * * 1"
+
+concurrency:
+  group: sync-back
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  UPSTREAM_REPO: Dolibarr/dolibarr-community-modules
+  COMMUNITY_BRANCH: main
+  OUR_BASE: main
+  TARGET_SUBDIR: ksef
+  SYNC_BRANCH: sync-back/community
+
+jobs:
+  sync-back:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Clone upstream community repo
+        run: |
+          git clone --depth 1 --branch "$COMMUNITY_BRANCH" \
+            "https://github.com/${UPSTREAM_REPO}.git" \
+            "${{ runner.temp }}/community"
+
+      - name: Overlay monorepo ksef/ onto source
+        id: overlay
+        run: |
+          set -euo pipefail
+          SRC="${{ runner.temp }}/community/${TARGET_SUBDIR}"
+          if [ ! -d "$SRC" ]; then
+            if [ "${{ github.event_name }}" = "schedule" ]; then
+              echo "::notice::${TARGET_SUBDIR}/ not yet present upstream; nothing to sync back."
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "::error::${TARGET_SUBDIR}/ not found in upstream repo"
+            exit 1
+          fi
+          rsync -a \
+            --exclude 'vendor/' --exclude 'lib/vendor/' \
+            --exclude 'build/' --exclude '.github/' --exclude '.git/' \
+            "$SRC/" ./
+          MISSING=""
+          while IFS= read -r f; do
+            [ -e "$SRC/$f" ] || MISSING="${MISSING}${f}"$'\n'
+          done < <(git ls-files)
+          if [ -n "$MISSING" ]; then
+            echo "::warning::Tracked files absent upstream (possible upstream deletions - handle manually):"
+            printf '%s' "$MISSING"
+          fi
+          git add -A
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No inbound changes."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Changed files:"
+            git diff --cached --name-only
+          fi
+
+      - name: Open PR into this repo
+        if: steps.overlay.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -n "$(gh pr list --head "$SYNC_BRANCH" --state open --json number --jq '.[].number')" ]; then
+            echo "::notice::Open sync-back PR already exists on ${SYNC_BRANCH}; leaving it for review."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$SYNC_BRANCH"
+          git commit -m "sync-back: inbound changes from ${UPSTREAM_REPO} ksef/"
+          git push -f origin "$SYNC_BRANCH"
+          out=$(gh pr create \
+            --base "$OUR_BASE" \
+            --head "$SYNC_BRANCH" \
+            --title "Sync-back: inbound changes from community repo" \
+            --body "$(printf '%s\n' \
+              'Automated inbound sync from `'"${UPSTREAM_REPO}"'` `'"${TARGET_SUBDIR}"'/`.')" 2>&1) \
+            || { echo "$out"; echo "$out" | grep -qi 'already exists' \
+                   && echo "PR already open on ${SYNC_BRANCH}." \
+                   || exit 1; }

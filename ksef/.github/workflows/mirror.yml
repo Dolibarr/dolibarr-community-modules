@@ -1,0 +1,117 @@
+name: Mirror to community repo
+
+# Mirrors this repo's tracked source, in its entirety, into the Dolibarr community repo under ksef/
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  workflow_dispatch: {}
+concurrency:
+  group: mirror
+  cancel-in-progress: false
+permissions:
+  contents: read
+
+env:
+  UPSTREAM_REPO: Dolibarr/dolibarr-community-modules
+  FORK_REPO: InPoint-Automation/dolibarr-community-modules
+  FORK_OWNER: InPoint-Automation
+  COMMUNITY_BRANCH: main
+  TARGET_SUBDIR: ksef
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout module source
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Clone upstream community repo
+        run: |
+          git clone --depth 1 --branch "$COMMUNITY_BRANCH" \
+            "https://github.com/${UPSTREAM_REPO}.git" \
+            "${{ runner.temp }}/community"
+
+      - name: Sync tracked source into subdir
+        id: sync
+        run: |
+          set -euo pipefail
+          C="${{ runner.temp }}/community"
+          rm -rf "$C/${TARGET_SUBDIR}"
+          mkdir -p "$C/${TARGET_SUBDIR}"
+          git -C "$GITHUB_WORKSPACE" archive HEAD | tar -x -C "$C/${TARGET_SUBDIR}"
+          cd "$C"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A "${TARGET_SUBDIR}"
+
+          if [ ! -f "$C/${TARGET_SUBDIR}/MAINTAINERS" ]; then
+            echo "::error::MAINTAINERS missing from mirrored tree - commit it before mirroring."
+            exit 1
+          fi
+
+          DELETED=$(git diff --cached --name-status | awk '$1=="D"{print $2}')
+          if [ -n "$DELETED" ]; then
+            echo "::warning::confirm equal forks first:"
+            echo "$DELETED"
+          fi
+
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No changes to mirror."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Changed files:"
+            git diff --cached --name-only
+          fi
+
+      - name: Push branch to fork (still manual PR)
+        if: steps.sync.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.COMMUNITY_TOKEN }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          C="${{ runner.temp }}/community"
+          cd "$C"
+          BRANCH="sync/${TARGET_SUBDIR}"
+
+          if [ "$REF_TYPE" = "tag" ]; then
+            LABEL="$REF_NAME"
+          else
+            LABEL="${REF_NAME}@${GITHUB_SHA:0:7}"
+          fi
+          git checkout -b "$BRANCH"
+          git commit -m "ksef: sync ${LABEL} from upstream mirror"
+          git remote add fork \
+            "https://x-access-token:${GH_TOKEN}@github.com/${FORK_REPO}.git"
+          git push -f fork "$BRANCH"
+          # Drop the tokened remote so the PAT doesn't linger in .git/config.
+          git remote remove fork
+
+          COMPARE_URL="https://github.com/${UPSTREAM_REPO}/compare/${COMMUNITY_BRANCH}...${FORK_OWNER}:${BRANCH}?expand=1"
+          echo "::notice::Branch pushed. If no PR is open yet, open one: ${COMPARE_URL}"
+          {
+            echo "### Mirror pushed \`${BRANCH}\` (${LABEL})"
+            echo ""
+            echo "Open the community PR: [compare & PR](${COMPARE_URL})"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # === AUTOMAGIC PR MAKING (later on) ==========================
+          # out=$(gh pr create \
+          #   --repo "$UPSTREAM_REPO" \
+          #   --base "$COMMUNITY_BRANCH" \
+          #   --head "${FORK_OWNER}:${BRANCH}" \
+          #   --title "ksef: sync ${LABEL}" \
+          #   --body "mirror of KSeF module from https://github.com/${{ github.repository }} (ref ${LABEL}). " 2>&1) \
+          #   || { echo "$out"; echo "$out" | grep -qi 'already exists' \
+          #          && echo "PR already open for ${FORK_OWNER}:${BRANCH}; branch updated." \
+          #          || exit 1; }
+          # =====================================================================

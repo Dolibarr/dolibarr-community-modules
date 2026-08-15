@@ -1,29 +1,44 @@
-# KSEF for Dolibarr ERP CRM
+# KSeF for Dolibarr ERP CRM
 
-## [Po Polsku](https://github.com/InPoint-Automation/Dolibarr-KSeF-Module/blob/main/README_PL.md)
+<p align="center" width="100%">
+<img alt="Icon" src="./img/ksef.png" width="20%" />
+</p>
+
+## [Po Polsku](README_PL.md)
 
 ## Description
 
-This module integrates Dolibarr (https://www.dolibarr.org/) with KSEF (Krajowy System e-Faktur / National e-Invoice System), the Polish electronic
-invoicing system.
+A complete KSeF (Krajowy System e-Faktur) e-invoicing integration for Dolibarr. Generate and submit FA(3) invoices to Poland's National e-Invoice System, handle correction chains, and import incoming invoices. In production use since the system went live in February 2026.
 
 ## Features
 
-- Generation of FA(3) XML
-- Signing and submission of FA(3) XML invoices to KSeF
-- Download of UPO (Recept of submission)
-- Automatic addition of QR code to PDF invoice
-- Can exclude 3rd parties from KSeF (e.g. generic B2C third parties)
-- Adds KSeF Fields (including clickable KSeF number and submission status to verify submission) to main invoice page
-- Adds page with overview of all submissions, as well as KSeF tab to invoice page
-- Download and processing of incoming invoices from KSeF
-- Generation of KSeF-style invoice visualizations
+- Generation, signing, and submission of FA(3) XML invoices to KSeF (online and offline modes)
+- Correction invoices (KOR) with chain tracking and payment settlement across corrections
+- Download, sync, and import of incoming invoices with supplier and product matching
+- Batch import with auto-creation of suppliers and products
+- KSeF system monitoring via Latarnia/Lighthouse API with outage warnings
+- NBP exchange rate integration for foreign currency invoices
+- KSeF-style PDF invoice visualizations for outgoing and incoming invoices
+- Automatic QR code on PDF invoices (online + offline)
+- Tax exemption support with configurable legal basis
+- Configurable notes, extrafields, and order/contract references in FA(3) XML
+- Per-environment authentication (Test/Demo/Production) with token or certificate
+- GUS/REGON company lookup by NIP (requires GUS API key - instructions in How To Use)
+- REST API endpoints
+- Third party KSeF exclusion (e.g. B2C customers)
+- In-module How To Use documentation
+- Scheduled jobs for status checking, incoming sync, offline retry, and KSeF monitoring
+
+## Documentation
+There is complete in-module documentation in the “How To Use” tab. However, we also have finished a more detailed documentation with a bunch of screenshots which is available on our website as well in English and Polish. If you run into issues or think something is missing, please let us know and we’ll add it!
+
+https://inpointautomation.com/content/ksef-integration-module-for-dolibarr/
 
 ## Requirements
 
 ### System Requirements
 
-- Dolibarr: tested on v22.0.3 and higher
+- Dolibarr: Tested and works on v22 and above
 - PHP: 7.4 or higher
 - PHP Extensions:
     - `OpenSSL`
@@ -31,33 +46,27 @@ invoicing system.
     - `DOM`
 - Dolibarr Barcode Module: for generating QR codes on PDFs
 
-### KSEF Account
+### KSeF Account
 
 - A valid Polish NIP (tax identification number) configured in your company settings.
-- An active KSEF account with an authorization token generated from the official KSEF portal for your chosen
-  environment (Test or Production).
+- An active KSeF account with an authorization token generated from the official KSeF portal for your chosen
+  environment (Test, Demo, or Production).
 
 ## Installation
 
 The recommended installation method is from a ZIP file.
 
-1. Download the latest module ZIP file from the release page
+1. Download the latest module ZIP file from the [release page](https://github.com/InPoint-Automation/Dolibarr-KSeF-Module/releases)
 2. In Dolibarr, go to Home → Setup → Modules/Applications
 3. Select the Deploy/install external module tab
 4. Upload the module's ZIP file
-5. Find the KSEF Integration module in the list and enable it
+5. Find the KSeF Integration module in the list and enable it
 
 ## Contributing
 
 Feel free to fork this module or contribute a PR to help improve the Dolibarr community
 
 Build instructions can be found in the developer readme [DEV.md](DEV.md)
-
-## Roadmap
-
-- [X] ~~Add KSeF exclusion to Third Party tabs (https://www.dolibarr.org/forum/t/ksef-module-for-dolibarr/30788/9)~~
-- [ ] FA(3) builder is yet not complete for some edge cases
-- [ ] Fix php-scoper issues with phpseclib
 
 ## Licenses
 
@@ -77,11 +86,7 @@ This module currently includes the following third-party libraries in the `lib/v
 - [paragonie/constant_time_encoding](https://github.com/paragonie/constant_time_encoding) - MIT License - Used by
   phpseclib
 
-- [composer](https://github.com/composer/composer) - MIT License - Composer files are currently vendor directory until
-  scoping is fixed and are not used at runtime
-
-> Dependencies are currently unscoped and distributed as-is from Composer. Future versions will
-> use [humbug/php-scoper](https://github.com/humbug/php-scoper) to scope dependencies
+- [composer](https://github.com/composer/composer) - MIT License - Composer files included in vendor directory, not used at runtime
 
 ## Legal Notice
 
@@ -101,4 +106,4 @@ learning from their module, this project would have taken ages longer to complet
 This module was developed by InPoint Automation Sp. z o.o.
 
 ## Changelog
-Visible on GitHub Repo
+See [CHANGELOG.md](CHANGELOG.md) for the full version history.

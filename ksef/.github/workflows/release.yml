@@ -1,0 +1,91 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: zip, curl, mbstring, dom, xml
+
+      - name: Build module
+        env:
+          TMPDIR: ${{ runner.temp }}/ksef-build
+        run: |
+          mkdir -p "$TMPDIR"
+          bash build/build.sh
+
+      - name: Locate build artifact
+        id: artifact
+        run: |
+          ZIP=$(find "${{ runner.temp }}/ksef-build" -maxdepth 1 -name 'module_ksef-*.zip' | head -n1)
+          if [ -z "$ZIP" ]; then
+            echo "::error::No module_ksef-*.zip produced by build.sh"
+            exit 1
+          fi
+          cp "$ZIP" "$GITHUB_WORKSPACE/$(basename "$ZIP")"
+          echo "path=$(basename "$ZIP")" >> "$GITHUB_OUTPUT"
+          echo "Built: $(basename "$ZIP")"
+
+      - name: Version / tag sanity check
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          MOD_VER=$(grep -oP "this->version\s*=\s*'\K[^']+" core/modules/modKSEF.class.php | head -n1)
+          if [ "${GITHUB_REF_NAME}" != "v${MOD_VER}" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match module version v${MOD_VER}. Bump this->version in core/modules/modKSEF.class.php or retag."
+            exit 1
+          fi
+
+      - name: Extract release notes from CHANGELOG
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          : > RELEASE_NOTES.md
+          if [ -f CHANGELOG.md ]; then
+            awk -v t="$TAG" '
+              $0 ~ "^### Version " t "[[:space:]]*$" {f=1; next}
+              f && /^### Version / {exit}
+              f {print}
+            ' CHANGELOG.md >> RELEASE_NOTES.md
+          fi
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "No changelog entry found for ${TAG}." > RELEASE_NOTES.md
+          fi
+          echo "----- RELEASE_NOTES.md -----"
+          cat RELEASE_NOTES.md
+
+      - name: Create / update release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body_path: RELEASE_NOTES.md
+          files: ${{ steps.artifact.outputs.path }}
+          fail_on_unmatched_files: true
+
+      - name: Upload artifact (non-tag runs)
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.artifact.outputs.path }}
+          path: ${{ steps.artifact.outputs.path }}
+          retention-days: 2

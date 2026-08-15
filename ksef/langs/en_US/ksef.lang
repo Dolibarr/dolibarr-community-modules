@@ -1,0 +1,1733 @@
+# Module KSEF - English Translation
+
+# ============================================
+# Module General
+# ============================================
+KSEF_Module=KSeF Integration
+KSEF_ModuleInformation=Module Information
+KSEF_Version=Version
+KSEF_Publisher=Publisher
+KSEF_AndTheDolibarrCommunity=and the Dolibarr community
+KSEF_CheckForUpdates=Check for updates
+KSEF_UpdateAvailable=A new version is available: <b>%s</b> (you have %s).
+KSEF_UpToDate=You are running the latest version (%s).
+KSEF_UpdateCheckFailed=Could not check for updates: %s.
+KSEF_UpdateCheckParseError=Could not read the latest version from GitHub.
+KSEF_DownloadUpdate=Download the update
+KSEF_UpdatesTitle=Updates
+KSEF_UpdateBannerTitle=Update available.
+KSEF_UpdateBannerDesc=KSeF module version %s is available (you have %s).
+KSEF_UpdateDownloadConfirm=Download KSeF module version %s (.zip) from GitHub? After it downloads, install it via Home > Setup > Modules > Deploy/install external module.
+KSEF_NeedHelp=Need help?
+KSEF_Support_Intro=Have a problem or a question? Here is where to get help:
+KSEF_Support_Issues=Report a bug or request a feature
+KSEF_Support_IssuesDesc=open an issue on GitHub
+KSEF_Support_Forum=Ask on the Dolibarr forum
+KSEF_Support_ForumDesc=KSeF module discussion thread
+KSEF_Support_DocsEN=Documentation (English)
+KSEF_Support_DocsPL=Documentation (Polish)
+KSEF_Support_Releases=Releases and changelog
+KSEF_Setup=Module Setup
+KSEF_SetupPage=Configure KSEF integration settings, certificate, and submission options
+KSEF_About=About
+KSEF_HowToUse=How to Use
+KSEF_BackToModuleList=Back to Module List
+KSEF_Enabled=Enabled
+KSEF_Active=Active
+KSEF_Add=Add
+KSEF_Save=Save
+KSEF_UpdateToken=Update Token
+KSEF_Value=Value
+KSEF_Parameter=Parameter
+KSEF_ActionRequired=Action Required
+
+# ============================================
+# Menu & Navigation
+# ============================================
+KSEF_Area=KSEF
+KSEF_Dashboard=KSEF Dashboard
+KSEF_Settings=KSEF Configuration
+KSEF_Status=KSEF Submission Status
+
+# ============================================
+# Configuration Groups
+# ============================================
+KSEF_AUTH_CONFIG=Authentication
+KSEF_UI_CONFIG=User Interface
+KSEF_IMPORTING_CONFIG=Importing
+KSEF_BATCH_AUTO_CREATE_SUPPLIERS_SETTING=Auto-create suppliers during batch import
+KSEF_BATCH_AUTO_CREATE_SUPPLIERS_SETTING_Help=When enabled, suppliers that cannot be matched to an existing third party will be automatically created during batch import. Matching is done by NIP (Polish tax ID) or EU VAT number. New suppliers are created with the name, address, and tax identifiers from the KSeF invoice. This setting is the default for batch imports and is remembered from the last batch import.
+KSEF_BATCH_AUTO_CREATE_PRODUCTS_SETTING=Auto-create products during batch import
+KSEF_BATCH_AUTO_CREATE_PRODUCTS_SETTING_Help=When enabled, products that cannot be matched to an existing product will be automatically created during batch import. Matching is attempted by product ref, supplier ref, and barcode/GTIN. New products are created with the description, ref, price, VAT rate, and barcode from the invoice line. If you do not need to track products or link invoice lines to your product catalog, you can leave this disabled - all unmatched lines will still be imported as free text descriptions. This setting is the default for batch imports and is remembered from the last batch import.
+KSEF_PRODUCT_REF_USE_INDEKS_SETTING=Use supplier's product code (indeks) as product ref when auto-creating
+KSEF_PRODUCT_REF_USE_INDEKS_SETTING_Help=When enabled, the supplier's product index code from the invoice line is used as the product reference when auto-creating new products. When disabled, Dolibarr's automatic numbering sequence is used instead.
+KSEF_CUSTOMIZATION_CONFIG=Customization
+KSEF_CUSTOMER_EXCLUSIONS=Customer Exclusions
+KSEF_Configuration=KSeF configuration
+
+# ============================================
+# Environment Settings
+# ============================================
+KSEF_ENV_DEMO=Demo
+KSEF_ENV_PRODUCTION=Production
+KSEF_ENV_TEST=Test
+KSEF_ENVIRONMENT=Environment
+KSEF_ENVIRONMENT_Help=Select TEST for testing, PRODUCTION for live invoices
+
+# ============================================
+# Authentication & Token
+# ============================================
+KSEF_AUTH_TOKEN_Help=Alphanumeric token from KSeF web portal
+KSEF_AUTH_TOKEN=Authentication token
+KSEF_TOKEN_STATUS=Token Status
+KSEF_TOKEN_OBTAIN_INFO=Obtain token by logging into KSeF portal with qualified seal/signature
+KSEF_PasteTokenHere=Paste your token here
+KSEF_EnterNewTokenToReplace=Enter new token to replace the existing one
+KSEF_TOKEN_SAVED=Token saved successfully
+KSEF_TOKEN_TOO_SHORT=Token is too short
+KSEF_TOKEN_INVALID_FORMAT=Token has invalid format
+KSEF_NoTokenConfigured=No token configured
+KSEF_NotConfigured=Not configured
+KSEF_Configured=Configured
+KSEF_WARNING_NO_TOKEN=Warning: No token configured
+KSEF_GetToken=Get Token
+KSEF_GenerateTokenInPortal=Generate a token in the portal under Token Management
+KSEF_VisitKSEFPortal=Visit KSeF Portal
+KSEF_AuthMethodAutoSwitchedToCert=Authentication method automatically switched to Certificate (no token configured)
+KSEF_AuthMethodAutoSwitchedToToken=Authentication method automatically switched to Token (no certificate configured)
+KSEF_PURGE_ON_DISABLE=Remove configuration data on module disable
+KSEF_PURGE_ON_DISABLE_Help=When enabled, all configuration (NIP, tokens, certificates, environment, etc.) will be permanently deleted when the module is disabled. When disabled (default), all settings are preserved through disable/enable cycles.
+
+# ============================================
+# NIP & Company Data
+# ============================================
+KSEF_COMPANY_NIP=Company NIP
+KSEF_COMPANY_NIP_Help=Auto-populated from the configured source field. If the source field is empty, falls back to VAT ID.
+KSEF_AutoPopulatedFromCompany=Auto-populated
+KSEF_WARNING_NO_NIP=Warning: Company NIP is missing
+KSEF_EnterNIPAndToken=Enter your NIP (tax ID) and paste your token
+KSEF_CustomerExcludedFromKSEF=Customer excluded from KSeF
+KSEF_CustomerRemovedFromKSEFExclusions=Customer removed from KSeF exclusions
+KSEF_EXCLUDED_CUSTOMERS=Excluded Customers
+KSEF_EXCLUDED_CUSTOMERS_Help=List of customers excluded from KSeF submissions
+KSEF_EXCLUDED_CUSTOMERS_INFO=Comma-separated list of customer IDs
+KSEF_SelectCustomer=Select Customer
+KSEF_PleaseSelectCustomer=Please select a customer
+KSEF_COMPANY_KRS=Company KRS
+KSEF_COMPANY_KRS_Help=Auto-populated from the configured source field. National Court Register number.
+KSEF_COMPANY_REGON=Company REGON
+KSEF_COMPANY_REGON_Help=Auto-populated from the configured source field. Statistical identification number.
+KSEF_COMPANY_BDO=Company BDO
+KSEF_COMPANY_BDO_Help=Auto-populated from the configured source field. Waste Database register number.
+KSEF_COMPANY_EORI=Company EORI
+KSEF_COMPANY_EORI_Help=Auto-populated from the configured source field. Economic Operators Registration and Identification number for EU customs/trade.
+KSEF_Optional=Optional
+KSEF_FIELD_SOURCE=Source field
+KSEF_FIELD_NONE=Not used
+KSEF_FIELD_VATID=EU VAT ID
+KSEF_FIELD_VATID_Help=EU VAT identification number is always read from the VAT ID field (tva_intra). This cannot be changed.
+KSEF_FIELD_VATID_ALWAYS=always uses this field
+KSEF_NIP_FROM_VATID_NOTE=NIP will be extracted by stripping the country prefix
+KSEF_PRODUCTION_WARNING=Production environment - only submit official invoices. Submissions cannot be reversed.
+
+# ============================================
+# Features
+# ============================================
+KSEF_ADD_QR=Add QR code to PDF
+KSEF_ADD_QR_Help=Include verification QR code on invoice PDFs
+KSEF_EnableBarcodeModuleForQR=Enable the Barcode module to generate QR codes
+KSEF_TCPDFRequiredForQR=TCPDF library is required for QR codes
+KSEF_SomeOptionalFeaturesUnavailable=Some optional features are unavailable
+KSEF_AutoSubmit=Auto-submit on validation
+KSEF_AUTO_SUBMIT_Help=Automatically send invoices to KSeF when validated
+KSEF_ExcludeFromKSEF=Exclude from KSeF
+KSEF_ExcludeFromKSEFHelp=Do not submit invoices for this customer to KSeF
+KSEF_NotApplicableNotCustomer=Not applicable - this third party is not a customer. KSeF exclusion only applies to customers you issue invoices to.
+KSEF_EnableMulticurrencyForForeignInvoices=Enable the Multicurrency module to support foreign currency invoices with NBP exchange rates
+KSEF_EnableCSRFProtection=Enable CSRF token protection (set MAIN_SECURITY_CSRF_WITH_TOKEN in Home - Setup - Other)
+
+# ============================================
+# UI Settings
+# ============================================
+KSEF_BUTTON_COLOR=Button Color
+KSEF_BUTTON_COLOR_Help=Color of the KSeF action button on invoices
+KSEF_Blue=Blue
+KSEF_Red=Red
+KSEF_Green=Green
+KSEF_Yellow=Yellow
+KSEF_Orange=Orange
+KSEF_Purple=Purple
+KSEF_Cyan=Cyan
+
+# ============================================
+# FA3 Optional Fields
+# ============================================
+KSEF_FA3_OPTIONAL_FIELDS=FA(3) Optional Fields
+KSEF_FA3_INCLUDE_NRKLIENTA=Include Customer Code
+KSEF_FA3_INCLUDE_NRKLIENTA_Help=Include the Dolibarr customer code in the FA3 invoice XML.
+KSEF_FA3_INCLUDE_INDEKS=Include Product Index Code
+KSEF_FA3_INCLUDE_INDEKS_Help=Include the product reference code in invoice line items.
+KSEF_FA3_INCLUDE_GTIN=Include GTIN/EAN Barcode
+KSEF_FA3_INCLUDE_GTIN_Help=Include product barcodes as GTIN in invoice line items. Enable only if your barcodes are valid GTIN/EAN codes (not internal codes).
+KSEF_FA3_INCLUDE_UNIT=Include Unit of Measure
+KSEF_FA3_INCLUDE_UNIT_Help=Include the unit of measure for products in invoice line items.
+KSEF_FA3_INCLUDE_BANK_DESC=Include Bank Account Description
+KSEF_FA3_INCLUDE_BANK_DESC_Help=Include the bank account label/description in payment section. Enable only if your account labels are suitable for external visibility (not internal-only names).
+KSEF_FA3_INCLUDE_CONTACT=Include Customer Contact Details
+KSEF_FA3_INCLUDE_CONTACT_Help=Include the customer email and phone on KSeF invoices. Disable to omit them for everyone; individual customers can also be opted out on their card.
+KSEF_ExtraFieldHideContact=Hide contact on KSeF invoice
+KSEF_ExtraFieldHideContactHelp=Omit this customer's email and phone from KSeF invoices, even if enabled globally. The data stays in Dolibarr.
+KSEF_ExtraFieldHideEori=Hide EORI on KSeF invoice
+KSEF_ExtraFieldHideEoriHelp=Omit this customer's EORI number from KSeF invoices. The data stays in Dolibarr.
+KSEF_ConfigureOfflineCertificate=Configure offline signing certificate for KSeF unavailability periods (tryb awaryjny)
+KSEF_FA3_PLACE_OF_ISSUE=Place of Issue
+KSEF_FA3_PLACE_OF_ISSUE_Help=Optional field indicating the city/location where the invoice was issued.
+KSEF_FA3_PLACE_OF_ISSUE_DISABLED=Disabled
+KSEF_FA3_PLACE_OF_ISSUE_COMPANY=From company address (city)
+KSEF_FA3_PLACE_OF_ISSUE_CUSTOM=Custom value
+KSEF_FA3_PLACE_OF_ISSUE_CUSTOM_Placeholder=Enter city name...
+KSEF_FA3_SALE_DATE_SOURCE=Default Date of Sale Source
+KSEF_FA3_SALE_DATE_SOURCE_Help=Controls how the ksef_sale_date extrafield is auto-populated. "Linked delivery/order date" will prioritize shipment date, order delivery date, order date, and then invoice date if they exist. "Invoice date" always uses the invoice date directly. The extrafield can still be manually overridden after creation.
+KSEF_FA3_SALE_DATE_SOURCE_INVOICE=Invoice date only
+KSEF_FA3_SALE_DATE_SOURCE_DELIVERY=Linked delivery/order date (default)
+
+# Invoice Notes and Custom Fields (DodatkowyOpis in KSeF XML)
+KSEF_DODATKOWY_OPIS_SECTION=Invoice Notes and Custom Fields
+KSEF_DODATKOWY_OPIS_NOTE_MODE=Public Note Mode
+KSEF_DODATKOWY_OPIS_NOTE_MODE_Help=Controls how the invoice public note is included in the KSeF XML.<br><b>Simple - Footer</b> sends the note as plain text in the invoice footer. This is the default.<br><b>Simple - Additional description</b> sends the full note as a key-value entry with key "Uwagi", splitting into 256-character chunks if needed.<br><b>Key:Value - Additional description</b> parses each line at the first colon into separate key-value entries.<br><b>Disabled</b> omits the note from the KSeF XML entirely.
+KSEF_DODATKOWY_OPIS_NOTE_MODE_DISABLED=Disabled (note not included)
+KSEF_DODATKOWY_OPIS_NOTE_MODE_SIMPLE=Simple (full note as remark)
+KSEF_DODATKOWY_OPIS_NOTE_MODE_KEYVALUE=Key:Value (parse lines)
+KSEF_NOTE_COMBINED_SIMPLE_STOPKA=Simple - Stopka Faktury (invoice footer as plain text)
+KSEF_NOTE_COMBINED_SIMPLE_DODATKOWY=Simple - Dodatkowy Opis (additional description as "Uwagi" entry)
+KSEF_NOTE_COMBINED_KEYVALUE_DODATKOWY=Key:Value - Dodatkowy Opis (parse note lines into key-value entries)
+KSEF_DODATKOWY_OPIS_EXTRAFIELDS=Include Extrafields
+KSEF_DODATKOWY_OPIS_EXTRAFIELDS_Help=Select which custom fields to include in the KSeF XML. Fields can target the additional description (key-value pairs) or the invoice footer (footer text). Both key and value are truncated to 256 characters.
+KSEF_DODATKOWY_OPIS_NO_EXTRAFIELDS=No custom extrafields available (only KSeF system fields found). Create extrafields in Dolibarr setup to use this feature.
+KSEF_DODATKOWY_OPIS_FACTURE_TITLE=Invoice Fields
+KSEF_DODATKOWY_OPIS_FACTURE_SUBTITLE=Extrafields on the invoice card. Values you enter are included in KSeF XML as notes (label -> Klucz, value -> Wartosc). Choose where each field appears.
+KSEF_DODATKOWY_OPIS_FACTURE_NO_EXTRAFIELDS=No invoice extrafields available. Create invoice extrafields in Dolibarr setup or use the form below.
+KSEF_DODATKOWY_OPIS_DET_TITLE=Invoice Line Fields
+KSEF_DODATKOWY_OPIS_DET_SUBTITLE=Extrafields on invoice line items. Values are included in KSeF XML as notes linked to the line via its line number (label -> Klucz, value -> Wartosc). Always the additional description.
+KSEF_DODATKOWY_OPIS_DET_NO_EXTRAFIELDS=No invoice line extrafields available. Create invoice line extrafields in Dolibarr setup or use the form below.
+KSEF_DODATKOWY_OPIS_PRODUCT_TITLE=Product Fields
+KSEF_DODATKOWY_OPIS_PRODUCT_SUBTITLE=Extrafields on product/service cards. Values are included in KSeF XML as notes linked to the line via its line number (label -> Klucz, value -> Wartosc). Always the additional description.
+KSEF_DODATKOWY_OPIS_PRODUCT_NO_EXTRAFIELDS=No product extrafields available. Create product extrafields in Dolibarr setup or use the form below.
+KSEF_DODATKOWY_OPIS_SOCIETE_TITLE=Third Party Fields
+KSEF_DODATKOWY_OPIS_SOCIETE_SUBTITLE=Extrafields on the third party card, sourced from the customer on each invoice. Values are included in KSeF XML as notes (label -> Klucz, value -> Wartosc). Choose where each field appears.
+KSEF_DODATKOWY_OPIS_SOCIETE_NO_EXTRAFIELDS=No third party extrafields available. Create third party extrafields in Dolibarr setup or use the form below.
+KSEF_DODATKOWY_OPIS_PROJECT_TITLE=Project Fields
+KSEF_DODATKOWY_OPIS_PROJECT_SUBTITLE=Extrafields on the project card, sourced from the linked project. Values are included in KSeF XML as notes (label -> Klucz, value -> Wartosc). Choose where each field appears.
+KSEF_DODATKOWY_OPIS_PROJECT_NO_EXTRAFIELDS=No project extrafields available. Create project extrafields in Dolibarr setup or use the form below.
+KSEF_ENTITY_BOXES_INTRO=Configure which data from Dolibarr invoices, third parties, products, and other entities is included in your KSeF invoices.
+KSEF_ENTITY_BOX_FIELD_SOURCES=KSeF Field Sources
+KSEF_ENTITY_BOX_NOTES=Notes (additional description / invoice footer)
+KSEF_ENTITY_BOX_EXTRAFIELDS=Extrafields
+KSEF_ENTITY_BOX_EXTRAFIELDS_INVOICE=Invoice Extrafields
+KSEF_ENTITY_BOX_EXTRAFIELDS_THIRDPARTY=Third Party Extrafields
+KSEF_ENTITY_BOX_EXTRAFIELDS_PRODUCT=Product Extrafields
+KSEF_ENTITY_BOX_EXTRAFIELDS_INVOICELINE=Invoice Line Extrafields
+KSEF_ENTITY_BOX_EXTRAFIELDS_PROJECT=Project Extrafields
+KSEF_ENTITY_BOX_CREATE_FIELD=Create new extrafield...
+KSEF_NOTE_SETTINGS_SECTION=Note Settings
+KSEF_DODATKOWY_OPIS_TARGET_COLUMN=Target
+KSEF_DODATKOWY_OPIS_TARGET_DODATKOWY=Additional description
+KSEF_DODATKOWY_OPIS_TARGET_STOPKA=Invoice footer
+KSEF_DODATKOWY_OPIS_PREVIEW=Notes Preview
+KSEF_DODATKOWY_OPIS_PREVIEW_ENTRIES=Expand to see
+KSEF_DODATKOWY_OPIS_PREVIEW_NRWIERSZA=Line No.
+KSEF_DODATKOWY_OPIS_PREVIEW_KEY=Key
+KSEF_DODATKOWY_OPIS_PREVIEW_VALUE=Value
+KSEF_DODATKOWY_OPIS_HINT_SIMPLE=<b>Simple mode:</b> the note will be sent as a single entry with key "Uwagi". If the text exceeds 256 characters, it will be split into numbered entries (Uwagi, Uwagi 2, Uwagi 3, ...).
+KSEF_DODATKOWY_OPIS_HINT_KEYVALUE=<b>Key:Value mode:</b> each line is parsed at the first colon. Example: <code>Order number: ZAM/2026/001</code><br>Lines without a colon are ignored. Both "Key:Value" and "Key: Value" (with space) work.
+KSEF_DODATKOWY_OPIS_HINT_EXTRAFIELDS=Plus %s extrafield(s) configured in module settings will also be included.
+KSEF_DODATKOWY_OPIS_CHARS_LABEL=characters
+KSEF_DODATKOWY_OPIS_NOTE_NO_ENTRIES=No entries yet. Start typing to see the breakdown.
+KSEF_DODATKOWY_OPIS_NOTE_TRUNCATED=truncated
+KSEF_DODATKOWY_OPIS_PREVIEW_FROM_NOTE=From public note
+KSEF_DODATKOWY_OPIS_PREVIEW_FROM_EXTRAFIELDS=From extrafields
+KSEF_DODATKOWY_OPIS_PREVIEW_EMPTY_SECTION=(no entries yet)
+KSEF_DODATKOWY_OPIS_PREVIEW_OVERRIDDEN=overridden: %s
+KSEF_DODATKOWY_OPIS_CREATE_FIELD=Create new custom field
+KSEF_DODATKOWY_OPIS_CREATE_FIELD_TARGET=Applies to
+KSEF_DODATKOWY_OPIS_TARGET_FACTURE=Invoice (one value per invoice)
+KSEF_DODATKOWY_OPIS_TARGET_FACTUREDET=Invoice line (one value per line, with the line number)
+KSEF_DODATKOWY_OPIS_TARGET_SOCIETE=Third Party (one value per customer)
+KSEF_DODATKOWY_OPIS_TARGET_PRODUCT=Product (one value per product - sourced per line)
+KSEF_DODATKOWY_OPIS_TARGET_PROJECT=Project (one value per linked project)
+KSEF_NR_UMOWY_NO_EXTRAFIELDS=No suitable extrafields available. Create a third party extrafield (auto-populates from customer) or an invoice extrafield (manual entry per invoice) using the "Create new custom field" form in the Invoice Notes section below.
+KSEF_DODATKOWY_OPIS_CREATE_FIELD_LABEL=Label (shown as Klucz in KSeF XML)
+KSEF_DODATKOWY_OPIS_CREATE_FIELD_CODE=Field code (internal name)
+KSEF_DODATKOWY_OPIS_CREATE_FIELD_TYPE=Type
+KSEF_DODATKOWY_OPIS_CREATE_FIELD_OPTIONS=Options (one per line, format: code|Label or just Label)
+KSEF_DODATKOWY_OPIS_CREATE_FIELD_SUBMIT=Create field
+KSEF_DODATKOWY_OPIS_EDIT_FIELD_SUBMIT=Save changes
+KSEF_DODATKOWY_OPIS_DELETE_CONFIRM=Delete extrafield "%s"? This removes the field and all values stored on existing invoices.
+KSEF_DODATKOWY_OPIS_TYPE_VARCHAR=Text (up to 255 chars)
+KSEF_DODATKOWY_OPIS_TYPE_TEXT=Long text
+KSEF_DODATKOWY_OPIS_TYPE_INT=Integer
+KSEF_DODATKOWY_OPIS_TYPE_DOUBLE=Decimal
+KSEF_DODATKOWY_OPIS_TYPE_DATE=Date
+KSEF_DODATKOWY_OPIS_TYPE_DATETIME=Date and time
+KSEF_DODATKOWY_OPIS_TYPE_SELECT=Select (dropdown)
+KSEF_DODATKOWY_OPIS_CREATE_FIELD_SUCCESS=Custom field "%s" created and included in the notes list
+KSEF_DODATKOWY_OPIS_UPDATE_SUCCESS=Extrafield "%s" updated
+KSEF_DODATKOWY_OPIS_DELETE_SUCCESS=Extrafield "%s" deleted
+KSEF_DODATKOWY_OPIS_CREATE_FIELD_ERROR_LABEL=Label is required
+KSEF_DODATKOWY_OPIS_CREATE_FIELD_ERROR_CODE=Field code must be lowercase letters, digits and underscores only, and must start with a letter.
+KSEF_DODATKOWY_OPIS_CREATE_FIELD_ERROR_TYPE=Invalid field type
+KSEF_DODATKOWY_OPIS_CREATE_FIELD_ERROR_RESERVED=Field code cannot start with "ksef_" (reserved for module system fields)
+KSEF_DODATKOWY_OPIS_CREATE_FIELD_ERROR_DUPLICATE=A field with this code already exists
+KSEF_DODATKOWY_OPIS_CREATE_FIELD_ERROR_DUP_LABEL=A custom field with this label already exists
+KSEF_DODATKOWY_OPIS_INTERNAL_CODE=Internal code
+KSEF_EXTRAFIELD_EXTERNAL=Created outside the KSeF module
+KSEF_DODATKOWY_OPIS_OVERRIDE_SAVED=Notes mode override saved
+KSEF_MODULE_NEEDS_REACTIVATION=Module updated but not re-activated
+KSEF_MODULE_NEEDS_REACTIVATION_Desc=The KSeF module was updated from version %s to version %s. Some features may not work until you disable and re-enable the module in the modules list.
+KSEF_VERSION_UNKNOWN=unknown
+KSEF_GOTO_MODULES_LIST=Go to modules list
+KSEF_DODATKOWY_OPIS_CREATE_FIELD_ERROR_NOT_FOUND=Extrafield not found
+
+# ============================================
+# Connection & Testing
+# ============================================
+KSEF_TEST_CONNECTION=Test Connection
+KSEF_TEST_TOKEN_AUTH=Test Token Authentication
+KSEF_CONNECTION_SUCCESS=Connection successful
+KSEF_CONNECTION_FAILED=Connection failed
+KSEF_CONNECTION_ERROR=Connection error
+KSEF_AUTH_SUCCESS=Authentication successful
+KSEF_AUTH_FAILED=Authentication failed
+KSEF_AUTH_ERROR=Authentication error
+KSEF_Diagnostics=Diagnostics
+KSEF_Test=Test
+KSEF_Details=Details
+KSEF_TestEnvironment=Test Environment
+
+# ============================================
+# System Requirements & Health
+# ============================================
+KSEF_SystemInformation=System Information
+KSEF_SystemInformationDesc=Information about your system environment
+KSEF_SystemRequirements=System Requirements
+KSEF_CriticalIssues=Critical Issues
+KSEF_Warnings=Warnings
+KSEF_AllRequirementsMet=All requirements met
+KSEF_Required=Required
+KSEF_OK=OK
+KSEF_Missing=Missing
+KSEF_FileNotFound=File not found
+KSEF_TableExists=Table exists
+KSEF_TableMissing=Table missing
+KSEF_RunSQLScripts=Run SQL scripts to fix
+KSEF_FixAndRetry=Fix the issue and retry
+KSEF_CriticalRequirementsNotMet=Critical requirements are not met
+
+# ============================================
+# Requirement Checks
+# ============================================
+KSEF_Test_PHPExtensions=PHP Extensions
+KSEF_Test_Certificate=Certificate
+KSEF_Test_DatabaseTable=Database Table
+KSEF_Test_NIPConfigured=NIP Configured
+KSEF_Test_NIPInvalid=NIP Invalid
+
+# ============================================
+# Dashboard / Home (ksefindex.php)
+# ============================================
+KSEF_Statistics=Statistics
+KSEF_Last30Days=Last 30 days
+KSEF_TotalSubmissions=Total submissions
+KSEF_Accepted=Accepted
+KSEF_Pending=Pending
+KSEF_Failed=Failed
+KSEF_SuccessRate=Success rate
+KSEF_RecentSubmissions=Recent submissions
+KSEF_NoRecentSubmissions=No recent submissions
+KSEF_CreateInvoice=Create invoice
+KSEF_SetupRequired=Setup required
+KSEF_SetupRequiredDesc=Configure Company NIP and authentication before using KSeF
+KSEF_MandatoryWarning=Mandatory KSeF notice
+KSEF_MandatoryWarningDesc=KSeF will be mandatory in %d days. Configure your system now.
+KSEF_OutgoingInvoices=Outgoing Invoices
+KSEF_Sent=Sent
+KSEF_Ready=Ready
+KSEF_CertificateExpiresInDays=Certificate expires in %d days
+KSEF_NeedsAttention=Needs Attention
+KSEF_OfflineDeadlineSoon=Offline invoices - deadline approaching
+KSEF_FailedCanRetry=Failed - can retry
+KSEF_AwaitingConfirmation=Awaiting confirmation
+KSEF_NewToReview=New invoices to review
+KSEF_ImportErrors=Import errors
+KSEF_RecentIncoming=Recent Incoming
+KSEF_ViewAll=View all
+
+# ============================================
+# How to Use
+# ============================================
+
+# Quick Start Section
+KSEF_HowToUse=How to Use
+KSEF_HowToUsePage=Usage Guide
+KSEF_QuickStartGuide=Quick Start Guide
+KSEF_GetCredentials=Get Your Credentials
+KSEF_GetCredentialsDesc=You need either an authorization token or a qualified certificate from the KSeF portal. Certificates are preferred - tokens are being phased out at the end of 2026, and you'll need a certificate anyway if you want offline invoice capability.
+KSEF_Portals=KSeF Portals
+KSEF_CurrentEnvironment=current
+KSEF_Important=Important
+KSEF_PermissionsWarning=After generating your token or registering your certificate, make sure you configure the proper permissions in the KSeF portal under "Uprawnienia". Having valid credentials isn't enough - you need upload/download permissions assigned to them. This is a common oversight that results in authentication errors.
+
+KSEF_ConfigureModule=Configure Module
+KSEF_ConfigureModuleDesc=NIP is on the General tab. Tokens and certificates are on the Authentication tab, stored per environment so you don't re-enter them when switching.
+KSEF_DefaultEnvironmentNote=The module defaults to Demo environment to prevent accidentally submitting official invoices while testing. Switch to Production (and upload the production certificates) once you're confident everything works correctly.
+KSEF_ModuleSetup=Module Setup
+KSEF_GoToSetup=Go to Setup
+
+KSEF_TestConnection=Test Connection
+KSEF_TestConnectionDesc=Use the test buttons to verify your connection and authentication work before attempting to submit invoices.
+KSEF_TestNow=Test Now
+
+KSEF_SubmitFirstInvoice=Submit Your First Invoice
+KSEF_SubmitFirstInvoiceDesc=Open any validated invoice and click the KSeF button. If it comes back as ACCEPTED with a KSeF number, you're good to go. You can view the uploaded XML, the UPO, and generate either a Dolibarr PDF or a KSeF-app style PDF as needed.
+
+# Configuration Section
+KSEF_ConfigurationSection=Configuration
+KSEF_Environments=Environments
+KSEF_ENV_TEST_FullDesc=Submit fake invoices to fake companies with fake company information (e.g. company with NIP 9999999999) with non-secure certificate or token generated from publicly accessible test portal, just for testing the system out.
+KSEF_ENV_DEMO_FullDesc=Submit fake invoices to fake companies with real company information and your Demo certificate or token, for testing system and verifying functionality. Invoices here are not legally binding.
+KSEF_ENV_PRODUCTION_FullDesc=Submit real invoices with real company information and your Production certificate or token. These are legally binding invoices.
+
+KSEF_Authentication=Authentication
+KSEF_AuthenticationDesc=Certificates are the better choice, however tokens work fine for now but lose validity at the end of 2026. Offline invoicing requires an offline certificate regardless.
+
+KSEF_HowTo_Config_PerEnvAuth=Per-Environment Credentials
+KSEF_HowTo_Config_PerEnvAuthDesc=Each environment (TEST/DEMO/PRODUCTION) stores its own token and certificate. Switching environments automatically uses that environment's saved credentials. Configure each on the Authentication tab.
+
+KSEF_HowTo_Config_PaymentDefaults=Default Payment Settings
+KSEF_HowTo_Config_PaymentDefaultsDesc=Set default payment terms, method, and bank account on the Outgoing Invoices tab. These pre-fill when creating invoices if the customer has no specific settings configured. Customer-level values and linked source documents (orders/proposals) take priority.
+
+KSEF_OptionalFields=Optional Fields
+KSEF_OptionalFieldsDesc=The Outgoing Invoices tab has toggles for optional FA(3) fields like customer codes, product references, GTINs, and units of measure. Enable these if you have the data in Dolibarr and want it included in your KSeF submissions.
+
+KSEF_HowTo_Config_Notes=Invoice Notes and Custom Fields
+KSEF_HowTo_Config_NotesIntro=Include extra content in the KSeF XML from the invoice's public note and from invoice custom fields. Configure both on the Outgoing Invoices tab under "Invoice Notes and Custom Fields".
+KSEF_HowTo_Config_NotesModes=The public note mode controls where and how the note is included in the KSeF XML. <b>Simple - Stopka</b> (default) sends the note as plain text in the invoice footer. <b>Simple - Dodatkowy Opis</b> sends it as a key-value entry with key "Uwagi", splitting into numbered entries if over 256 characters. <b>Key:Value - Dodatkowy Opis</b> parses each line at the first colon into a separate entry. Lines without a colon are skipped. Example:
+KSEF_HowTo_Config_NotesKeyValueExample1=Order number: ZAM/2026/001
+KSEF_HowTo_Config_NotesKeyValueExample2=Special instructions: Handle with care
+KSEF_HowTo_Config_CustomFields=Custom fields from five entity types can be included: <b>Invoice</b> (applies to entire invoice), <b>Invoice Line</b> (linked to line via its line number), <b>Product</b> (sourced from linked product per line, with the line number), <b>Third Party</b> (sourced from customer), and <b>Project</b> (sourced from linked project). Create a new field with the form at the bottom of the section, or enable existing extrafields using the checkboxes.
+KSEF_HowTo_Config_CustomFieldsTarget=For Invoice, Third Party, and Project extrafields, you can choose whether each field goes to the <b>additional description</b> (key-value pairs in the XML) or the <b>invoice footer</b> (appended as "Label: Value" text in the invoice footer). Invoice Line and Product fields always go to the additional description since they require linking to a line number.
+KSEF_HowTo_Config_Limits=Keys and values are capped at 256 characters. Simple mode splits longer notes into numbered entries. Key:Value and custom field values beyond 256 characters are truncated. Invoice footer text is capped at 3500 characters per entry.
+KSEF_HowTo_Sending_Notes=Invoice Notes and Custom Fields
+KSEF_HowTo_Sending_NotesEditing=Notes are edited on the invoice's Notes tab. A helper box below the textarea shows the current mode, a per-entry character breakdown, and any custom fields that will be included.
+KSEF_HowTo_Sending_NotesPreview=The Notes tab and invoice card both show a preview panel listing exactly what will be sent, grouped by source. The panel reflects the last saved state.
+KSEF_HowTo_Sending_NotesOverride=On the Notes tab, the "Notes mode (this invoice)" dropdown overrides the global setting for one invoice. Each option controls both where the note goes and how it's formatted. Configured custom fields are still included. Disabled suppresses everything for that invoice - notes and custom fields are omitted from both the invoice footer and the additional description (boilerplate and registry numbers are not affected).
+
+KSEF_HowTo_Sending_PDFPreview=PDF Preview
+KSEF_HowTo_Sending_PDFPreviewDesc=A KSeF-style PDF preview is available on draft and validated invoices before submission. Use it to verify how the invoice will appear in KSeF format without submitting.
+
+KSEF_HowTo_Config_OrderContract=Order and Contract Numbers
+KSEF_HowTo_Config_OrderContractDesc=<b>Order number</b> (order/PO number) can be sourced from: Customer Reference (ref_client, default), linked sales order number, or an invoice extrafield. Multiple linked orders on one invoice result in multiple order number entries. <b>Contract number</b> can come from a third party extrafield (auto-populates from customer record) or an invoice extrafield (manual per invoice). Optionally enable <b>date-prefix parsing</b> to read a leading date from the contract number value into the contract date, stripping it from the number. Configure these on the Outgoing Invoices tab.
+
+KSEF_HowTo_Config_Boilerplate=Footer Boilerplate
+KSEF_HowTo_Config_BoilerplateDesc=A static text block on the Outgoing Invoices tab that appears in every invoice's footer. Use it for KRS registration, legal disclaimers, or GDPR clauses. Maximum 3500 characters. Not affected by per-invoice note overrides.
+
+KSEF_CompanyIdentifiers=Company Identifiers
+KSEF_CompanyIdentifiersDesc=NIP is required. KRS, REGON, and BDO are optional and will auto-populate from your company settings if configured there.
+KSEF_TranslationOverrides=Translation Overrides
+KSEF_ApplyTransOverrides=Apply Translation Overrides
+KSEF_RemoveTransOverrides=Remove Translation Overrides
+KSEF_TransOverridesApplied=Translation overrides applied successfully for: %s
+KSEF_TransOverridesRemoved=Translation overrides removed successfully for: %s
+KSEF_TransOverridesError=Error updating translation overrides
+KSEF_TransOverridesNoLang=Please select at least one language
+KSEF_TransOverridesDesc=Sync Dolibarr field labels (ProfId, VATIntra) to match the identifier mappings configured above. This writes to the translation override table used by Home > Setup > Translation.
+KSEF_TransOverridesCurrent=Current translation overrides
+KSEF_TransOverridesPreview=Overrides based on current mappings
+KSEF_TransOverridesNone=No translation overrides currently applied
+KSEF_TransOverridesField=Field
+KSEF_TransOverridesLabel=Label
+KSEF_ConfirmRemoveTransOverrides=Are you sure you want to remove all translation overrides?
+
+# Sending Invoices Section
+KSEF_SendingInvoices=Sending Invoices
+KSEF_UsingTheModule=Using the Module
+KSEF_SubmitInvoice=Submit Invoice
+KSEF_SubmittingInvoices=Submitting Invoices
+KSEF_TheWorkflow=The Workflow
+KSEF_Workflow_Step1=Create or open an invoice
+KSEF_Workflow_Step2=Add fields as needed
+KSEF_Workflow_Step3=Click the KSeF button
+KSEF_Workflow_Step4=Wait for confirmation
+KSEF_SubmitInvoiceSteps=Steps to submit an invoice
+KSEF_OpenAnyInvoice=Open any invoice (date should be today)
+KSEF_OpenInvoiceCard=Open invoice card
+KSEF_OpenValidatedInvoice=Open a validated invoice
+KSEF_ClickKSEFButton=Click the "Validate and Upload to KSeF" button to submit
+KSEF_ClickRedKSEFButton=Click the red KSeF button
+KSEF_WaitForConfirmation=Wait for confirmation
+
+KSEF_ValidateAndUpload_Desc=On draft invoices, handles validation and upload in one step. Can be hidden in settings if you prefer the payment-first workflow below
+KSEF_UploadToKSEF_Desc=On validated, paid, or closed invoices, uploads to KSeF
+
+KSEF_HowTo_Sending_PaymentFirst=Payment-First Workflow
+KSEF_HowTo_Sending_PaymentFirstDesc=If you want payment data included in the KSeF XML: validate the invoice first, record payment(s), then click Upload to KSeF. The XML will include payment status, date, and amount. To encourage this flow, disable the "Validate and Upload" button on the Outgoing Invoices settings tab - this removes the one-click shortcut so the separate steps are more obvious.
+
+KSEF_Statuses=Statuses
+KSEF_STATUS_ACCEPTED_Desc=Invoice received a KSeF number, you're done
+KSEF_STATUS_PENDING_Desc=Still processing, check back shortly
+KSEF_STATUS_REJECTED_Desc=Check the error details and retry
+KSEF_STATUS_OFFLINE_Desc=KSeF was unavailable, invoice saved locally with a deadline to submit online later
+
+KSEF_ForeignCurrencyInvoices=Foreign Currency Invoices
+KSEF_ForeignCurrencyDesc=For invoices in EUR or other non-PLN currencies, you need to fetch the NBP exchange rate before submitting and must have the multicurrency module enabled. When this is true, there is a button on the invoice card that pulls the rate from the last working day before the invoice date. Submission is blocked until the NBP exchange rate is pulled. You can choose whether to change the PLN price or the foreign currency price when exchange rate differs from the previous in settings, similar to multicurrency.
+
+KSEF_BankAccountOnInvoice=Bank Account on Invoices
+KSEF_BankAccountOnInvoiceDesc=If you send invoices with bank transfer as the payment method and want your bank account details (IBAN) to appear on the invoice, you need to assign a bank account to the invoice. Dolibarr can auto-fill this for you.
+KSEF_BankAccount_Step1=Go to Bank/Cash and make sure your bank account has the IBAN filled in (SWIFT/BIC and bank name are optional but recommended)
+KSEF_BankAccount_Step2=Go to the customer's Third Party card and set a default bank account - this will auto-fill on new invoices for that customer
+KSEF_BankAccount_Step3=When creating an invoice with wire transfer payment, verify the Bank Account dropdown shows the correct account
+KSEF_BankAccount_Step4=If the bank account is set and payment method is wire transfer, the IBAN will be included in the KSeF XML automatically
+
+KSEF_AfterAcceptance=After Acceptance
+KSEF_AfterAcceptanceDesc=Once accepted, you can generate a KSeF-style PDF visualization from the invoice card. If you have QR codes enabled in settings, the KSeF number also gets added to your regular invoice PDFs.
+
+KSEF_CheckingStatusDesc=The KSeF tab on any invoice card shows all submission attempts for that invoice. The global Status page shows submissions across all invoices and highlights common errors:
+
+# PDF Generation
+KSEF_GenerateKSeFPDF=Generate KSeF-style PDF
+KSEF_PDFRequiresSubmission=Invoice must be submitted to KSeF first
+KSEF_PDFRequiresAccepted=Invoice must have ACCEPTED status in KSeF
+KSEF_PDFRequiresOnline=Invoice must be submitted online (not offline mode)
+KSEF_PDFGeneratedSuccess=KSeF-style PDF generated successfully: %s
+KSEF_PDFGenerationError=Error generating KSeF-style PDF
+KSEF_PreviewXMLBuildError=Could not generate KSeF preview - XML build failed
+KSEF_PreviewXMLValidationWarnings=KSeF XML validation warnings (preview still generated)
+KSEF_PreviewPDFGenerated=KSeF preview PDF generated: %s
+KSEF_QRVerificationInstruction=Can't scan the code from the image? Click the verification link to verify the invoice!
+KSEF_QRCodeII=QR Code II
+KSEF_QRCodeIIUnavailable=Unavailable - certificate not configured
+
+# Receiving Invoices Section
+KSEF_ReceivingInvoices=Receiving Invoices
+KSEF_ReceivingInvoicesDesc=Invoices that suppliers send you via KSeF can be synced into Dolibarr.
+KSEF_Receiving_Step1=Go to the Incoming Invoices page:
+KSEF_Receiving_Step2=Click "Sync from KSeF"
+KSEF_Receiving_Step3=New invoices appear in the list
+KSEF_ReceivingActions=For each invoice you can view the full details, download the original XML, download a PDF visualization, or verify it directly on the KSeF portal.
+
+KSEF_ImportingToDolibarr=Importing to Dolibarr
+KSEF_ImportingToDolibarrDesc=Incoming invoices can be imported as supplier invoices in Dolibarr. The module automatically matches suppliers by their tax identification numbers (NIP, EU VAT, or other professional identifiers configured in Dolibarr) and line items by product reference, supplier product reference, or barcode (GTIN).
+KSEF_Importing_HowItWorks=How it works
+KSEF_Importing_Step1=Sync incoming invoices from KSeF (manually or via scheduled job)
+KSEF_Importing_Step2=Import invoices individually from the invoice's "Import to Dolibarr" tab, or use batch import from the incoming invoices list
+KSEF_Importing_Step3=The module auto-matches the supplier and attempts to match each line item to an existing product - first by product reference, then by supplier reference, then by barcode
+KSEF_Importing_Step4=Lines without a product match are imported as free text on the supplier invoice. If "Auto-create products when no match found" is enabled in module settings, new products are created instead
+KSEF_Importing_Individual=Individual import
+KSEF_Importing_IndividualDesc=Individual import allows you to review each invoice before importing. You can select or create a supplier (pre-filled from the invoice data) and choose which product to associate with each line item. A "+" button next to each line allows you to create a new product pre-filled with the reference, description, price, VAT rate, and barcode from the invoice.
+KSEF_Importing_Batch=Batch import
+KSEF_Importing_BatchDesc=Batch import processes multiple invoices at once from the incoming invoices list. It auto-matches suppliers and products where possible.
+KSEF_Importing_StockNote=Importing an invoice does not automatically affect stock levels. Stock movements only occur when the imported supplier invoice is validated, and only if "Increase real stocks on validation of vendor invoice/credit note" is enabled in the Stock module settings:
+KSEF_Importing_StockNoteLink=Stock module settings
+KSEF_Importing_StockNoteFreeText=Lines imported as free text (without a linked product) will not affect stock regardless of this setting.
+
+# Customer Exclusions Section
+KSEF_CustomerExclusions=Customer Exclusions
+KSEF_CustomerExclusionsDesc=Some customers don't need invoices sent to KSeF. You can exclude specific customers either from the module settings page or directly on the third party card using the exclusion checkbox.
+
+# Troubleshooting Section
+KSEF_Troubleshooting=Troubleshooting
+KSEF_FindingErrorDetails=Finding Error Details
+KSEF_FindingErrorDetailsDesc=Open the invoice, go to the KSeF tab, and view the error code and message. The global Status page also shows common errors across all submissions from the past 30 days:
+KSEF_ViewingErrorDetails=Viewing Error Details
+KSEF_ErrorDetailsLocation=To see detailed error information
+KSEF_ClickInfoIcon=Click the info icon
+KSEF_ScrollToKSEFSection=Scroll to KSeF section
+KSEF_ConfigureNow=Configure now
+
+KSEF_CommonIssues=Common Issues
+
+KSEF_Issue_DuplicateNumber=Duplicate invoice number (Error 440)
+KSEF_Issue_DuplicateNumber_Desc=This invoice number was already used in KSeF. Common in test/demo environments since data persists between sessions. Change the invoice number and retry.
+
+KSEF_Issue_AuthFailed_Desc=First, verify your token or certificate hasn't expired. If credentials are valid, the most common cause is missing permissions in the KSeF portal. Go to "Moje uprawnienia" in the KSeF application and verify you have upload/download permissions configured. Valid authentication alone isn't sufficient - permissions must be explicitly assigned.
+
+KSEF_Issue_NBPMissing=NBP rate missing
+KSEF_Issue_NBPMissing_Desc=Foreign currency invoice without an exchange rate. Use the fetch button on the invoice card to pull the rate from NBP.
+
+KSEF_Issue_Timeout_Desc=KSeF didn't respond in time (error: "Curl error: Operation timed out after X milliseconds"). The default timeout is 7 seconds. You can increase it in Setup > Other Settings by changing the KSEF_TIMEOUT value. The submission might still be processing on the KSeF side, so check the status or retry.
+
+KSEF_RetryLimits=Retry Limits
+KSEF_RetryLimitsDesc=Failed submissions can be retried up to 30 times before being marked as permanently failed. Each attempt is logged in the submission history.
+
+
+# ============================================
+# Invoice Tab (tab_ksef.php)
+# ============================================
+KSEF_Tab=KSeF
+KSEF_SubmissionHistory=KSeF submission history
+KSEF_Number=KSeF number
+KSEF_DownloadFA3XML=Download FA(3) XML
+KSEF_DownloadUPO=Download UPO
+KSEF_SubmittedOn=Submitted on
+
+# ============================================
+# Status List Page (status.php)
+# ============================================
+KSEF_ErrorDetails=Error details
+KSEF_ErrorCode=Error code
+KSEF_TechnicalDetails=Technical details
+KSEF_UPONotAvailable=UPO file not available
+KSEF_CommonErrors=Common errors
+KSEF_StatusUpdated=Status updated
+KSEF_VerifyOnKSEFPortal=Verify on KSeF portal
+KSEF_ViewAllAttemptsOnInvoice=View all attempts on this invoice
+KSEF_ViewAllSubmissions=View all submissions
+KSEF_CheckStatus=Check status
+KSEF_ViewErrorDetails=View error details
+KSEF_DownloadKSEFZip=Download invoices with KSeF data (ZIP)
+KSEF_Attempts=Attempts
+KSEF_SubmissionRetried=Submission retried
+
+# ============================================
+# Status Badge Values (ksef.lib.php)
+# ============================================
+KSEF_STATUS_PENDING=Pending
+KSEF_STATUS_SUBMITTED=Submitted
+KSEF_STATUS_ACCEPTED=Accepted
+KSEF_STATUS_REJECTED=Rejected
+KSEF_STATUS_FAILED=Failed
+KSEF_STATUS_TIMEOUT=Timeout
+
+# ============================================
+# Actions & Buttons (actions_ksef.class.php)
+# ============================================
+KSEF_SubmitToKSEF=Submit to KSeF
+KSEF_ValidateAndUpload=Validate and Upload to KSeF
+KSEF_ValidatingAndSubmitting=Validating and submitting to KSeF
+KSEF_SubmittingToKSEF=Submitting to KSeF
+KSEF_ViewSubmissionDetails=View Details
+KSEF_ViewXML=View FA(3) XML
+
+# ============================================
+# Success Messages
+# ============================================
+KSEF_SubmissionSuccess=Invoice successfully submitted to KSeF
+KSEF_AcceptanceSuccess=Invoice accepted by KSeF
+KSEF_UPODownloaded=UPO confirmation downloaded
+KSEF_InvoiceAccepted=Invoice Accepted
+KSEF_SubmissionStatus=Submission Status
+KSEF_CheckingStatus=Checking Status
+KSEF_BeingProcessed=Being processed
+KSEF_Updated=Updated
+
+# ============================================
+# Invoice Messages
+# ============================================
+KSEF_SubmissionPending=Invoice submitted - waiting for KSeF confirmation
+KSEF_SubmissionRejected=Invoice rejected by KSeF
+KSEF_SubmissionFailed=Failed to submit invoice to KSeF
+KSEF_CustomerExcluded=This customer is excluded from KSeF submissions
+KSEF_CustomerExcludedInfo=This customer is excluded from KSeF - invoice will not be submitted
+KSEF_AlreadySubmitted=Invoice already submitted to KSeF
+KSEF_XMLGenerationFailed=Failed to generate FA(3) XML
+KSEF_SubmissionRecordFailed=Submission successful but failed to save record
+KSEF_IncludedInPDF=KSeF number will be included in PDF
+
+# ============================================
+# Extrafields
+# ============================================
+KSEF_KSEFNumber=KSeF Number
+KSEF_KSEFStatus=KSeF Status
+KSEF_KSEFSubmissionDate=KSeF Submission Date
+KSEF_KSEFReference=KSeF Reference
+KSEF_ExtraFieldNumber=KSeF Number
+KSEF_ExtraFieldStatus=KSeF Status
+KSEF_ExtraFieldSubmissionDate=KSeF Submission Date
+KSEF_StatusPending=Pending
+KSEF_StatusAccepted=Accepted
+KSEF_StatusRejected=Rejected
+KSEF_StatusFailed=Failed
+KSEF_StatusOffline=Offline
+KSEF_StatusValidationFailed=Validation Failed
+KSEF_ExtraFieldSaleDate=Date of Sale
+KSEF_ExtraFieldSaleDateHelp=Date of sale/delivery. Auto-populated from linked sales order delivery date, or invoice date. Can be manually overridden.
+KSEF_ExtraFieldDodatkowyOpisMode=Notes mode (this invoice)
+KSEF_ExtraFieldDodatkowyOpisModeHelp=Override the global Invoice Notes setting for this invoice only. "Default" uses the module global settings. "Simple" or "Key:Value" forces the note to that mode; configured custom fields are still included. "Disabled" suppresses both notes and custom fields from this invoice's KSeF XML (boilerplate text is not affected).
+KSEF_DodatkowyOpisMode_Default=Default (use module settings)
+KSEF_DodatkowyOpisMode_SimpleStopka=Simple - Stopka Faktury (footer as plain text)
+KSEF_DodatkowyOpisMode_SimpleDodatkowy=Simple - Dodatkowy Opis (as "Uwagi" entry)
+KSEF_DodatkowyOpisMode_KeyValueDodatkowy=Key:Value - Dodatkowy Opis (parse note lines)
+KSEF_DodatkowyOpisMode_Disabled=Disabled (no notes or custom fields)
+KSEF_NotSubmitted=No KSeF data
+
+# ============================================
+# Currency
+# ============================================
+KSEF_ExtraFieldKursData=NBP Rate Date
+KSEF_ExtraFieldKursDataHelp=NBP exchange rate date for foreign currency invoice (last working day before sale date)
+KSEF_NBPRate=NBP Rate
+KSEF_NBPRateFromDate=from %s
+KSEF_NBPRateRequired=NBP rate missing for foreign currency invoice. Fetch rate before KSeF submission.
+KSEF_NBPCurrencyNotSupported=Currency %s is not supported by NBP
+KSEF_NBPNoRateForDate=No NBP rate available for the specified date
+KSEF_NBPRateMissing=Rate Missing
+KSEF_RefreshNBPRate=Refresh
+KSEF_FetchNBPRate=Fetch NBP Rate
+KSEF_RefreshNBPRateTooltip=Fetch latest NBP exchange rate for this invoice date
+KSEF_FetchNBPRateTooltip=Fetch NBP exchange rate from National Bank of Poland
+KSEF_NBPRateNotNeeded=NBP exchange rate is not needed for PLN invoices
+KSEF_NBPRateFetched=NBP exchange rate fetched successfully: %s from %s
+KSEF_NBPRateFetchError=Failed to fetch NBP exchange rate: %s
+KSEF_MULTICURRENCY_CONFIG=Multicurrency / NBP Settings
+KSEF_NBP_RATE_MODE=NBP Rate Application Mode
+KSEF_NBP_RATE_MODE_KEEP_BASE=Keep base currency amounts (PLN) - recalculate foreign currency (EUR/etc)
+KSEF_NBP_RATE_MODE_KEEP_FOREIGN=Keep foreign currency amounts (EUR/etc) - recalculate PLN
+KSEF_NBP_SYNC_CURRENCIES=Currencies to sync (NBP cron)
+KSEF_NBP_SYNC_CURRENCIES_Help=Currencies enabled in the Multicurrency module. Leave empty to sync them all, or pick specific ones for the daily NBP cron.
+KSEF_NBP_SYNC_CURRENCIES_All=All currencies
+KSEF_MulticurrencyRefreshDisabled=Disabled for KSeF - Use "Fetch NBP Rate" button in the NBP Rate Date field instead
+
+# ============================================
+# Default Invoice Payment Settings
+# ============================================
+KSEF_ZWOLNIENIE_PODSTAWA=VAT Exemption Legal Basis
+KSEF_ZWOLNIENIE_PODSTAWA_Help=Legal basis for VAT exemption, emitted when the invoice contains lines with a 0%% VAT rate that has the ZW code set in the VAT rate dictionary. Example: "art. 43 ust. 1 pkt 18 ustawy o VAT". Only applies to products/services with 0%% VAT rate using the ZW code. When disabled, invoices with ZW lines will be sent without an exemption basis.
+KSEF_ZWOLNIENIE_TYPE_DISABLED=Disabled (no exemption basis)
+KSEF_ZWOLNIENIE_PODSTAWA_Placeholder=e.g. art. 43 ust. 1 pkt 18 ustawy o VAT
+KSEF_ZWOLNIENIE_TYPE_P19A=Polish law (ustawa)
+KSEF_ZWOLNIENIE_TYPE_P19B=EU Directive
+KSEF_ZWOLNIENIE_TYPE_P19C=Other legal basis
+KSEF_ZWOLNIENIE_PRODUCT_FIELD=Per-Product Exemption Basis
+KSEF_ZWOLNIENIE_PRODUCT_FIELD_Help=Product extrafield containing the exemption legal basis. When set, ZW invoice lines use the basis from their product instead of the global default above. Different products can have different exemption bases (e.g. art. 43 pkt 18 for medical, art. 43 pkt 26 for education). Requires extrafield type: varchar, text, or select.
+KSEF_ZWOLNIENIE_PRODUCT_FIELD_DISABLED=Disabled (use global default only)
+KSEF_NR_ZAMOWIENIA_SOURCE=Order/PO Number Source
+KSEF_NR_ZAMOWIENIA_SOURCE_Help=Where the order/PO number comes from: customer reference (default), linked sales order, or an invoice extrafield. Field type: varchar/text/int.
+KSEF_NR_ZAMOWIENIA_SOURCE_REF_CLIENT=Customer Reference (ref_client)
+KSEF_NR_ZAMOWIENIA_SOURCE_LINKED_ORDER=Linked Sales Order Number
+KSEF_NR_ZAMOWIENIA_SOURCE_DISABLED=Disabled
+KSEF_NR_ZAMOWIENIA_SOURCE_EXTRAFIELD=Extrafield
+KSEF_NR_UMOWY_SOURCE=Contract Number Source
+KSEF_NR_UMOWY_SOURCE_Help=Where the contract number comes from: a customer extrafield (auto-filled from the customer) or an invoice extrafield (per-invoice). Field type: varchar/text/int.
+KSEF_NR_UMOWY_SOURCE_DISABLED=Disabled
+KSEF_NR_UMOWY_SOURCE_EXTRAFIELD=Invoice extrafield
+KSEF_NR_UMOWY_SOURCE_THIRDPARTY_EXTRAFIELD=Third party extrafield
+KSEF_NR_UMOWY_PARSE_DATE=Parse date from contract number
+KSEF_NR_UMOWY_PARSE_DATE_Help=A date at the start of the contract field becomes the contract date and is removed from the number. Use day/month/year, e.g. "01.12.2026 Umowa o współpracy" or "1/12/26 - Umowa o współpracy" gives date 2026-12-02 and number "Umowa o współpracy".
+KSEF_NOTE_PUBLIC_TARGET=Public Note Target
+KSEF_NOTE_PUBLIC_TARGET_Help=Choose where the public note content is sent in the KSeF XML. Additional description: key-value pairs (existing behavior). Invoice footer: free-text footer block. Extrafields always go to the additional description regardless of this setting.
+KSEF_NOTE_PUBLIC_TARGET_DODATKOWY_OPIS=Additional description (key/value)
+KSEF_NOTE_PUBLIC_TARGET_STOPKA_FAKTURY=Invoice footer (free text)
+KSEF_STOPKA_FAKTURY_SECTION=Invoice Footer
+KSEF_STOPKA_BOILERPLATE=Footer Boilerplate Text
+KSEF_STOPKA_BOILERPLATE_Help=Static text appended to every outgoing invoice footer. Typical content: KRS registration, GDPR clause, capital info, legal disclaimers. Maximum 3500 characters per the FA(3) schema.
+KSEF_STOPKA_BOILERPLATE_Limit=Maximum 3500 characters
+
+KSEF_DEFAULT_PAYMENT_CONFIG=Default Invoice Payment Settings
+KSEF_DEFAULT_PAYMENT_TERM=Default Payment Terms
+KSEF_DEFAULT_PAYMENT_TERM_Help=Pre-fill payment terms when creating a new invoice. Used when the customer has no payment terms configured and no source document (order/proposal) is linked. Can always be changed per invoice.
+KSEF_DEFAULT_PAYMENT_METHOD=Default Payment Method
+KSEF_DEFAULT_PAYMENT_METHOD_Help=Pre-fill payment method when creating a new invoice. Used when the customer has no payment method configured and no source document is linked. Can always be changed per invoice.
+KSEF_DEFAULT_BANK_ACCOUNT=Default Bank Account
+KSEF_DEFAULT_BANK_ACCOUNT_Help=Pre-fill bank account when creating a new invoice. Used when the customer has no bank account configured and no source document is linked. Can always be changed per invoice.
+
+KSEF_VAT_DICTIONARY_HELPER=KSeF VAT Rate Codes
+KSEF_VAT_DICTIONARY_HELPER_Help=KSeF uses specific codes to distinguish 0%% VAT types (exempt, reverse charge, not subject, WDT, export). Enable the codes your business needs - they will appear in the VAT rate dropdown when creating invoice lines. Standard 0%% (without a code) is always available and auto-detected by buyer country.
+KSEF_VAT_DICTIONARY_HELPER_Desc=Enable or disable available VAT rates on invoices
+KSEF_VAT_CODE_ZW=Exempt - medical, educational, financial, small business (art. 43/113)
+KSEF_VAT_CODE_RC=Reverse charge (art. 17 ust. 1 pkt 7/8)
+KSEF_VAT_CODE_NP=Not subject - goods/services outside territory
+KSEF_VAT_CODE_NP2=Not subject II - intra-EU services (art. 100 ust. 1 pkt 4)
+KSEF_VAT_CODE_WDT=Intra-EU delivery of goods (WDT)
+KSEF_VAT_CODE_EX=Export of goods
+KSEF_VAT_CODE_COLUMN=Code
+KSEF_VAT_CODE_DESC_COLUMN=Description
+KSEF_VAT_CODE_GLOBAL=Managed globally - toggle in Dolibarr dictionary
+KSEF_VAT_IN_DROPDOWN=In dropdown
+KSEF_VAT_CODE_DICT_LINK=Open VAT dictionary for advanced editing
+
+# ============================================
+# Issue Solutions
+# ============================================
+KSEF_Issue_CertNotFound=Certificate not found
+KSEF_Issue_CertNotFound_Solution=Check if the certificate file exists in the specified path.
+KSEF_Issue_AuthFailed=Authentication failed
+KSEF_Issue_AuthFailed_Solution=Verify your token and NIP. Ensure the token is generated for the correct environment (Test/Prod).
+KSEF_Issue_Timeout=Connection timeout
+KSEF_Issue_Timeout_Solution=Increase KSEF_TIMEOUT in Setup > Other Settings (e.g. to 15). Also check your internet connection and firewall settings.
+KSEF_Issue_InvalidNIP=Invalid NIP
+KSEF_Issue_InvalidNIP_Solution=Ensure the Company NIP contains only digits and is valid.
+KSEF_Issue_XMLValidation=XML Validation Error
+KSEF_Issue_XMLValidation_Solution=The generated XML does not match the KSeF schema. Check invoice data.
+
+# ============================================
+# Info Fields (Support Page)
+# ============================================
+KSEF_SOC_NAME=Company Name
+KSEF_SOC_MAIL=Company Email
+KSEF_SOC_NIP=Company NIP
+KSEF_MOD_NAME=Module Name
+KSEF_MOD_VERSION=Module Version
+KSEF_DOL_VERSION=Dolibarr Version
+KSEF_PHP_VERSION=PHP Version
+KSEF_SERVER_OS=Server OS
+KSEF_DATABASE=Database
+KSEF_USER_AGENT=User Agent
+KSEF_CERT_STATUS=Certificate Status
+KSEF_PHP_OPENSSL=OpenSSL Extension
+KSEF_PHP_CURL=cURL Extension
+KSEF_PHP_DOM=DOM Extension
+KSEF_STATS_TOTAL=Total Submissions
+KSEF_STATS_ACCEPTED=Accepted
+KSEF_STATS_PENDING=Pending
+KSEF_STATS_FAILED=Failed
+KSEF_STATS_SUCCESS_RATE=Success Rate
+KSEF_DESCRIPTION=Description
+
+# ============================================
+# Offline Mode & Deadlines
+# ============================================
+KSEF_OfflineMode=Offline Mode
+KSEF_MODE_OFFLINE=Offline
+KSEF_MODE_OFFLINE_SYSTEM=System Offline
+KSEF_MODE_AWARYJNY=Emergency Mode
+KSEF_OfflineDeadline=Submission Deadline
+KSEF_DeadlinePassed=Deadline Passed
+KSEF_DeadlineUrgent=URGENT
+KSEF_HoursRemaining=%s hours remaining
+KSEF_OfflineDeadlinePassed=Offline deadline has passed - invoice cannot be uploaded
+KSEF_STATUS_OFFLINE=Offline (Awaiting Upload)
+KSEF_OfflineNumberNotYetSubmitted=This is an offline invoice number - not yet submitted to KSeF
+
+# ============================================
+# Offline Confirmation Dialog
+# ============================================
+KSEF_OfflineConfirmTitle=Offline Mode Required
+KSEF_OfflineConfirmMessage=Invoice date is %s day(s) behind the current date. This invoice will be submitted in OFFLINE mode.
+KSEF_OfflineConfirmInfo=In offline mode, the invoice must be submitted to KSeF by the deadline shown above. Two QR codes will be added to the PDF.
+KSEF_ConfirmOfflineSubmit=Submit in Offline Mode
+KSEF_OfflineBackdatedTitle=Backdated Invoice Detected
+KSEF_OfflineBackdatedMessage=Invoice is dated %d day(s) in the past and requires offline mode.
+KSEF_OfflineConnectionTitle=Connection Issue Detected
+KSEF_OfflineConnectionMessage=Unable to connect to KSeF. You can create an offline invoice instead.
+KSEF_OfflineExplanation=The invoice will be stored locally and must be uploaded to KSeF before the deadline.
+
+# ============================================
+# Technical Correction
+# ============================================
+KSEF_TechnicalCorrection=Technical Correction
+KSEF_TechnicalCorrectionSubmitted=Technical correction submitted successfully
+KSEF_TechnicalCorrectionFailed=Technical correction failed
+
+# ============================================
+# Certificate Configuration (Common)
+# ============================================
+KSEF_Certificate=Certificate
+KSEF_PrivateKey=Private Key
+KSEF_Password=Password
+KSEF_CertificateFile=Certificate File
+KSEF_PrivateKeyFile=Private Key File
+KSEF_PrivateKeyPassword=Private Key Password
+KSEF_PrivateKeyPassword_Help=The password used to decrypt the encrypted private key (.key file)
+KSEF_OrPasteContent=Or paste content
+KSEF_LeaveEmptyToKeep=Leave empty to keep current
+KSEF_EnterPassword=Enter password
+KSEF_CertSerial=Serial Number
+KSEF_ValidUntil=Valid Until
+KSEF_CertificateReady=Certificate Ready
+KSEF_CertificateIncomplete=Configuration Incomplete
+KSEF_CertificateActive=Certificate Active
+KSEF_CertificateExpired=Certificate Expired
+KSEF_CertificateExpiresSoon=Certificate expires within 30 days
+KSEF_ExpiresSoon=Expires Soon
+KSEF_RemoveAll=Remove All
+KSEF_RemoveCertificate=Remove Certificate
+KSEF_UpdateCertificate=Update Certificate
+KSEF_CertificateSaved=Certificate saved successfully
+KSEF_PrivateKeySaved=Private key saved successfully (encrypted)
+KSEF_PrivateKeyValidated=Private key validated successfully
+KSEF_PrivateKeyInvalid=Invalid private key format
+KSEF_PrivateKeyPasswordMismatch=Warning: Password does not match the private key
+KSEF_CertificateRemoved=Certificate configuration removed
+KSEF_CertificateParseError=Failed to parse certificate
+KSEF_CertificateInvalid=Invalid certificate format
+KSEF_NoCertificateConfigured=No certificate configured
+KSEF_CertificateNotConfigured=Certificate not configured
+
+# ============================================
+# Offline Certificate Configuration
+# ============================================
+KSEF_OFFLINE_CERTIFICATE_CONFIG=Offline Certificate Configuration (QR Code II)
+KSEF_OFFLINE_CERTIFICATE=Offline Certificate
+KSEF_OFFLINE_CERTIFICATE_Help=Certificate used for signing QR Code II on invoices issued in offline mode. You need both the certificate (.crt) and the encrypted private key (.key) that was used to generate the certificate request.
+KSEF_OFFLINE_PRIVATE_KEY=Offline Certificate Private Key
+KSEF_OFFLINE_PRIVATE_KEY_Help=Private key corresponding to the offline certificate. Will be stored encrypted.
+KSEF_SaveOfflineCertificate=Save Offline Certificate
+KSEF_OfflineCertificateSaved=Offline certificate saved
+KSEF_OfflinePrivateKeySaved=Offline private key saved
+KSEF_OfflinePasswordSaved=Offline certificate password saved
+KSEF_OfflineCertificateRemoved=Offline certificate configuration removed
+KSEF_ConfirmRemoveOfflineCert=Are you sure you want to remove the offline certificate configuration?
+KSEF_CertificateRequiredForOffline=Certificate is required for QR Code II generation in offline mode
+KSEF_OfflineCertificateRequired=Offline Certificate Required
+KSEF_OfflineCertificateRequiredExplanation=To create offline invoices, you must configure an offline certificate in the KSeF module settings.
+KSEF_OfflineCertificateMissingItems=Missing configuration
+KSEF_Missing_certificate=Offline certificate (.crt file)
+KSEF_Missing_private_key=Offline private key (.key file)
+KSEF_Missing_password=Private key password
+KSEF_QR_CertNotConfigured=Cert not configured
+
+# ============================================
+# Authentication Certificate Configuration
+# ============================================
+KSEF_ConfigureCertificateBelow=You can configure the Online Certificate needed below
+KSEF_ForAPIAuthentication=Online Certificate
+KSEF_ForQRCodeSigning=Offline Certificate
+KSEF_AUTH_CERTIFICATE_CONFIG=Authentication Certificate Configuration
+KSEF_AUTH_CERTIFICATE=Authentication Certificate
+KSEF_AUTH_CERTIFICATE_Help=Certificate used for authenticating with KSeF API via XAdES signature. You need both the certificate (.crt) and the encrypted private key (.key) that was used to generate the certificate request.
+KSEF_SaveAuthCertificate=Save Authentication Certificate
+KSEF_AuthCertificateSaved=Authentication certificate saved
+KSEF_AuthPrivateKeySaved=Authentication private key saved
+KSEF_AuthPasswordSaved=Authentication certificate password saved
+KSEF_AuthCertificateRemoved=Authentication certificate configuration removed
+KSEF_ConfirmRemoveAuthCert=Are you sure you want to remove the authentication certificate configuration?
+KSEF_NoAuthCertificateConfigured=No authentication certificate configured
+KSEF_AuthCertificateInfo=Authentication certificates can be obtained from the KSeF portal. They allow authentication via digital signature instead of using tokens.
+KSEF_ConfigureCertificateFirst=You need to configure the authentication certificate first
+KSEF_WARNING_NO_AUTH_CERTIFICATE=Certificate authentication is selected but certificate is not fully configured
+
+# ============================================
+# Authentication Method
+# ============================================
+KSEF_AUTH_METHOD_SELECT=Authentication Method
+KSEF_AUTH_METHOD_SELECT_Help=Choose whether to authenticate using a KSeF token or a KSeF certificate. Certificate authentication requires a valid certificate issued by KSeF with both .crt and .key files.
+KSEF_AUTH_METHOD_TOKEN=Token Authentication
+KSEF_AUTH_METHOD_CERTIFICATE=Certificate Authentication
+KSEF_AuthMethodUpdated=Authentication method updated
+KSEF_NO_AUTH_CONFIGURED=No Authentication Configured
+KSEF_ConfigureAuthBelow=Configure token or certificate below to enable KSeF submissions
+KSEF_WARNING_NO_AUTH=No authentication method configured
+KSEF_WARNING_CONFIGURE_TOKEN_OR_CERT=You must configure either a token or certificate to submit invoices to KSeF
+KSEF_WARNING_AUTH_CERT_INCOMPLETE=Authentication certificate is incomplete
+KSEF_WARNING_AUTH_CERT_MISSING_PARTS=Missing: %s
+KSEF_TEST_CERT_AUTH=Test Certificate Authentication
+KSEF_CERT_AUTH_SUCCESS=Certificate authentication successful
+KSEF_CERT_AUTH_FAILED=Certificate authentication failed
+KSEF_CERT_AUTH_ERROR=Certificate authentication error
+
+# ============================================
+# Token Configuration
+# ============================================
+KSEF_TOKEN_CONFIG=Token Configuration
+KSEF_TokenConfigured=Token Configured
+KSEF_TokenNotConfigured=Token not configured
+KSEF_ConfigureTokenBelow=Configure in the Token section below
+KSEF_ConfigureTokenFirst=You need to configure the authentication token first
+
+# ============================================
+# Offline Submission & Retry
+# ============================================
+KSEF_SubmissionInProgress=Submission in progress...
+KSEF_RetrySubmission=Retry Submission
+KSEF_RetryingSubmission=Retrying submission
+KSEF_RetryFailed=Retry failed
+KSEF_RetryOnlineHelp=Try to submit this offline invoice to KSeF online (before deadline)
+KSEF_CreateOfflineInvoice=Create Offline Invoice
+KSEF_CreatingOfflineInvoice=Creating offline invoice
+KSEF_OfflineInvoiceCreated=Offline invoice created successfully
+KSEF_OfflineCreationFailed=Failed to create offline invoice
+KSEF_SubmitOnline=Submit Online
+KSEF_TryAgain=Try Again
+KSEF_AlreadyAccepted=Invoice already accepted in KSeF
+KSEF_TooManyRetries=Too many retry attempts
+KSEF_InvalidStatusForUpload=Invoice is not in offline status
+KSEF_NoSubmissionFound=No submission record found for this invoice
+
+# ============================================
+# Upload Status
+# ============================================
+KSEF_UploadToKSEF=Upload to KSeF
+KSEF_UploadingToKSEF=Uploading to KSeF
+KSEF_UploadSuccess=Successfully uploaded to KSeF
+KSEF_UploadFailed=Upload to KSeF failed
+KSEF_UploadPending=Upload submitted, awaiting confirmation
+KSEF_OnlineSubmissionSuccess=Online submission successful
+KSEF_OnlineRetryFailed=Online retry failed, offline invoice remains valid
+KSEF_DuplicateInvoiceNumber=Duplicate Invoice Number
+KSEF_InvoiceNumberUsedBy=This invoice number was already used by
+KSEF_Retries=Retries
+
+# ============================================
+# Failure Dialog
+# ============================================
+KSEF_ConnectionFailed=Connection to KSeF Failed
+KSEF_ConnectionErrorExplanation=Unable to connect to the KSeF server. This could be due to network issues, server maintenance, or firewall settings. You can try again or create an offline invoice.
+KSEF_OfflineOptionAvailable=Create Offline Invoice?
+KSEF_OfflineOptionExplanation=Since we can't submit to KSeF page, we can create an Offline invoice. If the issue is on your side, you have until the next business day to submit the invoice to KSeF (the Deadline shown below). You can also check the Ministry of Finance page (https://www.gov.pl/web/finanse) for announcements that may extend this timeline.
+
+# ============================================
+# Modification Warnings
+# ============================================
+KSEF_ModifyWarningTitle=KSeF Warning
+KSEF_ModifyWarningKSeF=This invoice has already been submitted to KSeF with number %s. Modifying it will NOT update the KSeF record. You may need to issue a corrective invoice instead.
+KSEF_ModifyWarningOffline=An offline invoice has been generated for this document. Modifying it will invalidate the QR codes on the printed PDF and may cause compliance issues.
+KSEF_ModifyInfoFailed=A previous KSeF submission attempt failed. Modifying the invoice will require a new submission.
+
+# ============================================
+# Incoming Invoices - General
+# ============================================
+KSEF_IncomingInvoices=Incoming Invoices
+KSEF_IncomingInvoice=Incoming Invoice
+KSEF_NoIncomingInvoices=No incoming invoices found
+KSEF_TopSellers=Top Suppliers
+
+# ============================================
+# Incoming Invoices - Fetch & Sync
+# ============================================
+KSEF_FetchFromKSeF=Fetch from KSeF
+KSEF_DateFrom=Date From
+KSEF_DateTo=Date To
+KSEF_DateType=Date Type
+KSEF_DateTypeIssue=Invoice Date
+KSEF_DateTypeInvoicing=KSeF Receipt Date
+KSEF_FetchInvoices=Fetch Invoices
+KSEF_FetchResults=Found %s invoices: %s new added, %s already in system
+KSEF_FetchErrors=Errors during fetch
+KSEF_SyncFromKSeF=Sync from KSeF
+KSEF_SyncNow=Sync Now
+KSEF_SyncContinuationPoint=Continuation Point
+KSEF_LastSync=Last Sync
+KSEF_LastSyncResult=Last Result
+KSEF_SyncNotInitialized=Sync not yet initialized. Click "Sync Now" to start.
+KSEF_SyncResults=Synced %s new, %s existing (of %s total)
+KSEF_SyncResultShort=+%s new, %s existing (%s total)
+KSEF_SyncTruncated=More data available - sync again to continue.
+KSEF_SyncErrors=%s errors during sync
+KSEF_RateLimitActive=Rate limited by KSeF API. Retry after %s
+KSEF_ResetSyncState=Reset Sync
+KSEF_ConfirmResetSync=Reset sync state? This will reset the sync point to 31 Jan 2026 (day before KSeF went live) and re-sync all invoices from the beginning.
+KSEF_SyncStateReset=Sync state reset. Next sync will fetch all invoices from KSeF went live.
+KSEF_SyncProgress=Sync Coverage
+KSEF_SyncProgressStart=KSeF Start
+KSEF_SyncProgressHWM=Synced to
+KSEF_SyncProgressUpToDate=Up to date
+KSEF_SyncProgressPartial=Partially synced
+KSEF_SyncProgressBehind=Sync behind
+KSEF_SyncNotStarted=Not yet synced
+KSEF_FetchInProgress=Fetching invoices from KSeF...
+KSEF_FetchCompleted=Fetch completed
+KSEF_FetchFailed=Fetch failed
+KSEF_FetchAlreadyInProgress=Fetch already in progress
+KSEF_FetchReset=Fetch state reset
+KSEF_ElapsedTime=Elapsed
+KSEF_NewInvoices=New
+KSEF_ExistingInvoices=Existing
+KSEF_ConfirmCancelFetch=Cancel current fetch?
+KSEF_ResetAndRetry=Reset and retry
+KSEF_Downloading=Downloading invoices...
+KSEF_ProcessingBatches=Processing invoices
+KSEF_ReadyToProcess=Download ready, starting...
+KSEF_CurrentStatus=Current Status
+KSEF_PhaseWaitingKSeF=Waiting for KSeF to prepare export...
+KSEF_PhaseReadyToProcess=Download ready, starting...
+KSEF_PhaseDownloading=Downloading invoices...
+KSEF_PhaseProcessingBatches=Processing invoices (%s/%s)...
+NotSet=Not set
+
+# ============================================
+# Incoming Invoices - Invoice Details
+# ============================================
+KSEF_InvoiceDetails=Invoice Details
+KSEF_Seller=Seller
+KSEF_Buyer=Buyer (Us)
+KSEF_KSEFInformation=KSeF Information
+KSEF_Information=KSeF Information
+KSEF_FetchedOn=Fetched On
+KSEF_XMLCreated=XML Created
+KSEF_SystemInfo=System Info
+KSEF_SaleDate=Sale Date
+KSEF_Totals=Totals
+KSEF_Net=Net
+KSEF_NetExempt=Net (Exempt)
+KSEF_LineItems=Line Items
+KSEF_VatSummary=VAT Summary
+KSEF_VATBreakdown=VAT Breakdown
+KSEF_VATExempt=Exempt
+KSEF_VATDomestic=domestic
+KSEF_VATExport=export
+KSEF_VATNotSubject=Not subject
+KSEF_VATReverseCharge=Reverse charge
+KSEF_PaymentInfo=Payment Information
+KSEF_CorrectsInvoice=Corrects Invoice
+KSEF_CorrectsKsefNr=Corrects KSeF Nr
+KSEF_OriginalKsefNumber=Original KSeF Number
+KSEF_VendorRef=Vendor ref
+KSEF_ImportedAs=Imported as
+KSEF_CorrectsXInvoices=Corrects %s invoices (see table on right)
+KSEF_CorrectedInvoices=Corrected Invoices
+KSEF_CorrectionReason=Correction Reason
+
+# ============================================
+# Incoming Invoices - Actions & Status
+# ============================================
+KSEF_ImportStatus=Import Status
+KSEF_ImportStatusNEW=New
+KSEF_ImportStatusIMPORTED=Imported
+KSEF_ImportStatusSKIPPED=Skipped
+KSEF_ImportStatusERROR=Error
+KSEF_SkipInvoice=Skip Invoice
+KSEF_UnskipInvoice=Mark as New
+KSEF_ImportToDolibarr=Import to Dolibarr
+KSEF_ImportFeatureComingSoon=Import Feature Coming Soon
+KSEF_ImportFeatureDescription=The ability to automatically import KSeF incoming invoices as Dolibarr supplier invoices will be available in a future version. For now, you can view the invoice details and manually create a matching supplier invoice.
+KSEF_ImportComingSoon=This feature will be available in a future version
+KSEF_ViewLinkedInvoice=View Linked Invoice
+KSEF_AlreadyImported=Already imported to Dolibarr
+KSEF_ComingSoon=Coming in future version
+KSEF_ViewRawXml=View XML
+KSEF_DownloadXml=Download XML
+KSEF_XMLMetadata=XML Metadata
+KSEF_DownloadPdf=Generate PDF
+KSEF_DownloadPdfTooltip=Generate PDF visualization with QR code
+KSEF_VisualizationError=Failed to generate invoice visualization
+KSEF_ViewOnPortal=View on KSeF Portal
+KSEF_ClearAll=Clear All Records
+KSEF_ConfirmClearAll=Delete ALL incoming invoices for environment %s? This cannot be undone.
+KSEF_ClearedRecords=Cleared %s incoming invoice records from %s environment
+RecordsDeleted=%s records deleted
+ConfirmDeleteIncomingInvoice=Delete incoming invoice %s?
+NotInSystem=not in system
+
+
+KSEF_BASIC_CONFIG=Basic Configuration
+KSEF_MenuSubmissionStatus=Submission Status
+KSEF_MenuConfiguration=Configuration
+
+# ============================================
+# About Page - System Requirements
+# ============================================
+KSEF_Note=Note
+
+# Requirement Labels
+KSEF_Req_PHPVersion=PHP Version
+KSEF_Req_PHPVersionDesc=PHP 7.4 or higher required
+KSEF_Req_OpenSSL=OpenSSL Extension
+KSEF_Req_OpenSSLDesc=Required for encryption and secure communications
+KSEF_Req_cURL=cURL Extension
+KSEF_Req_cURLDesc=Required for API communications with KSeF
+KSEF_Req_DOM=DOM Extension
+KSEF_Req_DOMDesc=Required for XML processing
+KSEF_Req_Mbstring=Multibyte String Extension
+KSEF_Req_MbstringDesc=Required for handling invoice data and Polish characters
+KSEF_Req_JSON=JSON Extension
+KSEF_Req_JSONDesc=Required for KSeF API request/response processing
+KSEF_Req_Zip=Zip Extension
+KSEF_Req_ZipDesc=Required for unpacking incoming invoice packages from KSeF (ZipArchive)
+KSEF_Req_phpseclib=phpseclib Library
+KSEF_Req_phpseclibDesc=Cryptographic library for RSA encryption, included in module
+KSEF_Req_TCPDF=TCPDF Library
+KSEF_Req_TCPDFDesc=Required for QR code generation on PDFs
+KSEF_Req_TCPDF2DMissing=(2D barcode support missing)
+KSEF_Req_BarcodeModule=Barcode Module
+KSEF_Req_BarcodeModuleDesc=Dolibarr Barcode module (recommended for QR codes)
+KSEF_Req_MulticurrencyModule=Multicurrency Module
+KSEF_Req_MulticurrencyModuleDesc=Dolibarr Multicurrency module (required for foreign currency invoices with NBP exchange rates)
+KSEF_Req_CompanyNIP=Company NIP
+KSEF_Req_CompanyNIPDesc=Polish tax identification number
+KSEF_Req_KSeFAuth=KSeF Authentication
+KSEF_Req_KSeFAuthDesc=Token or valid certificate required for API access
+KSEF_Req_OfflineCert=Offline Signing Certificate
+KSEF_Req_OfflineCertDesc=Required for issuing invoices during KSeF unavailability (tryb awaryjny)
+KSEF_Req_Environment=Environment
+KSEF_Req_EnvironmentDesc=Current KSeF environment
+KSEF_Req_CSRF=CSRF Protection
+KSEF_Req_CSRFDesc=Cross-Site Request Forgery token protection (recommended for security)
+
+# Authentication Values
+KSEF_AuthValue_Token=Token
+KSEF_AuthValue_Certificate=Certificate
+KSEF_AuthValue_TokenAndCert=Token + Certificate
+KSEF_AuthValue_CertExpires=(cert expires: %s)
+KSEF_AuthValue_Expired=(EXPIRED: %s)
+KSEF_AuthValue_Expires=(expires: %s)
+
+# Certificate Status Values
+KSEF_CertValue_ValidUntil=Valid until: %s
+KSEF_CertValue_Expired=EXPIRED: %s
+KSEF_CertValue_Configured=Configured
+KSEF_CertValue_NotConfigured=Not configured
+
+# ============================================
+# Import Incoming Invoices
+# ============================================
+KSEF_Import=Import
+KSEF_ImportDesc=Import invoice as supplier invoice. Lines with selected products will be linked, others will be imported as free text.
+KSEF_ImportConfirmTitle=Are you sure you want to import this invoice?
+KSEF_ImportAsFreeText=free text (no product linked)
+KSEF_ImportLinkedTo=linked to
+KSEF_ImportSkip=Skip
+KSEF_ImportSkipDesc=Mark this invoice as skipped - it won't be imported
+KSEF_ImportSkipConfirm=Are you sure you want to skip this invoice?
+KSEF_ImportSuccess=Invoice successfully imported as supplier invoice %s
+KSEF_ImportErrorNoSupplier=Please select a supplier before importing
+KSEF_ImportErrorAlreadyImported=This invoice has already been imported
+KSEF_SupplierAutoMatched=Supplier auto-matched by NIP
+KSEF_SupplierNotFound=No supplier found matching %s - please select manually
+KSEF_SupplierChangeSelection=Change
+KSEF_CreateProduct=Create new product
+KSEF_CreateSupplier=Create new supplier
+KSEF_ImportedInvoice=Imported Supplier Invoice
+KSEF_ReopenForImport=Re-open for import
+KSEF_InvoiceSkipped=This invoice was marked as skipped
+KSEF_ProductColumn=Product (optional)
+
+# ============================================
+# Batch Import & Quick Import
+# ============================================
+KSEF_BatchImport=Batch Import
+KSEF_BatchImportTitle=Batch Import Preview
+KSEF_BatchImportConfirm=Import Selected
+KSEF_BatchImporting=Importing...
+KSEF_BatchImportResults=Import Results
+KSEF_BatchImportSuccessLine=Imported successfully
+KSEF_BatchSupplierMatched=Matched
+KSEF_BatchSupplierWillCreate=Will create
+KSEF_BatchProductsMatched=matched
+KSEF_BatchAutoCreateSuppliers=Auto-create suppliers when no match found
+KSEF_BatchAutoCreateSuppliers_Help=When checked, suppliers that cannot be matched by NIP or EU VAT number to an existing third party will be automatically created with data from the KSeF invoice (name, address, tax identifiers). When unchecked, invoices with unmatched suppliers will be skipped during batch import.
+KSEF_BatchAutoCreateProducts=Auto-create products when no match found
+KSEF_BatchAutoCreateProducts_Help=When checked, invoice line items that cannot be matched to an existing product (by product ref, supplier ref, or barcode/GTIN) will be automatically created as new products. When unchecked, unmatched lines are imported as free text on the supplier invoice. If you do not need to track products or link invoice lines to your product catalog, you can leave this disabled - all lines will still be imported as free text descriptions.
+KSEF_BatchNoImportable=No importable invoices in selection (only NEW/ERROR status can be imported)
+KSEF_BatchProductWillCreate=Will create
+KSEF_MatchedByRef=Matched by product ref
+KSEF_MatchedBySupplierRef=Matched by supplier ref
+KSEF_MatchedByBarcode=Matched by barcode
+KSEF_MatchMethod=Match Method
+KSEF_QuickImport=Quick Import
+KSEF_QuickImportAutoComplete=Invoice auto-imported (supplier and all products matched)
+
+# ============================================
+# Reset Import Status
+# ============================================
+KSEF_ResetImportStatus=Reset Import Status
+KSEF_LinkedInvoiceDeleted=Linked supplier invoice has been deleted
+KSEF_ImportStatusReset=Import status has been reset. You can now re-import this invoice.
+KSEF_LinkedInvoiceStillExists=Cannot reset - the linked supplier invoice still exists
+KSEF_ConfirmResetImport=The linked supplier invoice no longer exists. Reset this invoice's status to allow re-importing?
+
+# ============================================
+# Stock / Inventory Info
+# ============================================
+KSEF_StockWillIncrease=Stocks of matched products will be increased on invoice validation
+KSEF_StockWillNotIncrease=Stocks of matched products will not be increased on invoice validation
+KSEF_StockAutoIncreaseEnabled=Stock will be adjusted when the imported invoice is validated. You will be asked to select a warehouse. Lines imported as free text (without a linked product) will not affect stock levels.
+KSEF_StockAutoIncreaseDisabled=Automatic stock increase on invoice validation is disabled. You can enable it under Stock module settings: "Increase real stocks on validation of vendor invoice/credit note". Lines imported as free text (without a linked product) will not affect stock levels.
+KSEF_ImportConfirmSupplier=Supplier
+
+# ============================================
+# Correction Invoice Import
+# ============================================
+KSEF_ImportErrorOriginalNotImported=Cannot import correction invoice - the original invoice must be imported first. Please import "%s" first.
+KSEF_ImportErrorNoCorrectionsReference=Cannot import correction invoice - no reference to corrected invoice found in XML data
+KSEF_CorrectionNoReferenceData=This correction invoice does not contain references to corrected invoices in the XML
+KSEF_CorrectionChooseStrategy=This correction applies to multiple invoices. Choose how to import:
+KSEF_CorrectionStandalone=Standalone credit note (no link to source invoice)
+KSEF_CorrectionStandaloneDesc=All corrected invoice references will be included in the note
+KSEF_CorrectionLinkTo=Link credit note to: %s
+KSEF_CorrectionOverride=Allow import without all originals imported
+KSEF_CorrectionNotAllImported=Not all corrected invoices have been imported to Dolibarr yet
+KSEF_CorrectionOriginalNotImported=Not yet imported
+KSEF_CorrectionStandaloneNoteText=Corrected invoices: %s
+KSEF_UpwardCorrection=This correction increases the invoice amount
+KSEF_UpwardCorrectionChoose=Choose how to handle the upward correction:
+KSEF_UpwardCorrectionDifference=Supplementary invoice for the difference only
+KSEF_UpwardCorrectionDifferenceDesc=Creates a standard invoice for the additional amount (%s)
+KSEF_UpwardCorrectionReplace=Zero out original and create correction invoice
+KSEF_UpwardCorrectionReplaceDesc=Creates a credit note to cancel the original, plus a new invoice with the corrected total
+KSEF_UpwardCorrectionReplaceRequiresLink=Requires a linked original invoice
+KSEF_UpwardCorrectionCreditNoteRef=Zeroing out: %s (KSeF correction %s)
+KSEF_CorrectionSummaryLine=Correction - %s VAT rate
+KSEF_CorrectionItemDetail=net: %s, qty: %s %s
+KSEF_OriginalNotImported=Original invoice not yet imported
+KSEF_ImportOriginalFirst=Import original invoice first
+KSEF_OriginalNotInSystem=Original invoice not found in KSeF incoming records
+KSEF_LinkedInvoice=Linked Invoice
+KSEF_CorrectedKsefNumberSameAsOwn=Corrected and corrective invoice KSeF numbers are identical - likely error from invoice issuer
+KSEF_InvoiceNumber=Invoice Number
+KSEF_BatchCorrectionBlocked=Correction invoice - cannot batch import
+KSEF_BatchCorrectionOriginalNotImported=Original invoice not yet imported - import it first via individual import
+KSEF_BatchCorrectionSelfReference=Corrected KSeF number is identical to this invoice's KSeF number
+KSEF_BatchCorrectionOriginalNotInSystem=Original invoice not found in KSeF incoming records
+KSEF_BatchCorrectionNoReference=Correction invoice has no reference to corrected invoices
+KSEF_BatchCorrectionUseIndividualImport=Use individual import page to override
+KSEF_BatchSupplierNotMatched=Supplier not matched - enable auto-create or use individual import
+KSEF_BatchSupplierNoMatch=No match
+KSEF_BatchProductFreeText=Free text
+KSEF_BatchProductsFreeTextWarning=Unmatched lines will be imported as free text
+KSEF_ReplaceCreditNote=Credit Note (zeroing original)
+KSEF_ReplaceCreditNoteDesc=Zeroes out original invoice %s
+KSEF_ReplaceCreditNoteCardDesc=Credit note that zeroes out the original invoice
+KSEF_ReplaceCreditNoteDesc_Source=Zeroes out
+KSEF_ReplaceNewInvoice=Correction Invoice
+KSEF_ReplaceNewInvoiceDesc=New invoice with the corrected total amount
+KSEF_ViewCreditNote=View Credit Note
+KSEF_ViewReplacementInvoice=View Correction Invoice
+KSEF_ImportMode=Import Mode
+KSEF_SyncErrorsExist=%s invoices had errors during last sync and were not imported
+KSEF_ViewErrors=View errors
+KSEF_HideErrors=Hide errors
+KSEF_ErrorKsefNumber=KSeF Number
+KSEF_ErrorMessage=Error
+KSEF_WARNING_NO_TRANS_OVERRIDES=Translation overrides have not been applied. Fields like REGON/BDO will not appear on the third party card. Scroll down to "Translation Overrides" and click "Apply Translation Overrides".
+KSEF_WARNING_DUPLICATE_FIELD=Identifiers %s are both mapped to the same source field (%s). Each identifier should use a unique field.
+KSEF_CountryRequirement=Third Party Country
+KSEF_CountryRequirementDesc=Each third party (customer/supplier) should have their country set correctly. The module uses the country to determine how to identify the buyer in the KSeF XML: Polish buyers use NIP, EU buyers use the EU VAT number, and non-EU buyers use their foreign tax ID. If no country is set, the module will attempt to infer it from the VAT ID prefix (e.g. "DE" from "DE123456789"), otherwise it defaults to Poland.
+KSEF_TranslationOverridesHowTo=Translation Overrides (Field Labels)
+KSEF_TranslationOverridesHowToDesc=By default, Dolibarr does not display all professional ID fields (idprof3-6) for Polish companies. This module can override the field labels so that NIP, KRS, REGON, and BDO appear correctly on the Third Party card. Go to the module setup page, scroll to "Translation Overrides", and click "Apply Translation Overrides" for your languages. This only needs to be done once (or again after changing field mappings).
+KSEF_HowTo_Config_VatRates=VAT Rate Codes for KSeF
+KSEF_HowTo_Config_VatRatesIntro=KSeF uses specific codes to distinguish different types of 0%% VAT (exempt, reverse charge, not subject, intra-EU delivery, export). The module automatically creates these entries in Dolibarr's VAT rate dictionary when first activated, but they are <b>disabled by default</b> to keep the invoice VAT dropdown clean. Enable only the codes your business needs in the module settings.
+KSEF_HowTo_Config_VatRatesCodes_Intro=How to enable VAT rate codes:
+KSEF_HowTo_Config_VatRatesCodes_Step1=Go to the KSeF module settings page
+KSEF_HowTo_Config_VatRatesCodes_Step2=In the <b>Optional Fields</b> section, find the <b>KSeF VAT Rate Codes</b> table
+KSEF_HowTo_Config_VatRatesCodes_Step3=Check the codes you need (e.g. ZW for exempt services, WDT for EU deliveries)
+KSEF_HowTo_Config_VatRatesCodes_Step4=Click Save - the enabled codes will appear in the VAT rate dropdown when creating invoice lines
+KSEF_HowTo_Config_VatRatesCodes_Outro=The standard 0%% rate (without a code) is always available and auto-detects domestic/WDT/export based on the buyer's country. Supported codes:
+KSEF_HowTo_Config_VatRatesTable_ColCode=Code
+KSEF_HowTo_Config_VatRatesTable_ColUse=Use for
+KSEF_HowTo_Config_VatRatesTable_None=(none)
+KSEF_HowTo_Config_VatRatesTable_NoneUse=Standard 0%% - always available. The module automatically selects the correct KSeF type (domestic, intra-EU delivery, or export) based on the buyer's country.
+KSEF_HowTo_Config_VatRatesTable_ZWUse=VAT exempt (zwolniony) - medical/dental services (art. 43), educational, financial, small business (art. 113)
+KSEF_HowTo_Config_VatRatesTable_RCUse=Reverse charge (art. 17 ust. 1 pkt 7/8)
+KSEF_HowTo_Config_VatRatesTable_NPUse=Not subject - goods/services outside Poland's territory
+KSEF_HowTo_Config_VatRatesTable_NP2Use=Not subject II - intra-EU services (art. 100 ust. 1 pkt 4)
+KSEF_HowTo_Config_VatRatesTable_WDTUse=Intra-EU delivery of goods - use when auto-detection is not sufficient
+KSEF_HowTo_Config_VatRatesTable_EXUse=Export of goods - use when auto-detection is not sufficient
+KSEF_HowTo_Config_VatRatesSetup=<b>When creating invoice lines</b>, select the correct VAT rate from the dropdown. For example, a dental practice should use <b>0%% (ZW)</b> for exempt services, while a regular domestic sale uses the standard 23%%. If you need a code that is not listed above, you can add custom entries via <b>Home > Setup > Dictionaries > VAT Rates</b>.
+KSEF_HowTo_Config_VatExemptSetup=VAT Exempt Invoices (ZW) - Additional Setup
+KSEF_HowTo_Config_VatExemptIntro=When issuing VAT-exempt invoices (code ZW), KSeF requires a legal basis for the exemption. The module provides two ways to set this - a global default and a per-product override.
+KSEF_HowTo_Config_VatExemptSteps_S1Title=Step 1: Set a global default (required)
+KSEF_HowTo_Config_VatExemptSteps_S1_1=In the KSeF module settings, under <b>Optional Fields</b>, find <b>VAT Exemption Legal Basis</b>
+KSEF_HowTo_Config_VatExemptSteps_S1_2=Select the basis type - <b>Polish law</b> is correct for most Polish exemptions
+KSEF_HowTo_Config_VatExemptSteps_S1_3=Enter the legal reference, e.g. <b>art. 43 ust. 1 pkt 18 ustawy o VAT</b> (medical/dental services)
+KSEF_HowTo_Config_VatExemptSteps_S1Outro=This is used for all ZW invoice lines unless overridden at the product level.
+KSEF_HowTo_Config_VatExemptSteps_S2Title=Step 2: Per-product override (optional - for businesses with multiple exemption types)
+KSEF_HowTo_Config_VatExemptSteps_S2_1=Create a product/service extrafield, e.g. go to <b>Home > Setup > Other Setup > Extrafields</b>, select the <b>Products/Services</b> tab, and create a new text field (e.g. "zwolnienie_podstawa")
+KSEF_HowTo_Config_VatExemptSteps_S2_2=On each exempt product card, fill in the specific legal basis for that product
+KSEF_HowTo_Config_VatExemptSteps_S2_3=In the KSeF module settings, set <b>Per-Product Exemption Basis</b> to point at your new extrafield
+KSEF_HowTo_Config_VatExemptSteps_S2Outro=When an invoice contains ZW lines, the module checks each product for its own basis first. If found, the product-level values are used (multiple different bases are joined with commas). If no product-level basis is found, the global default is used.
+KSEF_CannotModifySubmitted=This invoice has been submitted to KSeF and cannot be modified
+KSEF_PaymentStatus=Payment Status
+KSEF_SellerMarkedPaid=Paid (per XML)
+KSEF_SellerMarkedPaidInstallments=Paid in parts (per XML)
+KSEF_SellerMarkedPartial=Partially Paid (per XML)
+KSEF_PaymentMethod=Payment Method
+KSEF_PaymentDate=Payment Date
+KSEF_PaymentAmount=Amount
+KSEF_NotSpecifiedInXml=Not specified in XML
+KSEF_ValidateAndPay=Validate & Add Payment
+KSEF_PaymentConfirmed=Invoice validated and payment confirmed based on KSeF data
+KSEF_PaymentConfirmError=Could not confirm payment
+#
+# Latarnia (Lighthouse) - KSeF System Status
+#
+KSEF_LATARNIA_AVAILABLE=Available
+KSEF_LATARNIA_MAINTENANCE=Maintenance
+KSEF_LATARNIA_FAILURE=Failure
+KSEF_LATARNIA_TOTAL_FAILURE=Total Failure
+KSEF_LATARNIA_UNREACHABLE=Unreachable
+KSEF_LATARNIA_UNKNOWN=Unknown
+KSEF_SystemStatus=KSeF System Status
+KSEF_LastChecked=Last checked
+KSEF_CheckNow=Check Now
+KSEF_CheckLatarnia=Check KSeF Lighthouse
+KSEF_NeverChecked=Never checked
+KSEF_LatarniaUnreachableWarning=Could not reach the KSeF status service (Latarnia). KSeF availability is unknown.
+KSEF_MaintenancePlanned=Planned maintenance: %s
+KSEF_MaintenanceOngoing=Maintenance in progress since %s
+KSEF_SystemDownFailure=KSeF is experiencing a failure since %s
+KSEF_SystemDownTotalFailure=KSeF is experiencing a total failure since %s
+KSEF_SystemDownWarning=KSeF system is currently unavailable. Invoices can be issued in offline mode.
+KSEF_LatarniaCheckSuccess=KSeF system status: %s
+KSEF_LatarniaCheckError=Could not check KSeF system status: %s
+KSEF_DeadlineFailure7Days=7 business days after outage ends
+KSEF_DeadlineTotalFailureNone=No deadline (total failure - no obligation to re-send)
+KSEF_DeadlinePendingOutageEnd=Deadline will be calculated when outage ends
+KSEF_LatarniaMessages=Messages
+KSEF_Start=Start
+KSEF_End=End
+KSEF_Published=Published
+KSEF_LATARNIA_TYPE_FAILURE_START=Failure started
+KSEF_LATARNIA_TYPE_FAILURE_END=Failure ended
+KSEF_LATARNIA_TYPE_MAINTENANCE_ANNOUNCEMENT=Maintenance announced
+KSEF_NothingToReport=Nothing to report
+
+
+KSEF_DISABLE_VALIDATE_AND_UPLOAD=Disable "Validate and Upload" button
+KSEF_DISABLE_VALIDATE_AND_UPLOAD_Help=When enabled, the combined "Validate and Upload to KSeF" button is hidden on draft invoices. This forces a step-by-step workflow: validate the invoice first (optionally record payment), then upload to KSeF separately. Useful when you need to record payment before sending to KSeF.
+KSEF_CONFIRM_BEFORE_UPLOAD=Confirmation before uploading to KSeF
+KSEF_CONFIRM_BEFORE_UPLOAD_Help=When enabled, a confirmation dialog with KSeF PDF preview is shown before submitting an invoice to KSeF. This allows you to review the invoice before submission. Enabled by default.
+KSEF_ConfirmUploadTitle=Confirm Upload to KSeF
+KSEF_ConfirmUploadValidatedTitle=Invoice validated - confirm upload to KSeF
+KSEF_ConfirmUploadText=You are about to submit invoice %s to KSeF.
+KSEF_ConfirmUploadSubmit=Submit to KSeF
+KSEF_ConfirmUploadCancel=Cancel
+KSEF_ConfirmUploadNote=KSeF number and QR code will be added to the PDF after upload and receipt.
+KSEF_ConfirmLatarniaWarning=KSeF system status issue detected:
+KSEF_ConfirmXMLWarnings=XML validation warnings
+KSEF_SHOW_PDF_AFTER_UPLOAD=Show PDF after upload to KSeF
+KSEF_SHOW_PDF_AFTER_UPLOAD_Help=When enabled, after a successful upload to KSeF, a dialog is shown with the final PDF (including KSeF number and QR code). Allows quick printing or saving. Enabled by default.
+KSEF_PostUploadTitle=Invoice uploaded to KSeF
+KSEF_PostUploadText=Invoice %s has been successfully submitted to KSeF.
+KSEF_PostUploadKsefNumber=KSeF number
+KSEF_PostUploadClose=Close
+KSEF_PostUploadSave=Save to PC
+KSEF_PostUploadPrint=Print
+KSEF_CONFIRM_PDF_TEMPLATE=Confirmation preview PDF template
+KSEF_CONFIRM_PDF_TEMPLATE_Help=Choose which PDF template to display in the upload confirmation dialog. "KSeF PDF" shows the KSeF-style invoice preview. Dolibarr templates (Sponge, Crabe, etc.) show the standard Dolibarr invoice PDF.
+KSEF_CONFIRM_PDF_TEMPLATE_KSEF=KSeF PDF
+KSEF_Tab_General=General
+KSEF_Tab_Authentication=Authentication
+KSEF_Tab_Outgoing=Outgoing Invoices
+KSEF_Tab_Incoming=Incoming Invoices
+KSEF_WarningFixOnTab=Fix this on the <a href="%s">%s</a> tab
+KSEF_WARNING_MISSING_EXTENSIONS=Missing required PHP extensions: %s
+KSEF_WARNING_AUTH_CERT_EXPIRED=Authentication certificate has expired for the active environment
+KSEF_WARNING_OFFLINE_CERT_EXPIRED=Offline certificate has expired for the active environment
+KSEF_EnvSection_TEST=TEST Environment
+KSEF_EnvSection_DEMO=DEMO Environment
+KSEF_EnvSection_PRODUCTION=PRODUCTION Environment
+KSEF_EnvSection_Active=(active)
+KSEF_EnvStatusToken=Token
+KSEF_EnvStatusCert=Certificate
+KSEF_EnvStatusMethod=Method
+KSEF_EnvStatusOffline=Offline Cert
+KSEF_Configured=Configured
+KSEF_NotConfigured=Not configured
+KSEF_Expired=Expired
+KSEF_TestsAgainstActiveEnv=Tests run against the active environment (%s)
+KSEF_WARNING_ENV_NO_AUTH=You switched to the %s environment which has no authentication configured. KSeF operations will fail until you configure a token or certificate.
+KSEF_AuthPageInfo=All 3 environment certificates can be configured and stored. The currently selected environment is highlighted in green. The other environments can be expanded by clicking on their header to add certificates there.
+KSEF_CertificateConfigured=Certificate configured
+KSEF_LINE_ITEM_FIELDS=Line Item Fields
+KSEF_INVOICE_HEADER_FIELDS=Invoice Fields
+KSEF_VAT_EXEMPTION_SECTION=VAT Exemption
+KSEF_SUBMISSION_PDF_SECTION=Submission & PDF Settings
+KSEF_EXTRAFIELD_CREATE_EXPLANATION=Extrafields are custom data fields in Dolibarr. Creating one here adds a new input field to the selected entity's card (invoice, product, third party, etc.). Once created, assign it in the extrafields table above: as a note (additional description or invoice footer) or as a source for a specific KSeF field (order number, GTU, etc.). Existing Dolibarr extrafields appear automatically.
+KSEF_ASSIGN_NONE=(not assigned)
+KSEF_ASSIGN_DODATKOWY=Additional description (note)
+KSEF_ASSIGN_STOPKA=Invoice footer (note)
+KSEF_ASSIGN_NR_ZAMOWIENIA=Order number
+KSEF_ASSIGN_NR_UMOWY=Contract number
+KSEF_ASSIGN_TP=TP (related party flag)
+KSEF_ASSIGN_IDNABYWCY=Buyer ID
+KSEF_ASSIGN_NREORI=Buyer EORI number
+KSEF_ASSIGN_GTU=GTU (goods/services marker)
+KSEF_ASSIGN_PROCEDURA=Procedura (procedure marker)
+KSEF_ASSIGN_ZWOLNIENIE=VAT exemption basis
+KSEF_ASSIGN_COLUMN=Assignment
+
+# ============================================
+# Correction Invoices
+# ============================================
+KSEF_CorrectionInvoicesSection=Correction Invoices
+KSEF_CorrectionInvoicesDesc=Both credit notes and replacement invoices are sent to KSeF as corrections (KOR) referencing the original. The original must be on KSeF first. Credit notes handle reductions only. Replacement invoices handle any change and support correcting paid invoices with automatic payment transfer.
+KSEF_ExtraFieldCorrectionReason=Correction Reason
+KSEF_ExtraFieldCorrectionType=Correction Type
+KSEF_CorrectionReason=Correction Reason
+KSEF_CorrectionReasonHelp=Free-text reason for the correction. Recommended by Polish tax law (art. 106j VAT Act) but not enforced by the KSeF schema.
+KSEF_CorrectionReasonPlaceholder=e.g. Corrected VAT rate, updated address...
+KSEF_CorrectionDetails=Correction Details
+KSEF_CorrectionType=Correction Type
+KSEF_CorrectionType1=1 - Takes effect on original invoice date
+KSEF_CorrectionType2=2 - Takes effect on correction invoice date
+KSEF_CorrectionType3=3 - Takes effect on another date
+KSEF_StatusCorrected=Corrected
+KSEF_StatusCorrectedLong=Corrected (KSeF)
+KSEF_StatusCorrectedTooltip=This invoice was replaced by a correction invoice submitted to KSeF
+KSEF_DefaultCorrectionReason=Default Correction Reason
+KSEF_DefaultCorrectionReasonHelp=Pre-filled correction reason for new correction invoices. Users can change it per invoice. Leave empty for no default.
+KSEF_DefaultCorrectionType=Default Correction Type
+KSEF_DefaultCorrectionTypeHelp=Pre-filled correction type for new correction invoices. Users can change it per invoice. Leave empty for no default.
+KSEF_KOR_LINE_METHOD=Correction Line Method
+KSEF_KOR_LINE_METHOD_Help=How correction invoice line items are presented in the FA(3) XML. Credit notes always use Differential regardless of this setting (reconstructing before/after state from a credit note is not supported). Default: Before/After.
+KSEF_KOR_LINE_METHOD_DIFFERENTIAL=Differential - delta lines only
+KSEF_KOR_LINE_METHOD_STANPRZED=Before/After - full line detail (recommended)
+KSEF_ENTITY_FIELDS_SECTION=Entity Fields
+KSEF_IDNABYWCY_SOURCE=Buyer ID Source
+KSEF_IDNABYWCY_SOURCE_Help=Optional buyer ID that keeps the buyer identifiable across corrections when their data changes. Source: customer code or a customer extrafield. Field type: varchar/text/int.
+KSEF_IDNABYWCY_SOURCE_DISABLED=Disabled
+KSEF_IDNABYWCY_SOURCE_CODE_CLIENT=Customer code (code_client)
+KSEF_IDNABYWCY_SOURCE_EXTRAFIELD=Thirdparty extrafield
+KSEF_LINE_FIELDS_SECTION=Line-Level Fields
+KSEF_GTU_SOURCE=GTU Marker Source
+KSEF_GTU_SOURCE_Help=Source for per-line GTU markers (GTU_01 through GTU_13, goods/services type classification). Select a product extrafield that stores the GTU code. Aids JPK_VAT alignment. Requires extrafield type: varchar, select, or text.
+KSEF_GTU_SOURCE_DISABLED=Disabled
+KSEF_GTU_SOURCE_PRODUCT_EXTRAFIELD=Product extrafield
+KSEF_PROCEDURA_SOURCE=Procedura Marker Source
+KSEF_PROCEDURA_SOURCE_Help=Source for per-line Procedura markers (WSTO_EE, IED, TT_D, I_42, I_63, B_SPV, B_SPV_DOSTAWA, B_MPV_PROWIZJA, MPP). Select a product extrafield that stores the procedure code. Requires extrafield type: varchar, select, or text.
+KSEF_PROCEDURA_SOURCE_DISABLED=Disabled
+KSEF_PROCEDURA_SOURCE_PRODUCT_EXTRAFIELD=Product extrafield
+KSEF_FA3_INCLUDE_UU_ID=Include Line UUID
+KSEF_FA3_INCLUDE_UU_ID_Help=Emits a unique identifier per invoice line in the FA(3) XML. Useful for reliable line matching in correction invoices. Warning: this field is visible on the KSeF PDF visualization as "Unikalny numer wiersza" column, which may confuse invoice recipients.
+KSEF_ExtraFieldUUID=KSeF Line UUID
+KSEF_INVOICE_FLAGS_SECTION=Invoice Flags
+KSEF_FA3_INCLUDE_FP=FP Flag (art. 109 ust. 3d)
+KSEF_FA3_INCLUDE_FP_Help=Emit FP=1 on invoices. Applies to invoices by taxpayers who lost their VAT exemption (art. 109 ust. 3d ustawy o VAT). Enable only if applicable to your business.
+KSEF_TP_SOURCE=Related Party Flag Source
+KSEF_TP_SOURCE_Help=Marks related-party transactions (TP). Source: a customer or invoice extrafield whose value flags a related party. Field type: boolean/select/varchar/int.
+KSEF_TP_SOURCE_DISABLED=Disabled
+KSEF_TP_SOURCE_THIRDPARTY_EXTRAFIELD=Thirdparty extrafield
+KSEF_TP_SOURCE_EXTRAFIELD=Invoice extrafield
+# Per-invoice Adnotacje flag sources (#29)
+KSEF_FA3_MPP_SOURCE=Split Payment (MPP) Source
+KSEF_FA3_MPP_SOURCE_Help=Emits the split-payment flag and its mandatory note. For Annex-15 goods at or above 15 000 PLN gross. Set per invoice via an invoice extrafield. Field type: boolean/select/varchar/int.
+KSEF_FA3_MPP_SOURCE_DISABLED=Disabled
+KSEF_FA3_MPP_SOURCE_EXTRAFIELD=Invoice extrafield
+KSEF_FA3_MPP_SOURCE_ALWAYS_ON=Always on
+KSEF_FA3_FP_SOURCE=FP Flag (art. 109 ust. 3d) Source
+KSEF_FA3_FP_SOURCE_Help=Emits FP (invoice issued against a fiscal receipt). Set per invoice via an invoice extrafield. Field type: boolean/select/varchar/int.
+KSEF_FA3_FP_SOURCE_DISABLED=Disabled
+KSEF_FA3_FP_SOURCE_EXTRAFIELD=Invoice extrafield
+KSEF_FA3_FP_SOURCE_ALWAYS_ON=Always on
+KSEF_P17_SOURCE=Self-Billing - Per-Invoice Source
+KSEF_P17_SOURCE_Help=Emits the self-billing flag. Either this per-invoice field or the per-customer default below turns it on (whichever is set); the invoice field cannot switch off a customer default. Source: an invoice extrafield. Field type: boolean/select/varchar/int.
+KSEF_P17_SOURCE_DISABLED=Disabled
+KSEF_P17_SOURCE_EXTRAFIELD=Invoice extrafield
+KSEF_P17_SOURCE_ALWAYS_ON=Always on
+KSEF_P17_TP_SOURCE=Self-Billing - Per-Customer Default
+KSEF_P17_TP_SOURCE_Help=Per-customer self-billing default (the buyers you have a self-billing agreement with). Turns self-billing on for all their invoices, independently of the per-invoice field above. Source: a customer extrafield. Field type: boolean/select/varchar/int.
+KSEF_P17_TP_SOURCE_DISABLED=Disabled
+KSEF_P17_TP_SOURCE_THIRDPARTY_EXTRAFIELD=Customer extrafield
+KSEF_P16_SOURCE=Cash Accounting Source
+KSEF_P16_SOURCE_Help=Emits the cash accounting flag. Taxpayer-level, normally Always on; disable if you don't use cash accounting.
+KSEF_P16_SOURCE_DISABLED=Disabled
+KSEF_P16_SOURCE_ALWAYS_ON=Always on
+KSEF_P18_SOURCE=Reverse Charge - Per-Invoice Source
+KSEF_P18_SOURCE_Help=Emits the reverse charge flag for cross-border/intra-EU supplies. Either this per-invoice field or the per-customer default below turns it on (whichever is set); the invoice field cannot switch off a customer default. Per-invoice extrafield, or always on. Field type: boolean/select/varchar/int.
+KSEF_P18_SOURCE_DISABLED=Disabled
+KSEF_P18_SOURCE_EXTRAFIELD=Invoice extrafield
+KSEF_P18_SOURCE_ALWAYS_ON=Always on
+KSEF_P18_TP_SOURCE=Reverse Charge - Per-Customer Default
+KSEF_P18_TP_SOURCE_Help=Per-customer reverse-charge default. Turns reverse charge on for all that customer's invoices, independently of the per-invoice field above. Source: a customer extrafield. Field type: boolean/select/varchar/int.
+KSEF_P18_TP_SOURCE_DISABLED=Disabled
+KSEF_P18_TP_SOURCE_THIRDPARTY_EXTRAFIELD=Customer extrafield
+KSEF_ASSIGN_MPP=Split payment (MPP)
+KSEF_ASSIGN_FP=FP (faktura do paragonu)
+KSEF_ASSIGN_P17=Self-billing
+KSEF_ASSIGN_P18=Reverse charge
+# Third entity (#28)
+KSEF_PODMIOT3_SOURCE=Third entity
+KSEF_PODMIOT3_SOURCE_Help=Adds a third-entity picker to each invoice's KSeF tab, for an entity besides seller and buyer, most often a payer who isn't the buyer. Reconciliation stays manual.
+KSEF_PODMIOT3_ROLE=Default third entity role
+KSEF_PODMIOT3_ROLE_Help=Role pre-selected in the picker; override per invoice. Payer is most common.
+KSEF_Podmiot3_Field=KSeF third entity
+KSEF_Podmiot3_Field_Help=Backing field for the KSeF third-entity selection. Set it via the picker on the KSeF tab, not here.
+KSEF_Podmiot3_Role_Field=KSeF third entity role
+KSEF_Podmiot3_Role_Field_Help=Backing field for the KSeF third-entity role code. Set it via the picker on the KSeF tab, not here.
+KSEF_Podmiot3_Details=Third entity
+KSEF_Podmiot3_Details_Help=Add an additional entity to this invoice, besides the seller and buyer, e.g. a payer who differs from the buyer. Pick the company and its role. Leave the company empty to add none.
+KSEF_Podmiot3_Party=Third entity
+KSEF_Podmiot3_Role=Role
+KSEF_Podmiot3_Saved=Third entity saved
+KSEF_Podmiot3_Locked=Invoice already submitted to KSeF; third entity can no longer be changed
+KSEF_Podmiot3_Add=Add third entity
+KSEF_Podmiot3_SaveAddAnother=Save and add another
+KSEF_Podmiot3_Remove=Remove
+KSEF_Podmiot3_Max=Maximum 20 third entities per invoice
+KSEF_Podmiot3_Role2=Recipient (internal unit)
+KSEF_Podmiot3_Role3=Original entity
+KSEF_Podmiot3_Role4=Additional buyer
+KSEF_Podmiot3_Role5=Invoice issuer
+KSEF_Podmiot3_Role6=Payer (makes the payment)
+KSEF_Podmiot3_Role7=LGU issuer (JST)
+KSEF_Podmiot3_Role8=LGU recipient (JST)
+KSEF_Podmiot3_Role9=VAT group member (issuer)
+KSEF_Podmiot3_Role10=VAT group member (recipient)
+KSEF_Podmiot3_Role11=Employee
+KSEF_Podmiot3_Role1=Factor
+KSEF_Podmiot3_Udzial=Share %%
+KSEF_Podmiot3_Udzial_Help=Optional. Leave empty for equal shares between buyers.
+KSEF_Podmiot3_FactorNoBank=Factor has no bank account on file: %s. Add a bank account to the third party, otherwise the factor's bank account will be omitted from the invoice XML.
+KSEF_ASSIGN_IDWEW=IDWew (internal identifier)
+KSEF_IDWEW_SOURCE=IDWew (internal identifier) source
+KSEF_IDWEW_SOURCE_Help=Optional. Maps a customer extrafield holding an internal ID (IDWew) for third-entity branches/units/employees without their own NIP. Format: NIP-12345 (e.g. 1234567890-00001). Emitted instead of NIP when set. Field type: varchar/text.
+KSEF_IDWEW_SOURCE_DISABLED=Disabled
+KSEF_IDWEW_SOURCE_THIRDPARTY_EXTRAFIELD=Thirdparty extrafield
+KSEF_HintCreditNote=KSeF correction: use for reductions only (returns, quantity decreases, discounts). Original must be submitted to KSeF first.
+KSEF_HintReplacement=KSeF correction: use for any change, including increases, decreases, VAT rates, addresses, or line edits. Original must be submitted to KSeF first.
+KSEF_CorrectionInvoice=Correction invoice
+KSEF_CorrectionInvoiceFor=Correction of invoice
+KSEF_CorrectionInvoiceAsk=Correction invoice for invoice
+KSEF_CorrectionInvoiceDesc=<b>Correction invoice</b> is sent to KSeF as a KOR correction referencing the original. Can change amounts, VAT rates, addresses, or lines. Paid invoices can also be corrected with automatic payment transfer.
+KSEF_ReplacedByCorrectionInvoice=Corrected by invoice
+KSEF_CreateCorrection=Create correction
+KSEF_KorektaOfKorekta=KSeF correction - correction of correction
+KSEF_CorrectionOriginalHT=Original invoice net total
+KSEF_CorrectionOriginalTVA=Original invoice VAT total
+KSEF_CorrectionOriginalTTC=Original invoice gross total
+KSEF_CorrectionDiscountId=Correction discount record ID
+KSEF_CorrectionSummary=Correction Summary
+KSEF_CorrectionOf=Correction of
+KSEF_OriginalAmount=Original amount
+KSEF_CorrectedAmount=Corrected amount
+KSEF_CorrectionDifference=Difference
+KSEF_CorrectionChainBlocked=Cannot unvalidate or delete: this invoice is corrected by %s
+KSEF_CorrectionDiscountDescription=Correction of %s - original amount applied to correction
+KSEF_CorrectionRemainToRefund=Remaining amount to refund
+KSEF_CorrectionDraftHint=This correction replaces the original. Edit line items to show what the corrected invoice should contain - the system calculates differences automatically.
+KSEF_CreditNoteDraftHint=This correction subtracts from the original. Enter only the amounts to reduce or return.
+KSEF_CorrectionOriginalNoKsef=Original invoice has not been submitted to KSeF. The correction will reference only the invoice number, not a KSeF number.
+KSEF_CorrectionReasonPreset_return=Goods return
+KSEF_CorrectionReasonPreset_qty=Incorrect quantity
+KSEF_CorrectionReasonPreset_price=Incorrect price
+KSEF_CorrectionReasonPreset_vat=Incorrect VAT rate
+KSEF_CorrectionReasonPreset_discount=Post-transaction discount
+KSEF_CorrectionReasonPreset_skonto=Early payment discount (skonto)
+KSEF_CorrectionReasonPreset_advance=Advance payment return
+KSEF_CorrectionReasonPreset_buyer=Incorrect buyer data
+KSEF_CorrectionReasonPreset_other=Other - enter text
+KSEF_CorrectionDetailsSaved=Correction details saved
+KSEF_CorrectionDetailsLocked=Correction details cannot be changed after the invoice has been accepted by KSeF or created offline
+KSEF_NotSet=(not set)
+KSEF_CorrectionReasonAlwaysPolishHelp=The correction reason is always saved in Polish as required by KSeF. If you choose "Other", enter the text in Polish.
+KSEF_CorrectionReasonCustomPlaceholder=Enter reason in Polish...
+KSEF_CorrectionChain=Correction chain
+KSEF_CorrectionChainInvoice=Invoice
+KSEF_CorrectionChainExclTax=Excl. tax
+KSEF_CorrectionChainTax=Tax
+KSEF_CorrectionChainInclTax=Inc. tax
+KSEF_CorrectionChainDiff=Diff
+KSEF_CorrectionChainStatus=Status
+KSEF_CorrectionChainCorrected=Corrected
+KSEF_CorrectionChainCurrent=Current
+KSEF_CorrectionChainTotalPaid=Total paid on chain
+KSEF_CorrectionChainCurrentAmount=Current invoice amount
+KSEF_CorrectionChainRemainToRefund=Remaining to refund
+KSEF_CorrectionChainRemainToCollect=Remaining to collect
+KSEF_CorrectionChainSettled=Settled
+KSEF_CorrectionChainCorrectedNote=This invoice has been corrected - payments are tracked on the latest correction in the chain.
+KSEF_CorrectionChainCurrentNote=This is the latest correction in the chain - payments are tracked here.
+KSEF_CorrectionChainSuperseded=Superseded
+
+
+KSEF_HowTo_Corrections=Correction Invoices (Faktury Korygujące)
+KSEF_HowTo_Corrections_Intro=Polish tax law uses one concept for all invoice corrections: <b>faktura korygująca</b>. Dolibarr has two invoice types that serve this purpose. Both are sent to KSeF as KOR corrections referencing the original invoice, which must be on KSeF first.
+KSEF_HowTo_Corrections_WhenTitle=When to use which type
+KSEF_HowTo_Corrections_CreditNote=<b>Credit note</b> (Dolibarr "avoir") creates a negative invoice. Use for reductions only: returns, quantity decreases, post-sale discounts.
+KSEF_HowTo_Corrections_Replacement=<b>Correction invoice</b> (Dolibarr "replacement") replaces the original entirely. Use for any change: amounts, VAT rates, addresses, or lines. Paid invoices can also be corrected this way.
+KSEF_HowTo_Corrections_CreateTitle=Creating a correction
+KSEF_HowTo_Corrections_CreateButton=After an invoice is accepted on KSeF, a <b>Create correction</b> button appears on the invoice card. It opens the creation page with the correction type and source invoice pre-selected.
+KSEF_HowTo_Corrections_CreateRadio=Corrections can also be created from the invoice creation page by selecting the correction invoice radio and choosing the source invoice.
+KSEF_HowTo_Corrections_PaidInvoice=For paid invoices, a discount is automatically applied to settle the correction when validated. The original invoice is restored to Paid/Closed status (not canceled).
+KSEF_HowTo_Corrections_DetailsTitle=Correction details
+KSEF_HowTo_Corrections_Reason=<b>Correction Reason</b> - free-text reason for the correction. Recommended by Polish tax law but not required by the KSeF schema. Choose from preset reasons or enter custom text. Always stored in Polish. A default can be set on the Outgoing Invoices tab.
+KSEF_HowTo_Corrections_Type=<b>Correction Type</b> - when the correction takes effect: original invoice date, correction invoice date, or another date. Optional.
+KSEF_HowTo_Corrections_KsefTitle=What gets sent to KSeF
+KSEF_HowTo_Corrections_KsefXml=The KOR XML references the original by its KSeF number. Line method is configurable on the Outgoing Invoices tab:
+KSEF_HowTo_Corrections_MethodDiff=<b>Differential</b> - only delta lines showing the change
+KSEF_HowTo_Corrections_MethodStan=<b>Before/After</b> (state before, default) - original and corrected state for each line
+KSEF_HowTo_Corrections_CreditNoteDiff=Credit notes always use the Differential method regardless of this setting.
+KSEF_HowTo_Corrections_ChainTitle=Correction chains
+KSEF_HowTo_Corrections_Chain=A correction invoice can itself be corrected (korekta korekty). Each correction in the chain references the previous one. You cannot unvalidate or delete an invoice that has been corrected.
+KSEF_HowTo_Corrections_ConfigTitle=Configuration
+KSEF_HowTo_Corrections_Config=Correction settings are on the <b>Outgoing Invoices</b> settings tab under <b>Correction Invoices</b>: default correction reason and correction line method (Differential / Before-After).
+
+
+KSEF_HowTo_AdvancedFields=Advanced FA(3) Fields
+KSEF_HowTo_AdvancedFields_Intro=Optional fields that add extra data to the FA(3) XML. Configured on the <b>Outgoing Invoices</b> tab, except the seller EORI field which is on the <b>General</b> tab.
+KSEF_HowTo_EntityFields=Entity Fields (Podmiot)
+KSEF_HowTo_EntityFields_IDNabywcy=<b>Buyer ID (IDNabywcy)</b> - stable buyer identifier used across corrections when buyer data changes. Source from customer code or a thirdparty extrafield. Optional.
+KSEF_HowTo_EntityFields_EORI=<b>EORI Numbers</b> - EU customs/trade identifier. Set seller EORI in General settings. Buyer EORI reads the third party's professional-ID field mapped via the EORI field setting (General settings, default idprof5). Only relevant for EU customs operations.
+KSEF_HowTo_LineFields=Line-Level Fields (invoice line)
+KSEF_HowTo_LineFields_GTU=<b>GTU Markers</b> - goods/services classification (GTU_01 through GTU_13) per invoice line. Source from a product extrafield. Aids JPK_VAT alignment.
+KSEF_HowTo_LineFields_Procedura=<b>Procedura Markers</b> - procedure codes per invoice line (WSTO_EE, IED, TT_D, MPP, etc.). Source from a product extrafield.
+KSEF_HowTo_LineFields_UUID=<b>Line unique ID (UUID)</b> - unique identifier per invoice line for reliable line matching in corrections. Warning: visible on the KSeF PDF visualization, which may confuse recipients.
+KSEF_HowTo_InvoiceFlags=Invoice Flags
+KSEF_HowTo_InvoiceFlags_FP=<b>FP (faktura do paragonu)</b> - invoice issued against a prior fiscal receipt. Set per invoice from an invoice extrafield in Outgoing settings (no POS auto-detect, since a POS issues real invoices too). Does not propagate to corrections.
+KSEF_HowTo_InvoiceFlags_TP=<b>TP Flag</b> - related party transactions (art. 32 ust. 2 pkt 1). Source from a thirdparty or invoice extrafield. Aids JPK_VAT alignment.
+KSEF_HowTo_InvoiceFlags_MPP=<b>MPP (split payment)</b> - set per invoice from an invoice extrafield. Prints the mandatory "Mechanizm podzielonej płatności" note on the PDF. <b>Inherits</b> onto correction invoices. No accounting automation: seller-side MPP is just two partial payments (net to your regular account, VAT to the dedicated VAT account) you enter via each payment's bank account.
+KSEF_HowTo_InvoiceFlags_P16=<b>Cash accounting (metoda kasowa)</b> - a taxpayer-level status, so normally set to "always on" in Outgoing settings.
+KSEF_HowTo_InvoiceFlags_P17=<b>Self-billing (samofakturowanie)</b> - marks an invoice issued under the self-billing procedure. A per-document fact: set per invoice via an invoice extrafield, or as a per-customer default via a thirdparty extrafield.
+KSEF_HowTo_InvoiceFlags_P18=<b>Reverse charge (odwrotne obciążenie)</b> - applies to cross-border / intra-EU reverse-charge supplies (domestic reverse charge abolished PL 2019). Sources are combined with OR - any one being set emits the flag, so a per-invoice field cannot switch off a customer default: a per-customer default (thirdparty extrafield, e.g. an intra-EU customer always reverse-charged), a per-invoice extrafield, or always on. Does not propagate to corrections - set it on the correction too if the corrected supply was reverse-charge.
+# Third entity (#28)
+KSEF_HowTo_Podmiot3=Third entity
+KSEF_HowTo_Podmiot3_Intro=FA(3) lets you declare an additional entity in the transaction besides the seller and buyer (this is the <b>third entity</b>). The most common case is a <b>payer</b> who differs from the buyer, but it also covers an internal recipient unit, an additional buyer, an invoice issuer, JST/VAT-group members, and an employee. Enable it in <b>outgoing invoice settings</b>, then per invoice:
+KSEF_HowTo_Podmiot3_Step1=Enable <b>Third entity</b> in outgoing settings and pick a <b>default role</b> (overridable per invoice).
+KSEF_HowTo_Podmiot3_Step2=Open the <b>KSeF tab</b> of an invoice, and a third-entity picker appears. Choose the company and its role.
+KSEF_HowTo_Podmiot3_Step3=Save. The third entity is added to the FA(3) XML and shown on the KSeF PDF. Leave the company empty to add none. Corrections re-emit it fresh (the schema has no correction node for it).
+KSEF_HowTo_Podmiot3_Reconciliation=<b>Reconciliation is manual.</b> A payer's bank inflow is matched by hand against the buyer's receivable; the receivable stays on the buyer's sub-ledger (art. 356 KC). There is no accounting automation in this release.
+KSEF_HowTo_Podmiot3_JSTGV_Title=JST / VAT-group roles (7/8/9/10)
+KSEF_HowTo_Podmiot3_JSTGV=The seller-side markers (roles 7 JST / 9 VAT-group issuer) need nothing extra; the role code on the third entity alone declares them. The buyer-side markers (roles 8 JST / 10 VAT-group recipient) additionally require the <b>buyer</b> thirdparty to be flagged. The module does not create those flags: add a boolean <code>societe</code> extrafield named <code>is_jst</code> and/or <code>is_vat_group</code>, tick it on the buyer, then pick role 8/10 on the invoice. The buyer's JST / VAT-group element is then emitted automatically.
+KSEF_HowTo_Podmiot3_IDWew_Title=IDWew (branches / internal units / employees)
+KSEF_HowTo_Podmiot3_IDWew_What=<b>What is IDWew?</b> "Identyfikator wewnętrzny" (internal identifier) is a code a company generates inside KSeF for one of its branches/establishments (zakład, oddział), internal units, or an employee treated as a separate unit. Its format is the company's NIP, a dash, then 5 digits, e.g. <code>1234567890-00001</code>. KSeF uses it for access permissions: people authorized for that unit can issue/see only invoices where the unit appears as the third entity. You normally need it when the third entity is an internal unit that has <b>no NIP of its own</b> (roles 2 and 11).
+KSEF_HowTo_Podmiot3_IDWew_How=<b>How to use it (optional):</b> create any <code>societe</code> extrafield (varchar/text) to hold the value, enter the internal ID on the third entity, then map your field in outgoing settings via the <b>internal ID source</b> dropdown. The module then emits the internal ID instead of the NIP. Without a mapped source (or an empty value), the entity's own NIP (or a "no tax ID" marker for an employee with none) is used instead.
+KSEF_HowTo_Podmiot3_Limits_Title=Limitations in this release
+KSEF_HowTo_Podmiot3_Faktor=<b>Role 1 (Factor):</b> fully supported, including the factor's bank accounts - enter them on the third entity.
+KSEF_HowTo_Podmiot3_Role4=<b>Role 4 (additional buyer):</b> enter the co-buyer's ownership share in the Udzial field (0-100%); leave it blank for equal shares. On correction invoices the co-buyer is re-emitted as a fresh third entity rather than carried in the before-correction buyer block (fine for single-buyer use); full multi-buyer correction linkage is deferred.
+
+# ============================================
+# GUS / REGON Lookup
+# ============================================
+KSEF_GusSectionTitle=GUS / REGON lookup
+KSEF_GusSectionDesc=Fetch Polish company data from the GUS REGON register by NIP to auto-fill a customer.
+KSEF_GusEnabled=Enable GUS lookup
+KSEF_GusEnv=Environment
+KSEF_GusEnvTest=Test
+KSEF_GusEnvProd=Production
+KSEF_GusApiKey=GUS user key
+KSEF_GusApiKeyHelp=Production requires a free user key from GUS. The test environment uses a public key automatically.
+KSEF_GusNameStyle=Organization name style
+KSEF_GusNameStyleFull=As returned by GUS (e.g. KOWALSKI TRANSPORT SPÓŁKA Z OGRANICZONĄ ODPOWIEDZIALNOŚCIĄ)
+KSEF_GusNameStyleUpper=Uppercase acronyms (e.g. KOWALSKI TRANSPORT SP. Z O.O.)
+KSEF_GusNameStyleMixed=Mixed-case acronyms (e.g. KOWALSKI TRANSPORT Sp. z o.o.)
+KSEF_GusSetupRequiredBanner=GUS lookup needs the KSeF field labels applied first, so the NIP/REGON/KRS fields are set up correctly. Apply the translation overrides above, then enable GUS.
+KSEF_GusTestConnection=Test connection
+KSEF_GusTestOk=GUS connection successful.
+KSEF_GusTestFail=GUS connection failed: %s
+KSEF_GusFetch=Fetch from GUS
+KSEF_GusFetching=Fetching from GUS...
+KSEF_GusSetupRequired=Run the KSeF field setup before using GUS lookup
+KSEF_GusRunSetup=Open setup
+KSEF_GusConflictTitle=GUS returned different values. Tick the fields to overwrite:
+KSEF_GusApply=Apply selected
+KSEF_GusDismiss=Cancel
+KSEF_GusSelectAll=Select all
+KSEF_GusFilled=Filled %s field(s) from GUS.
+KSEF_GusNoChanges=GUS data matches the current fields; nothing to fill.
+KSEF_GusNipCancelled=Warning: this NIP is marked cancelled in the register (%s).
+KSEF_GusInactiveWarn=Warning: this entity appears inactive in the register.
+KSEF_GusErrForbidden=You are not allowed to look up companies.
+KSEF_GusErrDisabled=GUS lookup is disabled.
+KSEF_GusErrSetupRequired=GUS lookup is not set up. Run the KSeF field setup first.
+KSEF_GusErrInvalidNip=Enter a valid 10 digit NIP.
+KSEF_GusErrNoKey=No GUS user key is configured.
+KSEF_GusNotConfiguredWarning=GUS company lookup is not enabled.
+KSEF_GusErrRateLimited=Too many GUS lookups in a short time. Please wait a moment and try again.
+KSEF_GusErrNotFound=No company found for NIP %s.
+KSEF_GusErrUnsupportedType=This entity type is not supported (local unit / branch). Enter the parent entity NIP.
+KSEF_GusErrSession=GUS session error. Please try again.
+KSEF_GusErrTransport=Could not reach the GUS service. Please try again.
+KSEF_GusError=GUS lookup failed.
+KSEF_GusFetchSuppliers=Fetch Supplier Data from GUS
+KSEF_GusFetchSuppliers_Help=When auto-creating suppliers, look up each Polish NIP in GUS and use the official registry name and address. You confirm any changes before the suppliers are created.
+KSEF_GusOverrideTitle=Confirm supplier data from GUS
+KSEF_GusOverrideIntro=The following suppliers will be created with data from the GUS register, replacing the values from the invoice:
+KSEF_GusOverrideProceed=Create with GUS data
+KSEF_GusPreviewFailed=The GUS supplier lookup failed or timed out. Import anyway using the invoice data as-is?
+KSEF_GusPreviewTruncated=%s supplier(s) were not looked up in GUS because the per-batch limit was reached; they will be imported using the invoice data. Continue?
+KSEF_GusRequestKeyTitle=Requesting a production key
+KSEF_GusNoKeyBanner=No production key is configured. To use GUS lookup in production, request a free key from GUS.
+KSEF_GusKeyHelpTitle=How to get and apply a GUS key
+KSEF_GusKeyApplyStep1=Send the email below to regon_bir@stat.gov.pl.
+KSEF_GusKeyApplyStep2=GUS replies with your user key (Klucz Uzytkownika).
+KSEF_GusKeyApplyStep3=Paste the key into the GUS key field on the Authentication settings tab.
+KSEF_GusKeyApplyStep4=Set the environment to Production and save.
+KSEF_GusHowTo_Title=Lookup Company Info by NIP
+KSEF_GusHowTo_Intro=When creating or editing a Polish customer, enter their NIP and click <b>Pobierz z GUS</b> to fetch the company name and address from the official REGON register and fill the form. Existing values are never overwritten without your confirmation.
+KSEF_GusHowTo_KeyTest=<b>Test environment:</b> works out of the box using a public test key (data is frozen and anonymized, for wiring only). For example, try NIP 5261040828.
+KSEF_GusHowTo_KeyProd=<b>Production:</b> request a free user key from GUS by sending a plain email to regon_bir@stat.gov.pl. Paste the key in the GUS section of the module settings and switch the environment to Production.
+KSEF_GusHowTo_Step1=Apply the KSeF field labels in settings so NIP/REGON/KRS are set up.
+KSEF_GusHowTo_Step2=Enable GUS lookup and choose the environment.
+KSEF_GusHowTo_Step3=On a customer card, type the NIP and click <b>Pobierz z GUS</b>.
+KSEF_GusHowTo_Step4=Review the values, tick any fields to overwrite, then save.
+KSEF_GusHowTo_EmailLabel=Example email to request a production key (prefilled with info from Setup->Company/Organization):

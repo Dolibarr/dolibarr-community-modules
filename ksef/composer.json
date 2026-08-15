@@ -1,0 +1,9 @@
+{
+  "name": "inpoint-automation/dolibarr-ksef-module",
+  "description": "Polish KSeF (Krajowy System e-Faktur) e-invoicing integration for Dolibarr",
+  "license": "AGPL-3.0-or-later",
+  "require": {
+    "php": ">=7.4",
+    "phpseclib/phpseclib": "~3.0"
+  }
+}
