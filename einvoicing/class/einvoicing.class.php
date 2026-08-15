@@ -466,6 +466,16 @@ class EInvoicing
 		self::STATUS_SUSPENDED
 	];
 
+	/**
+	 * The statuses by which a buyer accepts a received document, in whole or in part, and commits to
+	 * settling it. "Disputed", "Suspended" and "Refused" are deliberately not here: none of them
+	 * accepts anything.
+	 */
+	public const STATUSES_ACCEPTING_A_DOCUMENT = [
+		self::STATUS_APPROVED,
+		self::STATUS_PARTIALLY_APPROVED
+	];
+
 
 	/**
 	 * Constructor
@@ -736,6 +746,11 @@ class EInvoicing
 	 * the normal order of things is to approve an invoice and then pay it, and "Payment transmitted"
 	 * (211) is precisely what is sent afterwards. An approved invoice can no longer be refused either.
 	 *
+	 * One thing narrows the list beyond that history: a credit note correcting an invoice we refused
+	 * cannot be accepted, since the invoice it credits owes nothing (issue #594, see
+	 * SupplierInvoiceHelper::refusedSourceOfCreditNote()). Refusing it stays offered - that is what the
+	 * document is for here - as do the statuses that settle nothing, like "Disputed" or "Suspended".
+	 *
 	 * @param	int		$elementId		Id of the invoice
 	 * @param	string	$elementType	Element type ('invoice_supplier')
 	 * @return	array<string|int,array{label:string,data-html:string,disable?:int,css?:string}>	The sendable
@@ -755,6 +770,15 @@ class EInvoicing
 		foreach (array_keys($statuses) as $code) {
 			if ($this->hasSentStatusMessage($elementId, $elementType, (int) $code, 1)) {
 				unset($statuses[$code]);
+			}
+		}
+
+		if ($elementType === 'invoice_supplier') {
+			dol_include_once('einvoicing/class/helpers/SupplierInvoiceHelper.class.php');
+			if (SupplierInvoiceHelper::refusedSourceOfCreditNote((int) $elementId) > 0) {
+				foreach (self::STATUSES_ACCEPTING_A_DOCUMENT as $code) {
+					unset($statuses[$code]);
+				}
 			}
 		}
 
