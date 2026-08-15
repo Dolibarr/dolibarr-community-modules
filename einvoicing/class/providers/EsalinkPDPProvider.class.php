@@ -538,7 +538,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				$this->error .= ' - Curl error ' . $response['curl_error_no'] . (empty($response['curl_error_msg']) ? '' : ' - ' . $response['curl_error_msg']);
 			}
 			$this->errors[] = $this->error;
-			return 0;
+			return false;
 		}
 	}
 
@@ -547,7 +547,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	 * This function generates a sample invoice and sends it to PDP
 	 *
 	 * @param 	int 			$onlymake		1=to only make the sample
-	 * @return array|string 					True if the invoice was successfully sent, false otherwise.
+	 * @return 	string[]|0	 					Array of messages if the invoice was successfully sent, 0 otherwise.
 	 */
 	public function sendSampleInvoice($onlymake = 0)
 	{

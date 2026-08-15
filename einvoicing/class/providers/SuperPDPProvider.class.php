@@ -833,7 +833,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 * This function send an invoice to PDP
 	 *
 	 * @param	Facture		$object 	Invoice object
-	 * @return 	string|array{res:int<-1,1>,message:string}|0|false			flowId if the invoice was successfully sent, false otherwise.
+	 * @return 	false|string|array{res:int<-1,1>,message:string}			flowId if the invoice was successfully sent, false otherwise.
 	 */
 	public function sendInvoice($object)
 	{
@@ -992,7 +992,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				$this->error .= ' - Curl error ' . $response['curl_error_no'] . (empty($response['curl_error_msg']) ? '' : ' - ' . $response['curl_error_msg']);
 			}
 			$this->errors[] = $this->error;
-			return 0;
+			return false;
 		}
 	}
 
@@ -1001,7 +1001,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 * This function generates a sample invoice and sends it to PDP
 	 *
 	 * @param 	int<0,1>		$onlymake		1=to only make the sample
-	 * @return 	string[]|0	 					True if the invoice was successfully sent, false otherwise.
+	 * @return 	string[]|0	 					Array of messages if the invoice was successfully sent, 0 otherwise.
 	 */
 	public function sendSampleInvoice($onlymake = 0)
 	{
