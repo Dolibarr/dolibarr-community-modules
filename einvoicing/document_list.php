@@ -2,6 +2,7 @@
 /* Copyright (C) 2007-2017  Laurent Destailleur         <eldy@users.sourceforge.net>
  * Copyright (C) 2024       Frédéric France             <frederic.france@free.fr>
  * Copyright (C) 2025       SuperAdmin                  <daoud.mouhamed@gmail.com>
+ * Copyright (C) 2026		Jose Martinez				<jose.martinez@pichinov.com>
  * Copyright (C) 2026       Alexandre Spangaro          <alexandre@inovea-conseil.com>
  * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
@@ -165,12 +166,24 @@ $object->fields['recap'] = array(
 	'notsearchable' => 1
 );
 
+// Add a virtual "thirdparty" field into $object->fields for the list (resolved on the fly from the linked invoice, like native invoice lists)
+$object->fields['thirdparty'] = array(
+	'label' => $langs->trans("ThirdParty"),
+	'type' => 'text',
+	'visible' => 1,
+	'enabled' => '1',
+	'position' => 52,
+	'checked' => 1,
+	'notsearchable' => 1
+);
+
 
 // Initialize array of search criteria
 $search_all = trim(GETPOST('search_all', 'alphanohtml'));
+$search_thirdparty = trim(GETPOST('search_thirdparty', 'alphanohtml'));
 $search = array();
 foreach ($object->fields as $key => $val) {
-	if ($key == 'recap') {
+	if ($key == 'recap' || $key == 'thirdparty') {
 		continue;
 	}
 	if (GETPOST('search_'.$key, 'alpha') !== '') {
@@ -279,6 +292,7 @@ if (empty($reshook)) {
 
 	// Purge search criteria
 	if (GETPOST('button_removefilter_x', 'alpha') || GETPOST('button_removefilter.x', 'alpha') || GETPOST('button_removefilter', 'alpha')) { // All tests are required to be compatible with all browsers
+		$search_thirdparty = '';
 		foreach ($object->fields as $key => $val) {
 			$search[$key] = '';
 			if (preg_match('/^(date|timestamp|datetime)/', $val['type'])) {
@@ -359,7 +373,7 @@ $morecss = array();
 // Build and execute select
 // --------------------------------------------------------------------
 $sql = "SELECT";
-$sql .= " ".$object->getFieldList('t', array('recap', 'xml_data'));
+$sql .= " ".$object->getFieldList('t', array('recap', 'xml_data', 'thirdparty'));
 // Add fields from extrafields
 if (!empty($extrafields->attributes[$object->table_element]['label'])) {
 	foreach ($extrafields->attributes[$object->table_element]['label'] as $key => $val) {
@@ -371,6 +385,12 @@ $parameters = array();
 $reshook = $hookmanager->executeHooks('printFieldListSelect', $parameters, $object, $action); // Note that $action and $object may have been modified by hook
 $sql .= $hookmanager->resPrint;
 $sql = preg_replace('/,\s*$/', '', $sql);
+
+// Virtual "thirdparty_name" column resolved from the linked invoice, used to sort the Tiers column
+$sql .= ", (CASE";
+$sql .= " WHEN t.fk_element_type = 'facture' THEN (SELECT s.nom FROM ".$db->prefix()."societe as s INNER JOIN ".$db->prefix()."facture as f ON f.fk_soc = s.rowid WHERE f.rowid = t.fk_element_id)";
+$sql .= " WHEN t.fk_element_type = 'invoice_supplier' THEN (SELECT s.nom FROM ".$db->prefix()."societe as s INNER JOIN ".$db->prefix()."facture_fourn as ff ON ff.fk_soc = s.rowid WHERE ff.rowid = t.fk_element_id)";
+$sql .= " ELSE '' END) as thirdparty_name";
 
 $sqlfields = $sql; // $sql fields to remove for count total
 
@@ -462,6 +482,13 @@ if ($socid) {
 */
 //$sql.= dolSqlDateFilter("t.field", $search_xxxday, $search_xxxmonth, $search_xxxyear);
 // Add where from extra fields
+// Filter on thirdparty resolved from the linked invoice (facture / facture fournisseur)
+if ($search_thirdparty != '') {
+	$sql .= " AND (";
+	$sql .= " EXISTS (SELECT 1 FROM ".$db->prefix()."facture as sf INNER JOIN ".$db->prefix()."societe as ss ON ss.rowid = sf.fk_soc WHERE sf.rowid = t.fk_element_id AND t.fk_element_type = 'facture'".natural_search("ss.nom", $search_thirdparty, 0, 0).")";
+	$sql .= " OR EXISTS (SELECT 1 FROM ".$db->prefix()."facture_fourn as sff INNER JOIN ".$db->prefix()."societe as ssf ON ssf.rowid = sff.fk_soc WHERE sff.rowid = t.fk_element_id AND t.fk_element_type = 'invoice_supplier'".natural_search("ssf.nom", $search_thirdparty, 0, 0).")";
+	$sql .= " )";
+}
 include DOL_DOCUMENT_ROOT.'/core/tpl/extrafields_list_search_sql.tpl.php';
 // Add where from hooks
 $parameters = array();
@@ -602,6 +629,9 @@ foreach ($search as $key => $val) {
 	}
 }
 // Add $param from extra fields
+if ($search_thirdparty != '') {
+	$param .= '&search_thirdparty='.urlencode($search_thirdparty);
+}
 include DOL_DOCUMENT_ROOT.'/core/tpl/extrafields_list_search_param.tpl.php';
 // Add $param from hooks
 $parameters = array('param' => &$param);
@@ -1059,6 +1089,8 @@ foreach ($object->fields as $key => $val) {
 			print $formadmin->select_language((isset($search[$key]) ? $search[$key] : ''), 'search_lang', 0, array(), 1, 0, 0, 'minwidth100imp maxwidth125', 2);
 		} elseif ($val['type'] === 'boolean') {
 			print $form->selectyesno('search_' . $key, $search[$key] ?? '', 1, false, 1);
+		} elseif ($key == 'thirdparty') {
+			print '<input type="text" class="flat maxwidth100" name="search_thirdparty" value="'.dol_escape_htmltag($search_thirdparty).'">';
 		} else {
 			if (!empty($val['notsearchable'])) {
 				continue;
@@ -1111,7 +1143,8 @@ foreach ($object->fields as $key => $val) {
 	}
 	$cssforfield = preg_replace('/small\s*/', '', $cssforfield);	// the 'small' css must not be used for the title label
 	if (!empty($arrayfields['t.'.$key]['checked'])) {
-		print getTitleFieldOfList($arrayfields['t.'.$key]['label'], 0, $_SERVER['PHP_SELF'], 't.'.$key, '', $param, ($cssforfield ? 'class="'.$cssforfield.'"' : ''), $sortfield, $sortorder, ($cssforfield ? $cssforfield.' ' : ''), 0, (empty($val['helplist']) ? '' : $val['helplist']))."\n";
+		$sortablefield = ($key == 'thirdparty' ? 'thirdparty_name' : 't.'.$key);
+		print getTitleFieldOfList($arrayfields['t.'.$key]['label'], 0, $_SERVER['PHP_SELF'], $sortablefield, '', $param, ($cssforfield ? 'class="'.$cssforfield.'"' : ''), $sortfield, $sortorder, ($cssforfield ? $cssforfield.' ' : ''), 0, (empty($val['helplist']) ? '' : $val['helplist']))."\n";
 		$totalarray['nbfield']++;
 	}
 }
@@ -1305,6 +1338,25 @@ while ($i < $imaxinloop) {
 						$out = preg_replace('/<a /', '<a target="_blank" rel="noopener noreferrer" ', $out, 1);
 					}
 
+					print $out;
+				} elseif ($key == 'thirdparty') {
+					$out = '';
+					if (!empty($object->fk_element_type) && !empty($object->fk_element_id)) {
+						$linkedobj = null;
+						if ($object->fk_element_type === 'facture') {
+							require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
+							$linkedobj = new Facture($db);
+						} elseif ($object->fk_element_type === 'invoice_supplier') {
+							require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';
+							$linkedobj = new FactureFournisseur($db);
+						}
+						if (is_object($linkedobj) && $linkedobj->fetch((int) $object->fk_element_id) > 0) {
+							$linkedobj->fetch_thirdparty();
+							if (is_object($linkedobj->thirdparty) && $linkedobj->thirdparty->id > 0) {
+								$out = $linkedobj->thirdparty->getNomUrl(1, '', 24);
+							}
+						}
+					}
 					print $out;
 				} elseif ($key == 'fk_element_type') {
 					print '<span class="nowraponall">';
