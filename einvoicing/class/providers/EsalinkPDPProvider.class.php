@@ -283,15 +283,25 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	{
 		global $langs;
 
+		$extraHeaders = [];
+
 		// OAuth2 client_credentials — RFC 6749, application/x-www-form-urlencoded
 		// Replace old POST /v1/token (JSON username/password) disabled since v1.2.6 (2026-07).
-		// Prefers Authorization to be more compliant between PA usage
-		$param = http_build_query(array(
-			'client_secret' => $this->config['password'],
-		));
+		// Prefers Authorization to be more compliant between PA usage and provide a constant to use old authentication credential
+		if (getDolGlobalString('ESALINK_AUTHENT_USING_CLIENT_CREDENTIAL')) {
+			$param = http_build_query(array(
+				'grant_type'    => 'client_credentials',
+				'client_id'     => $this->config['username'],
+				'client_secret' => $this->config['password'],
+			));
+		} else {
+			$param = http_build_query(array(
+				'client_secret' => $this->config['password'],
+			));
+			$extraHeaders["Authorization"] = "Basic ".base64_encode(urlencode($this->config['username']).":".urlencode($this->config['password']));
+		}
 
-		$extraHeaders = array('Content-Type' => 'application/x-www-form-urlencoded');
-		$extraHeaders["Authorization"] = "Basic ".base64_encode(urlencode($this->config['username']).":".urlencode($this->config['password']));
+		$extraHeaders['Content-Type'] ='application/x-www-form-urlencoded';
 
 		$response = $this->callApi("oauth2/token", "POSTALREADYFORMATED", $param, $extraHeaders, 'get_access_token');
 
