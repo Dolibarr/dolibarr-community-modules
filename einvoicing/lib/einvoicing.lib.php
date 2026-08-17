@@ -122,6 +122,21 @@ function pdpShowWarning($einvoicing)
 		}
 	}
 
+	// A Factur-X file is a PDF/A-3 file carrying the XML, and the module can only embed the XML into the
+	// PDF the core produced - it cannot repair its pages. Say so here, where the setting that decides it
+	// can be reached, and not only when an invoice is generated. Not gated on EINVOICING_LIVE: a test
+	// instance producing files no validator accepts is exactly what one wants to know about early.
+	$carrierCheck = $einvoicing->validateEInvoiceCarrierConfiguration();
+	if ($carrierCheck['res'] <= 0) {
+		$ret .= '<div class="warning">';
+		$ret .= $langs->trans("FxCheckWarningPdfaCarrierNotEnabled");
+		$ret .= '<br><br>';
+		$ret .= '<a class="gotopdfsetup" href="' . DOL_URL_ROOT . '/admin/pdf.php">';
+		$ret .= $langs->trans("FxGoToPdfSetup") . '<i class="fas fa-tools marginleftonly"></i>';
+		$ret .= '</a>';
+		$ret .= '</div>';
+	}
+
 	return ($ret ? $ret . '<br>' : '');
 }
 

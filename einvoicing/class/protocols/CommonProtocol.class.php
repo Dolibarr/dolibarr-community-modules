@@ -393,6 +393,9 @@ trait CommonProtocol
 		// from a CLI script or a test that only included master.inc.php, the call fatals with
 		// 'Class "ExtraFields" not found', so require it explicitly here.
 		require_once DOL_DOCUMENT_ROOT . '/core/class/extrafields.class.php';
+		// Note: the carrier of the specimen is the one the setup of the instance produces, untouched.
+		// A Factur-X specimen is only a conformant PDF/A-3 when PDF_USE_A is set to PDF/A-3b in
+		// "Home - Setup - PDF", which is exactly what the specimen is there to show.
 		$tmpinvoice->generateDocument($tmpinvoice->model_pdf, $outputlangs);
 
 		// For invoice with ->specimen=1, the file is SPECIMEN.pdf so we rename it into ref
