@@ -97,6 +97,9 @@ jobs:
             if [[ "$file" == helloasso/* ]]; then
               LABELS+="Module: HelloAsso|"
             fi
+            if [[ "$file" == ksef/* ]]; then
+              LABELS+="Module: EInvoicing KSEF (Poland)|"
+            fi
           done < changed_files.txt
 
           echo "Store LABELS=$LABELS into FINALJS"
