@@ -1140,6 +1140,34 @@ class EInvoicing
 	}
 
 	/**
+	 * Check that the setup of the instance can produce a conformant carrier for the selected format.
+	 *
+	 * Only Factur-X is concerned: a Factur-X file is a PDF/A-3 file carrying the XML (ISO 19005-3), and
+	 * the module can only embed the XML into the PDF the core produced - it cannot repair its pages. At
+	 * the default PDF_USE_A = 0 that PDF is drawn with the Standard 14 fonts, which are not embedded,
+	 * while 6.2.11.4.1 requires every font used for rendering to be: the result is rejected by any PDF/A
+	 * validator (veraPDF), whatever the container of the module does right, and the invoice is not a
+	 * conformant Factur-X. The setting belongs to the core and is only read here, never written: the
+	 * user is told to raise it, in "Home - Setup - PDF", or to use CII - which is the recommended format
+	 * and needs no PDF at all.
+	 *
+	 * @return array{res:int, message:string} Returns array with 'res' (1 when nothing to report, 0 on warning) and info 'message'
+	 */
+	public function validateEInvoiceCarrierConfiguration()
+	{
+		global $langs;
+
+		if (getDolGlobalString('EINVOICING_PROTOCOL') != 'FACTURX') {
+			return ['res' => 1, 'message' => ''];
+		}
+		if (getDolGlobalInt('PDF_USE_A') >= 3) {
+			return ['res' => 1, 'message' => ''];
+		}
+
+		return ['res' => 0, 'message' => '<br> Warning: ' . $langs->trans("FxCheckWarningPdfaCarrierNotEnabled")];
+	}
+
+	/**
 	 * Check required information for E-Invoicing
 	 *
 	 * @param Facture 	$invoice   Invoice object
@@ -1151,6 +1179,7 @@ class EInvoicing
 		$mysocConfigCheck    = $this->validateMyCompanyConfiguration();
 		$socConfigCheck      = $this->validatethirdpartyConfiguration($invoice->thirdparty);
 		$invoiceConfigCheck  = $this->validateInvoiceConfiguration($invoice);
+		$carrierConfigCheck  = $this->validateEInvoiceCarrierConfiguration();
 		$chorusConfigCheck   = null;
 		if (getDolGlobalInt('EINVOICING_USE_CHORUS')) {
 			$chorusConfigCheck = $this->validateChorusInformations($invoice);
@@ -1172,6 +1201,9 @@ class EInvoicing
 		if (!empty($invoiceConfigCheck['message'])) {
 			$messages[] = $invoiceConfigCheck['message'];
 		}
+		if (!empty($carrierConfigCheck['message'])) {
+			$messages[] = $carrierConfigCheck['message'];
+		}
 		if (!empty($chorusConfigCheck['message'])) {
 			$messages[] = $chorusConfigCheck['message'];
 		}
@@ -1189,6 +1221,7 @@ class EInvoicing
 		} elseif (
 			$mysocConfigCheck['res'] === 0 || $socConfigCheck['res'] === 0
 			|| $invoiceConfigCheck['res'] === 0
+			|| $carrierConfigCheck['res'] === 0
 			|| (isset($chorusConfigCheck) && $chorusConfigCheck['res'] === 0)
 			|| (isset($apiConfigCheck) && $apiConfigCheck['res'] === 0)
 		) {
