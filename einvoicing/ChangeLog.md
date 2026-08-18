@@ -2,6 +2,23 @@
 
 ## 1.0.4
 
+FIX: A third party recognised as a private individual is no longer reported as misconfigured when
+EINVOICING_SKIP_B2C is on (issue #600). The option already kept B2C invoices out of the e-invoicing
+scope - needEInvoiceManagement() answers "do not manage" on them, since B2C is reported by e-reporting
+and not transmitted as an e-invoice - but the pre-check of the third party knew nothing about it and
+still demanded a professional id, an identifier a private individual has no reason to own. Generating
+or sending such an invoice failed on "The customer has no professional id (SIREN)", and the invoice
+could be refused altogether where EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS is set. The pre-check
+now reads the same Societe::isACompany() as the decision does, so both ends of the chain agree on who
+is B2C, and neither the professional id nor the routing id is required of a private individual. A
+company without a professional id is still blocked, option or not.
+
+The same invoices could also reach that pre-check through the other end: needEInvoiceManagement()
+answers with a status code, and the two codes meaning "out of scope" (98 and 99) are truthy, so the
+callers that only tested its answer for truth treated an ignored invoice as one to e-invoice. They
+now compare against the codes, which also removes the generation button from an invoice explicitly
+excluded from e-invoicing.
+
 FIX: The Factur-X files the module produces are now valid PDF/A-3, which they had never been - and a
 Factur-X file that is not a PDF/A-3 file is not a conformant Factur-X, whatever its XML says (veraPDF
 1.30.2 rejected every one of them, on Dolibarr 17 to 24 alike). The cause that belongs to the module is

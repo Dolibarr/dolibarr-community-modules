@@ -103,8 +103,13 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		if ($invoiceObject instanceof Facture) {
 			/** @var Facture $invoiceObject */
 
+			// needEInvoiceManagement() answers with a status code, not a boolean: STATUS_IGNORE (99) and
+			// STATUS_IGNORE_2 (98) both mean "out of the e-invoicing scope" yet are truthy, so testing the
+			// return value alone let an ignored invoice (a B2C one when EINVOICING_SKIP_B2C is on, typically)
+			// walk into the checks below and be reported as misconfigured. Only the "to generate" answer opens
+			// the real-time generation.
 			$needEinvoice = $einvoicing->needEInvoiceManagement($invoiceObject);
-			if ($needEinvoice) {
+			if ($needEinvoice && $needEinvoice != $einvoicing::STATUS_IGNORE && $needEinvoice != $einvoicing::STATUS_IGNORE_2) {
 				// Get current status of e-invoice
 				$currentStatusDetails = $einvoicing->fetchLastknownInvoiceStatus($invoiceObject->id, $invoiceObject->ref);
 
@@ -316,9 +321,14 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 			if ($object->status == Facture::STATUS_VALIDATED || $object->status == Facture::STATUS_CLOSED) {
 				// if E-invoice is not generated, show button to generate e-invoice
+				// STATUS_IGNORE_2 has no entry in STATUS_LABEL_KEYS, so the "unknown code" fallback below used to
+				// offer the generation button on an invoice explicitly excluded from e-invoicing. Exclude both
+				// ignore codes explicitly: an ignored invoice has nothing to generate.
 				if (
-					$currentStatusDetails['code'] == $einvoicing::STATUS_NOT_GENERATED
-					|| !array_key_exists($currentStatusDetails['code'], $einvoicing::STATUS_LABEL_KEYS)
+					$currentStatusDetails['code'] != $einvoicing::STATUS_IGNORE
+					&& $currentStatusDetails['code'] != $einvoicing::STATUS_IGNORE_2
+					&& ($currentStatusDetails['code'] == $einvoicing::STATUS_NOT_GENERATED
+						|| !array_key_exists($currentStatusDetails['code'], $einvoicing::STATUS_LABEL_KEYS))
 				) {
 					$url_button[] = array(
 						'lang' => 'einvoicing',

@@ -886,11 +886,19 @@ class EInvoicing
 		$baseErrors = [];
 		$baseWarnings = [];
 
+		// A private individual has no professional id, and when EINVOICING_SKIP_B2C is on that third party is
+		// out of the e-invoicing scope anyway (B2C is reported by e-reporting, not transmitted as an e-invoice):
+		// its missing SIREN must not be reported as a blocking configuration error. Detection is delegated to
+		// Societe::isACompany(), the same way needEInvoiceManagement() does, so both ends of the chain agree.
+		$isB2C = getDolGlobalInt('EINVOICING_SKIP_B2C') && is_object($thirdparty) && !$thirdparty->isACompany();
+
 		if (empty($thirdparty->name)) {
 			$baseErrors[] = $langs->trans("FxCheckErrorCustomerName");
 		}
 		if (empty($thirdparty->idprof1)) {
-			$baseErrors[] = $langs->trans("FxCheckErrorCustomerIDPROF1");
+			if (!$isB2C) {
+				$baseErrors[] = $langs->trans("FxCheckErrorCustomerIDPROF1");
+			}
 		} elseif (!empty($thirdparty->country_code) && $thirdparty->country_code === 'FR') {
 			// Validate SIREN/SIRET format based on length (French companies only)
 			$idprof1 = preg_replace('/\s+/', '', (string) $thirdparty->idprof1);
@@ -925,7 +933,9 @@ class EInvoicing
 		$routing_id = $this->getBuyerCommunicationURI($thirdparty);
 		// If EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID is off, we use the profid as einvoice id and we already have the previous error message of
 		// profid missing. But if on, we also add a message dedicated to einvoice ID.
-		if (getDolGlobalString('EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID') && empty($routing_id)) {
+		// Same reason as for the professional id above: a B2C third party is not addressed on the network, so
+		// having no routing id is expected and must not block.
+		if (getDolGlobalString('EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID') && empty($routing_id) && !$isB2C) {
 			$baseErrors[] = $langs->trans("FxCheckErrorCustomerRoutingID");
 		}
 		if ($thirdparty->tva_assuj && empty($thirdparty->tva_intra)) {
