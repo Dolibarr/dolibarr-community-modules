@@ -2,6 +2,14 @@
 
 ## 1.0.4
 
+FIX: The supplier invoice list no longer fails on a MySQL server that keeps its default sql_mode. The
+columns the module adds to the SELECT of that list were never added to its GROUP BY, so MySQL refused the
+whole query with error 1055 (only_full_group_by) and the page reported a technical error instead of showing
+the list. MariaDB, whose default sql_mode does not include ONLY_FULL_GROUP_BY, accepted the same query,
+which is why the fault went unnoticed. The printFieldListGroupBy hook the core calls right after building
+its own GROUP BY - where it adds its extrafields for that very reason - is now implemented. Dolibarr 17 to
+21 are concerned; from Dolibarr 22 on the core builds no GROUP BY on that list at all.
+
 FIX: The Factur-X files the module produces are now valid PDF/A-3, which they had never been - and a
 Factur-X file that is not a PDF/A-3 file is not a conformant Factur-X, whatever its XML says (veraPDF
 1.30.2 rejected every one of them, on Dolibarr 17 to 24 alike). The cause that belongs to the module is
