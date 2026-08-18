@@ -247,8 +247,9 @@ class SkipB2CPrecheckTest extends CommonClassTest
 	/**
 	 * The two ignore codes are what needEInvoiceManagement() answers for an invoice out of the
 	 * e-invoicing scope, and both are truthy: a caller that only tests the answer for truth treats
-	 * them as "to be e-invoiced". Pinned here because that is what let an ignored invoice reach the
-	 * pre-check in the first place, and the callers now compare against these codes.
+	 * them as "to be e-invoiced". That is what let an ignored invoice reach the pre-check in the first
+	 * place, and the callers now ask isIgnoredStatus() instead, which reads the STATUS_IGNORE_CODES
+	 * list - so a new ignore code added there is honoured by all of them at once.
 	 *
 	 * @return void
 	 */
@@ -257,5 +258,18 @@ class SkipB2CPrecheckTest extends CommonClassTest
 		$this->assertTrue((bool) EInvoicing::STATUS_IGNORE);
 		$this->assertTrue((bool) EInvoicing::STATUS_IGNORE_2);
 		$this->assertNotSame(EInvoicing::STATUS_NOT_GENERATED, EInvoicing::STATUS_IGNORE);
+
+		$this->assertSame(
+			array(EInvoicing::STATUS_IGNORE, EInvoicing::STATUS_IGNORE_2),
+			EInvoicing::STATUS_IGNORE_CODES,
+			'every ignore code must be listed, that list is what the callers read'
+		);
+		foreach (EInvoicing::STATUS_IGNORE_CODES as $code) {
+			$this->assertTrue(EInvoicing::isIgnoredStatus($code));
+			// The stored status read from the database is a string: the helper must answer the same on it.
+			$this->assertTrue(EInvoicing::isIgnoredStatus((string) $code));
+		}
+		$this->assertFalse(EInvoicing::isIgnoredStatus(EInvoicing::STATUS_NOT_GENERATED));
+		$this->assertFalse(EInvoicing::isIgnoredStatus(EInvoicing::STATUS_GENERATED));
 	}
 }

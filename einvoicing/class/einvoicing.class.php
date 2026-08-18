@@ -70,6 +70,17 @@ class EInvoicing
 	public const STATUS_IGNORE_2            = 98;		// Never sync (for another reason than ereporting, not used yet)
 	public const STATUS_IGNORE              = 99;		// Never sync
 
+	/**
+	 * The two codes above, as a list: they keep an invoice out of the e-invoicing scope, it is never
+	 * generated nor sent (B2C invoices reported by e-reporting, TakePOS tickets synced by the cash
+	 * closing, ...). Grouped here so that adding an "ignore" code is honoured by every caller at
+	 * once, through isIgnoredStatus().
+	 */
+	public const STATUS_IGNORE_CODES = [
+		self::STATUS_IGNORE,
+		self::STATUS_IGNORE_2
+	];
+
 	// PDP / PA normalized statuses
 	// public const STATUS_DEPOSITED           = 200;
 	// public const STATUS_ISSUED              = 201;
@@ -2973,7 +2984,9 @@ class EInvoicing
 
 
 	/**
-	 * Return if an invoice need EInvoicing management.
+	 * Return the e-invoicing status an invoice qualifies for. This is the status to store, not an
+	 * answer to "must this invoice be e-invoiced?": the codes meaning "out of scope" are truthy, so
+	 * never test this answer for truth alone, call mustManageEInvoice() for that question.
 	 *
 	 * @param 	Facture|FactureRec		$object		Object
 	 * @return 	int 								self::STATUS_NOT_GENERATED if the invoice object need management of EInvoicing, self::STATUS_IGNORE or self::self::STATUS_IGNORE_2 if not.
@@ -3029,6 +3042,33 @@ class EInvoicing
 		// TODO Add hook
 
 		return $return;
+	}
+
+
+	/**
+	 * Return if an invoice must be managed by EInvoicing. Boolean counterpart of
+	 * needEInvoiceManagement(), which answers with a status code.
+	 *
+	 * @param 	Facture|FactureRec		$object		Object
+	 * @return 	bool								True if the invoice is in the e-invoicing scope
+	 */
+	public function mustManageEInvoice($object)
+	{
+		$status = $this->needEInvoiceManagement($object);
+
+		return !empty($status) && !self::isIgnoredStatus($status);
+	}
+
+
+	/**
+	 * Return if a status code keeps the invoice out of the e-invoicing scope.
+	 *
+	 * @param 	int|string				$status		Status code, a self::STATUS_* value
+	 * @return 	bool								True if the invoice must never be e-invoiced
+	 */
+	public static function isIgnoredStatus($status)
+	{
+		return in_array((int) $status, self::STATUS_IGNORE_CODES, true);
 	}
 
 

@@ -16,8 +16,9 @@ company without a professional id is still blocked, option or not.
 The same invoices could also reach that pre-check through the other end: needEInvoiceManagement()
 answers with a status code, and the two codes meaning "out of scope" (98 and 99) are truthy, so the
 callers that only tested its answer for truth treated an ignored invoice as one to e-invoice. They
-now compare against the codes, which also removes the generation button from an invoice explicitly
-excluded from e-invoicing.
+now ask the boolean question instead - mustManageEInvoice() for an invoice, isIgnoredStatus() for a
+stored status - both reading a single list of the codes that keep an invoice out of the scope. This
+also removes the generation button from an invoice explicitly excluded from e-invoicing.
 
 FIX: The Factur-X files the module produces are now valid PDF/A-3, which they had never been - and a
 Factur-X file that is not a PDF/A-3 file is not a conformant Factur-X, whatever its XML says (veraPDF
