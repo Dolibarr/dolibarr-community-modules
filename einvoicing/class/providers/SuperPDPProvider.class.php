@@ -898,9 +898,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 						$msg .= ' <b>'.$langs->trans('RemoteInfoPeppolPAMismatchRequestPortability', 'SuperPDP').'</b>';
 					}
 					$lines[] = $msg;
-				}
 
-				$directory['ppf_error'] = true;
+					$directory['ppf_error'] = true;
+				}
 			}
 		}
 
