@@ -359,6 +359,20 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	}
 
 	/**
+	 * Retrieve and format remote account/company information from the provider and peppol directory, if available,
+	 * For display to the user.
+	 *
+	 * @return array{status_code:int,message:string}
+	 */
+	public function getRemoteInfo()
+	{
+		return array(
+			'status_code' => -1,
+			'message' => 'Not yet implemented',
+		);
+	}
+
+	/**
 	 * Validate an electronic invoice file using the Esalink validation service.
 	 *
 	 * @param 	int 	$idinvoice 	ID of the invoice to check
