@@ -3242,7 +3242,7 @@ class EInvoicing
 	 * France only (iso6523 scheme '0225'): the module does not officially support other countries yet.
 	 *
 	 * @param 	string 	$siren 		French SIREN (9 digits)
-	 * @return 	array|null 			Array with keys 'exists' (bool), 'pa_hostname' (string|null), and 'pa_label' (string|null) if the SIREN is found on Peppol, or null if the lookup failed or the SIREN is empty/invalid
+	 * @return 	array{exists: bool, pa_hostname: string|null, pa_label: string|null}|null	Lookup result, or null if the lookup failed or the SIREN is empty/invalid
 	 */
 	public function getPeppolAccessPointBySiren($siren)
 	{
