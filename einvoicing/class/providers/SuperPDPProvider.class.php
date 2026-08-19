@@ -892,13 +892,15 @@ class SuperPDPProvider extends AbstractPDPProvider
 				$lines[] = $langs->trans('RemoteInfoPeppolPAUnknown');
 			} else {
 				$lines[] = $langs->trans('RemoteInfoPeppolPAMismatch', $detectedPA);
-				if (strcasecmp($detectedPA, 'SuperPDP') !== 0) {
+				if (strcasecmp($detectedPA, 'SuperPDP') !== 0) {	// If not SuperPDP, show a warning
 					$msg = $langs->trans('RemoteInfoPeppolPAMismatchCheck', $detectedPA);
 					if (!empty($directory['ppf_identifier'])) {
-						$msg .= ' '.$langs->trans('RemoteInfoPeppolPAMismatchRequestPortability', 'SuperPDP');
+						$msg .= ' <b>'.$langs->trans('RemoteInfoPeppolPAMismatchRequestPortability', 'SuperPDP').'</b>';
 					}
 					$lines[] = $msg;
 				}
+
+				$directory['ppf_error'] = true;
 			}
 		}
 
