@@ -72,8 +72,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			'prod_afnor_directory_url' => 'https://hubtimize.fr/api/orchestrator/v1/',
 			'test_afnor_directory_url' => 'https://ppd.hubtimize.fr/api/orchestrator/v1/',
 			'username' => getDolGlobalString('EINVOICING_ESALINK_USERNAME'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '')),
-			'password' => getDolGlobalString('EINVOICING_ESALINK_PASSWORD'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '')),
-			'api_key'  => getDolGlobalString('EINVOICING_ESALINK_API_KEY'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '')),
+			'password' => self::getCredentialConstValue('EINVOICING_ESALINK_', 'PASSWORD'),
+			'api_key'  => self::getCredentialConstValue('EINVOICING_ESALINK_', 'API_KEY'),
 			'dol_prefix' => 'EINVOICING_ESALINK',
 			'has_validator' => 0,
 			'live' => getDolGlobalInt('EINVOICING_LIVE', 0)
@@ -163,7 +163,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$item->cssClass = 'minwidth500';
 
 		// Client secret
-		$item = $formSetup->newItem($prefix . 'PASSWORD'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''));
+		$item = $formSetup->newItem(self::getCredentialConstName($prefix, 'PASSWORD'));
 		if (method_exists('FormSetupItem', 'setAsGenericPassword')) {
 			$item->setAsGenericPassword();
 		} else {
@@ -176,12 +176,12 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$item->cssClass = 'minwidth500';
 
 		// API_KEY
-		$item = $formSetup->newItem($prefix . 'API_KEY'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''));
+		$item = $formSetup->newItem(self::getCredentialConstName($prefix, 'API_KEY'));
 		$item->nameText = $langs->transnoentities('EINVOICING_API_KEY');
 		$item->cssClass = 'minwidth500';
 
 		// Token
-		if (getDolGlobalString($prefix . 'API_KEY'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''))) {
+		if (self::getCredentialConstValue($prefix, 'API_KEY')) {
 			$texttoshow = $langs->trans('ConnectTo').' ('.$langs->trans('generateAccessToken').')';
 			$urltogeneratetoken = $_SERVER["PHP_SELF"] . "?action=set" . $prefix . "TOKEN&token=" . newToken();
 
