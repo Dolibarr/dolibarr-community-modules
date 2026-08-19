@@ -268,7 +268,9 @@ if ($prefix && preg_match('/call'.$prefix.'HEALTHCHECK/i', $action, $reg)) {
 // Action show remote info
 if ($prefix && preg_match('/call'.$prefix.'REMOTEINFO/i', $action, $reg)) {
 	$remoteInfo = $provider->getRemoteInfo();
-	setEventMessages($remoteInfo['message'], null, ($remoteInfo['status_code'] == 200 ? 'mesgs' : 'warnings'));
+	//$style = ($remoteInfo['status_code'] == 200 ? 'warnings' : 'errors');
+	$style = 'warnings';	// We always use warnings because we need message to be persistent (too long to read).
+	setEventMessages($remoteInfo['message'], null, $style);
 }
 
 // Generate a sample invoice and try to send it
