@@ -63,9 +63,10 @@ class EInvoicing
 
 	public const STATUS_NOT_GENERATED       = 5;		// To generate then to sync
 	public const STATUS_GENERATED           = 10;		// To sync
-	public const STATUS_AWAITING_VALIDATION = 15;		// Einvoice received but not yet analyzed by your AP
-	public const STATUS_AWAITING_ACK        = 20;		// Einvoice received and analyzed by your AP. Next step happen when doing sync.
-	public const STATUS_ERROR               = 25;
+	public const STATUS_AWAITING_VALIDATION = 15;		// Einvoice sent to your AP, but not yet analyzed by your AP
+	public const STATUS_AWAITING_ACK        = 20;		// Einvoice sent to your AP. next step happen when doing sync.
+
+	public const STATUS_ERROR               = 25;		// Unknown error, should not happe
 
 	public const STATUS_IGNORE_2            = 98;		// Never sync (for another reason than ereporting, not used yet)
 	public const STATUS_IGNORE              = 99;		// Never sync (will be processed by ereporting)
@@ -201,16 +202,18 @@ class EInvoicing
 		self::STATUS_IGNORE              => 'EInvStatusDoNotSync',		// To exclude invoice from einvoice sync (ereporting)
 		//self::STATUS_IGNORE_2            => 'EInvStatusDoNotSync2',		// To exclude invoice from einvoice sync (for other reason, not used yet)
 		self::STATUS_NOT_GENERATED       => 'EInvStatusNotGenerated',
-		self::STATUS_ERROR               => 'EInvStatusError',			// Error in generation by Dolibarr
 		self::STATUS_GENERATED           => 'EInvStatusGenerated',
 		self::STATUS_AWAITING_VALIDATION => 'EInvStatusAwaitingValidation',
 		self::STATUS_AWAITING_ACK        => 'EInvStatusAwaitingAck',
 
 		// PDP / PA
-		self::STATUS_DEPOSITED           => 'EInvStatus200Deposited',
-		self::STATUS_ISSUED              => 'EInvStatus201Issued',
+		self::STATUS_DEPOSITED           => 'EInvStatus200Deposited',				// Accepted by seller AP
+		self::STATUS_REJECTED            => 'EInvStatus213Rejected',				// Rejected by seller AP
+
+		self::STATUS_ISSUED              => 'EInvStatus201Issued',					// Issued by seller AP to customer AP
 		self::STATUS_RECEIVED            => 'EInvStatus202Received',
-		self::STATUS_AVAILABLE           => 'EInvStatus203Available',
+		self::STATUS_AVAILABLE           => 'EInvStatus203Available',				// Available to customer
+		self::STATUS_REFUSED             => 'EInvStatus210Refused',					// Refused by customer
 		self::STATUS_TAKEN_OVER          => 'EInvStatus204TakenOver',
 		self::STATUS_APPROVED            => 'EInvStatus205Approved',
 		self::STATUS_PARTIALLY_APPROVED  => 'EInvStatus206PartiallyApproved',
@@ -218,9 +221,9 @@ class EInvoicing
 		self::STATUS_SUSPENDED           => 'EInvStatus208Suspended',
 		self::STATUS_COMPLETED           => 'EInvStatus209Completed',
 		self::STATUS_PAYMENT_SENT        => 'EInvStatus211PaymentTransmitted',
-		self::STATUS_PAID                => 'EInvStatus212Paid',
-		self::STATUS_REFUSED             => 'EInvStatus210Refused',
-		self::STATUS_REJECTED            => 'EInvStatus213Rejected',
+		self::STATUS_PAID                => 'EInvStatus212PaymentReceived',
+
+		self::STATUS_ERROR               => 'EInvStatusError',			// Error in generation by Dolibarr
 	];
 
 
@@ -664,8 +667,11 @@ class EInvoicing
 	 */
 	public function getEinvoiceStatusOptions($includeCodesInLabel = 0, $onlyPdpStatuses = 0, $onlySendable = 0, $onlyCreate = 0, $onlyOut = 0, $disableUnknownStatus = 1, $addseparator = 0)
 	{
-		global $langs;
+		global $langs, $mysoc;
+
 		$options = [];
+
+		// Add separators
 		foreach (self::STATUS_LABEL_KEYS as $code => $labelKey) {
 			if ($code == self::STATUS_GENERATED && $addseparator) {
 				$options['separator1'] = array('label' => '--------------------', 'disabled' => 1);
@@ -677,8 +683,12 @@ class EInvoicing
 			}
 			$options[$code] = $value;
 
-			if ($code == self::STATUS_PAID && $addseparator) {
+			if ($code == self::STATUS_AWAITING_ACK && $addseparator) {
 				$options['separator2'] = array('label' => '--------------------', 'disabled' => 1);
+			}
+
+			if ($code == self::STATUS_PAID && $addseparator) {
+				$options['separator3'] = array('label' => '--------------------', 'disabled' => 1);
 			}
 		}
 
@@ -732,7 +742,27 @@ class EInvoicing
 			unset($options[self::STATUS_REFUSED]);
 		}
 
-		// TODO : remove statuses that cannot be chronologically be sent (for example, it doesn't make sense to send "Taken over" if invoice is refused), PDP may accept them and ignore them without returning an error.
+		// TODO : remove statuses that cannot be chronologically be sent (for example, it doesn't make sense to send "Taken over" if invoice is refused), AP may accept them and ignore them without returning an error.
+
+		// Convert array into array for combo list
+		foreach ($options as $key => $val) {
+			if (! is_array($val)) {
+				$options[$key] = array('label' => $val, 'data-html' => $val);
+			}
+		}
+
+		// Complete label if using an AP in France
+		if ($mysoc->country_code == 'FR') {
+			$mandatorystatus = array(200, 210, 212, 213);
+			foreach ($options as $key => $val) {
+				if ($key >= 200 && $key < 300) {
+					$options[$key]['data-html'] .= (in_array($key, $mandatorystatus) ? '  <span class="small opacitymedium">('.$key.' - '.$langs->trans("Mandatory").')</span>' : '  <span class="small opacitymedium">('.$key.')</span>');
+				}
+			}
+		}
+
+		// TODO
+		// Make some status disabled by setting 'disabled
 
 
 		return $options;
