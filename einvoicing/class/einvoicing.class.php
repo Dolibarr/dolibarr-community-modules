@@ -3236,6 +3236,62 @@ class EInvoicing
 	}
 
 	/**
+	 * Look up the Peppol Directory (via the public Peppol Lookup API, https://api-lookup.peppol.org/lookup)
+	 * to determine which Access Point (PA) currently serves a given French SIREN on the Peppol network.
+	 *
+	 * France only (iso6523 scheme '0225'): the module does not officially support other countries yet.
+	 *
+	 * @param 	string 	$siren 		French SIREN (9 digits)
+	 * @return 	array|null 			Array with keys 'exists' (bool), 'pa_hostname' (string|null), and 'pa_label' (string|null) if the SIREN is found on Peppol, or null if the lookup failed or the SIREN is empty/invalid
+	 */
+	public function getPeppolAccessPointBySiren($siren)
+	{
+		$siren = $this->removeSpaces((string) $siren);
+		if (empty($siren)) {
+			return null;
+		}
+
+		$response = getURLContent(
+			'https://api-lookup.peppol.org/lookup',
+			'POST',
+			json_encode(array('identifier' => 'iso6523-actorid-upis::0225:' . $siren)),
+			1,
+			array('Content-Type: application/json'),
+			array('http', 'https'),
+			0,
+			-1,
+			0,
+			0,
+			array(),
+			'_einvoicing'
+		);
+
+		if (($response['http_code'] ?? 0) !== 200 || empty($response['content'])) {
+			dol_syslog(__METHOD__ . ' Peppol lookup API unreachable (HTTP ' . ($response['http_code'] ?? 'N/A') . ')', LOG_WARNING);
+			return null;
+		}
+
+		$data = json_decode($response['content'], true);
+		if (!is_array($data) || empty($data['exists'])) {
+			return array('exists' => false, 'pa_hostname' => null, 'pa_label' => null);
+		}
+
+		// Known Peppol SMP hostnames mapped to a human-readable Access Point name. Unknown hostnames are shown as-is: complete this map as new Access Points are identified.
+		$paHostnameMap = array(
+			'api.superpdp.tech' => 'SuperPDP',
+			'smp.pennylane.com' => 'Pennylane',
+		);
+
+		$hostname = parse_url((string) ($data['smpUrl'] ?? ''), PHP_URL_HOST) ?: null;
+
+		return array(
+			'exists' => true,
+			'pa_hostname' => $hostname,
+			'pa_label' => $hostname !== null ? ($paHostnameMap[$hostname] ?? $hostname) : null,
+		);
+	}
+
+	/**
 	 * Get buyer communication URI
 	 *
 	 * @param  Societe 		$thirdparty		Third party

@@ -836,7 +836,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 */
 	public function getRemoteInfo()
 	{
-		global $langs;
+		global $langs, $mysoc;
 
 		$session = $this->getRemoteSessionInfo();
 		$directory = $this->checkDirectoryStatus();
@@ -856,6 +856,22 @@ class SuperPDPProvider extends AbstractPDPProvider
 			$lines[] = $langs->trans('RemoteInfoPPFDetection', $paName) . ($directory['ppf_status'] !== null ? ' - ' . $langs->trans('RemoteInfoPPFStatusDetail', $directory['ppf_status'], $directory['ppf_message'] ?? '') : '');
 		} else {
 			$lines[] = $langs->trans('RemoteInfoDirectoryError') . ' (HTTP ' . ($directory['status_code'] ?? 'N/A') . ')';
+		}
+
+		// Show registered PA for your company (Peppol directory)
+		$tokenData = $this->getTokenData();
+		if (!empty($tokenData['token']) && !empty($mysoc->country_code) && $mysoc->country_code === 'FR' && !empty($mysoc->idprof1)) {
+			$peppolPA = (new EInvoicing($this->db))->getPeppolAccessPointBySiren($mysoc->idprof1);
+			$detectedPA = (!empty($peppolPA['exists']) && !empty($peppolPA['pa_label'])) ? $peppolPA['pa_label'] : '';
+
+			if (empty($detectedPA)) {
+				$lines[] = $langs->trans('RemoteInfoPeppolPAUnknown');
+			} else {
+				$lines[] = $langs->trans('RemoteInfoPeppolPAMismatch', $detectedPA);
+				if (strcasecmp($detectedPA, 'SuperPDP') !== 0) {
+					$lines[] = $langs->trans('RemoteInfoPeppolPAMismatchCheck', $detectedPA);
+				}
+			}
 		}
 
 		return array(
