@@ -2,6 +2,19 @@
 
 ## 1.0.4
 
+FIX: The production credentials of an Access Point are no longer stored in clear text in llx_const
+(issue #599). A module does not choose whether one of its settings is encrypted - dolibarr_set_const()
+decides alone, by matching the END of the constant name against a list of sensitive keywords - and the
+production names ended with the environment marker (EINVOICING_SUPERPDP_CLIENT_SECRET_PROD), which hid
+the keyword from that test. The sandbox secret was encrypted, the production one entered on the very
+same screen was written as typed, on every Dolibarr from 17 to 24. The marker now comes before the
+credential (EINVOICING_SUPERPDP_PROD_CLIENT_SECRET), a name the core does encrypt, and the same applies
+to the Esalink password and API key and to the TestPDP API key, which the fix released in Dolibarr 24
+does not cover either. Enabling the module moves the existing values to the new names and deletes the
+clear text rows; until it is enabled again the old names are still read, so an installation keeps
+working in between. Administrators should rotate the secret at their Access Point: it has already been
+written in clear and is therefore in every database dump taken since.
+
 FIX: The Factur-X files the module produces are now valid PDF/A-3, which they had never been - and a
 Factur-X file that is not a PDF/A-3 file is not a conformant Factur-X, whatever its XML says (veraPDF
 1.30.2 rejected every one of them, on Dolibarr 17 to 24 alike). The cause that belongs to the module is

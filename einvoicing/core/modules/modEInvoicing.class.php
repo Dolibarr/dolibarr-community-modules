@@ -583,6 +583,11 @@ class modEInvoicing extends DolibarrModules
 			return -1; // Do not activate module if error 'not allowed' returned when loading module SQL queries (the _load_table run sql with run_sql with the error allowed parameter set to 'default')
 		}
 
+		// Move the production credentials to a constant name Dolibarr encrypts (issue #599)
+		if ($this->migrateCredentialConstNames() < 0) {
+			return -1;
+		}
+
 		// Create extrafields during init
 		include_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
 		$extrafields = new ExtraFields($this->db);
@@ -794,6 +799,97 @@ class modEInvoicing extends DolibarrModules
 		}
 
 		return $this->_init($sql, $options);
+	}
+
+	/**
+	 *	Save the production credentials again under a constant name that Dolibarr encrypts, and drop
+	 *	the clear text copy (issue #599).
+	 *
+	 *	A module never decides whether one of its settings is encrypted: dolibarr_set_const()
+	 *	(core/lib/admin.lib.php) decides alone, and it decides on the END of the constant name. The
+	 *	historical names put the environment marker last (EINVOICING_SUPERPDP_CLIENT_SECRET_PROD),
+	 *	which hides the keyword the core looks for, so every production credential was written to
+	 *	llx_const in clear text - on every Dolibarr from 17 to 24. The names below put the marker
+	 *	before the credential instead, which the core does encrypt.
+	 *
+	 *	This cannot be one of the sql/ files: encrypting needs dolEncrypt(), whose key lives in
+	 *	conf.php and is out of reach of plain SQL, and _load_tables() only runs the files of that
+	 *	directory whose name starts with 'llx_' anyway. So it runs from init(), that is when the
+	 *	module is enabled.
+	 *
+	 *	Note for administrators: the secret has already been written in clear, so it is in every
+	 *	database dump taken since. Rotating it at the Access Point is the only thing that closes that
+	 *	exposure; storing it encrypted from now on does not.
+	 *
+	 *	@return	int		Number of constants migrated, -1 if error
+	 */
+	public function migrateCredentialConstNames()
+	{
+		require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
+
+		// The credentials the setup page saves per environment, old name => new name. Only the
+		// production ones are listed: a sandbox name already ends with a keyword the core encrypts.
+		$credentials = array(
+			'EINVOICING_SUPERPDP_CLIENT_SECRET_PROD' => 'EINVOICING_SUPERPDP_PROD_CLIENT_SECRET',
+			'EINVOICING_SUPERPDPVIAPARTNER_CLIENT_SECRET_PROD' => 'EINVOICING_SUPERPDPVIAPARTNER_PROD_CLIENT_SECRET',
+			'EINVOICING_ESALINK_PASSWORD_PROD' => 'EINVOICING_ESALINK_PROD_PASSWORD',
+			'EINVOICING_ESALINK_API_KEY_PROD' => 'EINVOICING_ESALINK_PROD_API_KEY',
+			'EINVOICING_TESTPDP_API_KEY_PROD' => 'EINVOICING_TESTPDP_PROD_API_KEY',
+		);
+
+		$nbmigrated = 0;
+
+		foreach ($credentials as $oldname => $newname) {
+			// A constant belongs to an entity and the module is enabled entity by entity, but the clear
+			// text value has to go whatever entity holds it, so read them all.
+			$sql = "SELECT value, entity FROM ".MAIN_DB_PREFIX."const WHERE name = ".$this->db->encrypt($oldname);
+			$resql = $this->db->query($sql);
+			if (!$resql) {
+				$this->error = $this->db->lasterror();
+				return -1;
+			}
+
+			$rows = array();
+			while ($obj = $this->db->fetch_object($resql)) {
+				// The value is expected to be in clear - that is the bug - but dolDecrypt() returns a
+				// chain it does not recognise untouched, so an already encrypted one is handled too.
+				$rows[] = array('value' => dolDecrypt($obj->value), 'entity' => (int) $obj->entity);
+			}
+			$this->db->free($resql);
+
+			foreach ($rows as $row) {
+				// Never overwrite a credential already saved under the new name.
+				$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."const WHERE name = ".$this->db->encrypt($newname);
+				$sql .= " AND entity = ".$row['entity'];
+				$resql = $this->db->query($sql);
+				if (!$resql) {
+					$this->error = $this->db->lasterror();
+					return -1;
+				}
+				$alreadymigrated = ($this->db->num_rows($resql) > 0);
+				$this->db->free($resql);
+
+				if (!$alreadymigrated && $row['value'] !== '') {
+					if (dolibarr_set_const($this->db, $newname, $row['value'], 'chaine', 0, '', $row['entity']) < 0) {
+						$this->error = $this->db->lasterror();
+						return -1;
+					}
+					$nbmigrated++;
+				}
+
+				// Drop the clear text copy: getting rid of it is the whole point of this migration.
+				if (dolibarr_del_const($this->db, $oldname, $row['entity']) < 0) {
+					$this->error = $this->db->lasterror();
+					return -1;
+				}
+			}
+		}
+
+		if ($nbmigrated > 0) {
+			dol_syslog(get_class($this)."::migrateCredentialConstNames ".$nbmigrated." credential(s) moved to an encrypted constant name, see issue #599", LOG_WARNING);
+		}
+
+		return $nbmigrated;
 	}
 
 	/**

@@ -74,7 +74,7 @@ class TestPDPProvider extends AbstractPDPProvider
 			'prod_api_url' => 'https://example.com/api/v1/',
 			'test_auth_url' => 'https://sandbox.example.com/api/v1/',
 			'test_api_url' => 'https://sandbox.example.com/api/v1/',
-			'api_key' => getDolGlobalString('EINVOICING_TESTPDP_API_KEY'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '')),
+			'api_key' => self::getCredentialConstValue('EINVOICING_TESTPDP_', 'API_KEY'),
 			'dol_prefix' => 'EINVOICING_TESTPDP',
 			'has_validator' => 0,
 			'live' => getDolGlobalInt('EINVOICING_LIVE', 0),
@@ -134,7 +134,7 @@ class TestPDPProvider extends AbstractPDPProvider
 		// Credentials. The '_PROD' suffix keeps the production credentials apart from the test ones, so
 		// switching EINVOICING_LIVE does not make the module talk to a platform with the wrong keys.
 		/*
-		$item = $formSetup->newItem($prefix.'API_KEY'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''));
+		$item = $formSetup->newItem(self::getCredentialConstName($prefix, 'API_KEY'));
 		$item->nameText = $langs->transnoentities('EINVOICING_API_KEY');
 		$item->cssClass = 'minwidth500';
 		*/
