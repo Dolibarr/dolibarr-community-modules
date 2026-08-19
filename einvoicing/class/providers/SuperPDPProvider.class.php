@@ -894,8 +894,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 				$lines[] = $langs->trans('RemoteInfoPeppolPAMismatch', $detectedPA);
 				if (strcasecmp($detectedPA, 'SuperPDP') !== 0) {
 					$msg = $langs->trans('RemoteInfoPeppolPAMismatchCheck', $detectedPA);
-					if (empty($directory['ppf_identifier'])) {
-						$msg .= ' '.$langs->trans('RemoteInfoPeppolPAMismatchRequestPortability', $detectedPA);
+					if (!empty($directory['ppf_identifier'])) {
+						$msg .= ' '.$langs->trans('RemoteInfoPeppolPAMismatchRequestPortability', 'SuperPDP');
 					}
 					$lines[] = $msg;
 				}
