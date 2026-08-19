@@ -845,8 +845,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 		$lines = array();
 		if ($session['status_code'] == 200 && is_array($session['response'])) {
-			$lines[] = $langs->trans('RemoteInfoCompanyVerification', $this->formatKycStatus($session['response']['company_verification_status'] ?? null));
-			$lines[] = $langs->trans('RemoteInfoUserVerification', $this->formatKycStatus($session['response']['user_identity_verification_status'] ?? null));
+			$lines[] = $langs->trans('RemoteInfoCompanyVerification', $this->name, $this->formatKycStatus($session['response']['company_verification_status'] ?? null));
+			$lines[] = $langs->trans('RemoteInfoUserVerification', $this->name, $this->formatKycStatus($session['response']['user_identity_verification_status'] ?? null));
 		} else {
 			$lines[] = $langs->trans('RemoteInfoSessionError') . ' (HTTP ' . ($session['status_code'] ?? 'N/A') . ')';
 		}
