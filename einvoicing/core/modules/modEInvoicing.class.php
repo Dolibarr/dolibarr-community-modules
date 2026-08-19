@@ -860,7 +860,7 @@ class modEInvoicing extends DolibarrModules
 			foreach ($rows as $row) {
 				// Never overwrite a credential already saved under the new name.
 				$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."const WHERE name = ".$this->db->encrypt($newname);
-				$sql .= " AND entity = ".$row['entity'];
+				$sql .= " AND entity = ".((int) $row['entity']);
 				$resql = $this->db->query($sql);
 				if (!$resql) {
 					$this->error = $this->db->lasterror();
