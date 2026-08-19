@@ -42,6 +42,16 @@ PDF/A, and ISO 19005-3 requires every font used for rendering to be embedded. Ge
 in Factur-X while "PDF documents format" is not PDF/A-3b now warns, on the setup page of the module and
 on the invoice, that the recommended format is CII - which needs no PDF at all - and that keeping
 Factur-X means setting PDF/A-3b for the whole Dolibarr, in Home - Setup - PDF.
+NEW: A credit note received for an invoice that was refused can no longer be accepted. Refusing a
+received invoice cancels it - it owes nothing any more - and the vendor answers by issuing the credit
+note that closes the matter on its side. Accepting that credit note would acknowledge the reversal of a
+debt that never entered the accounts, and would leave the exchange saying two contradictory things about
+the same operation. So "Approved" and "Partially approved" are no longer offered on it, validating it no
+longer answers its vendor with "Approved" either, and the card says which refused invoice it credits;
+refusing it stays available, as do the statuses that settle nothing, like "Disputed" or "Suspended". A
+replacement invoice is deliberately left alone: it is the corrected invoice a vendor sends after a
+refusal, which is precisely what one has to be able to accept. A refusal the platform has not confirmed
+yet changes nothing either, since it can still be rejected (issue #594).
 
 NEW: Validating a supplier invoice received through the platform now answers its vendor with the
 "Approved" (205) status, instead of waiting for someone to remember the button on the invoice card.
