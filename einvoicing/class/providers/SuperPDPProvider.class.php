@@ -789,19 +789,19 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$entries = is_array($result['response']) ? ($result['response']['data'] ?? []) : [];
 		$ppfEntry = null;
 
-		$listofenties = '';
+		$listofentries = '';
 		foreach ($entries as $entry) {
 			if (($entry['directory'] ?? null) === 'ppf') {		// Entry in PPF directory, not a peppol directory entry
 				if (is_null($ppfEntry)) {
 					$ppfEntry = $entry;		// We take the first one
 				}
-				if (!empty($listofenties)) {
-					$listofenties .= "<br>\n";
-					$listofenties .= $entry['identifier'] ?? 'No identifier';
-					$listofenties .= '-' . ($entry['company']['formal_name'] ?? 'No formal name');
-					$listofenties .= '-' . ($ppfEntry['effective_date'] ?? '');
-					$listofenties .= '-' . ($ppfEntry['status'] ?? '');
+				if (!empty($listofentries)) {
+					$listofentries .= "<br>\n";
 				}
+				$listofentries .= $entry['identifier'] ?? 'No identifier';
+				$listofentries .= '-' . ($entry['company']['formal_name'] ?? 'No formal name');
+				$listofentries .= '-' . ($ppfEntry['effective_date'] ?? '');
+				$listofentries .= '-' . ($ppfEntry['status'] ?? '');
 			}
 		}
 
@@ -810,7 +810,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$result['ppf_effective_date'] = $ppfEntry['effective_date'] ?? '';
 		$result['ppf_message'] = $ppfEntry['status_message'] ?? '';
 
-		$result['listof_ppf_entries'] = $listofenties;
+		$result['listof_ppf_entries'] = $listofentries;
 		$result['ppf_error'] = ($result['ppf_status'] === 'error');
 
 		return $result;
