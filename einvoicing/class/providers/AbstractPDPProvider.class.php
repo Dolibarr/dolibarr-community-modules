@@ -378,49 +378,6 @@ abstract class AbstractPDPProvider
 
 
 	/**
-	 * Name of the constant holding a credential of this provider for the environment in use.
-	 *
-	 * Dolibarr never lets a module decide whether a setting is encrypted: dolibarr_set_const()
-	 * (core/lib/admin.lib.php) does it alone, by matching the END of the constant name against a
-	 * list of sensitive keywords (_SECRET, _PASSWORD, _KEY, ...). Appending the environment marker
-	 * after the credential, as 'EINVOICING_SUPERPDP_CLIENT_SECRET_PROD' did, pushes that keyword
-	 * out of the end of the name, and the production credential is then written to llx_const in
-	 * clear text - it lands in every database dump and staging copy made from it (issue #599).
-	 * So the marker is inserted before the credential instead, which is also the layout
-	 * saveOAuthTokenDB() already uses for the token constants.
-	 *
-	 * @param  string $prefix	Constant prefix of the provider, '_' included (eg 'EINVOICING_SUPERPDP_')
-	 * @param  string $name		Name of the credential (eg 'CLIENT_SECRET')
-	 * @return string			Name of the constant to read from and to save to
-	 */
-	public static function getCredentialConstName($prefix, $name)
-	{
-		return $prefix.(getDolGlobalInt('EINVOICING_LIVE') ? 'PROD_' : '').$name;
-	}
-
-	/**
-	 * Value of a credential of this provider for the environment in use.
-	 *
-	 * Falls back on the name used before issue #599 so that an installation whose files have been
-	 * updated keeps working until the module is disabled and enabled again, which is what renames
-	 * the constants (see modEInvoicing::migrateCredentialConstNames()).
-	 *
-	 * @param  string $prefix	Constant prefix of the provider, '_' included (eg 'EINVOICING_SUPERPDP_')
-	 * @param  string $name		Name of the credential (eg 'CLIENT_SECRET')
-	 * @return string			Value of the credential, '' if not set
-	 */
-	public static function getCredentialConstValue($prefix, $name)
-	{
-		$value = getDolGlobalString(self::getCredentialConstName($prefix, $name));
-		if ($value === '' && getDolGlobalInt('EINVOICING_LIVE')) {
-			$value = getDolGlobalString($prefix.$name.'_PROD');
-		}
-
-		return $value;
-	}
-
-
-	/**
 	 * Try to get a flow data from its id and doc type, using API
 	 *
 	 * @param string	$flowId 		The id of the flow

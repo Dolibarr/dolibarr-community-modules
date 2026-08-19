@@ -85,7 +85,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 			'prod_afnor_directory_url' => 'https://api.superpdp.tech/afnor-directory/',
 			'test_afnor_directory_url' => 'https://api.superpdp.tech/afnor-directory/',
 			'client_id'     => getDolGlobalString('EINVOICING_SUPERPDP_CLIENT_ID'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '')),
-			'client_secret' => self::getCredentialConstValue('EINVOICING_SUPERPDP_', 'CLIENT_SECRET'),
+			'client_secret' => getDolGlobalString('EINVOICING_SUPERPDP_CLIENT_SECRET'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '')),
 			'dol_prefix'    => getDolGlobalString('EINVOICING_PDP') == 'SUPERPDPViaPartner' ? 'EINVOICING_SUPERPDPVIAPARTNER' : 'EINVOICING_SUPERPDP',
 			'has_validator' => 1,
 			'live' => getDolGlobalInt('EINVOICING_LIVE', 0)
@@ -290,7 +290,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 			$item->cssClass = 'minwidth500';
 
 			// Password
-			$item = $formSetup->newItem(self::getCredentialConstName($prefix, 'CLIENT_SECRET'));
+			$item = $formSetup->newItem($prefix.'CLIENT_SECRET'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''));
 			if (method_exists('FormSetupItem', 'setAsGenericPassword')) {
 				$item->setAsGenericPassword();
 			} else {
@@ -379,7 +379,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 						}
 					}
 					$urltogeneratetoken .= '?' . http_build_query($query);
-				} elseif (getDolGlobalString($prefix . 'CLIENT_ID'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '')) && self::getCredentialConstValue($prefix, 'CLIENT_SECRET')) {
+				} elseif (getDolGlobalString($prefix . 'CLIENT_ID'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '')) && getDolGlobalString($prefix . 'CLIENT_SECRET'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''))) {
 					if (getDolGlobalString($prefix . 'GRANT_TYPE') == 'authorization_code') {
 						// OAuth 2.1 Authorization Code: redirect the user to SuperPDP's authorize endpoint.
 						$texttoshow = $langs->trans('ConnectTo').' ('.$langs->trans('EINVOICING_SUPERPDP_GRANT_AUTHORIZATION_CODE').')';
