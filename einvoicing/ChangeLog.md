@@ -15,6 +15,31 @@ clear text rows; until it is enabled again the old names are still read, so an i
 working in between. Administrators should rotate the secret at their Access Point: it has already been
 written in clear and is therefore in every database dump taken since.
 
+FIX: A third party recognised as a private individual is no longer reported as misconfigured when
+EINVOICING_SKIP_B2C is on (issue #600). The option already kept B2C invoices out of the e-invoicing
+scope - needEInvoiceManagement() answers "do not manage" on them, since B2C is reported by e-reporting
+and not transmitted as an e-invoice - but the pre-check of the third party knew nothing about it and
+still demanded a professional id, an identifier a private individual has no reason to own. Generating
+or sending such an invoice failed on "The customer has no professional id (SIREN)", and the invoice
+could be refused altogether where EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS is set. The pre-check
+now reads the same Societe::isACompany() as the decision does, so both ends of the chain agree on who
+is B2C, and neither the professional id nor the routing id is required of a private individual. A
+company without a professional id is still blocked, option or not.
+The same invoices could also reach that pre-check through the other end: needEInvoiceManagement()
+answers with a status code, and the two codes meaning "out of scope" (98 and 99) are truthy, so the
+callers that only tested its answer for truth treated an ignored invoice as one to e-invoice. They
+now ask the boolean question instead - mustManageEInvoice() for an invoice, isIgnoredStatus() for a
+stored status - both reading a single list of the codes that keep an invoice out of the scope. This
+also removes the generation button from an invoice explicitly excluded from e-invoicing.
+
+FIX: The supplier invoice list no longer fails on a MySQL server that keeps its default sql_mode. The
+columns the module adds to the SELECT of that list were never added to its GROUP BY, so MySQL refused the
+whole query with error 1055 (only_full_group_by) and the page reported a technical error instead of showing
+the list. MariaDB, whose default sql_mode does not include ONLY_FULL_GROUP_BY, accepted the same query,
+which is why the fault went unnoticed. The printFieldListGroupBy hook the core calls right after building
+its own GROUP BY - where it adds its extrafields for that very reason - is now implemented. Dolibarr 17 to
+21 are concerned; from Dolibarr 22 on the core builds no GROUP BY on that list at all.
+
 FIX: The Factur-X files the module produces are now valid PDF/A-3, which they had never been - and a
 Factur-X file that is not a PDF/A-3 file is not a conformant Factur-X, whatever its XML says (veraPDF
 1.30.2 rejected every one of them, on Dolibarr 17 to 24 alike). The cause that belongs to the module is
@@ -30,6 +55,16 @@ PDF/A, and ISO 19005-3 requires every font used for rendering to be embedded. Ge
 in Factur-X while "PDF documents format" is not PDF/A-3b now warns, on the setup page of the module and
 on the invoice, that the recommended format is CII - which needs no PDF at all - and that keeping
 Factur-X means setting PDF/A-3b for the whole Dolibarr, in Home - Setup - PDF.
+NEW: A credit note received for an invoice that was refused can no longer be accepted. Refusing a
+received invoice cancels it - it owes nothing any more - and the vendor answers by issuing the credit
+note that closes the matter on its side. Accepting that credit note would acknowledge the reversal of a
+debt that never entered the accounts, and would leave the exchange saying two contradictory things about
+the same operation. So "Approved" and "Partially approved" are no longer offered on it, validating it no
+longer answers its vendor with "Approved" either, and the card says which refused invoice it credits;
+refusing it stays available, as do the statuses that settle nothing, like "Disputed" or "Suspended". A
+replacement invoice is deliberately left alone: it is the corrected invoice a vendor sends after a
+refusal, which is precisely what one has to be able to accept. A refusal the platform has not confirmed
+yet changes nothing either, since it can still be rejected (issue #594).
 
 NEW: Validating a supplier invoice received through the platform now answers its vendor with the
 "Approved" (205) status, instead of waiting for someone to remember the button on the invoice card.

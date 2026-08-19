@@ -24,7 +24,7 @@
  */
 
 require_once DOL_DOCUMENT_ROOT.'/core/triggers/dolibarrtriggers.class.php';
-dol_include_once('einvoicing/class/helpers/SupplierInvoiceHelper.class.php');
+dol_include_once('einvoicing/class/utils/SupplierInvoiceHelper.class.php');
 // The classes below happen to be already loaded when the action comes from the module screens, but not
 // when a trigger fires from a context that never went through them: cron, CLI, REST API, bank import...
 dol_include_once('einvoicing/class/einvoicing.class.php');
@@ -410,7 +410,9 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 	{
 		$einvoicing = new EInvoicing($this->db);
 
-		if (!$einvoicing->needEInvoiceManagement($invoice)) {
+		// Ask the boolean question: needEInvoiceManagement() answers with a status code whose ignore values
+		// are truthy. An invoice out of the e-invoicing scope has no cash-in to report.
+		if (!$einvoicing->mustManageEInvoice($invoice)) {
 			return;
 		}
 

@@ -143,6 +143,14 @@ abstract class AbstractPDPProvider
 	abstract public function checkHealth();
 
 	/**
+	 * Retrieve and format remote account/company information from the provider and peppol directory, if available,
+	 * For display to the user.
+	 *
+	 * @return array{status_code:int,message:string}
+	 */
+	abstract public function getRemoteInfo();
+
+	/**
 	 * Get the base API URL for provider depending on the mode (authentication or regular API calls).
 	 *
 	 * @param string 	$mode 		'auth', 'api' or 'ap_api'

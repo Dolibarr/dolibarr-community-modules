@@ -265,6 +265,12 @@ if ($prefix && preg_match('/call'.$prefix.'HEALTHCHECK/i', $action, $reg)) {
 	}
 }
 
+// Action show remote info
+if ($prefix && preg_match('/call'.$prefix.'REMOTEINFO/i', $action, $reg)) {
+	$remoteInfo = $provider->getRemoteInfo();
+	setEventMessages($remoteInfo['message'], null, 'warnings');
+}
+
 // Generate a sample invoice and try to send it
 if ($prefix && preg_match('/make'.$prefix.'sampleinvoice/i', $action, $reg)) {
 	$result = $provider->sendSampleInvoice(1);

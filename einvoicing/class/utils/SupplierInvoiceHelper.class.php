@@ -17,7 +17,7 @@
  */
 
 /**
- * \file    einvoicing/class/helpers/SupplierInvoiceHelper.class.php
+ * \file    einvoicing/class/utils/SupplierInvoiceHelper.class.php
  * \ingroup einvoicing
  * \brief   Utility class for supplier invoices.
  * 			This file is mainly used when EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION is set but
@@ -26,7 +26,7 @@
 
 dol_include_once('einvoicing/class/protocols/ProtocolManager.class.php');
 dol_include_once('einvoicing/class/document.class.php');
-dol_include_once('einvoicing/class/helpers/PriceHelper.class.php');
+dol_include_once('einvoicing/class/utils/PriceHelper.class.php');
 dol_include_once('fourn/class/fournisseur.facture.class.php');
 
 /**
@@ -495,6 +495,61 @@ class SupplierInvoiceHelper
 	}
 
 	/**
+	 * Tell whether a received supplier invoice is a credit note correcting an invoice we refused.
+	 *
+	 * Refusing a received invoice cancels it: it owes nothing any more, and the vendor answers by
+	 * issuing the credit note that closes the matter on its side. Accepting that credit note would
+	 * acknowledge the reversal of a debt that never entered our accounts, and would leave the exchange
+	 * saying two contradictory things about the same operation. The credit note follows its invoice:
+	 * refused (issue #594).
+	 *
+	 * Only credit notes. A replacement invoice (BT-3 = 384) also references the document it corrects,
+	 * and there the answer is the opposite one: it is the corrected invoice the vendor sends after a
+	 * refusal, which is exactly what one has to be able to accept.
+	 *
+	 * The lookup is a single query on the invoice rather than a fetch: this runs on every display of a
+	 * received supplier invoice card, and all it needs is the type and the reference to the source.
+	 *
+	 * @param	int		$supplierInvoiceId	Id of the received supplier invoice
+	 * @return	int							Id of the refused source invoice, 0 when the rule does not apply
+	 */
+	public static function refusedSourceOfCreditNote(int $supplierInvoiceId): int
+	{
+		global $db;
+
+		if ($supplierInvoiceId <= 0) {
+			return 0;
+		}
+
+		$sql = "SELECT fk_facture_source FROM " . $db->prefix() . "facture_fourn";
+		$sql .= " WHERE rowid = " . (int) $supplierInvoiceId;
+		$sql .= " AND type = " . (int) FactureFournisseur::TYPE_CREDIT_NOTE;
+		$sql .= " AND fk_facture_source > 0";
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . ' SQL error: ' . $db->lasterror(), LOG_ERR, 0, '_einvoicing');
+			return 0;
+		}
+		$obj = $db->fetch_object($resql);
+		$db->free($resql);
+		if (!$obj) {
+			return 0;
+		}
+
+		$sourceId = (int) $obj->fk_facture_source;
+
+		// Only a refusal the platform confirmed counts: one still pending can still be rejected, and
+		// answering the credit note on the strength of it would commit us to something not yet true.
+		$einvoicing = new EInvoicing($db);
+		if (!$einvoicing->hasSentStatusMessage($sourceId, 'invoice_supplier', EInvoicing::STATUS_REFUSED, 1)) {
+			return 0;
+		}
+
+		return $sourceId;
+	}
+
+	/**
 	 * Close the supplier invoice that a newly validated replacement invoice replaces.
 	 *
 	 * Dolibarr does this on the customer side - Facture::validate() cancels the replaced invoice with
@@ -574,6 +629,8 @@ class SupplierInvoiceHelper
 	 *   - a lifecycle already closed by a 205 or a 210 sent earlier: neither is repeated, and a refusal
 	 *     is not silently turned into an approval by a later validation. Same rule as the card, which
 	 *     stops offering the buttons once one of the two has been sent and confirmed.
+	 *   - a credit note correcting an invoice we refused: it credits an invoice that owes nothing, so
+	 *     validating it in the accounts must not answer its vendor that we accept it (issue #594).
 	 *
 	 * @param	EInvoicing	$einvoicing		Module object, for the lifecycle message lookup
 	 * @param	int			$supplierInvoiceId	Id of the supplier invoice being validated
@@ -595,6 +652,9 @@ class SupplierInvoiceHelper
 			return false;
 		}
 		if ($einvoicing->hasSentStatusMessage($supplierInvoiceId, $elementType, EInvoicing::STATUS_REFUSED)) {
+			return false;
+		}
+		if (self::refusedSourceOfCreditNote($supplierInvoiceId) > 0) {
 			return false;
 		}
 

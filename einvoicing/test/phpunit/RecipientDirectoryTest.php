@@ -107,7 +107,19 @@ class FakeDirectoryPDPProvider extends AbstractPDPProvider
 		return $next !== null ? $next : array('status_code' => 500, 'response' => '');
 	}
 
-	// Unused by checkRecipientDirectory(), only there to satisfy the abstract base class.
+	/**
+	 * Retrieve and format remote account/company information from SuperPDP (session info + ppf directory status),
+	 * for display to the user (e.g. "Show your remote information" link in the setup page).
+	 *
+	 * @return array{status_code:int,message:string}
+	 */
+	public function getRemoteInfo()
+	{
+		return array(
+			'status_code' => 200,
+			'message' => '',
+		);
+	}
 
 	/**
 	 * @param  int $mode Mode

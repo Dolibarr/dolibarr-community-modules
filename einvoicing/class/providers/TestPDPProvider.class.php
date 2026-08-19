@@ -252,6 +252,21 @@ class TestPDPProvider extends AbstractPDPProvider
 
 
 	/**
+	 * Retrieve and format remote account/company information from the provider and peppol directory, if available,
+	 * For display to the user.
+	 *
+	 * @return array{status_code:int,message:string}
+	 */
+	public function getRemoteInfo()
+	{
+		return array(
+			'status_code' => -1,
+			'message' => 'Not yet implemented',
+		);
+	}
+
+
+	/**
 	 * Call the provider API.
 	 *
 	 * This is the single place where a provider talks to its platform: every other method goes through

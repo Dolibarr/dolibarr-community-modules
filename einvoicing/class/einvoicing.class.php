@@ -61,14 +61,26 @@ class EInvoicing
 	// Dolibarr internal statuses
 	public const STATUS_UNKNOWN             = 0;		// By default, before the e-invoice has been generated
 
-	public const STATUS_NOT_GENERATED       = 5;		// To sync
-	public const STATUS_GENERATED           = 10;
-	public const STATUS_AWAITING_VALIDATION = 15;		// Einvoice received but not yet analyzed by your AP
-	public const STATUS_AWAITING_ACK        = 20;		// Einvoice received and analyzed by your AP. Next step happen when doing sync.
-	public const STATUS_ERROR               = 25;
+	public const STATUS_NOT_GENERATED       = 5;		// To generate then to sync
+	public const STATUS_GENERATED           = 10;		// To sync
+	public const STATUS_AWAITING_VALIDATION = 15;		// Einvoice sent to your AP, but not yet analyzed by your AP
+	public const STATUS_AWAITING_ACK        = 20;		// Einvoice sent to your AP. next step happen when doing sync.
+
+	public const STATUS_ERROR               = 25;		// Unknown error, should not happe
 
 	public const STATUS_IGNORE_2            = 98;		// Never sync (for another reason than ereporting, not used yet)
-	public const STATUS_IGNORE              = 99;		// Never sync
+	public const STATUS_IGNORE              = 99;		// Never sync (will be processed by ereporting)
+
+	/**
+	 * The two codes above, as a list: they keep an invoice out of the e-invoicing scope, it is never
+	 * generated nor sent (B2C invoices reported by e-reporting, TakePOS tickets synced by the cash
+	 * closing, ...). Grouped here so that adding an "ignore" code is honoured by every caller at
+	 * once, through isIgnoredStatus().
+	 */
+	public const STATUS_IGNORE_CODES = [
+		self::STATUS_IGNORE,
+		self::STATUS_IGNORE_2
+	];
 
 	// PDP / PA normalized statuses
 	// public const STATUS_DEPOSITED           = 200;
@@ -190,16 +202,18 @@ class EInvoicing
 		self::STATUS_IGNORE              => 'EInvStatusDoNotSync',		// To exclude invoice from einvoice sync (ereporting)
 		//self::STATUS_IGNORE_2            => 'EInvStatusDoNotSync2',		// To exclude invoice from einvoice sync (for other reason, not used yet)
 		self::STATUS_NOT_GENERATED       => 'EInvStatusNotGenerated',
-		self::STATUS_ERROR               => 'EInvStatusError',			// Error in generation by Dolibarr
 		self::STATUS_GENERATED           => 'EInvStatusGenerated',
 		self::STATUS_AWAITING_VALIDATION => 'EInvStatusAwaitingValidation',
 		self::STATUS_AWAITING_ACK        => 'EInvStatusAwaitingAck',
 
 		// PDP / PA
-		self::STATUS_DEPOSITED           => 'EInvStatus200Deposited',
-		self::STATUS_ISSUED              => 'EInvStatus201Issued',
+		self::STATUS_DEPOSITED           => 'EInvStatus200Deposited',				// Accepted by seller AP
+		self::STATUS_REJECTED            => 'EInvStatus213Rejected',				// Rejected by seller AP
+
+		self::STATUS_ISSUED              => 'EInvStatus201Issued',					// Issued by seller AP to customer AP
 		self::STATUS_RECEIVED            => 'EInvStatus202Received',
-		self::STATUS_AVAILABLE           => 'EInvStatus203Available',
+		self::STATUS_AVAILABLE           => 'EInvStatus203Available',				// Available to customer
+		self::STATUS_REFUSED             => 'EInvStatus210Refused',					// Refused by customer
 		self::STATUS_TAKEN_OVER          => 'EInvStatus204TakenOver',
 		self::STATUS_APPROVED            => 'EInvStatus205Approved',
 		self::STATUS_PARTIALLY_APPROVED  => 'EInvStatus206PartiallyApproved',
@@ -207,9 +221,9 @@ class EInvoicing
 		self::STATUS_SUSPENDED           => 'EInvStatus208Suspended',
 		self::STATUS_COMPLETED           => 'EInvStatus209Completed',
 		self::STATUS_PAYMENT_SENT        => 'EInvStatus211PaymentTransmitted',
-		self::STATUS_PAID                => 'EInvStatus212Paid',
-		self::STATUS_REFUSED             => 'EInvStatus210Refused',
-		self::STATUS_REJECTED            => 'EInvStatus213Rejected',
+		self::STATUS_PAID                => 'EInvStatus212PaymentReceived',
+
+		self::STATUS_ERROR               => 'EInvStatusError',			// Error in generation by Dolibarr
 	];
 
 
@@ -466,6 +480,16 @@ class EInvoicing
 		self::STATUS_SUSPENDED
 	];
 
+	/**
+	 * The statuses by which a buyer accepts a received document, in whole or in part, and commits to
+	 * settling it. "Disputed", "Suspended" and "Refused" are deliberately not here: none of them
+	 * accepts anything.
+	 */
+	public const STATUSES_ACCEPTING_A_DOCUMENT = [
+		self::STATUS_APPROVED,
+		self::STATUS_PARTIALLY_APPROVED
+	];
+
 
 	/**
 	 * Constructor
@@ -653,8 +677,11 @@ class EInvoicing
 	 */
 	public function getEinvoiceStatusOptions($includeCodesInLabel = 0, $onlyPdpStatuses = 0, $onlySendable = 0, $onlyCreate = 0, $onlyOut = 0, $disableUnknownStatus = 1, $addseparator = 0)
 	{
-		global $langs;
+		global $langs, $mysoc;
+
 		$options = [];
+
+		// Add separators
 		foreach (self::STATUS_LABEL_KEYS as $code => $labelKey) {
 			if ($code == self::STATUS_GENERATED && $addseparator) {
 				$options['separator1'] = array('label' => '--------------------', 'disabled' => 1);
@@ -666,8 +693,12 @@ class EInvoicing
 			}
 			$options[$code] = $value;
 
-			if ($code == self::STATUS_PAID && $addseparator) {
+			if ($code == self::STATUS_AWAITING_ACK && $addseparator) {
 				$options['separator2'] = array('label' => '--------------------', 'disabled' => 1);
+			}
+
+			if ($code == self::STATUS_PAID && $addseparator) {
+				$options['separator3'] = array('label' => '--------------------', 'disabled' => 1);
 			}
 		}
 
@@ -721,7 +752,27 @@ class EInvoicing
 			unset($options[self::STATUS_REFUSED]);
 		}
 
-		// TODO : remove statuses that cannot be chronologically be sent (for example, it doesn't make sense to send "Taken over" if invoice is refused), PDP may accept them and ignore them without returning an error.
+		// TODO : remove statuses that cannot be chronologically be sent (for example, it doesn't make sense to send "Taken over" if invoice is refused), AP may accept them and ignore them without returning an error.
+
+		// Convert array into array for combo list
+		foreach ($options as $key => $val) {
+			if (! is_array($val)) {
+				$options[$key] = array('label' => $val, 'data-html' => $val);
+			}
+		}
+
+		// Complete label if using an AP in France
+		if ($mysoc->country_code == 'FR') {
+			$mandatorystatus = array(200, 210, 212, 213);
+			foreach ($options as $key => $val) {
+				if ($key >= 200 && $key < 300) {
+					$options[$key]['data-html'] .= (in_array($key, $mandatorystatus) ? '  <span class="small opacitymedium">('.$key.' - '.$langs->trans("Mandatory").')</span>' : '  <span class="small opacitymedium">('.$key.')</span>');
+				}
+			}
+		}
+
+		// TODO
+		// Make some status disabled by setting 'disabled
 
 
 		return $options;
@@ -735,6 +786,11 @@ class EInvoicing
 	 * its vendor is not going to be paid, so nothing else is owed on it. "Approved" (205) ends nothing:
 	 * the normal order of things is to approve an invoice and then pay it, and "Payment transmitted"
 	 * (211) is precisely what is sent afterwards. An approved invoice can no longer be refused either.
+	 *
+	 * One thing narrows the list beyond that history: a credit note correcting an invoice we refused
+	 * cannot be accepted, since the invoice it credits owes nothing (issue #594, see
+	 * SupplierInvoiceHelper::refusedSourceOfCreditNote()). Refusing it stays offered - that is what the
+	 * document is for here - as do the statuses that settle nothing, like "Disputed" or "Suspended".
 	 *
 	 * @param	int		$elementId		Id of the invoice
 	 * @param	string	$elementType	Element type ('invoice_supplier')
@@ -755,6 +811,15 @@ class EInvoicing
 		foreach (array_keys($statuses) as $code) {
 			if ($this->hasSentStatusMessage($elementId, $elementType, (int) $code, 1)) {
 				unset($statuses[$code]);
+			}
+		}
+
+		if ($elementType === 'invoice_supplier') {
+			dol_include_once('einvoicing/class/utils/SupplierInvoiceHelper.class.php');
+			if (SupplierInvoiceHelper::refusedSourceOfCreditNote((int) $elementId) > 0) {
+				foreach (self::STATUSES_ACCEPTING_A_DOCUMENT as $code) {
+					unset($statuses[$code]);
+				}
 			}
 		}
 
@@ -886,11 +951,19 @@ class EInvoicing
 		$baseErrors = [];
 		$baseWarnings = [];
 
+		// A private individual has no professional id, and when EINVOICING_SKIP_B2C is on that third party is
+		// out of the e-invoicing scope anyway (B2C is reported by e-reporting, not transmitted as an e-invoice):
+		// its missing SIREN must not be reported as a blocking configuration error. Detection is delegated to
+		// Societe::isACompany(), the same way needEInvoiceManagement() does, so both ends of the chain agree.
+		$isB2C = getDolGlobalInt('EINVOICING_SKIP_B2C') && is_object($thirdparty) && !$thirdparty->isACompany();
+
 		if (empty($thirdparty->name)) {
 			$baseErrors[] = $langs->trans("FxCheckErrorCustomerName");
 		}
 		if (empty($thirdparty->idprof1)) {
-			$baseErrors[] = $langs->trans("FxCheckErrorCustomerIDPROF1");
+			if (!$isB2C) {
+				$baseErrors[] = $langs->trans("FxCheckErrorCustomerIDPROF1");
+			}
 		} elseif (!empty($thirdparty->country_code) && $thirdparty->country_code === 'FR') {
 			// Validate SIREN/SIRET format based on length (French companies only)
 			$idprof1 = preg_replace('/\s+/', '', (string) $thirdparty->idprof1);
@@ -925,7 +998,9 @@ class EInvoicing
 		$routing_id = $this->getBuyerCommunicationURI($thirdparty);
 		// If EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID is off, we use the profid as einvoice id and we already have the previous error message of
 		// profid missing. But if on, we also add a message dedicated to einvoice ID.
-		if (getDolGlobalString('EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID') && empty($routing_id)) {
+		// Same reason as for the professional id above: a B2C third party is not addressed on the network, so
+		// having no routing id is expected and must not block.
+		if (getDolGlobalString('EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID') && empty($routing_id) && !$isB2C) {
 			$baseErrors[] = $langs->trans("FxCheckErrorCustomerRoutingID");
 		}
 		if ($thirdparty->tva_assuj && empty($thirdparty->tva_intra)) {
@@ -2947,7 +3022,7 @@ class EInvoicing
 		}
 
 		if ($lcMessageRow && $lcMessageRow->element_type === 'invoice_supplier') {
-			dol_include_once('einvoicing/class/helpers/SupplierInvoiceHelper.class.php');
+			dol_include_once('einvoicing/class/utils/SupplierInvoiceHelper.class.php');
 			SupplierInvoiceHelper::onOutboundStatusMessageValidated(
 				$db,
 				$user,
@@ -2963,7 +3038,9 @@ class EInvoicing
 
 
 	/**
-	 * Return if an invoice need EInvoicing management.
+	 * Return the e-invoicing status an invoice qualifies for. This is the status to store, not an
+	 * answer to "must this invoice be e-invoiced?": the codes meaning "out of scope" are truthy, so
+	 * never test this answer for truth alone, call mustManageEInvoice() for that question.
 	 *
 	 * @param 	Facture|FactureRec		$object		Object
 	 * @return 	int 								self::STATUS_NOT_GENERATED if the invoice object need management of EInvoicing, self::STATUS_IGNORE or self::self::STATUS_IGNORE_2 if not.
@@ -3019,6 +3096,33 @@ class EInvoicing
 		// TODO Add hook
 
 		return $return;
+	}
+
+
+	/**
+	 * Return if an invoice must be managed by EInvoicing. Boolean counterpart of
+	 * needEInvoiceManagement(), which answers with a status code.
+	 *
+	 * @param 	Facture|FactureRec		$object		Object
+	 * @return 	bool								True if the invoice is in the e-invoicing scope
+	 */
+	public function mustManageEInvoice($object)
+	{
+		$status = $this->needEInvoiceManagement($object);
+
+		return !empty($status) && !self::isIgnoredStatus($status);
+	}
+
+
+	/**
+	 * Return if a status code keeps the invoice out of the e-invoicing scope.
+	 *
+	 * @param 	int|string				$status		Status code, a self::STATUS_* value
+	 * @return 	bool								True if the invoice must never be e-invoiced
+	 */
+	public static function isIgnoredStatus($status)
+	{
+		return in_array((int) $status, self::STATUS_IGNORE_CODES, true);
 	}
 
 

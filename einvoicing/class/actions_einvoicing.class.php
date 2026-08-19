@@ -103,13 +103,15 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		if ($invoiceObject instanceof Facture) {
 			/** @var Facture $invoiceObject */
 
-			$needEinvoice = $einvoicing->needEInvoiceManagement($invoiceObject);
-			if ($needEinvoice) {
+			// Ask the boolean question: needEInvoiceManagement() answers with a status code, and the codes
+			// meaning "out of the e-invoicing scope" are truthy, so testing its answer for truth alone let an
+			// ignored invoice (a B2C one when EINVOICING_SKIP_B2C is on, typically) walk into the checks below
+			// and be reported as misconfigured.
+			if ($einvoicing->mustManageEInvoice($invoiceObject)) {
 				// Get current status of e-invoice
 				$currentStatusDetails = $einvoicing->fetchLastknownInvoiceStatus($invoiceObject->id, $invoiceObject->ref);
 
-				if (!isset($currentStatusDetails['code']) ||
-					($currentStatusDetails['code'] != $einvoicing::STATUS_IGNORE && $currentStatusDetails['code'] != $einvoicing::STATUS_IGNORE_2)) {
+				if (!isset($currentStatusDetails['code']) || !EInvoicing::isIgnoredStatus($currentStatusDetails['code'])) {
 					if ($invoiceObject->status != $invoiceObject::STATUS_DRAFT	// Never generate/transmit an e-invoice for a DRAFT (note: at validation the invoice has already status VALIDATED when Dolibarr regenerates the final PDF, so the legitimate flow is preserved).
 						&& !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')
 						&& getDolGlobalString('EINVOICING_EINVOICE_IN_REAL_TIME')) {
@@ -316,9 +318,13 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 			if ($object->status == Facture::STATUS_VALIDATED || $object->status == Facture::STATUS_CLOSED) {
 				// if E-invoice is not generated, show button to generate e-invoice
+				// STATUS_IGNORE_2 has no entry in STATUS_LABEL_KEYS, so the "unknown code" fallback below used to
+				// offer the generation button on an invoice explicitly excluded from e-invoicing. An ignored
+				// invoice has nothing to generate, whatever its code is known or not.
 				if (
-					$currentStatusDetails['code'] == $einvoicing::STATUS_NOT_GENERATED
-					|| !array_key_exists($currentStatusDetails['code'], $einvoicing::STATUS_LABEL_KEYS)
+					!EInvoicing::isIgnoredStatus($currentStatusDetails['code'])
+					&& ($currentStatusDetails['code'] == $einvoicing::STATUS_NOT_GENERATED
+						|| !array_key_exists($currentStatusDetails['code'], $einvoicing::STATUS_LABEL_KEYS))
 				) {
 					$url_button[] = array(
 						'lang' => 'einvoicing',
@@ -450,6 +456,16 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				// the payment - and the "Payment transmitted" (211) that reports it - necessarily comes
 				// after the approval (issue #548).
 				$availableStatuses = $einvoicing->getSendableStatusesForReceivedInvoice($object->id, $object->element);
+
+				// A button that quietly disappears looks like a bug. Say why the credit note of a refused
+				// invoice cannot be accepted, and name the invoice it credits (issue #594).
+				dol_include_once('einvoicing/class/utils/SupplierInvoiceHelper.class.php');
+				$refusedSourceId = SupplierInvoiceHelper::refusedSourceOfCreditNote((int) $object->id);
+				if ($refusedSourceId > 0) {
+					$sourceInvoice = new FactureFournisseur($db);
+					$sourceRef = ($sourceInvoice->fetch($refusedSourceId) > 0) ? ($sourceInvoice->ref_supplier ?: $sourceInvoice->ref) : (string) $refusedSourceId;
+					print '<div class="info">' . $langs->trans('EInvoiceCreditNoteOfRefusedInvoice', $sourceRef) . '</div>';
+				}
 
 				$url_button = array();
 				foreach ($availableStatuses as $code => $label) {
@@ -737,6 +753,24 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
 				$pdpstatuscode = GETPOSTINT('pdpstatuscode') ?: 0;
 				$statusRaison = GETPOST('statusRaison', 'alpha');
+
+				// The card stops offering it, but the card is not what sends: a status travels here as a
+				// parameter of an URL, so this is where a credit note crediting an invoice we refused is
+				// actually kept from being accepted (issue #594).
+				if (in_array($pdpstatuscode, EInvoicing::STATUSES_ACCEPTING_A_DOCUMENT, true)) {
+					dol_include_once('einvoicing/class/utils/SupplierInvoiceHelper.class.php');
+					$refusedSourceId = SupplierInvoiceHelper::refusedSourceOfCreditNote((int) $object->id);
+					if ($refusedSourceId > 0) {
+						$sourceInvoice = new FactureFournisseur($db);
+						$sourceRef = ($sourceInvoice->fetch($refusedSourceId) > 0) ? ($sourceInvoice->ref_supplier ?: $sourceInvoice->ref) : (string) $refusedSourceId;
+						$message = $langs->trans('EInvoiceCannotAcceptCreditNoteOfRefusedInvoice', $sourceRef);
+						dol_syslog(__METHOD__ . ' ' . strip_tags($message), LOG_WARNING, 0, '_einvoicing');
+						setEventMessages($message, array(), 'errors');
+						$this->errors[] = $message;
+
+						return 0;
+					}
+				}
 
 				$result = $provider->sendStatusMessage($object, $pdpstatuscode, $statusRaison); // Send status message
 
@@ -1136,7 +1170,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		// never be transferred to accountancy.
 		if (in_array('accountancysupplierlist', $contexts)) {
 			require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
-			dol_include_once('einvoicing/class/helpers/SupplierInvoiceHelper.class.php');
+			dol_include_once('einvoicing/class/utils/SupplierInvoiceHelper.class.php');
 
 			$this->resprints .= ' AND NOT (f.fk_statut = ' . ((int) FactureFournisseur::STATUS_ABANDONED)
 				. " AND f.close_code = '" . $db->escape(SupplierInvoiceHelper::CLOSECODE_PDPREFUSED) . "')";
@@ -1145,6 +1179,28 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		return 0;
 	}
 
+
+	/**
+	 * Add GROUP BY fields
+	 * Mandatory for the fields added by printFieldListSelect() on lists that build a GROUP BY clause,
+	 * otherwise MySQL rejects the query with sql_mode=only_full_group_by (error 1055).
+	 * Only supplierinvoicelist is concerned: thirdpartylist/societelist call the hook without any
+	 * GROUP BY clause, and productservicelist selects no column from the joined table.
+	 *
+	 * @param array<string,mixed> 	$parameters		Array of parameters
+	 * @param CommonObject			$object			Object invoice
+	 * @param string		 		$action			Code action
+	 * @param Hookmanager			$hookmanager	Hookmanager
+	 * @return int									Result
+	 */
+	public function printFieldListGroupBy($parameters, $object, &$action, $hookmanager)
+	{
+		if (in_array('supplierinvoicelist', explode(':', $parameters['context']), true)) {
+			$this->resprints .= ', ext.rowid, ext.provider';
+		}
+
+		return 0;
+	}
 
 	/**
 	 * Filter options
