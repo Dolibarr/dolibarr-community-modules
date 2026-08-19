@@ -12,13 +12,20 @@ could be refused altogether where EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS i
 now reads the same Societe::isACompany() as the decision does, so both ends of the chain agree on who
 is B2C, and neither the professional id nor the routing id is required of a private individual. A
 company without a professional id is still blocked, option or not.
-
 The same invoices could also reach that pre-check through the other end: needEInvoiceManagement()
 answers with a status code, and the two codes meaning "out of scope" (98 and 99) are truthy, so the
 callers that only tested its answer for truth treated an ignored invoice as one to e-invoice. They
 now ask the boolean question instead - mustManageEInvoice() for an invoice, isIgnoredStatus() for a
 stored status - both reading a single list of the codes that keep an invoice out of the scope. This
 also removes the generation button from an invoice explicitly excluded from e-invoicing.
+
+FIX: The supplier invoice list no longer fails on a MySQL server that keeps its default sql_mode. The
+columns the module adds to the SELECT of that list were never added to its GROUP BY, so MySQL refused the
+whole query with error 1055 (only_full_group_by) and the page reported a technical error instead of showing
+the list. MariaDB, whose default sql_mode does not include ONLY_FULL_GROUP_BY, accepted the same query,
+which is why the fault went unnoticed. The printFieldListGroupBy hook the core calls right after building
+its own GROUP BY - where it adds its extrafields for that very reason - is now implemented. Dolibarr 17 to
+21 are concerned; from Dolibarr 22 on the core builds no GROUP BY on that list at all.
 
 FIX: The Factur-X files the module produces are now valid PDF/A-3, which they had never been - and a
 Factur-X file that is not a PDF/A-3 file is not a conformant Factur-X, whatever its XML says (veraPDF

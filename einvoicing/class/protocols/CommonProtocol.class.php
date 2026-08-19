@@ -1684,8 +1684,11 @@ trait CommonProtocol
 						}
 
 						if (empty($vatex)) {
+							// Say where the constant is entered: its name alone sends the administrator looking for a
+							// setup page that does not exist for it (it is a hidden constant, only Home - Setup - Other).
+							$urltoconstsetup = DOL_URL_ROOT.'/admin/const.php';
 							$errormsg = $langs->trans("UnknownVATEX1", $id, '0', $vat_src_code);
-							$errormsg .= '<br>'.$langs->trans("UnknownVATEX2a", '0', ($vat_src_code ? $vat_src_code : "''"), $constantforvatex);
+							$errormsg .= '<br>'.$langs->trans("UnknownVATEX2a", '0', ($vat_src_code ? $vat_src_code : "''"), $constantforvatex, $urltoconstsetup);
 							//$exemptionReason .= ' '.$langs->trans("ClickHere", $constantforvatex);		// Go on other setup page
 
 							throw new Exception('MISSINGSETUP: '.$errormsg);
@@ -1716,9 +1719,12 @@ trait CommonProtocol
 						}
 
 						if (empty($vatex)) {
+							// The dictionary has a lot of columns: name the one to fill, and name it with the label of
+							// the core so the administrator reads on screen the same words as in the message.
+							$langs->load("compta");
 							$urltovatdic = DOL_URL_ROOT.'/admin/dict.php?id=10';
 							$errormsg = $langs->trans("UnknownVATEX1", $id, '0', $vat_src_code);
-							$errormsg .= '<br>'.$langs->trans("UnknownVATEX2b", '0', ($vat_src_code ? $vat_src_code : "''"), $urltovatdic);
+							$errormsg .= '<br>'.$langs->trans("UnknownVATEX2b", '0', ($vat_src_code ? $vat_src_code : "''"), $urltovatdic, $langs->trans("VATExemptionCode"));
 							//$errormsg .= ' '.$langs->trans("ClickHere", $constantforvatex);		// Go on dictionary page
 
 							throw new Exception('MISSINGSETUP: '.$errormsg);
