@@ -589,53 +589,6 @@ class modEInvoicing extends DolibarrModules
 		$param = array('options' => array(1 => 0));
 		$sql = array();
 
-		// Product extrafields
-		/*
-		$result = $extrafields->addExtraField(
-			'einvoicing_product_separator',
-			$langs->trans('EInvoicing'),
-			'separate',
-			95020,
-			'',
-			'product',
-			0,
-			1,
-			'',
-			$param,
-			1,
-			'',
-			1,
-			0,
-			'',
-			'',
-			'einvoicing@einvoicing',
-			'isModEnabled("einvoicing")'
-		);
-		*/
-		// $result = $extrafields->addExtraField(
-		// 	'einvoicing_source',
-		// 	$langs->trans('EInvoicingProductSource'),
-		// 	'varchar',
-		// 	95022,
-		// 	100,
-		// 	'product',
-		// 	0,
-		// 	0,
-		// 	'',
-		// 	null,
-		// 	1,
-		// 	'',
-		// 	1,
-		// 	0,
-		// 	'',
-		// 	'',
-		// 	'einvoicing@einvoicing',
-		// 	'isModEnabled("einvoicing")',
-		// 	0,
-		// 	1
-		// );
-
-		// Invoice extrafields
 		// Chorus fields
 		// TODO : Remove Chorus extrafields and move them to einvoicing_extlinks table
 		$result = $extrafields->addExtraField('d4d_separator', $langs->trans('ChorusSeparator'), 'separate', 95024, '', 'facture', 0, 1, '', $param, 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")');
@@ -695,96 +648,11 @@ class modEInvoicing extends DolibarrModules
 			array() //$moreparams
 		);
 
-		/*
-		CREATE TABLE llx_einvoicing_call(
-			-- BEGIN MODULEBUILDER FIELDS
-			rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL,
-			date_creation datetime NOT NULL,
-			tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-			fk_user_creat integer NOT NULL,
-			fk_user_modif integer,
-			status integer NOT NULL, 			-- Status of the call
-			call_type varchar(50) NOT NULL, 	-- Type of API call
-			method varchar(10), 				-- HTTP method
-			endpoint varchar(255) NOT NULL, 	-- API endpoint URL
-			request_body text, 					-- Request body content (JSON)
-			response text, 						-- Response content (JSON)
-			entity integer DEFAULT 1, 			-- Entity
-			fk_provider integer NOT NULL 		-- Foreign key to provider (EsaLink...)
-			-- END MODULEBUILDER FIELDS
-		) ENGINE=innodb;
-
-		CREATE TABLE llx_einvoicing_document(
-			-- BEGIN MODULEBUILDER FIELDS
-			rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL,
-			date_creation datetime NOT NULL,
-			tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-			fk_user_creat integer NOT NULL,
-			fk_user_modif integer,
-			fk_element_id integer,
-			fk_element_type varchar(50),
-			status integer NOT NULL, 			-- Status of the document
-			fk_call integer,		 			-- Reference to the original call
-			flow_id integer, 					-- PDP Flow identifier
-			tracking_id integer, 				-- Document tracking identifier
-			flow_type varchar(255), 			-- Type of flow (CustomerInvoice, etc.)
-			flow_direction varchar(10), 		-- Direction of flow (In/Out)
-			flow_syntax varchar(50), 			-- Document syntax (Factur-X, CII, UBL, etc.)
-			flow_profile varchar(50), 			-- Profile used (Basic, Cius, etc.)
-			ack_status varchar(50), 			-- Acknowledgment status (Success, Error, Pending)
-			ack_reason_code varchar(255), 		-- Reason code for acknowledgment
-			ack_info text, 						-- Additional acknowledgment information
-			document_body text, 				-- Full document content XML
-			entity integer DEFAULT 1 			-- Entity identifier
-			-- END MODULEBUILDER FIELDS
-		) ENGINE=innodb;
-
-		*/
-
-		//$result0=$extrafields->addExtraField('einvoicing_separator1', "Separator 1", 'separator', 1,  0, 'thirdparty',   0, 0, '', array('options'=>array(1=>1)), 1, '', 1, 0, '', '', 'einvoicing@einvoicing', 'isModEnabled("einvoicing")');
-		//$result1=$extrafields->addExtraField('einvoicing_myattr1', "New Attr 1 label", 'boolean', 1,  3, 'thirdparty',   0, 0, '', '', 1, '', -1, 0, '', '', 'einvoicing@einvoicing', 'isModEnabled("einvoicing")');
-		//$result2=$extrafields->addExtraField('einvoicing_myattr2', "New Attr 2 label", 'varchar', 1, 10, 'project',      0, 0, '', '', 1, '', -1, 0, '', '', 'einvoicing@einvoicing', 'isModEnabled("einvoicing")');
-		//$result3=$extrafields->addExtraField('einvoicing_myattr3', "New Attr 3 label", 'varchar', 1, 10, 'bank_account', 0, 0, '', '', 1, '', -1, 0, '', '', 'einvoicing@einvoicing', 'isModEnabled("einvoicing")');
-		//$result4=$extrafields->addExtraField('einvoicing_myattr4', "New Attr 4 label", 'select',  1,  3, 'thirdparty',   0, 1, '', array('options'=>array('code1'=>'Val1','code2'=>'Val2','code3'=>'Val3')), 1,'', -1, 0, '', '', 'einvoicing@einvoicing', 'isModEnabled("einvoicing")');
-		//$result5=$extrafields->addExtraField('einvoicing_myattr5', "New Attr 5 label", 'text',    1, 10, 'user',         0, 0, '', '', 1, '', -1, 0, '', '', 'einvoicing@einvoicing', 'isModEnabled("einvoicing")');
-
 		// Permissions
 		$this->remove($options);
 
-
-		// Document templates
-		// $moduledir = dol_sanitizeFileName('einvoicing');
-		// $myTmpObjects = array();
-		// $myTmpObjects['Call'] = array('includerefgeneration' => 0, 'includedocgeneration' => 0);
-
-		// foreach ($myTmpObjects as $myTmpObjectKey => $myTmpObjectArray) {
-		// 	if ($myTmpObjectArray['includerefgeneration']) {
-		// 		$src = DOL_DOCUMENT_ROOT.'/install/doctemplates/'.$moduledir.'/template_calls.odt';
-		// 		$dirodt = DOL_DATA_ROOT.($conf->entity > 1 ? '/'.$conf->entity : '').'/doctemplates/'.$moduledir;
-		// 		$dest = $dirodt.'/template_calls.odt';
-
-		// 		if (file_exists($src) && !file_exists($dest)) {
-		// 			require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
-		// 			dol_mkdir($dirodt);
-		// 			$result = dol_copy($src, $dest, '0', 0);
-		// 			if ($result < 0) {
-		// 				$langs->load("errors");
-		// 				$this->error = $langs->trans('ErrorFailToCopyFile', $src, $dest);
-		// 				return 0;
-		// 			}
-		// 		}
-
-		// 		$sql = array_merge($sql, array(
-		// 			"DELETE FROM ".$this->db->prefix()."document_model WHERE nom = 'standard_".strtolower($myTmpObjectKey)."' AND type = '".$this->db->escape(strtolower($myTmpObjectKey))."' AND entity = ".((int) $conf->entity),
-		// 			"INSERT INTO ".$this->db->prefix()."document_model (nom, type, entity) VALUES('standard_".strtolower($myTmpObjectKey)."', '".$this->db->escape(strtolower($myTmpObjectKey))."', ".((int) $conf->entity).")",
-		// 			"DELETE FROM ".$this->db->prefix()."document_model WHERE nom = 'generic_".strtolower($myTmpObjectKey)."_odt' AND type = '".$this->db->escape(strtolower($myTmpObjectKey))."' AND entity = ".((int) $conf->entity),
-		// 			"INSERT INTO ".$this->db->prefix()."document_model (nom, type, entity) VALUES('generic_".strtolower($myTmpObjectKey)."_odt', '".$this->db->escape(strtolower($myTmpObjectKey))."', ".((int) $conf->entity).")"
-		// 		));
-		// 	}
-		// }
-
+		// Set the live mode to on by default, but only if it is the first time we enable the module
 		if (!getDolGlobalString('EINVOICING_PDP')) {
-			// Set the live mode to on, but only if it is the first time we enable the module
 			$sqltmp = "INSERT INTO ".MAIN_DB_PREFIX."const (name, value, visible, entity, note) VALUES";
 			$sqltmp .= " ('EINVOICING_LIVE'";
 			$sqltmp .= ", ".$this->db->encrypt('1');
