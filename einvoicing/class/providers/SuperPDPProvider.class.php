@@ -780,7 +780,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 * Check the status of the "ppf" entry in the SuperPDP directory (PPF network registration).
 	 * That can be used to determine if the company is registered and if the registration is valid.
 	 *
-	 * @return array{status_code:int,response:null|string|array<string,mixed>,call_id:null|string,ppf_status:string|null,ppf_error:bool,ppf_message:string|null}
+	 * @return array{status_code:int,response:null|string|array<string,mixed>,call_id:null|string,ppf_identifier:string,ppf_status:string|null,ppf_effective_date:string,ppf_message:string,ppf_error:bool,listof_ppf_entries:string}
 	 */
 	private function checkDirectoryStatus()
 	{
@@ -788,15 +788,29 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 		$entries = is_array($result['response']) ? ($result['response']['data'] ?? []) : [];
 		$ppfEntry = null;
+
+		$listofenties = '';
 		foreach ($entries as $entry) {
-			if (($entry['directory'] ?? null) === 'ppf') {
-				$ppfEntry = $entry;
-				break;
+			if (($entry['directory'] ?? null) === 'ppf') {		// Entry in PPF directory, not a peppol directory entry
+				if (is_null($ppfEntry)) {
+					$ppfEntry = $entry;		// We take the first one
+				}
+				if (!empty($listofenties)) {
+					$listofenties .= "<br>\n";
+					$listofenties .= $entry['identifier'] ?? 'No identifier';
+					$listofenties .= '-' . ($entry['company']['formal_name'] ?? 'No formal name');
+					$listofenties .= '-' . ($ppfEntry['effective_date'] ?? '');
+					$listofenties .= '-' . ($ppfEntry['status'] ?? '');
+				}
 			}
 		}
 
+		$result['ppf_identifier'] = $ppfEntry['identifier'] ?? '';
 		$result['ppf_status'] = $ppfEntry['status'] ?? null;
-		$result['ppf_message'] = $ppfEntry['status_message'] ?? null;
+		$result['ppf_effective_date'] = $ppfEntry['effective_date'] ?? '';
+		$result['ppf_message'] = $ppfEntry['status_message'] ?? '';
+
+		$result['listof_ppf_entries'] = $listofenties;
 		$result['ppf_error'] = ($result['ppf_status'] === 'error');
 
 		return $result;
@@ -838,29 +852,35 @@ class SuperPDPProvider extends AbstractPDPProvider
 	{
 		global $langs;
 
-		$session = $this->getRemoteSessionInfo();
-		$directory = $this->checkDirectoryStatus();
-
-		$ok = ($session['status_code'] == 200 && $directory['status_code'] == 200 && !$directory['ppf_error']);
+		// Check KYC status
+		$session = $this->getRemoteSessionInfo();	// Call the oauth2_sessions/me endpoint
 
 		$lines = array();
 		if ($session['status_code'] == 200 && is_array($session['response'])) {
 			$lines[] = $langs->trans('RemoteInfoCompanyVerification', $this->name, $this->formatKycStatus($session['response']['company_verification_status'] ?? null));
-			$lines[] = $langs->trans('RemoteInfoUserVerification', $this->name, $this->formatKycStatus($session['response']['user_identity_verification_status'] ?? null));
+			if (isset($session['response']['user_identity_verification_status'])) {		// Sometimes this is empty
+				$lines[] = $langs->trans('RemoteInfoUserVerification', $this->name, $this->formatKycStatus($session['response']['user_identity_verification_status'] ?? null));
+			}
 		} else {
 			$lines[] = $langs->trans('RemoteInfoSessionError') . ' (HTTP ' . ($session['status_code'] ?? 'N/A') . ')';
 		}
 
+		// Check AP
+		$directory = $this->checkDirectoryStatus();
+
 		if ($directory['status_code'] == 200) {
 			$paName = (!$directory['ppf_error'] && $directory['ppf_status'] !== null) ? 'SuperPDP' : $langs->trans('RemoteInfoPAUndetermined');
-			$lines[] = $langs->trans('RemoteInfoPPFDetection', $paName) . ($directory['ppf_status'] !== null ? ' - ' . $langs->trans('RemoteInfoPPFStatusDetail', $directory['ppf_status'], $directory['ppf_message'] ?? '') : '');
+			$lines[] = $langs->trans('RemoteInfoPPFDetection', 'Peppol', $paName) . ' ['. $directory['ppf_identifier'] . ' - ' . $langs->trans('RemoteInfoPPFStatusDetail', $directory['ppf_status']) . ' - ' . $directory['ppf_effective_date'].']';
 		} else {
 			$lines[] = $langs->trans('RemoteInfoDirectoryError') . ' (HTTP ' . ($directory['status_code'] ?? 'N/A') . ')';
 		}
 
+
+		$ok = ($session['status_code'] == 200 && $directory['status_code'] == 200 && !$directory['ppf_error']);
+
 		return array(
 			'status_code' => $ok ? 200 : 400,
-			'message' => implode('<br>', $lines),
+			'message' => implode('<br>', $lines).' <!-- listof_ppf_entries: '.$directory['listof_ppf_entries'].' -->',
 		);
 	}
 
