@@ -61,14 +61,14 @@ class EInvoicing
 	// Dolibarr internal statuses
 	public const STATUS_UNKNOWN             = 0;		// By default, before the e-invoice has been generated
 
-	public const STATUS_NOT_GENERATED       = 5;		// To sync
-	public const STATUS_GENERATED           = 10;
+	public const STATUS_NOT_GENERATED       = 5;		// To generate then to sync
+	public const STATUS_GENERATED           = 10;		// To sync
 	public const STATUS_AWAITING_VALIDATION = 15;		// Einvoice received but not yet analyzed by your AP
 	public const STATUS_AWAITING_ACK        = 20;		// Einvoice received and analyzed by your AP. Next step happen when doing sync.
 	public const STATUS_ERROR               = 25;
 
 	public const STATUS_IGNORE_2            = 98;		// Never sync (for another reason than ereporting, not used yet)
-	public const STATUS_IGNORE              = 99;		// Never sync
+	public const STATUS_IGNORE              = 99;		// Never sync (will be processed by ereporting)
 
 	/**
 	 * The two codes above, as a list: they keep an invoice out of the e-invoicing scope, it is never
