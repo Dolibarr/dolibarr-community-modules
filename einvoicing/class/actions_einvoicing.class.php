@@ -1142,7 +1142,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		// never be transferred to accountancy.
 		if (in_array('accountancysupplierlist', $contexts)) {
 			require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
-			dol_include_once('einvoicing/class/helpers/SupplierInvoiceHelper.class.php');
+			dol_include_once('einvoicing/class/utils/SupplierInvoiceHelper.class.php');
 
 			$this->resprints .= ' AND NOT (f.fk_statut = ' . ((int) FactureFournisseur::STATUS_ABANDONED)
 				. " AND f.close_code = '" . $db->escape(SupplierInvoiceHelper::CLOSECODE_PDPREFUSED) . "')";

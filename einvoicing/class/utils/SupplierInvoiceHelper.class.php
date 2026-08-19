@@ -17,7 +17,7 @@
  */
 
 /**
- * \file    einvoicing/class/helpers/SupplierInvoiceHelper.class.php
+ * \file    einvoicing/class/utils/SupplierInvoiceHelper.class.php
  * \ingroup einvoicing
  * \brief   Utility class for supplier invoices.
  * 			This file is mainly used when EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION is set but
@@ -26,7 +26,7 @@
 
 dol_include_once('einvoicing/class/protocols/ProtocolManager.class.php');
 dol_include_once('einvoicing/class/document.class.php');
-dol_include_once('einvoicing/class/helpers/PriceHelper.class.php');
+dol_include_once('einvoicing/class/utils/PriceHelper.class.php');
 dol_include_once('fourn/class/fournisseur.facture.class.php');
 
 /**

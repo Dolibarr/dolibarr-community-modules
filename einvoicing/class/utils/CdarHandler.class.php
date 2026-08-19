@@ -284,7 +284,7 @@ class CdarHandler
 		// Electronic address (MDT-73) of the CDAR recipient. Every status but the cash-in (212) is sent on a
 		// supplier invoice: we are the buyer and the CDAR goes back to the vendor. Sending its SIREN blindly
 		// only works when the platform happens to know the vendor under that very address, and gets the
-		// message refused with "L'adresse electronique (MDT-73) est invalide" otherwise.
+		// message refused with "Electronic address (MDT-73) is invalid" otherwise.
 		//
 		// The status is a reply, so the address to reply to is the one the vendor exchanges under:
 		//   1. a routing recorded in Dolibarr for that vendor, which is a deliberate choice of ours;
@@ -504,7 +504,7 @@ class CdarHandler
 			return '';
 		}
 
-		dol_include_once('/einvoicing/class/helpers/SupplierInvoiceHelper.class.php');
+		dol_include_once('/einvoicing/class/utils/SupplierInvoiceHelper.class.php');
 
 		$xmlData = '';
 		try {

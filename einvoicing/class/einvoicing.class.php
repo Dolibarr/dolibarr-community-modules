@@ -2998,7 +2998,7 @@ class EInvoicing
 		}
 
 		if ($lcMessageRow && $lcMessageRow->element_type === 'invoice_supplier') {
-			dol_include_once('einvoicing/class/helpers/SupplierInvoiceHelper.class.php');
+			dol_include_once('einvoicing/class/utils/SupplierInvoiceHelper.class.php');
 			SupplierInvoiceHelper::onOutboundStatusMessageValidated(
 				$db,
 				$user,

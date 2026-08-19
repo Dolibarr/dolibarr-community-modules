@@ -45,7 +45,7 @@ if (!file_exists($dolibarrHtdocs . '/master.inc.php')) {
 require_once $dolibarrHtdocs . '/master.inc.php';
 require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';
 dol_include_once('einvoicing/class/einvoicing.class.php');
-dol_include_once('einvoicing/class/helpers/SupplierInvoiceHelper.class.php');
+dol_include_once('einvoicing/class/utils/SupplierInvoiceHelper.class.php');
 require_once __DIR__ . '/CommonClassTestCompat.inc.php';
 
 if (empty($user->id)) {
