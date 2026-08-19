@@ -139,13 +139,14 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 	 * EInvoicing::storeStatusMessage() so the test does not depend on the EINVOICING_PDP
 	 * setup of the environment it runs in).
 	 *
-	 * @param	int		$elementId		Id of the related element
-	 * @param	string	$elementType	Element type ('invoice_supplier', 'facture', ...)
-	 * @param	int		$lcStatus		Lifecycle status code sent
-	 * @param	string	$lcReasonCode	Reason code sent
-	 * @return	int						Id of the inserted row
+	 * @param	int		$elementId			Id of the related element
+	 * @param	string	$elementType		Element type ('invoice_supplier', 'facture', ...)
+	 * @param	int		$lcStatus			Lifecycle status code sent
+	 * @param	string	$lcReasonCode		Reason code sent
+	 * @param	string	$lcValidationStatus	What the platform answered: 'Pending' by default, 'Ok' for a status it confirmed
+	 * @return	int							Id of the inserted row
 	 */
-	private function insertLifecycleMessageFixture($elementId, $elementType, $lcStatus, $lcReasonCode)
+	private function insertLifecycleMessageFixture($elementId, $elementType, $lcStatus, $lcReasonCode, $lcValidationStatus = 'Pending')
 	{
 		global $db, $user;
 
@@ -158,7 +159,7 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 		$sql .= "'OUT', ";
 		$sql .= (int) $lcStatus . ", ";
 		$sql .= "'Test fixture', ";
-		$sql .= "'Pending', ";
+		$sql .= "'" . $db->escape($lcValidationStatus) . "', ";
 		$sql .= "'', ";
 		$sql .= "'" . $db->escape($lcReasonCode) . "', ";
 		$sql .= "'" . $db->idate(dol_now()) . "', ";
@@ -789,5 +790,122 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 
 		// And back to the default, to be sure the two lines above are what changed the answer.
 		$this->assertTrue(SupplierInvoiceHelper::shouldSendApprovedOnValidation($einvoicing, (int) $invoice->id, 'invoice_supplier'));
+	}
+
+	/**
+	 * Create a received document correcting another one: a credit note, or a replacement invoice.
+	 *
+	 * @param	int		$sourceId	Id of the supplier invoice it corrects
+	 * @param	int		$type		FactureFournisseur::TYPE_CREDIT_NOTE or TYPE_REPLACEMENT
+	 * @return	FactureFournisseur
+	 */
+	private function createCorrectingSupplierInvoice(int $sourceId, int $type)
+	{
+		global $db;
+
+		$correcting = $this->createSpecimenSupplierInvoice();
+
+		// initAsSpecimen() builds a standard invoice, and the type is not something create() takes from
+		// the object on every version this module supports: set both columns where they are read from.
+		$sql = "UPDATE " . MAIN_DB_PREFIX . "facture_fourn";
+		$sql .= " SET type = " . (int) $type . ", fk_facture_source = " . (int) $sourceId;
+		$sql .= " WHERE rowid = " . (int) $correcting->id;
+		$this->assertNotFalse($db->query($sql), (string) $db->lasterror());
+
+		return $correcting;
+	}
+
+	/**
+	 * The rule of issue #594: an invoice we refused is cancelled and owes nothing, so the credit note
+	 * the vendor issues to close the matter cannot be accepted in its turn.
+	 *
+	 * @return void
+	 */
+	public function testCreditNoteOfARefusedInvoiceCannotBeAccepted()
+	{
+		global $conf, $db;
+
+		$source = $this->createSpecimenSupplierInvoice();
+		$this->insertLifecycleMessageFixture($source->id, 'invoice_supplier', EInvoicing::STATUS_REFUSED, 'NON_CONFORME', 'Ok');
+		$creditNote = $this->createCorrectingSupplierInvoice((int) $source->id, FactureFournisseur::TYPE_CREDIT_NOTE);
+		$this->addEInvoicingDocument($creditNote->id);
+
+		$this->assertSame((int) $source->id, SupplierInvoiceHelper::refusedSourceOfCreditNote((int) $creditNote->id));
+
+		$einvoicing = new EInvoicing($db);
+		$offered = array_map('intval', array_keys($einvoicing->getSendableStatusesForReceivedInvoice($creditNote->id, 'invoice_supplier')));
+
+		$this->assertNotContains(EInvoicing::STATUS_APPROVED, $offered, 'the credit note of a refused invoice cannot be approved');
+		$this->assertNotContains(EInvoicing::STATUS_PARTIALLY_APPROVED, $offered, 'nor partially approved, which accepts it too');
+		$this->assertContains(EInvoicing::STATUS_REFUSED, $offered, 'refusing it is exactly what is left to do');
+
+		// Validating it in the accounts is the other way of accepting it, and it must not answer 205.
+		$conf->global->EINVOICING_SEND_APPROVED_ON_VALIDATION = '1';
+		$this->assertFalse(SupplierInvoiceHelper::shouldSendApprovedOnValidation($einvoicing, (int) $creditNote->id, 'invoice_supplier'));
+	}
+
+	/**
+	 * A refusal the platform has not confirmed yet can still be rejected, so it does not close
+	 * anything: the credit note stays open to every answer until then.
+	 *
+	 * @return void
+	 */
+	public function testCreditNoteOfAnInvoiceRefusedButNotConfirmedIsStillOpen()
+	{
+		global $db;
+
+		$source = $this->createSpecimenSupplierInvoice();
+		$this->insertLifecycleMessageFixture($source->id, 'invoice_supplier', EInvoicing::STATUS_REFUSED, 'NON_CONFORME', 'Pending');
+		$creditNote = $this->createCorrectingSupplierInvoice((int) $source->id, FactureFournisseur::TYPE_CREDIT_NOTE);
+		$this->addEInvoicingDocument($creditNote->id);
+
+		$this->assertSame(0, SupplierInvoiceHelper::refusedSourceOfCreditNote((int) $creditNote->id));
+
+		$einvoicing = new EInvoicing($db);
+		$offered = array_map('intval', array_keys($einvoicing->getSendableStatusesForReceivedInvoice($creditNote->id, 'invoice_supplier')));
+		$this->assertContains(EInvoicing::STATUS_APPROVED, $offered);
+	}
+
+	/**
+	 * The nuance that makes the rule right rather than merely strict: a replacement invoice also
+	 * references the document it corrects, and it is the corrected invoice the vendor sends *after* a
+	 * refusal. Refusing that one too would leave the operation with no acceptable document at all.
+	 *
+	 * @return void
+	 */
+	public function testReplacementInvoiceOfARefusedInvoiceStaysAcceptable()
+	{
+		global $db;
+
+		$source = $this->createSpecimenSupplierInvoice();
+		$this->insertLifecycleMessageFixture($source->id, 'invoice_supplier', EInvoicing::STATUS_REFUSED, 'NON_CONFORME', 'Ok');
+		$replacement = $this->createCorrectingSupplierInvoice((int) $source->id, FactureFournisseur::TYPE_REPLACEMENT);
+		$this->addEInvoicingDocument($replacement->id);
+
+		$this->assertSame(0, SupplierInvoiceHelper::refusedSourceOfCreditNote((int) $replacement->id));
+
+		$einvoicing = new EInvoicing($db);
+		$offered = array_map('intval', array_keys($einvoicing->getSendableStatusesForReceivedInvoice($replacement->id, 'invoice_supplier')));
+		$this->assertContains(EInvoicing::STATUS_APPROVED, $offered, 'a replacement invoice is what one accepts after refusing the first one');
+	}
+
+	/**
+	 * And an ordinary credit note, on an invoice nobody refused, is answered like any other document.
+	 *
+	 * @return void
+	 */
+	public function testCreditNoteOfAnInvoiceNobodyRefusedIsUnaffected()
+	{
+		global $db;
+
+		$source = $this->createSpecimenSupplierInvoice();
+		$creditNote = $this->createCorrectingSupplierInvoice((int) $source->id, FactureFournisseur::TYPE_CREDIT_NOTE);
+		$this->addEInvoicingDocument($creditNote->id);
+
+		$this->assertSame(0, SupplierInvoiceHelper::refusedSourceOfCreditNote((int) $creditNote->id));
+
+		$einvoicing = new EInvoicing($db);
+		$offered = array_map('intval', array_keys($einvoicing->getSendableStatusesForReceivedInvoice($creditNote->id, 'invoice_supplier')));
+		$this->assertContains(EInvoicing::STATUS_APPROVED, $offered);
 	}
 }

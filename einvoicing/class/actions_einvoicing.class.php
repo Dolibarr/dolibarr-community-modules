@@ -457,6 +457,16 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				// after the approval (issue #548).
 				$availableStatuses = $einvoicing->getSendableStatusesForReceivedInvoice($object->id, $object->element);
 
+				// A button that quietly disappears looks like a bug. Say why the credit note of a refused
+				// invoice cannot be accepted, and name the invoice it credits (issue #594).
+				dol_include_once('einvoicing/class/utils/SupplierInvoiceHelper.class.php');
+				$refusedSourceId = SupplierInvoiceHelper::refusedSourceOfCreditNote((int) $object->id);
+				if ($refusedSourceId > 0) {
+					$sourceInvoice = new FactureFournisseur($db);
+					$sourceRef = ($sourceInvoice->fetch($refusedSourceId) > 0) ? ($sourceInvoice->ref_supplier ?: $sourceInvoice->ref) : (string) $refusedSourceId;
+					print '<div class="info">' . $langs->trans('EInvoiceCreditNoteOfRefusedInvoice', $sourceRef) . '</div>';
+				}
+
 				$url_button = array();
 				foreach ($availableStatuses as $code => $label) {
 					$url_button[] = array(
@@ -743,6 +753,24 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
 				$pdpstatuscode = GETPOSTINT('pdpstatuscode') ?: 0;
 				$statusRaison = GETPOST('statusRaison', 'alpha');
+
+				// The card stops offering it, but the card is not what sends: a status travels here as a
+				// parameter of an URL, so this is where a credit note crediting an invoice we refused is
+				// actually kept from being accepted (issue #594).
+				if (in_array($pdpstatuscode, EInvoicing::STATUSES_ACCEPTING_A_DOCUMENT, true)) {
+					dol_include_once('einvoicing/class/utils/SupplierInvoiceHelper.class.php');
+					$refusedSourceId = SupplierInvoiceHelper::refusedSourceOfCreditNote((int) $object->id);
+					if ($refusedSourceId > 0) {
+						$sourceInvoice = new FactureFournisseur($db);
+						$sourceRef = ($sourceInvoice->fetch($refusedSourceId) > 0) ? ($sourceInvoice->ref_supplier ?: $sourceInvoice->ref) : (string) $refusedSourceId;
+						$message = $langs->trans('EInvoiceCannotAcceptCreditNoteOfRefusedInvoice', $sourceRef);
+						dol_syslog(__METHOD__ . ' ' . strip_tags($message), LOG_WARNING, 0, '_einvoicing');
+						setEventMessages($message, array(), 'errors');
+						$this->errors[] = $message;
+
+						return 0;
+					}
+				}
 
 				$result = $provider->sendStatusMessage($object, $pdpstatuscode, $statusRaison); // Send status message
 
