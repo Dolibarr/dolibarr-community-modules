@@ -410,7 +410,9 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 	{
 		$einvoicing = new EInvoicing($this->db);
 
-		if (!$einvoicing->needEInvoiceManagement($invoice)) {
+		// Ask the boolean question: needEInvoiceManagement() answers with a status code whose ignore values
+		// are truthy. An invoice out of the e-invoicing scope has no cash-in to report.
+		if (!$einvoicing->mustManageEInvoice($invoice)) {
 			return;
 		}
 

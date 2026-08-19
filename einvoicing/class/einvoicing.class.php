@@ -61,14 +61,25 @@ class EInvoicing
 	// Dolibarr internal statuses
 	public const STATUS_UNKNOWN             = 0;		// By default, before the e-invoice has been generated
 
-	public const STATUS_NOT_GENERATED       = 5;		// To sync
-	public const STATUS_GENERATED           = 10;
+	public const STATUS_NOT_GENERATED       = 5;		// To generate then to sync
+	public const STATUS_GENERATED           = 10;		// To sync
 	public const STATUS_AWAITING_VALIDATION = 15;		// Einvoice received but not yet analyzed by your AP
 	public const STATUS_AWAITING_ACK        = 20;		// Einvoice received and analyzed by your AP. Next step happen when doing sync.
 	public const STATUS_ERROR               = 25;
 
 	public const STATUS_IGNORE_2            = 98;		// Never sync (for another reason than ereporting, not used yet)
-	public const STATUS_IGNORE              = 99;		// Never sync
+	public const STATUS_IGNORE              = 99;		// Never sync (will be processed by ereporting)
+
+	/**
+	 * The two codes above, as a list: they keep an invoice out of the e-invoicing scope, it is never
+	 * generated nor sent (B2C invoices reported by e-reporting, TakePOS tickets synced by the cash
+	 * closing, ...). Grouped here so that adding an "ignore" code is honoured by every caller at
+	 * once, through isIgnoredStatus().
+	 */
+	public const STATUS_IGNORE_CODES = [
+		self::STATUS_IGNORE,
+		self::STATUS_IGNORE_2
+	];
 
 	// PDP / PA normalized statuses
 	// public const STATUS_DEPOSITED           = 200;
@@ -886,11 +897,19 @@ class EInvoicing
 		$baseErrors = [];
 		$baseWarnings = [];
 
+		// A private individual has no professional id, and when EINVOICING_SKIP_B2C is on that third party is
+		// out of the e-invoicing scope anyway (B2C is reported by e-reporting, not transmitted as an e-invoice):
+		// its missing SIREN must not be reported as a blocking configuration error. Detection is delegated to
+		// Societe::isACompany(), the same way needEInvoiceManagement() does, so both ends of the chain agree.
+		$isB2C = getDolGlobalInt('EINVOICING_SKIP_B2C') && is_object($thirdparty) && !$thirdparty->isACompany();
+
 		if (empty($thirdparty->name)) {
 			$baseErrors[] = $langs->trans("FxCheckErrorCustomerName");
 		}
 		if (empty($thirdparty->idprof1)) {
-			$baseErrors[] = $langs->trans("FxCheckErrorCustomerIDPROF1");
+			if (!$isB2C) {
+				$baseErrors[] = $langs->trans("FxCheckErrorCustomerIDPROF1");
+			}
 		} elseif (!empty($thirdparty->country_code) && $thirdparty->country_code === 'FR') {
 			// Validate SIREN/SIRET format based on length (French companies only)
 			$idprof1 = preg_replace('/\s+/', '', (string) $thirdparty->idprof1);
@@ -925,7 +944,9 @@ class EInvoicing
 		$routing_id = $this->getBuyerCommunicationURI($thirdparty);
 		// If EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID is off, we use the profid as einvoice id and we already have the previous error message of
 		// profid missing. But if on, we also add a message dedicated to einvoice ID.
-		if (getDolGlobalString('EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID') && empty($routing_id)) {
+		// Same reason as for the professional id above: a B2C third party is not addressed on the network, so
+		// having no routing id is expected and must not block.
+		if (getDolGlobalString('EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID') && empty($routing_id) && !$isB2C) {
 			$baseErrors[] = $langs->trans("FxCheckErrorCustomerRoutingID");
 		}
 		if ($thirdparty->tva_assuj && empty($thirdparty->tva_intra)) {
@@ -2963,7 +2984,9 @@ class EInvoicing
 
 
 	/**
-	 * Return if an invoice need EInvoicing management.
+	 * Return the e-invoicing status an invoice qualifies for. This is the status to store, not an
+	 * answer to "must this invoice be e-invoiced?": the codes meaning "out of scope" are truthy, so
+	 * never test this answer for truth alone, call mustManageEInvoice() for that question.
 	 *
 	 * @param 	Facture|FactureRec		$object		Object
 	 * @return 	int 								self::STATUS_NOT_GENERATED if the invoice object need management of EInvoicing, self::STATUS_IGNORE or self::self::STATUS_IGNORE_2 if not.
@@ -3019,6 +3042,33 @@ class EInvoicing
 		// TODO Add hook
 
 		return $return;
+	}
+
+
+	/**
+	 * Return if an invoice must be managed by EInvoicing. Boolean counterpart of
+	 * needEInvoiceManagement(), which answers with a status code.
+	 *
+	 * @param 	Facture|FactureRec		$object		Object
+	 * @return 	bool								True if the invoice is in the e-invoicing scope
+	 */
+	public function mustManageEInvoice($object)
+	{
+		$status = $this->needEInvoiceManagement($object);
+
+		return !empty($status) && !self::isIgnoredStatus($status);
+	}
+
+
+	/**
+	 * Return if a status code keeps the invoice out of the e-invoicing scope.
+	 *
+	 * @param 	int|string				$status		Status code, a self::STATUS_* value
+	 * @return 	bool								True if the invoice must never be e-invoiced
+	 */
+	public static function isIgnoredStatus($status)
+	{
+		return in_array((int) $status, self::STATUS_IGNORE_CODES, true);
 	}
 
 

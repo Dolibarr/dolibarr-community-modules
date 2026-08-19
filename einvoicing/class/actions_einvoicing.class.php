@@ -103,13 +103,15 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		if ($invoiceObject instanceof Facture) {
 			/** @var Facture $invoiceObject */
 
-			$needEinvoice = $einvoicing->needEInvoiceManagement($invoiceObject);
-			if ($needEinvoice) {
+			// Ask the boolean question: needEInvoiceManagement() answers with a status code, and the codes
+			// meaning "out of the e-invoicing scope" are truthy, so testing its answer for truth alone let an
+			// ignored invoice (a B2C one when EINVOICING_SKIP_B2C is on, typically) walk into the checks below
+			// and be reported as misconfigured.
+			if ($einvoicing->mustManageEInvoice($invoiceObject)) {
 				// Get current status of e-invoice
 				$currentStatusDetails = $einvoicing->fetchLastknownInvoiceStatus($invoiceObject->id, $invoiceObject->ref);
 
-				if (!isset($currentStatusDetails['code']) ||
-					($currentStatusDetails['code'] != $einvoicing::STATUS_IGNORE && $currentStatusDetails['code'] != $einvoicing::STATUS_IGNORE_2)) {
+				if (!isset($currentStatusDetails['code']) || !EInvoicing::isIgnoredStatus($currentStatusDetails['code'])) {
 					if ($invoiceObject->status != $invoiceObject::STATUS_DRAFT	// Never generate/transmit an e-invoice for a DRAFT (note: at validation the invoice has already status VALIDATED when Dolibarr regenerates the final PDF, so the legitimate flow is preserved).
 						&& !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')
 						&& getDolGlobalString('EINVOICING_EINVOICE_IN_REAL_TIME')) {
@@ -316,9 +318,13 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 			if ($object->status == Facture::STATUS_VALIDATED || $object->status == Facture::STATUS_CLOSED) {
 				// if E-invoice is not generated, show button to generate e-invoice
+				// STATUS_IGNORE_2 has no entry in STATUS_LABEL_KEYS, so the "unknown code" fallback below used to
+				// offer the generation button on an invoice explicitly excluded from e-invoicing. An ignored
+				// invoice has nothing to generate, whatever its code is known or not.
 				if (
-					$currentStatusDetails['code'] == $einvoicing::STATUS_NOT_GENERATED
-					|| !array_key_exists($currentStatusDetails['code'], $einvoicing::STATUS_LABEL_KEYS)
+					!EInvoicing::isIgnoredStatus($currentStatusDetails['code'])
+					&& ($currentStatusDetails['code'] == $einvoicing::STATUS_NOT_GENERATED
+						|| !array_key_exists($currentStatusDetails['code'], $einvoicing::STATUS_LABEL_KEYS))
 				) {
 					$url_button[] = array(
 						'lang' => 'einvoicing',

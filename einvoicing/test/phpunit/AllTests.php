@@ -123,6 +123,8 @@ class AllTests
 		$suite->addTestSuite('RecipientDirectoryTest');
 		require_once dirname(__FILE__).'/SellerVatRegimeTest.php';
 		$suite->addTestSuite('SellerVatRegimeTest');
+		require_once dirname(__FILE__).'/SkipB2CPrecheckTest.php';
+		$suite->addTestSuite('SkipB2CPrecheckTest');
 		require_once dirname(__FILE__).'/SupplierInvoiceHelperTest.php';
 		$suite->addTestSuite('SupplierInvoiceHelperTest');
 		require_once dirname(__FILE__).'/TransmittedLockTest.php';

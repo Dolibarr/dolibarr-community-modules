@@ -2,6 +2,23 @@
 
 ## 1.0.4
 
+FIX: A third party recognised as a private individual is no longer reported as misconfigured when
+EINVOICING_SKIP_B2C is on (issue #600). The option already kept B2C invoices out of the e-invoicing
+scope - needEInvoiceManagement() answers "do not manage" on them, since B2C is reported by e-reporting
+and not transmitted as an e-invoice - but the pre-check of the third party knew nothing about it and
+still demanded a professional id, an identifier a private individual has no reason to own. Generating
+or sending such an invoice failed on "The customer has no professional id (SIREN)", and the invoice
+could be refused altogether where EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS is set. The pre-check
+now reads the same Societe::isACompany() as the decision does, so both ends of the chain agree on who
+is B2C, and neither the professional id nor the routing id is required of a private individual. A
+company without a professional id is still blocked, option or not.
+The same invoices could also reach that pre-check through the other end: needEInvoiceManagement()
+answers with a status code, and the two codes meaning "out of scope" (98 and 99) are truthy, so the
+callers that only tested its answer for truth treated an ignored invoice as one to e-invoice. They
+now ask the boolean question instead - mustManageEInvoice() for an invoice, isIgnoredStatus() for a
+stored status - both reading a single list of the codes that keep an invoice out of the scope. This
+also removes the generation button from an invoice explicitly excluded from e-invoicing.
+
 FIX: The supplier invoice list no longer fails on a MySQL server that keeps its default sql_mode. The
 columns the module adds to the SELECT of that list were never added to its GROUP BY, so MySQL refused the
 whole query with error 1055 (only_full_group_by) and the page reported a technical error instead of showing
