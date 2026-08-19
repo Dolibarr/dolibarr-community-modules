@@ -864,16 +864,18 @@ class SuperPDPProvider extends AbstractPDPProvider
 		} else {
 			$lines[] = $langs->trans('RemoteInfoSessionError') . ' (HTTP ' . ($session['status_code'] ?? 'N/A') . ')';
 		}
+		$lines[] = "";
 
 		// Check AP using SuperPDP api
 		$directory = $this->checkDirectoryStatus();
 
 		if ($directory['status_code'] == 200) {
 			$paName = (!$directory['ppf_error'] && $directory['ppf_status'] !== null) ? 'SuperPDP' : $langs->trans('RemoteInfoPAUndetermined');
-			$lines[] = $langs->trans('RemoteInfoPPFDetection', 'SuperPDP', $paName) . ' <span class="smallimp">['. $directory['ppf_identifier'] . ' - ' . $langs->trans('RemoteInfoPPFStatusDetail', $directory['ppf_status']) . ' - ' . $directory['ppf_effective_date'].']</span>';
+			$lines[] = $langs->trans('RemoteInfoPPFDetection', 'SuperPDP', $paName) . ' <span class="smallimp">['. $directory['ppf_identifier'] . ' - ' . $langs->trans('RemoteInfoPPFStatusDetail', $directory['ppf_status']) . ' - ' . ($directory['ppf_status'] === 'error' ? $directory['ppf_message'] : $directory['ppf_effective_date']).']</span>';
 		} else {
 			$lines[] = $langs->trans('RemoteInfoDirectoryError') . ' (HTTP ' . ($directory['status_code'] ?? 'N/A') . ')';
 		}
+		$lines[] = "";
 
 		// Show registered PA for your company (Peppol directory)
 		$tokenData = $this->getTokenData();
