@@ -873,7 +873,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 			$paName = (!$directory['ppf_error'] && $directory['ppf_status'] !== null) ? 'SuperPDP' : $langs->trans('RemoteInfoPAUndetermined');
 
 			if (empty($directory['ppf_identifier'])) {
-				$lines[] = $langs->trans('RemoteInfoPPFNoEntry', 'SuperPDP', $paName) . ' <span class="smallimp">['. $directory['ppf_identifier'] . ' - ' . $langs->trans('RemoteInfoPPFStatusDetail', $directory['ppf_status']) . ' - ' . ($directory['ppf_status'] === 'error' ? $directory['ppf_message'] : $directory['ppf_effective_date']).']</span>';
+				$lines[] = $langs->trans('RemoteInfoPPFNoEntry', 'SuperPDP', $paName);
 			} else {
 				$lines[] = $langs->trans('RemoteInfoPPFDetection', 'SuperPDP', $paName) . ' <span class="smallimp">['. $directory['ppf_identifier'] . ' - ' . $langs->trans('RemoteInfoPPFStatusDetail', $directory['ppf_status']) . ' - ' . ($directory['ppf_status'] === 'error' ? $directory['ppf_message'] : $directory['ppf_effective_date']).']</span>';
 			}
@@ -893,7 +893,11 @@ class SuperPDPProvider extends AbstractPDPProvider
 			} else {
 				$lines[] = $langs->trans('RemoteInfoPeppolPAMismatch', $detectedPA);
 				if (strcasecmp($detectedPA, 'SuperPDP') !== 0) {
-					$lines[] = $langs->trans('RemoteInfoPeppolPAMismatchCheck', $detectedPA);
+					$msg = $langs->trans('RemoteInfoPeppolPAMismatchCheck', $detectedPA);
+					if (empty($directory['ppf_identifier'])) {
+						$msg .= ' '.$langs->trans('RemoteInfoPeppolPAMismatchRequestPortability', $detectedPA);
+					}
+					$lines[] = $msg;
 				}
 			}
 		}
