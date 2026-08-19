@@ -1147,6 +1147,28 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 
 	/**
+	 * Add GROUP BY fields
+	 * Mandatory for the fields added by printFieldListSelect() on lists that build a GROUP BY clause,
+	 * otherwise MySQL rejects the query with sql_mode=only_full_group_by (error 1055).
+	 * Only supplierinvoicelist is concerned: thirdpartylist/societelist call the hook without any
+	 * GROUP BY clause, and productservicelist selects no column from the joined table.
+	 *
+	 * @param array<string,mixed> 	$parameters		Array of parameters
+	 * @param CommonObject			$object			Object invoice
+	 * @param string		 		$action			Code action
+	 * @param Hookmanager			$hookmanager	Hookmanager
+	 * @return int									Result
+	 */
+	public function printFieldListGroupBy($parameters, $object, &$action, $hookmanager)
+	{
+		if (in_array('supplierinvoicelist', explode(':', $parameters['context']), true)) {
+			$this->resprints .= ', ext.rowid, ext.provider';
+		}
+
+		return 0;
+	}
+
+	/**
 	 * Filter options
 	 *
 	 * @param array<string,mixed> 	$parameters		Array of parameters
