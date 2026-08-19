@@ -569,6 +569,7 @@ RemoteInfoCompanyVerification=Verification by %s of your company identify (KYB):
 RemoteInfoUserVerification=Verification by %s of your user identify (KYC): %s
 RemoteInfoSessionError=Unable to retrieve session information
 RemoteInfoPPFDetection=Access Point detected by %s for your company: %s
+RemoteInfoPPFNoEntry=No e-invoice address recorded for your company. If you forgot to opt-in for sending or receiving e-invoices during your registration, check this FAQ 3 of https://www.dolicloud.com/livre-blanc-facturation-electronique-dolibarr.php
 RemoteInfoPAUndetermined=Undetermined
 RemoteInfoPPFStatusDetail=Status: %s
 RemoteInfoDirectoryError=Unable to retrieve directory entries
