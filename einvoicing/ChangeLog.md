@@ -2,6 +2,20 @@
 
 ## 1.0.4
 
+NEW: The order reference the supplier declared on a received e-invoice (BT-13) is now kept on the
+supplier invoice the import creates, and shown on its card, whether or not it matched a purchase order
+of Dolibarr (issue #603). That reference was only used to auto-link the invoice to an order; the
+no-match case - the ordinary one - dropped it, so the accountant could not see what the supplier had
+declared, nor reconcile the invoice by hand. It is stored as sent, trimmed, in every case, and the
+auto-link keeps behaving exactly as before.
+
+The value does not go into an extrafield: the module deliberately stopped using the extrafields of the
+core, since an admin or a user can rename, empty or delete one while the module is accountable for the
+data it holds. It goes into a new table of the module, llx_einvoicing_extrafields, built on the model of
+llx_einvoicing_extlinks - element_id and element_type identify the object - plus a name and a value, so
+that the next property to keep on an object needs no schema change. EInvoicing::insertOrUpdateExtraField()
+and EInvoicing::getExtraFieldValue() are the way in and out.
+
 FIX: A third party recognised as a private individual is no longer reported as misconfigured when
 EINVOICING_SKIP_B2C is on (issue #600). The option already kept B2C invoices out of the e-invoicing
 scope - needEInvoiceManagement() answers "do not manage" on them, since B2C is reported by e-reporting
