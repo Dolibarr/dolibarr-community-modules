@@ -2603,7 +2603,7 @@ class EInvoicing
 		$value = null;
 		if ($this->db->num_rows($resql) > 0) {
 			$obj = $this->db->fetch_object($resql);
-			$value = $obj->value;
+			$value = (string) $obj->value;
 		}
 		$this->db->free($resql);
 
