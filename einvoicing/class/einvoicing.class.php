@@ -771,6 +771,18 @@ class EInvoicing
 			}
 		}
 
+		// Dolibarr 17 prints the data-* values of a combo option as they are (Form::selectarray()), while
+		// 18 and later escape them. The HTML added just above would close the attribute on its first quote
+		// there and leave an invalid <option>, so escape it for those cores only: doing it on the others
+		// would escape it twice and show the tags as text.
+		if ((float) DOL_VERSION < 18) {
+			foreach ($options as $key => $val) {
+				if (isset($val['data-html'])) {
+					$options[$key]['data-html'] = dol_escape_htmltag($val['data-html']);
+				}
+			}
+		}
+
 		// TODO
 		// Make some status disabled by setting 'disabled
 
