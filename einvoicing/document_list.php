@@ -391,6 +391,10 @@ $sql .= ", (CASE";
 $sql .= " WHEN t.fk_element_type = 'facture' THEN (SELECT s.nom FROM ".$db->prefix()."societe as s INNER JOIN ".$db->prefix()."facture as f ON f.fk_soc = s.rowid WHERE f.rowid = t.fk_element_id)";
 $sql .= " WHEN t.fk_element_type = 'invoice_supplier' THEN (SELECT s.nom FROM ".$db->prefix()."societe as s INNER JOIN ".$db->prefix()."facture_fourn as ff ON ff.fk_soc = s.rowid WHERE ff.rowid = t.fk_element_id)";
 $sql .= " ELSE '' END) as thirdparty_name";
+$sql .= ", (CASE";
+$sql .= " WHEN t.fk_element_type = 'facture' THEN (SELECT f.fk_soc FROM ".$db->prefix()."facture as f WHERE f.rowid = t.fk_element_id)";
+$sql .= " WHEN t.fk_element_type = 'invoice_supplier' THEN (SELECT ff.fk_soc FROM ".$db->prefix()."facture_fourn as ff WHERE ff.rowid = t.fk_element_id)";
+$sql .= " ELSE 0 END) as thirdparty_id";
 
 $sqlfields = $sql; // $sql fields to remove for count total
 
@@ -1340,22 +1344,17 @@ while ($i < $imaxinloop) {
 
 					print $out;
 				} elseif ($key == 'thirdparty') {
+					// Thirdparty resolved in the SELECT (thirdparty_id/thirdparty_name); render through a
+					// reusable light company object to avoid re-fetching the whole invoice for every row.
 					$out = '';
-					if (!empty($object->fk_element_type) && !empty($object->fk_element_id)) {
-						$linkedobj = null;
-						if ($object->fk_element_type === 'facture') {
-							require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
-							$linkedobj = new Facture($db);
-						} elseif ($object->fk_element_type === 'invoice_supplier') {
-							require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';
-							$linkedobj = new FactureFournisseur($db);
+					if (!empty($object->thirdparty_id) && !empty($object->thirdparty_name)) {
+						if (!isset($companystatic) || !is_object($companystatic)) {
+							require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
+							$companystatic = new Societe($db);
 						}
-						if (is_object($linkedobj) && $linkedobj->fetch((int) $object->fk_element_id) > 0) {
-							$linkedobj->fetch_thirdparty();
-							if (is_object($linkedobj->thirdparty) && $linkedobj->thirdparty->id > 0) {
-								$out = $linkedobj->thirdparty->getNomUrl(1, '', 24);
-							}
-						}
+						$companystatic->id = (int) $object->thirdparty_id;
+						$companystatic->name = $object->thirdparty_name;
+						$out = $companystatic->getNomUrl(1, '', 24);
 					}
 					print $out;
 				} elseif ($key == 'fk_element_type') {
