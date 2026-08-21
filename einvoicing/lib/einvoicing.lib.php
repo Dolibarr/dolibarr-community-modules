@@ -179,7 +179,7 @@ function thirdpartyidprof($object)
 /**
  * removeAllSpaces
  *
- * @param  string $str string to be cleaned
+ * @param  ?string $str string to be cleaned
  * @param  ?string $original_encoding original encoding
  * @return string
  */
