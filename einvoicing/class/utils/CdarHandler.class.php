@@ -252,10 +252,20 @@ class CdarHandler
 		// SIREN (0002)
 		$mysocGlobalID = idprof($mysoc);
 
-		// Issuer SIREN (0002) of the invoice the status is about: us when we sell, the vendor otherwise
-		$InvoiceIssuerGlobalID = $isOurOwnInvoice
-			? $mysocGlobalID
-			: thirdpartyidprof($object);
+		// Issuer SIREN (0002) of the invoice the status is about: us when we sell, the vendor otherwise.
+		// For a received supplier invoice, the platform indexed the incoming flow under the identifier
+		// the vendor's PDP placed in SellerTradeParty.GlobalID — which may differ from the Dolibarr
+		// third-party SIREN (e.g. test environments where the PDP assigns synthetic identifiers).
+		// Reading it from the stored XML is the only way to reference the same invoice the platform knows.
+		if ($isOurOwnInvoice) {
+			$InvoiceIssuerGlobalID = $mysocGlobalID;
+		} else {
+			$InvoiceIssuerGlobalID = $this->getVendorGlobalIDFromReceivedInvoice($object);
+			if ($InvoiceIssuerGlobalID === '') {
+				$InvoiceIssuerGlobalID = thirdpartyidprof($object);
+				dol_syslog(__METHOD__ . ' no GlobalID found in stored XML for supplier invoice id=' . $object->id . ', falling back on Dolibarr third-party SIREN: ' . $InvoiceIssuerGlobalID, LOG_NOTICE);
+			}
+		}
 
 		// Invoice reference
 		$IssuerAssignedID = $isOurOwnInvoice
@@ -380,6 +390,7 @@ class CdarHandler
 			// We issue the status as the BUYER of a supplier invoice, and it goes back to the vendor
 			$CdarIssuerTradeParty = [
 				'GlobalID' => $mysocGlobalID, // GlobalID of CDAR SENDER
+				'SchemeID' => CdarHandler::SCHEME_SIREN_0002,
 				'RoleCode' => CdarHandler::ROLE_BY
 			];
 
@@ -533,6 +544,60 @@ class CdarHandler
 		}
 
 		return trim((string) $found[0]);
+	}
+
+	/**
+	 * Read the vendor's legal identifier (GlobalID / SIREN) from the XML of a received supplier invoice.
+	 *
+	 * The platform indexed the incoming flow under the identifier the vendor's PDP placed in
+	 * SellerTradeParty — not necessarily the SIREN recorded in the Dolibarr third-party card. Using
+	 * this value as InvoiceIssuerGlobalID in the CDAR ensures the status references the same invoice
+	 * the platform knows, including in test environments where synthetic identifiers are assigned.
+	 *
+	 * @param  FactureFournisseur $object  Supplier invoice
+	 * @return string  GlobalID (schemeID 0002), '' when the XML is absent or carries no such identifier
+	 */
+	private function getVendorGlobalIDFromReceivedInvoice($object)
+	{
+		if (empty($object->id) || $object->element !== 'invoice_supplier') {
+			return '';
+		}
+
+		dol_include_once('/einvoicing/class/helpers/SupplierInvoiceHelper.class.php');
+
+		$xmlData = '';
+		try {
+			$xmlData = (string) SupplierInvoiceHelper::getXmlData((int) $object->id, false);
+		} catch (Exception $e) {
+			dol_syslog(__METHOD__ . ' no e-invoice stored for supplier invoice id ' . $object->id . ': ' . $e->getMessage(), LOG_DEBUG);
+			return '';
+		}
+		if ($xmlData === '') {
+			return '';
+		}
+
+		$xml = @simplexml_load_string($xmlData);
+		if ($xml === false) {
+			dol_syslog(__METHOD__ . ' the e-invoice stored for supplier invoice id ' . $object->id . ' is not parsable XML', LOG_WARNING);
+			return '';
+		}
+
+		// Only ram: is needed — the same read works on a CII and on the XML extracted from a Factur-X
+		$xml->registerXPathNamespace('ram', 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100');
+
+		// BT-29: GlobalID with schemeID="0002" is the SIREN in the French mandate
+		$found = $xml->xpath('//ram:SellerTradeParty/ram:GlobalID[@schemeID="0002"]');
+		if (!empty($found)) {
+			return trim((string) $found[0]);
+		}
+
+		// BT-30: SpecifiedLegalOrganization.ID — also carries the SIREN (legal registration number)
+		$found = $xml->xpath('//ram:SellerTradeParty/ram:SpecifiedLegalOrganization/ram:ID');
+		if (!empty($found)) {
+			return trim((string) $found[0]);
+		}
+
+		return '';
 	}
 
 	/**
