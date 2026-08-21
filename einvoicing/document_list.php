@@ -166,16 +166,21 @@ $object->fields['recap'] = array(
 	'notsearchable' => 1
 );
 
-// Add a virtual "thirdparty" field into $object->fields for the list (resolved on the fly from the linked invoice, like native invoice lists)
-$object->fields['thirdparty'] = array(
-	'label' => $langs->trans("ThirdParty"),
-	'type' => 'text',
-	'visible' => 1,
-	'enabled' => '1',
-	'position' => 52,
-	'checked' => 1,
-	'notsearchable' => 1
-);
+// Add a virtual "thirdparty" field into $object->fields for the list (resolved on the fly from the linked invoice, like native invoice lists).
+// Opt-in: resolving the thirdparty relies on correlated subqueries (llx_einvoicing_document has no fk_soc), which can be
+// heavy on very large bases, so the whole column is gated behind a hidden constant and disabled by default.
+$showthirdpartycol = getDolGlobalInt('EINVOICING_SHOW_THIRDPARTY_COLUMN');
+if ($showthirdpartycol) {
+	$object->fields['thirdparty'] = array(
+		'label' => $langs->trans("ThirdParty"),
+		'type' => 'text',
+		'visible' => 1,
+		'enabled' => '1',
+		'position' => 52,
+		'checked' => 1,
+		'notsearchable' => 1
+	);
+}
 
 
 // Initialize array of search criteria
@@ -386,15 +391,17 @@ $reshook = $hookmanager->executeHooks('printFieldListSelect', $parameters, $obje
 $sql .= $hookmanager->resPrint;
 $sql = preg_replace('/,\s*$/', '', $sql);
 
-// Virtual "thirdparty_name" column resolved from the linked invoice, used to sort the Tiers column
-$sql .= ", (CASE";
-$sql .= " WHEN t.fk_element_type = 'facture' THEN (SELECT s.nom FROM ".$db->prefix()."societe as s INNER JOIN ".$db->prefix()."facture as f ON f.fk_soc = s.rowid WHERE f.rowid = t.fk_element_id)";
-$sql .= " WHEN t.fk_element_type = 'invoice_supplier' THEN (SELECT s.nom FROM ".$db->prefix()."societe as s INNER JOIN ".$db->prefix()."facture_fourn as ff ON ff.fk_soc = s.rowid WHERE ff.rowid = t.fk_element_id)";
-$sql .= " ELSE '' END) as thirdparty_name";
-$sql .= ", (CASE";
-$sql .= " WHEN t.fk_element_type = 'facture' THEN (SELECT f.fk_soc FROM ".$db->prefix()."facture as f WHERE f.rowid = t.fk_element_id)";
-$sql .= " WHEN t.fk_element_type = 'invoice_supplier' THEN (SELECT ff.fk_soc FROM ".$db->prefix()."facture_fourn as ff WHERE ff.rowid = t.fk_element_id)";
-$sql .= " ELSE 0 END) as thirdparty_id";
+// Virtual "thirdparty_name"/"thirdparty_id" columns resolved from the linked invoice (display + sort of the Tiers column)
+if ($showthirdpartycol) {
+	$sql .= ", (CASE";
+	$sql .= " WHEN t.fk_element_type = 'facture' THEN (SELECT s.nom FROM ".$db->prefix()."societe as s INNER JOIN ".$db->prefix()."facture as f ON f.fk_soc = s.rowid WHERE f.rowid = t.fk_element_id)";
+	$sql .= " WHEN t.fk_element_type = 'invoice_supplier' THEN (SELECT s.nom FROM ".$db->prefix()."societe as s INNER JOIN ".$db->prefix()."facture_fourn as ff ON ff.fk_soc = s.rowid WHERE ff.rowid = t.fk_element_id)";
+	$sql .= " ELSE '' END) as thirdparty_name";
+	$sql .= ", (CASE";
+	$sql .= " WHEN t.fk_element_type = 'facture' THEN (SELECT f.fk_soc FROM ".$db->prefix()."facture as f WHERE f.rowid = t.fk_element_id)";
+	$sql .= " WHEN t.fk_element_type = 'invoice_supplier' THEN (SELECT ff.fk_soc FROM ".$db->prefix()."facture_fourn as ff WHERE ff.rowid = t.fk_element_id)";
+	$sql .= " ELSE 0 END) as thirdparty_id";
+}
 
 $sqlfields = $sql; // $sql fields to remove for count total
 
@@ -487,7 +494,7 @@ if ($socid) {
 //$sql.= dolSqlDateFilter("t.field", $search_xxxday, $search_xxxmonth, $search_xxxyear);
 // Add where from extra fields
 // Filter on thirdparty resolved from the linked invoice (facture / facture fournisseur)
-if ($search_thirdparty != '') {
+if ($showthirdpartycol && $search_thirdparty != '') {
 	$sql .= " AND (";
 	$sql .= " EXISTS (SELECT 1 FROM ".$db->prefix()."facture as sf INNER JOIN ".$db->prefix()."societe as ss ON ss.rowid = sf.fk_soc WHERE sf.rowid = t.fk_element_id AND t.fk_element_type = 'facture'".natural_search("ss.nom", $search_thirdparty, 0, 0).")";
 	$sql .= " OR EXISTS (SELECT 1 FROM ".$db->prefix()."facture_fourn as sff INNER JOIN ".$db->prefix()."societe as ssf ON ssf.rowid = sff.fk_soc WHERE sff.rowid = t.fk_element_id AND t.fk_element_type = 'invoice_supplier'".natural_search("ssf.nom", $search_thirdparty, 0, 0).")";
