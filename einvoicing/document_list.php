@@ -1193,6 +1193,9 @@ $i = 0;
 $savnbfield = $totalarray['nbfield'];
 $totalarray = array();
 $totalarray['nbfield'] = 0;
+require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
+$companystatic = new Societe($db);
+
 $imaxinloop = ($limit ? min($num, $limit) : $num);
 while ($i < $imaxinloop) {
 	$obj = $db->fetch_object($resql);
@@ -1354,13 +1357,9 @@ while ($i < $imaxinloop) {
 					// Thirdparty resolved in the SELECT (thirdparty_id/thirdparty_name); render through a
 					// reusable light company object to avoid re-fetching the whole invoice for every row.
 					$out = '';
-					if (!empty($object->thirdparty_id) && !empty($object->thirdparty_name)) {
-						if (!isset($companystatic) || !is_object($companystatic)) {
-							require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
-							$companystatic = new Societe($db);
-						}
-						$companystatic->id = (int) $object->thirdparty_id;
-						$companystatic->name = $object->thirdparty_name;
+					if (!empty($obj->thirdparty_id) && !empty($obj->thirdparty_name)) {
+						$companystatic->id = (int) $obj->thirdparty_id;
+						$companystatic->name = $obj->thirdparty_name;
 						$out = $companystatic->getNomUrl(1, '', 24);
 					}
 					print $out;
