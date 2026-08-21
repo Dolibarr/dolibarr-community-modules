@@ -2,6 +2,13 @@
 
 ## 1.0.4
 
+FIX: The e-invoice status combo no longer renders an invalid <option> on Dolibarr 17. The code of an
+Access Point status is shown next to its label through a <span> put in the 'data-html' of the option,
+and Form::selectarray() prints the data-* values of an option as they are on 17, where 18 and later
+escape them: the attribute closed on the first quote of that span, and the markup of the whole option
+was broken. The status list escapes the value itself on those cores now, which produces exactly what
+the newer ones produce, and leaves the newer ones untouched rather than escaping twice.
+
 FIX: A third party recognised as a private individual is no longer reported as misconfigured when
 EINVOICING_SKIP_B2C is on (issue #600). The option already kept B2C invoices out of the e-invoicing
 scope - needEInvoiceManagement() answers "do not manage" on them, since B2C is reported by e-reporting
