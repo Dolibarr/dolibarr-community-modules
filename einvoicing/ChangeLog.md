@@ -2,6 +2,21 @@
 
 ## 1.0.4
 
+FIX: The list of e-invoicing flows works again on Dolibarr 17, the version the descriptor of the module
+declares as the minimum it supports; that page had never been able to render there. It asks
+CommonObject::getFieldList() to leave out of the SELECT the columns it does not read, among them 'recap',
+a virtual column of the list which has no column in the table. That second argument only exists since
+Dolibarr 18: on 17 the method takes the alias alone and ignores the rest without a word, so 'recap' went
+into the query and the page answered a technical error, "Unknown column 't.recap' in 'SELECT'". Below 18
+the page now builds the same list the core builds since 18, and nothing changes on 18 and above, where
+getFieldList() is still the one doing it. Past that, the page died on "Call to undefined function
+GETPOSTDATE()", a helper the core gained in 18 as well: it is polyfilled in the library of the module
+next to GETPOSTFLOAT(), and the page loads that library now - which also covers dolPrintHTMLForAttribute(),
+a function of Dolibarr 19 the same page calls to render its text columns. Finally, the page read
+$conf->main_checkbox_left_column directly, a property the core only carries since Dolibarr 21, so every
+load below that wrote six PHP warnings in the log for a value that is empty there anyway: it is read
+through empty() now, the way one of those six places already read it.
+
 FIX: A third party recognised as a private individual is no longer reported as misconfigured when
 EINVOICING_SKIP_B2C is on (issue #600). The option already kept B2C invoices out of the e-invoicing
 scope - needEInvoiceManagement() answers "do not manage" on them, since B2C is reported by e-reporting
