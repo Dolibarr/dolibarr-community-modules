@@ -78,6 +78,7 @@ include_once __DIR__.'/class/providers/PDPProviderManager.class.php';
 include_once __DIR__.'/class/protocols/ProtocolManager.class.php';
 
 // load module libraries
+include_once __DIR__.'/lib/einvoicing.lib.php';
 include_once __DIR__.'/class/document.class.php';
 // for other modules
 //dol_include_once('/othermodule/class/otherobject.class.php');
@@ -359,7 +360,24 @@ $morecss = array();
 // Build and execute select
 // --------------------------------------------------------------------
 $sql = "SELECT";
-$sql .= " ".$object->getFieldList('t', array('recap', 'xml_data'));
+// Fields of the table for the SELECT. 'recap' is a virtual column of this list - it has no column in
+// the table - and 'xml_data' is never displayed, so both must stay out of the query.
+$fieldstoexcludefromselect = array('recap', 'xml_data');
+if ((float) DOL_VERSION < 18) {
+	// CommonObject::getFieldList() takes what to exclude only since Dolibarr 18: on 17 it takes the alias
+	// alone and ignores the rest without a word, which sends 't.recap' into the query and fails it. Build
+	// the same list as the core builds since 18.
+	$fieldlist = array();
+	foreach (array_keys($object->fields) as $fieldname) {
+		if (in_array($fieldname, $fieldstoexcludefromselect)) {
+			continue;
+		}
+		$fieldlist[] = 't.'.$fieldname;
+	}
+	$sql .= " ".implode(',', $fieldlist);
+} else {
+	$sql .= " ".$object->getFieldList('t', $fieldstoexcludefromselect);
+}
 // Add fields from extrafields
 if (!empty($extrafields->attributes[$object->table_element]['label'])) {
 	foreach ($extrafields->attributes[$object->table_element]['label'] as $key => $val) {
@@ -702,7 +720,7 @@ if (!empty($moreforfilter)) {
 
 $varpage = empty($contextpage) ? $_SERVER["PHP_SELF"] : $contextpage;
 //$varpage = '';
-$htmlofselectarray = $form->multiSelectArrayWithCheckbox('selectedfields', $arrayfields, $varpage, $conf->main_checkbox_left_column);  // This also change content of $arrayfields with user setup
+$htmlofselectarray = $form->multiSelectArrayWithCheckbox('selectedfields', $arrayfields, $varpage, empty($conf->main_checkbox_left_column) ? 0 : $conf->main_checkbox_left_column);  // This also change content of $arrayfields with user setup
 $selectedfields = (($mode != 'kanban' && $mode != 'kanbangroupby') ? $htmlofselectarray : '');
 $selectedfields .= (count($arrayofmassactions) ? $form->showCheckAddButtons('checkforselect', 1) : '');
 
@@ -1018,7 +1036,7 @@ print '<table class="tagtable nobottomiftotal noborder liste'.($moreforfilter ? 
 // --------------------------------------------------------------------
 print '<tr class="liste_titre_filter">';
 // Action column
-if ($conf->main_checkbox_left_column) {
+if (!empty($conf->main_checkbox_left_column)) {
 	print '<td class="liste_titre center maxwidthsearch">';
 	$searchpicto = $form->showFilterButtons('left');
 	print $searchpicto;
@@ -1079,7 +1097,7 @@ print $hookmanager->resPrint;
 	print '<td class="liste_titre"></td>';
 }*/
 // Action column
-if (!$conf->main_checkbox_left_column) {
+if (empty($conf->main_checkbox_left_column)) {
 	print '<td class="liste_titre center maxwidthsearch">';
 	$searchpicto = $form->showFilterButtons();
 	print $searchpicto;
@@ -1094,7 +1112,7 @@ $totalarray['nbfield'] = 0;
 // --------------------------------------------------------------------
 print '<tr class="liste_titre">';
 // Action column
-if ($conf->main_checkbox_left_column) {
+if (!empty($conf->main_checkbox_left_column)) {
 	print getTitleFieldOfList($selectedfields, 0, $_SERVER["PHP_SELF"], '', '', '', '', $sortfield, $sortorder, 'center maxwidthsearch ')."\n";
 	$totalarray['nbfield']++;
 }
@@ -1126,7 +1144,7 @@ print $hookmanager->resPrint;
 	$totalarray['nbfield']++;
 }*/
 // Action column
-if (!$conf->main_checkbox_left_column) {
+if (empty($conf->main_checkbox_left_column)) {
 	print getTitleFieldOfList($selectedfields, 0, $_SERVER["PHP_SELF"], '', '', '', '', $sortfield, $sortorder, 'center maxwidthsearch ')."\n";
 	$totalarray['nbfield']++;
 }
@@ -1225,7 +1243,7 @@ while ($i < $imaxinloop) {
 		print '<tr data-rowid="'.$object->id.'" class="oddeven row-with-select">';
 
 		// Action column
-		if ($conf->main_checkbox_left_column) {
+		if (!empty($conf->main_checkbox_left_column)) {
 			print '<td class="nowrap center">';
 			if ($massactionbutton || $massaction) { // If we are in select mode (massactionbutton defined) or if we have already selected and sent an action ($massaction) defined
 				$selected = 0;
