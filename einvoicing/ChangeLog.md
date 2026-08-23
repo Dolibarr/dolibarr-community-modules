@@ -23,6 +23,11 @@ CHANGE: GETPOSTFLOAT(), a function the core gained in Dolibarr 20 and that the m
 versions below, moves from the library of the module to compat/functions.lib.php, where the module keeps
 what it copies from the core. Pure move, guard included: the library requires that file, so the two call
 sites of admin/setup.php keep finding the function where they used to.
+CHANGE: getDolGlobalFloat(), a function the core gained in Dolibarr 21 and that the module backports for
+the versions below, moves from the library of the module to compat/functions.lib.php, where the module
+keeps what it copies from the core. Pure move, guard included: the library requires that file, so the
+eight call sites of PriceHelper - the rounding rule of the totals - keep finding the function where they
+used to.
 
 CHANGE: dolPrintHTMLForAttribute(), a function the core only gained in Dolibarr 19, was backported in
 the library of the module, among its own functions. It now sits in compat/functions.lib.php, next to the

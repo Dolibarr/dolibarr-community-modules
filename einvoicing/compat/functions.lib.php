@@ -25,6 +25,23 @@
 
 // @phan-file-suppress PhanRedefineFunction
 
+if (!function_exists('getDolGlobalFloat')) {
+	/**
+	 *  Return a Dolibarr global constant value, converted into float.
+	 *  Provided as a polyfill for Dolibarr < 21, where this function does not exist yet.
+	 *
+	 *  @param  string  $key        Name of the constant
+	 *  @param  float   $default    Default value if constant is not defined
+	 *  @return float               Value converted into float
+	 *  @since  Dolibarr V21
+	 */
+	function getDolGlobalFloat($key, $default = 0)
+	{
+		global $conf;
+		return (float) (isset($conf->global->$key) ? $conf->global->$key : $default);
+	}
+}
+
 if (!function_exists('GETPOSTDATE')) {
 	/**
 	 *  Return a timestamp built from the year, month, day (and optionally hour, minute, second) fields
