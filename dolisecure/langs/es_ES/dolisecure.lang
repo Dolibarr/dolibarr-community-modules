@@ -1,0 +1,84 @@
+# Translation file
+
+#
+# Generic
+#
+ModuleDoliSecureName = DoliSecure
+ModuleDoliSecureDesc = Comprueba que la versión de Dolibarr instalada no esté afectada por ninguna vulnerabilidad (CVE) conocida y muestra un indicador, visible solo para administradores, en la página de inicio
+DoliSecureDescription = Comprueba que la versión de Dolibarr instalada no esté afectada por ninguna vulnerabilidad (CVE) conocida y muestra un indicador, visible solo para administradores, en la página de inicio
+
+#
+# Admin page
+#
+DoliSecureSetup = Configuración de DoliSecure
+Settings = Parámetros
+DoliSecureSetupPage = Este módulo comprueba periódicamente la versión de Dolibarr instalada frente a la base de datos de vulnerabilidades NVD (NIST) y muestra un indicador, visible solo para administradores, en la página de inicio.
+DOLISECURE_CACHE_DELAY_HOURS = Plazo antes de la próxima comprobación (horas)
+DOLISECURE_CACHE_DELAY_HOURSTooltip = Número de horas durante las cuales se reutiliza el último resultado antes de realizar una nueva comprobación en línea
+DOLISECURE_SHOW_OK_BANNER = Mostrar el indicador incluso sin vulnerabilidad
+DOLISECURE_SHOW_OK_BANNERTooltip = Si está activado, se muestra un indicador verde en la página de inicio incluso si no se detecta ninguna vulnerabilidad
+DOLISECURE_SEND_ADMIN_ALERT = Enviar un correo a los administradores en caso de vulnerabilidad
+DOLISECURE_SEND_ADMIN_ALERTTooltip = Se envía un correo automáticamente cuando se detecta una nueva vulnerabilidad (un único envío mientras la lista de vulnerabilidades no cambie)
+DOLISECURE_ALERT_EMAIL = Destinatario(s) de la alerta (opcional)
+DOLISECURE_ALERT_EMAILTooltip = Lista de direcciones de correo separadas por comas. Déjelo vacío para notificar automáticamente a todos los usuarios activos marcados como administrador
+
+#
+# Status / report
+#
+DoliSecureStatus = Estado de seguridad
+DoliSecureInstalledVersion = Versión instalada
+DoliSecureLastCheck = Última comprobación
+DoliSecureCheckNow = Comprobar ahora
+DoliSecureVulnerable = %s vulnerabilidad(es) conocida(s) detectada(s)
+DoliSecureOk = Ninguna vulnerabilidad conocida
+DoliSecureCheckError = Fallo en la comprobación (%s)
+DoliSecureNeverChecked = Nunca comprobado
+DoliSecureCveList = Vulnerabilidades detectadas
+DoliSecureCveId = CVE
+DoliSecureSeverity = Gravedad
+DoliSecureFixedIn = Corregida en
+DoliSecurePublished = Publicada el
+DoliSecureSeeOnNvd = Ver en NVD
+DoliSecureSeeDetails = Ver detalles
+DoliSecureSeeSetupPage = Consulte la página de configuración del módulo DoliSecure para más información.
+DoliSecureVulnerabilityFound = %s vulnerabilidad(es) conocida(s) afectan a la versión %s de Dolibarr instalada
+DoliSecureNoVulnerability = Ninguna vulnerabilidad conocida para la versión %s de Dolibarr instalada
+DoliSecureNoVulnerabilityLong = La versión instalada de Dolibarr no estaba afectada por ninguna vulnerabilidad (CVE) conocida en el momento de la última comprobación.
+
+#
+# Alert email
+#
+DoliSecureAlertMailSubject = [DoliSecure] Dolibarr %s: %s vulnerabilidad(es) conocida(s) detectada(s)
+DoliSecureAlertMailIntro = El módulo DoliSecure ha detectado que la versión %s de Dolibarr instalada en este servidor está afectada por al menos una vulnerabilidad (CVE) conocida:
+DoliSecureAlertMailOutro = Por favor, planifique la actualización de Dolibarr o la aplicación de los parches correspondientes lo antes posible. Este correo ha sido enviado automáticamente por el módulo DoliSecure.
+DoliSecureFixedInVersion = Corregida en la versión %s de Dolibarr (o una versión posterior).
+DoliSecureFixedVersionUnknown = La fuente no indica la versión que corrige esta vulnerabilidad: consulte la ficha CVE anterior.
+
+#
+# About page
+#
+About = Acerca de
+DoliSecureAbout = Acerca de DoliSecure
+DoliSecureAboutPage = Página "Acerca de" de DoliSecure
+
+#
+# Home page / top menu
+#
+DoliSecureArea = Seguridad de Dolibarr
+
+#
+# Home page widget
+#
+DoliSecureBoxTitle = Seguridad de Dolibarr (CVE)
+
+#
+# Cross-promotion
+#
+DoliSecureDiscoverOtherModules = Otros módulos creados por Joliciel están disponibles en %s.
+
+#
+# About page - Joliciel / Dolistore promotion
+#
+DoliSecureAboutJolicielTitle = Joliciel, editor de módulos para Dolibarr
+DoliSecureAboutJolicielText = Joliciel diseña y publica módulos complementarios para Dolibarr ERP & CRM, entre ellos DoliSecure, disponibles en DoliStore.com, el mercado oficial de Dolibarr. Encuentre en esa página la lista actualizada de todos los módulos de Joliciel: seguridad, integraciones, productividad diaria...
+DoliSecureAboutJolicielCta = Descubrir los módulos de Joliciel en DoliStore.com
