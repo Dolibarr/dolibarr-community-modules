@@ -95,7 +95,7 @@ if (!empty($user->socid) && $user->socid > 0) {
 if (!isModEnabled('einvoicing')) {
 	accessforbidden('Module not enabled');
 }
-/** @var User $user */
+/** @phan-var User $user */
 if (!$user->hasRight('einvoicing', 'read')) {
 	accessforbidden();
 }
