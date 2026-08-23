@@ -334,7 +334,14 @@ print '<table class="tagtable nobottomiftotal liste">';
 // Filter line
 print '<tr class="liste_titre_filter">';
 print '<td class="liste_titre">';
-print $form->select_company($search_socid, 'search_socid', '(s.fournisseur:=:1)', '1', 0, 0, array(), 0, 'maxwidth200');
+// Form::select_company() does not read this filter the same way on every version. Until Dolibarr 18
+// the criteria is appended to the query as it stands, so it has to be plain SQL; from 18 a criteria
+// holding parentheses is converted by forgeSQLFromUniversalSearchCriteria(), and on 24 that conversion
+// is no longer conditional - every criteria goes through it. Passing the Universal Search syntax to 17
+// therefore ends the page on "DB_ERROR_SYNTAX ... near ':=:1))'", and passing plain SQL to 24 would be
+// mangled the other way round.
+$vendorfilter = ((float) DOL_VERSION < 18) ? 's.fournisseur = 1' : '(s.fournisseur:=:1)';
+print $form->select_company($search_socid, 'search_socid', $vendorfilter, '1', 0, 0, array(), 0, 'maxwidth200');
 print '</td>';
 print '<td class="liste_titre"><input type="text" class="flat maxwidth100" name="search_ref_fourn" value="'.dol_escape_htmltag($search_ref_fourn).'"></td>';
 print '<td class="liste_titre"></td>';
