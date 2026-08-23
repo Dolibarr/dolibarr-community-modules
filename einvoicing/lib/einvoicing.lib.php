@@ -368,26 +368,6 @@ if (!function_exists("getMultidirVersion")) {
 	}
 }
 
-if (!function_exists("GETPOSTFLOAT")) {
-	/**
-	 *  Return the value of a $_GET or $_POST supervariable, converted into float.
-	 *  Warning: This function assumes by default that the input is a number entered by end user in user format in local language (with possible thousands separator and decimal separator).
-	 *  If it is not the case, use the parameter $option = 1 instead.
-	 *
-	 *  @param  string          $paramname      Name of the $_GET or $_POST parameter
-	 *	@param	''|'MU'|'MT'|'MS'|'CU'|'CT'|int	$rounding	Type of rounding ('', 'MU', 'MT, 'MS', 'CU', 'CT', integer) {@see price2num()}
-	 * 	@param	int<0,2>		$option			Put 1 if you know that content is already universal format number (so no correction on decimal will be done)
-	 * 											Put 2 if you know that number is a user input (so we know we have to fix decimal separator).
-	 * 					                        Use 0 if unknown (never use this anymore, automatic detection is not reliable with some languages).
-	 *  @return float                           Value converted into float
-	 *  @since	Dolibarr V20
-	 */
-	function GETPOSTFLOAT($paramname, $rounding = '', $option = 2)  // @phan-suppress-current-line PhanRedefineFunction
-	{
-		// price2num() can be used to round to an expected accuracy and/or to sanitize any valid user input (such as "1 234.5", "1 234,5", "1'234,5", "1·234,5", "1,234.5", etc.)
-		return (float) price2num(GETPOST($paramname), $rounding, $option);
-	}
-}
 
 if (!function_exists('getDolGlobalFloat')) {
 	/**

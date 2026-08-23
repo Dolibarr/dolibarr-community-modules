@@ -2,6 +2,11 @@
 
 ## 1.0.4
 
+CHANGE: GETPOSTFLOAT(), a function the core gained in Dolibarr 20 and that the module backports for the
+versions below, moves from the library of the module to compat/functions.lib.php, where the module keeps
+what it copies from the core. Pure move, guard included: the library requires that file, so the two call
+sites of admin/setup.php keep finding the function where they used to.
+
 CHANGE: dolPrintHTMLForAttribute(), a function the core only gained in Dolibarr 19, was backported in
 the library of the module, among its own functions. It now sits in compat/functions.lib.php, next to the
 other core helpers the module ships for the versions that do not have them. Nothing else changes: the
