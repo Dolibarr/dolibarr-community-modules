@@ -33,6 +33,10 @@ versions below, moves from the library of the module to compat/functions.lib.php
 what it copies from the core. Pure move, guard included: the library requires that file, so the two call
 sites - the temporary directory the providers write a retrieved test invoice into - keep finding the
 function where they used to.
+CHANGE: dolPrintHTML(), a function the core gained in Dolibarr 18 and that the module backports for
+Dolibarr 17, moves from the library of the module to compat/functions.lib.php, where the module keeps
+what it copies from the core. Pure move, guard included: the library requires that file, so the seven
+call sites keep finding the function where they used to.
 
 CHANGE: dolPrintHTMLForAttribute(), a function the core only gained in Dolibarr 19, was backported in
 the library of the module, among its own functions. It now sits in compat/functions.lib.php, next to the
