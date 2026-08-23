@@ -320,7 +320,6 @@ class modDoliSecure extends DolibarrModules
 			'user' => 2, // 0=Menu for internal users, 1=external users, 2=both
 		);
 		/* END MODULEBUILDER TOPMENU */
-
 	}
 
 	/**

@@ -496,7 +496,7 @@ class DoliSecureChecker
 	/**
 	 * Rank a CVSS base severity string for comparison (higher = more dangerous)
 	 *
-	 * @param	string	$severity
+	 * @param	string	$severity	Severity string (e.g. 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW')
 	 * @return	int
 	 */
 	protected static function severityRank($severity)
@@ -518,7 +518,7 @@ class DoliSecureChecker
 	/**
 	 * Return the most dangerous severity found among a list of CVEs (CRITICAL > HIGH > MEDIUM > LOW > unknown)
 	 *
-	 * @param	array<int,array<string,mixed>>	$cves
+	 * @param	array<int,array<string,mixed>>	$cves	List of CVE arrays, each with a 'severity' key
 	 * @return	string	'CRITICAL', 'HIGH', 'MEDIUM', 'LOW', or '' if none has a known severity
 	 */
 	public static function getMaxSeverity(array $cves)
@@ -541,7 +541,7 @@ class DoliSecureChecker
 	 * Reuses Dolibarr's own semantic colors (info/warning/error) so the shading matches the rest of the UI,
 	 * plus a distinct darker red for CRITICAL since Dolibarr has no built-in class beyond "error".
 	 *
-	 * @param	string	$severity
+	 * @param	string	$severity	Severity string (e.g. 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW')
 	 * @return	array{bg:string,border:string}
 	 */
 	public static function severityColors($severity)
