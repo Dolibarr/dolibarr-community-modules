@@ -20,6 +20,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+/** @phan-file-suppress PhanRedefineFunction */
+
 /*
    The goal of that php CLI script is to make zip package of your module
    as an alternative to web "build zip" or "perl script makepack"
@@ -136,7 +138,7 @@ function delTree($dir)
  *
  * @param   string  $path  full path to delete
  *
- * @return bool true on success ($path does not exists at the end of process), else exit
+ * @return true|never true on success ($path does not exists at the end of process), else exit
  */
 function secureUnlink($path)
 {
@@ -161,7 +163,7 @@ function secureUnlink($path)
  *
  * @param   string  $path  path to make
  *
- * @return bool true on success ($path exists at the end of process), else exit
+ * @return true|never true on success ($path exists at the end of process), else exit
  */
 function mkdirAndCheck($path)
 {

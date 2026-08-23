@@ -133,13 +133,13 @@ print '<td>'.dol_escape_htmltag($checker->getInstalledVersion()).'</td>';
 print '<td>'.(!empty($last['date']) ? dol_print_date($last['date'], 'dayhour') : $langs->trans('DoliSecureNeverChecked')).'</td>';
 print '<td>';
 if ($last['status'] === 'vulnerable') {
-	print img_picto('', 'fa-shield-alt', 'class="pictofixedwidth valignmiddle"', false, 0, 0, '', 'text-danger');
+	print img_picto('', 'fa-shield-alt', 'class="pictofixedwidth valignmiddle"', 0, 0, 0, '', 'text-danger');
 	print ' '.$langs->trans('DoliSecureVulnerable', count($last['cves']));
 } elseif ($last['status'] === 'ok') {
-	print img_picto('', 'fa-shield-alt', 'class="pictofixedwidth valignmiddle"', false, 0, 0, '', 'text-success');
+	print img_picto('', 'fa-shield-alt', 'class="pictofixedwidth valignmiddle"', 0, 0, 0, '', 'text-success');
 	print ' '.$langs->trans('DoliSecureOk');
 } elseif ($last['status'] === 'error') {
-	print img_picto('', 'fa-shield-alt', 'class="pictofixedwidth valignmiddle"', false, 0, 0, '', 'text-warning');
+	print img_picto('', 'fa-shield-alt', 'class="pictofixedwidth valignmiddle"', 0, 0, 0, '', 'text-warning');
 	print ' '.$langs->trans('DoliSecureCheckError', $last['error']);
 } else {
 	print $langs->trans('DoliSecureNeverChecked');

@@ -197,13 +197,13 @@ print '<td>'.(!empty($last['date']) ? dol_print_date($last['date'], 'dayhour') :
 print '<td>';
 if ($last['status'] === 'vulnerable') {
 	$badgecolors = DoliSecureChecker::severityColors(DoliSecureChecker::getMaxSeverity($last['cves']));
-	print img_picto('', 'fa-shield-alt', 'class="pictofixedwidth valignmiddle"', false, 0, 0, '', 'text-danger');
+	print img_picto('', 'fa-shield-alt', 'class="pictofixedwidth valignmiddle"', 0, 0, 0, '', 'text-danger');
 	print ' <span class="badge badge-status" style="background-color:'.$badgecolors['border'].';color:#fff;">'.$langs->trans('DoliSecureVulnerable', count($last['cves'])).'</span>';
 } elseif ($last['status'] === 'ok') {
-	print img_picto('', 'fa-shield-alt', 'class="pictofixedwidth valignmiddle"', false, 0, 0, '', 'text-success');
+	print img_picto('', 'fa-shield-alt', 'class="pictofixedwidth valignmiddle"', 0, 0, 0, '', 'text-success');
 	print ' <span class="badge badge-status4 badge-status">'.$langs->trans('DoliSecureOk').'</span>';
 } elseif ($last['status'] === 'error') {
-	print img_picto('', 'fa-shield-alt', 'class="pictofixedwidth valignmiddle"', false, 0, 0, '', 'text-warning');
+	print img_picto('', 'fa-shield-alt', 'class="pictofixedwidth valignmiddle"', 0, 0, 0, '', 'text-warning');
 	print ' '.$langs->trans('DoliSecureCheckError', $last['error']);
 } else {
 	print $langs->trans('DoliSecureNeverChecked');

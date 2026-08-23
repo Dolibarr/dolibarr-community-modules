@@ -132,15 +132,15 @@ class dolisecurewidget1 extends ModeleBoxes
 				$maxseverity = DoliSecureChecker::getMaxSeverity($last['cves']);
 				$colors = DoliSecureChecker::severityColors($maxseverity);
 				$trattr = 'style="background-color:'.$colors['bg'].';border-left: 4px solid '.$colors['border'].';"';
-				$statustext = img_picto('', 'fa-shield-alt', 'class="pictofixedwidth valignmiddle"', false, 0, 0, '', 'text-danger');
+				$statustext = img_picto('', 'fa-shield-alt', 'class="pictofixedwidth valignmiddle"', 0, 0, 0, '', 'text-danger');
 				$statustext .= ' '.$langs->trans('DoliSecureVulnerabilityFound', count($last['cves']), $last['version']);
 				break;
 			case 'ok':
-				$statustext = img_picto('', 'fa-shield-alt', 'class="pictofixedwidth valignmiddle"', false, 0, 0, '', 'text-success');
+				$statustext = img_picto('', 'fa-shield-alt', 'class="pictofixedwidth valignmiddle"', 0, 0, 0, '', 'text-success');
 				$statustext .= ' '.$langs->trans('DoliSecureOk');
 				break;
 			case 'error':
-				$statustext = img_picto('', 'fa-shield-alt', 'class="pictofixedwidth valignmiddle"', false, 0, 0, '', 'text-warning');
+				$statustext = img_picto('', 'fa-shield-alt', 'class="pictofixedwidth valignmiddle"', 0, 0, 0, '', 'text-warning');
 				$statustext .= ' '.$langs->trans('DoliSecureCheckError', $last['error']);
 				break;
 			default:

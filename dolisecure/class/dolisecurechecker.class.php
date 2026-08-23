@@ -294,7 +294,7 @@ class DoliSecureChecker
 
 		$langs->load('dolisecure@dolisecure');
 
-		$subject = $langs->transnoentities('DoliSecureAlertMailSubject', $version, count($cves));
+		$subject = $langs->transnoentities('DoliSecureAlertMailSubject', $version, (string) count($cves));
 
 		$body = $langs->transnoentities('DoliSecureAlertMailIntro', $version)."\n\n";
 		foreach ($cves as $cve) {
