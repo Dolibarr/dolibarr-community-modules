@@ -21,6 +21,13 @@
  * \brief   Library files with common functions for EInvoicing
  */
 
+// dolPrintHTMLForAttribute() is a core function of Dolibarr 19 that several files of this module call
+// on versions that do not have it. Its backport lives with the other core helpers, in compat/, and is
+// loaded from here so every file that already loads this library keeps finding it.
+// require_once on a path relative to this file, not dol_include_once: the latter resolves the module
+// through dol_buildpath() and, when that resolution fails, only writes a line in the log (issue #565).
+require_once __DIR__ . '/../compat/functions.lib.php';
+
 /**
  * Prepare admin pages header
  *
@@ -446,33 +453,6 @@ if (!function_exists('dolPrintHTML')) {
 	function dolPrintHTML($s)  // @phan-suppress-current-line PhanRedefineFunction
 	{
 		return dol_escape_htmltag(dol_htmlwithnojs(dol_string_onlythesehtmltags(dol_htmlentitiesbr($s), 1, 1, 1)), 1, 1, 'common', 0, 1);
-	}
-}
-
-if (!function_exists('dolPrintHTMLForAttribute')) {
-	/**
-	 * Return a string ready to be output into an HTML attribute (alt, title, data-html, ...)
-	 * With dolPrintHTMLForAttribute(), the content is HTML encode, even if it is already HTML content.
-	 *
-	 * @param	string		$s						String to print
-	 * @param	int			$escapeonlyhtmltags		1=Escape only html tags, not the special chars like accents.
-	 * @param	string[]	$allowothertags			List of other tags allowed
-	 * @return	string								String ready for HTML output
-	 * @see dolPrintHTML(), dolPrintHTMLFortextArea()
-	 */
-	function dolPrintHTMLForAttribute($s, $escapeonlyhtmltags = 0, $allowothertags = array())  // @phan-suppress-current-line PhanRedefineFunction
-	{
-		$allowedtags = array('br', 'b', 'font', 'hr', 'span');
-		if (!empty($allowothertags) && is_array($allowothertags)) {
-			$allowedtags = array_merge($allowedtags, $allowothertags);
-		}
-		// The dol_htmlentitiesbr will convert simple text into html, including switching accent into HTML entities
-		// The dol_escape_htmltag will escape html tags.
-		if ($escapeonlyhtmltags) {
-			return dol_escape_htmltag(dol_string_onlythesehtmltags($s, 1, 0, 0, 0, $allowedtags), 1, -1, '', 1, 1);
-		} else {
-			return dol_escape_htmltag(dol_string_onlythesehtmltags(dol_htmlentitiesbr($s), 1, 0, 0, 0, $allowedtags), 1, -1, '', 0, 1);
-		}
 	}
 }
 

@@ -2,6 +2,15 @@
 
 ## 1.0.4
 
+CHANGE: dolPrintHTMLForAttribute(), a function the core only gained in Dolibarr 19, was backported in
+the library of the module, among its own functions. It now sits in compat/functions.lib.php, next to the
+other core helpers the module ships for the versions that do not have them. Nothing else changes: the
+library loads that file, so every caller finds the function where it used to. Worth knowing for the
+versions below 19: the backport calls dol_escape_htmltag() with six arguments and that function only
+takes five on Dolibarr 17, so the sixth one is not read there - which changes nothing for this use, the
+fifth argument being 0 already escapes the whole string. Checked on 17 and 18 against the core of 19,
+same output for plain text, accents, html tags, quotes, a javascript: link and an onerror attribute.
+
 FIX: The list of e-invoicing flows works again on Dolibarr 17, the version the descriptor of the module
 declares as the minimum it supports; that page had never been able to render there. It asks
 CommonObject::getFieldList() to leave out of the SELECT the columns it does not read, among them 'recap',

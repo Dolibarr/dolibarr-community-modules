@@ -67,3 +67,37 @@ if (!function_exists('GETPOSTDATE')) {
 		return dol_mktime($hour, $minute, $second, GETPOSTINT($prefix.'month'), GETPOSTINT($prefix.'day'), GETPOSTINT($prefix.'year'), $gm);
 	}
 }
+
+if (!function_exists('dolPrintHTMLForAttribute')) {
+	/**
+	 * Return a string ready to be output into an HTML attribute (alt, title, data-html, ...)
+	 * With dolPrintHTMLForAttribute(), the content is HTML encode, even if it is already HTML content.
+	 *
+	 * Copy of the function added to htdocs/core/lib/functions.lib.php in Dolibarr 19. It calls
+	 * dol_escape_htmltag() with six arguments, and that function only takes five on 17: PHP passes the
+	 * extra one to a userland function without complaining, so the sixth ($cleanalsojavascript) is
+	 * simply not read there. It changes nothing for this use - the fifth argument is 0, which already
+	 * escapes the whole string - and the output on 17 and 18 was checked to be the one the core returns
+	 * on 19 for plain text, accents, html tags, quotes, a javascript: link and an onerror attribute.
+	 *
+	 * @param	string		$s						String to print
+	 * @param	int			$escapeonlyhtmltags		1=Escape only html tags, not the special chars like accents.
+	 * @param	string[]	$allowothertags			List of other tags allowed
+	 * @return	string								String ready for HTML output
+	 * @see dolPrintHTML(), dolPrintHTMLFortextArea()
+	 */
+	function dolPrintHTMLForAttribute($s, $escapeonlyhtmltags = 0, $allowothertags = array())
+	{
+		$allowedtags = array('br', 'b', 'font', 'hr', 'span');
+		if (!empty($allowothertags) && is_array($allowothertags)) {
+			$allowedtags = array_merge($allowedtags, $allowothertags);
+		}
+		// The dol_htmlentitiesbr will convert simple text into html, including switching accent into HTML entities
+		// The dol_escape_htmltag will escape html tags.
+		if ($escapeonlyhtmltags) {
+			return dol_escape_htmltag(dol_string_onlythesehtmltags($s, 1, 0, 0, 0, $allowedtags), 1, -1, '', 1, 1);
+		} else {
+			return dol_escape_htmltag(dol_string_onlythesehtmltags(dol_htmlentitiesbr($s), 1, 0, 0, 0, $allowedtags), 1, -1, '', 0, 1);
+		}
+	}
+}
