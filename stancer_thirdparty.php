@@ -211,7 +211,7 @@ if ($action == "deletesepa") {
 if ($action == "refreshStancerAccount") {
 	//actualise les comptes sepa & cb issus de stancer
 	$companypaymentmode = new CompanyPaymentModeStancer($db);
-	$res = $companypaymentmode->fetch(0, '', '', '', " AND label LIKE 'stancer-card%' AND stancer_account <> '' AND fk_soc = ".((int) $socid));
+	$res = $companypaymentmode->fetch(0, null, null, null, " AND label LIKE 'stancer-card%' AND stancer_account <> '' AND fk_soc = ".((int) $socid));
 	$stancerAccountOk = false;
 	// print json_encode($companypaymentmode);
 	if ($res > 0) {
@@ -221,7 +221,7 @@ if ($action == "refreshStancerAccount") {
 if ($action == "deleteStancerAccount") {
 	//actualise les comptes sepa & cb issus de stancer
 	$companypaymentmode = new CompanyPaymentModeStancer($db);
-	$res = $companypaymentmode->fetch(0, '', '', '', " AND label LIKE 'stancer-card%' AND stancer_account <> '' AND fk_soc = ".((int) $socid));
+	$res = $companypaymentmode->fetch(0, null, null, null, " AND label LIKE 'stancer-card%' AND stancer_account <> '' AND fk_soc = ".((int) $socid));
 	// print json_encode($companypaymentmode);
 	if ($res > 0) {
 		$companypaymentmode->delete($user);
@@ -237,7 +237,7 @@ if (isModEnabled('stancer') && $user->hasRight('stancer', 'read')) {
 
 	print "<h2>" . $langs->trans("StancerAccount") . "</h2>";
 	$companypaymentmode = new CompanyPaymentModeStancer($db);
-	$res = $companypaymentmode->fetch(0, '', '', '', " AND label LIKE 'stancer-card%' AND stancer_account <> '' AND fk_soc = ".((int) $socid));
+	$res = $companypaymentmode->fetch(0, null, null, null, " AND label LIKE 'stancer-card%' AND stancer_account <> '' AND fk_soc = ".((int) $socid));
 	$stancerAccountOk = false;
 	// print json_encode($companypaymentmode);
 	if ($res > 0) {
@@ -277,7 +277,7 @@ if (isModEnabled('stancer') && $user->hasRight('stancer', 'read')) {
 		$resStancer = null;
 		print "<h2>" . $langs->trans("StancerSEPA") . "</h2>";
 		$companypaymentmode = new CompanyPaymentModeStancer($db);
-		// $res = $companypaymentmode->fetch(0, '', '', '', " AND type = 'ban' AND label LIKE 'stancer-sepa%' AND fk_soc = ".((int) $socid));
+		// $res = $companypaymentmode->fetch(0, null, null, null, " AND type = 'ban' AND label LIKE 'stancer-sepa%' AND fk_soc = ".((int) $socid));
 		// if ($res) {
 		//     print "<ul>\n";
 		//     // print "  <li>" . $companypaymentmode->label . "</li>\n";
@@ -503,7 +503,7 @@ if (isModEnabled('stancer') && $user->hasRight('stancer', 'read')) {
 
 		print "<h2>" . $langs->trans("StancerCBAccount") . "</h2>";
 		$companypaymentmode = new CompanyPaymentModeStancer($db);
-		$res = $companypaymentmode->fetch(0, '', '', '', " AND type = 'card' AND label LIKE 'stancer-card%' AND stancer_object_ref <> '' AND fk_soc = ".((int) $socid));
+		$res = $companypaymentmode->fetch(0, null, null, null, " AND type = 'card' AND label LIKE 'stancer-card%' AND stancer_object_ref <> '' AND fk_soc = ".((int) $socid));
 		if ($res) {
 			$cb = $companypaymentmode;
 

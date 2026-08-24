@@ -211,22 +211,23 @@ class Stancer extends CommonObject
 	}
 
 
-	 /**
-	  * process invoices for payment mode
-	  *
-	  * @param   string $mode                            [$mode description]
-	  * @param   int $idpaiement                      [$idpaiement description]
-	  * @param   array $invoiceprocessed                [$invoiceprocessed description]
-	  * @param   array $invoiceprocessedok              [$invoiceprocessedok description]
-	  * @param   array $invoiceprocessedko              [$invoiceprocessedko description]
-	  * @param   array $invoiceprocessedinfo            [$invoiceprocessedinfo description]
-	  * @param   array $invoiceprocessedwaitingduedate  [$invoiceprocessedwaitingduedate description]
-	  * @param   int $maxnbofinvoicetotry             [$maxnbofinvoicetotry description]
-	  * @param   int|null $thirdparty_id                   [$thirdparty_id description]
-	  * @param   boolean   $isautomatic                     [$isautomatic description]
-	  *
-	  * @return  int                                  [return description]
-	  */
+	/**
+	 * Take payment for every validated and unpaid invoice matching a payment mode.
+	 * Invoices are selected on their Dolibarr payment mode and on the existence of a
+	 * Stancer mandate of the requested type in llx_societe_rib.
+	 *
+	 * @param	string		$mode								Mandate type stored in llx_societe_rib.type: 'ban' for SEPA, 'card' for credit card
+	 * @param	int			$idpaiement							Dolibarr payment mode id (llx_facture.fk_mode_reglement) used to select the invoices
+	 * @param	array		$invoiceprocessed					Output, facid => invoice ref for every invoice actually processed
+	 * @param	array		$invoiceprocessedok					Output, facid => invoice ref for invoices paid without error
+	 * @param	array		$invoiceprocessedko					Output, facid => invoice ref for invoices in error or skipped
+	 * @param	array		$invoiceprocessedinfo				Output, facid => invoice ref reserved for informative results (never filled by this method today)
+	 * @param	array		$invoiceprocessedwaitingduedate		Output, facid => invoice ref for SEPA payments postponed to their due date
+	 * @param	int			$maxnbofinvoicetotry				Max number of invoices to process, 0 for no limit
+	 * @param	int|null	$thirdparty_id						Restrict the run to this thirdparty id, null or 0 to process them all
+	 * @param	boolean		$isautomatic						True when called by the scheduled job, enables the anti-duplicate and contract-only checks
+	 * @return	int												Number of errors, 0 if OK
+	 */
 	public function processInvoicesForPaymentMode($mode, $idpaiement, &$invoiceprocessed, &$invoiceprocessedok, &$invoiceprocessedko, &$invoiceprocessedinfo, &$invoiceprocessedwaitingduedate, $maxnbofinvoicetotry = 0, $thirdparty_id = null, $isautomatic = false)
 	{
 		global $conf;

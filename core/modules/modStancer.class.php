@@ -710,10 +710,16 @@ class modStancer extends DolibarrModules
 			"INSERT INTO ".MAIN_DB_PREFIX."document_model (nom, libelle, type, entity) VALUES('sepamandate_stancer', 'sepamandate_stancer', 'bankaccount', ".((int) $conf->entity).")",
 		));
 
+		// The memcached PHP extension is optional and absent from the static
+		// analysis environment, hence the class_exists() guard and the
+		// suppressions: the class is only touched when it really exists.
 		if (class_exists('Memcached')) {
+			// @phan-suppress-next-line PhanUndeclaredClassMethod
 			$m = new Memcached();
+			// @phan-suppress-next-line PhanUndeclaredClassMethod
 			$m->addServer('localhost', 11211);
-			/* invalide tous les éléments dans 10 secondes */
+			/* invalidate every entry within 10 seconds */
+			// @phan-suppress-next-line PhanUndeclaredClassMethod
 			$m->flush(1);
 		}
 

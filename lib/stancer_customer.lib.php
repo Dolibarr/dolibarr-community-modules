@@ -1260,7 +1260,7 @@ function stancerShowOnlineIBANDataForCustomer($socid, $name)
 	global $langs, $db;
 
 	$companypaymentmode = new CompanyPaymentModeStancer($db);
-	$res = $companypaymentmode->fetch(0, '', '', '', " AND type = 'ban' AND label LIKE 'stancer-sepa%' AND stancer_object_ref <> '' AND fk_soc = " . ((int) $socid));
+	$res = $companypaymentmode->fetch(0, null, null, null, " AND type = 'ban' AND label LIKE 'stancer-sepa%' AND stancer_object_ref <> '' AND fk_soc = " . ((int) $socid));
 
 	$out = "";
 	if ($res) {
@@ -1310,7 +1310,7 @@ function stancerShowOnlineCBDataForCustomer($socid, $name)
 	global $langs, $db;
 
 	$companypaymentmode = new CompanyPaymentModeStancer($db);
-	$res = $companypaymentmode->fetch(0, '', '', '', " AND type = 'card' AND label LIKE 'stancer-card%' AND stancer_object_ref <> '' AND fk_soc = " . ((int) $socid));
+	$res = $companypaymentmode->fetch(0, null, null, null, " AND type = 'card' AND label LIKE 'stancer-card%' AND stancer_object_ref <> '' AND fk_soc = " . ((int) $socid));
 	$out = "";
 	if ($res) {
 		$cb = $companypaymentmode;
@@ -1340,7 +1340,7 @@ function stancerGetDataCB($socid, $name)
 
 	$arr = [];
 	$cb = new CompanyPaymentModeStancer($db);
-	$res = $cb->fetch(0, '', '', '', " AND type = 'card' AND label LIKE 'stancer-card%' AND stancer_object_ref <> '' AND fk_soc = " . ((int) $socid));
+	$res = $cb->fetch(0, null, null, null, " AND type = 'card' AND label LIKE 'stancer-card%' AND stancer_object_ref <> '' AND fk_soc = " . ((int) $socid));
 	if ($res) {
 		$arr['name'] = $cb->proprio;
 		$arr['type'] = $cb->bank;
@@ -1366,7 +1366,7 @@ function stancerGetDataIBAN($socid, $name)
 
 	$arr = [];
 	$companypaymentmode = new CompanyPaymentModeStancer($db);
-	$res = $companypaymentmode->fetch(0, '', '', '', " AND type = 'ban' AND label LIKE 'stancer-sepa%' AND stancer_object_ref <> '' AND fk_soc = " . ((int) $socid));
+	$res = $companypaymentmode->fetch(0, null, null, null, " AND type = 'ban' AND label LIKE 'stancer-sepa%' AND stancer_object_ref <> '' AND fk_soc = " . ((int) $socid));
 	if ($res) {
 		$arr['bank'] = $companypaymentmode->bank;
 		$arr['bic'] = $companypaymentmode->bic;

@@ -1350,7 +1350,8 @@ function stancerDateToTimeStamp($input)
 /**
  * corrige les dates sur le compte bancaire principal pour que l'export FEC soit correct
  * (entre autre)
- * @return  [type]  [return description]
+ *
+ * @return	void
  */
 function stancerUpdateAllDatesOnMainBankAccount()
 {
@@ -1400,8 +1401,9 @@ function stancerUpdateAllDatesOnMainBankAccountFromBanking4Doli()
 
 /**
  * refunds special case
+ * Replay the paid negative payouts to add the missing refund lines on the bank account.
  *
- * @return  [type]  [return description]
+ * @return	void
  */
 function stancerAddRefundFeesToBank()
 {
@@ -1452,7 +1454,7 @@ function stancerAddRefundFeesToBank()
 /**
  * check lines on stancer bank account and (re)add if needed
  *
- * @return  [type]  [return description]
+ * @return	int|null	-1 when the Stancer bank account cannot be loaded, null otherwise (including the rollback on add line failure)
  */
 function stancerCheckBankLines()
 {
