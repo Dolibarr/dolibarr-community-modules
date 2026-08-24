@@ -890,7 +890,7 @@ if ($ispaymentok) {
 
 
 			// Do action only if $FinalPaymentAmt is set (session variable is cleaned after this page to avoid duplicate actions when page is POST a second time)
-			if (isModEnabled('facture')) {
+			if (stancerIsModEnabled('invoice')) {
 				$invoice = null;
 				if (
 					$partialPayment == 1
@@ -1061,7 +1061,7 @@ if ($ispaymentok) {
 			}
 
 			// Auto create invoice if option is enabled
-			if (getDolGlobalString('STANCER_AUTO_INVOICE_ON_PROPAL_PAID') && isModEnabled('facture')) {
+			if (getDolGlobalString('STANCER_AUTO_INVOICE_ON_PROPAL_PAID') && stancerIsModEnabled('invoice')) {
 				dol_syslog("stancerPaymentBack propal: auto create invoice enabled", LOG_DEBUG, 0, '_payment');
 
 				$partialPayment = isset($_SESSION["partialPayment"]) ? $_SESSION["partialPayment"] : 0;

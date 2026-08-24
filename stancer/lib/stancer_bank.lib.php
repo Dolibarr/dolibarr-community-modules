@@ -1123,7 +1123,7 @@ function getObjectFromOrderID($orderid)
 		}
 	}
 
-	if (isModEnabled('facture')) {
+	if (stancerIsModEnabled('invoice')) {
 		$object = new Facture($db);
 		$result = $object->fetch(0, $orderid);
 		if ($result > 0) {
@@ -1133,7 +1133,7 @@ function getObjectFromOrderID($orderid)
 		}
 	}
 
-	if (isModEnabled('commande')) {
+	if (stancerIsModEnabled('order')) {
 		$object = new Commande($db);
 		$result = $object->fetch(0, $orderid);
 		if ($result) {
@@ -1153,7 +1153,7 @@ function getObjectFromOrderID($orderid)
 		}
 	}
 
-	if (isModEnabled('adherent')) {
+	if (stancerIsModEnabled('member')) {
 		$object = new AdherentStancer($db);
 		$result = $object->fetch(0, $orderid);
 		if ($result) {
