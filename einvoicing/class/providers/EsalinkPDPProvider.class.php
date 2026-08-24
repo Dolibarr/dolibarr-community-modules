@@ -289,18 +289,24 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 		// OAuth2 client_credentials — RFC 6749, application/x-www-form-urlencoded
 		// Replace old POST /v1/token (JSON username/password) disabled since v1.2.6 (2026-07).
-		// Prefers Authorization to be more compliant between PA usage and provide a constant to use old authentication credential
-		if (getDolGlobalString('ESALINK_AUTHENT_USING_CLIENT_CREDENTIAL')) {
+		// grant_type is REQUIRED by RFC 6749 section 4.4.2, whatever the client authentication
+		// method is: without it the endpoint answers 400 {"error":"Bad Request","message":"must
+		// not be blank"} and no token can ever be issued.
+		// Default is the credentials in the body, the only form checked against the platform.
+		// ESALINK_AUTHENT_USING_BASIC_AUTH switches to HTTP Basic (RFC 6749 section 2.3.1) for
+		// an access point that would require it: credentials then go in the header only, as a
+		// client must not use more than one authentication method in the same request.
+		if (getDolGlobalString('ESALINK_AUTHENT_USING_BASIC_AUTH')) {
+			$param = http_build_query(array(
+				'grant_type'    => 'client_credentials',
+			));
+			$extraHeaders["Authorization"] = "Basic ".base64_encode(urlencode($this->config['username']).":".urlencode($this->config['password']));
+		} else {
 			$param = http_build_query(array(
 				'grant_type'    => 'client_credentials',
 				'client_id'     => $this->config['username'],
 				'client_secret' => $this->config['password'],
 			));
-		} else {
-			$param = http_build_query(array(
-				'client_secret' => $this->config['password'],
-			));
-			$extraHeaders["Authorization"] = "Basic ".base64_encode(urlencode($this->config['username']).":".urlencode($this->config['password']));
 		}
 
 		$extraHeaders['Content-Type'] ='application/x-www-form-urlencoded';
