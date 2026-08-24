@@ -19,6 +19,15 @@ tolerated without losing the boundary it forms. Several candidates are reported 
 instead of being guessed, and a database failure is no longer reported to the user as a missing
 document.
 
+FIX: A cash-in is no longer reported with the status 212 on an invoice the Approved Platform refused.
+The guard that decides it reads the 'transmitted' flag, which is true of every status but the local
+ones - and STATUS_ERROR is one it lets through, although that code is exactly what an acknowledgement
+"Error" leaves behind. So an e-invoice whose deposit the platform rejected counted as deposited, and
+the next payment recorded on the invoice reported a cash-in the platform has no invoice to attach it
+to. The cash-in is now skipped on that status, with a warning naming the invoice and a line in the
+log: the e-invoice has to be corrected and sent again, which the "Send" button of the invoice card
+still offers on that very status, and the cash-in reported afterwards.
+
 FIX: A third party recognised as a private individual is no longer reported as misconfigured when
 EINVOICING_SKIP_B2C is on (issue #600). The option already kept B2C invoices out of the e-invoicing
 scope - needEInvoiceManagement() answers "do not manage" on them, since B2C is reported by e-reporting

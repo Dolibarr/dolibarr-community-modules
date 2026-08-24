@@ -425,6 +425,20 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			return;
 		}
 
+		// A deposit the platform refused is not a deposit. 'transmitted' is true of every status but the
+		// local ones, and STATUS_ERROR is among those it lets through: it is exactly what an
+		// acknowledgement "Error" leaves behind, see getDolibarrStatusCodeFromPdpLabel(). The platform
+		// holds no invoice to attach a cash-in to, so the status would be refused; and reporting it as
+		// sent would be worse than not sending it, since the reform expects that cash-in once the
+		// invoice is deposited. The invoice has to be corrected and re-sent first, which is what the
+		// "Send" button of the card offers on that very status, and the cash-in reported by hand
+		// afterwards.
+		if ((int) $currentStatusDetails['code'] === EInvoicing::STATUS_ERROR) {
+			dol_syslog(__METHOD__ . ' Cash-in not reported for invoice id=' . $invoice->id . ': the platform refused its deposit (status ' . EInvoicing::STATUS_ERROR . '), there is nothing to report the payment on', LOG_WARNING, 0, '_einvoicing');
+			setEventMessage($langs->trans("ModuleEInvoicingName") . ' : ' . $langs->trans('EInvoiceCashInNotReportedDepositRefused', $invoice->ref), 'warnings');
+			return;
+		}
+
 		$PDPManager = new PDPProviderManager($this->db);
 		$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
 
