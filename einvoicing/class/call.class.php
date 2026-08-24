@@ -1223,20 +1223,25 @@ class Call extends CommonObject
 	 */
 	public function getNextCallId()
 	{
-		global $db;
-
 		$prefix = 'Call-';
 
+		// Read the highest number through the connection this record will be written on, not through
+		// the global $db. logCall() builds its Call on the independent $dbhistory precisely so the trace
+		// survives a rollback of the caller, and reading elsewhere hands out a number that connection
+		// cannot see yet: a page working inside a transaction on $db - recording a payment, importing a
+		// received invoice - holds a consistent-read snapshot taken before the previous call was
+		// committed by $dbhistory, so the same number comes back twice and the second insert dies on
+		// uk_einvoicing_call_callid. The API call it was tracing then leaves no trace at all.
 		$sql = "SELECT MAX(CAST(SUBSTRING(call_id, ".(strlen($prefix) + 1).") AS SIGNED)) AS maxref";
-		$sql .= " FROM ".MAIN_DB_PREFIX.$this->table_element;
-		$sql .= " WHERE call_id LIKE '".$db->escape($prefix)."%'";
+		$sql .= " FROM ".$this->db->prefix().$this->table_element;
+		$sql .= " WHERE call_id LIKE '".$this->db->escape($prefix)."%'";
 
-		$resql = $db->query($sql);
+		$resql = $this->db->query($sql);
 		if (!$resql) {
 			return null;
 		}
 
-		$obj = $db->fetch_object($resql);
+		$obj = $this->db->fetch_object($resql);
 		$next = ((int) $obj->maxref) + 1;
 
 		return $prefix.sprintf('%06d', $next);
