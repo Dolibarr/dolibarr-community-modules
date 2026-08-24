@@ -89,6 +89,26 @@ class StancerPaymentsTest extends TestCase
         ];
     }
 
+    /**
+     * Reverse way: an int code must resolve back to its Stancer label.
+     *
+     * $tab_status is a static property: reading it through $this-> silently
+     * yielded null, so every int used to fall back to STATUS_ERROR.
+     *
+     * @dataProvider statusStringProvider
+     */
+    public function testConvertStatusCodeFromInt(string $expectedLabel, int $statusCode): void
+    {
+        $result = $this->payment->convert_status_code($statusCode);
+        $this->assertSame($expectedLabel, $result);
+    }
+
+    public function testConvertStatusCodeFromUnknownIntReturnsError(): void
+    {
+        $result = $this->payment->convert_status_code(9999);
+        $this->assertEquals(\Stancer_payments::STATUS_ERROR, $result);
+    }
+
     public function testConvertStatusCodeFromUnknownStringReturnsError(): void
     {
         $result = $this->payment->convert_status_code('unknown_status');

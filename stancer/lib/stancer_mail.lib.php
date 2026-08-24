@@ -22,6 +22,126 @@
  */
 
 /**
+ * Return the mail metadata matching the type of a Dolibarr object
+ *
+ * Payments can target an invoice, an order, a proposal, a member or a donation
+ * (see getObjectFromTag()), so none of these four values may be hardcoded:
+ *
+ *  - trackidprefix: prefix the Dolibarr email collector decodes to reattach an answer
+ *    to its object ('inv' => Facture, 'ord' => Commande, 'pro' => Propal,
+ *    'mem' => Adherent, see emailcollector.class.php). A wrong prefix does not fail,
+ *    it reattaches the answer to a totally unrelated object carrying the same rowid,
+ *    so an empty prefix (no track id at all) is the safe fallback.
+ *  - elementtype: value to pass to ActionComm::getActions(). ActionComm::create()
+ *    rewrites 'facture' into 'invoice' and 'commande' into 'order' before the INSERT,
+ *    so reading the events back requires the rewritten value, not $object->element.
+ *  - templatetype: type_template of the email templates handling this object.
+ *  - diroutput: directory holding the generated PDF, used for the attachment.
+ *
+ * @param   CommonObject  $object  Invoice, order, proposal, member or donation
+ * @return  array                  Keys trackidprefix, elementtype, templatetype, diroutput
+ */
+function stancerGetObjectMailContext($object)
+{
+	global $conf;
+
+	$element = is_object($object) ? (string) $object->element : '';
+	$modconf = null;
+	switch ($element) {
+		case 'facture':
+			$ctx = array('trackidprefix' => 'inv', 'elementtype' => 'invoice', 'templatetype' => 'facture_send');
+			$modconf = isset($conf->facture) ? $conf->facture : null;
+			break;
+		case 'commande':
+			$ctx = array('trackidprefix' => 'ord', 'elementtype' => 'order', 'templatetype' => 'order_send');
+			$modconf = isset($conf->commande) ? $conf->commande : null;
+			break;
+		case 'propal':
+			$ctx = array('trackidprefix' => 'pro', 'elementtype' => 'propal', 'templatetype' => 'propal_send');
+			$modconf = isset($conf->propal) ? $conf->propal : null;
+			break;
+		case 'member':
+			$ctx = array('trackidprefix' => 'mem', 'elementtype' => 'member', 'templatetype' => 'member');
+			$modconf = isset($conf->adherent) ? $conf->adherent : null;
+			break;
+		case 'don':
+			// The email collector decodes no prefix for donations: emitting none is safer
+			// than emitting one it would resolve to another object type.
+			$ctx = array('trackidprefix' => '', 'elementtype' => 'don', 'templatetype' => '');
+			$modconf = isset($conf->don) ? $conf->don : null;
+			break;
+		default:
+			dol_syslog("stancerGetObjectMailContext unsupported element '" . $element . "': no track id, no template type and no attachment for this mail", LOG_WARNING);
+			return array('trackidprefix' => '', 'elementtype' => $element, 'templatetype' => '', 'diroutput' => '');
+	}
+
+	$entity = (is_object($object) && !empty($object->entity)) ? (int) $object->entity : (int) $conf->entity;
+	$ctx['diroutput'] = '';
+	if (!empty($modconf->multidir_output[$entity])) {
+		$ctx['diroutput'] = $modconf->multidir_output[$entity];
+	} elseif (!empty($modconf->dir_output)) {
+		$ctx['diroutput'] = $modconf->dir_output;
+	} else {
+		dol_syslog("stancerGetObjectMailContext no output directory for element '" . $element . "' (module disabled?), no document will be attached", LOG_WARNING);
+	}
+
+	return $ctx;
+}
+
+/**
+ * Resolve an email template by label, trying each given template type in order
+ *
+ * The setup page only lists the templates of one type per setting (order_send for the
+ * CB order mail, facture_send for the invoice ones), so a label configured before the
+ * object type was taken into account only exists under that legacy type. The type
+ * matching the object is therefore tried first, the legacy one second, which keeps
+ * existing setups working while letting an integrator create a properly typed template.
+ *
+ * @param   FormMail   $formmail       Form handler used to query the template table
+ * @param   string     $modele         Template label to look for
+ * @param   Translate  $outputlangs    Language the template must be loaded in
+ * @param   array      $templatetypes  type_template values to try, most specific first
+ * @param   string     $caller         Calling function name, for the logs
+ * @return  object|null                Template found (ModelMail), null when none matches
+ */
+function stancerGetMailTemplate($formmail, $modele, $outputlangs, $templatetypes, $caller)
+{
+	global $db, $user;
+
+	if (empty($modele)) {
+		dol_syslog($caller . " modele is empty, getEMailTemplate skipped, mail will be sent with EMPTY subject/body", LOG_WARNING);
+		return null;
+	}
+
+	$tried = array();
+	foreach ($templatetypes as $templatetype) {
+		if (empty($templatetype) || in_array($templatetype, $tried)) {
+			continue;
+		}
+		$tried[] = $templatetype;
+
+		$tpl = $formmail->getEMailTemplate($db, $templatetype, $user, $outputlangs, -2, 1, $modele);
+		if (is_object($tpl) && $tpl->id > 0) {
+			// Trace the EXACT template Dolibarr resolved for the requested label. If the resolved
+			// row belongs to another module (eg 'doliscan'), the operator can spot it here without
+			// having to query llx_c_email_templates by hand.
+			dol_syslog($caller . " template resolved: rowid=" . $tpl->id . ", label='" . ($tpl->label ?? '')
+				. "', module='" . ($tpl->module ?? '') . "', lang='" . ($tpl->lang ?? '') . "' (searched label='" . $modele
+				. "', searchedLang='" . $outputlangs->defaultlang . "', type_template='" . $templatetype . "')", LOG_INFO);
+			return $tpl;
+		}
+
+		$errCode = is_int($tpl) ? (' (getEMailTemplate returned ' . $tpl . ')') : '';
+		dol_syslog($caller . " template NOT FOUND for label='" . $modele . "' (lang='" . $outputlangs->defaultlang
+			. "', type_template='" . $templatetype . "')" . $errCode, LOG_WARNING);
+	}
+
+	dol_syslog($caller . " no template matching label='" . $modele . "' in types " . json_encode($tried)
+		. " -- mail will be sent with EMPTY subject/body", LOG_WARNING);
+	return null;
+}
+
+/**
  * Record an agenda event, linked to the given object so it shows on its events tab
  *
  * @param   object   $object              Object the event is attached to (fk_element + elementtype)
@@ -118,7 +238,7 @@ function stancerSendMail($to, $subject, $message, $isForCustomer = false, $cc = 
 	global $conf, $langs, $mysoc;
 
 	$from = getDolGlobalString('MAIN_MAIL_EMAIL_FROM');
-	if (empty(trim($from)) || empty(trim($to))) {
+	if (empty(trim((string) $from)) || empty(trim((string) $to))) {
 		dol_syslog("stancerSendMail early return, from=$from or to=$to is empty", LOG_DEBUG);
 		return;
 	}
@@ -204,6 +324,9 @@ function stancerSendInvoiceMailModele($modele, $object, $actionCode = "", $force
 	dol_syslog("stancerSendInvoiceMailModele caller=$caller, modele='$modele', actionCode=$actionCode, forceMail=$forceMail, invoice=$objRef (id=$objId), socid=$objSocid", LOG_INFO);
 	$result = 0;
 	$subject = $msg = "";
+	// Track id, ActionComm elementtype, template type and document directory all depend
+	// on the type of $object: never hardcode them, see stancerGetObjectMailContext().
+	$mailctx = stancerGetObjectMailContext($object);
 
 	if ($forceMail == 0 && !empty($actionCode)) {
 		// Dedup: avoid re-sending the same notification for the same invoice. Two storage
@@ -219,12 +342,12 @@ function stancerSendInvoiceMailModele($modele, $object, $actionCode = "", $force
 		$filterDedup = " AND ((code='" . $dedupCodeEsc . "') OR (code='AC_EMAIL' AND extraparams='" . $dedupCodeEsc . "'))";
 		$actioncomm = new ActionComm($db);
 		if (floatval(DOL_VERSION) < 15) {
-			$resAC = $actioncomm->getActions($db, $object->socid, $object->id, "invoice", $filterDedup);
+			$resAC = $actioncomm->getActions($db, $object->socid, $object->id, $mailctx['elementtype'], $filterDedup);
 		} else {
-			$resAC = $actioncomm->getActions($object->socid, $object->id, "invoice", $filterDedup);
+			$resAC = $actioncomm->getActions($object->socid, $object->id, $mailctx['elementtype'], $filterDedup);
 		}
 		if (!empty($resAC)) {
-			dol_syslog("stancerSendInvoiceMailModele modele=$modele already sent (dedup matched on $dedupCode for invoice id=" . ($object->id ?? '?') . ")", LOG_INFO);
+			dol_syslog("stancerSendInvoiceMailModele modele=$modele already sent (dedup matched on $dedupCode for " . $mailctx['elementtype'] . " id=" . ($object->id ?? '?') . ")", LOG_INFO);
 			return $result;
 		}
 	}
@@ -267,37 +390,20 @@ function stancerSendInvoiceMailModele($modele, $object, $actionCode = "", $force
 		dol_syslog("stancerSendInvoiceMailModele utilisation de l'adresse mail societe, destinataire = $to", LOG_DEBUG);
 	}
 
-	if (empty(trim($from)) || empty(trim($to))) {
+	if (empty(trim((string) $from)) || empty(trim((string) $to))) {
 		// print json_encode($object);
 		dol_syslog("stancerSendInvoiceMailModele early return, from=$from or to=$to is empty", LOG_DEBUG);
 		return; // returns null: an empty from/to is a skip, distinct from dedup (0)
 	}
 
 	// Get email content from templae
-	$arraydefaultmessage = null;
-
 	$formmail = new FormMail($db);
+	//getEMailTemplate($dbs, $type_template, $user, $outputlangs, $id = 0, $active = 1, $label = '', $defaultfortype = -1)
+	$arraydefaultmessage = stancerGetMailTemplate($formmail, $modele, $outputlangs, array($mailctx['templatetype'], 'facture_send'), 'stancerSendInvoiceMailModele');
 
-	if (!empty($modele)) {
-		$arraydefaultmessage = $formmail->getEMailTemplate($db, 'facture_send', $user, $outputlangs, -2, 1, $modele);
-		//getEMailTemplate($dbs, $type_template, $user, $outputlangs, $id = 0, $active = 1, $label = '', $defaultfortype = -1)
-		// $arraydefaultmessage = $formmail->getEMailTemplate($db, 'facture_send', $user, $outputlangs, $model_id);
-	} else {
-		dol_syslog("stancerSendInvoiceMailModele modele is empty, getEMailTemplate skipped, mail will be sent with EMPTY subject/body", LOG_WARNING);
-	}
-
-	if (!empty($modele) && is_object($arraydefaultmessage) && $arraydefaultmessage->id > 0) {
+	if (is_object($arraydefaultmessage)) {
 		$subject = $arraydefaultmessage->topic;
 		$msg     = $arraydefaultmessage->content;
-		// Trace the EXACT template Dolibarr resolved for the requested label. If the resolved
-		// row belongs to another module (eg 'doliscan'), the operator can spot it here without
-		// having to query llx_c_email_templates by hand.
-		dol_syslog("stancerSendInvoiceMailModele template resolved: rowid=" . $arraydefaultmessage->id
-			. ", label='" . ($arraydefaultmessage->label ?? '') . "', module='" . ($arraydefaultmessage->module ?? '') . "', lang='" . ($arraydefaultmessage->lang ?? '') . "' (searched label='$modele', searchedLang='" . $outputlangs->defaultlang . "', type_template='facture_send')", LOG_INFO);
-	} else {
-		$errCode = is_int($arraydefaultmessage) ? (' (getEMailTemplate returned ' . $arraydefaultmessage . ')') : '';
-		dol_syslog("stancerSendInvoiceMailModele template NOT FOUND for label='$modele' (lang='" . $outputlangs->defaultlang
-			. "', type_template='facture_send')" . $errCode . " -- mail will be sent with EMPTY subject/body", LOG_WARNING);
 	}
 
 	$substitutionarray = getCommonSubstitutionArray($outputlangs, 0, null, $object);
@@ -319,21 +425,27 @@ function stancerSendInvoiceMailModele($modele, $object, $actionCode = "", $force
 	$listofpaths = array();
 	$listofnames = array();
 	$listofmimes = array();
-	if (is_object($object)) {
-		$objectdiroutput = $conf->facture->dir_output;
-		$fileparams = dol_most_recent_file($objectdiroutput . '/' . $object->ref, preg_quote($object->ref, '/') . '.*.pdf');
+	if (is_object($object) && !empty($mailctx['diroutput'])) {
+		// dol_most_recent_file() returns null when the directory holds no matching file,
+		// hence the is_array() guard before reading 'fullname'.
+		$fileparams = dol_most_recent_file($mailctx['diroutput'] . '/' . $object->ref, preg_quote($object->ref, '/') . '.*.pdf');
 
-		$file = $fileparams['fullname'];
+		$file = (is_array($fileparams) && !empty($fileparams['fullname'])) ? $fileparams['fullname'] : '';
 
 		if ($file) {
 			$listofpaths = array($file);
 			$listofnames = array(basename($file));
 			$listofmimes = array(dol_mimetype($file));
+		} else {
+			dol_syslog('stancerSendInvoiceMailModele no pdf found in ' . $mailctx['diroutput'] . '/' . $object->ref . ', mail will be sent without attachment', LOG_WARNING);
 		}
 	}
 	dol_syslog('stancerSendInvoiceMailModele fichier(s) joint(s) : ' . json_encode($listofpaths));
 
-	$trackid = 'inv' . $object->id;
+	$trackid = empty($mailctx['trackidprefix']) ? '' : $mailctx['trackidprefix'] . $object->id;
+	if (empty($trackid)) {
+		dol_syslog('stancerSendInvoiceMailModele no track id for element ' . (is_object($object) ? $object->element : '?') . ', answers to this mail will not be reattached by the email collector', LOG_INFO);
+	}
 	$moreinheader = 'X-Dolibarr-Info: stancerSendInvoiceMailModele' . "\r\n";
 	$addr_cc = '';
 	if (!empty($object->thirdparty->array_options['options_emailccinvoice'])) {
@@ -415,10 +527,14 @@ function stancerSendInvoiceMailModele($modele, $object, $actionCode = "", $force
 
 
 /**
- * send mail with order ($object) attached
+ * send mail with the paid object ($object) attached
+ *
+ * Historically written for orders, this function is called by the CB payment start with
+ * whatever getObjectFromTag() returned: an invoice, an order, a proposal, a member or a
+ * donation. Everything that depends on that type comes from stancerGetObjectMailContext().
  *
  * @param   string  		$modele  	mail model to use
- * @param   CommonObject	$object  	order, also called with an invoice
+ * @param   CommonObject	$object  	object being paid (invoice, order, proposal, member, donation)
  * @param   string  		$actionCode	actionComm code to use
  * @param   int  			$forceMail	send mail even if actioncomm exists for that code
  * @param   string  		$to			target mail addr
@@ -427,9 +543,12 @@ function stancerSendInvoiceMailModele($modele, $object, $actionCode = "", $force
 function stancerSendOrderMailModele($modele, $object, $actionCode = "", $forceMail = 0, $to = '')
 {
 	global $db, $conf, $langs, $user, $mysoc;
-	dol_syslog("stancerSendOrderMailModele modele=$modele, actionCode=$actionCode, forceMail=$forceMail", LOG_DEBUG);
+	dol_syslog("stancerSendOrderMailModele modele=$modele, actionCode=$actionCode, forceMail=$forceMail, element=" . (is_object($object) ? $object->element : '?') . ", id=" . (is_object($object) ? $object->id : '?'), LOG_DEBUG);
 	$result = 0;
 	$subject = $msg = "";
+	// Track id, ActionComm elementtype, template type and document directory all depend
+	// on the type of $object: never hardcode them, see stancerGetObjectMailContext().
+	$mailctx = stancerGetObjectMailContext($object);
 
 	if ($forceMail == 0 && !empty($actionCode)) {
 		// Dedup: match both legacy rows (code='AC_<actionCode>') and new rows where the email
@@ -440,13 +559,21 @@ function stancerSendOrderMailModele($modele, $object, $actionCode = "", $forceMa
 		$filterDedup = " AND ((code='" . $dedupCodeEsc . "') OR (code='AC_EMAIL' AND extraparams='" . $dedupCodeEsc . "'))";
 		$actioncomm = new ActionComm($db);
 		if (floatval(DOL_VERSION) < 15) {
-			$resAC = $actioncomm->getActions($db, $object->socid, $object->id, "order", $filterDedup);
+			$resAC = $actioncomm->getActions($db, $object->socid, $object->id, $mailctx['elementtype'], $filterDedup);
 		} else {
-			$resAC = $actioncomm->getActions($object->socid, $object->id, "order", $filterDedup);
+			$resAC = $actioncomm->getActions($object->socid, $object->id, $mailctx['elementtype'], $filterDedup);
 		}
 		if (!empty($resAC)) {
-			dol_syslog("stancerSendOrderMailModele modele=$modele already sent (dedup matched on $dedupCode for order id=" . ($object->id ?? '?') . ")", LOG_INFO);
+			dol_syslog("stancerSendOrderMailModele modele=$modele already sent (dedup matched on $dedupCode for " . $mailctx['elementtype'] . " id=" . ($object->id ?? '?') . ")", LOG_INFO);
 			return $result;
+		}
+	}
+
+	// The thirdparty drives both the output language and the fallback recipient, and it is
+	// not always loaded by the caller (payment pages fetch the object with a bare fetch()).
+	if (empty($object->thirdparty) && is_object($object) && method_exists($object, 'fetch_thirdparty')) {
+		if ($object->fetch_thirdparty() <= 0) {
+			dol_syslog("stancerSendOrderMailModele no thirdparty attached to " . $object->element . " id=" . $object->id . ", falling back on the default language", LOG_WARNING);
 		}
 	}
 
@@ -459,35 +586,27 @@ function stancerSendOrderMailModele($modele, $object, $actionCode = "", $forceMa
 
 	//destinataire -> contact facturation de la société et à défaut adresse mail de la société
 	if (empty($to)) {
-		$to = $object->thirdparty->email;
+		$to = empty($object->thirdparty->email) ? '' : $object->thirdparty->email;
 		dol_syslog("stancerSendOrderMailModele utilisation de l'adresse mail societe, destinataire = $to", LOG_DEBUG);
 	}
 
-	if (empty(trim($from)) || empty(trim($to))) {
+	if (empty(trim((string) $from)) || empty(trim((string) $to))) {
 		// print json_encode($object);
 		dol_syslog("stancerSendOrderMailModele early return, from=$from or to=$to is empty", LOG_DEBUG);
 		return;
 	}
 
 	// Get email content from templae
-	$arraydefaultmessage = null;
-
 	$formmail = new FormMail($db);
+	//getEMailTemplate($dbs, $type_template, $user, $outputlangs, $id = 0, $active = 1, $label = '', $defaultfortype = -1)
+	// 'order_send' is kept as a fallback: admin/mail.php only lists templates of that type
+	// for STANCER_AUTO_MAIL_ORDER_CB_MAILTYPE, so existing setups point at an order template
+	// even when the paid object is an invoice.
+	$arraydefaultmessage = stancerGetMailTemplate($formmail, $modele, $outputlangs, array($mailctx['templatetype'], 'order_send'), 'stancerSendOrderMailModele');
 
-	if (!empty($modele)) {
-		$arraydefaultmessage = $formmail->getEMailTemplate($db, 'order_send', $user, $outputlangs, -2, 1, $modele);
-		//getEMailTemplate($dbs, $type_template, $user, $outputlangs, $id = 0, $active = 1, $label = '', $defaultfortype = -1)
-		// $arraydefaultmessage = $formmail->getEMailTemplate($db, 'facture_send', $user, $outputlangs, $model_id);
-	}
-	// print "<p>Recherche des mails type pour modele=$modele</p>";
-	// print json_encode($arraydefaultmessage);
-	// exit;
-
-	if (!empty($modele) && is_object($arraydefaultmessage) && $arraydefaultmessage->id > 0) {
+	if (is_object($arraydefaultmessage)) {
 		$subject = $arraydefaultmessage->topic;
 		$msg     = $arraydefaultmessage->content;
-	} else {
-		dol_syslog("stancerSendOrderMailModele empty modele or arraydefaultmessagee error", LOG_DEBUG);
 	}
 
 	$substitutionarray = getCommonSubstitutionArray($outputlangs, 0, null, $object);
@@ -507,21 +626,27 @@ function stancerSendOrderMailModele($modele, $object, $actionCode = "", $forceMa
 	$listofpaths = array();
 	$listofnames = array();
 	$listofmimes = array();
-	if (is_object($object)) {
-		$objectdiroutput = $conf->facture->dir_output;
-		$fileparams = dol_most_recent_file($objectdiroutput . '/' . $object->ref, preg_quote($object->ref, '/') . '.*.pdf');
+	if (is_object($object) && !empty($mailctx['diroutput'])) {
+		// dol_most_recent_file() returns null when the directory holds no matching file,
+		// hence the is_array() guard before reading 'fullname'.
+		$fileparams = dol_most_recent_file($mailctx['diroutput'] . '/' . $object->ref, preg_quote($object->ref, '/') . '.*.pdf');
 
-		$file = $fileparams['fullname'];
+		$file = (is_array($fileparams) && !empty($fileparams['fullname'])) ? $fileparams['fullname'] : '';
 
 		if ($file) {
 			$listofpaths = array($file);
 			$listofnames = array(basename($file));
 			$listofmimes = array(dol_mimetype($file));
+		} else {
+			dol_syslog('stancerSendOrderMailModele no pdf found in ' . $mailctx['diroutput'] . '/' . $object->ref . ', mail will be sent without attachment', LOG_WARNING);
 		}
 	}
 	dol_syslog('stancerSendOrderMailModele fichier(s) joint(s) : ' . json_encode($listofpaths));
 
-	$trackid = 'ord' . $object->id;
+	$trackid = empty($mailctx['trackidprefix']) ? '' : $mailctx['trackidprefix'] . $object->id;
+	if (empty($trackid)) {
+		dol_syslog('stancerSendOrderMailModele no track id for element ' . (is_object($object) ? $object->element : '?') . ', answers to this mail will not be reattached by the email collector', LOG_INFO);
+	}
 	$moreinheader = 'X-Dolibarr-Info: stancerSendOrderMailModele' . "\r\n";
 
 	// Send email (substitutionarray must be done just before this)
@@ -540,7 +665,7 @@ function stancerSendOrderMailModele($modele, $object, $actionCode = "", $forceMa
 		$ispostactionok = -1;
 	} else {
 		if ($file) {
-			$postactionmessages[] = 'Email sent to thirdparty (to ' . $to . ' with order document attached: ' . $file . ', language = ' . $outputlangs->defaultlang . ')';
+			$postactionmessages[] = 'Email sent to thirdparty (to ' . $to . ' with ' . (is_object($object) ? $object->element : '?') . ' document attached: ' . $file . ', language = ' . $outputlangs->defaultlang . ')';
 		} else {
 			$postactionmessages[] = 'Email sent to thirdparty (to ' . $to . ' without any attached document, language = ' . $outputlangs->defaultlang . ')';
 		}

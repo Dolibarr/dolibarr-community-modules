@@ -310,7 +310,12 @@ function stancerCardstartPayWithRedirect($object, $parameters, $forceAmount = nu
 				if (getDolGlobalString('STANCER_AUTO_MAIL_ORDER_CB_MAILTYPE', '') != '') {
 					stancerSendOrderMailModele(getDolGlobalString('STANCER_AUTO_MAIL_ORDER_CB_MAILTYPE', ''), $object, '', 0, $customerEmail);
 				} else {
-					stancerSendMail($customerEmail, $langs->trans('StancerMailSubjectConfirmLinkToPay'), $message, true, '', ($object->element == 'facture' ? 'inv' : 'ord') . $object->id);
+					// The object can be an invoice, an order, a proposal, a member or a donation:
+					// the track id prefix must follow it, otherwise the email collector reattaches
+					// the customer answer to an unrelated object carrying the same rowid.
+					$mailctx = stancerGetObjectMailContext($object);
+					$mailTrackid = empty($mailctx['trackidprefix']) ? '' : $mailctx['trackidprefix'] . $object->id;
+					stancerSendMail($customerEmail, $langs->trans('StancerMailSubjectConfirmLinkToPay'), $message, true, '', $mailTrackid);
 				}
 			}
 
