@@ -509,6 +509,7 @@ EInvoiceGeneratedButRecipientNotRoutable=E-invoice generated, but the recipient 
 EInvoiceNotSentRecipientNotRoutable=Invoice not sent: the recipient cannot receive electronic invoices
 EInvoiceGeneratedButRecipientReachabilityUnconfirmed=E-invoice generated, but the recipient reachability could not be confirmed, so its transmission will be blocked
 EInvoiceNotSentRecipientReachabilityUnconfirmed=Invoice not sent: the recipient reachability could not be confirmed
+EInvoiceCashInNotReportedDepositRefused=Cash-in of the invoice %s not reported to the Approved Platform: it refused the deposit of that e-invoice, so it holds no invoice to report a payment on. Correct and send the e-invoice again, then report the cash-in.
 EINVOICING_JOB_MANUAL_ACTION_REQUIRED=Manual action is required. The job has been interrupted.
 NoPDPProviderConfigured=No Approved Platform configured: nothing to synchronize
 

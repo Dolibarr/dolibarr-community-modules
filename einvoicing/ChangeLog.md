@@ -94,6 +94,15 @@ tolerated without losing the boundary it forms. Several candidates are reported 
 instead of being guessed, and a database failure is no longer reported to the user as a missing
 document.
 
+FIX: A cash-in is no longer reported with the status 212 on an invoice the Approved Platform refused.
+The guard that decides it reads the 'transmitted' flag, which is true of every status but the local
+ones - and STATUS_ERROR is one it lets through, although that code is exactly what an acknowledgement
+"Error" leaves behind. So an e-invoice whose deposit the platform rejected counted as deposited, and
+the next payment recorded on the invoice reported a cash-in the platform has no invoice to attach it
+to. The cash-in is now skipped on that status, with a warning naming the invoice and a line in the
+log: the e-invoice has to be corrected and sent again, which the "Send" button of the invoice card
+still offers on that very status, and the cash-in reported afterwards.
+  
 FIX: The automatic transmission to the Access Point no longer fires on a document rebuild that has
 nothing to do with a validation. EINVOICING_AUTO_SEND_ON_GENERATION says it transmits "on invoice
 validation", but it lived in afterPDFCreation(), a hook called for every rebuild of the invoice PDF
