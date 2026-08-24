@@ -57,6 +57,19 @@ class EInvoicing
 	 */
 	public $errors = array();
 
+	/**
+	 * Ids of the customer invoices whose validation happened during the current request.
+	 *
+	 * The hook that generates the e-invoice, afterPDFCreation(), is called for every rebuild of the
+	 * invoice PDF and cannot tell what asked for it. The BILL_VALIDATE trigger can: it runs inside
+	 * Facture::validate(), before the caller regenerates the document, and it runs for no other
+	 * reason. Marking the invoice there is what lets the hook recognise the generation that follows a
+	 * validation - the only one EINVOICING_AUTO_SEND_ON_GENERATION is meant to transmit.
+	 *
+	 * @var int[]
+	 */
+	private static $validatedinthisrequest = array();
+
 
 	// Dolibarr internal statuses
 	public const STATUS_UNKNOWN             = 0;		// By default, before the e-invoice has been generated
@@ -505,6 +518,30 @@ class EInvoicing
 	public function __construct($db)
 	{
 		$this->db = $db;
+	}
+
+	/**
+	 * Record that a customer invoice has just been validated, from the BILL_VALIDATE trigger.
+	 *
+	 * @param  int	$invoiceid	Id of the validated invoice
+	 * @return void
+	 */
+	public static function setInvoiceValidatedInThisRequest($invoiceid)
+	{
+		if ($invoiceid > 0 && !in_array((int) $invoiceid, self::$validatedinthisrequest, true)) {
+			self::$validatedinthisrequest[] = (int) $invoiceid;
+		}
+	}
+
+	/**
+	 * Tell whether this customer invoice has been validated during the current request.
+	 *
+	 * @param  int	$invoiceid	Id of the invoice
+	 * @return bool				True if the invoice went through BILL_VALIDATE in this very request
+	 */
+	public static function isInvoiceValidatedInThisRequest($invoiceid)
+	{
+		return in_array((int) $invoiceid, self::$validatedinthisrequest, true);
 	}
 
 

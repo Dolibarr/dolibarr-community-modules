@@ -94,6 +94,21 @@ tolerated without losing the boundary it forms. Several candidates are reported 
 instead of being guessed, and a database failure is no longer reported to the user as a missing
 document.
 
+FIX: The automatic transmission to the Access Point no longer fires on a document rebuild that has
+nothing to do with a validation. EINVOICING_AUTO_SEND_ON_GENERATION says it transmits "on invoice
+validation", but it lived in afterPDFCreation(), a hook called for every rebuild of the invoice PDF
+and unable to tell what asked for one. Recording a payment rebuilds the invoice document from inside
+Paiement::create(), and so do the "Generate" button of the invoice card and any mass or scheduled PDF
+rebuild. On an invoice validated before the module was set up - or deliberately left to be sent by
+hand - the first such rebuild deposited it at the Access Point on its own: an invoice dated three
+months earlier was submitted at the moment its payment was entered, and being transmitted from then
+on, it also unlocked the cash-in status (212) that the very same payment reported next. The
+BILL_VALIDATE trigger now marks the invoice for the rest of the request - it runs inside
+Facture::validate(), before the caller regenerates the document, and for no other reason - and the
+auto-send is limited to a generation that carries that mark. Nothing changes for the validation flow,
+in the card, in a mass action or through the API; every other rebuild still regenerates the e-invoice
+file and now leaves the transmission to the "Send" button.
+
 FIX: A third party recognised as a private individual is no longer reported as misconfigured when
 EINVOICING_SKIP_B2C is on (issue #600). The option already kept B2C invoices out of the e-invoicing
 scope - needEInvoiceManagement() answers "do not manage" on them, since B2C is reported by e-reporting

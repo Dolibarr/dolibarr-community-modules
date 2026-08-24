@@ -70,7 +70,8 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 
 		dol_syslog("Trigger '".$this->name."' for action '".$action."' launched by ".__FILE__.". id=".$object->id);
 
-		// Note: Option EINVOICING_AUTO_SEND_ON_GENERATION is managed in hook afterPDFCreation().
+		// Note: Option EINVOICING_AUTO_SEND_ON_GENERATION is managed in hook afterPDFCreation(), which is
+		// told by the BILL_VALIDATE case below that a validation is what triggers the coming generation.
 
 		// THIRD PARTIES
 		if ($action == 'COMPANY_CREATE' || $action == 'COMPANY_MODIFY') {
@@ -148,6 +149,11 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		if ($action == 'BILL_VALIDATE') {
 			/** @var Facture $object */
 			'@phan-var-force Facture $object';
+
+			// Tell the afterPDFCreation() hook that the document rebuild about to happen is the one that
+			// follows a validation. Set unconditionally and before anything else: this only records a fact
+			// about the request, and the hook is the one place that decides what to do with it.
+			EInvoicing::setInvoiceValidatedInThisRequest($object->id);
 
 			if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {		// If sync Dolibarr to AP is on
 				$einvoicing = new EInvoicing($this->db);
