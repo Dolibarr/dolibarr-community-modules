@@ -1368,7 +1368,7 @@ class Stancer_payments extends CommonObject
 				$res = self::STATUS_ERROR;
 			}
 		} else {
-			if (isset($this->tab_status[$value])) {
+			if (isset(self::$tab_status[$value])) {
 				$res = self::$tab_status[$value];
 			} else {
 				$res = self::STATUS_ERROR;
