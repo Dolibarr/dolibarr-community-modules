@@ -2,6 +2,15 @@
 
 ## 1.0.4
 
+FIX: The CHORUS extrafields no longer print on the PDF of an invoice or an order when the CHORUS option
+is off (issue #614). They were declared printable = 1, "always print it", while their visibility depends
+on a condition, getDolGlobalInt("EINVOICING_USE_CHORUS"), that the card of the object honours but the PDF
+does not: CommonDocGenerator::getExtrafieldsInHtml() reads that condition on Dolibarr 18, 22, 23 and 24,
+and not on 17, 19, 20 and 21, where three empty labels of a feature nobody turned on reached every
+document. They are declared printable = 2 now, "print it only when it holds something", so an empty field
+stays out of the document on every version. An installation that already carries the extrafields keeps
+its own definition - addExtraField() does not touch an existing one - so the module updates them the way
+it already updates their condition, the next time it is activated.
 FIX: The e-invoice status combo no longer renders an invalid <option> on Dolibarr 17. The code of an
 Access Point status is shown next to its label through a <span> put in the 'data-html' of the option,
 and Form::selectarray() prints the data-* values of an option as they are on 17, where 18 and later
