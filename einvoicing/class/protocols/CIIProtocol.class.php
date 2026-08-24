@@ -44,6 +44,7 @@ dol_include_once('einvoicing/class/protocols/AbstractProtocol.class.php');
 dol_include_once('einvoicing/class/protocols/CommonProtocol.class.php');
 dol_include_once('einvoicing/class/einvoicing.class.php');
 dol_include_once('einvoicing/class/utils/XmlPatcher.class.php');
+dol_include_once('einvoicing/class/utils/SupplierInvoiceHelper.class.php');
 dol_include_once('einvoicing/lib/einvoicing.lib.php');
 
 
@@ -860,23 +861,17 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		// Check if this invoice has already been imported for this supplier
-		$sql = "SELECT rowid as id FROM " . MAIN_DB_PREFIX . "facture_fourn";
-		$sql .= " WHERE ref_supplier = '" . $db->escape($parsedHeader['documentno']) . "'";
-		$sql .= " AND fk_soc = " . ((int) $socId);
-		$sql .= " AND entity IN (" . getEntity('facture_fourn') . ")";
-		$resql = $db->query($sql);
-		if ($resql) {
-			if ($db->num_rows($resql) > 0) {
-				$supplierInvoiceId = $db->fetch_object($resql)->id;
-				$einvoicing->cleanUpTemporaryFiles(); // Clean up temp files to remove retrieved Einvoice file since invoice already exists
+		$supplierInvoiceId = SupplierInvoiceHelper::findIdByRef($parsedHeader['documentno'] ?? null, (int) $socId);
+		if ($supplierInvoiceId < 0) {
+			return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($supplierInvoiceId, $parsedHeader['documentno'] ?? '', 'while checking whether it was already imported')];
+		}
+		if ($supplierInvoiceId > 0) {
+			$einvoicing->cleanUpTemporaryFiles(); // Clean up temp files to remove retrieved Einvoice file since invoice already exists
 
-				// FIXME supplierinvoice already found but may be that documents are not linked (this is done later but only after creating invoice,
-				// may be we should also do it in this case to fix inconsistent data).
+			// FIXME supplierinvoice already found but may be that documents are not linked (this is done later but only after creating invoice,
+			// may be we should also do it in this case to fix inconsistent data).
 
-				return ['res' => $supplierInvoiceId, 'message' => 'Supplier Invoice with reference ' . $parsedHeader['documentno'] . ' already exists'];
-			}
-		} else {
-			return ['res' => -1, 'message' => 'Database error while checking existing supplier invoice: ' . $db->lasterror()];
+			return ['res' => $supplierInvoiceId, 'message' => 'Supplier Invoice with reference ' . $parsedHeader['documentno'] . ' already exists'];
 		}
 
 		// Check if all referenced documents in the invoice exist in Dolibarr for the same supplier, if not return with error since we need them for correct linking in the invoice
@@ -886,9 +881,11 @@ class CIIProtocol extends AbstractProtocol
 				$dateDoc = $invoiceRefDoc['FormattedIssueDateTime'] ?? null;
 				$typeDoc = $invoiceRefDoc['TypeCode'] ?? null;
 
-				$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "facture_fourn WHERE ref_supplier = '" . $db->escape($refDoc) . "' AND fk_soc = " . ((int) $socId) . " AND entity IN (" . getEntity('facture_fourn') . ") LIMIT 1";
-				$resql = $db->query($sql);
-				if ($db->num_rows($resql) != 1) {
+				$refDocInvoiceId = SupplierInvoiceHelper::findIdByRef($refDoc, (int) $socId);
+				if ($refDocInvoiceId < 0) {
+					return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($refDocInvoiceId, $refDoc, 'linked to document ' . ($parsedHeader['documentno'] ?? ''))];
+				}
+				if ($refDocInvoiceId == 0) {
 					return ['res' => -1, 'message' => 'Document : ' . $refDoc . ' linked to document ' . $parsedHeader['documentno'] . ' not found in Dolibarr'];
 				}
 			}
@@ -913,16 +910,13 @@ class CIIProtocol extends AbstractProtocol
 			$firstRefDoc = reset($parsedHeader['invoiceRefDocs']);
 			$refSourceSupplier = !empty($firstRefDoc['IssuerAssignedID']) ? (string) $firstRefDoc['IssuerAssignedID'] : '';
 			if ($refSourceSupplier !== '') {
-				$sqlSource = "SELECT rowid FROM " . MAIN_DB_PREFIX . "facture_fourn WHERE ref_supplier = '" . $db->escape($refSourceSupplier) . "' AND fk_soc = " . ((int) $socId) . " AND entity IN (" . getEntity('facture_fourn') . ") LIMIT 1";
-				$resqlSource = $db->query($sqlSource);
-				if ($resqlSource) {
-					$objSource = $db->fetch_object($resqlSource);
-					if ($objSource) {
-						$supplierInvoice->fk_facture_source = (int) $objSource->rowid;
-						dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource Linked to source invoice id=' . $supplierInvoice->fk_facture_source, LOG_DEBUG);
-					} else {
-						dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource Source invoice ref_supplier="' . $refSourceSupplier . '" not found for ' . ($parsedHeader['documentno'] ?? ''), LOG_WARNING);
-					}
+				$sourceInvoiceId = SupplierInvoiceHelper::findIdByRef($refSourceSupplier, (int) $socId);
+				if ($sourceInvoiceId > 0) {
+					$supplierInvoice->fk_facture_source = $sourceInvoiceId;
+					dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource Linked to source invoice id=' . $supplierInvoice->fk_facture_source, LOG_DEBUG);
+				} else {
+					// Not found, ambiguous or database error: leave fk_facture_source empty rather than link the wrong invoice
+					dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource Source invoice ref_supplier="' . $refSourceSupplier . '" not resolved (code ' . $sourceInvoiceId . ') for ' . ($parsedHeader['documentno'] ?? ''), LOG_WARNING);
 				}
 			}
 		}
@@ -1000,12 +994,13 @@ class CIIProtocol extends AbstractProtocol
 					$dateDoc = $doc['FormattedIssueDateTime'] ?? null;
 					$typeDoc = $doc['TypeCode'] ?? null;
 
-					$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "facture_fourn WHERE ref_supplier = '" . $db->escape($refDoc) . "' AND fk_soc = " . ((int) $socId) . " AND entity IN (" . getEntity('facture_fourn') . ") LIMIT 1";
-					$resql = $db->query($sql);
-					if ($db->num_rows($resql) != 1) {
+					$linkedObjectId = SupplierInvoiceHelper::findIdByRef($refDoc, (int) $socId);
+					if ($linkedObjectId < 0) {
+						return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($linkedObjectId, $refDoc, 'linked to document ' . ($parsedHeader['documentno'] ?? ''))];
+					}
+					if ($linkedObjectId == 0) {
 						return ['res' => -1, 'message' => 'Document : ' . $refDoc . ' linked to document ' . $parsedHeader['documentno'] . ' not found in Dolibarr'];
 					}
-					$linkedObjectId = $db->fetch_object($resql)->rowid;
 
 					// Fetch Object
 					$linkedObject = new FactureFournisseur($db);
@@ -1166,9 +1161,11 @@ class CIIProtocol extends AbstractProtocol
 					$lineRefDocType = $refDoc['typeCode'] ?? null;
 					$lineRefDocDate = $refDoc['issueDate'] ?? null;
 
-					$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "facture_fourn WHERE ref_supplier = '" . $db->escape($lineRefDocId) . "' AND fk_soc = " . ((int) $parsedLine['supplierId']) . " AND entity IN (" . getEntity('facture_fourn') . ") LIMIT 1";
-					$resql = $db->query($sql);
-					if ($db->num_rows($resql) != 1) {
+					$linkedObjectId = SupplierInvoiceHelper::findIdByRef($lineRefDocId, (int) $parsedLine['supplierId']);
+					if ($linkedObjectId < 0) {
+						return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($linkedObjectId, $lineRefDocId, 'linked to line ' . $parsedLine['lineid'])];
+					}
+					if ($linkedObjectId == 0) {
 						return [
 							'res' => -1,
 							'message' => 'Document "' . $lineRefDocId . '" linked to line ' . $parsedLine['lineid'] . ' was not found in Dolibarr. Please verify why this document is missing (deleted, not imported, or not provided by the supplier). To resolve this issue, you must manually create the invoice using the supplier invoice reference "' . $lineRefDocId . '".'
@@ -1178,7 +1175,6 @@ class CIIProtocol extends AbstractProtocol
 
 					// Load linked supplier invoice
 					$linkedObject = new FactureFournisseur($db);
-					$linkedObjectId = $db->fetch_object($resql)->rowid;
 					$resFetchLinkedObject = $linkedObject->fetch($linkedObjectId);
 					if ($resFetchLinkedObject > 0) {
 						/*

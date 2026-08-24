@@ -2131,10 +2131,10 @@ class EInvoicing
 		if (version_compare(DOL_VERSION, '22.0.0', '<')) {
 			// Before v22, select_produits_fournisseurs() uses print instead of return
 			ob_start();
-			$form->select_produits_fournisseurs($socid, $selected, $htmlname, '', '', array(), 0, 1);
+			$form->select_produits_fournisseurs($socid, $selected, $htmlname, '', '', array(), 0, 1, 'maxwidth300');
 			$out = ob_get_clean();
 		} else {
-			$out = $form->select_produits_fournisseurs($socid, $selected, $htmlname, '', '', array(), 0, 1, '', '', 1);
+			$out = $form->select_produits_fournisseurs($socid, $selected, $htmlname, '', '', array(), 0, 1, 'maxwidth300', '', 1);
 		}
 
 		$status = $savstatus;

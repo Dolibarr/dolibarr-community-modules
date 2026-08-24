@@ -2,6 +2,23 @@
 
 ## 1.0.4
 
+NEW: The reference a received e-invoice carries can now be matched against a ref_supplier that was
+typed with extra text around it. The five lookups the import runs on ref_supplier - the duplicate
+check, the referenced documents at document and at line level, and the source invoice of a credit
+note - were as many copies of the same exact-match query, in the CII path and again in the Factur-X
+one. A supplier invoice entered by hand as "PAY123 - FA202610 - dinner" was therefore never
+recognised as the one the XML calls "FA202610", and the import stopped on a document it could not
+find. Those call sites now share SupplierInvoiceHelper::findIdByRef(), which is still exact by
+default: the hidden option EINVOICING_TOLERANT_SUPPLIER_REF_MATCH adds a fallback, tried only when
+the exact match found nothing, and narrow enough that it cannot answer for the wrong invoice. A
+reference shorter than EINVOICING_TOLERANT_SUPPLIER_REF_MIN_LENGTH (8) or purely numeric is never
+searched for as a substring; the substring must be delimited by a non alphanumeric character or by
+an edge of the ref_supplier, so "FA202610" matches "PAY123 - FA202610 - dinner" but not "FA2026100";
+and the whitespace manual entry adds - "FA 2026 10", tabs and non-breaking spaces included - is
+tolerated without losing the boundary it forms. Several candidates are reported as an ambiguity
+instead of being guessed, and a database failure is no longer reported to the user as a missing
+document.
+
 FIX: A third party recognised as a private individual is no longer reported as misconfigured when
 EINVOICING_SKIP_B2C is on (issue #600). The option already kept B2C invoices out of the e-invoicing
 scope - needEInvoiceManagement() answers "do not manage" on them, since B2C is reported by e-reporting
