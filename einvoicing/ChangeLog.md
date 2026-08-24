@@ -2,6 +2,23 @@
 
 ## 1.0.4
 
+FIX: The module can obtain an access token from the Esalink access point again. The token request had
+lost its grant_type parameter, which RFC 6749 requires whatever the client authentication method is,
+so the access point answered 400 Bad Request - "must not be blank" - before it ever looked at the
+credentials, and the setup screen could only report that no token could be obtained. No token means no
+exchange at all: no invoice sent and none received, on an installation whose credentials are perfectly
+valid. The parameter was dropped when the token request moved to an Authorization: Basic header for
+issue #586, and the option added afterwards, ESALINK_AUTHENT_USING_CLIENT_CREDENTIAL, restored the
+working form only for the installations that knew to set it - the default stayed without grant_type.
+The full form-urlencoded body - grant_type, client_id and client_secret, with no Basic header - is the
+default again: it is the form scripts/testconnect.php has always sent, which is why the diagnostic
+script kept working while the setup screen failed on the same credentials. HTTP Basic remains
+available behind ESALINK_AUTHENT_USING_BASIC_AUTH for an access point that requires it, with
+grant_type in the body there too and the credentials in the header only, as a client must not use more
+than one authentication method in the same request. An installation that set
+ESALINK_AUTHENT_USING_CLIENT_CREDENTIAL as a workaround keeps working: the constant is now without
+effect, and the request it used to select is the default.
+
 CHANGE: GETPOSTFLOAT(), a function the core gained in Dolibarr 20 and that the module backports for the
 versions below, moves from the library of the module to compat/functions.lib.php, where the module keeps
 what it copies from the core. Pure move, guard included: the library requires that file, so the two call
