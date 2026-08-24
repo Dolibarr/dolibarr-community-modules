@@ -13,7 +13,6 @@ return [
     // PhanUndeclaredProperty : 20+ occurrences
     // PhanTypeMismatchArgumentProbablyReal : 8 occurrences
     // PhanUndeclaredClassMethod : 7 occurrences
-    // PhanTypeMismatchReturn : 6 occurrences
     // PhanTypeObjectUnsetDeclaredProperty : 6 occurrences
     // PhanUndeclaredMethod : 6 occurrences
     // PhanTypeMismatchArgumentNullable : 5 occurrences
@@ -40,7 +39,7 @@ return [
         'einvoicing/class/protocols/CIIProtocol.class.php' => ['PhanDeprecatedProperty', 'PhanParamTooMany', 'PhanPluginDuplicateExpressionAssignmentOperation', 'PhanTypeMismatchArgumentNullable'],
         'einvoicing/class/protocols/CommonProtocol.class.php' => ['PhanTypeMismatchArgumentNullable', 'PhanUndeclaredMethod'],
         'einvoicing/class/protocols/FacturXProtocol.class.php' => ['PhanDeprecatedFunction', 'PhanTypeMismatchArgumentProbablyReal', 'PhanTypeMismatchPropertyProbablyReal'],
-        'einvoicing/class/providers/EsalinkPDPProvider.class.php' => ['PhanTypeArraySuspiciousNullable', 'PhanTypeMismatchArgumentProbablyReal', 'PhanTypeMismatchReturn', 'PhanUndeclaredProperty', 'PhanUndeclaredVariableDim'],
+        'einvoicing/class/providers/EsalinkPDPProvider.class.php' => ['PhanTypeArraySuspiciousNullable', 'PhanTypeMismatchArgumentProbablyReal', 'PhanUndeclaredProperty', 'PhanUndeclaredVariableDim'],
         'einvoicing/class/providers/PDPProviderManager.class.php' => ['PhanTypeMismatchReturnNullable'],
         'einvoicing/class/providers/SuperPDPProvider.class.php' => ['PhanTypeArraySuspiciousNullable', 'PhanTypeMismatchArgumentProbablyReal', 'PhanUndeclaredProperty'],
         'einvoicing/compat/commonhookactions.class.php' => ['PhanRedefineClass'],
