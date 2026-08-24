@@ -18,6 +18,50 @@ would fatal on 17 and 18 for the same reason. Finally, the page read
 $conf->main_checkbox_left_column directly, a property the core only carries since Dolibarr 21, so every
 load below that wrote six PHP warnings in the log for a value that is empty there anyway: it is read
 through empty() now, the way one of those six places already read it.
+FIX: The CHORUS extrafields no longer print on the PDF of an invoice or an order when the CHORUS option
+is off (issue #614). They were declared printable = 1, "always print it", while their visibility depends
+on a condition, getDolGlobalInt("EINVOICING_USE_CHORUS"), that the card of the object honours but the PDF
+does not: CommonDocGenerator::getExtrafieldsInHtml() reads that condition on Dolibarr 18, 22, 23 and 24,
+and not on 17, 19, 20 and 21, where three empty labels of a feature nobody turned on reached every
+document. They are declared printable = 2 now, "print it only when it holds something", so an empty field
+stays out of the document on every version. An installation that already carries the extrafields keeps
+its own definition - addExtraField() does not touch an existing one - so the module updates them the way
+it already updates their condition, the next time it is activated.
+FIX: The e-invoice status combo no longer renders an invalid <option> on Dolibarr 17. The code of an
+Access Point status is shown next to its label through a <span> put in the 'data-html' of the option,
+and Form::selectarray() prints the data-* values of an option as they are on 17, where 18 and later
+escape them: the attribute closed on the first quote of that span, and the markup of the whole option
+was broken. The status list escapes the value itself on those cores now, which produces exactly what
+the newer ones produce, and leaves the newer ones untouched rather than escaping twice.
+NEW: The order reference the supplier declared on a received e-invoice (BT-13) is now kept on the
+supplier invoice the import creates, and shown on its card, whether or not it matched a purchase order
+of Dolibarr (issue #603). That reference was only used to auto-link the invoice to an order; the
+no-match case - the ordinary one - dropped it, so the accountant could not see what the supplier had
+declared, nor reconcile the invoice by hand. It is stored as sent, trimmed, in every case, and the
+auto-link keeps behaving exactly as before.
+
+The value does not go into an extrafield: the module deliberately stopped using the extrafields of the
+core, since an admin or a user can rename, empty or delete one while the module is accountable for the
+data it holds. It goes into a new table of the module, llx_einvoicing_extrafields, built on the model of
+llx_einvoicing_extlinks - element_id and element_type identify the object - plus a name and a value, so
+that the next property to keep on an object needs no schema change. EInvoicing::insertOrUpdateExtraField()
+and EInvoicing::getExtraFieldValue() are the way in and out.
+NEW: The reference a received e-invoice carries can now be matched against a ref_supplier that was
+typed with extra text around it. The five lookups the import runs on ref_supplier - the duplicate
+check, the referenced documents at document and at line level, and the source invoice of a credit
+note - were as many copies of the same exact-match query, in the CII path and again in the Factur-X
+one. A supplier invoice entered by hand as "PAY123 - FA202610 - dinner" was therefore never
+recognised as the one the XML calls "FA202610", and the import stopped on a document it could not
+find. Those call sites now share SupplierInvoiceHelper::findIdByRef(), which is still exact by
+default: the hidden option EINVOICING_TOLERANT_SUPPLIER_REF_MATCH adds a fallback, tried only when
+the exact match found nothing, and narrow enough that it cannot answer for the wrong invoice. A
+reference shorter than EINVOICING_TOLERANT_SUPPLIER_REF_MIN_LENGTH (8) or purely numeric is never
+searched for as a substring; the substring must be delimited by a non alphanumeric character or by
+an edge of the ref_supplier, so "FA202610" matches "PAY123 - FA202610 - dinner" but not "FA2026100";
+and the whitespace manual entry adds - "FA 2026 10", tabs and non-breaking spaces included - is
+tolerated without losing the boundary it forms. Several candidates are reported as an ambiguity
+instead of being guessed, and a database failure is no longer reported to the user as a missing
+document.
 
 FIX: A third party recognised as a private individual is no longer reported as misconfigured when
 EINVOICING_SKIP_B2C is on (issue #600). The option already kept B2C invoices out of the e-invoicing
