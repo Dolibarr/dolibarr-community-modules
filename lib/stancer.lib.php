@@ -44,6 +44,51 @@ require_once DOL_DOCUMENT_ROOT . '/core/lib/security2.lib.php';
 require_once DOL_DOCUMENT_ROOT . '/core/lib/functions.lib.php';
 require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
 
+/**
+ * isModEnabled() aware of the module keys renamed by recent Dolibarr releases
+ *
+ * Dolibarr renamed several module keys: 'facture' became 'invoice', 'commande'
+ * became 'order' and 'adherent' became 'member'. The conversion table inside
+ * isModEnabled() only covers a handful of keys (bank, category, contract,
+ * project, delivery_note), so on a release predating the rename,
+ * isModEnabled('invoice') silently returns false while the invoice module IS
+ * enabled. Every invoice related treatment of this module would then be
+ * skipped, without any error.
+ *
+ * Measured on Dolibarr 18.0.8, with the modules enabled:
+ *   isModEnabled('facture')  = true   isModEnabled('invoice') = false
+ *   isModEnabled('commande') = true   isModEnabled('order')   = false
+ *   isModEnabled('adherent') = true   isModEnabled('member')  = false
+ *   isModEnabled('banque')   = true   isModEnabled('bank')    = true
+ *
+ * The core itself only switched to the modern keys in Dolibarr 23, while this
+ * module supports Dolibarr 15 and above: both spellings must therefore be
+ * handled. Callers use the modern key, this helper maps it back to the
+ * historical one on older releases. The historical keys stay valid on recent
+ * releases too, so the fallback is safe in every case.
+ *
+ * @param   string  $module   Modern module key ('invoice', 'order', 'member', ...)
+ * @return  bool              True when the module is enabled
+ */
+function stancerIsModEnabled($module)
+{
+	// Dolibarr 23 is the first release whose core uses the modern keys.
+	if (((int) DOL_VERSION) >= 23) {
+		return (bool) isModEnabled($module);
+	}
+
+	// Historical keys, the only ones understood before the rename. The argument
+	// is a variable on purpose: these legacy names must remain reachable.
+	$legacyKeys = array(
+		'invoice' => 'facture',
+		'order'   => 'commande',
+		'member'  => 'adherent',
+	);
+	$key = isset($legacyKeys[$module]) ? $legacyKeys[$module] : $module;
+
+	return (bool) isModEnabled($key);
+}
+
 //a partir de dolibarr 16 la lib php-iban fonctionne correctement pour convertir un iban en rib...
 if (floatval(DOL_VERSION) < 16.0) {
 	dol_include_once('/stancer/backport/php-iban/oophp-iban.php');

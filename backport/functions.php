@@ -2,13 +2,15 @@
 require_once DOL_DOCUMENT_ROOT.'/core/lib/security2.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/functions.lib.php';
 
-/**
- * Is Dolibarr module enabled
- *
- * @param string $module module name to check
- * @return int
- */
 if (!function_exists('isModEnabled')) {
+	/**
+	 * Is Dolibarr module enabled
+	 *
+	 * Backport for Dolibarr releases predating the introduction of isModEnabled().
+	 *
+	 * @param  string $module  module name to check
+	 * @return bool            True when the module is enabled
+	 */
 	function isModEnabled($module)
 	{
 		global $conf;
