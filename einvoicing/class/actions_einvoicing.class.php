@@ -3,6 +3,7 @@
  * Copyright (C) 2025		Laurent Destailleur		<eldy@users.sourceforge.net>
  * Copyright (C) 2026		Charlene Benke			<charlene@patas-monkey.com>
  * Copyright (C) 2026       Frédéric France         <frederic.france@free.fr>
+ * Copyright (C) 2026		Jose Martinez				<jose.martinez@pichinov.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -473,7 +474,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 						'lang' => 'einvoicing',
 						'enabled' => true,
 						'perm' => ($forcedisabling ? -1 : ((bool) $user->hasRight("fournisseur", "facture", "creer") && empty($forcedisabling))),
-						'label' => (string) $label,
+						'label' => (string) (is_array($label) ? ($label['label'] ?? '') : $label),
 						'url' => '/fourn/facture/card.php?id=' . $object->id . '&action=sendStatusMessage&pdpstatuscode=' . $code . '&token=' . newToken()
 					);
 				}
