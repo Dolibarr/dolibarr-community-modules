@@ -324,6 +324,10 @@ function stancerSendInvoiceMailModele($modele, $object, $actionCode = "", $force
 	dol_syslog("stancerSendInvoiceMailModele caller=$caller, modele='$modele', actionCode=$actionCode, forceMail=$forceMail, invoice=$objRef (id=$objId), socid=$objSocid", LOG_INFO);
 	$result = 0;
 	$subject = $msg = "";
+	// Initialised up front: both are only written inside conditional branches,
+	// so a static analyser cannot tell they are always set before being read.
+	$error = '';
+	$postactionmessages = array();
 	// Track id, ActionComm elementtype, template type and document directory all depend
 	// on the type of $object: never hardcode them, see stancerGetObjectMailContext().
 	$mailctx = stancerGetObjectMailContext($object);
@@ -426,9 +430,12 @@ function stancerSendInvoiceMailModele($modele, $object, $actionCode = "", $force
 	$listofnames = array();
 	$listofmimes = array();
 	if (is_object($object) && !empty($mailctx['diroutput'])) {
+		// ->ref is not typed on CommonObject: cast it before preg_quote(), which
+		// rejects null since PHP 8.1.
+		$objectRef = (string) ($object->ref ?? '');
 		// dol_most_recent_file() returns null when the directory holds no matching file,
 		// hence the is_array() guard before reading 'fullname'.
-		$fileparams = dol_most_recent_file($mailctx['diroutput'] . '/' . $object->ref, preg_quote($object->ref, '/') . '.*.pdf');
+		$fileparams = dol_most_recent_file($mailctx['diroutput'] . '/' . $objectRef, preg_quote($objectRef, '/') . '.*.pdf');
 
 		$file = (is_array($fileparams) && !empty($fileparams['fullname'])) ? $fileparams['fullname'] : '';
 
@@ -546,6 +553,10 @@ function stancerSendOrderMailModele($modele, $object, $actionCode = "", $forceMa
 	dol_syslog("stancerSendOrderMailModele modele=$modele, actionCode=$actionCode, forceMail=$forceMail, element=" . (is_object($object) ? $object->element : '?') . ", id=" . (is_object($object) ? $object->id : '?'), LOG_DEBUG);
 	$result = 0;
 	$subject = $msg = "";
+	// Initialised up front: both are only written inside conditional branches,
+	// so a static analyser cannot tell they are always set before being read.
+	$error = '';
+	$postactionmessages = array();
 	// Track id, ActionComm elementtype, template type and document directory all depend
 	// on the type of $object: never hardcode them, see stancerGetObjectMailContext().
 	$mailctx = stancerGetObjectMailContext($object);
@@ -627,9 +638,12 @@ function stancerSendOrderMailModele($modele, $object, $actionCode = "", $forceMa
 	$listofnames = array();
 	$listofmimes = array();
 	if (is_object($object) && !empty($mailctx['diroutput'])) {
+		// ->ref is not typed on CommonObject: cast it before preg_quote(), which
+		// rejects null since PHP 8.1.
+		$objectRef = (string) ($object->ref ?? '');
 		// dol_most_recent_file() returns null when the directory holds no matching file,
 		// hence the is_array() guard before reading 'fullname'.
-		$fileparams = dol_most_recent_file($mailctx['diroutput'] . '/' . $object->ref, preg_quote($object->ref, '/') . '.*.pdf');
+		$fileparams = dol_most_recent_file($mailctx['diroutput'] . '/' . $objectRef, preg_quote($objectRef, '/') . '.*.pdf');
 
 		$file = (is_array($fileparams) && !empty($fileparams['fullname'])) ? $fileparams['fullname'] : '';
 
