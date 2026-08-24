@@ -471,10 +471,14 @@ if (isModEnabled('stancer') && $user->hasRight('stancer', 'read')) {
 
 				if (getDolGlobalString('STANCER_MANDATE_AUTO_UPTOSIGN', '') != '') {
 					print '<p>'.$langs->transnoentitiesnoconv("NiceUptoSignIsEnabled").'</p>';
+					// uptosign is an optional third party module, loaded at runtime only when
+					// installed, so its class is unknown to the static analysers.
 					if (dol_include_once('/uptosign/class/uptosignCore.class.php')) {
+						// @phan-suppress-next-line PhanUndeclaredClassMethod
 						$uptosignCore = new uptosignCore(['db' => $db]);
 
 						//sepamandate object does not exists, so we use "contract" as document type to find who can sign
+						// @phan-suppress-next-line PhanUndeclaredClassMethod
 						$list_of_potential_signers = $uptosignCore->whoCanSign($societe->id, 'contrat', 'CustomerSign');
 						if (is_countable($list_of_potential_signers)) {
 							if (@count($list_of_potential_signers) == 0) {

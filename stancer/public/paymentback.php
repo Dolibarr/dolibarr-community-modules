@@ -2041,7 +2041,9 @@ print "\n</div>\n";
 
 
 if (((int) DOL_VERSION) < 18) {
+	// Renamed into htmlPrintOnlineFooter() in Dolibarr 18, kept for older versions
 	// @phpstan-ignore-next-line
+	// @phan-suppress-next-line PhanUndeclaredFunction
 	htmlPrintOnlinePaymentFooter($mysoc, $langs);
 } else {
 	// @phpstan-ignore-next-line

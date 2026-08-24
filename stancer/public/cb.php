@@ -384,7 +384,9 @@ print "\n</div>\n";
 print '<script src="'.dol_buildpath('/stancer/js/stancer_submit_once.js', 1).'"></script>'."\n";
 
 if (((int) DOL_VERSION) < 18) {
+	// Renamed into htmlPrintOnlineFooter() in Dolibarr 18, kept for older versions
 	// @phpstan-ignore-next-line
+	// @phan-suppress-next-line PhanUndeclaredFunction
 	htmlPrintOnlinePaymentFooter($mysoc, $langs);
 } else {
 	// @phpstan-ignore-next-line

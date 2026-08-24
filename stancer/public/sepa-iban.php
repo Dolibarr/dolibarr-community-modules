@@ -277,9 +277,13 @@ if ($action == "stancerGetCustomerIBAN") {
 							if (getDolGlobalString('STANCER_MANDATE_AUTO_UPTOSIGN', '') != '') {
 								dol_syslog("stancer sepa mandate call uptosign code to sign that mandate !", LOG_DEBUG);
 
+								// uptosign is an optional third party module, loaded at runtime only when
+								// installed, so its class is unknown to the static analysers.
 								if (dol_include_once('/uptosign/class/uptosignCore.class.php')) {
+									// @phan-suppress-next-line PhanUndeclaredClassMethod
 									$uptosignCore = new uptosignCore(['db'=>$db]);
 									//sepamandate object does not exists, so we use "contract" as document type to find who can sign
+									// @phan-suppress-next-line PhanUndeclaredClassMethod
 									$list_of_potential_signers = $uptosignCore->whoCanSign($societe->id, 'contrat', 'CustomerSign');
 
 									// print "<p>Liste des signataires possibles : " . json_encode($list_of_potential_signers) . "</p>";
@@ -301,6 +305,7 @@ if ($action == "stancerGetCustomerIBAN") {
 													'signPosX' => 120,
 													'signPosY' => 220 );
 
+										// @phan-suppress-next-line PhanUndeclaredClassMethod
 										$uptosignCore = new uptosignCore([
 														'db'=>$db,
 														'src_file_name'=> $pdf->result['fullpath'],
@@ -315,10 +320,12 @@ if ($action == "stancerGetCustomerIBAN") {
 														'mail_alerts' => getDolGlobalString('STANCER_EMAIL_INFO_SEPA')
 													]);
 										dol_syslog("stancer sepa mandate call uptosign *********************************** user is " . json_encode($user), LOG_DEBUG);
+										// @phan-suppress-next-line PhanUndeclaredClassMethod
 										$resSign = $uptosignCore->run([], $user);
 										dol_syslog("stancer sepa mandate call uptosign end ********************************", LOG_DEBUG);
 										if ($resSign == 0) {
 											dol_syslog("stancer sepa mandate call uptosign end ******************************** ressign = 0", LOG_DEBUG);
+											// @phan-suppress-next-line PhanUndeclaredClassMethod
 											$signLink = $uptosignCore->signLink();
 											if (empty($signLink)) {
 												$signLink = 'email';
@@ -525,7 +532,9 @@ print "\n</div>\n";
 print '<script src="'.dol_buildpath('/stancer/js/stancer_submit_once.js', 1).'"></script>'."\n";
 
 if (((int) DOL_VERSION) < 18) {
+	// Renamed into htmlPrintOnlineFooter() in Dolibarr 18, kept for older versions
 	// @phpstan-ignore-next-line
+	// @phan-suppress-next-line PhanUndeclaredFunction
 	htmlPrintOnlinePaymentFooter($mysoc, $langs);
 } else {
 	// @phpstan-ignore-next-line
