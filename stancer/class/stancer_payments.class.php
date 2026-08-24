@@ -1238,7 +1238,7 @@ class Stancer_payments extends CommonObject
 			//il faudrait aller récupérer le socid du client dans dolibarr
 			if (empty($fk_soc)) {
 				$companypaymentmode = new CompanyPaymentModeStancer($this->db);
-				$res = $companypaymentmode->fetch(0, '', '', '', " AND label LIKE 'stancer-%' AND stancer_account = ".$customer);
+				$res = $companypaymentmode->fetch(0, null, null, null, " AND label LIKE 'stancer-%' AND stancer_account = ".$customer);
 				if ($res > 0) {
 					$fk_soc = $companypaymentmode->fk_soc;
 					dol_syslog("stancer fillData fk_soc=$fk_soc resolved from companypaymentmode mapping (no CUS= tag)");
@@ -1433,7 +1433,7 @@ class Stancer_payments extends CommonObject
 			$customerId = is_array($customer) ? (isset($customer['id']) ? $customer['id'] : '') : $customer;
 			if (empty($fk_soc) && !empty($customerId)) {
 				$companypaymentmode = new CompanyPaymentModeStancer($this->db);
-				$res = $companypaymentmode->fetch(0, '', '', '', " AND label LIKE 'stancer-%' AND stancer_account = '".$this->db->escape($customerId)."'");
+				$res = $companypaymentmode->fetch(0, null, null, null, " AND label LIKE 'stancer-%' AND stancer_account = '".$this->db->escape($customerId)."'");
 				if ($res > 0) {
 					$fk_soc = $companypaymentmode->fk_soc;
 					dol_syslog("stancer fillDataFromApi fk_soc=$fk_soc resolved from companypaymentmode mapping (no CUS= tag)");
@@ -1612,7 +1612,7 @@ class Stancer_payments extends CommonObject
 	/**
 	 * return true if that payment is initial process pay is ok (initial ok but maybe not confirmed) + confirmed
 	 *
-	 * @return  [type]  [return description]
+	 * @return	bool	True when the current status means the payment went through, even if the capture is not confirmed yet
 	 */
 	public function isInitPaid()
 	{
@@ -1652,7 +1652,7 @@ class Stancer_payments extends CommonObject
 	/**
 	 * return true if that payment is reusable
 	 *
-	 * @return  [type]  [return description]
+	 * @return	bool	True when the payment is still a draft and can be reused for a new attempt
 	 */
 	public function canBeReused()
 	{

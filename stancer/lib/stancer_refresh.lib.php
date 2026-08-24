@@ -1735,7 +1735,7 @@ function stancerRefreshAllPayoutsFromDolibarr($userMessage = true, $lastrun = nu
  * get number of days to get (history)
  * default is 31 (1 month)
  *
- * @return  [type]  [return description]
+ * @return	int		Number of days read from STANCER_NB_DAYS_TO_SYNC, 31 when unset or out of the 1-3649 range
  */
 function stancerGetNumberOfDaysToGet()
 {
@@ -1789,9 +1789,8 @@ function stancerGetAuditCapturedWindowDays()
 
 /**
  * get number of items to retrieve (history)
- * default is 200
  *
- * @return  [type]  [return description]
+ * @return	int		Page size read from STANCER_NUMBER_OF_ITEMS_TO_SYNC, 10 when unset or out of the 1-100 range
  */
 function stancerGetNumberOfItemToGet()
 {

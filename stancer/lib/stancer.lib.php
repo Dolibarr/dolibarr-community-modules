@@ -135,7 +135,7 @@ if (isset($db)) {
 /**
  * get stancer public key
  *
- * @return  [type]  [return description]
+ * @return	string	Live or test public API key depending on STANCER_IS_PROD, empty string when not configured
  */
 function stancer_get_public_key()
 {
@@ -150,7 +150,7 @@ function stancer_get_public_key()
 /**
  * get stancer private key
  *
- * @return  [type]  [return description]
+ * @return	string	Live or test private API key depending on STANCER_IS_PROD, empty string when not configured
  */
 function stancer_get_private_key()
 {

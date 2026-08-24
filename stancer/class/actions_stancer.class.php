@@ -142,7 +142,7 @@ class ActionsStancer
 
 			//une cb est enregistrée pour ce client on propose un paiement direct ?
 			$companypaymentmode = new CompanyPaymentModeStancer($db);
-			$res = $companypaymentmode->fetch(0, '', '', '', " AND type = 'card' AND label LIKE 'stancer-card%' AND stancer_object_ref <> '' AND fk_soc = " . ((int) $object->socid));
+			$res = $companypaymentmode->fetch(0, null, null, null, " AND type = 'card' AND label LIKE 'stancer-card%' AND stancer_object_ref <> '' AND fk_soc = " . ((int) $object->socid));
 			if ($res) {
 				$message .= '<p>&nbsp;</p><p>' . $langs->trans('StancerPopupCBexists') . '</p>';
 				$formconfirm = $form->formconfirm($_SERVER["PHP_SELF"] . '?id=' . $object->id, $langs->trans('Stancer'), $message, 'confirm_stancertakecbpayment', '', 'no', 1, 340, 480);
