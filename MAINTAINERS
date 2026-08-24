@@ -65,7 +65,7 @@ F:	ksef/
 T:	https://github.com/Dolibarr/dolibarr-community-modules.git
 
 STANCER MODULE
-M:	Eric Seigne <eric.seigne@cap-rel.fr> / GITHUB_ID_TO_BE_COMPLETED
+M:	Eric Seigne <eric.seigne@cap-rel.fr> / rycks
 S:	Maintained
 W:	https://doc.cap-rel.fr/stancer/
 F:	stancer/
