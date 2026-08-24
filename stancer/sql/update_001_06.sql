@@ -1,0 +1,12 @@
+--
+-- E3: enforce payment identity uniqueness (per entity) so two concurrent
+-- refresh/paymentback runs cannot both insert the same Stancer payment
+-- (which led to over-paid invoices and a double bank credit).
+--
+-- NOTE: if the table already holds duplicate (entity, stancer_id) rows, this
+-- ALTER fails. Deduplicate first, keeping the lowest rowid per key, e.g.:
+--   DELETE p FROM llx_stancer_stancer_payments p
+--     INNER JOIN llx_stancer_stancer_payments q
+--     ON p.entity = q.entity AND p.stancer_id = q.stancer_id AND p.rowid > q.rowid;
+--
+ALTER TABLE `llx_stancer_stancer_payments` ADD UNIQUE INDEX uk_stancer_stancer_payments_stancer_id (entity, stancer_id);

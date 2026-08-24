@@ -1,0 +1,542 @@
+# Copyright (C) 2023 Eric Seigne <eric.seigne@cap-rel.fr>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+#
+# Generic
+#
+
+# Module label 'ModuleStancerName'
+ModuleStancerName = Stancer
+ModuleStancerDesc = Stancer Zahlungsmodul
+
+#
+# Dashboard
+#
+StancerDashboard = Stancer Dashboard
+StancerTestModeWarning = Testmodus aktiv — die angezeigten Daten stammen aus der Testumgebung
+StancerDashboardKPI = Monatliche Kennzahlen
+StancerDashboardRevenue = Stancer-Einnahmen
+StancerDashboardPayments = Zahlungen
+StancerDashboardRefunds = Erstattungen
+StancerDashboardDisputes = Streitfälle
+StancerDashboardCaptured = erfasst
+StancerDashboardThisMonth = diesen Monat
+StancerDashboardOpen = offen
+StancerDashboardMethods = Verteilung nach Zahlungsmethode
+StancerDashboardYearlyComparison = Jahresvergleich der Stancer-Einnahmen
+StancerDashboardMethodMonthly = Monatliche CB / SEPA-Einnahmen
+StancerDashboardAlerts = Warnungen
+StancerDashboardAlertDisputes = %s offene(r) Streitfall/-fälle für insgesamt %s
+StancerDashboardAlertRefunds = %s ausstehende Erstattung(en) für insgesamt %s
+StancerDashboardLastPayments = Letzte Zahlungen
+
+#
+# Admin page
+#
+StancerSetup = Stancer Konfiguration: Allgemein
+StancerSetupSepa = Stancer Konfiguration: SEPA
+StancerSettingsMenu = Allgemein
+StancerSetupPage = Stancer Konfigurationsseite
+StancerSignupURL = https://stancer.com/fr/paiement-en-ligne?mtm_campaign=Dolibarr&mtm_source=Dolibarr
+StancerNoApiKeysMessage = Sie haben noch kein Stancer-Konto? <a href="%s" target="_blank">Erstellen Sie Ihr kostenloses Konto</a>, um Ihre API-Schlüssel zu erhalten und Kreditkarten- und SEPA-Zahlungen zu akzeptieren.
+StancerSignupPromo = Empfehlen Sie Stancer! <a href="%s" target="_blank">Ein Stancer-Konto erstellen</a>
+StancerPartnershipMessage = Dieses Modul ist dank der Stancer-Partnerschaft kostenlos. <a href="%s" target="_blank">Erstellen Sie Ihr Stancer-Konto</a> und profitieren Sie von einer einfachen und wettbewerbsfähigen Zahlungslösung.
+
+STANCER_PROD_PARAMS = Produktionsmodus
+
+STANCER_PROD_PUBLIC_KEY = Öffentlicher Schlüssel (Produktionsmodus)
+STANCER_PROD_PUBLIC_KEYTooltip = Fügen Sie hier Ihren öffentlichen Stancer-Produktionsschlüssel ein (Präfix pprod_ oder plive_).
+STANCER_PROD_PRIVATE_KEY = Privater Schlüssel (Produktionsmodus)
+STANCER_PROD_PRIVATE_KEYTooltip = Fügen Sie hier Ihren privaten Stancer-Produktionsschlüssel ein (Präfix sprod_ oder slive_).
+
+STANCER_TEST_PARAMS = Testmodus
+
+STANCER_TEST_PUBLIC_KEY = Öffentlicher Schlüssel (Testmodus)
+STANCER_TEST_PUBLIC_KEYTooltip = Fügen Sie hier Ihren öffentlichen Stancer-Testschlüssel ein (Präfix ptest_).
+STANCER_TEST_PRIVATE_KEY = Privater Schlüssel (Testmodus)
+STANCER_TEST_PRIVATE_KEYTooltip = Fügen Sie hier Ihren privaten Stancer-Testschlüssel ein (Präfix stest_).
+STANCER_KEY_HINT = Muss mit %s beginnen
+STANCER_KEY_INVALID = Der Schlüssel %s muss mit %s beginnen. Die Eingabe wurde abgelehnt und der vorherige Wert beibehalten.
+STANCER_USER_ACCOUNT_FOR_ACTIONS = Dolibarr-Benutzer für automatische Stancer-Operationen
+
+#
+# About page
+#
+About = Über uns
+StancerAbout = Über Stancer
+StancerAboutPage = Über-Seite
+
+StancerTest = Testbereich
+StancerAccount = Verknüpftes Stancer-Konto
+CreateAccountOnStancer = Kundenkonto bei Stancer erstellen (oder verknüpfen)
+StancerAccountID = Kennung
+StancerAccountDeleteLink = Verknüpfung mit Stancer-Konto löschen
+StancerOrderID = Interne Ref.
+StancerUniqueID = Eindeutige ID
+StancerCBCard = Kreditkarte
+STANCER_PAY_BUTTON = Mit Karte bezahlen
+STANCER_PAY_BUTTON_MESSAGE = Sie werden zur Stancer-Website weitergeleitet, um die Zahlung durchzuführen
+STANCER_PAY_BUTTON_DEPOSIT = Anzahlung von %s %% d.h. %s
+STANCER_CB_ORDER_PARTIAL_PAY = Teilzahlung für Bestellungen mit automatischer Anzahlungsrechnung aktivieren
+STANCER_CB_ORDER_PARTIAL_PAYTooltip = Diese Option ermöglicht z.B. "30%% Zahlung bei Bestellung". Weitere Informationen in der <a href="https://doc.cap-rel.fr/projet_stancer/versement_d_un_acompte_a_la_commande">Dokumentation</a>
+STANCER_CB_PROPAL_PARTIAL_PAY = Teilzahlung für Angebote mit automatischer Anzahlungsrechnung aktivieren
+STANCER_CB_PROPAL_PARTIAL_PAYTooltip = Diese Option ermöglicht z.B. "20%% Zahlung bei Angebotsunterzeichnung" unter Verwendung des in den Zahlungsbedingungen des Angebots definierten Anzahlungsprozentsatzes
+
+STANCER_AUTO_SEPA_ONLY_FOR_CONTRACTS = Automatische SEPA-Lastschriften nur auslösen, wenn die Rechnung mit einem Vertrag verknüpft ist
+STANCER_AUTO_SEPA_ONLY_FOR_CONTRACTSTooltip = Lassen Sie dieses Feld deaktiviert, wenn jede Rechnung mit Lastschrift-Zahlungsmethode automatisch durch die geplante Aufgabe eingezogen werden soll
+stancer_status_to_capture = Zahlung akzeptiert
+MainAPIURI = Serveradresse
+STANCER_IS_PROD = "Produktions"-Modus aktivieren (für Testmodus deaktiviert lassen)
+STANCER_BANK_ACCOUNT_FOR_PAYMENTS = Dediziertes Dolibarr-Bankkonto für Stancer-Zahlungen
+STANCER_BANK_ACCOUNT_FOR_PAYMENTSTooltip = Normalerweise wurde bei der Modulaktivierung ein "Stancer"-Konto erstellt, verwenden Sie dieses. Mischen Sie nicht alles mit Ihrem Hauptkonto.
+STANCER_BANK_MAIN_ACCOUNT_FOR_PAYOUTS = Dolibarr-Bankkonto, auf das Stancer Geld überweist
+STANCER_BANK_MAIN_ACCOUNT_FOR_PAYOUTSTooltip = Ihr Hauptbankkonto
+STANCER_CHECK_PAYMENT_STATUS = Überprüfung des Zahlungsstatus der Transaktion:
+STANCER_REDIRECT = Wenn Ihr Browser nicht automatisch zur Zahlungsseite wechselt, klicken Sie bitte auf den folgenden Link:
+response = Details
+created = Datum
+AmountCents = Betrag
+Amount = Betrag
+Fees = Gebühren
+details = Details
+date_bank = Datum (Bank)
+date_paym = Datum (Zahlung)
+StancerRefused = Abgelehnt
+StancerToCapture = Warten auf Bank
+StancerDisputed = Streitfall
+StancerCaptured = Erfasst
+StancerPopupCB = Zahlung der Rechnung Ref. %s per Karte.
+StancerCardStart = Stancer CB
+StancerCardTPE = Stancer POS
+stancerFindPaymentInvoice = Automatische Zahlungssuche
+SepaMandateForStancer = SEPA-Mandat - Stancer
+SepaMandateForStancerPageTitle = Erstellung Ihres SEPA-Mandats
+SEPALegalTextStancer = Mit der Unterzeichnung dieses Mandatsformulars ermächtigen Sie (A) %s, Anweisungen an Ihre Bank zu senden, um Ihr Konto zu belasten, und (B) Ihre Bank, Ihr Konto gemäß den Anweisungen von %s zu belasten. Sie haben das Recht, von Ihrer Bank unter den in Ihrer Vereinbarung mit ihr beschriebenen Bedingungen erstattet zu werden. Ein Erstattungsantrag muss innerhalb von 8 Wochen ab dem Datum der Belastung Ihres Kontos für eine autorisierte Lastschrift eingereicht werden. Sie erklären sich damit einverstanden, Benachrichtigungen über bevorstehende Lastschriften innerhalb von 2 Tagen vor deren Ausführung zu erhalten. Jede abgelehnte Lastschrift wird ebenfalls gemäß unseren Allgemeinen Geschäftsbedingungen berechnet.
+SEPALegalTextStancer2 = Durch das Ausfüllen dieses Mandatsformulars ermächtigen Sie (A) %s, Anweisungen an Ihre Bank zu senden, um Ihr Konto zu belasten, und (B) Ihre Bank, Ihr Konto gemäß den Anweisungen von %s zu belasten. Sie haben das Recht, von Ihrer Bank unter den in Ihrer Vereinbarung mit ihr beschriebenen Bedingungen erstattet zu werden. Ein Erstattungsantrag muss innerhalb von 8 Wochen ab dem Datum der Belastung Ihres Kontos für eine autorisierte Lastschrift eingereicht werden. Sie erklären sich damit einverstanden, Benachrichtigungen über bevorstehende Lastschriften innerhalb von 2 Tagen vor deren Ausführung zu erhalten. Jede abgelehnte Lastschrift wird ebenfalls gemäß unseren Allgemeinen Geschäftsbedingungen berechnet.
+SEPALegalTextStancerDPO = Die in diesem Mandat enthaltenen Informationen sind nur für die Verwaltung der Beziehung des Gläubigers mit seinem Kunden bestimmt. Sie können zur Ausübung von Widerspruchs-, Zugangs-, Löschungs-, Portabilitäts-, Beschränkungs- und Berichtigungsrechten führen, wie in den Artikeln 38 ff. des Gesetzes Nr. 78-17 vom 6. Januar 1978 über Datenverarbeitung, Dateien und Freiheiten vorgesehen, per E-Mail an %s.
+PleaseReturnMandateStancer = Bitte senden Sie dieses Mandat per E-Mail an %s oder per Post an
+ShowInStancer = Weitere Details auf der Stancer-Website
+StancerPayments = Zahlungen
+StancerPayouts = Auszahlungen
+StancerRefunds = Erstattungen
+StancerDisputes = Streitfälle
+StancerDisputeID = Stancer-Streitfall-Ref.
+StancerPaymentID = Stancer-Zahlungs-Ref.
+StancerSEPA = SEPA-Mandatsbereich
+CreateSEPAOnStancer = Dieses SEPA-Mandat bei Stancer erstellen
+ErrorStancer = Stancer-Fehlermeldung
+StancerSEPAID = Bestehende SEPA-Kennung bei Stancer
+StancerCBID = Bestehende CB-Kennung bei Stancer
+StancerSEPAstart = SEPA-Lastschrift durch Stancer
+StancerPleaseEnterYourIBANTitle = Automatische Lastschrift
+StancerPleaseEnterYourIBAN = Bitte geben Sie Ihren IBAN-Code ein, um die automatische Lastschrift (SEPA) für Ihre Rechnungen einzurichten.
+StancerYouAcceptPaymentViaSEPA =
+StancerYourIBAN = Ihr IBAN-Code:
+StancerIBANCBinpoutSecurekeyError = Der Sicherheitsschlüssel für den Zugriff auf diese Seite ist falsch, bitte überprüfen Sie bei Ihrem Anbieter, ob sich der Zugriffslink zu dieser Seite nicht geändert hat.
+StancerLinkFoCustomerIBAN = Sie können Ihrem Kunden anbieten, seinen IBAN-Code selbst auszufüllen, um das Lastschriftmandat zu verwalten, indem Sie ihm diesen speziellen Link mitteilen.
+StancerLinkFoCustomerIBANforce = Sie können Ihrem Kunden anbieten, ein neues Mandat zu erstellen, um das aktuelle zu ersetzen. In diesem Fall teilen Sie ihm den folgenden Link mit.
+stancerSEPAinvalidIBAN = Die angegebene IBAN-Nummer ist falsch, bitte überprüfen Sie sie und reichen Sie Ihren Antrag erneut ein.
+StancerCustomerName = Name Ihrer Organisation (Organisation / Unternehmen / Institution...)
+StancerCustomerNameOnIBAN = Kontoinhaber (ändern Sie, wenn vom Firmennamen abweichend)
+StancerBankName = Name Ihrer Bank
+StancerSuccessSEPAdone = Die Erstellung Ihres SEPA-Lastschriftmandats ist abgeschlossen!
+StancerPleaseEnterYourIBANorCBTitleDone = Vielen Dank!
+StancerPleaseEnterYourIBANDone = Ihre SEPA-Lastschrift-Zahlungsmethode ist jetzt registriert.
+StancerPleaseEnterYourCBDone = Ihre Kreditkarten-Zahlungsmethode ist jetzt registriert.
+StancerPleaseEnterYourIBANWillBeSent = Das zu unterzeichnende Mandat wird Ihnen in Kürze zugesandt.
+StancerPleaseEnterYourIBANWillBeSentByUptoSign = Ihr Mandat ist fertig, Sie müssen es nur noch unterschreiben. Unser Partner für elektronische Signaturen (uptosign) sollte Ihnen in wenigen Minuten eine E-Mail mit der Einladung zur elektronischen Signatur an <b> %s </b> senden. Wenn dies nicht Ihre Adresse ist, kontaktieren Sie uns bitte.
+StancerPleaseEnterYourIBANisReadyToSign = Das elektronisch zu unterzeichnende Mandat ist fertig, %s klicken Sie hier, um es über unseren Partner uptosign zu unterzeichnen %s.
+StancerPleaseEnterYourIBANisReadyToSignAutoRedir = Das elektronisch zu unterzeichnende Mandat ist fertig, Sie werden automatisch zur uptosign-Plattform für elektronische Signaturen weitergeleitet, warten Sie einige Sekunden, wenn nichts passiert %s klicken Sie hier, um dorthin zu gelangen%s.
+StancerSEPAMenu = SEPA-Mandat
+StancerCBMenu = Kreditkarte
+StancerCBConfig = Kreditkartenzahlungskonfiguration
+StancerMandateConfig = SEPA-Lastschriftmandat
+StancerMandatePresentation = Dieses Modul ermöglicht Ihnen die Einrichtung von SEPA-Lastschriften. Dafür müssen Sie Ihren Kunden das SEPA-Mandat unterschreiben lassen. Wenn Sie das Modul %s UptoSign %s auf Ihrem Dolibarr installiert haben, können Sie die automatische elektronische Signatur einrichten...
+StancerMandatePresentationWarning = Vergessen Sie nicht, Ihre ICS-Nummer vor jedem Lastschriftversuch an Stancer zu übermitteln, wie in deren Dokumentation angegeben %s!
+STANCER_PUBLIC_IBAN_PAGE = Öffentliche Seite aktivieren, auf der Ihre Kunden ihre IBAN eingeben können
+STANCER_PUBLIC_IBAN_PAGETooltip = Ihre Kunden können ihre IBAN/RIB selbst eingeben, um ihr Lastschriftmandat zu erstellen
+STANCER_PUBLIC_IBAN_PAGE_FORCE = Öffentliche Seite aktivieren, auf der Ihre Kunden ihre IBAN eingeben können, auch wenn sie bereits ein aktives Mandat haben
+STANCER_PUBLIC_IBAN_PAGE_FORCETooltip = Ermöglicht Ihrem Kunden, das aktuelle Mandat durch Erstellung eines neuen SEPA-Mandats zu ersetzen
+STANCER_SEPA_CHECK_IBAN = IBAN bei Erstellung des SEPA-Mandats überprüfen
+STANCER_SEPA_CHECK_IBANTooltip = Nutzt den SEPAMail-Überprüfungsdienst von Stancer, um zu validieren, dass die IBAN dem Kontoinhaber entspricht. Funktioniert nur für französische und italienische Banken.
+StancerSepaCheckSuccess = IBAN-Überprüfung: Score %s/100 (Klassifizierung %s)
+StancerSepaCheckWarning = IBAN-Überprüfung: niedriger Score %s/100 (Klassifizierung %s) — bitte Bankdaten überprüfen
+StancerSepaCheckPending = IBAN-Überprüfung gestartet (ID: %s), Ergebnis ausstehend — Mandat wurde erstellt, Ergebnis wird später verfügbar sein
+StancerSepaCheckSkipped = IBAN-Überprüfung für diesen Geschäftspartner nicht verfügbar (Service auf FR/IT-Banken mit gesetzlicher Kennung beschränkt)
+StancerSepaCheckError = Fehler bei der IBAN-Überprüfung: %s
+STANCER_MANDATE_AUTO = SEPA-Mandat automatisch im PDF-Format generieren
+STANCER_MANDATE_AUTOTooltip = Bei Aktivierung dieser Option wird das SEPA-Mandat automatisch generiert, wenn Ihr Kunde seine IBAN eingibt
+STANCER_MANDATE_AUTO_UPTOSIGN = Elektronisches Signaturverfahren automatisch über UpToSign starten
+STANCER_MANDATE_AUTO_UPTOSIGNTooltip = Option nur verfügbar, wenn Sie das UptoSign-Modul auf Ihrem Dolibarr haben, in diesem Fall wird die elektronische Signatur automatisch gestartet. Achten Sie darauf, die automatische Signaturpositionierung sowie den Standard-Unterzeichnerkontakt für Mandate in der Kundenakte zu konfigurieren. Weitere Details finden Sie in der <a href="https://doc.cap-rel.fr/projet_stancer/saisie_du_rib_par_votre_client_pour_creer_son_mandat_de_prelevement_sepa">Online-Dokumentation</a>.
+STANCER_INSTALL_UPTOSIGN = Installieren Sie das Zusatzmodul <a href="https://www.dolistore.com/fr/modules/1656-uptosign---signature---lectronique-eidas.html">UptoSign über diesen Link</a>, um einen eIDAS-konformen elektronischen Signaturdienst bereitzustellen (Signatur von Lastschriftmandaten, Angeboten, Rechnungen usw.)
+STANCER_INSTALL_UPTOSIGN_UPGRADENEEDED = Achtung, Ihr uptosign-Modul scheint nicht aktuell zu sein und die automatische Verkettung zur elektronischen Signatur des Mandats ist daher nicht möglich! Bitte aktualisieren Sie es und kontaktieren Sie CAP-REL, wenn diese Meldung weiterhin erscheint.
+StancerPublicIBANPageDisabled = Die öffentliche IBAN-Eingabeseite ist nicht in der %sModulkonfiguration%s aktiviert
+StancerAddManualExistingMandate = Wenn Sie bereits ein aktives SEPA-Lastschriftmandat mit diesem Kunden haben, können Sie es hinzufügen, indem Sie auf die Schaltfläche am Ende der entsprechenden Kontozeile klicken.
+StancerCompanyMailOrPhone = Es ist nicht möglich, das Stancer-Konto Ihres Kunden zu erstellen. Bitte ändern Sie seine Akte, um eine E-Mail-Adresse oder Telefonnummer im internationalen Format hinzuzufügen.
+StancerCompanyMailOrPhoneNewPayment = Zahlung über Stancer ist nicht möglich, bitte geben Sie uns Ihre E-Mail-Adresse oder Telefonnummer (im internationalen Format) an, um Ihre Akte zu vervollständigen, bevor Sie die Online-Zahlung erneut starten.
+YouCanAccelSignWithUptoSign = Beachten Sie, dass Sie den Prozess beschleunigen und optimieren können, indem Sie eine eIDAS-konforme elektronische Signatur einrichten und das %s UptoSign-Zusatzmodul %s zu Ihrem Dolibarr hinzufügen...
+NiceUptoSignIsEnabled = UptoSign ist aktiv, so dass Ihr Kunde Ihr Mandat online elektronisch unterschreiben kann!
+StancerAlreadyPaid = Laut Stancer wurde diese Transaktion bereits bezahlt, bitte kontaktieren Sie %s zur Überprüfung.
+ErrorStancerPleaseContactBy = Bitte kontaktieren Sie das Unternehmen
+ErrorStancerPleaseContactByPhone = Telefonisch unter %s
+ErrorStancerPleaseContactByMail = Per E-Mail unter %s
+StancerSEPAisNotConfiguredForThatCustomer = Die SEPA-Zahlungsmethode ist für diesen Kunden nicht konfiguriert. Klicken Sie in seiner Kundenakte auf den Stancer-Tab, um die SEPA-Zahlung zu konfigurieren.
+StancerPaymentDoneSuccessTitle = Vielen Dank!
+StancerPaymentDoneSuccessMessage = Ihre Zahlung wurde bestätigt, unten finden Sie die Details Ihrer Transaktion:
+StancerPaymentDoneSuccessMessageFacture = Ihre Rechnung wird in Kürze in Ihrem Kundenbereich verfügbar sein und wird Ihnen auch per E-Mail zugesandt. Wenn Sie innerhalb von 24 Stunden nichts erhalten haben, kontaktieren Sie uns bitte, nachdem Sie Ihren Spam-Ordner und andere Filter überprüft haben.
+StancerPaymentDoneID = Transaktions-ID: %s
+StancerPaymentDoneStatus = Status: %s
+StancerPaymentInvoiceOrOrder = Rechnungs- oder Bestellreferenz: %s
+StancerPaymentAmount = Zahlungsbetrag: %s %s
+StancerPaymentDoneEndMessage = Sie können diese Nachricht speichern, um die Transaktionsnummer aufzubewahren, und dann dieses Fenster schließen oder zu unserer Website gehen: %s
+StancerPaymentDoneErrorTitle = Fehler!
+StancerPaymentDoneErrorMessage = Während des Zahlungsvorgangs ist ein Fehler aufgetreten. Unten finden Sie einige zusätzliche Informationen.
+StancerPaymentDoneErrorMessageShortByStancer = Fehlermeldung (Zusammenfassung): %s
+StancerPaymentDoneErrorEndMessage = Bitte machen Sie einen Screenshot dieses Fehlers und senden Sie ihn zusammen mit Ihrer Bestell- oder Rechnungsreferenz an %s.
+StancerPaymentDoneErrorSeverityStancer = Stancer-Fehlerschweregrad: %s
+StancerPaymentOrderRef = Zahlung der Bestellung oder Rechnung %s
+StancerPaymentMembership = Mitgliedsbeitrag
+StancerPaymentPropal = Angebotszahlung %s
+StancerPaymentDonation = Spende an %s
+ErrorStancerPleaseUniqueID = Anzugebende Referenz: %s
+NotAvailableInTestMode = Diese Liste ist bei Verwendung von Testschlüsseln nicht verfügbar
+StancerReloadDetected = Seitenneuladung erkannt (oder Rückkehr von einer Teilzahlung, die von Dolibarr noch nicht verarbeitet wurde). Keine weitere Verarbeitung erforderlich, Sie können dieses Fenster schließen oder zu unserer Website gehen: %s.
+StancerSEPAalreadyInProgress = Eine SEPA-Lastschrift ist für diese Rechnung bereits im Gange: %s siehe laufendes Verfahren %s
+StancerAlreadyInProgress = Ein Zahlungsverfahren ist bereits im Gange
+StancerSEPAalreadyInProgressForceClicOnYes = Klicken Sie auf die Ja-Schaltfläche, wenn Sie eine neue Lastschrift erzwingen möchten.
+statementDescription = Beschreibung
+PayoutID = Referenz
+StancerPaid = Abgeschlossen
+StancerCaptureSent = In Bearbeitung
+StancerToPay = Geplant
+STANCER_BANK = Bankkontenkonfiguration
+STANCER_ADD_FEES_ON_BANK_FOR_EACH_PAYMENT = Belastungszeile für jede Gebühr im Zusammenhang mit einer Zahlung hinzufügen
+STANCER_ADD_FEES_ON_BANK_FOR_EACH_PAYOUT = Belastungszeile hinzufügen, die Gebühren bei Überweisung auf das Hauptkonto zusammenfasst
+STANCER_ADD_FEES = Automatisches Hinzufügen von Gebühren zum Bankkonto
+STANCER_ADD_FEESTooltip = Mit dieser Option können Sie wählen, ob bei jeder Stancer-Zahlung eine Zeile für die transaktionsbezogenen Gebühren hinzugefügt werden soll oder ob Sie es vorziehen, dass dies bei der Überweisung von Konto zu Konto zusammengefasst wird. Wenn Sie diese Option nicht aktivieren, müssen Sie Ihren Ausgleichseintrag manuell hinzufügen. <a href="https://doc.cap-rel.fr/projet_stancer/ecritures_sur_le_compte_bancaire">Klicken Sie hier für detaillierte Dokumentation</a>
+STANCER_ADD_FEES_ON_BANK_NONE = Keine, im manuellen Modus bleiben
+StancerFees = Stancer-Gebühren
+StancerCheckPay = Täglicher Stancer (Bank)
+StancerCheckPaymentAndPayout = Überprüfung von Stancer-Zahlungen und -Auszahlungen
+StancerTransferFromToDone = Überweisung von %s nach %s (Betrag %s %s) wurde abgeschlossen
+StancerCheckTakePayments = Automatische Stancer-Zahlungen
+StancerCheckTakePaymentsDetails = Automatischer Start von CB-Zahlungen und SEPA-Lastschriften: Start der automatischen Zahlung für jede unbezahlte Rechnung, deren Zahlungsmethode (CB oder Lastschrift) + Stancer-Bankkonto ist. Weitere Details: <a href="https://doc.cap-rel.fr/projet_stancer/paiement_automatique_des_factures">https://doc.cap-rel.fr/projet_stancer/paiement_automatique_des_factures</a>
+STANCER_NUMBER_OF_ITEMS_TO_SYNC = Anzahl der Transaktionen zum Herunterladen bei der Aktualisierung
+STANCER_NUMBER_OF_ITEMS_TO_SYNCTooltip = Limit der maximalen Anzahl von Transaktionen, die jede Nacht durch die geplante Aufgabe und in Listen mit Stancer synchronisiert werden. Ausnahmsweise können Sie 200 oder 1000 wählen, aber lassen Sie diesen Wert niemals für mehr als eine Synchronisation, da sonst die Gefahr einer Netzwerküberlastung mit Stancer besteht und Ihr Konto deaktiviert werden könnte.
+STANCER_NB_DAYS_TO_SYNC = Anzahl der Tage zum Herunterladen bei der Aktualisierung des Verlaufs
+STANCER_NB_DAYS_TO_SYNCTooltip = Wenn Sie die Verlaufssynchronisation neu starten, können Sie wählen, wie weit Sie in der Zeit zurückgehen möchten. Ausnahmsweise können Sie 1 Jahr oder 2 wählen, aber lassen Sie diesen Wert niemals für mehr als eine Synchronisation, da sonst die Gefahr einer Netzwerküberlastung mit Stancer besteht und Ihr Konto deaktiviert werden könnte.
+PRELEVEMENT_ICS = Ihre ICS-Nummer (SEPA-Gläubiger-Identifikationsnummer)
+PRELEVEMENT_ICSTooltip = Diese Nummer wird Ihnen von Ihrem Bankanbieter (Bank oder Stancer) mitgeteilt, sie ist für jedes Unternehmen eindeutig und muss von der Bank von Frankreich bereitgestellt werden, es ist der Code, der Ihr Unternehmen im SEPA-System identifiziert.
+ModeRECUR = Wiederkehrende Zahlungen
+StancerSignature = Elektronische Signatur
+StancerMailSubjectIBANandMandateReady = IBAN hinzugefügt und Mandat bereit
+StancerMailIBANandMandateReady = Eine IBAN-Nummer wurde von Ihrem Kunden %s hinzugefügt, das Mandat wurde wie in den Moduleinstellungen konfiguriert generiert und der elektronische Signaturprozess wurde gestartet.
+StancerMailSubjectIBANandMandateReadyToSign = IBAN hinzugefügt und Mandat bereit zur Unterschrift
+StancerMailIBANandMandateReadyToSignErr = Eine IBAN-Nummer wurde von Ihrem Kunden %s hinzugefügt, das Mandat wurde wie in den Moduleinstellungen konfiguriert generiert, aber der elektronische Signaturprozess konnte nicht gestartet werden (uptosign-Modul inkompatibel oder fehlend), Sie müssen übernehmen und das Verfahren manuell abschließen.
+StancerMailIBANandMandateReadyToSign = Eine IBAN-Nummer wurde von Ihrem Kunden %s hinzugefügt, das Mandat wurde wie in den Moduleinstellungen konfiguriert generiert, ist aber nicht unterschrieben, Sie müssen jetzt die notwendigen Schritte unternehmen.
+StancerMailSubjectIBANandMandateErr = IBAN hinzugefügt, aber Fehler bei der Mandatserstellung
+StancerMailIBANandMandateErr = Eine IBAN-Nummer wurde von Ihrem Kunden %s hinzugefügt, aber das Mandat wurde nicht generiert, bitte nehmen Sie die Akte an diesem Punkt wieder auf und erstellen Sie das Mandat manuell, dann lassen Sie es von Ihrem Kunden unterschreiben.
+StancerMailSubjectIBANsimple = IBAN hinzugefügt
+StancerMailIBANsimple = Eine IBAN-Nummer wurde von Ihrem Kunden %s hinzugefügt, das Mandat wurde gemäß den Moduleinstellungen nicht generiert. Sie müssen nun das Mandat manuell erstellen und von Ihrem Kunden unterschreiben lassen.
+StancerMailHello = Hallo,
+StancerMailGoodBye = Weitere Details finden Sie in der <a href="https://doc.cap-rel.fr/projet_stancer/accueil">Online-Dokumentation</a>
+StancerMailSignature = Gesendet vom Stancer-Modul für Dolibarr von %s
+STANCER_EMAIL_INFO_SEPA = An welche E-Mail-Adresse möchten Sie Benachrichtigungen über IBAN-Einträge erhalten?
+STANCER_EMAIL_INFO_SEPATooltip = Wenn ein Kunde seine IBAN auf Ihrer öffentlichen Seite eingibt, wird eine E-Mail an diese Adresse gesendet, um Sie einzuladen, dem Verfahren zu folgen...
+StancerDocTitleForUptoSign = SEPA-Mandat %s - %s
+StancerYourMandateRefIs = Ihre Mandatsreferenz (RUM) ist: <b> %s </b>. Wir laden Sie ein, sie zu notieren und bis zur endgültigen Unterzeichnung des Mandats aufzubewahren. Sie könnte bei Problemen im aktuellen Verfahren nützlich sein.
+StancerPublicIBANCBPageReload = Seitenneuladung erkannt. Keine weitere Verarbeitung erforderlich, Sie können dieses Fenster schließen oder zu unserer Website gehen: %s.
+StancerMailIBANandMandateReadyButMissingSignPeople = Eine IBAN-Nummer wurde von Ihrem Kunden %s hinzugefügt, das Mandat wurde generiert, aber die elektronische Signatur konnte nicht gestartet werden, weil kein Kontakt als "Vertragsunterzeichner (elektronische Signatur)" für diesen Geschäftspartner bestimmt ist. Sie müssen den elektronischen Signaturprozess manuell starten, nachdem Sie den Unterzeichnerkontakt bestimmt haben.
+SepaMandateFileName = SEPAMandat
+StancerUptoSignNotOnlyOneSigner = Achtung, mehr als ein Kontakt, der mit diesem Geschäftspartner verknüpft ist, hat die Rolle "Elektronische Signatur (Vertrag)", daher wird das SEPA-Mandat nicht automatisch zur elektronischen Signatur gesendet (derzeit sollte nur ein Kontakt pro Geschäftspartner diese Rolle haben).
+StancerUptoSignNoSigner = Achtung, kein Kontakt, der mit diesem Geschäftspartner verknüpft ist, hat die Rolle "Elektronische Signatur (Vertrag)" (oder falls ja, hat er keine Mobiltelefonnummer), daher wird das SEPA-Mandat nicht automatisch zur elektronischen Signatur gesendet. Dieser Kontakt muss eine gültige E-Mail-Adresse und eine Mobilnummer im internationalen Format haben, die SMS empfangen kann.
+StancerYourBIC = BIC/SWIFT-Code
+StancerReturnsJsonNull = Das von Stancer zurückgegebene JSON ist leer (null)
+STANCER_DEFAULT_CUSTOMER_IF_NULL = Standardkunde für Zahlungen ohne verknüpftes Kundenkonto (z.B. direkte POS-Zahlung)
+STANCER_DEFAULT_CUSTOMER_IF_NULLTooltip = Wenn Sie das Stancer-POS direkt ohne Dolibarr verwenden, sind Zahlungen mit keinem Dolibarr-Kundenkonto verknüpft, diese Option ermöglicht eine Standardzuordnung und vermeidet einen "leere Seite"-Fehler
+STANCER_DELAY_SEPA = Verzögerung (in Tagen) für SEPA-Lastschrift
+STANCER_DELAY_SEPATooltip = Geben Sie hier die Anzahl der Tage zwischen Rechnungsdatum und Zahlungsdatum ein, um die Vorschriften einzuhalten (in Frankreich 14 Tage) - <a href="https://particuliers.banque-france.fr/moyens-de-paiement/prelevement-sepa">https://particuliers.banque-france.fr/moyens-de-paiement/prelevement-sepa</a>
+STANCER_DELAY_SEPA_UPDATE_INVOICES = Fälligkeitsdatum der Rechnung aktualisieren?
+STANCER_DELAY_SEPA_UPDATE_INVOICESTooltip = Aktivieren Sie dieses Kontrollkästchen, wenn Sie möchten, dass das Stancer-Modul das Fälligkeitsdatum von Rechnungen, deren Zahlungsmethode SEPA-Lastschrift ist, auf das Rechnungsdatum + oben konfigurierte Verzögerung aktualisiert
+StancerCBisNotConfiguredForThatCustomer = Dieser Kunde (%s) hat keine CB auf seinem Stancer-Konto registriert
+StancerdoTakePaymentStancerResultMessageA = Eine Rechnung wurde erfolgreich bezahlt von insgesamt %s qualifizierten Rechnung(en) (Stancer-Zahlungsmethode) %s.
+StancerdoTakePaymentStancerResultMessageAP = %s Rechnungen wurden erfolgreich bezahlt von insgesamt %s qualifizierten Rechnungen (Stancer-Zahlungsmethode) %s.
+StancerdoTakePaymentStancerResultMessageB = Eine Rechnung wurde nicht verarbeitet (Datum noch nicht erreicht, fehlende Zahlungsinformationen, Kartennummer oder Zahlungsfehler) %s.
+StancerdoTakePaymentStancerResultMessageBP = %s Rechnungen wurden nicht verarbeitet (Datum noch nicht erreicht, fehlende Zahlungsinformationen, Kartennummer oder Zahlungsfehler) %s.
+StancerdoTakePaymentStancerResultMessageC = Eine neue Rechnung (SEPA-Lastschrift) wurde verarbeitet (Informations-E-Mail gesendet): %s.
+StancerdoTakePaymentStancerResultMessageCP = %s neue Rechnungen (SEPA-Lastschrift) wurden verarbeitet (Informations-E-Mail gesendet): %s.
+StancerdoTakePaymentStancerResultMessageD = Eine Rechnung (SEPA-Lastschrift) hat ihr Zahlungsdatum noch nicht erreicht: %s.
+StancerdoTakePaymentStancerResultMessageDP = %s Rechnungen (SEPA-Lastschrift) haben ihr Zahlungsdatum noch nicht erreicht: %s.
+STANCER_AUTO_MAIL_INVOICES_CB = Automatisierter Versand von per CB bezahlten Rechnungen per E-Mail
+STANCER_AUTO_MAIL_INVOICES_CBTooltip = Mit dieser Option können Sie die Rechnung automatisch senden, wenn die CB-Zahlung durch die Stancer-Planungsaufgabe gestartet wird oder wenn Ihr Kunde eine Rechnung direkt online bezahlt.
+STANCER_AUTO_MAIL_INVOICES_CB_MAILTYPE = Wählen Sie die Vorlage für die CB-Zahlungsbenachrichtigungs-E-Mail
+STANCER_AUTO_MAIL_INVOICES_CB_MAILTYPETooltip = Um eine E-Mail-Vorlage zu erstellen, gehen Sie zu Start > Konfiguration > E-Mails
+STANCER_AUTO_MAIL_INVOICES_SEPA_INFORMATION = Automatisierter Versand der SEPA-Lastschrift-Vorabinformations-E-Mail
+STANCER_AUTO_MAIL_INVOICES_SEPA_INFORMATIONTooltip = Mit dieser Option wird am Tag der Rechnungsstellung eine E-Mail gesendet, um Ihren Kunden zu informieren, dass die Lastschrift innerhalb der im SEPA-Tab konfigurierten Frist erfolgt
+STANCER_AUTO_MAIL_INVOICES_SEPA = Automatisierter Versand von per SEPA-Lastschrift bezahlten Rechnungen per E-Mail
+STANCER_AUTO_MAIL_INVOICES_SEPATooltip = Mit dieser Option wird am Tag des Starts der SEPA-Lastschrift eine E-Mail gesendet
+StancerMailMenu = E-Mail
+STANCER_AUTO_MAIL_INVOICES_SEPA_INFORMATION_MAILTYPE = Wählen Sie die Vorlage für die erste Informations-E-Mail (SEPA)
+STANCER_AUTO_MAIL_INVOICES_SEPA_MAILTYPE = Wählen Sie die Vorlage für die Zahlungs-E-Mail (SEPA)
+STANCER_AUTO_MAIL_INVOICES_SEPA_PAID = Rechnung an Kunden senden, wenn SEPA-Zahlung abgeschlossen ist
+STANCER_AUTO_MAIL_INVOICES_SEPA_PAID_MAILTYPE = Wählen Sie die Vorlage für die E-Mail bei abgeschlossener Zahlung (SEPA)
+StancerMailConfig = E-Mail
+StancerMailPresentation = Dieses Modul ermöglicht es Ihnen, den E-Mail-Versand an Ihre Kunden, die über Stancer bezahlen, zu automatisieren. Weitere Details finden Sie in der <a href="https://doc.cap-rel.fr/projet_stancer/envoyez_automatiquement_les_mails">Online-Dokumentation</a>.
+STANCER_AUTO_MAIL_INVOICES_ERROR = Wählen Sie die E-Mail-Vorlage für Zahlungsfehler
+STANCER_AUTO_MAIL_INVOICES_ERRORTooltip = Diese E-Mail-Vorlage wird bei Zahlungsfehlern verwendet, sowohl bei CB als auch bei SEPA-Lastschrift
+ErrorStancerSEPAdelay = Die Benachrichtigungsfrist (%s Tage) wurde noch nicht erreicht
+ErrorStancerSEPAdelayTitle = SEPA-Verzögerung
+ErrorStancerInvoiceDateDue = Das Zahlungsdatum der Rechnung wurde noch nicht erreicht
+ErrorStancerCBdueTitle = Zahlungsdatum
+StancerThereIsNoSocID = Ein Fehler ist aufgetreten, Ihre Kundenakte kann nicht gefunden werden, bitte kontaktieren Sie uns
+STANCER_PUBLIC_CB_PAGE = Öffentliche Seite aktivieren, auf der ein Kunde seine Kreditkarteninformationen eingeben kann
+STANCER_PUBLIC_CB_PAGETooltip = Wenn Sie diese Option aktivieren, wird eine öffentliche Seite zugänglich, auf der Ihre Kunden ihre CB-Zahlungsinformationen eingeben können (nützlich z.B. für ein Abonnement mit automatischer CB-Zahlung)
+StancerPageTitleForCB = Hinzufügen Ihrer Kreditkarte als Zahlungsmethode
+StancerCBAccount = Kreditkartenbereich
+CBLegalTextStancer2 = Durch das Ausfüllen dieses Formulars ermächtigen Sie %s, diese Informationen zur Verarbeitung von Zahlungen für ausstehende und zukünftige Rechnungen zu verwenden. Ihre Kreditkartennummer wird nicht auf unserem System gespeichert, sie wird direkt an unseren sicheren Zahlungsanbieter Stancer übertragen, der einen Fingerabdruck zurückgibt, der für zukünftige Zahlungen verwendet wird.
+StancerPleaseEnterYourCBTitle = CB-Zahlungsinformationen
+StancerPleaseEnterYourCB = Bitte füllen Sie das folgende Formular für die Kreditkartenzahlung Ihrer Abonnements aus
+StancerHolderName = Name des Kreditkarteninhabers
+StancerCBNumber = Kreditkartennummer
+StancerCBExpiry = Ablaufdatum
+StancerCBCCV = CCV-Code (Rückseite)
+StancerNoCBRecord = Es ist noch keine Kreditkarte registriert
+StancerLinkFoCustomerCB = Sie können Ihrem Kunden anbieten, das folgende Formular selbst auszufüllen, um automatische Kreditkartenzahlungen zu verwalten.
+CardNumber = Nummer
+CardExpiry = Ablaufdatum
+CardType = Netzwerk
+StancerPublicCBpageDisabled = Die öffentliche Kreditkartenregistrierungsseite ist nicht aktiviert! Bitte aktivieren Sie diese Option in der %sModulkonfiguration%s.
+StancerPayBalanceCB = Restbetrag per CB bezahlen
+StancerPayBalanceAmountCB = Restbetrag (%s) per CB bezahlen (experimentell)
+StancerPopupCBexists = Eine CB ist für diesen Kunden registriert, möchten Sie sie für die direkte Zahlung verwenden? Wenn ja, klicken Sie auf "Ja". Zum Abbrechen klicken Sie auf "Nein".
+StancerPaymentDoneOn = Zahlung für Rechnungen %s eingeleitet
+StancerPaymentNoInvoice = Keine Rechnungen warten auf Zahlung
+StancerPaymentErrorOn = Zahlungsfehler für Rechnungen %s
+StancerPaymentInProgress = Eine Zahlung über Stancer ist für diese Rechnung im Gange und wird hier sichtbar, sobald sie vom Anbieter endgültig validiert ist (24h für eine Kreditkarte, einige Tage für eine SEPA-Lastschrift). %s[Dokumentation]%s (Status: %s)
+StancerAssoMenu = Vereine
+StancerAssoConfig = Konfiguration für Vereine
+StancerAssoPresentation = Vereinsverwaltung (Mitglieder, Beiträge, Spenden...)
+STANCER_ASSO_ACTIVE = Unterstützung für vereinsspezifische Funktionen aktivieren
+STANCER_AUTO_MAIL_NOTIFICATIONS = Automatische E-Mail-Benachrichtigungen aktivieren
+STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT = E-Mail-Adresse für Benachrichtigung bei Zahlungsbestätigung
+STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT_DETAILS = Detaillierte E-Mail für jeden Zahlungsfehler erhalten (kann viele E-Mails verursachen)
+STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT_DETAILSTooltip = Wenn Sie dieses Kontrollkästchen deaktiviert lassen, erhalten Sie eine E-Mail mit der Gesamtzusammenfassung der Fehler
+STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENTTooltip = Lassen Sie dieses Feld leer, wenn Sie keine Benachrichtigungen erhalten möchten. Weitere Details finden Sie in der <a href="https://doc.cap-rel.fr/projet_stancer/notifications_par_mail">Online-Dokumentation</a>.
+STANCER_AUTO_MAIL_NOTIFICATIONS_PAYOUT = E-Mail-Adresse für Benachrichtigung bei Überweisung (Auszahlung)
+STANCER_AUTO_MAIL_NOTIFICATIONS_PAYOUTTooltip = Lassen Sie dieses Feld leer, wenn Sie keine Benachrichtigungen erhalten möchten. Weitere Details finden Sie in der <a href="https://doc.cap-rel.fr/projet_stancer/notifications_par_mail">Online-Dokumentation</a>.
+STANCER_AUTO_MAIL_NOTIFICATIONS_PAYOUT_DETAILS = Detaillierte E-Mail für jeden Bankübertragungsfehler vom Stancer-Konto auf Ihr Hauptkonto erhalten (kann viele E-Mails verursachen)
+STANCER_AUTO_MAIL_NOTIFICATIONS_PAYOUT_DETAILSTooltip = Wenn Sie dieses Kontrollkästchen deaktiviert lassen, erhalten Sie eine E-Mail mit der Gesamtzusammenfassung der Fehler
+StancerMailSubjectPaymentConfirm = Zahlungsbestätigung - %s: %s €
+StancerMailPaymentConfirm = Zahlung von %s € für Rechnung %s (Kunde: %s) wurde von Stancer bestätigt.
+StancerMailSubjectPaymentConfirmButError = Zahlungsbestätigung (Verwaltungsfehler) - %s: %s €
+StancerMailPaymentConfirmButError = Zahlung von %s € für Rechnung %s (Kunde: %s) wurde von Stancer bestätigt, aber die Erfassung in Dolibarr ist fehlerhaft, bitte überprüfen und beheben Sie die Situation manuell.
+StancerMailSubjectPaymentError = Zahlungsfehler - %s: %s €
+StancerMailPaymentError = Zahlung von %s € für Rechnung %s (Kunde: %s) ist fehlerhaft, Sie finden die Fehlermeldung unten: %s
+StancerMailSubjectPaymentExeption = Fehler der geplanten Aufgabe (Zahlungen)
+StancerMailPaymentExeption = Ein schwerwiegender Fehler ist aufgetreten, Sie finden die Meldung unten, zögern Sie nicht, CAP-REL zu kontaktieren, um bei Bedarf eine Lösung zu finden: %s
+StancerMailPayment = Sie finden unten die Liste der Fehler oder besonderen Verarbeitungsfälle für Zahlungen: <br />%s
+StancerMailSubjectPayoutExeption = Fehler der geplanten Aufgabe (Auszahlungen)
+StancerMailPayoutExeption = Ein schwerwiegender Fehler ist aufgetreten, Sie finden die Meldung unten, zögern Sie nicht, CAP-REL zu kontaktieren, um bei Bedarf eine Lösung zu finden: %s
+StancerMailSubjectPayoutDone = Banküberweisung abgeschlossen: %s €
+StancerMailPayoutDone = Überweisung von %s € von Stancer auf Ihr Hauptkonto ist abgeschlossen. Detaillierte Nachricht: %s
+StancerMailSendBy = Gesendet vom <a href="https://www.dolistore.com/fr/modules/1857-Stancer-paiement---lectronique-CB-SEPA.html">Stancer-Modul für Dolibarr</a>
+StancerMailPayoutError = Bankübertragungsfehler
+StancerMailPayout = Sie finden unten die Liste der Fehler oder besonderen Verarbeitungsfälle für Überweisungsoperationen von Stancer auf Ihr Hauptkonto: <br />%s
+StancerMailSubjectPayoutError = Ein Fehler ist aufgetreten. Sie finden die Fehlermeldung unten: %s
+StancerMailSubjectPayment = Geplante Aufgabe für Zahlungen
+StancerMailSubjectPayout = Geplante Aufgabe für Auszahlungen
+StancerMailTableHeaderStancer = Stancer
+StancerMailTableHeaderDolibarr = Dolibarr
+StancerMailTableHeaderAmount = Betrag
+StancerMailTableHeaderMessage = Nachricht
+StancerMailTableHeaderDate = Datum
+StancerMailSubjectCB = Neue Zahlungsmethode hinzugefügt (CB)
+StancerMailCB = Eine neue CB wurde für %s hinzugefügt
+STANCER_AUTO_MAIL_NOTIFICATIONS_ON_NEW_CB_AND_SEPA = E-Mail-Benachrichtigung, wenn ein Kunde seinen Kreditkarten-Fingerabdruck registriert
+ErrorStancerModuleVersionDatabase = Stancer-Modul: Achtung, Ihre Modulversion stimmt nicht mit der Datenbankversion überein, bitte deaktivieren und reaktivieren Sie das Modul...
+ErrorStancerDPOmissing = Achtung, Ihre DPO-E-Mail-Adresse ist noch nicht ausgefüllt, diese Information ist für das Lastschriftmandat erforderlich.
+ErrorStancerCustomerNotFound = Der Kunde konnte auf Stancer nicht identifiziert werden. Bitte überprüfen Sie die E-Mail-Adresse und Kontaktdaten des Kunden oder versuchen Sie eine andere Zahlungsmethode.
+draft = Entwurf
+authorized = Autorisiert
+StancerAuthorized = Autorisiert
+captured = Erfasst
+capture_sent = In Bearbeitung
+disputed = Streitfall
+expired = Abgelaufen
+StancerExpired = Abgelaufen
+failed = Fehler
+StancerFailed = Fehler
+refused = Abgelehnt
+to_capture = Warten auf Bank
+STANCER_EMAIL_DPO = Ihre DPO-E-Mail-Adresse
+STANCER_EMAIL_DPOTooltip = Erforderlich für die Information auf dem SEPA-Mandatsformular
+STANCER_ENABLE_CB = Kreditkartenverwaltung aktivieren
+STANCER_ENABLE_CBTooltip = Sie können diese Option deaktivieren, um z.B. nur SEPA-Lastschriften zu verwenden
+StancerCBPresentation = Das Stancer-Modul ermöglicht die Annahme von Kreditkartenzahlungen. Wenn Sie diese Funktion aktivieren möchten, aktivieren Sie bitte das Kontrollkästchen.
+STANCER_ENABLE_SEPA = SEPA-Lastschriftverwaltung aktivieren
+STANCER_NO_CODE_CB = Es gibt keinen 'CB'-Code in den aktiven Zahlungsmethoden Ihres Dolibarr. Weitere Informationen in der <a href="https://doc.cap-rel.fr/projet_stancer/cb_et_pre_dans_le_dictionnaire_des_moyens_de_paiements">folgenden Online-Dokumentation</a>.
+STANCER_NO_CODE_PRE = Es gibt keinen 'PRE'-Code in den aktiven Zahlungsmethoden Ihres Dolibarr. Weitere Informationen in der <a href="https://doc.cap-rel.fr/projet_stancer/cb_et_pre_dans_le_dictionnaire_des_moyens_de_paiements">folgenden Online-Dokumentation</a>.
+STANCER_MANDATE_AUTO_UPTOSIGN_NOCLICK = Automatische Weiterleitung zur uptosign elektronischen Signatur
+STANCER_MANDATE_AUTO_UPTOSIGN_NOCLICKTooltip = Wenn Sie diese Option nicht aktivieren, muss Ihr Kunde nach dem Ausfüllen auf den Link "zur Online-elektronischen Signatur gehen" im Mandat klicken
+StancerInCaseOfTroubleYourLinkTopay = Wenn Ihr Webbrowser es Ihnen nicht erlaubt hat, direkt zu bezahlen, können Sie es erneut versuchen <a href="%s">über diesen Link</a>.
+StancerMailSubjectConfirmLinkToPay = Zahlungslink für Ihre Bestellung
+StancerMailPayoutConfirmMail = Vielen Dank für Ihre Bestellung.
+
+STANCER_AUTO_MAIL_ORDER_CB = Bestellungserinnerung mit Zahlungslink vor der Weiterleitung zur Stancer-Website senden
+STANCER_AUTO_MAIL_ORDER_CBTooltip = Diese Option sendet eine Erinnerungs-E-Mail der Bestellung an Ihren Kunden mit dem Zahlungslink, falls die Weiterleitung nicht funktioniert oder der Zahlungsvorgang fehlschlägt
+STANCER_AUTO_MAIL_ORDER_CB_MAILTYPE = Wählen Sie die E-Mail-Vorlage für den automatischen Bestellungsversand per E-Mail
+StancerCheckInvoicesPaid = Rechnungen als bezahlt markieren
+StancerCheckInvoicesPaidDetails = Alle Rechnungen suchen, deren Restbetrag null ist und deren Zahlungsstatus "Zahlung begonnen" ist, um sie auf "Bezahlt" zu setzen (Bereinigung)
+StancerSendPaymentReminders = Zahlungserinnerungen
+StancerSendPaymentRemindersDetails = Automatischer Versand von E-Mail-Erinnerungen an Kunden, deren Zahlung fehlgeschlagen ist, gemäß dem konfigurierten Zeitplan
+STANCER_PAYMENT_REMINDER_TITLE = Zahlungserinnerungen
+STANCER_PAYMENT_REMINDER_ENABLED = Automatische Zahlungserinnerungen bei Zahlungsfehlern aktivieren
+STANCER_PAYMENT_REMINDER_ENABLEDTooltip = Wenn eine Zahlung fehlschlägt (abgelehnt, abgelaufen, bestritten), sendet das Modul automatisch E-Mail-Erinnerungen an den Kunden gemäß dem unten konfigurierten Zeitplan
+STANCER_PAYMENT_REMINDER_MAILTYPE = E-Mail-Vorlage für Zahlungserinnerungen
+STANCER_PAYMENT_REMINDER_MAILTYPETooltip = Wählen Sie eine Vorlage vom Typ "Rechnung senden". Sie können die Variable __ONLINE_PAYMENT_URL__ oder __STANCER_PAYMENT_URL__ in der Vorlage verwenden, um den Online-Zahlungslink einzufügen
+STANCER_PAYMENT_REMINDER_SCHEDULE = Erinnerungszeitplan (Tage nach Fehlschlag)
+STANCER_PAYMENT_REMINDER_SCHEDULETooltip = Kommagetrennte Liste der Tage nach Zahlungsfehlschlag für jede Erinnerung. Beispiel: 1,3,7 sendet eine Erinnerung an T+1, T+3 und T+7
+STANCER_PAYMENT_REMINDER_ADMIN_SUMMARY = Erinnerungszusammenfassung an den Administrator senden
+STANCER_PAYMENT_REMINDER_ADMIN_SUMMARYTooltip = Der Administrator erhält bei jeder Ausführung der geplanten Aufgabe eine Zusammenfassungs-E-Mail der gesendeten Erinnerungen
+StancerMailSubjectPaymentFailure = Zahlungsfehler
+StancerMailPaymentFailure = Die Zahlung von %s für Rechnung Referenz %s ist fehlgeschlagen (Status: %s). Bitte überprüfen Sie die Situation.
+StancerMailSubjectReminders = Zusammenfassung der Zahlungserinnerungen
+StancerRemindersSentList = Erfolgreich gesendete Erinnerungen
+StancerRemindersErrorList = Fehler beim Senden der Erinnerungen
+StancerdoCheckInvoicesPaidResultMessageA = Eine Rechnung wurde erfolgreich als bezahlt markiert von insgesamt %s qualifizierten Rechnung(en) %s.
+StancerdoCheckInvoicesPaidResultMessageAP = %s Rechnungen wurden erfolgreich als bezahlt markiert von insgesamt %s qualifizierten Rechnungen %s.
+STANCER_CB_AS_PAID = Rechnung sofort bei positivem Stancer-Rücklauf als bezahlt markieren, ohne auf endgültige Bestätigung zu warten
+STANCER_CB_AS_PAIDTooltip = Wenn Sie diese Option aktivieren, wird die Rechnung Ihres Kunden beim ersten Vorab-Validierungsrücklauf von Stancer als bezahlt markiert. Achtung, diese Information kann einige Tage später widerlegt werden, wenn die Zahlung von der Bank Ihres Kunden abgelehnt wird. Siehe <a href="https://doc.cap-rel.fr/projet_stancer/des_le_retour_de_pre-acceptation_du_paiement_cb">Dokumentation für weitere Details</a>
+STANCER_CB_ALLOW_RETRY = Neuen CB-Zahlungsversuch über Stancer nach einem Fehler erlauben
+STANCER_CB_ALLOW_RETRYTooltip = Standardmäßig wird die Stancer-Zahlungsschaltfläche auf der öffentlichen Seite nicht mehr angezeigt, wenn bereits ein Stancer-Zahlungsversuch unternommen wurde (auch bei Fehlschlag). Wenn Sie diese Option aktivieren, wird die Schaltfläche erneut angezeigt, solange keine Zahlung erfolgreich erfasst wurde.
+STANCER_SWITCH_SEPA_AMOUNT = Automatischen Anbieterwechsel aktivieren, wenn der abzubuchende Betrag ein Limit überschreitet?
+STANCER_SWITCH_SEPA_AMOUNTTooltip = Wenn Sie diese Option aktivieren, sind die folgenden zwei Felder erforderlich
+STANCER_SWITCH_SEPA_AMOUNT_MAX = Maximalbetrag der SEPA-Lastschriften durch Stancer
+STANCER_SWITCH_SEPA_AMOUNT_MAXTooltip = Aufgrund des variablen Prozentsatzes bei SEPA-Lastschriften ist es oft günstiger, einen anderen Zahlungsvermittler als Stancer für SEPA-Lastschriften über 60 zu verwenden, aber Sie können hier den Betrag angeben, ab dem Sie nicht mehr möchten, dass Stancer für die Lastschrift verwendet wird.
+STANCER_SWITCH_SEPA_TO_OTHER_BANK = Wahl der Bank bei Überschreitung des oben definierten Limits
+STANCER_SWITCH_SEPA_TO_OTHER_BANKTooltip = Geben Sie z.B. Ihr Stripe-Konto oder ein anderes an, um zu verhindern, dass das Stancer-Modul Lastschriften für von dieser Limitüberschreitung betroffene Rechnungen initiiert
+StancerPayCB = Stancer CB-Zahlung
+StancerPaySEPA = Stancer SEPA-Zahlung
+StancerPayAmountStarted = Zahlung von %s eingeleitet
+StancerPayWithRedirectStarted = Zahlung von %s über Web-Zahlungsseite eingeleitet
+
+cbType = Kartentyp
+cbNumber = Nummer
+cbEOL = Ablaufdatum
+
+StancerNewPaymentMode = Zahlungsquelle hinzugefügt
+StancerNewPaymentModeAdded = Eine neue Zahlungsmethode wurde hinzugefügt: %s
+StancerUpdatePaymentMode = Aktualisierung
+StancerUpdatePaymentModeDone = Zahlungsmethode %s wurde aktualisiert
+StancerForceRefreshAccount = Daten von Stancer aktualisieren
+DeleteSEPAOnStancer = Löschen
+StancerEventAdded = Ereignis zum Verlauf hinzugefügt
+CleanStancerTestsDataHelp = Klicken Sie auf diese Schaltfläche, wenn Sie den Stancer-Testmodus verwendet haben, um Ihre Datenbank zu bereinigen (eindeutige Kundenkennung bei Stancer)
+CleanStancerTestsData = Testdaten bereinigen
+CleanStancerTestsDataDone = Stancer-Testdaten wurden gelöscht
+
+
+# Refund
+StancerRefundStart = Erstattung über Stancer
+StancerRefundTitle = Stancer-Erstattung
+StancerRefundConfirmMessage = Sie sind dabei, %s %s über Stancer zu erstatten. Bestätigen Sie diesen Vorgang?
+StancerRefundOriginalInvoice = Originalrechnung: %s
+StancerRefundSuccess = Erstattung erfolgreich abgeschlossen (ID: %s)
+StancerRefundError = Erstattungsfehler: %s
+StancerRefundNoPaymentFound = Keine Stancer-Zahlung für diese Rechnung gefunden
+StancerRefundNoLinkedPayment = Keine Stancer-Zahlung mit der Originalrechnung verknüpft
+StancerRefundAlreadyDone = Eine Erstattung wurde für diesen Betrag bereits verarbeitet
+
+# Propal (quote) payment
+STANCER_PROPAL_TITLE = Angebotszahlungen
+STANCER_AUTO_INVOICE_ON_PROPAL_PAID = Automatisch eine Rechnung erstellen, wenn ein Angebot bezahlt wird
+STANCER_AUTO_INVOICE_ON_PROPAL_PAIDTooltip = Wenn diese Option aktiviert ist, wird automatisch eine Rechnung erstellt und validiert, wenn ein Kunde ein Angebot über Stancer bezahlt
+StancerPropalPaymentLink = Stancer-Zahlungslink
+StancerPropalPaymentLinkNeedEmail = Die Geschäftspartnerakte enthält keine E-Mail-Adresse, diese ist erforderlich, um eine Zahlung über Stancer zu initiieren!
+
+# Generic keys used in module (not in core)
+Optional = Optional
+Path = Pfad
+Success = Erfolg
+NoData = Keine Daten
+ClassNotFound = Klasse nicht gefunden
+ErrorNumberingModuleNotSetup = Nummerierungsmodul nicht konfiguriert (Element: %s)
+AmountTo = Betrag an
+PaymentDoneOn = Zahlung erfolgt am: %s
+StartFix = Korrektur starten
+StartImport = Import starten
+StancerNewVersionAvailable = Stancer: Eine neuere Version ist verfügbar (installiert %s, verfügbar %s). Bitte aktualisieren.
+StancerNotifyCustomers = Empfänger per E-Mail benachrichtigen
+StancerRefreshSelected = Aktualisierung der ausgewählten Zeilen erzwingen
+StancerForceRefreshSelectedDone = Erzwungene Aktualisierung von %s Zahlung(en) abgeschlossen. Einzelheiten zu den vorgenommenen Korrekturen finden Sie in den Protokollen.
+
+# Stancer payment attribution audit (page stancer_audit.php) - TODO translate to de_DE
+StancerAuditTitle = Stancer payment attribution audit
+StancerAuditIntro = This page queries the Stancer API for every local payment and checks that the customer, invoice and amount stored in Dolibarr match the actual Stancer data. No write is performed: the page is strictly read-only. Click "Run audit" to get the report.
+StancerAuditRun = Run audit
+StancerAuditResults = Audit results
+StancerAuditSummary = Summary
+StancerAuditRowsAudited = %s payment(s) audited in %s second(s).
+StancerAuditOptionalSocid = (optional - leave empty to audit every customer)
+StancerAuditMaxRows = Cap
+StancerAuditMaxRowsHelp = At most %s payment(s) will be audited per run (configurable via STANCER_AUDIT_MAX_ROWS).
+StancerAuditNoRows = No Stancer payment found within the selected period.
+StancerAuditTooMany = More than %s payment(s) match. Only the most recent ones are audited. Narrow the period down or increase STANCER_AUDIT_MAX_ROWS.
+StancerAuditSqlError = SQL error while fetching payments. See logs.
+StancerAuditAuthStop = Stancer API authentication error (HTTP 401). Audit was aborted. Check the private key configured for the current mode.
+StancerAuditPaymId = Stancer ID
+StancerAuditApiStatus = Stancer status
+StancerAuditStatus = Audit status
+StancerAuditDoublesTitle = Double-charge detection
+StancerAuditDoublesIntro = This section lists Stancer invoices (api_order_id) that received 2 or more payments. When more than one payment is captured on the same invoice, the customer has been charged twice.
+StancerAuditDoublesAlert = WARNING: %s invoice(s) charged more than once. A refund must probably be issued from the Stancer interface before any attribution correction.
+StancerAuditDoublesOrderId = Stancer invoice (api_order_id)
+StancerAuditDoublesNbPayments = Nb payments
+StancerAuditDoublesCapturedCount = Nb captured
+StancerAuditDoublesFlag = State
+StancerAuditDoublesFlagDouble = DOUBLE CHARGE
+StancerAuditDoublesFlagOk = No double
+StancerAuditDoublesDetail = Payment details
+
+# Action buttons + modal (phase 2) - TODO translate to de_DE
+StancerAuditActions = Actions
+StancerAuditFix = Fix
+StancerAuditIgnore = Ignore
+StancerAuditDone = Fixed
+StancerAuditStatusIgnored = Ignored
+StancerAuditModalTitleFix = Fix payment attribution
+StancerAuditModalTitleIgnore = Ignore this payment
+StancerAuditConfirmFix = Confirm moving this payment to the invoice indicated by the Stancer API? The operation is logged in the events of every impacted invoice.
+StancerAuditConfirmIgnore = Mark this payment as to-be-ignored in subsequent audits? Use this for legitimate cases (subsidiary, customer merge) that should not be auto-corrected.
+StancerAuditModalDoubleWarning = WARNING: this payment is part of a double-charge pair. The target invoice will be over-paid after this move. You must issue a credit note or a separate refund.
+StancerAuditPaymInDoubleTooltip = This paym_id is part of a double-charge pair detected on the same Stancer invoice (api_order_id).
+StancerAuditNetworkError = Network error while sending.
+StancerAuditApiCustomer = Customer (API)
+StancerAuditApiOrderId = Invoice ref (API)
+StancerAuditApiAmount = Amount (API)
+StancerAuditDbClient = Customer (Dolibarr)
+StancerAuditDbInvoice = Invoice (Dolibarr)
+StancerAuditDbAmount = Amount (Dolibarr)
+StancerAuditDetails = Details
+StancerAuditStatus_OK = OK
+StancerAuditStatus_grouped = Grouped SEPA
+StancerAuditStatus_wrong_invoice_same_customer = Wrong invoice (same customer)
+StancerAuditStatus_wrong_customer = Wrong customer
+StancerAuditStatus_wrong_customer_unmapped = Wrong customer (unmapped - please verify)
+StancerAuditStatus_wrong_amount = Inconsistent amount
+StancerAuditStatus_no_mapping = Unmapped Stancer customer
+StancerAuditStatus_api_unreachable = API unreachable
+StancerAuditStatus_api_not_found = Not found on Stancer
+StancerAuditStatus_api_auth_error = API authentication error

@@ -62,4 +62,10 @@ KSEF MODULE
 M:	Kontakt Automation <kontakt@inpointautomation.com> / TheRealBeef
 S:	Maintained
 F:	ksef/
+
+STANCER MODULE
+M:	Eric Seigne <eric.seigne@cap-rel.fr> / GITHUB_ID_TO_BE_COMPLETED
+S:	Maintained
+W:	https://doc.cap-rel.fr/stancer/
+F:	stancer/
 T:	https://github.com/Dolibarr/dolibarr-community-modules.git

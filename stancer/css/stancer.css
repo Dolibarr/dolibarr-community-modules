@@ -1,0 +1,8 @@
+.stancerbuttonpayment, .stancerbuttonpayment:hover {
+	border: 0;
+	background-color: var(--butactionbg);
+	box-shadow: var(--btncolorbg);
+	color: var(--textbutaction);
+	text-transform: unset;
+	font-weight: unset;
+}
