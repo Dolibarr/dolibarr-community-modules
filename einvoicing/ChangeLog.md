@@ -2,6 +2,12 @@
 
 ## 1.0.4
 
+FIX: The e-invoice status combo no longer renders an invalid <option> on Dolibarr 17. The code of an
+Access Point status is shown next to its label through a <span> put in the 'data-html' of the option,
+and Form::selectarray() prints the data-* values of an option as they are on 17, where 18 and later
+escape them: the attribute closed on the first quote of that span, and the markup of the whole option
+was broken. The status list escapes the value itself on those cores now, which produces exactly what
+the newer ones produce, and leaves the newer ones untouched rather than escaping twice.
 NEW: The order reference the supplier declared on a received e-invoice (BT-13) is now kept on the
 supplier invoice the import creates, and shown on its card, whether or not it matched a purchase order
 of Dolibarr (issue #603). That reference was only used to auto-link the invoice to an order; the
