@@ -72,9 +72,11 @@ $max = 5;
 $now = dol_now();
 
 // Security check - Protection if external user
-$socid = GETPOST('socid', 'int');
+// Cast explicitly: GETPOST() is declared as returning string|array, so every
+// downstream call expecting an int would otherwise be a type mismatch.
+$socid = (int) GETPOST('socid', 'int');
 if (isset($user->socid) && $user->socid > 0) {
-	$socid = $user->socid;
+	$socid = (int) $user->socid;
 }
 
 $societe = new Societe($db);
