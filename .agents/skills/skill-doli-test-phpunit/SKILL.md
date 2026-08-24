@@ -28,7 +28,7 @@ The user request should contain, when available:
 
 ## General Rules
 
-- follow the coding style already used in files in the `test/phpunit/` directory
+- follow the coding style already used in files in the `mymodule/test/phpunit/` directory
 - modify the minimum amount of existing code
 - prefer adding new test methods instead of modifying existing ones
 - tests must be deterministic and independent
@@ -37,7 +37,7 @@ The user request should contain, when available:
 
 ## Test Location
 
-Locate the most appropriate existing PHPUnit test file in `test/phpunit/`.
+Locate the most appropriate existing PHPUnit test file in `mymodule/test/phpunit/`.
 
 If no suitable test file exists, create one using the naming convention `FeatureTest.php`.
 
@@ -84,15 +84,15 @@ When generating code:
 ### Input: "Add a unit test for the create() method of the Invoice class"
 
 **Action:**
-1. locate or create `test/phpunit/MyObjectTest.php`
+1. locate or create `mymodule/test/phpunit/MyObjectTest.php`
 2. add test method following Dolibarr conventions
 
 ### Input: "Write tests for the calculateVAT() function in price.lib.php"
 
 **Action:**
-1. locate or create appropriate test file in `test/phpunit/`
+1. locate or create appropriate test file in `mymodule/test/phpunit/`
 2. add test methods for various VAT calculation scenarios
-3. you can test or suggest to test it by running the command: `phpunit test/phpunit/TheTestFile.php`
+3. you can test or suggest to test it by running the command: `phpunit mymodule/test/phpunit/TheTestFile.php`
 
 
 ## Error Handling
@@ -101,7 +101,7 @@ When generating code:
 
 | Issue | Validation | Solution |
 |-------|------------|----------|
-| Test file does not exist | Check `test/phpunit/` directory | Create new test file with proper naming |
+| Test file does not exist | Check `mymodule/test/phpunit/` directory | Create new test file with proper naming |
 | Class or method not found | Verify namespace and file location | Use proper use statements and class paths |
 | Database dependencies | Review test for external DB calls | Mock database interactions or use test fixtures |
 | Non-deterministic behavior | Check for random values or timestamps | Use fixed seeds or mock time |
