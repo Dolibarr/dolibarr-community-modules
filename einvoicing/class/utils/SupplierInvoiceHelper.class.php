@@ -704,6 +704,176 @@ class SupplierInvoiceHelper
 	}
 
 	/**
+	 * Find the supplier invoice of a given supplier whose ref_supplier is the given reference.
+	 *
+	 * The default is an exact match, which is the only safe rule while the quality of the incoming
+	 * data is unknown: a wrong match on a duplicate check silently drops an invoice that is then
+	 * never imported, and a wrong match on a referenced document links the new invoice to the wrong
+	 * one. With the option below off, this is exactly the query the callers used to run inline.
+	 *
+	 * The hidden option EINVOICING_TOLERANT_SUPPLIER_REF_MATCH adds a fallback, tried only when the
+	 * exact match found nothing. It accepts a ref_supplier that was typed manually with extra text
+	 * around the reference, or with stray whitespace inside it, e.g.
+	 * "PLTHDDD5OAAABBB - TEST-GROUP-2026-07-06-19407 - EVENEMENT 30/06/2026 A PARIS" for a document
+	 * whose reference in the XML is only "TEST-GROUP-2026-07-06-19407". That fallback stays narrow:
+	 * a reference shorter than EINVOICING_TOLERANT_SUPPLIER_REF_MIN_LENGTH (8) or purely numeric is
+	 * never searched for as a substring, the substring must be delimited so that "FA202610" does not
+	 * match "FA2026100", and an ambiguity is reported instead of guessed.
+	 *
+	 * @param	string|null	$ref	Reference to look for (ExchangedDocument/ID or IssuerAssignedID of the XML)
+	 * @param	int			$socId	Id of the supplier thirdparty
+	 * @return	int					Invoice id (>0) on a single certain match, 0 when not found, -1 on database error, -2 when several invoices match
+	 */
+	public static function findIdByRef($ref, int $socId): int
+	{
+		global $db;
+
+		$ref = trim((string) $ref);
+		if ($ref === '' || $socId <= 0) {
+			return 0;
+		}
+
+		// Exact match. Always tried first, and always enough on its own.
+		$sql = "SELECT rowid FROM " . $db->prefix() . "facture_fourn";
+		$sql .= " WHERE ref_supplier = '" . $db->escape($ref) . "'";
+		$sql .= " AND fk_soc = " . ((int) $socId);
+		$sql .= " AND entity IN (" . getEntity('facture_fourn') . ")";
+		$sql .= " LIMIT 1";
+		$resql = $db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . ' ' . $db->lasterror(), LOG_ERR);
+			return -1;
+		}
+		$obj = $db->fetch_object($resql);
+		$db->free($resql);
+		if ($obj) {
+			return (int) $obj->rowid;
+		} elseif (getDolGlobalInt('EINVOICING_TOLERANT_SUPPLIER_REF_MATCH')) {
+			// Tolerant fallback, opt-in and deliberately narrow. Everything that widens the match is
+			// enclosed in this branch on purpose: no code path reaches it while the option is off.
+			$refNoSpaces = self::normalizeRef($ref);
+			if (dol_strlen($refNoSpaces) < getDolGlobalInt('EINVOICING_TOLERANT_SUPPLIER_REF_MIN_LENGTH', 8) || ctype_digit($refNoSpaces)) {
+				// A short or purely numeric reference is a substring of far too many others, do not even try
+				return 0;
+			}
+
+			$sql = "SELECT rowid, ref_supplier FROM " . $db->prefix() . "facture_fourn";
+			$sql .= " WHERE REPLACE(ref_supplier, ' ', '') LIKE '%" . $db->escape($db->escapeforlike($refNoSpaces)) . "%'";
+			$sql .= " AND fk_soc = " . ((int) $socId);
+			$sql .= " AND entity IN (" . getEntity('facture_fourn') . ")";
+			$resql = $db->query($sql);
+			if (!$resql) {
+				dol_syslog(__METHOD__ . ' ' . $db->lasterror(), LOG_ERR);
+				return -1;
+			}
+			$matches = array();
+			while ($obj = $db->fetch_object($resql)) {
+				// The SQL LIKE is only a prefilter, the delimiter rule below is what decides
+				if (self::refEmbedsReference($obj->ref_supplier, $ref)) {
+					$matches[(int) $obj->rowid] = (int) $obj->rowid;
+				}
+			}
+			$db->free($resql);
+
+			if (count($matches) > 1) {
+				dol_syslog(__METHOD__ . ' several supplier invoices embed reference "' . $ref . '" for socid ' . ((int) $socId) . ', ids ' . implode(',', $matches), LOG_WARNING);
+				return -2;
+			}
+			if (count($matches) == 1) {
+				$found = (int) reset($matches);
+				dol_syslog(__METHOD__ . ' reference "' . $ref . '" matched supplier invoice id ' . $found . ' by tolerant match', LOG_NOTICE);
+				return $found;
+			}
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Build the message of a lookup that findIdByRef() could not answer.
+	 *
+	 * A database failure and an ambiguous reference are two different problems, and neither of them
+	 * is a missing document, so neither may be reported as one.
+	 *
+	 * @param	int			$code		Negative code returned by findIdByRef()
+	 * @param	string|null	$ref		Reference that was looked for
+	 * @param	string		$context	Where that reference comes from, appended to the message
+	 * @return	string					Message to report to the caller
+	 */
+	public static function refLookupErrorMessage(int $code, $ref, string $context): string
+	{
+		global $db;
+
+		if ($code == -2) {
+			return 'Several supplier invoices match reference "' . $ref . '" ' . $context . ', cannot determine which one to use';
+		}
+
+		return 'Database error while looking for a supplier invoice with reference "' . $ref . '" ' . $context . ': ' . $db->lasterror();
+	}
+
+	/**
+	 * Tell whether a ref_supplier embeds a reference as a delimited substring.
+	 *
+	 * Both values are compared without their whitespace, so that a ref_supplier typed as
+	 * "FA 2026 10" matches the reference "FA202610". The reference must be bounded on both sides by
+	 * a non alphanumeric character, by a removed gap or by an edge of the string, so that "FA202610"
+	 * matches "PAY123 - FA202610 - dinner" but not "FA2026100". Comparison is case insensitive, as
+	 * the SQL prefilter of findIdByRef() is under the usual collations.
+	 *
+	 * @param	string|null	$refSupplier	ref_supplier value read from database
+	 * @param	string|null	$ref			Reference looked for
+	 * @return	bool						True when the reference is embedded as a delimited substring
+	 */
+	public static function refEmbedsReference($refSupplier, $ref): bool
+	{
+		$needle = self::normalizeRef($ref);
+		if ($needle === '') {
+			return false;
+		}
+
+		// Whitespace is removed so that "FA 2026 10" matches "FA202610", but removing it must not
+		// destroy the boundary it forms: remember where a gap was, it counts as a delimiter.
+		$haystack = '';
+		$gapBefore = array();
+		$pendingGap = false;
+		foreach (preg_split('//u', (string) $refSupplier, -1, PREG_SPLIT_NO_EMPTY) as $char) {
+			if (preg_match('/^(\s|\xc2\xa0)$/u', $char)) {
+				$pendingGap = true;
+				continue;
+			}
+			$gapBefore[strlen($haystack)] = $pendingGap;
+			$pendingGap = false;
+			$haystack .= $char;
+		}
+		$gapBefore[strlen($haystack)] = $pendingGap;
+
+		$length = strlen($needle);
+		$offset = 0;
+		while (($pos = stripos($haystack, $needle, $offset)) !== false) {
+			$end = $pos + $length;
+			$startIsBounded = ($pos == 0 || !empty($gapBefore[$pos]) || !ctype_alnum($haystack[$pos - 1]));
+			$endIsBounded = ($end >= strlen($haystack) || !empty($gapBefore[$end]) || !ctype_alnum($haystack[$end]));
+			if ($startIsBounded && $endIsBounded) {
+				return true;
+			}
+			$offset = $pos + 1;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Strip from a reference the whitespace that manual entry adds (space, tab, non breaking space).
+	 *
+	 * @param	string|null	$value	Raw reference
+	 * @return	string				Reference without any whitespace
+	 */
+	private static function normalizeRef($value): string
+	{
+		return (string) preg_replace('/(\s|\xc2\xa0)+/u', '', (string) $value);
+	}
+
+	/**
 	 * Round an amount according to a number of digits after decimal point and return it.
 	 *
 	 * @param float $amount    		The amount to round

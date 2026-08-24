@@ -23,6 +23,8 @@
  *                  business rule (issue #286): SupplierInvoiceHelper::abandonRefusedSupplierInvoice(),
  *                  SupplierInvoiceHelper::onOutboundStatusMessageValidated() and their dispatch from
  *                  EInvoicing::updateStatusMessageValidation().
+ *                  Also covers SupplierInvoiceHelper::findIdByRef() and the delimiter rule of its
+ *                  opt-in tolerant fallback (SupplierInvoiceHelper::refEmbedsReference()).
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 
@@ -84,6 +86,9 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 		parent::setUp();
 
 		$conf->global->EINVOICING_SEND_APPROVED_ON_VALIDATION = '0';
+		// findIdByRef() is exact by default; the tests that are about the tolerant fallback turn it on
+		$conf->global->EINVOICING_TOLERANT_SUPPLIER_REF_MATCH = '0';
+		unset($conf->global->EINVOICING_TOLERANT_SUPPLIER_REF_MIN_LENGTH);
 	}
 
 	/**
@@ -907,5 +912,239 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 		$einvoicing = new EInvoicing($db);
 		$offered = array_map('intval', array_keys($einvoicing->getSendableStatusesForReceivedInvoice($creditNote->id, 'invoice_supplier')));
 		$this->assertContains(EInvoicing::STATUS_APPROVED, $offered);
+	}
+
+	/**
+	 * Build a reference no other row of the instance can carry, long enough and not purely numeric,
+	 * so the fixtures of the findIdByRef() tests never collide with real data.
+	 *
+	 * @return string	Unique reference
+	 */
+	private function uniqueSupplierRef()
+	{
+		return 'PR605' . strtoupper(bin2hex(random_bytes(5)));
+	}
+
+	/**
+	 * Create a draft supplier invoice carrying an explicit ref_supplier.
+	 *
+	 * @param	string	$refSupplier	Value to store in ref_supplier
+	 * @param	int		$socId			Supplier id, resolved to any existing third party when 0
+	 * @return	FactureFournisseur		The created invoice
+	 */
+	private function createSupplierInvoiceWithRef($refSupplier, $socId = 0)
+	{
+		global $db, $user;
+
+		$localobject = new FactureFournisseur($db);
+		$localobject->initAsSpecimen();
+		$localobject->ref_supplier = $refSupplier;
+		$localobject->socid = ($socId > 0 ? $socId : $this->getAnyThirdpartyId());
+		$result = $localobject->create($user);
+		$this->assertGreaterThan(0, $result, $localobject->errorsToString());
+
+		return $localobject;
+	}
+
+	/**
+	 * The delimiter rule of the tolerant fallback, on its own: no database, no option, just the
+	 * cases that decide whether the fallback is safe enough to be offered at all.
+	 *
+	 * @return void
+	 */
+	public function testRefEmbedsReferenceDelimiterRule()
+	{
+		$cases = array(
+			// stored ref_supplier, reference looked for, expected
+			array('PLTHDDD5OAAABBB - TEST-GROUP-2026-07-06-19407 - EVENEMENT 30/06/2026 A PARIS', 'TEST-GROUP-2026-07-06-19407', true),
+			array('TEST-GROUP-2026-07-06-19407', 'TEST-GROUP-2026-07-06-19407', true),
+			array('FA202610', 'FA202610', true),
+			array('PAY123 - FA202610 - dinner', 'FA202610', true),
+			array('X-FA202610', 'FA202610', true),
+			array('fa202610', 'FA202610', true),
+			// A gap that was removed still counts as a delimiter
+			array('acompte FA 2026 10 solde', 'FA202610', true),
+			array("acompte FA\xc2\xa02026 10 solde", 'FA202610', true),
+			array("acompte\tFA202610 solde", 'FA202610', true),
+			array('facture FA202610 du 12/03', 'FA 2026 10', true),
+			// The first occurrence is glued, the second one is delimited
+			array('FA2026100 et FA202610', 'FA202610', true),
+			// The cases the rule exists for: a longer reference must not answer for a shorter one
+			array('FA2026100', 'FA202610', false),
+			array('INV-2026-1000', 'INV-2026-100', false),
+			array('XFA202610', 'FA202610', false),
+			array('FA202610suite', 'FA202610', false),
+			// Nothing to look for, nothing to look into
+			array('', 'FA202610', false),
+			array('FA202610', '', false),
+			array('FA202610', '   ', false),
+			array(null, 'FA202610', false),
+			array('FA202610', null, false),
+		);
+
+		foreach ($cases as $case) {
+			list($stored, $ref, $expected) = $case;
+			$this->assertSame(
+				$expected,
+				SupplierInvoiceHelper::refEmbedsReference($stored, $ref),
+				'ref_supplier "' . $stored . '" against reference "' . $ref . '"'
+			);
+		}
+	}
+
+	/**
+	 * The exact match is the default and needs no option.
+	 *
+	 * @return void
+	 */
+	public function testFindIdByRefMatchesAnExactReference()
+	{
+		$ref = $this->uniqueSupplierRef();
+		$invoice = $this->createSupplierInvoiceWithRef($ref);
+
+		$this->assertSame((int) $invoice->id, SupplierInvoiceHelper::findIdByRef($ref, (int) $invoice->socid));
+	}
+
+	/**
+	 * A reference nothing carries is not found, and an empty one is not looked for at all.
+	 *
+	 * @return void
+	 */
+	public function testFindIdByRefReportsAnUnknownReferenceAsNotFound()
+	{
+		$socId = $this->getAnyThirdpartyId();
+
+		$this->assertSame(0, SupplierInvoiceHelper::findIdByRef($this->uniqueSupplierRef(), $socId));
+		$this->assertSame(0, SupplierInvoiceHelper::findIdByRef('', $socId));
+		$this->assertSame(0, SupplierInvoiceHelper::findIdByRef(null, $socId));
+		$this->assertSame(0, SupplierInvoiceHelper::findIdByRef($this->uniqueSupplierRef(), 0));
+	}
+
+	/**
+	 * Without the option, a reference buried in a longer ref_supplier is NOT found: this is the
+	 * behaviour that existed before the helper, and it stays the default.
+	 *
+	 * @return void
+	 */
+	public function testFindIdByRefIgnoresAnEmbeddedReferenceByDefault()
+	{
+		$ref = $this->uniqueSupplierRef();
+		$invoice = $this->createSupplierInvoiceWithRef('PAY123 - ' . $ref . ' - dinner');
+
+		$this->assertSame(0, SupplierInvoiceHelper::findIdByRef($ref, (int) $invoice->socid));
+	}
+
+	/**
+	 * With the option on, that same reference is found.
+	 *
+	 * @return void
+	 */
+	public function testFindIdByRefMatchesAnEmbeddedReferenceWhenTolerant()
+	{
+		global $conf;
+
+		$ref = $this->uniqueSupplierRef();
+		$invoice = $this->createSupplierInvoiceWithRef('PAY123 - ' . $ref . ' - dinner');
+
+		$conf->global->EINVOICING_TOLERANT_SUPPLIER_REF_MATCH = '1';
+
+		$this->assertSame((int) $invoice->id, SupplierInvoiceHelper::findIdByRef($ref, (int) $invoice->socid));
+	}
+
+	/**
+	 * The case the tolerant matching of PR #605 got wrong: an invoice numbered one digit longer must
+	 * never answer for the shorter reference, or the incoming invoice is silently declared a
+	 * duplicate and never imported.
+	 *
+	 * @return void
+	 */
+	public function testFindIdByRefRefusesALongerGluedReferenceWhenTolerant()
+	{
+		global $conf;
+
+		$ref = $this->uniqueSupplierRef();
+		$invoice = $this->createSupplierInvoiceWithRef($ref . '0');
+
+		$conf->global->EINVOICING_TOLERANT_SUPPLIER_REF_MATCH = '1';
+
+		$this->assertSame(0, SupplierInvoiceHelper::findIdByRef($ref, (int) $invoice->socid));
+	}
+
+	/**
+	 * An exact match answers alone, even when other invoices embed the same reference.
+	 *
+	 * @return void
+	 */
+	public function testFindIdByRefPrefersTheExactMatch()
+	{
+		global $conf;
+
+		$ref = $this->uniqueSupplierRef();
+		$exact = $this->createSupplierInvoiceWithRef($ref);
+		$this->createSupplierInvoiceWithRef('PAY123 - ' . $ref . ' - dinner', (int) $exact->socid);
+
+		$conf->global->EINVOICING_TOLERANT_SUPPLIER_REF_MATCH = '1';
+
+		$this->assertSame((int) $exact->id, SupplierInvoiceHelper::findIdByRef($ref, (int) $exact->socid));
+	}
+
+	/**
+	 * Two candidates and no exact match is an ambiguity, reported as such instead of guessed.
+	 *
+	 * @return void
+	 */
+	public function testFindIdByRefReportsSeveralCandidatesWhenTolerant()
+	{
+		global $conf;
+
+		$ref = $this->uniqueSupplierRef();
+		$first = $this->createSupplierInvoiceWithRef('PAY123 - ' . $ref . ' - dinner');
+		$this->createSupplierInvoiceWithRef('PAY456 - ' . $ref . ' - taxi', (int) $first->socid);
+
+		$conf->global->EINVOICING_TOLERANT_SUPPLIER_REF_MATCH = '1';
+
+		$this->assertSame(-2, SupplierInvoiceHelper::findIdByRef($ref, (int) $first->socid));
+	}
+
+	/**
+	 * A short or purely numeric reference is a substring of far too many others, so the tolerant
+	 * fallback does not even look for it.
+	 *
+	 * @return void
+	 */
+	public function testFindIdByRefNeverSubstringSearchesAShortOrNumericReference()
+	{
+		global $conf;
+
+		$shortRef = 'AB12';
+		$numericRef = (string) mt_rand(100000000, 999999999);
+		$invoice = $this->createSupplierInvoiceWithRef('PAY123 - ' . $shortRef . ' - ' . $numericRef . ' - dinner');
+
+		$conf->global->EINVOICING_TOLERANT_SUPPLIER_REF_MATCH = '1';
+
+		$this->assertSame(0, SupplierInvoiceHelper::findIdByRef($shortRef, (int) $invoice->socid));
+		$this->assertSame(0, SupplierInvoiceHelper::findIdByRef($numericRef, (int) $invoice->socid));
+
+		// The minimum length is configurable, and lowering it brings the short reference back
+		$conf->global->EINVOICING_TOLERANT_SUPPLIER_REF_MIN_LENGTH = '4';
+		$this->assertSame((int) $invoice->id, SupplierInvoiceHelper::findIdByRef($shortRef, (int) $invoice->socid));
+	}
+
+	/**
+	 * An ambiguity and a database failure are two different problems, and neither of them is a
+	 * missing document.
+	 *
+	 * @return void
+	 */
+	public function testRefLookupErrorMessageDistinguishesAmbiguityFromDatabaseError()
+	{
+		$ambiguous = SupplierInvoiceHelper::refLookupErrorMessage(-2, 'FA202610', 'linked to document FA202611');
+		$this->assertStringContainsString('Several supplier invoices match', $ambiguous);
+		$this->assertStringContainsString('FA202610', $ambiguous);
+		$this->assertStringContainsString('linked to document FA202611', $ambiguous);
+
+		$dbError = SupplierInvoiceHelper::refLookupErrorMessage(-1, 'FA202610', 'linked to document FA202611');
+		$this->assertStringContainsString('Database error', $dbError);
+		$this->assertStringNotContainsString('Several supplier invoices match', $dbError);
 	}
 }
