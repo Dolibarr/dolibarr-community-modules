@@ -136,6 +136,7 @@ class Call extends CommonObject
 		"call_type" => array("type" => "varchar(50)", "label" => "Type", "enabled" => "1", 'position' => 25, 'notnull' => 1, "visible" => "1", "comment" => "Call type (SyncDocs, SyncSoc, FetchDoc, FetchSoc...)", "csslist" => "tdoverflowmax125"),
 		"method" => array("type" => "varchar(10)", "label" => "Method", "enabled" => "1", 'position' => 30, 'notnull' => 0, "visible" => "1", "comment" => "-- HTTP method (GET, POST, PUT, DELETE)"),
 		"endpoint" => array("type" => "varchar(255)", "label" => "Endpoint", "enabled" => "1", 'position' => 35, 'notnull' => 1, "visible" => "-1", "comment" => "-- URL or endpoint called"),
+		"request_id" => array("type" => "varchar(36)", "label" => "RequestId", "langs" => "einvoicing@einvoicing", "enabled" => "1", 'position' => 36, 'notnull' => 0, "visible" => "-1", "comment" => "-- Request-Id header sent with the call, to correlate our log with the one of the Access Point"),
 		"skippedflow" => array("type" => "integer", "label" => "SkippedFlows", "enabled" => "1", 'position' => 130, 'notnull' => 1, "visible" => "1", "comment" => "Skipped flows during the API call"),
 		"successflow" => array("type" => "integer", "label" => "SuccessfullFlows", "langs" => "einvoicing@einvoicing", "enabled" => "1", 'position' => 140, 'notnull' => 1, "visible" => "1", "comment" => "Successfully completed flows during the API call"),
 		"totalflow" => array("type" => "integer", "label" => "TotalFlows", "enabled" => "1", 'position' => 150, 'notnull' => 1, "visible" => "-1", "comment" => "Total flows handled during the API call"),
@@ -165,6 +166,7 @@ class Call extends CommonObject
 	public $call_type;
 	public $method;
 	public $endpoint;
+	public $request_id;
 	public $request_body;
 	public $response;
 
