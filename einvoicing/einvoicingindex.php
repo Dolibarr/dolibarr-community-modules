@@ -71,10 +71,15 @@ if (!$res) {
  * @var Translate $langs
  * @var User $user
  */
+'@phan-var-force User $user';
 include_once DOL_DOCUMENT_ROOT.'/core/class/html.formfile.class.php';
 
 // Load translation files required by the page
 $langs->loadLangs(array("einvoicing@einvoicing"));
+
+// Load required classes
+include_once __DIR__ . '/class/providers/PDPProviderManager.class.php';
+include_once __DIR__ . '/class/providers/AbstractPDPProvider.class.php';
 
 $action = GETPOST('action', 'aZ09');
 
@@ -118,7 +123,113 @@ llxHeader("", $langs->trans("EInvoiceManagement"), '', '', 0, 0, '', '', '', 'mo
 
 print load_fiche_titre($langs->trans("EInvoiceManagement"), '', 'einvoicing.png@einvoicing');
 
-print '<div class="fichecenter"><div class="fichethirdleft">';
+print '<div class="fichecenter">';
+
+
+
+// Check if connected to a PA (Access Point)
+$PDPManager = new PDPProviderManager($db);
+$pa_connected = false;
+$pa_name = '';
+
+if (getDolGlobalString('EINVOICING_PDP')) {
+	$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+
+	if ($provider instanceof AbstractPDPProvider) {
+		$pa_name = $provider->name;
+
+		$tokenData = $provider->getTokenData();
+		// Check if there is a token or credentials configured
+		if ($tokenData['token']) {
+			$pa_connected = true;
+		}
+	}
+}
+
+// Display PA connection status
+if ($pa_connected) {
+	print '<div class="green greenborder nomargintop">';
+	print '<td colspan="2" class="center">' . $langs->trans("YourSoftwareSeemsConnectedWith", strtoupper($pa_name)) . '</td>';
+	print '</div>';
+	print '<br>';
+} else {
+	print '<div class="warning nomargintop">';
+	print '<td colspan="2" class="center">' . $langs->trans("YourSoftwareDoesNotSeemsConnectedWith") . '</td>';
+	print '</div>';
+	print '<br>';
+}
+
+
+
+// Dashboard - Synchronization statistics
+print '<div class="fichehalfleft">';
+
+print '<table class="noborder centpercent">';
+print '<tr class="liste_titre">';
+print '<th colspan="2">'.$langs->trans("SynchronizationDashboard").'</th>';
+print '</tr>';
+
+// Get last synchronization date
+$sql_last_sync = "SELECT MAX(date_creation) as last_sync FROM " . $db->prefix() . "einvoicing_document";
+$resql_last_sync = $db->query($sql_last_sync);
+$last_sync_date = '';
+if ($resql_last_sync && $db->num_rows($resql_last_sync) > 0) {
+	$obj_last_sync = $db->fetch_object($resql_last_sync);
+	if (!empty($obj_last_sync->last_sync)) {
+		$last_sync_date = dol_print_date($db->jdate($obj_last_sync->last_sync), 'dayhour');
+	}
+	$db->free($resql_last_sync);
+}
+
+// Get count of customer invoices
+$sql_customer = "SELECT COUNT(*) as nb_customer FROM " . $db->prefix() . "einvoicing_document WHERE fk_element_type = 'facture' and flow_type = 'CustomerInvoice'";
+$resql_customer = $db->query($sql_customer);
+$nb_customer = 0;
+if ($resql_customer && $db->num_rows($resql_customer) > 0) {
+	$obj_customer = $db->fetch_object($resql_customer);
+	$nb_customer = $obj_customer->nb_customer;
+	$db->free($resql_customer);
+}
+
+// Get count of supplier invoices
+$sql_supplier = "SELECT COUNT(*) as nb_supplier FROM " . $db->prefix() . "einvoicing_document WHERE fk_element_type = 'invoice_supplier' and flow_type = 'SupplierInvoice'";
+$resql_supplier = $db->query($sql_supplier);
+$nb_supplier = 0;
+if ($resql_supplier && $db->num_rows($resql_supplier) > 0) {
+	$obj_supplier = $db->fetch_object($resql_supplier);
+	$nb_supplier = $obj_supplier->nb_supplier;
+	$db->free($resql_supplier);
+}
+
+// Display dashboard
+print '<tr class="oddeven">';
+print '<td>'.$langs->trans("LastSynchronizationDate").'</td>';
+print '<td class="right">' . ($last_sync_date ?: $langs->trans("None")) . '</td>';
+print '</tr>';
+
+print '<tr class="oddeven">';
+print '<td>'.$langs->trans("CustomerInvoicesSynchronized").'</td>';
+print '<td class="right"><span class="badge badge-info">' . $nb_customer . '</span></td>';
+print '</tr>';
+
+print '<tr class="oddeven">';
+print '<td>'.$langs->trans("SupplierInvoicesSynchronized").'</td>';
+print '<td class="right"><span class="badge badge-info">' . $nb_supplier . '</span></td>';
+print '</tr>';
+
+print '</table>';
+print '</div>';
+
+
+print '</div>';
+
+print '<div class="fichehalfright">';
+
+
+
+print '</div><div class="clearboth"></div>';
+
+print '<div class="fichethirdleft">';
 
 
 /* BEGIN MODULEBUILDER DRAFT MYOBJECT

@@ -27,3 +27,5 @@ ALTER TABLE llx_einvoicing_call ALTER COLUMN entity SET DEFAULT 1;
 ALTER TABLE llx_einvoicing_extlinks ADD COLUMN ap_precheck_status varchar(50) DEFAULT NULL;
 
 ALTER TABLE llx_einvoicing_extlinks ADD COLUMN ap_precheck_result text DEFAULT NULL;
+
+ALTER TABLE llx_einvoicing_call ADD COLUMN call_id_num integer AFTER call_id;

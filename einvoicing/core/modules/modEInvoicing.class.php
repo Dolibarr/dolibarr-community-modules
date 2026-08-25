@@ -153,7 +153,7 @@ class modEInvoicing extends DolibarrModules
 		// Prerequisites
 		$this->phpmin = array(7, 0); // Minimum version of PHP required by module
 		// $this->phpmax = array(8, 0); // Maximum version of PHP required by module
-		$this->need_dolibarr_version = array(17, -3); // Minimum version of Dolibarr required by module
+		$this->need_dolibarr_version = array(18, -3); // Minimum version of Dolibarr required by module
 		// $this->max_dolibarr_version = array(19, -3); // Maximum version of Dolibarr required by module
 		$this->need_javascript_ajax = 0;
 
@@ -591,19 +591,23 @@ class modEInvoicing extends DolibarrModules
 
 		// Chorus fields
 		// TODO : Remove Chorus extrafields and move them to einvoicing_extlinks table
+		// The text fields are declared printable = 2, "print it only when it holds something", and not 1,
+		// "always print it": CommonDocGenerator::getExtrafieldsInHtml() reads the 'enabled' condition
+		// before printing on 18, 22, 23 and 24, but not on 17, 19, 20 and 21, where a field of a feature
+		// nobody turned on still reached the PDF of every invoice and every order (issue #614).
 		$result = $extrafields->addExtraField('d4d_separator', $langs->trans('ChorusSeparator'), 'separate', 95024, '', 'facture', 0, 1, '', $param, 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")');
-		$result = $extrafields->addExtraField('d4d_service_code', $langs->trans('ChorusServiceCode'), 'varchar', 95026, '100', 'facture', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 1);
-		$result = $extrafields->addExtraField('d4d_contract_number', $langs->trans('ChorusContractNumber'), 'varchar', 95028, '50', 'facture', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 1);
-		$result = $extrafields->addExtraField('d4d_promise_code', $langs->trans('ChorusPromiseCode'), 'varchar', 95030, '50', 'facture', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 1);
+		$result = $extrafields->addExtraField('d4d_service_code', $langs->trans('ChorusServiceCode'), 'varchar', 95026, '100', 'facture', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 2);
+		$result = $extrafields->addExtraField('d4d_contract_number', $langs->trans('ChorusContractNumber'), 'varchar', 95028, '50', 'facture', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 2);
+		$result = $extrafields->addExtraField('d4d_promise_code', $langs->trans('ChorusPromiseCode'), 'varchar', 95030, '50', 'facture', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 2);
 		// No computed formula here: the field must stay editable (see openDSI note below). A formula
 		// pointing at options_chorus_id also warns on every render, that extrafield belongs to openDSI.
 		$result = $extrafields->addExtraField('d4d_chorus_id', $langs->trans('ChorusId'), 'varchar', 95032, '36', 'facture', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 1);
 
 		// Same fields for orders
 		$result = $extrafields->addExtraField('d4d_separator', $langs->trans('ChorusSeparator'), 'separate', 95042, '', 'commande', 0, 1, '', $param, 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")');
-		$result = $extrafields->addExtraField('d4d_service_code', $langs->trans('ChorusServiceCode'), 'varchar', 95044, '100', 'commande', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 1);
-		$result = $extrafields->addExtraField('d4d_contract_number', $langs->trans('ChorusContractNumber'), 'varchar', 95046, '50', 'commande', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 1);
-		$result = $extrafields->addExtraField('d4d_promise_code', $langs->trans('ChorusPromiseCode'), 'varchar', 95048, '50', 'commande', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 1);
+		$result = $extrafields->addExtraField('d4d_service_code', $langs->trans('ChorusServiceCode'), 'varchar', 95044, '100', 'commande', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 2);
+		$result = $extrafields->addExtraField('d4d_contract_number', $langs->trans('ChorusContractNumber'), 'varchar', 95046, '50', 'commande', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 2);
+		$result = $extrafields->addExtraField('d4d_promise_code', $langs->trans('ChorusPromiseCode'), 'varchar', 95048, '50', 'commande', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 2);
 
 		// Fix condition of extrafields for old installations
 		$sql = array_merge(
@@ -613,7 +617,10 @@ class modEInvoicing extends DolibarrModules
 				"UPDATE " . MAIN_DB_PREFIX . "extrafields SET enabled='getDolGlobalInt(\"EINVOICING_USE_CHORUS\")' WHERE enabled = '\$conf->global->EINVOICING_USE_CHORUS'",
 				// Drop the stale computed formula on d4d_chorus_id: it targets options_chorus_id (openDSI),
 				// which raises a PHP warning on every invoice render and makes the field read-only.
-				"UPDATE " . MAIN_DB_PREFIX . "extrafields SET fieldcomputed = '' WHERE name = 'd4d_chorus_id' AND fieldcomputed LIKE '%options_chorus_id%'"
+				"UPDATE " . MAIN_DB_PREFIX . "extrafields SET fieldcomputed = '' WHERE name = 'd4d_chorus_id' AND fieldcomputed LIKE '%options_chorus_id%'",
+				// addExtraField() leaves an existing definition alone, so an installation that already carries
+				// these fields keeps printable = 1 until this runs (issue #614).
+				"UPDATE " . MAIN_DB_PREFIX . "extrafields SET printable = 2 WHERE printable = 1 AND elementtype IN ('facture', 'commande') AND name IN ('d4d_service_code', 'd4d_contract_number', 'd4d_promise_code')"
 			)
 		);
 

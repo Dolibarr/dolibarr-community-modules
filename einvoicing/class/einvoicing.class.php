@@ -57,6 +57,19 @@ class EInvoicing
 	 */
 	public $errors = array();
 
+	/**
+	 * Ids of the customer invoices whose validation happened during the current request.
+	 *
+	 * The hook that generates the e-invoice, afterPDFCreation(), is called for every rebuild of the
+	 * invoice PDF and cannot tell what asked for it. The BILL_VALIDATE trigger can: it runs inside
+	 * Facture::validate(), before the caller regenerates the document, and it runs for no other
+	 * reason. Marking the invoice there is what lets the hook recognise the generation that follows a
+	 * validation - the only one EINVOICING_AUTO_SEND_ON_GENERATION is meant to transmit.
+	 *
+	 * @var int[]
+	 */
+	private static $validatedinthisrequest = array();
+
 
 	// Dolibarr internal statuses
 	public const STATUS_UNKNOWN             = 0;		// By default, before the e-invoice has been generated
@@ -490,6 +503,12 @@ class EInvoicing
 		self::STATUS_PARTIALLY_APPROVED
 	];
 
+	/**
+	 * Name, into llx_einvoicing_extrafields, of the order reference the supplier declared on the
+	 * invoice it sent (BT-13). Kept whether or not it matched a purchase order of Dolibarr.
+	 */
+	public const EXTRAFIELD_BUYER_ORDER_REFERENCE = 'buyer_order_reference';
+
 
 	/**
 	 * Constructor
@@ -499,6 +518,30 @@ class EInvoicing
 	public function __construct($db)
 	{
 		$this->db = $db;
+	}
+
+	/**
+	 * Record that a customer invoice has just been validated, from the BILL_VALIDATE trigger.
+	 *
+	 * @param  int	$invoiceid	Id of the validated invoice
+	 * @return void
+	 */
+	public static function setInvoiceValidatedInThisRequest($invoiceid)
+	{
+		if ($invoiceid > 0 && !in_array((int) $invoiceid, self::$validatedinthisrequest, true)) {
+			self::$validatedinthisrequest[] = (int) $invoiceid;
+		}
+	}
+
+	/**
+	 * Tell whether this customer invoice has been validated during the current request.
+	 *
+	 * @param  int	$invoiceid	Id of the invoice
+	 * @return bool				True if the invoice went through BILL_VALIDATE in this very request
+	 */
+	public static function isInvoiceValidatedInThisRequest($invoiceid)
+	{
+		return in_array((int) $invoiceid, self::$validatedinthisrequest, true);
 	}
 
 
@@ -767,6 +810,18 @@ class EInvoicing
 			foreach ($options as $key => $val) {
 				if ($key >= 200 && $key < 300) {
 					$options[$key]['data-html'] .= (in_array($key, $mandatorystatus) ? '  <span class="small opacitymedium">('.$key.' - '.$langs->trans("Mandatory").')</span>' : '  <span class="small opacitymedium">('.$key.')</span>');
+				}
+			}
+		}
+
+		// Dolibarr 17 prints the data-* values of a combo option as they are (Form::selectarray()), while
+		// 18 and later escape them. The HTML added just above would close the attribute on its first quote
+		// there and leave an invalid <option>, so escape it for those cores only: doing it on the others
+		// would escape it twice and show the tags as text.
+		if ((float) DOL_VERSION < 18) {
+			foreach ($options as $key => $val) {
+				if (isset($val['data-html'])) {
+					$options[$key]['data-html'] = dol_escape_htmltag($val['data-html']);
 				}
 			}
 		}
@@ -1669,7 +1724,7 @@ class EInvoicing
 	 */
 	public function supplierInvoiceCardBlock($object, $mode = '', $parameters = array())
 	{
-		global $langs;
+		global $langs, $form;
 		global $action;
 
 		$resprints = '';
@@ -1752,6 +1807,16 @@ class EInvoicing
 		$resprints .= '<td>' . $langs->trans("einvoicingSourceTitle") . '</td>';
 		$resprints .= '<td>' . ($provider ? dolPrintHTML($provider) : '<span class="opacitymedium">' . $langs->trans("CreatedManually") . '</span>') . '</td>';
 		$resprints .= '</tr>';
+
+		// Order reference declared by the supplier (BT-13), kept at import whether or not it matched an
+		// order of Dolibarr. Only shown when the received invoice carried one.
+		$buyerOrderReference = $this->getExtraFieldValue($object->id, $object->element, self::EXTRAFIELD_BUYER_ORDER_REFERENCE);
+		if (!empty($buyerOrderReference)) {
+			$resprints .= '<tr class="treinvoicing_collapseseparator">';
+			$resprints .= '<td>' . $form->textwithpicto($langs->trans("EInvoiceBuyerOrderReference"), $langs->trans("EInvoiceBuyerOrderReferenceHelp")) . '</td>';
+			$resprints .= '<td>' . dolPrintHTML($buyerOrderReference) . '</td>';
+			$resprints .= '</tr>';
+		}
 
 		if ($provider) {
 			// Get current status
@@ -2494,6 +2559,104 @@ class EInvoicing
 		}
 
 		return $exists ? 1 : $db->last_insert_id($db->prefix() . "einvoicing_extlinks");
+	}
+
+	/**
+	 * Store a property of a Dolibarr object into the table of the module.
+	 *
+	 * The module does not use the extrafields of the core for the data it needs to keep on an object:
+	 * an admin or a user can rename, empty or delete an extrafield, and the module would lose data it
+	 * is accountable for. The properties are stored into llx_einvoicing_extrafields instead, one row
+	 * per (object, property name), so a new property needs no schema change.
+	 *
+	 * @param int		$elementId		ID of the element (or of the element line) the property belongs to
+	 * @param string	$elementType	Type of element (property object->element: 'facture', 'invoice_supplier', 'societe', ...)
+	 * @param string	$name			Name of the property ('buyer_order_reference', ...)
+	 * @param string	$value			Value to store ('' stores an empty value, it does not delete the row)
+	 * @return int						-1 on error, 1 if an existing row was updated, rowid of the new row otherwise
+	 */
+	public function insertOrUpdateExtraField($elementId, $elementType, $name, $value)
+	{
+		global $user;
+
+		if ((int) $elementId <= 0 || $elementType === '' || $name === '') {
+			$this->errors[] = 'insertOrUpdateExtraField called without element or property name';
+			return -1;
+		}
+
+		// Check if the property is already stored for this object
+		$sql = "SELECT rowid FROM " . $this->db->prefix() . "einvoicing_extrafields";
+		$sql .= " WHERE element_id = " . (int) $elementId;
+		$sql .= " AND element_type = '" . $this->db->escape($elementType) . "'";
+		$sql .= " AND name = '" . $this->db->escape($name) . "'";
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->errors[] = $this->db->lasterror();
+			return -1;
+		}
+
+		$exists = $this->db->num_rows($resql) > 0;
+		$this->db->free($resql);
+
+		if ($exists) {
+			$sql = "UPDATE " . $this->db->prefix() . "einvoicing_extrafields SET";
+			$sql .= " value = '" . $this->db->escape($value) . "'";
+			$sql .= ", fk_user_modif = " . (int) $user->id;
+			$sql .= " WHERE element_id = " . (int) $elementId;
+			$sql .= " AND element_type = '" . $this->db->escape($elementType) . "'";
+			$sql .= " AND name = '" . $this->db->escape($name) . "'";
+		} else {
+			$sql = "INSERT INTO " . $this->db->prefix() . "einvoicing_extrafields";
+			$sql .= " (element_id, element_type, name, value, date_creation, fk_user_creat)";
+			$sql .= " VALUES (" . (int) $elementId . ", '" . $this->db->escape($elementType) . "'";
+			$sql .= ", '" . $this->db->escape($name) . "'";
+			$sql .= ", '" . $this->db->escape($value) . "'";
+			$sql .= ", '" . $this->db->idate(dol_now()) . "', " . (int) $user->id . ")";
+		}
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->errors[] = $this->db->lasterror();
+			return -1;
+		}
+
+		return $exists ? 1 : $this->db->last_insert_id($this->db->prefix() . "einvoicing_extrafields");
+	}
+
+	/**
+	 * Read a property stored by the module on a Dolibarr object.
+	 *
+	 * @param int		$elementId		ID of the element (or of the element line) the property belongs to
+	 * @param string	$elementType	Type of element (property object->element)
+	 * @param string	$name			Name of the property
+	 * @return ?string					Value stored, or null when nothing is stored for that object and name
+	 */
+	public function getExtraFieldValue($elementId, $elementType, $name)
+	{
+		if ((int) $elementId <= 0 || $elementType === '' || $name === '') {
+			return null;
+		}
+
+		$sql = "SELECT value FROM " . $this->db->prefix() . "einvoicing_extrafields";
+		$sql .= " WHERE element_id = " . (int) $elementId;
+		$sql .= " AND element_type = '" . $this->db->escape($elementType) . "'";
+		$sql .= " AND name = '" . $this->db->escape($name) . "'";
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->errors[] = $this->db->lasterror();
+			return null;
+		}
+
+		$value = null;
+		if ($this->db->num_rows($resql) > 0) {
+			$obj = $this->db->fetch_object($resql);
+			$value = (string) $obj->value;
+		}
+		$this->db->free($resql);
+
+		return $value;
 	}
 
 

@@ -2,3 +2,21 @@
 /.project
 /.settings/
 /.vscode/
+
+# ignore .htaccess files
+.htaccess
+/.run-phpstan
+
+# Mistral Vibe
+.vibe
+/.vibeignore
+
+# Claude Code
+.claude
+/.claudeignore
+
+# Agent workflow artifacts (specs/plans), not product documentation
+docs/superpowers/
+
+# Agent-managed git worktrees
+.worktrees/

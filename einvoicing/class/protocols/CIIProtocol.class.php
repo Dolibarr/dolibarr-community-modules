@@ -967,6 +967,10 @@ class CIIProtocol extends AbstractProtocol
 		if ($supplierInvoiceId < 0) {
 			return ['res' => -1, 'message' => 'Invoice creation error: ' . $supplierInvoice->error];
 		} else {
+			// Keep the order reference the supplier declared (BT-13) whether or not it matches an
+			// order of Dolibarr, so the invoice can be reconciled by hand when it does not. See issue #603.
+			$this->_saveImportedBuyerOrderReference($supplierInvoice, $parsedHeader['orderReference'] ?? '');
+
 			// Link the invoice to its purchase order (commande fournisseur) when the order reference
 			// (BT-13) matches a single order for the same supplier. Non-blocking. See issue #303.
 			$orderLinkMessage = $this->_linkSupplierInvoiceToPurchaseOrder($supplierInvoice, $socId, $parsedHeader['orderReference'] ?? '');
