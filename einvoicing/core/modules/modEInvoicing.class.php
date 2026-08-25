@@ -620,7 +620,8 @@ class modEInvoicing extends DolibarrModules
 				"UPDATE " . MAIN_DB_PREFIX . "extrafields SET fieldcomputed = '' WHERE name = 'd4d_chorus_id' AND fieldcomputed LIKE '%options_chorus_id%'",
 				// addExtraField() leaves an existing definition alone, so an installation that already carries
 				// these fields keeps printable = 1 until this runs (issue #614).
-				"UPDATE " . MAIN_DB_PREFIX . "extrafields SET printable = 2 WHERE printable = 1 AND elementtype IN ('facture', 'commande') AND name IN ('d4d_service_code', 'd4d_contract_number', 'd4d_promise_code')"
+				"UPDATE " . MAIN_DB_PREFIX . "extrafields SET printable = 2 WHERE printable = 1 AND elementtype IN ('facture', 'commande') AND name IN ('d4d_service_code', 'd4d_contract_number', 'd4d_promise_code')",
+				"ALTER TABLE ".MAIN_DB_PREFIX."einvoicing_call ADD COLUMN call_id_num integer AFTER call_id"
 			)
 		);
 
