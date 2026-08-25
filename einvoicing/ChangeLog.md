@@ -101,10 +101,10 @@ the caller. A page working inside a transaction on $db, recording a payment or i
 invoice, holds a consistent-read snapshot taken before the previous call was committed by
 $dbhistory, so the same number was handed out twice and the second insert died on
 uk_einvoicing_call_callid. Every API call after the first one in such a request left no trace at all,
-which in production hid the very transmission that had to be audited. The number is now read through
-the connection the record is written on, and a collision - now only possible against another request
-- is retried once instead of losing the trace.
-  
+which in production hid the very transmission that had to be audited. The number is now read on the
+connection the record is written on, with a locking read (FOR UPDATE) held until that insert commits,
+so it can be neither stale nor handed out twice.
+
 FIX: A cash-in is no longer reported with the status 212 on an invoice the Approved Platform refused.
 The guard that decides it reads the 'transmitted' flag, which is true of every status but the local
 ones - and STATUS_ERROR is one it lets through, although that code is exactly what an acknowledgement

@@ -791,46 +791,32 @@ abstract class AbstractPDPProvider
 			$dbhistory = getDoliDBInstance($conf->db->type, $conf->db->host, (string) $conf->db->user, $dolibarr_main_db_pass, (string) $conf->db->name, (int) $conf->db->port);
 		}
 
+		// The number and the row it belongs to are taken on the same connection, inside the same
+		// transaction: getNextCallId() locks the range it reads (FOR UPDATE) until this commit, so no
+		// other request can take the number in between and lose the trace on uk_einvoicing_call_callid.
+		$dbhistory->begin();
+
 		$params = self::redactSensitiveData($params);
 		$response = self::redactSensitiveData($response);
 
-		$failure = '';
+		$call = new Call($dbhistory);
+		$call->call_id = $call->getNextCallId();
+		$call->call_type = $callType;
+		$call->method = ($method == 'POSTALREADYFORMATED' ? 'POST' : $method);
+		$call->endpoint = '/' . $resource;
+		$call->request_body = is_array($params) ? json_encode($params) : $params;
+		$call->response = is_array($response) ? json_encode($response) : $response;
+		$call->provider = $this->name;
+		$call->entity = $conf->entity;
+		$call->status = ($statusCode == 200 || $statusCode == 202) ? 1 : 0;
 
-		// The call number is read and written on the same connection (see Call::getNextCallId()), so it
-		// is only ever taken by someone else: another request logging its own call in between. That
-		// leaves the number free to be recomputed, which is worth one retry - the alternative is losing
-		// the trace of an API call to the platform over a numbering collision.
-		for ($attempt = 1; $attempt <= 2; $attempt++) {
-			$dbhistory->begin();
-
-			$call = new Call($dbhistory);
-			$call->call_id = $call->getNextCallId();
-			$call->call_type = $callType;
-			$call->method = ($method == 'POSTALREADYFORMATED' ? 'POST' : $method);
-			$call->endpoint = '/' . $resource;
-			$call->request_body = is_array($params) ? json_encode($params) : $params;
-			$call->response = is_array($response) ? json_encode($response) : $response;
-			$call->provider = $this->name;
-			$call->entity = $conf->entity;
-			$call->status = ($statusCode == 200 || $statusCode == 202) ? 1 : 0;
-
-			if ($call->create($user) > 0) {
-				$dbhistory->commit();
-				return array('id' => $call->id, 'call_id' => $call->call_id);
-			}
-
-			$dbhistory->rollback();
-			$failure = $call->error . " - " . implode(',', $call->errors);
-
-			// "ErrorRefAlreadyExists" is what createCommon() reports for DB_ERROR_RECORD_ALREADY_EXISTS,
-			// on every version the module supports. Any other failure is not a collision and retrying it
-			// would only log the same failure twice.
-			if (!in_array('ErrorRefAlreadyExists', $call->errors)) {
-				break;
-			}
+		if ($call->create($user) > 0) {
+			$dbhistory->commit();
+			return array('id' => $call->id, 'call_id' => $call->call_id);
 		}
 
-		dol_syslog(__METHOD__ . " Failed to log API call to PDP provider: " . $failure, LOG_ERR);
+		$dbhistory->rollback();
+		dol_syslog(__METHOD__ . " Failed to log API call to PDP provider: " . $call->error . " - " . implode(',', $call->errors), LOG_ERR);
 		return null;
 	}
 
