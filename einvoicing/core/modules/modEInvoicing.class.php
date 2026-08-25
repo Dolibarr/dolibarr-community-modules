@@ -667,8 +667,9 @@ class modEInvoicing extends DolibarrModules
 
 		$result = $this->_init($sql, $options);
 
-		$updatesql = file_get_contents(dol_buildpath('/einvoicing/sql/update_v1.1.0.sql'));
-		run_sql($updatesql);	// The run_sql is a SQL error tolerant function.
+		// Disabled, the _init contains launch of update_allversion.sql
+		//$updatesql = file_get_contents(dol_buildpath('/einvoicing/sql/update_v1.1.0.sql'));
+		//run_sql($updatesql);	// The run_sql is a SQL error tolerant function.
 
 		return $result;
 	}
