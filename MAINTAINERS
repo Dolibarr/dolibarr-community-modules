@@ -63,3 +63,9 @@ M:	Kontakt Automation <kontakt@inpointautomation.com> / TheRealBeef
 S:	Maintained
 F:	ksef/
 T:	https://github.com/Dolibarr/dolibarr-community-modules.git
+
+DOLISECURE MODULE
+M:	Laurent Bouquet <laurent.bouquet@joliciel.fr> / LaurentBouquet
+S:	Maintained
+F:	dolisecure/
+T:	https://github.com/Dolibarr/dolibarr-community-modules.git
