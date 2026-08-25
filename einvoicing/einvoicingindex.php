@@ -71,6 +71,7 @@ if (!$res) {
  * @var Translate $langs
  * @var User $user
  */
+'@phan-var-force User $user';
 include_once DOL_DOCUMENT_ROOT.'/core/class/html.formfile.class.php';
 
 // Load translation files required by the page
