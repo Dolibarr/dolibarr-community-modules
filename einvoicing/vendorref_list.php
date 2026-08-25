@@ -320,7 +320,9 @@ print '<input type="hidden" name="sortorder" value="'.dol_escape_htmltag($sortor
 
 print_barre_liste($title, $page, $_SERVER["PHP_SELF"], $param, $sortfield, $sortorder, '', $num, $nbtotalofrecords, 'einvoicing.png@einvoicing', 0, $newcardbutton, '', $limit);
 
-print '<span class="opacitymedium">'.$langs->trans("MappedVendorRefsDesc").'</span>';
+print '<span class="opacitymedium">'.$langs->trans("MappedVendorRefsDesc");
+print ' '.$langs->trans("MapEInvoiceProductsDesc2");
+print '.</span>';
 //print ' '.$form->textwithpicto('', $langs->trans("OnlyToBuyProductsAreListedHelp"), 1, 'help');
 
 

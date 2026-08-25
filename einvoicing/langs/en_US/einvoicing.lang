@@ -517,7 +517,8 @@ NoPDPProviderConfigured=No Approved Platform configured: nothing to synchronize
 # Manual mapping of vendor products onto Dolibarr products (product_mapping.php)
 MapToAnExistingProduct=Map to an existing product
 MapEInvoiceProducts=Map the products of an e-invoice
-MapEInvoiceProductsDesc=List the lines of incoming e-invoices and allow to link product supplier references into your product database. The link is saved as another product supplier price, which is the first criteria used when importing an invoice to find which product to use in your database.
+MapEInvoiceProductsDesc=List the lines of incoming e-invoices and allow to link product supplier references with your products. The link is saved as another product supplier price, which is the first criteria used when importing an invoice to find which product to use in your database.
+MapEInvoiceProductsDesc2=Note that if you set a "Default product" to use for e-invoice import on your supplier card, doing a mapping for each supplier reference may not be necessary
 VendorProductRef=Vendor product ref.
 BuyerProductRef=Buyer product ref.
 ProductGlobalId=Global ID (EAN/GTIN)
