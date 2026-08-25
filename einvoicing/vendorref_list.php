@@ -285,7 +285,10 @@ if ($search_product != '') {
 	$param .= '&search_product='.urlencode($search_product);
 }
 
-$newcardbutton = dolGetButtonTitle($langs->trans("MapEInvoiceProducts"), '', 'fa fa-link', dol_buildpath('/einvoicing/product_mapping.php', 1), '', ($permissiontoadd ? 1 : 0));
+$newcardbutton = '';
+if (getDolGlobalString('EINVOICING_SHOW_MAPPING_TOOL_ON_VENDOR_PRICE_LIST')) {	// Hidden option because editing mapping outside of an import process is discouraged.
+	$newcardbutton = dolGetButtonTitle($langs->trans("MapEInvoiceProducts"), '', 'fa fa-link', dol_buildpath('/einvoicing/product_mapping.php', 1), '', ($permissiontoadd ? 1 : 0));
+}
 
 // Confirmations are printed before the search form: a form cannot be nested into another one
 if ($action == 'delete' && $permissiontoadd && $rowid > 0) {
@@ -317,9 +320,13 @@ print '<input type="hidden" name="sortorder" value="'.dol_escape_htmltag($sortor
 
 print_barre_liste($title, $page, $_SERVER["PHP_SELF"], $param, $sortfield, $sortorder, '', $num, $nbtotalofrecords, 'einvoicing.png@einvoicing', 0, $newcardbutton, '', $limit);
 
-print '<span class="opacitymedium">'.$langs->trans("MappedVendorRefsDesc").'</span>';
-print ' '.$form->textwithpicto('', $langs->trans("OnlyToBuyProductsAreListedHelp"), 1, 'help');
-print '<br><br>';
+print '<div class="info"><span class="">'.$langs->trans("MappedVendorRefsDesc");
+print ' '.$langs->trans("MapEInvoiceProductsDesc2");
+print '.</span></div>';
+//print ' '.$form->textwithpicto('', $langs->trans("OnlyToBuyProductsAreListedHelp"), 1, 'help');
+
+
+print '<br>';
 
 print '<div class="div-table-responsive">';
 print '<table class="tagtable nobottomiftotal liste">';
@@ -472,9 +479,9 @@ while ($i < min($num, $limit)) {
 		print '<button type="submit" class="button smallpaddingimp" name="action" value="savemapping">'.$langs->trans("Save").'</button>';
 		print ' <button type="submit" class="button button-cancel smallpaddingimp" name="cancel" value="1">'.$langs->trans("Cancel").'</button>';
 	} elseif ($permissiontoadd) {
-		print '<a class="editfielda paddingrightonly" href="'.$_SERVER["PHP_SELF"].'?action=editmapping&token='.newToken().'&rowid='.((int) $obj->rowid).$param.'" title="'.dol_escape_htmltag($langs->trans("RemapVendorRef")).'">'.img_edit().'</a>';
-		print '<a class="paddingleftonly" href="'.$_SERVER["PHP_SELF"].'?action=delete&token='.newToken().'&rowid='.((int) $obj->rowid).$param.'" title="'.dol_escape_htmltag($langs->trans("DeleteVendorRefMapping")).'">'.img_delete().'</a>';
-		print ' <input type="checkbox" class="flat checkforselect" name="toselect[]" value="'.((int) $obj->rowid).'"'.(in_array($obj->rowid, $toselect) ? ' checked' : '').'>';
+		print '<a class="editfielda marginrightonly marginleftonly" href="'.$_SERVER["PHP_SELF"].'?action=editmapping&token='.newToken().'&rowid='.((int) $obj->rowid).$param.'" title="'.dol_escape_htmltag($langs->trans("RemapVendorRef")).'">'.img_edit().'</a>';
+		print '<a class="marginrightonly marginleftonly" href="'.$_SERVER["PHP_SELF"].'?action=delete&token='.newToken().'&rowid='.((int) $obj->rowid).$param.'" title="'.dol_escape_htmltag($langs->trans("DeleteVendorRefMapping")).'">'.img_delete().'</a>';
+		print '<input type="checkbox" class="flat marginrightonly marginleftonly checkforselect" name="toselect[]" value="'.((int) $obj->rowid).'"'.(in_array($obj->rowid, $toselect) ? ' checked' : '').'>';
 	}
 	print '</td>';
 

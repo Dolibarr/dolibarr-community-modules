@@ -14,26 +14,27 @@
 -- along with this program.  If not, see https://www.gnu.org/licenses/.
 
 
-CREATE TABLE llx_einvoicing_call(
+CREATE TABLE llx_einvoicing_call (
 	-- BEGIN MODULEBUILDER FIELDS
-	rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL, 
-	call_id varchar(50) NOT NULL, 
-	totalflow integer NULL DEFAULT NULL, 
-	batchlimit integer NOT NULL DEFAULT 1, 
-	skippedflow integer NOT NULL DEFAULT 1, 
-	successflow integer NOT NULL DEFAULT 1, 
-	date_creation datetime NOT NULL, 
-	tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, 
-	fk_user_creat integer NOT NULL, 
-	fk_user_modif integer, 
-	status integer NOT NULL, 
-	call_type varchar(50) NOT NULL, 
-	method varchar(10), 
-	endpoint varchar(255) NOT NULL, 
-	request_body text, 
-	response text, 
-	processing_result text, 
-	provider varchar(50) NOT NULL, 
+	rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL,
+	call_id varchar(50) NOT NULL,
+	call_id_num integer NULL,
+	totalflow integer NULL DEFAULT NULL,
+	batchlimit integer NOT NULL DEFAULT 1,
+	skippedflow integer NOT NULL DEFAULT 1,
+	successflow integer NOT NULL DEFAULT 1,
+	date_creation datetime NOT NULL,
+	tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+	fk_user_creat integer NOT NULL,
+	fk_user_modif integer,
+	status integer NOT NULL,
+	call_type varchar(50) NOT NULL,
+	method varchar(10),
+	endpoint varchar(255) NOT NULL,
+	request_body text,
+	response text,
+	processing_result text,
+	provider varchar(50) NOT NULL,
 	entity integer DEFAULT 1
 	-- END MODULEBUILDER FIELDS
-) ENGINE=innodb;
+) ENGINE = innodb;

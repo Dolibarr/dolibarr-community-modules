@@ -1,6 +1,6 @@
 # CHANGELOG MODULE EINVOICING FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
-## 1.0.4
+## 1.1.0
 
 FIX: The module can obtain an access token from the Esalink access point again. The token request had
 lost its grant_type parameter, which RFC 6749 requires whatever the client authentication method is,
