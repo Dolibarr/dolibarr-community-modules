@@ -204,12 +204,21 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 							// Optionally transmit to the Access Point right after generation (opt-in + idempotent) and if not yet generated.
 							// Without this, validation only generates the Factur-X; the invoice is never sent to the
 							// PA (transmission was a manual "send_to_pdp" click only).
-							// Two guards, because one is not enough: 'transmitted' reads the syncstatus, which
-							// generateInvoice() just reset to GENERATED a few lines above, so it stops seeing a
+							// Restricted to the generation that follows a validation, which is what the option says
+							// it does. This hook is called for every rebuild of the invoice PDF, and several of them
+							// happen long after the validation and with nobody asking for a transmission: recording a
+							// payment rebuilds the document from inside Paiement::create(), and so do the "Generate"
+							// button of the invoice card and any mass/cron PDF rebuild. On an invoice validated before
+							// the module was set up - or deliberately left to be sent by hand - the first of those
+							// rebuilds used to deposit it at the PA on its own, months after its date, and to unlock
+							// the cash-in status (212) that the very same payment then reported.
+							// Then two more guards, because one is not enough: 'transmitted' reads the syncstatus,
+							// which generateInvoice() just reset to GENERATED a few lines above, so it stops seeing a
 							// transmission from the second regeneration on. isTransmittedLockActive() reads the
 							// flow_id, which the first submission assigned and nothing clears, so it holds for good
 							// (and honors EINVOICING_ALLOW_RESEND_TRANSMITTED like the manual send does).
-							if (getDolGlobalString('EINVOICING_AUTO_SEND_ON_GENERATION') && empty($currentStatusDetails['transmitted'])
+							if (getDolGlobalString('EINVOICING_AUTO_SEND_ON_GENERATION') && EInvoicing::isInvoiceValidatedInThisRequest($invoiceObject->id)
+								&& empty($currentStatusDetails['transmitted'])
 								&& !$einvoicing->isTransmittedLockActive($invoiceObject->id, $invoiceObject->ref) && $precheckresult >= 0) {
 								dol_syslog("actions_einvoicing: Invoice seems not yet transmitted and EINVOICING_AUTO_SEND_ON_GENERATION is on, so we try to send it");
 

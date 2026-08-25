@@ -80,10 +80,9 @@ include_once __DIR__.'/class/protocols/ProtocolManager.class.php';
 
 // load module libraries
 // GETPOSTDATE() arrived in the core in Dolibarr 18 and dolPrintHTMLForAttribute() in Dolibarr 19; this
-// page calls both, so it would fatal below the version the module declares it supports. The first is
-// backported next to the other core helpers of compat/, the second already ships in the module library.
+// page calls both, so it would fatal below the version the module declares it supports. Both are
+// backported in compat/functions.lib.php, and that is all this page needs from the two libraries.
 include_once __DIR__.'/compat/functions.lib.php';
-include_once __DIR__.'/lib/einvoicing.lib.php';
 include_once __DIR__.'/class/document.class.php';
 // for other modules
 //dol_include_once('/othermodule/class/otherobject.class.php');
@@ -712,8 +711,9 @@ $newcardbutton = '';
 
 // Manual mapping of the vendor products of a flow onto existing Dolibarr products (useful when the automatic
 // creation of products is disabled and a synchronization is blocked on an unknown product).
-$newcardbutton .= dolGetButtonTitle($langs->trans('MapEInvoiceProducts'), '', 'fa fa-link', dol_buildpath('/einvoicing/product_mapping.php', 1), '', $permissiontoadd);
-
+if (getDolGlobalString('EINVOICING_SHOW_MAPPING_TOOL_ON_VENDOR_PRICE_LIST')) {	// Hidden option because editing mapping outside of an import process is discouraged.
+	$newcardbutton .= dolGetButtonTitle($langs->trans('MapEInvoiceProducts'), '', 'fa fa-link', dol_buildpath('/einvoicing/product_mapping.php', 1), '', $permissiontoadd);
+}
 
 $providershort = '';
 if ($provider) {
