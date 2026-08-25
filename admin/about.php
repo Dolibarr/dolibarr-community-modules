@@ -81,7 +81,9 @@ if ($action == 'send_feedback') {
 		require_once DOL_DOCUMENT_ROOT.'/core/class/CMailFile.class.php';
 
 		$to = 'commercial+stancer@cap-rel.fr';
-		$from = !empty($email) ? $email : getDolGlobalString('MAIN_MAIL_EMAIL_FROM');
+		// Named $fromEmail and not $from: this value goes into a mail header, it never
+		// reaches the database, and the SQL analyzer treats a bare $from as a SQL fragment.
+		$fromEmail = !empty($email) ? $email : getDolGlobalString('MAIN_MAIL_EMAIL_FROM');
 		$subject = 'Stancer Module Feedback - '.$rating.'/5 stars';
 
 		$message = "New feedback from Stancer module:\n\n";
@@ -91,7 +93,7 @@ if ($action == 'send_feedback') {
 		$message .= "Dolibarr version: ".DOL_VERSION."\n\n";
 		$message .= "Feedback:\n".$feedback."\n";
 
-		$mail = new CMailFile($subject, $to, $from, $message);
+		$mail = new CMailFile($subject, $to, $fromEmail, $message);
 
 		if ($mail->sendfile()) {
 			setEventMessage($langs->trans('StancerFeedbackSent'), 'mesgs');

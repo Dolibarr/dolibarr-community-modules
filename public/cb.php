@@ -128,14 +128,39 @@ $signLink = $signer = '';
 
 //note : public page, user is not set, so we use user who create that company
 $user = new User($db);
-$res = $user->fetch(getDolGlobalString('STANCER_USER_ACCOUNT_FOR_ACTIONS'));
+$res = $user->fetch(getDolGlobalInt('STANCER_USER_ACCOUNT_FOR_ACTIONS'));
 if ($res < 0) {
-	//fallback on last user modif ...
-	$uid = $societe->user_modification ?? $societe->user_creation;
-	$user->fetch($uid);
+	// Fallback on the user who last modified the thirdparty, then on its creator.
+	// Societe::fetch() fills user_modification/user_creation up to Dolibarr 18, and
+	// user_modification_id/user_creation_id from Dolibarr 19, so the four spellings
+	// are probed, modification before creation. The *_id properties are not declared
+	// at all on Dolibarr 15, so they are only ever reached through empty(): a direct
+	// read would raise a PHP 8 "Undefined property" warning on that version.
+	$uid = 0;
+	if (!empty($societe->user_modification_id)) {
+		$uid = $societe->user_modification_id;
+	}
+	if (empty($uid)) {
+		// @phan-suppress-next-line PhanDeprecatedProperty  only source up to Dolibarr 18
+		$uid = $societe->user_modification;
+	}
+	if (empty($uid) && !empty($societe->user_creation_id)) {
+		$uid = $societe->user_creation_id;
+	}
+	if (empty($uid)) {
+		// @phan-suppress-next-line PhanDeprecatedProperty  only source up to Dolibarr 18
+		$uid = $societe->user_creation;
+	}
+	if (empty($uid)) {
+		dol_syslog("stancer cb.php: no fallback user found on thirdparty ".$societe->id, LOG_ERR);
+	} elseif ($user->fetch((int) $uid) <= 0) {
+		dol_syslog("stancer cb.php: cannot load fallback user ".((int) $uid)." for thirdparty ".$societe->id.": ".$user->error, LOG_ERR);
+	}
 }
+// loadRights() only exists from Dolibarr 20; getrights() is the only call valid on 15..21.
+// @phan-suppress-next-line PhanDeprecatedFunction
 $user->getrights();
-$cbccv = $cbname = $cbnumber = $cbexpiry = null;
+$cbccv = $cbname = $cbnumber = $cbexpiry = '';
 
 // $sp = new Stancer_payments($db);
 $action = (string) GETPOST('action', 'aZ09');
@@ -145,8 +170,8 @@ if ($action == "stancerGetCustomerCB") {
 	$cbt = explode('/', $cbexpiry);
 	$cbexp_month = $cbt[0];
 	$cbexp_year =$cbt[1];
-	$cbccv = GETPOST('cbccv', 'alpha');
-	$cbname = GETPOST('cbname', 'alpha');
+	$cbccv = (string) GETPOST('cbccv', 'alpha');
+	$cbname = (string) GETPOST('cbname', 'alpha');
 	$db->begin();
 
 	// print "<p>Saisie CB : number=$cbnumber, expiry=$cbexp_month / $cbexp_year, cbname=$cbname, cbexp_month=$cbexp_month, cbexp_year=$cbexp_year, cbccv=$cbccv </p>";
@@ -175,13 +200,11 @@ if ($action == "stancerGetCustomerCB") {
 	}
 	dol_syslog("stancer cb.php returned from stancerAddCBIfNeeded ...");
 } elseif ($action == 'preauth') {
-	// print "<p>Retour de la Pré-Auth 3DS</p>";
-	// print json_encode($_POST);
-	// print "<hr>";
-	// $pm = new Stancer\Payment(GETPOST('payment', 'alpha'));
-	// print json_encode($pm->getStatus());
-	// print "<hr>";
-	// exit;
+	// 3DS pre-authentication return. The card itself is stored by the
+	// 'stancerGetCustomerCB' action above, so there is nothing to persist here:
+	// we only trace the callback instead of failing silently.
+	$preauthPayment = (string) GETPOST('payment', 'alpha');
+	dol_syslog("stancer cb.php: 3DS pre-auth return for payment '".$preauthPayment."', nothing to process at this step", LOG_DEBUG);
 }
 $reg = array();
 $object = new stdClass(); // For triggers
@@ -374,10 +397,10 @@ if (!empty($conf->stancer->enabled)) {
 	<?php
 	print '</form>'."\n";
 }
-// If data not provided from back url, search them into the session env
-if (!isset($ipaddress) || empty($ipaddress)) {
-	$ipaddress = $_SESSION['ipaddress'];
-}
+// If data not provided from back url, search them into the session env.
+// $ipaddress is never set earlier in this script: read it straight from the session,
+// and default to an empty string when the session does not carry it either.
+$ipaddress = isset($_SESSION['ipaddress']) ? $_SESSION['ipaddress'] : '';
 
 print "\n</div>\n";
 

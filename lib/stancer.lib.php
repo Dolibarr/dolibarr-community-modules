@@ -165,7 +165,7 @@ function stancer_get_private_key()
 /**
  * Prepare admin pages header
  *
- * @return array
+ * @return array<int,array<int,string>>	Array of tabs, each tab being array(url, label, code)
  */
 function stancerAdminPrepareHead()
 {

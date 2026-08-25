@@ -141,7 +141,7 @@ if ($action == "stancertakepayment") {
 
 	include_once DOL_DOCUMENT_ROOT.'/societe/class/companypaymentmode.class.php';
 	$companypaymentmode = new CompanyPaymentModeStancer($db);
-	$res = $companypaymentmode->fetch(GETPOST('companymodeid', 'int'));     // Read into llx_societe_rib
+	$res = $companypaymentmode->fetch((int) GETPOST('companymodeid', 'int'));     // Read into llx_societe_rib
 
 	if ($companypaymentmode->id > 0) {
 		$result = $stancer->doTakePaymentStancer(0, 0, $socid);
@@ -181,7 +181,7 @@ llxHeader("", $langs->trans("StancerArea"));
 $head = societe_prepare_head($societe);
 
 //print load_fiche_titre($langs->trans("StancerArea"), '', 'stancer.png@stancer');
-dol_fiche_head($head, 'tabStancer', $langs->trans("ThirdParty"), -1, 'company');
+print dol_get_fiche_head($head, 'tabStancer', $langs->trans("ThirdParty"), -1, 'company');
 
 print '<div class="fichecenter">';
 
@@ -211,7 +211,7 @@ if ($action == "deletesepa") {
 if ($action == "refreshStancerAccount") {
 	//actualise les comptes sepa & cb issus de stancer
 	$companypaymentmode = new CompanyPaymentModeStancer($db);
-	$res = $companypaymentmode->fetch(0, null, null, null, " AND label LIKE 'stancer-card%' AND stancer_account <> '' AND fk_soc = ".((int) $socid));
+	$res = $companypaymentmode->fetch(0, '', 0, '', " AND label LIKE 'stancer-card%' AND stancer_account <> '' AND fk_soc = ".((int) $socid));
 	$stancerAccountOk = false;
 	// print json_encode($companypaymentmode);
 	if ($res > 0) {
@@ -221,7 +221,7 @@ if ($action == "refreshStancerAccount") {
 if ($action == "deleteStancerAccount") {
 	//actualise les comptes sepa & cb issus de stancer
 	$companypaymentmode = new CompanyPaymentModeStancer($db);
-	$res = $companypaymentmode->fetch(0, null, null, null, " AND label LIKE 'stancer-card%' AND stancer_account <> '' AND fk_soc = ".((int) $socid));
+	$res = $companypaymentmode->fetch(0, '', 0, '', " AND label LIKE 'stancer-card%' AND stancer_account <> '' AND fk_soc = ".((int) $socid));
 	// print json_encode($companypaymentmode);
 	if ($res > 0) {
 		$companypaymentmode->delete($user);
@@ -237,7 +237,7 @@ if (isModEnabled('stancer') && $user->hasRight('stancer', 'read')) {
 
 	print "<h2>" . $langs->trans("StancerAccount") . "</h2>";
 	$companypaymentmode = new CompanyPaymentModeStancer($db);
-	$res = $companypaymentmode->fetch(0, null, null, null, " AND label LIKE 'stancer-card%' AND stancer_account <> '' AND fk_soc = ".((int) $socid));
+	$res = $companypaymentmode->fetch(0, '', 0, '', " AND label LIKE 'stancer-card%' AND stancer_account <> '' AND fk_soc = ".((int) $socid));
 	$stancerAccountOk = false;
 	// print json_encode($companypaymentmode);
 	if ($res > 0) {
@@ -277,7 +277,7 @@ if (isModEnabled('stancer') && $user->hasRight('stancer', 'read')) {
 		$resStancer = null;
 		print "<h2>" . $langs->trans("StancerSEPA") . "</h2>";
 		$companypaymentmode = new CompanyPaymentModeStancer($db);
-		// $res = $companypaymentmode->fetch(0, null, null, null, " AND type = 'ban' AND label LIKE 'stancer-sepa%' AND fk_soc = ".((int) $socid));
+		// $res = $companypaymentmode->fetch(0, '', 0, '', " AND type = 'ban' AND label LIKE 'stancer-sepa%' AND fk_soc = ".((int) $socid));
 		// if ($res) {
 		//     print "<ul>\n";
 		//     // print "  <li>" . $companypaymentmode->label . "</li>\n";
@@ -354,7 +354,13 @@ if (isModEnabled('stancer') && $user->hasRight('stancer', 'read')) {
 				if ($resStancer && !empty($companypaymentmode->stancer_account)) {
 					//check if sepa exists on stancer
 					$data = [
-						'iban' => $companypaymentmode->iban ?? $companypaymentmode->iban_prefix,
+						// iban_prefix is the only IBAN column of llx_societe_rib, and the only IBAN
+						// entry of CompanyPaymentMode::$fields, so it is the only one fetch()
+						// loads from the database. $iban is a deprecated alias (@deprecated
+						// @see $iban_prefix from Dolibarr 18 to 21, not even declared before 18)
+						// that fetch() copies from iban_prefix, so the former "?? iban_prefix"
+						// fallback could never yield another value on any supported version.
+						'iban' => $companypaymentmode->iban_prefix,
 						'bic' => $companypaymentmode->bic,
 						'mandate' => $companypaymentmode->rum,
 						'date_mandate' => $companypaymentmode->date_rum ?? dol_now(),
@@ -503,7 +509,7 @@ if (isModEnabled('stancer') && $user->hasRight('stancer', 'read')) {
 
 		print "<h2>" . $langs->trans("StancerCBAccount") . "</h2>";
 		$companypaymentmode = new CompanyPaymentModeStancer($db);
-		$res = $companypaymentmode->fetch(0, null, null, null, " AND type = 'card' AND label LIKE 'stancer-card%' AND stancer_object_ref <> '' AND fk_soc = ".((int) $socid));
+		$res = $companypaymentmode->fetch(0, '', 0, '', " AND type = 'card' AND label LIKE 'stancer-card%' AND stancer_object_ref <> '' AND fk_soc = ".((int) $socid));
 		if ($res) {
 			$cb = $companypaymentmode;
 

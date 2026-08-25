@@ -39,7 +39,7 @@
  *  - diroutput: directory holding the generated PDF, used for the attachment.
  *
  * @param   CommonObject  $object  Invoice, order, proposal, member or donation
- * @return  array                  Keys trackidprefix, elementtype, templatetype, diroutput
+ * @return  array{trackidprefix:string,elementtype:string,templatetype:string,diroutput:string}  Mail metadata for this object type
  */
 function stancerGetObjectMailContext($object)
 {
@@ -185,7 +185,9 @@ function stancerAddActionComm($object, $actioncode, $label, $description, $posta
 	 $actioncomm->email_tobcc = $object->email_tobcc;
 	 $actioncomm->email_subject = $object->email_subject;
 	 $actioncomm->errors_to   = $object->errors_to;*/
-	$actioncomm->fk_element   = $object->id;
+	$actioncomm->elementid    = (int) $object->id;
+	// @phan-suppress-next-line PhanDeprecatedProperty  ActionComm::create() only reads fk_element up to Dolibarr 18, both fields must be fed
+	$actioncomm->fk_element   = (int) $object->id;
 	$actioncomm->elementtype  = $object->element;
 	$actioncomm->extraparams  = dol_trunc($extraparams, 250);
 	$actioncomm->create($user);
@@ -204,9 +206,10 @@ function stancerBuildInvoiceLink($obj)
 	} elseif ($obj->element == 'commande') {
 		$url = dol_buildpath('/commande/card.php', 3) . '?id=' . $obj->id;
 	} else {
-		return htmlspecialchars($obj->ref);
+		// ->ref is ?string on CommonObject, htmlspecialchars() rejects null since PHP 8.1.
+		return htmlspecialchars((string) $obj->ref);
 	}
-	return '<a href="' . $url . '" style="color:#4169E1;text-decoration:none;font-weight:600;">' . htmlspecialchars($obj->ref) . '</a>';
+	return '<a href="' . $url . '" style="color:#4169E1;text-decoration:none;font-weight:600;">' . htmlspecialchars((string) $obj->ref) . '</a>';
 }
 
 /**
@@ -310,11 +313,15 @@ function stancerSendMail($to, $subject, $message, $isForCustomer = false, $cc = 
  * @param   bool  $wrapInLayout	wrap email content in the styled blue header layout
  * @param   string  $extraCc	additional CC email address (appended to thirdparty CC)
  *
- * @return  int           1 on success, -1 on error, 0 if skipped
+ * @return  int|null      1 on success, -1 on error, 0 if skipped by dedup, null when from/to is empty
  */
 function stancerSendInvoiceMailModele($modele, $object, $actionCode = "", $forceMail = 0, $wrapInLayout = false, $extraCc = '')
 {
 	global $db, $conf, $langs, $user, $mysoc;
+	// The signature stays generic (callers hold a CommonObject reference), but every caller
+	// passes an invoice: getIdBillingContact() and ->socid are read below and only Facture
+	// declares them.
+	'@phan-var Facture $object';
 	// Identify the caller so we can trace which code path triggered this send when reviewing logs.
 	$bt = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
 	$caller = isset($bt[1]) ? (basename((string) ($bt[1]['file'] ?? '?')) . ':' . ($bt[1]['line'] ?? '?')) : '?';
@@ -345,11 +352,9 @@ function stancerSendInvoiceMailModele($modele, $object, $actionCode = "", $force
 		$dedupCodeEsc = $db->escape($dedupCode);
 		$filterDedup = " AND ((code='" . $dedupCodeEsc . "') OR (code='AC_EMAIL' AND extraparams='" . $dedupCodeEsc . "'))";
 		$actioncomm = new ActionComm($db);
-		if (floatval(DOL_VERSION) < 15) {
-			$resAC = $actioncomm->getActions($db, $object->socid, $object->id, $mailctx['elementtype'], $filterDedup);
-		} else {
-			$resAC = $actioncomm->getActions($object->socid, $object->id, $mailctx['elementtype'], $filterDedup);
-		}
+		// The module requires Dolibarr 15 minimum, where getActions() no longer takes the
+		// database handle as first argument: the legacy branch was dead code.
+		$resAC = $actioncomm->getActions($object->socid, $object->id, $mailctx['elementtype'], $filterDedup);
 		if (!empty($resAC)) {
 			dol_syslog("stancerSendInvoiceMailModele modele=$modele already sent (dedup matched on $dedupCode for " . $mailctx['elementtype'] . " id=" . ($object->id ?? '?') . ")", LOG_INFO);
 			return $result;
@@ -545,11 +550,15 @@ function stancerSendInvoiceMailModele($modele, $object, $actionCode = "", $force
  * @param   string  		$actionCode	actionComm code to use
  * @param   int  			$forceMail	send mail even if actioncomm exists for that code
  * @param   string  		$to			target mail addr
- * @return  int						1 if the mail was sent, -1 on error, 0 when nothing was done
+ * @return  int|null				1 if the mail was sent, -1 on error, 0 on dedup, null when from/to is empty
  */
 function stancerSendOrderMailModele($modele, $object, $actionCode = "", $forceMail = 0, $to = '')
 {
 	global $db, $conf, $langs, $user, $mysoc;
+	// The signature stays generic (the payment pages only hold a CommonObject reference), but
+	// getObjectFromTag() can only return one of these five concrete classes, and all of them
+	// declare the ->socid read below.
+	'@phan-var Facture|Commande|Propal|Adherent|Don $object';
 	dol_syslog("stancerSendOrderMailModele modele=$modele, actionCode=$actionCode, forceMail=$forceMail, element=" . (is_object($object) ? $object->element : '?') . ", id=" . (is_object($object) ? $object->id : '?'), LOG_DEBUG);
 	$result = 0;
 	$subject = $msg = "";
@@ -569,11 +578,9 @@ function stancerSendOrderMailModele($modele, $object, $actionCode = "", $forceMa
 		$dedupCodeEsc = $db->escape($dedupCode);
 		$filterDedup = " AND ((code='" . $dedupCodeEsc . "') OR (code='AC_EMAIL' AND extraparams='" . $dedupCodeEsc . "'))";
 		$actioncomm = new ActionComm($db);
-		if (floatval(DOL_VERSION) < 15) {
-			$resAC = $actioncomm->getActions($db, $object->socid, $object->id, $mailctx['elementtype'], $filterDedup);
-		} else {
-			$resAC = $actioncomm->getActions($object->socid, $object->id, $mailctx['elementtype'], $filterDedup);
-		}
+		// The module requires Dolibarr 15 minimum, where getActions() no longer takes the
+		// database handle as first argument: the legacy branch was dead code.
+		$resAC = $actioncomm->getActions($object->socid, $object->id, $mailctx['elementtype'], $filterDedup);
 		if (!empty($resAC)) {
 			dol_syslog("stancerSendOrderMailModele modele=$modele already sent (dedup matched on $dedupCode for " . $mailctx['elementtype'] . " id=" . ($object->id ?? '?') . ")", LOG_INFO);
 			return $result;
@@ -604,7 +611,7 @@ function stancerSendOrderMailModele($modele, $object, $actionCode = "", $forceMa
 	if (empty(trim((string) $from)) || empty(trim((string) $to))) {
 		// print json_encode($object);
 		dol_syslog("stancerSendOrderMailModele early return, from=$from or to=$to is empty", LOG_DEBUG);
-		return;
+		return; // returns null: an empty from/to is a skip, distinct from dedup (0)
 	}
 
 	// Get email content from templae
@@ -712,7 +719,8 @@ function stancerSendOrderMailModele($modele, $object, $actionCode = "", $forceMa
  */
 function stancerObjectUrlForMail($obj)
 {
-	$ref = dol_escape_htmltag($obj->ref);
+	// ->ref is ?string on CommonObject, dol_escape_htmltag() is declared to take a string.
+	$ref = dol_escape_htmltag((string) $obj->ref);
 	$pathMap = array(
 		'facture' => '/compta/facture/card.php',
 		'commande' => '/commande/card.php',
@@ -754,7 +762,8 @@ function stancerCSVtoHTML($header, $message)
 	$arrayOfValues = str_getcsv($message, "\n");
 	$rowIndex = 0;
 	foreach ($arrayOfValues as $row) {
-		$cols = str_getcsv($row, ";");
+		// str_getcsv() may hand back a null entry for a blank line, and rejects null since PHP 8.1.
+		$cols = str_getcsv((string) $row, ";");
 
 		if (in_array($cols[0], $dedup)) {
 			dol_syslog("stancerCSVtoHTML : dedup row " . $cols[0]);

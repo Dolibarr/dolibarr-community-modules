@@ -87,7 +87,7 @@ class InterfaceStancerTriggers extends DolibarrTriggers
 	 * is inside directory core/triggers
 	 *
 	 * @param string 		$action 	Event action code
-	 * @param Facture 	$object 	Object
+	 * @param CommonObject 	$object 	Object
 	 * @param User 			$user 		Object user
 	 * @param Translate 	$langs 		Object langs
 	 * @param Conf 			$conf 		Object conf
@@ -120,8 +120,16 @@ class InterfaceStancerTriggers extends DolibarrTriggers
 			'COMPANY_MODIFY' => 'companyModify',
 		);
 		$objId = is_object($object) ? ($object->id ?? '?') : '?';
+		// Label used by the type guards below: the parent signature is untyped, so a
+		// non-object must never make get_class() fatal on an error path.
+		$objClass = is_object($object) ? get_class($object) : gettype($object);
 		if (isset($actionHandlers[$action]) && method_exists($this, $actionHandlers[$action])) {
 			dol_syslog("Trigger '".$this->name."' for action '$action' launched by ".__FILE__.". id=".$objId);
+			// Every handler of the allowlist above is a COMPANY_* handler and expects a Societe.
+			if (!$object instanceof Societe) {
+				dol_syslog("stancerTrigger $action called with ".$objClass." instead of Societe, skip", LOG_ERR);
+				return 0;
+			}
 			return call_user_func(array($this, $actionHandlers[$action]), $action, $object, $user, $langs, $conf);
 		}
 
@@ -238,6 +246,10 @@ class InterfaceStancerTriggers extends DolibarrTriggers
 			//case 'BILL_CREATE':
 			//case 'BILL_MODIFY':
 			case 'BILL_VALIDATE':
+				if (!$object instanceof Facture) {
+					dol_syslog("stancerTrigger $action called with " . $objClass . " instead of Facture, skip", LOG_ERR);
+					return 0;
+				}
 				dol_syslog("stancerTrigger catch BILL_VALIDATE trigger, mode_reglement_code=" . $object->mode_reglement_code, LOG_DEBUG);
 
 				// Global option: send all invoices by email at validation, regardless of payment mode
@@ -250,11 +262,8 @@ class InterfaceStancerTriggers extends DolibarrTriggers
 							$dueDate = dol_now() + ($delayHours * 3600);
 							$pendingActionCode = 'BILL_VALIDATE_PENDING';
 							$actioncommCheck = new ActionComm($this->db);
-							if (floatval(DOL_VERSION) < 15) {
-								$existingPending = $actioncommCheck->getActions($this->db, $object->socid, $object->id, "invoice", " AND code='AC_" . $pendingActionCode . "' AND percentage < 100");
-							} else {
-								$existingPending = $actioncommCheck->getActions($object->socid, $object->id, "invoice", " AND code='AC_" . $pendingActionCode . "' AND percentage < 100");
-							}
+							// The module requires Dolibarr 15 minimum, where getActions() no longer takes $db as first argument.
+							$existingPending = $actioncommCheck->getActions($object->socid, $object->id, "invoice", " AND code='AC_" . $pendingActionCode . "' AND percentage < 100");
 							if (!empty($existingPending)) {
 								dol_syslog("stancerTrigger BILL_VALIDATE: delay=" . $delayHours . "h but a pending mail already exists for invoice " . $object->ref . ", skip schedule", LOG_DEBUG);
 							} else {
@@ -269,6 +278,8 @@ class InterfaceStancerTriggers extends DolibarrTriggers
 								$pendingEvt->authorid    = $user->id;
 								$pendingEvt->userownerid = $user->id;
 								$pendingEvt->note_private = $langs->trans('StancerBillValidatePendingNote', $delayHours, $mailtype);
+								$pendingEvt->elementid   = (int) $object->id;
+								// @phan-suppress-next-line PhanDeprecatedProperty  Dolibarr 15..18 only read fk_element in ActionComm::create()
 								$pendingEvt->fk_element  = $object->id;
 								$pendingEvt->elementtype = 'invoice';
 								$pendingEvt->fulldayevent = 0;
@@ -291,13 +302,14 @@ class InterfaceStancerTriggers extends DolibarrTriggers
 			case 'BILL_UNVALIDATE':
 			case 'BILL_DELETE':
 			case 'BILL_CANCEL':
+				if (!$object instanceof Facture) {
+					dol_syslog("stancerTrigger $action called with " . $objClass . " instead of Facture, skip", LOG_ERR);
+					return 0;
+				}
 				// Cancel any pending auto-send mail scheduled at validation
 				$actioncommCancel = new ActionComm($this->db);
-				if (floatval(DOL_VERSION) < 15) {
-					$pendingActions = $actioncommCancel->getActions($this->db, $object->socid, $object->id, "invoice", " AND code='AC_BILL_VALIDATE_PENDING' AND percentage < 100");
-				} else {
-					$pendingActions = $actioncommCancel->getActions($object->socid, $object->id, "invoice", " AND code='AC_BILL_VALIDATE_PENDING' AND percentage < 100");
-				}
+				// The module requires Dolibarr 15 minimum, where getActions() no longer takes $db as first argument.
+				$pendingActions = $actioncommCancel->getActions($object->socid, $object->id, "invoice", " AND code='AC_BILL_VALIDATE_PENDING' AND percentage < 100");
 				if (is_array($pendingActions) && !empty($pendingActions)) {
 					foreach ($pendingActions as $pa) {
 						$pa->percentage = 100;
@@ -313,6 +325,10 @@ class InterfaceStancerTriggers extends DolibarrTriggers
 				break;
 			//case 'BILL_SENTBYMAIL':
 			case 'BILL_PAYED':
+				if (!$object instanceof Facture) {
+					dol_syslog("stancerTrigger $action called with " . $objClass . " instead of Facture, skip", LOG_ERR);
+					return 0;
+				}
 				dol_syslog("stancerTrigger catch BILL_PAYED trigger, mode_reglement_code=" . $object->mode_reglement_code . " and bank account= " . $object->fk_account . " (stancer account code is " . getDolGlobalString('STANCER_BANK_ACCOUNT_FOR_PAYMENTS') . ")", LOG_DEBUG);
 
 				//information à envoyer par mail

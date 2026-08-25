@@ -427,7 +427,9 @@ class Stancer_disputes extends CommonObject
 		global $langs;
 
 		if (in_array($key, array('amount'))) {
-			return price($object / 100);
+			// Amounts are stored in cents. $object is typed string by the parent
+			// signature, cast it before the division to stay on a numeric operation.
+			return price((float) $object / 100);
 		}
 		if ($key == 'dispute_id') {
 			$label = dol_escape_htmltag($object);

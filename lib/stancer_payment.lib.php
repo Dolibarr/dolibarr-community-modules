@@ -31,6 +31,9 @@
 function stancerCommonFilterBeforePay($object)
 {
 	global $db, $langs;
+	// Signature must stay generic (the hook layer only knows CommonObject), but the
+	// concrete classes that reach this code all declare the fields used below.
+	'@phan-var Facture|Commande|Propal|Adherent|Don $object';
 	dol_syslog("stancerCommonFilterBeforePay", LOG_DEBUG);
 
 	$listofHandledElements = ['facture', 'commande', 'invoice', 'order', 'don', 'member', 'propal'];
@@ -43,7 +46,9 @@ function stancerCommonFilterBeforePay($object)
 		return -1;
 	}
 	if ($object->element == 'facture') {
+		// @phan-suppress-next-line PhanDeprecatedProperty  $paye is the column Dolibarr 15..21 fills and still writes; status==2 also covers abandoned invoices
 		if ($object->paye != '0') {
+			// @phan-suppress-next-line PhanDeprecatedProperty  same reason as above, kept for the log line
 			dol_syslog("stancerCommonFilterBeforePay invoice status paye is not 0, paye=" . $object->paye, LOG_DEBUG);
 			$message = $langs->trans("Payment object is already paid");
 			setEventMessages($langs->trans("ErrorStancer") . " (9) " . $message, [], 'errors');
@@ -96,6 +101,9 @@ function stancerCommonFilterBeforePay($object)
 function stancerCardstartPayWithRedirect($object, $parameters, $forceAmount = null, $forceJsRedirect = false, $sendMailToCustomer = null)
 {
 	global $db, $conf, $user, $langs, $mysoc;
+	// Signature must stay generic (the hook layer only knows CommonObject), but the
+	// concrete classes that reach this code all declare the fields used below.
+	'@phan-var Facture|Commande|Propal|Adherent|Don $object';
 	dol_syslog("stancerCardstartPayWithRedirect");
 	$error = 0;
 	$stancerApi = new StancerApi();
@@ -137,7 +145,7 @@ function stancerCardstartPayWithRedirect($object, $parameters, $forceAmount = nu
 				&& getDolGlobalString('STANCER_CB_ORDER_PARTIAL_PAY') != ''
 				&& isset($object->deposit_percent) && $object->deposit_percent > 0 && $object->deposit_percent < 100
 			) {
-				$amountToPay = StancerApi::toCents(price2num($object->total_ttc ?? $object->amount, 'MT') * ($object->deposit_percent / 100));
+				$amountToPay = StancerApi::toCents((float) price2num($object->total_ttc ?? $object->amount, 'MT') * ((float) $object->deposit_percent / 100));
 				dol_syslog("stancerCardstartPayWithRedirect : partial Amount $amountToPay");
 			}
 		}
@@ -338,7 +346,7 @@ function stancerCardstartPayWithRedirect($object, $parameters, $forceAmount = nu
 		$message = "Please try with an other payment provider like Stripe";
 		setEventMessages($langs->trans("ErrorStancer") . " " . $message, [], 'errors');
 
-		$urlPayment = getOnlinePaymentUrl(0, $object->element, $object->ref);
+		$urlPayment = getOnlinePaymentUrl(0, $object->element, (string) $object->ref);
 		header("Location: " . $urlPayment);
 		exit;
 	}
@@ -361,6 +369,9 @@ function stancerSEPAstartPay($object, $userMessage = true, $companypaymentmodeid
 {
 	global $db, $conf, $user, $langs;
 	$returnCode = -1;
+	// Signature must stay generic (the hook layer only knows CommonObject), but the
+	// concrete classes that reach this code all declare the fields used below.
+	'@phan-var Facture|Commande|Propal|Adherent|Don $object';
 	dol_syslog("stancerSEPAstartPay");
 	$stancerApi = new StancerApi();
 
@@ -401,7 +412,8 @@ function stancerSEPAstartPay($object, $userMessage = true, $companypaymentmodeid
 			dol_syslog("stancerSEPAstartPay amount to pay is over STANCER_SWITCH_SEPA_AMOUNT_MAX", LOG_DEBUG);
 			if (getDolGlobalString('STANCER_SWITCH_SEPA_TO_OTHER_BANK', '') != '') {
 				dol_syslog("stancerSEPAstartPay auto reconfigure payment account to #" . getDolGlobalString('STANCER_SWITCH_SEPA_TO_OTHER_BANK'), LOG_DEBUG);
-				$object->fk_account = getDolGlobalString('STANCER_SWITCH_SEPA_TO_OTHER_BANK');
+				// Facture::$fk_account is an int: read the constant as an int, not as a string.
+				$object->fk_account = getDolGlobalInt('STANCER_SWITCH_SEPA_TO_OTHER_BANK');
 				$object->update($user, 1);
 			}
 			return -5;
@@ -581,7 +593,7 @@ function stancerSEPAstartPay($object, $userMessage = true, $companypaymentmodeid
 
 			// Update payment method on invoice
 			dol_syslog("stancer update invoice with bankAccount and paymentType", LOG_DEBUG);
-			$bankaccountId = getDolGlobalString('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
+			$bankaccountId = getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
 			$paymentmethodId = dol_getIdFromCode($db, 'PRE', 'c_paiement', 'code', 'id', 1);
 			$object->setPaymentMethods($paymentmethodId);
 			$object->setBankAccount($bankaccountId);
@@ -781,7 +793,9 @@ function stancerSEPAstartPayGrouped(array $invoices, $companypaymentmodeid, $use
 			dol_syslog("stancerSEPAstartPayGrouped invoice " . $inv->ref . " mode_reglement_code is not PRE, abort group", LOG_ERR);
 			return -4;
 		}
+		// @phan-suppress-next-line PhanDeprecatedProperty  $paye is the column Dolibarr 15..21 fills and still writes; status==2 also covers abandoned invoices
 		if (!empty($inv->paye)) {
+			// @phan-suppress-next-line PhanDeprecatedProperty  same reason as above, kept for the log line
 			dol_syslog("stancerSEPAstartPayGrouped invoice " . $inv->ref . " is already paid (paye=" . var_export($inv->paye, true) . "), abort group", LOG_ERR);
 			return -10;
 		}
@@ -936,7 +950,7 @@ function stancerSEPAstartPayGrouped(array $invoices, $companypaymentmodeid, $use
 	}
 
 	// Per-invoice updates: mark mode + bank account, attach event for traceability.
-	$bankaccountId = getDolGlobalString('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
+	$bankaccountId = getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
 	$paymentmethodId = dol_getIdFromCode($db, 'PRE', 'c_paiement', 'code', 'id', 1);
 	$stc = new Stancer($db);
 	$eventMsg = $langs->trans("Stancer SEPA grouped payment engaged") . ' (' . count($invoices) . ' invoices, total=' . ($totalCents / 100) . ' ' . $currency . ', paymentId=' . $paymentId . ')';
@@ -965,15 +979,19 @@ function stancerSEPAstartPayGrouped(array $invoices, $companypaymentmodeid, $use
  * @param   bool          $userMessage           Show the result to the user with setEventMessages()
  * @param   int           $companypaymentmodeid  Card to debit, default card of the thirdparty when 0
  * @param   int           $force                 Bypass the delay set by STANCER_DELAY_SEPA
- * @return  int      code
+ * @return  int|null code
  *          0 == ok
  *          2 == delais mail d'info SEPA envoyé
  *   le reste == erreur
+ *       null == a Stancer payment already exists for that invoice, nothing was started
  */
 function stancerCBstartPay($object, $userMessage = true, $companypaymentmodeid = 0, $force = 0)
 {
 	global $db, $conf, $user, $langs;
 	$returnCode = -1;
+	// Signature must stay generic (the hook layer only knows CommonObject), but the
+	// concrete classes that reach this code all declare the fields used below.
+	'@phan-var Facture|Commande|Propal|Adherent|Don $object';
 	$langs->loadLangs(array("stancer@stancer"));
 	$stancerApi = new StancerApi();
 
@@ -1183,7 +1201,7 @@ function stancerCBstartPay($object, $userMessage = true, $companypaymentmodeid =
 
 			//erics update payment method on invoice, like #18
 			dol_syslog("stancer update invoice with bankAccount and paymentType", LOG_DEBUG);
-			$bankaccountId = getDolGlobalString('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
+			$bankaccountId = getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
 			$paymentmethodId = dol_getIdFromCode($db, 'CB', 'c_paiement', 'code', 'id', 1);
 			$object->setPaymentMethods($paymentmethodId);
 			$object->setBankAccount($bankaccountId);
@@ -1299,7 +1317,7 @@ function stancerGetCustomerSocidFromTag($tag)
 	// Validate the thirdparty exists and belongs to the current entity, to
 	// avoid writing a bogus id if the tag is malformed or stale.
 	$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "societe";
-	$sql .= " WHERE rowid = " . $socid;
+	$sql .= " WHERE rowid = " . ((int) $socid);
 	$sql .= " AND entity IN (" . getEntity('societe') . ")";
 	$resql = $db->query($sql);
 	if (!$resql) {
@@ -1325,6 +1343,9 @@ function stancerGetCustomerSocidFromTag($tag)
 function stancerMakeTAG($object, $addUnique = false)
 {
 	global $db;
+	// Signature must stay generic (the hook layer only knows CommonObject), but the
+	// concrete classes that reach this code all declare the fields used below.
+	'@phan-var Facture|Commande|Propal|Adherent|Don $object';
 	dol_syslog("stancerMakeTAG call for " . $object->ref . " addunique = $addUnique");
 
 	$tag = '';
@@ -1417,7 +1438,7 @@ function stancerGetPropalPaymentUrl($object)
 	$url = dol_buildpath("/stancer/public/newpayment_propal.php", 2);
 	// $url = DOL_MAIN_URL_ROOT . '/custom/stancer/public/newpayment.php';
 	$url .= '?source=propal';
-	$url .= '&ref=' . urlencode($object->ref);
+	$url .= '&ref=' . urlencode((string) $object->ref);
 	if (!empty($securekey)) {
 		$url .= '&securekey=' . urlencode($securekey);
 	}
@@ -1462,17 +1483,17 @@ function stancerCheckIfPaymentInProgress($object)
 	// the one whose ref happens to fit in the truncated order_id. Without this,
 	// the cron picks up the other invoices of the group as still unpaid and
 	// re-triggers a payment -> double billing (the incident on 13/05 + 14/05).
-	$objIdEsc = (int) $object->id;
-	$objRefEsc = $db->escape($object->ref);
+	$sanitizedObjId = (int) $object->id;
+	$sanitizedObjRef = $db->escape($object->ref);
 	$customSql = "live_mode = '" . getDolGlobalString('STANCER_IS_PROD') . "'";
 	$customSql .= " AND (";
-	$customSql .= "unique_id LIKE '%INV=" . $objIdEsc . "'";
-	$customSql .= " OR unique_id LIKE '%INV=" . $objIdEsc . ".%'";
-	$customSql .= " OR order_id LIKE '%" . $objRefEsc . "%'";
-	$customSql .= " OR grouped_invoice_ids = '" . $objIdEsc . "'";
-	$customSql .= " OR grouped_invoice_ids LIKE '" . $objIdEsc . ",%'";
-	$customSql .= " OR grouped_invoice_ids LIKE '%," . $objIdEsc . "'";
-	$customSql .= " OR grouped_invoice_ids LIKE '%," . $objIdEsc . ",%'";
+	$customSql .= "unique_id LIKE '%INV=" . $sanitizedObjId . "'";
+	$customSql .= " OR unique_id LIKE '%INV=" . $sanitizedObjId . ".%'";
+	$customSql .= " OR order_id LIKE '%" . $sanitizedObjRef . "%'";
+	$customSql .= " OR grouped_invoice_ids = '" . $sanitizedObjId . "'";
+	$customSql .= " OR grouped_invoice_ids LIKE '" . $sanitizedObjId . ",%'";
+	$customSql .= " OR grouped_invoice_ids LIKE '%," . $sanitizedObjId . "'";
+	$customSql .= " OR grouped_invoice_ids LIKE '%," . $sanitizedObjId . ",%'";
 	$customSql .= ")";
 	$resSP = $sp->fetchAll('ASC', '', 0, 0, array('customsql' => $customSql));
 	if (is_array($resSP) && count($resSP) > 0) {
@@ -1527,6 +1548,9 @@ function stancerIsObjectStillEligibleForStancer($obj)
 	if (!in_array($obj->element, array('facture', 'commande'), true)) {
 		return true;
 	}
+	// Past this point the element is a facture or a commande, both of which declare
+	// the fields read below; the signature stays generic for the callers.
+	'@phan-var Facture|Commande $obj';
 
 	$ref = isset($obj->ref) ? $obj->ref : '?';
 	$modeCode = isset($obj->mode_reglement_code) ? $obj->mode_reglement_code : '';
@@ -1601,7 +1625,7 @@ function stancerGetOutstandingBills($customerID, $late = 0, $paymentMode = "CB")
 
 	$total = 0;
 	$object = new Facture($db);
-	$result = $object->liste_array(1, 0, '', $customerID, 0, 0);
+	$result = $object->liste_array(1, 0, null, $customerID, 0, 0);
 	if (is_array($result) && (count($result) > 0)) {
 		// print json_encode($result);
 		foreach ($result as $id => $ref) {
@@ -1610,6 +1634,7 @@ function stancerGetOutstandingBills($customerID, $late = 0, $paymentMode = "CB")
 			if ($res) {
 				// print json_encode($obj);
 				if (
+					// @phan-suppress-next-line PhanDeprecatedProperty  $paye is the column Dolibarr 15..21 fills and still writes; status==2 also covers abandoned invoices
 					$obj->paye == 0
 					&& $obj->status != $object::STATUS_DRAFT    	// Not a draft
 					&& $obj->status != $object::STATUS_ABANDONED	// Not abandonned
@@ -1639,7 +1664,7 @@ function stancerRegeneratePDFifNeeded(CommonObject $object)
 	$file = '';
 	if (is_object($object)) {
 		$objectdiroutput = $conf->facture->dir_output;
-		$fileparams = dol_most_recent_file($objectdiroutput . '/' . $object->ref, preg_quote($object->ref, '/') . '.*.pdf');
+		$fileparams = dol_most_recent_file($objectdiroutput . '/' . $object->ref, preg_quote((string) $object->ref, '/') . '.*.pdf');
 		if (empty($fileparams['fullname'])) {
 			$result = $object->generateDocument($object->model_pdf, $langs);
 		}

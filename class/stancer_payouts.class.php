@@ -318,10 +318,10 @@ class Stancer_payouts extends CommonObject
 	/**
 	 * Load object in memory from the database
 	 *
-	 * @param int    $id         Id object
-	 * @param string $ref        Ref
-	 * @param string $payout_id  Stancer payout id, used when neither id nor ref is known
-	 * @return int               <0 if KO, 0 if not found, >0 if OK
+	 * @param int         $id         Id object
+	 * @param string|null $ref        Ref
+	 * @param string|null $payout_id  Stancer payout id, used when neither id nor ref is known
+	 * @return int                    <0 if KO, 0 if not found, >0 if OK
 	 */
 	public function fetch($id, $ref = null, $payout_id = null)//, $uuid=null)
 	{
@@ -362,7 +362,8 @@ class Stancer_payouts extends CommonObject
 	 * @param  int         $offset       Offset
 	 * @param  array       $filter       Filter array. Example array('field'=>'valueforlike', 'customurl'=>...)
 	 * @param  string      $filtermode   Filter mode (AND or OR)
-	 * @return array|int                 int <0 if KO, array of pages if OK
+	 * @return array<int,Stancer_payouts>|int          int <0 if KO, array of records (possibly empty) if OK
+	 * @phan-suppress PhanPluginMoreSpecificActualReturnType  The array is legitimately empty when no row matches the filter, so the non-empty-array type inferred by Phan must not be documented here
 	 */
 	public function fetchAll($sortorder = '', $sortfield = '', $limit = 0, $offset = 0, $filter = array(), $filtermode = 'AND')
 	{
@@ -401,7 +402,8 @@ class Stancer_payouts extends CommonObject
 			}
 		}
 		if (count($sqlwhere) > 0) {
-			$sql .= " AND (".implode(" ".$filtermode." ", $sqlwhere).")";
+			// Whitelist the glue: $filtermode comes from the caller and must never reach the SQL as is.
+			$sql .= " AND (".implode((strtoupper($filtermode) == 'OR' ? " OR " : " AND "), $sqlwhere).")";
 		}
 
 		if (!empty($sortfield)) {
@@ -928,7 +930,7 @@ class Stancer_payouts extends CommonObject
 	/**
 	 * 	Create an array of lines
 	 *
-	 * 	@return array|int		array of lines if OK, <0 if KO
+	 * 	@return CommonObjectLine[]|int		array of lines if OK, <0 if KO
 	 */
 	public function getLinesArray()
 	{
@@ -950,7 +952,7 @@ class Stancer_payouts extends CommonObject
 	/**
 	 *  Returns the reference to the following non used object depending on the active numbering module.
 	 *
-	 *  @return string      		Object free reference
+	 *  @return int      		Object free reference (row count + 1), or -1 in case of error
 	 */
 	public function getNextNumRef()
 	{
@@ -961,7 +963,7 @@ class Stancer_payouts extends CommonObject
 		if ($resql) {
 			$obj = $this->db->fetch_object($resql);
 			dol_syslog(__METHOD__.' count = '. $obj->count, LOG_DEBUG);
-			return $obj->count + 1;
+			return (int) ($obj->count + 1);
 		} else {
 			$this->errors[] = 'Error '.$this->db->lasterror();
 			dol_syslog(__METHOD__.' '.implode(',', $this->errors), LOG_ERR);
@@ -1215,13 +1217,13 @@ class Stancer_payouts extends CommonObject
 		//stancer store amount in cents
 		if (in_array($key, ['amount','fees'])) {
 			// print "clé = $key, val=" . json_encode($object);
-			return price($object/100);
+			return price((float) $object / 100);
 		}
 		if ($key == 'amount_net') {
 			if (empty($object)) {
 				$object = $this->amount - $this->fees;
 			}
-			return price($object/100);
+			return price((float) $object / 100);
 		}
 		if ($key == 'payout_id') {
 				$linkExternal = "<a href='https://manage.stancer.com/fr/details-du-reversement?id=" . $object . "' target='_stancer'>" . img_picto($langs->trans('ShowInStancer'), 'globe') . " " . $object . "</a>";

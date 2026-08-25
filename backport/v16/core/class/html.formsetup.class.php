@@ -35,6 +35,12 @@ if (!function_exists('isModEnabled')) {
 
 /**
  * This class help you create setup render
+ *
+ * Backported from Dolibarr 16 for older versions, where the core class does not
+ * exist yet. Only one of the two declarations is ever loaded at runtime, so the
+ * duplicate warning below is muted on purpose.
+ *
+ * @phan-suppress PhanRedefinedClassReference
  */
 class FormSetup
 {
@@ -597,6 +603,12 @@ class FormSetup
 
 /**
  * This class help to create item for class formSetup
+ *
+ * Backported from Dolibarr 16 for older versions, where the core class does not
+ * exist yet. Only one of the two declarations is ever loaded at runtime, so the
+ * duplicate warning below is muted on purpose.
+ *
+ * @phan-suppress PhanRedefinedClassReference
  */
 class FormSetupItem
 {

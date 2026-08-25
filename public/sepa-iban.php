@@ -124,19 +124,46 @@ $signLinkAutoRedirect = false;
 
 //note : public page, user is not set, so we use user who create that company
 $user = new User($db);
-$res = $user->fetch(getDolGlobalString('STANCER_USER_ACCOUNT_FOR_ACTIONS'));
+$res = $user->fetch(getDolGlobalInt('STANCER_USER_ACCOUNT_FOR_ACTIONS'));
 if ($res < 0) {
-	//fallback on last user modif ...
-	$uid = $societe->user_modification ?? $societe->user_creation;
-	$user->fetch($uid);
+	// Fallback on the user who last modified the thirdparty, then on its creator.
+	// Societe::fetch() fills user_modification/user_creation up to Dolibarr 18, and
+	// user_modification_id/user_creation_id from Dolibarr 19, so the four spellings
+	// are probed, modification before creation. The *_id properties are not declared
+	// at all on Dolibarr 15, so they are only ever reached through empty(): a direct
+	// read would raise a PHP 8 "Undefined property" warning on that version.
+	$uid = 0;
+	if (!empty($societe->user_modification_id)) {
+		$uid = $societe->user_modification_id;
+	}
+	if (empty($uid)) {
+		// @phan-suppress-next-line PhanDeprecatedProperty  only source up to Dolibarr 18
+		$uid = $societe->user_modification;
+	}
+	if (empty($uid) && !empty($societe->user_creation_id)) {
+		$uid = $societe->user_creation_id;
+	}
+	if (empty($uid)) {
+		// @phan-suppress-next-line PhanDeprecatedProperty  only source up to Dolibarr 18
+		$uid = $societe->user_creation;
+	}
+	if (empty($uid)) {
+		dol_syslog("stancer sepa-iban public: no fallback user found on thirdparty ".$societe->id, LOG_ERR);
+	} elseif ($user->fetch((int) $uid) <= 0) {
+		dol_syslog("stancer sepa-iban public: cannot load fallback user ".((int) $uid)." for thirdparty ".$societe->id.": ".$user->error, LOG_ERR);
+	}
 }
+// loadRights() only exists from Dolibarr 20; getrights() is the only call valid on 15..21.
+// @phan-suppress-next-line PhanDeprecatedFunction
 $user->getrights();
 
 $stancerCustomerNameOnIBAN = $societe->name;
 // $sp = new Stancer_payments($db);
 $action = (string) GETPOST('action', 'aZ09');
 $iban = $bic = $stancerIBANBankName = $stancerCustomerNameOnIBAN = "";
-$companypaymentmode = $error = null;
+$companypaymentmode = null;
+// Error counter, incremented below: it must be an int, not null.
+$error = 0;
 
 if ($action == "stancerGetCustomerIBAN") {
 	$iban = (string) GETPOST('stancerIBAN', 'alpha');
@@ -167,7 +194,12 @@ if ($action == "stancerGetCustomerIBAN") {
 			// Error message already set by stancerCheckIBAN()
 			dol_syslog("stancer sepa-iban public: mandate creation aborted due to SEPA check failure", LOG_WARNING);
 		} else {
+			// The Dolibarr stub declares iban_get_parts() with an empty body and no
+			// @return, and that declaration wins over the backported php-iban one,
+			// hence the void inference on both the assignment and the reads below.
+			// @phan-suppress-next-line PhanTypeVoidAssignment
 			$myIbanParts = iban_get_parts($iban);
+			'@phan-var-force array<string,string> $myIbanParts';
 			// print json_encode($myIbanParts);
 
 			//create stancer account if needed
@@ -268,6 +300,11 @@ if ($action == "stancerGetCustomerIBAN") {
 						'use_companybankid'=>$companypaymentmode->id,
 						'force_dir_output'=>$conf->societe->multidir_output[$conf->entity].'/'.dol_sanitizeFileName($args['socid'])
 						);
+						// The SEPA mandate template reads the fields shared by
+						// CompanyBankAccount and CompanyPaymentMode (rum, frstrecur, iban...),
+						// and its @param cannot be widened without breaking the parent
+						// signature of ModeleBankAccountDoc::write_file().
+						// @phan-suppress-next-line PhanTypeMismatchArgumentProbablyReal
 						if ($pdf->write_file($companypaymentmode, $langs, '', 0, 0, 0, $pdfMoreparams) > 0) {
 							dol_syslog("stancer sepa mandate pdf is ready !");
 							$result = $companypaymentmode->call_trigger('SEPA_MANDATE_PDF_CREATED', $user);
@@ -295,6 +332,8 @@ if ($action == "stancerGetCustomerIBAN") {
 											$signer = reset($list_of_potential_signers);
 										}
 
+										// uptosign expects a list, only one signer is supported here.
+										$list_of_signers = array();
 										$list_of_signers[] = array('id' => $signer->id,
 													'firstname' => $signer->firstname,
 													'lastname' => $signer->lastname,
@@ -522,9 +561,11 @@ $('#stancerIBAN').on('keyup', function() {
 	<?php
 	print '</form>'."\n";
 }
-// If data not provided from back url, search them into the session env
-if (!isset($ipaddress) || empty($ipaddress)) {
-	$ipaddress       = $_SESSION['ipaddress'];
+// If data not provided from back url, search them into the session env.
+// $ipaddress is never set earlier in this script: read it straight from the session.
+$ipaddress = isset($_SESSION['ipaddress']) ? $_SESSION['ipaddress'] : '';
+if ($ipaddress === '') {
+	dol_syslog("stancer sepa-iban public: no ipaddress found in session", LOG_DEBUG);
 }
 
 print "\n</div>\n";

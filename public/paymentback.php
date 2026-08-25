@@ -107,7 +107,9 @@ dol_syslog("stancer paymentback decoded args=" . json_encode($args), LOG_DEBUG);
 
 $socid = $pid = null;
 $FULLTAG = $source = $ref = $securekey = $uuid = $service = "";
-$bankaccountid = $paymentmethodId = $customerID = $societe = $suffix = null;
+$bankaccountid = $paymentmethodId = $customerID = $societe = null;
+// $suffix is only ever concatenated into a constant name, so it must be a string.
+$suffix = '';
 
 $sp = new Stancer_payments($db);
 if (is_array($args) && !empty($args)) {
@@ -221,13 +223,15 @@ if (!empty($logosmall) && is_readable($conf->mycompany->dir_output . '/logos/thu
 }
 
 $user = new User($db);
-$stancerUserAccountId = getDolGlobalString('STANCER_USER_ACCOUNT_FOR_ACTIONS');
+$stancerUserAccountId = getDolGlobalInt('STANCER_USER_ACCOUNT_FOR_ACTIONS');
 dol_syslog("stancer paymentback fetch user for actions, STANCER_USER_ACCOUNT_FOR_ACTIONS=" . $stancerUserAccountId, LOG_DEBUG);
 $res = $user->fetch($stancerUserAccountId);
 if ($res <= 0) {
 	dol_syslog("stancer paymentback user fetch failed (res=$res), fallback to user id 1", LOG_WARNING);
 	$user->fetch(1);
 }
+// loadRights() only exists from Dolibarr 20; getrights() is the only call valid on 15..21.
+// @phan-suppress-next-line PhanDeprecatedFunction
 $user->getrights();
 dol_syslog("stancer paymentback user loaded: id=" . $user->id . ", login=" . $user->login, LOG_DEBUG);
 
@@ -381,9 +385,11 @@ $parameters = [
 	'paymentmethod' => $paymentmethod,
 ];
 
-// If data not provided from back url, search them into the session env
-if (!isset($ipaddress) || empty($ipaddress)) {
-	$ipaddress       = $_SESSION['ipaddress'];
+// If data not provided from back url, search them into the session env.
+// $ipaddress is never set earlier in this script: read it straight from the session.
+$ipaddress = isset($_SESSION['ipaddress']) ? $_SESSION['ipaddress'] : '';
+if ($ipaddress === '') {
+	dol_syslog("stancer paymentback no ipaddress in session, payment notes will not carry the customer IP", LOG_WARNING);
 }
 if (empty($TRANSACTIONID)) {
 	$TRANSACTIONID   = $_SESSION['TRANSACTIONID'];
@@ -765,9 +771,13 @@ if ($ispaymentok) {
 		dol_syslog("stancerPaymentBack is invoice", LOG_DEBUG, 0, '_payment');
 		// Record payment
 		$object = new Facture($db);
-		$result = $object->fetch($tmptag['INV']);
+		// fetch() returns 1 when found, 0 when not found and <0 on error. It returns
+		// -1 right away for an id that casts to 0, which a tampered or malformed tag
+		// can produce ('INV=FA2304-1134' passes the >0 test above under PHP 8), so
+		// only a strictly positive result means $object really holds an invoice.
+		$result = $object->fetch((int) $tmptag['INV']);
 		// print "<p>facture 1</p>";
-		if ($result) {
+		if ($result > 0) {
 			// M2: the recorded amount must come from the Stancer API (source of
 			// truth), not the session (seeded from a GETPOST in newpayment). The
 			// API amount is an integer number of cents, so /100 is exact. Log any
@@ -821,10 +831,17 @@ if ($ispaymentok) {
 			if (!$error) {
 				//erics update payment method on invoice, like #14
 				dol_syslog("stancer update invoice with bankAccount and paymentType", LOG_DEBUG, 0, '_payment');
-				$bankaccountid = getDolGlobalString('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
+				// setBankAccount() writes fk_account unconditionally, so an unset constant
+				// would wipe the bank account already carried by the invoice. Same guard as
+				// the order branch below.
+				$bankaccountid = getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
 				$paymentmethodId = dol_getIdFromCode($db, 'CB', 'c_paiement', 'code', 'id', 1);
 				$object->setPaymentMethods($paymentmethodId);
-				$object->setBankAccount($bankaccountid);
+				if ($bankaccountid > 0) {
+					$object->setBankAccount($bankaccountid);
+				} else {
+					dol_syslog("stancer STANCER_BANK_ACCOUNT_FOR_PAYMENTS is not set, bank account of invoice " . $object->ref . " left unchanged", LOG_WARNING, 0, '_payment');
+				}
 				$object->update($user, 1);
 
 				if (getDolGlobalString('STANCER_CB_AS_PAID', '') != '') {
@@ -837,6 +854,7 @@ if ($ispaymentok) {
 				}
 			}
 		} else {
+			dol_syslog("stancer paymentback invoice " . $tmptag['INV'] . " was not found (fetch returned $result), payment not recorded", LOG_ERR, 0, '_payment');
 			$postactionmessages[] = 'Invoice paid ' . $tmptag['INV'] . ' was not found';
 			$ispostactionok = -1;
 		}
@@ -844,8 +862,10 @@ if ($ispaymentok) {
 		dol_syslog("stancerPaymentBack is order", LOG_DEBUG, 0, '_payment');
 		//commande
 		$object = new Commande($db);
+		// Same contract as Facture::fetch(): 1 found, 0 not found, <0 on error, and
+		// -1 right away for an id that casts to 0. Test the sign, not the truthiness.
 		$result = $object->fetch((int) $tmptag['ORD']);
-		if ($result) {
+		if ($result > 0) {
 			$FinalPaymentAmt = $_SESSION["FinalPaymentAmt"];
 			//if partialPayment=1 -> make a deposit
 			$partialPayment = $_SESSION["partialPayment"];
@@ -882,9 +902,17 @@ if ($ispaymentok) {
 			if ($paymentTypeId) {
 				//update order payment type, like #14
 				dol_syslog("stancer update order paymentType", LOG_DEBUG, 0, '_payment');
+				// This branch never fed $bankaccountid, so setBankAccount() received null
+				// and wiped the bank account of the order. Read the constant here, exactly
+				// like the invoice branch does, and never overwrite with an empty account.
+				$bankaccountid = getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
 				$paymentmethodId = dol_getIdFromCode($db, 'CB', 'c_paiement', 'code', 'id', 1);
 				$object->setPaymentMethods($paymentmethodId);
-				$object->setBankAccount($bankaccountid);
+				if ($bankaccountid > 0) {
+					$object->setBankAccount($bankaccountid);
+				} else {
+					dol_syslog("stancer STANCER_BANK_ACCOUNT_FOR_PAYMENTS is not set, bank account of order " . $object->ref . " left unchanged", LOG_WARNING, 0, '_payment');
+				}
 				$object->update($user);
 			}
 
@@ -900,7 +928,7 @@ if ($ispaymentok) {
 					$amount = ($object->total_ttc * $object->deposit_percent / 100);
 					dol_syslog("stancerPaymentBack create deposit invoice", LOG_DEBUG, 0, '_payment');
 					// @phpstan-ignore-next-line
-					$invoice = Facture::createDepositFromOrigin($object, $now, $object->cond_reglement_id, $user, 0, true);
+					$invoice = Facture::createDepositFromOrigin($object, $now, (int) $object->cond_reglement_id, $user, 0, true);
 
 					if ($invoice) {
 						dol_syslog("stancerPaymentBack deposit invoice done", LOG_DEBUG, 0, '_payment');
@@ -932,10 +960,17 @@ if ($ispaymentok) {
 					} else {
 						$object->classifyBilled($user);
 					}
-					$bankaccountid = getDolGlobalString('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
+					// setBankAccount() writes fk_account unconditionally, so an unset constant
+					// would wipe the bank account already carried by the invoice. Same guard as
+					// the other branches of this page.
+					$bankaccountid = getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
 					$paymentmethodId = dol_getIdFromCode($db, 'CB', 'c_paiement', 'code', 'id', 1);
 					$invoice->setPaymentMethods($paymentmethodId);
-					$invoice->setBankAccount($bankaccountid);
+					if ($bankaccountid > 0) {
+						$invoice->setBankAccount($bankaccountid);
+					} else {
+						dol_syslog("stancer STANCER_BANK_ACCOUNT_FOR_PAYMENTS is not set, bank account of invoice " . $invoice->ref . " left unchanged", LOG_WARNING, 0, '_payment');
+					}
 					//$invoice->update($user); //validate do the job?
 
 					if ($invoice->status != Facture::STATUS_VALIDATED && $invoice->status != Facture::STATUS_CLOSED) {
@@ -983,13 +1018,13 @@ if ($ispaymentok) {
 					if (!$error && isModEnabled("bank")) {
 						$bankaccountid = 0;
 						if ($paymentmethod == 'paybox') {
-							$bankaccountid = getDolGlobalString('PAYBOX_BANK_ACCOUNT_FOR_PAYMENTS');
+							$bankaccountid = getDolGlobalInt('PAYBOX_BANK_ACCOUNT_FOR_PAYMENTS');
 						} elseif ($paymentmethod == 'paypal') {
-							$bankaccountid = getDolGlobalString('PAYPAL_BANK_ACCOUNT_FOR_PAYMENTS');
+							$bankaccountid = getDolGlobalInt('PAYPAL_BANK_ACCOUNT_FOR_PAYMENTS');
 						} elseif ($paymentmethod == 'stripe') {
-							$bankaccountid = getDolGlobalString('STRIPE_BANK_ACCOUNT_FOR_PAYMENTS');
+							$bankaccountid = getDolGlobalInt('STRIPE_BANK_ACCOUNT_FOR_PAYMENTS');
 						} elseif ($paymentmethod == 'stancer') {
-							$bankaccountid = getDolGlobalString('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
+							$bankaccountid = getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
 						}
 
 						if ($bankaccountid > 0) {
@@ -1036,6 +1071,7 @@ if ($ispaymentok) {
 				$ispostactionok = -1;
 			}
 		} else {
+			dol_syslog("stancer paymentback order " . $tmptag['ORD'] . " was not found (fetch returned $result), payment not recorded", LOG_ERR, 0, '_payment');
 			$postactionmessages[] = 'Order paid ' . $tmptag['ORD'] . ' was not found';
 			$ispostactionok = -1;
 		}
@@ -1056,7 +1092,7 @@ if ($ispaymentok) {
 			$paymentTypeId = dol_getIdFromCode($db, $paymentType, 'c_paiement', 'code', 'id', 1);
 
 			// Mark propal as signed/billed
-			if ($propal->statut == Propal::STATUS_VALIDATED) {
+			if ($propal->status == Propal::STATUS_VALIDATED) {
 				$propal->closeProposal($user, Propal::STATUS_SIGNED, 'Paiement Stancer');
 			}
 
@@ -1076,7 +1112,7 @@ if ($ispaymentok) {
 					$FinalPaymentAmt = ($propal->total_ttc * $propal->deposit_percent / 100);
 					dol_syslog("stancerPaymentBack propal: create deposit invoice, amount=" . $FinalPaymentAmt, LOG_DEBUG, 0, '_payment');
 					// @phpstan-ignore-next-line
-					$result = Facture::createDepositFromOrigin($propal, $now, $propal->cond_reglement_id, $user, 0, true);
+					$result = Facture::createDepositFromOrigin($propal, $now, (int) $propal->cond_reglement_id, $user, 0, true);
 				} else {
 					// Create full invoice from propal
 					$result = stancerCreateInvoiceFromPropal($db, $user, $propalid);
@@ -1099,11 +1135,17 @@ if ($ispaymentok) {
 					if ($invoiceValidate > 0) {
 						dol_syslog("stancerPaymentBack invoice validated ok", LOG_DEBUG, 0, '_payment');
 
-						// Set payment method and bank account
-						$bankaccountid = getDolGlobalString('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
+						// Set payment method and bank account. setBankAccount() writes fk_account
+						// unconditionally, so an unset constant would wipe the bank account
+						// already carried by the invoice. Same guard as the other branches.
+						$bankaccountid = getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
 						$paymentmethodId = dol_getIdFromCode($db, 'CB', 'c_paiement', 'code', 'id', 1);
 						$invoice->setPaymentMethods($paymentmethodId);
-						$invoice->setBankAccount($bankaccountid);
+						if ($bankaccountid > 0) {
+							$invoice->setBankAccount($bankaccountid);
+						} else {
+							dol_syslog("stancer STANCER_BANK_ACCOUNT_FOR_PAYMENTS is not set, bank account of invoice " . $invoice->ref . " left unchanged", LOG_WARNING, 0, '_payment');
+						}
 
 						// Create payment
 						$paiement = new Paiement($db);
@@ -1130,7 +1172,7 @@ if ($ispaymentok) {
 
 							// Add payment to bank
 							if (!$error && isModEnabled('bank')) {
-								$bankaccountid = getDolGlobalString('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
+								$bankaccountid = getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
 								if ($bankaccountid > 0) {
 									$label = '(CustomerInvoicePayment)';
 									$result = $paiement->addPaymentToBank($user, 'payment', $label, $bankaccountid, '', '');
@@ -1254,11 +1296,11 @@ if ($ispaymentok) {
 				if (!$error && isModEnabled("bank")) {
 					$bankaccountid = 0;
 					if ($paymentmethod == 'paybox') {
-						$bankaccountid = getDolGlobalString('PAYBOX_BANK_ACCOUNT_FOR_PAYMENTS');
+						$bankaccountid = getDolGlobalInt('PAYBOX_BANK_ACCOUNT_FOR_PAYMENTS');
 					} elseif ($paymentmethod == 'paypal') {
-						$bankaccountid = getDolGlobalString('PAYPAL_BANK_ACCOUNT_FOR_PAYMENTS');
+						$bankaccountid = getDolGlobalInt('PAYPAL_BANK_ACCOUNT_FOR_PAYMENTS');
 					} elseif ($paymentmethod == 'stripe') {
-						$bankaccountid = getDolGlobalString('STRIPE_BANK_ACCOUNT_FOR_PAYMENTS');
+						$bankaccountid = getDolGlobalInt('STRIPE_BANK_ACCOUNT_FOR_PAYMENTS');
 					}
 
 					//Get bank account for a specific paymentmedthod
@@ -1378,11 +1420,11 @@ if ($ispaymentok) {
 					if (!$error && !empty($conf->banque->enabled)) {
 						$bankaccountid = 0;
 						if ($paymentmethod == 'paybox') {
-							$bankaccountid = getDolGlobalString('PAYBOX_BANK_ACCOUNT_FOR_PAYMENTS');
+							$bankaccountid = getDolGlobalInt('PAYBOX_BANK_ACCOUNT_FOR_PAYMENTS');
 						} elseif ($paymentmethod == 'paypal') {
-							$bankaccountid = getDolGlobalString('PAYPAL_BANK_ACCOUNT_FOR_PAYMENTS');
+							$bankaccountid = getDolGlobalInt('PAYPAL_BANK_ACCOUNT_FOR_PAYMENTS');
 						} elseif ($paymentmethod == 'stripe') {
-							$bankaccountid = getDolGlobalString('STRIPE_BANK_ACCOUNT_FOR_PAYMENTS');
+							$bankaccountid = getDolGlobalInt('STRIPE_BANK_ACCOUNT_FOR_PAYMENTS');
 						}
 
 						if ($bankaccountid > 0) {
@@ -1409,7 +1451,7 @@ if ($ispaymentok) {
 					$attendeetovalidate = new ConferenceOrBoothAttendee($db);
 					if (!$error) {
 						// Validating the attendee
-						$resultattendee = $attendeetovalidate->fetch($tmptag['ATT']);
+						$resultattendee = $attendeetovalidate->fetch((int) $tmptag['ATT']);
 						if ($resultattendee < 0) {
 							$error++;
 							setEventMessages("", $attendeetovalidate->errors, "errors");
@@ -1451,7 +1493,7 @@ if ($ispaymentok) {
 							$labeltouse = getDolGlobalString('EVENTORGANIZATION_TEMPLATE_EMAIL_AFT_SUBS_EVENT');
 
 							if (!empty($labeltouse)) {
-								$arraydefaultmessage = $formmail->getEMailTemplate($db, 'conferenceorbooth', $user, $outputlangs, $labeltouse, 1, '');
+								$arraydefaultmessage = $formmail->getEMailTemplate($db, 'conferenceorbooth', $user, $outputlangs, (int) $labeltouse, 1, '');
 							}
 
 							$subject = $msg = "";
@@ -1568,11 +1610,11 @@ if ($ispaymentok) {
 					if (!$error && !empty($conf->banque->enabled)) {
 						$bankaccountid = 0;
 						if ($paymentmethod == 'paybox') {
-							$bankaccountid = getDolGlobalString('PAYBOX_BANK_ACCOUNT_FOR_PAYMENTS');
+							$bankaccountid = getDolGlobalInt('PAYBOX_BANK_ACCOUNT_FOR_PAYMENTS');
 						} elseif ($paymentmethod == 'paypal') {
-							$bankaccountid = getDolGlobalString('PAYPAL_BANK_ACCOUNT_FOR_PAYMENTS');
+							$bankaccountid = getDolGlobalInt('PAYPAL_BANK_ACCOUNT_FOR_PAYMENTS');
 						} elseif ($paymentmethod == 'stripe') {
-							$bankaccountid = getDolGlobalString('STRIPE_BANK_ACCOUNT_FOR_PAYMENTS');
+							$bankaccountid = getDolGlobalInt('STRIPE_BANK_ACCOUNT_FOR_PAYMENTS');
 						}
 
 						if ($bankaccountid > 0) {
@@ -1599,7 +1641,7 @@ if ($ispaymentok) {
 					if (!$error) {
 						// Putting the booth to "suggested" state
 						$booth = new ConferenceOrBooth($db);
-						$resultbooth = $booth->fetch($tmptag['BOO']);
+						$resultbooth = $booth->fetch((int) $tmptag['BOO']);
 						if ($resultbooth < 0) {
 							$error++;
 							setEventMessages("", $booth->errors, "errors");
@@ -1635,7 +1677,7 @@ if ($ispaymentok) {
 
 										$labeltouse = getDolGlobalString('EVENTORGANIZATION_TEMPLATE_EMAIL_AFT_SUBS_EVENT');
 										if (!empty($labeltouse)) {
-											$arraydefaultmessage = $formmail->getEMailTemplate($db, 'conferenceorbooth', $user, $outputlangs, $labeltouse, 1, '');
+											$arraydefaultmessage = $formmail->getEMailTemplate($db, 'conferenceorbooth', $user, $outputlangs, (int) $labeltouse, 1, '');
 										}
 
 										$msg = $subject = "";
@@ -1770,13 +1812,17 @@ if ($ispaymentok) {
 
 		$urlback = $_SERVER["REQUEST_URI"];
 		$topic = '[' . $appli . '] ' . $companylangs->transnoentitiesnoconv("NewOnlinePaymentReceived");
-		// Fetch thirdparty name if available
+		// Fetch thirdparty name if available. $object is a Facture or a Commande here,
+		// and neither fetch() ever fills $fk_soc on Dolibarr 15..21: only $socid is set,
+		// so reading $fk_soc left $thirdpartyName always empty in the notification mail.
 		$thirdpartyName = '';
-		if (is_object($object) && !empty($object->fk_soc)) {
+		if (is_object($object) && !empty($object->socid)) {
 			require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
 			$soc = new Societe($db);
-			if ($soc->fetch($object->fk_soc) > 0) {
+			if ($soc->fetch((int) $object->socid) > 0) {
 				$thirdpartyName = $soc->name;
+			} else {
+				dol_syslog("stancer paymentback cannot load thirdparty " . $object->socid . " for the notification mail", LOG_WARNING);
 			}
 		}
 		$content = "";

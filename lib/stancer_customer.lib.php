@@ -89,7 +89,7 @@ function stancerFindExistingCustomerLocally($socid, $db, $liveMode)
 
 	// Pass 1: societe_rib (persistent payment modes).
 	$sql1 = "SELECT stancer_account FROM " . MAIN_DB_PREFIX . "societe_rib";
-	$sql1 .= " WHERE fk_soc = " . $socid;
+	$sql1 .= " WHERE fk_soc = " . ((int) $socid);
 	$sql1 .= " AND stancer_account IS NOT NULL AND stancer_account <> ''";
 	$sql1 .= " ORDER BY rowid LIMIT 1";
 	$res = $db->query($sql1);
@@ -106,9 +106,9 @@ function stancerFindExistingCustomerLocally($socid, $db, $liveMode)
 	// test and prod customers when both are seeded for the same socid.
 	$liveValue = $liveMode ? 1 : 0;
 	$sql2 = "SELECT customer, COUNT(*) AS nb FROM " . MAIN_DB_PREFIX . "stancer_stancer_payments";
-	$sql2 .= " WHERE fk_soc = " . $socid;
+	$sql2 .= " WHERE fk_soc = " . ((int) $socid);
 	$sql2 .= " AND customer IS NOT NULL AND customer <> ''";
-	$sql2 .= " AND live_mode = " . $liveValue;
+	$sql2 .= " AND live_mode = " . ((int) $liveValue);
 	$sql2 .= " GROUP BY customer";
 	$sql2 .= " ORDER BY nb DESC, customer ASC LIMIT 1";
 	$res = $db->query($sql2);
@@ -274,6 +274,8 @@ function stancerTraceSharedCustomer($socid, $customerID, $otherSocids, $resoluti
 	$ac->socid        = $socid;
 	$ac->authorid     = (int) $user->id;
 	$ac->userownerid  = (int) $user->id;
+	$ac->elementid    = $socid;
+	// @phan-suppress-next-line PhanDeprecatedProperty  ActionComm::create() only reads fk_element up to Dolibarr 18, both fields must be fed
 	$ac->fk_element   = $socid;
 	$ac->elementtype  = 'societe';
 	$ac->extraparams  = dol_trunc($customerID, 250);
@@ -315,7 +317,7 @@ function stancerCreateCustomerWithFallback($customerData, $stancerApi)
  * add customer on Stancer if needed
  *
  * @param	object	$object		Thirdparty or member the Stancer customer must be attached to
- * @return	string				stancerID, < 0 in case of error
+ * @return	string|int|null		stancerID (cust_xxx), a negative int code, or null when the API failed and no id could be recovered
  */
 function stancerAddCustomerIfNeeded($object)
 {
@@ -459,7 +461,7 @@ function stancerAddCustomerIfNeeded($object)
 		if ($existing === '') {
 			// Pass 3: remote lookup by email. This is where a cust of another
 			// thirdparty could be picked up, so it gets the strictest guard below.
-			$existing = stancerFindExistingCustomerOnStancer($email, $phone, $stancerApi);
+			$existing = stancerFindExistingCustomerOnStancer((string) $email, (string) $phone, $stancerApi);
 			$existingFromApi = ($existing !== '');
 		}
 
@@ -575,7 +577,7 @@ function stancerAddCustomerIfNeeded($object)
 		}
 
 		if (!empty($customerID)) {
-			stancerUpdateCustomerStancerRef($memberid, $accountType, $customerID);
+			stancerUpdateCustomerStancerRef((int) $memberid, (string) $accountType, $customerID);
 		} else {
 			dol_syslog("stancer cannot extract customer ID from error response", LOG_ERR);
 			setEventMessages($langs->trans("ErrorStancer") . " (1) " . $message, [], 'errors');
@@ -640,7 +642,7 @@ function stancerAddCustomerIfNeeded($object)
  * Delete SEPA entry on stancer account
  *
  * @param   int         $socid                  dolibarr soc id
- * @param   array       $stancersepauuid        id to delete
+ * @param   string      $stancersepauuid        Stancer SEPA mandate id (sepa_xxx) to delete
  * @param   int|string  $companyPaymentModeID   Dolibarr company payment mode (llx_societe_rib) row id
  * @return  bool                                False in case of error
  */
@@ -649,7 +651,7 @@ function stancerDeleteSEPA($socid, $stancersepauuid, $companyPaymentModeID)
 	global $db, $conf;
 	$stancerApi = StancerApi::getInstance();
 	$user = new User($db);
-	$res = $user->fetch(getDolGlobalString('STANCER_USER_ACCOUNT_FOR_ACTIONS'));
+	$res = $user->fetch(getDolGlobalInt('STANCER_USER_ACCOUNT_FOR_ACTIONS'));
 	if ($res <= 0) {
 		dol_syslog("stancerDeleteSEPA cannot fetch action user (STANCER_USER_ACCOUNT_FOR_ACTIONS): " . $user->error, LOG_ERR);
 		return false;
@@ -711,6 +713,11 @@ function stancerDeleteSEPA($socid, $stancersepauuid, $companyPaymentModeID)
  * @param   string   $iban      IBAN to verify
  * @param   Societe  $societe   Dolibarr company object
  * @return  array|null          Check result array or null if not available/not applicable
+ *
+ * The contract exposed to callers is 'an array or null': the shape of the SEPAMail
+ * payload is decided by Stancer, so declaring a narrower non-empty-array here would
+ * document an API guarantee this module cannot enforce.
+ * @phan-suppress PhanPluginMoreSpecificActualReturnType
  */
 function stancerCheckIBAN($iban, $societe)
 {
@@ -811,7 +818,7 @@ function stancerCheckIBAN($iban, $societe)
  * @param   int  $socid    dolibarr soc id
  * @param   array  $data   data to use
  *
- * @return  string stancer sepaID like sepa_... or < 0 in case of error
+ * @return  string|int  stancer sepaID like sepa_... or a negative int code in case of error
  */
 function stancerAddSEPAIfNeeded($socid, $data)
 {
@@ -1017,7 +1024,7 @@ function stancerSwitchTo3DS($socid, $customerID, $cbData)
  * @param   int  $socid    dolibarr soc id
  * @param   array  $data   data to use
  *
- * @return  string stancer cbID like card_... or < 0 in case of error
+ * @return  string|int|null  stancer cbID like card_..., a negative int code, or null when no card id was returned
  */
 function stancerAddCBIfNeeded($socid, $data)
 {
@@ -1091,7 +1098,9 @@ function stancerAddCBIfNeeded($socid, $data)
 		dol_syslog("stancer create CB (id #$cbID; last4=$last4, brand=$brand) is OK for : " . $societe->name, LOG_DEBUG);
 	}
 
-	if (null !== $cbID && $cbData !== false) {
+	// Both branches that could leave $cbData at false already returned -1 above,
+	// so at this point only the presence of a card id has to be checked.
+	if (null !== $cbID) {
 		dol_syslog("stancer resCB ok, cbID = $cbID cbData=" . json_encode($cbData), LOG_DEBUG);
 		$last4 = isset($cbData['last4']) ? $cbData['last4'] : '';
 		$brand = isset($cbData['brand']) ? $cbData['brand'] : '';
@@ -1260,7 +1269,7 @@ function stancerShowOnlineIBANDataForCustomer($socid, $name)
 	global $langs, $db;
 
 	$companypaymentmode = new CompanyPaymentModeStancer($db);
-	$res = $companypaymentmode->fetch(0, null, null, null, " AND type = 'ban' AND label LIKE 'stancer-sepa%' AND stancer_object_ref <> '' AND fk_soc = " . ((int) $socid));
+	$res = $companypaymentmode->fetch(0, '', 0, '', " AND type = 'ban' AND label LIKE 'stancer-sepa%' AND stancer_object_ref <> '' AND fk_soc = " . ((int) $socid));
 
 	$out = "";
 	if ($res) {
@@ -1310,7 +1319,7 @@ function stancerShowOnlineCBDataForCustomer($socid, $name)
 	global $langs, $db;
 
 	$companypaymentmode = new CompanyPaymentModeStancer($db);
-	$res = $companypaymentmode->fetch(0, null, null, null, " AND type = 'card' AND label LIKE 'stancer-card%' AND stancer_object_ref <> '' AND fk_soc = " . ((int) $socid));
+	$res = $companypaymentmode->fetch(0, '', 0, '', " AND type = 'card' AND label LIKE 'stancer-card%' AND stancer_object_ref <> '' AND fk_soc = " . ((int) $socid));
 	$out = "";
 	if ($res) {
 		$cb = $companypaymentmode;
@@ -1340,7 +1349,7 @@ function stancerGetDataCB($socid, $name)
 
 	$arr = [];
 	$cb = new CompanyPaymentModeStancer($db);
-	$res = $cb->fetch(0, null, null, null, " AND type = 'card' AND label LIKE 'stancer-card%' AND stancer_object_ref <> '' AND fk_soc = " . ((int) $socid));
+	$res = $cb->fetch(0, '', 0, '', " AND type = 'card' AND label LIKE 'stancer-card%' AND stancer_object_ref <> '' AND fk_soc = " . ((int) $socid));
 	if ($res) {
 		$arr['name'] = $cb->proprio;
 		$arr['type'] = $cb->bank;
@@ -1366,7 +1375,7 @@ function stancerGetDataIBAN($socid, $name)
 
 	$arr = [];
 	$companypaymentmode = new CompanyPaymentModeStancer($db);
-	$res = $companypaymentmode->fetch(0, null, null, null, " AND type = 'ban' AND label LIKE 'stancer-sepa%' AND stancer_object_ref <> '' AND fk_soc = " . ((int) $socid));
+	$res = $companypaymentmode->fetch(0, '', 0, '', " AND type = 'ban' AND label LIKE 'stancer-sepa%' AND stancer_object_ref <> '' AND fk_soc = " . ((int) $socid));
 	if ($res) {
 		$arr['bank'] = $companypaymentmode->bank;
 		$arr['bic'] = $companypaymentmode->bic;

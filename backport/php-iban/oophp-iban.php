@@ -1,7 +1,16 @@
 <?php
 namespace PHP_IBAN;
 
-// OO wrapper for 'php-iban.php'
+/**
+ * OO wrapper for the procedural php-iban codebase.
+ *
+ * Bundled here because Dolibarr < 16 ships an outdated php-iban returning wrong
+ * national checksum parts. Dolibarr >= 16 ships the same class under
+ * htdocs/includes/php-iban/: only one of the two is ever loaded at runtime, so the
+ * duplicate warning below is muted on purpose.
+ *
+ * @phan-suppress PhanRedefinedClassReference
+ */
 Class IBAN
 {
 

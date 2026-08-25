@@ -342,7 +342,10 @@ if (empty($notPosted)) {
 		}
 	}
 	if (!empty($socIds)) {
-		$sqlNames = "SELECT rowid, nom FROM " . MAIN_DB_PREFIX . "societe WHERE rowid IN (" . implode(',', $socIds) . ")";
+		// Sanitize inside the implode() itself: the values are already int-cast above,
+		// but the check must be visible on the concatenation line. The IN () list can
+		// never be empty here, the enclosing if () guarantees at least one id.
+		$sqlNames = "SELECT rowid, nom FROM " . MAIN_DB_PREFIX . "societe WHERE rowid IN (" . implode(',', array_map('intval', $socIds)) . ")";
 		$resNames = $db->query($sqlNames);
 		if ($resNames) {
 			while (($rn = $db->fetch_object($resNames))) {

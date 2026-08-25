@@ -174,9 +174,10 @@ if ($source == 'invoice') {
 	$totalcreditnotes = $object->getSumCreditNotesUsed();
 	$totaldeposits = $object->getSumDepositsUsed();
 
-	//TODO amount pour association
-	$resteapayer = (float) price2num(($object->total_ttc ?? $object->amount) - $totalpaye - $totalcreditnotes - $totaldeposits, 'MT');
-	if ($resteapayer != (float) price2num($object->total_ttc ?? $object->amount)) {
+	// $object is a Facture here: total_ttc is always filled by fetch(), the former
+	// fallback on $object->amount was dead code (no such property on Facture).
+	$resteapayer = (float) price2num($object->total_ttc - $totalpaye - $totalcreditnotes - $totaldeposits, 'MT');
+	if ($resteapayer != (float) price2num($object->total_ttc)) {
 		$list = $object->getListOfPayments();
 		$numPaiement = count($list);
 		// print "<p>FACTURE : $ref reste à payer $resteapayer num=$numPaiement</p>";
@@ -190,7 +191,7 @@ if ($source == 'invoice') {
 		$mesg = $order->error;
 		$error++;
 	} else {
-		$result = $order->fetch_thirdparty($order->socid);
+		$result = $order->fetch_thirdparty((int) $order->socid);
 	}
 	$object = $order;
 

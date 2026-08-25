@@ -115,7 +115,7 @@ $ref = GETPOST('ref', 'alpha');
 $limit = GETPOST('limit', 'int') ? GETPOST('limit', 'int') : $conf->liste_limit;
 $sortfield = GETPOST('sortfield', 'aZ09comma');
 $sortorder = GETPOST('sortorder', 'aZ09comma');
-$page = GETPOSTISSET('pageplusone') ? (GETPOST('pageplusone') - 1) : GETPOST("page", 'int');
+$page = GETPOSTISSET('pageplusone') ? (GETPOSTINT('pageplusone') - 1) : GETPOST("page", 'int');
 
 // Initialize technical objects
 $object = new Stancer_payouts($db);
@@ -172,7 +172,7 @@ $arrayfields = array();
 foreach ($object->fields as $key => $val) {
 	// If $val['visible']==0, then we never show the field
 	if (!empty($val['visible'])) {
-		$visible = (int) dol_eval($val['visible'], 1);
+		$visible = (int) dol_eval((string) $val['visible'], 1);
 		$arrayfields['t.'.$key] = array(
 			'label'=>$val['label'],
 			'checked'=>(($visible < 0) ? 0 : 1),
@@ -422,10 +422,12 @@ foreach ($search as $key => $val) {
 			$columnName = preg_replace('/(_dtstart|_dtend)$/', '', $key);
 			if (preg_match('/^(date|timestamp|datetime)/', $object->fields[$columnName]['type'])) {
 				if (preg_match('/_dtstart$/', $key)) {
-					$sql .= " AND t.".$db->escape($columnName)." >= '".$db->idate($search[$key])."'";
+					// sanitize() and not escape(): this is a column identifier, it must not be quoted
+					$sql .= " AND t.".$db->sanitize($columnName)." >= '".$db->idate($search[$key])."'";
 				}
 				if (preg_match('/_dtend$/', $key)) {
-					$sql .= " AND t.".$db->escape($columnName)." <= '".$db->idate($search[$key])."'";
+					// sanitize() and not escape(): this is a column identifier, it must not be quoted
+					$sql .= " AND t.".$db->sanitize($columnName)." <= '".$db->idate($search[$key])."'";
 				}
 			}
 		}
@@ -695,7 +697,9 @@ foreach ($object->fields as $key => $val) {
 		} elseif ($key == 'lang') {
 			require_once DOL_DOCUMENT_ROOT.'/core/class/html.formadmin.class.php';
 			$formadmin = new FormAdmin($db);
-			print $formadmin->select_language($search[$key], 'search_lang', 0, null, 1, 0, 0, 'minwidth150 maxwidth200', 2);
+			// Empty array and null are both handled as "no filter" by the core, but the
+			// declared type is array: pass an array so the contract is respected.
+			print $formadmin->select_language($search[$key], 'search_lang', 0, array(), 1, 0, 0, 'minwidth150 maxwidth200', 2);
 		} else {
 			print '<input type="text" class="flat maxwidth75" name="search_'.$key.'" value="'.dol_escape_htmltag(isset($search[$key]) ? $search[$key] : '').'">';
 		}
@@ -847,13 +851,14 @@ while ($i < $imaxinloop) {
 				if ($key == 'status') {
 					print $object->getLibStatut(5);
 				} elseif ($key == 'rowid') {
-					print $object->showOutputField($val, $key, $object->id, '');
+					print $object->showOutputField($val, $key, (string) $object->id, '');
 				} elseif ($key == 'response') {
-					print $object->getLibResponse(5);
+					// getLibResponse() takes no argument, the 5 was copied over from getLibStatut(5)
+					print $object->getLibResponse();
 				} elseif ($key == 'amount') {
 					print price($object->amount/100);
 				} else {
-					print $object->showOutputField($val, $key, $object->$key, '');
+					print $object->showOutputField($val, $key, (string) $object->$key, '');
 				}
 				print '</td>';
 				if (!$i) {
@@ -908,13 +913,13 @@ while ($i < $imaxinloop) {
 // amount_net is the real bank settlement (already nets refunds/disputes/fees/vat),
 // so it must NOT be recomputed as (amount - fees) anymore.
 if (isset($totalarray['val']['t.amount'])) {
-	$totalarray['val']['t.amount'] = $totalarray['val']['t.amount'] / 100;
+	$totalarray['val']['t.amount'] /= 100;
 }
 if (isset($totalarray['val']['t.fees'])) {
-	$totalarray['val']['t.fees'] = $totalarray['val']['t.fees'] / 100;
+	$totalarray['val']['t.fees'] /= 100;
 }
 if (isset($totalarray['val']['t.amount_net'])) {
-	$totalarray['val']['t.amount_net'] = $totalarray['val']['t.amount_net'] / 100;
+	$totalarray['val']['t.amount_net'] /= 100;
 }
 
 // Show total line

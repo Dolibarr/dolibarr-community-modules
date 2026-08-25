@@ -25,7 +25,7 @@
  * Prepare array of tabs for Stancer_refunds
  *
  * @param	Stancer_refunds	$object		Stancer_refunds
- * @return 	array					Array of tabs
+ * @return 	array<int,array<int,string>>	Array of tabs
  */
 function stancer_refundsPrepareHead($object)
 {

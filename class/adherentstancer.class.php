@@ -79,6 +79,10 @@ class AdherentStancer extends Adherent
 			require_once DOL_DOCUMENT_ROOT . '/core/lib/company.lib.php';
 			// Signature changed in Dolibarr 20: $dbtouse changed from int to DoliDB|null
 			if (floatval(DOL_VERSION) < 20.0) {
+				// Dolibarr 15..19 declares getState($id, $withcode, $dbtouse = 0, ...) and only tests
+				// is_object($dbtouse), so 0 is the documented "use the global $db" value on that range.
+				// Phan only sees the Dolibarr >= 20 signature (?DoliDB), hence the suppression.
+				// @phan-suppress-next-next-line PhanTypeMismatchArgumentProbablyReal
 				// @phpstan-ignore-next-line
 				$tmparray = getState($this->state_id, 'all', 0, 1);
 			} else {
@@ -93,6 +97,10 @@ class AdherentStancer extends Adherent
 
 		// Signature changed in Dolibarr 20: $outputlangs changed from string to Translate|null
 		if (floatval(DOL_VERSION) < 20.0) {
+			// Dolibarr 15..19 declares dol_format_address($object, $withcountry, $sep, $outputlangs = '', ...)
+			// and only tests is_object($outputlangs), so '' is the documented "use the global $langs"
+			// value on that range. Phan only sees the Dolibarr >= 20 signature (?Translate).
+			// @phan-suppress-next-next-line PhanTypeMismatchArgumentProbablyReal
 			// @phpstan-ignore-next-line
 			return dol_format_address($this, $withcountry, $sep, '', 0, $extralangcode);
 		}

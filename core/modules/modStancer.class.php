@@ -653,7 +653,22 @@ class modStancer extends DolibarrModules
 			$bank->ref             = 'STANCER';
 			$bank->label           = 'Stancer';
 			$bank->bank            = 'Stancer';
+			// Account::create() delegates to Account::update(), which writes the DB
+			// columns from $courant/$clos/$proprio up to Dolibarr 19, and from
+			// $type/$status/$owner_name from Dolibarr 20 on. Both sets must be fed,
+			// otherwise the account is created with type 0 and no holder name.
+			// $type is a plain int property on every supported version, so it is always
+			// safe to set. $status and $owner_name are not: Dolibarr 20 introduced
+			// $owner_name and turned $status into the int status inherited from
+			// CommonObject in the same refactoring. On Dolibarr 15..19, Account declares
+			// $status as the array of translated status labels built by its constructor,
+			// and declares no $owner_name at all, so writing them there would destroy
+			// that array and create a dynamic property (deprecated as of PHP 8.2).
+			// property_exists() tells the two layouts apart without parsing DOL_VERSION.
+			$bank->type            = Account::TYPE_CURRENT;
+			// @phan-suppress-next-line PhanDeprecatedProperty  read by Account::update() up to Dolibarr 19
 			$bank->courant         = Account::TYPE_CURRENT;
+			// @phan-suppress-next-line PhanDeprecatedProperty  read by Account::update() up to Dolibarr 19
 			$bank->clos            = Account::STATUS_OPEN;
 			$bank->code_banque     = '';
 			$bank->code_guichet    = '';
@@ -661,6 +676,13 @@ class modStancer extends DolibarrModules
 			$bank->cle_rib         = '';
 			$bank->bic             = '';
 			$bank->iban            = '';
+			if (property_exists($bank, 'owner_name')) {
+				$bank->status      = Account::STATUS_OPEN;
+				$bank->owner_name  = $mysoc->name;
+			} else {
+				dol_syslog("stancer init : Dolibarr ".DOL_VERSION." declares no Account::owner_name, only the legacy courant/clos/proprio fields are filled", LOG_DEBUG);
+			}
+			// @phan-suppress-next-line PhanDeprecatedProperty  read by Account::create()/update() up to Dolibarr 19
 			$bank->proprio         = $mysoc->name;
 			$bank->owner_address   = $mysoc->address;
 			$bank->country_id      = $mysoc->country_id;
@@ -687,7 +709,9 @@ class modStancer extends DolibarrModules
 				if (file_exists($src) && !file_exists($dest)) {
 					require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 					dol_mkdir($dirodt);
-					$result = dol_copy($src, $dest, 0, 0);
+					// $newmask is documented int in files.lib.php but declared string in
+					// recent signatures; the body only tests empty(), so '0' and 0 behave alike.
+					$result = dol_copy($src, $dest, '0', 0);
 					if ($result < 0) {
 						$langs->load("errors");
 						$this->error = $langs->trans('ErrorFailToCopyFile', $src, $dest);
@@ -696,10 +720,10 @@ class modStancer extends DolibarrModules
 				}
 
 				$sql = array_merge($sql, array(
-					"DELETE FROM ".MAIN_DB_PREFIX."document_model WHERE nom = 'standard_".strtolower($myTmpObjectKey)."' AND type = '".$this->db->escape(strtolower($myTmpObjectKey))."' AND entity = ".((int) $conf->entity),
-					"INSERT INTO ".MAIN_DB_PREFIX."document_model (nom, type, entity) VALUES('standard_".strtolower($myTmpObjectKey)."', '".$this->db->escape(strtolower($myTmpObjectKey))."', ".((int) $conf->entity).")",
-					"DELETE FROM ".MAIN_DB_PREFIX."document_model WHERE nom = 'generic_".strtolower($myTmpObjectKey)."_odt' AND type = '".$this->db->escape(strtolower($myTmpObjectKey))."' AND entity = ".((int) $conf->entity),
-					"INSERT INTO ".MAIN_DB_PREFIX."document_model (nom, type, entity) VALUES('generic_".strtolower($myTmpObjectKey)."_odt', '".$this->db->escape(strtolower($myTmpObjectKey))."', ".((int) $conf->entity).")"
+					"DELETE FROM ".MAIN_DB_PREFIX."document_model WHERE nom = 'standard_".$this->db->escape(strtolower($myTmpObjectKey))."' AND type = '".$this->db->escape(strtolower($myTmpObjectKey))."' AND entity = ".((int) $conf->entity),
+					"INSERT INTO ".MAIN_DB_PREFIX."document_model (nom, type, entity) VALUES('standard_".$this->db->escape(strtolower($myTmpObjectKey))."', '".$this->db->escape(strtolower($myTmpObjectKey))."', ".((int) $conf->entity).")",
+					"DELETE FROM ".MAIN_DB_PREFIX."document_model WHERE nom = 'generic_".$this->db->escape(strtolower($myTmpObjectKey))."_odt' AND type = '".$this->db->escape(strtolower($myTmpObjectKey))."' AND entity = ".((int) $conf->entity),
+					"INSERT INTO ".MAIN_DB_PREFIX."document_model (nom, type, entity) VALUES('generic_".$this->db->escape(strtolower($myTmpObjectKey))."_odt', '".$this->db->escape(strtolower($myTmpObjectKey))."', ".((int) $conf->entity).")"
 				));
 			}
 		}
