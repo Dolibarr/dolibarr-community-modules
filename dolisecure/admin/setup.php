@@ -119,11 +119,6 @@ $setupnotempty = count($formSetup->items);
  * Actions
  */
 
-// For retrocompatibility Dolibarr < 15.0
-if (versioncompare(explode('.', DOL_VERSION), array(15)) < 0 && $action == 'update' && !empty($user->admin)) {
-	$formSetup->saveConfFromPost();
-}
-
 include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php';
 
 if ($action == 'checknow') {
