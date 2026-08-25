@@ -45,7 +45,6 @@ return [
         'einvoicing/class/providers/SuperPDPProvider.class.php' => ['PhanTypeArraySuspiciousNullable', 'PhanTypeMismatchArgumentProbablyReal', 'PhanUndeclaredProperty'],
         'einvoicing/compat/commonhookactions.class.php' => ['PhanRedefineClass'],
         'einvoicing/document_card.php' => ['PhanUndeclaredProperty'],
-        'einvoicing/einvoicingindex.php' => ['PhanNonClassMethodCall'],
         'einvoicing/lib/buildinvoicelines.inc.php' => ['PhanDeprecatedFunction', 'PhanDeprecatedProperty'],
         'einvoicing/lib/einvoicing.lib.php' => ['PhanTypeMismatchArgumentNullable'],
         'helloasso/admin/setup.php' => ['PhanUndeclaredClassMethod'],
