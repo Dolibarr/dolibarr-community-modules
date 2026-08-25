@@ -24,16 +24,21 @@ Every modification must respect:
 
 ## Expected Architecture
 
-Module structure:
+External module structure:
 `htdocs/mymodule`
-├── `core/`
+├── `admin/`
 ├── `class/`
+├── `core/`
+├── `css/`
+├── `doc/`
+├── `js/`
+├── `langs/`
 ├── `lib/`
 ├── `sql/`
-├── `tpl/`
-└── `admin/`
+├── `test/`
+└── `tpl/`
 
-A template of a module directory content can be found in the `htdocs/modulebuilder/template` folder of this project.
+A template of an external module directory content can be found in the `htdocs/modulebuilder/template` folder of this project.
 
 ---
 
