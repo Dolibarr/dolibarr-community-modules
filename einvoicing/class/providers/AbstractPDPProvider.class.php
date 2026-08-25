@@ -775,9 +775,10 @@ abstract class AbstractPDPProvider
 	 * @param   string|array<mixed>         $params     Request body
 	 * @param   string|array<mixed>         $response   Response payload
 	 * @param   int                         $statusCode HTTP status code of the response
+	 * @param   string                      $requestId  Request-Id header sent with the call, kept to correlate our log with the one of the Access Point
 	 * @return  ?array{id:int,call_id:?string}           Created log identifiers, or null if not logged
 	 */
-	protected function logCall(?string $callType, $resource, $method, $params, $response, $statusCode)
+	protected function logCall(?string $callType, $resource, $method, $params, $response, $statusCode, string $requestId = '')
 	{
 		global $conf, $user, $dolibarr_main_db_pass, $dbhistory;
 
@@ -804,6 +805,7 @@ abstract class AbstractPDPProvider
 		$call->call_type = $callType;
 		$call->method = ($method == 'POSTALREADYFORMATED' ? 'POST' : $method);
 		$call->endpoint = '/' . $resource;
+		$call->request_id = $requestId;
 		$call->request_body = is_array($params) ? json_encode($params) : $params;
 		$call->response = is_array($response) ? json_encode($response) : $response;
 		$call->provider = $this->name;

@@ -193,6 +193,7 @@ EINVOICING_LINK_CREATE_ACCOUNTVia=Link to create an account via %s
 EInvoicing=E-invoicing
 einvoicingInvoiceStatus=E-invoicing status
 ProcessingDetail=Detail of processing
+RequestId=Request-Id
 CallsListHelp=This page is reserved for advanced users. It can help to diagnose troubles of synchronization with the E-invoice partner platform. You don't need to use this screen in a common usage of your application.
 GenerateEinvoice=Generate
 GenerateEinvoiceHelp=Create the E-invoice from the current invoice, generating a new file in Linked Files

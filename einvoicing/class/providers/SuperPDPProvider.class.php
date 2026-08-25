@@ -1020,19 +1020,18 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 		$file_info = pathinfo($invoice_path);
 
-		// Format Access Point resource Url
-		$uuid = $this->generateUuidV4(); // UUID used to correlate logs between Dolibarr and PDP TODO : Store it somewhere
+		// UUID used to correlate our logs with the ones of the Access Point. The flow API declares
+		// Request-Id as a header, not as a query parameter: put in the URL it is simply ignored, so
+		// the correlation it exists for was never established. callApi() records it in the call log.
+		$uuid = $this->generateUuidV4();
 
 		// Format AP resource Url
 		$resource = 'flows';
-		$urlparams = array(
-			'Request-Id' => $uuid,
-		);
-		$resource .= '?' . http_build_query($urlparams);
 
 		// Extra headers
 		$extraHeaders = [
-			'Content-Type' => 'multipart/form-data'
+			'Content-Type' => 'multipart/form-data',
+			'Request-Id' => $uuid,
 		];
 
 		// Params
@@ -1059,7 +1058,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 
 
-		$response = $this->callApi("flows", "POSTALREADYFORMATED", $params, $extraHeaders, 'send_invoice');
+		$response = $this->callApi($resource, "POSTALREADYFORMATED", $params, $extraHeaders, 'send_invoice');
 
 		if ($response['status_code'] == 200 || $response['status_code'] == 202) {
 			$flowId = $response['response']['flowId'] ?? '';
@@ -1409,7 +1408,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 		// Log the API call through an independent connection so the trace survives a
 		// rollback of the caller's transaction on error (see logCall(), issue #291).
-		$logged = $this->logCall($callType, $resource, $method, $params, $returnarray['response'], $returnarray['status_code']);
+		$logged = $this->logCall($callType, $resource, $method, $params, $returnarray['response'], $returnarray['status_code'], (string) ($extraHeaders['Request-Id'] ?? ''));
 		if ($logged !== null) {
 			$returnarray['id'] = $logged['id'];
 			$returnarray['call_id'] = $logged['call_id'];
@@ -1663,11 +1662,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$actions = array();				// business message (manual action to do)
 
 		$resource = 'flows/search';
-		$uuid = $this->generateUuidV4(); // UUID used to correlate logs between Dolibarr and PDP TODO : Store it somewhere
-		$urlparams = array(
-			'Request-Id' => $uuid,
-		);
-		$resource .= '?' . http_build_query($urlparams);
+		// Correlation id, sent as the Request-Id header of the call below and recorded in the call log.
+		$uuid = $this->generateUuidV4();
 
 		//self::$EINVOICING_LAST_IMPORT_KEY = $uuid;
 		self::$EINVOICING_LAST_IMPORT_KEY = dol_print_date(dol_now(), 'dayhourlog');
@@ -1755,7 +1751,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 			// Only the first call is typed as a synchronization: it is the one creating the Call row the
 			// whole run is reported on, and one run must stay one line of history.
-			$response = $this->callApi($resource, "POST", json_encode($params), [], ($batchNumber == 1 ? "synchronization" : ""));
+			$response = $this->callApi($resource, "POST", json_encode($params), array('Request-Id' => $uuid), ($batchNumber == 1 ? "synchronization" : ""));
 
 			if ($response['status_code'] != 200) {
 				$this->errors[] = "Failed to retrieve flows for synchronization." . ' (HTTP ' . $response['status_code'] . ')';

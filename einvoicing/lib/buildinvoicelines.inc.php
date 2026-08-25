@@ -598,7 +598,7 @@ foreach ($object->lines as $line) {
 
 		'prodname'                  => $libelle,			// BT-153
 		'proddesc'                  => $description,		// BT-154
-		'prodsellerid'              => $line->product_ref ? $line->product_ref : "0000",
+		'prodsellerid'              => $line->product_ref ? $line->product_ref : "",
 		'prodbuyerid'               => null,
 		'prodglobalidtype'          => null,
 		'prodglobalid'              => null,
