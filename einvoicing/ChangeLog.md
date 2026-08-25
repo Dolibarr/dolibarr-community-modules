@@ -94,6 +94,15 @@ tolerated without losing the boundary it forms. Several candidates are reported 
 instead of being guessed, and a database failure is no longer reported to the user as a missing
 document.
 
+FIX: A lifecycle status sent as the buyer of a supplier invoice now qualifies the identifier of its
+issuer. The GlobalID of the IssuerTradeParty - our own SIREN, the party the status comes from - went out
+with no schemeID attribute on the statuses 205, 210 and 211, while every other identifier of the same
+document carries schemeID="0002": the recipient of the status, the issuer of the invoice it refers to,
+and the issuer of the cash-in (212), which was given the attribute when the seller branch was written and
+the buyer one was left without it. An identifier with no scheme is not qualified - nothing in the document
+says those nine digits are a SIREN rather than any other registration number - and the platforms accepted
+it anyway, which is why it went unnoticed since the module started answering its vendors.
+
 FIX: The log of the API calls to the Approved Platform no longer loses rows. Call::getNextCallId()
 read the highest call number through the global $db, while logCall() builds and inserts its record on
 the independent $dbhistory - the connection it deliberately uses so the trace survives a rollback of

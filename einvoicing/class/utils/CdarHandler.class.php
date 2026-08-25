@@ -380,6 +380,7 @@ class CdarHandler
 			// We issue the status as the BUYER of a supplier invoice, and it goes back to the vendor
 			$CdarIssuerTradeParty = [
 				'GlobalID' => $mysocGlobalID, // GlobalID of CDAR SENDER
+				'SchemeID' => CdarHandler::SCHEME_SIREN_0002,
 				'RoleCode' => CdarHandler::ROLE_BY
 			];
 
