@@ -668,6 +668,16 @@ class modEInvoicing extends DolibarrModules
 			$this->db->query($sqltmp);
 		}
 
+		// The call log carries the Request-Id sent to the Access Point, and llx_einvoicing_call.sql
+		// declares the column for a fresh installation. _load_tables() only creates the tables it does
+		// not find, so an installation that already carried that table never receives the column: the
+		// insert of every API call then fails on an unknown column, and it fails silently because the
+		// trace is written on its own connection (see AbstractPDPProvider::logCall()).
+		$resql = $this->db->DDLDescTable(MAIN_DB_PREFIX . 'einvoicing_call', 'request_id');
+		if (!$resql || !$this->db->fetch_object($resql)) {
+			$this->db->DDLAddField(MAIN_DB_PREFIX . 'einvoicing_call', 'request_id', array('type' => 'varchar', 'value' => '36'), 'AFTER endpoint');
+		}
+
 		return $this->_init($sql, $options);
 	}
 
