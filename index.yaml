@@ -91,3 +91,38 @@ packages:
     direct-download: no
     dolistore-upload: 'no'
     dolistore-download: ''
+
+  - modulename: 'DoliSecure'
+    author: 'Joliciel'
+    author_url: 'https://joliciel.fr'
+    maintener_email: 'laurent.bouquet@joliciel.fr'
+    label:
+      fr: "DoliSecure"
+      en: "DoliSecure"
+      it: "DoliSecure"
+      es: "DoliSecure"
+      de: "DoliSecure"
+    description:
+      fr: "Vérifie que la version de Dolibarr installée n'est pas affectée par une vulnérabilité connue (CVE), via la base publique NVD. Affiche un indicateur de danger sur la page d'accueil, envoie un email aux administrateurs dès qu'une nouvelle vulnérabilité est détectée, et fournit une page de rapport détaillée listant chaque CVE."
+      en: "Checks that the installed Dolibarr version is not affected by any known vulnerability (CVE), by querying the public NVD database. Shows a danger-level indicator on the home page, emails administrators as soon as a new vulnerability is detected, and provides a detailed report page listing every CVE."
+      it: "Verifica che la versione di Dolibarr installata non sia interessata da vulnerabilità note (CVE) interrogando il database pubblico NVD. Mostra un indicatore del livello di pericolo nella pagina principale, invia un'e-mail agli amministratori non appena viene rilevata una nuova vulnerabilità e fornisce una pagina di report dettagliato che elenca ogni CVE."
+      es: "Comprueba que la versión de Dolibarr instalada no esté afectada por ninguna vulnerabilidad conocida (CVE) consultando la base de datos pública NVD. Muestra un indicador de nivel de peligro en la página de inicio, envía un correo electrónico a los administradores en cuanto se detecta una nueva vulnerabilidad y proporciona una página de informe detallado que lista cada CVE."
+      de: "Prüft, ob die installierte Dolibarr-Version von bekannten Sicherheitslücken (CVEs) betroffen ist, indem die öffentliche NVD-Datenbank abgefragt wird. Zeigt einen Indikator für die Gefahrenstufe auf der Startseite an, sendet den Administratoren eine E-Mail, sobald eine neue Sicherheitslücke erkannt wird, und bietet eine detaillierte Berichtsseite, die jeden CVE auflistet."
+    status: 'enabled'
+    created_at: '2026-08-21'
+    last_updated_at: 'auto'
+    category: '79'
+    git: 'https://github.com/Dolibarr/dolibarr-community-modules/tree/main/dolisecure'
+    git-branch: 'main'
+    git-system: 'github'
+    cover: 'https://raw.githubusercontent.com/Dolibarr/dolibarr-community-modules/main/dolisecure/cover.png'
+    current_version: 'auto'
+    dolibarrmin: 'auto'
+    dolibarrmax: 'auto'
+    phpmin: 'auto'
+    phpmax: 'auto'
+    price: 0
+    # direct-download is yes if we can download the module to install it in application
+    direct-download: 'yes'
+    # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
+    dolistore-upload: 'manual'
