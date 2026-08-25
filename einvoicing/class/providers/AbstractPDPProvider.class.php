@@ -791,6 +791,9 @@ abstract class AbstractPDPProvider
 			$dbhistory = getDoliDBInstance($conf->db->type, $conf->db->host, (string) $conf->db->user, $dolibarr_main_db_pass, (string) $conf->db->name, (int) $conf->db->port);
 		}
 
+		// The number and the row it belongs to are taken on the same connection, inside the same
+		// transaction: getNextCallId() locks the range it reads (FOR UPDATE) until this commit, so no
+		// other request can take the number in between and lose the trace on uk_einvoicing_call_callid.
 		$dbhistory->begin();
 
 		$params = self::redactSensitiveData($params);

@@ -1205,12 +1205,15 @@ trait CommonProtocol
 
 			$message = 'Unable to find product' . $detailsStr . '. Auto-creation of products is disabled in settings.';
 
-			$action = $langs->trans('CreateProductManually') . ' ';
-			$action .= '<a class="butAction smallpaddingimp" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
-			$action .= '<i class="fas fa-plus-circle"></i> ';
-			$action .= $langs->trans($prodType == 1 ? 'CreateTheService' : 'CreateTheProduct');
-			$action .= '</a>';
+			$btnStyle = 'display:inline-block;width:auto;';
 
+			$action = '<div class="marginbottomonly">' . $langs->trans('SuggestedActionsIntro') . '</div>';
+
+			// First choice: create the product manually
+			$action .= '<a class="button small smallpaddingimp" style="' . $btnStyle . '" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
+			$action .= '<i class="fas fa-plus-circle"></i> ';
+			$action .= $langs->trans($prodType == 1 ? 'CreateServiceManually' : 'CreateProductManually');
+			$action .= '</a>';
 
 			// Second choice: map the vendor product reference(s) of this flow onto existing Dolibarr products.
 			// This creates the vendor reference (llx_product_fournisseur_price) that the matching uses at step 1,
@@ -1222,10 +1225,18 @@ trait CommonProtocol
 					$mappingUrl .= '&socid=' . ((int) $vendorId);
 				}
 
-				$action .= ' ' . $langs->trans("or") . ' ';
-				$action .= '<a class="butAction smallpaddingimp" href="' . dol_escape_htmltag($mappingUrl) . '" target="_blank">';
+				$action .= '<a class="button small smallpaddingimp" style="' . $btnStyle . '" href="' . dol_escape_htmltag($mappingUrl) . '" target="_blank">';
 				$action .= '<i class="fas fa-link unsetcolor"></i> ';
-				$action .= $langs->trans('MapToAnExistingProduct');
+				$action .= $langs->trans('AssociateExistingProductMessage');
+				$action .= '</a>';
+			}
+
+			// Third choice: set a default product on the vendor thirdparty (used for future imports when no product is found)
+			if (!empty($vendorId)) {
+				$thirdpartyUrl = dol_buildpath('/societe/card.php', 1) . '?socid=' . ((int) $vendorId) . '&action=edit#treinvoicing';
+				$action .= '<a class="button small smallpaddingimp" style="' . $btnStyle . '" href="' . dol_escape_htmltag($thirdpartyUrl) . '" target="_blank">';
+				$action .= '<i class="fas fa-star"></i> ';
+				$action .= $langs->trans('SetDefaultProductForThirdparty');
 				$action .= '</a>';
 			}
 
