@@ -45,6 +45,12 @@ Descriptions of section entries and preferred order
 Maintainers List
 ----------------
 
+DOLISECURE MODULE
+M:	Laurent Bouquet <laurent.bouquet@joliciel.fr> / LaurentBouquet
+S:	Maintained
+F:	dolisecure/
+T:	https://github.com/Dolibarr/dolibarr-community-modules.git
+
 EINVOICING
 M:	Mohamed Daoud <mdaoud@dolicloud.com> / Daoud-mohamed
 M:	Laurent Destailleur <ldestailleur@dolicloud.com> / eldy
@@ -64,8 +70,8 @@ S:	Maintained
 F:	ksef/
 T:	https://github.com/Dolibarr/dolibarr-community-modules.git
 
-DOLISECURE MODULE
-M:	Laurent Bouquet <laurent.bouquet@joliciel.fr> / LaurentBouquet
+STANCER MODULE
+M:	Eric Seigne <eric.seigne@cap-rel.fr> / rycks
 S:	Maintained
-F:	dolisecure/
-T:	https://github.com/Dolibarr/dolibarr-community-modules.git
+W:	https://doc.cap-rel.fr/stancer/
+F:	stancer/
