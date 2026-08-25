@@ -83,6 +83,44 @@ function stancerIsBankLineDateLocked($dateo)
 }
 
 /**
+ * Turn a Stancer date into the timestamp Account::addline() expects.
+ *
+ * Stancer hands over either a unix timestamp (API) or a 'YYYY-MM-DD' string
+ * (CSV import of the settlement file). Converting the string form keeps
+ * DoliDB::idate() out of its legacy branch, which logs a warning on every
+ * insert; the stored value is identical either way.
+ *
+ * A value the converter cannot read (empty, null, or malformed) is handed over
+ * as an empty or unchanged string, so the core stores exactly what it stored
+ * before this conversion existed. Returning 0 instead would silently book the
+ * bank line on 1970-01-01, because DoliDB::idate(0) formats a real date while
+ * DoliDB::idate('') and DoliDB::idate(null) both return an empty string.
+ *
+ * Not to be confused with stancerDateToTimeStamp(), which always returns an
+ * int and falls back on dol_now() for values it cannot read.
+ *
+ * @param   string|int|null  $date  Unix timestamp or date string, possibly empty
+ * @return  int|string              Timestamp when readable, the input value otherwise
+ */
+function stancerNormalizeBankDate($date)
+{
+	if ($date === null || $date === '') {
+		// '' and null give the same insert: DoliDB::idate() returns '' for both.
+		return '';
+	}
+	if (is_numeric($date)) {
+		return (int) $date;
+	}
+	$timestamp = dol_stringtotime((string) $date, 1);
+	if (empty($timestamp)) {
+		dol_syslog("stancerNormalizeBankDate cannot read date '" . $date . "', forwarded unchanged to the bank layer", LOG_WARNING);
+		return $date;
+	}
+
+	return (int) $timestamp;
+}
+
+/**
  * Delete rows in llx_bank_url whose url_id points to a record that no longer
  * exists in the referenced table. Protects the accounting journal from
  * generating phantom debit/credit entries when related records have been
@@ -122,7 +160,9 @@ function stancerCleanupOrphanBankUrls($fkBank = null)
 
 	foreach ($cleanups as $type => $refTable) {
 		$sql = "DELETE bu FROM " . MAIN_DB_PREFIX . "bank_url bu";
-		$sql .= " LEFT JOIN " . MAIN_DB_PREFIX . $refTable . " t ON t.rowid = bu.url_id";
+		// $refTable is a table name (an identifier), so it must go through sanitize()
+		// and never through escape(): quoting an identifier would break the JOIN.
+		$sql .= " LEFT JOIN " . MAIN_DB_PREFIX . $db->sanitize($refTable) . " t ON t.rowid = bu.url_id";
 		$sql .= " WHERE bu.type = '" . $db->escape($type) . "' AND t.rowid IS NULL";
 		$sql .= $whereBank;
 		$resql = $db->query($sql);
@@ -148,8 +188,8 @@ function stancerCleanupOrphanBankUrls($fkBank = null)
  * @param   int|string       $fk_account   id du compte bancaire
  * @param   string           $stancer_id   id stancer
  * @param   int|string|null  $date         date d'opération, dol_now() si null
- * @param   int|string|null  $datev        date de valeur, identique à $date si null
- * @return  int                            < 0 en cas d'erreur, id de l'écriture bancaire sinon
+ * @param   int|string|null  $datev        date de valeur, dol_now() si null
+ * @return  int                            1 on success, -1 on error (never the bank entry id)
  */
 function stancerAddPaimentFeeOnBank($ref, $totalamount, $fk_account, $stancer_id, $date = null, $datev = null)
 {
@@ -174,6 +214,11 @@ function stancerAddPaimentFeeOnBank($ref, $totalamount, $fk_account, $stancer_id
 	$result = $acc->fetch($fk_account);
 	if ($result < 0) {
 		$error++;
+		// Close the transaction opened above, otherwise the begin() counter stays
+		// open and the next commit() of the request silently commits nothing.
+		dol_syslog("stancerAddPaimentFeeOnBank cannot load bank account " . $fk_account . " for " . $stancer_id . ": " . $acc->error, LOG_ERR);
+		$db->rollback();
+
 		return -1;
 	}
 
@@ -187,7 +232,12 @@ function stancerAddPaimentFeeOnBank($ref, $totalamount, $fk_account, $stancer_id
 		$label .= " " . $date;
 	}
 
-	// Look for existing bank lines for this stancer_id on this account.
+	// Look for existing fee lines for this stancer_id on this account.
+	// The "amount <= 0" filter is mandatory, not a refinement: a fee is always a
+	// debit, while a SEPA customer payment produces a credit line that carries the
+	// very same num_chq (paym_xxx) AND the very same fk_type ('PRE'). Without the
+	// filter, case 2 below would take that credit line for a stale fee line and
+	// overwrite the collected amount with the fee amount.
 	// Four cases:
 	//   1. exact-amount line exists -> nothing to do (real duplicate)
 	//   2. line(s) exist with a different amount AND rappro=0 AND not in closed
@@ -199,8 +249,9 @@ function stancerAddPaimentFeeOnBank($ref, $totalamount, $fk_account, $stancer_id
 	//      closed fiscal year)
 	$sqlExisting = "SELECT rowid, amount, rappro, dateo FROM " . MAIN_DB_PREFIX . "bank";
 	$sqlExisting .= " WHERE num_chq='" . $db->escape($stancer_id) . "'";
-	$sqlExisting .= " AND fk_account='" . $db->escape($fk_account) . "'";
+	$sqlExisting .= " AND fk_account='" . ((int) $fk_account) . "'";
 	$sqlExisting .= " AND fk_type='PRE'";
+	$sqlExisting .= " AND amount <= 0";
 	$resqlExisting = $db->query($sqlExisting);
 
 	$exactMatch = false;
@@ -216,6 +267,13 @@ function stancerAddPaimentFeeOnBank($ref, $totalamount, $fk_account, $stancer_id
 				$lockedMismatch = true;
 			}
 		}
+	} else {
+		// Without this list we cannot tell an update from an insert, so we would
+		// blindly add a duplicate fee line: stop before doing any harm.
+		dol_syslog("stancerAddPaimentFeeOnBank cannot read existing bank lines for $stancer_id: " . $db->lasterror(), LOG_ERR);
+		$db->rollback();
+
+		return -1;
 	}
 
 	if ($exactMatch) {
@@ -242,7 +300,7 @@ function stancerAddPaimentFeeOnBank($ref, $totalamount, $fk_account, $stancer_id
 			$label,
 			$amount, // Sign must be positive when we receive money (customer payment), negative when you give money (supplier invoice or credit note)
 			$stancer_id,
-			'',
+			0, // $categorie: no bank category, the core only tests "> 0"
 			$user,
 			'',
 			'',
@@ -357,7 +415,7 @@ function stancerAddPaimentFeeOnBank($ref, $totalamount, $fk_account, $stancer_id
 function stancerBankLineDoesNotExists($stancer_id, $account_id, $amount)
 {
 	global $langs, $db, $user, $conf;
-	$sql = "SELECT * FROM " . MAIN_DB_PREFIX . "bank WHERE num_chq='" . $db->escape($stancer_id) . "' AND fk_account='" . (int) $account_id . "' AND ROUND(amount,2)=" . $amount;
+	$sql = "SELECT * FROM " . MAIN_DB_PREFIX . "bank WHERE num_chq='" . $db->escape($stancer_id) . "' AND fk_account='" . ((int) $account_id) . "' AND ROUND(amount,2)=" . ((float) $amount);
 	$resql = $db->query($sql);
 	if ($resql) {
 		$num = $db->num_rows($resql);
@@ -399,8 +457,8 @@ function stancerBankLineURLDoesNotExists($fk_bank, $url_id, $type)
  *
  * @param   Account  $accountfrom	account from
  * @param   Account  $accountto   	account to
- * @param	string   $dateo			Date operation
- * @param   string	 $datev         Date validation
+ * @param	string|null   $dateo	Date operation (callers resolve it from API or CSV data, may be null)
+ * @param   string|null	  $datev	Date validation (idem)
  * @param   string   $label         Label
  * @param   string   $labelto       label on destination account (will be on bank pdf)
  * @param	float	 $amount		Amount
@@ -408,7 +466,8 @@ function stancerBankLineURLDoesNotExists($fk_bank, $url_id, $type)
  * @param   string   $stancer_id    stancer id
  * @param   boolean  $userMessage   send a message to user
  *
- * @return  int result value
+ * @return  int|null  result value, null on the two short returns (already existing
+ *                    transfer, or target date inside a closed fiscal year)
  */
 function stancerAddTransfertFromAccountToAccount(Account $accountfrom, Account $accountto, $dateo, $datev, $label, $labelto, $amount, $amountto, $stancer_id, $userMessage = true)
 {
@@ -417,6 +476,11 @@ function stancerAddTransfertFromAccountToAccount(Account $accountfrom, Account $
 	$errorMessage = "";
 	$error = 0;
 	$result = 0;
+
+	// Normalize right away: callers may hand over null dates, and dol_stringtotime()
+	// below feeds preg_match(), which is deprecated with null on PHP 8.1+.
+	$dateo = (string) $dateo;
+	$datev = (string) $datev;
 
 	if (empty($dateo) && !empty($datev)) {
 		$dateo = $datev;
@@ -489,7 +553,7 @@ function stancerAddTransfertFromAccountToAccount(Account $accountfrom, Account $
 							} else {
 								$realAmount = (float) price2num($amount);
 							}
-							$sqlUpdate = "UPDATE " . MAIN_DB_PREFIX . "bank SET amount='" . $realAmount . "' WHERE rowid='" . $obj->rowid . "'";
+							$sqlUpdate = "UPDATE " . MAIN_DB_PREFIX . "bank SET amount='" . ((float) $realAmount) . "' WHERE rowid='" . ((int) $obj->rowid) . "'";
 							$resqlUpdate = $db->query($sqlUpdate);
 							dol_syslog("stancerAddTransfertFromAccountToAccount duplicate but old entries are not right against fees, fix is done");
 						}
@@ -523,11 +587,21 @@ function stancerAddTransfertFromAccountToAccount(Account $accountfrom, Account $
 			$typefrom = 'VIR';
 			$typeto = 'VIR';
 
+			// Account::addline() expects a timestamp. Converting the 'YYYY-MM-DD'
+			// form keeps DoliDB::idate() out of its legacy branch, which logs a
+			// warning on every insert. An unreadable date stays unreadable so the
+			// stored value never changes (see stancerNormalizeBankDate()).
+			if ($dateo === '' && $datev === '') {
+				dol_syslog("stancerAddTransfertFromAccountToAccount no date at all for $stancer_id, bank lines will be inserted without an operation date", LOG_WARNING);
+			}
+			$dateots = stancerNormalizeBankDate($dateo);
+			$datevts = stancerNormalizeBankDate($datev);
+
 			if (!$error) {
 				//check duplicate on each line
 				if (stancerBankLineDoesNotExists($stancer_id, $accountfrom->id, (float) price2num(-1 * $amount))) {
 					dol_syslog("stancerAddTransfertFromAccountToAccount no duplicate entries for account out=" . $accountfrom->id);
-					$bank_line_id_from = $accountfrom->addline($dateo, $typefrom, $label, (float) price2num(-1 * $amount), $stancer_id, '', $user);
+					$bank_line_id_from = $accountfrom->addline($dateots, $typefrom, $label, (float) price2num(-1 * $amount), $stancer_id, 0, $user);
 					if (!($bank_line_id_from > 0)) {
 						$error++;
 					}
@@ -539,7 +613,7 @@ function stancerAddTransfertFromAccountToAccount(Account $accountfrom, Account $
 				//utilisation de datev comme date opé car sur le compte de destination la dateo n'a rien à voir
 				if (stancerBankLineDoesNotExists($stancer_id, $accountto->id, $amountto)) {
 					dol_syslog("stancerAddTransfertFromAccountToAccount no duplicate entries for account in=" . $accountto->id);
-					$bank_line_id_to = $accountto->addline($datev, $typeto, $labelto, $amountto, $stancer_id, '', $user);
+					$bank_line_id_to = $accountto->addline($datevts, $typeto, $labelto, $amountto, $stancer_id, 0, $user);
 					if (!($bank_line_id_to > 0)) {
 						$error++;
 					}
@@ -685,12 +759,14 @@ function stancerAddPaymentOnObject($object, $data, &$errorMessage, $bypassCustom
 
 	$actioncode = "";
 	$error = 0;
+	// Collected along the way and handed over to stancerAddActionComm() at the end.
+	$postactionmessages = array();
 	dol_syslog("stancerAddPaymentOnObject add payment on =" . json_encode($object->ref) . " data = " . json_encode($data));
 
 	//if object is not an invoice, we have to search for corresponding invoice and check payment on that
 	$objtype = get_class($object);
 	if ($object->element == 'commande') {
-		$object->fetchObjectLinked($object->id, $objtype, '', 'facture');
+		$object->fetchObjectLinked($object->id, $objtype, null, 'facture');
 		foreach ($object->linkedObjectsIds as $linkedobj) {
 			foreach ($linkedobj as $facid) {
 				$inv = new Facture($db);
@@ -764,8 +840,9 @@ function stancerAddPaymentOnObject($object, $data, &$errorMessage, $bypassCustom
 	// Guard 2: API customer.id must map (via societe_rib.stancer_account) to the
 	// invoice's socid. Without this, paym_id of customer A can be posted on
 	// invoice of customer B (BHG paying 12 EUR ended up on invoice).
-	// Note: Dolibarr Facture exposes the customer id as $socid, not $fk_soc.
-	$objectSocid = (int) (isset($object->socid) ? $object->socid : (isset($object->fk_soc) ? $object->fk_soc : 0));
+	// Note: this guard only runs on invoices, and Facture::fetch() feeds $socid only
+	// (it never writes $fk_soc), so there is no fallback to read here.
+	$objectSocid = (int) (isset($object->socid) ? $object->socid : 0);
 	if ($bypassCustomerGuard) {
 		// Supervised admin force-post: the customer attached to the payment may be
 		// wrong (cross-customer leak), so we deliberately skip the customer<->socid
@@ -816,7 +893,7 @@ function stancerAddPaymentOnObject($object, $data, &$errorMessage, $bypassCustom
 	}
 
 	$db->begin();
-	$bankaccountid = getDolGlobalString('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
+	$bankaccountid = getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
 	if (empty($conf->banque->enabled) || empty($bankaccountid)) {
 		$postactionmessages[] = "Setup of bank account to use in module Stancer was not set.";
 		$ispostactionok = -1;
@@ -827,6 +904,9 @@ function stancerAddPaymentOnObject($object, $data, &$errorMessage, $bypassCustom
 
 	// Creation of payment line : warning donation is a special case
 	if ($object->element == 'don') {
+		// Only Don objects carry element 'don'. Narrowing matters here because
+		// Don::setPaid() takes an id while Facture::setPaid() takes a User.
+		'@phan-var Don $object';
 		$paiement = new PaymentDonation($db);
 		$paiement->datep 			= $data['date'];
 		$paiement->amounts 			= array($object->id => (float) price2num($data['FinalPaymentAmt']));
@@ -836,8 +916,14 @@ function stancerAddPaymentOnObject($object, $data, &$errorMessage, $bypassCustom
 		$paiement->ext_payment_site = $data['service'];
 		$paiement->paymenttype 		= $data['paymentTypeId'];
 		$paiement->fk_donation 		= $object->id;
-		$paiement->total 			= (float) price2num($data['FinalPaymentAmt']);
 		$paiement->amount 			= (float) price2num($data['FinalPaymentAmt']);
+		// $total must be fed even though create() computes and writes it itself:
+		// PaymentDonation::addPaymentToBank() (called below) reads ONLY $this->total,
+		// with no fallback on $this->amount, in Dolibarr 15 as in 21. When create()
+		// fails it returns before writing $total, and the call below still happens,
+		// so leaving $total unset would send a null amount to Account::addline().
+		// @phan-suppress-next-line PhanDeprecatedProperty  the only field PaymentDonation::addPaymentToBank() reads
+		$paiement->total 			= (float) price2num($data['FinalPaymentAmt']);
 		$paiement->datepaid 		= $data['date'];
 
 		dol_syslog("stancerAddPaymentOnObject ask PaymentDonation create with " . json_encode($paiement));
@@ -987,7 +1073,7 @@ function stancerAddPaymentOnInvoices(array $invoices, $data, &$errorMessage)
 		return -3;
 	}
 
-	$bankaccountid = getDolGlobalString('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
+	$bankaccountid = getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
 	if (empty($conf->banque->enabled) || empty($bankaccountid)) {
 		$errorMessage = "Setup of bank account to use in module Stancer was not set.";
 		dol_syslog($errorMessage, LOG_WARNING);
@@ -1105,7 +1191,7 @@ function stancerAddPaymentOnInvoices(array $invoices, $data, &$errorMessage)
  *
  * @param   string  $orderid  order id
  *
- * @return  Propal|Facture|Commande|Don|AdherentStancer object from dolibarr
+ * @return  Propal|Facture|Commande|Don|AdherentStancer|null  object from dolibarr, null when nothing matches
  */
 function getObjectFromOrderID($orderid)
 {
@@ -1171,7 +1257,7 @@ function getObjectFromOrderID($orderid)
  *
  * @param   string       $tag		dolibarr tag
  *
- * @return  Facture|Commande|Don|AdherentStancer object from dolibarr
+ * @return  Facture|Commande|Don|AdherentStancer|Propal|null  object from dolibarr, null when the tag matches nothing
  */
 function getObjectFromTag($tag)
 {
@@ -1182,7 +1268,7 @@ function getObjectFromTag($tag)
 	$tmptag = dolExplodeIntoArray($tag, '.', '=');
 	if (array_key_exists('INV', $tmptag) && $tmptag['INV'] > 0) {
 		$object = new Facture($db);
-		$result = $object->fetch($tmptag['INV']);
+		$result = $object->fetch((int) $tmptag['INV']);
 		if ($result) {
 			return $object;
 		} else {
@@ -1190,7 +1276,7 @@ function getObjectFromTag($tag)
 		}
 	} elseif (array_key_exists('ORD', $tmptag) && $tmptag['ORD'] > 0) {
 		$object = new Commande($db);
-		$result = $object->fetch($tmptag['ORD']);
+		$result = $object->fetch((int) $tmptag['ORD']);
 		if ($result) {
 			return $object;
 		} else {
@@ -1198,7 +1284,7 @@ function getObjectFromTag($tag)
 		}
 	} elseif (array_key_exists('DON', $tmptag) && $tmptag['DON'] > 0) {
 		$object = new Don($db);
-		$result = $object->fetch($tmptag['DON']);
+		$result = $object->fetch((int) $tmptag['DON']);
 		if ($result) {
 			return $object;
 		} else {
@@ -1206,7 +1292,7 @@ function getObjectFromTag($tag)
 		}
 	} elseif (array_key_exists('MEM', $tmptag) && $tmptag['MEM'] > 0) {
 		$object = new AdherentStancer($db);
-		$result = $object->fetch($tmptag['MEM']);
+		$result = $object->fetch((int) $tmptag['MEM']);
 		if ($result) {
 			return $object;
 		} else {
@@ -1215,7 +1301,7 @@ function getObjectFromTag($tag)
 	} elseif (array_key_exists('PRO', $tmptag) && $tmptag['PRO'] > 0) {
 		// Devis: built as 'PRO=<id>' in stancer_payment.lib.php
 		$object = new Propal($db);
-		$result = $object->fetch($tmptag['PRO']);
+		$result = $object->fetch((int) $tmptag['PRO']);
 		if ($result) {
 			return $object;
 		} else {
@@ -1364,7 +1450,7 @@ function stancerUpdateAllDatesOnMainBankAccount()
 			$pid = $obj->payout_id;
 			$datebank = $obj->date_bank;
 
-			$sqlupdate = "UPDATE " . MAIN_DB_PREFIX . "bank SET dateo='" . $datebank . "', datev='" . $datebank . "' WHERE num_chq='" . $pid . "' AND amount > 0";
+			$sqlupdate = "UPDATE " . MAIN_DB_PREFIX . "bank SET dateo='" . $db->escape($datebank) . "', datev='" . $db->escape($datebank) . "' WHERE num_chq='" . $db->escape($pid) . "' AND amount > 0";
 			//print $sql . "<br />";
 			$resqlupdate = $db->query($sqlupdate);
 		}
@@ -1391,7 +1477,7 @@ function stancerUpdateAllDatesOnMainBankAccountFromBanking4Doli()
 			$datebank = $obj->record_date;
 			$id = $obj->bid;
 
-			$sqlupdate = "UPDATE " . MAIN_DB_PREFIX . "bank SET dateo='" . $datebank . "', datev='" . $datebank . "' WHERE rowid='" . $id . "'";
+			$sqlupdate = "UPDATE " . MAIN_DB_PREFIX . "bank SET dateo='" . $db->escape($datebank) . "', datev='" . $db->escape($datebank) . "' WHERE rowid='" . ((int) $id) . "'";
 			// print $sqlupdate . "<br />";
 			$resqlupdate = $db->query($sqlupdate);
 		}
@@ -1411,6 +1497,8 @@ function stancerAddRefundFeesToBank()
 	$stancerApi = StancerApi::getInstance();
 	$sp = new Stancer_payouts($db);
 	$resList = $sp->fetchAll('ASC', '', 0, 0, array('customsql' => "amount < '0'"));
+	// Declared before the try because the catch block reports it.
+	$payoutID = '';
 	try {
 		$counter = 0;
 		foreach ($resList as $oneSp) {
@@ -1439,7 +1527,7 @@ function stancerAddRefundFeesToBank()
 			if (!empty($dateo) && ($fees  > 0)) {
 				// erics add new line on bank account for Stancer Fees
 				$ref = $oneSp->payout_id;
-				$bankaccountid = getDolGlobalString('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
+				$bankaccountid = getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
 				dol_syslog("STANCER_ADD_FEES is on each REFUNDS ....");
 				$resAddPaiment = stancerAddPaimentFeeOnBank($ref, $fees, $bankaccountid, $ref, $dateo, $datev);
 			}
@@ -1505,7 +1593,9 @@ function stancerCheckBankLines()
 		// print "</p>";exit;
 		$dateo = $oneSp->created;
 		$datev = $oneSp->date_bank;
-		$fees = $oneSp->fees / 100;
+		// Stancer_payments names the column "fee" (singular). Reading "fees" here
+		// silently yielded null, so the Stancer fees were always booked as zero.
+		$fees = $oneSp->fee / 100;
 		$amount = $oneSp->amount / 100;
 		$ref = $oneSp->stancer_id;
 		$type = "";
@@ -1564,7 +1654,7 @@ function stancerCheckBankLines()
 
 		if (stancerBankLineDoesNotExists($ref, $bankaccountid, (float) price2num($amount))) {
 			dol_syslog("stancerCheckBankLines no duplicate entries found");
-			$bank_line_id = $account->addline($dateo, $type, $label, (float) price2num($amount), $ref, '', $user);
+			$bank_line_id = $account->addline($dateo, $type, $label, (float) price2num($amount), $ref, 0, $user);
 			if (!($bank_line_id > 0)) {
 				dol_syslog("stancerCheckBankLines add line error for " . $ref . "");
 				$error++;
@@ -1602,14 +1692,14 @@ function stancerUpdateLabelOnMainAccount($payoutID)
 {
 	global $db, $conf;
 	$stancerApi = StancerApi::getInstance();
-	$fk_account = getDolGlobalString('STANCER_BANK_MAIN_ACCOUNT_FOR_PAYOUTS');
+	$fk_account = getDolGlobalInt('STANCER_BANK_MAIN_ACCOUNT_FOR_PAYOUTS');
 	$payoutData = $stancerApi->getPayout($payoutID);
 	if ($payoutData === false) {
 		dol_syslog("stancerUpdateLabelOnMainAccount error: " . $stancerApi->error);
 		return;
 	}
 	$labelTo = isset($payoutData['statement_description']) ? $payoutData['statement_description'] : '';
-	$sql = "UPDATE " . MAIN_DB_PREFIX . "bank SET label='" . $db->escape($labelTo) . "' WHERE num_chq='" . $db->escape($payoutID) . "' AND fk_account='" . $db->escape($fk_account) . "'";
+	$sql = "UPDATE " . MAIN_DB_PREFIX . "bank SET label='" . $db->escape($labelTo) . "' WHERE num_chq='" . $db->escape($payoutID) . "' AND fk_account='" . ((int) $fk_account) . "'";
 	$resql = $db->query($sql);
 	if (!$resql) {
 		dol_syslog("stancerUpdateLabelOnMainAccount sql error : $sql");

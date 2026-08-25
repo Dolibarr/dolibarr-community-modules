@@ -126,15 +126,25 @@ class ActionsStancer
 		// dol_syslog("stancer formConfirm object = " . json_encode($object));
 		// dol_syslog("stancer formConfirm action = " . json_encode($action));
 
+		// The three actions handled below are only ever triggered from the invoice
+		// card (buttons built by addMoreActionsButtons()), where the core always
+		// hands us a Facture. Anything else means a foreign caller: log and skip.
+		if (!($object instanceof Facture)) {
+			if (in_array($action, array('stancerCard', 'stancerSEPA', 'stancerRefund'), true)) {
+				dol_syslog("stancer formConfirm: action " . $action . " received with " . (is_object($object) ? get_class($object) : gettype($object)) . " instead of Facture, skip", LOG_ERR);
+			}
+			return 0;
+		}
+
 		if ($action == "stancerCard" && getDolGlobalString('STANCER_ENABLE_CB')) {
 			$formconfirm = '';
 			$form = new Form($object->db);
 
-			$qrdata = stancerQRCodePayment(getOnlinePaymentUrl(0, 'invoice', $object->ref));
+			$qrdata = stancerQRCodePayment(getOnlinePaymentUrl(0, 'invoice', (string) $object->ref));
 			$message = "<img style='float:right; background: white' src='data:image/png;base64," . base64_encode($qrdata) . "' /> <br />";
 			$message .= "<p>" . $langs->trans('StancerPopupCB', $object->ref) . "</p>"; //. showOnlinePaymentUrl('invoice', $object->ref);
 
-			$urlPayment = getOnlinePaymentUrl(0, 'invoice', $object->ref);
+			$urlPayment = getOnlinePaymentUrl(0, 'invoice', (string) $object->ref);
 			$message .= '<div class=""><input type="text" id="onlinepaymenturl" class="quatrevingtpercentminusx" value="' . $urlPayment . '">';
 			$message .= '<a class="" href="' . $urlPayment . '" target="_blank" rel="noopener noreferrer">' . img_picto('', 'globe', 'class="paddingleft"') . '</a>';
 			$message .= '</div>';
@@ -142,7 +152,9 @@ class ActionsStancer
 
 			//une cb est enregistrée pour ce client on propose un paiement direct ?
 			$companypaymentmode = new CompanyPaymentModeStancer($db);
-			$res = $companypaymentmode->fetch(0, null, null, null, " AND type = 'card' AND label LIKE 'stancer-card%' AND stancer_object_ref <> '' AND fk_soc = " . ((int) $object->socid));
+			// fetch() tests each argument for truthiness, so '' and 0 behave exactly
+			// like the null values used before while matching the declared types.
+			$res = $companypaymentmode->fetch(0, '', 0, '', " AND type = 'card' AND label LIKE 'stancer-card%' AND stancer_object_ref <> '' AND fk_soc = " . ((int) $object->socid));
 			if ($res) {
 				$message .= '<p>&nbsp;</p><p>' . $langs->trans('StancerPopupCBexists') . '</p>';
 				$formconfirm = $form->formconfirm($_SERVER["PHP_SELF"] . '?id=' . $object->id, $langs->trans('Stancer'), $message, 'confirm_stancertakecbpayment', '', 'no', 1, 340, 480);
@@ -202,7 +214,7 @@ class ActionsStancer
 			$formconfirm = '';
 			$form = new Form($object->db);
 
-			$amountToRefund = abs($object->total_ttc);
+			$amountToRefund = abs((float) $object->total_ttc);
 			$message = $langs->trans('StancerRefundConfirmMessage', price($amountToRefund), $object->multicurrency_code ?: 'EUR');
 
 			// Show original invoice info
@@ -480,7 +492,7 @@ class ActionsStancer
 			}
 
 			// Stancer refund for credit notes
-			if ($action == "confirm_stancerRefund" && $object->type == Facture::TYPE_CREDIT_NOTE) {
+			if ($action == "confirm_stancerRefund" && $object instanceof Facture && $object->type == Facture::TYPE_CREDIT_NOTE) {
 				dol_syslog("stancer doActions confirm_stancerRefund for credit note id=" . $object->id);
 
 				// Find the original invoice
@@ -490,7 +502,7 @@ class ActionsStancer
 						// Find the Stancer payment
 						$sp = new Stancer_payments($this->db);
 						$resSP = $sp->fetchAll('DESC', 't.rowid', 1, 0, array(
-							'customsql' => "live_mode = '" . getDolGlobalString('STANCER_IS_PROD', '0') . "' AND status = '" . Stancer_payments::STATUS_CAPTURED . "' AND (unique_id LIKE '%INV=" . $this->db->escape($originalInvoice->id) . "' OR unique_id LIKE '%INV=" . $this->db->escape($originalInvoice->id) . ".%' OR order_id LIKE '%" . $this->db->escape($originalInvoice->ref) . "%')"
+							'customsql' => "live_mode = '" . getDolGlobalString('STANCER_IS_PROD', '0') . "' AND status = '" . Stancer_payments::STATUS_CAPTURED . "' AND (unique_id LIKE '%INV=" . ((int) $originalInvoice->id) . "' OR unique_id LIKE '%INV=" . ((int) $originalInvoice->id) . ".%' OR order_id LIKE '%" . $this->db->escape($originalInvoice->ref) . "%')"
 						));
 
 						if (is_array($resSP) && count($resSP) > 0) {
@@ -523,9 +535,15 @@ class ActionsStancer
 		if ($parameters['currentcontext'] == 'invoicesuppliercard') {
 			dol_syslog("stancer doActions: invoicesuppliercard context matched, action=$action", LOG_DEBUG);
 			if ($action == 'stancerFindPaymentInvoice') {
-				dol_syslog("stancer doActions: calling stancerFindPaymentInvoiceAction", LOG_DEBUG);
-				$this->stancerFindPaymentInvoiceAction($object, $user, $error);
-				dol_syslog("stancer doActions: stancerFindPaymentInvoiceAction completed, error=$error", LOG_DEBUG);
+				// stancerFindPaymentInvoiceAction() reads supplier invoice fields
+				// ($date, getSommePaiement()...), so only run it on a real one.
+				if ($object instanceof FactureFournisseur) {
+					dol_syslog("stancer doActions: calling stancerFindPaymentInvoiceAction", LOG_DEBUG);
+					$this->stancerFindPaymentInvoiceAction($object, $user, $error);
+					dol_syslog("stancer doActions: stancerFindPaymentInvoiceAction completed, error=$error", LOG_DEBUG);
+				} else {
+					dol_syslog("stancer doActions: stancerFindPaymentInvoice ignored, object is " . (is_object($object) ? get_class($object) : gettype($object)) . " instead of FactureFournisseur", LOG_ERR);
+				}
 			}
 		} else {
 			// DEBUG: Log why we didn't enter the invoicesuppliercard block
@@ -886,23 +904,28 @@ class ActionsStancer
 		// print json_encode($object);
 		// exit;
 
-		if (empty($object)) {
-			$object = getObjectFromTag($parameters['tag']);
-			// print "<p>objet vide il faut le retrouver a partir du tag ... " . $parameters['tag'] . "</p>";
-			// print "dopayment : " . json_encode($object);
-			// exit;
-		}
-
-
-		if ($parameters['currentcontext'] == 'newpayment') {
-			if ($parameters['paymentmethod'] == 'stancer') {
-				$amount = null;
-				if (isset($parameters['amount'])) {
-					$amount = $parameters['amount'];
-				}
-				$res = stancerCardstartPayWithRedirect($object, $parameters, $amount);
-				dol_syslog("stancer doPayment call stancerCardstartPayWithRedirect returns " . json_encode($res));
+		// The core calls this hook on every load of the public payment page, including
+		// when no object is known yet and when another payment module is the target.
+		// Anything but our own case must be left alone: returning an error here would
+		// poison the whole hook result and hide the other modules embedded forms.
+		if ($parameters['currentcontext'] == 'newpayment' && (isset($parameters['paymentmethod']) ? $parameters['paymentmethod'] : '') == 'stancer') {
+			if (empty($object)) {
+				$object = getObjectFromTag(isset($parameters['tag']) ? $parameters['tag'] : '');
 			}
+
+			if (empty($object)) {
+				// getObjectFromTag() returns null on an unknown or malformed tag:
+				// going further would call a method on null (fatal on a public page).
+				dol_syslog("stancer doPayment: no Dolibarr object found for tag '" . (isset($parameters['tag']) ? $parameters['tag'] : '') . "', payment aborted", LOG_ERR);
+				return $error;
+			}
+
+			$amount = null;
+			if (isset($parameters['amount'])) {
+				$amount = $parameters['amount'];
+			}
+			$res = stancerCardstartPayWithRedirect($object, $parameters, $amount);
+			dol_syslog("stancer doPayment call stancerCardstartPayWithRedirect returns " . json_encode($res));
 		}
 		return $error;
 	}
@@ -992,10 +1015,6 @@ class ActionsStancer
 		$deltemp = array();
 		dol_syslog(get_class($this) . '::executeHooks action=' . $action);
 
-		/* print_r($parameters); print_r($object); echo "action: " . $action; */
-		if (in_array($parameters['currentcontext'], array('somecontext1', 'somecontext2'))) {        // do something only for the context 'somecontext1' or 'somecontext2'
-		}
-
 		return $ret;
 	}
 
@@ -1019,11 +1038,6 @@ class ActionsStancer
 		$ret = 0;
 		$deltemp = array();
 		dol_syslog(get_class($this) . '::executeHooks action=' . $action);
-
-		/* print_r($parameters); print_r($object); echo "action: " . $action; */
-		if (in_array($parameters['currentcontext'], array('somecontext1', 'somecontext2'))) {
-			// do something only for the context 'somecontext1' or 'somecontext2'
-		}
 
 		return $ret;
 	}
@@ -1106,7 +1120,7 @@ class ActionsStancer
 	 * @param  object $object            the object you want to process (an invoice if you are in invoice module, a propale in propale's module, etc...)
 	 * @param  string $action             current action (if set). Generally create or edit or null
 	 * @param  HookManager $hookmanager Hook manager propagated to allow calling another hook
-	 * @return void
+	 * @return int                      0 on success (extra column is printed directly)
 	 */
 	public function printFieldListTitle($parameters, &$object, &$action, $hookmanager)
 	{
@@ -1148,7 +1162,7 @@ class ActionsStancer
 	 *
 	 * @param	array	$parameters		Array of parameters
 	 * @param	object	$object			Object
-	 * @return	string					HTML content to add by hook
+	 * @return	int						0 on success (cell content is printed directly)
 	 */
 	public function printFieldListValue($parameters, &$object)
 	{
@@ -1193,55 +1207,110 @@ class ActionsStancer
 
 		dol_syslog("stancer addMoreActionsButtons param = " . json_encode($parameters) . ", action = $action", LOG_DEBUG);
 
+		// The blocks below read invoice fields on $object. The core always passes the
+		// matching class for these two contexts, so a mismatch is a caller bug: log it.
+		if (($currentcontext == 'invoicecard' && !($object instanceof Facture))
+			|| ($currentcontext == 'invoicesuppliercard' && !($object instanceof FactureFournisseur))) {
+			dol_syslog("stancer addMoreActionsButtons: context " . $currentcontext . " received with " . (is_object($object) ? get_class($object) : gettype($object)) . ", no Stancer button added", LOG_ERR);
+			return 0;
+		}
+
 		// print json_encode($object);exit;
-		if ($currentcontext == 'invoicesuppliercard') {
+		if ($currentcontext == 'invoicesuppliercard' && $object instanceof FactureFournisseur) {
 			// uniquement si fournisseur est stancer !
 			$search = "/(ILIAD 78)|(stancer)/i";
 
+			// Keep $statut here: FactureFournisseur::fetch() only fills $this->statut
+			// on Dolibarr 15 (still supported), $this->status appears in Dolibarr 16.
+			// @phan-suppress-next-line PhanDeprecatedProperty
 			if ($object->statut == FactureFournisseur::STATUS_VALIDATED && preg_match($search, $object->thirdparty->name)) {
 				print '<div class="inline-block divButAction"><a class="butAction" href="' . $_SERVER["PHP_SELF"] . '?id=' . $object->id . '&action=stancerFindPaymentInvoice">' . $langs->trans('stancerFindPaymentInvoice') . '</a></div>';
 			}
 		}
 
-		if ($currentcontext == 'invoicecard') {
+		if ($currentcontext == 'invoicecard' && $object instanceof Facture) {
 			dol_syslog("stancer addMoreActionsButtons object status = " . $object->status, LOG_DEBUG);
 
-			if ($object->statut == Facture::STATUS_VALIDATED) {
+			if ($object->status == Facture::STATUS_VALIDATED) {
 				//Moyen de paiement prélèvement ?
+				$showSepaButton = ($object->mode_reglement_code == 'PRE');
+				//idée proposer des paiements fragmentés
+				$showCardButton = ($object->mode_reglement_code == 'CB' && getDolGlobalString('STANCER_ENABLE_CB'));
+
 				//disable si déjà en cours ?
 				$btnAction = "butAction";
+				$runningLabels = array();
+				$runningStancerId = '';
 
-				$sp = new Stancer_payments($this->db);
-				//Vérification que nous n'avons pas déjà un SEPA en cours ....
-				$resSP = $sp->fetch(0, null, null, "", $object->ref);
-				// print "recherche $object->ref : " . json_encode($resSP) . "...";
-				if ($resSP > 0) {
-					$btnAction = "butActionRefused";
+				// Disable the buttons while a debit is engaged for this invoice, so a
+				// second click cannot debit the customer twice. All the rows that link
+				// a running payment to this invoice are read, not just one: order_id
+				// has no unique index and a same-day grouped SEPA debit only names the
+				// invoice in grouped_invoice_ids. See fetchAllRunningForInvoice().
+				// The query is skipped when no Stancer button is going to be printed:
+				// this hook runs on every display of every validated invoice, most of
+				// which are not paid through Stancer at all.
+				if ($showSepaButton || $showCardButton) {
+					$sp = new Stancer_payments($this->db);
+					$runningPayments = $sp->fetchAllRunningForInvoice($object->id, (string) $object->ref);
+					if (!is_array($runningPayments)) {
+						// fetchAllRunningForInvoice() already logged the SQL error. Leave the
+						// buttons active: refusing a legitimate debit on a failed read would
+						// block the user with no way out.
+						dol_syslog("stancer addMoreActionsButtons cannot read the Stancer payments of invoice " . $object->ref . " (id=" . $object->id . "), buttons left active", LOG_ERR);
+					} elseif (count($runningPayments) > 0) {
+						// Same wording as the server side guards of stancerSEPAstartPay()
+						// and stancerCBstartPay(), so what the user reads in the tooltip
+						// can be grepped as is in dolibarr.log.
+						$runningLabels = Stancer_payments::describeRecords($runningPayments);
+						$firstRunningPayment = reset($runningPayments);
+						$runningStancerId = (string) $firstRunningPayment->stancer_id;
+						dol_syslog("stancer addMoreActionsButtons " . count($runningLabels) . " Stancer payment(s) still running for invoice " . $object->ref . " (id=" . $object->id . "): " . implode(', ', $runningLabels) . ", payment buttons disabled", LOG_WARNING);
+						$btnAction = "butActionRefused";
+					}
 				}
 
-				if ($object->mode_reglement_code == 'PRE') {
+				// Tooltip of the disabled buttons: name the payments that hold the lock,
+				// so the user can find them in the list reached by the button added below.
+				// trans() already returns HTML encoded text, only the dynamic part is
+				// escaped here: escaping the whole string would show the entities raw.
+				$alreadyInProgressTitle = $langs->trans('StancerAlreadyInProgress');
+				if ($runningStancerId !== '') {
+					$alreadyInProgressTitle .= ' (' . dol_escape_htmltag(implode(' / ', $runningLabels)) . ')';
+				}
+
+				if ($showSepaButton) {
 					if ($btnAction == "butAction") {
 						print '<div class="inline-block divButAction"><a class="' . $btnAction . '" href="' . $_SERVER["PHP_SELF"] . '?id=' . $object->id . '&action=stancerSEPA">' . $langs->trans('StancerSEPAstart') . '</a></div>';
 					} else {
-						print '<div class="inline-block divButAction"><a class="' . $btnAction . ' classfortooltip" href="#" title="' . $langs->trans('StancerAlreadyInProgress') . '">' . $langs->trans('StancerSEPAstart') . '</a></div>';
+						print '<div class="inline-block divButAction"><a class="' . $btnAction . ' classfortooltip" href="#" title="' . $alreadyInProgressTitle . '">' . $langs->trans('StancerSEPAstart') . '</a></div>';
 					}
 				}
-				//idée proposer des paiements fragmentés
-				if ($object->mode_reglement_code == 'CB' && getDolGlobalString('STANCER_ENABLE_CB')) {
+				if ($showCardButton) {
 					if ($btnAction == "butAction") {
 						print '<div class="inline-block divButAction"><a class="' . $btnAction . '" href="' . $_SERVER["PHP_SELF"] . '?id=' . $object->id . '&action=stancerCard">' . $langs->trans('StancerCardStart') . '</a></div>';
 					} else {
-						print '<div class="inline-block divButAction"><a class="' . $btnAction . ' classfortooltip" href="#" title="' . $langs->trans('StancerAlreadyInProgress') . '">' . $langs->trans('StancerCardStart') . '</a></div>';
+						print '<div class="inline-block divButAction"><a class="' . $btnAction . ' classfortooltip" href="#" title="' . $alreadyInProgressTitle . '">' . $langs->trans('StancerCardStart') . '</a></div>';
 					}
+				}
+
+				// Way out of the disabled state. A row can stay in a running status for
+				// good if the synchronisation stops, so the user needs to reach it: this
+				// button opens the payment list on the blocking payment, where the force
+				// refresh mass action asks Stancer for its real status. Once that status
+				// is no longer a running one, the buttons above become clickable again.
+				if ($runningStancerId !== '') {
+					$runningPaymentUrl = dol_buildpath('/stancer/stancer_payments_list.php', 1) . '?search_stancer_id=' . urlencode($runningStancerId);
+					print '<div class="inline-block divButAction"><a class="butAction classfortooltip" href="' . $runningPaymentUrl . '" title="' . $alreadyInProgressTitle . '">' . $langs->trans('StancerPayments') . '</a></div>';
 				}
 			}
 		}
 
 		// Payment link for propal is now displayed in formBuilddocOptions hook (bottom of page)
 
-		if ($currentcontext == 'invoicecard') {
+		if ($currentcontext == 'invoicecard' && $object instanceof Facture) {
 			// Button for credit notes (avoir) - Stancer refund
-			if ($object->type == Facture::TYPE_CREDIT_NOTE && $object->statut == Facture::STATUS_VALIDATED) {
+			if ($object->type == Facture::TYPE_CREDIT_NOTE && $object->status == Facture::STATUS_VALIDATED) {
 				$canRefund = false;
 				$refundBtnClass = "butActionRefused";
 				$refundTooltip = $langs->trans('StancerRefundNoLinkedPayment');
@@ -1253,7 +1322,7 @@ class ActionsStancer
 						// Search for a captured Stancer payment on the original invoice
 						$sp = new Stancer_payments($this->db);
 						$resSP = $sp->fetchAll('DESC', 't.rowid', 1, 0, array(
-							'customsql' => "live_mode = '" . getDolGlobalString('STANCER_IS_PROD', '0') . "' AND status = '" . Stancer_payments::STATUS_CAPTURED . "' AND (unique_id LIKE '%INV=" . $this->db->escape($originalInvoice->id) . "' OR unique_id LIKE '%INV=" . $this->db->escape($originalInvoice->id) . ".%' OR order_id LIKE '%" . $this->db->escape($originalInvoice->ref) . "%')"
+							'customsql' => "live_mode = '" . getDolGlobalString('STANCER_IS_PROD', '0') . "' AND status = '" . Stancer_payments::STATUS_CAPTURED . "' AND (unique_id LIKE '%INV=" . ((int) $originalInvoice->id) . "' OR unique_id LIKE '%INV=" . ((int) $originalInvoice->id) . ".%' OR order_id LIKE '%" . $this->db->escape($originalInvoice->ref) . "%')"
 						));
 						if (is_array($resSP) && count($resSP) > 0) {
 							$canRefund = true;
@@ -1294,7 +1363,7 @@ class ActionsStancer
 	 * This method analyzes Stancer payments to calculate total fees for the invoice period
 	 * and matches them with bank withdrawals to properly link the supplier invoice.
 	 *
-	 * @param  CommonObject $object  The supplier invoice
+	 * @param  FactureFournisseur $object  The supplier invoice
 	 * @param  User               $user    Current user
 	 * @param  int                $error   Error counter (passed by reference)
 	 * @return void
@@ -1342,7 +1411,7 @@ class ActionsStancer
 			return;
 		}
 
-		$invoiceAmountTTC = abs($object->total_ttc);
+		$invoiceAmountTTC = abs((float) $object->total_ttc);
 		$invoiceAmountTTCCents = (int) round($invoiceAmountTTC * 100);
 
 		$year = dol_print_date($object->date, "%Y");
@@ -1353,11 +1422,11 @@ class ActionsStancer
 		// Calculate date range for fee search
 		// Stancer invoices typically cover the previous month's activity
 		$periodStart = new DateTime();
-		$periodStart->setDate($year, $month, 1);
+		$periodStart->setDate((int) $year, (int) $month, 1);
 		$periodStart->modify('-1 month');
 
 		$periodEnd = new DateTime();
-		$periodEnd->setDate($year, $month, 1);
+		$periodEnd->setDate((int) $year, (int) $month, 1);
 		$periodEnd->modify('-1 day');
 
 		$debugMessages[] = "Period start: " . $periodStart->format('Y-m-d');
@@ -1521,7 +1590,9 @@ class ActionsStancer
 		// Now look for bank withdrawals to link
 		$debugMessages[] = "=== BANK SEARCH ===";
 
-		$bankAccountId = getDolGlobalString('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
+		// Constant holds a llx_bank_account rowid: read it as an int, it is fed to
+		// Account::fetch() and concatenated in the SQL below.
+		$bankAccountId = getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
 		$debugMessages[] = "Bank account ID: $bankAccountId";
 
 		if (empty($bankAccountId)) {
@@ -1533,7 +1604,7 @@ class ActionsStancer
 
 		// Search for bank withdrawals in the invoice month
 		$prevdate = new DateTime();
-		$prevdate->setDate($year, $month, 1);
+		$prevdate->setDate((int) $year, (int) $month, 1);
 		$prevdate->modify('-1 month');
 
 		// Only accept bank lines whose num_chq is a real Stancer fee reference:
@@ -1543,7 +1614,7 @@ class ActionsStancer
 		$sqlBank = "SELECT rowid, amount, num_chq, dateo, label
 			FROM " . MAIN_DB_PREFIX . "bank
 			WHERE rappro = '0'
-			AND fk_account = '" . $this->db->escape($bankAccountId) . "'
+			AND fk_account = " . ((int) $bankAccountId) . "
 			AND amount < 0
 			AND dateo >= '" . $prevdate->format('Y-m-d') . "'
 			AND dateo <= '" . dol_print_date($object->date, '%Y-%m-%d') . "'
@@ -1647,7 +1718,7 @@ class ActionsStancer
 				$pai->amounts[$object->id] = $paymentAmount;
 				$pai->datepaye = $object->date;
 				$pai->paiementid = 3; // withdrawal
-				$pai->num_payment = $object->ref;
+				$pai->num_payment = (string) $object->ref;
 
 				if ($pai->create($user, 0) < 0) {
 					$debugMessages[] = "  ERROR creating payment: " . implode(', ', $pai->errors);
@@ -1697,7 +1768,7 @@ class ActionsStancer
 				// Also reconcile credit lines (payouts) for the same month on this bank account
 				$invoiceMonth = dol_print_date($object->date, '%Y-%m');
 				$sqlReconcileCredits = "UPDATE " . MAIN_DB_PREFIX . "bank SET rappro = 1, num_releve = '" . $this->db->escape($statementRef) . "'
-					WHERE fk_account = '" . $this->db->escape($bankAccountId) . "'
+					WHERE fk_account = " . ((int) $bankAccountId) . "
 					AND amount > 0
 					AND rappro = 0
 					AND DATE_FORMAT(dateo, '%Y-%m') = '" . $this->db->escape($invoiceMonth) . "'";
@@ -1706,7 +1777,7 @@ class ActionsStancer
 
 				// Reconcile outgoing transfers (VIR) for the same period on Stancer account
 				$sqlReconcileVIR = "UPDATE " . MAIN_DB_PREFIX . "bank SET rappro = 1, num_releve = '" . $this->db->escape($statementRef) . "'
-					WHERE fk_account = '" . $this->db->escape($bankAccountId) . "'
+					WHERE fk_account = " . ((int) $bankAccountId) . "
 					AND amount < 0
 					AND rappro = 0
 					AND fk_type = 'VIR'

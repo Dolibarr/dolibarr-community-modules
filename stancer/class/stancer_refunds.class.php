@@ -297,10 +297,10 @@ class Stancer_refunds extends CommonObject
 	/**
 	 * Load object in memory from the database
 	 *
-	 * @param int    $id         Id object
-	 * @param string $ref        Ref
-	 * @param string $refund_id  Stancer refund ID (rfnd_xxx)
-	 * @return int               <0 if KO, 0 if not found, >0 if OK
+	 * @param int         $id         Id object
+	 * @param string|null $ref        Ref
+	 * @param string|null $refund_id  Stancer refund ID (rfnd_xxx)
+	 * @return int                    <0 if KO, 0 if not found, >0 if OK
 	 */
 	public function fetch($id, $ref = null, $refund_id = null)
 	{
@@ -338,7 +338,10 @@ class Stancer_refunds extends CommonObject
 	 * @param  int         $offset       Offset
 	 * @param  array       $filter       Filter array. Example array('field'=>'valueforlike', 'customurl'=>...)
 	 * @param  string      $filtermode   Filter mode (AND or OR)
-	 * @return array|int                 int <0 if KO, array of pages if OK
+	 * @return array<int,Stancer_refunds>|int   int <0 if KO, array of records indexed by rowid if OK
+	 *
+	 * An empty result set is a legitimate return value, so the array cannot be documented as non-empty.
+	 * @phan-suppress PhanPluginMoreSpecificActualReturnType
 	 */
 	public function fetchAll($sortorder = '', $sortfield = '', $limit = 0, $offset = 0, $filter = array(), $filtermode = 'AND')
 	{
@@ -372,7 +375,8 @@ class Stancer_refunds extends CommonObject
 			}
 		}
 		if (count($sqlwhere) > 0) {
-			$sql .= " AND (".implode(" ".$filtermode." ", $sqlwhere).")";
+			// Whitelist the boolean operator instead of concatenating the caller value as is.
+			$sql .= " AND (".implode((strtoupper($filtermode) == 'OR' ? " OR " : " AND "), $sqlwhere).")";
 		}
 
 		if (!empty($sortfield)) {
@@ -783,6 +787,9 @@ class Stancer_refunds extends CommonObject
 			$return .= '<input id="cb'.$this->id.'" class="flat checkforselect fright" type="checkbox" name="toselect[]" value="'.$this->id.'"'.($selected ? ' checked="checked"' : '').'>';
 		}
 		if (property_exists($this, 'label')) {
+			// Generic kanban renderer coming from the Dolibarr CRUD skeleton: the property_exists()
+			// test above is the runtime guard, but Phan does not narrow on it.
+			// @phan-suppress-next-line PhanUndeclaredProperty
 			$return .= ' <div class="inline-block opacitymedium valignmiddle tdoverflowmax100">'.$this->label.'</div>';
 		}
 		if (property_exists($this, 'thirdparty') && is_object($this->thirdparty)) {
@@ -952,7 +959,7 @@ class Stancer_refunds extends CommonObject
 	/**
 	 * 	Create an array of lines
 	 *
-	 * 	@return array|int		array of lines if OK, <0 if KO
+	 * 	@return CommonObjectLine[]|int		array of lines if OK, <0 if KO
 	 */
 	public function getLinesArray()
 	{
@@ -996,10 +1003,10 @@ class Stancer_refunds extends CommonObject
 				$dir = dol_buildpath($reldir."core/modules/stancer/");
 
 				// Load file with numbering class (if found)
-				$mybool |= @include_once $dir.$file;
+				$mybool = ((bool) @include_once $dir.$file) || $mybool;
 			}
 
-			if ($mybool === false) {
+			if (!$mybool) {
 				dol_print_error($this->db, "Failed to include file ".$file);
 				return '';
 			}
@@ -1129,7 +1136,7 @@ class Stancer_refunds extends CommonObject
 		global $langs;
 
 		if (in_array($key, array('amount'))) {
-			return price($object / 100);
+			return price((float) $object / 100);
 		}
 		if ($key == 'refund_id') {
 			$label = dol_escape_htmltag($object);

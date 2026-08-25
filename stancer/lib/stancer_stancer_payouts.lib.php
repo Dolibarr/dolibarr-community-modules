@@ -25,7 +25,7 @@
  * Prepare array of tabs for Stancer_payouts
  *
  * @param	Stancer_payouts	$object		Stancer_payouts
- * @return 	array					Array of tabs
+ * @return 	array<int,array<int,string>>			Array of tabs
  */
 function stancer_payoutsPrepareHead($object)
 {

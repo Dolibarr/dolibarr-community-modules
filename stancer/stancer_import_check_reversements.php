@@ -106,30 +106,6 @@ if (!$permissiontoread) {
 
 
 /**
- * pour avoir les liens vers le tiers et ainsi lors de la ventilation en compta avoir les bon comptes de tiers
- *
- * @param   object  $object  Bank entry to link to its thirdparty
- * @return  void
- */
-function stancer_check_bank_url_links($object)
-{
-	// global $db;
-	// //le lien vers stancer
-	// $sql = "SELECT * FROM ".MAIN_DB_PREFIX."bank_url WHERE fk_bank='" . $db->escape($object->rowid) . "' AND type='product'";
-	// $resql = $db->query($sql);
-	// if ($resql) {
-	//     $num_rows = $db->num_rows($resql);
-	// 	if($num_rows > 0) {
-	// 		return;
-	// 	}
-	// 	$soc = new Societe($db);
-	// 	$soc->fetch();
-	// 	$sqlI = "INSERT INTO ".MAIN_DB_PREFIX."bank_url(fk_bank,url_id,url,label,type) VALUES('" . $db->escape($object->rowid) . "','" . $db->escape($soc->id) . "','/comm/card.php?socid=','" . $db->escape($soc->name) . "','company')";
-	// }
-}
-
-
-/**
  * Convert an ISO date (YYYY-MM-DD) to the french display format (DD/MM/YYYY)
  *
  * @param   string  $d  Date in YYYY-MM-DD format
@@ -151,7 +127,7 @@ function stancer_convert_date($d)
  * @param   float   $fees           Stancer fees of the payout line
  * @param   string  $numreleve      Bank statement number to set
  * @param   int     $numrowstarget  Expected number of matching bank rows
- * @return  array                   array(status, html), status is -1 on error and 0 otherwise
+ * @return  array{0:int,1:string}   array(status, html), status is -1 on error and 0 otherwise
  */
 function stancer_find_update($id, $date, $ref, $amount, $fees, $numreleve, $numrowstarget)
 {
@@ -168,7 +144,11 @@ function stancer_find_update($id, $date, $ref, $amount, $fees, $numreleve, $numr
 			$html .= "<p>Nb d'enregistrements non conforme pour $id : attendu=$numrowstarget réel en base=$num_rows</p>";
 			//race condition --
 			if ($num_rows == 0) {
-				//ADD missing lines
+				// No bank line at all for this Stancer id. Only the payout call site below
+				// reads the -1 returned here, and reacts by re-syncing the payout, the
+				// refund or the dispute from the API; the two payment call sites discard
+				// the return code, so for them this log is the only trace left.
+				dol_syslog("stancer import_check_reversements: no bank line found for stancer id ".$id." on account ".$fk_account, LOG_WARNING);
 			}
 			return [-1,$html];
 		}
@@ -179,9 +159,8 @@ function stancer_find_update($id, $date, $ref, $amount, $fees, $numreleve, $numr
 				$html .= "<p>Update num releve to $numreleve :: (debug)</p>";// . json_encode($obj) . ")</p>";
 				$sqlUpdate = "UPDATE ".MAIN_DB_PREFIX."bank SET num_releve='" . $db->escape($numreleve) . "' WHERE rowid='" . $db->escape($obj->rowid) . "'";
 				$resqlU = $db->query($sqlUpdate);
-				if ($resqlU) {
-				} else {
-					// $html .= "<p>update... error " . $sqlUpdate . "</p>";
+				if (!$resqlU) {
+					dol_syslog("stancer import_check_reversements: cannot set num_releve on bank line ".$obj->rowid.": ".$db->lasterror(), LOG_ERR);
 				}
 			}
 			//verif VIR et PRE
@@ -209,30 +188,25 @@ function stancer_find_update($id, $date, $ref, $amount, $fees, $numreleve, $numr
 			}
 			//cas particulier des remboursements il faut 2 écritures : le montant remboursé et les frais
 			if (substr($id, 0, 5) == "refd_") {
-				$resAddPaiment = stancerAddPaimentFeeOnBank($id, $fees, $fk_account, $id, $date, $date);
+				stancerAddPaimentFeeOnBank($id, $fees, $fk_account, $id, $date, $date);
 				$sqlUpdate = "UPDATE ".MAIN_DB_PREFIX."bank SET num_releve='" . $db->escape($numreleve) . "' WHERE num_chq='" . $db->escape($id) . "'";
 				$resqlU = $db->query($sqlUpdate);
-				if ($resqlU) {
-				} else {
-					// $html .= "<p>update... error " . $sqlUpdate . "</p>";
+				if (!$resqlU) {
+					dol_syslog("stancer import_check_reversements: cannot set num_releve on refund ".$id.": ".$db->lasterror(), LOG_ERR);
 				}
 			}
 			//cas particulier des disputes il faut 2 écritures : le montant et les frais
 			if (substr($id, 0, 5) == "dspt_") {
-				$resAddPaiment = stancerAddPaimentFeeOnBank($id, $fees, $fk_account, $id, $date, $date);
+				stancerAddPaimentFeeOnBank($id, $fees, $fk_account, $id, $date, $date);
 				$sqlUpdate = "UPDATE ".MAIN_DB_PREFIX."bank SET num_releve='" . $db->escape($numreleve) . "' WHERE num_chq='" . $db->escape($id) . "'";
 				$resqlU = $db->query($sqlUpdate);
-				if ($resqlU) {
-				} else {
-					// $html .= "<p>update... error " . $sqlUpdate . "</p>";
+				if (!$resqlU) {
+					dol_syslog("stancer import_check_reversements: cannot set num_releve on dispute ".$id.": ".$db->lasterror(), LOG_ERR);
 				}
-			}
-			//ajout / vérification des liens
-			if ($obj->fk_type == 'PRE') {
-				stancer_check_bank_url_links($obj);
 			}
 		}
 	} else {
+		dol_syslog("stancer import_check_reversements: bank lookup failed for stancer id ".$id.": ".$db->lasterror(), LOG_ERR);
 		$html .= "<p>Erreur de recherche pour $id / $date / $ref ..</p>";
 	}
 	return [0, $html];
@@ -264,17 +238,20 @@ if ($action == "import") {
 		$action = '';
 	} else {
 		$map = [];
-		$mf_id_reversement = $mf_date = $mf_statut = $mf_total_pay = $mf_amount_remb = $mf_total_com_ttc = $mf_total_net = $mf_id_ope = $mf_ref_commande = $mf_montant_brut = $mf_total_com_ope = $mf_montant_net_ope = $mf_com_ht = $prevpout = null;
+		// -1 is the "column not found" sentinel, same as the ?? -1 fallbacks used
+		// when the header line is parsed below. Never null: these are array indexes.
+		$mf_id_reversement = $mf_date = $mf_statut = $mf_total_pay = $mf_amount_remb = $mf_total_com_ttc = $mf_total_net = $mf_id_ope = $mf_ref_commande = $mf_montant_brut = $mf_total_com_ope = $mf_montant_net_ope = $mf_com_ht = -1;
+		$prevpout = '';
 
 		if (($handle = fopen($src, "r")) !== false) {
 			while (($line = fgets($handle, 1000)) !== false) {
 				$data = str_getcsv($line, ';', '"');
 
 				//1st line : labels
-				if ($data['0'] == "Identifiant de l'opération") {
+				if ($data[0] == "Identifiant de l'opération") {
 					$nb = 0;
 					foreach ($data as $field) {
-						$map[$field] = $nb;
+						$map[(string) $field] = $nb;
 						$nb++;
 					}
 
@@ -286,7 +263,7 @@ if ($action == "import") {
 					$mf_amount_remb = $map["Total des remboursements"] ?? -1; //4
 					// $mf_ = $map["Total des contestations"]; //5
 					// $mf_ = $map["Total brut"];//6
-					$mf_com_ht = $map["Commissions (HT)"];//7
+					$mf_com_ht = $map["Commissions (HT)"] ?? -1;//7
 					// $mf_ = $map["Total des TVA Commissions"];//8
 					$mf_total_com_ttc = $map["Total des commissions (TTC)"] ?? -1;//9
 					$mf_total_net = $map["Total net"] ?? -1;//10
@@ -310,8 +287,10 @@ if ($action == "import") {
 					exit;
 				}
 
-				$pout = $data[$mf_id_reversement];
-				$date = $data[$mf_date];
+				// str_getcsv() yields null for a missing cell: normalise to string
+				// right here, every consumer below expects a string.
+				$pout = (string) $data[$mf_id_reversement];
+				$date = (string) $data[$mf_date];
 				$ladate = stancer_convert_date($date);
 
 				$pout_amount = (float) price2num($data[$mf_total_net]);
@@ -320,8 +299,8 @@ if ($action == "import") {
 					$rbt_amount = (float) price2num($data[$mf_amount_remb]);
 				}
 				$pout_fees = (float) price2num($data[$mf_total_com_ttc]);
-				$paym = $data[$mf_id_ope];
-				$ref = $data[$mf_ref_commande];
+				$paym = (string) $data[$mf_id_ope];
+				$ref = (string) $data[$mf_ref_commande];
 				$amount = (float) price2num($data[$mf_montant_brut]);
 				$fees = (float) price2num($data[$mf_com_ht]);
 				$net = (float) price2num($data[$mf_montant_net_ope]);
@@ -383,13 +362,13 @@ if ($action == "import") {
 					$accountStancer = new Account($db);
 					$accountMainBank = new Account($db);
 
-					$result = $accountStancer->fetch(getDolGlobalString('STANCER_BANK_ACCOUNT_FOR_PAYMENTS'));
+					$result = $accountStancer->fetch(getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS'));
 					if ($result < 0) {
 						$error++;
 						$outputerror = "error STANCER_BANK_ACCOUNT_FOR_PAYMENTS is not defined";
 					}
 
-					$result = $accountMainBank->fetch(getDolGlobalString('STANCER_BANK_MAIN_ACCOUNT_FOR_PAYOUTS'));
+					$result = $accountMainBank->fetch(getDolGlobalInt('STANCER_BANK_MAIN_ACCOUNT_FOR_PAYOUTS'));
 					if ($result < 0) {
 						$error++;
 						$outputerror = "error STANCER_BANK_MAIN_ACCOUNT_FOR_PAYOUTS is not defined";
@@ -443,10 +422,8 @@ if ($action == "import") {
 		$htmlreleve .= "</table>\n";
 
 		//verification inverse: y a t il des ecritures qui ne sont pas dans la liste ...
-		$escapedNumChqList = array_map(function ($v) use ($db) {
-			return $db->escape($v);
-		}, array_merge($paym_list, $pout_list));
-		$sql = "SELECT rowid,num_chq FROM ".MAIN_DB_PREFIX."bank WHERE num_chq NOT IN ('" . implode("','", $escapedNumChqList) . "') AND fk_account='" . $db->escape($fk_account) ."' AND num_releve = '" . $db->escape($numreleve) . "'";
+		$sanitizedNumChqList = array_map(array($db, 'escape'), array_merge($paym_list, $pout_list));
+		$sql = "SELECT rowid,num_chq FROM ".MAIN_DB_PREFIX."bank WHERE num_chq NOT IN ('" . implode("','", $sanitizedNumChqList) . "') AND fk_account='" . $db->escape($fk_account) ."' AND num_releve = '" . $db->escape($numreleve) . "'";
 		$resql = $db->query($sql);
 		// $html .= "<p>double verif inverse " . $sql ." </p>";
 		if ($resql) {

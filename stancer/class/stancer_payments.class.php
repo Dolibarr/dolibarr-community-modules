@@ -91,6 +91,19 @@ class Stancer_payments extends CommonObject
 	public const STATUS_CANCELED = 9;
 	public const STATUS_VALIDATED = 10;
 
+	/**
+	 * Statuses meaning the money movement is engaged at Stancer and its outcome is
+	 * not known yet. Starting a second payment on the same document while one of
+	 * these is in the table debits the customer twice.
+	 *
+	 * STATUS_CAPTURED is deliberately out: the money is already collected, so a
+	 * further payment can only be for the part left to pay, which the module
+	 * supports (stancerMakeTAG() then appends a '.SEQ=<n>' part to the tag).
+	 * The failure statuses (draft, expired, failed, refused, canceled, disputed)
+	 * are out too, they must stay retryable.
+	 */
+	public const RUNNING_STATUS = array(self::STATUS_AUTHORIZED, self::STATUS_CAPTURE_SENT, self::STATUS_TO_CAPTURE);
+
 	// internal stancer status
 	static public $tab_status = array(
 		'-10'=>'error',
@@ -262,6 +275,11 @@ class Stancer_payments extends CommonObject
 	public $rowid;
 	public $stancer_id;
 	public $amount;
+	/**
+	 * Fee taken by Stancer on this payment, in cents (integer), as returned by
+	 * the API field 'fee'. Beware: the property is named "fee", singular. Writing
+	 * $payment->fees returns null and silently books a zero fee.
+	 */
 	public $fee;
 	public $currency;
 	public $description;
@@ -434,26 +452,139 @@ class Stancer_payments extends CommonObject
 	/**
 	 * Load object in memory from the database
 	 *
-	 * @param int    $id   Id object
-	 * @param string $ref  Ref
-	 * @param string $stancer_id  stancer_id (compute by stancer)
-	 * @param string $uuid  unique id (dolibarr tag)
-	 * @return int         <0 if KO, 0 if not found, >0 if OK
+	 * The lookup keys are cumulative: passing two of them narrows the search
+	 * instead of replacing the first one.
+	 *
+	 * How unique each key is, as declared in sql/llx_stancer_stancer_payments.sql
+	 * and sql/llx_stancer_stancer_payments.key.sql:
+	 *  - $id is the rowid, unique;
+	 *  - $stancer_id is unique per entity (uk_stancer_stancer_payments_stancer_id);
+	 *  - $uuid is stored in unique_id, which carries a UNIQUE constraint;
+	 *  - $order_id has NO unique constraint. Payment retries and same-day grouped
+	 *    SEPA debits legitimately share one value, and fetchCommon() ends with
+	 *    "LIMIT 1" without any ORDER BY, so the row loaded is whichever one the
+	 *    database returns first. Call fetchAllRunningForInvoice() or fetchAll()
+	 *    when every matching row matters.
+	 *  - $ref has no matching column in this table, so a non empty value makes
+	 *    fetchCommon() query a column that does not exist. Leave it empty.
+	 *
+	 * @param int         $id          Id object
+	 * @param string|null $ref         Ref (unused here, see above)
+	 * @param string|null $stancer_id  stancer_id (compute by stancer)
+	 * @param string|null $uuid        unique id (dolibarr tag)
+	 * @param string|null $order_id    Reference of the source document, as stored in the order_id column
+	 * @return int                     <0 if KO, 0 if not found, >0 if OK
 	 */
-	public function fetch($id, $ref = null, $stancer_id = null, $uuid = null)
+	public function fetch($id, $ref = null, $stancer_id = null, $uuid = null, $order_id = null)
 	{
 		$more = "";
 		if (!empty($stancer_id)) {
-			$more = " AND stancer_id='" . $this->db->escape($stancer_id) . "'";
+			$more .= " AND stancer_id='" . $this->db->escape($stancer_id) . "'";
 		}
 		if (!empty($uuid)) {
-			$more = " AND unique_id='" . $this->db->escape($uuid) . "'";
+			$more .= " AND unique_id='" . $this->db->escape($uuid) . "'";
+		}
+		if (!empty($order_id)) {
+			$more .= " AND order_id='" . $this->db->escape($order_id) . "'";
 		}
 		$result = $this->fetchCommon($id, $ref, $more);
 		if ($result > 0 && !empty($this->table_element_line)) {
 			$this->fetchLines();
 		}
 		return $result;
+	}
+
+	/**
+	 * Load every Stancer payment that is still moving money for one Dolibarr invoice.
+	 *
+	 * A payment is reported here when its status is one of RUNNING_STATUS, it belongs
+	 * to the current live/test mode, and it is attached to the invoice by one of the
+	 * three links the module creates:
+	 *  - unique_id, the tag stancerMakeTAG() builds (lib/stancer_payment.lib.php).
+	 *    That tag is NOT 'INV=<rowid>' followed by the other parts: it ends with
+	 *    stancerCleanUpDuplicate(), which ksort()s the parts, so the value really
+	 *    stored is 'CUS=<socid>.INV=<rowid>' and the optional '.SEQ=' / '.UNIQ='
+	 *    parts sort after 'INV='. This is why the two clauses below start with a
+	 *    leading '%'. Never turn them into a prefix match on 'INV=<rowid>%': it
+	 *    would match no real tag any more, and the guard would silently let a
+	 *    second debit through instead of refusing it;
+	 *  - order_id, which stancerCardstartPayWithRedirect() and stancerSEPAstartPay()
+	 *    fill with the exact invoice ref;
+	 *  - grouped_invoice_ids, the comma separated list written by
+	 *    stancerSEPAstartPayGrouped() when several same-day invoices of one customer
+	 *    share a single debit. That column is the only reliable link for a grouped
+	 *    payment: stancerBuildGroupedOrderId() joins the refs with '+' and truncates
+	 *    the result to the 36 chars Stancer accepts, so a large group only names its
+	 *    first refs in order_id, the others being replaced by a '+<count>' suffix.
+	 *
+	 * @param  int    $invoiceId   Dolibarr invoice rowid
+	 * @param  string $invoiceRef  Dolibarr invoice ref
+	 * @return array<int,Stancer_payments>|int  Matching records keyed by rowid (possibly empty), -1 on error
+	 */
+	public function fetchAllRunningForInvoice($invoiceId, $invoiceRef)
+	{
+		$sanitizedInvoiceId = (int) $invoiceId;
+		$invoiceRef = (string) $invoiceRef;
+		if ($sanitizedInvoiceId <= 0 && $invoiceRef === '') {
+			dol_syslog(__METHOD__ . " called with neither an invoice id nor an invoice ref, nothing to look for", LOG_ERR);
+			return -1;
+		}
+
+		// Same live/test partition as every other payment lookup of the module, so a
+		// test row can never talk about a production invoice and the other way round.
+		$customSql = "live_mode = '" . $this->db->escape(getDolGlobalString('STANCER_IS_PROD', '0')) . "'";
+		$customSql .= " AND status IN (" . implode(',', array_map('intval', self::RUNNING_STATUS)) . ")";
+		$customSql .= " AND (";
+		$firstClause = true;
+		if ($sanitizedInvoiceId > 0) {
+			$customSql .= "unique_id LIKE '%INV=" . $sanitizedInvoiceId . "'";
+			$customSql .= " OR unique_id LIKE '%INV=" . $sanitizedInvoiceId . ".%'";
+			$customSql .= " OR grouped_invoice_ids = '" . $sanitizedInvoiceId . "'";
+			$customSql .= " OR grouped_invoice_ids LIKE '" . $sanitizedInvoiceId . ",%'";
+			$customSql .= " OR grouped_invoice_ids LIKE '%," . $sanitizedInvoiceId . "'";
+			$customSql .= " OR grouped_invoice_ids LIKE '%," . $sanitizedInvoiceId . ",%'";
+			$firstClause = false;
+		}
+		if ($invoiceRef !== '') {
+			// Equality on purpose: a ref may hold '%' or '_' with a custom numbering
+			// mask, and those are wildcards for LIKE. Grouped payments are covered by
+			// grouped_invoice_ids above, so no LIKE on order_id is needed.
+			$customSql .= ($firstClause ? "" : " OR ") . "order_id = '" . $this->db->escape($invoiceRef) . "'";
+		}
+		$customSql .= ")";
+
+		$records = $this->fetchAll('DESC', 't.rowid', 0, 0, array('customsql' => $customSql));
+		if (!is_array($records)) {
+			dol_syslog(__METHOD__ . " sql error while looking for running payments of invoice id=" . $sanitizedInvoiceId . " ref=" . $invoiceRef . ": " . implode(',', $this->errors), LOG_ERR);
+			return -1;
+		}
+		return $records;
+	}
+
+	/**
+	 * Name the given payments the same way everywhere.
+	 *
+	 * The invoice card tooltip, the invoice card log line and the server side guards
+	 * of stancerSEPAstartPay() and stancerCBstartPay() all have to tell the user and
+	 * the administrator which rows blocked a debit. One formatter keeps those three
+	 * places readable with the same vocabulary, so a refusal seen on screen can be
+	 * grepped in dolibarr.log without translating anything.
+	 *
+	 * @param  array<int,Stancer_payments> $records Records, typically from fetchAllRunningForInvoice()
+	 * @return list<string>                         One 'rowid=12 stancer_id=paym_xxx status=8' per record
+	 */
+	public static function describeRecords(array $records)
+	{
+		return array_map(
+			/**
+			 * @param  Stancer_payments $record One matching payment
+			 * @return string                   Its label
+			 */
+			static function ($record) {
+				return 'rowid=' . ((int) $record->id) . ' stancer_id=' . $record->stancer_id . ' status=' . ((int) $record->status);
+			},
+			array_values($records)
+		);
 	}
 
 	/**
@@ -478,8 +609,11 @@ class Stancer_payments extends CommonObject
 	 * @param  int         $limit        limit
 	 * @param  int         $offset       Offset
 	 * @param  array       $filter       Filter array. Example array('field'=>'valueforlike', 'customurl'=>...)
-	 * @param  string      $filtermode   Filter mode (AND or OR)
-	 * @return array|int                 int <0 if KO, array of pages if OK
+	 * @param  string      $filtermode   Filter mode ('OR' for OR, anything else for AND)
+	 * @return array<int,Stancer_payments>|int   int <0 if KO, array of records keyed by rowid if OK (possibly empty)
+	 *
+	 * @phan-suppress PhanPluginMoreSpecificActualReturnType  The array is legitimately empty when the
+	 *                query matches no row, so 'non-empty-associative-array' must not be documented here.
 	 */
 	public function fetchAll($sortorder = '', $sortfield = '', $limit = 0, $offset = 0, $filter = array(), $filtermode = 'AND')
 	{
@@ -518,7 +652,9 @@ class Stancer_payments extends CommonObject
 			}
 		}
 		if (count($sqlwhere) > 0) {
-			$sql .= " AND (".implode(" ".$filtermode." ", $sqlwhere).")";
+			// Whitelist the glue instead of interpolating $filtermode: only 'OR' and 'AND'
+			// can ever reach the query, whatever an external caller passes.
+			$sql .= " AND (".implode((strtoupper($filtermode) == 'OR' ? " OR " : " AND "), $sqlwhere).")";
 		}
 
 		if (!empty($sortfield)) {
@@ -784,7 +920,7 @@ class Stancer_payments extends CommonObject
 		$label .= '<br>';
 		$label .= '<b>'.$langs->trans('Ref').':</b> '.$this->ref;
 
-		$url = dol_buildpath('/stancer/stancer_payments_list.php', 1).'?search_stancer_id='.urlencode($this->ref);
+		$url = dol_buildpath('/stancer/stancer_payments_list.php', 1).'?search_stancer_id='.urlencode((string) $this->ref);
 
 		if ($option != 'nolink') {
 			// Add param to save lastsearch_values or not
@@ -1067,7 +1203,7 @@ class Stancer_payments extends CommonObject
 	/**
 	 * 	Create an array of lines
 	 *
-	 * 	@return array|int		array of lines if OK, <0 if KO
+	 * 	@return CommonObjectLine[]|int		array of lines if OK, <0 if KO
 	 */
 	public function getLinesArray()
 	{
@@ -1089,7 +1225,7 @@ class Stancer_payments extends CommonObject
 	/**
 	 *  Returns the reference to the following non used object depending on the active numbering module.
 	 *
-	 *  @return string      		Object free reference
+	 *  @return string      		Object free reference, or '-1' in case of error
 	 */
 	public function getNextNumRef()
 	{
@@ -1100,11 +1236,13 @@ class Stancer_payments extends CommonObject
 		if ($resql) {
 			$obj = $this->db->fetch_object($resql);
 			dol_syslog(__METHOD__.' count = '. $obj->count, LOG_DEBUG);
-			return $obj->count + 1;
+			// COUNT(*) always comes back as a numeric string: return the ref as the
+			// declared string type, callers concatenate or substr() it.
+			return (string) (((int) $obj->count) + 1);
 		} else {
 			$this->errors[] = 'Error '.$this->db->lasterror();
 			dol_syslog(__METHOD__.' '.implode(',', $this->errors), LOG_ERR);
-			return -1;
+			return '-1';
 		}
 	}
 
@@ -1180,10 +1318,16 @@ class Stancer_payments extends CommonObject
 	/**
 	 * fill object data from Stancer Payment
 	 *
+	 * Takes an object of the Stancer PHP SDK (getUniqueId(), populate()->get()...).
+	 * The module dropped that SDK for its own StancerApi client, so nothing calls
+	 * this method any more: every remaining call site is commented out
+	 * (stancer_payouts_list.php, lib/stancer_dispute.lib.php). Kept for third party
+	 * code that would still pass an SDK object.
+	 *
 	 * @deprecated Use fillDataFromApi() instead
 	 * @param   mixed $payment Stancer Payment object (deprecated)
 	 *
-	 * @return  int ret code
+	 * @return  int ret code, <0 on error
 	 */
 	public function fillData($payment)
 	{
@@ -1238,7 +1382,7 @@ class Stancer_payments extends CommonObject
 			//il faudrait aller récupérer le socid du client dans dolibarr
 			if (empty($fk_soc)) {
 				$companypaymentmode = new CompanyPaymentModeStancer($this->db);
-				$res = $companypaymentmode->fetch(0, null, null, null, " AND label LIKE 'stancer-%' AND stancer_account = ".$customer);
+				$res = $companypaymentmode->fetch(0, '', 0, '', " AND label LIKE 'stancer-%' AND stancer_account = ".$customer);
 				if ($res > 0) {
 					$fk_soc = $companypaymentmode->fk_soc;
 					dol_syslog("stancer fillData fk_soc=$fk_soc resolved from companypaymentmode mapping (no CUS= tag)");
@@ -1276,6 +1420,9 @@ class Stancer_payments extends CommonObject
 			'date_bank' => 'DateBank',
 			'return_url' => 'ReturnUrl'
 		];
+		// Collected values, fed to fillDataArray() below. Declared here because the
+		// loop only writes keys and the block after it reads $data['status'].
+		$data = array();
 		foreach ($listOfPropToGet as $key => $val) {
 			try {
 				$func = "get" . $val;
@@ -1291,6 +1438,24 @@ class Stancer_payments extends CommonObject
 		//try to get data from basic json ...
 		if (is_null($data['status']) && isset($json['status'])) {
 			$data['status']		= $json['status'];
+		}
+
+		// The fee is accounting data of its own: stancerCheckBankLines() books it as a
+		// separate negative bank line (stancerAddPaimentFeeOnBank(), lib/stancer_bank.lib.php).
+		// $json stays null when populate()->get() threw above, and the key can also be
+		// missing from a partial answer. Reading $json['fee'] then would be an undefined
+		// index, and skipping the assignment would keep whatever ->fee already held, so
+		// the caller could not tell a real zero fee from a missing one. Stop instead,
+		// with a log: nothing has been written to the object yet except ->entity.
+		if (!is_array($json) || !isset($json['fee'])) {
+			$idForLog = '';
+			if (isset($data['stancer_id']) && is_scalar($data['stancer_id'])) {
+				$idForLog = (string) $data['stancer_id'];
+			} elseif (!empty($this->stancer_id)) {
+				$idForLog = (string) $this->stancer_id;
+			}
+			dol_syslog("stancer fillData no fee in Stancer answer for payment " . $idForLog . " (unique_id=" . $uuid . ", answer type=" . gettype($json) . "), object left unchanged and not saved", LOG_ERR);
+			return -1;
 		}
 
 		$data['fee'] 		= $json['fee'];
@@ -1313,7 +1478,9 @@ class Stancer_payments extends CommonObject
 	 */
 	public function fillDataArray($array, $forceEmptyValues = false)
 	{
-		dol_syslog("Stancer_payments fillDataArray, forceEmptyValues=$forceEmptyValues");
+		// Cast for the log line only: a bool interpolates as '' or '1', which reads badly.
+		$forceEmptyValuesLog = (int) $forceEmptyValues;
+		dol_syslog("Stancer_payments fillDataArray, forceEmptyValues=$forceEmptyValuesLog");
 		//dol_syslog("Stancer_payments fillDataArray (listOfPropToGet), input array is " . json_encode($array));
 		foreach ($array as $key => $value) {
 			if ($key == "status") {
@@ -1433,7 +1600,7 @@ class Stancer_payments extends CommonObject
 			$customerId = is_array($customer) ? (isset($customer['id']) ? $customer['id'] : '') : $customer;
 			if (empty($fk_soc) && !empty($customerId)) {
 				$companypaymentmode = new CompanyPaymentModeStancer($this->db);
-				$res = $companypaymentmode->fetch(0, null, null, null, " AND label LIKE 'stancer-%' AND stancer_account = '".$this->db->escape($customerId)."'");
+				$res = $companypaymentmode->fetch(0, '', 0, '', " AND label LIKE 'stancer-%' AND stancer_account = '".$this->db->escape($customerId)."'");
 				if ($res > 0) {
 					$fk_soc = $companypaymentmode->fk_soc;
 					dol_syslog("stancer fillDataFromApi fk_soc=$fk_soc resolved from companypaymentmode mapping (no CUS= tag)");
@@ -1513,7 +1680,7 @@ class Stancer_payments extends CommonObject
 
 		//stancer store amount in cents
 		if (in_array($key, ['amount','fee'])) {
-			return price($object/100);
+			return price((float) $object / 100);
 		} elseif ($key == 'stancer_id') {
 			$linkExternal = "<a href='https://manage.stancer.com/fr/details-de-paiement?id=" . $object . "' target='_stancer'>" . img_picto($langs->trans('ShowInStancer'), 'globe') . " " . $object . "</a>";
 			$linkRaw = '';
@@ -1535,25 +1702,52 @@ class Stancer_payments extends CommonObject
 		} elseif ($key == 'unique_id_switch') {
 			//split tag to make link to object
 			$tmptag = dolExplodeIntoArray($object, '.', '=');
+			// The tag value must be a positive rowid. Guard it before fetching: fetch(0) does
+			// not mean "not found" in the core classes. Facture and Commande return -1 (a truthy
+			// value) on an empty id, Don and Adherent drop the rowid filter and load the FIRST
+			// record of the table, which would render a link to an unrelated object.
 			if (isset($tmptag['INV'])) {
-				$fac = new Facture($this->db);
-				if ($fac->fetch($tmptag['INV'])) {
-					return $fac->getNomUrl(1, '', 0, 0, '');
+				$targetId = (int) $tmptag['INV'];
+				if ($targetId <= 0) {
+					dol_syslog("stancer showOutputField unique_id_switch: INV tag '".$tmptag['INV']."' is not a valid rowid, no invoice link built", LOG_WARNING);
+				} else {
+					$fac = new Facture($this->db);
+					if ($fac->fetch($targetId)) {
+						return $fac->getNomUrl(1, '', 0, 0, '');
+					}
 				}
 			} elseif (isset($tmptag['ORD'])) {
-				$ord = new Commande($this->db);
-				if ($ord->fetch($tmptag['ORD'])) {
-					return $ord->getNomUrl(1, '', 0, 0, '');
+				$targetId = (int) $tmptag['ORD'];
+				if ($targetId <= 0) {
+					dol_syslog("stancer showOutputField unique_id_switch: ORD tag '".$tmptag['ORD']."' is not a valid rowid, no order link built", LOG_WARNING);
+				} else {
+					$ord = new Commande($this->db);
+					if ($ord->fetch($targetId)) {
+						// Commande::getNomUrl($withpicto, $option, $max, $short, $notooltip)
+						return $ord->getNomUrl(1, '', 0, 0, 0);
+					}
 				}
 			} elseif (isset($tmptag['DON'])) {
-				$don = new Don($this->db);
-				if ($don->fetch($tmptag['DON'])) {
-					return $don->getNomUrl(1, '', 0, 0, '');
+				$targetId = (int) $tmptag['DON'];
+				if ($targetId <= 0) {
+					dol_syslog("stancer showOutputField unique_id_switch: DON tag '".$tmptag['DON']."' is not a valid rowid, no donation link built", LOG_WARNING);
+				} else {
+					$don = new Don($this->db);
+					if ($don->fetch($targetId)) {
+						// Don::getNomUrl($withpicto, $notooltip, $moretitle, $save_lastsearch_value)
+						return $don->getNomUrl(1);
+					}
 				}
 			} elseif (isset($tmptag['MEM'])) {
-				$adh = new AdherentStancer($this->db);
-				if ($adh->fetch($tmptag['MEM'])) {
-					return $adh->getNomUrl(1, '', 0, 0, '');
+				$targetId = (int) $tmptag['MEM'];
+				if ($targetId <= 0) {
+					dol_syslog("stancer showOutputField unique_id_switch: MEM tag '".$tmptag['MEM']."' is not a valid rowid, no member link built", LOG_WARNING);
+				} else {
+					$adh = new AdherentStancer($this->db);
+					if ($adh->fetch($targetId)) {
+						// Adherent::getNomUrl($withpictoimg, $maxlen, $option, $mode, $morecss)
+						return $adh->getNomUrl(1, 0, 'card', '', '');
+					}
 				}
 			}
 			//return "<a href='https://manage.stancer.com/fr/details-de-paiement?id=" . $object . "' target='_stancer'>" . img_picto($langs->trans('ShowInStancer'), 'globe') . " " . $object . "</a>";

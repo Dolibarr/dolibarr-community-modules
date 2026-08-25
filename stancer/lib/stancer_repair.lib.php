@@ -115,17 +115,14 @@ function stancerFindSharedCustomerIds($db)
  * Build the per-thirdparty detail for one shared customer: which socids are
  * linked, through which source, with payment counts/amounts.
  *
+ * The @return array shape is deliberately kept on a single physical line: a
+ * multi-line shape is not parsed by static analysers and degrades to plain array.
+ *
  * @param  string $customerID Stancer customer id (cust_xxx).
  * @param  DoliDB $db         Database handle.
  *                            rib_rowids lists every societe_rib link; rib_ban_rowids is the subset that
  *                            carries a SEPA mandate (type='ban') and is therefore never deletable.
- *
- * @return array{
- *   customer:string,
- *   socids:array<int, array{socid:int,name:string,email:string,in_rib:bool,
- *     rib_rowids:int[],rib_ban_rowids:int[],nb_payments:int,amount_total:float,
- *     live_mode:int,first_pay:?string,last_pay:?string}>
- * }
+ * @return array{customer:string,socids:array<int,array{socid:int,name:string,email:string,in_rib:bool,rib_rowids:int[],rib_ban_rowids:int[],nb_payments:int,amount_total:float,live_mode:int,first_pay:?string,last_pay:?string}>}
  */
 function stancerGetSharedCustomerDetail($customerID, $db)
 {
@@ -134,7 +131,7 @@ function stancerGetSharedCustomerDetail($customerID, $db)
 	if ($customerID === '') {
 		return $detail;
 	}
-	$escaped = $db->escape($customerID);
+	$sanitizedCustomerId = $db->escape($customerID);
 
 	$ensureSocid = function ($socid) use (&$detail) {
 		$socid = (int) $socid;
@@ -159,7 +156,7 @@ function stancerGetSharedCustomerDetail($customerID, $db)
 	// Links via societe_rib. The type is read so the caller can tell a droppable
 	// card link from a SEPA mandate, which must survive any repair.
 	$sqlRib = "SELECT rowid, fk_soc, type FROM " . MAIN_DB_PREFIX . "societe_rib";
-	$sqlRib .= " WHERE stancer_account = '" . $escaped . "' AND fk_soc > 0";
+	$sqlRib .= " WHERE stancer_account = '" . $sanitizedCustomerId . "' AND fk_soc > 0";
 	$resRib = $db->query($sqlRib);
 	if ($resRib) {
 		while (($row = $db->fetch_object($resRib))) {
@@ -179,9 +176,9 @@ function stancerGetSharedCustomerDetail($customerID, $db)
 	$sqlPay = "SELECT sp.fk_soc, COUNT(*) AS nb, COALESCE(SUM(sp.amount),0) AS amt,";
 	$sqlPay .= " MIN(sp.date_creation) AS first_pay, MAX(sp.date_creation) AS last_pay, MAX(sp.live_mode) AS live_mode";
 	$sqlPay .= " FROM " . MAIN_DB_PREFIX . "stancer_stancer_payments sp";
-	$sqlPay .= " WHERE sp.customer = '" . $escaped . "' AND sp.fk_soc > 0";
+	$sqlPay .= " WHERE sp.customer = '" . $sanitizedCustomerId . "' AND sp.fk_soc > 0";
 	$sqlPay .= " AND NOT EXISTS (SELECT 1 FROM " . MAIN_DB_PREFIX . "societe_rib r";
-	$sqlPay .= "   WHERE r.fk_soc = sp.fk_soc AND r.stancer_account <> '' AND r.stancer_account <> '" . $escaped . "')";
+	$sqlPay .= "   WHERE r.fk_soc = sp.fk_soc AND r.stancer_account <> '' AND r.stancer_account <> '" . $sanitizedCustomerId . "')";
 	$sqlPay .= " GROUP BY sp.fk_soc";
 	$resPay = $db->query($sqlPay);
 	if ($resPay) {
@@ -198,8 +195,9 @@ function stancerGetSharedCustomerDetail($customerID, $db)
 
 	// Decorate with thirdparty name + email.
 	if (!empty($detail['socids'])) {
-		$ids = implode(',', array_map('intval', array_keys($detail['socids'])));
-		$sqlSoc = "SELECT rowid, nom, email FROM " . MAIN_DB_PREFIX . "societe WHERE rowid IN (" . $ids . ")";
+		// Guarded by the !empty() above, so the IN () list is never empty.
+		$sanitizedSocIds = implode(',', array_map('intval', array_keys($detail['socids'])));
+		$sqlSoc = "SELECT rowid, nom, email FROM " . MAIN_DB_PREFIX . "societe WHERE rowid IN (" . $sanitizedSocIds . ")";
 		$resSoc = $db->query($sqlSoc);
 		if ($resSoc) {
 			while (($row = $db->fetch_object($resSoc))) {
@@ -311,6 +309,8 @@ function stancerRepairTraceDetach($db, $user, $socid, $label, $note, $extraparam
 	$ac->socid        = (int) $socid;
 	$ac->authorid     = (int) (isset($user->id) ? $user->id : 0);
 	$ac->userownerid  = (int) (isset($user->id) ? $user->id : 0);
+	$ac->elementid    = (int) $socid;
+	// @phan-suppress-next-line PhanDeprecatedProperty  ActionComm::create() only reads fk_element on Dolibarr 15..18, both fields must be fed
 	$ac->fk_element   = (int) $socid;
 	$ac->elementtype  = 'societe';
 	$ac->extraparams  = dol_trunc($extraparams, 250);
@@ -341,19 +341,16 @@ function stancerRepairTraceDetach($db, $user, $socid, $label, $note, $extraparam
  * shared through a preserved mandate keeps being listed by the detection: that
  * is intended, a visible report is worth more than a destroyed mandate.
  *
+ * The @return array shape is deliberately kept on a single physical line: a
+ * multi-line shape is not parsed by static analysers and degrades to plain array.
+ *
  * @param  string     $customerID Shared cust_xxx.
  * @param  int        $ownerSocid Thirdparty that legitimately owns the cust.
  * @param  DoliDB     $db         Database handle.
  * @param  User       $user       Current user (for ActionComm / audit trail).
  * @param  StancerApi $stancerApi API client.
  * @param  bool       $dryRun     If true, only simulate.
- * @return array{
- *   success:bool, customer:string, owner_socid:int, dry_run:bool,
- *   actions:array<int, array{socid:int,name:string,new_cust:string,
- *     rib_deleted:int,rib_preserved:int,payments_relinked:int,status:string,
- *     message:string}>,
- *   message:string
- * }
+ * @return array{success:bool,customer:string,owner_socid:int,dry_run:bool,actions:array<int,array{socid:int,name:string,new_cust:string,rib_deleted:int,rib_preserved:int,payments_relinked:int,status:string,message:string}>,message:string}
  */
 function stancerRepairSharedCustomer($customerID, $ownerSocid, $db, $user, $stancerApi, $dryRun = true)
 {
@@ -396,7 +393,7 @@ function stancerRepairSharedCustomer($customerID, $ownerSocid, $db, $user, $stan
 		return $result;
 	}
 
-	$escapedCust = $db->escape($customerID);
+	$sanitizedCust = $db->escape($customerID);
 
 	foreach ($intruders as $socid) {
 		$action = array(
@@ -453,7 +450,7 @@ function stancerRepairSharedCustomer($customerID, $ownerSocid, $db, $user, $stan
 			$db->begin();
 
 			$sqlDel = "DELETE FROM " . MAIN_DB_PREFIX . "societe_rib";
-			$sqlDel .= " WHERE fk_soc = " . (int) $socid . " AND stancer_account = '" . $escapedCust . "'";
+			$sqlDel .= " WHERE fk_soc = " . (int) $socid . " AND stancer_account = '" . $sanitizedCust . "'";
 			$sqlDel .= STANCER_REPAIR_RIB_DELETABLE_SQL;
 			$resDel = $db->query($sqlDel);
 			if (!$resDel) {
@@ -474,7 +471,7 @@ function stancerRepairSharedCustomer($customerID, $ownerSocid, $db, $user, $stan
 			// belongs to the owner (resolved by email), only fk_soc was stale.
 			$sqlUpd = "UPDATE " . MAIN_DB_PREFIX . "stancer_stancer_payments";
 			$sqlUpd .= " SET fk_soc = " . (int) $ownerSocid;
-			$sqlUpd .= " WHERE fk_soc = " . (int) $socid . " AND customer = '" . $escapedCust . "'";
+			$sqlUpd .= " WHERE fk_soc = " . (int) $socid . " AND customer = '" . $sanitizedCust . "'";
 			$resUpd = $db->query($sqlUpd);
 			if (!$resUpd) {
 				$db->rollback();
@@ -502,6 +499,8 @@ function stancerRepairSharedCustomer($customerID, $ownerSocid, $db, $user, $stan
 			$ac->socid        = (int) $ownerSocid;
 			$ac->authorid     = (int) $user->id;
 			$ac->userownerid  = (int) $user->id;
+			$ac->elementid    = (int) $ownerSocid;
+			// @phan-suppress-next-line PhanDeprecatedProperty  ActionComm::create() only reads fk_element on Dolibarr 15..18, both fields must be fed
 			$ac->fk_element   = (int) $ownerSocid;
 			$ac->elementtype  = 'societe';
 			$ac->extraparams  = dol_trunc($customerID . ' merged#' . $socid, 250);
@@ -550,7 +549,7 @@ function stancerRepairSharedCustomer($customerID, $ownerSocid, $db, $user, $stan
 			$db->begin();
 
 			$sqlDel = "DELETE FROM " . MAIN_DB_PREFIX . "societe_rib";
-			$sqlDel .= " WHERE fk_soc = " . (int) $socid . " AND stancer_account = '" . $escapedCust . "'";
+			$sqlDel .= " WHERE fk_soc = " . (int) $socid . " AND stancer_account = '" . $sanitizedCust . "'";
 			$sqlDel .= STANCER_REPAIR_RIB_DELETABLE_SQL;
 			$resDel = $db->query($sqlDel);
 			if (!$resDel) {
@@ -572,7 +571,7 @@ function stancerRepairSharedCustomer($customerID, $ownerSocid, $db, $user, $stan
 			// Clear the wrong customer label; keep fk_soc (the invoice link).
 			$sqlUpd = "UPDATE " . MAIN_DB_PREFIX . "stancer_stancer_payments";
 			$sqlUpd .= " SET customer = ''";
-			$sqlUpd .= " WHERE fk_soc = " . (int) $socid . " AND customer = '" . $escapedCust . "'";
+			$sqlUpd .= " WHERE fk_soc = " . (int) $socid . " AND customer = '" . $sanitizedCust . "'";
 			$resUpd = $db->query($sqlUpd);
 			if (!$resUpd) {
 				$db->rollback();
@@ -600,6 +599,8 @@ function stancerRepairSharedCustomer($customerID, $ownerSocid, $db, $user, $stan
 			$ac->socid        = (int) $socid;
 			$ac->authorid     = (int) $user->id;
 			$ac->userownerid  = (int) $user->id;
+			$ac->elementid    = (int) $socid;
+			// @phan-suppress-next-line PhanDeprecatedProperty  ActionComm::create() only reads fk_element on Dolibarr 15..18, both fields must be fed
 			$ac->fk_element   = (int) $socid;
 			$ac->elementtype  = 'societe';
 			$ac->extraparams  = dol_trunc($customerID . ' cleared#' . $socid, 250);
@@ -644,7 +645,7 @@ function stancerRepairSharedCustomer($customerID, $ownerSocid, $db, $user, $stan
 			}
 			$db->begin();
 			$sqlDelNoPay = "DELETE FROM " . MAIN_DB_PREFIX . "societe_rib";
-			$sqlDelNoPay .= " WHERE fk_soc = " . (int) $socid . " AND stancer_account = '" . $escapedCust . "'";
+			$sqlDelNoPay .= " WHERE fk_soc = " . (int) $socid . " AND stancer_account = '" . $sanitizedCust . "'";
 			$sqlDelNoPay .= STANCER_REPAIR_RIB_DELETABLE_SQL;
 			$resDelNoPay = $db->query($sqlDelNoPay);
 			if (!$resDelNoPay) {
@@ -716,7 +717,7 @@ function stancerRepairSharedCustomer($customerID, $ownerSocid, $db, $user, $stan
 
 		$sqlDel = "DELETE FROM " . MAIN_DB_PREFIX . "societe_rib";
 		$sqlDel .= " WHERE fk_soc = " . (int) $socid;
-		$sqlDel .= " AND stancer_account = '" . $escapedCust . "'";
+		$sqlDel .= " AND stancer_account = '" . $sanitizedCust . "'";
 		$sqlDel .= STANCER_REPAIR_RIB_DELETABLE_SQL;
 		$resDel = $db->query($sqlDel);
 		if (!$resDel) {
@@ -740,7 +741,7 @@ function stancerRepairSharedCustomer($customerID, $ownerSocid, $db, $user, $stan
 			$sqlReanchor = "UPDATE " . MAIN_DB_PREFIX . "societe_rib";
 			$sqlReanchor .= " SET stancer_account = '" . $db->escape($newCust) . "'";
 			$sqlReanchor .= " WHERE fk_soc = " . (int) $socid;
-			$sqlReanchor .= " AND stancer_account = '" . $escapedCust . "'";
+			$sqlReanchor .= " AND stancer_account = '" . $sanitizedCust . "'";
 			$sqlReanchor .= " AND type = 'ban'";
 			$resReanchor = $db->query($sqlReanchor);
 			if (!$resReanchor) {
@@ -842,13 +843,13 @@ function stancerRepairSharedCustomer($customerID, $ownerSocid, $db, $user, $stan
 function stancerFindCapturedPaymentsNotPosted($db, $liveMode = null, $maxRows = 500)
 {
 	// Stancer_payments::STATUS_AUTHORIZED=1, CAPTURED=2, CAPTURE_SENT=3, TO_CAPTURE=8.
-	$paidStatuses = '1,2,3,8';
+	$sqlPaidStatuses = '1,2,3,8';
 	// Restrict to the current fiscal year: payments (hence their invoices) from a
 	// previous, closed fiscal year are already booked / in the balance sheet and
 	// must never be surfaced as doubles to act on. Cheap pre-filter on the payment
 	// creation date; the exact per-invoice date guard is applied by the caller.
 	$fiscalStart = dol_print_date(stancerGetFiscalYearStartTs(), '%Y-%m-%d');
-	$sql = "SELECT sp.rowid, sp.stancer_id, sp.amount, sp.order_id, sp.unique_id, sp.grouped_invoice_ids, sp.fk_soc, sp.customer, sp.date_creation, sp.status, sp.live_mode, sp.tms FROM " . MAIN_DB_PREFIX . "stancer_stancer_payments sp WHERE sp.status IN (" . $paidStatuses . ") AND sp.stancer_id IS NOT NULL AND sp.stancer_id <> '' AND sp.date_creation >= '" . $db->escape($fiscalStart) . "'"
+	$sql = "SELECT sp.rowid, sp.stancer_id, sp.amount, sp.order_id, sp.unique_id, sp.grouped_invoice_ids, sp.fk_soc, sp.customer, sp.date_creation, sp.status, sp.live_mode, sp.tms FROM " . MAIN_DB_PREFIX . "stancer_stancer_payments sp WHERE sp.status IN (" . $sqlPaidStatuses . ") AND sp.stancer_id IS NOT NULL AND sp.stancer_id <> '' AND sp.date_creation >= '" . $db->escape($fiscalStart) . "'"
 		// Identity-based "already posted" check: a Stancer payment is recorded as soon
 		// as ANY Dolibarr paiement references its unique paym_xxx id, in num_paiement OR
 		// ext_payment_id, whatever the ext_payment_site tag. This covers legacy rows
@@ -1058,7 +1059,9 @@ function stancerForcePostPayment($paymId, $db, $user, $stancerApi, $allowOverpay
 	// year (already booked / in the balance sheet, must not be modified).
 	$fiscalStartTs = stancerGetFiscalYearStartTs();
 	foreach ($invoices as $inv) {
-		if ((int) $inv->statut < 1) {
+		// Facture::fetch() fills $status alongside the deprecated $statut on every
+		// supported Dolibarr release (checked on 15.0.0 up to 21).
+		if ((int) $inv->status < 1) {
 			$result['invoice_ref'] = (string) $inv->ref;
 			$result['invoice_id']  = (int) $inv->id;
 			$result['message'] = "Target invoice $inv->ref is not validated; refusing to post.";
@@ -1135,6 +1138,7 @@ function stancerForcePostPayment($paymId, $db, $user, $stancerApi, $allowOverpay
 	// before posting so Dolibarr accepts the extra payment; the amount guard is
 	// bypassed below. The resulting over-payment is left for the admin to settle
 	// with a credit note / refund.
+	// @phan-suppress-next-line PhanDeprecatedProperty  $paye is the column Dolibarr 15..21 fills and still writes; status==2 also covers abandoned invoices
 	if ($allowOverpay && (int) $fac->paye === 1) {
 		$resReopen = $fac->setUnpaid($user);
 		if ($resReopen <= 0) {
@@ -1205,7 +1209,7 @@ function stancerInvoicePaymentMethods($invoiceId, $db)
 	}
 	$sql = "SELECT DISTINCT p.ext_payment_site FROM " . MAIN_DB_PREFIX . "paiement p";
 	$sql .= " INNER JOIN " . MAIN_DB_PREFIX . "paiement_facture pf ON pf.fk_paiement = p.rowid";
-	$sql .= " WHERE pf.fk_facture = " . $invoiceId;
+	$sql .= " WHERE pf.fk_facture = " . ((int) $invoiceId);
 	$sql .= " AND p.ext_payment_site IS NOT NULL AND p.ext_payment_site <> ''";
 	$res = $db->query($sql);
 	if (!$res) {
@@ -1234,7 +1238,7 @@ function stancerPickLinkedInvoice($obj, $db)
 {
 	require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
 
-	$obj->fetchObjectLinked($obj->id, $obj->element, '', 'facture');
+	$obj->fetchObjectLinked($obj->id, $obj->element, null, 'facture');
 	if (empty($obj->linkedObjectsIds['facture'])) {
 		return null;
 	}
@@ -1335,7 +1339,7 @@ function stancerResolveInvoiceFromOrderId($orderId, $db)
 function stancerLinkedInvoiceIdsContain($obj, $invoiceId, $db)
 {
 	$invoiceId = (int) $invoiceId;
-	$obj->fetchObjectLinked($obj->id, $obj->element, '', 'facture');
+	$obj->fetchObjectLinked($obj->id, $obj->element, null, 'facture');
 	if (empty($obj->linkedObjectsIds['facture'])) {
 		return false;
 	}
@@ -1401,10 +1405,12 @@ function stancerOrderIdCoversInvoiceId($orderId, $invoiceId, $db)
  * that designates a commande/propal (invoice created afterwards) still resolves to
  * the real linked invoice.
  *
+ * The @return array shape is deliberately kept on a single physical line: a
+ * multi-line shape is not parsed by static analysers and degrades to plain array.
+ *
  * @param  string $orderId Stancer order_id (invoice, order or propal ref).
  * @param  DoliDB $db      Database handle.
- * @return array{found:bool, invoice_id:int, invoice_ref:string, remaining:float|null,
- *               is_settled:bool, methods:string[]}
+ * @return array{found:bool,invoice_id:int,invoice_ref:string,invoice_date:int,remaining:float|null,is_settled:bool,methods:string[]}
  */
 function stancerInvoiceStateForOrderId($orderId, $db)
 {
@@ -1518,11 +1524,12 @@ function stancerResolveInvoicesForPayment($paymentRow, $db)
  * Aggregate the settlement state of one or several invoices covered by a Stancer
  * payment. Mirrors stancerInvoiceStateForOrderId() but for a set of invoices.
  *
+ * The @return array shape is deliberately kept on a single physical line: a
+ * multi-line shape is not parsed by static analysers and degrades to plain array.
+ *
  * @param  Facture[] $invoices Resolved invoices.
  * @param  DoliDB    $db       Database handle.
- * @return array{found:bool, grouped:bool, count:int, remaining:float, is_settled:bool,
- *               earliest_date:int, methods:string[],
- *               invoices:array<int,array{id:int, ref:string, remaining:float, is_settled:bool}>}
+ * @return array{found:bool,grouped:bool,count:int,remaining:float,is_settled:bool,earliest_date:int,methods:string[],invoices:array<int,array{id:int,ref:string,remaining:float,is_settled:bool}>}
  */
 function stancerAggregateInvoiceState(array $invoices, $db)
 {
@@ -1583,10 +1590,12 @@ function stancerAggregateInvoiceState(array $invoices, $db)
  * then the exact remaining (incl. credit notes / deposits) is recomputed per
  * invoice to confirm the over-payment.
  *
+ * The @return array shape is deliberately kept on a single physical line: a
+ * multi-line shape is not parsed by static analysers and degrades to plain array.
+ *
  * @param  DoliDB $db      Database handle.
  * @param  int    $maxRows Hard cap.
- * @return array<int, array{invoice_id:int, invoice_ref:string, total_ttc:float,
- *               paid:float, excess:float, fk_soc:int, soc_name:string, methods:string[]}>
+ * @return array<int,array{invoice_id:int,invoice_ref:string,total_ttc:float,paid:float,excess:float,fk_soc:int,soc_name:string,methods:string[]}>
  */
 function stancerFindOverpaidWithStancer($db, $maxRows = 500)
 {

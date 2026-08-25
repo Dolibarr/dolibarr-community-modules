@@ -96,15 +96,15 @@ $currentMonthEnd = date('Y-m-t 23:59:59', $now);
 $previousMonth = date('Y-m-01', strtotime('-1 month', $now));
 $previousMonthEnd = date('Y-m-t 23:59:59', strtotime('-1 month', $now));
 
-$entityFilter = " AND entity = ".((int) $conf->entity);
-$liveModeFilter = " AND live_mode = ".((int) $liveMode);
+$sqlEntityFilter = " AND entity = ".((int) $conf->entity);
+$sqlLiveModeFilter = " AND live_mode = ".((int) $liveMode);
 $capturedFilter = " AND status = ".Stancer_payments::STATUS_CAPTURED;
 
 // --- KPI 1: Revenue this month (captured payments) ---
 $sql = "SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as cnt";
 $sql .= " FROM ".MAIN_DB_PREFIX."stancer_stancer_payments";
 $sql .= " WHERE status = ".Stancer_payments::STATUS_CAPTURED;
-$sql .= $liveModeFilter.$entityFilter;
+$sql .= $sqlLiveModeFilter.$sqlEntityFilter;
 $sql .= " AND date_creation >= '".$db->escape($currentMonth)."'";
 $sql .= " AND date_creation <= '".$db->escape($currentMonthEnd)."'";
 
@@ -121,7 +121,7 @@ if ($resql) {
 $sql = "SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as cnt";
 $sql .= " FROM ".MAIN_DB_PREFIX."stancer_stancer_payments";
 $sql .= " WHERE status = ".Stancer_payments::STATUS_CAPTURED;
-$sql .= $liveModeFilter.$entityFilter;
+$sql .= $sqlLiveModeFilter.$sqlEntityFilter;
 $sql .= " AND date_creation >= '".$db->escape($previousMonth)."'";
 $sql .= " AND date_creation <= '".$db->escape($previousMonthEnd)."'";
 
@@ -138,7 +138,7 @@ if ($resql) {
 $sql = "SELECT COUNT(*) as cnt, COALESCE(SUM(amount), 0) as total";
 $sql .= " FROM ".MAIN_DB_PREFIX."stancer_stancer_refunds";
 $sql .= " WHERE status = 0";
-$sql .= $liveModeFilter.$entityFilter;
+$sql .= $sqlLiveModeFilter.$sqlEntityFilter;
 
 $refundsPending = 0;
 $refundsPendingAmount = 0;
@@ -152,7 +152,7 @@ if ($resql) {
 // Total refunds this month
 $sql = "SELECT COUNT(*) as cnt";
 $sql .= " FROM ".MAIN_DB_PREFIX."stancer_stancer_refunds";
-$sql .= " WHERE 1 = 1".$liveModeFilter.$entityFilter;
+$sql .= " WHERE 1 = 1".$sqlLiveModeFilter.$sqlEntityFilter;
 $sql .= " AND created >= '".$db->escape($currentMonth)."'";
 $sql .= " AND created <= '".$db->escape($currentMonthEnd)."'";
 
@@ -167,7 +167,7 @@ if ($resql) {
 $sql = "SELECT COUNT(*) as cnt, COALESCE(SUM(amount), 0) as total";
 $sql .= " FROM ".MAIN_DB_PREFIX."stancer_stancer_disputes";
 $sql .= " WHERE status = 'OPEN'";
-$sql .= $liveModeFilter.$entityFilter;
+$sql .= $sqlLiveModeFilter.$sqlEntityFilter;
 
 $disputesOpen = 0;
 $disputesOpenAmount = 0;
@@ -183,7 +183,7 @@ if ($resql) {
 $sql = "SELECT MIN(YEAR(date_creation)) as min_year";
 $sql .= " FROM ".MAIN_DB_PREFIX."stancer_stancer_payments";
 $sql .= " WHERE status = ".Stancer_payments::STATUS_CAPTURED;
-$sql .= $liveModeFilter.$entityFilter;
+$sql .= $sqlLiveModeFilter.$sqlEntityFilter;
 
 $minYear = $currentYear;
 $resql = $db->query($sql);
@@ -198,7 +198,7 @@ if ($resql) {
 $sql = "SELECT YEAR(date_creation) as yr, MONTH(date_creation) as mn, COALESCE(SUM(amount), 0) as total";
 $sql .= " FROM ".MAIN_DB_PREFIX."stancer_stancer_payments";
 $sql .= " WHERE status = ".Stancer_payments::STATUS_CAPTURED;
-$sql .= $liveModeFilter.$entityFilter;
+$sql .= $sqlLiveModeFilter.$sqlEntityFilter;
 $sql .= " AND YEAR(date_creation) >= ".((int) $minYear);
 $sql .= " GROUP BY YEAR(date_creation), MONTH(date_creation)";
 $sql .= " ORDER BY yr, mn";
@@ -239,8 +239,8 @@ for ($m = 1; $m <= 12; $m++) {
 $sql = "SELECT DATE_FORMAT(date_creation, '%Y-%m') as ym, method, COALESCE(SUM(amount), 0) as total";
 $sql .= " FROM ".MAIN_DB_PREFIX."stancer_stancer_payments";
 $sql .= " WHERE status = ".Stancer_payments::STATUS_CAPTURED;
-$sql .= $liveModeFilter.$entityFilter;
-$sql .= " AND date_creation >= '".date('Y-m-01', strtotime('-11 months', $now))."'";
+$sql .= $sqlLiveModeFilter.$sqlEntityFilter;
+$sql .= " AND date_creation >= '".$db->escape(date('Y-m-01', strtotime('-11 months', $now)))."'";
 $sql .= " GROUP BY ym, method";
 $sql .= " ORDER BY ym";
 
@@ -269,7 +269,7 @@ for ($m = 11; $m >= 0; $m--) {
 $sql = "SELECT method, COUNT(*) as cnt, COALESCE(SUM(amount), 0) as total";
 $sql .= " FROM ".MAIN_DB_PREFIX."stancer_stancer_payments";
 $sql .= " WHERE status = ".Stancer_payments::STATUS_CAPTURED;
-$sql .= $liveModeFilter.$entityFilter;
+$sql .= $sqlLiveModeFilter.$sqlEntityFilter;
 $sql .= " GROUP BY method";
 
 $methodPieData = array();

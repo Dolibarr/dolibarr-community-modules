@@ -232,7 +232,9 @@ class Stancer extends CommonObject
 	{
 		global $conf;
 		$error = 0;
-		dol_syslog("stancer processInvoicesForPaymentMode mode=$mode idpaiement=$idpaiement thirdparty_id=$thirdparty_id isautomatic=$isautomatic", LOG_DEBUG);
+		// PHP interpolates false as an empty string, log the flag as 0/1 instead.
+		$isautomaticlog = (int) $isautomatic;
+		dol_syslog("stancer processInvoicesForPaymentMode mode=$mode idpaiement=$idpaiement thirdparty_id=$thirdparty_id isautomatic=$isautomaticlog", LOG_DEBUG);
 
 		$sql = 'SELECT f.rowid, f.fk_soc as socid, sr.rowid as companypaymentmodeid';
 		$sql .= ' FROM '.MAIN_DB_PREFIX.'facture as f, '.MAIN_DB_PREFIX.'societe_rib as sr';
@@ -384,7 +386,8 @@ class Stancer extends CommonObject
 							$onlycontracts = getDolGlobalString('STANCER_AUTO_SEPA_ONLY_FOR_CONTRACTS', "");
 							if ($onlycontracts != "") {
 								//is automatic -> only for invoices linked to a contract ?
-								$invoice->fetchObjectLinked('', 'contrat');
+								// $sourceid is a ?int, pass null and not '' so the core falls back on $invoice->id.
+								$invoice->fetchObjectLinked(null, 'contrat');
 								if (empty($invoice->linkedObjectsIds)) {
 									dol_syslog("stancer processInvoicesForPaymentMode : automatic mode is enabled and there is no contract linked to that invoice, break");
 									$invoiceprocessedko[$facid] = $invoice->ref;
@@ -764,6 +767,7 @@ class Stancer extends CommonObject
 			$invoicesProcessed[] = $obj->id;
 
 			// Skip if invoice is already paid or not in validated status
+			// @phan-suppress-next-line PhanDeprecatedProperty  $paye is the column Dolibarr 15..21 still fills and writes; status == 2 also covers abandoned invoices
 			if ($obj->paye == 1 || $obj->status != Facture::STATUS_VALIDATED) {
 				dol_syslog("stancer doSendPaymentReminders invoice " . $obj->ref . " already paid or not validated, skip", LOG_DEBUG);
 				continue;
@@ -778,11 +782,8 @@ class Stancer extends CommonObject
 
 			// Count existing reminders via ActionComm
 			$actioncomm = new ActionComm($this->db);
-			if (floatval(DOL_VERSION) < 15) {
-				$existingReminders = $actioncomm->getActions($this->db, $obj->socid, $obj->id, "invoice", " AND code LIKE 'AC_BILL_RELANCE_%_SENTBYMAIL'");
-			} else {
-				$existingReminders = $actioncomm->getActions($obj->socid, $obj->id, "invoice", " AND code LIKE 'AC_BILL_RELANCE_%_SENTBYMAIL'");
-			}
+			// The module requires Dolibarr 15 minimum, where getActions() no longer takes $db as first argument.
+			$existingReminders = $actioncomm->getActions($obj->socid, $obj->id, "invoice", " AND code LIKE 'AC_BILL_RELANCE_%_SENTBYMAIL'");
 			$reminderCount = is_array($existingReminders) ? count($existingReminders) : 0;
 
 			// All reminders already sent?
@@ -1067,7 +1068,11 @@ class Stancer extends CommonObject
 		$evt->authorid    = $user->id; // User saving action
 		$evt->userownerid = $user->id;
 		$evt->note_private = $date . ": " . trim($langs->trans($message));
-		$evt->fk_element = $object->id;
+		// Feed both fields: ActionComm::create() only reads fk_element up to Dolibarr 18,
+		// and reconciles it with elementid from Dolibarr 19 on.
+		$evt->elementid = (int) $object->id;
+		// @phan-suppress-next-line PhanDeprecatedProperty  only source read by ActionComm::create() on Dolibarr 15..18
+		$evt->fk_element = (int) $object->id;
 		$evt->elementtype = $object->element;
 
 		$evt->ref_ext = $object->ref;
@@ -1076,9 +1081,6 @@ class Stancer extends CommonObject
 		$evt->transparency = 1;
 		$evt->socpeopleassigned = array();
 		$evt->userassigned = array();
-
-		$evt->fk_element  = $object->id;
-		$evt->elementtype = $object->element;
 
 		$evt->create($user, 1);
 

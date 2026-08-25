@@ -121,10 +121,11 @@ class pdf_sepamandate_stancer extends pdf_sepamandate
 		$this->page_largeur = $formatarray['width'];
 		$this->page_hauteur = $formatarray['height'];
 		$this->format = array($this->page_largeur,$this->page_hauteur);
-		$this->marge_gauche=getDolGlobalString('MAIN_PDF_MARGIN_LEFT', '10');
-		$this->marge_droite=getDolGlobalString('MAIN_PDF_MARGIN_RIGHT', '10');
-		$this->marge_haute =getDolGlobalString('MAIN_PDF_MARGIN_TOP', '10');
-		$this->marge_basse =getDolGlobalString('MAIN_PDF_MARGIN_BOTTOM', '10');
+		// Margins are used in arithmetic below and stored in int properties: read them as int.
+		$this->marge_gauche=getDolGlobalInt('MAIN_PDF_MARGIN_LEFT', 10);
+		$this->marge_droite=getDolGlobalInt('MAIN_PDF_MARGIN_RIGHT', 10);
+		$this->marge_haute =getDolGlobalInt('MAIN_PDF_MARGIN_TOP', 10);
+		$this->marge_basse =getDolGlobalInt('MAIN_PDF_MARGIN_BOTTOM', 10);
 
 		$this->option_logo = 1; // Display logo FAC_PDF_LOGO
 
@@ -157,6 +158,12 @@ class pdf_sepamandate_stancer extends pdf_sepamandate
 	 *  @param		int			$hideref			Do not show ref (not used for this template)
 	 *  @param      null|array  $moreparams         More parameters
 	 *	@return	    int         				    1 if OK, <=0 if KO
+	 *
+	 * Dolibarr 20 widened the parent parameter from CompanyBankAccount to Account, and the
+	 * analysers read that recent signature. Keeping CompanyBankAccount here is the accurate
+	 * contract: the body reads $rum and $frstrecur, declared on CompanyBankAccount and on
+	 * CompanyPaymentMode, but on no version of Account.
+	 * @phan-suppress PhanParamSignatureMismatch
 	 */
 	public function write_file($object, $outputlangs, $srctemplatepath = '', $hidedetails = 0, $hidedesc = 0, $hideref = 0, $moreparams = null)
 	{
@@ -172,6 +179,8 @@ class pdf_sepamandate_stancer extends pdf_sepamandate
 		if (! is_object($outputlangs)) {
 			$outputlangs=$langs;
 		}
+		// Standard Dolibarr fallback above: from here $outputlangs is always a Translate.
+		'@phan-var-force Translate $outputlangs';
 		// For backward compatibility with FPDF, force output charset to ISO, because FPDF expect text to be encoded in ISO
 		if (getDolGlobalString('MAIN_USE_FPDF', '') != '') {
 			$outputlangs->charset_output='ISO-8859-1';
@@ -195,7 +204,9 @@ class pdf_sepamandate_stancer extends pdf_sepamandate
 				$objectref = "";
 				if (!empty($object->socid)) {
 					$objectref = $object->socid;
+					// @phan-suppress-next-line PhanDeprecatedProperty  CompanyPaymentMode, also passed to this template, declares fk_soc and no socid
 				} elseif (!empty($object->fk_soc)) {
+					// @phan-suppress-next-line PhanDeprecatedProperty  CompanyPaymentMode, also passed to this template, declares fk_soc and no socid
 					$objectref = $object->fk_soc;
 				}
 				if (!empty($object->id)) {
@@ -231,12 +242,13 @@ class pdf_sepamandate_stancer extends pdf_sepamandate
 				$pdf=pdf_getInstance($this->format);
 				$default_font_size = pdf_getPDFFontSize($outputlangs);	// Must be after pdf_getInstance
 				$heightforinfotot = 60;	// Height reserved to output the info and total part
-				$heightforfreetext= getDolGlobalString('MAIN_PDF_FREETEXT_HEIGHT', '5');	// Height reserved to output the free text on last page
+				$heightforfreetext= getDolGlobalInt('MAIN_PDF_FREETEXT_HEIGHT', 5);	// Height reserved to output the free text on last page
 				$heightforfooter = $this->marge_basse + (!getDolGlobalString('MAIN_GENERATE_DOCUMENTS_SHOW_FOOT_DETAILS') ? 12 : 22); // Height reserved to output the footer (value include bottom margin)
 				if (getDolGlobalString('MAIN_GENERATE_DOCUMENTS_SHOW_FOOT_DETAILS', '') != '') {
 					$heightforfooter+= 6;
 				}
-				$pdf->SetAutoPageBreak(0, 0);
+				// TCPDF only tests the truthiness of $auto, false is strictly equivalent to the historical 0.
+				$pdf->SetAutoPageBreak(false, 0);
 
 				if (class_exists('TCPDF')) {
 					$pdf->setPrintHeader(false);
@@ -261,7 +273,10 @@ class pdf_sepamandate_stancer extends pdf_sepamandate
 
 				// New page
 				$pdf->AddPage();
-				$pdf->setPageOrientation('', 0, $heightforfooter + $heightforfreetext);
+				// TCPDF keeps this flag as is (its empty_string() test only rejects null and ''),
+				// then forwards it to SetAutoPageBreak(), which only tests its truthiness:
+				// false is strictly equivalent to the historical 0.
+				$pdf->setPageOrientation('', false, $heightforfooter + $heightforfreetext);
 
 				$pagenb++;
 				$this->_pagehead($pdf, $object, 1, $outputlangs);
@@ -277,7 +292,7 @@ class pdf_sepamandate_stancer extends pdf_sepamandate
 				// Show notes
 				if (! empty($object->note_public)) {
 					$pdf->SetFont('', '', $default_font_size - 1);
-					$pdf->writeHTMLCell(190, 3, $this->posxref-1, $tab_top-2, dol_htmlentitiesbr($object->note_public), 0, 1);
+					$pdf->writeHTMLCell(190, 3, $this->posxref-1, $tab_top-2, dol_htmlentitiesbr((string) $object->note_public), 0, 1);
 					$nexY = $pdf->GetY();
 					$height_note=$nexY-($tab_top-2);
 
@@ -285,7 +300,7 @@ class pdf_sepamandate_stancer extends pdf_sepamandate
 					$pdf->SetDrawColor(192, 192, 192);
 					$pdf->Rect($this->marge_gauche, $tab_top-3, $this->page_largeur-$this->marge_gauche-$this->marge_droite, $height_note+1);
 
-					$tab_height = $tab_height - $height_note;
+					$tab_height -= $height_note;
 					$tab_top = $nexY+6;
 				} else {
 					$height_note=0;
@@ -355,20 +370,41 @@ class pdf_sepamandate_stancer extends pdf_sepamandate
 				$thirdparty=new Societe($this->db);
 				if ($object->socid > 0) {
 					$thirdparty->fetch($object->socid);
+					// @phan-suppress-next-line PhanDeprecatedProperty  CompanyPaymentMode, also passed to this template, declares fk_soc and no socid
 				} elseif ($object->fk_soc > 0) {
+					// @phan-suppress-next-line PhanDeprecatedProperty  CompanyPaymentMode, also passed to this template, declares fk_soc and no socid
 					$thirdparty->fetch($object->fk_soc);
 				}
 
+				// Name of the account holder, printed between parentheses next to the customer
+				// name. Dolibarr 20 and above fill $owner_name on Account and CompanyBankAccount,
+				// while CompanyPaymentMode, also passed to this template by public/sepa-iban.php,
+				// only ever fills $proprio, from Dolibarr 15 to 21. Both fields are read through
+				// empty() so a property missing on the running version stays silent on PHP 8.
+				// @phan-suppress-next-line PhanDeprecatedProperty  $proprio is the only holder field before Dolibarr 20, and the only one filled on CompanyPaymentMode
+				$accountOwner = !empty($object->owner_name) ? $object->owner_name : (!empty($object->proprio) ? $object->proprio : '');
+
 				$sepaname = '______________________________________________';
 				if ($thirdparty->id > 0) {
-					$sepaname = $thirdparty->name.($object->account_owner ? ' ('.$object->account_owner.')' : '');
+					if ($accountOwner === '') {
+						// Ordinary case, not a degraded path: the holder field is optional on the
+						// core screen Thirdparty > Payment modes, which also builds this mandate
+						// because the model is registered as a bankaccount document model.
+						dol_syslog("stancer sepa mandate pdf : no account holder name on bank account id=".(empty($object->id) ? 'unknown' : $object->id).", only the thirdparty name is printed on the mandate", LOG_DEBUG);
+					}
+					$sepaname = $thirdparty->name.($accountOwner !== '' ? ' ('.$accountOwner.')' : '');
 				}
 				$posY=$pdf->GetY();
 				$posY+=3;
 				$pdf->SetXY($this->marge_gauche, $posY);
 				$pdf->MultiCell($this->page_largeur - $this->marge_gauche - $this->marge_droite, 3, $outputlangs->transnoentitiesnoconv("SEPAFormYourName").' * : ', 0, 'L');
 				$pdf->SetXY(80, $posY);
-				$pdf->MultiCell($this->page_largeur - $this->marge_gauche - $this->marge_droite, 3, $sepaname, 0, 'L');
+				// This cell starts at x=80, so its width has to stop at the right margin. Reusing
+				// the width of the label column (page 210 - 10 - 10 = 190 on A4) would make TCPDF
+				// set a right margin of 210 - 80 - 190 = -60, and a long "name (holder)" value
+				// would run past the page edge instead of wrapping. The core template keeps the
+				// label width here, so wrapping has never worked there either.
+				$pdf->MultiCell($this->page_largeur - $this->marge_droite - 80, 3, $sepaname, 0, 'L');
 
 				$address = '______________________________________________';
 				if ($thirdparty->id > 0) {
@@ -514,7 +550,7 @@ class pdf_sepamandate_stancer extends pdf_sepamandate
 	 *
 	 *   @param		TCPDF				$pdf     		Object PDF
 	 *   @param		CompanyBankAccount	$object			Object to show
-	 *   @param		int			$posy			Y
+	 *   @param		float		$posy			Y
 	 *   @param		Translate	$outputlangs	Langs object
 	 *   @return	float
 	 */
@@ -544,9 +580,9 @@ class pdf_sepamandate_stancer extends pdf_sepamandate
 	 *
 	 *	@param	TCPDF				$pdf           	Object PDF
 	 *	@param  CompanyBankAccount	$object         Object invoice
-	 *	@param	int					$posy			Position depart
+	 *	@param	float				$posy			Position depart
 	 *	@param	Translate			$outputlangs	Objet langs
-	 *	@return int									Position pour suite
+	 *	@return float								Position pour suite
 	 */
 	protected function _signature_area(&$pdf, $object, $posy, $outputlangs)
 	{
@@ -608,7 +644,7 @@ class pdf_sepamandate_stancer extends pdf_sepamandate
 	 *  @param  CompanyBankAccount	$object     	Object to show
 	 *  @param  int	    	$showaddress    0=no, 1=yes
 	 *  @param  Translate	$outputlangs	Object lang for output
-	 *  @return	void
+	 *  @return	float|int					Top shift value, always 0 here, ignored by the caller
 	 */
 	public function _pagehead(&$pdf, $object, $showaddress, $outputlangs)
 	{
@@ -694,6 +730,12 @@ class pdf_sepamandate_stancer extends pdf_sepamandate
 			}
 		}
 		*/
+
+		// Dolibarr 20 gave this method a return value, a top shift the caller may add to its
+		// own top position, and the core template returns 0 there; up to Dolibarr 19 it was
+		// documented void with no return at all. This header shifts nothing and the call site
+		// in write_file() ignores the value, so return the same neutral 0 as the core.
+		return 0;
 	}
 
 

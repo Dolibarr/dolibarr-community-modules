@@ -93,7 +93,7 @@ $formSetup->newItem('STANCER_CB_AS_PAID')->setAsYesNo();
 
 $formSetup->newItem('STANCER_PUBLIC_CB_PAGE')->setAsYesNo();
 
-$sql = "SELECT rowid, nom FROM ".MAIN_DB_PREFIX."societe WHERE status='1' AND client='1' AND entity = '".$conf->entity."'";
+$sql = "SELECT rowid, nom FROM ".MAIN_DB_PREFIX."societe WHERE status='1' AND client='1' AND entity = '".((int) $conf->entity)."'";
 $result = $db->query($sql);
 $options = array();
 if ($result) {

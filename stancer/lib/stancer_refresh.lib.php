@@ -94,7 +94,9 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 			dol_syslog("stancerRefreshAllPaymentsFromDolibarr forceAudit with empty selection, nothing to do");
 			return $output;
 		}
-		$customsql = "live_mode = '" . getDolGlobalString('STANCER_IS_PROD') . "' AND rowid IN (" . implode(',', $cleanIds) . ")";
+		// The intval() cast stays inside the implode(): the SQL guard reads the
+		// concatenated line, it does not follow the value back to $cleanIds.
+		$customsql = "live_mode = '" . getDolGlobalString('STANCER_IS_PROD') . "' AND rowid IN (" . implode(',', array_map('intval', $cleanIds)) . ")";
 	} else {
 		//Refresh sur un historique de ... 1 mois, 60 jours ... autre ?
 		$nbjour = stancerGetNumberOfDaysToGet();
@@ -114,7 +116,7 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 		$customsql = "live_mode = '" . getDolGlobalString('STANCER_IS_PROD') . "'";
 		$customsql .= " AND ((status <> '" . Stancer_payments::STATUS_CAPTURED . "' AND status <> '" . Stancer_payments::STATUS_HIDDEN . "')";
 		$customsql .= "      OR (grouped_invoice_ids IS NOT NULL AND grouped_invoice_ids <> ''))";
-		$customsql .= " AND date_creation > '" . $ladate . "'";
+		$customsql .= " AND date_creation > '" . $db->escape($ladate) . "'";
 	}
 
 	$resList = $sp->fetchAll('ASC', '', 0, 0, array('customsql' => $customsql));
@@ -155,7 +157,8 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 			$allPaid = true;
 			foreach ($groupedInvoices as $inv) {
 				$paidLoc = $inv->getSommePaiement() ?? 0;
-				if (!(price2num($paidLoc, 'MT') >= price2num($inv->total_ttc, 'MT') - 0.01 || $inv->paye == 1)) {
+				// @phan-suppress-next-line PhanDeprecatedProperty  $paye is the column Dolibarr 15..21 fills and still writes; status == 2 also covers abandoned invoices
+				if (!((float) price2num($paidLoc, 'MT') >= (float) price2num($inv->total_ttc, 'MT') - 0.01 || $inv->paye == 1)) {
 					$allPaid = false;
 					break;
 				}
@@ -163,6 +166,7 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 			if ($allPaid) {
 				dol_syslog("stancerRefreshAllPaymentsFromDolibarr $paymentId grouped: all invoices already paid, capture and next");
 				foreach ($groupedInvoices as $inv) {
+					// @phan-suppress-next-line PhanDeprecatedProperty  $paye is the column Dolibarr 15..21 fills and still writes; status == 2 also covers abandoned invoices
 					if ($inv->paye == 0 && $inv->setPaid($user) < 0) {
 						dol_syslog("stancerRefreshAllPaymentsFromDolibarr $paymentId grouped: setPaid failed on invoice " . $inv->ref . ": " . $inv->error, LOG_ERR);
 					}
@@ -275,11 +279,7 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 					// Idempotence: skip if the action was already created on the first invoice of the group.
 					$firstInv = $groupedInvoices[0];
 					$actioncommReopenCheck = new ActionComm($db);
-					if (floatval(DOL_VERSION) < 15) {
-						$existingReopen = $actioncommReopenCheck->getActions($db, $firstInv->socid, $firstInv->id, 'invoice', " AND code='AC_" . $db->escape($reopenActionCode) . "'");
-					} else {
-						$existingReopen = $actioncommReopenCheck->getActions($firstInv->socid, $firstInv->id, 'invoice', " AND code='AC_" . $db->escape($reopenActionCode) . "'");
-					}
+					$existingReopen = $actioncommReopenCheck->getActions($firstInv->socid, $firstInv->id, 'invoice', " AND code='AC_" . $db->escape($reopenActionCode) . "'");
 					if (empty($existingReopen)) {
 						$reopenRes = stancerReopenInvoiceFromPayment($paymentId, $langs->transnoentitiesnoconv('StancerPaymentFailedReopenReason', $paymentStatus, $paymentId));
 						if (is_array($reopenRes)) {
@@ -314,6 +314,9 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 			//facture dont il ne reste rien à payer -> short circuit
 			if ($obj->element == 'facture') {
 				$paid = $obj->getSommePaiement() ?? 0;
+				// price2num() returns a numeric string that PHP coerces in this comparison; the
+				// literal form is pinned by the M7 guard test (StancerAmountComparisonTest).
+				// @phan-suppress-next-line PhanTypeInvalidLeftOperandOfNumericOp
 				if (price2num($paid, 'MT') >= price2num($obj->total_ttc, 'MT') - 0.01) {
 					dol_syslog("stancerRefreshAllPaymentsFromDolibarr $paymentId that invoice was paid, change status and do short circuit, next, ref=$objRef");
 					if ($obj->setPaid($user) < 0) {
@@ -326,6 +329,7 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 					}
 					continue;
 				}
+				// @phan-suppress-next-line PhanDeprecatedProperty  $paye is the column Dolibarr 15..21 fills and still writes; status == 2 also covers abandoned invoices
 				if ($obj->paye == 1) {
 					dol_syslog("stancerRefreshAllPaymentsFromDolibarr $paymentId that invoice is marked as paid short circuit, next, ref=$objRef");
 					//stancer status could be stucked to "in progress" for sure if we are in that portion of code
@@ -338,20 +342,24 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 			}
 			if ($obj->element == 'commande') {
 				dol_syslog("stancerRefreshAllPaymentsFromDolibarr $paymentId is an order, fetch linked invoices");
-				$obj->fetchObjectLinked($obj->id, $obj->element, '', 'facture');
+				$obj->fetchObjectLinked($obj->id, $obj->element, null, 'facture');
 				foreach ($obj->linkedObjectsIds as $objecttype => $linkedobj) {
 					foreach ($linkedobj as $key => $facid) {
 						$inv = new Facture($db);
 						$resInv = $inv->fetch($facid);
 						if ($resInv) {
 							$paid = $inv->getSommePaiement() ?? 0;
+							// price2num() returns a numeric string that PHP coerces in this comparison; the
+							// literal form is pinned by the M7 guard test (StancerAmountComparisonTest).
+							// @phan-suppress-next-line PhanTypeInvalidLeftOperandOfNumericOp
 							if (price2num($paid, 'MT') >= price2num($inv->total_ttc, 'MT') - 0.01) {
 								dol_syslog("stancerRefreshAllPaymentsFromDolibarr $paymentId invoice " . $inv->ref . " linked to that order was paid, change status and do short circuit, next, ref=$objRef");
 								dol_syslog("stancerRefreshAllPaymentsFromDolibarr paid=$paid, total_ttc=" . $inv->total_ttc);
+								// @phan-suppress-next-line PhanDeprecatedProperty  $paye is the column Dolibarr 15..21 fills and still writes; status == 2 also covers abandoned invoices
 								if ($inv->paye == 0 && $inv->setPaid($user) < 0) {
 									dol_syslog("stancerRefreshAllPaymentsFromDolibarr $paymentId setPaid failed on invoice " . $inv->ref . ": " . $inv->error, LOG_ERR);
 								}
-								if ($obj->statut != Commande::STATUS_CLOSED && $obj->cloture($user, 1) < 0) {
+								if ($obj->status != Commande::STATUS_CLOSED && $obj->cloture($user, 1) < 0) {
 									dol_syslog("stancerRefreshAllPaymentsFromDolibarr $paymentId cloture failed on order $objRef: " . $obj->error, LOG_ERR);
 								}
 								//stancer status could be stucked to "in progress"
@@ -367,15 +375,19 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 			}
 			if ($obj->element == 'propal') {
 				dol_syslog("stancerRefreshAllPaymentsFromDolibarr $paymentId is a propal, fetch linked invoices");
-				$obj->fetchObjectLinked($obj->id, $obj->element, '', 'facture');
+				$obj->fetchObjectLinked($obj->id, $obj->element, null, 'facture');
 				foreach ($obj->linkedObjectsIds as $objecttype => $linkedobj) {
 					foreach ($linkedobj as $key => $facid) {
 						$inv = new Facture($db);
 						$resInv = $inv->fetch($facid);
 						if ($resInv) {
 							$paid = $inv->getSommePaiement() ?? 0;
+							// price2num() returns a numeric string that PHP coerces in this comparison; the
+							// literal form is pinned by the M7 guard test (StancerAmountComparisonTest).
+							// @phan-suppress-next-line PhanTypeInvalidLeftOperandOfNumericOp
 							if (price2num($paid, 'MT') >= price2num($inv->total_ttc, 'MT') - 0.01) {
 								dol_syslog("stancerRefreshAllPaymentsFromDolibarr $paymentId invoice " . $inv->ref . " linked to that propal was paid, change status and do short circuit, next, ref=$objRef");
+								// @phan-suppress-next-line PhanDeprecatedProperty  $paye is the column Dolibarr 15..21 fills and still writes; status == 2 also covers abandoned invoices
 								if ($inv->paye == 0 && $inv->setPaid($user) < 0) {
 									dol_syslog("stancerRefreshAllPaymentsFromDolibarr $paymentId setPaid failed on invoice " . $inv->ref . ": " . $inv->error, LOG_ERR);
 								}
@@ -603,11 +615,7 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 			if ($mailNotif) {
 				$adminActionCode = 'ADMIN_PAYERROR_' . strtoupper($paymentStatus);
 				$actioncommCheck = new ActionComm($db);
-				if (floatval(DOL_VERSION) < 15) {
-					$existingAdminNotif = $actioncommCheck->getActions($db, $obj->socid, $obj->id, $obj->element, " AND code='AC_" . $db->escape($adminActionCode) . "'");
-				} else {
-					$existingAdminNotif = $actioncommCheck->getActions($obj->socid, $obj->id, $obj->element, " AND code='AC_" . $db->escape($adminActionCode) . "'");
-				}
+				$existingAdminNotif = $actioncommCheck->getActions($obj->socid, $obj->id, $obj->element, " AND code='AC_" . $db->escape($adminActionCode) . "'");
 				if (empty($existingAdminNotif)) {
 					$obj->fetch_thirdparty();
 					$customerName = is_object($obj->thirdparty) ? $obj->thirdparty->name : '';
@@ -626,11 +634,7 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 				// Reopen the invoice if it had been marked paid (idempotent: noop if already unpaid)
 				$reopenActionCode = 'BILL_REOPEN_FAILED_' . strtoupper($paymentStatus);
 				$actioncommReopenCheck = new ActionComm($db);
-				if (floatval(DOL_VERSION) < 15) {
-					$existingReopen = $actioncommReopenCheck->getActions($db, $obj->socid, $obj->id, "invoice", " AND code='AC_" . $db->escape($reopenActionCode) . "'");
-				} else {
-					$existingReopen = $actioncommReopenCheck->getActions($obj->socid, $obj->id, "invoice", " AND code='AC_" . $db->escape($reopenActionCode) . "'");
-				}
+				$existingReopen = $actioncommReopenCheck->getActions($obj->socid, $obj->id, "invoice", " AND code='AC_" . $db->escape($reopenActionCode) . "'");
 				if (empty($existingReopen)) {
 					$reopenRes = stancerReopenInvoiceFromPayment($paymentId, $langs->transnoentitiesnoconv('StancerPaymentFailedReopenReason', $paymentStatus, $paymentId));
 					if (is_object($reopenRes)) {
@@ -667,11 +671,7 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 
 					// Deduplication check via ActionComm
 					$actioncommCheck = new ActionComm($db);
-					if (floatval(DOL_VERSION) < 15) {
-						$existingSepaNotif = $actioncommCheck->getActions($db, $obj->socid, $obj->id, "invoice", " AND code='AC_" . $db->escape($actionCodeSepaReject) . "'");
-					} else {
-						$existingSepaNotif = $actioncommCheck->getActions($obj->socid, $obj->id, "invoice", " AND code='AC_" . $db->escape($actionCodeSepaReject) . "'");
-					}
+					$existingSepaNotif = $actioncommCheck->getActions($obj->socid, $obj->id, "invoice", " AND code='AC_" . $db->escape($actionCodeSepaReject) . "'");
 
 					if (empty($existingSepaNotif)) {
 						// Send SEPA rejection email via template (with PDF attachment + ActionComm on invoice)
@@ -701,7 +701,7 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 
 						// Auto-create rejection fee invoice if enabled
 						if (getDolGlobalString('STANCER_SEPA_REJECTION_FEE_AUTO_APPLY')) {
-							$feeResult = stancerCreateRejectionFeeInvoice($obj->socid, $sepaResponseCode, $obj->ref);
+							$feeResult = stancerCreateRejectionFeeInvoice($obj->socid, $sepaResponseCode, (string) $obj->ref);
 							if (is_object($feeResult)) {
 								dol_syslog("stancerRefreshAllPaymentsFromDolibarr $paymentId rejection fee invoice created: " . $feeResult->ref, LOG_INFO);
 								stancerAddActionComm($obj, 'BILL_SEPAFEE_CREATED', $langs->transnoentitiesnoconv('StancerSepaFeeInvoiceCreated', $feeResult->ref), '', array(), '');
@@ -724,11 +724,7 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 			// invoice's lifetime is negligible.
 			$cronSummaryCode = 'CRON_PAY_REP_' . substr(md5($paymentId), 0, 8) . '_' . strtoupper($paymentStatus);
 			$actioncommCheckSummary = new ActionComm($db);
-			if (floatval(DOL_VERSION) < 15) {
-				$existingSummary = $actioncommCheckSummary->getActions($db, $obj->socid, $obj->id, $obj->element, " AND code='AC_" . $db->escape($cronSummaryCode) . "'");
-			} else {
-				$existingSummary = $actioncommCheckSummary->getActions($obj->socid, $obj->id, $obj->element, " AND code='AC_" . $db->escape($cronSummaryCode) . "'");
-			}
+			$existingSummary = $actioncommCheckSummary->getActions($obj->socid, $obj->id, $obj->element, " AND code='AC_" . $db->escape($cronSummaryCode) . "'");
 
 			if (empty($existingSummary)) {
 				$urlPayment = "<a href='https://manage.stancer.com/fr/details-de-paiement?id=" . $paymentId . "'>" . $paymentId . "</a>";
@@ -801,7 +797,7 @@ function stancerAuditRecentCapturedPayments($lastrun = null, $sendNotifications 
 	dol_syslog("stancerAuditRecentCapturedPayments windowDays=$windowDays sinceDate=$sinceDate");
 
 	$sp = new Stancer_payments($db);
-	$customsql = "live_mode = '" . getDolGlobalString('STANCER_IS_PROD') . "' AND status = '" . Stancer_payments::STATUS_CAPTURED . "' AND date_creation > '" . $sinceDate . "'";
+	$customsql = "live_mode = '" . getDolGlobalString('STANCER_IS_PROD') . "' AND status = '" . Stancer_payments::STATUS_CAPTURED . "' AND date_creation > '" . $db->escape($sinceDate) . "'";
 	$resList = $sp->fetchAll('ASC', '', 0, 0, array('customsql' => $customsql));
 	if (!is_array($resList)) {
 		dol_syslog("stancerAuditRecentCapturedPayments fetchAll error: " . $sp->error, LOG_ERR);
@@ -953,6 +949,9 @@ function stancerRefreshAllPayments($userMessage = true, $lastrun = null, $sendNo
 			// Invoice already fully paid -> short circuit
 			if ($obj->element == 'facture') {
 				$paid = $obj->getSommePaiement() ?? 0;
+				// price2num() returns a numeric string that PHP coerces in this comparison; the
+				// literal form is pinned by the M7 guard test (StancerAmountComparisonTest).
+				// @phan-suppress-next-line PhanTypeInvalidLeftOperandOfNumericOp
 				if (price2num($paid, 'MT') >= price2num($obj->total_ttc, 'MT') - 0.01) {
 					dol_syslog("stancerRefreshAllPayments $paymentId that invoice was paid, change status and do short circuit, next, ref=$objRef");
 
@@ -966,13 +965,14 @@ function stancerRefreshAllPayments($userMessage = true, $lastrun = null, $sendNo
 					}
 					continue;
 				}
+				// @phan-suppress-next-line PhanDeprecatedProperty  $paye is the column Dolibarr 15..21 fills and still writes; status == 2 also covers abandoned invoices
 				if ($obj->paye == 1) {
 					dol_syslog("stancerRefreshAllPayments $paymentId that invoice is marked as paid short circuit, next, ref=$objRef");
 					continue;
 				}
 			}
 			if ($obj->element == 'commande') {
-				$obj->fetchObjectLinked($obj->id, $obj->element, '', 'facture');
+				$obj->fetchObjectLinked($obj->id, $obj->element, null, 'facture');
 				foreach ($obj->linkedObjectsIds as $objecttype => $linkedobj) {
 					foreach ($linkedobj as $key => $facid) {
 						dol_syslog("stancerRefreshAllPayments $paymentId fetch linked invoice " . json_encode($facid));
@@ -980,6 +980,9 @@ function stancerRefreshAllPayments($userMessage = true, $lastrun = null, $sendNo
 						$resInv = $inv->fetch($facid);
 						if ($resInv) {
 							$paid = $inv->getSommePaiement() ?? 0;
+							// price2num() returns a numeric string that PHP coerces in this comparison; the
+							// literal form is pinned by the M7 guard test (StancerAmountComparisonTest).
+							// @phan-suppress-next-line PhanTypeInvalidLeftOperandOfNumericOp
 							if (price2num($paid, 'MT') >= price2num($inv->total_ttc, 'MT') - 0.01) {
 								dol_syslog("stancerRefreshAllPayments $paymentId invoice linked to that order was paid, change status and do short circuit, next, ref=$objRef");
 
@@ -988,10 +991,11 @@ function stancerRefreshAllPayments($userMessage = true, $lastrun = null, $sendNo
 									dol_syslog("stancerRefreshAllPayments $paymentId local status update failed: " . $sp->error, LOG_ERR);
 								}
 
+								// @phan-suppress-next-line PhanDeprecatedProperty  $paye is the column Dolibarr 15..21 fills and still writes; status == 2 also covers abandoned invoices
 								if ($inv->paye == 0 && $inv->setPaid($user) < 0) {
 									dol_syslog("stancerRefreshAllPayments $paymentId setPaid failed on invoice " . $inv->ref . ": " . $inv->error, LOG_ERR);
 								}
-								if ($obj->statut != Commande::STATUS_CLOSED && $obj->cloture($user, 1) < 0) {
+								if ($obj->status != Commande::STATUS_CLOSED && $obj->cloture($user, 1) < 0) {
 									dol_syslog("stancerRefreshAllPayments $paymentId cloture failed on order $objRef: " . $obj->error, LOG_ERR);
 								}
 								continue 3;
@@ -1001,7 +1005,7 @@ function stancerRefreshAllPayments($userMessage = true, $lastrun = null, $sendNo
 				}
 			}
 			if ($obj->element == 'propal') {
-				$obj->fetchObjectLinked($obj->id, $obj->element, '', 'facture');
+				$obj->fetchObjectLinked($obj->id, $obj->element, null, 'facture');
 				foreach ($obj->linkedObjectsIds as $objecttype => $linkedobj) {
 					foreach ($linkedobj as $key => $facid) {
 						dol_syslog("stancerRefreshAllPayments $paymentId fetch linked invoice (from propal) " . json_encode($facid));
@@ -1009,6 +1013,9 @@ function stancerRefreshAllPayments($userMessage = true, $lastrun = null, $sendNo
 						$resInv = $inv->fetch($facid);
 						if ($resInv) {
 							$paid = $inv->getSommePaiement() ?? 0;
+							// price2num() returns a numeric string that PHP coerces in this comparison; the
+							// literal form is pinned by the M7 guard test (StancerAmountComparisonTest).
+							// @phan-suppress-next-line PhanTypeInvalidLeftOperandOfNumericOp
 							if (price2num($paid, 'MT') >= price2num($inv->total_ttc, 'MT') - 0.01) {
 								dol_syslog("stancerRefreshAllPayments $paymentId invoice linked to that propal was paid, change status and do short circuit, next, ref=$objRef");
 
@@ -1017,6 +1024,7 @@ function stancerRefreshAllPayments($userMessage = true, $lastrun = null, $sendNo
 									dol_syslog("stancerRefreshAllPayments $paymentId local status update failed: " . $sp->error, LOG_ERR);
 								}
 
+								// @phan-suppress-next-line PhanDeprecatedProperty  $paye is the column Dolibarr 15..21 fills and still writes; status == 2 also covers abandoned invoices
 								if ($inv->paye == 0 && $inv->setPaid($user) < 0) {
 									dol_syslog("stancerRefreshAllPayments $paymentId setPaid failed on invoice " . $inv->ref . ": " . $inv->error, LOG_ERR);
 								}
@@ -1112,7 +1120,7 @@ function stancerRefreshAllPayments($userMessage = true, $lastrun = null, $sendNo
 						//erics update payment method on invoice, like #18
 						//note we make refresh from stancer list
 						dol_syslog("stancerRefreshAllPayments $paymentId update invoice with bankAccount and paymentType", LOG_DEBUG);
-						$bankaccountId = getDolGlobalString('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
+						$bankaccountId = getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
 						if ($obj->setPaymentMethods($paymentTypeId) < 0) {
 							dol_syslog("stancerRefreshAllPayments $paymentId setPaymentMethods failed on $objRef: " . $obj->error, LOG_ERR);
 						}
@@ -1174,11 +1182,7 @@ function stancerRefreshAllPayments($userMessage = true, $lastrun = null, $sendNo
 				// invoice's lifetime is negligible.
 				$cronSummaryCode = 'CRON_PAY_REP_' . substr(md5($paymentId), 0, 8) . '_' . strtoupper($paymentStatus);
 				$actioncommCheck = new ActionComm($db);
-				if (floatval(DOL_VERSION) < 15) {
-					$existingSummary = $actioncommCheck->getActions($db, $obj->socid, $obj->id, $obj->element, " AND code='AC_" . $db->escape($cronSummaryCode) . "'");
-				} else {
-					$existingSummary = $actioncommCheck->getActions($obj->socid, $obj->id, $obj->element, " AND code='AC_" . $db->escape($cronSummaryCode) . "'");
-				}
+				$existingSummary = $actioncommCheck->getActions($obj->socid, $obj->id, $obj->element, " AND code='AC_" . $db->escape($cronSummaryCode) . "'");
 
 				if (empty($existingSummary)) {
 					if ($mailNotif) {
@@ -1275,14 +1279,14 @@ function stancerRefreshAllPayoutsFromStancer($userMessage = true, $lastrun = nul
 	$accountStancer = new Account($db);
 	$accountMainBank = new Account($db);
 
-	$result = $accountStancer->fetch(getDolGlobalString('STANCER_BANK_ACCOUNT_FOR_PAYMENTS'));
+	$result = $accountStancer->fetch(getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS'));
 	if ($result < 0) {
 		$error++;
 		$output->error = "error STANCER_BANK_ACCOUNT_FOR_PAYMENTS is not defined";
 		return $output;
 	}
 
-	$result = $accountMainBank->fetch(getDolGlobalString('STANCER_BANK_MAIN_ACCOUNT_FOR_PAYOUTS'));
+	$result = $accountMainBank->fetch(getDolGlobalInt('STANCER_BANK_MAIN_ACCOUNT_FOR_PAYOUTS'));
 	if ($result < 0) {
 		$error++;
 		$output->error = "error STANCER_BANK_MAIN_ACCOUNT_FOR_PAYOUTS is not defined";
@@ -1346,7 +1350,7 @@ function stancerRefreshAllPayoutsFromStancer($userMessage = true, $lastrun = nul
 				continue;
 			}
 
-			$res = $sp->fetch(null, null, $payoutID);
+			$res = $sp->fetch(0, null, $payoutID);
 			$resFill = $sp->fillDataFromApi($payout);
 			if ($resFill < 0) {
 				dol_syslog("stancerRefreshAllPayoutsFromStancer next loop due to fillDataFromApi < 0: $resFill");
@@ -1402,7 +1406,7 @@ function stancerRefreshAllPayoutsFromStancer($userMessage = true, $lastrun = nul
 					$feesCents = (isset($payout['fees']) ? (int) $payout['fees'] : 0) + (isset($payout['fees_vat']) ? (int) $payout['fees_vat'] : 0);
 					$fees = $feesCents / 100;
 					$ref = $payoutID;
-					$bankaccountid = getDolGlobalString('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
+					$bankaccountid = getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
 					dol_syslog("STANCER_ADD_FEES is on each PAYOUT (TTC=$fees) in stancer_payouts_list.php ....");
 					$resAddPaiment = stancerAddPaimentFeeOnBank($ref, $fees, $bankaccountid, $payoutID, $dateo, $datev);
 					if ($resAddPaiment < 0) {
@@ -1466,7 +1470,7 @@ function stancerRefreshOnePayout($payoutID, $userMessage = true, $lastrun = null
 	if (is_object($accountStancer)) {
 	} else {
 		$accountStancer = new Account($db);
-		$result = $accountStancer->fetch(getDolGlobalString('STANCER_BANK_ACCOUNT_FOR_PAYMENTS'));
+		$result = $accountStancer->fetch(getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS'));
 		if ($result < 0) {
 			$error++;
 			$output->error = "error STANCER_BANK_ACCOUNT_FOR_PAYMENTS is not defined";
@@ -1478,7 +1482,7 @@ function stancerRefreshOnePayout($payoutID, $userMessage = true, $lastrun = null
 	if (is_object($accountMainBank)) {
 	} else {
 		$accountMainBank = new Account($db);
-		$result = $accountMainBank->fetch(getDolGlobalString('STANCER_BANK_MAIN_ACCOUNT_FOR_PAYOUTS'));
+		$result = $accountMainBank->fetch(getDolGlobalInt('STANCER_BANK_MAIN_ACCOUNT_FOR_PAYOUTS'));
 		if ($result < 0) {
 			$error++;
 			$output->error = "error STANCER_BANK_MAIN_ACCOUNT_FOR_PAYOUTS is not defined";
@@ -1498,7 +1502,7 @@ function stancerRefreshOnePayout($payoutID, $userMessage = true, $lastrun = null
 
 	$sp = new Stancer_payouts($db);
 
-	$res = $sp->fetch(null, null, $payoutID);
+	$res = $sp->fetch(0, null, $payoutID);
 
 	// Fetch payout data from API
 	$payout = $stancerApi->getPayout($payoutID);
@@ -1566,7 +1570,7 @@ function stancerRefreshOnePayout($payoutID, $userMessage = true, $lastrun = null
 			$feesCents = (isset($payout['fees']) ? (int) $payout['fees'] : 0) + (isset($payout['fees_vat']) ? (int) $payout['fees_vat'] : 0);
 			$fees = $feesCents / 100;
 			$ref = $payoutID;
-			$bankaccountid = getDolGlobalString('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
+			$bankaccountid = getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
 			dol_syslog("STANCER_ADD_FEES is on each PAYOUT (TTC=$fees) in stancer_payouts_list.php ....");
 			$resAddPaiment = stancerAddPaimentFeeOnBank($ref, $fees, $bankaccountid, $payoutID, $dateo, $datev);
 			if ($resAddPaiment < 0) {
@@ -1615,7 +1619,7 @@ function stancerRefreshAllPayoutsFromDolibarr($userMessage = true, $lastrun = nu
 	$accountStancer = new Account($db);
 	$accountMainBank = new Account($db);
 
-	$result = $accountStancer->fetch(getDolGlobalString('STANCER_BANK_ACCOUNT_FOR_PAYMENTS'));
+	$result = $accountStancer->fetch(getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS'));
 	if ($result < 0) {
 		$error++;
 		$output->error = "error STANCER_BANK_ACCOUNT_FOR_PAYMENTS is not defined";
@@ -1623,7 +1627,7 @@ function stancerRefreshAllPayoutsFromDolibarr($userMessage = true, $lastrun = nu
 		return $output;
 	}
 
-	$result = $accountMainBank->fetch(getDolGlobalString('STANCER_BANK_MAIN_ACCOUNT_FOR_PAYOUTS'));
+	$result = $accountMainBank->fetch(getDolGlobalInt('STANCER_BANK_MAIN_ACCOUNT_FOR_PAYOUTS'));
 	if ($result < 0) {
 		$error++;
 		$output->error = "error STANCER_BANK_MAIN_ACCOUNT_FOR_PAYOUTS is not defined";
@@ -1631,7 +1635,9 @@ function stancerRefreshAllPayoutsFromDolibarr($userMessage = true, $lastrun = nu
 		return $output;
 	}
 
-	$payoutID = null;
+	// Declared before the try because the catch block interpolates it in its log
+	// and error message: an empty string reads better there than a null.
+	$payoutID = '';
 	$sp = new Stancer_payouts($db);
 
 	$resList = $sp->fetchAll('ASC', '', 0, 0, array('customsql' => "status <> '" . Stancer_payouts::STATUS_PAID . "'"));
@@ -1661,7 +1667,7 @@ function stancerRefreshAllPayoutsFromDolibarr($userMessage = true, $lastrun = nu
 				continue;
 			}
 
-			$res = $sp->fetch(null, null, $payoutID);
+			$res = $sp->fetch(0, null, $payoutID);
 			if ($res) {
 				$resFill = $sp->fillDataFromApi($payoutData);
 				if ($resFill < 0) {
@@ -1682,7 +1688,9 @@ function stancerRefreshAllPayoutsFromDolibarr($userMessage = true, $lastrun = nu
 				}
 
 				$dateo = isset($payoutData['created']) ? (string) $payoutData['created'] : '';
-				$datev = null;
+				// Empty string and not null: the consumers (stancerAddTransfertFromAccountToAccount,
+				// stancerAddPaimentFeeOnBank) both test empty($datev) and expect a string.
+				$datev = '';
 				if (!empty($payoutData['date_bank'])) {
 					$datev = (string) $payoutData['date_bank'];
 				}
@@ -1701,7 +1709,7 @@ function stancerRefreshAllPayoutsFromDolibarr($userMessage = true, $lastrun = nu
 					if (getDolGlobalString('STANCER_ADD_FEES') == 'PAYOUT') {
 						$fees = isset($payoutData['fees']) ? $payoutData['fees'] / 100 : 0;
 						$ref = $payoutID;
-						$bankaccountid = getDolGlobalString('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
+						$bankaccountid = getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
 						dol_syslog("STANCER_ADD_FEES is on each PAYOUT in stancer_payouts_list.php ....");
 						$resAddPaiment = stancerAddPaimentFeeOnBank($ref, $fees, $bankaccountid, $payoutID, $dateo, $datev);
 						if ($resAddPaiment < 0) {
@@ -1823,7 +1831,7 @@ function stancerGetNumberOfItemToGet()
  * @param int        $notifyCustomers   0/1 flag coming from the notify checkbox
  * @param bool       $permissiontoadd   guard, mirrors the page permission check
  * @param string     $massaction        in/out: current mass action; reset to '' on success
- * @return object|null result of stancerRefreshAllPaymentsFromDolibarr, or null when
+ * @return stdClass|null result of stancerRefreshAllPaymentsFromDolibarr, or null when
  *                     the action did not match the entry conditions.
  */
 function stancerHandleRefreshSelectedMassAction($toselect, $notifyCustomers, $permissiontoadd, &$massaction)

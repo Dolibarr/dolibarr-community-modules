@@ -31,6 +31,11 @@
  * @param  string  $reason            Reason for reopening (for the note)
  * @return Facture|Facture[]|int      Facture for solo, array<Facture> for grouped,
  *                                    0 if no invoice found or already unpaid, -1 on error
+ *
+ * The grouped path only returns the array once at least one invoice has been reopened
+ * (the empty case returns 0 earlier), so the real type is narrower than Facture[].
+ * Documenting a non-empty list here would be wrong for any future caller.
+ * @phan-suppress PhanPluginMoreSpecificActualReturnType
  */
 function stancerReopenInvoiceFromPayment($paymentStancerId, $reason)
 {
@@ -432,7 +437,7 @@ function stancerCreateRejectionFeeInvoice($socid, $responseCode = '', $invoiceRe
 		'',
 		0,
 		0,
-		'',
+		0,
 		'HT'
 	);
 	if ($resultLine < 0) {
@@ -460,8 +465,8 @@ function stancerCreateRejectionFeeInvoice($socid, $responseCode = '', $invoiceRe
 /**
  * télécharge une dispute et fais le job
  *
- * @param   string  $id  Stancer dispute id (dspt_xxx)
- * @return  string       CSV report line(s) of what has been done
+ * @param   string    $id  Stancer dispute id (dspt_xxx)
+ * @return  stdClass       Report object with 'error' and 'message' properties
  */
 function stancerRefreshOneDispute($id)
 {
@@ -487,7 +492,7 @@ function stancerRefreshOneDispute($id)
 	if (is_object($accountStancer)) {
 	} else {
 		$accountStancer = new Account($db);
-		$result = $accountStancer->fetch(getDolGlobalString('STANCER_BANK_ACCOUNT_FOR_PAYMENTS'));
+		$result = $accountStancer->fetch(getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS'));
 		if ($result < 0) {
 			$error++;
 			$output->error = "error STANCER_BANK_ACCOUNT_FOR_PAYMENTS is not defined";
@@ -499,7 +504,7 @@ function stancerRefreshOneDispute($id)
 	if (is_object($accountMainBank)) {
 	} else {
 		$accountMainBank = new Account($db);
-		$result = $accountMainBank->fetch(getDolGlobalString('STANCER_BANK_MAIN_ACCOUNT_FOR_PAYOUTS'));
+		$result = $accountMainBank->fetch(getDolGlobalInt('STANCER_BANK_MAIN_ACCOUNT_FOR_PAYOUTS'));
 		if ($result < 0) {
 			$error++;
 			$output->error = "error STANCER_BANK_MAIN_ACCOUNT_FOR_PAYOUTS is not defined";
@@ -555,8 +560,8 @@ function stancerRefreshOneDispute($id)
 /**
  * télécharge un remboursement et fais le job
  *
- * @param   string  $id  Stancer refund id (refd_xxx)
- * @return  string       CSV report line(s) of what has been done
+ * @param   string    $id  Stancer refund id (refd_xxx)
+ * @return  stdClass       Report object with 'error' and 'message' properties
  */
 function stancerRefreshOneRefund($id)
 {
@@ -581,7 +586,7 @@ function stancerRefreshOneRefund($id)
 	if (is_object($accountStancer)) {
 	} else {
 		$accountStancer = new Account($db);
-		$result = $accountStancer->fetch(getDolGlobalString('STANCER_BANK_ACCOUNT_FOR_PAYMENTS'));
+		$result = $accountStancer->fetch(getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS'));
 		if ($result < 0) {
 			$error++;
 			$output->error = "[$id] error STANCER_BANK_ACCOUNT_FOR_PAYMENTS is not defined";
@@ -592,7 +597,7 @@ function stancerRefreshOneRefund($id)
 	if (is_object($accountMainBank)) {
 	} else {
 		$accountMainBank = new Account($db);
-		$result = $accountMainBank->fetch(getDolGlobalString('STANCER_BANK_MAIN_ACCOUNT_FOR_PAYOUTS'));
+		$result = $accountMainBank->fetch(getDolGlobalInt('STANCER_BANK_MAIN_ACCOUNT_FOR_PAYOUTS'));
 		if ($result < 0) {
 			$error++;
 			$output->error = "[$id] error STANCER_BANK_MAIN_ACCOUNT_FOR_PAYOUTS is not defined";
@@ -679,9 +684,14 @@ function stancerRefreshOneRefund($id)
 				if ($resDedup && $db->num_rows($resDedup) > 0) {
 					dol_syslog("stancer [$id] stancerRefreshOneRefund duplicate entry (by refund id) for account=" . $accountStancer->id . ", do not add line");
 				} else {
-					$bank_line_id_from = $accountStancer->addline($dateo, '', $label, (float) price2num(-1 * $amount), $id, '', $user);
+					// Account::addline() expects a timestamp. Stancer sends a unix timestamp,
+					// but a 'YYYY-MM-DD' string can also reach us, so convert accordingly:
+					// a blind (int) cast would turn '2024-05-12' into the year 2024.
+					$dateots = is_numeric($dateo) ? (int) $dateo : (int) dol_stringtotime($dateo, 1);
+					$bank_line_id_from = $accountStancer->addline($dateots, '', $label, (float) price2num(-1 * $amount), $id, 0, $user);
 					if (!($bank_line_id_from > 0)) {
 						$error++;
+						dol_syslog("stancer [$id] stancerRefreshOneRefund addline failed on account=" . $accountStancer->id . " (date=$dateo, amount=$amount): " . $accountStancer->error, LOG_ERR);
 					}
 				}
 			}
@@ -714,7 +724,7 @@ function stancerRefreshOneRefund($id)
  *
  * @param  bool        $userMessage  Show event messages to user
  * @param  int|null    $lastrun      Last run timestamp or null
- * @return object      Object with error and message properties
+ * @return stdClass    Object with error and message properties
  */
 function stancerRefreshAllRefunds($userMessage = true, $lastrun = null)
 {
@@ -866,7 +876,7 @@ function stancerRefreshAllRefunds($userMessage = true, $lastrun = null)
  *
  * @param  bool        $userMessage  Show event messages to user
  * @param  int|null    $lastrun      Last run timestamp or null
- * @return object      Object with error and message properties
+ * @return stdClass    Object with error and message properties
  */
 function stancerRefreshAllDisputes($userMessage = true, $lastrun = null)
 {
@@ -942,7 +952,7 @@ function stancerRefreshAllDisputes($userMessage = true, $lastrun = null)
 			}
 
 			$sd = new Stancer_disputes($db);
-			$res = $sd->fetch(0, null, $disputeId);
+			$res = $sd->fetch(0, '', $disputeId);
 			$oldStatus = $res ? $sd->status : '';
 			$resFill = $sd->fillDataFromApi($dispute);
 			if ($resFill < 0) {
@@ -985,11 +995,8 @@ function stancerRefreshAllDisputes($userMessage = true, $lastrun = null)
 			if ($isLost && !empty($sd->payment_id)) {
 				$actionCodeReopen = 'DISPUTE_REOPEN_' . $disputeId;
 				$actioncommCheck = new ActionComm($db);
-				if (floatval(DOL_VERSION) < 15) {
-					$existingReopen = $actioncommCheck->getActions($db, 0, 0, '', " AND code='AC_" . $db->escape($actionCodeReopen) . "'");
-				} else {
-					$existingReopen = $actioncommCheck->getActions(0, 0, '', " AND code='AC_" . $db->escape($actionCodeReopen) . "'");
-				}
+				// The module requires Dolibarr 15 or above, where getActions() no longer takes the database handler.
+				$existingReopen = $actioncommCheck->getActions(0, 0, '', " AND code='AC_" . $db->escape($actionCodeReopen) . "'");
 
 				if (empty($existingReopen)) {
 					// Reopen invoice (returns Facture for solo, array<Facture> for grouped, 0 or -1 on failure)
@@ -1156,8 +1163,8 @@ function stancerRefreshAllDisputes($userMessage = true, $lastrun = null)
  * Create a refund on Stancer for a given payment
  *
  * @param  string  $paymentStancerId  Stancer payment ID (paym_xxx)
- * @param  int     $amount            Amount to refund in cents (null = full refund)
- * @return object  Object with error and message properties, and refund_id on success
+ * @param  int       $amount            Amount to refund in cents (null = full refund)
+ * @return stdClass  Object with error and message properties, and refund_id on success
  */
 function stancerCreateRefund($paymentStancerId, $amount = null)
 {
@@ -1251,9 +1258,9 @@ function stancerCreateRefund($paymentStancerId, $amount = null)
 /**
  * Create a refund for a Dolibarr payment record
  *
- * @param  int     $paymentRowId  Local payment rowid in llx_stancer_stancer_payments
- * @param  int     $amount        Amount to refund in cents (null = full refund)
- * @return object  Object with error and message properties
+ * @param  int       $paymentRowId  Local payment rowid in llx_stancer_stancer_payments
+ * @param  int       $amount        Amount to refund in cents (null = full refund)
+ * @return stdClass  Object with error and message properties
  */
 function stancerCreateRefundFromPaymentId($paymentRowId, $amount = null)
 {
@@ -1316,13 +1323,21 @@ function stancerCreateInvoiceFromPropal($db, $user, $propal_id, $options = [])
 	$facture->cond_reglement_id = $propal->cond_reglement_id;
 	$facture->mode_reglement_id = $propal->mode_reglement_id;
 	$facture->fk_project = $propal->fk_project;
-	$facture->ref_client = $propal->ref_client;
+	// Checked on the real sources (facture.class.php 18.0.8): create() inserts $ref_customer
+	// when it is set and falls back on $ref_client, which is also the property the core itself
+	// fills when it builds an invoice from another document. Feeding $ref_client stays right
+	// on Dolibarr 15..21. The cast keeps trim() from receiving null on a propal without ref.
+	// @phan-suppress-next-line PhanDeprecatedProperty
+	$facture->ref_client = (string) $propal->ref_client;
 	$facture->note_private = $propal->note_private;
 	$facture->note_public = $propal->note_public;
 	$facture->model_pdf = $propal->model_pdf;
 	$facture->fk_account = $propal->fk_account;
 
 	// Link to the source proposal
+	// $origin_type does not exist on CommonObject before Dolibarr 19, so $origin is the
+	// only property that records the source element on the whole supported range.
+	// @phan-suppress-next-line PhanDeprecatedProperty
 	$facture->origin = 'propal';
 	$facture->origin_id = $propal->id;
 
@@ -1370,10 +1385,13 @@ function stancerCreateInvoiceFromPropal($db, $user, $propal_id, $options = [])
 			$line->rang,
 			$line->special_code,
 			'propal',                       // origin
-			$line->rowid,                   // origin_id (ligne du devis)
+			$line->id,                      // origin_id (ligne du devis)
 			0,                              // fk_parent_line
 			$line->fk_fournprice,
 			$line->pa_ht,
+			// Propal::fetch_lines() fills $label from the custom_label column on Dolibarr 15..21
+			// and no other property carries that text.
+			// @phan-suppress-next-line PhanDeprecatedProperty
 			$line->label,
 			$line->array_options,
 			100,                            // situation_percent

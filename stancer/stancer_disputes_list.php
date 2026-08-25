@@ -89,7 +89,7 @@ $ref = GETPOST('ref', 'alpha');
 $limit = GETPOST('limit', 'int') ? GETPOST('limit', 'int') : $conf->liste_limit;
 $sortfield = (string) GETPOST('sortfield', 'aZ09comma');
 $sortorder = (string) GETPOST('sortorder', 'aZ09comma');
-$page = GETPOSTISSET('pageplusone') ? (GETPOST('pageplusone') - 1) : GETPOST("page", 'int');
+$page = GETPOSTISSET('pageplusone') ? (GETPOSTINT('pageplusone') - 1) : GETPOST("page", 'int');
 if (empty($page) || $page < 0 || GETPOST('button_search', 'alpha') || GETPOST('button_removefilter', 'alpha')) {
 	$page = 0;
 }
@@ -136,7 +136,7 @@ $fieldstosearchall = array();
 $arrayfields = array();
 foreach ($object->fields as $key => $val) {
 	if (!empty($val['visible'])) {
-		$visible = (int) dol_eval($val['visible'], 1);
+		$visible = (int) dol_eval((string) $val['visible'], 1);
 		$arrayfields['t.'.$key] = array(
 			'label'=>$val['label'],
 			'checked'=>(($visible < 0) ? 0 : 1),
@@ -308,11 +308,15 @@ foreach ($search as $key => $val) {
 		if (preg_match('/(_dtstart|_dtend)$/', $key) && $search[$key] != '') {
 			$columnName = preg_replace('/(_dtstart|_dtend)$/', '', $key);
 			if (preg_match('/^(date|timestamp|datetime)/', $object->fields[$columnName]['type'])) {
+				// $columnName is a column name, appended to the SQL unquoted. escape() only
+				// neutralises what matters inside a quoted string literal, so it is not a
+				// guard for an identifier; sanitize() drops every character outside
+				// [a-z0-9_.,-], which is exactly what a column name may contain.
 				if (preg_match('/_dtstart$/', $key)) {
-					$sql .= " AND t.".$db->escape($columnName)." >= '".$db->idate($search[$key])."'";
+					$sql .= " AND t.".$db->sanitize($columnName)." >= '".$db->idate($search[$key])."'";
 				}
 				if (preg_match('/_dtend$/', $key)) {
-					$sql .= " AND t.".$db->escape($columnName)." <= '".$db->idate($search[$key])."'";
+					$sql .= " AND t.".$db->sanitize($columnName)." <= '".$db->idate($search[$key])."'";
 				}
 			}
 		}
@@ -451,12 +455,18 @@ include DOL_DOCUMENT_ROOT.'/core/tpl/massactions_pre.tpl.php';
 
 if ($search_all) {
 	$setupstring = '';
+	// Dead loop as it stands: this page never fills $fieldstosearchall. Unlike
+	// stancer_payments_list.php it has neither the loop over $object->fields['searchall']
+	// nor the completeFieldsToSearchAll hook, so the array declared above stays empty and
+	// nothing outside this file can feed it. Kept to stay aligned with the Dolibarr list
+	// template; add the filling block above to bring the "search in all" display to life.
+	// @phan-suppress-next-line PhanEmptyForeach
 	foreach ($fieldstosearchall as $key => $val) {
 		$fieldstosearchall[$key] = $langs->trans($val);
 		$setupstring .= $key."=".$val.";";
 	}
 	print '<!-- Search done like if MYOBJECT_QUICKSEARCH_ON_FIELDS = '.$setupstring.' -->'."\n";
-	print '<div class="divsearchfieldfilter">'.$langs->trans("FilterOnInto", $search_all).join(', ', $fieldstosearchall).'</div>'."\n";
+	print '<div class="divsearchfieldfilter">'.$langs->trans("FilterOnInto", $search_all).implode(', ', $fieldstosearchall).'</div>'."\n";
 }
 
 $moreforfilter = '';
@@ -562,13 +572,9 @@ foreach ($object->fields as $key => $val) {
 	}
 	$cssforfield = preg_replace('/small\s*/', '', $cssforfield);
 	if (!empty($arrayfields['t.'.$key]['checked'])) {
-		if (floatval(DOL_VERSION) < 20.0) {
-			//@phpstan-ignore-next-line
-			print getTitleFieldOfList($arrayfields['t.'.$key]['label'], 0, $_SERVER['PHP_SELF'], 't.'.$key, '', $param, ($cssforfield ? 'class="'.$cssforfield.'"' : ''), $sortfield, $sortorder, ($cssforfield ? $cssforfield.' ' : ''), '0', (empty($val['helplist']) ? '' : $val['helplist']))."\n";
-		} else {
-			//@phpstan-ignore-next-line
-			print getTitleFieldOfList($arrayfields['t.'.$key]['label'], 0, $_SERVER['PHP_SELF'], 't.'.$key, '', $param, ($cssforfield ? 'class="'.$cssforfield.'"' : ''), $sortfield, $sortorder, ($cssforfield ? $cssforfield.' ' : ''), 0, (empty($val['helplist']) ? '' : $val['helplist']))."\n";
-		}
+		// $disablesortlink has the same "= 0" default and the same empty() test in the
+		// core from Dolibarr 15 to 21, so a single call covers the whole range.
+		print getTitleFieldOfList($arrayfields['t.'.$key]['label'], 0, $_SERVER['PHP_SELF'], 't.'.$key, '', $param, ($cssforfield ? 'class="'.$cssforfield.'"' : ''), $sortfield, $sortorder, ($cssforfield ? $cssforfield.' ' : ''), 0, (empty($val['helplist']) ? '' : $val['helplist']))."\n";
 		$totalarray['nbfield']++;
 	}
 }
@@ -677,7 +683,7 @@ while ($i < $imaxinloop) {
 				if ($key == 'status') {
 					print $object->getLibStatut(5);
 				} elseif ($key == 'rowid') {
-					print $object->showOutputField($val, $key, $object->id, '');
+					print $object->showOutputField($val, $key, (string) $object->id, '');
 				} elseif ($key == 'amount' || $key == 'fee') {
 					print price($object->$key / 100);
 				} elseif ($key == 'dispute_id') {
@@ -699,7 +705,7 @@ while ($i < $imaxinloop) {
 						print dol_escape_htmltag($oid);
 					}
 				} else {
-					print $object->showOutputField($val, $key, $object->$key, '');
+					print $object->showOutputField($val, $key, (string) $object->$key, '');
 				}
 				print '</td>';
 				if (!$i) {
@@ -750,10 +756,10 @@ while ($i < $imaxinloop) {
 
 // Convert total amounts from cents to EUR before displaying
 if (isset($totalarray['val']['t.amount'])) {
-	$totalarray['val']['t.amount'] = $totalarray['val']['t.amount'] / 100;
+	$totalarray['val']['t.amount'] /= 100;
 }
 if (isset($totalarray['val']['t.fee'])) {
-	$totalarray['val']['t.fee'] = $totalarray['val']['t.fee'] / 100;
+	$totalarray['val']['t.fee'] /= 100;
 }
 
 // Show total line

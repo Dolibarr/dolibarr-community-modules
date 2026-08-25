@@ -280,6 +280,9 @@ function stancerAuditPayment($dbRow, $stancerApi, $db)
  * @param int      $socid     If > 0, restrict to this customer.
  * @param int      $maxRows   Hard cap on the number of returned rows.
  * @return array<int, object>|false  Array of rows, or false on SQL error.
+ *
+ * @phan-suppress PhanPluginMoreSpecificActualReturnType  An empty result set is a legitimate
+ *   outcome (no Stancer payment in the period), so the return type cannot be a non-empty list.
  */
 function stancerAuditFetchRows($db, $dateStart, $dateEnd, $socid, $maxRows)
 {
@@ -383,6 +386,9 @@ function stancerAuditFetchIgnoredPaymIds($db)
  *
  * @param array<int, array{has_double:bool, api_order_id:string, payments:array}> $groups  Groups built by stancerAuditBuildGroupView()
  * @return array<string, string>  Map paym_id => api_order_id of the double.
+ *
+ * @phan-suppress PhanPluginMoreSpecificActualReturnType  No group carrying a double is the
+ *   nominal case, so an empty map is a legitimate return value.
  */
 function stancerAuditDetectPaymsInDoubles(array $groups)
 {
@@ -425,7 +431,7 @@ function stancerAuditIgnore($paiementId, $db, $user, $reason = '')
 	}
 
 	$sql = "SELECT rowid, num_paiement, fk_user_creat FROM " . MAIN_DB_PREFIX . "paiement";
-	$sql .= " WHERE rowid = " . $paiementId . " AND ext_payment_site = 'stancer'";
+	$sql .= " WHERE rowid = " . ((int) $paiementId) . " AND ext_payment_site = 'stancer'";
 	$res = $db->query($sql);
 	if (!$res) {
 		$result['message'] = 'SQL error fetching paiement';
@@ -471,6 +477,8 @@ function stancerAuditIgnore($paiementId, $db, $user, $reason = '')
 	$ac->authorid     = (int) $user->id;
 	$ac->userownerid  = (int) $user->id;
 	$ac->extraparams  = $paymId;
+	$ac->elementid    = $paiementId;
+	// @phan-suppress-next-line PhanDeprecatedProperty  ActionComm::create() only reads fk_element up to Dolibarr 18, both fields must be fed
 	$ac->fk_element   = $paiementId;
 	$ac->elementtype  = 'payment';
 	$acId = $ac->create($user);
@@ -528,7 +536,7 @@ function stancerAuditFix($paiementId, $db, $user, $stancerApi)
 	$sqlLoad .= " FROM " . MAIN_DB_PREFIX . "paiement p";
 	$sqlLoad .= " INNER JOIN " . MAIN_DB_PREFIX . "paiement_facture pf ON pf.fk_paiement = p.rowid";
 	$sqlLoad .= " INNER JOIN " . MAIN_DB_PREFIX . "facture f ON f.rowid = pf.fk_facture";
-	$sqlLoad .= " WHERE p.rowid = " . $paiementId;
+	$sqlLoad .= " WHERE p.rowid = " . ((int) $paiementId);
 	$sqlLoad .= " AND p.ext_payment_site = 'stancer' LIMIT 1";
 	$resLoad = $db->query($sqlLoad);
 	if (!$resLoad) {
@@ -596,9 +604,9 @@ function stancerAuditFix($paiementId, $db, $user, $stancerApi)
 	$db->begin();
 
 	$sqlUpdate = "UPDATE " . MAIN_DB_PREFIX . "paiement_facture";
-	$sqlUpdate .= " SET fk_facture = " . $newFkFacture;
-	$sqlUpdate .= " WHERE fk_paiement = " . $paiementId;
-	$sqlUpdate .= " AND fk_facture = " . $oldFkFacture;
+	$sqlUpdate .= " SET fk_facture = " . ((int) $newFkFacture);
+	$sqlUpdate .= " WHERE fk_paiement = " . ((int) $paiementId);
+	$sqlUpdate .= " AND fk_facture = " . ((int) $oldFkFacture);
 	$resUpdate = $db->query($sqlUpdate);
 	if (!$resUpdate) {
 		$db->rollback();
@@ -659,6 +667,8 @@ function stancerAuditFix($paiementId, $db, $user, $stancerApi)
 		$ac->authorid     = (int) $user->id;
 		$ac->userownerid  = (int) $user->id;
 		$ac->extraparams  = $paymId;
+		$ac->elementid    = (int) $inv->id;
+		// @phan-suppress-next-line PhanDeprecatedProperty  ActionComm::create() only reads fk_element up to Dolibarr 18, both fields must be fed
 		$ac->fk_element   = (int) $inv->id;
 		$ac->elementtype  = 'facture';
 		$ac->socid        = (int) $inv->socid;
@@ -699,9 +709,11 @@ function stancerAuditRecomputePayeFlag($invoice, $user)
 	$remaining = (float) price2num($invoice->total_ttc - $total, 'MT');
 
 	// Tolerate 0.01 EUR rounding gap.
+	// @phan-suppress-next-line PhanDeprecatedProperty  $paye is the column Dolibarr 16..21 fills and still writes; status==2 also covers abandoned invoices
 	if ($remaining <= 0.01 && (int) $invoice->paye === 0) {
 		$invoice->setPaid($user);
 		dol_syslog("stancerAuditRecomputePayeFlag invoice " . $invoice->ref . " -> setPaid (paid=$total ttc=" . $invoice->total_ttc . ")", LOG_NOTICE);
+		// @phan-suppress-next-line PhanDeprecatedProperty  $paye is the column Dolibarr 16..21 fills and still writes; status==2 also covers abandoned invoices
 	} elseif ($remaining > 0.01 && (int) $invoice->paye === 1) {
 		$invoice->setUnpaid($user);
 		dol_syslog("stancerAuditRecomputePayeFlag invoice " . $invoice->ref . " -> setUnpaid (paid=$total ttc=" . $invoice->total_ttc . ")", LOG_NOTICE);

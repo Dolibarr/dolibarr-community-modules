@@ -129,7 +129,7 @@ if ($action == 'regularize') {
 			$supplier_general_account = substr($supplier_account, 0, 3);
 
 			// Get supplier account label
-			$sql_label = "SELECT label FROM ".MAIN_DB_PREFIX."accounting_account WHERE account_number = '".$db->escape($supplier_general_account)."' AND entity = ".$conf->entity;
+			$sql_label = "SELECT label FROM ".MAIN_DB_PREFIX."accounting_account WHERE account_number = '".$db->escape($supplier_general_account)."' AND entity = ".((int) $conf->entity);
 			$res_label = $db->query($sql_label);
 			$supplier_account_label = 'Fournisseurs';
 			if ($res_label && $obj_label = $db->fetch_object($res_label)) {
@@ -137,7 +137,7 @@ if ($action == 'regularize') {
 			}
 
 			// Get gap account label
-			$sql_label2 = "SELECT label FROM ".MAIN_DB_PREFIX."accounting_account WHERE account_number = '".$db->escape($account_ecart)."' AND entity = ".$conf->entity;
+			$sql_label2 = "SELECT label FROM ".MAIN_DB_PREFIX."accounting_account WHERE account_number = '".$db->escape($account_ecart)."' AND entity = ".((int) $conf->entity);
 			$res_label2 = $db->query($sql_label2);
 			$gap_account_label = 'Charges diverses';
 			if ($res_label2 && $obj_label2 = $db->fetch_object($res_label2)) {
@@ -214,6 +214,11 @@ if ($action == 'regularize') {
 					$bookkeeping->label_operation = $langs->trans("StancerComptaRegulEcart").' '.$obj->ref;
 					$bookkeeping->debit = $is_credit_supplier ? 0 : $amount;
 					$bookkeeping->credit = $is_credit_supplier ? $amount : 0;
+					// BookKeeping::create() still writes the llx_accounting_bookkeeping.montant
+					// column from $this->montant on Dolibarr 15 to 21, and the core journals
+					// (bankjournal, sellsjournal, purchasesjournal) still fill it the same way.
+					// It carries the unsigned amount, the direction being held by $sens.
+					// @phan-suppress-next-line PhanDeprecatedProperty  no replacement: debit/credit/sens carry a different information
 					$bookkeeping->montant = $amount;
 					$bookkeeping->sens = $is_credit_supplier ? 'C' : 'D';
 					$bookkeeping->fk_user_author = $user->id;
@@ -241,6 +246,9 @@ if ($action == 'regularize') {
 					$bookkeeping2->label_operation = $langs->trans("StancerComptaRegulEcart").' '.$obj->ref;
 					$bookkeeping2->debit = $is_credit_supplier ? $amount : 0;
 					$bookkeeping2->credit = $is_credit_supplier ? 0 : $amount;
+					// Same as above: unsigned amount, direction held by $sens, still written
+					// by BookKeeping::create() on the whole supported Dolibarr range.
+					// @phan-suppress-next-line PhanDeprecatedProperty  no replacement: debit/credit/sens carry a different information
 					$bookkeeping2->montant = $amount;
 					$bookkeeping2->sens = $is_credit_supplier ? 'D' : 'C';
 					$bookkeeping2->fk_user_author = $user->id;
@@ -311,7 +319,7 @@ print '</tr>';
 print '<tr class="oddeven">';
 print '<td>'.$langs->trans("StancerComptaJournalOD").'</td>';
 print '<td>';
-$sql = "SELECT rowid, code, label FROM ".MAIN_DB_PREFIX."accounting_journal WHERE entity = ".$conf->entity." AND active = 1 ORDER BY code";
+$sql = "SELECT rowid, code, label FROM ".MAIN_DB_PREFIX."accounting_journal WHERE entity = ".((int) $conf->entity)." AND active = 1 ORDER BY code";
 $resql = $db->query($sql);
 $journals = array();
 if ($resql) {
@@ -341,7 +349,7 @@ print '</td></tr>';
 print '<tr class="oddeven">';
 print '<td>'.$langs->trans("StancerComptaSupplier").'</td>';
 print '<td>';
-$sql = "SELECT rowid, nom FROM ".MAIN_DB_PREFIX."societe WHERE fournisseur = 1 AND entity = ".$conf->entity." ORDER BY nom";
+$sql = "SELECT rowid, nom FROM ".MAIN_DB_PREFIX."societe WHERE fournisseur = 1 AND entity = ".((int) $conf->entity)." ORDER BY nom";
 $resql = $db->query($sql);
 $suppliers = array();
 if ($resql) {

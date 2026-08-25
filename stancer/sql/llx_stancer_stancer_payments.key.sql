@@ -26,5 +26,13 @@ ALTER TABLE llx_stancer_stancer_payments ADD INDEX idx_stancer_stancer_payments_
 -- refresh/paymentback runs cannot both insert the same Stancer payment.
 ALTER TABLE llx_stancer_stancer_payments ADD UNIQUE INDEX uk_stancer_stancer_payments_stancer_id (entity, stancer_id);
 
+-- order_id holds the ref of the source document. It is a lookup key of the
+-- module: Stancer_payments::fetch() can search on it, the payment list offers a
+-- search_order_id filter, and the "a payment is already running" guard of the
+-- invoice card (Stancer_payments::fetchAllRunningForInvoice()) matches it on
+-- every display of a validated invoice. It had no index. Not unique: retries and
+-- same-day grouped SEPA debits legitimately share one value.
+ALTER TABLE llx_stancer_stancer_payments ADD INDEX idx_stancer_stancer_payments_order_id (order_id);
+
 --ALTER TABLE llx_stancer_stancer_payments ADD CONSTRAINT llx_stancer_stancer_payments_fk_field FOREIGN KEY (fk_field) REFERENCES llx_stancer_myotherobject(rowid);
 

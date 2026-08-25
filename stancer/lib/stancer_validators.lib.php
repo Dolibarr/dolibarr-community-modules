@@ -22,8 +22,9 @@
  *
  * @param  array  $data  Raw input. Expected keys: cbnumber, cbexp_month,
  *                       cbexp_year, cbccv, cbname (optional).
- * @return array|int     Sanitized payload ready for createCard, or
- *                       array('error' => string) on validation failure.
+ * @return array{error:string}|array{number:string,exp_month:int,exp_year:int,cvc:string,name:string}
+ *                       Sanitized payload ready for createCard, or a single
+ *                       'error' entry describing the validation failure.
  */
 function stancerSanitizeCardData(array $data)
 {
@@ -82,7 +83,9 @@ function stancerSanitizeCardData(array $data)
  * Sanitize a SEPA payload for Stancer API (SepaIn schema).
  *
  * @param  array  $data  Raw input. Expected keys: iban, bic (optional), name.
- * @return array|int     Sanitized payload, or array('error' => string).
+ * @return array{error:string}|array{iban:string,name:string,bic?:string}
+ *                       Sanitized payload ready for createSepa ('bic' is only
+ *                       present when supplied), or a single 'error' entry.
  */
 function stancerSanitizeSepaData(array $data)
 {
@@ -129,7 +132,10 @@ function stancerSanitizeSepaData(array $data)
  * Sanitize a customer payload for Stancer API (CustomerIn schema).
  *
  * @param  array  $data  Raw input. Expected keys: email, mobile (optional), name.
- * @return array|int     Sanitized payload, or array('error' => string).
+ * @return array{error:string}|array{name:string,email?:string,mobile?:string}
+ *                       Sanitized payload ready for createCustomer ('email' and
+ *                       'mobile' are only present when supplied), or a single
+ *                       'error' entry.
  */
 function stancerSanitizeCustomerData(array $data)
 {
