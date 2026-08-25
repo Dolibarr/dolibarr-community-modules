@@ -1,4 +1,14 @@
 <?php
+/**
+ * Backported core helpers for the Dolibarr releases that predate them.
+ *
+ * Every declaration below is guarded by function_exists(): only a release
+ * missing the helper ever declares it. Phan does not evaluate that guard and
+ * reports the core declaration found in the stubs as a redefinition.
+ *
+ * @phan-file-suppress PhanRedefineFunction
+ */
+
 require_once DOL_DOCUMENT_ROOT.'/core/lib/security2.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/functions.lib.php';
 

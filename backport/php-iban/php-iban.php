@@ -1,4 +1,35 @@
 <?php
+// phpcs:ignoreFile Upstream code, coding style is the one of github.com/globalcitizen/php-iban
+/**
+ * Upstream php-iban codebase, kept unmodified.
+ *
+ * Bundled for Dolibarr < 16, whose own copy returns wrong national checksum
+ * parts. Dolibarr >= 16 ships the same functions under
+ * htdocs/includes/php-iban/, so only one of the two is loaded at runtime.
+ *
+ * Phan reports the whole file against the core declarations found in its
+ * Dolibarr stubs: those stubs have empty bodies, hence the void inference on
+ * calls and assignments, plus the redefinition of every function. The
+ * remaining reports are upstream coding habits we do not patch, so this copy
+ * stays diffable against github.com/globalcitizen/php-iban.
+ *
+ * @phan-file-suppress PhanRedefineFunction
+ * @phan-file-suppress PhanTypeVoidAssignment
+ * @phan-file-suppress PhanTypeVoidArgument
+ * @phan-file-suppress PhanTypeMismatchArgumentInternal
+ * @phan-file-suppress PhanTypeMismatchArgumentNullableInternal
+ * @phan-file-suppress PhanTypeMismatchDimFetch
+ * @phan-file-suppress PhanTypeSuspiciousStringExpression
+ * @phan-file-suppress PhanTypeArraySuspicious
+ * @phan-file-suppress PhanTypeInvalidLeftOperandOfAdd
+ * @phan-file-suppress PhanTypeInvalidRightOperandOfAdd
+ * @phan-file-suppress PhanTypeInvalidLeftOperandOfNumericOp
+ * @phan-file-suppress PhanTypeInvalidRightOperandOfNumericOp
+ * @phan-file-suppress PhanPossiblyUndeclaredVariable
+ * @phan-file-suppress PhanUndeclaredVariableDim
+ * @phan-file-suppress PhanPluginDuplicateExpressionAssignmentOperation
+ * @phan-file-suppress PhanPluginInconsistentReturnFunction
+ */
 
 // PHP IBAN - http://github.com/globalcitizen/php-iban - LGPLv3
 

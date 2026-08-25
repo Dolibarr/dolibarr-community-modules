@@ -1,4 +1,5 @@
 <?php
+// phpcs:ignoreFile Upstream code, coding style is the one of github.com/globalcitizen/php-iban
 namespace PHP_IBAN;
 
 /**
@@ -7,9 +8,16 @@ namespace PHP_IBAN;
  * Bundled here because Dolibarr < 16 ships an outdated php-iban returning wrong
  * national checksum parts. Dolibarr >= 16 ships the same class under
  * htdocs/includes/php-iban/: only one of the two is ever loaded at runtime, so the
- * duplicate warning below is muted on purpose.
+ * duplicate declaration is muted on purpose.
+ *
+ * The procedural functions called below live in the global namespace of
+ * php-iban.php, which is upstream code kept unmodified: unqualified calls and
+ * the void inference coming from the Dolibarr stubs are muted as well.
  *
  * @phan-suppress PhanRedefinedClassReference
+ * @phan-file-suppress PhanRedefineClass
+ * @phan-file-suppress PhanPluginNotFullyQualifiedFunctionCall
+ * @phan-file-suppress PhanTypeVoidAssignment
  */
 Class IBAN
 {

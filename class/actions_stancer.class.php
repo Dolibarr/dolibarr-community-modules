@@ -230,6 +230,9 @@ class ActionsStancer
 			$this->resprints = $formconfirm;
 			return 0;
 		}
+
+		// No confirmation form to build for this action: let the standard code run.
+		return 0;
 	}
 
 	/**
