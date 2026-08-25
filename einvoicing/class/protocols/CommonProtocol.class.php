@@ -979,7 +979,7 @@ trait CommonProtocol
 		}
 
 		// Check with EI- prefix for product inmported using prodsellerid as internal reference with EI- prefix
-		if (!empty($lineData['prodsellerid']) && $lineData['prodsellerid'] !== "0000") {
+		if (!empty($lineData['prodsellerid']) && $lineData['prodsellerid'] !== "") {
 			$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product";
 			$sql .= " WHERE ref = 'EI-" . $db->escape($lineData['prodsellerid']) . "'";
 			$sql .= " AND entity IN (" . getEntity('product') . ")";
@@ -1082,7 +1082,7 @@ trait CommonProtocol
 			// Auto-create product
 			$product = new Product($db);
 			$product->type 		= $this->_detectProductTypeFromEinvoiceLine($lineData);
-			$product->ref 		= 'EI-' . dol_sanitizeFileName(!empty($lineData['prodsellerid'] && $lineData['prodsellerid'] !== "0000") ? $lineData['prodsellerid'] : uniqid());
+			$product->ref 		= 'EI-' . dol_sanitizeFileName(!empty($lineData['prodsellerid'] && $lineData['prodsellerid'] !== "") ? $lineData['prodsellerid'] : uniqid());
 			$product->ref_ext 	= trim($lineData['prodsellerid'] ?? '');
 			$product->label 	= !empty($lineData['prodname'])
 				? $lineData['prodname']
@@ -1155,10 +1155,10 @@ trait CommonProtocol
 			$createParams = [];
 			$actiondata = ['ref' => $prodRef, 'supplierref' => $prodSupplierRef, 'name' => $prodName];
 
-			if (!empty($prodRef) && $prodRef !== "0000") {
+			if (!empty($prodRef)) {
 				$errorDetails[] = 'Ref: '.$prodRef;
 
-				$createParams['ref'] = 'EI-' . dol_sanitizeFileName(!empty($lineData['prodsellerid'] && $lineData['prodsellerid'] !== "0000") ? $lineData['prodsellerid'] : uniqid());
+				$createParams['ref'] = 'EI-' . dol_sanitizeFileName(!empty($lineData['prodsellerid'] && $lineData['prodsellerid'] !== "") ? $lineData['prodsellerid'] : uniqid());
 
 				$createParams['ref_ext'] = $prodRef;
 			}
@@ -1385,7 +1385,7 @@ trait CommonProtocol
 		}
 
 		// C. Piece but no seller reference => likely service
-		if ($sellerId === '' || $sellerId === '0000') {
+		if ($sellerId === '') {
 			return 1;
 		}
 
