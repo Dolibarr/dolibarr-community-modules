@@ -540,7 +540,8 @@ StancerComptaSupplierNoAccount = The selected supplier has no supplier accountin
 
 # Disputes & Refunds notifications
 StancerMailSubjectNewDispute = Dispute %s - %s - %s: %s
-StancerMailNewDispute = Dispute detected:<br /><br /><b>Customer:</b> %s<br /><b>Invoice:</b> %s<br /><b>Amount:</b> %s<br /><b>Type:</b> %s<br /><b>Status:</b> %s<br /><b>SEPA code:</b> %s<br /><b>ID:</b> %s<br /><br />Please review and handle this dispute.
+StancerMailNewDispute = Dispute detected:<br /><br /><b>Customer:</b> %s<br /><b>Invoice:</b> %s<br /><b>Amount:</b> %s<br /><b>Type:</b> %s<br /><b>Status:</b> %s
+StancerMailNewDisputeDetails = <br /><b>SEPA code:</b> %s<br /><b>ID:</b> %s<br /><br />Please review and handle this dispute.
 StancerMailSubjectNewRefund = New refund - %s: %s
 StancerMailNewRefund = A new refund has been detected: ID %s, amount %s, related payment %s. Please review.
 StancerDisputeLostReopenReason = Dispute lost (%s): invoice has been automatically set back to unpaid.

@@ -1057,7 +1057,10 @@ function stancerRefreshAllDisputes($userMessage = true, $lastrun = null)
 						stancerSendMail(
 							getDolGlobalString('STANCER_AUTO_MAIL_NOTIFICATIONS_PAYOUT', ''),
 							$langs->transnoentitiesnoconv('StancerMailSubjectNewDispute', $sd->dispute_type, $invoiceRef, $clientName, $disputeAmount),
-							$langs->transnoentitiesnoconv('StancerMailNewDispute', $clientName, $invoiceRefWithLink, $disputeAmount, $sd->dispute_type, $sd->status, $sepaCode, $disputeId),
+							// transnoentitiesnoconv() sprintf's over five parameters at most, so the
+							// two remaining fields live in their own key.
+							$langs->transnoentitiesnoconv('StancerMailNewDispute', $clientName, $invoiceRefWithLink, $disputeAmount, $sd->dispute_type, $sd->status)
+								. $langs->transnoentitiesnoconv('StancerMailNewDisputeDetails', $sepaCode, $disputeId),
 							false, '', $disputeTrackid
 						);
 					}
@@ -1137,7 +1140,10 @@ function stancerRefreshAllDisputes($userMessage = true, $lastrun = null)
 				stancerSendMail(
 					getDolGlobalString('STANCER_AUTO_MAIL_NOTIFICATIONS_PAYOUT', ''),
 					$langs->transnoentitiesnoconv('StancerMailSubjectNewDispute', $sd->dispute_type, $invoiceRef, $clientName, $disputeAmount),
-					$langs->transnoentitiesnoconv('StancerMailNewDispute', $clientName, $invoiceRefWithLink, $disputeAmount, $sd->dispute_type, $sd->status, $sepaCode, $disputeId),
+					// transnoentitiesnoconv() sprintf's over five parameters at most, so the
+					// two remaining fields live in their own key.
+					$langs->transnoentitiesnoconv('StancerMailNewDispute', $clientName, $invoiceRefWithLink, $disputeAmount, $sd->dispute_type, $sd->status)
+						. $langs->transnoentitiesnoconv('StancerMailNewDisputeDetails', $sepaCode, $disputeId),
 					false, '', $disputeTrackid
 				);
 			}

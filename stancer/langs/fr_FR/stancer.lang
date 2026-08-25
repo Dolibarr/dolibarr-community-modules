@@ -540,7 +540,8 @@ StancerComptaSupplierNoAccount = Le fournisseur sélectionné n'a pas de compte 
 
 # Disputes & Refunds notifications
 StancerMailSubjectNewDispute = Contestation %s - %s - %s : %s
-StancerMailNewDispute = Contestation détectée :<br /><br /><b>Client :</b> %s<br /><b>Facture :</b> %s<br /><b>Montant :</b> %s<br /><b>Type :</b> %s<br /><b>Statut :</b> %s<br /><b>Code SEPA :</b> %s<br /><b>ID :</b> %s<br /><br />Veuillez vérifier et traiter cette contestation.
+StancerMailNewDispute = Contestation détectée :<br /><br /><b>Client :</b> %s<br /><b>Facture :</b> %s<br /><b>Montant :</b> %s<br /><b>Type :</b> %s<br /><b>Statut :</b> %s
+StancerMailNewDisputeDetails = <br /><b>Code SEPA :</b> %s<br /><b>ID :</b> %s<br /><br />Veuillez vérifier et traiter cette contestation.
 StancerMailSubjectNewRefund = Nouveau remboursement - %s : %s
 StancerMailNewRefund = Un nouveau remboursement a été détecté : ID %s, montant %s, paiement associé %s. Veuillez vérifier.
 StancerDisputeLostReopenReason = Contestation perdue (%s) : la facture a été reclassée en impayée automatiquement.
