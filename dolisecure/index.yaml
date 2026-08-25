@@ -25,13 +25,13 @@ packages:
     git-branch: 'main'
     git-system: 'github'
     cover: 'https://raw.githubusercontent.com/Dolibarr/dolibarr-community-modules/main/dolisecure/cover.png'
-    current_version: '1.0.10'
-    dolibarrmin: '21.0'
-    dolibarrmax: '24.0'
+    current_version: 'auto'
+    dolibarrmin: 'auto'
+    dolibarrmax: 'auto'
     phpmin: 'auto'
     phpmax: 'auto'
     price: 0
     # direct-download is yes if we can download the module to install it in application
-    direct-download: yes
+    direct-download: 'yes'
     # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
     dolistore-upload: 'manual'
