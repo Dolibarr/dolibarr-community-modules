@@ -472,8 +472,6 @@ if (!method_exists('Societe', 'findNearest')) {
 			return $rowid;
 		}
 
-		$errors = array();
-
 		dol_syslog("findNearest", LOG_DEBUG);
 		$tmpthirdparty = new Societe($db);
 
@@ -555,7 +553,7 @@ if (!method_exists('Societe', 'findNearest')) {
 				}
 			} else {
 				$error = $db->lasterror();
-				$errors[] = $db->lasterror();
+				dol_syslog($error, LOG_ERR);
 				$result = -3;
 			}
 			if ($result != 0) {
@@ -608,7 +606,7 @@ if (!method_exists('Societe', 'findNearest')) {
 				}
 			} else {
 				$error = $db->lasterror();
-				$errors[] = $db->lasterror();
+				dol_syslog($error, LOG_ERR);
 				$result = -3;
 			}
 		}
