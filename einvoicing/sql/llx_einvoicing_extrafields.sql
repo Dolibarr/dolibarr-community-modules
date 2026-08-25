@@ -1,4 +1,4 @@
--- Copyright (C) 2025		SuperAdmin					<daoud.mouhamed@gmail.com>
+-- Copyright (C) 2026		Pierre Grasswill			<da.grumpf@gmail.com>
 --
 -- This program is free software: you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License as published by
@@ -13,28 +13,18 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see https://www.gnu.org/licenses/.
 
+-- Properties the module has to keep on a Dolibarr object without using the extrafields of the core,
+-- which an admin or a user could rename, empty or delete while the data they hold is critical.
+-- One row = one named property of one object, so a new property needs no schema change.
 
-CREATE TABLE llx_einvoicing_call (
-	-- BEGIN MODULEBUILDER FIELDS
+CREATE TABLE llx_einvoicing_extrafields (
 	rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL,
-	call_id varchar(50) NOT NULL,
-	call_id_num integer NULL,
-	totalflow integer NULL DEFAULT NULL,
-	batchlimit integer NOT NULL DEFAULT 1,
-	skippedflow integer NOT NULL DEFAULT 1,
-	successflow integer NOT NULL DEFAULT 1,
+	element_id integer NOT NULL,					-- ID of element or element line
+	element_type varchar(50) NOT NULL,				-- Type of element (from property object->element, for example 'facture', 'invoice_supplier', 'societe', ...)
+	name varchar(64) NOT NULL,						-- Name of the property ('buyer_order_reference', ...)
+	value text,										-- Value of the property
 	date_creation datetime NOT NULL,
 	tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 	fk_user_creat integer NOT NULL,
-	fk_user_modif integer,
-	status integer NOT NULL,
-	call_type varchar(50) NOT NULL,
-	method varchar(10),
-	endpoint varchar(255) NOT NULL,
-	request_body text,
-	response text,
-	processing_result text,
-	provider varchar(50) NOT NULL,
-	entity integer DEFAULT 1
-	-- END MODULEBUILDER FIELDS
+	fk_user_modif integer
 ) ENGINE = innodb;

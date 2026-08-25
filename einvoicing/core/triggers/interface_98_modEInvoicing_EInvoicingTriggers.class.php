@@ -70,7 +70,8 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 
 		dol_syslog("Trigger '".$this->name."' for action '".$action."' launched by ".__FILE__.". id=".$object->id);
 
-		// Note: Option EINVOICING_AUTO_SEND_ON_GENERATION is managed in hook afterPDFCreation().
+		// Note: Option EINVOICING_AUTO_SEND_ON_GENERATION is managed in hook afterPDFCreation(), which is
+		// told by the BILL_VALIDATE case below that a validation is what triggers the coming generation.
 
 		// THIRD PARTIES
 		if ($action == 'COMPANY_CREATE' || $action == 'COMPANY_MODIFY') {
@@ -148,6 +149,11 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		if ($action == 'BILL_VALIDATE') {
 			/** @var Facture $object */
 			'@phan-var-force Facture $object';
+
+			// Tell the afterPDFCreation() hook that the document rebuild about to happen is the one that
+			// follows a validation. Set unconditionally and before anything else: this only records a fact
+			// about the request, and the hook is the one place that decides what to do with it.
+			EInvoicing::setInvoiceValidatedInThisRequest($object->id);
 
 			if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {		// If sync Dolibarr to AP is on
 				$einvoicing = new EInvoicing($this->db);
@@ -422,6 +428,20 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 
 		$currentStatusDetails = $einvoicing->fetchLastknownInvoiceStatus($invoice->id, (string) $invoice->ref);
 		if ($currentStatusDetails['transmitted'] != 1) {	// Nothing to report a payment on if the invoice never reached the platform
+			return;
+		}
+
+		// A deposit the platform refused is not a deposit. 'transmitted' is true of every status but the
+		// local ones, and STATUS_ERROR is among those it lets through: it is exactly what an
+		// acknowledgement "Error" leaves behind, see getDolibarrStatusCodeFromPdpLabel(). The platform
+		// holds no invoice to attach a cash-in to, so the status would be refused; and reporting it as
+		// sent would be worse than not sending it, since the reform expects that cash-in once the
+		// invoice is deposited. The invoice has to be corrected and re-sent first, which is what the
+		// "Send" button of the card offers on that very status, and the cash-in reported by hand
+		// afterwards.
+		if ((int) $currentStatusDetails['code'] === EInvoicing::STATUS_ERROR) {
+			dol_syslog(__METHOD__ . ' Cash-in not reported for invoice id=' . $invoice->id . ': the platform refused its deposit (status ' . EInvoicing::STATUS_ERROR . '), there is nothing to report the payment on', LOG_WARNING, 0, '_einvoicing');
+			setEventMessage($langs->trans("ModuleEInvoicingName") . ' : ' . $langs->trans('EInvoiceCashInNotReportedDepositRefused', $invoice->ref), 'warnings');
 			return;
 		}
 

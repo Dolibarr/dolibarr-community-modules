@@ -1205,12 +1205,15 @@ trait CommonProtocol
 
 			$message = 'Unable to find product' . $detailsStr . '. Auto-creation of products is disabled in settings.';
 
-			$action = $langs->trans('CreateProductManually') . ' ';
-			$action .= '<a class="butAction smallpaddingimp" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
-			$action .= '<i class="fas fa-plus-circle"></i> ';
-			$action .= $langs->trans($prodType == 1 ? 'CreateTheService' : 'CreateTheProduct');
-			$action .= '</a>';
+			$btnStyle = 'display:inline-block;width:auto;';
 
+			$action = '<div class="marginbottomonly">' . $langs->trans('SuggestedActionsIntro') . '</div>';
+
+			// First choice: create the product manually
+			$action .= '<a class="button small smallpaddingimp" style="' . $btnStyle . '" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
+			$action .= '<i class="fas fa-plus-circle"></i> ';
+			$action .= $langs->trans($prodType == 1 ? 'CreateServiceManually' : 'CreateProductManually');
+			$action .= '</a>';
 
 			// Second choice: map the vendor product reference(s) of this flow onto existing Dolibarr products.
 			// This creates the vendor reference (llx_product_fournisseur_price) that the matching uses at step 1,
@@ -1222,10 +1225,18 @@ trait CommonProtocol
 					$mappingUrl .= '&socid=' . ((int) $vendorId);
 				}
 
-				$action .= ' ' . $langs->trans("or") . ' ';
-				$action .= '<a class="butAction smallpaddingimp" href="' . dol_escape_htmltag($mappingUrl) . '" target="_blank">';
+				$action .= '<a class="button small smallpaddingimp" style="' . $btnStyle . '" href="' . dol_escape_htmltag($mappingUrl) . '" target="_blank">';
 				$action .= '<i class="fas fa-link unsetcolor"></i> ';
-				$action .= $langs->trans('MapToAnExistingProduct');
+				$action .= $langs->trans('AssociateExistingProductMessage');
+				$action .= '</a>';
+			}
+
+			// Third choice: set a default product on the vendor thirdparty (used for future imports when no product is found)
+			if (!empty($vendorId)) {
+				$thirdpartyUrl = dol_buildpath('/societe/card.php', 1) . '?socid=' . ((int) $vendorId) . '&action=edit#treinvoicing';
+				$action .= '<a class="button small smallpaddingimp" style="' . $btnStyle . '" href="' . dol_escape_htmltag($thirdpartyUrl) . '" target="_blank">';
+				$action .= '<i class="fas fa-star"></i> ';
+				$action .= $langs->trans('SetDefaultProductForThirdparty');
 				$action .= '</a>';
 			}
 
@@ -1792,6 +1803,36 @@ trait CommonProtocol
 		return 0;
 	}
 
+
+	/**
+	 * Keep the order reference the supplier declared on the invoice it sent (BT-13) on the created
+	 * supplier invoice, whether or not it matched a purchase order of Dolibarr.
+	 *
+	 * Auto-linking only happens on an exact, unambiguous match for that supplier: on every other
+	 * case the reference used to be dropped, and the accountant had no way to know what the supplier
+	 * had declared, nor to reconcile the invoice by hand. It is stored into the table of the module
+	 * and not into an extrafield of the core, which a user could rename or delete. Never blocking:
+	 * an import must not fail because a piece of information could not be kept beside it.
+	 *
+	 * @param FactureFournisseur	$supplierInvoice	Supplier invoice created by the import
+	 * @param string				$orderReference		Order reference declared by the supplier (BT-13)
+	 * @return void
+	 */
+	private function _saveImportedBuyerOrderReference($supplierInvoice, $orderReference)
+	{
+		global $db;
+
+		$orderReference = trim((string) $orderReference);
+		if ($orderReference === '' || empty($supplierInvoice->id)) {
+			return;
+		}
+
+		$einvoicing = new EInvoicing($db);
+		$res = $einvoicing->insertOrUpdateExtraField($supplierInvoice->id, $supplierInvoice->element, EInvoicing::EXTRAFIELD_BUYER_ORDER_REFERENCE, $orderReference);
+		if ($res < 0) {
+			dol_syslog(get_class($this) . '::_saveImportedBuyerOrderReference Failed to store the order reference "' . $orderReference . '" of supplier invoice ' . ((int) $supplierInvoice->id) . ': ' . implode(', ', $einvoicing->errors), LOG_ERR);
+		}
+	}
 
 	/**
 	 * Link an inbound supplier invoice to its Dolibarr purchase order (commande fournisseur).

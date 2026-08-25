@@ -581,3 +581,7 @@ RemoteInfoPeppolPAMismatchCheck=Le point d'accès enregistré pour votre entrepr
 RemoteInfoPeppolPAMismatchRequestPortability=Vous devez demander à %s d'effectuer la portabilité.
 KYCStatusFailed=Refusé
 KYCStatusNotVerified=Non vérifié ou non démarré
+SynchronizationDashboard=Tableau de bord de synchronisation
+LastSynchronizationDate=Date de la dernière synchronisation
+CustomerInvoicesSynchronized=Factures client synchronisées
+SupplierInvoicesSynchronized=Factures fournisseurs synchronisées

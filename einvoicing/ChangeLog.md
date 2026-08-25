@@ -1,6 +1,133 @@
 # CHANGELOG MODULE EINVOICING FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
-## 1.0.4
+## 1.1.0
+
+FIX: The module can obtain an access token from the Esalink access point again. The token request had
+lost its grant_type parameter, which RFC 6749 requires whatever the client authentication method is,
+so the access point answered 400 Bad Request - "must not be blank" - before it ever looked at the
+credentials, and the setup screen could only report that no token could be obtained. No token means no
+exchange at all: no invoice sent and none received, on an installation whose credentials are perfectly
+valid. The parameter was dropped when the token request moved to an Authorization: Basic header for
+issue #586, and the option added afterwards, ESALINK_AUTHENT_USING_CLIENT_CREDENTIAL, restored the
+working form only for the installations that knew to set it - the default stayed without grant_type.
+The full form-urlencoded body - grant_type, client_id and client_secret, with no Basic header - is the
+default again: it is the form scripts/testconnect.php has always sent, which is why the diagnostic
+script kept working while the setup screen failed on the same credentials. HTTP Basic remains
+available behind ESALINK_AUTHENT_USING_BASIC_AUTH for an access point that requires it, with
+grant_type in the body there too and the credentials in the header only, as a client must not use more
+than one authentication method in the same request. An installation that set
+ESALINK_AUTHENT_USING_CLIENT_CREDENTIAL as a workaround keeps working: the constant is now without
+effect, and the request it used to select is the default.
+
+CHANGE: GETPOSTFLOAT(), a function the core gained in Dolibarr 20 and that the module backports for the
+versions below, moves from the library of the module to compat/functions.lib.php, where the module keeps
+what it copies from the core. Pure move, guard included: the library requires that file, so the two call
+sites of admin/setup.php keep finding the function where they used to.
+
+CHANGE: dolPrintHTMLForAttribute(), a function the core only gained in Dolibarr 19, was backported in
+the library of the module, among its own functions. It now sits in compat/functions.lib.php, next to the
+other core helpers the module ships for the versions that do not have them. Nothing else changes: the
+library loads that file, so every caller finds the function where it used to. Worth knowing for the
+versions below 19: the backport calls dol_escape_htmltag() with six arguments and that function only
+takes five on Dolibarr 17, so the sixth one is not read there - which changes nothing for this use, the
+fifth argument being 0 already escapes the whole string. Checked on 17 and 18 against the core of 19,
+same output for plain text, accents, html tags, quotes, a javascript: link and an onerror attribute.
+
+FIX: The list of e-invoicing flows works again on Dolibarr 17, the version the descriptor of the module
+declares as the minimum it supports; that page had never been able to render there. It asks
+CommonObject::getFieldList() to leave out of the SELECT the columns it does not read, among them 'recap',
+a virtual column of the list which has no column in the table. That second argument only exists since
+Dolibarr 18: on 17 the method takes the alias alone and ignores the rest without a word, so 'recap' went
+into the query and the page answered a technical error, "Unknown column 't.recap' in 'SELECT'". Below 18
+the page now builds the same list the core builds since 18, and nothing changes on 18 and above, where
+getFieldList() is still the one doing it. Past that, the page died on "Call to undefined function
+GETPOSTDATE()", a helper the core gained in 18 as well: it is backported in compat/functions.lib.php,
+next to the other core helpers the module already ships for 17, and the page loads it. The page also
+loads the library of the module, for dolPrintHTMLForAttribute() - a function the core only gained in
+Dolibarr 19, already polyfilled there, that the same page calls to render its text columns and that
+would fatal on 17 and 18 for the same reason. Finally, the page read
+$conf->main_checkbox_left_column directly, a property the core only carries since Dolibarr 21, so every
+load below that wrote six PHP warnings in the log for a value that is empty there anyway: it is read
+through empty() now, the way one of those six places already read it.
+FIX: The CHORUS extrafields no longer print on the PDF of an invoice or an order when the CHORUS option
+is off (issue #614). They were declared printable = 1, "always print it", while their visibility depends
+on a condition, getDolGlobalInt("EINVOICING_USE_CHORUS"), that the card of the object honours but the PDF
+does not: CommonDocGenerator::getExtrafieldsInHtml() reads that condition on Dolibarr 18, 22, 23 and 24,
+and not on 17, 19, 20 and 21, where three empty labels of a feature nobody turned on reached every
+document. They are declared printable = 2 now, "print it only when it holds something", so an empty field
+stays out of the document on every version. An installation that already carries the extrafields keeps
+its own definition - addExtraField() does not touch an existing one - so the module updates them the way
+it already updates their condition, the next time it is activated.
+FIX: The e-invoice status combo no longer renders an invalid <option> on Dolibarr 17. The code of an
+Access Point status is shown next to its label through a <span> put in the 'data-html' of the option,
+and Form::selectarray() prints the data-* values of an option as they are on 17, where 18 and later
+escape them: the attribute closed on the first quote of that span, and the markup of the whole option
+was broken. The status list escapes the value itself on those cores now, which produces exactly what
+the newer ones produce, and leaves the newer ones untouched rather than escaping twice.
+NEW: The order reference the supplier declared on a received e-invoice (BT-13) is now kept on the
+supplier invoice the import creates, and shown on its card, whether or not it matched a purchase order
+of Dolibarr (issue #603). That reference was only used to auto-link the invoice to an order; the
+no-match case - the ordinary one - dropped it, so the accountant could not see what the supplier had
+declared, nor reconcile the invoice by hand. It is stored as sent, trimmed, in every case, and the
+auto-link keeps behaving exactly as before.
+
+The value does not go into an extrafield: the module deliberately stopped using the extrafields of the
+core, since an admin or a user can rename, empty or delete one while the module is accountable for the
+data it holds. It goes into a new table of the module, llx_einvoicing_extrafields, built on the model of
+llx_einvoicing_extlinks - element_id and element_type identify the object - plus a name and a value, so
+that the next property to keep on an object needs no schema change. EInvoicing::insertOrUpdateExtraField()
+and EInvoicing::getExtraFieldValue() are the way in and out.
+NEW: The reference a received e-invoice carries can now be matched against a ref_supplier that was
+typed with extra text around it. The five lookups the import runs on ref_supplier - the duplicate
+check, the referenced documents at document and at line level, and the source invoice of a credit
+note - were as many copies of the same exact-match query, in the CII path and again in the Factur-X
+one. A supplier invoice entered by hand as "PAY123 - FA202610 - dinner" was therefore never
+recognised as the one the XML calls "FA202610", and the import stopped on a document it could not
+find. Those call sites now share SupplierInvoiceHelper::findIdByRef(), which is still exact by
+default: the hidden option EINVOICING_TOLERANT_SUPPLIER_REF_MATCH adds a fallback, tried only when
+the exact match found nothing, and narrow enough that it cannot answer for the wrong invoice. A
+reference shorter than EINVOICING_TOLERANT_SUPPLIER_REF_MIN_LENGTH (8) or purely numeric is never
+searched for as a substring; the substring must be delimited by a non alphanumeric character or by
+an edge of the ref_supplier, so "FA202610" matches "PAY123 - FA202610 - dinner" but not "FA2026100";
+and the whitespace manual entry adds - "FA 2026 10", tabs and non-breaking spaces included - is
+tolerated without losing the boundary it forms. Several candidates are reported as an ambiguity
+instead of being guessed, and a database failure is no longer reported to the user as a missing
+document.
+
+FIX: The log of the API calls to the Approved Platform no longer loses rows. Call::getNextCallId()
+read the highest call number through the global $db, while logCall() builds and inserts its record on
+the independent $dbhistory - the connection it deliberately uses so the trace survives a rollback of
+the caller. A page working inside a transaction on $db, recording a payment or importing a received
+invoice, holds a consistent-read snapshot taken before the previous call was committed by
+$dbhistory, so the same number was handed out twice and the second insert died on
+uk_einvoicing_call_callid. Every API call after the first one in such a request left no trace at all,
+which in production hid the very transmission that had to be audited. The number is now read on the
+connection the record is written on, with a locking read (FOR UPDATE) held until that insert commits,
+so it can be neither stale nor handed out twice.
+
+FIX: A cash-in is no longer reported with the status 212 on an invoice the Approved Platform refused.
+The guard that decides it reads the 'transmitted' flag, which is true of every status but the local
+ones - and STATUS_ERROR is one it lets through, although that code is exactly what an acknowledgement
+"Error" leaves behind. So an e-invoice whose deposit the platform rejected counted as deposited, and
+the next payment recorded on the invoice reported a cash-in the platform has no invoice to attach it
+to. The cash-in is now skipped on that status, with a warning naming the invoice and a line in the
+log: the e-invoice has to be corrected and sent again, which the "Send" button of the invoice card
+still offers on that very status, and the cash-in reported afterwards.
+  
+FIX: The automatic transmission to the Access Point no longer fires on a document rebuild that has
+nothing to do with a validation. EINVOICING_AUTO_SEND_ON_GENERATION says it transmits "on invoice
+validation", but it lived in afterPDFCreation(), a hook called for every rebuild of the invoice PDF
+and unable to tell what asked for one. Recording a payment rebuilds the invoice document from inside
+Paiement::create(), and so do the "Generate" button of the invoice card and any mass or scheduled PDF
+rebuild. On an invoice validated before the module was set up - or deliberately left to be sent by
+hand - the first such rebuild deposited it at the Access Point on its own: an invoice dated three
+months earlier was submitted at the moment its payment was entered, and being transmitted from then
+on, it also unlocked the cash-in status (212) that the very same payment reported next. The
+BILL_VALIDATE trigger now marks the invoice for the rest of the request - it runs inside
+Facture::validate(), before the caller regenerates the document, and for no other reason - and the
+auto-send is limited to a generation that carries that mark. Nothing changes for the validation flow,
+in the card, in a mass action or through the API; every other rebuild still regenerates the e-invoice
+file and now leaves the transmission to the "Send" button.
 
 FIX: A third party recognised as a private individual is no longer reported as misconfigured when
 EINVOICING_SKIP_B2C is on (issue #600). The option already kept B2C invoices out of the e-invoicing
