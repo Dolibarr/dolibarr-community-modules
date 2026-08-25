@@ -74,7 +74,7 @@ class ActionsDolisecure
 
 		$this->resprints = '';
 
-		if (!isModEnabled('dolisecure') || empty($user) || empty($user->id)) {
+		if (!isModEnabled('dolisecure') || empty($user->id)) {
 			return 0;
 		}
 
