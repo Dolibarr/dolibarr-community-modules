@@ -474,7 +474,7 @@ if (!empty($conf->stancer->enabled)) {
 	  <p class="mb-4"><?php echo $langs->trans("StancerPleaseEnterYourIBANDone"); ?></p>
 	  <p class="mb-4"><?php echo $langs->trans("StancerYourMandateRefIs", $companypaymentmode->rum); ?></p>
 		<?php if ($signLink == 'email') { ?>
-	  <p class="mb-4"><?php echo $langs->transnoentitiesnoconv("StancerPleaseEnterYourIBANWillBeSentByUptoSign", $signer->email); ?></p>
+	  <p class="mb-4"><?php echo $langs->transnoentitiesnoconv("StancerPleaseEnterYourIBANWillBeSentByUptoSign", (string) $signer->email); ?></p>
 	  <p class="mb-4"><?php echo $langs->transnoentitiesnoconv("StancerPaymentDoneEndMessage", "<a href='" . $mysoc->url . "'>" . $mysoc->name . " - " . $mysoc->url . "</a>") ?></p>
 		<?php } elseif ($signLink != '' && $signLinkAutoRedirect) { ?>
 	  <p class="mb-4"><?php echo $langs->transnoentitiesnoconv("StancerPleaseEnterYourIBANisReadyToSignAutoRedir", '<a href="' . $signLink . '">', '</a><span class="fas fa-external-link-alt" style=""></span>'); ?></p>

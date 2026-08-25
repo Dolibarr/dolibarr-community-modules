@@ -541,9 +541,9 @@ class Stancer extends CommonObject
 
 		$message = "";
 		if (@count($invoiceprocessedok) == 1) {
-			$message = $langs->transnoentitiesnoconv("StancerdoTakePaymentStancerResultMessageA", count($invoiceprocessed), $listeFactureOKLink);
+			$message = $langs->transnoentitiesnoconv("StancerdoTakePaymentStancerResultMessageA", (string) count($invoiceprocessed), $listeFactureOKLink);
 		} elseif (@count($invoiceprocessedok) > 1) {
-			$message = $langs->transnoentitiesnoconv("StancerdoTakePaymentStancerResultMessageAP", count($invoiceprocessedok), count($invoiceprocessed), $listeFactureOKLink);
+			$message = $langs->transnoentitiesnoconv("StancerdoTakePaymentStancerResultMessageAP", (string) count($invoiceprocessedok), (string) count($invoiceprocessed), $listeFactureOKLink);
 		}
 		if (!empty($message)) {
 			$message .= "<br />";
@@ -551,7 +551,7 @@ class Stancer extends CommonObject
 		if (@count($invoiceprocessedinfoSEPA) == 1) {
 			$message = $langs->transnoentitiesnoconv("StancerdoTakePaymentStancerResultMessageC", $listeFactureInfoLink);
 		} elseif (@count($invoiceprocessedinfoSEPA) > 1) {
-			$message = $langs->transnoentitiesnoconv("StancerdoTakePaymentStancerResultMessageCP", count($invoiceprocessedinfoSEPA), $listeFactureInfoLink);
+			$message = $langs->transnoentitiesnoconv("StancerdoTakePaymentStancerResultMessageCP", (string) count($invoiceprocessedinfoSEPA), $listeFactureInfoLink);
 		}
 		if (!empty($message)) {
 			$message .= "<br />";
@@ -559,7 +559,7 @@ class Stancer extends CommonObject
 		if (@count($invoiceprocessedSEPAwaitingduedate) == 1) {
 			$message = $langs->transnoentitiesnoconv("StancerdoTakePaymentStancerResultMessageD", $invoiceprocessedSEPAwaitingduedateLink);
 		} elseif (@count($invoiceprocessedSEPAwaitingduedate) > 1) {
-			$message = $langs->transnoentitiesnoconv("StancerdoTakePaymentStancerResultMessageDP", count($invoiceprocessedSEPAwaitingduedate), $invoiceprocessedSEPAwaitingduedateLink);
+			$message = $langs->transnoentitiesnoconv("StancerdoTakePaymentStancerResultMessageDP", (string) count($invoiceprocessedSEPAwaitingduedate), $invoiceprocessedSEPAwaitingduedateLink);
 		}
 		if (!empty($message)) {
 			$message .= "<br />";
@@ -567,7 +567,7 @@ class Stancer extends CommonObject
 		if (@count($invoiceprocessedko) == 1) {
 			$message = $langs->transnoentitiesnoconv("StancerdoTakePaymentStancerResultMessageB", $listeFactureKOLink);
 		} elseif (@count($invoiceprocessedko) > 1) {
-			$message = $langs->transnoentitiesnoconv("StancerdoTakePaymentStancerResultMessageBP", count($invoiceprocessedko), $listeFactureKOLink);
+			$message = $langs->transnoentitiesnoconv("StancerdoTakePaymentStancerResultMessageBP", (string) count($invoiceprocessedko), $listeFactureKOLink);
 		}
 		$this->output = $message;
 
@@ -644,9 +644,9 @@ class Stancer extends CommonObject
 		}
 
 		if (@count($invoiceprocessedok) == 1) {
-			$message = $langs->transnoentitiesnoconv("StancerdoCheckInvoicesPaidResultMessageA", count($invoiceprocessed), $listeFactureOKLink);
+			$message = $langs->transnoentitiesnoconv("StancerdoCheckInvoicesPaidResultMessageA", (string) count($invoiceprocessed), $listeFactureOKLink);
 		} elseif (@count($invoiceprocessedok) > 1) {
-			$message = $langs->transnoentitiesnoconv("StancerdoCheckInvoicesPaidResultMessageAP", count($invoiceprocessedok), count($invoiceprocessed), $listeFactureOKLink);
+			$message = $langs->transnoentitiesnoconv("StancerdoCheckInvoicesPaidResultMessageAP", (string) count($invoiceprocessedok), (string) count($invoiceprocessed), $listeFactureOKLink);
 		}
 		$this->output = $message;
 

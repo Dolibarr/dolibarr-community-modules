@@ -668,7 +668,7 @@ function stancerAddTransfertFromAccountToAccount(Account $accountfrom, Account $
 					if ($alreadyNotified) {
 						dol_syslog("stancerAddTransfertFromAccountToAccount payout $stancer_id mail already sent (code=$payoutNotifyCode), skip", LOG_DEBUG);
 					} else {
-						stancerSendMail(getDolGlobalString('STANCER_AUTO_MAIL_NOTIFICATIONS_PAYOUT', ''), $langs->transnoentitiesnoconv('StancerMailSubjectPayoutDone', $amount), $langs->transnoentitiesnoconv('StancerMailPayoutDone', $amount, $mesgs));
+						stancerSendMail(getDolGlobalString('STANCER_AUTO_MAIL_NOTIFICATIONS_PAYOUT', ''), $langs->transnoentitiesnoconv('StancerMailSubjectPayoutDone', (string) $amount), $langs->transnoentitiesnoconv('StancerMailPayoutDone', (string) $amount, $mesgs));
 						$flagAccount = (object) array(
 							'id' => $accountto->id,
 							'element' => 'bank_account',
@@ -1327,10 +1327,10 @@ function stancerChangeLabel($object)
 	} elseif ($object->element == 'member') {
 		return $langs->transnoentitiesnoconv("StancerPaymentMembership");
 	} elseif ($object->element == 'propal') {
-		return $langs->transnoentitiesnoconv("StancerPaymentPropal", $object->ref);
+		return $langs->transnoentitiesnoconv("StancerPaymentPropal", (string) $object->ref);
 	}
 	//Le cas général
-	return $langs->transnoentitiesnoconv("StancerPaymentOrderRef", $object->ref);
+	return $langs->transnoentitiesnoconv("StancerPaymentOrderRef", (string) $object->ref);
 }
 
 /**

@@ -572,7 +572,7 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 					$customerName = is_object($obj->thirdparty) ? $obj->thirdparty->name : '';
 					$refUrl = stancerBuildInvoiceLink($obj);
 					$objTrackid = ($obj->element == 'facture' ? 'inv' : 'ord') . $obj->id;
-					stancerSendMail(getDolGlobalString('STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT', ''), $langs->transnoentitiesnoconv('StancerMailSubjectPaymentConfirm', $obj->ref, price($amount / 100)), $langs->transnoentitiesnoconv('StancerMailPaymentConfirm', price($amount / 100), $refUrl, $customerName), false, '', $objTrackid);
+					stancerSendMail(getDolGlobalString('STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT', ''), $langs->transnoentitiesnoconv('StancerMailSubjectPaymentConfirm', (string) $obj->ref, price($amount / 100)), $langs->transnoentitiesnoconv('StancerMailPaymentConfirm', price($amount / 100), $refUrl, $customerName), false, '', $objTrackid);
 				}
 				$message .= "SUCCESS;";
 				$output->message .=  $message . "\n";
@@ -589,7 +589,7 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 						$customerName = is_object($obj->thirdparty) ? $obj->thirdparty->name : '';
 						$refUrl = stancerBuildInvoiceLink($obj);
 						$objTrackid = ($obj->element == 'facture' ? 'inv' : 'ord') . $obj->id;
-						stancerSendMail(getDolGlobalString('STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT', ''), $langs->transnoentitiesnoconv('StancerMailSubjectPaymentConfirmButError', $obj->ref, price($amount / 100)), $langs->transnoentitiesnoconv('StancerMailPaymentConfirmButError', price($amount / 100), $refUrl, $customerName), false, '', $objTrackid);
+						stancerSendMail(getDolGlobalString('STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT', ''), $langs->transnoentitiesnoconv('StancerMailSubjectPaymentConfirmButError', (string) $obj->ref, price($amount / 100)), $langs->transnoentitiesnoconv('StancerMailPaymentConfirmButError', price($amount / 100), $refUrl, $customerName), false, '', $objTrackid);
 					}
 					$output->data[$obj->ref]['status'] = 'error';
 					$message .= "ERROR;";
@@ -622,8 +622,8 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 					$refUrl = stancerBuildInvoiceLink($obj);
 					$statusUrl = stancerBuildManagerLink($paymentId, $paymentStatus);
 					$objTrackid = ($obj->element == 'facture' ? 'inv' : 'ord') . $obj->id;
-					stancerSendMail(getDolGlobalString('STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT', ''), $langs->transnoentitiesnoconv('StancerMailSubjectPaymentError', $obj->ref, price($amount / 100)), $langs->transnoentitiesnoconv('StancerMailPaymentError', price($amount / 100), $refUrl, $customerName, $statusUrl), false, '', $objTrackid);
-					stancerAddActionComm($obj, $adminActionCode, $langs->transnoentitiesnoconv('StancerMailSubjectPaymentError', $obj->ref, price($amount / 100)), $langs->transnoentitiesnoconv('StancerMailPaymentError', price($amount / 100), $obj->ref, $customerName, $paymentStatus), array(), '');
+					stancerSendMail(getDolGlobalString('STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT', ''), $langs->transnoentitiesnoconv('StancerMailSubjectPaymentError', (string) $obj->ref, price($amount / 100)), $langs->transnoentitiesnoconv('StancerMailPaymentError', price($amount / 100), $refUrl, $customerName, $statusUrl), false, '', $objTrackid);
+					stancerAddActionComm($obj, $adminActionCode, $langs->transnoentitiesnoconv('StancerMailSubjectPaymentError', (string) $obj->ref, price($amount / 100)), $langs->transnoentitiesnoconv('StancerMailPaymentError', price($amount / 100), (string) $obj->ref, $customerName, $paymentStatus), array(), '');
 				} else {
 					dol_syslog("stancerRefreshAllPaymentsFromDolibarr $paymentId admin notification already sent for status=$paymentStatus on " . $obj->element . " " . $obj->ref . ", skip", LOG_DEBUG);
 				}
@@ -639,7 +639,7 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 					$reopenRes = stancerReopenInvoiceFromPayment($paymentId, $langs->transnoentitiesnoconv('StancerPaymentFailedReopenReason', $paymentStatus, $paymentId));
 					if (is_object($reopenRes)) {
 						dol_syslog("stancerRefreshAllPaymentsFromDolibarr $paymentId invoice " . $obj->ref . " reopened (status=$paymentStatus)", LOG_INFO);
-						stancerAddActionComm($obj, $reopenActionCode, $langs->transnoentitiesnoconv('StancerPaymentFailedReopenTitle', $obj->ref), $langs->transnoentitiesnoconv('StancerPaymentFailedReopenReason', $paymentStatus, $paymentId), array(), '');
+						stancerAddActionComm($obj, $reopenActionCode, $langs->transnoentitiesnoconv('StancerPaymentFailedReopenTitle', (string) $obj->ref), $langs->transnoentitiesnoconv('StancerPaymentFailedReopenReason', $paymentStatus, $paymentId), array(), '');
 					} elseif ($reopenRes === 0) {
 						dol_syslog("stancerRefreshAllPaymentsFromDolibarr $paymentId no reopen needed for invoice " . $obj->ref . " (not paid or no link found)", LOG_DEBUG);
 					} else {
@@ -743,7 +743,7 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 					'message' => null,
 				];
 
-				stancerAddActionComm($obj, $cronSummaryCode, $langs->transnoentitiesnoconv('StancerCronSummaryReported', $obj->ref, $paymentStatus, price($amount / 100)), $langs->transnoentitiesnoconv('StancerCronSummaryReportedDesc', $paymentId, $paymentStatus, price($amount / 100)), array(), '');
+				stancerAddActionComm($obj, $cronSummaryCode, $langs->transnoentitiesnoconv('StancerCronSummaryReported', (string) $obj->ref, $paymentStatus, price($amount / 100)), $langs->transnoentitiesnoconv('StancerCronSummaryReportedDesc', $paymentId, $paymentStatus, price($amount / 100)), array(), '');
 			} else {
 				dol_syslog("stancerRefreshAllPaymentsFromDolibarr $paymentId status=$paymentStatus already reported in summary email, skip", LOG_DEBUG);
 			}
@@ -1136,7 +1136,7 @@ function stancerRefreshAllPayments($userMessage = true, $lastrun = null, $sendNo
 							$customerName = is_object($obj->thirdparty) ? $obj->thirdparty->name : '';
 							$refUrl = stancerBuildInvoiceLink($obj);
 							$objTrackid = ($obj->element == 'facture' ? 'inv' : 'ord') . $obj->id;
-							stancerSendMail(getDolGlobalString('STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT', ''), $langs->transnoentitiesnoconv('StancerMailSubjectPaymentConfirm', $obj->ref, price($amount / 100)), $langs->transnoentitiesnoconv('StancerMailPaymentConfirm', price($amount / 100), $refUrl, $customerName), false, '', $objTrackid);
+							stancerSendMail(getDolGlobalString('STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT', ''), $langs->transnoentitiesnoconv('StancerMailSubjectPaymentConfirm', (string) $obj->ref, price($amount / 100)), $langs->transnoentitiesnoconv('StancerMailPaymentConfirm', price($amount / 100), $refUrl, $customerName), false, '', $objTrackid);
 						}
 						$message .= "SUCCESS;";
 						$output->message .=  $message . "\n";
@@ -1153,7 +1153,7 @@ function stancerRefreshAllPayments($userMessage = true, $lastrun = null, $sendNo
 								$customerName = is_object($obj->thirdparty) ? $obj->thirdparty->name : '';
 								$refUrl = stancerBuildInvoiceLink($obj);
 								$objTrackid = ($obj->element == 'facture' ? 'inv' : 'ord') . $obj->id;
-								stancerSendMail(getDolGlobalString('STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT', ''), $langs->transnoentitiesnoconv('StancerMailSubjectPaymentConfirmButError', $obj->ref, price($amount / 100)), $langs->transnoentitiesnoconv('StancerMailPaymentConfirmButError', price($amount / 100), $refUrl, $customerName), false, '', $objTrackid);
+								stancerSendMail(getDolGlobalString('STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT', ''), $langs->transnoentitiesnoconv('StancerMailSubjectPaymentConfirmButError', (string) $obj->ref, price($amount / 100)), $langs->transnoentitiesnoconv('StancerMailPaymentConfirmButError', price($amount / 100), $refUrl, $customerName), false, '', $objTrackid);
 							}
 							$output->data[$obj->ref]['status'] = 'error';
 							$message .= "ERROR;";
@@ -1191,7 +1191,7 @@ function stancerRefreshAllPayments($userMessage = true, $lastrun = null, $sendNo
 						$refUrl = stancerBuildInvoiceLink($obj);
 						$statusUrl = stancerBuildManagerLink($paymentId, $paymentStatus);
 						$objTrackid = ($obj->element == 'facture' ? 'inv' : 'ord') . $obj->id;
-						stancerSendMail(getDolGlobalString('STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT', ''), $langs->transnoentitiesnoconv('StancerMailSubjectPaymentError', $obj->ref, price($amount / 100)), $langs->transnoentitiesnoconv('StancerMailPaymentError', price($amount / 100), $refUrl, $customerName, $statusUrl), false, '', $objTrackid);
+						stancerSendMail(getDolGlobalString('STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT', ''), $langs->transnoentitiesnoconv('StancerMailSubjectPaymentError', (string) $obj->ref, price($amount / 100)), $langs->transnoentitiesnoconv('StancerMailPaymentError', price($amount / 100), $refUrl, $customerName, $statusUrl), false, '', $objTrackid);
 					}
 					dol_syslog("stancerRefreshAllPayments do not insert paiement : status=" . $paymentStatus . ", amount=$amount, date=" . json_encode($datebank), LOG_WARNING);
 					$urlPayment = "<a href='https://manage.stancer.com/fr/details-de-paiement?id=" . $paymentId . "'>" . $paymentId . "</a>";
@@ -1199,7 +1199,7 @@ function stancerRefreshAllPayments($userMessage = true, $lastrun = null, $sendNo
 					$urlObj = stancerObjectUrlForMail($obj);
 					$output->error .= $urlPayment . ";" . $urlObj . ";" . $amountEur . ";" . $paymentStatus . ";" . ($datebank ? $datebank->format('Y-m-d H:i:s') : '') . ";\n";
 
-					stancerAddActionComm($obj, $cronSummaryCode, $langs->transnoentitiesnoconv('StancerCronSummaryReported', $obj->ref, $paymentStatus, price($amount / 100)), $langs->transnoentitiesnoconv('StancerCronSummaryReportedDesc', $paymentId, $paymentStatus, price($amount / 100)), array(), '');
+					stancerAddActionComm($obj, $cronSummaryCode, $langs->transnoentitiesnoconv('StancerCronSummaryReported', (string) $obj->ref, $paymentStatus, price($amount / 100)), $langs->transnoentitiesnoconv('StancerCronSummaryReportedDesc', $paymentId, $paymentStatus, price($amount / 100)), array(), '');
 				} else {
 					dol_syslog("stancerRefreshAllPayments $paymentId status=$paymentStatus already reported in summary email, skip", LOG_DEBUG);
 				}
