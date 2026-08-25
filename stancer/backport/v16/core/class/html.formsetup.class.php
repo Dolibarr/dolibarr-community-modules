@@ -15,6 +15,24 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+/**
+ * Backported FormSetup from Dolibarr 16, kept as close as possible to the core file.
+ *
+ * Loaded by the admin pages only when the running Dolibarr does not provide the
+ * class, so the core declaration and this one never coexist at runtime. Phan
+ * compares the file with the Dolibarr stubs and reports the class, the guarded
+ * function and the type habits of the original core code.
+ *
+ * @phan-file-suppress PhanRedefineClass
+ * @phan-file-suppress PhanRedefineFunction
+ * @phan-file-suppress PhanDeprecatedFunction
+ * @phan-file-suppress PhanTypeMismatchArgument
+ * @phan-file-suppress PhanTypeMismatchReturn
+ * @phan-file-suppress PhanTypeMismatchReturnProbablyReal
+ * @phan-file-suppress PhanTypeMismatchPropertyProbablyReal
+ * @phan-file-suppress PhanPluginMoreSpecificActualReturnType
+ * @phan-file-suppress PhanPluginDuplicateExpressionAssignmentOperation
+ */
 
 if (!function_exists('isModEnabled')) {
 	/**

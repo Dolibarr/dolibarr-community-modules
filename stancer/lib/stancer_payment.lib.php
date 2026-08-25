@@ -1346,7 +1346,7 @@ function stancerMakeTAG($object, $addUnique = false)
 	// Signature must stay generic (the hook layer only knows CommonObject), but the
 	// concrete classes that reach this code all declare the fields used below.
 	'@phan-var Facture|Commande|Propal|Adherent|Don $object';
-	dol_syslog("stancerMakeTAG call for " . $object->ref . " addunique = $addUnique");
+	dol_syslog("stancerMakeTAG call for " . $object->ref . " addunique = " . ($addUnique ? '1' : '0'));
 
 	$tag = '';
 	if ($object->element == 'facture') {
