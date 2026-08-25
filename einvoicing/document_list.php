@@ -711,8 +711,9 @@ $newcardbutton = '';
 
 // Manual mapping of the vendor products of a flow onto existing Dolibarr products (useful when the automatic
 // creation of products is disabled and a synchronization is blocked on an unknown product).
-$newcardbutton .= dolGetButtonTitle($langs->trans('MapEInvoiceProducts'), '', 'fa fa-link', dol_buildpath('/einvoicing/product_mapping.php', 1), '', $permissiontoadd);
-
+if (getDolGlobalString('EINVOICING_SHOW_MAPPING_TOOL_ON_VENDOR_PRICE_LIST')) {	// Hidden option because editing mapping outside of an import process is discouraged.
+	$newcardbutton .= dolGetButtonTitle($langs->trans('MapEInvoiceProducts'), '', 'fa fa-link', dol_buildpath('/einvoicing/product_mapping.php', 1), '', $permissiontoadd);
+}
 
 $providershort = '';
 if ($provider) {

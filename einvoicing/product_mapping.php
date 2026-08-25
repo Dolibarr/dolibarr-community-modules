@@ -233,7 +233,12 @@ llxHeader('', $title, $help_url, '', 0, 0, '', '', '', 'mod-einvoicing page-prod
 
 print load_fiche_titre($title, '', 'einvoicing.png@einvoicing');
 
-print '<span class="opacitymedium">'.$langs->trans("MapEInvoiceProductsDesc").'</span><br><br>';
+// The mappings saved here are only visible product by product afterwards, so point to the list of them.
+$vendorrefsurl = dol_buildpath('/einvoicing/vendorref_list.php', 1).($socid > 0 ? '?search_socid='.((int) $socid) : '');
+
+print '<span class="opacitymedium">'.$langs->trans("MapEInvoiceProductsDesc").'</span>';
+print ' - <a class="" href="'.$vendorrefsurl.'">'.$langs->trans("SeeMappedVendorRefs").'</a>';
+print '<br><br>';
 
 // Form to select the flow to work on (prefilled when we come from the synchronization result)
 print '<form method="GET" action="'.$_SERVER["PHP_SELF"].'">';
@@ -245,12 +250,6 @@ print $form->select_company($socid, 'socid', '(s.fournisseur:=:1)', 'SelectThird
 print '</div>';
 print '<input type="submit" class="button small" value="'.$langs->trans("Refresh").'">';
 print '</form>';
-
-// The mappings saved here are only visible product by product afterwards, so point to the list of them.
-$vendorrefsurl = dol_buildpath('/einvoicing/vendorref_list.php', 1).($socid > 0 ? '?search_socid='.((int) $socid) : '');
-print '<div class="paddingtop">';
-print '<a class="button small" href="'.$vendorrefsurl.'">'.$langs->trans("SeeMappedVendorRefs").'</a>';
-print '</div>';
 
 print '<br>';
 
