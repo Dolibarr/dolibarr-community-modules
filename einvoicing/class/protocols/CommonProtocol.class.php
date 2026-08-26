@@ -618,25 +618,16 @@ trait CommonProtocol
 
 		//$thirdpartyId = -2; // For testing
 
-		// if found, update information
-		if ($thirdpartyId > 0) {
-			// if complete info is disabled, we return directly the thirdpartyId
-			if (getDolGlobalInt('EINVOICING_THIRDPARTIES_COMPLETE_INFO')) {
-				dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Complete info disabled, returning existing thirdparty: ' . $thirdpartyId);
-				return array(
-					'res' => $thirdpartyId,
-					'message' => 'Existing thirdparty used without update: ' . $thirdpartyId . ($nameMismatchWarning !== '' ? ' - ' . $nameMismatchWarning : '')
-				);
-			}
-
-			dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Updating existing thirdparty: ' . $thirdpartyId);
+		dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Updating existing thirdparty: ' . $thirdpartyId);
 			// TODO: MAYBE we should call PDP to retrieve more information
 
 			$thirdparty = new Societe($db);
 			$thirdparty->fetch($thirdpartyId);
 
 			// Update thirdparty information based on priority
-			if ($priority === 'pdp') { // Overwrite Dolibarr data with AP data
+			if (getDolGlobalInt('EINVOICING_THIRDPARTIES_COMPLETE_INFO')) {
+
+				if ($priority === 'pdp') { // Overwrite Dolibarr data with AP data
 				$thirdparty->name = $sellerInfo['sellername'] ?? $thirdparty->name;
 				$thirdparty->address = $sellerInfo['sellerlineone'] ?? $thirdparty->address;
 				if (!empty($sellerInfo['sellerlinetwo'])) {
@@ -666,54 +657,55 @@ trait CommonProtocol
 				if (!empty($sellerInfo['sellerTaxRegistations']['VA'])) {
 					$thirdparty->tva_intra = $einvoicing->removeSpaces($sellerInfo['sellerTaxRegistations']['VA']);
 					$thirdparty->tva_assuj = 1;
-				}
-			} elseif ($priority === 'dolibarr') { // Fill only empty fields from pdp data
-				dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Keeping existing thirdparty data and fill only empty fields as priority is dolibarr: ' . $thirdpartyId);
-
-				if (empty($thirdparty->name) && !empty($sellerInfo['sellername'])) {
-					$thirdparty->name = $sellerInfo['sellername'];
-				}
-				if (empty($thirdparty->address) && !empty($sellerInfo['sellerlineone'])) {
-					$thirdparty->address = $sellerInfo['sellerlineone'];
-					if (!empty($sellerInfo['sellerlinetwo'])) {
-						$thirdparty->address .= "\n" . $sellerInfo['sellerlinetwo'];
+				}										  
+				} elseif ($priority === 'dolibarr') { // Fill only empty fields from pdp data
+					dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Keeping existing thirdparty data and fill only empty fields as priority is dolibarr: ' . $thirdpartyId);
+	
+					if (empty($thirdparty->name) && !empty($sellerInfo['sellername'])) {
+						$thirdparty->name = $sellerInfo['sellername'];
 					}
-					if (!empty($sellerInfo['sellerlinethree'])) {
-						$thirdparty->address .= "\n" . $sellerInfo['sellerlinethree'];
+					if (empty($thirdparty->address) && !empty($sellerInfo['sellerlineone'])) {
+						$thirdparty->address = $sellerInfo['sellerlineone'];
+						if (!empty($sellerInfo['sellerlinetwo'])) {
+							$thirdparty->address .= "\n" . $sellerInfo['sellerlinetwo'];
+						}
+						if (!empty($sellerInfo['sellerlinethree'])) {
+							$thirdparty->address .= "\n" . $sellerInfo['sellerlinethree'];
+						}
 					}
-				}
-				if (empty($thirdparty->zip) && !empty($sellerInfo['sellerpostcode'])) {
-					$thirdparty->zip = $sellerInfo['sellerpostcode'];
-				}
-				if (empty($thirdparty->town) && !empty($sellerInfo['sellercity'])) {
-					$thirdparty->town = $sellerInfo['sellercity'];
-				}
-				if (empty($thirdparty->country_code) && !empty($sellerInfo['sellercountry'])) {
-					$thirdparty->country_code = $sellerInfo['sellercountry'];
-				}
-				if (empty($thirdparty->email) && !empty($sellerInfo['sellercontactemailaddr'])) {
-					$thirdparty->email = $sellerInfo['sellercontactemailaddr'];
-				}
-				if (empty($thirdparty->phone) && !empty($sellerInfo['sellercontactphoneno'])) {
-					$thirdparty->phone = $sellerInfo['sellercontactphoneno'];
-				}
-				if (empty($thirdparty->fax) && !empty($sellerInfo['sellercontactfaxno'])) {
-					$thirdparty->fax = $sellerInfo['sellercontactfaxno'];
-				}
-				// Set identification numbers if empty
-				if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
-					foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
-						if (!empty($globalId)) {
-							$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode);
-							if (!empty($idprofField) && empty($thirdparty->$idprofField)) {
-								$thirdparty->$idprofField = $einvoicing->removeSpaces($globalId);
+					if (empty($thirdparty->zip) && !empty($sellerInfo['sellerpostcode'])) {
+						$thirdparty->zip = $sellerInfo['sellerpostcode'];
+					}
+					if (empty($thirdparty->town) && !empty($sellerInfo['sellercity'])) {
+						$thirdparty->town = $sellerInfo['sellercity'];
+					}
+					if (empty($thirdparty->country_code) && !empty($sellerInfo['sellercountry'])) {
+						$thirdparty->country_code = $sellerInfo['sellercountry'];
+					}
+					if (empty($thirdparty->email) && !empty($sellerInfo['sellercontactemailaddr'])) {
+						$thirdparty->email = $sellerInfo['sellercontactemailaddr'];
+					}
+					if (empty($thirdparty->phone) && !empty($sellerInfo['sellercontactphoneno'])) {
+						$thirdparty->phone = $sellerInfo['sellercontactphoneno'];
+					}
+					if (empty($thirdparty->fax) && !empty($sellerInfo['sellercontactfaxno'])) {
+						$thirdparty->fax = $sellerInfo['sellercontactfaxno'];
+					}
+					// Set identification numbers if empty
+					if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
+						foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
+							if (!empty($globalId)) {
+								$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode);
+								if (!empty($idprofField) && empty($thirdparty->$idprofField)) {
+									$thirdparty->$idprofField = $einvoicing->removeSpaces($globalId);
+								}
 							}
 						}
 					}
-				}
-				if (!empty($sellerInfo['sellerTaxRegistations']['VA']) && empty($thirdparty->tva_intra)) {
-					$thirdparty->tva_intra = $einvoicing->removeSpaces($sellerInfo['sellerTaxRegistations']['VA']);
-					$thirdparty->tva_assuj = 1;
+					if (!empty($sellerInfo['sellerTaxRegistations']['VA']) && empty($thirdparty->tva_intra)) {
+						$thirdparty->tva_intra = $einvoicing->removeSpaces($sellerInfo['sellerTaxRegistations']['VA']);
+						$thirdparty->tva_assuj = 1;
+					}
 				}
 			}
 			// Flag the thirdparty as a vendor if it is not one yet
