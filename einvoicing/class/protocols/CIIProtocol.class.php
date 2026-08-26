@@ -2088,6 +2088,24 @@ class CIIProtocol extends AbstractProtocol
 			$contractRef->appendChild($doc->createElement('ram:IssuerAssignedID', htmlspecialchars($invoiceData['contractReference'])));
 		}
 
+		// Additional order references: when an invoice covers several purchase orders, the first is
+		// emitted as BT-13 (BuyerOrderReferencedDocument above) and the others are listed here as
+		// AdditionalReferencedDocument/TypeCode=130 — the same approach Factur-X uses. Restricted to
+		// profiles that carry AdditionalReferencedDocument in the agreement section (not MINIMUM), and
+		// skipped for Chorus (which does not accept these extra nodes). Sequence position: after
+		// ContractReferencedDocument, before SpecifiedProcuringProject (CII schema order).
+		if (!$invoiceData['_chorus'] && $profile !== 'MINIMUM' && !empty($invoiceData['_customerOrderReferenceList'])) {
+			foreach ($invoiceData['_customerOrderReferenceList'] as $additionalOrderRef) {
+				if ($additionalOrderRef === $invoiceData['orderReference']) {
+					continue;
+				}
+				$addRef = $doc->createElement('ram:AdditionalReferencedDocument');
+				$addRef->appendChild($doc->createElement('ram:IssuerAssignedID', htmlspecialchars($additionalOrderRef)));
+				$addRef->appendChild($doc->createElement('ram:TypeCode', '130'));
+				$agreement->appendChild($addRef);
+			}
+		}
+
 		// Project reference (BT-11): the project the invoice belongs to. ram:SpecifiedProcuringProject
 		// only exists from EN16931 up, and ProcuringProjectType makes BOTH ram:ID and ram:Name
 		// mandatory, so a project with no title falls back on its reference rather than emit an empty
