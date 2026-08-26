@@ -1,0 +1,542 @@
+# Copyright (C) 2023 Eric Seigne <eric.seigne@cap-rel.fr>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+#
+# Generic
+#
+
+# Module label 'ModuleStancerName'
+ModuleStancerName = Stancer
+ModuleStancerDesc = Modulo di pagamento Stancer
+
+#
+# Dashboard
+#
+StancerDashboard = Dashboard Stancer
+StancerTestModeWarning = Modalità test attiva — i dati visualizzati provengono dall'ambiente di test
+StancerDashboardKPI = Indicatori mensili
+StancerDashboardRevenue = Incassi Stancer
+StancerDashboardPayments = Pagamenti
+StancerDashboardRefunds = Rimborsi
+StancerDashboardDisputes = Contestazioni
+StancerDashboardCaptured = acquisiti
+StancerDashboardThisMonth = questo mese
+StancerDashboardOpen = aperti
+StancerDashboardMethods = Ripartizione per metodo di pagamento
+StancerDashboardYearlyComparison = Confronto annuale degli incassi Stancer
+StancerDashboardMethodMonthly = Incassi mensili CB / SEPA
+StancerDashboardAlerts = Avvisi
+StancerDashboardAlertDisputes = %s contestazione/i aperta/e per un totale di %s
+StancerDashboardAlertRefunds = %s rimborso/i in attesa per un totale di %s
+StancerDashboardLastPayments = Ultimi pagamenti
+
+#
+# Admin page
+#
+StancerSetup = Configurazione Stancer: Generale
+StancerSetupSepa = Configurazione Stancer: SEPA
+StancerSettingsMenu = Generale
+StancerSetupPage = Pagina di configurazione Stancer
+StancerSignupURL = https://stancer.com/fr/paiement-en-ligne?mtm_campaign=Dolibarr&mtm_source=Dolibarr
+StancerNoApiKeysMessage = Non hai ancora un account Stancer? <a href="%s" target="_blank">Crea il tuo account gratuito</a> per ottenere le chiavi API e iniziare ad accettare pagamenti con carta e SEPA.
+StancerSignupPromo = Consiglia Stancer! <a href="%s" target="_blank">Crea un account Stancer</a>
+StancerPartnershipMessage = Questo modulo è gratuito grazie alla partnership con Stancer. <a href="%s" target="_blank">Crea il tuo account Stancer</a> per beneficiare di una soluzione di pagamento semplice e competitiva.
+
+STANCER_PROD_PARAMS = Modalità Produzione
+
+STANCER_PROD_PUBLIC_KEY = Chiave pubblica (Modalità Produzione)
+STANCER_PROD_PUBLIC_KEYTooltip = Incolla qui la tua chiave pubblica Stancer di produzione (prefisso pprod_ o plive_).
+STANCER_PROD_PRIVATE_KEY = Chiave privata (Modalità Produzione)
+STANCER_PROD_PRIVATE_KEYTooltip = Incolla qui la tua chiave privata Stancer di produzione (prefisso sprod_ o slive_).
+
+STANCER_TEST_PARAMS = Modalità Test
+
+STANCER_TEST_PUBLIC_KEY = Chiave pubblica (modalità TEST)
+STANCER_TEST_PUBLIC_KEYTooltip = Incolla qui la tua chiave pubblica Stancer di test (prefisso ptest_).
+STANCER_TEST_PRIVATE_KEY = Chiave privata (modalità TEST)
+STANCER_TEST_PRIVATE_KEYTooltip = Incolla qui la tua chiave privata Stancer di test (prefisso stest_).
+STANCER_KEY_HINT = Deve iniziare con %s
+STANCER_KEY_INVALID = La chiave %s deve iniziare con %s. L'input e' stato rifiutato e il valore precedente e' stato mantenuto.
+STANCER_USER_ACCOUNT_FOR_ACTIONS = Utente Dolibarr per operazioni automatiche Stancer
+
+#
+# About page
+#
+About = Informazioni
+StancerAbout = Informazioni su Stancer
+StancerAboutPage = Pagina Informazioni
+
+StancerTest = Area di test
+StancerAccount = Account Stancer associato
+CreateAccountOnStancer = Crea (o collega) account cliente su Stancer
+StancerAccountID = Identificatore
+StancerAccountDeleteLink = Elimina collegamento con account Stancer
+StancerOrderID = Rif. interno
+StancerUniqueID = ID univoco
+StancerCBCard = Carta di credito
+STANCER_PAY_BUTTON = Paga con carta
+STANCER_PAY_BUTTON_MESSAGE = Sarai reindirizzato al sito web Stancer per procedere con il pagamento
+STANCER_PAY_BUTTON_DEPOSIT = Pagamento acconto del %s %% ovvero %s
+STANCER_CB_ORDER_PARTIAL_PAY = Abilita pagamento parziale per ordini con creazione automatica di fattura di acconto
+STANCER_CB_ORDER_PARTIAL_PAYTooltip = Questa opzione consente di impostare "30%% di pagamento all'ordine" ad esempio. Maggiori informazioni nella <a href="https://doc.cap-rel.fr/projet_stancer/versement_d_un_acompte_a_la_commande">documentazione</a>
+STANCER_CB_PROPAL_PARTIAL_PAY = Abilita pagamento parziale per preventivi con creazione automatica di fattura di acconto
+STANCER_CB_PROPAL_PARTIAL_PAYTooltip = Questa opzione consente di impostare "20%% di pagamento alla firma del preventivo" ad esempio, utilizzando la percentuale di acconto definita nei termini di pagamento del preventivo
+
+STANCER_AUTO_SEPA_ONLY_FOR_CONTRACTS = Attiva gli addebiti diretti SEPA automatici solo se la fattura è collegata a un contratto
+STANCER_AUTO_SEPA_ONLY_FOR_CONTRACTSTooltip = Lascia questa casella deselezionata se vuoi che qualsiasi fattura il cui metodo di pagamento è addebito diretto venga automaticamente addebitata dall'attività pianificata
+stancer_status_to_capture = Pagamento accettato
+MainAPIURI = Indirizzo del server
+STANCER_IS_PROD = Abilita modalità "produzione" (lascia deselezionato per modalità test)
+STANCER_BANK_ACCOUNT_FOR_PAYMENTS = Conto bancario Dolibarr dedicato per pagamenti Stancer
+STANCER_BANK_ACCOUNT_FOR_PAYMENTSTooltip = Normalmente è stato creato un conto "Stancer" all'attivazione del modulo, usalo. Non mescolare tutto con il tuo conto principale.
+STANCER_BANK_MAIN_ACCOUNT_FOR_PAYOUTS = Conto bancario Dolibarr su cui Stancer trasferisce denaro
+STANCER_BANK_MAIN_ACCOUNT_FOR_PAYOUTSTooltip = Il tuo conto bancario principale
+STANCER_CHECK_PAYMENT_STATUS = Verifica dello stato di pagamento della transazione:
+STANCER_REDIRECT = Se il tuo browser non passa automaticamente alla pagina di pagamento, clicca sul seguente link:
+response = Dettagli
+created = Data
+AmountCents = Importo
+Amount = Importo
+Fees = Commissioni
+details = Dettagli
+date_bank = Data (banca)
+date_paym = Data (pagamento)
+StancerRefused = Rifiutato
+StancerToCapture = In attesa della banca
+StancerDisputed = Contestazione
+StancerCaptured = Acquisito
+StancerPopupCB = Pagamento fattura rif. %s con carta.
+StancerCardStart = Stancer CB
+StancerCardTPE = Stancer POS
+stancerFindPaymentInvoice = Ricerca automatica pagamenti
+SepaMandateForStancer = Mandato SEPA - Stancer
+SepaMandateForStancerPageTitle = Creazione del tuo mandato SEPA
+SEPALegalTextStancer = Firmando questo modulo di mandato, autorizzi (A) %s a inviare istruzioni alla tua banca per addebitare il tuo conto, e (B) la tua banca ad addebitare il tuo conto in conformità con le istruzioni di %s. Hai il diritto di essere rimborsato dalla tua banca alle condizioni descritte nel tuo accordo con essa. Una richiesta di rimborso deve essere presentata entro 8 settimane dalla data di addebito del tuo conto per un addebito autorizzato. Accetti di ricevere notifica degli addebiti imminenti entro 2 giorni prima della loro esecuzione. Qualsiasi addebito rifiutato sarà inoltre addebitato secondo i nostri termini e condizioni generali.
+SEPALegalTextStancer2 = Compilando questo modulo di mandato, autorizzi (A) %s a inviare istruzioni alla tua banca per addebitare il tuo conto, e (B) la tua banca ad addebitare il tuo conto in conformità con le istruzioni di %s. Hai il diritto di essere rimborsato dalla tua banca alle condizioni descritte nel tuo accordo con essa. Una richiesta di rimborso deve essere presentata entro 8 settimane dalla data di addebito del tuo conto per un addebito autorizzato. Accetti di ricevere notifica degli addebiti imminenti entro 2 giorni prima della loro esecuzione. Qualsiasi addebito rifiutato sarà inoltre addebitato secondo i nostri termini e condizioni generali.
+SEPALegalTextStancerDPO = Le informazioni contenute in questo mandato sono destinate ad essere utilizzate dal creditore solo per la gestione del suo rapporto con il cliente. Possono dar luogo all'esercizio da parte di quest'ultimo dei suoi diritti di opposizione, accesso, cancellazione, portabilità, limitazione e rettifica come previsto dagli articoli 38 e seguenti della legge n. 78-17 del 6 gennaio 1978 relativa all'informatica, ai file e alle libertà, inviando un'email a %s.
+PleaseReturnMandateStancer = Si prega di restituire questo mandato via email a %s o per posta a
+ShowInStancer = Maggiori dettagli sul sito web di Stancer
+StancerPayments = Pagamenti
+StancerPayouts = Trasferimenti
+StancerRefunds = Rimborsi
+StancerDisputes = Contestazioni
+StancerDisputeID = Rif. contestazione Stancer
+StancerPaymentID = Rif. pagamento Stancer
+StancerSEPA = Area Mandato SEPA
+CreateSEPAOnStancer = Crea questo mandato SEPA su Stancer
+ErrorStancer = Messaggio di errore Stancer
+StancerSEPAID = Identificatore SEPA esistente su Stancer
+StancerCBID = Identificatore CB esistente su Stancer
+StancerSEPAstart = Addebito diretto SEPA tramite Stancer
+StancerPleaseEnterYourIBANTitle = Addebito diretto automatico
+StancerPleaseEnterYourIBAN = Inserisci il tuo codice IBAN per impostare l'addebito diretto automatico (SEPA) per le tue fatture.
+StancerYouAcceptPaymentViaSEPA =
+StancerYourIBAN = Il tuo codice IBAN:
+StancerIBANCBinpoutSecurekeyError = La chiave di sicurezza per accedere a questa pagina non è corretta, verifica con il tuo fornitore che il link di accesso a questa pagina non sia cambiato.
+StancerLinkFoCustomerIBAN = Puoi offrire al tuo cliente di completare da solo il suo codice IBAN per gestire il Mandato di Addebito Diretto fornendogli questo link speciale.
+StancerLinkFoCustomerIBANforce = Puoi offrire al tuo cliente di creare un nuovo mandato per sostituire quello attuale. In questo caso, fornigli il link seguente.
+stancerSEPAinvalidIBAN = Il numero IBAN fornito non è corretto, verificalo e reinvia la tua richiesta.
+StancerCustomerName = Nome della tua organizzazione (organizzazione / azienda / istituzione...)
+StancerCustomerNameOnIBAN = Titolare del conto bancario (modifica se diverso dal nome dell'azienda)
+StancerBankName = Nome della tua banca
+StancerSuccessSEPAdone = La creazione del tuo mandato di addebito diretto SEPA è completa!
+StancerPleaseEnterYourIBANorCBTitleDone = Grazie!
+StancerPleaseEnterYourIBANDone = Il tuo metodo di pagamento tramite addebito diretto SEPA è ora registrato.
+StancerPleaseEnterYourCBDone = Il tuo metodo di pagamento con carta di credito è ora registrato.
+StancerPleaseEnterYourIBANWillBeSent = Il Mandato da firmare ti sarà inviato a breve.
+StancerPleaseEnterYourIBANWillBeSentByUptoSign = Il tuo Mandato è pronto, devi solo firmarlo. Il nostro partner per la firma elettronica (uptosign) dovrebbe inviarti un'email che ti invita a seguire la procedura di firma elettronica entro pochi minuti a <b> %s </b>. Se questo non è il tuo indirizzo, contattaci.
+StancerPleaseEnterYourIBANisReadyToSign = Il Mandato da firmare elettronicamente è pronto, %s clicca qui per procedere alla firma tramite il nostro partner uptosign %s.
+StancerPleaseEnterYourIBANisReadyToSignAutoRedir = Il Mandato da firmare elettronicamente è pronto, sarai automaticamente reindirizzato alla piattaforma di firma elettronica uptosign, attendi qualche secondo, se non succede nulla %s clicca qui per andare%s.
+StancerSEPAMenu = Mandato SEPA
+StancerCBMenu = Carta di credito
+StancerCBConfig = Configurazione pagamento con carta di credito
+StancerMandateConfig = Mandato di addebito diretto SEPA
+StancerMandatePresentation = Questo modulo ti consente di impostare addebiti diretti SEPA. Per questo dovrai far firmare al tuo cliente il Mandato SEPA. Se hai il modulo %s UptoSign %s installato sul tuo Dolibarr puoi impostare la firma elettronica automatica...
+StancerMandatePresentationWarning = Non dimenticare di fornire il tuo numero ICS a Stancer prima di qualsiasi tentativo di addebito diretto come indicato %s nella loro documentazione %s!
+STANCER_PUBLIC_IBAN_PAGE = Abilita la pagina pubblica che consente ai tuoi clienti di inserire il loro IBAN
+STANCER_PUBLIC_IBAN_PAGETooltip = I tuoi clienti potranno inserire da soli il loro codice IBAN/RIB per creare il loro Mandato di Addebito Diretto
+STANCER_PUBLIC_IBAN_PAGE_FORCE = Abilita la pagina pubblica che consente ai tuoi clienti di inserire il loro IBAN anche se hanno già un mandato attivo
+STANCER_PUBLIC_IBAN_PAGE_FORCETooltip = Consente al tuo cliente di sostituire il mandato attuale creando un nuovo mandato SEPA
+STANCER_SEPA_CHECK_IBAN = Verifica IBAN alla creazione del mandato SEPA
+STANCER_SEPA_CHECK_IBANTooltip = Utilizza il servizio di verifica SEPAMail di Stancer per validare che l'IBAN corrisponda al titolare del conto. Funziona solo per le banche francesi e italiane.
+StancerSepaCheckSuccess = Verifica IBAN: punteggio %s/100 (classificazione %s)
+StancerSepaCheckWarning = Verifica IBAN: punteggio basso %s/100 (classificazione %s) — verificare i dati bancari
+StancerSepaCheckPending = Verifica IBAN avviata (id: %s), risultato in attesa — il mandato è stato creato, il risultato sarà disponibile in seguito
+StancerSepaCheckSkipped = Verifica IBAN non disponibile per questo terzo (servizio limitato alle banche FR/IT con identificativo legale)
+StancerSepaCheckError = Errore durante la verifica IBAN: %s
+STANCER_MANDATE_AUTO = Genera automaticamente il Mandato SEPA in formato PDF
+STANCER_MANDATE_AUTOTooltip = Abilitando questa opzione il mandato SEPA sarà generato automaticamente quando il tuo cliente inserisce il suo IBAN
+STANCER_MANDATE_AUTO_UPTOSIGN = Avvia automaticamente la procedura di firma elettronica tramite UpToSign
+STANCER_MANDATE_AUTO_UPTOSIGNTooltip = Opzione disponibile solo se hai il modulo UptoSign sul tuo Dolibarr, in questo caso la firma elettronica viene avviata automaticamente. Fai attenzione a configurare il posizionamento automatico della firma e il contatto firmatario predefinito per i Mandati nella scheda cliente. Per maggiori dettagli consulta la <a href="https://doc.cap-rel.fr/projet_stancer/saisie_du_rib_par_votre_client_pour_creer_son_mandat_de_prelevement_sepa">documentazione online</a>.
+STANCER_INSTALL_UPTOSIGN = Installa il modulo aggiuntivo <a href="https://www.dolistore.com/fr/modules/1656-uptosign---signature---lectronique-eidas.html">UptoSign seguendo questo link</a> per fornire un servizio di firma elettronica conforme eIDAS (firma di mandati di addebito diretto, preventivi, fatture, ecc.)
+STANCER_INSTALL_UPTOSIGN_UPGRADENEEDED = Attenzione, il tuo modulo uptosign non sembra essere aggiornato e quindi il concatenamento automatico alla firma elettronica del mandato non è possibile! Aggiornalo e contatta CAP-REL se questo messaggio persiste.
+StancerPublicIBANPageDisabled = La pagina pubblica di inserimento IBAN non è abilitata nella %sconfigurazione del modulo%s
+StancerAddManualExistingMandate = Se hai già un mandato di addebito diretto SEPA attivo con questo cliente puoi aggiungerlo cliccando sul pulsante alla fine della riga del conto corrispondente.
+StancerCompanyMailOrPhone = Non è possibile creare l'account Stancer del tuo cliente. Modifica la sua scheda per aggiungere un indirizzo email o un numero di telefono in formato internazionale.
+StancerCompanyMailOrPhoneNewPayment = Il pagamento tramite Stancer non è possibile, forniscici il tuo indirizzo email o numero di telefono (in formato internazionale) per completare la tua scheda prima di riavviare il pagamento online.
+YouCanAccelSignWithUptoSign = Nota che puoi accelerare e semplificare il processo impostando la firma elettronica conforme eIDAS aggiungendo il %s modulo aggiuntivo UptoSign %s al tuo Dolibarr...
+NiceUptoSignIsEnabled = UptoSign è attivo, quindi il tuo cliente può firmare elettronicamente il tuo mandato online!
+StancerAlreadyPaid = Secondo Stancer questa transazione è già stata pagata, contatta %s per verificare.
+ErrorStancerPleaseContactBy = Contatta l'azienda
+ErrorStancerPleaseContactByPhone = Per telefono, al %s
+ErrorStancerPleaseContactByMail = Via email, a %s
+StancerSEPAisNotConfiguredForThatCustomer = Il metodo di pagamento SEPA non è configurato per questo cliente. Clicca sulla scheda Stancer dalla sua scheda cliente per configurare il pagamento SEPA.
+StancerPaymentDoneSuccessTitle = Grazie!
+StancerPaymentDoneSuccessMessage = Il tuo pagamento è stato convalidato, di seguito troverai i dettagli della tua transazione:
+StancerPaymentDoneSuccessMessageFacture = La tua fattura sarà disponibile a breve nella tua area clienti e ti sarà anche inviata via email. Se non hai ricevuto nulla entro 24 ore, contattaci dopo aver controllato la spam e altri filtri.
+StancerPaymentDoneID = ID transazione: %s
+StancerPaymentDoneStatus = Stato: %s
+StancerPaymentInvoiceOrOrder = Riferimento fattura o ordine: %s
+StancerPaymentAmount = Importo del pagamento: %s %s
+StancerPaymentDoneEndMessage = Puoi salvare questo messaggio per conservare il numero di transazione e poi chiudere questa finestra o andare al nostro sito web: %s
+StancerPaymentDoneErrorTitle = Errore!
+StancerPaymentDoneErrorMessage = Si è verificato un errore durante il processo di pagamento. Troverai alcune informazioni aggiuntive di seguito.
+StancerPaymentDoneErrorMessageShortByStancer = Messaggio di errore (riepilogo): %s
+StancerPaymentDoneErrorEndMessage = Si prega di fare uno screenshot di questo errore e inviarlo a %s insieme al riferimento del tuo ordine o fattura.
+StancerPaymentDoneErrorSeverityStancer = Livello di gravità errore Stancer: %s
+StancerPaymentOrderRef = Pagamento dell'ordine o fattura %s
+StancerPaymentMembership = Pagamento iscrizione
+StancerPaymentPropal = Pagamento preventivo %s
+StancerPaymentDonation = Donazione a %s
+ErrorStancerPleaseUniqueID = Riferimento da fornire: %s
+NotAvailableInTestMode = Questa lista non è disponibile quando si usano le chiavi di test
+StancerReloadDetected = Ricaricamento pagina rilevato (o ritorno da un pagamento parziale non ancora gestito da Dolibarr). Non è necessaria ulteriore elaborazione, puoi chiudere questa finestra o andare al nostro sito web: %s.
+StancerSEPAalreadyInProgress = Un addebito diretto SEPA è già in corso per questa fattura: %s vedi procedura attuale %s
+StancerAlreadyInProgress = Una procedura di pagamento è già in corso
+StancerSEPAalreadyInProgressForceClicOnYes = Clicca sul pulsante Sì se vuoi forzare un nuovo addebito diretto.
+statementDescription = Descrizione
+PayoutID = Riferimento
+StancerPaid = Completato
+StancerCaptureSent = In corso
+StancerToPay = Programmato
+STANCER_BANK = Configurazione conti bancari
+STANCER_ADD_FEES_ON_BANK_FOR_EACH_PAYMENT = Aggiungi riga di addebito per ogni commissione relativa a un pagamento
+STANCER_ADD_FEES_ON_BANK_FOR_EACH_PAYOUT = Aggiungi riga di addebito che globalizza le commissioni al trasferimento sul conto principale
+STANCER_ADD_FEES = Aggiunta automatica delle commissioni al conto bancario
+STANCER_ADD_FEESTooltip = Questa opzione ti consente di scegliere se vuoi che ogni pagamento Stancer comporti l'aggiunta di una riga per le commissioni relative alla transazione o se preferisci che sia globalizzato al trasferimento da conto a conto. Se non abiliti questa opzione dovrai aggiungere manualmente la tua scrittura di compensazione. <a href="https://doc.cap-rel.fr/projet_stancer/ecritures_sur_le_compte_bancaire">Clicca qui per la documentazione dettagliata</a>
+STANCER_ADD_FEES_ON_BANK_NONE = Nessuno, resta in modalità manuale
+StancerFees = Commissioni Stancer
+StancerCheckPay = Stancer giornaliero (banca)
+StancerCheckPaymentAndPayout = Verifica pagamenti e trasferimenti Stancer
+StancerTransferFromToDone = Trasferimento da %s a %s (importo %s %s) completato
+StancerCheckTakePayments = Pagamenti automatici Stancer
+StancerCheckTakePaymentsDetails = Lancio automatico di pagamenti CB e addebiti diretti SEPA: Lancio del pagamento automatico per qualsiasi fattura non pagata il cui metodo di pagamento è (CB o addebito diretto) + conto bancario Stancer. Maggiori dettagli: <a href="https://doc.cap-rel.fr/projet_stancer/paiement_automatique_des_factures">https://doc.cap-rel.fr/projet_stancer/paiement_automatique_des_factures</a>
+STANCER_NUMBER_OF_ITEMS_TO_SYNC = Numero di transazioni da scaricare durante l'aggiornamento
+STANCER_NUMBER_OF_ITEMS_TO_SYNCTooltip = Limite del numero massimo di transazioni da sincronizzare con Stancer ogni notte dall'attività pianificata e nelle liste. Eccezionalmente puoi scegliere 200 o 1000 ma non lasciare mai questo valore per più di una sincronizzazione sotto rischio di causare sovraccarico di rete con Stancer e far disabilitare il tuo account.
+STANCER_NB_DAYS_TO_SYNC = Numero di giorni da scaricare durante l'aggiornamento della cronologia
+STANCER_NB_DAYS_TO_SYNCTooltip = Quando riavvii la sincronizzazione della cronologia puoi scegliere quanto indietro nel tempo vuoi andare. Eccezionalmente puoi scegliere 1 anno o 2 ma non lasciare mai questo valore per più di una sincronizzazione sotto rischio di causare sovraccarico di rete con Stancer e far disabilitare il tuo account.
+PRELEVEMENT_ICS = Il tuo numero ICS (Identificativo Creditore SEPA)
+PRELEVEMENT_ICSTooltip = Questo numero ti viene fornito dal tuo fornitore bancario (banca o Stancer), è unico per ogni azienda e deve essere fornito dalla Banca di Francia, è il codice che identifica la tua azienda nel sistema SEPA.
+ModeRECUR = Pagamenti ricorrenti
+StancerSignature = Firma elettronica
+StancerMailSubjectIBANandMandateReady = IBAN aggiunto e mandato pronto
+StancerMailIBANandMandateReady = Un numero IBAN è stato aggiunto dal tuo cliente %s, il mandato è stato generato come configurato nelle impostazioni del modulo e il processo di firma elettronica è stato avviato.
+StancerMailSubjectIBANandMandateReadyToSign = IBAN aggiunto e mandato pronto da firmare
+StancerMailIBANandMandateReadyToSignErr = Un numero IBAN è stato aggiunto dal tuo cliente %s, il mandato è stato generato come configurato nelle impostazioni del modulo ma il processo di firma elettronica non ha potuto essere avviato (modulo uptosign incompatibile o mancante), dovrai prendere in mano e completare la procedura manualmente.
+StancerMailIBANandMandateReadyToSign = Un numero IBAN è stato aggiunto dal tuo cliente %s, il mandato è stato generato come configurato nelle impostazioni del modulo ma non è firmato, ora dovrai prendere le misure necessarie.
+StancerMailSubjectIBANandMandateErr = IBAN aggiunto ma errore nella creazione del mandato
+StancerMailIBANandMandateErr = Un numero IBAN è stato aggiunto dal tuo cliente %s, ma il mandato non è stato generato, riprendi il fascicolo a questo passaggio e procedi con la creazione manuale del mandato, poi assicurati che sia firmato dal tuo cliente.
+StancerMailSubjectIBANsimple = IBAN aggiunto
+StancerMailIBANsimple = Un numero IBAN è stato aggiunto dal tuo cliente %s, il mandato non è stato generato secondo le impostazioni del modulo. Ora dovrai creare manualmente il mandato e farlo firmare dal tuo cliente.
+StancerMailHello = Ciao,
+StancerMailGoodBye = Per maggiori dettagli consulta la <a href="https://doc.cap-rel.fr/projet_stancer/accueil">documentazione online</a>
+StancerMailSignature = Inviato dal modulo Stancer per Dolibarr da %s
+STANCER_EMAIL_INFO_SEPA = A quale indirizzo email vuoi ricevere le notifiche sugli inserimenti IBAN?
+STANCER_EMAIL_INFO_SEPATooltip = Quando un cliente inserisce il suo IBAN sulla tua pagina pubblica, verrà inviata un'email a questo indirizzo per invitarti a seguire la procedura...
+StancerDocTitleForUptoSign = Mandato SEPA %s - %s
+StancerYourMandateRefIs = Il riferimento del tuo mandato (RUM) è: <b> %s </b>. Ti invitiamo ad annotarlo e conservarlo fino alla firma definitiva del Mandato. Potrebbe essere utile in caso di problemi nella procedura attuale.
+StancerPublicIBANCBPageReload = Ricaricamento pagina rilevato. Non è necessaria ulteriore elaborazione, puoi chiudere questa finestra o andare al nostro sito web: %s.
+StancerMailIBANandMandateReadyButMissingSignPeople = Un numero IBAN è stato aggiunto dal tuo cliente %s, il mandato è stato generato ma la firma elettronica non ha potuto essere avviata perché nessun contatto è designato "Firmatario Contratto (firma elettronica)" per questa terza parte. Dovrai avviare manualmente il processo di firma elettronica dopo aver designato il contatto firmatario.
+SepaMandateFileName = MandatoSEPA
+StancerUptoSignNotOnlyOneSigner = Attenzione, più di un contatto collegato a questa Terza Parte ha il ruolo di "Firma elettronica (Contratto)", quindi il Mandato SEPA non verrà inviato automaticamente per la firma elettronica (per ora solo un contatto per terza parte dovrebbe avere questo ruolo).
+StancerUptoSignNoSigner = Attenzione, nessun contatto collegato a questa Terza Parte ha il ruolo di "Firma elettronica (Contratto)" (o se sì non ha un numero di cellulare), quindi il Mandato SEPA non verrà inviato automaticamente per la firma elettronica. Questo contatto deve avere un indirizzo email valido e un numero di cellulare in formato internazionale in grado di ricevere SMS.
+StancerYourBIC = Codice BIC/SWIFT
+StancerReturnsJsonNull = Il JSON restituito da Stancer è vuoto (null)
+STANCER_DEFAULT_CUSTOMER_IF_NULL = Cliente predefinito da associare ai pagamenti quando nessun account cliente è collegato (pagamento diretto POS ad esempio)
+STANCER_DEFAULT_CUSTOMER_IF_NULLTooltip = Se usi il POS Stancer direttamente senza passare per Dolibarr, i pagamenti non sono collegati a nessun account cliente Dolibarr, questa opzione consente di fare un'associazione predefinita ed evitare un bug "pagina bianca"
+STANCER_DELAY_SEPA = Ritardo (in giorni) per addebito diretto SEPA
+STANCER_DELAY_SEPATooltip = Inserisci qui il numero di giorni che vuoi tra la data di fatturazione e la data di pagamento per rispettare le normative (in Francia 14 giorni) - <a href="https://particuliers.banque-france.fr/moyens-de-paiement/prelevement-sepa">https://particuliers.banque-france.fr/moyens-de-paiement/prelevement-sepa</a>
+STANCER_DELAY_SEPA_UPDATE_INVOICES = Aggiornare la data di scadenza della fattura?
+STANCER_DELAY_SEPA_UPDATE_INVOICESTooltip = Seleziona questa casella se vuoi che il modulo Stancer aggiorni la data di scadenza delle fatture il cui metodo di pagamento è addebito diretto SEPA alla data di fatturazione + ritardo configurato sopra
+StancerCBisNotConfiguredForThatCustomer = Questo cliente (%s) non ha una CB registrata sul suo account Stancer
+StancerdoTakePaymentStancerResultMessageA = Una fattura è stata pagata con successo su un totale di %s fattura(e) qualificata(e) (metodo di pagamento Stancer) %s.
+StancerdoTakePaymentStancerResultMessageAP = %s fatture sono state pagate con successo su un totale di %s fatture qualificate (metodo di pagamento Stancer) %s.
+StancerdoTakePaymentStancerResultMessageB = Una fattura non è stata elaborata (data non ancora raggiunta, informazioni di pagamento mancanti, numero di carta o errori di pagamento) %s.
+StancerdoTakePaymentStancerResultMessageBP = %s fatture non sono state elaborate (data non ancora raggiunta, informazioni di pagamento mancanti, numero di carta o errori di pagamento) %s.
+StancerdoTakePaymentStancerResultMessageC = Una nuova fattura (addebito diretto SEPA) è stata elaborata (email informativa inviata): %s.
+StancerdoTakePaymentStancerResultMessageCP = %s nuove fatture (addebito diretto SEPA) sono state elaborate (email informativa inviata): %s.
+StancerdoTakePaymentStancerResultMessageD = Una fattura (addebito diretto SEPA) non ha ancora raggiunto la sua data di pagamento: %s.
+StancerdoTakePaymentStancerResultMessageDP = %s fatture (addebito diretto SEPA) non hanno ancora raggiunto la loro data di pagamento: %s.
+STANCER_AUTO_MAIL_INVOICES_CB = Automatizza l'invio delle fatture pagate con CB via email
+STANCER_AUTO_MAIL_INVOICES_CBTooltip = Questa opzione ti consente di inviare automaticamente la fattura quando il pagamento CB viene lanciato dall'attività pianificata Stancer o quando il tuo cliente paga una fattura direttamente online.
+STANCER_AUTO_MAIL_INVOICES_CB_MAILTYPE = Scegli il modello che vuoi usare per l'email di notifica pagamento CB
+STANCER_AUTO_MAIL_INVOICES_CB_MAILTYPETooltip = Per creare un modello email vai su Home > Configurazione > Email
+STANCER_AUTO_MAIL_INVOICES_SEPA_INFORMATION = Automatizza l'invio dell'email informativa preliminare all'addebito diretto SEPA
+STANCER_AUTO_MAIL_INVOICES_SEPA_INFORMATIONTooltip = Con questa opzione verrà inviata un'email il giorno dell'emissione della fattura per informare il tuo cliente che l'addebito diretto verrà effettuato entro il termine configurato nella scheda SEPA
+STANCER_AUTO_MAIL_INVOICES_SEPA = Automatizza l'invio delle fatture pagate con addebito diretto SEPA via email
+STANCER_AUTO_MAIL_INVOICES_SEPATooltip = Con questa opzione verrà inviata un'email il giorno in cui viene avviato l'addebito diretto SEPA
+StancerMailMenu = Posta
+STANCER_AUTO_MAIL_INVOICES_SEPA_INFORMATION_MAILTYPE = Scegli il modello che vuoi usare per l'email informativa iniziale (SEPA)
+STANCER_AUTO_MAIL_INVOICES_SEPA_MAILTYPE = Scegli il modello che vuoi usare per l'email di pagamento (SEPA)
+STANCER_AUTO_MAIL_INVOICES_SEPA_PAID = Invia fattura al cliente quando il pagamento SEPA è completato
+STANCER_AUTO_MAIL_INVOICES_SEPA_PAID_MAILTYPE = Scegli il modello che vuoi usare per l'email di pagamento completato (SEPA)
+StancerMailConfig = Email
+StancerMailPresentation = Questo modulo ti consente di automatizzare l'invio di email ai tuoi clienti che pagano tramite Stancer. Per maggiori dettagli consulta <a href="https://doc.cap-rel.fr/projet_stancer/envoyez_automatiquement_les_mails">la documentazione online</a>.
+STANCER_AUTO_MAIL_INVOICES_ERROR = Scegli il modello email che vuoi usare in caso di errore di pagamento
+STANCER_AUTO_MAIL_INVOICES_ERRORTooltip = Questo modello email verrà utilizzato in caso di errore di pagamento, sia con CB che con addebito diretto SEPA
+ErrorStancerSEPAdelay = Il termine di notifica (%s giorni) non è ancora stato raggiunto
+ErrorStancerSEPAdelayTitle = Ritardo SEPA
+ErrorStancerInvoiceDateDue = La data di pagamento della fattura non è ancora stata raggiunta
+ErrorStancerCBdueTitle = Data di pagamento
+StancerThereIsNoSocID = Si è verificato un errore, la tua scheda cliente non può essere trovata, contattaci
+STANCER_PUBLIC_CB_PAGE = Abilita la pagina pubblica che consente a un cliente di inserire le informazioni della sua carta di credito
+STANCER_PUBLIC_CB_PAGETooltip = Se abiliti questa opzione, una pagina pubblica sarà accessibile per i tuoi clienti per inserire le loro informazioni di pagamento CB (utile per un abbonamento con pagamento CB automatico ad esempio)
+StancerPageTitleForCB = Aggiunta della tua carta di credito come metodo di pagamento
+StancerCBAccount = Area Carta di Credito
+CBLegalTextStancer2 = Compilando questo modulo, autorizzi %s a utilizzare queste informazioni per elaborare pagamenti per fatture in sospeso e future. Il tuo numero di carta di credito non viene memorizzato sul nostro sistema, viene trasferito direttamente al nostro fornitore di pagamento sicuro Stancer che restituisce un'impronta digitale che verrà utilizzata per i pagamenti futuri.
+StancerPleaseEnterYourCBTitle = Informazioni di pagamento CB
+StancerPleaseEnterYourCB = Compila il seguente modulo per il pagamento con carta di credito dei tuoi abbonamenti
+StancerHolderName = Nome del titolare della carta di credito
+StancerCBNumber = Numero carta di credito
+StancerCBExpiry = Data di scadenza
+StancerCBCCV = Codice CCV (retro)
+StancerNoCBRecord = Nessuna carta di credito è ancora registrata
+StancerLinkFoCustomerCB = Puoi offrire al tuo cliente di compilare da solo il seguente modulo per gestire i pagamenti automatici con carta di credito.
+CardNumber = Numero
+CardExpiry = Data di scadenza
+CardType = Circuito
+StancerPublicCBpageDisabled = La pagina pubblica di registrazione carta di credito non è abilitata! Abilita questa opzione nella %sconfigurazione del modulo%s.
+StancerPayBalanceCB = Paga saldo con CB
+StancerPayBalanceAmountCB = Paga saldo (%s) con CB (sperimentale)
+StancerPopupCBexists = Una CB è registrata per questo cliente, vuoi usarla per procedere con il pagamento diretto? Se sì clicca su "sì". Per annullare clicca su "no".
+StancerPaymentDoneOn = Pagamento avviato per fatture %s
+StancerPaymentNoInvoice = Nessuna fattura in attesa di pagamento
+StancerPaymentErrorOn = Errore di pagamento per fatture %s
+StancerPaymentInProgress = Un pagamento tramite Stancer è in corso su questa fattura, e sarà visibile qui non appena sarà definitivamente convalidato dal fornitore (24h per una carta di credito, qualche giorno per un addebito diretto SEPA). %s[documentazione]%s (Stato: %s)
+StancerAssoMenu = Associazioni
+StancerAssoConfig = Configurazione per Associazioni
+StancerAssoPresentation = Gestione associazioni (membri, quote, donazioni...)
+STANCER_ASSO_ACTIVE = Abilita supporto per funzionalità specifiche delle associazioni
+STANCER_AUTO_MAIL_NOTIFICATIONS = Abilita notifiche email automatiche
+STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT = Indirizzo email da notificare quando i pagamenti sono confermati
+STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT_DETAILS = Ricevi un'email dettagliata per ogni errore di pagamento (può essere fonte di molte email)
+STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT_DETAILSTooltip = Se lasci questa casella deselezionata riceverai un'email contenente il riepilogo generale degli errori
+STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENTTooltip = Lascia questo campo vuoto se non vuoi ricevere notifiche. Per maggiori dettagli consulta la <a href="https://doc.cap-rel.fr/projet_stancer/notifications_par_mail">documentazione online</a>.
+STANCER_AUTO_MAIL_NOTIFICATIONS_PAYOUT = Indirizzo email da notificare quando viene effettuato un trasferimento (pagamento)
+STANCER_AUTO_MAIL_NOTIFICATIONS_PAYOUTTooltip = Lascia questo campo vuoto se non vuoi ricevere notifiche. Per maggiori dettagli consulta la <a href="https://doc.cap-rel.fr/projet_stancer/notifications_par_mail">documentazione online</a>.
+STANCER_AUTO_MAIL_NOTIFICATIONS_PAYOUT_DETAILS = Ricevi un'email dettagliata per ogni errore di trasferimento bancario dall'account Stancer al tuo account principale (può essere fonte di molte email)
+STANCER_AUTO_MAIL_NOTIFICATIONS_PAYOUT_DETAILSTooltip = Se lasci questa casella deselezionata riceverai un'email contenente il riepilogo generale degli errori
+StancerMailSubjectPaymentConfirm = Conferma pagamento - %s: %s €
+StancerMailPaymentConfirm = Il pagamento di %s € per la fattura %s (cliente: %s) è confermato da Stancer.
+StancerMailSubjectPaymentConfirmButError = Conferma pagamento (errore di gestione) - %s: %s €
+StancerMailPaymentConfirmButError = Il pagamento di %s € per la fattura %s (cliente: %s) è confermato da Stancer ma la sua registrazione su Dolibarr è in errore, verifica e gestisci la situazione manualmente.
+StancerMailSubjectPaymentError = Errore di pagamento - %s: %s €
+StancerMailPaymentError = Il pagamento di %s € per la fattura %s (cliente: %s) è in errore, troverai il messaggio di errore di seguito: %s
+StancerMailSubjectPaymentExeption = Errore attività pianificata (pagamenti)
+StancerMailPaymentExeption = Si è verificato un errore grave, troverai il messaggio di seguito, non esitare a contattare CAP-REL per trovare una soluzione se necessario: %s
+StancerMailPayment = troverai di seguito l'elenco degli errori o casi speciali di elaborazione dei pagamenti: <br />%s
+StancerMailSubjectPayoutExeption = Errore attività pianificata (trasferimenti)
+StancerMailPayoutExeption = Si è verificato un errore grave, troverai il messaggio di seguito, non esitare a contattare CAP-REL per trovare una soluzione se necessario: %s
+StancerMailSubjectPayoutDone = Trasferimento bancario completato: %s €
+StancerMailPayoutDone = Il trasferimento di %s € da Stancer al tuo account principale è completato. Messaggio dettagliato: %s
+StancerMailSendBy = Inviato dal <a href="https://www.dolistore.com/fr/modules/1857-Stancer-paiement---lectronique-CB-SEPA.html">modulo Stancer per Dolibarr</a>
+StancerMailPayoutError = Errore trasferimento bancario
+StancerMailPayout = troverai di seguito l'elenco degli errori o casi speciali di elaborazione delle operazioni di trasferimento da Stancer al tuo account principale: <br />%s
+StancerMailSubjectPayoutError = Si è verificato un errore. Troverai il messaggio di errore di seguito: %s
+StancerMailSubjectPayment = Attività pianificata pagamenti
+StancerMailSubjectPayout = Attività pianificata trasferimenti
+StancerMailTableHeaderStancer = Stancer
+StancerMailTableHeaderDolibarr = Dolibarr
+StancerMailTableHeaderAmount = Importo
+StancerMailTableHeaderMessage = Messaggio
+StancerMailTableHeaderDate = Data
+StancerMailSubjectCB = Nuovo metodo di pagamento aggiunto (CB)
+StancerMailCB = Una nuova CB è stata aggiunta per %s
+STANCER_AUTO_MAIL_NOTIFICATIONS_ON_NEW_CB_AND_SEPA = Notifica email quando un cliente registra l'impronta della sua carta di credito
+ErrorStancerModuleVersionDatabase = Modulo Stancer: Attenzione, la versione del tuo modulo non è coerente con la versione del database, disabilita e riabilita il modulo...
+ErrorStancerDPOmissing = Attenzione, il tuo indirizzo email DPO non è ancora compilato, questa informazione è necessaria per il Mandato di Addebito Diretto.
+ErrorStancerCustomerNotFound = Impossibile identificare il cliente su Stancer. Verificare l'email e i dati di contatto del cliente, o provare un altro metodo di pagamento.
+draft = Bozza
+authorized = Autorizzato
+StancerAuthorized = Autorizzato
+captured = Acquisito
+capture_sent = In corso
+disputed = Contestazione
+expired = Scaduto
+StancerExpired = Scaduto
+failed = Errore
+StancerFailed = Errore
+refused = Rifiutato
+to_capture = In attesa della banca
+STANCER_EMAIL_DPO = Il tuo indirizzo email DPO
+STANCER_EMAIL_DPOTooltip = Richiesto per le informazioni sul modulo di Mandato SEPA
+STANCER_ENABLE_CB = Abilita gestione carte di credito
+STANCER_ENABLE_CBTooltip = Puoi disabilitare questa opzione per usare solo addebiti diretti SEPA ad esempio
+StancerCBPresentation = Il modulo Stancer consente di accettare pagamenti con carta di credito. Se vuoi abilitare questa funzionalità seleziona la casella.
+STANCER_ENABLE_SEPA = Abilita gestione addebiti diretti SEPA
+STANCER_NO_CODE_CB = Non c'è codice 'CB' nei Metodi di Pagamento attivi sul tuo Dolibarr. Maggiori informazioni nella <a href="https://doc.cap-rel.fr/projet_stancer/cb_et_pre_dans_le_dictionnaire_des_moyens_de_paiements">seguente documentazione online</a>.
+STANCER_NO_CODE_PRE = Non c'è codice 'PRE' nei Metodi di Pagamento attivi sul tuo Dolibarr. Maggiori informazioni nella <a href="https://doc.cap-rel.fr/projet_stancer/cb_et_pre_dans_le_dictionnaire_des_moyens_de_paiements">seguente documentazione online</a>.
+STANCER_MANDATE_AUTO_UPTOSIGN_NOCLICK = Reindirizzamento automatico alla firma elettronica uptosign
+STANCER_MANDATE_AUTO_UPTOSIGN_NOCLICKTooltip = Se non abiliti questa opzione il tuo cliente dovrà cliccare sul link "vai alla firma elettronica online" del mandato dopo averlo completato
+StancerInCaseOfTroubleYourLinkTopay = Se il tuo browser web non ti ha permesso di pagare direttamente, puoi riprovare <a href="%s">seguendo questo link</a>.
+StancerMailSubjectConfirmLinkToPay = Link di pagamento per il tuo ordine
+StancerMailPayoutConfirmMail = Grazie per il tuo ordine.
+
+STANCER_AUTO_MAIL_ORDER_CB = Invia promemoria ordine con link di pagamento prima di reindirizzare al sito Stancer
+STANCER_AUTO_MAIL_ORDER_CBTooltip = Questa opzione invia un'email di promemoria dell'ordine al tuo cliente con il link di pagamento da usare se il reindirizzamento non funziona o il processo di pagamento fallisce
+STANCER_AUTO_MAIL_ORDER_CB_MAILTYPE = Scegli il modello email da inviare quando invii automaticamente l'ordine via email
+StancerCheckInvoicesPaid = Contrassegna fatture come pagate
+StancerCheckInvoicesPaidDetails = Cerca tutte le fatture con importo residuo da pagare uguale a zero e stato pagamento "Pagamento iniziato" per forzarle allo stato "Pagato" (pulizia)
+StancerSendPaymentReminders = Promemoria di pagamento
+StancerSendPaymentRemindersDetails = Invio automatico di promemoria via email ai clienti il cui pagamento è fallito secondo il calendario configurato
+STANCER_PAYMENT_REMINDER_TITLE = Promemoria di pagamento
+STANCER_PAYMENT_REMINDER_ENABLED = Attivare promemoria automatici in caso di errore di pagamento
+STANCER_PAYMENT_REMINDER_ENABLEDTooltip = Quando un pagamento fallisce (rifiutato, scaduto, contestato), il modulo invierà automaticamente promemoria via email al cliente secondo il calendario configurato di seguito
+STANCER_PAYMENT_REMINDER_MAILTYPE = Modello email da utilizzare per i promemoria di pagamento
+STANCER_PAYMENT_REMINDER_MAILTYPETooltip = Scegliere un modello di tipo "Invio fattura". È possibile utilizzare la variabile __ONLINE_PAYMENT_URL__ o __STANCER_PAYMENT_URL__ nel modello per includere il link di pagamento online
+STANCER_PAYMENT_REMINDER_SCHEDULE = Calendario dei promemoria (giorni dopo il fallimento)
+STANCER_PAYMENT_REMINDER_SCHEDULETooltip = Lista separata da virgole dei giorni dopo il fallimento del pagamento per inviare ogni promemoria. Esempio: 1,3,7 invierà un promemoria a G+1, G+3 e G+7
+STANCER_PAYMENT_REMINDER_ADMIN_SUMMARY = Inviare un riepilogo dei promemoria all'amministratore
+STANCER_PAYMENT_REMINDER_ADMIN_SUMMARYTooltip = L'amministratore riceverà un'email di riepilogo dei promemoria inviati durante ogni esecuzione del task pianificato
+StancerMailSubjectPaymentFailure = Errore di pagamento
+StancerMailPaymentFailure = Il pagamento di %s per la fattura riferimento %s è fallito (stato: %s). Si prega di verificare la situazione.
+StancerMailSubjectReminders = Riepilogo dei promemoria di pagamento
+StancerRemindersSentList = Promemoria inviati con successo
+StancerRemindersErrorList = Errori durante l'invio dei promemoria
+StancerdoCheckInvoicesPaidResultMessageA = Una fattura è stata contrassegnata come pagata con successo su un totale di %s fattura(e) qualificata(e) %s.
+StancerdoCheckInvoicesPaidResultMessageAP = %s fatture sono state contrassegnate come pagate con successo su un totale di %s fatture qualificate %s.
+STANCER_CB_AS_PAID = Contrassegna fattura come pagata immediatamente al ritorno positivo di Stancer senza attendere la conferma finale
+STANCER_CB_AS_PAIDTooltip = Se abiliti questa opzione la fattura del tuo cliente sarà contrassegnata come pagata al primo ritorno di pre-validazione da Stancer. Attenzione, questa informazione può essere contraddetta qualche giorno dopo se il pagamento viene rifiutato dalla banca del tuo cliente. Vedi la <a href="https://doc.cap-rel.fr/projet_stancer/des_le_retour_de_pre-acceptation_du_paiement_cb">documentazione per maggiori dettagli</a>
+STANCER_CB_ALLOW_RETRY = Consenti un nuovo tentativo di pagamento CB tramite Stancer dopo un errore
+STANCER_CB_ALLOW_RETRYTooltip = Per impostazione predefinita, se un pagamento Stancer è già stato tentato (anche se fallito), il pulsante di pagamento Stancer non viene più visualizzato sulla pagina pubblica. Se abiliti questa opzione, il pulsante verrà mostrato di nuovo finché nessun pagamento è stato catturato con successo.
+STANCER_SWITCH_SEPA_AMOUNT = Abilita cambio automatico fornitore quando l'importo da addebitare supera un limite?
+STANCER_SWITCH_SEPA_AMOUNTTooltip = Se abiliti questa opzione i due campi seguenti sono obbligatori
+STANCER_SWITCH_SEPA_AMOUNT_MAX = Importo massimo degli addebiti diretti SEPA da effettuare tramite Stancer
+STANCER_SWITCH_SEPA_AMOUNT_MAXTooltip = A causa della percentuale variabile sugli addebiti diretti SEPA, spesso è meno costoso usare un altro intermediario di pagamento rispetto a Stancer per addebiti diretti SEPA superiori a 60, ma puoi indicare qui l'importo oltre il quale non vuoi più che Stancer sia usato per effettuare l'addebito diretto.
+STANCER_SWITCH_SEPA_TO_OTHER_BANK = Scelta della banca da usare quando l'importo dell'addebito supera il limite definito sopra
+STANCER_SWITCH_SEPA_TO_OTHER_BANKTooltip = Ad esempio, indica il tuo account Stripe o altro per impedire al modulo Stancer di avviare addebiti diretti per fatture interessate da questo superamento del limite
+StancerPayCB = Pagamento CB Stancer
+StancerPaySEPA = Pagamento SEPA Stancer
+StancerPayAmountStarted = Pagamento di %s avviato
+StancerPayWithRedirectStarted = Pagamento di %s avviato tramite pagina web di pagamento
+
+cbType = Tipo carta
+cbNumber = Numero
+cbEOL = Data di scadenza
+
+StancerNewPaymentMode = Fonte di pagamento aggiunta
+StancerNewPaymentModeAdded = È stato aggiunto un nuovo metodo di pagamento: %s
+StancerUpdatePaymentMode = Aggiornamento
+StancerUpdatePaymentModeDone = Il metodo di pagamento %s è stato aggiornato
+StancerForceRefreshAccount = Aggiorna dati da Stancer
+DeleteSEPAOnStancer = Elimina
+StancerEventAdded = Evento aggiunto alla cronologia
+CleanStancerTestsDataHelp = Clicca su questo pulsante se hai usato la modalità Test di Stancer per pulire il tuo database (identificatore cliente univoco su Stancer)
+CleanStancerTestsData = Pulisci dati di test
+CleanStancerTestsDataDone = I dati di test di Stancer sono stati eliminati
+
+
+# Refund
+StancerRefundStart = Rimborso tramite Stancer
+StancerRefundTitle = Rimborso Stancer
+StancerRefundConfirmMessage = Stai per rimborsare %s %s tramite Stancer. Confermi questa operazione?
+StancerRefundOriginalInvoice = Fattura originale: %s
+StancerRefundSuccess = Rimborso completato con successo (ID: %s)
+StancerRefundError = Errore rimborso: %s
+StancerRefundNoPaymentFound = Nessun pagamento Stancer trovato per questa fattura
+StancerRefundNoLinkedPayment = Nessun pagamento Stancer collegato alla fattura originale
+StancerRefundAlreadyDone = Un rimborso è già stato elaborato per questo importo
+
+# Propal (quote) payment
+STANCER_PROPAL_TITLE = Pagamenti preventivi
+STANCER_AUTO_INVOICE_ON_PROPAL_PAID = Crea automaticamente una fattura quando un preventivo viene pagato
+STANCER_AUTO_INVOICE_ON_PROPAL_PAIDTooltip = Se questa opzione è abilitata, una fattura verrà automaticamente creata e convalidata quando un cliente paga un preventivo tramite Stancer
+StancerPropalPaymentLink = Link di pagamento Stancer
+StancerPropalPaymentLinkNeedEmail = La scheda della terza parte non contiene un indirizzo email, è necessario per avviare un pagamento tramite Stancer!
+
+# Generic keys used in module (not in core)
+Optional = Opzionale
+Path = Percorso
+Success = Successo
+NoData = Nessun dato
+ClassNotFound = Classe non trovata
+ErrorNumberingModuleNotSetup = Modulo di numerazione non configurato (elemento: %s)
+AmountTo = Importo verso
+PaymentDoneOn = Pagamento effettuato il: %s
+StartFix = Avvia correzione
+StartImport = Avvia importazione
+StancerNewVersionAvailable = Stancer: e' disponibile una versione piu' recente (installata %s, disponibile %s). Si consiglia di aggiornare.
+StancerNotifyCustomers = Notificare i destinatari via e-mail
+StancerRefreshSelected = Forza aggiornamento delle righe selezionate
+StancerForceRefreshSelectedDone = Aggiornamento forzato di %s pagament(i) completato. Consulta i log per i dettagli delle correzioni applicate.
+
+# Stancer payment attribution audit (page stancer_audit.php) - TODO translate to it_IT
+StancerAuditTitle = Stancer payment attribution audit
+StancerAuditIntro = This page queries the Stancer API for every local payment and checks that the customer, invoice and amount stored in Dolibarr match the actual Stancer data. No write is performed: the page is strictly read-only. Click "Run audit" to get the report.
+StancerAuditRun = Run audit
+StancerAuditResults = Audit results
+StancerAuditSummary = Summary
+StancerAuditRowsAudited = %s payment(s) audited in %s second(s).
+StancerAuditOptionalSocid = (optional - leave empty to audit every customer)
+StancerAuditMaxRows = Cap
+StancerAuditMaxRowsHelp = At most %s payment(s) will be audited per run (configurable via STANCER_AUDIT_MAX_ROWS).
+StancerAuditNoRows = No Stancer payment found within the selected period.
+StancerAuditTooMany = More than %s payment(s) match. Only the most recent ones are audited. Narrow the period down or increase STANCER_AUDIT_MAX_ROWS.
+StancerAuditSqlError = SQL error while fetching payments. See logs.
+StancerAuditAuthStop = Stancer API authentication error (HTTP 401). Audit was aborted. Check the private key configured for the current mode.
+StancerAuditPaymId = Stancer ID
+StancerAuditApiStatus = Stancer status
+StancerAuditStatus = Audit status
+StancerAuditDoublesTitle = Double-charge detection
+StancerAuditDoublesIntro = This section lists Stancer invoices (api_order_id) that received 2 or more payments. When more than one payment is captured on the same invoice, the customer has been charged twice.
+StancerAuditDoublesAlert = WARNING: %s invoice(s) charged more than once. A refund must probably be issued from the Stancer interface before any attribution correction.
+StancerAuditDoublesOrderId = Stancer invoice (api_order_id)
+StancerAuditDoublesNbPayments = Nb payments
+StancerAuditDoublesCapturedCount = Nb captured
+StancerAuditDoublesFlag = State
+StancerAuditDoublesFlagDouble = DOUBLE CHARGE
+StancerAuditDoublesFlagOk = No double
+StancerAuditDoublesDetail = Payment details
+
+# Action buttons + modal (phase 2) - TODO translate to it_IT
+StancerAuditActions = Actions
+StancerAuditFix = Fix
+StancerAuditIgnore = Ignore
+StancerAuditDone = Fixed
+StancerAuditStatusIgnored = Ignored
+StancerAuditModalTitleFix = Fix payment attribution
+StancerAuditModalTitleIgnore = Ignore this payment
+StancerAuditConfirmFix = Confirm moving this payment to the invoice indicated by the Stancer API? The operation is logged in the events of every impacted invoice.
+StancerAuditConfirmIgnore = Mark this payment as to-be-ignored in subsequent audits? Use this for legitimate cases (subsidiary, customer merge) that should not be auto-corrected.
+StancerAuditModalDoubleWarning = WARNING: this payment is part of a double-charge pair. The target invoice will be over-paid after this move. You must issue a credit note or a separate refund.
+StancerAuditPaymInDoubleTooltip = This paym_id is part of a double-charge pair detected on the same Stancer invoice (api_order_id).
+StancerAuditNetworkError = Network error while sending.
+StancerAuditApiCustomer = Customer (API)
+StancerAuditApiOrderId = Invoice ref (API)
+StancerAuditApiAmount = Amount (API)
+StancerAuditDbClient = Customer (Dolibarr)
+StancerAuditDbInvoice = Invoice (Dolibarr)
+StancerAuditDbAmount = Amount (Dolibarr)
+StancerAuditDetails = Details
+StancerAuditStatus_OK = OK
+StancerAuditStatus_grouped = Grouped SEPA
+StancerAuditStatus_wrong_invoice_same_customer = Wrong invoice (same customer)
+StancerAuditStatus_wrong_customer = Wrong customer
+StancerAuditStatus_wrong_customer_unmapped = Wrong customer (unmapped - please verify)
+StancerAuditStatus_wrong_amount = Inconsistent amount
+StancerAuditStatus_no_mapping = Unmapped Stancer customer
+StancerAuditStatus_api_unreachable = API unreachable
+StancerAuditStatus_api_not_found = Not found on Stancer
+StancerAuditStatus_api_auth_error = API authentication error
