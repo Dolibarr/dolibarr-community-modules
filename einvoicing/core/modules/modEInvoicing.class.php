@@ -618,9 +618,6 @@ class modEInvoicing extends DolibarrModules
 				// Drop the stale computed formula on d4d_chorus_id: it targets options_chorus_id (openDSI),
 				// which raises a PHP warning on every invoice render and makes the field read-only.
 				"UPDATE " . MAIN_DB_PREFIX . "extrafields SET fieldcomputed = '' WHERE name = 'd4d_chorus_id' AND fieldcomputed LIKE '%options_chorus_id%'",
-				// addExtraField() leaves an existing definition alone, so an installation that already carries
-				// these fields keeps printable = 1 until this runs (issue #614).
-				"UPDATE " . MAIN_DB_PREFIX . "extrafields SET printable = 2 WHERE printable = 1 AND elementtype IN ('facture', 'commande') AND name IN ('d4d_service_code', 'd4d_contract_number', 'd4d_promise_code')"
 			)
 		);
 
@@ -668,7 +665,13 @@ class modEInvoicing extends DolibarrModules
 			$this->db->query($sqltmp);
 		}
 
-		return $this->_init($sql, $options);
+		$result = $this->_init($sql, $options);
+
+		// Disabled, the _init contains already the launch of update_x.y.z.sql sorted by name.
+		//$updatesql = file_get_contents(dol_buildpath('/einvoicing/sql/update_v1.1.0.sql'));
+		//run_sql($updatesql);	// The run_sql is a SQL error tolerant function.
+
+		return $result;
 	}
 
 	/**

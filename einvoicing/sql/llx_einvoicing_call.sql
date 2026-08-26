@@ -31,6 +31,7 @@ CREATE TABLE llx_einvoicing_call (
 	call_type varchar(50) NOT NULL,
 	method varchar(10),
 	endpoint varchar(255) NOT NULL,
+	request_id varchar(36),
 	request_body text,
 	response text,
 	processing_result text,

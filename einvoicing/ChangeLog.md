@@ -2,6 +2,26 @@
 
 ## 1.1.0
 
+FIX: The remote information of the SuperPDP setup page now describes the e-invoice address the module
+really sends with. A company can hold several entries in the French directory at once - one per
+document family, '<siren>_Invoice' or '<siren>_Status', beside the bare identifier - and the screen
+reported whichever one the platform returned first, that is the oldest one, whatever the routing
+identifier configured in the module. An installation sending with '<siren>_Status' was told its
+address was '<siren>_Invoice'. The entry that matches the routing identifier of the module is now the
+one reported, the other addresses of the company are listed beside it, and an address that has no
+directory entry at all is called out: invoices sent with it are refused for an unknown address, which
+nothing announced before the first refusal. The list of the entries also carried the status and the
+effective date of the first one on every line, so two entries out of three were shown with a date that
+was not theirs.
+
+NEW: The remote information of the SuperPDP setup page now shows the identity the Access Point holds
+for your company - name, company number and address - and compares it with the company set up in
+Dolibarr. A company number that differs is reported as an error, because an invoice issued for a
+company other than the one of the session is refused at sending time, and that refusal was only
+discovered on the first transmission. A name or an address that differs is reported as a note. The
+information comes from the directory entries, which the page already read: the session endpoint of the
+platform returns nothing but the verification statuses.
+
 FIX: The module can obtain an access token from the Esalink access point again. The token request had
 lost its grant_type parameter, which RFC 6749 requires whatever the client authentication method is,
 so the access point answered 400 Bad Request - "must not be blank" - before it ever looked at the

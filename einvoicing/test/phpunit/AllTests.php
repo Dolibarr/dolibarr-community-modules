@@ -113,6 +113,8 @@ class AllTests
 		$suite->addTestSuite('CIIProfileShapeTest');
 		require_once dirname(__FILE__).'/CIIProtocolTest.php';
 		$suite->addTestSuite('CIIProtocolTest');
+		require_once dirname(__FILE__).'/CompatShimReloadTest.php';
+		$suite->addTestSuite('CompatShimReloadTest');
 		require_once dirname(__FILE__).'/EInvoicingSamplesTest.php';
 		$suite->addTestSuite('EInvoicingSamplesTest');
 		require_once dirname(__FILE__).'/InvoicingPeriodTest.php';

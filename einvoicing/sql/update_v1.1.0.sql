@@ -19,3 +19,5 @@ ALTER TABLE llx_einvoicing_extrafields ADD UNIQUE INDEX uk_einvoicing_extrafield
 UPDATE llx_extrafields SET printable = 2 WHERE printable = 1 AND elementtype IN ('facture', 'commande') AND name IN ('d4d_service_code', 'd4d_contract_number', 'd4d_promise_code');
 
 ALTER TABLE llx_einvoicing_call ADD COLUMN call_id_num integer AFTER call_id;
+
+ALTER TABLE llx_einvoicing_call ADD COLUMN request_id varchar(36) AFTER endpoint;

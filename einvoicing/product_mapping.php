@@ -182,7 +182,7 @@ if ($action == 'savemapping' && $permissiontoadd && !empty($parsedLines) && $soc
 			}
 
 			$reffourn = trim((string) ($parsedLine['prodsellerid'] ?? ''));
-			if ($reffourn === '' || $reffourn === '0000') {
+			if ($reffourn === '') {
 				// Without a vendor reference we have nothing to store the mapping on
 				continue;
 			}
@@ -331,7 +331,7 @@ if (!empty($parsedLines)) {
 			print ' '.$form->textwithpicto('', $matchresults[$idx]['message'], 1, 'help');
 		} elseif ($socid <= 0) {
 			print '<span class="opacitymedium">'.$langs->trans("SelectTheSupplierOfThisFlow").'</span>';
-		} elseif ($reffourn === '' || $reffourn === '0000') {
+		} elseif ($reffourn === '') {
 			// Without a vendor reference, the mapping has nothing to be stored on
 			print $form->textwithpicto('<span class="opacitymedium">'.$langs->trans("NotMappable").'</span>', $langs->trans("NotMappableBecauseNoVendorRef"), 1, 'warning');
 		} elseif ($permissiontoadd) {

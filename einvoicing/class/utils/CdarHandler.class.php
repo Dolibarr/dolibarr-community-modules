@@ -252,10 +252,30 @@ class CdarHandler
 		// SIREN (0002)
 		$mysocGlobalID = idprof($mysoc);
 
-		// Issuer SIREN (0002) of the invoice the status is about: us when we sell, the vendor otherwise
-		$InvoiceIssuerGlobalID = $isOurOwnInvoice
-			? $mysocGlobalID
-			: thirdpartyidprof($object);
+		// Issuer SIREN (0002) of the invoice the status is about: us when we sell, the vendor otherwise.
+		// For a received supplier invoice, the platform indexed the incoming flow under the identifier
+		// the vendor's PDP placed in SellerTradeParty.GlobalID — which may differ from the Dolibarr
+		// third-party SIREN (e.g. test environments where the PDP assigns synthetic identifiers, or a
+		// vendor whose card has not been kept up to date). Reading it from the stored XML is the only
+		// reliable way to reference the same invoice the platform knows. The same parse also yields the
+		// vendor's electronic address (BT-34), used further down for MDT-73 when no routing is recorded.
+		$vendorIdentity = array('globalid' => '', 'uriid' => '');
+		if ($isOurOwnInvoice) {
+			$InvoiceIssuerGlobalID = $mysocGlobalID;
+		} else {
+			// fetch_thirdparty() populates $object->thirdparty, which the MDT-73 routing ladder below
+			// requires. thirdpartyidprof() used to provide this side effect unconditionally; now that it
+			// only runs as a fallback, the call must be explicit so the ladder is never skipped on a
+			// null thirdparty (e.g. automatic 211 from PaiementFourn::create(), where fetch() nulls it
+			// and setPaid() triggers the status before anyone fetches it back).
+			$object->fetch_thirdparty();
+			$vendorIdentity = $this->getVendorIdentityFromReceivedInvoice($object);
+			$InvoiceIssuerGlobalID = $vendorIdentity['globalid'];
+			if ($InvoiceIssuerGlobalID === '') {
+				$InvoiceIssuerGlobalID = thirdpartyidprof($object);
+				dol_syslog(__METHOD__ . ' no GlobalID found in stored XML for supplier invoice id=' . $object->id . ', falling back on Dolibarr third-party SIREN: ' . $InvoiceIssuerGlobalID, LOG_DEBUG);
+			}
+		}
 
 		// Invoice reference
 		$IssuerAssignedID = $isOurOwnInvoice
@@ -300,7 +320,7 @@ class CdarHandler
 			$vendorURIID = ($vendorRouting > 0) ? $einvoicing->removeSpaces((string) $vendorRouting) : '';	// 0 when none is recorded, -1 on error
 
 			if ($vendorURIID === '') {
-				$vendorURIID = $einvoicing->removeSpaces($this->getVendorAddressFromReceivedInvoice($object));
+				$vendorURIID = $einvoicing->removeSpaces($vendorIdentity['uriid']);
 				if ($vendorURIID !== '') {
 					dol_syslog(__METHOD__ . ' no routing ID recorded for vendor SIREN ' . $InvoiceIssuerGlobalID . ', replying to the electronic address of the invoice it sent us: ' . $vendorURIID, LOG_NOTICE);
 				}
@@ -379,8 +399,9 @@ class CdarHandler
 		} else {
 			// We issue the status as the BUYER of a supplier invoice, and it goes back to the vendor
 			$CdarIssuerTradeParty = [
-				'GlobalID' => $mysocGlobalID, // GlobalID of CDAR SENDER
-				'RoleCode' => CdarHandler::ROLE_BY
+				'GlobalID'  => $mysocGlobalID, // GlobalID of CDAR SENDER
+				'SchemeID'  => CdarHandler::SCHEME_SIREN_0002,
+				'RoleCode'  => CdarHandler::ROLE_BY
 			];
 
 			$CdarRecipientTradeParty = [
@@ -488,20 +509,32 @@ class CdarHandler
 	}
 
 	/**
-	 * Electronic address (BT-34) the vendor put on the e-invoice we received from it.
+	 * What the e-invoice we received says about its vendor: the legal identifier it issued under
+	 * (BT-29, or BT-30 when the former is absent) and the electronic address it exchanges from (BT-34).
 	 *
-	 * That address is the vendor saying where it exchanges from, so it is the natural place to send a
-	 * status back to when no routing was recorded for it in Dolibarr. Read from the e-invoice stored with
-	 * the supplier invoice, never by calling the platform back: addressing a status is no reason for a
-	 * network round trip, and an invoice keyed by hand simply has none.
+	 * The globalid is used as InvoiceIssuerGlobalID in the CDAR so the status references the invoice
+	 * under the same identifier the platform indexed it — which may differ from the Dolibarr third-party
+	 * SIREN in legitimate cases: test environments where the PDP assigns synthetic identifiers that
+	 * Dolibarr's own validation would reject as input, or a vendor that sends via one PDP and receives
+	 * via another (its sending routing address differs from its receiving one, and cannot be derived
+	 * from the third-party card alone). Fallback to the card SIREN when the XML carries nothing.
+	 *
+	 * The uriid is the natural reply-to address when no routing is recorded for that vendor in Dolibarr.
+	 *
+	 * Read from the e-invoice stored with the supplier invoice, never by calling the platform back:
+	 * addressing a status is no reason for a network round trip, and an invoice keyed by hand has none.
+	 * A single parse serves both values, since a CDAR always needs the two together.
 	 *
 	 * @param  FactureFournisseur $object  Supplier invoice the status is sent on
-	 * @return string                      The address, '' when there is no stored e-invoice to read it from
+	 * @return array{globalid:string,uriid:string}  Empty strings when there is no stored e-invoice,
+	 *                                              when it is unparsable, or when it carries no such field
 	 */
-	private function getVendorAddressFromReceivedInvoice($object)
+	private function getVendorIdentityFromReceivedInvoice($object)
 	{
+		$identity = array('globalid' => '', 'uriid' => '');
+
 		if (empty($object->id) || $object->element !== 'invoice_supplier') {
-			return '';
+			return $identity;
 		}
 
 		dol_include_once('/einvoicing/class/utils/SupplierInvoiceHelper.class.php');
@@ -513,26 +546,41 @@ class CdarHandler
 			$xmlData = (string) SupplierInvoiceHelper::getXmlData((int) $object->id, false);
 		} catch (Exception $e) {
 			dol_syslog(__METHOD__ . ' no e-invoice stored for supplier invoice id ' . $object->id . ': ' . $e->getMessage(), LOG_DEBUG);
-			return '';
+			return $identity;
 		}
 		if ($xmlData === '') {
-			return '';
+			return $identity;
 		}
 
 		$xml = @simplexml_load_string($xmlData);
 		if ($xml === false) {
 			dol_syslog(__METHOD__ . ' the e-invoice stored for supplier invoice id ' . $object->id . ' is not parsable XML', LOG_WARNING);
-			return '';
+			return $identity;
 		}
 
-		// Only ram: is needed, so the same read works on a CII and on the XML extracted from a Factur-X
+		// Only ram: is needed — the same read works on a CII and on the XML extracted from a Factur-X
 		$xml->registerXPathNamespace('ram', 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100');
-		$found = $xml->xpath('//ram:SellerTradeParty/ram:URIUniversalCommunication/ram:URIID');
-		if (empty($found)) {
-			return '';
+
+		// BT-29: GlobalID[@schemeID="0002"] is the SIREN in the French mandate
+		$found = $xml->xpath('//ram:SellerTradeParty/ram:GlobalID[@schemeID="0002"]');
+		if (!empty($found)) {
+			$identity['globalid'] = removeAllSpaces((string) $found[0]);
+		} else {
+			// BT-30: SpecifiedLegalOrganization/ID[@schemeID="0002"] — legal registration number.
+			// The schemeID guard is required: without it a SIRET (0009), a GLN (0088), or a foreign
+			// registration number would be shipped to the platform declared as a SIREN.
+			$found = $xml->xpath('//ram:SellerTradeParty/ram:SpecifiedLegalOrganization/ram:ID[@schemeID="0002"]');
+			if (!empty($found)) {
+				$identity['globalid'] = removeAllSpaces((string) $found[0]);
+			}
 		}
 
-		return trim((string) $found[0]);
+		$found = $xml->xpath('//ram:SellerTradeParty/ram:URIUniversalCommunication/ram:URIID');
+		if (!empty($found)) {
+			$identity['uriid'] = trim((string) $found[0]);
+		}
+
+		return $identity;
 	}
 
 	/**

@@ -1,0 +1,542 @@
+# Copyright (C) 2023 Eric Seigne <eric.seigne@cap-rel.fr>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+#
+# Generic
+#
+
+# Module label 'ModuleStancerName'
+ModuleStancerName = Stancer
+ModuleStancerDesc = Stancer betalingsmodule
+
+#
+# Dashboard
+#
+StancerDashboard = Stancer Dashboard
+StancerTestModeWarning = Testmodus actief — weergegeven gegevens komen uit de testomgeving
+StancerDashboardKPI = Maandelijkse indicatoren
+StancerDashboardRevenue = Stancer-ontvangsten
+StancerDashboardPayments = Betalingen
+StancerDashboardRefunds = Terugbetalingen
+StancerDashboardDisputes = Geschillen
+StancerDashboardCaptured = vastgelegd
+StancerDashboardThisMonth = deze maand
+StancerDashboardOpen = open
+StancerDashboardMethods = Verdeling per betaalmethode
+StancerDashboardYearlyComparison = Jaarlijkse vergelijking van Stancer-ontvangsten
+StancerDashboardMethodMonthly = Maandelijkse CB / SEPA-ontvangsten
+StancerDashboardAlerts = Waarschuwingen
+StancerDashboardAlertDisputes = %s open geschil(len) voor een totaal van %s
+StancerDashboardAlertRefunds = %s openstaande terugbetaling(en) voor een totaal van %s
+StancerDashboardLastPayments = Laatste betalingen
+
+#
+# Admin page
+#
+StancerSetup = Stancer Configuratie: Algemeen
+StancerSetupSepa = Stancer Configuratie: SEPA
+StancerSettingsMenu = Algemeen
+StancerSetupPage = Stancer configuratiepagina
+StancerSignupURL = https://stancer.com/fr/paiement-en-ligne?mtm_campaign=Dolibarr&mtm_source=Dolibarr
+StancerNoApiKeysMessage = Heeft u nog geen Stancer-account? <a href="%s" target="_blank">Maak uw gratis account aan</a> om uw API-sleutels te ontvangen en creditcard- en SEPA-betalingen te accepteren.
+StancerSignupPromo = Beveel Stancer aan! <a href="%s" target="_blank">Een Stancer-account aanmaken</a>
+StancerPartnershipMessage = Deze module is gratis dankzij het Stancer-partnerschap. <a href="%s" target="_blank">Maak uw Stancer-account aan</a> om te profiteren van een eenvoudige en concurrerende betalingsoplossing.
+
+STANCER_PROD_PARAMS = Productiemodus
+
+STANCER_PROD_PUBLIC_KEY = Publieke sleutel (Productiemodus)
+STANCER_PROD_PUBLIC_KEYTooltip = Plak hier uw Stancer publieke productiesleutel (prefix pprod_ of plive_).
+STANCER_PROD_PRIVATE_KEY = Privésleutel (Productiemodus)
+STANCER_PROD_PRIVATE_KEYTooltip = Plak hier uw Stancer privé-productiesleutel (prefix sprod_ of slive_).
+
+STANCER_TEST_PARAMS = Testmodus
+
+STANCER_TEST_PUBLIC_KEY = Publieke sleutel (TESTmodus)
+STANCER_TEST_PUBLIC_KEYTooltip = Plak hier uw Stancer publieke testsleutel (prefix ptest_).
+STANCER_TEST_PRIVATE_KEY = Privésleutel (TESTmodus)
+STANCER_TEST_PRIVATE_KEYTooltip = Plak hier uw Stancer privé-testsleutel (prefix stest_).
+STANCER_KEY_HINT = Moet beginnen met %s
+STANCER_KEY_INVALID = De sleutel %s moet beginnen met %s. De invoer is geweigerd en de vorige waarde is behouden.
+STANCER_USER_ACCOUNT_FOR_ACTIONS = Dolibarr gebruiker voor automatische Stancer operaties
+
+#
+# About page
+#
+About = Over
+StancerAbout = Over Stancer
+StancerAboutPage = Over pagina
+
+StancerTest = Testgebied
+StancerAccount = Gekoppeld Stancer account
+CreateAccountOnStancer = Klantaccount aanmaken (of koppelen) op Stancer
+StancerAccountID = Identificatie
+StancerAccountDeleteLink = Koppeling met Stancer account verwijderen
+StancerOrderID = Interne ref.
+StancerUniqueID = Unieke ID
+StancerCBCard = Creditcard
+STANCER_PAY_BUTTON = Betaal met kaart
+STANCER_PAY_BUTTON_MESSAGE = U wordt doorgestuurd naar de Stancer website om de betaling te voltooien
+STANCER_PAY_BUTTON_DEPOSIT = Aanbetaling van %s %% d.w.z. %s
+STANCER_CB_ORDER_PARTIAL_PAY = Gedeeltelijke betaling voor bestellingen met automatische aanbetalingsfactuur inschakelen
+STANCER_CB_ORDER_PARTIAL_PAYTooltip = Met deze optie kunt u bijvoorbeeld "30%% betaling bij bestelling" instellen. Meer informatie in <a href="https://doc.cap-rel.fr/projet_stancer/versement_d_un_acompte_a_la_commande">de documentatie</a>
+STANCER_CB_PROPAL_PARTIAL_PAY = Gedeeltelijke betaling voor offertes met automatische aanbetalingsfactuur inschakelen
+STANCER_CB_PROPAL_PARTIAL_PAYTooltip = Met deze optie kunt u bijvoorbeeld "20%% betaling bij ondertekening offerte" instellen, met gebruik van het aanbetalingspercentage gedefinieerd in de betalingsvoorwaarden van de offerte
+
+STANCER_AUTO_SEPA_ONLY_FOR_CONTRACTS = Automatische SEPA-incasso's alleen activeren als de factuur aan een contract is gekoppeld
+STANCER_AUTO_SEPA_ONLY_FOR_CONTRACTSTooltip = Laat dit vakje uitgevinkt als u wilt dat elke factuur waarvan de betaalmethode incasso is, automatisch wordt geïncasseerd door de geplande taak
+stancer_status_to_capture = Betaling geaccepteerd
+MainAPIURI = Serveradres
+STANCER_IS_PROD = "Productie" modus inschakelen (uitgevinkt laten voor testmodus)
+STANCER_BANK_ACCOUNT_FOR_PAYMENTS = Toegewezen Dolibarr bankrekening voor Stancer betalingen
+STANCER_BANK_ACCOUNT_FOR_PAYMENTSTooltip = Normaal gesproken is er een "Stancer" rekening aangemaakt bij activatie van de module, gebruik deze. Meng niet alles met uw hoofdrekening.
+STANCER_BANK_MAIN_ACCOUNT_FOR_PAYOUTS = Dolibarr bankrekening waarnaar Stancer geld overmaakt
+STANCER_BANK_MAIN_ACCOUNT_FOR_PAYOUTSTooltip = Uw hoofdbankrekening
+STANCER_CHECK_PAYMENT_STATUS = Betalingsstatus van de transactie controleren:
+STANCER_REDIRECT = Als uw browser niet automatisch naar de betaalpagina gaat, klik dan op de volgende link:
+response = Details
+created = Datum
+AmountCents = Bedrag
+Amount = Bedrag
+Fees = Kosten
+details = Details
+date_bank = Datum (bank)
+date_paym = Datum (betaling)
+StancerRefused = Geweigerd
+StancerToCapture = Wachten op bank
+StancerDisputed = Geschil
+StancerCaptured = Vastgelegd
+StancerPopupCB = Betaling van factuur ref %s met kaart.
+StancerCardStart = Stancer CB
+StancerCardTPE = Stancer POS
+stancerFindPaymentInvoice = Automatisch zoeken naar betalingen
+SepaMandateForStancer = SEPA Mandaat - Stancer
+SepaMandateForStancerPageTitle = Aanmaken van uw SEPA mandaat
+SEPALegalTextStancer = Door dit mandaatformulier te ondertekenen, machtigt u (A) %s om instructies naar uw bank te sturen om uw rekening te debiteren, en (B) uw bank om uw rekening te debiteren in overeenstemming met de instructies van %s. U heeft het recht om door uw bank te worden terugbetaald onder de voorwaarden beschreven in uw overeenkomst met hen. Een terugbetalingsverzoek moet worden ingediend binnen 8 weken na de datum waarop uw rekening is gedebiteerd voor een geautoriseerde incasso. U stemt ermee in om kennisgeving van aanstaande incasso's te ontvangen binnen 2 dagen voor de uitvoering ervan. Elke afgewezen incasso wordt ook in rekening gebracht volgens onze algemene voorwaarden.
+SEPALegalTextStancer2 = Door dit mandaatformulier in te vullen, machtigt u (A) %s om instructies naar uw bank te sturen om uw rekening te debiteren, en (B) uw bank om uw rekening te debiteren in overeenstemming met de instructies van %s. U heeft het recht om door uw bank te worden terugbetaald onder de voorwaarden beschreven in uw overeenkomst met hen. Een terugbetalingsverzoek moet worden ingediend binnen 8 weken na de datum waarop uw rekening is gedebiteerd voor een geautoriseerde incasso. U stemt ermee in om kennisgeving van aanstaande incasso's te ontvangen binnen 2 dagen voor de uitvoering ervan. Elke afgewezen incasso wordt ook in rekening gebracht volgens onze algemene voorwaarden.
+SEPALegalTextStancerDPO = De informatie in dit mandaat is bedoeld om uitsluitend door de crediteur te worden gebruikt voor het beheer van zijn relatie met zijn klant. Deze kan aanleiding geven tot de uitoefening door laatstgenoemde van zijn rechten op bezwaar, toegang, verwijdering, overdraagbaarheid, beperking en rectificatie zoals voorzien in artikelen 38 e.v. van wet nr. 78-17 van 6 januari 1978 betreffende gegevensverwerking, bestanden en vrijheden, door te e-mailen naar %s.
+PleaseReturnMandateStancer = Stuur dit mandaat terug per e-mail naar %s of per post naar
+ShowInStancer = Meer details op de Stancer website
+StancerPayments = Betalingen
+StancerPayouts = Uitbetalingen
+StancerRefunds = Terugbetalingen
+StancerDisputes = Geschillen
+StancerDisputeID = Stancer geschil ref.
+StancerPaymentID = Stancer betaling ref.
+StancerSEPA = SEPA Mandaat Gebied
+CreateSEPAOnStancer = Dit SEPA mandaat aanmaken op Stancer
+ErrorStancer = Stancer foutmelding
+StancerSEPAID = Bestaande SEPA identificatie op Stancer
+StancerCBID = Bestaande CB identificatie op Stancer
+StancerSEPAstart = SEPA incasso door Stancer
+StancerPleaseEnterYourIBANTitle = Automatische incasso
+StancerPleaseEnterYourIBAN = Voer uw IBAN-code in om automatische incasso (SEPA) in te stellen voor uw facturen.
+StancerYouAcceptPaymentViaSEPA =
+StancerYourIBAN = Uw IBAN-code:
+StancerIBANCBinpoutSecurekeyError = De beveiligingssleutel om toegang te krijgen tot deze pagina is onjuist, controleer bij uw leverancier of de toegangslink naar deze pagina niet is gewijzigd.
+StancerLinkFoCustomerIBAN = U kunt uw klant aanbieden om zelf zijn IBAN-code in te vullen om het Incassomandaat te beheren door hem deze speciale link te geven.
+StancerLinkFoCustomerIBANforce = U kunt uw klant aanbieden om een nieuw mandaat aan te maken om het huidige te vervangen. In dat geval geeft u hem de onderstaande link.
+stancerSEPAinvalidIBAN = Het opgegeven IBAN-nummer is onjuist, controleer het en dien uw verzoek opnieuw in.
+StancerCustomerName = Naam van uw organisatie (organisatie / bedrijf / instelling...)
+StancerCustomerNameOnIBAN = Rekeninghouder (wijzig indien afwijkend van bedrijfsnaam)
+StancerBankName = Naam van uw bank
+StancerSuccessSEPAdone = Het aanmaken van uw SEPA incassomandaat is voltooid!
+StancerPleaseEnterYourIBANorCBTitleDone = Bedankt!
+StancerPleaseEnterYourIBANDone = Uw SEPA incasso betaalmethode is nu geregistreerd.
+StancerPleaseEnterYourCBDone = Uw creditcard betaalmethode is nu geregistreerd.
+StancerPleaseEnterYourIBANWillBeSent = Het te ondertekenen Mandaat wordt binnenkort naar u verzonden.
+StancerPleaseEnterYourIBANWillBeSentByUptoSign = Uw Mandaat is klaar, u hoeft het alleen nog te ondertekenen. Onze partner voor elektronische handtekeningen (uptosign) zou u binnen enkele minuten een e-mail moeten sturen met een uitnodiging om de elektronische handtekeningprocedure te volgen op <b> %s </b>. Als dit niet uw adres is, neem dan contact met ons op.
+StancerPleaseEnterYourIBANisReadyToSign = Het elektronisch te ondertekenen Mandaat is klaar, %s klik hier om door te gaan met ondertekenen via onze partner uptosign %s.
+StancerPleaseEnterYourIBANisReadyToSignAutoRedir = Het elektronisch te ondertekenen Mandaat is klaar, u wordt automatisch doorgestuurd naar het uptosign elektronische handtekeningplatform, wacht enkele seconden, als er niets gebeurt %s klik hier om erheen te gaan%s.
+StancerSEPAMenu = SEPA Mandaat
+StancerCBMenu = Creditcard
+StancerCBConfig = Creditcardbetaling configuratie
+StancerMandateConfig = SEPA incassomandaat
+StancerMandatePresentation = Met deze module kunt u SEPA-incasso's instellen. Hiervoor moet u uw klant het SEPA Mandaat laten ondertekenen. Als u de module %s UptoSign %s op uw Dolibarr heeft geïnstalleerd, kunt u automatische elektronische handtekening instellen...
+StancerMandatePresentationWarning = Vergeet niet uw ICS-nummer aan Stancer door te geven voor elke incassopoging zoals aangegeven %s in hun documentatie %s!
+STANCER_PUBLIC_IBAN_PAGE = Openbare pagina inschakelen waarmee uw klanten hun IBAN kunnen invoeren
+STANCER_PUBLIC_IBAN_PAGETooltip = Uw klanten kunnen zelf hun IBAN/RIB-code invoeren om hun Incassomandaat aan te maken
+STANCER_PUBLIC_IBAN_PAGE_FORCE = Openbare pagina inschakelen waarmee uw klanten hun IBAN kunnen invoeren, ook als ze al een actief mandaat hebben
+STANCER_PUBLIC_IBAN_PAGE_FORCETooltip = Hiermee kan uw klant het huidige mandaat vervangen door een nieuw SEPA mandaat aan te maken
+STANCER_SEPA_CHECK_IBAN = IBAN verifiëren bij het aanmaken van SEPA mandaat
+STANCER_SEPA_CHECK_IBANTooltip = Gebruikt de SEPAMail verificatiedienst van Stancer om te valideren dat de IBAN overeenkomt met de rekeninghouder. Werkt alleen voor Franse en Italiaanse banken.
+StancerSepaCheckSuccess = IBAN verificatie: score %s/100 (classificatie %s)
+StancerSepaCheckWarning = IBAN verificatie: lage score %s/100 (classificatie %s) — controleer de bankgegevens
+StancerSepaCheckPending = IBAN verificatie gestart (id: %s), resultaat in afwachting — mandaat is aangemaakt, resultaat wordt later beschikbaar
+StancerSepaCheckSkipped = IBAN verificatie niet beschikbaar voor deze relatie (dienst beperkt tot FR/IT banken met wettelijke identificatie)
+StancerSepaCheckError = Fout bij IBAN verificatie: %s
+STANCER_MANDATE_AUTO = Automatisch het SEPA Mandaat genereren in PDF-formaat
+STANCER_MANDATE_AUTOTooltip = Door deze optie in te schakelen wordt het SEPA mandaat automatisch gegenereerd wanneer uw klant zijn IBAN invoert
+STANCER_MANDATE_AUTO_UPTOSIGN = Automatisch de elektronische handtekeningprocedure starten via UpToSign
+STANCER_MANDATE_AUTO_UPTOSIGNTooltip = Optie alleen beschikbaar als u de UptoSign module op uw Dolibarr heeft, in dat geval wordt de elektronische handtekening automatisch gestart. Let erop de automatische handtekeningpositionering en het standaard ondertekenaarcontact voor Mandaten in het klantbestand te configureren. Voor meer details kunt u de <a href="https://doc.cap-rel.fr/projet_stancer/saisie_du_rib_par_votre_client_pour_creer_son_mandat_de_prelevement_sepa">online documentatie</a> raadplegen.
+STANCER_INSTALL_UPTOSIGN = Installeer de add-on module <a href="https://www.dolistore.com/fr/modules/1656-uptosign---signature---lectronique-eidas.html">UptoSign via deze link</a> om een eIDAS-conforme elektronische handtekeningdienst te bieden (ondertekening van incassomandaten, offertes, facturen, enz.)
+STANCER_INSTALL_UPTOSIGN_UPGRADENEEDED = Let op, uw uptosign module lijkt niet up-to-date te zijn en de automatische koppeling naar de elektronische handtekening van het mandaat is daarom niet mogelijk! Werk het bij en neem contact op met CAP-REL als dit bericht blijft verschijnen.
+StancerPublicIBANPageDisabled = De openbare IBAN-invoerpagina is niet ingeschakeld in de %smoduleconfiguratie%s
+StancerAddManualExistingMandate = Als u al een actief SEPA incassomandaat met deze klant heeft, kunt u het toevoegen door te klikken op de knop aan het einde van de corresponderende rekeningregel.
+StancerCompanyMailOrPhone = Het is niet mogelijk om het Stancer account van uw klant aan te maken. Wijzig zijn bestand om een e-mailadres of telefoonnummer in internationaal formaat toe te voegen.
+StancerCompanyMailOrPhoneNewPayment = Betaling via Stancer is niet mogelijk, geef ons uw e-mailadres of telefoonnummer (in internationaal formaat) om uw bestand te voltooien voordat u de online betaling opnieuw start.
+YouCanAccelSignWithUptoSign = Merk op dat u het proces kunt versnellen en stroomlijnen door eIDAS-conforme elektronische handtekening in te stellen door de %s UptoSign add-on module %s aan uw Dolibarr toe te voegen...
+NiceUptoSignIsEnabled = UptoSign is actief, dus uw klant kan uw mandaat elektronisch online ondertekenen!
+StancerAlreadyPaid = Volgens Stancer is deze transactie al betaald, neem contact op met %s om te verifiëren.
+ErrorStancerPleaseContactBy = Neem contact op met het bedrijf
+ErrorStancerPleaseContactByPhone = Telefonisch, op %s
+ErrorStancerPleaseContactByMail = Per e-mail, op %s
+StancerSEPAisNotConfiguredForThatCustomer = De SEPA betaalmethode is niet geconfigureerd voor deze klant. Klik op het Stancer tabblad in zijn klantbestand om SEPA-betaling te configureren.
+StancerPaymentDoneSuccessTitle = Bedankt!
+StancerPaymentDoneSuccessMessage = Uw betaling is gevalideerd, hieronder vindt u de details van uw transactie:
+StancerPaymentDoneSuccessMessageFacture = Uw factuur is binnenkort beschikbaar in uw klantgebied en wordt u ook per e-mail toegestuurd. Als u binnen 24 uur niets heeft ontvangen, neem dan contact met ons op nadat u uw spam en andere filters heeft gecontroleerd.
+StancerPaymentDoneID = Transactie-ID: %s
+StancerPaymentDoneStatus = Status: %s
+StancerPaymentInvoiceOrOrder = Factuur- of orderreferentie: %s
+StancerPaymentAmount = Betalingsbedrag: %s %s
+StancerPaymentDoneEndMessage = U kunt dit bericht opslaan om het transactienummer te bewaren en vervolgens dit venster sluiten of naar onze website gaan: %s
+StancerPaymentDoneErrorTitle = Fout!
+StancerPaymentDoneErrorMessage = Er is een fout opgetreden tijdens het betalingsproces. Hieronder vindt u aanvullende informatie.
+StancerPaymentDoneErrorMessageShortByStancer = Foutmelding (samenvatting): %s
+StancerPaymentDoneErrorEndMessage = Maak een screenshot van deze fout en stuur deze naar %s samen met uw order- of factuurreferentie.
+StancerPaymentDoneErrorSeverityStancer = Stancer fout ernstniveau: %s
+StancerPaymentOrderRef = Betaling van order of factuur %s
+StancerPaymentMembership = Lidmaatschapsbetaling
+StancerPaymentPropal = Offertebetaling %s
+StancerPaymentDonation = Donatie aan %s
+ErrorStancerPleaseUniqueID = Te verstrekken referentie: %s
+NotAvailableInTestMode = Deze lijst is niet beschikbaar bij gebruik van testsleutels
+StancerReloadDetected = Pagina herladen gedetecteerd (of terugkeer van een gedeeltelijke betaling die nog niet door Dolibarr is verwerkt). Geen verdere verwerking nodig, u kunt dit venster sluiten of naar onze website gaan: %s.
+StancerSEPAalreadyInProgress = Een SEPA-incasso is al bezig voor deze factuur: %s zie huidige procedure %s
+StancerAlreadyInProgress = Een betalingsprocedure is al bezig
+StancerSEPAalreadyInProgressForceClicOnYes = Klik op de Ja-knop als u een nieuwe incasso wilt forceren.
+statementDescription = Beschrijving
+PayoutID = Referentie
+StancerPaid = Voltooid
+StancerCaptureSent = Bezig
+StancerToPay = Gepland
+STANCER_BANK = Bankrekeningconfiguratie
+STANCER_ADD_FEES_ON_BANK_FOR_EACH_PAYMENT = Debetlijn toevoegen voor elke kost gerelateerd aan een betaling
+STANCER_ADD_FEES_ON_BANK_FOR_EACH_PAYOUT = Debetlijn toevoegen die kosten globaliseert bij overschrijving naar hoofdrekening
+STANCER_ADD_FEES = Automatisch toevoegen van kosten aan de bankrekening
+STANCER_ADD_FEESTooltip = Met deze optie kunt u kiezen of u wilt dat elke Stancer-betaling het toevoegen van een regel voor de transactiegerelateerde kosten omvat of dat u de voorkeur geeft aan globalisatie bij overschrijving van rekening naar rekening. Als u deze optie niet inschakelt, moet u uw compensatieboeking handmatig toevoegen. <a href="https://doc.cap-rel.fr/projet_stancer/ecritures_sur_le_compte_bancaire">Klik hier voor gedetailleerde documentatie</a>
+STANCER_ADD_FEES_ON_BANK_NONE = Geen, blijf in handmatige modus
+StancerFees = Stancer kosten
+StancerCheckPay = Dagelijkse Stancer (bank)
+StancerCheckPaymentAndPayout = Verificatie van Stancer betalingen en uitbetalingen
+StancerTransferFromToDone = Overschrijving van %s naar %s (bedrag %s %s) is voltooid
+StancerCheckTakePayments = Automatische Stancer betalingen
+StancerCheckTakePaymentsDetails = Automatische lancering van CB-betalingen en SEPA-incasso's: Lancering van automatische betaling voor elke onbetaalde factuur waarvan de betaalmethode (CB of incasso) + Stancer bankrekening is. Meer details: <a href="https://doc.cap-rel.fr/projet_stancer/paiement_automatique_des_factures">https://doc.cap-rel.fr/projet_stancer/paiement_automatique_des_factures</a>
+STANCER_NUMBER_OF_ITEMS_TO_SYNC = Aantal transacties om te downloaden tijdens verversing
+STANCER_NUMBER_OF_ITEMS_TO_SYNCTooltip = Limiet van het maximum aantal transacties om elke nacht te synchroniseren met Stancer door de geplande taak en in lijsten. Uitzonderlijk kunt u 200 of 1000 kiezen maar laat deze waarde nooit voor meer dan één synchronisatie onder risico van netwerkoverbelasting met Stancer en deactivering van uw account.
+STANCER_NB_DAYS_TO_SYNC = Aantal dagen om te downloaden bij verversing van geschiedenis
+STANCER_NB_DAYS_TO_SYNCTooltip = Wanneer u de geschiedenissynchronisatie herstart, kunt u kiezen hoe ver terug in de tijd u wilt gaan. Uitzonderlijk kunt u 1 jaar of 2 kiezen maar laat deze waarde nooit voor meer dan één synchronisatie onder risico van netwerkoverbelasting met Stancer en deactivering van uw account.
+PRELEVEMENT_ICS = Uw ICS-nummer (SEPA Creditor Identifier)
+PRELEVEMENT_ICSTooltip = Dit nummer wordt u verstrekt door uw bankprovider (bank of Stancer), het is uniek voor elk bedrijf en moet worden verstrekt door de Bank van Frankrijk, het is de code die uw bedrijf identificeert in het SEPA-systeem.
+ModeRECUR = Terugkerende betalingen
+StancerSignature = Elektronische handtekening
+StancerMailSubjectIBANandMandateReady = IBAN toegevoegd en mandaat gereed
+StancerMailIBANandMandateReady = Een IBAN-nummer is toegevoegd door uw klant %s, het mandaat is gegenereerd zoals geconfigureerd in de module-instellingen en het elektronische handtekeningproces is gestart.
+StancerMailSubjectIBANandMandateReadyToSign = IBAN toegevoegd en mandaat gereed om te ondertekenen
+StancerMailIBANandMandateReadyToSignErr = Een IBAN-nummer is toegevoegd door uw klant %s, het mandaat is gegenereerd zoals geconfigureerd in de module-instellingen maar het elektronische handtekeningproces kon niet worden gestart (uptosign module incompatibel of afwezig), u moet overnemen en de procedure handmatig voltooien.
+StancerMailIBANandMandateReadyToSign = Een IBAN-nummer is toegevoegd door uw klant %s, het mandaat is gegenereerd zoals geconfigureerd in de module-instellingen maar is niet ondertekend, u moet nu de nodige stappen ondernemen.
+StancerMailSubjectIBANandMandateErr = IBAN toegevoegd maar fout bij aanmaken mandaat
+StancerMailIBANandMandateErr = Een IBAN-nummer is toegevoegd door uw klant %s, maar het mandaat is niet gegenereerd, hervat het dossier bij deze stap en ga door met handmatige mandaataanmaak, zorg er vervolgens voor dat het door uw klant wordt ondertekend.
+StancerMailSubjectIBANsimple = IBAN toegevoegd
+StancerMailIBANsimple = Een IBAN-nummer is toegevoegd door uw klant %s, het mandaat is niet gegenereerd volgens de module-instellingen. U moet nu handmatig het mandaat aanmaken en het door uw klant laten ondertekenen.
+StancerMailHello = Hallo,
+StancerMailGoodBye = Voor meer details kunt u de <a href="https://doc.cap-rel.fr/projet_stancer/accueil">online documentatie</a> raadplegen
+StancerMailSignature = Verzonden door de Stancer module voor Dolibarr van %s
+STANCER_EMAIL_INFO_SEPA = Op welk e-mailadres wilt u meldingen over IBAN-invoer ontvangen?
+STANCER_EMAIL_INFO_SEPATooltip = Wanneer een klant zijn IBAN op uw openbare pagina invoert, wordt een e-mail naar dit adres gestuurd om u uit te nodigen de procedure te volgen...
+StancerDocTitleForUptoSign = SEPA Mandaat %s - %s
+StancerYourMandateRefIs = Uw mandaatreferentie (RUM) is: <b> %s </b>. Wij nodigen u uit om het te noteren en te bewaren tot de definitieve ondertekening van het Mandaat. Het kan nuttig zijn bij problemen in de huidige procedure.
+StancerPublicIBANCBPageReload = Pagina herladen gedetecteerd. Geen verdere verwerking nodig, u kunt dit venster sluiten of naar onze website gaan: %s.
+StancerMailIBANandMandateReadyButMissingSignPeople = Een IBAN-nummer is toegevoegd door uw klant %s, het mandaat is gegenereerd maar de elektronische handtekening kon niet worden gestart omdat geen contact is aangewezen als "Contractondertekenaar (elektronische handtekening)" voor deze derde partij. U moet het elektronische handtekeningproces handmatig starten nadat u het ondertekeningscontact heeft aangewezen.
+SepaMandateFileName = SEPAMandaat
+StancerUptoSignNotOnlyOneSigner = Let op, meer dan één contact gekoppeld aan deze Derde Partij heeft de rol van "Elektronische handtekening (Contract)", daarom wordt het SEPA Mandaat niet automatisch verzonden voor elektronische handtekening (voorlopig mag slechts één contact per derde partij deze rol hebben).
+StancerUptoSignNoSigner = Let op, geen contact gekoppeld aan deze Derde Partij heeft de rol van "Elektronische handtekening (Contract)" (of indien wel, heeft hij geen mobiel telefoonnummer), daarom wordt het SEPA Mandaat niet automatisch verzonden voor elektronische handtekening. Dit contact moet een geldig e-mailadres en een mobiel nummer in internationaal formaat hebben dat SMS kan ontvangen.
+StancerYourBIC = BIC/SWIFT code
+StancerReturnsJsonNull = De JSON geretourneerd door Stancer is leeg (null)
+STANCER_DEFAULT_CUSTOMER_IF_NULL = Standaardklant om te associëren met betalingen wanneer geen klantaccount is gekoppeld (directe POS-betaling bijvoorbeeld)
+STANCER_DEFAULT_CUSTOMER_IF_NULLTooltip = Als u de Stancer POS direct gebruikt zonder via Dolibarr te gaan, zijn betalingen niet gekoppeld aan een Dolibarr klantaccount, met deze optie kunt u een standaardassociatie maken en een "lege pagina" bug vermijden
+STANCER_DELAY_SEPA = Vertraging (in dagen) voor SEPA-incasso
+STANCER_DELAY_SEPATooltip = Voer hier het aantal dagen in dat u wilt tussen de factuurdatum en de betaaldatum om aan de regelgeving te voldoen (in Frankrijk 14 dagen) - <a href="https://particuliers.banque-france.fr/moyens-de-paiement/prelevement-sepa">https://particuliers.banque-france.fr/moyens-de-paiement/prelevement-sepa</a>
+STANCER_DELAY_SEPA_UPDATE_INVOICES = Vervaldatum factuur bijwerken?
+STANCER_DELAY_SEPA_UPDATE_INVOICESTooltip = Vink dit vakje aan als u wilt dat de Stancer module de vervaldatum van facturen waarvan de betaalmethode SEPA-incasso is, bijwerkt naar de factuurdatum + hierboven geconfigureerde vertraging
+StancerCBisNotConfiguredForThatCustomer = Deze klant (%s) heeft geen CB geregistreerd op zijn Stancer account
+StancerdoTakePaymentStancerResultMessageA = Eén factuur is succesvol betaald van in totaal %s gekwalificeerde facturen (Stancer betaalmethode) %s.
+StancerdoTakePaymentStancerResultMessageAP = %s facturen zijn succesvol betaald van in totaal %s gekwalificeerde facturen (Stancer betaalmethode) %s.
+StancerdoTakePaymentStancerResultMessageB = Eén factuur is niet verwerkt (datum nog niet bereikt, ontbrekende betalingsinformatie, kaartnummer of betalingsfouten) %s.
+StancerdoTakePaymentStancerResultMessageBP = %s facturen zijn niet verwerkt (datum nog niet bereikt, ontbrekende betalingsinformatie, kaartnummer of betalingsfouten) %s.
+StancerdoTakePaymentStancerResultMessageC = Eén nieuwe factuur (SEPA-incasso) is verwerkt (informatie-e-mail verzonden): %s.
+StancerdoTakePaymentStancerResultMessageCP = %s nieuwe facturen (SEPA-incasso) zijn verwerkt (informatie-e-mail verzonden): %s.
+StancerdoTakePaymentStancerResultMessageD = Eén factuur (SEPA-incasso) heeft zijn betaaldatum nog niet bereikt: %s.
+StancerdoTakePaymentStancerResultMessageDP = %s facturen (SEPA-incasso) hebben hun betaaldatum nog niet bereikt: %s.
+STANCER_AUTO_MAIL_INVOICES_CB = Automatiseer het verzenden van facturen betaald met CB per e-mail
+STANCER_AUTO_MAIL_INVOICES_CBTooltip = Met deze optie kunt u automatisch de factuur verzenden wanneer de CB-betaling wordt gestart door de Stancer geplande taak of wanneer uw klant een factuur direct online betaalt.
+STANCER_AUTO_MAIL_INVOICES_CB_MAILTYPE = Kies de sjabloon die u wilt gebruiken voor de CB-betalingsmelding e-mail
+STANCER_AUTO_MAIL_INVOICES_CB_MAILTYPETooltip = Om een e-mailsjabloon te maken, ga naar Home > Configuratie > E-mails
+STANCER_AUTO_MAIL_INVOICES_SEPA_INFORMATION = Automatiseer het verzenden van voorafgaande SEPA-incasso informatie e-mail
+STANCER_AUTO_MAIL_INVOICES_SEPA_INFORMATIONTooltip = Met deze optie wordt een e-mail verzonden op de dag dat de factuur wordt uitgegeven om uw klant te informeren dat de incasso zal plaatsvinden binnen de termijn geconfigureerd in het SEPA-tabblad
+STANCER_AUTO_MAIL_INVOICES_SEPA = Automatiseer het verzenden van facturen betaald met SEPA-incasso per e-mail
+STANCER_AUTO_MAIL_INVOICES_SEPATooltip = Met deze optie wordt een e-mail verzonden op de dag dat de SEPA-incasso wordt gestart
+StancerMailMenu = E-mail
+STANCER_AUTO_MAIL_INVOICES_SEPA_INFORMATION_MAILTYPE = Kies de sjabloon die u wilt gebruiken voor de initiële informatie e-mail (SEPA)
+STANCER_AUTO_MAIL_INVOICES_SEPA_MAILTYPE = Kies de sjabloon die u wilt gebruiken voor de betalings e-mail (SEPA)
+STANCER_AUTO_MAIL_INVOICES_SEPA_PAID = Stuur factuur naar klant wanneer SEPA-betaling is voltooid
+STANCER_AUTO_MAIL_INVOICES_SEPA_PAID_MAILTYPE = Kies de sjabloon die u wilt gebruiken voor de voltooide betalings e-mail (SEPA)
+StancerMailConfig = E-mail
+StancerMailPresentation = Met deze module kunt u het verzenden van e-mails naar uw klanten die via Stancer betalen automatiseren. Voor meer details kunt u <a href="https://doc.cap-rel.fr/projet_stancer/envoyez_automatiquement_les_mails">de online documentatie</a> raadplegen.
+STANCER_AUTO_MAIL_INVOICES_ERROR = Kies de e-mailsjabloon die u wilt gebruiken in geval van betalingsfout
+STANCER_AUTO_MAIL_INVOICES_ERRORTooltip = Deze e-mailsjabloon wordt gebruikt in geval van betalingsfout, zowel met CB als SEPA-incasso
+ErrorStancerSEPAdelay = De meldingstermijn (%s dagen) is nog niet bereikt
+ErrorStancerSEPAdelayTitle = SEPA-vertraging
+ErrorStancerInvoiceDateDue = De betaaldatum van de factuur is nog niet bereikt
+ErrorStancerCBdueTitle = Betaaldatum
+StancerThereIsNoSocID = Er is een fout opgetreden, uw klantbestand kan niet worden gevonden, neem contact met ons op
+STANCER_PUBLIC_CB_PAGE = Openbare pagina inschakelen waarmee een klant zijn creditcardgegevens kan invoeren
+STANCER_PUBLIC_CB_PAGETooltip = Als u deze optie inschakelt, wordt een openbare pagina toegankelijk voor uw klanten om hun CB-betalingsgegevens in te voeren (handig voor een abonnement met automatische CB-betaling bijvoorbeeld)
+StancerPageTitleForCB = Toevoegen van uw creditcard als betaalmethode
+StancerCBAccount = Creditcardgebied
+CBLegalTextStancer2 = Door dit formulier in te vullen, machtigt u %s om deze informatie te gebruiken om betalingen te verwerken voor openstaande en toekomstige facturen. Uw creditcardnummer wordt niet opgeslagen op ons systeem, het wordt direct overgedragen aan onze beveiligde betalingsprovider Stancer die een vingerafdruk retourneert die zal worden gebruikt voor toekomstige betalingen.
+StancerPleaseEnterYourCBTitle = CB-betalingsinformatie
+StancerPleaseEnterYourCB = Vul het onderstaande formulier in voor creditcardbetaling van uw abonnementen
+StancerHolderName = Naam creditcardhouder
+StancerCBNumber = Creditcardnummer
+StancerCBExpiry = Vervaldatum
+StancerCBCCV = CCV-code (achterzijde)
+StancerNoCBRecord = Er is nog geen creditcard geregistreerd
+StancerLinkFoCustomerCB = U kunt uw klant aanbieden om zelf het volgende formulier in te vullen om automatische creditcardbetalingen te beheren.
+CardNumber = Nummer
+CardExpiry = Vervaldatum
+CardType = Netwerk
+StancerPublicCBpageDisabled = De openbare creditcardregistratiepagina is niet ingeschakeld! Schakel deze optie in de %smoduleconfiguratie%s in.
+StancerPayBalanceCB = Betaal saldo met CB
+StancerPayBalanceAmountCB = Betaal saldo (%s) met CB (experimenteel)
+StancerPopupCBexists = Er is een CB geregistreerd voor deze klant, wilt u deze gebruiken om door te gaan met directe betaling? Zo ja, klik op "ja". Om te annuleren klik op "nee".
+StancerPaymentDoneOn = Betaling gestart voor facturen %s
+StancerPaymentNoInvoice = Geen facturen wachten op betaling
+StancerPaymentErrorOn = Betalingsfout voor facturen %s
+StancerPaymentInProgress = Een betaling via Stancer is bezig voor deze factuur, en zal hier zichtbaar zijn zodra het definitief is gevalideerd door de provider (24u voor een creditcard, enkele dagen voor een SEPA-incasso). %s[documentatie]%s (Status: %s)
+StancerAssoMenu = Verenigingen
+StancerAssoConfig = Configuratie voor Verenigingen
+StancerAssoPresentation = Verenigingenbeheer (leden, contributies, donaties...)
+STANCER_ASSO_ACTIVE = Ondersteuning voor verenigingsspecifieke functies inschakelen
+STANCER_AUTO_MAIL_NOTIFICATIONS = Automatische e-mailmeldingen inschakelen
+STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT = E-mailadres om te melden wanneer betalingen worden bevestigd
+STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT_DETAILS = Ontvang een gedetailleerde e-mail voor elke betalingsfout (kan bron van veel e-mails zijn)
+STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT_DETAILSTooltip = Als u dit vakje uitgevinkt laat, ontvangt u een e-mail met het algemene overzicht van fouten
+STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENTTooltip = Laat dit veld leeg als u geen meldingen wilt ontvangen. Voor meer details kunt u de <a href="https://doc.cap-rel.fr/projet_stancer/notifications_par_mail">online documentatie</a> raadplegen.
+STANCER_AUTO_MAIL_NOTIFICATIONS_PAYOUT = E-mailadres om te melden wanneer een overboeking (uitbetaling) wordt gemaakt
+STANCER_AUTO_MAIL_NOTIFICATIONS_PAYOUTTooltip = Laat dit veld leeg als u geen meldingen wilt ontvangen. Voor meer details kunt u de <a href="https://doc.cap-rel.fr/projet_stancer/notifications_par_mail">online documentatie</a> raadplegen.
+STANCER_AUTO_MAIL_NOTIFICATIONS_PAYOUT_DETAILS = Ontvang een gedetailleerde e-mail voor elke bankoverboekingsfout van Stancer account naar uw hoofdaccount (kan bron van veel e-mails zijn)
+STANCER_AUTO_MAIL_NOTIFICATIONS_PAYOUT_DETAILSTooltip = Als u dit vakje uitgevinkt laat, ontvangt u een e-mail met het algemene overzicht van fouten
+StancerMailSubjectPaymentConfirm = Betalingsbevestiging - %s: %s €
+StancerMailPaymentConfirm = Betaling van %s € voor factuur %s (klant: %s) is bevestigd door Stancer.
+StancerMailSubjectPaymentConfirmButError = Betalingsbevestiging (beheerfout) - %s: %s €
+StancerMailPaymentConfirmButError = Betaling van %s € voor factuur %s (klant: %s) is bevestigd door Stancer maar de registratie op Dolibarr is foutief, controleer en handel de situatie handmatig af.
+StancerMailSubjectPaymentError = Betalingsfout - %s: %s €
+StancerMailPaymentError = Betaling van %s € voor factuur %s (klant: %s) is foutief, u vindt het foutbericht hieronder: %s
+StancerMailSubjectPaymentExeption = Geplande taak fout (betalingen)
+StancerMailPaymentExeption = Er is een ernstige fout opgetreden, u vindt het bericht hieronder, aarzel niet om contact op te nemen met CAP-REL om indien nodig een oplossing te vinden: %s
+StancerMailPayment = u vindt hieronder de lijst met fouten of speciale verwerkingsgevallen voor betalingen: <br />%s
+StancerMailSubjectPayoutExeption = Geplande taak fout (uitbetalingen)
+StancerMailPayoutExeption = Er is een ernstige fout opgetreden, u vindt het bericht hieronder, aarzel niet om contact op te nemen met CAP-REL om indien nodig een oplossing te vinden: %s
+StancerMailSubjectPayoutDone = Bankoverboeking voltooid: %s €
+StancerMailPayoutDone = Overboeking van %s € van Stancer naar uw hoofdaccount is voltooid. Gedetailleerd bericht: %s
+StancerMailSendBy = Verzonden door de <a href="https://www.dolistore.com/fr/modules/1857-Stancer-paiement---lectronique-CB-SEPA.html">Stancer module voor Dolibarr</a>
+StancerMailPayoutError = Bankoverboekingsfout
+StancerMailPayout = u vindt hieronder de lijst met fouten of speciale verwerkingsgevallen voor overboekingsoperaties van Stancer naar uw hoofdaccount: <br />%s
+StancerMailSubjectPayoutError = Er is een fout opgetreden. U vindt het foutbericht hieronder: %s
+StancerMailSubjectPayment = Geplande taak betalingen
+StancerMailSubjectPayout = Geplande taak uitbetalingen
+StancerMailTableHeaderStancer = Stancer
+StancerMailTableHeaderDolibarr = Dolibarr
+StancerMailTableHeaderAmount = Bedrag
+StancerMailTableHeaderMessage = Bericht
+StancerMailTableHeaderDate = Datum
+StancerMailSubjectCB = Nieuwe betaalmethode toegevoegd (CB)
+StancerMailCB = Een nieuwe CB is toegevoegd voor %s
+STANCER_AUTO_MAIL_NOTIFICATIONS_ON_NEW_CB_AND_SEPA = E-mailmelding wanneer een klant zijn creditcardvingerafdruk registreert
+ErrorStancerModuleVersionDatabase = Stancer module: Let op, uw moduleversie is niet consistent met de databaseversie, deactiveer en reactiveer de module...
+ErrorStancerDPOmissing = Let op, uw DPO e-mailadres is nog niet ingevuld, deze informatie is nodig voor het Incassomandaat.
+ErrorStancerCustomerNotFound = Kan de klant niet identificeren op Stancer. Controleer het e-mailadres en de contactgegevens van de klant, of probeer een andere betaalmethode.
+draft = Concept
+authorized = Geautoriseerd
+StancerAuthorized = Geautoriseerd
+captured = Vastgelegd
+capture_sent = Bezig
+disputed = Geschil
+expired = Verlopen
+StancerExpired = Verlopen
+failed = Fout
+StancerFailed = Fout
+refused = Geweigerd
+to_capture = Wachten op bank
+STANCER_EMAIL_DPO = Uw DPO e-mailadres
+STANCER_EMAIL_DPOTooltip = Vereist voor de informatie op het SEPA Mandaatformulier
+STANCER_ENABLE_CB = Creditcardbeheer inschakelen
+STANCER_ENABLE_CBTooltip = U kunt deze optie uitschakelen om bijvoorbeeld alleen SEPA-incasso's te gebruiken
+StancerCBPresentation = De Stancer module maakt het mogelijk om creditcardbetalingen te accepteren. Als u deze functie wilt inschakelen, vink dan het vakje aan.
+STANCER_ENABLE_SEPA = SEPA-incassobeheer inschakelen
+STANCER_NO_CODE_CB = Er is geen 'CB' code in de actieve Betaalmethoden op uw Dolibarr. Meer informatie in de <a href="https://doc.cap-rel.fr/projet_stancer/cb_et_pre_dans_le_dictionnaire_des_moyens_de_paiements">volgende online documentatie</a>.
+STANCER_NO_CODE_PRE = Er is geen 'PRE' code in de actieve Betaalmethoden op uw Dolibarr. Meer informatie in de <a href="https://doc.cap-rel.fr/projet_stancer/cb_et_pre_dans_le_dictionnaire_des_moyens_de_paiements">volgende online documentatie</a>.
+STANCER_MANDATE_AUTO_UPTOSIGN_NOCLICK = Automatische doorverwijzing naar uptosign elektronische handtekening
+STANCER_MANDATE_AUTO_UPTOSIGN_NOCLICKTooltip = Als u deze optie niet inschakelt, moet uw klant klikken op de link "ga naar online elektronische handtekening" van het mandaat na het invullen
+StancerInCaseOfTroubleYourLinkTopay = Als uw webbrowser u niet toestond om direct te betalen, kunt u het opnieuw proberen <a href="%s">via deze link</a>.
+StancerMailSubjectConfirmLinkToPay = Betaallink voor uw bestelling
+StancerMailPayoutConfirmMail = Bedankt voor uw bestelling.
+
+STANCER_AUTO_MAIL_ORDER_CB = Stuur een bestellingsherinnering met betaallink voor doorverwijzing naar de Stancer site
+STANCER_AUTO_MAIL_ORDER_CBTooltip = Deze optie stuurt een herinnerings-e-mail van de bestelling naar uw klant met de betaallink om te gebruiken als de doorverwijzing niet werkt of het betalingsproces faalt
+STANCER_AUTO_MAIL_ORDER_CB_MAILTYPE = Kies de e-mailsjabloon om te verzenden bij automatisch verzenden van de bestelling per e-mail
+StancerCheckInvoicesPaid = Markeer facturen als betaald
+StancerCheckInvoicesPaidDetails = Zoek alle facturen met restbedrag te betalen gelijk aan nul en betalingsstatus "Betaling gestart" om ze te forceren naar "Betaald" status (opschoning)
+StancerSendPaymentReminders = Betalingsherinneringen
+StancerSendPaymentRemindersDetails = Automatisch verzenden van e-mailherinneringen naar klanten wiens betaling is mislukt volgens het geconfigureerde schema
+STANCER_PAYMENT_REMINDER_TITLE = Betalingsherinneringen
+STANCER_PAYMENT_REMINDER_ENABLED = Automatische betalingsherinneringen bij betalingsfouten activeren
+STANCER_PAYMENT_REMINDER_ENABLEDTooltip = Wanneer een betaling mislukt (geweigerd, verlopen, betwist), zal de module automatisch e-mailherinneringen naar de klant sturen volgens het hieronder geconfigureerde schema
+STANCER_PAYMENT_REMINDER_MAILTYPE = E-mailsjabloon voor betalingsherinneringen
+STANCER_PAYMENT_REMINDER_MAILTYPETooltip = Kies een sjabloon van het type "Factuur verzenden". U kunt de variabele __ONLINE_PAYMENT_URL__ of __STANCER_PAYMENT_URL__ in het sjabloon gebruiken om de online betalingslink op te nemen
+STANCER_PAYMENT_REMINDER_SCHEDULE = Herinneringsschema (dagen na mislukking)
+STANCER_PAYMENT_REMINDER_SCHEDULETooltip = Door komma's gescheiden lijst van dagen na betalingsmislukking voor elke herinnering. Voorbeeld: 1,3,7 stuurt een herinnering op D+1, D+3 en D+7
+STANCER_PAYMENT_REMINDER_ADMIN_SUMMARY = Stuur een herinneringsoverzicht naar de beheerder
+STANCER_PAYMENT_REMINDER_ADMIN_SUMMARYTooltip = De beheerder ontvangt een overzichts-e-mail van verzonden herinneringen bij elke uitvoering van de geplande taak
+StancerMailSubjectPaymentFailure = Betalingsfout
+StancerMailPaymentFailure = De betaling van %s voor factuur referentie %s is mislukt (status: %s). Controleer de situatie.
+StancerMailSubjectReminders = Overzicht betalingsherinneringen
+StancerRemindersSentList = Succesvol verzonden herinneringen
+StancerRemindersErrorList = Fouten bij het verzenden van herinneringen
+StancerdoCheckInvoicesPaidResultMessageA = Eén factuur is succesvol als betaald gemarkeerd van in totaal %s gekwalificeerde facturen %s.
+StancerdoCheckInvoicesPaidResultMessageAP = %s facturen zijn succesvol als betaald gemarkeerd van in totaal %s gekwalificeerde facturen %s.
+STANCER_CB_AS_PAID = Markeer factuur onmiddellijk als betaald bij positieve Stancer terugkeer zonder te wachten op definitieve bevestiging
+STANCER_CB_AS_PAIDTooltip = Als u deze optie inschakelt, wordt de factuur van uw klant als betaald gemarkeerd bij de eerste pre-validatie terugkeer van Stancer. Let op, deze informatie kan enkele dagen later worden tegengesproken als de betaling wordt geweigerd door de bank van uw klant. Zie de <a href="https://doc.cap-rel.fr/projet_stancer/des_le_retour_de_pre-acceptation_du_paiement_cb">documentatie voor meer details</a>
+STANCER_CB_ALLOW_RETRY = Een nieuwe CB-betalingspoging via Stancer toestaan na een fout
+STANCER_CB_ALLOW_RETRYTooltip = Standaard wordt de Stancer-betalingsknop niet meer weergegeven op de openbare pagina als er al een Stancer-betalingspoging is gedaan (zelfs als deze mislukt is). Als u deze optie inschakelt, wordt de knop opnieuw weergegeven zolang er geen betaling succesvol is vastgelegd.
+STANCER_SWITCH_SEPA_AMOUNT = Automatische providerwisseling inschakelen wanneer het te incasseren bedrag een limiet overschrijdt?
+STANCER_SWITCH_SEPA_AMOUNTTooltip = Als u deze optie inschakelt, zijn de volgende twee velden vereist
+STANCER_SWITCH_SEPA_AMOUNT_MAX = Maximumbedrag van SEPA-incasso's uit te voeren door Stancer
+STANCER_SWITCH_SEPA_AMOUNT_MAXTooltip = Vanwege het variabele percentage op SEPA-incasso's is het vaak goedkoper om een andere betalingstussenpersoon dan Stancer te gebruiken voor SEPA-incasso's boven 60, maar u kunt hier het bedrag aangeven waarboven u niet meer wilt dat Stancer wordt gebruikt om de incasso uit te voeren.
+STANCER_SWITCH_SEPA_TO_OTHER_BANK = Keuze van bank om te gebruiken wanneer incassobedrag de hierboven gedefinieerde limiet overschrijdt
+STANCER_SWITCH_SEPA_TO_OTHER_BANKTooltip = Geef bijvoorbeeld uw Stripe account of ander aan om te voorkomen dat de Stancer module incasso's start voor facturen die door deze limietoverschrijding worden beïnvloed
+StancerPayCB = Stancer CB-betaling
+StancerPaySEPA = Stancer SEPA-betaling
+StancerPayAmountStarted = Betaling van %s gestart
+StancerPayWithRedirectStarted = Betaling van %s gestart via web-betaalpagina
+
+cbType = Kaarttype
+cbNumber = Nummer
+cbEOL = Vervaldatum
+
+StancerNewPaymentMode = Betalingsbron toegevoegd
+StancerNewPaymentModeAdded = Een nieuwe betaalmethode is toegevoegd: %s
+StancerUpdatePaymentMode = Update
+StancerUpdatePaymentModeDone = Betaalmethode %s is bijgewerkt
+StancerForceRefreshAccount = Gegevens verversen van Stancer
+DeleteSEPAOnStancer = Verwijderen
+StancerEventAdded = Gebeurtenis toegevoegd aan geschiedenis
+CleanStancerTestsDataHelp = Klik op deze knop als u de Stancer Testmodus heeft gebruikt om uw database op te schonen (unieke klantidentificatie bij Stancer)
+CleanStancerTestsData = Testgegevens opschonen
+CleanStancerTestsDataDone = Stancer testgegevens zijn verwijderd
+
+
+# Refund
+StancerRefundStart = Terugbetaling via Stancer
+StancerRefundTitle = Stancer Terugbetaling
+StancerRefundConfirmMessage = U staat op het punt %s %s terug te betalen via Stancer. Bevestigt u deze operatie?
+StancerRefundOriginalInvoice = Originele factuur: %s
+StancerRefundSuccess = Terugbetaling succesvol voltooid (ID: %s)
+StancerRefundError = Terugbetalingsfout: %s
+StancerRefundNoPaymentFound = Geen Stancer betaling gevonden voor deze factuur
+StancerRefundNoLinkedPayment = Geen Stancer betaling gekoppeld aan de originele factuur
+StancerRefundAlreadyDone = Een terugbetaling is al verwerkt voor dit bedrag
+
+# Propal (quote) payment
+STANCER_PROPAL_TITLE = Offertebetalingen
+STANCER_AUTO_INVOICE_ON_PROPAL_PAID = Automatisch een factuur aanmaken wanneer een offerte wordt betaald
+STANCER_AUTO_INVOICE_ON_PROPAL_PAIDTooltip = Als deze optie is ingeschakeld, wordt automatisch een factuur aangemaakt en gevalideerd wanneer een klant een offerte betaalt via Stancer
+StancerPropalPaymentLink = Stancer betaallink
+StancerPropalPaymentLinkNeedEmail = Het derde partij bestand bevat geen e-mailadres, dit is vereist om een betaling via Stancer te starten!
+
+# Generic keys used in module (not in core)
+Optional = Optioneel
+Path = Pad
+Success = Succes
+NoData = Geen gegevens
+ClassNotFound = Klasse niet gevonden
+ErrorNumberingModuleNotSetup = Nummeringsmodule niet ingesteld (element: %s)
+AmountTo = Bedrag naar
+PaymentDoneOn = Betaling uitgevoerd op: %s
+StartFix = Start correctie
+StartImport = Start import
+StancerNewVersionAvailable = Stancer: een nieuwere versie is beschikbaar (geinstalleerd %s, beschikbaar %s). Werk de module bij.
+StancerNotifyCustomers = Ontvangers per e-mail informeren
+StancerRefreshSelected = Geselecteerde regels geforceerd vernieuwen
+StancerForceRefreshSelectedDone = Geforceerde vernieuwing van %s betaling(en) voltooid. Raadpleeg de logs voor details over de toegepaste correcties.
+
+# Stancer payment attribution audit (page stancer_audit.php) - TODO translate to nl_NL
+StancerAuditTitle = Stancer payment attribution audit
+StancerAuditIntro = This page queries the Stancer API for every local payment and checks that the customer, invoice and amount stored in Dolibarr match the actual Stancer data. No write is performed: the page is strictly read-only. Click "Run audit" to get the report.
+StancerAuditRun = Run audit
+StancerAuditResults = Audit results
+StancerAuditSummary = Summary
+StancerAuditRowsAudited = %s payment(s) audited in %s second(s).
+StancerAuditOptionalSocid = (optional - leave empty to audit every customer)
+StancerAuditMaxRows = Cap
+StancerAuditMaxRowsHelp = At most %s payment(s) will be audited per run (configurable via STANCER_AUDIT_MAX_ROWS).
+StancerAuditNoRows = No Stancer payment found within the selected period.
+StancerAuditTooMany = More than %s payment(s) match. Only the most recent ones are audited. Narrow the period down or increase STANCER_AUDIT_MAX_ROWS.
+StancerAuditSqlError = SQL error while fetching payments. See logs.
+StancerAuditAuthStop = Stancer API authentication error (HTTP 401). Audit was aborted. Check the private key configured for the current mode.
+StancerAuditPaymId = Stancer ID
+StancerAuditApiStatus = Stancer status
+StancerAuditStatus = Audit status
+StancerAuditDoublesTitle = Double-charge detection
+StancerAuditDoublesIntro = This section lists Stancer invoices (api_order_id) that received 2 or more payments. When more than one payment is captured on the same invoice, the customer has been charged twice.
+StancerAuditDoublesAlert = WARNING: %s invoice(s) charged more than once. A refund must probably be issued from the Stancer interface before any attribution correction.
+StancerAuditDoublesOrderId = Stancer invoice (api_order_id)
+StancerAuditDoublesNbPayments = Nb payments
+StancerAuditDoublesCapturedCount = Nb captured
+StancerAuditDoublesFlag = State
+StancerAuditDoublesFlagDouble = DOUBLE CHARGE
+StancerAuditDoublesFlagOk = No double
+StancerAuditDoublesDetail = Payment details
+
+# Action buttons + modal (phase 2) - TODO translate to nl_NL
+StancerAuditActions = Actions
+StancerAuditFix = Fix
+StancerAuditIgnore = Ignore
+StancerAuditDone = Fixed
+StancerAuditStatusIgnored = Ignored
+StancerAuditModalTitleFix = Fix payment attribution
+StancerAuditModalTitleIgnore = Ignore this payment
+StancerAuditConfirmFix = Confirm moving this payment to the invoice indicated by the Stancer API? The operation is logged in the events of every impacted invoice.
+StancerAuditConfirmIgnore = Mark this payment as to-be-ignored in subsequent audits? Use this for legitimate cases (subsidiary, customer merge) that should not be auto-corrected.
+StancerAuditModalDoubleWarning = WARNING: this payment is part of a double-charge pair. The target invoice will be over-paid after this move. You must issue a credit note or a separate refund.
+StancerAuditPaymInDoubleTooltip = This paym_id is part of a double-charge pair detected on the same Stancer invoice (api_order_id).
+StancerAuditNetworkError = Network error while sending.
+StancerAuditApiCustomer = Customer (API)
+StancerAuditApiOrderId = Invoice ref (API)
+StancerAuditApiAmount = Amount (API)
+StancerAuditDbClient = Customer (Dolibarr)
+StancerAuditDbInvoice = Invoice (Dolibarr)
+StancerAuditDbAmount = Amount (Dolibarr)
+StancerAuditDetails = Details
+StancerAuditStatus_OK = OK
+StancerAuditStatus_grouped = Grouped SEPA
+StancerAuditStatus_wrong_invoice_same_customer = Wrong invoice (same customer)
+StancerAuditStatus_wrong_customer = Wrong customer
+StancerAuditStatus_wrong_customer_unmapped = Wrong customer (unmapped - please verify)
+StancerAuditStatus_wrong_amount = Inconsistent amount
+StancerAuditStatus_no_mapping = Unmapped Stancer customer
+StancerAuditStatus_api_unreachable = API unreachable
+StancerAuditStatus_api_not_found = Not found on Stancer
+StancerAuditStatus_api_auth_error = API authentication error
