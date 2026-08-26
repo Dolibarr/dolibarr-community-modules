@@ -126,5 +126,5 @@ packages:
     direct-download: 'yes'
     # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
     dolistore-upload: 'manual'
-    dolistore-download: 'A DEFINIR quand le module sera accessible dans le DoliStore'
-
+    # à définir quand le module sera accessible dans le DoliStore
+    dolistore-download: ''
