@@ -24,18 +24,25 @@
 
 // @phan-suppress-file PhanRedefineClass
 
-/**
- *	Parent class of all other hook actions classes
- */
-abstract class CommonHookActions
-{
+// Guarded like the other shims of this directory. The class is only missing before Dolibarr 19, and
+// every module that has to run on both sides of that line carries the same copy of it: whoever gets
+// loaded second declares a name that is already taken, which is a fatal error and not a recoverable
+// one. It cost the activation of the module on the second entity of a multicompany setup (issue
+// #630), where the other module happened to bring its own copy in first.
+if (!class_exists('CommonHookActions', false)) {
 	/**
-	 * @var string	String of results.
+	 *	Parent class of all other hook actions classes
 	 */
-	public $resprints;
+	abstract class CommonHookActions
+	{
+		/**
+		 * @var string	String of results.
+		 */
+		public $resprints;
 
-	/**
-	 * @var array 	Array of results.
-	 */
-	public $results = array();
+		/**
+		 * @var array 	Array of results.
+		 */
+		public $results = array();
+	}
 }
