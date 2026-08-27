@@ -105,8 +105,11 @@ Pour obtenir un nouveau module, réalisé spécialement pour vous, écrivez à :
 ### Pour proposer vos améliorations
 
 Faire une nouvelle version (-> doc/backup) :
-1) ajouter le n° de version et une description dans `ChangeLog.md`
-2) incrémenter le n° de version dans `index.yaml`
-3) incrémenter le n° de version dans `core/modules/modDoliSecure.class.php`
-4) `git add . ; git commit -m "laDescription" ; git push`
-5) `git tag 1.0.10 ; git push --tags`
+1) lancer build/buildzip.php # → /tmp/module_dolisecure-X.Y.Z.zip
+2) copier /tmp/module_dolisecure-X.Y.Z.zip dans ../dev/build/bin/
+3) ajouter le n° de version et une description dans `ChangeLog.md`
+4) incrémenter le n° de version dans `index.yaml`
+5) incrémenter le n° de version dans `core/modules/modDoliSecure.class.php`
+6) `git add . ; git commit -m "laDescription" ; git push`
+7) `git tag 1.0.10 ; git push --tags`
+   
