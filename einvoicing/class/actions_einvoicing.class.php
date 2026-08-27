@@ -104,6 +104,15 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		if ($invoiceObject instanceof Facture) {
 			/** @var Facture $invoiceObject */
 
+			// This PDF is the one the module is rebuilding to embed the e-invoice into: the caller is
+			// producing the document, this hook must not produce it a second time and must not clean up
+			// the temporary XML the caller still needs (issue #658). Nothing in $parameters says who
+			// called generateDocument(), hence the request-scoped marker.
+			if (EInvoicing::isEInvoiceGenerationInProgress($invoiceObject->id)) {
+				dol_syslog(__METHOD__ . " the module is rebuilding the PDF of invoice id=" . $invoiceObject->id . " itself, nothing to do here");
+				return 0;
+			}
+
 			// Ask the boolean question: needEInvoiceManagement() answers with a status code, and the codes
 			// meaning "out of the e-invoicing scope" are truthy, so testing its answer for truth alone let an
 			// ignored invoice (a B2C one when EINVOICING_SKIP_B2C is on, typically) walk into the checks below
