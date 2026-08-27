@@ -603,51 +603,32 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					$einvoicing::STATUS_UNKNOWN
 				])
 			) {
-				// Validate thirdparty data before sending to Access Point
-				$object->fetch_thirdparty();
-				$checkResult = $einvoicing->checkRequiredinformations($object);
-				if ($checkResult['res'] < 0) {
-					$message = $langs->trans("InvoiceNotSentToPDPDueToThirdpartyIssues") . ': <br>' . $checkResult['message'];
-					dol_syslog(__METHOD__ . " " . strip_tags($message));
-					setEventMessages($message, array(), 'errors');
-					$error++;
-				} elseif ($checkResult['res'] == 0) {
+				// Same gates and same transmission as the mass action of the invoice list
+				$PDPManager = new PDPProviderManager($db);
+				$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+
+				$sendresult = $this->sendOneInvoiceToAccessPoint($object, $einvoicing, $provider);
+
+				foreach ($sendresult['warnings'] as $warning) {
 					// Non-blocking warning: notify user but proceed with sending
-					dol_syslog(__METHOD__ . " " . strip_tags($checkResult['message']));
-					setEventMessages($checkResult['message'], array(), 'warnings');
+					dol_syslog(__METHOD__ . " " . $warning);
+					setEventMessages($warning, array(), 'warnings');
 				}
 
-				// Gate on recipient directory reachability (opt-in): do not transmit to a recipient the platform
-				// would reject for a routing error (fr:213).
-				if (!$error) {
-					$routecheck = $einvoicing->checkRecipientRoutableForSend($object);
-					if (!$routecheck['ok']) {
-						$errkey = ($routecheck['status'] === 'undetermined') ? "EInvoiceNotSentRecipientReachabilityUnconfirmed" : "EInvoiceNotSentRecipientNotRoutable";
-						setEventMessages($langs->trans($errkey) . ': <br>' . $routecheck['message'], array(), 'errors');
-						$error++;
+				if ($sendresult['res'] > 0) {
+					$messages = array();
+					$messages[] = $langs->trans("InvoiceSuccessfullySentToPDP");
+					$messages[] = $langs->trans("FlowId") . ": " . $sendresult['flowid'];
+					setEventMessages('', $messages, 'mesgs');
+					// Once transmitted, the invoice is locked from re-edit/regenerate/re-send: the
+					// BILL_UNVALIDATE / BILL_MODIFY triggers and the guards above key on the persistent
+					// flow_id (EInvoicing::isTransmittedLockActive), overridable via EINVOICING_ALLOW_RESEND_TRANSMITTED.
+				} elseif ($sendresult['res'] < 0) {
+					$error++;
+					foreach ($sendresult['errors'] as $senderror) {
+						dol_syslog(__METHOD__ . " " . $senderror, LOG_ERR);
 					}
-				}
-
-				if (!$error) {
-					$PDPManager = new PDPProviderManager($db);
-					$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
-
-					// Send invoice
-					$result = $provider->sendInvoice($object);
-
-					if ($result) {
-						$messages = array();
-						$messages[] = $langs->trans("InvoiceSuccessfullySentToPDP");
-						$messages[] = $langs->trans("FlowId") . ": " . $result;
-						setEventMessages('', $messages, 'mesgs');
-						// Once transmitted, the invoice is locked from re-edit/regenerate/re-send: the
-						// BILL_UNVALIDATE / BILL_MODIFY triggers and the guards above key on the persistent
-						// flow_id (EInvoicing::isTransmittedLockActive), overridable via EINVOICING_ALLOW_RESEND_TRANSMITTED.
-					} else {
-						$error++;
-						$this->error = $provider->error;
-						$this->errors = array_merge($this->errors, $provider->errors);
-					}
+					$this->errors = array_merge($this->errors, $sendresult['errors']);
 				}
 			}
 
@@ -879,6 +860,190 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			$db->commit();
 			return 0;
 		}
+	}
+
+	/**
+	 * Add the e-invoice mass actions to the combo of the customer invoice list.
+	 *
+	 * @param array<string,mixed>	$parameters		Array of parameters
+	 * @param CommonObject|null		$object			Object (not provided for this hook)
+	 * @param string				$action			Action code
+	 * @param HookManager			$hookmanager	Hook manager
+	 * @return int									0 to let the caller add its own actions too
+	 */
+	public function addMoreMassActions($parameters, $object, &$action, $hookmanager)
+	{
+		global $langs, $user;
+
+		if (!$this->isMassSendAvailable($parameters)) {
+			return 0;
+		}
+
+		$langs->load("einvoicing@einvoicing");
+
+		$label = $langs->trans("EInvoiceMassSendToPDP");
+		$this->resprints = '<option value="einvoicing_send_to_pdp" data-html="'.dol_escape_htmltag($label).'">'.$label.'</option>';
+
+		return 0;
+	}
+
+	/**
+	 * Transmit the selected invoices to the Access Point.
+	 *
+	 * Only the invoices whose e-invoice file is already generated and not transmitted yet are sent;
+	 * nothing is generated here, so the mass action never depends on the document generation of a
+	 * given protocol. The others are counted and reported, never silently dropped.
+	 *
+	 * @param array<string,mixed>	$parameters		Array of parameters, with 'toselect' and 'massaction'
+	 * @param CommonObject			$object			Object of the list
+	 * @param string				$action			Action code
+	 * @param HookManager			$hookmanager	Hook manager
+	 * @return int									1 when the mass action was handled, <0 on setup error
+	 */
+	public function doMassActions($parameters, $object, &$action, $hookmanager)
+	{
+		global $db, $langs, $user;
+
+		if (empty($parameters['massaction']) || $parameters['massaction'] != 'einvoicing_send_to_pdp') {
+			return 0;
+		}
+		if (!$this->isMassSendAvailable($parameters)) {
+			return 0;
+		}
+
+		$langs->load("einvoicing@einvoicing");
+
+		$einvoicing = new EInvoicing($db);
+		if ($einvoicing->checkModulePrerequisites() < 0) {
+			$this->errors[] = $langs->trans("CheckPdpConfiguration");
+			return -1;
+		}
+
+		require_once __DIR__ . '/providers/PDPProviderManager.class.php';
+		$PDPManager = new PDPProviderManager($db);
+		$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+		if (!is_object($provider)) {
+			$this->errors[] = $langs->trans("CheckPdpConfiguration");
+			return -1;
+		}
+
+		require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
+
+		$toselect = (isset($parameters['toselect']) && is_array($parameters['toselect'])) ? $parameters['toselect'] : array();
+		$sent = 0;
+		$skipped = 0;
+		$failed = 0;
+		$lines = array();
+
+		foreach ($toselect as $id) {
+			$invoice = new Facture($db);
+			if ($invoice->fetch((int) $id) <= 0) {
+				$failed++;
+				$lines[] = $langs->trans("ErrorLoadingInvoice") . ' (id ' . ((int) $id) . ')';
+				continue;
+			}
+
+			$result = $this->sendOneInvoiceToAccessPoint($invoice, $einvoicing, $provider);
+
+			if ($result['res'] > 0) {
+				$sent++;
+				$lines[] = $invoice->ref . ' : ' . $langs->trans("FlowId") . ' ' . $result['flowid'];
+			} elseif ($result['res'] == 0) {
+				$skipped++;
+				$lines[] = $invoice->ref . ' : ' . $result['reason'];
+			} else {
+				$failed++;
+				$lines[] = $invoice->ref . ' : ' . implode(' - ', $result['errors']);
+			}
+		}
+
+		setEventMessages($langs->trans("EInvoiceMassSendResult", $sent, $skipped, $failed), $lines, $failed ? 'warnings' : 'mesgs');
+
+		return 1;
+	}
+
+	/**
+	 * Tell whether the e-invoice mass actions apply to the current call.
+	 *
+	 * @param array<string,mixed>	$parameters		Parameters of the hook, with its 'context'
+	 * @return bool
+	 */
+	private function isMassSendAvailable($parameters)
+	{
+		global $user;
+
+		$contexts = explode(':', empty($parameters['context']) ? '' : $parameters['context']);
+		if (!in_array('invoicelist', $contexts)) {
+			return false;
+		}
+
+		return !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') && $user->hasRight('facture', 'write');
+	}
+
+	/**
+	 * Transmit one already generated e-invoice to the Access Point, with the gates of the invoice card.
+	 *
+	 * @param Facture			$invoice		Invoice to transmit
+	 * @param EInvoicing		$einvoicing		Module object, reused over a batch
+	 * @param object			$provider		Access Point provider
+	 * @return array{res:int<-1,1>, flowid:string, reason:string, warnings:string[], errors:string[]}	res: 1 sent, 0 skipped (reason), -1 failed (errors)
+	 */
+	private function sendOneInvoiceToAccessPoint($invoice, $einvoicing, $provider)
+	{
+		global $langs;
+
+		$out = array('res' => 0, 'flowid' => '', 'reason' => '', 'warnings' => array(), 'errors' => array());
+
+		$status = $einvoicing->fetchLastknownInvoiceStatus($invoice->id, (string) $invoice->ref);
+
+		// An invoice already transmitted is immutable: re-sending it makes the PA refuse a duplicate.
+		// Keyed on the persistent flow_id, like the invoice card, and honors EINVOICING_ALLOW_RESEND_TRANSMITTED.
+		if ($einvoicing->isTransmittedLockActive($invoice->id, (string) $invoice->ref)) {
+			$out['reason'] = $langs->trans('EInvoiceAlreadyTransmittedLocked', is_array($status) ? $status['flow_id'] : '');
+			return $out;
+		}
+
+		if (!is_array($status) || empty($status['file']) || !in_array($status['code'], array(
+			$einvoicing::STATUS_GENERATED,
+			$einvoicing::STATUS_ERROR,
+			$einvoicing::STATUS_UNKNOWN
+		))) {
+			$out['reason'] = $langs->trans("EInvoiceNotGeneratedYetSoNotSent");
+			return $out;
+		}
+
+		$invoice->fetch_thirdparty();
+
+		$checkResult = $einvoicing->checkRequiredinformations($invoice);
+		if ($checkResult['res'] < 0) {
+			$out['res'] = -1;
+			$out['errors'][] = $langs->trans("InvoiceNotSentToPDPDueToThirdpartyIssues") . ': ' . strip_tags($checkResult['message']);
+			return $out;
+		} elseif ($checkResult['res'] == 0) {
+			$out['warnings'][] = strip_tags($checkResult['message']);
+		}
+
+		// Gate on recipient directory reachability (opt-in): do not transmit to a recipient the platform
+		// would reject for a routing error (fr:213).
+		$routecheck = $einvoicing->checkRecipientRoutableForSend($invoice);
+		if (!$routecheck['ok']) {
+			$errkey = ($routecheck['status'] === 'undetermined') ? "EInvoiceNotSentRecipientReachabilityUnconfirmed" : "EInvoiceNotSentRecipientNotRoutable";
+			$out['res'] = -1;
+			$out['errors'][] = $langs->trans($errkey) . ': ' . strip_tags($routecheck['message']);
+			return $out;
+		}
+
+		$flowid = $provider->sendInvoice($invoice);
+		if ($flowid) {
+			$out['res'] = 1;
+			$out['flowid'] = (string) $flowid;
+			return $out;
+		}
+
+		$out['res'] = -1;
+		$out['errors'] = $provider->errors ? $provider->errors : array($provider->error);
+
+		return $out;
 	}
 
 	/**
