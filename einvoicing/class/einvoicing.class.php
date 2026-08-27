@@ -2092,12 +2092,15 @@ class EInvoicing
 			$resprints .= '</tr>';
 
 			// Add a line for the Default product for thirdparty (to use when importing vendor invoice and no product found)
-			$resprints .= '<tr class="treinvoicing_collapseseparator trrouting_product_id '.($expand_display ? '' : 'hidden').'">';
-			$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
-			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
-			$resprints .= $this->selectVendorProduct($form, $object->id, $product_id, 'routing_product_id');
-			$resprints .= '</td>';
-			$resprints .= '</tr>';
+			// Vendors only, like in edit mode: the core sets fournisseur when the creation starts from the vendor area
+			if ($object->fournisseur > 0) {
+				$resprints .= '<tr class="treinvoicing_collapseseparator trrouting_product_id '.($expand_display ? '' : 'hidden').'">';
+				$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
+				$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
+				$resprints .= $this->selectVendorProduct($form, $object->id, $product_id, 'routing_product_id');
+				$resprints .= '</td>';
+				$resprints .= '</tr>';
+			}
 
 			return $resprints;
 		}
