@@ -160,6 +160,17 @@ class EInvoicingSamplesTest extends CommonClassTest
 	}
 
 	/**
+	 * The replacement sample invoice must keep producing the same CII XML.
+	 *
+	 * @return void
+	 */
+	public function testReplacementInvoiceMatchesReference()
+	{
+		$generated = $this->getGenerated();
+		$this->assertMatchesFixture('cii_replacement.xml', $generated['replacement']);
+	}
+
+	/**
 	 * The credit note sample invoice must keep producing the same CII XML.
 	 *
 	 * @return void
@@ -168,5 +179,16 @@ class EInvoicingSamplesTest extends CommonClassTest
 	{
 		$generated = $this->getGenerated();
 		$this->assertMatchesFixture('cii_creditnote.xml', $generated['creditnote']);
+	}
+
+	/**
+	 * The situation sample invoice must keep producing the same CII XML.
+	 *
+	 * @return void
+	 */
+	public function testSituationInvoiceMatchesReference()
+	{
+		$generated = $this->getGenerated();
+		$this->assertMatchesFixture('cii_situation.xml', $generated['situation']);
 	}
 }

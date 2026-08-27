@@ -1,0 +1,139 @@
+---
+# A Factur-X file is a PDF/A-3 file carrying the XML. Every other check of this repository looks at
+# the XML only, so the container had no guard: two defects that made the files invalid PDF/A shipped
+# unnoticed on Dolibarr 17 to 24 alike. This runs the PHPUnit test of the einvoicing module that
+# builds a Factur-X file per fixture with each of the two mergers and reads the container back, then
+# hands the very same documents to veraPDF - the reference implementation for PDF/A, which exits
+# non-zero when a file is not conformant, and which settles the clauses PHP alone cannot.
+#
+# It needs no Dolibarr and no database: the mergers only want a logger, and the carrier PDF and the
+# XML fixtures are already in the repository. What it cannot cover is the invoice PDF the core
+# produces, which is where the font half of the problem came from - that one is a setting of the
+# instance ("Home - Setup - PDF"), which the module reports and does not decide.
+#
+# Everything the job reads lives in the module: the two mergers it exercises, the carrier PDF and
+# the XML fixtures it builds from. Nothing outside einvoicing/ can make those documents differ, so
+# a change elsewhere does not start the job - the exception being this file, which does decide how
+# the run goes.
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'einvoicing/**'
+      - '.github/workflows/module_einvoicing_pdfa.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'einvoicing/**'
+      - '.github/workflows/module_einvoicing_pdfa.yml'
+
+  workflow_dispatch:
+
+concurrency:
+  group: pdfa-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The merger used below Dolibarr 24 is built on TCPDF, which the core ships and this repository
+  # does not. It needs nothing else of the core, so a plain release of the library is enough.
+  TCPDF_VERSION: 6.7.5
+
+name: pdfa
+jobs:
+  pdfa:
+    name: Factur-X container is PDF/A-3
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.3
+          tools: phpunit:9.6
+          coverage: none # disable xdebug, pcov
+
+      - name: Fetch TCPDF
+        run: |
+          curl -sSL "https://github.com/tecnickcom/TCPDF/archive/refs/tags/${TCPDF_VERSION}.tar.gz" | tar xz
+          echo "TCPDF_DIR=${GITHUB_WORKSPACE}/TCPDF-${TCPDF_VERSION}" >> "$GITHUB_ENV"
+
+      - name: Fetch veraPDF
+        run: |
+          curl -sSL -o verapdf-installer.zip https://software.verapdf.org/rel/verapdf-installer.zip
+          unzip -q -o verapdf-installer.zip
+          # The only distribution is an IzPack installer, which takes its answers from a file. It
+          # matches the packs by index, so they are all named here to keep the file readable; what
+          # 1.30.2 ships is these four, and only the command line is of any use to a runner - the
+          # GUI alone is 15 MB of Swing that nothing here can even open.
+          cat > verapdf-auto-install.xml <<EOF
+          <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+          <AutomatedInstallation langpack="eng">
+            <com.izforge.izpack.panels.htmlhello.HTMLHelloPanel id="welcome"/>
+            <com.izforge.izpack.panels.target.TargetPanel id="install_dir">
+              <installpath>${GITHUB_WORKSPACE}/verapdf</installpath>
+            </com.izforge.izpack.panels.target.TargetPanel>
+            <com.izforge.izpack.panels.packs.PacksPanel id="sdk_pack_select">
+              <pack index="0" name="veraPDF GUI" selected="false"/>
+              <pack index="1" name="veraPDF CLI" selected="true"/>
+              <pack index="2" name="veraPDF Documentation" selected="false"/>
+              <pack index="3" name="veraPDF Sample Plugins" selected="false"/>
+            </com.izforge.izpack.panels.packs.PacksPanel>
+            <com.izforge.izpack.panels.install.InstallPanel id="install"/>
+            <com.izforge.izpack.panels.finish.FinishPanel id="finish"/>
+          </AutomatedInstallation>
+          EOF
+          java -jar verapdf-greenfield-*/verapdf-izpack-installer-*.jar verapdf-auto-install.xml
+          ./verapdf/verapdf --version
+
+      - name: Build the documents and read their container back
+        # --fail-on-skipped: the test skips a merger it cannot build - no TCPDF, or a global class
+        # FPDF already claimed. Skipping silently here would leave half the coverage out on a green
+        # run, so a skip is a failure in the CI while it stays a skip for a developer.
+        env:
+          FACTURX_PDFA_OUTDIR: ${{ github.workspace }}/out
+        run: phpunit --no-configuration --fail-on-skipped --testdox einvoicing/test/phpunit/FacturxPdfaContainerTest.php
+
+      - name: Validate the same documents with veraPDF
+        run: ./verapdf/verapdf -f 3b --format text out/*.pdf
+
+      - name: A document veraPDF has to refuse
+        # A green validation says something only if a document that is not conformant comes back red.
+        # This takes one of the documents just validated and moves the namespace its extension schema
+        # declares by one letter - the same number of bytes, so the file stays whole and the offsets
+        # keep pointing where they did - which leaves the Factur-X properties declared by no schema
+        # at all: ISO 19005-3, 6.6.2.3.1. That is the clause which separates a Factur-X file from a
+        # PDF with something attached to it, and the half of the format nothing here used to check.
+        # If veraPDF still answered PASS, the step above would not be looking at what it says it is.
+        run: |
+          php -r '
+            $files = glob("out/*.pdf");
+            sort($files);
+            if (!$files) { fwrite(STDERR, "no document to build the control from\n"); exit(2); }
+            $carrier = file_get_contents($files[0]);
+            $declaration = "<pdfaSchema:namespaceURI>urn:factur-x:";
+            if (substr_count($carrier, $declaration) !== 1) {
+              fwrite(STDERR, "the control cannot be built: " . substr_count($carrier, $declaration) . " extension schema declarations in " . $files[0] . "\n");
+              exit(2);
+            }
+            file_put_contents("control.pdf", str_replace($declaration, "<pdfaSchema:namespaceURI>urn:factur-y:", $carrier));
+            echo "control built from ", basename($files[0]), "\n";
+          '
+          if ./verapdf/verapdf -f 3b --format text control.pdf; then
+            echo "::error::veraPDF accepted a document whose Factur-X properties are declared by no extension schema - the validation of the six documents is not checking what it says it checks"
+            exit 1
+          fi
+          echo "veraPDF refuses the control document, as it has to."
+
+      - name: Provide the validation report as artifact
+        if: ${{ always() }}
+        run: ./verapdf/verapdf -f 3b --format mrr out/*.pdf > verapdf-report.xml || true
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: verapdf-report
+          path: |
+            verapdf-report.xml
+            out/
+          retention-days: 2
