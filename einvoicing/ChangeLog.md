@@ -2,21 +2,6 @@
 
 ## 1.1.0
 
-FIX: The Factur-X protocol now builds its XML through the CII code, and through nothing else. It
-carried a second and complete XML builder of its own, written on top of the horstoeko/zugferd library
-and kept behind EINVOICING_USE_EXTERNAL_FACTURX_BUILDER, an option no screen offers and no
-documentation mentions: every installation has been generating its Factur-X XML with the native
-builder for a long time, and that second builder could only be reached by setting a constant by hand
-in the database. Two builders for one format means a correction lands in one of them and not in the
-other, and the drift was real - the additional order references of an invoice covering several
-purchase orders were emitted by the old builder alone, so no installation ever sent them. The old
-builder is removed, and with it the option, so the two formats cannot diverge again. The Factur-X
-specimen of the setup page follows the same rule: below Dolibarr 24 it was the example invoice
-shipped with the library, that is the name of your company over a Munich address, a German buyer and
-three German product lines for a total nobody could recognise, while Dolibarr 24 and above already
-built the specimen from a real invoice of the instance. Every supported version now produces that
-second one - your company, your address, your PDF model, your VAT rates.
-
 FIX: The remote information of the SuperPDP setup page now describes the e-invoice address the module
 really sends with. A company can hold several entries in the French directory at once - one per
 document family, '<siren>_Invoice' or '<siren>_Status', beside the bare identifier - and the screen
