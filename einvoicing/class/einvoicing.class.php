@@ -3571,6 +3571,7 @@ class EInvoicing
 		$standardXml = '';
 		$replacementXml = '';
 		$creditnoteXml = '';
+		$situationXml = '';
 
 		try {
 			$depositXml = self::generateSampleInvoiceXml($seller, $buyer, array(
@@ -3596,6 +3597,12 @@ class EInvoicing
 				'invoicetype' => Facture::TYPE_CREDIT_NOTE,
 				'referencedinvoice' => 'FA0000-SPECIMEN-STANDARD',
 			));
+
+			$situationXml = self::generateSampleInvoiceXml($seller, $buyer, array(
+				'invoiceformat' => 'CII',
+				'invoicetype' => Facture::TYPE_SITUATION,
+				'referencedinvoice' => '',
+			));
 		} finally {
 			$conf->global->EINVOICING_PDP = $savEinvoicingPdp;
 			$conf->global->EINVOICING_SPECIMEN_ROUTING_ID = $savEinvoicingRoutingId;
@@ -3609,6 +3616,7 @@ class EInvoicing
 			'standard' => self::normalizeSampleInvoiceXml($standardXml),
 			'replacement' => self::normalizeSampleInvoiceXml($replacementXml),
 			'creditnote' => self::normalizeSampleInvoiceXml($creditnoteXml),
+			'situation' => self::normalizeSampleInvoiceXml($situationXml),
 		);
 	}
 

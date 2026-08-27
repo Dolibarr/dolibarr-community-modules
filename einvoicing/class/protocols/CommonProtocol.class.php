@@ -291,6 +291,19 @@ trait CommonProtocol
 			$tmpinvoice->fk_facture_source = $options['referencedinvoice'] ?? 'FA0000-SPECIMEN';
 		}
 
+		// A situation invoice bills a share of the work done, and every amount of the line follows that
+		// share: the line carries it and the totals are computed with it. The specimen is the first
+		// situation of its cycle, the one shape that needs no predecessor to exist - BT-25/26, the
+		// reference to the situation before, only appears from the second one on and would mean
+		// reading an invoice out of a database.
+		$situationPercent = 0;
+		if ($tmpinvoice->type == Facture::TYPE_SITUATION) {
+			$tmpinvoice->situation_counter = 1;
+			$tmpinvoice->situation_cycle_ref = 1;
+			$tmpinvoice->situation_final = 0;
+			$situationPercent = 50;
+		}
+
 		$line = new FactureLigne($this->db);
 		$line->desc = $langs->trans("Description") . " 1";
 		$line->qty = 5;
@@ -318,7 +331,13 @@ trait CommonProtocol
 		$savRoundDiscountOnUnitPrice = getDolGlobalString('MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY');
 		$conf->global->MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY = '0';
 
-		$tmp = calcul_price_total($line->qty, $line->subprice, $line->remise_percent, $line->tva_tx, 0, 0, 0, 'HT', 0, 0);
+		// The progress is passed to the very function the invoice would have used, so the totals of the
+		// specimen are the totals of its lines. Left at 100 - the default - for every other type, which
+		// is what the call meant before and what keeps the other specimens unchanged.
+		if ($situationPercent) {
+			$line->situation_percent = $situationPercent;
+		}
+		$tmp = calcul_price_total($line->qty, $line->subprice, $line->remise_percent, $line->tva_tx, 0, 0, 0, 'HT', 0, 0, null, array(), $situationPercent ?: 100);
 
 		$conf->global->MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY = $savRoundDiscountOnUnitPrice;
 
