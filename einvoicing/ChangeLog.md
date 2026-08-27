@@ -39,6 +39,10 @@ than one authentication method in the same request. An installation that set
 ESALINK_AUTHENT_USING_CLIENT_CREDENTIAL as a workaround keeps working: the constant is now without
 effect, and the request it used to select is the default.
 
+CHANGE: the backport of getMultidirVersion() is removed. That function entered the core in Dolibarr 20
+and the module carried a copy of it for the versions below, but it calls it nowhere - not once in the
+whole repository - so the copy was never reached on any version.
+
 CHANGE: GETPOSTFLOAT(), a function the core gained in Dolibarr 20 and that the module backports for the
 versions below, moves from the library of the module to compat/functions.lib.php, where the module keeps
 what it copies from the core. Pure move, guard included: the library requires that file, so the two call
