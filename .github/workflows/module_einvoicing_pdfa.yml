@@ -20,12 +20,12 @@ on:
     branches: [ main ]
     paths:
       - 'einvoicing/**'
-      - '.github/workflows/pdfa.yml'
+      - '.github/workflows/module_einvoicing_pdfa.yml'
   pull_request:
     branches: [ main ]
     paths:
       - 'einvoicing/**'
-      - '.github/workflows/pdfa.yml'
+      - '.github/workflows/module_einvoicing_pdfa.yml'
 
   workflow_dispatch:
 
