@@ -108,6 +108,7 @@ $files = array(
 	'deposit' => $fixturesDir . '/cii_deposit.xml',
 	'standard' => $fixturesDir . '/cii_standard.xml',
 	'creditnote' => $fixturesDir . '/cii_creditnote.xml',
+	'situation' => $fixturesDir . '/cii_situation.xml',
 );
 
 try {

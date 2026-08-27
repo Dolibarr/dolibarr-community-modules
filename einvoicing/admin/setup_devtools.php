@@ -311,6 +311,7 @@ if (getDolGlobalString('EINVOICING_PDP')) {
 			Facture::TYPE_STANDARD => array('label' => $langs->trans('Standard')),
 			Facture::TYPE_DEPOSIT => array('label' => $langs->trans('Deposit')),
 			Facture::TYPE_CREDIT_NOTE => array('label' => $langs->trans('CreditNote')),
+			Facture::TYPE_SITUATION => array('label' => $langs->trans('InvoiceSituation')),
 		);
 		print $form->selectarray('invoicetype', $typeofinvoice, GETPOSTISSET('invoicetype') ? GETPOSTINT('invoicetype') : Facture::TYPE_STANDARD, 0, 0, 0, '', 0, 0, 0, '', 'minwidth300');
 	} else {
