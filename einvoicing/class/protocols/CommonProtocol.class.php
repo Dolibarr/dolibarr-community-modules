@@ -282,8 +282,12 @@ trait CommonProtocol
 			$tmpinvoice->type = $options['invoicetype'];
 		}
 
-		// Reference of original invoice in case of credit note
-		if ($tmpinvoice->type == Facture::TYPE_CREDIT_NOTE) {
+		// Reference of the original invoice, for the two types that correct one. A credit note carries
+		// it as BT-25 and a replacement invoice (BT-3 = 384) in the same slot, where BR-FR-CO-04 makes
+		// it mandatory with a "fatal" flag: a replacement sent without it is refused by the access
+		// point. A specimen of that type has to carry it too, or it shows the one shape the norm does
+		// not accept.
+		if (in_array($tmpinvoice->type, array(Facture::TYPE_CREDIT_NOTE, Facture::TYPE_REPLACEMENT))) {
 			$tmpinvoice->fk_facture_source = $options['referencedinvoice'] ?? 'FA0000-SPECIMEN';
 		}
 
