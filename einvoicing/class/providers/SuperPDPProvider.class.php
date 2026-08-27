@@ -243,6 +243,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		// @phan-suppress-next-line PhanTypeMismatchArgumentNullable
 		$item->fieldAttr['placeholder'] = idprof($mysoc);
 		$item->fieldParams['isMandatory'] = 0;
+		$item->fieldAttr['autocomplete'] = "new-password";
 		$item->cssClass = 'minwidth300';
 
 		// Setup conf to choose a protocol of exchange
@@ -288,6 +289,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 			$item = $formSetup->newItem($prefix.'CLIENT_ID'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''));
 			$item->nameText = $langs->trans('EINVOICING_CLIENT_ID');
 			$item->cssClass = 'minwidth500';
+			$item->fieldAttr['autocomplete'] = "new-password";
 
 			// Password
 			$item = $formSetup->newItem($prefix.'CLIENT_SECRET'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''));
@@ -297,8 +299,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 				// Dolibarr 18/19 fallback: setAsGenericPassword() does not exist yet.
 				// Force a masked password input so the secret is not displayed in clear text.
 				$item->fieldAttr['type'] = 'password';
-				$item->fieldAttr['autocomplete'] = 'new-password';
 			}
+			$item->fieldAttr['autocomplete'] = 'new-password';
 			$item->nameText = $langs->trans('EINVOICING_CLIENT_SECRET');
 			$item->cssClass = 'minwidth500';
 
@@ -781,36 +783,70 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 * Check the status of the "ppf" entry in the SuperPDP directory (PPF network registration).
 	 * That can be used to determine if the company is registered and if the registration is valid.
 	 *
-	 * @return array{status_code:int,response:null|string|array<string,mixed>,call_id:null|string,ppf_identifier:string,ppf_status:string|null,ppf_effective_date:string,ppf_message:string,ppf_error:bool,listof_ppf_entries:string}
+	 * @return array{status_code:int,response:null|string|array<string,mixed>,call_id:null|string,ppf_identifier:string,ppf_status:string|null,ppf_effective_date:string,ppf_message:string,ppf_error:bool,listof_ppf_entries:string,ppf_expected_identifier:string,ppf_identifier_registered:bool,listof_other_ppf_identifiers:string,listof_peppol_identifiers:string,company:array<string,mixed>}
 	 */
 	private function checkDirectoryStatus()
 	{
 		$result = $this->callApi('directory_entries', 'GET', false, [], 'check_directory_status');
 
 		$entries = is_array($result['response']) ? ($result['response']['data'] ?? []) : [];
+
+		// A company can hold several PPF entries at once (one per document family - '<siren>_Invoice',
+		// '<siren>_Status' - beside the bare identifier), and the API returns them by creation date. The
+		// entry to report is the one the module signs its invoices with, not the oldest one.
+		$einvoicingtmp = new EInvoicing($this->db);
+		$expectedidentifier = $einvoicingtmp->getSellerCommunicationURI(0);
+
 		$ppfEntry = null;
+		$firstPpfEntry = null;
+		$company = array();
+		$ppfidentifiers = array();
+		$peppolidentifiers = array();
 
 		$listofentries = '';
 		foreach ($entries as $entry) {
+			if (empty($company) && !empty($entry['company']) && is_array($entry['company'])) {
+				$company = $entry['company'];		// Every entry of the account carries the same company block
+			}
+			if (($entry['directory'] ?? null) === 'peppol') {
+				$peppolidentifiers[] = $entry['identifier'] ?? '';
+				continue;
+			}
 			if (($entry['directory'] ?? null) === 'ppf') {		// Entry in PPF directory, not a peppol directory entry
-				if (is_null($ppfEntry)) {
-					$ppfEntry = $entry;		// We take the first one
+				if (is_null($firstPpfEntry)) {
+					$firstPpfEntry = $entry;
+				}
+				$ppfidentifiers[] = $entry['identifier'] ?? '';
+				if (!empty($expectedidentifier) && strcasecmp((string) ($entry['identifier'] ?? ''), $expectedidentifier) == 0) {
+					$ppfEntry = $entry;		// The address we send with
 				}
 				if (!empty($listofentries)) {
 					$listofentries .= "<br>\n";
 				}
 				$listofentries .= $entry['identifier'] ?? 'No identifier';
 				$listofentries .= '-' . ($entry['company']['formal_name'] ?? 'No formal name');
-				$listofentries .= '-' . ($ppfEntry['effective_date'] ?? '');
-				$listofentries .= '-' . ($ppfEntry['status'] ?? '');
+				$listofentries .= '-' . ($entry['effective_date'] ?? '');
+				$listofentries .= '-' . ($entry['status'] ?? '');
 			}
 		}
 
-		$result['ppf_identifier'] = $ppfEntry['identifier'] ?? '';
-		$result['ppf_status'] = $ppfEntry['status'] ?? null;
-		$result['ppf_effective_date'] = $ppfEntry['effective_date'] ?? '';
-		$result['ppf_message'] = $ppfEntry['status_message'] ?? '';
+		// Reported apart from 'ppf_identifier': the address the invoices carry has no directory entry, so
+		// the platform will refuse them, even though the company does have other entries.
+		$result['ppf_expected_identifier'] = $expectedidentifier;
+		$result['ppf_identifier_registered'] = !is_null($ppfEntry);
 
+		if (is_null($ppfEntry)) {
+			$ppfEntry = $firstPpfEntry;		// Nothing matches: fall back on the first entry so the company is still described
+		}
+
+		$result['ppf_identifier'] = (string) ($ppfEntry['identifier'] ?? '');
+		$result['ppf_status'] = isset($ppfEntry['status']) ? (string) $ppfEntry['status'] : null;
+		$result['ppf_effective_date'] = (string) ($ppfEntry['effective_date'] ?? '');
+		$result['ppf_message'] = (string) ($ppfEntry['status_message'] ?? '');
+
+		$result['company'] = (array) $company;
+		$result['listof_other_ppf_identifiers'] = implode(', ', array_diff(array_filter($ppfidentifiers), array($result['ppf_identifier'])));
+		$result['listof_peppol_identifiers'] = implode(', ', array_filter($peppolidentifiers));
 		$result['listof_ppf_entries'] = $listofentries;
 		$result['ppf_error'] = ($result['ppf_status'] === 'error');
 
@@ -880,6 +916,48 @@ class SuperPDPProvider extends AbstractPDPProvider
 				$lines[] = $langs->trans('RemoteInfoPPFNoEntry', 'SuperPDP', $paName);
 			} else {
 				$lines[] = $langs->trans('RemoteInfoPPFDetection', 'SuperPDP', $paName) . ' <span class="smallimp">['. $directory['ppf_identifier'] . ' - ' . $langs->trans('RemoteInfoPPFStatusDetail', $directory['ppf_status']) . ' - ' . ($directory['ppf_status'] === 'error' ? $directory['ppf_message'] : $directory['ppf_effective_date']).']</span>';
+			}
+			if (!empty($directory['listof_other_ppf_identifiers'])) {
+				$lines[] = $langs->trans('RemoteInfoOtherPPFEntries', $directory['listof_other_ppf_identifiers']);
+			}
+			if (!empty($directory['listof_peppol_identifiers'])) {
+				$lines[] = $langs->trans('RemoteInfoPeppolEntries', $directory['listof_peppol_identifiers']);
+			}
+
+			// The address the invoices are signed with must have a directory entry, otherwise the platform
+			// answers "unknown address". Reported only when the company does have entries: when it has none,
+			// RemoteInfoPPFNoEntry above already says it, and saying it twice helps nobody.
+			if (!empty($directory['ppf_identifier']) && empty($directory['ppf_identifier_registered'])) {
+				$lines[] = '<b>' . $langs->trans('RemoteInfoRoutingIdentifierNotRegistered', $directory['ppf_expected_identifier'], 'SuperPDP') . '</b>';
+				$directory['ppf_error'] = true;
+			}
+
+			// Identity held by the Access Point for the company. Not available anywhere else: the session
+			// endpoint only returns the verification statuses.
+			$company = $directory['company'];
+			if (!empty($company)) {
+				$remotename = (string) ($company['formal_name'] ?? '');
+				$remotenumber = (string) ($company['number'] ?? '');
+				$remoteaddress = trim(($company['address'] ?? '') . ' ' . ($company['postcode'] ?? '') . ' ' . ($company['city'] ?? '') . ' ' . ($company['country'] ?? ''));
+				$localaddress = trim($mysoc->address . ' ' . $mysoc->zip . ' ' . $mysoc->town . ' ' . $mysoc->country_code);
+				$localnumber = idprof($mysoc);
+
+				$lines[] = "";
+				$lines[] = $langs->trans('RemoteInfoCompanyIdentity', 'SuperPDP', $remotename . ' - ' . ($company['number_scheme'] ?? '') . ' ' . $remotenumber);
+				$lines[] = $langs->trans('RemoteInfoCompanyAddress', 'SuperPDP', $remoteaddress);
+
+				// A company number differing from the one of the invoices is refused at sending time
+				// ("the seller is not the company of the session"), so it is worth more than a note.
+				if ($remotenumber !== '' && $localnumber !== '' && strcasecmp($remotenumber, $localnumber) != 0) {
+					$lines[] = '<b>' . $langs->trans('RemoteInfoNumberMismatch', 'SuperPDP', $remotenumber, $localnumber) . '</b>';
+					$directory['ppf_error'] = true;
+				}
+				if ($remotename !== '' && $mysoc->name !== '' && strcasecmp($remotename, (string) $mysoc->name) != 0) {
+					$lines[] = $langs->trans('RemoteInfoNameMismatch', 'SuperPDP', $remotename, $mysoc->name);
+				}
+				if ($remoteaddress !== '' && $localaddress !== '' && strcasecmp(preg_replace('/[^a-z0-9]/i', '', $remoteaddress), preg_replace('/[^a-z0-9]/i', '', $localaddress)) != 0) {
+					$lines[] = $langs->trans('RemoteInfoAddressMismatch', 'SuperPDP', $remoteaddress, $localaddress);
+				}
 			}
 		} else {
 			$lines[] = $langs->trans('RemoteInfoDirectoryError') . ' (HTTP ' . ($directory['status_code'] ?? 'N/A') . ')';
