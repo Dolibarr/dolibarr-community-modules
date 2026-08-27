@@ -139,6 +139,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$item->helpText .= '<br><br>'.img_picto('', 'warning').' '.$langs->trans('WarningIfYouSetAnIDItMustExistsInAnnuary');
 		$item->fieldAttr['placeholder'] = idprof($mysoc);
 		$item->fieldParams['isMandatory'] = 0;
+		$item->fieldAttr['autocomplete'] = "new-password";
 		$item->cssClass = 'minwidth300';
 
 		// Setup conf to choose a protocol of exchange
@@ -170,8 +171,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			// Dolibarr 18/19 fallback: setAsGenericPassword() does not exist yet.
 			// Force a masked password input so the secret is not displayed in clear text.
 			$item->fieldAttr['type'] = 'password';
-			$item->fieldAttr['autocomplete'] = 'new-password';
 		}
+		$item->fieldAttr['autocomplete'] = "new-password";
 		$item->nameText = $langs->transnoentities('EINVOICING_CLIENT_SECRET');
 		$item->cssClass = 'minwidth500';
 
