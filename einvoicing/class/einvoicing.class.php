@@ -2228,6 +2228,10 @@ class EInvoicing
 	 * free to have set to anything: force it here, and give it back, so the combo cannot silently come
 	 * back empty.
 	 *
+	 * The field also follows the two setup options the core uses for its own product combos:
+	 * PRODUIT_USE_SEARCH_TO_SELECT (search form instead of a combo, with its minimum number of
+	 * characters) and PRODUIT_LIMIT_SIZE (number of products shown in a select).
+	 *
 	 * @param	Form	$form		Form handler
 	 * @param	int		$socid		Vendor id
 	 * @param	string	$selected	Product currently selected
@@ -2236,18 +2240,26 @@ class EInvoicing
 	 */
 	private function selectVendorProduct($form, $socid, $selected, $htmlname)
 	{
-		global $status;
+		global $conf, $status;
 
 		$savstatus = isset($status) ? $status : null;
 		$status = 1; // Products to buy
 
-		if (version_compare(DOL_VERSION, '22.0.0', '<')) {
-			// Before v22, select_produits_fournisseurs() uses print instead of return
-			ob_start();
-			$form->select_produits_fournisseurs($socid, $selected, $htmlname, '', '', array(), 0, 1, 'maxwidth300');
-			$out = ob_get_clean();
+		if (!empty($conf->use_javascript_ajax) && getDolGlobalString('PRODUIT_USE_SEARCH_TO_SELECT')) {
+			// Search form: product/ajax/products.php answers with PRODUIT_LIMIT_SIZE products at most
+			if (version_compare(DOL_VERSION, '22.0.0', '<')) {
+				// Before v22, select_produits_fournisseurs() uses print instead of return
+				ob_start();
+				$form->select_produits_fournisseurs($socid, $selected, $htmlname, '', '', array(), 0, 1, 'maxwidth300');
+				$out = ob_get_clean();
+			} else {
+				$out = $form->select_produits_fournisseurs($socid, $selected, $htmlname, '', '', array(), 0, 1, 'maxwidth300', '', 1);
+			}
 		} else {
-			$out = $form->select_produits_fournisseurs($socid, $selected, $htmlname, '', '', array(), 0, 1, 'maxwidth300', '', 1);
+			// Combo: select_produits_fournisseurs() asks the list without any limit, so it loads every
+			// product of the database. Call the list the way the core calls it for its own combos, with
+			// the number of products the user allowed in a select.
+			$out = $form->select_produits_fournisseurs_list($socid, $selected, $htmlname, '', '', '', $status, 0, getDolGlobalInt('PRODUIT_LIMIT_SIZE', 1000), 1, 'maxwidth300', getDolGlobalInt('SUPPLIER_SHOW_STOCK_IN_PRODUCTS_COMBO'));
 		}
 
 		$status = $savstatus;
