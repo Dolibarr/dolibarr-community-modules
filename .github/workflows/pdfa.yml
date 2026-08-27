@@ -96,6 +96,34 @@ jobs:
       - name: Validate the same documents with veraPDF
         run: ./verapdf/verapdf -f 3b --format text out/*.pdf
 
+      - name: A document veraPDF has to refuse
+        # A green validation says something only if a document that is not conformant comes back red.
+        # This takes one of the documents just validated and moves the namespace its extension schema
+        # declares by one letter - the same number of bytes, so the file stays whole and the offsets
+        # keep pointing where they did - which leaves the Factur-X properties declared by no schema
+        # at all: ISO 19005-3, 6.6.2.3.1. That is the clause which separates a Factur-X file from a
+        # PDF with something attached to it, and the half of the format nothing here used to check.
+        # If veraPDF still answered PASS, the step above would not be looking at what it says it is.
+        run: |
+          php -r '
+            $files = glob("out/*.pdf");
+            sort($files);
+            if (!$files) { fwrite(STDERR, "no document to build the control from\n"); exit(2); }
+            $carrier = file_get_contents($files[0]);
+            $declaration = "<pdfaSchema:namespaceURI>urn:factur-x:";
+            if (substr_count($carrier, $declaration) !== 1) {
+              fwrite(STDERR, "the control cannot be built: " . substr_count($carrier, $declaration) . " extension schema declarations in " . $files[0] . "\n");
+              exit(2);
+            }
+            file_put_contents("control.pdf", str_replace($declaration, "<pdfaSchema:namespaceURI>urn:factur-y:", $carrier));
+            echo "control built from ", basename($files[0]), "\n";
+          '
+          if ./verapdf/verapdf -f 3b --format text control.pdf; then
+            echo "::error::veraPDF accepted a document whose Factur-X properties are declared by no extension schema - the validation of the six documents is not checking what it says it checks"
+            exit 1
+          fi
+          echo "veraPDF refuses the control document, as it has to."
+
       - name: Provide the validation report as artifact
         if: ${{ always() }}
         run: ./verapdf/verapdf -f 3b --format mrr out/*.pdf > verapdf-report.xml || true
