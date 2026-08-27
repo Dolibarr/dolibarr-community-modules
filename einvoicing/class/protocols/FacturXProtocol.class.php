@@ -722,7 +722,20 @@ class FacturXProtocol extends CIIProtocol
 			}
 			// Source PDF deleted or never generated: regenerate it with the default PDF model before embedding.
 			$modelname = getDolGlobalString('FACTURE_ADDON_PDF') ?: 'crabe';
-			$resultpdf = $invoice->generateDocument($modelname, $langs);
+
+			// That rebuild fires afterPDFCreation, whose job is to produce the e-invoice - which is exactly
+			// what this call is doing. Tell the hook to stand back for this invoice, or it generates the
+			// document a second time and cleans up the temporary XML this call still needs (issue #658).
+			// try/finally, not two plain assignments: a rebuild that throws must not leave the hook muted
+			// for the rest of the request, which would silently skip the e-invoice of the invoices a mass
+			// generation handles after this one.
+			$resultpdf = -1;
+			EInvoicing::setEInvoiceGenerationInProgress($invoice->id, true);
+			try {
+				$resultpdf = $invoice->generateDocument($modelname, $langs);
+			} finally {
+				EInvoicing::setEInvoiceGenerationInProgress($invoice->id, false);
+			}
 			if ($resultpdf < 0) {
 				dol_syslog(get_class($this) . "::generateInvoice failed to regenerate missing PDF for invoice id=" . $invoice_id, LOG_ERR);
 				$this->error = $langs->trans("ErrorFailedToRegeneratePDF");
@@ -770,7 +783,11 @@ class FacturXProtocol extends CIIProtocol
 
 		// TODO A third method can be tried using the atgp/factur-x library.
 
-		if (!file_exists($orig_pdf)) {
+		// The mergers below take the XML as content, and treat the string as content when it is not the
+		// path of an existing file. A missing XML therefore does not fail, it gets embedded: check it here
+		// rather than hand over a PDF carrying its own file name. Nothing removes that file any more, but
+		// the merge is the last place where the mistake is still catchable (issue #658).
+		if (!file_exists($orig_pdf) || empty($xmlfile) || !file_exists($xmlfile)) {
 			throw new \Exception("XML and/or PDF does not exist");
 		}
 

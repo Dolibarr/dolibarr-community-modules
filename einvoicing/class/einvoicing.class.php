@@ -70,6 +70,18 @@ class EInvoicing
 	 */
 	private static $validatedinthisrequest = array();
 
+	/**
+	 * Invoices whose source PDF the module is rebuilding right now, to embed their e-invoice into it.
+	 *
+	 * Same idea as $validatedinthisrequest, for the opposite purpose: telling the afterPDFCreation hook
+	 * which PDF creations are its business. A rebuild started by generateInvoice() is not - the caller is
+	 * already producing the document, and a hook that produces it a second time also cleans up the
+	 * temporary XML the caller still needs (issue #658).
+	 *
+	 * @var array<int,bool>
+	 */
+	private static $einvoicegenerationinprogress = array();
+
 
 	// Dolibarr internal statuses
 	public const STATUS_UNKNOWN             = 0;		// By default, before the e-invoice has been generated
@@ -542,6 +554,42 @@ class EInvoicing
 	public static function isInvoiceValidatedInThisRequest($invoiceid)
 	{
 		return in_array((int) $invoiceid, self::$validatedinthisrequest, true);
+	}
+
+	/**
+	 * Record that the module is rebuilding the source PDF of an invoice to embed its e-invoice into it.
+	 *
+	 * That rebuild goes through generateDocument(), which fires the afterPDFCreation hook - whose job is
+	 * to produce the e-invoice, which is exactly what the caller is already doing. Left alone, the hook
+	 * re-enters the generation, produces the document a second time and deletes the temporary XML the
+	 * outer call still holds a path to (issue #658).
+	 *
+	 * @param  int	$invoiceid	Id of the invoice whose source PDF is being rebuilt
+	 * @param  bool	$inprogress	True when the rebuild starts, false when it is over
+	 * @return void
+	 */
+	public static function setEInvoiceGenerationInProgress($invoiceid, $inprogress)
+	{
+		$invoiceid = (int) $invoiceid;
+		if ($invoiceid <= 0) {
+			return;
+		}
+		if ($inprogress) {
+			self::$einvoicegenerationinprogress[$invoiceid] = true;
+		} else {
+			unset(self::$einvoicegenerationinprogress[$invoiceid]);
+		}
+	}
+
+	/**
+	 * Tell whether the module is itself rebuilding the source PDF of this invoice right now.
+	 *
+	 * @param  int	$invoiceid	Id of the invoice
+	 * @return bool				True while generateInvoice() is rebuilding the PDF it needs
+	 */
+	public static function isEInvoiceGenerationInProgress($invoiceid)
+	{
+		return !empty(self::$einvoicegenerationinprogress[(int) $invoiceid]);
 	}
 
 
