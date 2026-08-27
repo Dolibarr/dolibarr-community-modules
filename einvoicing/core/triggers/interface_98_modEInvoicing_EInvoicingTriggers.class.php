@@ -140,8 +140,17 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 				// When invoice is created
 				$result = $einvoicing->setEInvoiceStatus($object, $statustouse, '');
 				if ($result < 0) {
-					$this->errors = array_merge($this->errors, $einvoicing->errors);
-					return -1;
+					// Warn, never roll back: BILL_VALIDATE recomputes the status, and until then a missing
+					// row reads as STATUS_UNKNOWN. Same rule as the payment statuses below (issue #354).
+					$reason = implode(', ', array_filter(array_merge(array($einvoicing->error), (array) $einvoicing->errors)));
+					dol_syslog(
+						__METHOD__ . ' Failed to record the e-invoice status of invoice id=' . $object->id
+						. '. The invoice is created anyway. Error: ' . $reason,
+						LOG_ERR,
+						0,
+						'_einvoicing'
+					);
+					setEventMessages($langs->trans("ModuleEInvoicingName") . ' : ' . $langs->trans("EInvoiceFailedToRecordStatusOnCreation"), $einvoicing->errors, 'warnings');
 				}
 			}
 		}
@@ -177,8 +186,19 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 
 					$result = $einvoicing->setEInvoiceStatus($newobject, $statustouse, '');
 					if ($result < 0) {
-						$this->errors = array_merge($this->errors, $einvoicing->errors);
-						return -1;
+						// Same rule as BILL_CREATE above, and refusing here would only move the blockage one
+						// step: an invoice created without its row reaches this very branch. Nothing
+						// downstream needs the row - generation and transmission are gated by
+						// mustManageEInvoice(), and generateInvoice() writes the status on its way.
+						$reason = implode(', ', array_filter(array_merge(array($einvoicing->error), (array) $einvoicing->errors)));
+						dol_syslog(
+							__METHOD__ . ' Failed to record the e-invoice status of invoice id=' . $object->id
+							. '. The invoice is validated anyway. Error: ' . $reason,
+							LOG_ERR,
+							0,
+							'_einvoicing'
+						);
+						setEventMessages($langs->trans("ModuleEInvoicingName") . ' : ' . $langs->trans("EInvoiceFailedToRecordStatusOnValidation"), $einvoicing->errors, 'warnings');
 					}
 				}
 			}
