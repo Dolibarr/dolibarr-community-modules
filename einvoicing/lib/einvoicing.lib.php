@@ -396,20 +396,6 @@ if (!function_exists('einvoicingDolGetButtonActionDropdown')) {
 	}
 }
 
-if (!function_exists('dolPrintHTML')) {
-	/**
-	 * Return a string ready to be output on HTML page
-	 * To use text inside an attribute, use can use only dol_escape_htmltag()
-	 *
-	 * @param	string	$s		String to print
-	 * @return	string			String ready for HTML output
-	 */
-	function dolPrintHTML($s)  // @phan-suppress-current-line PhanRedefineFunction
-	{
-		return dol_escape_htmltag(dol_htmlwithnojs(dol_string_onlythesehtmltags(dol_htmlentitiesbr($s), 1, 1, 1)), 1, 1, 'common', 0, 1);
-	}
-}
-
 
 if (!method_exists('Societe', 'findNearest')) {
 	/**
