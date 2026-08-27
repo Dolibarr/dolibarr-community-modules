@@ -28408,6 +28408,11 @@ namespace {
          */
         public $localtax2_type;
         /**
+         * Int discount
+         * @var int
+         */
+        public $fk_remise_except;
+        /**
          * Percent of discount
          * @var float
          */
