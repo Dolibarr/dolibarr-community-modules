@@ -309,6 +309,7 @@ if (getDolGlobalString('EINVOICING_PDP')) {
 	if ((float) DOL_VERSION >= 24.0) {
 		$typeofinvoice = array(
 			Facture::TYPE_STANDARD => array('label' => $langs->trans('Standard')),
+			Facture::TYPE_REPLACEMENT => array('label' => $langs->trans('ReplacementInvoice')),
 			Facture::TYPE_DEPOSIT => array('label' => $langs->trans('Deposit')),
 			Facture::TYPE_CREDIT_NOTE => array('label' => $langs->trans('CreditNote')),
 		);
@@ -328,7 +329,7 @@ if (getDolGlobalString('EINVOICING_PDP')) {
 	$(function() {
 		function toggleCreditNoteOptions() {
 			var invoicetype = $("select[name=\'invoicetype\']").val();
-			if (invoicetype == "'.Facture::TYPE_CREDIT_NOTE.'") {
+			if (invoicetype == "'.Facture::TYPE_CREDIT_NOTE.'" || invoicetype == "'.Facture::TYPE_REPLACEMENT.'") {
 				$(".referencedinvoiceblock").show();
 			} else {
 				$(".referencedinvoiceblock").hide();

@@ -3569,6 +3569,7 @@ class EInvoicing
 
 		$depositXml = '';
 		$standardXml = '';
+		$replacementXml = '';
 		$creditnoteXml = '';
 
 		try {
@@ -3582,6 +3583,12 @@ class EInvoicing
 				'invoiceformat' => 'CII',
 				'invoicetype' => Facture::TYPE_STANDARD,
 				'referencedinvoice' => 'FA0000-SPECIMEN-DEPOSIT',
+			));
+
+			$replacementXml = self::generateSampleInvoiceXml($seller, $buyer, array(
+				'invoiceformat' => 'CII',
+				'invoicetype' => Facture::TYPE_REPLACEMENT,
+				'referencedinvoice' => 'FA0000-SPECIMEN-STANDARD',
 			));
 
 			$creditnoteXml = self::generateSampleInvoiceXml($seller, $buyer, array(
@@ -3600,6 +3607,7 @@ class EInvoicing
 		return array(
 			'deposit' => self::normalizeSampleInvoiceXml($depositXml),
 			'standard' => self::normalizeSampleInvoiceXml($standardXml),
+			'replacement' => self::normalizeSampleInvoiceXml($replacementXml),
 			'creditnote' => self::normalizeSampleInvoiceXml($creditnoteXml),
 		);
 	}

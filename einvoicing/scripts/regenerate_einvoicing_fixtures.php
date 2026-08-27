@@ -107,6 +107,7 @@ dol_mkdir($fixturesDir);
 $files = array(
 	'deposit' => $fixturesDir . '/cii_deposit.xml',
 	'standard' => $fixturesDir . '/cii_standard.xml',
+	'replacement' => $fixturesDir . '/cii_replacement.xml',
 	'creditnote' => $fixturesDir . '/cii_creditnote.xml',
 );
 
