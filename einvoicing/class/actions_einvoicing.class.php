@@ -634,85 +634,33 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 			// Action to generate the E-invoice alone
 			if ($action == 'generate_einvoice' && $permissiontoedit) {
-				$object->fetch_thirdparty();
-				$invoiceObject = $object;
-
-				// Call function to create E-invoice document
+				// Same gates and same generation as the mass action of the invoice list
 				require_once __DIR__ . '/protocols/ProtocolManager.class.php';
-
-				$usedProtocols = getDolGlobalString('EINVOICING_PROTOCOL');
 				$ProtocolManager = new ProtocolManager($db);
-				$protocol = $ProtocolManager->getProtocol($usedProtocols);
+				$protocol = $ProtocolManager->getProtocol(getDolGlobalString('EINVOICING_PROTOCOL'));
 
-				// Check configuration
-				$result = $einvoicing->checkRequiredinformations($invoiceObject);
-				if ($result['res'] < 0) {			// Blocking error, message contains at least one error and may also have warnings
-					$message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
+				$genresult = $this->generateOneEInvoice($object, $einvoicing, $protocol, $outputlangs);
 
-					dol_syslog(__METHOD__ . " " . $message);
+				if ($genresult['res'] > 0) {
+					dol_syslog(__METHOD__ . " Invoice generated successfully for invoice ID " . $object->id);
 
-					setEventMessages($message, array(), 'errors');
-					$error++;
-				} elseif ($result['res'] == 0) {	// Non blocking error, warning
-					$this->warnings[] = $result['message'];
-
-					dol_syslog(__METHOD__ . " " . $result['message']);
-				}
-
-				// Recipient directory reachability (opt-in): a recipient that is not routable does not make the
-				// e-invoice document invalid, only undeliverable, so keep generating it and only warn. The
-				// actual transmission is what gets blocked, by the send_to_pdp gate.
-				if (!$error) {
-					$routecheck = $einvoicing->checkRecipientRoutableForSend($invoiceObject);
-					if (!$routecheck['ok']) {
-						$warnkey = ($routecheck['status'] === 'undetermined') ? "EInvoiceGeneratedButRecipientReachabilityUnconfirmed" : "EInvoiceGeneratedButRecipientNotRoutable";
-						setEventMessages($langs->trans($warnkey) . ': <br>' . $routecheck['message'], array(), 'warnings');
-						$this->warnings[] = $routecheck['message'];
-					}
-				}
-
-				// Generate E-invoice by calling the method of the Protocol
-				if (!$error) {
-					$result = $protocol->generateInvoice($invoiceObject, $outputlangs);
-					if ($result && (!is_numeric($result) || $result > 0)) {
-						// No error
-						dol_syslog(__METHOD__ . " Invoice generated successfully for invoice ID " . $invoiceObject->id);
-						// Merge non-blocking size warnings from the protocol
-						if (!empty($protocol->warnings)) {
-							$this->warnings = array_merge($this->warnings, (array) $protocol->warnings);
-						}
-						if (!empty($this->warnings)) {
-							setEventMessages($langs->trans("InvoiceGeneratedWithWarnings"), $this->warnings, 'warnings');
-						} else {
-							setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
-						}
-
-						// Precheck the e-invoice with the Access Point validation service if available.
-						if (getDolGlobalString('EINVOICING_PDP') && getDolGlobalString('EINVOICING_AP_PRECHECK') === 'auto') {
-							$PDPManager = new PDPProviderManager($db);
-							$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
-							if (is_object($provider) && $provider->hasValidator()) {
-								$einvoiceFilePath = $einvoicing->getEInvoiceFilePath($invoiceObject->ref);
-								$result = $provider->validateEInvoiceFile($invoiceObject->id, $einvoiceFilePath);
-								if ($result['res'] > 0) {
-									setEventMessages($langs->trans("InvoicePrecheckSuccessful"), array(), 'mesgs');
-								} else {
-									setEventMessages($langs->trans("InvoicePrecheckFailed"), array(), 'errors');
-									dol_syslog(__METHOD__ . " Invoice precheck failed for invoice ID " . $invoiceObject->id);
-								}
-							}
-						}
+					$this->warnings = array_merge($this->warnings, $genresult['warnings']);
+					if (!empty($this->warnings)) {
+						setEventMessages($langs->trans("InvoiceGeneratedWithWarnings"), $this->warnings, 'warnings');
 					} else {
-						// If there is an error, we move warnings into error message
-						// Cast to array to avoid TypeError on PHP 8 when property is null
-						$this->errors = array_merge($this->errors, (array) $protocol->errors);
-						if (!empty($this->warnings)) {
-							$this->errors = array_merge($this->errors, (array) $this->warnings);
-						}
-						$this->warnings = array();
-						dol_syslog(__METHOD__ . " " . implode(',', (array) $protocol->errors));
-						$error++;
+						setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
 					}
+
+					if ($genresult['precheck'] === 1) {
+						setEventMessages($langs->trans("InvoicePrecheckSuccessful"), array(), 'mesgs');
+					} elseif ($genresult['precheck'] === 0) {
+						dol_syslog(__METHOD__ . " Invoice precheck failed for invoice ID " . $object->id);
+					}
+				} elseif ($genresult['res'] < 0) {
+					$error++;
+					dol_syslog(__METHOD__ . " " . implode(',', $genresult['errors']));
+					$this->errors = array_merge($this->errors, $genresult['errors']);
+					$this->warnings = array();
 				}
 			}
 
@@ -881,8 +829,12 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		$langs->load("einvoicing@einvoicing");
 
-		$label = $langs->trans("EInvoiceMassSendToPDP");
-		$this->resprints = '<option value="einvoicing_send_to_pdp" data-html="'.dol_escape_htmltag($label).'">'.$label.'</option>';
+		$out = '';
+		foreach (array('einvoicing_generate' => "EInvoiceMassGenerate", 'einvoicing_send_to_pdp' => "EInvoiceMassSendToPDP") as $code => $key) {
+			$label = $langs->trans($key);
+			$out .= '<option value="'.$code.'" data-html="'.dol_escape_htmltag($label).'">'.$label.'</option>';
+		}
+		$this->resprints = $out;
 
 		return 0;
 	}
@@ -904,7 +856,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	{
 		global $db, $langs, $user;
 
-		if (empty($parameters['massaction']) || $parameters['massaction'] != 'einvoicing_send_to_pdp') {
+		$massaction = empty($parameters['massaction']) ? '' : $parameters['massaction'];
+		if (!in_array($massaction, array('einvoicing_send_to_pdp', 'einvoicing_generate'))) {
 			return 0;
 		}
 		if (!$this->isMassSendAvailable($parameters)) {
@@ -919,18 +872,23 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			return -1;
 		}
 
-		require_once __DIR__ . '/providers/PDPProviderManager.class.php';
-		$PDPManager = new PDPProviderManager($db);
-		$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
-		if (!is_object($provider)) {
-			$this->errors[] = $langs->trans("CheckPdpConfiguration");
-			return -1;
+		$provider = null;
+		if ($massaction == 'einvoicing_send_to_pdp') {
+			require_once __DIR__ . '/providers/PDPProviderManager.class.php';
+			$PDPManager = new PDPProviderManager($db);
+			$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+			if (!is_object($provider)) {
+				$this->errors[] = $langs->trans("CheckPdpConfiguration");
+				return -1;
+			}
+		} else {
+			require_once __DIR__ . '/protocols/ProtocolManager.class.php';
 		}
 
 		require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
 
 		$toselect = (isset($parameters['toselect']) && is_array($parameters['toselect'])) ? $parameters['toselect'] : array();
-		$sent = 0;
+		$done = 0;
 		$skipped = 0;
 		$failed = 0;
 		$lines = array();
@@ -943,11 +901,22 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				continue;
 			}
 
-			$result = $this->sendOneInvoiceToAccessPoint($invoice, $einvoicing, $provider);
+			if ($massaction == 'einvoicing_send_to_pdp') {
+				$result = $this->sendOneInvoiceToAccessPoint($invoice, $einvoicing, $provider);
+				$okline = $langs->trans("FlowId") . ' ' . $result['flowid'];
+			} else {
+				// A protocol per invoice: the object collects the warnings and the errors of the one
+				// document it produced, and must not carry them over to the next invoice of the batch.
+				$ProtocolManager = new ProtocolManager($db);
+				$protocol = $ProtocolManager->getProtocol(getDolGlobalString('EINVOICING_PROTOCOL'));
+				$result = $this->generateOneEInvoice($invoice, $einvoicing, $protocol, $langs);
+				$okline = $langs->trans("EInvoiceGenerated");
+			}
 
 			if ($result['res'] > 0) {
-				$sent++;
-				$lines[] = $invoice->ref . ' : ' . $langs->trans("FlowId") . ' ' . $result['flowid'];
+				$done++;
+				$lines[] = $invoice->ref . ' : ' . $okline
+					. (empty($result['warnings']) ? '' : ' - ' . implode(' - ', $result['warnings']));
 			} elseif ($result['res'] == 0) {
 				$skipped++;
 				$lines[] = $invoice->ref . ' : ' . $result['reason'];
@@ -957,9 +926,88 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			}
 		}
 
-		setEventMessages($langs->trans("EInvoiceMassSendResult", $sent, $skipped, $failed), $lines, $failed ? 'warnings' : 'mesgs');
+		$summary = ($massaction == 'einvoicing_send_to_pdp') ? "EInvoiceMassSendResult" : "EInvoiceMassGenerateResult";
+		setEventMessages($langs->trans($summary, $done, $skipped, $failed), $lines, $failed ? 'warnings' : 'mesgs');
 
 		return 1;
+	}
+
+	/**
+	 * Generate the e-invoice document of one invoice, with the gates of the invoice card.
+	 *
+	 * @param Facture		$invoice		Invoice whose e-invoice has to be produced
+	 * @param EInvoicing	$einvoicing		Module object, reused over a batch
+	 * @param object|null	$protocol		Protocol of the module, one instance per invoice
+	 * @param Translate		$outputlangs	Output language
+	 * @return array{res:int<-1,1>, reason:string, precheck:string|int, warnings:string[], errors:string[]}	res: 1 generated, 0 skipped (reason), -1 failed (errors)
+	 */
+	private function generateOneEInvoice($invoice, $einvoicing, $protocol, $outputlangs)
+	{
+		global $db, $langs;
+
+		$out = array('res' => 0, 'reason' => '', 'precheck' => '', 'warnings' => array(), 'errors' => array());
+
+		if (!is_object($protocol)) {
+			$out['res'] = -1;
+			$out['errors'][] = $langs->trans("CheckPdpConfiguration");
+			return $out;
+		}
+
+		// Regenerating a transmitted invoice resets its local status and re-opens the trap the send gate
+		// closes, so it is refused here as on the invoice card, unless EINVOICING_ALLOW_REGEN_TRANSMITTED.
+		if (!getDolGlobalString('EINVOICING_ALLOW_REGEN_TRANSMITTED')
+			&& $einvoicing->isTransmittedLockActive($invoice->id, (string) $invoice->ref)) {
+			$status = $einvoicing->fetchLastknownInvoiceStatus($invoice->id, (string) $invoice->ref);
+			$out['reason'] = $langs->trans('EInvoiceAlreadyTransmittedLocked', is_array($status) ? $status['flow_id'] : '');
+			return $out;
+		}
+
+		$invoice->fetch_thirdparty();
+
+		$check = $einvoicing->checkRequiredinformations($invoice);
+		if ($check['res'] < 0) {
+			$out['res'] = -1;
+			$out['errors'][] = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': ' . strip_tags($check['message']);
+			return $out;
+		} elseif ($check['res'] == 0) {
+			$out['warnings'][] = strip_tags($check['message']);
+		}
+
+		// A recipient that is not routable does not make the document invalid, only undeliverable: keep
+		// generating and only warn. The transmission is what gets blocked, by the send gate.
+		$routecheck = $einvoicing->checkRecipientRoutableForSend($invoice);
+		if (!$routecheck['ok']) {
+			$warnkey = ($routecheck['status'] === 'undetermined') ? "EInvoiceGeneratedButRecipientReachabilityUnconfirmed" : "EInvoiceGeneratedButRecipientNotRoutable";
+			$out['warnings'][] = $langs->trans($warnkey) . ': ' . strip_tags($routecheck['message']);
+		}
+
+		$result = $protocol->generateInvoice($invoice, $outputlangs);
+		if (!$result || (is_numeric($result) && $result <= 0)) {
+			// On failure the warnings are part of the story: they are moved into the errors, as the card does
+			$out['res'] = -1;
+			$out['errors'] = array_merge((array) $protocol->errors, $out['warnings']);
+			$out['warnings'] = array();
+			return $out;
+		}
+
+		$out['res'] = 1;
+		$out['warnings'] = array_merge($out['warnings'], (array) $protocol->warnings);
+
+		// Precheck the e-invoice with the validation service of the Access Point when the setup asks for it
+		if (getDolGlobalString('EINVOICING_PDP') && getDolGlobalString('EINVOICING_AP_PRECHECK') === 'auto') {
+			require_once __DIR__ . '/providers/PDPProviderManager.class.php';
+			$PDPManager = new PDPProviderManager($db);
+			$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+			if (is_object($provider) && $provider->hasValidator()) {
+				$precheck = $provider->validateEInvoiceFile($invoice->id, $einvoicing->getEInvoiceFilePath($invoice->ref));
+				$out['precheck'] = ($precheck['res'] > 0) ? 1 : 0;
+				if ($out['precheck'] === 0) {
+					$out['warnings'][] = $langs->trans("InvoicePrecheckFailed");
+				}
+			}
+		}
+
+		return $out;
 	}
 
 	/**
@@ -985,7 +1033,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 *
 	 * @param Facture			$invoice		Invoice to transmit
 	 * @param EInvoicing		$einvoicing		Module object, reused over a batch
-	 * @param object			$provider		Access Point provider
+	 * @param object|null		$provider		Access Point provider
 	 * @return array{res:int<-1,1>, flowid:string, reason:string, warnings:string[], errors:string[]}	res: 1 sent, 0 skipped (reason), -1 failed (errors)
 	 */
 	private function sendOneInvoiceToAccessPoint($invoice, $einvoicing, $provider)
@@ -993,6 +1041,12 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		global $langs;
 
 		$out = array('res' => 0, 'flowid' => '', 'reason' => '', 'warnings' => array(), 'errors' => array());
+
+		if (!is_object($provider)) {
+			$out['res'] = -1;
+			$out['errors'][] = $langs->trans("CheckPdpConfiguration");
+			return $out;
+		}
 
 		$status = $einvoicing->fetchLastknownInvoiceStatus($invoice->id, (string) $invoice->ref);
 
