@@ -730,6 +730,16 @@ class FacturXProtocol extends CIIProtocol
 				return -1;
 			}
 			$orig_pdf = $filedir . '/' . $filename . '.' . self::INVOICE_FILE_EXTENSION;				// generateDocument writes <ref>.pdf
+
+			// That rebuild fired the afterPDFCreation hook, which generates the e-invoice on its own and
+			// deletes this very temporary XML once it has embedded it. Write it again rather than merge
+			// against a path that points at nothing: the mergers take the XML as content and fall back to
+			// treating the string as content when the file is gone, so what would be embedded is the path
+			// itself - 61 bytes of file name announced as a Factur-X (issue #658).
+			if (!file_exists($xmlfile)) {
+				dol_syslog(get_class($this) . "::generateInvoice temporary XML consumed by the PDF rebuild, generating it again");
+				$xmlfile = $this->generateXML($invoice, $outputlangs);
+			}
 		}
 
 		// Make a copy of the original PDF file
@@ -770,7 +780,10 @@ class FacturXProtocol extends CIIProtocol
 
 		// TODO A third method can be tried using the atgp/factur-x library.
 
-		if (!file_exists($orig_pdf)) {
+		// The mergers below take the XML as content, and treat the string as content when it is not the
+		// path of an existing file. A missing XML therefore does not fail, it gets embedded: check it here
+		// rather than hand over a PDF carrying its own file name (issue #658).
+		if (!file_exists($orig_pdf) || empty($xmlfile) || !file_exists($xmlfile)) {
 			throw new \Exception("XML and/or PDF does not exist");
 		}
 
