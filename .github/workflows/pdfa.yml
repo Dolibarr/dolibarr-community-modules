@@ -10,11 +10,22 @@
 # XML fixtures are already in the repository. What it cannot cover is the invoice PDF the core
 # produces, which is where the font half of the problem came from - that one is a setting of the
 # instance ("Home - Setup - PDF"), which the module reports and does not decide.
+#
+# Everything the job reads lives in the module: the two mergers it exercises, the carrier PDF and
+# the XML fixtures it builds from. Nothing outside einvoicing/ can make those documents differ, so
+# a change elsewhere does not start the job - the exception being this file, which does decide how
+# the run goes.
 on:
   push:
     branches: [ main ]
+    paths:
+      - 'einvoicing/**'
+      - '.github/workflows/pdfa.yml'
   pull_request:
     branches: [ main ]
+    paths:
+      - 'einvoicing/**'
+      - '.github/workflows/pdfa.yml'
 
   workflow_dispatch:
 
