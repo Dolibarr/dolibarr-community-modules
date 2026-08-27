@@ -243,6 +243,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		// @phan-suppress-next-line PhanTypeMismatchArgumentNullable
 		$item->fieldAttr['placeholder'] = idprof($mysoc);
 		$item->fieldParams['isMandatory'] = 0;
+		$item->fieldAttr['autocomplete'] = "new-password";
 		$item->cssClass = 'minwidth300';
 
 		// Setup conf to choose a protocol of exchange
@@ -288,6 +289,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 			$item = $formSetup->newItem($prefix.'CLIENT_ID'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''));
 			$item->nameText = $langs->trans('EINVOICING_CLIENT_ID');
 			$item->cssClass = 'minwidth500';
+			$item->fieldAttr['autocomplete'] = "new-password";
 
 			// Password
 			$item = $formSetup->newItem($prefix.'CLIENT_SECRET'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''));
@@ -297,8 +299,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 				// Dolibarr 18/19 fallback: setAsGenericPassword() does not exist yet.
 				// Force a masked password input so the secret is not displayed in clear text.
 				$item->fieldAttr['type'] = 'password';
-				$item->fieldAttr['autocomplete'] = 'new-password';
 			}
+			$item->fieldAttr['autocomplete'] = 'new-password';
 			$item->nameText = $langs->trans('EINVOICING_CLIENT_SECRET');
 			$item->cssClass = 'minwidth500';
 
