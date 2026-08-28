@@ -641,7 +641,7 @@ trait CommonProtocol
 
 		//$thirdpartyId = -2; // For testing
 		if ($thirdpartyId > 0) {
-		dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Updating existing thirdparty: ' . $thirdpartyId);
+			dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Updating existing thirdparty: ' . $thirdpartyId);
 			// TODO: MAYBE we should call PDP to retrieve more information
 
 			$thirdparty = new Societe($db);
@@ -651,39 +651,39 @@ trait CommonProtocol
 			if (getDolGlobalInt('EINVOICING_THIRDPARTIES_COMPLETE_INFO')) {
 
 				if ($priority === 'pdp') { // Overwrite Dolibarr data with AP data
-				$thirdparty->name = $sellerInfo['sellername'] ?? $thirdparty->name;
-				$thirdparty->address = $sellerInfo['sellerlineone'] ?? $thirdparty->address;
-				if (!empty($sellerInfo['sellerlinetwo'])) {
-					$thirdparty->address .= "\n" . $sellerInfo['sellerlinetwo'];
-				}
-				if (!empty($sellerInfo['sellerlinethree'])) {
-					$thirdparty->address .= "\n" . $sellerInfo['sellerlinethree'];
-				}
-				$thirdparty->zip = $sellerInfo['sellerpostcode'] ?? $thirdparty->zip;
-				$thirdparty->town = $sellerInfo['sellercity'] ?? $thirdparty->town;
-				$thirdparty->country_code = $sellerInfo['sellercountry'] ?? $thirdparty->country_code;
-				$thirdparty->email = $sellerInfo['sellercontactemailaddr'] ?? $thirdparty->email;
-				$thirdparty->phone = $sellerInfo['sellercontactphoneno'] ?? $thirdparty->phone;
-				$thirdparty->fax = $sellerInfo['sellercontactfaxno'] ?? $thirdparty->fax;
-
-				// Set identification numbers
-				if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
-					foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
-						if (!empty($globalId)) {
-							$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode);
-							if (!empty($idprofField)) {
-								$thirdparty->$idprofField = $einvoicing->removeSpaces($globalId);
+					$thirdparty->name = $sellerInfo['sellername'] ?? $thirdparty->name;
+					$thirdparty->address = $sellerInfo['sellerlineone'] ?? $thirdparty->address;
+					if (!empty($sellerInfo['sellerlinetwo'])) {
+						$thirdparty->address .= "\n" . $sellerInfo['sellerlinetwo'];
+					}
+					if (!empty($sellerInfo['sellerlinethree'])) {
+						$thirdparty->address .= "\n" . $sellerInfo['sellerlinethree'];
+					}
+					$thirdparty->zip = $sellerInfo['sellerpostcode'] ?? $thirdparty->zip;
+					$thirdparty->town = $sellerInfo['sellercity'] ?? $thirdparty->town;
+					$thirdparty->country_code = $sellerInfo['sellercountry'] ?? $thirdparty->country_code;
+					$thirdparty->email = $sellerInfo['sellercontactemailaddr'] ?? $thirdparty->email;
+					$thirdparty->phone = $sellerInfo['sellercontactphoneno'] ?? $thirdparty->phone;
+					$thirdparty->fax = $sellerInfo['sellercontactfaxno'] ?? $thirdparty->fax;
+	
+					// Set identification numbers
+					if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
+						foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
+							if (!empty($globalId)) {
+								$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode);
+								if (!empty($idprofField)) {
+									$thirdparty->$idprofField = $einvoicing->removeSpaces($globalId);
+								}
 							}
 						}
 					}
-				}
-				if (!empty($sellerInfo['sellerTaxRegistations']['VA'])) {
-					$thirdparty->tva_intra = $einvoicing->removeSpaces($sellerInfo['sellerTaxRegistations']['VA']);
-					$thirdparty->tva_assuj = 1;
-				}										  
+					if (!empty($sellerInfo['sellerTaxRegistations']['VA'])) {
+						$thirdparty->tva_intra = $einvoicing->removeSpaces($sellerInfo['sellerTaxRegistations']['VA']);
+						$thirdparty->tva_assuj = 1;
+					}										  
 				} elseif ($priority === 'dolibarr') { // Fill only empty fields from pdp data
 					dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Keeping existing thirdparty data and fill only empty fields as priority is dolibarr: ' . $thirdpartyId);
-	
+
 					if (empty($thirdparty->name) && !empty($sellerInfo['sellername'])) {
 						$thirdparty->name = $sellerInfo['sellername'];
 					}
