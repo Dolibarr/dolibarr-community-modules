@@ -640,7 +640,7 @@ trait CommonProtocol
 		// Step 3: Create or update thirdparty
 
 		//$thirdpartyId = -2; // For testing
-
+		if ($thirdpartyId > 0) {
 		dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Updating existing thirdparty: ' . $thirdpartyId);
 			// TODO: MAYBE we should call PDP to retrieve more information
 
@@ -770,7 +770,7 @@ trait CommonProtocol
 					'message' => 'Thirdparty ' . $thirdparty->name . ' updated successfully.' . ($nameMismatchWarning !== '' ? ' - ' . $nameMismatchWarning : '')
 				);
 			}
-		
+		}
 
 		// if not found, create new thirdparty
 		if ($thirdpartyId < 0 && getDolGlobalInt('EINVOICING_THIRDPARTIES_AUTO_GENERATION')) {
