@@ -770,7 +770,7 @@ trait CommonProtocol
 					'message' => 'Thirdparty ' . $thirdparty->name . ' updated successfully.' . ($nameMismatchWarning !== '' ? ' - ' . $nameMismatchWarning : '')
 				);
 			}
-		}
+		
 
 		// if not found, create new thirdparty
 		if ($thirdpartyId < 0 && getDolGlobalInt('EINVOICING_THIRDPARTIES_AUTO_GENERATION')) {
