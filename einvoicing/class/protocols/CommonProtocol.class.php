@@ -649,7 +649,6 @@ trait CommonProtocol
 
 			// Update thirdparty information based on priority
 			if (getDolGlobalInt('EINVOICING_THIRDPARTIES_COMPLETE_INFO')) {
-
 				if ($priority === 'pdp') { // Overwrite Dolibarr data with AP data
 					$thirdparty->name = $sellerInfo['sellername'] ?? $thirdparty->name;
 					$thirdparty->address = $sellerInfo['sellerlineone'] ?? $thirdparty->address;
@@ -665,7 +664,6 @@ trait CommonProtocol
 					$thirdparty->email = $sellerInfo['sellercontactemailaddr'] ?? $thirdparty->email;
 					$thirdparty->phone = $sellerInfo['sellercontactphoneno'] ?? $thirdparty->phone;
 					$thirdparty->fax = $sellerInfo['sellercontactfaxno'] ?? $thirdparty->fax;
-	
 					// Set identification numbers
 					if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
 						foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
@@ -680,7 +678,7 @@ trait CommonProtocol
 					if (!empty($sellerInfo['sellerTaxRegistations']['VA'])) {
 						$thirdparty->tva_intra = $einvoicing->removeSpaces($sellerInfo['sellerTaxRegistations']['VA']);
 						$thirdparty->tva_assuj = 1;
-					}										  
+					}
 				} elseif ($priority === 'dolibarr') { // Fill only empty fields from pdp data
 					dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Keeping existing thirdparty data and fill only empty fields as priority is dolibarr: ' . $thirdpartyId);
 
