@@ -938,7 +938,7 @@ trait CommonProtocol
 			$message .= $langs->trans("AutoCreateThirdPartyOffCreateItManually");
 
 			$action = $langs->trans('CreateSupplierManually');
-			$action .= '<a class="butAction small" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
+			$action .= '<a class="butAction small smallpaddingimp" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
 			$action .= '<i class="fas fa-plus-circle"></i> ';
 			$action .= $langs->trans('CreateSupplier');
 			$action .= '</a>';

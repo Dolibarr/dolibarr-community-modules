@@ -292,7 +292,7 @@ if (!empty($parsedLines)) {
 	print '<input type="hidden" name="flowid" value="'.dol_escape_htmltag($flowid).'">';
 	print '<input type="hidden" name="socid" value="'.((int) $socid).'">';
 
-	print '<div class="div-table-responsive">';
+	print '<div class="div-table-responsive'.($flowid ? '-nomin' : '').'">';
 	print '<table class="noborder centpercent">';
 	print '<tr class="liste_titre">';
 	print '<th>'.$langs->trans("Line").'</th>';
@@ -350,6 +350,9 @@ if (!empty($parsedLines)) {
 	print '</div>';
 
 	print '<div class="center paddingtop">';
+	if ($nbtomap == 0 && $socid > 0) {
+		print '<br><div class="ok">'.$langs->trans("AllLinesOfFlowAreMapped").'</div>';
+	}
 	if ($permissiontoadd && $socid > 0 && $nbtomap > 0) {
 		print '<input type="submit" class="button" value="'.$langs->trans("SaveMappingAndCreateVendorRefs").'">';
 	}
@@ -357,10 +360,6 @@ if (!empty($parsedLines)) {
 	print '</div>';
 
 	print '</form>';
-
-	if ($nbtomap == 0 && $socid > 0) {
-		print '<br><div class="ok">'.$langs->trans("AllLinesOfFlowAreMapped").'</div>';
-	}
 } elseif (empty($loaderror) && !empty($flowid)) {
 	print '<div class="warning">'.$langs->trans("NoLineFoundIntoThisFlow").'</div>';
 }

@@ -1930,8 +1930,17 @@ class SuperPDPProvider extends AbstractPDPProvider
 							if ($rescode == 'THIRDPARTY_NOT_FOUND') {
 								$infostring = '';
 								foreach ($res['actiondata'] ?? [] as $datakey => $dataval) {
-									if ($datakey && $dataval) {
-										$infostring .= ($infostring ? ', ' : '').$datakey.': '.$dataval;
+									if ($datakey && $dataval && in_array($datakey, array('name', 'email', 'vatnumber', 'idprof1'))) {
+										$transdatakey = ucfirst($datakey);
+										if ($transdatakey == 'Vatnumber') {
+											$transdatakey = 'VATIntraShort';
+										}
+										if ($transdatakey == 'Idprof1') {
+											$transdatakey = 'ProfId1';
+										}
+										$infostring .= ($infostring ? ', ' : '');
+										$infostring .= $langs->transnoentitiesnoconv($transdatakey);
+										$infostring .= ': '.$dataval;
 									}
 								}
 								$actions[$rescode]['businessmessage'] = $langs->trans("CantFindThirdpartyFromTheImportedInvoice", $infostring);
