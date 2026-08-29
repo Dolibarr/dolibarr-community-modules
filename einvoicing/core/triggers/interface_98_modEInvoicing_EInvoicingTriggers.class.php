@@ -388,10 +388,24 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			'@phan-var-force Document $object';
 			$duplicate = false;
 			if ($object->fk_element_type == 'invoice_supplier' && SupplierInvoiceHelper::isEInvoice($object->fk_element_id, true, $duplicate)) {
-				$this->errors[] = $duplicate
-					? $langs->trans('EinvoicingDuplicateDocumentForSupplierInvoice', $object->fk_element_id)
-					: $langs->trans('EinvoicingCantDeleteADocumentLinkedToAnExistingSupplierInvoice', $object->id, $object->fk_element_id);
-				return -1;
+				$lastid = 0;
+
+				// Test if einvoice is the last one(in this case, we may accept to delete the document, record will be loaded at next sync
+				// If not, we refuse to delete the document
+				$sqlgetlast = "SELECT rowid FROM ".MAIN_DB_PREFIX."einvoicing_document";
+				$sqlgetlast .= " ORDER BY rowid DESC LIMIT 1";
+				$resql = $this->db->query($sqlgetlast);
+				if ($resql) {
+					$obj = $this->db->fetch_object($resql);
+					$lastid = $obj->rowid;
+				}
+
+				if ($object->id != $lastid) {	// If not the last one,
+					$this->errors[] = $duplicate
+						? $langs->trans('EinvoicingDuplicateDocumentForSupplierInvoice', $object->fk_element_id)
+						: $langs->trans('EinvoicingCantDeleteADocumentLinkedToAnExistingSupplierInvoice', $object->id, $object->fk_element_id);
+					return -1;
+				}
 			}
 		}
 
