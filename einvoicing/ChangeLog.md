@@ -39,10 +39,28 @@ than one authentication method in the same request. An installation that set
 ESALINK_AUTHENT_USING_CLIENT_CREDENTIAL as a workaround keeps working: the constant is now without
 effect, and the request it used to select is the default.
 
+CHANGE: the backport of getMultidirVersion() is removed. That function entered the core in Dolibarr 20
+and the module carried a copy of it for the versions below, but it calls it nowhere - not once in the
+whole repository - so the copy was never reached on any version.
+
 CHANGE: GETPOSTFLOAT(), a function the core gained in Dolibarr 20 and that the module backports for the
 versions below, moves from the library of the module to compat/functions.lib.php, where the module keeps
 what it copies from the core. Pure move, guard included: the library requires that file, so the two call
 sites of admin/setup.php keep finding the function where they used to.
+CHANGE: getDolGlobalFloat(), a function the core gained in Dolibarr 21 and that the module backports for
+the versions below, moves from the library of the module to compat/functions.lib.php, where the module
+keeps what it copies from the core. Pure move, guard included: the library requires that file, so the
+eight call sites of PriceHelper - the rounding rule of the totals - keep finding the function where they
+used to.
+CHANGE: getMultidirTemp(), a function the core gained in Dolibarr 20 and that the module backports for the
+versions below, moves from the library of the module to compat/functions.lib.php, where the module keeps
+what it copies from the core. Pure move, guard included: the library requires that file, so the two call
+sites - the temporary directory the providers write a retrieved test invoice into - keep finding the
+function where they used to.
+CHANGE: dolPrintHTML(), a function the core gained in Dolibarr 18 and that the module backports for
+Dolibarr 17, moves from the library of the module to compat/functions.lib.php, where the module keeps
+what it copies from the core. Pure move, guard included: the library requires that file, so the seven
+call sites keep finding the function where they used to.
 
 CHANGE: dolPrintHTMLForAttribute(), a function the core only gained in Dolibarr 19, was backported in
 the library of the module, among its own functions. It now sits in compat/functions.lib.php, next to the

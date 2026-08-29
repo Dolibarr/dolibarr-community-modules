@@ -341,55 +341,8 @@ function getMultidirOutputCompat($object, $module = '', $forobject = 0, $mode = 
 	}
 }
 
-if (!function_exists("getMultidirTemp")) {
-	/**
-	 * Return the full path of the directory where a module (or an object of a module) stores its temporary files.
-	 * Path may depends on the entity if a multicompany module is enabled.
-	 *
-	 * @param 	CommonObject 	$object 	Dolibarr common object
-	 * @param 	string 			$module 	Override object element, for example to use 'mycompany' instead of 'societe'
-	 * @param	int				$forobject	Return the more complete path for the given object instead of for the module only.
-	 * @return 	string|null					The path of the relative temp directory of the module
-	 */
-	function getMultidirTemp($object, $module = '', $forobject = 0)  // @phan-suppress-current-line PhanRedefineFunction
-	{
-		return getMultidirOutputCompat($object, $module, $forobject, 'temp');
-	}
-}
-
-if (!function_exists("getMultidirVersion")) {
-	/**
-	 * Return the full path of the directory where a module (or an object of a module) stores its versioned files.
-	 * Path may depends on the entity if a multicompany module is enabled.
-	 *
-	 * @param 	CommonObject 	$object 	Dolibarr common object
-	 * @param 	string 			$module 	Override object element, for example to use 'mycompany' instead of 'societe'
-	 * @param	int				$forobject	Return the more complete path for the given object instead of for the module only.
-	 * @return string|null					The path of the relative version directory of the module
-	 */
-	function getMultidirVersion($object, $module = '', $forobject = 0)  // @phan-suppress-current-line PhanRedefineFunction
-	{
-		return getMultidirOutputCompat($object, $module, $forobject, 'version');
-	}
-}
 
 
-if (!function_exists('getDolGlobalFloat')) {
-	/**
-	 *  Return a Dolibarr global constant value, converted into float.
-	 *  Provided as a polyfill for Dolibarr < 21, where this function does not exist yet.
-	 *
-	 *  @param  string  $key        Name of the constant
-	 *  @param  float   $default    Default value if constant is not defined
-	 *  @return float               Value converted into float
-	 *  @since  Dolibarr V21
-	 */
-	function getDolGlobalFloat($key, $default = 0)  // @phan-suppress-current-line PhanRedefineFunction
-	{
-		global $conf;
-		return (float) (isset($conf->global->$key) ? $conf->global->$key : $default);
-	}
-}
 
 if (!function_exists('einvoicingDolGetButtonActionDropdown')) {
 	/**
@@ -424,20 +377,6 @@ if (!function_exists('einvoicingDolGetButtonActionDropdown')) {
 		$out .= '</div>';
 
 		return $out;
-	}
-}
-
-if (!function_exists('dolPrintHTML')) {
-	/**
-	 * Return a string ready to be output on HTML page
-	 * To use text inside an attribute, use can use only dol_escape_htmltag()
-	 *
-	 * @param	string	$s		String to print
-	 * @return	string			String ready for HTML output
-	 */
-	function dolPrintHTML($s)  // @phan-suppress-current-line PhanRedefineFunction
-	{
-		return dol_escape_htmltag(dol_htmlwithnojs(dol_string_onlythesehtmltags(dol_htmlentitiesbr($s), 1, 1, 1)), 1, 1, 'common', 0, 1);
 	}
 }
 
