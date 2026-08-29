@@ -630,7 +630,9 @@ trait CommonProtocol
 				if ($invoiceName === '') {
 					$invoiceName = trim($sellerInfo['sellerTradingName'] ?? '');
 				}
-				$nameMismatchWarning = $langs->trans('EInvoiceSupplierNameMismatchWarning', $invoiceName, $thirdparty->name);
+				$nameMismatchWarning = $langs->trans('EInvoiceSupplierNameMismatchWarning', $invoiceName, '{s1}');
+				$nameMismatchWarning = str_replace('{s1}', $thirdparty->getNomUrl(0, '', 0, 1), $nameMismatchWarning);
+
 				dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller ' . $nameMismatchWarning, LOG_WARNING);
 				dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller ' . $nameMismatchWarning, LOG_WARNING, 0, '_einvoicing');
 				setEventMessages($nameMismatchWarning, null, 'warnings');
@@ -1068,10 +1070,10 @@ trait CommonProtocol
 
 	/**
 	 * Find or create a Dolibarr product based on Einvoice line data
+	 *
 	 * @param array $lineData Array containing invoice line data extracted from XML
 	 * @param string $flowId Flow identifier source of the product. Used for logging purposes.
-	 *
-	 * @return array{res:int, message:string, actioncode:string|null, actionurl:string|null, action:string|null}   Returns array with 'res' (ID of the found or created product, -1 on error) with a 'message' and an optional 'action'.
+	 * @return array{res:int, message:string, actioncode:string|null, action:string|null, actionurl:string|null, actiondata:array<string,mixed>, allactiondata:array<string,array<string,mixed>>}   Returns array with 'res' (ID of the found or created product, -1 on error) with a 'message' and an optional 'action'.
 	 */
 	private function _findOrCreateProductFromEinvoiceLine($lineData, $flowId = '')
 	{
@@ -1176,7 +1178,6 @@ trait CommonProtocol
 
 			$errorDetails = [];
 			$createParams = [];
-			$actiondata = ['ref' => $prodRef, 'supplierref' => $prodSupplierRef, 'name' => $prodName];
 
 			if (!empty($prodRef)) {
 				$errorDetails[] = 'Ref: '.$prodRef;
@@ -1230,13 +1231,16 @@ trait CommonProtocol
 
 			$btnStyle = 'display:inline-block;width:auto;';
 
-			$action = '<div class="marginbottomonly">' . $langs->trans('SuggestedActionsIntro') . '</div>';
+			$action = '<div class="marginbottomonly opacitymedium">' . $langs->trans('SuggestedActionsIntro') . '</div>';
 
-			// First choice: create the product manually
-			$action .= '<a class="button small smallpaddingimp" style="' . $btnStyle . '" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
+
+			// First choice: create a new product manually
+			$action .= '<a class="button small smallpaddingimp" style="' . $btnStyle . '" href="' . dol_escape_htmltag($createUrl) . '" target="_blank" title="'.$langs->trans($prodType == 1 ? 'CreateServiceManually' : 'CreateProductManually').'">';
 			$action .= '<i class="fas fa-plus-circle"></i> ';
-			$action .= $langs->trans($prodType == 1 ? 'CreateServiceManually' : 'CreateProductManually');
+			$action .= $langs->trans($prodType == 1 ? 'CreateService' : 'CreateProduct');
 			$action .= '</a>';
+			$actiondata = $createParams;
+			$allactiondata['createproduct'] = array('label' => $langs->trans($prodType == 1 ? 'CreateServiceManually' : 'CreateProductManually'), 'url' => $createUrl, 'actiondata' => $actiondata);
 
 			// Second choice: map the vendor product reference(s) of this flow onto existing Dolibarr products.
 			// This creates the vendor reference (llx_product_fournisseur_price) that the matching uses at step 1,
@@ -1252,15 +1256,19 @@ trait CommonProtocol
 				$action .= '<i class="fas fa-link unsetcolor"></i> ';
 				$action .= $langs->trans('AssociateExistingProductMessage');
 				$action .= '</a>';
+
+				$allactiondata['addsupplierrefprice'] = array('label' => $langs->trans("AssociateExistingProductMessage"), 'url' => $mappingUrl, 'actiondata' => array('socid' => ((int) $vendorId)));
 			}
 
 			// Third choice: set a default product on the vendor thirdparty (used for future imports when no product is found)
 			if (!empty($vendorId)) {
-				$thirdpartyUrl = dol_buildpath('/societe/card.php', 1) . '?socid=' . ((int) $vendorId) . '&action=edit#treinvoicing';
+				$thirdpartyUrl = dol_buildpath('/societe/card.php', 1) . '?socid=' . ((int) $vendorId) . '&action=edit&highlight=routing_product_id#treinvoicing';
 				$action .= '<a class="button small smallpaddingimp" style="' . $btnStyle . '" href="' . dol_escape_htmltag($thirdpartyUrl) . '" target="_blank">';
 				$action .= '<i class="fas fa-star"></i> ';
 				$action .= $langs->trans('SetDefaultProductForThirdparty');
 				$action .= '</a>';
+
+				$allactiondata['setdefaultproduct'] = array('label' => $langs->trans("SetDefaultProductForThirdparty"), 'url' => $thirdpartyUrl, 'actiondata' => array('socid' => ((int) $vendorId)));
 			}
 
 
@@ -1268,9 +1276,10 @@ trait CommonProtocol
 				'res' => -1,
 				'message' => $message,
 				'actioncode' => 'PRODUCT_NOT_FOUND',
-				'actionurl' => $createUrl,
-				'action' => $action,				// label of sentence to make action
-				'actiondata' => $actiondata			// array of paramto use for URL to make action
+				'action' => $action,				// full text suggested to make actions
+				'actionurl' => $createUrl,			// URL of first action
+				'actiondata' => $actiondata,		// Array of param to use for first action
+				'allactiondata' => $allactiondata	// Array with all actions
 			);
 		}
 	}

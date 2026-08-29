@@ -280,6 +280,7 @@ PDPSyncStatus=E-invoice Status
 SuggestedActions=Recommended actions to do
 CreateSupplier=Create the supplier
 CreateProduct=Create the product
+CreateService=Create the service
 CreateSupplierManually=Create manually the supplier based on the information retrieved from E-invoice, then relaunch the synchronization...
 CreateProductManually=Create a new product
 CreateServiceManually=Create a new service

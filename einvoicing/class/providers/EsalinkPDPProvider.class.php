@@ -162,6 +162,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$item = $formSetup->newItem($prefix . 'USERNAME'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''));
 		$item->nameText = $langs->transnoentities('EINVOICING_CLIENT_ID');
 		$item->cssClass = 'minwidth500';
+		$item->fieldAttr['autocomplete'] = "new-password";
 
 		// Client secret
 		$item = $formSetup->newItem($prefix . 'PASSWORD'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''));
@@ -229,15 +230,26 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				}
 			}
 
-			$einvoicing = new EInvoicing($this->db);
-			$idtocheck = $einvoicing->getSellerCommunicationURI(0);
-
-			// Check your ID in French E-Invoice Annuary
+			// Check your ID in E-Invoice Annuary
+			$showannuary = 0;
+			$idtocheck = '';
 			if ($mysoc->country_code == 'FR') {
-				$item->fieldOverride .= '<a class="reposition" href="https://facturation.chorus-pro.gouv.fr/annuaire/#/" target="_blank"><i class="fa fa-list-alt pictofixedwidth centerimp"></i>' . $langs->trans('CheckYourIDInFrenchEInvoiceAnnuary') . '</a>';
-				if (!getDolGlobalString('EINVOICING_LIVE')) {
-					$item->fieldOverride .= ' - <a class="reposition" href="https://test-directory.peppol.eu/public/locale-en_US/menuitem-search?q='.urlencode($idtocheck).'&mode=fr&env=sandbox" target="_blank">' . $langs->trans('PeppolTestAnnuary') . '</a>';
+				$showannuary++;
+
+				$item->fieldOverride .= '<i class="fa fa-list-alt pictofixedwidth centerimp"></i>'.$langs->trans('CheckYourIDInEInvoiceAnnuary');
+
+				$einvoicing = new EInvoicing($this->db);
+				$idtocheck = (string) $einvoicing->getSellerCommunicationURI(0);
+
+				if (getDolGlobalString('EINVOICING_LIVE')) {
+					$item->fieldOverride .= ': <a class="reposition" href="https://facturation.chorus-pro.gouv.fr/annuaire/#/" target="_blank">' . $langs->trans('FrenchGovAnnuary') . '</a>';
 				}
+			}
+			if (!getDolGlobalString('EINVOICING_LIVE')) {
+				if ($showannuary) {
+					$item->fieldOverride .= ' - ';
+				}
+				$item->fieldOverride .= '<a class="reposition" href="https://test-directory.peppol.eu/public/locale-en_US/menuitem-search?q='.urlencode($idtocheck).'&mode=fr&env=sandbox" target="_blank">' . $langs->trans('PeppolTestAnnuary') . '</a>';
 			}
 		}
 	}
@@ -361,8 +373,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		global $langs;
 
 		$response = $this->callApi("healthcheck", "GET", false, [], 'healthcheck');		// This include the refresh of token
+		$returnarray = array();
 
 		$nameOfAccessPoint = getDolGlobalString('EINVOICING_PDP');
+		$nameOfAccessPoint = preg_replace('/ViaPartner/', '', $nameOfAccessPoint);
 
 		if ($response['status_code'] === 200) {
 			$returnarray['status_code'] = true;
@@ -377,7 +391,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 	/**
 	 * Retrieve and format remote account/company information from the provider and peppol directory, if available,
-	 * For display to the user.
+	 * for display to the user.
 	 *
 	 * @return array{status_code:int,message:string}
 	 */
@@ -390,9 +404,9 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	}
 
 	/**
-	 * Validate an electronic invoice file using the Esalink validation service.
+	 * Validate an electronic invoice file using the provider validation service.
 	 *
-	 * @param 	int 	$idinvoice 	ID of the invoice to check
+	 * @param 	int 	$idinvoice 	ID of the invoice to validate
 	 * @param 	string 	$filePath 	Path to the invoice file to validate
 	 * @return 	array|string 		Validation result or error message.
 	 */
@@ -413,11 +427,11 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	 * This function send an invoice to PDP
 	 *
 	 * @param	Facture		$object 	Invoice object
-	 * @return 	false|array{res:int<-1,-1>,message:string}|string   flowId if the invoice was successfully sent, false otherwise.
+	 * @return 	false|string|array{res:int<-1,-1>,message:string}   flowId if the invoice was successfully sent, false otherwise.
 	 */
 	public function sendInvoice($object)
 	{
-		global $conf, $langs, $user;
+		global $conf, $langs;
 
 		$outputLog = array(); // Feedback to display
 
@@ -487,7 +501,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$response = $this->callApi($resource, "POSTALREADYFORMATED", $params, $extraHeaders, 'send_invoice');
 
 		if ($response['status_code'] == 200 || $response['status_code'] == 202) {
-			$flowId = $response['response']['flowId'];
+			$flowId = $response['response']['flowId'] ?? '';
 			$callId = $response['id'];
 			$callRef = $response['call_id'];
 
@@ -576,7 +590,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	 * Send a sample electronic invoice for testing purposes.
 	 * This function generates a sample invoice and sends it to PDP
 	 *
-	 * @param 	int 			$onlymake		1=to only make the sample
+	 * @param 	int<0,1>		$onlymake		1=to only make the sample
 	 * @return 	string[]|0	 					Array of messages if the invoice was successfully sent, 0 otherwise.
 	 */
 	public function sendSampleInvoice($onlymake = 0)
@@ -784,11 +798,12 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 		$response = getURLContent($url, $method, $params, 1, $httpheader, array('http', 'https'), 0, -1, 0, 0, array(), '_einvoicing');
 
-		$status_code = $response['http_code'];
+		$status_code = $response['http_code'] ?? 0;
+		$content = $response['content'] ?? '';
 		$body = 'Error';
 
 		if ($status_code == 200 || $status_code == 202) {
-			$body = $response['content'];
+			$body = $content;
 			if (!isset($extraHeaders['Accept'])) { // Json if default format
 				$body = json_decode($body, true);
 			}
@@ -799,7 +814,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		} else {
 			$returnarray = array(
 				'status_code' => $status_code,
-				'response' => 'Error ' . $status_code . ' - ' . (string) $response['content']
+				'response' => 'Error ' . $status_code . ' - ' . (string) $content
 			);
 			if (!empty($response['curl_error_no'])) {
 				$returnarray['curl_error_no'] = $response['curl_error_no'];
@@ -807,9 +822,19 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			if (!empty($response['curl_error_msg'])) {
 				$returnarray['curl_error_msg'] = $response['curl_error_msg'];
 			}
-			if ($contentarray = json_decode((string) $response['content'], true)) {
-				$returnarray['errorCode'] = (string) $contentarray['errorCode'];
-				$returnarray['errorMessage'] = (string) $contentarray['errorMessage'];
+			// An error body is not always the {errorCode, errorMessage} pair this expects: a plain JSON
+			// string decodes into a string, and indexing that is a fatal on PHP 8, not a warning.
+			// Each key is set only when the body really carries it: callers tell "no message" from
+			// "empty message" with isset(), and would otherwise report an empty error instead of
+			// falling back on the HTTP code.
+			$contentarray = json_decode((string) $content, true);
+			if (is_array($contentarray)) {
+				if (isset($contentarray['errorCode'])) {
+					$returnarray['errorCode'] = (string) $contentarray['errorCode'];
+				}
+				if (isset($contentarray['errorMessage'])) {
+					$returnarray['errorMessage'] = (string) $contentarray['errorMessage'];
+				}
 			}
 		}
 
@@ -850,7 +875,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$actions = array();				// business message (manual action to do)
 
 		$resource = 'flows/search';
-		// Correlation id, sent as the Request-Id header of the calls below and recorded in the call log.
+		// Correlation id, sent as the Request-Id header of the call below and recorded in the call log.
 		$uuid = $this->generateUuidV4();
 
 		//self::$EINVOICING_LAST_IMPORT_KEY = $uuid;
@@ -931,15 +956,21 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			return array('res' => 1, 'messages' => $results_messages);
 		}
 
-		// Since AP may not return flows in the order they want (by updatedAt ASC), we sort them here
+		$results = $response['response']['results'] ?? array();
+		if (empty($results)) {
+			break;
+		}
+
+		// Since AP may not return flows in the order they want (by updatedAt ASC), we sort them here.
+		// On the sub-second key, because the cursor moves along it.
 		dol_syslog(__METHOD__ . " Sort the flows per updatedAt", LOG_DEBUG, 0, "_einvoicing");
-		usort($response['response']['results'], function ($a, $b) {
-			return strtotime($a['updatedAt']) <=> strtotime($b['updatedAt']);
+		usort($results, function ($a, $b) {
+			return strcmp(self::updatedAtSortKey($a['updatedAt'] ?? ''), self::updatedAtSortKey($b['updatedAt'] ?? ''));
 		});
 
 		// Clean already processed flows from the list
 		$alreadyProcessedFlowIds = [];
-		$flowIds = array_column($response['response']['results'] ?? [], 'flowId');
+		$flowIds = array_column($results, 'flowId');
 		$sanitizedFlowIds = array();
 		foreach ($flowIds as $flowId) {
 			$sanitizedFlowIds[] = "'" . $db->escape($flowId) . "'";
@@ -993,6 +1024,26 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 				// If res < 0, rollback
 				if ($res['res'] < 0) {
+					if (!empty($res['postponeflow'])) {
+						// This flow could not be read, but nothing was stored for it: it stays pending and
+						// the next synchronization will try it again, so no invoice is lost. Report it with
+						// the action to do and carry on, instead of stalling this batch - and every flow
+						// behind it - on a problem that has to be fixed on the access point side anyway.
+						$actions[$res['actioncode']] = array(
+							'actionurl' => ($res['actionurl'] ?? ''),
+							'actioncode' => $res['actioncode'],
+							'action' => $res['action'],
+							'businessmessage' => $langs->trans("CantReadTheDocumentOfTheImportedInvoice", $flow['flowId'])
+								. $form->textwithpicto('', "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], 1, 'help', '', 0, 2, 'help')
+						);
+
+						dol_syslog(__METHOD__ . " Flow " . $flow['flowId'] . " postponed: " . $res['message'], LOG_WARNING, 0, "_einvoicing");
+						$results_messages[] = "Flow " . $flow['flowId'] . " postponed, it will be retried on the next synchronization: " . $res['message'];
+
+						$postponedFlows++;
+						continue;
+					}
+
 					if (isset($res['action']) && $res['action'] != '') {	// Save business errors if it is
 						$rescode = $res['actioncode'] ?? '0';
 						// Set the result code and label into array $actions.
@@ -1014,9 +1065,21 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 						}
 						if ($rescode == 'PRODUCT_NOT_FOUND') {
 							$infostring = '';
+							if (!empty($res['actiondata']['socid'])) {
+								$socid = $res['actiondata']['socid'];
+								$tmpthirdparty = new Societe($db);
+								$tmpthirdparty->fetch($socid);
+								$infostring .= $langs->transnoentitiesnoconv("Supplier") . ': ' . $tmpthirdparty->name;
+							}
 							foreach ($res['actiondata'] ?? [] as $datakey => $dataval) {
-								if ($datakey && $dataval) {
-									$infostring .= ($infostring ? ', ' : '').$datakey.': '.$dataval;
+								if ($datakey && $dataval && in_array($datakey, array('supplierref', 'label'))) {
+									$transdatakey = ucfirst($datakey);
+									if ($transdatakey == 'Supplierref') {
+										$transdatakey = 'SupplierRef';
+									}
+									$infostring .= ($infostring ? ', ' : '');
+									$infostring .= $langs->transnoentitiesnoconv($transdatakey);
+									$infostring .= ': '.$dataval;
 								}
 							}
 							$actions[$rescode]['businessmessage'] = $langs->trans("CantFindProductFromTheImportedInvoice", $infostring);
@@ -1073,6 +1136,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			}
 		}
 		$messages[] = $langs->trans("TotalSkippedSync") . ": <b>" . $alreadyExist . "</b> - " . $langs->trans("TotalNewSync") . ": <b>" . $syncedFlows . "</b>";
+		if ($postponedFlows > 0) {
+			// Counted apart from the skipped ones: those flows were not stored, they come back next run
+			$messages[] = $langs->trans("TotalPostponedSync") . ": <b>" . $postponedFlows . "</b>";
+		}
 
 		// Processing result that will be saved in DB
 		$processingResult = '';
@@ -1111,12 +1178,32 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	}
 
 	/**
+	 * Comparable key for the updatedAt of a flow.
+	 *
+	 * The platform does not pad the fractional seconds to a fixed width - '.47288Z' and '.626638Z'
+	 * both occur - so the raw strings cannot be compared to each other, and strtotime() drops the
+	 * fraction entirely, which is precisely what the cursor needs. Padding it to six digits gives a
+	 * key that sorts on the microsecond.
+	 *
+	 * @param	string	$updatedAt	Timestamp as returned by the platform
+	 * @return	string				Key to sort and compare on
+	 */
+	private static function updatedAtSortKey($updatedAt)
+	{
+		if (!preg_match('/^([^.Z]+)(?:\.(\d+))?/', (string) $updatedAt, $reg)) {
+			return (string) $updatedAt;
+		}
+
+		return $reg[1] . '.' . str_pad(substr(isset($reg[2]) ? $reg[2] : '', 0, 6), 6, '0');
+	}
+
+	/**
 	 * Sync a given flow data.
 	 * Called by syncFlows() for example.
 	 *
 	 * @param string 		$flowId        	FlowId
 	 * @param string|null 	$call_id  		Call ID for logging purposes
-	 * @return array{res:int<-1,1>, message:string, actioncode?:string|null, actionurl?:string|null, action?:string|null} Returns array with 'res' (1 on success, 0 if exists or already processed, -1 on failure) with a 'message' and for business errors an optional 'actioncode', 'actionurl' and 'action'.
+	 * @return array{res:int<-1,1>, message:string, postponeflow?:int, actioncode?:string|null, actionurl?:string|null, action?:string|null} Returns array with 'res' (1 on success, 0 if exists or already processed, -1 on failure) with a 'message' and for business errors an optional 'actioncode', 'actionurl' and 'action'.
 	 */
 	public function syncFlow($flowId, $call_id = null)
 	{

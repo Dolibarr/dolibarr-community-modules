@@ -300,7 +300,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				// Force a masked password input so the secret is not displayed in clear text.
 				$item->fieldAttr['type'] = 'password';
 			}
-			$item->fieldAttr['autocomplete'] = 'new-password';
+			$item->fieldAttr['autocomplete'] = "new-password";
 			$item->nameText = $langs->trans('EINVOICING_CLIENT_SECRET');
 			$item->cssClass = 'minwidth500';
 
@@ -879,8 +879,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 	}
 
 	/**
-	 * Retrieve and format remote account/company information from SuperPDP (session info + ppf directory status),
-	 * for display to the user (e.g. "Show your remote information" link in the setup page).
+	 * Retrieve and format remote account/company information from the provider and peppol directory, if available,
+	 * for display to the user.
 	 *
 	 * @return array{status_code:int,message:string}
 	 */
@@ -996,11 +996,10 @@ class SuperPDPProvider extends AbstractPDPProvider
 	}
 
 	/**
-	 * Validate an electronic invoice file using the superPDP validation service.
+	 * Validate an electronic invoice file using the provider validation service.
 	 *
 	 * @param 	int 	$idinvoice 	ID of the invoice to validate
 	 * @param 	string 	$filePath 	Path to the invoice file to validate
-	 *
 	 * @return 	array|string 		Validation result or error message.
 	 */
 	public function validateEInvoiceFile($idinvoice, $filePath)
@@ -1063,7 +1062,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 * This function send an invoice to PDP
 	 *
 	 * @param	Facture		$object 	Invoice object
-	 * @return 	false|string|array{res:int<-1,1>,message:string}			flowId if the invoice was successfully sent, false otherwise.
+	 * @return 	false|string|array{res:int<-1,-1>,message:string}	flowId if the invoice was successfully sent, false otherwise.
 	 */
 	public function sendInvoice($object)
 	{
@@ -1439,10 +1438,6 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 		$response = getURLContent($url, $method, $params, 1, $httpheader, array('http', 'https'), 0, -1, 0, 0, array(), '_einvoicing');
 
-		// Neither key is guaranteed: getURLContent() sets 'content' only when the body is not empty
-		// (an Access Point answering 200 with no body, as a healthcheck does, has none), and on a curl
-		// failure - timeout, DNS, refused connection - it returns the error keys without 'http_code'.
-		// Reading them raw turned those two ordinary situations into PHP warnings.
 		$status_code = $response['http_code'] ?? 0;
 		$content = $response['content'] ?? '';
 		$body = 'Error';
@@ -1767,7 +1762,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		/* response param "total" not supported by SuperPDP
 		if ($limit == 0) {
 			$jsonparams = json_encode($params);
-			$response = $this->callApi($resource, "POST", $jsonparams);
+			$response = $this->callApi($resource, "POST", $jsonparams, array('Request-Id' => $uuid));
 
 			$totalFlows = 0;
 			if ($response['status_code'] != 200) {
@@ -1945,9 +1940,21 @@ class SuperPDPProvider extends AbstractPDPProvider
 							}
 							if ($rescode == 'PRODUCT_NOT_FOUND') {
 								$infostring = '';
+								if (!empty($res['actiondata']['socid'])) {
+									$socid = $res['actiondata']['socid'];
+									$tmpthirdparty = new Societe($db);
+									$tmpthirdparty->fetch($socid);
+									$infostring .= $langs->transnoentitiesnoconv("Supplier") . ': ' . $tmpthirdparty->name;
+								}
 								foreach ($res['actiondata'] ?? [] as $datakey => $dataval) {
-									if ($datakey && $dataval) {
-										$infostring .= ($infostring ? ', ' : '').$datakey.': '.$dataval;
+									if ($datakey && $dataval && in_array($datakey, array('supplierref', 'label'))) {
+										$transdatakey = ucfirst($datakey);
+										if ($transdatakey == 'Supplierref') {
+											$transdatakey = 'SupplierRef';
+										}
+										$infostring .= ($infostring ? ', ' : '');
+										$infostring .= $langs->transnoentitiesnoconv($transdatakey);
+										$infostring .= ': '.$dataval;
 									}
 								}
 								$actions[$rescode]['businessmessage'] = $langs->trans("CantFindProductFromTheImportedInvoice", $infostring);
