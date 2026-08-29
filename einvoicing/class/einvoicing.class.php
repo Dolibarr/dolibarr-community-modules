@@ -1555,6 +1555,17 @@ class EInvoicing
 		$resprints .= '</td>';
 		$resprints .= '</tr>';
 
+		// For STATUS_IGNORE invoices (in view mode), replace operational fields with a single
+		// explanatory line. The status field above stays editable so the user can override manually.
+		if ($action != 'create' && (int) ($currentStatusInfo['code'] ?? 0) === self::STATUS_IGNORE) {
+			$reason = $this->getIgnoreReason($object) ?? $langs->trans('EInvoiceIgnoreReasonUserChoice');
+			$resprints .= '<tr class="treinvoicing_collapseseparator">';
+			$resprints .= '<td>' . $form->textwithpicto($langs->trans('EInvoiceIgnoreReasonLabel'), $langs->transnoentitiesnoconv('EInvoiceIgnoreReasonLabelHelp')) . '</td>';
+			$resprints .= '<td>' . dol_escape_htmltag($reason) . '</td>';
+			$resprints .= '</tr>';
+			return $resprints;
+		}
+
 		// Display precheck result if errors or warnings
 		if (!empty($currentStatusInfo['ap_precheck_result'])) {
 			$precheckStatus = $currentStatusInfo['ap_precheck_status'] ?? '';
@@ -2082,6 +2093,7 @@ class EInvoicing
 		// In create mode only : we show a text input (the thirdparty is not yet in database, no routing line exists)
 		// In edit mode, we show the routing array
 		if ($mode == 'create') {
+			// Skip out-of-scope detection during creation: country and VAT status are not yet finalised.
 			$resprints .= '<tr class="treinvoicing_collapseseparator trrouting_id '.($expand_display ? '' : 'hidden').'">';
 			$resprints .= '<td class="">' . $form->textwithpicto($langs->trans("RoutingIdFieldShort"), $langs->trans("SpecificRoutingFieldHelp")) . '</td>';
 			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
@@ -2092,14 +2104,42 @@ class EInvoicing
 			$resprints .= '</tr>';
 
 			// Add a line for the Default product for thirdparty (to use when importing vendor invoice and no product found)
-			$resprints .= '<tr class="treinvoicing_collapseseparator trrouting_product_id '.($expand_display ? '' : 'hidden').'">';
-			$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
-			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
-			$resprints .= $this->selectVendorProduct($form, $object->id, $product_id, 'routing_product_id');
-			$resprints .= '</td>';
-			$resprints .= '</tr>';
+			// Vendors only, like in edit mode: the core sets fournisseur when the creation starts from the vendor area
+			if ($object->fournisseur > 0) {
+				$resprints .= '<tr class="treinvoicing_collapseseparator trrouting_product_id '.($expand_display ? '' : 'hidden').'">';
+				$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
+				$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
+				$resprints .= $this->selectVendorProduct($form, $object->id, $product_id, 'routing_product_id');
+				$resprints .= '</td>';
+				$resprints .= '</tr>';
+			}
 
 			return $resprints;
+		}
+
+		// Detect thirdparties that are structurally outside the e-invoicing scope (view/edit mode only).
+		// B2C is an invoice-level check and is intentionally omitted here.
+		$langs->load("einvoicing@einvoicing");
+		$outOfScopeReason = null;
+		if ($object->country_code != 'FR') {
+			$outOfScopeReason = $langs->trans('EInvoiceIgnoreReasonNotFR');
+		} elseif (getDolGlobalInt('EINVOICING_SKIP_B2C') && !$object->isACompany()) {
+			$outOfScopeReason = $langs->trans('EInvoiceIgnoreReasonB2C');
+		} elseif (isset($object->tva_assuj) && !$object->tva_assuj) {
+			$outOfScopeReason = $langs->trans('EInvoiceIgnoreReasonNotVATRegistered');
+		}
+		if ($outOfScopeReason !== null) {
+			$resprints .= '<tr class="treinvoicing_collapseseparator ' . ($expand_display ? '' : 'hidden') . '">';
+			$resprints .= '<td>' . $langs->trans('EInvoiceIgnoreReasonLabel') . '</td>';
+			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
+			$resprints .= dol_escape_htmltag($outOfScopeReason);
+			$resprints .= '</td>';
+			$resprints .= '</tr>';
+			// In view mode, routing and product fields are irrelevant — stop here.
+			// In edit mode, continue rendering them so the user can correct everything in one pass.
+			if ($mode != 'edit') {
+				return $resprints;
+			}
 		}
 
 		// Check if this thirdparty is present into einvoicing_extlinks table to know if it is an imported object
@@ -2228,6 +2268,10 @@ class EInvoicing
 	 * free to have set to anything: force it here, and give it back, so the combo cannot silently come
 	 * back empty.
 	 *
+	 * The field also follows the two setup options the core uses for its own product combos:
+	 * PRODUIT_USE_SEARCH_TO_SELECT (search form instead of a combo, with its minimum number of
+	 * characters) and PRODUIT_LIMIT_SIZE (number of products shown in a select).
+	 *
 	 * @param	Form	$form		Form handler
 	 * @param	int		$socid		Vendor id
 	 * @param	string	$selected	Product currently selected
@@ -2236,18 +2280,26 @@ class EInvoicing
 	 */
 	private function selectVendorProduct($form, $socid, $selected, $htmlname)
 	{
-		global $status;
+		global $conf, $status;
 
 		$savstatus = isset($status) ? $status : null;
 		$status = 1; // Products to buy
 
-		if (version_compare(DOL_VERSION, '22.0.0', '<')) {
-			// Before v22, select_produits_fournisseurs() uses print instead of return
-			ob_start();
-			$form->select_produits_fournisseurs($socid, $selected, $htmlname, '', '', array(), 0, 1, 'maxwidth300');
-			$out = ob_get_clean();
+		if (!empty($conf->use_javascript_ajax) && getDolGlobalString('PRODUIT_USE_SEARCH_TO_SELECT')) {
+			// Search form: product/ajax/products.php answers with PRODUIT_LIMIT_SIZE products at most
+			if (version_compare(DOL_VERSION, '22.0.0', '<')) {
+				// Before v22, select_produits_fournisseurs() uses print instead of return
+				ob_start();
+				$form->select_produits_fournisseurs($socid, $selected, $htmlname, '', '', array(), 0, 1, 'maxwidth300');
+				$out = ob_get_clean();
+			} else {
+				$out = $form->select_produits_fournisseurs($socid, $selected, $htmlname, '', '', array(), 0, 1, 'maxwidth300', '', 1);
+			}
 		} else {
-			$out = $form->select_produits_fournisseurs($socid, $selected, $htmlname, '', '', array(), 0, 1, 'maxwidth300', '', 1);
+			// Combo: select_produits_fournisseurs() asks the list without any limit, so it loads every
+			// product of the database. Call the list the way the core calls it for its own combos, with
+			// the number of products the user allowed in a select.
+			$out = $form->select_produits_fournisseurs_list($socid, $selected, $htmlname, '', '', '', $status, 0, getDolGlobalInt('PRODUIT_LIMIT_SIZE', 1000), 1, 'maxwidth300', getDolGlobalInt('SUPPLIER_SHOW_STOCK_IN_PRODUCTS_COMBO'));
 		}
 
 		$status = $savstatus;
@@ -3303,6 +3355,15 @@ class EInvoicing
 			$return = getDolGlobalInt('EINVOICING_DEFAULT_EINVOICE_STATUS_FOR_TAKEPOS', self::STATUS_IGNORE);
 		}
 
+		// Associations and non-VAT-registered entities (tva_assuj = 0) are outside the mandatory
+		// e-invoicing scope per DGFIP guidance: only VAT-registered entities (assujettis) are in scope.
+		// tva_assuj defaults to 1 in Dolibarr (both in the DB schema and the Societe class), so a value
+		// of 0 is an explicit, intentional flag — not an absent/unknown one.
+		// Placed after TakePOS so that EINVOICING_DEFAULT_EINVOICE_STATUS_FOR_TAKEPOS is always honoured.
+		if ($return == self::STATUS_NOT_GENERATED && isset($object->thirdparty->tva_assuj) && !$object->thirdparty->tva_assuj) {
+			$return = self::STATUS_IGNORE;
+		}
+
 		// TODO More tests to do...
 		// TODO Add hook
 
@@ -3322,6 +3383,40 @@ class EInvoicing
 		$status = $this->needEInvoiceManagement($object);
 
 		return !empty($status) && !self::isIgnoredStatus($status);
+	}
+
+
+	/**
+	 * Return a translated string explaining why e-invoicing is not managed for this invoice,
+	 * based on the same conditions as needEInvoiceManagement(). Returns null when no automatic
+	 * exclusion applies (the ignore status was set manually by the user).
+	 *
+	 * @param	Facture|FactureRec		$object		Invoice object (thirdparty must be loadable)
+	 * @return	string|null							Translated reason, or null if exclusion is a manual choice
+	 */
+	public function getIgnoreReason($object)
+	{
+		global $langs;
+		$langs->load("einvoicing@einvoicing");
+
+		if (empty($object->thirdparty->country_code)) {
+			$object->fetch_thirdparty();
+		}
+
+		if ($object->thirdparty->country_code != 'FR') {
+			return $langs->trans('EInvoiceIgnoreReasonNotFR');
+		}
+
+		if (getDolGlobalInt('EINVOICING_SKIP_B2C') && !$object->thirdparty->isACompany()) {
+			return $langs->trans('EInvoiceIgnoreReasonB2C');
+		}
+
+		if (isset($object->thirdparty->tva_assuj) && !$object->thirdparty->tva_assuj) {
+			return $langs->trans('EInvoiceIgnoreReasonNotVATRegistered');
+		}
+
+		// No automatic exclusion: the user manually set the status to IGNORE
+		return null;
 	}
 
 
