@@ -635,7 +635,8 @@ trait CommonProtocol
 
 				dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller ' . $nameMismatchWarning, LOG_WARNING);
 				dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller ' . $nameMismatchWarning, LOG_WARNING, 0, '_einvoicing');
-				setEventMessages($nameMismatchWarning, null, 'warnings');
+
+				setEventMessages($nameMismatchWarning, null, 'warnings', '', 1);
 			}
 		}
 
