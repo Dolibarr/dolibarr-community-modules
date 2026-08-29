@@ -994,6 +994,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$error = 0;
 		$alreadyExist = 0;
 		$syncedFlows = 0;
+		$postponedFlows = 0;	// Flows left unread on purpose, retried on the next run (see 'postponeflow')
 
 		// Call ID for logging purposes
 		$call_id = $response['call_id'] ?? null;
