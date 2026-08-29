@@ -116,7 +116,7 @@ class FacturXProtocol extends CIIProtocol
 			$xmlfile = $this->generateXML($invoice, $outputlangs);
 		} catch (Exception $e) {
 			dol_syslog(get_class($this) . "::generateInvoice failed to generate XML for invoice id=" . $invoice_id . ". Error " . $e->getMessage(), LOG_ERR);
-			$this->error = $langs->trans("ErrorGeneratingXML") . '. ' . $e->getMessage();
+			$this->error = $langs->trans("ErrorGeneratingXML") . '.<br>' . $e->getMessage();
 			$this->errors[] = $this->error;
 			return -1;
 		}
@@ -408,7 +408,7 @@ class FacturXProtocol extends CIIProtocol
 	 */
 	protected function doCreateSupplierInvoiceFromSource($file, $ReadableViewFile, $flowId, $tempFile, $tempFileReadableView)
 	{
-		global $conf, $db, $user;
+		global $conf, $db, $langs, $user;
 
 		// Duplicate code with doCreateSupplierInvoiceFromSource in CIIProtocol.class.php
 		// TODO Merge tis code with the one into CIIProtocol.class.php to avoid duplicate
@@ -640,7 +640,7 @@ class FacturXProtocol extends CIIProtocol
 			$this->openedTransactions--;
 			return [
 				'res' => -1,
-				'message' => 'Thirdparty sync or creation error: ' . implode("<br>\n", $return_messages),
+				'message' => "Thirdparty sync or creation error:<br>\n" . implode("<br>\n", $return_messages),
 				'actioncode' => $syncSocRes['actioncode'] ?? '',
 				'actionurl' => $syncSocRes['actionurl'] ?? '',
 				'action' => $syncSocRes['action'] ?? null,
@@ -665,10 +665,30 @@ class FacturXProtocol extends CIIProtocol
 		}
 
 		// Check if this invoice has already been imported for this supplier
-		$supplierInvoiceId = SupplierInvoiceHelper::findIdByRef($parsedHeader['documentno'] ?? null, (int) $socId);
+		$supplierInvoiceId = SupplierInvoiceHelper::findIdByRef($parsedHeader['documentno'] ?? null, (int) $socId, $parsedHeader['grandTotalAmount'] ?? 0);
+
+		if ($supplierInvoiceId == -3) {
+			$langs->load("bills");
+			$action = $langs->trans('FixTheAmountOrModifySupplierRef', $langs->transnoentitiesnoconv("RefSupplierBill"), $parsedHeader['documentno'], $langs->trans("Duplicate"));
+			$action .= ' <a class="butAction small smallpaddingimp nomarginleft" href="' . DOL_URL_ROOT.'/fourn/facture/list.php?search_refsupplier='.urlencode($parsedHeader['documentno'] ?? '').'&socid=' . (int) $socId. '" target="_blank">';
+			$action .= '<i class="fas fa-plus-circle"></i> ';
+			$action .= $langs->trans('ModifySupplierInvoice');
+			$action .= '</a>';
+
+			return [
+				'res' => -1,
+				'message' => SupplierInvoiceHelper::refLookupErrorMessage($supplierInvoiceId, $parsedHeader['documentno'] ?? '', 'while checking whether it was already imported'),
+				'actioncode' => 'SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT',
+				'actionurl' => 'none',
+				'actiondata' => array('supplierref' => $parsedHeader['documentno'], 'socid' => (int) $socId, 'expectedamount' => $parsedHeader['grandTotalAmount'] ?? 0),
+				'action' => $action
+			];
+		}
+
 		if ($supplierInvoiceId < 0) {
 			return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($supplierInvoiceId, $parsedHeader['documentno'] ?? '', 'while checking whether it was already imported')];
 		}
+
 		if ($supplierInvoiceId > 0) {
 			$einvoicing->cleanUpTemporaryFiles(); // Clean up temp files to remove retrieved Einvoice file since invoice already exists
 
@@ -788,7 +808,7 @@ class FacturXProtocol extends CIIProtocol
 
 			$res = $this->createSupplierInvoiceLinesFromSource($supplierInvoice, $parsedLines, $remise_already_used_line_level_ids, $supplierPriceEntries, $return_messages, $flowId);
 			if ($res['res'] < 0) {
-				return $res;
+				return $res;  // Return the full result array because it may contain additional information like actioncode, actionurl...
 			}
 
 			$create_deposit_line = 0;

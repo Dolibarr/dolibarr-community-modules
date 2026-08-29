@@ -1924,9 +1924,14 @@ class SuperPDPProvider extends AbstractPDPProvider
 							$actions[$rescode] = array(
 								'actionurl' => $res['actionurl'],
 								'actioncode' => ($res['actioncode'] ?? '0'),
-								'action' => $res['action']
+								'action' => $res['action'],
+								'actiondata' => $res['actiondata'] ?? array()
 							);
 
+							// Complete the $actions array with the Business error message
+							if ($rescode == 'SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT') {
+								$actions[$rescode]['businessmessage'] = $langs->trans("SupplierInvoiceFoundButWithdifferentAmount", $res['actiondata']['supplierref'], $res['actiondata']['expectedamount']);
+							}
 							if ($rescode == 'THIRDPARTY_NOT_FOUND') {
 								$infostring = '';
 								foreach ($res['actiondata'] ?? [] as $datakey => $dataval) {
@@ -2118,6 +2123,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 */
 	private static function updatedAtSortKey($updatedAt)
 	{
+		$reg = array();
 		if (!preg_match('/^([^.Z]+)(?:\.(\d+))?/', (string) $updatedAt, $reg)) {
 			return (string) $updatedAt;
 		}

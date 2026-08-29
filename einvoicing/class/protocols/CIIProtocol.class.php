@@ -35,6 +35,7 @@ require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
 require_once DOL_DOCUMENT_ROOT . '/core/class/discount.class.php';
 require_once DOL_DOCUMENT_ROOT . '/core/lib/files.lib.php';
 require_once DOL_DOCUMENT_ROOT . '/core/lib/date.lib.php';
+
 // dolChmod() only exists from Dolibarr 18, and both writers call it on the XML they just produced.
 if ((float) DOL_VERSION < 18) {
 	dol_include_once('/einvoicing/compat/files.lib.php');
@@ -787,7 +788,7 @@ class CIIProtocol extends AbstractProtocol
 	 */
 	protected function doCreateSupplierInvoiceFromSource($file, $ReadableViewFile, $flowId, $tempFile, $tempFileReadableView)
 	{
-		global $conf, $db, $user;
+		global $db, $user, $langs;
 
 		$einvoicing = new EInvoicing($db);
 		$return_messages = array();
@@ -811,8 +812,8 @@ class CIIProtocol extends AbstractProtocol
 		$parsedHeader = $this->parseInvoiceHeader($file);
 		$parsedLines = $this->parseInvoiceLines($file);
 
-		dol_syslog(get_class($this) . '::createSupplierInvoiceFromSource parsedHeader: ' . json_encode($parsedHeader), LOG_DEBUG);
-		dol_syslog(get_class($this) . '::createSupplierInvoiceFromSource parsedHeader: ' . json_encode($parsedHeader), LOG_DEBUG, 0, '_einvoicing');
+		dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource parsedHeader: ' . json_encode($parsedHeader), LOG_DEBUG);
+		dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource parsedHeader: ' . json_encode($parsedHeader), LOG_DEBUG, 0, '_einvoicing');
 
 		// Sync or create supplier based on seller info.
 		// Done before the duplicate/ref-docs checks below so those checks can be scoped to this supplier
@@ -861,10 +862,30 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		// Check if this invoice has already been imported for this supplier
-		$supplierInvoiceId = SupplierInvoiceHelper::findIdByRef($parsedHeader['documentno'] ?? null, (int) $socId);
+		$supplierInvoiceId = SupplierInvoiceHelper::findIdByRef($parsedHeader['documentno'] ?? null, (int) $socId, $parsedHeader['grandTotalAmount'] ?? 0);
+
+		if ($supplierInvoiceId == -3) {
+			$langs->load("bills");
+			$action = $langs->trans('FixTheAmountOrModifySupplierRef', $langs->transnoentitiesnoconv("RefSupplierBill"), $parsedHeader['documentno'], $langs->trans("Duplicate"));
+			$action .= ' <a class="butAction small smallpaddingimp nomarginleft" href="' . DOL_URL_ROOT.'/fourn/facture/list.php?search_refsupplier='.urlencode($parsedHeader['documentno'] ?? '').'&socid=' . (int) $socId. '" target="_blank">';
+			$action .= '<i class="fas fa-plus-circle"></i> ';
+			$action .= $langs->trans('ModifySupplierInvoice');
+			$action .= '</a>';
+
+			return [
+				'res' => -1,
+				'message' => SupplierInvoiceHelper::refLookupErrorMessage($supplierInvoiceId, $parsedHeader['documentno'] ?? '', 'while checking whether it was already imported'),
+				'actioncode' => 'SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT',
+				'actionurl' => 'none',
+				'actiondata' => array('supplierref' => $parsedHeader['documentno'], 'socid' => (int) $socId, 'expectedamount' => $parsedHeader['grandTotalAmount'] ?? 0),
+				'action' => $action
+			];
+		}
+
 		if ($supplierInvoiceId < 0) {
 			return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($supplierInvoiceId, $parsedHeader['documentno'] ?? '', 'while checking whether it was already imported')];
 		}
+
 		if ($supplierInvoiceId > 0) {
 			$einvoicing->cleanUpTemporaryFiles(); // Clean up temp files to remove retrieved Einvoice file since invoice already exists
 
@@ -1137,6 +1158,7 @@ class CIIProtocol extends AbstractProtocol
 
 	/**
 	 * Add lines to a supplier invoice from e-invoice parsed lines
+	 *
 	 * @param 	FactureFournisseur 	$supplierInvoice						The supplier invoice to add lines on
 	 * @param 	array 				$parsedLines							The parsed lines data (previously extracted from e-invoice)
 	 * @param 	array 				$remise_already_used_line_level_ids		The list of ids for remise already used

@@ -720,11 +720,12 @@ class SupplierInvoiceHelper
 	 * never searched for as a substring, the substring must be delimited so that "FA202610" does not
 	 * match "FA2026100", and an ambiguity is reported instead of guessed.
 	 *
-	 * @param	string|null	$ref	Reference to look for (ExchangedDocument/ID or IssuerAssignedID of the XML)
-	 * @param	int			$socId	Id of the supplier thirdparty
-	 * @return	int					Invoice id (>0) on a single certain match, 0 when not found, -1 on database error, -2 when several invoices match
+	 * @param	string|null	$ref		Reference to look for (ExchangedDocument/ID or IssuerAssignedID of the XML)
+	 * @param	int			$socId		Id of the supplier thirdparty
+	 * @param	float		$total_ttc	If set, check that total amount of the invoicewe is ok.
+	 * @return	int						Invoice id (>0) on a single certain match, 0 when not found, -1 on database error, -2 when several invoices match, -3 found the ref butnot with the expected amount
 	 */
-	public static function findIdByRef($ref, int $socId): int
+	public static function findIdByRef($ref, int $socId, float $total_ttc): int
 	{
 		global $db;
 
@@ -734,7 +735,7 @@ class SupplierInvoiceHelper
 		}
 
 		// Exact match. Always tried first, and always enough on its own.
-		$sql = "SELECT rowid FROM " . $db->prefix() . "facture_fourn";
+		$sql = "SELECT rowid, total_ttc FROM " . $db->prefix() . "facture_fourn";
 		$sql .= " WHERE ref_supplier = '" . $db->escape($ref) . "'";
 		$sql .= " AND fk_soc = " . ((int) $socId);
 		$sql .= " AND entity IN (" . getEntity('facture_fourn') . ")";
@@ -745,8 +746,14 @@ class SupplierInvoiceHelper
 			return -1;
 		}
 		$obj = $db->fetch_object($resql);
+
 		$db->free($resql);
 		if ($obj) {
+			if ($total_ttc && ($obj->total_ttc != $total_ttc)) {
+				dol_syslog(__METHOD__ . ' found a supplier invoice matching the ref "' . $ref . '" for socid ' . ((int) $socId) . ' but not with the expected amount ' . $total_ttc, LOG_WARNING);
+				return -3;
+			}
+
 			return (int) $obj->rowid;
 		} elseif (getDolGlobalInt('EINVOICING_TOLERANT_SUPPLIER_REF_MATCH')) {
 			// Tolerant fallback, opt-in and deliberately narrow. Everything that widens the match is
@@ -757,7 +764,7 @@ class SupplierInvoiceHelper
 				return 0;
 			}
 
-			$sql = "SELECT rowid, ref_supplier FROM " . $db->prefix() . "facture_fourn";
+			$sql = "SELECT rowid, ref_supplier, total_ttc FROM " . $db->prefix() . "facture_fourn";
 			$sql .= " WHERE REPLACE(ref_supplier, ' ', '') LIKE '%" . $db->escape($db->escapeforlike($refNoSpaces)) . "%'";
 			$sql .= " AND fk_soc = " . ((int) $socId);
 			$sql .= " AND entity IN (" . getEntity('facture_fourn') . ")";
@@ -767,10 +774,12 @@ class SupplierInvoiceHelper
 				return -1;
 			}
 			$matches = array();
+			$grandTotal = 0;
 			while ($obj = $db->fetch_object($resql)) {
 				// The SQL LIKE is only a prefilter, the delimiter rule below is what decides
 				if (self::refEmbedsReference($obj->ref_supplier, $ref)) {
 					$matches[(int) $obj->rowid] = (int) $obj->rowid;
+					$grandTotal = $obj->total_ttc;
 				}
 			}
 			$db->free($resql);
@@ -779,7 +788,13 @@ class SupplierInvoiceHelper
 				dol_syslog(__METHOD__ . ' several supplier invoices embed reference "' . $ref . '" for socid ' . ((int) $socId) . ', ids ' . implode(',', $matches), LOG_WARNING);
 				return -2;
 			}
+
 			if (count($matches) == 1) {
+				if ($total_ttc && ($grandTotal != $total_ttc)) {
+					dol_syslog(__METHOD__ . ' found a supplier invoice matching the supplier invoice ref "' . $ref . '" for socid ' . ((int) $socId) . ' but not with the expected amount ' . $total_ttc, LOG_WARNING);
+					return -3;
+				}
+
 				$found = (int) reset($matches);
 				dol_syslog(__METHOD__ . ' reference "' . $ref . '" matched supplier invoice id ' . $found . ' by tolerant match', LOG_NOTICE);
 				return $found;
@@ -806,6 +821,9 @@ class SupplierInvoiceHelper
 
 		if ($code == -2) {
 			return 'Several supplier invoices match reference "' . $ref . '" ' . $context . ', cannot determine which one to use';
+		}
+		if ($code == -3) {
+			return 'Found a supplier invoice matching "' . $ref . '" for the thirdparty (but with non matching expected amount) ' . $context . ', cannot determine which one to use';
 		}
 
 		return 'Database error while looking for a supplier invoice with reference "' . $ref . '" ' . $context . ': ' . $db->lasterror();
