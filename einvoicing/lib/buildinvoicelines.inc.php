@@ -535,14 +535,20 @@ foreach ($object->lines as $line) {
 	if ($line->remise_percent) {
 		$line_unit_price_with_discount = $line_unit_price * (1 - $line->remise_percent / 100);
 	}
-	if ($object->type == $object::TYPE_SITUATION && $line->situation_percent) {
-		$line_unit_price_with_discount = $line_unit_price_with_discount * $line->situation_percent / 100;
-	}
-	$line_unit_price_with_discount = price2num($line_unit_price_with_discount, getDolGlobalString('MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY', 'MU'));
-
 	// Progress of the line, which only a situation invoice carries: calcul_price_total() applies it
 	// after the discount, exactly like the amounts of the invoice were computed.
-	$line_progress = ($object->type == $object::TYPE_SITUATION && $line->situation_percent) ? $line->situation_percent : 100;
+	// The test is on the presence of the progress, not on its truthiness: a line left at 0 % has a
+	// progress of zero, which used to be read as "no progress at all" and to fall back to 100 %, so
+	// the document carried the whole amount of a line the invoice did not invoice yet (issue #666).
+	$line_progress = 100;
+	if ($object->type == $object::TYPE_SITUATION && isset($line->situation_percent) && (string) $line->situation_percent !== '') {
+		$line_progress = (float) $line->situation_percent;
+	}
+
+	if ($line_progress != 100) {
+		$line_unit_price_with_discount = $line_unit_price_with_discount * $line_progress / 100;
+	}
+	$line_unit_price_with_discount = price2num($line_unit_price_with_discount, getDolGlobalString('MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY', 'MU'));
 
 	// The amounts of the line are asked to the very function that computed the invoice
 	// (calcul_price_total(), the one update_price() calls), instead of being computed a second time
@@ -560,7 +566,7 @@ foreach ($object->lines as $line) {
 	// Uncomment for test using the most accurate possible calculation (but not following the e-invoice rule to round to 2 digit at each step of calculation)
 	if (getDolGlobalInt('EINVOICING_USE_DOLIBARR_ALREADY_CALCULATED_AMOUNTS')) {
 		$line_unit_price = $line->subprice;								// Note, 4 digits seems common accuracy for unit price with einvoice but default dolibarr setup is 5.
-		$line_unit_price_with_discount = price2num($line->subprice * (1 - $line->remise_percent / 100) * ($line->situation_percent ? $line->situation_percent / 100 : 1), 'MU');
+		$line_unit_price_with_discount = price2num($line->subprice * (1 - $line->remise_percent / 100) * ($line_progress / 100), 'MU');
 		$line_total_ht = $line->total_ht;
 		$line_total_tva = $line->total_tva;
 		$line_total_ttc = $line->total_ttc;
