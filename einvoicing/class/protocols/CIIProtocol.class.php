@@ -866,7 +866,7 @@ class CIIProtocol extends AbstractProtocol
 
 		if ($supplierInvoiceId == -3) {
 			$langs->load("bills");
-			$action = $langs->trans('FixTheAmountOrModifySupplierRef', $langs->transnoentitiesnoconv("RefSupplierBill"), $parsedHeader['documentno'], $langs->trans("Duplicate"));
+			$action = $langs->trans('FixTheAmountOrModifySupplierRef', $langs->transnoentitiesnoconv("RefSupplierBill"), $parsedHeader['documentno'] ?? '', $langs->trans("Duplicate"));
 			$action .= ' <a class="butAction small smallpaddingimp nomarginleft" href="' . DOL_URL_ROOT.'/fourn/facture/list.php?search_refsupplier='.urlencode($parsedHeader['documentno'] ?? '').'&socid=' . (int) $socId. '" target="_blank">';
 			$action .= '<i class="fas fa-plus-circle"></i> ';
 			$action .= $langs->trans('ModifySupplierInvoice');

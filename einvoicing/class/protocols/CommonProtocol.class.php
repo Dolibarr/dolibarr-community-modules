@@ -1179,6 +1179,7 @@ trait CommonProtocol
 
 			$errorDetails = [];
 			$createParams = [];
+			$allactiondata = [];
 
 			if (!empty($prodRef)) {
 				$errorDetails[] = 'Ref: '.$prodRef;
