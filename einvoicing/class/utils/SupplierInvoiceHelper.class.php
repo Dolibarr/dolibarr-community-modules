@@ -722,10 +722,10 @@ class SupplierInvoiceHelper
 	 *
 	 * @param	string|null	$ref		Reference to look for (ExchangedDocument/ID or IssuerAssignedID of the XML)
 	 * @param	int			$socId		Id of the supplier thirdparty
-	 * @param	float		$total_ttc	If set, check that total amount of the invoicewe is ok.
-	 * @return	int						Invoice id (>0) on a single certain match, 0 when not found, -1 on database error, -2 when several invoices match, -3 found the ref butnot with the expected amount
+	 * @param	float		$total_ttc	If set, check that the total amount of the invoice is the expected one. 0 to look the reference up without checking any amount.
+	 * @return	int						Invoice id (>0) on a single certain match, 0 when not found, -1 on database error, -2 when several invoices match, -3 when the reference matches but not with the expected amount
 	 */
-	public static function findIdByRef($ref, int $socId, float $total_ttc): int
+	public static function findIdByRef($ref, int $socId, float $total_ttc = 0): int
 	{
 		global $db;
 
