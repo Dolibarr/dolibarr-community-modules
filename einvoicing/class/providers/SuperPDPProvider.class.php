@@ -2374,6 +2374,10 @@ class SuperPDPProvider extends AbstractPDPProvider
 						$retarray['actionurl'] = $res['actionurl'] ?? null;
 						$retarray['action'] = $res['action'] ?? null;
 						$retarray['actiondata'] = $res['actiondata'] ?? null;
+						// A failure that stored nothing may be retried later: the flag and the message that
+						// goes with it have to reach syncFlows(), which is what decides to carry on.
+						$retarray['postponeflow'] = $res['postponeflow'] ?? null;
+						$retarray['businessmessage'] = $res['businessmessage'] ?? null;
 
 						return $retarray;
 					} else {
