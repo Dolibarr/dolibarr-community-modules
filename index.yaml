@@ -1,5 +1,41 @@
 
 packages:
+  - modulename: 'DoliSecure'
+    author: 'Joliciel'
+    author_url: 'https://joliciel.fr'
+    maintener_email: 'laurent.bouquet@joliciel.fr'
+    label:
+      fr: 'DoliSecure'
+      en: 'DoliSecure'
+      it: 'DoliSecure'
+      es: 'DoliSecure'
+      de: 'DoliSecure'
+    description:
+      fr: 'Vérifie que la version de Dolibarr installée n’est pas affectée par une vulnérabilité connue (CVE), via la base publique NVD. Affiche un indicateur de danger sur la page d’accueil, envoie un email aux administrateurs dès qu’une nouvelle vulnérabilité est détectée, et fournit une page de rapport détaillée listant chaque CVE.'
+      en: 'Checks that the installed Dolibarr version is not affected by any known vulnerability (CVE), by querying the public NVD database. Shows a danger-level indicator on the home page, emails administrators as soon as a new vulnerability is detected, and provides a detailed report page listing every CVE.'
+      it: 'Verifica che la versione di Dolibarr installata non sia interessata da vulnerabilità note (CVE) interrogando il database pubblico NVD. Mostra un indicatore del livello di pericolo nella pagina principale, invia un’e-mail agli amministratori non appena viene rilevata una nuova vulnerabilità e fornisce una pagina di report dettagliato che elenca ogni CVE.'
+      es: 'Comprueba que la versión de Dolibarr instalada no esté afectada por ninguna vulnerabilidad conocida (CVE) consultando la base de datos pública NVD. Muestra un indicador de nivel de peligro en la página de inicio, envía un correo electrónico a los administradores en cuanto se detecta una nueva vulnerabilidad y proporciona una página de informe detallado que lista cada CVE.'
+      de: 'Prüft, ob die installierte Dolibarr-Version von bekannten Sicherheitslücken (CVEs) betroffen ist, indem die öffentliche NVD-Datenbank abgefragt wird. Zeigt einen Indikator für die Gefahrenstufe auf der Startseite an, sendet den Administratoren eine E-Mail, sobald eine neue Sicherheitslücke erkannt wird, und bietet eine detaillierte Berichtsseite, die jeden CVE auflistet.'
+    status: 'enabled'
+    created_at: '2026-08-21'
+    last_updated_at: "2026-08-30"
+    category: '79'
+    git: 'https://github.com/Dolibarr/dolibarr-community-modules/tree/main/dolisecure'
+    git-branch: 'main'
+    git-system: 'github'
+    cover: 'https://raw.githubusercontent.com/Dolibarr/dolibarr-community-modules/main/dolisecure/cover.png'
+    current_version: "1.0.10"
+    dolibarrmin: "21.0"
+    dolibarrmax: "24.0"
+    phpmin: "7.2"
+    phpmax: ""
+    price: 0
+    # direct-download is yes if we can download the module to install it in application
+    direct-download: 'yes'
+    # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
+    dolistore-upload: 'manual'
+
+
   - modulename: 'EInvoicing'
     author: 'Dolibarr foundation'
     author_url: 'https://www.dolibarr.org'
@@ -22,7 +58,7 @@ packages:
     phpmax: ""
     price: 0
     created_at: '2025-10-10'
-    last_updated_at: "2026-08-25"
+    last_updated_at: "2026-08-30"
     # direct-download is yes if we can download the module to install it in application. Use 'dolistore' to force download from dolistore using dolistore-download
     direct-download: 'yes'
     # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
@@ -44,7 +80,7 @@ packages:
       en: 'Provides a way to make an online checkout of any membership dues, donation, customer invoice or customer order with the HelloAsso API. Also offer an option to synchronize membership.'
     status: 'enabled'
     created_at: '2024-12-10'
-    last_updated_at: "2026-08-25"
+    last_updated_at: "2026-08-30"
     category: '68, 67'
     git: 'https://github.com/Dolibarr/dolibarr-community-modules/tree/main/helloasso'
     git-branch: 'main'
@@ -91,3 +127,35 @@ packages:
     direct-download: no
     dolistore-upload: 'no'
     dolistore-download: ''
+
+
+  - modulename: 'Stancer'
+    author: 'CAP-REL'
+    author_url: 'https://cap-rel.fr'
+    maintener_email: 'eric.seigne@cap-rel.fr'
+    label:
+      fr: 'Stancer (par CAP-REL)'
+      en: 'Stancer (by CAP-REL)'
+    description:
+      fr: 'Encaissez vos factures, commandes, propositions commerciales, cotisations et dons par carte bancaire (avec 3D Secure) ou par prélèvement SEPA via la plateforme de paiement Stancer. Gère les mandats SEPA, les rejets de prélèvement avec leurs codes ISO 20022, les remboursements, les litiges, le rapprochement bancaire des virements Stancer et les paiements automatiques par tâche planifiée.'
+      en: 'Collect payments for your invoices, orders, proposals, memberships and donations by credit card (with 3D Secure) or SEPA direct debit through the Stancer payment platform. Handles SEPA mandates, direct debit rejections with their ISO 20022 codes, refunds, disputes, bank reconciliation of Stancer payouts and automatic payments through a scheduled job.'
+    status: 'enabled'
+    created_at: '2023-03-12'
+    last_updated_at: "2026-08-30"
+    category: '68, 67'
+    git: 'https://github.com/Dolibarr/dolibarr-community-modules/tree/main/stancer'
+    git-branch: 'main'
+    git-system: 'github'
+    cover: 'https://raw.githubusercontent.com/Dolibarr/dolibarr-community-modules/main/stancer/cover.png'
+    current_version: "2.0.22"
+    dolibarrmin: '15'
+    dolibarrmax: "24.0"
+    phpmin: '7.4'
+    phpmax: ""
+    price: 0
+    # direct-download is yes if we can download the module to install it in application
+    direct-download: yes
+    # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
+    dolistore-upload: 'manual'
+    # dolistore-download is url of product page for download if module can also be found on dolistore.com
+    dolistore-download: 'https://www.dolistore.com/product.php?id=623'
