@@ -42,7 +42,7 @@
       </ram:SpecifiedTradeProduct>
       <ram:SpecifiedLineTradeAgreement>
         <ram:NetPriceProductTradePrice>
-          <ram:ChargeAmount>100.05000</ram:ChargeAmount>
+          <ram:ChargeAmount>50.02500</ram:ChargeAmount>
         </ram:NetPriceProductTradePrice>
       </ram:SpecifiedLineTradeAgreement>
       <ram:SpecifiedLineTradeDelivery>
@@ -60,8 +60,8 @@
             <udt:Indicator>false</udt:Indicator>
           </ram:ChargeIndicator>
           <ram:CalculationPercent>10.00</ram:CalculationPercent>
-          <ram:BasisAmount>500.25</ram:BasisAmount>
-          <ram:ActualAmount>50.03</ram:ActualAmount>
+          <ram:BasisAmount>250.13</ram:BasisAmount>
+          <ram:ActualAmount>25.01</ram:ActualAmount>
           <ram:ReasonCode>95</ram:ReasonCode>
         </ram:SpecifiedTradeAllowanceCharge>
         <ram:SpecifiedTradeSettlementLineMonetarySummation>

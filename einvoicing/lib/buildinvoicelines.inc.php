@@ -614,12 +614,16 @@ foreach ($object->lines as $line) {
 		'prodOriginCountry'         => null,
 
 		// Mandatory by Factur-X, EN 16931
-		// This is the unit price, excluding tax. We can use
-		// $line_unit_price_with_discount
-		// or
-		//$line_unit_price but we must add block TradeAllowanceCharge
-		//'netpriceamount'            => $line_unit_price_with_discount,		// BT-148 / BT-146
-		'netpriceamount'            => $line_unit_price,		// BT-148 / BT-146
+		// This is the unit price, excluding tax. The discount of the line is deliberately left out
+		// of it: it is stated as a line allowance (BG-27) further down, whose basis is this price
+		// times the quantity, which is the other way EN 16931 offers to write a discounted line and
+		// the one this module has always used. Stating $line_unit_price_with_discount here instead
+		// would need the TradeAllowanceCharge block of BT-148 / BT-147.
+		// The progress of a situation line, on the contrary, belongs to this price: without it the
+		// document states a price and a quantity whose product is not its own line amount (BT-131),
+		// and a receiver rebuilding the amounts from them - this module does exactly that when it
+		// imports - reads the whole line instead of the part that is invoiced (issue #672).
+		'netpriceamount'            => (float) ($line_progress != 100 ? price2num($line_unit_price * $line_progress / 100, 'MU') : $line_unit_price),		// BT-146
 		'netpricebasisquantity'     => null,
 		'netpricebasisquantityunitcode' => null,
 
