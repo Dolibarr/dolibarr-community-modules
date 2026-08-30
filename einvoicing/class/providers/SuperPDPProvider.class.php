@@ -2146,7 +2146,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 *
 	 * @param string 		$flowId        	FlowId
 	 * @param string|null 	$call_id  		Call ID for logging purposes
-	 * @return array{res:int<-1,1>, message:string, postponeflow?:int, actioncode?:string|null, actionurl?:string|null, action?:string|null, actiondata?:array<string,mixed>|null, businessmessage?:string|null} Returns array with 'res' (1 on success, 0 if exists or already processed, -1 on failure) with a 'message' and for business errors an optional 'actioncode', 'actionurl' and 'action'. 'postponeflow' marks a failure that stored nothing, so the batch may go on and the flow be retried later.
+	 * @return array{res:int<-1,1>, message:string, postponeflow?:int, actioncode?:string|null, actionurl?:string|null, action?:string|null, actiondata?:array<string,mixed>|null, businessmessage?:string} Returns array with 'res' (1 on success, 0 if exists or already processed, -1 on failure) with a 'message' and for business errors an optional 'actioncode', 'actionurl' and 'action'. 'postponeflow' marks a failure that stored nothing, so the batch may go on and the flow be retried later.
 	 */
 	public function syncFlow($flowId, $call_id = null)
 	{
@@ -2375,9 +2375,14 @@ class SuperPDPProvider extends AbstractPDPProvider
 						$retarray['action'] = $res['action'] ?? null;
 						$retarray['actiondata'] = $res['actiondata'] ?? null;
 						// A failure that stored nothing may be retried later: the flag and the message that
-						// goes with it have to reach syncFlows(), which is what decides to carry on.
-						$retarray['postponeflow'] = $res['postponeflow'] ?? null;
-						$retarray['businessmessage'] = $res['businessmessage'] ?? null;
+						// goes with it have to reach syncFlows(), which is what decides to carry on. Both are
+						// set only when the import sent them, so the shape stays the one declared above.
+						if (!empty($res['postponeflow'])) {
+							$retarray['postponeflow'] = (int) $res['postponeflow'];
+						}
+						if (!empty($res['businessmessage'])) {
+							$retarray['businessmessage'] = (string) $res['businessmessage'];
+						}
 
 						return $retarray;
 					} else {
