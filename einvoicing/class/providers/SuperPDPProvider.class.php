@@ -1914,7 +1914,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 								'actionurl' => ($res['actionurl'] ?? ''),
 								'actioncode' => $res['actioncode'],
 								'action' => $res['action'],
-								'businessmessage' => $langs->trans("CantReadTheDocumentOfTheImportedInvoice", $flow['flowId'])
+								// A postponed flow says itself what happened when it can: only the caller knows
+								// whether the document was unreadable or referenced an invoice that is missing.
+								'businessmessage' => (empty($res['businessmessage']) ? $langs->trans("CantReadTheDocumentOfTheImportedInvoice", $flow['flowId']) : $res['businessmessage'])
 									. $form->textwithpicto('', "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], 1, 'help', '', 0, 2, 'help')
 							);
 
