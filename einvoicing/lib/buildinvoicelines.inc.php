@@ -440,7 +440,8 @@ foreach ($object->lines as $line) {
 	// The second method need to use the field BT-113. We don't use it as we use the first method.
 	$depositFactRef  = null;
 	$depositFactDate = null;
-	if ($line->desc == '(DEPOSIT)') {
+	$lineDiscount    = null;	// Discount the line was built from, when it is a discount line
+	if ($line->desc == '(DEPOSIT)' && !empty($line->fk_remise_except)) {
 		$isDepositLine   = 1;
 		$depositFactRef  = "";
 		$depositFactDate = new DateTime();
@@ -450,6 +451,7 @@ foreach ($object->lines as $line) {
 		dol_syslog("Fetch discount " . $line->fk_remise_except . ", res=" . $resdiscount, LOG_DEBUG);
 
 		if ($resdiscount > 0) {
+			$lineDiscount = $discount;
 			$origFact    = new Facture($this->db);
 			$resOrigFact = $origFact->fetch($discount->fk_facture_source);
 			dol_syslog("Fetch origFact " . $discount->fk_facture_source . ", res=" . $resOrigFact, LOG_DEBUG);
@@ -483,9 +485,16 @@ foreach ($object->lines as $line) {
 		$resdiscount = $discount->fetch($line->fk_remise_except);
 		dol_syslog("Fetch discount " . $line->fk_remise_except . ", res=" . $resdiscount, LOG_DEBUG);
 
+		$lineDiscount = ($resdiscount > 0 ? $discount : null);
+
+		// BT-97. The description of a discount built from another piece is a sentinel, not a text to
+		// show: resolved here, the customer reads which credit note or which excess payment is deducted
+		// instead of '(CREDIT_NOTE)'. A discount entered by hand keeps the reason that was typed.
+		$discountReason = einvoicingDiscountLabel($lineDiscount, $discount->description ?? '', $outputlangs);
+
 		$globalDiscounts[] = array(
 			'value' => (float) $discount->total_ht,
-			'reason' => $discount->description ?? 'REMISE',
+			'reason' => $discountReason ?: ($discount->description ?? 'REMISE'),
 			'taxRate' => (float) $discount->tva_tx,
 			'categoryVAT' => $categoryVAT,
 		);
@@ -546,6 +555,15 @@ foreach ($object->lines as $line) {
 		if ($libelle == $description) {
 			$description = "";
 		}
+	}
+
+	// A discount line still standing at this point is a deposit deducted from the invoice, and its
+	// description is the sentinel the core stores, not a text meant to be read. Left as it is, the
+	// customer reads '(DEPOSIT)' as the name of the line (BT-153).
+	$discountLabel = einvoicingDiscountLabel($lineDiscount, $line->desc ?? '', $outputlangs);
+	if ($discountLabel !== '') {
+		$libelle     = $discountLabel;
+		$description = "";
 	}
 
 	// Billing period of the line
