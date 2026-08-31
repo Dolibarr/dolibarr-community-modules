@@ -932,6 +932,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 			if (!empty($directory['ppf_identifier']) && empty($directory['ppf_identifier_registered'])) {
 				$lines[] = '<b>' . $langs->trans('RemoteInfoRoutingIdentifierNotRegistered', $directory['ppf_expected_identifier'], 'SuperPDP') . '</b>';
 				$directory['ppf_error'] = true;
+
+				$lines[] = "";
 			}
 
 			// Identity held by the Access Point for the company. Not available anywhere else: the session
@@ -944,7 +946,6 @@ class SuperPDPProvider extends AbstractPDPProvider
 				$localaddress = trim($mysoc->address . ' ' . $mysoc->zip . ' ' . $mysoc->town . ' ' . $mysoc->country_code);
 				$localnumber = idprof($mysoc);
 
-				$lines[] = "";
 				$lines[] = $langs->trans('RemoteInfoCompanyIdentity', 'SuperPDP', $remotename . ' - ' . ($company['number_scheme'] ?? '') . ' ' . $remotenumber);
 				$lines[] = $langs->trans('RemoteInfoCompanyAddress', 'SuperPDP', $remoteaddress);
 
@@ -964,6 +965,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		} else {
 			$lines[] = $langs->trans('RemoteInfoDirectoryError') . ' (HTTP ' . ($directory['status_code'] ?? 'N/A') . ')';
 		}
+		$lines[] = "";
 
 		// Show registered PA for your company (Peppol directory)
 		$tokenData = $this->getTokenData();
