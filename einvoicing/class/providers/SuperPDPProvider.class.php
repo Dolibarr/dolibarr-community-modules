@@ -915,9 +915,13 @@ class SuperPDPProvider extends AbstractPDPProvider
 			if (empty($directory['ppf_identifier'])) {
 				$lines[] = $langs->trans('RemoteInfoPPFNoEntry', 'SuperPDP', $paName);
 			} else {
-				$lines[] = $langs->trans('RemoteInfoPPFDetection', 'SuperPDP', $paName) . ($directory['ppf_status'] !== 'error' ? ' <span class="smallimp">['. $directory['ppf_identifier'] . ' - ' . $langs->trans('RemoteInfoPPFStatusDetail', $directory['ppf_status']) . ' - ' . ($directory['ppf_status'] === 'error' ? $directory['ppf_message'] : $directory['ppf_effective_date']).']</span>' : '');
-				if ($directory['ppf_status'] === 'error') {
-					$lines[] = '<span class="smallimp">'. $langs->trans("Message").': '.$directory['ppf_identifier'] . ' - ' . $langs->trans('RemoteInfoPPFStatusDetail', $directory['ppf_status']) . ' - ' . $directory['ppf_message'].']</span>';
+				if ($directory['ppf_status'] !== 'error') {
+					$lines[] = $langs->trans('RemoteInfoPPFDetection', 'SuperPDP', $paName) . ' <span class="smallimp">['. $directory['ppf_identifier'] . ' - ' . $langs->trans('RemoteInfoPPFStatusDetail', $directory['ppf_status']) . ' - ' . ($directory['ppf_status'] === 'error' ? $directory['ppf_message'] : $directory['ppf_effective_date']).']</span>';
+				} else {
+					$lines[] = $langs->trans('RemoteInfoPPFDetection', 'SuperPDP', $paName);
+					$form = new Form($this->db);
+					print $form->textwithpicto('', $langs->trans("Message").': '.$directory['ppf_identifier'] . ' - ' . $langs->trans('RemoteInfoPPFStatusDetail', $directory['ppf_status']) . ' - ' . $directory['ppf_message']);
+					//$lines[] = '<span class="smallimp">'. $langs->trans("Message").': '.$directory['ppf_identifier'] . ' - ' . $langs->trans('RemoteInfoPPFStatusDetail', $directory['ppf_status']) . ' - ' . $directory['ppf_message'].']</span>';
 				}
 			}
 			if (!empty($directory['listof_other_ppf_identifiers'])) {
