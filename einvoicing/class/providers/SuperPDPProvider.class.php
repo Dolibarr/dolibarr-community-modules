@@ -964,7 +964,6 @@ class SuperPDPProvider extends AbstractPDPProvider
 		} else {
 			$lines[] = $langs->trans('RemoteInfoDirectoryError') . ' (HTTP ' . ($directory['status_code'] ?? 'N/A') . ')';
 		}
-		$lines[] = "";
 
 		// Show registered PA for your company (Peppol directory)
 		$tokenData = $this->getTokenData();
