@@ -75,6 +75,22 @@ class DiscountSentinelTest extends CommonClassTest
 	}
 
 	/**
+	 * The list of the sentinels is the one of the core, spelled exactly as the core spells it. It is
+	 * pinned here because it is shared by the resolution and by the last look that reports a sentinel
+	 * having reached a field of the document: a fifth entry, or one spelling drifting, would silently
+	 * make one of the four unresolvable again.
+	 *
+	 * @return void
+	 */
+	public function testTheSentinelsAreTheOnesOfTheCore()
+	{
+		$this->assertSame(
+			array('(CREDIT_NOTE)', '(DEPOSIT)', '(EXCESS RECEIVED)', '(EXCESS PAID)'),
+			array_keys(einvoicingDiscountSentinels())
+		);
+	}
+
+	/**
 	 * The four sentinels are resolved, each into the text of the core for the case it stands for, and
 	 * each naming the piece the amount comes from. The spelling of the four is not homogeneous -
 	 * '(CREDIT_NOTE)' holds an underscore where '(EXCESS PAID)' and '(EXCESS RECEIVED)' hold a space -
