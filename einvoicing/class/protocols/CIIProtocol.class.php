@@ -3315,6 +3315,19 @@ class CIIProtocol extends AbstractProtocol
 			if ($line->product_type < 9 && $line->total_ht != 0) { // Remove lines with product_type greater than or equal to 9 and no need to create discount if amount is null
 				$keyforvatrate = $line->tva_tx . ($line->vat_src_code ? ' (' . $line->vat_src_code . ')' : '');
 
+				// Open the accumulators for a rate met for the first time. Adding to a key that does not
+				// exist yet is what the core does here, and it costs six "Undefined array key" warnings
+				// per deposit converted - silent on a web page, but they are real and they pile up in the
+				// PHP log of every synchronization that imports an invoice linked to a deposit.
+				if (!isset($amount_ht[$keyforvatrate])) {
+					$amount_ht[$keyforvatrate] = 0;
+					$amount_tva[$keyforvatrate] = 0;
+					$amount_ttc[$keyforvatrate] = 0;
+					$multicurrency_amount_ht[$keyforvatrate] = 0;
+					$multicurrency_amount_tva[$keyforvatrate] = 0;
+					$multicurrency_amount_ttc[$keyforvatrate] = 0;
+				}
+
 				$amount_ht[$keyforvatrate] += $line->total_ht;
 				$amount_tva[$keyforvatrate] += $line->total_tva;
 				$amount_ttc[$keyforvatrate] += $line->total_ttc;
