@@ -977,7 +977,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 			} else {
 				$lines[] = $langs->trans('RemoteInfoPeppolPAMismatch', $detectedPA);
 				if (strcasecmp($detectedPA, 'SuperPDP') !== 0) {	// If not SuperPDP, show a warning
-					$msg = '<span class="opacitymedium">'.$langs->trans('RemoteInfoPeppolPAMismatchCheck', $detectedPA);
+					$msg = '<span class="smallimp">'.$langs->trans('RemoteInfoPeppolPAMismatchCheck', $detectedPA);
 					if (!empty($directory['ppf_identifier'])) {
 						$msg .= ' <b>'.$langs->trans('RemoteInfoPeppolPAMismatchRequestPortability', 'SuperPDP').'</b>';
 					}
