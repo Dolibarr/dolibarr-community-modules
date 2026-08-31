@@ -521,6 +521,14 @@ class EInvoicing
 	 */
 	public const EXTRAFIELD_BUYER_ORDER_REFERENCE = 'buyer_order_reference';
 
+	/**
+	 * ISO/IEC 6523 scheme identifier of the French routing code ("code de routage"), the scheme the
+	 * Chorus Pro "code service exécutant" is declared under as BT-46 by BR-FR-CPRO-11 and
+	 * BR-FR-CPRO-13 of XP Z12-012. Not to be confused with 0225 (e-invoice address) nor with 0002 /
+	 * 0009 (SIREN / SIRET), which identify the legal entity itself.
+	 */
+	public const SCHEME_FR_ROUTING_CODE = '0224';
+
 
 	/**
 	 * Constructor

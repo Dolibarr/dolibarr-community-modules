@@ -256,6 +256,38 @@ if (!empty($newlang)) {
 }
 $outputlangs->load("einvoicing@einvoicing");
 
+// Buyer routing code: the Chorus Pro "code service exécutant", which BR-FR-CPRO-11 and BR-FR-CPRO-13
+// of XP Z12-012 read as a private identifier of the buyer (BT-46 under scheme 0224). Without it, a
+// B2G invoice to a buyer whose directory record demands a service code is rejected (issue #678).
+//
+// It is a SECOND ram:GlobalID on the buyer party, and only the EXTENDED profiles accept one: the
+// Factur-X EN16931 Schematron caps that element at a single occurrence (FX-SCH-A-000164,
+// "Element 'ram:GlobalID' may occur at maximum 1 times"), so emitting it below EXTENDED makes the
+// document invalid - measured on the FNFE validator, which answers "valid, 0 failure" on the very
+// same invoice built as EXTENDED-CTC-FR. The Annexe B examples say the same thing: the routing code
+// appears in the EXTENDED and EXTENDED-CTC-FR files of an invoice and not in its EN16931 twin.
+// Below EXTENDED the code is simply not sent, and the user is told why rather than handed a document
+// an access point refuses.
+$buildProfile = $this->getBuildXmlProfile();
+$buyerRoutingCode = trim((string) ($object->array_options['options_d4d_service_code'] ?? ''));
+if ($buyerRoutingCode !== '' && $buyerParty->country_code != 'FR') {
+	// Scheme 0224 is the French routing code: it means nothing for a buyer of another country.
+	$buyerRoutingCode = '';
+}
+if ($buyerRoutingCode !== '' && !preg_match('/^[A-Za-z0-9+\-_.]{1,100}$/', $buyerRoutingCode)) {
+	// BR-FR-24 and BR-FR-26 are both "fatal" on that identifier: alphanumerics plus "+-_." only, and
+	// 100 characters at most. The service code is free text typed by a user, so a value that would
+	// make the whole document invalid is left out and reported, never emitted.
+	$this->warnings[] = $outputlangs->trans('EInvoiceRoutingCodeRejected', $buyerRoutingCode);
+	dol_syslog('einvoicing: Chorus service code "' . $buyerRoutingCode . '" breaks BR-FR-24 / BR-FR-26, BT-46 scheme 0224 not emitted', LOG_WARNING);
+	$buyerRoutingCode = '';
+}
+if ($buyerRoutingCode !== '' && !$this->isExtendedProfile($buildProfile)) {
+	$this->warnings[] = $outputlangs->trans('EInvoiceRoutingCodeNeedsExtendedProfile', $buyerRoutingCode, $buildProfile);
+	dol_syslog('einvoicing: Chorus service code "' . $buyerRoutingCode . '" not emitted as BT-46 scheme 0224, profile ' . $buildProfile . ' allows a single buyer GlobalID', LOG_WARNING);
+	$buyerRoutingCode = '';
+}
+
 
 // Project
 if (! ($object->project instanceof Project)) {
@@ -846,6 +878,7 @@ $invoiceData = [
 
 	'buyervatnumber'            => $buyerParty->tva_intra ?? '',
 	'buyerGlobalIds'            => [['schemeID' => $schemeGlobalIdProf, 'value' => $globalIdProf]],
+	'buyerRoutingCode'          => ($buyerRoutingCode !== '' ? $buyerRoutingCode : null),
 
 	'buyerLegalOrgId'           => $idprof,
 	'buyerLegalOrgScheme'       => $schemeIdProf,

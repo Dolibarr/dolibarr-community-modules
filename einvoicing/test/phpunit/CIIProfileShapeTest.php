@@ -461,6 +461,108 @@ class CIIProfileShapeTest extends CommonClassTest
 	}
 
 	/**
+	 * The buyer routing code travels as a second ram:GlobalID of the buyer party, and only the
+	 * EXTENDED profiles may carry it.
+	 *
+	 * Scheme 0224 is where BR-FR-CPRO-11 and BR-FR-CPRO-13 read the Chorus Pro service code, but it
+	 * is a second identifier for the party, and the Factur-X EN16931 Schematron caps that element at
+	 * one occurrence (FX-SCH-A-000164): a document below EXTENDED that carries both is refused. The
+	 * Annexe B examples of XP Z12-012 agree - the routing code is in the EXTENDED and EXTENDED-CTC-FR
+	 * files of an invoice, absent from its EN16931 twin (issue #678).
+	 *
+	 * @return void
+	 */
+	public function testBuyerRoutingCodeIsOnlyEmittedByTheExtendedProfiles()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		$data = $this->baseInvoiceData();
+		$data['buyerRoutingCode'] = 'CDROUT1';
+
+		foreach (CIIProtocol::SUPPORTED_XML_PROFILES as $profile) {
+			$xml = $protocol->buildXML($data, $this->baseLinesData(), $profile);
+			$found = $this->partyGlobalIds($xml, 'BuyerTradeParty');
+
+			if ($profile === 'MINIMUM') {
+				$this->assertSame([], $found, 'MINIMUM declares no identifier for the buyer party');
+			} elseif (in_array($profile, ['EXTENDED', 'EXTENDEDFR'], true)) {
+				$this->assertSame(
+					[['0225', '12345678200019'], ['0224', 'CDROUT1']],
+					$found,
+					$profile . ' must carry the legal identifier and the routing code'
+				);
+			} else {
+				$this->assertSame(
+					[['0225', '12345678200019']],
+					$found,
+					$profile . ' allows a single buyer identifier, the routing code must be left out'
+				);
+			}
+		}
+	}
+
+	/**
+	 * The routing code of the buyer never reaches the deliver-to party.
+	 *
+	 * That party is built from the same data in minimal mode, and its own identifier is BT-71, the
+	 * identifier of a location. Writing the buyer routing code there means the wrong term, and a
+	 * second ram:GlobalID its Schematron rule caps at one as well (FX-SCH-A-000452).
+	 *
+	 * @return void
+	 */
+	public function testBuyerRoutingCodeNeverReachesTheDeliverToParty()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		// No _shipFromContactShip on purpose: that is the path where the deliver-to party is built as
+		// a stripped-down copy of the buyer, hence the one that could carry the routing code along.
+		$data = $this->baseInvoiceData();
+		$data['buyerRoutingCode'] = 'CDROUT1';
+
+		foreach (['EXTENDED', 'EXTENDEDFR'] as $profile) {
+			$xml = $protocol->buildXML($data, $this->baseLinesData(), $profile);
+
+			$this->assertSame(
+				[['0225', '12345678200019'], ['0224', 'CDROUT1']],
+				$this->partyGlobalIds($xml, 'BuyerTradeParty'),
+				$profile . ' must carry the routing code on the buyer'
+			);
+			foreach ($this->partyGlobalIds($xml, 'ShipToTradeParty') as $globalId) {
+				$this->assertNotSame('0224', $globalId[0], $profile . ' must not route-code the deliver-to party');
+			}
+		}
+	}
+
+	/**
+	 * Read the (schemeID, value) pairs of the ram:GlobalID of a party.
+	 *
+	 * @param	string				$xml	Generated XML
+	 * @param	string				$tag	Local name of the party element
+	 * @return	array<array<string>>		One [schemeID, value] pair per identifier, in document order
+	 */
+	private function partyGlobalIds(string $xml, string $tag)
+	{
+		$doc = new DOMDocument();
+		$this->assertTrue($doc->loadXML($xml), 'generated document is not well-formed XML');
+
+		$found = [];
+		$parties = $doc->getElementsByTagName($tag);
+		if ($parties->length > 0) {
+			foreach ($parties->item(0)->childNodes as $child) {
+				if ($child instanceof DOMElement && $child->localName === 'GlobalID') {
+					$found[] = [$child->getAttribute('schemeID'), $child->nodeValue];
+				}
+			}
+		}
+
+		return $found;
+	}
+
+	/**
 	 * The contract reference (BT-12) is absent from the MINIMUM schema and declared everywhere else.
 	 *
 	 * @return void
