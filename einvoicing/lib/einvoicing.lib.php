@@ -790,3 +790,36 @@ function einvoicingInvoicingPeriodFromLines($billingPeriod)
 
 	return array('start' => $start, 'end' => $end);
 }
+
+/**
+ * Commit the module sources were built from, empty string when it cannot be known.
+ *
+ * An installed module has no repository to ask: the zip is unpacked into custom/ and that is
+ * all there is. So the packager writes the commit it built from into a COMMIT file at the root
+ * of the module (dev/build/makepack-modules.php), and reading that file back is the whole
+ * mechanism - nothing is executed here, only one file is read.
+ *
+ * The commit is deliberately NOT part of the version: einvoicing/VERSION is compared with
+ * version_compare() by the core (DolibarrModules::checkForUpdate()) against the VERSION file
+ * published on GitHub, and it names both the package and the release tag in the packager. A
+ * build suffix there would turn the "update available" flag into a lexicographic comparison of
+ * hexadecimal, and every build into a new tag. A file of its own costs none of that.
+ *
+ * An installation whose sources predate the stamp gets no commit and the caller falls back to
+ * the version alone, exactly as before.
+ *
+ * @return	string	Short commit hash, or '' when the sources are not stamped
+ */
+function einvoicingModuleCommit()
+{
+	$stampfile = dirname(__DIR__).'/COMMIT';
+
+	if (is_readable($stampfile)) {
+		$commit = trim((string) file_get_contents($stampfile));
+		if (preg_match('/^[0-9a-f]{7,40}$/', $commit)) {
+			return $commit;
+		}
+	}
+
+	return '';
+}
