@@ -805,10 +805,12 @@ function einvoicingInvoicingPeriodFromLines($billingPeriod)
  * build suffix there would turn the "update available" flag into a lexicographic comparison of
  * hexadecimal, and every build into a new tag. A file of its own costs none of that.
  *
- * An installation whose sources predate the stamp gets no commit and the caller falls back to
- * the version alone, exactly as before.
+ * A deployment made from a clone of the repository rather than from a package has no stamp and
+ * never will, so the repository metadata is read as a second source. An installation answering
+ * to neither - sources predating the stamp, an unpacked zip built before it - gets no commit,
+ * and the caller falls back to the version alone, exactly as before.
  *
- * @return	string	Short commit hash, or '' when the sources are not stamped
+ * @return	string	Short commit hash, or '' when neither source answers
  */
 function einvoicingModuleCommit()
 {
@@ -821,5 +823,75 @@ function einvoicingModuleCommit()
 		}
 	}
 
+	// Deployed from a clone: no stamp was ever written, but the checkout itself knows. Two
+	// places are looked at and no more - the module directory, when the module is a repository
+	// of its own, and the directory above it, which is this repository.
+	foreach (array(dirname(__DIR__), dirname(__DIR__, 2)) as $repodir) {
+		$commit = einvoicingCheckoutCommit($repodir);
+		if ($commit !== '') {
+			return $commit;
+		}
+	}
+
 	return '';
+}
+
+/**
+ * Commit at the tip of a repository checkout, read from its metadata files.
+ *
+ * git is not run: a module has no business executing commands, and exec() is forbidden on a
+ * good many hostings anyway. What is read is what `git rev-parse HEAD` would resolve - HEAD,
+ * then the ref it names, as a file of its own or as a line of packed-refs - through the two
+ * indirections a checkout may add: a .git that is a file naming the real directory (a linked
+ * worktree, a submodule), and refs kept in the repository the worktree came from.
+ *
+ * Anything unexpected returns an empty string. This names sources, it never decides anything.
+ *
+ * @param	string	$repodir	Directory expected to hold the .git of a checkout
+ * @return	string				Short commit hash, or '' when it is not a readable checkout
+ */
+function einvoicingCheckoutCommit($repodir)
+{
+	$gitdir = $repodir.'/.git';
+
+	// A linked worktree and a submodule replace .git with a file naming the real directory
+	$reg = array();
+	if (is_file($gitdir) && preg_match('/^gitdir:\s*(\S.*)$/m', (string) file_get_contents($gitdir), $reg)) {
+		$gitdir = trim($reg[1]);
+		if (strpos($gitdir, '/') !== 0) {
+			$gitdir = $repodir.'/'.$gitdir;
+		}
+	}
+	if (!is_dir($gitdir) || !is_readable($gitdir.'/HEAD')) {
+		return '';
+	}
+
+	$head = trim((string) file_get_contents($gitdir.'/HEAD'));
+	if (preg_match('/^[0-9a-f]{40,}$/', $head)) {
+		return substr($head, 0, 7);		// detached HEAD carries the commit itself
+	}
+	if (!preg_match('#^ref:\s*(refs/\S+)#', $head, $reg)) {
+		return '';
+	}
+	$ref = $reg[1];
+
+	// A linked worktree has a HEAD of its own but shares the refs of the main repository
+	$refdir = $gitdir;
+	if (is_readable($gitdir.'/commondir')) {
+		$commondir = trim((string) file_get_contents($gitdir.'/commondir'));
+		$refdir = (strpos($commondir, '/') === 0 ? $commondir : $gitdir.'/'.$commondir);
+	}
+
+	$commit = '';
+	if (is_readable($refdir.'/'.$ref)) {
+		$commit = trim((string) file_get_contents($refdir.'/'.$ref));
+	} elseif (is_readable($refdir.'/packed-refs')) {
+		// git packs refs away instead of keeping one file each: "<commit> <refname>" per line
+		$packed = (string) file_get_contents($refdir.'/packed-refs');
+		if (preg_match('/^([0-9a-f]{40,})\s+'.preg_quote($ref, '/').'$/m', $packed, $reg)) {
+			$commit = $reg[1];
+		}
+	}
+
+	return (preg_match('/^[0-9a-f]{40,}$/', $commit) ? substr($commit, 0, 7) : '');
 }
