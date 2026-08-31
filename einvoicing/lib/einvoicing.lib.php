@@ -805,6 +805,10 @@ function einvoicingInvoicingPeriodFromLines($billingPeriod)
  * build suffix there would turn the "update available" flag into a lexicographic comparison of
  * hexadecimal, and every build into a new tag. A file of its own costs none of that.
  *
+ * Whichever source answers, the commit is named on seven characters. `git rev-parse --short`
+ * returns the shortest unambiguous prefix, which is a property of the repository on the machine
+ * that built the package and grows with it, so the stamp is not a stable length on its own.
+ *
  * A deployment made from a clone of the repository rather than from a package has no stamp and
  * never will, so the repository metadata is read as a second source. An installation answering
  * to neither - sources predating the stamp, an unpacked zip built before it - gets no commit,
@@ -819,7 +823,7 @@ function einvoicingModuleCommit()
 	if (is_readable($stampfile)) {
 		$commit = trim((string) file_get_contents($stampfile));
 		if (preg_match('/^[0-9a-f]{7,40}$/', $commit)) {
-			return $commit;
+			return substr($commit, 0, 7);
 		}
 	}
 
