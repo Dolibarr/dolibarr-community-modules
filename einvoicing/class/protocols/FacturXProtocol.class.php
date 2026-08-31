@@ -710,7 +710,29 @@ class FacturXProtocol extends CIIProtocol
 					return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($refDocInvoiceId, $refDoc, 'linked to document ' . ($parsedHeader['documentno'] ?? ''))];
 				}
 				if ($refDocInvoiceId == 0) {
-					return ['res' => -1, 'message' => 'Document : ' . $refDoc . ' linked to document ' . $parsedHeader['documentno'] . ' not found in Dolibarr'];
+					// The invoice references a document this Dolibarr does not hold: the final invoice of a
+					// deposit, the invoice a credit note credits, the one a replacement replaces. Nothing has
+					// been created at this point, so the flow is postponed rather than failed: it is retried
+					// on the next synchronization, and the invoices queued behind it keep coming in. What the
+					// user has to do cannot be guessed from a technical message, so it is spelled out with a
+					// link to the screen where the missing invoice is created.
+					$langs->load("bills");
+					$action = $langs->trans('CreateTheMissingSupplierInvoiceToImport', $refDoc);
+					$action .= ' <a class="butAction small smallpaddingimp nomarginleft" href="' . DOL_URL_ROOT . '/fourn/facture/card.php?action=create&socid=' . (int) $socId . '&ref_supplier=' . urlencode($refDoc) . '" target="_blank">';
+					$action .= '<i class="fas fa-plus-circle"></i> ';
+					$action .= $langs->trans('NewBill');
+					$action .= '</a>';
+
+					return [
+						'res' => -1,
+						'postponeflow' => 1,
+						'message' => 'Document : ' . $refDoc . ' linked to document ' . $parsedHeader['documentno'] . ' not found in Dolibarr',
+						'actioncode' => 'LINKED_INVOICE_NOT_FOUND',
+						'actionurl' => 'none',
+						'actiondata' => array('supplierref' => $refDoc, 'linkedref' => ($parsedHeader['documentno'] ?? ''), 'socid' => (int) $socId),
+						'action' => $action,
+						'businessmessage' => $langs->trans('CantFindLinkedInvoiceOfTheImportedInvoice', ($parsedHeader['documentno'] ?? ''), $refDoc)
+					];
 				}
 			}
 		}
