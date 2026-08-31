@@ -34,7 +34,7 @@ if ((float) DOL_VERSION < 19) {
 }
 require_once __DIR__ . "/einvoicing.class.php";
 dol_include_once('/einvoicing/class/providers/PDPProviderManager.class.php');
-dol_include_once('/einvoicing/class/helpers/SupplierInvoiceHelper.class.php');
+dol_include_once('/einvoicing/class/utils/SupplierInvoiceHelper.class.php');
 
 
 /**
@@ -487,6 +487,12 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					print '<div class="info">' . $langs->trans('EInvoiceCreditNoteOfRefusedInvoice', $sourceRef) . '</div>';
 				}
 
+				if ($object->status == FactureFournisseur::STATUS_DRAFT &&
+					$user->hasRight('facture', 'write') &&
+					!SupplierInvoiceHelper::isSupplierImportInvoiceLinesAuto($object->socid)) {
+					print dolGetButtonAction($langs->trans('EinvoiceImportLines'), '', 'default', dol_buildpath('/fourn/facture/card.php?id=' . $object->id . '&action=reimportLines&token=' . newToken(), 1), 'einvoicing_import_lines_button', true);
+				}
+
 				$url_button = array();
 				foreach ($availableStatuses as $code => $label) {
 					$url_button[] = array(
@@ -505,12 +511,6 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 						print dolGetButtonAction($langs->trans('einvoice'), '', 'default', $url_button, '', true);
 					} else {
 						print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true);
-					}
-
-					if ($object->status == FactureFournisseur::STATUS_DRAFT &&
-						$user->hasRight('facture', 'write') &&
-						!SupplierInvoiceHelper::isSupplierImportInvoiceLinesAuto($object->socid)) {
-						print dolGetButtonAction($langs->trans('EinvoiceImportLines'), '', 'default', dol_buildpath('/fourn/facture/card.php?id=' . $object->id . '&action=reimportLines&token=' . newToken(), 1), 'einvoicing_import_lines_button', true);
 					}
 				}
 			}
@@ -1011,6 +1011,22 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 						setEventMessages($langs->trans('FailedToSetDefaultRoutingID').' '.$einvoicing->error, null, 'errors');
 					}
 				}
+			}
+
+			// Update default import type for supplier invoice lines creation
+			if (in_array($action, array('update', 'set_supplierinvoicelinesimporttype')) && !empty($socId) && $permissiontoedit) {
+				$supplierInvoiceLinesImportType = GETPOSTINT('einvoicing_supplier_invoice_lines_import_type');
+
+				if (!in_array($supplierInvoiceLinesImportType, array(
+					Einvoicing::SUPPLIER_INVOICE_LINES_IMPORT_USE_GLOBAL_CONFIG,
+					Einvoicing::SUPPLIER_INVOICE_LINES_IMPORT_AUTO,
+					Einvoicing::SUPPLIER_INVOICE_LINES_IMPORT_MANUAL,
+				))) {
+					$supplierInvoiceLinesImportType = Einvoicing::SUPPLIER_INVOICE_LINES_IMPORT_USE_GLOBAL_CONFIG;
+				}
+				$einvoicing = new EInvoicing($db);
+				$soc = new Societe($db);
+				$einvoicing->insertOrUpdateExtraField($socId, $soc->element, 'einvoicing_supplier_invoice_lines_import_type', (string) $supplierInvoiceLinesImportType);
 			}
 		}
 

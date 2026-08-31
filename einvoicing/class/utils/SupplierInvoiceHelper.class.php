@@ -453,12 +453,14 @@ class SupplierInvoiceHelper
 	{
 		global $db;
 
-		$soc = new Societe($db);
-
 		if ($socId > 0) {
-			$res = $soc->fetch($socId);
-			if ($res > 0 && isset($soc->array_options['options_einvoicing_supplier_invoice_lines_import_type']) && $soc->array_options['options_einvoicing_supplier_invoice_lines_import_type'] > 0) {
-				return $soc->array_options['options_einvoicing_supplier_invoice_lines_import_type'] == Einvoicing::SUPPLIER_INVOICE_LINES_IMPORT_AUTO;
+			$soc = new Societe($db);
+
+			$einvoicing = new EInvoicing($db);
+			$importType = $einvoicing->getExtraFieldValue($socId, $soc->element, 'einvoicing_supplier_invoice_lines_import_type');
+
+			if (isset($importType) && $importType != Einvoicing::SUPPLIER_INVOICE_LINES_IMPORT_USE_GLOBAL_CONFIG) {
+				return $importType == Einvoicing::SUPPLIER_INVOICE_LINES_IMPORT_AUTO;
 			} else {
 				return getDolGlobalInt('EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_TYPE') == Einvoicing::SUPPLIER_INVOICE_LINES_IMPORT_AUTO;
 			}
