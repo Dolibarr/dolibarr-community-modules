@@ -4,6 +4,7 @@
  * Copyright (C) 2026		Charlene Benke			<charlene@patas-monkey.com>
  * Copyright (C) 2026       Frédéric France         <frederic.france@free.fr>
  * Copyright (C) 2026		Jose Martinez				<jose.martinez@pichinov.com>
+ * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -1822,6 +1823,105 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			return -1;
 		}
 
+		return 0;
+	}
+
+	/**
+	 * Hook: Generate .txt preview for CII XML files.
+	 *
+	 * When document lists are displayed (via showdocuments), this hook automatically
+	 * creates a .txt version of any file ending with '_cii.xml'. The .txt extension
+	 * ensures dolIsAllowedForPreview() returns true (text/plain is in the allowed
+	 * preview mime types), enabling the preview link in the UI. The .txt file is
+	 * generated on-demand and will be automatically cleaned up by downloadDocument
+	 * or topmenu hooks after 1 hour to avoid disk clutter.
+	 *
+	 * @param  array          $parameters	Hook parameters (includes filedir, modulepart)
+	 * @param  CommonObject   $object		Current object
+	 * @param  string         $action		Current action
+	 * @param  HookManager    $hookmanager	Hook manager
+	 * @return int							0
+	 */
+	public function showDocuments($parameters, &$object, &$action, $hookmanager)
+	{
+		$filedir = &$parameters['filedir'];
+		$modulepart = &$parameters['modulepart'];
+
+		if (!in_array($modulepart, array('facture', 'propal', 'commande', 'societe'))) {
+			return 0;
+		}
+
+		foreach (glob($filedir.'/*_cii.xml') as $xml) {
+			$txt = $xml.'.txt';
+			if (!file_exists($txt) || filemtime($txt) < filemtime($xml)) {
+				file_put_contents($txt, file_get_contents($xml));
+				touch($txt, time());
+			}
+		}
+		return 0;
+	}
+
+	/**
+	 * Hook: Cleanup stale .txt preview files on file access.
+	 *
+	 * Runs when any document is served via document.php. Scans the directory of the
+	 * requested file and removes any _cii.xml.txt files older than 1 hour. This ensures
+	 * temporary preview files do not accumulate when users access other documents.
+	 * Works in conjunction with showDocuments (which generates the files) and topmenu
+	 * (which provides global cleanup for files never accessed).
+	 *
+	 * @param  array          $parameters	Hook parameters (includes modulepart, fullpath_original_file)
+	 * @param  CommonObject   $object		Current object
+	 * @param  string         $action		Current action
+	 * @param  HookManager    $hookmanager	Hook manager
+	 * @return int							0
+	 */
+	public function downloadDocument($parameters, &$object, &$action, $hookmanager)
+	{
+		$modulepart = $parameters['modulepart'];
+		$dir = dirname($parameters['fullpath_original_file']);
+
+		if (in_array($modulepart, array('facture', 'propal', 'commande', 'societe', 'medias'))) {
+			foreach (glob($dir.'/*_cii.xml.txt') as $old) {
+				if (filemtime($old) < time() - 3600) {
+					unlink($old);
+				}
+			}
+		}
+		return 0;
+	}
+
+	/**
+	 * Hook: Global cleanup of stale .txt preview files.
+	 *
+	 * Runs on every page load (via topmenu hook). Performs a throttled (once per 5 minutes
+	 * per session) cleanup of all _cii.xml.txt files older than 1 hour across all
+	 * supported modules (facture, propal, commande, societe). This ensures preview files
+	 * are removed even if users never access document.php again after generation.
+	 * Complements downloadDocument which cleans up files only in accessed directories.
+	 *
+	 * @param  array          $parameters	Hook parameters
+	 * @param  CommonObject   $object		Current object
+	 * @param  string         $action		Current action
+	 * @param  HookManager    $hookmanager	Hook manager
+	 * @return int							0
+	 */
+	public function topmenu($parameters, &$object, &$action, $hookmanager)
+	{
+		global $conf;
+
+		if (!isset($_SESSION['cii_cleanup']) || $_SESSION['cii_cleanup'] < time() - 300) {
+			$_SESSION['cii_cleanup'] = time();
+			$modules = array('facture', 'propal', 'commande', 'societe');
+			foreach ($modules as $module) {
+				$dir = $conf->$module->dir_output;
+				foreach (glob($dir.'/*/*_cii.xml.txt') as $file) {
+					if (filemtime($file) < time() - 3600) {
+						unlink($file);
+					}
+				}
+			}
+		}
 		return 0;
 	}
 }
