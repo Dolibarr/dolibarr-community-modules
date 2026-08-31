@@ -910,7 +910,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$directory = $this->checkDirectoryStatus();
 
 		if ($directory['status_code'] == 200) {
-			$paName = (!$directory['ppf_error'] && $directory['ppf_status'] !== null) ? 'SuperPDP' : $langs->trans('RemoteInfoPAUndetermined');
+			$paName = (!$directory['ppf_error'] && $directory['ppf_status'] !== null) ? 'SuperPDP' : $langs->transnoentitiesnoconv('RemoteInfoPAUndetermined');
 
 			if (empty($directory['ppf_identifier'])) {
 				$lines[] = $langs->trans('RemoteInfoPPFNoEntry', 'SuperPDP', $paName);
@@ -923,6 +923,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 			if (!empty($directory['listof_peppol_identifiers'])) {
 				$lines[] = $langs->trans('RemoteInfoPeppolEntries', $directory['listof_peppol_identifiers']);
 			}
+
+			$lines[] = "";
 
 			// The address the invoices are signed with must have a directory entry, otherwise the platform
 			// answers "unknown address". Reported only when the company does have entries: when it has none,
@@ -953,10 +955,10 @@ class SuperPDPProvider extends AbstractPDPProvider
 					$directory['ppf_error'] = true;
 				}
 				if ($remotename !== '' && $mysoc->name !== '' && strcasecmp($remotename, (string) $mysoc->name) != 0) {
-					$lines[] = $langs->trans('RemoteInfoNameMismatch', 'SuperPDP', $remotename, $mysoc->name);
+					$lines[] = '<span class="smallimp">'.$langs->trans('RemoteInfoNameMismatch', 'SuperPDP', $remotename, $mysoc->name).'</span>';
 				}
 				if ($remoteaddress !== '' && $localaddress !== '' && strcasecmp(preg_replace('/[^a-z0-9]/i', '', $remoteaddress), preg_replace('/[^a-z0-9]/i', '', $localaddress)) != 0) {
-					$lines[] = $langs->trans('RemoteInfoAddressMismatch', 'SuperPDP', $remoteaddress, $localaddress);
+					$lines[] = '<span class="smallimp">'.$langs->trans('RemoteInfoAddressMismatch', 'SuperPDP', $remoteaddress, $localaddress).'</span>';
 				}
 			}
 		} else {
@@ -975,10 +977,11 @@ class SuperPDPProvider extends AbstractPDPProvider
 			} else {
 				$lines[] = $langs->trans('RemoteInfoPeppolPAMismatch', $detectedPA);
 				if (strcasecmp($detectedPA, 'SuperPDP') !== 0) {	// If not SuperPDP, show a warning
-					$msg = $langs->trans('RemoteInfoPeppolPAMismatchCheck', $detectedPA);
+					$msg = '<span class="opacitymedium">'.$langs->trans('RemoteInfoPeppolPAMismatchCheck', $detectedPA);
 					if (!empty($directory['ppf_identifier'])) {
 						$msg .= ' <b>'.$langs->trans('RemoteInfoPeppolPAMismatchRequestPortability', 'SuperPDP').'</b>';
 					}
+					$msg .= '</span>';
 					$lines[] = $msg;
 
 					$directory['ppf_error'] = true;
