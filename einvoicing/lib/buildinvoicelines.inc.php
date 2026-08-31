@@ -691,6 +691,29 @@ foreach ($object->lines as $line) {
 	$numligne++;
 }
 
+// Last look for a sentinel that reached a field the customer reads. Everything above resolves the four
+// of them, so anything left here is a way of building a document that this file does not know about -
+// which is not a supposition: the resolution was written for the reason of a document level allowance
+// and the item name of a deposit line was found carrying the sentinel afterwards, at the second look.
+//
+// The test is an equality, never an inclusion: a line of work named 'Reprise (DEPOSIT) du chantier' is
+// a legitimate text and must go out untouched. And it reports rather than refuses - a marker in an item
+// name is ugly, not invalid, and holding back an invoice over it would cost the seller more than it
+// saves.
+$discountSentinels = array_keys(einvoicingDiscountSentinels());
+foreach ($linesData as $numligne => $vals) {
+	foreach (array('prodname' => 'BT-153', 'proddesc' => 'BT-154') as $field => $businessTerm) {
+		if (in_array((string) ($vals[$field] ?? ''), $discountSentinels, true)) {
+			dol_syslog("EInvoicing: line ".$numligne." of ".$object->ref." carries the unresolved discount marker ".$vals[$field]." in ".$businessTerm.". The line is a discount whose source piece could not be read.", LOG_ERR);
+		}
+	}
+}
+foreach ($globalDiscounts as $discountIndex => $vals) {
+	if (in_array((string) ($vals['reason'] ?? ''), $discountSentinels, true)) {
+		dol_syslog("EInvoicing: allowance ".$discountIndex." of ".$object->ref." carries the unresolved discount marker ".$vals['reason']." in BT-97. The discount source piece could not be read.", LOG_ERR);
+	}
+}
+
 // Rounding convention of the totals.
 // Dolibarr sums the amounts already rounded on each line ("total of round", the default), unless
 // MAIN_ROUNDOFTOTAL_NOT_TOTALOFROUND is set, in which case it rounds the sum instead ("round of

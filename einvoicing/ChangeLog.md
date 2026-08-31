@@ -11,7 +11,11 @@ e-invoice, so the item name of a deducted deposit (BT-153) and the reason of a d
 amount comes from. The resolution follows the test of the core - an exact description on a line that
 really carries a discount - rather than a search through the text, which would rename a line of work
 quoting the string and would miss two of the four markers, spelled with a space where the first is
-spelled with an underscore.
+spelled with an underscore. A marker that reaches a field of the document all the same is reported in
+the log, naming the line and the business term it landed in: the resolution was written for the reason
+of an allowance, and the item name of a deposit line was found carrying the marker afterwards, so the
+document is looked at once more before it goes out. It is reported and not refused - a marker in an item
+name is ugly, not invalid, and holding an invoice back over it would cost the seller more than it saves.
 
 FIX: The amount an invoice declares as already paid (BT-113) now also counts an excess payment or a
 deposit held against it, where only a credit note was counted. Everything it forgot there, it claimed

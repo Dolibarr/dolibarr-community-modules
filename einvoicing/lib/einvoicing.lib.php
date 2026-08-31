@@ -792,7 +792,7 @@ function einvoicingInvoicingPeriodFromLines($billingPeriod)
 }
 
 /**
- * Text a discount line stands for, in place of the sentinel Dolibarr stores in its description.
+ * The four sentinels Dolibarr stores in the description of a discount, and the text each stands for.
  *
  * A discount built from another piece - a credit note applied, a deposit deducted, an excess payment
  * carried over - carries no text of its own: the core writes one of four sentinels in the description
@@ -807,6 +807,23 @@ function einvoicingInvoicingPeriodFromLines($billingPeriod)
  * even spelled alike: '(CREDIT_NOTE)' holds an underscore where '(EXCESS PAID)' and
  * '(EXCESS RECEIVED)' hold a space.
  *
+ * @return	array<string,string>	Sentinel of the core => translation key of the text it stands for
+ */
+function einvoicingDiscountSentinels()
+{
+	return array(
+		'(CREDIT_NOTE)'     => 'DiscountFromCreditNote',
+		'(DEPOSIT)'         => 'DiscountFromDeposit',
+		'(EXCESS RECEIVED)' => 'DiscountFromExcessReceived',
+		'(EXCESS PAID)'     => 'DiscountFromExcessPaid',
+	);
+}
+
+/**
+ * Text a discount line stands for, in place of the sentinel Dolibarr stores in its description.
+ *
+ * See einvoicingDiscountSentinels() for what the four sentinels are and why they are matched exactly.
+ *
  * @param	?DiscountAbsolute	$discount		Discount the line was built from, already fetched
  * @param	string				$description	Description to resolve, of the line or of the discount
  * @param	Translate			$outputlangs	Language of the document being built
@@ -814,12 +831,7 @@ function einvoicingInvoicingPeriodFromLines($billingPeriod)
  */
 function einvoicingDiscountLabel($discount, $description, $outputlangs)
 {
-	$transkeyOfSentinel = array(
-		'(CREDIT_NOTE)'     => 'DiscountFromCreditNote',
-		'(DEPOSIT)'         => 'DiscountFromDeposit',
-		'(EXCESS RECEIVED)' => 'DiscountFromExcessReceived',
-		'(EXCESS PAID)'     => 'DiscountFromExcessPaid',
-	);
+	$transkeyOfSentinel = einvoicingDiscountSentinels();
 
 	$description = (string) $description;
 	if (!isset($transkeyOfSentinel[$description]) || empty($discount) || empty($discount->id)) {
