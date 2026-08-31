@@ -2,6 +2,23 @@
 
 ## 1.1.0
 
+FIX: A discount built from another piece no longer shows the customer the sentinel Dolibarr stores
+instead of a text. A credit note applied, a deposit deducted or an excess payment carried over holds no
+wording of its own: the core writes '(CREDIT_NOTE)', '(DEPOSIT)', '(EXCESS RECEIVED)' or
+'(EXCESS PAID)' in the description and resolves it when it prints. Nothing resolved it for the
+e-invoice, so the item name of a deducted deposit (BT-153) and the reason of a document level allowance
+(BT-97) were sent out as the raw marker. They now read the same text as the PDF, naming the piece the
+amount comes from. The resolution follows the test of the core - an exact description on a line that
+really carries a discount - rather than a search through the text, which would rename a line of work
+quoting the string and would miss two of the four markers, spelled with a space where the first is
+spelled with an underscore.
+
+FIX: The amount an invoice declares as already paid (BT-113) now also counts an excess payment or a
+deposit held against it, where only a credit note was counted. Everything it forgot there, it claimed
+again in the amount due (BT-115): a customer whose overpayment had been carried over was asked for it a
+second time. The piece each amount comes from is announced under its own document type code, a deposit
+invoice no longer being declared a credit note.
+
 FIX: The remote information of the SuperPDP setup page now describes the e-invoice address the module
 really sends with. A company can hold several entries in the French directory at once - one per
 document family, '<siren>_Invoice' or '<siren>_Status', beside the bare identifier - and the screen

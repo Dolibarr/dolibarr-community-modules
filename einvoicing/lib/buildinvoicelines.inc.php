@@ -397,7 +397,8 @@ foreach ($object->lines as $line) {
 	// The second method need to use the field BT-113. We don't use it as we use the first method.
 	$depositFactRef  = null;
 	$depositFactDate = null;
-	if ($line->desc == '(DEPOSIT)') {
+	$lineDiscount    = null;	// Discount the line was built from, when it is a discount line
+	if ($line->desc == '(DEPOSIT)' && !empty($line->fk_remise_except)) {
 		$isDepositLine   = 1;
 		$depositFactRef  = "";
 		$depositFactDate = new DateTime();
@@ -407,6 +408,7 @@ foreach ($object->lines as $line) {
 		dol_syslog("Fetch discount " . $line->fk_remise_except . ", res=" . $resdiscount, LOG_DEBUG);
 
 		if ($resdiscount > 0) {
+			$lineDiscount = $discount;
 			$origFact    = new Facture($this->db);
 			$resOrigFact = $origFact->fetch($discount->fk_facture_source);
 			dol_syslog("Fetch origFact " . $discount->fk_facture_source . ", res=" . $resOrigFact, LOG_DEBUG);
@@ -440,9 +442,16 @@ foreach ($object->lines as $line) {
 		$resdiscount = $discount->fetch($line->fk_remise_except);
 		dol_syslog("Fetch discount " . $line->fk_remise_except . ", res=" . $resdiscount, LOG_DEBUG);
 
+		$lineDiscount = ($resdiscount > 0 ? $discount : null);
+
+		// BT-97. The description of a discount built from another piece is a sentinel, not a text to
+		// show: resolved here, the customer reads which credit note or which excess payment is deducted
+		// instead of '(CREDIT_NOTE)'. A discount entered by hand keeps the reason that was typed.
+		$discountReason = einvoicingDiscountLabel($lineDiscount, $discount->description ?? '', $outputlangs);
+
 		$globalDiscounts[] = array(
 			'value' => (float) $discount->total_ht,
-			'reason' => $discount->description ?? 'REMISE',
+			'reason' => $discountReason ?: ($discount->description ?? 'REMISE'),
 			'taxRate' => (float) $discount->tva_tx,
 			'categoryVAT' => $categoryVAT,
 		);
@@ -503,6 +512,15 @@ foreach ($object->lines as $line) {
 		if ($libelle == $description) {
 			$description = "";
 		}
+	}
+
+	// A discount line still standing at this point is a deposit deducted from the invoice, and its
+	// description is the sentinel the core stores, not a text meant to be read. Left as it is, the
+	// customer reads '(DEPOSIT)' as the name of the line (BT-153).
+	$discountLabel = einvoicingDiscountLabel($lineDiscount, $line->desc ?? '', $outputlangs);
+	if ($discountLabel !== '') {
+		$libelle     = $discountLabel;
+		$description = "";
 	}
 
 	// Billing period of the line
@@ -696,33 +714,42 @@ if (getDolGlobalString($roundTotalConstName) == '1') {		// Same comparison as up
 	$grand_total_ttc = (float) price2num($grand_total_ht + $grand_total_tva, 2);
 }
 
-// already used credit note amount
-$usedcreditnoteamount = 0;
-$usedcreditnote = array();
+// Amounts settled by another piece and held against this invoice: a credit note applied, an excess
+// payment carried over, a deposit deducted. The three are amounts the customer no longer owes, so they
+// belong to what the document declares as already paid (BT-113), and what it forgets there it claims
+// again in the amount due (BT-115).
+//
+// Only the discounts held against the invoice itself are read here. A discount held against a line of
+// the invoice is a line, and the loop above already turned it into a document level allowance; reading
+// it a second time would deduct it twice. The fourth sentinel of the core, '(EXCESS PAID)', belongs to
+// the supplier side, where the discount is held by fk_invoice_supplier and never by fk_facture.
+$usedDiscountAmount = 0;
 $sql = "SELECT re.rowid, re.amount_ht, re.amount_tva, re.amount_ttc,";
 $sql .= " re.description, re.fk_facture_source";
 $sql .= " FROM ".MAIN_DB_PREFIX."societe_remise_except as re";
-$sql .= " WHERE fk_facture = ".((int) $object->id) ." AND description = '(CREDIT_NOTE)'";
+$sql .= " WHERE fk_facture = ".((int) $object->id);
+$sql .= " AND description IN ('(CREDIT_NOTE)', '(EXCESS RECEIVED)', '(DEPOSIT)')";
 $resql = $db->query($sql);
 if ($resql) {
 	while ($obj = $db->fetch_object($resql)) {
-		$usedcreditnoteamount += abs($obj->amount_ttc);
+		$usedDiscountAmount += abs($obj->amount_ttc);
 
-		// Add used credit note into reference documents of invoice
-		$usedCreditNoteFact = new Facture($this->db);
-		if ($usedCreditNoteFact->fetch($obj->fk_facture_source) > 0) {
-			$usedCreditNoteFactDate = new DateTime(dol_print_date($usedCreditNoteFact->date, 'dayrfc'));
+		// Add the piece the amount comes from into the reference documents of the invoice. A deposit
+		// invoice is not a credit note: each is announced under the document type code that is its own.
+		$sourceInvoice = new Facture($this->db);
+		if ($sourceInvoice->fetch($obj->fk_facture_source) > 0) {
+			$sourceInvoiceDate = new DateTime(dol_print_date($sourceInvoice->date, 'dayrfc'));
 			$invoiceRefDocs[] = [
-				'ref' => $usedCreditNoteFact->ref,
-				'date' => $usedCreditNoteFactDate,
-				'type' => '381'
+				'ref' => $sourceInvoice->ref,
+				'date' => $sourceInvoiceDate,
+				'type' => ($obj->description == '(DEPOSIT)' ? '386' : '381')
 			];
 		} else {
-			dol_syslog("Error " . $db->error() . " when looking for credit note linked to invoice to calculate prepaid amount for invoice " . $object->id, LOG_WARNING);
+			dol_syslog("Error " . $db->error() . " when looking for the invoice linked to discount " . $obj->rowid . " to calculate prepaid amount for invoice " . $object->id, LOG_WARNING);
 		}
 	}
 } else {
-	dol_syslog("Error " . $db->error() . " when looking for credit note linked to invoice to calculate prepaid amount for invoice " . $object->id, LOG_WARNING);
+	dol_syslog("Error " . $db->error() . " when looking for discounts linked to invoice to calculate prepaid amount for invoice " . $object->id, LOG_WARNING);
 }
 
 // Amount already received for this invoice: direct payments + used credit notes.
@@ -731,7 +758,7 @@ if ($resql) {
 // invoice reported TotalPrepaidAmount = 2x the amount and a negative DuePayableAmount).
 $getAlreadyPaid = $object->getSommePaiement();
 
-$prepaidAmount  = $getAlreadyPaid + $usedcreditnoteamount;
+$prepaidAmount  = $getAlreadyPaid + $usedDiscountAmount;
 
 // Invoicing period of the document (BG-14): the earliest start and the latest end of the periods its
 // lines carry, Dolibarr having no such field at invoice level. See einvoicingInvoicingPeriodFromLines()

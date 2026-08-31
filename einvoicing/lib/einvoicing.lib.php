@@ -790,3 +790,54 @@ function einvoicingInvoicingPeriodFromLines($billingPeriod)
 
 	return array('start' => $start, 'end' => $end);
 }
+
+/**
+ * Text a discount line stands for, in place of the sentinel Dolibarr stores in its description.
+ *
+ * A discount built from another piece - a credit note applied, a deposit deducted, an excess payment
+ * carried over - carries no text of its own: the core writes one of four sentinels in the description
+ * of the discount, insert_discount() copies it into the description of the line, and pdf_getlinedesc()
+ * resolves it against the piece it comes from at print time. Nothing resolves it for an e-invoice, so
+ * the customer used to read '(CREDIT_NOTE)' in the item name of the line (BT-153) or in the reason of
+ * a document level allowance (BT-97).
+ *
+ * The test is the one the core makes: the description equals a sentinel exactly, and the line is
+ * actually a discount line. Matching the text alone is wrong in both directions - a description edited
+ * by hand is missed, and a service line quoting the string is caught - and the four sentinels are not
+ * even spelled alike: '(CREDIT_NOTE)' holds an underscore where '(EXCESS PAID)' and
+ * '(EXCESS RECEIVED)' hold a space.
+ *
+ * @param	?DiscountAbsolute	$discount		Discount the line was built from, already fetched
+ * @param	string				$description	Description to resolve, of the line or of the discount
+ * @param	Translate			$outputlangs	Language of the document being built
+ * @return	string								Resolved text, '' when the description is no sentinel
+ */
+function einvoicingDiscountLabel($discount, $description, $outputlangs)
+{
+	$transkeyOfSentinel = array(
+		'(CREDIT_NOTE)'     => 'DiscountFromCreditNote',
+		'(DEPOSIT)'         => 'DiscountFromDeposit',
+		'(EXCESS RECEIVED)' => 'DiscountFromExcessReceived',
+		'(EXCESS PAID)'     => 'DiscountFromExcessPaid',
+	);
+
+	$description = (string) $description;
+	if (!isset($transkeyOfSentinel[$description]) || empty($discount) || empty($discount->id)) {
+		return '';
+	}
+
+	// Which piece is quoted depends on the side the discount belongs to: a discount held on a supplier
+	// invoice names that invoice, and reading ref_facture_source there would name nothing at all.
+	$sourceref = !empty($discount->discount_type) ? $discount->ref_invoice_supplier_source : $discount->ref_facture_source;
+
+	$outputlangs->load("bills");
+	$label = $outputlangs->transnoentitiesnoconv($transkeyOfSentinel[$description], $sourceref);
+
+	// The PDF of the core adds the date of the deposit when the option asks for it; the e-invoice reads
+	// the same way as the paper it accompanies.
+	if ($description == '(DEPOSIT)' && getDolGlobalString('INVOICE_ADD_DEPOSIT_DATE')) {
+		$label .= ' ('.dol_print_date($discount->datec, 'day', '', $outputlangs).')';
+	}
+
+	return $label;
+}
