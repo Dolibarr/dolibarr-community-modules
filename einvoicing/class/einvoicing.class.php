@@ -2441,7 +2441,10 @@ class EInvoicing
 			}
 
 			if (!empty($tmpstatus)) {
-				$status = $tmpstatus;
+				// Merged, not replaced: the row read from the table does not carry every key of the default
+				// answer - 'file' in particular is set further down - and a caller reading a key the row does
+				// not define would get an "Undefined array key" warning.
+				$status = array_merge($status, $tmpstatus);
 			}
 
 			if (empty($foundforanotherprovider) && empty($foundforcurrentprovider)) {
@@ -2478,6 +2481,15 @@ class EInvoicing
 				$status['code'] = self::STATUS_GENERATED;
 				$status['status'] = $this->getStatusLabel(self::STATUS_GENERATED);
 			}
+		} elseif (!empty($einvoicefilepath) && $status['code'] == self::STATUS_GENERATED && empty($status['everTransmitted'])) {
+			// Symmetrical to the promotion above. "Generated (ready to send)" is written in the table when the
+			// invoice carried no status row at generation time - an invoice that predates the module on the
+			// base - and nothing ever cleared it, so deleting the e-invoice file left the card announcing a
+			// document that does not exist any more. An invoice that already reached the Access Point keeps
+			// its status: the document it announces exists there, whatever is left on disk.
+			$status['code'] = self::STATUS_NOT_GENERATED;
+			$status['status'] = $this->getStatusLabel(self::STATUS_NOT_GENERATED);
+			$status['info'] = '';	// The stored comment explains the status we just stopped reporting
 		}
 
 		return $status;
