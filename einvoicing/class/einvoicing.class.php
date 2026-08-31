@@ -522,6 +522,14 @@ class EInvoicing
 	public const EXTRAFIELD_BUYER_ORDER_REFERENCE = 'buyer_order_reference';
 
 	/**
+	 * Name, into llx_einvoicing_extrafields, of the buyer reference (BT-10): a reference owned by the
+	 * buyer, used to route the invoice inside its own organisation (business unit, service reference,
+	 * internal mailbox...). A plain EN 16931 core term, unrelated to the public sector, so it is kept
+	 * per invoice and offered whatever the Chorus Pro option (issue #678).
+	 */
+	public const EXTRAFIELD_BUYER_REFERENCE = 'buyer_reference';
+
+	/**
 	 * ISO/IEC 6523 scheme identifier of the French routing code ("code de routage"), the scheme the
 	 * Chorus Pro "code service exécutant" is declared under as BT-46 by BR-FR-CPRO-11 and
 	 * BR-FR-CPRO-13 of XP Z12-012. Not to be confused with 0225 (e-invoice address) nor with 0002 /
@@ -1685,6 +1693,35 @@ class EInvoicing
 				$resprints .= '</td>';
 				$resprints .= '</tr>';
 			}
+		}
+
+		// Buyer reference (BT-10): the reference the buyer uses to route the invoice inside its own
+		// organisation (business unit, service reference, internal mailbox...). A core EN 16931 term,
+		// so it is offered on every invoice, with no dependency on the Chorus Pro option (issue #678).
+		// Stored into llx_einvoicing_extrafields rather than a core extrafield, which an admin or a
+		// user could rename, empty or delete.
+		if (($object->element == 'facture' || $object->element == 'invoice') && $object->id > 0) {
+			$currentBuyerReference = (string) $this->getExtraFieldValue($object->id, $object->element, self::EXTRAFIELD_BUYER_REFERENCE);
+			$resprints .= '<tr class="treinvoicing_collapseseparator">';
+			$resprints .= '<td>';
+			$resprints .= $form->editfieldkey($form->textwithpicto($langs->trans("EInvoiceBuyerReference"), $langs->trans("EInvoiceBuyerReferenceHelp")), 'einvoice_buyer_reference', '', $object, (int) $editenable);
+			$resprints .= '</td>';
+			$resprints .= '<td>';
+			if ($action == 'editeinvoice_buyer_reference' && $editenable) {
+				$resprints .= '<form name="setbuyerreference" action="' . $_SERVER["PHP_SELF"] . '?id=' . $object->id . '" method="post">';
+				$resprints .= '<input type="hidden" name="token" value="' . newToken() . '">';
+				$resprints .= '<input type="hidden" name="action" value="setbuyerreference">';
+				$resprints .= '<input type="hidden" name="page_y" value="page_y">';
+				$resprints .= '<input type="text" name="einvoice_buyer_reference" class="minwidth200" maxlength="255" value="' . dol_escape_htmltag($currentBuyerReference) . '">';
+				$resprints .= '<input type="submit" class="button button-edit smallpaddingimp reposition" value="' . $langs->trans('Modify') . '">';
+				$resprints .= '</form>';
+			} elseif ($currentBuyerReference !== '') {
+				$resprints .= dol_escape_htmltag($currentBuyerReference);
+			} else {
+				$resprints .= '<span class="opacitymedium">' . $langs->trans("NotDefined") . '</span>';
+			}
+			$resprints .= '</td>';
+			$resprints .= '</tr>';
 		}
 
 		// If current status requires a reason, display it

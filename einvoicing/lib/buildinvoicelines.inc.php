@@ -288,6 +288,17 @@ if ($buyerRoutingCode !== '' && !$this->isExtendedProfile($buildProfile)) {
 	$buyerRoutingCode = '';
 }
 
+// Buyer reference (BT-10): a reference owned by the buyer, used to route the invoice inside its own
+// organisation (business unit, service reference, internal mailbox...). A core EN 16931 term with no
+// relation to the public sector, which no field of the module let a private issuer fill until now.
+// The Chorus Pro service code keeps feeding it when that dedicated property is empty: Annexe A of
+// XP Z12-012 documents BT-10 as the "Service Executant" of the public sector, so the historical
+// mapping is a documented usage of the term and is left untouched (issue #678).
+$buyerReference = $einvoicing->getExtraFieldValue($object->id, $object->element, EInvoicing::EXTRAFIELD_BUYER_REFERENCE);
+if (trim((string) $buyerReference) === '') {
+	$buyerReference = $object->array_options['options_d4d_service_code'] ?? null;
+}
+
 
 // Project
 if (! ($object->project instanceof Project)) {
@@ -884,7 +895,7 @@ $invoiceData = [
 	'buyerLegalOrgScheme'       => $schemeIdProf,
 	'buyerTradingName'          => $buyerName,
 
-	'buyerReference'            => $object->array_options['options_d4d_service_code'] ?? null,
+	'buyerReference'            => $buyerReference,
 
 	// URIUniversalCommunication
 	'buyerCommunicationUriScheme' => $schemeUri,
