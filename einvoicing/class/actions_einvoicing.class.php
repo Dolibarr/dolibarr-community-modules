@@ -2225,4 +2225,110 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		return 1;
 	}
+
+	/**
+	 * Add a link to the read-only XML viewer on the line of the e-invoice file, in the document list
+	 * of an invoice card (issue #687).
+	 *
+	 * The core does not offer a preview on that line: dolIsAllowedForPreview() whitelists a fixed list
+	 * of mime subtypes that contains neither xml nor the Factur-X pdf carrying the xml, so
+	 * FormFile::showPreview() renders nothing for those files. This hook is executed once per file
+	 * line, which is where the link belongs.
+	 *
+	 * @param array{colspan:int,socid:int|string,id:int|string,modulepart:string,relativepath:string}	$parameters		Array of parameters
+	 * @param array<string,mixed>																		$object			The file of the line being rendered
+	 * @param string																					$action			Code action
+	 * @param Hookmanager																				$hookmanager	Hookmanager
+	 * @return int																										0 in all cases (the line is completed, never replaced)
+	 */
+	public function formBuilddocLineOptions($parameters, $object, &$action, $hookmanager)
+	{
+		global $db, $langs, $user;
+
+		$this->resprints = '';
+
+		$modulepart = (string) ($parameters['modulepart'] ?? '');
+		$invoiceid = (int) ($parameters['id'] ?? 0);
+		$relativepath = (string) ($parameters['relativepath'] ?? '');
+		if ($invoiceid <= 0 || strpos($relativepath, '/') === false) {
+			return 0;
+		}
+
+		// Only the line of the XML. The PDF of the core, and the Factur-X one, are previewed by the core
+		// itself and have nothing to gain here. The name is checked first because it costs nothing, then
+		// the module is asked for the file it holds for this invoice, and the line is completed only if
+		// the two are the same file.
+		$einvoicing = new EInvoicing($db);
+		if ($modulepart == 'facture') {
+			// Sent to a customer: <ref>/<ref>_cii.xml, so the directory names the invoice
+			if (!$user->hasRight('facture', 'lire') || substr($relativepath, -8) !== '_cii.xml') {
+				return 0;
+			}
+			$xmlfile = $einvoicing->getEInvoiceXmlFilePath(basename(dirname($relativepath)));
+			$urlparam = '';
+		} elseif ($modulepart == 'facture_fournisseur') {
+			// Received from a supplier: the file is named after the reference of the supplier, so the
+			// invoice has to be read to know it
+			if (!$user->hasRight('fournisseur', 'facture', 'lire') || substr($relativepath, -13) !== '_einvoice.xml') {
+				return 0;
+			}
+			require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
+			$supplierinvoice = new FactureFournisseur($db);
+			if ($supplierinvoice->fetch($invoiceid) <= 0) {
+				return 0;
+			}
+			$xmlfile = $einvoicing->getSupplierEInvoiceXmlFilePath($supplierinvoice);
+			$urlparam = '&element=supplier';
+		} else {
+			return 0;
+		}
+		if (empty($xmlfile) || basename($xmlfile) !== basename($relativepath)) {
+			return 0;
+		}
+
+		$langs->load("einvoicing@einvoicing");
+
+		// The 'documentpreview' class is what the core binds (lib_foot.js.php) to its own preview dialog:
+		// it reads href, mime and data-title and frames the answer, so the XML opens where a PDF opens,
+		// instead of in a page of its own. Without javascript the href is simply followed, and the same
+		// page answers as a full page. The file name keeps the download link the core gives it.
+		$url = dol_buildpath('/einvoicing/xmlpreview.php', 1).'?id='.$invoiceid.$urlparam.'&mode=raw';
+
+		// Same markup as the preview picto of FormFile::showPreview(), so the line reads as a native one
+		$anchorid = 'einvoicingxmlpreview'.$invoiceid;
+		$this->resprints = '<td class="right nowraponall">';
+		$this->resprints .= '<a id="'.$anchorid.'" class="pictopreview documentpreview" href="'.$url.'" mime="text/html"';
+		$this->resprints .= ' data-title="'.dol_escape_htmltag($langs->trans("EInvoiceXmlPreviewTitle")).'"';
+		$this->resprints .= ' target="_blank" rel="noopener noreferrer"';
+		$this->resprints .= ' title="'.dol_escape_htmltag($langs->trans("EInvoicePreviewXml")).'">';
+		$this->resprints .= '<span class="fas fa-search-plus pictofixedwidth" style=" color: #808080;"></span>';
+		$this->resprints .= '</a>';
+
+		// The core closes the cell holding the file name before this hook is executed, so the only place
+		// the hook can write is a cell of its own at the end of the line. The picto belongs next to the
+		// ones the core puts on the previewable files, so it is moved into that first cell, and the cell
+		// this hook had to open is dropped, leaving the line with the columns it had. Without javascript
+		// nothing moves: the picto stays at the end of the line and still opens the file.
+		$this->resprints .= '<script nonce="'.getNonce().'" type="text/javascript">
+			jQuery(function() {
+				var picto = document.getElementById("'.$anchorid.'");
+				if (!picto || !picto.parentNode || !picto.parentNode.parentNode) {
+					return;
+				}
+				var cell = picto.parentNode;
+				var line = cell.parentNode;
+				// Same class the core gives the name of a file that carries a picto, so the picto lands
+				// in the same column as the ones of the lines that already had one
+				var name = line.cells[0].querySelector("span.spanoverflow");
+				if (name) {
+					name.className += " widthcentpercentminusx valignmiddle";
+				}
+				line.cells[0].appendChild(picto);
+				line.removeChild(cell);
+			});
+			</script>';
+		$this->resprints .= '</td>';
+
+		return 0;
+	}
 }
