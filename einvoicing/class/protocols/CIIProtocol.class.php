@@ -3063,7 +3063,12 @@ class CIIProtocol extends AbstractProtocol
 		global $conf;
 
 		// Ensure upload directory exists
-		$folder_part = get_exdir(0, 0, 0, 0, $supplierInvoice);
+		// The arguments are the ones the card of the core passes (fourn/facture/card.php), and they are
+		// passed in full on purpose: get_exdir(0, 0, ...) answers the same thing only since Dolibarr 20,
+		// where an empty level defaults to 2 for a supplier invoice. On 18 and 19 that default does not
+		// exist, the path falls back to the reference of the invoice, and the document is written into a
+		// directory the card never reads - so a received e-invoice was shown nowhere.
+		$folder_part = get_exdir($supplierInvoice->id, 2, 0, 0, $supplierInvoice, 'invoice_supplier');
 		$relative_path = 'fournisseur/facture/' . $folder_part . dol_sanitizeFileName($supplierInvoice->ref);
 		$upload_dir = $conf->fournisseur->dir_output . '/facture/' . $folder_part . dol_sanitizeFileName($supplierInvoice->ref);
 
