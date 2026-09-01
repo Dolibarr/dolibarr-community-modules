@@ -1942,7 +1942,9 @@ class EInvoicing
 			// Current status
 			$resprints .= '<tr class="treinvoicing_collapseseparator">';
 			$resprints .= '<td class="">' . $langs->trans("einvoicingInvoiceStatus") . '</td>';
-			$resprints .= '<td><span id="einvoice-status">' . $currentStatus . '</span>';
+			$resprints .= '<td><span id="einvoice-status" title="'.$obj->lc_status.'">' . $currentStatus;
+			$resprints .= ($obj->lc_status > 200 ? ' <span class="opacitymedium small">'.$obj->lc_status.'</span>' : '');
+			$resprints .= '</span>';
 
 			// If current status requires a reason, display it
 			$reasonLabel = '';
