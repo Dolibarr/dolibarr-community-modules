@@ -2675,8 +2675,17 @@ class CIIProtocol extends AbstractProtocol
 		// TradeAddressType is reduced to the country code by the MINIMUM schema
 		if (!$this->isMinimumProfile($profile)) {
 			$addr->appendChild($doc->createElement('ram:PostcodeCode', $data[$prefix . 'postcode']));
+			// The three address lines the norm has: BT-35/36/162 for the seller, BT-50/51/163 for the
+			// buyer. XSD order inside TradeAddressType is PostcodeCode, LineOne, LineTwo, LineThree,
+			// CityName, CountryID - the elements are written in that order and nowhere else.
 			if (!empty($data[$prefix . 'lineone'])) {
 				$addr->appendChild($doc->createElement('ram:LineOne', htmlspecialchars($data[$prefix . 'lineone'])));
+			}
+			if (!empty($data[$prefix . 'linetwo'])) {
+				$addr->appendChild($doc->createElement('ram:LineTwo', htmlspecialchars($data[$prefix . 'linetwo'])));
+			}
+			if (!empty($data[$prefix . 'linethree'])) {
+				$addr->appendChild($doc->createElement('ram:LineThree', htmlspecialchars($data[$prefix . 'linethree'])));
 			}
 			$addr->appendChild($doc->createElement('ram:CityName', htmlspecialchars($data[$prefix . 'city'])));
 		}
@@ -2769,8 +2778,17 @@ class CIIProtocol extends AbstractProtocol
 		if (!empty($ship['zip'])) {
 			$addr->appendChild($doc->createElement('ram:PostcodeCode', $ship['zip']));
 		}
-		if (!empty($ship['address'])) {
-			$addr->appendChild($doc->createElement('ram:LineOne', htmlspecialchars($ship['address'])));
+		// BT-75/76/165: the deliver-to address has three lines too. The caller splits the free text
+		// field Dolibarr stores; a single-line address keeps landing on LineOne alone.
+		$shiplines = array(
+			$ship['lineone'] ?? $ship['address'] ?? '',
+			$ship['linetwo'] ?? '',
+			$ship['linethree'] ?? '',
+		);
+		foreach (array('ram:LineOne', 'ram:LineTwo', 'ram:LineThree') as $rank => $element) {
+			if (!empty($shiplines[$rank])) {
+				$addr->appendChild($doc->createElement($element, htmlspecialchars($shiplines[$rank])));
+			}
 		}
 		if (!empty($ship['town'])) {
 			$addr->appendChild($doc->createElement('ram:CityName', htmlspecialchars($ship['town'])));
