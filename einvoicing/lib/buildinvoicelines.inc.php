@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2025		SuperAdmin					<daoud.mouhamed@gmail.com>
+ * Copyright (C) 2026		Jose Martinez				<jose.martinez@pichinov.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -431,6 +432,13 @@ foreach ($object->lines as $line) {
 	$exemptionReason = $tmparray['ExemptionReason'];
 	$exemptionReasonCode = $tmparray['ExemptionReasonCode'];
 
+	// EN16931 / Factur-X: a VAT breakdown group (BG-23) is identified by VAT category code (BT-118),
+	// VAT rate (BT-119) and the exemption reason (BT-120/BT-121) only - NOT by the Dolibarr vat_src_code.
+	// Keying the breakdown by vat_src_code split otherwise identical "S"/rate lines into two
+	// ApplicableTradeTax groups (e.g. products carrying code TVAFR20 vs services without code), which
+	// the PDP rejects (BR-FXEXT-S08b / BR-S-08: duplicate breakdown, taxable base does not reconcile).
+	$vatBreakdownKey = $categoryVAT.'|'.$line->tva_tx.'|'.$exemptionReasonCode.'|'.$exemptionReason;
+
 	// if ($line->subprice < 0 || $line->subprice_ttc < 0) {
 	// 	throw new Exception("NEGATIVE_UNIT_PRICE_NOT_ALLOWED: Unit price in lines can't be negative. Try to edit the line with ID " . $line->id);
 	// }
@@ -491,17 +499,17 @@ foreach ($object->lines as $line) {
 		);
 
 		// Add (or update) VAT rate to $taxBreakdown
-		if (!isset($taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')])) {
-			$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')] = ['tva_tx' => '', 'vat_src_code' => '', 'categoryVAT' => '', 'ExemptionReasonCode' => '', 'ExemptionReason' => '', 'totalHT' => 0, 'totalTVA' => 0];
+		if (!isset($taxBreakdown[$vatBreakdownKey])) {
+			$taxBreakdown[$vatBreakdownKey] = ['tva_tx' => '', 'vat_src_code' => '', 'categoryVAT' => '', 'ExemptionReasonCode' => '', 'ExemptionReason' => '', 'totalHT' => 0, 'totalTVA' => 0];
 		}
-		$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['tva_tx'] = $line->tva_tx;
-		$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['vat_src_code'] = $line->vat_src_code;
-		$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['categoryVAT'] = $categoryVAT;
-		$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['ExemptionReasonCode'] = $exemptionReasonCode;
-		$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['ExemptionReason'] = $exemptionReason;
+		$taxBreakdown[$vatBreakdownKey]['tva_tx'] = $line->tva_tx;
+		$taxBreakdown[$vatBreakdownKey]['vat_src_code'] = $line->vat_src_code;
+		$taxBreakdown[$vatBreakdownKey]['categoryVAT'] = $categoryVAT;
+		$taxBreakdown[$vatBreakdownKey]['ExemptionReasonCode'] = $exemptionReasonCode;
+		$taxBreakdown[$vatBreakdownKey]['ExemptionReason'] = $exemptionReason;
 
-		$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['totalHT']  -= $discount->total_ht;
-		$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['totalTVA'] -= $discount->total_tva;
+		$taxBreakdown[$vatBreakdownKey]['totalHT']  -= $discount->total_ht;
+		$taxBreakdown[$vatBreakdownKey]['totalTVA'] -= $discount->total_tva;
 
 
 		$grand_total_ht  -= $discount->total_ht;
@@ -616,17 +624,17 @@ foreach ($object->lines as $line) {
 	}
 
 	// Add (or update) VAT rate to $taxBreakdown
-	if (!isset($taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')])) {
-		$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')] = ['tva_tx' => '', 'vat_src_code' => '', 'categoryVAT' => '', 'ExemptionReasonCode' => '', 'ExemptionReason' => '', 'totalHT' => 0, 'totalTVA' => 0];
+	if (!isset($taxBreakdown[$vatBreakdownKey])) {
+		$taxBreakdown[$vatBreakdownKey] = ['tva_tx' => '', 'vat_src_code' => '', 'categoryVAT' => '', 'ExemptionReasonCode' => '', 'ExemptionReason' => '', 'totalHT' => 0, 'totalTVA' => 0];
 	}
-	$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['tva_tx'] = $line->tva_tx;
-	$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['vat_src_code'] = $line->vat_src_code;
-	$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['categoryVAT'] = $categoryVAT;
-	$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['ExemptionReasonCode'] = $exemptionReasonCode;
-	$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['ExemptionReason'] = $exemptionReason;
+	$taxBreakdown[$vatBreakdownKey]['tva_tx'] = $line->tva_tx;
+	$taxBreakdown[$vatBreakdownKey]['vat_src_code'] = $line->vat_src_code;
+	$taxBreakdown[$vatBreakdownKey]['categoryVAT'] = $categoryVAT;
+	$taxBreakdown[$vatBreakdownKey]['ExemptionReasonCode'] = $exemptionReasonCode;
+	$taxBreakdown[$vatBreakdownKey]['ExemptionReason'] = $exemptionReason;
 
-	$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['totalHT']  += $line_total_ht;
-	$taxBreakdown[$line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '')]['totalTVA'] += $line_total_tva;
+	$taxBreakdown[$vatBreakdownKey]['totalHT']  += $line_total_ht;
+	$taxBreakdown[$vatBreakdownKey]['totalTVA'] += $line_total_tva;
 
 	$lines_total_ht  += $line_total_ht;
 	$lines_total_ttc += $line_total_ttc;
