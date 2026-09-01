@@ -1,6 +1,7 @@
 <?php
 /* Copyright (C) 2025       Laurent Destailleur         <eldy@users.sourceforge.net>
  * Copyright (C) 2025       Mohamed DAOUD               <mdaoud@dolicloud.com>
+ * Copyright (C) 2026		Jose Martinez			<jose.martinez@pichinov.com>
  * Copyright (C) 2026		William Mead				<william@m34d.com>
  * Copyright (C) 2026       Frédéric France             <frederic.france@free.fr>
  *
@@ -1569,7 +1570,7 @@ class EInvoicing
 				$resprints .= $currentStatusInfo['status'];
 			}
 			$resprints .= '</span><br>';
-			$resprints .= '<span id="einvoice-info" class="clearboth small opacitymedium">' . dolPrintHTML($info) . '</span>';
+			$resprints .= '<div id="einvoice-info" class="clearboth small opacitymedium" style="max-width:100%;max-height:8em;overflow:auto;overflow-wrap:anywhere;word-break:break-word;">' . dolPrintHTML($info) . '</div>';
 		}
 		$resprints .= '</td>';
 		$resprints .= '</tr>';
