@@ -3723,7 +3723,7 @@ class EInvoicing
 			$lines = array_merge(array_slice($lines, 0, 2), array(implode(', ', array_slice($lines, 2))));
 		}
 
-		return $lines + array('', '', '');
+		return array_pad($lines, 3, '');
 	}
 
 	/**

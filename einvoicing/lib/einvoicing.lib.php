@@ -731,7 +731,7 @@ function einvoicingSellerVatRegime($seller)
  * @param	Societe		$buyer			Thirdparty being invoiced, last resort for the name
  * @param	Translate	$outputlangs	Language the name is built in
  * @param	DoliDB		$db				Database handler
- * @return	array						Keys name, address, zip, town, country
+ * @return	array{name:string,address:string,zip:string,town:string,country:string}
  */
 function einvoicingShipToFromContact($shipContact, $buyer, $outputlangs, $db)
 {
@@ -759,11 +759,11 @@ function einvoicingShipToFromContact($shipContact, $buyer, $outputlangs, $db)
 	$source = !empty($shipContact->address) ? $shipContact : ($shipSoc !== null ? $shipSoc : $shipContact);
 
 	return array(
-		'name'    => $name,
-		'address' => $source->address,
-		'zip'     => $source->zip,
-		'town'    => $source->town,
-		'country' => $shipContact->country_code ?: ($shipSoc !== null ? $shipSoc->country_code : ''),
+		'name'    => (string) $name,
+		'address' => (string) $source->address,
+		'zip'     => (string) $source->zip,
+		'town'    => (string) $source->town,
+		'country' => (string) ($shipContact->country_code ?: ($shipSoc !== null ? $shipSoc->country_code : '')),
 	);
 }
 
