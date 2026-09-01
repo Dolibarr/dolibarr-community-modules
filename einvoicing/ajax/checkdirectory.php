@@ -97,6 +97,26 @@ $langs->load('einvoicing@einvoicing');
 top_httphead();
 
 /**
+ * Localized provenance of a directory answer, when it carries one.
+ *
+ * Every status but the plain error one may come from somewhere else than the standardized directory
+ * answer: the platform's own endpoint settling a missing line status, or that same endpoint read as a
+ * fallback because the standardized call did not go through. The user compares the badge with the
+ * annuaire consulted by hand, so that difference must be readable without opening the code.
+ *
+ * @param array 	$r 	Result from AbstractPDPProvider::checkRecipientDirectory()
+ * @return string 		Escaped detail, empty when the answer carries no provenance
+ */
+function einvoicing_directory_provenance($r)
+{
+	global $langs;
+	if (empty($r['message'])) {
+		return '';
+	}
+	return dol_escape_htmltag($langs->trans($r['message'], (string) ($r['messageparam'] ?? '')));
+}
+
+/**
  * Build a localized, ready-to-display HTML snippet from a directory result.
  *
  * @param array 	$r 		Result from AbstractPDPProvider::checkRecipientDirectory()
@@ -122,11 +142,9 @@ function einvoicing_directory_html($r, $siren)
 			if (!empty($r['platform'])) {
 				$details[] = $langs->trans("EInvoicingDirectoryPlatformType").': '.dol_escape_htmltag($r['platform']);
 			}
-			// Where the status was read, when it did not come from the standardized directory answer:
-			// the annuaire consulted by hand then shows no status for that line, and the difference
-			// must be explainable without reading the code.
-			if (!empty($r['message'])) {
-				$details[] = dol_escape_htmltag($langs->trans($r['message']));
+			// Where the status was read, when it did not come from the standardized directory answer.
+			if (($provenance = einvoicing_directory_provenance($r)) !== '') {
+				$details[] = $provenance;
 			}
 			if (!empty($details)) {
 				$txt .= ' <span class="opacitymedium small">('.implode(' - ', $details).')</span>';
@@ -149,8 +167,8 @@ function einvoicing_directory_html($r, $siren)
 			if (!empty($r['linestatus'])) {
 				$details[] = $langs->trans("EInvoicingDirectoryLineStatus").': '.dol_escape_htmltag($r['linestatus']);
 			}
-			if (!empty($r['message'])) {
-				$details[] = dol_escape_htmltag($langs->trans($r['message']));
+			if (($provenance = einvoicing_directory_provenance($r)) !== '') {
+				$details[] = $provenance;
 			}
 			if (!empty($details)) {
 				$txt .= ' <span class="opacitymedium small">('.implode(' - ', $details).')</span>';
@@ -159,9 +177,22 @@ function einvoicing_directory_html($r, $siren)
 		case 'undetermined':
 			// Neutral on purpose: a line exists but its status was not communicated, so the check fails
 			// open without asserting anything. Green here is what let an undeliverable invoice be sent.
+			// The provenance matters most here, and used to be the one thing this branch dropped: the
+			// same wording is reached both when the standardized directory answered without a line
+			// status and when it did not answer at all and the platform's own endpoint was read
+			// instead. The first is the recipient's platform being terse, the second is a call
+			// failing on this instance - two different problems, and only the message tells them
+			// apart (issue #698).
 			$txt = $langs->trans("EInvoicingDirectoryUndetermined", $siren);
+			$details = array();
 			if (!empty($r['identifier'])) {
-				$txt .= ' <span class="opacitymedium small">('.dol_escape_htmltag($r['identifier']).')</span>';
+				$details[] = dol_escape_htmltag($r['identifier']);
+			}
+			if (($provenance = einvoicing_directory_provenance($r)) !== '') {
+				$details[] = $provenance;
+			}
+			if (!empty($details)) {
+				$txt .= ' <span class="opacitymedium small">('.implode(' - ', $details).')</span>';
 			}
 			return '<span class="opacitymedium">'.img_picto('', 'info', 'class="paddingright"').$txt.'</span>';
 		case 'unsupported':

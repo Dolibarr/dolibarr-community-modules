@@ -725,6 +725,60 @@ function einvoicingSellerVatRegime($seller)
 }
 
 /**
+ * Build the deliver-to address of a shipping contact, the way the core builds the shipping frame.
+ *
+ * @param	Contact		$shipContact	Contact designated as the delivery point
+ * @param	Societe		$buyer			Thirdparty being invoiced, last resort for the name
+ * @param	Translate	$outputlangs	Language the name is built in
+ * @param	DoliDB		$db				Database handler
+ * @return	array{name:string,address:string,zip:string,town:string,country:string}
+ */
+function einvoicingShipToFromContact($shipContact, $buyer, $outputlangs, $db)
+{
+	require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
+
+	$shipSoc = null;
+	$shipSocId = (int) (!empty($shipContact->socid) ? $shipContact->socid : ($shipContact->fk_soc ?? 0));
+	if ($shipSocId > 0) {
+		$tmpsoc = new Societe($db);
+		if ($tmpsoc->fetch($shipSocId) > 0) {
+			$shipSoc = $tmpsoc;
+		}
+	}
+
+	// The core makes the distinction here and this follows it: pdf_build_address() switches to the
+	// company of the contact only when that company is not the one being invoiced
+	// ($targetcontact->socid != $targetcompany->id).
+	$anothercompany = ($shipSoc !== null && $shipSoc->id != $buyer->id);
+
+	// BT-70 names a party. When the contact belongs to another company, that company is the party the
+	// goods go to, and naming it also spares the document a personal name it has no use for. When the
+	// contact belongs to the company being invoiced, its name is already the BuyerTradeParty name and
+	// would say nothing here, while the label the user gave the contact is what names the delivery
+	// point - so that one is kept.
+	$name = ($anothercompany && !empty($shipSoc->name)) ? $shipSoc->name : trim($shipContact->getFullName($outputlangs));
+	if ($name === '') {
+		$name = ($shipSoc !== null && !empty($shipSoc->name)) ? $shipSoc->name : $buyer->name;
+	}
+
+	// The contact wins when it carries an address of its own - that is a delivery site the user
+	// entered deliberately. With none, the address of its company is the one that means something;
+	// the contact's own empty fields would emit a deliver-to party with no address at all. This is
+	// again what pdf_build_address() does, and a contact of the invoiced company with no address of
+	// its own falls back on that same company, so the deliver-to party then equals the buyer and no
+	// distinct BG-15 is emitted at all.
+	$source = !empty($shipContact->address) ? $shipContact : ($shipSoc !== null ? $shipSoc : $shipContact);
+
+	return array(
+		'name'    => (string) $name,
+		'address' => (string) $source->address,
+		'zip'     => (string) $source->zip,
+		'town'    => (string) $source->town,
+		'country' => (string) ($shipContact->country_code ?: ($shipSoc !== null ? $shipSoc->country_code : '')),
+	);
+}
+
+/**
  * Tax registrations (BT-31 / BT-32) the seller declares, in the shape the two writers consume.
  *
  * One entry, because the two identifiers answer the same question and a document that carried both
