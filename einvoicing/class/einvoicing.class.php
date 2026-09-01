@@ -1928,6 +1928,8 @@ class EInvoicing
 		if ($provider) {
 			// Get current status
 			$currentStatus = '-';
+			$currentStatusCode = 0;
+			$currentReasonCode = '';
 			$sql = "SELECT lc_status, lc_reason_code FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
 			$sql .= " WHERE element_type = '" . $this->db->escape($object->element) . "'";
 			$sql .= " AND element_id = " . (int) $object->id;
@@ -1936,21 +1938,23 @@ class EInvoicing
 			$resql = $this->db->query($sql);
 			if ($resql && $this->db->num_rows($resql) > 0) {
 				$obj = $this->db->fetch_object($resql);
-				$currentStatus = $this->getStatusLabel($obj->lc_status);
+				$currentStatusCode = (int) $obj->lc_status;
+				$currentReasonCode = $obj->lc_reason_code;
+				$currentStatus = $this->getStatusLabel($currentStatusCode);
 			}
 			$this->db->free($resql);
 			// Current status
 			$resprints .= '<tr class="treinvoicing_collapseseparator">';
 			$resprints .= '<td class="">' . $langs->trans("einvoicingInvoiceStatus") . '</td>';
-			$resprints .= '<td><span id="einvoice-status" title="'.$obj->lc_status.'">' . $currentStatus;
-			$resprints .= ($obj->lc_status > 200 ? ' <span class="opacitymedium small">('.$langs->trans("EInvoiceCodeShort").' '.$obj->lc_status.')</span>' : '');
+			$resprints .= '<td><span id="einvoice-status"' . ($currentStatusCode ? ' title="' . $currentStatusCode . '"' : '') . '>' . $currentStatus;
+			$resprints .= ($currentStatusCode > 200 ? ' <span class="opacitymedium small">(' . $langs->trans("EInvoiceCodeShort") . ' ' . $currentStatusCode . ')</span>' : '');
 			$resprints .= '</span>';
 
 			// If current status requires a reason, display it
 			$reasonLabel = '';
 			$displayReasonLabel = 'style="display:none;"';
-			if (!empty($obj->lc_reason_code)) {
-				$reasonLabel = $langs->trans($this->getReasonsByStatus($obj->lc_status)[$obj->lc_reason_code]['label'] ?? $obj->lc_reason_code);
+			if (!empty($currentReasonCode)) {
+				$reasonLabel = $langs->trans($this->getReasonsByStatus($currentStatusCode)[$currentReasonCode]['label'] ?? $currentReasonCode);
 				$displayReasonLabel = '';
 			}
 
