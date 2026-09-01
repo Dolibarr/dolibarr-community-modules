@@ -2004,8 +2004,12 @@ class EInvoicing
 					$resprints .= '
                     <script type="text/javascript">
                     (function() {
+						let checkattempt = 0;
+
                         function checkSupplierInvoiceStatus() {
-                            console.log("checkSupplierInvoiceStatus Checking invoice status...");
+							checkattempt++;
+                            console.log("checkSupplierInvoiceStatus Status is STATUS_AWAITING_VALIDATION, so we call API to check last status. Attempt no " + checkattempt + "/5 ...");
+
                             $.get("' . $urlajax . '", {
                                 token: "' . currentToken() . '",
                                 id: "' . dol_escape_js($object->id) . '"
@@ -2033,7 +2037,7 @@ class EInvoicing
                                 }
 
                                 // Retry only if still awaiting validation
-                                if (data.statusvalidationlabel === "Pending") {
+                                if (data.statusvalidationlabel === "Pending" && checkattempt < 5) {
                                     setTimeout(checkSupplierInvoiceStatus, 5000);
                                 }
                             }, "json");
