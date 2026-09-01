@@ -180,7 +180,7 @@ if ($objectID) {
 			$CurrentLCStatusLabel = $einvoicing->getStatusLabel($obj->lc_status);
 			$currentLCReasonLabel = $langs->trans($einvoicing->getReasonsByStatus($obj->lc_status)[$obj->lc_reason_code]['label'] ?? $obj->lc_reason_code);
 			$eventLabel = "EINVOICING - ".$langs->trans("CheckStatus");
-			$eventMessage = "EINVOICING - ".$langs->trans("CheckStatus")." (From ajax checksupplierinvoicestatus) - [Dolibarr: " . $CurrentLCStatusLabel . $langs->trans("ResultOnAP").' '.$statusvalidationlabel . (!empty($statusvalidationinfo) ? " - " . $statusvalidationinfo : "") . (!empty($lcReasonCode) ? " - Reason: " . $currentLCReasonLabel : "")."]";
+			$eventMessage = "EINVOICING - ".$langs->trans("CheckStatus")." (From ajax checksupplierinvoicestatus) - [Dolibarr: " . $CurrentLCStatusLabel . ', '.$langs->trans("ResultOnAP").': '.$statusvalidationlabel . (!empty($statusvalidationinfo) ? " - " . $statusvalidationinfo : "") . (!empty($lcReasonCode) ? " - Reason: " . $currentLCReasonLabel : "")."]";
 
 			$resLogEvent = $provider->addEvent('STATUS', $eventLabel, $eventMessage, $invoice);
 			if ($resLogEvent < 0) {

@@ -1894,15 +1894,16 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 					$einvoicing->updateStatusMessageValidation($resStoreStatus, '', $ack_statusLabel, $syncComment);
 
 					// Log an event in the invoice timeline if status not pending
-					if ($ack_statusLabel != 'Pending') {
+					// We have just POST a new status so we log a rcord here in agenda to remind date (even if message is pending, so not yet fully processed by AP)
+					//if ($ack_statusLabel != 'Pending') {
 						$eventLabel = "EINVOICING - ".$langs->trans("SendStatus");
-						$eventMessage = "EINVOICING - ".$langs->trans("SendStatus")." (From sendStatusMessage) - [Dolibarr: " . $statusLabelToSend . $langs->trans("ResultOnAP").' '.$ack_statusLabel . (!empty($syncComment) ? " - " . $syncComment : "")."]";
+						$eventMessage = "EINVOICING - ".$langs->trans("SendStatus")." (From sendStatusMessage) - [Dolibarr: " . $statusLabelToSend . ', '.$langs->trans("ResultOnAP").': '.$ack_statusLabel . (!empty($syncComment) ? " - " . $syncComment : "")."]";
 
 						$resLogEvent = $this->addEvent('STATUS', $eventLabel, $eventMessage, $object);
-						if ($resLogEvent < 0) {
-							dol_syslog(__METHOD__ . " Failed to log event for flowId: {$flowId}", LOG_WARNING);
-						}
+					if ($resLogEvent < 0) {
+						dol_syslog(__METHOD__ . " Failed to log event for flowId: {$flowId}", LOG_WARNING);
 					}
+					//}
 				} else {
 					dol_syslog(__METHOD__ . " Unable to retrieve flow details after sending status message for flowId: {$flowId}. Status code: " . $response['status_code'], LOG_WARNING);
 					$res = 1;
