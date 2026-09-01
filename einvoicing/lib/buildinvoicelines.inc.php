@@ -740,7 +740,7 @@ foreach ($object->lines as $line) {
 // nothing and the lines already hold the instalment: there is nothing to deduct.
 if (!empty($object->situation_counter) && $object->situation_counter > 1
 	&& isset($object->type) && $object->type == $object::TYPE_SITUATION
-	&& getDolGlobalInt('INVOICE_USE_SITUATION') != 2) {
+	&& getDolGlobalInt('INVOICE_USE_SITUATION') == 1) {
 	$previousSituations = array();		// Amounts already invoiced, per VAT rate of the current line
 	foreach ($object->lines as $line) {
 		if (empty($line->fk_prev_id)) {
