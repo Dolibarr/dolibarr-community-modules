@@ -1245,7 +1245,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 */
 	public function completeArrayFields($parameters, $object, &$action, $hookmanager)
 	{
-		if (in_array('invoicelist', explode(':', $parameters['context'])) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
+		if (self::isListCompletedByModule($parameters['context'], 'invoicelist')) {
 			// Add fields to invoice list
 			$parameters['arrayfields']['einvoicegenerated'] = array(
 				'label' => 'EInvoiceFile',
@@ -1263,8 +1263,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			);
 		}
 
-		if (in_array('thirdpartylist', explode(':', $parameters['context'])) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI'))) {
-			// Add fields to invoice list
+		if (self::isListCompletedByModule($parameters['context'], 'thirdpartylist')) {
+			// Add fields to thirdparty list
 			$parameters['arrayfields']['routing_id'] = array(
 				'label' => 'RoutingIdField',
 				'help' => 'SpecificRoutingFieldHelp',
@@ -1286,6 +1286,94 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	}
 
 
+
+	/**
+	 * Tell whether the module completes a given list of the core with its own columns.
+	 *
+	 * The SELECT, the FROM, the WHERE and the GROUP BY must all answer the same thing: a column read
+	 * from, or a filter set on, a table that the FROM did not join turns the page of the core into an
+	 * SQL error. Same conditions as the ones printFieldListTitle() and printFieldListValue() use to
+	 * decide whether they display something.
+	 *
+	 * @param 	string	$context	Value of $parameters['context'] as the hook manager builds it
+	 * @param 	string	$list		List to test ('invoicelist', 'supplierinvoicelist' or 'thirdpartylist')
+	 * @return 	bool				True if the module adds its columns and its joins to that list
+	 */
+	protected static function isListCompletedByModule($context, $list)
+	{
+		if (!in_array($list, explode(':', $context), true)) {
+			return false;
+		}
+
+		if ($list == 'invoicelist') {
+			return !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP');
+		}
+
+		if ($list == 'supplierinvoicelist') {
+			return !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI');
+		}
+
+		return !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI');
+	}
+
+	/**
+	 * Build the condition restricting the join on einvoicing_extlinks (aliased 'ext') to a single row.
+	 *
+	 * An element can carry several links: one per provider, and a provider can be registered both
+	 * directly and through a partner. Without this condition every extra link adds a line to the list
+	 * and, because the core builds its record count on the same FROM clause, an invoice is counted as
+	 * many times as it has links. The row kept here is the one EInvoicing::fetchLastknownInvoiceStatus()
+	 * would keep, so the list and the card never disagree.
+	 *
+	 * @param 	'facture'|'invoice_supplier'|'societe'	$elementtype	Value of einvoicing_extlinks.element_type, which also tells which list of the core is being built
+	 * @return 	string									Condition to append to the ON clause of the join
+	 */
+	protected static function getExtLinkJoinCondition($elementtype)
+	{
+		global $db;
+
+		// The 'ViaPartner' suffix tells how the provider is reached, not which provider it is.
+		$providershort = preg_replace('/ViaPartner$/', '', getDolGlobalString('EINVOICING_PDP'));
+		$sqlcurrentprovider = "sub.provider IN ('" . $db->escape($providershort) . "', '" . $db->escape($providershort . 'ViaPartner') . "')";
+
+		$sql = ' AND ext.rowid = (SELECT sub.rowid FROM ' . $db->prefix() . 'einvoicing_extlinks as sub';
+		$sql .= " WHERE sub.element_type = '" . $db->escape($elementtype) . "'";
+		if ($elementtype == 'societe') {
+			$sql .= ' AND sub.element_id = s.rowid';	// Alias of the thirdparty in the thirdparty list of the core
+		} else {
+			$sql .= ' AND sub.element_id = f.rowid';	// Alias of the invoice in both invoice lists of the core
+		}
+		$sql .= ' ORDER BY CASE WHEN ' . $sqlcurrentprovider . ' THEN 0 ELSE 1 END,';
+		// fetchLastknownInvoiceStatus() keeps the LAST link read for the configured provider, but the
+		// FIRST one read for another provider, so the two cases do not order the rowid the same way.
+		$sql .= ' CASE WHEN ' . $sqlcurrentprovider . ' THEN -sub.rowid ELSE sub.rowid END';
+		$sql .= ' LIMIT 1)';
+
+		return $sql;
+	}
+
+	/**
+	 * Build the condition restricting the join on einvoicing_routing (aliased 'rt') to a single row.
+	 *
+	 * A thirdparty can hold several routing identifiers, and a routing row for its default product on
+	 * top of them, so the join repeats the thirdparty in the list as many times. The row kept here is
+	 * the one EInvoicing::fetchDefaultRouting() and EInvoicing::fetchAllRoutings() put first.
+	 *
+	 * @return 	string				Condition to append to the ON clause of the join, correlated on s.rowid
+	 */
+	protected static function getRoutingJoinCondition()
+	{
+		global $db;
+
+		$sql = ' AND rt.rowid = (SELECT sub.rowid FROM ' . $db->prefix() . 'einvoicing_routing as sub';
+		$sql .= ' WHERE sub.fk_soc = s.rowid';	// Alias of the thirdparty in the thirdparty list of the core
+		$sql .= " AND sub.routing_type = 'thirdparty'";
+		$sql .= ' AND sub.active = 1';
+		$sql .= ' ORDER BY sub.is_default DESC, sub.rowid ASC';
+		$sql .= ' LIMIT 1)';
+
+		return $sql;
+	}
 
 	/**
 	 * Build the sub query returning the last lifecycle status validated by the Access Point for a supplier invoice.
@@ -1315,24 +1403,20 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	public function printFieldListSelect($parameters, $object, &$action, $hookmanager)
 	{
 		// Invoice list
-		if (in_array('invoicelist', explode(':', $parameters['context']))) {
+		if (self::isListCompletedByModule($parameters['context'], 'invoicelist')) {
 			$this->resprints .= ', ext.rowid AS pdplink_id, ext.provider AS pdp_provider';
 			$this->resprints .= ', ext.syncstatus AS pdp_syncstatus';
 		}
 
-		// Supplier invoice list, Product list, Soc list
-		if (in_array('supplierinvoicelist', explode(':', $parameters['context']))) {
+		// Supplier invoice list
+		if (self::isListCompletedByModule($parameters['context'], 'supplierinvoicelist')) {
 			$this->resprints .= ', ext.rowid AS pdplink_id, ext.provider AS pdp_provider';
 			// Last known lifecycle status accepted by the Access Point, same source as the one shown on the invoice card
 			$this->resprints .= ', (' . self::getSupplierLifecycleStatusSubQuery() . ') AS pdp_lcstatus';
 		}
 
-		if (in_array('thirdpartylist', explode(':', $parameters['context']))) {
-			$this->resprints .= ', ext.rowid AS pdplink_id, ext.provider AS pdp_provider';
-			$this->resprints .= ', rt.routing_id AS routing_id';
-		}
-
-		if (in_array('societelist', explode(':', $parameters['context']))) {
+		// Thirdparty list
+		if (self::isListCompletedByModule($parameters['context'], 'thirdpartylist')) {
 			$this->resprints .= ', ext.rowid AS pdplink_id, ext.provider AS pdp_provider';
 			$this->resprints .= ', rt.routing_id AS routing_id';
 		}
@@ -1353,26 +1437,24 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	{
 		global $db;
 
-		// Supplier invoice list, Product list, Soc list
-		$contexts = explode(':', $parameters['context']);
+		// Thirdparty list
+		if (self::isListCompletedByModule($parameters['context'], 'thirdpartylist')) {
+			$this->resprints .= ' LEFT JOIN ' . $db->prefix() . "einvoicing_extlinks as ext ON ext.element_id = s.rowid AND ext.element_type = 'societe'";
+			$this->resprints .= self::getExtLinkJoinCondition('societe');
+			$this->resprints .= ' LEFT JOIN ' . $db->prefix() . 'einvoicing_routing rt ON rt.fk_soc = s.rowid';
+			$this->resprints .= self::getRoutingJoinCondition();
+		}
 
-		if (array_intersect($contexts, ['invoicelist', 'supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist'])) {
-			if (in_array('thirdpartylist', $contexts, true)) {
-				$this->resprints .= ' LEFT JOIN ' . $db->prefix() . "einvoicing_extlinks as ext ON ext.element_id = s.rowid AND ext.element_type = 'societe'";
-				$this->resprints .= ' LEFT JOIN ' . $db->prefix() . "einvoicing_routing rt ON rt.fk_soc = s.rowid";
-			}
+		// Invoice list
+		if (self::isListCompletedByModule($parameters['context'], 'invoicelist')) {
+			$this->resprints .= ' LEFT JOIN ' . $db->prefix() . "einvoicing_extlinks as ext ON ext.element_id = f.rowid AND ext.element_type = 'facture'";
+			$this->resprints .= self::getExtLinkJoinCondition('facture');
+		}
 
-			if (in_array('invoicelist', explode(':', $parameters['context']))) {
-				$this->resprints .= " LEFT JOIN " . $db->prefix() . "einvoicing_extlinks as ext ON ext.element_id = f.rowid AND ext.element_type = 'facture'";
-			}
-
-			if (in_array('supplierinvoicelist', $contexts, true)) {
-				$this->resprints .= ' LEFT JOIN ' . $db->prefix() . "einvoicing_extlinks as ext ON ext.element_id = f.rowid AND ext.element_type = 'invoice_supplier'";
-			}
-
-			if (in_array('productservicelist', $contexts, true)) {
-				$this->resprints .= ' LEFT JOIN ' . $db->prefix() . "einvoicing_extlinks as ext ON ext.element_id = p.rowid AND ext.element_type = 'product'";
-			}
+		// Supplier invoice list
+		if (self::isListCompletedByModule($parameters['context'], 'supplierinvoicelist')) {
+			$this->resprints .= ' LEFT JOIN ' . $db->prefix() . "einvoicing_extlinks as ext ON ext.element_id = f.rowid AND ext.element_type = 'invoice_supplier'";
+			$this->resprints .= self::getExtLinkJoinCondition('invoice_supplier');
 		}
 
 		return 0;
@@ -1393,23 +1475,27 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		$contexts = explode(':', $parameters['context']);
 
-		if (array_intersect($contexts, ['invoicelist', 'supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist'])) {
-			if (GETPOST('search_pdplinked', 'alpha') !== '' && GETPOST('search_pdplinked', 'alpha') == getDolGlobalString('EINVOICING_PDP')) {
-				$this->resprints .= " AND ext.provider = '" . $db->escape(getDolGlobalString('EINVOICING_PDP')) . "'";
-			}
+		// Only the lists the module joined its tables to: a filter on a table left out of the FROM is an SQL error
+		$hasextlink = self::isListCompletedByModule($parameters['context'], 'invoicelist')
+			|| self::isListCompletedByModule($parameters['context'], 'supplierinvoicelist')
+			|| self::isListCompletedByModule($parameters['context'], 'thirdpartylist');
 
-			if (GETPOST('search_routing_id', 'alpha') !== '' && GETPOST('search_routing_id', 'alpha') != "") {
-				$this->resprints .= " AND ext.routing_id = '" . $db->escape(GETPOST('search_routing_id', 'alpha')) . "'";
-			}
+		if ($hasextlink && GETPOST('search_pdplinked', 'alpha') !== '' && GETPOST('search_pdplinked', 'alpha') == getDolGlobalString('EINVOICING_PDP')) {
+			$this->resprints .= " AND ext.provider = '" . $db->escape(getDolGlobalString('EINVOICING_PDP')) . "'";
 		}
 
-		if (in_array('invoicelist', $contexts) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
+		// The routing identifier is a column of einvoicing_routing, joined as 'rt' on the thirdparty list only
+		if (self::isListCompletedByModule($parameters['context'], 'thirdpartylist') && GETPOST('search_routing_id', 'alpha') !== '') {
+			$this->resprints .= " AND rt.routing_id = '" . $db->escape(GETPOST('search_routing_id', 'alpha')) . "'";
+		}
+
+		if (self::isListCompletedByModule($parameters['context'], 'invoicelist')) {
 			if (GETPOST('search_pdp_syncstatus', 'alpha') !== '' && GETPOST('search_pdp_syncstatus', 'alpha') != -2) {
 				$this->resprints .= ' AND ext.syncstatus = ' . ((int) GETPOST('search_pdp_syncstatus'));
 			}
 		}
 
-		if (in_array('supplierinvoicelist', $contexts) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI') && GETPOST('search_pdp_lcstatus', 'alpha') !== '' && GETPOST('search_pdp_lcstatus', 'alpha') != -2) {
+		if (self::isListCompletedByModule($parameters['context'], 'supplierinvoicelist') && GETPOST('search_pdp_lcstatus', 'alpha') !== '' && GETPOST('search_pdp_lcstatus', 'alpha') != -2) {
 			$this->resprints .= ' AND (' . self::getSupplierLifecycleStatusSubQuery() . ') = ' . GETPOSTINT('search_pdp_lcstatus');
 		}
 
@@ -1432,8 +1518,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 * Add GROUP BY fields
 	 * Mandatory for the fields added by printFieldListSelect() on lists that build a GROUP BY clause,
 	 * otherwise MySQL rejects the query with sql_mode=only_full_group_by (error 1055).
-	 * Only supplierinvoicelist is concerned: thirdpartylist/societelist call the hook without any
-	 * GROUP BY clause, and productservicelist selects no column from the joined table.
+	 * Only supplierinvoicelist is concerned: the thirdparty list and the invoice list call the hook
+	 * without any GROUP BY clause.
 	 *
 	 * @param array<string,mixed> 	$parameters		Array of parameters
 	 * @param CommonObject			$object			Object invoice
@@ -1443,7 +1529,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 */
 	public function printFieldListGroupBy($parameters, $object, &$action, $hookmanager)
 	{
-		if (in_array('supplierinvoicelist', explode(':', $parameters['context']), true)) {
+		if (self::isListCompletedByModule($parameters['context'], 'supplierinvoicelist')) {
 			$this->resprints .= ', ext.rowid, ext.provider';
 		}
 
@@ -1463,7 +1549,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	{
 		global $form, $db;
 
-		if (in_array('invoicelist', explode(':', $parameters['context'])) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
+		if (self::isListCompletedByModule($parameters['context'], 'invoicelist')) {
 			$einvoicing = new EInvoicing($db);
 			$checkConfig = $einvoicing->checkModulePrerequisites();
 			if ($checkConfig < 0) {
@@ -1527,8 +1613,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			}
 		}
 
-		// Supplier invoice list, Product list, Soc list
-		if (in_array('supplierinvoicelist', explode(':', $parameters['context'])) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
+		// Supplier invoice list
+		if (self::isListCompletedByModule($parameters['context'], 'supplierinvoicelist')) {
 			$tmpeinvoicingpartner = preg_replace('/ViaPartner/i', '', getDolGlobalString('EINVOICING_PDP'));
 			$listofoptions = array(
 				$tmpeinvoicingpartner => $tmpeinvoicingpartner,
@@ -1573,8 +1659,9 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		}
 
 
-		if (in_array('thirdpartylist', explode(':', $parameters['context'])) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI'))) {
-			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
+		if (self::isListCompletedByModule($parameters['context'], 'thirdpartylist')) {
+			// 'routing_id' is the field completeArrayFields() declares for that list
+			if (!empty($parameters['arrayfields']['routing_id']['checked'])) {
 				print '<td class="liste_titre">';
 				print '<input type="text" name="search_routing_id" value="' . dolPrintHTMLForAttribute(GETPOST('search_routing_id', 'alpha')) . '" class="minwidth50 maxwidth100">';
 				print '</td>';
@@ -1605,7 +1692,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		$contexts = explode(':', $parameters['context']);
 
-		if (in_array('invoicelist', $contexts) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
+		if (self::isListCompletedByModule($parameters['context'], 'invoicelist')) {
 			$einvoicing = new EInvoicing($db);
 			$checkConfig = $einvoicing->checkModulePrerequisites();
 			if ($checkConfig < 0) {
@@ -1626,14 +1713,14 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			}
 		}
 
-		// Supplier invoice list, Product list, Soc list
-		if (in_array('supplierinvoicelist', $contexts) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
+		// Supplier invoice list
+		if (self::isListCompletedByModule($parameters['context'], 'supplierinvoicelist')) {
 			print_liste_field_titre($langs->transnoentitiesnoconv('einvoicingSourceTitle'));
 			print_liste_field_titre($langs->transnoentitiesnoconv('einvoicingInvoiceStatus'), '', '', '', $parameters['param'] ?? '', '', '', '', 'center ');
 		}
 
-		if (in_array('thirdpartylist', $contexts) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI'))) {
-			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
+		if (self::isListCompletedByModule($parameters['context'], 'thirdpartylist')) {
+			if (!empty($parameters['arrayfields']['routing_id']['checked'])) {
 				print_liste_field_titre($langs->transnoentitiesnoconv('einvoicingThirdPartyRoutingTitle'));
 			}
 		}
@@ -1660,8 +1747,6 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	{
 		global $db, $langs;
 
-		$contexts = explode(':', $parameters['context']);
-
 		// Every block below counts the cells it prints into the caller's column counter, which sizes the
 		// footer of the list. A hook is not guaranteed to receive that counter already built, so make sure
 		// of it once, before the first increment rather than after it. Only create the key when it is
@@ -1674,7 +1759,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			$parameters['totalarray']['nbfield'] = 0;
 		}
 
-		if (in_array('invoicelist', $contexts) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
+		if (self::isListCompletedByModule($parameters['context'], 'invoicelist')) {
 			$einvoicing = new EInvoicing($db);
 			$checkConfig = $einvoicing->checkModulePrerequisites();
 			if ($checkConfig < 0) {
@@ -1719,8 +1804,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			}
 		}
 
-		// Supplier invoice list, Product list, Soc list
-		if (in_array('supplierinvoicelist', $contexts) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
+		// Supplier invoice list
+		if (self::isListCompletedByModule($parameters['context'], 'supplierinvoicelist')) {
 			$obj = $parameters['obj'];
 
 			print '<td class="tdoverflowmax100">';
@@ -1743,12 +1828,13 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			}
 		}
 
-		if (in_array('thirdpartylist', explode(':', $parameters['context']), true)) {
-			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
+		if (self::isListCompletedByModule($parameters['context'], 'thirdpartylist')) {
+			if (!empty($parameters['arrayfields']['routing_id']['checked'])) {
 				$obj = $parameters['obj'];
 
 				print '<td class="tdoverflowmax125">';
-				if ($obj->pdplink_id) {
+				// A thirdparty holds a routing identifier whether or not it also carries a link to the Access Point
+				if (!empty($obj->routing_id)) {
 					print dolPrintHTML($obj->routing_id);
 				}
 				print '</td>';
