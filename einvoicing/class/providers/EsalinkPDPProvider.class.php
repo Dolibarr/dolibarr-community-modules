@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2025       Laurent Destailleur         <eldy@users.sourceforge.net>
+ * Copyright (C) 2026		Jose Martinez				<jose.martinez@pichinov.com>
  * Copyright (C) 2025       Mohamed DAOUD               <mdaoud@dolicloud.com>
  * Copyright (C) 2026       Frédéric France             <frederic.france@free.fr>
  *
@@ -1293,7 +1294,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$document->flow_uiid            = $flowData['uuid'] ?? null;
 
 		if (getDolGlobalString('EINVOICING_DEBUG_MODE')) {
-			$document->response_for_debug = $response['response'];
+			$document->response_for_debug = $this->makeStorableDebugPayload($response['response']);
 		}
 
 		$returnRes = 1;

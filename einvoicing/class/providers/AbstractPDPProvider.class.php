@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2025       Laurent Destailleur         <eldy@users.sourceforge.net>
+ * Copyright (C) 2026		Jose Martinez				<jose.martinez@pichinov.com>
  * Copyright (C) 2025       Mohamed DAOUD               <mdaoud@dolicloud.com>
  * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
@@ -756,6 +757,29 @@ abstract class AbstractPDPProvider
 	}
 
 	/**
+	 * Make an API payload safe to store in the utf8mb4 TEXT debug columns
+	 * (llx_einvoicing_call.response, llx_einvoicing_document.response_for_debug).
+	 *
+	 * Some PDP responses carry non-UTF-8 bytes (signed or compressed payloads): stored as-is
+	 * they raise a SQL error 1366 (Incorrect string value) and abort the flow. Valid UTF-8 is
+	 * kept unchanged; anything else is base64-encoded behind a marker so the trace stays both
+	 * storable and recoverable.
+	 *
+	 * @param   string|null $payload    Raw payload, possibly binary
+	 * @return  string                  UTF-8-safe representation
+	 */
+	protected function makeStorableDebugPayload($payload)
+	{
+		if (!is_string($payload) || $payload === '') {
+			return (string) $payload;
+		}
+		if (preg_match('//u', $payload)) {	// already valid UTF-8
+			return $payload;
+		}
+		return '[base64] ' . base64_encode($payload);
+	}
+
+	/**
 	 * Log an API call into llx_einvoicing_call using a SEPARATE database connection.
 	 *
 	 * The call trace must survive even when the caller's main transaction is rolled
@@ -806,8 +830,8 @@ abstract class AbstractPDPProvider
 		$call->method = ($method == 'POSTALREADYFORMATED' ? 'POST' : $method);
 		$call->endpoint = '/' . $resource;
 		$call->request_id = $requestId;
-		$call->request_body = is_array($params) ? json_encode($params) : $params;
-		$call->response = is_array($response) ? json_encode($response) : $response;
+		$call->request_body = $this->makeStorableDebugPayload(is_array($params) ? json_encode($params) : $params);
+		$call->response = $this->makeStorableDebugPayload(is_array($response) ? json_encode($response) : $response);
 		$call->provider = $this->name;
 		$call->entity = $conf->entity;
 		$call->status = ($statusCode == 200 || $statusCode == 202) ? 1 : 0;

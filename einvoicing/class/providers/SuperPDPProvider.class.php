@@ -2225,7 +2225,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$document->flow_uiid            = $flowData['uuid'] ?? null;
 
 		if (getDolGlobalString('EINVOICING_DEBUG_MODE')) {
-			$document->response_for_debug = $response['response'];
+			$document->response_for_debug = $this->makeStorableDebugPayload($response['response']);
 		}
 
 
