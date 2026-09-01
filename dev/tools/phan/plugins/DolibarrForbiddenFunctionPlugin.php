@@ -63,7 +63,10 @@ class DolibarrForbiddenFunctionVisitor extends PluginAwarePostAnalysisVisitor
 		if (!is_string($name)) {
 			return;
 		}
-		if (!in_array($name, ['time', 'touch'])) {
+		if (!in_array($name, [
+			'time', 'touch',
+			'curl_init', 'curl_exec', 'curl_setopt_array', 'curl_close', 'curl_getinfo', 'curl_error',
+		])) {
 			return;
 		}
 		$this->emitPluginIssue(
