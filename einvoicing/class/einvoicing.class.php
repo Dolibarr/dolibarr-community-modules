@@ -1935,6 +1935,7 @@ class EInvoicing
 			$sql .= " AND lc_validation_status = 'Ok'";
 			$sql .= " ORDER BY rowid DESC LIMIT 1";
 			$resql = $this->db->query($sql);
+			$obj = null;
 			if ($resql && $this->db->num_rows($resql) > 0) {
 				$obj = $this->db->fetch_object($resql);
 				$currentStatus = $this->getStatusLabel($obj->lc_status);
@@ -1943,8 +1944,10 @@ class EInvoicing
 			// Current status
 			$resprints .= '<tr class="treinvoicing_collapseseparator">';
 			$resprints .= '<td class="">' . $langs->trans("einvoicingInvoiceStatus") . '</td>';
-			$resprints .= '<td><span id="einvoice-status" title="'.$obj->lc_status.'">' . $currentStatus;
-			$resprints .= ($obj->lc_status > 200 ? ' <span class="opacitymedium small">('.$langs->trans("EInvoiceCodeShort").' '.$obj->lc_status.')</span>' : '');
+			$resprints .= '<td><span id="einvoice-status" title="'.($obj ? $obj->lc_status : '').'">' . $currentStatus;
+			if ($obj) {
+				$resprints .= ($obj->lc_status > 200 ? ' <span class="opacitymedium small">('.$langs->trans("EInvoiceCodeShort").' '.$obj->lc_status.')</span>' : '');
+			}
 			$resprints .= '</span>';
 
 			// If current status requires a reason, display it
