@@ -272,8 +272,8 @@ if (!$permissiontoread) {
 // AbstractProtocol::cleanupIncomingTempFiles(): one per protocol (einvoice.xml for a CII flow,
 // einvoice.pdf for a Factur-X one), plus the readable view when the platform provided one.
 $protocolManager = new ProtocolManager($db);
-$diagFileNames = $protocolManager->getIncomingDiagnosticFileNames();
-$diagReadableFileName = AbstractProtocol::INCOMING_DIAGNOSTIC_READABLE_FILE_NAME;
+$diagFileNames = $protocolManager->getIncomingDiagnosticFileNames();				// Return the document Converted in format of the default Protocol.
+$diagReadableFileName = AbstractProtocol::INCOMING_DIAGNOSTIC_READABLE_FILE_NAME;	// Return the document Readable (a generated PDF)
 
 
 
@@ -812,20 +812,20 @@ foreach ($diagFileNames as $f) {
 }
 
 if ($diagFileName) {
-	$urlOriginalFile = DOL_URL_ROOT . '/document.php?modulepart=einvoicing&file=' . urlencode('temp/' . $diagFileName);
+	$urlConvertedFile = DOL_URL_ROOT . '/document.php?modulepart=einvoicing&file=' . urlencode('temp/' . $diagFileName);
 
 	$last_supplier_invoice_error = '<span class="opacitylowx">'.img_picto('', 'times', 'class="pictofixedwidth"');
 	$last_supplier_invoice_error .= ' ' . $langs->trans("LastSupplierInvoiceCouldNotBeProcessed");
 	$last_supplier_invoice_error .= '<i class="fas fa-info-circle em088 opacityhigh classfortooltip" title="'. $langs->trans("LastSupplierInvoiceCouldNotBeProcessedInfo") .'"></i>';
 	$last_supplier_invoice_error .= ' : </span>';
-	$last_supplier_invoice_error .= '<a href="'.$urlOriginalFile.'">' . $langs->trans("facturXDownloadOriginal") . ' ' . img_picto('', 'download', 'class="pictofixedwidth"') . '</a>';
+	$last_supplier_invoice_error .= '<a href="'.$urlConvertedFile.'" target="_blank">' . $langs->trans("DocDownloadConverted") . ' ' . img_picto('', 'download', 'class="pictofixedwidth"') . '</a>';
 
 	// The readable view is only stored when the platform provided one with the flow
 	if (file_exists($conf->einvoicing->dir_temp . '/' . $diagReadableFileName)) {
-		$urlConvertedFile = DOL_URL_ROOT . '/document.php?modulepart=einvoicing&file=' . urlencode('temp/' . $diagReadableFileName);
+		$urlReadableFile = DOL_URL_ROOT . '/document.php?modulepart=einvoicing&file=' . urlencode('temp/' . $diagReadableFileName);
 
 		$last_supplier_invoice_error .= ' <span class="opacitylow">|</span> ';
-		$last_supplier_invoice_error .= '<a href="'.$urlConvertedFile.'">' . $langs->trans("facturXDownloadConverted") . ' ' . img_picto('', 'download', 'class="pictofixedwidth"') . '</a>';
+		$last_supplier_invoice_error .= '<a href="'.$urlReadableFile.'" target="_blank">' . $langs->trans("DocDownloadReadable") . ' ' . img_picto('', 'download', 'class="pictofixedwidth"') . '</a>';
 	}
 }
 

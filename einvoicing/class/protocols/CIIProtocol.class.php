@@ -670,11 +670,11 @@ class CIIProtocol extends AbstractProtocol
 	 * This may create the Supplier and the Product depending on setup.
 	 *
 	 * @param  string 			$file                       		Source string file (XML or PDF string). We use this file to get data of supplier invoice.
-	 * @param  string|null 		$ReadableViewFile        			Readable view file (PDP Generated readable PDF). We only store it if available.
+	 * @param  string|null 		$readableViewFile        			Readable view file (PDP Generated readable PDF). We only store it if available.
 	 * @param  string 			$flowId                       		Flow identifier source of the invoice.
 	 * @return array{res:int<-1,1>, message:string, actioncode?: string|null, actionurl?: string|null, action?:string|null}   Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and an optional 'actioncode' and 'action'.
 	 */
-	public function createSupplierInvoiceFromSource($file, $ReadableViewFile = null, $flowId = '')
+	public function createSupplierInvoiceFromSource($file, $readableViewFile = null, $flowId = '')
 	{
 		global $conf, $db;
 
@@ -696,7 +696,7 @@ class CIIProtocol extends AbstractProtocol
 
 		$result = ['res' => -1, 'message' => 'Unexpected error while creating supplier invoice'];
 		try {
-			$result = $this->doCreateSupplierInvoiceFromSource($file, $ReadableViewFile, $flowId, $tempFile, $tempFileReadableView);
+			$result = $this->doCreateSupplierInvoiceFromSource($file, $readableViewFile, $flowId, $tempFile, $tempFileReadableView);
 		} finally {
 			$failed = !is_array($result) || !isset($result['res']) || $result['res'] < 0;
 			$this->cleanupIncomingTempFiles($tempDir, $tempFile, $tempFileReadableView, $failed);
@@ -781,13 +781,13 @@ class CIIProtocol extends AbstractProtocol
 	 * import transaction is opened here too, right after, but closed by that same wrapper.
 	 *
 	 * @param  string			$file                 Raw CII XML content
-	 * @param  string|null		$ReadableViewFile     Optional readable view (PDP-generated readable PDF)
+	 * @param  string|null		$readableViewFile     Optional readable view (PDP-generated readable PDF)
 	 * @param  string			$flowId               Source flow identifier
 	 * @param  string			$tempFile             Unique working file for the received XML
 	 * @param  string			$tempFileReadableView Unique working file for the readable view
 	 * @return array{res:int<-1,1>, message:string, action?:string|null}
 	 */
-	protected function doCreateSupplierInvoiceFromSource($file, $ReadableViewFile, $flowId, $tempFile, $tempFileReadableView)
+	protected function doCreateSupplierInvoiceFromSource($file, $readableViewFile, $flowId, $tempFile, $tempFileReadableView)
 	{
 		global $db, $user, $langs;
 
@@ -798,8 +798,8 @@ class CIIProtocol extends AbstractProtocol
 			return ['res' => -1, 'message' => 'Failed to save EInvoice file to temporary location'];
 		}
 
-		if ($ReadableViewFile) {
-			if (file_put_contents($tempFileReadableView, $ReadableViewFile) === false) {
+		if ($readableViewFile) {
+			if (file_put_contents($tempFileReadableView, $readableViewFile) === false) {
 				return ['res' => -1, 'message' => 'Failed to save readable view file to temporary location'];
 			}
 		}
@@ -1161,7 +1161,7 @@ class CIIProtocol extends AbstractProtocol
 
 
 			// Save readable view file in supplier invoice attachments
-			if ($ReadableViewFile && $tempFileReadableView && file_exists($tempFileReadableView)) {
+			if ($readableViewFile && $tempFileReadableView && file_exists($tempFileReadableView)) {
 				$res = $this->saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempFileReadableView, getDolGlobalString('EINVOICING_PDP', 'PDP'));
 
 				if ($res['res'] < 0) {
@@ -2687,8 +2687,17 @@ class CIIProtocol extends AbstractProtocol
 		// TradeAddressType is reduced to the country code by the MINIMUM schema
 		if (!$this->isMinimumProfile($profile)) {
 			$addr->appendChild($doc->createElement('ram:PostcodeCode', htmlspecialchars((string) $data[$prefix . 'postcode'])));
+			// The three address lines the norm has: BT-35/36/162 for the seller, BT-50/51/163 for the
+			// buyer. XSD order inside TradeAddressType is PostcodeCode, LineOne, LineTwo, LineThree,
+			// CityName, CountryID - the elements are written in that order and nowhere else.
 			if (!empty($data[$prefix . 'lineone'])) {
 				$addr->appendChild($doc->createElement('ram:LineOne', htmlspecialchars($data[$prefix . 'lineone'])));
+			}
+			if (!empty($data[$prefix . 'linetwo'])) {
+				$addr->appendChild($doc->createElement('ram:LineTwo', htmlspecialchars($data[$prefix . 'linetwo'])));
+			}
+			if (!empty($data[$prefix . 'linethree'])) {
+				$addr->appendChild($doc->createElement('ram:LineThree', htmlspecialchars($data[$prefix . 'linethree'])));
 			}
 			$addr->appendChild($doc->createElement('ram:CityName', htmlspecialchars($data[$prefix . 'city'])));
 		}
@@ -2781,8 +2790,17 @@ class CIIProtocol extends AbstractProtocol
 		if (!empty($ship['zip'])) {
 			$addr->appendChild($doc->createElement('ram:PostcodeCode', htmlspecialchars((string) $ship['zip'])));
 		}
-		if (!empty($ship['address'])) {
-			$addr->appendChild($doc->createElement('ram:LineOne', htmlspecialchars($ship['address'])));
+		// BT-75/76/165: the deliver-to address has three lines too. The caller splits the free text
+		// field Dolibarr stores; a single-line address keeps landing on LineOne alone.
+		$shiplines = array(
+			$ship['lineone'] ?? $ship['address'] ?? '',
+			$ship['linetwo'] ?? '',
+			$ship['linethree'] ?? '',
+		);
+		foreach (array('ram:LineOne', 'ram:LineTwo', 'ram:LineThree') as $rank => $element) {
+			if (!empty($shiplines[$rank])) {
+				$addr->appendChild($doc->createElement($element, htmlspecialchars($shiplines[$rank])));
+			}
 		}
 		if (!empty($ship['town'])) {
 			$addr->appendChild($doc->createElement('ram:CityName', htmlspecialchars($ship['town'])));
@@ -3075,7 +3093,12 @@ class CIIProtocol extends AbstractProtocol
 		global $conf;
 
 		// Ensure upload directory exists
-		$folder_part = get_exdir(0, 0, 0, 0, $supplierInvoice);
+		// The arguments are the ones the card of the core passes (fourn/facture/card.php), and they are
+		// passed in full on purpose: get_exdir(0, 0, ...) answers the same thing only since Dolibarr 20,
+		// where an empty level defaults to 2 for a supplier invoice. On 18 and 19 that default does not
+		// exist, the path falls back to the reference of the invoice, and the document is written into a
+		// directory the card never reads - so a received e-invoice was shown nowhere.
+		$folder_part = get_exdir($supplierInvoice->id, 2, 0, 0, $supplierInvoice, 'invoice_supplier');
 		$relative_path = 'fournisseur/facture/' . $folder_part . dol_sanitizeFileName($supplierInvoice->ref);
 		$upload_dir = $conf->fournisseur->dir_output . '/facture/' . $folder_part . dol_sanitizeFileName($supplierInvoice->ref);
 
