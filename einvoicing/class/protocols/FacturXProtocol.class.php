@@ -415,13 +415,13 @@ class FacturXProtocol extends CIIProtocol
 	 * import transaction is opened here too, right after, but closed by that same wrapper.
 	 *
 	 * @param  string			$file                 Raw Factur-X PDF content
-	 * @param  string|null		$ReadableViewFile     Optional readable view (PDP-generated readable PDF)
+	 * @param  string|null		$readableViewFile     Optional readable view (PDP-generated readable PDF)
 	 * @param  string			$flowId               Source flow identifier
 	 * @param  string			$tempFile             Unique working file for the received PDF
 	 * @param  string			$tempFileReadableView Unique working file for the readable view
 	 * @return array{res:int<-1,1>, message:string, action?:string|null}
 	 */
-	protected function doCreateSupplierInvoiceFromSource($file, $ReadableViewFile, $flowId, $tempFile, $tempFileReadableView)
+	protected function doCreateSupplierInvoiceFromSource($file, $readableViewFile, $flowId, $tempFile, $tempFileReadableView)
 	{
 		global $conf, $db, $langs, $user;
 
@@ -435,8 +435,8 @@ class FacturXProtocol extends CIIProtocol
 			return ['res' => -1, 'message' => 'Failed to save EInvoice file to temporary location'];
 		}
 
-		if ($ReadableViewFile) {
-			if (file_put_contents($tempFileReadableView, $ReadableViewFile) === false) {
+		if ($readableViewFile) {
+			if (file_put_contents($tempFileReadableView, $readableViewFile) === false) {
 				return ['res' => -1, 'message' => 'Failed to save readable view file to temporary location'];
 			}
 		}
@@ -978,7 +978,7 @@ class FacturXProtocol extends CIIProtocol
 
 
 			// Save readable view file in supplier invoice attachments
-			if ($ReadableViewFile && $tempFileReadableView && file_exists($tempFileReadableView)) {
+			if ($readableViewFile && $tempFileReadableView && file_exists($tempFileReadableView)) {
 				$res = $this->saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempFileReadableView, getDolGlobalString('EINVOICING_PDP', 'PDP'));
 
 				if ($res['res'] < 0) {
