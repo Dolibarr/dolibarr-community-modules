@@ -3151,8 +3151,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 					// Log an event in the invoice timeline if status not pending
 					if ($ack_statusLabel != 'Pending') {
-						$eventLabel = "EINVOICING - ".$langs->trans("CheckStatus");
-						$eventMessage = "EINVOICING - ".$langs->trans("CheckStatus")." (From sendStatusMessage) - [Dolibarr: " . $statusLabelToSend . $langs->trans("ResultOnAP").' '.$ack_statusLabel . (!empty($syncComment) ? " - " . $syncComment : "")."]";
+						$eventLabel = "EINVOICING - ".$langs->trans("SendStatus");
+						$eventMessage = "EINVOICING - ".$langs->trans("SendStatus")." (From sendStatusMessage) - [Dolibarr: " . $statusLabelToSend . $langs->trans("ResultOnAP").' '.$ack_statusLabel . (!empty($syncComment) ? " - " . $syncComment : "")."]";
 
 						$resLogEvent = $this->addEvent('STATUS', $eventLabel, $eventMessage, $object);
 						if ($resLogEvent < 0) {
