@@ -408,10 +408,11 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					$einvoicing::STATUS_ERROR,
 					$einvoicing::STATUS_UNKNOWN,
 					$einvoicing::STATUS_AWAITING_VALIDATION,		// retry affordance (PA will refuse a duplicate)
-					$einvoicing::STATUS_AWAITING_ACK				// retry affordance (PA will refuse a duplicate)
+					$einvoicing::STATUS_AWAITING_ACK,				// retry affordance (PA will refuse a duplicate)
+					$einvoicing::STATUS_REJECTED					// resend after correcting a rejected e-invoice (gated by EINVOICING_ALLOW_RESEND_TRANSMITTED)
 				])) {
 					$resend = false;
-					if (in_array($currentStatusDetails['code'], [$einvoicing::STATUS_AWAITING_VALIDATION, $einvoicing::STATUS_AWAITING_ACK])) {
+					if (in_array($currentStatusDetails['code'], [$einvoicing::STATUS_AWAITING_VALIDATION, $einvoicing::STATUS_AWAITING_ACK, $einvoicing::STATUS_REJECTED])) {
 						$resend = true;
 					}
 					$url_button[] = array(
@@ -619,7 +620,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				&& in_array($currentStatusDetails['code'], [
 					$einvoicing::STATUS_GENERATED,
 					$einvoicing::STATUS_ERROR,
-					$einvoicing::STATUS_UNKNOWN
+					$einvoicing::STATUS_UNKNOWN,
+					$einvoicing::STATUS_REJECTED			// resend a corrected rejected e-invoice (gated by EINVOICING_ALLOW_RESEND_TRANSMITTED)
 				])
 			) {
 				// Same gates and same transmission as the mass action of the invoice list
