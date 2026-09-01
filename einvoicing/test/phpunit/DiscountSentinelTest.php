@@ -75,6 +75,20 @@ class DiscountSentinelTest extends CommonClassTest
 	}
 
 	/**
+	 * A discount object that was never fetched: nothing to read on it, which is what a deleted or
+	 * unreadable source piece leaves behind.
+	 *
+	 * @return stdClass
+	 */
+	private function unfetchedDiscount()
+	{
+		$discount = $this->discount();
+		$discount->id = 0;
+
+		return $discount;
+	}
+
+	/**
 	 * The list of the sentinels is the one of the core, spelled exactly as the core spells it. It is
 	 * pinned here because it is shared by the resolution and by the last look that reports a sentinel
 	 * having reached a field of the document: a fifth entry, or one spelling drifting, would silently
@@ -157,20 +171,55 @@ class DiscountSentinelTest extends CommonClassTest
 	}
 
 	/**
-	 * A description that is a sentinel but has no discount behind it is left alone: there is no piece to
-	 * name, so there is no text to build, and inventing one would announce a deduction from nothing.
+	 * A sentinel with no piece to name still gets a text of its own, and never goes out as it stands.
+	 * The wording of the core quotes a reference, so it would be issued with a hole in the middle of the
+	 * sentence; the module has its own for the case. The one thing that must not happen is the marker
+	 * reaching the document: an item name that is a technical marker is what BR-25 refuses in spirit,
+	 * and it is what the customer would read.
 	 *
 	 * @return void
 	 */
-	public function testASentinelWithNoDiscountBehindItIsLeftAlone()
+	public function testASentinelWithNoPieceToNameStillGetsAText()
 	{
 		global $langs;
 
-		$this->assertSame('', einvoicingDiscountLabel(null, '(CREDIT_NOTE)', $langs));
+		foreach (array(null, $this->discount(''), $this->unfetchedDiscount()) as $noSource) {
+			$label = einvoicingDiscountLabel($noSource, '(CREDIT_NOTE)', $langs);
 
-		$unfetched = $this->discount();
-		$unfetched->id = 0;
-		$this->assertSame('', einvoicingDiscountLabel($unfetched, '(CREDIT_NOTE)', $langs));
+			$this->assertNotSame('', $label);
+			$this->assertStringNotContainsString('(CREDIT_NOTE)', $label);
+		}
+
+		// And each case keeps a wording of its own, a deposit deducted not being a credit note applied.
+		$this->assertNotSame(
+			einvoicingDiscountLabel(null, '(CREDIT_NOTE)', $langs),
+			einvoicingDiscountLabel(null, '(DEPOSIT)', $langs)
+		);
+	}
+
+	/**
+	 * The invoice the deducted piece corrects is named beside the piece itself: a deduction that only
+	 * says which credit note it comes from leaves the customer to find which invoice that credit note
+	 * was about. It is skipped when it would name the piece already named, which is what a deposit
+	 * deducted from the very invoice it was asked on would do.
+	 *
+	 * @return void
+	 */
+	public function testTheCorrectedInvoiceIsNamedBesideThePiece()
+	{
+		global $langs;
+
+		$withCorrected = einvoicingDiscountLabel($this->discount(), '(CREDIT_NOTE)', $langs, 'FA2026-0100');
+		$withoutCorrected = einvoicingDiscountLabel($this->discount(), '(CREDIT_NOTE)', $langs);
+
+		$this->assertStringStartsWith($withoutCorrected, $withCorrected);
+		$this->assertStringContainsString('FA2026-0100', $withCorrected);
+
+		// The same reference on both sides is named once.
+		$this->assertSame(
+			einvoicingDiscountLabel($this->discount('FA2026-0180'), '(DEPOSIT)', $langs),
+			einvoicingDiscountLabel($this->discount('FA2026-0180'), '(DEPOSIT)', $langs, 'FA2026-0180')
+		);
 	}
 
 	/**

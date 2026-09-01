@@ -729,3 +729,11 @@ EInvoicePreviewXml=Show the e-invoice XML
 EInvoiceNoFileToPreview=No e-invoice XML has been generated for this invoice.
 EInvoiceNoReceivedFileToPreview=No e-invoice XML has been received for this invoice.
 EInvoiceXmlReindented=received on a single line, shown reindented
+
+# Wording of a discount line whose source piece cannot be named (BT-153 / BT-97)
+EInvDiscountOnInvoice=on invoice %s
+DiscountFromCreditNoteNoSource=Discount from a credit note
+DiscountFromDepositNoSource=Down payment deducted
+DiscountFromExcessReceivedNoSource=Payment in excess deducted
+DiscountFromExcessPaidNoSource=Payment in excess deducted
+FxCheckErrorLinesWithNoName=The following lines have neither a product label nor a description, so the item name of the e-invoice (BT-153) would be empty, which rule BR-25 refuses: %s. Enter a description on each of them.
