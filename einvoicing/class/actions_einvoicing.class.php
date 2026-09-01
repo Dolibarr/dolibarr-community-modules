@@ -525,6 +525,13 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	{
 		global $db, $langs, $user;
 
+		// Before anything else, and before the early return below: on a list the core builds its
+		// $arrayfields before it knows any action, and the older versions offer no other hook to
+		// complete it. See addFieldsToList().
+		if (isset($parameters['arrayfields'])) {
+			self::addFieldsToList($parameters['arrayfields'], $parameters['context']);
+		}
+
 		if (empty($action)) {
 			return 0;
 		}
@@ -1245,16 +1252,39 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 */
 	public function completeArrayFields($parameters, $object, &$action, $hookmanager)
 	{
-		if (self::isListCompletedByModule($parameters['context'], 'invoicelist')) {
+		if (isset($parameters['arrayfields'])) {
+			self::addFieldsToList($parameters['arrayfields'], $parameters['context']);
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Declare the columns of the module in the list of fields a list of the core offers to display.
+	 *
+	 * Called from two hooks on purpose. 'completeArrayFields' is the hook meant for this, but the core
+	 * only runs it from Dolibarr 22 (customer invoice list) and 23 (the four lists); 'doActions', on the
+	 * other hand, receives the same array by reference from Dolibarr 17 on the customer invoice list,
+	 * 19 on the supplier invoice list and 20 on the thirdparty and product lists. Declaring from both
+	 * is what makes the columns reachable on the versions still supported. Writing the same keys twice
+	 * where both hooks run changes nothing.
+	 *
+	 * @param 	array<string,mixed>	$arrayfields	Fields of the list, as the core passes them by reference
+	 * @param 	string				$context		Value of $parameters['context'] as the hook manager builds it
+	 * @return 	void
+	 */
+	protected static function addFieldsToList(&$arrayfields, $context)
+	{
+		if (self::isListCompletedByModule($context, 'invoicelist')) {
 			// Add fields to invoice list
-			$parameters['arrayfields']['einvoicegenerated'] = array(
+			$arrayfields['einvoicegenerated'] = array(
 				'label' => 'EInvoiceFile',
 				'checked' => -1,
 				'position' => 900,
 				'enabled' => 1,
 				'perms' => '1'
 			);
-			$parameters['arrayfields']['pdp_syncstatus'] = array(
+			$arrayfields['pdp_syncstatus'] = array(
 				'label' => 'PDPSyncStatus',
 				'checked' => 1,
 				'position' => 901,
@@ -1263,9 +1293,9 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			);
 		}
 
-		if (self::isListCompletedByModule($parameters['context'], 'thirdpartylist')) {
+		if (self::isListCompletedByModule($context, 'thirdpartylist')) {
 			// Add fields to thirdparty list
-			$parameters['arrayfields']['routing_id'] = array(
+			$arrayfields['routing_id'] = array(
 				'label' => 'RoutingIdField',
 				'help' => 'SpecificRoutingFieldHelp',
 				'checked' => -1,
@@ -1273,7 +1303,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				'enabled' => 1,
 				'perms' => '1'
 			);
-			$parameters['arrayfields']['routing_product_id'] = array(
+			$arrayfields['routing_product_id'] = array(
 				'label' => 'DefaultProductEBilling',
 				'checked' => -1,
 				'position' => 901,
@@ -1281,8 +1311,6 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				'perms' => '1'
 			);
 		}
-
-		return 0;
 	}
 
 
