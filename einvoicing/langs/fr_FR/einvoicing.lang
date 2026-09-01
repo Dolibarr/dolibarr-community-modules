@@ -585,3 +585,11 @@ SynchronizationDashboard=Tableau de bord de synchronisation
 LastSynchronizationDate=Date de la dernière synchronisation
 CustomerInvoicesSynchronized=Factures client synchronisées
 SupplierInvoicesSynchronized=Factures fournisseurs synchronisées
+
+# Libellé d'une ligne de remise dont la pièce source ne peut pas être nommée (BT-153 / BT-97)
+EInvDiscountOnInvoice=sur facture %s
+DiscountFromCreditNoteNoSource=Remise sur avoir
+DiscountFromDepositNoSource=Acompte déduit
+DiscountFromExcessReceivedNoSource=Trop-perçu déduit
+DiscountFromExcessPaidNoSource=Trop-perçu déduit
+FxCheckErrorLinesWithNoName=Les lignes suivantes n'ont ni libellé de produit ni description : le nom d'article de la facture électronique (BT-153) serait vide, ce que la règle BR-25 refuse : %s. Saisir une description sur chacune.

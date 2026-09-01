@@ -824,26 +824,50 @@ function einvoicingDiscountSentinels()
  *
  * See einvoicingDiscountSentinels() for what the four sentinels are and why they are matched exactly.
  *
- * @param	?DiscountAbsolute	$discount		Discount the line was built from, already fetched
- * @param	string				$description	Description to resolve, of the line or of the discount
- * @param	Translate			$outputlangs	Language of the document being built
- * @return	string								Resolved text, '' when the description is no sentinel
+ * @param	?DiscountAbsolute	$discount			Discount the line was built from, already fetched
+ * @param	string				$description		Description to resolve, of the line or of the discount
+ * @param	Translate			$outputlangs		Language of the document being built
+ * @param	string				$relatedInvoiceRef	Invoice the deducted piece corrects, from einvoicingDiscountRelatedInvoiceRef()
+ * @return	string									Resolved text, '' when the description is no sentinel
  */
-function einvoicingDiscountLabel($discount, $description, $outputlangs)
+function einvoicingDiscountLabel($discount, $description, $outputlangs, $relatedInvoiceRef = '')
 {
 	$transkeyOfSentinel = einvoicingDiscountSentinels();
 
 	$description = (string) $description;
-	if (!isset($transkeyOfSentinel[$description]) || empty($discount) || empty($discount->id)) {
+	if (!isset($transkeyOfSentinel[$description])) {
 		return '';
 	}
 
+	$outputlangs->load("bills");
+	$outputlangs->load("einvoicing@einvoicing");
+
 	// Which piece is quoted depends on the side the discount belongs to: a discount held on a supplier
 	// invoice names that invoice, and reading ref_facture_source there would name nothing at all.
-	$sourceref = !empty($discount->discount_type) ? $discount->ref_invoice_supplier_source : $discount->ref_facture_source;
+	$sourceref = '';
+	if (!empty($discount) && !empty($discount->id)) {
+		$sourceref = !empty($discount->discount_type) ? $discount->ref_invoice_supplier_source : $discount->ref_facture_source;
+	}
+	$sourceref = trim((string) $sourceref);
 
-	$outputlangs->load("bills");
+	if ($sourceref === '') {
+		// No piece to name: a discount entered by hand, or one whose source has been deleted. The text
+		// of the core quotes a reference and would be issued with a hole in the middle of the sentence,
+		// so the module has a wording of its own for the case. What must never happen is the marker
+		// going out as it stands: BT-153 refuses an empty item name (BR-25), and it refuses a technical
+		// marker in spirit.
+		return $outputlangs->transnoentitiesnoconv($transkeyOfSentinel[$description].'NoSource');
+	}
+
 	$label = $outputlangs->transnoentitiesnoconv($transkeyOfSentinel[$description], $sourceref);
+
+	// The piece deducted usually corrects another invoice, and naming it is what lets the customer
+	// reconcile the deduction without opening its own ledger. Skipped when it would name the piece
+	// already named, which happens on a deposit deducted from the invoice it was asked on.
+	$relatedInvoiceRef = trim((string) $relatedInvoiceRef);
+	if ($relatedInvoiceRef !== '' && $relatedInvoiceRef !== $sourceref) {
+		$label .= ' ('.$outputlangs->transnoentitiesnoconv('EInvDiscountOnInvoice', $relatedInvoiceRef).')';
+	}
 
 	// The PDF of the core adds the date of the deposit when the option asks for it; the e-invoice reads
 	// the same way as the paper it accompanies.
@@ -852,4 +876,36 @@ function einvoicingDiscountLabel($discount, $description, $outputlangs)
 	}
 
 	return $label;
+}
+
+/**
+ * Reference of the invoice the piece behind a discount corrects, '' when there is none to name.
+ *
+ * A credit note converted into a discount names the invoice it corrects in its own fk_facture_source,
+ * one level below the discount. Read from the discount alone, a deduction only says which credit note
+ * it comes from; the customer still has to find which invoice that credit note was about.
+ *
+ * @param	?DiscountAbsolute	$discount	Discount the line was built from, already fetched
+ * @param	DoliDB				$db			Database handler
+ * @return	string							Reference of the corrected invoice, '' when there is none
+ */
+function einvoicingDiscountRelatedInvoiceRef($discount, $db)
+{
+	if (empty($discount) || empty($discount->fk_facture_source)) {
+		return '';
+	}
+
+	require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
+
+	$sourcePiece = new Facture($db);
+	if ($sourcePiece->fetch((int) $discount->fk_facture_source) <= 0 || empty($sourcePiece->fk_facture_source)) {
+		return '';
+	}
+
+	$correctedInvoice = new Facture($db);
+	if ($correctedInvoice->fetch((int) $sourcePiece->fk_facture_source) <= 0) {
+		return '';
+	}
+
+	return (string) $correctedInvoice->ref;
 }

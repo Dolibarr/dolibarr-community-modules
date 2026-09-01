@@ -447,7 +447,7 @@ foreach ($object->lines as $line) {
 		// BT-97. The description of a discount built from another piece is a sentinel, not a text to
 		// show: resolved here, the customer reads which credit note or which excess payment is deducted
 		// instead of '(CREDIT_NOTE)'. A discount entered by hand keeps the reason that was typed.
-		$discountReason = einvoicingDiscountLabel($lineDiscount, $discount->description ?? '', $outputlangs);
+		$discountReason = einvoicingDiscountLabel($lineDiscount, $discount->description ?? '', $outputlangs, einvoicingDiscountRelatedInvoiceRef($lineDiscount, $this->db));
 
 		$globalDiscounts[] = array(
 			'value' => (float) $discount->total_ht,
@@ -517,7 +517,7 @@ foreach ($object->lines as $line) {
 	// A discount line still standing at this point is a deposit deducted from the invoice, and its
 	// description is the sentinel the core stores, not a text meant to be read. Left as it is, the
 	// customer reads '(DEPOSIT)' as the name of the line (BT-153).
-	$discountLabel = einvoicingDiscountLabel($lineDiscount, $line->desc ?? '', $outputlangs);
+	$discountLabel = einvoicingDiscountLabel($lineDiscount, $line->desc ?? '', $outputlangs, einvoicingDiscountRelatedInvoiceRef($lineDiscount, $this->db));
 	if ($discountLabel !== '') {
 		$libelle     = $discountLabel;
 		$description = "";
@@ -701,12 +701,26 @@ foreach ($object->lines as $line) {
 // name is ugly, not invalid, and holding back an invoice over it would cost the seller more than it
 // saves.
 $discountSentinels = array_keys(einvoicingDiscountSentinels());
+$linesWithNoName = array();
 foreach ($linesData as $numligne => $vals) {
+	if (trim((string) ($vals['prodname'] ?? '')) === '') {
+		$linesWithNoName[] = $numligne;
+	}
 	foreach (array('prodname' => 'BT-153', 'proddesc' => 'BT-154') as $field => $businessTerm) {
 		if (in_array((string) ($vals[$field] ?? ''), $discountSentinels, true)) {
 			dol_syslog("EInvoicing: line ".$numligne." of ".$object->ref." carries the unresolved discount marker ".$vals[$field]." in ".$businessTerm.". The line is a discount whose source piece could not be read.", LOG_ERR);
 		}
 	}
+}
+
+// BR-25: a line with no name is not a document the platform accepts, so it is refused here rather than
+// after transmission, on a line number the seller would then have to go and find. Every such line is
+// named at once: sending them back one refusal at a time would be a round trip per line. This is the
+// same missing data the pre-check reports before validation (validateInvoiceConfiguration()); a
+// document reaching this point with one is one whose lines changed since, or one built by a path that
+// does not run the pre-check.
+if (!empty($linesWithNoName)) {
+	throw new Exception('MISSINGDATA[BR-25]: The line'.(count($linesWithNoName) > 1 ? 's ' : ' ').implode(', ', $linesWithNoName).' of '.$object->ref.' '.(count($linesWithNoName) > 1 ? 'have' : 'has').' no item name (BT-153). Enter a description on the line, or a label on the product it invoices.');
 }
 foreach ($globalDiscounts as $discountIndex => $vals) {
 	if (in_array((string) ($vals['reason'] ?? ''), $discountSentinels, true)) {

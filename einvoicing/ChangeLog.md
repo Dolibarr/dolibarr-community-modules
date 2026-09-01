@@ -16,6 +16,16 @@ the log, naming the line and the business term it landed in: the resolution was 
 of an allowance, and the item name of a deposit line was found carrying the marker afterwards, so the
 document is looked at once more before it goes out. It is reported and not refused - a marker in an item
 name is ugly, not invalid, and holding an invoice back over it would cost the seller more than it saves.
+Beside the piece it deducts, the text now also names the invoice that piece corrects, so a customer can
+place the deduction without opening its own ledger, and a discount whose source piece cannot be read at
+all gets a wording of its own rather than the marker.
+
+FIX: A line with no name is refused before the document leaves, and reported before it is even built.
+Every line of an e-invoice names what it invoices (BT-153), built from the label of the product or from
+the description of the line, so a line holding neither was transmitted with an empty name and refused by
+the platform on rule BR-25 - on a line number the seller then had to go and find. The pre-check of the
+invoice now lists every such line before validation, and the generator refuses to build the document,
+naming them all at once instead of one refusal per round trip.
 
 FIX: The amount an invoice declares as already paid (BT-113) now also counts an excess payment or a
 deposit held against it, where only a credit note was counted. Everything it forgot there, it claimed

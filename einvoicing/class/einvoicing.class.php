@@ -1309,6 +1309,32 @@ class EInvoicing
 			}
 		}
 
+		// BR-25: every line of the document names what it invoices (BT-153). The name is built from the
+		// label of the product, or from the first line of the description when there is no product, so a
+		// line holding neither is issued with an empty name and the document is refused - and refused by
+		// the platform, after transmission, on a line number the seller then has to go and find. Every
+		// such line is listed here instead, before anything is sent.
+		//
+		// Title and subtotal lines are not concerned: they are pseudo-lines that never reach the
+		// document. A discount line is not concerned either, its name being built from the piece it
+		// deducts (see einvoicingDiscountLabel()).
+		$linesWithNoName = [];
+		if (!empty($invoice->lines) && is_array($invoice->lines)) {
+			foreach ($invoice->lines as $line) {
+				if ((int) $line->product_type == 9 || !empty($line->fk_remise_except)) {
+					continue;
+				}
+				$hasLabel = trim((string) ($line->product_label ?? '')) !== '';
+				$hasDesc = trim(dol_string_nohtmltag((string) ($line->desc ?? ''), 0)) !== '';
+				if (!$hasLabel && !$hasDesc) {
+					$linesWithNoName[] = (int) ($line->rang ?: count($linesWithNoName) + 1);
+				}
+			}
+		}
+		if (!empty($linesWithNoName)) {
+			$baseErrors[] = $langs->trans("FxCheckErrorLinesWithNoName", implode(', ', $linesWithNoName));
+		}
+
 		if (!empty($baseErrors)) {
 			$res = -1;
 			$message .= '<br> Error: ' . implode('<br> Error: ', $baseErrors);
