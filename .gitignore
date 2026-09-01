@@ -20,3 +20,6 @@ docs/superpowers/
 
 # Agent-managed git worktrees
 .worktrees/
+
+# Commit stamp written into the package by dev/build/makepack-modules.php
+/*/COMMIT

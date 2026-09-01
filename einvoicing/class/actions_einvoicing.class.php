@@ -689,6 +689,16 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				}
 			}
 
+			// Action to set the buyer reference of the invoice (BT-10, issue #678)
+			if ($action == 'setbuyerreference' && $permissiontoedit) {
+				$buyerReference = GETPOST('einvoice_buyer_reference', 'alphanohtml');
+				$result = $einvoicing->insertOrUpdateExtraField($object->id, $object->element, EInvoicing::EXTRAFIELD_BUYER_REFERENCE, $buyerReference);
+				if ($result < 0) {
+					$error++;
+					$this->errors = array_merge($this->errors, $einvoicing->errors);
+				}
+			}
+
 			// An invoice already transmitted to the Access Point (a flow_id is assigned, by any provider) is
 			// immutable: re-sending it makes the PA refuse a duplicate, and regenerating it would only reset
 			// the local status and re-open that trap. Block both by default; correct a transmitted invoice

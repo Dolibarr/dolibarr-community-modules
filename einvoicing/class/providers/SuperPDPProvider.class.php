@@ -910,12 +910,20 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$directory = $this->checkDirectoryStatus();
 
 		if ($directory['status_code'] == 200) {
-			$paName = (!$directory['ppf_error'] && $directory['ppf_status'] !== null) ? 'SuperPDP' : $langs->trans('RemoteInfoPAUndetermined');
+			$paName = (!$directory['ppf_error'] && $directory['ppf_status'] !== null) ? 'SuperPDP' : $langs->transnoentitiesnoconv('RemoteInfoPAUndetermined');
 
 			if (empty($directory['ppf_identifier'])) {
 				$lines[] = $langs->trans('RemoteInfoPPFNoEntry', 'SuperPDP', $paName);
 			} else {
-				$lines[] = $langs->trans('RemoteInfoPPFDetection', 'SuperPDP', $paName) . ' <span class="smallimp">['. $directory['ppf_identifier'] . ' - ' . $langs->trans('RemoteInfoPPFStatusDetail', $directory['ppf_status']) . ' - ' . ($directory['ppf_status'] === 'error' ? $directory['ppf_message'] : $directory['ppf_effective_date']).']</span>';
+				if ($directory['ppf_status'] !== 'error') {
+					$lines[] = $langs->trans('RemoteInfoPPFDetection', 'SuperPDP', $paName) . ' <span class="smallimp">['. $directory['ppf_identifier'] . ' - ' . $langs->trans('RemoteInfoPPFStatusDetail', $directory['ppf_status']) . ' - ' . ($directory['ppf_status'] === 'error' ? $directory['ppf_message'] : $directory['ppf_effective_date']).']</span>';
+				} else {
+					//$form = new Form($this->db);
+					//$s = $form->textwithpicto('', $langs->trans("Message").': '.$directory['ppf_identifier'] . ' - ' . $langs->trans('RemoteInfoPPFStatusDetail', $directory['ppf_status']) . ' - ' . $directory['ppf_message']);
+					//$lines[] = $langs->trans('RemoteInfoPPFDetection', 'SuperPDP', $paName).' '.$s;
+					$lines[] = $langs->trans('RemoteInfoPPFDetection', 'SuperPDP', $paName);
+					$lines[] = '<span class="smallimp">'. $langs->trans("Message").': '.$directory['ppf_identifier'] . ' - ' . $langs->trans('RemoteInfoPPFStatusDetail', $directory['ppf_status']) . ' - ' . $directory['ppf_message'].']</span>';
+				}
 			}
 			if (!empty($directory['listof_other_ppf_identifiers'])) {
 				$lines[] = $langs->trans('RemoteInfoOtherPPFEntries', $directory['listof_other_ppf_identifiers']);
@@ -924,12 +932,16 @@ class SuperPDPProvider extends AbstractPDPProvider
 				$lines[] = $langs->trans('RemoteInfoPeppolEntries', $directory['listof_peppol_identifiers']);
 			}
 
+			$lines[] = "";
+
 			// The address the invoices are signed with must have a directory entry, otherwise the platform
 			// answers "unknown address". Reported only when the company does have entries: when it has none,
 			// RemoteInfoPPFNoEntry above already says it, and saying it twice helps nobody.
 			if (!empty($directory['ppf_identifier']) && empty($directory['ppf_identifier_registered'])) {
 				$lines[] = '<b>' . $langs->trans('RemoteInfoRoutingIdentifierNotRegistered', $directory['ppf_expected_identifier'], 'SuperPDP') . '</b>';
 				$directory['ppf_error'] = true;
+
+				$lines[] = "";
 			}
 
 			// Identity held by the Access Point for the company. Not available anywhere else: the session
@@ -942,7 +954,6 @@ class SuperPDPProvider extends AbstractPDPProvider
 				$localaddress = trim($mysoc->address . ' ' . $mysoc->zip . ' ' . $mysoc->town . ' ' . $mysoc->country_code);
 				$localnumber = idprof($mysoc);
 
-				$lines[] = "";
 				$lines[] = $langs->trans('RemoteInfoCompanyIdentity', 'SuperPDP', $remotename . ' - ' . ($company['number_scheme'] ?? '') . ' ' . $remotenumber);
 				$lines[] = $langs->trans('RemoteInfoCompanyAddress', 'SuperPDP', $remoteaddress);
 
@@ -953,10 +964,10 @@ class SuperPDPProvider extends AbstractPDPProvider
 					$directory['ppf_error'] = true;
 				}
 				if ($remotename !== '' && $mysoc->name !== '' && strcasecmp($remotename, (string) $mysoc->name) != 0) {
-					$lines[] = $langs->trans('RemoteInfoNameMismatch', 'SuperPDP', $remotename, $mysoc->name);
+					$lines[] = '<span class="smallimp">'.$langs->trans('RemoteInfoNameMismatch', 'SuperPDP', $remotename, $mysoc->name).'</span>';
 				}
 				if ($remoteaddress !== '' && $localaddress !== '' && strcasecmp(preg_replace('/[^a-z0-9]/i', '', $remoteaddress), preg_replace('/[^a-z0-9]/i', '', $localaddress)) != 0) {
-					$lines[] = $langs->trans('RemoteInfoAddressMismatch', 'SuperPDP', $remoteaddress, $localaddress);
+					$lines[] = '<span class="smallimp">'.$langs->trans('RemoteInfoAddressMismatch', 'SuperPDP', $remoteaddress, $localaddress).'</span>';
 				}
 			}
 		} else {
@@ -975,10 +986,11 @@ class SuperPDPProvider extends AbstractPDPProvider
 			} else {
 				$lines[] = $langs->trans('RemoteInfoPeppolPAMismatch', $detectedPA);
 				if (strcasecmp($detectedPA, 'SuperPDP') !== 0) {	// If not SuperPDP, show a warning
-					$msg = $langs->trans('RemoteInfoPeppolPAMismatchCheck', $detectedPA);
+					$msg = '<span class="smallimp">'.$langs->trans('RemoteInfoPeppolPAMismatchCheck', $detectedPA);
 					if (!empty($directory['ppf_identifier'])) {
 						$msg .= ' <b>'.$langs->trans('RemoteInfoPeppolPAMismatchRequestPortability', 'SuperPDP').'</b>';
 					}
+					$msg .= '</span>';
 					$lines[] = $msg;
 
 					$directory['ppf_error'] = true;
@@ -1907,7 +1919,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 								'actionurl' => ($res['actionurl'] ?? ''),
 								'actioncode' => $res['actioncode'],
 								'action' => $res['action'],
-								'businessmessage' => $langs->trans("CantReadTheDocumentOfTheImportedInvoice", $flow['flowId'])
+								// A postponed flow says itself what happened when it can: only the caller knows
+								// whether the document was unreadable or referenced an invoice that is missing.
+								'businessmessage' => (empty($res['businessmessage']) ? $langs->trans("CantReadTheDocumentOfTheImportedInvoice", $flow['flowId']) : $res['businessmessage'])
 									. $form->textwithpicto('', "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], 1, 'help', '', 0, 2, 'help')
 							);
 
@@ -2137,7 +2151,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 *
 	 * @param string 		$flowId        	FlowId
 	 * @param string|null 	$call_id  		Call ID for logging purposes
-	 * @return array{res:int<-1,1>, message:string, postponeflow?:int, actioncode?:string|null, actionurl?:string|null, action?:string|null, actiondata?:array<string,mixed>|null} Returns array with 'res' (1 on success, 0 if exists or already processed, -1 on failure) with a 'message' and for business errors an optional 'actioncode', 'actionurl' and 'action'. 'postponeflow' marks a failure that stored nothing, so the batch may go on and the flow be retried later.
+	 * @return array{res:int<-1,1>, message:string, postponeflow?:int, actioncode?:string|null, actionurl?:string|null, action?:string|null, actiondata?:array<string,mixed>|null, businessmessage?:string} Returns array with 'res' (1 on success, 0 if exists or already processed, -1 on failure) with a 'message' and for business errors an optional 'actioncode', 'actionurl' and 'action'. 'postponeflow' marks a failure that stored nothing, so the batch may go on and the flow be retried later.
 	 */
 	public function syncFlow($flowId, $call_id = null)
 	{
@@ -2365,6 +2379,15 @@ class SuperPDPProvider extends AbstractPDPProvider
 						$retarray['actionurl'] = $res['actionurl'] ?? null;
 						$retarray['action'] = $res['action'] ?? null;
 						$retarray['actiondata'] = $res['actiondata'] ?? null;
+						// A failure that stored nothing may be retried later: the flag and the message that
+						// goes with it have to reach syncFlows(), which is what decides to carry on. Both are
+						// set only when the import sent them, so the shape stays the one declared above.
+						if (!empty($res['postponeflow'])) {
+							$retarray['postponeflow'] = (int) $res['postponeflow'];
+						}
+						if (!empty($res['businessmessage'])) {
+							$retarray['businessmessage'] = (string) $res['businessmessage'];
+						}
 
 						return $retarray;
 					} else {

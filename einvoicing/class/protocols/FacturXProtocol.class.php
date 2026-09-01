@@ -267,14 +267,29 @@ class FacturXProtocol extends CIIProtocol
 			$creator = (string) pdfExtractMetadata($orig_pdf, 'Creator');
 		}
 
+		// The choice below reads the global class FPDF, and must not depend on whether the request
+		// happened to render a PDF before reaching here. Below Dolibarr 24 the core declares its own
+		// "class FPDF extends TCPDF {}" in htdocs/includes/tcpdi/tcpdi.php, but only once its PDF stack
+		// is loaded: a generation that finds the source PDF already on disk - the mass generation of the
+		// invoice list, typically - never renders one, so the shim is absent and the branch below picks
+		// the horstoeko/setasign writer, which autoloads the real FPDF of the module. Both classes are
+		// named FPDF and only the first one of the request survives, so the next core PDF of that same
+		// request dies on "Cannot redeclare class FPDF ... in includes/tcpdi/tcpdi.php". Load the PDF
+		// stack of the core now, so the question is settled by the Dolibarr version alone. The instance
+		// is discarded: pdf_getInstance() is called for what it loads and for the K_* constants TCPDF
+		// needs, which no PDF render defined yet in this request.
+		if (!class_exists('FPDF', false)) {
+			require_once DOL_DOCUMENT_ROOT . '/core/lib/pdf.lib.php';
+			pdf_getInstance();
+		}
+
 		try {
 			if (class_exists('FPDF', false) && is_subclass_of('FPDF', 'TCPDF')) {
-				// Below Dolibarr 24, htdocs/includes/tcpdi/tcpdi.php declares "class FPDF extends TCPDF {}"
-				// as soon as any PDF is rendered in the request - the invoice PDF produced at validation,
-				// right before this hook runs. The horstoeko/zugferd writer then inherits from TCPDF instead
-				// of the real FPDF and dies on ZugferdPdfWriter::_getpagesize(). Merge with TCPDF itself,
-				// which needs no FPDF at all and supports PDF/A-3 natively. Reaching this branch means
-				// the core has loaded TCPDF, which is what the merger descends from.
+				// Below Dolibarr 24, htdocs/includes/tcpdi/tcpdi.php declares "class FPDF extends TCPDF {}".
+				// The horstoeko/zugferd writer then inherits from TCPDF instead of the real FPDF and dies on
+				// ZugferdPdfWriter::_getpagesize(). Merge with TCPDF itself, which needs no FPDF at all and
+				// supports PDF/A-3 natively. Reaching this branch means the core has loaded TCPDF, which is
+				// what the merger descends from.
 				dol_include_once('einvoicing/class/utils/FacturxTcpdfMerger.class.php');
 				$merger = new FacturxTcpdfMerger($xmlfile, $orig_pdf);
 			} else {
@@ -710,7 +725,29 @@ class FacturXProtocol extends CIIProtocol
 					return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($refDocInvoiceId, $refDoc, 'linked to document ' . ($parsedHeader['documentno'] ?? ''))];
 				}
 				if ($refDocInvoiceId == 0) {
-					return ['res' => -1, 'message' => 'Document : ' . $refDoc . ' linked to document ' . $parsedHeader['documentno'] . ' not found in Dolibarr'];
+					// The invoice references a document this Dolibarr does not hold: the final invoice of a
+					// deposit, the invoice a credit note credits, the one a replacement replaces. Nothing has
+					// been created at this point, so the flow is postponed rather than failed: it is retried
+					// on the next synchronization, and the invoices queued behind it keep coming in. What the
+					// user has to do cannot be guessed from a technical message, so it is spelled out with a
+					// link to the screen where the missing invoice is created.
+					$langs->load("bills");
+					$action = $langs->trans('CreateTheMissingSupplierInvoiceToImport', $refDoc);
+					$action .= ' <a class="butAction small smallpaddingimp nomarginleft" href="' . DOL_URL_ROOT . '/fourn/facture/card.php?action=create&socid=' . (int) $socId . '&ref_supplier=' . urlencode($refDoc) . '" target="_blank">';
+					$action .= '<i class="fas fa-plus-circle"></i> ';
+					$action .= $langs->trans('NewBill');
+					$action .= '</a>';
+
+					return [
+						'res' => -1,
+						'postponeflow' => 1,
+						'message' => 'Document : ' . $refDoc . ' linked to document ' . $parsedHeader['documentno'] . ' not found in Dolibarr',
+						'actioncode' => 'LINKED_INVOICE_NOT_FOUND',
+						'actionurl' => 'none',
+						'actiondata' => array('supplierref' => $refDoc, 'linkedref' => ($parsedHeader['documentno'] ?? ''), 'socid' => (int) $socId),
+						'action' => $action,
+						'businessmessage' => $langs->trans('CantFindLinkedInvoiceOfTheImportedInvoice', ($parsedHeader['documentno'] ?? ''), $refDoc)
+					];
 				}
 			}
 		}

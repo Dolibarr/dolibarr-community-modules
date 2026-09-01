@@ -399,6 +399,7 @@ class CIIProtocol extends AbstractProtocol
 		 *   buyersubdivision: null,
 		 *   buyervatnumber: string,
 		 *   buyerGlobalIds: list<array{schemeID: string, value: string}>,
+		 *   buyerRoutingCode: null|string,
 		 *   buyerLegalOrgId: string,
 		 *   buyerLegalOrgScheme: string,
 		 *   buyerTradingName: string,
@@ -500,7 +501,7 @@ class CIIProtocol extends AbstractProtocol
 		 */
 		'
 		@phan-var-force Facture 			$object			The $invoice object used in entry on inc file, but completed.
-		@phan-var-force array{documentno:string,documenttypecode:null|string,documentdate:DateTimeInterface,invoiceCurrency:string|array<string>,taxCurrency:null,documentname:null,documentlanguage:string,effectiveSpecifiedPeriod:\'NA\',documentDeliveryDate:DateTimeInterface,invoicingPeriodStart:?DateTimeInterface,invoicingPeriodEnd:?DateTimeInterface,businessProcessId:string,isTestDocument:bool,documentNotePublic:string,documentNotePMT:string,documentNotePMD:string,documentNoteAAB:string,documentNoteTXD:string,documentNotes:array,vatDueDateTypeCode:string,sellername:string,sellerids:string,sellerlineone:string,sellerlinetwo:string,sellerlinethree:string,sellerpostcode:string,sellercity:string,sellercountry:string,sellersubdivision:null,sellercontactpersonname:string,sellercontactdepartmentname:null,sellercontactphoneno:string,sellercontactfaxno:string,sellercontactemailaddr:string,sellerCommunicationUriScheme:string,sellerCommunicationUri:string,sellerGlobalIds:array<array{schemeID:string,value:string}>,sellerTaxRegistrations:array<array{type:string,value:string}>,sellervatnumber:string,sellerLegalOrgId:string,sellerLegalOrgScheme:string,sellerTradingName:string,buyername:string,buyerids:string,buyerlineone:string,buyerlinetwo:string,buyerlinethree:string,buyerpostcode:string,buyercity:string,buyercountry:string,buyersubdivision:null,buyervatnumber:string,buyerGlobalIds:array<array{schemeID:string,value:string}>,buyerLegalOrgId:string,buyerLegalOrgScheme:string,buyerTradingName:string,buyerReference:null|string,buyerCommunicationUriScheme:string,buyerCommunicationUri:string,buyercontactpersonname:null,buyercontactemailaddr:null,buyercontactphoneno:null,grandTotalAmount:float|int,duePayableAmount:float|int,lineTotalAmount:float|int,chargeTotalAmount:float,allowanceTotalAmount:float|int,taxBasisTotalAmount:float|int,taxTotalAmount:float|int,roundingAmount:null,totalPrepaidAmount:float|int,iban_id:int,iban:string,bic:string,accountName:string,accountRef:string,accountLabel:string,paymentDueDate:DateTimeInterface,paymentTermsText:string,headerAllowancesCharges:array,invoiceRefDocs:array|array<array{ref:string|int,date:DateTimeInterface,type:string}>,orderReference:string,contractReference:null|string,despatchAdviceRef:null,taxBreakdown:array|array<array<string,array>>,_chorus:bool,_depositlines:array|array<array{lineId:int,invoiceRef:string,invoiceDate:DateTimeInterface}>,_globalDiscounts:array|array<array{value:float,reason:string,taxRate:float,categoryVAT:string}>,_customerOrderReferenceList:string[],_project:Project|null,paymentMeansCode?:int,paymentMeansText?:string,_shipFromContactBill?:array{address:null|string,zip:null|string,town:null|string,country:string},_shipFromContactShip?:array{name:string,address:null|string,zip:null|string,town:null|string,country:string}} $invoiceData
+		@phan-var-force array{documentno:string,documenttypecode:null|string,documentdate:DateTimeInterface,invoiceCurrency:string|array<string>,taxCurrency:null,documentname:null,documentlanguage:string,effectiveSpecifiedPeriod:\'NA\',documentDeliveryDate:DateTimeInterface,invoicingPeriodStart:?DateTimeInterface,invoicingPeriodEnd:?DateTimeInterface,businessProcessId:string,isTestDocument:bool,documentNotePublic:string,documentNotePMT:string,documentNotePMD:string,documentNoteAAB:string,documentNoteTXD:string,documentNotes:array,vatDueDateTypeCode:string,sellername:string,sellerids:string,sellerlineone:string,sellerlinetwo:string,sellerlinethree:string,sellerpostcode:string,sellercity:string,sellercountry:string,sellersubdivision:null,sellercontactpersonname:string,sellercontactdepartmentname:null,sellercontactphoneno:string,sellercontactfaxno:string,sellercontactemailaddr:string,sellerCommunicationUriScheme:string,sellerCommunicationUri:string,sellerGlobalIds:array<array{schemeID:string,value:string}>,sellerTaxRegistrations:array<array{type:string,value:string}>,sellervatnumber:string,sellerLegalOrgId:string,sellerLegalOrgScheme:string,sellerTradingName:string,buyername:string,buyerids:string,buyerlineone:string,buyerlinetwo:string,buyerlinethree:string,buyerpostcode:string,buyercity:string,buyercountry:string,buyersubdivision:null,buyervatnumber:string,buyerGlobalIds:array<array{schemeID:string,value:string}>,buyerRoutingCode:null|string,buyerLegalOrgId:string,buyerLegalOrgScheme:string,buyerTradingName:string,buyerReference:null|string,buyerCommunicationUriScheme:string,buyerCommunicationUri:string,buyercontactpersonname:null,buyercontactemailaddr:null,buyercontactphoneno:null,grandTotalAmount:float|int,duePayableAmount:float|int,lineTotalAmount:float|int,chargeTotalAmount:float,allowanceTotalAmount:float|int,taxBasisTotalAmount:float|int,taxTotalAmount:float|int,roundingAmount:null,totalPrepaidAmount:float|int,iban_id:int,iban:string,bic:string,accountName:string,accountRef:string,accountLabel:string,paymentDueDate:DateTimeInterface,paymentTermsText:string,headerAllowancesCharges:array,invoiceRefDocs:array|array<array{ref:string|int,date:DateTimeInterface,type:string}>,orderReference:string,contractReference:null|string,despatchAdviceRef:null,taxBreakdown:array|array<array<string,array>>,_chorus:bool,_depositlines:array|array<array{lineId:int,invoiceRef:string,invoiceDate:DateTimeInterface}>,_globalDiscounts:array|array<array{value:float,reason:string,taxRate:float,categoryVAT:string}>,_customerOrderReferenceList:string[],_project:Project|null,paymentMeansCode?:int,paymentMeansText?:string,_shipFromContactBill?:array{address:null|string,zip:null|string,town:null|string,country:string},_shipFromContactShip?:array{name:string,address:null|string,zip:null|string,town:null|string,country:string}} $invoiceData
 		@phan-var-force array<int,array{lineid:int,linestatuscode:\'NA\',linestatusreasoncode:\'NA\',lineNote:null,prodname:string,proddesc:string,prodsellerid:string,prodbuyerid:null|string,prodglobalidtype:null|string,prodglobalid:null|string,prodmultilangs:array,prodClassificationCode:null|string,prodClassificationScheme:null|string,prodOriginCountry:null|string,netpriceamount:float,netpricebasisquantity:null|float,netpricebasisquantityunitcode:null|string,billedquantity:float,billedquantityunitcode:string,chargeFreeQuantity:null|float,chargeFreeQuantityunitcode:null|string,packageQuantity:null|float,packageQuantityunitcode:null|string,lineTotalAmount:float|string,totalAllowanceChargeAmount:null|float,categoryCode:string,typeCode:\'VAT\',rateApplicablePercent:string,tva_tx:float|string,vat_src_code:string,ExemptionReason:string,ExemptionReasonCode:string,calculatedAmount:null|float,lineAllowances:array,lineGrossPriceAllowances:array,lineremisepercent:\'NA\'|float,linePeriodStart:?DateTimeInterface,linePeriodEnd:?DateTimeInterface,additionalRefDocs:array,isDepositLine:bool,depositInvoiceRef:null|string,depositInvoiceDate:?DateTimeInterface,parentDocumentNo:null|string,is_deposit:int<0,1>,fk_remise:null|int,discountPercent:float,grosspriceamount:null|float,grosspricebasisquantity:null|float,grosspricebasisquantityunitcode:null|string}> $linesData
 		@phan-var-force string 				$outputlang		Value of $outputlangs->defaultlang
 		@phan-var-force Account				$account
@@ -907,7 +908,29 @@ class CIIProtocol extends AbstractProtocol
 					return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($refDocInvoiceId, $refDoc, 'linked to document ' . ($parsedHeader['documentno'] ?? ''))];
 				}
 				if ($refDocInvoiceId == 0) {
-					return ['res' => -1, 'message' => 'Document : ' . $refDoc . ' linked to document ' . $parsedHeader['documentno'] . ' not found in Dolibarr'];
+					// The invoice references a document this Dolibarr does not hold: the final invoice of a
+					// deposit, the invoice a credit note credits, the one a replacement replaces. Nothing has
+					// been created at this point, so the flow is postponed rather than failed: it is retried
+					// on the next synchronization, and the invoices queued behind it keep coming in. What the
+					// user has to do cannot be guessed from a technical message, so it is spelled out with a
+					// link to the screen where the missing invoice is created.
+					$langs->load("bills");
+					$action = $langs->trans('CreateTheMissingSupplierInvoiceToImport', $refDoc);
+					$action .= ' <a class="butAction small smallpaddingimp nomarginleft" href="' . DOL_URL_ROOT . '/fourn/facture/card.php?action=create&socid=' . (int) $socId . '&ref_supplier=' . urlencode($refDoc) . '" target="_blank">';
+					$action .= '<i class="fas fa-plus-circle"></i> ';
+					$action .= $langs->trans('NewBill');
+					$action .= '</a>';
+
+					return [
+						'res' => -1,
+						'postponeflow' => 1,
+						'message' => 'Document : ' . $refDoc . ' linked to document ' . $parsedHeader['documentno'] . ' not found in Dolibarr',
+						'actioncode' => 'LINKED_INVOICE_NOT_FOUND',
+						'actionurl' => 'none',
+						'actiondata' => array('supplierref' => $refDoc, 'linkedref' => ($parsedHeader['documentno'] ?? ''), 'socid' => (int) $socId),
+						'action' => $action,
+						'businessmessage' => $langs->trans('CantFindLinkedInvoiceOfTheImportedInvoice', ($parsedHeader['documentno'] ?? ''), $refDoc)
+					];
 				}
 			}
 		}
@@ -1946,7 +1969,9 @@ class CIIProtocol extends AbstractProtocol
 
 		$textforcomment = 'Einvoice XML generated by';
 		$textforcomment .= ' Dolibarr ' . DOL_VERSION;
-		$textforcomment .= ' Einvoicing ' . file_get_contents(__DIR__.'/../../VERSION');
+		$textforcomment .= ' Einvoicing ' . trim((string) file_get_contents(__DIR__.'/../../VERSION'));
+		$modulecommit = einvoicingModuleCommit();
+		$textforcomment .= ($modulecommit ? ' ('.$modulecommit.')' : '');
 		$textforcomment .= ' - ' . dol_print_date(dol_now('gmt'), 'dayhourrfc', 'gmt');
 		$textforcomment .= ($hash_unique_id ? ' - Instance public hash '.$hash_unique_id : '');
 		$comment = $doc->createComment($textforcomment);
@@ -2072,10 +2097,12 @@ class CIIProtocol extends AbstractProtocol
 		$agreement = $doc->createElement('ram:ApplicableHeaderTradeAgreement');
 		$sctt->appendChild($agreement);
 
-		// Buyer reference (BT-10): what the buyer needs to route the invoice on its side, and the
-		// "service exécutant" Chorus Pro expects from a public buyer. Every profile declares it,
-		// MINIMUM included, and it opens the HeaderTradeAgreement sequence, so it is appended
-		// before the parties.
+		// Buyer reference (BT-10): what the buyer needs to route the invoice inside its own
+		// organisation (business unit, service reference, internal mailbox...), and what Annexe A of
+		// XP Z12-012 documents as the "Service Executant" of a public buyer. Every profile declares
+		// it, MINIMUM included, and it opens the HeaderTradeAgreement sequence, so it is appended
+		// before the parties. It is not what BR-FR-CPRO-11 and BR-FR-CPRO-13 read, though: those two
+		// look the service code up on BT-46 under scheme 0224, emitted by buildParty() (issue #678).
 		if (!empty($invoiceData['buyerReference'])) {
 			$comment = $doc->createComment('Buyer reference (BT-10)');
 			$agreement->appendChild($comment);
@@ -2573,6 +2600,19 @@ class CIIProtocol extends AbstractProtocol
 				}
 			} else {
 				$node->appendChild($doc->createElement('ram:ID', $data[$prefix . 'ids']));
+			}
+
+			// Routing code of the buyer (BT-46 under scheme 0224), where BR-FR-CPRO-11 and
+			// BR-FR-CPRO-13 read the Chorus Pro "code service exécutant". It is a second ram:GlobalID,
+			// which only the EXTENDED profiles accept (FX-SCH-A-000164 caps that element at one
+			// occurrence below them), and it belongs to the buyer alone: the deliver-to party is built
+			// from the same data in minimal mode, and its own identifier is BT-71, a location, not a
+			// routing code of the buyer. See issue #678; the caller only fills the key when the value
+			// is emittable.
+			if ($type === 'buyer' && !$minimal && $this->isExtendedProfile($profile) && !empty($data['buyerRoutingCode'])) {
+				$routing = $doc->createElement('ram:GlobalID', htmlspecialchars($data['buyerRoutingCode']));
+				$routing->setAttribute('schemeID', EInvoicing::SCHEME_FR_ROUTING_CODE);
+				$node->appendChild($routing);
 			}
 		}
 
@@ -3301,6 +3341,19 @@ class CIIProtocol extends AbstractProtocol
 		foreach ($linkedObject->lines as $line) {
 			if ($line->product_type < 9 && $line->total_ht != 0) { // Remove lines with product_type greater than or equal to 9 and no need to create discount if amount is null
 				$keyforvatrate = $line->tva_tx . ($line->vat_src_code ? ' (' . $line->vat_src_code . ')' : '');
+
+				// Open the accumulators for a rate met for the first time. Adding to a key that does not
+				// exist yet is what the core does here, and it costs six "Undefined array key" warnings
+				// per deposit converted - silent on a web page, but they are real and they pile up in the
+				// PHP log of every synchronization that imports an invoice linked to a deposit.
+				if (!isset($amount_ht[$keyforvatrate])) {
+					$amount_ht[$keyforvatrate] = 0;
+					$amount_tva[$keyforvatrate] = 0;
+					$amount_ttc[$keyforvatrate] = 0;
+					$multicurrency_amount_ht[$keyforvatrate] = 0;
+					$multicurrency_amount_tva[$keyforvatrate] = 0;
+					$multicurrency_amount_ttc[$keyforvatrate] = 0;
+				}
 
 				$amount_ht[$keyforvatrate] += $line->total_ht;
 				$amount_tva[$keyforvatrate] += $line->total_tva;
