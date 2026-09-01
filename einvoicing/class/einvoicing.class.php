@@ -1213,6 +1213,24 @@ class EInvoicing
 	}
 
 	/**
+	 * Tell whether a value returned by the French National Business Registry API is masked.
+	 *
+	 * Units that exercised their right to opposition (art. A123-96 of the French commercial code)
+	 * carry the "partial diffusion" status: they are still returned by the API, but each protected
+	 * field is replaced by the literal string "[NON-DIFFUSIBLE]". Cross-checking such a placeholder
+	 * against the third party record can only ever mismatch, so the field must be skipped instead of
+	 * being reported. Fields that stay public for those units (SIREN, commune, administrative status)
+	 * keep being checked.
+	 *
+	 * @param  string|null $value   Value read from the API response
+	 * @return bool                 True when the field is masked and must not be cross-checked
+	 */
+	private function _isRegistryValueMasked($value)
+	{
+		return is_string($value) && strtoupper(trim($value)) === '[NON-DIFFUSIBLE]';
+	}
+
+	/**
 	 * Check the thirdparty existence and active status via the French National Business Registry API (data.gouv.fr).
 	 * Search is performed by company name; the returned SIREN is then cross-checked against idprof1.
 	 * No authentication required. API rate limit: 7 req/s.
@@ -1272,10 +1290,12 @@ class EInvoicing
 					}
 
 					// Cross-check company name (partial match to handle legal form suffixes and abbreviations)
-					$nomApi      = strtolower(preg_replace('/[^a-z0-9]/i', '', $matchedCompany['nom_complet'] ?? ''));
+					$nameApiRaw  = $matchedCompany['nom_complet'] ?? '';
+					$nomApi      = strtolower(preg_replace('/[^a-z0-9]/i', '', $nameApiRaw));
 					$nomDolibarr = strtolower(preg_replace('/[^a-z0-9]/i', '', $thirdparty->name));
 					if (
-						!empty($nomApi) && !empty($nomDolibarr)
+						!$this->_isRegistryValueMasked($nameApiRaw)
+						&& !empty($nomApi) && !empty($nomDolibarr)
 						&& strpos($nomApi, $nomDolibarr) === false
 						&& strpos($nomDolibarr, $nomApi) === false
 					) {
@@ -1285,14 +1305,21 @@ class EInvoicing
 					// Cross-check ZIP code (objective field, no formatting ambiguity)
 					$zipApi      = trim($matchedCompany['siege']['code_postal'] ?? '');
 					$zipDolibarr = trim($thirdparty->zip ?? '');
-					if (!empty($zipApi) && !empty($zipDolibarr) && $zipApi !== $zipDolibarr) {
+					if (
+						!$this->_isRegistryValueMasked($zipApi)
+						&& !empty($zipApi) && !empty($zipDolibarr) && $zipApi !== $zipDolibarr
+					) {
 						$warnings[] = $langs->trans("FxCheckWarnZIPMismatch", $zipDolibarr, $zipApi);
 					}
 
 					// Cross-check town (case-insensitive, strip accents for robustness)
-					$townApi      = strtolower(trim($matchedCompany['siege']['libelle_commune'] ?? ''));
+					$townApiRaw   = $matchedCompany['siege']['libelle_commune'] ?? '';
+					$townApi      = strtolower(trim($townApiRaw));
 					$townDolibarr = strtolower(trim($thirdparty->town ?? ''));
-					if (!empty($townApi) && !empty($townDolibarr) && $townApi !== $townDolibarr) {
+					if (
+						!$this->_isRegistryValueMasked($townApiRaw)
+						&& !empty($townApi) && !empty($townDolibarr) && $townApi !== $townDolibarr
+					) {
 						$warnings[] = $langs->trans("FxCheckWarnTownMismatch", $thirdparty->town, $matchedCompany['siege']['libelle_commune']);
 					}
 				}
