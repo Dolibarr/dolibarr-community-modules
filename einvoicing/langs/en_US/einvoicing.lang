@@ -231,6 +231,7 @@ FailedToSyncADocument=Failed to sync at least one document. The synchronization 
 FailedToSyncADocumentMore=See the recommended action on the main page to solve this...
 SyncResults=Synchronization summary
 SyncLog=Synchronization Log (Debug Mode)
+ResultOnAP=Result on Access Point
 EInvStatusNotGenerated=Not generated
 EInvStatusGenerated=Generated (ready to send)
 EInvStatusAwaitingValidation=Sent (awaiting validation)
@@ -399,6 +400,8 @@ EInvoiceBuyerReferenceHelp=Reference owned by the customer, used to route the in
 WarningEinvoicingInvoiceStatusDifferentProvider=Invoice generated or sent for another Access Point %s.
 EinvoicingCantUnvalidateATransmittedInvoice=You try to modify the status of an invoice that is locked once the invoice has been transmitted to the Access Point
 EinvoicingCantModifyATransmittedInvoice=You try to modify a property that is locked once the invoice has been transmitted to the Access Point
+SendStatus=Send status
+CheckStatus=Check status
 
 EINVOICING_CLIENT_ID=Client ID
 EINVOICING_CLIENT_SECRET=Client secret

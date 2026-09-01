@@ -1051,7 +1051,14 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 							'actionurl' => $res['actionurl'],
 							'actioncode' => ($res['actioncode'] ?? '0'),
 							'action' => $res['action']
+							'action' => $res['action'],
+							'actiondata' => $res['actiondata'] ?? array()
 						);
+
+						// Complete the $actions array with the Business error message
+						if ($rescode == 'SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT') {
+							$actions[$rescode]['businessmessage'] = $langs->trans("SupplierInvoiceFoundButWithdifferentAmount", $res['actiondata']['supplierref'] ?? '', $res['actiondata']['expectedamount'] ?? '');
+						}
 						if ($rescode == 'THIRDPARTY_NOT_FOUND') {
 							$infostring = '';
 							foreach ($res['actiondata'] ?? [] as $datakey => $dataval) {
@@ -1199,6 +1206,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	 */
 	private static function updatedAtSortKey($updatedAt)
 	{
+		$reg = array();
 		if (!preg_match('/^([^.Z]+)(?:\.(\d+))?/', (string) $updatedAt, $reg)) {
 			return (string) $updatedAt;
 		}
@@ -1886,13 +1894,15 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 					//$einvoicing->insertOrUpdateExtLink($object->id, $object->element, $flowId, $syncStatus, $syncRef, $syncComment);
 					$einvoicing->updateStatusMessageValidation($resStoreStatus, '', $ack_statusLabel, $syncComment);
 
-					// Log an event in the invoice timeline
-					$eventLabel = "EINVOICING - Send status " . $statusLabelToSend . " : " . $ack_statusLabel;
-					$eventMessage = "EINVOICING - Send status " . $statusLabelToSend . " : " . $ack_statusLabel . (!empty($syncComment) ? " - " . $syncComment : "");
+					// Log an event in the invoice timeline if status not pending
+					if ($ack_statusLabel != 'Pending') {
+						$eventLabel = "EINVOICING - ".$langs->trans("CheckStatus");
+						$eventMessage = "EINVOICING - ".$langs->trans("CheckStatus")." (From sendStatusMessage) - [Dolibarr: " . $statusLabelToSend . $langs->trans("ResultOnAP").' '.$ack_statusLabel . (!empty($syncComment) ? " - " . $syncComment : "")."]";
 
-					$resLogEvent = $this->addEvent('STATUS', $eventLabel, $eventMessage, $object);
-					if ($resLogEvent < 0) {
-						dol_syslog(__METHOD__ . " Failed to log event for flowId: {$flowId}", LOG_WARNING);
+						$resLogEvent = $this->addEvent('STATUS', $eventLabel, $eventMessage, $object);
+						if ($resLogEvent < 0) {
+							dol_syslog(__METHOD__ . " Failed to log event for flowId: {$flowId}", LOG_WARNING);
+						}
 					}
 				} else {
 					dol_syslog(__METHOD__ . " Unable to retrieve flow details after sending status message for flowId: {$flowId}. Status code: " . $response['status_code'], LOG_WARNING);

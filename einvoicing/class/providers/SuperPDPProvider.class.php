@@ -3149,13 +3149,15 @@ class SuperPDPProvider extends AbstractPDPProvider
 					//$einvoicing->insertOrUpdateExtLink($object->id, $object->element, $flowId, $syncStatus, $syncRef, $syncComment);
 					$einvoicing->updateStatusMessageValidation($resStoreStatus, '', $ack_statusLabel, $syncComment);
 
-					// Log an event in the invoice timeline
-					$eventLabel = "EINVOICING - Send status " . $statusLabelToSend . " : " . $ack_statusLabel;
-					$eventMessage = "EINVOICING - Send status " . $statusLabelToSend . " : " . $ack_statusLabel . (!empty($syncComment) ? " - " . $syncComment : "");
+					// Log an event in the invoice timeline if status not pending
+					if ($ack_statusLabel != 'Pending') {
+						$eventLabel = "EINVOICING - ".$langs->trans("CheckStatus");
+						$eventMessage = "EINVOICING - ".$langs->trans("CheckStatus")." (From sendStatusMessage) - [Dolibarr: " . $statusLabelToSend . $langs->trans("ResultOnAP").' '.$ack_statusLabel . (!empty($syncComment) ? " - " . $syncComment : "")."]";
 
-					$resLogEvent = $this->addEvent('STATUS', $eventLabel, $eventMessage, $object);
-					if ($resLogEvent < 0) {
-						dol_syslog(__METHOD__ . " Failed to log event for flowId: {$flowId}", LOG_WARNING);
+						$resLogEvent = $this->addEvent('STATUS', $eventLabel, $eventMessage, $object);
+						if ($resLogEvent < 0) {
+							dol_syslog(__METHOD__ . " Failed to log event for flowId: {$flowId}", LOG_WARNING);
+						}
 					}
 				} else {
 					dol_syslog(__METHOD__ . " Unable to retrieve flow details after sending status message for flowId: {$flowId}. Status code: " . $response['status_code'], LOG_WARNING);

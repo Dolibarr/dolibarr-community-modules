@@ -1746,9 +1746,10 @@ class EInvoicing
             <script type="text/javascript">
             (function() {
 				var countCheckInvoiceStatus = 1;
+
                 function checkInvoiceStatus() {
 					console.log(\'checkInvoiceStatus Checking invoice status (try \'+countCheckInvoiceStatus+\') to url '.dol_escape_js($urlajax).'...\');
-                    // alert("Checking invoice status...");
+
                     $.get("' . $urlajax . '", {
                         token: "' . currentToken() . '",
                         ref: "' . dol_escape_js($object->ref) . '"
@@ -1773,9 +1774,9 @@ class EInvoicing
                         // Retry only if still awaiting validation
                         if (parseInt(data.code) === ' . self::STATUS_AWAITING_VALIDATION . ') {
 							countCheckInvoiceStatus++;
-							if (countCheckInvoiceStatus <= 5) {
+							if (countCheckInvoiceStatus <= 3) {
                             	setTimeout(checkInvoiceStatus, 5000);
-							} else if (countCheckInvoiceStatus <= 10) {
+							} else if (countCheckInvoiceStatus <= 5) {
                             	setTimeout(checkInvoiceStatus, 10000);
 							}
                         }
@@ -2004,11 +2005,10 @@ class EInvoicing
 					$resprints .= '
                     <script type="text/javascript">
                     (function() {
-						let checkattempt = 0;
+						var countCheckInvoiceStatus = 1;
 
                         function checkSupplierInvoiceStatus() {
-							checkattempt++;
-                            console.log("checkSupplierInvoiceStatus Status is STATUS_AWAITING_VALIDATION, so we call API to check last status. Attempt no " + checkattempt + "/5 ...");
+                            console.log("checkSupplierInvoiceStatus Status is STATUS_AWAITING_VALIDATION, so we call API to check last status. Attempt no " + countCheckInvoiceStatus + "...");
 
                             $.get("' . $urlajax . '", {
                                 token: "' . currentToken() . '",
@@ -2037,8 +2037,11 @@ class EInvoicing
                                 }
 
                                 // Retry only if still awaiting validation
-                                if (data.statusvalidationlabel === "Pending" && checkattempt < 5) {
-                                    setTimeout(checkSupplierInvoiceStatus, 5000);
+                                if (data.statusvalidationlabel === "Pending") {
+									countCheckInvoiceStatus++;
+									if (countCheckInvoiceStatus <= 3) {
+                                    	setTimeout(checkSupplierInvoiceStatus, 5000);
+									}
                                 }
                             }, "json");
                         }
