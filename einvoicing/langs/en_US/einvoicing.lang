@@ -180,6 +180,7 @@ updatedAt=Updated At
 provider=Provider
 entity=Entity
 flow_uiid=UUID
+EInvoiceCodeShort=Code
 cdar_lifecycle_code=LC code
 cdar_lifecycle_label=LC status
 cdar_reason_code=LC Reason code
