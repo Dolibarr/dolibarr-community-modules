@@ -216,16 +216,18 @@ abstract class AbstractPDPProvider
 	 * the feature degrades gracefully and never blocks them.
 	 *
 	 * @param 	string 	$idprof1 	Recipient professional id 1 (SIREN for France)
-	 * @return 	array{status:string,reachable:int,entries:int,active:int,unknown:int,identifier:string,linestatus:string,platform:string,effectivedate:int,message:string,httpcode:int}
+	 * @return 	array{status:string,reachable:int,entries:int,active:int,unknown:int,identifier:string,linestatus:string,platform:string,effectivedate:int,message:string,messageparam:string,httpcode:int}
 	 *								status: unsupported|error|absent|inactive|undetermined|routable ;
 	 *								reachable: 1 routable, 0 not routable, -1 unknown ;
 	 *								identifier: first active electronic address found (if any) ;
 	 *								linestatus/platform: directoryLineStatus and platformType of that address,
-	 *								reported to the user so a positive answer carries its provenance.
+	 *								reported to the user so a positive answer carries its provenance ;
+	 *								message: translation key naming where the answer comes from, with
+	 *								messageparam as its single parameter when the key takes one.
 	 */
 	public function checkRecipientDirectory($idprof1)
 	{
-		$result = array('status' => 'unsupported', 'reachable' => -1, 'entries' => 0, 'active' => 0, 'unknown' => 0, 'identifier' => '', 'linestatus' => '', 'platform' => '', 'effectivedate' => 0, 'message' => '', 'httpcode' => 0);
+		$result = array('status' => 'unsupported', 'reachable' => -1, 'entries' => 0, 'active' => 0, 'unknown' => 0, 'identifier' => '', 'linestatus' => '', 'platform' => '', 'effectivedate' => 0, 'message' => '', 'messageparam' => '', 'httpcode' => 0);
 
 		// The standardized route check uses the AFNOR Directory Service (XP Z12-013), so any conformant
 		// Approved Platform is supported. A provider that does not expose that base keeps the

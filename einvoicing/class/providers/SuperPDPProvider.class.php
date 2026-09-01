@@ -1508,7 +1508,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 * french_directory endpoint only when the standardized lookup is not available.
 	 *
 	 * @param 	string 	$idprof1 	Recipient SIREN (idprof1)
-	 * @return 	array{status:string,reachable:int,entries:int,active:int,unknown:int,identifier:string,linestatus:string,platform:string,effectivedate:int,message:string,httpcode:int}
+	 * @return 	array{status:string,reachable:int,entries:int,active:int,unknown:int,identifier:string,linestatus:string,platform:string,effectivedate:int,message:string,messageparam:string,httpcode:int}
 	 */
 	public function checkRecipientDirectory($idprof1)
 	{
@@ -1528,7 +1528,25 @@ class SuperPDPProvider extends AbstractPDPProvider
 		}
 
 		// Standardized lookup unavailable or errored: fall back to the SuperPDP specific endpoint.
-		return $this->checkRecipientDirectoryLegacy($idprof1);
+		// That answer is weaker (a boolean with no effective date, so it cannot conclude 'routable' on
+		// its own) and it must say so: without the provenance, the non-conclusive badge it produces
+		// reads as a verdict on the recipient, when what it really reports is a call that did not go
+		// through on this instance. Issue #698 was exactly that misreading, and it cost a round trip
+		// with the recipient's platform before the API call log settled it.
+		$legacy = $this->checkRecipientDirectoryLegacy($idprof1);
+		if ($legacy['status'] !== 'error') {
+			// Only when the fallback itself answered: its own error message is what the caller must
+			// display in that case, and overwriting it would hide the reason of the second failure.
+			if ($result['status'] === 'error') {
+				$legacy['message'] = 'EInvoicingDirectoryFallbackAfterError';
+				$legacy['messageparam'] = (string) $result['httpcode'];
+			} else {
+				// 'unsupported': no standardized base for this configuration, so no call was even made
+				// and there is no HTTP code to report.
+				$legacy['message'] = 'EInvoicingDirectoryFallbackNoService';
+			}
+		}
+		return $legacy;
 	}
 
 	/**
@@ -1550,8 +1568,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 * verdict says the recipient cannot receive without claiming which of the two it is.
 	 *
 	 * @param 	string 	$idprof1 	Recipient SIREN (idprof1)
-	 * @param 	array{status:string,reachable:int,entries:int,active:int,unknown:int,identifier:string,linestatus:string,platform:string,effectivedate:int,message:string,httpcode:int} 	$result 	Non-conclusive result of the standardized check
-	 * @return 	array{status:string,reachable:int,entries:int,active:int,unknown:int,identifier:string,linestatus:string,platform:string,effectivedate:int,message:string,httpcode:int}
+	 * @param 	array{status:string,reachable:int,entries:int,active:int,unknown:int,identifier:string,linestatus:string,platform:string,effectivedate:int,message:string,messageparam:string,httpcode:int} 	$result 	Non-conclusive result of the standardized check
+	 * @return 	array{status:string,reachable:int,entries:int,active:int,unknown:int,identifier:string,linestatus:string,platform:string,effectivedate:int,message:string,messageparam:string,httpcode:int}
 	 */
 	private function settleUndeterminedDirectory($idprof1, $result)
 	{
@@ -1596,11 +1614,11 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 * its own, see below.
 	 *
 	 * @param 	string 	$idprof1 	Recipient SIREN (idprof1)
-	 * @return 	array{status:string,reachable:int,entries:int,active:int,unknown:int,identifier:string,linestatus:string,platform:string,effectivedate:int,message:string,httpcode:int}
+	 * @return 	array{status:string,reachable:int,entries:int,active:int,unknown:int,identifier:string,linestatus:string,platform:string,effectivedate:int,message:string,messageparam:string,httpcode:int}
 	 */
 	private function checkRecipientDirectoryLegacy($idprof1)
 	{
-		$result = array('status' => 'error', 'reachable' => -1, 'entries' => 0, 'active' => 0, 'unknown' => 0, 'identifier' => '', 'linestatus' => '', 'platform' => '', 'effectivedate' => 0, 'message' => '', 'httpcode' => 0);
+		$result = array('status' => 'error', 'reachable' => -1, 'entries' => 0, 'active' => 0, 'unknown' => 0, 'identifier' => '', 'linestatus' => '', 'platform' => '', 'effectivedate' => 0, 'message' => '', 'messageparam' => '', 'httpcode' => 0);
 
 		$siren = preg_replace('/[^0-9]/', '', (string) $idprof1);
 		if ($siren === '') {
