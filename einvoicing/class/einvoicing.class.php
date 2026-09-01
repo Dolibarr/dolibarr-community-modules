@@ -1030,6 +1030,9 @@ class EInvoicing
 		}
 		if (!empty($baseErrors)) {
 			$res = -1;
+			if ($message) {
+				$message .= '<br>';
+			}
 			$message .= '<b>' . $langs->trans("Error") . '</b>: ' . implode('<br><b>' . $langs->trans("Error") . '</b>: ', $baseErrors);
 		}
 		if (empty($baseErrors) && empty($baseWarnings)) {
