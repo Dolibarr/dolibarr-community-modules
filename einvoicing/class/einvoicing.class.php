@@ -3700,6 +3700,33 @@ class EInvoicing
 	}
 
 	/**
+	 * Split a Dolibarr postal address into the three lines EN 16931 has for it.
+	 *
+	 * Dolibarr keeps a postal address as one free text field where the user separates the lines with
+	 * newlines, while the norm gives an address three separate terms - BT-35/36/162 for the seller,
+	 * BT-50/51/163 for the buyer, BT-75/76/165 for the deliver-to party. Handing the whole field to
+	 * the first of them puts raw newlines inside a single element, which the receiving side renders
+	 * as one run-on line (issue #683).
+	 *
+	 * Nothing is dropped: the norm stops at three lines, so a fourth and beyond join the third,
+	 * separated by a comma, rather than disappearing from the document.
+	 *
+	 * @param	string	$address	Address as Dolibarr stores it, lines separated by newlines
+	 * @return	string[]			Exactly three lines, empty strings when the address has fewer
+	 */
+	public function splitAddressLines($address)
+	{
+		$lines = preg_split('/\R/', (string) $address);
+		$lines = array_values(array_filter(array_map('trim', $lines), 'strlen'));
+
+		if (count($lines) > 3) {
+			$lines = array_merge(array_slice($lines, 0, 2), array(implode(', ', array_slice($lines, 2))));
+		}
+
+		return $lines + array('', '', '');
+	}
+
+	/**
 	 * Generates the deposit, standard and credit note CII sample-invoice chain and returns the normalized XML of each.
 	 *
 	 * Generates three sample invoices (deposit, standard, and credit note) using fixed specimen

@@ -725,6 +725,49 @@ function einvoicingSellerVatRegime($seller)
 }
 
 /**
+ * Build the deliver-to address of a shipping contact, the way the core builds the shipping frame.
+ *
+ * @param	Contact		$shipContact	Contact designated as the delivery point
+ * @param	Societe		$buyer			Thirdparty being invoiced, last resort for the name
+ * @param	Translate	$outputlangs	Language the name is built in
+ * @param	DoliDB		$db				Database handler
+ * @return	array						Keys name, address, zip, town, country
+ */
+function einvoicingShipToFromContact($shipContact, $buyer, $outputlangs, $db)
+{
+	require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
+
+	$shipSoc = null;
+	$shipSocId = (int) (!empty($shipContact->socid) ? $shipContact->socid : ($shipContact->fk_soc ?? 0));
+	if ($shipSocId > 0) {
+		$tmpsoc = new Societe($db);
+		if ($tmpsoc->fetch($shipSocId) > 0) {
+			$shipSoc = $tmpsoc;
+		}
+	}
+
+	// BT-70 names a party. The person keeps no place of its own in BG-15, which also spares the
+	// document a personal name it does not need.
+	$name = ($shipSoc !== null && !empty($shipSoc->name)) ? $shipSoc->name : trim($shipContact->getFullName($outputlangs));
+	if ($name === '') {
+		$name = $buyer->name;
+	}
+
+	// The contact wins when it carries an address of its own - that is a delivery site the user
+	// entered deliberately. With none, the address of its company is the one that means something;
+	// the contact's own empty fields would emit a deliver-to party with no address at all.
+	$source = !empty($shipContact->address) ? $shipContact : ($shipSoc !== null ? $shipSoc : $shipContact);
+
+	return array(
+		'name'    => $name,
+		'address' => $source->address,
+		'zip'     => $source->zip,
+		'town'    => $source->town,
+		'country' => $shipContact->country_code ?: ($shipSoc !== null ? $shipSoc->country_code : ''),
+	);
+}
+
+/**
  * Tax registrations (BT-31 / BT-32) the seller declares, in the shape the two writers consume.
  *
  * One entry, because the two identifiers answer the same question and a document that carried both
