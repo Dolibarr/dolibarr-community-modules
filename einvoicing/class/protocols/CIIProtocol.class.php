@@ -670,11 +670,11 @@ class CIIProtocol extends AbstractProtocol
 	 * This may create the Supplier and the Product depending on setup.
 	 *
 	 * @param  string 			$file                       		Source string file (XML or PDF string). We use this file to get data of supplier invoice.
-	 * @param  string|null 		$ReadableViewFile        			Readable view file (PDP Generated readable PDF). We only store it if available.
+	 * @param  string|null 		$readableViewFile        			Readable view file (PDP Generated readable PDF). We only store it if available.
 	 * @param  string 			$flowId                       		Flow identifier source of the invoice.
 	 * @return array{res:int<-1,1>, message:string, actioncode?: string|null, actionurl?: string|null, action?:string|null}   Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and an optional 'actioncode' and 'action'.
 	 */
-	public function createSupplierInvoiceFromSource($file, $ReadableViewFile = null, $flowId = '')
+	public function createSupplierInvoiceFromSource($file, $readableViewFile = null, $flowId = '')
 	{
 		global $conf, $db;
 
@@ -696,7 +696,7 @@ class CIIProtocol extends AbstractProtocol
 
 		$result = ['res' => -1, 'message' => 'Unexpected error while creating supplier invoice'];
 		try {
-			$result = $this->doCreateSupplierInvoiceFromSource($file, $ReadableViewFile, $flowId, $tempFile, $tempFileReadableView);
+			$result = $this->doCreateSupplierInvoiceFromSource($file, $readableViewFile, $flowId, $tempFile, $tempFileReadableView);
 		} finally {
 			$failed = !is_array($result) || !isset($result['res']) || $result['res'] < 0;
 			$this->cleanupIncomingTempFiles($tempDir, $tempFile, $tempFileReadableView, $failed);
@@ -781,13 +781,13 @@ class CIIProtocol extends AbstractProtocol
 	 * import transaction is opened here too, right after, but closed by that same wrapper.
 	 *
 	 * @param  string			$file                 Raw CII XML content
-	 * @param  string|null		$ReadableViewFile     Optional readable view (PDP-generated readable PDF)
+	 * @param  string|null		$readableViewFile     Optional readable view (PDP-generated readable PDF)
 	 * @param  string			$flowId               Source flow identifier
 	 * @param  string			$tempFile             Unique working file for the received XML
 	 * @param  string			$tempFileReadableView Unique working file for the readable view
 	 * @return array{res:int<-1,1>, message:string, action?:string|null}
 	 */
-	protected function doCreateSupplierInvoiceFromSource($file, $ReadableViewFile, $flowId, $tempFile, $tempFileReadableView)
+	protected function doCreateSupplierInvoiceFromSource($file, $readableViewFile, $flowId, $tempFile, $tempFileReadableView)
 	{
 		global $db, $user, $langs;
 
@@ -798,8 +798,8 @@ class CIIProtocol extends AbstractProtocol
 			return ['res' => -1, 'message' => 'Failed to save EInvoice file to temporary location'];
 		}
 
-		if ($ReadableViewFile) {
-			if (file_put_contents($tempFileReadableView, $ReadableViewFile) === false) {
+		if ($readableViewFile) {
+			if (file_put_contents($tempFileReadableView, $readableViewFile) === false) {
 				return ['res' => -1, 'message' => 'Failed to save readable view file to temporary location'];
 			}
 		}
@@ -1161,7 +1161,7 @@ class CIIProtocol extends AbstractProtocol
 
 
 			// Save readable view file in supplier invoice attachments
-			if ($ReadableViewFile && $tempFileReadableView && file_exists($tempFileReadableView)) {
+			if ($readableViewFile && $tempFileReadableView && file_exists($tempFileReadableView)) {
 				$res = $this->saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempFileReadableView, getDolGlobalString('EINVOICING_PDP', 'PDP'));
 
 				if ($res['res'] < 0) {

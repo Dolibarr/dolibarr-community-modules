@@ -106,6 +106,11 @@ class ProtocolManager
 		}
 		//}
 
+		// TODO Just loop into directory /einvoices/temp/lastfailed
+
+
+
+
 		return array_values(array_unique($names));
 	}
 
