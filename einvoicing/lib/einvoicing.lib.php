@@ -746,16 +746,27 @@ function einvoicingShipToFromContact($shipContact, $buyer, $outputlangs, $db)
 		}
 	}
 
-	// BT-70 names a party. The person keeps no place of its own in BG-15, which also spares the
-	// document a personal name it does not need.
-	$name = ($shipSoc !== null && !empty($shipSoc->name)) ? $shipSoc->name : trim($shipContact->getFullName($outputlangs));
+	// The core makes the distinction here and this follows it: pdf_build_address() switches to the
+	// company of the contact only when that company is not the one being invoiced
+	// ($targetcontact->socid != $targetcompany->id).
+	$anothercompany = ($shipSoc !== null && $shipSoc->id != $buyer->id);
+
+	// BT-70 names a party. When the contact belongs to another company, that company is the party the
+	// goods go to, and naming it also spares the document a personal name it has no use for. When the
+	// contact belongs to the company being invoiced, its name is already the BuyerTradeParty name and
+	// would say nothing here, while the label the user gave the contact is what names the delivery
+	// point - so that one is kept.
+	$name = ($anothercompany && !empty($shipSoc->name)) ? $shipSoc->name : trim($shipContact->getFullName($outputlangs));
 	if ($name === '') {
-		$name = $buyer->name;
+		$name = ($shipSoc !== null && !empty($shipSoc->name)) ? $shipSoc->name : $buyer->name;
 	}
 
 	// The contact wins when it carries an address of its own - that is a delivery site the user
 	// entered deliberately. With none, the address of its company is the one that means something;
-	// the contact's own empty fields would emit a deliver-to party with no address at all.
+	// the contact's own empty fields would emit a deliver-to party with no address at all. This is
+	// again what pdf_build_address() does, and a contact of the invoiced company with no address of
+	// its own falls back on that same company, so the deliver-to party then equals the buyer and no
+	// distinct BG-15 is emitted at all.
 	$source = !empty($shipContact->address) ? $shipContact : ($shipSoc !== null ? $shipSoc : $shipContact);
 
 	return array(
