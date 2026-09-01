@@ -1508,7 +1508,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 * french_directory endpoint only when the standardized lookup is not available.
 	 *
 	 * @param 	string 	$idprof1 	Recipient SIREN (idprof1)
-	 * @return 	array{status:string,reachable:int,entries:int,active:int,unknown:int,identifier:string,linestatus:string,platform:string,effectivedate:int,message:string,httpcode:int}
+	 * @return 	array{status:string,reachable:int,entries:int,active:int,unknown:int,identifier:string,linestatus:string,platform:string,effectivedate:int,message:string,messageparam:string,httpcode:int}
 	 */
 	public function checkRecipientDirectory($idprof1)
 	{
@@ -1528,7 +1528,25 @@ class SuperPDPProvider extends AbstractPDPProvider
 		}
 
 		// Standardized lookup unavailable or errored: fall back to the SuperPDP specific endpoint.
-		return $this->checkRecipientDirectoryLegacy($idprof1);
+		// That answer is weaker (a boolean with no effective date, so it cannot conclude 'routable' on
+		// its own) and it must say so: without the provenance, the non-conclusive badge it produces
+		// reads as a verdict on the recipient, when what it really reports is a call that did not go
+		// through on this instance. Issue #698 was exactly that misreading, and it cost a round trip
+		// with the recipient's platform before the API call log settled it.
+		$legacy = $this->checkRecipientDirectoryLegacy($idprof1);
+		if ($legacy['status'] !== 'error') {
+			// Only when the fallback itself answered: its own error message is what the caller must
+			// display in that case, and overwriting it would hide the reason of the second failure.
+			if ($result['status'] === 'error') {
+				$legacy['message'] = 'EInvoicingDirectoryFallbackAfterError';
+				$legacy['messageparam'] = (string) $result['httpcode'];
+			} else {
+				// 'unsupported': no standardized base for this configuration, so no call was even made
+				// and there is no HTTP code to report.
+				$legacy['message'] = 'EInvoicingDirectoryFallbackNoService';
+			}
+		}
+		return $legacy;
 	}
 
 	/**
@@ -1550,8 +1568,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 * verdict says the recipient cannot receive without claiming which of the two it is.
 	 *
 	 * @param 	string 	$idprof1 	Recipient SIREN (idprof1)
-	 * @param 	array{status:string,reachable:int,entries:int,active:int,unknown:int,identifier:string,linestatus:string,platform:string,effectivedate:int,message:string,httpcode:int} 	$result 	Non-conclusive result of the standardized check
-	 * @return 	array{status:string,reachable:int,entries:int,active:int,unknown:int,identifier:string,linestatus:string,platform:string,effectivedate:int,message:string,httpcode:int}
+	 * @param 	array{status:string,reachable:int,entries:int,active:int,unknown:int,identifier:string,linestatus:string,platform:string,effectivedate:int,message:string,messageparam:string,httpcode:int} 	$result 	Non-conclusive result of the standardized check
+	 * @return 	array{status:string,reachable:int,entries:int,active:int,unknown:int,identifier:string,linestatus:string,platform:string,effectivedate:int,message:string,messageparam:string,httpcode:int}
 	 */
 	private function settleUndeterminedDirectory($idprof1, $result)
 	{
@@ -1596,11 +1614,11 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 * its own, see below.
 	 *
 	 * @param 	string 	$idprof1 	Recipient SIREN (idprof1)
-	 * @return 	array{status:string,reachable:int,entries:int,active:int,unknown:int,identifier:string,linestatus:string,platform:string,effectivedate:int,message:string,httpcode:int}
+	 * @return 	array{status:string,reachable:int,entries:int,active:int,unknown:int,identifier:string,linestatus:string,platform:string,effectivedate:int,message:string,messageparam:string,httpcode:int}
 	 */
 	private function checkRecipientDirectoryLegacy($idprof1)
 	{
-		$result = array('status' => 'error', 'reachable' => -1, 'entries' => 0, 'active' => 0, 'unknown' => 0, 'identifier' => '', 'linestatus' => '', 'platform' => '', 'effectivedate' => 0, 'message' => '', 'httpcode' => 0);
+		$result = array('status' => 'error', 'reachable' => -1, 'entries' => 0, 'active' => 0, 'unknown' => 0, 'identifier' => '', 'linestatus' => '', 'platform' => '', 'effectivedate' => 0, 'message' => '', 'messageparam' => '', 'httpcode' => 0);
 
 		$siren = preg_replace('/[^0-9]/', '', (string) $idprof1);
 		if ($siren === '') {
@@ -1852,7 +1870,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 			$results = $response['response']['results'] ?? array();
 			if (empty($results)) {
-				break;
+				break;	// end of loop for batch management
 			}
 
 			// The batch really returned may be smaller than the one asked for, the API caps it.
@@ -2229,7 +2247,6 @@ class SuperPDPProvider extends AbstractPDPProvider
 		}
 
 
-
 		$returnRes = 1;
 		$returnMessage = "";
 		switch ($document->flow_type) {
@@ -2285,53 +2302,29 @@ class SuperPDPProvider extends AbstractPDPProvider
 					break;
 				}
 
-				// Retrieve the PDF file converted by Access Point
+				// Retrieve the einvoice file converted by Access Point
 				$receivedFile = null;
 				/*
-				$flowResource = 'flows/' . $flowId;
-				$flowUrlparams = array(
-					'docType' => 'Converted', 						// docType can be 'Metadata' (JSON), 'Original', 'Converted' or 'ReadableView'
-				);
-				$flowResource .= '?' . http_build_query($flowUrlparams);
-				$flowResponse = $this->callApi(
-					$flowResource,
-					"GET",
-					false,
-					['Accept' => 'application/octet-stream']
-				);
+				$flowResponse = $this->fetchFlowData($flowId, 'Converted');
 
 				if ($flowResponse['status_code'] != 200) {
-					return array('res' => -1, 'message' => "ERROR_FLOW_GETCONV Failed to retrieve 'Converted' document for SupplierInvoice flow (flowId: ".$flowId.")".(empty($flowResponse['errorMessage']) ? '' : ' - '.$flowResponse['errorMessage']));
+					return array('res' => -1, 'message' => "ERROR_FLOW_GETCONV Failed to retrieve 'Converted' document for SupplierInvoice flow (flowId: $flowId)");
 				}
-				$receivedFile = $flowResponse['response'];
+				$receivedFile = $flowResponse['response'];		// This is a string with PDF file content (with both Original and Converted).
 				*/
 
-				// Retrieve also PDF file generated by Access Point
-				$ReadableViewFile = null;
-				/*
-				$flowResource = 'flows/' . $flowId;
-				$flowUrlparams = array(
-					'docType' => 'ReadableView', 					// docType can be 'Metadata' (JSON), 'Original', 'Converted' or 'ReadableView'
-				);
-				$flowResource .= '?' . http_build_query($flowUrlparams);
-				$flowResponse = $this->callApi(
-					$flowResource,
-					"GET",
-					false,
-					['Accept' => 'application/octet-stream']
-				);
-				if ($flowResponse['status_code'] != 200) {
-					return array('res' => -1, 'message' => "ERROR_FLOW_GETREADABLE Failed to retrieve ReadableView document for SupplierInvoice flow (flowId: ".$flowId.")".(empty($flowResponse['errorMessage']) ? '' : ' - '.$flowResponse['errorMessage']));
-				}
+				// Retrieve also einvoice file that is readable generated by Access Point
+				$readableViewFile = null;
+				$flowResponse = $this->fetchFlowData($flowId, 'ReadableView');
+
 				if ($flowResponse['status_code'] != 200) {
 					// We disable this error, getting the readable file is optional.
 					//return array('res' => -1, 'message' => "ERROR_FLOW_GETREADABLE Failed to retrieve ReadableView document for SupplierInvoice flow (flowId: $flowId)");
 				} else {
-					$ReadableViewFile = $flowResponse['response'];	// This is a string with PDF file content.
+					$readableViewFile = $flowResponse['response'];	// This is a string with PDF file content.
 				}
-				*/
 
-				// Retrieve the invoice document, in whichever shape this module is able to read
+				// Retrieve the invoice document in Converted mode (always the same format), in whichever shape this module is able to read
 				$tmpProtocolManager = new ProtocolManager($this->db);
 				$importable = $this->fetchImportableFlowDocument($flowId, $tmpProtocolManager);
 
@@ -2368,7 +2361,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				// error on the invoice (product not found, ...) no longer rolls back the created thirdparty.
 				try {
 					// Try to create the supplier + product + invoice
-					$res = $exchangeProtocol->createSupplierInvoiceFromSource($receivedFile, $ReadableViewFile, $flowId);
+					$res = $exchangeProtocol->createSupplierInvoiceFromSource($receivedFile, $readableViewFile, $flowId);
 
 					if ($res['res'] < 0) {
 						$retarray = array(
@@ -2811,7 +2804,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		// the human-readable PDF) before the Converted one, so the created supplier invoice keeps the PDF.
 		$docTypeOrder = getDolGlobalString('EINVOICING_PREFER_ORIGINAL')
 			? array('Original', 'Converted', 'ReadableView')
-			: array('Converted', 'Original', 'ReadableView');
+			: array('Converted', 'Original', 'ReadableView');		// Default: First take the Converted (so always in same format defined in AP setup).
 		foreach ($docTypeOrder as $docType) {
 			$flowResponse = $this->fetchFlowData($flowId, $docType, 'get_flow_for_supplier_invoice');
 
@@ -3149,14 +3142,17 @@ class SuperPDPProvider extends AbstractPDPProvider
 					//$einvoicing->insertOrUpdateExtLink($object->id, $object->element, $flowId, $syncStatus, $syncRef, $syncComment);
 					$einvoicing->updateStatusMessageValidation($resStoreStatus, '', $ack_statusLabel, $syncComment);
 
-					// Log an event in the invoice timeline
-					$eventLabel = "EINVOICING - Send status " . $statusLabelToSend . " : " . $ack_statusLabel;
-					$eventMessage = "EINVOICING - Send status " . $statusLabelToSend . " : " . $ack_statusLabel . (!empty($syncComment) ? " - " . $syncComment : "");
+					// Log an event in the invoice timeline if status not pending
+					// We have just POST a new status so we log a rcord here in agenda to remind date (even if message is pending, so not yet fully processed by AP)
+					//if ($ack_statusLabel != 'Pending') {
+						$eventLabel = "EINVOICING - ".$langs->trans("SendStatus").' ['.$statusLabelToSend.']';
+						$eventMessage = "EINVOICING - ".$langs->trans("SendStatus")." (From sendStatusMessage) - [Dolibarr: " . $statusLabelToSend . ", ".$langs->trans("ResultOnAP").': '.$ack_statusLabel . (!empty($syncComment) ? " - " . $syncComment : "")."]";
 
-					$resLogEvent = $this->addEvent('STATUS', $eventLabel, $eventMessage, $object);
+						$resLogEvent = $this->addEvent('STATUS', $eventLabel, $eventMessage, $object);
 					if ($resLogEvent < 0) {
 						dol_syslog(__METHOD__ . " Failed to log event for flowId: {$flowId}", LOG_WARNING);
 					}
+					//}
 				} else {
 					dol_syslog(__METHOD__ . " Unable to retrieve flow details after sending status message for flowId: {$flowId}. Status code: " . $response['status_code'], LOG_WARNING);
 					$res = 1;

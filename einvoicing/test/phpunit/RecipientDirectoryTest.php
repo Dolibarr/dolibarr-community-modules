@@ -787,6 +787,92 @@ class RecipientDirectoryTest extends CommonClassTest
 	}
 
 	/**
+	 * Build a SuperPDP double whose standardized directory call is refused with the given HTTP code,
+	 * and whose specific french_directory lookup then answers the given entries.
+	 *
+	 * @param	int								$httpcode	Status code the standardized search answers with
+	 * @param	?array<int,array<string,mixed>>	$entries	Entries returned by french_directory/entries, null for a failing call
+	 * @return	FakeDirectorySuperPDPProvider
+	 */
+	private function superPdpRefusingTheStandardizedSearch($httpcode, $entries)
+	{
+		global $db;
+
+		$provider = new FakeDirectorySuperPDPProvider($db);
+		$provider->cannedResponses = array(
+			array('status_code' => $httpcode, 'response' => 'Error ' . $httpcode . ' - Forbidden'),
+			$entries === null ? array('status_code' => 500, 'response' => '') : array('status_code' => 200, 'response' => array('data' => $entries)),
+		);
+
+		return $provider;
+	}
+
+	/**
+	 * The standardized directory call did not go through (credentials whose scope does not cover the
+	 * directory service answer 403), so the answer shown comes from the platform own endpoint, which
+	 * only carries an undated boolean and cannot conclude. The verdict is the same non-conclusive one
+	 * as a terse standardized answer, and that is exactly why it must name where it comes from: one is
+	 * the recipient platform being terse, the other is a call failing on this instance (issue #698).
+	 *
+	 * @return void
+	 */
+	public function testFallbackAfterAFailedStandardizedCallSaysSoWithItsHttpCode()
+	{
+		$provider = $this->superPdpRefusingTheStandardizedSearch(403, array(
+			array('identifier' => '0225:824369342', 'is_active' => true),
+		));
+
+		$result = $provider->checkRecipientDirectory('824369342');
+
+		$this->assertSame('undetermined', $result['status']);
+		$this->assertSame(-1, $result['reachable']);
+		$this->assertSame('0225:824369342', $result['identifier']);
+		$this->assertSame('EInvoicingDirectoryFallbackAfterError', $result['message']);
+		$this->assertSame('403', $result['messageparam']);
+		$this->assertSame(
+			array('afnor-directory/v1/directory-line/search', 'french_directory/entries?number=824369342'),
+			$provider->calledResources
+		);
+	}
+
+	/**
+	 * Same fallback, reached the other way: no standardized directory base is configured, so no call is
+	 * even made and there is no HTTP code to report. The answer still says it is the weaker one.
+	 *
+	 * @return void
+	 */
+	public function testFallbackWithoutAStandardizedServiceSaysSoWithoutAnHttpCode()
+	{
+		$provider = $this->legacyProviderReturningEntries(array(
+			array('identifier' => '0225:824369342', 'is_active' => true),
+		));
+
+		$result = $provider->checkRecipientDirectory('824369342');
+
+		$this->assertSame('undetermined', $result['status']);
+		$this->assertSame('EInvoicingDirectoryFallbackNoService', $result['message']);
+		$this->assertSame('', $result['messageparam']);
+		$this->assertSame(array('french_directory/entries?number=824369342'), $provider->calledResources);
+	}
+
+	/**
+	 * When the fallback fails in its turn, its own error is what the caller has to display: the
+	 * provenance label must not overwrite it, or the card reports the first failure and hides the
+	 * second one.
+	 *
+	 * @return void
+	 */
+	public function testFallbackErrorKeepsItsOwnMessage()
+	{
+		$provider = $this->superPdpRefusingTheStandardizedSearch(403, null);
+
+		$result = $provider->checkRecipientDirectory('824369342');
+
+		$this->assertSame('error', $result['status']);
+		$this->assertSame('HTTP 500', $result['message']);
+	}
+
+	/**
 	 * When the tie-breaker does date the entry and that date is still ahead, the recipient cannot
 	 * receive yet and the date is reported with the verdict.
 	 *

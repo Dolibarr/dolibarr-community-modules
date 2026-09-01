@@ -85,11 +85,11 @@ abstract class AbstractProtocol
 	 * and generates a corresponding supplier invoice within Dolibarr.
 	 *
 	 * @param  string 			$file                       		Source string file. We use this file to get data of supplier invoice.
-	 * @param  string|null 		$ReadableViewFile        			Readable view file (PDP Generated readable PDF).e only store it if available.
+	 * @param  string|null 		$readableViewFile        			Readable view file (PDP Generated readable PDF).e only store it if available.
 	 * @param  string 			$flowId                       		Flow identifier source of the invoice.
 	 * @return array{res:int, message:string, action:string|null}   Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and an optional 'action'.
 	 */
-	abstract public function createSupplierInvoiceFromSource($file, $ReadableViewFile = null, $flowId = '');
+	abstract public function createSupplierInvoiceFromSource($file, $readableViewFile = null, $flowId = '');
 
 	/**
 	 * Generate a sample invoice for testing or demonstration purposes (for Dolibarr version < 24.0)

@@ -1773,9 +1773,10 @@ class EInvoicing
             <script type="text/javascript">
             (function() {
 				var countCheckInvoiceStatus = 1;
+
                 function checkInvoiceStatus() {
-					console.log(\'checkInvoiceStatus Checking invoice status (try \'+countCheckInvoiceStatus+\') to url '.dol_escape_js($urlajax).'...\');
-                    // alert("Checking invoice status...");
+					console.log(\'checkInvoiceStatus Last LC message for invoice is STATUS_AWAITING_VALIDATION, so we check invoice status (try \'+countCheckInvoiceStatus+\') to url '.dol_escape_js($urlajax).'...\');
+
                     $.get("' . $urlajax . '", {
                         token: "' . currentToken() . '",
                         ref: "' . dol_escape_js($object->ref) . '"
@@ -1800,9 +1801,9 @@ class EInvoicing
                         // Retry only if still awaiting validation
                         if (parseInt(data.code) === ' . self::STATUS_AWAITING_VALIDATION . ') {
 							countCheckInvoiceStatus++;
-							if (countCheckInvoiceStatus <= 5) {
+							if (countCheckInvoiceStatus <= 3) {
                             	setTimeout(checkInvoiceStatus, 5000);
-							} else if (countCheckInvoiceStatus <= 10) {
+							} else if (countCheckInvoiceStatus <= 5) {
                             	setTimeout(checkInvoiceStatus, 10000);
 							}
                         }
@@ -1961,6 +1962,7 @@ class EInvoicing
 			$sql .= " AND lc_validation_status = 'Ok'";
 			$sql .= " ORDER BY rowid DESC LIMIT 1";
 			$resql = $this->db->query($sql);
+			$obj = null;
 			if ($resql && $this->db->num_rows($resql) > 0) {
 				$obj = $this->db->fetch_object($resql);
 				$currentStatus = $this->getStatusLabel($obj->lc_status);
@@ -1969,8 +1971,10 @@ class EInvoicing
 			// Current status
 			$resprints .= '<tr class="treinvoicing_collapseseparator">';
 			$resprints .= '<td class="">' . $langs->trans("einvoicingInvoiceStatus") . '</td>';
-			$resprints .= '<td><span id="einvoice-status" title="'.$obj->lc_status.'">' . $currentStatus;
-			$resprints .= ($obj->lc_status > 200 ? ' <span class="opacitymedium small">('.$langs->trans("EInvoiceCodeShort").' '.$obj->lc_status.')</span>' : '');
+			$resprints .= '<td><span id="einvoice-status" title="'.($obj ? $obj->lc_status : '').'">' . $currentStatus;
+			if ($obj) {
+				$resprints .= ($obj->lc_status > 200 ? ' <span class="opacitymedium small">('.$langs->trans("EInvoiceCodeShort").' '.$obj->lc_status.')</span>' : '');
+			}
 			$resprints .= '</span>';
 
 			// If current status requires a reason, display it
@@ -1988,7 +1992,8 @@ class EInvoicing
 
 			// Get last sent status to know if we need to add the JavaScript for real time update of status and to display last sent status validation if it is pending or in error
 			$lastSentStatus = array();
-			$sql = "SELECT lc_status, lc_status_message, lc_validation_status, lc_validation_message FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
+			$sql = "SELECT lc_status, lc_status_message, lc_validation_status, lc_validation_message";
+			$sql .= " FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
 			$sql .= " WHERE element_type = '" . $this->db->escape($object->element) . "'";
 			$sql .= " AND element_id = " . (int) $object->id;
 			$sql .= " ORDER BY rowid DESC LIMIT 1";
@@ -2031,8 +2036,11 @@ class EInvoicing
 					$resprints .= '
                     <script type="text/javascript">
                     (function() {
+						var countCheckInvoiceStatus = 1;
+
                         function checkSupplierInvoiceStatus() {
-                            console.log("checkSupplierInvoiceStatus Checking invoice status...");
+                            console.log("checkSupplierInvoiceStatus Last LC message for invoice is STATUS_AWAITING_VALIDATION, so we check invoice status (try " + countCheckInvoiceStatus + ") to url '.dol_escape_js($urlajax).'...");
+
                             $.get("' . $urlajax . '", {
                                 token: "' . currentToken() . '",
                                 id: "' . dol_escape_js($object->id) . '"
@@ -2061,13 +2069,18 @@ class EInvoicing
 
                                 // Retry only if still awaiting validation
                                 if (data.statusvalidationlabel === "Pending") {
-                                    setTimeout(checkSupplierInvoiceStatus, 5000);
+									countCheckInvoiceStatus++;
+									if (countCheckInvoiceStatus <= 3) {
+		                            	setTimeout(checkInvoiceStatus, 5000);
+									} else if (countCheckInvoiceStatus <= 5) {
+		                            	setTimeout(checkInvoiceStatus, 10000);
+									}
                                 }
                             }, "json");
                         }
 
                         // First call
-                        console.log("checkSupplierInvoiceStatus Invoice has status pending, so we add a timer to run checkInvoiceStatus in few seconds...");
+                        console.log("checkSupplierInvoiceStatus Invoice has status pending, so we add a timer to run checkInvoiceStatus in 2.5 seconds...");
                         setTimeout(checkSupplierInvoiceStatus, 2500);
 
                     })();
@@ -3729,6 +3742,33 @@ class EInvoicing
 	{
 		// TODO: move this function to class utils
 		return preg_replace('/\\s+/', '', $str);
+	}
+
+	/**
+	 * Split a Dolibarr postal address into the three lines EN 16931 has for it.
+	 *
+	 * Dolibarr keeps a postal address as one free text field where the user separates the lines with
+	 * newlines, while the norm gives an address three separate terms - BT-35/36/162 for the seller,
+	 * BT-50/51/163 for the buyer, BT-75/76/165 for the deliver-to party. Handing the whole field to
+	 * the first of them puts raw newlines inside a single element, which the receiving side renders
+	 * as one run-on line (issue #683).
+	 *
+	 * Nothing is dropped: the norm stops at three lines, so a fourth and beyond join the third,
+	 * separated by a comma, rather than disappearing from the document.
+	 *
+	 * @param	string	$address	Address as Dolibarr stores it, lines separated by newlines
+	 * @return	string[]			Exactly three lines, empty strings when the address has fewer
+	 */
+	public function splitAddressLines($address)
+	{
+		$lines = preg_split('/\R/', (string) $address);
+		$lines = array_values(array_filter(array_map('trim', $lines), 'strlen'));
+
+		if (count($lines) > 3) {
+			$lines = array_merge(array_slice($lines, 0, 2), array(implode(', ', array_slice($lines, 2))));
+		}
+
+		return array_pad($lines, 3, '');
 	}
 
 	/**
