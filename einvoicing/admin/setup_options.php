@@ -119,15 +119,16 @@ foreach ($protocolsList as $key => $protocolconfig) {
 	if ($protocolconfig['is_enabled'] == 0) {
 		continue;
 	}
-	$TFieldProtocols[$key] = array('label' => $protocolconfig['protocol_name']);
+	$TFieldProtocols[$key] = array('label' => $protocolconfig['protocol_name'], 'data-html' => $protocolconfig['protocol_label'] ?? $protocolconfig['protocol_name']);
 	if (!empty($protocolconfig['protocol_dol_min'])) {
-		// With Esalink, we can use the Factur-X even on version lower than v24 because it accepts duplicate factur-x.xml inside the PDF.
-		if ($protocolconfig['protocol_name'] != 'FACTURX' || getDolGlobalString('EINVOICING_PDP') != 'ESALINK') {
-			$TFieldProtocols[$key]['data-html'] = $protocolconfig['protocol_name'].' <span class="opacitymedium">(Dolibarr '.$protocolconfig['protocol_dol_min'].'+)</span>';
-		}
+		$TFieldProtocols[$key]['data-html'] .= ' <span class="opacitymedium">(Dolibarr '.$protocolconfig['protocol_dol_min'].'+)</span>';
 	}
 	if ($protocolconfig['protocol_name'] == 'CII') {
-		$TFieldProtocols[$key]['data-html'] = $protocolconfig['protocol_name'].' <span class="opacitymedium">('.$langs->trans("Recommended").')</span>';
+		$TFieldProtocols[$key]['data-html'] .= ' <span class="opacitymedium">('.$langs->trans("Recommended").')</span>';
+	}
+	if (!empty($protocolconfig['is_greyed'])) {
+		$TFieldProtocols[$key]['disabled'] = 1;
+		$TFieldProtocols[$key]['data-html'] .= ' <span class="opacitymedium">('.$protocolconfig['is_greyed'].')</span>';
 	}
 }
 
@@ -137,7 +138,6 @@ foreach ($protocolsList as $key => $protocolconfig) {
 
 //$dirmodels = array_merge(array('/'), (array) $conf->modules_parts['models']);
 //$moduledir = 'einvoicing';
-
 
 
 /*
@@ -154,8 +154,15 @@ if (getDolGlobalString('EINVOICING_PDP') && !getDolGlobalString('EINVOICING_PROT
 if ($action == 'savesyncoptions') {
 	dolibarr_set_const($db, "EINVOICING_DISABLE_SYNC_AP_TO_DOLI", (int) !GETPOSTINT("EINVOICING_DISABLE_SYNC_AP_TO_DOLI"), 'chaine', 0, '', $conf->entity);
 	dolibarr_set_const($db, "EINVOICING_DISABLE_SYNC_DOLI_TO_AP", (int) !GETPOSTINT("EINVOICING_DISABLE_SYNC_DOLI_TO_AP"), 'chaine', 0, '', $conf->entity);
+
+	header("Location: ".$_SERVER["PHP_SELF"]);
+	exit;
 }
 
+// If we use the test mode, sync supplier invoices is not available
+//if (getDolGlobalString('EINVOICING_PDP') == 'TESTPDP') {
+//	$conf->global->EINVOICING_DISABLE_SYNC_AP_TO_DOLI = 1;
+//}
 
 if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$itemtitle = $formSetup->newItem('EINVOICING_SYNC_TO_PA');
@@ -197,8 +204,11 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	// Setup conf to precheck the e-invoice with the Access Point validation service if available.
 	if (getDolGlobalString('EINVOICING_PDP')) {
 		$PDPManager = new PDPProviderManager($db);
+
 		$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+
 		$providerconfig  = $provider->getConf();
+
 		$hasValidator = $providerconfig['has_validator'];
 		if ($hasValidator) {
 			$item = $formSetup->newItem('EINVOICING_AP_PRECHECK')->setAsSelect(array(
@@ -238,7 +248,13 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 
 	// Setup conf to REQUIRE the recipient to be routable in the directory before generating/sending. Off by
 	// default (opt-in enforcement on top of the read-only pre-check above): blocks reaching a routing reject.
-	$item = $formSetup->newItem('EINVOICING_REQUIRE_ROUTABLE_RECIPIENT')->setAsYesNo();
+	// Value 2 blocks the non-conclusive directory answer too (recipient known, status of its reception
+	// address not reported). Formerly a yes/no, whose two values keep their meaning here.
+	$item = $formSetup->newItem('EINVOICING_REQUIRE_ROUTABLE_RECIPIENT')->setAsSelect(array(
+		'0' => $langs->transnoentities('EINVOICING_REQUIRE_ROUTABLE_RECIPIENT_OFF'),
+		'1' => $langs->transnoentities('EINVOICING_REQUIRE_ROUTABLE_RECIPIENT_ON'),
+		'2' => $langs->transnoentities('EINVOICING_REQUIRE_ROUTABLE_RECIPIENT_STRICT'),
+	));
 	$item->helpText = $langs->transnoentities('EINVOICING_REQUIRE_ROUTABLE_RECIPIENT_HELP');
 	$item->defaultFieldValue = '0';
 	$item->cssClass = 'minwidth500';
@@ -251,27 +267,27 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->defaultFieldValue = '0';
 	$item->cssClass = 'minwidth500';
 
+	// The VAT exigibility scheme decides when the VAT of an invoice falls due, hence the VAT point date
+	// code (BT-8) the document declares, the "VAT on debits" legal mention it carries, and whether a
+	// cash-in has to be reported with the status 212. Dolibarr already holds that scheme in the setup of
+	// the Tax/VAT module (TAX_MODE_SELL_PRODUCT / TAX_MODE_SELL_SERVICE), so it is not duplicated here:
+	// remind its current value, with a link to the page that owns it.
+	// The VAT regime the generated documents declare in BT-8. Left to the VAT mode above by default;
+	// an explicit value is for a seller whose regime that mode cannot express (issue #419).
+	$item = $formSetup->newItem('EINVOICING_VAT_POINT_DATE_CODE')->setAsSelect(array(
+		'auto' => $langs->transnoentities('EINVOICING_VAT_POINT_DATE_CODE_AUTO'),
+		'5'    => $langs->transnoentities('EINVOICING_VAT_POINT_DATE_CODE_5'),
+		'29'   => $langs->transnoentities('EINVOICING_VAT_POINT_DATE_CODE_29'),
+		'72'   => $langs->transnoentities('EINVOICING_VAT_POINT_DATE_CODE_72'),
+	));
+	$item->helpText = $langs->transnoentities('EINVOICING_VAT_POINT_DATE_CODE_HELP');
+	$item->defaultFieldValue = 'auto';
+	$item->cssClass = 'minwidth500';
+
 	// Setup conf to automatically transmit the e-invoice to the PA right after it is generated (on validation)
 	$item = $formSetup->newItem('EINVOICING_AUTO_SEND_ON_GENERATION')->setAsYesNo();
 	$item->helpText = $langs->transnoentities('EINVOICING_AUTO_SEND_ON_GENERATION_HELP');
 	$item->defaultFieldValue = '0';
-	$item->cssClass = 'minwidth500';
-
-	// Allow re-sending / re-editing an invoice already transmitted to the Access Point. Off by default:
-	// a transmitted invoice is immutable (correct it with a credit note / corrective invoice), and re-sending
-	// makes the PA refuse a duplicate. Turn on only to deliberately test PA retry behaviour.
-	$item = $formSetup->newItem('EINVOICING_ALLOW_RESEND_TRANSMITTED')->setAsYesNo();
-	$item->nameText = $langs->trans("EINVOICING_ALLOW_RESEND_TRANSMITTED").' <span class="opacitymedium">('.$langs->trans("EINVOICING_TRANSMITTED_NOT_FOR_PROD").')</span>';
-	$item->defaultFieldValue = '0';
-	$item->helpText = $langs->transnoentities('EINVOICING_ALLOW_RESEND_TRANSMITTED_HELP');
-	$item->cssClass = 'minwidth500';
-
-	// Dev-only: keep the "Regenerate e-invoice" button/action available on a transmitted-locked invoice
-	// (rebuild the CII/Factur-X to inspect the XML). Re-sending stays locked. Off by default.
-	$item = $formSetup->newItem('EINVOICING_ALLOW_REGEN_TRANSMITTED')->setAsYesNo();
-	$item->nameText = $langs->trans("EINVOICING_ALLOW_REGEN_TRANSMITTED").' <span class="opacitymedium">('.$langs->trans("EINVOICING_TRANSMITTED_NOT_FOR_PROD").')</span>';
-	$item->defaultFieldValue = '0';
-	$item->helpText = $langs->transnoentities('EINVOICING_ALLOW_REGEN_TRANSMITTED_HELP');
 	$item->cssClass = 'minwidth500';
 
 	// Setup conf for maximum e-invoice file size (warning if exceeded)
@@ -296,6 +312,41 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item = $formSetup->newItem('EINVOICING_AAB');
 	$item->helpText = $langs->transnoentities('EINVOICING_AAB_HELP');
 	$item->cssClass = 'minwidth500';
+
+	/*
+	$vatexigibility = $langs->trans(getDolGlobalString('TAX_MODE_SELL_PRODUCT') == 'payment' ? 'OnPayment' : 'OnInvoice');
+	$vatexigibility .= ' / ';
+	$vatexigibility .= $langs->trans(getDolGlobalString('TAX_MODE_SELL_SERVICE') == 'payment' ? 'OnPayment' : 'OnInvoice');
+	*/
+	$conf->global->EINVOICING_TELL_CUSTOMER_PAYMENT_RECEIVED = $langs->trans("Mandatory");
+	$item = $formSetup->newItem('EINVOICING_TELL_CUSTOMER_PAYMENT_RECEIVED');
+	$item->helpText = $langs->trans('EINVOICING_TELL_CUSTOMER_PAYMENT_RECEIVED_HELP');
+	$item->fieldInputOverride = $langs->trans("Mandatory");
+	//$item->enabled = 0;
+	$item->cssClass = 'opacitymedium';
+
+	// Allow re-sending / re-editing an invoice already transmitted to the Access Point. Off by default:
+	// a transmitted invoice is immutable (correct it with a credit note / corrective invoice), and re-sending
+	// makes the PA refuse a duplicate. Turn on only to deliberately test PA retry behaviour.
+	$item = $formSetup->newItem('EINVOICING_ALLOW_RESEND_TRANSMITTED')->setAsYesNo();
+	$item->nameText = $langs->trans("EINVOICING_ALLOW_RESEND_TRANSMITTED").' <span class="opacitymedium">('.$langs->trans("EINVOICING_TRANSMITTED_NOT_FOR_PROD").')</span>';
+	$item->defaultFieldValue = '0';
+	$item->helpText = $langs->transnoentities('EINVOICING_ALLOW_RESEND_TRANSMITTED_HELP');
+	$item->cssClass = 'minwidth500';
+
+	// Dev-only: keep the "Regenerate e-invoice" button/action available on a transmitted-locked invoice
+	// (rebuild the CII/Factur-X to inspect the XML). Re-sending stays locked. Off by default.
+	$item = $formSetup->newItem('EINVOICING_ALLOW_REGEN_TRANSMITTED')->setAsYesNo();
+	$item->nameText = $langs->trans("EINVOICING_ALLOW_REGEN_TRANSMITTED").' <span class="opacitymedium">('.$langs->trans("EINVOICING_TRANSMITTED_NOT_FOR_PROD").')</span>';
+	$item->defaultFieldValue = '0';
+	$item->helpText = $langs->transnoentities('EINVOICING_ALLOW_REGEN_TRANSMITTED_HELP');
+	$item->cssClass = 'minwidth500';
+
+	/*
+	$itemtitle->helpText = $langs->trans('EINVOICING_VAT_EXIGIBILITY_HELP').' <b>'
+			.dol_escape_htmltag($vatexigibility)
+			.'</b> <a href="'.DOL_URL_ROOT.'/admin/taxes.php">'.$langs->trans('Setup').'</a>';
+	*/
 }
 
 
@@ -342,13 +393,39 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
 	$item->fieldParams['forcereload'] = 1;
 	*/
 
-	//if (getDolGlobalString('EINVOICING_FLOWS_SYNC_CALL_LIMIT')) {
-		// Setup conf to to define the number of flows to synchronize per one synchronization call
-		$item = $formSetup->newItem('EINVOICING_FLOWS_SYNC_CALL_SIZE');
-		$item->helpText = $langs->transnoentities('EINVOICING_FLOWS_SYNC_CALL_SIZE_HELP');
-		$item->defaultFieldValue = '100';
-		$item->cssClass = 'maxwidth100';
-	//}
+	if (getDolGlobalString('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION_AVAILABLE')) {
+		// Setup conf to enable or not the consistency check on supplier invoice validation
+		$item = $formSetup->newItem('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION');
+		$item->helpText = $langs->transnoentities('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION_HELP');
+		$item->setAsYesNo();
+	}
+
+	// Tell the vendor that its invoice is approved (status 205) when the supplier invoice is validated so approved.
+	// Off by default.
+	$item = $formSetup->newItem('EINVOICING_SEND_APPROVED_ON_VALIDATION')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('EINVOICING_SEND_APPROVED_ON_VALIDATION_HELP');
+	$item->defaultFieldValue = '0';
+	$item->cssClass = 'minwidth500';
+
+	// Tell the vendor of a supplier invoice that its payment has been sent (status 211), as soon as the
+	// invoice is classified paid in Dolibarr. Optional status of the reform, hence off by default: it is
+	// a courtesy to the vendor and it costs one platform flow per invoice.
+	$item = $formSetup->newItem('EINVOICING_SEND_PAYMENT_SENT_STATUS')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('EINVOICING_SEND_PAYMENT_SENT_STATUS_HELP');
+	$item->defaultFieldValue = '0';
+	$item->cssClass = 'minwidth500';
+}
+
+
+if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
+	$itemtitle = $formSetup->newItem('EINVOICING_DEBUG')->setAsTitle();
+	$itemtitle->nameText = '<b>'.$langs->trans("Other").'</b>';
+
+	// Setup conf to to define the number of flows to synchronize per one synchronization call
+	$item = $formSetup->newItem('EINVOICING_FLOWS_SYNC_CALL_SIZE');
+	$item->helpText = $langs->transnoentities('EINVOICING_FLOWS_SYNC_CALL_SIZE_HELP');
+	$item->defaultFieldValue = '100';
+	$item->cssClass = 'maxwidth100';
 
 	// Setup conf to define a time margin in hours to go back from the current date of the last synchronization
 	$item = $formSetup->newItem('EINVOICING_SYNC_MARGIN_TIME_HOURS');
@@ -364,19 +441,6 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
 
 	$item = $formSetup->newItem('EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_CATEGORY_OF_TARGET_IMPORT_PRODUCT_LIST');
 	$item->setAsCategory('product');
-
-	if (getDolGlobalString('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION_AVAILABLE')) {
-		// Setup conf to enable or not the consistency check on supplier invoice validation
-		$item = $formSetup->newItem('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION');
-		$item->helpText = $langs->transnoentities('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION_HELP');
-		$item->setAsYesNo();
-	}
-}
-
-
-if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
-	$itemtitle = $formSetup->newItem('EINVOICING_DEBUG')->setAsTitle();
-	$itemtitle->nameText = '<b>'.$langs->trans("Other").'</b>';
 
 	// Setup conf to choose to use Chorus or not
 	$item = $formSetup->newItem('EINVOICING_USE_CHORUS')->setAsYesNo();
@@ -436,12 +500,16 @@ print '<input type="hidden" name="token" value="'.newToken().'">';
 print '<input type="hidden" name="action" value="savesyncoptions">';
 
 print '<div class="neutral">';
-print img_picto('', 'supplier_invoice', 'class="pictofixedwidth"').$langs->trans("EnableInvoiceImport").' ';
-print $form->selectyesno("EINVOICING_DISABLE_SYNC_AP_TO_DOLI", GETPOSTISSET("EINVOICING_DISABLE_SYNC_AP_TO_DOLI") ? GETPOSTINT("EINVOICING_DISABLE_SYNC_AP_TO_DOLI") : !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI'), 1, false, 0, 1);
-print '<br><br>';
 
 print img_picto('', 'bill', 'class="pictofixedwidth"').$langs->trans("EnableInvoiceExport").' ';
 print $form->selectyesno("EINVOICING_DISABLE_SYNC_DOLI_TO_AP", GETPOSTISSET("EINVOICING_DISABLE_SYNC_DOLI_TO_AP") ? GETPOSTINT('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') : !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP'), 1, false, 0, 1);
+print '<br>';
+
+print '<br>';
+
+print img_picto('', 'supplier_invoice', 'class="pictofixedwidth"').$langs->trans("EnableInvoiceImport").' ';
+print $form->selectyesno("EINVOICING_DISABLE_SYNC_AP_TO_DOLI", GETPOSTISSET("EINVOICING_DISABLE_SYNC_AP_TO_DOLI") ? GETPOSTINT("EINVOIC
+NG_DISABLE_SYNC_AP_TO_DOLI") : !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI'), 1, false, 0, 1);
 print '<br>';
 
 print '</div>';
