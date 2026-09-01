@@ -879,6 +879,12 @@ $deliveryDate = !empty($deliveryDateList)
 $vatOnDebits      = einvoicingVatOnDebits();
 $vatPointDateCode = einvoicingVatPointDateCode($hasProductLine, $hasServiceLine, $object->type == $object::TYPE_DEPOSIT);
 
+// A postal address is one free text field in Dolibarr and three terms in EN 16931 (BT-35/36/162 for
+// the seller, BT-50/51/163 for the buyer). Handing the whole field to the first of them puts raw
+// newlines inside a single element, which the receiving side renders as one run-on line (issue #683).
+$sellerAddressLines = $einvoicing->splitAddressLines($mysoc->address ?? '');
+$buyerAddressLines  = $einvoicing->splitAddressLines($buyerAddress);
+
 // Filling $invoiceData (based on $invoiceTemplate)
 $invoiceData = [
 	// Document part
@@ -920,9 +926,9 @@ $invoiceData = [
 	'sellername'                => $mysoc->name,
 	'sellerids'                 => $myidprof,
 
-	'sellerlineone'             => $mysoc->address      ?? 'ADDRESS EMPTY',
-	'sellerlinetwo'             => "",
-	'sellerlinethree'           => "",
+	'sellerlineone'             => $sellerAddressLines[0] !== '' ? $sellerAddressLines[0] : 'ADDRESS EMPTY',
+	'sellerlinetwo'             => $sellerAddressLines[1],
+	'sellerlinethree'           => $sellerAddressLines[2],
 	'sellerpostcode'            => $mysoc->zip          ?? 'ZIP EMPTY',
 	'sellercity'                => $mysoc->town         ?? 'NO TOWN',
 	'sellercountry'             => $mysoc->country_code ?? 'COUNTRY NOT SET',
@@ -952,9 +958,9 @@ $invoiceData = [
 	'buyername'                 =>  $buyerName ?: 'CUSTOMER',
 	'buyerids'                  => $idprof ?: 'IDPROF',
 
-	'buyerlineone'              => $buyerAddress     ?: 'ADDRESS',
-	'buyerlinetwo'              => "",
-	'buyerlinethree'            => "",
+	'buyerlineone'              => $buyerAddressLines[0] !== '' ? $buyerAddressLines[0] : 'ADDRESS',
+	'buyerlinetwo'              => $buyerAddressLines[1],
+	'buyerlinethree'            => $buyerAddressLines[2],
 	'buyerpostcode'             => $buyerZip         ?: 'ZIP',
 	'buyercity'                 => $buyerTown        ?: 'TOWN',
 	'buyercountry'              => $buyerCountryCode ?: 'COUNTRY',
@@ -1035,7 +1041,16 @@ if ($object->mode_reglement_code) {
 // buildShipToTradePartyBuilder function only emits the node when the resolved address
 // actually differs from the buyer (bill-to) address and carries a country code; otherwise it falls
 // back to the buyer party. Nothing resolved => keys stay unset => ship-to = buyer is preserved.
+//
+// A shipping contact is a person, and BT-70 is the name of a party: what the document has to name is
+// the company the delivery is made to. The core says the same, and says it in the shipping frame of
+// the invoice PDF - pdfBuildThirdpartyName() given a Contact returns the name of its thirdparty, and
+// pdf_build_address() reads the address of the contact when it carries one, else the address of the
+// company the contact belongs to (core/lib/pdf.lib.php). einvoicingShipToFromContact() below builds
+// BG-15 the same way, so the XML and the PDF of one invoice no longer name two different things
+// (issue #683).
 $shipAddress = null;
+
 if (method_exists($object, 'liste_contact')) {
 	$shipContacts = $object->liste_contact(-1, 'external', 0, 'SHIPPING');
 	if (is_array($shipContacts) && count($shipContacts) > 0) {
@@ -1045,17 +1060,7 @@ if (method_exists($object, 'liste_contact')) {
 		require_once DOL_DOCUMENT_ROOT . '/contact/class/contact.class.php';
 		$shipContact = new Contact($db);
 		if ($shipContact->fetch($shipContacts[0]['id']) > 0) {
-			$shipName = trim($shipContact->getFullName($outputlangs));
-			if ($shipName === '') {
-				$shipName = $object->thirdparty->name;
-			}
-			$shipAddress = array(
-				'name'    => $shipName,
-				'address' => $shipContact->address,
-				'zip'     => $shipContact->zip,
-				'town'    => $shipContact->town,
-				'country' => $shipContact->country_code,
-			);
+			$shipAddress = einvoicingShipToFromContact($shipContact, $object->thirdparty, $outputlangs, $db);
 		}
 	}
 }
@@ -1069,17 +1074,7 @@ if ($shipAddress === null && !empty($object->linkedObjectsIds['shipping']) && is
 		if ($tmpexpedition->fetch($expeditionId) > 0 && !empty($tmpexpedition->fk_delivery_address)) {
 			$shipContact = new Contact($db);
 			if ($shipContact->fetch((int) $tmpexpedition->fk_delivery_address) > 0) {
-				$shipName = trim($shipContact->getFullName($outputlangs));
-				if ($shipName === '') {
-					$shipName = $object->thirdparty->name;
-				}
-				$shipAddress = array(
-					'name'    => $shipName,
-					'address' => $shipContact->address,
-					'zip'     => $shipContact->zip,
-					'town'    => $shipContact->town,
-					'country' => $shipContact->country_code,
-				);
+				$shipAddress = einvoicingShipToFromContact($shipContact, $object->thirdparty, $outputlangs, $db);
 				break;
 			}
 		}
@@ -1093,6 +1088,12 @@ if ($shipAddress !== null) {
 		'town'    => $object->thirdparty->town,
 		'country' => $object->thirdparty->country_code,
 	);
+	// Split here rather than in the writer, so the three address terms of a party are decided in one
+	// place for the seller, the buyer and the deliver-to party alike.
+	$shipAddressLines = $einvoicing->splitAddressLines($shipAddress['address']);
+	$shipAddress['lineone']   = $shipAddressLines[0];
+	$shipAddress['linetwo']   = $shipAddressLines[1];
+	$shipAddress['linethree'] = $shipAddressLines[2];
 	$invoiceData['_shipFromContactShip'] = $shipAddress;
 }
 
