@@ -1,0 +1,129 @@
+---
+# Attaches the installable package of the einvoicing module to the GitHub release of its tag, so a
+# version has one artifact everybody can point at.
+#
+# Why this exists: the archive GitHub generates for a tag is the whole repository, under a root
+# directory named after the tag. Dolibarr refuses it twice over - the deployment screen matches the
+# file name against /^(module[a-zA-Z0-9]*_|theme_|).*\-([0-9][0-9\.]*)(\s\(\d+\)\s)?\.zip$/i, which
+# "einvoicing_1.1.0.zip" does not satisfy, and unpacking it would not put an "einvoicing" directory
+# in htdocs/custom. The package people can install is the one dev/build/makepack-modules.php builds,
+# and nothing published it: it is committed under dev/build/bin/ and uploaded to Dolistore by hand,
+# which is how a 1.0.4 package came to be served while the catalogue announced 1.1.0 (issue #703).
+#
+# The job builds with that same script - the one that produces what ships - so the release carries
+# the package that was tested, not a second build made another way. It packages what the tag already
+# contains and never edits a file of the module.
+on:
+  push:
+    tags:
+      - 'einvoicing_*'
+
+  # Lets a maintainer build the package of any branch without publishing anything, to check what a
+  # release would ship.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+
+    steps:
+      # makepack-modules.php stamps the package with the commit it was built from, so the checkout
+      # needs a repository and not only the files.
+      - uses: actions/checkout@v6
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.3
+          extensions: zip
+
+      # The tag carries the version after the underscore ("einvoicing_1.1.0"), the module carries it
+      # in its VERSION file, and the descriptor reads that file at runtime. Two sources, so check
+      # they agree before anything is published under that number.
+      - name: Check the tag and the VERSION file agree
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          set -euo pipefail
+          file_version=$(tr -d '[:space:]' < einvoicing/VERSION)
+          tag_version=${GITHUB_REF_NAME#einvoicing_}
+          echo "VERSION file: $file_version, tag: $tag_version"
+          if [ "$file_version" != "$tag_version" ]; then
+            echo "::error::einvoicing/VERSION says $file_version but the tag says $tag_version"
+            exit 1
+          fi
+
+      - name: Build the module package
+        id: build
+        run: |
+          set -euo pipefail
+          version=$(tr -d '[:space:]' < einvoicing/VERSION)
+          package="dev/build/bin/module_einvoicing-$version.zip"
+          # The script leaves a package alone when a tag already names its version - which is always
+          # the case here, since a tag is what started the job. Removing it asks for the rebuild.
+          rm -f "$package"
+          php dev/build/makepack-modules.php makezip einvoicing
+          if [ ! -f "$package" ]; then
+            echo "::error::makepack-modules.php produced no $package"
+            ls -l dev/build/bin/ || true
+            exit 1
+          fi
+          echo "package=$package" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      # A package that misses one of these installs, then makes the module - and the page listing the
+      # modules with it - fatal on the next request. That is what #537 was, and it is cheap to check.
+      - name: Check the package can be installed
+        run: |
+          set -euo pipefail
+          package='${{ steps.build.outputs.package }}'
+          entries=$(unzip -Z1 "$package")
+          for entry in einvoicing/VERSION \
+                       einvoicing/COMMIT \
+                       einvoicing/COPYING \
+                       einvoicing/index.yaml \
+                       einvoicing/core/modules/modEInvoicing.class.php \
+                       einvoicing/compat/functions.lib.php \
+                       einvoicing/vendor/autoload.php; do
+            if ! grep -qFx "$entry" <<< "$entries"; then
+              echo "::error::$entry is missing from the package"
+              exit 1
+            fi
+          done
+          # Everything must sit under a single "einvoicing/" directory: that is what is unpacked into
+          # htdocs/custom, and a package rooted anywhere else installs a module Dolibarr cannot see.
+          outside=$(grep -v '^einvoicing/' <<< "$entries" || true)
+          if [ -n "$outside" ]; then
+            echo "::error::the package holds entries outside of einvoicing/"
+            head <<< "$outside"
+            exit 1
+          fi
+          echo "$(wc -l <<< "$entries") entries, $(du -h "$package" | cut -f1)"
+
+      - name: Upload the package as a build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: module_einvoicing-${{ steps.build.outputs.version }}
+          path: ${{ steps.build.outputs.package }}
+          if-no-files-found: error
+
+      # The asset keeps the name the builder gave it, the one the deployment screen accepts.
+      - name: Attach the package to the release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" \
+              --title "EInvoicing ${{ steps.build.outputs.version }}" \
+              --notes "Installable package of the einvoicing module, to deploy from Home - Setup - Modules." \
+              --verify-tag
+          fi
+          gh release upload "$GITHUB_REF_NAME" '${{ steps.build.outputs.package }}' --clobber
