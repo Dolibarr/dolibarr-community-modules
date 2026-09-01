@@ -1748,7 +1748,7 @@ class EInvoicing
 				var countCheckInvoiceStatus = 1;
 
                 function checkInvoiceStatus() {
-					console.log(\'checkInvoiceStatus Checking invoice status (try \'+countCheckInvoiceStatus+\') to url '.dol_escape_js($urlajax).'...\');
+					console.log(\'checkInvoiceStatus Last LC message for invoice is STATUS_AWAITING_VALIDATION, so we check invoice status (try \'+countCheckInvoiceStatus+\') to url '.dol_escape_js($urlajax).'...\');
 
                     $.get("' . $urlajax . '", {
                         token: "' . currentToken() . '",
@@ -1962,7 +1962,8 @@ class EInvoicing
 
 			// Get last sent status to know if we need to add the JavaScript for real time update of status and to display last sent status validation if it is pending or in error
 			$lastSentStatus = array();
-			$sql = "SELECT lc_status, lc_status_message, lc_validation_status, lc_validation_message FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
+			$sql = "SELECT lc_status, lc_status_message, lc_validation_status, lc_validation_message";
+			$sql .= " FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
 			$sql .= " WHERE element_type = '" . $this->db->escape($object->element) . "'";
 			$sql .= " AND element_id = " . (int) $object->id;
 			$sql .= " ORDER BY rowid DESC LIMIT 1";
@@ -2008,7 +2009,7 @@ class EInvoicing
 						var countCheckInvoiceStatus = 1;
 
                         function checkSupplierInvoiceStatus() {
-                            console.log("checkSupplierInvoiceStatus Status is STATUS_AWAITING_VALIDATION, so we call API to check last status. Attempt no " + countCheckInvoiceStatus + "...");
+                            console.log("checkSupplierInvoiceStatus Last LC message for invoice is STATUS_AWAITING_VALIDATION, so we check invoice status (try " + countCheckInvoiceStatus + ") to url '.dol_escape_js($urlajax).'...");
 
                             $.get("' . $urlajax . '", {
                                 token: "' . currentToken() . '",
@@ -2040,14 +2041,16 @@ class EInvoicing
                                 if (data.statusvalidationlabel === "Pending") {
 									countCheckInvoiceStatus++;
 									if (countCheckInvoiceStatus <= 3) {
-                                    	setTimeout(checkSupplierInvoiceStatus, 5000);
+		                            	setTimeout(checkInvoiceStatus, 5000);
+									} else if (countCheckInvoiceStatus <= 5) {
+		                            	setTimeout(checkInvoiceStatus, 10000);
 									}
                                 }
                             }, "json");
                         }
 
                         // First call
-                        console.log("checkSupplierInvoiceStatus Invoice has status pending, so we add a timer to run checkInvoiceStatus in few seconds...");
+                        console.log("checkSupplierInvoiceStatus Invoice has status pending, so we add a timer to run checkInvoiceStatus in 2.5 seconds...");
                         setTimeout(checkSupplierInvoiceStatus, 2500);
 
                     })();
