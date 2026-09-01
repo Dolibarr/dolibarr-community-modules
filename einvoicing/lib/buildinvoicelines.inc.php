@@ -726,6 +726,79 @@ foreach ($object->lines as $line) {
 	$numligne++;
 }
 
+// A situation invoice states, on each of its lines, the cumulative amount of the work done, and the
+// core deducts the situations already invoiced from the header of the invoice
+// (CommonObject::update_price(), block "Situations totals"): llx_facture.total_ttc holds the
+// instalment, which is what the customer owes and what the payment screen expects. The document has
+// to state the same amount, so what the previous situations already asked for is carried as a
+// document level allowance: the lines keep saying what has been done, BT-106 keeps summing them, and
+// BT-107 brings BT-109 (and the VAT breakdown with it) back onto the instalment (issue #674).
+// The amount deducted for a line is the one its predecessor recorded, read from the invoice that
+// carries it - not recomputed here, so the document deducts exactly what was invoiced before, cents
+// included.
+// With INVOICE_USE_SITUATION = 2 each invoice states its own share of the progress, the core deducts
+// nothing and the lines already hold the instalment: there is nothing to deduct.
+if (!empty($object->situation_counter) && $object->situation_counter > 1
+	&& isset($object->type) && $object->type == $object::TYPE_SITUATION
+	&& getDolGlobalInt('INVOICE_USE_SITUATION') == 1) {
+	$previousSituations = array();		// Amounts already invoiced, per VAT rate of the current line
+	foreach ($object->lines as $line) {
+		if (empty($line->fk_prev_id)) {
+			continue;					// A line that appears in this situation was never invoiced before
+		}
+		$sqlprev = "SELECT total_ht, total_tva FROM " . MAIN_DB_PREFIX . "facturedet WHERE rowid = " . ((int) $line->fk_prev_id);
+		$resqlprev = $db->query($sqlprev);
+		if (!$resqlprev) {
+			dol_syslog("EInvoicing cannot read the previous situation line " . $line->fk_prev_id . ": " . $db->lasterror(), LOG_ERR);
+			continue;
+		}
+		$objprev = $db->fetch_object($resqlprev);
+		$db->free($resqlprev);
+		if (empty($objprev) || (empty($objprev->total_ht) && empty($objprev->total_tva))) {
+			continue;
+		}
+
+		// The allowance reduces the basis of a VAT rate of THIS invoice, so it is filed under the rate
+		// of the line as it stands now, which is the one the breakdown knows.
+		$keyforvatrate = $line->tva_tx . ($line->vat_src_code ? ' (' . $line->vat_src_code . ')' : '');
+		if (!isset($taxBreakdown[$keyforvatrate])) {
+			continue;
+		}
+		if (!isset($previousSituations[$keyforvatrate])) {
+			$previousSituations[$keyforvatrate] = array('ht' => 0, 'tva' => 0);
+		}
+		$previousSituations[$keyforvatrate]['ht'] += (float) $objprev->total_ht;
+		$previousSituations[$keyforvatrate]['tva'] += (float) $objprev->total_tva;
+	}
+
+	foreach ($previousSituations as $keyforvatrate => $alreadyinvoiced) {
+		$deduction_ht = (float) price2num($alreadyinvoiced['ht'], 2);
+		$deduction_tva = (float) price2num($alreadyinvoiced['tva'], 2);
+
+		$globalDiscounts[] = array(
+			'value' => $deduction_ht,
+			'reason' => $langs->transnoentitiesnoconv('EInvoicingDeductionOfPreviousSituations'),
+			'taxRate' => (float) $taxBreakdown[$keyforvatrate]['tva_tx'],
+			'categoryVAT' => $taxBreakdown[$keyforvatrate]['categoryVAT'],
+		);
+
+		$taxBreakdown[$keyforvatrate]['totalHT'] -= $deduction_ht;
+		$taxBreakdown[$keyforvatrate]['totalTVA'] -= $deduction_tva;
+
+		$grand_total_ht -= $deduction_ht;
+		$grand_total_tva -= $deduction_tva;
+		$grand_total_ttc -= ($deduction_ht + $deduction_tva);
+	}
+
+	// The deduction is built line by line while the core builds it invoice by invoice: they agree on
+	// every shape met so far, and a gap would mean the document is claiming something the invoice does
+	// not. Say so rather than transmit it silently.
+	if (isset($object->total_ht) && abs($grand_total_ht - (float) $object->total_ht) > 0.01) {
+		dol_syslog("EInvoicing situation invoice " . $object->ref . ": the deduction of the previous situations gives "
+			. $grand_total_ht . " where the invoice records " . $object->total_ht, LOG_WARNING);
+	}
+}
+
 // Rounding convention of the totals.
 // Dolibarr sums the amounts already rounded on each line ("total of round", the default), unless
 // MAIN_ROUNDOFTOTAL_NOT_TOTALOFROUND is set, in which case it rounds the sum instead ("round of
