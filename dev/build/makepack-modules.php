@@ -506,6 +506,23 @@ function buildModulePackages($action, $modulename)
 		}
 
 
+		// Stamp the package with the commit it was built from. A zip carries no repository, so
+		// this is the only moment where that commit can be known; the einvoicing module reads
+		// the file back to name its sources in the XML it generates (issue #686). The commit is
+		// kept out of VERSION on purpose: that file is compared with version_compare() by the
+		// core and names both the zip and the release tag here.
+		$commitoutput = array();
+		$returnCode = 0;
+		exec('git rev-parse --short HEAD 2>/dev/null', $commitoutput, $returnCode);
+		if ($returnCode === 0 && !empty($commitoutput[0])) {
+			$commit = trim($commitoutput[0]);
+			print "Stamp package with commit ".$commit."\n";
+			file_put_contents($dst . '/COMMIT', $commit."\n");
+		} else {
+			print "Could not read the current commit, the package is not stamped\n";
+		}
+
+
 		$z = new ZipArchive();
 		$z->open($outzip, ZIPARCHIVE::CREATE);
 		zipDir($tmpdir, $z, $tmpdir . '/');

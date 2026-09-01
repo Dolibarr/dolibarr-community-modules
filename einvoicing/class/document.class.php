@@ -1225,7 +1225,7 @@ class Document extends CommonObject
 
 		if (isset($provider)) {
 			$syncFromDate = $provider->getLastSyncDate();
-			$maxflows = (int) getDolGlobalString('EINVOICING_MAX_SYNC_FLOWS', 0);
+			$maxflows = getDolGlobalInt('EINVOICING_FLOWS_SYNC_CALL_SIZE', 100);
 
 			// Sync all flows
 			$sync_result = $provider->syncFlows($syncFromDate, $maxflows);

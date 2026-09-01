@@ -521,6 +521,22 @@ class EInvoicing
 	 */
 	public const EXTRAFIELD_BUYER_ORDER_REFERENCE = 'buyer_order_reference';
 
+	/**
+	 * Name, into llx_einvoicing_extrafields, of the buyer reference (BT-10): a reference owned by the
+	 * buyer, used to route the invoice inside its own organisation (business unit, service reference,
+	 * internal mailbox...). A plain EN 16931 core term, unrelated to the public sector, so it is kept
+	 * per invoice and offered whatever the Chorus Pro option (issue #678).
+	 */
+	public const EXTRAFIELD_BUYER_REFERENCE = 'buyer_reference';
+
+	/**
+	 * ISO/IEC 6523 scheme identifier of the French routing code ("code de routage"), the scheme the
+	 * Chorus Pro "code service exécutant" is declared under as BT-46 by BR-FR-CPRO-11 and
+	 * BR-FR-CPRO-13 of XP Z12-012. Not to be confused with 0225 (e-invoice address) nor with 0002 /
+	 * 0009 (SIREN / SIRET), which identify the legal entity itself.
+	 */
+	public const SCHEME_FR_ROUTING_CODE = '0224';
+
 
 	/**
 	 * Constructor
@@ -1682,6 +1698,35 @@ class EInvoicing
 			}
 		}
 
+		// Buyer reference (BT-10): the reference the buyer uses to route the invoice inside its own
+		// organisation (business unit, service reference, internal mailbox...). A core EN 16931 term,
+		// so it is offered on every invoice, with no dependency on the Chorus Pro option (issue #678).
+		// Stored into llx_einvoicing_extrafields rather than a core extrafield, which an admin or a
+		// user could rename, empty or delete.
+		if (($object->element == 'facture' || $object->element == 'invoice') && $object->id > 0) {
+			$currentBuyerReference = (string) $this->getExtraFieldValue($object->id, $object->element, self::EXTRAFIELD_BUYER_REFERENCE);
+			$resprints .= '<tr class="treinvoicing_collapseseparator">';
+			$resprints .= '<td>';
+			$resprints .= $form->editfieldkey($form->textwithpicto($langs->trans("EInvoiceBuyerReference"), $langs->trans("EInvoiceBuyerReferenceHelp")), 'einvoice_buyer_reference', '', $object, (int) $editenable);
+			$resprints .= '</td>';
+			$resprints .= '<td>';
+			if ($action == 'editeinvoice_buyer_reference' && $editenable) {
+				$resprints .= '<form name="setbuyerreference" action="' . $_SERVER["PHP_SELF"] . '?id=' . $object->id . '" method="post">';
+				$resprints .= '<input type="hidden" name="token" value="' . newToken() . '">';
+				$resprints .= '<input type="hidden" name="action" value="setbuyerreference">';
+				$resprints .= '<input type="hidden" name="page_y" value="page_y">';
+				$resprints .= '<input type="text" name="einvoice_buyer_reference" class="minwidth200" maxlength="255" value="' . dol_escape_htmltag($currentBuyerReference) . '">';
+				$resprints .= '<input type="submit" class="button button-edit smallpaddingimp reposition" value="' . $langs->trans('Modify') . '">';
+				$resprints .= '</form>';
+			} elseif ($currentBuyerReference !== '') {
+				$resprints .= dol_escape_htmltag($currentBuyerReference);
+			} else {
+				$resprints .= '<span class="opacitymedium">' . $langs->trans("NotDefined") . '</span>';
+			}
+			$resprints .= '</td>';
+			$resprints .= '</tr>';
+		}
+
 		// If current status requires a reason, display it
 		if (!empty($currentStatusInfo['reasonCode'])) {
 			$reasonLabel = self::REASONS[$currentStatusInfo['reasonCode']]['label'] ?? $currentStatusInfo['reasonCode'];
@@ -2444,7 +2489,10 @@ class EInvoicing
 			}
 
 			if (!empty($tmpstatus)) {
-				$status = $tmpstatus;
+				// Merged, not replaced: the row read from the table does not carry every key of the default
+				// answer - 'file' in particular is set further down - and a caller reading a key the row does
+				// not define would get an "Undefined array key" warning.
+				$status = array_merge($status, $tmpstatus);
 			}
 
 			if (empty($foundforanotherprovider) && empty($foundforcurrentprovider)) {
@@ -2481,6 +2529,15 @@ class EInvoicing
 				$status['code'] = self::STATUS_GENERATED;
 				$status['status'] = $this->getStatusLabel(self::STATUS_GENERATED);
 			}
+		} elseif (!empty($einvoicefilepath) && $status['code'] == self::STATUS_GENERATED && empty($status['everTransmitted'])) {
+			// Symmetrical to the promotion above. "Generated (ready to send)" is written in the table when the
+			// invoice carried no status row at generation time - an invoice that predates the module on the
+			// base - and nothing ever cleared it, so deleting the e-invoice file left the card announcing a
+			// document that does not exist any more. An invoice that already reached the Access Point keeps
+			// its status: the document it announces exists there, whatever is left on disk.
+			$status['code'] = self::STATUS_NOT_GENERATED;
+			$status['status'] = $this->getStatusLabel(self::STATUS_NOT_GENERATED);
+			$status['info'] = '';	// The stored comment explains the status we just stopped reporting
 		}
 
 		return $status;
