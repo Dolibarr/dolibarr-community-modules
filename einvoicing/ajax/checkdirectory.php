@@ -150,6 +150,13 @@ function einvoicing_directory_html($r, $siren)
 				$txt .= ' <span class="opacitymedium small">('.implode(' - ', $details).')</span>';
 			}
 			return img_picto('', 'tick', 'class="color-green paddingright"').$txt;
+		case 'unknownaddress':
+			// The recipient may well be reachable at another address; this invoice is not addressed to
+			// it. Saying "reachable" here, on the strength of a line the document does not carry, is
+			// exactly the answer that lets a transmission leave for a rejection (fr:213). The address
+			// is named so the user can compare it with the annuaire, and correct the routing record
+			// rather than wonder which of the two the badge was talking about.
+			return img_picto('', 'error', 'class="color-red paddingright"').$langs->trans("EInvoicingDirectoryAddressNotDeclared", (string) ($r['identifier'] ?? ''), $siren);
 		case 'absent':
 			return img_picto('', 'error', 'class="color-red paddingright"').$langs->trans("EInvoicingDirectoryAbsent", $siren);
 		case 'inactive':
@@ -245,8 +252,17 @@ if (!is_object($provider)) {
 	exit;
 }
 
-$r = $provider->checkRecipientDirectory($siren);
+// The badge must answer about the address this invoice is sent to, so it asks for it the same way the
+// generation does: invoice-level override first, then the third-party default routing, then the SIREN.
+// Reading only the SIREN told the user a recipient was reachable while the document went to a
+// SIRET-suffixed address the check had never looked at.
+require_once "../class/einvoicing.class.php";
+$einvoicing = new EInvoicing($db);
+$routingid = $einvoicing->getBuyerCommunicationURI($invoice->thirdparty, $invoice);
+
+$r = $provider->checkRecipientDirectory($siren, $routingid);
 $r['siren'] = $siren;
+$r['routingid'] = $routingid;
 $r['html'] = einvoicing_directory_html($r, $siren);
 
 print json_encode($r);

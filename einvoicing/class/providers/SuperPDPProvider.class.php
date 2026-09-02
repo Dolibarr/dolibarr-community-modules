@@ -1507,24 +1507,26 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 * Service (XP Z12-013) handled by the parent, and falling back to the SuperPDP specific
 	 * french_directory endpoint only when the standardized lookup is not available.
 	 *
-	 * @param 	string 	$idprof1 	Recipient SIREN (idprof1)
+	 * @param 	string 	$idprof1 				Recipient SIREN (idprof1)
+	 * @param 	string 	$addressingidentifier 	Routing address the invoice is actually sent to (BT-49), empty to answer on any line of the SIREN
 	 * @return 	array{status:string,reachable:int,entries:int,active:int,unknown:int,identifier:string,linestatus:string,platform:string,effectivedate:int,message:string,messageparam:string,httpcode:int}
 	 */
-	public function checkRecipientDirectory($idprof1)
+	public function checkRecipientDirectory($idprof1, $addressingidentifier = '')
 	{
 		// Standardized AFNOR directory check first (works for any conformant Approved Platform).
-		$result = parent::checkRecipientDirectory($idprof1);
-		if (in_array($result['status'], array('routable', 'inactive', 'absent'), true)) {
+		$result = parent::checkRecipientDirectory($idprof1, $addressingidentifier);
+		if (in_array($result['status'], array('routable', 'inactive', 'absent', 'unknownaddress'), true)) {
 			// The standardized answer carried the line status: it decides, and nothing else may
 			// override it. This is what keeps the specific endpoint from re-introducing a wrong
-			// positive on a line the annuaire reports as not open.
+			// positive on a line the annuaire reports as not open - or on a line other than the one
+			// the invoice is addressed to, which the standardized answer just reported as undeclared.
 			return $result;
 		}
 		if ($result['status'] === 'undetermined') {
 			// Lines exist for that SIREN but the platform did not report their status, and it cannot be
 			// asked for it. Its own directory endpoint does carry that information: use it to settle the
 			// answer instead of leaving the user with a shrug.
-			return $this->settleUndeterminedDirectory($idprof1, $result);
+			return $this->settleUndeterminedDirectory($idprof1, $result, $addressingidentifier);
 		}
 
 		// Standardized lookup unavailable or errored: fall back to the SuperPDP specific endpoint.
@@ -1533,7 +1535,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		// reads as a verdict on the recipient, when what it really reports is a call that did not go
 		// through on this instance. Issue #698 was exactly that misreading, and it cost a round trip
 		// with the recipient's platform before the API call log settled it.
-		$legacy = $this->checkRecipientDirectoryLegacy($idprof1);
+		$legacy = $this->checkRecipientDirectoryLegacy($idprof1, $addressingidentifier);
 		if ($legacy['status'] !== 'error') {
 			// Only when the fallback itself answered: its own error message is what the caller must
 			// display in that case, and overwriting it would hide the reason of the second failure.
@@ -1567,13 +1569,22 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 * The boolean does not tell a line waiting for its effective date from a closed one, so a negative
 	 * verdict says the recipient cannot receive without claiming which of the two it is.
 	 *
-	 * @param 	string 	$idprof1 	Recipient SIREN (idprof1)
+	 * @param 	string 	$idprof1 				Recipient SIREN (idprof1)
 	 * @param 	array{status:string,reachable:int,entries:int,active:int,unknown:int,identifier:string,linestatus:string,platform:string,effectivedate:int,message:string,messageparam:string,httpcode:int} 	$result 	Non-conclusive result of the standardized check
+	 * @param 	string 	$addressingidentifier 	Routing address the invoice is actually sent to (BT-49), empty to settle on any entry of the SIREN
 	 * @return 	array{status:string,reachable:int,entries:int,active:int,unknown:int,identifier:string,linestatus:string,platform:string,effectivedate:int,message:string,messageparam:string,httpcode:int}
 	 */
-	private function settleUndeterminedDirectory($idprof1, $result)
+	private function settleUndeterminedDirectory($idprof1, $result, $addressingidentifier = '')
 	{
-		$legacy = $this->checkRecipientDirectoryLegacy($idprof1);
+		$legacy = $this->checkRecipientDirectoryLegacy($idprof1, $addressingidentifier);
+
+		if ($legacy['status'] === 'unknownaddress') {
+			// The specific endpoint knows this SIREN but not the address the invoice is sent to. It is
+			// the weaker of the two answers, so it does not get to turn a non-conclusive standardized
+			// answer into a negative verdict: the address stays undetermined, and the caller keeps
+			// failing open on it.
+			return $result;
+		}
 
 		if ($legacy['entries'] == 0 || $legacy['status'] === 'error') {
 			// Nothing to settle with: the specific endpoint failed, or knows no entry for a SIREN the
@@ -1613,10 +1624,11 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 * from one that is merely declared with a future effective date: it cannot conclude 'routable' on
 	 * its own, see below.
 	 *
-	 * @param 	string 	$idprof1 	Recipient SIREN (idprof1)
+	 * @param 	string 	$idprof1 				Recipient SIREN (idprof1)
+	 * @param 	string 	$addressingidentifier 	Routing address the invoice is actually sent to (BT-49), empty to answer on any entry of the SIREN
 	 * @return 	array{status:string,reachable:int,entries:int,active:int,unknown:int,identifier:string,linestatus:string,platform:string,effectivedate:int,message:string,messageparam:string,httpcode:int}
 	 */
-	private function checkRecipientDirectoryLegacy($idprof1)
+	private function checkRecipientDirectoryLegacy($idprof1, $addressingidentifier = '')
 	{
 		$result = array('status' => 'error', 'reachable' => -1, 'entries' => 0, 'active' => 0, 'unknown' => 0, 'identifier' => '', 'linestatus' => '', 'platform' => '', 'effectivedate' => 0, 'message' => '', 'messageparam' => '', 'httpcode' => 0);
 
@@ -1640,6 +1652,22 @@ class SuperPDPProvider extends AbstractPDPProvider
 			$data = $response['response']['data'];
 		}
 		$result['entries'] = count($data);
+
+		if ($result['entries'] > 0 && ($wanted = self::normalizeAddressingIdentifier($addressingidentifier)) !== '') {
+			// Same rule as the standardized lookup: answer about the address the invoice carries, not
+			// about a sibling entry of the same SIREN. This endpoint qualifies its identifiers with the
+			// scheme ('0225:<siren>'), which the normalization strips before comparing.
+			$data = array_values(array_filter($data, function ($entry) use ($wanted) {
+				return self::normalizeAddressingIdentifier(isset($entry['identifier']) ? $entry['identifier'] : '') === $wanted;
+			}));
+			if (empty($data)) {
+				$result['status'] = 'unknownaddress';
+				$result['reachable'] = 0;
+				$result['identifier'] = $wanted;
+				return $result;
+			}
+		}
+
 		$upcoming = 0;
 		$upcomingdate = 0;
 		foreach ($data as $entry) {
