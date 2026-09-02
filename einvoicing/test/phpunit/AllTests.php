@@ -121,6 +121,8 @@ class AllTests
 		$suite->addTestSuite('EInvoicingSamplesTest');
 		require_once dirname(__FILE__).'/InvoicingPeriodTest.php';
 		$suite->addTestSuite('InvoicingPeriodTest');
+		require_once dirname(__FILE__).'/LineWithoutQuantityTest.php';
+		$suite->addTestSuite('LineWithoutQuantityTest');
 		require_once dirname(__FILE__).'/PDPProviderManagerTest.php';
 		$suite->addTestSuite('PDPProviderManagerTest');
 		require_once dirname(__FILE__).'/RecipientDirectoryTest.php';
