@@ -32,9 +32,8 @@ if (!defined('NOREQUIREHTML')) {
 if (!defined('NOREQUIREAJAX')) {
 	define('NOREQUIREAJAX', '1');
 }
-if (!defined('NOREQUIRESOC')) {
-	define('NOREQUIRESOC', '1');
-}
+// NOREQUIRESOC is deliberately not defined here: this endpoint builds a PDPProviderManager, which reads
+// $mysoc->country_code to decide the list of providers, so $mysoc must exist.
 if (!defined('NOCSRFCHECK')) {
 	define('NOCSRFCHECK', '1');
 }
