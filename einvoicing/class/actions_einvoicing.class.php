@@ -2230,10 +2230,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 * Add a link to the read-only XML viewer on the line of the e-invoice file, in the document list
 	 * of an invoice card (issue #687).
 	 *
-	 * The core does not offer a preview on that line: dolIsAllowedForPreview() whitelists a fixed list
-	 * of mime subtypes that contains neither xml nor the Factur-X pdf carrying the xml, so
-	 * FormFile::showPreview() renders nothing for those files. This hook is executed once per file
-	 * line, which is where the link belongs.
+	 * The core offers no preview there: dolIsAllowedForPreview() whitelists mime subtypes that hold
+	 * neither xml nor the Factur-X pdf. This hook runs once per file line, which is where the link goes.
 	 *
 	 * @param array{colspan:int,socid:int|string,id:int|string,modulepart:string,relativepath:string}	$parameters		Array of parameters
 	 * @param array<string,mixed>																		$object			The file of the line being rendered
@@ -2243,7 +2241,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 */
 	public function formBuilddocLineOptions($parameters, $object, &$action, $hookmanager)
 	{
-		global $db, $langs, $user;
+		global $langs, $user;
 
 		$this->resprints = '';
 
@@ -2255,34 +2253,23 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		}
 
 		// Only the line of the XML. The PDF of the core, and the Factur-X one, are previewed by the core
-		// itself and have nothing to gain here. The name is checked first because it costs nothing, then
-		// the module is asked for the file it holds for this invoice, and the line is completed only if
-		// the two are the same file.
-		$einvoicing = new EInvoicing($db);
+		// itself and have nothing to gain here. The line is recognised by the name the module gives the
+		// file it writes, which costs nothing: the viewer resolves the path of the file on its own, and
+		// prints nothing if it does not find it.
 		if ($modulepart == 'facture') {
-			// Sent to a customer: <ref>/<ref>_cii.xml, so the directory names the invoice
+			// Sent to a customer: <ref>/<ref>_cii.xml, the name EInvoicing::getEInvoiceXmlFilePath() builds
 			if (!$user->hasRight('facture', 'lire') || substr($relativepath, -8) !== '_cii.xml') {
 				return 0;
 			}
-			$xmlfile = $einvoicing->getEInvoiceXmlFilePath(basename(dirname($relativepath)));
 			$urlparam = '';
 		} elseif ($modulepart == 'facture_fournisseur') {
-			// Received from a supplier: the file is named after the reference of the supplier, so the
-			// invoice has to be read to know it
+			// Received from a supplier: <ref supplier>_einvoice.xml, the name
+			// CIIProtocol::saveEInvoiceFileToSupplierInvoiceAttachment() gives the file it saves
 			if (!$user->hasRight('fournisseur', 'facture', 'lire') || substr($relativepath, -13) !== '_einvoice.xml') {
 				return 0;
 			}
-			require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
-			$supplierinvoice = new FactureFournisseur($db);
-			if ($supplierinvoice->fetch($invoiceid) <= 0) {
-				return 0;
-			}
-			$xmlfile = $einvoicing->getSupplierEInvoiceXmlFilePath($supplierinvoice);
 			$urlparam = '&element=supplier';
 		} else {
-			return 0;
-		}
-		if (empty($xmlfile) || basename($xmlfile) !== basename($relativepath)) {
 			return 0;
 		}
 

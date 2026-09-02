@@ -20,17 +20,11 @@
  *		\ingroup    einvoicing
  *		\brief      Read-only viewer of the e-invoice XML of an invoice.
  *
- *		Dolibarr does not preview XML files: dolIsAllowedForPreview() whitelists a fixed list of mime
- *		subtypes that does not contain xml, and document.php serves anything outside that list as
- *		application/octet-stream. That exclusion is deliberate - an inline text/xml response served from
- *		the Dolibarr origin can carry an xml-stylesheet processing instruction and have the browser render
- *		arbitrary HTML in that origin. So the XML is not served inline here either: it is read on
- *		the server and printed escaped inside a <pre>, which shows the invoice without ever handing the
- *		browser a document it would parse.
- *
- *		Only the XML is concerned. A Factur-X e-invoice is a PDF, and a PDF Dolibarr previews on its own.
- *		The page answers for an invoice sent to a customer as well as for a document received from a
- *		supplier, which is the same need read from the other end: element=supplier asks for the second.
+ *		Dolibarr excludes XML from its preview on purpose: an inline text/xml response served from the
+ *		Dolibarr origin can carry an xml-stylesheet processing instruction and render arbitrary HTML
+ *		there. So the file is not served inline here either - it is read on the server and printed
+ *		escaped inside a <pre>. Only the XML is concerned, a Factur-X e-invoice being a PDF the core
+ *		previews itself; element=supplier asks for a document received instead of one sent.
  */
 
 // Load Dolibarr environment
@@ -80,6 +74,7 @@ if (!$res) {
 include_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
 include_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';
 dol_include_once('/einvoicing/class/einvoicing.class.php');
+dol_include_once('/einvoicing/lib/xmlhighlight.lib.php');
 
 // Load translation files required by the page
 $langs->loadLangs(array("einvoicing@einvoicing", "bills", "suppliers", "other"));
@@ -147,14 +142,10 @@ if ($xml !== '' && substr_count($xml, "\n") <= 2) {
 
 $title = $langs->trans("EInvoiceXmlPreviewTitle");
 
-// What the page has to say, whatever the mode it is asked in.
-// htmlspecialchars() and not dol_escape_htmltag(): the point of this page is to show the file as it is,
-// and dol_escape_htmltag() would not. It drops the tags it does not keep (an element named b or br would
-// disappear from the display), it turns the newlines into a literal backslash-n, and it runs
-// html_entity_decode() first, so an escaped character of the XML (&#233;) would be shown decoded instead
-// of as it is written in the file.
-// pre-wrap and not pre: the namespace declarations of a CII root element make a line several hundred
-// characters long, which would otherwise scroll the whole page sideways.
+// What the page has to say, whatever the mode it is asked in. einvoicingXmlSourceToHtml() escapes
+// every token with htmlspecialchars() and writes the only tags of the result itself, so nothing of the
+// document can act as markup. Not dol_escape_htmltag(): it drops tags, turns newlines into a literal
+// backslash-n and decodes entities, where this page has to show the file exactly as it is on disk.
 if (empty($einvoicefile)) {
 	$body = '<div class="opacitymedium">'.$langs->trans($issupplier ? "EInvoiceNoReceivedFileToPreview" : "EInvoiceNoFileToPreview").'</div>';
 } else {
@@ -163,9 +154,8 @@ if (empty($einvoicefile)) {
 		$body .= ' &mdash; '.dol_escape_htmltag($langs->trans("EInvoiceXmlReindented"));
 	}
 	$body .= '</div>';
-	$body .= '<pre style="white-space: pre-wrap; overflow-wrap: anywhere;">';
-	$body .= htmlspecialchars($xml, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-	$body .= '</pre>';
+	$body .= '<pre class="xmlsource">'.einvoicingXmlSourceToHtml($xml).'</pre>';
+	$body .= einvoicingXmlSourceCss(1, function_exists('getNonce') ? getNonce() : '');
 }
 
 if ($mode == 'raw') {
@@ -174,8 +164,8 @@ if ($mode == 'raw') {
 	top_httphead('text/html');
 	print '<!DOCTYPE html>'."\n".'<html><head><meta charset="UTF-8">';
 	print '<title>'.dol_escape_htmltag($title).'</title>';
-	print '<style>body { margin: 0; padding: 8px; font-family: monospace; font-size: 12px; }';
-	print ' pre { margin: 0; } .opacitymedium { opacity: 0.6; padding-bottom: 8px; }</style>';
+	print '<style>body { margin: 0; padding: 8px; font-family: monospace; font-size: 12px; background: #fff; }';
+	print ' .opacitymedium { opacity: 0.6; padding-bottom: 8px; }</style>';
 	print '</head><body>'.$body.'</body></html>';
 } else {
 	llxHeader('', $title, '', '', 0, 0, '', '', '', 'mod-einvoicing page-xmlpreview');
