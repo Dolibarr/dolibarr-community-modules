@@ -1397,10 +1397,20 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			if (GETPOST('search_pdplinked', 'alpha') !== '' && GETPOST('search_pdplinked', 'alpha') == getDolGlobalString('EINVOICING_PDP')) {
 				$this->resprints .= " AND ext.provider = '" . $db->escape(getDolGlobalString('EINVOICING_PDP')) . "'";
 			}
+		}
 
-			if (GETPOST('search_routing_id', 'alpha') !== '' && GETPOST('search_routing_id', 'alpha') != "") {
-				$this->resprints .= " AND ext.routing_id = '" . $db->escape(GETPOST('search_routing_id', 'alpha')) . "'";
-			}
+		// The routing identifier is a column of einvoicing_routing, and printFieldListFrom() joins that
+		// table into the thirdparty list only. Read on 'ext', the alias of einvoicing_extlinks, which
+		// holds no such column, the filter turned the page of the core into an SQL error.
+		//
+		// The filter is written on a subquery of its own rather than on the joined row: a thirdparty can
+		// hold several routing identifiers while the list shows only one of them, so a condition on the
+		// joined row would answer 'no result' for every identifier that is not the one displayed.
+		if (in_array('thirdpartylist', $contexts, true) && GETPOST('search_routing_id', 'alpha') !== '') {
+			$this->resprints .= ' AND EXISTS (SELECT 1 FROM ' . $db->prefix() . 'einvoicing_routing as subrt';
+			$this->resprints .= ' WHERE subrt.fk_soc = s.rowid';	// Alias of the thirdparty in the thirdparty list of the core
+			$this->resprints .= " AND subrt.routing_type = 'thirdparty' AND subrt.active = 1";
+			$this->resprints .= " AND subrt.routing_id = '" . $db->escape(GETPOST('search_routing_id', 'alpha')) . "')";
 		}
 
 		if (in_array('invoicelist', $contexts) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
