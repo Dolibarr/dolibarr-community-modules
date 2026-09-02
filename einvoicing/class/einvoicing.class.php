@@ -3012,8 +3012,8 @@ class EInvoicing
 
 		$db->begin();
 
-		// Check if this entry was the default
-		$sql = "SELECT is_default FROM " . $db->prefix() . "einvoicing_routing";
+		// Check if this entry was the default, and for which type of routing
+		$sql = "SELECT is_default, routing_type FROM " . $db->prefix() . "einvoicing_routing";
 		$sql .= " WHERE rowid = " . (int) $rowid;
 		$resql = $db->query($sql);
 		if (!$resql) {
@@ -3023,6 +3023,7 @@ class EInvoicing
 		}
 		$obj = $db->fetch_object($resql);
 		$wasDefault = $obj ? (int) $obj->is_default : 0;
+		$routingtype = $obj ? $obj->routing_type : '';
 		$db->free($resql);
 
 		$sql = "DELETE FROM " . $db->prefix() . "einvoicing_routing";
@@ -3033,11 +3034,15 @@ class EInvoicing
 			return -1;
 		}
 
-		// Reassign default to oldest remaining entry if needed
+		// Reassign default to oldest remaining entry of the same type if needed. Without the filter on
+		// routing_type, a routing of the other type could take the default and leave the remaining entries
+		// of the deleted type without any, so fetchDefaultRouting() would answer nothing for a thirdparty
+		// that still holds an active routing identifier.
 		if ($wasDefault) {
 			$sql = "UPDATE " . $db->prefix() . "einvoicing_routing";
 			$sql .= " SET is_default = 1";
 			$sql .= " WHERE fk_soc = " . (int) $fk_soc . " AND active = 1";
+			$sql .= " AND routing_type = '" . $db->escape($routingtype) . "'";
 			$sql .= " ORDER BY rowid ASC LIMIT 1";
 			$db->query($sql); // Non-blocking: if no rows remain, nothing to reassign
 		}
