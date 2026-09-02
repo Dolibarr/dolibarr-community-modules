@@ -3358,6 +3358,10 @@ class CIIProtocol extends AbstractProtocol
 	{
 		global $db, $langs;
 
+		if (empty($headerAllowancesCharges)) {
+			return array();
+		}
+
 		$chargeLines = array();
 
 		foreach ($headerAllowancesCharges as $allowanceCharge) {
