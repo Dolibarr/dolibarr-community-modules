@@ -119,6 +119,8 @@ class AllTests
 		$suite->addTestSuite('CompatShimReloadTest');
 		require_once dirname(__FILE__).'/EInvoicingSamplesTest.php';
 		$suite->addTestSuite('EInvoicingSamplesTest');
+		require_once dirname(__FILE__).'/HeaderChargeLineTest.php';
+		$suite->addTestSuite('HeaderChargeLineTest');
 		require_once dirname(__FILE__).'/InvoicingPeriodTest.php';
 		$suite->addTestSuite('InvoicingPeriodTest');
 		require_once dirname(__FILE__).'/PDPProviderManagerTest.php';
