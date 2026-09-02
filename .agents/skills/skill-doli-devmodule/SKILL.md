@@ -54,7 +54,7 @@ External module structure:
 ├── `test/`
 └── `tpl/`
 
-Dolibarr core projet is inside ~/git/dolibarr or ~/git/dolibarr_dev.
+Dolibarr core projet may be found inside ~/git/dolibarr or ~/git/dolibarr_dev.
 
 Do not explore other directories than the workdir (that contains external modules) and the directory of Dolibarr project (that is in is ~/git/dolibarr or ~/git/dolibarr_dev). 
 A template of an external module directory content can be found in the `htdocs/modulebuilder/template` folder of the Dolibarr project.
