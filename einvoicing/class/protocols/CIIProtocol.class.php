@@ -262,8 +262,12 @@ class CIIProtocol extends AbstractProtocol
 		$this->lineTemplate = [
 
 			'lineid' => './ram:AssociatedDocumentLineDocument/ram:LineID',
-			'linestatuscode' => 'NA',
-			'linestatusreasoncode' => 'NA',
+			// BT-X-7 / BT-X-8, the EXTENDED status of the line. Absent from the EN 16931 profile, where
+			// every line is a regular one; on EXTENDED CTC-FR the reason code tells a real invoice line
+			// (DETAIL) from a line that only carries text or a subtotal, and the French rules treat the
+			// two differently - see isDetailLine().
+			'linestatuscode' => './ram:AssociatedDocumentLineDocument/ram:LineStatusCode',
+			'linestatusreasoncode' => './ram:AssociatedDocumentLineDocument/ram:LineStatusReasonCode',
 			'lineNote' => './ram:AssociatedDocumentLineDocument/ram:IncludedNote/ram:Content',
 
 			'prodname' => './ram:SpecifiedTradeProduct/ram:Name',
@@ -444,8 +448,8 @@ class CIIProtocol extends AbstractProtocol
 		 * }	$invoiceData
 		 * @var array<int, array{
 		 *   lineid: int,
-		 *   linestatuscode: 'NA',
-		 *   linestatusreasoncode: 'NA',
+		 *   linestatuscode: null|string,
+		 *   linestatusreasoncode: null|string,
 		 *   lineNote: null,
 		 *   prodname: string,
 		 *   proddesc: string,
@@ -502,7 +506,7 @@ class CIIProtocol extends AbstractProtocol
 		'
 		@phan-var-force Facture 			$object			The $invoice object used in entry on inc file, but completed.
 		@phan-var-force array{documentno:string,documenttypecode:null|string,documentdate:DateTimeInterface,invoiceCurrency:string|array<string>,taxCurrency:null,documentname:null,documentlanguage:string,effectiveSpecifiedPeriod:\'NA\',documentDeliveryDate:DateTimeInterface,invoicingPeriodStart:?DateTimeInterface,invoicingPeriodEnd:?DateTimeInterface,businessProcessId:string,isTestDocument:bool,documentNotePublic:string,documentNotePMT:string,documentNotePMD:string,documentNoteAAB:string,documentNoteTXD:string,documentNotes:array,vatDueDateTypeCode:string,sellername:string,sellerids:string,sellerlineone:string,sellerlinetwo:string,sellerlinethree:string,sellerpostcode:string,sellercity:string,sellercountry:string,sellersubdivision:null,sellercontactpersonname:string,sellercontactdepartmentname:null,sellercontactphoneno:string,sellercontactfaxno:string,sellercontactemailaddr:string,sellerCommunicationUriScheme:string,sellerCommunicationUri:string,sellerGlobalIds:array<array{schemeID:string,value:string}>,sellerTaxRegistrations:array<array{type:string,value:string}>,sellervatnumber:string,sellerLegalOrgId:string,sellerLegalOrgScheme:string,sellerTradingName:string,buyername:string,buyerids:string,buyerlineone:string,buyerlinetwo:string,buyerlinethree:string,buyerpostcode:string,buyercity:string,buyercountry:string,buyersubdivision:null,buyervatnumber:string,buyerGlobalIds:array<array{schemeID:string,value:string}>,buyerRoutingCode:null|string,buyerLegalOrgId:string,buyerLegalOrgScheme:string,buyerTradingName:string,buyerReference:null|string,buyerCommunicationUriScheme:string,buyerCommunicationUri:string,buyercontactpersonname:null,buyercontactemailaddr:null,buyercontactphoneno:null,grandTotalAmount:float|int,duePayableAmount:float|int,lineTotalAmount:float|int,chargeTotalAmount:float,allowanceTotalAmount:float|int,taxBasisTotalAmount:float|int,taxTotalAmount:float|int,roundingAmount:null,totalPrepaidAmount:float|int,iban_id:int,iban:string,bic:string,accountName:string,accountRef:string,accountLabel:string,paymentDueDate:DateTimeInterface,paymentTermsText:string,headerAllowancesCharges:array,invoiceRefDocs:array|array<array{ref:string|int,date:DateTimeInterface,type:string}>,orderReference:string,contractReference:null|string,despatchAdviceRef:null,taxBreakdown:array|array<array<string,array>>,_chorus:bool,_depositlines:array|array<array{lineId:int,invoiceRef:string,invoiceDate:DateTimeInterface}>,_globalDiscounts:array|array<array{value:float,reason:string,taxRate:float,categoryVAT:string}>,_customerOrderReferenceList:string[],_project:Project|null,paymentMeansCode?:int,paymentMeansText?:string,_shipFromContactBill?:array{address:null|string,zip:null|string,town:null|string,country:string},_shipFromContactShip?:array{name:string,address:null|string,zip:null|string,town:null|string,country:string}} $invoiceData
-		@phan-var-force array<int,array{lineid:int,linestatuscode:\'NA\',linestatusreasoncode:\'NA\',lineNote:null,prodname:string,proddesc:string,prodsellerid:string,prodbuyerid:null|string,prodglobalidtype:null|string,prodglobalid:null|string,prodmultilangs:array,prodClassificationCode:null|string,prodClassificationScheme:null|string,prodOriginCountry:null|string,netpriceamount:float,netpricebasisquantity:null|float,netpricebasisquantityunitcode:null|string,billedquantity:float,billedquantityunitcode:string,chargeFreeQuantity:null|float,chargeFreeQuantityunitcode:null|string,packageQuantity:null|float,packageQuantityunitcode:null|string,lineTotalAmount:float|string,totalAllowanceChargeAmount:null|float,categoryCode:string,typeCode:\'VAT\',rateApplicablePercent:string,tva_tx:float|string,vat_src_code:string,ExemptionReason:string,ExemptionReasonCode:string,calculatedAmount:null|float,lineAllowances:array,lineGrossPriceAllowances:array,lineremisepercent:\'NA\'|float,linePeriodStart:?DateTimeInterface,linePeriodEnd:?DateTimeInterface,additionalRefDocs:array,isDepositLine:bool,depositInvoiceRef:null|string,depositInvoiceDate:?DateTimeInterface,parentDocumentNo:null|string,is_deposit:int<0,1>,fk_remise:null|int,discountPercent:float,grosspriceamount:null|float,grosspricebasisquantity:null|float,grosspricebasisquantityunitcode:null|string}> $linesData
+		@phan-var-force array<int,array{lineid:int,linestatuscode:null|string,linestatusreasoncode:null|string,lineNote:null,prodname:string,proddesc:string,prodsellerid:string,prodbuyerid:null|string,prodglobalidtype:null|string,prodglobalid:null|string,prodmultilangs:array,prodClassificationCode:null|string,prodClassificationScheme:null|string,prodOriginCountry:null|string,netpriceamount:float,netpricebasisquantity:null|float,netpricebasisquantityunitcode:null|string,billedquantity:float,billedquantityunitcode:string,chargeFreeQuantity:null|float,chargeFreeQuantityunitcode:null|string,packageQuantity:null|float,packageQuantityunitcode:null|string,lineTotalAmount:float|string,totalAllowanceChargeAmount:null|float,categoryCode:string,typeCode:\'VAT\',rateApplicablePercent:string,tva_tx:float|string,vat_src_code:string,ExemptionReason:string,ExemptionReasonCode:string,calculatedAmount:null|float,lineAllowances:array,lineGrossPriceAllowances:array,lineremisepercent:\'NA\'|float,linePeriodStart:?DateTimeInterface,linePeriodEnd:?DateTimeInterface,additionalRefDocs:array,isDepositLine:bool,depositInvoiceRef:null|string,depositInvoiceDate:?DateTimeInterface,parentDocumentNo:null|string,is_deposit:int<0,1>,fk_remise:null|int,discountPercent:float,grosspriceamount:null|float,grosspricebasisquantity:null|float,grosspricebasisquantityunitcode:null|string}> $linesData
 		@phan-var-force string 				$outputlang		Value of $outputlangs->defaultlang
 		@phan-var-force Account				$account
 		@phan-var-force EInvoicing			$einvoicing
@@ -1109,6 +1113,14 @@ class CIIProtocol extends AbstractProtocol
 				}
 			}
 
+			// Insert document level charges (BG-21) as lines of this supplier invoice
+			if (!empty($parsedHeader['headerAllowancesCharges'])) {
+				$chargeRes = $this->createHeaderChargeLines($supplierInvoiceId, $parsedHeader['headerAllowancesCharges'], $return_messages);
+				if ($chargeRes['res'] < 0) {
+					return $chargeRes;
+				}
+			}
+
 			// Create or update supplier prices for imported products
 			if (!empty($supplierPriceEntries)) {
 				require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.product.class.php';
@@ -1358,6 +1370,23 @@ class CIIProtocol extends AbstractProtocol
 			$line->total_tva = $parsedLine['calculatedAmount'] ?? 0;
 			$line->total_ttc = $parsedLine['lineTotalAmount'] + ($parsedLine['calculatedAmount'] ?? 0);
 
+			// The three properties just set are not what reaches the database: the line is written by
+			// createSupplierInvoiceLinesIntoDatabase(), which hands quantity, unit price and discount to
+			// FactureFournisseur::updateline() and lets the core recompute the totals. So BT-131 is read
+			// and then dropped, and whatever quantity times price gives is what the invoice ends up with.
+			// A deposit line is left alone: its amount does not come from the document but from the
+			// discount created out of the deposit invoice.
+			if (!$is_deposit_line) {
+				$amounts = $this->resolveLineAmounts($parsedLine, (float) $line->qty, (float) $line->subprice, (float) $line->remise_percent);
+				$line->qty = $amounts['qty'];
+				$line->subprice = $amounts['subprice'];
+				$line->remise_percent = $amounts['remise_percent'];
+				if ($amounts['warning'] !== '') {
+					$return_messages[] = $amounts['warning'];
+					dol_syslog(get_class($this) . '::createSupplierInvoiceLinesFromSource ' . $amounts['warning'], LOG_WARNING);
+				}
+			}
+
 			// Billing period of the line (BT-134 / BT-135). The two dates were read from the document and
 			// then went nowhere: createSupplierInvoiceLinesIntoDatabase() has always handed
 			// $line->date_start / ->date_end to updateline(), but nothing ever set them, so a service line
@@ -1535,6 +1564,89 @@ class CIIProtocol extends AbstractProtocol
 		$v = str_replace(',', '.', trim($v));
 		return is_numeric($v) ? (float) $v : null;
 	}
+
+	/**
+	 * Decide the quantity, unit price and discount a received line must carry in Dolibarr.
+	 *
+	 * The line is written by createSupplierInvoiceLinesIntoDatabase(), which hands those three to
+	 * FactureFournisseur::updateline() and lets the core recompute the totals of the line. The net amount
+	 * the document announces for the line, BT-131, is therefore never stored as such: whatever quantity
+	 * times unit price gives is what the invoice ends up with. Three cases have to be told apart.
+	 *
+	 * 1. A line that is not a regular item - EXTENDED CTC-FR, BT-X-8 other than DETAIL: a comment, a group
+	 *    header, a subtotal. BR-FREXT-CO-10 sums BT-106 over the DETAIL lines only, so such a line carries
+	 *    no amount of its own and importing it as a priced line would count its amount a second time. It
+	 *    becomes a text line. BR-FREXT-BR-22 is also why it may carry no quantity at all.
+	 * 2. A regular item that announces an amount its quantity cannot rebuild, because that quantity is
+	 *    zero or absent. Such a document is not necessarily wrong: BR-22 only tests the presence of
+	 *    ram:BilledQuantity, so a quantity of zero satisfies it, and nothing in EN 16931 requires BT-131 to
+	 *    equal BT-129 times BT-146. The document of issue #726 is exactly that - EXTENDED CTC-FR, a line
+	 *    carrying <BilledQuantity unitCode="C62">0.0000</BilledQuantity>, no BT-X-8, and a BT-131 of 12.00
+	 *    that BR-FREXT-CO-10 does count into BT-106. It is therefore the import that has to cope: quantity
+	 *    times price makes the line zero and changes the total of the invoice without a word, so the amount
+	 *    is carried as a single unit instead, the way it would be keyed in by hand.
+	 * 3. Everything else: check that what the core is about to compute is what the document announces, and
+	 *    say so when it is not. The tolerance is the one BR-FREXT-CO-10 applies to the totals.
+	 *
+	 * @param	array<string,mixed>		$parsedLine			One line as parseInvoiceLines() returns it
+	 * @param	float					$qty				Quantity read from the document (BT-129)
+	 * @param	float					$subprice			Unit price the caller resolved (BT-146, discount applied)
+	 * @param	float					$remisePercent		Discount percent the caller resolved
+	 * @return	array{qty:float,subprice:float,remise_percent:float,warning:string}	What to store, and what to report about it
+	 */
+	protected function resolveLineAmounts(array $parsedLine, $qty, $subprice, $remisePercent)
+	{
+		$lineid = (string) ($parsedLine['lineid'] ?? '?');
+		$announced = round((float) ($parsedLine['lineTotalAmount'] ?? 0), 2);
+
+		if (!$this->isDetailLine($parsedLine)) {
+			return array('qty' => 0.0, 'subprice' => 0.0, 'remise_percent' => 0.0, 'warning' => '');
+		}
+
+		if (empty($qty) && !empty($announced)) {
+			$warning = 'Line ' . $lineid . ' of the received document carries a net amount (BT-131) of ' . $announced
+				. ' while its invoiced quantity (BT-129) is zero or absent, so quantity times unit price rebuilds 0.00. It was imported as a single unit at that amount, so the total of the invoice matches the document.';
+
+			return array('qty' => 1.0, 'subprice' => $announced, 'remise_percent' => 0.0, 'warning' => $warning);
+		}
+
+		$rebuilt = round($qty * $subprice * (1 - ($remisePercent / 100)), 2);
+		$warning = '';
+		if (abs($rebuilt - $announced) > 0.01) {
+			$warning = 'Line ' . $lineid . ' of the received document announces a net amount (BT-131) of ' . $announced
+				. ', but its quantity and unit price rebuild ' . $rebuilt . '. The invoice carries the rebuilt amount.';
+		}
+
+		return array('qty' => $qty, 'subprice' => $subprice, 'remise_percent' => $remisePercent, 'warning' => $warning);
+	}
+
+
+	/**
+	 * Tell whether a parsed line is a regular invoice item, the only kind that carries an amount.
+	 *
+	 * EN 16931 has one sort of line and every one of them is priced. The EXTENDED profile adds a subtype,
+	 * BT-X-8, carried by ram:AssociatedDocumentLineDocument/ram:LineStatusReasonCode, and the French rules
+	 * hang two behaviours on it:
+	 *
+	 * - BR-FREXT-BR-22 requires the invoiced quantity (BT-129) only when the subtype is DETAIL or absent,
+	 *   so a comment or a group header may legitimately carry no quantity at all;
+	 * - BR-FREXT-CO-10 sums BT-131 into BT-106 over those same lines only:
+	 *   [not(ram:AssociatedDocumentLineDocument/ram:LineStatusReasonCode)
+	 *    or ram:AssociatedDocumentLineDocument/ram:LineStatusReasonCode = 'DETAIL'].
+	 *
+	 * The predicate below is that XPath. An absent code means a regular item, which is also what every
+	 * EN 16931 document gives, so nothing changes for the profiles that have no subtype.
+	 *
+	 * @param	array<string,mixed>		$parsedLine		One line as parseInvoiceLines() returns it
+	 * @return	bool									True for a regular item, false for a line that carries no amount
+	 */
+	protected function isDetailLine(array $parsedLine)
+	{
+		$reason = trim((string) ($parsedLine['linestatusreasoncode'] ?? ''));
+
+		return $reason === '' || strtoupper($reason) === 'DETAIL';
+	}
+
 
 	/**
 	 * Billing period of a received line (BG-26 / BT-134 / BT-135), as the timestamps a Dolibarr line holds.
@@ -3286,6 +3398,118 @@ class CIIProtocol extends AbstractProtocol
 
 
 	/**
+	 * Carry the document level charges of a received document (BG-21) as lines of the supplier invoice.
+	 *
+	 * EN 16931 puts two symmetric groups at document level: BG-20, an allowance, which subtracts from the
+	 * total, and BG-21, a charge, which adds to it - freight, packaging, a handling fee. BR-CO-13 defines
+	 * the total of the invoice as
+	 * "Σ Invoice line net amount (BT-131) - Sum of allowances on document level (BT-107)
+	 *  + Sum of charges on document level (BT-108)",
+	 * so a charge is part of what is owed, exactly like a line is.
+	 *
+	 * In CII the two are the same element, ram:SpecifiedTradeAllowanceCharge, told apart only by
+	 * ram:ChargeIndicator/udt:Indicator. The allowances become a DiscountAbsolute, which is the object
+	 * Dolibarr has for them; the charges had nowhere to go, because a supplier invoice holds no positive
+	 * amount at document level, and they were dropped - the invoice then totalled less than the document
+	 * it came from, silently (issue #726).
+	 *
+	 * A line is what a human would key in, so that is what is written here: one line per charge, a single
+	 * unit at the charge amount (BT-99), with the VAT rate the charge declares (BT-103) and the reason it
+	 * gives (BT-104, or its reason code BT-105 when only that is present - BR-38 requires one of the two).
+	 * They are written through createSupplierInvoiceLinesIntoDatabase(), the same path as every other line
+	 * of the import, so nothing new touches the core.
+	 *
+	 * @param	int						$supplierInvoiceId			Id of the invoice being imported
+	 * @param	array<int,array<string,mixed>>	$headerAllowancesCharges	Parsed ram:SpecifiedTradeAllowanceCharge of the header
+	 * @param	array<int,string>		$return_messages			Messages of the import, completed here
+	 * @return	array{res:int,message?:string}						res 1 on success, -1 on failure
+	 */
+	protected function createHeaderChargeLines($supplierInvoiceId, array $headerAllowancesCharges, &$return_messages): array
+	{
+		global $db;
+
+		$chargeLines = $this->buildHeaderChargeLines($headerAllowancesCharges);
+
+		if (empty($chargeLines)) {
+			return ['res' => 1];
+		}
+
+		// Reuse the writer of the import rather than FactureFournisseur::addline(), whose signature moved
+		// between the supported cores: the invoice is reloaded and handed only the lines to add, so the
+		// ones already written are left alone.
+		$carrier = new FactureFournisseur($db);
+		if ($carrier->fetch((int) $supplierInvoiceId) <= 0) {
+			return ['res' => -1, 'message' => 'Failed to reload the supplier invoice to add its document level charges'];
+		}
+		$carrier->lines = $chargeLines;
+
+		if (!$this->createSupplierInvoiceLinesIntoDatabase($carrier)) {
+			return ['res' => -1, 'message' => 'Failed to add the document level charges of the received document as invoice lines'];
+		}
+
+		$return_messages[] = count($chargeLines) . ' document level charge(s) of the received document were added as invoice lines.';
+
+		return ['res' => 1];
+	}
+
+
+	/**
+	 * Turn the document level charges of a received document into the invoice lines that carry them.
+	 *
+	 * Split out of createHeaderChargeLines() because it is the whole decision - which entries are charges,
+	 * what each line is worth and how it is labelled - and it touches neither the database nor the core.
+	 *
+	 * @param	array<int,array<string,mixed>>	$headerAllowancesCharges	Parsed ram:SpecifiedTradeAllowanceCharge of the header
+	 * @return	SupplierInvoiceLine[]										One line per charge, in the order of the document
+	 */
+	protected function buildHeaderChargeLines(array $headerAllowancesCharges)
+	{
+		global $db, $langs;
+
+		if (empty($headerAllowancesCharges)) {
+			return array();
+		}
+
+		$chargeLines = array();
+
+		foreach ($headerAllowancesCharges as $allowanceCharge) {
+			// Charges only (BG-21). The allowances are handled by createHeaderDiscounts().
+			if (($allowanceCharge['indicator'] ?? '') !== 'true') {
+				continue;
+			}
+
+			$actualAmount = (float) ($allowanceCharge['actualAmount'] ?? 0);
+			if ($actualAmount == 0.0) {
+				continue;
+			}
+
+			$reason = trim((string) ($allowanceCharge['reason'] ?? ''));
+			$reasonCode = trim((string) ($allowanceCharge['reasonCode'] ?? ''));
+			if ($reason === '') {
+				// BR-38 accepts a reason code alone, and a bare code says nothing to whoever reads the
+				// invoice, so it is labelled.
+				$reason = $langs->transnoentitiesnoconv('EInvoicingDocumentLevelCharge');
+				if ($reasonCode !== '') {
+					$reason .= ' (' . $reasonCode . ')';
+				}
+			}
+
+			$line = new SupplierInvoiceLine($db);
+			$line->desc = $reason;
+			$line->qty = 1;
+			$line->subprice = $actualAmount;
+			$line->tva_tx = (float) ($allowanceCharge['rateApplicablePercent'] ?? 0);
+			$line->product_type = 1;	// A charge is a service, never a stocked good
+			$line->remise_percent = 0;
+
+			$chargeLines[] = $line;
+		}
+
+		return $chargeLines;
+	}
+
+
+	/**
 	 * Create Dolibarr global discount exceptions from CII header allowances.
 	 *
 	 * Only processes allowances (indicator = "false"), ignores charges (indicator = "true").
@@ -3303,7 +3527,9 @@ class CIIProtocol extends AbstractProtocol
 		$result = [];
 
 		foreach ($headerAllowancesCharges as $index => $allowanceCharge) {
-			// Skip charges
+			// Allowances only (BG-20, ChargeIndicator false). A document level charge (BG-21) adds to the
+			// total instead of subtracting from it, and a discount of Dolibarr can only subtract, so it is
+			// carried as a line of the invoice by createHeaderChargeLines().
 			if (($allowanceCharge['indicator'] ?? '') !== 'false') {
 				continue;
 			}

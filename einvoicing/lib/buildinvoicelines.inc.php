@@ -389,7 +389,7 @@ foreach ($object->lines as $line) {
 	// they must not reach getCategoryRate() (would trigger a VATEX exemption error on rate 0 / no code).
 	// Detection is centralized in _isLineFromExternalModule(), which covers both the legacy modSubtotal
 	// module and the native core subtotal feature.
-	$isSubTotalLine = $this->_isLineFromExternalModule($line, $object->element, 'modSubtotal');
+	$isSubTotalLine = $this->_isLineFromExternalModule($line, 'modSubtotal');
 	if ($isSubTotalLine) {
 		continue;
 	}
