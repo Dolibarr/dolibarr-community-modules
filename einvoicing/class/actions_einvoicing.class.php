@@ -1274,7 +1274,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				$formconfirm = $form->formconfirm(
 					DOL_URL_ROOT . '/fourn/facture/card.php?id=' . $object->id . '&action=confirm_change_entity',
 					$langs->trans('ChangeEntity'),
-					$langs->trans('ConfirmChangeEntity', $object->ref),
+					$langs->trans('ConfirmChangeEntity', (string) $object->ref),
 					'confirm_change_entity',
 					$formquestion,
 					'yes',
