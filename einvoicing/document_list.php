@@ -837,7 +837,7 @@ if ($provider) {
 	print '<div class="formconsumeproduce" style="padding: 10px;">'."\n";
 
 	print '<div class="div-table-responsive">'; // You can use div-table-responsive-no-min if you don't need reserved height for your table
-	print '<table>'."\n";
+	print '<table class="inline-block valignmiddle marginrightonly">'."\n";
 
 	print '<tr>';
 	print '<td class="syncFormLabel">'.$langs->trans("StartSynchronizationFrom").'</td>';
@@ -877,15 +877,6 @@ if ($provider) {
 
 	print '</td>';
 
-	$rowspan = getDolGlobalInt('EINVOICING_FLOWS_SYNC_CALL_LIMIT') ? 2 : 1;
-	print '<td style="padding-left: 40px; padding-right: 40px"'.($rowspan > 1 ? ' rowspan="'.$rowspan.'"' : '').'>';
-
-	// Button to submit (sync manage both in and update of out invoices)
-	print '<a href="#" id="runSyncBtn" class="butAction small" style="margin: 0;">';
-	print img_picto('', 'refresh', 'class="pictofixedwidth"').' '.$langs->trans("RUN_SYNC");
-	print '</a>'."\n";
-
-	print '</td>';
 	print '</tr>';
 
 	if (getDolGlobalInt('EINVOICING_FLOWS_SYNC_CALL_LIMIT')) {
@@ -901,6 +892,12 @@ if ($provider) {
 	}
 
 	print '</table>'."\n";
+
+	// Button to submit (sync manage both in and update of out invoices)
+	print '<a class="inline-block valignmiddle butAction small margintoponly marginbottomonly" href="#" id="runSyncBtn" style="margin: 0;">';
+	print img_picto('', 'refresh', 'class="pictofixedwidth"').' '.$langs->trans("RUN_SYNC");
+	print '</a>'."\n";
+
 	print '</div>';
 	print '</div>'."\n";
 
