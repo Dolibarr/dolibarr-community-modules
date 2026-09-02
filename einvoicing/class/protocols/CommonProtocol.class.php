@@ -1947,9 +1947,11 @@ trait CommonProtocol
 	{
 		global $db;
 		if ($element == 'shipping' || $element == 'delivery') {
-			$fk_origin_line = $line->fk_origin_line;
+			// Dolibarr 20 renamed this property from fk_origin_line to fk_elementdet with no BC alias;
+			// this module supports back to Dolibarr 18, so both names have to be handled.
+			$fk_elementdet = property_exists($line, 'fk_elementdet') ? $line->fk_elementdet : $line->fk_origin_line;
 			$line = new OrderLine($db);
-			$line->fetch($fk_origin_line);
+			$line->fetch($fk_elementdet);
 		}
 		if ((int) $line->product_type != 9) {
 			return false;
