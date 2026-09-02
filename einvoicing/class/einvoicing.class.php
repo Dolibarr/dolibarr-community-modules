@@ -1589,14 +1589,16 @@ class EInvoicing
 			if (!empty($currentStatusInfo['otherprovider'])) {
 				$resprints .=  '<span class="small">'.img_warning().' '.$langs->trans("WarningEinvoicingInvoiceStatusDifferentProvider", $currentStatusInfo['otherprovider']).'</span><br>';
 			}
-			$resprints .= '<span id="einvoice-status">';
+			$resprints .= '<span id="einvoice-status" class="valignmiddle">';
 			if ($currentStatusInfo['code'] == self::STATUS_NOT_GENERATED) {
 				$resprints .= '<span class="opacitymedium">' . $currentStatusInfo['status'] . '</span>';
 			} else {
 				$resprints .= $currentStatusInfo['status'];
 			}
-			$resprints .= '</span><br>';
-			$resprints .= '<span id="einvoice-info" class="clearboth small opacitymedium">' . dolPrintHTML($info) . '</span>';
+			$resprints .= '</span> ';
+			$resprints .= '<span id="einvoice-info" class="clearboth small opacitymedium valignmiddle inline-block marginleftonly">';
+			$resprints .= $form->textwithpicto('', $info);
+			$resprints .= '</span>';
 		}
 		$resprints .= '</td>';
 		$resprints .= '</tr>';
@@ -1649,7 +1651,7 @@ class EInvoicing
 		// an e-invoice, instead of discovering a routing rejection (fr:213) only after transmission.
 		// Only for live mode, not for test mode (no directory check in test mode)
 		// Only for invoices not yet transmitted
-		if (($object->element == 'facture' || $object->element == 'invoice') && $action != 'create' && getDolGlobalInt('EINVOICING_PRECHECK_DIRECTORY', 1) && !empty(getDolGlobalString('EINVOICING_LIVE')) && empty($currentStatusInfo['transmitted'])) {
+		if (($object->element == 'facture' || $object->element == 'invoice') && $action != 'create' && getDolGlobalInt('EINVOICING_PRECHECK_DIRECTORY') && !empty(getDolGlobalString('EINVOICING_LIVE')) && empty($currentStatusInfo['transmitted'])) {
 			if (!is_object($object->thirdparty ?? null) && !empty($object->socid)) {
 				$object->fetch_thirdparty();
 			}
@@ -1748,7 +1750,7 @@ class EInvoicing
 			} elseif ($currentBuyerReference !== '') {
 				$resprints .= dol_escape_htmltag($currentBuyerReference);
 			} else {
-				$resprints .= '<span class="opacitymedium">' . $langs->trans("NotDefined") . '</span>';
+				//$resprints .= '<span class="opacitymedium">' . $langs->trans("NotDefined") . '</span>';
 			}
 			$resprints .= '</td>';
 			$resprints .= '</tr>';

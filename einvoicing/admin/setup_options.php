@@ -243,7 +243,7 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	// sending, and surface it on the invoice card. On by default. A read-only directory lookup: it never blocks.
 	$item = $formSetup->newItem('EINVOICING_PRECHECK_DIRECTORY')->setAsYesNo();
 	$item->helpText = $langs->transnoentities('EINVOICING_PRECHECK_DIRECTORY_HELP');
-	$item->defaultFieldValue = '1';
+	$item->defaultFieldValue = '0';
 	$item->cssClass = 'minwidth500';
 
 	// Setup conf to REQUIRE the recipient to be routable in the directory before generating/sending. Off by
