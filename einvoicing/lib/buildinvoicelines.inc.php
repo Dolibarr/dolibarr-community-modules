@@ -333,6 +333,7 @@ $lines_total_ht 	= $lines_total_tva = $lines_total_ttc = 0;
 $grand_total_ht    	= $grand_total_tva = $grand_total_ttc = 0;
 $prepaidAmount     	= 0;
 $depositlines      	= [];
+$lineRowIds        	= [];	// Document line number => llx_facturedet.rowid, for the messages
 $globalDiscounts	= [];
 $billing_period    	= [];
 $numligne          	= 1;
@@ -607,6 +608,11 @@ foreach ($object->lines as $line) {
 
 
 
+	// The rowid of the line, kept beside its document line number: the number places the line in the
+	// document, the rowid is what a correction is addressed to, and a message that names only the first
+	// leaves its reader to count the lines to find it.
+	$lineRowIds[$numligne] = (int) $line->id;
+
 	// Filling $linesData (based on $lineTemplate)
 	$linesData[$numligne] = [
 		'lineid'                    => $numligne,
@@ -704,7 +710,7 @@ $discountSentinels = array_keys(einvoicingDiscountSentinels());
 $linesWithNoName = array();
 foreach ($linesData as $numligne => $vals) {
 	if (trim((string) ($vals['prodname'] ?? '')) === '') {
-		$linesWithNoName[] = $numligne;
+		$linesWithNoName[] = $numligne.' (id '.($lineRowIds[$numligne] ?? 0).')';
 	}
 	foreach (array('prodname' => 'BT-153', 'proddesc' => 'BT-154') as $field => $businessTerm) {
 		if (in_array((string) ($vals[$field] ?? ''), $discountSentinels, true)) {

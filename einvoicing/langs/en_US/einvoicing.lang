@@ -616,4 +616,4 @@ DiscountFromCreditNoteNoSource=Discount from a credit note
 DiscountFromDepositNoSource=Down payment deducted
 DiscountFromExcessReceivedNoSource=Payment in excess deducted
 DiscountFromExcessPaidNoSource=Payment in excess deducted
-FxCheckErrorLinesWithNoName=The following lines have neither a product label nor a description, so the item name of the e-invoice (BT-153) would be empty, which rule BR-25 refuses: %s. Enter a description on each of them.
+FxCheckErrorLinesWithNoName=The following lines have neither a product label nor a description, so the item name of the e-invoice (BT-153) would be empty, which rule BR-25 refuses: %s. Enter a description on each of them (rank in the document, then line id).

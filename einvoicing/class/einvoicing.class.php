@@ -1327,7 +1327,9 @@ class EInvoicing
 				$hasLabel = trim((string) ($line->product_label ?? '')) !== '';
 				$hasDesc = trim(dol_string_nohtmltag((string) ($line->desc ?? ''), 0)) !== '';
 				if (!$hasLabel && !$hasDesc) {
-					$linesWithNoName[] = (int) ($line->rang ?: count($linesWithNoName) + 1);
+					// The rank places the line on the paper, the rowid is what a correction is addressed to.
+					// Naming both is what lets whoever reads this go straight to the line and fix it.
+					$linesWithNoName[] = ($line->rang ? '#'.((int) $line->rang) : '').' (id '.((int) $line->id).')';
 				}
 			}
 		}
