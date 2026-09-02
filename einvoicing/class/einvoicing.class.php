@@ -1214,6 +1214,24 @@ class EInvoicing
 	}
 
 	/**
+	 * Tell whether a value returned by the French National Business Registry API is masked.
+	 *
+	 * Units that exercised their right to opposition (art. A123-96 of the French commercial code)
+	 * carry the "partial diffusion" status: they are still returned by the API, but each protected
+	 * field is replaced by the literal string "[NON-DIFFUSIBLE]". Cross-checking such a placeholder
+	 * against the third party record can only ever mismatch, so the field must be skipped instead of
+	 * being reported. Fields that stay public for those units (SIREN, commune, administrative status)
+	 * keep being checked.
+	 *
+	 * @param  string|null $value   Value read from the API response
+	 * @return bool                 True when the field is masked and must not be cross-checked
+	 */
+	private function _isRegistryValueMasked($value)
+	{
+		return is_string($value) && strtoupper(trim($value)) === '[NON-DIFFUSIBLE]';
+	}
+
+	/**
 	 * Check the thirdparty existence and active status via the French National Business Registry API (data.gouv.fr).
 	 * Search is performed by company name; the returned SIREN is then cross-checked against idprof1.
 	 * No authentication required. API rate limit: 7 req/s.
@@ -1273,10 +1291,12 @@ class EInvoicing
 					}
 
 					// Cross-check company name (partial match to handle legal form suffixes and abbreviations)
-					$nomApi      = strtolower(preg_replace('/[^a-z0-9]/i', '', $matchedCompany['nom_complet'] ?? ''));
+					$nameApiRaw  = $matchedCompany['nom_complet'] ?? '';
+					$nomApi      = strtolower(preg_replace('/[^a-z0-9]/i', '', $nameApiRaw));
 					$nomDolibarr = strtolower(preg_replace('/[^a-z0-9]/i', '', $thirdparty->name));
 					if (
-						!empty($nomApi) && !empty($nomDolibarr)
+						!$this->_isRegistryValueMasked($nameApiRaw)
+						&& !empty($nomApi) && !empty($nomDolibarr)
 						&& strpos($nomApi, $nomDolibarr) === false
 						&& strpos($nomDolibarr, $nomApi) === false
 					) {
@@ -1286,14 +1306,21 @@ class EInvoicing
 					// Cross-check ZIP code (objective field, no formatting ambiguity)
 					$zipApi      = trim($matchedCompany['siege']['code_postal'] ?? '');
 					$zipDolibarr = trim($thirdparty->zip ?? '');
-					if (!empty($zipApi) && !empty($zipDolibarr) && $zipApi !== $zipDolibarr) {
+					if (
+						!$this->_isRegistryValueMasked($zipApi)
+						&& !empty($zipApi) && !empty($zipDolibarr) && $zipApi !== $zipDolibarr
+					) {
 						$warnings[] = $langs->trans("FxCheckWarnZIPMismatch", $zipDolibarr, $zipApi);
 					}
 
 					// Cross-check town (case-insensitive, strip accents for robustness)
-					$townApi      = strtolower(trim($matchedCompany['siege']['libelle_commune'] ?? ''));
+					$townApiRaw   = $matchedCompany['siege']['libelle_commune'] ?? '';
+					$townApi      = strtolower(trim($townApiRaw));
 					$townDolibarr = strtolower(trim($thirdparty->town ?? ''));
-					if (!empty($townApi) && !empty($townDolibarr) && $townApi !== $townDolibarr) {
+					if (
+						!$this->_isRegistryValueMasked($townApiRaw)
+						&& !empty($townApi) && !empty($townDolibarr) && $townApi !== $townDolibarr
+					) {
 						$warnings[] = $langs->trans("FxCheckWarnTownMismatch", $thirdparty->town, $matchedCompany['siege']['libelle_commune']);
 					}
 				}
@@ -1563,14 +1590,16 @@ class EInvoicing
 			if (!empty($currentStatusInfo['otherprovider'])) {
 				$resprints .=  '<span class="small">'.img_warning().' '.$langs->trans("WarningEinvoicingInvoiceStatusDifferentProvider", $currentStatusInfo['otherprovider']).'</span><br>';
 			}
-			$resprints .= '<span id="einvoice-status">';
+			$resprints .= '<span id="einvoice-status" class="valignmiddle">';
 			if ($currentStatusInfo['code'] == self::STATUS_NOT_GENERATED) {
 				$resprints .= '<span class="opacitymedium">' . $currentStatusInfo['status'] . '</span>';
 			} else {
 				$resprints .= $currentStatusInfo['status'];
 			}
-			$resprints .= '</span><br>';
-			$resprints .= '<div id="einvoice-info" class="clearboth small opacitymedium" style="max-width:100%;max-height:8em;overflow:auto;overflow-wrap:anywhere;word-break:break-word;">' . dolPrintHTML($info) . '</div>';
+			$resprints .= '</span> ';
+			$resprints .= '<div id="einvoice-info" class="clearboth small opacitymedium valignmiddle inline-block marginleftonly" style="max-width:100%;max-height:8em;overflow:auto;overflow-wrap:anywhere;word-break:break-word;">';
+			$resprints .= $form->textwithpicto('', $info);
+			$resprints .= '</div>';
 		}
 		$resprints .= '</td>';
 		$resprints .= '</tr>';
@@ -1623,7 +1652,7 @@ class EInvoicing
 		// an e-invoice, instead of discovering a routing rejection (fr:213) only after transmission.
 		// Only for live mode, not for test mode (no directory check in test mode)
 		// Only for invoices not yet transmitted
-		if (($object->element == 'facture' || $object->element == 'invoice') && $action != 'create' && getDolGlobalInt('EINVOICING_PRECHECK_DIRECTORY', 1) && !empty(getDolGlobalString('EINVOICING_LIVE')) && empty($currentStatusInfo['transmitted'])) {
+		if (($object->element == 'facture' || $object->element == 'invoice') && $action != 'create' && getDolGlobalInt('EINVOICING_PRECHECK_DIRECTORY') && !empty(getDolGlobalString('EINVOICING_LIVE')) && empty($currentStatusInfo['transmitted'])) {
 			if (!is_object($object->thirdparty ?? null) && !empty($object->socid)) {
 				$object->fetch_thirdparty();
 			}
@@ -1722,7 +1751,7 @@ class EInvoicing
 			} elseif ($currentBuyerReference !== '') {
 				$resprints .= dol_escape_htmltag($currentBuyerReference);
 			} else {
-				$resprints .= '<span class="opacitymedium">' . $langs->trans("NotDefined") . '</span>';
+				//$resprints .= '<span class="opacitymedium">' . $langs->trans("NotDefined") . '</span>';
 			}
 			$resprints .= '</td>';
 			$resprints .= '</tr>';
@@ -2585,9 +2614,16 @@ class EInvoicing
 	 * Gate generation/transmission on the recipient being reachable in the Approved Platforms directory.
 	 *
 	 * Only enforced when EINVOICING_REQUIRE_ROUTABLE_RECIPIENT is on (off by default, opt-in). A recipient
-	 * that is absent from the directory, or present without an active routing line, would be rejected by the
-	 * platform with a routing error (fr:213): blocking generation/sending avoids reaching that error state.
-	 * That option has a second, stricter, value (2) that also blocks a non-conclusive directory answer.
+	 * that is absent from the directory, present without an active routing line, or present without the
+	 * very address this invoice is addressed to, would be rejected by the platform with a routing error
+	 * (fr:213): blocking generation/sending avoids reaching that error state. That option has a second,
+	 * stricter, value (2) that also blocks a non-conclusive directory answer.
+	 *
+	 * What is checked is the electronic address the document will carry (BT-49), read through the same
+	 * getBuyerCommunicationURI() the generation uses, so the gate and the document can never disagree.
+	 * When that address is empty - only reachable with EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID and no
+	 * routing recorded, a configuration the required-information checks already stop - the check falls
+	 * back on any line declared for the SIREN.
 	 *
 	 * Fails open (ok=1) whenever the check cannot be trusted, so it never blocks unexpectedly: option off,
 	 * provider without a directory lookup (status unsupported), directory call error, a directory answer that
@@ -2623,9 +2659,21 @@ class EInvoicing
 			return $res;
 		}
 
-		$dir = $provider->checkRecipientDirectory($siren);
+		// Check the address this very invoice is sent to (BT-49), not merely the SIREN: a recipient can
+		// declare several reception addresses, only the one written into the document decides whether
+		// the transmission is accepted. Same call as getBuyerCommunicationURI() makes at generation, so
+		// what is checked and what is emitted can never drift apart.
+		$routingid = $this->getBuyerCommunicationURI($object->thirdparty, $object);
+
+		$dir = $provider->checkRecipientDirectory($siren, $routingid);
 		$res['status'] = isset($dir['status']) ? $dir['status'] : 'error';
-		if ($res['status'] === 'absent') {
+		if ($res['status'] === 'unknownaddress') {
+			// The address the invoice carries is not declared in the directory for that SIREN. Falling
+			// back on another line that happens to be open would send to an address nobody chose, so
+			// this is a hard stop: whoever recorded the routing identifier owns that decision.
+			$res['ok'] = 0;
+			$res['message'] = $langs->trans('EInvoicingDirectoryAddressNotDeclared', $routingid, $siren);
+		} elseif ($res['status'] === 'absent') {
 			$res['ok'] = 0;
 			$res['message'] = $langs->trans('EInvoicingDirectoryAbsent', $siren);
 		} elseif ($res['status'] === 'inactive') {

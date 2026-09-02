@@ -1341,6 +1341,44 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	}
 
 	/**
+	 * Build the condition restricting the join on einvoicing_extlinks (aliased 'ext') to a single row.
+	 *
+	 * An element can carry several links: one per provider, and a provider can be registered both
+	 * directly and through a partner. Without this condition every extra link adds a line to the list
+	 * of the core and, because list.php builds its record count on the same FROM clause, the element
+	 * is counted as many times as it has links. The row kept here is the one
+	 * EInvoicing::fetchLastknownInvoiceStatus() would keep, so a list and a card never disagree.
+	 *
+	 * @param 	'facture'|'invoice_supplier'|'societe'|'product'	$elementtype	Value of einvoicing_extlinks.element_type, which also tells which list of the core is being built
+	 * @return 	string															Condition to append to the ON clause of the join
+	 */
+	protected static function getExtLinkJoinCondition($elementtype)
+	{
+		global $db;
+
+		// The 'ViaPartner' suffix tells how the provider is reached, not which provider it is.
+		$providershort = preg_replace('/ViaPartner$/', '', getDolGlobalString('EINVOICING_PDP'));
+		$sqlcurrentprovider = "sub.provider IN ('" . $db->escape($providershort) . "', '" . $db->escape($providershort . 'ViaPartner') . "')";
+
+		$sql = ' AND ext.rowid = (SELECT sub.rowid FROM ' . $db->prefix() . 'einvoicing_extlinks as sub';
+		$sql .= " WHERE sub.element_type = '" . $db->escape($elementtype) . "'";
+		if ($elementtype == 'societe') {
+			$sql .= ' AND sub.element_id = s.rowid';	// Alias of the thirdparty in the thirdparty list of the core
+		} elseif ($elementtype == 'product') {
+			$sql .= ' AND sub.element_id = p.rowid';	// Alias of the product in the product list of the core
+		} else {
+			$sql .= ' AND sub.element_id = f.rowid';	// Alias of the invoice in both invoice lists of the core
+		}
+		$sql .= ' ORDER BY CASE WHEN ' . $sqlcurrentprovider . ' THEN 0 ELSE 1 END,';
+		// fetchLastknownInvoiceStatus() keeps the LAST link read for the configured provider, but the
+		// FIRST one read for another provider, so the two cases do not order the rowid the same way.
+		$sql .= ' CASE WHEN ' . $sqlcurrentprovider . ' THEN -sub.rowid ELSE sub.rowid END';
+		$sql .= ' LIMIT 1)';
+
+		return $sql;
+	}
+
+	/**
 	 * Add FROM / JOIN
 	 *
 	 * @param array<string,mixed> 	$parameters		Array of parameters
@@ -1358,20 +1396,20 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		if (array_intersect($contexts, ['invoicelist', 'supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist'])) {
 			if (in_array('thirdpartylist', $contexts, true)) {
-				$this->resprints .= ' LEFT JOIN ' . $db->prefix() . "einvoicing_extlinks as ext ON ext.element_id = s.rowid AND ext.element_type = 'societe'";
+				$this->resprints .= ' LEFT JOIN ' . $db->prefix() . "einvoicing_extlinks as ext ON ext.element_id = s.rowid AND ext.element_type = 'societe'" . self::getExtLinkJoinCondition('societe');
 				$this->resprints .= ' LEFT JOIN ' . $db->prefix() . "einvoicing_routing rt ON rt.fk_soc = s.rowid";
 			}
 
 			if (in_array('invoicelist', explode(':', $parameters['context']))) {
-				$this->resprints .= " LEFT JOIN " . $db->prefix() . "einvoicing_extlinks as ext ON ext.element_id = f.rowid AND ext.element_type = 'facture'";
+				$this->resprints .= " LEFT JOIN " . $db->prefix() . "einvoicing_extlinks as ext ON ext.element_id = f.rowid AND ext.element_type = 'facture'" . self::getExtLinkJoinCondition('facture');
 			}
 
 			if (in_array('supplierinvoicelist', $contexts, true)) {
-				$this->resprints .= ' LEFT JOIN ' . $db->prefix() . "einvoicing_extlinks as ext ON ext.element_id = f.rowid AND ext.element_type = 'invoice_supplier'";
+				$this->resprints .= ' LEFT JOIN ' . $db->prefix() . "einvoicing_extlinks as ext ON ext.element_id = f.rowid AND ext.element_type = 'invoice_supplier'" . self::getExtLinkJoinCondition('invoice_supplier');
 			}
 
 			if (in_array('productservicelist', $contexts, true)) {
-				$this->resprints .= ' LEFT JOIN ' . $db->prefix() . "einvoicing_extlinks as ext ON ext.element_id = p.rowid AND ext.element_type = 'product'";
+				$this->resprints .= ' LEFT JOIN ' . $db->prefix() . "einvoicing_extlinks as ext ON ext.element_id = p.rowid AND ext.element_type = 'product'" . self::getExtLinkJoinCondition('product');
 			}
 		}
 
@@ -1397,10 +1435,20 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			if (GETPOST('search_pdplinked', 'alpha') !== '' && GETPOST('search_pdplinked', 'alpha') == getDolGlobalString('EINVOICING_PDP')) {
 				$this->resprints .= " AND ext.provider = '" . $db->escape(getDolGlobalString('EINVOICING_PDP')) . "'";
 			}
+		}
 
-			if (GETPOST('search_routing_id', 'alpha') !== '' && GETPOST('search_routing_id', 'alpha') != "") {
-				$this->resprints .= " AND ext.routing_id = '" . $db->escape(GETPOST('search_routing_id', 'alpha')) . "'";
-			}
+		// The routing identifier is a column of einvoicing_routing, and printFieldListFrom() joins that
+		// table into the thirdparty list only. Read on 'ext', the alias of einvoicing_extlinks, which
+		// holds no such column, the filter turned the page of the core into an SQL error.
+		//
+		// The filter is written on a subquery of its own rather than on the joined row: a thirdparty can
+		// hold several routing identifiers while the list shows only one of them, so a condition on the
+		// joined row would answer 'no result' for every identifier that is not the one displayed.
+		if (in_array('thirdpartylist', $contexts, true) && GETPOST('search_routing_id', 'alpha') !== '') {
+			$this->resprints .= ' AND EXISTS (SELECT 1 FROM ' . $db->prefix() . 'einvoicing_routing as subrt';
+			$this->resprints .= ' WHERE subrt.fk_soc = s.rowid';	// Alias of the thirdparty in the thirdparty list of the core
+			$this->resprints .= " AND subrt.routing_type = 'thirdparty' AND subrt.active = 1";
+			$this->resprints .= " AND subrt.routing_id = '" . $db->escape(GETPOST('search_routing_id', 'alpha')) . "')";
 		}
 
 		if (in_array('invoicelist', $contexts) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {

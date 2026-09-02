@@ -1,5 +1,11 @@
 # CHANGELOG MODULE EINVOICING FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.2.0
+
+NEW: When using SuperPDP, a PDF is also retreived in addition to the .xml einvoice file. 
+
+
+
 ## 1.1.0
 
 FIX: The remote information of the SuperPDP setup page now describes the e-invoice address the module

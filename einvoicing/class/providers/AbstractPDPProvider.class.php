@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2025       Laurent Destailleur         <eldy@users.sourceforge.net>
+ * Copyright (C) 2026		Jose Martinez				<jose.martinez@pichinov.com>
  * Copyright (C) 2025       Mohamed DAOUD               <mdaoud@dolicloud.com>
  * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
@@ -215,17 +216,25 @@ abstract class AbstractPDPProvider
 	 * Providers that do not expose a directory lookup keep the default 'unsupported' status so
 	 * the feature degrades gracefully and never blocks them.
 	 *
-	 * @param 	string 	$idprof1 	Recipient professional id 1 (SIREN for France)
+	 * A SIREN can hold several reception addresses in the directory (the bare SIREN and one per
+	 * establishment SIRET), and only one of them is written into the invoice as BT-49. Answering on
+	 * whichever line the directory returns first would then report the reachability of an address the
+	 * invoice is not sent to: pass that BT-49 address as $addressingidentifier and the answer is about
+	 * it alone. An address that is not declared for that SIREN is reported as its own status, never
+	 * silently replaced by another line that happens to be open.
+	 *
+	 * @param 	string 	$idprof1 				Recipient professional id 1 (SIREN for France)
+	 * @param 	string 	$addressingidentifier 	Routing address the invoice is actually sent to (BT-49). Empty to answer on any line declared for the SIREN, which is what a caller with no invoice at hand wants.
 	 * @return 	array{status:string,reachable:int,entries:int,active:int,unknown:int,identifier:string,linestatus:string,platform:string,effectivedate:int,message:string,messageparam:string,httpcode:int}
-	 *								status: unsupported|error|absent|inactive|undetermined|routable ;
+	 *								status: unsupported|error|absent|inactive|undetermined|routable|unknownaddress ;
 	 *								reachable: 1 routable, 0 not routable, -1 unknown ;
-	 *								identifier: first active electronic address found (if any) ;
+	 *								identifier: electronic address the answer is about ;
 	 *								linestatus/platform: directoryLineStatus and platformType of that address,
 	 *								reported to the user so a positive answer carries its provenance ;
 	 *								message: translation key naming where the answer comes from, with
 	 *								messageparam as its single parameter when the key takes one.
 	 */
-	public function checkRecipientDirectory($idprof1)
+	public function checkRecipientDirectory($idprof1, $addressingidentifier = '')
 	{
 		$result = array('status' => 'unsupported', 'reachable' => -1, 'entries' => 0, 'active' => 0, 'unknown' => 0, 'identifier' => '', 'linestatus' => '', 'platform' => '', 'effectivedate' => 0, 'message' => '', 'messageparam' => '', 'httpcode' => 0);
 
@@ -263,6 +272,24 @@ abstract class AbstractPDPProvider
 			$lines = $response['response']['results'];
 		}
 		$result['entries'] = count($lines);
+
+		if ($result['entries'] > 0 && ($wanted = self::normalizeAddressingIdentifier($addressingidentifier)) !== '') {
+			// Keep only the line of the address this invoice is sent to. Whoever recorded a routing
+			// identifier for that third party (or forced one on the invoice) took responsibility for the
+			// address: reporting on a sibling line, open or not, would answer a question nobody asked.
+			$lines = array_values(array_filter($lines, function ($line) use ($wanted) {
+				return self::normalizeAddressingIdentifier(isset($line['addressingIdentifier']) ? $line['addressingIdentifier'] : '') === $wanted;
+			}));
+			if (empty($lines)) {
+				// The SIREN is in the directory, this address is not. Sending to an address the annuaire
+				// does not declare is rejected with a routing error (fr:213) whatever the other lines say,
+				// so this is a negative answer of its own, not an 'absent' recipient nor an 'inactive' one.
+				$result['status'] = 'unknownaddress';
+				$result['reachable'] = 0;
+				$result['identifier'] = $wanted;
+				return $result;
+			}
+		}
 
 		if ($result['entries'] > 0) {
 			// A directory line exists, but only an enabled one can actually receive: the annuaire also
@@ -343,6 +370,30 @@ abstract class AbstractPDPProvider
 		}
 		$result['reachable'] = 0;
 		return $result;
+	}
+
+	/**
+	 * Normalize an electronic address so two writings of the same one compare equal.
+	 *
+	 * The address recorded in Dolibarr and the one the directory returns are the same string in
+	 * principle, but they do not always come written the same way: a user typing a SIRET-suffixed
+	 * address adds spaces to read it, and a platform may qualify the address with the scheme it
+	 * belongs to ('0225:' for the French SIREN scheme, which the legacy SuperPDP endpoint does). The
+	 * scheme is not part of the address, and Dolibarr records the address without it, so neither
+	 * difference may turn a match into a mismatch and report a declared address as unknown.
+	 *
+	 * @param 	string 	$identifier 	Electronic address, as recorded or as returned by a platform
+	 * @return 	string 					Comparable form of that address, empty when there is none
+	 */
+	protected static function normalizeAddressingIdentifier($identifier)
+	{
+		$identifier = preg_replace('/\s+/', '', (string) $identifier);
+
+		if (preg_match('/^[0-9]{4}:(.+)$/', $identifier, $reg)) {
+			$identifier = $reg[1];
+		}
+
+		return $identifier;
 	}
 
 	/**
@@ -758,6 +809,29 @@ abstract class AbstractPDPProvider
 	}
 
 	/**
+	 * Make an API payload safe to store in the utf8mb4 TEXT debug columns
+	 * (llx_einvoicing_call.response, llx_einvoicing_document.response_for_debug).
+	 *
+	 * Some PDP responses carry non-UTF-8 bytes (signed or compressed payloads): stored as-is
+	 * they raise a SQL error 1366 (Incorrect string value) and abort the flow. Valid UTF-8 is
+	 * kept unchanged; anything else is base64-encoded behind a marker so the trace stays both
+	 * storable and recoverable.
+	 *
+	 * @param   string|null $payload    Raw payload, possibly binary
+	 * @return  string                  UTF-8-safe representation
+	 */
+	protected function makeStorableDebugPayload($payload)
+	{
+		if (!is_string($payload) || $payload === '') {
+			return (string) $payload;
+		}
+		if (preg_match('//u', $payload)) {	// already valid UTF-8
+			return $payload;
+		}
+		return '[base64] ' . base64_encode($payload);
+	}
+
+	/**
 	 * Log an API call into llx_einvoicing_call using a SEPARATE database connection.
 	 *
 	 * The call trace must survive even when the caller's main transaction is rolled
@@ -808,8 +882,8 @@ abstract class AbstractPDPProvider
 		$call->method = ($method == 'POSTALREADYFORMATED' ? 'POST' : $method);
 		$call->endpoint = '/' . $resource;
 		$call->request_id = $requestId;
-		$call->request_body = is_array($params) ? json_encode($params) : $params;
-		$call->response = is_array($response) ? json_encode($response) : $response;
+		$call->request_body = $this->makeStorableDebugPayload(is_array($params) ? json_encode($params) : $params);
+		$call->response = $this->makeStorableDebugPayload(is_array($response) ? json_encode($response) : $response);
 		$call->provider = $this->name;
 		$call->entity = $conf->entity;
 		$call->status = ($statusCode == 200 || $statusCode == 202) ? 1 : 0;
