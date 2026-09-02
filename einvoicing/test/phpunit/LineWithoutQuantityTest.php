@@ -192,7 +192,38 @@ class LineWithoutQuantityTest extends CommonClassTest
 		$this->assertSame(12.0, $amounts['subprice']);
 		$this->assertSame(0.0, $amounts['remise_percent']);
 		$this->assertStringContainsString('BT-129', $amounts['warning'], 'the repair is reported, not silent');
-		$this->assertStringContainsString('BR-22', $amounts['warning']);
+		$this->assertStringContainsString('BT-131', $amounts['warning']);
+	}
+
+	/**
+	 * The shape of the document actually reported on #726: the quantity is not absent, it is present and
+	 * zero - which satisfies BR-22, a presence test - and the line still announces 12.00.
+	 *
+	 * @return	void
+	 */
+	public function testAQuantityPresentAndZeroIsTreatedTheSameWay()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		$xml = $this->documentWithLine('
+      <ram:AssociatedDocumentLineDocument><ram:LineID>899</ram:LineID></ram:AssociatedDocumentLineDocument>
+      <ram:SpecifiedTradeProduct><ram:Name>COMMENT</ram:Name></ram:SpecifiedTradeProduct>
+      <ram:SpecifiedLineTradeDelivery><ram:BilledQuantity unitCode="C62">0.0000</ram:BilledQuantity></ram:SpecifiedLineTradeDelivery>
+      <ram:SpecifiedLineTradeSettlement>
+        <ram:SpecifiedTradeSettlementLineMonetarySummation><ram:LineTotalAmount>12.00</ram:LineTotalAmount></ram:SpecifiedTradeSettlementLineMonetarySummation>
+      </ram:SpecifiedLineTradeSettlement>');
+
+		$lines = $protocol->parseInvoiceLines($xml);
+		$this->assertCount(1, $lines);
+		$this->assertEquals(0.0, (float) $lines[0]['billedquantity'], 'BT-129 is there and it is zero');
+		$this->assertTrue($this->isDetail($lines[0]), 'no BT-X-8 means a regular item, whatever the product is called');
+
+		$amounts = $this->callResolveLineAmounts($protocol, $lines[0], (float) $lines[0]['billedquantity'], 12.0);
+		$this->assertSame(1.0, $amounts['qty']);
+		$this->assertSame(12.0, $amounts['subprice']);
+		$this->assertNotSame('', $amounts['warning']);
 	}
 
 	/**

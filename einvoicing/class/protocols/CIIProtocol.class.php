@@ -1565,12 +1565,14 @@ class CIIProtocol extends AbstractProtocol
 	 *    header, a subtotal. BR-FREXT-CO-10 sums BT-106 over the DETAIL lines only, so such a line carries
 	 *    no amount of its own and importing it as a priced line would count its amount a second time. It
 	 *    becomes a text line. BR-FREXT-BR-22 is also why it may carry no quantity at all.
-	 * 2. A regular item with an amount but no invoiced quantity. On the EN 16931 profile the document is
-	 *    already non-conformant - BR-22 is fatal and only tests the presence of ram:BilledQuantity, so a
-	 *    quantity of zero passes and an absent element does not - but the document has been received and
-	 *    it states what is owed. Quantity times price would make the line zero and change the total of the
-	 *    invoice without a word, so the amount is carried as a single unit instead, the way it would be
-	 *    keyed in by hand.
+	 * 2. A regular item that announces an amount its quantity cannot rebuild, because that quantity is
+	 *    zero or absent. Such a document is not necessarily wrong: BR-22 only tests the presence of
+	 *    ram:BilledQuantity, so a quantity of zero satisfies it, and nothing in EN 16931 requires BT-131 to
+	 *    equal BT-129 times BT-146. The document of issue #726 is exactly that - EXTENDED CTC-FR, a line
+	 *    carrying <BilledQuantity unitCode="C62">0.0000</BilledQuantity>, no BT-X-8, and a BT-131 of 12.00
+	 *    that BR-FREXT-CO-10 does count into BT-106. It is therefore the import that has to cope: quantity
+	 *    times price makes the line zero and changes the total of the invoice without a word, so the amount
+	 *    is carried as a single unit instead, the way it would be keyed in by hand.
 	 * 3. Everything else: check that what the core is about to compute is what the document announces, and
 	 *    say so when it is not. The tolerance is the one BR-FREXT-CO-10 applies to the totals.
 	 *
@@ -1591,7 +1593,7 @@ class CIIProtocol extends AbstractProtocol
 
 		if (empty($qty) && !empty($announced)) {
 			$warning = 'Line ' . $lineid . ' of the received document carries a net amount (BT-131) of ' . $announced
-				. ' but no invoiced quantity (BT-129), which BR-22 requires. It was imported as a single unit at that amount, so the total of the invoice matches the document.';
+				. ' while its invoiced quantity (BT-129) is zero or absent, so quantity times unit price rebuilds 0.00. It was imported as a single unit at that amount, so the total of the invoice matches the document.';
 
 			return array('qty' => 1.0, 'subprice' => $announced, 'remise_percent' => 0.0, 'warning' => $warning);
 		}
