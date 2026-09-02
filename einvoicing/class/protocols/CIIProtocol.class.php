@@ -1162,7 +1162,8 @@ class CIIProtocol extends AbstractProtocol
 
 			// Save readable view file in supplier invoice attachments
 			if ($readableViewFile && $tempFileReadableView && file_exists($tempFileReadableView)) {
-				$res = $this->saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempFileReadableView, getDolGlobalString('EINVOICING_PDP', 'PDP'));
+				$readablefileext = 'pdf';	// Usually the extension of file for the readable version is PDF
+				$res = $this->saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempFileReadableView, getDolGlobalString('EINVOICING_PDP', 'PDP'), $readablefileext);
 
 				if ($res['res'] < 0) {
 					$return_messages[] = 'Failed to save readable view file as attachment: ' . $res['message'];
@@ -3086,9 +3087,10 @@ class CIIProtocol extends AbstractProtocol
 	 * @param FactureFournisseur    $supplierInvoice 	Supplier invoice object
 	 * @param string                $filePath        	Path to the E-invoice file to save
 	 * @param string                $suffix          	Optional suffix for the saved file name
+	 * @param string				$fileext			Force file extension
 	 * @return array{res:int, message:string}   		Returns array with 'res' (1 on success, -1 on error) and info 'message'
 	 */
-	protected function saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $filePath, $suffix = 'einvoice')
+	protected function saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $filePath, $suffix = 'einvoice', $fileext = '')
 	{
 		global $conf;
 
@@ -3110,7 +3112,10 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		// Prepare destination filename with optional prefix
-		$filename = dol_sanitizeFileName($supplierInvoice->ref_supplier . (empty($suffix) ? '' : '_' . $suffix) . '.' . static::INVOICE_FILE_EXTENSION);
+		if (empty($fileext)) {
+			$fileext = static::INVOICE_FILE_EXTENSION;
+		}
+		$filename = dol_sanitizeFileName($supplierInvoice->ref_supplier . (empty($suffix) ? '' : '_' . $suffix) . '.' . $fileext);
 
 		$dest_path = $upload_dir . '/' . $filename;
 
