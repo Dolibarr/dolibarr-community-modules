@@ -3305,6 +3305,11 @@ class CIIProtocol extends AbstractProtocol
 			}
 
 			$remise = new DiscountAbsolute($db);
+			// Both properties carry the thirdparty, because the core does not read the same one everywhere:
+			// DiscountAbsolute::create() inserts fk_soc up to Dolibarr 19 and socid from Dolibarr 20 on. Filling
+			// only one of them writes fk_soc = 0 on the older cores, which the foreign key of
+			// llx_societe_remise_except refuses - and the whole synchronization stops on that flow.
+			$remise->fk_soc         = $fk_soc;
 			$remise->socid          = $fk_soc;
 			$remise->amount_ht       = $actualAmount;
 			$remise->amount_tva      = round($actualAmount * (($allowanceCharge['rateApplicablePercent'] ?? 0) / 100), 2);
