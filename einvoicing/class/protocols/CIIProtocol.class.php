@@ -1321,6 +1321,10 @@ class CIIProtocol extends AbstractProtocol
 					// it is often project-specific and not carried by the product's own label/description.
 					$line->desc = trim($parsedLine['proddesc']);
 				}
+				// Because we reuse an already existing product without changing its ref and label, we add the label from the supplier invoice into the description
+				if (!empty($parsedLine['prodname'])) {
+					$line->desc = dol_concatdesc($parsedLine['prodname'], $line->desc ?? '');
+				}
 			} elseif (!$is_deposit_line) {
 				// Free line: no product linked, description set from XML data
 				$line->desc = trim($parsedLine['prodname'] ?? '') . (!empty($parsedLine['proddesc']) ? "\n" . trim($parsedLine['proddesc']) : '');
