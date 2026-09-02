@@ -892,4 +892,236 @@ class RecipientDirectoryTest extends CommonClassTest
 		$this->assertSame('Upcoming', $result['linestatus']);
 		$this->assertGreaterThan(dol_now(), $result['effectivedate']);
 	}
+
+	/**
+	 * A recipient often declares several addresses: the bare SIREN and one per establishment SIRET.
+	 * Only one of them is written into the invoice (BT-49), and it is the one the answer must be about
+	 * - not whichever line the directory returns first, which is what the check used to report.
+	 *
+	 * Shape taken from a live answer (SIREN 518484464, two Enabled lines, invoice addressed to the
+	 * SIRET one): the badge named the bare SIREN while the document went to the SIRET address.
+	 *
+	 * @return void
+	 */
+	public function testTheAnswerIsAboutTheAddressTheInvoiceCarries()
+	{
+		$provider = $this->providerReturningLines(array(
+			array('addressingIdentifier' => '518484464', 'directoryLineStatus' => 'Enabled', 'platformType' => 'WK', 'siren' => '518484464'),
+			array('addressingIdentifier' => '518484464_51848446400053', 'directoryLineStatus' => 'Enabled', 'platformType' => 'WK', 'siren' => '518484464', 'siret' => '51848446400053'),
+		));
+
+		$result = $provider->checkRecipientDirectory('518484464', '518484464_51848446400053');
+
+		$this->assertSame('routable', $result['status']);
+		$this->assertSame(1, $result['reachable']);
+		// Both lines are counted as declared for that SIREN, only the addressed one is answered about.
+		$this->assertSame(2, $result['entries']);
+		$this->assertSame(1, $result['active']);
+		$this->assertSame('518484464_51848446400053', $result['identifier']);
+		$this->assertSame('Enabled', $result['linestatus']);
+	}
+
+	/**
+	 * The address the invoice is sent to is not declared for that SIREN. Another line is open, but
+	 * sending to an undeclared address is rejected all the same (fr:213): answering on the sibling line
+	 * would report a reachability this invoice does not have. Own status, and a negative one.
+	 *
+	 * @return void
+	 */
+	public function testAnAddressTheDirectoryDoesNotDeclareIsNotReachable()
+	{
+		$provider = $this->providerReturningLines(array(
+			array('addressingIdentifier' => '518484464', 'directoryLineStatus' => 'Enabled', 'platformType' => 'WK', 'siren' => '518484464'),
+		));
+
+		$result = $provider->checkRecipientDirectory('518484464', '518484464_51848446400099');
+
+		$this->assertSame('unknownaddress', $result['status']);
+		$this->assertSame(0, $result['reachable']);
+		$this->assertSame(1, $result['entries']);
+		$this->assertSame(0, $result['active']);
+		// The address asked about is the one to display: the user compares it with the annuaire.
+		$this->assertSame('518484464_51848446400099', $result['identifier']);
+	}
+
+	/**
+	 * The reverse case, and the one that cost a rejected invoice: no routing identifier recorded, so
+	 * the invoice is addressed to the bare SIREN, while the annuaire only carries the establishment
+	 * line. The old check saw an Enabled line for the SIREN and showed the recipient as reachable.
+	 *
+	 * @return void
+	 */
+	public function testTheBareSirenIsNotReachableWhenOnlyAnEstablishmentLineExists()
+	{
+		$provider = $this->providerReturningLines(array(
+			array('addressingIdentifier' => '899047773_89904777300036', 'directoryLineStatus' => 'Enabled', 'platformType' => 'WK', 'siren' => '899047773', 'siret' => '89904777300036'),
+		));
+
+		$result = $provider->checkRecipientDirectory('899047773', '899047773');
+
+		$this->assertSame('unknownaddress', $result['status']);
+		$this->assertSame(0, $result['reachable']);
+		$this->assertSame('899047773', $result['identifier']);
+	}
+
+	/**
+	 * The addressed line decides on its own status too: an open sibling does not make a Disabled
+	 * address receive, and the status of the addressed line is what gets reported.
+	 *
+	 * @return void
+	 */
+	public function testTheAddressedLineDecidesEvenWhenASiblingIsOpen()
+	{
+		$provider = $this->providerReturningLines(array(
+			array('addressingIdentifier' => '518484464', 'directoryLineStatus' => 'Enabled', 'platformType' => 'WK', 'siren' => '518484464'),
+			array('addressingIdentifier' => '518484464_51848446400053', 'directoryLineStatus' => 'Disabled', 'platformType' => 'WK', 'siren' => '518484464'),
+		));
+
+		$result = $provider->checkRecipientDirectory('518484464', '518484464_51848446400053');
+
+		$this->assertSame('inactive', $result['status']);
+		$this->assertSame(0, $result['reachable']);
+		$this->assertSame('Disabled', $result['linestatus']);
+	}
+
+	/**
+	 * An addressed line whose status the platform did not report stays non-conclusive, exactly as a
+	 * SIREN-wide answer does: the sibling line carrying a status must not settle it either way.
+	 *
+	 * @return void
+	 */
+	public function testAnAddressedLineWithoutStatusStaysUndetermined()
+	{
+		$provider = $this->providerReturningLines(array(
+			array('addressingIdentifier' => '518484464', 'directoryLineStatus' => 'Enabled', 'platformType' => 'WK', 'siren' => '518484464'),
+			array('addressingIdentifier' => '518484464_51848446400053', 'siren' => '518484464'),
+		));
+
+		$result = $provider->checkRecipientDirectory('518484464', '518484464_51848446400053');
+
+		$this->assertSame('undetermined', $result['status']);
+		$this->assertSame(-1, $result['reachable']);
+		$this->assertSame('518484464_51848446400053', $result['identifier']);
+	}
+
+	/**
+	 * A SIRET-suffixed address is long, so it gets typed with spaces to be read back. That is a
+	 * writing difference, not a different address, and it must not report a declared line as unknown.
+	 *
+	 * @return void
+	 */
+	public function testAnAddressRecordedWithSpacesStillMatchesItsLine()
+	{
+		$provider = $this->providerReturningLines(array(
+			array('addressingIdentifier' => '518484464_51848446400053', 'directoryLineStatus' => 'Enabled', 'platformType' => 'WK', 'siren' => '518484464'),
+		));
+
+		$result = $provider->checkRecipientDirectory('518484464', '518484464_518 484 464 00053');
+
+		$this->assertSame('routable', $result['status']);
+		$this->assertSame(1, $result['reachable']);
+	}
+
+	/**
+	 * No address asked about: the answer stays what it was, about any line declared for that SIREN.
+	 * That is what an inbound lifecycle reply needs (CdarHandler looks for a reply-to address, with no
+	 * invoice of ours to take a BT-49 from), so this path must not become stricter with the change.
+	 *
+	 * @return void
+	 */
+	public function testWithoutAnAddressTheAnswerStaysSirenWide()
+	{
+		$provider = $this->providerReturningLines(array(
+			array('addressingIdentifier' => '518484464_51848446400053', 'directoryLineStatus' => 'Enabled', 'platformType' => 'WK', 'siren' => '518484464'),
+		));
+
+		$result = $provider->checkRecipientDirectory('518484464');
+
+		$this->assertSame('routable', $result['status']);
+		$this->assertSame(1, $result['reachable']);
+		$this->assertSame('518484464_51848446400053', $result['identifier']);
+	}
+
+	/**
+	 * The legacy endpoint qualifies its identifiers with the scheme they belong to ('0225:' for the
+	 * French SIREN scheme) while Dolibarr records the address without it. Same address, so the
+	 * fallback must recognize it rather than call the recipient's own address undeclared.
+	 *
+	 * @return void
+	 */
+	public function testTheSchemePrefixOfTheLegacyEndpointDoesNotBreakTheMatch()
+	{
+		$provider = $this->legacyProviderReturningEntries(array(
+			array('identifier' => '0225:824369342', 'is_active' => true, 'startDate' => '2024-01-15'),
+		));
+
+		$result = $provider->checkRecipientDirectory('824369342', '824369342');
+
+		$this->assertSame('routable', $result['status']);
+		$this->assertSame(1, $result['reachable']);
+	}
+
+	/**
+	 * Fallback path, address unknown to the specific endpoint: the SIREN has entries, none of them is
+	 * the address the invoice carries. Not an absent recipient - an address that is not declared.
+	 *
+	 * @return void
+	 */
+	public function testTheLegacyFallbackReportsAnAddressItDoesNotCarry()
+	{
+		$provider = $this->legacyProviderReturningEntries(array(
+			array('identifier' => '0225:824369342', 'is_active' => true, 'startDate' => '2024-01-15'),
+		));
+
+		$result = $provider->checkRecipientDirectory('824369342', '824369342_82436934200017');
+
+		$this->assertSame('unknownaddress', $result['status']);
+		$this->assertSame(0, $result['reachable']);
+		$this->assertSame('824369342_82436934200017', $result['identifier']);
+	}
+
+	/**
+	 * The tie-breaker is about the SIREN, not about a given establishment address: when the addressed
+	 * line has no status and the specific endpoint knows nothing of that address, it must not settle.
+	 * Concluding 'routable' there would use an open SIREN-level entry to green-light an invoice sent
+	 * to an establishment address, which is the very confusion this check exists to remove.
+	 *
+	 * @return void
+	 */
+	public function testTheSpecificDirectoryDoesNotSettleAnAddressItDoesNotKnow()
+	{
+		$provider = $this->superPdpReturningLinesThenEntries(
+			array(array('addressingIdentifier' => '824369342_82436934200017', 'siren' => '824369342', 'siret' => '82436934200017')),
+			array(array('identifier' => '0225:824369342', 'is_active' => true))
+		);
+
+		$result = $provider->checkRecipientDirectory('824369342', '824369342_82436934200017');
+
+		$this->assertSame('undetermined', $result['status']);
+		$this->assertSame(-1, $result['reachable']);
+		$this->assertSame('824369342_82436934200017', $result['identifier']);
+		// No provenance of a settled verdict: nothing was settled.
+		$this->assertSame('EInvoicingDirectoryNoLineStatus', $result['message']);
+	}
+
+	/**
+	 * A standardized answer that already named the address as undeclared is final: the specific
+	 * endpoint, which is the weaker source, does not get to turn it back into a positive.
+	 *
+	 * @return void
+	 */
+	public function testAnUndeclaredAddressIsNotOverriddenBySpecificDirectory()
+	{
+		$provider = $this->superPdpReturningLinesThenEntries(
+			array(array('addressingIdentifier' => '824369342', 'directoryLineStatus' => 'Enabled', 'siren' => '824369342')),
+			array(array('identifier' => '0225:824369342', 'is_active' => true, 'startDate' => '2024-01-15'))
+		);
+
+		$result = $provider->checkRecipientDirectory('824369342', '824369342_82436934200017');
+
+		$this->assertSame('unknownaddress', $result['status']);
+		$this->assertSame(0, $result['reachable']);
+		// Only the standardized search was called: the answer needed no tie-breaker.
+		$this->assertSame(array('afnor-directory/v1/directory-line/search'), $provider->calledResources);
+	}
 }
