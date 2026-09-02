@@ -135,6 +135,8 @@ class AllTests
 		$suite->addTestSuite('SupplierInvoiceHelperTest');
 		require_once dirname(__FILE__).'/TransmittedLockTest.php';
 		$suite->addTestSuite('TransmittedLockTest');
+		require_once dirname(__FILE__).'/VatCategoryFromVatCodeTest.php';
+		$suite->addTestSuite('VatCategoryFromVatCodeTest');
 		require_once dirname(__FILE__).'/VatPointDateCodeTest.php';
 		$suite->addTestSuite('VatPointDateCodeTest');
 
