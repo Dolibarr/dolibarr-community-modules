@@ -40,6 +40,26 @@ These principles must be followed even before reviewing specific task details. V
 2.  **Action/View Separation:** Always clearly separate page action logic (executed on POST) from pure rendering (the HTML view).
 3.  **Hooks First:** Before implementing any logic that runs on a core lifecycle event (e.g., form save, object update), check if an existing Dolibarr hook can be used. Use the standard calling pattern: `$hookmanager->executeHooks('actionName', $parameters, $object, $action);`.
 
+External module structure:
+`htdocs/mymodule`
+├── `admin/`
+├── `class/`
+├── `core/`
+├── `css/`
+├── `doc/`
+├── `js/`
+├── `langs/`
+├── `lib/`
+├── `sql/`
+├── `test/`
+└── `tpl/`
+
+Dolibarr core projet is inside ~/git/dolibarr or ~/git/dolibarr_dev.
+
+Do not explore other directories than the workdir (that contains external modules) and the directory of Dolibarr project (that is in is ~/git/dolibarr or ~/git/dolibarr_dev). 
+A template of an external module directory content can be found in the `htdocs/modulebuilder/template` folder of the Dolibarr project.
+
+
 ---
 
 ## Workflow and Tasks Guidance
