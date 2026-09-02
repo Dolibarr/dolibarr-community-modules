@@ -3016,7 +3016,12 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$sql .= " FROM " . $db->prefix() . "facture_fourn as f";
 		$sql .= " INNER JOIN " . $db->prefix() . "societe as s ON s.rowid = f.fk_soc";
 		$sql .= " WHERE f.ref_supplier = '" . $db->escape($vendorReference) . "'";
-		$sql .= " AND f.entity IN (" . getEntity('facture_fourn') . ")";
+
+		$listofentityids = getEntity('facture_fourn');
+		if (getDolGlobalString('EINVOICING_ALLOW_MULTICOMPANY_INVOICE_MOVE')) {
+			$listofentityids .= ','.getDolGlobalString('EINVOICING_ALLOW_MULTICOMPANY_INVOICE_MOVE');
+		}
+		$sql .= " AND f.entity IN (" . $db->sanitize($listofentityids) . ")";
 
 		$resql = $db->query($sql);
 		if (!$resql) {

@@ -738,7 +738,13 @@ class SupplierInvoiceHelper
 		$sql = "SELECT rowid, total_ttc FROM " . $db->prefix() . "facture_fourn";
 		$sql .= " WHERE ref_supplier = '" . $db->escape($ref) . "'";
 		$sql .= " AND fk_soc = " . ((int) $socId);
-		$sql .= " AND entity IN (" . getEntity('facture_fourn') . ")";
+
+		$listofentityids = getEntity('facture_fourn');
+		if (getDolGlobalString('EINVOICING_ALLOW_MULTICOMPANY_INVOICE_MOVE')) {
+			$listofentityids .= ','.getDolGlobalString('EINVOICING_ALLOW_MULTICOMPANY_INVOICE_MOVE');
+		}
+		$sql .= " AND entity IN (" . $db->sanitize($listofentityids) . ")";
+
 		$sql .= " LIMIT 1";
 		$resql = $db->query($sql);
 		if (!$resql) {
@@ -767,7 +773,13 @@ class SupplierInvoiceHelper
 			$sql = "SELECT rowid, ref_supplier, total_ttc FROM " . $db->prefix() . "facture_fourn";
 			$sql .= " WHERE REPLACE(ref_supplier, ' ', '') LIKE '%" . $db->escape($db->escapeforlike($refNoSpaces)) . "%'";
 			$sql .= " AND fk_soc = " . ((int) $socId);
-			$sql .= " AND entity IN (" . getEntity('facture_fourn') . ")";
+
+			$listofentityids = getEntity('facture_fourn');
+			if (getDolGlobalString('EINVOICING_ALLOW_MULTICOMPANY_INVOICE_MOVE')) {
+				$listofentityids .= ','.getDolGlobalString('EINVOICING_ALLOW_MULTICOMPANY_INVOICE_MOVE');
+			}
+			$sql .= " AND entity IN (" . $db->sanitize($listofentityids) . ")";
+
 			$resql = $db->query($sql);
 			if (!$resql) {
 				dol_syslog(__METHOD__ . ' ' . $db->lasterror(), LOG_ERR);
