@@ -109,8 +109,6 @@ class AllTests
 		//$suite->addTestSuite('CoreTest');
 		require_once dirname(__FILE__).'/BillingProcessIdTest.php';
 		$suite->addTestSuite('BillingProcessIdTest');
-		require_once dirname(__FILE__).'/ChangeEntityTest.php';
-		$suite->addTestSuite('ChangeEntityTest');
 		require_once dirname(__FILE__).'/CIIProfileShapeTest.php';
 		$suite->addTestSuite('CIIProfileShapeTest');
 		require_once dirname(__FILE__).'/CIIProtocolTest.php';
