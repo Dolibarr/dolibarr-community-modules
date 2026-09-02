@@ -1329,7 +1329,11 @@ class EInvoicing
 				if (!$hasLabel && !$hasDesc) {
 					// The rank places the line on the paper, the rowid is what a correction is addressed to.
 					// Naming both is what lets whoever reads this go straight to the line and fix it.
-					$linesWithNoName[] = ($line->rang ? '#'.((int) $line->rang) : '').' (id '.((int) $line->id).')';
+					// FactureLigne and FactureFournisseurLigne both hold the rank, their common parent
+					// does not declare it, and this reads whichever of the two the invoice carries.
+					// @phan-suppress-next-line PhanUndeclaredProperty
+					$rank = (int) ($line->rang ?? 0);
+					$linesWithNoName[] = ($rank ? '#'.$rank : '').' (id '.((int) $line->id).')';
 				}
 			}
 		}
