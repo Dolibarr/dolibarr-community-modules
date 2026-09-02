@@ -1113,6 +1113,14 @@ class CIIProtocol extends AbstractProtocol
 				}
 			}
 
+			// Insert document level charges (BG-21) as lines of this supplier invoice
+			if (!empty($parsedHeader['headerAllowancesCharges'])) {
+				$chargeRes = $this->createHeaderChargeLines($supplierInvoiceId, $parsedHeader['headerAllowancesCharges'], $return_messages);
+				if ($chargeRes['res'] < 0) {
+					return $chargeRes;
+				}
+			}
+
 			// Create or update supplier prices for imported products
 			if (!empty($supplierPriceEntries)) {
 				require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.product.class.php';
@@ -3390,6 +3398,118 @@ class CIIProtocol extends AbstractProtocol
 
 
 	/**
+	 * Carry the document level charges of a received document (BG-21) as lines of the supplier invoice.
+	 *
+	 * EN 16931 puts two symmetric groups at document level: BG-20, an allowance, which subtracts from the
+	 * total, and BG-21, a charge, which adds to it - freight, packaging, a handling fee. BR-CO-13 defines
+	 * the total of the invoice as
+	 * "Σ Invoice line net amount (BT-131) - Sum of allowances on document level (BT-107)
+	 *  + Sum of charges on document level (BT-108)",
+	 * so a charge is part of what is owed, exactly like a line is.
+	 *
+	 * In CII the two are the same element, ram:SpecifiedTradeAllowanceCharge, told apart only by
+	 * ram:ChargeIndicator/udt:Indicator. The allowances become a DiscountAbsolute, which is the object
+	 * Dolibarr has for them; the charges had nowhere to go, because a supplier invoice holds no positive
+	 * amount at document level, and they were dropped - the invoice then totalled less than the document
+	 * it came from, silently (issue #726).
+	 *
+	 * A line is what a human would key in, so that is what is written here: one line per charge, a single
+	 * unit at the charge amount (BT-99), with the VAT rate the charge declares (BT-103) and the reason it
+	 * gives (BT-104, or its reason code BT-105 when only that is present - BR-38 requires one of the two).
+	 * They are written through createSupplierInvoiceLinesIntoDatabase(), the same path as every other line
+	 * of the import, so nothing new touches the core.
+	 *
+	 * @param	int						$supplierInvoiceId			Id of the invoice being imported
+	 * @param	array<int,array<string,mixed>>	$headerAllowancesCharges	Parsed ram:SpecifiedTradeAllowanceCharge of the header
+	 * @param	array<int,string>		$return_messages			Messages of the import, completed here
+	 * @return	array{res:int,message?:string}						res 1 on success, -1 on failure
+	 */
+	protected function createHeaderChargeLines($supplierInvoiceId, array $headerAllowancesCharges, &$return_messages): array
+	{
+		global $db;
+
+		$chargeLines = $this->buildHeaderChargeLines($headerAllowancesCharges);
+
+		if (empty($chargeLines)) {
+			return ['res' => 1];
+		}
+
+		// Reuse the writer of the import rather than FactureFournisseur::addline(), whose signature moved
+		// between the supported cores: the invoice is reloaded and handed only the lines to add, so the
+		// ones already written are left alone.
+		$carrier = new FactureFournisseur($db);
+		if ($carrier->fetch((int) $supplierInvoiceId) <= 0) {
+			return ['res' => -1, 'message' => 'Failed to reload the supplier invoice to add its document level charges'];
+		}
+		$carrier->lines = $chargeLines;
+
+		if (!$this->createSupplierInvoiceLinesIntoDatabase($carrier)) {
+			return ['res' => -1, 'message' => 'Failed to add the document level charges of the received document as invoice lines'];
+		}
+
+		$return_messages[] = count($chargeLines) . ' document level charge(s) of the received document were added as invoice lines.';
+
+		return ['res' => 1];
+	}
+
+
+	/**
+	 * Turn the document level charges of a received document into the invoice lines that carry them.
+	 *
+	 * Split out of createHeaderChargeLines() because it is the whole decision - which entries are charges,
+	 * what each line is worth and how it is labelled - and it touches neither the database nor the core.
+	 *
+	 * @param	array<int,array<string,mixed>>	$headerAllowancesCharges	Parsed ram:SpecifiedTradeAllowanceCharge of the header
+	 * @return	SupplierInvoiceLine[]										One line per charge, in the order of the document
+	 */
+	protected function buildHeaderChargeLines(array $headerAllowancesCharges)
+	{
+		global $db, $langs;
+
+		if (empty($headerAllowancesCharges)) {
+			return array();
+		}
+
+		$chargeLines = array();
+
+		foreach ($headerAllowancesCharges as $allowanceCharge) {
+			// Charges only (BG-21). The allowances are handled by createHeaderDiscounts().
+			if (($allowanceCharge['indicator'] ?? '') !== 'true') {
+				continue;
+			}
+
+			$actualAmount = (float) ($allowanceCharge['actualAmount'] ?? 0);
+			if ($actualAmount == 0.0) {
+				continue;
+			}
+
+			$reason = trim((string) ($allowanceCharge['reason'] ?? ''));
+			$reasonCode = trim((string) ($allowanceCharge['reasonCode'] ?? ''));
+			if ($reason === '') {
+				// BR-38 accepts a reason code alone, and a bare code says nothing to whoever reads the
+				// invoice, so it is labelled.
+				$reason = $langs->transnoentitiesnoconv('EInvoicingDocumentLevelCharge');
+				if ($reasonCode !== '') {
+					$reason .= ' (' . $reasonCode . ')';
+				}
+			}
+
+			$line = new SupplierInvoiceLine($db);
+			$line->desc = $reason;
+			$line->qty = 1;
+			$line->subprice = $actualAmount;
+			$line->tva_tx = (float) ($allowanceCharge['rateApplicablePercent'] ?? 0);
+			$line->product_type = 1;	// A charge is a service, never a stocked good
+			$line->remise_percent = 0;
+
+			$chargeLines[] = $line;
+		}
+
+		return $chargeLines;
+	}
+
+
+	/**
 	 * Create Dolibarr global discount exceptions from CII header allowances.
 	 *
 	 * Only processes allowances (indicator = "false"), ignores charges (indicator = "true").
@@ -3407,7 +3527,9 @@ class CIIProtocol extends AbstractProtocol
 		$result = [];
 
 		foreach ($headerAllowancesCharges as $index => $allowanceCharge) {
-			// Skip charges
+			// Allowances only (BG-20, ChargeIndicator false). A document level charge (BG-21) adds to the
+			// total instead of subtracting from it, and a discount of Dolibarr can only subtract, so it is
+			// carried as a line of the invoice by createHeaderChargeLines().
 			if (($allowanceCharge['indicator'] ?? '') !== 'false') {
 				continue;
 			}

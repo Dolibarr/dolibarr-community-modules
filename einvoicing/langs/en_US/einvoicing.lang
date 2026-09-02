@@ -361,6 +361,7 @@ CantReadTheDocumentOfTheImportedInvoice=The invoice of flow %s could not be read
 CantFindLinkedInvoiceOfTheImportedInvoice=The received invoice %s refers to the invoice %s, which is not in your database. It is needed to link the two, so the flow was not imported and will be retried on the next synchronization. Record the missing supplier invoice with that exact supplier reference, and it will come in.
 CreateTheMissingSupplierInvoiceToImport=Create the supplier invoice with the reference %s, then let the next synchronization run.
 EInvoicingDeductionOfPreviousSituations=Deduction of the situations already invoiced
+EInvoicingDocumentLevelCharge=Document level charge
 AccessPointConversionFormatNotSet=Your Access Point reports that no conversion format is configured for this client.
 SetTheAccessPointConversionFormat=On your Access Point account, set the preferred conversion format to a syntax supported here (CII or Factur-X, not UBL): it decides in which syntax a received invoice is handed over to this module.
 DisabledInProductionMode=Disabled in production mode.
