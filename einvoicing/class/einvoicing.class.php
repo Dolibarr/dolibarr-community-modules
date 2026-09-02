@@ -1597,7 +1597,7 @@ class EInvoicing
 				$resprints .= $currentStatusInfo['status'];
 			}
 			$resprints .= '</span> ';
-			$resprints .= '<div id="einvoice-info" class="clearboth small opacitymedium valignmiddle inline-block marginleftonly" style="max-width:100%;max-height:8em;overflow:auto;overflow-wrap:anywhere;word-break:break-word;">';
+			$resprints .= '<div id="einvoice-info" class="clearboth small opacitymedium valignmiddle inline-block" style="max-width:100%;max-height:6em;overflow:auto;overflow-wrap:anywhere;word-break:break-word;">';
 			$resprints .= $form->textwithpicto('', $info);
 			$resprints .= '</div>';
 		}
