@@ -2611,9 +2611,16 @@ class EInvoicing
 	 * Gate generation/transmission on the recipient being reachable in the Approved Platforms directory.
 	 *
 	 * Only enforced when EINVOICING_REQUIRE_ROUTABLE_RECIPIENT is on (off by default, opt-in). A recipient
-	 * that is absent from the directory, or present without an active routing line, would be rejected by the
-	 * platform with a routing error (fr:213): blocking generation/sending avoids reaching that error state.
-	 * That option has a second, stricter, value (2) that also blocks a non-conclusive directory answer.
+	 * that is absent from the directory, present without an active routing line, or present without the
+	 * very address this invoice is addressed to, would be rejected by the platform with a routing error
+	 * (fr:213): blocking generation/sending avoids reaching that error state. That option has a second,
+	 * stricter, value (2) that also blocks a non-conclusive directory answer.
+	 *
+	 * What is checked is the electronic address the document will carry (BT-49), read through the same
+	 * getBuyerCommunicationURI() the generation uses, so the gate and the document can never disagree.
+	 * When that address is empty - only reachable with EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID and no
+	 * routing recorded, a configuration the required-information checks already stop - the check falls
+	 * back on any line declared for the SIREN.
 	 *
 	 * Fails open (ok=1) whenever the check cannot be trusted, so it never blocks unexpectedly: option off,
 	 * provider without a directory lookup (status unsupported), directory call error, a directory answer that
@@ -2649,9 +2656,21 @@ class EInvoicing
 			return $res;
 		}
 
-		$dir = $provider->checkRecipientDirectory($siren);
+		// Check the address this very invoice is sent to (BT-49), not merely the SIREN: a recipient can
+		// declare several reception addresses, only the one written into the document decides whether
+		// the transmission is accepted. Same call as getBuyerCommunicationURI() makes at generation, so
+		// what is checked and what is emitted can never drift apart.
+		$routingid = $this->getBuyerCommunicationURI($object->thirdparty, $object);
+
+		$dir = $provider->checkRecipientDirectory($siren, $routingid);
 		$res['status'] = isset($dir['status']) ? $dir['status'] : 'error';
-		if ($res['status'] === 'absent') {
+		if ($res['status'] === 'unknownaddress') {
+			// The address the invoice carries is not declared in the directory for that SIREN. Falling
+			// back on another line that happens to be open would send to an address nobody chose, so
+			// this is a hard stop: whoever recorded the routing identifier owns that decision.
+			$res['ok'] = 0;
+			$res['message'] = $langs->trans('EInvoicingDirectoryAddressNotDeclared', $routingid, $siren);
+		} elseif ($res['status'] === 'absent') {
 			$res['ok'] = 0;
 			$res['message'] = $langs->trans('EInvoicingDirectoryAbsent', $siren);
 		} elseif ($res['status'] === 'inactive') {
