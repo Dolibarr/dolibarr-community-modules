@@ -314,6 +314,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		$einvoicing = new EInvoicing($db);
 		$checkConfig = $einvoicing->checkModulePrerequisites();
 		if ($checkConfig < 0) {
+			print 'Warning: Einvoicing module enabled but no provider defined in setup';
 			dol_syslog(__METHOD__ . "EINVOICING Module is not correctly configured.");
 			return 0;
 		}
@@ -509,6 +510,17 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			}
 		}
 
+		// Add button to change the entity (multi-company) of a supplier invoice
+		if (getDolGlobalString('EINVOICING_ALLOW_MULTICOMPANY_INVOICE_MOVE') && isModEnabled('multicompany') && in_array($object->element, ['invoice_supplier']) && !empty($object->id) && $user->hasRight('fournisseur', 'facture', 'creer')) {
+			if ($object->isEditable()) {
+				print '<a class="butAction" href="' . DOL_URL_ROOT . '/fourn/facture/card.php?id=' . $object->id . '&action=change_entity&token=' . newToken() . '">'
+					. $langs->trans('ChangeEntity') . '</a>';
+			} else {
+				print '<span class="butActionRefused classfortooltip" title="' . dol_escape_htmltag($langs->trans('DisabledBecauseNotEditable')) . '">'
+					. $langs->trans('ChangeEntity') . '</span>';
+			}
+		}
+
 		return 0;
 	}
 
@@ -523,7 +535,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 */
 	public function doActions($parameters, $object, &$action, $hookmanager)
 	{
-		global $db, $langs, $user;
+		global $db, $langs, $user, $conf;
 
 		if (empty($action)) {
 			return 0;
@@ -738,6 +750,54 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					$error++;
 					$this->errors = array_merge($this->errors, $provider->errors);
 					setEventMessages($result['message'], $provider->errors, 'errors');
+				}
+			}
+
+			// Action to change the entity (multi-company) of a supplier invoice
+			if ($action == 'confirm_change_entity' && $permissiontoedit) {
+				$newEntity = GETPOSTINT('new_entity');
+				if ($newEntity > 0) {
+					// Check that the supplier (fk_soc) is visible in the target entity
+					$socId = (int) $object->socid;
+					$socVisible = false;
+					if ($socId > 0) {
+						// Get the entity of the thirdparty
+						$sqlSoc = "SELECT entity FROM " . $db->prefix() . "societe WHERE rowid = " . ((int) $socId);
+						$resqlSoc = $db->query($sqlSoc);
+						if ($resqlSoc) {
+							$objSoc = $db->fetch_object($resqlSoc);
+							$db->free($resqlSoc);
+							if ($objSoc) {
+								// Temporarily switch to the target entity to compute getEntity('societe')
+								$savedEntity = $conf->entity;
+								$conf->entity = $newEntity;
+								$visibleEntities = getEntity('societe');
+								$conf->entity = $savedEntity;
+
+								$socEntity = (int) $objSoc->entity;
+								$visibleArray = explode(',', $visibleEntities);
+								$socVisible = in_array($socEntity, array_map('intval', $visibleArray));
+							}
+						}
+					}
+
+					if (!$socVisible) {
+						$error++;
+						setEventMessages($langs->trans('ErrorSupplierNotVisibleInEntity', $object->thirdparty->name ?? $socId, $newEntity), null, 'errors');
+					} else {
+						$result = $object->setValueFrom('entity', $newEntity);
+						if ($result > 0) {
+							setEventMessages($langs->trans('EntityChangedSuccess', $newEntity), null, 'mesgs');
+							header("Location: " . $_SERVER['PHP_SELF'] . '?id=' . $object->id);
+							exit;
+						} else {
+							$error++;
+							setEventMessages($object->error, $object->errors, 'errors');
+						}
+					}
+				} else {
+					$error++;
+					setEventMessages($langs->trans('ErrorEntityRequired'), null, 'errors');
 				}
 			}
 		}
@@ -1175,6 +1235,52 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					250
 				);
 
+				$this->resprints .= $formconfirm;
+			}
+
+			// Confirmation popup to change the entity (multi-company) of a supplier invoice
+			if ($action == 'change_entity') {
+				$form = new Form($db);
+
+				// Build the dropdown of entities from the multicompany module
+				$entityList = array();
+				if (isModEnabled('multicompany')) {
+					dol_include_once('/multicompany/class/dao_multicompany.class.php');
+					// @phan-suppress-next-line PhanUndeclaredClassMethod DaoMulticompany is an external module class not analyzed by phan
+					$mc = new DaoMulticompany($db);
+					// @phan-suppress-next-line PhanUndeclaredClassMethod DaoMulticompany is an external module class not analyzed by phan
+					if ($mc->getEntities(false, false, true) > 0) {
+						// @phan-suppress-next-line PhanUndeclaredClassProperty DaoMulticompany is an external module class not analyzed by phan
+						foreach ($mc->entities as $entityId => $entityObj) {
+							if ($entityId == $object->entity) {
+								continue;	// Do not offer the current entity
+							}
+							$entityList[$entityId] = $entityObj->label;
+						}
+					}
+				}
+
+				$formquestion = array(
+					array(
+						'type' => 'select',
+						'name' => 'new_entity',
+						'label' => $langs->trans('EntityNumber'),
+						'values' => $entityList,
+						'default' => '',
+						'select_show_empty' => 1,
+						'select_key_in_label' => 1
+					)
+				);
+				$formconfirm = $form->formconfirm(
+					DOL_URL_ROOT . '/fourn/facture/card.php?id=' . $object->id . '&action=confirm_change_entity',
+					$langs->trans('ChangeEntity'),
+					$langs->trans('ConfirmChangeEntity', (string) $object->ref),
+					'confirm_change_entity',
+					$formquestion,
+					'yes',
+					1,
+					250
+				);
 				$this->resprints .= $formconfirm;
 			}
 		}

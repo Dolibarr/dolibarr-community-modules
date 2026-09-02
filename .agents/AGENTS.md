@@ -111,8 +111,9 @@ Before any modification, verify:
 - Multi-entity compatibility (add ` AND entity IN ('.getDolEntity("tablename").')`)
 
 If possible:
-- If doing an external module, add a PHPUnit test file in `yourmoduledir/test/phpunit/`
-- If modifying the Dolibarr code project, add a PHPUnit test file into `test/phpunit/` and add the entry into file `test/phpunit/AllTests.php`.
+- If making an external module, add a PHPUnit test file in `yourmoduledir/test/phpunit/`
+- If a robust validation of code is explicitely requested, you can check code and dev syntax rules by running the following command on modified files (it takes a long time):
+	`phan -k .phan/config.php -B dev/tools/phan/baseline.txt --analyze-twice --minimum-target-php-version 7.2 --exclude-directory-list=dev/tools,mymodule/test/,mymodule/doc/,mymodule/langs/,mymodule/vendor/ --output-mode=checkstyle filemodified1.php filemodified2.php ...`
 
 
 ---
