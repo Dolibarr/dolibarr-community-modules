@@ -131,6 +131,8 @@ class AllTests
 		$suite->addTestSuite('NegativeLineAmountTest');
 		require_once dirname(__FILE__).'/PDPProviderManagerTest.php';
 		$suite->addTestSuite('PDPProviderManagerTest');
+		require_once dirname(__FILE__).'/RedirectUrlAllowlistTest.php';
+		$suite->addTestSuite('RedirectUrlAllowlistTest');
 		require_once dirname(__FILE__).'/RecipientDirectoryTest.php';
 		$suite->addTestSuite('RecipientDirectoryTest');
 		require_once dirname(__FILE__).'/SellerVatRegimeTest.php';

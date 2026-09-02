@@ -1014,3 +1014,69 @@ function einvoicingVatBreakdownKey($categoryVAT, $rate, $exemptionReasonCode = '
 {
 	return $categoryVAT.'|'.$rate.'|'.$exemptionReasonCode.'|'.$exemptionReason;
 }
+
+/**
+ * Tell whether an URL may be used as the target of a redirect made by the OAuth proxy.
+ *
+ * public/proxy_oauthcallback.php is reachable without authentication (NOLOGIN) and hands the caller
+ * back to an address the caller itself supplied in redirect_uri. On the callback branch that address
+ * receives the freshly issued access_token and refresh_token in its query string, so whoever controls
+ * it controls the tokens: the destination is a trust decision, not a formatting detail, and it must be
+ * taken in one single place for every redirect of that page.
+ *
+ * The allowed destinations are the domains listed in EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN, comma
+ * separated. When that constant is empty the only trusted domain is the one of this very instance:
+ * a proxy deployment that serves partner domains has to name them explicitly. Refusing by default is
+ * the whole point - an unset option used to mean "no check at all", which let any third party drive
+ * the flow and collect the tokens on a host of its choice.
+ *
+ * Two shapes are refused whatever the allowlist says:
+ *  - anything that is not an absolute http(s) URL, so that "javascript:" payloads and the scheme
+ *    relative "//evil.tld" (which a browser resolves to the attacker host) never reach a Location header;
+ *  - a host that merely ends with an allowed domain. Matching on the suffix alone accepts
+ *    "notpartner.tld" for "partner.tld", so the comparison is on the host itself or on a dot boundary.
+ *
+ * @param	string	$url	Candidate destination, as received from the caller
+ * @return	bool			True when the URL may be passed to header('Location: ...')
+ */
+function einvoicingIsAllowedRedirectUrl($url)
+{
+	$url = trim((string) $url);
+	if ($url === '') {
+		return false;
+	}
+	if (!preg_match('#^https?://#i', $url)) {
+		return false;
+	}
+
+	$host = parse_url($url, PHP_URL_HOST);
+	if (!is_string($host) || $host === '') {
+		return false;
+	}
+	$host = strtolower($host);
+
+	$alloweddomains = getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN');
+	if ($alloweddomains === '') {
+		// No partner domain declared: this instance is the only destination we can vouch for.
+		$ownhost = parse_url(DOL_MAIN_URL_ROOT, PHP_URL_HOST);
+		if (!is_string($ownhost) || $ownhost === '') {
+			return false;
+		}
+		$alloweddomains = $ownhost;
+	}
+
+	foreach (explode(',', $alloweddomains) as $alloweddomain) {
+		$alloweddomain = strtolower(trim($alloweddomain, " \t\n\r\0\x0B."));
+		if ($alloweddomain === '') {
+			continue;
+		}
+		if ($host === $alloweddomain) {
+			return true;
+		}
+		if (substr($host, -(strlen($alloweddomain) + 1)) === '.'.$alloweddomain) {
+			return true;
+		}
+	}
+
+	return false;
+}

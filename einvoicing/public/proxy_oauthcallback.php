@@ -204,11 +204,17 @@ if ($action != 'delete' && !GETPOST('afteroauthloginreturn') && (empty($statewit
 		// State or permissions are missing - log and redirect with error
 		dol_syslog("state or statewithscopeonly and/or requestedpermissionsarray are empty");
 
-		$backtourl = GETPOST('redirect_uri').(strpos(GETPOST('redirect_uri'), '?') !== false ? '&' : '?').'error=scopeundefined';
+		$requestedredirecturi = GETPOST('redirect_uri');
 
-		// TODO Test that backtourl start with the allowed domain
-		//var_dump($backtourl);exit;
+		// This branch answers before the allowlist test further down in the page, and it exits, so
+		// that test never sees it: the destination has to be checked right here or not at all.
+		if (!einvoicingIsAllowedRedirectUrl($requestedredirecturi)) {
+			http_response_code(400);
+			print 'Error, the redirect_uri ('.dol_escape_htmltag($requestedredirecturi).') is not among the allowed domains.';
+			exit;
+		}
 
+		$backtourl = $requestedredirecturi.(strpos($requestedredirecturi, '?') !== false ? '&' : '?').'error=scopeundefined';
 
 		header('Location: '.$backtourl);
 		exit();
@@ -249,21 +255,13 @@ if ($emailregistration) {
 
 $save_redirect_uri = GETPOST('redirect_uri');
 
-// Test that redirect_uri match an allowed url/domain
-if ($save_redirect_uri && getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN')) {		// Example: domainofproxycompany.com
-	$domainofuser = getDomainFromURL($save_redirect_uri, 2);
-	$alloweddomains = explode(',', getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN'));
-	$allowed = 0;
-	foreach ($alloweddomains as $allowedomain) {
-		if (preg_match('/'.preg_quote($allowedomain, '/').'$/', $domainofuser)) {
-			$allowed = 1;
-			break;
-		}
-	}
-	if (!$allowed) {
-		print 'Error, the domain of the requester ('.$domainofuser.') extracted from redirect_uri ('.$save_redirect_uri.') is not among allowed domains.';
-		exit;
-	}
+// Test that redirect_uri match an allowed url/domain.
+// The check runs whether or not EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN is set: an unset option
+// used to skip it entirely, and this address is where the tokens are delivered further down.
+if ($save_redirect_uri && !einvoicingIsAllowedRedirectUrl($save_redirect_uri)) {		// Example of the option: domainofproxycompany.com
+	http_response_code(400);
+	print 'Error, the redirect_uri ('.dol_escape_htmltag($save_redirect_uri).') is not among allowed domains.';
+	exit;
 }
 
 
@@ -343,8 +341,7 @@ if (empty($code) && !GETPOST('error')) {
 		if (preg_match('/^[a-z0-9]+\-(.*)/', $state, $reg)) {
 			$origin_redirect_uri = urldecode($reg[1]);
 		}
-		if ($origin_redirect_uri) {
-			// TODO Test that origin_redirect_uri start with the allowed domain
+		if ($origin_redirect_uri && einvoicingIsAllowedRedirectUrl($origin_redirect_uri)) {
 			print '<a href="'.dol_escape_htmltag($origin_redirect_uri).'">Go back to setup page...</a>';
 			print '<br>';
 		}
@@ -393,6 +390,16 @@ if (empty($code) && !GETPOST('error')) {
 					$origin_redirect_uri = $reg[1];
 				}
 				$origin_redirect_uri = urldecode($origin_redirect_uri);
+
+				// The tokens are about to be appended to this address and handed to the browser. It comes
+				// back from the state parameter, so it is caller controlled: check it before it can carry
+				// anything, and never build the URL at all when it is refused.
+				if ($origin_redirect_uri !== '' && !einvoicingIsAllowedRedirectUrl($origin_redirect_uri)) {
+					dol_syslog("Refused origin_redirect_uri, not among allowed domains: ".$origin_redirect_uri, LOG_WARNING);
+					http_response_code(400);
+					print 'Error, the redirect_uri ('.dol_escape_htmltag($origin_redirect_uri).') is not among allowed domains. No token has been delivered.';
+					exit;
+				}
 
 				if (empty($resultget['curl_error_no']) && isset($resultget['http_code']) && $resultget['http_code'] == 200) {
 					dol_syslog("From state, we have origin_redirect_uri=".$origin_redirect_uri);
