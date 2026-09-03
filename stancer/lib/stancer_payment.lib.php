@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2023-2026 Eric Seigne <eric.seigne@cap-rel.fr>
+ * Copyright (C) 2026		MDW			<mdeweerd@users.noreply.github.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -512,7 +513,7 @@ function stancerSEPAstartPay($object, $userMessage = true, $companypaymentmodeid
 			if ($sp->isInitPaid()) {
 				dol_syslog("stancer SEPA error (transaction already in progress, status is " . $sp->getLabelStatus() . ")", LOG_DEBUG);
 			} else {
-				dol_syslog("stancer SEPA warning (transaction in progress but not successfull : status is " . $sp->getLabelStatus() . ")", LOG_DEBUG);
+				dol_syslog("stancer SEPA warning (transaction in progress but not successful : status is " . $sp->getLabelStatus() . ")", LOG_DEBUG);
 			}
 
 			$url = "<a href='" . dol_buildpath("/stancer/stancer_payments_list.php", 2) . "?search_stancer_id=" . $sp->stancer_id . "&token=" . newToken() . "'>";
@@ -585,7 +586,7 @@ function stancerSEPAstartPay($object, $userMessage = true, $companypaymentmodeid
 		$sp->fillDataArray($data);
 		$res = $sp->create($user, true);
 		if ($res) {
-			$message = $langs->trans("Nice, Stancer SEPA payement is engaged !");
+			$message = $langs->trans("Nice, Stancer SEPA payment is engaged !");
 			$returnCode = 0;
 
 			$stc = new Stancer($db);
@@ -1192,7 +1193,7 @@ function stancerCBstartPay($object, $userMessage = true, $companypaymentmodeid =
 		$sp->fillDataArray($data);
 		$res = $sp->create($user, true);
 		if ($res) {
-			$message = $langs->trans("Nice, Stancer CB payement is engaged !");
+			$message = $langs->trans("Nice, Stancer CB payment is engaged !");
 
 			$stc = new Stancer($db);
 			$stc->createEvent($object, "stancer_cb_start", $langs->trans("StancerPayCB"), $langs->trans("StancerPayAmountStarted", $amountToPay));
@@ -1391,7 +1392,7 @@ function stancerMakeTAG($object, $addUnique = false)
 		$totaldeposits = $object->getSumDepositsUsed();
 		$resteapayer = (float) price2num($object->total_ttc - $totalpaye - $totalcreditnotes - $totaldeposits, 'MT');
 		if ($resteapayer != (float) price2num($object->total_ttc)) {
-			dol_syslog("stancerMakeTAG invoice non full payed, add SEQ tag");
+			dol_syslog("stancerMakeTAG invoice non full paid, add SEQ tag");
 			$list = $object->getListOfPayments();
 			$numPaiement = count($list);
 			// print "<p>FACTURE : $ref reste à payer $resteapayer num=$numPaiement</p>";
@@ -1637,7 +1638,7 @@ function stancerGetOutstandingBills($customerID, $late = 0, $paymentMode = "CB")
 					// @phan-suppress-next-line PhanDeprecatedProperty  $paye is the column Dolibarr 15..21 fills and still writes; status==2 also covers abandoned invoices
 					$obj->paye == 0
 					&& $obj->status != $object::STATUS_DRAFT    	// Not a draft
-					&& $obj->status != $object::STATUS_ABANDONED	// Not abandonned
+					&& $obj->status != $object::STATUS_ABANDONED	// Not abandoned
 					&& $obj->status != $object::STATUS_CLOSED		// Not classified as paid
 					&& $obj->status != $object::STATUS_CLOSED		// Not classified as paid
 					&& $obj->mode_reglement_code == $paymentMode

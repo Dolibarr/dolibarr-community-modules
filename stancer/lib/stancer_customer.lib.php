@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2023-2026 Eric Seigne <eric.seigne@cap-rel.fr>
+ * Copyright (C) 2026		MDW			<mdeweerd@users.noreply.github.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -1223,7 +1224,7 @@ function stancerAddCompanyPaymentModeifNeeded($data)
 
 /**
  * return html code to display online link to for public page where your customer cand add their
- * bank account by themselve
+ * bank account by themselves
  *
  * @param   int  $socid     socid
  * @param   string  $name   soc name
@@ -1243,7 +1244,7 @@ function stancerShowOnlineIBANLinkForCustomer($socid, $name)
 
 /**
  * return html code to display online link to for public page where your customer cand add their
- * bank account by themselve
+ * bank account by themselves
  *
  * @param   int  $socid     socid
  * @param   string  $name   soc name
@@ -1288,7 +1289,7 @@ function stancerShowOnlineIBANDataForCustomer($socid, $name)
 
 /**
  * return html code to display online link to for public page where your customer cand add their
- * credit card id by themselve
+ * credit card id by themselves
  *
  * @param   int  $socid     socid
  * @param   string  $name   soc name

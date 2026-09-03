@@ -1,4 +1,6 @@
 <?php
+/* Copyright (C) 2026		MDW	<mdeweerd@users.noreply.github.com>
+ */
 // phpcs:ignoreFile Upstream code, coding style is the one of github.com/globalcitizen/php-iban
 /**
  * Upstream php-iban codebase, kept unmodified.
@@ -154,7 +156,7 @@ function iban_verify_checksum($iban)
 	$iban = iban_to_machine_format($iban);
 	// move first 4 chars (countrycode and checksum) to the end of the string
 	$tempiban = substr($iban, 4).substr($iban, 0, 4);
-	// subsitutute chars
+	// substitute chars
 	$tempiban = iban_checksum_string_replace($tempiban);
 	// mod97-10
 	$result = iban_mod97_10($tempiban);
@@ -926,7 +928,7 @@ function _iban_nationalchecksum_implementation_dj($iban, $mode)
 	return _iban_nationalchecksum_implementation_fr($iban, $mode);
 }
 
-// Implement the national checksum for an Equitorial Guinea (GQ) IBAN
+// Implement the national checksum for an Equatorial Guinea (GQ) IBAN
 function _iban_nationalchecksum_implementation_gq($iban, $mode)
 {
 	return _iban_nationalchecksum_implementation_fr($iban, $mode);
