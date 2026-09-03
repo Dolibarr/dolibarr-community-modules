@@ -137,6 +137,18 @@ class CdarHandler
 	}
 
 	/**
+	 * @var string	Electronic address (MDT-73) the last CDAR was addressed to
+	 */
+	public $recipientURIID = '';
+
+	/**
+	 * @var string	Where that address came from: 'routing' (recorded in Dolibarr), 'einvoice' (BT-34 of
+	 *				the document received), 'directory' (access point directory), 'thirdpartyid' or
+	 *				'issuerid' (fallen back on an identifier of the vendor)
+	 */
+	public $recipientURIIDOrigin = '';
+
+	/**
 	 * readFromString
 	 *
 	 * @param  string $xmlString xml string
@@ -320,13 +332,19 @@ class CdarHandler
 		//      alone: the invoice-level routing override it also knows about is looked up among the customer
 		//      invoices (element_type = 'facture'), which a supplier invoice must not read.
 		$RecipientURIID = $InvoiceIssuerGlobalID;
+		$this->recipientURIIDOrigin = 'issuerid';
 		if ($statusCode != 212 && $object->thirdparty instanceof Societe) {
 			$vendorRouting = $einvoicing->fetchDefaultRouting($object->thirdparty->id);
 			$vendorURIID = ($vendorRouting > 0) ? $einvoicing->removeSpaces((string) $vendorRouting) : '';	// 0 when none is recorded, -1 on error
 
+			if ($vendorURIID !== '') {
+				$this->recipientURIIDOrigin = 'routing';
+			}
+
 			if ($vendorURIID === '') {
 				$vendorURIID = $einvoicing->removeSpaces($vendorIdentity['uriid']);
 				if ($vendorURIID !== '') {
+					$this->recipientURIIDOrigin = 'einvoice';
 					dol_syslog(__METHOD__ . ' no routing ID recorded for vendor SIREN ' . $InvoiceIssuerGlobalID . ', replying to the electronic address of the invoice it sent us: ' . $vendorURIID, LOG_NOTICE);
 				}
 			}
@@ -340,6 +358,7 @@ class CdarHandler
 					$directory = $provider->checkRecipientDirectory($InvoiceIssuerGlobalID);
 					if (!empty($directory['identifier'])) {
 						$vendorURIID = $einvoicing->removeSpaces($directory['identifier']);
+						$this->recipientURIIDOrigin = 'directory';
 						dol_syslog(__METHOD__ . ' nothing known about how to reach vendor SIREN ' . $InvoiceIssuerGlobalID . ', using the address the directory declares for it: ' . $vendorURIID, LOG_NOTICE);
 					} else {
 						dol_syslog(__METHOD__ . ' nothing known about how to reach vendor SIREN ' . $InvoiceIssuerGlobalID . ' and the directory returned none (' . $directory['status'] . '), falling back on the SIREN as electronic address: the platform will refuse the status if it does not know the vendor under that address', LOG_WARNING);
@@ -349,12 +368,23 @@ class CdarHandler
 
 			if ($vendorURIID === '') {
 				$vendorURIID = $einvoicing->getBuyerCommunicationURI($object->thirdparty);
+				if ($vendorURIID !== '') {
+					$this->recipientURIIDOrigin = 'thirdpartyid';
+				}
 			}
 
 			if ($vendorURIID !== '') {	// Empty with EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID and no routing: keep the SIREN, an empty MDT-73 is worse
 				$RecipientURIID = $vendorURIID;
+			} else {
+				$this->recipientURIIDOrigin = 'issuerid';
 			}
 		}
+		// The platform answers "Electronic address (MDT-73) is invalid" when it does not know the vendor
+		// under the address chosen above, and its message names neither the vendor nor the address. Keep
+		// both so the caller can say which one was tried and where it came from: without that, a received
+		// invoice that can be neither approved nor refused - and therefore not deleted - leaves the user
+		// with nothing to act on.
+		$this->recipientURIID = $RecipientURIID;
 
 		// MDG-43 blocks. Rule BR-FR-CDV-14: a "Encaissee" status (212) must carry at least one block with
 		// MDT-207 = MEN, and every MEN block must hold both an amount (MDT-215) and a VAT rate (MDT-224).
