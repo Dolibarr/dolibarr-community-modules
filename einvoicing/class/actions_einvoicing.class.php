@@ -568,11 +568,11 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			return 0;
 		}
 
-		$db->begin();
-
 		if ($isFactureContext) {
 			'@phan-var-force Facture $object';
 			$permissiontoedit = $user->hasRight('facture', 'write');
+
+			$db->begin();
 
 			if ($action == 'add') {
 				// On create, we can do nothing here. We will update the einvoice status into the CREATE trigger.
@@ -714,10 +714,20 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					setEventMessages($langs->trans("InvoicePrecheckFailed"), array(), 'errors');
 				}
 			}
+
+			if ($error) {
+				$db->rollback();
+				return -1;
+			} else {
+				$db->commit();
+				return 0;
+			}
 		}
 
 
 		if ($isSupplierInvoiceContext) {
+			$db->begin();
+
 			$permissiontoedit = $user->hasRight('fournisseur', 'facture', 'creer');
 
 			if ($action == 'confirm_sendStatusMessage' && $permissiontoedit) {
@@ -738,6 +748,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 						dol_syslog(__METHOD__ . ' ' . strip_tags($message), LOG_WARNING, 0, '_einvoicing');
 						setEventMessages($message, array(), 'errors');
 						$this->errors[] = $message;
+
+						$db->commit();
 
 						return 0;
 					}
@@ -814,9 +826,24 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					setEventMessages($langs->trans('ErrorEntityRequired'), null, 'errors');
 				}
 			}
+
+			if ($error) {
+				$db->rollback();
+				return -1;
+			} else {
+				$db->commit();
+
+				if ($redirectto) {
+					header("Location: " . $redirectto);
+					exit;
+				}
+				return 0;
+			}
 		}
 
 		if ($isThirdpartyContext) {
+			$db->begin();
+
 			$permissiontoedit = $user->hasRight('societe', 'creer');
 
 			// $object->id may be empty at hook time if core hasn't fetched the object yet
@@ -892,20 +919,17 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					}
 				}
 			}
-		}
 
-		if ($error) {
-			$db->rollback();
-			return -1;
-		} else {
-			$db->commit();
-
-			if ($redirectto) {
-				header("Location: " . $redirectto);
-				exit;
+			if ($error) {
+				$db->rollback();
+				return -1;
+			} else {
+				$db->commit();
+				return 0;
 			}
-			return 0;
 		}
+
+		return 0;
 	}
 
 	/**
