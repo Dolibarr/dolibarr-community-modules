@@ -611,8 +611,7 @@ if ($num == 1 && getDolGlobalInt('MAIN_SEARCH_DIRECT_OPEN_IF_ONLY_ONE') && $sear
 // Output page
 // --------------------------------------------------------------------
 
-llxHeader('', $title, $help_url, '', 0, 0, $morejs, $morecss, '', 'mod-einvoicing page-list bodyforlist');	// Can use also classforhorizontalscrolloftabs instead of bodyforlist for a horizontal scroll in the table instead of page
-
+llxHeader('', $title.' '.trim(file_get_contents('VERSION')), $help_url, '', 0, 0, $morejs, $morecss, '', 'mod-einvoicing page-list bodyforlist');	// Can use also classforhorizontalscrolloftabs instead of bodyforlist for a horizontal scroll in the table instead of page
 
 if (getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP") && $conf->entity != getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP")) {
 	print $langs->trans("EInvoicingInfoManagedByMasterSetup", getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP"));
@@ -716,7 +715,6 @@ if ($provider) {
 }
 
 print_barre_liste($title, $page, $_SERVER["PHP_SELF"], $param, $sortfield, $sortorder, $massactionbutton, $num, $nbtotalofrecords, $object->picto, 0, $newcardbutton, '', $limit, 0, 0, 1);
-print "\n".'<!-- Einvoicing version '.file_get_contents('VERSION').' -->'."\n\n";
 
 // Add code for pre mass action (confirmation or email presend form)
 $topicmail = "SendDocumentRef";
