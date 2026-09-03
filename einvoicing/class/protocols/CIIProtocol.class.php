@@ -3253,8 +3253,14 @@ class CIIProtocol extends AbstractProtocol
 		// exist, the path falls back to the reference of the invoice, and the document is written into a
 		// directory the card never reads - so a received e-invoice was shown nowhere.
 		$folder_part = get_exdir($supplierInvoice->id, 2, 0, 0, $supplierInvoice, 'invoice_supplier');
-		$relative_path = 'fournisseur/facture/' . $folder_part . dol_sanitizeFileName($supplierInvoice->ref);
-		$upload_dir = $conf->fournisseur->dir_output . '/facture/' . $folder_part . dol_sanitizeFileName($supplierInvoice->ref);
+
+		if ($supplierInvoice->entity > 1) {
+			$relative_path = $supplierInvoice->entity.'/fournisseur/facture/' . $folder_part . dol_sanitizeFileName($supplierInvoice->ref);
+			$upload_dir = DOL_DATA_ROOT.'/'.$relative_path;
+		} else {
+			$relative_path = 'fournisseur/facture/' . $folder_part . dol_sanitizeFileName($supplierInvoice->ref);
+			$upload_dir = $conf->fournisseur->dir_output . '/facture/' . $folder_part . dol_sanitizeFileName($supplierInvoice->ref);
+		}
 
 		if (!file_exists($upload_dir)) {
 			if (!dol_mkdir($upload_dir)) {
