@@ -75,6 +75,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 		parent::__construct($db);
 
+		$envislive = getDolGlobalInt('EINVOICING_LIVE');
+
 		$this->config = array(
 			'provider_url'  => 'https://superpdp.tech/',
 			'prod_auth_url' => 'https://api.superpdp.tech/oauth2/',
@@ -84,12 +86,28 @@ class SuperPDPProvider extends AbstractPDPProvider
 			'ap_api_url' 	=> 'https://api.superpdp.tech/v1.beta/',
 			'prod_afnor_directory_url' => 'https://api.superpdp.tech/afnor-directory/',
 			'test_afnor_directory_url' => 'https://api.superpdp.tech/afnor-directory/',
-			'client_id'     => getDolGlobalString('EINVOICING_SUPERPDP_CLIENT_ID'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '')),
-			'client_secret' => getDolGlobalString('EINVOICING_SUPERPDP_CLIENT_SECRET'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '')),
+			'client_id'     => getDolGlobalString('EINVOICING_SUPERPDP_CLIENT_ID'.($envislive ? '_PROD' : '')),
+			'client_secret' => getDolGlobalString('EINVOICING_SUPERPDP_CLIENT_SECRET'.($envislive ? '_PROD' : '')),
 			'dol_prefix'    => getDolGlobalString('EINVOICING_PDP') == 'SUPERPDPViaPartner' ? 'EINVOICING_SUPERPDPVIAPARTNER' : 'EINVOICING_SUPERPDP',
 			'has_validator' => 1,
-			'live' => getDolGlobalInt('EINVOICING_LIVE', 0)
+			'live' => $envislive
 		);
+
+		if (isModEnabled('multicompany') && getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP")) {
+			// We are in a multicompany environment where supplier invoices are retrieved from the Access Point by the master entity only and moved manually
+			// into another environment manually (All env have the same SIREN).
+			// So when on a slave env, we need to use the master setup so a slave can send answers to the Access Point.
+			include_once DOL_DOCUMENT_ROOT . '/core/lib/admin.lib.php';
+
+			$entitymaster = getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP");
+
+			$envislive = dolibarr_get_const($db, 'EINVOICING_LIVE', $entitymaster);
+
+			$this->config['client_id'] = dolibarr_get_const($db, 'EINVOICING_SUPERPDP_CLIENT_ID'.($envislive ? '_PROD' : ''), $entitymaster);
+			$this->config['client_secret'] = dolibarr_get_const($db, 'EINVOICING_SUPERPDP_CLIENT_SECRET'.($envislive ? '_PROD' : ''), $entitymaster);
+			$this->config['dol_prefix'] = dolibarr_get_const($db, 'EINVOICING_SUPERPDP_CLIENT_ID', $entitymaster) == 'SUPERPDPViaPartner' ? 'EINVOICING_SUPERPDPVIAPARTNER' : 'EINVOICING_SUPERPDP';
+			$this->config['live'] = $envislive;
+		}
 
 		// Default mode
 		$this->helpToGetCredentials = '<div class="">' . $langs->trans("EINVOICING_SUPERPDP_HELP_CREDENTIAL1") . '</div>';
@@ -108,7 +126,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$this->callbackurl = $redirect_uri;
 
 		// Retrieve and complete the OAuth token information from the database
-		$this->tokenData = $this->fetchOAuthTokenDB();
+		$this->tokenData = $this->fetchOAuthTokenDB(getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP"));
 
 		/*
 		$exchangeProtocolConf = getDolGlobalString('EINVOICING_PROTOCOL');
@@ -582,7 +600,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 					$body = json_decode($resultget['content'], true);
 					if (is_array($body) && !empty($body['access_token']) && isset($body['expires_in'])) {
 						$this->saveOAuthTokenDB($body['access_token'], $body['refresh_token'] ?? $this->tokenData['refresh_token'], $body['expires_in']);
-						$this->tokenData = $this->fetchOAuthTokenDB();
+						$this->tokenData = $this->fetchOAuthTokenDB(getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP"));
 						return $body['access_token'];
 					}
 				}
@@ -610,7 +628,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 			if ($status_code == 200 && is_array($body) && isset($body['access_token']) && isset($body['expires_in'])) {
 				// Persist the rotated refresh_token (keep the previous one if the server did not rotate it).
 				$this->saveOAuthTokenDB($body['access_token'], $body['refresh_token'] ?? $this->tokenData['refresh_token'], $body['expires_in']);
-				$this->tokenData = $this->fetchOAuthTokenDB();
+				$this->tokenData = $this->fetchOAuthTokenDB(getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP"));
 				return $body['access_token'];
 			}
 			// Refresh failed (refresh token expired or already rotated away): fall through to a full re-auth.
@@ -723,7 +741,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 		if ($status_code == 200 && is_array($body) && isset($body['access_token']) && isset($body['expires_in'])) {
 			$this->saveOAuthTokenDB($body['access_token'], $body['refresh_token'] ?? '', $body['expires_in']);
-			$this->tokenData = $this->fetchOAuthTokenDB();
+			$this->tokenData = $this->fetchOAuthTokenDB(getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP"));
 			return $body['access_token'];
 		}
 
@@ -733,6 +751,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 	/**
 	 * Delete access token.
+	 * Called by the setup page only.
 	 *
 	 * @return 	bool                	       	True if success, false otherwise
 	 */

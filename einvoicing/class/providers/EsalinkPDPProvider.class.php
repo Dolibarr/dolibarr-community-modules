@@ -85,7 +85,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$this->helpToGetCredentials .= '<br>' . $langs->trans("EINVOICING_ESALINKP_HELP_CREDENTIAL2", '{s1}');
 
 		// Retrieve and complete the OAuth token information from the database
-		$this->tokenData = $this->fetchOAuthTokenDB();
+		$this->tokenData = $this->fetchOAuthTokenDB(getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP"));
 
 		/*
 		$exchangeProtocolConf = getDolGlobalString('EINVOICING_PROTOCOL');
@@ -356,6 +356,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 	/**
 	 * Delete access token.
+	 * Called by the setup page only.
 	 *
 	 * @return 	bool                	       	True if success, false otherwise
 	 */

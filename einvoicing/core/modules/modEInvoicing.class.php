@@ -118,8 +118,17 @@ class modEInvoicing extends DolibarrModules
 			),
 			// Set here all hooks context managed by module. To find available hook context, make a "grep -r '>initHooks(' *" on source code. You can also set hook context to 'all'
 			/* BEGIN MODULEBUILDER HOOKSCONTEXTS */
+			// The module reacts on the invoice, supplier invoice, thirdparty and product cards, on the lists
+			// that carry its columns, on the document generation, and on the REST API (thirdparty merge and
+			// invoice set back to draft go through hooks there too). Contexts are listed one by one on purpose:
+			// 'all' loads this class into every HookManager of the request, including the ones other modules
+			// build for their own contexts.
 			'hooks' => [
-				'all', 'invoicecard'
+				'invoicecard', 'invoicesuppliercard', 'thirdpartycard', 'thirdpartycomm', 'productcard',
+				'invoicelist', 'supplierinvoicelist', 'thirdpartylist', 'societelist', 'productlist',
+				'productservicelist', 'accountancysupplierlist',
+				'pdfgeneration', 'odtgeneration',
+				'api',
 			],
 			/* END MODULEBUILDER HOOKSCONTEXTS */
 			// Set this to 1 if features of module are opened to external users

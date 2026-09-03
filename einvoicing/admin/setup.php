@@ -293,7 +293,7 @@ if ($prefix && preg_match('/makesend'.$prefix.'sampleinvoice/i', $action, $reg))
 
 if ($prefix && preg_match('/delete'.$prefix.'TOKEN/i', $action, $reg)) {
 	// Delete token
-	$result = $provider->deleteAccessToken();
+	$result = $provider->deleteAccessToken(getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP"));
 
 	if ($result) {
 		setEventMessages("Token deleted successfully", null, 'mesgs');
@@ -457,7 +457,11 @@ if ($stringwarning) {
 }
 
 if (!empty($formSetup2->items)) {
-	print $pdpRenderFormSetup($formSetup2, $langs->transnoentitiesnoconv('EInvoicingConnectionSetup'));
+	if (getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP")) {
+		print $langs->trans("EInvoicingInfoManagedByMasterSetup", getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP"));
+	} else {
+		print $pdpRenderFormSetup($formSetup2, $langs->transnoentitiesnoconv('EInvoicingConnectionSetup'));
+	}
 	print '<br>';
 }
 
