@@ -858,6 +858,33 @@ function einvoicingInvoicingPeriodFromLines($billingPeriod)
 }
 
 /**
+ * Version of the module, followed by the commit it was built from when that one is known.
+ *
+ * The version alone does not name sources: between two releases the VERSION file does not move,
+ * so every build of a branch answers the same string and a bug report quoting it says nothing
+ * about what actually runs. einvoicingModuleCommit() is what names the sources, and this is the
+ * single place deciding how the two read together, so that the stamp is the same wherever it is
+ * printed - the comment opening a generated XML, the title of a page.
+ *
+ * An installation whose commit cannot be known gets the version alone, with no parentheses,
+ * which is what every caller printed before the commit existed.
+ *
+ * @return	string	Something like "1.4.2 (a6f4d2b)", or "1.4.2" when the commit is unknown
+ */
+function einvoicingModuleStamp()
+{
+	$versionfile = dirname(__DIR__).'/VERSION';
+	$version = (is_readable($versionfile) ? trim((string) file_get_contents($versionfile)) : '');
+	$commit = einvoicingModuleCommit();
+
+	if ($version === '') {
+		return $commit;		// the file is part of the module, but nothing forces a deployment to keep it
+	}
+
+	return $version.($commit !== '' ? ' ('.$commit.')' : '');
+}
+
+/**
  * Commit the module sources were built from, empty string when it cannot be known.
  *
  * An installed module has no repository to ask: the zip is unpacked into custom/ and that is
