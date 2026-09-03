@@ -163,8 +163,8 @@ If possible and if it was explicitely requested:
     - Types: `NEW`, `FIX` or `CLOSE`
     - Example: `FIX: #1234 Correct VAT calculation on credit notes`
 - Do not update the `ChangeLog` file (this file will be generated before the release from all commit titles)
-- Do not introduce new syntax or features unavailable in the branch's minimum PHP version
-- When committing, mention the AI agent name in the commit message (e.g. "Co-authored-by: AI Agent <ai-agent@dolibarr.org>")
+- When commiting, keep your commit comment short and add a line "Co-authored-by:" to mention the AI agent name
+- When making a Pull Request, keep the PR description short (never exceed 100 lines) and mention the AI agent name in the description by adding a line "Co-authored-by:"
 
 ---
 
