@@ -592,3 +592,4 @@ EntityChangedSuccess=Facture fournisseur déplacée vers l'entité %s
 ErrorEntityRequired=Un numéro d'entité valide est requis
 DisabledBecauseNotEditable=Cette facture n'est pas modifiable
 ErrorSupplierNotVisibleInEntity=Le fournisseur « %s » n'est pas visible dans l'entité %s. Vous devez le partager ou le créer dans l'entité cible au préalable.
+WarningEntityChangedFileMoveFailed=L'entité a été modifiée mais les fichiers de la facture n'ont pas pu être déplacés vers le répertoire de la nouvelle entité. Vous devrez peut-être les déplacer manuellement.

@@ -786,8 +786,16 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 						$error++;
 						setEventMessages($langs->trans('ErrorSupplierNotVisibleInEntity', $object->thirdparty->name ?? $socId, $newEntity), null, 'errors');
 					} else {
+						$oldEntity = (int) ($object->entity > 0 ? $object->entity : $conf->entity);
+
 						$result = $object->setValueFrom('entity', $newEntity);
 						if ($result > 0) {
+							// Move the invoice files to the new entity's directory
+							$fileMoveResult = $this->moveSupplierInvoiceFilesToEntity($object, $oldEntity, $newEntity);
+							if ($fileMoveResult < 0) {
+								setEventMessages($langs->trans('WarningEntityChangedFileMoveFailed'), null, 'warnings');
+							}
+
 							setEventMessages($langs->trans('EntityChangedSuccess', $newEntity), null, 'mesgs');
 							$redirectto = $_SERVER['PHP_SELF'] . '?id=' . $object->id;
 						} else {
@@ -1999,5 +2007,92 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		}
 
 		return 0;
+	}
+
+	/**
+	 * Move the physical files of a supplier invoice from one entity's directory to another,
+	 * and update the ecm_files index accordingly.
+	 *
+	 * Uses dol_move() for each file so that the ecm_files index (filepath, filename, ref hash)
+	 * is updated by Dolibarr core. A final SQL UPDATE corrects the entity column, which
+	 * dol_move() does not change on an existing record.
+	 *
+	 * @param CommonObject $object     The supplier invoice object
+	 * @param int          $oldEntity  Source entity ID
+	 * @param int          $newEntity  Target entity ID
+	 * @return int                      1 on success, -1 on error
+	 */
+	private function moveSupplierInvoiceFilesToEntity($object, $oldEntity, $newEntity)
+	{
+		global $conf, $db;
+
+		$folderPart = get_exdir($object->id, 2, 0, 0, $object, 'invoice_supplier');
+		$ref = dol_sanitizeFileName($object->ref);
+
+		// Source directory (old entity) - dir_output already points to the current (old) entity's root
+		$sourceDir = $conf->fournisseur->facture->dir_output . '/' . $folderPart . $ref;
+
+		// Target directory (new entity) - build manually since multidir_output only has the current entity
+		$targetRoot = DOL_DATA_ROOT;
+		if (isModEnabled('multicompany') && $newEntity > 1) {
+			$targetRoot .= '/' . $newEntity;
+		}
+		$targetDir = $targetRoot . '/fournisseur/facture/' . $folderPart . $ref;
+
+		// If source directory does not exist, there is nothing to move
+		if (!is_dir($sourceDir)) {
+			return 1;
+		}
+
+		// Create the target directory structure if needed
+		if (!is_dir($targetDir)) {
+			if (!dol_mkdir($targetDir)) {
+				dol_syslog(__METHOD__ . " Failed to create target directory: " . $targetDir, LOG_ERR);
+				return -1;
+			}
+		}
+
+		// List all files recursively (including subdirectories like thumbs/)
+		$fileList = dol_dir_list($sourceDir, 'files', 1);
+
+		$moveError = 0;
+		foreach ($fileList as $fileEntry) {
+			$relativePath = substr($fileEntry['fullname'], strlen($sourceDir) + 1);
+			$destFile = $targetDir . '/' . $relativePath;
+
+			// Ensure the target subdirectory exists (for files inside subdirectories)
+			$destParent = dirname($destFile);
+			if (!is_dir($destParent)) {
+				dol_mkdir($destParent);
+			}
+
+			// dol_move handles the physical move and updates ecm_files (filepath, filename, ref hash)
+			$result = dol_move($fileEntry['fullname'], $destFile, '0', 1, 0, 1);
+			if (!$result) {
+				dol_syslog(__METHOD__ . " Failed to move file " . $fileEntry['fullname'] . " to " . $destFile, LOG_ERR);
+				$moveError++;
+			}
+		}
+
+		if ($moveError > 0) {
+			return -1;
+		}
+
+		// Remove now-empty source directory tree
+		dol_delete_dir_recursive($sourceDir);
+
+		// dol_move updated filepath/filename in ecm_files but kept the old entity.
+		// Fix the entity column for all records of this invoice.
+		$sql = "UPDATE " . $db->prefix() . "ecm_files";
+		$sql .= " SET entity = " . ((int) $newEntity);
+		$sql .= " WHERE src_object_type = '" . $db->escape($object->table_element) . "' AND src_object_id = " . ((int) $object->id);
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . " Failed to update ecm_files entity: " . $db->lasterror(), LOG_ERR);
+			return -1;
+		}
+
+		return 1;
 	}
 }
