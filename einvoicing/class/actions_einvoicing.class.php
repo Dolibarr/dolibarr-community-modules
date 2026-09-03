@@ -504,7 +504,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					} elseif ((float) DOL_VERSION < 22) {
 						print dolGetButtonAction($langs->trans('einvoice'), '', 'default', $url_button, '', true);
 					} else {
-						print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true);
+						$params = array('forceDropdownButtons' => true);	// This is supported on v24+ only
+						print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true, $params);
 					}
 				}
 			}
