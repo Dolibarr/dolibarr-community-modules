@@ -85,17 +85,17 @@ class EInvoicing
 
 
 	// Dolibarr internal statuses
-	public const STATUS_UNKNOWN             = 0;		// By default, before the e-invoice has been generated
+	const STATUS_UNKNOWN             = 0;		// By default, before the e-invoice has been generated
 
-	public const STATUS_NOT_GENERATED       = 5;		// To generate then to sync
-	public const STATUS_GENERATED           = 10;		// To sync
-	public const STATUS_AWAITING_VALIDATION = 15;		// Einvoice sent to your AP, but not yet analyzed by your AP
-	public const STATUS_AWAITING_ACK        = 20;		// Einvoice sent to your AP. next step happen when doing sync.
+	const STATUS_NOT_GENERATED       = 5;		// To generate then to sync
+	const STATUS_GENERATED           = 10;		// To sync
+	const STATUS_AWAITING_VALIDATION = 15;		// Einvoice sent to your AP, but not yet analyzed by your AP
+	const STATUS_AWAITING_ACK        = 20;		// Einvoice sent to your AP. next step happen when doing sync.
 
-	public const STATUS_ERROR               = 25;		// Unknown error, should not happe
+	const STATUS_ERROR               = 25;		// Unknown error, should not happe
 
-	public const STATUS_IGNORE_2            = 98;		// Never sync (for another reason than ereporting, not used yet)
-	public const STATUS_IGNORE              = 99;		// Never sync (will be processed by ereporting)
+	const STATUS_IGNORE_2            = 98;		// Never sync (for another reason than ereporting, not used yet)
+	const STATUS_IGNORE              = 99;		// Never sync (will be processed by ereporting)
 
 	/**
 	 * The two codes above, as a list: they keep an invoice out of the e-invoicing scope, it is never
@@ -103,7 +103,7 @@ class EInvoicing
 	 * closing, ...). Grouped here so that adding an "ignore" code is honoured by every caller at
 	 * once, through isIgnoredStatus().
 	 */
-	public const STATUS_IGNORE_CODES = [
+	const STATUS_IGNORE_CODES = [
 		self::STATUS_IGNORE,
 		self::STATUS_IGNORE_2
 	];
@@ -129,100 +129,100 @@ class EInvoicing
 	 * Invoice deposited
 	 * Status sent only by the PDP/PA
 	 */
-	public const STATUS_DEPOSITED = 200;
+	const STATUS_DEPOSITED = 200;
 
 	/**
 	 * Invoice issued
 	 * Status sent only by the PDP/PA
 	 */
-	public const STATUS_ISSUED = 201;
+	const STATUS_ISSUED = 201;
 
 	/**
 	 * Invoice received
 	 * Status sent only by the PDP/PA
 	 */
-	public const STATUS_RECEIVED = 202;
+	const STATUS_RECEIVED = 202;
 
 	/**
 	 * Invoice made available
 	 * Status sent only by the PDP/PA
 	 */
-	public const STATUS_AVAILABLE = 203;
+	const STATUS_AVAILABLE = 203;
 
 	/**
 	 * Invoice taken over
 	 * - Customer invoice: received from the PDP
 	 * - Supplier invoice: can be sent by Dolibarr (optional)
 	 */
-	public const STATUS_TAKEN_OVER = 204;
+	const STATUS_TAKEN_OVER = 204;
 
 	/**
 	 * Invoice approved
 	 * - Customer invoice: received from the PDP
 	 * - Supplier invoice: can be sent by Dolibarr (optional)
 	 */
-	public const STATUS_APPROVED = 205;
+	const STATUS_APPROVED = 205;
 
 	/**
 	 * Invoice partially approved
 	 * - Customer invoice: received from the PDP
 	 * - Supplier invoice: can be sent by Dolibarr (optional)
 	 */
-	public const STATUS_PARTIALLY_APPROVED = 206;
+	const STATUS_PARTIALLY_APPROVED = 206;
 
 	/**
 	 * Invoice disputed
 	 * - Customer invoice: received from the PDP
 	 * - Supplier invoice: can be sent by Dolibarr (optional)
 	 */
-	public const STATUS_DISPUTED = 207;
+	const STATUS_DISPUTED = 207;
 
 	/**
 	 * Invoice suspended
 	 * - Customer invoice: received from the PDP
 	 * - Supplier invoice: can be sent by Dolibarr (optional)
 	 */
-	public const STATUS_SUSPENDED = 208;
+	const STATUS_SUSPENDED = 208;
 
 	/**
 	 * Invoice refused
 	 * - Customer invoice: received from the PDP
 	 * - Supplier invoice: can be sent by Dolibarr (mandatory)
 	 */
-	public const STATUS_REFUSED = 210;
+	const STATUS_REFUSED = 210;
 
 	/**
 	 * Payment transmitted
 	 * - Customer invoice: received from the PDP
 	 * - Supplier invoice: can be sent by Dolibarr (optional, recommended)
 	 */
-	public const STATUS_PAYMENT_SENT = 211;
+	const STATUS_PAYMENT_SENT = 211;
 
 	/**
 	 * Invoice paid
 	 * - Customer invoice: can be sent by Dolibarr (optional, recommended)
 	 * - Supplier invoice: /
 	 */
-	public const STATUS_PAID = 212;
+	const STATUS_PAID = 212;
 
 	/**
 	 * Invoice completed
 	 * - Customer invoice: /
 	 * - Supplier invoice: /
 	 */
-	public const STATUS_COMPLETED = 209;
+	const STATUS_COMPLETED = 209;
 
 	/**
 	 * Invoice rejected (technical)
 	 * - Customer invoice: received from the PDP
 	 * - Supplier invoice: /
 	 */
-	public const STATUS_REJECTED = 213;
+	const STATUS_REJECTED = 213;
 
 	/**
 	 * List of Einvoice status
 	 */
-	public const STATUS_LABEL_KEYS = [
+	const STATUS_LABEL_KEYS = [
 		// Dolibarr
 		self::STATUS_UNKNOWN             => 'EInvStatusUnknown',
 		self::STATUS_IGNORE              => 'EInvStatusDoNotSync',		// To exclude invoice from einvoice sync (ereporting)
@@ -254,7 +254,7 @@ class EInvoicing
 
 
 	// All reasons with their details (Used when sending supplier invoices status: Refused, Disputed, Suspended, Partially Approved)
-	private const REASONS = [
+	const REASONS = [
 		"NON_TRANSMISE" => [
 			"label" => "ReasonRecipientNotConnected",
 			"desc" => "This reason is used ONLY with the \"DEPOSITED\" status to indicate that the invoice could not be transmitted because the recipient (BUYER), although present in the PPF Directory, has no active invoice reception address (i.e., connected to an Approved Platform for reception)."
@@ -438,7 +438,7 @@ class EInvoicing
 	];
 
 	// Codes reasons by status
-	private const REASONS_CODE_FOR_STATUS = [
+	const REASONS_CODE_FOR_STATUS = [
 		self::STATUS_DISPUTED => [
 			"AUTRE",
 			"COORD_BANC_ERR",
@@ -499,7 +499,7 @@ class EInvoicing
 		]
 	];
 
-	public const STATUS_REQUIRING_REASONS = [
+	const STATUS_REQUIRING_REASONS = [
 		self::STATUS_REFUSED,
 		self::STATUS_DISPUTED,
 		self::STATUS_PARTIALLY_APPROVED,
@@ -511,7 +511,7 @@ class EInvoicing
 	 * settling it. "Disputed", "Suspended" and "Refused" are deliberately not here: none of them
 	 * accepts anything.
 	 */
-	public const STATUSES_ACCEPTING_A_DOCUMENT = [
+	const STATUSES_ACCEPTING_A_DOCUMENT = [
 		self::STATUS_APPROVED,
 		self::STATUS_PARTIALLY_APPROVED
 	];
@@ -520,7 +520,7 @@ class EInvoicing
 	 * Name, into llx_einvoicing_extrafields, of the order reference the supplier declared on the
 	 * invoice it sent (BT-13). Kept whether or not it matched a purchase order of Dolibarr.
 	 */
-	public const EXTRAFIELD_BUYER_ORDER_REFERENCE = 'buyer_order_reference';
+	const EXTRAFIELD_BUYER_ORDER_REFERENCE = 'buyer_order_reference';
 
 	/**
 	 * Name, into llx_einvoicing_extrafields, of the buyer reference (BT-10): a reference owned by the
@@ -528,7 +528,7 @@ class EInvoicing
 	 * internal mailbox...). A plain EN 16931 core term, unrelated to the public sector, so it is kept
 	 * per invoice and offered whatever the Chorus Pro option (issue #678).
 	 */
-	public const EXTRAFIELD_BUYER_REFERENCE = 'buyer_reference';
+	const EXTRAFIELD_BUYER_REFERENCE = 'buyer_reference';
 
 	/**
 	 * ISO/IEC 6523 scheme identifier of the French routing code ("code de routage"), the scheme the
@@ -536,7 +536,7 @@ class EInvoicing
 	 * BR-FR-CPRO-13 of XP Z12-012. Not to be confused with 0225 (e-invoice address) nor with 0002 /
 	 * 0009 (SIREN / SIRET), which identify the legal entity itself.
 	 */
-	public const SCHEME_FR_ROUTING_CODE = '0224';
+	const SCHEME_FR_ROUTING_CODE = '0224';
 
 
 	/**

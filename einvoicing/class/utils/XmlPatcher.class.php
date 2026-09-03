@@ -49,12 +49,12 @@ class XmlPatcher
 	/**
 	 * URN for the standard Factur-X EXTENDED profile (horstoeko default output)
 	 */
-	private const URN_EXTENDED = 'urn:cen.eu:en16931:2017#conformant#urn:factur-x.eu:1p0:extended';
+	const URN_EXTENDED = 'urn:cen.eu:en16931:2017#conformant#urn:factur-x.eu:1p0:extended';
 
 	/**
 	 * URN for the EXTENDED-CTC-FR profile (French e-invoicing mandate)
 	 */
-	private const URN_EXTENDED_CTC_FR = 'urn:cen.eu:en16931:2017#conformant#urn.cpro.gouv.fr:1p0:extended-ctc-fr';
+	const URN_EXTENDED_CTC_FR = 'urn:cen.eu:en16931:2017#conformant#urn.cpro.gouv.fr:1p0:extended-ctc-fr';
 
 	/**
 	 * Deposit line references to inject: array of ['lineId', 'invoiceRef', 'invoiceDate']
@@ -156,7 +156,7 @@ class XmlPatcher
 	 *
 	 * @return void  No value return
 	 */
-	private static function patchGuidelineId(DOMXPath $xpath): void
+	private static function patchGuidelineId(DOMXPath $xpath)
 	{
 		$nodes = $xpath->query(
 			'//rsm:ExchangedDocumentContext/ram:GuidelineSpecifiedDocumentContextParameter/ram:ID'
@@ -198,7 +198,7 @@ class XmlPatcher
 		string $lineId,
 		string $invoiceRef,
 		DateTimeInterface $invoiceDate
-	): void {
+	) {
 		// Find the SpecifiedLineTradeSettlement for this LineID
 		$query = sprintf(
 			'//ram:IncludedSupplyChainTradeLineItem[ram:AssociatedDocumentLineDocument/ram:LineID[normalize-space(.)="%s"]]/ram:SpecifiedLineTradeSettlement',
