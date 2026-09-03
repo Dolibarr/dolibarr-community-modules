@@ -58,20 +58,6 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	public $warnings = array();
 
 	/**
-	 * systemMessage
-	 *
-	 * @param array<string,mixed> 	$parameters		Array of parameters
-	 * @param CommonObject			$object			Object invoice
-	 * @param string		 		$action			Code action
-	 * @param Hookmanager			$hookmanager	Hookmanager
-	 * @return int									Result
-	 */
-	public function messageOfTheDay($parameters, $object, &$action, $hookmanager)
-	{
-		return 0;
-	}
-
-	/**
 	 * Hook called after a PDF is created
 	 *
 	 * @param 	array   		$parameters 	Hook parameters
@@ -568,11 +554,11 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			return 0;
 		}
 
-		$db->begin();
-
 		if ($isFactureContext) {
 			'@phan-var-force Facture $object';
 			$permissiontoedit = $user->hasRight('facture', 'write');
+
+			$db->begin();
 
 			if ($action == 'add') {
 				// On create, we can do nothing here. We will update the einvoice status into the CREATE trigger.
@@ -714,6 +700,14 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					setEventMessages($langs->trans("InvoicePrecheckFailed"), array(), 'errors');
 				}
 			}
+
+			if ($error) {
+				$db->rollback();
+				return -1;
+			} else {
+				$db->commit();
+				return 0;
+			}
 		}
 
 
@@ -721,6 +715,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			$permissiontoedit = $user->hasRight('fournisseur', 'facture', 'creer');
 
 			if ($action == 'confirm_sendStatusMessage' && $permissiontoedit) {
+				$db->begin();
+
 				$PDPManager = new PDPProviderManager($db);
 				$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
 				$pdpstatuscode = GETPOSTINT('pdpstatuscode') ?: 0;
@@ -739,6 +735,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 						setEventMessages($message, array(), 'errors');
 						$this->errors[] = $message;
 
+						$db->commit();
+
 						return 0;
 					}
 				}
@@ -752,10 +750,20 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					$this->errors = array_merge($this->errors, $provider->errors);
 					setEventMessages($result['message'], $provider->errors, 'errors');
 				}
+
+				if ($error) {
+					$db->rollback();
+					return -1;
+				} else {
+					$db->commit();
+					return 0;
+				}
 			}
 
 			// Action to change the entity (multi-company) of a supplier invoice
 			if ($action == 'confirm_change_entity' && $permissiontoedit) {
+				$db->begin();
+
 				$newEntity = GETPOSTINT('new_entity');
 				if ($newEntity > 0) {
 					// Check that the supplier (fk_soc) is visible in the target entity
@@ -797,9 +805,10 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 								setEventMessages($langs->trans('WarningEntityChangedFileMoveFailed'), null, 'warnings');
 							} else {
 								dol_include_once('/multicompany/class/actions_multicompany.class.php');
-								// @phan-suppress-next-line PhanUndeclaredClassMethod DaoMulticompany is an external module class not analyzed by phan
-								$object = new ActionsMulticompany($db);
-								echo $object->switchEntity($newEntity);
+								// @phan-suppress-next-line PhanUndeclaredClassMethod ActionsMulticompany is an external module class not analyzed by phan
+								$actionsmulticompany = new ActionsMulticompany($db);
+								// @phan-suppress-next-line PhanUndeclaredClassMethod ActionsMulticompany is an external module class not analyzed by phan
+								$actionsmulticompany->switchEntity($newEntity);
 
 								setEventMessages($langs->trans('EntityChangedSuccess', $newEntity), null, 'mesgs');
 								$redirectto = $_SERVER['PHP_SELF'] . '?id=' . $object->id;
@@ -813,10 +822,25 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					$error++;
 					setEventMessages($langs->trans('ErrorEntityRequired'), null, 'errors');
 				}
+
+				if ($error) {
+					$db->rollback();
+					return -1;
+				} else {
+					$db->commit();
+
+					if ($redirectto) {
+						header("Location: " . $redirectto);
+						exit;
+					}
+					return 0;
+				}
 			}
 		}
 
 		if ($isThirdpartyContext) {
+			$db->begin();
+
 			$permissiontoedit = $user->hasRight('societe', 'creer');
 
 			// $object->id may be empty at hook time if core hasn't fetched the object yet
@@ -892,20 +916,17 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					}
 				}
 			}
-		}
 
-		if ($error) {
-			$db->rollback();
-			return -1;
-		} else {
-			$db->commit();
-
-			if ($redirectto) {
-				header("Location: " . $redirectto);
-				exit;
+			if ($error) {
+				$db->rollback();
+				return -1;
+			} else {
+				$db->commit();
+				return 0;
 			}
-			return 0;
 		}
+
+		return 0;
 	}
 
 	/**
