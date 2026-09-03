@@ -576,6 +576,18 @@ trait CommonProtocol
 
 		// Step 3: If not found, try to find by findNearest function
 		if ($thirdpartyId < 0) {
+			// An email address is not an identity: it can be shared by several third parties, and a
+			// third party that merely carries the sender's address is not necessarily the sender. Using
+			// it as a match criterion books a received supplier invoice on an unrelated company (issue
+			// #739), so it is not used unless an administrator explicitly asks for it. When the option is
+			// on, the email is passed as the last criterion of the loose match below, as it was before.
+			$emailForLooseMatch = '';
+			if (getDolGlobalString('EINVOICING_THIRDPARTIES_MATCH_ON_EMAIL')) {
+				$emailForLooseMatch = $sellerInfo['sellercontactemailaddr'] ?? '';
+			} elseif (!empty($sellerInfo['sellercontactemailaddr'])) {
+				dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Email of the seller is not used as a match criterion (option EINVOICING_THIRDPARTIES_MATCH_ON_EMAIL is off)');
+			}
+
 			if (method_exists($thirdparty, 'findNearest')) {
 				$result = $thirdparty->findNearest(
 					0,
@@ -588,7 +600,7 @@ trait CommonProtocol
 					'',
 					'',
 					'',
-					$sellerInfo['sellercontactemailaddr'] ?? '',
+					$emailForLooseMatch,
 					$sellerInfo['sellername'] ?? ''
 				); // TODO: we can add phone, address and vat number to improve matching
 			} else {	// Compat method for old versions
@@ -603,7 +615,7 @@ trait CommonProtocol
 					'',
 					'',
 					'',
-					$sellerInfo['sellercontactemailaddr'] ?? '',
+					$emailForLooseMatch,
 					$sellerInfo['sellername'] ?? ''
 				);
 			}
