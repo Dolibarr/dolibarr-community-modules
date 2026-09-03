@@ -111,7 +111,7 @@ Before any modification, verify:
 If possible and if it was explicitely requested:
 - If making or modifying external module, add PHPUnit test files in `yourmoduledir/test/phpunit/`.
 - If you need to validate code change or if it is explicitely requested, you can check code and dev syntax rules by running the following command on modified files (it takes a long time):
-	`phan -k .phan/config.php -B dev/tools/phan/baseline.txt --analyze-twice --minimum-target-php-version 7.2 --exclude-directory-list=dev/tools,mymodule/test/,mymodule/doc/,mymodule/langs/,mymodule/vendor/ --output-mode=checkstyle filemodified1.php filemodified2.php ...`
+	`phan -k .phan/config.php -B dev/tools/phan/baseline.txt --analyze-twice --minimum-target-php-version 7.2 --exclude-directory-list=dev/tools,mymodule/test/,mymodule/vendor/ --output-mode=checkstyle filemodified1.php filemodified2.php ...`
 
 
 ---
