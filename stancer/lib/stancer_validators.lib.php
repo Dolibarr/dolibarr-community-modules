@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2026 Eric Seigne <eric.seigne@cap-rel.fr>
+ * Copyright (C) 2026		MDW			<mdeweerd@users.noreply.github.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,6 +17,7 @@
  *          Real-world rules not in the spec (e.g. "number digits only") are
  *          documented inline.
  */
+require_once DOL_DOCUMENT_ROOT . '/core/lib/functions.lib.php';
 
 /**
  * Sanitize a credit card payload for Stancer API (CardIn schema).
@@ -94,8 +96,8 @@ function stancerSanitizeSepaData(array $data)
 	$rawName = isset($data['name']) ? (string) $data['name'] : '';
 
 	// Strip whitespace, uppercase. IBAN is 15-34 alphanumeric chars per ISO 13616.
-	$iban = strtoupper(preg_replace('/\s+/', '', $rawIban));
-	$bic  = strtoupper(preg_replace('/\s+/', '', $rawBic));
+	$iban = dol_strtoupper(preg_replace('/\s+/', '', $rawIban));
+	$bic  = dol_strtoupper(preg_replace('/\s+/', '', $rawBic));
 
 	if ($iban === null || $iban === '') {
 		return array('error' => 'iban is empty after sanitization');

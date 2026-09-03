@@ -2,6 +2,7 @@
 /* Copyright (C) 2025       Laurent Destailleur         <eldy@users.sourceforge.net>
  * Copyright (C) 2025       Mohamed DAOUD               <mdaoud@dolicloud.com>
  * Copyright (C) 2026       Frédéric France             <frederic.france@free.fr>
+ * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,6 +25,7 @@
  */
 
 dol_include_once('einvoicing/lib/einvoicing.lib.php');
+require_once DOL_DOCUMENT_ROOT . '/core/lib/functions.lib.php';
 
 /**
  * CdarHandler
@@ -497,7 +499,7 @@ class CdarHandler
 
 		// Unique per-call name so two concurrent status sends of the same condition cannot collide (#226).
 		$filename = $tempDir . '/cdar_' . $ProcessCondition . '_' . bin2hex(random_bytes(8)) . '.xml';
-		$filename = strtolower(dol_sanitizePathName(dol_string_unaccent($filename)));
+		$filename = dol_strtolower(dol_sanitizePathName(dol_string_unaccent($filename)));
 
 		$result = $this->saveToFile($data, $filename);
 		if ($result === false) {

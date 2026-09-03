@@ -28,6 +28,7 @@ dol_include_once('einvoicing/class/protocols/ProtocolManager.class.php');
 dol_include_once('einvoicing/class/document.class.php');
 dol_include_once('einvoicing/class/utils/PriceHelper.class.php');
 dol_include_once('fourn/class/fournisseur.facture.class.php');
+require_once DOL_DOCUMENT_ROOT . '/core/lib/functions.lib.php';
 
 /**
  * Class SupplierInvoiceHelper
@@ -362,7 +363,7 @@ class SupplierInvoiceHelper
 
 				if ((empty($resdoc) || is_null($document->xml_data) || $document->xml_data == '') && $fetchXmlIfEmpty) {
 					$providerManager = new PDPProviderManager($db);
-					$provider = $providerManager->getProvider(strtoupper((string) $document->provider));
+					$provider = $providerManager->getProvider(dol_strtoupper((string) $document->provider));
 
 					$cleanedXmlData = $provider->fetchFlowXml($document->flow_id, true);
 

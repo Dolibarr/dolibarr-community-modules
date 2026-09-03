@@ -34,6 +34,7 @@ require_once DOL_DOCUMENT_ROOT . '/core/class/translate.class.php';
 require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
 require_once DOL_DOCUMENT_ROOT . '/core/class/discount.class.php';
 require_once DOL_DOCUMENT_ROOT . '/core/lib/files.lib.php';
+require_once DOL_DOCUMENT_ROOT . '/core/lib/functions.lib.php';
 require_once DOL_DOCUMENT_ROOT . '/core/lib/date.lib.php';
 
 // dolChmod() only exists from Dolibarr 18, and both writers call it on the XML they just produced.
@@ -1680,7 +1681,7 @@ class CIIProtocol extends AbstractProtocol
 	{
 		$reason = trim((string) ($parsedLine['linestatusreasoncode'] ?? ''));
 
-		return $reason === '' || strtoupper($reason) === 'DETAIL';
+		return $reason === '' || dol_strtoupper($reason) === 'DETAIL';
 	}
 
 
@@ -1979,7 +1980,7 @@ class CIIProtocol extends AbstractProtocol
 			return static::BUILD_XML_PROFILE;
 		}
 
-		$configured = strtoupper(trim($configured));
+		$configured = dol_strtoupper(trim($configured));
 		if (!in_array($configured, self::SUPPORTED_XML_PROFILES, true)) {
 			dol_syslog(get_class($this).'::getBuildXmlProfile unknown EINVOICING_XML_PROFILE "'.$configured.'", falling back to '.static::BUILD_XML_PROFILE, LOG_WARNING);
 			return static::BUILD_XML_PROFILE;
@@ -2139,7 +2140,7 @@ class CIIProtocol extends AbstractProtocol
 			$bp->appendChild($doc->createElement('ram:ID', htmlspecialchars((string) $invoiceData['businessProcessId'])));
 		}
 
-		$profile = !empty($profile) ? strtoupper($profile) : 'EXTENDED';
+		$profile = !empty($profile) ? dol_strtoupper($profile) : 'EXTENDED';
 
 		$guideline = $doc->createElement('ram:GuidelineSpecifiedDocumentContextParameter');
 		$ctx->appendChild($guideline);
@@ -2920,7 +2921,7 @@ class CIIProtocol extends AbstractProtocol
 		// redundant BG-15 identical to the buyer address.
 		$norm = function ($s) {
 			$s = preg_replace('/\s+/', ' ', trim((string) ($s ?? '')));
-			return function_exists('mb_strtoupper') ? mb_strtoupper($s, 'UTF-8') : strtoupper($s);
+			return function_exists('mb_strtoupper') ? mb_strtoupper($s, 'UTF-8') : dol_strtoupper($s);
 		};
 		$billKey = array($norm($bill['address'] ?? ''), $norm($bill['zip'] ?? ''), $norm($bill['town'] ?? ''), $norm($bill['country'] ?? ''));
 		$shipKey = array($norm($ship['address'] ?? ''), $norm($ship['zip'] ?? ''), $norm($ship['town'] ?? ''), $norm($ship['country'] ?? ''));

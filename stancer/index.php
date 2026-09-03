@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2023-2026 Eric Seigne <eric.seigne@cap-rel.fr>
+ * Copyright (C) 2026		MDW			<mdeweerd@users.noreply.github.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -47,6 +48,7 @@ if (!$res) {
 	die("Include of main fails");
 }
 
+require_once DOL_DOCUMENT_ROOT . '/core/lib/functions.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/class/dolgraph.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php';
 dol_include_once('/stancer/class/stancer_payments.class.php');
@@ -248,7 +250,7 @@ $methodMonthlyRaw = array(); // [ym][method] = total
 $resql = $db->query($sql);
 if ($resql) {
 	while ($obj = $db->fetch_object($resql)) {
-		$methodMonthlyRaw[$obj->ym][strtolower($obj->method)] = (int) $obj->total;
+		$methodMonthlyRaw[$obj->ym][dol_strtolower($obj->method)] = (int) $obj->total;
 	}
 }
 
@@ -276,7 +278,7 @@ $methodPieData = array();
 $resql = $db->query($sql);
 if ($resql) {
 	while ($obj = $db->fetch_object($resql)) {
-		$label = strtoupper($obj->method);
+		$label = dol_strtoupper($obj->method);
 		if ($label === 'CARD') {
 			$label = 'CB';
 		}
@@ -622,10 +624,10 @@ if (empty($lastPayments)) {
 		print '</td>';
 
 		// Amount
-		print '<td class="right nowrap"><span class="amount">'.price($pay->amount / 100, 0, $langs, 1, -1, 2).' '.strtoupper($pay->currency).'</span></td>';
+		print '<td class="right nowrap"><span class="amount">'.price($pay->amount / 100, 0, $langs, 1, -1, 2).' '.dol_strtoupper($pay->currency).'</span></td>';
 
 		// Method
-		$methodLabel = strtoupper($pay->method);
+		$methodLabel = dol_strtoupper($pay->method);
 		if ($methodLabel === 'CARD') {
 			$methodLabel = 'CB';
 		}

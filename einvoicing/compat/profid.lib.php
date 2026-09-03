@@ -23,6 +23,7 @@
  *  \brief		Set of functions for professional identifiers
  */
 
+require_once DOL_DOCUMENT_ROOT . '/core/lib/functions.lib.php';
 // @phan-file-suppress PhanRedefineFunction
 
 if (!function_exists('isValidLuhn')) {
@@ -192,7 +193,7 @@ if (!function_exists('isValidTinForES')) {
 	{
 		$str = trim($str);
 		$str = preg_replace('/(\s)/', '', $str);
-		$str = strtoupper($str);
+		$str = dol_strtoupper($str);
 
 		//Check format
 		if (!preg_match('/((^[A-Z]{1}[0-9]{7}[A-Z0-9]{1}$|^[T]{1}[A-Z0-9]{8}$)|^[0-9]{8}[A-Z]{1}$)/', $str)) {

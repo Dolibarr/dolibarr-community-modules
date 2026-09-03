@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2026 Eric Seigne <eric.seigne@cap-rel.fr>
+ * Copyright (C) 2026		MDW			<mdeweerd@users.noreply.github.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -35,6 +36,7 @@
  * Detection is read-only. Repair is explicit, atomic and traced via ActionComm.
  */
 
+require_once DOL_DOCUMENT_ROOT . '/core/lib/functions.lib.php';
 dol_include_once('/stancer/class/stancer_api.class.php');
 
 // ActionComm code recorded on each repaired thirdparty. Kept <= 50 chars.
@@ -64,7 +66,7 @@ define('STANCER_REPAIR_RIB_DELETABLE_SQL', " AND (type IS NULL OR type <> 'ban')
  */
 function stancerRepairNormaliseEmail($email)
 {
-	return strtolower(trim((string) $email));
+	return dol_strtolower(trim((string) $email));
 }
 
 /**

@@ -221,8 +221,8 @@ class HelloAssoMemberUtils
 		$headers[] = "Accept: application/json";
 		$headers[] = "Content-Type: application/json";
 
-		$assoslug = str_replace('_', '-', dol_string_nospecial(strtolower(dol_string_unaccent($this->organization_slug)), '-'));
-		$formslug = str_replace('_', '-', dol_string_nospecial(strtolower(dol_string_unaccent($this->form_slug)), '-'));
+		$assoslug = str_replace('_', '-', dol_string_nospecial(dol_strtolower(dol_string_unaccent($this->organization_slug)), '-'));
+		$formslug = str_replace('_', '-', dol_string_nospecial(dol_strtolower(dol_string_unaccent($this->form_slug)), '-'));
 		$urlforform = "https://".urlencode($this->helloasso_url)."/v5/organizations/".urlencode($assoslug)."/forms/Membership/".urlencode($formslug).'/public';
 		dol_syslog("Send Get to url=".$urlforform.", to get HelloAsso Member type information", LOG_DEBUG);
 		$date_start_subscription = 0;
@@ -499,8 +499,8 @@ class HelloAssoMemberUtils
 		$headers[] = "Accept: application/json";
 		$headers[] = "Content-Type: application/json";
 
-		$assoslug = str_replace('_', '-', dol_string_nospecial(strtolower(dol_string_unaccent($this->organization_slug)), '-'));
-		$formslug = str_replace('_', '-', dol_string_nospecial(strtolower(dol_string_unaccent($this->form_slug)), '-'));
+		$assoslug = str_replace('_', '-', dol_string_nospecial(dol_strtolower(dol_string_unaccent($this->organization_slug)), '-'));
+		$formslug = str_replace('_', '-', dol_string_nospecial(dol_strtolower(dol_string_unaccent($this->form_slug)), '-'));
 		$parambase = '?pageSize='.urlencode((string) $pagesize).'&pageIndex=1&withDetails=true';
 		$paramfrom = "";
 		$helloasso_date_last_fetch_tms = 0;  // Initialise

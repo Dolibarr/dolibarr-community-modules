@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2026		Gregory Aliot			<greg.aliot@gmail.com>
+ * Copyright (C) 2026		MDW						<mdeweerd@users.noreply.github.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -82,6 +83,7 @@ if (!$res) {
  * @var Translate $langs
  * @var User $user
  */
+require_once DOL_DOCUMENT_ROOT.'/core/lib/functions.lib.php';
 
 $objectRef = GETPOST('ref', 'alpha');	// 'alpha' like the invoice card (compta/facture/card.php): keeps refs with '/', '-', etc. from numbering masks. fetch() escapes it for SQL.
 
@@ -164,7 +166,7 @@ function einvoicing_directory_html($r, $siren)
 			// search answer carries the status but no date, hence the two wordings.
 			if (!empty($r['effectivedate'])) {
 				$txt = $langs->trans("EInvoicingDirectoryUpcoming", $siren, dol_print_date((int) $r['effectivedate'], 'day'));
-			} elseif (strtolower((string) ($r['linestatus'] ?? '')) === 'upcoming') {
+			} elseif (dol_strtolower((string) ($r['linestatus'] ?? '')) === 'upcoming') {
 				$txt = $langs->trans("EInvoicingDirectoryUpcomingNoDate", $siren);
 			} else {
 				$txt = $langs->trans("EInvoicingDirectoryInactive", $siren);

@@ -22,6 +22,8 @@
  * \brief   API sync functions (refresh payments, payouts from Stancer)
  */
 
+require_once DOL_DOCUMENT_ROOT . '/core/lib/functions.lib.php';
+
 /**
  * les vieux paiements brouillons de plus de 1 mois -> supprimer de la base locale
  *
@@ -276,7 +278,7 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 				// Failure statuses on grouped: call reopen ONCE (it handles the whole group internally and returns array<Facture>).
 				$failureStatuses = array('disputed', 'refused', 'expired', 'failed');
 				if (in_array($paymentStatus, $failureStatuses)) {
-					$reopenActionCode = 'BILL_REOPEN_FAILED_' . strtoupper($paymentStatus);
+					$reopenActionCode = 'BILL_REOPEN_FAILED_' . dol_strtoupper($paymentStatus);
 					// Idempotence: skip if the action was already created on the first invoice of the group.
 					$firstInv = $groupedInvoices[0];
 					$actioncommReopenCheck = new ActionComm($db);
@@ -614,7 +616,7 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 			// Admin notification: only send once per payment status per object (invoice/order/propal/...)
 			// to avoid daily duplicates from the scheduled refresh.
 			if ($mailNotif) {
-				$adminActionCode = 'ADMIN_PAYERROR_' . strtoupper($paymentStatus);
+				$adminActionCode = 'ADMIN_PAYERROR_' . dol_strtoupper($paymentStatus);
 				$actioncommCheck = new ActionComm($db);
 				$existingAdminNotif = $actioncommCheck->getActions($obj->socid, $obj->id, $obj->element, " AND code='AC_" . $db->escape($adminActionCode) . "'");
 				if (empty($existingAdminNotif)) {
@@ -633,7 +635,7 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 			$failureStatuses = ['disputed', 'refused', 'expired', 'failed'];
 			if (in_array($paymentStatus, $failureStatuses) && $obj->element == 'facture') {
 				// Reopen the invoice if it had been marked paid (idempotent: noop if already unpaid)
-				$reopenActionCode = 'BILL_REOPEN_FAILED_' . strtoupper($paymentStatus);
+				$reopenActionCode = 'BILL_REOPEN_FAILED_' . dol_strtoupper($paymentStatus);
 				$actioncommReopenCheck = new ActionComm($db);
 				$existingReopen = $actioncommReopenCheck->getActions($obj->socid, $obj->id, "invoice", " AND code='AC_" . $db->escape($reopenActionCode) . "'");
 				if (empty($existingReopen)) {
@@ -651,7 +653,7 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 				}
 
 				if ($sendNotifications && getDolGlobalString('STANCER_AUTO_MAIL_INVOICES_ERROR')) {
-					$actionCodeForStatus = 'BILL_' . strtoupper($paymentStatus) . '_SENTBYMAIL';
+					$actionCodeForStatus = 'BILL_' . dol_strtoupper($paymentStatus) . '_SENTBYMAIL';
 					dol_syslog("stancerRefreshAllPaymentsFromDolibarr $paymentId sending failure notification to customer, actionCode=$actionCodeForStatus", LOG_DEBUG);
 					stancerSendInvoiceMailModele(
 						getDolGlobalString('STANCER_AUTO_MAIL_INVOICES_ERROR', ''),
@@ -723,7 +725,7 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 			// blow the limit (Data too long for column 'code' -> INSERT silently fails -> dedup
 			// stops working). We hash the paym_id to 8 hex chars; collision risk over a single
 			// invoice's lifetime is negligible.
-			$cronSummaryCode = 'CRON_PAY_REP_' . substr(md5($paymentId), 0, 8) . '_' . strtoupper($paymentStatus);
+			$cronSummaryCode = 'CRON_PAY_REP_' . substr(md5($paymentId), 0, 8) . '_' . dol_strtoupper($paymentStatus);
 			$actioncommCheckSummary = new ActionComm($db);
 			$existingSummary = $actioncommCheckSummary->getActions($obj->socid, $obj->id, $obj->element, " AND code='AC_" . $db->escape($cronSummaryCode) . "'");
 
@@ -1181,7 +1183,7 @@ function stancerRefreshAllPayments($userMessage = true, $lastrun = null, $sendNo
 				// blow the limit (Data too long for column 'code' -> INSERT silently fails -> dedup
 				// stops working). We hash the paym_id to 8 hex chars; collision risk over a single
 				// invoice's lifetime is negligible.
-				$cronSummaryCode = 'CRON_PAY_REP_' . substr(md5($paymentId), 0, 8) . '_' . strtoupper($paymentStatus);
+				$cronSummaryCode = 'CRON_PAY_REP_' . substr(md5($paymentId), 0, 8) . '_' . dol_strtoupper($paymentStatus);
 				$actioncommCheck = new ActionComm($db);
 				$existingSummary = $actioncommCheck->getActions($obj->socid, $obj->id, $obj->element, " AND code='AC_" . $db->escape($cronSummaryCode) . "'");
 

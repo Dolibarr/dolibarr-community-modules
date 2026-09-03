@@ -25,6 +25,7 @@
 
 // Put here all includes required by your class file
 require_once DOL_DOCUMENT_ROOT.'/core/class/commonobject.class.php';
+require_once DOL_DOCUMENT_ROOT . '/core/lib/functions.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 //require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
 //require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
@@ -655,7 +656,7 @@ class Stancer_payments extends CommonObject
 		if (count($sqlwhere) > 0) {
 			// Whitelist the glue instead of interpolating $filtermode: only 'OR' and 'AND'
 			// can ever reach the query, whatever an external caller passes.
-			$sql .= " AND (".implode((strtoupper($filtermode) == 'OR' ? " OR " : " AND "), $sqlwhere).")";
+			$sql .= " AND (".implode((dol_strtoupper($filtermode) == 'OR' ? " OR " : " AND "), $sqlwhere).")";
 		}
 
 		if (!empty($sortfield)) {
@@ -981,7 +982,7 @@ class Stancer_payments extends CommonObject
 						$pathtophoto .= $filename.'_mini';
 					}
 
-					if (empty($conf->global->{strtoupper($module.'_'.$class).'_FORMATLISTPHOTOSASUSERS'})) {
+					if (empty($conf->global->{dol_strtoupper($module.'_'.$class).'_FORMATLISTPHOTOSASUSERS'})) {
 						$result .= '<div class="floatleft inline-block valignmiddle divphotoref"><div class="photoref"><img class="photo'.$module.'" alt="No photo" border="0" src="'.DOL_URL_ROOT.'/viewimage.php?modulepart='.$module.'&entity='.$conf->entity.'&file='.urlencode($pathtophoto).'"></div></div>';
 					} else {
 						$result .= '<div class="floatleft inline-block valignmiddle divphotoref"><img class="photouserphoto userphoto" alt="No photo" border="0" src="'.DOL_URL_ROOT.'/viewimage.php?modulepart='.$module.'&entity='.$conf->entity.'&file='.urlencode($pathtophoto).'"></div>';

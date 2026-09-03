@@ -5,6 +5,7 @@
  * Copyright (C) 2015       Jean-François Ferry     <jfefe@aternatik.fr>
  * Copyright (C) 2024       Frédéric France         <frederic.france@free.fr>
  * Copyright (C) 2025		SuperAdmin					<daoud.mouhamed@gmail.com>
+ * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -72,6 +73,7 @@ if (!$res) {
  * @var User $user
  */
 '@phan-var-force User $user';
+require_once DOL_DOCUMENT_ROOT . '/core/lib/functions.lib.php';
 include_once DOL_DOCUMENT_ROOT.'/core/class/html.formfile.class.php';
 
 // Load translation files required by the page
@@ -149,7 +151,7 @@ if (getDolGlobalString('EINVOICING_PDP')) {
 // Display PA connection status
 if ($pa_connected) {
 	print '<div class="green greenborder nomargintop">';
-	print '<td colspan="2" class="center">' . $langs->trans("YourSoftwareSeemsConnectedWith", strtoupper($pa_name)) . '</td>';
+	print '<td colspan="2" class="center">' . $langs->trans("YourSoftwareSeemsConnectedWith", dol_strtoupper($pa_name)) . '</td>';
 	print '</div>';
 	print '<br>';
 } else {

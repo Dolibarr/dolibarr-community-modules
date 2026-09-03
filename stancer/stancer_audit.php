@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2026 Eric Seigne <eric.seigne@cap-rel.fr>
+ * Copyright (C) 2026		MDW			<mdeweerd@users.noreply.github.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -79,6 +80,7 @@ if (!$res) {
 	die("Include of main fails");
 }
 
+require_once DOL_DOCUMENT_ROOT . '/core/lib/functions.lib.php';
 require_once DOL_DOCUMENT_ROOT . '/core/class/html.formother.class.php';
 require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
 
@@ -378,11 +380,11 @@ if ($action === 'run') {
 		// Map Stancer status -> badge color. captured/to_capture = green (money in),
 		// refused/canceled = grey, disputed = orange, others = blue.
 		$apiStatusCss = 'badge-status1';
-		if (in_array(strtolower($apiStatusRaw), array('captured', 'to_capture', 'authorized'), true)) {
+		if (in_array(dol_strtolower($apiStatusRaw), array('captured', 'to_capture', 'authorized'), true)) {
 			$apiStatusCss = 'badge-status4';
-		} elseif (in_array(strtolower($apiStatusRaw), array('refused', 'canceled', 'expired'), true)) {
+		} elseif (in_array(dol_strtolower($apiStatusRaw), array('refused', 'canceled', 'expired'), true)) {
 			$apiStatusCss = 'badge-status0';
-		} elseif (in_array(strtolower($apiStatusRaw), array('disputed', 'refunded'), true)) {
+		} elseif (in_array(dol_strtolower($apiStatusRaw), array('disputed', 'refunded'), true)) {
 			$apiStatusCss = 'badge-status7';
 		}
 

@@ -26,6 +26,7 @@
  * \brief   Base class for all PDP provider integrations.
  */
 
+require_once DOL_DOCUMENT_ROOT . '/core/lib/functions.lib.php';
 require_once __DIR__ . '/../protocols/ProtocolManager.class.php';
 
 
@@ -309,7 +310,7 @@ abstract class AbstractPDPProvider
 					}
 					continue;
 				}
-				if (strtolower($linestatus) != 'enabled') {
+				if (dol_strtolower($linestatus) != 'enabled') {
 					if ($firstblocked[0] === '') {
 						$firstblocked = array($linestatus, isset($line['platformType']) ? (string) $line['platformType'] : '');
 					}
@@ -870,7 +871,7 @@ abstract class AbstractPDPProvider
 		if (is_array($value)) {
 			$redacted = array();
 			foreach ($value as $key => $item) {
-				if (is_string($key) && in_array(strtolower($key), self::LOGCALL_SENSITIVE_KEYS, true)) {
+				if (is_string($key) && in_array(dol_strtolower($key), self::LOGCALL_SENSITIVE_KEYS, true)) {
 					$redacted[$key] = '[REDACTED]';
 				} else {
 					$redacted[$key] = is_array($item) ? self::redactSensitiveData($item) : $item;
@@ -1163,7 +1164,7 @@ abstract class AbstractPDPProvider
 		}
 
 		$content = '';
-		if (strtolower(pathinfo($invoicePath, PATHINFO_EXTENSION)) === 'pdf') {
+		if (dol_strtolower(pathinfo($invoicePath, PATHINFO_EXTENSION)) === 'pdf') {
 			// Factur-X: the CII lives as a PDF/A-3 attachment
 			try {
 				require_once __DIR__ . '/../../vendor/autoload.php';

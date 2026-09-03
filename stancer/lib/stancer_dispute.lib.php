@@ -22,6 +22,8 @@
  * \brief   Dispute, refund, reopen invoice, SEPA codes, fee invoices
  */
 
+require_once DOL_DOCUMENT_ROOT . '/core/lib/functions.lib.php';
+
 /**
  * Reopen the invoice(s) linked to a Stancer payment when a dispute is lost or a refund is confirmed.
  * Finds the invoice(s) via the local Stancer_payments row:
@@ -349,7 +351,7 @@ function stancerGetSepaResponseMessage($code)
 		return '';
 	}
 
-	$upperCode = strtoupper(trim($code));
+	$upperCode = dol_strtoupper(trim($code));
 	if (isset($codeMap[$upperCode])) {
 		return $langs->transnoentitiesnoconv($codeMap[$upperCode]);
 	}
@@ -1038,7 +1040,7 @@ function stancerRefreshAllDisputes($userMessage = true, $lastrun = null)
 
 					// Admin mail notification
 					if ($mailNotif) {
-						$disputeAmount = price($sd->amount / 100, 0, $langs, 1, -1, -1, strtoupper($sd->currency));
+						$disputeAmount = price($sd->amount / 100, 0, $langs, 1, -1, -1, dol_strtoupper($sd->currency));
 						$clientName = '?';
 						if (!empty($sd->fk_soc)) {
 							$socForMail = new Societe($db);
@@ -1111,7 +1113,7 @@ function stancerRefreshAllDisputes($userMessage = true, $lastrun = null)
 
 			// Admin mail for new disputes that are NOT yet lost (informational)
 			if (!$res && !$isLost && $mailNotif && !empty($sd->payment_id)) {
-				$disputeAmount = price($sd->amount / 100, 0, $langs, 1, -1, -1, strtoupper($sd->currency));
+				$disputeAmount = price($sd->amount / 100, 0, $langs, 1, -1, -1, dol_strtoupper($sd->currency));
 				$clientName = '?';
 				if (!empty($sd->fk_soc)) {
 					$socForMail = new Societe($db);

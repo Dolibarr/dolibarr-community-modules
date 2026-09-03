@@ -22,6 +22,8 @@
  * \brief   Bank operations (fees, transfers, bank lines, utilities)
  */
 
+require_once DOL_DOCUMENT_ROOT . '/core/lib/functions.lib.php';
+
 /**
  * Return the latest closed fiscal year end date (YYYY-MM-DD) or null.
  *
@@ -653,7 +655,7 @@ function stancerAddTransfertFromAccountToAccount(Account $accountfrom, Account $
 
 				if ($mailNotif) {
 					// Deduplicate: only send the "payout done" mail once per stancer_id
-					$payoutNotifyCode = 'AC_STANCER_PAYOUT_' . strtoupper((string) $stancer_id);
+					$payoutNotifyCode = 'AC_STANCER_PAYOUT_' . dol_strtoupper((string) $stancer_id);
 					$sqlDedup = "SELECT id FROM " . MAIN_DB_PREFIX . "actioncomm";
 					$sqlDedup .= " WHERE code='" . $db->escape($payoutNotifyCode) . "'";
 					$sqlDedup .= " LIMIT 1";
@@ -676,7 +678,7 @@ function stancerAddTransfertFromAccountToAccount(Account $accountfrom, Account $
 							'socid' => 0,
 							'fk_project' => 0,
 						);
-						stancerAddActionComm($flagAccount, 'STANCER_PAYOUT_' . strtoupper((string) $stancer_id), 'Stancer payout ' . $stancer_id . ' notified by mail', 'amount=' . $amount, array(), '');
+						stancerAddActionComm($flagAccount, 'STANCER_PAYOUT_' . dol_strtoupper((string) $stancer_id), 'Stancer payout ' . $stancer_id . ' notified by mail', 'amount=' . $amount, array(), '');
 						dol_syslog("stancerAddTransfertFromAccountToAccount payout $stancer_id mail sent and dedup flag created (code=$payoutNotifyCode)", LOG_INFO);
 					}
 				}
@@ -697,7 +699,7 @@ function stancerAddTransfertFromAccountToAccount(Account $accountfrom, Account $
 	if ($errorMessage != '') {
 		if ($mailNotif) {
 			// Deduplicate: only one error mail per stancer_id+errorMessage combination
-			$payoutErrCode = 'AC_STANCER_PAYOUT_ERR_' . strtoupper((string) $stancer_id) . '_' . substr(md5($errorMessage), 0, 8);
+			$payoutErrCode = 'AC_STANCER_PAYOUT_ERR_' . dol_strtoupper((string) $stancer_id) . '_' . substr(md5($errorMessage), 0, 8);
 			$sqlErrDedup = "SELECT id FROM " . MAIN_DB_PREFIX . "actioncomm";
 			$sqlErrDedup .= " WHERE code='" . $db->escape($payoutErrCode) . "'";
 			$sqlErrDedup .= " LIMIT 1";
@@ -720,7 +722,7 @@ function stancerAddTransfertFromAccountToAccount(Account $accountfrom, Account $
 					'socid' => 0,
 					'fk_project' => 0,
 				);
-				stancerAddActionComm($flagErrAccount, 'STANCER_PAYOUT_ERR_' . strtoupper((string) $stancer_id) . '_' . substr(md5($errorMessage), 0, 8), 'Stancer payout ' . $stancer_id . ' error notified by mail', $errorMessage, array(), '');
+				stancerAddActionComm($flagErrAccount, 'STANCER_PAYOUT_ERR_' . dol_strtoupper((string) $stancer_id) . '_' . substr(md5($errorMessage), 0, 8), 'Stancer payout ' . $stancer_id . ' error notified by mail', $errorMessage, array(), '');
 				dol_syslog("stancerAddTransfertFromAccountToAccount payout $stancer_id error mail sent (code=$payoutErrCode)", LOG_INFO);
 			}
 		}

@@ -1,6 +1,7 @@
 <?php
 /* Copyright (C) 2024      Lucas Marcouiller    <lmarcouiller@dolicloud.com>
  * Copyright (C) 2025 	   Pablo Lagrave           <contact@devlandes.com>
+ * Copyright (C) 2026		MDW						<mdeweerd@users.noreply.github.com>
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -23,6 +24,7 @@
  * Put detailed description here.
  */
 
+require_once DOL_DOCUMENT_ROOT . '/core/lib/functions.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/class/commonhookactions.class.php';
 
 
@@ -704,7 +706,7 @@ class ActionsHelloAsso extends CommonHookActions  // @phan-suppress-current-line
 						$jsontosenddata .= '}';
 						//var_dump($jsontosenddata);exit;
 
-						$assoslug = str_replace('_', '-', dol_string_nospecial(strtolower(dol_string_unaccent($client_organisation)), '-'));
+						$assoslug = str_replace('_', '-', dol_string_nospecial(dol_strtolower(dol_string_unaccent($client_organisation)), '-'));
 
 						$urlforcheckout = "https://".urlencode($helloassourl)."/v5/organizations/".urlencode($assoslug)."/checkout-intents";
 
@@ -801,7 +803,7 @@ class ActionsHelloAsso extends CommonHookActions  // @phan-suppress-current-line
 						$client_organisation = getDolGlobalString("HELLOASSO_TEST_CLIENT_ORGANISATION");
 						$helloassourl = "api.helloasso-sandbox.com";
 					}
-					$assoslug = str_replace('_', '-', dol_string_nospecial(strtolower(dol_string_unaccent($client_organisation)), '-'));
+					$assoslug = str_replace('_', '-', dol_string_nospecial(dol_strtolower(dol_string_unaccent($client_organisation)), '-'));
 
 					$result = helloassoDoConnection();
 					if ($result <= 0) {

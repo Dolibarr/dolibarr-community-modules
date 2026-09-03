@@ -23,6 +23,7 @@
  * \ingroup einvoicing
  * \brief   Common methods for all AP protocols.
  */
+require_once DOL_DOCUMENT_ROOT . '/core/lib/functions.lib.php';
 
 /**
  * @mixin AbstractProtocol
@@ -1337,7 +1338,7 @@ trait CommonProtocol
 		}
 
 		// Strip accents then lowercase so "Société" and "SOCIETE" compare equal
-		$name = strtolower(dol_string_unaccent($name));
+		$name = dol_strtolower(dol_string_unaccent($name));
 
 		// Remove common legal forms (whole words only) to avoid false positives on suffixes
 		$legalForms = array(
@@ -1413,9 +1414,9 @@ trait CommonProtocol
 		$globalId = trim($line['prodglobalid'] ?? '');
 		$globalIdType = trim($line['prodglobalidtype'] ?? '');
 		$sellerId = trim($line['prodsellerid'] ?? '');
-		$unitCode = strtoupper(trim($line['billedquantityunitcode'] ?? ''));
-		$name = strtolower($line['prodname'] ?? '');
-		$desc = strtolower($line['proddesc'] ?? '');
+		$unitCode = dol_strtoupper(trim($line['billedquantityunitcode'] ?? ''));
+		$name = dol_strtolower($line['prodname'] ?? '');
+		$desc = dol_strtolower($line['proddesc'] ?? '');
 
 		// A. Global ID known => product
 		// EAN = 0088
@@ -1703,7 +1704,7 @@ trait CommonProtocol
 			if (empty($exemptionReasonCode)) {
 				// Dolibarr 23 and below have no einvoice_vatex column in the dictionary; there the code is the
 				// hidden constant the module already documents for the exempt lines.
-				$exemptionReasonCode = strtoupper(getDolGlobalString('MAIN_VAT_EXEMPTION_CODE_FOR_'.price2num($vat_rate, 2).'_'.strtoupper($vat_src_code)));
+				$exemptionReasonCode = dol_strtoupper(getDolGlobalString('MAIN_VAT_EXEMPTION_CODE_FOR_'.price2num($vat_rate, 2).'_'.dol_strtoupper($vat_src_code)));
 			}
 			if (empty($exemptionReasonCode)) {
 				// The regime itself has a code in the VATEX list for AE, G and K, so those need no setup at all.
@@ -1814,7 +1815,7 @@ trait CommonProtocol
 							$obj = $db->fetch_object($resql);
 							if ($obj) {
 								if (preg_match('/^VATEX/i', $obj->code)) {
-									$vatex = strtoupper((string) $obj->code);
+									$vatex = dol_strtoupper((string) $obj->code);
 								}
 							}
 						}
@@ -1824,7 +1825,7 @@ trait CommonProtocol
 
 						if (empty($vatex)) {
 							$constantforvatex = "MAIN_VAT_EXEMPTION_CODE_FOR_" . $vat_rate.($vat_src_code ? "_". $vat_src_code : '');
-							$vatex = strtoupper(getDolGlobalString($constantforvatex));
+							$vatex = dol_strtoupper(getDolGlobalString($constantforvatex));
 						}
 
 						if (empty($vatex)) {
@@ -1855,9 +1856,9 @@ trait CommonProtocol
 						if ($resql) {
 							$obj = $db->fetch_object($resql);
 							if ($obj) {
-								$vatex = strtoupper((string) $obj->einvoice_vatex);
+								$vatex = dol_strtoupper((string) $obj->einvoice_vatex);
 								if (empty($vatex) && preg_match('/^VATEX/i', $obj->code)) {
-									$vatex = strtoupper((string) $obj->code);
+									$vatex = dol_strtoupper((string) $obj->code);
 								}
 							}
 						}
@@ -1908,7 +1909,7 @@ trait CommonProtocol
 		// not taken at its word and keeps going through the rules that follow.
 		$supportedCategories = array('S', 'Z', 'E', 'AE', 'K', 'G');
 
-		$code = strtoupper(trim((string) $vat_src_code));
+		$code = dol_strtoupper(trim((string) $vat_src_code));
 		if ($code === '') {
 			return '';
 		}
@@ -1948,7 +1949,7 @@ trait CommonProtocol
 			$obj = $db->fetch_object($resql);
 			if ($obj) {
 				$entry['note'] = trim((string) $obj->note);
-				$entry['einvoice_vatex'] = ($hasVatexColumn ? strtoupper(trim((string) $obj->einvoice_vatex)) : '');
+				$entry['einvoice_vatex'] = ($hasVatexColumn ? dol_strtoupper(trim((string) $obj->einvoice_vatex)) : '');
 			}
 		}
 

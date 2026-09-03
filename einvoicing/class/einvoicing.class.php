@@ -4,6 +4,7 @@
  * Copyright (C) 2026		Jose Martinez			<jose.martinez@pichinov.com>
  * Copyright (C) 2026		William Mead				<william@m34d.com>
  * Copyright (C) 2026       Frédéric France             <frederic.france@free.fr>
+ * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -35,6 +36,7 @@ if ((float) DOL_VERSION < 20) {
 	require_once DOL_DOCUMENT_ROOT . '/core/lib/profid.lib.php';
 }
 
+require_once DOL_DOCUMENT_ROOT.'/core/lib/functions.lib.php';
 require_once DOL_DOCUMENT_ROOT . '/core/lib/geturl.lib.php';
 dol_include_once('einvoicing/lib/einvoicing.lib.php');
 
@@ -1004,7 +1006,7 @@ class EInvoicing
 						$provider = getDolGlobalString('EINVOICING_PDP');
 						//$providershort = preg_replace('/ViaPartner/', '', $provider);	// If provider is XXX or XXXViaPartner it must be saved as XXX so if we change method, data still match the situation.
 
-						$uriConf = 'EINVOICING_' . strtoupper($provider) . '_ROUTING_ID';
+						$uriConf = 'EINVOICING_' . dol_strtoupper($provider) . '_ROUTING_ID';
 						$einvoiceid = getDolGlobalString($uriConf);
 
 						//EINVOICING_LIVE
@@ -1131,7 +1133,7 @@ class EInvoicing
 			$baseWarnings[] = $langs->trans("FxCheckErrorCustomerVAT");
 		} elseif ($thirdparty->tva_assuj && !empty($thirdparty->tva_intra) && !empty($thirdparty->country_code) && $thirdparty->country_code === 'FR') {
 			// Validate French intra-community VAT number format: FR + 2 alphanumeric characters + 9 digits (SIREN)
-			$vatNormalized = strtoupper(preg_replace('/\s+/', '', $thirdparty->tva_intra));
+			$vatNormalized = dol_strtoupper(preg_replace('/\s+/', '', $thirdparty->tva_intra));
 			if (!preg_match('/^FR[0-9A-Z]{2}[0-9]{9}$/', $vatNormalized)) {
 				$baseWarnings[] = $langs->trans("FxCheckErrorCustomerVATFormat");
 			} elseif (!empty($thirdparty->idprof1)) {
@@ -1228,7 +1230,7 @@ class EInvoicing
 	 */
 	private function _isRegistryValueMasked($value)
 	{
-		return is_string($value) && strtoupper(trim($value)) === '[NON-DIFFUSIBLE]';
+		return is_string($value) && dol_strtoupper(trim($value)) === '[NON-DIFFUSIBLE]';
 	}
 
 	/**
@@ -1292,8 +1294,8 @@ class EInvoicing
 
 					// Cross-check company name (partial match to handle legal form suffixes and abbreviations)
 					$nameApiRaw  = $matchedCompany['nom_complet'] ?? '';
-					$nomApi      = strtolower(preg_replace('/[^a-z0-9]/i', '', $nameApiRaw));
-					$nomDolibarr = strtolower(preg_replace('/[^a-z0-9]/i', '', $thirdparty->name));
+					$nomApi      = dol_strtolower(preg_replace('/[^a-z0-9]/i', '', $nameApiRaw));
+					$nomDolibarr = dol_strtolower(preg_replace('/[^a-z0-9]/i', '', $thirdparty->name));
 					if (
 						!$this->_isRegistryValueMasked($nameApiRaw)
 						&& !empty($nomApi) && !empty($nomDolibarr)
@@ -1315,8 +1317,8 @@ class EInvoicing
 
 					// Cross-check town (case-insensitive, strip accents for robustness)
 					$townApiRaw   = $matchedCompany['siege']['libelle_commune'] ?? '';
-					$townApi      = strtolower(trim($townApiRaw));
-					$townDolibarr = strtolower(trim($thirdparty->town ?? ''));
+					$townApi      = dol_strtolower(trim($townApiRaw));
+					$townDolibarr = dol_strtolower(trim($thirdparty->town ?? ''));
 					if (
 						!$this->_isRegistryValueMasked($townApiRaw)
 						&& !empty($townApi) && !empty($townDolibarr) && $townApi !== $townDolibarr
@@ -3644,7 +3646,7 @@ class EInvoicing
 			return '';
 		}
 
-		$uriConf = 'EINVOICING_' . strtoupper($provider) . '_ROUTING_ID';
+		$uriConf = 'EINVOICING_' . dol_strtoupper($provider) . '_ROUTING_ID';
 		$einvoiceid = getDolGlobalString($uriConf);
 
 		// If electronic invoicing routing ID is not set for the provider, we use professional ID 1 as default value

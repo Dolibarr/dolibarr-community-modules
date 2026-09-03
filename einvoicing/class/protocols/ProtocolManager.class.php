@@ -17,6 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+require_once DOL_DOCUMENT_ROOT . '/core/lib/functions.lib.php';
 /**
  * \file    einvoicing/class/protocols/ProtocolManager.class.php
  * \ingroup einvoicing
@@ -129,7 +130,7 @@ class ProtocolManager
 
 		$protocol = null;
 
-		$codename = strtoupper(str_replace('-', '', $name));
+		$codename = dol_strtoupper(str_replace('-', '', $name));
 
 		// Initialize protocol based on name
 		switch ($codename) {

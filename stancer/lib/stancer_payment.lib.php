@@ -22,6 +22,8 @@
  * \brief   Payment start functions (CB, SEPA, tags, filters)
  */
 
+require_once DOL_DOCUMENT_ROOT . '/core/lib/functions.lib.php';
+
 /**
  * common check before starting payment process
  *
@@ -254,7 +256,7 @@ function stancerCardstartPayWithRedirect($object, $parameters, $forceAmount = nu
 		// Build payment data for API
 		$paymentApiData = array(
 			'amount' => (int) $amountToPay,
-			'currency' => strtolower($object->multicurrency_code ?? 'eur'),
+			'currency' => dol_strtolower($object->multicurrency_code ?? 'eur'),
 			'customer' => $customerID,
 			'order_id' => $object->ref,
 			'unique_id' => $tag,
@@ -547,7 +549,7 @@ function stancerSEPAstartPay($object, $userMessage = true, $companypaymentmodeid
 	// Build payment data for SEPA
 	$paymentApiData = array(
 		'amount' => (int) $amountToPay,
-		'currency' => strtolower($object->multicurrency_code ?? 'eur'),
+		'currency' => dol_strtolower($object->multicurrency_code ?? 'eur'),
 		'customer' => $customerId,
 		'order_id' => $object->ref,
 		'unique_id' => $tag,
@@ -767,7 +769,7 @@ function stancerSEPAstartPayGrouped(array $invoices, $companypaymentmodeid, $use
 	$first = $invoices[0];
 	$socid = (int) $first->socid;
 	$datef = $first->date;
-	$currency = strtolower($first->multicurrency_code ?? 'eur');
+	$currency = dol_strtolower($first->multicurrency_code ?? 'eur');
 	$invoiceIds = array();
 	$refs = array();
 	$totalCents = 0;
@@ -785,7 +787,7 @@ function stancerSEPAstartPayGrouped(array $invoices, $companypaymentmodeid, $use
 			dol_syslog("stancerSEPAstartPayGrouped invoice " . $inv->ref . " datef mismatch (got " . $inv->date . ", expected $datef), abort group", LOG_ERR);
 			return -10;
 		}
-		$invCurrency = strtolower($inv->multicurrency_code ?? 'eur');
+		$invCurrency = dol_strtolower($inv->multicurrency_code ?? 'eur');
 		if ($invCurrency !== $currency) {
 			dol_syslog("stancerSEPAstartPayGrouped invoice " . $inv->ref . " currency mismatch (got $invCurrency, expected $currency), abort group", LOG_ERR);
 			return -10;
@@ -1145,7 +1147,7 @@ function stancerCBstartPay($object, $userMessage = true, $companypaymentmodeid =
 	//create payment via API
 	$paymentApiData = array(
 		'amount' => (int) $amountToPay,
-		'currency' => strtolower($object->multicurrency_code ?? 'eur'),
+		'currency' => dol_strtolower($object->multicurrency_code ?? 'eur'),
 		'card' => $cardId,
 		'customer' => $customerId,
 		'order_id' => $object->ref,

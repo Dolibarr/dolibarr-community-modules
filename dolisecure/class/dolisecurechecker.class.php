@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2026	Joliciel	<contact@joliciel.fr>
+ * Copyright (C) 2026		MDW			<mdeweerd@users.noreply.github.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,6 +22,7 @@
  *	\brief		Class to check the installed Dolibarr version against public CVE databases
  */
 
+require_once DOL_DOCUMENT_ROOT.'/core/lib/functions.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/geturl.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
 
@@ -303,7 +305,7 @@ class DoliSecureChecker
 
 			// For high-severity CVEs, tell the admin which version to upgrade to when we actually know it
 			// (an exclusive upper bound: "before/prior to X" or CPE versionEndExcluding). We never guess it.
-			if (in_array(strtoupper((string) $cve['severity']), array('HIGH', 'CRITICAL'), true)) {
+			if (in_array(dol_strtoupper((string) $cve['severity']), array('HIGH', 'CRITICAL'), true)) {
 				if (!empty($cve['fixedversion'])) {
 					$body .= '  '.$langs->transnoentities('DoliSecureFixedInVersion', $cve['fixedversion'])."\n";
 				} else {
@@ -501,7 +503,7 @@ class DoliSecureChecker
 	 */
 	protected static function severityRank($severity)
 	{
-		switch (strtoupper((string) $severity)) {
+		switch (dol_strtoupper((string) $severity)) {
 			case 'CRITICAL':
 				return 4;
 			case 'HIGH':
@@ -530,7 +532,7 @@ class DoliSecureChecker
 			$rank = self::severityRank($severity);
 			if ($rank > $maxrank) {
 				$maxrank = $rank;
-				$max = strtoupper((string) $severity);
+				$max = dol_strtoupper((string) $severity);
 			}
 		}
 		return $max;
@@ -546,7 +548,7 @@ class DoliSecureChecker
 	 */
 	public static function severityColors($severity)
 	{
-		switch (strtoupper((string) $severity)) {
+		switch (dol_strtoupper((string) $severity)) {
 			case 'CRITICAL':
 				return array('bg' => '#f5c2c7', 'border' => '#dc3545');
 			case 'HIGH':

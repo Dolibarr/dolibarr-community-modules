@@ -3,6 +3,7 @@
  * Copyright (C) 2026		Jose Martinez				<jose.martinez@pichinov.com>
  * Copyright (C) 2025       Mohamed DAOUD               <mdaoud@dolicloud.com>
  * Copyright (C) 2026       Frédéric France             <frederic.france@free.fr>
+ * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -31,6 +32,7 @@ dol_include_once('einvoicing/class/call.class.php');
 dol_include_once('einvoicing/class/einvoicing.class.php');
 dol_include_once('einvoicing/lib/einvoicing.lib.php');
 require_once DOL_DOCUMENT_ROOT . '/core/lib/admin.lib.php';
+require_once DOL_DOCUMENT_ROOT . '/core/lib/functions.lib.php';
 
 
 /**
@@ -125,7 +127,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		} else {
 			$this->helpToGetCredentials = '<div class="green greenborder">';
 			$this->helpToGetCredentials .= '<center>';
-			$this->helpToGetCredentials .= $langs->trans("YourSoftwareSeemsConnectedWith", strtoupper($this->name));
+			$this->helpToGetCredentials .= $langs->trans("YourSoftwareSeemsConnectedWith", dol_strtoupper($this->name));
 			$this->helpToGetCredentials .= ' <a href="'.$this->config['provider_url'].'" target="_blank">('.$this->config['provider_url'].')</a>';
 			$this->helpToGetCredentials .= '<br><br>' . img_picto('', 'delete', 'class="pictofixedwidth"') . '<a href="' . $_SERVER["PHP_SELF"] . '?action=delete' . $prefix . "TOKEN&token=" . newToken() . '">' . $langs->trans("ClickHereToRemoveConnection") . '</a>';
 			$this->helpToGetCredentials .= '</center>';
@@ -650,7 +652,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 		$file_info = pathinfo($invoice_path);
 		$fileext = $file_info['extension'] ?? ''; // Should be "pdf" or "xml" depending on the protocol
-		if (strtolower($fileext) == 'pdf') {
+		if (dol_strtolower($fileext) == 'pdf') {
 			$mime_type = 'application/pdf';
 		} else {
 			$mime_type = 'text/xml';

@@ -25,6 +25,7 @@
 
 // Put here all includes required by your class file
 require_once DOL_DOCUMENT_ROOT.'/core/class/commonobject.class.php';
+require_once DOL_DOCUMENT_ROOT . '/core/lib/functions.lib.php';
 require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
 dol_include_once('/stancer/lib/stancer.lib.php');
 
@@ -1059,7 +1060,7 @@ class Stancer extends CommonObject
 
 		dol_syslog("stancer: Creation d'un evenement", LOG_DEBUG);
 		$evt->type_code   = 'AC_OTH_AUTO'; //
-		$evt->code        = 'AC_'.strtoupper($code);
+		$evt->code        = 'AC_'.dol_strtoupper($code);
 		$evt->label = $object->ref . ": " . $title;
 		$evt->datep = $now;
 		$evt->datef = $now;

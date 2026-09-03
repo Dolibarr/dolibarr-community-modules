@@ -1,7 +1,7 @@
 <?php
 /* Copyright (C) 2022       Laurent Destailleur     <eldy@users.sourceforge.net>
  * Copyright (C) 2015-2026  Frédéric France         <frederic.france@free.fr>
- * Copyright (C) 2024		MDW						<mdeweerd@users.noreply.github.com>
+ * Copyright (C) 2024-2026	MDW						<mdeweerd@users.noreply.github.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -79,6 +79,7 @@ if (!$res) {
  *
  * @var string $dolibarr_main_url_root
  */
+require_once DOL_DOCUMENT_ROOT . '/core/lib/functions.lib.php';
 require_once '../lib/einvoicing.lib.php';
 require_once "../class/providers/PDPProviderManager.class.php";
 require_once "../class/protocols/ProtocolManager.class.php";
@@ -123,7 +124,7 @@ if ($state) { // Used to store scope and anti-csrf value. The scope is stored in
 
 $providertouse = getDolGlobalString('EINVOICING_PDP');
 if (GETPOSt('proxy') && getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER') == 'proxy') {	// If using a proxy is requested and we are on a server proxy
-	$providertouse = strtoupper(GETPOST('proxy', 'aZ09'));
+	$providertouse = dol_strtoupper(GETPOST('proxy', 'aZ09'));
 }
 
 
@@ -137,8 +138,8 @@ $pdpprovider = new PDPProviderManager($db);
 $setupprovider = $pdpprovider->getProvider($providertouse);
 
 
-$keyforparamid = 'EINVOICING_'.strtoupper($providertouse).'_CLIENT_ID'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '');
-$keyforparamsecret = 'EINVOICING_'.strtoupper($providertouse).'_CLIENT_SECRET'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '');
+$keyforparamid = 'EINVOICING_'.dol_strtoupper($providertouse).'_CLIENT_ID'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '');
+$keyforparamsecret = 'EINVOICING_'.dol_strtoupper($providertouse).'_CLIENT_SECRET'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : '');
 if (!getDolGlobalString($keyforparamid)) {
 	accessforbidden('Setup of service '.$keyforparamid.' is not complete. Customer ID is missing');
 }

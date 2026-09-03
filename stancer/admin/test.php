@@ -1,6 +1,7 @@
 <?php
 /* Copyright (C) 2004-2017 Laurent Destailleur  <eldy@users.sourceforge.net>
  * Copyright (C) 2023-2024 Eric Seigne <eric.seigne@cap-rel.fr>
+ * Copyright (C) 2026		MDW						<mdeweerd@users.noreply.github.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -50,6 +51,7 @@ if (!$res) {
 
 // Libraries
 require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
+require_once DOL_DOCUMENT_ROOT . '/core/lib/functions.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/functions2.lib.php';
 dol_include_once('/stancer/lib/stancer.lib.php');
 dol_include_once('/stancer/class/stancer_api.class.php');
@@ -161,7 +163,7 @@ if ($payments === false) {
 			foreach ($lastPayments as $payment) {
 				print "<tr class='oddeven'>";
 				print "<td><a href='https://manage.stancer.com/fr/details-de-paiement?id=" . $payment['id'] . "' target='_blank'>" . $payment['id'] . "</a></td>";
-				print "<td>" . StancerApi::fromCents($payment['amount']) . " " . strtoupper($payment['currency']) . "</td>";
+				print "<td>" . StancerApi::fromCents($payment['amount']) . " " . dol_strtoupper($payment['currency']) . "</td>";
 				print "<td>" . $payment['status'] . "</td>";
 				print "<td>" . dol_print_date($payment['created'], 'dayhour') . "</td>";
 				print "</tr>";
@@ -201,7 +203,7 @@ if ($payouts === false) {
 			foreach ($lastPayouts as $payout) {
 				print "<tr class='oddeven'>";
 				print "<td><a href='https://manage.stancer.com/fr/details-du-reversement?id=" . $payout['id'] . "' target='_blank'>" . $payout['id'] . "</a></td>";
-				print "<td>" . StancerApi::fromCents($payout['amount']) . " " . strtoupper($payout['currency']) . "</td>";
+				print "<td>" . StancerApi::fromCents($payout['amount']) . " " . dol_strtoupper($payout['currency']) . "</td>";
 				print "<td>" . $payout['status'] . "</td>";
 				print "<td>" . dol_print_date($payout['date_payout'], 'dayhour') . "</td>";
 				print "</tr>";
@@ -224,7 +226,7 @@ if (isset($payments['payments']) && count($payments['payments']) > 0) {
 	} else {
 		print "<p>Détails du paiement " . $testPaymentId . " :</p>";
 		print "<ul>";
-		print "<li>Montant : " . StancerApi::fromCents($paymentDetail['amount']) . " " . strtoupper($paymentDetail['currency']) . "</li>";
+		print "<li>Montant : " . StancerApi::fromCents($paymentDetail['amount']) . " " . dol_strtoupper($paymentDetail['currency']) . "</li>";
 		print "<li>Statut : " . $paymentDetail['status'] . "</li>";
 		print "<li>Méthode : " . (isset($paymentDetail['method']) ? $paymentDetail['method'] : 'N/A') . "</li>";
 		print "<li>Description : " . (isset($paymentDetail['description']) ? $paymentDetail['description'] : 'N/A') . "</li>";

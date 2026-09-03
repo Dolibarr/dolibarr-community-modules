@@ -1,6 +1,7 @@
 <?php
 /* Copyright (C) 2025		SuperAdmin					<daoud.mouhamed@gmail.com>
  * Copyright (C) 2026		Jose Martinez				<jose.martinez@pichinov.com>
+ * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,6 +28,7 @@
 // loaded from here so every file that already loads this library keeps finding it.
 // require_once on a path relative to this file, not dol_include_once: the latter resolves the module
 // through dol_buildpath() and, when that resolution fails, only writes a line in the log (issue #565).
+require_once DOL_DOCUMENT_ROOT . '/core/lib/functions.lib.php';
 require_once __DIR__ . '/../compat/functions.lib.php';
 
 /**
@@ -216,7 +218,7 @@ function removeAllSpaces($str, $original_encoding = null)
 		$original_encoding = mb_detect_encoding($str, mb_detect_order(), true) ?: 'UTF-8';
 	}
 
-	$is_utf8 = (strtoupper($original_encoding) === 'UTF-8');
+	$is_utf8 = (dol_strtoupper($original_encoding) === 'UTF-8');
 	if (!$is_utf8) {
 		$str = mb_convert_encoding($str, 'UTF-8', $original_encoding);
 	}

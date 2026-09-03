@@ -22,6 +22,8 @@
  * \brief   Customer management functions (SEPA, CB, IBAN)
  */
 
+require_once DOL_DOCUMENT_ROOT . '/core/lib/functions.lib.php';
+
 /**
  * update stancer account ref
  *
@@ -170,7 +172,7 @@ function stancerFindExistingCustomerOnStancer($email, $mobile, $stancerApi)
 		$list = $resp['data'];
 	}
 
-	$needle = strtolower($email);
+	$needle = dol_strtolower($email);
 	foreach ($list as $entry) {
 		if (empty($entry['id'])) {
 			continue;
@@ -178,7 +180,7 @@ function stancerFindExistingCustomerOnStancer($email, $mobile, $stancerApi)
 		// Defensive validation: only reuse a customer whose email REALLY matches
 		// the one we searched. This is what makes us immune to an API that does
 		// not honour the email filter and returns unrelated customers.
-		$entryEmail = isset($entry['email']) ? strtolower(trim((string) $entry['email'])) : '';
+		$entryEmail = isset($entry['email']) ? dol_strtolower(trim((string) $entry['email'])) : '';
 		if ($entryEmail !== $needle) {
 			dol_syslog("stancerFindExistingCustomerOnStancer: IGNORING cust=" . $entry['id']
 				. " returned for email='$email' but whose email='" . ($entry['email'] ?? '')
@@ -731,7 +733,7 @@ function stancerCheckIBAN($iban, $societe)
 	$langs->load('stancer@stancer');
 
 	// SEPAMail check only works for FR and IT banks
-	$countryCode = strtoupper($societe->country_code);
+	$countryCode = dol_strtoupper($societe->country_code);
 	if (!in_array($countryCode, array('FR', 'IT'))) {
 		dol_syslog("stancerCheckIBAN skipped: country_code=$countryCode not supported (FR/IT only)", LOG_DEBUG);
 		setEventMessages($langs->trans('StancerSepaCheckSkipped'), array(), 'warnings');

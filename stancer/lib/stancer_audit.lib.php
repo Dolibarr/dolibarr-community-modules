@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2026 Eric Seigne <eric.seigne@cap-rel.fr>
+ * Copyright (C) 2026		MDW			<mdeweerd@users.noreply.github.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -29,6 +30,7 @@
  * No write here. The audit only classifies. Remediation is a separate step.
  */
 
+require_once DOL_DOCUMENT_ROOT . '/core/lib/functions.lib.php';
 dol_include_once('/stancer/class/stancer_api.class.php');
 
 // Classification constants. Keep stable: used as i18n keys (StancerAuditStatus<X>)
@@ -89,7 +91,7 @@ function stancerAuditNormaliseName($name)
 	if (function_exists('mb_strtolower')) {
 		$name = mb_strtolower($name, 'UTF-8');
 	} else {
-		$name = strtolower($name);
+		$name = dol_strtolower($name);
 	}
 	$name = preg_replace('/\s+/', ' ', trim($name));
 	return $name === null ? '' : $name;
@@ -786,7 +788,7 @@ function stancerAuditBuildGroupView(array $results)
 			'db_invoice_ref' => isset($row->db_invoice_ref) ? (string) $row->db_invoice_ref : '',
 			'db_paid_amount' => isset($row->db_paid_amount) ? (float) $row->db_paid_amount : 0.0,
 		);
-		if (in_array(strtolower($apiStatus), $captured, true)) {
+		if (in_array(dol_strtolower($apiStatus), $captured, true)) {
 			$byOrderId[$apiOrderId]['captured_count']++;
 		}
 	}
