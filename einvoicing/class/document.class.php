@@ -534,6 +534,92 @@ class Document extends CommonObject
 	}
 
 	/**
+	 * Import a received document again, from the access point, as if it had never been imported.
+	 *
+	 * The vendor of a supplier invoice cannot be changed once it exists, so an incoming document
+	 * booked on the wrong third party - because the identifiers it carries matched nothing, or
+	 * matched the wrong record - has no way back short of this: fix the third party data, then run
+	 * the import again and let it resolve the vendor from the document a second time.
+	 *
+	 * The local draft goes first (a validated invoice is refused: it is an accounting record, and
+	 * the recovery this offers is for an import that has not been acted on yet). The flow is then
+	 * fetched from the platform again, which creates the invoice and a fresh flow record; only once
+	 * that succeeded is the previous flow record removed. A failed import therefore leaves the
+	 * previous record in place, detached, rather than losing the document.
+	 *
+	 * @param	User				$user		User asking for the import
+	 * @return	array{res:int,message:string}	res > 0 is the id of the supplier invoice created
+	 */
+	public function reimport(User $user)
+	{
+		global $langs;
+
+		require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';
+		require_once __DIR__.'/providers/PDPProviderManager.class.php';
+
+		$langs->load('einvoicing@einvoicing');
+
+		if ($this->flow_direction !== 'In' || $this->fk_element_type !== 'invoice_supplier') {
+			return array('res' => -1, 'message' => $langs->trans('EInvoiceReimportNotAReceivedInvoice'));
+		}
+		if (empty($this->flow_id)) {
+			return array('res' => -1, 'message' => $langs->trans('EInvoiceReimportNoFlowId'));
+		}
+
+		$providerManager = new PDPProviderManager($this->db);
+		$provider = $providerManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+		if (empty($provider)) {
+			return array('res' => -1, 'message' => $langs->trans('EInvoiceReimportNoProvider'));
+		}
+
+		// The invoice this document was booked on, if it is still there. Deleting it detaches this
+		// record (see the BILL_SUPPLIER_DELETE trigger), which is why the id is read before.
+		$previousInvoiceId = (int) $this->fk_element_id;
+		if ($previousInvoiceId > 0) {
+			$previousInvoice = new FactureFournisseur($this->db);
+			if ($previousInvoice->fetch($previousInvoiceId) > 0) {
+				if ((int) $previousInvoice->status !== FactureFournisseur::STATUS_DRAFT) {
+					return array('res' => -1, 'message' => $langs->trans('EInvoiceReimportInvoiceIsNotADraft', $previousInvoice->ref));
+				}
+				if ($previousInvoice->delete($user) <= 0) {
+					$reason = $previousInvoice->error ? $previousInvoice->error : implode(', ', (array) $previousInvoice->errors);
+					return array('res' => -1, 'message' => $langs->trans('EInvoiceReimportFailedToDeleteTheDraft', $previousInvoice->ref).' '.$reason);
+				}
+			}
+		}
+
+		$res = $provider->syncFlow($this->flow_id);
+		if (!isset($res['res']) || $res['res'] <= 0) {
+			return array('res' => -1, 'message' => (string) ($res['message'] ?? ''));
+		}
+
+		// The document has been imported again and now has its own record: this one is the previous
+		// import and would show the same flow twice in the list.
+		$previousRecord = new Document($this->db);
+		if ($previousRecord->fetch($this->id) > 0 && $previousRecord->delete($user) <= 0) {
+			dol_syslog(__METHOD__.' imported flow '.$this->flow_id.' again but could not delete the previous record '.$this->id.': '.$previousRecord->error, LOG_WARNING);
+		}
+
+		// The invoice the import has just booked the document on, to send the user straight to it.
+		$newInvoiceId = 0;
+		$sql = "SELECT fk_element_id FROM ".MAIN_DB_PREFIX.$this->table_element;
+		$sql .= " WHERE flow_id = '".$this->db->escape($this->flow_id)."'";
+		$sql .= " AND fk_element_type = 'invoice_supplier'";
+		$sql .= " AND entity IN (".getEntity($this->element).")";
+		$sql .= " ORDER BY rowid DESC LIMIT 1";
+		$resql = $this->db->query($sql);
+		if ($resql) {
+			$obj = $this->db->fetch_object($resql);
+			if ($obj) {
+				$newInvoiceId = (int) $obj->fk_element_id;
+			}
+			$this->db->free($resql);
+		}
+
+		return array('res' => ($newInvoiceId > 0 ? $newInvoiceId : 1), 'message' => (string) ($res['message'] ?? ''));
+	}
+
+	/**
 	 *  Delete a line of object in database
 	 *
 	 *	@param	User		$user		User that delete

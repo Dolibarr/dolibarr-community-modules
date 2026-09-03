@@ -1,0 +1,132 @@
+# Copyright (C) 2023 Alice Adminson
+# Copyright (C) 2025 	   Pablo Lagrave           <contact@devlandes.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see .
+
+#
+# Generic
+#
+
+# Module label 'ModuleHelloAssoName'
+ModuleHelloAssoName = HalloAsso
+# Module description 'ModuleHelloAssoDesc'
+ModuleHelloAssoDesc = Bied klanten een online betaalpagina van HelloAsso aan (creditcards/betaalpassen). Hiermee kunnen klanten incidentele betalingen doen of betalingen die gekoppeld zijn aan een specifiek Dolibarr-object (factuur, bestelling, enz.).
+
+#
+# Admin page
+#
+HelloAssoSetup = HelloAsso-configuratie
+Settings = Instellingen
+SettingsMember=Lidmaatschapsinstellingen
+
+HELLOASSO_LIVE = HelloAsso bevindt zich in productiemodus (anders in test-/sandboxmodus).
+HELLOASSO_TEST_CLIENT_ID=Test de identificatiesleutel voor de client
+HELLOASSO_TEST_CLIENT_ID_HELP=De testclient-ID-sleutel uit uw Helloasso API-configuratie
+HELLOASSO_TEST_CLIENT_SECRET=Test de geheime sleutel van de client
+HELLOASSO_TEST_SECRET_HELP=De geheime sleutel van de testclient-ID uit uw Helloasso API-configuratie
+HELLOASSO_TEST_CLIENT_ORGANISATION=Organisatienaam voor testmodus
+HELLOASSO_TEST_CLIENT_ORGANISATION_HELP=De naam van de organisatie voor de testmodus. Moet overeenkomen met de naam die is gedefinieerd in het HelloAsso-account.
+
+HELLOASSO_CLIENT_ID=Identificatiesleutel voor de productieklant
+HELLOASSO_CLIENT_ID_HELP=De client-ID voor de productiemodus, zoals gespecificeerd in uw Helloasso API-configuratie.
+HELLOASSO_CLIENT_SECRET=Clientgeheime sleutel voor productiemodus
+HELLOASSO_SECRET_HELP=De geheime client-ID voor de productiemodus, gegenereerd door uw Helloasso API-configuratie.
+HELLOASSO_CLIENT_ORGANISATION=Organisatienaam voor de productiemodus
+HELLOASSO_CLIENT_ORGANISATION_HELP=De naam van de organisatie voor de productiemodus. Moet overeenkomen met de naam die is gedefinieerd in het HelloAsso-account.
+HELLOASSO_BANK_ACCOUNT_FOR_PAYMENTS=Bankrekening voor betalingen
+HELLOASSO_SHOW_ONLINE_PAYMENTS=Toon de online betaalpagina
+HELLOASSO_STANDAR_BTN = Schakel de grafische stijl HelloAsso in voor de betaalknop.
+HELLOASSO_STANDAR_BTN_HELP = Schakel deze optie in om het HelloAsso CSS-bestand te laden. Dit bestand vervangt de standaardstijl van Dolibarr door een ontwerp dat is afgestemd op de visuele identiteit van HelloAsso (knoppen, kleuren, enz.).
+
+ExampleOfTestCreditCardHelloAsso=Een voorbeeld van een creditcard is te vinden op deze URL:
+TestConnectionHelloasso=Testverbinding
+SuccessfullyConnected=Verbinding succesvol
+TestGetMembersHelloasso=Probeer donaties te verzamelen via HelloAsso.
+
+HELLOASSO_FORM_MEMBERSHIP_SLUG=Naam van het lidmaatschapsformulier voor de productiemodus
+HELLOASSO_FORM_MEMBERSHIP_SLUG_HELP=De naam van het live-lidmaatschapsformulier waar u informatie van wilt ontvangen. Moet overeenkomen met het webadres van uw formulier in uw HelloAsso-account.
+HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG=Testlidmaatschapsformulier naam
+HELLOASSO_TEST_FORM_MEMBERSHIP_SLUG_HELP=Naam van het proeflidmaatschapsformulier waarvan de informatie moet worden opgehaald. Moet overeenkomen met het webadres van uw formulier in uw HelloAsso-account.
+HELLOASSO_FORM_PAGINATION_PAGES_SIZE=Maximaal aantal lidmaatschapskosten dat per pagina kan worden opgevraagd
+HELLOASSO_FORM_PAGINATION_PAGES_SIZE_HELP=Het maximale aantal bijdragen dat door de pagina's wordt opgehaald bij het importeren van leden vanuit HelloAsso.
+HELLOASSO_MAX_FORM_PAGINATION_PAGES=Maximaal aantal pagina's met lidmaatschapskosten dat kan worden opgehaald
+HELLOASSO_MAX_FORM_PAGINATION_PAGES_HELP=Het maximale aantal pagina's dat moet worden opgehaald bij het importeren van lidmaatschapskosten vanuit HelloAsso.
+HELLOASSO_FORM_CREATE_THIRDPARTY=Een externe partij aanmaken en koppelen aan een nieuw lid.
+HELLOASSO_FORM_CREATE_THIRDPARTY_HELP=Wanneer een nieuw lidmaatschapsbedrag wordt gesynchroniseerd, maak dan een nieuwe derde partij aan voor dit lid en koppel deze.
+
+HelloAssoMemberTypeDictionary=Mapping tussen het HelloAsso-lidtypewoordenboek en Dolibarr
+HelloAssoMemberCustomFieldDictionary=Woordenboek van HelloAsso-aangepaste velden en Dolibarr-veldcorrespondentie
+
+HelloAssoDolibarrMemberTypeID=Dolibarr lidtype-ID
+HelloAssoMemberTypeID=HelloAsso lidtype-ID
+ErrorHelloAssoBadParameter=Ongeldige parameter %s
+
+ErrorHelloAssoMemberTypeAlreadySet=Lidtype reeds gedefinieerd
+ErrorHelloAssoAddingMemberType=Fout bij het toevoegen van een lidtype.
+ErrorHelloAssoRemovingMemberType=Fout bij het verwijderen van een lidtype.
+HelloAssoMemberTypeDictionaryAddedSucesfully=Lidtype succesvol toegevoegd
+HelloAssoMemberTypeDictionaryRemovedSucesfully=Lidtype succesvol verwijderd
+
+ErrorHelloAssoCustomFieldAlreadySet=Aangepast veld is al ingesteld
+ErrorHelloAssoAddingCustomField=Fout bij het toevoegen van een aangepast veld.
+ErrorHelloAssoRemovingCustomField=Fout bij het verwijderen van een aangepast veld.
+HelloAssoCustomFieldDictionaryAddedSucesfully=Aangepast veld succesvol toegevoegd
+HelloAssoCustomFieldDictionaryRemovedSucesfully=Aangepast veld succesvol verwijderd
+
+HelloAssoRecordNotFound=Record niet gevonden
+
+HelloAssoMembersNothingDone=%s Lidmaatschapskosten verwerkt, maar er is niets gedaan (testrun). Er waren %s Lidmaatschapskosten met een fout.
+HelloAssoMembersAddedSucessfully=%s Lidmaatschapskosten zijn succesvol toegevoegd
+HelloAssoDolibarrCorrespondenceParameters=Correspondentieparameters tussen HelloAsso en Dolibarr
+HelloAssoFormParameters=HelloAsso formulierinstellingen
+HelloAssoMemberTypeIdTitle=ID van het overeenkomstige lidtype in HelloAsso
+HelloAssoMemberTypeId=HelloAsso lidmaatschapstype-ID
+HelloAssoCustomField=HelloAsso aangepaste veldslug
+HelloAssoCustomFieldTitle=Slug van het overeenkomstige aangepaste veld in HelloAsso
+HelloAssoSelectMemberType=Selecteer een dolibarr-lidtype
+HelloAssoSelectMemberField=Selecteer een veld voor een Dolibarr-lid
+HelloAssoMemberTypeDictionaryHelp=Dit woordenboek koppelt de lidtypen van HelloAsso en Dolibarr aan elkaar. Als het woordenboek leeg is, wordt er een nieuw lidtype in Dolibarr aangemaakt. Volg de procedure in de HelloAsso-modulewiki om de HelloAsso-lid-ID te vinden.
+HelloAssoMemberCustomFieldDictionaryHelp=Woordenboek van HelloAsso-aangepaste velden en Dolibarr-veldcorrespondentie.<br>Om een nieuw aangepast veld te configureren: selecteer een veld van het Dolibarr-lidobject en stel de naam van het overeenkomstige HelloAsso-veld in het invoerveld in.
+ModuleHelloAssoMemberSyncDesc=Synchroniseer de HelloAsso-lidmaatschapskosten in de Dolibarr-database door leden en lidmaatschapskosten aan te maken.
+HelloAssoSyncButtonDesc=Test de synchronisatie van uw lidmaatschapskosten met uw applicatie zonder uw gegevens te wijzigen. <br>Zodra de configuratie in orde is, kunt u de synchronisatie automatiseren in de module Geplande taken met de taak HelloAssoGetNewMembers.
+HELLOASSO_SUBSCRIPTION_COMPLEMENTARYACTIONS=Aanvullende actie met betrekking tot de synchronisatie van lidmaatschapskosten
+HELLOASSO_SUBSCRIPTION_COMPLEMENTARYACTIONS_HELP=Aanvullende actie bij synchronisatie van lidmaatschapskosten. <br>Er kunnen meer aanvullende acties worden ingesteld als het aanmaken van derden is ingeschakeld bij synchronisatie.
+
+# About page
+#
+About = Over
+HelloAssoAboutPage = HelloAsso over de pagina
+
+#
+# Sample page
+#
+HelloAssoArea = Startpagina HelloAsso
+
+HelloAssoDoPayment = Betaal met HelloAsso
+
+ErrorBadValueAmount=Wijzig het bedrag in uw winkelmandje. Het artikel moet gratis zijn of een waarde hebben van minimaal € 0,50 om uw betaling te kunnen autoriseren.
+ErrorValueFinalPaymentDiffers= De waarde van FinalPayment (%s) verschilt van de waarde die verwacht wordt voor het lidmaatschap (%s).
+ErrorBadClientIdOrSecret=Ongeldige client-ID of geheime sleutel
+
+HelloAssoExplanatoryText=Door lid te worden van HelloAsso word je lid van een op solidariteit gebaseerd systeem, gefinancierd door vrijwillige bijdragen van gebruikers, om hoogwaardige, gratis online diensten aan alle verenigingen aan te bieden. Door lid te worden profiteer je dus van dit op solidariteit gebaseerde model, waardoor je gratis online betalingen kunt innen. Het is daarom belangrijk om over dit model te communiceren en je gebruikers te informeren over de reikwijdte van hun betalingen. class='notranslate'><br><b>Om betalingen te accepteren met HelloAsso, heb je een account nodig op HelloAsso.</b>
+HelloAssoExplanatoryText2=Je hebt nog geen account op HelloAsso. Maak hier binnen enkele minuten je account aan. Als je problemen ondervindt, neem dan gerust een kijkje in ons helpcentrum. class='notranslate'></a> of om <a href="https://www.helloasso.com/contactez-nous" target="_blank">direct contact met ons op te nemen</a>.</i>
+HelloAssoExplanatoryText3=Om een HelloAsso-testaccount te krijgen, moet je hier een ander account aanmaken: <a href="https://auth.helloasso.com/inscription" target="_blank">
+Connected=Aangesloten.
+LastRecordedToken=Laatst geregistreerde token
+HelloAssoMembershipStatus=Lidmaatschapsstatus
+HelloAssoMemberPaymentLabel=HelloAsso abonnementsbetaling nr. %s
+ErrorHelloAssoCode=Er is een %s fout opgetreden. Controleer of de slugs, formuliernamen en sleutel geldig zijn in de configuratie van de HelloAsso-module.
+ErrorHelloassoMissingFirstNameOrLastName=Er is een fout opgetreden bij het ophalen van de ledengegevens; de voornaam of achternaam ontbreekt voor ten minste één lid.
+ErrorHelloAssoMembershipPost=Er is een fout opgetreden tijdens het verwerken van de lidmaatschapsbijdrage met de informatie %s en de fouten %s.
+HelloAssoMembersError=%s De registratie van de lidmaatschapskosten is onjuist.

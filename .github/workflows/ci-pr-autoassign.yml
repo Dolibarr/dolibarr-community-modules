@@ -108,14 +108,26 @@ jobs:
             fi
           done < changed_files.txt
 
-          echo "Store LABELS=$LABELS into FINALJS"
+          #echo "Store LABELS=$LABELS into FINALJS"
           if [ "x$LABELS" = "x" ]; then
             echo "No labels detected for changed files. Skipping."
             exit 0
           fi
 
-          # dedup + format CSV
-          FINAL=$(echo $LABELS | tr '|' '\n' | grep -v '^$' | sort -u | paste -sd, -)
+          # Deduplicate detected modules
+          FINAL=$(echo "$LABELS" | tr '|' '\n' | grep -v '^$' | sort -u)
+
+          # A PR must impact only one module
+          MODULE_COUNT=$(echo "$FINAL" | grep -c . || true)
+
+          if [ "$MODULE_COUNT" -gt 1 ]; then
+            echo "::error::A PR must impact one module at once"
+            echo "Detected modified modules:"
+            echo "$FINAL"
+            exit 1
+          fi
+
+          FINAL=$(echo "$FINAL" | paste -sd, -)
           FINALJS=$(echo "$FINAL" | jq -R 'split(",")')
 
           echo "Adding labels '$FINALJS' to PR #${PR_NUMBER}"

@@ -373,10 +373,40 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			'@phan-var-force FactureFournisseur $object';
 			$duplicate = false;
 			if (SupplierInvoiceHelper::isEInvoice($object->id, true, $duplicate)) {
-				$this->errors[] = $duplicate
-					? $langs->trans('EinvoicingDuplicateDocumentForSupplierInvoice', $object->id)
-					: $langs->trans('EinvoicingCantDeleteASupplierInvoice');
-				return -1;
+				if ($duplicate) {
+					$this->errors[] = $langs->trans('EinvoicingDuplicateDocumentForSupplierInvoice', $object->id);
+					return -1;
+				}
+
+				// A draft is a local booking, not the electronic invoice: it holds no accounting entry and
+				// says nothing to the platform, so removing it repudiates nothing. It is also the only way
+				// out of an import that landed on the wrong third party, since the vendor of an existing
+				// supplier invoice cannot be changed. Read the status from the database: the object handed
+				// to a trigger is not always freshly fetched.
+				// The incoming flow itself is kept, detached from the invoice that is about to disappear,
+				// so the document stays in the flow list and can be imported again.
+				$status = -1;
+				$sqlstatus = "SELECT fk_statut FROM ".MAIN_DB_PREFIX."facture_fourn WHERE rowid = ".((int) $object->id);
+				$resqlstatus = $this->db->query($sqlstatus);
+				if ($resqlstatus) {
+					$objstatus = $this->db->fetch_object($resqlstatus);
+					if ($objstatus) {
+						$status = (int) $objstatus->fk_statut;
+					}
+					$this->db->free($resqlstatus);
+				}
+
+				if ($status !== FactureFournisseur::STATUS_DRAFT) {
+					// A new key rather than the wording that was here: the old one asked to approve or refuse
+					// the invoice, which never unlocked the deletion, and its translations still say so.
+					$this->errors[] = $langs->trans('EinvoicingCantDeleteAValidatedSupplierInvoice');
+					return -1;
+				}
+
+				if ($this->detachEInvoicingRecordsOfSupplierInvoice((int) $object->id) < 0) {
+					$this->errors[] = $langs->trans('EinvoicingFailedToDetachTheFlowOfADeletedSupplierInvoice', $object->id);
+					return -1;
+				}
 			}
 		}
 
@@ -516,5 +546,41 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		}
 
 		return einvoicingVatDueOnCollection($hasProductLine, $hasServiceLine);
+	}
+
+	/**
+	 * Detach the e-invoicing records of a supplier invoice that is about to be deleted.
+	 *
+	 * The incoming flow is not the Dolibarr invoice: it belongs to the platform and keeps its
+	 * lifecycle, so it is kept and only unlinked (fk_element_id emptied). The extlinks row, on the
+	 * other hand, describes the local element itself and is removed with it - leaving it behind
+	 * would make the flow list show a link to an invoice that no longer exists.
+	 *
+	 * Runs inside the transaction opened by FactureFournisseur::delete(), which rolls back when
+	 * this trigger fails.
+	 *
+	 * @param	int		$supplierInvoiceId	Id of the supplier invoice being deleted
+	 * @return	int							Return integer <0 if KO, >0 if OK
+	 */
+	private function detachEInvoicingRecordsOfSupplierInvoice($supplierInvoiceId)
+	{
+		$sql = "UPDATE ".MAIN_DB_PREFIX."einvoicing_document";
+		$sql .= " SET fk_element_id = 0";
+		$sql .= " WHERE fk_element_type = 'invoice_supplier'";
+		$sql .= " AND fk_element_id = ".((int) $supplierInvoiceId);
+		if (!$this->db->query($sql)) {
+			dol_syslog(__METHOD__.' '.$this->db->lasterror(), LOG_ERR);
+			return -1;
+		}
+
+		$sql = "DELETE FROM ".MAIN_DB_PREFIX."einvoicing_extlinks";
+		$sql .= " WHERE element_type = 'invoice_supplier'";
+		$sql .= " AND element_id = ".((int) $supplierInvoiceId);
+		if (!$this->db->query($sql)) {
+			dol_syslog(__METHOD__.' '.$this->db->lasterror(), LOG_ERR);
+			return -1;
+		}
+
+		return 1;
 	}
 }

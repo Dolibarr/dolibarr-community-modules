@@ -497,6 +497,34 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			}
 		}
 
+		// Offer to import a received document again, on the invoice it was booked on: this is where
+		// a wrong vendor is noticed, and the vendor of an existing supplier invoice cannot be changed.
+		// The action itself lives on the flow card, which is also where a flow whose draft has already
+		// been deleted is picked up again.
+		if (in_array($object->element, ['invoice_supplier']) && !empty($object->id) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI') && $user->hasRight('einvoicing', 'write')) {
+			$sql = "SELECT rowid FROM " . $db->prefix() . "einvoicing_document";
+			$sql .= " WHERE fk_element_type = 'invoice_supplier'";
+			$sql .= " AND fk_element_id = " . ((int) $object->id);
+			$sql .= " AND flow_direction = 'In'";
+			$sql .= " AND flow_type = 'SupplierInvoice'";
+			$sql .= " AND entity IN (" . getEntity('document') . ")";
+			$sql .= " LIMIT 1";
+
+			$resql = $db->query($sql);
+			if ($resql && ($objdoc = $db->fetch_object($resql))) {
+				$reimporturl = dol_buildpath('/einvoicing/document_card.php', 1) . '?id=' . ((int) $objdoc->rowid) . '&action=reimport&token=' . newToken();
+				if ((int) $object->status === FactureFournisseur::STATUS_DRAFT) {
+					print '<a class="butAction" href="' . $reimporturl . '">' . $langs->trans('EInvoiceReimport') . '</a>';
+				} else {
+					print '<span class="butActionRefused classfortooltip" title="' . dol_escape_htmltag($langs->trans('EInvoiceReimportOnlyOnADraft')) . '">'
+						. $langs->trans('EInvoiceReimport') . '</span>';
+				}
+			}
+			if ($resql) {
+				$db->free($resql);
+			}
+		}
+
 		// Add button to change the entity (multi-company) of a supplier invoice
 		if (getDolGlobalString('EINVOICING_ALLOW_MULTICOMPANY_INVOICE_MOVE') && isModEnabled('multicompany') && in_array($object->element, ['invoice_supplier']) && !empty($object->id) && $user->hasRight('fournisseur', 'facture', 'creer')) {
 			if ($object->isEditable()) {
