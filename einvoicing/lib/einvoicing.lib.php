@@ -965,3 +965,25 @@ function einvoicingCheckoutCommit($repodir)
 
 	return (preg_match('/^[0-9a-f]{40,}$/', $commit) ? substr($commit, 0, 7) : '');
 }
+
+/**
+ * Key identifying the VAT breakdown group (BG-23) a line belongs to.
+ *
+ * EN 16931 identifies a breakdown group by its VAT category code (BT-118), its rate (BT-119) and its
+ * exemption reason (BT-120/BT-121), and by nothing else - in particular not by the Dolibarr
+ * vat_src_code, which used to split otherwise identical groups in two and had the platform reject the
+ * document (BR-S-08: the taxable base does not reconcile).
+ *
+ * It exists as a function because the same key is built in more than one place: a breakdown filled
+ * under one shape and read back under another silently loses what was filed under it.
+ *
+ * @param	string		$categoryVAT			VAT category code of the line (BT-118)
+ * @param	float|string	$rate				VAT rate of the line (BT-119)
+ * @param	string		$exemptionReasonCode	Exemption reason code (BT-121), empty when there is none
+ * @param	string		$exemptionReason		Exemption reason text (BT-120), empty when there is none
+ * @return	string								Key of the group in the breakdown accumulator
+ */
+function einvoicingVatBreakdownKey($categoryVAT, $rate, $exemptionReasonCode = '', $exemptionReason = '')
+{
+	return $categoryVAT.'|'.$rate.'|'.$exemptionReasonCode.'|'.$exemptionReason;
+}
