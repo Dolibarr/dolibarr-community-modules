@@ -129,7 +129,7 @@ Before writing any code, the agent **must**:
 
 - Never run SQL queries inside loops (avoid N+1 problem — use JOINs or batch queries instead)
 - Use JOINs or batch queries instead of multiple sequential queries
-- Use `db->limit()` on list queries for performance
+- Use limit on query list with `db->limit()` for performance
 - Cache repeated calls to `getDolGlobalString()` or `$conf->global->` in local variables
 
 ---
