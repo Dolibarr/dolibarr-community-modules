@@ -805,8 +805,9 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 								setEventMessages($langs->trans('WarningEntityChangedFileMoveFailed'), null, 'warnings');
 							} else {
 								dol_include_once('/multicompany/class/actions_multicompany.class.php');
-								// @phan-suppress-next-line PhanUndeclaredClassMethod DaoMulticompany is an external module class not analyzed by phan
+								// @phan-suppress-next-line PhanUndeclaredClassMethod ActionsMulticompany is an external module class not analyzed by phan
 								$actionsmulticompany = new ActionsMulticompany($db);
+								// @phan-suppress-next-line PhanUndeclaredClassMethod ActionsMulticompany is an external module class not analyzed by phan
 								$actionsmulticompany->switchEntity($newEntity);
 
 								setEventMessages($langs->trans('EntityChangedSuccess', $newEntity), null, 'mesgs');
