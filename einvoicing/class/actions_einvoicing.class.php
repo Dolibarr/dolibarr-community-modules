@@ -726,11 +726,11 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 
 		if ($isSupplierInvoiceContext) {
-			$db->begin();
-
 			$permissiontoedit = $user->hasRight('fournisseur', 'facture', 'creer');
 
 			if ($action == 'confirm_sendStatusMessage' && $permissiontoedit) {
+				$db->begin();
+
 				$PDPManager = new PDPProviderManager($db);
 				$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
 				$pdpstatuscode = GETPOSTINT('pdpstatuscode') ?: 0;
@@ -764,10 +764,20 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					$this->errors = array_merge($this->errors, $provider->errors);
 					setEventMessages($result['message'], $provider->errors, 'errors');
 				}
+
+				if ($error) {
+					$db->rollback();
+					return -1;
+				} else {
+					$db->commit();
+					return 0;
+				}
 			}
 
 			// Action to change the entity (multi-company) of a supplier invoice
 			if ($action == 'confirm_change_entity' && $permissiontoedit) {
+				$db->begin();
+
 				$newEntity = GETPOSTINT('new_entity');
 				if ($newEntity > 0) {
 					// Check that the supplier (fk_soc) is visible in the target entity
@@ -825,19 +835,19 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					$error++;
 					setEventMessages($langs->trans('ErrorEntityRequired'), null, 'errors');
 				}
-			}
 
-			if ($error) {
-				$db->rollback();
-				return -1;
-			} else {
-				$db->commit();
+				if ($error) {
+					$db->rollback();
+					return -1;
+				} else {
+					$db->commit();
 
-				if ($redirectto) {
-					header("Location: " . $redirectto);
-					exit;
+					if ($redirectto) {
+						header("Location: " . $redirectto);
+						exit;
+					}
+					return 0;
 				}
-				return 0;
 			}
 		}
 
