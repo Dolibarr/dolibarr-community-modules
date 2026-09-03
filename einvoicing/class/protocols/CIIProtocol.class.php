@@ -892,12 +892,40 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		if ($supplierInvoiceId > 0) {
-			$einvoicing->cleanUpTemporaryFiles(); // Clean up temp files to remove retrieved Einvoice file since invoice already exists
+			$return_messages[] = 'Supplier Invoice with reference ' . $parsedHeader['documentno'] . ' already exists';
 
-			// FIXME supplierinvoice already found but may be that documents are not linked (this is done later but only after creating invoice,
-			// may be we should also do it in this case to fix inconsistent data).
+			$supplierInvoice = new FactureFournisseur($db);
+			$supplierInvoice->fetch($supplierInvoiceId);
 
-			return ['res' => $supplierInvoiceId, 'message' => 'Supplier Invoice with reference ' . $parsedHeader['documentno'] . ' already exists'];
+			// Supplier invoice already found but may be that documents are downloaded or were removed
+			// Save documents in supplier invoice attachments if they do not exists yet.
+			if ($tempFile && file_exists($tempFile)) {
+				$res = $this->saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempFile);
+
+				if ($res['res'] < 0) {
+					$return_messages[] = 'Failed to save Einvoice file as attachment: ' . $res['message'];
+				} else {
+					$return_messages[] = 'Einvoice file saved as attachment';
+				}
+			} else {
+				dol_syslog("Temporary 'converted pdf file' not found for attachment", LOG_ERR);
+			}
+
+			// Save readable view file in supplier invoice attachments
+			if ($readableViewFile && $tempFileReadableView && file_exists($tempFileReadableView)) {
+				$readablefileext = 'pdf';	// Usually the extension of file for the readable version is PDF
+				$res = $this->saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempFileReadableView, getDolGlobalString('EINVOICING_PDP', 'PDP'), $readablefileext);
+
+				if ($res['res'] < 0) {
+					$return_messages[] = 'Failed to save readable view file as attachment: ' . $res['message'];
+				} else {
+					$return_messages[] = 'Readable view file saved as attachment';
+				}
+			} else {
+				dol_syslog("Temporary 'readable pdf file' not found for attachment", LOG_ERR);
+			}
+
+			return ['res' => $supplierInvoiceId, 'message' => implode("\n", $return_messages)];
 		}
 
 		// Check if all referenced documents in the invoice exist in Dolibarr for the same supplier, if not return with error since we need them for correct linking in the invoice
@@ -3243,43 +3271,15 @@ class CIIProtocol extends AbstractProtocol
 
 		$dest_path = $upload_dir . '/' . $filename;
 
-		// Copy file to destination
-		if (!copy($filePath, $dest_path)) {
-			dol_syslog(__METHOD__ . " Failed to copy file from $filePath to $dest_path", LOG_ERR);
-			return array('res' => -1, 'message' => 'Failed to save attachment file');
-		}
-
-		// Verify file was copied successfully
-		if (!file_exists($dest_path) || filesize($dest_path) === 0) {
-			dol_syslog(__METHOD__ . " File verification failed: $dest_path", LOG_ERR);
-			return array('res' => -1, 'message' => 'File verification failed after copy');
-		}
-
-		// Set proper file permissions
-		chmod($dest_path, 0660);
-		dol_syslog(__METHOD__ . " File saved successfully to: $dest_path", LOG_DEBUG);
-
-		// Register file in database index
-		$res = addFileIntoDatabaseIndex(
-			$upload_dir,
-			$filename,
-			$filename,
-			'generated',
-			0,
-			$supplierInvoice
+		$moreinfo = array(
+			'gen_or_uploaded' => 'imported',
+			'src_object_type' => $supplierInvoice->table_element,
+			'src_object_id' => $supplierInvoice->id,
+			'description' => 'File imported by the einvoicing module'
 		);
-
-		if ($res > 0) {
-			dol_syslog(__METHOD__ . " File attachment registered in database: $dest_path", LOG_DEBUG);
-		} else {
-			dol_syslog(__METHOD__ . " Error registering file attachment in database: $dest_path", LOG_ERR);
-			// File exists but not indexed - not a critical error, continue
-		}
-
-		// Clean up temporary file
-		if (file_exists($filePath)) {
-			unlink($filePath);
-			dol_syslog(__METHOD__ . " Temporary file deleted: $filePath", LOG_DEBUG);
+		$result = dol_move($filePath, $dest_path, '0', 1, 0, 1, $moreinfo);
+		if (!$result) {
+			return array('res' => -1, 'message' => 'Error failed to move file from '.$filePath.' to '.$dest_path);
 		}
 
 		return array('res' => 1, 'message' => 'Attachment saved successfully ' . $dest_path);
