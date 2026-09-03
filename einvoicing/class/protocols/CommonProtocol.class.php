@@ -592,7 +592,12 @@ trait CommonProtocol
 				$result = $thirdparty->findNearest(
 					0,
 					$sellerInfo['sellername'] ?? '',
-					$sellerInfo['sellername'] ?? '',
+					// The name is not passed as ref_ext any more: ref_ext is a free field, absent from the
+					// third party card and usually written by whatever import created the record, so a third
+					// party whose ref_ext happens to equal the seller name makes no claim to BE that seller.
+					// The last stage of findNearest() ORs name, alias and ref_ext, so that one coincidence
+					// was enough to attach the received invoice to it (issue #739).
+					'',
 					'',
 					'',
 					'',
@@ -607,7 +612,12 @@ trait CommonProtocol
 				$result = findNearest(
 					0,
 					$sellerInfo['sellername'] ?? '',
-					$sellerInfo['sellername'] ?? '',
+					// The name is not passed as ref_ext any more: ref_ext is a free field, absent from the
+					// third party card and usually written by whatever import created the record, so a third
+					// party whose ref_ext happens to equal the seller name makes no claim to BE that seller.
+					// The last stage of findNearest() ORs name, alias and ref_ext, so that one coincidence
+					// was enough to attach the received invoice to it (issue #739).
+					'',
 					'',
 					'',
 					'',
