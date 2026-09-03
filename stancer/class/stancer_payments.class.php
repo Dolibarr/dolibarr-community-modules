@@ -1,6 +1,7 @@
 <?php
 /* Copyright (C) 2017  Laurent Destailleur <eldy@users.sourceforge.net>
  * Copyright (C) 2023 Eric Seigne <eric.seigne@cap-rel.fr>
+ * Copyright (C) 2026		MDW					<mdeweerd@users.noreply.github.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -224,7 +225,7 @@ class Stancer_payments extends CommonObject
 	 *  'alwayseditable' says if field can be modified also when status is not draft ('1' or '0')
 	 *  'default' is a default value for creation (can still be overwrote by the Setup of Default Values if field is editable in creation form). Note: If default is set to '(PROV)' and field is 'ref', the default value will be set to '(PROVid)' where id is rowid when a new record is created.
 	 *  'index' if we want an index in database.
-	 *  'foreignkey'=>'tablename.field' if the field is a foreign key (it is recommanded to name the field fk_...).
+	 *  'foreignkey'=>'tablename.field' if the field is a foreign key (it is recommended to name the field fk_...).
 	 *  'searchall' is 1 if we want to search in this field when making a search from the quick search button.
 	 *  'isameasure' must be set to 1 or 2 if field can be used for measure. Field type must be summable like integer or double(24,8). Use 1 in most cases, or 2 if you don't want to see the column total into list (for example for percentage)
 	 *  'css' and 'cssview' and 'csslist' is the CSS style to use on field. 'css' is used in creation and update. 'cssview' is used in view mode. 'csslist' is used for columns in lists. For example: 'css'=>'minwidth300 maxwidth500 widthcentpercentminusx', 'cssview'=>'wordbreak', 'csslist'=>'tdoverflowmax200'
@@ -783,7 +784,7 @@ class Stancer_payments extends CommonObject
 
 		// Protection
 		if ($this->status == self::STATUS_VALIDATED) {
-			dol_syslog(get_class($this)."::validate action abandonned: already validated", LOG_WARNING);
+			dol_syslog(get_class($this)."::validate action abandoned: already validated", LOG_WARNING);
 			return 0;
 		}
 
@@ -894,7 +895,7 @@ class Stancer_payments extends CommonObject
 	}
 
 	/**
-	 *  Return a link to the object card (with optionaly the picto)
+	 *  Return a link to the object card (with optionally the picto)
 	 *
 	 *  @param  int     $withpicto                  Include picto in link (0=No picto, 1=Include picto into link, 2=Only picto)
 	 *  @param  string  $option                     On what the link point to ('nolink', ...)
@@ -1370,7 +1371,7 @@ class Stancer_payments extends CommonObject
 			dol_syslog("stancer fillData fk_soc=$fk_soc resolved from CUS= tag");
 		}
 
-		//TODO cutomer peut-être vide si c'est payé par TPE physique
+		//TODO customer peut-être vide si c'est payé par TPE physique
 		if (null === $customer) {
 			//customer is null, use default TPE ?
 			if (empty($fk_soc)) {
@@ -1668,7 +1669,7 @@ class Stancer_payments extends CommonObject
 	 * @param  array   $val		       Array of properties of field to show
 	 * @param  string  $key            Key of attribute
 	 * @param  string  $object         list object with preselected value to show (for date type it must be in timestamp format, for amount or price it must be a php numeric value)
-	 * @param  string  $moreparam      To add more parametes on html input tag
+	 * @param  string  $moreparam      To add more parameters on html input tag
 	 * @param  string  $keysuffix      Prefix string to add into name and id of field (can be used to avoid duplicate names)
 	 * @param  string  $keyprefix      Suffix string to add into name and id of field (can be used to avoid duplicate names)
 	 * @param  mixed   $showsize       Value for css to define size. May also be a numeric.

@@ -1,6 +1,7 @@
 <?php
 /* Copyright (C) 2017  Laurent Destailleur      <eldy@users.sourceforge.net>
  * Copyright (C) 2024 Eric Seigne <eric.seigne@cap-rel.fr>
+ * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -416,7 +417,7 @@ class Stancer_disputes extends CommonObject
 	 * @param  array   $val		       Array of properties of field to show
 	 * @param  string  $key            Key of attribute
 	 * @param  string  $object         list object with preselected value to show (for date type it must be in timestamp format, for amount or price it must be a php numeric value)
-	 * @param  string  $moreparam      To add more parametes on html input tag
+	 * @param  string  $moreparam      To add more parameters on html input tag
 	 * @param  string  $keysuffix      Prefix string to add into name and id of field (can be used to avoid duplicate names)
 	 * @param  string  $keyprefix      Suffix string to add into name and id of field (can be used to avoid duplicate names)
 	 * @param  mixed   $showsize       Value for css to define size. May also be a numeric.

@@ -1,6 +1,7 @@
 <?php
 /* Copyright (C) 2017  Laurent Destailleur <eldy@users.sourceforge.net>
  * Copyright (C) 2023 Eric Seigne <eric.seigne@cap-rel.fr>
+ * Copyright (C) 2026		MDW					<mdeweerd@users.noreply.github.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -581,8 +582,8 @@ class Stancer extends CommonObject
 
 	/**
 	 * Action executed by scheduler
-	 * Loop on invoice for customer with amount to pay = 0 and status not payed
-	 * Then change status to payed
+	 * Loop on invoice for customer with amount to pay = 0 and status not paid
+	 * Then change status to paid
 	 * CAN BE A CRON TASK
 	 *
 	 * @param	int		$maxnbofinvoicetotry    		Max number of payment to do (0 = No max)
