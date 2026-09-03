@@ -2444,13 +2444,13 @@ class CIIProtocol extends AbstractProtocol
 			}
 
 			// VAT array by rate (tax breakdown)
-			foreach ($invoiceData['taxBreakdown'] as $rate => $vals) {		// $rate is 0, 20.0, ..., $vals is an array
+			foreach ($invoiceData['taxBreakdown'] as $vals) {		// $vals is one VAT breakdown group (BG-23)
 				// Add comment
 				$comment = $doc->createComment('VAT rate: '.$vals['tva_tx'].', VAT src code: '.$vals['vat_src_code'].', ExemptionReasonCode: '.$vals['ExemptionReasonCode']);
 				$settlement->appendChild($comment);
 
 				$settlement->appendChild(
-					$this->buildTaxNode($doc, $rate, $vals, $invoiceData['invoiceCurrency'], $invoiceData['vatDueDateTypeCode'] ?? '') 	// ApplicableTradeTax
+					$this->buildTaxNode($doc, $vals, $invoiceData['invoiceCurrency'], $invoiceData['vatDueDateTypeCode'] ?? '') 	// ApplicableTradeTax
 				);
 			}
 
@@ -3003,13 +3003,12 @@ class CIIProtocol extends AbstractProtocol
 	 * Build a tax node.
 	 *
 	 * @param \DOMDocument 		$doc 		Document to create nodes in
-	 * @param float|string      $rate 		Tax rate
-	 * @param array       		$vals 		Array containing tax values
+	 * @param array       		$vals 		One VAT breakdown group (BG-23): rate, category, exemption and totals
 	 * @param string       		$currency 	Currency code
 	 * @param string       		$dueDateTypeCode 	BT-8, VAT point date code ('5', '29' or '72'), empty to omit it
 	 * @return \DOMElement
 	 */
-	private function buildTaxNode($doc, $rate, $vals, $currency, $dueDateTypeCode = '')
+	private function buildTaxNode($doc, $vals, $currency, $dueDateTypeCode = '')
 	{
 		$tax = $doc->createElement('ram:ApplicableTradeTax');
 
@@ -3033,9 +3032,9 @@ class CIIProtocol extends AbstractProtocol
 			$tax->appendChild($doc->createElement('ram:DueDateTypeCode', htmlspecialchars((string) $dueDateTypeCode)));
 		}
 
-		$floatrate = preg_replace('/\(.*\)/', '', (string) $rate);		// If $rate is 'x.x (CODE)', we change it into 'x.x'
-
-		$tax->appendChild($doc->createElement('ram:RateApplicablePercent', number_format((float) $floatrate, 2, '.', '')));
+		// BT-119 comes from the group itself, never from the key it is filed under: that key identifies
+		// the group (category, rate and exemption reason together) and is not a number.
+		$tax->appendChild($doc->createElement('ram:RateApplicablePercent', number_format((float) $vals['tva_tx'], 2, '.', '')));
 
 		return $tax;
 	}
