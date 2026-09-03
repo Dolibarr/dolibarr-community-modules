@@ -793,11 +793,12 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 							// Move the invoice files to the new entity's directory
 							$fileMoveResult = $this->moveSupplierInvoiceFilesToEntity($object, $oldEntity, $newEntity);
 							if ($fileMoveResult < 0) {
+								$error++;
 								setEventMessages($langs->trans('WarningEntityChangedFileMoveFailed'), null, 'warnings');
+							} else {
+								setEventMessages($langs->trans('EntityChangedSuccess', $newEntity), null, 'mesgs');
+								$redirectto = $_SERVER['PHP_SELF'] . '?id=' . $object->id;
 							}
-
-							setEventMessages($langs->trans('EntityChangedSuccess', $newEntity), null, 'mesgs');
-							$redirectto = $_SERVER['PHP_SELF'] . '?id=' . $object->id;
 						} else {
 							$error++;
 							setEventMessages($object->error, $object->errors, 'errors');
@@ -892,12 +893,12 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			$db->rollback();
 			return -1;
 		} else {
+			$db->commit();
+
 			if ($redirectto) {
 				header("Location: " . $redirectto);
 				exit;
 			}
-
-			$db->commit();
 			return 0;
 		}
 	}
