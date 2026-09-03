@@ -536,20 +536,31 @@ abstract class AbstractPDPProvider
 
 		// For backward compatibility with Dolibarr versions < 23.0.0
 		if (version_compare(DOL_VERSION, '23.0.0-alpha', '<')) {
-			dolibarr_set_const($db, $serviceName.'_TOKEN', $accessToken, 'chaine', 0, '', $conf->entity);
+			$forceentity = $conf->entity;
+			if (getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP")) {
+				$forceentity = getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP");
+			}
+
+			dolibarr_set_const($db, $serviceName.'_TOKEN', $accessToken, 'chaine', 0, '', $forceentity);
 
 			if ($refreshToken !== null) {
-				dolibarr_set_const($db, $serviceName.'_REFRESH', $refreshToken, 'chaine', 0, '', $conf->entity);
+				dolibarr_set_const($db, $serviceName.'_REFRESH', $refreshToken, 'chaine', 0, '', $forceentity);
 			}
 
 			if ($expire_at !== null) {
-				dolibarr_set_const($db, $serviceName.'_EXPIRE', $expire_at, 'chaine', 0, '', $conf->entity);
+				dolibarr_set_const($db, $serviceName.'_EXPIRE', $expire_at, 'chaine', 0, '', $forceentity);
 			}
 		} else {
 			// Check if a token already exists for this service
+
+			$forceentity = $conf->entity;
+			if (getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP")) {
+				$forceentity = getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP");
+			}
+
 			$sql_check = "SELECT rowid FROM ".MAIN_DB_PREFIX."oauth_token";
 			$sql_check .= " WHERE service = '".$db->escape($serviceName)."'";
-			$sql_check .= " AND entity = ".((int) $conf->entity);
+			$sql_check .= " AND entity = ".((int) $forceentity);
 
 			$resql = $db->query($sql_check);
 			if (!$resql) {
@@ -568,7 +579,7 @@ abstract class AbstractPDPProvider
 					$sql .= ", expire_at = '".$db->idate($expire_at, 'gmt')."'";
 				}
 				$sql .= " WHERE service = '".$db->escape($serviceName)."'";
-				$sql .= " AND entity = ".((int) $conf->entity);
+				$sql .= " AND entity = ".((int) $forceentity);
 			} else {
 				// --- Insert new token ---
 				$sql  = "INSERT INTO ".MAIN_DB_PREFIX."oauth_token (service, tokenstring";
@@ -581,7 +592,7 @@ abstract class AbstractPDPProvider
 				$sql .= $refreshToken !== null ? ", '".$db->escape($refreshToken)."'" : "";
 				$sql .= ", '".$db->idate($now)."'";
 				$sql .= $expire_at !== null ? ", '".$db->idate($expire_at, 'gmt')."'" : "";
-				$sql .= ", ".(int) $conf->entity.")";
+				$sql .= ", ".(int) $forceentity.")";
 			}
 
 			// Execute SQL

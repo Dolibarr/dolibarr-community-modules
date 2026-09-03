@@ -303,7 +303,7 @@ class CdarHandler
 		dol_include_once('/einvoicing/class/providers/PDPProviderManager.class.php');
 		$einvoicing = new EInvoicing($this->db);
 		$ProcessCondition = $einvoicing->getStatusLabel($statusCode);
-		$ProcessCondition = str_replace(' ', '_', $ProcessCondition);
+		$ProcessCondition = str_replace(' ', '_', dol_string_unaccent($ProcessCondition));
 		$ProcessCondition = preg_replace('/[^A-Za-z0-9_]/', '', $ProcessCondition); // Clean special chars
 
 		// Electronic address (MDT-73) of the CDAR recipient. Every status but the cash-in (212) is sent on a
@@ -467,6 +467,7 @@ class CdarHandler
 
 		// Unique per-call name so two concurrent status sends of the same condition cannot collide (#226).
 		$filename = $tempDir . '/cdar_' . $ProcessCondition . '_' . bin2hex(random_bytes(8)) . '.xml';
+		$filename = strtolower(dol_sanitizePathName(dol_string_unaccent($filename)));
 
 		$result = $this->saveToFile($data, $filename);
 		if ($result === false) {

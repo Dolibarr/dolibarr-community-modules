@@ -457,7 +457,11 @@ if ($stringwarning) {
 }
 
 if (!empty($formSetup2->items)) {
-	print $pdpRenderFormSetup($formSetup2, $langs->transnoentitiesnoconv('EInvoicingConnectionSetup'));
+	if (getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP")) {
+		print info_admin($langs->trans("EInvoicingInfoManagedByMasterSetup"), getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP"));
+	} else {
+		print $pdpRenderFormSetup($formSetup2, $langs->transnoentitiesnoconv('EInvoicingConnectionSetup'));
+	}
 	print '<br>';
 }
 

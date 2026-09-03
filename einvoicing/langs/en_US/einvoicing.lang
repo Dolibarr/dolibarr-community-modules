@@ -646,3 +646,4 @@ EntityChangedSuccess=Supplier invoice moved to entity %s
 ErrorEntityRequired=A valid entity number is required
 DisabledBecauseNotEditable=This invoice is not editable
 ErrorSupplierNotVisibleInEntity=The supplier "%s" is not visible in entity %s. You must share or create it in the target entity first.
+EInvoicingInfoManagedByMasterSetup=The einvoicing setup is managed by the master entity (ID %s)
