@@ -374,13 +374,6 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
 		$item->fieldParams['warningifon'] = 1;
 	}
 
-	// Setup conf to allow the email address as a criterion to find the third party of a received e-invoice
-	$item = $formSetup->newItem('EINVOICING_THIRDPARTIES_MATCH_ON_EMAIL')->setAsYesNo();
-	$item->helpText = $langs->transnoentities('EINVOICING_THIRDPARTIES_MATCH_ON_EMAIL_HELP');
-	$item->defaultFieldValue = '0';
-	$item->cssClass = 'minwidth500';
-	$item->fieldParams['warningifon'] = 1;
-
 	// Setup conf to choose use of auto generation or not of third parties
 	$item = $formSetup->newItem('EINVOICING_THIRDPARTIES_AUTO_GENERATION')->setAsYesNo();
 	$item->helpText = $langs->transnoentities('EINVOICING_THIRDPARTIES_AUTO_GENERATION_HELP');
