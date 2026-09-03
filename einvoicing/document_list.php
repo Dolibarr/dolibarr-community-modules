@@ -716,7 +716,7 @@ if ($provider) {
 }
 
 print_barre_liste($title, $page, $_SERVER["PHP_SELF"], $param, $sortfield, $sortorder, $massactionbutton, $num, $nbtotalofrecords, $object->picto, 0, $newcardbutton, '', $limit, 0, 0, 1);
-
+print "\n".'<!-- Einvoicing version '.file_get_contents('VERSION').' -->'."\n\n";
 
 // Add code for pre mass action (confirmation or email presend form)
 $topicmail = "SendDocumentRef";
