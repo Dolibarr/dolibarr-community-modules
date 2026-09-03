@@ -437,7 +437,7 @@ foreach ($object->lines as $line) {
 	// Keying the breakdown by vat_src_code split otherwise identical "S"/rate lines into two
 	// ApplicableTradeTax groups (e.g. products carrying code TVAFR20 vs services without code), which
 	// the PDP rejects (BR-FXEXT-S08b / BR-S-08: duplicate breakdown, taxable base does not reconcile).
-	$vatBreakdownKey = $categoryVAT.'|'.$line->tva_tx.'|'.$exemptionReasonCode.'|'.$exemptionReason;
+	$vatBreakdownKey = einvoicingVatBreakdownKey($categoryVAT, $line->tva_tx, $exemptionReasonCode, $exemptionReason);
 
 	// if ($line->subprice < 0 || $line->subprice_ttc < 0) {
 	// 	throw new Exception("NEGATIVE_UNIT_PRICE_NOT_ALLOWED: Unit price in lines can't be negative. Try to edit the line with ID " . $line->id);
@@ -766,9 +766,12 @@ if (!empty($object->situation_counter) && $object->situation_counter > 1
 			continue;
 		}
 
-		// The allowance reduces the basis of a VAT rate of THIS invoice, so it is filed under the rate
-		// of the line as it stands now, which is the one the breakdown knows.
-		$keyforvatrate = $line->tva_tx . ($line->vat_src_code ? ' (' . $line->vat_src_code . ')' : '');
+		// The allowance reduces the basis of a VAT breakdown group of THIS invoice, so it is filed under
+		// the group of the line as it stands now, which is the one the breakdown knows. The key has to be
+		// built exactly the way the breakdown above built it, hence the shared helper: filed under any
+		// other shape, the deduction lands on a group that does not exist and is silently dropped.
+		$tmpcategory = $this->getCategoryRate($line, $mysoc, $object);
+		$keyforvatrate = einvoicingVatBreakdownKey($tmpcategory['categoryVAT'], $line->tva_tx, $tmpcategory['ExemptionReasonCode'], $tmpcategory['ExemptionReason']);
 		if (!isset($taxBreakdown[$keyforvatrate])) {
 			continue;
 		}
