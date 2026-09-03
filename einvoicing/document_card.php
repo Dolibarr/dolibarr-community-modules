@@ -95,6 +95,13 @@ if (!$res) {
 include_once DOL_DOCUMENT_ROOT.'/core/class/html.formcompany.class.php';
 include_once DOL_DOCUMENT_ROOT.'/core/class/html.formfile.class.php';
 include_once DOL_DOCUMENT_ROOT.'/core/class/html.formprojet.class.php';
+// Two functions this page reaches are not there on Dolibarr 18, where it is therefore blank:
+// dragAndDropFileUpload(), which dol_get_fiche_head() calls for the drag-and-drop upload area and
+// which lives in a core library nothing else here loads; and dolPrintHTMLForAttribute(), called by
+// Document::getNomUrl() and only added to the core in Dolibarr 19 - backported in
+// compat/functions.lib.php, which document_list.php already includes for the same reason.
+include_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+include_once __DIR__.'/compat/functions.lib.php';
 dol_include_once('/einvoicing/class/document.class.php');
 dol_include_once('/einvoicing/lib/einvoicing_document.lib.php');
 
