@@ -542,6 +542,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		}
 
 		//dol_syslog(__METHOD__ . " Hook doActions called for object " . get_class($object) . " action=" . $action);
+		$redirectto = '';
 
 		$einvoicing = new EInvoicing($db);
 		$checkConfig = $einvoicing->checkModulePrerequisites();
@@ -788,8 +789,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 						$result = $object->setValueFrom('entity', $newEntity);
 						if ($result > 0) {
 							setEventMessages($langs->trans('EntityChangedSuccess', $newEntity), null, 'mesgs');
-							header("Location: " . $_SERVER['PHP_SELF'] . '?id=' . $object->id);
-							exit;
+							$redirectto = $_SERVER['PHP_SELF'] . '?id=' . $object->id;
 						} else {
 							$error++;
 							setEventMessages($object->error, $object->errors, 'errors');
@@ -882,6 +882,12 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		if ($error) {
 			$db->rollback();
+
+			if ($redirectto) {
+				header("Location: " . $_SERVER['PHP_SELF'] . '?id=' . $object->id);
+				exit;
+			}
+
 			return -1;
 		} else {
 			$db->commit();
@@ -1249,7 +1255,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					// @phan-suppress-next-line PhanUndeclaredClassMethod DaoMulticompany is an external module class not analyzed by phan
 					$mc = new DaoMulticompany($db);
 					// @phan-suppress-next-line PhanUndeclaredClassMethod DaoMulticompany is an external module class not analyzed by phan
-					if ($mc->getEntities(false, false, true) > 0) {
+					if ($mc->getEntities(false, false, true, true) > 0) {
 						// @phan-suppress-next-line PhanUndeclaredClassProperty DaoMulticompany is an external module class not analyzed by phan
 						foreach ($mc->entities as $entityId => $entityObj) {
 							if ($entityId == $object->entity) {
