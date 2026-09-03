@@ -797,9 +797,11 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 								setEventMessages($langs->trans('WarningEntityChangedFileMoveFailed'), null, 'warnings');
 							} else {
 								dol_include_once('/multicompany/class/actions_multicompany.class.php');
-								// @phan-suppress-next-line PhanUndeclaredClassMethod DaoMulticompany is an external module class not analyzed by phan
-								$object = new ActionsMulticompany($db);
-								echo $object->switchEntity($newEntity);
+								// ActionsMulticompany comes from the external multicompany module, which phan does not analyze.
+								// It must not be assigned to $object: the supplier invoice is still needed below, to build the
+								// redirect url with its id.
+								$multicompany = new ActionsMulticompany($db); // @phan-suppress-current-line PhanUndeclaredClassMethod
+								echo $multicompany->switchEntity($newEntity); // @phan-suppress-current-line PhanUndeclaredClassMethod
 
 								setEventMessages($langs->trans('EntityChangedSuccess', $newEntity), null, 'mesgs');
 								$redirectto = $_SERVER['PHP_SELF'] . '?id=' . $object->id;
