@@ -108,7 +108,7 @@ jobs:
             fi
           done < changed_files.txt
 
-          echo "Store LABELS=$LABELS into FINALJS"
+          #echo "Store LABELS=$LABELS into FINALJS"
           if [ "x$LABELS" = "x" ]; then
             echo "No labels detected for changed files. Skipping."
             exit 0
