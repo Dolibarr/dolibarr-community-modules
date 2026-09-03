@@ -208,6 +208,24 @@ if (empty($reshook)) {
 	// Action to build doc
 	include DOL_DOCUMENT_ROOT.'/core/actions_builddoc.inc.php';
 
+	// Import a received document again, once the data it is matched on has been fixed. The invoice
+	// it was booked on - a draft, or nothing left if it has already been deleted - is replaced by
+	// the one this new import creates, so there is nothing to come back to on this page.
+	if ($action == 'confirm_reimport' && $confirm == 'yes' && $permissiontoadd) {
+		$result = $object->reimport($user);
+		if ($result['res'] > 0) {
+			setEventMessages($langs->trans('EInvoiceReimportDone', $object->flow_id), null, 'mesgs');
+			if ($result['res'] > 1) {
+				header('Location: '.DOL_URL_ROOT.'/fourn/facture/card.php?id='.((int) $result['res']));
+			} else {
+				header('Location: '.dol_buildpath('/einvoicing/document_list.php', 1));
+			}
+			exit;
+		}
+		setEventMessages($langs->trans('EInvoiceReimportFailed', $object->flow_id), array($result['message']), 'errors');
+		$action = '';
+	}
+
 	// Other special actions
 	/*
 	if ($action == 'set_thirdparty' && $permissiontoadd) {
@@ -350,6 +368,19 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	// Confirmation to delete line
 	if ($action == 'deleteline') {
 		$formconfirm = $form->formconfirm($_SERVER["PHP_SELF"].'?id='.$object->id.'&lineid='.$lineid, $langs->trans('DeleteLine'), $langs->trans('ConfirmDeleteLine'), 'confirm_deleteline', '', 0, 1);
+	}
+
+	// Import a received document again
+	if ($action == 'reimport') {
+		$formconfirm = $form->formconfirm(
+			$_SERVER["PHP_SELF"].'?id='.$object->id,
+			$langs->trans('EInvoiceReimport'),
+			$langs->trans('EInvoiceReimportConfirm', $object->flow_id),
+			'confirm_reimport',
+			'',
+			0,
+			1
+		);
 	}
 
 	// Clone confirmation
@@ -582,6 +613,16 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 			$params = array();
 			print dolGetButtonAction('', $langs->trans("Delete"), 'delete', $deleteUrl, $buttonId, $permissiontodelete, $params);
 		}
+		print '</div>'."\n";
+	}
+
+	// Actions on a received document. The block above is the skeleton one, left disabled by the
+	// module builder: it offers the CRUD of a flow record, which is written by synchronizations
+	// and not by hand.
+	if ($action != 'presend' && $action != 'editline'
+		&& $object->flow_direction == 'In' && $object->fk_element_type == 'invoice_supplier' && !empty($object->flow_id)) {
+		print '<div class="tabsAction">'."\n";
+		print dolGetButtonAction('', $langs->trans('EInvoiceReimport'), 'default', $_SERVER["PHP_SELF"].'?id='.$object->id.'&action=reimport&token='.newToken(), '', $permissiontoadd);
 		print '</div>'."\n";
 	}
 
