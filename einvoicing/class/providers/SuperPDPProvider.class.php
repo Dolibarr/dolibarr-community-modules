@@ -2412,6 +2412,26 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 				$exchangeProtocol = $tmpProtocolManager->getProtocol($detectedProtocol);
 
+				if (!is_object($exchangeProtocol)) {
+					// The syntax was recognized, but this module has no reader for it: detectProtocolFromContent()
+					// answers 'UBL' on a UBL invoice while ProtocolManager has no UBLProtocol class to build, so
+					// getProtocol() returns null. Calling the import on that null raises an Error, which is not an
+					// Exception: neither the catch below nor the one of syncFlows() takes it, and the whole
+					// synchronization request dies without even reporting the flow it died on.
+					// Nothing has been stored at this point and the flow is still pending at the Access Point, so
+					// it is postponed - it is retried on the next synchronization, the invoices queued behind it
+					// keep coming in, and the user is told which conversion format to set on their account.
+					return array(
+						'res' => -1,
+						'postponeflow' => 1,
+						'message' => "ERROR_FLOW_NOT_SUPPORTED_PROTOCOL The document received for SupplierInvoice flow (flowId: " . $flowId . ") is in the '" . $detectedProtocol . "' syntax, which this module cannot read",
+						'actioncode' => 'CONVERSION_FORMAT_NOT_SUPPORTED',
+						'actionurl' => '',
+						'action' => $langs->trans('SetTheAccessPointConversionFormat'),
+						'actiondata' => array()
+					);
+				}
+
 				$exceptionmessage = '';
 
 				// No transaction opened here: createSupplierInvoiceFromSource() owns it. It synchronizes
