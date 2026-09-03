@@ -3223,9 +3223,24 @@ class SuperPDPProvider extends AbstractPDPProvider
 				}
 			} else {
 				$res = -1;
-				$message = 'Failed to send CDAR file to PDP. Status code: ' . $response['status_code'] . '. Message: ' . (!empty($response['response']['message'])
+				$platformMessage = (string) (!empty($response['response']['message'])
 					? $response['response']['message']
 					: ($response['errorMessage'] ?? 'No message'));
+				$message = 'Failed to send CDAR file to PDP. Status code: ' . $response['status_code'] . '. Message: ' . $platformMessage;
+				// MDT-73 is the electronic address the status is sent to. The platform refuses the CDAR when
+				// it does not know the vendor under the address the module used, and says nothing about what
+				// to do next - while the received invoice stays impossible to approve or refuse, and so
+				// impossible to delete. Name the third party and the field that fixes it.
+				if (strpos($platformMessage, 'MDT-73') !== false) {
+					if (empty($object->thirdparty)) {
+						$object->fetch_thirdparty();
+					}
+					$vendorName = !empty($object->thirdparty->name) ? $object->thirdparty->name : ('#' . (int) $object->socid);
+					$usedAddress = $cdarHandler->recipientURIID !== '' ? $cdarHandler->recipientURIID : '-';
+					$message .= ' - ' . ($cdarHandler->recipientURIIDOrigin === 'routing'
+						? $langs->trans('CdarAddressRefusedRecordedRouting', $vendorName, $usedAddress)
+						: $langs->trans('CdarAddressRefusedNoRouting', $vendorName, $usedAddress));
+				}
 				return ['res' => $res, 'message' => $message];
 			}
 		} else {
