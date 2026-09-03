@@ -169,8 +169,9 @@ If adding a unit test was explicitely requested:
     - Types: `NEW`, `FIX` or `CLOSE`
     - Example: `FIX: #1234 Correct VAT calculation on credit notes`
 - Do not update the `ChangeLog` file (this file will be generated before the release from all commit titles)
-- When commiting, keep your commit comment short and add a line "Co-authored-by:" to mention the AI agent name
-- When making a Pull Request, keep the PR description short (never exceed 50 lines) and mention the AI agent name in the description by adding a line "Co-authored-by:"
+- When commiting, keep your commit comment short (NEVER exceed 50 lines) and add a line "Co-authored-by:" to mention the AI agent name
+- When making a Pull Request, keep the PR description short (never exceed 50 lines) and mention the AI agent name in the description with a line like "Submited with <AI agent name> (see commit comments for attributions)"
+- A pull request can contain database structure change only, or one new feature, or one bug fix, or a refactoring but never a mix of these. 
 
 ---
 
