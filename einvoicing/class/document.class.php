@@ -1265,7 +1265,7 @@ class Document extends CommonObject
 	 * @param ?string $xmlData The XML data to check
 	 * @return bool True if xmlData is within size bounds
 	 */
-	public static function checkXmlDataMaxSize(?string &$xmlData): bool
+	public static function checkXmlDataMaxSize(&$xmlData): bool
 	{
 		if (isset($xmlData)) {
 			// 16Mo for MEDIUMTEXT
@@ -1281,7 +1281,7 @@ class Document extends CommonObject
 	 * @param ?string $xmlData The XML data to clean
 	 * @return ?string The cleaned XML data
 	 */
-	public static function cleanXmlData(?string $xmlData): ?string
+	public static function cleanXmlData($xmlData)
 	{
 		global $db;
 

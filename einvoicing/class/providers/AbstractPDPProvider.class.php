@@ -753,7 +753,7 @@ abstract class AbstractPDPProvider
 	 *
 	 * @var array<int,string>
 	 */
-	private const LOGCALL_SENSITIVE_KEYS = array('client_secret', 'access_token', 'refresh_token', 'id_token', 'password');
+	const LOGCALL_SENSITIVE_KEYS = array('client_secret', 'access_token', 'refresh_token', 'id_token', 'password');
 
 	/**
 	 * Redact known sensitive fields (@see LOGCALL_SENSITIVE_KEYS) from a value before it is
@@ -854,7 +854,7 @@ abstract class AbstractPDPProvider
 	 * @param   string                      $requestId  Request-Id header sent with the call, kept to correlate our log with the one of the Access Point
 	 * @return  ?array{id:int,call_id:?string}           Created log identifiers, or null if not logged
 	 */
-	protected function logCall(?string $callType, $resource, $method, $params, $response, $statusCode, string $requestId = '')
+	protected function logCall($callType, $resource, $method, $params, $response, $statusCode, string $requestId = '')
 	{
 		global $conf, $user, $dolibarr_main_db_pass, $dbhistory;
 
@@ -1040,7 +1040,7 @@ abstract class AbstractPDPProvider
 	 *
 	 * @var array<string,string>
 	 */
-	protected const FLOW_PROFILE_BY_GUIDELINE = array(
+	const FLOW_PROFILE_BY_GUIDELINE = array(
 		'urn:factur-x.eu:1p0:basic' => 'Basic',
 		'urn:cen.eu:en16931:2017' => 'CIUS',
 		'urn:cen.eu:en16931:2017#conformant#urn.cpro.gouv.fr:1p0:extended-ctc-fr' => 'Extended-CTC-FR',

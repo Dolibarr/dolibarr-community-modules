@@ -62,13 +62,13 @@ class FacturXProtocol extends CIIProtocol
 	use CommonProtocol;
 
 	/** @const string Invoice file extension (without the dot, example 'xml') */
-	protected const INVOICE_FILE_EXTENSION = 'pdf';
+	const INVOICE_FILE_EXTENSION = 'pdf';
 
 	/** @const string Generated invoice file name */
-	protected const GENERATED_INVOICE_XML_FILE_NAME = 'factur-x.xml';
+	const GENERATED_INVOICE_XML_FILE_NAME = 'factur-x.xml';
 
 	/** @const string The profile used to generate XML */
-	protected const BUILD_XML_PROFILE = 'EXTENDED';
+	const BUILD_XML_PROFILE = 'EXTENDED';
 
 	/**
 	 * Generate a complete Factur-X invoice file by embedding the XML into a PDF.
