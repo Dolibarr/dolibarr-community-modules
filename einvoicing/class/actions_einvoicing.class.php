@@ -1504,6 +1504,13 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			if (in_array('thirdpartylist', $contexts, true)) {
 				$this->resprints .= ' LEFT JOIN ' . $db->prefix() . "einvoicing_extlinks as ext ON ext.element_id = s.rowid AND ext.element_type = 'societe'" . self::getExtLinkJoinCondition('societe');
 				$this->resprints .= ' LEFT JOIN ' . $db->prefix() . "einvoicing_routing rt ON rt.fk_soc = s.rowid";
+				// A thirdparty can hold several routing identifiers, and a routing row for its default product
+				// on top of them, so joining on fk_soc alone repeats the thirdparty in the list as many times.
+				// The active default routing of type 'thirdparty' is the single row the list must show: it is
+				// the one the card of the thirdparty displays at the top of its list, and the one
+				// EInvoicing::fetchDefaultRouting() answers. The column stays empty for a thirdparty holding
+				// no routing identifier, so no row leaves the list.
+				$this->resprints .= " AND rt.routing_type = 'thirdparty' AND rt.active = 1 AND rt.is_default = 1";
 			}
 
 			if (in_array('invoicelist', explode(':', $parameters['context']))) {
