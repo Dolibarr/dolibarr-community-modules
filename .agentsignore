@@ -11,7 +11,10 @@
 *.lock
 *.map
 *.min.js
+node_modules
 vendor
+*/vendor
+*/node_modules
 documents
 node_modules
 cache
