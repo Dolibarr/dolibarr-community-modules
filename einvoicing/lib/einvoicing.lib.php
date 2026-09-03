@@ -415,7 +415,13 @@ if (!method_exists('Societe', 'findNearest')) {
 		$tmpthirdparty = new Societe($db);
 
 		// We try to find the thirdparty with exact matching on all fields
+		// Societe::fetch() answers 1 on a match up to Dolibarr 19, and the row id from 20 on. This
+		// function has to answer an id whatever the core, because that is what its callers book the
+		// document on - taking the raw answer attached it to the thirdparty of id 1 (issue #739).
 		$result = $tmpthirdparty->fetch($rowid, $ref, $ref_ext, $barcode, $idprof1, $idprof2, $idprof3, $idprof4, $idprof5, $idprof6, $email, $ref_alias, $is_client, $is_supplier);
+		if ($result > 0) {
+			return $tmpthirdparty->id;
+		}
 		if ($result != 0) {
 			return $result;
 		}
@@ -424,6 +430,9 @@ if (!method_exists('Societe', 'findNearest')) {
 		dol_syslog("Thirdparty not found with exact match so we try barcode search", LOG_DEBUG);
 		if ($barcode) {
 			$result = $tmpthirdparty->fetch(0, '', '', $barcode, '', '', '', '', '', '', '', '', $is_client, $is_supplier);
+			if ($result > 0) {
+				return $tmpthirdparty->id;
+			}
 			if ($result != 0) {
 				return $result;
 			}
@@ -504,6 +513,9 @@ if (!method_exists('Societe', 'findNearest')) {
 		dol_syslog("Thirdparty not found with profids search so we try email search", LOG_DEBUG);
 		if ($email) {
 			$result = $tmpthirdparty->fetch(0, '', '', '', '', '', '', '', '', '', $email, '', $is_client, $is_supplier);
+			if ($result > 0) {
+				return $tmpthirdparty->id;
+			}
 			if ($result != 0) {
 				return $result;
 			}
