@@ -104,6 +104,8 @@ Before writing any code, the agent **must**:
 - Use Dolibarr native dol_move() function if you need to move files.
 - Use Dolibarr native dol_delete_file(), dol_delete_dir() or dol_delete_dir_recursive() function if you need to delete files or directories.
 - Use Dolibarr native dol_mkdir() function if you need to create directories.
+- Read configuration with `getDolGlobalString()` / `getDolGlobalInt()` / `getDolGlobalBool()`, not `$conf->global->XXX`
+- Check module activation with `isModEnabled('module')`, not `!empty($conf->module->enabled)`
 
 ---
 
@@ -127,10 +129,11 @@ Before writing any code, the agent **must**:
 
 ## Performance
 
-- Never run SQL queries inside loops (avoid N+1 problem — use JOINs or batch queries instead)
+- Never run SQL queries inside loops (N+1 problem)
 - Use JOINs or batch queries instead of multiple sequential queries
-- Use limit on query list with `db->limit()` for performance
-- Cache repeated calls to `getDolGlobalString()` or `$conf->global->` in local variables
+- Use LIMIT on SQL query list with `db->limit()`
+- Cache repeated calls to `getDolGlobalString()` in local variables
+- If you need a cache array to be used into a loop, you can use `$conf->cache['aNameForYourCacheArray'] = array();`
 
 ---
 
