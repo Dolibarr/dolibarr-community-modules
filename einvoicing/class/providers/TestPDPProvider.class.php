@@ -81,7 +81,7 @@ class TestPDPProvider extends AbstractPDPProvider
 		);
 
 		// Retrieve and complete the OAuth token information from the database
-		$this->tokenData = $this->fetchOAuthTokenDB();
+		$this->tokenData = $this->fetchOAuthTokenDB(getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP"));
 
 		// The protocol builds the XML (CII, Factur-X, UBL...). It is chosen by the user, not by the
 		// provider, so every provider loads it the same way.
@@ -214,7 +214,7 @@ class TestPDPProvider extends AbstractPDPProvider
 			return null;
 		}
 
-		$this->tokenData = $this->fetchOAuthTokenDB();
+		$this->tokenData = $this->fetchOAuthTokenDB(getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP"));
 
 		return $token;
 	}

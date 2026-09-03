@@ -389,6 +389,7 @@ abstract class AbstractPDPProvider
 	{
 		$identifier = preg_replace('/\s+/', '', (string) $identifier);
 
+		$reg = array();
 		if (preg_match('/^[0-9]{4}:(.+)$/', $identifier, $reg)) {
 			$identifier = $reg[1];
 		}
@@ -603,9 +604,10 @@ abstract class AbstractPDPProvider
 	/**
 	 * Retrieve OAuth token for the given PDP service.
 	 *
-	 * @return array{token:string,refresh_token:string,token_expires_at:string}|false   Array with keys 'access_token', 'refresh_token', 'expire_at', or false if not found
+	 * @param	int		$forceentity		0=Use current entity, >0=Use specific entity
+	 * @return 	array{token:string,refresh_token:string,token_expires_at:string}|false   Array with keys 'access_token', 'refresh_token', 'expire_at', or false if not found
 	 */
-	public function fetchOAuthTokenDB()
+	public function fetchOAuthTokenDB($forceentity = 0)
 	{
 		global $conf, $db;
 
@@ -617,6 +619,14 @@ abstract class AbstractPDPProvider
 			$token = getDolGlobalString($serviceName.'_TOKEN');
 			$refresh = getDolGlobalString($serviceName.'_REFRESH');
 			$expire = getDolGlobalString($serviceName.'_EXPIRE');
+
+			if ($forceentity) {
+				require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
+
+				$token = dolibarr_get_const($this->db, $serviceName.'_TOKEN', (int) $forceentity);
+				$refresh = dolibarr_get_const($this->db, $serviceName.'_REFRESH', (int) $forceentity);
+				$expire = dolibarr_get_const($this->db, $serviceName.'_EXPIRE', (int) $forceentity);
+			}
 
 			if (empty($token)) {
 				return false;
@@ -633,7 +643,7 @@ abstract class AbstractPDPProvider
 		$sql = "SELECT tokenstring, tokenstring_refresh, expire_at
 				FROM ".MAIN_DB_PREFIX."oauth_token
 				WHERE service = '".$db->escape($serviceName)."'
-				AND entity = ".((int) $conf->entity)." LIMIT 1";
+				AND entity = ".((int) ($forceentity ? $forceentity : $conf->entity))." LIMIT 1";
 
 		$resql = $db->query($sql);
 		if (!$resql) {
@@ -657,10 +667,12 @@ abstract class AbstractPDPProvider
 
 	/**
 	 * Insert or update OAuth token for the given PDP.
+	 * Called by the deleteAccessToken() only, itself called by the setup page only.
 	 *
+	 * @param	int		$forceentity		0=Use current entity, >0=Use specific entity
 	 * @return bool                        True if success, false otherwise
 	 */
-	public function deleteOAuthTokenDB()
+	public function deleteOAuthTokenDB($forceentity = 0)
 	{
 		global $conf, $db;
 
@@ -670,16 +682,17 @@ abstract class AbstractPDPProvider
 
 		if (version_compare(DOL_VERSION, '23.0.0', '<')) {
 			require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
-			dolibarr_del_const($this->db, $serviceName.'_TOKEN', $conf->entity);
-			dolibarr_del_const($this->db, $serviceName.'_REFRESH', $conf->entity);
-			dolibarr_del_const($this->db, $serviceName.'_EXPIRE', $conf->entity);
+
+			dolibarr_del_const($this->db, $serviceName.'_TOKEN', (int) ($forceentity ? $forceentity : $conf->entity));
+			dolibarr_del_const($this->db, $serviceName.'_REFRESH', (int) ($forceentity ? $forceentity : $conf->entity));
+			dolibarr_del_const($this->db, $serviceName.'_EXPIRE', (int) ($forceentity ? $forceentity : $conf->entity));
 			return true;
 		}
 
 		// Check if a token already exists for this service
 		$sql_check = "DELETE FROM ".MAIN_DB_PREFIX."oauth_token
 						WHERE service = '".$db->escape($serviceName)."'
-						AND entity = ".((int) $conf->entity);
+						AND entity = ".((int) ($forceentity ? $forceentity : $conf->entity));
 
 		$resql = $db->query($sql_check);
 		if (!$resql) {
