@@ -882,14 +882,13 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		if ($error) {
 			$db->rollback();
-
+			return -1;
+		} else {
 			if ($redirectto) {
-				header("Location: " . $_SERVER['PHP_SELF'] . '?id=' . $object->id);
+				header("Location: " . $redirectto);
 				exit;
 			}
 
-			return -1;
-		} else {
 			$db->commit();
 			return 0;
 		}
