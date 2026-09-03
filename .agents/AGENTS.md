@@ -55,9 +55,7 @@ Before writing any code, the agent **must**:
 
 ## PHP Best Practices
 
-- PHP >= 7.3 (minimum support); PHP 8.1+ recommended for new external modules
--  When writing a **bug fix**, always target the lowest compatible PHP version
-  of the branch being patched — do not use PHP 8.x syntax on a fix targeting v19 or v20
+- When writing a **bug fix**, target the lowest compatible PHP version of the module (see `modMyModule.class.php` for the `phpmin` property).
 - Respect PSR-12, but **indentations must use Tabs, not Spaces**
 - Write short, readable, and testable functions
 - Avoid side effects
