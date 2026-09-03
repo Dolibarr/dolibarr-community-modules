@@ -22,6 +22,8 @@ env:
   GITHUB_JSON: ${{ toJSON(github) }} # Helps in debugging Github Action
 
 name: phan
+permissions:
+  contents: read
 jobs:
   phan:
     name: Run phan

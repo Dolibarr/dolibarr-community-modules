@@ -152,7 +152,7 @@ Before any modification, verify:
 - User rights enforcement (`$user->hasRights("module", "permission")` or `$user->hasRights("module", "objectname", "permission")`)
 - Multi-entity compatibility (add ` AND entity IN ('.getDolEntity("tablename").')` in SQL requests)
 
-If possible and if it was explicitely requested:
+If adding a unit test was explicitely requested:
 - If making or modifying external module, add PHPUnit test files in `yourmoduledir/test/phpunit/`.
 - If you need to validate code change or if it is explicitely requested, you can check code and dev syntax rules by running the following command on modified files (it takes a long time):
 	`phan -k .phan/config.php -B dev/tools/phan/baseline.txt --analyze-twice --minimum-target-php-version 7.2 --exclude-directory-list=dev/tools,mymodule/test/,mymodule/vendor/ --output-mode=checkstyle filemodified1.php filemodified2.php ...`
