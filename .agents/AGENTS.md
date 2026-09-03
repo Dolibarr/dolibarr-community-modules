@@ -116,7 +116,7 @@ If possible and if it was explicitely requested:
 ## Standardization
 
 - Use Dolibarr native dol_move() function if you need to move files.
-- Use Dolibarr native dol_delete_file() function if you need to delete files.
+- Use Dolibarr native dol_delete_file(), dol_delete_dir() or dol_delete_dir_recursive() function if you need to delete files or directories.
 - Use Dolibarr native dol_mkdir() function if you need to create directories.
 
 ---
