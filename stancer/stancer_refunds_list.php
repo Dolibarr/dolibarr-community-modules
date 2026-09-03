@@ -76,6 +76,7 @@ if (!$res) {
 
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.formcompany.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php';
+require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/company.lib.php';
 
 // load module libraries
@@ -100,7 +101,7 @@ $show_files = (int) GETPOST('show_files', 'int'); // Show files area generated b
 $confirm    = (string) GETPOST('confirm', 'alpha'); // Result of a confirmation
 $cancel     = (string) GETPOST('cancel', 'alpha'); // We click on a Cancel button
 $toselect   = (string) GETPOST('toselect', 'array'); // Array of ids of elements selected into a list
-$contextpage = (string) GETPOST('contextpage', 'aZ') ? GETPOST('contextpage', 'aZ') : str_replace('_', '', basename(dirname(__FILE__)).basename(__FILE__, '.php')); // To manage different context of search
+$contextpage = (string) GETPOST('contextpage', 'aZ') ? GETPOST('contextpage', 'aZ') : str_replace('_', '', dol_basename(dirname(__FILE__)).dol_basename(__FILE__, '.php')); // To manage different context of search
 $backtopage = (string) GETPOST('backtopage', 'alpha'); // Go back to a dedicated page
 $optioncss  = (string) GETPOST('optioncss', 'aZ'); // Option for the css output (always '' except when 'print')
 $mode       = (string) GETPOST('mode', 'aZ'); // The output mode ('list', 'kanban', 'hierarchy', 'calendar', ...)

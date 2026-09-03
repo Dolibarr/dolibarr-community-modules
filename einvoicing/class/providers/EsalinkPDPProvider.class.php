@@ -31,6 +31,7 @@ dol_include_once('einvoicing/class/call.class.php');
 dol_include_once('einvoicing/class/einvoicing.class.php');
 dol_include_once('einvoicing/lib/einvoicing.lib.php');
 require_once DOL_DOCUMENT_ROOT . '/core/lib/admin.lib.php';
+require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 
 
 /**
@@ -498,7 +499,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 		$params = [
 			'flowInfo' => json_encode($flowInfo),
-			'file' => new CURLFile($invoice_path, $mime_type, basename($invoice_path))
+			'file' => new CURLFile($invoice_path, $mime_type, dol_basename($invoice_path))
 		];
 
 		$response = $this->callApi($resource, "POSTALREADYFORMATED", $params, $extraHeaders, 'send_invoice');
@@ -680,7 +681,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				"flowProfile" => "CIUS",
 				"sha256" => hash_file('sha256', $invoice_path)
 			]),
-			'file' => new CURLFile($invoice_path, $mime_type, basename($invoice_path))
+			'file' => new CURLFile($invoice_path, $mime_type, dol_basename($invoice_path))
 		];
 
 		$response = $this->callApi("flows", "POSTALREADYFORMATED", $params, $extraHeaders, 'send_sample_invoice');
@@ -1857,7 +1858,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 					"name" => "LC_" . $object->ref,
 					"flowSyntax" => "CDAR"
 				]),
-				'file' => new CURLFile($filepath, 'application/xml', basename($filepath))
+				'file' => new CURLFile($filepath, 'application/xml', dol_basename($filepath))
 			];
 
 			// Call API to send CDAR

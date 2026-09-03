@@ -27,6 +27,7 @@
  */
 
 require_once __DIR__ . '/../protocols/ProtocolManager.class.php';
+require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 
 
 /**
@@ -1169,7 +1170,7 @@ abstract class AbstractPDPProvider
 				require_once __DIR__ . '/../../vendor/autoload.php';
 				$content = (string) \horstoeko\zugferd\ZugferdDocumentPdfReaderExt::getInvoiceDocumentContentFromFile($invoicePath);
 			} catch (\Throwable $e) {
-				dol_syslog(get_class($this) . '::readGuidelineUrn could not extract the XML from ' . basename($invoicePath) . ': ' . $e->getMessage(), LOG_WARNING);
+				dol_syslog(get_class($this) . '::readGuidelineUrn could not extract the XML from ' . dol_basename($invoicePath) . ': ' . $e->getMessage(), LOG_WARNING);
 				return '';
 			}
 		} else {
@@ -1198,7 +1199,7 @@ abstract class AbstractPDPProvider
 		$guideline = $this->readGuidelineUrn($invoicePath);
 
 		if ($guideline === '') {
-			dol_syslog(get_class($this) . '::resolveFlowProfile no guideline found in ' . basename($invoicePath) . ', flowProfile omitted', LOG_WARNING);
+			dol_syslog(get_class($this) . '::resolveFlowProfile no guideline found in ' . dol_basename($invoicePath) . ', flowProfile omitted', LOG_WARNING);
 			return '';
 		}
 

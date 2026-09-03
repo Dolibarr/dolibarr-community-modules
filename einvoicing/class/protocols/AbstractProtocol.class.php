@@ -1,6 +1,7 @@
 <?php
 /* Copyright (C) 2025       Laurent Destailleur         <eldy@users.sourceforge.net>
  * Copyright (C) 2025       Mohamed DAOUD               <mdaoud@dolicloud.com>
+ * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,6 +18,7 @@
  */
 
 
+require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 /**
  * \file    einvoicing/class/protocols/AbstractProtocol.class.php
  * \ingroup einvoicing
@@ -176,7 +178,7 @@ abstract class AbstractProtocol
 		if ($sizeMB > $maxMB) {
 			$langs->load('einvoicing@einvoicing');
 			$this->warnings[] = $langs->trans('EInvoiceFileSizeExceedsLimit', number_format($sizeMB, 2), number_format($maxMB, 2));
-			dol_syslog(get_class($this) . '::checkFileSizeLimit ' . basename($filepath) . ' size ' . number_format($sizeMB, 2) . ' MB exceeds configured limit of ' . number_format($maxMB, 2) . ' MB', LOG_WARNING);
+			dol_syslog(get_class($this) . '::checkFileSizeLimit ' . dol_basename($filepath) . ' size ' . number_format($sizeMB, 2) . ' MB exceeds configured limit of ' . number_format($maxMB, 2) . ' MB', LOG_WARNING);
 		}
 	}
 

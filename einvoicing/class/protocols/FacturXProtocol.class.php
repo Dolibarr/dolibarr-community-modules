@@ -2,6 +2,7 @@
 /* Copyright (c) 2025       Eric Seigne                 <eric.seigne@cap-rel.fr>
  * Copyright (C) 2025       Laurent Destailleur         <eldy@users.sourceforge.net>
  * Copyright (C) 2025       Mohamed DAOUD               <mdaoud@dolicloud.com>
+ * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
  *
  * This program is free software: you can redistribute it and/or modify
@@ -32,6 +33,7 @@ use horstoeko\zugferd\ZugferdDocumentPdfReaderExt;
 
 require __DIR__ . "/../../vendor/autoload.php";
 
+require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 dol_include_once('einvoicing/class/protocols/CIIProtocol.class.php');
 dol_include_once('einvoicing/class/protocols/CommonProtocol.class.php');
 dol_include_once('einvoicing/class/utils/XmlPatcher.class.php');
@@ -138,7 +140,7 @@ class FacturXProtocol extends CIIProtocol
 		// Resolve the source PDF into which the Factur-X XML will be embedded.
 		// Priority:
 		//   1. $sourceFilePath provided by the generation hook (afterPDFCreation / afterODTCreation).
-		//      ODT/ODS models hand over the .odt path; the PDF rendition (MAIN_ODT_AS_PDF) shares the basename.
+		//      ODT/ODS models hand over the .odt path; the PDF rendition (MAIN_ODT_AS_PDF) shares the dol_basename.
 		//   2. the most recent <ref>*.pdf already present in the output dir (manual generation, ODT output
 		//      like <ref>_Template.pdf for which last_main_doc is not maintained), excluding our own output.
 		//   3. legacy <ref>.pdf, regenerated with the default PDF model if missing.
@@ -314,8 +316,8 @@ class FacturXProtocol extends CIIProtocol
 			if (file_exists($pathfacturxpdf)) {
 				dol_delete_file($pathfacturxpdf, 0, 1);
 			}
-			dol_syslog(get_class($this) . '::generateInvoice cannot embed the XML into ' . basename($orig_pdf) . ' : ' . $e->getMessage(), LOG_ERR, 0, '_einvoicing');
-			$this->error = $langs->trans('ErrorEInvoiceCannotEmbedXmlIntoPdf', basename($orig_pdf), $e->getMessage());
+			dol_syslog(get_class($this) . '::generateInvoice cannot embed the XML into ' . dol_basename($orig_pdf) . ' : ' . $e->getMessage(), LOG_ERR, 0, '_einvoicing');
+			$this->error = $langs->trans('ErrorEInvoiceCannotEmbedXmlIntoPdf', dol_basename($orig_pdf), $e->getMessage());
 			$this->errors[] = $this->error;
 			return -1;
 		}
@@ -401,9 +403,9 @@ class FacturXProtocol extends CIIProtocol
 		}
 
 		$langs->load('einvoicing@einvoicing');
-		$message = $langs->trans('EInvoiceFacturxStructureIncomplete', basename($pathfacturxpdf), implode(', ', $missing));
+		$message = $langs->trans('EInvoiceFacturxStructureIncomplete', dol_basename($pathfacturxpdf), implode(', ', $missing));
 
-		dol_syslog(get_class($this) . '::checkFacturxStructure ' . basename($pathfacturxpdf) . ' is missing: ' . implode(', ', $missing), LOG_WARNING, 0, '_einvoicing');
+		dol_syslog(get_class($this) . '::checkFacturxStructure ' . dol_basename($pathfacturxpdf) . ' is missing: ' . implode(', ', $missing), LOG_WARNING, 0, '_einvoicing');
 
 		$this->warnings[] = $message;
 	}

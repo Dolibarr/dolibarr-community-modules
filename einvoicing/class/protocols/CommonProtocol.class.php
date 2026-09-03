@@ -24,6 +24,7 @@
  * \brief   Common methods for all AP protocols.
  */
 
+require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 /**
  * @mixin AbstractProtocol
  */
@@ -448,7 +449,7 @@ trait CommonProtocol
 		if (is_numeric($pathOfEInvoice) && $pathOfEInvoice < 0) {
 			$result = $pathOfEInvoice;
 		} else {
-			$newPathOfEInvoice = $dir . '/temp/' . basename($pathOfEInvoice);
+			$newPathOfEInvoice = $dir . '/temp/' . dol_basename($pathOfEInvoice);
 			dol_move($pathOfEInvoice, $newPathOfEInvoice, '0', 1);
 
 			$result = array('path' => $newPathOfEInvoice, 'ref' => $tmpinvoice->ref);

@@ -53,6 +53,7 @@ if (!$res) {
 
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.formcompany.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php';
+require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/company.lib.php';
 
 // load module libraries
@@ -77,7 +78,7 @@ $show_files = (int) GETPOST('show_files', 'int');
 $confirm    = (string) GETPOST('confirm', 'alpha');
 $cancel     = (string) GETPOST('cancel', 'alpha');
 $toselect   = (string) GETPOST('toselect', 'array');
-$contextpage = (string) GETPOST('contextpage', 'aZ') ? GETPOST('contextpage', 'aZ') : str_replace('_', '', basename(dirname(__FILE__)).basename(__FILE__, '.php'));
+$contextpage = (string) GETPOST('contextpage', 'aZ') ? GETPOST('contextpage', 'aZ') : str_replace('_', '', dol_basename(dirname(__FILE__)).dol_basename(__FILE__, '.php'));
 $backtopage = (string) GETPOST('backtopage', 'alpha');
 $optioncss  = (string) GETPOST('optioncss', 'aZ');
 $mode       = (string) GETPOST('mode', 'aZ');

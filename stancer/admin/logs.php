@@ -53,6 +53,7 @@ if (!$res) {
 global $langs, $user;
 
 // Libraries
+require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
 require_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
 dol_include_once('/stancer/lib/stancer.lib.php');
@@ -111,7 +112,7 @@ if ($action == 'down') {
 		if (file_exists($fullfname)) {
 			header('Content-Type: application/octet-stream');
 			header("Content-Transfer-Encoding: Binary");
-			header("Content-disposition: attachment; filename=\"".basename($filename)."\"");
+			header("Content-disposition: attachment; filename=\"".dol_basename($filename)."\"");
 			readfile($fullfname);
 			exit;
 		}

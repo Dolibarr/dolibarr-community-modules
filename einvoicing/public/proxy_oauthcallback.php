@@ -79,6 +79,7 @@ if (!$res) {
  *
  * @var string $dolibarr_main_url_root
  */
+require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 require_once '../lib/einvoicing.lib.php';
 require_once "../class/providers/PDPProviderManager.class.php";
 require_once "../class/protocols/ProtocolManager.class.php";
@@ -322,7 +323,7 @@ if (empty($code) && !GETPOST('error')) {
 	exit();
 } else {
 	// We are coming from the return of an OAuth2 provider page.
-	dol_syslog(basename(__FILE__)." We are coming from the oauth provider page keyforprovider=".$keyforprovider." code=".dol_trunc(GETPOST('code'), 5));
+	dol_syslog(dol_basename(__FILE__)." We are coming from the oauth provider page keyforprovider=".$keyforprovider." code=".dol_trunc(GETPOST('code'), 5));
 
 	// Check if the OAuth provider returned an error before we try to get the token. If so, we redirect to the origin page with error message.
 	if (GETPOST('error')) {

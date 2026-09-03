@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2023-2026 Eric Seigne <eric.seigne@cap-rel.fr>
+ * Copyright (C) 2026		MDW			<mdeweerd@users.noreply.github.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,6 +22,7 @@
  * \brief   Email sending functions (notifications, templates, CSV to HTML)
  */
 
+require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 /**
  * Return the mail metadata matching the type of a Dolibarr object
  *
@@ -324,7 +326,7 @@ function stancerSendInvoiceMailModele($modele, $object, $actionCode = "", $force
 	'@phan-var Facture $object';
 	// Identify the caller so we can trace which code path triggered this send when reviewing logs.
 	$bt = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
-	$caller = isset($bt[1]) ? (basename((string) ($bt[1]['file'] ?? '?')) . ':' . ($bt[1]['line'] ?? '?')) : '?';
+	$caller = isset($bt[1]) ? (dol_basename((string) ($bt[1]['file'] ?? '?')) . ':' . ($bt[1]['line'] ?? '?')) : '?';
 	$objRef = is_object($object) ? ($object->ref ?? '?') : '?';
 	$objId = is_object($object) ? ($object->id ?? '?') : '?';
 	$objSocid = is_object($object) ? ($object->socid ?? '?') : '?';
@@ -446,7 +448,7 @@ function stancerSendInvoiceMailModele($modele, $object, $actionCode = "", $force
 
 		if ($file) {
 			$listofpaths = array($file);
-			$listofnames = array(basename($file));
+			$listofnames = array(dol_basename($file));
 			$listofmimes = array(dol_mimetype($file));
 		} else {
 			dol_syslog('stancerSendInvoiceMailModele no pdf found in ' . $mailctx['diroutput'] . '/' . $object->ref . ', mail will be sent without attachment', LOG_WARNING);
@@ -656,7 +658,7 @@ function stancerSendOrderMailModele($modele, $object, $actionCode = "", $forceMa
 
 		if ($file) {
 			$listofpaths = array($file);
-			$listofnames = array(basename($file));
+			$listofnames = array(dol_basename($file));
 			$listofmimes = array(dol_mimetype($file));
 		} else {
 			dol_syslog('stancerSendOrderMailModele no pdf found in ' . $mailctx['diroutput'] . '/' . $object->ref . ', mail will be sent without attachment', LOG_WARNING);
