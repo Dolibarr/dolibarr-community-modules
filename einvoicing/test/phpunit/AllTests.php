@@ -123,6 +123,8 @@ class AllTests
 		$suite->addTestSuite('HeaderChargeLineTest');
 		require_once dirname(__FILE__).'/InvoicingPeriodTest.php';
 		$suite->addTestSuite('InvoicingPeriodTest');
+		require_once dirname(__FILE__).'/LineChargeTest.php';
+		$suite->addTestSuite('LineChargeTest');
 		require_once dirname(__FILE__).'/LineWithoutQuantityTest.php';
 		$suite->addTestSuite('LineWithoutQuantityTest');
 		require_once dirname(__FILE__).'/PDPProviderManagerTest.php';
