@@ -1,0 +1,231 @@
+---
+# The einvoicing module ships around twenty PHPUnit test files, and until now the CI ran exactly one
+# of them: the Factur-X container test, the only one that needs neither a Dolibarr nor a database.
+# Everything else - and that includes EInvoicingSamplesTest, which compares the CII of five specimen
+# invoices against committed reference documents - could only be run by hand on a developer bench.
+#
+# That is how #709 went in: the merge turned the VAT breakdown rate (BT-119) of every generated
+# document into 0.00, EInvoicingSamplesTest was red on all five samples from the merge commit on, and
+# nothing in the CI was looking. The documents it produced are refused by a conformant platform.
+#
+# This job gives those tests the Dolibarr they need. The core is checked out at a release tag and its
+# own demo dump is loaded, which is how the core CI builds a database too - no installer to drive, no
+# fixture of ours to maintain. The module is symlinked into htdocs/custom and activated the way the
+# "Modules" page does it, then every test file runs on its own, as they are meant to be run, on three
+# cores: the oldest one the module supports, the current stable, and the newest.
+#
+# Everything the tests read lives in the module or in that core, so a change elsewhere in the
+# repository does not start the job - the exception being this file, which decides how the run goes.
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'einvoicing/**'
+      - '.github/workflows/module_einvoicing_phpunit.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'einvoicing/**'
+      - '.github/workflows/module_einvoicing_phpunit.yml'
+
+  workflow_dispatch:
+
+concurrency:
+  group: phpunit-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+name: phpunit
+jobs:
+  phpunit:
+    name: PHPUnit on Dolibarr ${{ matrix.dolibarr }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      # One core failing says nothing about the others, and the interesting information is usually
+      # which ones fail, so let every version go to the end.
+      fail-fast: false
+      matrix:
+        include:
+          # The floor the module declares (modEInvoicing::$need_dolibarr_version), the current
+          # stable, and the newest release. The PHP each of them is run with is the one that release
+          # was published for.
+          - dolibarr: '18.0.10'
+            php: '8.2'
+          - dolibarr: '23.0.4'
+            php: '8.3'
+          - dolibarr: '24.0.0'
+            php: '8.3'
+
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: dolibarr
+          MARIADB_DATABASE: dolibarr
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      DOLIBARR_HTDOCS: ${{ github.workspace }}/dolibarr/htdocs
+
+    steps:
+      - name: Checkout the modules repository
+        uses: actions/checkout@v6
+
+      - name: Checkout Dolibarr ${{ matrix.dolibarr }}
+        uses: actions/checkout@v6
+        with:
+          repository: Dolibarr/dolibarr
+          ref: ${{ matrix.dolibarr }}
+          path: dolibarr
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mysqli, intl, gd, mbstring, zip, xml, curl
+          tools: phpunit:9.6
+          coverage: none # disable xdebug, pcov
+
+      - name: Load the Dolibarr demo database
+        # The release ships the dump of its own demo database next to the sources; that is what the
+        # core CI loads too. Building the schema out of htdocs/install/mysql by hand would mean
+        # reimplementing the installer, and loading an older dump would mean driving the migration.
+        run: |
+          major=${DOLIBARR_VERSION%%.*}
+          dump=$(ls dolibarr/dev/initdemo/mysqldump_dolibarr_${major}.*.sql 2>/dev/null | head -1)
+          if [ -z "$dump" ]; then
+            echo "::error::No demo dump for Dolibarr ${major} in dolibarr/dev/initdemo/"
+            ls dolibarr/dev/initdemo/ || true
+            exit 1
+          fi
+          echo "Loading $dump"
+          mysql --host 127.0.0.1 --port 3306 -uroot -pdolibarr dolibarr < "$dump"
+          # The tests write documents; the umask of the demo is the one of the machine it was dumped
+          # on, and a stricter one makes the generation fail on a file it cannot read back.
+          mysql --host 127.0.0.1 --port 3306 -uroot -pdolibarr dolibarr \
+            -e "UPDATE llx_const SET value = '0666' WHERE name = 'MAIN_UMASK';"
+          mysql --host 127.0.0.1 --port 3306 -uroot -pdolibarr dolibarr \
+            -e "SELECT name, value FROM llx_const WHERE name IN ('MAIN_VERSION_LAST_UPGRADE','MAIN_VERSION_LAST_INSTALL');"
+        env:
+          DOLIBARR_VERSION: ${{ matrix.dolibarr }}
+
+      - name: Configure that Dolibarr
+        run: |
+          mkdir -p "${GITHUB_WORKSPACE}/documents/admin/temp"
+          chmod -R 777 "${GITHUB_WORKSPACE}/documents"
+          # No web server runs here, but the core still refuses to work while it believes it is
+          # mid-installation.
+          touch "${GITHUB_WORKSPACE}/documents/install.lock"
+          cat > "${DOLIBARR_HTDOCS}/conf/conf.php" <<PHPCONF
+          <?php
+          \$dolibarr_main_url_root='http://127.0.0.1';
+          \$dolibarr_main_document_root='${DOLIBARR_HTDOCS}';
+          \$dolibarr_main_url_root_alt='/custom';
+          \$dolibarr_main_document_root_alt='${DOLIBARR_HTDOCS}/custom';
+          \$dolibarr_main_data_root='${GITHUB_WORKSPACE}/documents';
+          \$dolibarr_main_db_host='127.0.0.1';
+          \$dolibarr_main_db_port='3306';
+          \$dolibarr_main_db_name='dolibarr';
+          \$dolibarr_main_db_prefix='llx_';
+          \$dolibarr_main_db_user='root';
+          \$dolibarr_main_db_pass='dolibarr';
+          \$dolibarr_main_db_type='mysqli';
+          \$dolibarr_main_db_character_set='utf8';
+          \$dolibarr_main_db_collation='utf8_unicode_ci';
+          \$dolibarr_main_authentication='dolibarr';
+          \$dolibarr_main_prod='0';
+          \$dolibarr_main_instance_unique_id='cieinvoicing';
+          PHPCONF
+          cat "${DOLIBARR_HTDOCS}/conf/conf.php"
+
+      - name: Deploy and activate the module
+        # This is how the module is deployed everywhere: a symlink in htdocs/custom, which is what
+        # dolibarr_main_document_root_alt above points at. Activating it plays its sql/ files, so the
+        # tests find the tables of the module and not only those of the core.
+        run: |
+          mkdir -p "${DOLIBARR_HTDOCS}/custom"
+          ln -sfn "${GITHUB_WORKSPACE}/einvoicing" "${DOLIBARR_HTDOCS}/custom/einvoicing"
+          ls -l "${DOLIBARR_HTDOCS}/custom/"
+          cat > activate-module.php <<'PHPACTIVATE'
+          <?php
+          // Activate the module exactly like Home - Setup - Modules does, so what the tests run
+          // against is an instance the module has really been installed on.
+          global $conf, $db, $langs, $user, $mysoc;
+          $htdocs = getenv('DOLIBARR_HTDOCS');
+          require_once $htdocs . '/master.inc.php';
+          require_once DOL_DOCUMENT_ROOT . '/core/lib/admin.lib.php';
+          require_once DOL_DOCUMENT_ROOT . '/user/class/user.class.php';
+
+          $user = new User($db);
+          $user->fetch(1);
+
+          $result = activateModule('modEInvoicing');
+          if (!empty($result['errors'])) {
+              fwrite(STDERR, "Activation failed: " . implode(' | ', $result['errors']) . "\n");
+              exit(1);
+          }
+          echo "Module activated (" . (int) $result['nbmodules'] . " module(s), " . (int) $result['nbperms'] . " permission(s))\n";
+          PHPACTIVATE
+          php activate-module.php
+          mysql --host 127.0.0.1 --port 3306 -uroot -pdolibarr dolibarr \
+            -e "SELECT name, value FROM llx_const WHERE name LIKE 'MAIN_MODULE_EINVOICING%';"
+
+      - name: Run the test files, one by one
+        # One process per file, the way the module is tested on a bench: a fatal in one file then
+        # takes that file down and not the whole suite, and the summary below says which ones failed
+        # instead of stopping at the first.
+        run: |
+          failed=""
+          passed=0
+          for file in einvoicing/test/phpunit/*.php; do
+            name=$(basename "$file")
+            case "$name" in
+              AllTests.php|CommonClassTestCompat.inc.php) continue ;;
+            esac
+            echo "::group::$name"
+            if phpunit --no-configuration --testdox "$file"; then
+              passed=$((passed + 1))
+            else
+              failed="$failed $name"
+            fi
+            echo "::endgroup::"
+          done
+          echo "$passed file(s) passed"
+          if [ -n "$failed" ]; then
+            echo "::error::Failed test files:$failed"
+            exit 1
+          fi
+
+      - name: The reference documents, damaged, PHPUnit has to refuse them
+        # A green suite says something only once the runner is shown to compare what it claims to
+        # compare. EInvoicingSamplesTest is the file that would have caught #709, and it is a
+        # comparison against committed documents: change one figure in a reference document and it
+        # has to come back red. One that still passes means the samples are not being compared at
+        # all - a missing fixture, a generation that silently produced nothing, a version that skips.
+        run: |
+          fixture=einvoicing/test/phpunit/fixtures/einvoicing_samples/cii_standard.xml
+          cp "$fixture" "$fixture.orig"
+          # A VAT breakdown rate of 19.00 where the specimen carries 20.00: the exact shape of the
+          # defect #709 shipped, in a document that stays well formed.
+          php -r '
+            $file = "einvoicing/test/phpunit/fixtures/einvoicing_samples/cii_standard.xml";
+            $xml = file_get_contents($file);
+            $damaged = str_replace("<ram:RateApplicablePercent>20.00", "<ram:RateApplicablePercent>19.00", $xml, $count);
+            if ($count < 1) { fwrite(STDERR, "the control cannot be built: no 20.00 rate in the reference document\n"); exit(2); }
+            file_put_contents($file, $damaged);
+            echo "reference document damaged on ", $count, " rate(s)\n";
+          '
+          if phpunit --no-configuration --testdox einvoicing/test/phpunit/EInvoicingSamplesTest.php > control-report.txt 2>&1; then
+            echo "::error::EInvoicingSamplesTest passes against a damaged reference document - the run above is not comparing the generated XML"
+            cat control-report.txt
+            mv "$fixture.orig" "$fixture"
+            exit 1
+          fi
+          mv "$fixture.orig" "$fixture"
+          echo "EInvoicingSamplesTest refuses the damaged reference document, as it has to."
