@@ -371,6 +371,23 @@ if (empty($code) && !GETPOST('error')) {
 
 				$redirect_uri = dol_buildpath('einvoicing/public/proxy_oauthcallback.php', 3);
 
+				$reg = array();
+				$origin_redirect_uri = '';
+				if (preg_match('/^[a-z0-9]+\-(.*)/', $state, $reg)) {
+					$origin_redirect_uri = $reg[1];
+				}
+				$origin_redirect_uri = urldecode($origin_redirect_uri);
+
+				// The tokens are about to be appended to this address and handed to the browser, so where
+				// it points is the whole security of the proxy. Decide it before asking the token: an
+				// authorization code we are not going to be able to deliver must not be spent at all.
+				if ($origin_redirect_uri !== '' && !einvoicingIsAllowedRedirectUrl($origin_redirect_uri)) {
+					dol_syslog("Refused origin_redirect_uri, not among allowed domains: ".$origin_redirect_uri, LOG_WARNING);
+					http_response_code(400);
+					print 'Error, the redirect_uri ('.dol_escape_htmltag($origin_redirect_uri).') is not among allowed domains. No token has been asked nor delivered.';
+					exit;
+				}
+
 				$params = [
 					"client_id" => getDolGlobalString($keyforparamid),
 					"client_secret" => getDolGlobalString($keyforparamsecret),
@@ -383,23 +400,6 @@ if (empty($code) && !GETPOST('error')) {
 				// Send as application/x-www-form-urlencoded (the OAuth 2.0 standard for the token endpoint),
 				// not multipart/form-data which an array param would produce.
 				$resultget = getURLContent($oauthserverurl, 'POST', http_build_query($params), 1, array('Content-Type: application/x-www-form-urlencoded'));
-
-				$reg = array();
-				$origin_redirect_uri = '';
-				if (preg_match('/^[a-z0-9]+\-(.*)/', $state, $reg)) {
-					$origin_redirect_uri = $reg[1];
-				}
-				$origin_redirect_uri = urldecode($origin_redirect_uri);
-
-				// The tokens are about to be appended to this address and handed to the browser. It comes
-				// back from the state parameter, so it is caller controlled: check it before it can carry
-				// anything, and never build the URL at all when it is refused.
-				if ($origin_redirect_uri !== '' && !einvoicingIsAllowedRedirectUrl($origin_redirect_uri)) {
-					dol_syslog("Refused origin_redirect_uri, not among allowed domains: ".$origin_redirect_uri, LOG_WARNING);
-					http_response_code(400);
-					print 'Error, the redirect_uri ('.dol_escape_htmltag($origin_redirect_uri).') is not among allowed domains. No token has been delivered.';
-					exit;
-				}
 
 				if (empty($resultget['curl_error_no']) && isset($resultget['http_code']) && $resultget['http_code'] == 200) {
 					dol_syslog("From state, we have origin_redirect_uri=".$origin_redirect_uri);

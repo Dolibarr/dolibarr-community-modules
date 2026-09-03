@@ -137,6 +137,22 @@ class RedirectUrlAllowlistTest extends CommonClassTest
 	}
 
 	/**
+	 * "https://partner.tld@evil.tld/" reads as the allowed domain but the browser goes to evil.tld:
+	 * everything before the "@" is a user name. The decision is taken on the host parse_url() gives,
+	 * never on the look of the string.
+	 *
+	 * @return void
+	 */
+	public function testAnAllowedDomainPlacedInTheUserInfoIsRefused()
+	{
+		$this->setAllowlist('partner.tld');
+
+		$this->assertFalse(einvoicingIsAllowedRedirectUrl('https://partner.tld@evil.tld/callback'), 'The allowed domain used as a user name must not make the URL allowed');
+		$this->assertFalse(einvoicingIsAllowedRedirectUrl('https://evil.tld#@partner.tld'), 'An allowed domain placed in the fragment must not make the URL allowed');
+		$this->assertTrue(einvoicingIsAllowedRedirectUrl('http://partner.tld:8080/callback'), 'A port on an allowed domain does not change the host');
+	}
+
+	/**
 	 * Several partner domains may be declared, separated by commas and possibly by spaces.
 	 *
 	 * @return void
@@ -163,7 +179,8 @@ class RedirectUrlAllowlistTest extends CommonClassTest
 
 		$this->assertFalse(einvoicingIsAllowedRedirectUrl('https://evil.tld/callback'), 'An unset allowlist must not mean that everything is allowed');
 
-		$ownhost = parse_url(DOL_MAIN_URL_ROOT, PHP_URL_HOST);
+		global $dolibarr_main_url_root;
+		$ownhost = parse_url((string) $dolibarr_main_url_root, PHP_URL_HOST);
 		if (is_string($ownhost) && $ownhost !== '') {
 			$this->assertTrue(einvoicingIsAllowedRedirectUrl('https://'.$ownhost.'/custom/einvoicing/admin/setup.php'), 'The instance itself stays a valid destination');
 		}

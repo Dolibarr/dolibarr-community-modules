@@ -1058,7 +1058,11 @@ function einvoicingIsAllowedRedirectUrl($url)
 	$alloweddomains = getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN');
 	if ($alloweddomains === '') {
 		// No partner domain declared: this instance is the only destination we can vouch for.
-		$ownhost = parse_url(DOL_MAIN_URL_ROOT, PHP_URL_HOST);
+		// The address comes from the configuration file, not from DOL_MAIN_URL_ROOT: the latter is
+		// rebuilt from SERVER_NAME on each hit, and a decision of this kind must not depend on
+		// anything the request brings with it.
+		global $dolibarr_main_url_root;
+		$ownhost = parse_url((string) $dolibarr_main_url_root, PHP_URL_HOST);
 		if (!is_string($ownhost) || $ownhost === '') {
 			return false;
 		}
