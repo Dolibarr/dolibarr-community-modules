@@ -463,6 +463,84 @@ abstract class AbstractPDPProvider
 	}
 
 	/**
+	 * Pick, among the documents the access point holds for a flow, the first one this module can read.
+	 *
+	 * A flow carries its invoice in several shapes: 'Converted' is the invoice rewritten into the
+	 * syntax configured on the access point account, 'Original' is what the issuer really sent, and
+	 * 'ReadableView' is the human readable copy - which, on an access point that builds it as a
+	 * Factur-X PDF, carries the same data again.
+	 *
+	 * 'Converted' comes first because it is the one that shields the import from an issuer emitting a
+	 * syntax this module does not read - UBL, in particular, belongs to the French socle but has no
+	 * implementation here. But it depends on a setting that lives on the access point account, outside
+	 * Dolibarr: left unset, the platform refuses to produce the document at all; set to a syntax this
+	 * module does not support, it produces one that cannot be imported. Neither case says anything
+	 * about the other documents of the same flow, so they are tried in turn rather than failing the
+	 * flow on the first miss.
+	 *
+	 * @param	string			$flowId				Identifier of the flow to read
+	 * @param	ProtocolManager	$protocolManager	Protocol factory used to recognize the documents
+	 * @return	array{file:?string,protocol:?AbstractProtocol,protocol_name:string,doc_type:string,fetched:int,attempts:string[],client_not_configured:bool}	The importable document, or a null protocol and the reason each shape was rejected
+	 */
+	protected function fetchImportableFlowDocument($flowId, $protocolManager)
+	{
+		$result = array(
+			'file' => null,
+			'protocol' => null,
+			'protocol_name' => '',
+			'doc_type' => '',
+			'fetched' => 0,				// nb of documents the access point did return, whatever their syntax
+			'attempts' => array(),
+			'client_not_configured' => false
+		);
+
+		// EINVOICING_PREFER_ORIGINAL: fetch the issuer's Original document (its Factur-X, which carries
+		// the human-readable PDF) before the Converted one, so the created supplier invoice keeps the PDF.
+		$docTypeOrder = getDolGlobalString('EINVOICING_PREFER_ORIGINAL')
+			? array('Original', 'Converted', 'ReadableView')
+			: array('Converted', 'Original', 'ReadableView');		// Default: First take the Converted (so always in same format defined in AP setup).
+		foreach ($docTypeOrder as $docType) {
+			$flowResponse = $this->fetchFlowData($flowId, $docType, 'get_flow_for_supplier_invoice');
+
+			if ($flowResponse['status_code'] != 200) {
+				if (isset($flowResponse['errorCode']) && $flowResponse['errorCode'] == 'CLIENT_NOT_CONFIGURED') {
+					// The access point has no conversion syntax configured for this client
+					$result['client_not_configured'] = true;
+				}
+				$result['attempts'][] = $docType . ": HTTP " . $flowResponse['status_code'] . (empty($flowResponse['errorMessage']) ? '' : ' - ' . $flowResponse['errorMessage']);
+				continue;
+			}
+
+			$result['fetched']++;
+
+			$content = (string) $flowResponse['response'];
+			$protocolName = $protocolManager->detectProtocolFromContent($content);
+			if (empty($protocolName)) {
+				$result['attempts'][] = $docType . ": unrecognized syntax";
+				continue;
+			}
+
+			$protocol = $protocolManager->getProtocol($protocolName);
+			if (empty($protocol)) {
+				$result['attempts'][] = $docType . ": " . $protocolName . " is not supported";
+				continue;
+			}
+
+			if ($docType != 'Converted') {
+				dol_syslog(__METHOD__ . " No usable 'Converted' document for flowId " . $flowId . " (" . implode(' | ', $result['attempts']) . "), reading the '" . $docType . "' one instead", LOG_WARNING, 0, "_einvoicing");
+			}
+
+			$result['file'] = $content;
+			$result['protocol'] = $protocol;
+			$result['protocol_name'] = $protocolName;
+			$result['doc_type'] = $docType;
+			break;
+		}
+
+		return $result;
+	}
+
+	/**
 	 * Send a sample electronic invoice for testing purposes.
 	 * This function generates a sample invoice and sends it to PDP
 	 *
