@@ -145,6 +145,24 @@ function pdpShowWarning($einvoicing)
 		$ret .= '</div>';
 	}
 
+	// public/proxy_oauthcallback.php answers without authentication and hands the caller back to the
+	// address it supplied itself in redirect_uri; on the callback branch that address receives the
+	// access token and the refresh token in its query string. On a proxy instance, the domains listed
+	// in EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN are the only thing separating a customer instance
+	// from anyone else on the internet, and an empty list is still accepted for one transition step
+	// (see einvoicingIsAllowedRedirectUrl). Say so loudly, on both setup pages, for as long as it is.
+	if (getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER') == 'proxy' && !getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN')) {
+		$ret .= '<div class="error">';
+		$ret .= img_warning().' <b>'.$langs->trans("ProxyRedirectDomainsNotSet").'</b>';
+		$ret .= '<br><br>';
+		$ret .= $langs->trans("ProxyRedirectDomainsNotSetDetail");
+		$ret .= '<br><br>';
+		$ret .= '<a class="gotoothersetup" href="'.DOL_URL_ROOT.'/admin/const.php">';
+		$ret .= $langs->trans("ProxyRedirectDomainsGoToOtherSetup").'<i class="fas fa-tools marginleftonly"></i>';
+		$ret .= '</a>';
+		$ret .= '</div>';
+	}
+
 	return ($ret ? $ret . '<br>' : '');
 }
 
@@ -1025,12 +1043,13 @@ function einvoicingVatBreakdownKey($categoryVAT, $rate, $exemptionReasonCode = '
  * taken in one single place for every redirect of that page.
  *
  * The allowed destinations are the domains listed in EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN, comma
- * separated. When that constant is empty the only trusted domain is the one of this very instance:
- * a proxy deployment that serves partner domains has to name them explicitly. Refusing by default is
- * the whole point - an unset option used to mean "no check at all", which let any third party drive
- * the flow and collect the tokens on a host of its choice.
+ * separated. A proxy deployment that serves partner domains has to name them explicitly; an empty
+ * list is what the security report is about, since it lets any third party drive the flow and collect
+ * the tokens on a host of its choice. It is nevertheless accepted for one transition step, because
+ * nothing ever set that option and refusing at once would stop every existing proxy: see the TODO
+ * below, and the warning pdpShowWarning() prints on the setup pages meanwhile.
  *
- * Two shapes are refused whatever the allowlist says:
+ * Two shapes are refused whatever the allowlist says, empty or not:
  *  - anything that is not an absolute http(s) URL, so that "javascript:" payloads and the scheme
  *    relative "//evil.tld" (which a browser resolves to the attacker host) never reach a Location header;
  *  - a host that merely ends with an allowed domain. Matching on the suffix alone accepts
@@ -1057,16 +1076,14 @@ function einvoicingIsAllowedRedirectUrl($url)
 
 	$alloweddomains = getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN');
 	if ($alloweddomains === '') {
-		// No partner domain declared: this instance is the only destination we can vouch for.
-		// The address comes from the configuration file, not from DOL_MAIN_URL_ROOT: the latter is
-		// rebuilt from SERVER_NAME on each hit, and a decision of this kind must not depend on
-		// anything the request brings with it.
-		global $dolibarr_main_url_root;
-		$ownhost = parse_url((string) $dolibarr_main_url_root, PHP_URL_HOST);
-		if (!is_string($ownhost) || $ownhost === '') {
-			return false;
-		}
-		$alloweddomains = $ownhost;
+		// TRANSITION. No proxy deployment has this option today - no code, no setup page and no
+		// upgrade ever set it - so refusing here would cut every customer instance off its proxy on
+		// the day of the update. It stays open for one step, and both setup pages print a warning
+		// for as long as it is: while the list is empty the proxy hands the access token and the
+		// refresh token to whatever destination the caller names.
+		// TODO Remove this and return false instead, once deployments have had time to declare the
+		// domains of their customer instances.
+		return true;
 	}
 
 	foreach (explode(',', $alloweddomains) as $alloweddomain) {

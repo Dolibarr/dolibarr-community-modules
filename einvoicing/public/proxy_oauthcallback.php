@@ -255,9 +255,10 @@ if ($emailregistration) {
 
 $save_redirect_uri = GETPOST('redirect_uri');
 
-// Test that redirect_uri match an allowed url/domain.
-// The check runs whether or not EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN is set: an unset option
-// used to skip it entirely, and this address is where the tokens are delivered further down.
+// Test that redirect_uri match an allowed url/domain. This address is where the tokens are delivered
+// further down, so it is checked here, on the way in, and in one place for every redirect of the page.
+// An empty EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN still lets everything through for one transition
+// step - see einvoicingIsAllowedRedirectUrl() - but the shape of the URL is checked in every case.
 if ($save_redirect_uri && !einvoicingIsAllowedRedirectUrl($save_redirect_uri)) {		// Example of the option: domainofproxycompany.com
 	http_response_code(400);
 	print 'Error, the redirect_uri ('.dol_escape_htmltag($save_redirect_uri).') is not among allowed domains.';

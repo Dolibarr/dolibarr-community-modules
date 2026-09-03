@@ -23,10 +23,11 @@
  *                  redirect of public/proxy_oauthcallback.php. That page answers without
  *                  authentication and hands the caller back to the address it supplied itself in
  *                  redirect_uri; on the callback branch that address receives the access_token and the
- *                  refresh_token in its query string. Three ways of losing them are covered here:
- *                  an unset EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN, which used to mean no check at
- *                  all; a host that merely ends with an allowed domain, which a suffix match accepts;
- *                  and a destination that is not an absolute http(s) URL.
+ *                  refresh_token in its query string. Two ways of losing them are covered here: a host
+ *                  that merely ends with an allowed domain, which a suffix match accepts, and a
+ *                  destination that is not an absolute http(s) URL. The third one, an unset
+ *                  EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN, is still accepted for one transition
+ *                  step and is pinned here as such, so that the day it closes is a visible change.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 
@@ -167,23 +168,42 @@ class RedirectUrlAllowlistTest extends CommonClassTest
 	}
 
 	/**
-	 * With no partner domain declared, the option used to be read as "no check at all": any third
-	 * party could drive the flow and collect the tokens on a host of its choice. Only this very
-	 * instance is trusted by default now.
+	 * TRANSITION. Nothing ever set EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN, so an empty list is
+	 * still read as "every domain", and every proxy deployment keeps working on the day of the
+	 * update. This is the very case the security report is about: it is held open on purpose, the
+	 * setup pages warn about it, and this test is what will have to be flipped when the option
+	 * becomes mandatory.
 	 *
 	 * @return void
 	 */
-	public function testWithoutAllowlistOnlyThisInstanceIsTrusted()
+	public function testAnEmptyAllowlistStillAcceptsEveryDomainForNow()
 	{
 		$this->setAllowlist(null);
 
-		$this->assertFalse(einvoicingIsAllowedRedirectUrl('https://evil.tld/callback'), 'An unset allowlist must not mean that everything is allowed');
+		$this->assertTrue(einvoicingIsAllowedRedirectUrl('https://evil.tld/callback'), 'The transition step accepts any domain while the option is unset');
 
 		global $dolibarr_main_url_root;
 		$ownhost = parse_url((string) $dolibarr_main_url_root, PHP_URL_HOST);
 		if (is_string($ownhost) && $ownhost !== '') {
 			$this->assertTrue(einvoicingIsAllowedRedirectUrl('https://'.$ownhost.'/custom/einvoicing/admin/setup.php'), 'The instance itself stays a valid destination');
 		}
+	}
+
+	/**
+	 * The transition above only lifts the domain comparison. The shape of the destination is judged
+	 * in every case: a scheme relative "//evil.tld" or a "javascript:" payload must never reach a
+	 * Location header, allowlist or no allowlist.
+	 *
+	 * @return void
+	 */
+	public function testTheShapeOfTheUrlIsCheckedEvenWithAnEmptyAllowlist()
+	{
+		$this->setAllowlist(null);
+
+		$this->assertFalse(einvoicingIsAllowedRedirectUrl(''), 'An empty destination must be refused whatever the allowlist');
+		$this->assertFalse(einvoicingIsAllowedRedirectUrl('//evil.tld/callback'), 'A scheme relative URL must be refused whatever the allowlist');
+		$this->assertFalse(einvoicingIsAllowedRedirectUrl('javascript:alert(1)'), 'A javascript payload must be refused whatever the allowlist');
+		$this->assertFalse(einvoicingIsAllowedRedirectUrl('https:///callback'), 'An URL without a host must be refused whatever the allowlist');
 	}
 
 	/**

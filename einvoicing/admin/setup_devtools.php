@@ -428,10 +428,11 @@ if (getDolGlobalString('EINVOICING_PDP')) {
 			print '- on the instance of your customers, the variable EINVOICING_SUPERPDP_VIAPARTNER_OAUTH_URL to <input type="text" class="width300" id="idproxyurl2" value="'.$urlforproxy.'" spellcheck="false"><br>';
 			print ajax_autoselect("idproxyurl2");
 			// The proxy page delivers the OAuth tokens to the redirect_uri the customer instance asks for,
-			// so that list is what separates a customer of yours from anyone else on the internet. Without
-			// it the proxy only accepts this very instance, and no customer instance can complete the flow.
+			// so that list is what separates a customer of yours from anyone else on the internet. While
+			// it is empty every destination is accepted, which is the warning pdpShowWarning() prints
+			// above; a future version will refuse the redirect instead of accepting everything.
 			print '- on THIS instance, the variable EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN to the comma separated list of the domains of your customer instances, for example <input type="text" class="width300" id="idproxydomains" value="domainofmycustomers.com,anotherdomain.com" spellcheck="false">: ';
-			print (getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN') ? '<span class="ok">'.img_picto('', 'tick').' '.dolPrintHTML(getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN')).'</span>' : '<span class="error">KO, only this instance is accepted as a destination</span>').'<br>';
+			print (getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN') ? '<span class="ok">'.img_picto('', 'tick').' '.dolPrintHTML(getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN')).'</span>' : '<span class="error">'.img_warning().' KO, not set: every redirect destination is accepted</span>').'<br>';
 			print ajax_autoselect("idproxydomains");
 			print '</div>';
 			print '<br>';
