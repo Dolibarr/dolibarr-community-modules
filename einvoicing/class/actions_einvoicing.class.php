@@ -725,9 +725,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				$pdpstatuscode = GETPOSTINT('pdpstatuscode') ?: 0;
 				$statusRaison = GETPOST('statusRaison', 'alpha');
 
-				// The card stops offering it, but the card is not what sends: a status travels here as a
-				// parameter of an URL, so this is where a credit note crediting an invoice we refused is
-				// actually kept from being accepted (issue #594).
+				// If the status we try to set is Approved, check that the invoice we try to approve is not a credit note to correct a supplier invoice that were already refused.
+				// If parent invoice was refused, we must block the Approval because we need to refuse the credit note also.
 				if (in_array($pdpstatuscode, EInvoicing::STATUSES_ACCEPTING_A_DOCUMENT, true)) {
 					dol_include_once('einvoicing/class/utils/SupplierInvoiceHelper.class.php');
 					$refusedSourceId = SupplierInvoiceHelper::refusedSourceOfCreditNote((int) $object->id);
