@@ -46,16 +46,16 @@ abstract class AbstractProtocol
 	public $warnings = [];
 
 	/** @const string Invoice file extension (without the dot, example 'xml') */
-	protected const INVOICE_FILE_EXTENSION = ''; // Must be overridden by subclasses
+	const INVOICE_FILE_EXTENSION = ''; // Must be overridden by subclasses
 
 	/** @const string Generated invoice XML file name*/
-	protected const GENERATED_INVOICE_XML_FILE_NAME = ''; // Must be overridden by subclasses
+	const GENERATED_INVOICE_XML_FILE_NAME = ''; // Must be overridden by subclasses
 
 	/** @const string The profile used to generate XML */
-	protected const BUILD_XML_PROFILE = ''; // Must be overridden by subclasses
+	const BUILD_XML_PROFILE = ''; // Must be overridden by subclasses
 
 	/** @const string Fixed file name of the readable view of the last invoice that could not be processed */
-	public const INCOMING_DIAGNOSTIC_READABLE_FILE_NAME = 'einvoice_readable.pdf';
+	const INCOMING_DIAGNOSTIC_READABLE_FILE_NAME = 'einvoice_readable.pdf';
 
 	/**
 	 * @param DoliDB $db Db

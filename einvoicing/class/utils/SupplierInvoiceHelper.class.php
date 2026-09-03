@@ -39,7 +39,7 @@ class SupplierInvoiceHelper
 	 * by the e-invoicing platform (PDP/PA). Distinct from the standard close codes (abandon,
 	 * replaced, ...) so it can be reliably excluded from the accountancy transfer screen.
 	 */
-	public const CLOSECODE_PDPREFUSED = 'pdp_refused';
+	const CLOSECODE_PDPREFUSED = 'pdp_refused';
 
 	/**
 	 * Compare amounts according to a number of digits after decimal point and return true if they are equal.
@@ -49,7 +49,7 @@ class SupplierInvoiceHelper
 	 * @param ?int $roundPrecision The number of digits after decimal point to apply round()
 	 * @return bool Whether the amounts are equal or not
 	 */
-	private static function areAmountsEqual($amount1, $amount2, ?int $roundPrecision = null): bool
+	private static function areAmountsEqual($amount1, $amount2, $roundPrecision = null): bool
 	{
 		return (self::round($amount1, $roundPrecision) === self::round($amount2, $roundPrecision));
 	}
@@ -341,7 +341,7 @@ class SupplierInvoiceHelper
 	 * @return 	?string 							The XML data if available or null if can't get it
 	 * @throws 	Exception
 	 */
-	public static function getXmlData(int $supplierInvoiceId, bool $fetchXmlIfEmpty = false): ?string
+	public static function getXmlData(int $supplierInvoiceId, bool $fetchXmlIfEmpty = false)
 	{
 		global $db, $user;
 
@@ -678,7 +678,7 @@ class SupplierInvoiceHelper
 	 * @param	string	$validationStatus	Validation status just confirmed by the platform: 'Ok', 'Pending' or 'Error'
 	 * @return	int							1 if abandoned, 0 if not applicable / already done, -1 on error (logged, not blocking)
 	 */
-	public static function onOutboundStatusMessageValidated($db, User $user, int $elementId, int $lcStatus, ?string $lcReasonCode, string $validationStatus)
+	public static function onOutboundStatusMessageValidated($db, User $user, int $elementId, int $lcStatus, $lcReasonCode, string $validationStatus)
 	{
 		global $langs;
 

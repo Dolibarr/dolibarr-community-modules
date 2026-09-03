@@ -205,7 +205,7 @@ function thirdpartyidprof($object)
  * @param  ?string $original_encoding original encoding
  * @return string
  */
-function removeAllSpaces(?string $str, ?string $original_encoding = null)
+function removeAllSpaces($str, $original_encoding = null)
 {
 	// Tolerate a null identifier (e.g. a party without any professional id): treat it as empty.
 	if ($str === null) {
