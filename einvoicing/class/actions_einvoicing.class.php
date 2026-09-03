@@ -905,7 +905,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 */
 	public function addMoreMassActions($parameters, $object, &$action, $hookmanager)
 	{
-		global $langs, $user;
+		global $langs;
 
 		if (!$this->isMassSendAvailable($parameters)) {
 			return 0;
@@ -938,7 +938,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 */
 	public function doMassActions($parameters, $object, &$action, $hookmanager)
 	{
-		global $db, $langs, $user;
+		global $db, $langs;
 
 		$massaction = empty($parameters['massaction']) ? '' : $parameters['massaction'];
 		if (!in_array($massaction, array('einvoicing_send_to_pdp', 'einvoicing_generate'))) {
