@@ -544,8 +544,9 @@ class Document extends CommonObject
 	 * the recovery this offers is for an import that has not been acted on yet). The flow is then
 	 * fetched from the platform again, which creates the invoice and a record of its own, and that
 	 * record is moved onto this one: a flow the user has imported again keeps the line it already
-	 * had in the list, now pointing at the invoice that has just been created. A failed import
-	 * changes nothing and leaves this record in place, detached, rather than losing the document.
+	 * had in the list, now pointing at the invoice that has just been created - and that invoice is
+	 * given back the temporary number of the draft it replaces. A failed import changes nothing and
+	 * leaves this record in place, detached, rather than losing the document.
 	 *
 	 * @param	User				$user		User asking for the import
 	 * @return	array{res:int,message:string}	res > 0 is the id of the supplier invoice created
@@ -573,14 +574,18 @@ class Document extends CommonObject
 		}
 
 		// The invoice this document was booked on, if it is still there. Deleting it detaches this
-		// record (see the BILL_SUPPLIER_DELETE trigger), which is why the id is read before.
+		// record (see the BILL_SUPPLIER_DELETE trigger), which is why the id is read before. Its
+		// reference is read for the same reason: the draft it names is about to disappear, and the
+		// import that follows creates another one, which is given that same reference back.
 		$previousInvoiceId = (int) $this->fk_element_id;
+		$previousInvoiceRef = '';
 		if ($previousInvoiceId > 0) {
 			$previousInvoice = new FactureFournisseur($this->db);
 			if ($previousInvoice->fetch($previousInvoiceId) > 0) {
 				if ((int) $previousInvoice->status !== FactureFournisseur::STATUS_DRAFT) {
 					return array('res' => -1, 'message' => $langs->trans('EInvoiceReimportInvoiceIsNotADraft', $previousInvoice->ref));
 				}
+				$previousInvoiceRef = (string) $previousInvoice->ref;
 				if ($previousInvoice->delete($user) <= 0) {
 					$reason = $previousInvoice->error ? $previousInvoice->error : implode(', ', (array) $previousInvoice->errors);
 					return array('res' => -1, 'message' => $langs->trans('EInvoiceReimportFailedToDeleteTheDraft', $previousInvoice->ref).' '.$reason);
@@ -604,6 +609,16 @@ class Document extends CommonObject
 
 		// The invoice the import has just booked the document on, to send the user straight to it.
 		$newInvoiceId = (int) $importedRecord->fk_element_id;
+
+		// Give that invoice back the number of the draft it replaces. Nothing in the core reads an id
+		// out of a "(PROV...)" reference - it only tests the prefix - and the number of the draft that
+		// has just been deleted is free, so the operator keeps looking at the number they know.
+		if ($newInvoiceId > 0 && $previousInvoiceRef !== '') {
+			$newInvoice = new FactureFournisseur($this->db);
+			if ($newInvoice->fetch($newInvoiceId) > 0 && $this->reuseDraftRef($newInvoice, $previousInvoiceRef) > 0) {
+				$importedRecord->tracking_idref = $previousInvoiceRef;
+			}
+		}
 
 		// Move that record onto this line, so the flow keeps the line it already had in the list
 		// instead of losing it for a new one describing the same flow.
@@ -693,6 +708,113 @@ class Document extends CommonObject
 		}
 
 		$this->db->commit();
+
+		return 1;
+	}
+
+	/**
+	 * Give a draft supplier invoice the temporary reference of the draft it replaces.
+	 *
+	 * A draft is numbered by the core from the id of the row it has just created ("(PROV1234)"), so an
+	 * invoice imported again is a new row and gets a new number, for a document that has not changed.
+	 * The number of the draft that has just been deleted is free, and no code of the core reads an id
+	 * back out of it - it only tests the "PROV" prefix and skips such references when it looks for the
+	 * last number used - so it is given back here, files included.
+	 *
+	 * Only a temporary reference is ever moved this way, and only onto a draft: a validated invoice
+	 * carries a number of the numbering module, which belongs to it alone.
+	 *
+	 * @param	FactureFournisseur	$invoice	Draft the import has just created, renamed in place on success
+	 * @param	string				$wantedref	Reference of the draft it replaces
+	 * @return	int<-1,1>						1 when renamed, 0 when there was nothing to do, -1 on error
+	 */
+	private function reuseDraftRef(FactureFournisseur $invoice, $wantedref)
+	{
+		global $conf;
+
+		require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+
+		$currentref = (string) $invoice->ref;
+		if ($wantedref === '' || $wantedref === $currentref) {
+			return 0;
+		}
+		if (!preg_match('/^[\(]?PROV/i', $wantedref) || !preg_match('/^[\(]?PROV/i', $currentref)) {
+			return 0;
+		}
+		if ((int) $invoice->status !== FactureFournisseur::STATUS_DRAFT) {
+			return 0;
+		}
+
+		// Same path as the one the import writes its attachments to, and the same the card reads.
+		$folderpart = get_exdir($invoice->id, 2, 0, 0, $invoice, 'invoice_supplier');
+		$dirsource = $conf->fournisseur->facture->dir_output.'/'.$folderpart.dol_sanitizeFileName($currentref);
+		$dirdest = $conf->fournisseur->facture->dir_output.'/'.$folderpart.dol_sanitizeFileName($wantedref);
+
+		$moved = false;
+		if (file_exists($dirsource)) {
+			if (file_exists($dirdest)) {
+				// Left over by something else: merging two directories is not this method's business.
+				dol_syslog(__METHOD__.' cannot reuse reference '.$wantedref.': '.$dirdest.' already exists', LOG_WARNING);
+
+				return 0;
+			}
+			if (!@rename($dirsource, $dirdest)) {
+				dol_syslog(__METHOD__.' failed to rename '.$dirsource.' into '.$dirdest, LOG_ERR);
+
+				return -1;
+			}
+			$moved = true;
+		}
+
+		$relativesource = 'fournisseur/facture/'.$folderpart.dol_sanitizeFileName($currentref);
+		$relativedest = 'fournisseur/facture/'.$folderpart.dol_sanitizeFileName($wantedref);
+
+		$this->db->begin();
+
+		// Files named after the reference, then the directory they are indexed under: the two updates
+		// the core itself makes when it renames a draft (FactureFournisseur::validate()).
+		$sql = "UPDATE ".MAIN_DB_PREFIX."ecm_files SET";
+		$sql .= " filename = CONCAT('".$this->db->escape($wantedref)."', SUBSTR(filename, ".(strlen($currentref) + 1).")),";
+		$sql .= " filepath = '".$this->db->escape($relativedest)."'";
+		$sql .= " WHERE filename LIKE '".$this->db->escape($this->db->escapeforlike($currentref))."%'";
+		$sql .= " AND filepath = '".$this->db->escape($relativesource)."'";
+		$sql .= " AND entity = ".((int) $conf->entity);
+		$ok = (bool) $this->db->query($sql);
+
+		if ($ok) {
+			$sql = "UPDATE ".MAIN_DB_PREFIX."ecm_files SET filepath = '".$this->db->escape($relativedest)."'";
+			$sql .= " WHERE filepath = '".$this->db->escape($relativesource)."'";
+			$sql .= " AND entity = ".((int) $conf->entity);
+			$ok = (bool) $this->db->query($sql);
+		}
+
+		if ($ok) {
+			$sql = "UPDATE ".MAIN_DB_PREFIX."facture_fourn SET ref = '".$this->db->escape($wantedref)."'";
+			$sql .= " WHERE rowid = ".((int) $invoice->id);
+			$ok = (bool) $this->db->query($sql);
+		}
+
+		if (!$ok) {
+			dol_syslog(__METHOD__.' '.$this->db->lasterror(), LOG_ERR);
+			$this->db->rollback();
+			if ($moved) {
+				@rename($dirdest, $dirsource);
+			}
+
+			return -1;
+		}
+
+		$this->db->commit();
+
+		// The files themselves, when their name starts with the reference that has just changed.
+		if ($moved) {
+			foreach (dol_dir_list($dirdest, 'files', 1, '^'.preg_quote(dol_sanitizeFileName($currentref), '/')) as $fileentry) {
+				$newname = preg_replace('/^'.preg_quote(dol_sanitizeFileName($currentref), '/').'/', dol_sanitizeFileName($wantedref), $fileentry['name']);
+				@rename($fileentry['path'].'/'.$fileentry['name'], $fileentry['path'].'/'.$newname);
+			}
+		}
+
+		$invoice->ref = $wantedref;
 
 		return 1;
 	}
