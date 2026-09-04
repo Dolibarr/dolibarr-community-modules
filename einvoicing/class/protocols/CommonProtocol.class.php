@@ -798,6 +798,17 @@ trait CommonProtocol
 				$allowmodcodeclient = 1;
 			}
 
+			// This function never sets an extrafield on a thirdparty, so it must not rewrite them.
+			// It has to say so explicitly: from Dolibarr 20 on, fetch() pre-fills array_options with a
+			// null entry for every declared extrafield, and update() then hands that array to
+			// insertExtraFields(), which refuses the WHOLE update as soon as one of those fields is
+			// mandatory and empty. Every thirdparty this very function created is in that state (a
+			// programmatic create() writes no extrafield row at all), and so is every thirdparty that
+			// predates the mandatory flag - so a mandatory extrafield on the thirdparty rejected every
+			// received document. Emptied, array_options makes insertExtraFields() return 0 without
+			// touching the stored row, so no value is lost either.
+			$thirdparty->array_options = array();
+
 			$result = $thirdparty->update(0, $user, 1, $allowmodcodeclient, $allowmodcodefournisseur);
 			if ($result < 0) {
 				$this->error = $thirdparty->error;
@@ -1009,14 +1020,15 @@ trait CommonProtocol
 		$sql = "SELECT p.rowid ";
 		$sql .= " FROM " . MAIN_DB_PREFIX . "product as p ";
 		$sql .= " INNER JOIN " . MAIN_DB_PREFIX . "product_fournisseur_price as pfp ON pfp.fk_product = p.rowid ";
-		$sql .= " WHERE pfp.ref_fourn = '" . $db->escape($lineData['prodsellerid'] ?? '') . "' ";
+		$sql .= " WHERE (pfp.ref_fourn = '" . $db->escape($lineData['prodsellerid'] ?? '') . "' ";
+		$sql .= " OR pfp.ref_fourn = '" . $db->escape($lineData['prodname'] ?? '') . "') ";
 		$sql .= " AND pfp.fk_soc = " . intval($lineData['supplierId'] ?? 0) . " ";
 		$sql .= " AND p.entity IN (" . getEntity('product') . ")";
 		$sql .= " LIMIT 1";
 		$resql = $db->query($sql);
 		if ($resql && $db->num_rows($resql) > 0) {
 			$obj = $db->fetch_object($resql);
-			dol_syslog(__METHOD__ . ' Found product by prodsellerid: ' . $obj->rowid);
+			dol_syslog(__METHOD__ . ' Found product by prodsellerid or prodname as ref_fourn: ' . $obj->rowid);
 			return array('res' => $obj->rowid, 'message' => 'Product found by prodsellerid');
 			// No match found, continue to next step
 		}

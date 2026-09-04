@@ -910,6 +910,17 @@ if ($provider) {
 
 	print "</div>\n";
 
+	// Where the "import a received document again" action lives. This list is where a user lands after
+	// deleting the draft supplier invoice a reception created: the flow is still here, so re-running a
+	// synchronization or deleting the line looks like the way to get the document back, and neither is.
+	// The action is on the flow card, one click away but invisible from here, hence this reminder.
+	if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
+		print '<div class="opacitymedium small paddingtop paddingleft">';
+		print img_picto('', 'info', 'class="pictofixedwidth"').' ';
+		print $langs->trans('EInvoiceReimportHint', $langs->transnoentitiesnoconv('EInvoiceReimport'));
+		print '</div>'."\n";
+	}
+
 	print "</div>\n";
 
 	print '<script>'."\n";

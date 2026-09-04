@@ -118,9 +118,10 @@ class NegativeLineAmountTest extends CommonClassTest
 		$this->assertCount(1, $lines[0]['lineAllowances'], 'the line allowance is read');
 
 		// What createSupplierInvoiceLinesFromSource() resolves before it calls resolveLineAmounts().
-		// Whatever the allowance resolves to on such a line - today a discount of -100 percent, over an
-		// amount the allowance brings back to 0.00 - the couple it leaves rebuilds nothing, which is the
-		// state this test is about. The two are read the way the caller reads them, no more.
+		// Whatever the allowance resolves to on such a line - today nothing at all, the line being worth
+		// 0.00 before the allowance, so there is no percentage that expresses it - the couple it leaves
+		// rebuilds nothing, which is the state this test is about. The two are read the way the caller
+		// reads them, no more.
 		$discount = $this->callResolveLineDiscountPercent($protocol, $lines[0]['lineAllowances'], $lines[0]['lineTotalAmount']);
 		$remisePercent = ($discount === false) ? 0.0 : (float) $discount['percent'];
 		$subprice = ($discount === false)

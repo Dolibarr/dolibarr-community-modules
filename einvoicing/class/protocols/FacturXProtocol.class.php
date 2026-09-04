@@ -916,6 +916,9 @@ class FacturXProtocol extends CIIProtocol
 			if ($supplier->fournisseur != 1) {
 				$supplier->fournisseur = 1;
 				$supplier->code_fournisseur = 'auto';
+				// Flagging a vendor must not rewrite its extrafields, or a mandatory one left empty
+				// makes update() refuse the whole record. See _syncOrCreateThirdpartyFromEInvoiceSeller().
+				$supplier->array_options = array();
 				$supplier->update($supplier->id, $user);
 			}
 

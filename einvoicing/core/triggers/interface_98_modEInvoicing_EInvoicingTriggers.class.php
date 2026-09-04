@@ -417,7 +417,18 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			 */
 			'@phan-var-force Document $object';
 			$duplicate = false;
-			if ($object->fk_element_type == 'invoice_supplier' && SupplierInvoiceHelper::isEInvoice($object->fk_element_id, true, $duplicate)) {
+
+			// A flow does not always carry a supplier invoice id: a lifecycle message (flow_type
+			// 'SupplierInvoiceLC') sets fk_element_type without ever resolving an invoice, an import that
+			// failed never booked one, and deleting the local invoice detaches the flow it came from
+			// (see detachEInvoicingRecordsOfSupplierInvoice() below, which sets the column to 0). The
+			// column is nullable, so the value read here is null in the first two cases: passing it on
+			// used to raise an uncaught TypeError on the int parameter of isEInvoice() and end the mass
+			// deletion on a PHP fatal. Such a flow is linked to nothing, so there is nothing to protect
+			// and the deletion is allowed - as it already was for the detached (0) case.
+			$linkedsupplierinvoiceid = (int) $object->fk_element_id;
+
+			if ($object->fk_element_type == 'invoice_supplier' && $linkedsupplierinvoiceid > 0 && SupplierInvoiceHelper::isEInvoice($linkedsupplierinvoiceid, true, $duplicate)) {
 				$lastid = 0;
 
 				// Test if einvoice is the last one(in this case, we may accept to delete the document, record will be loaded at next sync
