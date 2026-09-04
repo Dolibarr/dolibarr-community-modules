@@ -77,6 +77,10 @@ require_once "../class/providers/PDPProviderManager.class.php";
 require_once "../class/protocols/ProtocolManager.class.php";
 require_once "../class/einvoicing.class.php";
 
+if (!class_exists('FormSetup')) {
+	require_once DOL_DOCUMENT_ROOT.'/core/class/html.formsetup.class.php';
+}
+
 
 // Translations
 $langs->loadLangs(array("admin", "bills", "einvoicing@einvoicing", "other"));
@@ -121,6 +125,25 @@ $invoice_path = '';
 
 $sellerId = GETPOSTINT('seller_id');
 $buyerId = GETPOSTINT('buyer_id');
+
+$formSetup = new FormSetup($db);
+
+// Allow re-sending / re-editing an invoice already transmitted to the Access Point. Off by default:
+// a transmitted invoice is immutable (correct it with a credit note / corrective invoice), and re-sending
+// makes the PA refuse a duplicate. Turn on only to deliberately test PA retry behaviour.
+$item = $formSetup->newItem('EINVOICING_ALLOW_RESEND_TRANSMITTED')->setAsYesNo();
+$item->nameText = $langs->trans("EINVOICING_ALLOW_RESEND_TRANSMITTED").' <span class="opacitymedium">('.$langs->trans("EINVOICING_TRANSMITTED_NOT_FOR_PROD").')</span>';
+$item->defaultFieldValue = '0';
+$item->helpText = $langs->transnoentities('EINVOICING_ALLOW_RESEND_TRANSMITTED_HELP');
+$item->cssClass = 'minwidth500';
+
+// Dev-only: keep the "Regenerate e-invoice" button/action available on a transmitted-locked invoice
+// (rebuild the CII/Factur-X to inspect the XML). Re-sending stays locked. Off by default.
+$item = $formSetup->newItem('EINVOICING_ALLOW_REGEN_TRANSMITTED')->setAsYesNo();
+$item->nameText = $langs->trans("EINVOICING_ALLOW_REGEN_TRANSMITTED").' <span class="opacitymedium">('.$langs->trans("EINVOICING_TRANSMITTED_NOT_FOR_PROD").')</span>';
+$item->defaultFieldValue = '0';
+$item->helpText = $langs->transnoentities('EINVOICING_ALLOW_REGEN_TRANSMITTED_HELP');
+$item->cssClass = 'minwidth500';
 
 
 /*
@@ -175,6 +198,9 @@ if ($action == 'buildsamplesupplierinvoice') {	// Test on permissions already do
 		setEventMessages('Sample invoice generated with ref '.$ref, null, 'mesgs');
 	}
 }
+
+// Save the options declared with $formSetup (action = 'update')
+include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php';
 
 
 /*
@@ -435,6 +461,11 @@ if (getDolGlobalString('EINVOICING_PDP')) {
 }
 
 print '<br>';
+
+if (!empty($formSetup->items)) {
+	print $formSetup->generateOutput(true, true);
+	print '<br>';
+}
 
 print '<div class="neutral">';
 print '<form action="'.$_SERVER["PHP_SELF"].'" method="POST">';
