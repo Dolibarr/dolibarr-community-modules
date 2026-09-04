@@ -1934,8 +1934,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 					// Log an event in the invoice timeline if status not pending
 					// We have just POST a new status so we log a rcord here in agenda to remind date (even if message is pending, so not yet fully processed by AP)
 					//if ($ack_statusLabel != 'Pending') {
-						$eventLabel = "EINVOICING - ".$langs->trans("SendStatus").' ['.$statusLabelToSend.']';
-						$eventMessage = "EINVOICING - ".$langs->trans("SendStatus")." (From sendStatusMessage) - [Dolibarr: " . $statusLabelToSend . ', '.$langs->trans("ResultOnAP").': '.$ack_statusLabel . (!empty($syncComment) ? " - " . $syncComment : "")."]";
+						$eventLabel = "EINVOICING - ".$langs->trans("SendingStatus").' ['.$statusLabelToSend.']';
+						$eventMessage = "EINVOICING - ".$langs->trans("SendingStatus")." (From sendStatusMessage) - [Dolibarr: " . $statusLabelToSend . ', '.$langs->trans("ResultOnAP").': '.$ack_statusLabel . (!empty($syncComment) ? " - " . $syncComment : "")."]";
 
 						$resLogEvent = $this->addEvent('STATUS', $eventLabel, $eventMessage, $object);
 					if ($resLogEvent < 0) {
