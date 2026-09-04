@@ -97,7 +97,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 
 			// Default product for import
 			$routingProductId = GETPOST('routing_product_id', 'aZ09');
-			if ($routingProductId !== '' && $routingProductId !== '-1') {
+			if ($routingProductId !== '-1') {
 				$existing = $einvoicing->fetchDefaultRouting($socId, 'product');
 				if (empty($existing)) {
 					$result = $einvoicing->addRouting($socId, $routingProductId, '', 'product');
