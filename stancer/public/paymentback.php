@@ -143,6 +143,20 @@ if (is_array($args) && !empty($args)) {
 	accessforbidden('', 0, 0, 1);
 }
 
+// The customer can land here without any Dolibarr session: with
+// STANCER_AUTO_MAIL_ORDER_CB the payment link is sent by email, so the payment
+// page is opened straight from the mailbox and nothing was ever written in
+// $_SESSION on this browser. The row fetched above from the return tag already
+// carries the right paym_ id, so it is the reference; the session is only a
+// fallback for the tag-less cases handled at the top of this file.
+$stancerPaymentId = stancerResolveReturnPaymentId($sp, $_SESSION["stancer_payment_id"] ?? '');
+if (empty($stancerPaymentId)) {
+	dol_syslog("stancer paymentback no stancer payment id available (neither on the local row nor in the session), the payment status cannot be checked", LOG_ERR);
+} elseif (empty($_SESSION["stancer_payment_id"])) {
+	dol_syslog("stancer paymentback no stancer_payment_id in session (payment page opened outside of the Dolibarr session), using the id of the local row: " . $stancerPaymentId, LOG_INFO);
+	$_SESSION["stancer_payment_id"] = $stancerPaymentId;
+}
+
 // Detect $paymentmethod
 $paymentmethod = 'stancer';
 $reg = array();
@@ -158,6 +172,8 @@ if (empty($socid)) {
 }
 
 $ispaymentok = false;
+// Payment as returned by the Stancer API, false as long as it was not fetched
+$paymentData = false;
 // If payment is ok
 $TRANSACTIONID = '';
 // If payment is ko
@@ -258,8 +274,8 @@ dol_syslog("stancer paymentback checking stancer module enabled=" . (!empty($con
 
 if (!empty($conf->stancer->enabled)) {
 	if ($paymentmethod == 'stancer') {
-		$pid = $_SESSION["stancer_payment_id"] ?? '';
-		dol_syslog("stancer paymentback session stancer_payment_id=" . $pid, LOG_DEBUG);
+		$pid = $stancerPaymentId;
+		dol_syslog("stancer paymentback stancer payment id=" . $pid, LOG_DEBUG);
 
 		$stancerApi = new StancerApi();
 		$paymentData = $stancerApi->getPayment($pid);
@@ -331,21 +347,25 @@ if (!empty($conf->stancer->enabled)) {
 			$statusTXT = $status;
 		}
 
-		// Detect already paid (F5 on payment ok)
+		// Detect already paid (F5 on payment ok). An empty transaction id must never
+		// reach the query: it would match every paiement row carrying an empty
+		// ext_payment_id (manual postings) and abort the page on a fake duplicate.
 		$transId = $_SESSION["TRANSACTIONID"] ?? '';
 		dol_syslog("stancer paymentback checking duplicate payment, TRANSACTIONID=$transId", LOG_DEBUG);
-		$sql = "SELECT * FROM " . MAIN_DB_PREFIX . "paiement WHERE ext_payment_id='" . $db->escape($transId) . "'";
-		$resql = $db->query($sql);
-		if ($resql) {
-			$num = $db->num_rows($resql);
-			if ($num > 0) {
-				$error++;
-				dol_syslog("stancer paymentback RELOAD DETECTED, payment already exists for TRANSACTIONID=$transId", LOG_WARNING);
-				print "<p class=''>" . $langs->transnoentitiesnoconv("StancerReloadDetected", dol_print_url($mysoc->url, '_blank', 0, 1)) . "</p>";
-				print "\n</div>\n";
-				llxFooter('', 'public', 1);
-				$db->close();
-				exit;
+		if ($transId !== '') {
+			$sql = "SELECT * FROM " . MAIN_DB_PREFIX . "paiement WHERE ext_payment_id='" . $db->escape($transId) . "'";
+			$resql = $db->query($sql);
+			if ($resql) {
+				$num = $db->num_rows($resql);
+				if ($num > 0) {
+					$error++;
+					dol_syslog("stancer paymentback RELOAD DETECTED, payment already exists for TRANSACTIONID=$transId", LOG_WARNING);
+					print "<p class=''>" . $langs->transnoentitiesnoconv("StancerReloadDetected", dol_print_url($mysoc->url, '_blank', 0, 1)) . "</p>";
+					print "\n</div>\n";
+					llxFooter('', 'public', 1);
+					$db->close();
+					exit;
+				}
 			}
 		}
 
@@ -392,18 +412,28 @@ $ipaddress = isset($_SESSION['ipaddress']) ? $_SESSION['ipaddress'] : '';
 if ($ipaddress === '') {
 	dol_syslog("stancer paymentback no ipaddress in session, payment notes will not carry the customer IP", LOG_WARNING);
 }
+// These three keys are only written above when the payment came back ok, and
+// paymentType only for a card: read them defensively, a missing key here is a
+// normal case (failed payment, SEPA payment, payment link opened out of session).
 if (empty($TRANSACTIONID)) {
-	$TRANSACTIONID   = $_SESSION['TRANSACTIONID'];
+	$TRANSACTIONID   = $_SESSION['TRANSACTIONID'] ?? '';
 }
 if (empty($FinalPaymentAmt)) {
-	$FinalPaymentAmt = $_SESSION["FinalPaymentAmt"];
+	$FinalPaymentAmt = $_SESSION["FinalPaymentAmt"] ?? 0;
 }
 if (empty($paymentType)) {
-	$paymentType     = $_SESSION["paymentType"];
+	$paymentType     = $_SESSION["paymentType"] ?? '';
 }
 
+// Same session-less scenario as the payment id above: currencyCodeType is only
+// written when the payment was started from a Dolibarr page. Leaving it empty
+// would make every "$currencyCodeType == $conf->currency" test below fail and
+// silently push the payment on the multicurrency path, which the order, donation
+// and event branches refuse. Write the resolved value back in session: the
+// notification block at the end of this page reads it again from there.
 if (empty($currencyCodeType)) {
-	$currencyCodeType = $_SESSION['currencyCodeType'];
+	$currencyCodeType = stancerResolveReturnCurrency($_SESSION['currencyCodeType'] ?? '', $paymentData, $sp, $conf->currency);
+	$_SESSION['currencyCodeType'] = $currencyCodeType;
 }
 
 $fulltag = $FULLTAG;
@@ -787,10 +817,10 @@ if ($ispaymentok) {
 			$FinalPaymentAmt = isset($paymentData['amount']) ? ((float) $paymentData['amount'] / 100) : $sessionAmt;
 			if (isset($paymentData['amount']) && abs($FinalPaymentAmt - $sessionAmt) > 0.01) {
 				dol_syslog("stancer paymentback: recorded amount mismatch session=" . $sessionAmt
-					. " api=" . $FinalPaymentAmt . " for payment " . $_SESSION["stancer_payment_id"]
+					. " api=" . $FinalPaymentAmt . " for payment " . $stancerPaymentId
 					. ", using the API amount", LOG_ERR);
 			}
-			$paymentType = $_SESSION["paymentType"];
+			$paymentType = $_SESSION["paymentType"] ?? '';
 			if (empty($paymentType)) {
 				$paymentType = 'CB';
 			}
@@ -808,7 +838,7 @@ if ($ispaymentok) {
 					: $paymentData['customer'];
 			}
 			$data = [
-				'payment_id' => $_SESSION["stancer_payment_id"],
+				'payment_id' => $stancerPaymentId,
 				'date' => $now,
 				'FinalPaymentAmt' => $FinalPaymentAmt,
 				'paymentTypeId' => $paymentTypeId,
@@ -869,7 +899,11 @@ if ($ispaymentok) {
 		if ($result > 0) {
 			$FinalPaymentAmt = $_SESSION["FinalPaymentAmt"];
 			//if partialPayment=1 -> make a deposit
-			$partialPayment = $_SESSION["partialPayment"];
+			// The row written when the payment started is the reference: without it a
+			// deposit paid through the emailed link (no session) would be billed as a
+			// full payment. The session stays as a fallback for rows created before
+			// the partial_payment column existed.
+			$partialPayment = stancerResolveReturnPartialPayment($sp, $_SESSION["partialPayment"] ?? null);
 
 			$paymentTypeId = 0;
 			if ($paymentmethod == 'stancer') {
@@ -997,7 +1031,7 @@ if ($ispaymentok) {
 						$error++;
 					}
 					$paiement->paiementid = $paymentTypeId;
-					$paiement->num_payment = $_SESSION["stancer_payment_id"]; //erics was ''
+					$paiement->num_payment = $stancerPaymentId; //erics was ''
 					$paiement->note_public = 'Online payment ' . dol_print_date($now, 'standard') . ' from ' . $ipaddress;
 					$paiement->ext_payment_id = $TRANSACTIONID;
 					$paiement->ext_payment_site = 'stancer'; // E4: must be 'stancer' so reconciliation recognizes the posting
@@ -1086,7 +1120,7 @@ if ($ispaymentok) {
 		$result = $propal->fetch($propalid);
 		if ($result) {
 			$FinalPaymentAmt = $_SESSION["FinalPaymentAmt"];
-			$paymentType = $_SESSION["paymentType"];
+			$paymentType = $_SESSION["paymentType"] ?? '';
 			if (empty($paymentType)) {
 				$paymentType = 'CB';
 			}
@@ -1101,7 +1135,9 @@ if ($ispaymentok) {
 			if (getDolGlobalString('STANCER_AUTO_INVOICE_ON_PROPAL_PAID') && stancerIsModEnabled('invoice')) {
 				dol_syslog("stancerPaymentBack propal: auto create invoice enabled", LOG_DEBUG, 0, '_payment');
 
-				$partialPayment = isset($_SESSION["partialPayment"]) ? $_SESSION["partialPayment"] : 0;
+				// Same as the order branch: the payment row knows whether this was a
+				// deposit, the session only helps for rows predating that column.
+				$partialPayment = stancerResolveReturnPartialPayment($sp, $_SESSION["partialPayment"] ?? null);
 
 				// Check if deposit invoice should be created
 				if (
@@ -1157,7 +1193,7 @@ if ($ispaymentok) {
 							$paiement->multicurrency_amounts = array($invoice->id => $FinalPaymentAmt);
 						}
 						$paiement->paiementid = $paymentTypeId;
-						$paiement->num_payment = $_SESSION["stancer_payment_id"];
+						$paiement->num_payment = $stancerPaymentId;
 						$paiement->note_public = 'Online payment ' . dol_print_date($now, 'standard') . ' from ' . $ipaddress . ' (propal ' . $propal->ref . ')';
 						$paiement->ext_payment_id = $TRANSACTIONID;
 						$paiement->ext_payment_site = 'stancer';
@@ -1272,7 +1308,7 @@ if ($ispaymentok) {
 				$paiement->datep = $now;
 				$paiement->datepaid = $now;
 				$paiement->paymenttype = $paymentTypeId;
-				$paiement->num_payment = $_SESSION["stancer_payment_id"]; //erics was ''
+				$paiement->num_payment = $stancerPaymentId; //erics was ''
 				$paiement->note_public  = 'Online payment ' . dol_print_date($now, 'standard') . ' from ' . $ipaddress;
 				$paiement->ext_payment_id = $TRANSACTIONID;
 				$paiement->ext_payment_site = $service;
@@ -1367,14 +1403,16 @@ if ($ispaymentok) {
 				$paymentTypeId = getDolGlobalString('STRIPE_PAYMENT_MODE_FOR_PAYMENTS');
 			}
 			if (empty($paymentTypeId)) {
-				$paymentType = $_SESSION["paymentType"];
+				$paymentType = $_SESSION["paymentType"] ?? '';
 				if (empty($paymentType)) {
 					$paymentType = 'CB';
 				}
 				$paymentTypeId = dol_getIdFromCode($db, $paymentType, 'c_paiement', 'code', 'id', 1);
 			}
 
-			$currencyCodeType = $_SESSION['currencyCodeType'];
+			// $currencyCodeType was already resolved above (session, then Stancer
+			// payment, then local row): re-reading the session here would blank it
+			// again when the payment page was opened outside of the Dolibarr session.
 
 			// Do action only if $FinalPaymentAmt is set (session variable is cleaned after this page to avoid duplicate actions when page is POST a second time)
 			if (!empty($FinalPaymentAmt) && $paymentTypeId > 0) {
@@ -1400,7 +1438,7 @@ if ($ispaymentok) {
 						$error++; // Not yet supported
 					}
 					$paiement->paiementid   = $paymentTypeId;
-					$paiement->num_payment = $_SESSION["stancer_payment_id"]; //erics was ''
+					$paiement->num_payment = $stancerPaymentId; //erics was ''
 					$paiement->note_public  = 'Online payment ' . dol_print_date($now, 'standard') . ' from ' . $ipaddress . ' for event registration';
 					$paiement->ext_payment_id = $TRANSACTIONID;
 					$paiement->ext_payment_site = $service;
@@ -1557,14 +1595,16 @@ if ($ispaymentok) {
 				$paymentTypeId = getDolGlobalString('STRIPE_PAYMENT_MODE_FOR_PAYMENTS');
 			}
 			if (empty($paymentTypeId)) {
-				$paymentType = $_SESSION["paymentType"];
+				$paymentType = $_SESSION["paymentType"] ?? '';
 				if (empty($paymentType)) {
 					$paymentType = 'CB';
 				}
 				$paymentTypeId = dol_getIdFromCode($db, $paymentType, 'c_paiement', 'code', 'id', 1);
 			}
 
-			$currencyCodeType = $_SESSION['currencyCodeType'];
+			// $currencyCodeType was already resolved above (session, then Stancer
+			// payment, then local row): re-reading the session here would blank it
+			// again when the payment page was opened outside of the Dolibarr session.
 
 			// Do action only if $FinalPaymentAmt is set (session variable is cleaned after this page to avoid duplicate actions when page is POST a second time)
 			if (!empty($FinalPaymentAmt) && $paymentTypeId > 0) {
@@ -1590,7 +1630,7 @@ if ($ispaymentok) {
 						$error++; // Not yet supported
 					}
 					$paiement->paiementid   = $paymentTypeId;
-					$paiement->num_payment = $_SESSION["stancer_payment_id"]; //erics was ''
+					$paiement->num_payment = $stancerPaymentId; //erics was ''
 					$paiement->note_public  = 'Online payment ' . dol_print_date($now, 'standard') . ' from ' . $ipaddress;
 					$paiement->ext_payment_id = $TRANSACTIONID;
 					$paiement->ext_payment_site = $service;
@@ -1738,13 +1778,11 @@ if ($ispaymentok) {
 }
 
 if ($ispaymentok) {
-	// Get on url call
-	$onlinetoken        = empty($PAYPALTOKEN) ? $_SESSION['onlinetoken'] : $PAYPALTOKEN;
-	$payerID            = empty($PAYPALPAYERID) ? $_SESSION['payerID'] : $PAYPALPAYERID;
-	// Set by newpayment.php
-	$paymentType        = $_SESSION['PaymentType'];
-	$currencyCodeType   = $_SESSION['currencyCodeType'];
-	$FinalPaymentAmt    = $_SESSION["FinalPaymentAmt"];
+	// $onlinetoken, $payerID and $_SESSION['PaymentType'] (capital P) come from the
+	// PayPal page this file was forked from. Stancer never writes any of them, and
+	// $PAYPALTOKEN / $PAYPALPAYERID do not exist here either, so reading them only
+	// produced notices and blanked values already resolved above. $paymentType,
+	// $currencyCodeType and $FinalPaymentAmt are set earlier in this page.
 
 	if (is_object($object) && method_exists($object, 'call_trigger')) {
 		// Call trigger
@@ -1926,13 +1964,9 @@ if ($ispaymentok) {
 		}
 	}
 } else {
-	// Get on url call
-	$onlinetoken = empty($PAYPALTOKEN) ? $_SESSION['onlinetoken'] : $PAYPALTOKEN;
-	$payerID            = empty($PAYPALPAYERID) ? $_SESSION['payerID'] : $PAYPALPAYERID;
-	// Set by newpayment.php
-	$paymentType        = $_SESSION['PaymentType'];
-	$currencyCodeType   = $_SESSION['currencyCodeType'];
-	$FinalPaymentAmt    = $_SESSION["FinalPaymentAmt"];
+	// Same PayPal leftovers as in the ok branch above: nothing to read from the
+	// session here. On a failed payment $_SESSION["FinalPaymentAmt"] is never even
+	// written, so this block used to blank the values it then emailed to the admin.
 
 	if (is_object($object) && method_exists($object, 'call_trigger')) {
 		// Call trigger
@@ -2005,7 +2039,10 @@ if ($ispaymentok) {
 		$content .= $companylangs->transnoentitiesnoconv("OnlinePaymentSystem") . ': <strong>' . $paymentmethod . "</strong><br>\n";
 		$content .= $companylangs->transnoentitiesnoconv("ReturnURLAfterPayment") . ': ' . $urlback . "<br>\n";
 		$content .= "<br>\n";
-		$content .= "tag=" . $fulltag . "<br>\ntoken=" . $onlinetoken . "<br>\npaymentType=" . $paymentType . "<br>\ncurrencycodeType=" . $currencyCodeType . "<br>\npayerId=" . $payerID . "<br>\nipaddress=" . $ipaddress . "<br>\nFinalPaymentAmt=" . $FinalPaymentAmt . "<br>\n";
+		// The PayPal token and payer id this line used to carry were always empty:
+		// name the Stancer payment and the status it came back with instead, they are
+		// what the administrator needs to look the transaction up.
+		$content .= "tag=" . $fulltag . "<br>\npayment=" . $stancerPaymentId . "<br>\nstatus=" . $statusTXT . "<br>\npaymentType=" . $paymentType . "<br>\ncurrencycodeType=" . $currencyCodeType . "<br>\nipaddress=" . $ipaddress . "<br>\nFinalPaymentAmt=" . $FinalPaymentAmt . "<br>\n";
 
 
 		$ishtml = 0;
@@ -2047,7 +2084,7 @@ if ($ispaymentok) {
 					<li><?php echo $langs->transnoentitiesnoconv("StancerPaymentDoneID", "<b>" . $pid . "</b>"); ?></li>
 					<li><?php echo $langs->transnoentitiesnoconv("StancerPaymentInvoiceOrOrder", "<b>" . $object->ref . "</b>"); ?></li>
 					<li><?php echo $langs->transnoentitiesnoconv("StancerPaymentDoneStatus", "<b>" . $statusTXT . "</b>"); ?></li>
-					<li><?php echo $langs->trans("StancerPaymentAmount", $_SESSION["FinalPaymentAmt"], $_SESSION['currencyCodeType']); ?></li>
+					<li><?php echo $langs->trans("StancerPaymentAmount", $FinalPaymentAmt, $currencyCodeType); ?></li>
 				</ul>
 				<p><?php echo $langs->transnoentitiesnoconv("StancerPaymentDoneSuccessMessageFacture", dol_print_url($mysoc->url, '_blank', 0, 1)); ?></p>
 				<p><?php echo $langs->transnoentitiesnoconv("StancerPaymentDoneEndMessage", dol_print_url($mysoc->url, '_blank', 0, 1)); ?></p>
