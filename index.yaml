@@ -18,7 +18,7 @@ packages:
       de: 'Prüft, ob die installierte Dolibarr-Version von bekannten Sicherheitslücken (CVEs) betroffen ist, indem die öffentliche NVD-Datenbank abgefragt wird. Zeigt einen Indikator für die Gefahrenstufe auf der Startseite an, sendet den Administratoren eine E-Mail, sobald eine neue Sicherheitslücke erkannt wird, und bietet eine detaillierte Berichtsseite, die jeden CVE auflistet.'
     status: 'enabled'
     created_at: '2026-08-21'
-    last_updated_at: "2026-08-30"
+    last_updated_at: "2026-09-04"
     category: '79'
     git: 'https://github.com/Dolibarr/dolibarr-community-modules/tree/main/dolisecure'
     git-branch: 'main'
@@ -51,14 +51,14 @@ packages:
     git-branch: 'main'
     git-system: 'github'
     cover: 'https://raw.githubusercontent.com/Dolibarr/dolibarr-community-modules/refs/heads/main/einvoicing/img/object_einvoicing.png'
-    current_version: "1.1.0"
+    current_version: "1.2.0"
     dolibarrmin: "18.0"
     dolibarrmax: "24.0"
     phpmin: "7.0"
     phpmax: ""
     price: 0
     created_at: '2025-10-10'
-    last_updated_at: "2026-08-30"
+    last_updated_at: "2026-09-04"
     # direct-download is yes if we can download the module to install it in application. Use 'dolistore' to force download from dolistore using dolistore-download
     direct-download: 'yes'
     # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
@@ -80,7 +80,7 @@ packages:
       en: 'Provides a way to make an online checkout of any membership dues, donation, customer invoice or customer order with the HelloAsso API. Also offer an option to synchronize membership.'
     status: 'enabled'
     created_at: '2024-12-10'
-    last_updated_at: "2026-08-30"
+    last_updated_at: "2026-09-04"
     category: '68, 67'
     git: 'https://github.com/Dolibarr/dolibarr-community-modules/tree/main/helloasso'
     git-branch: 'main'
@@ -141,7 +141,7 @@ packages:
       en: 'Collect payments for your invoices, orders, proposals, memberships and donations by credit card (with 3D Secure) or SEPA direct debit through the Stancer payment platform. Handles SEPA mandates, direct debit rejections with their ISO 20022 codes, refunds, disputes, bank reconciliation of Stancer payouts and automatic payments through a scheduled job.'
     status: 'enabled'
     created_at: '2023-03-12'
-    last_updated_at: "2026-08-30"
+    last_updated_at: "2026-09-04"
     category: '68, 67'
     git: 'https://github.com/Dolibarr/dolibarr-community-modules/tree/main/stancer'
     git-branch: 'main'
