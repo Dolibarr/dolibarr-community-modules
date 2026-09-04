@@ -35,6 +35,11 @@ class CdarHandler
 	 */
 	public $db;
 
+	/**
+	 * @var string Reason of the last failure, when a method returns false or a negative result.
+	 */
+	public $error = '';
+
 	// ==================== CONSTANTS ====================
 
 	// DateTime Formats
@@ -212,11 +217,21 @@ class CdarHandler
 	 */
 	public function saveToFile($data, $filename)
 	{
+		$this->error = '';
+
 		$xmlContent = $this->generate($data);
 		if ($xmlContent === false) {
+			$this->error = 'Failed to build the CDAR XML content';
 			return false;
-		} else {
-			file_put_contents($filename, $xmlContent);
+		}
+
+		// Report the write that did not happen, and the one that stopped halfway on a full disk. Without
+		// this, the file is simply missing or truncated further down the road, and the caller can only
+		// say the file does not exist, which points at the wrong cause.
+		$written = file_put_contents($filename, $xmlContent);
+		if ($written === false || $written < strlen($xmlContent)) {
+			$this->error = 'Failed to write the CDAR file ' . $filename;
+			return false;
 		}
 
 		return true;
@@ -493,6 +508,15 @@ class CdarHandler
 		$tempDir = $conf->einvoicing->dir_temp;
 		if (!dol_is_dir($tempDir)) {
 			dol_mkdir($tempDir);
+			if (!dol_is_dir($tempDir)) {
+				return array('res' => -1, 'message' => 'The temporary directory of the module cannot be created: ' . $tempDir);
+			}
+		}
+		// A directory the web server may enter but not write into is a plausible state (it happens when a
+		// command line script running as another user creates it first). Name it here, where the cause is
+		// still visible, rather than let the write fail silently.
+		if (!is_writable($tempDir)) {
+			return array('res' => -1, 'message' => 'The temporary directory of the module is not writable by the web server: ' . $tempDir);
 		}
 
 		// Unique per-call name so two concurrent status sends of the same condition cannot collide (#226).
@@ -501,7 +525,7 @@ class CdarHandler
 
 		$result = $this->saveToFile($data, $filename);
 		if ($result === false) {
-			return array('res' => -1, 'message' => 'Error saving CDAR file');
+			return array('res' => -1, 'message' => $this->error !== '' ? $this->error : 'Error saving CDAR file');
 		}
 		//echo "CDAR file generated: " . $filename;
 
