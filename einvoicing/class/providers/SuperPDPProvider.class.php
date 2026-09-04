@@ -2047,6 +2047,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 										if ($transdatakey == 'Supplierref') {
 											$transdatakey = 'SupplierRef';
 										}
+										if ($transdatakey == 'Label') {
+											$transdatakey = 'ProductLabel';
+										}
 										$infostring .= ($infostring ? ', ' : '');
 										$infostring .= $langs->transnoentitiesnoconv($transdatakey);
 										$infostring .= ': '.$dataval;
