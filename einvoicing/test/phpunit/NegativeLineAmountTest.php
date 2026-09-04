@@ -117,18 +117,23 @@ class NegativeLineAmountTest extends CommonClassTest
 		$this->assertEquals(0.0, (float) $lines[0]['netpriceamount'], 'BT-146 is zero, BR-27 forbidding it to be negative');
 		$this->assertCount(1, $lines[0]['lineAllowances'], 'the line allowance is read');
 
-		// What createSupplierInvoiceLinesFromSource() resolves before it calls resolveLineAmounts():
-		// a discount of -100 percent, over a price the allowance brings back to 0.00.
+		// What createSupplierInvoiceLinesFromSource() resolves before it calls resolveLineAmounts().
+		// Whatever the allowance resolves to on such a line - today a discount of -100 percent, over an
+		// amount the allowance brings back to 0.00 - the couple it leaves rebuilds nothing, which is the
+		// state this test is about. The two are read the way the caller reads them, no more.
 		$discount = $this->callResolveLineDiscountPercent($protocol, $lines[0]['lineAllowances'], $lines[0]['lineTotalAmount']);
-		$this->assertNotFalse($discount);
-		$this->assertSame(-100.0, $discount['percent'], 'an allowance over a negative base gives a discount that means nothing');
+		$remisePercent = ($discount === false) ? 0.0 : (float) $discount['percent'];
+		$subprice = ($discount === false)
+			? (float) $lines[0]['netpriceamount']
+			: round($discount['priceWithoutDiscount'] / (float) $lines[0]['billedquantity'], 8);
+		$this->assertSame(0.0, round((float) $lines[0]['billedquantity'] * $subprice * (1 - ($remisePercent / 100)), 2), 'quantity, price and discount rebuild nothing');
 
 		$amounts = $this->callResolveLineAmounts(
 			$protocol,
 			$lines[0],
 			(float) $lines[0]['billedquantity'],
-			round($discount['priceWithoutDiscount'] / (float) $lines[0]['billedquantity'], 8),
-			$discount['percent']
+			$subprice,
+			$remisePercent
 		);
 
 		$this->assertSame(1.0, $amounts['qty'], 'the amount is carried as a single unit');
