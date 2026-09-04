@@ -279,7 +279,54 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 */
 	public function afterODTCreation($parameters, $object, &$action, $hookmanager)
 	{
+		// The core hands this hook the document model itself, not the invoice (the invoice is in
+		// $parameters['object']). Raise its main-document flag while it can still be read - see the
+		// method for why this is the fix to issue #725 and not a workaround for it.
+		$this->backportUpdateMainDocField($parameters, $object);
+
 		return $this->afterPDFCreation($parameters, $object, $action, $hookmanager);
+	}
+
+	/**
+	 * Make the ODT invoice model maintain last_main_doc on the Dolibarr versions whose core does not.
+	 *
+	 * last_main_doc holds the document Dolibarr considers to be the official readable image of the
+	 * invoice; core/tpl/card_presend.tpl.php attaches it to the email by default. It is only written by
+	 * commonGenerateDocument() when the document model declares ->update_main_doc_field.
+	 * doc_generic_proposal_odt has always declared it, doc_generic_order_odt does since 23, and
+	 * doc_generic_invoice_odt only since 25.0.0 (core commit f9ae68e3). Below that, an invoice built
+	 * from an ODT template leaves last_main_doc empty and card_presend falls back to
+	 * dol_most_recent_file($dir, preg_quote($ref).'[^\-]+'): the newest file whose name starts with the
+	 * ref, with no filter on the type. The <ref>_cii.xml written by this module is then picked over the
+	 * readable document and mailed to the customer (issue #725).
+	 *
+	 * The flag is raised on the model instance the core passes to the hook, which is the one
+	 * commonGenerateDocument() reads it back from once write_file() has returned (verified on 18 to 24).
+	 * So the core keeps doing the indexing itself, including its condition that the file must still
+	 * exist - an ODT converted to PDF and deleted must not be recorded as the main document.
+	 *
+	 * No-op from 25.0.0 on, and for any model that already maintains the field, the built-in PDF ones
+	 * included.
+	 *
+	 * @param	array<string,mixed>	$parameters		Hook parameters ($parameters['object'] holds the invoice)
+	 * @param	object				$generator		Document model that called the hook
+	 * @return	void
+	 */
+	private function backportUpdateMainDocField($parameters, $generator)
+	{
+		if (!is_object($generator) || !property_exists($generator, 'update_main_doc_field')) {
+			return;
+		}
+		if (!empty($generator->update_main_doc_field)) {
+			return;		// Core 25+, or a model that maintains the field on its own
+		}
+		if (empty($parameters['object']) || !($parameters['object'] instanceof Facture)) {
+			return;		// The core fix is about the invoice model; leave the other objects alone
+		}
+
+		$generator->update_main_doc_field = 1;
+
+		dol_syslog(__METHOD__ . " model " . get_class($generator) . " does not maintain last_main_doc on Dolibarr " . DOL_VERSION . ", flag raised so the core indexes the generated document as the main one");
 	}
 
 
