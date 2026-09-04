@@ -348,7 +348,7 @@ if (getDolGlobalString('EINVOICING_PDP')) {
 	// Referenced invoice
 	print '<span class="referencedinvoiceblock">';
 	print '<span class="inline-block"> Sur la facture : </span> ';
-	print '<input type="text" name="referencedinvoice" value="'.GETPOST('referencedinvoice').'" placeholder="FA0000-SPECIMEN" class="width150">';
+	print '<input type="text" name="referencedinvoice" value="'.dolPrintHTMLForAttribute(GETPOST('referencedinvoice', 'alphanohtml')).'" placeholder="FA0000-SPECIMEN" class="width150">';
 	print '</span>';
 
 	// JS to show/hide referenced invoice and credit note type options only if credit note type is selected
@@ -427,6 +427,13 @@ if (getDolGlobalString('EINVOICING_PDP')) {
 			print ajax_autoselect("idproxyname");
 			print '- on the instance of your customers, the variable EINVOICING_SUPERPDP_VIAPARTNER_OAUTH_URL to <input type="text" class="width300" id="idproxyurl2" value="'.$urlforproxy.'" spellcheck="false"><br>';
 			print ajax_autoselect("idproxyurl2");
+			// The proxy page delivers the OAuth tokens to the redirect_uri the customer instance asks for,
+			// so that list is what separates a customer of yours from anyone else on the internet. While
+			// it is empty every destination is accepted, which is the warning pdpShowWarning() prints
+			// above; a future version will refuse the redirect instead of accepting everything.
+			print '- on THIS instance, the variable EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN to the comma separated list of the domains of your customer instances, for example <input type="text" class="width300" id="idproxydomains" value="domainofmycustomers.com,anotherdomain.com" spellcheck="false">: ';
+			print (getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN') ? '<span class="ok">'.img_picto('', 'tick').' '.dolPrintHTML(getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN')).'</span>' : '<span class="error">'.img_warning().' KO, not set: every redirect destination is accepted</span>').'<br>';
+			print ajax_autoselect("idproxydomains");
 			print '</div>';
 			print '<br>';
 		}

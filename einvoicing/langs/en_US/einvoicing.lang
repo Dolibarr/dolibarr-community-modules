@@ -670,3 +670,8 @@ DisabledBecauseNotEditable=This invoice is not editable
 ErrorSupplierNotVisibleInEntity=The supplier "%s" is not visible in entity %s. You must share or create it in the target entity first.
 WarningEntityChangedFileMoveFailed=The entity was changed but the invoice files could not be moved to the new entity's directory. You may need to move them manually.
 EInvoicingInfoManagedByMasterSetup=The einvoicing setup is managed by the master entity (ID %s)
+
+# OAuth proxy: allowed redirect domains (EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN)
+ProxyRedirectDomainsNotSet=Security: this instance is an OAuth proxy and accepts any redirect destination
+ProxyRedirectDomainsNotSetDetail=The proxy page (einvoicing/public/proxy_oauthcallback.php) answers without authentication and sends the OAuth access token and refresh token to the address the caller asks for. As long as the constant EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN is empty, every address is accepted, so anyone can have the tokens of an Access Point account delivered to a server of their own. Set that constant to the comma separated list of the domains of your customer instances, for example mycustomerdomain.com,anotherdomain.com. A future version will refuse every redirect while the list is empty.
+ProxyRedirectDomainsGoToOtherSetup=Set the constant in Home - Setup - Other
