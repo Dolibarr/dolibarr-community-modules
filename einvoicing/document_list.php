@@ -831,7 +831,7 @@ if ($provider) {
 
 	print '<div class="formconsumeproduce" style="padding: 10px;">'."\n";
 
-	print '<div class="div-table-responsive">'; // You can use div-table-responsive-no-min if you don't need reserved height for your table
+	print '<div class="div-table-responsive-no-min">'; // We need no min to support the selection of fields
 	print '<table class="inline-block valignmiddle marginrightonly">'."\n";
 
 	print '<tr>';
