@@ -398,6 +398,7 @@ SupplierInvoiceComparisonVatBasisDifference=Difference in VAT basis amount %s%% 
 SupplierInvoiceComparisonVatRateDifference=Difference in VAT amount %s%% (e-invoice: %s / Dolibarr invoice: %s)
 SupplierInvoiceComparisonVatRateNotFound=VAT rate of %s%% not found in the Dolibarr invoice
 SupplierInvoiceComparisonSuggestVatCalculationMode=Recalculate the invoice using Mode %s to get VAT amounts corresponding to the e-invoice
+EInvoiceImportVatModeRealigned=The invoice was recalculated using VAT calculation Mode %s to carry the totals of the received document, which announces a total VAT (BT-110) of %s and a total including VAT (BT-112) of %s, where the VAT calculation mode of this instance rebuilt a total of %s including VAT.
 EinvoicingCantDeleteADocumentLinkedToAnExistingSupplierInvoice=The flow %s can't be deleted because it is linked to the Dolibarr supplier invoice n° %s
 EinvoicingCantDeleteAValidatedSupplierInvoice=A supplier invoice created from a received e-invoice can no longer be deleted once it has been validated. Only its draft can, and deleting the draft leaves the received document itself in the flow list.
 EinvoicingFailedToDetachTheFlowOfADeletedSupplierInvoice=Failed to detach the received e-invoice from the supplier invoice %s, so the invoice was not deleted.
