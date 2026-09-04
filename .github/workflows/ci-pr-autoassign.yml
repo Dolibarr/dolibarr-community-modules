@@ -18,6 +18,12 @@
 # - On push: workflow runs but PR-specific actions are skipped
 #
 name: Set reviewers and label according to module MAINTENERS
+
+permissions:
+  pull-requests: write
+  issues: write
+
+
 on:
   pull_request_target:
     types: [opened, synchronize, reopened]
@@ -26,10 +32,6 @@ on:
   push:
     branches:
       - "main"
-
-permissions:
-  pull-requests: write
-  issues: write
 
 jobs:
   assign-and-label:

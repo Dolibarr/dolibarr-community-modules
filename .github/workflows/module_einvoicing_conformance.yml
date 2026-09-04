@@ -19,6 +19,9 @@
 #
 # The rules are the FNFE France_RFE package (EUPL), pinned to a release: an upstream release must
 # never turn this job red on its own, and moving the pin has to be a commit that can be reviewed.
+name: einvoicing_conformance
+
+
 on:
   push:
     branches: [ main ]
@@ -37,6 +40,7 @@ on:
 
   workflow_dispatch:
 
+
 concurrency:
   group: conformance-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -47,7 +51,6 @@ env:
   # Saxon-HE runs the compiled Schematron XSLT of that package.
   SAXON_VERSION: 10.9
 
-name: conformance
 jobs:
   conformance:
     name: The documents are accepted by the EN 16931 and CTC-FR rules
