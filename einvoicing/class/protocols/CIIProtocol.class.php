@@ -937,7 +937,7 @@ class CIIProtocol extends AbstractProtocol
 
 				$refDocInvoiceId = SupplierInvoiceHelper::findIdByRef($refDoc, (int) $socId);
 				if ($refDocInvoiceId < 0) {
-					return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($refDocInvoiceId, $refDoc, 'linked to document ' . ($parsedHeader['documentno'] ?? ''))];
+					return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($refDocInvoiceId, $refDoc, 'required by received document ' . ($parsedHeader['documentno'] ?? ''))];
 				}
 				if ($refDocInvoiceId == 0) {
 					// The invoice references a document this Dolibarr does not hold: the final invoice of a
@@ -956,7 +956,7 @@ class CIIProtocol extends AbstractProtocol
 					return [
 						'res' => -1,
 						'postponeflow' => 1,
-						'message' => 'Document : ' . $refDoc . ' linked to document ' . $parsedHeader['documentno'] . ' not found in Dolibarr',
+						'message' => 'Document ' . $refDoc . ', required by received document ' . $parsedHeader['documentno'] . ', was not found in Dolibarr',
 						'actioncode' => 'LINKED_INVOICE_NOT_FOUND',
 						'actionurl' => 'none',
 						'actiondata' => array('supplierref' => $refDoc, 'linkedref' => ($parsedHeader['documentno'] ?? ''), 'socid' => (int) $socId),
@@ -1076,10 +1076,10 @@ class CIIProtocol extends AbstractProtocol
 
 					$linkedObjectId = SupplierInvoiceHelper::findIdByRef($refDoc, (int) $socId);
 					if ($linkedObjectId < 0) {
-						return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($linkedObjectId, $refDoc, 'linked to document ' . ($parsedHeader['documentno'] ?? ''))];
+						return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($linkedObjectId, $refDoc, 'required by received document ' . ($parsedHeader['documentno'] ?? ''))];
 					}
 					if ($linkedObjectId == 0) {
-						return ['res' => -1, 'message' => 'Document : ' . $refDoc . ' linked to document ' . $parsedHeader['documentno'] . ' not found in Dolibarr'];
+						return ['res' => -1, 'message' => 'Document ' . $refDoc . ', required by received document ' . $parsedHeader['documentno'] . ', was not found in Dolibarr'];
 					}
 
 					// Fetch Object
@@ -1115,7 +1115,10 @@ class CIIProtocol extends AbstractProtocol
 
 						// Other linked document handling can be implemented here based on the type of the linked document for example credit note etc...
 					} else {
-						return ['res' => -1, 'message' => 'Document : ' . $refDoc . ' linked to document ' . $parsedHeader['documentno'] . ' not found in Dolibarr'];
+						// Reached only when fetch() failed on an id findIdByRef() did return, so the reference
+						// was matched and it is the loading that went wrong: saying "not found" here sent the
+						// reader looking for a missing invoice that is in fact there.
+						return ['res' => -1, 'message' => 'Document ' . $refDoc . ', required by received document ' . $parsedHeader['documentno'] . ', matches supplier invoice id ' . ((int) $linkedObjectId) . ' but that invoice could not be loaded'];
 					}
 				}
 			}
