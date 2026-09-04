@@ -45,6 +45,7 @@ require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
 require_once DOL_DOCUMENT_ROOT . '/core/lib/company.lib.php';
 require_once DOL_DOCUMENT_ROOT . '/core/class/html.form.class.php';
 require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
+require_once DOL_DOCUMENT_ROOT . '/user/class/user.class.php';
 dol_include_once('einvoicing/class/einvoicing.class.php');
 dol_include_once('einvoicing/core/triggers/interface_98_modEInvoicing_EInvoicingTriggers.class.php');
 require_once __DIR__ . '/CommonClassTestCompat.inc.php';
@@ -77,6 +78,29 @@ class DefaultProductRoutingResetTest extends CommonClassTest
 	}
 
 	/**
+	 * A user that owns a row of its own, to create the objects of the test with.
+	 *
+	 * The global $user of the suite does not always hold one, and Dolibarr 18 declares a foreign key
+	 * on the author of a product price: the creation would then fail on the database instead of
+	 * telling anything about the module.
+	 *
+	 * @return User		Author of the objects created by the test
+	 */
+	private function author()
+	{
+		global $db;
+
+		$resql = $db->query('SELECT rowid FROM ' . $db->prefix() . 'user ORDER BY rowid ASC LIMIT 1');
+		$obj = ($resql ? $db->fetch_object($resql) : null);
+		$this->assertNotEmpty($obj, 'No user in the base to create the objects of the test with');
+
+		$author = new User($db);
+		$author->fetch($obj->rowid);
+
+		return $author;
+	}
+
+	/**
 	 * A vendor holding a default product for the import of its invoices.
 	 *
 	 * @param	string	$productRouting	Value posted by the combo for the default product
@@ -84,7 +108,7 @@ class DefaultProductRoutingResetTest extends CommonClassTest
 	 */
 	private function createVendorWithDefaultProduct($productRouting)
 	{
-		global $db, $user;
+		global $db;
 
 		$thirdparty = new Societe($db);
 		$thirdparty->name = 'Vendor of the default product test';
@@ -92,7 +116,7 @@ class DefaultProductRoutingResetTest extends CommonClassTest
 		$thirdparty->fournisseur = 1;
 		$thirdparty->code_fournisseur = 'auto';
 
-		$socid = $thirdparty->create($user);
+		$socid = $thirdparty->create($this->author());
 		$this->assertGreaterThan(0, $socid, 'Could not create the vendor of the test: ' . $thirdparty->error . ' ' . implode(', ', $thirdparty->errors));
 
 		$einvoicing = new EInvoicing($db);
@@ -207,7 +231,9 @@ class DefaultProductRoutingResetTest extends CommonClassTest
 	 */
 	public function testTheComboShowsTheDefaultProductOfTheVendor()
 	{
-		global $db, $user, $conf;
+		global $db, $conf;
+
+		$author = $this->author();
 
 		$conf->global->PRODUIT_USE_SEARCH_TO_SELECT = 0;		// The combo, not the ajax search field
 
@@ -216,7 +242,7 @@ class DefaultProductRoutingResetTest extends CommonClassTest
 		$thirdparty->country_code = 'FR';
 		$thirdparty->fournisseur = 1;
 		$thirdparty->code_fournisseur = 'auto';
-		$socid = $thirdparty->create($user);
+		$socid = $thirdparty->create($author);
 		$this->assertGreaterThan(0, $socid, 'Could not create the vendor of the test: ' . $thirdparty->error . ' ' . implode(', ', $thirdparty->errors));
 
 		// A product to buy with no supplier price of its own: this is the case the cores mishandle
@@ -226,7 +252,7 @@ class DefaultProductRoutingResetTest extends CommonClassTest
 		$product->type = 0;
 		$product->status = 0;
 		$product->status_buy = 1;
-		$pid = $product->create($user);
+		$pid = $product->create($author);
 		$this->assertGreaterThan(0, $pid, 'Could not create the product of the test: ' . $product->error . ' ' . implode(', ', $product->errors));
 
 		$method = new ReflectionMethod(EInvoicing::class, 'selectVendorProduct');
@@ -265,14 +291,14 @@ class DefaultProductRoutingResetTest extends CommonClassTest
 	 */
 	public function testFirstSaveOfADefaultProduct()
 	{
-		global $db, $user;
+		global $db;
 
 		$thirdparty = new Societe($db);
 		$thirdparty->name = 'Vendor without default product';
 		$thirdparty->country_code = 'FR';
 		$thirdparty->fournisseur = 1;
 		$thirdparty->code_fournisseur = 'auto';
-		$socid = $thirdparty->create($user);
+		$socid = $thirdparty->create($this->author());
 		$this->assertGreaterThan(0, $socid, 'Could not create the vendor of the test: ' . $thirdparty->error . ' ' . implode(', ', $thirdparty->errors));
 
 		$this->assertEquals(0, $this->saveThirdparty($socid, '-1', ''), 'A vendor without default product got one out of the empty entry');
