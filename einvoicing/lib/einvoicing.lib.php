@@ -145,6 +145,24 @@ function pdpShowWarning($einvoicing)
 		$ret .= '</div>';
 	}
 
+	// public/proxy_oauthcallback.php answers without authentication and hands the caller back to the
+	// address it supplied itself in redirect_uri; on the callback branch that address receives the
+	// access token and the refresh token in its query string. On a proxy instance, the domains listed
+	// in EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN are the only thing separating a customer instance
+	// from anyone else on the internet, and an empty list is still accepted for one transition step
+	// (see einvoicingIsAllowedRedirectUrl). Say so loudly, on both setup pages, for as long as it is.
+	if (getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER') == 'proxy' && !getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN')) {
+		$ret .= '<div class="error">';
+		$ret .= img_warning().' <b>'.$langs->trans("ProxyRedirectDomainsNotSet").'</b>';
+		$ret .= '<br><br>';
+		$ret .= $langs->trans("ProxyRedirectDomainsNotSetDetail");
+		$ret .= '<br><br>';
+		$ret .= '<a class="gotoothersetup" href="'.DOL_URL_ROOT.'/admin/const.php">';
+		$ret .= $langs->trans("ProxyRedirectDomainsGoToOtherSetup").'<i class="fas fa-tools marginleftonly"></i>';
+		$ret .= '</a>';
+		$ret .= '</div>';
+	}
+
 	return ($ret ? $ret . '<br>' : '');
 }
 
@@ -858,6 +876,33 @@ function einvoicingInvoicingPeriodFromLines($billingPeriod)
 }
 
 /**
+ * Version of the module, followed by the commit it was built from when that one is known.
+ *
+ * The version alone does not name sources: between two releases the VERSION file does not move,
+ * so every build of a branch answers the same string and a bug report quoting it says nothing
+ * about what actually runs. einvoicingModuleCommit() is what names the sources, and this is the
+ * single place deciding how the two read together, so that the stamp is the same wherever it is
+ * printed - the comment opening a generated XML, the title of a page.
+ *
+ * An installation whose commit cannot be known gets the version alone, with no parentheses,
+ * which is what every caller printed before the commit existed.
+ *
+ * @return	string	Something like "1.4.2 (a6f4d2b)", or "1.4.2" when the commit is unknown
+ */
+function einvoicingModuleStamp()
+{
+	$versionfile = dirname(__DIR__).'/VERSION';
+	$version = (is_readable($versionfile) ? trim((string) file_get_contents($versionfile)) : '');
+	$commit = einvoicingModuleCommit();
+
+	if ($version === '') {
+		return $commit;		// the file is part of the module, but nothing forces a deployment to keep it
+	}
+
+	return $version.($commit !== '' ? ' ('.$commit.')' : '');
+}
+
+/**
  * Commit the module sources were built from, empty string when it cannot be known.
  *
  * An installed module has no repository to ask: the zip is unpacked into custom/ and that is
@@ -964,4 +1009,95 @@ function einvoicingCheckoutCommit($repodir)
 	}
 
 	return (preg_match('/^[0-9a-f]{40,}$/', $commit) ? substr($commit, 0, 7) : '');
+}
+
+/**
+ * Key identifying the VAT breakdown group (BG-23) a line belongs to.
+ *
+ * EN 16931 identifies a breakdown group by its VAT category code (BT-118), its rate (BT-119) and its
+ * exemption reason (BT-120/BT-121), and by nothing else - in particular not by the Dolibarr
+ * vat_src_code, which used to split otherwise identical groups in two and had the platform reject the
+ * document (BR-S-08: the taxable base does not reconcile).
+ *
+ * It exists as a function because the same key is built in more than one place: a breakdown filled
+ * under one shape and read back under another silently loses what was filed under it.
+ *
+ * @param	string		$categoryVAT			VAT category code of the line (BT-118)
+ * @param	float|string	$rate				VAT rate of the line (BT-119)
+ * @param	string		$exemptionReasonCode	Exemption reason code (BT-121), empty when there is none
+ * @param	string		$exemptionReason		Exemption reason text (BT-120), empty when there is none
+ * @return	string								Key of the group in the breakdown accumulator
+ */
+function einvoicingVatBreakdownKey($categoryVAT, $rate, $exemptionReasonCode = '', $exemptionReason = '')
+{
+	return $categoryVAT.'|'.$rate.'|'.$exemptionReasonCode.'|'.$exemptionReason;
+}
+
+/**
+ * Tell whether an URL may be used as the target of a redirect made by the OAuth proxy.
+ *
+ * public/proxy_oauthcallback.php is reachable without authentication (NOLOGIN) and hands the caller
+ * back to an address the caller itself supplied in redirect_uri. On the callback branch that address
+ * receives the freshly issued access_token and refresh_token in its query string, so whoever controls
+ * it controls the tokens: the destination is a trust decision, not a formatting detail, and it must be
+ * taken in one single place for every redirect of that page.
+ *
+ * The allowed destinations are the domains listed in EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN, comma
+ * separated. A proxy deployment that serves partner domains has to name them explicitly; an empty
+ * list is what the security report is about, since it lets any third party drive the flow and collect
+ * the tokens on a host of its choice. It is nevertheless accepted for one transition step, because
+ * nothing ever set that option and refusing at once would stop every existing proxy: see the TODO
+ * below, and the warning pdpShowWarning() prints on the setup pages meanwhile.
+ *
+ * Two shapes are refused whatever the allowlist says, empty or not:
+ *  - anything that is not an absolute http(s) URL, so that "javascript:" payloads and the scheme
+ *    relative "//evil.tld" (which a browser resolves to the attacker host) never reach a Location header;
+ *  - a host that merely ends with an allowed domain. Matching on the suffix alone accepts
+ *    "notpartner.tld" for "partner.tld", so the comparison is on the host itself or on a dot boundary.
+ *
+ * @param	string	$url	Candidate destination, as received from the caller
+ * @return	bool			True when the URL may be passed to header('Location: ...')
+ */
+function einvoicingIsAllowedRedirectUrl($url)
+{
+	$url = trim((string) $url);
+	if ($url === '') {
+		return false;
+	}
+	if (!preg_match('#^https?://#i', $url)) {
+		return false;
+	}
+
+	$host = parse_url($url, PHP_URL_HOST);
+	if (!is_string($host) || $host === '') {
+		return false;
+	}
+	$host = strtolower($host);
+
+	$alloweddomains = getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN');
+	if ($alloweddomains === '') {
+		// TRANSITION. No proxy deployment has this option today - no code, no setup page and no
+		// upgrade ever set it - so refusing here would cut every customer instance off its proxy on
+		// the day of the update. It stays open for one step, and both setup pages print a warning
+		// for as long as it is: while the list is empty the proxy hands the access token and the
+		// refresh token to whatever destination the caller names.
+		// TODO Remove this and return false instead, once deployments have had time to declare the
+		// domains of their customer instances.
+		return true;
+	}
+
+	foreach (explode(',', $alloweddomains) as $alloweddomain) {
+		$alloweddomain = strtolower(trim($alloweddomain, " \t\n\r\0\x0B."));
+		if ($alloweddomain === '') {
+			continue;
+		}
+		if ($host === $alloweddomain) {
+			return true;
+		}
+		if (substr($host, -(strlen($alloweddomain) + 1)) === '.'.$alloweddomain) {
+			return true;
+		}
+	}
+
+	return false;
 }

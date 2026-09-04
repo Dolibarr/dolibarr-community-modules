@@ -916,6 +916,9 @@ class FacturXProtocol extends CIIProtocol
 			if ($supplier->fournisseur != 1) {
 				$supplier->fournisseur = 1;
 				$supplier->code_fournisseur = 'auto';
+				// Flagging a vendor must not rewrite its extrafields, or a mandatory one left empty
+				// makes update() refuse the whole record. See _syncOrCreateThirdpartyFromEInvoiceSeller().
+				$supplier->array_options = array();
 				$supplier->update($supplier->id, $user);
 			}
 
@@ -932,6 +935,10 @@ class FacturXProtocol extends CIIProtocol
 					}
 				}
 			}
+
+			// Every line of the invoice exists now, so its totals can be confronted with the ones the
+			// document announces (issue #781).
+			$this->alignInvoiceTotalsWithDocument($supplierInvoiceId, $parsedHeader, $return_messages);
 
 			// Create or update supplier prices for imported products
 			if (!empty($supplierPriceEntries)) {

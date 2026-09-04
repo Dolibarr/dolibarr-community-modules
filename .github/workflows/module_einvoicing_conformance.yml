@@ -1,0 +1,170 @@
+---
+# Every document this module generates is meant to be accepted by a platform, and a platform decides
+# with schematrons: the CII schema, the XSLT of the declared profile - which carries the EN 16931
+# arithmetic - and the French CTC rules. Nothing in this repository ran them, so a change could make
+# the generation produce documents that are refused, and every job stayed green.
+#
+# #709 is the case: the VAT breakdown rate (BT-119) of every generated document became 0.00 against a
+# non-zero tax amount. Run through the rules below, the five specimen documents of that code come
+# back INVALID on BR-CO-17, BR-S-08 and BR-S-09, and VALID on the code before it. That is the
+# negative control at the end of this job: the defect of #709 is rebuilt on each document at every
+# run, and the job fails if the validators no longer refuse it.
+#
+# What is validated here are the reference documents committed in the module. They are not a copy of
+# the output: the phpunit job regenerates the five specimen invoices and compares them to these very
+# files, so "the reference documents are conformant" and "the generation matches the reference
+# documents" together say that what the module generates is conformant. Splitting it that way is what
+# lets this job run without a Dolibarr, a database or a PHP of the right version - it needs the rules
+# and a JVM.
+#
+# The rules are the FNFE France_RFE package (EUPL), pinned to a release: an upstream release must
+# never turn this job red on its own, and moving the pin has to be a commit that can be reviewed.
+name: einvoicing_conformance
+
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'einvoicing/test/phpunit/fixtures/einvoicing_samples/**'
+      - 'einvoicing/test/samples/**'
+      - 'einvoicing/test/conformance/**'
+      - '.github/workflows/module_einvoicing_conformance.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'einvoicing/test/phpunit/fixtures/einvoicing_samples/**'
+      - 'einvoicing/test/samples/**'
+      - 'einvoicing/test/conformance/**'
+      - '.github/workflows/module_einvoicing_conformance.yml'
+
+  workflow_dispatch:
+
+
+concurrency:
+  group: conformance-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The FNFE package that carries the three stages, pinned. https://github.com/fnfempe/France_RFE
+  FNFE_TAG: v1.4.0.03
+  # Saxon-HE runs the compiled Schematron XSLT of that package.
+  SAXON_VERSION: 10.9
+
+jobs:
+  conformance:
+    name: The documents are accepted by the EN 16931 and CTC-FR rules
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup PHP
+        # Only the XSD stage uses it, through DOMDocument::schemaValidate().
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.3
+          extensions: xml
+          coverage: none # disable xdebug, pcov
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Fetch the FNFE rules and Saxon
+        run: |
+          curl -sSL -o france-rfe.tar.gz \
+            "https://github.com/fnfempe/France_RFE/archive/refs/tags/${FNFE_TAG}.tar.gz"
+          mkdir -p france-rfe
+          tar xz -C france-rfe --strip-components=1 -f france-rfe.tar.gz
+          curl -sSL -o saxon.jar \
+            "https://repo1.maven.org/maven2/net/sf/saxon/Saxon-HE/${SAXON_VERSION}/Saxon-HE-${SAXON_VERSION}.jar"
+          echo "FNFE_ROOT=${GITHUB_WORKSPACE}/france-rfe/FNFE_RFE_INVOICE" >> "$GITHUB_ENV"
+          echo "SAXON_JAR=${GITHUB_WORKSPACE}/saxon.jar" >> "$GITHUB_ENV"
+          ls france-rfe/FNFE_RFE_INVOICE
+
+      - name: Validate the documents of the module
+        env:
+          SVRL_DIR: ${{ github.workspace }}/svrl
+        run: |
+          python3 einvoicing/test/conformance/validate-cii.py \
+            einvoicing/test/phpunit/fixtures/einvoicing_samples/*.xml \
+            einvoicing/test/samples/*.cii.xml
+
+      - name: The defect of #709, rebuilt on those documents, has to be refused
+        # A green validation says something only once the validators are shown to refuse something.
+        # The something is the regression this job exists for: on each of the documents just
+        # validated, the VAT breakdown rate is set to 0.00 while its tax amount is left as it is -
+        # the exact shape #709 shipped - and every one of them has to come back INVALID. The document
+        # stays well formed and keeps passing the XSD, so what is being shown is that the semantic
+        # stage is running and biting, not that a broken file is rejected.
+        env:
+          SVRL_DIR: ${{ github.workspace }}/svrl-control
+        run: |
+          mkdir -p control
+          php -r '
+            $ram = "urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100";
+            $files = array_merge(
+              glob("einvoicing/test/phpunit/fixtures/einvoicing_samples/*.xml"),
+              glob("einvoicing/test/samples/*.cii.xml")
+            );
+            sort($files);
+            if (!$files) { fwrite(STDERR, "no document to build the controls from\n"); exit(2); }
+            $built = 0;
+            foreach ($files as $file) {
+              $doc = new DOMDocument();
+              if (!$doc->load($file)) { fwrite(STDERR, "cannot read " . $file . "\n"); exit(2); }
+              $xpath = new DOMXPath($doc);
+              $xpath->registerNamespace("ram", $ram);
+              $damaged = 0;
+              foreach ($xpath->query("//ram:ApplicableHeaderTradeSettlement/ram:ApplicableTradeTax") as $tax) {
+                foreach ($xpath->query("ram:CalculatedAmount", $tax) as $amount) {
+                  if (abs((float) $amount->textContent) < 0.005) { continue 2; }
+                }
+                foreach ($xpath->query("ram:RateApplicablePercent", $tax) as $rate) {
+                  $rate->nodeValue = "0.00";
+                  $damaged++;
+                }
+              }
+              if (!$damaged) {
+                fwrite(STDERR, "the control cannot be built from " . basename($file) . ": no VAT breakdown that taxes\n");
+                exit(2);
+              }
+              $doc->save("control/" . basename($file));
+              $built++;
+            }
+            echo $built, " damaged documents built from the ", count($files), " validated above\n";
+          '
+          refused=0
+          built=0
+          for file in control/*; do
+            built=$((built + 1))
+            report="control-$(basename "$file").txt"
+            if python3 einvoicing/test/conformance/validate-cii.py "$file" > "$report" 2>&1; then
+              echo "::error::$(basename "$file") is still accepted with a 0.00 VAT rate - the validation above is not checking what it says it checks"
+              cat "$report"
+            elif grep -q 'BR-CO-17' "$report"; then
+              refused=$((refused + 1))
+            else
+              # Refused, but not on the rule the defect lands on: something else changed, and the
+              # control no longer demonstrates what it claims to.
+              echo "::error::$(basename "$file") is refused without BR-CO-17"
+              cat "$report"
+            fi
+          done
+          if [ "$refused" -ne "$built" ]; then
+            echo "::error::the rules refused $refused of the $built damaged documents on BR-CO-17"
+            exit 1
+          fi
+          echo "The rules refuse the $built damaged documents on BR-CO-17, as they have to."
+          cat "control-cii_standard.xml.txt"
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: svrl-reports
+          path: |
+            svrl/
+            svrl-control/
+          retention-days: 2

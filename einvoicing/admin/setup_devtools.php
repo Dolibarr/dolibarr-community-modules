@@ -77,6 +77,10 @@ require_once "../class/providers/PDPProviderManager.class.php";
 require_once "../class/protocols/ProtocolManager.class.php";
 require_once "../class/einvoicing.class.php";
 
+if (!class_exists('FormSetup')) {
+	require_once DOL_DOCUMENT_ROOT.'/core/class/html.formsetup.class.php';
+}
+
 
 // Translations
 $langs->loadLangs(array("admin", "bills", "einvoicing@einvoicing", "other"));
@@ -121,6 +125,25 @@ $invoice_path = '';
 
 $sellerId = GETPOSTINT('seller_id');
 $buyerId = GETPOSTINT('buyer_id');
+
+$formSetup = new FormSetup($db);
+
+// Allow re-sending / re-editing an invoice already transmitted to the Access Point. Off by default:
+// a transmitted invoice is immutable (correct it with a credit note / corrective invoice), and re-sending
+// makes the PA refuse a duplicate. Turn on only to deliberately test PA retry behaviour.
+$item = $formSetup->newItem('EINVOICING_ALLOW_RESEND_TRANSMITTED')->setAsYesNo();
+$item->nameText = $langs->trans("EINVOICING_ALLOW_RESEND_TRANSMITTED").' <span class="opacitymedium">('.$langs->trans("EINVOICING_TRANSMITTED_NOT_FOR_PROD").')</span>';
+$item->defaultFieldValue = '0';
+$item->helpText = $langs->transnoentities('EINVOICING_ALLOW_RESEND_TRANSMITTED_HELP');
+$item->cssClass = 'minwidth500';
+
+// Dev-only: keep the "Regenerate e-invoice" button/action available on a transmitted-locked invoice
+// (rebuild the CII/Factur-X to inspect the XML). Re-sending stays locked. Off by default.
+$item = $formSetup->newItem('EINVOICING_ALLOW_REGEN_TRANSMITTED')->setAsYesNo();
+$item->nameText = $langs->trans("EINVOICING_ALLOW_REGEN_TRANSMITTED").' <span class="opacitymedium">('.$langs->trans("EINVOICING_TRANSMITTED_NOT_FOR_PROD").')</span>';
+$item->defaultFieldValue = '0';
+$item->helpText = $langs->transnoentities('EINVOICING_ALLOW_REGEN_TRANSMITTED_HELP');
+$item->cssClass = 'minwidth500';
 
 
 /*
@@ -175,6 +198,9 @@ if ($action == 'buildsamplesupplierinvoice') {	// Test on permissions already do
 		setEventMessages('Sample invoice generated with ref '.$ref, null, 'mesgs');
 	}
 }
+
+// Save the options declared with $formSetup (action = 'update')
+include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php';
 
 
 /*
@@ -322,7 +348,7 @@ if (getDolGlobalString('EINVOICING_PDP')) {
 	// Referenced invoice
 	print '<span class="referencedinvoiceblock">';
 	print '<span class="inline-block"> Sur la facture : </span> ';
-	print '<input type="text" name="referencedinvoice" value="'.GETPOST('referencedinvoice').'" placeholder="FA0000-SPECIMEN" class="width150">';
+	print '<input type="text" name="referencedinvoice" value="'.dolPrintHTMLForAttribute(GETPOST('referencedinvoice', 'alphanohtml')).'" placeholder="FA0000-SPECIMEN" class="width150">';
 	print '</span>';
 
 	// JS to show/hide referenced invoice and credit note type options only if credit note type is selected
@@ -401,6 +427,13 @@ if (getDolGlobalString('EINVOICING_PDP')) {
 			print ajax_autoselect("idproxyname");
 			print '- on the instance of your customers, the variable EINVOICING_SUPERPDP_VIAPARTNER_OAUTH_URL to <input type="text" class="width300" id="idproxyurl2" value="'.$urlforproxy.'" spellcheck="false"><br>';
 			print ajax_autoselect("idproxyurl2");
+			// The proxy page delivers the OAuth tokens to the redirect_uri the customer instance asks for,
+			// so that list is what separates a customer of yours from anyone else on the internet. While
+			// it is empty every destination is accepted, which is the warning pdpShowWarning() prints
+			// above; a future version will refuse the redirect instead of accepting everything.
+			print '- on THIS instance, the variable EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN to the comma separated list of the domains of your customer instances, for example <input type="text" class="width300" id="idproxydomains" value="domainofmycustomers.com,anotherdomain.com" spellcheck="false">: ';
+			print (getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN') ? '<span class="ok">'.img_picto('', 'tick').' '.dolPrintHTML(getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN')).'</span>' : '<span class="error">'.img_warning().' KO, not set: every redirect destination is accepted</span>').'<br>';
+			print ajax_autoselect("idproxydomains");
 			print '</div>';
 			print '<br>';
 		}
@@ -435,6 +468,11 @@ if (getDolGlobalString('EINVOICING_PDP')) {
 }
 
 print '<br>';
+
+if (!empty($formSetup->items)) {
+	print $formSetup->generateOutput(true, true);
+	print '<br>';
+}
 
 print '<div class="neutral">';
 print '<form action="'.$_SERVER["PHP_SELF"].'" method="POST">';

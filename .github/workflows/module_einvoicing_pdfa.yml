@@ -15,6 +15,11 @@
 # the XML fixtures it builds from. Nothing outside einvoicing/ can make those documents differ, so
 # a change elsewhere does not start the job - the exception being this file, which does decide how
 # the run goes.
+name: einvoicing_pdfa
+
+permissions:
+  contents: read
+
 on:
   push:
     branches: [ main ]
@@ -38,7 +43,6 @@ env:
   # does not. It needs nothing else of the core, so a plain release of the library is enough.
   TCPDF_VERSION: 6.7.5
 
-name: pdfa
 jobs:
   pdfa:
     name: Factur-X container is PDF/A-3

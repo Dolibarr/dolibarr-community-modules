@@ -306,8 +306,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		}
 
 		$forcedisabling = '';
-		// Add buttons in invoice card
-		if (in_array($object->element, ['facture']) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
+		// Add buttons in invoice card (we test context invoicescard but also main for old versions of module)
+		if (in_array($object->element, ['facture']) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') && preg_match('/invoicecard|main/', $parameters['currentcontext'] ?? '')) {
 			// Get current status of e-invoice
 			$currentStatusDetails = $einvoicing->fetchLastknownInvoiceStatus($object->id, $object->ref);
 
@@ -446,8 +446,10 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		}
 
 
-		// Add buttons in supplier invoice card
-		if (in_array($object->element, ['invoice_supplier']) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
+		// Add buttons in supplier invoice card (we test context invoicesuppliercard but also main for old versions of module)
+		if (in_array($object->element, ['invoice_supplier']) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI') && preg_match('/invoicesuppliercard|main/', $parameters['currentcontext'] ?? '')) {
+			$url_button = array();
+
 			// Check if this invoice is present into einvoicing_extlinks table to know if it is an imported invoice from PDP or not
 			$sql = "SELECT rowid, provider FROM " . $db->prefix() . "einvoicing_extlinks";
 			$sql .= " WHERE element_type = '" . $db->escape($object->element) . "'";
@@ -473,7 +475,6 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					print '<div class="info">' . $langs->trans('EInvoiceCreditNoteOfRefusedInvoice', $sourceRef) . '</div>';
 				}
 
-				$url_button = array();
 				foreach ($availableStatuses as $code => $label) {
 					$url_button[] = array(
 						'lang' => 'einvoicing',
@@ -483,22 +484,52 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 						'url' => '/fourn/facture/card.php?id=' . $object->id . '&action=sendStatusMessage&pdpstatuscode=' . $code . '&token=' . newToken()
 					);
 				}
+			}
 
-				if (!empty($url_button)) {
-					if ((float) DOL_VERSION < 18) {
-						print einvoicingDolGetButtonActionDropdown($langs->trans('einvoice'), $url_button);
-					} elseif ((float) DOL_VERSION < 22) {
-						print dolGetButtonAction($langs->trans('einvoice'), '', 'default', $url_button, '', true);
+			// Offer to import a received document again, on the invoice it was booked on: this is where
+			// a wrong vendor is noticed, and the vendor of an existing supplier invoice cannot be changed.
+			// The action itself lives on the flow card, which is also where a flow whose draft has already
+			// been deleted is picked up again.
+			// TODO Move this in the section of the "Join files".
+			if (!empty($object->id) && $user->hasRight('einvoicing', 'write')) {
+				$sql = "SELECT rowid FROM " . $db->prefix() . "einvoicing_document";
+				$sql .= " WHERE fk_element_type = 'invoice_supplier'";
+				$sql .= " AND fk_element_id = " . ((int) $object->id);
+				$sql .= " AND flow_direction = 'In'";
+				$sql .= " AND flow_type = 'SupplierInvoice'";
+				$sql .= " AND entity IN (" . getEntity('document') . ")";
+				$sql .= " LIMIT 1";
+
+				$resql = $db->query($sql);
+				if ($resql && ($objdoc = $db->fetch_object($resql))) {
+					$reimporturl = dol_buildpath('/einvoicing/document_card.php', 1) . '?id=' . ((int) $objdoc->rowid) . '&action=reimport&token=' . newToken();
+					if ((int) $object->status === FactureFournisseur::STATUS_DRAFT) {
+						print '<a class="butAction" href="' . $reimporturl . '">' . $langs->trans('EInvoiceReimport') . '</a>';
 					} else {
-						$params = array('forceDropdownButtons' => true);	// This is supported on v24+ only
-						print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true, $params);
+						print '<span class="butActionRefused classfortooltip" title="' . dol_escape_htmltag($langs->trans('EInvoiceReimportOnlyOnADraft')) . '">'
+							. $langs->trans('EInvoiceReimport') . '</span>';
 					}
+				}
+				if ($resql) {
+					$db->free($resql);
+				}
+			}
+
+			if (!empty($url_button)) {
+				if ((float) DOL_VERSION < 18) {
+					print einvoicingDolGetButtonActionDropdown($langs->trans('einvoice'), $url_button);
+				} elseif ((float) DOL_VERSION < 22) {
+					print dolGetButtonAction($langs->trans('einvoice'), '', 'default', $url_button, '', true);
+				} else {
+					$params = array('forceDropdownButtons' => true);	// This is supported on v24+ only
+					print dolGetButtonAction('', $langs->trans('einvoice'), 'default', $url_button, '', true, $params);
 				}
 			}
 		}
 
-		// Add button to change the entity (multi-company) of a supplier invoice
-		if (getDolGlobalString('EINVOICING_ALLOW_MULTICOMPANY_INVOICE_MOVE') && isModEnabled('multicompany') && in_array($object->element, ['invoice_supplier']) && !empty($object->id) && $user->hasRight('fournisseur', 'facture', 'creer')) {
+		// Add button to change the entity (multi-company) of a supplier invoice (we test context invoicesuppliercard but also main for old versions of module)
+		if (getDolGlobalString('EINVOICING_ALLOW_MULTICOMPANY_INVOICE_MOVE') && isModEnabled('multicompany') && in_array($object->element, ['invoice_supplier'])
+			&& !empty($object->id) && $user->hasRight('fournisseur', 'facture', 'creer') && preg_match('/invoicesuppliercard|main/', $parameters['currentcontext'] ?? '')) {
 			if ($object->isEditable()) {
 				print '<a class="butAction" href="' . DOL_URL_ROOT . '/fourn/facture/card.php?id=' . $object->id . '&action=change_entity&token=' . newToken() . '">'
 					. $langs->trans('ChangeEntity') . '</a>';
@@ -1910,7 +1941,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 			// E-invoice sync status
 			if (empty($parameters['arrayfields']['pdp_syncstatus']) || !empty($parameters['arrayfields']['pdp_syncstatus']['checked'])) {
-				$currentStatusDetails = $obj->pdp_syncstatus ? $einvoicing->getStatusLabel($obj->pdp_syncstatus) : '-';
+				$currentStatusDetails = $obj->pdp_syncstatus ? $einvoicing->getStatusLabel($obj->pdp_syncstatus) : '';
 				print '<td class="center tdoverflowmax100" title="' . dolPrintHTMLForAttribute($currentStatusDetails) . '">';
 				print $currentStatusDetails;
 				print '</td>';

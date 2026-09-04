@@ -471,24 +471,37 @@ trait CommonProtocol
 		/**
 		 * Scenario to find or create a thirdparty based on E-invoice seller information:
 		 *
-		 * 1. Try to find thirdparty by global IDs (SIREN, VAT number ...)
+		 * 1. Try to find thirdparty by global IDs (SIREN, SIRET ...)
 		 * 1.1 If found, update thirdparty information with provided data
 		 *
-		 * 2. If not found, try to find thirdparty by closest match (findNearest)
+		 * 2. If not found, try to find thirdparty by VAT number
 		 * 2.1 If found one match, update thirdparty information with provided data
 		 * 2.2 If found multiple matches, log warning and return error
 		 *
-		 * 3. If still not found, create new thirdparty with provided data
+		 * 3. If still not found, and ONLY if the hidden option EINVOICING_THIRDPARTIES_MATCH_ON_NAME
+		 *    is set, try the closest match on the descriptive fields (findNearest)
+		 *
+		 * 4. If still not found, create new thirdparty with provided data - or refuse the document
+		 *    when the automatic creation of thirdparties is disabled
+		 *
+		 * By default a received document is attached to a thirdparty by a structured legal identifier
+		 * only. Name, commercial alias, ref_ext and email address are descriptive fields that several
+		 * companies can carry, so matching on them books a supplier invoice on a company that did not
+		 * issue it (issue #739). When the identifier of the seller matches nothing, the seller is
+		 * unknown, and an unknown seller is created rather than guessed - unless an expert turned
+		 * step 3 back on for a base whose thirdparties carry no legal identifier at all.
 		 */
 		global $db, $langs, $user, $conf;
 		require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
+		require_once DOL_DOCUMENT_ROOT . '/core/lib/company.lib.php'; // needed for getCountry() when running in cron context
 
 		$thirdparty = new Societe($db);
 		$einvoicing = new EInvoicing($db);
 		$thirdpartyId = -1;
 		// True when the third party was resolved through a structured identifier (SIREN/SIRET/routing/VAT)
-		// and not through a fuzzy name match (findNearest). Used to raise a non-blocking name-mismatch
-		// warning only when identification did not rely on the (descriptive) name itself. See issue #309.
+		// and not through a fuzzy name match (step 3, off unless the hidden option is set). Used to raise
+		// a non-blocking name-mismatch warning only when identification did not rely on the (descriptive)
+		// name itself. See issue #309.
 		$matchedByStructuredIdentifier = false;
 
 		$sellerCountryCode = $sellerInfo['sellercountry'] ?? '';
@@ -574,13 +587,20 @@ trait CommonProtocol
 			}
 		}
 
-		// Step 3: If not found, try to find by findNearest function
-		if ($thirdpartyId < 0) {
-			// An email address is not an identity: it can be shared by several third parties, and a
-			// third party that merely carries the sender's address is not necessarily the sender. Using
-			// it as a match criterion books a received supplier invoice on an unrelated company (issue
-			// #739), so it is not used unless an administrator explicitly asks for it. When the option is
-			// on, the email is passed as the last criterion of the loose match below, as it was before.
+		// Step 3: If not found, try to find by findNearest function.
+		//
+		// A name is not an identity: distinct legal entities collide on it, and under EN 16931 the
+		// seller name (BT-27) and trading name (BT-28) are descriptive fields of the document, never
+		// routing ones. The last stage of findNearest() ORs name and commercial alias, so a thirdparty
+		// merely carrying the seller name collects the received invoice (issue #739). This step is
+		// therefore OFF by default and kept behind the hidden option EINVOICING_THIRDPARTIES_MATCH_ON_NAME
+		// (no entry in the setup page on purpose), for the bases whose thirdparties were recorded
+		// without any legal identifier and which need this fallback. It is enabled knowingly.
+		if ($thirdpartyId < 0 && getDolGlobalString('EINVOICING_THIRDPARTIES_MATCH_ON_NAME')) {
+			// An email address is not an identity either: it can be shared by several third parties, and
+			// a third party that merely carries the sender's address is not necessarily the sender. It is
+			// added to the criteria below only when the (equally hidden) option
+			// EINVOICING_THIRDPARTIES_MATCH_ON_EMAIL is set too, as it was before issue #739.
 			$emailForLooseMatch = '';
 			if (getDolGlobalString('EINVOICING_THIRDPARTIES_MATCH_ON_EMAIL')) {
 				$emailForLooseMatch = $sellerInfo['sellercontactemailaddr'] ?? '';
@@ -635,6 +655,8 @@ trait CommonProtocol
 				$thirdpartyId = $result;
 				dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Found thirdparty by findNearest: ' . $thirdpartyId);
 			}
+		} elseif ($thirdpartyId < 0) {
+			dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Seller not found by its legal identifiers, and the name is not used as a match criterion (hidden option EINVOICING_THIRDPARTIES_MATCH_ON_NAME is off)');
 		}
 
 		// Identifier-based match: raise a NON-BLOCKING warning when the descriptive name carried by the
@@ -662,7 +684,7 @@ trait CommonProtocol
 			}
 		}
 
-		// Step 3: Create or update thirdparty
+		// Step 4: Create or update thirdparty
 
 		//$thirdpartyId = -2; // For testing
 		if ($thirdpartyId > 0) {
@@ -775,6 +797,17 @@ trait CommonProtocol
 				$thirdparty->code_client = 'auto';
 				$allowmodcodeclient = 1;
 			}
+
+			// This function never sets an extrafield on a thirdparty, so it must not rewrite them.
+			// It has to say so explicitly: from Dolibarr 20 on, fetch() pre-fills array_options with a
+			// null entry for every declared extrafield, and update() then hands that array to
+			// insertExtraFields(), which refuses the WHOLE update as soon as one of those fields is
+			// mandatory and empty. Every thirdparty this very function created is in that state (a
+			// programmatic create() writes no extrafield row at all), and so is every thirdparty that
+			// predates the mandatory flag - so a mandatory extrafield on the thirdparty rejected every
+			// received document. Emptied, array_options makes insertExtraFields() return 0 without
+			// touching the stored row, so no value is lost either.
+			$thirdparty->array_options = array();
 
 			$result = $thirdparty->update(0, $user, 1, $allowmodcodeclient, $allowmodcodefournisseur);
 			if ($result < 0) {
@@ -987,14 +1020,15 @@ trait CommonProtocol
 		$sql = "SELECT p.rowid ";
 		$sql .= " FROM " . MAIN_DB_PREFIX . "product as p ";
 		$sql .= " INNER JOIN " . MAIN_DB_PREFIX . "product_fournisseur_price as pfp ON pfp.fk_product = p.rowid ";
-		$sql .= " WHERE pfp.ref_fourn = '" . $db->escape($lineData['prodsellerid'] ?? '') . "' ";
+		$sql .= " WHERE (pfp.ref_fourn = '" . $db->escape($lineData['prodsellerid'] ?? '') . "' ";
+		$sql .= " OR pfp.ref_fourn = '" . $db->escape($lineData['prodname'] ?? '') . "') ";
 		$sql .= " AND pfp.fk_soc = " . intval($lineData['supplierId'] ?? 0) . " ";
 		$sql .= " AND p.entity IN (" . getEntity('product') . ")";
 		$sql .= " LIMIT 1";
 		$resql = $db->query($sql);
 		if ($resql && $db->num_rows($resql) > 0) {
 			$obj = $db->fetch_object($resql);
-			dol_syslog(__METHOD__ . ' Found product by prodsellerid: ' . $obj->rowid);
+			dol_syslog(__METHOD__ . ' Found product by prodsellerid or prodname as ref_fourn: ' . $obj->rowid);
 			return array('res' => $obj->rowid, 'message' => 'Product found by prodsellerid');
 			// No match found, continue to next step
 		}

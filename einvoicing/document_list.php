@@ -83,6 +83,7 @@ include_once __DIR__.'/class/protocols/ProtocolManager.class.php';
 // page calls both, so it would fatal below the version the module declares it supports. Both are
 // backported in compat/functions.lib.php, and that is all this page needs from the two libraries.
 include_once __DIR__.'/compat/functions.lib.php';
+include_once __DIR__.'/lib/einvoicing.lib.php';
 include_once __DIR__.'/class/document.class.php';
 // for other modules
 //dol_include_once('/othermodule/class/otherobject.class.php');
@@ -611,7 +612,9 @@ if ($num == 1 && getDolGlobalInt('MAIN_SEARCH_DIRECT_OPEN_IF_ONLY_ONE') && $sear
 // Output page
 // --------------------------------------------------------------------
 
-llxHeader('', $title.' '.trim(file_get_contents('VERSION')), $help_url, '', 0, 0, $morejs, $morecss, '', 'mod-einvoicing page-list bodyforlist');	// Can use also classforhorizontalscrolloftabs instead of bodyforlist for a horizontal scroll in the table instead of page
+// The version alone does not name sources between two releases, so the commit the module was
+// built from is stamped next to it, exactly as the comment opening a generated XML does.
+llxHeader('', $title.' '.einvoicingModuleStamp(), $help_url, '', 0, 0, $morejs, $morecss, '', 'mod-einvoicing page-list bodyforlist');	// Can use also classforhorizontalscrolloftabs instead of bodyforlist for a horizontal scroll in the table instead of page
 
 if (getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP") && $conf->entity != getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP")) {
 	print $langs->trans("EInvoicingInfoManagedByMasterSetup", getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP"));
@@ -828,7 +831,7 @@ if ($provider) {
 
 	print '<div class="formconsumeproduce" style="padding: 10px;">'."\n";
 
-	print '<div class="div-table-responsive">'; // You can use div-table-responsive-no-min if you don't need reserved height for your table
+	print '<div class="div-table-responsive-no-min">'; // We need no min to support the selection of fields
 	print '<table class="inline-block valignmiddle marginrightonly">'."\n";
 
 	print '<tr>';
@@ -906,6 +909,17 @@ if ($provider) {
 	}
 
 	print "</div>\n";
+
+	// Where the "import a received document again" action lives. This list is where a user lands after
+	// deleting the draft supplier invoice a reception created: the flow is still here, so re-running a
+	// synchronization or deleting the line looks like the way to get the document back, and neither is.
+	// The action is on the flow card, one click away but invisible from here, hence this reminder.
+	if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
+		print '<div class="opacitymedium small paddingtop paddingleft">';
+		print img_picto('', 'info', 'class="pictofixedwidth"').' ';
+		print $langs->trans('EInvoiceReimportHint', $langs->transnoentitiesnoconv('EInvoiceReimport'));
+		print '</div>'."\n";
+	}
 
 	print "</div>\n";
 

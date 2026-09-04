@@ -325,21 +325,10 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	//$item->enabled = 0;
 	$item->cssClass = 'opacitymedium';
 
-	// Allow re-sending / re-editing an invoice already transmitted to the Access Point. Off by default:
-	// a transmitted invoice is immutable (correct it with a credit note / corrective invoice), and re-sending
-	// makes the PA refuse a duplicate. Turn on only to deliberately test PA retry behaviour.
-	$item = $formSetup->newItem('EINVOICING_ALLOW_RESEND_TRANSMITTED')->setAsYesNo();
-	$item->nameText = $langs->trans("EINVOICING_ALLOW_RESEND_TRANSMITTED").' <span class="opacitymedium">('.$langs->trans("EINVOICING_TRANSMITTED_NOT_FOR_PROD").')</span>';
-	$item->defaultFieldValue = '0';
-	$item->helpText = $langs->transnoentities('EINVOICING_ALLOW_RESEND_TRANSMITTED_HELP');
-	$item->cssClass = 'minwidth500';
-
-	// Dev-only: keep the "Regenerate e-invoice" button/action available on a transmitted-locked invoice
-	// (rebuild the CII/Factur-X to inspect the XML). Re-sending stays locked. Off by default.
-	$item = $formSetup->newItem('EINVOICING_ALLOW_REGEN_TRANSMITTED')->setAsYesNo();
-	$item->nameText = $langs->trans("EINVOICING_ALLOW_REGEN_TRANSMITTED").' <span class="opacitymedium">('.$langs->trans("EINVOICING_TRANSMITTED_NOT_FOR_PROD").')</span>';
-	$item->defaultFieldValue = '0';
-	$item->helpText = $langs->transnoentities('EINVOICING_ALLOW_REGEN_TRANSMITTED_HELP');
+	// Setup conf for PMD - Mention regarding late payment penalties
+	$item = $formSetup->newItem('EINVOICING_NAME_OF_MODULESOURCE_THAT_ARE_POS');
+	$item->helpText = $langs->transnoentities('EINVOICING_NAME_OF_MODULESOURCE_THAT_ARE_POS_HELP');
+	$item->defaultFieldValue = getDolGlobalString('EINVOICING_NAME_OF_MODULESOURCE_THAT_ARE_POS', 'takepos');
 	$item->cssClass = 'minwidth500';
 
 	/*
@@ -373,13 +362,6 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
 		$item->cssClass = 'minwidth500';
 		$item->fieldParams['warningifon'] = 1;
 	}
-
-	// Setup conf to allow the email address as a criterion to find the third party of a received e-invoice
-	$item = $formSetup->newItem('EINVOICING_THIRDPARTIES_MATCH_ON_EMAIL')->setAsYesNo();
-	$item->helpText = $langs->transnoentities('EINVOICING_THIRDPARTIES_MATCH_ON_EMAIL_HELP');
-	$item->defaultFieldValue = '0';
-	$item->cssClass = 'minwidth500';
-	$item->fieldParams['warningifon'] = 1;
 
 	// Setup conf to choose use of auto generation or not of third parties
 	$item = $formSetup->newItem('EINVOICING_THIRDPARTIES_AUTO_GENERATION')->setAsYesNo();
