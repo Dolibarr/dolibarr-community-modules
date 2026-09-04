@@ -493,6 +493,7 @@ trait CommonProtocol
 		 */
 		global $db, $langs, $user, $conf;
 		require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
+		require_once DOL_DOCUMENT_ROOT . '/core/lib/company.lib.php'; // needed for getCountry() when running in cron context
 
 		$thirdparty = new Societe($db);
 		$einvoicing = new EInvoicing($db);
