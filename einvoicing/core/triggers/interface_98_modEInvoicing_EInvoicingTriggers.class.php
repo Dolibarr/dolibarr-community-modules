@@ -95,18 +95,37 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 				}
 			}
 
-			// Default product for import
-			$routingProductId = GETPOST('routing_product_id', 'aZ09');
-			if ($routingProductId !== '' && $routingProductId !== '-1') {
-				$existing = $einvoicing->fetchDefaultRouting($socId, 'product');
-				if (empty($existing)) {
-					$result = $einvoicing->addRouting($socId, $routingProductId, '', 'product');
-				} else {
-					$result = $einvoicing->setDefaultRouting($socId, $routingProductId, '', '', '', 'product');
+			// Default product for import.
+			// The combo posts '-1' when the empty entry is picked, and '' when the ajax search input is
+			// cleared: both mean "no default product any more", so the routing has to be deleted. Only a
+			// save that does not carry the field at all (thirdparty updated from the API, a mass action,
+			// an import...) must leave the current value untouched.
+			if (GETPOSTISSET('routing_product_id')) {
+				$routingProductId = GETPOST('routing_product_id', 'aZ09');
+				if ($routingProductId === '-1' || $routingProductId === '0') {
+					$routingProductId = '';
 				}
-				if ($result < 0) {
-					$error++;
-					$this->errors[] = $langs->trans('FailedToSaveRoutingID').' '.$einvoicing->error;
+				$existing = $einvoicing->fetchDefaultRouting($socId, 'product');
+				$result = 0;
+				if ($routingProductId === '') {
+					if (!empty($existing)) {
+						// setDefaultRouting() with an empty value only deletes the existing routing
+						$result = $einvoicing->setDefaultRouting($socId, '', '', '', '', 'product');
+						if ($result < 0) {
+							$error++;
+							$this->errors[] = $langs->trans('FailedToDeleteRoutingID').' '.$einvoicing->error;
+						}
+					}
+				} else {
+					if (empty($existing)) {
+						$result = $einvoicing->addRouting($socId, $routingProductId, '', 'product');
+					} else {
+						$result = $einvoicing->setDefaultRouting($socId, $routingProductId, '', '', '', 'product');
+					}
+					if ($result < 0) {
+						$error++;
+						$this->errors[] = $langs->trans('FailedToSaveRoutingID').' '.$einvoicing->error;
+					}
 				}
 			}
 

@@ -117,6 +117,8 @@ class AllTests
 		$suite->addTestSuite('CIITextEscapingTest');
 		require_once dirname(__FILE__).'/CompatShimReloadTest.php';
 		$suite->addTestSuite('CompatShimReloadTest');
+		require_once dirname(__FILE__).'/DefaultProductRoutingResetTest.php';
+		$suite->addTestSuite('DefaultProductRoutingResetTest');
 		require_once dirname(__FILE__).'/EInvoicingSamplesTest.php';
 		$suite->addTestSuite('EInvoicingSamplesTest');
 		require_once dirname(__FILE__).'/HeaderChargeLineTest.php';
