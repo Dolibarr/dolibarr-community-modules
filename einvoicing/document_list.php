@@ -853,6 +853,12 @@ if ($provider) {
 		}
 	}
 
+	// First sync (no history in DB) — pre-fill with the commissioning date so the user
+	// is not left with an empty picker that would cause a 500 on submission.
+	if (!$gmtdatetosuggest && isset($provider)) {
+		$gmtdatetosuggest = $provider->getLastSyncDate();
+	}
+
 	//var_dump($last_sync_db, 'last_sync_db gmt = '.dol_print_date($last_sync_db, 'dayhour', 'gmt'));
 	//var_dump($syncfromdate, 'syncfromdate gmt = '.dol_print_date($syncfromdate, 'dayhour', 'gmt'));
 	//var_dump($gmtdatetosuggest, 'gmtdatetosuggest gmt = '.dol_print_date($gmtdatetosuggest, 'dayhour', 'gmt'));
@@ -939,7 +945,7 @@ if ($action == 'sync' && $provider) {
 		$validationFormError++;
 		setEventMessages($langs->trans("InvalidSyncLimit"), array(), 'errors');
 	}
-	if ($syncfromdate === '') {
+	if (!$syncfromdate) {
 		$validationFormError++;
 		setEventMessages($langs->trans("InvalidSyncFromDate"), array(), 'errors');
 	}

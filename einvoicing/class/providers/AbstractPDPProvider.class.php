@@ -796,7 +796,8 @@ abstract class AbstractPDPProvider
 	/**
 	 * Get the last synchronization date with the PDP provider.
 	 * Retrieves the timestamp of the most recent successful flow synchronization
-	 * for this provider. If no sync has occurred yet, returns 0.
+	 * for this provider. If no sync has occurred yet, falls back to the module
+	 * commissioning date (see getFirstUseDate()).
 	 * Optionally applies a margin in hours to the returned timestamp.
 	 *
 	 * @param 	int 		$marginHours 	Optional time margin in hours to go back from the current date of the last synchronization
@@ -837,8 +838,9 @@ abstract class AbstractPDPProvider
 			dol_syslog(__METHOD__ . " SQL warning: Failed to get last sync date: we try to sync all flows from today", LOG_WARNING);
 		}
 
+		// No sync history yet — use the commissioning date so we never call the API with epoch (1970).
 		if ($LastSyncDate === null) {
-			$LastSyncDate = 0;
+			$LastSyncDate = $this->getFirstUseDate();
 		}
 
 		// Apply margin in hours
@@ -847,6 +849,65 @@ abstract class AbstractPDPProvider
 		}
 
 		return $LastSyncDate;
+	}
+
+	/**
+	 * Return a safe start date for the very first synchronization (no history in DB).
+	 *
+	 * Cascade:
+	 *  1. Date the PDP provider was configured (tms of EINVOICING_PDP in llx_const).
+	 *  2. Date the module was activated (tms of MAIN_MODULE_EINVOICING in llx_const).
+	 *  3. French e-invoicing legal mandate date: 2026-09-01.
+	 *
+	 * This prevents passing epoch (1970-01-01) to the PDP API, which most providers reject.
+	 *
+	 * @return int Unix timestamp
+	 */
+	protected function getFirstUseDate()
+	{
+		global $conf, $db;
+
+		// 1. Date the PDP provider was configured
+		$constNames = array('EINVOICING_PDP');
+		foreach ($constNames as $constName) {
+			$sql = "SELECT tms FROM ".MAIN_DB_PREFIX."const";
+			$sql .= " WHERE name = '".$db->escape($constName)."'";
+			$sql .= " AND entity IN (0, ".((int) $conf->entity).")";
+			$sql .= " ORDER BY entity DESC LIMIT 1";
+			$resql = $db->query($sql);
+			if ($resql) {
+				$obj = $db->fetch_object($resql);
+				if ($obj && !empty($obj->tms)) {
+					$ts = strtotime($obj->tms);
+					if ($ts > 0) {
+						dol_syslog(__METHOD__." First sync: using PDP configuration date ".dol_print_date($ts, 'standard'), LOG_DEBUG, 0, "_einvoicing");
+						return $ts;
+					}
+				}
+			}
+		}
+
+		// 2. Date the module was activated
+		$sql = "SELECT tms FROM ".MAIN_DB_PREFIX."const";
+		$sql .= " WHERE name = 'MAIN_MODULE_EINVOICING'";
+		$sql .= " AND entity IN (0, ".((int) $conf->entity).")";
+		$sql .= " ORDER BY entity DESC LIMIT 1";
+		$resql = $db->query($sql);
+		if ($resql) {
+			$obj = $db->fetch_object($resql);
+			if ($obj && !empty($obj->tms)) {
+				$ts = strtotime($obj->tms);
+				if ($ts > 0) {
+					dol_syslog(__METHOD__." First sync: using module activation date ".dol_print_date($ts, 'standard'), LOG_DEBUG, 0, "_einvoicing");
+					return $ts;
+				}
+			}
+		}
+
+		// 3. French e-invoicing legal mandate date
+		$fallback = (int) strtotime('2026-09-01 00:00:00');
+		dol_syslog(__METHOD__." First sync: using legal mandate fallback date 2026-09-01", LOG_DEBUG, 0, "_einvoicing");
+		return $fallback;
 	}
 
 	/**
