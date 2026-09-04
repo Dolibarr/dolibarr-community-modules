@@ -187,7 +187,23 @@ print '<div class="fichecenter">';
 
 
 if ($action == "add") {
-	stancerAddCustomerIfNeeded($societe);
+	$customerIDadded = stancerAddCustomerIfNeeded($societe);
+	// The function returns the cust_xxx on success, a negative code when the
+	// thirdparty data is not usable, and null when the API call failed. Without
+	// this feedback the user only sees the same button again and thinks the
+	// click did nothing.
+	if (is_string($customerIDadded) && $customerIDadded != '') {
+		setEventMessages($langs->trans("StancerAccountReady", $customerIDadded), [], 'mesgs');
+	} elseif ($customerIDadded === -10) {
+		dol_syslog("stancer_thirdparty: cannot create Stancer customer for socid=" . ((int) $socid) . ", no email and no international phone", LOG_WARNING);
+		setEventMessages($langs->trans("StancerCompanyMailOrPhone"), [], 'errors');
+	} elseif ($customerIDadded === -12) {
+		dol_syslog("stancer_thirdparty: cannot create Stancer customer for socid=" . ((int) $socid) . ", thirdparty name is empty", LOG_WARNING);
+		setEventMessages($langs->trans("StancerCompanyNameMissing"), [], 'errors');
+	} else {
+		dol_syslog("stancer_thirdparty: Stancer customer creation failed for socid=" . ((int) $socid) . ", see previous stancer log lines", LOG_ERR);
+		setEventMessages($langs->trans("StancerAccountCreationFailed"), [], 'errors');
+	}
 }
 
 if ($action == "addsepa") {
