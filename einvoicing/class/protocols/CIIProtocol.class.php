@@ -1152,6 +1152,10 @@ class CIIProtocol extends AbstractProtocol
 				}
 			}
 
+			// Every line of the invoice exists now, so its totals can be confronted with the ones the
+			// document announces (issue #781).
+			$this->alignInvoiceTotalsWithDocument($supplierInvoiceId, $parsedHeader, $return_messages);
+
 			// Create or update supplier prices for imported products
 			if (!empty($supplierPriceEntries)) {
 				require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.product.class.php';
@@ -3511,6 +3515,114 @@ class CIIProtocol extends AbstractProtocol
 			'discountAmount'       => $totalDiscountAmount,
 			'priceWithoutDiscount' => (float) $lineTotalAmount - $totalChargeAmount + $totalDiscountAmount,
 		];
+	}
+
+
+	/**
+	 * Record an imported invoice at the totals its document announces, whatever the VAT calculation
+	 * mode of the instance.
+	 *
+	 * Dolibarr computes the VAT of an invoice in one of two conventions, chosen once for the whole
+	 * instance: "total of round" - round the VAT of every line, then add them up - which is what
+	 * update_price() applies when nothing is set, or "round of total" - add the line amounts up, then
+	 * round the VAT once - selected by MAIN_ROUNDOFTOTAL_NOT_TOTALOFROUND_SUPPLIER (the core reads the
+	 * generic MAIN_ROUNDOFTOTAL_NOT_TOTALOFROUND before Dolibarr 20). The supplier invoice card offers
+	 * the two as the "ReCalculate Mode1 / Mode2" link, and either is a legitimate way to bill.
+	 *
+	 * A received document leaves nothing to choose: BT-110 and BT-112 are given by the issuer, who
+	 * rounded them the way its own system does. Importing under the convention of the instance
+	 * therefore records an invoice that does not total what the document says - two cents on a real
+	 * 46 line invoice (issue #781), which the module then refuses to validate, telling the operator to
+	 * recalculate in the other mode. This does exactly that, on that one invoice, and leaves the
+	 * setting of the instance alone.
+	 *
+	 * The net amounts are never concerned: the core writes a rounding difference back onto the VAT of a
+	 * line, never onto its net amount, so the line net amounts (BT-131) and their sum (BT-106) are the
+	 * same under both conventions. And when neither of the two reproduces the announced totals the
+	 * difference is a real one rather than a rounding convention: the invoice is left exactly as the
+	 * import built it and nothing is said here, checkDolInvoiceAndEInvoiceConsistency() being what
+	 * reports such a gap.
+	 *
+	 * @param	int					$supplierInvoiceId	Id of the invoice the import has just built
+	 * @param	array<string,mixed>	$parsedHeader		Header data of the received document
+	 * @param	array<int,string>	$return_messages	Messages of the import, completed here
+	 * @return	void
+	 */
+	protected function alignInvoiceTotalsWithDocument($supplierInvoiceId, array $parsedHeader, array &$return_messages)
+	{
+		global $db, $langs;
+
+		if (!isset($parsedHeader['taxTotalAmount']) || !isset($parsedHeader['grandTotalAmount'])) {
+			return;
+		}
+		$announcedTva = abs((float) $parsedHeader['taxTotalAmount']);
+		$announcedTtc = abs((float) $parsedHeader['grandTotalAmount']);
+
+		require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
+
+		$invoice = new FactureFournisseur($db);
+		if ($invoice->fetch($supplierInvoiceId) <= 0) {
+			return;
+		}
+		if (self::totalsAgreeWithDocument($invoice, $announcedTva, $announcedTtc)) {
+			return;
+		}
+
+		$importedTtc = (float) $invoice->total_ttc;
+		$invoice->fetch_thirdparty();
+
+		// Mode 2 first: a document announcing a VAT rounded on its total is the case met in the field.
+		// The mode of the instance has already been applied by the lines, so re-applying it costs one
+		// recomputation and keeps the two conventions treated the same way.
+		foreach (array('1' => 2, '0' => 1) as $roundingmode => $modenumber) {
+			// Same exclspec as the import itself used (FactureFournisseur::updateline calls
+			// update_price(1, 'auto')), so the rounding convention is the only thing that changes here.
+			if ($invoice->update_price(1, (string) $roundingmode, 0, $invoice->thirdparty) <= 0) {
+				dol_syslog(__METHOD__ . ' Failed to recalculate invoice ' . $supplierInvoiceId . ' in VAT mode ' . $modenumber . ': ' . $invoice->error, LOG_WARNING);
+				break;
+			}
+			if ($invoice->fetch($supplierInvoiceId) <= 0) {
+				return;
+			}
+			if (self::totalsAgreeWithDocument($invoice, $announcedTva, $announcedTtc)) {
+				// The import runs from a cron job as well as from a page, so the language file of the
+				// module is not necessarily loaded.
+				$langs->load('einvoicing@einvoicing');
+				// Translate::trans() takes four parameters and no more, its fifth argument being the
+				// maximum size of the result: a fifth value would end up there and break the sprintf.
+				$return_messages[] = $langs->trans(
+					'EInvoiceImportVatModeRealigned',
+					$modenumber,
+					price2num($announcedTva, 'MT'),
+					price2num($announcedTtc, 'MT'),
+					price2num($importedTtc, 'MT')
+				);
+				dol_syslog(__METHOD__ . ' Invoice ' . $supplierInvoiceId . ' recalculated in VAT mode ' . $modenumber . ' to match the totals of the received document', LOG_DEBUG);
+				return;
+			}
+		}
+
+		// Neither convention gives the announced totals: leave the invoice as the import built it.
+		$invoice->update_price(1, 'auto', 0, $invoice->thirdparty);
+	}
+
+	/**
+	 * Tell whether an invoice totals what the received document announces.
+	 *
+	 * Compared on the absolute values: a credit note is stored negative by Dolibarr while BT-110 and
+	 * BT-112 are always announced positive, the document type being what carries the sign (BR-CO-13
+	 * applies to a credit note as it does to an invoice). The tolerance is there for the float
+	 * representation, not for a difference: the document carries its totals to the cent.
+	 *
+	 * @param	FactureFournisseur	$invoice		The invoice, with its totals as stored
+	 * @param	float				$announcedTva	BT-110 of the received document, absolute value
+	 * @param	float				$announcedTtc	BT-112 of the received document, absolute value
+	 * @return	bool								True when both totals are the announced ones
+	 */
+	private static function totalsAgreeWithDocument(FactureFournisseur $invoice, $announcedTva, $announcedTtc)
+	{
+		return abs(abs((float) $invoice->total_tva) - $announcedTva) < 0.005
+			&& abs(abs((float) $invoice->total_ttc) - $announcedTtc) < 0.005;
 	}
 
 

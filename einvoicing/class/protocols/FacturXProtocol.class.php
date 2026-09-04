@@ -933,6 +933,10 @@ class FacturXProtocol extends CIIProtocol
 				}
 			}
 
+			// Every line of the invoice exists now, so its totals can be confronted with the ones the
+			// document announces (issue #781).
+			$this->alignInvoiceTotalsWithDocument($supplierInvoiceId, $parsedHeader, $return_messages);
+
 			// Create or update supplier prices for imported products
 			if (!empty($supplierPriceEntries)) {
 				require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.product.class.php';
