@@ -19,13 +19,19 @@
 /**
  *      \file       test/phpunit/LineDiscountBaseTest.php
  *      \ingroup    test
- *      \brief      PHPUnit test for the base a line discount is converted against (issue #783).
+ *      \brief      PHPUnit test for the conversion of a line discount into a percentage (issue #783).
  *
  *                  A Dolibarr line carries a discount as a percentage, so the fixed amount EN 16931
- *                  states (BT-136) has to be turned into one at import. The base of that percentage is
- *                  BT-137, which is optional and often absent. It used to fall back to BT-131, the
- *                  amount that remains *after* the allowance: the ratio came out too large and the line
- *                  was imported short - 94.74 for a line the document announces at 95.00.
+ *                  states (BT-136) has to be turned into one at import. Two things were read wrong
+ *                  there, and both left the line short of the amount its document announces:
+ *
+ *                  - the base of the percentage. It is BT-137, which is optional and often absent, and
+ *                    it used to fall back to BT-131, the amount that remains *after* the allowance: the
+ *                    ratio came out too large - 94.74 for a line announced at 95.00;
+ *                  - the sign of the amount. ram:ChargeIndicator already says which way an allowance
+ *                    goes, and an issuer that writes BT-136 negative means the same amount off the line.
+ *                    Taken with its sign the discount came out negative - 39.06 for a line announced at
+ *                    39.08.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 
@@ -335,6 +341,70 @@ class LineDiscountBaseTest extends CommonClassTest
 		$this->assertSame(-0.30, $imported['subprice'], 'at the amount the document announces');
 		$this->assertSame(0.0, $imported['remise_percent']);
 		$this->assertStringContainsString('BT-131', $imported['warning'], 'and the repair is reported, not silent');
+	}
+
+	/**
+	 * The second document of the report: BT-137 is stated, so the base is not in question, but the
+	 * allowance amount carries a minus sign - <ActualAmount>-0.6</ActualAmount> under a ChargeIndicator
+	 * of false. Taken with that sign the discount came out negative and the line was imported at 39.06
+	 * against the 39.08 the document announces. Read as a magnitude, which is what the indicator makes
+	 * it, the line totals what the document says and its unit price is BT-146 again.
+	 *
+	 * @return	void
+	 */
+	public function testAnAllowanceAmountWrittenNegativeIsReadAsAMagnitude()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		$lines = $protocol->parseInvoiceLines($this->documentWithLine('
+      <ram:AssociatedDocumentLineDocument><ram:LineID>4</ram:LineID></ram:AssociatedDocumentLineDocument>
+      <ram:SpecifiedTradeProduct><ram:Name>6C - Colissimo Domicile Sign. F</ram:Name></ram:SpecifiedTradeProduct>
+      <ram:SpecifiedLineTradeAgreement>
+        <ram:GrossPriceProductTradePrice><ram:ChargeAmount>19.84</ram:ChargeAmount></ram:GrossPriceProductTradePrice>
+        <ram:NetPriceProductTradePrice>
+          <ram:ChargeAmount>19.84</ram:ChargeAmount>
+          <ram:BasisQuantity unitCode="EA">1</ram:BasisQuantity>
+        </ram:NetPriceProductTradePrice>
+      </ram:SpecifiedLineTradeAgreement>
+      <ram:SpecifiedLineTradeDelivery><ram:BilledQuantity unitCode="EA">2</ram:BilledQuantity></ram:SpecifiedLineTradeDelivery>
+      <ram:SpecifiedLineTradeSettlement>
+        <ram:ApplicableTradeTax>
+          <ram:TypeCode>VAT</ram:TypeCode>
+          <ram:CategoryCode>S</ram:CategoryCode>
+          <ram:RateApplicablePercent>20</ram:RateApplicablePercent>
+        </ram:ApplicableTradeTax>
+        <ram:SpecifiedTradeAllowanceCharge>
+          <ram:ChargeIndicator><udt:Indicator>false</udt:Indicator></ram:ChargeIndicator>
+          <ram:CalculationPercent>2</ram:CalculationPercent>
+          <ram:BasisAmount>39.68</ram:BasisAmount>
+          <ram:ActualAmount>-0.6</ram:ActualAmount>
+          <ram:ReasonCode>95</ram:ReasonCode>
+          <ram:Reason>Remise</ram:Reason>
+        </ram:SpecifiedTradeAllowanceCharge>
+        <ram:SpecifiedTradeSettlementLineMonetarySummation><ram:LineTotalAmount>39.08</ram:LineTotalAmount></ram:SpecifiedTradeSettlementLineMonetarySummation>
+      </ram:SpecifiedLineTradeSettlement>'));
+
+		$this->assertEqualsWithDelta(-0.6, $lines[0]['lineAllowances'][0]['actualAmount'], 0.001, 'the sign of the document is read as it stands');
+
+		$discount = $this->call('resolveLineDiscountPercent', array($lines[0]['lineAllowances'], $lines[0]['lineTotalAmount']));
+
+		$this->assertNotFalse($discount);
+		$this->assertEqualsWithDelta(0.6, $discount['discountAmount'], 0.001, 'and turned into the size of the allowance');
+		$this->assertGreaterThan(0, $discount['percent'], 'a discount that subtracts, not one that adds back');
+		$this->assertEqualsWithDelta(39.68, $discount['priceWithoutDiscount'], 0.001, 'the line before its allowance');
+
+		$imported = $this->importedLine($lines[0]);
+
+		$this->assertEqualsWithDelta(19.84, $imported['subprice'], 0.001, 'the unit price is BT-146 again');
+		$this->assertEqualsWithDelta(39.08, $imported['rebuilt'], 0.001, 'and the line totals what the document announces');
+		$this->assertSame('', $imported['warning'], 'so there is nothing left to report');
+
+		// The control that this test would fail on the code it replaces: -0.6 over the stated base gave a
+		// discount of -1.5121 percent, a unit price of 19.24, and the 39.06 of the report.
+		$this->assertEqualsWithDelta(-1.5121, round((-0.6 / 39.68) * 100, 4), 0.0001, 'what the signed amount computed');
+		$this->assertEqualsWithDelta(39.06, round(2 * 19.24 * (1 - (-1.5121 / 100)), 2), 0.001, 'and the amount it imported');
 	}
 
 	/**

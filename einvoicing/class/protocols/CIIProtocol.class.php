@@ -3532,6 +3532,10 @@ class CIIProtocol extends AbstractProtocol
 	 * the percentage to the amount after discount: the ratio came out too large and the line was
 	 * imported short - 94.74 instead of 95.00 for a 5.00 allowance on a 100.00 line.
 	 *
+	 * The amount itself is read as a magnitude, whatever sign the document puts on it: ram:ChargeIndicator
+	 * already says which way it goes. Both readings are met in the field, and taken with its sign a
+	 * negative BT-136 turned the discount negative and left the line short in the same way.
+	 *
 	 * Multiple allowances are summed into one final percentage.
 	 *
 	 * @param array      $lineAllowances  parsed lineAllowances array
@@ -3558,10 +3562,16 @@ class CIIProtocol extends AbstractProtocol
 			return false;
 		}
 
-		// Sum all actualAmounts — always populated whether the source was % or fixed
+		// Sum all actualAmounts — always populated whether the source was % or fixed.
+		// Read as a magnitude: ram:ChargeIndicator already says which way the amount goes, so BT-136 is
+		// the size of the allowance and not a signed correction. An issuer that writes it negative -
+		// <ActualAmount>-0.6</ActualAmount> under an indicator of false, reported on issue #783 - means
+		// the same 0.60 off the line, and its own BT-131 is computed that way. Taken with its sign the
+		// discount came out negative, which put the line back *up* by that much on both sides of the
+		// division and left it short of the announced amount.
 		$totalDiscountAmount = 0.0;
 		foreach ($allowances as $allowance) {
-			$totalDiscountAmount += (float) ($allowance['actualAmount'] ?? 0);
+			$totalDiscountAmount += abs((float) ($allowance['actualAmount'] ?? 0));
 		}
 
 		if ($totalDiscountAmount === 0.0) {
