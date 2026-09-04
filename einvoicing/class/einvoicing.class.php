@@ -1568,6 +1568,7 @@ class EInvoicing
 		$resprints .= $langs->trans("einvoiceStatusFieldHelp") . '"></i>';*/
 		$resprints .= '</td>';
 		$resprints .= '<td>';
+		$resprints .= '<!-- data from llx_einvoicing_extlinks -->';
 		if ($action == 'editeinvoicestatus' || $action == 'create') {
 			if ($action != 'create') {
 				$resprints .=  '<form name="seteinvoicestatus" action="' . $_SERVER["PHP_SELF"] . '?id=' . $object->id . '" method="post">';
@@ -2444,8 +2445,6 @@ class EInvoicing
 	 */
 	public function fetchLastknownInvoiceStatus($invoiceId = 0, $invoiceRef = null)
 	{
-		global $conf;
-
 		// Default status is unknown until invoice is validated
 		$status = array(
 			'rowid' => 0,
@@ -3443,6 +3442,8 @@ class EInvoicing
 		$return = 0;	// By default, no einvoicing.
 
 		if (getDolGlobalInt('EINVOICING_USE_BILLING_CONTACT_AS_BUYER')) {
+			// Critical feature to NEVER use. VERY BAD PRACTICE(and probably not legal, an invoicing organization MUST be an official thirdparty with prof ID).
+			// WILL NEVER BE SUPPORTED.
 			$billingContactIds = $object->getIdContact('external', 'BILLING');
 			if (!empty($billingContactIds) && $object->fetch_contact($billingContactIds[0]) > 0 && is_object($object->contact)) {
 				$billingContact = $object->contact;
@@ -3478,11 +3479,18 @@ class EInvoicing
 			}
 		}
 
-		if ($object->module_source == 'takepos') {			// Force to ignore for all invoices generated from TakePOS
-			// If invoice is generated from TakePOS, we must not make any e-invoice sync.
-			// We will do a Z sync instead from the cash closing feature.
-			$return = getDolGlobalInt('EINVOICING_DEFAULT_EINVOICE_STATUS_FOR_TAKEPOS', self::STATUS_IGNORE);
+		// Force status to "Ignore" for all invoices generated from a POS
+		// If invoice is generated from a POS, we must not make any e-invoice sync.
+		// We will do a Z sync instead from the cash closing feature.
+		$listOfPOSModuleSource = array();
+		if (getDolGlobalString("EINVOICING_NAME_OF_MODULESOURCE_THAT_ARE_POS", "takepos")) {
+			$arrayofposmodules = array_map('trim', explode(',', getDolGlobalString("EINVOICING_NAME_OF_MODULESOURCE_THAT_ARE_POS", "takepos")));
+			$listOfPOSModuleSource = array_merge($listOfPOSModuleSource, $arrayofposmodules);
 		}
+		if (in_array($object->module_source, $listOfPOSModuleSource)) {			// Force status to "Ignore" for all invoices generated from a POS
+			$return = getDolGlobalInt('EINVOICING_DEFAULT_EINVOICE_STATUS_FOR_POS', self::STATUS_IGNORE);
+		}
+
 
 		// Associations and non-VAT-registered entities (tva_assuj = 0) are outside the mandatory
 		// e-invoicing scope per DGFIP guidance: only VAT-registered entities (assujettis) are in scope.

@@ -325,6 +325,15 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	//$item->enabled = 0;
 	$item->cssClass = 'opacitymedium';
 
+	// Setup conf for PMD - Mention regarding late payment penalties
+	$item = $formSetup->newItem('EINVOICING_NAME_OF_MODULESOURCE_THAT_ARE_POS');
+	$item->helpText = $langs->transnoentities('EINVOICING_NAME_OF_MODULESOURCE_THAT_ARE_POS_HELP');
+	$item->defaultFieldValue = getDolGlobalString('EINVOICING_NAME_OF_MODULESOURCE_THAT_ARE_POS', 'takepos');
+	$item->cssClass = 'minwidth500';
+
+
+	// TODO Move this in the dev setup page ?
+
 	// Allow re-sending / re-editing an invoice already transmitted to the Access Point. Off by default:
 	// a transmitted invoice is immutable (correct it with a credit note / corrective invoice), and re-sending
 	// makes the PA refuse a duplicate. Turn on only to deliberately test PA retry behaviour.
