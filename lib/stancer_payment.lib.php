@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2023-2026 Eric Seigne <eric.seigne@cap-rel.fr>
+ * Copyright (C) 2026		MDW			<mdeweerd@users.noreply.github.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,6 +21,117 @@
  * \ingroup stancer
  * \brief   Payment start functions (CB, SEPA, tags, filters)
  */
+
+/**
+ * Resolve the Stancer payment id the return page must work on.
+ *
+ * The session is not a reliable source here: with STANCER_AUTO_MAIL_ORDER_CB the
+ * payment link is emailed to the customer, who opens it straight from the
+ * mailbox without ever loading a Dolibarr page, so $_SESSION is empty on that
+ * browser. The local row loaded from the return tag already carries the paym_
+ * id, and it is the same id in every case, so it comes first.
+ *
+ * @param   Stancer_payments|null  $localPayment      Local row loaded from the return tag
+ * @param   string                 $sessionPaymentId  Payment id kept in session, may be empty
+ * @return  string                                    Payment id, empty string when none is known
+ */
+function stancerResolveReturnPaymentId($localPayment, $sessionPaymentId = '')
+{
+	if (is_object($localPayment) && !empty($localPayment->stancer_id)) {
+		return (string) $localPayment->stancer_id;
+	}
+
+	return trim((string) $sessionPaymentId);
+}
+
+/**
+ * Resolve the currency code of a payment coming back from Stancer.
+ *
+ * Same session-less scenario as stancerResolveReturnPaymentId(): an empty
+ * currency makes the return page compare '' with the company currency, take the
+ * multicurrency path and refuse to record the payment on the order, donation and
+ * event branches. The currency really charged by Stancer is the reference, the
+ * local row is the fallback, and the company currency closes the list so that a
+ * comparison against $conf->currency can never fail on an empty value.
+ *
+ * @param   string                 $sessionCurrency  Currency kept in session, may be empty
+ * @param   array|false            $paymentData      Payment as returned by the Stancer API, false when not fetched
+ * @param   Stancer_payments|null  $localPayment     Local row loaded from the return tag
+ * @param   string                 $companyCurrency  Currency of the company ($conf->currency)
+ * @return  string                                   Upper case currency code
+ */
+function stancerResolveReturnCurrency($sessionCurrency, $paymentData, $localPayment, $companyCurrency)
+{
+	if (trim((string) $sessionCurrency) !== '') {
+		return strtoupper(trim((string) $sessionCurrency));
+	}
+	if (is_array($paymentData) && !empty($paymentData['currency'])) {
+		return strtoupper((string) $paymentData['currency']);
+	}
+	if (is_object($localPayment) && !empty($localPayment->currency)) {
+		return strtoupper((string) $localPayment->currency);
+	}
+
+	dol_syslog("stancerResolveReturnCurrency no currency in session, on the Stancer payment nor on the local row, falling back to the company currency " . $companyCurrency, LOG_WARNING);
+
+	return strtoupper((string) $companyCurrency);
+}
+
+/**
+ * Resolve, on the return page, whether the payment coming back only covered a
+ * deposit.
+ *
+ * The row written when the payment started carries the answer, so it wins: the
+ * session that used to hold it does not exist when the customer opens the
+ * payment link from an email, and a deposit read as a full payment gets billed
+ * as a full invoice. The session is kept as a fallback for the rows created
+ * before the partial_payment column existed.
+ *
+ * @param   Stancer_payments|null  $localPayment          Local row loaded from the return tag
+ * @param   int|string|null        $sessionPartialPayment Value kept in session, null when absent
+ * @return  int                                           1 for a deposit payment, 0 otherwise
+ */
+function stancerResolveReturnPartialPayment($localPayment, $sessionPartialPayment = null)
+{
+	if (is_object($localPayment) && $localPayment->partial_payment !== null && $localPayment->partial_payment !== '') {
+		return ((int) $localPayment->partial_payment === 1) ? 1 : 0;
+	}
+
+	return ((int) $sessionPartialPayment === 1) ? 1 : 0;
+}
+
+/**
+ * Tell whether a payment started on this object only covers its deposit.
+ *
+ * This is the "30% on order" case: STANCER_CB_ORDER_PARTIAL_PAY (or its proposal
+ * counterpart STANCER_CB_PROPAL_PARTIAL_PAY) is set and the document carries a
+ * deposit percentage. The answer is stored on the payment row so that the return
+ * page still knows it when the customer opened the payment link from an email,
+ * where $_SESSION["partialPayment"] does not exist and a deposit would otherwise
+ * be billed as a full payment.
+ *
+ * @param   CommonObject|null  $object  Order or proposal being paid
+ * @return  int                         1 for a deposit payment, 0 otherwise
+ */
+function stancerIsDepositPayment($object)
+{
+	if (!is_object($object) || empty($object->element)) {
+		return 0;
+	}
+	// Same test as newpayment.php and paymentback.php: a percentage outside ]0;100[
+	// is not a deposit, it is the whole document.
+	if (!isset($object->deposit_percent) || $object->deposit_percent <= 0 || $object->deposit_percent >= 100) {
+		return 0;
+	}
+	if ($object->element == 'commande' && getDolGlobalString('STANCER_CB_ORDER_PARTIAL_PAY') != '') {
+		return 1;
+	}
+	if ($object->element == 'propal' && getDolGlobalString('STANCER_CB_PROPAL_PARTIAL_PAY') != '') {
+		return 1;
+	}
+
+	return 0;
+}
 
 /**
  * common check before starting payment process
@@ -300,6 +412,11 @@ function stancerCardstartPayWithRedirect($object, $parameters, $forceAmount = nu
 			'fk_soc' => $object->socid,
 		];
 		$sp->fillDataArray($data);
+		// Stored on the row, not only in $_SESSION["partialPayment"]: the customer may
+		// come back through the emailed payment link, with no session at all. Assigned
+		// outside of $data because fillDataArray() skips falsy values and 0 means
+		// "full payment" here, not "unknown".
+		$sp->partial_payment = stancerIsDepositPayment($object);
 		$res = $sp->create($user, true);
 		if ($res) {
 			// Redirect to Stancer payment page
@@ -512,7 +629,7 @@ function stancerSEPAstartPay($object, $userMessage = true, $companypaymentmodeid
 			if ($sp->isInitPaid()) {
 				dol_syslog("stancer SEPA error (transaction already in progress, status is " . $sp->getLabelStatus() . ")", LOG_DEBUG);
 			} else {
-				dol_syslog("stancer SEPA warning (transaction in progress but not successfull : status is " . $sp->getLabelStatus() . ")", LOG_DEBUG);
+				dol_syslog("stancer SEPA warning (transaction in progress but not successful : status is " . $sp->getLabelStatus() . ")", LOG_DEBUG);
 			}
 
 			$url = "<a href='" . dol_buildpath("/stancer/stancer_payments_list.php", 2) . "?search_stancer_id=" . $sp->stancer_id . "&token=" . newToken() . "'>";
@@ -585,7 +702,7 @@ function stancerSEPAstartPay($object, $userMessage = true, $companypaymentmodeid
 		$sp->fillDataArray($data);
 		$res = $sp->create($user, true);
 		if ($res) {
-			$message = $langs->trans("Nice, Stancer SEPA payement is engaged !");
+			$message = $langs->trans("Nice, Stancer SEPA payment is engaged !");
 			$returnCode = 0;
 
 			$stc = new Stancer($db);
@@ -1192,7 +1309,7 @@ function stancerCBstartPay($object, $userMessage = true, $companypaymentmodeid =
 		$sp->fillDataArray($data);
 		$res = $sp->create($user, true);
 		if ($res) {
-			$message = $langs->trans("Nice, Stancer CB payement is engaged !");
+			$message = $langs->trans("Nice, Stancer CB payment is engaged !");
 
 			$stc = new Stancer($db);
 			$stc->createEvent($object, "stancer_cb_start", $langs->trans("StancerPayCB"), $langs->trans("StancerPayAmountStarted", $amountToPay));
@@ -1391,7 +1508,7 @@ function stancerMakeTAG($object, $addUnique = false)
 		$totaldeposits = $object->getSumDepositsUsed();
 		$resteapayer = (float) price2num($object->total_ttc - $totalpaye - $totalcreditnotes - $totaldeposits, 'MT');
 		if ($resteapayer != (float) price2num($object->total_ttc)) {
-			dol_syslog("stancerMakeTAG invoice non full payed, add SEQ tag");
+			dol_syslog("stancerMakeTAG invoice non full paid, add SEQ tag");
 			$list = $object->getListOfPayments();
 			$numPaiement = count($list);
 			// print "<p>FACTURE : $ref reste à payer $resteapayer num=$numPaiement</p>";
@@ -1637,7 +1754,7 @@ function stancerGetOutstandingBills($customerID, $late = 0, $paymentMode = "CB")
 					// @phan-suppress-next-line PhanDeprecatedProperty  $paye is the column Dolibarr 15..21 fills and still writes; status==2 also covers abandoned invoices
 					$obj->paye == 0
 					&& $obj->status != $object::STATUS_DRAFT    	// Not a draft
-					&& $obj->status != $object::STATUS_ABANDONED	// Not abandonned
+					&& $obj->status != $object::STATUS_ABANDONED	// Not abandoned
 					&& $obj->status != $object::STATUS_CLOSED		// Not classified as paid
 					&& $obj->status != $object::STATUS_CLOSED		// Not classified as paid
 					&& $obj->mode_reglement_code == $paymentMode

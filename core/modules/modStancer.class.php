@@ -3,6 +3,7 @@
  * Copyright (C) 2018-2019  Nicolas ZABOURI         <info@inovea-conseil.com>
  * Copyright (C) 2019-2020  Frédéric France         <frederic.france@netlogic.fr>
  * Copyright (C) 2023 Eric Seigne <eric.seigne@cap-rel.fr>
+ * Copyright (C) 2026		MDW						<mdeweerd@users.noreply.github.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -78,7 +79,7 @@ class modStancer extends DolibarrModules
 		$this->editor_url = 'https://cap-rel.fr';
 
 		// Possible values for version are: 'development', 'experimental', 'dolibarr', 'dolibarr_deprecated', 'experimental_deprecated' or a version string like 'x.y.z'
-		$this->version = '2.0.22';
+		$this->version = '2.0.23';
 		// Url to the file with your last numberversion of this module
 		$this->url_last_version = "https://cap-rel.fr/dolibarr/ver.php?m=" . $this->rights_class . "&v=" . $this->version . "&d=" . DOL_VERSION;
 
@@ -209,7 +210,7 @@ class modStancer extends DolibarrModules
 		// 'intervention'     to add a tab in intervention view
 		// 'invoice'          to add a tab in customer invoice view
 		// 'invoice_supplier' to add a tab in supplier invoice view
-		// 'member'           to add a tab in fundation member view
+		// 'member'           to add a tab in foundation member view
 		// 'opensurveypoll'	  to add a tab in opensurvey poll view
 		// 'order'            to add a tab in sale order view
 		// 'order_supplier'   to add a tab in supplier order view
@@ -227,7 +228,7 @@ class modStancer extends DolibarrModules
 		/* Example:
 		$this->dictionaries=array(
 			'langs'=>'stancer@stancer',
-			// List of tables we want to see into dictonnary editor
+			// List of tables we want to see into dictionary editor
 			'tabname'=>array("table1", "table2", "table3"),
 			// Label of tables
 			'tablib'=>array("Table1", "Table2", "Table3"),
@@ -689,7 +690,7 @@ class modStancer extends DolibarrModules
 			$bank->date_solde	   = dol_now();
 			$bank->entity		   = $conf->entity;
 			$res = $bank->create($user);
-			dol_syslog("stancer init : bank account STANCER doest not exist, try to create it, return code is $res");
+			dol_syslog("stancer init : bank account STANCER does not exist, try to create it, return code is $res");
 		}
 
 		// Document templates

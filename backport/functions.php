@@ -1,4 +1,6 @@
 <?php
+/* Copyright (C) 2026		MDW	<mdeweerd@users.noreply.github.com>
+ */
 /**
  * Backported core helpers for the Dolibarr releases that predate them.
  *
@@ -32,7 +34,7 @@ if (!function_exists('dolJSToSetRandomPassword')) {
 
 
 	/**
-	 * Ouput javacript to autoset a generated password using default module into a HTML element.
+	 * Output JavaScript to autoset a generated password using default module into a HTML element.
 	 *
 	 * @param		string 		$htmlname			HTML name of element to insert key into
 	 * @param		string		$htmlnameofbutton	HTML name of button

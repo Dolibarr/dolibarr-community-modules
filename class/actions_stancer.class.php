@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2023 Seigne Eric <eric.seigne@cap-rel.fr>
+ * Copyright (C) 2026		MDW			<mdeweerd@users.noreply.github.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -419,7 +420,7 @@ class ActionsStancer
 			$out .= '<td>';
 			$out .= img_credit_card(!empty($obj->card_type) ? $obj->card_type : $obj->type);
 			$out .= '</td>';
-			// Informations: owner + last4 + expiry
+			// Information: owner + last4 + expiry
 			$out .= '<td class="minwidth100">';
 			if (!empty($obj->proprio)) {
 				$out .= '<span class="opacitymedium">' . dol_escape_htmltag($obj->proprio) . '</span><br>';

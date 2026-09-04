@@ -6,6 +6,7 @@
  * Copyright (C) 2018-2021	Thibault FOUCART	    <support@ptibogxiv.net>
  * Copyright (C) 2021		Waël Almoman	    	<info@almoman.com>
  * Copyright (C) 2021		Dorian Vabre			<dorian.vabre@gmail.com>
+ * Copyright (C) 2026		MDW						<mdeweerd@users.noreply.github.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -103,7 +104,7 @@ $langs->loadLangs(array("main", "other", "dict", "bills", "companies", "errors")
 $action = GETPOST('action', 'aZ09');
 $ref = $REF = GETPOST('ref', 'alpha');
 $TAG = GETPOST("tag", 'alpha');
-$FULLTAG = GETPOST("fulltag", 'alpha'); // fulltag is tag with more informations
+$FULLTAG = GETPOST("fulltag", 'alpha'); // fulltag is tag with more information
 $SECUREKEY = GETPOST("securekey"); // Secure key
 
 $suffix = GETPOST("suffix", 'aZ09');
@@ -226,7 +227,7 @@ if ($source == 'invoice') {
 }
 
 // Add more content on page for some services
-if (preg_match('/^dopayment/', $action)) {			// If we choosed/click on the payment mode
+if (preg_match('/^dopayment/', $action)) {			// If we choose/click on the payment mode
 	// Save some data for the paymentok
 	$remoteip = getUserRemoteIP();
 	$_SESSION["currencyCodeType"] = $currency;
