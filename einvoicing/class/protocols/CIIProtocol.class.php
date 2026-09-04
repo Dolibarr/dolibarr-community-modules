@@ -2573,6 +2573,14 @@ class CIIProtocol extends AbstractProtocol
 
 		$xml = $doc->saveXML();
 
+		// XML 1.0 admits no C0 control character other than tab, line feed and carriage return -
+		// neither as a character nor as a numeric reference. A description pasted from a PDF or from
+		// a terminal brings them in (0x0B is the usual one), DOM writes them out as they are, and
+		// what leaves is not XML: the platform answers HTTP 400 and the invoice never reaches its
+		// recipient. They carry no meaning in an invoice text, so they go. A byte below 0x80 never
+		// appears inside a UTF-8 sequence, so this cannot cut a character in half.
+		$xml = (string) preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', '', $xml);
+
 		return $xml;
 	}
 
