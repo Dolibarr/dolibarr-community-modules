@@ -1082,6 +1082,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 							$actions[$rescode]['businessmessage'] .= $form->textwithpicto('', "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], 1, 'help', '', 0, 2, 'help');
 						}
 						if ($rescode == 'PRODUCT_NOT_FOUND') {
+							$langs->load("products");
 							$infostring = '';
 							if (!empty($res['actiondata']['socid'])) {
 								$socid = $res['actiondata']['socid'];
