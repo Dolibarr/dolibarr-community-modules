@@ -542,9 +542,10 @@ class Document extends CommonObject
 	 *
 	 * The local draft goes first (a validated invoice is refused: it is an accounting record, and
 	 * the recovery this offers is for an import that has not been acted on yet). The flow is then
-	 * fetched from the platform again, which creates the invoice and a fresh flow record; only once
-	 * that succeeded is the previous flow record removed. A failed import therefore leaves the
-	 * previous record in place, detached, rather than losing the document.
+	 * fetched from the platform again, which creates the invoice and a record of its own, and that
+	 * record is moved onto this one: a flow the user has imported again keeps the line it already
+	 * had in the list, now pointing at the invoice that has just been created. A failed import
+	 * changes nothing and leaves this record in place, detached, rather than losing the document.
 	 *
 	 * @param	User				$user		User asking for the import
 	 * @return	array{res:int,message:string}	res > 0 is the id of the supplier invoice created
@@ -592,30 +593,108 @@ class Document extends CommonObject
 			return array('res' => -1, 'message' => (string) ($res['message'] ?? ''));
 		}
 
-		// The document has been imported again and now has its own record: this one is the previous
-		// import and would show the same flow twice in the list.
-		$previousRecord = new Document($this->db);
-		if ($previousRecord->fetch($this->id) > 0 && $previousRecord->delete($user) <= 0) {
-			dol_syslog(__METHOD__.' imported flow '.$this->flow_id.' again but could not delete the previous record '.$this->id.': '.$previousRecord->error, LOG_WARNING);
+		// The record the import has just written for this flow. Without it there is nothing to move
+		// onto this line, which then stays as it is - detached, and the only line of the flow.
+		$importedRecord = $this->fetchRecordWrittenByImport();
+		if (!($importedRecord instanceof Document)) {
+			dol_syslog(__METHOD__.' imported flow '.$this->flow_id.' again but found no record written by the import to move onto record '.$this->id, LOG_WARNING);
+
+			return array('res' => 1, 'message' => (string) ($res['message'] ?? ''));
 		}
 
 		// The invoice the import has just booked the document on, to send the user straight to it.
-		$newInvoiceId = 0;
-		$sql = "SELECT fk_element_id FROM ".MAIN_DB_PREFIX.$this->table_element;
-		$sql .= " WHERE flow_id = '".$this->db->escape($this->flow_id)."'";
-		$sql .= " AND fk_element_type = 'invoice_supplier'";
-		$sql .= " AND entity IN (".getEntity($this->element).")";
-		$sql .= " ORDER BY rowid DESC LIMIT 1";
-		$resql = $this->db->query($sql);
-		if ($resql) {
-			$obj = $this->db->fetch_object($resql);
-			if ($obj) {
-				$newInvoiceId = (int) $obj->fk_element_id;
-			}
-			$this->db->free($resql);
+		$newInvoiceId = (int) $importedRecord->fk_element_id;
+
+		// Move that record onto this line, so the flow keeps the line it already had in the list
+		// instead of losing it for a new one describing the same flow.
+		if ($this->adoptRecordWrittenByImport($importedRecord, $user) < 0) {
+			dol_syslog(__METHOD__.' imported flow '.$this->flow_id.' again but could not move record '.$importedRecord->id.' onto record '.$this->id.': '.$this->error, LOG_WARNING);
 		}
 
 		return array('res' => ($newInvoiceId > 0 ? $newInvoiceId : 1), 'message' => (string) ($res['message'] ?? ''));
+	}
+
+	/**
+	 * Find the record an import has just written for this flow, that is the most recent record of the
+	 * same flow other than this one.
+	 *
+	 * @return	?Document		The record, null when the import wrote none
+	 */
+	private function fetchRecordWrittenByImport()
+	{
+		$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX.$this->table_element;
+		$sql .= " WHERE flow_id = '".$this->db->escape($this->flow_id)."'";
+		$sql .= " AND fk_element_type = 'invoice_supplier'";
+		$sql .= " AND entity IN (".getEntity($this->element).")";
+		$sql .= " AND rowid <> ".((int) $this->id);
+		$sql .= " ORDER BY rowid DESC LIMIT 1";
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__.' '.$this->db->lasterror(), LOG_ERR);
+
+			return null;
+		}
+
+		$obj = $this->db->fetch_object($resql);
+		$this->db->free($resql);
+		if (empty($obj)) {
+			return null;
+		}
+
+		$record = new Document($this->db);
+		if ($record->fetch((int) $obj->rowid) <= 0) {
+			return null;
+		}
+
+		return $record;
+	}
+
+	/**
+	 * Take over what an import has just written for this flow, and remove the record it wrote.
+	 *
+	 * Everything the access point said about the flow is taken, including the invoice it has just been
+	 * booked on; what belongs to this line as a line - its id, its entity, and who created it when -
+	 * is kept, which is the whole point: the flow keeps its place in the list.
+	 *
+	 * @param	Document	$record		Record written by the import, deleted once its content is taken
+	 * @param	User		$user		User asking for the import
+	 * @return	int<-1,1>				1 when the record has been taken over, -1 on error
+	 */
+	private function adoptRecordWrittenByImport(Document $record, User $user)
+	{
+		// The identity of the line, as opposed to what it says about the flow.
+		$ownfields = array('rowid', 'entity', 'date_creation', 'tms', 'fk_user_creat', 'fk_user_modif');
+
+		$this->db->begin();
+
+		foreach (array_keys($this->fields) as $field) {
+			if (in_array($field, $ownfields)) {
+				continue;
+			}
+			$this->$field = $record->$field;
+		}
+		$this->fk_user_modif = $user->id;
+
+		if ($this->update($user) <= 0) {
+			$this->db->rollback();
+
+			return -1;
+		}
+
+		// The trigger refuses the deletion of a flow linked to a supplier invoice that exists, which is
+		// exactly what this record is: it is not deleted here as a flow the user gives up on, it is the
+		// same flow, on the line above. Its content has just been written there, so nothing is lost.
+		if ($record->delete($user, 1) <= 0) {
+			$this->error = $record->error ? $record->error : implode(', ', (array) $record->errors);
+			$this->db->rollback();
+
+			return -1;
+		}
+
+		$this->db->commit();
+
+		return 1;
 	}
 
 	/**
