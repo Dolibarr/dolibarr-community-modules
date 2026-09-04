@@ -2333,6 +2333,9 @@ class EInvoicing
 			$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
 			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
 			if ($mode == 'edit') {
+				if (preg_match('/^idprod/', $product_id)) {
+					$product_id = (int) str_replace('idprod_', '', $product_id);
+				}
 				$resprints .= $this->selectVendorProduct($form, $object->id, $product_id, 'routing_product_id');
 			} else {
 				if ($product_id != '' && $product_id != '-1') {
