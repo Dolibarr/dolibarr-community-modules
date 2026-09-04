@@ -1613,14 +1613,22 @@ class CIIProtocol extends AbstractProtocol
 	 *    header, a subtotal. BR-FREXT-CO-10 sums BT-106 over the DETAIL lines only, so such a line carries
 	 *    no amount of its own and importing it as a priced line would count its amount a second time. It
 	 *    becomes a text line. BR-FREXT-BR-22 is also why it may carry no quantity at all.
-	 * 2. A regular item that announces an amount its quantity cannot rebuild, because that quantity is
-	 *    zero or absent. Such a document is not necessarily wrong: BR-22 only tests the presence of
-	 *    ram:BilledQuantity, so a quantity of zero satisfies it, and nothing in EN 16931 requires BT-131 to
-	 *    equal BT-129 times BT-146. The document of issue #726 is exactly that - EXTENDED CTC-FR, a line
-	 *    carrying <BilledQuantity unitCode="C62">0.0000</BilledQuantity>, no BT-X-8, and a BT-131 of 12.00
-	 *    that BR-FREXT-CO-10 does count into BT-106. It is therefore the import that has to cope: quantity
-	 *    times price makes the line zero and changes the total of the invoice without a word, so the amount
-	 *    is carried as a single unit instead, the way it would be keyed in by hand.
+	 * 2. A regular item whose quantity and unit price cannot express the amount it announces at all. Three
+	 *    shapes reach that state, and the repair is the same for the three: carry BT-131 as a single unit,
+	 *    the way it would be keyed in by hand, so the total of the invoice stays the total of the document.
+	 *    a. The invoiced quantity is zero or absent. Such a document is not necessarily wrong: BR-22 only
+	 *       tests the presence of ram:BilledQuantity, so a quantity of zero satisfies it, and nothing in
+	 *       EN 16931 requires BT-131 to equal BT-129 times BT-146. The document of issue #726 is exactly
+	 *       that - EXTENDED CTC-FR, a line carrying <BilledQuantity unitCode="C62">0.0000</BilledQuantity>,
+	 *       no BT-X-8, and a BT-131 of 12.00 that BR-FREXT-CO-10 does count into BT-106.
+	 *    b. The unit price is zero or absent while the line announces an amount. A free item that is then
+	 *       credited is written that way - issue #772, a vendor invoice whose "free" lines each announce a
+	 *       BT-131 of -0.30 over a BT-146 of 0.00. Quantity times price rebuilds 0.00, so every one of
+	 *       those credits used to be dropped and the invoice came out above the document.
+	 *    c. Quantity times price rebuilds the opposite sign of what the line announces. BT-146 is forbidden
+	 *       to be negative by BR-27, so a line that subtracts from the invoice carries its sign on BT-129
+	 *       alone; a document that puts it on BT-131 only would otherwise be imported as a charge, moving
+	 *       the invoice by twice the amount of the line.
 	 * 3. Everything else: check that what the core is about to compute is what the document announces, and
 	 *    say so when it is not. The tolerance is the one BR-FREXT-CO-10 applies to the totals.
 	 *
@@ -1639,14 +1647,28 @@ class CIIProtocol extends AbstractProtocol
 			return array('qty' => 0.0, 'subprice' => 0.0, 'remise_percent' => 0.0, 'warning' => '');
 		}
 
-		if (empty($qty) && !empty($announced)) {
+		$rebuilt = round($qty * $subprice * (1 - ($remisePercent / 100)), 2);
+
+		// The couple (quantity, unit price) cannot carry the announced amount: it rebuilds nothing, or it
+		// rebuilds it upside down. A line announcing nothing is left alone - a free sample or a heading is
+		// not an anomaly.
+		if (!empty($announced) && ($rebuilt == 0.0 || (($rebuilt > 0) !== ($announced > 0)))) {
+			if (empty($qty)) {
+				$reason = 'its invoiced quantity (BT-129) is zero or absent, so quantity times unit price rebuilds 0.00';
+			} elseif (empty($subprice)) {
+				$reason = 'its unit price (BT-146) is zero or absent, so quantity times unit price rebuilds 0.00';
+			} elseif ($rebuilt == 0.0) {
+				$reason = 'its quantity (BT-129), unit price (BT-146) and discount rebuild 0.00';
+			} else {
+				$reason = 'its quantity (BT-129) and unit price (BT-146) rebuild ' . $rebuilt . ', of the opposite sign';
+			}
+
 			$warning = 'Line ' . $lineid . ' of the received document carries a net amount (BT-131) of ' . $announced
-				. ' while its invoiced quantity (BT-129) is zero or absent, so quantity times unit price rebuilds 0.00. It was imported as a single unit at that amount, so the total of the invoice matches the document.';
+				. ' while ' . $reason . '. It was imported as a single unit at that amount, so the total of the invoice matches the document.';
 
 			return array('qty' => 1.0, 'subprice' => $announced, 'remise_percent' => 0.0, 'warning' => $warning);
 		}
 
-		$rebuilt = round($qty * $subprice * (1 - ($remisePercent / 100)), 2);
 		$warning = '';
 		if (abs($rebuilt - $announced) > 0.01) {
 			$warning = 'Line ' . $lineid . ' of the received document announces a net amount (BT-131) of ' . $announced
