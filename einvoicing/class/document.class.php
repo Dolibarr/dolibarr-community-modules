@@ -579,6 +579,7 @@ class Document extends CommonObject
 		// import that follows creates another one, which is given that same reference back.
 		$previousInvoiceId = (int) $this->fk_element_id;
 		$previousInvoiceRef = '';
+		$previousInvoiceRecords = array();
 		if ($previousInvoiceId > 0) {
 			$previousInvoice = new FactureFournisseur($this->db);
 			if ($previousInvoice->fetch($previousInvoiceId) > 0) {
@@ -586,6 +587,10 @@ class Document extends CommonObject
 					return array('res' => -1, 'message' => $langs->trans('EInvoiceReimportInvoiceIsNotADraft', $previousInvoice->ref));
 				}
 				$previousInvoiceRef = (string) $previousInvoice->ref;
+				// The other flows of that invoice - the lifecycle statuses its vendor has already sent -
+				// are listed before it goes: deleting it detaches every record it has at once, and a
+				// detached record no longer says which invoice it came from.
+				$previousInvoiceRecords = $this->fetchOtherRecordsOfInvoice($previousInvoiceId);
 				if ($previousInvoice->delete($user) <= 0) {
 					$reason = $previousInvoice->error ? $previousInvoice->error : implode(', ', (array) $previousInvoice->errors);
 					return array('res' => -1, 'message' => $langs->trans('EInvoiceReimportFailedToDeleteTheDraft', $previousInvoice->ref).' '.$reason);
@@ -618,6 +623,12 @@ class Document extends CommonObject
 			if ($newInvoice->fetch($newInvoiceId) > 0 && $this->reuseDraftRef($newInvoice, $previousInvoiceRef) > 0) {
 				$importedRecord->tracking_idref = $previousInvoiceRef;
 			}
+		}
+
+		// The statuses the vendor has already sent for this invoice describe the document, not the
+		// local row it was booked on, so they follow it onto the invoice the import has just created.
+		if ($newInvoiceId > 0 && $previousInvoiceId > 0) {
+			$this->moveHistoryToInvoice($previousInvoiceId, $newInvoiceId, $previousInvoiceRecords, (string) $importedRecord->tracking_idref);
 		}
 
 		// Move that record onto this line, so the flow keeps the line it already had in the list
@@ -702,6 +713,86 @@ class Document extends CommonObject
 		// same flow, on the line above. Its content has just been written there, so nothing is lost.
 		if ($record->delete($user, 1) <= 0) {
 			$this->error = $record->error ? $record->error : implode(', ', (array) $record->errors);
+			$this->db->rollback();
+
+			return -1;
+		}
+
+		$this->db->commit();
+
+		return 1;
+	}
+
+	/**
+	 * List the records of a supplier invoice other than this one, that is the lifecycle statuses its
+	 * vendor has sent for it.
+	 *
+	 * @param	int			$invoiceid	Supplier invoice the records are attached to
+	 * @return	int[]					Row ids, empty when there is none
+	 */
+	private function fetchOtherRecordsOfInvoice($invoiceid)
+	{
+		$ids = array();
+
+		$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX.$this->table_element;
+		$sql .= " WHERE fk_element_type = 'invoice_supplier'";
+		$sql .= " AND fk_element_id = ".((int) $invoiceid);
+		$sql .= " AND rowid <> ".((int) $this->id);
+		$sql .= " AND entity IN (".getEntity($this->element).")";
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__.' '.$this->db->lasterror(), LOG_ERR);
+
+			return $ids;
+		}
+
+		while ($obj = $this->db->fetch_object($resql)) {
+			$ids[] = (int) $obj->rowid;
+		}
+		$this->db->free($resql);
+
+		return $ids;
+	}
+
+	/**
+	 * Attach to a supplier invoice the lifecycle history of the one it replaces.
+	 *
+	 * A status a vendor has sent - received, made available, rejected - is about the invoice the vendor
+	 * issued, not about the row Dolibarr booked it on: an import made again creates another row for the
+	 * same document, and the statuses already received belong to it just the same. Left where they are
+	 * they would be attached to an invoice that no longer exists, so the new draft would come up with no
+	 * status at all while the flows that carried them sit in the list, linked to nothing.
+	 *
+	 * @param	int			$previousinvoiceid	Supplier invoice the import has just replaced
+	 * @param	int			$newinvoiceid		Supplier invoice the import has just created
+	 * @param	int[]		$recordids			Records of the previous invoice, listed before it was deleted
+	 * @param	string		$newref				Reference of the new invoice, as the flow list shows it
+	 * @return	int<-1,1>						1 when the history has been moved, -1 on error
+	 */
+	private function moveHistoryToInvoice($previousinvoiceid, $newinvoiceid, $recordids, $newref)
+	{
+		$this->db->begin();
+
+		if (!empty($recordids)) {
+			$sql = "UPDATE ".MAIN_DB_PREFIX.$this->table_element;
+			$sql .= " SET fk_element_id = ".((int) $newinvoiceid);
+			$sql .= ", tracking_idref = '".$this->db->escape($newref)."'";
+			$sql .= " WHERE rowid IN (".$this->db->sanitize(implode(',', $recordids)).")";
+			if (!$this->db->query($sql)) {
+				dol_syslog(__METHOD__.' '.$this->db->lasterror(), LOG_ERR);
+				$this->db->rollback();
+
+				return -1;
+			}
+		}
+
+		$sql = "UPDATE ".MAIN_DB_PREFIX."einvoicing_lifecycle_msg";
+		$sql .= " SET element_id = ".((int) $newinvoiceid);
+		$sql .= " WHERE element_type = 'invoice_supplier'";
+		$sql .= " AND element_id = ".((int) $previousinvoiceid);
+		if (!$this->db->query($sql)) {
+			dol_syslog(__METHOD__.' '.$this->db->lasterror(), LOG_ERR);
 			$this->db->rollback();
 
 			return -1;
