@@ -1335,7 +1335,7 @@ class CIIProtocol extends AbstractProtocol
 				if ($productId > 0 && $productMatchType != 'defaultrouting' && !empty($parsedLine['prodsellerid'])) {
 					$supplierPriceEntries[] = [
 						'productId' => $productId,
-						'unitPrice' => (float) $parsedLine['netpriceamount'],
+						'unitPrice' => $this->resolveLineUnitPrice($parsedLine),
 						'refFourn'  => (string) $parsedLine['prodsellerid'],
 						'tvaTx'     => (float) ($parsedLine['rateApplicablePercent'] ?? 0),
 					];
@@ -1386,13 +1386,13 @@ class CIIProtocol extends AbstractProtocol
 						$line->subprice = round($discount['priceWithoutDiscount'] / $parsedLine['billedquantity'], 8);
 					} else {
 						// Avoid a fatal DivisionByZeroError on a zero/empty billed quantity (e.g. a free
-						// sample line): keep the discount percent, let subprice fall back to netpriceamount below.
+						// sample line): keep the discount percent, let subprice fall back to the line unit price below.
 						dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource line ' . ($parsedLine['lineid'] ?? '?') . ' has a discount but billedquantity is zero/empty, skipping subprice adjustment', LOG_WARNING);
 					}
 				}
 			}
 			$line->qty = (float) $parsedLine['billedquantity'];
-			$line->subprice = $line->subprice ?? (float) $parsedLine['netpriceamount'];
+			$line->subprice = $line->subprice ?? $this->resolveLineUnitPrice($parsedLine);
 			$line->tva_tx = (float) $parsedLine['rateApplicablePercent'];
 			$line->total_ht = (float) $parsedLine['lineTotalAmount'];
 			$line->total_tva = $parsedLine['calculatedAmount'] ?? 0;
@@ -1602,6 +1602,46 @@ class CIIProtocol extends AbstractProtocol
 	}
 
 	/**
+	 * Unit price a received line must carry in Dolibarr: BT-146 brought back to a single unit.
+	 *
+	 * EN 16931 does not state the price of one item. It states BT-146, the item net price, as the price of
+	 * BT-149 units of that item - the item price base quantity. A price of "2.00 per 100" is
+	 * <ram:ChargeAmount>2.00</ram:ChargeAmount> with <ram:BasisQuantity>100</ram:BasisQuantity>, and the
+	 * net amount the document announces for the line, BT-131, is BT-129 / BT-149 x BT-146. UBL says the
+	 * same thing with cbc:PriceAmount and cbc:BaseQuantity. The pattern is ordinary wherever a rate is
+	 * billed rather than an item: a fuel surcharge per 100, a metered consumption per 100 000.
+	 *
+	 * A Dolibarr line has no such divisor. It holds one price for one unit and lets the core multiply it
+	 * by the quantity, so BT-149 has to be folded into the price at import. It was read by the parser and
+	 * then dropped, which multiplied the line - and the total of the whole invoice - by that base
+	 * quantity: a line priced 0.134195 per 100 000 came in at 9 983 012.03 instead of 99.83
+	 * (issues #777 and #778).
+	 *
+	 * BT-149 is optional and means one when absent; BR-64 requires it to be positive when present, and
+	 * BR-65 requires its unit code (BT-150) to be the invoiced quantity unit code (BT-130), so there is no
+	 * unit conversion to make here. Anything else - absent, zero, negative, unreadable - is taken as one,
+	 * which leaves the line exactly as the import built it before.
+	 *
+	 * The division is handed to the core unrounded on purpose: calcul_price_total() computes the total of
+	 * the line from the unit price it receives and only rounds the copy it stores as pu_ht, so a price
+	 * below the display precision still totals what the document announces.
+	 *
+	 * @param	array<string,mixed>		$parsedLine		One line as parseInvoiceLines() returns it
+	 * @return	float									Price of a single unit, to hand to updateline()
+	 */
+	public function resolveLineUnitPrice(array $parsedLine)
+	{
+		$netPrice = (float) ($parsedLine['netpriceamount'] ?? 0);
+		$baseQuantity = (float) ($parsedLine['netpricebasisquantity'] ?? 0);
+
+		if ($baseQuantity <= 0 || $baseQuantity == 1.0) {
+			return $netPrice;
+		}
+
+		return $netPrice / $baseQuantity;
+	}
+
+	/**
 	 * Decide the quantity, unit price and discount a received line must carry in Dolibarr.
 	 *
 	 * The line is written by createSupplierInvoiceLinesIntoDatabase(), which hands those three to
@@ -1630,7 +1670,9 @@ class CIIProtocol extends AbstractProtocol
 	 *       alone; a document that puts it on BT-131 only would otherwise be imported as a charge, moving
 	 *       the invoice by twice the amount of the line.
 	 * 3. Everything else: check that what the core is about to compute is what the document announces, and
-	 *    say so when it is not. The tolerance is the one BR-FREXT-CO-10 applies to the totals.
+	 *    say so when it is not. The tolerance is the one BR-FREXT-CO-10 applies to the totals. A line that
+	 *    does rebuild its amount can still hold a unit price too small for the core to store - see the
+	 *    branch below - and that is reported too.
 	 *
 	 * @param	array<string,mixed>		$parsedLine			One line as parseInvoiceLines() returns it
 	 * @param	float					$qty				Quantity read from the document (BT-129)
@@ -1673,6 +1715,21 @@ class CIIProtocol extends AbstractProtocol
 		if (abs($rebuilt - $announced) > 0.01) {
 			$warning = 'Line ' . $lineid . ' of the received document announces a net amount (BT-131) of ' . $announced
 				. ', but its quantity and unit price rebuild ' . $rebuilt . '. The invoice carries the rebuilt amount.';
+		} elseif ($subprice != 0.0 && (float) price2num($subprice, 'MU') == 0.0) {
+			// calcul_price_total() totals the line from the unit price it is handed and rounds only the copy
+			// it stores as pu_ht, to MAIN_MAX_DECIMALS_UNIT. A price of one unit below that precision -
+			// which is what a price stated per 100 000 comes down to (issue #777) - therefore totals exactly
+			// what the document announces and still reaches the line as 0.00000. The line as imported is
+			// right; it is opening and saving it again that would recompute it to zero, so say so here
+			// rather than let it be found out later.
+			// A price that small is a float PHP writes as 1.34195E-6, which reads as a typo in a message:
+			// spell it out in full, without the trailing zeros of a fixed number of decimals.
+			$spelled = rtrim(rtrim(number_format($subprice, 12, '.', ''), '0'), '.');
+
+			$warning = 'Line ' . $lineid . ' of the received document prices a single unit at ' . $spelled
+				. ', below the unit price precision of this Dolibarr (MAIN_MAX_DECIMALS_UNIT = '
+				. getDolGlobalInt('MAIN_MAX_DECIMALS_UNIT') . '). Its net amount (BT-131) of ' . $announced
+				. ' is imported as announced, but the unit price is stored as zero: editing that line would recompute it to 0.00.';
 		}
 
 		return array('qty' => $qty, 'subprice' => $subprice, 'remise_percent' => $remisePercent, 'warning' => $warning);
