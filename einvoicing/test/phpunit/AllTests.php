@@ -127,6 +127,8 @@ class AllTests
 		$suite->addTestSuite('LineChargeTest');
 		require_once dirname(__FILE__).'/LineWithoutQuantityTest.php';
 		$suite->addTestSuite('LineWithoutQuantityTest');
+		require_once dirname(__FILE__).'/NegativeLineAmountTest.php';
+		$suite->addTestSuite('NegativeLineAmountTest');
 		require_once dirname(__FILE__).'/PDPProviderManagerTest.php';
 		$suite->addTestSuite('PDPProviderManagerTest');
 		require_once dirname(__FILE__).'/RecipientDirectoryTest.php';
