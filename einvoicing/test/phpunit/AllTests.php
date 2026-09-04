@@ -125,6 +125,8 @@ class AllTests
 		$suite->addTestSuite('InvoicingPeriodTest');
 		require_once dirname(__FILE__).'/LineChargeTest.php';
 		$suite->addTestSuite('LineChargeTest');
+		require_once dirname(__FILE__).'/LineDiscountBaseTest.php';
+		$suite->addTestSuite('LineDiscountBaseTest');
 		require_once dirname(__FILE__).'/LinePriceBaseQuantityTest.php';
 		$suite->addTestSuite('LinePriceBaseQuantityTest');
 		require_once dirname(__FILE__).'/LineWithoutQuantityTest.php';

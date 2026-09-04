@@ -3521,8 +3521,17 @@ class CIIProtocol extends AbstractProtocol
 	/**
 	 * Resolve multiple line allowances into a single percentage for Dolibarr.
 	 *
-	 * Dolibarr only supports percentage discounts on lines, so fixed amounts
-	 * are converted using basisAmount or lineTotalAmount as base.
+	 * Dolibarr only supports percentage discounts on lines, so the fixed amount the document states
+	 * (BT-136) has to be turned into one. A percentage needs the amount it is taken off, which EN 16931
+	 * carries as BT-137 - an optional field, and one a fair share of issuers do not send.
+	 *
+	 * When it is missing the base is rebuilt from the line itself: BT-131 is the amount that remains
+	 * after the allowances, so adding them back (and taking the charges out, they leave by a line of
+	 * their own, issue #735) gives the amount before discount, the very number the caller then divides
+	 * by the quantity to get the unit price. Using BT-131 itself, as this did until issue #783, applied
+	 * the percentage to the amount after discount: the ratio came out too large and the line was
+	 * imported short - 94.74 instead of 95.00 for a 5.00 allowance on a 100.00 line.
+	 *
 	 * Multiple allowances are summed into one final percentage.
 	 *
 	 * @param array      $lineAllowances  parsed lineAllowances array
@@ -3549,13 +3558,6 @@ class CIIProtocol extends AbstractProtocol
 			return false;
 		}
 
-		// Base used for percent calculation — basisAmount of first entry, fallback to lineTotalAmount
-		$base = $allowances[0]['basisAmount'] ?? $lineTotalAmount;
-
-		if (!$base) {
-			return false;
-		}
-
 		// Sum all actualAmounts — always populated whether the source was % or fixed
 		$totalDiscountAmount = 0.0;
 		foreach ($allowances as $allowance) {
@@ -3566,11 +3568,23 @@ class CIIProtocol extends AbstractProtocol
 			return false;
 		}
 
+		// Amount of the line before its allowances, which is also what the caller turns into the unit
+		// price of the Dolibarr line.
+		$priceWithoutDiscount = (float) $lineTotalAmount - $totalChargeAmount + $totalDiscountAmount;
+
+		// Base used for percent calculation — BT-137 when the document states it, the amount before
+		// discount otherwise (issue #783).
+		$base = $allowances[0]['basisAmount'] ?? $priceWithoutDiscount;
+
+		if (!$base) {
+			return false;
+		}
+
 		return [
 			'percent'              => round(($totalDiscountAmount / $base) * 100, 4),
 			'base'                 => (float) $base,
 			'discountAmount'       => $totalDiscountAmount,
-			'priceWithoutDiscount' => (float) $lineTotalAmount - $totalChargeAmount + $totalDiscountAmount,
+			'priceWithoutDiscount' => $priceWithoutDiscount,
 		];
 	}
 
