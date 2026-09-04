@@ -43,6 +43,8 @@ require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
 // Societe::create() calls getCountry() on some cores (Dolibarr 21), and master.inc.php does not
 // load company.lib.php: without this the test errors out on an undefined function, not on the module.
 require_once DOL_DOCUMENT_ROOT . '/core/lib/company.lib.php';
+require_once DOL_DOCUMENT_ROOT . '/core/class/html.form.class.php';
+require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
 dol_include_once('einvoicing/class/einvoicing.class.php');
 dol_include_once('einvoicing/core/triggers/interface_98_modEInvoicing_EInvoicingTriggers.class.php');
 require_once __DIR__ . '/CommonClassTestCompat.inc.php';
@@ -67,7 +69,9 @@ class DefaultProductRoutingResetTest extends CommonClassTest
 	protected function tearDown(): void
 	{
 		unset($_POST['routing_product_id']);
+		unset($_POST['routing_product_id_shown']);
 		unset($_GET['routing_product_id']);
+		unset($_GET['routing_product_id_shown']);
 
 		parent::tearDown();
 	}
@@ -103,16 +107,19 @@ class DefaultProductRoutingResetTest extends CommonClassTest
 	 *
 	 * @param	int			$socid		Id of the thirdparty
 	 * @param	string|null	$posted		Value posted for routing_product_id, null to not post the field
+	 * @param	string		$shown		Value the field held when it was drawn (routing_product_id_shown)
 	 * @return	string|int				Default product of the vendor once saved
 	 */
-	private function saveThirdparty($socid, $posted)
+	private function saveThirdparty($socid, $posted, $shown = '')
 	{
 		global $db, $user, $langs, $conf;
 
 		if ($posted === null) {
 			unset($_POST['routing_product_id']);
+			unset($_POST['routing_product_id_shown']);
 		} else {
 			$_POST['routing_product_id'] = $posted;
+			$_POST['routing_product_id_shown'] = $shown;
 		}
 
 		$thirdparty = new Societe($db);
@@ -136,7 +143,7 @@ class DefaultProductRoutingResetTest extends CommonClassTest
 	{
 		$socid = $this->createVendorWithDefaultProduct('idprod_1234');
 
-		$this->assertEquals(0, $this->saveThirdparty($socid, '-1'), 'The default product survived the empty entry of the combo');
+		$this->assertEquals(0, $this->saveThirdparty($socid, '-1', 'idprod_1234'), 'The default product survived the empty entry of the combo');
 	}
 
 	/**
@@ -149,7 +156,7 @@ class DefaultProductRoutingResetTest extends CommonClassTest
 	{
 		$socid = $this->createVendorWithDefaultProduct('idprod_1234');
 
-		$this->assertEquals(0, $this->saveThirdparty($socid, ''), 'The default product survived the cleared search field');
+		$this->assertEquals(0, $this->saveThirdparty($socid, '', 'idprod_1234'), 'The default product survived the cleared search field');
 	}
 
 	/**
@@ -174,7 +181,80 @@ class DefaultProductRoutingResetTest extends CommonClassTest
 	{
 		$socid = $this->createVendorWithDefaultProduct('idprod_1234');
 
-		$this->assertEquals('idprod_5678', $this->saveThirdparty($socid, 'idprod_5678'), 'The default product was not replaced');
+		$this->assertEquals('idprod_5678', $this->saveThirdparty($socid, 'idprod_5678', 'idprod_1234'), 'The default product was not replaced');
+	}
+
+	/**
+	 * A save whose combo could not show the current value - the default product of the vendor is not
+	 * among the products the combo lists - must not be read as a removal.
+	 *
+	 * @return void
+	 */
+	public function testEmptyFieldThatShowedNothingKeepsTheDefaultProduct()
+	{
+		$socid = $this->createVendorWithDefaultProduct('idprod_1234');
+
+		$this->assertEquals('idprod_1234', $this->saveThirdparty($socid, '-1', ''), 'A field that showed nothing was read as a removal');
+	}
+
+	/**
+	 * The combo has to show the default product of the vendor as its selected entry. Before Dolibarr 22
+	 * the core only marks an option whose value is the id of a supplier price, so a product without one
+	 * ('idprod_ID') came back unmarked: the field showed nothing, and the save that follows would then
+	 * read an untouched field as a removal.
+	 *
+	 * @return void
+	 */
+	public function testTheComboShowsTheDefaultProductOfTheVendor()
+	{
+		global $db, $user, $conf;
+
+		$conf->global->PRODUIT_USE_SEARCH_TO_SELECT = 0;		// The combo, not the ajax search field
+
+		$thirdparty = new Societe($db);
+		$thirdparty->name = 'Vendor of the combo test';
+		$thirdparty->country_code = 'FR';
+		$thirdparty->fournisseur = 1;
+		$thirdparty->code_fournisseur = 'auto';
+		$socid = $thirdparty->create($user);
+		$this->assertGreaterThan(0, $socid, 'Could not create the vendor of the test: ' . $thirdparty->error . ' ' . implode(', ', $thirdparty->errors));
+
+		// A product to buy with no supplier price of its own: this is the case the cores mishandle
+		$product = new Product($db);
+		$product->ref = 'EINV791' . dol_print_date(dol_now(), '%y%m%d%H%M%S');
+		$product->label = 'Product of the combo test';
+		$product->type = 0;
+		$product->status = 0;
+		$product->status_buy = 1;
+		$pid = $product->create($user);
+		$this->assertGreaterThan(0, $pid, 'Could not create the product of the test: ' . $product->error . ' ' . implode(', ', $product->errors));
+
+		$method = new ReflectionMethod(EInvoicing::class, 'selectVendorProduct');
+		$method->setAccessible(true);
+
+		// Dolibarr 18 and 19 read $objp->barcode in that combo although their own query only selects it
+		// when the barcode module is on. The notice belongs to the core, but PHPUnit turns it into a
+		// failure: silence that one, nothing else.
+		set_error_handler(
+			/**
+			 * @param	int		$errno	Level of the error
+			 * @param	string	$errstr	Message of the error
+			 * @return	bool			True to swallow the error, false to hand it back to PHP
+			 */
+			static function ($errno, $errstr) {
+				return strpos($errstr, 'barcode') !== false;
+			},
+			E_WARNING | E_NOTICE
+		);
+		try {
+			$out = $method->invoke(new EInvoicing($db), new Form($db), $socid, 'idprod_' . $pid, 'routing_product_id');
+		} finally {
+			restore_error_handler();
+		}
+
+		$this->assertStringContainsString('<option value="idprod_' . $pid . '" selected', $out, 'The combo does not show the default product of the vendor');
+		$this->assertStringNotContainsString('<option value="-1" selected', $out, 'The combo shows its empty entry although a default product is set');
+		$this->assertStringContainsString('name="routing_product_id_shown" value="idprod_' . $pid . '"', $out, 'The combo does not tell the save what it shows');
 	}
 
 	/**
@@ -195,7 +275,7 @@ class DefaultProductRoutingResetTest extends CommonClassTest
 		$socid = $thirdparty->create($user);
 		$this->assertGreaterThan(0, $socid, 'Could not create the vendor of the test: ' . $thirdparty->error . ' ' . implode(', ', $thirdparty->errors));
 
-		$this->assertEquals(0, $this->saveThirdparty($socid, '-1'), 'A vendor without default product got one out of the empty entry');
-		$this->assertEquals('idprod_1234', $this->saveThirdparty($socid, 'idprod_1234'), 'The default product was not stored on the first save');
+		$this->assertEquals(0, $this->saveThirdparty($socid, '-1', ''), 'A vendor without default product got one out of the empty entry');
+		$this->assertEquals('idprod_1234', $this->saveThirdparty($socid, 'idprod_1234', ''), 'The default product was not stored on the first save');
 	}
 }

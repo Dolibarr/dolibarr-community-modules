@@ -2398,7 +2398,35 @@ class EInvoicing
 
 		$status = $savstatus;
 
-		return (string) $out;
+		$out = (string) $out;
+
+		// Cores before 22 only compare the selected value to the id of a supplier price: an 'idprod_ID'
+		// value - what a product with no supplier price of its own is worth - is never marked selected,
+		// so the combo shows its empty entry although the vendor does have a default product. Mark the
+		// option ourselves when the core did not: a field that contradicts the value it holds is read
+		// as an empty one by the save that follows.
+		$optstart = '<option value="' . $selected . '"';
+		if (preg_match('/^idprod_[0-9]+$/', (string) $selected) && strpos($out, $optstart . ' selected') === false) {
+			$pos = strpos($out, $optstart);
+			if ($pos !== false) {
+				$out = substr_replace($out, $optstart . ' selected', $pos, strlen($optstart));
+				$out = str_replace('<option value="-1" selected>', '<option value="-1">', $out);
+			}
+		}
+
+		// Tell the save what the field shows, that is the value it posts back when nobody touches it.
+		// An empty value posted against a filled field is a removal asked by the user; an empty value
+		// posted against an empty field is a save that had nothing to show in the first place - the
+		// combo only lists PRODUIT_LIMIT_SIZE products, and the default one of the vendor may not be
+		// among them.
+		if (preg_match('/<option value="([^"]*)" selected/', $out, $reg)) {
+			$shown = $reg[1];
+		} else {
+			$shown = (string) $selected;		// Ajax variant: its hidden input carries the current value
+		}
+		$out .= '<input type="hidden" name="' . $htmlname . '_shown" value="' . dolPrintHTMLForAttribute($shown) . '">';
+
+		return $out;
 	}
 
 	/**
