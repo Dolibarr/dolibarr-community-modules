@@ -1164,43 +1164,34 @@ abstract class AbstractPDPProvider
 	}
 
 	/**
-	 * Try to get a flow XML from its id using API
-	 * @param string $flowId 		The id of the flow to fetch
-	 * @param bool	 $cleanXml 		Whether you need to remove (attachments presents in XML content...)
+	 * The invoice of a flow, read from the same document the supplier invoice was imported from.
 	 *
-	 * @return ?string
+	 * It used to ask for the 'Original' while the import reads what fetchImportableFlowDocument()
+	 * picks, so the check compared the invoice against a file it was not built from, and opened a
+	 * PDF reader on installations whose reception path is plain XML.
+	 *
+	 * @param	string	$flowId			The id of the flow to fetch
+	 * @param	bool	$cleanXml		Whether you need to remove (attachments presents in XML content...)
+	 * @return	?string					The invoice XML, or null when no document of the flow can be read
+	 * @throws	Exception				When the access point returned no document at all
 	 */
 	public function fetchFlowXml($flowId, $cleanXml)
 	{
-		$flowResponse = $this->fetchFlowData($flowId, 'Original', 'get_flow_xml');
+		$importable = $this->fetchImportableFlowDocument($flowId, new ProtocolManager($this->db));
 
-		if ($flowResponse['status_code'] != 200) {
+		if (empty($importable['fetched'])) {
 			throw new Exception('Failed to get flow XML for flow id n° ' . $flowId);
 		}
 
-		$xmlData = null;
+		if (empty($importable['protocol'])) {
+			dol_syslog(__METHOD__ . " Flow " . $flowId . " holds no document this module can read: " . implode(' | ', $importable['attempts']), LOG_WARNING, 0, "_einvoicing");
+			return null;
+		}
 
-		// $receivedFileContent may be an XML file (CII, UBL...) or a PDF file (FacturX), or ...
-		$receivedFileContent = $flowResponse['response'];
+		$xmlData = $importable['protocol']->extractXmlFromFileContent((string) $importable['file']);
 
-		$resProtocol = ProtocolManager::getProtocolFromContent($receivedFileContent);
-		if ($resProtocol['success']) {
-			$protocol = $resProtocol['protocol_object'];
-
-			// getProtocolFromContent() succeeded on the container. The invoice inside may still be in a
-			// syntax with no reader here, and everything downstream - cleanXmlData() first - assumes a
-			// protocol was found for what it is handed. Return nothing rather than that.
-			$payloadReason = '';
-			$xmlData = $this->readableInvoicePayload($receivedFileContent, $protocol, new ProtocolManager($this->db), $payloadReason);
-
-			if ($xmlData === null) {
-				dol_syslog(__METHOD__ . " Flow " . $flowId . " holds no invoice this module can read: " . $payloadReason, LOG_WARNING, 0, "_einvoicing");
-				return null;
-			}
-
-			if ($cleanXml) {
-				$xmlData = Document::cleanXmlData($xmlData);
-			}
+		if ($cleanXml) {
+			$xmlData = Document::cleanXmlData($xmlData);
 		}
 
 		return $xmlData;
