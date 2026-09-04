@@ -22,6 +22,12 @@
 # Everything the tests read lives in the module or in that core, so a change elsewhere in the
 # repository does not start the job - the exception being this file and what it calls, which decide
 # how the run goes.
+name: einvoicing_phpunit
+
+permissions:
+  contents: read
+
+
 on:
   push:
     branches: [ main ]
@@ -46,7 +52,6 @@ concurrency:
   group: phpunit-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-name: phpunit
 jobs:
   # Which cores the suite runs on. A pull request answers on three - the floor the module declares,
   # the current stable and the newest - because that is what a reviewer waits for. What lands on main
