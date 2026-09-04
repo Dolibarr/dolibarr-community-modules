@@ -526,6 +526,15 @@ abstract class AbstractPDPProvider
 				continue;
 			}
 
+			// What was recognized above is the syntax of the file, not the syntax of the invoice it
+			// carries. Open the document before accepting it, or a syntax with no reader here is
+			// handed to the reader of another one.
+			$payloadReason = '';
+			if ($this->readableInvoicePayload($content, $protocol, $protocolManager, $payloadReason) === null) {
+				$result['attempts'][] = $docType . ": " . $protocolName . " but " . $payloadReason;
+				continue;
+			}
+
 			if ($docType != 'Converted') {
 				dol_syslog(__METHOD__ . " No usable 'Converted' document for flowId " . $flowId . " (" . implode(' | ', $result['attempts']) . "), reading the '" . $docType . "' one instead", LOG_WARNING, 0, "_einvoicing");
 			}
@@ -538,6 +547,57 @@ abstract class AbstractPDPProvider
 		}
 
 		return $result;
+	}
+
+	/**
+	 * The invoice a document carries, once its container has been opened, when this module can read it.
+	 *
+	 * detectProtocolFromContent() answers on the outside of a file: a PDF is 'FACTURX' on the strength
+	 * of its '%PDF-' header alone, whatever it holds. What it holds is a separate question, because the
+	 * embedded invoice is picked by file name and not by content - 'xrechnung.xml' is one of the names
+	 * accepted, and an XRechnung is commonly UBL, a syntax that has no reader here.
+	 *
+	 * Reading the outside only is how such a payload reaches the reader of another syntax. The CII
+	 * reader then finds none of the elements it expects and reports a business error that names nothing
+	 * the user can act on, which is counted as a failure and stops the whole synchronization batch; and
+	 * on the consistency check, the same document reaches code that dereferences a protocol which was
+	 * never built.
+	 *
+	 * The document is not re-typed on what is found inside: a Factur-X PDF is imported as Factur-X,
+	 * whose reader does the extraction itself. Only the question "can this be read at all" is answered.
+	 *
+	 * @param	string				$content			Raw document, as the access point returned it
+	 * @param	AbstractProtocol	$protocol			Protocol recognized on the container
+	 * @param	ProtocolManager		$protocolManager	Protocol factory used to recognize the payload
+	 * @param	string				$reason				Filled with why the payload was rejected
+	 * @return	?string									The invoice inside, or null when it cannot be read
+	 */
+	protected function readableInvoicePayload($content, $protocol, $protocolManager, &$reason)
+	{
+		$reason = '';
+
+		try {
+			// AbstractProtocol::extractXmlFromFileContent() returns the content unchanged, so a
+			// document that is already an XML is its own payload and this costs nothing there.
+			$payload = (string) $protocol->extractXmlFromFileContent($content);
+		} catch (Throwable $e) {
+			// A PDF with no embedded invoice at all raises ZugferdNoPdfAttachmentFoundException here.
+			$reason = "its container holds no invoice - " . $e->getMessage();
+			return null;
+		}
+
+		$payloadName = $protocolManager->detectProtocolFromContent($payload);
+		if (empty($payloadName)) {
+			$reason = "what it carries is in an unrecognized syntax";
+			return null;
+		}
+
+		if (empty($protocolManager->getProtocol($payloadName))) {
+			$reason = "what it carries is " . $payloadName . ", which is not supported";
+			return null;
+		}
+
+		return $payload;
 	}
 
 	/**
@@ -1122,7 +1182,16 @@ abstract class AbstractPDPProvider
 		if ($resProtocol['success']) {
 			$protocol = $resProtocol['protocol_object'];
 
-			$xmlData = $protocol->extractXmlFromFileContent($receivedFileContent);
+			// getProtocolFromContent() succeeded on the container. The invoice inside may still be in a
+			// syntax with no reader here, and everything downstream - cleanXmlData() first - assumes a
+			// protocol was found for what it is handed. Return nothing rather than that.
+			$payloadReason = '';
+			$xmlData = $this->readableInvoicePayload($receivedFileContent, $protocol, new ProtocolManager($this->db), $payloadReason);
+
+			if ($xmlData === null) {
+				dol_syslog(__METHOD__ . " Flow " . $flowId . " holds no invoice this module can read: " . $payloadReason, LOG_WARNING, 0, "_einvoicing");
+				return null;
+			}
 
 			if ($cleanXml) {
 				$xmlData = Document::cleanXmlData($xmlData);
