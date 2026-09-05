@@ -49,3 +49,9 @@ jobs:
         run: var-dump-check --extensions php --tracy --exclude */vendor/* .
       - name: Run Parallel Lint
         run: parallel-lint --exclude einvoicing/vendor/ --exclude dev/tools/phan/stubs/ .
+      - name: One test file per source file under test
+        # Only files this pull request ADDS are looked at, so the existing suite never fails the job.
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --quiet origin "${{ github.base_ref }}"
+          php .github/scripts/check-test-file-placement.php FETCH_HEAD
