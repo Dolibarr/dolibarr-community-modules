@@ -161,6 +161,14 @@ If adding a unit test was explicitely requested:
 
 ---
 
+## Comments
+
+- Block and inline comments must be written in English.
+- Comments must be concise and clear (never more that 5 lines, never more than the number of lines code added or modified).
+- Block comments can reach 120 characters 
+
+---
+
 ## Git Workflow
 
 - Branch strategy:
