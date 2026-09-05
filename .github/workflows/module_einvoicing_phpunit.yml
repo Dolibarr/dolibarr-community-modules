@@ -83,7 +83,6 @@ jobs:
                 {"dolibarr":"23.0.0","php":"8.3"},
                 {"dolibarr":"24.0.0","php":"8.3"}]'
           review='[{"dolibarr":"18.0.0","php":"8.2"},
-                   {"dolibarr":"23.0.0","php":"8.3"},
                    {"dolibarr":"24.0.0","php":"8.3"}]'
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             chosen="$review"
