@@ -540,7 +540,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		$result = $provider->sendStatusMessage($invoice, 212, '', array('amount' => $amount));
 
 		if ($result['res'] > 0) {
-			setEventMessage($langs->trans("ModuleEInvoicingName").' : '.$langs->trans('EInvStatus212Paid'), 'mesgs');
+			setEventMessage($langs->trans("ModuleEInvoicingName").' : '.$langs->trans('EInvStatus212PaymentReceived'), 'mesgs');
 		} else {
 			dol_syslog(__METHOD__ . ' Failed to send paid status (212) to platform for invoice id=' . $invoice->id . ' : ' . $result['message'], LOG_ERR);
 			setEventMessage($langs->trans("ModuleEInvoicingName").' : '.$result['message'], 'errors');

@@ -94,7 +94,7 @@ dol_include_once('/einvoicing/class/document.class.php');
 dol_include_once('/einvoicing/lib/einvoicing_document.lib.php');
 
 // Load translation files required by the page
-$langs->loadLangs(array("einvoicing@einvoicing", "other"));
+$langs->loadLangs(array("einvoicing@einvoicing", "other", "agenda", "commercial"));
 
 // Get parameters
 $id = GETPOSTINT('id');

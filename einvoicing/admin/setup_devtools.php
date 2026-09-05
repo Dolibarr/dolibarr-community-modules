@@ -334,7 +334,7 @@ if (getDolGlobalString('EINVOICING_PDP')) {
 	print '<span class="width150 inline-block">'.$langs->trans("InvoiceType").'</span> ';
 	if ((float) DOL_VERSION >= 24.0) {
 		$typeofinvoice = array(
-			Facture::TYPE_STANDARD => array('label' => $langs->trans('Standard')),
+			Facture::TYPE_STANDARD => array('label' => $langs->trans('InvoiceStandard')),
 			Facture::TYPE_REPLACEMENT => array('label' => $langs->trans('ReplacementInvoice')),
 			Facture::TYPE_DEPOSIT => array('label' => $langs->trans('Deposit')),
 			Facture::TYPE_CREDIT_NOTE => array('label' => $langs->trans('CreditNote')),
@@ -342,7 +342,7 @@ if (getDolGlobalString('EINVOICING_PDP')) {
 		);
 		print $form->selectarray('invoicetype', $typeofinvoice, GETPOSTISSET('invoicetype') ? GETPOSTINT('invoicetype') : Facture::TYPE_STANDARD, 0, 0, 0, '', 0, 0, 0, '', 'minwidth300');
 	} else {
-		print $langs->trans("Standard");
+		print $langs->trans("InvoiceStandard");
 	}
 
 	// Referenced invoice

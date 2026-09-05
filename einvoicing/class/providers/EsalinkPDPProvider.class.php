@@ -197,7 +197,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				$item->fieldOverride = htmlspecialchars('**************' . substr($tokenData['token'], -4));
 
 				if (!empty($tokenData['token_expires_at'])) {
-					$item->fieldOverride .= ' &nbsp; <span class="opacitymedium hideonsmartphone">(' . $langs->trans("until") . ' ' . dol_print_date($tokenData['token_expires_at'], 'dayhoursec', 'tzuserrel') . ')</span>';
+					$item->fieldOverride .= ' &nbsp; <span class="opacitymedium hideonsmartphone">(' . $langs->trans("Until") . ' ' . dol_print_date($tokenData['token_expires_at'], 'dayhoursec', 'tzuserrel') . ')</span>';
 				}
 				//var_dump($tokenData);
 			}
@@ -421,7 +421,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			return array('res' => -1, 'message' => $langs->trans('NoAvailableValidatorforThisAccessPoint'));
 		}
 
-		return array('res' => 0, 'message' => $langs->trans('skipped'));
+		return array('res' => 0, 'message' => $langs->trans('Skipped'));
 	}
 
 	/**

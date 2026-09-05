@@ -421,7 +421,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 						$item->fieldOverride = htmlspecialchars('**************' . substr($tokenData['token'], -4));
 
 						if (!empty($tokenData['token_expires_at'])) {
-							$item->fieldOverride .= ' &nbsp; <span class="opacitymedium hideonsmartphone">(' . $langs->trans("until") . ' ' . dol_print_date($tokenData['token_expires_at'], 'dayhoursec', 'tzuserrel') . ')</span>';
+							$item->fieldOverride .= ' &nbsp; <span class="opacitymedium hideonsmartphone">(' . $langs->trans("Until") . ' ' . dol_print_date($tokenData['token_expires_at'], 'dayhoursec', 'tzuserrel') . ')</span>';
 						}
 						//var_dump($tokenData);
 					}

@@ -7,6 +7,23 @@
 ModuleEInvoicingName = EInvoicing
 ModuleEInvoicingDesc = Support for E-invoice management. This module allows generating (automatically or manually) invoices in E-invoice format and send them to an E-invoice Access Point. It can also retrieve purchase invoices from this E-invoice Access Point. Only a few countries (France) and Access Points (also called PDP/PA) are supported.
 
+# Keys of the core that the supported cores do not all carry: absent from 18 for all of them,
+# from 19 to 21 for Automatic, and up to 23 for the six last ones. Same wording as the core.
+AccessToken=Access Token
+Message=Message
+RefSupplierBill=Supplier invoice ref
+Automatic=Automatic
+ErrorThirdPartyNotFound=Error ThirdParty Not Found
+Input=Input
+InvoiceType=Invoice type
+Output=Output
+Success=Success
+VATExemptionCode=VAT exemption code
+
+# Keys of the core that live in a lang file these pages do not load, with the wording of the core.
+Options=Options
+Until=until
+
 #
 # Admin page
 #
@@ -178,6 +195,7 @@ DateSyncro=Sync date
 Status=Status
 call_id=Call ID
 flow_id=Flow ID
+FlowId=Flow ID
 tracking_idref=Tracking Ref
 flow_type=Flow type
 flow_direction=Direction
@@ -199,6 +217,18 @@ cdar_reason_detail=LC Reason details
 ack_status=Acknowledgement status
 ack_reason_code=Acknowledgement reason code
 ack_info=Acknowledgement details
+
+# Cards, lists and error paths of the two objects of the module (document_card.php, call_card.php)
+Document=Document
+ShowDocument=Show document
+DeleteDocument=Delete document
+ShowCall=Show call
+DeleteCall=Delete call
+Failed=Failed
+Skipped=Skipped
+ClassNotFound=Class not found
+ErrorNumberingModuleNotSetup=Numbering module not set up for %s
+ErrorLoadingInvoice=Failed to load the invoice
 PASettings=Access Point Settings (PA, PDP...)
 EInvoicingInfo=As part of the French electronic invoicing law, any invoicing software must allow the sending and receiving of invoices. This is achieved through communication with an approved private partner called a PA (formerly PDP). This module enables bi-directional synchronization between your Dolibarr and a PA. The module is free, but the PA you choose will most likely charge subscription fees (The contract is drawn up directly with the PA %s).
 EInvoicingInfoProxy= Or via %s
@@ -357,6 +387,11 @@ VATOnDebitsMention=Option for the payment of VAT on debits
 CurrentAP=Current access point: %s
 CreatedManually=Created manually
 DevTools=Dev tools
+
+# Generation page of the developer tools (admin/setup_devtools.php)
+MyCompany=My company
+Seller=Seller
+Buyer=Buyer
 YourSoftwareSeemsConnectedWith=Your software seems linked to the E-invoicing Access Point Platform %s
 YourSoftwareDoesNotSeemsConnectedWith=Your software does NOT appear to be linked to an E-invoicing Access Point Platform yet. Go into the e-invoicing module setup to connect it.
 ClickHereToRemoveConnection=Click here to remove this connection
@@ -434,6 +469,7 @@ EinvoicingCantUnvalidateATransmittedInvoice=You are trying to modify the status 
 EinvoicingCantModifyATransmittedInvoice=You are trying to modify a property that is locked once the invoice has been transmitted to the Access Point
 SendingStatus=Sending status
 CheckingStatus=Checking status
+CheckStatus=Check status
 
 EINVOICING_CLIENT_ID=Client ID
 EINVOICING_CLIENT_SECRET=Client secret
