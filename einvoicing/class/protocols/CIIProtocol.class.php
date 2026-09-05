@@ -732,6 +732,10 @@ class CIIProtocol extends AbstractProtocol
 	 */
 	public function createSupplierInvoiceLinesIntoDatabase(FactureFournisseur $supplierInvoice): bool
 	{
+		// Start after the lines already written: this runs a second time for the document level charges
+		// (BG-21). line_max() is what addline() itself calls to resolve its $rang = -1.
+		$rang = (int) $supplierInvoice->line_max();
+
 		foreach ($supplierInvoice->lines as $i => $val) {
 			$sql = 'INSERT INTO '.MAIN_DB_PREFIX.'facture_fourn_det (fk_facture_fourn, special_code, fk_remise_except)';
 			/** @phan-suppress-next-line PhanUndeclaredProperty */
@@ -740,6 +744,7 @@ class CIIProtocol extends AbstractProtocol
 			$resql_insert = $this->db->query($sql);
 			if ($resql_insert) {
 				$idligne = $this->db->last_insert_id(MAIN_DB_PREFIX.'facture_fourn_det');
+				$rang++;
 
 				$res = $supplierInvoice->updateline(
 					$idligne,
@@ -764,7 +769,8 @@ class CIIProtocol extends AbstractProtocol
 					$supplierInvoice->lines[$i]->fk_unit,
 					$supplierInvoice->lines[$i]->multicurrency_subprice,
 					/** @phan-suppress-next-line PhanUndeclaredProperty */
-					$supplierInvoice->lines[$i]->ref_supplier
+					$supplierInvoice->lines[$i]->ref_supplier,
+					$rang
 				);
 
 				if ($res < 0) {
