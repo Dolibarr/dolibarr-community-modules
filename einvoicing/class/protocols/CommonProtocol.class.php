@@ -2226,17 +2226,21 @@ trait CommonProtocol
 			if (isset(self::$UNTDID4461_TO_DOLIBARR_PAIEMENT_CODE[$untdidCode])) {
 				$dolibarrPaymentCode = self::$UNTDID4461_TO_DOLIBARR_PAIEMENT_CODE[$untdidCode];
 
-				$sql = "SELECT id FROM " . MAIN_DB_PREFIX . "c_paiement";
-				$sql .= " WHERE code = '" . $db->escape($dolibarrPaymentCode) . "'";
-				$sql .= " AND active = 1";
-				$sql .= " LIMIT 1";
+				// Read the dictionary through the core helper instead of forging the query here: it
+				// applies the multicompany filter (entity IN (getEntity('c_paiement'))) and caches the
+				// lookup. The extra filter keeps the "active entries only" behaviour the helper has no
+				// argument for; it is a hardcoded literal, never anything coming from the document.
+				// Only 7 arguments: the 8th ($useCache) does not exist on Dolibarr 19. From 19 on the
+				// core caches on [table][key][fieldid] only, so the entity and the filter above are not
+				// part of the cache key; harmless here, an import reads the dictionary in one entity
+				// with one filter.
+				$paymentModeId = (int) dol_getIdFromCode($db, $dolibarrPaymentCode, 'c_paiement', 'code', 'id', 1, " AND active = 1");
 
-				$resql = $db->query($sql);
-				if ($resql && $db->num_rows($resql) == 1) {
-					$obj = $db->fetch_object($resql);
-					$supplierInvoice->mode_reglement_id = (int) $obj->id;
+				if ($paymentModeId > 0) {
+					$supplierInvoice->mode_reglement_id = $paymentModeId;
 					$messages[] = 'Payment method mapped from UNTDID 4461 code ' . $untdidCode . ' to Dolibarr code ' . $dolibarrPaymentCode . '.';
 				} else {
+					dol_syslog('CommonProtocol::_applyPaymentInfoToSupplierInvoice no active c_paiement entry with code ' . $dolibarrPaymentCode . ' for the current entity', LOG_NOTICE);
 					$messages[] = 'Payment method code ' . $dolibarrPaymentCode . ' (from UNTDID 4461 code ' . $untdidCode . ') not found or not active in Dolibarr dictionary, left empty.';
 				}
 			} else {
