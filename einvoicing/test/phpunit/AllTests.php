@@ -62,10 +62,6 @@ if (isModEnabled('debugbar')) {
 	print "Error: Debugbar module should not be enabled. It generates troubles in db management.\n";
 	exit(1);
 }
-if (!isModEnabled('member')) {
-	print "Error: Module member must be enabled to have significant results.\n";
-	exit(1);
-}
 if (!isModEnabled('einvoicing')) {
 	print "Error: Module einvoicing must be enabled to have significant results.\n";
 	exit(1);
@@ -76,7 +72,12 @@ if (isModEnabled('google')) {
 if (empty($user->id)) {
 	print "Load permissions for admin user nb 1\n";
 	$user->fetch(1);
-	$user->loadRights();
+	// User::loadRights() only exists from Dolibarr 20 on, older versions name it getrights()
+	if (method_exists($user, 'loadRights')) {
+		$user->loadRights();
+	} else {
+		$user->getrights();
+	}
 }
 $conf->global->MAIN_DISABLE_ALL_MAILS = 1;
 $conf->global->MAIN_UMASK = '666';
@@ -105,62 +106,13 @@ class AllTests
 	{
 		$suite = new PHPUnit\Framework\TestSuite('PHPUnit Framework');
 
-		//require_once dirname(__FILE__).'/CoreTest.php';
-		//$suite->addTestSuite('CoreTest');
-		require_once dirname(__FILE__).'/BillingProcessIdTest.php';
-		$suite->addTestSuite('BillingProcessIdTest');
-		require_once dirname(__FILE__).'/CIIProfileShapeTest.php';
-		$suite->addTestSuite('CIIProfileShapeTest');
-		require_once dirname(__FILE__).'/CIIProtocolTest.php';
-		$suite->addTestSuite('CIIProtocolTest');
-		require_once dirname(__FILE__).'/CIITextEscapingTest.php';
-		$suite->addTestSuite('CIITextEscapingTest');
-		require_once dirname(__FILE__).'/CompatShimReloadTest.php';
-		$suite->addTestSuite('CompatShimReloadTest');
-		require_once dirname(__FILE__).'/DefaultProductRoutingResetTest.php';
-		$suite->addTestSuite('DefaultProductRoutingResetTest');
-		require_once dirname(__FILE__).'/EInvoicingSamplesTest.php';
-		$suite->addTestSuite('EInvoicingSamplesTest');
-		require_once dirname(__FILE__).'/HeaderChargeLineTest.php';
-		$suite->addTestSuite('HeaderChargeLineTest');
-		require_once dirname(__FILE__).'/InvoicingPeriodTest.php';
-		$suite->addTestSuite('InvoicingPeriodTest');
-		require_once dirname(__FILE__).'/LineChargeTest.php';
-		$suite->addTestSuite('LineChargeTest');
-		require_once dirname(__FILE__).'/LineDiscountBaseTest.php';
-		$suite->addTestSuite('LineDiscountBaseTest');
-		require_once dirname(__FILE__).'/LinePriceBaseQuantityTest.php';
-		$suite->addTestSuite('LinePriceBaseQuantityTest');
-		require_once dirname(__FILE__).'/LineWithoutQuantityTest.php';
-		$suite->addTestSuite('LineWithoutQuantityTest');
-		require_once dirname(__FILE__).'/MandatoryThirdpartyExtrafieldTest.php';
-		$suite->addTestSuite('MandatoryThirdpartyExtrafieldTest');
-		require_once dirname(__FILE__).'/NegativeLineAmountTest.php';
-		$suite->addTestSuite('NegativeLineAmountTest');
-		require_once dirname(__FILE__).'/ImportVatCalculationModeTest.php';
-		$suite->addTestSuite('ImportVatCalculationModeTest');
-		require_once dirname(__FILE__).'/PDPProviderManagerTest.php';
-		$suite->addTestSuite('PDPProviderManagerTest');
-		require_once dirname(__FILE__).'/RedirectUrlAllowlistTest.php';
-		$suite->addTestSuite('RedirectUrlAllowlistTest');
-		require_once dirname(__FILE__).'/RecipientDirectoryTest.php';
-		$suite->addTestSuite('RecipientDirectoryTest');
-		require_once dirname(__FILE__).'/SellerVatRegimeTest.php';
-		$suite->addTestSuite('SellerVatRegimeTest');
-		require_once dirname(__FILE__).'/SkipB2CPrecheckTest.php';
-		$suite->addTestSuite('SkipB2CPrecheckTest');
-		require_once dirname(__FILE__).'/StatusComboMarkupTest.php';
-		$suite->addTestSuite('StatusComboMarkupTest');
-		require_once dirname(__FILE__).'/SupportExportTest.php';
-		$suite->addTestSuite('SupportExportTest');
-		require_once dirname(__FILE__).'/SupplierInvoiceHelperTest.php';
-		$suite->addTestSuite('SupplierInvoiceHelperTest');
-		require_once dirname(__FILE__).'/TransmittedLockTest.php';
-		$suite->addTestSuite('TransmittedLockTest');
-		require_once dirname(__FILE__).'/VatCategoryFromVatCodeTest.php';
-		$suite->addTestSuite('VatCategoryFromVatCodeTest');
-		require_once dirname(__FILE__).'/VatPointDateCodeTest.php';
-		$suite->addTestSuite('VatPointDateCodeTest');
+		// Every test file of this directory, in name order. The list this replaces was written by
+		// hand and had already missed 13 of the 39 files, and each new one was a conflict between
+		// the pull requests adding it.
+		foreach ((array) glob(dirname(__FILE__).'/*Test.php') as $file) {
+			require_once $file;
+			$suite->addTestSuite(basename($file, '.php'));
+		}
 
 		return $suite;
 	}
