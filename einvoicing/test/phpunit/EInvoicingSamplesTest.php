@@ -70,17 +70,10 @@ require_once __DIR__ . '/CommonClassTestCompat.inc.php';
 /**
  * Class EInvoicingSamplesTest
  *
- * This test class ensures that the generated XML output for different invoice types remains
- * consistent and matches the committed reference fixtures. It validates three invoice types:
- * - Deposit invoices
- * - Standard invoices
- * - Credit notes
- *
- * Generated XML is compared against the reference fixtures stored in
- * test/phpunit/fixtures/einvoicing_samples/ using semantic XML comparison.
- *
- * The same documents also have to hold together on their own, whatever the fixtures say: the VAT
- * breakdown (BG-23) of each one is checked here too, on the chain generated once for the class.
+ * Ensures the generated XML for the three invoice types it validates (deposit invoices, standard
+ * invoices, credit notes) remains consistent with the committed reference fixtures stored in
+ * test/phpunit/fixtures/einvoicing_samples/, using semantic XML comparison. The VAT breakdown
+ * (BG-23) of each document is checked here too, on the chain generated once for the class.
  */
 class EInvoicingSamplesTest extends CommonClassTest
 {

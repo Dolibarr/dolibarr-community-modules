@@ -20,14 +20,10 @@
  *      \file       test/phpunit/CIITextEscapingTest.php
  *      \ingroup    test
  *      \brief      PHPUnit test for the XML escaping of the values written in a CII document.
- *                  DOMDocument::createElement() PARSES its second argument: a value holding an
- *                  ampersand ("ETHIQUE & TACT", an ordinary company name) raises an "unterminated
- *                  entity reference" warning and produces an EMPTY element, so the business term is
- *                  silently lost and the document is refused by PEPPOL-EN16931-R008, which forbids
- *                  empty elements (issue #695). Every value must therefore be escaped on its way in.
- *                  The same question is then asked of the whole generation path, on an invoice of
- *                  the base carrying the shapes a description really holds - a control character
- *                  pasted from a PDF among them.
+ *                  DOMDocument::createElement() parses its second argument, so a value holding an
+ *                  ampersand produces an empty element, refused by PEPPOL-EN16931-R008 (issue #695).
+ *                  The whole generation path is then checked on an invoice of the base carrying the
+ *                  shapes a description really holds, a control character pasted from a PDF included.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 
