@@ -85,6 +85,12 @@ class CdarHandler
 	const SCHEME_SIREN_0225 = '0225';
 	const SCHEME_SIREN_0002 = '0002';
 
+	// MDT-97: what kind of object the lifecycle message is about (rule G7.14 of XP Z12-012).
+	// A status sent by this module always refers to an invoice of the e-invoicing circuit; the
+	// other values of the rule cover a flow, regulatory data, an e-reporting transmission, the
+	// directory, and a status about a status.
+	const REFERENCE_TYPE_EINVOICE = 'urn.cpro.gouv.fr:1p0:CDV:einvoicingF2';
+
 	// Status Codes
 	const STATUS_ACCEPTED = '1';
 	const STATUS_REJECTED = '8';
@@ -152,6 +158,11 @@ class CdarHandler
 	 *				'issuerid' (fallen back on an identifier of the vendor)
 	 */
 	public $recipientURIIDOrigin = '';
+
+	/**
+	 * @var string EAS scheme (MDT-73-1) declared for the address above, as chosen by generateCdarFile()
+	 */
+	public $recipientURISchemeID = self::SCHEME_SIREN_0225;
 
 	/**
 	 * readFromString
@@ -357,6 +368,7 @@ class CdarHandler
 		//      alone: the invoice-level routing override it also knows about is looked up among the customer
 		//      invoices (element_type = 'facture'), which a supplier invoice must not read.
 		$RecipientURIID = $InvoiceIssuerGlobalID;
+		$RecipientURISchemeID = CdarHandler::SCHEME_SIREN_0225;
 		$this->recipientURIIDOrigin = 'issuerid';
 		if ($statusCode != 212 && $object->thirdparty instanceof Societe) {
 			$vendorRouting = $einvoicing->fetchDefaultRouting($object->thirdparty->id);
@@ -370,6 +382,13 @@ class CdarHandler
 				$vendorURIID = removeAllSpaces($vendorIdentity['uriid']);
 				if ($vendorURIID !== '') {
 					$this->recipientURIIDOrigin = 'einvoice';
+					// MDT-73-1 is the EAS scheme of the address actually used, not a constant: the vendor
+					// published this one on its invoice (BT-34) together with its scheme, and re-labelling
+					// it as a national directory address (0225) would describe it wrongly. Every other rung
+					// does take an address of the national directory, so 0225 stays right for them.
+					if ($vendorIdentity['urischeme'] !== '') {
+						$RecipientURISchemeID = $vendorIdentity['urischeme'];
+					}
 					dol_syslog(__METHOD__ . ' no routing ID recorded for vendor SIREN ' . $InvoiceIssuerGlobalID . ', replying to the electronic address of the invoice it sent us: ' . $vendorURIID, LOG_NOTICE);
 				}
 			}
@@ -410,6 +429,7 @@ class CdarHandler
 		// invoice that can be neither approved nor refused - and therefore not deleted - leaves the user
 		// with nothing to act on.
 		$this->recipientURIID = $RecipientURIID;
+		$this->recipientURISchemeID = $RecipientURISchemeID;
 
 		// MDG-43 blocks. Rule BR-FR-CDV-14: a "Encaissee" status (212) must carry at least one block with
 		// MDT-207 = MEN, and every MEN block must hold both an amount (MDT-215) and a VAT rate (MDT-224).
@@ -469,7 +489,7 @@ class CdarHandler
 				'SchemeID'     => CdarHandler::SCHEME_SIREN_0002,
 				'RoleCode'     => CdarHandler::ROLE_SE,
 				'URIID'        => $RecipientURIID,	// The routing of the vendor, its SIREN when none is recorded
-				'URISchemeID'  => CdarHandler::SCHEME_SIREN_0225
+				'URISchemeID'  => $RecipientURISchemeID
 			];
 		}
 
@@ -499,6 +519,8 @@ class CdarHandler
 					'IssuerAssignedID' => $IssuerAssignedID,
 					'StatusCode' => $StatusCodeCdar,
 					'TypeCode' => CdarHandler::DOC_INVOICE, // TODO: map DOC_INVOICE with $object type
+					// MDT-97, mandatory in the CTC-FR profile: it says what the lifecycle message is about
+					'ReferenceTypeCode' => CdarHandler::REFERENCE_TYPE_EINVOICE,
 					// Every XP Z12-012 reference example dates the referenced invoice with a plain date
 					'FormattedIssueDateTime' => date('Ymd', $object->date),
 					'ProcessConditionCode' => $statusCode,
@@ -596,12 +618,14 @@ class CdarHandler
 	 * A single parse serves both values, since a CDAR always needs the two together.
 	 *
 	 * @param  FactureFournisseur $object  Supplier invoice the status is sent on
-	 * @return array{globalid:string,uriid:string}  Empty strings when there is no stored e-invoice,
-	 *                                              when it is unparsable, or when it carries no such field
+	 * @return array{globalid:string,uriid:string,urischeme:string}  Empty strings when there is no stored
+	 *                                              e-invoice, when it is unparsable, or when it carries no
+	 *                                              such field. 'urischeme' is the EAS scheme the document
+	 *                                              declares on that address (MDT-73-1 of the CDAR).
 	 */
 	private function getVendorIdentityFromReceivedInvoice($object)
 	{
-		$identity = array('globalid' => '', 'uriid' => '');
+		$identity = array('globalid' => '', 'uriid' => '', 'urischeme' => '');
 
 		if (empty($object->id) || $object->element !== 'invoice_supplier') {
 			return $identity;
@@ -648,6 +672,11 @@ class CdarHandler
 		$found = $xml->xpath('//ram:SellerTradeParty/ram:URIUniversalCommunication/ram:URIID');
 		if (!empty($found)) {
 			$identity['uriid'] = trim((string) $found[0]);
+			// The scheme comes with the address: MDT-73-1 has to declare the address for what the vendor
+			// published it as, and a vendor reachable under its SIREN (0002) is not a national directory
+			// address (0225). Kept only when the document actually carries one.
+			$scheme = (string) ($found[0]->attributes()->schemeID ?? '');
+			$identity['urischeme'] = trim($scheme);
 		}
 
 		return $identity;
@@ -1114,6 +1143,12 @@ class CdarHandler
 		$ref->appendChild($dom->createElement('ram:IssuerAssignedID', htmlspecialchars((string) $doc['IssuerAssignedID'])));
 		$ref->appendChild($dom->createElement('ram:StatusCode', htmlspecialchars((string) $doc['StatusCode'])));
 		$ref->appendChild($dom->createElement('ram:TypeCode', htmlspecialchars((string) $doc['TypeCode'])));
+
+		// MDT-97. Its place in the CDAR XSD sequence (ReferencedDocumentType) is after ReceiptDateTime /
+		// AttachmentBinaryObject and before FormattedIssueDateTime - the order the platforms use too.
+		if (!empty($doc['ReferenceTypeCode'])) {
+			$ref->appendChild($dom->createElement('ram:ReferenceTypeCode', htmlspecialchars((string) $doc['ReferenceTypeCode'])));
+		}
 
 		$formattedDateTime = $dom->createElement('ram:FormattedIssueDateTime');
 		$dateTimeStr = $dom->createElement('qdt:DateTimeString', htmlspecialchars((string) $doc['FormattedIssueDateTime']));
