@@ -255,6 +255,7 @@ class Stancer_payments extends CommonObject
 		'order_id' => array('type'=>'varchar(36)', 'label'=>'StancerOrderID', 'enabled'=>'1', 'position'=>70, 'notnull'=>0, 'visible'=>-1, 'showoncombobox'=>'1', 'validate'=>'1', 'comment'=>"Your reference id"),
 		'unique_id' => array('type'=>'varchar(36)', 'label'=>'StancerUniqueID', 'enabled'=>'1', 'position'=>80, 'notnull'=>0, 'visible'=>1, 'showoncombobox'=>'1', 'validate'=>'1', 'comment'=>"Your unicity key"),
 		'grouped_invoice_ids' => array('type'=>'text', 'label'=>'StancerGroupedInvoiceIds', 'enabled'=>'1', 'position'=>81, 'notnull'=>0, 'visible'=>-1, 'validate'=>'1', 'comment'=>"Comma-separated list of Dolibarr invoice ids when this Stancer payment groups several same-day invoices for the same customer"),
+		'partial_payment' => array('type'=>'integer', 'label'=>'StancerPartialPayment', 'enabled'=>'1', 'position'=>82, 'notnull'=>0, 'visible'=>-1, 'default'=>'0', 'validate'=>'1', 'comment'=>"1 when this payment only covers the deposit percentage of the source order or proposal"),
 		'method' => array('type'=>'varchar(4)', 'label'=>'Method', 'enabled'=>'1', 'position'=>90, 'notnull'=>0, 'visible'=>1, 'arrayofkeyval'=>array('' => '', 'card'=>'CB', 'sepa'=>'SEPA'), 'validate'=>'1', 'comment'=>"The payment method used to pay"),
 		'card' => array('type'=>'varchar(30)', 'label'=>'StancerCBCard', 'enabled'=>'1', 'position'=>100, 'notnull'=>0, 'visible'=>1, 'showoncombobox'=>'1', 'validate'=>'1', 'comment'=>"If present, will perform a credit card payment"),
 		'sepa' => array('type'=>'varchar(30)', 'label'=>'SEPA', 'enabled'=>'1', 'position'=>110, 'notnull'=>0, 'visible'=>1, 'showoncombobox'=>'1', 'validate'=>'1', 'comment'=>"If present, will perform a SEPA payment"),
@@ -287,6 +288,12 @@ class Stancer_payments extends CommonObject
 	public $order_id;
 	public $unique_id;
 	public $grouped_invoice_ids;
+	/**
+	 * 1 when the payment only covers the deposit percentage of the source order or
+	 * proposal. Written when the payment starts, so that the return page knows it
+	 * even when the customer opened the payment link from an email, with no session.
+	 */
+	public $partial_payment;
 	public $method;
 	public $card;
 	public $sepa;

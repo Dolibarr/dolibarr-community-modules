@@ -83,6 +83,27 @@ include_once __DIR__.'/class/document.class.php';
 // Load translation files required by the page
 $langs->loadLangs(array("einvoicing@einvoicing", "products", "companies", "bills", "other"));
 
+
+/**
+ * Price of a single unit of a parsed line, the one this page shows and stores as a buying price.
+ *
+ * EN 16931 states BT-146 as the price of BT-149 units, so a line priced "2.00 per 100" carries a
+ * ChargeAmount of 2.00 - which is not the price of one unit and must not be recorded as one
+ * (issues #777 and #778). The protocol owns that arithmetic; this page only asks it.
+ *
+ * @param	object|null				$protocol	Protocol that parsed the flow, when it knows how to answer
+ * @param	array<string,mixed>		$parsedLine	One line as parseInvoiceLines() returns it
+ * @return	float								Price of a single unit, without tax
+ */
+function einvoicingLineUnitPrice($protocol, array $parsedLine)
+{
+	if (is_object($protocol) && method_exists($protocol, 'resolveLineUnitPrice')) {
+		return (float) $protocol->resolveLineUnitPrice($parsedLine);
+	}
+
+	return (float) ($parsedLine['netpriceamount'] ?? 0);
+}
+
 // Get parameters
 $action = GETPOST('action', 'aZ09');
 $flowid = GETPOST('flowid', 'alphanohtml');
@@ -191,7 +212,7 @@ if ($action == 'savemapping' && $permissiontoadd && !empty($parsedLines) && $soc
 			$productFourn->id = $idprod;
 			$resultbuyprice = $productFourn->update_buyprice(
 				1,															// qty min
-				(float) ($parsedLine['netpriceamount'] ?? 0),				// unit price without tax
+				einvoicingLineUnitPrice($protocol, $parsedLine),			// unit price without tax, BT-146 brought back to one unit
 				$user,
 				'HT',
 				$supplier,
@@ -316,7 +337,7 @@ if (!empty($parsedLines)) {
 		print '<td>'.dol_escape_htmltag((string) ($parsedLine['prodglobalid'] ?? '')).'</td>';
 		print '<td>'.dol_escape_htmltag(dol_trunc((string) ($parsedLine['prodname'] ?? ''), 60)).'</td>';
 		print '<td class="right">'.dol_escape_htmltag((string) ($parsedLine['billedquantity'] ?? '')).' '.dol_escape_htmltag((string) ($parsedLine['billedquantityunitcode'] ?? '')).'</td>';
-		print '<td class="right">'.price((float) ($parsedLine['netpriceamount'] ?? 0)).'</td>';
+		print '<td class="right">'.price(einvoicingLineUnitPrice($protocol, $parsedLine)).'</td>';
 		print '<td class="right">'.price((float) ($parsedLine['rateApplicablePercent'] ?? 0)).'%</td>';
 
 		print '<td>';

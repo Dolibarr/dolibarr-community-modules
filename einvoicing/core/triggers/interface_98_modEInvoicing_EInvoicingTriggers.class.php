@@ -95,18 +95,42 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 				}
 			}
 
-			// Default product for import
-			$routingProductId = GETPOST('routing_product_id', 'aZ09');
-			if ($routingProductId !== '' && $routingProductId !== '-1') {
-				$existing = $einvoicing->fetchDefaultRouting($socId, 'product');
-				if (empty($existing)) {
-					$result = $einvoicing->addRouting($socId, $routingProductId, '', 'product');
-				} else {
-					$result = $einvoicing->setDefaultRouting($socId, $routingProductId, '', '', '', 'product');
+			// Default product for import.
+			// The combo posts '-1' when the empty entry is picked, and '' when the ajax search input is
+			// cleared: both mean "no default product any more", so the routing has to be deleted. Two
+			// saves must leave the current value untouched: one that does not carry the field at all
+			// (thirdparty updated from the API, a mass action, an import...), and one whose field could
+			// not show the current value, which routing_product_id_shown tells apart.
+			if (GETPOSTISSET('routing_product_id')) {
+				$routingProductId = GETPOST('routing_product_id', 'aZ09');
+				if ($routingProductId === '-1' || $routingProductId === '0') {
+					$routingProductId = '';
 				}
-				if ($result < 0) {
-					$error++;
-					$this->errors[] = $langs->trans('FailedToSaveRoutingID').' '.$einvoicing->error;
+				$shownProductId = GETPOST('routing_product_id_shown', 'aZ09');
+				if ($shownProductId === '-1' || $shownProductId === '0') {
+					$shownProductId = '';
+				}
+				$existing = $einvoicing->fetchDefaultRouting($socId, 'product');
+				$result = 0;
+				if ($routingProductId === '') {
+					if ($shownProductId !== '' && !empty($existing)) {
+						// setDefaultRouting() with an empty value only deletes the existing routing
+						$result = $einvoicing->setDefaultRouting($socId, '', '', '', '', 'product');
+						if ($result < 0) {
+							$error++;
+							$this->errors[] = $langs->trans('FailedToDeleteRoutingID').' '.$einvoicing->error;
+						}
+					}
+				} else {
+					if (empty($existing)) {
+						$result = $einvoicing->addRouting($socId, $routingProductId, '', 'product');
+					} else {
+						$result = $einvoicing->setDefaultRouting($socId, $routingProductId, '', '', '', 'product');
+					}
+					if ($result < 0) {
+						$error++;
+						$this->errors[] = $langs->trans('FailedToSaveRoutingID').' '.$einvoicing->error;
+					}
 				}
 			}
 
@@ -417,7 +441,18 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			 */
 			'@phan-var-force Document $object';
 			$duplicate = false;
-			if ($object->fk_element_type == 'invoice_supplier' && SupplierInvoiceHelper::isEInvoice($object->fk_element_id, true, $duplicate)) {
+
+			// A flow does not always carry a supplier invoice id: a lifecycle message (flow_type
+			// 'SupplierInvoiceLC') sets fk_element_type without ever resolving an invoice, an import that
+			// failed never booked one, and deleting the local invoice detaches the flow it came from
+			// (see detachEInvoicingRecordsOfSupplierInvoice() below, which sets the column to 0). The
+			// column is nullable, so the value read here is null in the first two cases: passing it on
+			// used to raise an uncaught TypeError on the int parameter of isEInvoice() and end the mass
+			// deletion on a PHP fatal. Such a flow is linked to nothing, so there is nothing to protect
+			// and the deletion is allowed - as it already was for the detached (0) case.
+			$linkedsupplierinvoiceid = (int) $object->fk_element_id;
+
+			if ($object->fk_element_type == 'invoice_supplier' && $linkedsupplierinvoiceid > 0 && SupplierInvoiceHelper::isEInvoice($linkedsupplierinvoiceid, true, $duplicate)) {
 				$lastid = 0;
 
 				// Test if einvoice is the last one(in this case, we may accept to delete the document, record will be loaded at next sync

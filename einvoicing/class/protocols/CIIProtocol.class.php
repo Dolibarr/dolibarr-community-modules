@@ -937,7 +937,7 @@ class CIIProtocol extends AbstractProtocol
 
 				$refDocInvoiceId = SupplierInvoiceHelper::findIdByRef($refDoc, (int) $socId);
 				if ($refDocInvoiceId < 0) {
-					return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($refDocInvoiceId, $refDoc, 'linked to document ' . ($parsedHeader['documentno'] ?? ''))];
+					return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($refDocInvoiceId, $refDoc, 'required by received document ' . ($parsedHeader['documentno'] ?? ''))];
 				}
 				if ($refDocInvoiceId == 0) {
 					// The invoice references a document this Dolibarr does not hold: the final invoice of a
@@ -956,7 +956,7 @@ class CIIProtocol extends AbstractProtocol
 					return [
 						'res' => -1,
 						'postponeflow' => 1,
-						'message' => 'Document : ' . $refDoc . ' linked to document ' . $parsedHeader['documentno'] . ' not found in Dolibarr',
+						'message' => 'Document ' . $refDoc . ', required by received document ' . $parsedHeader['documentno'] . ', was not found in Dolibarr',
 						'actioncode' => 'LINKED_INVOICE_NOT_FOUND',
 						'actionurl' => 'none',
 						'actiondata' => array('supplierref' => $refDoc, 'linkedref' => ($parsedHeader['documentno'] ?? ''), 'socid' => (int) $socId),
@@ -1076,10 +1076,10 @@ class CIIProtocol extends AbstractProtocol
 
 					$linkedObjectId = SupplierInvoiceHelper::findIdByRef($refDoc, (int) $socId);
 					if ($linkedObjectId < 0) {
-						return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($linkedObjectId, $refDoc, 'linked to document ' . ($parsedHeader['documentno'] ?? ''))];
+						return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($linkedObjectId, $refDoc, 'required by received document ' . ($parsedHeader['documentno'] ?? ''))];
 					}
 					if ($linkedObjectId == 0) {
-						return ['res' => -1, 'message' => 'Document : ' . $refDoc . ' linked to document ' . $parsedHeader['documentno'] . ' not found in Dolibarr'];
+						return ['res' => -1, 'message' => 'Document ' . $refDoc . ', required by received document ' . $parsedHeader['documentno'] . ', was not found in Dolibarr'];
 					}
 
 					// Fetch Object
@@ -1115,7 +1115,10 @@ class CIIProtocol extends AbstractProtocol
 
 						// Other linked document handling can be implemented here based on the type of the linked document for example credit note etc...
 					} else {
-						return ['res' => -1, 'message' => 'Document : ' . $refDoc . ' linked to document ' . $parsedHeader['documentno'] . ' not found in Dolibarr'];
+						// Reached only when fetch() failed on an id findIdByRef() did return, so the reference
+						// was matched and it is the loading that went wrong: saying "not found" here sent the
+						// reader looking for a missing invoice that is in fact there.
+						return ['res' => -1, 'message' => 'Document ' . $refDoc . ', required by received document ' . $parsedHeader['documentno'] . ', matches supplier invoice id ' . ((int) $linkedObjectId) . ' but that invoice could not be loaded'];
 					}
 				}
 			}
@@ -1124,6 +1127,9 @@ class CIIProtocol extends AbstractProtocol
 			if ($supplier->fournisseur != 1) {
 				$supplier->fournisseur = 1;
 				$supplier->code_fournisseur = 'auto';
+				// Flagging a vendor must not rewrite its extrafields, or a mandatory one left empty
+				// makes update() refuse the whole record. See _syncOrCreateThirdpartyFromEInvoiceSeller().
+				$supplier->array_options = array();
 				$supplier->update($supplier->id, $user);
 			}
 
@@ -1148,6 +1154,10 @@ class CIIProtocol extends AbstractProtocol
 					return $chargeRes;
 				}
 			}
+
+			// Every line of the invoice exists now, so its totals can be confronted with the ones the
+			// document announces (issue #781).
+			$this->alignInvoiceTotalsWithDocument($supplierInvoiceId, $parsedHeader, $return_messages);
 
 			// Create or update supplier prices for imported products
 			if (!empty($supplierPriceEntries)) {
@@ -1335,7 +1345,7 @@ class CIIProtocol extends AbstractProtocol
 				if ($productId > 0 && $productMatchType != 'defaultrouting' && !empty($parsedLine['prodsellerid'])) {
 					$supplierPriceEntries[] = [
 						'productId' => $productId,
-						'unitPrice' => (float) $parsedLine['netpriceamount'],
+						'unitPrice' => $this->resolveLineUnitPrice($parsedLine),
 						'refFourn'  => (string) $parsedLine['prodsellerid'],
 						'tvaTx'     => (float) ($parsedLine['rateApplicablePercent'] ?? 0),
 					];
@@ -1386,13 +1396,13 @@ class CIIProtocol extends AbstractProtocol
 						$line->subprice = round($discount['priceWithoutDiscount'] / $parsedLine['billedquantity'], 8);
 					} else {
 						// Avoid a fatal DivisionByZeroError on a zero/empty billed quantity (e.g. a free
-						// sample line): keep the discount percent, let subprice fall back to netpriceamount below.
+						// sample line): keep the discount percent, let subprice fall back to the line unit price below.
 						dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource line ' . ($parsedLine['lineid'] ?? '?') . ' has a discount but billedquantity is zero/empty, skipping subprice adjustment', LOG_WARNING);
 					}
 				}
 			}
 			$line->qty = (float) $parsedLine['billedquantity'];
-			$line->subprice = $line->subprice ?? (float) $parsedLine['netpriceamount'];
+			$line->subprice = $line->subprice ?? $this->resolveLineUnitPrice($parsedLine);
 			$line->tva_tx = (float) $parsedLine['rateApplicablePercent'];
 			$line->total_ht = (float) $parsedLine['lineTotalAmount'];
 			$line->total_tva = $parsedLine['calculatedAmount'] ?? 0;
@@ -1602,6 +1612,46 @@ class CIIProtocol extends AbstractProtocol
 	}
 
 	/**
+	 * Unit price a received line must carry in Dolibarr: BT-146 brought back to a single unit.
+	 *
+	 * EN 16931 does not state the price of one item. It states BT-146, the item net price, as the price of
+	 * BT-149 units of that item - the item price base quantity. A price of "2.00 per 100" is
+	 * <ram:ChargeAmount>2.00</ram:ChargeAmount> with <ram:BasisQuantity>100</ram:BasisQuantity>, and the
+	 * net amount the document announces for the line, BT-131, is BT-129 / BT-149 x BT-146. UBL says the
+	 * same thing with cbc:PriceAmount and cbc:BaseQuantity. The pattern is ordinary wherever a rate is
+	 * billed rather than an item: a fuel surcharge per 100, a metered consumption per 100 000.
+	 *
+	 * A Dolibarr line has no such divisor. It holds one price for one unit and lets the core multiply it
+	 * by the quantity, so BT-149 has to be folded into the price at import. It was read by the parser and
+	 * then dropped, which multiplied the line - and the total of the whole invoice - by that base
+	 * quantity: a line priced 0.134195 per 100 000 came in at 9 983 012.03 instead of 99.83
+	 * (issues #777 and #778).
+	 *
+	 * BT-149 is optional and means one when absent; BR-64 requires it to be positive when present, and
+	 * BR-65 requires its unit code (BT-150) to be the invoiced quantity unit code (BT-130), so there is no
+	 * unit conversion to make here. Anything else - absent, zero, negative, unreadable - is taken as one,
+	 * which leaves the line exactly as the import built it before.
+	 *
+	 * The division is handed to the core unrounded on purpose: calcul_price_total() computes the total of
+	 * the line from the unit price it receives and only rounds the copy it stores as pu_ht, so a price
+	 * below the display precision still totals what the document announces.
+	 *
+	 * @param	array<string,mixed>		$parsedLine		One line as parseInvoiceLines() returns it
+	 * @return	float									Price of a single unit, to hand to updateline()
+	 */
+	public function resolveLineUnitPrice(array $parsedLine)
+	{
+		$netPrice = (float) ($parsedLine['netpriceamount'] ?? 0);
+		$baseQuantity = (float) ($parsedLine['netpricebasisquantity'] ?? 0);
+
+		if ($baseQuantity <= 0 || $baseQuantity == 1.0) {
+			return $netPrice;
+		}
+
+		return $netPrice / $baseQuantity;
+	}
+
+	/**
 	 * Decide the quantity, unit price and discount a received line must carry in Dolibarr.
 	 *
 	 * The line is written by createSupplierInvoiceLinesIntoDatabase(), which hands those three to
@@ -1630,7 +1680,9 @@ class CIIProtocol extends AbstractProtocol
 	 *       alone; a document that puts it on BT-131 only would otherwise be imported as a charge, moving
 	 *       the invoice by twice the amount of the line.
 	 * 3. Everything else: check that what the core is about to compute is what the document announces, and
-	 *    say so when it is not. The tolerance is the one BR-FREXT-CO-10 applies to the totals.
+	 *    say so when it is not. The tolerance is the one BR-FREXT-CO-10 applies to the totals. A line that
+	 *    does rebuild its amount can still hold a unit price too small for the core to store - see the
+	 *    branch below - and that is reported too.
 	 *
 	 * @param	array<string,mixed>		$parsedLine			One line as parseInvoiceLines() returns it
 	 * @param	float					$qty				Quantity read from the document (BT-129)
@@ -1673,6 +1725,21 @@ class CIIProtocol extends AbstractProtocol
 		if (abs($rebuilt - $announced) > 0.01) {
 			$warning = 'Line ' . $lineid . ' of the received document announces a net amount (BT-131) of ' . $announced
 				. ', but its quantity and unit price rebuild ' . $rebuilt . '. The invoice carries the rebuilt amount.';
+		} elseif ($subprice != 0.0 && (float) price2num($subprice, 'MU') == 0.0) {
+			// calcul_price_total() totals the line from the unit price it is handed and rounds only the copy
+			// it stores as pu_ht, to MAIN_MAX_DECIMALS_UNIT. A price of one unit below that precision -
+			// which is what a price stated per 100 000 comes down to (issue #777) - therefore totals exactly
+			// what the document announces and still reaches the line as 0.00000. The line as imported is
+			// right; it is opening and saving it again that would recompute it to zero, so say so here
+			// rather than let it be found out later.
+			// A price that small is a float PHP writes as 1.34195E-6, which reads as a typo in a message:
+			// spell it out in full, without the trailing zeros of a fixed number of decimals.
+			$spelled = rtrim(rtrim(number_format($subprice, 12, '.', ''), '0'), '.');
+
+			$warning = 'Line ' . $lineid . ' of the received document prices a single unit at ' . $spelled
+				. ', below the unit price precision of this Dolibarr (MAIN_MAX_DECIMALS_UNIT = '
+				. getDolGlobalInt('MAIN_MAX_DECIMALS_UNIT') . '). Its net amount (BT-131) of ' . $announced
+				. ' is imported as announced, but the unit price is stored as zero: editing that line would recompute it to 0.00.';
 		}
 
 		return array('qty' => $qty, 'subprice' => $subprice, 'remise_percent' => $remisePercent, 'warning' => $warning);
@@ -3457,8 +3524,21 @@ class CIIProtocol extends AbstractProtocol
 	/**
 	 * Resolve multiple line allowances into a single percentage for Dolibarr.
 	 *
-	 * Dolibarr only supports percentage discounts on lines, so fixed amounts
-	 * are converted using basisAmount or lineTotalAmount as base.
+	 * Dolibarr only supports percentage discounts on lines, so the fixed amount the document states
+	 * (BT-136) has to be turned into one. A percentage needs the amount it is taken off, which EN 16931
+	 * carries as BT-137 - an optional field, and one a fair share of issuers do not send.
+	 *
+	 * When it is missing the base is rebuilt from the line itself: BT-131 is the amount that remains
+	 * after the allowances, so adding them back (and taking the charges out, they leave by a line of
+	 * their own, issue #735) gives the amount before discount, the very number the caller then divides
+	 * by the quantity to get the unit price. Using BT-131 itself, as this did until issue #783, applied
+	 * the percentage to the amount after discount: the ratio came out too large and the line was
+	 * imported short - 94.74 instead of 95.00 for a 5.00 allowance on a 100.00 line.
+	 *
+	 * The amount itself is read as a magnitude, whatever sign the document puts on it: ram:ChargeIndicator
+	 * already says which way it goes. Both readings are met in the field, and taken with its sign a
+	 * negative BT-136 turned the discount negative and left the line short in the same way.
+	 *
 	 * Multiple allowances are summed into one final percentage.
 	 *
 	 * @param array      $lineAllowances  parsed lineAllowances array
@@ -3485,20 +3565,31 @@ class CIIProtocol extends AbstractProtocol
 			return false;
 		}
 
-		// Base used for percent calculation — basisAmount of first entry, fallback to lineTotalAmount
-		$base = $allowances[0]['basisAmount'] ?? $lineTotalAmount;
-
-		if (!$base) {
-			return false;
-		}
-
-		// Sum all actualAmounts — always populated whether the source was % or fixed
+		// Sum all actualAmounts — always populated whether the source was % or fixed.
+		// Read as a magnitude: ram:ChargeIndicator already says which way the amount goes, so BT-136 is
+		// the size of the allowance and not a signed correction. An issuer that writes it negative -
+		// <ActualAmount>-0.6</ActualAmount> under an indicator of false, reported on issue #783 - means
+		// the same 0.60 off the line, and its own BT-131 is computed that way. Taken with its sign the
+		// discount came out negative, which put the line back *up* by that much on both sides of the
+		// division and left it short of the announced amount.
 		$totalDiscountAmount = 0.0;
 		foreach ($allowances as $allowance) {
-			$totalDiscountAmount += (float) ($allowance['actualAmount'] ?? 0);
+			$totalDiscountAmount += abs((float) ($allowance['actualAmount'] ?? 0));
 		}
 
 		if ($totalDiscountAmount === 0.0) {
+			return false;
+		}
+
+		// Amount of the line before its allowances, which is also what the caller turns into the unit
+		// price of the Dolibarr line.
+		$priceWithoutDiscount = (float) $lineTotalAmount - $totalChargeAmount + $totalDiscountAmount;
+
+		// Base used for percent calculation — BT-137 when the document states it, the amount before
+		// discount otherwise (issue #783).
+		$base = $allowances[0]['basisAmount'] ?? $priceWithoutDiscount;
+
+		if (!$base) {
 			return false;
 		}
 
@@ -3506,8 +3597,116 @@ class CIIProtocol extends AbstractProtocol
 			'percent'              => round(($totalDiscountAmount / $base) * 100, 4),
 			'base'                 => (float) $base,
 			'discountAmount'       => $totalDiscountAmount,
-			'priceWithoutDiscount' => (float) $lineTotalAmount - $totalChargeAmount + $totalDiscountAmount,
+			'priceWithoutDiscount' => $priceWithoutDiscount,
 		];
+	}
+
+
+	/**
+	 * Record an imported invoice at the totals its document announces, whatever the VAT calculation
+	 * mode of the instance.
+	 *
+	 * Dolibarr computes the VAT of an invoice in one of two conventions, chosen once for the whole
+	 * instance: "total of round" - round the VAT of every line, then add them up - which is what
+	 * update_price() applies when nothing is set, or "round of total" - add the line amounts up, then
+	 * round the VAT once - selected by MAIN_ROUNDOFTOTAL_NOT_TOTALOFROUND_SUPPLIER (the core reads the
+	 * generic MAIN_ROUNDOFTOTAL_NOT_TOTALOFROUND before Dolibarr 20). The supplier invoice card offers
+	 * the two as the "ReCalculate Mode1 / Mode2" link, and either is a legitimate way to bill.
+	 *
+	 * A received document leaves nothing to choose: BT-110 and BT-112 are given by the issuer, who
+	 * rounded them the way its own system does. Importing under the convention of the instance
+	 * therefore records an invoice that does not total what the document says - two cents on a real
+	 * 46 line invoice (issue #781), which the module then refuses to validate, telling the operator to
+	 * recalculate in the other mode. This does exactly that, on that one invoice, and leaves the
+	 * setting of the instance alone.
+	 *
+	 * The net amounts are never concerned: the core writes a rounding difference back onto the VAT of a
+	 * line, never onto its net amount, so the line net amounts (BT-131) and their sum (BT-106) are the
+	 * same under both conventions. And when neither of the two reproduces the announced totals the
+	 * difference is a real one rather than a rounding convention: the invoice is left exactly as the
+	 * import built it and nothing is said here, checkDolInvoiceAndEInvoiceConsistency() being what
+	 * reports such a gap.
+	 *
+	 * @param	int					$supplierInvoiceId	Id of the invoice the import has just built
+	 * @param	array<string,mixed>	$parsedHeader		Header data of the received document
+	 * @param	array<int,string>	$return_messages	Messages of the import, completed here
+	 * @return	void
+	 */
+	protected function alignInvoiceTotalsWithDocument($supplierInvoiceId, array $parsedHeader, array &$return_messages)
+	{
+		global $db, $langs;
+
+		if (!isset($parsedHeader['taxTotalAmount']) || !isset($parsedHeader['grandTotalAmount'])) {
+			return;
+		}
+		$announcedTva = abs((float) $parsedHeader['taxTotalAmount']);
+		$announcedTtc = abs((float) $parsedHeader['grandTotalAmount']);
+
+		require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
+
+		$invoice = new FactureFournisseur($db);
+		if ($invoice->fetch($supplierInvoiceId) <= 0) {
+			return;
+		}
+		if (self::totalsAgreeWithDocument($invoice, $announcedTva, $announcedTtc)) {
+			return;
+		}
+
+		$importedTtc = (float) $invoice->total_ttc;
+		$invoice->fetch_thirdparty();
+
+		// Mode 2 first: a document announcing a VAT rounded on its total is the case met in the field.
+		// The mode of the instance has already been applied by the lines, so re-applying it costs one
+		// recomputation and keeps the two conventions treated the same way.
+		foreach (array('1' => 2, '0' => 1) as $roundingmode => $modenumber) {
+			// Same exclspec as the import itself used (FactureFournisseur::updateline calls
+			// update_price(1, 'auto')), so the rounding convention is the only thing that changes here.
+			if ($invoice->update_price(1, (string) $roundingmode, 0, $invoice->thirdparty) <= 0) {
+				dol_syslog(__METHOD__ . ' Failed to recalculate invoice ' . $supplierInvoiceId . ' in VAT mode ' . $modenumber . ': ' . $invoice->error, LOG_WARNING);
+				break;
+			}
+			if ($invoice->fetch($supplierInvoiceId) <= 0) {
+				return;
+			}
+			if (self::totalsAgreeWithDocument($invoice, $announcedTva, $announcedTtc)) {
+				// The import runs from a cron job as well as from a page, so the language file of the
+				// module is not necessarily loaded.
+				$langs->load('einvoicing@einvoicing');
+				// Translate::trans() takes four parameters and no more, its fifth argument being the
+				// maximum size of the result: a fifth value would end up there and break the sprintf.
+				$return_messages[] = $langs->trans(
+					'EInvoiceImportVatModeRealigned',
+					$modenumber,
+					price2num($announcedTva, 'MT'),
+					price2num($announcedTtc, 'MT'),
+					price2num($importedTtc, 'MT')
+				);
+				dol_syslog(__METHOD__ . ' Invoice ' . $supplierInvoiceId . ' recalculated in VAT mode ' . $modenumber . ' to match the totals of the received document', LOG_DEBUG);
+				return;
+			}
+		}
+
+		// Neither convention gives the announced totals: leave the invoice as the import built it.
+		$invoice->update_price(1, 'auto', 0, $invoice->thirdparty);
+	}
+
+	/**
+	 * Tell whether an invoice totals what the received document announces.
+	 *
+	 * Compared on the absolute values: a credit note is stored negative by Dolibarr while BT-110 and
+	 * BT-112 are always announced positive, the document type being what carries the sign (BR-CO-13
+	 * applies to a credit note as it does to an invoice). The tolerance is there for the float
+	 * representation, not for a difference: the document carries its totals to the cent.
+	 *
+	 * @param	FactureFournisseur	$invoice		The invoice, with its totals as stored
+	 * @param	float				$announcedTva	BT-110 of the received document, absolute value
+	 * @param	float				$announcedTtc	BT-112 of the received document, absolute value
+	 * @return	bool								True when both totals are the announced ones
+	 */
+	private static function totalsAgreeWithDocument(FactureFournisseur $invoice, $announcedTva, $announcedTtc)
+	{
+		return abs(abs((float) $invoice->total_tva) - $announcedTva) < 0.005
+			&& abs(abs((float) $invoice->total_ttc) - $announcedTtc) < 0.005;
 	}
 
 

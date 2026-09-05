@@ -1,0 +1,421 @@
+---
+# The einvoicing module ships more than twenty PHPUnit test files, and until now the CI ran exactly
+# one of them: the Factur-X container test, the only one that needs neither a Dolibarr nor a
+# database. Everything else - and that includes EInvoicingSamplesTest, which compares the CII of five
+# specimen invoices against committed reference documents - could only be run by hand on a developer
+# bench.
+#
+# That is how #709 went in: the merge turned the VAT breakdown rate (BT-119) of every generated
+# document into 0.00, EInvoicingSamplesTest was red on all five samples from the merge commit on, and
+# nothing in the CI was looking. The documents it produced are refused by a conformant platform.
+#
+# This gives those tests the Dolibarr they need. The core is checked out at a release tag and its own
+# demo dump is loaded, which is how the core CI builds a database too - no installer to drive, no
+# fixture of ours to maintain. Then three things happen on that instance:
+#
+#   - the whole suite runs, one process per file, as the tests are meant to be run;
+#   - the pages of the module are opened, because half of what breaks in this module breaks on a page
+#     and not in a computation;
+#   - the package a user installs is built by the release script and installed, because what the
+#     tests run against is a symlinked repository and not what ships.
+#
+# Everything the tests read lives in the module or in that core, so a change elsewhere in the
+# repository does not start the job - the exception being this file and what it calls, which decide
+# how the run goes.
+name: einvoicing_phpunit
+
+permissions:
+  contents: read
+
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'einvoicing/**'
+      - 'dev/build/**'
+      - '.github/workflows/module_einvoicing_phpunit.yml'
+      - '.github/actions/**'
+      - '.github/scripts/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'einvoicing/**'
+      - 'dev/build/**'
+      - '.github/workflows/module_einvoicing_phpunit.yml'
+      - '.github/actions/**'
+      - '.github/scripts/**'
+
+  workflow_dispatch:
+
+concurrency:
+  group: phpunit-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The FNFE package that carries the three validation stages, pinned. https://github.com/fnfempe/France_RFE
+  FNFE_TAG: v1.4.0.03
+  # Saxon-HE runs the compiled Schematron XSLT of that package.
+  SAXON_VERSION: 10.9
+
+jobs:
+  # Which cores the suite runs on. A pull request answers on three - the floor the module declares,
+  # the current stable and the newest - because that is what a reviewer waits for. What lands on main
+  # is run on all seven supported cores: the version specific traps of this module live in the middle
+  # of the range, and they cost a few runner minutes to cover.
+  cores:
+    name: Cores to run on
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.pick.outputs.matrix }}
+    steps:
+      - id: pick
+        run: |
+          # The release each demo dump belongs to. A later patch of the same series would work for
+          # the tests, which talk to the database directly, but every page would answer a redirect
+          # to the migration screen: the core compares its own version with the one the database
+          # was last upgraded to, and the dump carries the .0 of its series.
+          all='[{"dolibarr":"18.0.0","php":"8.2"},
+                {"dolibarr":"19.0.0","php":"8.2"},
+                {"dolibarr":"20.0.0","php":"8.2"},
+                {"dolibarr":"21.0.0","php":"8.3"},
+                {"dolibarr":"22.0.0","php":"8.3"},
+                {"dolibarr":"23.0.0","php":"8.3"},
+                {"dolibarr":"24.0.0","php":"8.3"}]'
+          review='[{"dolibarr":"18.0.0","php":"8.2"},
+                   {"dolibarr":"23.0.0","php":"8.3"},
+                   {"dolibarr":"24.0.0","php":"8.3"}]'
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            chosen="$review"
+          else
+            chosen="$all"
+          fi
+          echo "matrix=$(echo "$chosen" | tr -d '\n ')" >> "$GITHUB_OUTPUT"
+
+  phpunit:
+    name: PHPUnit on Dolibarr ${{ matrix.dolibarr }}
+    needs: cores
+    runs-on: ubuntu-latest
+
+    strategy:
+      # One core failing says nothing about the others, and the interesting information is usually
+      # which ones fail, so let every version go to the end.
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.cores.outputs.matrix) }}
+
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: dolibarr
+          MARIADB_DATABASE: dolibarr
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout the modules repository
+        uses: actions/checkout@v6
+
+      - name: A Dolibarr ${{ matrix.dolibarr }} to run against
+        id: instance
+        uses: ./.github/actions/dolibarr-instance
+        with:
+          dolibarr: ${{ matrix.dolibarr }}
+          php: ${{ matrix.php }}
+
+      - name: Deploy and activate the module
+        # This is how the module is deployed by a developer: a symlink in htdocs/custom, which is
+        # what dolibarr_main_document_root_alt points at. Activating it plays its sql/ files, so the
+        # tests find the tables of the module and not only those of the core. It is activated twice
+        # on purpose: those files are replayed at every activation, and a replay that fails is a
+        # module that cannot be turned off and on again.
+        run: |
+          ln -sfn "${GITHUB_WORKSPACE}/einvoicing" "${{ steps.instance.outputs.htdocs }}/custom/einvoicing"
+          php .github/scripts/activate-einvoicing.php
+          php .github/scripts/activate-einvoicing.php
+
+      - name: Run the test files, one by one
+        # One process per file, the way the module is tested on a bench: a fatal in one file then
+        # takes that file down and not the whole suite, and the summary below says which ones failed
+        # instead of stopping at the first.
+        run: |
+          failed=""
+          passed=0
+          for file in einvoicing/test/phpunit/*.php; do
+            name=$(basename "$file")
+            case "$name" in
+              AllTests.php|CommonClassTestCompat.inc.php) continue ;;
+            esac
+            echo "::group::$name"
+            if phpunit --no-configuration --testdox "$file"; then
+              passed=$((passed + 1))
+            else
+              failed="$failed $name"
+            fi
+            echo "::endgroup::"
+          done
+          echo "$passed file(s) passed"
+          if [ -n "$failed" ]; then
+            echo "::error::Failed test files:$failed"
+            exit 1
+          fi
+
+      - name: Open the pages of the module
+        uses: ./.github/actions/dolibarr-smoke
+        with:
+          htdocs: ${{ steps.instance.outputs.htdocs }}
+
+      - name: The reference documents, damaged, PHPUnit has to refuse them
+        # A green suite says something only once the runner is shown to compare what it claims to
+        # compare. EInvoicingSamplesTest is the file that would have caught #709, and it is a
+        # comparison against committed documents: change one figure in a reference document and it
+        # has to come back red. One that still passes means the samples are not being compared at
+        # all - a missing fixture, a generation that silently produced nothing, a version that skips.
+        run: |
+          fixture=einvoicing/test/phpunit/fixtures/einvoicing_samples/cii_standard.xml
+          cp "$fixture" "$fixture.orig"
+          # A VAT breakdown rate of 19.00 where the specimen carries 20.00: the exact shape of the
+          # defect #709 shipped, in a document that stays well formed.
+          php -r '
+            $file = "einvoicing/test/phpunit/fixtures/einvoicing_samples/cii_standard.xml";
+            $xml = file_get_contents($file);
+            $damaged = str_replace("<ram:RateApplicablePercent>20.00", "<ram:RateApplicablePercent>19.00", $xml, $count);
+            if ($count < 1) { fwrite(STDERR, "the control cannot be built: no 20.00 rate in the reference document\n"); exit(2); }
+            file_put_contents($file, $damaged);
+            echo "reference document damaged on ", $count, " rate(s)\n";
+          '
+          if phpunit --no-configuration --testdox einvoicing/test/phpunit/EInvoicingSamplesTest.php > control-report.txt 2>&1; then
+            echo "::error::EInvoicingSamplesTest passes against a damaged reference document - the run above is not comparing the generated XML"
+            cat control-report.txt
+            mv "$fixture.orig" "$fixture"
+            exit 1
+          fi
+          mv "$fixture.orig" "$fixture"
+          echo "EInvoicingSamplesTest refuses the damaged reference document, as it has to."
+
+  package:
+    name: The package installs and its pages open
+    runs-on: ubuntu-latest
+
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: dolibarr
+          MARIADB_DATABASE: dolibarr
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout the modules repository
+        uses: actions/checkout@v6
+
+      - name: A Dolibarr to install into
+        id: instance
+        uses: ./.github/actions/dolibarr-instance
+        with:
+          dolibarr: '23.0.0'
+          php: '8.3'
+
+      - name: Build the package with the release script
+        # dev/build/makepack-modules.php is what produces what ships. Building it here with that same
+        # script means the thing installed below is the thing users are given, and not a zip made
+        # another way for the occasion.
+        id: build
+        run: |
+          set -euo pipefail
+          version=$(tr -d '[:space:]' < einvoicing/VERSION)
+          package="dev/build/bin/module_einvoicing-$version.zip"
+          rm -f "$package"
+          php dev/build/makepack-modules.php makezip einvoicing
+          if [ ! -f "$package" ]; then
+            echo "::error::makepack-modules.php produced no $package"
+            ls -l dev/build/bin/ || true
+            exit 1
+          fi
+          echo "package=$package" >> "$GITHUB_OUTPUT"
+          echo "$(unzip -Z1 "$package" | wc -l) entries, $(du -h "$package" | cut -f1)"
+
+      - name: Install it the way the deployment screen does
+        # Everything the package holds is unpacked into htdocs/custom, and nothing else is copied:
+        # what runs from here on is the package alone. A file the builder leaves out makes the module,
+        # and the page listing the modules with it, fatal on the next request - that is what #537 was,
+        # and the page smoke below is where it shows.
+        run: |
+          set -euo pipefail
+          unzip -q '${{ steps.build.outputs.package }}' -d '${{ steps.instance.outputs.htdocs }}/custom'
+          test -d '${{ steps.instance.outputs.htdocs }}/custom/einvoicing'
+          php .github/scripts/activate-einvoicing.php
+
+      - name: Open the pages of the module
+        uses: ./.github/actions/dolibarr-smoke
+        with:
+          htdocs: ${{ steps.instance.outputs.htdocs }}
+
+      - name: A package without its compat directory has to be refused
+        # The check above says something only if it fails when the package is incomplete. #537 is
+        # rebuilt here: the same instance, the same package, minus the one directory whose absence
+        # made the module list fatal - and the page has to stop answering.
+        run: |
+          set -uo pipefail
+          rm -rf '${{ steps.instance.outputs.htdocs }}/custom/einvoicing/compat'
+          php -S 127.0.0.1:8081 -t '${{ steps.instance.outputs.htdocs }}' > server.log 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+          for _ in $(seq 1 30); do
+            curl -fsS -o /dev/null "http://127.0.0.1:8081/index.php" && break
+            sleep 1
+          done
+          code=$(curl -sS -o control.html -w '%{http_code}' "http://127.0.0.1:8081/admin/modules.php")
+          if [ "$code" = "200" ] && ! grep -qiE '(Fatal error|Uncaught )' control.html; then
+            echo "::error::the module list still opens without the compat directory of the module - the page check above is not reading what it says it reads"
+            exit 1
+          fi
+          echo "Without compat/, the module list answers $code, as it has to."
+
+  # The suite above proves "what the module generates matches the reference documents", and the
+  # einvoicing_conformance workflow proves "the reference documents are accepted by the rules". Put
+  # end to end those two say what actually matters - that what the module produces would be accepted
+  # by a platform - but only as long as both keep running on the same change, and each is guarded by
+  # its own paths filter: einvoicing_conformance starts on a fixture being committed, not on the
+  # generation being touched. Nothing enforces that the two filters stay in step.
+  #
+  # So the documents are validated here as they come out of the code, on a real core, at this commit.
+  # It is the same claim, made in one step instead of two. What it buys beyond the belt and braces is
+  # the cost of covering a new case: a shape added to generateSampleEInvoicesForTests() is validated
+  # by this job the day it is added, with no reference document to commit first - and the shapes not
+  # covered yet are most of the module (one line, one 20 % rate, one allowance and one charge is all
+  # the five specimens carry between them).
+  conformance:
+    name: What the module generates is accepted by the EN 16931 and CTC-FR rules
+    runs-on: ubuntu-latest
+
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: dolibarr
+          MARIADB_DATABASE: dolibarr
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout the modules repository
+        uses: actions/checkout@v6
+
+      - name: A Dolibarr to generate on
+        # One core is enough: the suite above already runs the generation on every supported core and
+        # holds all of them to the same reference documents, so a document that differs by version
+        # cannot reach this job unnoticed.
+        id: instance
+        uses: ./.github/actions/dolibarr-instance
+        with:
+          dolibarr: '23.0.0'
+          php: '8.3'
+
+      - name: Deploy and activate the module
+        run: |
+          ln -sfn "${GITHUB_WORKSPACE}/einvoicing" "${{ steps.instance.outputs.htdocs }}/custom/einvoicing"
+          php .github/scripts/activate-einvoicing.php
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Fetch the FNFE rules and Saxon
+        run: |
+          curl -sSL -o france-rfe.tar.gz \
+            "https://github.com/fnfempe/France_RFE/archive/refs/tags/${FNFE_TAG}.tar.gz"
+          mkdir -p france-rfe
+          tar xz -C france-rfe --strip-components=1 -f france-rfe.tar.gz
+          curl -sSL -o saxon.jar \
+            "https://repo1.maven.org/maven2/net/sf/saxon/Saxon-HE/${SAXON_VERSION}/Saxon-HE-${SAXON_VERSION}.jar"
+          echo "FNFE_ROOT=${GITHUB_WORKSPACE}/france-rfe/FNFE_RFE_INVOICE" >> "$GITHUB_ENV"
+          echo "SAXON_JAR=${GITHUB_WORKSPACE}/saxon.jar" >> "$GITHUB_ENV"
+
+      - name: Generate the specimen documents on that instance
+        # scripts/regenerate_einvoicing_fixtures.php is the script a developer runs after a change
+        # that alters the XML on purpose - the same entry point, so this job validates what that
+        # developer would be committing. It writes over the reference documents in the workspace,
+        # which is why they are copied out before anything else reads them.
+        run: |
+          set -euo pipefail
+          php einvoicing/scripts/regenerate_einvoicing_fixtures.php
+          mkdir -p generated
+          cp einvoicing/test/phpunit/fixtures/einvoicing_samples/*.xml generated/
+          git checkout -- einvoicing/test/phpunit/fixtures/einvoicing_samples/
+          count=$(ls generated/*.xml | wc -l)
+          if [ "$count" -lt 5 ]; then
+            echo "::error::the generation produced $count documents, expected the five specimens"
+            exit 1
+          fi
+          for file in generated/*.xml; do
+            if [ ! -s "$file" ]; then
+              echo "::error::$(basename "$file") was generated empty"
+              exit 1
+            fi
+          done
+          echo "$count documents generated: $(ls generated/ | tr '\n' ' ')"
+
+      - name: The generated documents are accepted by the rules
+        env:
+          SVRL_DIR: ${{ github.workspace }}/svrl
+        run: python3 einvoicing/test/conformance/validate-cii.py generated/*.xml
+
+      - name: The defect of #709, rebuilt on what was just generated, has to be refused
+        # A green validation says something only once the validators are shown to refuse something.
+        # The something is the regression this job exists for, rebuilt on the very documents that
+        # were just accepted - see einvoicing/test/conformance/damage-vat-rate.php.
+        env:
+          SVRL_DIR: ${{ github.workspace }}/svrl-control
+        run: |
+          php einvoicing/test/conformance/damage-vat-rate.php control generated/*.xml
+          refused=0
+          built=0
+          for file in control/*.xml; do
+            built=$((built + 1))
+            report="control-$(basename "$file").txt"
+            if python3 einvoicing/test/conformance/validate-cii.py "$file" > "$report" 2>&1; then
+              echo "::error::$(basename "$file") is still accepted with a 0.00 VAT rate - the validation above is not checking what it says it checks"
+              cat "$report"
+            elif grep -q 'BR-CO-17' "$report"; then
+              refused=$((refused + 1))
+            else
+              # Refused, but not on the rule the defect lands on: something else changed, and the
+              # control no longer demonstrates what it claims to.
+              echo "::error::$(basename "$file") is refused without BR-CO-17"
+              cat "$report"
+            fi
+          done
+          if [ "$refused" -ne "$built" ]; then
+            echo "::error::the rules refused $refused of the $built damaged documents on BR-CO-17"
+            exit 1
+          fi
+          echo "The rules refuse the $built damaged documents on BR-CO-17, as they have to."
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: svrl-reports-generated
+          path: |
+            generated/
+            svrl/
+            svrl-control/
+          retention-days: 2

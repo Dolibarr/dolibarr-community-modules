@@ -315,6 +315,49 @@ function stancerCreateCustomerWithFallback($customerData, $stancerApi)
 }
 
 /**
+ * Build the societe_rib row describing the "card" anchor of a Stancer customer.
+ *
+ * This row is what stancer_thirdparty.php uses as the proof that the thirdparty
+ * owns a Stancer customer (it looks for label LIKE 'stancer-card%'), so it must
+ * exist as soon as a cust_xxx is known for the socid.
+ *
+ * @param	int			$socid			Dolibarr thirdparty id
+ * @param	string		$customerID		Stancer customer id (cust_xxx)
+ * @param	string|null	$objname		Owner name to store in the row
+ * @param	string|null	$country_code	Country code of the thirdparty
+ * @return	array<string,mixed>			Data array for stancerAddCompanyPaymentModeifNeeded()
+ */
+function stancerBuildCardAnchorData($socid, $customerID, $objname, $country_code)
+{
+	global $db, $conf;
+
+	$label = 'stancer-card-tst';
+	if (getDolGlobalString('STANCER_IS_PROD', '0') == '1') {
+		$label = 'stancer-card';
+	}
+
+	return array(
+		'socid'           => $socid,
+		'fk_soc'          => $socid,
+		'bank'            => null,
+		'label'           => $label,
+		'stancer_account' => $db->escape($customerID),
+		'last_four'       => 0000,
+		'number'          => 0000,
+		'proprio'         => $objname,
+		'exp_date_month'  => "",
+		'exp_date_year'   => "",
+		'cvn'             => null,
+		'datec'           => dol_now(),
+		'default_rib'     => 0,
+		'type'            => 'card',
+		'entity'          => $conf->entity,
+		'country_code'    => $country_code,
+		'status'          => 1,
+	);
+}
+
+/**
  * add customer on Stancer if needed
  *
  * @param	object	$object		Thirdparty or member the Stancer customer must be attached to
@@ -394,6 +437,16 @@ function stancerAddCustomerIfNeeded($object)
 					// create a distinct customer instead of returning the shared one.
 					$otherSocids = stancerCustomerOtherSocids($customerID, $socid, $db);
 					if (empty($otherSocids)) {
+						// The row found above may be a SEPA mandate (or any rib
+						// carrying the cust_xxx) while the 'stancer-card%' anchor
+						// row is missing. Without that anchor the thirdparty tab
+						// keeps showing the "create account" button and clicking it
+						// does nothing (it lands here and returns). Make sure the
+						// anchor exists before returning.
+						if (substr((string) $companypaymentmode->label, 0, 12) != 'stancer-card') {
+							dol_syslog("stancerAddCustomerIfNeeded: cust=$customerID of socid=$socid found on rib label='" . $companypaymentmode->label . "', ensuring the missing 'stancer-card' anchor row", LOG_NOTICE);
+							stancerAddCompanyPaymentModeifNeeded(stancerBuildCardAnchorData($socid, $customerID, $objname, $country_code));
+						}
 						dol_syslog("stancerAddCustomerIfNeeded exist (company), return id=" . $customerID, LOG_DEBUG);
 						return $customerID;
 					}
@@ -493,30 +546,7 @@ function stancerAddCustomerIfNeeded($object)
 			$customerID = $existing;
 			// Persist the mapping in societe_rib so the next lookup finds it
 			// instantly without re-hitting the API.
-			$label = 'stancer-card-tst';
-			if (getDolGlobalString('STANCER_IS_PROD', '0') === '1') {
-				$label = 'stancer-card';
-			}
-			$data = array(
-				'socid'           => $socid,
-				'fk_soc'          => $socid,
-				'bank'            => null,
-				'label'           => $label,
-				'stancer_account' => $db->escape($customerID),
-				'last_four'       => 0000,
-				'number'          => 0000,
-				'proprio'         => $objname,
-				'exp_date_month'  => "",
-				'exp_date_year'   => "",
-				'cvn'             => null,
-				'datec'           => dol_now(),
-				'default_rib'     => 0,
-				'type'            => 'card',
-				'entity'          => $conf->entity,
-				'country_code'    => $country_code,
-				'status'          => 1,
-			);
-			stancerAddCompanyPaymentModeifNeeded($data);
+			stancerAddCompanyPaymentModeifNeeded(stancerBuildCardAnchorData($socid, $customerID, $objname, $country_code));
 			return $customerID;
 		}
 	}
@@ -586,11 +616,6 @@ function stancerAddCustomerIfNeeded($object)
 		dol_syslog("stancer récupération de l'id du client : " . $email . ", " . $customerID, LOG_DEBUG);
 	}
 
-	$label = 'stancer-card-tst';
-	if (getDolGlobalString('STANCER_IS_PROD', '0') == '1') {
-		$label = 'stancer-card';
-	}
-
 	// Re-anchor the SEPA mandate(s) the delete above deliberately spared: they
 	// still carry the shared cust, which would make the dedupe resolve back to it
 	// and create yet another customer on the next payment. Only stancer_account
@@ -614,26 +639,7 @@ function stancerAddCustomerIfNeeded($object)
 	}
 
 	if ($socid && $customerID) {
-		$data = [
-			'socid' => $socid,
-			'fk_soc' => $socid,
-			'bank' => null,
-			'label' => $label,
-			'stancer_account' => $db->escape($customerID),
-			'last_four' => 0000,
-			'number' => 0000,
-			'proprio' => $objname,
-			'exp_date_month' => "",
-			'exp_date_year' => "",
-			'cvn' => null,
-			'datec' => dol_now(),
-			'default_rib' => 0,
-			'type' => 'card',
-			'entity' => $conf->entity,
-			'country_code' => $country_code,
-			'status' => 1,
-		];
-		$compPayModeId = stancerAddCompanyPaymentModeifNeeded($data);
+		stancerAddCompanyPaymentModeifNeeded(stancerBuildCardAnchorData($socid, $customerID, $objname, $country_code));
 	}
 	return $customerID;
 }
