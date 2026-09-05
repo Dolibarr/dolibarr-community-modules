@@ -259,6 +259,14 @@ function removeAllSpaces($str, $original_encoding = null)
  * Return the full path of the directory where a module (or an object of a module) stores its files.
  * Path may depends on the entity if a multicompany module is enabled.
  *
+ * Since Dolibarr 20.0.0 the core getMultidirOutput() takes the four arguments this module needs, so
+ * the call is simply handed over to it and the module benefits from every later core fix. On
+ * Dolibarr 18 and 19 the core function only accepts ($object, $module) and knows neither $forobject
+ * nor $mode, hence the backported body kept below as a fallback.
+ *
+ * The version guard is placed here, and not at the four call sites, so that they keep a single entry
+ * point and there is exactly one place to move (or drop) when the supported version floor rises.
+ *
  * @param 	CommonObject|BlockedLog|null	$object 	Dolibarr common object.
  * @param 	string 							$module 	Override object element, for example to use 'mycompany' instead of 'societe'
  * @param	int								$forobject	Return the more complete path for the given object (including ref) instead of for the module only.
@@ -268,6 +276,15 @@ function removeAllSpaces($str, $original_encoding = null)
 function getMultidirOutputCompat($object, $module = '', $forobject = 0, $mode = 'output')
 {
 	global $conf;
+
+	// version_compare() rather than a (float) cast: DOL_VERSION carries development suffixes
+	// ('a.b.c-alpha', 'a.b.c-beta', 'a.b.c-rcX', see filefunc.inc.php) that a cast flattens, so
+	// (float) '20.0.0-alpha' is exactly 20.0 and would hand a pre-release snapshot over to a core
+	// signature that may not be there yet. version_compare() sorts those suffixed versions below
+	// 20.0.0 and keeps them on the backport, which is the safe side.
+	if (version_compare(DOL_VERSION, '20.0.0', '>=')) {
+		return getMultidirOutput($object, $module, $forobject, $mode);
+	}
 
 	$subdirectory = '';
 	if (!is_object($object) && empty($module)) {
