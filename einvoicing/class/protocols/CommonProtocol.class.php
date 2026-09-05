@@ -24,6 +24,8 @@
  * \brief   Common methods for all AP protocols.
  */
 
+dol_include_once('einvoicing/lib/einvoicing.lib.php');	// removeAllSpaces(), used to clean the identifiers read from a received document
+
 /**
  * @mixin AbstractProtocol
  */
@@ -560,7 +562,7 @@ trait CommonProtocol
 		// Step 2: Try to find using VAT number if not found by global IDs
 		if ($thirdpartyId < 0) {
 			if (!empty($sellerInfo['sellerTaxRegistations']['VA'])) {
-				$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "societe WHERE REPLACE(tva_intra, ' ', '') = '" . $db->escape($einvoicing->removeSpaces($sellerInfo['sellerTaxRegistations']['VA'])) . "' AND entity IN (". getEntity('societe').")";
+				$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "societe WHERE REPLACE(tva_intra, ' ', '') = '" . $db->escape(removeAllSpaces($sellerInfo['sellerTaxRegistations']['VA'])) . "' AND entity IN (". getEntity('societe').")";
 				$resql = $db->query($sql);
 				if ($resql) {
 					if ($db->num_rows($resql) > 1) {
@@ -717,13 +719,13 @@ trait CommonProtocol
 							if (!empty($globalId)) {
 								$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode);
 								if (!empty($idprofField)) {
-									$thirdparty->$idprofField = $einvoicing->removeSpaces($globalId);
+									$thirdparty->$idprofField = removeAllSpaces($globalId);
 								}
 							}
 						}
 					}
 					if (!empty($sellerInfo['sellerTaxRegistations']['VA'])) {
-						$thirdparty->tva_intra = $einvoicing->removeSpaces($sellerInfo['sellerTaxRegistations']['VA']);
+						$thirdparty->tva_intra = removeAllSpaces($sellerInfo['sellerTaxRegistations']['VA']);
 						$thirdparty->tva_assuj = 1;
 					}
 				} elseif ($priority === 'dolibarr') { // Fill only empty fields from pdp data
@@ -765,13 +767,13 @@ trait CommonProtocol
 							if (!empty($globalId)) {
 								$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode);
 								if (!empty($idprofField) && empty($thirdparty->$idprofField)) {
-									$thirdparty->$idprofField = $einvoicing->removeSpaces($globalId);
+									$thirdparty->$idprofField = removeAllSpaces($globalId);
 								}
 							}
 						}
 					}
 					if (!empty($sellerInfo['sellerTaxRegistations']['VA']) && empty($thirdparty->tva_intra)) {
-						$thirdparty->tva_intra = $einvoicing->removeSpaces($sellerInfo['sellerTaxRegistations']['VA']);
+						$thirdparty->tva_intra = removeAllSpaces($sellerInfo['sellerTaxRegistations']['VA']);
 						$thirdparty->tva_assuj = 1;
 					}
 				}
@@ -855,14 +857,14 @@ trait CommonProtocol
 					if (!empty($globalId)) {
 						$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode);
 						if (!empty($idprofField)) {
-							$thirdparty->$idprofField = $einvoicing->removeSpaces($globalId);
+							$thirdparty->$idprofField = removeAllSpaces($globalId);
 						}
 					}
 				}
 			}
 
 			if (!empty($sellerInfo['sellerTaxRegistations']['VA'])) {
-				$thirdparty->tva_intra = $einvoicing->removeSpaces($sellerInfo['sellerTaxRegistations']['VA']);
+				$thirdparty->tva_intra = removeAllSpaces($sellerInfo['sellerTaxRegistations']['VA']);
 				$thirdparty->tva_assuj = 1;
 			}
 
