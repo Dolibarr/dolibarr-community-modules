@@ -360,14 +360,14 @@ class CdarHandler
 		$this->recipientURIIDOrigin = 'issuerid';
 		if ($statusCode != 212 && $object->thirdparty instanceof Societe) {
 			$vendorRouting = $einvoicing->fetchDefaultRouting($object->thirdparty->id);
-			$vendorURIID = ($vendorRouting > 0) ? $einvoicing->removeSpaces((string) $vendorRouting) : '';	// 0 when none is recorded, -1 on error
+			$vendorURIID = ($vendorRouting > 0) ? removeAllSpaces((string) $vendorRouting) : '';	// 0 when none is recorded, -1 on error
 
 			if ($vendorURIID !== '') {
 				$this->recipientURIIDOrigin = 'routing';
 			}
 
 			if ($vendorURIID === '') {
-				$vendorURIID = $einvoicing->removeSpaces($vendorIdentity['uriid']);
+				$vendorURIID = removeAllSpaces($vendorIdentity['uriid']);
 				if ($vendorURIID !== '') {
 					$this->recipientURIIDOrigin = 'einvoice';
 					dol_syslog(__METHOD__ . ' no routing ID recorded for vendor SIREN ' . $InvoiceIssuerGlobalID . ', replying to the electronic address of the invoice it sent us: ' . $vendorURIID, LOG_NOTICE);
@@ -382,7 +382,7 @@ class CdarHandler
 				if (is_object($provider)) {
 					$directory = $provider->checkRecipientDirectory($InvoiceIssuerGlobalID);
 					if (!empty($directory['identifier'])) {
-						$vendorURIID = $einvoicing->removeSpaces($directory['identifier']);
+						$vendorURIID = removeAllSpaces($directory['identifier']);
 						$this->recipientURIIDOrigin = 'directory';
 						dol_syslog(__METHOD__ . ' nothing known about how to reach vendor SIREN ' . $InvoiceIssuerGlobalID . ', using the address the directory declares for it: ' . $vendorURIID, LOG_NOTICE);
 					} else {

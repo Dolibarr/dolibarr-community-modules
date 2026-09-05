@@ -1008,7 +1008,7 @@ class EInvoicing
 						$einvoiceid = getDolGlobalString($uriConf);
 
 						//EINVOICING_LIVE
-						if (!preg_match('/^' . preg_replace('/\s+/', '', $mysoc->idprof1) . '/', $this->removeSpaces($einvoiceid))) {
+						if (!preg_match('/^' . removeAllSpaces($mysoc->idprof1) . '/', removeAllSpaces($einvoiceid))) {
 							//if (!empty($provider)) {
 								$baseWarnings[] = $langs->trans("FxCheckErrorRoutingIDFR", $einvoiceid);	// Your company profid must match the routing ID
 							//}
@@ -1025,7 +1025,7 @@ class EInvoicing
 		if (empty($mysoc->tva_intra) && (!empty($mysoc->tva_assuj) && $mysoc->tva_assuj != 'franchise')) {
 			$baseWarnings[] = $langs->trans("FxCheckErrorVATnumber");
 		}
-		if (!empty($mysoc->tva_intra) && !preg_match('/^[A-Z]{2}[A-Z0-9]{2,12}$/', $this->removeSpaces($mysoc->tva_intra))) { // Check VAT number format: 2-letter country code + 2 to 12 alphanumeric characters
+		if (!empty($mysoc->tva_intra) && !preg_match('/^[A-Z]{2}[A-Z0-9]{2,12}$/', removeAllSpaces($mysoc->tva_intra))) { // Check VAT number format: 2-letter country code + 2 to 12 alphanumeric characters
 			$baseErrors[] = $langs->trans("FxCheckErrorVATnumberFormat");
 		}
 		if (empty($mysoc->address)) {
@@ -1089,7 +1089,7 @@ class EInvoicing
 			}
 		} elseif (!empty($thirdparty->country_code) && $thirdparty->country_code === 'FR') {
 			// Validate SIREN/SIRET format based on length (French companies only)
-			$idprof1 = preg_replace('/\s+/', '', (string) $thirdparty->idprof1);
+			$idprof1 = removeAllSpaces((string) $thirdparty->idprof1);
 			if (strlen($idprof1) === 14) {
 				if (!isValidSiret($idprof1)) {
 					$baseWarnings[] = $langs->trans("FxCheckErrorCustomerSIRETFormat");
@@ -1131,12 +1131,12 @@ class EInvoicing
 			$baseWarnings[] = $langs->trans("FxCheckErrorCustomerVAT");
 		} elseif ($thirdparty->tva_assuj && !empty($thirdparty->tva_intra) && !empty($thirdparty->country_code) && $thirdparty->country_code === 'FR') {
 			// Validate French intra-community VAT number format: FR + 2 alphanumeric characters + 9 digits (SIREN)
-			$vatNormalized = strtoupper(preg_replace('/\s+/', '', $thirdparty->tva_intra));
+			$vatNormalized = strtoupper(removeAllSpaces($thirdparty->tva_intra));
 			if (!preg_match('/^FR[0-9A-Z]{2}[0-9]{9}$/', $vatNormalized)) {
 				$baseWarnings[] = $langs->trans("FxCheckErrorCustomerVATFormat");
 			} elseif (!empty($thirdparty->idprof1)) {
 				// Cross-check VAT against SIREN: French VAT key is deterministic (formula: (12 + 3 * (SIREN % 97)) % 97)
-				$siren9 = substr(preg_replace('/\s+/', '', $thirdparty->idprof1), 0, 9);
+				$siren9 = substr(removeAllSpaces($thirdparty->idprof1), 0, 9);
 				if (ctype_digit($siren9) && strlen($siren9) === 9) {
 					$expectedKey = (12 + 3 * ((int) $siren9 % 97)) % 97;
 					$expectedVAT = 'FR' . str_pad((string) $expectedKey, 2, '0', STR_PAD_LEFT) . $siren9;
@@ -1257,7 +1257,7 @@ class EInvoicing
 			!empty($thirdparty->country_code) && $thirdparty->country_code === 'FR'
 			&& !empty($thirdparty->name) && !empty($thirdparty->idprof1)
 		) {
-			$siren = substr(preg_replace('/\s+/', '', $thirdparty->idprof1), 0, 9);
+			$siren = substr(removeAllSpaces($thirdparty->idprof1), 0, 9);
 			$apiUrl = 'https://recherche-entreprises.api.gouv.fr/search?q=' . urlencode($siren) . '&per_page=5';
 
 			$response = getURLContent($apiUrl, 'GET', '', 1, ['Accept: application/json']);
@@ -3699,8 +3699,11 @@ class EInvoicing
 		if ($check) {
 			if ($mysoc->country_code == 'FR') {
 				if (!empty($einvoiceid)) {
-					$einvoiceid = $this->removeSpaces($einvoiceid);
-					if (!preg_match('/^' . preg_replace('/\s+/', '', $mysoc->idprof1) . '/', $einvoiceid)) {
+					$einvoiceid = removeAllSpaces($einvoiceid);
+					// Both sides of the comparison must be stripped the same way: idprof() built the routing id
+					// with removeAllSpaces(), so a non-breaking space pasted into idprof1 would otherwise survive
+					// here only, the match would fail and, in live mode, the seller URI would be emptied below.
+					if (!preg_match('/^' . removeAllSpaces($mysoc->idprof1) . '/', $einvoiceid)) {
 						if (getDolGlobalString('EINVOICING_LIVE')) {	// In live mode, we do not allow profid1 not matching routing id
 							dol_syslog("Error: The seller communication URI seems not correct (should be or start with your SIRET number). Value: " . $einvoiceid, LOG_WARNING);
 							$einvoiceid = '';
@@ -3710,7 +3713,7 @@ class EInvoicing
 			}
 		}
 
-		return $this->removeSpaces($einvoiceid);
+		return removeAllSpaces($einvoiceid);
 	}
 
 	/**
@@ -3724,7 +3727,7 @@ class EInvoicing
 	 */
 	public function getPeppolAccessPointBySiren($siren)
 	{
-		$siren = $this->removeSpaces((string) $siren);
+		$siren = removeAllSpaces((string) $siren);
 		if (empty($siren)) {
 			return null;
 		}
@@ -3784,7 +3787,7 @@ class EInvoicing
 		if ($invoice !== null && !empty($invoice->id)) {
 			$statusInfo = $this->fetchLastknownInvoiceStatus($invoice->id, $invoice->ref);
 			if (!empty($statusInfo['override_routing_id'])) {
-				return $this->removeSpaces($statusInfo['override_routing_id']);
+				return removeAllSpaces($statusInfo['override_routing_id']);
 			}
 		}
 
@@ -3798,7 +3801,7 @@ class EInvoicing
 			$uri = $thirdparty->idprof1;
 		}
 
-		return $this->removeSpaces($uri);
+		return removeAllSpaces($uri);
 	}
 
 	/**
@@ -3807,11 +3810,15 @@ class EInvoicing
 	 *
 	 * @param   string  $str  	String to cleanup
 	 * @return  string  		cleaned up string
+	 * @deprecated			Use the removeAllSpaces() function of einvoicing/lib/einvoicing.lib.php instead. This
+	 *						method only removed the ASCII spaces, so an identifier carrying a non-breaking space
+	 *						came out of it differently than out of idprof(). Kept as a delegation because it is
+	 *						public: another module or a hook may be calling it.
+	 * @see removeAllSpaces()
 	 */
 	public function removeSpaces($str)
 	{
-		// TODO: move this function to class utils
-		return preg_replace('/\\s+/', '', $str);
+		return removeAllSpaces($str);
 	}
 
 	/**
