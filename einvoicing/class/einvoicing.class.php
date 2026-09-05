@@ -3614,24 +3614,31 @@ class EInvoicing
 	/**
 	 * Calculate TVA intracommunity number for a thirdparty if missing, from the professional ID
 	 *
+	 * The core does exactly this, in Societe::calculateVATNumberFromProperties(), since Dolibarr 24.
+	 * This method is kept as the entry point of the module - it is what buildinvoicelines.inc.php calls
+	 * to fill BT-31 and BT-48 - but it no longer computes anything itself: it hands the thirdparty over
+	 * to the core when the core knows how, and to the faithful backport of compat/societe.lib.php on the
+	 * versions that do not have it yet. The presence of the method is what decides, not a version test:
+	 * the same module runs on 18 to 24, and a backport of the method into a maintenance release would
+	 * then be used as soon as it is there.
+	 *
+	 * The copy this replaced was wrong twice, and both defects reached the XML: the key was concatenated
+	 * raw, where the core pads it to two digits, so the roughly one SIREN in ten whose key is below 10
+	 * got a 12 character number instead of 13; and the SIRET to SIREN fallback cast to int, which eats
+	 * the leading zero of a SIREN that starts with one.
+	 *
 	 * @param mixed $thirdparty		Third party
 	 * @return string
 	 */
 	public function thirdpartyCalcVATIntra($thirdparty)
 	{
-		if ($thirdparty->country_code == 'FR' && empty($thirdparty->tva_intra) && !empty($thirdparty->tva_assuj)) {
-			$siren = trim($thirdparty->idprof1);
-			if (empty($siren)) {
-				$siren = (int) substr(str_replace(' ', '', $thirdparty->idprof2), 0, 9);
-			}
-			if (!empty($siren)) {
-				// [FR + code clé  + numéro SIREN ]
-				//Clé TVA = [12 + 3 × (SIREN modulo 97)] modulo 97
-				$cle = (12 + 3 * $siren % 97) % 97;
-				$tva_intra = 'FR' . $cle . $siren;
-			}
+		if (is_object($thirdparty) && method_exists($thirdparty, 'calculateVATNumberFromProperties')) {
+			return $thirdparty->calculateVATNumberFromProperties($thirdparty);
 		}
-		return $tva_intra ?? '';
+
+		require_once __DIR__ . '/../compat/societe.lib.php';
+
+		return calculateVATNumberFromProperties($thirdparty);
 	}
 
 	/**
