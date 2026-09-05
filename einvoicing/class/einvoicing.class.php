@@ -752,6 +752,63 @@ class EInvoicing
 	}
 
 	/**
+	 * Get the path of the CII XML file of an invoice, if the invoice has one to read.
+	 *
+	 * Not getEInvoiceFilePath(): that one names the file of the protocol currently configured, so it
+	 * answers a PDF under Factur-X. Only the XML is concerned here, because it is the only one of the
+	 * two Dolibarr cannot show - a PDF it previews on its own. An invoice generated before the setup
+	 * was changed keeps its XML, which stays readable whatever the protocol says today.
+	 *
+	 * @param 	?string 	$invoiceRef 	The reference of the invoice.
+	 * @return 	string						Full path of the XML, empty string if the invoice has none.
+	 */
+	public function getEInvoiceXmlFilePath($invoiceRef)
+	{
+		global $conf;
+
+		$filename = dol_sanitizeFileName($invoiceRef);
+		$path = $conf->invoice->multidir_output[$conf->entity] . '/' . $filename . '/' . $filename . '_cii.xml';
+
+		return is_readable($path) ? $path : '';
+	}
+
+	/**
+	 * Get the path of the CII XML received for a supplier invoice, if there is one to read.
+	 *
+	 * The file is the one the reception saved beside the supplier invoice, so the naming is the one of
+	 * CIIProtocol::saveEInvoiceFileToSupplierInvoiceAttachment(): the reference of the supplier names
+	 * the file, and the reference of the invoice names its directory. A document received in Factur-X
+	 * is a PDF, which Dolibarr previews on its own and which is not concerned here.
+	 *
+	 * @param 	FactureFournisseur 	$supplierInvoice 	Supplier invoice the document was received for.
+	 * @return 	string									Full path of the XML, empty string if there is none.
+	 */
+	public function getSupplierEInvoiceXmlFilePath($supplierInvoice)
+	{
+		global $conf;
+
+		if (!is_object($supplierInvoice) || empty($supplierInvoice->ref) || empty($supplierInvoice->ref_supplier)) {
+			return '';
+		}
+
+		$base = $conf->fournisseur->dir_output . '/facture/';
+		$ref = dol_sanitizeFileName($supplierInvoice->ref);
+		$filename = dol_sanitizeFileName($supplierInvoice->ref_supplier . '_einvoice.xml');
+
+		$path = $base . get_exdir($supplierInvoice->id, 2, 0, 0, $supplierInvoice, 'invoice_supplier') . $ref . '/' . $filename;
+		if (is_readable($path)) {
+			return $path;
+		}
+
+		// Documents received on Dolibarr 18 or 19 before issue #701 was fixed are in another directory,
+		// the one get_exdir() answers there when it is called without a level. They are not listed by the
+		// card, which reads the first path, but they are on disk and there is no reason not to show them.
+		$legacy = $base . get_exdir(0, 0, 0, 0, $supplierInvoice) . $ref . '/' . $filename;
+
+		return is_readable($legacy) ? $legacy : '';
+	}
+
+	/**
 	 * Get internal Dolibarr status code from PDP/PA status label (only for validation statuses 'Error', 'Pending', 'Ok', other status like lifecycle codes are normalized and with the same code in both systems)
 	 *
 	 * @param string $label PDP/PA status label can be 'Error', 'Pending', 'Ok', etc.

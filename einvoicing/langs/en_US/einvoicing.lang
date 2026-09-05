@@ -688,3 +688,10 @@ EInvoicingSupportExportQuestion=Build one archive out of the %s selected record(
 EInvoicingSupportExportPrivacy=The archive holds the selected records as they are stored, the e-invoice XML included, so it carries the names, addresses, e-mail addresses and phone numbers they contain. Credentials, tokens and passwords are removed. Read it before sending it to anyone.
 EInvoicingSupportExportNoZip=No support archive can be built: this PHP installation has no ZipArchive extension.
 EInvoicingSupportExportTooMany=Too many records selected for a support export: %s selected, %s at most. Narrow the selection, or raise the constant EINVOICING_SUPPORT_EXPORT_MAX.
+
+# E-invoice XML preview (xmlpreview.php)
+EInvoiceXmlPreviewTitle=E-invoice XML
+EInvoicePreviewXml=Show the e-invoice XML
+EInvoiceNoFileToPreview=No e-invoice XML has been generated for this invoice.
+EInvoiceNoReceivedFileToPreview=No e-invoice XML has been received for this invoice.
+EInvoiceXmlReindented=received on a single line, shown reindented
