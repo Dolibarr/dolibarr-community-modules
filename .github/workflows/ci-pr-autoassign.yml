@@ -15,7 +15,6 @@
 #     - Assign the reviewers listed below, excluding the PR author
 #       -> attempt per reviewer (if a reviewer fails, log and continue)
 #       -> the step fails only if no reviewer could be added
-# - On push: workflow runs but PR-specific actions are skipped
 #
 name: Set reviewers and label according to module MAINTENERS
 
@@ -27,9 +26,6 @@ permissions:
 on:
   pull_request_target:
     types: [opened, synchronize, reopened]
-    branches:
-      - "main"
-  push:
     branches:
       - "main"
 
@@ -280,9 +276,3 @@ jobs:
           else
             echo "Reviewers added: ${SUCCESS}. Failed to add: ${FAILED[*]:-none}"
           fi
-
-      # 6) Push event notice (no PR-specific actions performed)
-      - name: Push event notice
-        if: ${{ github.event_name == 'push' }}
-        run: |
-          echo "Triggered by push on branch. No PR-specific actions performed."
