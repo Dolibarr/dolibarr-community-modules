@@ -2196,13 +2196,22 @@ trait CommonProtocol
 				$nbDays = (int) round(($dueDate - $invoiceDateTimestamp) / 86400);
 
 				if ($nbDays >= 0) {
+					// The dictionary is per entity (llx_c_payment_term.entity, unique key on entity+code), so the
+					// term must be looked for in the entities the current one may read, the way the core reads
+					// that same table (Form::load_cache_conditions_paiement(), CommonInvoice::calculate_date_lim_reglement()).
+					$entities = getEntity('c_payment_term'); // for the log line below only, see the WHERE clause
+
 					$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "c_payment_term";
-					$sql .= " WHERE nbjour = " . ((int) $nbDays);
+					// getEntity() is called inline rather than through the variable above on purpose: the SQL
+					// plugin of phan rejects any variable interpolated into a query, however safe its origin
+					$sql .= " WHERE entity IN (" . getEntity('c_payment_term') . ")";
+					$sql .= " AND nbjour = " . ((int) $nbDays);
 					$sql .= " AND type_cdr = 0"; // fixed number of days only (no end of month)
 					$sql .= " AND active = 1";
 					$sql .= " ORDER BY rowid ASC"; // deterministic pick if duplicates
 					$sql .= " LIMIT 1";
 
+					dol_syslog(get_class($this) . '::_applyPaymentInfoToSupplierInvoice Looking for a payment term of ' . $nbDays . ' day(s) in entity ' . $entities, LOG_DEBUG);
 					$resql = $db->query($sql);
 					if ($resql && $db->num_rows($resql) == 1) {
 						$obj = $db->fetch_object($resql);
