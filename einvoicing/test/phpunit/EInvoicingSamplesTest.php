@@ -78,9 +78,13 @@ require_once __DIR__ . '/CommonClassTestCompat.inc.php';
  *
  * Generated XML is compared against the reference fixtures stored in
  * test/phpunit/fixtures/einvoicing_samples/ using semantic XML comparison.
+ *
+ * The same documents also have to hold together on their own, whatever the fixtures say: the VAT
+ * breakdown (BG-23) of each one is checked here too, on the chain generated once for the class.
  */
 class EInvoicingSamplesTest extends CommonClassTest
 {
+	const RAM = 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100';
 
 	/**
 	 * Holds the generated sample invoice chain (deposit, standard, credit note) for the whole test class.
@@ -190,5 +194,119 @@ class EInvoicingSamplesTest extends CommonClassTest
 	{
 		$generated = $this->getGenerated();
 		$this->assertMatchesFixture('cii_situation.xml', $generated['situation']);
+	}
+
+	/**
+	 * Read the VAT breakdowns (BG-23) of a document.
+	 *
+	 * @param	string	$xml	A CII document
+	 * @return	array<int,array{basis:float,tax:float,rate:float,category:string,exemption:string}>	One entry per ram:ApplicableTradeTax of the settlement
+	 */
+	private function vatBreakdowns($xml)
+	{
+		$doc = new DOMDocument();
+		$this->assertTrue($doc->loadXML($xml), 'the generated document is well formed XML');
+
+		$xpath = new DOMXPath($doc);
+		$xpath->registerNamespace('ram', self::RAM);
+
+		$breakdowns = array();
+		foreach ($xpath->query('//ram:ApplicableHeaderTradeSettlement/ram:ApplicableTradeTax') as $node) {
+			$read = function ($name) use ($xpath, $node) {
+				$found = $xpath->query('ram:' . $name, $node);
+				return ($found->length > 0) ? trim($found->item(0)->textContent) : '';
+			};
+
+			$breakdowns[] = array(
+				'basis' => (float) $read('BasisAmount'),					// BT-116
+				'tax' => (float) $read('CalculatedAmount'),				// BT-117
+				'rate' => (float) $read('RateApplicablePercent'),		// BT-119
+				'category' => $read('CategoryCode'),					// BT-118
+				'exemption' => $read('ExemptionReasonCode') . '|' . $read('ExemptionReason'),	// BT-121, BT-120
+			);
+		}
+
+		return $breakdowns;
+	}
+
+	/**
+	 * A breakdown that announces a tax amount states the rate that produced it.
+	 *
+	 * This is the shape #709 shipped: the rate was read from an array key that had become
+	 * "S|20.0000||", and (float) of that is 0, so every document declared 0.00 % against a non-zero
+	 * VAT amount.
+	 *
+	 * @return void
+	 */
+	public function testABreakdownThatTaxesStatesItsRate()
+	{
+		foreach ($this->getGenerated() as $type => $xml) {
+			$breakdowns = $this->vatBreakdowns($xml);
+			$this->assertNotEmpty($breakdowns, 'the ' . $type . ' specimen has a VAT breakdown');
+
+			foreach ($breakdowns as $index => $breakdown) {
+				$where = 'specimen ' . $type . ', VAT breakdown ' . ($index + 1) . ' (' . $breakdown['category'] . ')';
+
+				if (abs($breakdown['tax']) < 0.005) {
+					continue;		// An exempt or reverse charged breakdown legitimately taxes nothing.
+				}
+
+				$this->assertGreaterThan(
+					0,
+					$breakdown['rate'],
+					$where . ': BT-119 is ' . $breakdown['rate'] . ' % while BT-117 announces ' . $breakdown['tax']
+				);
+			}
+		}
+	}
+
+	/**
+	 * The tax amount of a breakdown follows from its own basis and its own rate (BR-CO-17).
+	 *
+	 * @return void
+	 */
+	public function testTheTaxAmountFollowsFromTheBasisAndTheRate()
+	{
+		foreach ($this->getGenerated() as $type => $xml) {
+			foreach ($this->vatBreakdowns($xml) as $index => $breakdown) {
+				$expected = round($breakdown['basis'] * $breakdown['rate'] / 100, 2);
+				$where = 'specimen ' . $type . ', VAT breakdown ' . ($index + 1) . ' (' . $breakdown['category'] . ')';
+
+				$this->assertEqualsWithDelta(
+					$expected,
+					$breakdown['tax'],
+					0.011,		// The tolerance BR-CO-17 itself grants.
+					$where . ': BT-117 = ' . $breakdown['tax'] . ' where BT-116 ' . $breakdown['basis']
+						. ' x BT-119 ' . $breakdown['rate'] . ' % gives ' . $expected
+				);
+			}
+		}
+	}
+
+	/**
+	 * A document carries one breakdown per category, rate and exemption reason, never two.
+	 *
+	 * That is what #709 was about - a national VAT source code was splitting one 20 % breakdown into
+	 * two, and the access point refused the document - so it is checked here rather than left to the
+	 * reference documents, which would not say why they changed.
+	 *
+	 * @return void
+	 */
+	public function testTwoBreakdownsNeverShareACategoryAndARate()
+	{
+		foreach ($this->getGenerated() as $type => $xml) {
+			$seen = array();
+			foreach ($this->vatBreakdowns($xml) as $breakdown) {
+				$key = $breakdown['category'] . '|' . number_format($breakdown['rate'], 4, '.', '') . '|' . $breakdown['exemption'];
+
+				$this->assertArrayNotHasKey(
+					$key,
+					$seen,
+					'specimen ' . $type . ': two VAT breakdowns for category ' . $breakdown['category']
+						. ' at ' . $breakdown['rate'] . ' %, which BR-S-08 and its siblings refuse'
+				);
+				$seen[$key] = true;
+			}
+		}
 	}
 }
