@@ -907,8 +907,12 @@ class EInvoicing
 	 * the normal order of things is to approve an invoice and then pay it, and "Payment transmitted"
 	 * (211) is precisely what is sent afterwards. An approved invoice can no longer be refused either.
 	 *
-	 * One thing narrows the list beyond that history: a credit note correcting an invoice we refused
-	 * cannot be accepted, since the invoice it credits owes nothing (issue #594, see
+	 * The order matters both ways: "Payment transmitted" is only offered once that approval has been
+	 * accepted by the platform, and never on a draft. Announcing the payment of an invoice nobody has
+	 * answered yet - or of one Dolibarr does not owe anything on - runs the lifecycle backwards.
+	 *
+	 * One last thing narrows the list beyond that history: a credit note correcting an invoice we
+	 * refused cannot be accepted, since the invoice it credits owes nothing (issue #594, see
 	 * SupplierInvoiceHelper::refusedSourceOfCreditNote()). Refusing it stays offered - that is what the
 	 * document is for here - as do the statuses that settle nothing, like "Disputed" or "Suspended".
 	 *
@@ -925,7 +929,9 @@ class EInvoicing
 		}
 
 		$statuses = $this->getEinvoiceStatusOptions(1, 1, 1);
-		if ($this->hasSentStatusMessage($elementId, $elementType, self::STATUS_APPROVED, 1)) {
+		$approved = $this->hasSentStatusMessage($elementId, $elementType, self::STATUS_APPROVED, 1)
+			|| $this->hasSentStatusMessage($elementId, $elementType, self::STATUS_PARTIALLY_APPROVED, 1);
+		if ($approved) {
 			unset($statuses[self::STATUS_REFUSED]);
 		}
 		foreach (array_keys($statuses) as $code) {
@@ -934,12 +940,32 @@ class EInvoicing
 			}
 		}
 
+		// The lifecycle runs in one direction: a received invoice is first answered - approved (205) or
+		// refused (210) - and only then paid, so "Payment transmitted" (211) is offered once that answer
+		// has been given and accepted by the platform, not before. Offering it right away announced the
+		// payment of an invoice we had said nothing about, and let it be sent while the answer was still
+		// pending or had been rejected by the platform - which is when the button is the most tempting,
+		// and the most wrong.
+		if (!$approved) {
+			unset($statuses[self::STATUS_PAYMENT_SENT]);
+		}
+
 		if ($elementType === 'invoice_supplier') {
 			dol_include_once('einvoicing/class/utils/SupplierInvoiceHelper.class.php');
+			dol_include_once('fourn/class/fournisseur.facture.class.php');
 			if (SupplierInvoiceHelper::refusedSourceOfCreditNote((int) $elementId) > 0) {
 				foreach (self::STATUSES_ACCEPTING_A_DOCUMENT as $code) {
 					unset($statuses[$code]);
 				}
+			}
+
+			// A draft owes nothing yet: it is not in the accounts, cannot be paid, and validating it is
+			// precisely the act of accepting it. Telling the vendor that its payment has been transmitted
+			// at that point describes something that cannot have happened. The state comes from the
+			// invoice itself, which is the core's own answer to the question.
+			$supplierInvoice = new FactureFournisseur($this->db);
+			if ($supplierInvoice->fetch((int) $elementId) > 0 && (int) $supplierInvoice->status === FactureFournisseur::STATUS_DRAFT) {
+				unset($statuses[self::STATUS_PAYMENT_SENT]);
 			}
 		}
 
