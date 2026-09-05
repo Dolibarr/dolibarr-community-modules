@@ -255,15 +255,9 @@ class En16931Validator
 		}
 
 		// ---------------------------------------------------------------
-		// CTC-FR SIREN format, as published in the FNFE "BR-FR-Flux2-Schematron-CII" V1.4.0:
-		//  - BR-FR-10/BT-30 targets the seller SIREN,
-		//  - BR-FR-32/LEGALID targets the legal identifier (scheme 0002) of ANY party,
-		//  - BR-FR-32/GLOBALID targets any party identifier with scheme 0002 or 0231.
-		// The platform reports each of them separately, so the same value can raise both a
-		// BR-FR-10 and a BR-FR-32 message: this mirrors the report the operator will get back.
-		// BR-FR-10 also makes the seller SIREN mandatory, which only holds for a French seller
-		// (the module also serves other countries) and an empty professional id is already
-		// refused when the invoice data is built, so only the format is checked here.
+		// CTC-FR SIREN format (FNFE "BR-FR-Flux2-Schematron-CII" V1.4.0): BR-FR-10/BT-30 for the seller
+		// SIREN, BR-FR-32/LEGALID for any legal identifier (0002), BR-FR-32/GLOBALID for any party id with
+		// scheme 0002 or 0231. Reported separately, as the platform does; only the format is checked here.
 		// ---------------------------------------------------------------
 		$sellerSirens = $xp->query('//ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:SpecifiedLegalOrganization/ram:ID[@schemeID="0002"]');
 		if ($sellerSirens !== false) {

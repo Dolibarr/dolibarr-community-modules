@@ -21,17 +21,10 @@
  *      \ingroup    test
  *      \brief      PHPUnit test for the polyfills of compat/: they must be inert when the symbol
  *                  they backport is already there.
- *      \remarks    The module runs from Dolibarr 17 and carries copies of core symbols that only
- *                  appeared later. It is not the only module in that situation: any other module of
- *                  the instance that also has to run on both sides of the line carries the same
- *                  copies, and on a name that is already taken PHP does not warn, it fatals. That is
- *                  how activating the module on the second entity of a multicompany setup died on
- *                  "Cannot declare class CommonHookActions, because the name is already in use"
- *                  (issue #630) - the hook of the module could no longer be loaded at all.
- *
- *                  Each shim is therefore checked in a subprocess, since a redeclaration cannot be
- *                  caught in the running one: first with the symbol already declared (the shim must
- *                  do nothing), then on its own (the shim must still deliver what it backports).
+ *      \remarks    Another module backporting the same core symbol makes PHP fatal on redeclaration,
+ *                  not warn (issue #630). A redeclaration cannot be caught in the running process, so
+ *                  each shim is checked in a subprocess: first with the symbol already declared (the
+ *                  shim must do nothing), then on its own (it must still deliver what it backports).
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 

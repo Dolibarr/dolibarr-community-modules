@@ -23,8 +23,7 @@
  *                  business rule (issue #286): SupplierInvoiceHelper::abandonRefusedSupplierInvoice(),
  *                  SupplierInvoiceHelper::onOutboundStatusMessageValidated() and their dispatch from
  *                  EInvoicing::updateStatusMessageValidation().
- *                  Also covers SupplierInvoiceHelper::findIdByRef() and the delimiter rule of its
- *                  opt-in tolerant fallback (SupplierInvoiceHelper::refEmbedsReference()).
+ *                  Also covers SupplierInvoiceHelper::findIdByRef() and refEmbedsReference().
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 

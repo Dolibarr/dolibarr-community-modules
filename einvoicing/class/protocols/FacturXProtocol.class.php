@@ -183,12 +183,9 @@ class FacturXProtocol extends CIIProtocol
 			// Source PDF deleted or never generated: regenerate it with the default PDF model before embedding.
 			$modelname = getDolGlobalString('FACTURE_ADDON_PDF') ?: 'crabe';
 
-			// That rebuild fires afterPDFCreation, whose job is to produce the e-invoice - which is exactly
-			// what this call is doing. Tell the hook to stand back for this invoice, or it generates the
-			// document a second time and cleans up the temporary XML this call still needs (issue #658).
-			// try/finally, not two plain assignments: a rebuild that throws must not leave the hook muted
-			// for the rest of the request, which would silently skip the e-invoice of the invoices a mass
-			// generation handles after this one.
+			// That rebuild fires afterPDFCreation, which would generate the document a second time and clean
+			// up the temporary XML this call still needs (issue #658), so the hook is told to stand back.
+			// try/finally: a rebuild that throws must not leave the hook muted for the rest of the request.
 			$resultpdf = -1;
 			EInvoicing::setEInvoiceGenerationInProgress($invoice->id, true);
 			try {
@@ -267,17 +264,11 @@ class FacturXProtocol extends CIIProtocol
 			$creator = (string) pdfExtractMetadata($orig_pdf, 'Creator');
 		}
 
-		// The choice below reads the global class FPDF, and must not depend on whether the request
-		// happened to render a PDF before reaching here. Below Dolibarr 24 the core declares its own
-		// "class FPDF extends TCPDF {}" in htdocs/includes/tcpdi/tcpdi.php, but only once its PDF stack
-		// is loaded: a generation that finds the source PDF already on disk - the mass generation of the
-		// invoice list, typically - never renders one, so the shim is absent and the branch below picks
-		// the horstoeko/setasign writer, which autoloads the real FPDF of the module. Both classes are
-		// named FPDF and only the first one of the request survives, so the next core PDF of that same
-		// request dies on "Cannot redeclare class FPDF ... in includes/tcpdi/tcpdi.php". Load the PDF
-		// stack of the core now, so the question is settled by the Dolibarr version alone. The instance
-		// is discarded: pdf_getInstance() is called for what it loads and for the K_* constants TCPDF
-		// needs, which no PDF render defined yet in this request.
+		// Below Dolibarr 24 the core declares its own "class FPDF extends TCPDF {}" in
+		// htdocs/includes/tcpdi/tcpdi.php, but only once its PDF stack is loaded. Load that stack now, so
+		// the branch below does not depend on whether this request rendered a PDF already: without it the
+		// module autoloads the real FPDF instead, and the next core PDF of the request dies on "Cannot
+		// redeclare class FPDF". The instance is discarded, only what it loads and the K_* constants matter.
 		if (!class_exists('FPDF', false)) {
 			require_once DOL_DOCUMENT_ROOT . '/core/lib/pdf.lib.php';
 			pdf_getInstance();
@@ -364,13 +355,9 @@ class FacturXProtocol extends CIIProtocol
 	/**
 	 * Check that the produced PDF really is a Factur-X file, and not a PDF with an attachment.
 	 *
-	 * Nothing in the standard makes the difference visible to the eye: both carry the XML and both
-	 * open normally. What a reader and a platform validator look for is the document level /AF array
-	 * and the PDF/A-3 output intent, and a file that has the embedded stream but neither of those is
-	 * refused - after being sent, which is the expensive moment to find out (issue #554).
-	 *
-	 * The check is on the produced file rather than on the code path that produced it, so it also
-	 * covers a merger that silently degrades for another reason.
+	 * A reader and a platform validator look for the document level /AF array and the PDF/A-3 output
+	 * intent, and refuse a file that has the embedded stream but neither of those - after it was sent
+	 * (issue #554). The check is on the produced file, so it also covers a merger that degrades silently.
 	 *
 	 * @param	string	$pathfacturxpdf		Full path of the generated Factur-X PDF
 	 * @return	void
@@ -644,12 +631,8 @@ class FacturXProtocol extends CIIProtocol
 		// Done before the duplicate/ref-docs checks below so those checks can be scoped to this supplier
 		// (ref_supplier is only unique per supplier, not globally - see issue about cross-supplier collisions).
 		//
-		// The vendor is reference data, not part of the invoice: it gets its own transaction, committed
-		// before the import starts. A business error raised further down - a product that cannot be
-		// auto-created, a referenced document missing - must not roll back the thirdparty the operator is
-		// precisely being asked to complete: the "create the product" and "map the product" links returned
-		// with that error carry its socid, so a rolled back vendor makes them point to a thirdparty that
-		// never existed.
+		// The vendor is reference data: it gets its own transaction, committed before the import starts,
+		// so a business error further down does not roll back the thirdparty the returned links point to.
 		$db->begin();
 		$this->openedTransactions++;
 
@@ -732,12 +715,9 @@ class FacturXProtocol extends CIIProtocol
 					return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($refDocInvoiceId, $refDoc, 'linked to document ' . ($parsedHeader['documentno'] ?? ''))];
 				}
 				if ($refDocInvoiceId == 0) {
-					// The invoice references a document this Dolibarr does not hold: the final invoice of a
-					// deposit, the invoice a credit note credits, the one a replacement replaces. Nothing has
-					// been created at this point, so the flow is postponed rather than failed: it is retried
-					// on the next synchronization, and the invoices queued behind it keep coming in. What the
-					// user has to do cannot be guessed from a technical message, so it is spelled out with a
-					// link to the screen where the missing invoice is created.
+					// The invoice references a document this Dolibarr does not hold (deposit, credited or
+					// replaced invoice). Nothing has been created yet, so the flow is postponed rather than
+					// failed, and the message spells out what to create with a link to the creation screen.
 					$langs->load("bills");
 					$action = $langs->trans('CreateTheMissingSupplierInvoiceToImport', $refDoc);
 					$action .= ' <a class="butAction small smallpaddingimp nomarginleft" href="' . DOL_URL_ROOT . '/fourn/facture/card.php?action=create&socid=' . (int) $socId . '&ref_supplier=' . urlencode($refDoc) . '" target="_blank">';

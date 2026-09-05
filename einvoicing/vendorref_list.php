@@ -20,12 +20,8 @@
  *		\ingroup    einvoicing
  *		\brief      List of the vendor product references, i.e. the mappings used to import an e-invoice.
  *
- *		The mapping between a product of the vendor and a product of Dolibarr is stored as a vendor
- *		reference (llx_product_fournisseur_price), because it is the first criteria used by the matching
- *		when a supplier invoice is imported. Once saved, that link was only visible product by product,
- *		in the "Supplier prices" tab of each product. This page lists them all, and lets the user
- *		correct one without leaving the list: reassign a vendor reference to another Dolibarr product,
- *		or drop the mapping.
+ *		The mapping is stored as a vendor reference (llx_product_fournisseur_price), because it is the
+ *		first criteria used by the matching when a supplier invoice is imported.
  */
 
 // Load Dolibarr environment

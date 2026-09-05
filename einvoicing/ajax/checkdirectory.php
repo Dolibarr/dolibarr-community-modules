@@ -181,14 +181,10 @@ function einvoicing_directory_html($r, $siren)
 			}
 			return img_picto('', 'warning', 'class="paddingright"').$txt;
 		case 'undetermined':
-			// Neutral on purpose: a line exists but its status was not communicated, so the check fails
-			// open without asserting anything. Green here is what let an undeliverable invoice be sent.
-			// The provenance matters most here, and used to be the one thing this branch dropped: the
-			// same wording is reached both when the standardized directory answered without a line
-			// status and when it did not answer at all and the platform's own endpoint was read
-			// instead. The first is the recipient's platform being terse, the second is a call
-			// failing on this instance - two different problems, and only the message tells them
-			// apart (issue #698).
+			// Neutral on purpose: the line exists but its status was not communicated, so fail open
+			// without asserting anything. Green here would let an undeliverable invoice be sent.
+			// Report the provenance: a terse directory answer and a failed call reach the same
+			// wording, and only the message tells the two apart (issue #698).
 			$txt = $langs->trans("EInvoicingDirectoryUndetermined", $siren);
 			$details = array();
 			if (!empty($r['identifier'])) {

@@ -20,14 +20,9 @@
  * \ingroup einvoicing
  * \brief   Builds the negative control of a conformance run: the same CII documents, with the rate
  *          of every taxing VAT breakdown set to 0.00.
- * \remarks This is the exact shape #709 shipped - BT-119 at 0.00 against a non-zero BT-117 - and the
- *          rules have to refuse it on BR-CO-17. A validation that comes back green says nothing
- *          until the validators are shown to bite, and this is what they are shown to bite on. The
- *          documents stay well formed and keep passing the XSD, so what a refusal demonstrates is
- *          that the semantic stage ran, not that a broken file was rejected.
- *
- *          Breakdowns that tax nothing are left alone: a 0.00 rate on a 0.00 tax amount is what an
- *          exempt document legitimately carries, and damaging one would prove nothing.
+ * \remarks This is the shape #709 shipped - BT-119 at 0.00 against a non-zero BT-117 - which the
+ *          rules must refuse on BR-CO-17. Breakdowns that tax nothing are left alone: a 0.00 rate
+ *          on a 0.00 tax amount is what an exempt document legitimately carries.
  *
  *          Usage: php damage-vat-rate.php <output directory> <document> [<document> ...]
  */

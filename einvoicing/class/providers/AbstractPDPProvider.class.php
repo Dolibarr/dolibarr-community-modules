@@ -217,12 +217,8 @@ abstract class AbstractPDPProvider
 	 * Providers that do not expose a directory lookup keep the default 'unsupported' status so
 	 * the feature degrades gracefully and never blocks them.
 	 *
-	 * A SIREN can hold several reception addresses in the directory (the bare SIREN and one per
-	 * establishment SIRET), and only one of them is written into the invoice as BT-49. Answering on
-	 * whichever line the directory returns first would then report the reachability of an address the
-	 * invoice is not sent to: pass that BT-49 address as $addressingidentifier and the answer is about
-	 * it alone. An address that is not declared for that SIREN is reported as its own status, never
-	 * silently replaced by another line that happens to be open.
+	 * A SIREN can hold several reception addresses (the bare SIREN and one per SIRET) but only the
+	 * BT-49 one receives the invoice: pass it as $addressingidentifier so the answer is about it alone.
 	 *
 	 * @param 	string 	$idprof1 				Recipient professional id 1 (SIREN for France)
 	 * @param 	string 	$addressingidentifier 	Routing address the invoice is actually sent to (BT-49). Empty to answer on any line declared for the SIREN, which is what a caller with no invoice at hand wants.
@@ -293,12 +289,9 @@ abstract class AbstractPDPProvider
 		}
 
 		if ($result['entries'] > 0) {
-			// A directory line exists, but only an enabled one can actually receive: the annuaire also
-			// carries lines that are declared and not open yet ('Upcoming', i.e. bound to a platform with
-			// a future effective date), or closed ('Disabled'). Counting every returned line as active
-			// would report 'routable' for a recipient the platform then refuses with a routing error
-			// (fr:213). A line whose status is missing proves nothing either way: it is counted apart so
-			// the caller can say so, instead of being silently trusted and shown as reachable.
+			// Only an 'Enabled' line can receive: 'Upcoming' (future effective date) and 'Disabled' ones
+			// would be refused by the platform with a routing error (fr:213). A missing status proves
+			// nothing either way, so it is counted apart rather than trusted.
 			$firstunknown = '';
 			$firstblocked = array('', '');
 			foreach ($lines as $line) {
@@ -329,14 +322,10 @@ abstract class AbstractPDPProvider
 				$result['status'] = 'routable';
 				$result['reachable'] = 1;
 			} elseif ($result['unknown'] > 0) {
-				// Lines are declared but the platform did not report their status, and it cannot be asked
-				// for: 'directoryLineStatus' is not part of the field list the search accepts (XP Z12-013
-				// only allows addressingIdentifier, siren, siret and addressingSuffix there), it is only
-				// returned as a bonus by the platforms that choose to. Fetching the line on its own
-				// (GET directory-line/code:<addressingIdentifier>) does not help either: on a platform
-				// that omits the status in the search, that answer omits it too. So an enabled address
-				// and one that merely takes effect later are indistinguishable here: stay non-conclusive
-				// (the caller keeps failing open) rather than claim the recipient is reachable.
+				// Lines declared without a status, and it cannot be asked for: XP Z12-013 does not allow
+				// directoryLineStatus as a search field, and a platform omitting it in the search omits it
+				// on GET directory-line too. Enabled and upcoming are indistinguishable here: stay
+				// non-conclusive so the caller fails open.
 				$result['status'] = 'undetermined';
 				$result['reachable'] = -1;
 				$result['identifier'] = $firstunknown;
@@ -356,11 +345,8 @@ abstract class AbstractPDPProvider
 
 		// 2) No directory line: tell apart a legal unit known to the directory but not able to receive
 		//    yet (inactive) from a SIREN that is unknown to the directory (absent).
-		//    The search form is used rather than the 'siren/code-insee:<siren>' consultation: both are
-		//    part of the same standardized service, but the consultation is not served by every Approved
-		//    Platform (one answers 404 on it while answering the search with the legal unit), so the
-		//    search is what keeps this second step meaningful everywhere. An unknown SIREN comes back
-		//    either as a 404 or as an empty result set depending on the platform, and both mean absent.
+		//    The search is used rather than the 'siren/code-insee:<siren>' consultation, which not every
+		//    Approved Platform serves. An unknown SIREN answers 404 or an empty result set: both absent.
 		$consultbody = json_encode(array('filters' => array('siren' => array('op' => 'strict', 'value' => $siren))));
 		$consult = $this->callApi('afnor-directory/v1/siren/search', 'POST', $consultbody, array(), 'precheck_directory');
 		$consultcode = (int) (isset($consult['status_code']) ? $consult['status_code'] : 0);
@@ -376,12 +362,8 @@ abstract class AbstractPDPProvider
 	/**
 	 * Normalize an electronic address so two writings of the same one compare equal.
 	 *
-	 * The address recorded in Dolibarr and the one the directory returns are the same string in
-	 * principle, but they do not always come written the same way: a user typing a SIRET-suffixed
-	 * address adds spaces to read it, and a platform may qualify the address with the scheme it
-	 * belongs to ('0225:' for the French SIREN scheme, which the legacy SuperPDP endpoint does). The
-	 * scheme is not part of the address, and Dolibarr records the address without it, so neither
-	 * difference may turn a match into a mismatch and report a declared address as unknown.
+	 * Dolibarr records the bare address, while a user adds spaces to read it and a platform may prefix
+	 * the scheme ('0225:' for the French SIREN scheme). Neither may turn a match into a mismatch.
 	 *
 	 * @param 	string 	$identifier 	Electronic address, as recorded or as returned by a platform
 	 * @return 	string 					Comparable form of that address, empty when there is none
@@ -466,18 +448,10 @@ abstract class AbstractPDPProvider
 	/**
 	 * Pick, among the documents the access point holds for a flow, the first one this module can read.
 	 *
-	 * A flow carries its invoice in several shapes: 'Converted' is the invoice rewritten into the
-	 * syntax configured on the access point account, 'Original' is what the issuer really sent, and
-	 * 'ReadableView' is the human readable copy - which, on an access point that builds it as a
-	 * Factur-X PDF, carries the same data again.
-	 *
-	 * 'Converted' comes first because it is the one that shields the import from an issuer emitting a
-	 * syntax this module does not read - UBL, in particular, belongs to the French socle but has no
-	 * implementation here. But it depends on a setting that lives on the access point account, outside
-	 * Dolibarr: left unset, the platform refuses to produce the document at all; set to a syntax this
-	 * module does not support, it produces one that cannot be imported. Neither case says anything
-	 * about the other documents of the same flow, so they are tried in turn rather than failing the
-	 * flow on the first miss.
+	 * 'Converted' (rewritten into the syntax set on the access point account) is tried first, as it
+	 * shields the import from an issuer emitting a syntax with no reader here, such as UBL. That
+	 * setting lives outside Dolibarr and may be unset or unsupported, so 'Original' then 'ReadableView'
+	 * are tried in turn rather than failing the flow on the first miss.
 	 *
 	 * @param	string			$flowId				Identifier of the flow to read
 	 * @param	ProtocolManager	$protocolManager	Protocol factory used to recognize the documents
@@ -553,19 +527,10 @@ abstract class AbstractPDPProvider
 	/**
 	 * The invoice a document carries, once its container has been opened, when this module can read it.
 	 *
-	 * detectProtocolFromContent() answers on the outside of a file: a PDF is 'FACTURX' on the strength
-	 * of its '%PDF-' header alone, whatever it holds. What it holds is a separate question, because the
-	 * embedded invoice is picked by file name and not by content - 'xrechnung.xml' is one of the names
-	 * accepted, and an XRechnung is commonly UBL, a syntax that has no reader here.
-	 *
-	 * Reading the outside only is how such a payload reaches the reader of another syntax. The CII
-	 * reader then finds none of the elements it expects and reports a business error that names nothing
-	 * the user can act on, which is counted as a failure and stops the whole synchronization batch; and
-	 * on the consistency check, the same document reaches code that dereferences a protocol which was
-	 * never built.
-	 *
-	 * The document is not re-typed on what is found inside: a Factur-X PDF is imported as Factur-X,
-	 * whose reader does the extraction itself. Only the question "can this be read at all" is answered.
+	 * detectProtocolFromContent() answers on the container alone: a PDF is 'FACTURX' on its '%PDF-'
+	 * header, while the embedded invoice is picked by file name and may be UBL ('xrechnung.xml'), which
+	 * has no reader here. Only "can this be read at all" is answered: the document keeps its container
+	 * type, a Factur-X PDF is still imported as Factur-X.
 	 *
 	 * @param	string				$content			Raw document, as the access point returned it
 	 * @param	AbstractProtocol	$protocol			Protocol recognized on the container
@@ -1001,12 +966,8 @@ abstract class AbstractPDPProvider
 	/**
 	 * Log an API call into llx_einvoicing_call using a SEPARATE database connection.
 	 *
-	 * The call trace must survive even when the caller's main transaction is rolled
-	 * back on error (see issue #291): a failed send_invoice rolls back the doActions()
-	 * transaction, which would otherwise wipe the very log we need to diagnose it.
-	 * Writing the log through an independent connection ($dbhistory) decouples it from
-	 * the business transaction, so it is committed whether the action succeeds or fails,
-	 * without ever forcing a commit on the rest. Same approach as the webhook logging.
+	 * The trace must survive a rollback of the caller's transaction (issue #291), so it is written on
+	 * an independent connection ($dbhistory) and committed whether the action succeeds or fails.
 	 *
 	 * Request/response payloads are redacted (@see redactSensitiveData()) before being
 	 * persisted: this log is readable by any user with the 'einvoicing' read right, so

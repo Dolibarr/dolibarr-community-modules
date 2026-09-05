@@ -21,14 +21,9 @@
  *      \ingroup    test
  *      \brief      PHPUnit test for the line billing period (EN 16931 BG-26 / BT-134 / BT-135), in
  *                  both directions.
- *                  Export (issue #435): CIIProtocol::buildLineItem() must map the line
- *                  date_start/date_end (already parsed upstream into linePeriodStart/linePeriodEnd)
- *                  to the BillingSpecifiedPeriod block, placed between ApplicableTradeTax and
- *                  SpecifiedTradeAllowanceCharge/SpecifiedTradeSettlementLineMonetarySummation as
- *                  required by the CII D22B schema sequence.
- *                  Import (issue #576): CIIProtocol::resolveLinePeriod() must turn what the parser
- *                  read back into the timestamps a supplier invoice line stores, keeping one side
- *                  alone and refusing a period that ends before it starts.
+ *                  Export (issue #435): buildLineItem() must place BillingSpecifiedPeriod where the
+ *                  CII D22B schema sequence requires it. Import (issue #576): resolveLinePeriod()
+ *                  must keep one side alone and refuse a period that ends before it starts.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 

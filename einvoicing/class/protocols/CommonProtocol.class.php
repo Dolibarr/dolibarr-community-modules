@@ -107,19 +107,10 @@ trait CommonProtocol
 
 		// Determine suffix 1 (initial invoice) or 2 (already paid invoice) according to invoice status and payment information and if the invoice contain a line a deposit (prepayment) so final invoice after deposit then suffix is 4
 		//
-		// BT-23 describes the billing case of the document, it is not a payment status: in the AFNOR
-		// nominal use case (XP Z12-012 annexe B, UC1_F202500003) the invoice is issued in frame S1 and
-		// stays S1 while the CDAR lifecycle reports 211 "Paiement transmis" then 212 "Encaissée" — the
-		// document is never re-issued in S2. So "already paid" only covers an invoice whose amount was
-		// already received when it was issued, and BR-FR-CO-09 makes that concrete and mandatory:
-		// with B2/S2/M2 the amount already paid (BT-113) must equal the total (BT-112) and the amount
-		// due (BT-115) must be 0, both fatal.
-		//
-		// Deriving the suffix from Facture::STATUS_CLOSED alone broke that: an invoice closed as paid
-		// without matching payment records — what "Classify as paid" does, and what the deposit turned
-		// into a discount does — still reports BT-113 = 0, so the document declared itself already paid
-		// while claiming the full amount was due, and was rejected. Claim the frame only when the
-		// amount the document will actually carry in BT-113 covers the total.
+		// BT-23 is the billing case of the document, not a payment status: BR-FR-CO-09 makes B2/S2/M2
+		// fatal unless the amount already paid (BT-113) equals the total (BT-112) and the amount due
+		// (BT-115) is 0. Facture::STATUS_CLOSED alone does not say that, so claim the frame only when
+		// the amount the document will actually carry in BT-113 covers the total.
 		$totalTtc = (float) price2num($invoice->total_ttc, 'MT');
 		if ($alreadyPaid === null) {
 			$alreadyPaid = (float) $invoice->getSommePaiement();
@@ -321,15 +312,9 @@ trait CommonProtocol
 		$line->fk_product = 0;
 
 		include_once DOL_DOCUMENT_ROOT.'/core/lib/price.lib.php';
-		// The specimen has to read the same everywhere, so the discount rounding is pinned instead of
-		// following the instance. It is pinned to the default convention - round the line total - and
-		// not to 2, "round the discounted unit price first", because no two supported cores agree on
-		// what 2 means: 18 and 20 do not implement the option at all and round the total, 23 rounds the
-		// unit price up and 24 rounds it down. On the line below (5 x 100.05 less 10%) that is three
-		// different totals, 450.23 / 450.25 / 450.20, for one specimen. The default is the one value
-		// the four of them return.
-		// Restored right after: this is a specimen, it has no business changing how the rest of the
-		// request computes its prices.
+		// Pin the discount rounding so the specimen reads the same everywhere: no two supported cores
+		// agree on MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE... (18 and 20 do not implement it, 23 rounds the
+		// unit price up, 24 rounds it down). Restored right after: this is a specimen.
 		$savRoundDiscountOnUnitPrice = getDolGlobalString('MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY');
 		$conf->global->MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY = '0';
 
@@ -486,12 +471,8 @@ trait CommonProtocol
 		 * 4. If still not found, create new thirdparty with provided data - or refuse the document
 		 *    when the automatic creation of thirdparties is disabled
 		 *
-		 * By default a received document is attached to a thirdparty by a structured legal identifier
-		 * only. Name, commercial alias, ref_ext and email address are descriptive fields that several
-		 * companies can carry, so matching on them books a supplier invoice on a company that did not
-		 * issue it (issue #739). When the identifier of the seller matches nothing, the seller is
-		 * unknown, and an unknown seller is created rather than guessed - unless an expert turned
-		 * step 3 back on for a base whose thirdparties carry no legal identifier at all.
+		 * A received document is attached by structured legal identifier only: name, alias, ref_ext and
+		 * email are descriptive fields several companies can carry (issue #739).
 		 */
 		global $db, $langs, $user, $conf;
 		require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
@@ -589,15 +570,10 @@ trait CommonProtocol
 			}
 		}
 
-		// Step 3: If not found, try to find by findNearest function.
-		//
-		// A name is not an identity: distinct legal entities collide on it, and under EN 16931 the
-		// seller name (BT-27) and trading name (BT-28) are descriptive fields of the document, never
-		// routing ones. The last stage of findNearest() ORs name and commercial alias, so a thirdparty
-		// merely carrying the seller name collects the received invoice (issue #739). This step is
-		// therefore OFF by default and kept behind the hidden option EINVOICING_THIRDPARTIES_MATCH_ON_NAME
-		// (no entry in the setup page on purpose), for the bases whose thirdparties were recorded
-		// without any legal identifier and which need this fallback. It is enabled knowingly.
+		// Step 3: If not found, try to find by findNearest function. A name is not an identity: BT-27 and
+		// BT-28 are descriptive, and the last stage of findNearest() ORs name and commercial alias, so a
+		// thirdparty merely carrying the seller name collects the invoice (issue #739). OFF by default,
+		// behind the hidden option EINVOICING_THIRDPARTIES_MATCH_ON_NAME (no setup page entry on purpose).
 		if ($thirdpartyId < 0 && getDolGlobalString('EINVOICING_THIRDPARTIES_MATCH_ON_NAME')) {
 			// An email address is not an identity either: it can be shared by several third parties, and
 			// a third party that merely carries the sender's address is not necessarily the sender. It is
@@ -661,12 +637,9 @@ trait CommonProtocol
 			dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Seller not found by its legal identifiers, and the name is not used as a match criterion (hidden option EINVOICING_THIRDPARTIES_MATCH_ON_NAME is off)');
 		}
 
-		// Identifier-based match: raise a NON-BLOCKING warning when the descriptive name carried by the
-		// e-invoice does not match the linked third party. Under EN 16931 / the French CTC framework, a
-		// supplier is identified and routed by its structured identifier (SIREN 0002, SIRET 0009, routing
-		// 0225) and VAT number, never by name. Seller name (BT-27) and trading name (BT-28) are descriptive
-		// fields, so a mismatch must not block import or routing, but it is a legitimate data-quality /
-		// mis-attachment / fraud signal worth surfacing. See issue #309.
+		// Identifier-based match: raise a NON-BLOCKING warning when the name carried by the e-invoice
+		// does not match the linked third party. A supplier is identified by its structured identifier,
+		// never by name (BT-27 and BT-28 are descriptive), so a mismatch only signals data quality (#309).
 		$nameMismatchWarning = '';
 		if ($thirdpartyId > 0 && $matchedByStructuredIdentifier) {
 			$invoiceNames = array($sellerInfo['sellername'] ?? '', $sellerInfo['sellerTradingName'] ?? '');
@@ -800,15 +773,11 @@ trait CommonProtocol
 				$allowmodcodeclient = 1;
 			}
 
-			// This function never sets an extrafield on a thirdparty, so it must not rewrite them.
-			// It has to say so explicitly: from Dolibarr 20 on, fetch() pre-fills array_options with a
-			// null entry for every declared extrafield, and update() then hands that array to
-			// insertExtraFields(), which refuses the WHOLE update as soon as one of those fields is
-			// mandatory and empty. Every thirdparty this very function created is in that state (a
-			// programmatic create() writes no extrafield row at all), and so is every thirdparty that
-			// predates the mandatory flag - so a mandatory extrafield on the thirdparty rejected every
-			// received document. Emptied, array_options makes insertExtraFields() return 0 without
-			// touching the stored row, so no value is lost either.
+			// This function never sets an extrafield on a thirdparty, so it must not rewrite them, and it has
+			// to say so explicitly: from Dolibarr 20 on, fetch() pre-fills array_options with a null entry for
+			// every declared extrafield, and update() hands that array to insertExtraFields(), which refuses
+			// the WHOLE update as soon as one of those fields is mandatory and empty. Emptied, array_options
+			// makes insertExtraFields() return 0 without touching the stored row.
 			$thirdparty->array_options = array();
 
 			$result = $thirdparty->update(0, $user, 1, $allowmodcodeclient, $allowmodcodefournisseur);
@@ -1525,14 +1494,9 @@ trait CommonProtocol
 	 * Refuse to build a line whose VAT category requires a Seller VAT identifier the seller has not got.
 	 *
 	 * BR-E-02 and its siblings BR-S-02, BR-Z-02 and BR-AE-02 are satisfied by either the Seller VAT
-	 * identifier (BT-31, schemeID VA) or the Seller tax registration identifier (BT-32, schemeID FC),
-	 * which is why a seller charging no VAT can identify itself with its SIREN. BR-G-02 and BR-IC-02
-	 * are not: their assertion reads schemeID = 'VA' alone, so an exportation or an intracommunity
-	 * supply demands a real VAT number and no fallback can stand in for it.
-	 *
-	 * Without this the document is built, sent, and refused by the platform on a rule the operator has
-	 * no way to connect to a missing field - the same reason BR-S-02 is reported here rather than left
-	 * to the platform (issue #560).
+	 * identifier (BT-31, schemeID VA) or the tax registration identifier (BT-32, schemeID FC). BR-G-02
+	 * and BR-IC-02 are not: their assertion reads schemeID = 'VA' alone. Reported here rather than left
+	 * to the platform, which refuses on a rule the operator cannot connect to a missing field (#560).
 	 *
 	 * @param	Societe		$seller		Selling company
 	 * @param	string		$rule		Business rule that will be broken, for the message
@@ -1664,13 +1628,10 @@ trait CommonProtocol
 		$exemptionReason = null;		// BT-120
 		$exemptionReasonCode = null;	// BT-121 - Must contain a VATEX code. https://docs.peppol.eu/poacc/billing/3.0/codelist/vatex/
 
-		// A line carrying recoverable non-collected VAT ("TVA non perçue récupérable", the overseas
-		// departments scheme of article 295 of the CGI) states a VAT rate, but that VAT is not collected:
-		// Dolibarr makes the total including tax of such a line equal to its net amount, and the amount
-		// due of the invoice follows. EN 16931 offers no way to declare a VAT that is not claimed - the
-		// total with VAT is the net total plus the VAT total (BR-CO-15), so anything declared here would
-		// be claimed from the buyer. The line is therefore issued exempt, which the standard covers with
-		// a reason code of its own for that very article (issue #508).
+		// A line carrying recoverable non-collected VAT (the overseas departments scheme of article 295 of
+		// the CGI) states a VAT rate that is not collected. EN 16931 offers no way to declare a VAT that is
+		// not claimed - BR-CO-15 makes the total with VAT the net total plus the VAT total - so the line is
+		// issued exempt, with the VATEX reason code of that very article (issue #508).
 		if (!empty($line->info_bits) && ((int) $line->info_bits & 1)) {
 			$categoryVAT = 'E';
 			if ($seller->country_code == 'FR') {
@@ -1960,14 +1921,10 @@ trait CommonProtocol
 	/**
 	 * Build the entity restriction of a read of the VAT dictionary table.
 	 *
-	 * The dictionary is per entity: a line of it belongs to the entity that declared it, and the core
-	 * reads it with "AND t.entity IN (".getEntity('c_tva').")" (see getTaxesFromId() in
-	 * htdocs/core/lib/functions.lib.php). Reading it without that clause answers a line another entity
-	 * declared, so the invoice carries an exemption reason (BT-121) that is not the seller's one.
-	 *
-	 * The column itself only exists from Dolibarr 19: it is added by the 18.0.0-19.0.0 migration, and
-	 * the core of 18 reads llx_c_tva with no entity clause at all. So on 18 there is nothing to restrict
-	 * and naming the column would only break the query.
+	 * The dictionary is per entity and the core reads it with "AND t.entity IN (getEntity('c_tva'))"
+	 * (getTaxesFromId(), htdocs/core/lib/functions.lib.php); without it the exemption reason (BT-121)
+	 * can be the one another entity declared. The column only exists from Dolibarr 19: the core of 18
+	 * reads llx_c_tva with no entity clause at all.
 	 *
 	 * @return	string		SQL clause to append to the WHERE, '' on Dolibarr 18
 	 */
@@ -2063,11 +2020,9 @@ trait CommonProtocol
 	 * Keep the order reference the supplier declared on the invoice it sent (BT-13) on the created
 	 * supplier invoice, whether or not it matched a purchase order of Dolibarr.
 	 *
-	 * Auto-linking only happens on an exact, unambiguous match for that supplier: on every other
-	 * case the reference used to be dropped, and the accountant had no way to know what the supplier
-	 * had declared, nor to reconcile the invoice by hand. It is stored into the table of the module
-	 * and not into an extrafield of the core, which a user could rename or delete. Never blocking:
-	 * an import must not fail because a piece of information could not be kept beside it.
+	 * Auto-linking only happens on an exact, unambiguous match for that supplier; on every other case
+	 * the reference would be dropped. Stored into the table of the module and not into an extrafield of
+	 * the core, which a user could rename or delete. Never blocking.
 	 *
 	 * @param FactureFournisseur	$supplierInvoice	Supplier invoice created by the import
 	 * @param string				$orderReference		Order reference declared by the supplier (BT-13)
@@ -2092,12 +2047,9 @@ trait CommonProtocol
 	/**
 	 * Link an inbound supplier invoice to its Dolibarr purchase order (commande fournisseur).
 	 *
-	 * Uses the purchase order reference (BT-13, BuyerOrderReferencedDocument/IssuerAssignedID) carried by
-	 * the invoice. The lookup is reference-exact (after trimming) AND scoped to the resolved supplier, so a
-	 * matching reference belonging to another supplier is never linked. The link is only created on a single
-	 * unambiguous match; several matches are flagged (no auto-link) and the absence of a match is silent.
-	 *
-	 * This is internal ERP reconciliation logic and must NEVER block import. See issue #303.
+	 * Uses BT-13 (BuyerOrderReferencedDocument/IssuerAssignedID). The lookup is reference-exact and
+	 * scoped to the resolved supplier, and only a single unambiguous match creates the link. Internal
+	 * ERP reconciliation logic: it must NEVER block import (issue #303).
 	 *
 	 * @param 	FactureFournisseur 	$supplierInvoice 	Freshly created supplier invoice (must expose ->id)
 	 * @param 	int 				$socId 				Resolved supplier third party id
@@ -2263,14 +2215,10 @@ trait CommonProtocol
 			if (isset(self::$UNTDID4461_TO_DOLIBARR_PAIEMENT_CODE[$untdidCode])) {
 				$dolibarrPaymentCode = self::$UNTDID4461_TO_DOLIBARR_PAIEMENT_CODE[$untdidCode];
 
-				// Read the dictionary through the core helper instead of forging the query here: it
-				// applies the multicompany filter (entity IN (getEntity('c_paiement'))) and caches the
-				// lookup. The extra filter keeps the "active entries only" behaviour the helper has no
-				// argument for; it is a hardcoded literal, never anything coming from the document.
-				// Only 7 arguments: the 8th ($useCache) does not exist on Dolibarr 19. From 19 on the
-				// core caches on [table][key][fieldid] only, so the entity and the filter above are not
-				// part of the cache key; harmless here, an import reads the dictionary in one entity
-				// with one filter.
+				// Read the dictionary through the core helper: it applies the multicompany filter and caches the
+				// lookup. The extra filter keeps the "active entries only" behaviour and is a hardcoded literal,
+				// never anything coming from the document. Only 7 arguments: the 8th ($useCache) does not exist
+				// on Dolibarr 19.
 				$paymentModeId = (int) dol_getIdFromCode($db, $dolibarrPaymentCode, 'c_paiement', 'code', 'id', 1, " AND active = 1");
 
 				if ($paymentModeId > 0) {

@@ -145,12 +145,10 @@ function pdpShowWarning($einvoicing)
 		$ret .= '</div>';
 	}
 
-	// public/proxy_oauthcallback.php answers without authentication and hands the caller back to the
-	// address it supplied itself in redirect_uri; on the callback branch that address receives the
-	// access token and the refresh token in its query string. On a proxy instance, the domains listed
-	// in EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN are the only thing separating a customer instance
-	// from anyone else on the internet, and an empty list is still accepted for one transition step
-	// (see einvoicingIsAllowedRedirectUrl). Say so loudly, on both setup pages, for as long as it is.
+	// In proxy mode public/proxy_oauthcallback.php answers without authentication and hands the access
+	// and refresh tokens to the redirect_uri the caller supplied, so the domains listed in
+	// EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN are the only thing separating a customer instance from
+	// anyone else. An empty list is still accepted for one transition step, so warn on both setup pages.
 	if (getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER') == 'proxy' && !getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN')) {
 		$ret .= '<div class="error">';
 		$ret .= img_warning().' <b>'.$langs->trans("ProxyRedirectDomainsNotSet").'</b>';
@@ -219,18 +217,10 @@ function thirdpartyidprof($object)
 /**
  * Remove every space of an identifier, whatever kind of space it is.
  *
- * French people write a long number in groups to read it back - SIREN "844 431 239", SIRET
- * "844 431 239 00020", VAT number "FR 43 844431239" - and a value copied from a web page or from a
- * PDF very often carries a non-breaking space (U+00A0), a thin space or a zero-width character
- * rather than the ordinary one. None of them belongs to the identifier, and a '/\s+/' pattern
- * written without the /u modifier sees none of them.
- *
- * This is the one and only place where the module strips those spaces, so the identifier it emits
- * (idprof(), the routing id sent to the platform) and the identifier it checks back
- * (EInvoicing::getSellerCommunicationURI() and the configuration pre-checks) are always cleaned the
- * same way. It lives here, in the module library, rather than in a class: idprof() and the provider
- * classes call it as a free function, and it needs no object to do its job. See the deprecated
- * EInvoicing::removeSpaces(), which now delegates here.
+ * A value copied from a web page or a PDF often carries a non-breaking (U+00A0), thin or zero-width
+ * space, which a '/\s+/' pattern written without the /u modifier does not see. Single place where the
+ * module strips them, so the identifier it emits and the one it checks back agree; the deprecated
+ * EInvoicing::removeSpaces() delegates here.
  *
  * @param  ?string $str					String to be cleaned. null is accepted and gives ''.
  * @param  ?string $original_encoding	Encoding of $str, null to detect it. The result is given back in that same encoding.
@@ -296,13 +286,8 @@ function removeAllSpaces($str, $original_encoding = null)
  * Return the full path of the directory where a module (or an object of a module) stores its files.
  * Path may depends on the entity if a multicompany module is enabled.
  *
- * Since Dolibarr 20.0.0 the core getMultidirOutput() takes the four arguments this module needs, so
- * the call is simply handed over to it and the module benefits from every later core fix. On
- * Dolibarr 18 and 19 the core function only accepts ($object, $module) and knows neither $forobject
- * nor $mode, hence the backported body kept below as a fallback.
- *
- * The version guard is placed here, and not at the four call sites, so that they keep a single entry
- * point and there is exactly one place to move (or drop) when the supported version floor rises.
+ * Core getMultidirOutput() takes the four arguments this module needs only since Dolibarr 20.0.0; on
+ * 18 and 19 it accepts ($object, $module) alone, hence the backported fallback body below.
  *
  * @param 	CommonObject|BlockedLog|null	$object 	Dolibarr common object.
  * @param 	string 							$module 	Override object element, for example to use 'mycompany' instead of 'societe'
@@ -642,16 +627,9 @@ if (!method_exists('Societe', 'findNearest')) {
 /**
  * Tell whether the seller reports the VAT on debits ("TVA d'apres les debits").
  *
- * That option makes the VAT of a service fall due when the invoice is issued instead of when it is
- * collected, and the seller who took it must carry the corresponding legal mention on its invoices.
- * The scheme itself is not a setting of this module: Dolibarr already holds it in the setup of the
- * Tax/VAT module (Home - Setup - Modules - Tax/VAT, "VAT mode"), where "TVA d'apres les debits" is
- * TAX_MODE 1, the one that puts both sell modes on 'invoice'. Conf::setValues() always populates the
- * two constants, defaulting to the French standard scheme.
- *
- * There is no option of this module to override it, deliberately: the same two constants are what the
- * VAT report of Dolibarr declares on (compta/tva/, through tax.lib.php), so an override would make the
- * document tell the buyer one regime while the seller declares its VAT under another.
+ * The scheme is not a setting of this module: Dolibarr holds it in the Tax/VAT module setup, where
+ * "TVA d'apres les debits" is TAX_MODE 1, the one that puts both sell modes on 'invoice'. Those same
+ * two constants are what the VAT report of Dolibarr declares on, hence no override here.
  *
  * @return bool		True when the invoices must carry the "VAT on debits" mention
  */
@@ -663,44 +641,10 @@ function einvoicingVatOnDebits()
 /**
  * VAT point date code (BT-8) the generated document has to declare.
  *
- * BT-8 tells the buyer when the VAT falls due, hence from when it may be deducted. BR-CL-06 restricts
- * it to a subset of UNTDID 2475 - 5 (invoice date), 29 (delivery date) and 72 (payment date) - and
- * BR-CO-03 makes it mutually exclusive with BT-7, the VAT point date itself. In CII the code lives in
- * the VAT breakdown (BG-23), which repeats per rate, but only one distinct value may appear in the
- * whole document (CII-SR-462): it is a document-level decision.
- *
- * What the French socle asks of it is narrower than the semantics of the codes, and it is what this
- * function follows. XP Z12-012 annexe A introduces BT-8 as the "champ permettant de specifier l'option
- * pour le paiement de la taxe d'apres les debits", reads its three values as "5 : date de la facture
- * (TVA sur DEBITS)", "29 : date de livraison (TVA sur DEBITS)" and "72 : date de paiement (TVA sur
- * ENCAISSEMENTS)", and carries two rules on it:
- *
- * @phpcs:ignore
- *   G1.43        "Le BT-8 ne sera obligatoire que si l'entreprise a opte pour la TVA sur les debits
- *                 et le specifie au moyen du code 5 (CII)"
- * @phpcs:ignore
- *   BR-FR-MAP-03 "BT-8 est obligatoire pour les factures de service des lors que l'assujetti Vendeur
- *                 a opte pour les debits"
- *
- * So 5 is not "this invoice is payable now", it is "I took the debits option", and a seller who did
- * not take it must not send it. That is why a goods invoice of a seller under the standard scheme
- * declares nothing: it has no option to signal, and its VAT falls due on a delivery the document
- * already dates. 72 is not mandatory anywhere, but it is true of an operation taxed on collection and
- * the annexe B examples carry it on every services invoice, so it is sent.
- *
- *   TAX_MODE 0, the French default   products on invoice, services on payment  -> 72 on a service line
- *   TAX_MODE 1, "d'apres les debits" everything on invoice                     -> 5
- *   TAX_MODE 2                       everything on payment                     -> 72
- *
- * 29 is never sent. It says the same thing as 5, BR-FR-MAP-29 states that "le PPF attend uniquement 5"
- * - a 29 having to be reported as 5 to the public portal - and Dolibarr has nothing to derive it from
- * anyway: its own setup reads the goods delivery as "OnDelivery (SupposedToBeInvoiceDate)".
- *
- * None of this is a setting of this module. Dolibarr holds the scheme once, in admin/taxes.php, and
- * that same setting decides how its VAT report is built, so a second place to state it would be a
- * second place to state it differently: a document declaring the debits option to the buyer while the
- * seller declares its VAT on collection, or the reverse. This is the same reason there is no option
- * for the VAT regime of the seller (BT-31 / BT-32) - see einvoicingSellerVatRegime().
+ * BR-CL-06 restricts BT-8 to 5, 29 or 72, BR-CO-03 makes it exclusive with BT-7, and CII-SR-462 allows
+ * one distinct value for the whole document. Under the French socle 5 does not mean "payable now" but
+ * "the seller took the debits option" (G1.43, BR-FR-MAP-03), so a seller under the standard scheme
+ * sends nothing on goods and 72 on services. 29 is never sent: BR-FR-MAP-29 says the PPF expects only 5.
  *
  * @param  bool		$hasProductLine		The document carries at least one goods line
  * @param  bool		$hasServiceLine		The document carries at least one service line
@@ -745,11 +689,9 @@ function einvoicingVatPointDateCode($hasProductLine, $hasServiceLine, $isDeposit
  * Tell whether the VAT of this document falls due on collection, i.e. whether a cash-in on it has to
  * be reported to the platform with the status 212.
  *
- * Close to the question BT-8 answers, but not the same one: BT-8 is what the French socle makes of it,
- * the declaration of the debits option, while this is the plain fact of when the VAT falls due. They
- * part company on the down payment of a seller who took the option, whose document declares 5 because
- * the option is general (G1.43), while the down payment itself is still taxed on collection - the
- * option "ne peut avoir pour effet de retarder l'exigibilite".
+ * Not the same question as BT-8: they part company on the down payment of a seller who took the debits
+ * option, whose document declares 5 because the option is general (G1.43) while the down payment
+ * itself stays taxed on collection.
  *
  * @param  bool		$hasProductLine		The document carries at least one goods line
  * @param  bool		$hasServiceLine		The document carries at least one service line
@@ -773,26 +715,10 @@ function einvoicingVatDueOnCollection($hasProductLine, $hasServiceLine)
 /**
  * VAT regime of the seller, as far as the identifier it declares on its invoices is concerned.
  *
- * EN 16931 lets a seller identify itself for tax purposes in two ways, and a document carries the one
- * that matches its regime:
- *
- *   BT-31  Seller VAT identifier            ram:SpecifiedTaxRegistration/ram:ID[@schemeID='VA']
- *   BT-32  Seller tax registration identif. ram:SpecifiedTaxRegistration/ram:ID[@schemeID='FC']
- *
- * A seller that charges VAT declares BT-31. A seller that does not - franchise en base de TVA of the
- * micro-entrepreneur, and more generally the "Non assujetti a la TVA" setup of Dolibarr - has no VAT
- * identifier to declare, and BT-32 is what the standard leaves it: in France, its SIREN. Without one
- * or the other, every exempt line of the document trips BR-E-02 and the platform refuses it, which is
- * the whole of issue #560.
- *
- * This is deliberately not a setting of this module, and there is no option to override it: Dolibarr
- * already holds the regime in the setup of the company (Home - Setup - Company/Organization, the "VAT
- * is used / is not used" radio, which admin/company.php writes into FACTURE_TVAOPTION as 1 or 0), and a
- * second place to state the same thing is a second place for it to be stated differently. Nothing is
- * re-derived from that constant here either: Societe::setMysoc() already turns it into ->tva_assuj, and
- * getCategoryRate() already decides from that same ->tva_assuj whether a line is exempt. Reading the
- * property the core computed is what keeps the two from ever disagreeing - a document declaring an
- * exempt line while claiming a VAT registration, or the reverse.
+ * A seller that charges VAT declares BT-31, one that does not (franchise en base, "Non assujetti a la
+ * TVA" in Dolibarr) declares BT-32 - in France its SIREN. Without either, every exempt line trips
+ * BR-E-02 and the platform refuses the document (issue #560). The regime is read from the property the
+ * core computed (Societe::setMysoc() into ->tva_assuj), never re-derived, so the two cannot disagree.
  *
  * @param	Societe		$seller		Selling company, normally $mysoc
  * @return	string					'standard' (the seller charges VAT, BT-31) or 'franchise' (it does not, BT-32)
@@ -845,12 +771,9 @@ function einvoicingShipToFromContact($shipContact, $buyer, $outputlangs, $db)
 		$name = ($shipSoc !== null && !empty($shipSoc->name)) ? $shipSoc->name : $buyer->name;
 	}
 
-	// The contact wins when it carries an address of its own - that is a delivery site the user
-	// entered deliberately. With none, the address of its company is the one that means something;
-	// the contact's own empty fields would emit a deliver-to party with no address at all. This is
-	// again what pdf_build_address() does, and a contact of the invoiced company with no address of
-	// its own falls back on that same company, so the deliver-to party then equals the buyer and no
-	// distinct BG-15 is emitted at all.
+	// The contact wins when it carries an address of its own - a delivery site the user entered
+	// deliberately; with none, its company address is used, as pdf_build_address() does. A contact of
+	// the invoiced company with no address then equals the buyer, so no distinct BG-15 is emitted.
 	$source = !empty($shipContact->address) ? $shipContact : ($shipSoc !== null ? $shipSoc : $shipContact);
 
 	return array(
@@ -865,11 +788,9 @@ function einvoicingShipToFromContact($shipContact, $buyer, $outputlangs, $db)
 /**
  * Tax registrations (BT-31 / BT-32) the seller declares, in the shape the two writers consume.
  *
- * One entry, because the two identifiers answer the same question and a document that carried both
- * would be claiming a VAT registration it does not use. Which one is decided by the regime rather
- * than by "is a VAT number recorded": a seller subject to VAT that simply left the field empty must
- * keep getting the explicit BADVATNUMBER message that names what to fill in, not a silent fallback on
- * its SIREN (issue #560).
+ * One entry only: the two identifiers answer the same question. Which one is decided by the regime,
+ * not by "is a VAT number recorded", so a seller subject to VAT that left the field empty still gets
+ * the explicit BADVATNUMBER message instead of a silent fallback on its SIREN (issue #560).
  *
  * @param	Societe		$seller		Selling company, normally $mysoc
  * @return	array<array{type:string,value:string}>	Registrations to write, possibly empty
@@ -892,21 +813,10 @@ function einvoicingSellerTaxRegistrations($seller)
 /**
  * Invoicing period of the document (BG-14 / BT-73 / BT-74), derived from the periods of its lines.
  *
- * Dolibarr has no invoicing period at invoice level: the period lives on the line, as the date_start
- * and date_end a service line carries. EN 16931 has both - BT-134/BT-135 on the line, BT-73/BT-74 on
- * the header - and says nothing about deriving one from the other, so the derivation is a decision:
- * the document covers everything its lines cover, hence the earliest start and the latest end (issue
- * #572, option 1, chosen by the maintainer because most receiving software only reads the header).
- *
- * A period that would be its own contradiction is not emitted. One line billed from March with another
- * billed until January derives a start after its end, which BR-29 refuses ("The Invoicing period end
- * date shall be later or equal to the Invoicing period start date") - and a document refused whole for
- * a header the operator never filled in would be worse than not deriving anything. The lines keep
- * their own periods in that case, which is what happened before this existed.
- *
- * The argument is the accumulator buildinvoicelines.inc.php fills as it walks the lines:
- * ['start' => [<numligne> => <timestamp>, ...], 'end' => [...]], either key absent when no line has
- * that side.
+ * Dolibarr has no period at invoice level, only BT-134/BT-135 on the line, so the header takes the
+ * earliest start and the latest end (issue #572). A start later than its end is not emitted at all:
+ * BR-29 refuses it and the whole document would be rejected. $billingPeriod is the accumulator
+ * buildinvoicelines.inc.php fills, ['start' => [<numligne> => <timestamp>], 'end' => [...]].
  *
  * @param	array<string,array<int,int>>	$billingPeriod	Line periods collected from the invoice
  * @return	array{start: ?int, end: ?int}					BT-73 and BT-74, null when there is none
@@ -932,14 +842,9 @@ function einvoicingInvoicingPeriodFromLines($billingPeriod)
 /**
  * Version of the module, followed by the commit it was built from when that one is known.
  *
- * The version alone does not name sources: between two releases the VERSION file does not move,
- * so every build of a branch answers the same string and a bug report quoting it says nothing
- * about what actually runs. einvoicingModuleCommit() is what names the sources, and this is the
- * single place deciding how the two read together, so that the stamp is the same wherever it is
- * printed - the comment opening a generated XML, the title of a page.
- *
- * An installation whose commit cannot be known gets the version alone, with no parentheses,
- * which is what every caller printed before the commit existed.
+ * The VERSION file does not move between two releases, so the version alone does not name sources.
+ * Single place deciding how version and commit read together, so the stamp is the same wherever it is
+ * printed. An installation whose commit cannot be known gets the version alone, with no parentheses.
  *
  * @return	string	Something like "1.4.2 (a6f4d2b)", or "1.4.2" when the commit is unknown
  */
@@ -959,25 +864,10 @@ function einvoicingModuleStamp()
 /**
  * Commit the module sources were built from, empty string when it cannot be known.
  *
- * An installed module has no repository to ask: the zip is unpacked into custom/ and that is
- * all there is. So the packager writes the commit it built from into a COMMIT file at the root
- * of the module (dev/build/makepack-modules.php), and reading that file back is the whole
- * mechanism - nothing is executed here, only one file is read.
- *
- * The commit is deliberately NOT part of the version: einvoicing/VERSION is compared with
- * version_compare() by the core (DolibarrModules::checkForUpdate()) against the VERSION file
- * published on GitHub, and it names both the package and the release tag in the packager. A
- * build suffix there would turn the "update available" flag into a lexicographic comparison of
- * hexadecimal, and every build into a new tag. A file of its own costs none of that.
- *
- * Whichever source answers, the commit is named on seven characters. `git rev-parse --short`
- * returns the shortest unambiguous prefix, which is a property of the repository on the machine
- * that built the package and grows with it, so the stamp is not a stable length on its own.
- *
- * A deployment made from a clone of the repository rather than from a package has no stamp and
- * never will, so the repository metadata is read as a second source. An installation answering
- * to neither - sources predating the stamp, an unpacked zip built before it - gets no commit,
- * and the caller falls back to the version alone, exactly as before.
+ * An installed module has no repository to ask, so the packager writes the commit into a COMMIT file
+ * at the root of the module (dev/build/makepack-modules.php); a deployment made from a clone has none,
+ * hence the repository metadata read as a second source. Deliberately not part of VERSION, which the
+ * core compares with version_compare() to flag an available update. Always shortened to 7 characters.
  *
  * @return	string	Short commit hash, or '' when neither source answers
  */
@@ -1008,13 +898,9 @@ function einvoicingModuleCommit()
 /**
  * Commit at the tip of a repository checkout, read from its metadata files.
  *
- * git is not run: a module has no business executing commands, and exec() is forbidden on a
- * good many hostings anyway. What is read is what `git rev-parse HEAD` would resolve - HEAD,
- * then the ref it names, as a file of its own or as a line of packed-refs - through the two
- * indirections a checkout may add: a .git that is a file naming the real directory (a linked
- * worktree, a submodule), and refs kept in the repository the worktree came from.
- *
- * Anything unexpected returns an empty string. This names sources, it never decides anything.
+ * git is never run: exec() is forbidden on a good many hostings. What is read is what
+ * `git rev-parse HEAD` would resolve, through the two indirections a checkout may add - a .git file
+ * naming the real directory (linked worktree, submodule), and refs kept in the repository it came from.
  *
  * @param	string	$repodir	Directory expected to hold the .git of a checkout
  * @return	string				Short commit hash, or '' when it is not a readable checkout
@@ -1068,13 +954,9 @@ function einvoicingCheckoutCommit($repodir)
 /**
  * Key identifying the VAT breakdown group (BG-23) a line belongs to.
  *
- * EN 16931 identifies a breakdown group by its VAT category code (BT-118), its rate (BT-119) and its
- * exemption reason (BT-120/BT-121), and by nothing else - in particular not by the Dolibarr
- * vat_src_code, which used to split otherwise identical groups in two and had the platform reject the
- * document (BR-S-08: the taxable base does not reconcile).
- *
- * It exists as a function because the same key is built in more than one place: a breakdown filled
- * under one shape and read back under another silently loses what was filed under it.
+ * A group is identified by BT-118, BT-119 and BT-120/BT-121 and by nothing else - in particular not by
+ * the Dolibarr vat_src_code, which split otherwise identical groups in two and had the platform reject
+ * the document (BR-S-08). A function because the same key is built in more than one place.
  *
  * @param	string		$categoryVAT			VAT category code of the line (BT-118)
  * @param	float|string	$rate				VAT rate of the line (BT-119)
@@ -1090,24 +972,10 @@ function einvoicingVatBreakdownKey($categoryVAT, $rate, $exemptionReasonCode = '
 /**
  * Tell whether an URL may be used as the target of a redirect made by the OAuth proxy.
  *
- * public/proxy_oauthcallback.php is reachable without authentication (NOLOGIN) and hands the caller
- * back to an address the caller itself supplied in redirect_uri. On the callback branch that address
- * receives the freshly issued access_token and refresh_token in its query string, so whoever controls
- * it controls the tokens: the destination is a trust decision, not a formatting detail, and it must be
- * taken in one single place for every redirect of that page.
- *
- * The allowed destinations are the domains listed in EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN, comma
- * separated. A proxy deployment that serves partner domains has to name them explicitly; an empty
- * list is what the security report is about, since it lets any third party drive the flow and collect
- * the tokens on a host of its choice. It is nevertheless accepted for one transition step, because
- * nothing ever set that option and refusing at once would stop every existing proxy: see the TODO
- * below, and the warning pdpShowWarning() prints on the setup pages meanwhile.
- *
- * Two shapes are refused whatever the allowlist says, empty or not:
- *  - anything that is not an absolute http(s) URL, so that "javascript:" payloads and the scheme
- *    relative "//evil.tld" (which a browser resolves to the attacker host) never reach a Location header;
- *  - a host that merely ends with an allowed domain. Matching on the suffix alone accepts
- *    "notpartner.tld" for "partner.tld", so the comparison is on the host itself or on a dot boundary.
+ * public/proxy_oauthcallback.php is reachable without authentication and hands the freshly issued
+ * tokens to the redirect_uri the caller supplied: a trust decision. Only an absolute http(s) URL whose
+ * host matches, on a dot boundary, a comma separated EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN entry
+ * is allowed. An empty list is accepted for one transition step.
  *
  * @param	string	$url	Candidate destination, as received from the caller
  * @return	bool			True when the URL may be passed to header('Location: ...')
@@ -1130,11 +998,8 @@ function einvoicingIsAllowedRedirectUrl($url)
 
 	$alloweddomains = getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN');
 	if ($alloweddomains === '') {
-		// TRANSITION. No proxy deployment has this option today - no code, no setup page and no
-		// upgrade ever set it - so refusing here would cut every customer instance off its proxy on
-		// the day of the update. It stays open for one step, and both setup pages print a warning
-		// for as long as it is: while the list is empty the proxy hands the access token and the
-		// refresh token to whatever destination the caller names.
+		// TRANSITION. Nothing ever set this option, so refusing here would cut every customer instance off
+		// its proxy on the day of the update. Both setup pages warn for as long as the list is empty.
 		// TODO Remove this and return false instead, once deployments have had time to declare the
 		// domains of their customer instances.
 		return true;

@@ -32,13 +32,9 @@ require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
  * Build a support archive out of a selection of flows (llx_einvoicing_document) or of API calls
  * (llx_einvoicing_call).
  *
- * Diagnosing a refusal today means walking the user through four screens - the flow, the API call,
- * the setup constants, the versions - and having them turn an option on, because the two most
- * useful columns (llx_einvoicing_call.response and llx_einvoicing_document.response_for_debug) are
- * only written when EINVOICING_DEBUG_MODE is set. This class packs all of that into one file.
- *
- * It lives apart from the two list pages on purpose: page code cannot be exercised by PHPUnit, and
- * the redaction this class performs is exactly what has to be covered by a test.
+ * The two most useful columns (llx_einvoicing_call.response and llx_einvoicing_document.response_for_debug)
+ * are only written when EINVOICING_DEBUG_MODE is set. This packs the flow, the API call, the setup
+ * constants and the versions into one file, apart from the list pages so PHPUnit can cover the redaction.
  */
 class SupportExport
 {
@@ -182,14 +178,9 @@ class SupportExport
 	/**
 	 * Send the archive to the browser, then remove it from the server.
 	 *
-	 * Handing the file over straight away rather than leaving it for the "generated documents" box
-	 * of the list is deliberate. That box downloads through document.php with the modulepart
-	 * massfilesarea_einvoicing, and dol_check_secure_access_document() grants that modulepart on
-	 * hasRight(<module>, 'lire') up to Dolibarr 21 (it moved to 'read' in 22): the module declares
-	 * 'read', like every module builder module, so the link would answer "access forbidden" on the
-	 * whole lower half of the supported range. Deleting the file afterwards also keeps archives
-	 * full of invoice XML - names, addresses, contact details - from piling up in the temporary
-	 * area of the instance.
+	 * Not left in the "generated documents" box: dol_check_secure_access_document() grants the modulepart
+	 * massfilesarea_einvoicing on hasRight(<module>, 'lire') up to Dolibarr 21 and on 'read' from 22,
+	 * while the module declares 'read', so that link is forbidden on 18 to 21.
 	 *
 	 * Headers are sent here, so the caller must have written nothing yet and must exit right after.
 	 *
@@ -248,9 +239,8 @@ class SupportExport
 	/**
 	 * The EINVOICING_* constants of the current entity, secrets replaced by whether they are set.
 	 *
-	 * Read from $conf->global rather than from llx_const: that is the very object the module reads
-	 * its options from, so the manifest shows what the code saw, entity resolution and decryption
-	 * (dolDecrypt) included - which is also why the values have to be filtered here.
+	 * Read from $conf->global rather than from llx_const: the manifest then shows what the code saw,
+	 * entity resolution and decryption (dolDecrypt) included - which is why the values are filtered here.
 	 *
 	 * @return array<string,string> Constant name => value or placeholder, sorted by name
 	 * @phan-suppress PhanPluginMoreSpecificActualReturnType
@@ -379,11 +369,10 @@ class SupportExport
 	/**
 	 * Keep, of the posted selection, the rows the current entity may read.
 	 *
-	 * The filter has to be a query of its own: fetch() answers on the rowid alone, and the entity
-	 * column never even reaches the object, because CommonObject::getFieldList() leaves it out of
-	 * the SELECT it builds (checked on Dolibarr 18 and 24). So an export driven by ids posted in a
-	 * form is filtered here, on getEntity(), exactly the way the two list pages filter their own
-	 * query. Anything dropped is counted as skipped, and the manifest says so.
+	 * The filter has to be a query of its own: fetch() answers on the rowid alone and the entity column
+	 * never reaches the object, CommonObject::getFieldList() leaving it out of the SELECT it builds
+	 * (Dolibarr 18 to 24). So ids posted in a form are filtered here, on getEntity(), the way the list
+	 * pages filter their own query. Anything dropped is counted as skipped in the manifest.
 	 *
 	 * @param	Document|Call	$object		An instance of the class being exported, for its table
 	 * @param	int[]			$ids		Rowids as they were posted

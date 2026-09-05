@@ -20,11 +20,9 @@
  *      \file       test/phpunit/CIIProfileShapeTest.php
  *      \ingroup    test
  *      \brief      PHPUnit test for the groups a profile is allowed to carry.
- *                  MINIMUM and BASIC WL are header-only Factur-X profiles: neither
- *                  ram:IncludedSupplyChainTradeLineItem (BG-25) nor ram:DefinedTradeContact
- *                  (BG-6 / BG-9) is declared in their XSD, so emitting either makes every
- *                  generated document fail the profile schema. Every profile from BASIC upwards
- *                  expects both.
+ *                  MINIMUM and BASIC WL are header-only Factur-X profiles: their XSD declares
+ *                  neither ram:IncludedSupplyChainTradeLineItem (BG-25) nor ram:DefinedTradeContact
+ *                  (BG-6 / BG-9), while every profile from BASIC upwards expects both.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 
@@ -464,11 +462,9 @@ class CIIProfileShapeTest extends CommonClassTest
 	 * The buyer routing code travels as a second ram:GlobalID of the buyer party, and only the
 	 * EXTENDED profiles may carry it.
 	 *
-	 * Scheme 0224 is where BR-FR-CPRO-11 and BR-FR-CPRO-13 read the Chorus Pro service code, but it
-	 * is a second identifier for the party, and the Factur-X EN16931 Schematron caps that element at
-	 * one occurrence (FX-SCH-A-000164): a document below EXTENDED that carries both is refused. The
-	 * Annexe B examples of XP Z12-012 agree - the routing code is in the EXTENDED and EXTENDED-CTC-FR
-	 * files of an invoice, absent from its EN16931 twin (issue #678).
+	 * Scheme 0224 is where BR-FR-CPRO-11 and BR-FR-CPRO-13 read the Chorus Pro service code, and the
+	 * Factur-X EN16931 Schematron caps ram:GlobalID at one occurrence (FX-SCH-A-000164): a document
+	 * below EXTENDED carrying both is refused (issue #678).
 	 *
 	 * @return void
 	 */

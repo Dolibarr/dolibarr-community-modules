@@ -22,24 +22,9 @@
  *      \brief      PHPUnit test for the VAT number the module builds for a French thirdparty that has
  *                  none, BT-31 for the seller and BT-48 for the buyer.
  *
- *                  A French VAT number is FR, a two digit key, and the nine digits of the SIREN: it is
- *                  thirteen characters, always. The module used to carry its own copy of the core
- *                  computation and the copy was wrong twice:
- *
- *                  - the key was concatenated raw. It is [12 + 3 * (SIREN modulo 97)] modulo 97, so it
- *                    falls between 00 and 09 for about one SIREN in ten - 3 being invertible modulo 97,
- *                    every key from 0 to 96 is reached by exactly one residue - and those numbers went
- *                    out on twelve characters;
- *                  - the SIRET to SIREN fallback cast to int, which eats the leading zero of a SIREN
- *                    that starts with one, and the number went out on twelve characters again, with the
- *                    wrong digits.
- *
- *                  Both defects reached the XML, where a malformed BT-31 or BT-48 is a document the
- *                  platform refuses. The computation is now the core one - Societe::calculateVAT-
- *                  NumberFromProperties(), there since Dolibarr 24 - or the faithful backport of
- *                  compat/societe.lib.php on 18 to 23, which do not have it. Both paths are checked
- *                  here: the entry point of the module, and the backport on its own, so that the
- *                  fallback is covered whatever core the test runs against.
+ *                  A French VAT number is FR, a two digit key, then the SIREN: the key is
+ *                  [12 + 3 * (SIREN modulo 97)] modulo 97, padded below 10. The computation is
+ *                  Societe::calculateVATNumberFromProperties() from v24, the compat backport on 18-23.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 

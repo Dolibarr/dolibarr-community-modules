@@ -20,18 +20,11 @@
  *      \file       test/phpunit/MultidirOutputCompatTest.php
  *      \ingroup    test
  *      \brief      PHPUnit test for getMultidirOutputCompat(): it must hand the call over to the core
- *                  getMultidirOutput() as soon as the core knows the four arguments, and only fall
- *                  back on its backported body on the versions where it does not.
- *      \remarks    getMultidirOutputCompat() used to be an unconditional copy of the core function,
- *                  so every fix made in the core (the /sending subdirectory of a shipment, the
- *                  dol_sanitizePathName() added in Dolibarr 24, ...) was silently ignored by the
- *                  module. The core function takes ($object, $module) only up to Dolibarr 19 and
- *                  ($object, $module, $forobject, $mode) from Dolibarr 20 on, hence the guard.
- *
- *                  The backported body is unreachable once the guard delegates, so it is re-declared
- *                  here under another name, from the very source of lib/einvoicing.lib.php with the
- *                  delegation stripped, to be compared against the core function of the instance the
- *                  tests run on.
+ *                  getMultidirOutput() as soon as the core knows the four arguments.
+ *      \remarks    The core function takes ($object, $module) only up to Dolibarr 19 and
+ *                  ($object, $module, $forobject, $mode) from Dolibarr 20 on, hence the guard. The
+ *                  backported body is unreachable once the guard delegates, so it is re-declared here
+ *                  under another name to be compared against the core function of the instance.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 

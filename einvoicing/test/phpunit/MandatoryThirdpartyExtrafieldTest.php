@@ -21,13 +21,10 @@
  *      \ingroup    test
  *      \brief      PHPUnit test for the synchronization of the seller of a received document when the
  *                  base carries a mandatory extrafield on thirdparties.
- *                  The module never sets an extrafield on a thirdparty, but from Dolibarr 20 on
- *                  Societe::fetch() pre-fills array_options with a null entry for every declared
- *                  extrafield, and update() hands that array to insertExtraFields(), which refuses the
- *                  whole record as soon as one of those fields is mandatory and empty. A thirdparty
- *                  created programmatically holds no extrafield row at all - which is exactly what the
- *                  automatic creation of this same function produces - so every received document was
- *                  then rejected on the seller.
+ *                  From Dolibarr 20 on, Societe::fetch() pre-fills array_options with a null entry for
+ *                  every declared extrafield, and update() hands it to insertExtraFields(), which
+ *                  refuses the whole record when one of those fields is mandatory and empty - so every
+ *                  received document was rejected on the seller.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 

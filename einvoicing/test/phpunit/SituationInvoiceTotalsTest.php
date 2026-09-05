@@ -20,22 +20,11 @@
  *      \file       test/phpunit/SituationInvoiceTotalsTest.php
  *      \ingroup    test
  *      \brief      A generated document states the amount Dolibarr bills, not one of its own.
- *      \remarks    No validator can catch this. A document that overstates its amounts is
- *                  arithmetically consistent with itself - the lines, the breakdown and the totals
- *                  all agree - so the CEN, Factur-X and CTC-FR schematrons answer VALID on it. The
- *                  only thing it contradicts is the invoice it came from, and that is outside every
- *                  one of them.
- *
- *                  #709 did exactly that: it filed the deduction of the previous situations (#674)
- *                  under one key shape and read it back under another, so the document level
- *                  allowance (BT-107) was silently dropped. A second situation of 70 % on a 1000.00
- *                  line announced 840.00 where Dolibarr bills 480.00 - 360.00 too much, on a
- *                  document that goes to the platform and to the customer, and every validator said
- *                  the document was fine.
- *
- *                  This builds that very cycle - two situations, in the database, in the transaction
- *                  the test class rolls back - and requires the totals of the document to be the
- *                  totals of the invoice.
+ *      \remarks    No validator can catch this: a document that overstates its amounts is consistent
+ *                  with itself, so every schematron answers VALID; the only thing it contradicts is the
+ *                  invoice it came from. #709 dropped the document level allowance (BT-107) that carries
+ *                  the deduction of the previous situations (#674). Two situations are built here, in
+ *                  the database, and the totals of the document must be the totals of the invoice.
  */
 
 

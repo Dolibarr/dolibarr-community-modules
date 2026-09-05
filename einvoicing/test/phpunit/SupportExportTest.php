@@ -19,12 +19,9 @@
 /**
  *      \file       test/phpunit/SupportExportTest.php
  *      \ingroup    test
- *      \brief      PHPUnit test for the "Export for support" mass action of the flow list and of the
- *                  API call log. What has to hold whatever else changes: an archive built to be sent
- *                  to a maintainer carries no credential, and its manifest alone says which core,
- *                  which module build, which platform and which entity it was taken from - debug
- *                  mode included, without which an empty response cannot be told from a response
- *                  that was never stored.
+ *      \brief      PHPUnit test for the "Export for support" mass action of the flow list and of the API
+ *                  call log. What has to hold: the archive carries no credential, and its manifest alone
+ *                  says which core, module build, platform, entity and debug mode it was taken from.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 
