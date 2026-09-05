@@ -289,7 +289,10 @@ class CdarHandler
 
 		// Id format: {SupplierRef}_{StatusCode}_{CreationDate}#{DocType}_{CreationDate} as defined in documentation
 		// TODO: map DOC_INVOICE with $object type
-		$ID = ($statusCode == 212 ? $object->ref : $object->ref_supplier) . '_' . $statusCode . '_' . date('YmdHis', $object->date_creation) . '#' . CdarHandler::DOC_INVOICE . '_' . date('Ymd', $object->date_creation);
+		// 'tzserver' and not the 'auto' default: 'auto' resolves to $conf->tzuserinputkey, which the
+		// MAIN_TZUSERINPUTKEY constant can switch to 'tzuserrel', and the id would then follow the
+		// timezone of whoever triggers the send instead of the server one.
+		$ID = ($statusCode == 212 ? $object->ref : $object->ref_supplier) . '_' . $statusCode . '_' . dol_print_date((int) $object->date_creation, '%Y%m%d%H%M%S', 'tzserver') . '#' . CdarHandler::DOC_INVOICE . '_' . dol_print_date((int) $object->date_creation, '%Y%m%d', 'tzserver');
 
 		// We use same as ID for Name as its not required to be different
 		$Name = $ID;
@@ -522,7 +525,7 @@ class CdarHandler
 					// MDT-97, mandatory in the CTC-FR profile: it says what the lifecycle message is about
 					'ReferenceTypeCode' => CdarHandler::REFERENCE_TYPE_EINVOICE,
 					// Every XP Z12-012 reference example dates the referenced invoice with a plain date
-					'FormattedIssueDateTime' => date('Ymd', $object->date),
+					'FormattedIssueDateTime' => dol_print_date((int) $object->date, '%Y%m%d', 'tzserver'),
 					'ProcessConditionCode' => $statusCode,
 					'ProcessCondition' => $ProcessCondition,
 
@@ -775,6 +778,11 @@ class CdarHandler
 	/**
 	 * formatDateTime
 	 *
+	 * Kept on plain substr() on purpose: this is a pass-through formatter, anything that is not
+	 * exactly 14 digits comes back untouched. dol_stringtotime() strips every non-digit and pads
+	 * the result with '000000', so it cannot give that pass-through back, and it would also
+	 * normalize a 14-digit string that is not a real date (a DST gap hour, or '99999999999999').
+	 *
 	 * @param  string $dateTimeStr datetime
 	 *
 	 * @return string
@@ -790,6 +798,9 @@ class CdarHandler
 
 	/**
 	 * formatDate
+	 *
+	 * Same reason as formatDateTime(): a pass-through formatter the core date helpers cannot
+	 * reproduce, so it stays on substr().
 	 *
 	 * @param  string $dateStr date
 	 *
@@ -809,7 +820,14 @@ class CdarHandler
 	 */
 	public static function getCurrentDateTime()
 	{
-		return date('YmdHis');
+		// 'gmt' and not 'tzserver': unlike the dates read from the invoice, which DoliDB::jdate()
+		// hands back in the server timezone, this one is an instant, not a calendar date, and it
+		// travels between platforms. UTC is the safe convention for it.
+		// The limit, so that the next reader does not believe the matter settled: format 204
+		// (YYYYMMDDHHmmss) carries no offset, so writing UTC does not DECLARE UTC to the
+		// recipient. The code that would carry it is 2379, which the library does not implement.
+		// See generateCdarFile() for why the 'auto' default is never used in this class.
+		return dol_print_date(dol_now('gmt'), '%Y%m%d%H%M%S', 'gmt');
 	}
 
 	/**
@@ -819,7 +837,8 @@ class CdarHandler
 	 */
 	public static function getCurrentDate()
 	{
-		return date('Ymd');
+		// Same instant, same UTC choice and same limit as getCurrentDateTime().
+		return dol_print_date(dol_now('gmt'), '%Y%m%d', 'gmt');
 	}
 
 	// ==================== PRIVATE HELPERS ====================
