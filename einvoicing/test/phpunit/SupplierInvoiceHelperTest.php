@@ -915,6 +915,40 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 	}
 
 	/**
+	 * A draft is not in the accounts and cannot be paid, so "Payment transmitted" has nothing to
+	 * describe on it - even once the answer to the vendor has been given and accepted. Validating the
+	 * invoice is what makes the payment possible, and the status with it.
+	 *
+	 * @return void
+	 */
+	public function testADraftIsNeverOfferedThePaymentStatus()
+	{
+		global $db;
+
+		$invoice = $this->createSpecimenSupplierInvoice();
+		$this->addEInvoicingDocument($invoice->id);
+		// The answer is given and confirmed, so the draft state is the only thing left holding the
+		// payment status back.
+		$this->insertLifecycleMessageFixture($invoice->id, 'invoice_supplier', EInvoicing::STATUS_APPROVED, '', 'Ok');
+
+		$einvoicing = new EInvoicing($db);
+
+		$this->assertSame(FactureFournisseur::STATUS_DRAFT, (int) $invoice->status, 'initAsSpecimen() creates a draft');
+		$offered = array_map('intval', array_keys($einvoicing->getSendableStatusesForReceivedInvoice($invoice->id, 'invoice_supplier')));
+		$this->assertNotContains(EInvoicing::STATUS_PAYMENT_SENT, $offered, 'a draft has not been paid');
+
+		// Validate it the way the card does, without going through validate(): the reference and the
+		// triggers it fires are not what is being tested here, the status column is.
+		$sql = "UPDATE " . MAIN_DB_PREFIX . "facture_fourn";
+		$sql .= " SET fk_statut = " . (int) FactureFournisseur::STATUS_VALIDATED;
+		$sql .= " WHERE rowid = " . (int) $invoice->id;
+		$this->assertNotFalse($db->query($sql), (string) $db->lasterror());
+
+		$offered = array_map('intval', array_keys($einvoicing->getSendableStatusesForReceivedInvoice($invoice->id, 'invoice_supplier')));
+		$this->assertContains(EInvoicing::STATUS_PAYMENT_SENT, $offered, 'a validated and approved invoice is the one that gets paid');
+	}
+
+	/**
 	 * Build a reference no other row of the instance can carry, long enough and not purely numeric,
 	 * so the fixtures of the findIdByRef() tests never collide with real data.
 	 *

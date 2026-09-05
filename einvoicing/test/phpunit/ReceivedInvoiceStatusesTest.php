@@ -23,7 +23,8 @@
  *                  statuses a user may still send by hand on an invoice received through the platform,
  *                  given what the platform already accepted for it. The rule the module got wrong is
  *                  that approving an invoice does not end the exchange - the payment, and the status
- *                  reporting it, come after the approval (issue #548).
+ *                  reporting it, come after the approval (issue #548), and only after it: an invoice
+ *                  nobody has answered yet is not offered the status of its payment.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 
@@ -115,17 +116,52 @@ class ReceivedInvoiceStatusesTest extends CommonClassTest
 	}
 
 	/**
-	 * An invoice on which nothing was sent yet offers the whole sendable list.
+	 * An invoice on which nothing was sent yet is waiting for an answer, and only for that: approving
+	 * or refusing it are the two ways of giving it. "Payment transmitted" comes after, so it is not
+	 * part of what is offered at this point.
 	 *
 	 * @return void
 	 */
-	public function testNothingSentYetOffersEverySendableStatus()
+	public function testNothingSentYetOffersTheAnswerButNotThePayment()
 	{
 		$offered = $this->offered();
 
 		$this->assertContains(EInvoicing::STATUS_APPROVED, $offered);
 		$this->assertContains(EInvoicing::STATUS_REFUSED, $offered);
+		$this->assertNotContains(EInvoicing::STATUS_PAYMENT_SENT, $offered, 'nothing is paid before being accepted');
+	}
+
+	/**
+	 * A "Partially approved" accepted by the platform settles the answer just as an approval does: the
+	 * invoice is going to be paid, so the status reporting that payment becomes reachable.
+	 *
+	 * @return void
+	 */
+	public function testPartiallyApprovedAlsoOpensThePaymentStatus()
+	{
+		$this->sent(EInvoicing::STATUS_PARTIALLY_APPROVED);
+
+		$offered = $this->offered();
+
 		$this->assertContains(EInvoicing::STATUS_PAYMENT_SENT, $offered);
+		$this->assertNotContains(EInvoicing::STATUS_REFUSED, $offered, 'an accepted invoice cannot then be refused');
+	}
+
+	/**
+	 * An approval the platform has not confirmed yet settles nothing: it can still be rejected, and
+	 * until it is confirmed the invoice is in the same place as one nobody answered.
+	 *
+	 * @return void
+	 */
+	public function testAPendingApprovalDoesNotOpenThePaymentStatus()
+	{
+		$this->sent(EInvoicing::STATUS_APPROVED, 'Pending');
+
+		$offered = $this->offered();
+
+		$this->assertNotContains(EInvoicing::STATUS_PAYMENT_SENT, $offered);
+		$this->assertContains(EInvoicing::STATUS_APPROVED, $offered, 'the answer is still the thing to send');
+		$this->assertContains(EInvoicing::STATUS_REFUSED, $offered);
 	}
 
 	/**
@@ -187,5 +223,6 @@ class ReceivedInvoiceStatusesTest extends CommonClassTest
 
 		$this->assertContains(EInvoicing::STATUS_APPROVED, $offered);
 		$this->assertContains(EInvoicing::STATUS_REFUSED, $offered, 'nothing was accepted, so the choice is still open');
+		$this->assertNotContains(EInvoicing::STATUS_PAYMENT_SENT, $offered, 'a rejected approval leaves the invoice unanswered');
 	}
 }
