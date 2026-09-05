@@ -56,12 +56,8 @@ class SupplierInvoiceHelper
 
 	/**
 	 * Compare a Dolibarr supplier invoice to its related e-invoice and check they are identical
-	 * using following criteria :
-	 * - Currency
-	 * - VAT excl. total
-	 * - VAT incl. total
-	 * - VAT total
-	 * - Basis amount & VAT amount of each VAT rate
+	 * using following criteria : currency, VAT excl. total, VAT incl. total, VAT total, basis
+	 * amount & VAT amount of each VAT rate
 	 *
 	 * @param FactureFournisseur $dolSupplierInvoice   The Dolibarr object to compare to e-invoice
 	 *
@@ -443,20 +439,11 @@ class SupplierInvoiceHelper
 	}
 
 	/**
-	 * Abandon a Dolibarr supplier invoice because its refusal has been confirmed by the
-	 * e-invoicing platform (PDP/PA). Validates the invoice first if it is still a draft, then
-	 * cancels it with a dedicated close code so it can be excluded from the accountancy
-	 * transfer screen (see ActionsEinvoicing::printFieldListWhere()).
-	 *
-	 * Idempotent: calling this again on an invoice already abandoned by this same rule is a
-	 * no-op. A paid invoice is never touched. This idempotence check reads $object->status and
-	 * $object->close_code from the in-memory object: $object must reflect the current database
-	 * state (i.e. freshly fetched) for it to be reliable.
-	 *
-	 * The validation step runs BILL_SUPPLIER_VALIDATE normally, including the e-invoice/Dolibarr
-	 * consistency check when EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION is
-	 * enabled: if that check rejects the invoice, this method fails too (returns -1) rather than
-	 * abandoning it.
+	 * Abandon a Dolibarr supplier invoice because its refusal has been confirmed by the PDP/PA:
+	 * validates it if still a draft, then cancels it with a dedicated close code, excluded from the
+	 * accountancy transfer screen (see ActionsEinvoicing::printFieldListWhere()). A paid invoice is
+	 * never touched; the idempotence check needs a freshly fetched $object (status/close_code).
+	 * Validation runs BILL_SUPPLIER_VALIDATE: if its consistency check rejects, this method fails.
 	 *
 	 * @param	FactureFournisseur	$object			Supplier invoice to abandon
 	 * @param	User				$user			User (or system user, when called from a cron) triggering the change
@@ -662,13 +649,11 @@ class SupplierInvoiceHelper
 	}
 
 	/**
-	 * Callback to invoke once an outbound lifecycle status message has been validated (confirmed
-	 * or rejected by the e-invoicing platform). This is a no-op unless the message is a
-	 * confirmed ('Ok') refusal (EInvoicing::STATUS_REFUSED) of a supplier invoice, in which case
-	 * it abandons the corresponding Dolibarr supplier invoice (see abandonRefusedSupplierInvoice()).
-	 *
-	 * Errors are logged but never thrown: this callback must never break the caller that is
-	 * persisting the platform confirmation (see EInvoicing::updateStatusMessageValidation()).
+	 * Callback to invoke once an outbound lifecycle status message has been validated by the
+	 * e-invoicing platform. No-op unless the message is a confirmed ('Ok') refusal
+	 * (EInvoicing::STATUS_REFUSED) of a supplier invoice, then it abandons the Dolibarr supplier
+	 * invoice (see abandonRefusedSupplierInvoice()). Errors are logged but never thrown, to never
+	 * break the caller persisting the confirmation (see EInvoicing::updateStatusMessageValidation()).
 	 *
 	 * @param	DoliDB	$db					Database handler
 	 * @param	User	$user				User (or system user, when called from a cron) triggering the change

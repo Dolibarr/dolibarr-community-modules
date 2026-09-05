@@ -1278,23 +1278,10 @@ class CIIProtocol extends AbstractProtocol
 					$resFetchLinkedObject = $linkedObject->fetch($linkedObjectId);
 					if ($resFetchLinkedObject > 0) {
 						/*
-						 * --------------------------------------------------
-						 * Deposit handling
-						 * --------------------------------------------------
-						 * Deposits may be referenced:
-						 *  - at document level
-						 *  - at line level
-						 *
-						 * If the deposit is referenced at line level:
-						 *   → we create the discount before creating the invoice line,
-						 *     so it can be linked later.
-						 *
-						 * If the same deposit appears both at line and document level:
-						 *    line-level handling takes priority to avoid duplicates.
-						 *
-						 * If the deposit exists only at document level:
-						 *   → a discount line will be created later after all invoice
-						 *     lines are generated.
+						 * Deposit handling: deposits may be referenced at document level or at line level.
+						 * At line level, we create the discount before creating the invoice line, so it can be linked later.
+						 * If the same deposit appears both at line and document level, line-level handling takes priority to
+						 * avoid duplicates. If it exists only at document level, the discount line is created after all lines.
 						 */
 						if ($linkedObject->type == FactureFournisseur::TYPE_DEPOSIT) {
 							$is_deposit_line = 1;
@@ -2384,10 +2371,9 @@ class CIIProtocol extends AbstractProtocol
 			$contractRef->appendChild($doc->createElement('ram:IssuerAssignedID', htmlspecialchars($invoiceData['contractReference'])));
 		}
 
-		// Additional order references: when an invoice covers several purchase orders, the first is
-		// emitted as BT-13 (BuyerOrderReferencedDocument above) and the others are listed here as
-		// AdditionalReferencedDocument/TypeCode=130 — the same approach Factur-X uses. Restricted to
-		// profiles that carry AdditionalReferencedDocument in the agreement section (not MINIMUM), and
+		// Additional order references: when an invoice covers several purchase orders, the first is emitted as BT-13
+		// (BuyerOrderReferencedDocument above) and the others are listed here as AdditionalReferencedDocument/TypeCode=130.
+		// Restricted to profiles that carry AdditionalReferencedDocument in the agreement section (not MINIMUM), and
 		// skipped for Chorus (which does not accept these extra nodes). Sequence position: after
 		// ContractReferencedDocument, before SpecifiedProcuringProject (CII schema order).
 		if (!$invoiceData['_chorus'] && $profile !== 'MINIMUM' && !empty($invoiceData['_customerOrderReferenceList'])) {

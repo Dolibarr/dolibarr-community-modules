@@ -869,14 +869,10 @@ abstract class AbstractPDPProvider
 
 		$LastSyncDate = null;
 
-		// Retrieve the last synchronization timestamp from the database
-		// Note: The PDP API does not support per-document synchronization yet.
-		// We perform a global sync for all flows and track the last modification
-		// timestamp (tms) from the einvoicing_document table to determine
+		// Retrieve the last synchronization timestamp from the database.
+		// The PDP API does not support per-document synchronization yet: we perform a global sync for all
+		// flows and track the last modification timestamp (tms) of the einvoicing_document table to know
 		// which flows need to be synchronized since the last successful sync.
-		//
-		// Future enhancement: Individual document sync may be possible when
-		// the PDP provider API supports it.
 
 		$provider = (string) $this->providerName;
 		$providershort = '';
@@ -979,10 +975,9 @@ abstract class AbstractPDPProvider
 	 * Make an API payload safe to store in the utf8mb4 TEXT debug columns
 	 * (llx_einvoicing_call.response, llx_einvoicing_document.response_for_debug).
 	 *
-	 * Some PDP responses carry non-UTF-8 bytes (signed or compressed payloads): stored as-is
-	 * they raise a SQL error 1366 (Incorrect string value) and abort the flow. Valid UTF-8 is
-	 * kept unchanged; anything else is base64-encoded behind a marker so the trace stays both
-	 * storable and recoverable.
+	 * Some PDP responses carry non-UTF-8 bytes (signed or compressed payloads): stored as-is they raise a
+	 * SQL error 1366 (Incorrect string value) and abort the flow. Valid UTF-8 is kept unchanged; anything
+	 * else is base64-encoded behind a marker.
 	 *
 	 * @param   string|null $payload    Raw payload, possibly binary
 	 * @return  string                  UTF-8-safe representation

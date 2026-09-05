@@ -509,14 +509,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			$callRef = $response['call_id'];
 
 			/**
-			 * We make an additional call to retrieve the acknowledgment information and update the status.
-			 * However, document validation on the PDP side may take some time.
-			 * Therefore, we initially set the status to "Sent".
-			 *
-			 * We then try to fetch the PDP validation result:
+			 * Document validation on the PDP side may take some time, so we initially set the status to
+			 * "Sent", then make an additional call to retrieve the acknowledgment information:
 			 * - If the validation is successful, we update the status to "Sent (awaiting acknowledgment)".
 			 * - If the PDP validation fails, we set the status to "Error".
-			 *
 			 * If no response is available yet, we wait for the next synchronization.
 			 **/
 
@@ -1872,14 +1868,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 			if ($response['status_code'] == 200 || $response['status_code'] == 202) {
 				/**
-				 * We make an additional call to retrieve the acknowledgment information and update the status.
-				 * However, document validation on the PDP side may take some time.
-				 * Therefore, we initially set the status to "Sent".
-				 *
-				 * We then try to fetch the PDP validation result:
+				 * Document validation on the PDP side may take some time, so we initially set the status to
+				 * "Sent", then make an additional call to retrieve the acknowledgment information:
 				 * - If the validation is successful, we update the status of the electronic invoice accordingly.
 				 * - If the PDP validation fails, we set the status to "Error" and log the reason.
-				 *
 				 * If no response is available yet, we wait for the next synchronization.
 				 **/
 

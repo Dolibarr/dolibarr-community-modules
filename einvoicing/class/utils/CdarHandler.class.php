@@ -273,18 +273,11 @@ class CdarHandler
 		global $conf, $mysoc;
 
 		/**
-		* Perhaps in future PDP updates, endpoints will appear to simplify sending lifecycle messages without going through CDARs.
-		* Currently, CDARs must be generated manually.
-		* The CDAR can/must contain several blocks; for some statuses, informational blocks must be added.
-		* We should try to create them with the minimum number of mandatory blocks.
-		* Blocks will be added based on PDP feedback.
-		* Perhaps we need to import the UN/CEFACT XSD files to validate the generated files.
-		* We start by processing the following cases:
-		* - Acceptance (204) - optional => Implemented
+		* CDARs must be generated manually, with the minimum number of mandatory blocks; more blocks
+		* will be added based on PDP feedback. We start by processing the following cases:
 		* - Rejection (210) - mandatory in the case of a rejection (The only mandatory status for now)
+		* - Acceptance (204) - optional => Implemented ; Acceptance (205) - optional
 		* - Payment transmitted (212) - optional but recommended
-		* - Acceptance (205) - optional
-		* Others can be added as needed.
 		*/
 
 		// Id format: {SupplierRef}_{StatusCode}_{CreationDate}#{DocType}_{CreationDate} as defined in documentation
@@ -306,12 +299,10 @@ class CdarHandler
 		$mysocGlobalID = idprof($mysoc);
 
 		// Issuer SIREN (0002) of the invoice the status is about: us when we sell, the vendor otherwise.
-		// For a received supplier invoice, the platform indexed the incoming flow under the identifier
-		// the vendor's PDP placed in SellerTradeParty.GlobalID — which may differ from the Dolibarr
-		// third-party SIREN (e.g. test environments where the PDP assigns synthetic identifiers, or a
-		// vendor whose card has not been kept up to date). Reading it from the stored XML is the only
-		// reliable way to reference the same invoice the platform knows. The same parse also yields the
-		// vendor's electronic address (BT-34), used further down for MDT-73 when no routing is recorded.
+		// For a received supplier invoice, the platform indexed the flow under the identifier the vendor's
+		// PDP placed in SellerTradeParty.GlobalID, which may differ from the Dolibarr third-party SIREN.
+		// Reading it from the stored XML is the only reliable way to reference the same invoice. The same
+		// parse also yields the vendor's address (BT-34), used below for MDT-73 when no routing is recorded.
 		$vendorIdentity = array('globalid' => '', 'uriid' => '');
 		if ($isOurOwnInvoice) {
 			$InvoiceIssuerGlobalID = $mysocGlobalID;

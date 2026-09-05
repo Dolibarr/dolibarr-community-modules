@@ -20,15 +20,11 @@
  * \ingroup     einvoicing
  * \brief       Lightweight EN 16931 business-rules validator for generated CII invoices.
  *
- * Checks a focused subset of the EN 16931 business rules (BR, BR-CO) plus a few
- * CTC-FR ones (BR-FR) directly on the generated CrossIndustryInvoice XML, before
- * the file is stored/sent. This is NOT a replacement for the official Schematron
- * (still applied by the Approved Platform): it is a fast local safety net that
- * catches arithmetic inconsistencies (the most common generation bugs) with a
- * clear message, without a network call and for any PDP provider.
- *
- * Messages are technical by design (they quote the official rule id and the
- * amounts involved), like a validator report.
+ * Checks a focused subset of the EN 16931 business rules (BR, BR-CO) plus a few CTC-FR ones
+ * (BR-FR) directly on the generated CrossIndustryInvoice XML, before the file is stored/sent.
+ * This is NOT a replacement for the official Schematron (still applied by the Approved Platform):
+ * it is a fast local safety net that catches arithmetic inconsistencies, without a network call
+ * and for any PDP provider. Messages are technical (they quote the rule id and the amounts).
  */
 class En16931Validator
 {

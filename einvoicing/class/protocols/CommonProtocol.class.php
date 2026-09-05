@@ -1686,15 +1686,10 @@ trait CommonProtocol
 		}
 
 		// The VAT code the line carries (vat_src_code, the code column of the VAT dictionary) states the
-		// regime the line is invoiced under, and that regime is what BT-151 asks for. It is read here rather
-		// than deduced from the rate, because a rate of zero covers Z, E, AE, G and K alike: a generator that
-		// guesses from the rate builds a document that is valid and wrong, and BR-AE-05 and its siblings only
-		// catch the guesses that get the rate wrong as well.
-		//
+		// regime the line is invoiced under, which is what BT-151 asks for. It is read here rather than
+		// deduced from the rate, because a rate of zero covers Z, E, AE, G and K alike.
 		// The category is the segment of the code before its first dash, so 'AE' and 'AE-IC' are both reverse
-		// charge and a dictionary can tell apart two regimes that share one category. A code that does not
-		// open on a category the module supports - a code holding a VATEX identifier, or any code an existing
-		// installation already uses - is left to the rules below, unchanged.
+		// charge. A code that does not open on a category the module supports is left to the rules below.
 		$declaredCategoryVAT = $this->_getVatCategoryFromVatCode($vat_src_code);
 
 		if ($declaredCategoryVAT !== '' && $declaredCategoryVAT !== 'S') {
@@ -1830,11 +1825,9 @@ trait CommonProtocol
 					if ((float) DOL_VERSION < 24.0) {
 						// We must use the reason found in the constant MAIN_VAT_EXEMPTION_CODE_FOR_0.00_XXXX
 						// List of VATEX: https://docs.peppol.eu/poacc/billing/3.0/codelist/vatex/
-						// TVA non applicable article 261-4 CGI (nature non soumis à TVA, comme médecin): VATEX-FR-CGI261-4
-						// TVA non applicable - Vente objet art :       VATEX-FR-I
-						// TVA non applicable - Vente objet antiquité : VATEX-FR-J
-						// TVA non applicable - Vente agence voyage:    VATEX-EU-D
-						// TVA non applicable - Debours (VAT paid by customer):  VATEX-EU-79-C
+						// TVA non applicable: article 261-4 CGI (comme médecin) VATEX-FR-CGI261-4, vente objet art
+						// VATEX-FR-I, vente objet antiquité VATEX-FR-J, vente agence voyage VATEX-EU-D,
+						// debours (VAT paid by customer) VATEX-EU-79-C
 						$vatex = '';
 
 						// We try to find code in the vat code definition in the dictionary table (code only because einvoice_vatex does not exists).
