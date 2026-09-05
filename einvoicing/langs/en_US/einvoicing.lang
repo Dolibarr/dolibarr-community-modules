@@ -681,3 +681,10 @@ EInvoicingInfoManagedByMasterSetup=The einvoicing setup is managed by the master
 ProxyRedirectDomainsNotSet=Security: this instance is an OAuth proxy and accepts any redirect destination
 ProxyRedirectDomainsNotSetDetail=The proxy page (einvoicing/public/proxy_oauthcallback.php) answers without authentication and sends the OAuth access token and refresh token to the address the caller asks for. As long as the constant EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN is empty, every address is accepted, so anyone can have the tokens of an Access Point account delivered to a server of their own. Set that constant to the comma separated list of the domains of your customer instances, for example mycustomerdomain.com,anotherdomain.com. A future version will refuse every redirect while the list is empty.
 ProxyRedirectDomainsGoToOtherSetup=Set the constant in Home - Setup - Other
+
+# Support export (mass action of the flow list and of the API call log)
+EInvoicingSupportExport=Export in a zip archive
+EInvoicingSupportExportQuestion=Build one archive out of the %s selected record(s)?
+EInvoicingSupportExportPrivacy=The archive holds the selected records as they are stored, the e-invoice XML included, so it carries the names, addresses, e-mail addresses and phone numbers they contain. Credentials, tokens and passwords are removed. Read it before sending it to anyone.
+EInvoicingSupportExportNoZip=No support archive can be built: this PHP installation has no ZipArchive extension.
+EInvoicingSupportExportTooMany=Too many records selected for a support export: %s selected, %s at most. Narrow the selection, or raise the constant EINVOICING_SUPPORT_EXPORT_MAX.

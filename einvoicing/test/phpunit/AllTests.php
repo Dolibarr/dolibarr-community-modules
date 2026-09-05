@@ -151,6 +151,8 @@ class AllTests
 		$suite->addTestSuite('SkipB2CPrecheckTest');
 		require_once dirname(__FILE__).'/StatusComboMarkupTest.php';
 		$suite->addTestSuite('StatusComboMarkupTest');
+		require_once dirname(__FILE__).'/SupportExportTest.php';
+		$suite->addTestSuite('SupportExportTest');
 		require_once dirname(__FILE__).'/SupplierInvoiceHelperTest.php';
 		$suite->addTestSuite('SupplierInvoiceHelperTest');
 		require_once dirname(__FILE__).'/TransmittedLockTest.php';

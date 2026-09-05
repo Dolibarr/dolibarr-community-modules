@@ -923,10 +923,14 @@ abstract class AbstractPDPProvider
 	 * persisted in the API call log, whatever its shape: PHP array, application/x-www-form-urlencoded
 	 * string (OAuth token requests), JSON string, or plain text (left untouched in that last case).
 	 *
+	 * Public because the redaction has a second caller outside the write path: SupportExport
+	 * replays it on everything it puts in a support archive, so that rows written before this
+	 * method existed do not carry their tokens out of the instance.
+	 *
 	 * @param  array<mixed>|string|null $value Value to redact
 	 * @return array<mixed>|string|null Redacted value, same shape as the input
 	 */
-	private static function redactSensitiveData($value)
+	public static function redactSensitiveData($value)
 	{
 		if (is_array($value)) {
 			$redacted = array();
