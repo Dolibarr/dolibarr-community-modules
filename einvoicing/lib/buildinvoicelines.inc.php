@@ -838,42 +838,73 @@ if (getDolGlobalString($roundTotalConstName) == '1') {		// Same comparison as up
 	$grand_total_ttc = (float) price2num($grand_total_ht + $grand_total_tva, 2);
 }
 
-// already used credit note amount
-$usedcreditnoteamount = 0;
-$usedcreditnote = array();
-$sql = "SELECT re.rowid, re.amount_ht, re.amount_tva, re.amount_ttc,";
-$sql .= " re.description, re.fk_facture_source";
-$sql .= " FROM ".MAIN_DB_PREFIX."societe_remise_except as re";
-$sql .= " WHERE fk_facture = ".((int) $object->id) ." AND description = '(CREDIT_NOTE)'";
-$resql = $db->query($sql);
-if ($resql) {
-	while ($obj = $db->fetch_object($resql)) {
-		$usedcreditnoteamount += abs($obj->amount_ttc);
+// Documents this invoice refers to because a discount applied on it comes from them (BT-25/BT-26, BG-3).
+// Same rows as the core sums used below (attached by fk_facture, joined on the type of the source invoice,
+// never filtered on description), so references and prepaid amount always speak of the same discounts.
+// Customer invoices only: a purchase invoice uses fk_invoice_supplier and would match a foreign rowid here.
+if ($object->element == 'facture' || $object->element == 'invoice') {
+	// Type of the source invoice (BT-X-...), not necessarily a credit note: an '(EXCESS RECEIVED)' is born
+	// from a commercial invoice (380), announcing it as 381 would call an avoir an invoice already paid.
+	$refDocTypeByInvoiceType = array(
+		Facture::TYPE_STANDARD => '380',		// commercial invoice, the source of an excess received
+		Facture::TYPE_CREDIT_NOTE => '381',		// credit note
+		Facture::TYPE_DEPOSIT => '386',			// deposit invoice, same code as the deposit lines above
+		Facture::TYPE_SITUATION => '380',		// situation invoices are transmitted as standard invoices
+	);
 
-		// Add used credit note into reference documents of invoice
-		$usedCreditNoteFact = new Facture($this->db);
-		if ($usedCreditNoteFact->fetch($obj->fk_facture_source) > 0) {
-			$usedCreditNoteFactDate = new DateTime(dol_print_date($usedCreditNoteFact->date, 'dayrfc'));
-			$invoiceRefDocs[] = [
-				'ref' => $usedCreditNoteFact->ref,
-				'date' => $usedCreditNoteFactDate,
-				'type' => '381'
-			];
-		} else {
-			dol_syslog("Error " . $db->error() . " when looking for credit note linked to invoice to calculate prepaid amount for invoice " . $object->id, LOG_WARNING);
+	$sql = "SELECT re.fk_facture_source, re.description, f.type as sourcetype";
+	$sql .= " FROM ".MAIN_DB_PREFIX."societe_remise_except as re";
+	$sql .= " INNER JOIN ".MAIN_DB_PREFIX."facture as f ON f.rowid = re.fk_facture_source";
+	$sql .= " WHERE re.fk_facture = ".((int) $object->id);
+	$sql .= " AND f.type IN (".$db->sanitize(implode(', ', array_keys($refDocTypeByInvoiceType))).")";
+	$resql = $db->query($sql);
+	if ($resql) {
+		while ($obj = $db->fetch_object($resql)) {
+			$sourceDiscountFact = new Facture($this->db);
+			if ($sourceDiscountFact->fetch($obj->fk_facture_source) > 0) {
+				$invoiceRefDocs[] = [
+					'ref' => $sourceDiscountFact->ref,															// BT-25
+					'date' => new DateTime(dol_print_date($sourceDiscountFact->date, 'dayrfc')),					// BT-26
+					'type' => $refDocTypeByInvoiceType[(int) $obj->sourcetype]
+				];
+				dol_syslog("EInvoicing invoice " . $object->id . " refers to " . $sourceDiscountFact->ref
+					. " for the discount " . $obj->description . " applied on it", LOG_DEBUG);
+			} else {
+				dol_syslog("EInvoicing cannot read the invoice id=" . $obj->fk_facture_source . " a discount applied on invoice "
+					. $object->id . " comes from, it will not be referenced", LOG_WARNING);
+			}
 		}
+		$db->free($resql);
+	} else {
+		dol_syslog("EInvoicing cannot read the discounts applied on invoice " . $object->id . ": " . $db->lasterror(), LOG_WARNING);
 	}
-} else {
-	dol_syslog("Error " . $db->error() . " when looking for credit note linked to invoice to calculate prepaid amount for invoice " . $object->id, LOG_WARNING);
 }
 
-// Amount already received for this invoice: direct payments + used credit notes.
-// getSommePaiement() returns the sum of payments; on Dolibarr <= 22 it also stores that same
-// value into $object->sumpayed, so adding both double-counted the payment (#372: a fully paid
-// invoice reported TotalPrepaidAmount = 2x the amount and a negative DuePayableAmount).
-$getAlreadyPaid = $object->getSommePaiement();
+// Amount already paid (BT-113), which decides what the document still asks for (BT-115). Dolibarr has one
+// definition of it, the one getRemainToPay() applies from 18 to 24: payments + deposits used + credit notes
+// used, read from the return values only ($object->sumpayed repeats getSommePaiement(), see issue #372).
+// The former query, filtered on description = '(CREDIT_NOTE)', lost the '(EXCESS RECEIVED)' discount and the
+// deposit used without a line. No double count: a discount row carries fk_facture_line or fk_facture, never both.
+$prepaidAmount = 0.0;
+foreach (array('getSommePaiement', 'getSumDepositsUsed', 'getSumCreditNotesUsed') as $alreadyPaidMethod) {
+	$alreadyPaidPart = $object->$alreadyPaidMethod();
 
-$prepaidAmount  = $getAlreadyPaid + $usedcreditnoteamount;
+	// SUM() over no row answers NULL, handed back as it is: this invoice carries nothing of that kind.
+	if ($alreadyPaidPart === null || $alreadyPaidPart === '') {
+		continue;
+	}
+
+	// A failure is -1, and from Dolibarr 22 DiscountAbsolute answers 'ErrorBadElementType'/'ErrorBadSQLquery'.
+	// Neither is summed (cast, a string is 0 and -1 adds one euro), the amount is understated and says so.
+	if (!is_numeric($alreadyPaidPart) || (float) $alreadyPaidPart < 0) {
+		dol_syslog("EInvoicing cannot read what the core counts as already paid for invoice " . $object->id . ": "
+			. $alreadyPaidMethod . "() answered '" . (is_scalar($alreadyPaidPart) ? $alreadyPaidPart : gettype($alreadyPaidPart))
+			. "' (" . $object->error . "). The prepaid amount of the document is understated.", LOG_ERR);
+		continue;
+	}
+
+	$prepaidAmount += (float) $alreadyPaidPart;
+}
 
 // Invoicing period of the document (BG-14): the earliest start and the latest end of the periods its
 // lines carry, Dolibarr having no such field at invoice level. See einvoicingInvoicingPeriodFromLines()
