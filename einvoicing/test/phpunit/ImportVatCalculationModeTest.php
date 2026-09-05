@@ -20,17 +20,9 @@
  *      \file       test/phpunit/ImportVatCalculationModeTest.php
  *      \ingroup    test
  *      \brief      PHPUnit test for the VAT calculation mode of a received invoice (issue #781).
- *
- *                  Dolibarr computes the VAT of an invoice either by rounding it on every line and
- *                  adding the results up ("total of round", mode 1, the default), or by adding the
- *                  line amounts up and rounding the VAT once ("round of total", mode 2). A received
- *                  document does not leave that open: BT-110 and BT-112 are the ones its issuer
- *                  computed, so the imported invoice has to carry them whatever the instance is set
- *                  to.
- *
- *                  The three line amounts used below are taken from the reported 46 line document:
- *                  1.09, 7.79 and 1.59 at 20 %, which round to 0.22 + 1.56 + 0.32 = 2.10 line by
- *                  line, where the document announces 10.47 x 20 % = 2.09.
+ *                  BT-110 and BT-112 are the ones the issuer computed, so the imported invoice has to
+ *                  carry them whatever the instance is set to - "total of round" (mode 1, the default,
+ *                  rounding line by line) or "round of total" (mode 2).
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 

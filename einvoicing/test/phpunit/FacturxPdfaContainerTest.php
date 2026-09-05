@@ -19,24 +19,12 @@
 /**
  *      \file       test/phpunit/FacturxPdfaContainerTest.php
  *      \ingroup    test
- *      \brief      PHPUnit test for the PDF/A-3 container of the Factur-X files (issue #591).
- *                  A Factur-X file is a PDF/A-3 file carrying the XML, and everything else this
- *                  project validates looks at the XML only: the container had no guard, and two
- *                  defects that made the files invalid PDF/A shipped unnoticed. Both mergers of the
- *                  module are exercised here, on the carrier PDF and the XML fixtures the repository
- *                  already ships, and what they wrote into the container is read back.
- *
- *                  What is asserted is what a PDF/A validator would reject and what PHP can see
- *                  without one: a single parsable XMP packet identifying the file as PDF/A-3B, one
- *                  extension schema bag declaring Factur-X, a metadata stream whose /Length matches
- *                  what it holds, the XML embedded as an associated file with the right relationship,
- *                  and the PDF/A output intent. Run veraPDF over the same documents for the clauses
- *                  only a validator can settle - FACTURX_PDFA_OUTDIR is there for that.
- *
+ *      \brief      PHPUnit test for the PDF/A-3 container of the Factur-X files (issue #591). Both
+ *                  mergers are read back on the fixtures the repository ships: XMP packet identifying
+ *                  PDF/A-3B, extension schema declaring Factur-X, metadata stream /Length, embedded XML
+ *                  and output intent. FACTURX_PDFA_OUTDIR keeps the documents for a veraPDF run.
  *      \remarks    To run this script as CLI: phpunit filename.php
- *                  Needs no database. It uses the Dolibarr instance when there is one - as the other
- *                  tests of this directory do, through DOLIBARR_HTDOCS or the htdocs/custom symlink -
- *                  and stands on its own when there is none, which is how the CI runs it.
+ *                  Needs no database, which is how the CI runs it.
  */
 
 // Both mergers need a logger and nothing else of the core, so the Dolibarr instance is used when it
@@ -173,11 +161,9 @@ class FacturxPdfaContainerTest extends PHPUnit\Framework\TestCase
 	/**
 	 * Read back everything a Factur-X container is made of.
 	 *
-	 * The two defects this guards against both lived here: an XMP packet carrying two descriptions
-	 * that repeat pdfaExtension:schemas on the same subject - which the XMP specification forbids,
-	 * and which stops a reader before it ever sees the PDF/A identification, while staying perfectly
-	 * well-formed XML - and, once the entry is grafted into the bag the writer produces instead, a
-	 * metadata stream whose declared length no longer matches what it holds.
+	 * The two defects this guards against: an XMP packet repeating pdfaExtension:schemas on the same
+	 * subject, which the specification forbids and which stops a reader before the PDF/A identification
+	 * while staying well-formed XML; and a metadata stream whose declared length no longer matches.
 	 *
 	 * @param	string	$file	Full path of the generated document
 	 * @return	void

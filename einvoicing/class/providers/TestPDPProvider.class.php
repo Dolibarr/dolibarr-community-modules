@@ -31,15 +31,10 @@ dol_include_once('einvoicing/class/call.class.php');
 /**
  * Reference implementation of a PDP provider.
  *
- * This class is the skeleton to copy to integrate a new platform, either here or from an external
- * module (see einvoicing/doc/ADD-A-PDP-PROVIDER.md). It implements every method the rest of the
- * module calls, with the smallest body that is still honest: nothing here reaches the network, and
- * the methods that would need a platform to answer return an explicit error instead of pretending.
- *
- * What it does exercise for real, because it needs no platform: the configuration form of the setup
- * page, the storage of a token, the generation of a sample invoice by the exchange protocol, and the
- * logging of the API calls. That is enough to check that a new provider is correctly declared before
- * writing a single line of HTTP.
+ * The skeleton to copy to integrate a new platform, here or from an external module (see
+ * einvoicing/doc/ADD-A-PDP-PROVIDER.md). Nothing here reaches the network: the methods that would need a
+ * platform to answer return an explicit error. Only the setup form, the token storage, the sample invoice
+ * generation and the API call logging are exercised for real.
  */
 class TestPDPProvider extends AbstractPDPProvider
 {

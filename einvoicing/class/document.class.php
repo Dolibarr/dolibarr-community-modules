@@ -535,18 +535,10 @@ class Document extends CommonObject
 	/**
 	 * Import a received document again, from the access point, as if it had never been imported.
 	 *
-	 * The vendor of a supplier invoice cannot be changed once it exists, so an incoming document
-	 * booked on the wrong third party - because the identifiers it carries matched nothing, or
-	 * matched the wrong record - has no way back short of this: fix the third party data, then run
-	 * the import again and let it resolve the vendor from the document a second time.
-	 *
-	 * The local draft goes first (a validated invoice is refused: it is an accounting record, and
-	 * the recovery this offers is for an import that has not been acted on yet). The flow is then
-	 * fetched from the platform again, which creates the invoice and a record of its own, and that
-	 * record is moved onto this one: a flow the user has imported again keeps the line it already
-	 * had in the list, now pointing at the invoice that has just been created - and that invoice is
-	 * given back the temporary number of the draft it replaces. A failed import changes nothing and
-	 * leaves this record in place, detached, rather than losing the document.
+	 * The vendor of a supplier invoice cannot be changed once it exists, so a document booked on the
+	 * wrong third party has no way back short of this: fix the third party data, then import again.
+	 * The local draft is deleted first; a validated invoice is refused, it is an accounting record.
+	 * A failed import leaves this record in place, detached, rather than losing the document.
 	 *
 	 * @param	User				$user		User asking for the import
 	 * @return	array{res:int,message:string}	res > 0 is the id of the supplier invoice created
@@ -758,11 +750,8 @@ class Document extends CommonObject
 	/**
 	 * Attach to a supplier invoice the lifecycle history of the one it replaces.
 	 *
-	 * A status a vendor has sent - received, made available, rejected - is about the invoice the vendor
-	 * issued, not about the row Dolibarr booked it on: an import made again creates another row for the
-	 * same document, and the statuses already received belong to it just the same. Left where they are
-	 * they would be attached to an invoice that no longer exists, so the new draft would come up with no
-	 * status at all while the flows that carried them sit in the list, linked to nothing.
+	 * A status sent by the vendor is about the document, not about the row Dolibarr booked it on, so an
+	 * import made again must carry it over. Left in place it would point at a deleted invoice.
 	 *
 	 * @param	int			$previousinvoiceid	Supplier invoice the import has just replaced
 	 * @param	int			$newinvoiceid		Supplier invoice the import has just created
@@ -806,14 +795,10 @@ class Document extends CommonObject
 	/**
 	 * Give a draft supplier invoice the temporary reference of the draft it replaces.
 	 *
-	 * A draft is numbered by the core from the id of the row it has just created ("(PROV1234)"), so an
-	 * invoice imported again is a new row and gets a new number, for a document that has not changed.
-	 * The number of the draft that has just been deleted is free, and no code of the core reads an id
-	 * back out of it - it only tests the "PROV" prefix and skips such references when it looks for the
-	 * last number used - so it is given back here, files included.
-	 *
-	 * Only a temporary reference is ever moved this way, and only onto a draft: a validated invoice
-	 * carries a number of the numbering module, which belongs to it alone.
+	 * The core never reads an id back out of a "(PROV1234)" reference, it only tests the prefix, so the
+	 * number of the deleted draft can be given back to the new row, files included.
+	 * Only a temporary reference is moved this way, and only onto a draft: a validated invoice carries
+	 * a number of the numbering module, which belongs to it alone.
 	 *
 	 * @param	FactureFournisseur	$invoice	Draft the import has just created, renamed in place on success
 	 * @param	string				$wantedref	Reference of the draft it replaces

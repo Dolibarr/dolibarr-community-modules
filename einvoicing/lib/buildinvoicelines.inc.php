@@ -136,11 +136,8 @@ $myUri             = $einvoicing->getSellerCommunicationURI(0);
 $mySchemeUri       = $this->getIEC6523Code($mysoc->country_code, 2);
 
 // Buyer party resolution.
-// The billing contact of the invoice (external BILLING contact) always describes the buyer contact
-// group (BG-9): it is the point of contact the customer declared for its invoices, and nothing else
-// fills that group. Whether that contact also *replaces* the buyer party itself is another matter,
-// and stays opt-in behind EINVOICING_USE_BILLING_CONTACT_AS_BUYER (e.g. invoice addressed to the head
-// office / "siège social"):
+// The external BILLING contact always fills the buyer contact group (BG-9). Whether it also *replaces*
+// the buyer party stays opt-in behind EINVOICING_USE_BILLING_CONTACT_AS_BUYER (head office case):
 //   - Case B: the contact belongs to a different thirdparty (distinct legal entity) -> rebuild the
 //     whole buyer (name, address, SIREN/SIRET, VAT, routing) from that thirdparty.
 //   - Case A: same thirdparty -> keep its SIREN/VAT/routing, only override name/address.
@@ -261,18 +258,11 @@ if (!empty($newlang)) {
 }
 $outputlangs->load("einvoicing@einvoicing");
 
-// Buyer routing code: the Chorus Pro "code service exécutant", which BR-FR-CPRO-11 and BR-FR-CPRO-13
-// of XP Z12-012 read as a private identifier of the buyer (BT-46 under scheme 0224). Without it, a
-// B2G invoice to a buyer whose directory record demands a service code is rejected (issue #678).
-//
-// It is a SECOND ram:GlobalID on the buyer party, and only the EXTENDED profiles accept one: the
-// Factur-X EN16931 Schematron caps that element at a single occurrence (FX-SCH-A-000164,
-// "Element 'ram:GlobalID' may occur at maximum 1 times"), so emitting it below EXTENDED makes the
-// document invalid - measured on the FNFE validator, which answers "valid, 0 failure" on the very
-// same invoice built as EXTENDED-CTC-FR. The Annexe B examples say the same thing: the routing code
-// appears in the EXTENDED and EXTENDED-CTC-FR files of an invoice and not in its EN16931 twin.
-// Below EXTENDED the code is simply not sent, and the user is told why rather than handed a document
-// an access point refuses.
+// Buyer routing code: the Chorus Pro "code service exécutant", read by BR-FR-CPRO-11 and BR-FR-CPRO-13
+// of XP Z12-012 as a private identifier of the buyer (BT-46 under scheme 0224). Without it a B2G
+// invoice to a buyer whose directory record demands a service code is rejected (issue #678).
+// It is a SECOND ram:GlobalID on the buyer party, and the Factur-X EN16931 Schematron caps that element
+// at one occurrence (FX-SCH-A-000164): below EXTENDED the code is not sent and the user is told why.
 $buildProfile = $this->getBuildXmlProfile();
 $buyerRoutingCode = trim((string) ($object->array_options['options_d4d_service_code'] ?? ''));
 if ($buyerRoutingCode !== '' && $buyerParty->country_code != 'FR') {
@@ -294,11 +284,9 @@ if ($buyerRoutingCode !== '' && !$this->isExtendedProfile($buildProfile)) {
 }
 
 // Buyer reference (BT-10): a reference owned by the buyer, used to route the invoice inside its own
-// organisation (business unit, service reference, internal mailbox...). A core EN 16931 term with no
-// relation to the public sector, which no field of the module let a private issuer fill until now.
-// The Chorus Pro service code keeps feeding it when that dedicated property is empty: Annexe A of
-// XP Z12-012 documents BT-10 as the "Service Executant" of the public sector, so the historical
-// mapping is a documented usage of the term and is left untouched (issue #678).
+// organisation. The Chorus Pro service code keeps feeding it when the dedicated property is empty:
+// Annexe A of XP Z12-012 documents BT-10 as the "Service Executant" of the public sector, so that
+// mapping is a documented usage of the term (issue #678).
 $buyerReference = $einvoicing->getExtraFieldValue($object->id, $object->element, EInvoicing::EXTRAFIELD_BUYER_REFERENCE);
 if (trim((string) $buyerReference) === '') {
 	$buyerReference = $object->array_options['options_d4d_service_code'] ?? null;
@@ -605,12 +593,10 @@ foreach ($object->lines as $line) {
 	}
 	$line_unit_price_with_discount = price2num($line_unit_price_with_discount, getDolGlobalString('MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE_THEN_ROUND_BEFORE_MULTIPLICATION_BY_QTY', 'MU'));
 
-	// The amounts of the line are asked to the very function that computed the invoice
-	// (calcul_price_total(), the one update_price() calls), instead of being computed a second time
-	// here: the document has to state the amount the invoice states, and a second implementation
-	// misses the accuracies and the options of the instance, silently, by a few cents (issue #505).
-	// They are then rounded to the two decimals EN 16931 allows on an amount, which is a no-op on an
-	// instance keeping the default currency accuracy.
+	// Ask the amounts to the very function that computed the invoice (calcul_price_total(), the one
+	// update_price() calls) rather than computing them again: a second implementation silently misses
+	// the accuracies and options of the instance by a few cents (issue #505). Round to the two decimals
+	// EN 16931 allows on an amount.
 	$localtaxes_array = array($line->localtax1_type, $line->localtax1_tx, $line->localtax2_type, $line->localtax2_tx);
 	$tmpcal = calcul_price_total($line->qty, $line->subprice, $line->remise_percent, $line->tva_tx, $line->localtax1_tx, $line->localtax2_tx, 0, 'HT', $line->info_bits, $line->product_type, $mysoc, $localtaxes_array, $line_progress);
 
@@ -669,15 +655,10 @@ foreach ($object->lines as $line) {
 		'prodOriginCountry'         => null,
 
 		// Mandatory by Factur-X, EN 16931
-		// This is the unit price, excluding tax. The discount of the line is deliberately left out
-		// of it: it is stated as a line allowance (BG-27) further down, whose basis is this price
-		// times the quantity, which is the other way EN 16931 offers to write a discounted line and
-		// the one this module has always used. Stating $line_unit_price_with_discount here instead
-		// would need the TradeAllowanceCharge block of BT-148 / BT-147.
-		// The progress of a situation line, on the contrary, belongs to this price: without it the
-		// document states a price and a quantity whose product is not its own line amount (BT-131),
-		// and a receiver rebuilding the amounts from them - this module does exactly that when it
-		// imports - reads the whole line instead of the part that is invoiced (issue #672).
+		// Unit price excluding tax, discount left out: the line discount is stated as a line allowance
+		// (BG-27) further down, whose basis is this price times the quantity.
+		// The progress of a situation line belongs to this price: without it price times quantity is not
+		// the line amount (BT-131), and a receiver rebuilding the amounts reads the whole line (#672).
 		'netpriceamount'            => (float) ($line_progress != 100 ? price2num($line_unit_price * $line_progress / 100, 'MU') : $line_unit_price),		// BT-146
 		'netpricebasisquantity'     => null,
 		'netpricebasisquantityunitcode' => null,
@@ -738,18 +719,11 @@ foreach ($object->lines as $line) {
 	$numligne++;
 }
 
-// A situation invoice states, on each of its lines, the cumulative amount of the work done, and the
-// core deducts the situations already invoiced from the header of the invoice
-// (CommonObject::update_price(), block "Situations totals"): llx_facture.total_ttc holds the
-// instalment, which is what the customer owes and what the payment screen expects. The document has
-// to state the same amount, so what the previous situations already asked for is carried as a
-// document level allowance: the lines keep saying what has been done, BT-106 keeps summing them, and
-// BT-107 brings BT-109 (and the VAT breakdown with it) back onto the instalment (issue #674).
-// The amount deducted for a line is the one its predecessor recorded, read from the invoice that
-// carries it - not recomputed here, so the document deducts exactly what was invoiced before, cents
-// included.
-// With INVOICE_USE_SITUATION = 2 each invoice states its own share of the progress, the core deducts
-// nothing and the lines already hold the instalment: there is nothing to deduct.
+// A situation invoice states the cumulative work done on each line while the core deducts the previous
+// situations in the header (update_price(), "Situations totals"), so what they already asked for is
+// carried as a document level allowance: BT-107 brings BT-109 back onto the instalment (issue #674).
+// The amount deducted per line is the one its predecessor recorded, read back, not recomputed here.
+// With INVOICE_USE_SITUATION = 2 the lines already hold the instalment: there is nothing to deduct.
 if (!empty($object->situation_counter) && $object->situation_counter > 1
 	&& isset($object->type) && $object->type == $object::TYPE_SITUATION
 	&& getDolGlobalInt('INVOICE_USE_SITUATION') == 1) {
@@ -815,16 +789,11 @@ if (!empty($object->situation_counter) && $object->situation_counter > 1
 	}
 }
 
-// Rounding convention of the totals.
-// Dolibarr sums the amounts already rounded on each line ("total of round", the default), unless
-// MAIN_ROUNDOFTOTAL_NOT_TOTALOFROUND is set, in which case it rounds the sum instead ("round of
-// total"). update_price() then writes the difference back onto the last line of the VAT rate, so on
-// such an instance the invoice recorded, printed, booked and paid carries the second convention.
-// The loop above always applied the first one, so the document transmitted claimed a cent less (or
-// more) than the invoice it stands for, and nothing reported it: the document stays internally
-// consistent, and the tolerance BR-CO-17 allows absorbs the gap (issue #378).
-// Only the VAT is concerned: on a document priced without tax update_price() never adjusts the net
-// amount of a line, so the line net amounts (BT-131) and their sum (BT-106) are the same either way.
+// Rounding convention of the totals: Dolibarr sums the amounts already rounded on each line ("total of
+// round", the default), unless MAIN_ROUNDOFTOTAL_NOT_TOTALOFROUND rounds the sum instead. The loop
+// above always applies the first one, so follow the instance or the document claims a cent less than
+// the invoice it stands for (issue #378). Only the VAT is concerned: update_price() never adjusts the
+// net amount of a line, so BT-131 and BT-106 are the same either way.
 $roundTotalConstName = 'MAIN_ROUNDOFTOTAL_NOT_TOTALOFROUND';
 if (in_array($object->element, array('facture_fourn', 'invoice_supplier'))) {
 	$roundTotalConstName .= '_SUPPLIER';
@@ -1049,22 +1018,11 @@ if ($object->mode_reglement_code) {
 }
 
 
-// Delivery address (CII ShipToTradeParty / BG-15)
-// Resolve a deliver-to address and expose it so the CII builder can emit a dedicated deliver-to
-// party. Resolution priority:
-//   1) external "SHIPPING" contact attached to the invoice;
-//   2) fallback: delivery address carried by a linked shipment (expedition.fk_delivery_address).
+// Delivery address (CII ShipToTradeParty / BG-15): external "SHIPPING" contact, else a linked shipment.
 // buildShipToTradePartyBuilder function only emits the node when the resolved address
-// actually differs from the buyer (bill-to) address and carries a country code; otherwise it falls
-// back to the buyer party. Nothing resolved => keys stay unset => ship-to = buyer is preserved.
-//
-// A shipping contact is a person, and BT-70 is the name of a party: what the document has to name is
-// the company the delivery is made to. The core says the same, and says it in the shipping frame of
-// the invoice PDF - pdfBuildThirdpartyName() given a Contact returns the name of its thirdparty, and
-// pdf_build_address() reads the address of the contact when it carries one, else the address of the
-// company the contact belongs to (core/lib/pdf.lib.php). einvoicingShipToFromContact() below builds
-// BG-15 the same way, so the XML and the PDF of one invoice no longer name two different things
-// (issue #683).
+// actually differs from the buyer address and carries a country code; nothing resolved => ship-to = buyer.
+// A shipping contact is a person and BT-70 names a party, so BG-15 names its thirdparty like the PDF
+// does (pdfBuildThirdpartyName(), pdf_build_address(), issue #683).
 $shipAddress = null;
 
 if (method_exists($object, 'liste_contact')) {

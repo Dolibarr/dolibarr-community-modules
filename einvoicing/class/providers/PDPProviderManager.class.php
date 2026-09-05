@@ -172,17 +172,10 @@ class PDPProviderManager
 	/**
 	 * Complete the list of providers with the ones declared by external modules.
 	 *
-	 * An external module declares the hook context 'einvoicingproviders' in its descriptor
-	 * ($this->module_parts['hooks'] = array('einvoicingproviders');) and implements a method
-	 * addPDPProviders() into its /mymodule/class/actions_mymodule.class.php. The method fills
-	 * $this->results with entries keyed by the provider code, each one holding at least a 'class'
-	 * (a class extending AbstractPDPProvider) and a 'classpath' (directory of the class file,
-	 * relative to the Dolibarr document root).
+	 * An external module declares the hook context 'einvoicingproviders' in its descriptor and implements
+	 * addPDPProviders(), which fills $this->results with entries keyed by provider code, each holding at
+	 * least a 'class' (extending AbstractPDPProvider) and its 'classpath' relative to the document root.
 	 * See einvoicing/doc/ADD-A-PDP-PROVIDER.md for the complete contract.
-	 *
-	 * A hook is used rather than a scan of the module directories because it lists only the providers
-	 * of the modules that are enabled, it costs nothing when no module implements it, and it let the
-	 * module build its own entry (position, urls, label translated in the language of the user).
 	 *
 	 * @return void
 	 */

@@ -20,21 +20,11 @@
  *      \file       test/phpunit/ExportImportRoundTripTest.php
  *      \ingroup    test
  *      \brief      What the module writes, the module reads back the same.
- *      \remarks    The two halves of the module are tested apart: the generation against reference
- *                  documents, the import against documents written by hand. Nothing checks that they
- *                  agree, and that gap is where a whole family of defects lived - a quantity dropped
- *                  by updateline() on the way in (#726), a document level charge skipped (#731), a
- *                  received EXTENDED-CTC-FR document that could not be read at all (#742). Each of
- *                  them is a term the exporter writes and the importer does not read back.
- *
- *                  This generates an invoice, imports the document it produced as a supplier invoice
- *                  and requires the two to state the same thing: the same lines, the same
- *                  quantities, unit prices and rates, the same totals. Everything happens in the
- *                  transaction the test class rolls back.
- *
- *                  The seller of a generated document is the company of the instance, so the third
- *                  party the import resolves to is that same company seen from the other side: it is
- *                  created here as a supplier carrying the identifiers pinned on $mysoc.
+ *      \remarks    Generation and import are tested apart, and the gap between them is where a whole
+ *                  family of defects lived (#726, #731, #742). This generates an invoice, imports the
+ *                  document it produced as a supplier invoice and requires the two to state the same
+ *                  lines, quantities, prices, rates and totals. The seller of a generated document is
+ *                  $mysoc, so the supplier created here carries the identifiers pinned on it.
  */
 
 
@@ -154,12 +144,8 @@ class ExportImportRoundTripTest extends CommonClassTest
 
 		$savPdp = getDolGlobalString('EINVOICING_PDP');
 		$conf->global->EINVOICING_PDP = 'SPECIMEN';
-		// A line at 0 % has to say why it is exempt (BT-121), and the reason is a setting of the
-		// instance: without it the generation stops, which says nothing about the round trip. Pinned
-		// here to the French article an instance would name, and restored below.
-		// The lines sent here are free text, as most lines of a real invoice are. An instance either
-		// matches them to a product, creates the product, or takes the line as it comes: the last one
-		// is what this compares, and it is a setting, so it is pinned rather than assumed.
+		// The lines sent here are free text, as most lines of a real invoice are: the import is pinned
+		// to take them as they come rather than matching or creating a product. Restored below.
 		$savFreeLines = getDolGlobalString('EINVOICING_IMPORT_AS_FREE_LINES');
 		$conf->global->EINVOICING_IMPORT_AS_FREE_LINES = 1;
 

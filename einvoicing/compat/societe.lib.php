@@ -30,20 +30,10 @@ if (!function_exists('calculateVATNumberFromProperties')) {
 	/**
 	 *  Calculate VAT intracommunity number for a thirdparty if missing, from the professional ID.
 	 *
-	 *  Copy of Societe::calculateVATNumberFromProperties(), added to
-	 *  htdocs/societe/class/societe.class.php in Dolibarr 24, kept identical so a VAT number built on
-	 *  18 to 23 is the number the core would build. Measured: the method is absent from 18.0.10,
-	 *  19.0.4, 20.0.4, 21.0.4, 22.0.5 and 23.0.4, and present in 24.0.1.
-	 *
-	 *  The core exposes it as a *method* of Societe, and a method cannot be added to a core class from
-	 *  outside without patching the core, which a module must never do. So the backport takes the only
-	 *  shape a shim can take here: a free function carrying the name and the signature of the core
-	 *  symbol, guarded like every other shim of this directory. The module never reaches it when the
-	 *  real method is there - EInvoicing::thirdpartyCalcVATIntra() tests the method first, and calls
-	 *  this only as a fallback.
-	 *
-	 *  Note that the core method takes the thirdparty as an argument rather than working on $this,
-	 *  which is what makes it transposable to a function without changing what it does.
+	 *  Copy of Societe::calculateVATNumberFromProperties(), added to the core in Dolibarr 24, kept
+	 *  identical so a VAT number built on 18 to 23 is the one the core would build. Shimmed as a free
+	 *  function because a method cannot be added to a core class from outside;
+	 *  EInvoicing::thirdpartyCalcVATIntra() tests the real method first and falls back here.
 	 *
 	 *  @param	mixed	$thirdparty		A thirdparty object
 	 *  @return	string					A VAT number, '' if none can be built

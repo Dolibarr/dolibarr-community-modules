@@ -294,12 +294,9 @@ class CdarHandler
 		// We use same as ID for Name as its not required to be different
 		$Name = $ID;
 
-		// 212 (Encaissee) is the only status we send on one of OUR OWN invoices: we are then the seller and
-		// the CDAR is addressed to our customer. Every other status is sent on a supplier invoice, where we
-		// are the buyer and the CDAR goes back to the vendor. Getting those two parties the wrong way round
-		// makes the platform answer "no matching invoices found": it cannot find the invoice the status is
-		// about. See the XP Z12-012 annex B examples, UC1 205/211 (issued by the buyer) versus UC1 212
-		// (issued by the seller).
+		// 212 (Encaissee) is the only status sent on one of OUR OWN invoices: we are then the seller and the
+		// CDAR goes to our customer, every other status is sent on a supplier invoice where we are the buyer.
+		// Swapping the two makes the platform answer "no matching invoices found" (XP Z12-012 annex B, UC1).
 		$isOurOwnInvoice = ($statusCode == CdarHandler::PROC_PAID);
 
 		// SIREN (0002)
@@ -354,19 +351,11 @@ class CdarHandler
 		$ProcessCondition = str_replace(' ', '_', dol_string_unaccent($ProcessCondition));
 		$ProcessCondition = preg_replace('/[^A-Za-z0-9_]/', '', $ProcessCondition); // Clean special chars
 
-		// Electronic address (MDT-73) of the CDAR recipient. Every status but the cash-in (212) is sent on a
-		// supplier invoice: we are the buyer and the CDAR goes back to the vendor. Sending its SIREN blindly
-		// only works when the platform happens to know the vendor under that very address, and gets the
+		// Electronic address (MDT-73) of the CDAR recipient - the vendor, for every status but the cash-in
+		// (212). Its SIREN only works when the platform knows the vendor under that address, and gets the
 		// message refused with "Electronic address (MDT-73) is invalid" otherwise.
-		//
-		// The status is a reply, so the address to reply to is the one the vendor exchanges under:
-		//   1. a routing recorded in Dolibarr for that vendor, which is a deliberate choice of ours;
-		//   2. otherwise the electronic address (BT-34) carried by the e-invoice we received, which is the
-		//      vendor telling us where it exchanges from;
-		//   3. otherwise the platform directory, which may list another address of the same SIREN;
-		//   4. otherwise the SIREN guessed by getBuyerCommunicationURI(). It is called on the third party
-		//      alone: the invoice-level routing override it also knows about is looked up among the customer
-		//      invoices (element_type = 'facture'), which a supplier invoice must not read.
+		// Reply-to address, in order: routing recorded in Dolibarr, BT-34 of the received e-invoice, directory,
+		// then getBuyerCommunicationURI() on the third party alone (its override reads element_type='facture').
 		$RecipientURIID = $InvoiceIssuerGlobalID;
 		$RecipientURISchemeID = CdarHandler::SCHEME_SIREN_0225;
 		$this->recipientURIIDOrigin = 'issuerid';
@@ -685,12 +674,9 @@ class CdarHandler
 	/**
 	 * Build the MDG-43 "cashed amount" (MEN) blocks of a status 212 (Encaissee) CDAR.
 	 *
-	 * The reform asks the seller to declare what was actually cashed, broken down by VAT rate: one block per
-	 * rate, holding the TTC amount (MDT-215) and the rate itself (MDT-224). Dolibarr only records a payment as
-	 * a single TTC amount, so the amount is spread over the VAT rates of the invoice proportionally to their
-	 * TTC weight: exact for a fully paid invoice, prorata otherwise (a partial payment is not attached to
-	 * given lines in Dolibarr). Rounding differences are absorbed by the largest block so the blocks always
-	 * sum up to the cashed amount.
+	 * One block per VAT rate, holding the TTC amount (MDT-215) and the rate itself (MDT-224). Dolibarr only
+	 * records a payment as a single TTC amount, so it is spread over the VAT rates proportionally to their
+	 * TTC weight; rounding differences go to the largest block, so the blocks always sum up to the amount.
 	 *
 	 * @param  Facture|FactureFournisseur $object       Invoice the payment belongs to
 	 * @param  array{amount?:float,breakdown?:array<array{vatrate:float,amount:float}>}  $paymentData  Cashed amount (TTC, company currency) and/or a ready-made breakdown. Defaults to the sum of the payments of the invoice.

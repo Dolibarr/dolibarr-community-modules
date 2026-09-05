@@ -20,15 +20,10 @@
  *      \file       test/phpunit/CommonClassTestCompat.inc.php
  *      \ingroup    test
  *      \brief      Make CommonClassTest available whatever the Dolibarr version.
- *      \remarks    The module supports Dolibarr >= 17 (see modEInvoicing::$need_dolibarr_version) but
- *                  test/phpunit/CommonClassTest.class.php only appeared later: on Dolibarr 18 the
- *                  require_once fatals and the whole suite is unrunnable. When the core class is
- *                  there we use it, so the tests behave exactly like the core ones; otherwise we
- *                  declare the small subset the module tests actually rely on ($savconf, $savuser,
- *                  $savlangs, $savdb and the surrounding transaction).
- *
- *                  Include this instead of requiring CommonClassTest.class.php directly. Requires
- *                  master.inc.php to have been included first (DOL_DOCUMENT_ROOT must be defined).
+ *      \remarks    test/phpunit/CommonClassTest.class.php does not exist on Dolibarr 18: requiring it
+ *                  fatals and the whole suite is unrunnable. Use the core class when it is there,
+ *                  otherwise declare the subset the module tests rely on. Include this file instead of
+ *                  CommonClassTest.class.php directly, and after master.inc.php.
  */
 
 if (!defined('DOL_DOCUMENT_ROOT')) {

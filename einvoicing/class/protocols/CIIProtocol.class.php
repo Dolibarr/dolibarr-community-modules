@@ -75,12 +75,8 @@ class CIIProtocol extends AbstractProtocol
 	 * Maximum number of decimals allowed for the unit prices: Item net price (BT-146),
 	 * Item price discount (BT-147) and Item gross price (BT-148).
 	 *
-	 * EN 16931 sets no limit on these (BT-146 only carries BR-26 and BR-27), but the French
-	 * CTC layer does: rule BR-FR-DEC-03 of the FNFE-MPE CTC-FR Schematron rejects, with a
-	 * "fatal" flag, any value matching more than 6 decimals ('^[-]?\d{1,19}(\.\d{1,6})?$').
-	 * Note this is NOT the 2 decimals limit of the amounts (BR-DEC-* / BR-FR-DEC-01): a unit
-	 * price is not an amount, and no rule checks that the line net amount (BT-131) derives
-	 * arithmetically from the unit price.
+	 * EN 16931 sets no limit, but rule BR-FR-DEC-03 of the CTC-FR Schematron rejects, as fatal, more than 6
+	 * decimals. This is not the 2 decimals limit of the amounts (BR-DEC-* / BR-FR-DEC-01): a price is not an amount.
 	 *
 	 * @const int
 	 */
@@ -705,13 +701,10 @@ class CIIProtocol extends AbstractProtocol
 			$failed = !is_array($result) || !isset($result['res']) || $result['res'] < 0;
 			$this->cleanupIncomingTempFiles($tempDir, $tempFile, $tempFileReadableView, $failed);
 
-			// The invoice import transaction is opened by doCreateSupplierInvoiceFromSource() once the
-			// vendor has been synchronized. Close it here so every early return - and any exception -
-			// leaves a clean transaction state. A transaction left open would be rolled back by
-			// Dolibarr at the end of the request, taking the imported invoices AND the synchronization
-			// history down with it (issue #524).
-			// One commit/rollback per opened level: nested levels only decrement the counter of the
-			// database handler, the real COMMIT/ROLLBACK is issued on the last one.
+			// The invoice import transaction is opened by doCreateSupplierInvoiceFromSource(). Close it here so
+			// every early return - and any exception - leaves a clean transaction state, otherwise Dolibarr rolls
+			// it back at the end of the request and takes the synchronization history with it (issue #524).
+			// One commit/rollback per opened level: only the last one issues the real COMMIT/ROLLBACK.
 			while ($this->openedTransactions > 0) {
 				$this->openedTransactions--;
 				if ($failed) {
@@ -824,12 +817,8 @@ class CIIProtocol extends AbstractProtocol
 		// Done before the duplicate/ref-docs checks below so those checks can be scoped to this supplier
 		// (ref_supplier is only unique per supplier, not globally - see issue about cross-supplier collisions).
 		//
-		// The vendor is reference data, not part of the invoice: it gets its own transaction, committed
-		// before the import starts. A business error raised further down - a product that cannot be
-		// auto-created, a referenced document missing - must not roll back the thirdparty the operator is
-		// precisely being asked to complete: the "create the product" and "map the product" links returned
-		// with that error carry its socid, so a rolled back vendor makes them point to a thirdparty that
-		// never existed.
+		// The vendor is reference data: it gets its own transaction, committed before the import starts, so a
+		// business error further down does not roll back the thirdparty the operator is asked to complete.
 		$db->begin();
 		$this->openedTransactions++;
 
@@ -940,12 +929,9 @@ class CIIProtocol extends AbstractProtocol
 					return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($refDocInvoiceId, $refDoc, 'required by received document ' . ($parsedHeader['documentno'] ?? ''))];
 				}
 				if ($refDocInvoiceId == 0) {
-					// The invoice references a document this Dolibarr does not hold: the final invoice of a
-					// deposit, the invoice a credit note credits, the one a replacement replaces. Nothing has
-					// been created at this point, so the flow is postponed rather than failed: it is retried
-					// on the next synchronization, and the invoices queued behind it keep coming in. What the
-					// user has to do cannot be guessed from a technical message, so it is spelled out with a
-					// link to the screen where the missing invoice is created.
+					// The document references an invoice this Dolibarr does not hold. Nothing has been created at this
+					// point, so the flow is postponed and retried on the next synchronization rather than failed, and
+					// the message spells out what to create with a link to the screen that creates it.
 					$langs->load("bills");
 					$action = $langs->trans('CreateTheMissingSupplierInvoiceToImport', $refDoc);
 					$action .= ' <a class="butAction small smallpaddingimp nomarginleft" href="' . DOL_URL_ROOT . '/fourn/facture/card.php?action=create&socid=' . (int) $socId . '&ref_supplier=' . urlencode($refDoc) . '" target="_blank">';
@@ -1408,12 +1394,9 @@ class CIIProtocol extends AbstractProtocol
 			$line->total_tva = $parsedLine['calculatedAmount'] ?? 0;
 			$line->total_ttc = $parsedLine['lineTotalAmount'] + ($parsedLine['calculatedAmount'] ?? 0);
 
-			// The three properties just set are not what reaches the database: the line is written by
-			// createSupplierInvoiceLinesIntoDatabase(), which hands quantity, unit price and discount to
-			// FactureFournisseur::updateline() and lets the core recompute the totals. So BT-131 is read
-			// and then dropped, and whatever quantity times price gives is what the invoice ends up with.
-			// A deposit line is left alone: its amount does not come from the document but from the
-			// discount created out of the deposit invoice.
+			// The three properties just set are not what reaches the database: updateline() recomputes the totals
+			// from quantity, unit price and discount, so BT-131 is read and then dropped. A deposit line is left
+			// alone: its amount comes from the discount created out of the deposit invoice.
 			if (!$is_deposit_line) {
 				$amounts = $this->resolveLineAmounts($parsedLine, (float) $line->qty, (float) $line->subprice, (float) $line->remise_percent);
 				$line->qty = $amounts['qty'];
@@ -1614,27 +1597,10 @@ class CIIProtocol extends AbstractProtocol
 	/**
 	 * Unit price a received line must carry in Dolibarr: BT-146 brought back to a single unit.
 	 *
-	 * EN 16931 does not state the price of one item. It states BT-146, the item net price, as the price of
-	 * BT-149 units of that item - the item price base quantity. A price of "2.00 per 100" is
-	 * <ram:ChargeAmount>2.00</ram:ChargeAmount> with <ram:BasisQuantity>100</ram:BasisQuantity>, and the
-	 * net amount the document announces for the line, BT-131, is BT-129 / BT-149 x BT-146. UBL says the
-	 * same thing with cbc:PriceAmount and cbc:BaseQuantity. The pattern is ordinary wherever a rate is
-	 * billed rather than an item: a fuel surcharge per 100, a metered consumption per 100 000.
-	 *
-	 * A Dolibarr line has no such divisor. It holds one price for one unit and lets the core multiply it
-	 * by the quantity, so BT-149 has to be folded into the price at import. It was read by the parser and
-	 * then dropped, which multiplied the line - and the total of the whole invoice - by that base
-	 * quantity: a line priced 0.134195 per 100 000 came in at 9 983 012.03 instead of 99.83
-	 * (issues #777 and #778).
-	 *
-	 * BT-149 is optional and means one when absent; BR-64 requires it to be positive when present, and
-	 * BR-65 requires its unit code (BT-150) to be the invoiced quantity unit code (BT-130), so there is no
-	 * unit conversion to make here. Anything else - absent, zero, negative, unreadable - is taken as one,
-	 * which leaves the line exactly as the import built it before.
-	 *
-	 * The division is handed to the core unrounded on purpose: calcul_price_total() computes the total of
-	 * the line from the unit price it receives and only rounds the copy it stores as pu_ht, so a price
-	 * below the display precision still totals what the document announces.
+	 * BT-146 is the price of BT-149 units (the item price base quantity) while a Dolibarr line holds the price of
+	 * one unit, so BT-149 has to be folded into the price at import (issues #777 and #778). BT-149 is optional and
+	 * means one when absent. The division is left unrounded: calcul_price_total() rounds only the pu_ht copy it
+	 * stores, so a price below the display precision still totals what the document announces.
 	 *
 	 * @param	array<string,mixed>		$parsedLine		One line as parseInvoiceLines() returns it
 	 * @return	float									Price of a single unit, to hand to updateline()
@@ -1654,35 +1620,10 @@ class CIIProtocol extends AbstractProtocol
 	/**
 	 * Decide the quantity, unit price and discount a received line must carry in Dolibarr.
 	 *
-	 * The line is written by createSupplierInvoiceLinesIntoDatabase(), which hands those three to
-	 * FactureFournisseur::updateline() and lets the core recompute the totals of the line. The net amount
-	 * the document announces for the line, BT-131, is therefore never stored as such: whatever quantity
-	 * times unit price gives is what the invoice ends up with. Three cases have to be told apart.
-	 *
-	 * 1. A line that is not a regular item - EXTENDED CTC-FR, BT-X-8 other than DETAIL: a comment, a group
-	 *    header, a subtotal. BR-FREXT-CO-10 sums BT-106 over the DETAIL lines only, so such a line carries
-	 *    no amount of its own and importing it as a priced line would count its amount a second time. It
-	 *    becomes a text line. BR-FREXT-BR-22 is also why it may carry no quantity at all.
-	 * 2. A regular item whose quantity and unit price cannot express the amount it announces at all. Three
-	 *    shapes reach that state, and the repair is the same for the three: carry BT-131 as a single unit,
-	 *    the way it would be keyed in by hand, so the total of the invoice stays the total of the document.
-	 *    a. The invoiced quantity is zero or absent. Such a document is not necessarily wrong: BR-22 only
-	 *       tests the presence of ram:BilledQuantity, so a quantity of zero satisfies it, and nothing in
-	 *       EN 16931 requires BT-131 to equal BT-129 times BT-146. The document of issue #726 is exactly
-	 *       that - EXTENDED CTC-FR, a line carrying <BilledQuantity unitCode="C62">0.0000</BilledQuantity>,
-	 *       no BT-X-8, and a BT-131 of 12.00 that BR-FREXT-CO-10 does count into BT-106.
-	 *    b. The unit price is zero or absent while the line announces an amount. A free item that is then
-	 *       credited is written that way - issue #772, a vendor invoice whose "free" lines each announce a
-	 *       BT-131 of -0.30 over a BT-146 of 0.00. Quantity times price rebuilds 0.00, so every one of
-	 *       those credits used to be dropped and the invoice came out above the document.
-	 *    c. Quantity times price rebuilds the opposite sign of what the line announces. BT-146 is forbidden
-	 *       to be negative by BR-27, so a line that subtracts from the invoice carries its sign on BT-129
-	 *       alone; a document that puts it on BT-131 only would otherwise be imported as a charge, moving
-	 *       the invoice by twice the amount of the line.
-	 * 3. Everything else: check that what the core is about to compute is what the document announces, and
-	 *    say so when it is not. The tolerance is the one BR-FREXT-CO-10 applies to the totals. A line that
-	 *    does rebuild its amount can still hold a unit price too small for the core to store - see the
-	 *    branch below - and that is reported too.
+	 * updateline() recomputes the totals from those three, so BT-131 is never stored as such. A line that is not a
+	 * DETAIL item (BT-X-8) carries no amount and becomes a text line. A regular item whose quantity times price
+	 * cannot express BT-131 - zero quantity, zero price, opposite sign - carries BT-131 as a single unit instead
+	 * (issues #726 and #772). Anything else is checked against BT-131 and reported when it does not match.
 	 *
 	 * @param	array<string,mixed>		$parsedLine			One line as parseInvoiceLines() returns it
 	 * @param	float					$qty				Quantity read from the document (BT-129)
@@ -1726,14 +1667,10 @@ class CIIProtocol extends AbstractProtocol
 			$warning = 'Line ' . $lineid . ' of the received document announces a net amount (BT-131) of ' . $announced
 				. ', but its quantity and unit price rebuild ' . $rebuilt . '. The invoice carries the rebuilt amount.';
 		} elseif ($subprice != 0.0 && (float) price2num($subprice, 'MU') == 0.0) {
-			// calcul_price_total() totals the line from the unit price it is handed and rounds only the copy
-			// it stores as pu_ht, to MAIN_MAX_DECIMALS_UNIT. A price of one unit below that precision -
-			// which is what a price stated per 100 000 comes down to (issue #777) - therefore totals exactly
-			// what the document announces and still reaches the line as 0.00000. The line as imported is
-			// right; it is opening and saving it again that would recompute it to zero, so say so here
-			// rather than let it be found out later.
-			// A price that small is a float PHP writes as 1.34195E-6, which reads as a typo in a message:
-			// spell it out in full, without the trailing zeros of a fixed number of decimals.
+			// calcul_price_total() rounds only the pu_ht copy it stores, to MAIN_MAX_DECIMALS_UNIT: a price stated
+			// per 100 000 (issue #777) totals what the document announces and still reaches the line as 0.00000.
+			// The import is right, but reopening and saving the line would recompute it to zero, so say so now.
+			// Spell the price out in full: PHP writes such a float as 1.34195E-6, which reads as a typo.
 			$spelled = rtrim(rtrim(number_format($subprice, 12, '.', ''), '0'), '.');
 
 			$warning = 'Line ' . $lineid . ' of the received document prices a single unit at ' . $spelled
@@ -1749,18 +1686,9 @@ class CIIProtocol extends AbstractProtocol
 	/**
 	 * Tell whether a parsed line is a regular invoice item, the only kind that carries an amount.
 	 *
-	 * EN 16931 has one sort of line and every one of them is priced. The EXTENDED profile adds a subtype,
-	 * BT-X-8, carried by ram:AssociatedDocumentLineDocument/ram:LineStatusReasonCode, and the French rules
-	 * hang two behaviours on it:
-	 *
-	 * - BR-FREXT-BR-22 requires the invoiced quantity (BT-129) only when the subtype is DETAIL or absent,
-	 *   so a comment or a group header may legitimately carry no quantity at all;
-	 * - BR-FREXT-CO-10 sums BT-131 into BT-106 over those same lines only:
-	 *   [not(ram:AssociatedDocumentLineDocument/ram:LineStatusReasonCode)
-	 *    or ram:AssociatedDocumentLineDocument/ram:LineStatusReasonCode = 'DETAIL'].
-	 *
-	 * The predicate below is that XPath. An absent code means a regular item, which is also what every
-	 * EN 16931 document gives, so nothing changes for the profiles that have no subtype.
+	 * The EXTENDED profile adds the BT-X-8 subtype on ram:LineStatusReasonCode. BR-FREXT-BR-22 requires the
+	 * invoiced quantity (BT-129) only when it is DETAIL or absent, and BR-FREXT-CO-10 sums BT-131 into BT-106 over
+	 * those same lines only. The predicate below is that XPath; an absent code means a regular item.
 	 *
 	 * @param	array<string,mixed>		$parsedLine		One line as parseInvoiceLines() returns it
 	 * @return	bool									True for a regular item, false for a line that carries no amount
@@ -1776,19 +1704,10 @@ class CIIProtocol extends AbstractProtocol
 	/**
 	 * Billing period of a received line (BG-26 / BT-134 / BT-135), as the timestamps a Dolibarr line holds.
 	 *
-	 * parseInvoiceLines() hands the two dates as 'Y-m-d' strings, normDate() having already reduced whatever the
-	 * document carried to that shape, and a supplier invoice line stores a timestamp: updateline() passes
-	 * date_start / date_end to idate() on every supported core. dol_stringtotime() is the conversion the
-	 * import already makes for the invoice date itself, so the line periods are read the same way rather
-	 * than through a second convention (issue #576).
-	 *
-	 * One side alone is kept: BR-CO-20 accepts a period with a start date or an end date, "or both", and
-	 * facture_fourn_det holds one without the other.
-	 *
-	 * A period that ends before it starts is dropped, keeping the line. Such a document breaks BR-30 and
-	 * should not exist, but it comes from outside, and updateline() answers -1 on that pair
-	 * (ErrorStartDateGreaterEnd) - which would fail the whole import over a period, where dropping it
-	 * imports the invoice as it always did.
+	 * The dates arrive as 'Y-m-d' strings and a line stores a timestamp, read with dol_stringtotime() the way the
+	 * invoice date already is (issue #576). One side alone is kept, BR-CO-20 accepting a start or an end. A period
+	 * that ends before it starts is dropped, keeping the line: updateline() answers -1 on that pair
+	 * (ErrorStartDateGreaterEnd), which would fail the whole import over a period.
 	 *
 	 * @param	array<string,mixed>				$parsedLine		One line as parseInvoiceLines() returns it
 	 * @return	array{start: ?int, end: ?int}					Timestamps to store, null for a side with nothing
@@ -2094,16 +2013,9 @@ class CIIProtocol extends AbstractProtocol
 	/**
 	 * Tell whether a profile is one of the header-only Factur-X profiles.
 	 *
-	 * MINIMUM and BASIC WL ("WL" being "without lines") do not merely make some groups optional:
-	 * the elements are absent from their XSD altogether, so emitting one makes the whole document
-	 * fail schema validation. Checked against the schemas shipped by FNFE-MPE (France_RFE,
-	 * Factur-X/<profile>/1xsd/), the ones this module builds and that BASIC and above declare are:
-	 *   - ram:IncludedSupplyChainTradeLineItem 				(BG-25, the invoice lines)
-	 *   - ram:DefinedTradeContact 								(BG-6 / BG-9, the party contacts)
-	 *   - ram:Information 									(BT-82, payment means label)
-	 *   - ram:AccountName 									(BT-85, payment account holder)
-	 *   - ram:PayeeSpecifiedCreditorFinancialInstitution 	(BT-86, the BIC)
-	 * ram:IBANID and ram:ProprietaryID (BT-84) do exist there and stay.
+	 * MINIMUM and BASIC WL do not merely make some groups optional: the elements are absent from their XSD, so
+	 * emitting one makes the whole document fail schema validation. Concerned here, of what this module builds:
+	 * BG-25, BG-6 / BG-9, BT-82, BT-85 and BT-86. ram:IBANID and ram:ProprietaryID (BT-84) do exist there and stay.
 	 *
 	 * @param 	string 	$profile 	Profile name, uppercased
 	 * @return 	bool 				True if only the header-level subset may be emitted
@@ -2116,11 +2028,9 @@ class CIIProtocol extends AbstractProtocol
 	/**
 	 * Tell whether a profile carries the whole EN 16931 core.
 	 *
-	 * MINIMUM, BASIC WL and BASIC are subsets: a term of the core may simply not exist in their
-	 * XSD, and emitting it makes the document fail schema validation. EN16931 declares the core in
-	 * full, and EXTENDED / EXTENDED-CTC-FR are conformant extensions of it. Checked against the
-	 * Factur-X schemas (vendor/horstoeko/zugferd/src/schema/FACTUR-X_<profile>*.xsd): for instance
-	 * ram:SpecifiedProcuringProject (BT-11) appears from EN16931 on and nowhere below.
+	 * MINIMUM, BASIC WL and BASIC are subsets: a term of the core may simply not exist in their XSD, and emitting
+	 * it makes the document fail schema validation. EN16931 declares the core in full, and EXTENDED /
+	 * EXTENDED-CTC-FR are conformant extensions of it.
 	 *
 	 * @param 	string 	$profile 	Profile name, uppercased
 	 * @return 	bool 				True if the full EN 16931 core may be emitted
@@ -2133,20 +2043,10 @@ class CIIProtocol extends AbstractProtocol
 	/**
 	 * Tell whether a profile is MINIMUM, whose schema declares almost nothing.
 	 *
-	 * MINIMUM is not a reduced EN 16931: it is a different, far smaller document, and every type it
-	 * declares is cut down. Emitting anything else fails schema validation. What it allows, in full
-	 * (FACTUR-X_MINIMUM_*ReusableAggregateBusinessInformationEntity_100.xsd):
-	 *   ExchangedDocument                   ID, TypeCode, IssueDateTime          (no ram:IncludedNote)
-	 *   HeaderTradeAgreement                BuyerReference, Seller, Buyer, BuyerOrderReferencedDocument
-	 *   TradeParty                          Name, SpecifiedLegalOrganization, PostalTradeAddress,
-	 *                                       SpecifiedTaxRegistration            (no ID/GlobalID, no URI)
-	 *   LegalOrganization                   ID                                  (no TradingBusinessName)
-	 *   TradeAddress                        CountryID                           (nothing else)
-	 *   HeaderTradeDelivery                 nothing at all, the type is empty
-	 *   HeaderTradeSettlement               InvoiceCurrencyCode, SpecifiedTradeSettlementHeaderMonetarySummation
-	 *                                       (no payment means, no ApplicableTradeTax, no payment terms)
-	 *   MonetarySummation                   TaxBasisTotalAmount, TaxTotalAmount, GrandTotalAmount,
-	 *                                       DuePayableAmount                    (no line/charge/allowance/prepaid)
+	 * MINIMUM is not a reduced EN 16931: it is a far smaller document and every type it declares is cut down - no
+	 * note, no party identifier or URI, an empty HeaderTradeDelivery, no payment means, no ApplicableTradeTax, no
+	 * payment terms, and a monetary summation limited to BT-109, BT-110, BT-112 and BT-115. Emitting anything else
+	 * fails schema validation.
 	 *
 	 * @param 	string 	$profile 	Profile name, uppercased
 	 * @return 	bool 				True if only the MINIMUM subset may be emitted
@@ -2159,12 +2059,9 @@ class CIIProtocol extends AbstractProtocol
 	/**
 	 * Build CII XML from invoice data.
 	 *
-	 * Every value taken from the invoice or the company data is passed through htmlspecialchars()
-	 * before it is handed to DOMDocument::createElement(): that method parses its second argument,
-	 * so a value holding an ampersand ("A & B", a very ordinary company name) raises an
-	 * "unterminated entity reference" warning and produces an EMPTY element, silently losing the
-	 * business term - issue #695. Only literals of this file and values coming out of
-	 * number_format() or DateTime::format() may be written unescaped.
+	 * Every value taken from the invoice or the company data is passed through htmlspecialchars() before it is
+	 * handed to DOMDocument::createElement(): that method parses its second argument, so a value holding an
+	 * ampersand produces an EMPTY element and silently loses the business term - issue #695.
 	 *
 	 * @param array 		$invoiceData 	Header-level invoice data (generated by the buildinvoicelines.inc.php)
 	 * @param array 		$linesData 		Array of line-level data arrays (generated by the buildinvoicelines.inc.php)
@@ -2193,11 +2090,10 @@ class CIIProtocol extends AbstractProtocol
 		$doc->appendChild($root);
 
 		// Add comment
-		// getHashUniqueIdOfRegistration() lives in the blockedlog library, which only the paths going through
-		// the PDF builder happen to include (pdf.lib.php). Load it here as well, otherwise the very same invoice
-		// is stamped with the instance hash or not depending on the button that triggered the generation.
-		// The library ships with every supported version, the function itself only from Dolibarr 23, so the
-		// function_exists() below still decides: nothing is stamped under 23, exactly as before.
+		// getHashUniqueIdOfRegistration() lives in the blockedlog library, included only by the paths going
+		// through the PDF builder. Load it here too, otherwise the same invoice is stamped with the instance
+		// hash or not depending on the button used. The function itself exists only from Dolibarr 23, so the
+		// function_exists() below still decides.
 		if (!function_exists('getHashUniqueIdOfRegistration')) {
 			include_once DOL_DOCUMENT_ROOT.'/blockedlog/lib/blockedlog.lib.php';
 		}
@@ -2335,12 +2231,10 @@ class CIIProtocol extends AbstractProtocol
 		$agreement = $doc->createElement('ram:ApplicableHeaderTradeAgreement');
 		$sctt->appendChild($agreement);
 
-		// Buyer reference (BT-10): what the buyer needs to route the invoice inside its own
-		// organisation (business unit, service reference, internal mailbox...), and what Annexe A of
-		// XP Z12-012 documents as the "Service Executant" of a public buyer. Every profile declares
-		// it, MINIMUM included, and it opens the HeaderTradeAgreement sequence, so it is appended
-		// before the parties. It is not what BR-FR-CPRO-11 and BR-FR-CPRO-13 read, though: those two
-		// look the service code up on BT-46 under scheme 0224, emitted by buildParty() (issue #678).
+		// Buyer reference (BT-10): what the buyer needs to route the invoice inside its own organisation.
+		// Every profile declares it, MINIMUM included, and it opens the HeaderTradeAgreement sequence, so it
+		// is appended before the parties. BR-FR-CPRO-11 and BR-FR-CPRO-13 read BT-46 under scheme 0224
+		// instead, emitted by buildParty() (issue #678).
 		if (!empty($invoiceData['buyerReference'])) {
 			$comment = $doc->createComment('Buyer reference (BT-10)');
 			$agreement->appendChild($comment);
@@ -2432,11 +2326,9 @@ class CIIProtocol extends AbstractProtocol
 		// childless there - even a comment or a line feed inside it fails validation.
 		if (!$this->isMinimumProfile($profile)) {
 			// Add the ship to trade party (mandatory when using intracommunity delivery)
-			// ShipToTradeParty is itself a TradePartyType — populate it directly without
-			// wrapping it in another BuyerTradeParty (which would break XSD validation).
-			// When an external SHIPPING contact with a distinct address is attached to the invoice
-			// (keys filled by buildinvoicelines.inc.php), emit a dedicated deliver-to party (BG-15);
-			// otherwise fall back to the buyer party so the node stays present (upstream behaviour).
+			// ShipToTradeParty is itself a TradePartyType - do not wrap it in another BuyerTradeParty, that
+			// would break XSD validation. With an external SHIPPING contact carrying a distinct address, emit a
+			// dedicated deliver-to party (BG-15); otherwise fall back to the buyer party so the node stays.
 			$shiptotrade = null;
 			if (!empty($invoiceData['_shipFromContactShip'])) {
 				$shiptotrade = $this->buildShipToTradeParty(
@@ -2543,12 +2435,10 @@ class CIIProtocol extends AbstractProtocol
 				);
 			}
 
-			// Invoicing period of the document (BG-14 / BT-73 / BT-74), derived from the periods of the
-			// lines by einvoicingInvoicingPeriodFromLines(). Placed after the ApplicableTradeTax nodes
-			// and before SpecifiedTradeAllowanceCharge (the global discounts below), which is where
-			// HeaderTradeSettlementType declares it in every schema from BASIC WL upwards; MINIMUM does
-			// not declare it at all, and the enclosing condition already excludes that profile (issue
-			// #572).
+			// Invoicing period of the document (BG-14 / BT-73 / BT-74), derived from the line periods. Placed
+			// after the ApplicableTradeTax nodes and before SpecifiedTradeAllowanceCharge, where
+			// HeaderTradeSettlementType declares it from BASIC WL upwards; MINIMUM does not declare it at all
+			// and is already excluded by the enclosing condition (issue #572).
 			if ($invoiceData['invoicingPeriodStart'] !== null || $invoiceData['invoicingPeriodEnd'] !== null) {
 				$comment = $doc->createComment('Invoicing period');
 				$settlement->appendChild($comment);
@@ -2662,12 +2552,10 @@ class CIIProtocol extends AbstractProtocol
 
 		$xml = $doc->saveXML();
 
-		// XML 1.0 admits no C0 control character other than tab, line feed and carriage return -
-		// neither as a character nor as a numeric reference. A description pasted from a PDF or from
-		// a terminal brings them in (0x0B is the usual one), DOM writes them out as they are, and
-		// what leaves is not XML: the platform answers HTTP 400 and the invoice never reaches its
-		// recipient. They carry no meaning in an invoice text, so they go. A byte below 0x80 never
-		// appears inside a UTF-8 sequence, so this cannot cut a character in half.
+		// XML 1.0 admits no C0 control character other than tab, line feed and carriage return, neither as a
+		// character nor as a numeric reference. A description pasted from a PDF brings them in (0x0B is the
+		// usual one) and the platform then answers HTTP 400. A byte below 0x80 never appears inside a UTF-8
+		// sequence, so this cannot cut a character in half.
 		$xml = (string) preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', '', $xml);
 
 		return $xml;
@@ -2748,12 +2636,9 @@ class CIIProtocol extends AbstractProtocol
 		$tax->appendChild($doc->createElement('ram:TypeCode', 'VAT'));
 
 		// The exemption reason is repeated on the line, not only in the VAT breakdown it also feeds.
-		// BR-FXEXT-E-08 reconciles the taxable amount of an exempt breakdown (BT-116) with the sum of
-		// the net amounts of the lines it covers, and it only counts a line whose own reason code and
-		// reason text equal those of the breakdown. Writing them on the breakdown alone made it count
-		// zero lines, so an exempt invoice was reported as unbalanced - "basisAmount : 100, SumBT131 :
-		// 0, NBlines : 0" - and refused by the platform validator. The reader of this class already
-		// expects both at line level, so this closes the loop rather than opening a new one.
+		// BR-FXEXT-E-08 reconciles BT-116 with the sum of the net amounts of the lines it covers, and only
+		// counts a line whose own reason code and text equal those of the breakdown: written on the breakdown
+		// alone it counted zero lines and the platform validator refused the invoice.
 		// Order follows the CII D22B sequence of TradeTaxType, which is not the order of the getters.
 		$lineExemptionReason = (string) ($line['ExemptionReason'] ?? '');
 		$lineExemptionReasonCode = (string) ($line['ExemptionReasonCode'] ?? '');
@@ -2850,13 +2735,10 @@ class CIIProtocol extends AbstractProtocol
 				$node->appendChild($doc->createElement('ram:ID', htmlspecialchars((string) $data[$prefix . 'ids'])));
 			}
 
-			// Routing code of the buyer (BT-46 under scheme 0224), where BR-FR-CPRO-11 and
-			// BR-FR-CPRO-13 read the Chorus Pro "code service exécutant". It is a second ram:GlobalID,
-			// which only the EXTENDED profiles accept (FX-SCH-A-000164 caps that element at one
-			// occurrence below them), and it belongs to the buyer alone: the deliver-to party is built
-			// from the same data in minimal mode, and its own identifier is BT-71, a location, not a
-			// routing code of the buyer. See issue #678; the caller only fills the key when the value
-			// is emittable.
+			// Routing code of the buyer (BT-46 under scheme 0224), where BR-FR-CPRO-11 and BR-FR-CPRO-13 read
+			// the Chorus Pro "code service exécutant". It is a second ram:GlobalID, which only the EXTENDED
+			// profiles accept (FX-SCH-A-000164 caps that element at one occurrence below them), and it belongs
+			// to the buyer alone: on the deliver-to party the identifier is BT-71, a location (issue #678).
 			if ($type === 'buyer' && !$minimal && $this->isExtendedProfile($profile) && !empty($data['buyerRoutingCode'])) {
 				$routing = $doc->createElement('ram:GlobalID', htmlspecialchars($data['buyerRoutingCode']));
 				$routing->setAttribute('schemeID', EInvoicing::SCHEME_FR_ROUTING_CODE);
@@ -2885,14 +2767,10 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		// Contact
-		// ram:DefinedTradeContact is the wrapper for all contact sub-fields. Only create it when at
-		// least one sub-field is present, otherwise $contact stays null and appendChild() fatals
-		// (e.g. specimen seller with a phone but no contact person name).
-		// Skipped in minimal mode: the deliver-to party is a stripped-down copy of the buyer, and the
-		// CII syntax binding forbids a contact there (CII-SR-312), as it does a legal organization.
-		// The fax number is deliberately not part of this list: EN16931 has no business term for it
-		// and the CII syntax binding forbids ram:FaxUniversalCommunication (CII-SR-236 / CII-SR-265),
-		// so a party known only by its fax gets no contact block at all.
+		// ram:DefinedTradeContact is created only when a sub-field is present, otherwise $contact stays null
+		// and appendChild() fatals. Skipped in minimal mode: the CII syntax binding forbids a contact on the
+		// deliver-to party (CII-SR-312). The fax is deliberately absent: EN16931 has no business term for it
+		// and CII-SR-236 / CII-SR-265 forbid ram:FaxUniversalCommunication.
 		if (!$minimal
 			&& $this->isEn16931Profile($profile)
 			&& (!empty($data[$prefix . 'contactpersonname'])
@@ -2961,12 +2839,10 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		// VAT
-		// The party declares the tax registrations built for it, which is how a seller that charges no
-		// VAT declares its SIREN as BT-32 (schemeID FC) where a seller that does declares its VAT number
-		// as BT-31 (schemeID VA). Writing only the latter left the party of a "Non assujetti a la TVA"
-		// company with no tax registration at all, and every exempt line then tripped BR-E-02 (issue
-		// #560). Parties built without that list - the buyer, which has no BT-32 in EN 16931 - keep
-		// being written from their VAT number alone.
+		// The party declares the tax registrations built for it: a seller that charges no VAT declares its
+		// SIREN as BT-32 (schemeID FC) where a seller that does declares its VAT number as BT-31 (schemeID
+		// VA). Writing only the latter left an exempt seller with no registration at all and every exempt
+		// line then tripped BR-E-02 (issue #560).
 		if (!$minimal) {
 			$registrations = array();
 			if (!empty($data[$prefix . 'TaxRegistations']) && is_array($data[$prefix . 'TaxRegistations'])) {
@@ -3062,11 +2938,9 @@ class CIIProtocol extends AbstractProtocol
 	/**
 	 * Build a ram:BillingSpecifiedPeriod node.
 	 *
-	 * The same type serves the two levels the norm has for a period: BT-73/BT-74 under
-	 * ApplicableHeaderTradeSettlement (BG-14, the period the invoice covers) and BT-134/BT-135 under
-	 * SpecifiedLineTradeSettlement (BG-26, the period a line covers). One side alone is a period the
-	 * norm accepts - BR-CO-19 asks for the start date or the end date - so each date is written only
-	 * if it is there.
+	 * The same type serves BT-73 / BT-74 (BG-14, the period the invoice covers) and BT-134 / BT-135 (BG-26, the
+	 * period a line covers). One side alone is a period the norm accepts - BR-CO-19 asks for the start date or the
+	 * end date - so each date is written only if it is there.
 	 *
 	 * @param \DOMDocument 			$doc 	Document to create nodes in
 	 * @param ?\DateTimeInterface	$start 	Start of the period, null to leave BT-73 / BT-134 out
@@ -3341,11 +3215,9 @@ class CIIProtocol extends AbstractProtocol
 		global $conf;
 
 		// Ensure upload directory exists
-		// The arguments are the ones the card of the core passes (fourn/facture/card.php), and they are
-		// passed in full on purpose: get_exdir(0, 0, ...) answers the same thing only since Dolibarr 20,
-		// where an empty level defaults to 2 for a supplier invoice. On 18 and 19 that default does not
-		// exist, the path falls back to the reference of the invoice, and the document is written into a
-		// directory the card never reads - so a received e-invoice was shown nowhere.
+		// The arguments are the ones the card of the core passes (fourn/facture/card.php) and are passed in
+		// full on purpose: get_exdir(0, 0, ...) defaults an empty level to 2 only since Dolibarr 20. On 18
+		// and 19 the path falls back to the reference of the invoice, into a directory the card never reads.
 		$folder_part = get_exdir($supplierInvoice->id, 2, 0, 0, $supplierInvoice, 'invoice_supplier');
 
 		if ($supplierInvoice->entity > 1) {
@@ -3457,14 +3329,10 @@ class CIIProtocol extends AbstractProtocol
 	/**
 	 * Turn the charges of one received line (BG-28) into the invoice lines that carry them.
 	 *
-	 * EN 16931 mirrors at line level what it has at document level: BG-27, an allowance, and BG-28, a
-	 * charge. A Dolibarr line holds a quantity, a unit price and a discount percentage - it can express
-	 * an allowance and has nowhere to put a charge - so the charge follows its line instead, the way it
-	 * would be keyed in by hand. The unit price stored then stays the one the document gives (BT-146),
-	 * and the two lines together are worth the BT-131 the document announces.
-	 *
-	 * The VAT rate is the one of the line: in CII a line level allowance or charge carries none of its
-	 * own, CII-SR-191 forbidding ram:CategoryTradeTax there.
+	 * A Dolibarr line can express an allowance (BG-27) but has nowhere to put a charge, so the charge follows its
+	 * line as a line of its own: the unit price stored stays BT-146 and the two lines together are worth the BT-131
+	 * the document announces. The VAT rate is the one of the line, CII-SR-191 forbidding ram:CategoryTradeTax on a
+	 * line level allowance or charge.
 	 *
 	 * @param	array<string,mixed>		$parsedLine		One line as parseInvoiceLines() returns it
 	 * @return	SupplierInvoiceLine[]					One line per charge, in the order of the document
@@ -3524,20 +3392,9 @@ class CIIProtocol extends AbstractProtocol
 	/**
 	 * Resolve multiple line allowances into a single percentage for Dolibarr.
 	 *
-	 * Dolibarr only supports percentage discounts on lines, so the fixed amount the document states
-	 * (BT-136) has to be turned into one. A percentage needs the amount it is taken off, which EN 16931
-	 * carries as BT-137 - an optional field, and one a fair share of issuers do not send.
-	 *
-	 * When it is missing the base is rebuilt from the line itself: BT-131 is the amount that remains
-	 * after the allowances, so adding them back (and taking the charges out, they leave by a line of
-	 * their own, issue #735) gives the amount before discount, the very number the caller then divides
-	 * by the quantity to get the unit price. Using BT-131 itself, as this did until issue #783, applied
-	 * the percentage to the amount after discount: the ratio came out too large and the line was
-	 * imported short - 94.74 instead of 95.00 for a 5.00 allowance on a 100.00 line.
-	 *
-	 * The amount itself is read as a magnitude, whatever sign the document puts on it: ram:ChargeIndicator
-	 * already says which way it goes. Both readings are met in the field, and taken with its sign a
-	 * negative BT-136 turned the discount negative and left the line short in the same way.
+	 * Dolibarr only supports percentage discounts on lines, so BT-136 has to be turned into one. Its base is BT-137
+	 * when the issuer sends it, otherwise it is rebuilt from BT-131 with the allowances added back and the charges
+	 * taken out (issues #735 and #783). BT-136 is read as a magnitude, ram:ChargeIndicator saying which way it goes.
 	 *
 	 * Multiple allowances are summed into one final percentage.
 	 *
@@ -3565,13 +3422,9 @@ class CIIProtocol extends AbstractProtocol
 			return false;
 		}
 
-		// Sum all actualAmounts — always populated whether the source was % or fixed.
-		// Read as a magnitude: ram:ChargeIndicator already says which way the amount goes, so BT-136 is
-		// the size of the allowance and not a signed correction. An issuer that writes it negative -
-		// <ActualAmount>-0.6</ActualAmount> under an indicator of false, reported on issue #783 - means
-		// the same 0.60 off the line, and its own BT-131 is computed that way. Taken with its sign the
-		// discount came out negative, which put the line back *up* by that much on both sides of the
-		// division and left it short of the announced amount.
+		// Sum all actualAmounts - always populated whether the source was % or fixed.
+		// Read as a magnitude: ram:ChargeIndicator already says which way the amount goes, so a BT-136 written
+		// negative under an indicator of false (issue #783) still means that much off the line.
 		$totalDiscountAmount = 0.0;
 		foreach ($allowances as $allowance) {
 			$totalDiscountAmount += abs((float) ($allowance['actualAmount'] ?? 0));
@@ -3603,29 +3456,12 @@ class CIIProtocol extends AbstractProtocol
 
 
 	/**
-	 * Record an imported invoice at the totals its document announces, whatever the VAT calculation
-	 * mode of the instance.
+	 * Record an imported invoice at the totals its document announces (issue #781).
 	 *
-	 * Dolibarr computes the VAT of an invoice in one of two conventions, chosen once for the whole
-	 * instance: "total of round" - round the VAT of every line, then add them up - which is what
-	 * update_price() applies when nothing is set, or "round of total" - add the line amounts up, then
-	 * round the VAT once - selected by MAIN_ROUNDOFTOTAL_NOT_TOTALOFROUND_SUPPLIER (the core reads the
-	 * generic MAIN_ROUNDOFTOTAL_NOT_TOTALOFROUND before Dolibarr 20). The supplier invoice card offers
-	 * the two as the "ReCalculate Mode1 / Mode2" link, and either is a legitimate way to bill.
-	 *
-	 * A received document leaves nothing to choose: BT-110 and BT-112 are given by the issuer, who
-	 * rounded them the way its own system does. Importing under the convention of the instance
-	 * therefore records an invoice that does not total what the document says - two cents on a real
-	 * 46 line invoice (issue #781), which the module then refuses to validate, telling the operator to
-	 * recalculate in the other mode. This does exactly that, on that one invoice, and leaves the
-	 * setting of the instance alone.
-	 *
-	 * The net amounts are never concerned: the core writes a rounding difference back onto the VAT of a
-	 * line, never onto its net amount, so the line net amounts (BT-131) and their sum (BT-106) are the
-	 * same under both conventions. And when neither of the two reproduces the announced totals the
-	 * difference is a real one rather than a rounding convention: the invoice is left exactly as the
-	 * import built it and nothing is said here, checkDolInvoiceAndEInvoiceConsistency() being what
-	 * reports such a gap.
+	 * Dolibarr rounds the VAT of an invoice per line then sums, or sums then rounds once, chosen for the whole
+	 * instance by MAIN_ROUNDOFTOTAL_NOT_TOTALOFROUND_SUPPLIER (the generic constant before Dolibarr 20). A received
+	 * document leaves nothing to choose - BT-110 and BT-112 come from the issuer - so the convention that
+	 * reproduces them is applied to that one invoice; when neither does, the invoice is left exactly as imported.
 	 *
 	 * @param	int					$supplierInvoiceId	Id of the invoice the import has just built
 	 * @param	array<string,mixed>	$parsedHeader		Header data of the received document
@@ -3713,24 +3549,10 @@ class CIIProtocol extends AbstractProtocol
 	/**
 	 * Carry the document level charges of a received document (BG-21) as lines of the supplier invoice.
 	 *
-	 * EN 16931 puts two symmetric groups at document level: BG-20, an allowance, which subtracts from the
-	 * total, and BG-21, a charge, which adds to it - freight, packaging, a handling fee. BR-CO-13 defines
-	 * the total of the invoice as
-	 * "Σ Invoice line net amount (BT-131) - Sum of allowances on document level (BT-107)
-	 *  + Sum of charges on document level (BT-108)",
-	 * so a charge is part of what is owed, exactly like a line is.
-	 *
-	 * In CII the two are the same element, ram:SpecifiedTradeAllowanceCharge, told apart only by
-	 * ram:ChargeIndicator/udt:Indicator. The allowances become a DiscountAbsolute, which is the object
-	 * Dolibarr has for them; the charges had nowhere to go, because a supplier invoice holds no positive
-	 * amount at document level, and they were dropped - the invoice then totalled less than the document
-	 * it came from, silently (issue #726).
-	 *
-	 * A line is what a human would key in, so that is what is written here: one line per charge, a single
-	 * unit at the charge amount (BT-99), with the VAT rate the charge declares (BT-103) and the reason it
-	 * gives (BT-104, or its reason code BT-105 when only that is present - BR-38 requires one of the two).
-	 * They are written through createSupplierInvoiceLinesIntoDatabase(), the same path as every other line
-	 * of the import, so nothing new touches the core.
+	 * A supplier invoice holds no positive amount at document level: the allowances (BG-20) became a
+	 * DiscountAbsolute while the charges were dropped, silently shrinking the invoice (issue #726), though BR-CO-13
+	 * counts BT-108 into the total. They are written as one line per charge, a single unit at BT-99, with the VAT
+	 * rate BT-103 and the reason BT-104 (or BT-105 when only that is present, BR-38 requiring one of the two).
 	 *
 	 * @param	int						$supplierInvoiceId			Id of the invoice being imported
 	 * @param	array<int,array<string,mixed>>	$headerAllowancesCharges	Parsed ram:SpecifiedTradeAllowanceCharge of the header

@@ -30,25 +30,10 @@ require_once __DIR__ . '/../../vendor/autoload.php';
 /**
  * Factur-X merger built on TCPDF instead of FPDF.
  *
- * Why a second merger. CtcFrPdfMerger, like the whole horstoeko/zugferd writer, descends from
- * setasign/fpdi, which descends from the global class FPDF. Below Dolibarr 24, the core file
- * htdocs/includes/tcpdi/tcpdi.php declares its own "class FPDF extends TCPDF {}" shim, without a
- * class_exists() guard. The first declaration in the request wins and the other one can never be
- * loaded: a request that has already rendered a PDF (the invoice PDF produced at validation, right
- * before our hook runs) holds the core shim, and the zugferd writer then inherits from TCPDF, whose
- * internals it does not have (Call to undefined method ZugferdPdfWriter::_getpagesize()).
- *
- * The two classes cannot coexist in one PHP request, whatever the order, so the way out is not to
- * need FPDF at all. setasign/fpdi also ships a TCPDF flavour of its page importer, which is
- * namespaced and therefore immune to the shim, and TCPDF has native PDF/A-3 support. This class puts
- * the two together and produces the same structure as the v24 path: PDF/A-3 output intent, the XML
- * as an embedded file, the document level /AF array and the Factur-X XMP extension schema.
- *
- * What used to happen instead was a plain TCPDF FileAttachment annotation: the XML was carried, but
- * with no /AF and no PDF/A-3 output intent, which is not a Factur-X file - only a PDF with something
- * attached to it (issue #554).
- *
- * The public surface mirrors CtcFrPdfMerger so both branches of FacturXProtocol read the same.
+ * CtcFrPdfMerger descends from the global class FPDF, which cannot coexist with the unguarded
+ * "class FPDF extends TCPDF {}" shim of htdocs/includes/tcpdi/tcpdi.php below Dolibarr 24 (issue #554).
+ * This merger uses the namespaced TCPDF flavour of setasign/fpdi and produces the same structure as the
+ * v24 path. Its public surface mirrors CtcFrPdfMerger.
  */
 class FacturxTcpdfMerger extends TcpdfFpdi
 {
@@ -416,15 +401,10 @@ class FacturxTcpdfMerger extends TcpdfFpdi
 	/**
 	 * Graft the Factur-X schema entry into the PDF/A extension schema bag TCPDF writes.
 	 *
-	 * The properties added by setExtraXMPRDF() are external to PDF/A, so PDF/A-3 (ISO 19005-3, 6.6.2.3)
-	 * only accepts them when an extension schema declares them. The template shipped by
-	 * horstoeko/zugferd carries that declaration as a rdf:Description of its own, which is right for
-	 * the v24 path - horstoeko/zugferd writes the whole XMP block and writes none of its own - and
-	 * wrong here: TCPDF has already written a pdfaExtension:schemas for the pdf, xmpMM and pdfaid
-	 * schemas, on the same rdf:about="" subject. Two descriptions then repeat one property of one
-	 * subject, which the XMP specification forbids, and the packet stops parsing: a reader that gives
-	 * up there sees no pdfaid either, so the file is no longer even identified as PDF/A (veraPDF
-	 * 1.30.2 on the output of this class: clauses 6.6.2.1 and 6.6.4). One bag, one entry more.
+	 * PDF/A-3 (ISO 19005-3, 6.6.2.3) accepts the properties of setExtraXMPRDF() only when an extension
+	 * schema declares them. Adding it as its own rdf:Description, the way horstoeko/zugferd does,
+	 * would repeat a property of the rdf:about="" subject TCPDF already described, which XMP forbids:
+	 * the packet stops parsing and the file is no longer identified as PDF/A. One bag, one entry more.
 	 *
 	 * @param  string $s Body of the metadata object about to be written
 	 * @return string	 The same body, with the entry grafted and the stream length brought back in line
@@ -461,22 +441,10 @@ class FacturxTcpdfMerger extends TcpdfFpdi
 	/**
 	 * Complete the two objects TCPDF does not write the way Factur-X needs them.
 	 *
-	 * This is the one place where every PDF object passes before it reaches the buffer, and the object
-	 * offsets of the cross-reference table are recorded when an object starts, not when it ends, so
-	 * lengthening the body here shifts nothing.
-	 *
-	 * - the catalog gets the document level /AF array. TCPDF writes the /Names /EmbeddedFiles tree,
-	 *   which makes the file downloadable, but a Factur-X reader looks up /AF: without it the XML is
-	 *   an ordinary attachment and the document is not a Factur-X file.
-	 * - the file specification gets /AFRelationship /Data. TCPDF hardcodes /Source, and the v24 path
-	 *   emits /Data, so this keeps the two outputs comparable.
-	 * - the metadata stream gets the Factur-X entry grafted into its extension schema bag, see
-	 *   graftFacturxSchemaEntry().
-	 * - the embedded file stream gets its /Filter back. In PDF/A-3 mode TCPDF overwrites the filter
-	 *   entry with the /Subtype of the attachment instead of adding it, so a compressed attachment is
-	 *   written deflated and declared as plain: readers then hand over binary noise instead of the
-	 *   XML. TCPDF never meets the case because it also refuses to compress in PDF/A mode, which we
-	 *   turn back on.
+	 * Safe here because the cross-reference offsets are recorded when an object starts, not when it ends.
+	 * The catalog gets the document level /AF, the file specification /AFRelationship /Data instead of
+	 * /Source, the metadata stream the Factur-X entry, and the embedded file its /Filter back, which
+	 * TCPDF overwrites with the /Subtype and so declares a deflated attachment as plain.
 	 *
 	 * @param  string $s Object body about to be written
 	 * @return void

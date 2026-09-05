@@ -96,11 +96,10 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			}
 
 			// Default product for import.
-			// The combo posts '-1' when the empty entry is picked, and '' when the ajax search input is
-			// cleared: both mean "no default product any more", so the routing has to be deleted. Two
-			// saves must leave the current value untouched: one that does not carry the field at all
-			// (thirdparty updated from the API, a mass action, an import...), and one whose field could
-			// not show the current value, which routing_product_id_shown tells apart.
+			// The combo posts '-1' for the empty entry and '' for a cleared ajax input: both mean "no
+			// default any more" and delete the routing. A save that does not carry the field at all (API,
+			// mass action, import) or whose field could not show the current value (routing_product_id_shown)
+			// must leave it untouched.
 			if (GETPOSTISSET('routing_product_id')) {
 				$routingProductId = GETPOST('routing_product_id', 'aZ09');
 				if ($routingProductId === '-1' || $routingProductId === '0') {
@@ -402,20 +401,11 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 					return -1;
 				}
 
-				// A draft is a local booking, not the electronic invoice: it holds no accounting entry and
-				// says nothing to the platform, so removing it repudiates nothing. It is also the only way
-				// out of an import that landed on the wrong third party, since the vendor of an existing
-				// supplier invoice cannot be changed. Re-read the invoice: the object handed to a trigger
-				// is not always freshly fetched. It is re-read through the core class rather than by a
-				// query of our own, so the fk_statut column name and its mapping stay the business of
-				// Dolibarr. The property to read is ->status: fetch() selects "fk_statut as status" and
-				// fills ->status on every supported version (18 to 24), while ->statut is only kept as a
-				// backward compatibility alias, marked @deprecated since 19.
-				// A supplier invoice that cannot be re-read leaves the status at its initial -1, which is
-				// no draft, so the deletion is refused - exactly what the query it replaces did when it
-				// returned no row.
-				// The incoming flow itself is kept, detached from the invoice that is about to disappear,
-				// so the document stays in the flow list and can be imported again.
+				// A draft holds no accounting entry and says nothing to the platform, so removing it
+				// repudiates nothing, and it is the only way out of an import booked on the wrong vendor.
+				// Re-read through the core class: the object handed to a trigger is not always fresh, and
+				// ->status is the property to read (->statut is a @deprecated alias since 19). An invoice
+				// that cannot be re-read keeps status -1, which is no draft, so the deletion is refused.
 				$status = -1;
 				$invoicetodelete = new FactureFournisseur($this->db);
 				if ($invoicetodelete->fetch((int) $object->id) > 0) {
@@ -446,14 +436,10 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			'@phan-var-force Document $object';
 			$duplicate = false;
 
-			// A flow does not always carry a supplier invoice id: a lifecycle message (flow_type
-			// 'SupplierInvoiceLC') sets fk_element_type without ever resolving an invoice, an import that
-			// failed never booked one, and deleting the local invoice detaches the flow it came from
-			// (see detachEInvoicingRecordsOfSupplierInvoice() below, which sets the column to 0). The
-			// column is nullable, so the value read here is null in the first two cases: passing it on
-			// used to raise an uncaught TypeError on the int parameter of isEInvoice() and end the mass
-			// deletion on a PHP fatal. Such a flow is linked to nothing, so there is nothing to protect
-			// and the deletion is allowed - as it already was for the detached (0) case.
+			// A flow does not always carry a supplier invoice id: a lifecycle message never resolves one,
+			// a failed import never booked one, and the column is nullable. Passing null on raises a
+			// TypeError on the int parameter of isEInvoice() and ends a mass deletion on a PHP fatal.
+			// Such a flow is linked to nothing, so the deletion is allowed, as for the detached (0) case.
 			$linkedsupplierinvoiceid = (int) $object->fk_element_id;
 
 			if ($object->fk_element_type == 'invoice_supplier' && $linkedsupplierinvoiceid > 0 && SupplierInvoiceHelper::isEInvoice($linkedsupplierinvoiceid, true, $duplicate)) {
@@ -491,10 +477,8 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 	 * Report a cash-in (status 212 "Encaissee") of a customer invoice to the Approved Platform.
 	 *
 	 * Errors are never escalated to $this->errors / a negative return: that would roll back the payment
-	 * Dolibarr just recorded (Paiement::create() aborts on a trigger failure) and a platform notification
-	 * failure must never undo a real payment. dol_syslog is the only channel that reliably surfaces the
-	 * problem outside an interactive session (cron, API, bank import, ...), since setEventMessage() only
-	 * shows up on the next HTML page render.
+	 * Dolibarr just recorded (Paiement::create() aborts on a trigger failure). dol_syslog is the only
+	 * channel that surfaces the problem outside an interactive session (cron, API, bank import, ...).
 	 *
 	 * @param  Facture   $invoice Invoice that has been cashed in
 	 * @param  float     $amount  Amount cashed in (TTC) by this payment, reported as the MEN blocks of the CDAR
@@ -520,14 +504,10 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			return;
 		}
 
-		// A deposit the platform refused is not a deposit. 'transmitted' is true of every status but the
-		// local ones, and STATUS_ERROR is among those it lets through: it is exactly what an
-		// acknowledgement "Error" leaves behind, see getDolibarrStatusCodeFromPdpLabel(). The platform
-		// holds no invoice to attach a cash-in to, so the status would be refused; and reporting it as
-		// sent would be worse than not sending it, since the reform expects that cash-in once the
-		// invoice is deposited. The invoice has to be corrected and re-sent first, which is what the
-		// "Send" button of the card offers on that very status, and the cash-in reported by hand
-		// afterwards.
+		// A deposit the platform refused is not a deposit. 'transmitted' lets STATUS_ERROR through, which
+		// is what an acknowledgement "Error" leaves behind (see getDolibarrStatusCodeFromPdpLabel()).
+		// The platform holds no invoice to attach a cash-in to: it must be corrected, re-sent, and the
+		// cash-in reported by hand afterwards.
 		if ((int) $currentStatusDetails['code'] === EInvoicing::STATUS_ERROR) {
 			dol_syslog(__METHOD__ . ' Cash-in not reported for invoice id=' . $invoice->id . ': the platform refused its deposit (status ' . EInvoicing::STATUS_ERROR . '), there is nothing to report the payment on', LOG_WARNING, 0, '_einvoicing');
 			setEventMessage($langs->trans("ModuleEInvoicingName") . ' : ' . $langs->trans('EInvoiceCashInNotReportedDepositRefused', $invoice->ref), 'warnings');
@@ -590,13 +570,9 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 	/**
 	 * Detach the e-invoicing records of a supplier invoice that is about to be deleted.
 	 *
-	 * The incoming flow is not the Dolibarr invoice: it belongs to the platform and keeps its
-	 * lifecycle, so it is kept and only unlinked (fk_element_id emptied). The extlinks row, on the
-	 * other hand, describes the local element itself and is removed with it - leaving it behind
-	 * would make the flow list show a link to an invoice that no longer exists.
-	 *
-	 * Runs inside the transaction opened by FactureFournisseur::delete(), which rolls back when
-	 * this trigger fails.
+	 * The incoming flow belongs to the platform and keeps its lifecycle, so it is only unlinked
+	 * (fk_element_id emptied). The extlinks row describes the local element and is removed with it.
+	 * Runs inside the transaction opened by FactureFournisseur::delete(), which rolls back on failure.
 	 *
 	 * @param	int		$supplierInvoiceId	Id of the supplier invoice being deleted
 	 * @return	int							Return integer <0 if KO, >0 if OK

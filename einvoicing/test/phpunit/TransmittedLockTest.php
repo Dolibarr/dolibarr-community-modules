@@ -20,11 +20,9 @@
  *      \file       test/phpunit/TransmittedLockTest.php
  *      \ingroup    test
  *      \brief      PHPUnit test for the already-transmitted guard: EInvoicing::isTransmittedLockActive()
- *                  and the two flags fetchLastknownInvoiceStatus() derives from an extlink record,
- *                  'transmitted' (from the resettable syncstatus) and 'everTransmitted' (from the
- *                  flow_id the platform assigned, which nothing clears). Re-sending an invoice the
- *                  platform already holds is refused as a duplicate, so only the second flag may gate
- *                  a transmission.
+ *                  and the two flags fetchLastknownInvoiceStatus() derives, 'transmitted' (from the
+ *                  resettable syncstatus) and 'everTransmitted' (from the flow_id, which nothing clears).
+ *                  Re-sending is refused as a duplicate, so only the second may gate a transmission.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 

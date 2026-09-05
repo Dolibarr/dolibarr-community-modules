@@ -20,12 +20,10 @@
  *      \file       test/phpunit/IdentifierSpaceStrippingTest.php
  *      \ingroup    test
  *      \brief      PHPUnit test proving the module strips the spaces of an identifier the same way everywhere.
- *                  The module used to carry two strippers: removeAllSpaces(), which knows every kind of
- *                  space, and EInvoicing::removeSpaces(), a '/\s+/' without the /u modifier that sees
- *                  none of the non-breaking, thin or zero-width ones. idprof() built the routing id with
- *                  the first one while getSellerCommunicationURI() checked it back with the second, so a
- *                  non-breaking space pasted into idprof1 - what a SIRET copied from a web page or a PDF
- *                  carries - made the two sides disagree and, in EINVOICING_LIVE, emptied the seller URI.
+ *                  EInvoicing::removeSpaces() used a '/\s+/' without the /u modifier, so it missed the
+ *                  non-breaking and zero-width spaces removeAllSpaces() removes: a SIRET pasted with
+ *                  one made idprof() and getSellerCommunicationURI() disagree and, under EINVOICING_LIVE,
+ *                  emptied the seller URI.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 

@@ -1551,11 +1551,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 		}
 
 		// Standardized lookup unavailable or errored: fall back to the SuperPDP specific endpoint.
-		// That answer is weaker (a boolean with no effective date, so it cannot conclude 'routable' on
-		// its own) and it must say so: without the provenance, the non-conclusive badge it produces
-		// reads as a verdict on the recipient, when what it really reports is a call that did not go
-		// through on this instance. Issue #698 was exactly that misreading, and it cost a round trip
-		// with the recipient's platform before the API call log settled it.
+		// That answer is weaker (a boolean with no effective date, so it cannot conclude 'routable' on its
+		// own) and it must say so: without the provenance, the non-conclusive badge reads as a verdict on
+		// the recipient instead of a call that did not go through on this instance (issue #698).
 		$legacy = $this->checkRecipientDirectoryLegacy($idprof1, $addressingidentifier);
 		if ($legacy['status'] !== 'error') {
 			// Only when the fallback itself answered: its own error message is what the caller must
@@ -1576,19 +1574,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 * Settle a standardized directory answer that came back without line statuses, using the SuperPDP
 	 * specific french_directory endpoint as a tie-breaker.
 	 *
-	 * The status is missing from some standardized answers of this platform (observed on the lines
-	 * addressed by the bare SIREN and not open yet), and it cannot be requested: 'directoryLineStatus'
-	 * is not one of the values the search accepts in 'fields', and reading the line on its own omits it
-	 * as well. The platform's own endpoint answers about the very same lines, at the same moment, and
-	 * does carry the flag: on every line where both answers report it, the boolean matches the
-	 * standardized status (true for 'Enabled', false for 'Upcoming'). So it is used here to conclude,
-	 * and only here:
-	 * - it settles a non-conclusive answer, it never overrides a status the standardized answer gave ;
-	 * - it stays silent (the answer remains non-conclusive) when it knows nothing of that SIREN or
-	 *   fails, since the standardized annuaire does hold lines for it.
-	 *
-	 * The boolean does not tell a line waiting for its effective date from a closed one, so a negative
-	 * verdict says the recipient cannot receive without claiming which of the two it is.
+	 * The line status cannot be requested ('directoryLineStatus' is not accepted in 'fields'). The
+	 * specific endpoint carries a boolean that matches it (true for 'Enabled', false for 'Upcoming'), so
+	 * it only settles a non-conclusive answer and never overrides a status given.
 	 *
 	 * @param 	string 	$idprof1 				Recipient SIREN (idprof1)
 	 * @param 	array{status:string,reachable:int,entries:int,active:int,unknown:int,identifier:string,linestatus:string,platform:string,effectivedate:int,message:string,messageparam:string,httpcode:int} 	$result 	Non-conclusive result of the standardized check
@@ -1641,9 +1629,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 * endpoint (GET french_directory/entries on the v1.beta base). Kept for platforms or environments
 	 * where the standardized AFNOR Directory Service is not reachable.
 	 *
-	 * This endpoint only exposes a boolean 'is_active', which does not tell an open reception address
-	 * from one that is merely declared with a future effective date: it cannot conclude 'routable' on
-	 * its own, see below.
+	 * This endpoint only exposes a boolean 'is_active', which does not tell an open reception address from
+	 * one merely declared with a future effective date: it cannot conclude 'routable' on its own.
 	 *
 	 * @param 	string 	$idprof1 				Recipient SIREN (idprof1)
 	 * @param 	string 	$addressingidentifier 	Routing address the invoice is actually sent to (BT-49), empty to answer on any entry of the SIREN
@@ -2355,12 +2342,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 					break;
 				}
 
-				// Retrieve the invoice of the flow in whichever shape this module is able to read: the
-				// 'Converted' document first, then the 'Original', then the readable view. Asking only for
-				// the 'Converted' one makes the import depend on a setting that lives on the access point
-				// account: pointed at a syntax with no reader here - UBL - every received invoice of the
-				// instance becomes unreadable, even when the issuer sent a CII or a Factur-X the module
-				// reads perfectly.
+				// Retrieve the invoice of the flow in whichever shape this module can read: 'Converted' first,
+				// then 'Original', then the readable view. Asking only for 'Converted' makes the import depend
+				// on a setting of the access point account: pointed at UBL, every received invoice is lost.
 				$tmpProtocolManager = new ProtocolManager($this->db);
 				$importable = $this->fetchImportableFlowDocument($flowId, $tmpProtocolManager);
 
@@ -2654,12 +2638,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 				require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
 				$document->fk_element_type = 'invoice_supplier';
 
-				// An incoming one is a different thing entirely: it is a status the VENDOR issues about
-				// one of its own invoices - "Cashed in" (212) above all, which is the answer to the
-				// payment we reported with a 211. We never sent it, so it has no row in
-				// einvoicing_lifecycle_msg and the flowId lookup below cannot resolve it: it used to end
-				// up stored with neither its lifecycle code nor its supplier invoice, so nothing ever
-				// surfaced on the invoice.
+				// An incoming one is a status the VENDOR issues about one of its own invoices - "Cashed in"
+				// (212) above all, the answer to the payment we reported with a 211. We never sent it, so it
+				// has no row in einvoicing_lifecycle_msg and the flowId lookup below cannot resolve it.
 				if ($document->flow_direction == 'In') {
 					$resIncoming = $this->processIncomingSupplierInvoiceStatus($flowId, $document, $einvoicing);
 
@@ -2823,13 +2804,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 * Record a lifecycle status the vendor issued about one of its invoices, onto the supplier
 	 * invoice it refers to.
 	 *
-	 * This is the mirror of what the CustomerInvoiceLC case does for the statuses our own customers
-	 * send us: read the CDAR, resolve the invoice it points at, and store the status on it.
-	 *
-	 * Never returns a negative result for a status it cannot attach: a vendor may perfectly well
-	 * report on an invoice this Dolibarr does not hold (the invoice was refused, or the same access
-	 * point account is shared with another system), and failing the flow would stall the whole
-	 * synchronization on it, run after run. The flow is stored either way, so nothing is lost.
+	 * Never returns a negative result for a status it cannot attach: a vendor may report on an invoice this
+	 * Dolibarr does not hold (refused, or an access point account shared with another system), and failing
+	 * the flow would stall the whole synchronization on it, run after run. The flow is stored either way.
 	 *
 	 * @param	string		$flowId			Flow identifier of the lifecycle message
 	 * @param	Document	$document		Flow document being built, completed here with the CDAR data

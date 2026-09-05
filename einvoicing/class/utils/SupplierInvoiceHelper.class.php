@@ -419,12 +419,9 @@ class SupplierInvoiceHelper
 		$db->free($resql);
 
 		if ($num > 1) {
-			// Several e-invoicing documents for the same supplier invoice is a data integrity problem that
-			// needs a manual fix in database: the same invoice may hold diverging statuses coming from two
-			// access points. The answer to "is this an e-invoice" is still yes, so this predicate says yes
-			// and reports the duplicate. Throwing from here would not help: run_triggers() calls runTrigger()
-			// without a try/catch, so the exception used to surface as an uncaught PHP fatal instead of the
-			// message the user needs. Refusing the operation belongs to the caller.
+			// Several e-invoicing documents for one supplier invoice is a data integrity problem needing a
+			// manual fix: the invoice may hold diverging statuses from two access points. The predicate still
+			// answers yes and reports it; run_triggers() has no try/catch, so throwing here would be fatal.
 			$duplicate = true;
 			dol_syslog(__METHOD__ . ' duplicate entry in einvoicing_document for supplier invoice with id ' . $supplierInvoiceId, LOG_ERR);
 		}
@@ -497,18 +494,9 @@ class SupplierInvoiceHelper
 	/**
 	 * Tell whether a received supplier invoice is a credit note correcting an invoice we refused.
 	 *
-	 * Refusing a received invoice cancels it: it owes nothing any more, and the vendor answers by
-	 * issuing the credit note that closes the matter on its side. Accepting that credit note would
-	 * acknowledge the reversal of a debt that never entered our accounts, and would leave the exchange
-	 * saying two contradictory things about the same operation. The credit note follows its invoice:
-	 * refused (issue #594).
-	 *
-	 * Only credit notes. A replacement invoice (BT-3 = 384) also references the document it corrects,
-	 * and there the answer is the opposite one: it is the corrected invoice the vendor sends after a
-	 * refusal, which is exactly what one has to be able to accept.
-	 *
-	 * The lookup is a single query on the invoice rather than a fetch: this runs on every display of a
-	 * received supplier invoice card, and all it needs is the type and the reference to the source.
+	 * Refusing a received invoice cancels it, so the credit note the vendor issues to close the matter
+	 * follows it and is refused too (issue #594). Only credit notes: a replacement invoice (BT-3 = 384)
+	 * also references the document it corrects, and that one is exactly what has to remain acceptable.
 	 *
 	 * @param	int		$supplierInvoiceId	Id of the received supplier invoice
 	 * @return	int							Id of the refused source invoice, 0 when the rule does not apply
@@ -552,20 +540,10 @@ class SupplierInvoiceHelper
 	/**
 	 * Close the supplier invoice that a newly validated replacement invoice replaces.
 	 *
-	 * Dolibarr does this on the customer side - Facture::validate() cancels the replaced invoice with
-	 * the close code "replaced" - but FactureFournisseur::validate() does not, so a replaced supplier
-	 * invoice stayed validated, with nothing saying it had been superseded and nothing stopping it
-	 * from being paid a second time (issue #549).
-	 *
-	 * Scope. Only the invoices this module is responsible for are touched, i.e. those exchanged
-	 * through the platform: either the replacement or the invoice it replaces has to be an e-invoice.
-	 * A replacement recorded by hand between two ordinary supplier invoices is left to the core.
-	 *
-	 * Three states are deliberately left alone:
-	 * - a paid replaced invoice, because abandoning it would contradict the payment already recorded;
-	 * - a draft one, which cannot be paid nor transferred to accountancy anyway, and which validating
-	 *   just to cancel would give a reference it never earned;
-	 * - one already closed by this same rule, so the method is idempotent.
+	 * Facture::validate() does it on the customer side, FactureFournisseur::validate() does not, so a
+	 * replaced supplier invoice stayed validated and payable a second time (issue #549). Only invoices
+	 * exchanged through the platform are touched. Left alone: a paid replaced invoice, a draft one, and
+	 * one already closed by this same rule, so the method is idempotent.
 	 *
 	 * @param	FactureFournisseur	$replacement	Replacement invoice that has just been validated
 	 * @param	User				$user			User validating it
@@ -618,19 +596,10 @@ class SupplierInvoiceHelper
 	/**
 	 * Tell whether validating this supplier invoice has to answer its vendor with "Approved" (fr:205).
 	 *
-	 * Validating a received invoice in Dolibarr is the act of accepting it - it leaves the draft state to
-	 * enter the accounts and become payable - so it is what the buyer answers 205 for. Four things can
-	 * make the answer no:
-	 *
 	 *   - EINVOICING_SEND_APPROVED_ON_VALIDATION, for an instance where validating an invoice
 	 *     mean approving it. The status stays available by hand from the invoice card.
-	 *   - EINVOICING_DISABLE_SYNC_DOLI_TO_AP, which switches off everything this module sends.
-	 *   - an invoice that never came from the platform: its vendor is not waiting for any status.
-	 *   - a lifecycle already closed by a 205 or a 210 sent earlier: neither is repeated, and a refusal
-	 *     is not silently turned into an approval by a later validation. Same rule as the card, which
-	 *     stops offering the buttons once one of the two has been sent and confirmed.
-	 *   - a credit note correcting an invoice we refused: it credits an invoice that owes nothing, so
-	 *     validating it in the accounts must not answer its vendor that we accept it (issue #594).
+	 *   - the answer is no with EINVOICING_DISABLE_SYNC_DOLI_TO_AP set, on an invoice that never came from
+	 *     the platform, when a 205 or a 210 was already sent, or on a credit note of a refused one (#594).
 	 *
 	 * @param	EInvoicing	$einvoicing		Module object, for the lifecycle message lookup
 	 * @param	int			$supplierInvoiceId	Id of the supplier invoice being validated
@@ -706,19 +675,10 @@ class SupplierInvoiceHelper
 	/**
 	 * Find the supplier invoice of a given supplier whose ref_supplier is the given reference.
 	 *
-	 * The default is an exact match, which is the only safe rule while the quality of the incoming
-	 * data is unknown: a wrong match on a duplicate check silently drops an invoice that is then
-	 * never imported, and a wrong match on a referenced document links the new invoice to the wrong
-	 * one. With the option below off, this is exactly the query the callers used to run inline.
-	 *
-	 * The hidden option EINVOICING_TOLERANT_SUPPLIER_REF_MATCH adds a fallback, tried only when the
-	 * exact match found nothing. It accepts a ref_supplier that was typed manually with extra text
-	 * around the reference, or with stray whitespace inside it, e.g.
-	 * "PLTHDDD5OAAABBB - TEST-GROUP-2026-07-06-19407 - EVENEMENT 30/06/2026 A PARIS" for a document
-	 * whose reference in the XML is only "TEST-GROUP-2026-07-06-19407". That fallback stays narrow:
-	 * a reference shorter than EINVOICING_TOLERANT_SUPPLIER_REF_MIN_LENGTH (8) or purely numeric is
-	 * never searched for as a substring, the substring must be delimited so that "FA202610" does not
-	 * match "FA2026100", and an ambiguity is reported instead of guessed.
+	 * Exact match by default: a wrong match silently drops an invoice or links it to the wrong document.
+	 * EINVOICING_TOLERANT_SUPPLIER_REF_MATCH adds a narrow fallback, tried only when the exact match found
+	 * nothing: a short or purely numeric reference is never searched as a substring, the substring must be
+	 * delimited, and an ambiguity is reported rather than guessed.
 	 *
 	 * @param	string|null	$ref		Reference to look for (ExchangedDocument/ID or IssuerAssignedID of the XML)
 	 * @param	int			$socId		Id of the supplier thirdparty
@@ -844,11 +804,9 @@ class SupplierInvoiceHelper
 	/**
 	 * Tell whether a ref_supplier embeds a reference as a delimited substring.
 	 *
-	 * Both values are compared without their whitespace, so that a ref_supplier typed as
-	 * "FA 2026 10" matches the reference "FA202610". The reference must be bounded on both sides by
-	 * a non alphanumeric character, by a removed gap or by an edge of the string, so that "FA202610"
-	 * matches "PAY123 - FA202610 - dinner" but not "FA2026100". Comparison is case insensitive, as
-	 * the SQL prefilter of findIdByRef() is under the usual collations.
+	 * Both values are compared without their whitespace, so "FA 2026 10" matches "FA202610". The reference
+	 * must be bounded by a non alphanumeric character, a removed gap or an edge, so that "FA202610" matches
+	 * "PAY123 - FA202610 - dinner" but not "FA2026100". Case insensitive, like the SQL prefilter.
 	 *
 	 * @param	string|null	$refSupplier	ref_supplier value read from database
 	 * @param	string|null	$ref			Reference looked for
