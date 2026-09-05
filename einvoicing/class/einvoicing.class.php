@@ -907,8 +907,12 @@ class EInvoicing
 	 * the normal order of things is to approve an invoice and then pay it, and "Payment transmitted"
 	 * (211) is precisely what is sent afterwards. An approved invoice can no longer be refused either.
 	 *
-	 * One thing narrows the list beyond that history: a credit note correcting an invoice we refused
-	 * cannot be accepted, since the invoice it credits owes nothing (issue #594, see
+	 * The order matters both ways: "Payment transmitted" is only offered once that approval has been
+	 * accepted by the platform, and never on a draft. Announcing the payment of an invoice nobody has
+	 * answered yet - or of one Dolibarr does not owe anything on - runs the lifecycle backwards.
+	 *
+	 * One last thing narrows the list beyond that history: a credit note correcting an invoice we
+	 * refused cannot be accepted, since the invoice it credits owes nothing (issue #594, see
 	 * SupplierInvoiceHelper::refusedSourceOfCreditNote()). Refusing it stays offered - that is what the
 	 * document is for here - as do the statuses that settle nothing, like "Disputed" or "Suspended".
 	 *
@@ -925,7 +929,9 @@ class EInvoicing
 		}
 
 		$statuses = $this->getEinvoiceStatusOptions(1, 1, 1);
-		if ($this->hasSentStatusMessage($elementId, $elementType, self::STATUS_APPROVED, 1)) {
+		$approved = $this->hasSentStatusMessage($elementId, $elementType, self::STATUS_APPROVED, 1)
+			|| $this->hasSentStatusMessage($elementId, $elementType, self::STATUS_PARTIALLY_APPROVED, 1);
+		if ($approved) {
 			unset($statuses[self::STATUS_REFUSED]);
 		}
 		foreach (array_keys($statuses) as $code) {
@@ -934,12 +940,32 @@ class EInvoicing
 			}
 		}
 
+		// The lifecycle runs in one direction: a received invoice is first answered - approved (205) or
+		// refused (210) - and only then paid, so "Payment transmitted" (211) is offered once that answer
+		// has been given and accepted by the platform, not before. Offering it right away announced the
+		// payment of an invoice we had said nothing about, and let it be sent while the answer was still
+		// pending or had been rejected by the platform - which is when the button is the most tempting,
+		// and the most wrong.
+		if (!$approved) {
+			unset($statuses[self::STATUS_PAYMENT_SENT]);
+		}
+
 		if ($elementType === 'invoice_supplier') {
 			dol_include_once('einvoicing/class/utils/SupplierInvoiceHelper.class.php');
+			dol_include_once('fourn/class/fournisseur.facture.class.php');
 			if (SupplierInvoiceHelper::refusedSourceOfCreditNote((int) $elementId) > 0) {
 				foreach (self::STATUSES_ACCEPTING_A_DOCUMENT as $code) {
 					unset($statuses[$code]);
 				}
+			}
+
+			// A draft owes nothing yet: it is not in the accounts, cannot be paid, and validating it is
+			// precisely the act of accepting it. Telling the vendor that its payment has been transmitted
+			// at that point describes something that cannot have happened. The state comes from the
+			// invoice itself, which is the core's own answer to the question.
+			$supplierInvoice = new FactureFournisseur($this->db);
+			if ($supplierInvoice->fetch((int) $elementId) > 0 && (int) $supplierInvoice->status === FactureFournisseur::STATUS_DRAFT) {
+				unset($statuses[self::STATUS_PAYMENT_SENT]);
 			}
 		}
 
@@ -1008,7 +1034,7 @@ class EInvoicing
 						$einvoiceid = getDolGlobalString($uriConf);
 
 						//EINVOICING_LIVE
-						if (!preg_match('/^' . preg_replace('/\s+/', '', $mysoc->idprof1) . '/', $this->removeSpaces($einvoiceid))) {
+						if (!preg_match('/^' . removeAllSpaces($mysoc->idprof1) . '/', removeAllSpaces($einvoiceid))) {
 							//if (!empty($provider)) {
 								$baseWarnings[] = $langs->trans("FxCheckErrorRoutingIDFR", $einvoiceid);	// Your company profid must match the routing ID
 							//}
@@ -1025,7 +1051,7 @@ class EInvoicing
 		if (empty($mysoc->tva_intra) && (!empty($mysoc->tva_assuj) && $mysoc->tva_assuj != 'franchise')) {
 			$baseWarnings[] = $langs->trans("FxCheckErrorVATnumber");
 		}
-		if (!empty($mysoc->tva_intra) && !preg_match('/^[A-Z]{2}[A-Z0-9]{2,12}$/', $this->removeSpaces($mysoc->tva_intra))) { // Check VAT number format: 2-letter country code + 2 to 12 alphanumeric characters
+		if (!empty($mysoc->tva_intra) && !preg_match('/^[A-Z]{2}[A-Z0-9]{2,12}$/', removeAllSpaces($mysoc->tva_intra))) { // Check VAT number format: 2-letter country code + 2 to 12 alphanumeric characters
 			$baseErrors[] = $langs->trans("FxCheckErrorVATnumberFormat");
 		}
 		if (empty($mysoc->address)) {
@@ -1089,7 +1115,7 @@ class EInvoicing
 			}
 		} elseif (!empty($thirdparty->country_code) && $thirdparty->country_code === 'FR') {
 			// Validate SIREN/SIRET format based on length (French companies only)
-			$idprof1 = preg_replace('/\s+/', '', (string) $thirdparty->idprof1);
+			$idprof1 = removeAllSpaces((string) $thirdparty->idprof1);
 			if (strlen($idprof1) === 14) {
 				if (!isValidSiret($idprof1)) {
 					$baseWarnings[] = $langs->trans("FxCheckErrorCustomerSIRETFormat");
@@ -1131,12 +1157,12 @@ class EInvoicing
 			$baseWarnings[] = $langs->trans("FxCheckErrorCustomerVAT");
 		} elseif ($thirdparty->tva_assuj && !empty($thirdparty->tva_intra) && !empty($thirdparty->country_code) && $thirdparty->country_code === 'FR') {
 			// Validate French intra-community VAT number format: FR + 2 alphanumeric characters + 9 digits (SIREN)
-			$vatNormalized = strtoupper(preg_replace('/\s+/', '', $thirdparty->tva_intra));
+			$vatNormalized = strtoupper(removeAllSpaces($thirdparty->tva_intra));
 			if (!preg_match('/^FR[0-9A-Z]{2}[0-9]{9}$/', $vatNormalized)) {
 				$baseWarnings[] = $langs->trans("FxCheckErrorCustomerVATFormat");
 			} elseif (!empty($thirdparty->idprof1)) {
 				// Cross-check VAT against SIREN: French VAT key is deterministic (formula: (12 + 3 * (SIREN % 97)) % 97)
-				$siren9 = substr(preg_replace('/\s+/', '', $thirdparty->idprof1), 0, 9);
+				$siren9 = substr(removeAllSpaces($thirdparty->idprof1), 0, 9);
 				if (ctype_digit($siren9) && strlen($siren9) === 9) {
 					$expectedKey = (12 + 3 * ((int) $siren9 % 97)) % 97;
 					$expectedVAT = 'FR' . str_pad((string) $expectedKey, 2, '0', STR_PAD_LEFT) . $siren9;
@@ -1257,7 +1283,7 @@ class EInvoicing
 			!empty($thirdparty->country_code) && $thirdparty->country_code === 'FR'
 			&& !empty($thirdparty->name) && !empty($thirdparty->idprof1)
 		) {
-			$siren = substr(preg_replace('/\s+/', '', $thirdparty->idprof1), 0, 9);
+			$siren = substr(removeAllSpaces($thirdparty->idprof1), 0, 9);
 			$apiUrl = 'https://recherche-entreprises.api.gouv.fr/search?q=' . urlencode($siren) . '&per_page=5';
 
 			$response = getURLContent($apiUrl, 'GET', '', 1, ['Accept: application/json']);
@@ -3614,24 +3640,31 @@ class EInvoicing
 	/**
 	 * Calculate TVA intracommunity number for a thirdparty if missing, from the professional ID
 	 *
+	 * The core does exactly this, in Societe::calculateVATNumberFromProperties(), since Dolibarr 24.
+	 * This method is kept as the entry point of the module - it is what buildinvoicelines.inc.php calls
+	 * to fill BT-31 and BT-48 - but it no longer computes anything itself: it hands the thirdparty over
+	 * to the core when the core knows how, and to the faithful backport of compat/societe.lib.php on the
+	 * versions that do not have it yet. The presence of the method is what decides, not a version test:
+	 * the same module runs on 18 to 24, and a backport of the method into a maintenance release would
+	 * then be used as soon as it is there.
+	 *
+	 * The copy this replaced was wrong twice, and both defects reached the XML: the key was concatenated
+	 * raw, where the core pads it to two digits, so the roughly one SIREN in ten whose key is below 10
+	 * got a 12 character number instead of 13; and the SIRET to SIREN fallback cast to int, which eats
+	 * the leading zero of a SIREN that starts with one.
+	 *
 	 * @param mixed $thirdparty		Third party
 	 * @return string
 	 */
 	public function thirdpartyCalcVATIntra($thirdparty)
 	{
-		if ($thirdparty->country_code == 'FR' && empty($thirdparty->tva_intra) && !empty($thirdparty->tva_assuj)) {
-			$siren = trim($thirdparty->idprof1);
-			if (empty($siren)) {
-				$siren = (int) substr(str_replace(' ', '', $thirdparty->idprof2), 0, 9);
-			}
-			if (!empty($siren)) {
-				// [FR + code clé  + numéro SIREN ]
-				//Clé TVA = [12 + 3 × (SIREN modulo 97)] modulo 97
-				$cle = (12 + 3 * $siren % 97) % 97;
-				$tva_intra = 'FR' . $cle . $siren;
-			}
+		if (is_object($thirdparty) && method_exists($thirdparty, 'calculateVATNumberFromProperties')) {
+			return $thirdparty->calculateVATNumberFromProperties($thirdparty);
 		}
-		return $tva_intra ?? '';
+
+		require_once __DIR__ . '/../compat/societe.lib.php';
+
+		return calculateVATNumberFromProperties($thirdparty);
 	}
 
 	/**
@@ -3699,8 +3732,11 @@ class EInvoicing
 		if ($check) {
 			if ($mysoc->country_code == 'FR') {
 				if (!empty($einvoiceid)) {
-					$einvoiceid = $this->removeSpaces($einvoiceid);
-					if (!preg_match('/^' . preg_replace('/\s+/', '', $mysoc->idprof1) . '/', $einvoiceid)) {
+					$einvoiceid = removeAllSpaces($einvoiceid);
+					// Both sides of the comparison must be stripped the same way: idprof() built the routing id
+					// with removeAllSpaces(), so a non-breaking space pasted into idprof1 would otherwise survive
+					// here only, the match would fail and, in live mode, the seller URI would be emptied below.
+					if (!preg_match('/^' . removeAllSpaces($mysoc->idprof1) . '/', $einvoiceid)) {
 						if (getDolGlobalString('EINVOICING_LIVE')) {	// In live mode, we do not allow profid1 not matching routing id
 							dol_syslog("Error: The seller communication URI seems not correct (should be or start with your SIRET number). Value: " . $einvoiceid, LOG_WARNING);
 							$einvoiceid = '';
@@ -3710,7 +3746,7 @@ class EInvoicing
 			}
 		}
 
-		return $this->removeSpaces($einvoiceid);
+		return removeAllSpaces($einvoiceid);
 	}
 
 	/**
@@ -3724,7 +3760,7 @@ class EInvoicing
 	 */
 	public function getPeppolAccessPointBySiren($siren)
 	{
-		$siren = $this->removeSpaces((string) $siren);
+		$siren = removeAllSpaces((string) $siren);
 		if (empty($siren)) {
 			return null;
 		}
@@ -3784,7 +3820,7 @@ class EInvoicing
 		if ($invoice !== null && !empty($invoice->id)) {
 			$statusInfo = $this->fetchLastknownInvoiceStatus($invoice->id, $invoice->ref);
 			if (!empty($statusInfo['override_routing_id'])) {
-				return $this->removeSpaces($statusInfo['override_routing_id']);
+				return removeAllSpaces($statusInfo['override_routing_id']);
 			}
 		}
 
@@ -3798,7 +3834,7 @@ class EInvoicing
 			$uri = $thirdparty->idprof1;
 		}
 
-		return $this->removeSpaces($uri);
+		return removeAllSpaces($uri);
 	}
 
 	/**
@@ -3807,11 +3843,15 @@ class EInvoicing
 	 *
 	 * @param   string  $str  	String to cleanup
 	 * @return  string  		cleaned up string
+	 * @deprecated			Use the removeAllSpaces() function of einvoicing/lib/einvoicing.lib.php instead. This
+	 *						method only removed the ASCII spaces, so an identifier carrying a non-breaking space
+	 *						came out of it differently than out of idprof(). Kept as a delegation because it is
+	 *						public: another module or a hook may be calling it.
+	 * @see removeAllSpaces()
 	 */
 	public function removeSpaces($str)
 	{
-		// TODO: move this function to class utils
-		return preg_replace('/\\s+/', '', $str);
+		return removeAllSpaces($str);
 	}
 
 	/**

@@ -1012,8 +1012,8 @@ $invoiceData = [
 	'totalPrepaidAmount'        => $prepaidAmount,
 
 	'iban_id'                   => $account->id,
-	'iban'                      => $einvoicing->removeSpaces($account->iban),
-	'bic'                       => $einvoicing->removeSpaces($account->bic),
+	'iban'                      => removeAllSpaces($account->iban),
+	'bic'                       => removeAllSpaces($account->bic),
 	'accountName'               => $account_proprio,
 	'accountRef'                => $account->ref,
 	'accountLabel'              => $account->label,
@@ -1126,12 +1126,12 @@ if ($mySchemeIdProf == "0002" && strlen($myidprof) != 9) {
 	throw new Exception('BADPROFID: The professional ID ' . $myidprof . ' has type SIREN but length is not 9 characters. Fix this in your company or einvoice module setup page.');
 }
 if ($mysoc->country_code == 'FR' && !empty($mysoc->idprof1) && !empty($mysoc->idprof2)) {
-	if (strpos(preg_replace('/\s+/', '', $mysoc->idprof2), preg_replace('/\s+/', '', $mysoc->idprof1)) !== 0) {
+	if (strpos(removeAllSpaces($mysoc->idprof2), removeAllSpaces($mysoc->idprof1)) !== 0) {
 		throw new Exception('BADVALUEFORSIRENORSIRET: The seller has both a SIREN and SIRET but SIRET does not start with value of SIREN.');
 	}
 }
 if ($buyerParty->country_code == 'FR' && !empty($buyerParty->idprof1) && !empty($buyerParty->idprof2)) {
-	if (strpos(preg_replace('/\s+/', '', $buyerParty->idprof2), preg_replace('/\s+/', '', $buyerParty->idprof1)) !== 0) {
+	if (strpos(removeAllSpaces($buyerParty->idprof2), removeAllSpaces($buyerParty->idprof1)) !== 0) {
 		throw new Exception('BADVALUEFORSIRENORSIRET: The buyer has both a SIREN "' . $buyerParty->idprof1 . '" and SIRET "' . $buyerParty->idprof2 . '" but SIRET does not start with value of SIREN.');
 	}
 }

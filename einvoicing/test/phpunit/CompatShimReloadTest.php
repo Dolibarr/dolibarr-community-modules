@@ -81,6 +81,11 @@ class CompatShimReloadTest extends CommonClassTest
 				'function isValidLuhn($str) { return true; } function isValidSiren($siren) { return true; } function isValidSiret($siret) { return true; } function isValidTinForPT($str) { return true; } function isValidTinForDZ($str) { return true; } function isValidTinForBE($str) { return true; } function isValidTinForES($str) { return 1; }',
 				'function_exists("isValidLuhn") && function_exists("isValidTinForES")',
 			),
+			'societe' => array(
+				'compat/societe.lib.php',
+				'function calculateVATNumberFromProperties($thirdparty) { return ""; }',
+				'function_exists("calculateVATNumberFromProperties")',
+			),
 			'files' => array(
 				'compat/files.lib.php',
 				'function dolChmod($filepath, $newmask = "") { }',

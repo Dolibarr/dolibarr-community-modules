@@ -27,6 +27,7 @@
  */
 
 require_once __DIR__ . '/../protocols/ProtocolManager.class.php';
+dol_include_once('einvoicing/lib/einvoicing.lib.php');	// removeAllSpaces(), used to normalize an electronic address
 
 
 /**
@@ -387,7 +388,7 @@ abstract class AbstractPDPProvider
 	 */
 	protected static function normalizeAddressingIdentifier($identifier)
 	{
-		$identifier = preg_replace('/\s+/', '', (string) $identifier);
+		$identifier = removeAllSpaces((string) $identifier);
 
 		$reg = array();
 		if (preg_match('/^[0-9]{4}:(.+)$/', $identifier, $reg)) {
