@@ -20,13 +20,18 @@
  *      \file       test/phpunit/CIITextEscapingTest.php
  *      \ingroup    test
  *      \brief      PHPUnit test for the XML escaping of the values written in a CII document.
- *                  DOMDocument::createElement() PARSES its second argument: a value holding an
- *                  ampersand ("ETHIQUE & TACT", an ordinary company name) raises an "unterminated
- *                  entity reference" warning and produces an EMPTY element, so the business term is
- *                  silently lost and the document is refused by PEPPOL-EN16931-R008, which forbids
- *                  empty elements (issue #695). Every value must therefore be escaped on its way in.
+ *                  DOMDocument::createElement() parses its second argument, so a value holding an
+ *                  ampersand produces an empty element, refused by PEPPOL-EN16931-R008 (issue #695).
+ *                  The whole generation path is then checked on an invoice of the base carrying the
+ *                  shapes a description really holds, a control character pasted from a PDF included.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
+
+// This script must only be run from the command line.
+if (PHP_SAPI !== 'cli') {
+	echo "Error: this script must be run from the command line (CLI), not through a web server.\n";
+	exit(1);
+}
 
 global $conf, $user, $langs, $db;
 
@@ -40,6 +45,9 @@ if (!file_exists($dolibarrHtdocs . '/master.inc.php')) {
 }
 
 require_once $dolibarrHtdocs . '/master.inc.php';
+require_once DOL_DOCUMENT_ROOT . '/user/class/user.class.php';
+require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
+require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
 dol_include_once('einvoicing/class/protocols/CIIProtocol.class.php');
 require_once __DIR__ . '/CommonClassTestCompat.inc.php';
 
@@ -350,5 +358,163 @@ class CIITextEscapingTest extends CommonClassTest
 		foreach (['ram:TradingBusinessName', 'ram:Information', 'ram:AccountName'] as $tag) {
 			$this->assertSame(0, $doc->getElementsByTagName(explode(':', $tag)[1])->length, $tag . ' must be omitted when it has no value');
 		}
+	}
+
+	/** @var Societe|null	The buyer every invoice of this class is made for */
+	private static $buyer = null;
+
+	/**
+	 * The texts an invoice line is made to carry, and what has to survive of each.
+	 *
+	 * @return array<string,array{0:string,1:string}>	Case name => text typed, fragment that must remain
+	 */
+	public function hostileTexts()
+	{
+		return array(
+			'a vertical tab pasted from a PDF' => array("Assembly\x0Bkit, ref 4711", 'Assembly'),
+			'a unit separator' => array("Ref\x1F0042 delivered", 'delivered'),
+			'a null byte' => array("Serial\x00number", 'Serial'),
+			'an ampersand' => array('Nuts & bolts', 'Nuts & bolts'),
+			'quotes' => array('The "special" article', 'special'),
+			'accents' => array('Café crème, thé, à l\'unité', 'Café crème'),
+			'several lines' => array("First line\nSecond line", 'Second line'),
+			'a long text' => array(str_repeat('A very long description. ', 40), 'A very long description.'),
+		);
+	}
+
+	/**
+	 * The buyer of every invoice built here, created once.
+	 *
+	 * @return Societe	A customer third party
+	 */
+	private function buyer()
+	{
+		global $db;
+
+		if (self::$buyer !== null) {
+			return self::$buyer;
+		}
+
+		$user = new User($db);
+		$this->assertGreaterThan(0, $user->fetch(1), 'the instance has a user to act as');
+
+		$buyer = new Societe($db);
+		$buyer->name = 'EINVOICING TEXT BUYER';
+		$buyer->client = 1;
+		// Some instances - the demo database among them - number their customers with a module that
+		// refuses a third party without a code, and refuses a short one.
+		$buyer->code_client = 'EINVTX' . strtoupper(substr(md5(uniqid('', true)), 0, 6));
+		$buyer->address = '2 rue du Test';
+		$buyer->zip = '75000';
+		$buyer->town = 'Paris';
+		$buyer->country_id = 1;
+		$buyer->country_code = 'FR';
+		$buyer->idprof1 = '000000002';
+		$buyer->idprof2 = '00000000200010';
+		$buyer->tva_intra = 'FR12000000002';
+		$this->assertGreaterThan(0, $buyer->create($user), 'the buyer is created: ' . $buyer->error . ' ' . implode(', ', (array) $buyer->errors));
+
+		self::$buyer = $buyer;
+
+		return self::$buyer;
+	}
+
+	/**
+	 * Build a one-line invoice carrying the given text and generate its document.
+	 *
+	 * @param	string	$text	The description of the line
+	 * @return	string			The document produced
+	 */
+	private function generateWith($text)
+	{
+		global $conf, $db, $langs, $mysoc;
+
+		$user = new User($db);
+		$user->fetch(1);
+
+		$savPdp = getDolGlobalString('EINVOICING_PDP');
+		$conf->global->EINVOICING_PDP = 'SPECIMEN';
+		// A demo company whose SIREN is "123456" stops the generation before the text is reached.
+		$savSeller = array(
+			'idprof1' => $mysoc->idprof1,
+			'idprof2' => $mysoc->idprof2,
+			'tva_intra' => $mysoc->tva_intra,
+			'country_id' => $mysoc->country_id,
+			'country_code' => $mysoc->country_code,
+		);
+		$mysoc->idprof1 = '000000001';
+		$mysoc->idprof2 = '00000000100010';
+		$mysoc->tva_intra = 'FR12000000001';
+		$mysoc->country_id = 1;
+		$mysoc->country_code = 'FR';
+
+		try {
+			$invoice = new Facture($db);
+			$invoice->socid = $this->buyer()->id;
+			$invoice->type = Facture::TYPE_STANDARD;
+			$invoice->date = dol_now();
+			$this->assertGreaterThan(0, $invoice->create($user), 'the invoice is created: ' . $invoice->error);
+			$this->assertGreaterThan(0, $invoice->addline($text, 10.00, 1, 20), 'the line is added: ' . $invoice->error);
+
+			$reloaded = new Facture($db);
+			$reloaded->fetch($invoice->id);
+			$reloaded->fetch_lines();
+			$reloaded->fetch_thirdparty();
+
+			$protocol = new CIIProtocol($db);
+			$path = $protocol->generateXML($reloaded, $langs);
+			$this->assertNotEmpty($path, 'the document is generated: ' . $protocol->error);
+			$this->assertFileExists((string) $path, 'the generated document is written');
+
+			return (string) file_get_contents((string) $path);
+		} finally {
+			$conf->global->EINVOICING_PDP = $savPdp;
+			foreach ($savSeller as $property => $value) {
+				$mysoc->$property = $value;
+			}
+		}
+	}
+
+	/**
+	 * Whatever the text, the document produced is XML.
+	 *
+	 * @dataProvider hostileTexts
+	 * @param	string	$text		The text typed on the invoice line
+	 * @return	void
+	 */
+	public function testTheDocumentIsWellFormed($text)
+	{
+		$xml = $this->generateWith($text);
+
+		$document = new DOMDocument();
+		$parsed = @$document->loadXML($xml);
+
+		$this->assertTrue(
+			$parsed,
+			'the document generated for this text is not XML: ' . trim((string) (($error = libxml_get_last_error()) ? $error->message : ''))
+		);
+	}
+
+	/**
+	 * And the text is still in it. A document that drops what was typed is as wrong as one that
+	 * cannot be parsed - #695 produced empty elements, which are well formed.
+	 *
+	 * @dataProvider hostileTexts
+	 * @param	string	$text		The text typed on the invoice line
+	 * @param	string	$fragment	What has to remain readable in the document
+	 * @return	void
+	 */
+	public function testTheTextIsStillThere($text, $fragment)
+	{
+		$xml = $this->generateWith($text);
+
+		$document = new DOMDocument();
+		$this->assertTrue(@$document->loadXML($xml), 'the document generated for this text is XML');
+
+		$this->assertStringContainsString(
+			$fragment,
+			(string) $document->textContent,
+			'the document no longer carries "' . $fragment . '"'
+		);
 	}
 }
