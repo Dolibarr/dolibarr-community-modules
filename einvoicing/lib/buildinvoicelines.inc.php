@@ -55,6 +55,10 @@ $newlang = '';
 // calcul_price_total(), used below to get the amounts of a line from the same place the invoice got
 // them. The protocols reach this file from several entry points, not all of which load the library.
 require_once DOL_DOCUMENT_ROOT.'/core/lib/price.lib.php';
+// FactureLigne, used below to read the line a situation line continues. The class lives in
+// facture.class.php up to Dolibarr 20 and in factureligne.class.php from 21 on, where
+// facture.class.php requires it: this file is the one entry point that works on every version.
+require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
 
 // Load EInvoicing class
 $einvoicing = new EInvoicing($db);
@@ -754,15 +758,16 @@ if (!empty($object->situation_counter) && $object->situation_counter > 1
 		if (empty($line->fk_prev_id)) {
 			continue;					// A line that appears in this situation was never invoiced before
 		}
-		$sqlprev = "SELECT total_ht, total_tva FROM " . MAIN_DB_PREFIX . "facturedet WHERE rowid = " . ((int) $line->fk_prev_id);
-		$resqlprev = $db->query($sqlprev);
-		if (!$resqlprev) {
-			dol_syslog("EInvoicing cannot read the previous situation line " . $line->fk_prev_id . ": " . $db->lasterror(), LOG_ERR);
+		// The previous line is read with the class of the core, which is the one that knows the
+		// shape of llx_facturedet. FactureLigne::fetch() answers -1 when the read failed, 0 when the
+		// line is gone and 1 when it is loaded; it is the same method on 18 to 24.
+		$prevline = new FactureLigne($db);
+		$resprev = $prevline->fetch((int) $line->fk_prev_id);
+		if ($resprev < 0) {
+			dol_syslog("EInvoicing cannot read the previous situation line " . $line->fk_prev_id . ": " . $prevline->error, LOG_ERR);
 			continue;
 		}
-		$objprev = $db->fetch_object($resqlprev);
-		$db->free($resqlprev);
-		if (empty($objprev) || (empty($objprev->total_ht) && empty($objprev->total_tva))) {
+		if ($resprev == 0 || (empty($prevline->total_ht) && empty($prevline->total_tva))) {
 			continue;
 		}
 
@@ -778,8 +783,8 @@ if (!empty($object->situation_counter) && $object->situation_counter > 1
 		if (!isset($previousSituations[$keyforvatrate])) {
 			$previousSituations[$keyforvatrate] = array('ht' => 0, 'tva' => 0);
 		}
-		$previousSituations[$keyforvatrate]['ht'] += (float) $objprev->total_ht;
-		$previousSituations[$keyforvatrate]['tva'] += (float) $objprev->total_tva;
+		$previousSituations[$keyforvatrate]['ht'] += (float) $prevline->total_ht;
+		$previousSituations[$keyforvatrate]['tva'] += (float) $prevline->total_tva;
 	}
 
 	foreach ($previousSituations as $keyforvatrate => $alreadyinvoiced) {
