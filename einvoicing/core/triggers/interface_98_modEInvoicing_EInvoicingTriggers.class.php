@@ -405,19 +405,23 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 				// A draft is a local booking, not the electronic invoice: it holds no accounting entry and
 				// says nothing to the platform, so removing it repudiates nothing. It is also the only way
 				// out of an import that landed on the wrong third party, since the vendor of an existing
-				// supplier invoice cannot be changed. Read the status from the database: the object handed
-				// to a trigger is not always freshly fetched.
+				// supplier invoice cannot be changed. Re-read the invoice: the object handed to a trigger
+				// is not always freshly fetched. It is re-read through the core class rather than by a
+				// query of our own, so the fk_statut column name and its mapping stay the business of
+				// Dolibarr. The property to read is ->status: fetch() selects "fk_statut as status" and
+				// fills ->status on every supported version (18 to 24), while ->statut is only kept as a
+				// backward compatibility alias, marked @deprecated since 19.
+				// A supplier invoice that cannot be re-read leaves the status at its initial -1, which is
+				// no draft, so the deletion is refused - exactly what the query it replaces did when it
+				// returned no row.
 				// The incoming flow itself is kept, detached from the invoice that is about to disappear,
 				// so the document stays in the flow list and can be imported again.
 				$status = -1;
-				$sqlstatus = "SELECT fk_statut FROM ".MAIN_DB_PREFIX."facture_fourn WHERE rowid = ".((int) $object->id);
-				$resqlstatus = $this->db->query($sqlstatus);
-				if ($resqlstatus) {
-					$objstatus = $this->db->fetch_object($resqlstatus);
-					if ($objstatus) {
-						$status = (int) $objstatus->fk_statut;
-					}
-					$this->db->free($resqlstatus);
+				$invoicetodelete = new FactureFournisseur($this->db);
+				if ($invoicetodelete->fetch((int) $object->id) > 0) {
+					$status = (int) $invoicetodelete->status;
+				} else {
+					dol_syslog(__METHOD__ . ' Cannot re-read the supplier invoice id=' . ((int) $object->id) . ' being deleted: its deletion is refused', LOG_ERR);
 				}
 
 				if ($status !== FactureFournisseur::STATUS_DRAFT) {
