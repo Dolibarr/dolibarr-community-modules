@@ -475,11 +475,26 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					print '<div class="info">' . $langs->trans('EInvoiceCreditNoteOfRefusedInvoice', $sourceRef) . '</div>';
 				}
 
+				// Accepting a received invoice validates it in Dolibarr, so on a draft those statuses take
+				// the right the core asks for a validation (fourn/facture/card.php, $usercanvalidate) on
+				// top of the one to edit. Left to the core to render: dolGetButtonAction() drops a
+				// dropdown entry whose perm is empty before Dolibarr 22, and shows it disabled with
+				// "NotEnoughPermissions" after - what it never does is leave a live button that the
+				// action would refuse. A -1 would not do: it is truthy, so the old cores show it enabled.
+				$canvalidate = ((!getDolGlobalString('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('fournisseur', 'facture', 'creer'))
+					|| (getDolGlobalString('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('fournisseur', 'supplier_invoice_advance', 'validate')));
+				$isdraft = ((int) $object->status === FactureFournisseur::STATUS_DRAFT);
+
 				foreach ($availableStatuses as $code => $label) {
+					$perm = ($forcedisabling ? -1 : ((bool) $user->hasRight("fournisseur", "facture", "creer") && empty($forcedisabling)));
+					if ($perm === true && $isdraft && !$canvalidate && in_array((int) $code, EInvoicing::STATUSES_ACCEPTING_A_DOCUMENT, true)) {
+						$perm = false;
+					}
+
 					$url_button[] = array(
 						'lang' => 'einvoicing',
 						'enabled' => true,
-						'perm' => ($forcedisabling ? -1 : ((bool) $user->hasRight("fournisseur", "facture", "creer") && empty($forcedisabling))),
+						'perm' => $perm,
 						'label' => (string) (is_array($label) ? ($label['label'] ?? '') : $label),
 						'url' => '/fourn/facture/card.php?id=' . $object->id . '&action=sendStatusMessage&pdpstatuscode=' . $code . '&token=' . newToken()
 					);
@@ -744,6 +759,12 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		if ($isSupplierInvoiceContext) {
 			$permissiontoedit = $user->hasRight('fournisseur', 'facture', 'creer');
+			// Who may validate a supplier invoice is decided by the core, in fourn/facture/card.php
+			// ($usercanvalidate): the "create" right is enough, unless advanced permissions are on, where
+			// validating has a right of its own. Approving a received invoice validates it (see below),
+			// so it takes that same right.
+			$permissiontovalidate = ((!getDolGlobalString('MAIN_USE_ADVANCED_PERMS') && $permissiontoedit)
+				|| (getDolGlobalString('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('fournisseur', 'supplier_invoice_advance', 'validate')));
 
 			if ($action == 'confirm_sendStatusMessage' && $permissiontoedit) {
 				$db->begin();
@@ -772,10 +793,54 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					}
 				}
 
-				$result = $provider->sendStatusMessage($object, $pdpstatuscode, $statusRaison); // Send status message
+				// Answering "approved" while the invoice stays a draft tells the vendor and the accounts two
+				// different things about the same document. Validating a received invoice in Dolibarr is
+				// the act of accepting it - that is why the BILL_SUPPLIER_VALIDATE trigger answers 205 by
+				// itself - so the answer given from the card validates it too. Validation comes first: a
+				// status accepted by the platform cannot be taken back, while a validation that fails
+				// (numbering, closed period, ...) must leave the exchange untouched.
+				$sendtheanswer = true;
+				if (in_array($pdpstatuscode, EInvoicing::STATUSES_ACCEPTING_A_DOCUMENT, true) && (int) $object->status === FactureFournisseur::STATUS_DRAFT) {
+					if (!$permissiontovalidate) {
+						$message = $langs->trans('EInvoiceApprovalNeedsValidateRight');
+						setEventMessages($message, array(), 'errors');
+						$this->errors[] = $message;
+
+						$db->commit();
+
+						return 0;
+					}
+
+					if ($object->validate($user) <= 0) {
+						$error++;
+						$this->errors = array_merge($this->errors, $object->errors);
+						setEventMessages($langs->trans('EInvoiceApprovalCouldNotValidate'), $object->errors ? $object->errors : array($object->error), 'errors');
+
+						$db->rollback();
+
+						return -1;
+					}
+
+					setEventMessages($langs->trans('EInvoiceApprovalValidatedTheInvoice', (string) $object->ref), array(), 'mesgs');
+
+					// EINVOICING_SEND_APPROVED_ON_VALIDATION makes that validation answer the platform on
+					// its own: sending the status again here would duplicate the flow. Read what the
+					// validation actually recorded rather than the setting, so a status sent by any other
+					// path is not doubled either.
+					if ($einvoicing->hasSentStatusMessage($object->id, $object->element, $pdpstatuscode)) {
+						$sendtheanswer = false;
+					}
+				}
+
+				$result = array('res' => 1, 'message' => '');
+				if ($sendtheanswer) {
+					$result = $provider->sendStatusMessage($object, $pdpstatuscode, $statusRaison); // Send status message
+				}
 
 				if ($result['res'] > 0) {
-					setEventMessages($result['message'], array(), 'mesgs');
+					if ($result['message'] !== '') {
+						setEventMessages($result['message'], array(), 'mesgs');
+					}
 				} else {
 					$error++;
 					$this->errors = array_merge($this->errors, $provider->errors);
@@ -1295,10 +1360,17 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					);
 				}
 
+				// Accepting a draft validates it in the accounts (see doActions()): say so, rather than
+				// letting the reference appear on an invoice the user only meant to answer for.
+				$question = $langs->trans('ConfirmSendStatusMessage', (string) $object->ref, (string) $einvoicing->getStatusLabel($pdpstatuscode));
+				if (in_array((int) $pdpstatuscode, EInvoicing::STATUSES_ACCEPTING_A_DOCUMENT, true) && (int) $object->status === FactureFournisseur::STATUS_DRAFT) {
+					$question = $langs->trans('ConfirmSendStatusMessageAndValidate', (string) $object->ref, (string) $einvoicing->getStatusLabel($pdpstatuscode));
+				}
+
 				$formconfirm = $form->formconfirm(
 					DOL_URL_ROOT . "/fourn/facture/card.php?id={$object->id}&action=confirm_sendStatusMessage&pdpstatuscode={$pdpstatuscode}",
 					$langs->trans('SendStatusMessage'),
-					$langs->trans('ConfirmSendStatusMessage', (string) $object->ref, (string) $einvoicing->getStatusLabel($pdpstatuscode)),
+					$question,
 					'confirm_sendStatusMessage',
 					$formquestion,
 					'yes',
