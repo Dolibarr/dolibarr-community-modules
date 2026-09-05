@@ -1952,7 +1952,9 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				$platformMessage = (string) (!empty($response['response']['message'])
 					? $response['response']['message']
 					: ($response['errorMessage'] ?? 'No message'));
-				$message = 'Failed to send CDAR file to PDP. Status code: ' . $response['status_code'] . '. Message: ' . $platformMessage;
+				// Name the platform that refused: this wording is identical in every provider, so a bug
+				// report quoting it alone never says which platform answered (issue #799).
+				$message = 'Failed to send CDAR file to ' . $this->name . '. Status code: ' . $response['status_code'] . '. Message: ' . $platformMessage;
 				// MDT-73 is the electronic address the status is sent to. The platform refuses the CDAR when
 				// it does not know the vendor under the address the module used, and says nothing about what
 				// to do next - while the received invoice stays impossible to approve or refuse, and so
