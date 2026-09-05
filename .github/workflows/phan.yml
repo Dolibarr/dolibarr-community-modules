@@ -26,7 +26,7 @@ concurrency:
   group: phan-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 env:
-  gh_event: ${{ inputs.gh_event || github.event_name }}
+  gh_event: ${{ github.event_name }}
   PHAN_CONFIG: >
     ${{ 'dev/tools/phan/config.php' }}
   PHAN_BASELINE: dev/tools/phan/baseline.txt

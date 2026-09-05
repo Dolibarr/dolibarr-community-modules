@@ -12,9 +12,8 @@
 # instance ("Home - Setup - PDF"), which the module reports and does not decide.
 #
 # Everything the job reads lives in the module: the two mergers it exercises, the carrier PDF and
-# the XML fixtures it builds from. Nothing outside einvoicing/ can make those documents differ, so
-# a change elsewhere does not start the job - the exception being this file, which does decide how
-# the run goes.
+# the XML fixtures it builds from. It runs no Dolibarr and loads no language file, so a change
+# elsewhere - translations included - does not start it, the exception being this file.
 name: einvoicing_pdfa
 
 permissions:
@@ -25,11 +24,15 @@ on:
     branches: [ main ]
     paths:
       - 'einvoicing/**'
+      - '!einvoicing/langs/**'
+      - '!einvoicing/**.md'
       - '.github/workflows/module_einvoicing_pdfa.yml'
   pull_request:
     branches: [ main ]
     paths:
       - 'einvoicing/**'
+      - '!einvoicing/langs/**'
+      - '!einvoicing/**.md'
       - '.github/workflows/module_einvoicing_pdfa.yml'
 
   workflow_dispatch:

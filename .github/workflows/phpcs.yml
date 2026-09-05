@@ -22,6 +22,15 @@ on:
   workflow_dispatch:
 
 
+concurrency:
+  group: phpcs-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # actionlint reads the workflow files themselves: expressions, contexts, action inputs, matrix
+  # keys. Pinned, so an upstream release never turns this job red on its own.
+  ACTIONLINT_VERSION: 1.7.7
+
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   # This workflow contains a single job called "build"
@@ -33,19 +42,77 @@ jobs:
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v6
-        with:
-         fetch-depth: '0'
       - name: Setup PHP
         id: setup-php
         uses: shivammathur/setup-php@v2
         with:
           php-version: '7.4'
-          extensions: calendar, json, imagick, gd, zip, mbstring, intl, opcache, imap,
-              mysql, pgsql, sqlite3, ldap, xml, mcrypt
+          # The three tools below parse PHP, they do not run it: an extension listed here only makes
+          # the runner build an extension that no check ever loads.
+          extensions: mbstring, xml
           tools: php-parallel-lint/php-var-dump-check, parallel-lint, cs2pr, phpcs
+      - name: What the change touches
+        id: changed
+        uses: ./.github/actions/changed
+
+      - name: What has to be checked
+        # phpcs reads every PHP file of the repository, and that grows with each module added. On a
+        # pull request the files of the pull request are enough: what lands on main is checked
+        # whole, and so is a change to the ruleset, which can turn a file nobody touched red.
+        id: scope
+        env:
+          ALL_KINDS: ${{ steps.changed.outputs.all }}
+          KINDS: ${{ steps.changed.outputs.kinds }}
+          FILES: ${{ steps.changed.outputs.files }}
+        run: |
+          set -uo pipefail
+          if [ "$ALL_KINDS" = "true" ]; then
+            echo "mode=all" >> "$GITHUB_OUTPUT"
+            echo "workflows=yes" >> "$GITHUB_OUTPUT"
+            echo "The whole repository is checked."
+            exit 0
+          fi
+          if grep -qE '^(dev/setup/codesniffer/|\.github/workflows/phpcs\.yml$)' "$FILES"; then
+            echo "mode=all" >> "$GITHUB_OUTPUT"
+            echo "The ruleset itself changed: the whole repository is checked."
+          else
+            grep -E '\.php$' "$FILES" > changed-php.txt || true
+            if [ -s changed-php.txt ]; then
+              echo "mode=list" >> "$GITHUB_OUTPUT"
+            else
+              echo "mode=none" >> "$GITHUB_OUTPUT"
+              echo "No PHP file changed."
+            fi
+          fi
+          if [ "$(jq -n --argjson k "$KINDS" '$k | index("ci") != null')" = "true" ]; then
+            echo "workflows=yes" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run PHPCS
+        if: ${{ steps.scope.outputs.mode == 'all' }}
         run: phpcs -q --report=checkstyle --standard=dev/setup/codesniffer/ruleset.xml --extensions=php --ignore=*/tx/*,*/vendor/*,dev/tools/phan/* . | cs2pr --graceful-warnings
+      - name: Run PHPCS on the files of the pull request
+        if: ${{ steps.scope.outputs.mode == 'list' }}
+        run: phpcs -q --report=checkstyle --standard=dev/setup/codesniffer/ruleset.xml --extensions=php --ignore=*/tx/*,*/vendor/*,dev/tools/phan/* --file-list=changed-php.txt | cs2pr --graceful-warnings
       - name: Run VarDump Check
         run: var-dump-check --extensions php --tracy --exclude */vendor/* .
       - name: Run Parallel Lint
         run: parallel-lint --exclude einvoicing/vendor/ --exclude dev/tools/phan/stubs/ .
+      - name: One test file per source file under test
+        # Only files this pull request ADDS are looked at, so the existing suite never fails the job.
+        # Skipped when no PHP file changed: a translation or a workflow cannot add a test file.
+        if: ${{ github.event_name == 'pull_request' && steps.scope.outputs.mode != 'none' }}
+        run: |
+          git fetch --quiet origin "${{ github.base_ref }}"
+          php .github/scripts/check-test-file-placement.php FETCH_HEAD
+      - name: Lint the workflow files
+        # shellcheck is left out on purpose: it reports on the shell of every run block, which is
+        # not what this step is here for. What it checks is the workflow itself - an expression on
+        # a context that does not exist, an input an action does not take, a key YAML reads twice.
+        if: ${{ steps.scope.outputs.workflows == 'yes' }}
+        run: |
+          set -euo pipefail
+          curl -sSL "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz" \
+            | tar xz actionlint
+          ./actionlint -shellcheck= -pyflakes=
+          echo "The workflow files are well formed."
