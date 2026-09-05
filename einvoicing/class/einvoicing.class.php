@@ -3642,21 +3642,28 @@ class EInvoicing
 	public function cleanUpTemporaryFiles()
 	{
 		global $conf;
+
+		require_once DOL_DOCUMENT_ROOT . '/core/lib/files.lib.php';
+
 		// Clean up temporary files
 		$tempDir = $conf->einvoicing->dir_temp ?? '';
-		if (!empty($tempDir) && is_dir($tempDir)) {
-			$files = scandir($tempDir);
-			if (is_array($files)) {
-				foreach ($files as $file) {
-					if ($file !== '.' && $file !== '..') {
-						$filePath = "$tempDir/$file";
-						if (is_file($filePath)) {
-							dol_delete_file($filePath);
-						}
-					}
-				}
-			}
+		if (empty($tempDir) || !dol_is_dir($tempDir)) {
+			return;
 		}
+
+		// Files at the root of the directory only, which is the whole of what the module writes there:
+		// the working copies of an incoming document (in_*.xml, in_*_readable.pdf), the CDAR being sent
+		// (cdar_*.xml), the einvoice.* diagnostics and the sample invoices of the setup page are all
+		// flat. A subdirectory found here was put by something else and is not ours to remove, so the
+		// listing stays non recursive - and dol_dir_list() also skips the dot files the core protects,
+		// which a raw scandir() loop happily deleted.
+		$files = dol_dir_list($tempDir, 'files', 0);
+		foreach ($files as $file) {
+			// Exact delete: the name comes from the listing and must not be read back as a glob mask.
+			dol_delete_file($file['fullname'], 1);
+		}
+
+		dol_syslog(__METHOD__ . ' removed ' . count($files) . ' file(s) from ' . $tempDir, LOG_DEBUG, 0, '_einvoicing');
 	}
 
 	/**

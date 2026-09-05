@@ -231,7 +231,21 @@ class FacturxTcpdfMerger extends TcpdfFpdi
 		$this->Output($toFilename, 'F');
 
 		if ($this->temporaryXmlFile !== '' && file_exists($this->temporaryXmlFile)) {
-			unlink($this->temporaryXmlFile);
+			// dol_delete_file() rather than unlink(), as the project asks for. It lives in a library
+			// main.inc.php does not load: the only caller of this class (FacturXProtocol) does have it,
+			// through the file scope require of CIIProtocol, but this class is also built with no
+			// Dolibarr around at all - the PDF/A workflow of the CI runs it on the repository alone -
+			// so the helper is loaded here when it is reachable instead of being assumed.
+			if (!function_exists('dol_delete_file') && defined('DOL_DOCUMENT_ROOT')) {
+				require_once DOL_DOCUMENT_ROOT . '/core/lib/files.lib.php';
+			}
+			if (function_exists('dol_delete_file')) {
+				// Exact delete: the name was built by tempnam() and must not be read back as a glob mask.
+				dol_delete_file($this->temporaryXmlFile, 1);
+			} else {
+				// No instance to ask: the file was written by tempnam() a few lines above and is ours.
+				unlink($this->temporaryXmlFile);
+			}
 			$this->temporaryXmlFile = '';
 		}
 	}
