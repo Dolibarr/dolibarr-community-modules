@@ -45,13 +45,10 @@ dol_include_once('einvoicing/class/utils/CtcFrPdfMerger.class.php');
 /**
  * FacturX Protocol Class
  *
- * This class handles the FacturX protocol implementation for generating
- * and managing electronic invoices according to the FacturX standard.
- * This also throw an error if data is not correct.
- *
- * This implementation is based on FacturX plugin developed by CAP REL.
- * It has been adapted and integrated into the EInvoicing module to provide
- * electronic invoicing capabilities compliant with the French Factur-X standard.
+ * This class handles the FacturX protocol implementation for generating and managing electronic
+ * invoices according to the FacturX standard. This also throw an error if data is not correct.
+ * Based on the FacturX plugin developed by CAP REL, adapted and integrated into the EInvoicing
+ * module to provide electronic invoicing capabilities compliant with the French Factur-X standard.
  *
  * @author  Eric Seigne <eric.seigne@cap-rel.fr>
  * 			Modified by mdaoud
@@ -135,12 +132,10 @@ class FacturXProtocol extends CIIProtocol
 		$filename = dol_sanitizeFileName($invoice->ref);
 		$filedir = getMultidirOutputCompat($invoice, '', 1);		// Example '/mydolibarr/documents/facture/FAYYMM-XXXX'
 
-		// Resolve the source PDF into which the Factur-X XML will be embedded.
-		// Priority:
-		//   1. $sourceFilePath provided by the generation hook (afterPDFCreation / afterODTCreation).
-		//      ODT/ODS models hand over the .odt path; the PDF rendition (MAIN_ODT_AS_PDF) shares the basename.
+		// Resolve the source PDF into which the Factur-X XML will be embedded, by priority:
+		//   1. $sourceFilePath from the generation hook (ODT/ODS: the MAIN_ODT_AS_PDF rendition shares the basename);
 		//   2. the most recent <ref>*.pdf already present in the output dir (manual generation, ODT output
-		//      like <ref>_Template.pdf for which last_main_doc is not maintained), excluding our own output.
+		//      like <ref>_Template.pdf for which last_main_doc is not maintained), excluding our own output;
 		//   3. legacy <ref>.pdf, regenerated with the default PDF model if missing.
 		$orig_pdf = '';
 		$fromodt = false;

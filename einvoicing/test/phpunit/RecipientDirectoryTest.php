@@ -29,12 +29,11 @@
 
 global $conf, $user, $langs, $db;
 
-// This module is deployed by symlinking this repository into htdocs/custom/einvoicing of one or
-// several Dolibarr instances. Some test runners resolve the real (non-symlinked) path of this
-// file before including it, which breaks a fixed "../../htdocs/master.inc.php" relative path.
-// DOLIBARR_HTDOCS let's the developer/CI point explicitly at the Dolibarr instance to test
-// against; otherwise we fall back to the standard relative path (valid when this file is reached
-// through the htdocs/custom/einvoicing/test/phpunit symlink without realpath resolution).
+// This module is deployed by symlinking this repository into htdocs/custom/einvoicing. Some test
+// runners resolve the real (non-symlinked) path of this file before including it, which breaks a
+// fixed "../../htdocs/master.inc.php" relative path. DOLIBARR_HTDOCS let's the developer/CI point
+// explicitly at the Dolibarr instance to test against; otherwise we fall back to the relative path
+// (valid when this file is reached through the symlink without realpath resolution).
 $dolibarrHtdocs = getenv('DOLIBARR_HTDOCS');
 if (!$dolibarrHtdocs) {
 	$dolibarrHtdocs = dirname(__FILE__) . '/../../htdocs';

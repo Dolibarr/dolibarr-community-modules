@@ -1261,9 +1261,7 @@ class EInvoicing
 	 * Check the thirdparty existence and active status via the French National Business Registry API (data.gouv.fr).
 	 * Search is performed by company name; the returned SIREN is then cross-checked against idprof1.
 	 * No authentication required. API rate limit: 7 req/s.
-	 *
-	 * This check is optional and non-blocking: an API timeout or unavailability is
-	 * silently ignored (warning logged, no error raised to the user).
+	 * Optional and non-blocking: an API timeout or unavailability is silently ignored (warning logged).
 	 * Only runs when EINVOICING_ENABLE_API_VALIDATION constant is set to 1.
 	 *
 	 * @param Societe $thirdparty   Thirdparty object to check
@@ -2941,13 +2939,8 @@ class EInvoicing
 	 * Create or replace the default routing for a thirdparty.
 	 *
 	 * This method enforces a 1 → 1 relationship between a thirdparty and its active default routing:
-	 * - Only one active default routing can exist per thirdparty at any given time
 	 * - Any existing routing(s) for this thirdparty are automatically deleted before insertion
 	 * - The new routing is marked as active (active = 1) and default (is_default = 1)
-	 *
-	 * Note: Future versions may support true 1 → N routing management with:
-	 * - Multiple concurrent routings per thirdparty
-	 * - Switching default routing without deletion
 	 *
 	 * @param 	int    $fk_soc   		Thirdparty ID
 	 * @param 	string $routing_id		Routing ID
@@ -3422,11 +3415,10 @@ class EInvoicing
 	/**
 	 * Update validation information of an existing lifecycle status message.
 	 *
-	 * If the message being validated is an outbound "Refused" status message for a supplier
-	 * invoice, confirmed as accepted ('Ok') by the platform, this also triggers the abandon of
-	 * the related Dolibarr supplier invoice (see SupplierInvoiceHelper::onOutboundStatusMessageValidated()).
-	 * This side effect is best-effort: any failure in it is logged but never changes the return
-	 * value of this method, whose only responsibility is to persist the validation information.
+	 * An outbound "Refused" status message for a supplier invoice, confirmed as accepted ('Ok') by the
+	 * platform, also triggers the abandon of the related Dolibarr supplier invoice
+	 * (see SupplierInvoiceHelper::onOutboundStatusMessageValidated()). This side effect is best-effort:
+	 * any failure in it is logged but never changes the return value of this method.
 	 *
 	 * @param int    $rowid					ID
 	 * @param string $statusMessage         Optional detailed status message or comment
@@ -3884,9 +3876,8 @@ class EInvoicing
 	/**
 	 * Generates the deposit, standard and credit note CII sample-invoice chain and returns the normalized XML of each.
 	 *
-	 * Generates three sample invoices (deposit, standard, and credit note) using fixed specimen
-	 * third parties to ensure consistent, deterministic output across test runs. The XML output
-	 * is normalized to exclude non-deterministic parts like timestamps and dates.
+	 * Uses fixed specimen third parties to ensure consistent, deterministic output across test runs.
+	 * The XML output is normalized to exclude non-deterministic parts like timestamps and dates.
 	 *
 	 * @used-by	regenerate_einvoicing_fixtures.php For fixture generation
 	 * @used-by	EInvoicingSamplesTest.php For comparison and regression testing
