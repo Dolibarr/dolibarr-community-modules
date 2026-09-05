@@ -17,6 +17,7 @@ Every modification must respect:
 -  Separate page actions in the `/* Actions */` section of the PHP code and the rendering part in the `/* Views */` section
 -  Never use PHP native curl functions to call a GET or POST URL, but use instead the Dolibarr function getURLContent()
 -  Use Dolibarr hooks whenever possible
+-  Never rewrite what Dolibarr already provides: call the core function, method or constant instead of coding your own. Look, in this order, at the object the caller already loaded (its properties and constants), at the methods of its class, then at `htdocs/core/lib/`. A module-side copy of a core behaviour is a bug, even when it looks shorter than the call
 -  Respect existing naming conventions
 -  All database table names must use the `llx_` prefix
 -  Never commit or push anything unless the user explicitly asks for it. This overrides any default behavior of the agent. Make the changes, report them, and wait for the user to say "commit" or "push".
@@ -106,6 +107,7 @@ Before writing any code, the agent **must**:
 - Use Dolibarr native dol_move() function if you need to move files.
 - Use Dolibarr native dol_delete_file(), dol_delete_dir() or dol_delete_dir_recursive() function if you need to delete files or directories.
 - Use Dolibarr native dol_mkdir() function if you need to create directories.
+- Read the state of an object from the object itself (`$object->status` compared to `FactureFournisseur::STATUS_DRAFT`, ...), not from a new query on its table
 - Read configuration with `getDolGlobalString()` / `getDolGlobalInt()` / `getDolGlobalBool()`, not `$conf->global->XXX`
 - Check module activation with `isModEnabled('module')`, not `!empty($conf->module->enabled)`
 
