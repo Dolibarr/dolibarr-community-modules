@@ -1842,6 +1842,7 @@ trait CommonProtocol
 						$sql .= " WHERE taux = ".((float) $vat_rate);
 						$sql .= " AND active = 1";
 						$sql .= " AND fk_pays = ".((int) $mysoc->country_id);
+						$sql .= $this->_getVatDictionaryEntityFilter();
 						$sql .= " AND (code = '".$db->escape($vat_src_code)."')";
 						$resql = $db->query($sql);
 						if ($resql) {
@@ -1884,6 +1885,7 @@ trait CommonProtocol
 						$sql .= " WHERE taux = ".((float) $vat_rate);
 						$sql .= " AND active = 1";
 						$sql .= " AND fk_pays = ".((int) $mysoc->country_id);
+						$sql .= $this->_getVatDictionaryEntityFilter();
 						$sql .= " AND (code = '".$db->escape($vat_src_code)."')";
 						$resql = $db->query($sql);
 						if ($resql) {
@@ -1954,6 +1956,29 @@ trait CommonProtocol
 	}
 
 	/**
+	 * Build the entity restriction of a read of the VAT dictionary table.
+	 *
+	 * The dictionary is per entity: a line of it belongs to the entity that declared it, and the core
+	 * reads it with "AND t.entity IN (".getEntity('c_tva').")" (see getTaxesFromId() in
+	 * htdocs/core/lib/functions.lib.php). Reading it without that clause answers a line another entity
+	 * declared, so the invoice carries an exemption reason (BT-121) that is not the seller's one.
+	 *
+	 * The column itself only exists from Dolibarr 19: it is added by the 18.0.0-19.0.0 migration, and
+	 * the core of 18 reads llx_c_tva with no entity clause at all. So on 18 there is nothing to restrict
+	 * and naming the column would only break the query.
+	 *
+	 * @return	string		SQL clause to append to the WHERE, '' on Dolibarr 18
+	 */
+	private function _getVatDictionaryEntityFilter()
+	{
+		if ((float) DOL_VERSION < 19.0) {
+			return '';
+		}
+
+		return " AND entity IN (".getEntity('c_tva').")";
+	}
+
+	/**
 	 * Read the VAT dictionary line a rate and a code point to.
 	 *
 	 * @param	float|string	$vat_rate		VAT rate of the invoice line
@@ -1974,6 +1999,7 @@ trait CommonProtocol
 		$sql .= " WHERE taux = ".((float) $vat_rate);
 		$sql .= " AND active = 1";
 		$sql .= " AND fk_pays = ".((int) $mysoc->country_id);
+		$sql .= $this->_getVatDictionaryEntityFilter();
 		$sql .= " AND code = '".$db->escape($vat_src_code)."'";
 		$sql .= " LIMIT 1";
 
