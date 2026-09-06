@@ -76,7 +76,9 @@ jobs:
             echo "mode=all" >> "$GITHUB_OUTPUT"
             echo "The ruleset itself changed: the whole repository is checked."
           else
-            grep -E '\.php$' "$FILES" > changed-php.txt || true
+            # The list of the pull request also names the files it deletes, and phpcs stops on
+            # a path that does not exist: keep the files that are in the checkout.
+            grep -E '\.php$' "$FILES" | while read -r f; do [ -f "$f" ] && echo "$f"; done > changed-php.txt || true
             if [ -s changed-php.txt ]; then
               echo "mode=list" >> "$GITHUB_OUTPUT"
             else
