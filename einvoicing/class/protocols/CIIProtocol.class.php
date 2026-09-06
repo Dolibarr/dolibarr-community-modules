@@ -36,11 +36,6 @@ require_once DOL_DOCUMENT_ROOT . '/core/class/discount.class.php';
 require_once DOL_DOCUMENT_ROOT . '/core/lib/files.lib.php';
 require_once DOL_DOCUMENT_ROOT . '/core/lib/date.lib.php';
 
-// dolChmod() only exists from Dolibarr 18, and both writers call it on the XML they just produced.
-if ((float) DOL_VERSION < 18) {
-	dol_include_once('/einvoicing/compat/files.lib.php');
-}
-
 dol_include_once('einvoicing/class/protocols/AbstractProtocol.class.php');
 dol_include_once('einvoicing/class/protocols/CommonProtocol.class.php');
 dol_include_once('einvoicing/class/einvoicing.class.php');

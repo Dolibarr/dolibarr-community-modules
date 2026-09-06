@@ -42,44 +42,6 @@ if (!function_exists('getDolGlobalFloat')) {
 	}
 }
 
-if (!function_exists('GETPOSTDATE')) {
-	/**
-	 *  Return a timestamp built from the year, month, day (and optionally hour, minute, second) fields
-	 *  posted by a Dolibarr date selector (Form::selectDate()).
-	 *
-	 *  Copy of the Dolibarr 18 implementation, not a later one: it reads the 'hour', 'min' and 'sec'
-	 *  fields, the names Form::selectDate() posts. Dolibarr 19 to 21 read 'minute' and 'second' instead,
-	 *  names their own selector does not post.
-	 *
-	 *  @param	string	$prefix		Prefix used to build the date selector
-	 *  @param	string	$hourTime	'getpost' to read the hour, minute and second from the request,
-	 *  							'HH:MM:SS' to force them, anything else for midnight
-	 *  @param	string	$gm			Timezone the posted values are expressed in ('auto', 'gmt', 'tzserver', 'tzuserrel', ...)
-	 *  @return	int|''				Timestamp, or '' when the selector was left empty
-	 *  @since	Dolibarr V18
-	 */
-	function GETPOSTDATE($prefix, $hourTime = '', $gm = 'auto')
-	{
-		if ($hourTime === 'getpost') {
-			$hour = GETPOSTINT($prefix.'hour');
-			$minute = GETPOSTINT($prefix.'min');
-			$second = GETPOSTINT($prefix.'sec');
-		} elseif (preg_match('/^(\d\d):(\d\d):(\d\d)$/', $hourTime, $m)) {
-			$hour = intval($m[1]);
-			$minute = intval($m[2]);
-			$second = intval($m[3]);
-		} else {
-			$hour = $minute = $second = 0;
-		}
-		// normalize out of range values
-		$hour = min($hour, 23);
-		$minute = min($minute, 59);
-		$second = min($second, 59);
-
-		return dol_mktime($hour, $minute, $second, GETPOSTINT($prefix.'month'), GETPOSTINT($prefix.'day'), GETPOSTINT($prefix.'year'), $gm);
-	}
-}
-
 if (!function_exists('GETPOSTFLOAT')) {
 	/**
 	 *  Return the value of a $_GET or $_POST supervariable, converted into float.

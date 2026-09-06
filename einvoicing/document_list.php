@@ -79,9 +79,8 @@ include_once __DIR__.'/class/providers/PDPProviderManager.class.php';
 include_once __DIR__.'/class/protocols/ProtocolManager.class.php';
 
 // load module libraries
-// GETPOSTDATE() arrived in the core in Dolibarr 18 and dolPrintHTMLForAttribute() in Dolibarr 19; this
-// page calls both, so it would fatal below the version the module declares it supports. Both are
-// backported in compat/functions.lib.php, and that is all this page needs from the two libraries.
+// dolPrintHTMLForAttribute() arrived in the core in Dolibarr 19 and this page calls it, so it would
+// fatal on 18. It is backported in compat/functions.lib.php, which is all this page needs from it.
 include_once __DIR__.'/compat/functions.lib.php';
 include_once __DIR__.'/lib/einvoicing.lib.php';
 include_once __DIR__.'/class/document.class.php';

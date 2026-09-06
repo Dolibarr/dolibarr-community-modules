@@ -78,15 +78,10 @@ class CompatShimReloadTest extends CommonClassTest
 				'function calculateVATNumberFromProperties($thirdparty) { return ""; }',
 				'function_exists("calculateVATNumberFromProperties")',
 			),
-			'files' => array(
-				'compat/files.lib.php',
-				'function dolChmod($filepath, $newmask = "") { }',
-				'function_exists("dolChmod")',
-			),
 			'functions' => array(
 				'compat/functions.lib.php',
-				'function GETPOSTDATE($prefix, $hourTime = "", $gm = "auto") { return ""; } function GETPOSTFLOAT($paramname, $rounding = "") { return 0.0; } function dolPrintHTMLForAttribute($s) { return ""; }',
-				'function_exists("GETPOSTDATE") && function_exists("dolPrintHTMLForAttribute")',
+				'function getDolGlobalFloat($key, $default = 0) { return 0.0; } function GETPOSTFLOAT($paramname, $rounding = "") { return 0.0; } function dolPrintHTMLForAttribute($s) { return ""; }',
+				'function_exists("GETPOSTFLOAT") && function_exists("dolPrintHTMLForAttribute")',
 			),
 		);
 	}
