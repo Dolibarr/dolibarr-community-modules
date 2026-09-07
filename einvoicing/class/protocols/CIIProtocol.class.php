@@ -1223,6 +1223,25 @@ class CIIProtocol extends AbstractProtocol
 
 
 	/**
+	 * Tell whether a document referenced by a line is the identifier of the object being billed
+	 * rather than a document this Dolibarr could hold.
+	 *
+	 * A ReferenceTypeCode (BT-128-1) qualifies the scheme of an "Invoiced object identifier"
+	 * (BT-128): what the line bills - a phone number, a meter, a subscription - and never a document.
+	 * Telecom and utility issuers put one on every line, so looking those up as supplier invoices
+	 * fails each of their invoices, and from the scheduler it stops the whole synchronization on the
+	 * first one. The deposit references this module itself emits carry no ReferenceTypeCode, which is
+	 * what keeps them out of this test and on the lookup path.
+	 *
+	 * @param 	array 	$refDoc		One entry of the line's additionalRefDocs, as parseInvoiceLines() returns it
+	 * @return 	bool				True when the reference designates the billed object, not a document
+	 */
+	protected function lineRefDocIsInvoicedObjectIdentifier(array $refDoc): bool
+	{
+		return !empty($refDoc['referenceTypeCode']);
+	}
+
+	/**
 	 * Add lines to a supplier invoice from e-invoice parsed lines
 	 *
 	 * @param 	FactureFournisseur 	$supplierInvoice						The supplier invoice to add lines on
@@ -1252,6 +1271,10 @@ class CIIProtocol extends AbstractProtocol
 					$lineRefDocId = $refDoc['IssuerAssignedID'] ?? null;
 					$lineRefDocType = $refDoc['typeCode'] ?? null;
 					$lineRefDocDate = $refDoc['issueDate'] ?? null;
+
+					if ($this->lineRefDocIsInvoicedObjectIdentifier($refDoc)) {
+						continue;
+					}
 
 					$linkedObjectId = SupplierInvoiceHelper::findIdByRef($lineRefDocId, (int) $parsedLine['supplierId']);
 					if ($linkedObjectId < 0) {

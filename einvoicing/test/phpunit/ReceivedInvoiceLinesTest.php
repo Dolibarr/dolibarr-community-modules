@@ -1344,4 +1344,95 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 			array('indicator' => 'false', 'actualAmount' => 5.00, 'reason' => 'Commercial gesture', 'rateApplicablePercent' => 20.0),
 		)));
 	}
+
+	/**
+	 * Call CIIProtocol::lineRefDocIsInvoicedObjectIdentifier() through reflection: pure decision
+	 * logic, no DB access and no side effect.
+	 *
+	 * @param	CIIProtocol		$protocol	Protocol instance
+	 * @param	array			$refDoc		One entry of the line's additionalRefDocs
+	 * @return	bool						What the caller would decide
+	 */
+	private function callLineRefDocIsInvoicedObjectIdentifier(CIIProtocol $protocol, array $refDoc)
+	{
+		$method = new ReflectionMethod(CIIProtocol::class, 'lineRefDocIsInvoicedObjectIdentifier');
+		$method->setAccessible(true);
+
+		return $method->invoke($protocol, $refDoc);
+	}
+
+	/**
+	 * A telecom issuer writes the billed line on each invoice line as an Invoiced object identifier
+	 * (BT-128): TypeCode 130 and, what tells it apart, a ReferenceTypeCode qualifying its scheme.
+	 * That identifier is a phone number, not a document, and it used to be looked up as a supplier
+	 * invoice - failing every such invoice, and stopping the scheduled synchronization on the first.
+	 *
+	 * The number below is taken from the 0639 98 00 00 - 0639 98 99 99 range the ARCEP reserves for
+	 * fiction, so that no test data points at a real subscriber.
+	 *
+	 * @return	void
+	 */
+	public function testAnInvoicedObjectIdentifierIsNotLookedUpAsADocument()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		$xml = $this->documentWithLine('
+      <ram:AssociatedDocumentLineDocument><ram:LineID>000001</ram:LineID></ram:AssociatedDocumentLineDocument>
+      <ram:SpecifiedTradeProduct><ram:Name>Forfait 250Go 5G SIM Seule</ram:Name></ram:SpecifiedTradeProduct>
+      <ram:SpecifiedLineTradeSettlement>
+        <ram:AdditionalReferencedDocument>
+          <ram:IssuerAssignedID>0639980000</ram:IssuerAssignedID>
+          <ram:TypeCode>130</ram:TypeCode>
+          <ram:ReferenceTypeCode>AWV</ram:ReferenceTypeCode>
+        </ram:AdditionalReferencedDocument>
+        <ram:SpecifiedTradeSettlementLineMonetarySummation><ram:LineTotalAmount>39.16</ram:LineTotalAmount></ram:SpecifiedTradeSettlementLineMonetarySummation>
+      </ram:SpecifiedLineTradeSettlement>');
+
+		$lines = $protocol->parseInvoiceLines($xml);
+		$this->assertCount(1, $lines);
+		$this->assertCount(1, $lines[0]['additionalRefDocs'], 'the reference is read');
+		$this->assertSame('AWV', $lines[0]['additionalRefDocs'][0]['referenceTypeCode'], 'BT-128-1 reaches the parsed line');
+
+		$this->assertTrue(
+			$this->callLineRefDocIsInvoicedObjectIdentifier($protocol, $lines[0]['additionalRefDocs'][0]),
+			'a qualified identifier is the billed object, so no invoice is looked up for it'
+		);
+	}
+
+	/**
+	 * The deposit reference this module emits on a line carries TypeCode 130 too, but no
+	 * ReferenceTypeCode: it does designate an invoice, and must keep going through the lookup.
+	 * This is what forbids keying the decision on TypeCode 130 alone.
+	 *
+	 * @return	void
+	 */
+	public function testADepositReferenceIsStillLookedUp()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		$xml = $this->documentWithLine('
+      <ram:AssociatedDocumentLineDocument><ram:LineID>000001</ram:LineID></ram:AssociatedDocumentLineDocument>
+      <ram:SpecifiedTradeProduct><ram:Name>(DEPOSIT)</ram:Name></ram:SpecifiedTradeProduct>
+      <ram:SpecifiedLineTradeSettlement>
+        <ram:AdditionalReferencedDocument>
+          <ram:IssuerAssignedID>FA2601-0042</ram:IssuerAssignedID>
+          <ram:TypeCode>130</ram:TypeCode>
+        </ram:AdditionalReferencedDocument>
+        <ram:SpecifiedTradeSettlementLineMonetarySummation><ram:LineTotalAmount>-100.00</ram:LineTotalAmount></ram:SpecifiedTradeSettlementLineMonetarySummation>
+      </ram:SpecifiedLineTradeSettlement>');
+
+		$lines = $protocol->parseInvoiceLines($xml);
+		$this->assertCount(1, $lines);
+		$this->assertSame('130', $lines[0]['additionalRefDocs'][0]['typeCode'], 'the same TypeCode as the telecom case');
+		$this->assertEmpty($lines[0]['additionalRefDocs'][0]['referenceTypeCode'], 'and no scheme qualifying it');
+
+		$this->assertFalse(
+			$this->callLineRefDocIsInvoicedObjectIdentifier($protocol, $lines[0]['additionalRefDocs'][0]),
+			'an unqualified reference still designates a document to look up'
+		);
+	}
 }
