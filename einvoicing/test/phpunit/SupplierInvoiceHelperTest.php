@@ -1288,19 +1288,18 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 	}
 
 	/**
-	 * An invoice on which nothing was sent yet is waiting for an answer, and only for that: approving
-	 * or refusing it are the two ways of giving it. "Payment transmitted" comes after, so it is not
-	 * part of what is offered at this point.
+	 * An invoice on which nothing was sent yet is waiting for an answer: approving or refusing it are
+	 * the two ways of giving it. "Payment transmitted" is offered too, since only a refusal blocks it.
 	 *
 	 * @return void
 	 */
-	public function testNothingSentYetOffersTheAnswerButNotThePayment()
+	public function testNothingSentYetOffersTheAnswerAndThePayment()
 	{
 		$offered = $this->offered();
 
 		$this->assertContains(EInvoicing::STATUS_APPROVED, $offered);
 		$this->assertContains(EInvoicing::STATUS_REFUSED, $offered);
-		$this->assertNotContains(EInvoicing::STATUS_PAYMENT_SENT, $offered, 'nothing is paid before being accepted');
+		$this->assertContains(EInvoicing::STATUS_PAYMENT_SENT, $offered, 'only a refusal blocks the payment status');
 	}
 
 	/**
@@ -1321,17 +1320,18 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 
 	/**
 	 * An approval the platform has not confirmed yet settles nothing: it can still be rejected, and
-	 * until it is confirmed the invoice is in the same place as one nobody answered.
+	 * until it is confirmed the invoice is in the same place as one nobody answered - which still
+	 * offers the payment status, since only a refusal blocks it.
 	 *
 	 * @return void
 	 */
-	public function testAPendingApprovalDoesNotOpenThePaymentStatus()
+	public function testAPendingApprovalStillOpensThePaymentStatus()
 	{
 		$this->sent(EInvoicing::STATUS_APPROVED, 'Pending');
 
 		$offered = $this->offered();
 
-		$this->assertNotContains(EInvoicing::STATUS_PAYMENT_SENT, $offered);
+		$this->assertContains(EInvoicing::STATUS_PAYMENT_SENT, $offered);
 		$this->assertContains(EInvoicing::STATUS_APPROVED, $offered, 'the answer is still the thing to send');
 		$this->assertContains(EInvoicing::STATUS_REFUSED, $offered);
 	}
@@ -1395,6 +1395,6 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 
 		$this->assertContains(EInvoicing::STATUS_APPROVED, $offered);
 		$this->assertContains(EInvoicing::STATUS_REFUSED, $offered, 'nothing was accepted, so the choice is still open');
-		$this->assertNotContains(EInvoicing::STATUS_PAYMENT_SENT, $offered, 'a rejected approval leaves the invoice unanswered');
+		$this->assertContains(EInvoicing::STATUS_PAYMENT_SENT, $offered, 'a rejected approval is not a refusal, so the payment status stays open too');
 	}
 }
