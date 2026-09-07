@@ -1351,7 +1351,7 @@ class CIIProtocol extends AbstractProtocol
 					$line->desc = trim($parsedLine['proddesc']);
 				}
 				// Because we reuse an already existing product without changing its ref and label, we add the label from the supplier invoice into the description
-				if (!empty($parsedLine['prodname'])) {
+				if (!empty($parsedLine['prodname']) && trim($line->desc) != trim($parsedLine['prodname'])) {
 					$line->desc = dol_concatdesc($parsedLine['prodname'], $line->desc ?? '');
 				}
 			} elseif (!$is_deposit_line) {
