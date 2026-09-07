@@ -157,7 +157,7 @@ class modEInvoicing extends DolibarrModules
 		$this->langfiles = array("einvoicing@einvoicing");
 
 		// Prerequisites
-		$this->phpmin = array(7, 0); // Minimum version of PHP required by module
+		$this->phpmin = array(7, 3); // Minimum version of PHP required by module: the bundled horstoeko/zugferd needs 7.3
 		// $this->phpmax = array(8, 0); // Maximum version of PHP required by module
 		$this->need_dolibarr_version = array(18, -3); // Minimum version of Dolibarr required by module
 		// $this->max_dolibarr_version = array(19, -3); // Maximum version of Dolibarr required by module
