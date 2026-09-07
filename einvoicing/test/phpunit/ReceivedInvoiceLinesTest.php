@@ -644,6 +644,85 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 	}
 
 	/**
+	 * The reported case of issue #844, read from the document the way the import reads it: a metered
+	 * consumption of 1 951 593 units at 0.00000548, which the issuer can only write as 0.000005 (BT-146
+	 * takes six decimals, BR-FR-DEC-03). Quantity times that price rebuilds 9.76 where the document
+	 * announces 10.69, and the invoice used to carry the 9.76.
+	 *
+	 * @return	void
+	 */
+	public function testTheReportedRoundedUnitPriceStillTotalsTheAnnouncedAmount()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		$lines = $protocol->parseInvoiceLines($this->documentWithLine('
+      <ram:AssociatedDocumentLineDocument><ram:LineID>478803531</ram:LineID></ram:AssociatedDocumentLineDocument>
+      <ram:SpecifiedTradeProduct><ram:Name>Stockage Standard Infrequent Access</ram:Name></ram:SpecifiedTradeProduct>
+      <ram:SpecifiedLineTradeAgreement>
+        <ram:NetPriceProductTradePrice><ram:ChargeAmount>0.000005</ram:ChargeAmount></ram:NetPriceProductTradePrice>
+      </ram:SpecifiedLineTradeAgreement>
+      <ram:SpecifiedLineTradeDelivery><ram:BilledQuantity unitCode="C62">1951593.0000</ram:BilledQuantity></ram:SpecifiedLineTradeDelivery>
+      <ram:SpecifiedLineTradeSettlement>
+        <ram:SpecifiedTradeSettlementLineMonetarySummation><ram:LineTotalAmount>10.69</ram:LineTotalAmount></ram:SpecifiedTradeSettlementLineMonetarySummation>
+      </ram:SpecifiedLineTradeSettlement>'));
+
+		$this->assertCount(1, $lines);
+		$this->assertNull($lines[0]['netpricebasisquantity'], 'BT-149 is absent: the price is stated per unit, rounded');
+
+		$imported = $this->importedLine($lines[0]);
+
+		$this->assertSame(1951593.0, $imported['qty'], 'the quantity the document bills is kept');
+		$this->assertEquals(10.69, $imported['rebuilt'], 'the line totals BT-131, not 9.76');
+		$this->assertStringContainsString('BR-FR-DEC-03', $imported['warning'], 'the import says what it refined and why');
+		$this->assertStringContainsString('MAIN_MAX_DECIMALS_UNIT', $imported['warning'], 'and that such a price is stored as zero');
+	}
+
+	/**
+	 * The refinement is bounded by what the six decimals of BT-146 can hide, so a document whose line
+	 * genuinely does not add up is still reported and never rewritten: over 1 951 593 units the price
+	 * rounding is worth 0.98 at most, and a difference of 5.24 is not that.
+	 *
+	 * @return	void
+	 */
+	public function testADifferenceWiderThanThePriceRoundingIsOnlyReported()
+	{
+		$parsedLine = array('lineid' => '3', 'lineTotalAmount' => 15.00);
+
+		$amounts = $this->amounts($parsedLine, 1951593.0, 0.000005);
+
+		$this->assertSame(0.000005, $amounts['subprice'], 'the price the document states is left alone');
+		$this->assertStringContainsString('The invoice carries the rebuilt amount', $amounts['warning']);
+
+		// The other end of the same rule: an ordinary line of two units at 40.00 announcing 100.00 is a
+		// document that contradicts itself, whatever its price precision, and stays reported.
+		$ordinary = $this->amounts(array('lineid' => '4', 'lineTotalAmount' => 100.0), 2.0, 40.0);
+		$this->assertSame(40.0, $ordinary['subprice'], 'nothing is invented on a plain quantity');
+		$this->assertStringContainsString('rebuild 80', $ordinary['warning']);
+	}
+
+	/**
+	 * A discounted line is refined the same way, on the price the discount is applied to: the couple the
+	 * core stores is quantity, unit price and percent, and it is their product that has to total BT-131.
+	 *
+	 * @return	void
+	 */
+	public function testTheRefinedPriceAccountsForTheLineDiscount()
+	{
+		$parsedLine = array('lineid' => '5', 'lineTotalAmount' => 8.55);
+
+		$amounts = $this->amounts($parsedLine, 1951593.0, 0.000005, 20.0);
+
+		$this->assertSame(20.0, $amounts['remise_percent'], 'the discount of the document is kept');
+		$this->assertEquals(
+			8.55,
+			round($amounts['qty'] * $amounts['subprice'] * (1 - ($amounts['remise_percent'] / 100)), 2),
+			'the line still totals what BT-131 announces'
+		);
+	}
+
+	/**
 	 * Every other shape of BT-149 leaves the price alone. It is optional and means one when absent;
 	 * BR-64 requires it to be positive when it is there, so a zero or a negative one is a broken
 	 * document and the price it states is the best the import can do with it.
