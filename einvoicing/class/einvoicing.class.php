@@ -1006,9 +1006,10 @@ class EInvoicing
 	/**
 	 * Statuses a user may still send by hand on an invoice received through the platform.
 	 *
-	 * A status already accepted is not proposed again, "Refused" (210) ends the exchange, and "Payment
-	 * transmitted" (211) needs an accepted "Approved" (205) on a non-draft invoice. A credit note
-	 * correcting an invoice we refused cannot be accepted either (issue #594).
+	 * A status already accepted is not proposed again, and "Refused" (210) ends the exchange. The
+	 * processing statuses are otherwise independent of one another (XP Z12-014 annex A, 2.1), so
+	 * "Payment transmitted" (211) needs no prior approval; only a draft, which cannot have been paid,
+	 * hides it. A credit note correcting an invoice we refused cannot be accepted either (issue #594).
 	 *
 	 * @param	int		$elementId		Id of the invoice
 	 * @param	string	$elementType	Element type ('invoice_supplier')
@@ -1018,6 +1019,7 @@ class EInvoicing
 	 */
 	public function getSendableStatusesForReceivedInvoice($elementId, $elementType)
 	{
+		// An accepted refusal closes the exchange: nothing more is sendable on that invoice, 211 included.
 		if ($this->hasSentStatusMessage($elementId, $elementType, self::STATUS_REFUSED, 1)) {
 			return array();
 		}
@@ -1029,7 +1031,6 @@ class EInvoicing
 		$statuses = $this->getEinvoiceStatusOptions(1, 1, 1);
 		$approved = $this->hasSentStatusMessage($elementId, $elementType, self::STATUS_APPROVED, 1)
 			|| $this->hasSentStatusMessage($elementId, $elementType, self::STATUS_PARTIALLY_APPROVED, 1);
-		$refused = $this->hasSentStatusMessage($elementId, $elementType, self::STATUS_REFUSED, 1);
 		if ($approved) {
 			unset($statuses[self::STATUS_REFUSED]);
 		}
@@ -1037,12 +1038,6 @@ class EInvoicing
 			if ($this->hasSentStatusMessage($elementId, $elementType, (int) $code, 1)) {
 				unset($statuses[$code]);
 			}
-		}
-
-		// "Payment transmitted" (211) is offered only if the invoice has not been refused
-		// We can send "Payment transmitted" even if the invoice has not been approved, as long as it has not been refused
-		if ($refused) {
-			unset($statuses[self::STATUS_PAYMENT_SENT]);
 		}
 
 		if ($elementType === 'invoice_supplier') {
