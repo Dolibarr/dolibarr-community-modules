@@ -2150,7 +2150,7 @@ trait CommonProtocol
 		//------------------------
 		$dueDate = null;
 		if (!empty($parsedHeader['paymentDueDate'])) {
-			$dueDateTimestamp = dol_stringtotime($parsedHeader['paymentDueDate']);
+			$dueDateTimestamp = dol_stringtotime($parsedHeader['paymentDueDate'], 'tzserver');
 			if ($dueDateTimestamp) {
 				$dueDate = $dueDateTimestamp;
 				$supplierInvoice->date_echeance = $dueDate;
@@ -2163,7 +2163,7 @@ trait CommonProtocol
 		// Payment Terms (derived from Invoice date <-> Payment due on)
 		//---------------------------------------------------------------
 		if ($dueDate && !empty($supplierInvoice->date)) {
-			$invoiceDateTimestamp = is_numeric($supplierInvoice->date) ? $supplierInvoice->date : dol_stringtotime((string) $supplierInvoice->date);
+			$invoiceDateTimestamp = is_numeric($supplierInvoice->date) ? $supplierInvoice->date : dol_stringtotime((string) $supplierInvoice->date, 'tzserver');
 
 			if ($invoiceDateTimestamp) {
 				$nbDays = (int) round(($dueDate - $invoiceDateTimestamp) / 86400);

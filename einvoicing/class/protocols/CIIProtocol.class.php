@@ -969,7 +969,7 @@ class CIIProtocol extends AbstractProtocol
 			return ['res' => -1, 'message' => 'Unfounded dolibarr corresponding Invoice code for document type code: ' . dol_escape_htmltag((string) ($parsedHeader['documenttypecode'] ?? 'NA'))];
 		}
 		// documentdate is already formatted into 'Y-m-d' by the parser ZugFerd and CII
-		$supplierInvoice->date = !empty($parsedHeader['documentdate']) ? dol_stringtotime($parsedHeader['documentdate']) : null;
+		$supplierInvoice->date = !empty($parsedHeader['documentdate']) ? dol_stringtotime($parsedHeader['documentdate'], 'tzserver') : null;
 
 		// For credit notes and replacement invoices, link to the source invoice via fk_facture_source
 		// (BT-25). A replacement invoice (BT-3 = 384) corrects the invoice it references just as a credit
@@ -1697,18 +1697,18 @@ class CIIProtocol extends AbstractProtocol
 	/**
 	 * Billing period of a received line (BG-26 / BT-134 / BT-135), as the timestamps a Dolibarr line holds.
 	 *
-	 * The dates arrive as 'Y-m-d' strings and a line stores a timestamp, read with dol_stringtotime() the way the
-	 * invoice date already is (issue #576). One side alone is kept, BR-CO-20 accepting a start or an end. A period
-	 * that ends before it starts is dropped, keeping the line: updateline() answers -1 on that pair
-	 * (ErrorStartDateGreaterEnd), which would fail the whole import over a period.
+	 * The dates arrive as 'Y-m-d' strings and a line stores a timestamp, read in the timezone of the server the
+	 * way every other date of the document is (issue #576, then #853). One side alone is kept, BR-CO-20 accepting a
+	 * start or an end. A period that ends before it starts is dropped, keeping the line: updateline() answers -1 on
+	 * that pair (ErrorStartDateGreaterEnd), which would fail the whole import over a period.
 	 *
 	 * @param	array<string,mixed>				$parsedLine		One line as parseInvoiceLines() returns it
 	 * @return	array{start: ?int, end: ?int}					Timestamps to store, null for a side with nothing
 	 */
 	private function resolveLinePeriod(array $parsedLine)
 	{
-		$start = !empty($parsedLine['linePeriodStart']) ? dol_stringtotime((string) $parsedLine['linePeriodStart']) : null;
-		$end = !empty($parsedLine['linePeriodEnd']) ? dol_stringtotime((string) $parsedLine['linePeriodEnd']) : null;
+		$start = !empty($parsedLine['linePeriodStart']) ? dol_stringtotime((string) $parsedLine['linePeriodStart'], 'tzserver') : null;
+		$end = !empty($parsedLine['linePeriodEnd']) ? dol_stringtotime((string) $parsedLine['linePeriodEnd'], 'tzserver') : null;
 
 		// dol_stringtotime() answers false or '' on something it cannot read, and that must not reach idate().
 		$start = is_int($start) && $start > 0 ? $start : null;
