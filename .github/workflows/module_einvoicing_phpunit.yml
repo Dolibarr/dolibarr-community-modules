@@ -72,16 +72,20 @@ jobs:
           # the tests, which talk to the database directly, but every page would answer a redirect
           # to the migration screen: the core compares its own version with the one the database
           # was last upgraded to, and the dump carries the .0 of its series.
-          all='[{"dolibarr":"18.0.0","php":"8.2"},
-                {"dolibarr":"19.0.0","php":"8.2"},
-                {"dolibarr":"20.0.0","php":"8.2"},
-                {"dolibarr":"21.0.0","php":"8.3"},
+          # The PHP of each core walks the range install/check.php of that core accepts, one version
+          # per core: the floor runs on the oldest PHP the vendored libraries take, the latest release
+          # on the newest PHP its own CI runs, so a pull request meets both ends of PHP without one
+          # job more, and main covers every PHP from 7.4 to 8.5 once.
+          all='[{"dolibarr":"18.0.0","php":"7.4"},
+                {"dolibarr":"19.0.0","php":"8.0"},
+                {"dolibarr":"20.0.0","php":"8.1"},
+                {"dolibarr":"21.0.0","php":"8.2"},
                 {"dolibarr":"22.0.0","php":"8.3"},
-                {"dolibarr":"23.0.0","php":"8.3"},
-                {"dolibarr":"24.0.0","php":"8.3","validate":"yes"}]'
-          review='[{"dolibarr":"18.0.0","php":"8.2"},
-                   {"dolibarr":"24.0.0","php":"8.3","validate":"yes"}]'
-          translations='[{"dolibarr":"24.0.0","php":"8.3","validate":"yes"}]'
+                {"dolibarr":"23.0.0","php":"8.4"},
+                {"dolibarr":"24.0.0","php":"8.5","validate":"yes"}]'
+          review='[{"dolibarr":"18.0.0","php":"7.4"},
+                   {"dolibarr":"24.0.0","php":"8.5","validate":"yes"}]'
+          translations='[{"dolibarr":"24.0.0","php":"8.5","validate":"yes"}]'
           if [ "${{ github.event_name }}" != "pull_request" ]; then
             chosen="$all"
           elif [ "$ALL_KINDS" = "true" ]; then
@@ -324,7 +328,7 @@ jobs:
         uses: ./.github/actions/dolibarr-instance
         with:
           dolibarr: '24.0.0'
-          php: '8.3'
+          php: '8.5'
 
       - name: Build the package with the release script
         # dev/build/makepack-modules.php is what produces what ships. Building it here with that same
