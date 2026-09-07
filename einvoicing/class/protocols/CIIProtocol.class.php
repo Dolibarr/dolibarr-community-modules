@@ -1616,8 +1616,9 @@ class CIIProtocol extends AbstractProtocol
 	 * updateline() recomputes the totals from those three, so BT-131 is never stored as such. A line that is not a
 	 * DETAIL item (BT-X-8) carries no amount and becomes a text line. A regular item whose quantity times price
 	 * cannot express BT-131 - zero quantity, zero price, opposite sign - carries BT-131 as a single unit instead
-	 * (issues #726 and #772). A price whose six allowed decimals cannot state BT-131 over the quantity is refined
-	 * to the one that does (issue #844). Anything else is checked against BT-131 and reported when it differs.
+	 * (issues #726 and #772). Any other line whose quantity times price is not BT-131 is imported at BT-131, at
+	 * the unit price that totals it (issues #844 and #850), and what was rewritten is reported. The charges of
+	 * the line (BG-28) are out of all this: they leave on lines of their own.
 	 *
 	 * @param	array<string,mixed>		$parsedLine			One line as parseInvoiceLines() returns it
 	 * @param	float					$qty				Quantity read from the document (BT-129)
@@ -1628,7 +1629,12 @@ class CIIProtocol extends AbstractProtocol
 	protected function resolveLineAmounts(array $parsedLine, $qty, $subprice, $remisePercent)
 	{
 		$lineid = (string) ($parsedLine['lineid'] ?? '?');
-		$announced = round((float) ($parsedLine['lineTotalAmount'] ?? 0), 2);
+
+		// A line charge (BG-28) is part of BT-131 but rejoins the invoice as a line of its own (issue #735),
+		// so what this line has to total is BT-131 less those charges.
+		$charges = $this->lineChargeTotal($parsedLine);
+		$announced = round((float) ($parsedLine['lineTotalAmount'] ?? 0) - $charges, 2);
+		$announcedText = $announced . ($charges == 0.0 ? '' : ' (BT-131 less the charges that leave on their own line)');
 
 		if (!$this->isDetailLine($parsedLine)) {
 			return array('qty' => 0.0, 'subprice' => 0.0, 'remise_percent' => 0.0, 'warning' => '');
@@ -1650,32 +1656,40 @@ class CIIProtocol extends AbstractProtocol
 				$reason = 'its quantity (BT-129) and unit price (BT-146) rebuild ' . $rebuilt . ', of the opposite sign';
 			}
 
-			$warning = 'Line ' . $lineid . ' of the received document carries a net amount (BT-131) of ' . $announced
+			$warning = 'Line ' . $lineid . ' of the received document carries a net amount (BT-131) of ' . $announcedText
 				. ' while ' . $reason . '. It was imported as a single unit at that amount, so the total of the invoice matches the document.';
 
 			return array('qty' => 1.0, 'subprice' => $announced, 'remise_percent' => 0.0, 'warning' => $warning);
 		}
 
-		// A unit price is written with at most MAX_DECIMALS_UNIT_PRICE decimals while BT-131 is exact, and no rule
-		// ties one to the other: over a large quantity, the rounding of the price alone is worth euros (issue #844).
-		// When the whole difference fits in that rounding, the document is consistent and BT-131 says what the line
-		// is worth, so the price is refined to the one that totals it. Anything wider is reported, not rewritten.
+		// BT-131 is what the line is worth: the totals of the document are summed from it (BR-CO-10, BR-CO-13)
+		// and no rule ties it to quantity times price. So a line whose couple rebuilds another amount is imported
+		// at the one announced, with the unit price that totals it: the six decimals of a price cannot state it
+		// over a large quantity (issue #844), or the issuer simply prices the line elsewhere than it bills it
+		// (issue #850). Only a line announcing nothing keeps what its price rebuilds.
 		$difference = abs($rebuilt - $announced);
 		$divisor = $qty * (1 - ($remisePercent / 100));
 		$fromPriceRounding = (abs($divisor) * 0.5 / pow(10, self::MAX_DECIMALS_UNIT_PRICE)) + 0.01;
 
 		$warning = '';
 		$refined = false;
-		if ($difference > 0.01 && $difference <= $fromPriceRounding && $divisor != 0.0) {
+		if (!empty($announced) && $difference > 0.01 && $divisor != 0.0) {
 			$subprice = $announced / $divisor;
 			$refined = true;
 
-			$warning = 'Line ' . $lineid . ' of the received document announces a net amount (BT-131) of ' . $announced
-				. ', while its quantity and unit price (BT-146) rebuild ' . $rebuilt . '. That difference is within the '
-				. self::MAX_DECIMALS_UNIT_PRICE . ' decimals a unit price is written with (BR-FR-DEC-03), so the price was refined to '
-				. $this->spellOutUnitPrice($subprice) . ' and the line totals the amount announced.';
+			$warning = 'Line ' . $lineid . ' of the received document announces a net amount (BT-131) of ' . $announcedText
+				. ', while its quantity (BT-129) and unit price (BT-146) rebuild ' . $rebuilt . '. ';
+
+			if ($difference <= $fromPriceRounding) {
+				$warning .= 'That difference is within the ' . self::MAX_DECIMALS_UNIT_PRICE
+					. ' decimals a unit price is written with (BR-FR-DEC-03), so the price was refined to '
+					. $this->spellOutUnitPrice($subprice) . ' and the line totals the amount announced.';
+			} else {
+				$warning .= 'The document prices that line elsewhere than it bills it: the line was imported at the amount announced, at a unit price of '
+					. $this->spellOutUnitPrice($subprice) . ', so the invoice totals what the document bills.';
+			}
 		} elseif ($difference > 0.01) {
-			$warning = 'Line ' . $lineid . ' of the received document announces a net amount (BT-131) of ' . $announced
+			$warning = 'Line ' . $lineid . ' of the received document announces a net amount (BT-131) of ' . $announcedText
 				. ', but its quantity and unit price rebuild ' . $rebuilt . '. The invoice carries the rebuilt amount.';
 		}
 
@@ -1689,13 +1703,40 @@ class CIIProtocol extends AbstractProtocol
 			$warning = trim($warning . ' Line ' . $lineid . ' of the received document prices a single unit at '
 				. $this->spellOutUnitPrice($subprice)
 				. ', below the unit price precision of this Dolibarr (MAIN_MAX_DECIMALS_UNIT = '
-				. getDolGlobalInt('MAIN_MAX_DECIMALS_UNIT') . '). Its net amount (BT-131) of ' . $announced
+				. getDolGlobalInt('MAIN_MAX_DECIMALS_UNIT') . '). Its net amount (BT-131) of ' . $announcedText
 				. ' is imported as announced, but the unit price is stored as '
 				. number_format($stored, getDolGlobalInt('MAIN_MAX_DECIMALS_UNIT'), '.', '')
 				. ': editing that line would recompute it to ' . number_format($reopened, 2, '.', '') . '.');
 		}
 
 		return array('qty' => $qty, 'subprice' => $subprice, 'remise_percent' => $remisePercent, 'warning' => $warning);
+	}
+
+
+	/**
+	 * Total of the charges of a line (BG-28), the part of BT-131 that leaves on a line of its own.
+	 *
+	 * buildLineChargeLines() gives every charge of the line a Dolibarr line, so the line itself is worth
+	 * BT-131 less that total: comparing the whole of BT-131 to what quantity times price rebuilds would
+	 * count the charge twice (issue #735).
+	 *
+	 * @param	array<string,mixed>		$parsedLine		One line as parseInvoiceLines() returns it
+	 * @return	float									Sum of the charges of the line, zero when it has none
+	 */
+	protected function lineChargeTotal(array $parsedLine)
+	{
+		if (empty($parsedLine['lineAllowances']) || !is_array($parsedLine['lineAllowances'])) {
+			return 0.0;
+		}
+
+		$total = 0.0;
+		foreach ($parsedLine['lineAllowances'] as $allowanceCharge) {
+			if (($allowanceCharge['indicator'] ?? '') === 'true') {
+				$total += (float) ($allowanceCharge['actualAmount'] ?? 0);
+			}
+		}
+
+		return $total;
 	}
 
 

@@ -280,12 +280,12 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 	}
 
 	/**
-	 * A line whose quantity and price do not rebuild what the document announces keeps the amount the
-	 * core computes - it is the only one Dolibarr can store - but says so.
+	 * A line whose quantity and price do not rebuild what the document announces is imported at the
+	 * amount announced - BT-131 is the figure the totals of the document are summed from - and says so.
 	 *
 	 * @return	void
 	 */
-	public function testAnAmountThatDoesNotRebuildIsReported()
+	public function testAnAmountThatDoesNotRebuildIsImportedAtTheAnnouncedAmount()
 	{
 		global $db;
 
@@ -294,8 +294,8 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 		$parsedLine = array('lineid' => '004', 'lineTotalAmount' => 100.0, 'linestatusreasoncode' => 'DETAIL');
 		$amounts = $this->callResolveLineAmounts($protocol, $parsedLine, 2.0, 40.0);
 
-		$this->assertSame(2.0, $amounts['qty'], 'nothing is invented, the document is only reported');
-		$this->assertSame(40.0, $amounts['subprice']);
+		$this->assertSame(2.0, $amounts['qty'], 'the quantity of the document is kept');
+		$this->assertEquals(50.0, $amounts['subprice'], 'the price is the one that totals BT-131');
 		$this->assertStringContainsString('BT-131', $amounts['warning']);
 		$this->assertStringContainsString('80', $amounts['warning'], 'the warning names what was rebuilt');
 	}
@@ -680,26 +680,84 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 	}
 
 	/**
-	 * The refinement is bounded by what the six decimals of BT-146 can hide, so a document whose line
-	 * genuinely does not add up is still reported and never rewritten: over 1 951 593 units the price
-	 * rounding is worth 0.98 at most, and a difference of 5.24 is not that.
+	 * The reported case of issue #850: a bank fee whose line is priced elsewhere than it is billed. The
+	 * document states a quantity of 0.5999 - the rate the fee is computed at, printed as "0,5999 %" on
+	 * the PDF - against a price of 50 005.00, the credit it applies to, and announces the fee itself,
+	 * 300.00. The couple rebuilds 50 005.00, which is what the invoice used to carry.
 	 *
 	 * @return	void
 	 */
-	public function testADifferenceWiderThanThePriceRoundingIsOnlyReported()
+	public function testALinePricedElsewhereThanItIsBilledTotalsTheAnnouncedAmount()
 	{
-		$parsedLine = array('lineid' => '3', 'lineTotalAmount' => 15.00);
+		global $db;
 
-		$amounts = $this->amounts($parsedLine, 1951593.0, 0.000005);
+		$protocol = new CIIProtocol($db);
 
-		$this->assertSame(0.000005, $amounts['subprice'], 'the price the document states is left alone');
-		$this->assertStringContainsString('The invoice carries the rebuilt amount', $amounts['warning']);
+		$lines = $protocol->parseInvoiceLines($this->documentWithLine('
+      <ram:AssociatedDocumentLineDocument><ram:LineID>2608</ram:LineID></ram:AssociatedDocumentLineDocument>
+      <ram:SpecifiedTradeProduct><ram:Name>Frais dossier</ram:Name></ram:SpecifiedTradeProduct>
+      <ram:SpecifiedLineTradeAgreement>
+        <ram:NetPriceProductTradePrice>
+          <ram:ChargeAmount>50005.000000</ram:ChargeAmount>
+          <ram:BasisQuantity unitCode="A9">0.5999</ram:BasisQuantity>
+        </ram:NetPriceProductTradePrice>
+      </ram:SpecifiedLineTradeAgreement>
+      <ram:SpecifiedLineTradeDelivery><ram:BilledQuantity unitCode="A9">0.5999</ram:BilledQuantity></ram:SpecifiedLineTradeDelivery>
+      <ram:SpecifiedLineTradeSettlement>
+        <ram:SpecifiedTradeSettlementLineMonetarySummation><ram:LineTotalAmount>300.00</ram:LineTotalAmount></ram:SpecifiedTradeSettlementLineMonetarySummation>
+      </ram:SpecifiedLineTradeSettlement>'));
 
-		// The other end of the same rule: an ordinary line of two units at 40.00 announcing 100.00 is a
-		// document that contradicts itself, whatever its price precision, and stays reported.
-		$ordinary = $this->amounts(array('lineid' => '4', 'lineTotalAmount' => 100.0), 2.0, 40.0);
-		$this->assertSame(40.0, $ordinary['subprice'], 'nothing is invented on a plain quantity');
-		$this->assertStringContainsString('rebuild 80', $ordinary['warning']);
+		$this->assertCount(1, $lines);
+
+		$imported = $this->importedLine($lines[0]);
+
+		$this->assertSame(0.5999, $imported['qty'], 'the quantity the document bills is kept');
+		$this->assertEquals(300.00, $imported['rebuilt'], 'the line totals BT-131, not the 50005.00 its price rebuilds');
+		$this->assertStringContainsString('rebuild 50005', $imported['warning'], 'the import says what the document rebuilds');
+		$this->assertStringContainsString('imported at the amount announced', $imported['warning'], 'and what it did about it');
+	}
+
+	/**
+	 * A charge of the line (BG-28) is part of BT-131 but leaves on a line of its own (issue #735), so the
+	 * line itself is worth BT-131 less that charge: the couple the document states rebuilds exactly that,
+	 * and nothing is rewritten or reported. Five units at 100.05 less 10.001 percent, plus a charge of
+	 * 7.00, announcing 457.22.
+	 *
+	 * @return	void
+	 */
+	public function testAChargeOfTheLineIsOutOfTheComparison()
+	{
+		$parsedLine = array(
+			'lineid' => '6',
+			'lineTotalAmount' => 457.22,
+			'lineAllowances' => array(
+				array('indicator' => 'false', 'actualAmount' => 50.03, 'reason' => 'Commercial discount'),
+				array('indicator' => 'true', 'actualAmount' => 7.00, 'reasonCode' => 'FC', 'reason' => 'Handling'),
+			),
+		);
+
+		$amounts = $this->amounts($parsedLine, 5.0, 100.05, 10.001);
+
+		$this->assertSame(100.05, $amounts['subprice'], 'the price of the document is left alone');
+		$this->assertSame('', $amounts['warning'], 'and the charge is not read as a document that does not add up');
+
+		// Without the charge line the same figures do not add up, and there the price is refined.
+		unset($parsedLine['lineAllowances'][1]);
+		$this->assertNotSame('', $this->amounts($parsedLine, 5.0, 100.05, 10.001)['warning']);
+	}
+
+	/**
+	 * A line announcing nothing has no amount to be imported at: BT-131 is what a line is worth, and an
+	 * absent one is not a figure to rewrite a price against. It keeps what its own price rebuilds.
+	 *
+	 * @return	void
+	 */
+	public function testALineAnnouncingNothingKeepsWhatItsPriceRebuilds()
+	{
+		$amounts = $this->amounts(array('lineid' => '5', 'lineTotalAmount' => 0.0), 2.0, 40.0);
+
+		$this->assertSame(40.0, $amounts['subprice'], 'nothing is rewritten against an absent BT-131');
+		$this->assertStringContainsString('carries the rebuilt amount', $amounts['warning']);
 	}
 
 	/**
