@@ -20,10 +20,12 @@
  *      \file       test/phpunit/CIIProtocolTest.php
  *      \ingroup    test
  *      \brief      PHPUnit test for the line billing period (EN 16931 BG-26 / BT-134 / BT-135), in
- *                  both directions.
+ *                  both directions, and for the timezone the dates of a received document are read in.
  *                  Export (issue #435): buildLineItem() must place BillingSpecifiedPeriod where the
  *                  CII D22B schema sequence requires it. Import (issue #576): resolveLinePeriod()
  *                  must keep one side alone and refuse a period that ends before it starts.
+ *                  Import (issue #853): a date of the document must be stored as the day it states,
+ *                  whatever the timezone of the server that reads it.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 
@@ -54,6 +56,9 @@ require_once __DIR__ . '/CommonClassTestCompat.inc.php';
  */
 class CIIProtocolTest extends CommonClassTest
 {
+	/** @var string	PHP default timezone saved at setUp() */
+	private $savtz;
+
 	/**
 	 * Call the private CIIProtocol::buildLineItem() through reflection: pure line-level XML
 	 * generation logic (no DB access, no side effect), the kind of private method the project
@@ -296,8 +301,8 @@ class CIIProtocolTest extends CommonClassTest
 
 		$this->assertIsInt($period['start']);
 		$this->assertIsInt($period['end']);
-		$this->assertSame('2026-06-01', dol_print_date($period['start'], '%Y-%m-%d', 'gmt'));
-		$this->assertSame('2026-06-30', dol_print_date($period['end'], '%Y-%m-%d', 'gmt'));
+		$this->assertSame('2026-06-01', dol_print_date($period['start'], '%Y-%m-%d', 'tzserver'));
+		$this->assertSame('2026-06-30', dol_print_date($period['end'], '%Y-%m-%d', 'tzserver'));
 	}
 
 	/**
@@ -313,12 +318,12 @@ class CIIProtocolTest extends CommonClassTest
 		$protocol = new CIIProtocol($db);
 
 		$startOnly = $this->callResolveLinePeriod($protocol, ['linePeriodStart' => '2026-06-01', 'linePeriodEnd' => null]);
-		$this->assertSame('2026-06-01', dol_print_date($startOnly['start'], '%Y-%m-%d', 'gmt'));
+		$this->assertSame('2026-06-01', dol_print_date($startOnly['start'], '%Y-%m-%d', 'tzserver'));
 		$this->assertNull($startOnly['end']);
 
 		$endOnly = $this->callResolveLinePeriod($protocol, ['linePeriodStart' => null, 'linePeriodEnd' => '2026-06-30']);
 		$this->assertNull($endOnly['start']);
-		$this->assertSame('2026-06-30', dol_print_date($endOnly['end'], '%Y-%m-%d', 'gmt'));
+		$this->assertSame('2026-06-30', dol_print_date($endOnly['end'], '%Y-%m-%d', 'tzserver'));
 	}
 
 	/**
@@ -421,7 +426,125 @@ class CIIProtocolTest extends CommonClassTest
 		$this->assertSame('2026-06-30', $lines[0]['linePeriodEnd'], 'the parser normalises BT-135 to Y-m-d');
 
 		$period = $this->callResolveLinePeriod($protocol, $lines[0]);
-		$this->assertSame('2026-06-01', dol_print_date($period['start'], '%Y-%m-%d', 'gmt'));
-		$this->assertSame('2026-06-30', dol_print_date($period['end'], '%Y-%m-%d', 'gmt'));
+		$this->assertSame('2026-06-01', dol_print_date($period['start'], '%Y-%m-%d', 'tzserver'));
+		$this->assertSame('2026-06-30', dol_print_date($period['end'], '%Y-%m-%d', 'tzserver'));
+	}
+
+	/**
+	 * Save the timezone the tests below move.
+	 *
+	 * @return void
+	 */
+	protected function setUp(): void
+	{
+		parent::setUp();
+
+		$this->savtz = date_default_timezone_get();
+	}
+
+	/**
+	 * Put it back.
+	 *
+	 * @return void
+	 */
+	protected function tearDown(): void
+	{
+		date_default_timezone_set($this->savtz);
+
+		parent::tearDown();
+	}
+
+	/**
+	 * Timezones the dates are read in: UTC, one west of it (where issue #853 was reported), two east
+	 * of it, one of them with a fractional offset, and the one furthest ahead.
+	 *
+	 * @return string[]	Timezone identifiers
+	 */
+	private function timezones(): array
+	{
+		return array('UTC', 'America/New_York', 'Europe/Paris', 'Asia/Kolkata', 'Pacific/Kiritimati');
+	}
+
+	/**
+	 * The day DoliDB::idate() writes into the column for a timestamp, which is where issue #853
+	 * happened: it formats with 'tzserver' on the seven supported cores.
+	 *
+	 * @param	int|string	$timestamp	Timestamp the import would store
+	 * @return	string					The day the row carries
+	 */
+	private function storedDay($timestamp): string
+	{
+		return dol_print_date($timestamp, '%Y-%m-%d', 'tzserver');
+	}
+
+	/**
+	 * The dates of a received document reach the row as the days the document states, on a server in
+	 * any timezone: the period of a line (BT-134 / BT-135) and the due date (BT-9), read back the way
+	 * DoliDB::idate() writes them. The dates of the invoice of issue #853.
+	 *
+	 * @return void
+	 */
+	public function testTheDayWrittenIsTheDayOfTheDocument()
+	{
+		global $db;
+
+		require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
+
+		$protocol = new CIIProtocol($db);
+		$payment = new ReflectionMethod(CIIProtocol::class, '_applyPaymentInfoToSupplierInvoice');
+		$payment->setAccessible(true);
+
+		foreach ($this->timezones() as $tz) {
+			date_default_timezone_set($tz);
+
+			$period = $this->callResolveLinePeriod($protocol, array('linePeriodStart' => '2026-09-01', 'linePeriodEnd' => '2027-08-31'));
+			$this->assertSame('2026-09-01', $this->storedDay($period['start']), 'wrong start on a server in ' . $tz);
+			$this->assertSame('2027-08-31', $this->storedDay($period['end']), 'wrong end on a server in ' . $tz);
+
+			$supplierInvoice = new FactureFournisseur($db);
+			$payment->invoke($protocol, $supplierInvoice, array('paymentDueDate' => '2026-09-02'));
+			$this->assertSame('2026-09-02', $this->storedDay($supplierInvoice->date_echeance), 'wrong due date on a server in ' . $tz);
+		}
+	}
+
+	/**
+	 * What the second argument buys, on the timezone the defect was reported from: left out,
+	 * dol_stringtotime() answers midnight UTC, which idate() writes as the day before.
+	 *
+	 * @return void
+	 */
+	public function testTheDefaultOfTheCoreLosesADayWestOfUtc()
+	{
+		global $db;
+
+		date_default_timezone_set('America/New_York');
+
+		$this->assertSame('2026-09-01', $this->storedDay(dol_stringtotime('2026-09-02')), 'the state of issue #853');
+		$this->assertSame('2026-09-02', $this->storedDay(dol_stringtotime('2026-09-02', 'tzserver')));
+
+		$period = $this->callResolveLinePeriod(new CIIProtocol($db), array('linePeriodStart' => '2026-09-02'));
+		$this->assertSame('2026-09-02', $this->storedDay($period['start']), 'the import must read the day in the timezone of the server');
+	}
+
+	/**
+	 * The instant stored for a day, whatever the timezone: midnight of the server day, which is what
+	 * the line form of the core writes for the same field.
+	 *
+	 * @return void
+	 */
+	public function testALinePeriodIsMidnightOfTheServerDay()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		foreach ($this->timezones() as $tz) {
+			date_default_timezone_set($tz);
+
+			$period = $this->callResolveLinePeriod($protocol, array('linePeriodStart' => '2026-09-01', 'linePeriodEnd' => '2026-09-30'));
+
+			$this->assertSame('2026-09-01 00:00:00', dol_print_date($period['start'], '%Y-%m-%d %H:%M:%S', 'tzserver'), 'wrong start in ' . $tz);
+			$this->assertSame('2026-09-30 00:00:00', dol_print_date($period['end'], '%Y-%m-%d %H:%M:%S', 'tzserver'), 'wrong end in ' . $tz);
+		}
 	}
 }
