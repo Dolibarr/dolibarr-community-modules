@@ -1601,6 +1601,11 @@ class Document extends CommonObject
 
 			if ($sync_result['res'] <= 0) {
 				$error++;
+				// The scheduler builds what it shows from $this->error and $this->errors, never from
+				// $this->output. Leaving them empty is what turns a precise business error into the bare
+				// "Unknown error" the job card ends up displaying, so hand it the messages that aborted the run.
+				// A third-party provider may only fill 'details', so fall back on it rather than on nothing.
+				$this->errors = $sync_result['errors'] ?? ($sync_result['details'] ?? array());
 				$errortype = 'errors';
 				if (!empty($sync_result['actions'])) {
 					$errortype = 'warnings';
@@ -1615,7 +1620,8 @@ class Document extends CommonObject
 			}
 		} else {
 			$error++;
-			$this->output = $langs->trans("NoPDPProviderConfigured");
+			// Set on error only, not on output: the scheduler concatenates the two and would show it twice.
+			$this->error = $langs->trans("NoPDPProviderConfigured");
 		}
 
 		$this->output = trim($this->output);

@@ -1777,7 +1777,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 *
 	 * @param   int   $syncFromDate     Timestamp from which to start synchronization. If 0, begins from epoch (1970-01-01).
 	 * @param   int   $limit            Maximum number of flows to synchronize. 0 means no limit.
-	 * @return 	bool|array{res:int, messages:string[], totalFlows?:?int, alreadyExist?:int, syncedFlows?:int, batchlimit?:int, actions?:array<string,array{actionurl:string,actioncode:string,action:string,businessmessage:string}>, details?:string[]} 	True on success, false on failure along with messages, details for debugging, and suggested optional actions.
+	 * @return 	bool|array{res:int, messages:string[], totalFlows?:?int, alreadyExist?:int, syncedFlows?:int, batchlimit?:int, actions?:array<string,array{actionurl:string,actioncode:string,action:string,businessmessage:string}>, details?:string[], errors?:string[]} 	True on success, false on failure along with messages, details for debugging, the errors that aborted the run, and suggested optional actions.
 	 */
 	public function syncFlows($syncFromDate = 0, $limit = 0)
 	{
@@ -1793,6 +1793,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$this->clearIncomingDiagnosticFiles();
 
 		$results_messages = array();	// result message (technical error)
+		$error_messages = array();		// subset of the above holding only what made the run fail
 		$actions = array();				// business message (manual action to do)
 
 		$resource = 'flows/search';
@@ -2044,7 +2045,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 							}
 						}
 						dol_syslog(__METHOD__ . " Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], LOG_DEBUG, 0, "_einvoicing");
-						$results_messages[] = "ERROR_SYNCFLOW - Failed to synchronize flow " . dol_escape_htmltag((string) $flow['flowId']) . ": " . $res['message'];
+						$errormessage = "ERROR_SYNCFLOW - Failed to synchronize flow " . dol_escape_htmltag((string) $flow['flowId']) . ": " . $res['message'];
+						$results_messages[] = $errormessage;
+						$error_messages[] = $errormessage;
 
 						$error++;
 					}
@@ -2062,7 +2065,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 						//$lastsuccessfullSyncronizedFlow = $flow['flowId'];
 					}
 				} catch (Exception $e) {
-					$results_messages[] = "Exception occurred while synchronizing flow " . dol_escape_htmltag((string) $flow['flowId']) . ": " . dol_escape_htmltag($e->getMessage());
+					$errormessage = "Exception occurred while synchronizing flow " . dol_escape_htmltag((string) $flow['flowId']) . ": " . dol_escape_htmltag($e->getMessage());
+					$results_messages[] = $errormessage;
+					$error_messages[] = $errormessage;
 					$error++;
 				}
 
@@ -2165,6 +2170,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		// Return result
 		// 'actions' contains the action to do (in case of business error)
 		// 'details' will contain all technical error (for Log)
+		// 'errors' holds only what aborted the run, for a caller that has to report a cause
 		return [
 			'res' => $globalres,
 			'messages' => $messages,
@@ -2173,7 +2179,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 			'syncedFlows' => $syncedFlows,
 			'batchlimit' => $batchlimit,
 			'actions' => $actions,
-			'details' => $results_messages
+			'details' => $results_messages,
+			'errors' => $error_messages
 		];
 	}
 
