@@ -891,6 +891,87 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 	}
 
 	/**
+	 * The mark of issue #861, end to end: an import that could not reproduce the totals of the document
+	 * blocks the invoice, and the block is lifted the moment the invoice totals what was announced -
+	 * the mark keeps those figures precisely so it can be re-evaluated without the document.
+	 *
+	 * @return void
+	 */
+	public function testATotalsMismatchBlocksUntilTheInvoiceAgrees()
+	{
+		global $db;
+
+		$invoice = $this->createSpecimenSupplierInvoice();
+		$stored = new FactureFournisseur($db);
+		$this->assertGreaterThan(0, $stored->fetch((int) $invoice->id));
+
+		$this->assertNull(SupplierInvoiceHelper::totalsMismatch((int) $invoice->id), 'an invoice carries no mark to begin with');
+		$this->assertFalse(SupplierInvoiceHelper::totalsMismatchBlocks((int) $invoice->id));
+
+		// The import could not rebuild what the document announces: 130.00 including VAT, 30.00 of VAT.
+		SupplierInvoiceHelper::flagTotalsMismatch((int) $invoice->id, 30.00, 130.00);
+
+		$announced = SupplierInvoiceHelper::totalsMismatch((int) $invoice->id);
+		$this->assertIsArray($announced);
+		$this->assertEquals(130.00, $announced['ttc'], 'the mark keeps what the document announces');
+		$this->assertEquals(30.00, $announced['tva']);
+		$this->assertTrue(SupplierInvoiceHelper::totalsMismatchBlocks((int) $invoice->id), 'and it blocks while the invoice says otherwise');
+
+		// Same invoice, marked against the totals it actually carries: there is nothing left to block.
+		SupplierInvoiceHelper::flagTotalsMismatch((int) $invoice->id, abs((float) $stored->total_tva), abs((float) $stored->total_ttc));
+		$this->assertFalse(SupplierInvoiceHelper::totalsMismatchBlocks((int) $invoice->id), 'an invoice that totals the document blocks nothing');
+
+		SupplierInvoiceHelper::clearTotalsMismatch((int) $invoice->id);
+		$this->assertNull(SupplierInvoiceHelper::totalsMismatch((int) $invoice->id));
+	}
+
+	/**
+	 * The comparison is made on the absolute values: Dolibarr stores a credit note negative while
+	 * BT-110 and BT-112 are always announced positive, the document type carrying the sign.
+	 *
+	 * @return void
+	 */
+	public function testTotalsAgreeWithDocumentComparesAbsoluteValues()
+	{
+		global $db;
+
+		$creditNote = new FactureFournisseur($db);
+		$creditNote->total_tva = -20.00;
+		$creditNote->total_ttc = -120.00;
+
+		$this->assertTrue(SupplierInvoiceHelper::totalsAgreeWithDocument($creditNote, 20.00, 120.00));
+		$this->assertFalse(SupplierInvoiceHelper::totalsAgreeWithDocument($creditNote, 20.00, 130.00), 'a cent apart is a difference, not a rounding');
+		$this->assertTrue(SupplierInvoiceHelper::totalsAgreeWithDocument($creditNote, 20.001, 119.999), 'the tolerance is there for the float representation only');
+	}
+
+	/**
+	 * An invoice the import could not reproduce is not one to approve: approving it commits to paying
+	 * a figure the vendor did not bill. Refusing it stays offered - that is the answer it deserves.
+	 *
+	 * @return void
+	 */
+	public function testAnInvoiceThatDoesNotTotalItsDocumentCannotBeApproved()
+	{
+		global $db;
+
+		$invoice = $this->createSpecimenSupplierInvoice();
+		$this->addEInvoicingDocument($invoice->id);
+
+		$einvoicing = new EInvoicing($db);
+		$offered = array_map('intval', array_keys($einvoicing->getSendableStatusesForReceivedInvoice($invoice->id, 'invoice_supplier')));
+		$this->assertContains(EInvoicing::STATUS_APPROVED, $offered, 'nothing blocks an invoice that totals its document');
+
+		SupplierInvoiceHelper::flagTotalsMismatch((int) $invoice->id, 30.00, 130.00);
+
+		$offered = array_map('intval', array_keys($einvoicing->getSendableStatusesForReceivedInvoice($invoice->id, 'invoice_supplier')));
+		$this->assertNotContains(EInvoicing::STATUS_APPROVED, $offered, 'an invoice that does not total its document cannot be approved');
+		$this->assertNotContains(EInvoicing::STATUS_PARTIALLY_APPROVED, $offered, 'nor partially approved, which accepts it too');
+		$this->assertContains(EInvoicing::STATUS_REFUSED, $offered, 'refusing the document is what is left to do');
+
+		SupplierInvoiceHelper::clearTotalsMismatch((int) $invoice->id);
+	}
+
+	/**
 	 * The rule of issue #594: an invoice we refused is cancelled and owes nothing, so the credit note
 	 * the vendor issues to close the matter cannot be accepted in its turn.
 	 *

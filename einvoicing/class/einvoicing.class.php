@@ -522,6 +522,13 @@ class EInvoicing
 	];
 
 	/**
+	 * Name, into llx_einvoicing_extrafields, of the mark left on a supplier invoice the import could
+	 * not make total what the received document announces. Holds the announced BT-110 and BT-112, so
+	 * the block it carries can be lifted the moment the invoice totals them (issue #861).
+	 */
+	const EXTRAFIELD_TOTALS_MISMATCH = 'import_totals_mismatch';
+
+	/**
 	 * Name, into llx_einvoicing_extrafields, of the order reference the supplier declared on the
 	 * invoice it sent (BT-13). Kept whether or not it matched a purchase order of Dolibarr.
 	 */
@@ -1049,6 +1056,15 @@ class EInvoicing
 			dol_include_once('einvoicing/class/utils/SupplierInvoiceHelper.class.php');
 			dol_include_once('fourn/class/fournisseur.facture.class.php');
 			if (SupplierInvoiceHelper::refusedSourceOfCreditNote((int) $elementId) > 0) {
+				foreach (self::STATUSES_ACCEPTING_A_DOCUMENT as $code) {
+					unset($statuses[$code]);
+				}
+			}
+
+			// An invoice the import could not make total what the document announces is not one to
+			// approve: approving it commits to paying a figure the vendor did not bill (issue #861).
+			// Refusing it stays offered, which is the answer such a document deserves.
+			if (SupplierInvoiceHelper::totalsMismatchBlocks((int) $elementId)) {
 				foreach (self::STATUSES_ACCEPTING_A_DOCUMENT as $code) {
 					unset($statuses[$code]);
 				}
