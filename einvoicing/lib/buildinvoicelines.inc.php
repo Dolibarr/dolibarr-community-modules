@@ -925,10 +925,14 @@ $invoiceData = [
 	'isTestDocument'       => !empty($object->specimen),
 
 	// Notes
+	// BR-FR-05 makes the three notes below mandatory and BR-FR-06 fixes what each subject code carries:
+	// PMT the fixed recovery indemnity, PMD the late payment penalties, AAB the early payment discount.
+	// The fallbacks reproduce the wording of the XP Z12-012 annex B examples, because the penalties and the
+	// EUR 40 indemnity are owed by operation of law (art. L.441-10 and D.441-5 C. com.): they cannot be none.
 	'documentNotePublic'   => $object->note_public ?: "",
-	'documentNotePMT'      => getDolGlobalString('EINVOICING_PMT') ?: $outputlangs->transnoentities("NoInvoiceCollectionFees"),
-	'documentNotePMD'      => getDolGlobalString('EINVOICING_PMD') ?: $outputlangs->transnoentities('NoLatePaymentFees'),
-	'documentNoteAAB'      => getDolGlobalString('EINVOICING_AAB') ?: $outputlangs->transnoentities('NoEarlyPaymentDiscount'),
+	'documentNotePMT'      => getDolGlobalString('EINVOICING_PMT') ?: $outputlangs->transnoentities('RecoveryFeesMention'),
+	'documentNotePMD'      => getDolGlobalString('EINVOICING_PMD') ?: $outputlangs->transnoentities('LatePaymentPenaltiesMention'),
+	'documentNoteAAB'      => getDolGlobalString('EINVOICING_AAB') ?: $outputlangs->transnoentities('EarlyPaymentDiscountMention'),
 	// Legal mention that goes with the "TVA d'après les débits" option, mandatory on the invoices of a
 	// seller who took it. The structured form of the same information is the VAT point date code below.
 	'documentNoteTXD'      => $vatOnDebits ? $outputlangs->transnoentities('VATOnDebitsMention') : '',
