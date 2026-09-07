@@ -19,15 +19,15 @@
       <ram:Content>This is a comment (public)</ram:Content>
     </ram:IncludedNote>
     <ram:IncludedNote>
-      <ram:Content>No invoice collection fee</ram:Content>
+      <ram:Content>Fixed indemnity for recovery costs in the event of late payment: EUR 40.</ram:Content>
       <ram:SubjectCode>PMT</ram:SubjectCode>
     </ram:IncludedNote>
     <ram:IncludedNote>
-      <ram:Content>No late payment fees</ram:Content>
+      <ram:Content>Any late payment incurs a penalty payable from the due date, calculated at three times the statutory interest rate.</ram:Content>
       <ram:SubjectCode>PMD</ram:SubjectCode>
     </ram:IncludedNote>
     <ram:IncludedNote>
-      <ram:Content>No early payment discounts</ram:Content>
+      <ram:Content>Payments received before the due date do not give rise to any early payment discount.</ram:Content>
       <ram:SubjectCode>AAB</ram:SubjectCode>
     </ram:IncludedNote>
   </rsm:ExchangedDocument>
