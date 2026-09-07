@@ -535,8 +535,8 @@ class CdarHandler
 		}
 
 		// Unique per-call name so two concurrent status sends of the same condition cannot collide (#226).
-		$filename = $tempDir . '/cdar_' . $ProcessCondition . '_' . bin2hex(random_bytes(8)) . '.xml';
-		$filename = strtolower(dol_sanitizePathName(dol_string_unaccent($filename)));
+		$baseName = strtolower(dol_sanitizePathName(dol_string_unaccent('cdar_' . $ProcessCondition . '_' . bin2hex(random_bytes(8)) . '.xml')));
+		$filename = $tempDir . '/' . $baseName;
 
 		$result = $this->saveToFile($data, $filename);
 		if ($result === false) {

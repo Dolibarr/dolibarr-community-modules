@@ -1029,6 +1029,7 @@ class EInvoicing
 		$statuses = $this->getEinvoiceStatusOptions(1, 1, 1);
 		$approved = $this->hasSentStatusMessage($elementId, $elementType, self::STATUS_APPROVED, 1)
 			|| $this->hasSentStatusMessage($elementId, $elementType, self::STATUS_PARTIALLY_APPROVED, 1);
+		$refused = $this->hasSentStatusMessage($elementId, $elementType, self::STATUS_REFUSED, 1);
 		if ($approved) {
 			unset($statuses[self::STATUS_REFUSED]);
 		}
@@ -1038,10 +1039,9 @@ class EInvoicing
 			}
 		}
 
-		// The lifecycle runs in one direction: a received invoice is first answered - approved (205) or
-		// refused (210) - and only then paid, so "Payment transmitted" (211) is offered once that answer
-		// has been accepted by the platform, not while it is still pending or was rejected.
-		if (!$approved) {
+		// "Payment transmitted" (211) is offered only if the invoice has not been refused
+		// We can send "Payment transmitted" even if the invoice has not been approved, as long as it has not been refused
+		if ($refused) {
 			unset($statuses[self::STATUS_PAYMENT_SENT]);
 		}
 
