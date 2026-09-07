@@ -3430,9 +3430,9 @@ class CIIProtocol extends AbstractProtocol
 		// price of the Dolibarr line.
 		$priceWithoutDiscount = (float) $lineTotalAmount - $totalChargeAmount + $totalDiscountAmount;
 
-		// Base used for percent calculation — BT-137 when the document states it, the amount before
-		// discount otherwise (issue #783).
-		$base = $allowances[0]['basisAmount'] ?? $priceWithoutDiscount;
+		// Base for the percent — BT-137 if given, amount before discount otherwise (issue #783).
+		// A BasisAmount of 0 (some pivots emit it) counts as not given: ?? would keep the 0 and drop the discount.
+		$base = !empty($allowances[0]['basisAmount']) ? $allowances[0]['basisAmount'] : $priceWithoutDiscount;
 
 		if (!$base) {
 			return false;
