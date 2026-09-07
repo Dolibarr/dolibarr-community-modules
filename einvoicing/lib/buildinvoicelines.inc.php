@@ -134,6 +134,10 @@ $myGlobalIdProf    = idprof($mysoc);
 $mySchemeGlobalIdProf = $this->getIEC6523Code($mysoc->country_code, 1);
 $myUri             = $einvoicing->getSellerCommunicationURI(0);
 $mySchemeUri       = $this->getIEC6523Code($mysoc->country_code, 2);
+// BT-28, the trading name of the seller: "a name by which the seller is known, other than the
+// seller name". The company setup of the core has no such field, so there is nothing to declare
+// here and the term is left out of the document (issue #847).
+$sellerTradingName = trim((string) ($mysoc->name_alias ?? ''));
 
 // Buyer party resolution.
 // The external BILLING contact always fills the buyer contact group (BG-9). Whether it also *replaces*
@@ -192,6 +196,13 @@ if (!empty($billingContactIds) && $object->fetch_contact($billingContactIds[0]) 
 // Buyer identifiers (resolved buyer party: invoice thirdparty or billing-contact recipient)
 if (!($buyerParty instanceof Societe)) {
 	throw new \RuntimeException('einvoicing: invoice thirdparty is not a valid Societe (invoice id=' . $object->id . ')');
+}
+// BT-45, the trading name of the buyer: Dolibarr keeps it on the third party as name_alias,
+// labelled "Alias name (commercial, trademark, ...)". A term that only repeats the name of the
+// party says nothing, and the norm asks for it only when it differs (issue #847).
+$buyerTradingName  = trim((string) $buyerParty->name_alias);
+if ($buyerTradingName === trim((string) $buyerName)) {
+	$buyerTradingName = '';
 }
 $idprof            = idprof($buyerParty) ?? '';
 $schemeIdProf      = $this->getIEC6523Code($buyerParty->country_code);
@@ -972,7 +983,7 @@ $invoiceData = [
 
 	'sellerLegalOrgId'          => $myidprof,
 	'sellerLegalOrgScheme'      => $mySchemeIdProf,
-	'sellerTradingName'         => $mysoc->name ?? 'SPECIMEN',
+	'sellerTradingName'         => $sellerTradingName,
 
 	// Buyer part
 	'buyername'                 =>  $buyerName ?: 'CUSTOMER',
@@ -992,7 +1003,7 @@ $invoiceData = [
 
 	'buyerLegalOrgId'           => $idprof,
 	'buyerLegalOrgScheme'       => $schemeIdProf,
-	'buyerTradingName'          => $buyerName,
+	'buyerTradingName'          => $buyerTradingName,
 
 	'buyerReference'            => $buyerReference,
 
