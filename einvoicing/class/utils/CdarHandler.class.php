@@ -578,7 +578,9 @@ class CdarHandler
 				'TypeCode' => 'MPA',
 				'ValueAmount' => number_format($paidAmount, 2, '.', ''),
 				'CurrencyID' => $conf->currency,
-				'ValueDateTime' => dol_print_date($paidDate, '%Y%m%d')
+				// 'tzserver' like the other dates read from the invoice, and not the 'auto' default:
+				// the day the payment was made must not follow the timezone of whoever sends the status.
+				'ValueDateTime' => dol_print_date($paidDate, '%Y%m%d', 'tzserver')
 			)
 		);
 	}

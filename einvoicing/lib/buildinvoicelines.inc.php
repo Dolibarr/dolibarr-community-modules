@@ -317,7 +317,7 @@ if ($object->type == $object::TYPE_CREDIT_NOTE) {
 if ($refDocTypeCode !== '' && !empty($object->fk_facture_source)) {
 	$sourceFact = new Facture($this->db);
 	if ($sourceFact->fetch($object->fk_facture_source) > 0) {
-		$sourceFactDate = new DateTime(dol_print_date($sourceFact->date, 'dayrfc'));
+		$sourceFactDate = new DateTime(dol_print_date($sourceFact->date, 'dayrfc', 'tzserver'));
 		$invoiceRefDocs[] = [
 			'ref' => $sourceFact->ref,
 			'date' => $sourceFactDate,
@@ -327,7 +327,7 @@ if ($refDocTypeCode !== '' && !empty($object->fk_facture_source)) {
 	} else {
 		if ($object->id == 0) { // Specimen case.
 			$specimenRefDoc = $object->fk_facture_source ?? 'FA0000-SPECIMEN';
-			$sourceFactDate = new DateTime(dol_print_date(dol_now() - 100, 'dayrfc'));
+			$sourceFactDate = new DateTime(dol_print_date(dol_now() - 100, 'dayrfc', 'tzserver'));
 			$invoiceRefDocs[] = [
 				'ref' => $specimenRefDoc,
 				'date' => $sourceFactDate,
@@ -351,7 +351,7 @@ if ($object->type == $object::TYPE_SITUATION && !empty($object->situation_counte
 		$prevSituation = end($object->tab_previous_situation_invoice);
 		reset($object->tab_previous_situation_invoice);
 		if ($prevSituation && !empty($prevSituation->ref)) {
-			$prevSituationDate = new DateTime(dol_print_date($prevSituation->date, 'dayrfc'));
+			$prevSituationDate = new DateTime(dol_print_date($prevSituation->date, 'dayrfc', 'tzserver'));
 			$invoiceRefDocs[] = [
 				'ref'  => $prevSituation->ref,
 				'date' => $prevSituationDate,
@@ -455,7 +455,7 @@ foreach ($object->lines as $line) {
 			dol_syslog("Fetch origFact " . $discount->fk_facture_source . ", res=" . $resOrigFact, LOG_DEBUG);
 			if ($resOrigFact > 0) {
 				$depositFactRef  = $origFact->ref;
-				$depositFactDate = new DateTime(dol_print_date($origFact->date, 'dayrfc'));
+				$depositFactDate = new DateTime(dol_print_date($origFact->date, 'dayrfc', 'tzserver'));
 			}
 		}
 		$line->qty      = -$line->qty;				// For a deposit, ->qty should be -1.
@@ -833,7 +833,7 @@ if ($object->element == 'facture' || $object->element == 'invoice') {
 			if ($sourceDiscountFact->fetch($obj->fk_facture_source) > 0) {
 				$invoiceRefDocs[] = [
 					'ref' => $sourceDiscountFact->ref,															// BT-25
-					'date' => new DateTime(dol_print_date($sourceDiscountFact->date, 'dayrfc')),					// BT-26
+					'date' => new DateTime(dol_print_date($sourceDiscountFact->date, 'dayrfc', 'tzserver')),					// BT-26
 					'type' => $refDocTypeByInvoiceType[(int) $obj->sourcetype]
 				];
 				dol_syslog("EInvoicing invoice " . $object->id . " refers to " . $sourceDiscountFact->ref
@@ -883,9 +883,12 @@ $invoicingPeriodStart = $invoicingPeriod['start'] !== null ? $this->_tsToDateTim
 $invoicingPeriodEnd = $invoicingPeriod['end'] !== null ? $this->_tsToDateTime($invoicingPeriod['end']) : null;
 
 // Delivery date
+// $deliveryDateList already holds 'Y-m-d' days: handing one to dol_print_date(), which expects a
+// timestamp, reached a deprecated branch of the core that reads it back as midnight UTC, so BT-72
+// was emitted one day early on a server west of UTC (issue #853 on the sending side).
 $deliveryDate = !empty($deliveryDateList)
-	? new DateTime(dol_print_date($deliveryDateList[0], 'dayrfc'))
-	: new DateTime(dol_print_date($object->date, 'dayrfc'));
+	? new DateTime($deliveryDateList[0])
+	: new DateTime(dol_print_date($object->date, 'dayrfc', 'tzserver'));
 
 
 
@@ -906,7 +909,7 @@ $invoiceData = [
 	// Document part
 	'documentno'           => $object->ref,												// BT-25
 	'documenttypecode'     => $this->_getTypeOfInvoice($object),						// BT-3 Set the type of invoice (standard, deposit, credit note)
-	'documentdate'         => new DateTime(dol_print_date($object->date, 'dayrfc')),	// BT-26
+	'documentdate'         => new DateTime(dol_print_date($object->date, 'dayrfc', 'tzserver')),	// BT-26
 	'invoiceCurrency'      => $object->multicurrency_code,
 	'taxCurrency'          => null,
 	'documentname'         => null,
@@ -1022,7 +1025,7 @@ $invoiceData = [
 	'accountRef'                => $account->ref,
 	'accountLabel'              => $account->label,
 
-	'paymentDueDate'            => new DateTime(dol_print_date($object->date_lim_reglement, 'dayrfc')),
+	'paymentDueDate'            => new DateTime(dol_print_date($object->date_lim_reglement, 'dayrfc', 'tzserver')),
 	'paymentTermsText'          => $langs->transnoentitiesnoconv("PaymentConditions") . ": " . $langs->transnoentitiesnoconv("PaymentCondition" . $object->cond_reglement_code),
 
 	// Allowances / charges part

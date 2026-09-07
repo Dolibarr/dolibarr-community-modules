@@ -300,4 +300,32 @@ class CdarDateFormatTest extends CommonClassTest
 			$this->assertSame($input, CdarHandler::formatDate($input), 'formatDate() no longer passes "' . $input . '" through');
 		}
 	}
+
+	/**
+	 * The payment date of the MPA block was the one date of the file left on the 'auto' default of
+	 * dol_print_date(): it followed the timezone of the session as soon as MAIN_TZUSERINPUTKEY was
+	 * 'tzuserrel', where the day the payment was made must not.
+	 *
+	 * @return void
+	 */
+	public function testThePaymentDateDoesNotFollowTheSession()
+	{
+		global $conf;
+
+		$handler = new CdarHandler($GLOBALS['db']);
+		$conf->tzuserinputkey = 'tzuserrel';
+
+		foreach ($this->timezones() as $tz) {
+			date_default_timezone_set($tz);
+
+			// The epoch is left out: the method reads an empty date as "no date given" and stamps dol_now().
+			foreach (array_filter($this->timestamps()) as $ts) {
+				$_SESSION['dol_tz_string'] = 'Pacific/Kiritimati';	// UTC+14, a day ahead of most of the map
+
+				$mpa = $handler->getPaymentSentCharacteristics(new stdClass(), array('amount' => 12.0, 'date' => $ts));
+
+				$this->assertSame(date('Ymd', $ts), $mpa[0]['ValueDateTime'], 'Payment date changed for timestamp ' . $ts . ' in ' . $tz);
+			}
+		}
+	}
 }
