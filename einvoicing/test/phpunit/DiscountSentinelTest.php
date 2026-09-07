@@ -75,6 +75,23 @@ class DiscountSentinelTest extends CommonClassTest
 	}
 
 	/**
+	 * A line of the invoice, reduced to the two fields the resolution reads on it: the description it
+	 * carries, and the discount it points at - 0 for a line that points at none.
+	 *
+	 * @param	string	$desc				->desc, the description the core stores on the line
+	 * @param	int		$fk_remise_except	->fk_remise_except, the discount behind the line
+	 * @return	stdClass
+	 */
+	private function line($desc, $fk_remise_except)
+	{
+		$line = new stdClass();
+		$line->desc = $desc;
+		$line->fk_remise_except = $fk_remise_except;
+
+		return $line;
+	}
+
+	/**
 	 * A discount object that was never fetched: nothing to read on it, which is what a deleted or
 	 * unreadable source piece leaves behind.
 	 *
@@ -244,5 +261,36 @@ class DiscountSentinelTest extends CommonClassTest
 
 		$this->assertNotSame($withoutDate, $withDate);
 		$this->assertStringStartsWith($withoutDate, $withDate);
+	}
+
+	/**
+	 * A line an operator named after a sentinel, carrying no discount, keeps the name it was given.
+	 *
+	 * This is the half of the test of the core that lives on the line and not on the description: a
+	 * line of work can be named '(DEPOSIT)' and point at nothing, and the resolution has no business
+	 * renaming it. It used to go out as 'Down payment deducted', under the wording meant for a
+	 * discount whose source piece cannot be read - which says something false about a line that
+	 * deducts nothing at all.
+	 *
+	 * @return void
+	 */
+	public function testASentinelNameOnALineWithNoDiscountIsLeftAlone()
+	{
+		global $langs;
+
+		foreach (array_keys(einvoicingDiscountSentinels()) as $sentinel) {
+			$this->assertSame('', einvoicingDiscountLabelOfLine($this->line($sentinel, 0), null, $langs));
+		}
+
+		// And the line that does carry a discount is still resolved, sentinel by sentinel.
+		foreach (array_keys(einvoicingDiscountSentinels()) as $sentinel) {
+			$label = einvoicingDiscountLabelOfLine($this->line($sentinel, 24), $this->discount(), $langs);
+
+			$this->assertNotSame('', $label);
+			$this->assertStringNotContainsString($sentinel, $label);
+		}
+
+		// A line of work quoting a sentinel inside a sentence is untouched either way, discount or not.
+		$this->assertSame('', einvoicingDiscountLabelOfLine($this->line('Reprise (DEPOSIT) du chantier', 24), $this->discount(), $langs));
 	}
 }

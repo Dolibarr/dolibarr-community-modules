@@ -561,7 +561,10 @@ foreach ($object->lines as $line) {
 	// A discount line still standing at this point is a deposit deducted from the invoice, and its
 	// description is the sentinel the core stores, not a text meant to be read. Left as it is, the
 	// customer reads '(DEPOSIT)' as the name of the line (BT-153).
-	$discountLabel = einvoicingDiscountLabel($lineDiscount, $line->desc ?? '', $outputlangs, einvoicingDiscountRelatedInvoiceRef($lineDiscount, $this->db));
+	// The line has to carry a discount for that to hold, which is why the resolution goes through
+	// einvoicingDiscountLabelOfLine(): a line of work an operator named '(DEPOSIT)', pointing at no
+	// discount, is legitimate text and keeps the name it was given.
+	$discountLabel = einvoicingDiscountLabelOfLine($line, $lineDiscount, $outputlangs, einvoicingDiscountRelatedInvoiceRef($lineDiscount, $this->db));
 	if ($discountLabel !== '') {
 		$libelle     = $discountLabel;
 		$description = "";

@@ -1154,6 +1154,36 @@ function einvoicingDiscountLabel($discount, $description, $outputlangs, $related
 }
 
 /**
+ * Text a discount line of the invoice stands for, '' when the line carries no discount at all.
+ *
+ * einvoicingDiscountLabel() decides on the description alone, which is what a document level
+ * allowance needs: there, the caller has already established that a discount is behind the amount.
+ * A line of the invoice has not, and the description alone cannot tell - a line of work can be named
+ * '(DEPOSIT)' and carry nothing, and it was then renamed 'Down payment deducted' on its way out,
+ * under the wording meant for a discount whose source piece cannot be read, which is a different
+ * situation entirely.
+ *
+ * The test of the core is in two halves, the description AND the discount the line points at
+ * (pdf_getlinedesc(): $desc == '(DEPOSIT)' && $object->lines[$i]->fk_remise_except). This is where
+ * the second half is made, so that the two call sites read the line the same way: the one writing
+ * BT-97 already stands inside a test on fk_remise_except, the one writing BT-153 does not.
+ *
+ * @param	?object				$line				Line of the invoice being written
+ * @param	?DiscountAbsolute	$discount			Discount the line was built from, already fetched
+ * @param	Translate			$outputlangs		Language of the document being built
+ * @param	string				$relatedInvoiceRef	Invoice the deducted piece corrects, from einvoicingDiscountRelatedInvoiceRef()
+ * @return	string									Resolved text, '' when the line is no discount line
+ */
+function einvoicingDiscountLabelOfLine($line, $discount, $outputlangs, $relatedInvoiceRef = '')
+{
+	if (empty($line) || empty($line->fk_remise_except)) {
+		return '';
+	}
+
+	return einvoicingDiscountLabel($discount, $line->desc ?? '', $outputlangs, $relatedInvoiceRef);
+}
+
+/**
  * Reference of the invoice the piece behind a discount corrects, '' when there is none to name.
  *
  * A credit note converted into a discount names the invoice it corrects in its own fk_facture_source,
