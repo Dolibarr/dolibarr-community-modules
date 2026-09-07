@@ -143,7 +143,10 @@ class CdarDateFormatTest extends CommonClassTest
 		$conf->tzuserinputkey = $this->savtzuserinputkey;
 		if ($this->savsessiontzset) {
 			$_SESSION['dol_tz_string'] = $this->savsessiontz;
-		} else {
+		} elseif (isset($_SESSION)) {
+			// A CLI run starts no session, so $_SESSION does not exist until a test writes into it.
+			// unset() of a key of a variable that does not exist warns on PHP 8.0, the version the
+			// suite runs Dolibarr 19 on, and PHPUnit turns that warning into a failure.
 			unset($_SESSION['dol_tz_string']);
 		}
 
