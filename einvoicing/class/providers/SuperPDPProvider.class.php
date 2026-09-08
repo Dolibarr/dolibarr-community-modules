@@ -116,8 +116,12 @@ class SuperPDPProvider extends AbstractPDPProvider
 		// The step above describes a creation; an account that already has an application only needs the format changed
 		$this->helpToGetCredentials .= '<div class="margintoponly">' . $langs->trans("EINVOICING_SUPERPDP_HELP_CREDENTIAL3B") . '</div>';
 		$this->helpToGetCredentials .= '<div class="margintoponly">' . $langs->trans("EINVOICING_SUPERPDP_HELP_CREDENTIAL4", '{s3}', '{s4}', '{s5}', '{s6}') . '</div>';
+
 		// Stated apart from the steps: this one setting decides whether received invoices can be read at all
-		$this->helpToGetCredentials .= '<div class="margintoponly warning">' . img_picto('', 'warning') . ' ' . $langs->trans("EINVOICING_SUPERPDP_HELP_CREDENTIAL_CONVERSION") . '</div>';
+		// We do not show warning when there may be no need. Warning will be shown at running if we detect a wrong setup
+		//if (getDolGlobalString('EINVOICING_PROTOCOL') != 'CII') {
+		//	$this->helpToGetCredentials .= '<div class="margintoponly warning">' . img_picto('', 'warning') . ' ' . $langs->trans("EINVOICING_SUPERPDP_HELP_CREDENTIAL_CONVERSION") . '</div>';
+		//}
 
 		if (getDolGlobalString('EINVOICING_PDP') == 'SUPERPDPViaPartner') {
 			$this->helpToGetCredentials = '<div class="">' . $langs->trans("EINVOICING_SUPERPDP_HELP_CREDENTIAL_VIA_PARTNER", '{s1}') . '</div>';
