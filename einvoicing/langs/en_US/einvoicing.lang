@@ -413,6 +413,7 @@ EInvoicingLineCharge=Line charge
 EInvoicingLineChargeOfLine=charge of line %s
 AccessPointConversionFormatNotSet=Your Access Point reports that no conversion format is configured for this client.
 SetTheAccessPointConversionFormat=On your Access Point account, set the preferred conversion format to a syntax supported here (CII or Factur-X, not UBL): it decides in which syntax a received invoice is handed over to this module.
+ReceivedFormatNeedsNewerPhp=An invoice was received in the %s format, which needs PHP %s or higher to be read, while this server runs PHP %s. Either set the preferred conversion format of your Access Point account to CII, so received invoices are handed over in a syntax this PHP can read, or upgrade PHP on this server. Nothing is lost: the flow is kept and a later synchronization imports it once one of the two is done.
 DisabledInProductionMode=Disabled in production mode.
 ConnectTo=Connect
 UnknownVATEX1=Unknown exempting VAT reason for the line %s that has the VAT rate %s and VAT code '%s'.

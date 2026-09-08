@@ -2354,12 +2354,19 @@ class SuperPDPProvider extends AbstractPDPProvider
 					if ($importable['client_not_configured']) {
 						$action = $langs->trans('AccessPointConversionFormatNotSet') . ' ' . $action;
 					}
+					$actioncode = 'CONVERSION_FORMAT_NOT_SUPPORTED';
+					if (!empty($importable['php_too_old_for'])) {
+						// Nothing is wrong with the document nor with the account: this PHP cannot read that
+						// syntax. Both ways out are the user's to choose, so name them instead of picking one.
+						$actioncode = 'FORMAT_NEEDS_NEWER_PHP';
+						$action = $langs->trans('ReceivedFormatNeedsNewerPhp', $importable['php_too_old_for'], ProtocolManager::getProtocolPhpMin($importable['php_too_old_for']), PHP_VERSION);
+					}
 
 					return array(
 						'res' => -1,
 						'postponeflow' => 1,
 						'message' => $errorcode . " No document this module can read for SupplierInvoice flow (flowId: " . $flowId . ") - " . implode(' | ', $importable['attempts']),
-						'actioncode' => 'CONVERSION_FORMAT_NOT_SUPPORTED',
+						'actioncode' => $actioncode,
 						'actionurl' => '',
 						'action' => $action,
 						'actiondata' => array()

@@ -37,6 +37,10 @@ class ProtocolManager
 	const EXCEPTION_UNSUPPORTED_FORMAT = -100;
 	const EXCEPTION_UNKNOWN_FORMAT = -101;
 
+	// Factur-X is read and written by horstoeko/zugferd, whose vendor tree refuses to load below this
+	// version with a fatal error raised by vendor/composer/platform_check.php, not with a message.
+	const PHP_MIN_FACTURX = '7.3';
+
 	/**
 	 * Initialize available protocols.
 	 * @param DoliDB $db db
@@ -60,7 +64,7 @@ class ProtocolManager
 				'protocol_label' => 'Factur-X',
 				'description' => 'Factur-X is a French-German hybrid e-invoicing format combining a readable PDF invoice with embedded XML data for seamless automated processing.',
 				'is_enabled' => $facturexIsOk,
-				'is_greyed' => (version_compare(PHP_VERSION, '7.3.0') < 0) ? 'PHP 7.3+' : ''
+				'is_greyed' => self::isProtocolRunnableOnThisPhp('FACTURX') ? '' : 'PHP '.self::PHP_MIN_FACTURX.'+'
 				//'protocol_dol_min' => '24.0'	//experience a lot of trouble with autoload/tcpdf lib conflict and more with < 24.0. Use is possible but must be SERIOUSLY discouraged.
 			),
 			'UBL' => array(
@@ -69,6 +73,30 @@ class ProtocolManager
 				'is_enabled' => $ublIsOk
 			)
 		);
+	}
+
+	/**
+	 * PHP version a protocol needs on top of the one Dolibarr itself requires.
+	 *
+	 * @param	string	$name	Protocol name ('FACTURX', 'CII', 'UBL')
+	 * @return	string			Minimum PHP version, '' when the protocol asks for nothing of its own
+	 */
+	public static function getProtocolPhpMin($name)
+	{
+		return (strtoupper(str_replace('-', '', (string) $name)) == 'FACTURX') ? self::PHP_MIN_FACTURX : '';
+	}
+
+	/**
+	 * Whether the PHP running here can load the libraries a protocol needs.
+	 *
+	 * @param	string	$name	Protocol name ('FACTURX', 'CII', 'UBL')
+	 * @return	bool			True when the protocol can be used on this server
+	 */
+	public static function isProtocolRunnableOnThisPhp($name)
+	{
+		$phpmin = self::getProtocolPhpMin($name);
+
+		return ($phpmin === '' || version_compare(PHP_VERSION, $phpmin) >= 0);
 	}
 
 	/**
@@ -124,6 +152,14 @@ class ProtocolManager
 	{
 		// Check if protocol exists and is enabled in protocolsList
 		if (!isset($this->protocolsList[$name]) || !$this->protocolsList[$name]['is_enabled']) {
+			return null;
+		}
+
+		// A protocol whose libraries cannot run on this PHP is not available here. Answering null keeps
+		// the caller on the path it already has for an unsupported syntax, where including the class
+		// would raise a fatal error from the autoloader of the library.
+		if (!self::isProtocolRunnableOnThisPhp($name)) {
+			dol_syslog(__METHOD__." ".$name." needs PHP ".self::getProtocolPhpMin($name).", this server runs ".PHP_VERSION, LOG_WARNING, 0, "_einvoicing");
 			return null;
 		}
 

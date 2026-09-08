@@ -1023,7 +1023,8 @@ if ($action == 'confirm_sync' && getDolGlobalString('EINVOICING_PDP') && $confir
 		} else {
 			if ((is_null($sync_result['totalFlows']) || $sync_result['totalFlows'] > $sync_result['batchlimit'])
 				&& empty($sync_result['syncedFlows'])
-				&& !empty($sync_result['alreadyExist'])) {
+				&& !empty($sync_result['alreadyExist'])
+				&& empty($sync_result['actions'])) {		// the run already says why nothing came in
 				if (empty($sync_result['batchlimit']) || ($sync_result['batchlimit'] <= $sync_result['alreadyExist'])) {
 					$cssclass = 'warning';
 					$sync_result['actions']['LIMIT_TOO_LOW'] = array('action' => $langs->trans("TryToIncreaseStartDateOrMax", $langs->transnoentitiesnoconv("maxNumberToProcess")));

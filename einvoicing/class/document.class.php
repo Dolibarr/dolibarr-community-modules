@@ -1660,6 +1660,9 @@ class Document extends CommonObject
 			throw new Exception(__METHOD__ . " : protocol not detected for XML data");
 		}
 		$protocol = $protocolManager->getProtocol($detectedProtocolName);
+		if (!is_object($protocol)) {
+			throw new Exception(__METHOD__ . " : protocol " . $detectedProtocolName . " is not available on this server");
+		}
 		$protocolClassName = get_class($protocol);
 
 		$cleanedXmlData = $protocolClassName::removeAttachmentFromXml($xmlData);

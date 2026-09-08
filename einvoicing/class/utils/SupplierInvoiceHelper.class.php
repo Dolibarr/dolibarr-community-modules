@@ -84,6 +84,9 @@ class SupplierInvoiceHelper
 			return false;
 		}
 		$protocol = $protocolManager->getProtocol($detectedProtocolName);
+		if (!is_object($protocol)) {
+			return false;
+		}
 
 		// Extract XML header data
 		$parsedHeader = $protocol->parseInvoiceHeader($xmlData);

@@ -455,7 +455,7 @@ abstract class AbstractPDPProvider
 	 *
 	 * @param	string			$flowId				Identifier of the flow to read
 	 * @param	ProtocolManager	$protocolManager	Protocol factory used to recognize the documents
-	 * @return	array{file:?string,protocol:?AbstractProtocol,protocol_name:string,doc_type:string,fetched:int,attempts:string[],client_not_configured:bool}	The importable document, or a null protocol and the reason each shape was rejected
+	 * @return	array{file:?string,protocol:?AbstractProtocol,protocol_name:string,doc_type:string,fetched:int,attempts:string[],client_not_configured:bool,php_too_old_for:string}	The importable document, or a null protocol and the reason each shape was rejected
 	 */
 	protected function fetchImportableFlowDocument($flowId, $protocolManager)
 	{
@@ -466,7 +466,8 @@ abstract class AbstractPDPProvider
 			'doc_type' => '',
 			'fetched' => 0,				// nb of documents the access point did return, whatever their syntax
 			'attempts' => array(),
-			'client_not_configured' => false
+			'client_not_configured' => false,
+			'php_too_old_for' => ''		// label of a syntax this module reads, but not on the PHP running here
 		);
 
 		// EINVOICING_PREFER_ORIGINAL: fetch the issuer's Original document (its Factur-X, which carries
@@ -497,7 +498,15 @@ abstract class AbstractPDPProvider
 
 			$protocol = $protocolManager->getProtocol($protocolName);
 			if (empty($protocol)) {
-				$result['attempts'][] = $docType . ": " . $protocolName . " is not supported";
+				if (!ProtocolManager::isProtocolRunnableOnThisPhp($protocolName)) {
+					// The syntax is one this module reads, the PHP of this server is what stands in the
+					// way. Kept apart from a plain "not supported", because what to do about it differs.
+					$protocolsList = $protocolManager->getProtocolsList();
+					$result['php_too_old_for'] = isset($protocolsList[$protocolName]['protocol_label']) ? $protocolsList[$protocolName]['protocol_label'] : $protocolName;
+					$result['attempts'][] = $docType . ": " . $protocolName . " needs PHP " . ProtocolManager::getProtocolPhpMin($protocolName) . ", this server runs " . PHP_VERSION;
+				} else {
+					$result['attempts'][] = $docType . ": " . $protocolName . " is not supported";
+				}
 				continue;
 			}
 
