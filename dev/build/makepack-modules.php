@@ -564,6 +564,7 @@ function buildModulePackages($action, $modulename)
 
 	print "\n";
 
+	$lastmessagetoshow = "";
 
 	// For each module, we generate the zip file
 	foreach ($projects as $project) {
@@ -623,9 +624,8 @@ function buildModulePackages($action, $modulename)
 					$returnCode = 0;
 					$repo = $directoryToSearch . DIRECTORY_SEPARATOR . $project;
 					$command = sprintf('git -C %s tag %s 2>&1', escapeshellarg($repo), escapeshellarg($tag));
-					print "\n";
-					print "YOU MUST CHECK THAT ALL FILES ARE COMMITTED AND CREATE A TAG WITH COMMAND:\n";
-					print $command."\n";
+					$lastmessagetoshow .= "YOU MUST COMMIT ALL FILES (INCLUDING THE ZIP) AND CREATE A TAG WITH COMMAND:\n";
+					$lastmessagetoshow .= $command."\n";
 					/*exec(
 						$command,
 						$output,
@@ -670,6 +670,7 @@ function buildModulePackages($action, $modulename)
 		}
 
 		// TODO dir to exclude to store somewhere
+		print "Exclude some directories not useful.\n";
 		$dirsToExclude = array(
 			'einvoicing/vendor/horstoeko/zugferd/tests',
 			'einvoicing/vendor/horstoeko/zugferd/examples'
@@ -713,6 +714,9 @@ function buildModulePackages($action, $modulename)
 			print "\n";
 		}
 	}
+
+	print "\n";
+	print $lastmessagetoshow."\n";
 }
 
 /**
