@@ -47,7 +47,7 @@ class PDPProviderManager
 	{
 		// Access point declaration
 		// You can enter entry for a new access point here.
-		global $langs, $mysoc;
+		global $langs;
 		global $dolibarr_main_url_root;
 
 		$this->db = $db;
@@ -89,19 +89,18 @@ class PDPProviderManager
 			)
 		);
 
-		// An implementation that only generate documents (no network access). It talks to no platform. This can be used by some countries like Germany or user that push files to a platform manually.
-		if ($mysoc->country_code != 'FR' || getDolGlobalString('EINVOICING_ALLOW_DEVTOOLS') || getDolGlobalString('EINVOICING_ONLY_GENERATE')) {
-			$this->providersList['TESTPDP'] = array(
-				'class' => 'TestPDPProvider',
-				'position' => 100,
-				'provider_countries' => array('all'),
-				'provider_name' => img_picto('', 'generic', 'style="width: 16px"').' None <span class="opacitymedium">(Einvoice generation only, no send/receive)</span>',
-				'description' => 'EInvoice generation only',
-				'is_enabled' => 1,
-				'prod_account_admin_url' => '',
-				'test_account_admin_url' => '',
-			);
-		}
+		// An implementation that only generates documents (no network access). It talks to no platform.
+		// Choosing it is what turns EINVOICING_ONLY_GENERATE on
+		$this->providersList['TESTPDP'] = array(
+			'class' => 'TestPDPProvider',
+			'position' => 100,
+			'provider_countries' => array('all'),
+			'provider_name' => img_picto('', 'generic', 'style="width: 16px"').' None <span class="opacitymedium">(Einvoice generation only, no send/receive)</span>',
+			'description' => 'EInvoice generation only',
+			'is_enabled' => 1,
+			'prod_account_admin_url' => '',
+			'test_account_admin_url' => '',
+		);
 
 		// Add entry to use SuperPDP via OAuth delegation.
 		if (getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER')) {
