@@ -1482,6 +1482,11 @@ class EInvoicing
 		// Title and subtotal lines are not concerned: they are pseudo-lines that never reach the
 		// document. A discount line is not concerned either, its name being built from the piece it
 		// deducts (see einvoicingDiscountLabel()).
+		//
+		// Customer invoices only, afterPDFCreation() gating on instanceof Facture: FactureFournisseurLigne
+		// fills ->description and not ->desc before 20.0, so extending this guard to supplier invoices
+		// needs a ?: $line->description or every free line of an 18.0/19.0 purchase invoice reads as
+		// having no name.
 		$linesWithNoName = [];
 		if (!empty($invoice->lines) && is_array($invoice->lines)) {
 			foreach ($invoice->lines as $line) {
