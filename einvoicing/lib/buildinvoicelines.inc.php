@@ -838,19 +838,22 @@ foreach ($linesData as $numligne => $vals) {
 	}
 }
 
+foreach ($globalDiscounts as $discountIndex => $vals) {
+	if (in_array((string) ($vals['reason'] ?? ''), $discountSentinels, true)) {
+		dol_syslog("EInvoicing: allowance ".$discountIndex." of ".$object->ref." carries the unresolved discount marker ".$vals['reason']." in BT-97. The discount source piece could not be read.", LOG_ERR);
+	}
+}
+
 // BR-25: a line with no name is not a document the platform accepts, so it is refused here rather than
 // after transmission, on a line number the seller would then have to go and find. Every such line is
 // named at once: sending them back one refusal at a time would be a round trip per line. This is the
 // same missing data the pre-check reports before validation (validateInvoiceConfiguration()); a
 // document reaching this point with one is one whose lines changed since, or one built by a path that
-// does not run the pre-check.
+// does not run the pre-check. Refused after both halves of the last look above, never between them: a
+// document carrying a nameless line and an unresolved marker in BT-97 would otherwise leave without the
+// marker ever being reported - the very case that last look exists to catch.
 if (!empty($linesWithNoName)) {
 	throw new Exception('MISSINGDATA[BR-25]: The line'.(count($linesWithNoName) > 1 ? 's ' : ' ').implode(', ', $linesWithNoName).' of '.$object->ref.' '.(count($linesWithNoName) > 1 ? 'have' : 'has').' no item name (BT-153). Enter a description on the line, or a label on the product it invoices.');
-}
-foreach ($globalDiscounts as $discountIndex => $vals) {
-	if (in_array((string) ($vals['reason'] ?? ''), $discountSentinels, true)) {
-		dol_syslog("EInvoicing: allowance ".$discountIndex." of ".$object->ref." carries the unresolved discount marker ".$vals['reason']." in BT-97. The discount source piece could not be read.", LOG_ERR);
-	}
 }
 
 // Rounding convention of the totals: Dolibarr sums the amounts already rounded on each line ("total of
