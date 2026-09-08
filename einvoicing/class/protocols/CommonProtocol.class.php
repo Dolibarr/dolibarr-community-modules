@@ -1083,18 +1083,22 @@ trait CommonProtocol
 		// Fall back on the canonical form of the reference, for the vendors that do not write it
 		// the same way on their orders and on their invoices. The exact lookup above stays first,
 		// so nothing changes for the vendors that already match, and its index is still used there.
-		$canonical = self::canonicalRef($lineData['prodsellerid'] ?? '');
-		if ($canonical !== '' && !empty($lineData['supplierId'])) {
-			$map = self::canonicalVendorRefMap($db, (int) $lineData['supplierId']);
-			if (isset($map[$canonical])) {
-				if ($map[$canonical] > 0) {
-					dol_syslog(__METHOD__ . ' Found product by prodsellerid on its canonical form: ' . $map[$canonical]);
-					return array('res' => $map[$canonical], 'message' => 'Product found by prodsellerid (canonical form)');
+		// Off by default: this comparison is an approximation, so it is a setup option the user
+		// turns on knowingly.
+		if (getDolGlobalInt('EINVOICING_PRODUCTS_MATCH_CANONICAL_REF')) {
+			$canonical = self::canonicalRef($lineData['prodsellerid'] ?? '');
+			if ($canonical !== '' && !empty($lineData['supplierId'])) {
+				$map = self::canonicalVendorRefMap($db, (int) $lineData['supplierId']);
+				if (isset($map[$canonical])) {
+					if ($map[$canonical] > 0) {
+						dol_syslog(__METHOD__ . ' Found product by prodsellerid on its canonical form: ' . $map[$canonical]);
+						return array('res' => $map[$canonical], 'message' => 'Product found by prodsellerid (canonical form)');
+					}
+					// Several products of this supplier share that canonical form. Nothing can be
+					// decided here, so the line goes to the manual mapping instead of being bound
+					// to whichever row came first.
+					dol_syslog(__METHOD__ . ' Ambiguous canonical vendor ref ' . $canonical . ', left to the manual mapping', LOG_WARNING);
 				}
-				// Several products of this supplier share that canonical form. Nothing can be
-				// decided here, so the line goes to the manual mapping instead of being bound
-				// to whichever row came first.
-				dol_syslog(__METHOD__ . ' Ambiguous canonical vendor ref ' . $canonical . ', left to the manual mapping', LOG_WARNING);
 			}
 		}
 
