@@ -1,10 +1,98 @@
 # CHANGELOG MODULE EINVOICING FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+
+
 ## 1.2.0
 
-NEW: When using SuperPDP, a PDF is also retreived in addition to the .xml einvoice file. 
-
-
+FIX: #853 [einvoicing] The dates of a received document keep the day they state
+FIX: [einvoicing] The CDAR date test errors on Dolibarr 19 since it landed on main
+FIX: [einvoicing] Enhance status handling
+QUAL: einvoicing: format the CDAR dates with the core date helpers
+FIX: #831 Default legal mentions asserted the opposite of the law
+FIX: XSS: escape received e-invoice fields shown in the sync results panel
+FIX: [einvoicing] Realign the compat copies on the core they backport
+FIX: #784 [einvoicing] The consistency check reads the document the invoice was imported from
+FIX: [einvoicing] Typos: sotorder in the list title hook, GETPOSt in the OAuth proxy callback
+FIX: #832: no lifecycle status offered on a flow the platform filed as B2B international
+FIX: [einvoicing] The module no longer shows a raw translation key
+NEW: #687 [einvoicing] The e-invoice XML can be read without downloading it
+QUAL: [einvoicing] Shorten the comment blocks written by the other contributors
+FIX: einvoicing: the prepaid amount follows what the core counts as paid
+QUAL: [einvoicing] Shorten the comment blocks of the module to the rule of AGENTS.md
+QUAL: einvoicing: regroup the phpunit files by the source file they test
+FIX: einvoicing: give imported supplier invoice lines a rank
+FIX: einvoicing: run every phpunit file of the module from AllTests
+DOC: einvoicing: function map of the outbound and inbound chains, generated from the sources
+NEW: [einvoicing] Export the selected flows or API calls for support
+QUAL: #794 [einvoicing] An import made again keeps the line of the flow, the number of the draft, and the statuses already received
+FIX: einvoicing: offer "Payment transmitted" only on an answered, payable invoice
+FIX: einvoicing: name the platform in the CDAR send failure message
+FIX: #806 [einvoicing] Write MDT-97 in the CDAR and stop relabelling the recipient address
+FIX: einvoicing: build the VAT number the way the core does
+FIX: einvoicing: strip the spaces of an identifier the same way everywhere
+FIX: einvoicing: look up the payment term in the entity of the invoice
+FIX: einvoicing: read the VAT dictionary in the entity of the seller
+QUAL: einvoicing: read the previous situation line through FactureLigne
+QUAL: einvoicing: handle temporary files with the core file helpers
+QUAL: einvoicing: read the invoice status from the object, not from its table
+QUAL: einvoicing: use the core getMultidirOutput() when the core has it
+QUAL: einvoicing: read the payment mode from the core dictionary helper
+FIX: einvoicing: accepting a received invoice validates it in Dolibarr
+FIX: einvoicing: the default product of a vendor cannot be removed (#791)
+FIX: #761 [einvoicing] A received document is judged on the invoice it carries, not on its envelope
+FIX: #783 [einvoicing] A discounted line of a received document is imported at the amount it announces
+FIX: [einvoicing] A mandatory extrafield on thirdparties no longer rejects received documents
+FIX: also check prodname for ref_fourn
+NEW: [einvoicing] Say on the synchronization list how to import a document again
+FIX: [einvoicing] Deleting a flow with no supplier invoice is no longer a fatal
+FIX: [einvoicing] A price stated per N units is not a price per unit
+NEW: [einvoicing] The CI runs the suite, opens the pages and installs the package, on a real Dolibarr
+FIX: #781 [einvoicing] A received invoice is recorded at the totals its document announces
+FIX: [einvoicing] The message about a missing linked document says which of the two is missing
+FIX: [einvoicing] Fatal error getCountry() undefined when auto-creating thirdparty in cron context
+NEW: [einvoicing] Run the EN 16931 and CTC-FR rules on the documents of the module in the CI
+QUAL: [einvoicing] The two not-for-prod options move to the Dev tools page
+NEW: [einvoicing] A lifecycle answer says which build wrote it
+FIX: [einvoicing] Say the CDAR temporary directory cannot be written, not that the file is missing
+FIX: #772 [einvoicing] A received line that subtracts from the invoice is no longer dropped
+FIX: [einvoicing] A control character in a description no longer makes the document unreadable
+FIX: #739 [einvoicing] A structured legal identifier attaches a received document to a third party, a name only on request
+FIX: #755 [einvoicing] A received e-invoice booked on the wrong third party can be recovered: delete the draft, import the document again
+QUAL: [einvoicing] The debug stamp names the commit, not only the version
+FIX: [einvoicing] Translation
+FIX: [einvoicing] Both providers read the shape of a received flow they can import, not only the Converted one
+FIX: [einvoicing] Say how to set the AFNOR conversion format on an existing SuperPDP application
+FIX: [einvoicing] A status refused on the electronic address (MDT-73) says which address, and what to fix
+FIX: #742 [einvoicing] A received Factur-X in the EXTENDED-CTC-FR profile can be imported again
+FIX: #739 [einvoicing] ref_ext is not an identity claim for the seller of a received document
+FIX: #739 [einvoicing] A received invoice stops landing on a thirdparty that only shares the email address
+FIX: [einvoicing] Declare the hook contexts the module really uses, not 'all'
+FIX: #680 [einvoicing] The join on einvoicing_routing stops repeating the thirdparties of the list
+FIX: #735 [einvoicing] An invoice line charge (BG-28) stops being lost and corrupting the discount of its line
+FIX: #731 [einvoicing] A document level charge (BG-21) of a received document stops leaving the total
+FIX: #726 [einvoicing] A received line with an amount but no quantity stops being imported as zero
+FIX: [einvoicing] Remove the unreachable shipping/delivery branch of _isLineFromExternalModule()
+NEW: Add 'Change entity' button on supplier invoice card (EINVOICING_ALLOW_MULTICOMPANY_INVOICE_MOVE)
+NEW: [einvoicing] The VAT category of a line is read from its VAT code (reverse charge, AE)
+FIX: [einvoicing] The three check endpoints stop building their provider list without $mysoc
+FIX: #720 [einvoicing] The directory check answers about the address the invoice is sent to
+FIX: [einvoicing] A header allowance no longer breaks the whole synchronization on Dolibarr 18 and 19
+FIX: #680 [einvoicing] The join on einvoicing_extlinks stops repeating the rows of a list
+FIX: #680 [einvoicing] Searching a routing identifier stops turning the list into an SQL error
+FIX: #680 [einvoicing] The tables joined into the lists of Dolibarr carry an index
+FIX: #704 [einvoicing] The registry check keeps quiet on the fields INSEE does not disclose
+FIX: #695 An ampersand in a text value empties the CII element that carries it
+FIX: #674 [einvoicing] A situation invoice states the instalment it asks for, not the cumulative amount
+FIX: #701 [einvoicing] A received e-invoice is written where the supplier invoice card reads it
+FIX: #698 [einvoicing] The directory badge says when its answer comes from the fallback endpoint
+FIX: do not forget $db in your object
+FIX: #683 [einvoicing] The deliver-to party names the company, and an address keeps its lines
+FIX: #685 [einvoicing] A deleted e-invoice stops being announced as ready to send
+NEW: #686 The generated XML names the module commit, not only its version
+FIX: use EINVOICING_FLOWS_SYNC_CALL_SIZE in cronSyncFlows
+FIX: #681 [einvoicing] Generating a Factur-X no longer breaks the next PDF of the request
+FIX: [einvoicing] Converting a deposit no longer raises six PHP warnings per VAT rate
+FIX: #675 [einvoicing] A received invoice referencing a missing one no longer stops the whole synchronization
 
 ## 1.1.0
 
