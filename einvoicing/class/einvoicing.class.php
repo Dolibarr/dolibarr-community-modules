@@ -3477,7 +3477,51 @@ class EInvoicing
 		return $messages;
 	}
 
+	/**
+	 * Fetch the ordered lifecycle event history of a given element (all providers, all flows combined).
+	 *
+	 * Kept agnostic of the element type so the same reader serves customer invoices today and can serve
+	 * supplier invoices later without a rewrite: both write to this table under their own 'element_type'.
+	 *
+	 * @param	string	$elementType	Element type as stored in the table ('facture', 'invoice_supplier', ...)
+	 * @param	int		$elementId		Element id
+	 * @return	array{rowid:int,provider:string,flow_id:string,direction:string,lc_status:int,lc_status_message:string,lc_validation_status:string,lc_validation_message:string,lc_reason_code:string,date_creation:int}[]	Ordered events (oldest first), empty array if none or on SQL error
+	 */
+	public function fetchLifecycleEvents($elementType, $elementId)
+	{
+		global $db;
 
+		$sql = "SELECT rowid, provider, flow_id, direction, lc_status, lc_status_message, lc_validation_status, lc_validation_message, lc_reason_code, date_creation";
+		$sql .= " FROM " . $db->prefix() . "einvoicing_lifecycle_msg";
+		$sql .= " WHERE element_type = '" . $db->escape($elementType) . "'";
+		$sql .= " AND element_id = " . (int) $elementId;
+		$sql .= " ORDER BY date_creation ASC, rowid ASC";
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . ' SQL error: ' . $db->lasterror(), LOG_ERR);
+			return [];
+		}
+
+		$events = [];
+		while ($obj = $db->fetch_object($resql)) {
+			$events[] = [
+				'rowid' => (int) $obj->rowid,
+				'provider' => (string) $obj->provider,
+				'flow_id' => (string) $obj->flow_id,
+				'direction' => (string) $obj->direction,
+				'lc_status' => (int) $obj->lc_status,
+				'lc_status_message' => (string) $obj->lc_status_message,
+				'lc_validation_status' => (string) $obj->lc_validation_status,
+				'lc_validation_message' => (string) $obj->lc_validation_message,
+				'lc_reason_code' => (string) $obj->lc_reason_code,
+				'date_creation' => (int) $db->jdate($obj->date_creation),
+			];
+		}
+		$db->free($resql);
+
+		return $events;
+	}
 
 	/**
 	 * Update validation information of an existing lifecycle status message.
