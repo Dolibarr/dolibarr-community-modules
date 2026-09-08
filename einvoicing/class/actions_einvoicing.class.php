@@ -68,7 +68,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 */
 	public function afterPDFCreation($parameters, $object, &$action, $hookmanager)
 	{
-		global $db, $langs;
+		global $db, $langs, $user;
 
 		dol_syslog(__METHOD__ . " Hook afterPDFCreation called for object " . get_class($object));
 
@@ -1260,7 +1260,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 */
 	private function sendOneInvoiceToAccessPoint($invoice, $einvoicing, $provider)
 	{
-		global $langs;
+		global $langs, $user;
 
 		$out = array('res' => 0, 'flowid' => '', 'reason' => '', 'warnings' => array(), 'errors' => array());
 
