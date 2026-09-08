@@ -1044,7 +1044,7 @@ if (!extension_loaded('zip')) {
 }
 
 if (empty($argv[1])) {
-	print "Usage:   ".$script_file." index|makezip|pushdolistore\n";
+	print "Usage:   ".$script_file." index|makezip|makeziptag|pushdolistore\n";
 	print "Example: ".$script_file." index                           to rebuild the index.yaml file (used by Dolibarr to retrieve list of community modules)\n";
 	print "Example: ".$script_file." makezip|makeziptag [modulename] to regenerate zip of packages (and set Tag of version)\n";
 	print "Example: ".$script_file." pushdolistore      [modulename] to publish zip of packages on dolistore (ask for API key)\n";
