@@ -214,11 +214,15 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 									$sendres = $provider->sendInvoice($invoiceObject);
 									if ($sendres) {
 										setEventMessages($langs->trans("InvoiceSuccessfullySentToPDP") . ' - ' . $langs->trans("FlowId") . ': ' . $sendres, null, 'mesgs');
+										$invoiceObject->context['einvoicing_flowid'] = (string) $sendres;
+										$invoiceObject->call_trigger('EINVOICING_SEND_SUCCESS', $user);
 									} else {
 										// Don't block validation if auto-send fails: the e-invoice is generated and can still be sent manually.
 										$senderrors = $provider->errors ?: array($provider->error);
 										$this->warnings = array_merge($this->warnings, (array) $senderrors);
 										dol_syslog(__METHOD__ . " auto-send to PA failed: " . implode('; ', (array) $senderrors), LOG_WARNING, 0, "_einvoicing");
+										$invoiceObject->context['einvoicing_errors'] = (array) $senderrors;
+										$invoiceObject->call_trigger('EINVOICING_SEND_ERROR', $user);
 									}
 								}
 							}
@@ -1309,11 +1313,15 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		if ($flowid) {
 			$out['res'] = 1;
 			$out['flowid'] = (string) $flowid;
+			$invoice->context['einvoicing_flowid'] = (string) $flowid;
+			$invoice->call_trigger('EINVOICING_SEND_SUCCESS', $user);
 			return $out;
 		}
 
 		$out['res'] = -1;
 		$out['errors'] = $provider->errors ? $provider->errors : array($provider->error);
+		$invoice->context['einvoicing_errors'] = $out['errors'];
+		$invoice->call_trigger('EINVOICING_SEND_ERROR', $user);
 
 		return $out;
 	}
