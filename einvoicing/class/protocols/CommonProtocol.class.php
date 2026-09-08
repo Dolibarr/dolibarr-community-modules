@@ -286,10 +286,14 @@ trait CommonProtocol
 	 */
 	protected static function canonicalVendorRefMap($db, $socid)
 	{
+		global $conf;
+
 		static $cache = array();
 
-		if (isset($cache[$socid])) {
-			return $cache[$socid];
+		// The map depends on the entity, through getEntity() below, so the entity is part of the key.
+		$cachekey = ((int) $socid) . '_' . ((int) $conf->entity);
+		if (isset($cache[$cachekey])) {
+			return $cache[$cachekey];
 		}
 
 		$map = array();
@@ -313,7 +317,7 @@ trait CommonProtocol
 			}
 		}
 
-		$cache[$socid] = $map;
+		$cache[$cachekey] = $map;
 
 		return $map;
 	}
