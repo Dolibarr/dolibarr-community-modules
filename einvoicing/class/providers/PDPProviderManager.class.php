@@ -89,8 +89,8 @@ class PDPProviderManager
 			)
 		);
 
-		// An implementation that only generate documents (no network access). It talks to no platform. This can be used by some countries like Germany or user that push files to a platformmanually.
-		if ($mysoc->country_code != 'FR' || getDolGlobalString('EINVOICING_ALLOW_DEVTOOLS')) {
+		// An implementation that only generate documents (no network access). It talks to no platform. This can be used by some countries like Germany or user that push files to a platform manually.
+		if ($mysoc->country_code != 'FR' || getDolGlobalString('EINVOICING_ALLOW_DEVTOOLS') || getDolGlobalString('EINVOICING_ONLY_GENERATE')) {
 			$this->providersList['TESTPDP'] = array(
 				'class' => 'TestPDPProvider',
 				'position' => 100,

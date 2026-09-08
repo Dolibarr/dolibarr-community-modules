@@ -744,7 +744,7 @@ class FacturXProtocol extends CIIProtocol
 			return ['res' => -1, 'message' => 'Unfounded dolibarr corresponding Invoice code for document type code: ' . ($parsedHeader['documenttypecode'] ?? 'NA')];
 		}
 		// documentdate is already formatted into 'Y-m-d' by the parser ZugFerd and CII
-		$supplierInvoice->date = !empty($parsedHeader['documentdate']) ? dol_stringtotime($parsedHeader['documentdate']) : null;
+		$supplierInvoice->date = !empty($parsedHeader['documentdate']) ? dol_stringtotime($parsedHeader['documentdate'], 'tzserver') : null;
 
 		// For credit notes and replacement invoices, link to the source invoice via fk_facture_source
 		// (BT-25). A replacement invoice (BT-3 = 384) corrects the invoice it references just as a credit
