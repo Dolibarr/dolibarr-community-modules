@@ -1583,7 +1583,9 @@ class Document extends CommonObject
 		// a fatal the scheduler reports as a plain failed job.
 		require_once __DIR__ . '/providers/PDPProviderManager.class.php';
 
-		if (getDolGlobalString('EINVOICING_PDP')) {
+		// Generation-only mode: nothing is ever sent or received, so the sync job must not reach the
+		// network even if a real provider is still selected in EINVOICING_PDP.
+		if (getDolGlobalString('EINVOICING_PDP') && !getDolGlobalString('EINVOICING_ONLY_GENERATE')) {
 			$providerManager = new PDPProviderManager($this->db);
 			$provider = $providerManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
 		}

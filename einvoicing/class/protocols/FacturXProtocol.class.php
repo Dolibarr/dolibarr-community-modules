@@ -28,18 +28,16 @@
 
 //use custom\facturx\Fidry\FileSystem\FS;
 use horstoeko\zugferd\ZugferdDocumentPdfReader;
-use horstoeko\zugferd\ZugferdDocumentPdfReaderExt;
-
-require __DIR__ . "/../../vendor/autoload.php";
 
 dol_include_once('einvoicing/class/protocols/CIIProtocol.class.php');
 dol_include_once('einvoicing/class/protocols/CommonProtocol.class.php');
 dol_include_once('einvoicing/class/utils/XmlPatcher.class.php');
-dol_include_once('einvoicing/class/utils/CtcFrPdfMerger.class.php');
-// FacturxTcpdfMerger is NOT included here: it descends from TCPDF, which the core only loads when a
-// PDF is actually rendered. Requiring it at load time would make every page that instantiates this
-// protocol die on "Class TCPDF not found". It is included where it is used, which is precisely the
-// branch where the core has already loaded TCPDF.
+dol_include_once('einvoicing/class/utils/PdfAttachmentExtractor.class.php');
+// Neither vendor/autoload.php nor the two mergers are required here. Both mergers descend from a
+// composer class, and that autoloader refuses to run below the PHP its libraries need, so loading
+// them at file scope would make a received Factur-X fatal on a PHP that reads it perfectly well.
+// They belong to generateInvoice(), the only place that writes a container. The same reasoning has
+// always applied to FacturxTcpdfMerger, which descends from TCPDF and needs the core PDF stack.
 
 
 /**
@@ -269,6 +267,9 @@ class FacturXProtocol extends CIIProtocol
 			pdf_getInstance();
 		}
 
+		// From here on the container is written, which is what needs horstoeko/zugferd
+		require_once __DIR__ . '/../../vendor/autoload.php';
+
 		try {
 			if (class_exists('FPDF', false) && is_subclass_of('FPDF', 'TCPDF')) {
 				// Below Dolibarr 24, htdocs/includes/tcpdi/tcpdi.php declares "class FPDF extends TCPDF {}".
@@ -282,6 +283,7 @@ class FacturXProtocol extends CIIProtocol
 				// CtcFrPdfMerger behaves exactly like ZugferdDocumentPdfMerger, except that it can still
 				// supply the attachment and XMP parameters when the guideline URN is one the library does
 				// not know — which is the case of EXTENDED-CTC-FR.
+				dol_include_once('einvoicing/class/utils/CtcFrPdfMerger.class.php');
 				$merger = new CtcFrPdfMerger($xmlfile, $orig_pdf);
 			}
 
@@ -431,9 +433,9 @@ class FacturXProtocol extends CIIProtocol
 
 
 		// --- Read the Factur-X file
-		// Only the embedded CII is extracted here: getInvoiceDocumentContentFromFile() reads the PDF/A-3
-		// attachment and never looks at the profile the document declares.
-		$embeddedXml = ZugferdDocumentPdfReaderExt::getInvoiceDocumentContentFromFile($tempFile);
+		// Only the embedded CII is extracted here: the PDF/A-3 attachment is read as it stands, and the
+		// profile the document declares is never looked at.
+		$embeddedXml = PdfAttachmentExtractor::getInvoiceXmlFromFile($tempFile);
 
 		$parsedHeader = [];
 		$parsedLines = [];
@@ -446,6 +448,7 @@ class FacturXProtocol extends CIIProtocol
 			// its own table, which has no entry for EXTENDED-CTC-FR - the French profile this very module
 			// emits. Instantiating that reader is therefore only done on the path that actually uses it,
 			// instead of on every received Factur-X (issue #742).
+			require_once __DIR__ . '/../../vendor/autoload.php';
 			$document = ZugferdDocumentPdfReader::readAndGuessFromFile($tempFile);
 
 			$document->getDocumentInformation($documentno, $documenttypecode, $documentdate, $invoiceCurrency, $taxCurrency, $documentname, $documentlanguage, $effectiveSpecifiedPeriod);
@@ -993,7 +996,7 @@ class FacturXProtocol extends CIIProtocol
 	 */
 	public function extractXmlFromFileContent(string $fileContent)
 	{
-		$extractedXml = ZugferdDocumentPdfReaderExt::getInvoiceDocumentContentFromContent($fileContent);
+		$extractedXml = PdfAttachmentExtractor::getInvoiceXmlFromContent($fileContent);
 		return $extractedXml;
 	}
 }

@@ -684,6 +684,27 @@ function einvoicingVatOnDebits()
 }
 
 /**
+ * Tell whether sending customer invoices is disabled by setup or generation-only mode.
+ * This does not disable e-invoice generation.
+ *
+ * @return bool
+ */
+function einvoicingIsSendDisabled()
+{
+	return (bool) getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || (bool) getDolGlobalString('EINVOICING_ONLY_GENERATE');
+}
+
+/**
+ * Tell whether receiving supplier invoices is disabled.
+ *
+ * @return bool
+ */
+function einvoicingIsReceiveDisabled()
+{
+	return (bool) getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI') || (bool) getDolGlobalString('EINVOICING_ONLY_GENERATE');
+}
+
+/**
  * VAT point date code (BT-8) the generated document has to declare.
  *
  * BR-CL-06 restricts BT-8 to 5, 29 or 72, BR-CO-03 makes it exclusive with BT-7, and CII-SR-462 allows

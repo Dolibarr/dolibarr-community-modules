@@ -278,7 +278,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			/** @var Paiement $object */
 			'@phan-var-force Paiement $object';
 
-			if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {		// If sync Dolibarr to AP is on
+			if (!einvoicingIsSendDisabled()) {		// If sync Dolibarr to AP is on
 				require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
 
 				foreach ($object->amounts as $facid => $amount) {
@@ -362,7 +362,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			/** @var FactureFournisseur $object */
 			'@phan-var-force FactureFournisseur $object';
 
-			if (getDolGlobalInt('EINVOICING_SEND_PAYMENT_SENT_STATUS') && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
+			if (getDolGlobalInt('EINVOICING_SEND_PAYMENT_SENT_STATUS') && !einvoicingIsSendDisabled()) {
 				$paidAmount = (float) $object->getSommePaiement();
 
 				// Nothing to tell on a write-off (nothing was paid), nor on an invoice that never came

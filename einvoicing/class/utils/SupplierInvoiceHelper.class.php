@@ -28,6 +28,7 @@ dol_include_once('einvoicing/class/protocols/ProtocolManager.class.php');
 dol_include_once('einvoicing/class/document.class.php');
 dol_include_once('einvoicing/class/utils/PriceHelper.class.php');
 dol_include_once('fourn/class/fournisseur.facture.class.php');
+dol_include_once('einvoicing/lib/einvoicing.lib.php');
 
 /**
  * Class SupplierInvoiceHelper
@@ -599,7 +600,7 @@ class SupplierInvoiceHelper
 		if (!getDolGlobalString('EINVOICING_SEND_APPROVED_ON_VALIDATION')) {
 			return false;
 		}
-		if (getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
+		if (einvoicingIsSendDisabled()) {
 			return false;
 		}
 		if (!self::isEInvoice($supplierInvoiceId)) {
