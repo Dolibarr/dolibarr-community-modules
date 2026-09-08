@@ -398,11 +398,14 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					}
 				}
 
-				// If the e-invoice is generated but not sent, or if it was sent and a validation error was received,
-				// display the button to regenerate the e-invoice
-				// Re-send is offered for not-yet-transmitted states, plus AWAITING_* as a deliberate retry
-				// affordance. Once REALLY transmitted (persistent flow_id), it is locked by default unless
-				// EINVOICING_ALLOW_RESEND_TRANSMITTED is set ($locked already accounts for that opt-out).
+				// If the e-invoice is generated but not sent, or if it was sent and a validation error was
+				// received, display the button to (re)send the e-invoice.
+				// Re-send is offered for not-yet-transmitted states, plus AWAITING_*/REJECTED as a deliberate
+				// retry/correction affordance. Once REALLY transmitted (persistent flow_id) it is locked, and the
+				// only opt-out is the option EINVOICING_ALLOW_RESEND_TRANSMITTED. That option is read in a single
+				// place, EInvoicing::isTransmittedLockActive() (assigned to $locked above: it returns false as
+				// soon as EINVOICING_ALLOW_RESEND_TRANSMITTED is set), which the server-side send_to_pdp gate
+				// uses too, so the button visibility here and the real enforcement can never drift apart.
 				if (!$locked && in_array($currentStatusDetails['code'], [
 					$einvoicing::STATUS_GENERATED,
 					$einvoicing::STATUS_ERROR,
