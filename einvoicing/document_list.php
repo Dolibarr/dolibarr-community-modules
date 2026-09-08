@@ -1080,7 +1080,7 @@ if ($action == 'confirm_sync' && getDolGlobalString('EINVOICING_PDP') && $confir
 		if ($sync_result['actions']) {
 			print '<br><br>';
 			print '<!-- suggested action -->'."\n";
-			print '<strong><u>'.$langs->trans("SuggestedActions").'</u></strong></br>';
+			print '<strong><u>'.$langs->trans("SuggestedActions").'</u></strong><br>';
 			$i = 0;
 			foreach ($sync_result['actions'] as $tmpactioncode => $tmpactionstodo) {
 				print '<!-- action for code '.$tmpactioncode.' -->';
@@ -1098,7 +1098,7 @@ if ($action == 'confirm_sync' && getDolGlobalString('EINVOICING_PDP') && $confir
 		if ($sync_result['res'] < 0 && empty($sync_result['actions']) && !getDolGlobalInt('EINVOICING_DEBUG_MODE')) {
 			print '<!-- message to recommend to enable debug mode -->'."\n";
 			print '<div class="wordbreak warning clearboth">';
-			print '<strong><u>'.$langs->trans("SuggestedActions").' :</u></strong></br>';
+			print '<strong><u>'.$langs->trans("SuggestedActions").' :</u></strong><br>';
 			print $langs->trans("EnableDebugModeToSeeMoreDetails");
 			print '</div>';
 		}
