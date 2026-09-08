@@ -901,9 +901,11 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 			$totalFlows = 0;
 			if ($response['status_code'] != 200) {
-				$this->errors[] = "Failed to retrieve flows for synchronization.";
-				$results_messages[] = "Failed to retrieve flows for synchronization.";
-				return array('res' => 0, 'messages' => $results_messages);
+				$errormessage = "Failed to retrieve flows for synchronization.";
+				$this->errors[] = $errormessage;
+				$results_messages[] = $errormessage;
+				$error_messages[] = $errormessage;
+				return array('res' => 0, 'messages' => $results_messages, 'errors' => $error_messages);
 			}
 
 			$totalFlows = $response['response']['total'] ?? 0;
@@ -930,11 +932,13 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$response = $this->callApi($resource, "POST", $jsonparams, array('Request-Id' => $uuid), "synchronization");	// This will also create the Call entry
 
 		if ($response['status_code'] != 200) {
-			$this->errors[] = "Failed to retrieve flows for synchronization." . ' (HTTP ' . $response['status_code'] . ')';
-			$results_messages[] = "Failed to retrieve flows for synchronization." . ' (HTTP ' . $response['status_code'] . ')';
+			$errormessage = "Failed to retrieve flows for synchronization." . ' (HTTP ' . $response['status_code'] . ')';
+			$this->errors[] = $errormessage;
+			$results_messages[] = $errormessage;
+			$error_messages[] = $errormessage;
 
 			dol_syslog(__METHOD__ . " Failed to retrieve the list of flows for synchronization.", LOG_DEBUG, 0, "_einvoicing");
-			return array('res' => 0, 'messages' => $results_messages);
+			return array('res' => 0, 'messages' => $results_messages, 'errors' => $error_messages);
 		}
 
 		// Some AP returns nb of lines into "total", others returns into "limit"
@@ -977,11 +981,13 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 					$alreadyProcessedFlowIds[$obj->flow_id] = $obj->flow_id;
 				}
 			} else {
-				$this->errors[] = "Failed to retrieve from database the list of flows already processed. ".$this->db->lasterror();
-				$results_messages[] = "Failed to retrieve from database the list of flows already processed. ".$this->db->lasterror();
+				$errormessage = "Failed to retrieve from database the list of flows already processed. ".$this->db->lasterror();
+				$this->errors[] = $errormessage;
+				$results_messages[] = $errormessage;
+				$error_messages[] = $errormessage;
 
 				dol_syslog(__METHOD__ . " Failed to retrieve flows already processed among the list of flows received. ".$this->db->lasterror(), LOG_DEBUG, 0, "_einvoicing");
-				return array('res' => 0, 'messages' => $results_messages);
+				return array('res' => 0, 'messages' => $results_messages, 'errors' => $error_messages);
 			}
 		}
 
