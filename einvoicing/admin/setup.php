@@ -196,8 +196,11 @@ $item->helpText .= '<br>'.$langs->transnoentities('EINVOICING_PDP_HELP3');
 $item->cssClass = 'minwidth500';
 //var_dump($item);exit;
 
-$item = $formSetup->newItem('EINVOICING_LIVE')->setAsYesNo();
-$item->fieldParams['forcereload'] = 1;
+// Real/test mode has no meaning for the TESTPDP stub, which never talks to any platform.
+if (getDolGlobalString('EINVOICING_PDP') !== 'TESTPDP') {
+	$item = $formSetup->newItem('EINVOICING_LIVE')->setAsYesNo();
+	$item->fieldParams['forcereload'] = 1;
+}
 
 // Setup conf to use the invoice billing contact (external BILLING contact) as the XML buyer instead of the invoice thirdparty
 // This option is VERY DANGEROUS and a VARY BAD PRACTICE. DO NOT USE IT ! The invoiced thirdparty should always be the thirdparty (if we invoice a parent company,
@@ -231,7 +234,12 @@ $reg = array();
 
 // Setup conf for selection of the PDP provider
 if ($action == 'update' && GETPOSTISSET('EINVOICING_PDP') && GETPOST('EINVOICING_PDP') != getDolGlobalString('EINVOICING_PDP')) {
-	dolibarr_set_const($db, 'EINVOICING_PDP', GETPOST('EINVOICING_PDP'), 'chaine', 0, '', $conf->entity);
+	$newpdp = GETPOST('EINVOICING_PDP');
+	dolibarr_set_const($db, 'EINVOICING_PDP', $newpdp, 'chaine', 0, '', $conf->entity);
+
+	// EINVOICING_ONLY_GENERATE follows the provider choice: selecting the "None" test provider turns
+	// generation-only mode on, selecting any real provider turns it back off. Single source of truth.
+	dolibarr_set_const($db, 'EINVOICING_ONLY_GENERATE', ($newpdp === 'TESTPDP') ? '1' : '0', 'chaine', 0, '', $conf->entity);
 
 	// Set the default protocol when no default value is specified
 	if (getDolGlobalString('EINVOICING_PDP') && !getDolGlobalString('EINVOICING_PROTOCOL')) {
