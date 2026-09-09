@@ -79,6 +79,19 @@ abstract class AbstractProtocol
 	abstract public function generateXML($invoice, $outputlangs = null);
 
 	/**
+	 * Generate the e-invoice file of a given invoice, and return where it was written.
+	 *
+	 * The entry point of a protocol: the hooks and the sample generation of CommonProtocol call it on
+	 * whatever protocol the user selected, so every protocol has to answer to it.
+	 *
+	 * @param	int|Facture		$invoice_id		Invoice id, or invoice object, to process
+	 * @param	?Translate		$outputlangs	Output language
+	 * @param	string			$sourceFilePath	Source document the file is built from, when the format needs one
+	 * @return	-1|string						-1 if ko, path of the generated file if ok
+	 */
+	abstract public function generateInvoice($invoice_id, $outputlangs = null, $sourceFilePath = '');
+
+	/**
 	 * Create a supplier invoice in Dolibarr from Factur-X content.
 	 *
 	 * This function parses the provided Factur-X XML content
