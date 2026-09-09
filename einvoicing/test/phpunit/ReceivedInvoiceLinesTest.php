@@ -997,6 +997,30 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 	}
 
 	/**
+	 * A base stated as zero is a base the document did not state. Some issuers write BT-137 = 0.00 next
+	 * to a real allowance amount, and the null coalescing that used to pick the base kept that zero: the
+	 * guard below it sent the discount back false and the line was imported at its gross (PR #845).
+	 *
+	 * @return	void
+	 */
+	public function testABaseStatedAsZeroFallsBackTheSameWay()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		$zeroBase = $protocol->parseInvoiceLines($this->discountedLine(5.0, 100.05, 50.03, 450.22, 0.00));
+		$this->assertSame(0.0, $zeroBase[0]['lineAllowances'][0]['basisAmount'], 'BT-137 is read, and it is zero');
+
+		$discount = $this->call('resolveLineDiscountPercent', array($zeroBase[0]['lineAllowances'], $zeroBase[0]['lineTotalAmount']));
+
+		$this->assertNotFalse($discount, 'the discount is resolved and not dropped');
+		$this->assertEqualsWithDelta(500.25, $discount['base'], 0.011, 'the amount before the allowance, as when BT-137 is absent');
+		$this->assertEqualsWithDelta(10.001, $discount['percent'], 0.0001);
+		$this->assertEqualsWithDelta(450.22, $this->importedLine($zeroBase[0])['rebuilt'], 0.011, 'and the line totals BT-131');
+	}
+
+	/**
 	 * A line carrying a charge as well as an allowance (issue #735) keeps the treatment that issue gave
 	 * it: the charge leaves by a line of its own, so it is out of the base and out of the unit price.
 	 *
