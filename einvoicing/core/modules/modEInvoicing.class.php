@@ -187,7 +187,15 @@ class modEInvoicing extends DolibarrModules
 			'fr_FR:ParentCompany'=>'Maison mère ou revendeur'
 		)*/
 
-		if (!isModEnabled("einvoicing")) {
+		// For retrocompatibility with older Dolibarr versions to avoid crashing when module is present into custom modules repository of an older Dolibarr installation
+		if (function_exists('isModEnabled')) {
+			$moduleIsEnabled = isModEnabled("einvoicing");
+		} else {
+			$moduleIsEnabled = !empty($conf->einvoicing->enabled);
+		}
+
+		// Check if the module is enabled and initialize the configuration if not
+		if (!$moduleIsEnabled) {
 			$conf->einvoicing = new stdClass();
 			$conf->einvoicing->enabled = 0;
 		}

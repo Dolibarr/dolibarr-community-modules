@@ -134,6 +134,10 @@ $myGlobalIdProf    = idprof($mysoc);
 $mySchemeGlobalIdProf = $this->getIEC6523Code($mysoc->country_code, 1);
 $myUri             = $einvoicing->getSellerCommunicationURI(0);
 $mySchemeUri       = $this->getIEC6523Code($mysoc->country_code, 2);
+// BT-28, the trading name of the seller: "a name by which the seller is known, other than the
+// seller name". The company setup of the core has no such field, so there is nothing to declare
+// here and the term is left out of the document (issue #847).
+$sellerTradingName = trim((string) ($mysoc->name_alias ?? ''));
 
 // Buyer party resolution.
 // The external BILLING contact always fills the buyer contact group (BG-9). Whether it also *replaces*
@@ -192,6 +196,13 @@ if (!empty($billingContactIds) && $object->fetch_contact($billingContactIds[0]) 
 // Buyer identifiers (resolved buyer party: invoice thirdparty or billing-contact recipient)
 if (!($buyerParty instanceof Societe)) {
 	throw new \RuntimeException('einvoicing: invoice thirdparty is not a valid Societe (invoice id=' . $object->id . ')');
+}
+// BT-45, the trading name of the buyer: Dolibarr keeps it on the third party as name_alias,
+// labelled "Alias name (commercial, trademark, ...)". A term that only repeats the name of the
+// party says nothing, and the norm asks for it only when it differs (issue #847).
+$buyerTradingName  = trim((string) $buyerParty->name_alias);
+if ($buyerTradingName === trim((string) $buyerName)) {
+	$buyerTradingName = '';
 }
 $idprof            = idprof($buyerParty) ?? '';
 $schemeIdProf      = $this->getIEC6523Code($buyerParty->country_code);
@@ -369,6 +380,7 @@ $lines_total_ht 	= $lines_total_tva = $lines_total_ttc = 0;
 $grand_total_ht    	= $grand_total_tva = $grand_total_ttc = 0;
 $prepaidAmount     	= 0;
 $depositlines      	= [];
+$lineRowIds        	= [];	// Document line number => llx_facturedet.rowid, for the messages
 $globalDiscounts	= [];
 $billing_period    	= [];
 $numligne          	= 1;
@@ -440,7 +452,8 @@ foreach ($object->lines as $line) {
 	// The second method need to use the field BT-113. We don't use it as we use the first method.
 	$depositFactRef  = null;
 	$depositFactDate = null;
-	if ($line->desc == '(DEPOSIT)') {
+	$lineDiscount    = null;	// Discount the line was built from, when it is a discount line
+	if ($line->desc == '(DEPOSIT)' && !empty($line->fk_remise_except)) {
 		$isDepositLine   = 1;
 		$depositFactRef  = "";
 		$depositFactDate = new DateTime();
@@ -450,6 +463,7 @@ foreach ($object->lines as $line) {
 		dol_syslog("Fetch discount " . $line->fk_remise_except . ", res=" . $resdiscount, LOG_DEBUG);
 
 		if ($resdiscount > 0) {
+			$lineDiscount = $discount;
 			$origFact    = new Facture($this->db);
 			$resOrigFact = $origFact->fetch($discount->fk_facture_source);
 			dol_syslog("Fetch origFact " . $discount->fk_facture_source . ", res=" . $resOrigFact, LOG_DEBUG);
@@ -483,9 +497,16 @@ foreach ($object->lines as $line) {
 		$resdiscount = $discount->fetch($line->fk_remise_except);
 		dol_syslog("Fetch discount " . $line->fk_remise_except . ", res=" . $resdiscount, LOG_DEBUG);
 
+		$lineDiscount = ($resdiscount > 0 ? $discount : null);
+
+		// BT-97. The description of a discount built from another piece is a sentinel, not a text to
+		// show: resolved here, the customer reads which credit note or which excess payment is deducted
+		// instead of '(CREDIT_NOTE)'. A discount entered by hand keeps the reason that was typed.
+		$discountReason = einvoicingDiscountLabel($lineDiscount, $discount->description ?? '', $outputlangs, einvoicingDiscountRelatedInvoiceRef($lineDiscount, $this->db));
+
 		$globalDiscounts[] = array(
 			'value' => (float) $discount->total_ht,
-			'reason' => $discount->description ?? 'REMISE',
+			'reason' => $discountReason ?: ($discount->description ?? 'REMISE'),
 			'taxRate' => (float) $discount->tva_tx,
 			'categoryVAT' => $categoryVAT,
 		);
@@ -546,6 +567,18 @@ foreach ($object->lines as $line) {
 		if ($libelle == $description) {
 			$description = "";
 		}
+	}
+
+	// A discount line still standing at this point is a deposit deducted from the invoice, and its
+	// description is the sentinel the core stores, not a text meant to be read. Left as it is, the
+	// customer reads '(DEPOSIT)' as the name of the line (BT-153).
+	// The line has to carry a discount for that to hold, which is why the resolution goes through
+	// einvoicingDiscountLabelOfLine(): a line of work an operator named '(DEPOSIT)', pointing at no
+	// discount, is legitimate text and keeps the name it was given.
+	$discountLabel = einvoicingDiscountLabelOfLine($line, $lineDiscount, $outputlangs, einvoicingDiscountRelatedInvoiceRef($lineDiscount, $this->db));
+	if ($discountLabel !== '') {
+		$libelle     = $discountLabel;
+		$description = "";
 	}
 
 	// Billing period of the line
@@ -635,6 +668,11 @@ foreach ($object->lines as $line) {
 	$grand_total_tva += $line_total_tva;
 
 
+
+	// The rowid of the line, kept beside its document line number: the number places the line in the
+	// document, the rowid is what a correction is addressed to, and a message that names only the first
+	// leaves its reader to count the lines to find it.
+	$lineRowIds[$numligne] = (int) $line->id;
 
 	// Filling $linesData (based on $lineTemplate)
 	$linesData[$numligne] = [
@@ -787,6 +825,46 @@ if (!empty($object->situation_counter) && $object->situation_counter > 1
 		dol_syslog("EInvoicing situation invoice " . $object->ref . ": the deduction of the previous situations gives "
 			. $grand_total_ht . " where the invoice records " . $object->total_ht, LOG_WARNING);
 	}
+}
+
+// Last look for a sentinel that reached a field the customer reads. Everything above resolves the four
+// of them, so anything left here is a way of building a document that this file does not know about -
+// which is not a supposition: the resolution was written for the reason of a document level allowance
+// and the item name of a deposit line was found carrying the sentinel afterwards, at the second look.
+//
+// The test is an equality, never an inclusion: a line of work named 'Reprise (DEPOSIT) du chantier' is
+// a legitimate text and must go out untouched. And it reports rather than refuses - a marker in an item
+// name is ugly, not invalid, and holding back an invoice over it would cost the seller more than it
+// saves.
+$discountSentinels = array_keys(einvoicingDiscountSentinels());
+$linesWithNoName = array();
+foreach ($linesData as $numligne => $vals) {
+	if (trim((string) ($vals['prodname'] ?? '')) === '') {
+		$linesWithNoName[] = $numligne.' (id '.($lineRowIds[$numligne] ?? 0).')';
+	}
+	foreach (array('prodname' => 'BT-153', 'proddesc' => 'BT-154') as $field => $businessTerm) {
+		if (in_array((string) ($vals[$field] ?? ''), $discountSentinels, true)) {
+			dol_syslog("EInvoicing: line ".$numligne." of ".$object->ref." carries the unresolved discount marker ".$vals[$field]." in ".$businessTerm.". The line is a discount whose source piece could not be read.", LOG_ERR);
+		}
+	}
+}
+
+foreach ($globalDiscounts as $discountIndex => $vals) {
+	if (in_array((string) ($vals['reason'] ?? ''), $discountSentinels, true)) {
+		dol_syslog("EInvoicing: allowance ".$discountIndex." of ".$object->ref." carries the unresolved discount marker ".$vals['reason']." in BT-97. The discount source piece could not be read.", LOG_ERR);
+	}
+}
+
+// BR-25: a line with no name is not a document the platform accepts, so it is refused here rather than
+// after transmission, on a line number the seller would then have to go and find. Every such line is
+// named at once: sending them back one refusal at a time would be a round trip per line. This is the
+// same missing data the pre-check reports before validation (validateInvoiceConfiguration()); a
+// document reaching this point with one is one whose lines changed since, or one built by a path that
+// does not run the pre-check. Refused after both halves of the last look above, never between them: a
+// document carrying a nameless line and an unresolved marker in BT-97 would otherwise leave without the
+// marker ever being reported - the very case that last look exists to catch.
+if (!empty($linesWithNoName)) {
+	throw new Exception('MISSINGDATA[BR-25]: The line'.(count($linesWithNoName) > 1 ? 's ' : ' ').implode(', ', $linesWithNoName).' of '.$object->ref.' '.(count($linesWithNoName) > 1 ? 'have' : 'has').' no item name (BT-153). Enter a description on the line, or a label on the product it invoices.');
 }
 
 // Rounding convention of the totals: Dolibarr sums the amounts already rounded on each line ("total of
@@ -975,7 +1053,7 @@ $invoiceData = [
 
 	'sellerLegalOrgId'          => $myidprof,
 	'sellerLegalOrgScheme'      => $mySchemeIdProf,
-	'sellerTradingName'         => $mysoc->name ?? 'SPECIMEN',
+	'sellerTradingName'         => $sellerTradingName,
 
 	// Buyer part
 	'buyername'                 =>  $buyerName ?: 'CUSTOMER',
@@ -995,7 +1073,7 @@ $invoiceData = [
 
 	'buyerLegalOrgId'           => $idprof,
 	'buyerLegalOrgScheme'       => $schemeIdProf,
-	'buyerTradingName'          => $buyerName,
+	'buyerTradingName'          => $buyerTradingName,
 
 	'buyerReference'            => $buyerReference,
 

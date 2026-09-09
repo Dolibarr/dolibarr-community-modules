@@ -1111,6 +1111,18 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 	}
 
 	/**
+	 * A reference shorter than the default minimum length of the tolerant fallback, and unique per
+	 * call. It carries a letter on purpose: an all digits reference is refused by another rule, and
+	 * the test that uses this one is about the length, not about the digits.
+	 *
+	 * @return string
+	 */
+	private function uniqueShortSupplierRef()
+	{
+		return 'A' . strtoupper(bin2hex(random_bytes(2)));
+	}
+
+	/**
 	 * Create a draft supplier invoice carrying an explicit ref_supplier.
 	 *
 	 * @param	string	$refSupplier	Value to store in ref_supplier
@@ -1301,7 +1313,9 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 	{
 		global $conf;
 
-		$shortRef = 'AB12';
+		// A fixed value here survives any run that dies before the class-wide rollback, and the
+		// lookup below then answers "ambiguous" on that instance for good.
+		$shortRef = $this->uniqueShortSupplierRef();
 		$numericRef = (string) mt_rand(100000000, 999999999);
 		$invoice = $this->createSupplierInvoiceWithRef('PAY123 - ' . $shortRef . ' - ' . $numericRef . ' - dinner');
 

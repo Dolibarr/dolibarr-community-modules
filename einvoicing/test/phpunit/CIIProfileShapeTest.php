@@ -398,7 +398,8 @@ class CIIProfileShapeTest extends CommonClassTest
 	}
 
 	/**
-	 * Invoice data carrying the three header references, on top of the base fixture.
+	 * Invoice data carrying the header references, on top of the base fixture: an invoice covering
+	 * three purchase orders, so the first lands on BT-13 and the other two on BT-18.
 	 *
 	 * @return	array<string,mixed>
 	 */
@@ -416,6 +417,9 @@ class CIIProfileShapeTest extends CommonClassTest
 		$data['buyerReference'] = 'SERVICE-EXEC-01';		// BT-10
 		$data['contractReference'] = 'CTR-2026-118';		// BT-12
 		$data['_project'] = $project;						// BT-11
+		$data['orderReference'] = 'BC-2026-0007';			// BT-13
+		// An invoice covering three orders: BT-13 takes the first, the other two go to BT-18
+		$data['_customerOrderReferenceList'] = ['BC-2026-0007', 'BC-2026-0008', 'BC-2026-0009'];
 
 		return $data;
 	}
@@ -587,6 +591,41 @@ class CIIProfileShapeTest extends CommonClassTest
 	}
 
 	/**
+	 * The order references an invoice carries beyond BT-13 are emitted as invoiced object identifiers
+	 * (BT-18), an element ram:AdditionalReferencedDocument only declares from EN16931 up.
+	 *
+	 * @return void
+	 */
+	public function testAdditionalOrderReferencesFollowTheProfileSchema()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		foreach (CIIProtocol::SUPPORTED_XML_PROFILES as $profile) {
+			$xml = $protocol->buildXML($this->invoiceDataWithReferences(), $this->baseLinesData(), $profile);
+			$count = $this->countTag($xml, 'ram:AdditionalReferencedDocument');
+
+			if (!in_array($profile, ['EN16931', 'EXTENDED', 'EXTENDEDFR'], true)) {
+				$this->assertSame(0, $count, $profile . ' does not declare ram:AdditionalReferencedDocument in the agreement section');
+				continue;
+			}
+
+			$this->assertSame(2, $count, $profile . ' must carry the two order references BT-13 does not hold');
+
+			$doc = new DOMDocument();
+			$doc->loadXML($xml);
+			$found = [];
+			foreach ($doc->getElementsByTagName('AdditionalReferencedDocument') as $node) {
+				$this->assertSame('130', $node->getElementsByTagName('TypeCode')->item(0)->nodeValue, $profile . ' BT-18 type code');
+				$found[] = $node->getElementsByTagName('IssuerAssignedID')->item(0)->nodeValue;
+			}
+			// The reference already emitted as BT-13 must not be repeated here
+			$this->assertSame(['BC-2026-0008', 'BC-2026-0009'], $found, $profile . ' BT-18 values');
+		}
+	}
+
+	/**
 	 * The project reference (BT-11) only exists from EN16931 up, and its type makes both ram:ID and
 	 * ram:Name mandatory.
 	 *
@@ -657,6 +696,7 @@ class CIIProfileShapeTest extends CommonClassTest
 			$this->assertSame(0, $this->countTag($xml, 'ram:BuyerReference'), $profile . ' must not carry an empty BT-10');
 			$this->assertSame(0, $this->countTag($xml, 'ram:ContractReferencedDocument'), $profile . ' must not carry an empty BT-12');
 			$this->assertSame(0, $this->countTag($xml, 'ram:SpecifiedProcuringProject'), $profile . ' must not carry an empty BT-11');
+			$this->assertSame(0, $this->countTag($xml, 'ram:AdditionalReferencedDocument'), $profile . ' must not carry an empty BT-18');
 		}
 	}
 
