@@ -211,7 +211,7 @@ function thirdpartyidprof($object)
 {
 	$object->fetch_thirdparty();
 	$thirdparty = $object->thirdparty;
-	return $thirdparty ? idprof($object->thirdparty) : '';
+	return $thirdparty ? idprof($thirdparty) : '';
 }
 
 /**
