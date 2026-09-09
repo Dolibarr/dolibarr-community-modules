@@ -1011,6 +1011,8 @@ abstract class AbstractPDPProvider
 		$call->entity = $conf->entity;
 		$call->status = ($statusCode == 200 || $statusCode == 202) ? 1 : 0;
 
+		$call->context['statusCode'] = $statusCode;
+
 		if ($call->create($user) > 0) {
 			$dbhistory->commit();
 			return array('id' => $call->id, 'call_id' => $call->call_id);
