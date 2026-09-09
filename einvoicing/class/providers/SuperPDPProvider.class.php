@@ -756,18 +756,6 @@ class SuperPDPProvider extends AbstractPDPProvider
 	}
 
 	/**
-	 * Delete access token.
-	 * Called by the setup page only.
-	 *
-	 * @return 	bool                	       	True if success, false otherwise
-	 */
-	public function deleteAccessToken()
-	{
-		$result = $this->deleteOAuthTokenDB();
-		return $result;
-	}
-
-	/**
 	 * Perform a health check call for PDP provider.
 	 *
 	 * @return array Contains 'status' (bool) and 'message' (string)

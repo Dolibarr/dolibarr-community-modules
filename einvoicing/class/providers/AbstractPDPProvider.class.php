@@ -840,6 +840,19 @@ abstract class AbstractPDPProvider
 
 
 	/**
+	 * Delete the access token of this provider.
+	 * Called by the setup page only.
+	 *
+	 * @param	int		$forceentity		0=Use current entity, >0=Use specific entity
+	 * @return	bool						True if success, false otherwise
+	 */
+	public function deleteAccessToken($forceentity = 0)
+	{
+		return $this->deleteOAuthTokenDB($forceentity);
+	}
+
+
+	/**
 	 * Get the last synchronization date with the PDP provider.
 	 * Retrieves the timestamp of the most recent successful flow synchronization
 	 * for this provider. If no sync has occurred yet, returns 0.
