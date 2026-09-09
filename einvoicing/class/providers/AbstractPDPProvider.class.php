@@ -1094,13 +1094,13 @@ abstract class AbstractPDPProvider
 		$flowResource = 'flows/' . $flowId . '?' . http_build_query(array('docType' => 'Original'));
 		$flowResponse = $this->callApi($flowResource, "GET", false, array('Accept' => 'application/octet-stream'));
 		if ($flowResponse['status_code'] != 200) {
-			return array('res' => -1, 'message' => "Failed to retrieve flow details for flowId: " . $flowId);
+			return array('res' => 0, 'message' => "Failed to retrieve flow details for flowId: " . $flowId);
 		}
 
 		$cdarHandler = new CdarHandler($db);
 		$cdarDocument = $cdarHandler->readFromString($flowResponse['response']);
 		if (empty($cdarDocument) || empty($cdarDocument['AcknowledgementDocument']['ReferenceReferencedDocument'])) {
-			return array('res' => -1, 'message' => "FlowId: " . $flowId . " - Failed to parse CDAR document");
+			return array('res' => 0, 'message' => "FlowId: " . $flowId . " - Failed to parse CDAR document");
 		}
 
 		$refDoc = $cdarDocument['AcknowledgementDocument']['ReferenceReferencedDocument'];
