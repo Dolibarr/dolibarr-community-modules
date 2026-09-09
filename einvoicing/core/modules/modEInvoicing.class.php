@@ -204,9 +204,7 @@ class modEInvoicing extends DolibarrModules
 		/* BEGIN MODULEBUILDER TABS */
 		// Don't forget to deactivate/reactivate your module to test your changes
 		$this->tabs = array();
-		//$this->tabs[] = array('data' => 'invoice:+CustomerLCtab:einvoicecustomerlctab:einvoicing@einvoicing:$user->hasRight("facture", "read"):/einvoicing/einvoice_object_timeline.php?id=__ID__');
-
-		//$this->tabs[] = array('data' => 'invoice:+EinvoiceEvents:EinvoiceEventsTab:@einvoicing:$user->hasRight("facture","read"):/einvoicing/einvoice_events.php?id=__ID__&elementtype=invoice');
+		$this->tabs[] = array('data' => 'invoice:+EinvoiceEvents:EinvoiceEventsTab:@einvoicing:$user->hasRight("facture","read"):/einvoicing/einvoice_tracking.php?id=__ID__');
 
 		/* END MODULEBUILDER TABS */
 		// Example:

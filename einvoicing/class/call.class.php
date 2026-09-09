@@ -357,7 +357,7 @@ class Call extends CommonObject
 
 		if (!$error) {
 			// copy external contacts if same company  @phan-suppress-next-line PhanUndeclaredProperty
-			if (!empty($object->socid) && ((property_exists($this, 'fk_soc') && ($this->fk_soc == $object->socid)) || (property_exists($this, 'socid') && ($this->socid == $object->socid)))) {	// @phpstan-ignore-line
+			if (!empty($object->socid) && ((property_exists($this, 'fk_soc') && ($this->fk_soc == $object->socid)) || (property_exists($this, 'socid') && ($this->socid == $object->socid)))) {	// @phpstan-ignore-line @phan-suppress-current-line PhanUndeclaredProperty
 				if ($this->copy_linked_contact($object, 'external') < 0) {
 					$error++;
 				}
@@ -1233,11 +1233,23 @@ class Call extends CommonObject
 
 		// Read on the connection this record will be written on ($dbhistory), not on the global $db: a
 		// snapshot read from another transaction returns a stale number and the insert dies on
-		// uk_einvoicing_call_callid. FOR UPDATE makes it a locking read and holds the range until insert.
-		$sql = "SELECT MAX(CAST(SUBSTRING(call_id, ".(strlen($prefix) + 1).") AS SIGNED)) AS maxref";
+		// uk_einvoicing_call_callid. The read must therefore be a locking one, held until the insert.
+		$ispgsql = ($this->db->type == 'pgsql');
+
+		if ($ispgsql) {
+			// PostgreSQL refuses FOR UPDATE on an aggregate (SQLSTATE 0A000), so serialize the readers
+			// with an advisory lock instead. It is held until the transaction ends, like FOR UPDATE.
+			if (!$this->db->query("SELECT pg_advisory_xact_lock(1)")) {
+				return null;
+			}
+		}
+
+		$sql = "SELECT MAX(CAST(SUBSTRING(call_id, ".(strlen($prefix) + 1).") AS INTEGER)) AS maxref";
 		$sql .= " FROM ".$this->db->prefix().$this->table_element;
 		$sql .= " WHERE call_id LIKE '".$this->db->escape($prefix)."%'";
-		$sql .= " FOR UPDATE";
+		if (!$ispgsql) {
+			$sql .= " FOR UPDATE";
+		}
 
 		$resql = $this->db->query($sql);
 		if (!$resql) {

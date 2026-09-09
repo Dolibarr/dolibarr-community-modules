@@ -38,6 +38,9 @@ abstract class AbstractPDPProvider
 	/** @var DoliDB Database handler */
 	public $db;
 
+	/** @var string Error message */
+	public $error;
+
 	/** @var array Error messages */
 	public $errors = [];
 
@@ -415,6 +418,26 @@ abstract class AbstractPDPProvider
 
 
 	/**
+	 * Set the setup factory specific to the provider.
+	 *
+	 * Optional: a provider with nothing of its own to configure keeps this empty block, and the setup
+	 * page then simply shows nothing under the common one.
+	 *
+	 * @param FormSetup $formSetup 			The form setup object to initialize
+	 * @param string 	$prefix 			The prefix for configuration keys ('EINVOICING_MYPDP_')
+	 * @param string 	$prefixenv 			'prod' or 'test', depending on EINVOICING_LIVE
+	 * @param array 	$providersConfig 	The array containing providers configuration
+	 * @param array 	$TFieldProtocols 	The array of available protocols to set in the select field
+	 * @param array 	$TFieldProfiles 	The array of available profiles to set in the select field
+	 * @return void
+	 */
+	public function initFormSetup(&$formSetup, $prefix, $prefixenv, $providersConfig, $TFieldProtocols, $TFieldProfiles)
+	{
+		// Nothing to add to the setup page by default.
+	}
+
+
+	/**
 	 * Try to get a flow data from its id and doc type, using API
 	 *
 	 * @param string	$flowId 		The id of the flow
@@ -591,7 +614,7 @@ abstract class AbstractPDPProvider
 	 *
 	 * @param string 						$resource 	    Resource relative URL ('Flows', 'healthcheck' or others)
 	 * @param 'POST'|'GET'|'HEAD'|'PUT'|'PUTALREADYFORMATED'|'POSTALREADYFORMATED'|'DELETE' $method         HTTP method (dolibarr's types)
-	 * @param string|false 	$options 	    Options for the request (JSON encoded)
+	 * @param string|false|array<string,mixed> 	$options 	    Body of the request: a JSON encoded string, or an array carrying a CURLFile for a multipart upload. False when there is none.
 	 * @param array<string, string>         $extraHeaders   Optional additional headers
 	 * @param string|null                   $callType       Functional type of the API call for logging purposes (e.g., 'sync_flows', 'send_invoice')
 	 *
@@ -816,6 +839,19 @@ abstract class AbstractPDPProvider
 		}
 
 		return true;
+	}
+
+
+	/**
+	 * Delete the access token of this provider.
+	 * Called by the setup page only.
+	 *
+	 * @param	int		$forceentity		0=Use current entity, >0=Use specific entity
+	 * @return	bool						True if success, false otherwise
+	 */
+	public function deleteAccessToken($forceentity = 0)
+	{
+		return $this->deleteOAuthTokenDB($forceentity);
 	}
 
 
