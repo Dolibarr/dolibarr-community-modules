@@ -2351,10 +2351,10 @@ class CIIProtocol extends AbstractProtocol
 
 		// Additional order references: when an invoice covers several purchase orders, the first is emitted as BT-13
 		// (BuyerOrderReferencedDocument above) and the others are listed here as AdditionalReferencedDocument/TypeCode=130.
-		// Restricted to profiles that carry AdditionalReferencedDocument in the agreement section (not MINIMUM), and
-		// skipped for Chorus (which does not accept these extra nodes). Sequence position: after
+		// ram:AdditionalReferencedDocument is only declared in the agreement section from EN16931 up - MINIMUM, BASIC WL
+		// and BASIC do not have it - and Chorus does not accept these extra nodes. Sequence position: after
 		// ContractReferencedDocument, before SpecifiedProcuringProject (CII schema order).
-		if (!$invoiceData['_chorus'] && $profile !== 'MINIMUM' && !empty($invoiceData['_customerOrderReferenceList'])) {
+		if (!$invoiceData['_chorus'] && $this->isEn16931Profile($profile) && !empty($invoiceData['_customerOrderReferenceList'])) {
 			foreach ($invoiceData['_customerOrderReferenceList'] as $additionalOrderRef) {
 				// A blank reference would become an empty BT-18, which BR-52 rejects as fatal
 				if ($additionalOrderRef === $invoiceData['orderReference'] || trim((string) $additionalOrderRef) === '') {
