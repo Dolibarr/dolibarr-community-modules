@@ -73,20 +73,7 @@ function einvoicingLifecycleLabel($einvoicing, $status, $override = '')
 {
 	$override = trim((string) $override);
 	if ($override !== '' && $override !== (string) $status) {
-		return einvoicingLifecyclePlain($override);
+		return $override;
 	}
 	return $einvoicing->getStatusLabel($status);
-}
-
-/**
- * $langs->trans() may return HTML entities (&eacute;, ...); decode to plain UTF-8 so callers that embed
- * the result in a context with its own escaping (e.g. an SVG's htmlspecialchars()) do not double-encode
- * them.
- *
- * @param string $str Input string
- * @return string
- */
-function einvoicingLifecyclePlain($str)
-{
-	return html_entity_decode((string) $str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 }
