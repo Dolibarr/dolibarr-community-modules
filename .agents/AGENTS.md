@@ -164,11 +164,11 @@ Before any modification, verify:
 - User rights enforcement (`$user->hasRights("module", "permission")` or `$user->hasRights("module", "objectname", "permission")`)
 - Multi-entity compatibility (add ` AND entity IN ('.getDolEntity("tablename").')` in SQL requests)
 
-### If adding a unit test was explicitely requested
+### If adding a unit test was explicitly requested
 
 - If making or modifying external module, add PHPUnit test files in `yourmoduledir/test/phpunit/`.
 - **One test file per source file under test**: a new case goes into the test file of the class or library file it exercises, as a new method. Create a file only when that source file has no test file yet, and split by direction (export / import) rather than by issue when a file grows past about a thousand lines. The CI reads what a test file loads with `dol_include_once()` and refuses a new file whose source already has one.
-- If you need to validate code change or if it is explicitely requested, you can check code and dev syntax rules by running the following command on modified files (it takes a long time):
+- If you need to validate code change or if it is explicitly requested, you can check code and dev syntax rules by running the following command on modified files (it takes a long time):
 	`phan -k .phan/config.php -B dev/tools/phan/baseline.txt --analyze-twice --minimum-target-php-version 7.2 --exclude-directory-list=dev/tools,mymodule/test/,mymodule/vendor/ --output-mode=checkstyle filemodified1.php filemodified2.php ...`
 
 ### Local Dolibarr Online test — Page Access
@@ -196,8 +196,8 @@ Dolibarr requires a CSRF token and a session cookie. To access any authenticated
     - Types: `NEW`, `FIX` or `CLOSE`
     - Example: `FIX: #1234 Correct VAT calculation on credit notes`
 - Do not update the `ChangeLog` file (this file will be generated before the release from all commit titles)
-- When commiting, keep your commit comment short (NEVER exceed 50 lines) and add a line "Co-authored-by:" to mention the AI agent name
-- When making a Pull Request, keep the PR description short (never exceed 50 lines) and mention the AI agent name in the description with a line like "Submited with <AI agent name> (see commit comments for attributions)"
+- When committing, keep your commit comment short (NEVER exceed 50 lines) and add a line "Co-authored-by:" to mention the AI agent name
+- When making a Pull Request, keep the PR description short (never exceed 50 lines) and mention the AI agent name in the description with a line like "Submitted with <AI agent name> (see commit comments for attributions)"
 - A pull request can contain database structure change only, or one new feature, or one bug fix, or a refactoring but never a mix of these. 
 
 ---
