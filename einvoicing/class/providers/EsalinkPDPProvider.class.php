@@ -731,7 +731,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	 *
 	 * @param string 						$resource 	    Resource relative URL ('token', 'healthcheck', 'Flows', or others)
 	 * @param 'POST'|'GET'|'HEAD'|'PUT'|'PUTALREADYFORMATED'|'POSTALREADYFORMATED'|'DELETE' $method         HTTP method (dolibarr's types)
-	 * @param string|false 	$params 	    Options for the request (JSON encoded)
+	 * @param string|false|array<string,mixed> 	$params 	    Body of the request: a JSON encoded string, or an array carrying a CURLFile for a multipart upload. False when there is none.
 	 * @param array<string, string>         $extraHeaders   Optional additional headers
 	 * @param string|null                   $callType       Functional type of the API call for logging purposes (e.g., 'sync_flows', 'send_invoice')
 	 *
