@@ -1603,21 +1603,42 @@ class Document extends CommonObject
 
 			if ($sync_result['res'] <= 0) {
 				$error++;
-				$errortype = 'errors';
+				// The scheduler builds what it shows from $this->error and $this->errors, never from
+				// $this->output. Leaving both empty is what turns a precise cause into the bare
+				// "Unknown error" the job card ends up displaying.
 				if (!empty($sync_result['actions'])) {
-					$errortype = 'warnings';
-					$this->output .= '<br>' . $langs->trans("EINVOICING_JOB_MANUAL_ACTION_REQUIRED") . '<br>';
+					// A business error already carries a message written for a human, and the technical
+					// line with it, inside the tooltip its picto opens on the card. Handing the transcript
+					// to the scheduler as well would print that same line a second time and in clear,
+					// under the very action the operator is being asked to carry out. What is missing here
+					// is a cause, not a copy of one: give the sentence that closes the list, and stop
+					// writing it above them.
+					$this->output .= '<br>';
 					foreach ($sync_result['actions'] as $action) {
 						$this->output .= "---<br>";
 						$this->output .= $action['businessmessage'] . '<br>';
 					}
-					$this->output = rtrim($this->output, '<br>');
+					// Not rtrim($output, '<br>'): rtrim strips characters, not a string, so it eats into
+					// the closing tags of the business message and leaves broken markup behind.
+					$this->output = preg_replace('/<br>$/', '', $this->output);
+					$this->error = $langs->trans("EINVOICING_JOB_MANUAL_ACTION_REQUIRED");
+				} else {
+					// Everything else has no message written for a human, so the transcript is what the
+					// operator gets. A third-party provider may only fill the older 'details' key, so fall
+					// back on it rather than on nothing.
+					$this->errors = $sync_result['errors'] ?? ($sync_result['details'] ?? array());
+
+					// The early returns of syncFlows() - the access point answering something other than
+					// 200, the lookup of the already-processed flows failing - put their one message in
+					// both keys. The scheduler prints output and then the cause, so leaving it in both
+					// shows it twice.
+					$this->output = implode('<br>', array_diff($sync_result['messages'] ?? array(), $this->errors));
 				}
-				//$this->output = $langs->trans("FailedToSyncADocument").($errortype ? '<br>'.$langs->trans("FailedToSyncADocumentMore") : '');
 			}
 		} else {
 			$error++;
-			$this->output = $langs->trans("NoPDPProviderConfigured");
+			// Set on error only, not on output: the scheduler concatenates the two and would show it twice.
+			$this->error = $langs->trans("NoPDPProviderConfigured");
 		}
 
 		$this->output = trim($this->output);

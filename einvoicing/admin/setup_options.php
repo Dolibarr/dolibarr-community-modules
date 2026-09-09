@@ -363,6 +363,14 @@ if (!einvoicingIsReceiveDisabled()) {
 		$item->fieldParams['warningifon'] = 1;
 	}
 
+	// Setup conf to match a vendor product reference written with separators other than the recorded one.
+	// Off by default: the comparison ignores separators, so it is an approximation.
+	$item = $formSetup->newItem('EINVOICING_PRODUCTS_MATCH_CANONICAL_REF')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('EINVOICING_PRODUCTS_MATCH_CANONICAL_REF_HELP');
+	$item->defaultFieldValue = '0';
+	$item->cssClass = 'minwidth500';
+	$item->fieldParams['warningifon'] = 1;
+
 	// Setup conf to choose use of auto generation or not of third parties
 	$item = $formSetup->newItem('EINVOICING_THIRDPARTIES_AUTO_GENERATION')->setAsYesNo();
 	$item->helpText = $langs->transnoentities('EINVOICING_THIRDPARTIES_AUTO_GENERATION_HELP');

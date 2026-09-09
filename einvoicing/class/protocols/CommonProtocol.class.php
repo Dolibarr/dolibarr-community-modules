@@ -245,6 +245,82 @@ trait CommonProtocol
 		return $retour;
 	}
 
+	/**
+	 * Canonical form of a product reference, for comparison only.
+	 *
+	 * The same identifier reaches us in as many writings as there are systems it travels through.
+	 * A vendor may write 'A1234-10_42' on its order forms and 'A1234|10|42' on its invoices.
+	 * Dolibarr stores a product reference through dol_sanitizeFileName(), which replaces every
+	 * character forbidden in a file name. A catalogue that went through a spreadsheet comes back
+	 * with non breaking spaces. Comparing the raw strings answers "not found" for what is plainly
+	 * the same item, so the comparison is done on this canonical form instead: letters and digits
+	 * only, upper case.
+	 *
+	 * This form is a comparison key. It is never stored, never displayed, and never written back
+	 * to the reference it was computed from.
+	 *
+	 * @param	string	$ref	Reference as written by its source
+	 * @return	string			Canonical form, empty when nothing comparable is left
+	 */
+	public static function canonicalRef($ref)
+	{
+		$ref = dol_string_unaccent((string) $ref);
+		$ref = preg_replace('/[^A-Za-z0-9]/', '', $ref);
+
+		return strtoupper((string) $ref);
+	}
+
+	/**
+	 * Vendor references of one supplier, indexed by their canonical form.
+	 *
+	 * The normalization is done in PHP rather than in SQL, for three reasons: removing every
+	 * separator in SQL needs REGEXP_REPLACE, which is not available on every database Dolibarr
+	 * supports; a function applied to the column would prevent the use of any index anyway; and
+	 * one query per supplier for a whole invoice costs less than one scan per invoice line.
+	 * The result is cached for the run, so importing a hundred lines of the same vendor reads
+	 * its references once.
+	 *
+	 * @param	DoliDB	$db			Database handler
+	 * @param	int		$socid		Supplier id
+	 * @return	array<string,int>	Canonical reference => product id, 0 when several products share it
+	 */
+	protected static function canonicalVendorRefMap($db, $socid)
+	{
+		global $conf;
+
+		static $cache = array();
+
+		// The map depends on the entity, through getEntity() below, so the entity is part of the key.
+		$cachekey = ((int) $socid) . '_' . ((int) $conf->entity);
+		if (isset($cache[$cachekey])) {
+			return $cache[$cachekey];
+		}
+
+		$map = array();
+		$sql = "SELECT pfp.fk_product, pfp.ref_fourn";
+		$sql .= " FROM " . MAIN_DB_PREFIX . "product_fournisseur_price as pfp";
+		$sql .= " INNER JOIN " . MAIN_DB_PREFIX . "product as p ON p.rowid = pfp.fk_product";
+		$sql .= " WHERE pfp.fk_soc = " . ((int) $socid);
+		$sql .= " AND p.entity IN (" . getEntity('product') . ")";
+		$resql = $db->query($sql);
+		if ($resql) {
+			while ($obj = $db->fetch_object($resql)) {
+				$key = self::canonicalRef($obj->ref_fourn);
+				if ($key === '') {
+					continue;
+				}
+				if (!isset($map[$key])) {
+					$map[$key] = (int) $obj->fk_product;
+				} elseif ($map[$key] !== (int) $obj->fk_product) {
+					$map[$key] = 0;		// two products share that canonical form: undecidable
+				}
+			}
+		}
+
+		$cache[$cachekey] = $map;
+
+		return $map;
+	}
 
 	/**
 	 * Generate a sample E-invoice for demonstration or testing purposes (for Dolibarr version >= 24.0)
@@ -1004,6 +1080,28 @@ trait CommonProtocol
 			// No match found, continue to next step
 		}
 
+		// Fall back on the canonical form of the reference, for the vendors that do not write it
+		// the same way on their orders and on their invoices. The exact lookup above stays first,
+		// so nothing changes for the vendors that already match, and its index is still used there.
+		// Off by default: this comparison is an approximation, so it is a setup option the user
+		// turns on knowingly.
+		if (getDolGlobalInt('EINVOICING_PRODUCTS_MATCH_CANONICAL_REF')) {
+			$canonical = self::canonicalRef($lineData['prodsellerid'] ?? '');
+			if ($canonical !== '' && !empty($lineData['supplierId'])) {
+				$map = self::canonicalVendorRefMap($db, (int) $lineData['supplierId']);
+				if (isset($map[$canonical])) {
+					if ($map[$canonical] > 0) {
+						dol_syslog(__METHOD__ . ' Found product by prodsellerid on its canonical form: ' . $map[$canonical]);
+						return array('res' => $map[$canonical], 'message' => 'Product found by prodsellerid (canonical form)');
+					}
+					// Several products of this supplier share that canonical form. Nothing can be
+					// decided here, so the line goes to the manual mapping instead of being bound
+					// to whichever row came first.
+					dol_syslog(__METHOD__ . ' Ambiguous canonical vendor ref ' . $canonical . ', left to the manual mapping', LOG_WARNING);
+				}
+			}
+		}
+
 		// Global ID (prodglobalid + prodglobalidtype) and prodglobalidtype = '0160' search by barcode
 		// TODO
 
@@ -1021,10 +1119,15 @@ trait CommonProtocol
 			}
 		}
 
-		// Check with EI- prefix for product inmported using prodsellerid as internal reference with EI- prefix
+		// Check with EI- prefix for product imported using prodsellerid as internal reference with EI- prefix
 		if (!empty($lineData['prodsellerid']) && $lineData['prodsellerid'] !== "") {
+			// The reference is sanitized when the product is created (see
+			// _findOrCreateProductFromEinvoiceLine), so the lookup has to apply the same transform.
+			// A vendor reference holding a character forbidden in a file name is stored as
+			// 'EI-A1234_10_42' but was looked up as 'EI-A1234|10|42', so the module could never
+			// find back a product it had created itself.
 			$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product";
-			$sql .= " WHERE ref = 'EI-" . $db->escape($lineData['prodsellerid']) . "'";
+			$sql .= " WHERE ref = 'EI-" . $db->escape(dol_sanitizeFileName($lineData['prodsellerid'])) . "'";
 			$sql .= " AND entity IN (" . getEntity('product') . ")";
 			$sql .= " LIMIT 1";
 			$resql = $db->query($sql);
