@@ -415,6 +415,26 @@ abstract class AbstractPDPProvider
 
 
 	/**
+	 * Set the setup factory specific to the provider.
+	 *
+	 * Optional: a provider with nothing of its own to configure keeps this empty block, and the setup
+	 * page then simply shows nothing under the common one.
+	 *
+	 * @param FormSetup $formSetup 			The form setup object to initialize
+	 * @param string 	$prefix 			The prefix for configuration keys ('EINVOICING_MYPDP_')
+	 * @param string 	$prefixenv 			'prod' or 'test', depending on EINVOICING_LIVE
+	 * @param array 	$providersConfig 	The array containing providers configuration
+	 * @param array 	$TFieldProtocols 	The array of available protocols to set in the select field
+	 * @param array 	$TFieldProfiles 	The array of available profiles to set in the select field
+	 * @return void
+	 */
+	public function initFormSetup(&$formSetup, $prefix, $prefixenv, $providersConfig, $TFieldProtocols, $TFieldProfiles)
+	{
+		// Nothing to add to the setup page by default.
+	}
+
+
+	/**
 	 * Try to get a flow data from its id and doc type, using API
 	 *
 	 * @param string	$flowId 		The id of the flow
