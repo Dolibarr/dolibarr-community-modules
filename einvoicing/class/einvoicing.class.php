@@ -2818,7 +2818,11 @@ class EInvoicing
 		if (!is_object($object->thirdparty ?? null)) {
 			$object->fetch_thirdparty();
 		}
-		$siren = is_object($object->thirdparty ?? null) ? preg_replace('/[^0-9]/', '', (string) $object->thirdparty->idprof1) : '';
+		$thirdparty = $object->thirdparty;
+		if (!is_object($thirdparty)) {
+			return $res;	// no recipient loaded: nothing to look up
+		}
+		$siren = preg_replace('/[^0-9]/', '', (string) $thirdparty->idprof1);
 		if ($siren === '') {
 			return $res;	// no SIREN: the standard required-information checks handle this
 		}
@@ -2834,7 +2838,7 @@ class EInvoicing
 		// declare several reception addresses, only the one written into the document decides whether
 		// the transmission is accepted. Same call as getBuyerCommunicationURI() makes at generation, so
 		// what is checked and what is emitted can never drift apart.
-		$routingid = $this->getBuyerCommunicationURI($object->thirdparty, $object);
+		$routingid = $this->getBuyerCommunicationURI($thirdparty, $object);
 
 		$dir = $provider->checkRecipientDirectory($siren, $routingid);
 		$res['status'] = isset($dir['status']) ? $dir['status'] : 'error';
