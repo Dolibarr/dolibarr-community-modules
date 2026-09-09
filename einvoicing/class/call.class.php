@@ -1234,7 +1234,7 @@ class Call extends CommonObject
 		// Read on the connection this record will be written on ($dbhistory), not on the global $db: a
 		// snapshot read from another transaction returns a stale number and the insert dies on
 		// uk_einvoicing_call_callid. FOR UPDATE makes it a locking read and holds the range until insert.
-		$sql = "SELECT MAX(CAST(SUBSTRING(call_id, ".(strlen($prefix) + 1).") AS SIGNED)) AS maxref";
+		$sql = "SELECT MAX(CAST(SUBSTRING(call_id, ".(strlen($prefix) + 1).") AS INTEGER)) AS maxref";
 		$sql .= " FROM ".$this->db->prefix().$this->table_element;
 		$sql .= " WHERE call_id LIKE '".$this->db->escape($prefix)."%'";
 		$sql .= " FOR UPDATE";
