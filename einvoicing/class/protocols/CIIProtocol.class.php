@@ -3476,7 +3476,8 @@ class CIIProtocol extends AbstractProtocol
 		if ($invoice->fetch($supplierInvoiceId) <= 0) {
 			return;
 		}
-		if (self::totalsAgreeWithDocument($invoice, $announcedTva, $announcedTtc)) {
+		if (SupplierInvoiceHelper::totalsAgreeWithDocument($invoice, $announcedTva, $announcedTtc)) {
+			SupplierInvoiceHelper::clearTotalsMismatch($supplierInvoiceId);
 			return;
 		}
 
@@ -3496,7 +3497,7 @@ class CIIProtocol extends AbstractProtocol
 			if ($invoice->fetch($supplierInvoiceId) <= 0) {
 				return;
 			}
-			if (self::totalsAgreeWithDocument($invoice, $announcedTva, $announcedTtc)) {
+			if (SupplierInvoiceHelper::totalsAgreeWithDocument($invoice, $announcedTva, $announcedTtc)) {
 				// The import runs from a cron job as well as from a page, so the language file of the
 				// module is not necessarily loaded.
 				$langs->load('einvoicing@einvoicing');
@@ -3510,32 +3511,35 @@ class CIIProtocol extends AbstractProtocol
 					price2num($importedTtc, 'MT')
 				);
 				dol_syslog(__METHOD__ . ' Invoice ' . $supplierInvoiceId . ' recalculated in VAT mode ' . $modenumber . ' to match the totals of the received document', LOG_DEBUG);
+				SupplierInvoiceHelper::clearTotalsMismatch($supplierInvoiceId);
 				return;
 			}
 		}
 
-		// Neither convention gives the announced totals: leave the invoice as the import built it.
+		// Neither convention gives the announced totals: the document is one the import cannot
+		// reproduce. The invoice is left as it was built - the file is attached to it and nothing else
+		// carries what the vendor sent - but it is marked, and that mark keeps it out of validation and
+		// out of any approval until the two agree (issue #861).
 		$invoice->update_price(1, 'auto', 0, $invoice->thirdparty);
+		if ($invoice->fetch($supplierInvoiceId) <= 0) {
+			return;
+		}
+
+		SupplierInvoiceHelper::flagTotalsMismatch($supplierInvoiceId, $announcedTva, $announcedTtc);
+
+		$langs->load('einvoicing@einvoicing');
+		$return_messages[] = $langs->trans(
+			'EInvoiceImportTotalsMismatch',
+			dol_escape_htmltag((string) ($parsedHeader['documentno'] ?? '')),
+			price2num($announcedTtc, 'MT'),
+			price2num($announcedTva, 'MT'),
+			price2num(abs((float) $invoice->total_ttc), 'MT')
+		);
+		$return_messages[] = $langs->trans('EInvoiceImportTotalsMismatchAction');
+
+		dol_syslog(__METHOD__ . ' Invoice ' . $supplierInvoiceId . ' does not total the received document (announced ' . $announcedTtc . ' incl. VAT, imported ' . $invoice->total_ttc . '): validation and approval blocked', LOG_WARNING);
 	}
 
-	/**
-	 * Tell whether an invoice totals what the received document announces.
-	 *
-	 * Compared on the absolute values: a credit note is stored negative by Dolibarr while BT-110 and
-	 * BT-112 are always announced positive, the document type being what carries the sign (BR-CO-13
-	 * applies to a credit note as it does to an invoice). The tolerance is there for the float
-	 * representation, not for a difference: the document carries its totals to the cent.
-	 *
-	 * @param	FactureFournisseur	$invoice		The invoice, with its totals as stored
-	 * @param	float				$announcedTva	BT-110 of the received document, absolute value
-	 * @param	float				$announcedTtc	BT-112 of the received document, absolute value
-	 * @return	bool								True when both totals are the announced ones
-	 */
-	private static function totalsAgreeWithDocument(FactureFournisseur $invoice, $announcedTva, $announcedTtc)
-	{
-		return abs(abs((float) $invoice->total_tva) - $announcedTva) < 0.005
-			&& abs(abs((float) $invoice->total_ttc) - $announcedTtc) < 0.005;
-	}
 
 
 	/**

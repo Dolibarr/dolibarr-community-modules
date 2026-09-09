@@ -392,12 +392,14 @@ if (!einvoicingIsReceiveDisabled()) {
 	$item->fieldParams['forcereload'] = 1;
 	*/
 
-	if (getDolGlobalString('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION_AVAILABLE')) {
-		// Setup conf to enable or not the consistency check on supplier invoice validation
-		$item = $formSetup->newItem('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION');
-		$item->helpText = $langs->transnoentities('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION_HELP');
-		$item->setAsYesNo();
-	}
+	// Setup conf to enable or not the consistency check on supplier invoice validation. Off by default:
+	// it re-checks every e-invoice at validation, including the ones edited by hand afterwards, which is
+	// a wider question than the one the import itself settles.
+	$item = $formSetup->newItem('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION');
+	$item->helpText = $langs->transnoentities('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION_HELP');
+	$item->setAsYesNo();
+	$item->defaultFieldValue = '0';
+	$item->cssClass = 'minwidth500';
 
 	// Tell the vendor that its invoice is approved (status 205) when the supplier invoice is validated so approved.
 	// Off by default.

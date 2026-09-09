@@ -20,10 +20,9 @@
  * \file    einvoicing/class/utils/SupplierInvoiceHelper.class.php
  * \ingroup einvoicing
  * \brief   Utility class for supplier invoices.
- * 			This file is mainly used when EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION is set but
- * 			this option is seriously bugged. Do not use it.
  */
 
+dol_include_once('einvoicing/class/einvoicing.class.php');
 dol_include_once('einvoicing/class/protocols/ProtocolManager.class.php');
 dol_include_once('einvoicing/class/document.class.php');
 dol_include_once('einvoicing/class/utils/PriceHelper.class.php');
@@ -477,6 +476,113 @@ class SupplierInvoiceHelper
 		}
 
 		return 1;
+	}
+
+	/**
+	 * Tell whether an invoice totals what the received document announces.
+	 *
+	 * Compared on the absolute values: a credit note is stored negative by Dolibarr while BT-110 and
+	 * BT-112 are always announced positive, the document type being what carries the sign (BR-CO-13
+	 * applies to a credit note as it does to an invoice). The tolerance is there for the float
+	 * representation, not for a difference: the document carries its totals to the cent.
+	 *
+	 * @param	FactureFournisseur	$invoice		The invoice, with its totals as stored
+	 * @param	float				$announcedTva	BT-110 of the received document, absolute value
+	 * @param	float				$announcedTtc	BT-112 of the received document, absolute value
+	 * @return	bool								True when both totals are the announced ones
+	 */
+	public static function totalsAgreeWithDocument(FactureFournisseur $invoice, $announcedTva, $announcedTtc)
+	{
+		return abs(abs((float) $invoice->total_tva) - (float) $announcedTva) < 0.005
+			&& abs(abs((float) $invoice->total_ttc) - (float) $announcedTtc) < 0.005;
+	}
+
+	/**
+	 * Mark a supplier invoice as not totalling what the document it was imported from announces.
+	 *
+	 * The announced totals are kept with the mark, so what it blocks can be re-evaluated without the
+	 * document: an operator who corrects the invoice to the figures the vendor bills lifts the block
+	 * by doing so (issue #861).
+	 *
+	 * @param	int		$supplierInvoiceId	Id of the supplier invoice the import created
+	 * @param	float	$announcedTva		BT-110 of the received document, absolute value
+	 * @param	float	$announcedTtc		BT-112 of the received document, absolute value
+	 * @return	int							-1 on error, >0 otherwise
+	 */
+	public static function flagTotalsMismatch($supplierInvoiceId, $announcedTva, $announcedTtc)
+	{
+		global $db;
+
+		$einvoicing = new EInvoicing($db);
+		$value = json_encode(array('tva' => (float) $announcedTva, 'ttc' => (float) $announcedTtc));
+
+		return $einvoicing->insertOrUpdateExtraField((int) $supplierInvoiceId, 'invoice_supplier', EInvoicing::EXTRAFIELD_TOTALS_MISMATCH, (string) $value);
+	}
+
+	/**
+	 * Read the mark left by an import that could not reproduce the totals of the document.
+	 *
+	 * @param	int		$supplierInvoiceId		Id of the supplier invoice
+	 * @return	?array{tva:float,ttc:float}		The totals the document announces, or null when the invoice carries no mark
+	 */
+	public static function totalsMismatch($supplierInvoiceId)
+	{
+		global $db;
+
+		$einvoicing = new EInvoicing($db);
+		$stored = $einvoicing->getExtraFieldValue((int) $supplierInvoiceId, 'invoice_supplier', EInvoicing::EXTRAFIELD_TOTALS_MISMATCH);
+		if ($stored === null || $stored === '') {
+			return null;
+		}
+
+		$decoded = json_decode($stored, true);
+		if (!is_array($decoded) || !isset($decoded['tva']) || !isset($decoded['ttc'])) {
+			return null;
+		}
+
+		return array('tva' => (float) $decoded['tva'], 'ttc' => (float) $decoded['ttc']);
+	}
+
+	/**
+	 * Remove the mark, once the invoice totals what the document announces.
+	 *
+	 * @param	int		$supplierInvoiceId	Id of the supplier invoice
+	 * @return	int							-1 on error, >0 otherwise
+	 */
+	public static function clearTotalsMismatch($supplierInvoiceId)
+	{
+		global $db;
+
+		$einvoicing = new EInvoicing($db);
+
+		return $einvoicing->insertOrUpdateExtraField((int) $supplierInvoiceId, 'invoice_supplier', EInvoicing::EXTRAFIELD_TOTALS_MISMATCH, '');
+	}
+
+	/**
+	 * Tell whether a supplier invoice still disagrees with the document it was imported from.
+	 *
+	 * The mark alone is not the answer: it says the import could not reproduce the document, and the
+	 * invoice may have been corrected since. So the totals are confronted again, and a mark that no
+	 * longer holds blocks nothing.
+	 *
+	 * @param	int		$supplierInvoiceId	Id of the supplier invoice
+	 * @return	bool						True while the invoice does not total what the document announces
+	 */
+	public static function totalsMismatchBlocks($supplierInvoiceId)
+	{
+		global $db;
+
+		$announced = self::totalsMismatch((int) $supplierInvoiceId);
+		if ($announced === null) {
+			return false;
+		}
+
+		$invoice = new FactureFournisseur($db);
+		if ($invoice->fetch((int) $supplierInvoiceId) <= 0) {
+			return true;
+		}
+
+		return !self::totalsAgreeWithDocument($invoice, $announced['tva'], $announced['ttc']);
 	}
 
 	/**

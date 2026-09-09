@@ -302,6 +302,24 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		if ($action == 'BILL_SUPPLIER_VALIDATE') {
 			/** @var FactureFournisseur $object */
 			'@phan-var-force FactureFournisseur $object';
+			// An invoice the import could not make total what its document announces never becomes
+			// payable by being validated: the totals are confronted again here, so an invoice corrected
+			// to the figures the vendor bills validates normally and drops the mark (issue #861).
+			$announced = SupplierInvoiceHelper::totalsMismatch((int) $object->id);
+			if ($announced !== null) {
+				if (SupplierInvoiceHelper::totalsAgreeWithDocument($object, $announced['tva'], $announced['ttc'])) {
+					SupplierInvoiceHelper::clearTotalsMismatch((int) $object->id);
+				} else {
+					$this->errors[] = $langs->trans(
+						'EInvoiceTotalsMismatchBlocksValidation',
+						price2num($announced['ttc'], 'MT'),
+						price2num($announced['tva'], 'MT'),
+						price2num(abs((float) $object->total_ttc), 'MT')
+					);
+					return -1;
+				}
+			}
+
 			$duplicate = false;
 			if (getDolGlobalInt('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION') && SupplierInvoiceHelper::isEInvoice($object->id, false, $duplicate)) {
 				if ($duplicate) {
