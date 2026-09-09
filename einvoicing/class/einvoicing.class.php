@@ -1194,7 +1194,7 @@ class EInvoicing
 	/**
 	 * Validate thirdparty configuration
 	 *
-	 * @param Societe $thirdparty   Thirdparty object
+	 * @param ?Societe $thirdparty  Thirdparty object, null when the invoice carries no loaded thirdparty
 	 * @return array{res:int, message:string} Returns array with 'res' (1 on success, -1 on error and 0 on warning) and info 'message'
 	 */
 	public function validatethirdpartyConfiguration($thirdparty)
@@ -1249,8 +1249,9 @@ class EInvoicing
 		if (empty($thirdparty->country_code)) {
 			$baseErrors[] = $langs->trans("FxCheckErrorCustomerCountry");
 		}
-		// Check routing_id
-		$routing_id = $this->getBuyerCommunicationURI($thirdparty);
+		// Check routing_id. Without a loaded thirdparty there is no routing to read, and the missing
+		// name and professional id are already reported above.
+		$routing_id = is_object($thirdparty) ? $this->getBuyerCommunicationURI($thirdparty) : '';
 		// If EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID is off, we use the profid as einvoice id and we already have the previous error message of
 		// profid missing. But if on, we also add a message dedicated to einvoice ID.
 		// Same reason as for the professional id above: a B2C third party is not addressed on the network, so
@@ -1258,10 +1259,10 @@ class EInvoicing
 		if (getDolGlobalString('EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID') && empty($routing_id) && !$isB2C) {
 			$baseErrors[] = $langs->trans("FxCheckErrorCustomerRoutingID");
 		}
-		if ($thirdparty->tva_assuj && empty($thirdparty->tva_intra)) {
+		if (!empty($thirdparty->tva_assuj) && empty($thirdparty->tva_intra)) {
 			// Test VAT code only if thirdparty is subject to VAT
 			$baseWarnings[] = $langs->trans("FxCheckErrorCustomerVAT");
-		} elseif ($thirdparty->tva_assuj && !empty($thirdparty->tva_intra) && !empty($thirdparty->country_code) && $thirdparty->country_code === 'FR') {
+		} elseif (!empty($thirdparty->tva_assuj) && !empty($thirdparty->tva_intra) && !empty($thirdparty->country_code) && $thirdparty->country_code === 'FR') {
 			// Validate French intra-community VAT number format: FR + 2 alphanumeric characters + 9 digits (SIREN)
 			$vatNormalized = strtoupper(removeAllSpaces($thirdparty->tva_intra));
 			if (!preg_match('/^FR[0-9A-Z]{2}[0-9]{9}$/', $vatNormalized)) {
@@ -1368,7 +1369,7 @@ class EInvoicing
 	 * Optional and non-blocking: an API timeout or unavailability is silently ignored (warning logged).
 	 * Only runs when EINVOICING_ENABLE_API_VALIDATION constant is set to 1.
 	 *
-	 * @param Societe $thirdparty   Thirdparty object to check
+	 * @param ?Societe $thirdparty  Thirdparty object to check, null when the invoice carries no loaded thirdparty
 	 * @return array{res:int, message:string} res=1 OK, res=0 warning, res=-1 blocking error (never returned by this method)
 	 */
 	private function _checkThirdpartyViaExternalAPIs($thirdparty)
