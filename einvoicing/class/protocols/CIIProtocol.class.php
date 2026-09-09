@@ -2356,7 +2356,8 @@ class CIIProtocol extends AbstractProtocol
 		// ContractReferencedDocument, before SpecifiedProcuringProject (CII schema order).
 		if (!$invoiceData['_chorus'] && $profile !== 'MINIMUM' && !empty($invoiceData['_customerOrderReferenceList'])) {
 			foreach ($invoiceData['_customerOrderReferenceList'] as $additionalOrderRef) {
-				if ($additionalOrderRef === $invoiceData['orderReference']) {
+				// A blank reference would become an empty BT-18, which BR-52 rejects as fatal
+				if ($additionalOrderRef === $invoiceData['orderReference'] || trim((string) $additionalOrderRef) === '') {
 					continue;
 				}
 				$addRef = $doc->createElement('ram:AdditionalReferencedDocument');
@@ -3348,8 +3349,10 @@ class CIIProtocol extends AbstractProtocol
 					if (!empty($expedition->origin) && $expedition->origin == "commande" && !empty($expedition->origin_id)) {
 						$commande = new Commande($this->db);
 						$commandeFetchResult = $commande->fetch($expedition->origin_id);
-						if ($commandeFetchResult > 0 && !empty($commande->ref_client)) {
-							$customerOrderReferenceList[] = $commande->ref_client;
+						// empty() would let a reference made of spaces through - it becomes an empty BT-13 or
+						// BT-18, which BR-52 rejects - and would drop one that reads "0", which is a reference.
+						if ($commandeFetchResult > 0 && trim((string) $commande->ref_client) !== '') {
+							$customerOrderReferenceList[] = trim((string) $commande->ref_client);
 						}
 					}
 					if (!empty($expedition->date_delivery)) {
@@ -3365,8 +3368,8 @@ class CIIProtocol extends AbstractProtocol
 				$commande = new Commande($this->db);
 				$commandeFetchResult = $commande->fetch($commandeId);
 				if ($commandeFetchResult > 0) {
-					if (!empty($commande->ref_client)) {
-						$customerOrderReferenceList[] = $commande->ref_client;
+					if (trim((string) $commande->ref_client) !== '') {
+						$customerOrderReferenceList[] = trim((string) $commande->ref_client);
 					}
 					$commande->fetchObjectLinked();
 					$found = 0;

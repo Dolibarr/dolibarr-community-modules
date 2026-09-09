@@ -180,7 +180,9 @@ class CIITextEscapingTest extends CommonClassTest
 			'_chorus' => false,
 			'_depositlines' => [],
 			'_globalDiscounts' => [['value' => 10.0, 'reason' => 'Geste commercial R' . self::AMP, 'taxRate' => 20.0, 'categoryVAT' => 'S']],
-			'_customerOrderReferenceList' => [],
+			// An invoice covering three orders, one of which has a blank customer reference: the first
+			// entry repeats BT-13 and the blank one must not become an empty BT-18 (BR-52).
+			'_customerOrderReferenceList' => ['CMD-2026' . self::AMP, '   ', 'CMD-2027' . self::AMP],
 			'_project' => null,
 		];
 	}
@@ -334,6 +336,31 @@ class CIITextEscapingTest extends CommonClassTest
 
 			$this->assertSame([], $empty, $profile . ' carries empty elements: ' . implode(', ', $empty));
 		}
+	}
+
+	/**
+	 * A customer order whose reference is blank is collected by the same loop as the others, and it
+	 * used to reach the document as an empty BT-18. BR-52 rejects that as fatal, on the Access Point
+	 * validator as well as on the CTC-FR chain.
+	 *
+	 * @return void
+	 */
+	public function testABlankOrderReferenceIsNotEmittedAsAnEmptyBt18()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+		$doc = $this->load($protocol->buildXML($this->poisonedInvoiceData(), $this->poisonedLinesData(), 'EN16931'));
+		$xpath = $this->xpathOf($doc);
+
+		$path = '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:AdditionalReferencedDocument';
+		$emitted = [];
+		foreach ($xpath->query($path) as $node) {
+			$emitted[] = $node->getElementsByTagName('IssuerAssignedID')->item(0)->nodeValue;
+		}
+
+		// Only the third order is left: the first repeats BT-13, the second one is blank
+		$this->assertSame(['CMD-2027' . self::AMP], $emitted);
 	}
 
 	/**
