@@ -1484,6 +1484,43 @@ class EInvoicing
 			}
 		}
 
+		// BR-25: every line of the document names what it invoices (BT-153). The name is built from the
+		// label of the product, or from the first line of the description when there is no product, so a
+		// line holding neither is issued with an empty name and the document is refused - and refused by
+		// the platform, after transmission, on a line number the seller then has to go and find. Every
+		// such line is listed here instead, before anything is sent.
+		//
+		// Title and subtotal lines are not concerned: they are pseudo-lines that never reach the
+		// document. A discount line is not concerned either, its name being built from the piece it
+		// deducts (see einvoicingDiscountLabel()).
+		//
+		// Customer invoices only, afterPDFCreation() gating on instanceof Facture: FactureFournisseurLigne
+		// fills ->description and not ->desc before 20.0, so extending this guard to supplier invoices
+		// needs a ?: $line->description or every free line of an 18.0/19.0 purchase invoice reads as
+		// having no name.
+		$linesWithNoName = [];
+		if (!empty($invoice->lines) && is_array($invoice->lines)) {
+			foreach ($invoice->lines as $line) {
+				if ((int) $line->product_type == 9 || !empty($line->fk_remise_except)) {
+					continue;
+				}
+				$hasLabel = trim((string) ($line->product_label ?? '')) !== '';
+				$hasDesc = trim(dol_string_nohtmltag((string) ($line->desc ?? ''), 0)) !== '';
+				if (!$hasLabel && !$hasDesc) {
+					// The rank places the line on the paper, the rowid is what a correction is addressed to.
+					// Naming both is what lets whoever reads this go straight to the line and fix it.
+					// FactureLigne and FactureFournisseurLigne both hold the rank, their common parent
+					// does not declare it, and this reads whichever of the two the invoice carries.
+					// @phan-suppress-next-line PhanUndeclaredProperty
+					$rank = (int) ($line->rang ?? 0);
+					$linesWithNoName[] = ($rank ? '#'.$rank : '').' (id '.((int) $line->id).')';
+				}
+			}
+		}
+		if (!empty($linesWithNoName)) {
+			$baseErrors[] = $langs->trans("FxCheckErrorLinesWithNoName", implode(', ', $linesWithNoName));
+		}
+
 		if (!empty($baseErrors)) {
 			$res = -1;
 			$message .= '<br> Error: ' . implode('<br> Error: ', $baseErrors);
