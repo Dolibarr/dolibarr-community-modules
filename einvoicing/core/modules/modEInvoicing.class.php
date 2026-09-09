@@ -4,6 +4,7 @@
  * Copyright (C) 2019-2026	Frédéric France				<frederic.france@free.fr>
  * Copyright (C) 2025		SuperAdmin					<daoud.mouhamed@gmail.com>
  * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
+ * Copyright (C) 2026		Jose Martinez				<jose.martinez@pichinov.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -439,6 +440,23 @@ class modEInvoicing extends DolibarrModules
 			'object' => '',
 		);
 		/* END MODULEBUILDER LEFTMENU PDPMAPPEDVENDORREFS */
+		/* BEGIN MODULEBUILDER LEFTMENU PDPSYNCPENDING */
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=billing,fk_leftmenu=einvoicing_documents',
+			'type' => 'left',
+			'titre' => 'EInvoiceSyncPending',
+			'mainmenu' => 'billing',
+			'leftmenu' => 'einvoicing_sync_pending',
+			'url' => '/einvoicing/sync_pending_list.php',
+			'langs' => 'einvoicing@einvoicing',
+			'position' => 1004,
+			'enabled' => 'isModEnabled("einvoicing") && !getDolGlobalString("EINVOICING_ONLY_GENERATE")',
+			'perms' => '$user->hasRight("einvoicing", "read")',
+			'target' => '',
+			'user' => 2,
+			'object' => '',
+		);
+		/* END MODULEBUILDER LEFTMENU PDPSYNCPENDING */
 		/* BEGIN MODULEBUILDER LEFTMENU PDPSOCIETIES */
 		// $this->menu[$r++] = array(
 		// 	'fk_menu' => 'fk_mainmenu=billing,fk_leftmenu=einvoicing_billing',
