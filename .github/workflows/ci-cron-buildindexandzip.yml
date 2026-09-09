@@ -1,0 +1,113 @@
+---
+# Regenerate frequently the global index.yaml and rebuild the zip files.
+name: Rebuild index.yaml and module packages
+
+
+# yamllint disable-line rule:truthy
+on:
+  # Every time we want to refresh the baseline
+  schedule:
+    - cron: '0 5 * * *'
+  # And on demand, to publish without waiting for the next run
+  workflow_dispatch:
+
+
+permissions:
+  contents: write
+
+
+jobs:
+  update-index:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Configure Git to Ignore Case
+        run: git config --global core.ignorecase true
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+
+      - name: Run Script to Generate index.yaml
+        run: php dev/build/makepack-modules.php index
+
+      - name: Run Script to Generate zip
+        run: php dev/build/makepack-modules.php makezip
+
+      # The install button of Dolibarr downloads dev/build/bin/module_<name>-<version>.zip,
+      # with <version> read from index.yaml, so a package that does not exist under the
+      # announced name is a 404 on the user side. Check that what is announced is what is
+      # committed. A module the packager cannot build at all is reported, not fatal: it must
+      # not keep the other packages from being refreshed.
+      - name: Check Packages Match the Announced Versions
+        run: |
+          status=0
+          while read -r module version; do
+            zip="dev/build/bin/module_${module}-${version}.zip"
+            if [ ! -f "$zip" ]; then
+              if ls dev/build/bin/module_${module}-*.zip >/dev/null 2>&1; then
+                echo "[fail] $module announces $version but only $(ls dev/build/bin/module_${module}-*.zip) was built"
+                status=1
+              else
+                echo "[warn] $module announces $version and no package was built for it"
+              fi
+              continue
+            fi
+            roots=$(unzip -Z1 "$zip" | cut -d/ -f1 | sort -u)
+            if [ "$roots" != "$module" ]; then
+              echo "[fail] $zip does not unpack into a single $module directory: $roots"
+              status=1
+              continue
+            fi
+            if unzip -Z1 "$zip" | grep -qx "$module/VERSION"; then
+              packaged=$(unzip -p "$zip" "$module/VERSION" | tr -d "[:space:]")
+              if [ "$packaged" != "$version" ]; then
+                echo "[fail] $zip carries VERSION $packaged while index.yaml announces $version"
+                status=1
+                continue
+              fi
+            fi
+            echo "[ok] $module $version"
+          done < <(tr -d "\"'" < index.yaml | awk '
+            /^[[:space:]]*-[[:space:]]*modulename:/ {
+              module = $0
+              sub(/^[^:]*:[[:space:]]*/, "", module)
+              sub(/@.*$/, "", module)
+              gsub(/[[:space:]]/, "", module)
+              module = tolower(module)
+            }
+            /^[[:space:]]*current_version:/ && module != "" {
+              version = $0
+              sub(/^[^:]*:[[:space:]]*/, "", version)
+              gsub(/[[:space:]]/, "", version)
+              if (version != "" && version != "auto") {
+                print module, version
+              }
+              module = ""
+            }')
+          exit $status
+
+      - name: Check for Changes
+        id: check-changes
+        run: |
+          if [[ -n $(git status --porcelain) ]]; then
+            echo "CHANGED=true" >> $GITHUB_ENV
+          else
+            echo "CHANGED=false" >> $GITHUB_ENV
+          fi
+
+      - name: Commit and Push Changes
+        if: env.CHANGED == 'true'
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A index.yaml dev/build/bin
+          git commit -m "Rebuild index.yaml and module packages from main"
+          git push origin HEAD:main
