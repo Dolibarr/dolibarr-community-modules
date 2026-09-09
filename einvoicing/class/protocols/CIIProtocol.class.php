@@ -3275,7 +3275,7 @@ class CIIProtocol extends AbstractProtocol
 						}
 					}
 					if (!empty($expedition->date_delivery)) {
-						$deliveryDateList[] = date('Y-m-d', $expedition->date_delivery);
+						$deliveryDateList[] = dol_print_date($expedition->date_delivery, 'dayrfc', 'tzserver');
 					}
 				}
 			}
@@ -3299,14 +3299,14 @@ class CIIProtocol extends AbstractProtocol
 							if ($expeditionFetchResult > 0) {
 								if (!empty($expedition->date_delivery)) {
 									$found++;
-									$deliveryDateList[] = date('Y-m-d', $expedition->date_delivery);
+									$deliveryDateList[] = dol_print_date($expedition->date_delivery, 'dayrfc', 'tzserver');
 								}
 							}
 						}
 					}
 					if ($found == 0) {
 						if (!empty($commande->delivery_date)) {
-							$deliveryDateList[] = date('Y-m-d', $commande->delivery_date);
+							$deliveryDateList[] = dol_print_date($commande->delivery_date, 'dayrfc', 'tzserver');
 						}
 					}
 				}
