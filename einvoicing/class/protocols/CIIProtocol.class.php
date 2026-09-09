@@ -969,7 +969,7 @@ class CIIProtocol extends AbstractProtocol
 			return ['res' => -1, 'message' => 'Unfounded dolibarr corresponding Invoice code for document type code: ' . dol_escape_htmltag((string) ($parsedHeader['documenttypecode'] ?? 'NA'))];
 		}
 		// documentdate is already formatted into 'Y-m-d' by the parser ZugFerd and CII
-		$supplierInvoice->date = !empty($parsedHeader['documentdate']) ? dol_stringtotime($parsedHeader['documentdate']) : null;
+		$supplierInvoice->date = !empty($parsedHeader['documentdate']) ? dol_stringtotime($parsedHeader['documentdate'], 'tzserver') : null;
 
 		// For credit notes and replacement invoices, link to the source invoice via fk_facture_source
 		// (BT-25). A replacement invoice (BT-3 = 384) corrects the invoice it references just as a credit
@@ -1616,7 +1616,9 @@ class CIIProtocol extends AbstractProtocol
 	 * updateline() recomputes the totals from those three, so BT-131 is never stored as such. A line that is not a
 	 * DETAIL item (BT-X-8) carries no amount and becomes a text line. A regular item whose quantity times price
 	 * cannot express BT-131 - zero quantity, zero price, opposite sign - carries BT-131 as a single unit instead
-	 * (issues #726 and #772). Anything else is checked against BT-131 and reported when it does not match.
+	 * (issues #726 and #772). Any other line whose quantity times price is not BT-131 is imported at BT-131, at
+	 * the unit price that totals it (issues #844 and #850), and what was rewritten is reported. The charges of
+	 * the line (BG-28) are out of all this: they leave on lines of their own.
 	 *
 	 * @param	array<string,mixed>		$parsedLine			One line as parseInvoiceLines() returns it
 	 * @param	float					$qty				Quantity read from the document (BT-129)
@@ -1627,7 +1629,12 @@ class CIIProtocol extends AbstractProtocol
 	protected function resolveLineAmounts(array $parsedLine, $qty, $subprice, $remisePercent)
 	{
 		$lineid = (string) ($parsedLine['lineid'] ?? '?');
-		$announced = round((float) ($parsedLine['lineTotalAmount'] ?? 0), 2);
+
+		// A line charge (BG-28) is part of BT-131 but rejoins the invoice as a line of its own (issue #735),
+		// so what this line has to total is BT-131 less those charges.
+		$charges = $this->lineChargeTotal($parsedLine);
+		$announced = round((float) ($parsedLine['lineTotalAmount'] ?? 0) - $charges, 2);
+		$announcedText = $announced . ($charges == 0.0 ? '' : ' (BT-131 less the charges that leave on their own line)');
 
 		if (!$this->isDetailLine($parsedLine)) {
 			return array('qty' => 0.0, 'subprice' => 0.0, 'remise_percent' => 0.0, 'warning' => '');
@@ -1649,30 +1656,101 @@ class CIIProtocol extends AbstractProtocol
 				$reason = 'its quantity (BT-129) and unit price (BT-146) rebuild ' . $rebuilt . ', of the opposite sign';
 			}
 
-			$warning = 'Line ' . $lineid . ' of the received document carries a net amount (BT-131) of ' . $announced
+			$warning = 'Line ' . $lineid . ' of the received document carries a net amount (BT-131) of ' . $announcedText
 				. ' while ' . $reason . '. It was imported as a single unit at that amount, so the total of the invoice matches the document.';
 
 			return array('qty' => 1.0, 'subprice' => $announced, 'remise_percent' => 0.0, 'warning' => $warning);
 		}
 
-		$warning = '';
-		if (abs($rebuilt - $announced) > 0.01) {
-			$warning = 'Line ' . $lineid . ' of the received document announces a net amount (BT-131) of ' . $announced
-				. ', but its quantity and unit price rebuild ' . $rebuilt . '. The invoice carries the rebuilt amount.';
-		} elseif ($subprice != 0.0 && (float) price2num($subprice, 'MU') == 0.0) {
-			// calcul_price_total() rounds only the pu_ht copy it stores, to MAIN_MAX_DECIMALS_UNIT: a price stated
-			// per 100 000 (issue #777) totals what the document announces and still reaches the line as 0.00000.
-			// The import is right, but reopening and saving the line would recompute it to zero, so say so now.
-			// Spell the price out in full: PHP writes such a float as 1.34195E-6, which reads as a typo.
-			$spelled = rtrim(rtrim(number_format($subprice, 12, '.', ''), '0'), '.');
+		// BT-131 is what the line is worth: the totals of the document are summed from it (BR-CO-10, BR-CO-13)
+		// and no rule ties it to quantity times price. So a line whose couple rebuilds another amount is imported
+		// at the one announced, with the unit price that totals it: the six decimals of a price cannot state it
+		// over a large quantity (issue #844), or the issuer simply prices the line elsewhere than it bills it
+		// (issue #850). Only a line announcing nothing keeps what its price rebuilds.
+		$difference = abs($rebuilt - $announced);
+		$divisor = $qty * (1 - ($remisePercent / 100));
+		$fromPriceRounding = (abs($divisor) * 0.5 / pow(10, self::MAX_DECIMALS_UNIT_PRICE)) + 0.01;
 
-			$warning = 'Line ' . $lineid . ' of the received document prices a single unit at ' . $spelled
+		$warning = '';
+		$refined = false;
+		if (!empty($announced) && $difference > 0.01 && $divisor != 0.0) {
+			$subprice = $announced / $divisor;
+			$refined = true;
+
+			$warning = 'Line ' . $lineid . ' of the received document announces a net amount (BT-131) of ' . $announcedText
+				. ', while its quantity (BT-129) and unit price (BT-146) rebuild ' . $rebuilt . '. ';
+
+			if ($difference <= $fromPriceRounding) {
+				$warning .= 'That difference is within the ' . self::MAX_DECIMALS_UNIT_PRICE
+					. ' decimals a unit price is written with (BR-FR-DEC-03), so the price was refined to '
+					. $this->spellOutUnitPrice($subprice) . ' and the line totals the amount announced.';
+			} else {
+				$warning .= 'The document prices that line elsewhere than it bills it: the line was imported at the amount announced, at a unit price of '
+					. $this->spellOutUnitPrice($subprice) . ', so the invoice totals what the document bills.';
+			}
+		} elseif ($difference > 0.01) {
+			$warning = 'Line ' . $lineid . ' of the received document announces a net amount (BT-131) of ' . $announcedText
+				. ', but its quantity and unit price rebuild ' . $rebuilt . '. The invoice carries the rebuilt amount.';
+		}
+
+		// calcul_price_total() totals the line from the price it is handed, but stores a copy of that price rounded
+		// to MAIN_MAX_DECIMALS_UNIT: a price stated per 100 000 (issue #777) or refined above reaches the line as
+		// 0.00000. The amount imported is the one announced, but reopening and saving the line would recompute it
+		// from the stored price, so say so now rather than let it be found out.
+		$stored = (float) price2num($subprice, 'MU');
+		$reopened = round($qty * $stored * (1 - ($remisePercent / 100)), 2);
+		if (($warning === '' || $refined) && abs($reopened - $announced) > 0.001) {
+			$warning = trim($warning . ' Line ' . $lineid . ' of the received document prices a single unit at '
+				. $this->spellOutUnitPrice($subprice)
 				. ', below the unit price precision of this Dolibarr (MAIN_MAX_DECIMALS_UNIT = '
-				. getDolGlobalInt('MAIN_MAX_DECIMALS_UNIT') . '). Its net amount (BT-131) of ' . $announced
-				. ' is imported as announced, but the unit price is stored as zero: editing that line would recompute it to 0.00.';
+				. getDolGlobalInt('MAIN_MAX_DECIMALS_UNIT') . '). Its net amount (BT-131) of ' . $announcedText
+				. ' is imported as announced, but the unit price is stored as '
+				. number_format($stored, getDolGlobalInt('MAIN_MAX_DECIMALS_UNIT'), '.', '')
+				. ': editing that line would recompute it to ' . number_format($reopened, 2, '.', '') . '.');
 		}
 
 		return array('qty' => $qty, 'subprice' => $subprice, 'remise_percent' => $remisePercent, 'warning' => $warning);
+	}
+
+
+	/**
+	 * Total of the charges of a line (BG-28), the part of BT-131 that leaves on a line of its own.
+	 *
+	 * buildLineChargeLines() gives every charge of the line a Dolibarr line, so the line itself is worth
+	 * BT-131 less that total: comparing the whole of BT-131 to what quantity times price rebuilds would
+	 * count the charge twice (issue #735).
+	 *
+	 * @param	array<string,mixed>		$parsedLine		One line as parseInvoiceLines() returns it
+	 * @return	float									Sum of the charges of the line, zero when it has none
+	 */
+	protected function lineChargeTotal(array $parsedLine)
+	{
+		if (empty($parsedLine['lineAllowances']) || !is_array($parsedLine['lineAllowances'])) {
+			return 0.0;
+		}
+
+		$total = 0.0;
+		foreach ($parsedLine['lineAllowances'] as $allowanceCharge) {
+			if (($allowanceCharge['indicator'] ?? '') === 'true') {
+				$total += (float) ($allowanceCharge['actualAmount'] ?? 0);
+			}
+		}
+
+		return $total;
+	}
+
+
+	/**
+	 * Write a unit price out in full, for a message a human reads.
+	 *
+	 * PHP writes a price of that size as 1.34195E-6, which reads as a typo, and price() would round it away.
+	 *
+	 * @param	float	$subprice	Unit price to spell out
+	 * @return	string				The same price, in plain digits
+	 */
+	private function spellOutUnitPrice($subprice)
+	{
+		return rtrim(rtrim(number_format($subprice, 12, '.', ''), '0'), '.');
 	}
 
 
@@ -1697,18 +1775,18 @@ class CIIProtocol extends AbstractProtocol
 	/**
 	 * Billing period of a received line (BG-26 / BT-134 / BT-135), as the timestamps a Dolibarr line holds.
 	 *
-	 * The dates arrive as 'Y-m-d' strings and a line stores a timestamp, read with dol_stringtotime() the way the
-	 * invoice date already is (issue #576). One side alone is kept, BR-CO-20 accepting a start or an end. A period
-	 * that ends before it starts is dropped, keeping the line: updateline() answers -1 on that pair
-	 * (ErrorStartDateGreaterEnd), which would fail the whole import over a period.
+	 * The dates arrive as 'Y-m-d' strings and a line stores a timestamp, read in the timezone of the server the
+	 * way every other date of the document is (issue #576, then #853). One side alone is kept, BR-CO-20 accepting a
+	 * start or an end. A period that ends before it starts is dropped, keeping the line: updateline() answers -1 on
+	 * that pair (ErrorStartDateGreaterEnd), which would fail the whole import over a period.
 	 *
 	 * @param	array<string,mixed>				$parsedLine		One line as parseInvoiceLines() returns it
 	 * @return	array{start: ?int, end: ?int}					Timestamps to store, null for a side with nothing
 	 */
 	private function resolveLinePeriod(array $parsedLine)
 	{
-		$start = !empty($parsedLine['linePeriodStart']) ? dol_stringtotime((string) $parsedLine['linePeriodStart']) : null;
-		$end = !empty($parsedLine['linePeriodEnd']) ? dol_stringtotime((string) $parsedLine['linePeriodEnd']) : null;
+		$start = !empty($parsedLine['linePeriodStart']) ? dol_stringtotime((string) $parsedLine['linePeriodStart'], 'tzserver') : null;
+		$end = !empty($parsedLine['linePeriodEnd']) ? dol_stringtotime((string) $parsedLine['linePeriodEnd'], 'tzserver') : null;
 
 		// dol_stringtotime() answers false or '' on something it cannot read, and that must not reach idate().
 		$start = is_int($start) && $start > 0 ? $start : null;
@@ -2273,12 +2351,13 @@ class CIIProtocol extends AbstractProtocol
 
 		// Additional order references: when an invoice covers several purchase orders, the first is emitted as BT-13
 		// (BuyerOrderReferencedDocument above) and the others are listed here as AdditionalReferencedDocument/TypeCode=130.
-		// Restricted to profiles that carry AdditionalReferencedDocument in the agreement section (not MINIMUM), and
-		// skipped for Chorus (which does not accept these extra nodes). Sequence position: after
+		// ram:AdditionalReferencedDocument is only declared in the agreement section from EN16931 up - MINIMUM, BASIC WL
+		// and BASIC do not have it - and Chorus does not accept these extra nodes. Sequence position: after
 		// ContractReferencedDocument, before SpecifiedProcuringProject (CII schema order).
-		if (!$invoiceData['_chorus'] && $profile !== 'MINIMUM' && !empty($invoiceData['_customerOrderReferenceList'])) {
+		if (!$invoiceData['_chorus'] && $this->isEn16931Profile($profile) && !empty($invoiceData['_customerOrderReferenceList'])) {
 			foreach ($invoiceData['_customerOrderReferenceList'] as $additionalOrderRef) {
-				if ($additionalOrderRef === $invoiceData['orderReference']) {
+				// A blank reference would become an empty BT-18, which BR-52 rejects as fatal
+				if ($additionalOrderRef === $invoiceData['orderReference'] || trim((string) $additionalOrderRef) === '') {
 					continue;
 				}
 				$addRef = $doc->createElement('ram:AdditionalReferencedDocument');
@@ -3270,12 +3349,14 @@ class CIIProtocol extends AbstractProtocol
 					if (!empty($expedition->origin) && $expedition->origin == "commande" && !empty($expedition->origin_id)) {
 						$commande = new Commande($this->db);
 						$commandeFetchResult = $commande->fetch($expedition->origin_id);
-						if ($commandeFetchResult > 0 && !empty($commande->ref_client)) {
-							$customerOrderReferenceList[] = $commande->ref_client;
+						// empty() would let a reference made of spaces through - it becomes an empty BT-13 or
+						// BT-18, which BR-52 rejects - and would drop one that reads "0", which is a reference.
+						if ($commandeFetchResult > 0 && trim((string) $commande->ref_client) !== '') {
+							$customerOrderReferenceList[] = trim((string) $commande->ref_client);
 						}
 					}
 					if (!empty($expedition->date_delivery)) {
-						$deliveryDateList[] = date('Y-m-d', $expedition->date_delivery);
+						$deliveryDateList[] = dol_print_date($expedition->date_delivery, 'dayrfc', 'tzserver');
 					}
 				}
 			}
@@ -3287,8 +3368,8 @@ class CIIProtocol extends AbstractProtocol
 				$commande = new Commande($this->db);
 				$commandeFetchResult = $commande->fetch($commandeId);
 				if ($commandeFetchResult > 0) {
-					if (!empty($commande->ref_client)) {
-						$customerOrderReferenceList[] = $commande->ref_client;
+					if (trim((string) $commande->ref_client) !== '') {
+						$customerOrderReferenceList[] = trim((string) $commande->ref_client);
 					}
 					$commande->fetchObjectLinked();
 					$found = 0;
@@ -3299,14 +3380,14 @@ class CIIProtocol extends AbstractProtocol
 							if ($expeditionFetchResult > 0) {
 								if (!empty($expedition->date_delivery)) {
 									$found++;
-									$deliveryDateList[] = date('Y-m-d', $expedition->date_delivery);
+									$deliveryDateList[] = dol_print_date($expedition->date_delivery, 'dayrfc', 'tzserver');
 								}
 							}
 						}
 					}
 					if ($found == 0) {
 						if (!empty($commande->delivery_date)) {
-							$deliveryDateList[] = date('Y-m-d', $commande->delivery_date);
+							$deliveryDateList[] = dol_print_date($commande->delivery_date, 'dayrfc', 'tzserver');
 						}
 					}
 				}
@@ -3430,9 +3511,9 @@ class CIIProtocol extends AbstractProtocol
 		// price of the Dolibarr line.
 		$priceWithoutDiscount = (float) $lineTotalAmount - $totalChargeAmount + $totalDiscountAmount;
 
-		// Base used for percent calculation — BT-137 when the document states it, the amount before
-		// discount otherwise (issue #783).
-		$base = $allowances[0]['basisAmount'] ?? $priceWithoutDiscount;
+		// Base for the percent — BT-137 if given, amount before discount otherwise (issue #783).
+		// A BasisAmount of 0 (some pivots emit it) counts as not given: ?? would keep the 0 and drop the discount.
+		$base = !empty($allowances[0]['basisAmount']) ? $allowances[0]['basisAmount'] : $priceWithoutDiscount;
 
 		if (!$base) {
 			return false;
@@ -3476,7 +3557,8 @@ class CIIProtocol extends AbstractProtocol
 		if ($invoice->fetch($supplierInvoiceId) <= 0) {
 			return;
 		}
-		if (self::totalsAgreeWithDocument($invoice, $announcedTva, $announcedTtc)) {
+		if (SupplierInvoiceHelper::totalsAgreeWithDocument($invoice, $announcedTva, $announcedTtc)) {
+			SupplierInvoiceHelper::clearTotalsMismatch($supplierInvoiceId);
 			return;
 		}
 
@@ -3496,7 +3578,7 @@ class CIIProtocol extends AbstractProtocol
 			if ($invoice->fetch($supplierInvoiceId) <= 0) {
 				return;
 			}
-			if (self::totalsAgreeWithDocument($invoice, $announcedTva, $announcedTtc)) {
+			if (SupplierInvoiceHelper::totalsAgreeWithDocument($invoice, $announcedTva, $announcedTtc)) {
 				// The import runs from a cron job as well as from a page, so the language file of the
 				// module is not necessarily loaded.
 				$langs->load('einvoicing@einvoicing');
@@ -3510,32 +3592,35 @@ class CIIProtocol extends AbstractProtocol
 					price2num($importedTtc, 'MT')
 				);
 				dol_syslog(__METHOD__ . ' Invoice ' . $supplierInvoiceId . ' recalculated in VAT mode ' . $modenumber . ' to match the totals of the received document', LOG_DEBUG);
+				SupplierInvoiceHelper::clearTotalsMismatch($supplierInvoiceId);
 				return;
 			}
 		}
 
-		// Neither convention gives the announced totals: leave the invoice as the import built it.
+		// Neither convention gives the announced totals: the document is one the import cannot
+		// reproduce. The invoice is left as it was built - the file is attached to it and nothing else
+		// carries what the vendor sent - but it is marked, and that mark keeps it out of validation and
+		// out of any approval until the two agree (issue #861).
 		$invoice->update_price(1, 'auto', 0, $invoice->thirdparty);
+		if ($invoice->fetch($supplierInvoiceId) <= 0) {
+			return;
+		}
+
+		SupplierInvoiceHelper::flagTotalsMismatch($supplierInvoiceId, $announcedTva, $announcedTtc);
+
+		$langs->load('einvoicing@einvoicing');
+		$return_messages[] = $langs->trans(
+			'EInvoiceImportTotalsMismatch',
+			dol_escape_htmltag((string) ($parsedHeader['documentno'] ?? '')),
+			price2num($announcedTtc, 'MT'),
+			price2num($announcedTva, 'MT'),
+			price2num(abs((float) $invoice->total_ttc), 'MT')
+		);
+		$return_messages[] = $langs->trans('EInvoiceImportTotalsMismatchAction');
+
+		dol_syslog(__METHOD__ . ' Invoice ' . $supplierInvoiceId . ' does not total the received document (announced ' . $announcedTtc . ' incl. VAT, imported ' . $invoice->total_ttc . '): validation and approval blocked', LOG_WARNING);
 	}
 
-	/**
-	 * Tell whether an invoice totals what the received document announces.
-	 *
-	 * Compared on the absolute values: a credit note is stored negative by Dolibarr while BT-110 and
-	 * BT-112 are always announced positive, the document type being what carries the sign (BR-CO-13
-	 * applies to a credit note as it does to an invoice). The tolerance is there for the float
-	 * representation, not for a difference: the document carries its totals to the cent.
-	 *
-	 * @param	FactureFournisseur	$invoice		The invoice, with its totals as stored
-	 * @param	float				$announcedTva	BT-110 of the received document, absolute value
-	 * @param	float				$announcedTtc	BT-112 of the received document, absolute value
-	 * @return	bool								True when both totals are the announced ones
-	 */
-	private static function totalsAgreeWithDocument(FactureFournisseur $invoice, $announcedTva, $announcedTtc)
-	{
-		return abs(abs((float) $invoice->total_tva) - $announcedTva) < 0.005
-			&& abs(abs((float) $invoice->total_ttc) - $announcedTtc) < 0.005;
-	}
 
 
 	/**

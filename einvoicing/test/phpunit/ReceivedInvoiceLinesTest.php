@@ -280,12 +280,12 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 	}
 
 	/**
-	 * A line whose quantity and price do not rebuild what the document announces keeps the amount the
-	 * core computes - it is the only one Dolibarr can store - but says so.
+	 * A line whose quantity and price do not rebuild what the document announces is imported at the
+	 * amount announced - BT-131 is the figure the totals of the document are summed from - and says so.
 	 *
 	 * @return	void
 	 */
-	public function testAnAmountThatDoesNotRebuildIsReported()
+	public function testAnAmountThatDoesNotRebuildIsImportedAtTheAnnouncedAmount()
 	{
 		global $db;
 
@@ -294,8 +294,8 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 		$parsedLine = array('lineid' => '004', 'lineTotalAmount' => 100.0, 'linestatusreasoncode' => 'DETAIL');
 		$amounts = $this->callResolveLineAmounts($protocol, $parsedLine, 2.0, 40.0);
 
-		$this->assertSame(2.0, $amounts['qty'], 'nothing is invented, the document is only reported');
-		$this->assertSame(40.0, $amounts['subprice']);
+		$this->assertSame(2.0, $amounts['qty'], 'the quantity of the document is kept');
+		$this->assertEquals(50.0, $amounts['subprice'], 'the price is the one that totals BT-131');
 		$this->assertStringContainsString('BT-131', $amounts['warning']);
 		$this->assertStringContainsString('80', $amounts['warning'], 'the warning names what was rebuilt');
 	}
@@ -644,6 +644,143 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 	}
 
 	/**
+	 * The reported case of issue #844, read from the document the way the import reads it: a metered
+	 * consumption of 1 951 593 units at 0.00000548, which the issuer can only write as 0.000005 (BT-146
+	 * takes six decimals, BR-FR-DEC-03). Quantity times that price rebuilds 9.76 where the document
+	 * announces 10.69, and the invoice used to carry the 9.76.
+	 *
+	 * @return	void
+	 */
+	public function testTheReportedRoundedUnitPriceStillTotalsTheAnnouncedAmount()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		$lines = $protocol->parseInvoiceLines($this->documentWithLine('
+      <ram:AssociatedDocumentLineDocument><ram:LineID>478803531</ram:LineID></ram:AssociatedDocumentLineDocument>
+      <ram:SpecifiedTradeProduct><ram:Name>Stockage Standard Infrequent Access</ram:Name></ram:SpecifiedTradeProduct>
+      <ram:SpecifiedLineTradeAgreement>
+        <ram:NetPriceProductTradePrice><ram:ChargeAmount>0.000005</ram:ChargeAmount></ram:NetPriceProductTradePrice>
+      </ram:SpecifiedLineTradeAgreement>
+      <ram:SpecifiedLineTradeDelivery><ram:BilledQuantity unitCode="C62">1951593.0000</ram:BilledQuantity></ram:SpecifiedLineTradeDelivery>
+      <ram:SpecifiedLineTradeSettlement>
+        <ram:SpecifiedTradeSettlementLineMonetarySummation><ram:LineTotalAmount>10.69</ram:LineTotalAmount></ram:SpecifiedTradeSettlementLineMonetarySummation>
+      </ram:SpecifiedLineTradeSettlement>'));
+
+		$this->assertCount(1, $lines);
+		$this->assertNull($lines[0]['netpricebasisquantity'], 'BT-149 is absent: the price is stated per unit, rounded');
+
+		$imported = $this->importedLine($lines[0]);
+
+		$this->assertSame(1951593.0, $imported['qty'], 'the quantity the document bills is kept');
+		$this->assertEquals(10.69, $imported['rebuilt'], 'the line totals BT-131, not 9.76');
+		$this->assertStringContainsString('BR-FR-DEC-03', $imported['warning'], 'the import says what it refined and why');
+		$this->assertStringContainsString('MAIN_MAX_DECIMALS_UNIT', $imported['warning'], 'and that such a price is stored as zero');
+	}
+
+	/**
+	 * The reported case of issue #850: a bank fee whose line is priced elsewhere than it is billed. The
+	 * document states a quantity of 0.5999 - the rate the fee is computed at, printed as "0,5999 %" on
+	 * the PDF - against a price of 50 005.00, the credit it applies to, and announces the fee itself,
+	 * 300.00. The couple rebuilds 50 005.00, which is what the invoice used to carry.
+	 *
+	 * @return	void
+	 */
+	public function testALinePricedElsewhereThanItIsBilledTotalsTheAnnouncedAmount()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		$lines = $protocol->parseInvoiceLines($this->documentWithLine('
+      <ram:AssociatedDocumentLineDocument><ram:LineID>2608</ram:LineID></ram:AssociatedDocumentLineDocument>
+      <ram:SpecifiedTradeProduct><ram:Name>Frais dossier</ram:Name></ram:SpecifiedTradeProduct>
+      <ram:SpecifiedLineTradeAgreement>
+        <ram:NetPriceProductTradePrice>
+          <ram:ChargeAmount>50005.000000</ram:ChargeAmount>
+          <ram:BasisQuantity unitCode="A9">0.5999</ram:BasisQuantity>
+        </ram:NetPriceProductTradePrice>
+      </ram:SpecifiedLineTradeAgreement>
+      <ram:SpecifiedLineTradeDelivery><ram:BilledQuantity unitCode="A9">0.5999</ram:BilledQuantity></ram:SpecifiedLineTradeDelivery>
+      <ram:SpecifiedLineTradeSettlement>
+        <ram:SpecifiedTradeSettlementLineMonetarySummation><ram:LineTotalAmount>300.00</ram:LineTotalAmount></ram:SpecifiedTradeSettlementLineMonetarySummation>
+      </ram:SpecifiedLineTradeSettlement>'));
+
+		$this->assertCount(1, $lines);
+
+		$imported = $this->importedLine($lines[0]);
+
+		$this->assertSame(0.5999, $imported['qty'], 'the quantity the document bills is kept');
+		$this->assertEquals(300.00, $imported['rebuilt'], 'the line totals BT-131, not the 50005.00 its price rebuilds');
+		$this->assertStringContainsString('rebuild 50005', $imported['warning'], 'the import says what the document rebuilds');
+		$this->assertStringContainsString('imported at the amount announced', $imported['warning'], 'and what it did about it');
+	}
+
+	/**
+	 * A charge of the line (BG-28) is part of BT-131 but leaves on a line of its own (issue #735), so the
+	 * line itself is worth BT-131 less that charge: the couple the document states rebuilds exactly that,
+	 * and nothing is rewritten or reported. Five units at 100.05 less 10.001 percent, plus a charge of
+	 * 7.00, announcing 457.22.
+	 *
+	 * @return	void
+	 */
+	public function testAChargeOfTheLineIsOutOfTheComparison()
+	{
+		$parsedLine = array(
+			'lineid' => '6',
+			'lineTotalAmount' => 457.22,
+			'lineAllowances' => array(
+				array('indicator' => 'false', 'actualAmount' => 50.03, 'reason' => 'Commercial discount'),
+				array('indicator' => 'true', 'actualAmount' => 7.00, 'reasonCode' => 'FC', 'reason' => 'Handling'),
+			),
+		);
+
+		$amounts = $this->amounts($parsedLine, 5.0, 100.05, 10.001);
+
+		$this->assertSame(100.05, $amounts['subprice'], 'the price of the document is left alone');
+		$this->assertSame('', $amounts['warning'], 'and the charge is not read as a document that does not add up');
+
+		// Without the charge line the same figures do not add up, and there the price is refined.
+		unset($parsedLine['lineAllowances'][1]);
+		$this->assertNotSame('', $this->amounts($parsedLine, 5.0, 100.05, 10.001)['warning']);
+	}
+
+	/**
+	 * A line announcing nothing has no amount to be imported at: BT-131 is what a line is worth, and an
+	 * absent one is not a figure to rewrite a price against. It keeps what its own price rebuilds.
+	 *
+	 * @return	void
+	 */
+	public function testALineAnnouncingNothingKeepsWhatItsPriceRebuilds()
+	{
+		$amounts = $this->amounts(array('lineid' => '5', 'lineTotalAmount' => 0.0), 2.0, 40.0);
+
+		$this->assertSame(40.0, $amounts['subprice'], 'nothing is rewritten against an absent BT-131');
+		$this->assertStringContainsString('carries the rebuilt amount', $amounts['warning']);
+	}
+
+	/**
+	 * A discounted line is refined the same way, on the price the discount is applied to: the couple the
+	 * core stores is quantity, unit price and percent, and it is their product that has to total BT-131.
+	 *
+	 * @return	void
+	 */
+	public function testTheRefinedPriceAccountsForTheLineDiscount()
+	{
+		$parsedLine = array('lineid' => '5', 'lineTotalAmount' => 8.55);
+
+		$amounts = $this->amounts($parsedLine, 1951593.0, 0.000005, 20.0);
+
+		$this->assertSame(20.0, $amounts['remise_percent'], 'the discount of the document is kept');
+		$this->assertEquals(
+			8.55,
+			round($amounts['qty'] * $amounts['subprice'] * (1 - ($amounts['remise_percent'] / 100)), 2),
+			'the line still totals what BT-131 announces'
+		);
+	}
+
+	/**
 	 * Every other shape of BT-149 leaves the price alone. It is optional and means one when absent;
 	 * BR-64 requires it to be positive when it is there, so a zero or a negative one is a broken
 	 * document and the price it states is the best the import can do with it.
@@ -857,6 +994,30 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 		$this->assertEqualsWithDelta($statedBase['base'], $rebuiltBase['base'], 0.011);
 		$this->assertEqualsWithDelta($statedBase['percent'], $rebuiltBase['percent'], 0.0001);
 		$this->assertEqualsWithDelta(100.05, $rebuiltBase['priceWithoutDiscount'] / 5, 0.001, 'which is BT-146 for a quantity of 5');
+	}
+
+	/**
+	 * A base stated as zero is a base the document did not state. Some issuers write BT-137 = 0.00 next
+	 * to a real allowance amount, and the null coalescing that used to pick the base kept that zero: the
+	 * guard below it sent the discount back false and the line was imported at its gross (PR #845).
+	 *
+	 * @return	void
+	 */
+	public function testABaseStatedAsZeroFallsBackTheSameWay()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		$zeroBase = $protocol->parseInvoiceLines($this->discountedLine(5.0, 100.05, 50.03, 450.22, 0.00));
+		$this->assertSame(0.0, $zeroBase[0]['lineAllowances'][0]['basisAmount'], 'BT-137 is read, and it is zero');
+
+		$discount = $this->call('resolveLineDiscountPercent', array($zeroBase[0]['lineAllowances'], $zeroBase[0]['lineTotalAmount']));
+
+		$this->assertNotFalse($discount, 'the discount is resolved and not dropped');
+		$this->assertEqualsWithDelta(500.25, $discount['base'], 0.011, 'the amount before the allowance, as when BT-137 is absent');
+		$this->assertEqualsWithDelta(10.001, $discount['percent'], 0.0001);
+		$this->assertEqualsWithDelta(450.22, $this->importedLine($zeroBase[0])['rebuilt'], 0.011, 'and the line totals BT-131');
 	}
 
 	/**

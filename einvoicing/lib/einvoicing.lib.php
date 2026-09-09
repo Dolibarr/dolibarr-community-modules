@@ -684,6 +684,27 @@ function einvoicingVatOnDebits()
 }
 
 /**
+ * Tell whether sending customer invoices is disabled by setup or generation-only mode.
+ * This does not disable e-invoice generation.
+ *
+ * @return bool
+ */
+function einvoicingIsSendDisabled()
+{
+	return (bool) getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || (bool) getDolGlobalString('EINVOICING_ONLY_GENERATE');
+}
+
+/**
+ * Tell whether receiving supplier invoices is disabled.
+ *
+ * @return bool
+ */
+function einvoicingIsReceiveDisabled()
+{
+	return (bool) getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI') || (bool) getDolGlobalString('EINVOICING_ONLY_GENERATE');
+}
+
+/**
  * VAT point date code (BT-8) the generated document has to declare.
  *
  * BR-CL-06 restricts BT-8 to 5, 29 or 72, BR-CO-03 makes it exclusive with BT-7, and CII-SR-462 allows
@@ -1064,4 +1085,153 @@ function einvoicingIsAllowedRedirectUrl($url)
 	}
 
 	return false;
+}
+
+/**
+ * The four sentinels Dolibarr stores in the description of a discount, and the text each stands for.
+ *
+ * A discount built from another piece - a credit note applied, a deposit deducted, an excess payment
+ * carried over - carries no text of its own: the core writes one of four sentinels in the description
+ * of the discount, insert_discount() copies it into the description of the line, and pdf_getlinedesc()
+ * resolves it against the piece it comes from at print time. Nothing resolves it for an e-invoice, so
+ * the customer used to read '(CREDIT_NOTE)' in the item name of the line (BT-153) or in the reason of
+ * a document level allowance (BT-97).
+ *
+ * The test is the one the core makes: the description equals a sentinel exactly, and the line is
+ * actually a discount line. Matching the text alone is wrong in both directions - a description edited
+ * by hand is missed, and a service line quoting the string is caught - and the four sentinels are not
+ * even spelled alike: '(CREDIT_NOTE)' holds an underscore where '(EXCESS PAID)' and
+ * '(EXCESS RECEIVED)' hold a space.
+ *
+ * @return	array<string,string>	Sentinel of the core => translation key of the text it stands for
+ */
+function einvoicingDiscountSentinels()
+{
+	return array(
+		'(CREDIT_NOTE)'     => 'DiscountFromCreditNote',
+		'(DEPOSIT)'         => 'DiscountFromDeposit',
+		'(EXCESS RECEIVED)' => 'DiscountFromExcessReceived',
+		'(EXCESS PAID)'     => 'DiscountFromExcessPaid',
+	);
+}
+
+/**
+ * Text a discount line stands for, in place of the sentinel Dolibarr stores in its description.
+ *
+ * See einvoicingDiscountSentinels() for what the four sentinels are and why they are matched exactly.
+ *
+ * @param	?DiscountAbsolute	$discount			Discount the line was built from, already fetched
+ * @param	string				$description		Description to resolve, of the line or of the discount
+ * @param	Translate			$outputlangs		Language of the document being built
+ * @param	string				$relatedInvoiceRef	Invoice the deducted piece corrects, from einvoicingDiscountRelatedInvoiceRef()
+ * @return	string									Resolved text, '' when the description is no sentinel
+ */
+function einvoicingDiscountLabel($discount, $description, $outputlangs, $relatedInvoiceRef = '')
+{
+	$transkeyOfSentinel = einvoicingDiscountSentinels();
+
+	$description = (string) $description;
+	if (!isset($transkeyOfSentinel[$description])) {
+		return '';
+	}
+
+	$outputlangs->load("bills");
+	$outputlangs->load("einvoicing@einvoicing");
+
+	// Which piece is quoted depends on the side the discount belongs to: a discount held on a supplier
+	// invoice names that invoice, and reading ref_facture_source there would name nothing at all.
+	$sourceref = '';
+	if (!empty($discount) && !empty($discount->id)) {
+		$sourceref = !empty($discount->discount_type) ? $discount->ref_invoice_supplier_source : $discount->ref_facture_source;
+	}
+	$sourceref = trim((string) $sourceref);
+
+	if ($sourceref === '') {
+		// No piece to name: a discount entered by hand, or one whose source has been deleted. The text
+		// of the core quotes a reference and would be issued with a hole in the middle of the sentence,
+		// so the module has a wording of its own for the case. What must never happen is the marker
+		// going out as it stands: BT-153 refuses an empty item name (BR-25), and it refuses a technical
+		// marker in spirit.
+		return $outputlangs->transnoentitiesnoconv($transkeyOfSentinel[$description].'NoSource');
+	}
+
+	$label = $outputlangs->transnoentitiesnoconv($transkeyOfSentinel[$description], $sourceref);
+
+	// The piece deducted usually corrects another invoice, and naming it is what lets the customer
+	// reconcile the deduction without opening its own ledger. Skipped when it would name the piece
+	// already named, which happens on a deposit deducted from the invoice it was asked on.
+	$relatedInvoiceRef = trim((string) $relatedInvoiceRef);
+	if ($relatedInvoiceRef !== '' && $relatedInvoiceRef !== $sourceref) {
+		$label .= ' ('.$outputlangs->transnoentitiesnoconv('EInvDiscountOnInvoice', $relatedInvoiceRef).')';
+	}
+
+	// The PDF of the core adds the date of the deposit when the option asks for it; the e-invoice reads
+	// the same way as the paper it accompanies.
+	if ($description == '(DEPOSIT)' && getDolGlobalString('INVOICE_ADD_DEPOSIT_DATE')) {
+		$label .= ' ('.dol_print_date($discount->datec, 'day', '', $outputlangs).')';
+	}
+
+	return $label;
+}
+
+/**
+ * Text a discount line of the invoice stands for, '' when the line carries no discount at all.
+ *
+ * einvoicingDiscountLabel() decides on the description alone, which is what a document level
+ * allowance needs: there, the caller has already established that a discount is behind the amount.
+ * A line of the invoice has not, and the description alone cannot tell - a line of work can be named
+ * '(DEPOSIT)' and carry nothing, and it was then renamed 'Down payment deducted' on its way out,
+ * under the wording meant for a discount whose source piece cannot be read, which is a different
+ * situation entirely.
+ *
+ * The test of the core is in two halves, the description AND the discount the line points at
+ * (pdf_getlinedesc(): $desc == '(DEPOSIT)' && $object->lines[$i]->fk_remise_except). This is where
+ * the second half is made, so that the two call sites read the line the same way: the one writing
+ * BT-97 already stands inside a test on fk_remise_except, the one writing BT-153 does not.
+ *
+ * @param	?object				$line				Line of the invoice being written
+ * @param	?DiscountAbsolute	$discount			Discount the line was built from, already fetched
+ * @param	Translate			$outputlangs		Language of the document being built
+ * @param	string				$relatedInvoiceRef	Invoice the deducted piece corrects, from einvoicingDiscountRelatedInvoiceRef()
+ * @return	string									Resolved text, '' when the line is no discount line
+ */
+function einvoicingDiscountLabelOfLine($line, $discount, $outputlangs, $relatedInvoiceRef = '')
+{
+	if (empty($line) || empty($line->fk_remise_except)) {
+		return '';
+	}
+
+	return einvoicingDiscountLabel($discount, $line->desc ?? '', $outputlangs, $relatedInvoiceRef);
+}
+
+/**
+ * Reference of the invoice the piece behind a discount corrects, '' when there is none to name.
+ *
+ * A credit note converted into a discount names the invoice it corrects in its own fk_facture_source,
+ * one level below the discount. Read from the discount alone, a deduction only says which credit note
+ * it comes from; the customer still has to find which invoice that credit note was about.
+ *
+ * @param	?DiscountAbsolute	$discount	Discount the line was built from, already fetched
+ * @param	DoliDB				$db			Database handler
+ * @return	string							Reference of the corrected invoice, '' when there is none
+ */
+function einvoicingDiscountRelatedInvoiceRef($discount, $db)
+{
+	if (empty($discount) || empty($discount->fk_facture_source)) {
+		return '';
+	}
+
+	require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
+
+	$sourcePiece = new Facture($db);
+	if ($sourcePiece->fetch((int) $discount->fk_facture_source) <= 0 || empty($sourcePiece->fk_facture_source)) {
+		return '';
+	}
+
+	$correctedInvoice = new Facture($db);
+	if ($correctedInvoice->fetch((int) $sourcePiece->fk_facture_source) <= 0) {
+		return '';
+	}
+
+	return (string) $correctedInvoice->ref;
 }

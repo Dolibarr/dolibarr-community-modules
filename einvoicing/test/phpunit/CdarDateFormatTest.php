@@ -143,7 +143,10 @@ class CdarDateFormatTest extends CommonClassTest
 		$conf->tzuserinputkey = $this->savtzuserinputkey;
 		if ($this->savsessiontzset) {
 			$_SESSION['dol_tz_string'] = $this->savsessiontz;
-		} else {
+		} elseif (isset($_SESSION)) {
+			// A CLI run starts no session, so $_SESSION does not exist until a test writes into it.
+			// unset() of a key of a variable that does not exist warns on PHP 8.0, the version the
+			// suite runs Dolibarr 19 on, and PHPUnit turns that warning into a failure.
 			unset($_SESSION['dol_tz_string']);
 		}
 
@@ -295,6 +298,34 @@ class CdarDateFormatTest extends CommonClassTest
 
 		foreach (array('', '2025-12-31', '20251231233000', '202512', 'unknown', '0') as $input) {
 			$this->assertSame($input, CdarHandler::formatDate($input), 'formatDate() no longer passes "' . $input . '" through');
+		}
+	}
+
+	/**
+	 * The payment date of the MPA block was the one date of the file left on the 'auto' default of
+	 * dol_print_date(): it followed the timezone of the session as soon as MAIN_TZUSERINPUTKEY was
+	 * 'tzuserrel', where the day the payment was made must not.
+	 *
+	 * @return void
+	 */
+	public function testThePaymentDateDoesNotFollowTheSession()
+	{
+		global $conf;
+
+		$handler = new CdarHandler($GLOBALS['db']);
+		$conf->tzuserinputkey = 'tzuserrel';
+
+		foreach ($this->timezones() as $tz) {
+			date_default_timezone_set($tz);
+
+			// The epoch is left out: the method reads an empty date as "no date given" and stamps dol_now().
+			foreach (array_filter($this->timestamps()) as $ts) {
+				$_SESSION['dol_tz_string'] = 'Pacific/Kiritimati';	// UTC+14, a day ahead of most of the map
+
+				$mpa = $handler->getPaymentSentCharacteristics(new stdClass(), array('amount' => 12.0, 'date' => $ts));
+
+				$this->assertSame(date('Ymd', $ts), $mpa[0]['ValueDateTime'], 'Payment date changed for timestamp ' . $ts . ' in ' . $tz);
+			}
 		}
 	}
 }

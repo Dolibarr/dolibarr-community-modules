@@ -891,6 +891,87 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 	}
 
 	/**
+	 * The mark of issue #861, end to end: an import that could not reproduce the totals of the document
+	 * blocks the invoice, and the block is lifted the moment the invoice totals what was announced -
+	 * the mark keeps those figures precisely so it can be re-evaluated without the document.
+	 *
+	 * @return void
+	 */
+	public function testATotalsMismatchBlocksUntilTheInvoiceAgrees()
+	{
+		global $db;
+
+		$invoice = $this->createSpecimenSupplierInvoice();
+		$stored = new FactureFournisseur($db);
+		$this->assertGreaterThan(0, $stored->fetch((int) $invoice->id));
+
+		$this->assertNull(SupplierInvoiceHelper::totalsMismatch((int) $invoice->id), 'an invoice carries no mark to begin with');
+		$this->assertFalse(SupplierInvoiceHelper::totalsMismatchBlocks((int) $invoice->id));
+
+		// The import could not rebuild what the document announces: 130.00 including VAT, 30.00 of VAT.
+		SupplierInvoiceHelper::flagTotalsMismatch((int) $invoice->id, 30.00, 130.00);
+
+		$announced = SupplierInvoiceHelper::totalsMismatch((int) $invoice->id);
+		$this->assertIsArray($announced);
+		$this->assertEquals(130.00, $announced['ttc'], 'the mark keeps what the document announces');
+		$this->assertEquals(30.00, $announced['tva']);
+		$this->assertTrue(SupplierInvoiceHelper::totalsMismatchBlocks((int) $invoice->id), 'and it blocks while the invoice says otherwise');
+
+		// Same invoice, marked against the totals it actually carries: there is nothing left to block.
+		SupplierInvoiceHelper::flagTotalsMismatch((int) $invoice->id, abs((float) $stored->total_tva), abs((float) $stored->total_ttc));
+		$this->assertFalse(SupplierInvoiceHelper::totalsMismatchBlocks((int) $invoice->id), 'an invoice that totals the document blocks nothing');
+
+		SupplierInvoiceHelper::clearTotalsMismatch((int) $invoice->id);
+		$this->assertNull(SupplierInvoiceHelper::totalsMismatch((int) $invoice->id));
+	}
+
+	/**
+	 * The comparison is made on the absolute values: Dolibarr stores a credit note negative while
+	 * BT-110 and BT-112 are always announced positive, the document type carrying the sign.
+	 *
+	 * @return void
+	 */
+	public function testTotalsAgreeWithDocumentComparesAbsoluteValues()
+	{
+		global $db;
+
+		$creditNote = new FactureFournisseur($db);
+		$creditNote->total_tva = -20.00;
+		$creditNote->total_ttc = -120.00;
+
+		$this->assertTrue(SupplierInvoiceHelper::totalsAgreeWithDocument($creditNote, 20.00, 120.00));
+		$this->assertFalse(SupplierInvoiceHelper::totalsAgreeWithDocument($creditNote, 20.00, 130.00), 'a cent apart is a difference, not a rounding');
+		$this->assertTrue(SupplierInvoiceHelper::totalsAgreeWithDocument($creditNote, 20.001, 119.999), 'the tolerance is there for the float representation only');
+	}
+
+	/**
+	 * An invoice the import could not reproduce is not one to approve: approving it commits to paying
+	 * a figure the vendor did not bill. Refusing it stays offered - that is the answer it deserves.
+	 *
+	 * @return void
+	 */
+	public function testAnInvoiceThatDoesNotTotalItsDocumentCannotBeApproved()
+	{
+		global $db;
+
+		$invoice = $this->createSpecimenSupplierInvoice();
+		$this->addEInvoicingDocument($invoice->id);
+
+		$einvoicing = new EInvoicing($db);
+		$offered = array_map('intval', array_keys($einvoicing->getSendableStatusesForReceivedInvoice($invoice->id, 'invoice_supplier')));
+		$this->assertContains(EInvoicing::STATUS_APPROVED, $offered, 'nothing blocks an invoice that totals its document');
+
+		SupplierInvoiceHelper::flagTotalsMismatch((int) $invoice->id, 30.00, 130.00);
+
+		$offered = array_map('intval', array_keys($einvoicing->getSendableStatusesForReceivedInvoice($invoice->id, 'invoice_supplier')));
+		$this->assertNotContains(EInvoicing::STATUS_APPROVED, $offered, 'an invoice that does not total its document cannot be approved');
+		$this->assertNotContains(EInvoicing::STATUS_PARTIALLY_APPROVED, $offered, 'nor partially approved, which accepts it too');
+		$this->assertContains(EInvoicing::STATUS_REFUSED, $offered, 'refusing the document is what is left to do');
+
+		SupplierInvoiceHelper::clearTotalsMismatch((int) $invoice->id);
+	}
+
+	/**
 	 * The rule of issue #594: an invoice we refused is cancelled and owes nothing, so the credit note
 	 * the vendor issues to close the matter cannot be accepted in its turn.
 	 *
@@ -1027,6 +1108,18 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 	private function uniqueSupplierRef()
 	{
 		return 'PR605' . strtoupper(bin2hex(random_bytes(5)));
+	}
+
+	/**
+	 * A reference shorter than the default minimum length of the tolerant fallback, and unique per
+	 * call. It carries a letter on purpose: an all digits reference is refused by another rule, and
+	 * the test that uses this one is about the length, not about the digits.
+	 *
+	 * @return string
+	 */
+	private function uniqueShortSupplierRef()
+	{
+		return 'A' . strtoupper(bin2hex(random_bytes(2)));
 	}
 
 	/**
@@ -1220,7 +1313,9 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 	{
 		global $conf;
 
-		$shortRef = 'AB12';
+		// A fixed value here survives any run that dies before the class-wide rollback, and the
+		// lookup below then answers "ambiguous" on that instance for good.
+		$shortRef = $this->uniqueShortSupplierRef();
 		$numericRef = (string) mt_rand(100000000, 999999999);
 		$invoice = $this->createSupplierInvoiceWithRef('PAY123 - ' . $shortRef . ' - ' . $numericRef . ' - dinner');
 
@@ -1288,19 +1383,18 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 	}
 
 	/**
-	 * An invoice on which nothing was sent yet is waiting for an answer, and only for that: approving
-	 * or refusing it are the two ways of giving it. "Payment transmitted" comes after, so it is not
-	 * part of what is offered at this point.
+	 * An invoice on which nothing was sent yet is waiting for an answer: approving or refusing it are
+	 * the two ways of giving it. "Payment transmitted" is offered too, since only a refusal blocks it.
 	 *
 	 * @return void
 	 */
-	public function testNothingSentYetOffersTheAnswerButNotThePayment()
+	public function testNothingSentYetOffersTheAnswerAndThePayment()
 	{
 		$offered = $this->offered();
 
 		$this->assertContains(EInvoicing::STATUS_APPROVED, $offered);
 		$this->assertContains(EInvoicing::STATUS_REFUSED, $offered);
-		$this->assertNotContains(EInvoicing::STATUS_PAYMENT_SENT, $offered, 'nothing is paid before being accepted');
+		$this->assertContains(EInvoicing::STATUS_PAYMENT_SENT, $offered, 'only a refusal blocks the payment status');
 	}
 
 	/**
@@ -1321,17 +1415,18 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 
 	/**
 	 * An approval the platform has not confirmed yet settles nothing: it can still be rejected, and
-	 * until it is confirmed the invoice is in the same place as one nobody answered.
+	 * until it is confirmed the invoice is in the same place as one nobody answered - which still
+	 * offers the payment status, since only a refusal blocks it.
 	 *
 	 * @return void
 	 */
-	public function testAPendingApprovalDoesNotOpenThePaymentStatus()
+	public function testAPendingApprovalStillOpensThePaymentStatus()
 	{
 		$this->sent(EInvoicing::STATUS_APPROVED, 'Pending');
 
 		$offered = $this->offered();
 
-		$this->assertNotContains(EInvoicing::STATUS_PAYMENT_SENT, $offered);
+		$this->assertContains(EInvoicing::STATUS_PAYMENT_SENT, $offered);
 		$this->assertContains(EInvoicing::STATUS_APPROVED, $offered, 'the answer is still the thing to send');
 		$this->assertContains(EInvoicing::STATUS_REFUSED, $offered);
 	}
@@ -1395,6 +1490,6 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 
 		$this->assertContains(EInvoicing::STATUS_APPROVED, $offered);
 		$this->assertContains(EInvoicing::STATUS_REFUSED, $offered, 'nothing was accepted, so the choice is still open');
-		$this->assertNotContains(EInvoicing::STATUS_PAYMENT_SENT, $offered, 'a rejected approval leaves the invoice unanswered');
+		$this->assertContains(EInvoicing::STATUS_PAYMENT_SENT, $offered, 'a rejected approval is not a refusal, so the payment status stays open too');
 	}
 }

@@ -604,7 +604,7 @@ abstract class AbstractPDPProvider
 	 * @param   int   $syncFromDate     Timestamp from which to start synchronization. If 0, begins from epoch (1970-01-01).
 	 * @param   int   $limit            Maximum number of flows to synchronize. 0 means no limit.
 	 *
-	 * @return 	bool|array{res:int, messages:string[], totalFlows?:?int, alreadyExist?:int, syncedFlows?:int, batchlimit?:int, actions?:array<string,array{actionurl:string,actioncode:string,action:string,businessmessage:string}>, details?:string[]} 	True on success, false on failure along with messages, details for debugging, and suggested optional actions.
+	 * @return 	bool|array{res:int, messages:string[], totalFlows?:?int, alreadyExist?:int, syncedFlows?:int, batchlimit?:int, actions?:array<string,array{actionurl:string,actioncode:string,action:string,businessmessage:string}>, details?:string[], errors?:string[]} 	True on success, false on failure along with messages, details for debugging, the errors that aborted the run, and suggested optional actions.
 	 */
 	abstract public function syncFlows($syncFromDate = 0, $limit = 0);
 
@@ -1010,6 +1010,8 @@ abstract class AbstractPDPProvider
 		$call->provider = $this->name;
 		$call->entity = $conf->entity;
 		$call->status = ($statusCode == 200 || $statusCode == 202) ? 1 : 0;
+
+		$call->context['statusCode'] = $statusCode;
 
 		if ($call->create($user) > 0) {
 			$dbhistory->commit();

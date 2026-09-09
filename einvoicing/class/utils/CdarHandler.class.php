@@ -535,8 +535,8 @@ class CdarHandler
 		}
 
 		// Unique per-call name so two concurrent status sends of the same condition cannot collide (#226).
-		$filename = $tempDir . '/cdar_' . $ProcessCondition . '_' . bin2hex(random_bytes(8)) . '.xml';
-		$filename = strtolower(dol_sanitizePathName(dol_string_unaccent($filename)));
+		$baseName = strtolower(dol_sanitizePathName(dol_string_unaccent('cdar_' . $ProcessCondition . '_' . bin2hex(random_bytes(8)) . '.xml')));
+		$filename = $tempDir . '/' . $baseName;
 
 		$result = $this->saveToFile($data, $filename);
 		if ($result === false) {
@@ -578,7 +578,9 @@ class CdarHandler
 				'TypeCode' => 'MPA',
 				'ValueAmount' => number_format($paidAmount, 2, '.', ''),
 				'CurrencyID' => $conf->currency,
-				'ValueDateTime' => dol_print_date($paidDate, '%Y%m%d')
+				// 'tzserver' like the other dates read from the invoice, and not the 'auto' default:
+				// the day the payment was made must not follow the timezone of whoever sends the status.
+				'ValueDateTime' => dol_print_date($paidDate, '%Y%m%d', 'tzserver')
 			)
 		);
 	}

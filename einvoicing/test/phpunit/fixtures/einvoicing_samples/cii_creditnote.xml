@@ -77,7 +77,6 @@
         <ram:Name>EINVOICING TEST SELLER</ram:Name>
         <ram:SpecifiedLegalOrganization>
           <ram:ID schemeID="0002">000000001</ram:ID>
-          <ram:TradingBusinessName>EINVOICING TEST SELLER</ram:TradingBusinessName>
         </ram:SpecifiedLegalOrganization>
         <ram:DefinedTradeContact>
           <ram:PersonName>EINVOICING TEST SELLER</ram:PersonName>
@@ -107,7 +106,6 @@
         <ram:Name>EINVOICING TEST BUYER</ram:Name>
         <ram:SpecifiedLegalOrganization>
           <ram:ID schemeID="0002">000000002</ram:ID>
-          <ram:TradingBusinessName>EINVOICING TEST BUYER</ram:TradingBusinessName>
         </ram:SpecifiedLegalOrganization>
         <ram:PostalTradeAddress>
           <ram:PostcodeCode>75000</ram:PostcodeCode>

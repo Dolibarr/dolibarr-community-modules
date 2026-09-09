@@ -339,6 +339,167 @@ function completAutoTags($content, $modulePath)
 }
 
 /**
+ * Check that the module ChangeLog.md has an entry for the version being released.
+ *
+ * When the entry is missing, it is added with the titles of all pull requests merged
+ * since the previous version tag (tag format is {project}_{version}). The format of
+ * the new entry (with or without a "-- date" suffix) follows the one already used in
+ * the file. Returns true when the changelog was modified, false otherwise.
+ *
+ * @param   string  $mod        Module name (lowercase, from detectModule).
+ * @param   string  $version    Version being released.
+ * @param   string  $project    Project name (lowercase directory name, used for the tag prefix).
+ * @param   string  $repo       Full path to the module directory.
+ * @return  bool    True if the changelog was modified, false otherwise.
+ */
+function checkAndCompleteChangelog($mod, $version, $project, $repo)
+{
+	$changelogFile = $repo . DIRECTORY_SEPARATOR . 'ChangeLog.md';
+	if (!file_exists($changelogFile)) {
+		print "No ChangeLog.md found at " . $changelogFile . ", skipping changelog check.\n";
+		return false;
+	}
+
+	$content = file_get_contents($changelogFile);
+
+	// Check if the changelog already has an entry for this version.
+	// Entries look like "## 1.2.0" or "## 2.0.23 -- 2026-09-05".
+	if (preg_match('/^##\s+' . preg_quote($version, '/') . '\b/m', $content)) {
+		print "ChangeLog.md already has an entry for version " . $version . ".\n";
+		return false;
+	}
+
+	print "ChangeLog.md does not have an entry for version " . $version . ".\n";
+
+	// Find the previous version tag (tag format is {project}_{version}).
+	$tagPrefix = $project . '_';
+	$output = array();
+	$returnCode = 0;
+	$command ='git -C ' . escapeshellarg($repo) . ' tag --list ' . escapeshellarg($tagPrefix . '*') . ' --sort=-version:refname';
+	print $command."\n";
+	exec($command, $output, $returnCode);
+	$previousTag = '';
+	if (!empty($output)) {
+		$previousTag = $output[0];
+		print "Previous version tag found: " . $previousTag . "\n";
+	} else {
+		print "No previous version tag found, taking all merged pull requests.\n";
+	}
+
+	// Get the titles of all pull requests merged since the previous tag.
+	// The repository is a monorepo: a merge window can contain pull requests for
+	// other modules. Only keep the ones that touch at least one file whose path
+	// starts with the module directory name.
+	$logRange = $previousTag ? $previousTag . '..HEAD' : '';
+	$output = array();
+	$returnCode = 0;
+	$command = sprintf(
+		'git -C %s log %s --merges --grep="Merge pull request" --format="___CHANGELOG_SEP___%%H___TITLE___%%b"',
+		escapeshellarg($repo),
+		$logRange !== '' ? escapeshellarg($logRange) : ''
+	);
+	print $command."\n";
+	exec($command, $output, $returnCode);
+
+	$prTitles = array();
+	$rawBody = implode("\n", $output);
+	$entries = explode("___CHANGELOG_SEP___", $rawBody);
+	$modulePrefix = $project . '/';
+	foreach ($entries as $entry) {
+		$entry = trim($entry);
+		if ($entry === '') {
+			continue;
+		}
+
+		// Split the SHA and the title body.
+		$parts = explode("___TITLE___", $entry, 2);
+		$sha = trim($parts[0]);
+		$title = trim(isset($parts[1]) ? $parts[1] : '');
+		if ($sha === '' || $title === '') {
+			continue;
+		}
+
+		// Keep only the first line of a multi-line title.
+		$firstLine = preg_replace('/\n.*$/s', '', $title);
+
+		// Get the files changed by this merge (diff against first parent).
+		$filesOutput = array();
+		$filesReturnCode = 0;
+		$filesCommand = sprintf(
+			'git -C %s diff --name-only %s^1 %s',
+			escapeshellarg($repo),
+			escapeshellarg($sha),
+			escapeshellarg($sha)
+		);
+		exec($filesCommand, $filesOutput, $filesReturnCode);
+
+		// Keep the PR only if it touches at least one file under the module directory.
+		$touchesModule = false;
+		foreach ($filesOutput as $file) {
+			$file = trim($file);
+			if ($file !== '' && strpos($file, $modulePrefix) === 0) {
+				$touchesModule = true;
+				break;
+			}
+		}
+
+		if ($touchesModule) {
+			// Normalize the prefix: keep only titles starting with a recognized
+			// keyword (FIX, NEW, QUAL, PERF, DOC, CLOSE, SEC) followed by ":".
+			// Discard entries that do not match.
+			$prefixPattern = '/^(FIX|NEW|QUAL|PERF|DOC|CLOSE|SEC)\b\s*:?\s*(.*)$/i';
+			if (preg_match($prefixPattern, $firstLine, $prefixMatch)) {
+				$rest = ltrim($prefixMatch[2]);
+				// Strip any leading colons to avoid "::" sequences.
+				$rest = preg_replace('/^:+\s*/', '', $rest);
+				$normalized = strtoupper($prefixMatch[1]) . ': ' . $rest;
+				$prTitles[] = $normalized;
+			} else {
+				print "Skip PR (no recognized prefix): " . $firstLine . "\n";
+			}
+		} else {
+			print "Skip PR (no file under " . $modulePrefix . "): " . $firstLine . "\n";
+		}
+	}
+
+	// Detect whether the changelog uses the "-- date" format.
+	$useDate = false;
+	if (preg_match('/^##\s+\d+\.\d+[\.\d]*\s+--\s/m', $content)) {
+		$useDate = true;
+	}
+
+	// Build the new entry.
+	$header = '## ' . $version;
+	if ($useDate) {
+		$header .= ' -- ' . date('Y-m-d');
+	}
+	$newEntry = $header . "\n\n";
+	if (!empty($prTitles)) {
+		foreach ($prTitles as $title) {
+			$newEntry .= $title . "\n";
+		}
+	} else {
+		$newEntry .= "No merged pull requests found since previous version.\n";
+	}
+	$newEntry .= "\n";
+
+	// Insert the new entry after the header line(s) and before the first existing "## " entry.
+	$newContent = '';
+	$match = array();
+	if (preg_match('/^(.*?)(?=^##\s)/ms', $content, $match, PREG_OFFSET_CAPTURE)) {
+		$insertPos = $match[0][1] + strlen($match[0][0]);
+		$newContent = substr($content, 0, $insertPos) . $newEntry . substr($content, $insertPos);
+	} else {
+		// No existing "## " entry found, append after a blank line.
+		$newContent = rtrim($content) . "\n\n" . $newEntry;
+	}
+
+	file_put_contents($changelogFile, $newContent);
+	print "Added new entry to ChangeLog.md for version " . $version . " with " . count($prTitles) . " pull request title(s).\n";
+	return true;
+}
+
+/**
  * build modules zip file if module sources are available into the repository.
  *
  * @param	string	$action			Action code
@@ -403,6 +564,7 @@ function buildModulePackages($action, $modulename)
 
 	print "\n";
 
+	$lastmessagetoshow = "";
 
 	// For each module, we generate the zip file
 	foreach ($projects as $project) {
@@ -417,6 +579,20 @@ function buildModulePackages($action, $modulename)
 			print "\n";
 			continue;
 			// TODO : Try to retrieve zip from Dolistore or make a git clone and then generate the build from sources.
+		}
+
+		// When creating a tag, verify the changelog has an entry for the version being released.
+		// If the entry is missing, it is added from the merged PR titles and the script stops so
+		// the change can be committed before relaunching.
+		if ($action == 'makeziptag') {
+			$repo = $directoryToSearch . DIRECTORY_SEPARATOR . $project;
+			if (checkAndCompleteChangelog($mod, $version, $project, $repo)) {
+				print "\n";
+				print "The ChangeLog.md was updated with a new entry for version " . $version . ".\n";
+				print "PLEASE REVIEW THE CHANGES AND VERSION, COMMIT THEM, AND RELAUCH THE SCRIPT...\n";
+				print "\n";
+				exit(1);
+			}
 		}
 
 		//  Define the name of the output zip file and remove it if already exists
@@ -448,8 +624,8 @@ function buildModulePackages($action, $modulename)
 					$returnCode = 0;
 					$repo = $directoryToSearch . DIRECTORY_SEPARATOR . $project;
 					$command = sprintf('git -C %s tag %s 2>&1', escapeshellarg($repo), escapeshellarg($tag));
-					print "YOU MUST COMMIT ALL FILES AND CREATE A TAG WITH COMMAND:\n";
-					print $command."\n";
+					$lastmessagetoshow .= "YOU MUST COMMIT ALL FILES (INCLUDING THE ZIP) AND CREATE A TAG WITH COMMAND:\n";
+					$lastmessagetoshow .= $command."\n";
 					/*exec(
 						$command,
 						$output,
@@ -494,6 +670,7 @@ function buildModulePackages($action, $modulename)
 		}
 
 		// TODO dir to exclude to store somewhere
+		print "Exclude some directories not useful.\n";
 		$dirsToExclude = array(
 			'einvoicing/vendor/horstoeko/zugferd/tests',
 			'einvoicing/vendor/horstoeko/zugferd/examples'
@@ -537,6 +714,9 @@ function buildModulePackages($action, $modulename)
 			print "\n";
 		}
 	}
+
+	print "\n";
+	print $lastmessagetoshow."\n";
 }
 
 /**
@@ -1044,7 +1224,7 @@ if (!extension_loaded('zip')) {
 }
 
 if (empty($argv[1])) {
-	print "Usage:   ".$script_file." index|makezip|pushdolistore\n";
+	print "Usage:   ".$script_file." index|makezip|makeziptag|pushdolistore\n";
 	print "Example: ".$script_file." index                           to rebuild the index.yaml file (used by Dolibarr to retrieve list of community modules)\n";
 	print "Example: ".$script_file." makezip|makeziptag [modulename] to regenerate zip of packages (and set Tag of version)\n";
 	print "Example: ".$script_file." pushdolistore      [modulename] to publish zip of packages on dolistore (ask for API key)\n";

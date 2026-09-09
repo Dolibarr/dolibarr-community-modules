@@ -1898,6 +1898,11 @@
 							"which access point provider answers: SuperPDP, Esalink, the offline test one"
 						],
 						[
+							"`EINVOICING_ONLY_GENERATE`",
+							"both",
+							"hidden: offers the generate-only provider, which talks to no platform, to a French company that files its documents by hand"
+						],
+						[
 							"`EINVOICING_DEBUG_MODE`",
 							"both",
 							"keeps the temp XML and stores the raw PA response on the flow"

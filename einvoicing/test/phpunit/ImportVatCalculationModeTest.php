@@ -39,6 +39,7 @@ if (!file_exists($dolibarrHtdocs . '/master.inc.php')) {
 require_once $dolibarrHtdocs . '/master.inc.php';
 require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
 dol_include_once('einvoicing/class/protocols/CIIProtocol.class.php');
+dol_include_once('einvoicing/class/utils/SupplierInvoiceHelper.class.php');
 require_once __DIR__ . '/CommonClassTestCompat.inc.php';
 
 if (empty($user->id)) {
@@ -278,12 +279,13 @@ class ImportVatCalculationModeTest extends CommonClassTest
 	}
 
 	/**
-	 * A difference neither convention explains is a real one. The invoice is left exactly as the import
-	 * built it, and nothing is said here: the comparison of SupplierInvoiceHelper is what reports it.
+	 * A difference neither convention explains is a document the import cannot reproduce. The invoice
+	 * is left exactly as the import built it - nothing else carries what the vendor sent - but it is
+	 * said, and the invoice is marked so it cannot be validated or approved (issue #861).
 	 *
 	 * @return void
 	 */
-	public function testADifferenceThatIsNotARoundingConventionIsLeftAlone()
+	public function testADifferenceThatIsNotARoundingConventionIsReportedAndBlocks()
 	{
 		$this->setInstanceVatMode(1);
 
@@ -295,7 +297,19 @@ class ImportVatCalculationModeTest extends CommonClassTest
 		$this->assertEquals(10.47, (float) $untouched->total_ht);
 		$this->assertEquals(2.10, (float) $untouched->total_tva, 'the invoice keeps the mode of the instance');
 		$this->assertEquals(12.57, (float) $untouched->total_ttc);
-		$this->assertCount(0, $messages);
+
+		$this->assertCount(2, $messages, 'what the document announces, and what it means for that invoice');
+		$this->assertStringContainsString('13.47', $messages[0], 'the total the document announces');
+		$this->assertStringContainsString('12.57', $messages[0], 'against the one the invoice carries');
+
+		$announced = SupplierInvoiceHelper::totalsMismatch((int) $invoice->id);
+		$this->assertIsArray($announced, 'the invoice is marked');
+		$this->assertEquals(13.47, $announced['ttc']);
+		$this->assertTrue(SupplierInvoiceHelper::totalsMismatchBlocks((int) $invoice->id));
+
+		// And the mark goes as soon as an import makes the invoice total the document again.
+		$this->alignWith($invoice, 2.10, 12.57, $messages);
+		$this->assertNull(SupplierInvoiceHelper::totalsMismatch((int) $invoice->id), 'nothing left to block');
 	}
 
 	/**
@@ -331,17 +345,14 @@ class ImportVatCalculationModeTest extends CommonClassTest
 	{
 		global $db;
 
-		$method = new ReflectionMethod(CIIProtocol::class, 'totalsAgreeWithDocument');
-		$method->setAccessible(true);
-
 		$creditNote = new FactureFournisseur($db);
 		$creditNote->total_tva = -2.09;
 		$creditNote->total_ttc = -12.56;
-		$this->assertTrue($method->invoke(null, $creditNote, 2.09, 12.56));
+		$this->assertTrue(SupplierInvoiceHelper::totalsAgreeWithDocument($creditNote, 2.09, 12.56));
 
 		$off = new FactureFournisseur($db);
 		$off->total_tva = -2.10;
 		$off->total_ttc = -12.57;
-		$this->assertFalse($method->invoke(null, $off, 2.09, 12.56));
+		$this->assertFalse(SupplierInvoiceHelper::totalsAgreeWithDocument($off, 2.09, 12.56));
 	}
 }

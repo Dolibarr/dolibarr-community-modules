@@ -522,6 +522,13 @@ class EInvoicing
 	];
 
 	/**
+	 * Name, into llx_einvoicing_extrafields, of the mark left on a supplier invoice the import could
+	 * not make total what the received document announces. Holds the announced BT-110 and BT-112, so
+	 * the block it carries can be lifted the moment the invoice totals them (issue #861).
+	 */
+	const EXTRAFIELD_TOTALS_MISMATCH = 'import_totals_mismatch';
+
+	/**
 	 * Name, into llx_einvoicing_extrafields, of the order reference the supplier declared on the
 	 * invoice it sent (BT-13). Kept whether or not it matched a purchase order of Dolibarr.
 	 */
@@ -1006,9 +1013,10 @@ class EInvoicing
 	/**
 	 * Statuses a user may still send by hand on an invoice received through the platform.
 	 *
-	 * A status already accepted is not proposed again, "Refused" (210) ends the exchange, and "Payment
-	 * transmitted" (211) needs an accepted "Approved" (205) on a non-draft invoice. A credit note
-	 * correcting an invoice we refused cannot be accepted either (issue #594).
+	 * A status already accepted is not proposed again, and "Refused" (210) ends the exchange. The
+	 * processing statuses are otherwise independent of one another (XP Z12-014 annex A, 2.1), so
+	 * "Payment transmitted" (211) needs no prior approval; only a draft, which cannot have been paid,
+	 * hides it. A credit note correcting an invoice we refused cannot be accepted either (issue #594).
 	 *
 	 * @param	int		$elementId		Id of the invoice
 	 * @param	string	$elementType	Element type ('invoice_supplier')
@@ -1018,6 +1026,7 @@ class EInvoicing
 	 */
 	public function getSendableStatusesForReceivedInvoice($elementId, $elementType)
 	{
+		// An accepted refusal closes the exchange: nothing more is sendable on that invoice, 211 included.
 		if ($this->hasSentStatusMessage($elementId, $elementType, self::STATUS_REFUSED, 1)) {
 			return array();
 		}
@@ -1038,17 +1047,19 @@ class EInvoicing
 			}
 		}
 
-		// The lifecycle runs in one direction: a received invoice is first answered - approved (205) or
-		// refused (210) - and only then paid, so "Payment transmitted" (211) is offered once that answer
-		// has been accepted by the platform, not while it is still pending or was rejected.
-		if (!$approved) {
-			unset($statuses[self::STATUS_PAYMENT_SENT]);
-		}
-
 		if ($elementType === 'invoice_supplier') {
 			dol_include_once('einvoicing/class/utils/SupplierInvoiceHelper.class.php');
 			dol_include_once('fourn/class/fournisseur.facture.class.php');
 			if (SupplierInvoiceHelper::refusedSourceOfCreditNote((int) $elementId) > 0) {
+				foreach (self::STATUSES_ACCEPTING_A_DOCUMENT as $code) {
+					unset($statuses[$code]);
+				}
+			}
+
+			// An invoice the import could not make total what the document announces is not one to
+			// approve: approving it commits to paying a figure the vendor did not bill (issue #861).
+			// Refusing it stays offered, which is the answer such a document deserves.
+			if (SupplierInvoiceHelper::totalsMismatchBlocks((int) $elementId)) {
 				foreach (self::STATUSES_ACCEPTING_A_DOCUMENT as $code) {
 					unset($statuses[$code]);
 				}
@@ -1473,6 +1484,43 @@ class EInvoicing
 			}
 		}
 
+		// BR-25: every line of the document names what it invoices (BT-153). The name is built from the
+		// label of the product, or from the first line of the description when there is no product, so a
+		// line holding neither is issued with an empty name and the document is refused - and refused by
+		// the platform, after transmission, on a line number the seller then has to go and find. Every
+		// such line is listed here instead, before anything is sent.
+		//
+		// Title and subtotal lines are not concerned: they are pseudo-lines that never reach the
+		// document. A discount line is not concerned either, its name being built from the piece it
+		// deducts (see einvoicingDiscountLabel()).
+		//
+		// Customer invoices only, afterPDFCreation() gating on instanceof Facture: FactureFournisseurLigne
+		// fills ->description and not ->desc before 20.0, so extending this guard to supplier invoices
+		// needs a ?: $line->description or every free line of an 18.0/19.0 purchase invoice reads as
+		// having no name.
+		$linesWithNoName = [];
+		if (!empty($invoice->lines) && is_array($invoice->lines)) {
+			foreach ($invoice->lines as $line) {
+				if ((int) $line->product_type == 9 || !empty($line->fk_remise_except)) {
+					continue;
+				}
+				$hasLabel = trim((string) ($line->product_label ?? '')) !== '';
+				$hasDesc = trim(dol_string_nohtmltag((string) ($line->desc ?? ''), 0)) !== '';
+				if (!$hasLabel && !$hasDesc) {
+					// The rank places the line on the paper, the rowid is what a correction is addressed to.
+					// Naming both is what lets whoever reads this go straight to the line and fix it.
+					// FactureLigne and FactureFournisseurLigne both hold the rank, their common parent
+					// does not declare it, and this reads whichever of the two the invoice carries.
+					// @phan-suppress-next-line PhanUndeclaredProperty
+					$rank = (int) ($line->rang ?? 0);
+					$linesWithNoName[] = ($rank ? '#'.$rank : '').' (id '.((int) $line->id).')';
+				}
+			}
+		}
+		if (!empty($linesWithNoName)) {
+			$baseErrors[] = $langs->trans("FxCheckErrorLinesWithNoName", implode(', ', $linesWithNoName));
+		}
+
 		if (!empty($baseErrors)) {
 			$res = -1;
 			$message .= '<br> Error: ' . implode('<br> Error: ', $baseErrors);
@@ -1765,7 +1813,7 @@ class EInvoicing
 		// an e-invoice, instead of discovering a routing rejection (fr:213) only after transmission.
 		// Only for live mode, not for test mode (no directory check in test mode)
 		// Only for invoices not yet transmitted
-		if (($object->element == 'facture' || $object->element == 'invoice') && $action != 'create' && getDolGlobalInt('EINVOICING_PRECHECK_DIRECTORY') && !empty(getDolGlobalString('EINVOICING_LIVE')) && empty($currentStatusInfo['transmitted'])) {
+		if (($object->element == 'facture' || $object->element == 'invoice') && $action != 'create' && getDolGlobalInt('EINVOICING_PRECHECK_DIRECTORY') && !empty(getDolGlobalString('EINVOICING_LIVE')) && empty($currentStatusInfo['transmitted']) && !einvoicingIsSendDisabled()) {
 			if (!is_object($object->thirdparty ?? null) && !empty($object->socid)) {
 				$object->fetch_thirdparty();
 			}
@@ -2311,7 +2359,8 @@ class EInvoicing
 
 			// Add a line for the Default product for thirdparty (to use when importing vendor invoice and no product found)
 			// Vendors only, like in edit mode: the core sets fournisseur when the creation starts from the vendor area
-			if ($object->fournisseur > 0) {
+			// Reception only: meaningless once nothing is ever imported.
+			if ($object->fournisseur > 0 && !einvoicingIsReceiveDisabled()) {
 				$resprints .= '<tr class="treinvoicing_collapseseparator trrouting_product_id '.($expand_display ? '' : 'hidden').'">';
 				$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
 				$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
@@ -2439,8 +2488,8 @@ class EInvoicing
 		$resprints .= '</td>';
 		$resprints .= '</tr>';
 
-		// Default product for import (upstream addition)
-		if ($object->fournisseur > 0) {
+		// Default product for import (upstream addition). Reception only: meaningless once nothing is ever imported.
+		if ($object->fournisseur > 0 && !einvoicingIsReceiveDisabled()) {
 			$resprints .= '<tr class="treinvoicing_collapseseparator '.($expand_display ? '' : 'hidden').'">';
 			$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
 			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
@@ -2762,8 +2811,8 @@ class EInvoicing
 		$res = array('ok' => 1, 'status' => '', 'message' => '');
 
 		$require = getDolGlobalInt('EINVOICING_REQUIRE_ROUTABLE_RECIPIENT');
-		if (!$require) {
-			return $res;	// opt-in, off by default
+		if (!$require || einvoicingIsSendDisabled()) {
+			return $res;	// opt-in, off by default, and meaningless once nothing is ever sent
 		}
 
 		if (!is_object($object->thirdparty ?? null)) {

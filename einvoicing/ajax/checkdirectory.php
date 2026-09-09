@@ -238,6 +238,14 @@ if ($siren === '') {
 	exit;
 }
 
+require_once "../lib/einvoicing.lib.php";
+if (einvoicingIsSendDisabled()) {
+	// Generation-only mode (or the sync toggle): nothing is ever sent, so there is no recipient to reach.
+	print json_encode(array('status' => 'unsupported', 'html' => einvoicing_directory_html(array('status' => 'unsupported'), $siren)));
+	$db->close();
+	exit;
+}
+
 require_once "../class/providers/PDPProviderManager.class.php";
 $PDPManager = new PDPProviderManager($db);
 $provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));

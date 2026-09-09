@@ -948,7 +948,7 @@ if ($provider) {
 	// deleting the draft supplier invoice a reception created: the flow is still here, so re-running a
 	// synchronization or deleting the line looks like the way to get the document back, and neither is.
 	// The action is on the flow card, one click away but invisible from here, hence this reminder.
-	if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
+	if (!einvoicingIsReceiveDisabled()) {
 		print '<div class="opacitymedium small paddingtop paddingleft">';
 		print img_picto('', 'info', 'class="pictofixedwidth"').' ';
 		print $langs->trans('EInvoiceReimportHint', $langs->transnoentitiesnoconv('EInvoiceReimport'));
@@ -1080,7 +1080,7 @@ if ($action == 'confirm_sync' && getDolGlobalString('EINVOICING_PDP') && $confir
 		if ($sync_result['actions']) {
 			print '<br><br>';
 			print '<!-- suggested action -->'."\n";
-			print '<strong><u>'.$langs->trans("SuggestedActions").'</u></strong></br>';
+			print '<strong><u>'.$langs->trans("SuggestedActions").'</u></strong><br>';
 			$i = 0;
 			foreach ($sync_result['actions'] as $tmpactioncode => $tmpactionstodo) {
 				print '<!-- action for code '.$tmpactioncode.' -->';
@@ -1098,7 +1098,7 @@ if ($action == 'confirm_sync' && getDolGlobalString('EINVOICING_PDP') && $confir
 		if ($sync_result['res'] < 0 && empty($sync_result['actions']) && !getDolGlobalInt('EINVOICING_DEBUG_MODE')) {
 			print '<!-- message to recommend to enable debug mode -->'."\n";
 			print '<div class="wordbreak warning clearboth">';
-			print '<strong><u>'.$langs->trans("SuggestedActions").' :</u></strong></br>';
+			print '<strong><u>'.$langs->trans("SuggestedActions").' :</u></strong><br>';
 			print $langs->trans("EnableDebugModeToSeeMoreDetails");
 			print '</div>';
 		}
