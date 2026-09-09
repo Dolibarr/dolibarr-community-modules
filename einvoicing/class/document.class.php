@@ -1589,7 +1589,12 @@ class Document extends CommonObject
 		}
 
 		if (isset($provider)) {
-			$syncFromDate = $provider->getLastSyncDate();
+			// A flow postponed on one run (nothing stored for it) is only re-listed by a later run if the
+			// cursor still reaches back to it - a margin, applied here since the manual sync of
+			// document_list.php can already be re-run with a hand-picked date, the cron cannot. The flows
+			// it re-lists that are already stored are cheaply discarded by the alreadyProcessedFlowIds
+			// pre-check in syncFlows(), which queries only the flowIds of the current listing.
+			$syncFromDate = $provider->getLastSyncDate(getDolGlobalInt('EINVOICING_SYNC_MARGIN_TIME_HOURS'));
 			$maxflows = getDolGlobalInt('EINVOICING_FLOWS_SYNC_CALL_SIZE', 100);
 
 			// Sync all flows
