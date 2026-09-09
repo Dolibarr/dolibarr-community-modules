@@ -924,7 +924,9 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		// Check if all referenced documents in the invoice exist in Dolibarr for the same supplier, if not return with error since we need them for correct linking in the invoice
-		if (!empty($parsedHeader['invoiceRefDocs']) && is_array($parsedHeader['invoiceRefDocs'])) {
+		// Only check for invoice types that require a linked document (credit notes 381/503, replacement 384) — for standard invoices (380) BG-3 is optional and may contain vendor placeholders.
+		$refDocCheckTypes = ['381', '503', '384'];
+		if (in_array($parsedHeader['documenttypecode'] ?? null, $refDocCheckTypes) && !empty($parsedHeader['invoiceRefDocs']) && is_array($parsedHeader['invoiceRefDocs'])) {
 			foreach ($parsedHeader['invoiceRefDocs'] as $invoiceRefDoc) {
 				$refDoc = $invoiceRefDoc['IssuerAssignedID'] ?? null;
 				$dateDoc = $invoiceRefDoc['FormattedIssueDateTime'] ?? null;
