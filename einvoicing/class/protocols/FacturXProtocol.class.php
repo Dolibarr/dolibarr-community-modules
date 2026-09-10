@@ -565,7 +565,10 @@ class FacturXProtocol extends CIIProtocol
 					$document->getDocumentPositionProductDetails($prodname, $proddesc, $prodsellerid, $prodbuyerid, $prodglobalidtype, $prodglobalid);
 					$document->getDocumentPositionGrossPrice($grosspriceamount, $grosspricebasisquantity, $grosspricebasisquantityunitcode);
 					$document->getDocumentPositionNetPrice($netpriceamount, $netpricebasisquantity, $netpricebasisquantityunitcode);
-					$document->getDocumentPositionLineSummation($lineTotalAmount, $totalAllowanceChargeAmount);
+					// The two-argument form is deprecated in zugferd and never read the document for the
+					// second one: it set it to 0.0 and called the simple form for the first. Nothing here
+					// reads that second value, so call the form that is kept.
+					$document->getDocumentPositionLineSummationSimple($lineTotalAmount);
 					$document->getDocumentPositionQuantity($billedquantity, $billedquantityunitcode, $chargeFreeQuantity, $chargeFreeQuantityunitcode, $packageQuantity, $packageQuantityunitcode);
 
 					// Get AdditionalReferencedDocument at line level
@@ -596,7 +599,7 @@ class FacturXProtocol extends CIIProtocol
 						'netpricebasisquantity' => $netpricebasisquantity ?? null,
 						'netpricebasisquantityunitcode' => $netpricebasisquantityunitcode ?? null,
 						'lineTotalAmount' => $lineTotalAmount ?? null,
-						'totalAllowanceChargeAmount' => $totalAllowanceChargeAmount ?? null,
+						'totalAllowanceChargeAmount' => 0.0,
 						'billedquantity' => $billedquantity ?? null,
 						'billedquantityunitcode' => $billedquantityunitcode ?? null,
 						'chargeFreeQuantity' => $chargeFreeQuantity ?? null,
