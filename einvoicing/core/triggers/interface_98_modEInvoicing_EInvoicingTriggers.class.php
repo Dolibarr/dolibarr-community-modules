@@ -150,6 +150,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		if ($action == 'BILL_CREATE') {
 			/** @var Facture $object */
 			'@phan-var-force Facture $object';
+			/** @var Facture $object */
 
 			if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {		// If sync Dolibarr to AP is on
 				$einvoicing = new EInvoicing($this->db);
@@ -172,6 +173,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		if ($action == 'BILL_VALIDATE') {
 			/** @var Facture $object */
 			'@phan-var-force Facture $object';
+			/** @var Facture $object */
 
 			// Tell the afterPDFCreation() hook that the document rebuild about to happen is the one that
 			// follows a validation. Set unconditionally and before anything else: this only records a fact
@@ -210,6 +212,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		if ($action == 'BILL_UNVALIDATE') {
 			/** @var Facture $object */
 			'@phan-var-force Facture $object';
+			/** @var Facture $object */
 			$einvoicing = new EInvoicing($this->db);
 
 			// Lock on the REAL PA state (persistent flow_id), not the Dolibarr syncstatus which is reset to
@@ -224,6 +227,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		if ($action == 'BILL_DELETE') {
 			/** @var Facture $object */
 			'@phan-var-force Facture $object';
+			/** @var Facture $object */
 			$einvoicing = new EInvoicing($this->db);
 
 			// Lock on the REAL PA state (persistent flow_id), see BILL_UNVALIDATE above.
@@ -236,6 +240,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		if ($action == 'BILL_MODIFY') {
 			/** @var Facture $object */
 			'@phan-var-force Facture $object';
+			/** @var Facture $object */
 			$einvoicing = new EInvoicing($this->db);
 
 			// Lock on the REAL PA state (persistent flow_id), see BILL_UNVALIDATE above.
@@ -277,6 +282,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		if ($action == 'PAYMENT_CUSTOMER_CREATE') {
 			/** @var Paiement $object */
 			'@phan-var-force Paiement $object';
+			/** @var Paiement $object */
 
 			if (!einvoicingIsSendDisabled()) {		// If sync Dolibarr to AP is on
 				require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
@@ -302,6 +308,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		if ($action == 'BILL_SUPPLIER_VALIDATE') {
 			/** @var FactureFournisseur $object */
 			'@phan-var-force FactureFournisseur $object';
+			/** @var FactureFournisseur $object */
 			// An invoice the import could not make total what its document announces never becomes
 			// payable by being validated: the totals are confronted again here, so an invoice corrected
 			// to the figures the vendor bills validates normally and drops the mark (issue #861).
@@ -379,6 +386,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		if ($action == 'BILL_SUPPLIER_PAYED') {
 			/** @var FactureFournisseur $object */
 			'@phan-var-force FactureFournisseur $object';
+			/** @var FactureFournisseur $object */
 
 			if (getDolGlobalInt('EINVOICING_SEND_PAYMENT_SENT_STATUS') && !einvoicingIsSendDisabled()) {
 				$paidAmount = (float) $object->getSommePaiement();
@@ -412,6 +420,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		if ($action == 'BILL_SUPPLIER_DELETE') {
 			/** @var FactureFournisseur $object */
 			'@phan-var-force FactureFournisseur $object';
+			/** @var FactureFournisseur $object */
 			$duplicate = false;
 			if (SupplierInvoiceHelper::isEInvoice($object->id, true, $duplicate)) {
 				if ($duplicate) {
@@ -452,6 +461,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			 * @var Document $object
 			 */
 			'@phan-var-force Document $object';
+			/** @var Document $object */
 			$duplicate = false;
 
 			// A flow does not always carry a supplier invoice id: a lifecycle message never resolves one,

@@ -605,6 +605,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		if ($isFactureContext) {
 			'@phan-var-force Facture $object';
+			/** @var Facture $object */
 			$permissiontoedit = $user->hasRight('facture', 'write');
 
 			$db->begin();
@@ -1341,7 +1342,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 * @param array			$parameters		Array of parameters
 	 * @param CommonObject	$object			Object
 	 * @param string		$action			Action code
-	 * @param Hookmanager	$hookmanager	Hook manager
+	 * @param HookManager	$hookmanager	Hook manager
 	 * @return int
 	 */
 	public function formConfirm($parameters, $object, &$action, $hookmanager)
@@ -1457,7 +1458,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 * @param array<string,mixed> 	$parameters		Array of parameters
 	 * @param CommonObject			$object			Object invoice
 	 * @param string		 		$action			Code action
-	 * @param Hookmanager			$hookmanager	Hookmanager
+	 * @param HookManager			$hookmanager	Hookmanager
 	 * @return int									Result
 	 */
 	public function formObjectOptions($parameters, $object, &$action, $hookmanager)
@@ -1478,18 +1479,21 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			// generation status/history, not only the send-related parts (those are gated individually inside it).
 			if (in_array($object->element, ['facture']) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || getDolGlobalString('EINVOICING_ONLY_GENERATE'))) {
 				'@phan-var-force Facture $object';
+				/** @var Facture $object */
 				$this->resprints .= $einvoicing->EInvoiceCardBlock($object, $action, $parameters);		// Output fields in card, including js for refreshing state
 			}
 
 			// Add block in supplier invoice card (reception only)
 			if (in_array($object->element, ['invoice_supplier']) && !einvoicingIsReceiveDisabled()) {
 				'@phan-var-force FactureFournisseur $object';
+				/** @var FactureFournisseur $object */
 				$this->resprints .= $einvoicing->supplierInvoiceCardBlock($object, $action, $parameters);		// Output fields in card, including js for refreshing state
 			}
 
 			// Add block in product/service card  (reception only)
 			if (in_array($object->element, ['product']) && !einvoicingIsReceiveDisabled()) {
 				'@phan-var-force Product $object';
+				/** @var Product $object */
 				$this->resprints .= $einvoicing->productServiceCardBlock($object, $action, $parameters);		// Output fields in card, including js for refreshing state
 			}
 
@@ -1498,6 +1502,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			// import" part is gated individually inside thirdpartyCardBlock().
 			if (in_array($object->element, ['societe']) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI') || getDolGlobalString('EINVOICING_ONLY_GENERATE'))) {
 				'@phan-var-force Societe $object';
+				/** @var Societe $object */
 				$this->resprints .= $einvoicing->thirdpartyCardBlock($object, $action, $parameters);		// Output fields in card
 			}
 		}
@@ -1512,7 +1517,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 * @param array<string,mixed> 	$parameters		Array of parameters
 	 * @param CommonObject			$object			Object invoice
 	 * @param string		 		$action			Code action
-	 * @param Hookmanager			$hookmanager	Hookmanager
+	 * @param HookManager			$hookmanager	Hookmanager
 	 * @return int									Result
 	 */
 	public function completeArrayFields($parameters, $object, &$action, $hookmanager)
@@ -1607,7 +1612,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 * @param array<string,mixed> 	$parameters		Array of parameters
 	 * @param CommonObject			$object			Object invoice
 	 * @param string		 		$action			Code action
-	 * @param Hookmanager			$hookmanager	Hookmanager
+	 * @param HookManager			$hookmanager	Hookmanager
 	 * @return int									Result
 	 */
 	public function printFieldListSelect($parameters, $object, &$action, $hookmanager)
@@ -1680,7 +1685,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 * @param array<string,mixed> 	$parameters		Array of parameters
 	 * @param CommonObject			$object			Object invoice
 	 * @param string		 		$action			Code action
-	 * @param Hookmanager			$hookmanager	Hookmanager
+	 * @param HookManager			$hookmanager	Hookmanager
 	 * @return int									Result
 	 */
 	public function printFieldListFrom($parameters, $object, &$action, $hookmanager)
@@ -1722,7 +1727,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 * @param array<string,mixed> 	$parameters		Array of parameters
 	 * @param CommonObject			$object			Object invoice
 	 * @param string		 		$action			Code action
-	 * @param Hookmanager			$hookmanager	Hookmanager
+	 * @param HookManager			$hookmanager	Hookmanager
 	 * @return int									Result
 	 */
 	public function printFieldListWhere($parameters, $object, &$action, $hookmanager)
@@ -1783,7 +1788,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 * @param array<string,mixed> 	$parameters		Array of parameters
 	 * @param CommonObject			$object			Object invoice
 	 * @param string		 		$action			Code action
-	 * @param Hookmanager			$hookmanager	Hookmanager
+	 * @param HookManager			$hookmanager	Hookmanager
 	 * @return int									Result
 	 */
 	public function printFieldListGroupBy($parameters, $object, &$action, $hookmanager)
@@ -1801,7 +1806,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 * @param array<string,mixed> 	$parameters		Array of parameters
 	 * @param CommonObject			$object			Object invoice
 	 * @param string		 		$action			Code action
-	 * @param Hookmanager			$hookmanager	Hookmanager
+	 * @param HookManager			$hookmanager	Hookmanager
 	 * @return int									Result
 	 */
 	public function printFieldListOption($parameters, $object, &$action, $hookmanager)
@@ -1943,7 +1948,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 * @param array<string,mixed> 	$parameters		Array of parameters
 	 * @param CommonObject			$object			Object invoice
 	 * @param string		 		$action			Code action
-	 * @param Hookmanager			$hookmanager	Hookmanager
+	 * @param HookManager			$hookmanager	Hookmanager
 	 * @return int									Result
 	 */
 	public function printFieldListTitle($parameters, $object, &$action, $hookmanager)
@@ -2000,7 +2005,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 * @param array<string,mixed> 	$parameters		Array of parameters
 	 * @param CommonObject			$object			Object invoice
 	 * @param string		 		$action			Code action
-	 * @param Hookmanager			$hookmanager	Hookmanager
+	 * @param HookManager			$hookmanager	Hookmanager
 	 * @return int									Result
 	 */
 	public function printFieldListValue($parameters, $object, &$action, $hookmanager)
@@ -2113,7 +2118,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 * @param array<string,mixed> 	$parameters		Array of parameters
 	 * @param CommonObject			$object			Object invoice
 	 * @param string		 		$action			Code action
-	 * @param Hookmanager			$hookmanager	Hookmanager
+	 * @param HookManager			$hookmanager	Hookmanager
 	 * @return int									Result
 	 */
 	public function isEditable($parameters, $object, &$action, $hookmanager)
@@ -2151,7 +2156,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 * @param array{soc_origin:int,soc_dest:int} 	$parameters		Array of parameters (soc_origin = absorbed thirdparty id, soc_dest = surviving thirdparty id)
 	 * @param CommonObject							$object			Destination thirdparty object
 	 * @param string								$action			Code action
-	 * @param Hookmanager							$hookmanager	Hookmanager
+	 * @param HookManager							$hookmanager	Hookmanager
 	 * @return int									0 on success/nothing to do, -1 on error (sets $this->error/$this->errors)
 	 */
 	public function replaceThirdparty($parameters, $object, &$action, $hookmanager)
@@ -2277,7 +2282,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 * @param array{colspan:int,socid:int|string,id:int|string,modulepart:string,relativepath:string}	$parameters		Array of parameters
 	 * @param array<string,mixed>																		$object			The file of the line being rendered
 	 * @param string																					$action			Code action
-	 * @param Hookmanager																				$hookmanager	Hookmanager
+	 * @param HookManager																				$hookmanager	Hookmanager
 	 * @return int																										0 in all cases (the line is completed, never replaced)
 	 */
 	public function formBuilddocLineOptions($parameters, $object, &$action, $hookmanager)

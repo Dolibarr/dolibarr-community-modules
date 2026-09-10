@@ -317,7 +317,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 			// Password
 			$item = $formSetup->newItem($prefix.'CLIENT_SECRET'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''));
-			if (method_exists('FormSetupItem', 'setAsGenericPassword')) {
+			if (method_exists($item, 'setAsGenericPassword')) {
 				$item->setAsGenericPassword();
 			} else {
 				// Dolibarr 18/19 fallback: setAsGenericPassword() does not exist yet.
