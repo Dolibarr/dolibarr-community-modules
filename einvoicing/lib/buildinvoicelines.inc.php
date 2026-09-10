@@ -1035,12 +1035,12 @@ $invoiceData = [
 	'sellername'                => $mysoc->name,
 	'sellerids'                 => (empty($sellerGlobalIds) ? '' : $myidprof),
 
-	'sellerlineone'             => $sellerAddressLines[0] !== '' ? $sellerAddressLines[0] : 'ADDRESS EMPTY',
+	'sellerlineone'             => $sellerAddressLines[0],
 	'sellerlinetwo'             => $sellerAddressLines[1],
 	'sellerlinethree'           => $sellerAddressLines[2],
-	'sellerpostcode'            => $mysoc->zip          ?? 'ZIP EMPTY',
-	'sellercity'                => $mysoc->town         ?? 'NO TOWN',
-	'sellercountry'             => $mysoc->country_code ?? 'COUNTRY NOT SET',
+	'sellerpostcode'            => $mysoc->zip,
+	'sellercity'                => $mysoc->town,
+	'sellercountry'             => $mysoc->country_code,
 	'sellersubdivision'         => null,
 
 	'sellercontactpersonname'   => $salerepresentative_name,
@@ -1064,15 +1064,15 @@ $invoiceData = [
 	'sellerTradingName'         => $sellerTradingName,
 
 	// Buyer part
-	'buyername'                 =>  $buyerName ?: 'CUSTOMER',
+	'buyername'                 => $buyerName,
 	'buyerids'                  => (empty($buyerGlobalIds) ? '' : $idprof),
 
-	'buyerlineone'              => $buyerAddressLines[0] !== '' ? $buyerAddressLines[0] : 'ADDRESS',
+	'buyerlineone'              => $buyerAddressLines[0],
 	'buyerlinetwo'              => $buyerAddressLines[1],
 	'buyerlinethree'            => $buyerAddressLines[2],
-	'buyerpostcode'             => $buyerZip         ?: 'ZIP',
-	'buyercity'                 => $buyerTown        ?: 'TOWN',
-	'buyercountry'              => $buyerCountryCode ?: 'COUNTRY',
+	'buyerpostcode'             => $buyerZip,
+	'buyercity'                 => $buyerTown,
+	'buyercountry'              => $buyerCountryCode,
 	'buyersubdivision'          => null,
 
 	'buyervatnumber'            => $buyerParty->tva_intra ?? '',
@@ -1222,6 +1222,26 @@ if (!empty($mysoc->tva_intra) && !empty($mysoc->country_code) && substr($mysoc->
 }
 if (!empty($buyerParty->tva_intra) && !empty($buyerParty->country_code) && substr($buyerParty->tva_intra, 0, 2) != $buyerParty->country_code) {
 	throw new Exception('BADVATNUMBER: The VAT number of the thirdparty ' . $buyerParty->name . ' must start with its 2 letter country code.');
+}
+// The buyer registration identifier gets the same length control as the seller one above: G1.63 makes
+// the SIREN of both parties mandatory and G1.89 makes it nine digits, and BR-FR-32 refuses anything
+// else under scheme 0002 as fatal. idprof() truncates a SIRET to nine characters, so only a SIRET
+// typed into the SIREN field reaches this - which the import of a received document can produce.
+if ($schemeIdProf == "0002" && strlen($idprof) != 9) {
+	throw new Exception('BADTHIRDPARTYPROFID: The professional ID ' . $idprof . ' of the customer ' . $buyerParty->name . ' has type SIREN but length is not 9 characters. Fix this in the record of that third party.');
+}
+// BT-40 and BT-55 are the only mandatory terms of a postal address, and BR-09 and BR-11 refuse a
+// document without them. Naming the party here is what lets the operator open the right record; left
+// alone, the placeholders below produced a document the access point refuses on a rule pointing at
+// nothing the user can see.
+if (empty($mysoc->country_code)) {
+	throw new Exception('BADADDRESS: The country of your company is empty. Fix this in the setup of your company.');
+}
+if (empty($buyerCountryCode)) {
+	throw new Exception('BADADDRESS: The country of the customer ' . $buyerParty->name . ' is empty. Fix this in the record of that third party.');
+}
+if (empty($mysoc->name) || empty($buyerName)) {
+	throw new Exception('BADPARTYNAME: The name of your company (BT-27) and the name of the customer (BT-44) are both mandatory on an e-invoice.');
 }
 
 
