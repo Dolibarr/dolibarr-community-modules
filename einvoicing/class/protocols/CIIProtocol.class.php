@@ -778,6 +778,57 @@ class CIIProtocol extends AbstractProtocol
 	}
 
 	/**
+	 * Decide what to do with a BG-3 reference (BT-25) the buyer does not hold.
+	 * BT-113 is what tells the two cases apart: an amount already paid points at a deposit the import
+	 * has to deduct, so the flow waits for it rather than importing an invoice short of its deduction;
+	 * nothing paid means the reference is documentary - a contract number, or the placeholder some
+	 * vendors always emit - and stepping over it costs nothing, as long as it is reported (#880).
+	 * ram:TypeCode cannot arbitrate this: CII-DT-018 forbids it below EXTENDED, so it is always absent.
+	 *
+	 * @param  string					$refDoc           BT-25, the identifier of the referenced document
+	 * @param  array<string,mixed>		$parsedHeader     Parsed document header
+	 * @param  int						$socId            Supplier third party the document is attached to
+	 * @param  string					$relation         How the reference is named in messages
+	 * @param  string[]					$return_messages  Import messages, appended to when stepping over
+	 * @param  bool						$reportSkip       False past the pre-check, which reported already
+	 * @return array{res:int,postponeflow:int,message:string,actioncode:string,actionurl:string,actiondata:array<string,mixed>,action:string,businessmessage:string}|null	Postpone result, or null to step over
+	 */
+	protected function resolveMissingReferencedDocument($refDoc, $parsedHeader, $socId, $relation, &$return_messages, $reportSkip = true)
+	{
+		global $langs;
+
+		$documentno = (string) ($parsedHeader['documentno'] ?? '');
+
+		if ((float) ($parsedHeader['totalPrepaidAmount'] ?? 0) <= 0) {
+			if ($reportSkip) {
+				$return_messages[] = 'Document ' . dol_escape_htmltag((string) $refDoc) . ', ' . $relation . ' ' . dol_escape_htmltag($documentno) . ', was not found in Dolibarr and was ignored: the received document declares no amount already paid.';
+			}
+			dol_syslog(get_class($this) . '::resolveMissingReferencedDocument Stepping over unresolved InvoiceReferencedDocument ref="' . $refDoc . '" (no BT-113) for ' . $documentno, LOG_DEBUG);
+			return null;
+		}
+
+		// Nothing is stored while the reference is missing: syncFlow() rolls the import back and the
+		// next synchronization takes the flow again, by then with the deposit in place.
+		$langs->load("bills");
+		$action = $langs->trans('CreateTheMissingSupplierInvoiceToImport', $refDoc);
+		$action .= ' <a class="butAction small smallpaddingimp nomarginleft" href="' . DOL_URL_ROOT . '/fourn/facture/card.php?action=create&socid=' . (int) $socId . '&ref_supplier=' . urlencode($refDoc) . '" target="_blank">';
+		$action .= '<i class="fas fa-plus-circle"></i> ';
+		$action .= $langs->trans('NewBill');
+		$action .= '</a>';
+
+		return [
+			'res' => -1,
+			'postponeflow' => 1,
+			'message' => 'Document ' . dol_escape_htmltag((string) $refDoc) . ', ' . $relation . ' ' . dol_escape_htmltag($documentno) . ', was not found in Dolibarr',
+			'actioncode' => 'LINKED_INVOICE_NOT_FOUND',
+			'actionurl' => 'none',
+			'actiondata' => array('supplierref' => $refDoc, 'linkedref' => $documentno, 'socid' => (int) $socId),
+			'action' => $action,
+			'businessmessage' => $langs->trans('CantFindLinkedInvoiceOfTheImportedInvoice', $documentno, $refDoc)
+		];
+	}
+
+	/**
 	 * Build the supplier invoice from a received CII document written to a per-call working file.
 	 * The temp-file lifecycle is owned by createSupplierInvoiceFromSource() (the public wrapper).
 	 * The vendor synchronization runs in its own transaction, opened and closed here. The invoice
@@ -928,41 +979,17 @@ class CIIProtocol extends AbstractProtocol
 			foreach ($parsedHeader['invoiceRefDocs'] as $invoiceRefDoc) {
 				$refDoc = $invoiceRefDoc['IssuerAssignedID'] ?? null;
 				$dateDoc = $invoiceRefDoc['FormattedIssueDateTime'] ?? null;
-				$typeDoc = $invoiceRefDoc['TypeCode'] ?? null;
 
 				$refDocInvoiceId = SupplierInvoiceHelper::findIdByRef($refDoc, (int) $socId);
 				if ($refDocInvoiceId < 0) {
 					return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($refDocInvoiceId, $refDoc, 'required by received document ' . ($parsedHeader['documentno'] ?? ''))];
 				}
 				if ($refDocInvoiceId == 0) {
-					// An unqualified reference (no ram:TypeCode in the XML) is a placeholder that the import
-					// does not consume — some vendors (e.g. DSV Road) always emit BG-3 with a dummy value
-					// such as "XXXX" when no preceding invoice applies. Skip it silently so it does not block
-					// the import and does not reach the post-creation loop.
-					if (empty($typeDoc)) {
-						dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource Skipping unqualified InvoiceReferencedDocument ref="' . $refDoc . '" (no TypeCode) for ' . ($parsedHeader['documentno'] ?? ''), LOG_DEBUG);
-						continue;
+					$postpone = $this->resolveMissingReferencedDocument($refDoc, $parsedHeader, (int) $socId, 'required by received document', $return_messages);
+					if ($postpone !== null) {
+						return $postpone;
 					}
-					// The document references a qualified invoice this Dolibarr does not hold yet. Nothing has
-					// been created at this point, so the flow is postponed and retried on the next
-					// synchronization rather than failed, and the message spells out what to create.
-					$langs->load("bills");
-					$action = $langs->trans('CreateTheMissingSupplierInvoiceToImport', $refDoc);
-					$action .= ' <a class="butAction small smallpaddingimp nomarginleft" href="' . DOL_URL_ROOT . '/fourn/facture/card.php?action=create&socid=' . (int) $socId . '&ref_supplier=' . urlencode($refDoc) . '" target="_blank">';
-					$action .= '<i class="fas fa-plus-circle"></i> ';
-					$action .= $langs->trans('NewBill');
-					$action .= '</a>';
-
-					return [
-						'res' => -1,
-						'postponeflow' => 1,
-						'message' => 'Document ' . dol_escape_htmltag((string) $refDoc) . ', required by received document ' . dol_escape_htmltag((string) ($parsedHeader['documentno'] ?? '')) . ', was not found in Dolibarr',
-						'actioncode' => 'LINKED_INVOICE_NOT_FOUND',
-						'actionurl' => 'none',
-						'actiondata' => array('supplierref' => $refDoc, 'linkedref' => ($parsedHeader['documentno'] ?? ''), 'socid' => (int) $socId),
-						'action' => $action,
-						'businessmessage' => $langs->trans('CantFindLinkedInvoiceOfTheImportedInvoice', ($parsedHeader['documentno'] ?? ''), $refDoc)
-					];
+					continue;
 				}
 			}
 		}
@@ -1072,20 +1099,20 @@ class CIIProtocol extends AbstractProtocol
 				foreach ($parsedHeader['invoiceRefDocs'] as $doc) {
 					$refDoc = $doc['IssuerAssignedID'] ?? null;
 					$dateDoc = $doc['FormattedIssueDateTime'] ?? null;
-					$typeDoc = $doc['TypeCode'] ?? null;
 
 					$linkedObjectId = SupplierInvoiceHelper::findIdByRef($refDoc, (int) $socId);
 					if ($linkedObjectId < 0) {
 						return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($linkedObjectId, $refDoc, 'required by received document ' . ($parsedHeader['documentno'] ?? ''))];
 					}
 					if ($linkedObjectId == 0) {
-						// Unqualified references (no TypeCode) were already skipped by the pre-check above and
-						// should not reach this point. As a safety net, skip them here too rather than failing.
-						if (empty($typeDoc)) {
-							dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource Skipping unqualified InvoiceReferencedDocument ref="' . $refDoc . '" (no TypeCode) in post-creation loop for ' . ($parsedHeader['documentno'] ?? ''), LOG_DEBUG);
-							continue;
+						// The pre-check above already adjudicated every reference, so this is only reached if
+						// one disappeared in between. Answering the same way keeps a bare failure - which
+						// syncFlows() turns into "Aborting synchronization" - out of the post-creation path.
+						$postpone = $this->resolveMissingReferencedDocument($refDoc, $parsedHeader, (int) $socId, 'required by received document', $return_messages, false);
+						if ($postpone !== null) {
+							return $postpone;
 						}
-						return ['res' => -1, 'message' => 'Document ' . dol_escape_htmltag((string) $refDoc) . ', required by received document ' . dol_escape_htmltag((string) ($parsedHeader['documentno'] ?? '')) . ', was not found in Dolibarr'];
+						continue;
 					}
 
 					// Fetch Object
