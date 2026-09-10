@@ -1380,17 +1380,7 @@ parameters:
 			count: 1
 			path: ../../../einvoicing/class/utils/SupplierInvoiceHelper.class.php
 
-		-
-			message: '#^Method XmlPatcher\:\:patchXmlString\(\) has parameter \$depositRefs with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: ../../../einvoicing/class/utils/XmlPatcher.class.php
 
-		-
-			message: '#^Static method XmlPatcher\:\:patchGuidelineId\(\) is unused\.$#'
-			identifier: method.unused
-			count: 1
-			path: ../../../einvoicing/class/utils/XmlPatcher.class.php
 
 		-
 			message: '#^Loose comparison using \=\= between string\|false and string\|false will always evaluate to true\.$#'
