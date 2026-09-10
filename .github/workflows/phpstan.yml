@@ -101,7 +101,9 @@ jobs:
         env:
           DOLIBARR_HTDOCS: ${{ github.workspace }}/dolibarr/htdocs
         run: |
-          ./dev/tools/phpstan/phpstan.sh --no-progress --error-format=checkstyle -o _phpstan.xml
+          # PHPStan writes its report on stdout; the progress and the banner of the runner script
+          # go to stderr, so the redirection carries the checkstyle document alone.
+          ./dev/tools/phpstan/phpstan.sh --no-progress --error-format=checkstyle > _phpstan.xml
 
       - name: Add results to PR
         if: ${{ always() }}
