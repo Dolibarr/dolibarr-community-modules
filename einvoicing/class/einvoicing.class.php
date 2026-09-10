@@ -1775,7 +1775,7 @@ class EInvoicing
 			$reason = $this->getIgnoreReason($object) ?? $langs->trans('EInvoiceIgnoreReasonUserChoice');
 			$resprints .= '<tr class="treinvoicing_collapseseparator">';
 			$resprints .= '<td>' . $form->textwithpicto($langs->trans('EInvoiceIgnoreReasonLabel'), $langs->transnoentitiesnoconv('EInvoiceIgnoreReasonLabelHelp')) . '</td>';
-			$resprints .= '<td>' . dol_escape_htmltag($reason) . '</td>';
+			$resprints .= '<td>' . dol_escape_htmltag((string) $reason) . '</td>';
 			$resprints .= '</tr>';
 			return $resprints;
 		}
