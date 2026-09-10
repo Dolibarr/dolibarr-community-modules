@@ -784,6 +784,8 @@ class CIIProtocol extends AbstractProtocol
 	 * nothing paid means the reference is documentary - a contract number, or the placeholder some
 	 * vendors always emit - and stepping over it costs nothing, as long as it is reported (#880).
 	 * ram:TypeCode cannot arbitrate this: CII-DT-018 forbids it below EXTENDED, so it is always absent.
+	 * A reference repeating the document's own number (BT-1) is settled before BT-113 is even read:
+	 * it can never resolve, so waiting for it is waiting for ever (#927).
 	 *
 	 * @param  string					$refDoc           BT-25, the identifier of the referenced document
 	 * @param  array<string,mixed>		$parsedHeader     Parsed document header
@@ -798,6 +800,18 @@ class CIIProtocol extends AbstractProtocol
 		global $langs;
 
 		$documentno = (string) ($parsedHeader['documentno'] ?? '');
+
+		// A document naming itself as the invoice it follows has nothing to wait for: the reference
+		// resolves through the very lookup already run on the document above, which came back empty -
+		// reaching this point proves it. Postponing would postpone for ever, so it is stepped over
+		// whatever BT-113 says, and reported because an accounting document cannot precede itself.
+		if (trim((string) $refDoc) !== '' && trim((string) $refDoc) === trim($documentno)) {
+			if ($reportSkip) {
+				$return_messages[] = 'Document ' . dol_escape_htmltag($documentno) . ' names itself as the invoice it follows; the reference was ignored.';
+			}
+			dol_syslog(get_class($this) . '::resolveMissingReferencedDocument Stepping over self-referencing InvoiceReferencedDocument ref="' . $refDoc . '" for ' . $documentno, LOG_WARNING);
+			return null;
+		}
 
 		if ((float) ($parsedHeader['totalPrepaidAmount'] ?? 0) <= 0) {
 			if ($reportSkip) {
