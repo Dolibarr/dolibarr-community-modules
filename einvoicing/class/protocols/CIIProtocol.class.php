@@ -2901,7 +2901,12 @@ class CIIProtocol extends AbstractProtocol
 
 		// TradeAddressType is reduced to the country code by the MINIMUM schema
 		if (!$this->isMinimumProfile($profile)) {
-			$addr->appendChild($doc->createElement('ram:PostcodeCode', einvoicingXmlText((string) $data[$prefix . 'postcode'])));
+			// The post code (BT-38, BT-53) and the city (BT-37, BT-52) are optional terms: an absent one
+			// is written as nothing at all, an empty element being refused by PEPPOL-EN16931-R008. Only
+			// the country below is mandatory, and the caller has already refused a party without one.
+			if (!empty($data[$prefix . 'postcode'])) {
+				$addr->appendChild($doc->createElement('ram:PostcodeCode', einvoicingXmlText((string) $data[$prefix . 'postcode'])));
+			}
 			// The three address lines the norm has: BT-35/36/162 for the seller, BT-50/51/163 for the
 			// buyer. XSD order inside TradeAddressType is PostcodeCode, LineOne, LineTwo, LineThree,
 			// CityName, CountryID - the elements are written in that order and nowhere else.
@@ -2914,7 +2919,9 @@ class CIIProtocol extends AbstractProtocol
 			if (!empty($data[$prefix . 'linethree'])) {
 				$addr->appendChild($doc->createElement('ram:LineThree', einvoicingXmlText($data[$prefix . 'linethree'])));
 			}
-			$addr->appendChild($doc->createElement('ram:CityName', einvoicingXmlText($data[$prefix . 'city'])));
+			if (!empty($data[$prefix . 'city'])) {
+				$addr->appendChild($doc->createElement('ram:CityName', einvoicingXmlText($data[$prefix . 'city'])));
+			}
 		}
 		$addr->appendChild($doc->createElement('ram:CountryID', einvoicingXmlText((string) $data[$prefix . 'country'])));
 
