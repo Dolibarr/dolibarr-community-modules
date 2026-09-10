@@ -3583,42 +3583,34 @@ class CIIProtocol extends AbstractProtocol
 		$importedTtc = (float) $invoice->total_ttc;
 		$invoice->fetch_thirdparty();
 
-		// Mode 2 first: a document announcing a VAT rounded on its total is the case met in the field.
-		// The mode of the instance has already been applied by the lines, so re-applying it costs one
-		// recomputation and keeps the two conventions treated the same way.
-		foreach (array('1' => 2, '0' => 1) as $roundingmode => $modenumber) {
-			// Same exclspec as the import itself used (FactureFournisseur::updateline calls
-			// update_price(1, 'auto')), so the rounding convention is the only thing that changes here.
-			if ($invoice->update_price(1, (string) $roundingmode, 0, $invoice->thirdparty) <= 0) {
-				dol_syslog(__METHOD__ . ' Failed to recalculate invoice ' . $supplierInvoiceId . ' in VAT mode ' . $modenumber . ': ' . $invoice->error, LOG_WARNING);
-				break;
-			}
+
+		// The invoice does not total what the document announces. Rather than replaying the rounding
+		// conventions one after the other to find the vendor's, the amounts he announces are written in:
+		// they are what he bills, and no convention has to be guessed. update_price() is deliberately not
+		// called afterwards - 'auto' falls back to the mode that rebuilds every line from its unit price
+		// when the instance carries no rounding preference, and it would undo what was just carried.
+		if ($this->carryAnnouncedVatOntoLines($supplierInvoiceId, $parsedHeader)) {
 			if ($invoice->fetch($supplierInvoiceId) <= 0) {
 				return;
 			}
 			if (SupplierInvoiceHelper::totalsAgreeWithDocument($invoice, $announcedTva, $announcedTtc)) {
-				// The import runs from a cron job as well as from a page, so the language file of the
-				// module is not necessarily loaded.
 				$langs->load('einvoicing@einvoicing');
-				// Translate::trans() takes four parameters and no more, its fifth argument being the
-				// maximum size of the result: a fifth value would end up there and break the sprintf.
 				$return_messages[] = $langs->trans(
-					'EInvoiceImportVatModeRealigned',
-					$modenumber,
+					'EInvoiceImportVatCarriedFromDocument',
 					price2num($announcedTva, 'MT'),
-					price2num($announcedTtc, 'MT'),
-					price2num($importedTtc, 'MT')
+					price2num($announcedTtc, 'MT')
 				);
-				dol_syslog(__METHOD__ . ' Invoice ' . $supplierInvoiceId . ' recalculated in VAT mode ' . $modenumber . ' to match the totals of the received document', LOG_DEBUG);
+				dol_syslog(__METHOD__ . ' Invoice ' . $supplierInvoiceId . ' carries the VAT the received document announces (' . $announcedTva . '), which no calculation mode rebuilds', LOG_DEBUG);
 				SupplierInvoiceHelper::clearTotalsMismatch($supplierInvoiceId);
 				return;
 			}
 		}
 
-		// Neither convention gives the announced totals: the document is one the import cannot
-		// reproduce. The invoice is left as it was built - the file is attached to it and nothing else
-		// carries what the vendor sent - but it is marked, and that mark keeps it out of validation and
-		// out of any approval until the two agree (issue #861).
+		// Neither convention rebuilds the announced totals by calculation. That does not make the document
+		// wrong: a vendor invoice can carry a VAT its own tool rounded differently, and it is what he bills.
+		// The amounts it announces are therefore written onto the lines that carry each rate, so the invoice
+		// totals what was sent and keeps totalling it - update_price() sums what the lines hold. What is not
+		// carried is a taxable base that differs: that is a line read wrong, and it stays reported.
 		$invoice->update_price(1, 'auto', 0, $invoice->thirdparty);
 		if ($invoice->fetch($supplierInvoiceId) <= 0) {
 			return;
@@ -3894,6 +3886,109 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		return ['res' => 1, 'fkRemise' => $fkRemise];
+	}
+
+	/**
+	 * Write the VAT the document announces onto the lines that carry each rate.
+	 *
+	 * update_price() sums the VAT stored on the lines instead of recomputing it, so an amount written here
+	 * is the amount the invoice totals. The difference goes on the last line of the rate, which is where the
+	 * core puts a rounding difference too. A rate whose taxable base is not already the announced BT-116 is
+	 * refused outright: that is a line the import read wrong, and no rounding convention explains it.
+	 *
+	 * @param	int						$supplierInvoiceId	Id of the invoice being imported
+	 * @param	array<string,mixed>		$parsedHeader		The parsed header, for its BG-23 breakdown
+	 * @return	bool										True when every announced rate was carried
+	 */
+	protected function carryAnnouncedVatOntoLines($supplierInvoiceId, array $parsedHeader): bool
+	{
+		global $db;
+
+		if (empty($parsedHeader['taxBreakdown']) || !is_array($parsedHeader['taxBreakdown'])) {
+			return false;
+		}
+
+		$invoice = new FactureFournisseur($db);
+		if ($invoice->fetch((int) $supplierInvoiceId) <= 0 || $invoice->fetch_lines() <= 0) {
+			return false;
+		}
+
+		// The document announces its VAT by rate (BG-23) and not by line, so the lines are grouped the same way.
+		$groups = array();
+		foreach ($invoice->lines as $line) {
+			$rate = (string) price2num($line->tva_tx);
+			$groups[$rate]['base'] = ($groups[$rate]['base'] ?? 0) + (float) $line->total_ht;
+			$groups[$rate]['vat'] = ($groups[$rate]['vat'] ?? 0) + (float) $line->total_tva;
+			$groups[$rate]['lines'] = ($groups[$rate]['lines'] ?? 0) + 1;
+			$groups[$rate]['last'] = $line;
+		}
+
+		$carry = array();
+		foreach ($parsedHeader['taxBreakdown'] as $tax) {
+			if (($tax['typeCode'] ?? '') !== 'VAT') {
+				continue;
+			}
+			$rate = (string) price2num($tax['rateApplicablePercent'] ?? 0);
+			if (empty($groups[$rate])) {
+				return false;
+			}
+
+			// A credit note is stored negative by Dolibarr while a document announces positive amounts.
+			$sign = $groups[$rate]['base'] < 0 ? -1 : 1;
+			if (abs($groups[$rate]['base'] - $sign * abs((float) ($tax['basisAmount'] ?? 0))) >= 0.005) {
+				return false;
+			}
+
+			$difference = round($sign * abs((float) ($tax['calculatedAmount'] ?? 0)) - $groups[$rate]['vat'], 2);
+			// A rounding convention moves the VAT of a rate by at most a cent per line, each line VAT being
+			// rounded once and their total once more. Beyond that the document says something no convention
+			// explains, and it is reported rather than written in.
+			if (abs($difference) > 0.01 * ($groups[$rate]['lines'] + 1)) {
+				return false;
+			}
+			if (abs($difference) >= 0.005) {
+				$carry[] = array($groups[$rate]['last'], $difference);
+			}
+		}
+
+		if (empty($carry)) {
+			return false;
+		}
+
+		foreach ($carry as $entry) {
+			list($line, $difference) = $entry;
+			$vat = (float) price2num((float) $line->total_tva + $difference, 'MT');
+			$ttc = (float) price2num((float) $line->total_ht + $vat + (float) $line->total_localtax1 + (float) $line->total_localtax2, 'MT');
+
+			$sql = "UPDATE " . MAIN_DB_PREFIX . "facture_fourn_det SET tva = " . ((float) $vat) . ", total_ttc = " . ((float) $ttc);
+			$sql .= " WHERE rowid = " . (int) $line->rowid;
+			if (!$db->query($sql)) {
+				dol_syslog(__METHOD__ . ' ' . $db->lasterror(), LOG_ERR);
+				return false;
+			}
+		}
+
+		// The header follows the lines it sums, which is what update_price() would do - it is written
+		// straight because that call would recompute the VAT of the lines and undo them.
+		$sql = "SELECT SUM(total_ht) as ht, SUM(tva) as tva, SUM(total_ttc) as ttc";
+		$sql .= " FROM " . MAIN_DB_PREFIX . "facture_fourn_det WHERE fk_facture_fourn = " . (int) $supplierInvoiceId;
+		$resql = $db->query($sql);
+		if (!$resql || !($totals = $db->fetch_object($resql))) {
+			dol_syslog(__METHOD__ . ' ' . $db->lasterror(), LOG_ERR);
+			return false;
+		}
+
+		$sql = "UPDATE " . MAIN_DB_PREFIX . "facture_fourn SET";
+		$sql .= " total_ht = " . ((float) $totals->ht);
+		$sql .= ", total_tva = " . ((float) $totals->tva);
+		$sql .= ", total_ttc = " . ((float) $totals->ttc);
+		$sql .= " WHERE rowid = " . (int) $supplierInvoiceId;
+		if (!$db->query($sql)) {
+			dol_syslog(__METHOD__ . ' ' . $db->lasterror(), LOG_ERR);
+			return false;
+		}
+
+		return true;
 	}
 
 	/**
