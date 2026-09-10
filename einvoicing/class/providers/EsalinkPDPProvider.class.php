@@ -1045,9 +1045,6 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 						);
 
 						// Complete the $actions array with the Business error message
-						if ($rescode == 'SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT') {
-							$actions[$rescode]['businessmessage'] = $langs->trans("SupplierInvoiceFoundButWithdifferentAmount", $res['actiondata']['supplierref'] ?? '', $res['actiondata']['expectedamount'] ?? '');
-						}
 						if ($rescode == 'THIRDPARTY_NOT_FOUND') {
 							$infostring = '';
 							foreach ($res['actiondata'] ?? [] as $datakey => $dataval) {

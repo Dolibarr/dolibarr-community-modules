@@ -903,6 +903,47 @@ class SupplierInvoiceHelper
 	}
 
 	/**
+	 * Build the postponed result of a reference lookup findIdByRef() could not answer.
+	 *
+	 * None of these codes is a missing document, and none of them has stored anything: the import runs
+	 * inside the one transaction createSupplierInvoiceFromSource() rolls back whole. Returned bare, the
+	 * failure makes syncFlows() count an error and break, so a database hiccup - or an ambiguity, which
+	 * no retry clears on its own - takes the rest of the batch down with it and every flow behind stays
+	 * unimported for as long as nobody looks. 'postponeflow' keeps this flow pending, reports it with
+	 * what to do about it, and lets the ones behind through.
+	 *
+	 * @param	int			$code		Negative code returned by findIdByRef()
+	 * @param	string|null	$ref		Reference that was looked for
+	 * @param	string		$context	Where that reference comes from, appended to the message
+	 * @param	int			$socId		Supplier the reference was looked up for
+	 * @param	string		$documentno	Reference of the received document being imported
+	 * @return	array{res:int,postponeflow:int,message:string,actioncode:string,actionurl:string,actiondata:array<string,mixed>,action:string,businessmessage:string}	The postponed result
+	 */
+	public static function refLookupPostponedResult(int $code, $ref, string $context, int $socId, string $documentno): array
+	{
+		global $langs;
+
+		$langs->loadLangs(array('bills', 'einvoicing@einvoicing'));
+
+		$action = $langs->trans('CheckTheSupplierInvoicesCarryingTheReference', $ref);
+		$action .= ' <a class="butAction small smallpaddingimp nomarginleft" href="' . DOL_URL_ROOT . '/fourn/facture/list.php?search_refsupplier=' . urlencode((string) $ref) . '&socid=' . $socId . '" target="_blank">';
+		$action .= '<i class="fas fa-search"></i> ';
+		$action .= $langs->trans('ModifySupplierInvoice');
+		$action .= '</a>';
+
+		return array(
+			'res' => -1,
+			'postponeflow' => 1,
+			'message' => self::refLookupErrorMessage($code, $ref, $context),
+			'actioncode' => 'LINKED_INVOICE_LOOKUP_FAILED',
+			'actionurl' => 'none',
+			'actiondata' => array('supplierref' => (string) $ref, 'linkedref' => $documentno, 'socid' => $socId),
+			'action' => $action,
+			'businessmessage' => $langs->trans('CantResolveReferenceOfTheImportedInvoice', $documentno, (string) $ref)
+		);
+	}
+
+	/**
 	 * Tell whether a ref_supplier embeds a reference as a delimited substring.
 	 *
 	 * Both values are compared without their whitespace, so "FA 2026 10" matches "FA202610". The reference
