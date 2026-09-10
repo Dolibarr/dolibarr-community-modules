@@ -295,6 +295,43 @@ jobs:
           fi
           echo "The rules refuse the $built damaged documents on BR-CO-17, as they have to."
 
+      - name: The documents the rules accepted come back in and rebuild the same amounts
+        if: ${{ matrix.validate == 'yes' }}
+        # The loop closes here: what the module emits was just validated, so it is a document a real
+        # vendor could send us, and importing it back has to rebuild the invoice it came from. The
+        # confrontation is the module's own comparison, so this covers whatever that covers.
+        # --id-from-name gives each specimen back the document number the others refer to it by:
+        # the timestamp normalization leaves the five carrying the same one.
+        env:
+          DOLIBARR_HTDOCS: ${{ steps.instance.outputs.htdocs }}
+        run: php einvoicing/test/conformance/import-amounts.php --id-from-name generated/cii_*.xml
+
+      - name: A document damaged on its totals, imported back, has to be refused
+        if: ${{ !cancelled() && matrix.validate == 'yes' }}
+        # A green gate says something only once it is shown to refuse something. One cent added to the
+        # total of a document the import had just rebuilt: the gate has to come back red on it. This
+        # runs even when the step above failed: which documents it refused is worth knowing either way.
+        env:
+          DOLIBARR_HTDOCS: ${{ steps.instance.outputs.htdocs }}
+        run: |
+          set -euo pipefail
+          mkdir -p control-import
+          php -r '
+            $file = "generated/cii_standard.xml";
+            $xml = file_get_contents($file);
+            $damaged = str_replace("<ram:GrandTotalAmount>540.27", "<ram:GrandTotalAmount>540.28", $xml, $count);
+            if ($count < 1) { fwrite(STDERR, "the control cannot be built: no 540.27 grand total in the generated document\n"); exit(2); }
+            file_put_contents("control-import/cii_standard.xml", $damaged);
+            echo "grand total moved by one cent on ", $count, " document(s)\n";
+          '
+          if php einvoicing/test/conformance/import-amounts.php --id-from-name control-import/cii_standard.xml > control-import-report.txt 2>&1; then
+            echo "::error::the damaged document was rebuilt - the gate above is not comparing the amounts"
+            cat control-import-report.txt
+            exit 1
+          fi
+          cat control-import-report.txt
+          echo "The gate refuses the damaged document, as it has to."
+
       - uses: actions/upload-artifact@v7
         if: ${{ always() && matrix.validate == 'yes' }}
         with:

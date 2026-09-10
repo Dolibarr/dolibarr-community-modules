@@ -88,11 +88,33 @@ class SupplierInvoiceHelper
 		// Extract XML header data
 		$parsedHeader = $protocol->parseInvoiceHeader($xmlData);
 
+		return self::compareInvoiceWithDocument($dolSupplierInvoice, $parsedHeader);
+	}
+
+	/**
+	 * Compare a Dolibarr supplier invoice to the document it comes from, already parsed.
+	 *
+	 * Split out of checkDolInvoiceAndEInvoiceConsistency(), which can only read a document that is
+	 * already stored in einvoicing_document. The comparison itself needs nothing but the parsed header,
+	 * so it is reachable while a document is being imported and from a document that is not stored at all.
+	 *
+	 * @param	FactureFournisseur		$dolSupplierInvoice		The Dolibarr object to compare to the document
+	 * @param	array<string,mixed>		$parsedHeader			The header of the document, as parseInvoiceHeader() returns it
+	 * @return	array{identical:bool,errors:list<string>}		Whether they agree, and what differs
+	 */
+	public static function compareInvoiceWithDocument(FactureFournisseur $dolSupplierInvoice, array $parsedHeader)
+	{
+		global $conf, $langs;
+
+		$errors = [];
+
 		// Currency
 		$currencyCode = $dolSupplierInvoice->multicurrency_code ?? $conf->currency;
 		if ($currencyCode != $parsedHeader['invoiceCurrency']) {
 			$errors[] = $langs->trans('SupplierInvoiceComparisonCurrencyDifference', $parsedHeader['invoiceCurrency'], $currencyCode);
 		}
+
+		$errors = array_merge($errors, self::documentSumErrors($dolSupplierInvoice, $parsedHeader));
 
 		// -----------------------------------------------------------------
 		// 		Compare amount depending VAT calculation mode 1 & 2
@@ -193,6 +215,106 @@ class SupplierInvoiceHelper
 			'identical' => (count($errors) == 0),
 			'errors' => $errors,
 		];
+	}
+
+	/**
+	 * Confront the sums a received document announces with what the invoice built from it holds.
+	 *
+	 * BT-109, BT-110 and BT-112 are compared further down, and they are the end of a chain the import can
+	 * get right by accident: a line dropped and a charge counted twice cancel out. The parts of that chain
+	 * are therefore confronted too, and so is the document with itself - a document whose own sums do not
+	 * add up is one to report rather than to reproduce.
+	 *
+	 * @param	FactureFournisseur		$invoice		The invoice the import built
+	 * @param	array<string,mixed>		$parsedHeader	The header of the document, as parseInvoiceHeader() returns it
+	 * @return	list<string>							What does not add up, empty when everything does
+	 * @phan-suppress PhanPluginMoreSpecificActualReturnType
+	 *  Every append below is conditional, so a document that adds up returns nothing; phan loses
+	 *  that branch and asks for non-empty-list.
+	 */
+	private static function documentSumErrors(FactureFournisseur $invoice, array $parsedHeader)
+	{
+		global $langs;
+
+		$errors = array();
+		$announced = function ($key) use ($parsedHeader) {
+			return isset($parsedHeader[$key]) ? abs((float) $parsedHeader[$key]) : null;
+		};
+
+		// BR-CO-13 : BT-109 = BT-106 - BT-107 + BT-108, on the figures of the document alone.
+		$lineTotal = $announced('lineTotalAmount');
+		$basis = $announced('taxBasisTotalAmount');
+		if ($lineTotal !== null && $basis !== null) {
+			$expected = round($lineTotal - (float) $announced('allowanceTotalAmount') + (float) $announced('chargeTotalAmount'), 2);
+			if (!self::areAmountsEqual($expected, $basis)) {
+				$errors[] = (string) $langs->trans('SupplierInvoiceComparisonDocumentTaxBasisDifference', price2num($basis, 'MT'), price2num($expected, 'MT'));
+			}
+		}
+
+		// BR-CO-16 : BT-115 = BT-112 - BT-113 + BT-114.
+		$grandTotal = $announced('grandTotalAmount');
+		$due = $announced('duePayableAmount');
+		if ($grandTotal !== null && $due !== null) {
+			$expected = round($grandTotal - (float) $announced('totalPrepaidAmount') + (float) $announced('roundingAmount'), 2);
+			if (!self::areAmountsEqual($expected, $due)) {
+				$errors[] = (string) $langs->trans('SupplierInvoiceComparisonDocumentDuePayableDifference', price2num($due, 'MT'), price2num($expected, 'MT'));
+			}
+		}
+
+		// BT-106 and BT-108 against the lines: a document level charge is carried as a line of the
+		// invoice, so what the lines hold is the line total of the document plus its charges.
+		if ($lineTotal !== null) {
+			$linesTotal = 0.0;
+			foreach ((array) $invoice->lines as $line) {
+				if (empty($line->fk_remise_except)) {
+					$linesTotal += (float) $line->total_ht;
+				}
+			}
+			$expected = round($lineTotal + (float) $announced('chargeTotalAmount'), 2);
+			if (!self::areAmountsEqual(abs($linesTotal), $expected)) {
+				$errors[] = (string) $langs->trans('SupplierInvoiceComparisonLineTotalDifference', price2num($expected, 'MT'), price2num(abs($linesTotal), 'MT'));
+			}
+		}
+
+		// BT-107 against the document level allowances, which the import attaches as discounts.
+		$allowance = $announced('allowanceTotalAmount');
+		if ($allowance !== null) {
+			$attached = self::attachedAllowanceAmount((int) $invoice->id);
+			if (!self::areAmountsEqual($attached, $allowance)) {
+				$errors[] = (string) $langs->trans('SupplierInvoiceComparisonAllowanceDifference', price2num($allowance, 'MT'), price2num($attached, 'MT'));
+			}
+		}
+
+		return $errors;
+	}
+
+	/**
+	 * Amount the document level allowances attached to an invoice take off it, VAT excluded.
+	 *
+	 * A deposit is a discount too, and it answers BT-113 rather than BT-107: the two are told apart by
+	 * fk_invoice_supplier_source, which only a deposit carries.
+	 *
+	 * @param	int		$supplierInvoiceId	Id of the supplier invoice
+	 * @return	float						Sum of the allowances attached to it
+	 */
+	private static function attachedAllowanceAmount($supplierInvoiceId)
+	{
+		global $db;
+
+		$sql = "SELECT SUM(r.amount_ht) as total FROM " . MAIN_DB_PREFIX . "societe_remise_except as r";
+		$sql .= " LEFT JOIN " . MAIN_DB_PREFIX . "facture_fourn_det as d ON d.rowid = r.fk_invoice_supplier_line";
+		$sql .= " WHERE (r.fk_invoice_supplier_source IS NULL OR r.fk_invoice_supplier_source = 0)";
+		$sql .= " AND (r.fk_invoice_supplier = " . (int) $supplierInvoiceId;
+		$sql .= " OR d.fk_facture_fourn = " . (int) $supplierInvoiceId . ")";
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . ' ' . $db->lasterror(), LOG_ERR);
+			return 0.0;
+		}
+		$obj = $db->fetch_object($resql);
+
+		return abs((float) ($obj->total ?? 0));
 	}
 
 	/**
