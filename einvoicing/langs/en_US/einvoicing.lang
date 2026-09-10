@@ -326,6 +326,17 @@ SuccessfullFlows=Successful flows
 EInvoiceEventsLabel=E-invoicing events
 EInvoiceFile=E-invoice File
 PDPSyncStatus=E-invoice Status
+EInvCurrentStatus=Current status
+EInvLifecycleHistory=Detailed log
+EInvActorSeller=Seller
+EInvActorPlatform=PDP / PA
+EInvActorBuyer=Buyer
+EInvNoLifecycleEvent=No lifecycle event recorded for this invoice yet.
+EInvLocalStatusNotYetTransmitted=Not yet transmitted to the platform
+EInvDirection=Direction
+EInvDirectionIn=Incoming
+EInvDirectionOut=Outgoing
+EInvValidationStatus=Validation status
 SuggestedActions=Actions to do
 CreateSupplier=Create the supplier
 CreateProduct=Create the product
@@ -742,3 +753,7 @@ DiscountFromDepositNoSource=Down payment deducted
 DiscountFromExcessReceivedNoSource=Payment in excess deducted
 DiscountFromExcessPaidNoSource=Payment in excess deducted
 FxCheckErrorLinesWithNoName=The following lines have neither a product label nor a description, so the item name of the e-invoice (BT-153) would be empty, which rule BR-25 refuses: %s. Enter a description on each of them (rank in the document, then line id).
+
+# A lifecycle status about an invoice we sent, that this run could not record (flow left unstored, retried later)
+CantRecordTheStatusOfTheInvoiceYouSent=The status of an invoice you sent, carried by flow %s, could not be recorded. Nothing was stored, the flow will be retried on the next synchronization.
+CheckSyncLogCantRecordSentInvoiceStatus=Nothing to do here: this flow is retried automatically on the next synchronization. If it keeps failing, the synchronization log gives the technical reason.

@@ -211,7 +211,7 @@ function thirdpartyidprof($object)
 {
 	$object->fetch_thirdparty();
 	$thirdparty = $object->thirdparty;
-	return $thirdparty ? idprof($object->thirdparty) : '';
+	return $thirdparty ? idprof($thirdparty) : '';
 }
 
 /**
@@ -1053,6 +1053,14 @@ function einvoicingIsAllowedRedirectUrl($url)
 		return false;
 	}
 	if (!preg_match('#^https?://#i', $url)) {
+		return false;
+	}
+	// A browser treats a backslash in the authority as a slash, and strips control/space characters,
+	// while parse_url() does not. That gap lets "https://evil.com\@allowed.com" pass the host check
+	// below (parse_url sees allowed.com) while the browser navigates to evil.com, redirecting the user
+	// and the OAuth tokens to an attacker domain. No legitimate https redirect URL carries such a
+	// character, so reject the URL outright rather than try to normalize it.
+	if (preg_match('#[\\\\\x00-\x20\x7f]#', $url)) {
 		return false;
 	}
 

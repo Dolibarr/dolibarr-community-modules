@@ -351,18 +351,6 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	}
 
 	/**
-	 * Delete access token.
-	 * Called by the setup page only.
-	 *
-	 * @return 	bool                	       	True if success, false otherwise
-	 */
-	public function deleteAccessToken()
-	{
-		$result = $this->deleteOAuthTokenDB();
-		return $result;
-	}
-
-	/**
 	 * Perform a health check call for PDP provider.
 	 *
 	 * @return array Contains 'status' (bool) and 'message' (string)
@@ -731,7 +719,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	 *
 	 * @param string 						$resource 	    Resource relative URL ('token', 'healthcheck', 'Flows', or others)
 	 * @param 'POST'|'GET'|'HEAD'|'PUT'|'PUTALREADYFORMATED'|'POSTALREADYFORMATED'|'DELETE' $method         HTTP method (dolibarr's types)
-	 * @param string|false 	$params 	    Options for the request (JSON encoded)
+	 * @param string|false|array<string,mixed> 	$params 	    Body of the request: a JSON encoded string, or an array carrying a CURLFile for a multipart upload. False when there is none.
 	 * @param array<string, string>         $extraHeaders   Optional additional headers
 	 * @param string|null                   $callType       Functional type of the API call for logging purposes (e.g., 'sync_flows', 'send_invoice')
 	 *
@@ -1491,7 +1479,18 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				}
 
 				if ($flowResponse['status_code'] != 200) {
-					return array('res' => -1, 'message' => "Failed to retrieve flow details (neither 'Original' nor 'Converted' document) for flowId: " . $flowId);
+					// Transient, and nothing was stored for this flow: without 'postponeflow' the batch
+					// aborts here and on every run after it, since an unstored flow never leaves the
+					// synchronization window. The #718 convention is meant for exactly this.
+					return array(
+						'res' => -1,
+						'postponeflow' => 1,
+						'message' => "Failed to retrieve flow details (neither 'Original' nor 'Converted' document) for flowId: " . $flowId,
+						'actioncode' => 'CANT_RECORD_SENT_INVOICE_LIFECYCLE_STATUS',
+						'actionurl' => '',
+						'action' => $langs->trans('CheckSyncLogCantRecordSentInvoiceStatus'),
+						'businessmessage' => $langs->trans('CantRecordTheStatusOfTheInvoiceYouSent', $flowId)
+					);
 				}
 				$cdarXml = $flowResponse['response'];
 
@@ -1501,13 +1500,29 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 				try {
 					// Parse the CDAR document (returns an array)
-					$cdarDocument = $cdarHandler->readFromString($cdarXml);
+					try {
+						$cdarDocument = $cdarHandler->readFromString($cdarXml);
+					} catch (Exception $e) {
+						// Malformed XML (a JSON error body, an HTML page): it will not parse any better on
+						// a later run, so it falls into the guard below instead of the catch at the end.
+						dol_syslog(__METHOD__ . " FlowId " . $flowId . " - " . $e->getMessage(), LOG_WARNING);
+						$cdarDocument = array();
+					}
 
 					//var_dump($cdarDocument); exit;
 
-					// Check if parsing was successful
-					if (empty($cdarDocument) || !isset($cdarDocument['AcknowledgementDocument'])) {
-						return array('res' => -1, 'message' => "FlowId: " . $flowId . " - Failed to parse CDAR document");
+					// Check the lifecycle code this case exists to record, not the array: a parsed CDAR
+					// always carries every key, empty or not (CdarHandler::parseReferencedDocument()), so
+					// a non-empty array proves nothing. Left untested, IssuerAssignedID below reads as ''
+					// and Facture::fetch(0, '') returns -1 on its own guard - which aborted the batch on
+					// a message naming an empty reference, and aborted it again on every later run.
+					if (empty($cdarDocument['AcknowledgementDocument']['ReferenceReferencedDocument']['ProcessConditionCode'])) {
+						// Not transient: a document that carries no lifecycle status never will. Stored, so
+						// the next synchronization skips it instead of reading it again.
+						dol_syslog(__METHOD__ . " FlowId " . $flowId . " carries no readable CDAR", LOG_WARNING);
+						$returnRes = 0;
+						$returnMessage = "FlowId: " . $flowId . " - Failed to parse CDAR document";
+						break;
 					}
 
 					$factureObj = new Facture($this->db);
@@ -1518,13 +1533,24 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 					$res = $factureObj->fetch(0, $issuerAssignedID);
 					if ($res < 0) {
+						// A reference matching no invoice returns 0, and is stored below with no invoice
+						// attached: a negative result is an SQL failure only, so it is worth retrying.
 						return array(
 							'res' => -1,
-							'message' => "FlowId " . $flowId . " - Failed to fetch customer invoice using CDAR IssuerAssignedID/ref: " . $issuerAssignedID
+							'postponeflow' => 1,
+							'message' => "FlowId " . $flowId . " - Failed to fetch customer invoice using CDAR IssuerAssignedID/ref: " . $issuerAssignedID,
+							'actioncode' => 'CANT_RECORD_SENT_INVOICE_LIFECYCLE_STATUS',
+							'actionurl' => '',
+							'action' => $langs->trans('CheckSyncLogCantRecordSentInvoiceStatus'),
+							'businessmessage' => $langs->trans('CantRecordTheStatusOfTheInvoiceYouSent', $flowId)
 						);
 					}
 					if ($factureObj->entity && $factureObj->entity != $conf->entity) {
-						return array('res' => -1, 'message' => "Processing flowId: " . $flowId . " - Failed to fetch customer invoice ref " . $document->tracking_idref . " in entity " . $conf->entity);
+						// That invoice belongs to another entity, so this flow is not this one's business:
+						// treated exactly like a reference matching nothing (the flow is stored, with no
+						// invoice attached), instead of aborting the batch and every flow behind it.
+						dol_syslog(__METHOD__ . " FlowId " . $flowId . " refers to customer invoice " . $factureObj->ref . " of entity " . $factureObj->entity . ", not entity " . $conf->entity, LOG_WARNING);
+						$factureObj = new Facture($this->db);
 					}
 
 
@@ -1630,9 +1656,17 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 							break;
 					}
 				} catch (Exception $e) {
+					// Nothing is committed when this is reached: the inner block rolls back before it
+					// rethrows, and what runs after its commit cannot throw. So the flow was not stored
+					// either, and postponing it retries it whole rather than aborting the batch for good.
 					return array(
 						'res' => -1,
-						'message' => "FlowId " . $flowId . " - Error processing CDAR document - " . $e->getMessage()
+						'postponeflow' => 1,
+						'message' => "FlowId " . $flowId . " - Error processing CDAR document - " . $e->getMessage(),
+						'actioncode' => 'CANT_RECORD_SENT_INVOICE_LIFECYCLE_STATUS',
+						'actionurl' => '',
+						'action' => $langs->trans('CheckSyncLogCantRecordSentInvoiceStatus'),
+						'businessmessage' => $langs->trans('CantRecordTheStatusOfTheInvoiceYouSent', $flowId)
 					);
 				}
 

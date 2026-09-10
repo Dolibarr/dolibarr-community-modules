@@ -14,16 +14,14 @@ return [
     // PhanTypeMismatchArgumentProbablyReal : 8 occurrences
     // PhanUndeclaredClassMethod : 7 occurrences
     // PhanTypeObjectUnsetDeclaredProperty : 6 occurrences
-    // PhanUndeclaredMethod : 6 occurrences
+    // PhanUndeclaredMethod : 5 occurrences
     // PhanTypeMismatchArgumentNullable : 5 occurrences
-    // PhanTypeArraySuspiciousNullable : 4 occurrences
     // PhanDeprecatedFunction : 2 occurrences
+    // PhanTypeArraySuspiciousNullable : 2 occurrences
     // PhanUndeclaredClassProperty : 2 occurrences
-    // PhanUndeclaredVariableDim : 2 occurrences
     // PhanParamTooMany : 1 occurrence
     // PhanPluginDuplicateExpressionAssignmentOperation : 1 occurrence
     // PhanRedefineClass : 1 occurrence
-    // PhanTypeMismatchPropertyProbablyReal : 1 occurrence
     // PhanTypeMismatchReturnNullable : 1 occurrence
     // PhanUndeclaredTypeParameter : 1 occurrence
     // PhanUndeclaredTypeReturnType : 1 occurrence
@@ -38,8 +36,8 @@ return [
         'einvoicing/class/einvoicing.class.php' => ['PhanTypeMismatchArgumentNullable'],
         'einvoicing/class/protocols/CIIProtocol.class.php' => ['PhanDeprecatedProperty', 'PhanParamTooMany', 'PhanPluginDuplicateExpressionAssignmentOperation', 'PhanTypeMismatchArgumentNullable'],
         'einvoicing/class/protocols/CommonProtocol.class.php' => ['PhanTypeMismatchArgumentNullable', 'PhanUndeclaredMethod'],
-        'einvoicing/class/protocols/FacturXProtocol.class.php' => ['PhanDeprecatedFunction', 'PhanTypeMismatchArgumentProbablyReal', 'PhanTypeMismatchPropertyProbablyReal'],
-        'einvoicing/class/providers/EsalinkPDPProvider.class.php' => ['PhanTypeArraySuspiciousNullable', 'PhanTypeMismatchArgumentProbablyReal', 'PhanUndeclaredProperty', 'PhanUndeclaredVariableDim'],
+        'einvoicing/class/protocols/FacturXProtocol.class.php' => ['PhanDeprecatedFunction'],
+        'einvoicing/class/providers/EsalinkPDPProvider.class.php' => ['PhanTypeArraySuspiciousNullable', 'PhanTypeMismatchArgumentProbablyReal', 'PhanUndeclaredProperty'],
         'einvoicing/class/providers/PDPProviderManager.class.php' => ['PhanTypeMismatchReturnNullable'],
         'einvoicing/class/providers/SuperPDPProvider.class.php' => ['PhanTypeArraySuspiciousNullable', 'PhanTypeMismatchArgumentProbablyReal', 'PhanUndeclaredProperty'],
         'einvoicing/compat/commonhookactions.class.php' => ['PhanRedefineClass'],

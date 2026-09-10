@@ -170,6 +170,7 @@ if (GETPOST('code') && GETPOST('state') && $provider instanceof AbstractPDPProvi
 		setEventMessages($langs->trans('EINVOICING_SUPERPDP_OAUTH_STATE_MISMATCH'), null, 'errors');
 	} else {
 		unset($_SESSION['einvoicing_superpdp_oauth_state']);
+		// @phan-suppress-next-line PhanUndeclaredMethod  Guarded by the method_exists() above: only a provider using an authorization code flow declares it.
 		$token = $provider->exchangeAuthorizationCode(GETPOST('code'));
 		if ($token) {
 			setEventMessages("Token generated successfully", null, 'mesgs');
