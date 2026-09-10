@@ -10,40 +10,31 @@
 return [
     // # Issue statistics:
     // PhanDeprecatedProperty : 20+ occurrences
-    // PhanUndeclaredProperty : 20+ occurrences
-    // PhanTypeMismatchArgumentProbablyReal : 8 occurrences
     // PhanUndeclaredClassMethod : 7 occurrences
     // PhanTypeObjectUnsetDeclaredProperty : 6 occurrences
-    // PhanUndeclaredMethod : 5 occurrences
-    // PhanTypeMismatchArgumentNullable : 5 occurrences
+    // PhanTypeMismatchArgumentNullable : 3 occurrences
     // PhanDeprecatedFunction : 2 occurrences
     // PhanTypeArraySuspiciousNullable : 2 occurrences
     // PhanUndeclaredClassProperty : 2 occurrences
     // PhanParamTooMany : 1 occurrence
-    // PhanPluginDuplicateExpressionAssignmentOperation : 1 occurrence
     // PhanRedefineClass : 1 occurrence
-    // PhanTypeMismatchReturnNullable : 1 occurrence
+    // PhanUndeclaredProperty : 1 occurrence
     // PhanUndeclaredTypeParameter : 1 occurrence
     // PhanUndeclaredTypeReturnType : 1 occurrence
 
     // Currently, file_suppressions and directory_suppressions are the only supported suppressions
     'file_suppressions' => [
-        'einvoicing/admin/setup.php' => ['PhanUndeclaredMethod', 'PhanUndeclaredProperty'],
-        'einvoicing/call_card.php' => ['PhanUndeclaredProperty'],
-        'einvoicing/class/actions_einvoicing.class.php' => ['PhanUndeclaredMethod', 'PhanUndeclaredProperty'],
+        'einvoicing/class/actions_einvoicing.class.php' => ['PhanUndeclaredProperty'],
         'einvoicing/class/call.class.php' => ['PhanTypeObjectUnsetDeclaredProperty', 'PhanUndeclaredClassMethod', 'PhanUndeclaredClassProperty'],
-        'einvoicing/class/document.class.php' => ['PhanTypeObjectUnsetDeclaredProperty', 'PhanUndeclaredClassMethod', 'PhanUndeclaredClassProperty', 'PhanUndeclaredProperty'],
+        'einvoicing/class/document.class.php' => ['PhanTypeObjectUnsetDeclaredProperty', 'PhanUndeclaredClassMethod', 'PhanUndeclaredClassProperty'],
         'einvoicing/class/einvoicing.class.php' => ['PhanTypeMismatchArgumentNullable'],
-        'einvoicing/class/protocols/CIIProtocol.class.php' => ['PhanDeprecatedProperty', 'PhanParamTooMany', 'PhanPluginDuplicateExpressionAssignmentOperation', 'PhanTypeMismatchArgumentNullable'],
-        'einvoicing/class/protocols/CommonProtocol.class.php' => ['PhanTypeMismatchArgumentNullable', 'PhanUndeclaredMethod'],
+        'einvoicing/class/protocols/CIIProtocol.class.php' => ['PhanDeprecatedProperty', 'PhanParamTooMany', 'PhanTypeMismatchArgumentNullable'],
+        'einvoicing/class/protocols/CommonProtocol.class.php' => ['PhanTypeMismatchArgumentNullable'],
         'einvoicing/class/protocols/FacturXProtocol.class.php' => ['PhanDeprecatedFunction'],
-        'einvoicing/class/providers/EsalinkPDPProvider.class.php' => ['PhanTypeArraySuspiciousNullable', 'PhanTypeMismatchArgumentProbablyReal', 'PhanUndeclaredProperty'],
-        'einvoicing/class/providers/PDPProviderManager.class.php' => ['PhanTypeMismatchReturnNullable'],
-        'einvoicing/class/providers/SuperPDPProvider.class.php' => ['PhanTypeArraySuspiciousNullable', 'PhanTypeMismatchArgumentProbablyReal', 'PhanUndeclaredProperty'],
+        'einvoicing/class/providers/EsalinkPDPProvider.class.php' => ['PhanTypeArraySuspiciousNullable'],
+        'einvoicing/class/providers/SuperPDPProvider.class.php' => ['PhanTypeArraySuspiciousNullable'],
         'einvoicing/compat/commonhookactions.class.php' => ['PhanRedefineClass'],
-        'einvoicing/document_card.php' => ['PhanUndeclaredProperty'],
         'einvoicing/lib/buildinvoicelines.inc.php' => ['PhanDeprecatedFunction', 'PhanDeprecatedProperty'],
-        'einvoicing/lib/einvoicing.lib.php' => ['PhanTypeMismatchArgumentNullable'],
         'helloasso/admin/setup.php' => ['PhanUndeclaredClassMethod'],
         'helloasso/lib/helloasso.lib.php' => ['PhanUndeclaredClassMethod', 'PhanUndeclaredTypeParameter', 'PhanUndeclaredTypeReturnType'],
     ],
