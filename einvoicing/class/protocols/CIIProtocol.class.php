@@ -2217,7 +2217,10 @@ class CIIProtocol extends AbstractProtocol
 		$profileGuidelines = [
 			'MINIMUM'  => 'urn:factur-x.eu:1p0:minimum', 	// Factur-X profile
 			'BASICWL'  => 'urn:factur-x.eu:1p0:basicwl', 	// Factur-X profile
-			'BASIC'    => 'urn:factur-x.eu:1p0:basic', 		// Factur-X profile (flowProfile = BASIC)
+			// BASIC is a CIUS of EN 16931, where MINIMUM and BASIC WL are below it: its identifier carries
+			// the compliance prefix, and the bare form is registered nowhere. A document declaring the bare
+			// one is refused by a platform that reads BT-24 against the code list.
+			'BASIC'    => 'urn:cen.eu:en16931:2017#compliant#urn:factur-x.eu:1p0:basic', 		// Factur-X profile (flowProfile = BASIC)
 			'EN16931'=> 'urn:cen.eu:en16931:2017', 		// CII Profile (PDP flowProfile => CIUS)
 			'EXTENDED' => 'urn:cen.eu:en16931:2017#conformant#urn:factur-x.eu:1p0:extended', // Factur-X profile (flowProfile = Extended-CTC-FR)
 			'EXTENDEDFR' => 'urn:cen.eu:en16931:2017#conformant#urn.cpro.gouv.fr:1p0:extended-ctc-fr', 			// Factur-X and CII profile (Only France) (flowProfile = Extended-CTC-FR)
