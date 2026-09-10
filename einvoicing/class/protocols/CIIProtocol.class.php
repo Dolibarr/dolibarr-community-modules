@@ -3353,6 +3353,9 @@ class CIIProtocol extends AbstractProtocol
 	 * @param 	string[]   	$deliveryDateList            	array to store the corresponding delivery dates as string in format YYYY-MM-DD
 	 * @param 	Facture 	$object 						invoice object
 	 * @return	void
+	 *
+	 * @phan-suppress PhanDeprecatedProperty  Expedition->origin has no replacement on the versions the
+	 *               module supports: origin_type appears on CommonObject in Dolibarr 24, the floor is 18.
 	 */
 	protected function determineDeliveryDatesAndCustomerOrderNumbers(&$customerOrderReferenceList, &$deliveryDateList, $object)
 	{
@@ -3749,6 +3752,10 @@ class CIIProtocol extends AbstractProtocol
 	 * @param int    $fk_soc                  	supplier ID
 	 * @param string $description             	invoice number or any reference
 	 * @return array{-1:string}|array<int,int>	[ originalIndex => fk_remise_except_id ] or '-1' on error
+	 *
+	 * @phan-suppress PhanDeprecatedProperty  DiscountAbsolute::create() reads amount_* and fk_soc, and
+	 *               nothing else, from Dolibarr 18 to the development branch: the core deprecated those
+	 *               properties but its own writer still needs them. See the comment on fk_soc below.
 	 */
 	protected function createHeaderDiscounts(array $headerAllowancesCharges, int $fk_soc, string $description): array
 	{
@@ -3810,6 +3817,10 @@ class CIIProtocol extends AbstractProtocol
 	 *
 	 * @param FactureFournisseur $linkedObject The deposit (TYPE_DEPOSIT) supplier invoice referenced by the final invoice
 	 * @return array{res:int<-1,1>, message?:string, fkRemise?:int} 'res' 1 on success with 'fkRemise', -1 on error with 'message'
+	 *
+	 * @phan-suppress PhanDeprecatedProperty  Same as createHeaderDiscounts(): DiscountAbsolute::create()
+	 *               reads amount_*, multicurrency_amount_* and fk_soc only, from Dolibarr 18 to the
+	 *               development branch.
 	 */
 	protected function getOrCreateDepositDiscount(FactureFournisseur $linkedObject)
 	{
