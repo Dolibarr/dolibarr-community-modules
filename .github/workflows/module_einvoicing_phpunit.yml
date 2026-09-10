@@ -231,13 +231,17 @@ jobs:
         if: ${{ matrix.validate == 'yes' }}
         # regenerate_einvoicing_fixtures.php is the script a developer runs after a change that
         # alters the XML on purpose - the same entry point, so this validates what that developer
-        # would be committing. It writes over the reference documents, which is why they are copied
-        # out and restored before anything else reads them.
+        # would be committing. It writes over the reference documents, which is why they are restored
+        # before anything else reads them.
+        # What is validated is the documents BEFORE normalization: that step flattens every
+        # DateTimeString to 20000101 to keep the committed fixtures deterministic, which also makes
+        # BR-FR-CO-07, BR-FR-03 and G1.07 true whatever the document says. Everything else is
+        # identical, so nothing is lost by validating the raw ones.
+        env:
+          EINVOICING_RAW_FIXTURES_DIR: ${{ github.workspace }}/generated
         run: |
           set -euo pipefail
           php einvoicing/scripts/regenerate_einvoicing_fixtures.php
-          mkdir -p generated
-          cp einvoicing/test/phpunit/fixtures/einvoicing_samples/*.xml generated/
           git checkout -- einvoicing/test/phpunit/fixtures/einvoicing_samples/
           count=$(ls generated/*.xml | wc -l)
           if [ "$count" -lt 5 ]; then
