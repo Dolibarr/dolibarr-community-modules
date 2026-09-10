@@ -126,6 +126,12 @@ if (getDolGlobalString('STANCER_ENABLE_CB', '') != '') {
 
 	//le mail d'information paiement CB
 	$formSetup->newItem('STANCER_AUTO_MAIL_INVOICES_CB_MAILTYPE')->setAsSelect($options);
+
+	// Templates used by the "send the payment link" button. Left empty, the button
+	// falls back to a plain built-in message: a template is what lets the company
+	// write its own wording without touching the module.
+	$formSetup->newItem('STANCER_PAYLINK_ORDER_MAILTYPE')->setAsSelect($optionsOrderMail);
+	$formSetup->newItem('STANCER_PAYLINK_INVOICE_MAILTYPE')->setAsSelect($options);
 }
 
 if (getDolGlobalString('STANCER_ENABLE_SEPA', '') != '') {
