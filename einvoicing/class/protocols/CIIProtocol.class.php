@@ -2802,7 +2802,10 @@ class CIIProtocol extends AbstractProtocol
 					$g->setAttribute('schemeID', $globalId['schemeID']);
 					$node->appendChild($g);
 				}
-			} else {
+			} elseif (!empty($data[$prefix . 'ids'])) {
+				// The ram:ID variant of the same term. Nothing to write when the party identifier is
+				// deliberately not declared: BT-29 and BT-46 are optional, and an empty element would
+				// be refused by PEPPOL-EN16931-R008.
 				$node->appendChild($doc->createElement('ram:ID', htmlspecialchars((string) $data[$prefix . 'ids'])));
 			}
 

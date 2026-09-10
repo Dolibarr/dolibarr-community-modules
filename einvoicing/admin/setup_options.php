@@ -66,6 +66,7 @@ if (!$res) {
  * @var HookManager $hookmanager
  * @var Translate $langs
  * @var User $user
+ * @var Societe $mysoc
  */
 // Libraries
 require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
@@ -280,6 +281,25 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	));
 	$item->helpText = $langs->transnoentities('EINVOICING_VAT_POINT_DATE_CODE_HELP');
 	$item->defaultFieldValue = 'auto';
+	$item->cssClass = 'minwidth500';
+
+	// The scheme the party identifier (BT-29, BT-46) is declared under. A list for a French company,
+	// whose admissible values the specification names, and a free field for any other country, where
+	// the module has no table of registers and would otherwise declare a national identifier as a DUNS.
+	if ($mysoc->country_code == 'FR') {
+		$item = $formSetup->newItem('EINVOICING_PARTY_IDENTIFIER_SCHEME')->setAsSelect(array(
+			'0225' => $langs->transnoentities('EINVOICING_PARTY_IDENTIFIER_SCHEME_0225'),
+			'0009' => $langs->transnoentities('EINVOICING_PARTY_IDENTIFIER_SCHEME_0009'),
+			'none' => $langs->transnoentities('EINVOICING_PARTY_IDENTIFIER_SCHEME_NONE'),
+		));
+		$item->defaultFieldValue = '0225';
+	} else {
+		// Left empty on purpose outside France: an empty value keeps the code the module has always
+		// answered for that country, and 0225 is a French scheme that would be wrong anywhere else.
+		$item = $formSetup->newItem('EINVOICING_PARTY_IDENTIFIER_SCHEME');
+		$item->fieldAttr['placeholder'] = $langs->transnoentities('EINVOICING_PARTY_IDENTIFIER_SCHEME_PLACEHOLDER');
+	}
+	$item->helpText = $langs->transnoentities('EINVOICING_PARTY_IDENTIFIER_SCHEME_HELP');
 	$item->cssClass = 'minwidth500';
 
 	// Setup conf to automatically transmit the e-invoice to the PA right after it is generated (on validation)

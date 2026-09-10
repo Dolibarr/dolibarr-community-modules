@@ -220,6 +220,17 @@ trait CommonProtocol
 	 */
 	private function getIEC6523Code($country_code, $global = 0)
 	{
+		// EINVOICING_PARTY_IDENTIFIER_SCHEME decides the scheme of the party identifier (BT-29, BT-46)
+		// alone. It must not reach $global == 2, the electronic address (BT-34, BT-49), where 0225 is
+		// the right answer and BR-CL-25 accepts nothing outside the CEF EAS list.
+		if ($global == 1) {
+			$configured = trim(getDolGlobalString('EINVOICING_PARTY_IDENTIFIER_SCHEME'));
+			// 'none' rather than an empty string: an empty option is an option nobody set, which
+			// keeps the historical scheme of the country.
+			if ($configured !== '') {
+				return ($configured === 'none') ? '' : $configured;
+			}
+		}
 		$retour = "";
 		switch ($country_code) {
 			case 'BE':
@@ -243,6 +254,24 @@ trait CommonProtocol
 				$retour = "0060";	// DUNS
 		}
 		return $retour;
+	}
+
+	/**
+	 * Value of the party identifier (BT-29, BT-46), which follows the scheme the setup asks for.
+	 *
+	 * Every entry of the list but the SIRET is declared with the professional identifier idprof()
+	 * answers for the country of the party, which is what the module has always written.
+	 *
+	 * @param	Societe	$thirdparty		Party the identifier belongs to
+	 * @return	string					Identifier, empty when that party has nothing under that scheme
+	 */
+	private function getPartyIdentifierValue($thirdparty)
+	{
+		if (getDolGlobalString('EINVOICING_PARTY_IDENTIFIER_SCHEME') === '0009') {
+			return removeAllSpaces($thirdparty->idprof2);
+		}
+
+		return idprof($thirdparty);
 	}
 
 	/**
