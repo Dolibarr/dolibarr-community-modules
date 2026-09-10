@@ -113,7 +113,7 @@ function einvsp_actionsFromHtml($html)
  * "create thirdparty" share the same plus icon).
  *
  * @param 	string 	$url 	Destination URL of the action
- * @return 	array 			array('label'=>langkey, 'help'=>langkey, 'icon'=>faicon)
+ * @return 	array<string,string> 	array('label'=>langkey, 'help'=>langkey, 'icon'=>faicon)
  */
 function einvsp_actionMetaFromUrl($url)
 {

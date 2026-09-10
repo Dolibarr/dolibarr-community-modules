@@ -279,10 +279,12 @@ class EInvoicingSyncPending extends CommonObject
 	/**
 	 * Mark the queued row of a flow as resolved (the flow finally synchronized).
 	 *
-	 * @param  string $flowId   PDP flow id
-	 * @param  string $provider Provider short key
-	 * @param  User   $user     User running the synchronization
-	 * @return int              1 if a row was resolved, 0 if none, <0 on error
+	 * @param  string $flowId      PDP flow id
+	 * @param  string $provider    Provider short key
+	 * @param  User   $user        User running the synchronization
+	 * @param  string $elementType Element the flow created (e.g. 'invoice_supplier'), stored for traceability
+	 * @param  int    $elementId   Id of that element, stored for traceability
+	 * @return int                 1 if a row was resolved, 0 if none, <0 on error
 	 */
 	public function resolveByFlowId($flowId, $provider, User $user, $elementType = '', $elementId = 0)
 	{
