@@ -759,6 +759,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 
 		if ($isSupplierInvoiceContext) {
+			'@phan-var-force FactureFournisseur $object';
 			$permissiontoedit = $user->hasRight('fournisseur', 'facture', 'creer');
 			// Who may validate a supplier invoice is decided by the core, in fourn/facture/card.php
 			// ($usercanvalidate): the "create" right is enough, unless advanced permissions are on, where
