@@ -478,13 +478,13 @@ if ($action == 'linkthirdparty' && $rowid > 0 && $permissiontowrite) {
 		print '<div class="marginbottomonly">'.img_picto('', 'fa-search', 'class="paddingrightonly"').'<b>'.$langs->trans("MatchingThirdpartyCandidates").'</b></div>';
 		if (!empty($candidates)) {
 			print '<div class="div-table-responsive-no-min">';
-			print '<table class="noborder centpercent">';
+			print '<table class="noborder">';
 			print '<tr class="liste_titre"><th>'.$langs->trans("ThirdParty").'</th><th>'.$langs->trans("MatchedOn").'</th><th></th></tr>';
 			foreach ($candidates as $csocid => $cinfo) {
 				print '<tr class="oddeven">';
-				print '<td><a href="'.DOL_URL_ROOT.'/societe/card.php?socid='.((int) $csocid).'" target="_blank">'.dol_escape_htmltag($cinfo['name']).'</a> <span class="opacitymedium small">(#'.((int) $csocid).')</span></td>';
-				print '<td>'.dol_escape_htmltag(implode(', ', array_keys($cinfo['crit']))).'</td>';
-				print '<td class="right"><a class="butAction small smallpaddingimp" href="'.$_SERVER["PHP_SELF"].'?action=comparelinkthirdparty&rowid='.((int) $rowid).'&socid='.((int) $csocid).'&token='.newToken().$param.'">'.$langs->trans("AssociateWithThisThirdparty").' &rarr;</a></td>';
+				print '<td class="nowraponall"><a href="'.DOL_URL_ROOT.'/societe/card.php?socid='.((int) $csocid).'" target="_blank">'.dol_escape_htmltag($cinfo['name']).'</a> <span class="opacitymedium small">(#'.((int) $csocid).')</span></td>';
+				print '<td class="small">'.dol_escape_htmltag(implode(', ', array_keys($cinfo['crit']))).'</td>';
+				print '<td class="nowraponall paddingleft"><a class="butAction small smallpaddingimp" href="'.$_SERVER["PHP_SELF"].'?action=comparelinkthirdparty&rowid='.((int) $rowid).'&socid='.((int) $csocid).'&token='.newToken().$param.'">'.$langs->trans("AssociateWithThisThirdparty").' &rarr;</a></td>';
 				print '</tr>';
 			}
 			print '</table>';
@@ -578,7 +578,7 @@ if ($action == 'comparelinkthirdparty' && $rowid > 0 && $permissiontowrite) {
 			}
 
 			print '<div class="div-table-responsive-no-min">';
-			print '<table class="noborder centpercent">';
+			print '<table class="noborder">';
 			print '<tr class="liste_titre">';
 			print '<th>'.$langs->trans("Field").'</th>';
 			print '<th>'.$langs->trans("ValueFromInvoice").'</th>';
