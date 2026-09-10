@@ -215,6 +215,32 @@ function thirdpartyidprof($object)
 }
 
 /**
+ * Escape a value for a text node or an attribute of a generated XML document.
+ *
+ * Two ways a text value breaks the document, neither of which htmlspecialchars() handles alone:
+ * an invalid UTF-8 sequence, which it answers with an EMPTY STRING below PHP 8.1 where ENT_SUBSTITUTE
+ * is not a default (one latin-1 byte in a company name, and BR-06 refuses the empty element), and a
+ * control character forbidden by XML 1.0 (a vertical tab pasted from a PDF), which it copies through
+ * and which leaves a file no parser reads - the platform answers HTTP 400 on it.
+ *
+ * @param  mixed	$value	Value to escape. null is accepted and gives ''.
+ * @return string			Value escaped for DOMDocument::createElement() and setAttribute()
+ */
+function einvoicingXmlText($value)
+{
+	$value = (string) $value;
+
+	// Tab, LF and CR are the three control characters XML 1.0 allows. No /u here: the pattern is
+	// byte based on purpose, so it also holds on the invalid UTF-8 the escape below repairs.
+	$stripped = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', '', $value);
+	if ($stripped !== null) {
+		$value = $stripped;
+	}
+
+	return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
+
+/**
  * Remove every space of an identifier, whatever kind of space it is.
  *
  * A value copied from a web page or a PDF often carries a non-breaking (U+00A0), thin or zero-width
