@@ -195,7 +195,7 @@ class CdarHandler
 	/**
 	 * generate
 	 *
-	 * Values coming from the data are escaped with htmlspecialchars() before they reach
+	 * Values coming from the data are escaped with einvoicingXmlText() before they reach
 	 * DOMDocument::createElement(), which parses its second argument: an ampersand in a free text
 	 * (a rejection reason, a party name) would otherwise produce an empty element and lose the
 	 * information - same defect as issue #695 on the invoice side.
@@ -911,7 +911,7 @@ class CdarHandler
 		$context->appendChild($process);
 
 		$guideline = $dom->createElement('ram:GuidelineSpecifiedDocumentContextParameter');
-		$guideline->appendChild($dom->createElement('ram:ID', htmlspecialchars((string) $guidelineID)));
+		$guideline->appendChild($dom->createElement('ram:ID', einvoicingXmlText((string) $guidelineID)));
 		$context->appendChild($guideline);
 		$root->appendChild($context);
 	}
@@ -929,7 +929,7 @@ class CdarHandler
 	private function addDateTimeElement($dom, $parent, $elementName, $value, $format)
 	{
 		$element = $dom->createElement($elementName);
-		$dateTimeStr = $dom->createElement('udt:DateTimeString', htmlspecialchars((string) $value));
+		$dateTimeStr = $dom->createElement('udt:DateTimeString', einvoicingXmlText((string) $value));
 		$dateTimeStr->setAttribute('format', $format);
 		$element->appendChild($dateTimeStr);
 		$parent->appendChild($element);
@@ -949,18 +949,18 @@ class CdarHandler
 		$party = $dom->createElement($elementName);
 
 		if (isset($data['GlobalID'])) {
-			$globalID = $dom->createElement('ram:GlobalID', htmlspecialchars((string) $data['GlobalID']));
+			$globalID = $dom->createElement('ram:GlobalID', einvoicingXmlText((string) $data['GlobalID']));
 			if (!empty($data['SchemeID'])) {
 				$globalID->setAttribute('schemeID', $data['SchemeID']);
 			}
 			$party->appendChild($globalID);
 		}
 
-		$party->appendChild($dom->createElement('ram:RoleCode', htmlspecialchars((string) $data['RoleCode'])));
+		$party->appendChild($dom->createElement('ram:RoleCode', einvoicingXmlText((string) $data['RoleCode'])));
 
 		if (isset($data['URIID'])) {
 			$uriComm = $dom->createElement('ram:URIUniversalCommunication');
-			$uriID = $dom->createElement('ram:URIID', htmlspecialchars((string) $data['URIID']));
+			$uriID = $dom->createElement('ram:URIID', einvoicingXmlText((string) $data['URIID']));
 			$uriID->setAttribute('schemeID', $data['URISchemeID']);
 			$uriComm->appendChild($uriID);
 			$party->appendChild($uriComm);
@@ -1091,8 +1091,8 @@ class CdarHandler
 	private function addExchangedDocument($dom, $root, $doc)
 	{
 		$exchanged = $dom->createElement('rsm:ExchangedDocument');
-		$exchanged->appendChild($dom->createElement('ram:ID', htmlspecialchars((string) $doc['ID'])));
-		$exchanged->appendChild($dom->createElement('ram:Name', htmlspecialchars((string) $doc['Name'])));
+		$exchanged->appendChild($dom->createElement('ram:ID', einvoicingXmlText((string) $doc['ID'])));
+		$exchanged->appendChild($dom->createElement('ram:Name', einvoicingXmlText((string) $doc['Name'])));
 
 		$this->addDateTimeElement($dom, $exchanged, 'ram:IssueDateTime', $doc['IssueDateTime'], self::FORMAT_DATETIME);
 
@@ -1120,7 +1120,7 @@ class CdarHandler
 		$multipleRef->appendChild($indicator);
 		$ack->appendChild($multipleRef);
 
-		$ack->appendChild($dom->createElement('ram:TypeCode', htmlspecialchars((string) $doc['TypeCode'])));
+		$ack->appendChild($dom->createElement('ram:TypeCode', einvoicingXmlText((string) $doc['TypeCode'])));
 		$this->addDateTimeElement($dom, $ack, 'ram:IssueDateTime', $doc['IssueDateTime'], self::FORMAT_DATETIME);
 		$this->addReferencedDocument($dom, $ack, $doc['ReferenceReferencedDocument']);
 
@@ -1138,24 +1138,24 @@ class CdarHandler
 	private function addReferencedDocument($dom, $parent, $doc)
 	{
 		$ref = $dom->createElement('ram:ReferenceReferencedDocument');
-		$ref->appendChild($dom->createElement('ram:IssuerAssignedID', htmlspecialchars((string) $doc['IssuerAssignedID'])));
-		$ref->appendChild($dom->createElement('ram:StatusCode', htmlspecialchars((string) $doc['StatusCode'])));
-		$ref->appendChild($dom->createElement('ram:TypeCode', htmlspecialchars((string) $doc['TypeCode'])));
+		$ref->appendChild($dom->createElement('ram:IssuerAssignedID', einvoicingXmlText((string) $doc['IssuerAssignedID'])));
+		$ref->appendChild($dom->createElement('ram:StatusCode', einvoicingXmlText((string) $doc['StatusCode'])));
+		$ref->appendChild($dom->createElement('ram:TypeCode', einvoicingXmlText((string) $doc['TypeCode'])));
 
 		// MDT-97. Its place in the CDAR XSD sequence (ReferencedDocumentType) is after ReceiptDateTime /
 		// AttachmentBinaryObject and before FormattedIssueDateTime - the order the platforms use too.
 		if (!empty($doc['ReferenceTypeCode'])) {
-			$ref->appendChild($dom->createElement('ram:ReferenceTypeCode', htmlspecialchars((string) $doc['ReferenceTypeCode'])));
+			$ref->appendChild($dom->createElement('ram:ReferenceTypeCode', einvoicingXmlText((string) $doc['ReferenceTypeCode'])));
 		}
 
 		$formattedDateTime = $dom->createElement('ram:FormattedIssueDateTime');
-		$dateTimeStr = $dom->createElement('qdt:DateTimeString', htmlspecialchars((string) $doc['FormattedIssueDateTime']));
+		$dateTimeStr = $dom->createElement('qdt:DateTimeString', einvoicingXmlText((string) $doc['FormattedIssueDateTime']));
 		$dateTimeStr->setAttribute('format', self::FORMAT_DATE);
 		$formattedDateTime->appendChild($dateTimeStr);
 		$ref->appendChild($formattedDateTime);
 
-		$ref->appendChild($dom->createElement('ram:ProcessConditionCode', htmlspecialchars((string) $doc['ProcessConditionCode'])));
-		$ref->appendChild($dom->createElement('ram:ProcessCondition', htmlspecialchars((string) $doc['ProcessCondition'])));
+		$ref->appendChild($dom->createElement('ram:ProcessConditionCode', einvoicingXmlText((string) $doc['ProcessConditionCode'])));
+		$ref->appendChild($dom->createElement('ram:ProcessCondition', einvoicingXmlText((string) $doc['ProcessCondition'])));
 
 		$this->addTradeParty($dom, $ref, 'ram:IssuerTradeParty', $doc['IssuerTradeParty']);
 		$parent->appendChild($ref);
@@ -1165,13 +1165,13 @@ class CdarHandler
 
 			if (!empty($doc['SpecifiedDocumentStatus']['ReasonCode'])) {
 				$status->appendChild(
-					$dom->createElement('ram:ReasonCode', htmlspecialchars((string) $doc['SpecifiedDocumentStatus']['ReasonCode']))
+					$dom->createElement('ram:ReasonCode', einvoicingXmlText((string) $doc['SpecifiedDocumentStatus']['ReasonCode']))
 				);
 			}
 
 			if (!empty($doc['SpecifiedDocumentStatus']['Reason'])) {
 				$status->appendChild(
-					$dom->createElement('ram:Reason', htmlspecialchars((string) $doc['SpecifiedDocumentStatus']['Reason']))
+					$dom->createElement('ram:Reason', einvoicingXmlText((string) $doc['SpecifiedDocumentStatus']['Reason']))
 				);
 			}
 
@@ -1189,10 +1189,10 @@ class CdarHandler
 			if (!empty($doc['SpecifiedDocumentStatus']['SpecifiedDocumentCharacteristic'])) {
 				foreach ($doc['SpecifiedDocumentStatus']['SpecifiedDocumentCharacteristic'] as $characteristic) {
 					$characteristicElement = $dom->createElement('ram:SpecifiedDocumentCharacteristic');
-					$characteristicElement->appendChild($dom->createElement('ram:TypeCode', htmlspecialchars((string) $characteristic['TypeCode'])));
+					$characteristicElement->appendChild($dom->createElement('ram:TypeCode', einvoicingXmlText((string) $characteristic['TypeCode'])));
 
 					if (isset($characteristic['ValueAmount'])) {
-						$amountElement = $dom->createElement('ram:ValueAmount', htmlspecialchars((string) $characteristic['ValueAmount']));
+						$amountElement = $dom->createElement('ram:ValueAmount', einvoicingXmlText((string) $characteristic['ValueAmount']));
 						if (!empty($characteristic['CurrencyID'])) {
 							$amountElement->setAttribute('currencyID', $characteristic['CurrencyID']);
 						}
@@ -1204,7 +1204,7 @@ class CdarHandler
 					}
 
 					if (isset($characteristic['ValuePercent'])) {
-						$characteristicElement->appendChild($dom->createElement('ram:ValuePercent', htmlspecialchars((string) $characteristic['ValuePercent'])));
+						$characteristicElement->appendChild($dom->createElement('ram:ValuePercent', einvoicingXmlText((string) $characteristic['ValuePercent'])));
 					}
 
 					$status->appendChild($characteristicElement);
