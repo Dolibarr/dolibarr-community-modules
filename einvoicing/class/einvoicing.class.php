@@ -1194,7 +1194,7 @@ class EInvoicing
 	/**
 	 * Validate thirdparty configuration
 	 *
-	 * @param Societe $thirdparty   Thirdparty object
+	 * @param ?Societe $thirdparty  Thirdparty object, null when the invoice carries no loaded thirdparty
 	 * @return array{res:int, message:string} Returns array with 'res' (1 on success, -1 on error and 0 on warning) and info 'message'
 	 */
 	public function validatethirdpartyConfiguration($thirdparty)
@@ -1249,8 +1249,9 @@ class EInvoicing
 		if (empty($thirdparty->country_code)) {
 			$baseErrors[] = $langs->trans("FxCheckErrorCustomerCountry");
 		}
-		// Check routing_id
-		$routing_id = $this->getBuyerCommunicationURI($thirdparty);
+		// Check routing_id. Without a loaded thirdparty there is no routing to read, and the missing
+		// name and professional id are already reported above.
+		$routing_id = is_object($thirdparty) ? $this->getBuyerCommunicationURI($thirdparty) : '';
 		// If EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID is off, we use the profid as einvoice id and we already have the previous error message of
 		// profid missing. But if on, we also add a message dedicated to einvoice ID.
 		// Same reason as for the professional id above: a B2C third party is not addressed on the network, so
@@ -1258,10 +1259,10 @@ class EInvoicing
 		if (getDolGlobalString('EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID') && empty($routing_id) && !$isB2C) {
 			$baseErrors[] = $langs->trans("FxCheckErrorCustomerRoutingID");
 		}
-		if ($thirdparty->tva_assuj && empty($thirdparty->tva_intra)) {
+		if (!empty($thirdparty->tva_assuj) && empty($thirdparty->tva_intra)) {
 			// Test VAT code only if thirdparty is subject to VAT
 			$baseWarnings[] = $langs->trans("FxCheckErrorCustomerVAT");
-		} elseif ($thirdparty->tva_assuj && !empty($thirdparty->tva_intra) && !empty($thirdparty->country_code) && $thirdparty->country_code === 'FR') {
+		} elseif (!empty($thirdparty->tva_assuj) && !empty($thirdparty->tva_intra) && !empty($thirdparty->country_code) && $thirdparty->country_code === 'FR') {
 			// Validate French intra-community VAT number format: FR + 2 alphanumeric characters + 9 digits (SIREN)
 			$vatNormalized = strtoupper(removeAllSpaces($thirdparty->tva_intra));
 			if (!preg_match('/^FR[0-9A-Z]{2}[0-9]{9}$/', $vatNormalized)) {
@@ -1368,7 +1369,7 @@ class EInvoicing
 	 * Optional and non-blocking: an API timeout or unavailability is silently ignored (warning logged).
 	 * Only runs when EINVOICING_ENABLE_API_VALIDATION constant is set to 1.
 	 *
-	 * @param Societe $thirdparty   Thirdparty object to check
+	 * @param ?Societe $thirdparty  Thirdparty object to check, null when the invoice carries no loaded thirdparty
 	 * @return array{res:int, message:string} res=1 OK, res=0 warning, res=-1 blocking error (never returned by this method)
 	 */
 	private function _checkThirdpartyViaExternalAPIs($thirdparty)
@@ -2818,7 +2819,11 @@ class EInvoicing
 		if (!is_object($object->thirdparty ?? null)) {
 			$object->fetch_thirdparty();
 		}
-		$siren = is_object($object->thirdparty ?? null) ? preg_replace('/[^0-9]/', '', (string) $object->thirdparty->idprof1) : '';
+		$thirdparty = $object->thirdparty;
+		if (!is_object($thirdparty)) {
+			return $res;	// no recipient loaded: nothing to look up
+		}
+		$siren = preg_replace('/[^0-9]/', '', (string) $thirdparty->idprof1);
 		if ($siren === '') {
 			return $res;	// no SIREN: the standard required-information checks handle this
 		}
@@ -2834,7 +2839,7 @@ class EInvoicing
 		// declare several reception addresses, only the one written into the document decides whether
 		// the transmission is accepted. Same call as getBuyerCommunicationURI() makes at generation, so
 		// what is checked and what is emitted can never drift apart.
-		$routingid = $this->getBuyerCommunicationURI($object->thirdparty, $object);
+		$routingid = $this->getBuyerCommunicationURI($thirdparty, $object);
 
 		$dir = $provider->checkRecipientDirectory($siren, $routingid);
 		$res['status'] = isset($dir['status']) ? $dir['status'] : 'error';
@@ -3530,7 +3535,51 @@ class EInvoicing
 		return $messages;
 	}
 
+	/**
+	 * Fetch the ordered lifecycle event history of a given element (all providers, all flows combined).
+	 *
+	 * Kept agnostic of the element type so the same reader serves customer invoices today and can serve
+	 * supplier invoices later without a rewrite: both write to this table under their own 'element_type'.
+	 *
+	 * @param	string	$elementType	Element type as stored in the table ('facture', 'invoice_supplier', ...)
+	 * @param	int		$elementId		Element id
+	 * @return	array{rowid:int,provider:string,flow_id:string,direction:string,lc_status:int,lc_status_message:string,lc_validation_status:string,lc_validation_message:string,lc_reason_code:string,date_creation:int}[]	Ordered events (oldest first), empty array if none or on SQL error
+	 */
+	public function fetchLifecycleEvents($elementType, $elementId)
+	{
+		global $db;
 
+		$sql = "SELECT rowid, provider, flow_id, direction, lc_status, lc_status_message, lc_validation_status, lc_validation_message, lc_reason_code, date_creation";
+		$sql .= " FROM " . $db->prefix() . "einvoicing_lifecycle_msg";
+		$sql .= " WHERE element_type = '" . $db->escape($elementType) . "'";
+		$sql .= " AND element_id = " . (int) $elementId;
+		$sql .= " ORDER BY date_creation ASC, rowid ASC";
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . ' SQL error: ' . $db->lasterror(), LOG_ERR);
+			return [];
+		}
+
+		$events = [];
+		while ($obj = $db->fetch_object($resql)) {
+			$events[] = [
+				'rowid' => (int) $obj->rowid,
+				'provider' => (string) $obj->provider,
+				'flow_id' => (string) $obj->flow_id,
+				'direction' => (string) $obj->direction,
+				'lc_status' => (int) $obj->lc_status,
+				'lc_status_message' => (string) $obj->lc_status_message,
+				'lc_validation_status' => (string) $obj->lc_validation_status,
+				'lc_validation_message' => (string) $obj->lc_validation_message,
+				'lc_reason_code' => (string) $obj->lc_reason_code,
+				'date_creation' => (int) $db->jdate($obj->date_creation),
+			];
+		}
+		$db->free($resql);
+
+		return $events;
+	}
 
 	/**
 	 * Update validation information of an existing lifecycle status message.

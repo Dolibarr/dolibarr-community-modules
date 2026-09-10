@@ -279,10 +279,10 @@ class PDPProviderManager
 		}
 
 		$provider = new $classnametouse($db);
-
-		if ($provider) {
-			$provider->providerName = $name;
-		}
+		// The is_subclass_of() above is what makes this type true, and a constructor never returns
+		// anything falsy: the object is usable as an AbstractPDPProvider from here on.
+		'@phan-var-force AbstractPDPProvider $provider';
+		$provider->providerName = $name;
 
 		return $provider;
 	}
