@@ -4,6 +4,7 @@
 
 ## 1.2.0
 
+FIX: [einvoicing] A document referenced by a received line and unknown here no longer aborts the synchronization
 FIX: #853 [einvoicing] The dates of a received document keep the day they state
 FIX: [einvoicing] The CDAR date test errors on Dolibarr 19 since it landed on main
 FIX: [einvoicing] Enhance status handling

@@ -1242,61 +1242,12 @@ class CIIProtocol extends AbstractProtocol
 			// Add supplier ID to line for later use in product sync
 			$parsedLine['supplierId'] = $supplierInvoice->socid;
 
-			$is_deposit_line = 0;
-			$fk_remise = 0;
-			// --------------------------------------------------
-			// Loop on linked documents at line level
-			// --------------------------------------------------
-			if (!empty($parsedLine['additionalRefDocs']) && is_array($parsedLine['additionalRefDocs'])) {
-				foreach ($parsedLine['additionalRefDocs'] as $refDoc) {
-					$lineRefDocId = $refDoc['IssuerAssignedID'] ?? null;
-					$lineRefDocType = $refDoc['typeCode'] ?? null;
-					$lineRefDocDate = $refDoc['issueDate'] ?? null;
-
-					$linkedObjectId = SupplierInvoiceHelper::findIdByRef($lineRefDocId, (int) $parsedLine['supplierId']);
-					if ($linkedObjectId < 0) {
-						return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($linkedObjectId, $lineRefDocId, 'linked to line ' . $parsedLine['lineid'])];
-					}
-					if ($linkedObjectId == 0) {
-						return [
-							'res' => -1,
-							'message' => 'Document "' . dol_escape_htmltag((string) $lineRefDocId) . '" linked to line ' . dol_escape_htmltag((string) $parsedLine['lineid']) . ' was not found in Dolibarr. Please verify why this document is missing (deleted, not imported, or not provided by the supplier). To resolve this issue, you must manually create the invoice using the supplier invoice reference "' . dol_escape_htmltag((string) $lineRefDocId) . '".'
-						];
-						// TODO: Add a check before sending a final invoice after deposit to ensure that the deposit invoice has been properly sent to the PDP and successfully received.
-					}
-
-					// Load linked supplier invoice
-					$linkedObject = new FactureFournisseur($db);
-					$resFetchLinkedObject = $linkedObject->fetch($linkedObjectId);
-					if ($resFetchLinkedObject > 0) {
-						/*
-						 * Deposit handling: deposits may be referenced at document level or at line level.
-						 * At line level, we create the discount before creating the invoice line, so it can be linked later.
-						 * If the same deposit appears both at line and document level, line-level handling takes priority to
-						 * avoid duplicates. If it exists only at document level, the discount line is created after all lines.
-						 */
-						if ($linkedObject->type == FactureFournisseur::TYPE_DEPOSIT) {
-							$is_deposit_line = 1;
-
-							$depositDiscountRes = $this->getOrCreateDepositDiscount($linkedObject);
-							if ($depositDiscountRes['res'] < 0) {
-								return $depositDiscountRes;
-							}
-							$fk_remise = $depositDiscountRes['fkRemise'];
-						}
-
-						/*
-						 * --------------------------------------------------
-						 * Other linked document types
-						 * --------------------------------------------------
-						 * Additional logic may be added here for other
-						 * document types such as credit notes, etc.
-						 */
-					} else {
-						return ['res' => -1, 'message' => 'Document : ' . dol_escape_htmltag((string) $lineRefDocId) . ' linked to line ' . dol_escape_htmltag((string) $parsedLine['lineid']) . ' not found in Dolibarr'];
-					}
-				}
+			$linked = $this->resolveLineLinkedDocuments($parsedLine, $return_messages);
+			if ($linked['res'] < 0) {
+				return $linked;
 			}
+			$is_deposit_line = $linked['is_deposit'];
+			$fk_remise = $linked['fk_remise'];
 
 			$productId = 0;
 			$productMatchType = '';
@@ -1608,6 +1559,71 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		return $netPrice / $baseQuantity;
+	}
+
+	/**
+	 * Resolve the documents a received line references (BT-128, ram:AdditionalReferencedDocument).
+	 *
+	 * The reference is how a deposit gets attached to the line, not a condition for the invoice to be valid,
+	 * and the issuer is free to put anything else there - a contract number was seen in the wild. A reference
+	 * matching no supplier invoice is therefore reported and stepped over instead of failing the import, which
+	 * used to abort the whole synchronization and leave the invoice out. A deposit that really is missing still
+	 * shows up: the invoice then totals less than its document announces, which alignInvoiceTotalsWithDocument()
+	 * catches and flags.
+	 *
+	 * @param	array<string,mixed>		$parsedLine			One line as parseInvoiceLines() returns it
+	 * @param	array<int,string>		$return_messages	Messages of the import, completed here
+	 * @return	array{res:int,message?:string,is_deposit:int,fk_remise:int}	Deposit found on the line, if any
+	 */
+	protected function resolveLineLinkedDocuments(array $parsedLine, array &$return_messages): array
+	{
+		$resolved = ['res' => 1, 'is_deposit' => 0, 'fk_remise' => 0];
+
+		if (empty($parsedLine['additionalRefDocs']) || !is_array($parsedLine['additionalRefDocs'])) {
+			return $resolved;
+		}
+
+		$lineId = (string) ($parsedLine['lineid'] ?? '?');
+
+		foreach ($parsedLine['additionalRefDocs'] as $refDoc) {
+			$lineRefDocId = trim((string) ($refDoc['IssuerAssignedID'] ?? ''));
+			if ($lineRefDocId === '') {
+				continue;
+			}
+
+			$linkedObjectId = SupplierInvoiceHelper::findIdByRef($lineRefDocId, (int) $parsedLine['supplierId']);
+			if ($linkedObjectId < 0) {
+				return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($linkedObjectId, $lineRefDocId, 'linked to line ' . $lineId), 'is_deposit' => 0, 'fk_remise' => 0];
+			}
+			if ($linkedObjectId == 0) {
+				$return_messages[] = 'Document "' . dol_escape_htmltag($lineRefDocId) . '" referenced by line ' . dol_escape_htmltag($lineId) . ' matches no supplier invoice in Dolibarr and was skipped: it is only a reference, so the invoice is imported without it.';
+				continue;
+			}
+
+			$linkedObject = new FactureFournisseur($this->db);
+			if ($linkedObject->fetch($linkedObjectId) <= 0) {
+				return ['res' => -1, 'message' => 'Document : ' . dol_escape_htmltag($lineRefDocId) . ' linked to line ' . dol_escape_htmltag($lineId) . ' not found in Dolibarr', 'is_deposit' => 0, 'fk_remise' => 0];
+			}
+
+			/*
+			 * Deposit handling: deposits may be referenced at document level or at line level.
+			 * At line level, we create the discount before creating the invoice line, so it can be linked later.
+			 * If the same deposit appears both at line and document level, line-level handling takes priority to
+			 * avoid duplicates. If it exists only at document level, the discount line is created after all lines.
+			 */
+			if ($linkedObject->type == FactureFournisseur::TYPE_DEPOSIT) {
+				// TODO: Add a check before sending a final invoice after deposit to ensure that the deposit
+				// invoice has been properly sent to the PDP and successfully received.
+				$depositDiscountRes = $this->getOrCreateDepositDiscount($linkedObject);
+				if ($depositDiscountRes['res'] < 0) {
+					return $depositDiscountRes + ['is_deposit' => 0, 'fk_remise' => 0];
+				}
+				$resolved['is_deposit'] = 1;
+				$resolved['fk_remise'] = $depositDiscountRes['fkRemise'];
+			}
+		}
+
+		return $resolved;
 	}
 
 	/**
