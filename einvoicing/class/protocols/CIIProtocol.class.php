@@ -924,9 +924,7 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		// Check if all referenced documents in the invoice exist in Dolibarr for the same supplier, if not return with error since we need them for correct linking in the invoice
-		// Only check for invoice types that require a linked document (credit notes 381/503, replacement 384) — for standard invoices (380) BG-3 is optional and may contain vendor placeholders.
-		$refDocCheckTypes = ['381', '503', '384'];
-		if (in_array($parsedHeader['documenttypecode'] ?? null, $refDocCheckTypes) && !empty($parsedHeader['invoiceRefDocs']) && is_array($parsedHeader['invoiceRefDocs'])) {
+		if (!empty($parsedHeader['invoiceRefDocs']) && is_array($parsedHeader['invoiceRefDocs'])) {
 			foreach ($parsedHeader['invoiceRefDocs'] as $invoiceRefDoc) {
 				$refDoc = $invoiceRefDoc['IssuerAssignedID'] ?? null;
 				$dateDoc = $invoiceRefDoc['FormattedIssueDateTime'] ?? null;
@@ -937,9 +935,17 @@ class CIIProtocol extends AbstractProtocol
 					return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($refDocInvoiceId, $refDoc, 'required by received document ' . ($parsedHeader['documentno'] ?? ''))];
 				}
 				if ($refDocInvoiceId == 0) {
-					// The document references an invoice this Dolibarr does not hold. Nothing has been created at this
-					// point, so the flow is postponed and retried on the next synchronization rather than failed, and
-					// the message spells out what to create with a link to the screen that creates it.
+					// An unqualified reference (no ram:TypeCode in the XML) is a placeholder that the import
+					// does not consume — some vendors (e.g. DSV Road) always emit BG-3 with a dummy value
+					// such as "XXXX" when no preceding invoice applies. Skip it silently so it does not block
+					// the import and does not reach the post-creation loop.
+					if (empty($typeDoc)) {
+						dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource Skipping unqualified InvoiceReferencedDocument ref="' . $refDoc . '" (no TypeCode) for ' . ($parsedHeader['documentno'] ?? ''), LOG_DEBUG);
+						continue;
+					}
+					// The document references a qualified invoice this Dolibarr does not hold yet. Nothing has
+					// been created at this point, so the flow is postponed and retried on the next
+					// synchronization rather than failed, and the message spells out what to create.
 					$langs->load("bills");
 					$action = $langs->trans('CreateTheMissingSupplierInvoiceToImport', $refDoc);
 					$action .= ' <a class="butAction small smallpaddingimp nomarginleft" href="' . DOL_URL_ROOT . '/fourn/facture/card.php?action=create&socid=' . (int) $socId . '&ref_supplier=' . urlencode($refDoc) . '" target="_blank">';
@@ -1073,6 +1079,12 @@ class CIIProtocol extends AbstractProtocol
 						return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($linkedObjectId, $refDoc, 'required by received document ' . ($parsedHeader['documentno'] ?? ''))];
 					}
 					if ($linkedObjectId == 0) {
+						// Unqualified references (no TypeCode) were already skipped by the pre-check above and
+						// should not reach this point. As a safety net, skip them here too rather than failing.
+						if (empty($typeDoc)) {
+							dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource Skipping unqualified InvoiceReferencedDocument ref="' . $refDoc . '" (no TypeCode) in post-creation loop for ' . ($parsedHeader['documentno'] ?? ''), LOG_DEBUG);
+							continue;
+						}
 						return ['res' => -1, 'message' => 'Document ' . dol_escape_htmltag((string) $refDoc) . ', required by received document ' . dol_escape_htmltag((string) ($parsedHeader['documentno'] ?? '')) . ', was not found in Dolibarr'];
 					}
 
@@ -2008,6 +2020,7 @@ class CIIProtocol extends AbstractProtocol
 						'IssuerAssignedID' => $this->getXPathValue($xpath, 'ram:IssuerAssignedID', $n),
 						'issueDate' => $this->normDate($this->getXPathValue($xpath, 'ram:FormattedIssueDateTime/qdt:DateTimeString', $n)
 							?? $this->getXPathValue($xpath, 'ram:IssueDateTime/udt:DateTimeString', $n)),
+						'TypeCode' => $this->getXPathValue($xpath, 'ram:TypeCode', $n),
 					];
 					break;
 
