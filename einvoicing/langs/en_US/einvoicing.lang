@@ -763,3 +763,14 @@ FxCheckErrorLinesWithNoName=The following lines have neither a product label nor
 # A lifecycle status about an invoice we sent, that this run could not record (flow left unstored, retried later)
 CantRecordTheStatusOfTheInvoiceYouSent=The status of an invoice you sent, carried by flow %s, could not be recorded. Nothing was stored, the flow will be retried on the next synchronization.
 CheckSyncLogCantRecordSentInvoiceStatus=Nothing to do here: this flow is retried automatically on the next synchronization. If it keeps failing, the synchronization log gives the technical reason.
+
+# Backlog of the incoming flows the access point still holds, because a prerequisite is missing here
+PostponedFlowsBacklog=Documents waiting to be imported
+PostponedFlowsBacklogIntro=The access point still holds these documents: each one needs something that is missing in this Dolibarr before it can be imported. Nothing is lost and nothing blocks the other documents - each synchronization tries them again - but they will keep waiting until the reason below is dealt with.
+PostponedFlowsCount=%s document(s) waiting
+PostponedFlowWaitingSince=Waiting since
+PostponedFlowAttempts=Synchronizations that met it
+PostponedFlowReason=Why it is waiting
+PostponedFlowDocumentRef=Document expected
+NoPostponedFlow=No document is waiting to be imported.
+PostponedFlowOpenSyncCall=Open the synchronization call that carried it (to export it for support)

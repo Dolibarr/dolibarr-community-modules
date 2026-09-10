@@ -30,6 +30,7 @@ dol_include_once('einvoicing/class/protocols/ProtocolManager.class.php');
 dol_include_once('einvoicing/class/call.class.php');
 dol_include_once('einvoicing/class/einvoicing.class.php');
 dol_include_once('einvoicing/lib/einvoicing.lib.php');
+dol_include_once('einvoicing/class/utils/PostponedFlow.class.php');
 require_once DOL_DOCUMENT_ROOT . '/core/lib/admin.lib.php';
 
 
@@ -997,6 +998,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			$i++;
 			if (in_array($flow['flowId'], $alreadyProcessedFlowIds)) {
 				dol_syslog(__METHOD__ . " #" . $i . " Flow " . $flow['flowId'] . " already processed, discard it.", LOG_DEBUG, 0, "_einvoicing");
+				PostponedFlow::clear($db, $flow['flowId']);
 				$alreadyExist++;
 				continue;
 			}
@@ -1029,6 +1031,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 						dol_syslog(__METHOD__ . " Flow " . $flow['flowId'] . " postponed: " . $res['message'], LOG_WARNING, 0, "_einvoicing");
 						$results_messages[] = "Flow " . dol_escape_htmltag((string) $flow['flowId']) . " postponed, it will be retried on the next synchronization: " . $res['message'];
+
+						// The flow itself stores nothing, so this backlog line is the only record that it was
+						// seen: it is what lets the panel say what is waiting, why, and since when.
+						PostponedFlow::record($db, $flow['flowId'], (string) getDolGlobalString('EINVOICING_PDP', 'PDP'), $res, (string) $call_id);
 
 						$postponedFlows++;
 						continue;
@@ -1102,6 +1108,12 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 					$error_messages[] = $errormessage;
 
 					$error++;
+				}
+
+				// Whatever else happened, this flow is no longer waiting on a missing prerequisite: drop
+				// the backlog line so it never outlives its cause.
+				if ($res['res'] >= 0) {
+					PostponedFlow::clear($db, $flow['flowId']);
 				}
 
 				// If res == 0, commit but count it as already existed
