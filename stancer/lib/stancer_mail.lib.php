@@ -784,3 +784,72 @@ function stancerCSVtoHTML($header, $message)
 	$html .= "</table>\n";
 	return $html;
 }
+
+/**
+ * Send the online payment link of an object to whoever can pay it.
+ *
+ * The payment page is a permanent link: it recomputes what is left to pay and
+ * starts a fresh Stancer attempt on every click, so it can be sent again after
+ * a refusal without any risk of charging twice. The recipient is resolved the
+ * same way the payment itself resolves it - thirdparty first, then contacts -
+ * so an order whose thirdparty carries no address still reaches someone.
+ *
+ * @param  Object $object Paid object (order or invoice).
+ * @param  string $type   Online payment type, 'order' or 'invoice'.
+ * @return array          Keys: ok (bool), email (string), url (string), error (string).
+ */
+function stancerSendPaymentLink($object, $type)
+{
+	global $db, $langs, $mysoc;
+
+	$langs->loadLangs(array('stancer@stancer'));
+	$out = array('ok' => false, 'email' => '', 'url' => '', 'error' => '');
+
+	dol_include_once('/stancer/lib/stancer_customer.lib.php');
+
+	$societe = new Societe($db);
+	if (empty($object->socid) || $societe->fetch($object->socid) <= 0) {
+		$out['error'] = $langs->trans('StancerSendPayLinkNoRecipient');
+		return $out;
+	}
+
+	$payer = stancerResolvePayerContact($societe, $object);
+	if (empty($payer['email'])) {
+		$out['error'] = $langs->trans('StancerSendPayLinkNoRecipient');
+		return $out;
+	}
+	$out['email'] = $payer['email'];
+
+	$url = getOnlinePaymentUrl(0, $type, (string) $object->ref);
+	if (empty($url)) {
+		$out['error'] = $langs->trans('StancerSendPayLinkNoUrl');
+		return $out;
+	}
+	$out['url'] = $url;
+
+	$subject = $langs->trans('StancerPayLinkMailSubject', $object->ref);
+	$message = '<p>' . $langs->trans('StancerPayLinkMailIntro', $mysoc->name, $object->ref) . '</p>';
+	$message .= '<p><a href="' . $url . '">' . $langs->trans('StancerPayLinkMailButton') . '</a></p>';
+	$message .= '<p>' . $langs->trans('StancerPayLinkMailFallback') . '<br /><a href="' . $url . '">' . $url . '</a></p>';
+
+	$mailctx = stancerGetObjectMailContext($object);
+	$trackid = empty($mailctx['trackidprefix']) ? '' : $mailctx['trackidprefix'] . $object->id;
+	stancerSendMail($payer['email'], $subject, $message, true, '', $trackid);
+
+	// Trace it on the object: who was written to, and where the address came from.
+	// A payment link sent to a contact nobody remembers naming is a support call
+	// waiting to happen.
+	stancerAddActionComm(
+		$object,
+		'STANCER_PAYLINK_SENT',
+		$langs->trans('StancerSendPayLink'),
+		$langs->trans('StancerSendPayLinkSent', $payer['email']),
+		array($langs->trans('StancerSendPayLinkSent', $payer['email']), 'source: ' . $payer['email_from'], $url),
+		'',
+		true
+	);
+
+	$out['ok'] = true;
+
+	return $out;
+}
