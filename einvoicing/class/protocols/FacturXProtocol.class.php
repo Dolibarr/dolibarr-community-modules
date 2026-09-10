@@ -31,7 +31,7 @@ use horstoeko\zugferd\ZugferdDocumentPdfReader;
 
 dol_include_once('einvoicing/class/protocols/CIIProtocol.class.php');
 dol_include_once('einvoicing/class/protocols/CommonProtocol.class.php');
-dol_include_once('einvoicing/class/utils/XmlPatcher.class.php');
+dol_include_once('einvoicing/class/utils/EmbeddedXmlReader.class.php');
 dol_include_once('einvoicing/class/utils/PdfAttachmentExtractor.class.php');
 // Neither vendor/autoload.php nor the two mergers are required here. Both mergers descend from a
 // composer class, and that autoloader refuses to run below the PHP its libraries need, so loading
@@ -569,8 +569,8 @@ class FacturXProtocol extends CIIProtocol
 					$document->getDocumentPositionQuantity($billedquantity, $billedquantityunitcode, $chargeFreeQuantity, $chargeFreeQuantityunitcode, $packageQuantity, $packageQuantityunitcode);
 
 					// Get AdditionalReferencedDocument at line level
-					$patcher = new XmlPatcher($embeddedXml);
-					$additionalRefDocs[(string) $lineid] = $patcher->getLineAdditionalReferencedDocuments((string) $lineid);
+					$reader = new EmbeddedXmlReader($embeddedXml);
+					$additionalRefDocs[(string) $lineid] = $reader->getLineAdditionalReferencedDocuments((string) $lineid);
 
 					// Get tax information for the line
 					//$vatRate = 0;

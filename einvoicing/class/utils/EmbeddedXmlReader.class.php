@@ -18,20 +18,20 @@
  */
 
 /**
- * \file    einvoicing/class/utils/XmlPatcher.class.php
+ * \file    einvoicing/class/utils/EmbeddedXmlReader.class.php
  * \ingroup einvoicing
  * \brief   Read the CTC-FR specific nodes of an embedded Factur-X XML.
  */
 
 
 /**
- * XmlPatcher
+ * EmbeddedXmlReader
  *
  * This class must stay free of any composer import: CIIProtocol includes it, and the CII protocol
  * works on an instance where the php prerequisites of the module were never installed. Everything
  * here is done with the native DOM extension only.
  */
-class XmlPatcher
+class EmbeddedXmlReader
 {
 	/**
 	 * Embedded XML content
