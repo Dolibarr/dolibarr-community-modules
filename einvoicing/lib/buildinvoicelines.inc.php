@@ -1198,6 +1198,13 @@ if ($shipAddress !== null) {
 
 // Section to control data and throw errors in case of problem, to avoid generating non compliant XML
 // --------------------------------------------------------------------------------------------------
+// The amounts above come from calcul_price_total(), so they are expressed in the accounting currency of
+// the company, while BT-5 announces $object->multicurrency_code. A foreign currency invoice would claim
+// an amount it does not mean, and BR-FR-CO-12 refuses it anyway: BT-5 other than EUR makes the VAT total
+// in accounting currency (BT-6, BT-111) mandatory, and neither is built here.
+if (!empty($object->multicurrency_code) && $object->multicurrency_code != $conf->currency) {
+	throw new Exception('UNSUPPORTEDCURRENCY: The invoice ' . $object->ref . ' is issued in ' . $object->multicurrency_code . ' but the e-invoice can only be built in the accounting currency of your company (' . $conf->currency . ').');
+}
 if (empty($idprof)) {
 	throw new Exception('BADTHIRDPARTYPROFID: The main professional ID of the buyer ' . $buyerParty->name . ' is empty.');
 }
