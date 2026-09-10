@@ -569,7 +569,7 @@ class FacturXProtocol extends CIIProtocol
 					$document->getDocumentPositionQuantity($billedquantity, $billedquantityunitcode, $chargeFreeQuantity, $chargeFreeQuantityunitcode, $packageQuantity, $packageQuantityunitcode);
 
 					// Get AdditionalReferencedDocument at line level
-					$patcher = new XmlPatcher(null, $embeddedXml);
+					$patcher = new XmlPatcher($embeddedXml);
 					$additionalRefDocs[(string) $lineid] = $patcher->getLineAdditionalReferencedDocuments((string) $lineid);
 
 					// Get tax information for the line

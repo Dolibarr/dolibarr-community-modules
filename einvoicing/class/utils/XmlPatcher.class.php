@@ -20,7 +20,7 @@
 /**
  * \file    einvoicing/class/utils/XmlPatcher.class.php
  * \ingroup einvoicing
- * \brief   Add tools to handle specific needs of CTC-FR guideline and profile EXTENDED.
+ * \brief   Read the CTC-FR specific nodes of an embedded Factur-X XML.
  */
 
 
@@ -28,233 +28,25 @@
  * XmlPatcher
  *
  * This class must stay free of any composer import: CIIProtocol includes it, and the CII protocol
- * works on an instance where the php prerequisites of the module were never installed. Patching is
- * done with the native DOM extension only, and the horstoeko builder is received as a plain object
- * from the caller (FacturXProtocol), which is the one loading vendor/autoload.php.
+ * works on an instance where the php prerequisites of the module were never installed. Everything
+ * here is done with the native DOM extension only.
  */
 class XmlPatcher
 {
 	/**
-	 * @var Object			Can be ZugferdDocumentBuilder
-	 */
-	private $builder;
-
-	/**
 	 * Embedded XML content
 	 *
-	 * @var string
+	 * @var string|null
 	 */
 	private $embeddedXml;
 
 	/**
-	 * URN for the standard Factur-X EXTENDED profile (horstoeko default output)
-	 */
-	const URN_EXTENDED = 'urn:cen.eu:en16931:2017#conformant#urn:factur-x.eu:1p0:extended';
-
-	/**
-	 * URN for the EXTENDED-CTC-FR profile (French e-invoicing mandate)
-	 */
-	const URN_EXTENDED_CTC_FR = 'urn:cen.eu:en16931:2017#conformant#urn.cpro.gouv.fr:1p0:extended-ctc-fr';
-
-	/**
-	 * Deposit line references to inject: array of ['lineId', 'invoiceRef', 'invoiceDate']
-	 *
-	 * @var array<int, array{lineId: string|int, invoiceRef: string, invoiceDate: \DateTimeInterface}>
-	 */
-	public $depositRefs = [];
-
-
-	/**
-	 * @param mixed   		$builder		The horstoeko build used to generate invoice file (can be ZugferdDocumentBuilder, ...)
 	 * @param string|null  	$embeddedXml	The embedded XML content use to read invoice data
 	 */
-	public function __construct($builder = null, $embeddedXml = null)
+	public function __construct($embeddedXml = null)
 	{
-		$this->builder = $builder;
 		$this->embeddedXml = $embeddedXml;
 	}
-
-	/**
-	 * Register a deposit line that needs the AdditionalReferencedDocument injection.
-	 *
-	 * @param string|int            $lineId         Line identifier as set with setDocumentPositionId()
-	 * @param string                $invoiceRef     Deposit invoice number
-	 * @param DateTimeInterface    $invoiceDate    Deposit invoice date
-	 *
-	 * @return self This object
-	 */
-	public function addDepositLineReference(
-		$lineId,
-		string $invoiceRef,
-		DateTimeInterface $invoiceDate
-	): self {
-		$this->depositRefs[] = [
-			'lineId'      => (string) $lineId,
-			'invoiceRef'  => $invoiceRef,
-			'invoiceDate' => $invoiceDate,
-		];
-
-		return $this;
-	}
-
-	/**
-	 * Build the patched XML string.
-	 * TODO Seemsnot used.
-	 *
-	 * @return string Full patched XML ready to be embedded into the PDF
-	 */
-	public function getPatchedXml(): string
-	{
-		$xmlpath = $this->builder->getContent();		// Defined if ->builder is ZugferdDocumentBuilder
-
-		return self::patchXmlString($xmlpath, $this->depositRefs);
-	}
-
-
-	/**
-	 * Patch a raw Factur-X EXTENDED XML string:
-	 *   - Replace GuidelineID with EXTENDED-CTC-FR URN
-	 *   - Inject AdditionalReferencedDocument on deposit lines
-	 *
-	 * @param string $xmlpath           Path to the raw XML (for example produced by horstoeko/zugferd)
-	 * @param array  $depositRefs       Array of deposit refs to inject: array of ['lineId', 'invoiceRef', 'invoiceDate']
-	 *
-	 * @return string Patched XML string
-	 */
-	public static function patchXmlString($xmlpath, $depositRefs = []): string
-	{
-		$dom = new \DOMDocument('1.0', 'UTF-8');
-
-		if (!$dom->load($xmlpath)) {
-			throw new \RuntimeException('XmlPatcher: Failed to parse XML.');
-		}
-
-		$xpath = new \DOMXPath($dom);
-
-		// 1. Patch the GuidelineSpecifiedDocumentContextParameter ID to switch from EXTENDED to EXTENDED-CTC-FR
-		// self::patchGuidelineId($xpath);
-
-		// 2. Inject AdditionalReferencedDocument on each deposit line if it is a final invoice after a deposit
-		foreach ($depositRefs as $ref) {
-			self::injectDepositLineRef(
-				$dom,
-				$xpath,
-				(string) $ref['lineId'],
-				$ref['invoiceRef'],
-				$ref['invoiceDate']
-			);
-		}
-
-		// Other potential patches for CTC-FR can be added here in the future
-
-		return $dom->saveXML();
-	}
-
-	/**
-	 * Replace the GuidelineSpecifiedDocumentContextParameter ID value.
-	 * @param DOMXPath $xpath xpath
-	 *
-	 * @return void  No value return
-	 */
-	private static function patchGuidelineId(DOMXPath $xpath)
-	{
-		$nodes = $xpath->query(
-			'//rsm:ExchangedDocumentContext/ram:GuidelineSpecifiedDocumentContextParameter/ram:ID'
-		);
-
-		if ($nodes === false || $nodes->length === 0) {
-			throw new \RuntimeException(
-				'XmlPatcher: GuidelineSpecifiedDocumentContextParameter/ID not found in XML.'
-			);
-		}
-
-		/** @var \DOMElement $node */
-		$node = $nodes->item(0);
-
-		// Accept both EXTENDED and already-patched CTC-FR values
-		if (!in_array($node->nodeValue, [self::URN_EXTENDED, self::URN_EXTENDED_CTC_FR], true)) {
-			throw new \RuntimeException(sprintf(
-				'XmlPatcher: Unexpected guideline URN "%s". Only EXTENDED profile and EXTENDED-CTC-FR profile are supported.',
-				$node->nodeValue
-			));
-		}
-
-		$node->nodeValue = self::URN_EXTENDED_CTC_FR;
-	}
-
-	/**
-	 * Find the trade line with the given LineID and append an AdditionalReferencedDocument identifying it as a deposit recovery line.
-	 * @param DOMDocument $dom dom
-	 * @param DOMXPath $xpath xpath
-	 * @param string $lineId line id
-	 * @param string $invoiceRef invoice ref
-	 * @param DateTimeInterface $invoiceDate invoice date
-	 *
-	 * @return void  No value return
-	 */
-	private static function injectDepositLineRef(
-		DOMDocument $dom,
-		DOMXPath $xpath,
-		string $lineId,
-		string $invoiceRef,
-		DateTimeInterface $invoiceDate
-	) {
-		// Find the SpecifiedLineTradeSettlement for this LineID
-		$query = sprintf(
-			'//ram:IncludedSupplyChainTradeLineItem[ram:AssociatedDocumentLineDocument/ram:LineID[normalize-space(.)="%s"]]/ram:SpecifiedLineTradeSettlement',
-			addslashes($lineId)
-		);
-
-		$settlements = $xpath->query($query);
-
-		if ($settlements === false || $settlements->length === 0) {
-			throw new \RuntimeException(sprintf(
-				'XmlPatcher: SpecifiedLineTradeSettlement not found for LineID "%s".',
-				$lineId
-			));
-		}
-
-		/** @var \DOMElement $settlement */
-		$settlement = $settlements->item(0);
-
-		// Check if an AdditionalReferencedDocument with TypeCode=386 already exists
-		// to avoid duplicates when called multiple times
-		$existing = $xpath->query(
-			'ram:AdditionalReferencedDocument[ram:TypeCode="130"]',
-			$settlement
-		);
-
-		if ($existing !== false && $existing->length > 0) {
-			// Already patched — skip
-			return;
-		}
-
-		$ramNs = 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100';
-
-		// <ram:AdditionalReferencedDocument>		BG-3
-		$refDoc = $dom->createElementNS($ramNs, 'ram:AdditionalReferencedDocument');
-
-		// <ram:IssuerAssignedID>
-		$idEl = $dom->createElementNS($ramNs, 'ram:IssuerAssignedID');
-		$idEl->appendChild($dom->createTextNode($invoiceRef));
-		$refDoc->appendChild($idEl);
-
-		// <ram:TypeCode>386</ram:TypeCode>
-		$typeEl = $dom->createElementNS($ramNs, 'ram:TypeCode');
-		$typeEl->appendChild($dom->createTextNode('130'));
-		$refDoc->appendChild($typeEl);
-
-		// <ram:FormattedIssueDateTime>
-		$formattedDt = $dom->createElementNS($ramNs, 'ram:FormattedIssueDateTime');
-		$dtString    = $dom->createElement('qdt:DateTimeString');
-		$dtString->setAttribute('format', '102');
-		$dtString->appendChild($dom->createTextNode($invoiceDate->format('Ymd')));
-		$formattedDt->appendChild($dtString);
-		$refDoc->appendChild($formattedDt);
-
-		$settlement->appendChild($refDoc);
-	}
-
 
 	/**
 	 * Parse an XML string and return all AdditionalReferencedDocument entries
