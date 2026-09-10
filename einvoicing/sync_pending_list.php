@@ -252,6 +252,11 @@ if ($action == 'confirm_delete' && $rowid > 0 && $permissiontowrite && $confirm 
 	$action = 'view';
 }
 
+// Cancel on the field-comparison screen: go back to the candidate list without writing anything.
+if ($action == 'confirm_linkthirdparty' && GETPOST('cancel', 'alpha')) {
+	$action = 'linkthirdparty';
+}
+
 // Link a THIRDPARTY_NOT_FOUND flow to an existing thirdparty: write the issuer identifiers (SIREN/SIRET/VAT)
 // carried by the invoice onto the chosen thirdparty, so the matching finds it, then retry the flow.
 if ($action == 'confirm_linkthirdparty' && $rowid > 0 && $permissiontowrite) {
@@ -630,8 +635,7 @@ if ($action == 'comparelinkthirdparty' && $rowid > 0 && $permissiontowrite) {
 			if (!$anyapplicable) {
 				print '<div class="opacitymedium marginbottomonly">'.$langs->trans("NothingToApplyThirdpartyAlreadyMatches").'</div>';
 			}
-			print '<input type="submit" class="button" value="'.$langs->trans("Associate").'">';
-			print ' &nbsp; <a class="button button-cancel" href="'.$_SERVER["PHP_SELF"].'?action=linkthirdparty&rowid='.((int) $rowid).'&token='.newToken().$param.'">'.$langs->trans("Back").'</a>';
+			print $form->buttonsSaveCancel("Associate", "Cancel", array(), 1);
 			print '</div>';
 			print '</form><br>';
 		}
