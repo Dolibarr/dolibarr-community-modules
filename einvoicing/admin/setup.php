@@ -193,7 +193,7 @@ $item->defaultFieldValue = getDolGlobalString('EINVOICING_PDP');
 $item->helpText = $langs->transnoentities('EINVOICING_PDP_HELP');
 $item->helpText .= '<br>'.$langs->transnoentities('EINVOICING_PDP_HELP2');
 $item->helpText .= '<br>'.$langs->transnoentities('EINVOICING_PDP_HELP3');
-$item->cssClass = 'minwidth500';
+$item->cssClass = 'maxwidth500';
 //var_dump($item);exit;
 
 // Real/test mode has no meaning for the TESTPDP stub, which never talks to any platform.
