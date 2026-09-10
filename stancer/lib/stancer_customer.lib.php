@@ -436,7 +436,11 @@ function stancerLooksLikeMobile($phone)
  */
 function stancerResolvePayerContact($societe, $object = null)
 {
-	global $db;
+	global $db, $langs;
+
+	// The source is shown to the user before the payment link is sent: it must
+	// read like a place they know, not like a row id.
+	$langs->loadLangs(array('companies'));
 
 	$found = array('email' => '', 'mobile' => '', 'email_from' => '', 'mobile_from' => '');
 	if (!is_object($societe)) {
@@ -447,7 +451,7 @@ function stancerResolvePayerContact($societe, $object = null)
 	// Candidates, best first. Each one is a label plus the two fields it may fill.
 	$candidates = array();
 	$candidates[] = array(
-		'label' => 'thirdparty',
+		'label' => $langs->trans('ThirdParty'),
 		'email' => isset($societe->email) ? $societe->email : '',
 		'phones' => array(
 			isset($societe->phone_mobile) ? $societe->phone_mobile : '',
@@ -462,8 +466,9 @@ function stancerResolvePayerContact($societe, $object = null)
 			$billing = array();
 			$others = array();
 			foreach ($linked as $c) {
+				$contactName = trim((string) (isset($c['firstname']) ? $c['firstname'] : '') . ' ' . (string) (isset($c['lastname']) ? $c['lastname'] : ''));
 				$row = array(
-					'label' => 'contact ' . (empty($c['code']) ? 'linked' : $c['code']) . ' #' . (int) $c['id'],
+					'label' => $langs->trans('Contact') . ($contactName === '' ? ' #' . (int) $c['id'] : ' : ' . $contactName),
 					'email' => isset($c['email']) ? $c['email'] : '',
 					'phones' => array(
 						isset($c['phone_mobile']) ? $c['phone_mobile'] : '',
@@ -482,7 +487,7 @@ function stancerResolvePayerContact($societe, $object = null)
 
 	// Contacts of the thirdparty itself, oldest first (usually the main one).
 	if (!empty($societe->id)) {
-		$sql = "SELECT rowid, email, phone, phone_mobile FROM " . MAIN_DB_PREFIX . "socpeople";
+		$sql = "SELECT rowid, lastname, firstname, email, phone, phone_mobile FROM " . MAIN_DB_PREFIX . "socpeople";
 		$sql .= " WHERE fk_soc = " . ((int) $societe->id);
 		$sql .= " AND statut = 1";
 		$sql .= " AND entity IN (" . getEntity('socpeople') . ")";
@@ -490,8 +495,9 @@ function stancerResolvePayerContact($societe, $object = null)
 		$resql = $db->query($sql);
 		if ($resql) {
 			while ($obj = $db->fetch_object($resql)) {
+				$contactName = trim((string) $obj->firstname . ' ' . (string) $obj->lastname);
 				$candidates[] = array(
-					'label' => 'contact #' . (int) $obj->rowid,
+					'label' => $langs->trans('Contact') . ($contactName === '' ? ' #' . (int) $obj->rowid : ' : ' . $contactName),
 					'email' => $obj->email,
 					'phones' => array($obj->phone_mobile, $obj->phone),
 				);
