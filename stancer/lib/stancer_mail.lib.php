@@ -318,10 +318,11 @@ function stancerSendMail($to, $subject, $message, $isForCustomer = false, $cc = 
  * @param   int  $forceMail	send mail even if actioncomm exists for that code
  * @param   bool  $wrapInLayout	wrap email content in the styled blue header layout
  * @param   string  $extraCc	additional CC email address (appended to thirdparty CC)
+ * @param   string  $to		explicit recipient; when empty the billing contact is used
  *
  * @return  int|null      1 on success, -1 on error, 0 if skipped by dedup, null when from/to is empty
  */
-function stancerSendInvoiceMailModele($modele, $object, $actionCode = "", $forceMail = 0, $wrapInLayout = false, $extraCc = '')
+function stancerSendInvoiceMailModele($modele, $object, $actionCode = "", $forceMail = 0, $wrapInLayout = false, $extraCc = '', $to = '')
 {
 	global $db, $conf, $langs, $user, $mysoc;
 	// The signature stays generic (callers hold a CommonObject reference), but every caller
@@ -375,8 +376,13 @@ function stancerSendInvoiceMailModele($modele, $object, $actionCode = "", $force
 	$from = getDolGlobalString('MAIN_MAIL_EMAIL_FROM');
 
 	//destinataire -> contact facturation de la société et à défaut adresse mail de la société
-	$facturationID = $object->getIdBillingContact();
-	$to = '';
+	// An explicit $to wins: the caller may have resolved an address the billing
+	// contact does not carry, and silently mailing someone else - or no one - while
+	// the screen announced that address is worse than not sending at all.
+	$facturationID = ($to === '') ? $object->getIdBillingContact() : array();
+	if ($to !== '') {
+		dol_syslog("stancerSendInvoiceMailModele destinataire impose par l'appelant = $to", LOG_DEBUG);
+	}
 	if (!empty($facturationID)) {
 		dol_syslog("stancerSendInvoiceMailModele résultat de  getIdBillingContact : " . json_encode($facturationID), LOG_DEBUG);
 		foreach ($facturationID as $cfid) {
@@ -844,8 +850,7 @@ function stancerSendPaymentLink($object, $type)
 
 	if (!empty($template)) {
 		if ($type === 'invoice') {
-			// stancerSendInvoiceMailModele() picks the billing contact itself.
-			stancerSendInvoiceMailModele($template, $object, 'STANCER_PAYLINK_SENT', 1);
+			stancerSendInvoiceMailModele($template, $object, 'STANCER_PAYLINK_SENT', 1, false, '', $payer['email']);
 		} else {
 			stancerSendOrderMailModele($template, $object, 'STANCER_PAYLINK_SENT', 1, $payer['email']);
 		}
