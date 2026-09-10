@@ -124,7 +124,6 @@
     <!--Delivery-->
     <ram:ApplicableHeaderTradeDelivery>
       <ram:ShipToTradeParty>
-        <ram:GlobalID schemeID="0225">000000002</ram:GlobalID>
         <ram:Name>EINVOICING TEST BUYER</ram:Name>
         <ram:PostalTradeAddress>
           <ram:PostcodeCode>75000</ram:PostcodeCode>
