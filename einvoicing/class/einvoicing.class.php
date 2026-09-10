@@ -882,6 +882,9 @@ class EInvoicing
 			// Remove Dolibarr internal statuses
 			unset($options[self::STATUS_UNKNOWN]);
 			unset($options[self::STATUS_IGNORE]);
+			// STATUS_IGNORE_2 is commented out of STATUS_LABEL_KEYS, so the key is never there to
+			// begin with. The line stays for the day that entry is turned on again.
+			// @phpstan-ignore unset.offset
 			unset($options[self::STATUS_IGNORE_2]);
 			unset($options[self::STATUS_NOT_GENERATED]);
 		}

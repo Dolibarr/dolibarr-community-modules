@@ -168,7 +168,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 		// Client secret
 		$item = $formSetup->newItem($prefix . 'PASSWORD'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''));
-		if (method_exists('FormSetupItem', 'setAsGenericPassword')) {
+		if (method_exists($item, 'setAsGenericPassword')) {
 			$item->setAsGenericPassword();
 		} else {
 			// Dolibarr 18/19 fallback: setAsGenericPassword() does not exist yet.
