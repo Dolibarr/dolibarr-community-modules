@@ -44,7 +44,7 @@ if ((float) DOL_VERSION < 18) {
 dol_include_once('einvoicing/class/protocols/AbstractProtocol.class.php');
 dol_include_once('einvoicing/class/protocols/CommonProtocol.class.php');
 dol_include_once('einvoicing/class/einvoicing.class.php');
-dol_include_once('einvoicing/class/utils/XmlPatcher.class.php');
+dol_include_once('einvoicing/class/utils/EmbeddedXmlReader.class.php');
 dol_include_once('einvoicing/class/utils/SupplierInvoiceHelper.class.php');
 dol_include_once('einvoicing/lib/einvoicing.lib.php');
 
