@@ -753,3 +753,7 @@ DiscountFromDepositNoSource=Down payment deducted
 DiscountFromExcessReceivedNoSource=Payment in excess deducted
 DiscountFromExcessPaidNoSource=Payment in excess deducted
 FxCheckErrorLinesWithNoName=The following lines have neither a product label nor a description, so the item name of the e-invoice (BT-153) would be empty, which rule BR-25 refuses: %s. Enter a description on each of them (rank in the document, then line id).
+
+# A lifecycle status about an invoice we sent, that this run could not record (flow left unstored, retried later)
+CantRecordTheStatusOfTheInvoiceYouSent=The status of an invoice you sent, carried by flow %s, could not be recorded. Nothing was stored, the flow will be retried on the next synchronization.
+CheckSyncLogCantRecordSentInvoiceStatus=Nothing to do here: this flow is retried automatically on the next synchronization. If it keeps failing, the synchronization log gives the technical reason.
