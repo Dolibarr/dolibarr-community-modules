@@ -162,3 +162,75 @@ if (!function_exists('getMultidirTemp')) {
 		return getMultidirOutputCompat($object, $module, $forobject, 'temp');
 	}
 }
+
+if (!function_exists('recordNotFound')) {
+	/**
+	 * Print an error page for a record that does not exist, then end the page.
+	 * Provided as a polyfill for Dolibarr < 20, where this function does not exist yet.
+	 *
+	 * @param	string		$message			Message to show, an "ErrorRecordNotFound" translation when empty
+	 * @param	int<0,1>	$printheader		1 to print the page header
+	 * @param	int<0,1>	$printfooter		1 to print the page footer
+	 * @param	int<0,1>	$showonlymessage	1 to show the message alone, without the hooks
+	 * @param	mixed		$params				Optional parameters passed to the hook
+	 * @return	void							The function ends the execution of the page
+	 *  @since	Dolibarr V20
+	 */
+	function recordNotFound($message = '', $printheader = 1, $printfooter = 1, $showonlymessage = 0, $params = null)
+	{
+		global $conf, $db, $langs, $hookmanager;
+		global $action, $object;
+
+		if (!is_object($langs)) {
+			// The core ships install/inc.php, which defines DOL_DOCUMENT_ROOT as '..'; PHPStan
+			// resolves the constant against it and looks for the file next to the module.
+			// @phpstan-ignore includeOnce.fileNotFound
+			include_once DOL_DOCUMENT_ROOT.'/core/class/translate.class.php';
+			$langs = new Translate('', $conf);
+			$langs->setDefaultLang();
+		}
+
+		$langs->load("errors");
+
+		if ($printheader) {
+			if (function_exists("llxHeader")) {
+				// Kept as the core writes it. llxHeader() is redeclared by every page template,
+				// and the declaration the analysers pick up on the older cores takes no argument.
+				llxHeader(''); // @phpstan-ignore arguments.count
+			} elseif (function_exists("llxHeaderVierge")) {
+				// Same reason, for the public pages: they give llxHeaderVierge() a title.
+				// @phan-suppress-next-line PhanParamTooMany
+				llxHeaderVierge(''); // @phpstan-ignore arguments.count
+			}
+		}
+
+		print '<div class="error">';
+		if (empty($message)) {
+			print $langs->trans("ErrorRecordNotFound");
+		} else {
+			print $langs->trans($message);
+		}
+		print '</div>';
+		print '<br>';
+
+		if (empty($showonlymessage)) {
+			if (empty($hookmanager)) {
+				// Same as the translate.class.php include above.
+				// @phpstan-ignore includeOnce.fileNotFound
+				include_once DOL_DOCUMENT_ROOT.'/core/class/hookmanager.class.php';
+				$hookmanager = new HookManager($db);
+				// Initialize technical object to manage hooks of page. Note that conf->hooks_modules contains array of hook context
+				$hookmanager->initHooks(array('main'));
+			}
+
+			$parameters = array('message' => $message, 'params' => $params);
+			$hookmanager->executeHooks('getErrorRecordNotFound', $parameters, $object, $action); // Note that $action and $object may have been modified by some hooks
+			print $hookmanager->resPrint;
+		}
+
+		if ($printfooter && function_exists("llxFooter")) {
+			llxFooter();
+		}
+		exit(0);
+	}
+}

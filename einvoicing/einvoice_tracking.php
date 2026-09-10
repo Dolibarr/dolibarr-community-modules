@@ -68,6 +68,8 @@ if (!$res) {
  */
 require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/invoice.lib.php';
+// recordNotFound() below only exists from Dolibarr 20 on, and this page is served down to 18.
+include_once __DIR__.'/compat/functions.lib.php';
 dol_include_once('/einvoicing/class/einvoicing.class.php');
 dol_include_once('/einvoicing/lib/einvoicing_lifecycle.lib.php');
 
