@@ -242,7 +242,7 @@ class EInvoicingSyncPending extends CommonObject
 			// which strtotime() does not parse: drop the fraction before converting.
 			$ts = strtotime(preg_replace('/\.\d+/', '', (string) $flow['updatedAt']));
 			if ($ts !== false && $ts > 0) {
-				$updatedatSql = $ts;
+				$updatedatSql = (int) $ts;
 			}
 		}
 
