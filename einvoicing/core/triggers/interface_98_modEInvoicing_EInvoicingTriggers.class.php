@@ -183,29 +183,31 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {		// If sync Dolibarr to AP is on
 				$einvoicing = new EInvoicing($this->db);
 
-				$result = $einvoicing->fetchLastknownInvoiceStatus($object->id, (string) $object->ref);
+				// The known status and the configuration check are two different answers: keep them in two
+				// variables, the status is still needed after the check to decide what to write.
+				$statusinfo = $einvoicing->fetchLastknownInvoiceStatus($object->id, (string) $object->ref);
 
-				// If $result is $einvoicing::STATUS_IGNORE or STATUS_IGNORE_2, we do nothing.
+				// If $statusinfo is $einvoicing::STATUS_IGNORE or STATUS_IGNORE_2, we do nothing.
 
 				// If einvoice was set to $einvoicing::STATUS_NOT_GENERATED or $einvoicing::STATUS_UNKNOWN, we set it to STATUS_IGNORE (if not qualified for einvoice) or STATUS_NOT_GENERATED (if qualified for einvoice)
-				if ($result['code'] == $einvoicing::STATUS_NOT_GENERATED || $result['code'] == $einvoicing::STATUS_UNKNOWN) {
+				if ($statusinfo['code'] == $einvoicing::STATUS_NOT_GENERATED || $statusinfo['code'] == $einvoicing::STATUS_UNKNOWN) {
 					if (getDolGlobalString('EINVOICING_EINVOICE_IN_REAL_TIME')) {
 						// Check configuration
-						$result = $einvoicing->checkRequiredinformations($object);
-						if ($result['res'] < 0) {
-							$message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
+						$checkresult = $einvoicing->checkRequiredinformations($object);
+						if ($checkresult['res'] < 0) {
+							$message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $checkresult['message'];
 							dol_syslog(__METHOD__ . " " . $message);
 
 							if (getDolGlobalString('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
 								$error++;
-								$this->errors[] = $result['message'];
+								$this->errors[] = $checkresult['message'];
 								return -1;		// This should generate a rollback
 							}
 						}
 					}
 
 					// Test if invoice need to be managed by EInvoice and set the new status to use
-					if ($result['code'] == $einvoicing::STATUS_UNKNOWN) {
+					if ($statusinfo['code'] == $einvoicing::STATUS_UNKNOWN) {
 						$statustouse = $einvoicing::STATUS_IGNORE;	// default status to use if none of following rules match
 						$needEinvoice = $einvoicing->needEInvoiceManagement($object);
 						if ($needEinvoice) {
