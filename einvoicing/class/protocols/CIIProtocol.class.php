@@ -935,9 +935,17 @@ class CIIProtocol extends AbstractProtocol
 					return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($refDocInvoiceId, $refDoc, 'required by received document ' . ($parsedHeader['documentno'] ?? ''))];
 				}
 				if ($refDocInvoiceId == 0) {
-					// The document references an invoice this Dolibarr does not hold. Nothing has been created at this
-					// point, so the flow is postponed and retried on the next synchronization rather than failed, and
-					// the message spells out what to create with a link to the screen that creates it.
+					// An unqualified reference (no ram:TypeCode in the XML) is a placeholder that the import
+					// does not consume — some vendors (e.g. DSV Road) always emit BG-3 with a dummy value
+					// such as "XXXX" when no preceding invoice applies. Skip it silently so it does not block
+					// the import and does not reach the post-creation loop.
+					if (empty($typeDoc)) {
+						dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource Skipping unqualified InvoiceReferencedDocument ref="' . $refDoc . '" (no TypeCode) for ' . ($parsedHeader['documentno'] ?? ''), LOG_DEBUG);
+						continue;
+					}
+					// The document references a qualified invoice this Dolibarr does not hold yet. Nothing has
+					// been created at this point, so the flow is postponed and retried on the next
+					// synchronization rather than failed, and the message spells out what to create.
 					$langs->load("bills");
 					$action = $langs->trans('CreateTheMissingSupplierInvoiceToImport', $refDoc);
 					$action .= ' <a class="butAction small smallpaddingimp nomarginleft" href="' . DOL_URL_ROOT . '/fourn/facture/card.php?action=create&socid=' . (int) $socId . '&ref_supplier=' . urlencode($refDoc) . '" target="_blank">';
@@ -1071,6 +1079,12 @@ class CIIProtocol extends AbstractProtocol
 						return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($linkedObjectId, $refDoc, 'required by received document ' . ($parsedHeader['documentno'] ?? ''))];
 					}
 					if ($linkedObjectId == 0) {
+						// Unqualified references (no TypeCode) were already skipped by the pre-check above and
+						// should not reach this point. As a safety net, skip them here too rather than failing.
+						if (empty($typeDoc)) {
+							dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource Skipping unqualified InvoiceReferencedDocument ref="' . $refDoc . '" (no TypeCode) in post-creation loop for ' . ($parsedHeader['documentno'] ?? ''), LOG_DEBUG);
+							continue;
+						}
 						return ['res' => -1, 'message' => 'Document ' . dol_escape_htmltag((string) $refDoc) . ', required by received document ' . dol_escape_htmltag((string) ($parsedHeader['documentno'] ?? '')) . ', was not found in Dolibarr'];
 					}
 
@@ -2006,6 +2020,7 @@ class CIIProtocol extends AbstractProtocol
 						'IssuerAssignedID' => $this->getXPathValue($xpath, 'ram:IssuerAssignedID', $n),
 						'issueDate' => $this->normDate($this->getXPathValue($xpath, 'ram:FormattedIssueDateTime/qdt:DateTimeString', $n)
 							?? $this->getXPathValue($xpath, 'ram:IssueDateTime/udt:DateTimeString', $n)),
+						'TypeCode' => $this->getXPathValue($xpath, 'ram:TypeCode', $n),
 					];
 					break;
 
@@ -2130,7 +2145,7 @@ class CIIProtocol extends AbstractProtocol
 	/**
 	 * Build CII XML from invoice data.
 	 *
-	 * Every value taken from the invoice or the company data is passed through htmlspecialchars() before it is
+	 * Every value taken from the invoice or the company data is passed through einvoicingXmlText() before it is
 	 * handed to DOMDocument::createElement(): that method parses its second argument, so a value holding an
 	 * ampersand produces an EMPTY element and silently loses the business term - issue #695.
 	 *
@@ -2190,7 +2205,7 @@ class CIIProtocol extends AbstractProtocol
 		if (!empty($invoiceData['businessProcessId'])) {
 			$bp = $doc->createElement('ram:BusinessProcessSpecifiedDocumentContextParameter');
 			$ctx->appendChild($bp);
-			$bp->appendChild($doc->createElement('ram:ID', htmlspecialchars((string) $invoiceData['businessProcessId'])));
+			$bp->appendChild($doc->createElement('ram:ID', einvoicingXmlText((string) $invoiceData['businessProcessId'])));
 		}
 
 		$profile = !empty($profile) ? strtoupper($profile) : 'EXTENDED';
@@ -2220,8 +2235,8 @@ class CIIProtocol extends AbstractProtocol
 		$exDoc = $doc->createElement('rsm:ExchangedDocument');
 		$root->appendChild($exDoc);
 
-		$exDoc->appendChild($doc->createElement('ram:ID', htmlspecialchars((string) $invoiceData['documentno'])));
-		$exDoc->appendChild($doc->createElement('ram:TypeCode', htmlspecialchars((string) $invoiceData['documenttypecode'])));
+		$exDoc->appendChild($doc->createElement('ram:ID', einvoicingXmlText((string) $invoiceData['documentno'])));
+		$exDoc->appendChild($doc->createElement('ram:TypeCode', einvoicingXmlText((string) $invoiceData['documenttypecode'])));
 
 		// Date
 		$issueDT = $doc->createElement('ram:IssueDateTime');
@@ -2241,30 +2256,30 @@ class CIIProtocol extends AbstractProtocol
 			if (!empty($invoiceData['documentNotePublic'])) {
 				$note = $doc->createElement('ram:IncludedNote');
 				$exDoc->appendChild($note);
-				$note->appendChild($doc->createElement('ram:Content', htmlspecialchars($invoiceData['documentNotePublic'])));
+				$note->appendChild($doc->createElement('ram:Content', einvoicingXmlText($invoiceData['documentNotePublic'])));
 			}
 			if (!empty($invoiceData['documentNotePMT'])) {
 				$note = $doc->createElement('ram:IncludedNote');
 				$exDoc->appendChild($note);
-				$note->appendChild($doc->createElement('ram:Content', htmlspecialchars($invoiceData['documentNotePMT'])));
+				$note->appendChild($doc->createElement('ram:Content', einvoicingXmlText($invoiceData['documentNotePMT'])));
 				$note->appendChild($doc->createElement('ram:SubjectCode', 'PMT'));
 			}
 			if (!empty($invoiceData['documentNotePMD'])) {
 				$note = $doc->createElement('ram:IncludedNote');
 				$exDoc->appendChild($note);
-				$note->appendChild($doc->createElement('ram:Content', htmlspecialchars($invoiceData['documentNotePMD'])));
+				$note->appendChild($doc->createElement('ram:Content', einvoicingXmlText($invoiceData['documentNotePMD'])));
 				$note->appendChild($doc->createElement('ram:SubjectCode', 'PMD'));
 			}
 			if (!empty($invoiceData['documentNoteAAB'])) {
 				$note = $doc->createElement('ram:IncludedNote');
 				$exDoc->appendChild($note);
-				$note->appendChild($doc->createElement('ram:Content', htmlspecialchars($invoiceData['documentNoteAAB'])));
+				$note->appendChild($doc->createElement('ram:Content', einvoicingXmlText($invoiceData['documentNoteAAB'])));
 				$note->appendChild($doc->createElement('ram:SubjectCode', 'AAB'));
 			}
 			if (!empty($invoiceData['documentNoteTXD'])) {
 				$note = $doc->createElement('ram:IncludedNote');
 				$exDoc->appendChild($note);
-				$note->appendChild($doc->createElement('ram:Content', htmlspecialchars($invoiceData['documentNoteTXD'])));
+				$note->appendChild($doc->createElement('ram:Content', einvoicingXmlText($invoiceData['documentNoteTXD'])));
 				$note->appendChild($doc->createElement('ram:SubjectCode', 'TXD'));
 			}
 		}
@@ -2310,7 +2325,7 @@ class CIIProtocol extends AbstractProtocol
 			$comment = $doc->createComment('Buyer reference (BT-10)');
 			$agreement->appendChild($comment);
 
-			$agreement->appendChild($doc->createElement('ram:BuyerReference', htmlspecialchars($invoiceData['buyerReference'])));
+			$agreement->appendChild($doc->createElement('ram:BuyerReference', einvoicingXmlText($invoiceData['buyerReference'])));
 		}
 
 		// Seller
@@ -2334,7 +2349,7 @@ class CIIProtocol extends AbstractProtocol
 
 			$buyerOrderRef = $doc->createElement('ram:BuyerOrderReferencedDocument');
 			$agreement->appendChild($buyerOrderRef);
-			$buyerOrderRef->appendChild($doc->createElement('ram:IssuerAssignedID', htmlspecialchars($invoiceData['orderReference'])));
+			$buyerOrderRef->appendChild($doc->createElement('ram:IssuerAssignedID', einvoicingXmlText($invoiceData['orderReference'])));
 		}
 
 		// Contract reference (BT-12): the contract the invoice is issued under. ram:ContractReferencedDocument
@@ -2346,7 +2361,7 @@ class CIIProtocol extends AbstractProtocol
 
 			$contractRef = $doc->createElement('ram:ContractReferencedDocument');
 			$agreement->appendChild($contractRef);
-			$contractRef->appendChild($doc->createElement('ram:IssuerAssignedID', htmlspecialchars($invoiceData['contractReference'])));
+			$contractRef->appendChild($doc->createElement('ram:IssuerAssignedID', einvoicingXmlText($invoiceData['contractReference'])));
 		}
 
 		// Additional order references: when an invoice covers several purchase orders, the first is emitted as BT-13
@@ -2361,7 +2376,7 @@ class CIIProtocol extends AbstractProtocol
 					continue;
 				}
 				$addRef = $doc->createElement('ram:AdditionalReferencedDocument');
-				$addRef->appendChild($doc->createElement('ram:IssuerAssignedID', htmlspecialchars($additionalOrderRef)));
+				$addRef->appendChild($doc->createElement('ram:IssuerAssignedID', einvoicingXmlText($additionalOrderRef)));
 				$addRef->appendChild($doc->createElement('ram:TypeCode', '130'));
 				$agreement->appendChild($addRef);
 			}
@@ -2378,9 +2393,9 @@ class CIIProtocol extends AbstractProtocol
 
 			$procuringProject = $doc->createElement('ram:SpecifiedProcuringProject');
 			$agreement->appendChild($procuringProject);
-			$procuringProject->appendChild($doc->createElement('ram:ID', htmlspecialchars((string) $project->ref)));
+			$procuringProject->appendChild($doc->createElement('ram:ID', einvoicingXmlText((string) $project->ref)));
 			$projectName = trim((string) $project->title);
-			$procuringProject->appendChild($doc->createElement('ram:Name', htmlspecialchars($projectName !== '' ? $projectName : (string) $project->ref)));
+			$procuringProject->appendChild($doc->createElement('ram:Name', einvoicingXmlText($projectName !== '' ? $projectName : (string) $project->ref)));
 		}
 
 
@@ -2459,11 +2474,11 @@ class CIIProtocol extends AbstractProtocol
 				$pm = $doc->createElement('ram:SpecifiedTradeSettlementPaymentMeans');
 				$settlement->appendChild($pm);
 
-				$pm->appendChild($doc->createElement('ram:TypeCode', htmlspecialchars((string) $invoiceData['paymentMeansCode'])));		// A code for payment type BT-81 (BG-16)
+				$pm->appendChild($doc->createElement('ram:TypeCode', einvoicingXmlText((string) $invoiceData['paymentMeansCode'])));		// A code for payment type BT-81 (BG-16)
 				// BT-82 and BT-85 below are optional: emit them only when they carry something,
 				// an empty element being refused by PEPPOL-EN16931-R008 (issue #695).
 				if ($this->isEn16931Profile($profile) && !empty($invoiceData['paymentMeansText'])) {
-					$pm->appendChild($doc->createElement('ram:Information', htmlspecialchars((string) $invoiceData['paymentMeansText'])));	// A label for payment type BT-82
+					$pm->appendChild($doc->createElement('ram:Information', einvoicingXmlText((string) $invoiceData['paymentMeansText'])));	// A label for payment type BT-82
 				}
 
 				$acc = $doc->createElement('ram:PayeePartyCreditorFinancialAccount');
@@ -2471,7 +2486,7 @@ class CIIProtocol extends AbstractProtocol
 
 				// CII XSD order for CreditorFinancialAccountType: IBANID, AccountName, ProprietaryID
 				if (!empty($invoiceData['iban'])) {
-					$acc->appendChild($doc->createElement('ram:IBANID', htmlspecialchars((string) $invoiceData['iban'])));					// BT-84
+					$acc->appendChild($doc->createElement('ram:IBANID', einvoicingXmlText((string) $invoiceData['iban'])));					// BT-84
 				} else {
 					// If no IBAN provided
 					if ($invoiceData['paymentMeansCode'] == 30) {	// If payment by credit transfer
@@ -2483,15 +2498,15 @@ class CIIProtocol extends AbstractProtocol
 					}
 				}
 				if ($this->isEn16931Profile($profile) && !empty($invoiceData['accountName'])) {
-					$acc->appendChild($doc->createElement('ram:AccountName', htmlspecialchars((string) $invoiceData['accountName'])));		// BT-85
+					$acc->appendChild($doc->createElement('ram:AccountName', einvoicingXmlText((string) $invoiceData['accountName'])));		// BT-85
 				}
 				if (empty($invoiceData['iban']) && !empty($invoiceData['accountRef'])) {	// If IBAN unknown we can fallback on the private ref.
-					$acc->appendChild($doc->createElement('ram:ProprietaryID', htmlspecialchars((string) $invoiceData['accountRef'])));	// BT-84-0
+					$acc->appendChild($doc->createElement('ram:ProprietaryID', einvoicingXmlText((string) $invoiceData['accountRef'])));	// BT-84-0
 				}
 				if (!empty($invoiceData['bic']) && $this->isEn16931Profile($profile)) {
 					$inst = $doc->createElement('ram:PayeeSpecifiedCreditorFinancialInstitution');
 					$pm->appendChild($inst);
-					$inst->appendChild($doc->createElement('ram:BICID', htmlspecialchars((string) $invoiceData['bic'])));					// BT-86
+					$inst->appendChild($doc->createElement('ram:BICID', einvoicingXmlText((string) $invoiceData['bic'])));					// BT-86
 				}
 			}
 
@@ -2545,7 +2560,7 @@ class CIIProtocol extends AbstractProtocol
 			$terms = $doc->createElement('ram:SpecifiedTradePaymentTerms');
 			$settlement->appendChild($terms);
 
-			$terms->appendChild($doc->createElement('ram:Description', htmlspecialchars((string) $invoiceData['paymentTermsText'])));
+			$terms->appendChild($doc->createElement('ram:Description', einvoicingXmlText((string) $invoiceData['paymentTermsText'])));
 
 			// Due date is optional (e.g. immediate payment); guard against a null date to avoid a fatal on ->format().
 			if (!empty($invoiceData['paymentDueDate'])) {
@@ -2594,13 +2609,13 @@ class CIIProtocol extends AbstractProtocol
 				foreach ($invoiceData['invoiceRefDocs'] as $refDoc) {
 					$refNode = $doc->createElement('ram:InvoiceReferencedDocument');
 
-					$refNode->appendChild($doc->createElement('ram:IssuerAssignedID', htmlspecialchars((string) $refDoc['ref'])));
+					$refNode->appendChild($doc->createElement('ram:IssuerAssignedID', einvoicingXmlText((string) $refDoc['ref'])));
 
 					// The document type (BT-X-...) is a fatal error under EN 16931, where CII-DT-018 only
 					// tolerates a TypeCode on an AdditionalReferencedDocument. The EXTENDED and
 					// EXTENDED-CTC-FR profiles reinstate it (CII-EXT-DT-018).
 					if ($this->isExtendedProfile($profile)) {
-						$refNode->appendChild($doc->createElement('ram:TypeCode', htmlspecialchars((string) $refDoc['type'])));
+						$refNode->appendChild($doc->createElement('ram:TypeCode', einvoicingXmlText((string) $refDoc['type'])));
 					}
 
 					// The issue date of the preceding invoice (BT-26) is part of BG-3 in EN 16931, where
@@ -2648,19 +2663,19 @@ class CIIProtocol extends AbstractProtocol
 		// ID
 		$docLine = $doc->createElement('ram:AssociatedDocumentLineDocument');
 		$el->appendChild($docLine);
-		$docLine->appendChild($doc->createElement('ram:LineID', htmlspecialchars((string) $line['lineid'])));
+		$docLine->appendChild($doc->createElement('ram:LineID', einvoicingXmlText((string) $line['lineid'])));
 
 		// Product
 		$prod = $doc->createElement('ram:SpecifiedTradeProduct');
 		$el->appendChild($prod);
 		if (!empty($line['prodsellerid'])) {
 			$prod->appendChild(
-				$doc->createElement('ram:SellerAssignedID', htmlspecialchars((string) $line['prodsellerid']))
+				$doc->createElement('ram:SellerAssignedID', einvoicingXmlText((string) $line['prodsellerid']))
 			);
 		}
-		$prod->appendChild($doc->createElement('ram:Name', htmlspecialchars($line['prodname'])));
+		$prod->appendChild($doc->createElement('ram:Name', einvoicingXmlText($line['prodname'])));
 		if (!empty($line['proddesc'])) {
-			$prod->appendChild($doc->createElement('ram:Description', htmlspecialchars($line['proddesc'])));
+			$prod->appendChild($doc->createElement('ram:Description', einvoicingXmlText($line['proddesc'])));
 		}
 
 		// Price
@@ -2714,13 +2729,13 @@ class CIIProtocol extends AbstractProtocol
 		$lineExemptionReason = (string) ($line['ExemptionReason'] ?? '');
 		$lineExemptionReasonCode = (string) ($line['ExemptionReasonCode'] ?? '');
 		if ($lineExemptionReason !== '') {
-			$tax->appendChild($doc->createElement('ram:ExemptionReason', htmlspecialchars($lineExemptionReason)));
+			$tax->appendChild($doc->createElement('ram:ExemptionReason', einvoicingXmlText($lineExemptionReason)));
 		}
-		$tax->appendChild($doc->createElement('ram:CategoryCode', htmlspecialchars((string) $line['categoryCode'])));
+		$tax->appendChild($doc->createElement('ram:CategoryCode', einvoicingXmlText((string) $line['categoryCode'])));
 		if ($lineExemptionReasonCode !== '') {
-			$tax->appendChild($doc->createElement('ram:ExemptionReasonCode', htmlspecialchars((string) $lineExemptionReasonCode)));
+			$tax->appendChild($doc->createElement('ram:ExemptionReasonCode', einvoicingXmlText((string) $lineExemptionReasonCode)));
 		}
-		$tax->appendChild($doc->createElement('ram:RateApplicablePercent', htmlspecialchars((string) $line['rateApplicablePercent'])));
+		$tax->appendChild($doc->createElement('ram:RateApplicablePercent', einvoicingXmlText((string) $line['rateApplicablePercent'])));
 
 		// Billing period for the line (BG-26 / BT-134 / BT-135). Must be placed after ApplicableTradeTax
 		// and before SpecifiedTradeAllowanceCharge (discount below) per the CII D22B schema sequence.
@@ -2750,7 +2765,7 @@ class CIIProtocol extends AbstractProtocol
 		if (!empty($line['isDepositLine'])) {
 			$refNode = $doc->createElement('ram:AdditionalReferencedDocument');
 
-			$refNode->appendChild($doc->createElement('ram:IssuerAssignedID', htmlspecialchars((string) $line['depositInvoiceRef'])));
+			$refNode->appendChild($doc->createElement('ram:IssuerAssignedID', einvoicingXmlText((string) $line['depositInvoiceRef'])));
 			$refNode->appendChild($doc->createElement('ram:TypeCode', '130'));
 
 			if (!empty($line['depositInvoiceDate']) && $profile === 'EXTENDED') {
@@ -2798,12 +2813,15 @@ class CIIProtocol extends AbstractProtocol
 		if (!$this->isMinimumProfile($profile)) {
 			if (!empty($data[$prefix . 'GlobalIds'])) {
 				foreach ($data[$prefix . 'GlobalIds'] as $globalId) {
-					$g = $doc->createElement('ram:GlobalID', htmlspecialchars((string) $globalId['value']));
+					$g = $doc->createElement('ram:GlobalID', einvoicingXmlText((string) $globalId['value']));
 					$g->setAttribute('schemeID', $globalId['schemeID']);
 					$node->appendChild($g);
 				}
-			} else {
-				$node->appendChild($doc->createElement('ram:ID', htmlspecialchars((string) $data[$prefix . 'ids'])));
+			} elseif (!empty($data[$prefix . 'ids'])) {
+				// The ram:ID variant of the same term. Nothing to write when the party identifier is
+				// deliberately not declared: BT-29 and BT-46 are optional, and an empty element would
+				// be refused by PEPPOL-EN16931-R008.
+				$node->appendChild($doc->createElement('ram:ID', einvoicingXmlText((string) $data[$prefix . 'ids'])));
 			}
 
 			// Routing code of the buyer (BT-46 under scheme 0224), where BR-FR-CPRO-11 and BR-FR-CPRO-13 read
@@ -2811,19 +2829,19 @@ class CIIProtocol extends AbstractProtocol
 			// profiles accept (FX-SCH-A-000164 caps that element at one occurrence below them), and it belongs
 			// to the buyer alone: on the deliver-to party the identifier is BT-71, a location (issue #678).
 			if ($type === 'buyer' && !$minimal && $this->isExtendedProfile($profile) && !empty($data['buyerRoutingCode'])) {
-				$routing = $doc->createElement('ram:GlobalID', htmlspecialchars($data['buyerRoutingCode']));
+				$routing = $doc->createElement('ram:GlobalID', einvoicingXmlText($data['buyerRoutingCode']));
 				$routing->setAttribute('schemeID', EInvoicing::SCHEME_FR_ROUTING_CODE);
 				$node->appendChild($routing);
 			}
 		}
 
-		$node->appendChild($doc->createElement('ram:Name', htmlspecialchars($data[$prefix . 'name'])));
+		$node->appendChild($doc->createElement('ram:Name', einvoicingXmlText($data[$prefix . 'name'])));
 
 		// Legal org
 		if (!$minimal) {
 			$legal = $doc->createElement('ram:SpecifiedLegalOrganization');
 			$node->appendChild($legal);
-			$id = $doc->createElement('ram:ID', htmlspecialchars((string) $data[$prefix . 'LegalOrgId']));
+			$id = $doc->createElement('ram:ID', einvoicingXmlText((string) $data[$prefix . 'LegalOrgId']));
 			$id->setAttribute('schemeID', $data[$prefix . 'LegalOrgScheme']);
 			$legal->appendChild($id);
 			// LegalOrganizationType is reduced to ram:ID by the MINIMUM schema.
@@ -2832,7 +2850,7 @@ class CIIProtocol extends AbstractProtocol
 			// nothing at all: an empty element would be refused by PEPPOL-EN16931-R008 (issue #695).
 			if (!$this->isMinimumProfile($profile) && !empty($data[$prefix . 'TradingName'])) {
 				$legal->appendChild(
-					$doc->createElement('ram:TradingBusinessName', htmlspecialchars((string) $data[$prefix . 'TradingName']))
+					$doc->createElement('ram:TradingBusinessName', einvoicingXmlText((string) $data[$prefix . 'TradingName']))
 				);
 			}
 		}
@@ -2852,17 +2870,17 @@ class CIIProtocol extends AbstractProtocol
 			$node->appendChild($contact);
 
 			if (!empty($data[$prefix . 'contactpersonname'])) {
-				$contact->appendChild($doc->createElement('ram:PersonName', htmlspecialchars($data[$prefix . 'contactpersonname'])));
+				$contact->appendChild($doc->createElement('ram:PersonName', einvoicingXmlText($data[$prefix . 'contactpersonname'])));
 			}
 
 			if (!empty($data[$prefix . 'contactdepartmentname'])) {
-				$contact->appendChild($doc->createElement('ram:DepartmentName', htmlspecialchars($data[$prefix . 'contactdepartmentname'])));
+				$contact->appendChild($doc->createElement('ram:DepartmentName', einvoicingXmlText($data[$prefix . 'contactdepartmentname'])));
 			}
 
 			if (!empty($data[$prefix . 'contactphoneno'])) {
 				$phone = $doc->createElement('ram:TelephoneUniversalCommunication');
 				$contact->appendChild($phone);
-				$phone->appendChild($doc->createElement('ram:CompleteNumber', htmlspecialchars((string) $data[$prefix . 'contactphoneno'])));
+				$phone->appendChild($doc->createElement('ram:CompleteNumber', einvoicingXmlText((string) $data[$prefix . 'contactphoneno'])));
 			}
 
 			// No ram:FaxUniversalCommunication here on purpose, see the comment above. The
@@ -2872,7 +2890,7 @@ class CIIProtocol extends AbstractProtocol
 			if (!empty($data[$prefix . 'contactemailaddr'])) {
 				$email = $doc->createElement('ram:EmailURIUniversalCommunication');
 				$contact->appendChild($email);
-				$email->appendChild($doc->createElement('ram:URIID', htmlspecialchars((string) $data[$prefix . 'contactemailaddr'])));
+				$email->appendChild($doc->createElement('ram:URIID', einvoicingXmlText((string) $data[$prefix . 'contactemailaddr'])));
 			}
 		}
 
@@ -2883,28 +2901,28 @@ class CIIProtocol extends AbstractProtocol
 
 		// TradeAddressType is reduced to the country code by the MINIMUM schema
 		if (!$this->isMinimumProfile($profile)) {
-			$addr->appendChild($doc->createElement('ram:PostcodeCode', htmlspecialchars((string) $data[$prefix . 'postcode'])));
+			$addr->appendChild($doc->createElement('ram:PostcodeCode', einvoicingXmlText((string) $data[$prefix . 'postcode'])));
 			// The three address lines the norm has: BT-35/36/162 for the seller, BT-50/51/163 for the
 			// buyer. XSD order inside TradeAddressType is PostcodeCode, LineOne, LineTwo, LineThree,
 			// CityName, CountryID - the elements are written in that order and nowhere else.
 			if (!empty($data[$prefix . 'lineone'])) {
-				$addr->appendChild($doc->createElement('ram:LineOne', htmlspecialchars($data[$prefix . 'lineone'])));
+				$addr->appendChild($doc->createElement('ram:LineOne', einvoicingXmlText($data[$prefix . 'lineone'])));
 			}
 			if (!empty($data[$prefix . 'linetwo'])) {
-				$addr->appendChild($doc->createElement('ram:LineTwo', htmlspecialchars($data[$prefix . 'linetwo'])));
+				$addr->appendChild($doc->createElement('ram:LineTwo', einvoicingXmlText($data[$prefix . 'linetwo'])));
 			}
 			if (!empty($data[$prefix . 'linethree'])) {
-				$addr->appendChild($doc->createElement('ram:LineThree', htmlspecialchars($data[$prefix . 'linethree'])));
+				$addr->appendChild($doc->createElement('ram:LineThree', einvoicingXmlText($data[$prefix . 'linethree'])));
 			}
-			$addr->appendChild($doc->createElement('ram:CityName', htmlspecialchars($data[$prefix . 'city'])));
+			$addr->appendChild($doc->createElement('ram:CityName', einvoicingXmlText($data[$prefix . 'city'])));
 		}
-		$addr->appendChild($doc->createElement('ram:CountryID', htmlspecialchars((string) $data[$prefix . 'country'])));
+		$addr->appendChild($doc->createElement('ram:CountryID', einvoicingXmlText((string) $data[$prefix . 'country'])));
 
 		// URIUniversalCommunication. Not declared by the MINIMUM schema.
 		if (!$minimal && !$this->isMinimumProfile($profile) && !empty($data[$prefix . 'CommunicationUriScheme']) && !empty($data[$prefix . 'CommunicationUri'])) {
 			$uri = $doc->createElement('ram:URIUniversalCommunication');
 			$node->appendChild($uri);
-			$uriid = $doc->createElement('ram:URIID', htmlspecialchars((string) $data[$prefix . 'CommunicationUri']));			// Example 315143296_1939
+			$uriid = $doc->createElement('ram:URIID', einvoicingXmlText((string) $data[$prefix . 'CommunicationUri']));			// Example 315143296_1939
 			$uriid->setAttribute('schemeID', $data[$prefix . 'CommunicationUriScheme']);			// Example 0225
 			$uri->appendChild($uriid);
 		}
@@ -2929,7 +2947,7 @@ class CIIProtocol extends AbstractProtocol
 
 			foreach ($registrations as $registration) {
 				$tax = $doc->createElement('ram:SpecifiedTaxRegistration');
-				$id = $doc->createElement('ram:ID', htmlspecialchars((string) $registration['value']));
+				$id = $doc->createElement('ram:ID', einvoicingXmlText((string) $registration['value']));
 				$id->setAttribute('schemeID', $registration['type']);
 				$tax->appendChild($id);
 				$node->appendChild($tax);
@@ -2974,7 +2992,7 @@ class CIIProtocol extends AbstractProtocol
 
 		// BT-70 Deliver-to party name (optional).
 		if (!empty($ship['name'])) {
-			$node->appendChild($doc->createElement('ram:Name', htmlspecialchars($ship['name'])));
+			$node->appendChild($doc->createElement('ram:Name', einvoicingXmlText($ship['name'])));
 		}
 
 		// BG-15 Deliver-to address.
@@ -2983,7 +3001,7 @@ class CIIProtocol extends AbstractProtocol
 
 		// CII XSD order for PostalTradeAddress: PostcodeCode BEFORE LineOne (counter-intuitive).
 		if (!empty($ship['zip'])) {
-			$addr->appendChild($doc->createElement('ram:PostcodeCode', htmlspecialchars((string) $ship['zip'])));
+			$addr->appendChild($doc->createElement('ram:PostcodeCode', einvoicingXmlText((string) $ship['zip'])));
 		}
 		// BT-75/76/165: the deliver-to address has three lines too. The caller splits the free text
 		// field Dolibarr stores; a single-line address keeps landing on LineOne alone.
@@ -2994,14 +3012,14 @@ class CIIProtocol extends AbstractProtocol
 		);
 		foreach (array('ram:LineOne', 'ram:LineTwo', 'ram:LineThree') as $rank => $element) {
 			if (!empty($shiplines[$rank])) {
-				$addr->appendChild($doc->createElement($element, htmlspecialchars($shiplines[$rank])));
+				$addr->appendChild($doc->createElement($element, einvoicingXmlText($shiplines[$rank])));
 			}
 		}
 		if (!empty($ship['town'])) {
-			$addr->appendChild($doc->createElement('ram:CityName', htmlspecialchars($ship['town'])));
+			$addr->appendChild($doc->createElement('ram:CityName', einvoicingXmlText($ship['town'])));
 		}
 		// CountryID is mandatory whenever the address block exists (BR-57). Guaranteed non-empty here.
-		$addr->appendChild($doc->createElement('ram:CountryID', htmlspecialchars((string) $ship['country'])));
+		$addr->appendChild($doc->createElement('ram:CountryID', einvoicingXmlText((string) $ship['country'])));
 
 		return $node;
 	}
@@ -3059,19 +3077,19 @@ class CIIProtocol extends AbstractProtocol
 		$tax->appendChild($doc->createElement('ram:TypeCode', 'VAT'));
 
 		if ($vals['ExemptionReason']) {
-			$tax->appendChild($doc->createElement('ram:ExemptionReason', htmlspecialchars((string) $vals['ExemptionReason'])));
+			$tax->appendChild($doc->createElement('ram:ExemptionReason', einvoicingXmlText((string) $vals['ExemptionReason'])));
 		}
 
 		$tax->appendChild($doc->createElement('ram:BasisAmount', number_format($vals['totalHT'], 2, '.', '')));
 
-		$tax->appendChild($doc->createElement('ram:CategoryCode', htmlspecialchars((string) $vals['categoryVAT'])));
+		$tax->appendChild($doc->createElement('ram:CategoryCode', einvoicingXmlText((string) $vals['categoryVAT'])));
 
 		if ($vals['ExemptionReasonCode']) {
-			$tax->appendChild($doc->createElement('ram:ExemptionReasonCode', htmlspecialchars((string) $vals['ExemptionReasonCode'])));
+			$tax->appendChild($doc->createElement('ram:ExemptionReasonCode', einvoicingXmlText((string) $vals['ExemptionReasonCode'])));
 		}
 
 		if (!empty($dueDateTypeCode)) {		// BT-8, placed before the rate per the CII D22B sequence
-			$tax->appendChild($doc->createElement('ram:DueDateTypeCode', htmlspecialchars((string) $dueDateTypeCode)));
+			$tax->appendChild($doc->createElement('ram:DueDateTypeCode', einvoicingXmlText((string) $dueDateTypeCode)));
 		}
 
 		// BT-119 comes from the group itself, never from the key it is filed under: that key identifies
@@ -3136,12 +3154,12 @@ class CIIProtocol extends AbstractProtocol
 
 		// reasonCode
 		if ($reasonCode !== null) {
-			$node->appendChild($doc->createElement('ram:ReasonCode', htmlspecialchars((string) $reasonCode)));
+			$node->appendChild($doc->createElement('ram:ReasonCode', einvoicingXmlText((string) $reasonCode)));
 		}
 
 		// Reason
 		if ($reason !== null) {
-			$node->appendChild($doc->createElement('ram:Reason', htmlspecialchars((string) $reason)));
+			$node->appendChild($doc->createElement('ram:Reason', einvoicingXmlText((string) $reason)));
 		}
 
 		// Tax (important Factur-X). Document level only: on a line the VAT of the discount is already
@@ -3150,7 +3168,7 @@ class CIIProtocol extends AbstractProtocol
 			$taxNode = $doc->createElement('ram:CategoryTradeTax');
 
 			$taxNode->appendChild($doc->createElement('ram:TypeCode', 'VAT'));
-			$taxNode->appendChild($doc->createElement('ram:CategoryCode', htmlspecialchars((string) $taxCategory)));
+			$taxNode->appendChild($doc->createElement('ram:CategoryCode', einvoicingXmlText((string) $taxCategory)));
 			$taxNode->appendChild($doc->createElement('ram:RateApplicablePercent', number_format($taxRate, 2, '.', '')));
 
 			$node->appendChild($taxNode);

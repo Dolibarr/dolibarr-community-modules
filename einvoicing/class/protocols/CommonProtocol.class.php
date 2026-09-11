@@ -220,6 +220,17 @@ trait CommonProtocol
 	 */
 	private function getIEC6523Code($country_code, $global = 0)
 	{
+		// EINVOICING_PARTY_IDENTIFIER_SCHEME decides the scheme of the party identifier (BT-29, BT-46)
+		// alone. It must not reach $global == 2, the electronic address (BT-34, BT-49), where 0225 is
+		// the right answer and BR-CL-25 accepts nothing outside the CEF EAS list.
+		if ($global == 1) {
+			$configured = trim(getDolGlobalString('EINVOICING_PARTY_IDENTIFIER_SCHEME'));
+			// 'none' rather than an empty string: an empty option is an option nobody set, which
+			// keeps the historical scheme of the country.
+			if ($configured !== '') {
+				return ($configured === 'none') ? '' : $configured;
+			}
+		}
 		$retour = "";
 		switch ($country_code) {
 			case 'BE':
@@ -243,6 +254,24 @@ trait CommonProtocol
 				$retour = "0060";	// DUNS
 		}
 		return $retour;
+	}
+
+	/**
+	 * Value of the party identifier (BT-29, BT-46), which follows the scheme the setup asks for.
+	 *
+	 * Every entry of the list but the SIRET is declared with the professional identifier idprof()
+	 * answers for the country of the party, which is what the module has always written.
+	 *
+	 * @param	Societe	$thirdparty		Party the identifier belongs to
+	 * @return	string					Identifier, empty when that party has nothing under that scheme
+	 */
+	private function getPartyIdentifierValue($thirdparty)
+	{
+		if (getDolGlobalString('EINVOICING_PARTY_IDENTIFIER_SCHEME') === '0009') {
+			return removeAllSpaces($thirdparty->idprof2);
+		}
+
+		return idprof($thirdparty);
 	}
 
 	/**
@@ -583,7 +612,7 @@ trait CommonProtocol
 				if (!empty($globalId)) {
 					// Map scheme to idprof field (0002 = SIREN)
 					// TODO Use function idprof() ?
-					$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode);
+					$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode, $globalId);
 					if (!empty($idprofField)) {
 						$result = 0;
 						// Fetch thirdparty by corresponding idprof field
@@ -766,7 +795,7 @@ trait CommonProtocol
 					if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
 						foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
 							if (!empty($globalId)) {
-								$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode);
+								$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode, $globalId);
 								if (!empty($idprofField)) {
 									$thirdparty->$idprofField = removeAllSpaces($globalId);
 								}
@@ -814,7 +843,7 @@ trait CommonProtocol
 					if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
 						foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
 							if (!empty($globalId)) {
-								$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode);
+								$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode, $globalId);
 								if (!empty($idprofField) && empty($thirdparty->$idprofField)) {
 									$thirdparty->$idprofField = removeAllSpaces($globalId);
 								}
@@ -900,7 +929,7 @@ trait CommonProtocol
 			if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
 				foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
 					if (!empty($globalId)) {
-						$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode);
+						$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode, $globalId);
 						if (!empty($idprofField)) {
 							$thirdparty->$idprofField = removeAllSpaces($globalId);
 						}
@@ -962,7 +991,7 @@ trait CommonProtocol
 			if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
 				foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
 					if (!empty($globalId)) {
-						$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode);
+						$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode, $globalId);
 						if (!empty($idprofField)) {
 							$createParams[$idprofField] = $globalId;
 						}
@@ -1016,7 +1045,7 @@ trait CommonProtocol
 			if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
 				foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
 					if (!empty($globalId)) {
-						$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode);
+						$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode, $globalId);
 						if (!empty($idprofField)) {
 							$errorDetails[$idprofField] = $langs->trans($idprofField).': ' . $globalId;
 							$actiondata[$idprofField] = $globalId;
@@ -1410,15 +1439,33 @@ trait CommonProtocol
 	/**
 	 * Map global ID scheme to Dolibarr idprof field
 	 *
+	 * 0002 and 0009 name the register they come from, 0225 does not: it is the French e-invoicing
+	 * ADDRESS scheme, whose value is a SIREN, a SIRET, or either of them suffixed with a routing code
+	 * (rules G1.83, G1.93 and G1.115 of the French specification). Its shape is therefore what decides
+	 * where it is stored, and a suffixed one is stored nowhere: it identifies a mailbox, not a company.
+	 * 0231 (the SIREN of a VAT group) and 0088 (a GLN) are left out on purpose - neither is the
+	 * registration identifier of the party the document names.
+	 *
 	 * @param 	string 	$scheme 		Global ID scheme code
 	 * @param	string	$countrycode	Country code
-	 * @return 	string 					Corresponding idprof field name
+	 * @param	string	$value			Identifier carried under that scheme, read when the scheme alone does not decide
+	 * @return 	string 					Corresponding idprof field name, empty when the identifier is not one
 	 */
-	private function _mapGlobalIdSchemeToIdprof($scheme, $countrycode = '')
+	private function _mapGlobalIdSchemeToIdprof($scheme, $countrycode = '', $value = '')
 	{
+		if ($scheme === '0225') {
+			$digits = preg_replace('/\D/', '', (string) $value);
+			if ($digits !== (string) $value) {
+				return '';
+			}
+			if (dol_strlen($digits) == 9) {
+				return 'idprof1';	// SIREN
+			}
+			return (dol_strlen($digits) == 14) ? 'idprof2' : '';	// SIRET
+		}
+
 		$map = [
 			'0002' => 'idprof1',	// SIREN
-			'0225' => 'idprof1',	// SIREN
 			'0009' => 'idprof2',	// SIRET
 		];
 

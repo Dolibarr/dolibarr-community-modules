@@ -7,6 +7,8 @@
 # ignore .htaccess files
 .htaccess
 /.run-phpstan
+# Local PHPStan overrides; phpstan.neon.dist is the one that is versioned
+/phpstan.neon
 
 # Mistral Vibe
 .vibe

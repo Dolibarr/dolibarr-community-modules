@@ -130,8 +130,13 @@ if ($object->thirdparty->tva_assuj && empty($object->thirdparty->tva_intra)) {
 $sellerTaxRegistrations = einvoicingSellerTaxRegistrations($mysoc);
 $myidprof          = idprof($mysoc);
 $mySchemeIdProf    = $this->getIEC6523Code($mysoc->country_code);
-$myGlobalIdProf    = idprof($mysoc);
+// BT-29, whose scheme EINVOICING_PARTY_IDENTIFIER_SCHEME decides. An empty scheme or an empty value
+// means the term is not declared at all: it is optional, and BR-CO-26 is satisfied by BT-30 alone.
+$myGlobalIdProf    = $this->getPartyIdentifierValue($mysoc);
 $mySchemeGlobalIdProf = $this->getIEC6523Code($mysoc->country_code, 1);
+$sellerGlobalIds   = ($mySchemeGlobalIdProf !== '' && $myGlobalIdProf !== '')
+	? array(array('schemeID' => $mySchemeGlobalIdProf, 'value' => $myGlobalIdProf))
+	: array();
 $myUri             = $einvoicing->getSellerCommunicationURI(0);
 $mySchemeUri       = $this->getIEC6523Code($mysoc->country_code, 2);
 // BT-28, the trading name of the seller: "a name by which the seller is known, other than the
@@ -206,8 +211,11 @@ if ($buyerTradingName === trim((string) $buyerName)) {
 }
 $idprof            = idprof($buyerParty) ?? '';
 $schemeIdProf      = $this->getIEC6523Code($buyerParty->country_code);
-$globalIdProf      = idprof($buyerParty) ?? '';
+$globalIdProf      = $this->getPartyIdentifierValue($buyerParty) ?? '';	// BT-46, see BT-29 above
 $schemeGlobalIdProf = $this->getIEC6523Code($buyerParty->country_code, 1);
+$buyerGlobalIds    = ($schemeGlobalIdProf !== '' && $globalIdProf !== '')
+	? array(array('schemeID' => $schemeGlobalIdProf, 'value' => $globalIdProf))
+	: array();
 $uri               = $einvoicing->getBuyerCommunicationURI($buyerParty, $object);
 $reg = array();
 if (preg_match('/(\d+):(.+)/', $uri, $reg)) {
@@ -1025,7 +1033,7 @@ $invoiceData = [
 
 	// Seller part
 	'sellername'                => $mysoc->name,
-	'sellerids'                 => $myidprof,
+	'sellerids'                 => (empty($sellerGlobalIds) ? '' : $myidprof),
 
 	'sellerlineone'             => $sellerAddressLines[0] !== '' ? $sellerAddressLines[0] : 'ADDRESS EMPTY',
 	'sellerlinetwo'             => $sellerAddressLines[1],
@@ -1044,7 +1052,7 @@ $invoiceData = [
 	'sellerCommunicationUriScheme' => $mySchemeUri,
 	'sellerCommunicationUri'    => $myUri,
 
-	'sellerGlobalIds'           => [['schemeID' => $mySchemeGlobalIdProf, 'value' => $myGlobalIdProf]],
+	'sellerGlobalIds'           => $sellerGlobalIds,
 	// BT-31 or BT-32, whichever the VAT regime of the seller calls for - see
 	// einvoicingSellerTaxRegistrations(). A seller that does not charge VAT has no BT-31 to declare and
 	// must still identify itself, or every exempt line trips BR-E-02 (issue #560).
@@ -1057,7 +1065,7 @@ $invoiceData = [
 
 	// Buyer part
 	'buyername'                 =>  $buyerName ?: 'CUSTOMER',
-	'buyerids'                  => $idprof ?: 'IDPROF',
+	'buyerids'                  => (empty($buyerGlobalIds) ? '' : $idprof),
 
 	'buyerlineone'              => $buyerAddressLines[0] !== '' ? $buyerAddressLines[0] : 'ADDRESS',
 	'buyerlinetwo'              => $buyerAddressLines[1],
@@ -1068,7 +1076,7 @@ $invoiceData = [
 	'buyersubdivision'          => null,
 
 	'buyervatnumber'            => $buyerParty->tva_intra ?? '',
-	'buyerGlobalIds'            => [['schemeID' => $schemeGlobalIdProf, 'value' => $globalIdProf]],
+	'buyerGlobalIds'            => $buyerGlobalIds,
 	'buyerRoutingCode'          => ($buyerRoutingCode !== '' ? $buyerRoutingCode : null),
 
 	'buyerLegalOrgId'           => $idprof,

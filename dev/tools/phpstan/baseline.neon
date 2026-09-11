@@ -1,0 +1,1795 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: ../../../einvoicing/admin/about.php
+
+		-
+			message: '#^Call to function is_object\(\) with FormSetup will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 2
+			path: ../../../einvoicing/admin/setup.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: ../../../einvoicing/admin/setup.php
+
+		-
+			message: '#^Variable \$formSetup in empty\(\) always exists and is not falsy\.$#'
+			identifier: empty.variable
+			count: 2
+			path: ../../../einvoicing/admin/setup.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: ../../../einvoicing/admin/setup_devtools.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: ../../../einvoicing/admin/setup_options.php
+
+		-
+			message: '#^Property FormSetupItem\:\:\$fieldAttr \(array\{name\?\: string, id\?\: string, value\?\: mixed, class\?\: string, disabled\?\: int\<0, 1\>\|null, type\?\: string, size\?\: int, placeholder\?\: string, \.\.\.\}\) does not accept array\{name\?\: string, id\?\: string, value\?\: mixed, class\?\: string, disabled\?\: int\<0, 1\>\|null, type\?\: string, size\?\: int, placeholder\?\: string, \.\.\.\}\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: ../../../einvoicing/admin/setup_options.php
+
+		-
+			message: '#^Function einvoicing_directory_html\(\) has parameter \$r with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/ajax/checkdirectory.php
+
+		-
+			message: '#^Function einvoicing_directory_provenance\(\) has parameter \$r with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/ajax/checkdirectory.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: ../../../einvoicing/ajax/checkdirectory.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: ../../../einvoicing/ajax/checkinvoicestatus.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: ../../../einvoicing/ajax/checksupplierinvoicestatus.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: ../../../einvoicing/ajax/document.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: ../../../einvoicing/call_card.php
+
+		-
+			message: '#^Empty array passed to foreach\.$#'
+			identifier: foreach.emptyArray
+			count: 1
+			path: ../../../einvoicing/call_list.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: ../../../einvoicing/call_list.php
+
+		-
+			message: '#^Right side of && is always true\.$#'
+			identifier: booleanAnd.rightAlwaysTrue
+			count: 1
+			path: ../../../einvoicing/call_list.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between array\{type\: string, label\: string, enabled\: int\<0, 2\>\|string, position\: int, visible\: int\<\-6, 6\>\|string, langfile\?\: string, notnull\?\: int\<\-1, 1\>, noteditable\?\: int\<0, 1\>, \.\.\.\} and null will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: ../../../einvoicing/call_list.php
+
+		-
+			message: '#^Variable \$permissiontoread in empty\(\) always exists and is not falsy\.$#'
+			identifier: empty.variable
+			count: 1
+			path: ../../../einvoicing/call_list.php
+
+		-
+			message: '#^Method ActionsEInvoicing\:\:afterODTCreation\(\) has parameter \$parameters with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/actions_einvoicing.class.php
+
+		-
+			message: '#^Method ActionsEInvoicing\:\:afterPDFCreation\(\) has parameter \$parameters with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/actions_einvoicing.class.php
+
+		-
+			message: '#^Method ActionsEInvoicing\:\:formConfirm\(\) has parameter \$parameters with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/actions_einvoicing.class.php
+
+		-
+			message: '#^Parameter \#4 \$url of function dolGetButtonAction expects array\<int, array\{lang\: string, enabled\: bool, perm\: bool\|int, label\: string, text\?\: string, url\: string, urlroot\?\: string, isDropDown\?\: int\<0, 1\>\}\>\|string, array\{0\: array\{lang\: ''einvoicing'', enabled\: true, perm\: \-1\|bool, label\: mixed, text\?\: mixed, url\: non\-falsy\-string\}, 1\?\: array\{lang\: ''einvoicing'', enabled\: 1\|true, perm\: \-1\|bool, label\: mixed, text\?\: mixed, url\: non\-falsy\-string\}, 2\?\: array\{lang\: ''einvoicing'', enabled\: 1, perm\: \-1\|bool, label\: mixed, text\: mixed, url\: non\-falsy\-string\}\|array\{lang\: ''einvoicing'', enabled\: true, perm\: bool, label\: mixed, url\: non\-falsy\-string\}, 3\?\: array\{lang\: ''einvoicing'', enabled\: 1, perm\: \-1\|bool, label\: mixed, text\: mixed, url\: non\-falsy\-string\}\} given\.$#'
+			identifier: argument.type
+			count: 2
+			path: ../../../einvoicing/class/actions_einvoicing.class.php
+
+		-
+			message: '#^Property CommonObject\:\:\$element \(string\) in isset\(\) is not nullable\.$#'
+			identifier: isset.property
+			count: 2
+			path: ../../../einvoicing/class/actions_einvoicing.class.php
+
+		-
+			message: '#^Call to function method_exists\(\) with \$this\(Call\) and ''getLibStatut'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Call to function method_exists\(\) with \$this\(Call\) and ''getNomUrl'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Call to function property_exists\(\) with \$this\(Call\) and ''thirdparty'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Call to function property_exists\(\) with Call and ''date_creation'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Call to function property_exists\(\) with Call and ''date_modification'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Call to function property_exists\(\) with Call and ''ref'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Call to function property_exists\(\) with Call and ''status'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Left side of && is always false\.$#'
+			identifier: booleanAnd.leftAlwaysFalse
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Property Call\:\:\$batchlimit has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Property Call\:\:\$call_id has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Property Call\:\:\$call_type has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Property Call\:\:\$endpoint has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Property Call\:\:\$fields \(array\<string, array\{type\: string, label\: string, enabled\: int\<0, 2\>\|string, position\: int, visible\: int\<\-6, 6\>\|string, langfile\?\: string, notnull\?\: int\<\-1, 1\>, noteditable\?\: int\<0, 1\>, \.\.\.\}\>\) does not accept default value of type array\{rowid\: array\{type\: ''integer'', label\: ''TechnicalID'', enabled\: ''1'', position\: 1, notnull\: 1, visible\: ''1'', noteditable\: ''1'', index\: ''1'', \.\.\.\}, call_id\: array\{type\: ''varchar\(50\)'', label\: ''Ref'', enabled\: ''1'', position\: 10, notnull\: 1, visible\: ''1'', index\: ''1'', csslist\: ''tdoverflowmax150''\}, provider\: array\{type\: ''varchar\(50\)'', label\: ''provider'', enabled\: ''1'', position\: 20, notnull\: 1, visible\: ''1'', comment\: ''PDP Name''\}, call_type\: array\{type\: ''varchar\(50\)'', label\: ''Type'', enabled\: ''1'', position\: 25, notnull\: 1, visible\: ''1'', comment\: ''Call type \(SyncDocs…'', csslist\: ''tdoverflowmax125''\}, method\: array\{type\: ''varchar\(10\)'', label\: ''Method'', enabled\: ''1'', position\: 30, notnull\: 0, visible\: ''1'', comment\: ''\-\- HTTP method \(GET…''\}, endpoint\: array\{type\: ''varchar\(255\)'', label\: ''Endpoint'', enabled\: ''1'', position\: 35, notnull\: 1, visible\: ''\-1'', comment\: ''\-\- URL or endpoint…''\}, request_id\: array\{type\: ''varchar\(36\)'', label\: ''RequestId'', langs\: ''einvoicing…'', enabled\: ''1'', position\: 36, notnull\: 0, visible\: ''\-1'', comment\: ''\-\- Request\-Id…''\}, skippedflow\: array\{type\: ''integer'', label\: ''SkippedFlows'', enabled\: ''1'', position\: 130, notnull\: 1, visible\: ''1'', comment\: ''Skipped flows…''\}, \.\.\.\}\.$#'
+			identifier: property.defaultValue
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Property Call\:\:\$method has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Property Call\:\:\$processing_result has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Property Call\:\:\$provider has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Property Call\:\:\$request_body has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Property Call\:\:\$request_id has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Property Call\:\:\$response has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Property Call\:\:\$rowid has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Property Call\:\:\$skippedflow has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Property Call\:\:\$successflow has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Property Call\:\:\$totalflow has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Call to function method_exists\(\) with \$this\(Document\) and ''getLibStatut'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Call to function method_exists\(\) with \$this\(Document\) and ''getNomUrl'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Call to function property_exists\(\) with \$this\(Document\) and ''ref'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Call to function property_exists\(\) with \$this\(Document\) and ''thirdparty'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Call to function property_exists\(\) with Document and ''date_creation'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Call to function property_exists\(\) with Document and ''date_modification'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Call to function property_exists\(\) with Document and ''ref'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Call to function property_exists\(\) with Document and ''status'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Left side of && is always false\.$#'
+			identifier: booleanAnd.leftAlwaysFalse
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property Document\:\:\$ack_info has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property Document\:\:\$ack_reason_code has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property Document\:\:\$ack_status has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property Document\:\:\$call_id has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property Document\:\:\$cdar_lifecycle_code has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property Document\:\:\$cdar_lifecycle_label has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property Document\:\:\$cdar_reason_code has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property Document\:\:\$cdar_reason_desc has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property Document\:\:\$cdar_reason_detail has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property Document\:\:\$document_body has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property Document\:\:\$fields \(array\<string, array\{type\: string, label\: string, enabled\: int\<0, 2\>\|string, position\: int, visible\: int\<\-6, 6\>\|string, langfile\?\: string, notnull\?\: int\<\-1, 1\>, noteditable\?\: int\<0, 1\>, \.\.\.\}\>\) does not accept default value of type array\{rowid\: array\{type\: ''integer'', label\: ''ID'', enabled\: ''1'', position\: 1, notnull\: 1, visible\: ''1'', noteditable\: ''1'', index\: ''1'', \.\.\.\}, provider\: array\{type\: ''varchar\(50\)'', label\: ''AccessPoint'', langfile\: ''einvoicing…'', enabled\: ''1'', position\: 5, notnull\: 1, visible\: ''\-1'', comment\: ''EInvoice Platform…''\}, flow_id\: array\{type\: ''varchar\(255\)'', label\: ''flow_id'', enabled\: ''1'', position\: 10, notnull\: 0, visible\: ''1'', comment\: ''EInvoice flow UUID'', csslist\: ''tdoverflowmax100''\}, call_id\: array\{type\: ''varchar\(50\)'', label\: ''TransactionID'', enabled\: ''1'', position\: 20, notnull\: 0, visible\: ''1'', comment\: ''Reference to the…'', csslist\: ''tdoverflowmax100''\}, flow_type\: array\{type\: ''varchar\(255\)'', label\: ''flow_type'', enabled\: ''1'', position\: 40, notnull\: 0, visible\: ''1'', comment\: ''Flow type \(\\''sync\\'', …''\}, flow_direction\: array\{type\: ''varchar\(10\)'', label\: ''flow_direction'', enabled\: ''1'', position\: 50, notnull\: 0, visible\: ''1'', comment\: ''In or Out'', csslist\: ''center''\}, flow_syntax\: array\{type\: ''varchar\(50\)'', label\: ''flow_syntax'', enabled\: ''1'', position\: 60, notnull\: 0, visible\: ''\-1'', comment\: ''Document syntax …''\}, flow_profile\: array\{type\: ''varchar\(50\)'', label\: ''flow_profile'', enabled\: ''1'', position\: 70, notnull\: 0, visible\: ''\-1'', comment\: ''Profile used \(Basic…''\}, \.\.\.\}\.$#'
+			identifier: property.defaultValue
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property Document\:\:\$fk_element_id has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property Document\:\:\$fk_element_type has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property Document\:\:\$flow_direction has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property Document\:\:\$flow_id has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property Document\:\:\$flow_profile has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property Document\:\:\$flow_syntax has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property Document\:\:\$flow_type has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property Document\:\:\$flow_uiid has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property Document\:\:\$processing_rule has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property Document\:\:\$provider has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property Document\:\:\$response_for_debug has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property Document\:\:\$rowid has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property Document\:\:\$submittedat has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property Document\:\:\$tracking_idref has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property Document\:\:\$updatedat has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property Document\:\:\$xml_data has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Loose comparison using \=\= between \-1 and 2 will always evaluate to false\.$#'
+			identifier: equal.alwaysFalse
+			count: 3
+			path: ../../../einvoicing/class/einvoicing.class.php
+
+		-
+			message: '#^Offset ''ADR_ERR''\|''ART_ERR''\|''AUTRE''\|''CALCUL_ERR''\|''CMD_ERR''\|''CODE_ROUTAGE_ERR''\|''CONTRAT_TERM''\|''COORD_BANC_ERR''\|''DEST_ERR''\|''DOUBLE_FACT''\|''DOUBLON''\|''EMMET_INC''\|''JUSTIF_ABS''\|''LIVR_INCOMP''\|''MODPAI_ERR''\|''MONTANTTOTAL_ERR''\|''NON_CONFORME''\|''PU_ERR''\|''QTE_ERR''\|''QUALITE_ERR''\|''REF_CT_ABSENT''\|''REF_ERR''\|''REM_ERR''\|''ROUTAGE_ERR''\|''SIRET_ERR''\|''TRANSAC_INC''\|''TX_TVA_ERR'' on array\{NON_TRANSMISE\: array\{label\: ''ReasonRecipientNotC…'', desc\: ''This reason is used…''\}, JUSTIF_ABS\: array\{label\: ''ReasonMissingOrInsu…'', desc\: ''This reason should…''\}, ROUTAGE_ERR\: array\{label\: ''ReasonRoutingError'', desc\: ''This reason code…''\}, AUTRE\: array\{label\: ''ReasonOther'', desc\: ''Ce motif nécessite…''\}, COORD_BANC_ERR\: array\{label\: ''ReasonBankCoordinat…'', desc\: ''Les références…''\}, TX_TVA_ERR\: array\{label\: ''ReasonIncorrectVATR…'', desc\: ''Un taux de TVA…''\}, MONTANTTOTAL_ERR\: array\{label\: ''ReasonIncorrectTota…'', desc\: ''One of the invoice…''\}, CALCUL_ERR\: array\{label\: ''ReasonInvoiceCalcul…'', desc\: ''Soit détecté au…''\}, \.\.\.\} in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.offset
+			count: 1
+			path: ../../../einvoicing/class/einvoicing.class.php
+
+		-
+			message: '#^Parameter \#2 \$callback of function array_filter expects \(callable\(string\)\: bool\)\|null, ''strlen'' given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/einvoicing.class.php
+
+		-
+			message: '#^Property CommonInvoiceLine\:\:\$product_label \(string\) on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.property
+			count: 1
+			path: ../../../einvoicing/class/einvoicing.class.php
+
+		-
+			message: '#^Property CommonObjectLine\:\:\$desc \(string\) on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.property
+			count: 1
+			path: ../../../einvoicing/class/einvoicing.class.php
+
+		-
+			message: '#^Property Societe\:\:\$tva_assuj \(int\) in isset\(\) is not nullable\.$#'
+			identifier: isset.property
+			count: 1
+			path: ../../../einvoicing/class/einvoicing.class.php
+
+		-
+			message: '#^Variable \$baseErrors in empty\(\) always exists and is always falsy\.$#'
+			identifier: empty.variable
+			count: 2
+			path: ../../../einvoicing/class/einvoicing.class.php
+
+		-
+			message: '#^Method AbstractProtocol\:\:parseInvoiceHeader\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/protocols/AbstractProtocol.class.php
+
+		-
+			message: '#^Property AbstractProtocol\:\:\$errors type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/protocols/AbstractProtocol.class.php
+
+		-
+			message: '#^Property AbstractProtocol\:\:\$warnings type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/protocols/AbstractProtocol.class.php
+
+		-
+			message: '#^Property CommonInvoice\:\:\$total_ttc \(float\) in isset\(\) is not nullable\.$#'
+			identifier: isset.property
+			count: 1
+			path: ../../../einvoicing/class/protocols/AbstractProtocol.class.php
+
+		-
+			message: '#^Call to function method_exists\(\) with Societe and ''findNearest'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Expression "''…" on a separate line does not do anything\.$#'
+			identifier: expr.resultUnused
+			count: 2
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^If condition is always false\.$#'
+			identifier: if.alwaysFalse
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Left side of && is always true\.$#'
+			identifier: booleanAnd.leftAlwaysTrue
+			count: 3
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Loose comparison using \=\= between 1 and 2 will always evaluate to false\.$#'
+			identifier: equal.alwaysFalse
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Loose comparison using \=\= between float and 0\.0 will always evaluate to true\.$#'
+			identifier: equal.alwaysTrue
+			count: 2
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Method CIIProtocol\:\:_applyPaymentInfoToSupplierInvoice\(\) has parameter \$parsedHeader with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Method CIIProtocol\:\:_detectProductTypeFromEinvoiceLine\(\) has parameter \$line with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Method CIIProtocol\:\:_findOrCreateProductFromEinvoiceLine\(\) has parameter \$lineData with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Method CIIProtocol\:\:_findOrCreateProductFromEinvoiceLine\(\) should return array\{res\: int, message\: string, actioncode\: string\|null, action\: string\|null, actionurl\: string\|null, actiondata\: array\<string, mixed\>, allactiondata\: array\<string, array\<string, mixed\>\>\} but returns array\{res\: \-1, message\: non\-falsy\-string\}\.$#'
+			identifier: return.type
+			count: 2
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Method CIIProtocol\:\:_findOrCreateProductFromEinvoiceLine\(\) should return array\{res\: int, message\: string, actioncode\: string\|null, action\: string\|null, actionurl\: string\|null, actiondata\: array\<string, mixed\>, allactiondata\: array\<string, array\<string, mixed\>\>\} but returns array\{res\: 0, message\: ''Product not found,…''\}\.$#'
+			identifier: return.type
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Method CIIProtocol\:\:_findOrCreateProductFromEinvoiceLine\(\) should return array\{res\: int, message\: string, actioncode\: string\|null, action\: string\|null, actionurl\: string\|null, actiondata\: array\<string, mixed\>, allactiondata\: array\<string, array\<string, mixed\>\>\} but returns array\{res\: int, message\: ''Product…''\}\.$#'
+			identifier: return.type
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Method CIIProtocol\:\:_findOrCreateProductFromEinvoiceLine\(\) should return array\{res\: int, message\: string, actioncode\: string\|null, action\: string\|null, actionurl\: string\|null, actiondata\: array\<string, mixed\>, allactiondata\: array\<string, array\<string, mixed\>\>\} but returns array\{res\: int\<1, max\>, message\: string, matchtype\?\: string\}\.$#'
+			identifier: return.type
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Method CIIProtocol\:\:_syncOrCreateThirdpartyFromEInvoiceSeller\(\) has parameter \$sellerInfo with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Method CIIProtocol\:\:_syncOrCreateThirdpartyFromEInvoiceSeller\(\) should return array\{res\: int, message\: string, actioncode\: string\|null, actionurl\: string\|null, action\: string\|null\} but returns array\{res\: \-1, message\: non\-falsy\-string, actioncode\: ''DUPLICATE…'', action\: ''Merge the 2…'', actiondata\: array\{thirdpartyid1\: mixed, thirdpartyid2\: mixed\}\}\.$#'
+			identifier: return.type
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Method CIIProtocol\:\:_syncOrCreateThirdpartyFromEInvoiceSeller\(\) should return array\{res\: int, message\: string, actioncode\: string\|null, actionurl\: string\|null, action\: string\|null\} but returns array\{res\: \-1, message\: non\-falsy\-string\}\.$#'
+			identifier: return.type
+			count: 2
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Method CIIProtocol\:\:_syncOrCreateThirdpartyFromEInvoiceSeller\(\) should return array\{res\: int, message\: string, actioncode\: string\|null, actionurl\: string\|null, action\: string\|null\} but returns array\{res\: int, message\: non\-falsy\-string\}\.$#'
+			identifier: return.type
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Method CIIProtocol\:\:_syncOrCreateThirdpartyFromEInvoiceSeller\(\) should return array\{res\: int, message\: string, actioncode\: string\|null, actionurl\: string\|null, action\: string\|null\} but returns array\{res\: int\<1, max\>, message\: non\-falsy\-string\}\.$#'
+			identifier: return.type
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Method CIIProtocol\:\:addHeaderDiscount\(\) has parameter \$discount with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Method CIIProtocol\:\:addLineDiscount\(\) has parameter \$discount with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Method CIIProtocol\:\:buildLineItem\(\) has parameter \$line with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Method CIIProtocol\:\:buildParty\(\) has parameter \$data with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Method CIIProtocol\:\:buildShipToTradeParty\(\) has parameter \$bill with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Method CIIProtocol\:\:buildShipToTradeParty\(\) has parameter \$ship with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Method CIIProtocol\:\:buildTaxNode\(\) has parameter \$vals with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Method CIIProtocol\:\:buildXML\(\) has parameter \$invoiceData with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Method CIIProtocol\:\:buildXML\(\) has parameter \$linesData with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Method CIIProtocol\:\:buildXML\(\) invoked with 4 parameters, 2\-3 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Method CIIProtocol\:\:createSupplierInvoiceLinesFromSource\(\) has parameter \$parsedLines with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Method CIIProtocol\:\:createSupplierInvoiceLinesFromSource\(\) has parameter \$remise_already_used_line_level_ids with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Method CIIProtocol\:\:createSupplierInvoiceLinesFromSource\(\) has parameter \$return_messages with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Method CIIProtocol\:\:createSupplierInvoiceLinesFromSource\(\) has parameter \$supplierPriceEntries with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Method CIIProtocol\:\:createSupplierInvoiceLinesFromSource\(\) should return array\{res\: int, message\?\: string, actioncode\?\: string\|null, actionurl\?\: string\|null, action\?\: string\|null, actiondata\?\: string\|null\} but returns array\{res\: \-1, message\: non\-falsy\-string, actioncode\: string, actionurl\: string, action\: string\|null, actiondata\: array\<string, mixed\>\}\.$#'
+			identifier: return.type
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Method CIIProtocol\:\:findProductFromEinvoiceLine\(\) has parameter \$lineData with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Method CIIProtocol\:\:getCategoryRate\(\) should return array\<string, string\> but returns array\<string, string\|null\>\.$#'
+			identifier: return.type
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Method CIIProtocol\:\:getXPathValues\(\) is unused\.$#'
+			identifier: method.unused
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Method CIIProtocol\:\:parseInvoiceHeader\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Method CIIProtocol\:\:resolveLineDiscountPercent\(\) has parameter \$lineAllowances with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Multiple PHPDoc @var tags above single variable assignment are not supported\.$#'
+			identifier: varTag.multipleTags
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^PHPDoc tag @var for variable \$invoiceData has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 6
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^PHPDoc tag @var for variable \$linesData has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 4
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Property CIIProtocol\:\:\$lineTemplate type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Property CommonObjectLine\:\:\$desc \(string\) on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.property
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Property FactureFournisseur\:\:\$lines \(array\<CommonInvoiceLine\>\) does not accept array\<SupplierInvoiceLine\>\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Property SupplierInvoiceLine\:\:\$subprice \(float\) on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.property
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Result of \|\| is always true\.$#'
+			identifier: booleanOr.alwaysTrue
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between mixed~\(0\|0\.0\|''''\|''0''\|array\{\}\|false\|null\) and '''' will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 3
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Variable \$createParams in empty\(\) always exists and is not falsy\.$#'
+			identifier: empty.variable
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Call to function is_subclass_of\(\) with ''FPDF'' and ''TCPDF'' will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Call to function method_exists\(\) with Societe and ''findNearest'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Instanceof between DateTime and DateTime will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 2
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Left side of && is always true\.$#'
+			identifier: booleanAnd.leftAlwaysTrue
+			count: 3
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Loose comparison using \=\= between 1 and 2 will always evaluate to false\.$#'
+			identifier: equal.alwaysFalse
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Method FacturXProtocol\:\:_applyPaymentInfoToSupplierInvoice\(\) has parameter \$parsedHeader with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Method FacturXProtocol\:\:_detectProductTypeFromEinvoiceLine\(\) has parameter \$line with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Method FacturXProtocol\:\:_findOrCreateProductFromEinvoiceLine\(\) has parameter \$lineData with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Method FacturXProtocol\:\:_findOrCreateProductFromEinvoiceLine\(\) should return array\{res\: int, message\: string, actioncode\: string\|null, action\: string\|null, actionurl\: string\|null, actiondata\: array\<string, mixed\>, allactiondata\: array\<string, array\<string, mixed\>\>\} but returns array\{res\: \-1, message\: non\-falsy\-string\}\.$#'
+			identifier: return.type
+			count: 2
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Method FacturXProtocol\:\:_findOrCreateProductFromEinvoiceLine\(\) should return array\{res\: int, message\: string, actioncode\: string\|null, action\: string\|null, actionurl\: string\|null, actiondata\: array\<string, mixed\>, allactiondata\: array\<string, array\<string, mixed\>\>\} but returns array\{res\: 0, message\: ''Product not found,…''\}\.$#'
+			identifier: return.type
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Method FacturXProtocol\:\:_findOrCreateProductFromEinvoiceLine\(\) should return array\{res\: int, message\: string, actioncode\: string\|null, action\: string\|null, actionurl\: string\|null, actiondata\: array\<string, mixed\>, allactiondata\: array\<string, array\<string, mixed\>\>\} but returns array\{res\: int, message\: ''Product…''\}\.$#'
+			identifier: return.type
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Method FacturXProtocol\:\:_findOrCreateProductFromEinvoiceLine\(\) should return array\{res\: int, message\: string, actioncode\: string\|null, action\: string\|null, actionurl\: string\|null, actiondata\: array\<string, mixed\>, allactiondata\: array\<string, array\<string, mixed\>\>\} but returns array\{res\: int\<1, max\>, message\: string, matchtype\?\: string\}\.$#'
+			identifier: return.type
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Method FacturXProtocol\:\:_syncOrCreateThirdpartyFromEInvoiceSeller\(\) has parameter \$sellerInfo with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Method FacturXProtocol\:\:_syncOrCreateThirdpartyFromEInvoiceSeller\(\) should return array\{res\: int, message\: string, actioncode\: string\|null, actionurl\: string\|null, action\: string\|null\} but returns array\{res\: \-1, message\: non\-falsy\-string, actioncode\: ''DUPLICATE…'', action\: ''Merge the 2…'', actiondata\: array\{thirdpartyid1\: mixed, thirdpartyid2\: mixed\}\}\.$#'
+			identifier: return.type
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Method FacturXProtocol\:\:_syncOrCreateThirdpartyFromEInvoiceSeller\(\) should return array\{res\: int, message\: string, actioncode\: string\|null, actionurl\: string\|null, action\: string\|null\} but returns array\{res\: \-1, message\: non\-falsy\-string\}\.$#'
+			identifier: return.type
+			count: 2
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Method FacturXProtocol\:\:_syncOrCreateThirdpartyFromEInvoiceSeller\(\) should return array\{res\: int, message\: string, actioncode\: string\|null, actionurl\: string\|null, action\: string\|null\} but returns array\{res\: int, message\: non\-falsy\-string\}\.$#'
+			identifier: return.type
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Method FacturXProtocol\:\:_syncOrCreateThirdpartyFromEInvoiceSeller\(\) should return array\{res\: int, message\: string, actioncode\: string\|null, actionurl\: string\|null, action\: string\|null\} but returns array\{res\: int\<1, max\>, message\: non\-falsy\-string\}\.$#'
+			identifier: return.type
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Method FacturXProtocol\:\:findProductFromEinvoiceLine\(\) has parameter \$lineData with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Method FacturXProtocol\:\:getCategoryRate\(\) should return array\<string, string\> but returns array\<string, string\|null\>\.$#'
+			identifier: return.type
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Negated boolean expression is always false\.$#'
+			identifier: booleanNot.alwaysFalse
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between mixed~\(0\|0\.0\|''''\|''0''\|array\{\}\|false\|null\) and '''' will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 3
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Variable \$createParams in empty\(\) always exists and is not falsy\.$#'
+			identifier: empty.variable
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Variable \$documentDeliveryDate on left side of \?\? always exists and is always null\.$#'
+			identifier: nullCoalesce.variable
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Variable \$documentdate on left side of \?\? always exists and is always null\.$#'
+			identifier: nullCoalesce.variable
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Variable \$xmlfile in empty\(\) always exists and is not falsy\.$#'
+			identifier: empty.variable
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Method ProtocolManager\:\:getProtocolsList\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/protocols/ProtocolManager.class.php
+
+		-
+			message: '#^Call to function is_array\(\) with array\<int\|string, array\<mixed\>\|string\> will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: ../../../einvoicing/class/providers/AbstractPDPProvider.class.php
+
+		-
+			message: '#^Call to function method_exists\(\) with \$this\(AbstractPDPProvider\) and ''callApi'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: ../../../einvoicing/class/providers/AbstractPDPProvider.class.php
+
+		-
+			message: '#^Method AbstractPDPProvider\:\:checkHealth\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/providers/AbstractPDPProvider.class.php
+
+		-
+			message: '#^Method AbstractPDPProvider\:\:getConf\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/providers/AbstractPDPProvider.class.php
+
+		-
+			message: '#^Method AbstractPDPProvider\:\:initFormSetup\(\) has parameter \$TFieldProfiles with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/providers/AbstractPDPProvider.class.php
+
+		-
+			message: '#^Method AbstractPDPProvider\:\:initFormSetup\(\) has parameter \$TFieldProtocols with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/providers/AbstractPDPProvider.class.php
+
+		-
+			message: '#^Method AbstractPDPProvider\:\:initFormSetup\(\) has parameter \$providersConfig with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/providers/AbstractPDPProvider.class.php
+
+		-
+			message: '#^Method AbstractPDPProvider\:\:sendSampleInvoice\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/providers/AbstractPDPProvider.class.php
+
+		-
+			message: '#^Method AbstractPDPProvider\:\:validateEInvoiceFile\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/providers/AbstractPDPProvider.class.php
+
+		-
+			message: '#^Property AbstractPDPProvider\:\:\$EINVOICING_LAST_IMPORT_KEY has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/providers/AbstractPDPProvider.class.php
+
+		-
+			message: '#^Property AbstractPDPProvider\:\:\$config type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/providers/AbstractPDPProvider.class.php
+
+		-
+			message: '#^Property AbstractPDPProvider\:\:\$errors type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/providers/AbstractPDPProvider.class.php
+
+		-
+			message: '#^Dead catch \- Exception is never thrown in the try block\.$#'
+			identifier: catch.neverThrown
+			count: 3
+			path: ../../../einvoicing/class/providers/EsalinkPDPProvider.class.php
+
+		-
+			message: '#^If condition is always true\.$#'
+			identifier: if.alwaysTrue
+			count: 1
+			path: ../../../einvoicing/class/providers/EsalinkPDPProvider.class.php
+
+		-
+			message: '#^Left side of && is always true\.$#'
+			identifier: booleanAnd.leftAlwaysTrue
+			count: 1
+			path: ../../../einvoicing/class/providers/EsalinkPDPProvider.class.php
+
+		-
+			message: '#^Method EsalinkPDPProvider\:\:checkHealth\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/providers/EsalinkPDPProvider.class.php
+
+		-
+			message: '#^Method EsalinkPDPProvider\:\:initFormSetup\(\) has parameter \$TFieldProfiles with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/providers/EsalinkPDPProvider.class.php
+
+		-
+			message: '#^Method EsalinkPDPProvider\:\:initFormSetup\(\) has parameter \$TFieldProtocols with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/providers/EsalinkPDPProvider.class.php
+
+		-
+			message: '#^Method EsalinkPDPProvider\:\:initFormSetup\(\) has parameter \$providersConfig with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/providers/EsalinkPDPProvider.class.php
+
+		-
+			message: '#^Method EsalinkPDPProvider\:\:validateEInvoiceFile\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/providers/EsalinkPDPProvider.class.php
+
+		-
+			message: '#^Property AbstractPDPProvider\:\:\$exchangeProtocol \(AbstractProtocol\) in empty\(\) is not falsy\.$#'
+			identifier: empty.property
+			count: 1
+			path: ../../../einvoicing/class/providers/EsalinkPDPProvider.class.php
+
+		-
+			message: '#^Call to function is_null\(\) with null will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 2
+			path: ../../../einvoicing/class/providers/SuperPDPProvider.class.php
+
+		-
+			message: '#^Dead catch \- Exception is never thrown in the try block\.$#'
+			identifier: catch.neverThrown
+			count: 3
+			path: ../../../einvoicing/class/providers/SuperPDPProvider.class.php
+
+		-
+			message: '#^If condition is always true\.$#'
+			identifier: if.alwaysTrue
+			count: 1
+			path: ../../../einvoicing/class/providers/SuperPDPProvider.class.php
+
+		-
+			message: '#^Left side of && is always true\.$#'
+			identifier: booleanAnd.leftAlwaysTrue
+			count: 1
+			path: ../../../einvoicing/class/providers/SuperPDPProvider.class.php
+
+		-
+			message: '#^Method SuperPDPProvider\:\:checkHealth\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/providers/SuperPDPProvider.class.php
+
+		-
+			message: '#^Method SuperPDPProvider\:\:initFormSetup\(\) has parameter \$TFieldProfiles with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/providers/SuperPDPProvider.class.php
+
+		-
+			message: '#^Method SuperPDPProvider\:\:initFormSetup\(\) has parameter \$TFieldProtocols with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/providers/SuperPDPProvider.class.php
+
+		-
+			message: '#^Method SuperPDPProvider\:\:initFormSetup\(\) has parameter \$providersConfig with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/providers/SuperPDPProvider.class.php
+
+		-
+			message: '#^Method SuperPDPProvider\:\:validateEInvoiceFile\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/providers/SuperPDPProvider.class.php
+
+		-
+			message: '#^Property AbstractPDPProvider\:\:\$exchangeProtocol \(AbstractProtocol\) in empty\(\) is not falsy\.$#'
+			identifier: empty.property
+			count: 1
+			path: ../../../einvoicing/class/providers/SuperPDPProvider.class.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between mixed~''error'' and ''error'' will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: ../../../einvoicing/class/providers/SuperPDPProvider.class.php
+
+		-
+			message: '#^Method TestPDPProvider\:\:initFormSetup\(\) has parameter \$TFieldProfiles with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/providers/TestPDPProvider.class.php
+
+		-
+			message: '#^Method TestPDPProvider\:\:initFormSetup\(\) has parameter \$TFieldProtocols with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/providers/TestPDPProvider.class.php
+
+		-
+			message: '#^Method TestPDPProvider\:\:initFormSetup\(\) has parameter \$providersConfig with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/providers/TestPDPProvider.class.php
+
+		-
+			message: '#^Method TestPDPProvider\:\:sendSampleInvoice\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/providers/TestPDPProvider.class.php
+
+		-
+			message: '#^Property AbstractPDPProvider\:\:\$exchangeProtocol \(AbstractProtocol\) in empty\(\) is not falsy\.$#'
+			identifier: empty.property
+			count: 1
+			path: ../../../einvoicing/class/providers/TestPDPProvider.class.php
+
+		-
+			message: '#^Method CdarHandler\:\:addAcknowledgementDocument\(\) has parameter \$doc with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/utils/CdarHandler.class.php
+
+		-
+			message: '#^Method CdarHandler\:\:addExchangedDocument\(\) has parameter \$doc with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/utils/CdarHandler.class.php
+
+		-
+			message: '#^Method CdarHandler\:\:addReferencedDocument\(\) has parameter \$doc with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/utils/CdarHandler.class.php
+
+		-
+			message: '#^Method CdarHandler\:\:addTradeParty\(\) has parameter \$data with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/utils/CdarHandler.class.php
+
+		-
+			message: '#^Method CdarHandler\:\:generate\(\) has parameter \$data with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/utils/CdarHandler.class.php
+
+		-
+			message: '#^Method CdarHandler\:\:readFromFile\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 2
+			path: ../../../einvoicing/class/utils/CdarHandler.class.php
+
+		-
+			message: '#^Method CdarHandler\:\:readFromString\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 2
+			path: ../../../einvoicing/class/utils/CdarHandler.class.php
+
+		-
+			message: '#^Method CdarHandler\:\:saveToFile\(\) has parameter \$data with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/utils/CdarHandler.class.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: ../../../einvoicing/class/utils/CdarHandler.class.php
+
+		-
+			message: '#^Property CdarHandler\:\:\$namespaces has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/utils/CdarHandler.class.php
+
+		-
+			message: '#^Offset 3 on array\{array\{name\: ''basic'', altname\: ''BASIC'', description\: ''The BASIC profile…'', contextparameter\: ''urn\:cen\.eu\:en16931…'', alternativecontextparameters\: array\{''urn\:cen\.eu\:en16931…''\}, businessprocess\: null, attachmentfilename\: ''factur\-x\.xml'', xmpname\: ''BASIC'', \.\.\.\}, array\{name\: ''basicwl'', altname\: ''BASIC WL'', description\: ''The BASIC WL…'', contextparameter\: ''urn\:factur\-x\.eu\:1p0…'', alternativecontextparameters\: array\{''urn\:zugferd\.de\:2p0…''\}, businessprocess\: null, attachmentfilename\: ''factur\-x\.xml'', xmpname\: ''BASIC WL'', \.\.\.\}, array\{name\: ''en16931'', altname\: ''EN 16931 \(COMFORT\)'', description\: ''The EN 16931 …'', contextparameter\: ''urn\:cen\.eu\:en16931…'', alternativecontextparameters\: array\{\}, businessprocess\: null, attachmentfilename\: ''factur\-x\.xml'', xmpname\: ''EN 16931'', \.\.\.\}, array\{name\: ''extended'', altname\: ''EXTENDED'', description\: ''The EXTENDED…'', contextparameter\: ''urn\:cen\.eu\:en16931…'', alternativecontextparameters\: array\{''urn\:cen\.eu\:en16931…''\}, businessprocess\: ''urn\:fdc\:peppol\.eu…'', attachmentfilename\: ''factur\-x\.xml'', xmpname\: ''EXTENDED'', \.\.\.\}, array\{name\: ''en16931'', altname\: ''XRECHNUNG'', description\: ''The reference…'', contextparameter\: ''urn\:cen\.eu\:en16931…'', alternativecontextparameters\: array\{\}, businessprocess\: null, attachmentfilename\: ''xrechnung\.xml'', xmpname\: ''XRECHNUNG'', \.\.\.\}, array\{name\: ''en16931'', altname\: ''XRECHNUNG'', description\: ''The reference…'', contextparameter\: ''urn\:cen\.eu\:en16931…'', alternativecontextparameters\: array\{\}, businessprocess\: null, attachmentfilename\: ''xrechnung\.xml'', xmpname\: ''XRECHNUNG'', \.\.\.\}, array\{name\: ''en16931'', altname\: ''XRECHNUNG'', description\: ''The reference…'', contextparameter\: ''urn\:cen\.eu\:en16931…'', alternativecontextparameters\: array\{\}, businessprocess\: null, attachmentfilename\: ''xrechnung\.xml'', xmpname\: ''XRECHNUNG'', \.\.\.\}, array\{name\: ''en16931'', altname\: ''XRECHNUNG'', description\: ''The reference…'', contextparameter\: ''urn\:cen\.eu\:en16931…'', alternativecontextparameters\: array\{\}, businessprocess\: null, attachmentfilename\: ''xrechnung\.xml'', xmpname\: ''XRECHNUNG'', \.\.\.\}, \.\.\.\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: ../../../einvoicing/class/utils/CtcFrPdfMerger.class.php
+
+		-
+			message: '#^Offset 3 on array\{array\{name\: ''basic'', altname\: ''BASIC'', description\: ''The BASIC profile…'', contextparameter\: ''urn\:cen\.eu\:en16931…'', alternativecontextparameters\: array\{''urn\:cen\.eu\:en16931…''\}, businessprocess\: null, attachmentfilename\: ''factur\-x\.xml'', xmpname\: ''BASIC'', \.\.\.\}, array\{name\: ''basicwl'', altname\: ''BASIC WL'', description\: ''The BASIC WL…'', contextparameter\: ''urn\:factur\-x\.eu\:1p0…'', alternativecontextparameters\: array\{''urn\:zugferd\.de\:2p0…''\}, businessprocess\: null, attachmentfilename\: ''factur\-x\.xml'', xmpname\: ''BASIC WL'', \.\.\.\}, array\{name\: ''en16931'', altname\: ''EN 16931 \(COMFORT\)'', description\: ''The EN 16931 …'', contextparameter\: ''urn\:cen\.eu\:en16931…'', alternativecontextparameters\: array\{\}, businessprocess\: null, attachmentfilename\: ''factur\-x\.xml'', xmpname\: ''EN 16931'', \.\.\.\}, array\{name\: ''extended'', altname\: ''EXTENDED'', description\: ''The EXTENDED…'', contextparameter\: ''urn\:cen\.eu\:en16931…'', alternativecontextparameters\: array\{''urn\:cen\.eu\:en16931…''\}, businessprocess\: ''urn\:fdc\:peppol\.eu…'', attachmentfilename\: ''factur\-x\.xml'', xmpname\: ''EXTENDED'', \.\.\.\}, array\{name\: ''en16931'', altname\: ''XRECHNUNG'', description\: ''The reference…'', contextparameter\: ''urn\:cen\.eu\:en16931…'', alternativecontextparameters\: array\{\}, businessprocess\: null, attachmentfilename\: ''xrechnung\.xml'', xmpname\: ''XRECHNUNG'', \.\.\.\}, array\{name\: ''en16931'', altname\: ''XRECHNUNG'', description\: ''The reference…'', contextparameter\: ''urn\:cen\.eu\:en16931…'', alternativecontextparameters\: array\{\}, businessprocess\: null, attachmentfilename\: ''xrechnung\.xml'', xmpname\: ''XRECHNUNG'', \.\.\.\}, array\{name\: ''en16931'', altname\: ''XRECHNUNG'', description\: ''The reference…'', contextparameter\: ''urn\:cen\.eu\:en16931…'', alternativecontextparameters\: array\{\}, businessprocess\: null, attachmentfilename\: ''xrechnung\.xml'', xmpname\: ''XRECHNUNG'', \.\.\.\}, array\{name\: ''en16931'', altname\: ''XRECHNUNG'', description\: ''The reference…'', contextparameter\: ''urn\:cen\.eu\:en16931…'', alternativecontextparameters\: array\{\}, businessprocess\: null, attachmentfilename\: ''xrechnung\.xml'', xmpname\: ''XRECHNUNG'', \.\.\.\}, \.\.\.\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: ../../../einvoicing/class/utils/FacturxTcpdfMerger.class.php
+
+		-
+			message: '#^Method PdfAttachmentExtractor\:\:applyFilters\(\) has parameter \$dict with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/utils/PdfAttachmentExtractor.class.php
+
+		-
+			message: '#^Method PdfAttachmentExtractor\:\:arrayOf\(\) has parameter \$element with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/utils/PdfAttachmentExtractor.class.php
+
+		-
+			message: '#^Method PdfAttachmentExtractor\:\:arrayOf\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/utils/PdfAttachmentExtractor.class.php
+
+		-
+			message: '#^Method PdfAttachmentExtractor\:\:dictOf\(\) has parameter \$element with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/utils/PdfAttachmentExtractor.class.php
+
+		-
+			message: '#^Method PdfAttachmentExtractor\:\:dictOf\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/utils/PdfAttachmentExtractor.class.php
+
+		-
+			message: '#^Method PdfAttachmentExtractor\:\:readFileSpec\(\) has parameter \$element with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/utils/PdfAttachmentExtractor.class.php
+
+		-
+			message: '#^Method PdfAttachmentExtractor\:\:walkNameTree\(\) has parameter \$node with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/utils/PdfAttachmentExtractor.class.php
+
+		-
+			message: '#^Parameter \#7 \$notused of function calcul_price_total expects int, float given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/utils/PriceHelper.class.php
+
+		-
+			message: '#^Method SupplierInvoiceHelper\:\:checkDolInvoiceAndEInvoiceConsistency\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/utils/SupplierInvoiceHelper.class.php
+
+		-
+			message: '#^Offset ''roundoftotal'' on non\-empty\-array\<''current''\|''roundoftotal''\|''totalofround'', list\> on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: ../../../einvoicing/class/utils/SupplierInvoiceHelper.class.php
+
+		-
+			message: '#^Parameter \#12 \$localtaxes_array of static method PriceHelper\:\:calculatePriceTotal\(\) expects array\{string, int\|string, string, int\|string, string, string\}\|array\{string, int\|string, string, string\}, array\{int\<0, 6\>, float, int\<0, 6\>, float\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/utils/SupplierInvoiceHelper.class.php
+
+		-
+			message: '#^Property CommonInvoiceLine\:\:\$situation_percent \(float\) in isset\(\) is not nullable\.$#'
+			identifier: isset.property
+			count: 1
+			path: ../../../einvoicing/class/utils/SupplierInvoiceHelper.class.php
+
+		-
+			message: '#^Property CommonObject\:\:\$multicurrency_code \(array\<string\>\|string\) on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.property
+			count: 1
+			path: ../../../einvoicing/class/utils/SupplierInvoiceHelper.class.php
+
+		-
+			message: '#^Method XmlPatcher\:\:patchXmlString\(\) has parameter \$depositRefs with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/utils/XmlPatcher.class.php
+
+		-
+			message: '#^Static method XmlPatcher\:\:patchGuidelineId\(\) is unused\.$#'
+			identifier: method.unused
+			count: 1
+			path: ../../../einvoicing/class/utils/XmlPatcher.class.php
+
+		-
+			message: '#^Loose comparison using \=\= between string\|false and string\|false will always evaluate to true\.$#'
+			identifier: equal.alwaysTrue
+			count: 4
+			path: ../../../einvoicing/compat/profid.lib.php
+
+		-
+			message: '#^Result of \|\| is always true\.$#'
+			identifier: booleanOr.alwaysTrue
+			count: 2
+			path: ../../../einvoicing/compat/profid.lib.php
+
+		-
+			message: '#^Call to function is_numeric\(\) with 0 will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 2
+			path: ../../../einvoicing/document_agenda.php
+
+		-
+			message: '#^Call to function property_exists\(\) with Document and ''module'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 2
+			path: ../../../einvoicing/document_agenda.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: ../../../einvoicing/document_agenda.php
+
+		-
+			message: '#^If condition is always false\.$#'
+			identifier: if.alwaysFalse
+			count: 2
+			path: ../../../einvoicing/document_card.php
+
+		-
+			message: '#^Loose comparison using \=\= between 1 and 0 will always evaluate to false\.$#'
+			identifier: equal.alwaysFalse
+			count: 2
+			path: ../../../einvoicing/document_card.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: ../../../einvoicing/document_card.php
+
+		-
+			message: '#^Result of && is always false\.$#'
+			identifier: booleanAnd.alwaysFalse
+			count: 2
+			path: ../../../einvoicing/document_card.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: ../../../einvoicing/document_contact.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: ../../../einvoicing/document_document.php
+
+		-
+			message: '#^Empty array passed to foreach\.$#'
+			identifier: foreach.emptyArray
+			count: 1
+			path: ../../../einvoicing/document_list.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: ../../../einvoicing/document_list.php
+
+		-
+			message: '#^Right side of && is always true\.$#'
+			identifier: booleanAnd.rightAlwaysTrue
+			count: 1
+			path: ../../../einvoicing/document_list.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between array\{type\: string, label\: string, enabled\: int\<0, 2\>\|string, position\: int, visible\: int\<\-6, 6\>\|string, langfile\?\: string, notnull\?\: int\<\-1, 1\>, noteditable\?\: int\<0, 1\>, \.\.\.\} and null will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: ../../../einvoicing/document_list.php
+
+		-
+			message: '#^Variable \$permissiontoread in empty\(\) always exists and is not falsy\.$#'
+			identifier: empty.variable
+			count: 1
+			path: ../../../einvoicing/document_list.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: ../../../einvoicing/document_note.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: ../../../einvoicing/einvoice_tracking.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: ../../../einvoicing/einvoicingindex.php
+
+		-
+			message: '#^Expression "''…" on a separate line does not do anything\.$#'
+			identifier: expr.resultUnused
+			count: 1
+			path: ../../../einvoicing/lib/buildinvoicelines.inc.php
+
+		-
+			message: '#^Parameter \#12 \$localtaxes_array of function calcul_price_total expects array\{\}\|array\{string, int\|string, string, int\|string, string, string\}\|array\{string, int\|string, string, string\}, array\{int\<0, 6\>, float, int\<0, 6\>, float\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/lib/buildinvoicelines.inc.php
+
+		-
+			message: '#^Property CommonInvoice\:\:\$total_ht \(float\) in isset\(\) is not nullable\.$#'
+			identifier: isset.property
+			count: 1
+			path: ../../../einvoicing/lib/buildinvoicelines.inc.php
+
+		-
+			message: '#^Property CommonInvoice\:\:\$type \(int\) in isset\(\) is not nullable\.$#'
+			identifier: isset.property
+			count: 1
+			path: ../../../einvoicing/lib/buildinvoicelines.inc.php
+
+		-
+			message: '#^Property CommonInvoiceLine\:\:\$remise_percent \(float\) on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.property
+			count: 2
+			path: ../../../einvoicing/lib/buildinvoicelines.inc.php
+
+		-
+			message: '#^Property CommonInvoiceLine\:\:\$situation_percent \(float\) in isset\(\) is not nullable\.$#'
+			identifier: isset.property
+			count: 1
+			path: ../../../einvoicing/lib/buildinvoicelines.inc.php
+
+		-
+			message: '#^Property CommonInvoiceLine\:\:\$vat_src_code \(string\) on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.property
+			count: 1
+			path: ../../../einvoicing/lib/buildinvoicelines.inc.php
+
+		-
+			message: '#^Property CommonObjectLine\:\:\$subprice_ttc \(float\) in isset\(\) is not nullable\.$#'
+			identifier: isset.property
+			count: 1
+			path: ../../../einvoicing/lib/buildinvoicelines.inc.php
+
+		-
+			message: '#^Property CommonObjectLine\:\:\$subprice_ttc \(float\) on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.property
+			count: 1
+			path: ../../../einvoicing/lib/buildinvoicelines.inc.php
+
+		-
+			message: '#^Property DiscountAbsolute\:\:\$description \(string\) on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.property
+			count: 2
+			path: ../../../einvoicing/lib/buildinvoicelines.inc.php
+
+		-
+			message: '#^Property Facture\:\:\$fk_facture_source \(int\) on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.property
+			count: 1
+			path: ../../../einvoicing/lib/buildinvoicelines.inc.php
+
+		-
+			message: '#^Property Facture\:\:\$ref_client \(string\) on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.property
+			count: 1
+			path: ../../../einvoicing/lib/buildinvoicelines.inc.php
+
+		-
+			message: '#^Call to function is_numeric\(\) with int\<min, \-1\>\|int\<1, max\> will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: ../../../einvoicing/lib/einvoicing.lib.php
+
+		-
+			message: '#^Call to function method_exists\(\) with ''Societe'' and ''findNearest'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: ../../../einvoicing/lib/einvoicing.lib.php
+
+		-
+			message: '#^Function einvoicingDolGetButtonActionDropdown\(\) has parameter \$params with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/lib/einvoicing.lib.php
+
+		-
+			message: '#^Function einvoicingDolGetButtonActionDropdown\(\) has parameter \$urlButtons with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/lib/einvoicing.lib.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: ../../../einvoicing/product_mapping.php
+
+		-
+			message: '#^Loose comparison using \=\= between ''proxy'' and ''proxy'' will always evaluate to true\.$#'
+			identifier: equal.alwaysTrue
+			count: 1
+			path: ../../../einvoicing/public/proxy_oauthcallback.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: ../../../einvoicing/public/proxy_oauthcallback.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 1
+			path: ../../../einvoicing/public/proxy_oauthcallback.php
+
+		-
+			message: '#^Function fnmapCardHtml\(\) has parameter \$functions with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/scripts/build_function_map.php
+
+		-
+			message: '#^Function fnmapCardHtml\(\) has parameter \$node with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/scripts/build_function_map.php
+
+		-
+			message: '#^Function fnmapDiagramWidth\(\) has parameter \$diagram with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/scripts/build_function_map.php
+
+		-
+			message: '#^Function fnmapDiagramWidth\(\) has parameter \$functions with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/scripts/build_function_map.php
+
+		-
+			message: '#^Function fnmapExtractFacts\(\) has parameter \$index with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/scripts/build_function_map.php
+
+		-
+			message: '#^Function fnmapNodeLines\(\) has parameter \$function with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/scripts/build_function_map.php
+
+		-
+			message: '#^Function fnmapNodeLines\(\) has parameter \$node with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/scripts/build_function_map.php
+
+		-
+			message: '#^Function fnmapRenderBlockHtml\(\) has parameter \$block with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/scripts/build_function_map.php
+
+		-
+			message: '#^Function fnmapRenderBlockHtml\(\) has parameter \$functions with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/scripts/build_function_map.php
+
+		-
+			message: '#^Function fnmapRenderBlockMd\(\) has parameter \$block with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/scripts/build_function_map.php
+
+		-
+			message: '#^Function fnmapRenderBlockMd\(\) has parameter \$functions with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/scripts/build_function_map.php
+
+		-
+			message: '#^Function fnmapRenderDiagramHtml\(\) has parameter \$diagram with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/scripts/build_function_map.php
+
+		-
+			message: '#^Function fnmapRenderDiagramHtml\(\) has parameter \$functions with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/scripts/build_function_map.php
+
+		-
+			message: '#^Function fnmapRenderDiagramMd\(\) has parameter \$diagram with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/scripts/build_function_map.php
+
+		-
+			message: '#^Function fnmapRenderDiagramMd\(\) has parameter \$functions with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/scripts/build_function_map.php
+
+		-
+			message: '#^Function fnmapRenderHtml\(\) has parameter \$data with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/scripts/build_function_map.php
+
+		-
+			message: '#^Function fnmapRenderHtml\(\) has parameter \$functions with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/scripts/build_function_map.php
+
+		-
+			message: '#^Function fnmapRenderMarkdown\(\) has parameter \$data with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/scripts/build_function_map.php
+
+		-
+			message: '#^Function fnmapRenderMarkdown\(\) has parameter \$functions with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/scripts/build_function_map.php
+
+		-
+			message: '#^Function fnmapReportDrift\(\) has parameter \$data with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/scripts/build_function_map.php
+
+		-
+			message: '#^Function fnmapReportDrift\(\) has parameter \$facts with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/scripts/build_function_map.php
+
+		-
+			message: '#^Function fnmapResolveSymbol\(\) has parameter \$index with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/scripts/build_function_map.php
+
+		-
+			message: '#^Function fnmapSourceRef\(\) has parameter \$function with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/scripts/build_function_map.php
+
+		-
+			message: '#^Function fnmapSourceUrl\(\) has parameter \$function with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/scripts/build_function_map.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: ../../../einvoicing/scripts/regenerate_einvoicing_fixtures.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: ../../../einvoicing/scripts/testconnect.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: ../../../einvoicing/vendorref_list.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: ../../../einvoicing/xmlpreview.php

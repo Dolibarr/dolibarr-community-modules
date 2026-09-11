@@ -1,0 +1,2096 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Function llxHeader invoked with 10 parameters, 0 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/admin/about.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/lib/admin\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/admin/about.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/lib/functions2\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/admin/about.php
+
+		-
+			message: '#^Function llxHeader invoked with 10 parameters, 0 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/admin/setup.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/class/html\.formsetup\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/admin/setup.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/lib/admin\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/admin/setup.php
+
+		-
+			message: '#^Function llxHeader invoked with 10 parameters, 0 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/admin/setup_devtools.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/actions_setmoduleoptions\.inc\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/admin/setup_devtools.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./compta/facture/class/facture\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/admin/setup_devtools.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/class/html\.formsetup\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/admin/setup_devtools.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/lib/admin\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/admin/setup_devtools.php
+
+		-
+			message: '#^Function llxHeader invoked with 10 parameters, 0 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/admin/setup_options.php
+
+		-
+			message: '#^Parameter \#3 \$value of function dolibarr_set_const expects string, int given\.$#'
+			identifier: argument.type
+			count: 2
+			path: ../../../einvoicing/admin/setup_options.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/actions_setmoduleoptions\.inc\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/admin/setup_options.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/class/html\.formsetup\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/admin/setup_options.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/lib/admin\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/admin/setup_options.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./compta/facture/class/facture\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/ajax/checkdirectory.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./compta/facture/class/facture\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/ajax/checkinvoicestatus.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./fourn/class/fournisseur\.facture\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/ajax/checksupplierinvoicestatus.php
+
+		-
+			message: '#^Function llxHeader invoked with 10 parameters, 0 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/call_card.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/actions_addupdatedelete\.inc\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/call_card.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/actions_builddoc\.inc\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/call_card.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/actions_dellink\.inc\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/call_card.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/actions_fetchobject\.inc\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/call_card.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/actions_printing\.inc\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/call_card.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/actions_sendmails\.inc\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/call_card.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/tpl/card_presend\.tpl\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/call_card.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/tpl/commonfields_add\.tpl\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/call_card.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/tpl/commonfields_edit\.tpl\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/call_card.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/tpl/commonfields_view\.tpl\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/call_card.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/tpl/extrafields_add\.tpl\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/call_card.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/tpl/extrafields_edit\.tpl\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/call_card.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/tpl/extrafields_view\.tpl\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/call_card.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./core/class/html\.formcompany\.class\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/call_card.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./core/class/html\.formfile\.class\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/call_card.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./core/class/html\.formprojet\.class\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/call_card.php
+
+		-
+			message: '#^Property Call\:\:\$entity \(int\) in isset\(\) is not nullable\.$#'
+			identifier: isset.property
+			count: 1
+			path: ../../../einvoicing/call_card.php
+
+		-
+			message: '#^Function llxHeader invoked with 10 parameters, 0 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/call_list.php
+
+		-
+			message: '#^Parameter \#11 \$disablesortlink of function getTitleFieldOfList expects string, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/call_list.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/actions_changeselectedfields\.inc\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/call_list.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/actions_massactions\.inc\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/call_list.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/tpl/extrafields_list_array_fields\.tpl\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/call_list.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/tpl/extrafields_list_print_fields\.tpl\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/call_list.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/tpl/extrafields_list_search_input\.tpl\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/call_list.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/tpl/extrafields_list_search_param\.tpl\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/call_list.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/tpl/extrafields_list_search_sql\.tpl\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/call_list.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/tpl/extrafields_list_search_title\.tpl\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/call_list.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/tpl/list_print_total\.tpl\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/call_list.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/tpl/massactions_pre\.tpl\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/call_list.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./core/class/html\.formcompany\.class\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/call_list.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./core/lib/company\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/call_list.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./core/lib/date\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/call_list.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/class/html\.formadmin\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/call_list.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/class/html\.formfile\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/call_list.php
+
+		-
+			message: '#^Parameter \#3 \$newmask of function dol_move expects int, string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/actions_einvoicing.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./compta/facture/class/facture\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/actions_einvoicing.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./fourn/class/fournisseur\.facture\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/actions_einvoicing.class.php
+
+		-
+			message: '#^Property Societe\:\:\$name \(string\) on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.property
+			count: 1
+			path: ../../../einvoicing/class/actions_einvoicing.class.php
+
+		-
+			message: '#^Method CommonObject\:\:fetchCommon\(\) invoked with 4 parameters, 1\-3 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Method CommonObject\:\:fetchLinesCommon\(\) invoked with 2 parameters, 0\-1 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^PHPDoc type int\<0, 1\>\|string of property Call\:\:\$ismultientitymanaged is not covariant with PHPDoc type int of overridden property CommonObject\:\:\$ismultientitymanaged\.$#'
+			identifier: property.phpDocType
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^PHPDoc type int\<0, 1\>\|string\|null of property CallLine\:\:\$ismultientitymanaged is not covariant with PHPDoc type int of overridden property CommonObject\:\:\$ismultientitymanaged\.$#'
+			identifier: property.phpDocType
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Parameter \#1 \$db of function dol_print_error expects DoliDB\|string, null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Parameter \#2 \$notrigger of method CommonObject\:\:createCommon\(\) expects bool, int\<0, 1\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Parameter \#2 \$notrigger of method CommonObject\:\:deleteCommon\(\) expects bool, int\<0, 1\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Parameter \#2 \$notrigger of method CommonObject\:\:updateCommon\(\) expects bool, int\<0, 1\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Parameter \#3 \$notrigger of method CommonObject\:\:deleteLineCommon\(\) expects bool, int\<0, 1\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/class/commonobject\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/class/commonobjectline\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/lib/files\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 2
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Property Call\:\:\$fields type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Property Call\:\:\$fk_user_creat has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Property Call\:\:\$fk_user_modif has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Property Call\:\:\$status \(int\) in isset\(\) is not nullable\.$#'
+			identifier: isset.property
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Property Call\:\:\$tms has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Property CallLine\:\:\$fk_parent_attribute has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Property CallLine\:\:\$parent_element has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Property CommonObject\:\:\$date_modification \(int\|string\) does not accept null\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Property CommonObject\:\:\$oldref \(CommonObject\) does not accept string\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Method CommonObject\:\:fetchCommon\(\) invoked with 4 parameters, 1\-3 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Method CommonObject\:\:fetchLinesCommon\(\) invoked with 2 parameters, 0\-1 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^PHPDoc type int\<0, 1\>\|string of property Document\:\:\$ismultientitymanaged is not covariant with PHPDoc type int of overridden property CommonObject\:\:\$ismultientitymanaged\.$#'
+			identifier: property.phpDocType
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^PHPDoc type int\<0, 1\>\|string\|null of property DocumentLine\:\:\$ismultientitymanaged is not covariant with PHPDoc type int of overridden property CommonObject\:\:\$ismultientitymanaged\.$#'
+			identifier: property.phpDocType
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Parameter \#1 \$db of function dol_print_error expects DoliDB\|string, null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Parameter \#2 \$notrigger of method CommonObject\:\:createCommon\(\) expects bool, int\<0, 1\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Parameter \#2 \$notrigger of method CommonObject\:\:deleteCommon\(\) expects bool, int\<0, 1\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Parameter \#2 \$notrigger of method CommonObject\:\:updateCommon\(\) expects bool, int\<0, 1\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Parameter \#3 \$notrigger of method CommonObject\:\:deleteLineCommon\(\) expects bool, int\<0, 1\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/class/commonobject\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/class/commonobjectline\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/lib/files\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 3
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./fourn/class/fournisseur\.facture\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property CommonObject\:\:\$date_modification \(int\|string\) does not accept null\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property CommonObject\:\:\$oldref \(CommonObject\) does not accept string\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property Document\:\:\$fields type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property Document\:\:\$fk_user_creat has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property Document\:\:\$fk_user_modif has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property Document\:\:\$status \(int\) in isset\(\) is not nullable\.$#'
+			identifier: isset.property
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property Document\:\:\$tms has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property DocumentLine\:\:\$fk_parent_attribute has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property DocumentLine\:\:\$parent_element has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Function getURLContent invoked with 12 parameters, 1\-8 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/class/einvoicing.class.php
+
+		-
+			message: '#^Parameter \#1 \$stringtoescape of function dol_escape_js expects string, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/einvoicing.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./compta/facture/class/facture\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/einvoicing.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/lib/files\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/einvoicing.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/lib/geturl\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/einvoicing.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./societe/class/societe\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 2
+			path: ../../../einvoicing/class/einvoicing.class.php
+
+		-
+			message: '#^Property CommonObject\:\:\$thirdparty \(Societe\) on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.property
+			count: 5
+			path: ../../../einvoicing/class/einvoicing.class.php
+
+		-
+			message: '#^Property FactureLigne\:\:\$desc \(string\) on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.property
+			count: 1
+			path: ../../../einvoicing/class/einvoicing.class.php
+
+		-
+			message: '#^Property Societe\:\:\$town \(string\) on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.property
+			count: 1
+			path: ../../../einvoicing/class/einvoicing.class.php
+
+		-
+			message: '#^Property Societe\:\:\$zip \(string\) on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.property
+			count: 1
+			path: ../../../einvoicing/class/einvoicing.class.php
+
+		-
+			message: '#^Parameter \#3 \$newmask of function dol_copy expects int, string given\.$#'
+			identifier: argument.type
+			count: 2
+			path: ../../../einvoicing/class/protocols/AbstractProtocol.class.php
+
+		-
+			message: '#^Property CommonObject\:\:\$total_ttc \(float\) in isset\(\) is not nullable\.$#'
+			identifier: isset.property
+			count: 1
+			path: ../../../einvoicing/class/protocols/AbstractProtocol.class.php
+
+		-
+			message: '#^Call to function method_exists\(\) with Societe and ''findNearest'' will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Function dol_move invoked with 7 parameters, 2\-6 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Method CIIProtocol\:\:_syncOrCreateThirdpartyFromEInvoiceSeller\(\) should return array\{res\: int, message\: string, actioncode\: string\|null, actionurl\: string\|null, action\: string\|null\} but returns array\{res\: mixed, message\: non\-falsy\-string\}\.$#'
+			identifier: return.type
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Parameter \#1 \$vatrate of method CIIProtocol\:\:checkIfVatRateIsValid\(\) expects string, float given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Parameter \#11 \$seller of function calcul_price_total expects Societe, null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Parameter \#3 \$newmask of function dol_move expects int, string given\.$#'
+			identifier: argument.type
+			count: 4
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./blockedlog/lib/blockedlog\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./core/lib/price\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./commande/class/commande\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./compta/bank/class/account\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./compta/facture/class/facture\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 2
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./contact/class/contact\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/class/discount\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/class/extrafields\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/class/translate\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/lib/company\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/lib/date\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/lib/files\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 2
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/lib/pdf\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./expedition/class/expedition\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./fourn/class/fournisseur\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./fourn/class/fournisseur\.commande\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./fourn/class/fournisseur\.facture\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 2
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./fourn/class/fournisseur\.product\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./product/class/product\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./societe/class/societe\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 2
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Property CommonObject\:\:\$multicurrency_tx \(string\) does not accept int\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Property CommonObject\:\:\$thirdparty \(Societe\) in empty\(\) is not falsy\.$#'
+			identifier: empty.property
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Call to function method_exists\(\) with Societe and ''findNearest'' will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Method FacturXProtocol\:\:_syncOrCreateThirdpartyFromEInvoiceSeller\(\) should return array\{res\: int, message\: string, actioncode\: string\|null, actionurl\: string\|null, action\: string\|null\} but returns array\{res\: mixed, message\: non\-falsy\-string\}\.$#'
+			identifier: return.type
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Parameter \#1 \$vatrate of method FacturXProtocol\:\:checkIfVatRateIsValid\(\) expects string, float given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Parameter \#11 \$seller of function calcul_price_total expects Societe, null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Parameter \#3 \$newmask of function dol_move expects int, string given\.$#'
+			identifier: argument.type
+			count: 3
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Parameter \#5 \$excludefilter of function dol_dir_list expects array\|null, string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Parameter \#7 \$sortorder of function dol_dir_list expects string, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./core/lib/price\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./compta/facture/class/facture\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 2
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./contact/class/contact\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/class/extrafields\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/lib/company\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/lib/files\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/lib/pdf\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 2
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./fourn/class/fournisseur\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./fourn/class/fournisseur\.commande\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./fourn/class/fournisseur\.facture\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./fourn/class/fournisseur\.product\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./societe/class/societe\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 2
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Property CommonObject\:\:\$multicurrency_tx \(string\) does not accept int\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Property CommonObject\:\:\$thirdparty \(Societe\) in empty\(\) is not falsy\.$#'
+			identifier: empty.property
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Parameter \#3 \$value of function dolibarr_set_const expects string, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/providers/AbstractPDPProvider.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./comm/action/class/actioncomm\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/providers/AbstractPDPProvider.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/lib/admin\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 2
+			path: ../../../einvoicing/class/providers/AbstractPDPProvider.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./fourn/class/fournisseur\.facture\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/providers/AbstractPDPProvider.class.php
+
+		-
+			message: '#^Function getURLContent invoked with 12 parameters, 1\-8 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/class/providers/EsalinkPDPProvider.class.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./compta/facture/class/facture\.class\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/providers/EsalinkPDPProvider.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./compta/facture/class/facture\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 3
+			path: ../../../einvoicing/class/providers/EsalinkPDPProvider.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/class/html\.form\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/providers/EsalinkPDPProvider.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/lib/admin\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/providers/EsalinkPDPProvider.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/lib/geturl\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/providers/EsalinkPDPProvider.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./fourn/class/fournisseur\.facture\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/providers/EsalinkPDPProvider.class.php
+
+		-
+			message: '#^Property CommonObject\:\:\$entity \(int\) on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.property
+			count: 1
+			path: ../../../einvoicing/class/providers/EsalinkPDPProvider.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/class/hookmanager\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/providers/PDPProviderManager.class.php
+
+		-
+			message: '#^Function getURLContent invoked with 12 parameters, 1\-8 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/class/providers/SuperPDPProvider.class.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./compta/facture/class/facture\.class\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/providers/SuperPDPProvider.class.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./core/lib/admin\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/providers/SuperPDPProvider.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./compta/facture/class/facture\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 3
+			path: ../../../einvoicing/class/providers/SuperPDPProvider.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/class/html\.form\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/providers/SuperPDPProvider.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/lib/admin\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/providers/SuperPDPProvider.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/lib/geturl\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 2
+			path: ../../../einvoicing/class/providers/SuperPDPProvider.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./fourn/class/fournisseur\.facture\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/providers/SuperPDPProvider.class.php
+
+		-
+			message: '#^Property CommonObject\:\:\$entity \(int\) on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.property
+			count: 1
+			path: ../../../einvoicing/class/providers/SuperPDPProvider.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/lib/files\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/utils/FacturxTcpdfMerger.class.php
+
+		-
+			message: '#^Parameter \#1 \$qty of function calcul_price_total expects int, float given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/utils/PriceHelper.class.php
+
+		-
+			message: '#^Parameter \#13 \$progress of function calcul_price_total expects int, float given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/utils/PriceHelper.class.php
+
+		-
+			message: '#^Parameter \#12 \$localtaxes_array of static method PriceHelper\:\:calculatePriceTotal\(\) expects array\{string, int\|string, string, int\|string, string, string\}\|array\{string, int\|string, string, string\}, array\{float, float, float, float\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/utils/SupplierInvoiceHelper.class.php
+
+		-
+			message: '#^Property FactureFournisseur\:\:\$multicurrency_code \(string\) on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.property
+			count: 1
+			path: ../../../einvoicing/class/utils/SupplierInvoiceHelper.class.php
+
+		-
+			message: '#^Property SupplierInvoiceLine\:\:\$situation_percent \(int\) in isset\(\) is not nullable\.$#'
+			identifier: isset.property
+			count: 1
+			path: ../../../einvoicing/class/utils/SupplierInvoiceHelper.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/lib/files\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/utils/SupportExport.class.php
+
+		-
+			message: '#^Access to an undefined property modEInvoicing\:\:\$editor_squarred_logo\.$#'
+			identifier: property.notFound
+			count: 1
+			path: ../../../einvoicing/core/modules/modEInvoicing.class.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./core/class/extrafields\.class\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/core/modules/modEInvoicing.class.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./core/modules/DolibarrModules\.class\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/core/modules/modEInvoicing.class.php
+
+		-
+			message: '#^Property DolibarrModules\:\:\$depends \(array\<string\>\) does not accept array\<string, array\<int, string\>\>\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: ../../../einvoicing/core/modules/modEInvoicing.class.php
+
+		-
+			message: '#^Property DolibarrModules\:\:\$hidden \(bool\) does not accept int\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: ../../../einvoicing/core/modules/modEInvoicing.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./compta/facture/class/facture\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/core/triggers/interface_98_modEInvoicing_EInvoicingTriggers.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/triggers/dolibarrtriggers\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/core/triggers/interface_98_modEInvoicing_EInvoicingTriggers.class.php
+
+		-
+			message: '#^Function llxHeader invoked with 10 parameters, 0 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/document_agenda.php
+
+		-
+			message: '#^Parameter \#5 \$objcon of function show_actions_done expects Contact, null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/document_agenda.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/actions_fetchobject\.inc\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_agenda.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./contact/class/contact\.class\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_agenda.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./core/lib/company\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_agenda.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./core/lib/functions2\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_agenda.php
+
+		-
+			message: '#^Function llxHeader invoked with 10 parameters, 0 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/document_card.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/actions_addupdatedelete\.inc\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_card.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/actions_builddoc\.inc\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_card.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/actions_dellink\.inc\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_card.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/actions_fetchobject\.inc\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_card.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/actions_printing\.inc\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_card.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/actions_sendmails\.inc\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_card.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/tpl/ajaxrow\.tpl\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_card.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/tpl/card_presend\.tpl\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_card.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/tpl/commonfields_add\.tpl\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_card.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/tpl/commonfields_edit\.tpl\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_card.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/tpl/commonfields_view\.tpl\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_card.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/tpl/extrafields_add\.tpl\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_card.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/tpl/extrafields_edit\.tpl\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_card.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/tpl/extrafields_view\.tpl\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_card.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./core/class/html\.formactions\.class\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_card.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./core/class/html\.formcompany\.class\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_card.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./core/class/html\.formfile\.class\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_card.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./core/class/html\.formprojet\.class\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_card.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./core/lib/files\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_card.php
+
+		-
+			message: '#^Property Document\:\:\$entity \(int\) in isset\(\) is not nullable\.$#'
+			identifier: isset.property
+			count: 1
+			path: ../../../einvoicing/document_card.php
+
+		-
+			message: '#^Property Document\:\:\$status \(int\) in isset\(\) is not nullable\.$#'
+			identifier: isset.property
+			count: 1
+			path: ../../../einvoicing/document_card.php
+
+		-
+			message: '#^Function llxHeader invoked with 10 parameters, 0 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/document_contact.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/actions_fetchobject\.inc\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_contact.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./contact/class/contact\.class\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_contact.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./core/class/html\.formcompany\.class\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_contact.php
+
+		-
+			message: '#^Function llxHeader invoked with 10 parameters, 0 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/document_document.php
+
+		-
+			message: '#^Parameter \#5 \$excludefilter of function dol_dir_list expects array\|null, string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/document_document.php
+
+		-
+			message: '#^Parameter \#7 \$sortorder of function dol_dir_list expects string, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/document_document.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/actions_fetchobject\.inc\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_document.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/actions_linkedfiles\.inc\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_document.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/tpl/document_actions_post_headers\.tpl\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_document.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./core/class/html\.formfile\.class\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_document.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./core/lib/company\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_document.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./core/lib/files\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_document.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./core/lib/images\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_document.php
+
+		-
+			message: '#^Function info_admin invoked with 7 parameters, 1\-6 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/document_list.php
+
+		-
+			message: '#^Function llxHeader invoked with 10 parameters, 0 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/document_list.php
+
+		-
+			message: '#^Parameter \#11 \$disablesortlink of function getTitleFieldOfList expects string, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/document_list.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/actions_changeselectedfields\.inc\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_list.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/actions_massactions\.inc\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_list.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/tpl/extrafields_list_array_fields\.tpl\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_list.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/tpl/extrafields_list_print_fields\.tpl\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_list.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/tpl/extrafields_list_search_input\.tpl\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_list.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/tpl/extrafields_list_search_param\.tpl\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_list.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/tpl/extrafields_list_search_sql\.tpl\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_list.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/tpl/extrafields_list_search_title\.tpl\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_list.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/tpl/list_print_total\.tpl\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_list.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/tpl/massactions_pre\.tpl\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_list.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./core/class/html\.form\.class\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_list.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./core/class/html\.formcompany\.class\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_list.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./core/lib/company\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_list.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./core/lib/date\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_list.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./compta/facture/class/facture\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_list.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/class/html\.formadmin\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_list.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/class/html\.formfile\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_list.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./fourn/class/fournisseur\.facture\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_list.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./societe/class/societe\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_list.php
+
+		-
+			message: '#^Function llxHeader invoked with 10 parameters, 0 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/document_note.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/actions_fetchobject\.inc\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_note.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/actions_setnotes\.inc\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_note.php
+
+		-
+			message: '#^Path in include\(\) "\.\./core/tpl/notes\.tpl\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/document_note.php
+
+		-
+			message: '#^Function llxHeader invoked with 2 parameters, 0 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/einvoice_tracking.php
+
+		-
+			message: '#^Function recordNotFound not found\.$#'
+			identifier: function.notFound
+			count: 1
+			path: ../../../einvoicing/einvoice_tracking.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./compta/facture/class/facture\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/einvoice_tracking.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/lib/invoice\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/einvoice_tracking.php
+
+		-
+			message: '#^Function llxHeader invoked with 10 parameters, 0 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/einvoicingindex.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./core/class/html\.formfile\.class\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/einvoicingindex.php
+
+		-
+			message: '#^Parameter \#1 \$qty of function calcul_price_total expects int, float given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/lib/buildinvoicelines.inc.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./compta/facture/class/facture\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/lib/buildinvoicelines.inc.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./contact/class/contact\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 2
+			path: ../../../einvoicing/lib/buildinvoicelines.inc.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/lib/price\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/lib/buildinvoicelines.inc.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./expedition/class/expedition\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/lib/buildinvoicelines.inc.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./societe/class/societe\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/lib/buildinvoicelines.inc.php
+
+		-
+			message: '#^Property CommonObject\:\:\$country_code \(string\) on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.property
+			count: 1
+			path: ../../../einvoicing/lib/buildinvoicelines.inc.php
+
+		-
+			message: '#^Property CommonObject\:\:\$user \(User\) does not accept null\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: ../../../einvoicing/lib/buildinvoicelines.inc.php
+
+		-
+			message: '#^Property Facture\:\:\$ref_customer \(string\) on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.property
+			count: 1
+			path: ../../../einvoicing/lib/buildinvoicelines.inc.php
+
+		-
+			message: '#^Property Facture\:\:\$total_ht \(float\) in isset\(\) is not nullable\.$#'
+			identifier: isset.property
+			count: 1
+			path: ../../../einvoicing/lib/buildinvoicelines.inc.php
+
+		-
+			message: '#^Property FactureLigne\:\:\$remise_percent \(float\) on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.property
+			count: 2
+			path: ../../../einvoicing/lib/buildinvoicelines.inc.php
+
+		-
+			message: '#^Property FactureLigne\:\:\$situation_percent \(int\) in isset\(\) is not nullable\.$#'
+			identifier: isset.property
+			count: 1
+			path: ../../../einvoicing/lib/buildinvoicelines.inc.php
+
+		-
+			message: '#^Property Societe\:\:\$address \(string\) on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.property
+			count: 1
+			path: ../../../einvoicing/lib/buildinvoicelines.inc.php
+
+		-
+			message: '#^Property Societe\:\:\$default_lang \(string\) in isset\(\) is not nullable\.$#'
+			identifier: isset.property
+			count: 1
+			path: ../../../einvoicing/lib/buildinvoicelines.inc.php
+
+		-
+			message: '#^Property Societe\:\:\$name_alias \(string\) on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.property
+			count: 1
+			path: ../../../einvoicing/lib/buildinvoicelines.inc.php
+
+		-
+			message: '#^Property Societe\:\:\$town \(string\) on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.property
+			count: 1
+			path: ../../../einvoicing/lib/buildinvoicelines.inc.php
+
+		-
+			message: '#^Property Societe\:\:\$tva_intra \(string\) on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.property
+			count: 2
+			path: ../../../einvoicing/lib/buildinvoicelines.inc.php
+
+		-
+			message: '#^Property Societe\:\:\$zip \(string\) on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.property
+			count: 1
+			path: ../../../einvoicing/lib/buildinvoicelines.inc.php
+
+		-
+			message: '#^Function getMultidirOutput invoked with 4 parameters, 1\-2 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/lib/einvoicing.lib.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./compta/facture/class/facture\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/lib/einvoicing.lib.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./societe/class/societe\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/lib/einvoicing.lib.php
+
+		-
+			message: '#^Property Societe\:\:\$idprof1 \(string\) on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.property
+			count: 1
+			path: ../../../einvoicing/lib/einvoicing.lib.php
+
+		-
+			message: '#^Property Societe\:\:\$tva_intra \(string\) on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.property
+			count: 1
+			path: ../../../einvoicing/lib/einvoicing.lib.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/lib/files\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/lib/einvoicing_call.lib.php
+
+		-
+			message: '#^Parameter \#5 \$excludefilter of function dol_dir_list expects array\|null, string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/lib/einvoicing_document.lib.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/class/link\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/lib/einvoicing_document.lib.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/lib/files\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/lib/einvoicing_document.lib.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./fourn/class/fournisseur\.product\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/lib/einvoicing_vendorref.lib.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./societe/class/societe\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/lib/einvoicing_vendorref.lib.php
+
+		-
+			message: '#^Function llxHeader invoked with 10 parameters, 0 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/product_mapping.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./core/class/html\.form\.class\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/product_mapping.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./fourn/class/fournisseur\.product\.class\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/product_mapping.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./product/class/product\.class\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/product_mapping.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./societe/class/societe\.class\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/product_mapping.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: ../../../einvoicing/public/proxy_oauthcallback.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/lib/geturl\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/public/proxy_oauthcallback.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./core/lib/company\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/scripts/testconnect.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./core/lib/date\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/scripts/testconnect.php
+
+		-
+			message: '#^Function llxHeader invoked with 10 parameters, 0 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/vendorref_list.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./core/class/html\.form\.class\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/vendorref_list.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./core/lib/date\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/vendorref_list.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./fourn/class/fournisseur\.product\.class\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/vendorref_list.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./product/class/product\.class\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/vendorref_list.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./societe/class/societe\.class\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/vendorref_list.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./user/class/user\.class\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/vendorref_list.php
+
+		-
+			message: '#^Function llxHeader invoked with 10 parameters, 0 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/xmlpreview.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./compta/facture/class/facture\.class\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/xmlpreview.php
+
+		-
+			message: '#^Path in include_once\(\) "\.\./fourn/class/fournisseur\.facture\.class\.php" is not a file or it does not exist\.$#'
+			identifier: includeOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/xmlpreview.php
+		-
+			message: '#^Parameter \#7 \$moreinfo of function dol_move expects int, array\<string, int\|string\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Property CommonObject\:\:\$multicurrency_code \(string\) on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.property
+			count: 1
+			path: ../../../einvoicing/class/utils/SupplierInvoiceHelper.class.php
+		-
+			message: '#^Parameter \#4 \$url of function dolGetButtonAction expects array\<int, array\{lang\: string, enabled\: bool, perm\: bool, label\: string, url\: string\}\>\|string, array\{0\: array\{lang\: ''einvoicing'', enabled\: true, perm\: \-1\|bool, label\: mixed, text\?\: mixed, url\: non\-falsy\-string\}, 1\?\: array\{lang\: ''einvoicing'', enabled\: 1\|true, perm\: \-1\|bool, label\: mixed, text\?\: mixed, url\: non\-falsy\-string\}, 2\?\: array\{lang\: ''einvoicing'', enabled\: 1, perm\: \-1\|bool, label\: mixed, text\: mixed, url\: non\-falsy\-string\}\|array\{lang\: ''einvoicing'', enabled\: true, perm\: bool, label\: mixed, url\: non\-falsy\-string\}, 3\?\: array\{lang\: ''einvoicing'', enabled\: 1, perm\: \-1\|bool, label\: mixed, text\: mixed, url\: non\-falsy\-string\}\} given\.$#'
+			identifier: argument.type
+			count: 2
+			path: ../../../einvoicing/class/actions_einvoicing.class.php
+
+		-
+			message: '#^PHPDoc type int\<0, 1\>\|string\|null of property CallLine\:\:\$ismultientitymanaged is not covariant with PHPDoc type int\<0, 1\>\|string of overridden property CommonObject\:\:\$ismultientitymanaged\.$#'
+			identifier: property.phpDocType
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Property Call\:\:\$status \(array\<int, string\>\|int\) in isset\(\) is not nullable\.$#'
+			identifier: isset.property
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^PHPDoc type int\<0, 1\>\|string\|null of property DocumentLine\:\:\$ismultientitymanaged is not covariant with PHPDoc type int\<0, 1\>\|string of overridden property CommonObject\:\:\$ismultientitymanaged\.$#'
+			identifier: property.phpDocType
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Property Document\:\:\$status \(array\<int, string\>\|int\) in isset\(\) is not nullable\.$#'
+			identifier: isset.property
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Parameter \#11 \$seller of function calcul_price_total expects Societe\|string, null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Parameter \#11 \$seller of function calcul_price_total expects Societe\|string, null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Property Document\:\:\$status \(array\<int, string\>\|int\) in isset\(\) is not nullable\.$#'
+			identifier: isset.property
+			count: 1
+			path: ../../../einvoicing/document_card.php
+		-
+			message: '#^Parameter \#4 \$url of function dolGetButtonAction expects array\<int, array\{lang\: string, enabled\: bool, perm\: bool, label\: string, url\: string, urlroot\?\: string, isDropDown\?\: int\<0, 1\>\}\>\|string, array\{0\: array\{lang\: ''einvoicing'', enabled\: true, perm\: \-1\|bool, label\: mixed, text\?\: mixed, url\: non\-falsy\-string\}, 1\?\: array\{lang\: ''einvoicing'', enabled\: 1\|true, perm\: \-1\|bool, label\: mixed, text\?\: mixed, url\: non\-falsy\-string\}, 2\?\: array\{lang\: ''einvoicing'', enabled\: 1, perm\: \-1\|bool, label\: mixed, text\: mixed, url\: non\-falsy\-string\}\|array\{lang\: ''einvoicing'', enabled\: true, perm\: bool, label\: mixed, url\: non\-falsy\-string\}, 3\?\: array\{lang\: ''einvoicing'', enabled\: 1, perm\: \-1\|bool, label\: mixed, text\: mixed, url\: non\-falsy\-string\}\} given\.$#'
+			identifier: argument.type
+			count: 2
+			path: ../../../einvoicing/class/actions_einvoicing.class.php
+
+		-
+			message: '#^Property Call\:\:\$fields \(array\<string, array\{type\: string, label\: string, enabled\: int\<0, 2\>\|string, position\: int, notnull\?\: int, visible\: int\<\-6, 5\>\|string, alwayseditable\?\: int\<0, 1\>, noteditable\?\: int\<0, 1\>, \.\.\.\}\>\) does not accept default value of type array\{rowid\: array\{type\: ''integer'', label\: ''TechnicalID'', enabled\: ''1'', position\: 1, notnull\: 1, visible\: ''1'', noteditable\: ''1'', index\: ''1'', \.\.\.\}, call_id\: array\{type\: ''varchar\(50\)'', label\: ''Ref'', enabled\: ''1'', position\: 10, notnull\: 1, visible\: ''1'', index\: ''1'', csslist\: ''tdoverflowmax150''\}, provider\: array\{type\: ''varchar\(50\)'', label\: ''provider'', enabled\: ''1'', position\: 20, notnull\: 1, visible\: ''1'', comment\: ''PDP Name''\}, call_type\: array\{type\: ''varchar\(50\)'', label\: ''Type'', enabled\: ''1'', position\: 25, notnull\: 1, visible\: ''1'', comment\: ''Call type \(SyncDocs…'', csslist\: ''tdoverflowmax125''\}, method\: array\{type\: ''varchar\(10\)'', label\: ''Method'', enabled\: ''1'', position\: 30, notnull\: 0, visible\: ''1'', comment\: ''\-\- HTTP method \(GET…''\}, endpoint\: array\{type\: ''varchar\(255\)'', label\: ''Endpoint'', enabled\: ''1'', position\: 35, notnull\: 1, visible\: ''\-1'', comment\: ''\-\- URL or endpoint…''\}, request_id\: array\{type\: ''varchar\(36\)'', label\: ''RequestId'', langs\: ''einvoicing…'', enabled\: ''1'', position\: 36, notnull\: 0, visible\: ''\-1'', comment\: ''\-\- Request\-Id…''\}, skippedflow\: array\{type\: ''integer'', label\: ''SkippedFlows'', enabled\: ''1'', position\: 130, notnull\: 1, visible\: ''1'', comment\: ''Skipped flows…''\}, \.\.\.\}\.$#'
+			identifier: property.defaultValue
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Property Document\:\:\$fields \(array\<string, array\{type\: string, label\: string, enabled\: int\<0, 2\>\|string, position\: int, notnull\?\: int, visible\: int\<\-6, 5\>\|string, alwayseditable\?\: int\<0, 1\>, noteditable\?\: int\<0, 1\>, \.\.\.\}\>\) does not accept default value of type array\{rowid\: array\{type\: ''integer'', label\: ''ID'', enabled\: ''1'', position\: 1, notnull\: 1, visible\: ''1'', noteditable\: ''1'', index\: ''1'', \.\.\.\}, provider\: array\{type\: ''varchar\(50\)'', label\: ''AccessPoint'', langfile\: ''einvoicing…'', enabled\: ''1'', position\: 5, notnull\: 1, visible\: ''\-1'', comment\: ''EInvoice Platform…''\}, flow_id\: array\{type\: ''varchar\(255\)'', label\: ''flow_id'', enabled\: ''1'', position\: 10, notnull\: 0, visible\: ''1'', comment\: ''EInvoice flow UUID'', csslist\: ''tdoverflowmax100''\}, call_id\: array\{type\: ''varchar\(50\)'', label\: ''TransactionID'', enabled\: ''1'', position\: 20, notnull\: 0, visible\: ''1'', comment\: ''Reference to the…'', csslist\: ''tdoverflowmax100''\}, flow_type\: array\{type\: ''varchar\(255\)'', label\: ''flow_type'', enabled\: ''1'', position\: 40, notnull\: 0, visible\: ''1'', comment\: ''Flow type \(\\''sync\\'', …''\}, flow_direction\: array\{type\: ''varchar\(10\)'', label\: ''flow_direction'', enabled\: ''1'', position\: 50, notnull\: 0, visible\: ''1'', comment\: ''In or Out'', csslist\: ''center''\}, flow_syntax\: array\{type\: ''varchar\(50\)'', label\: ''flow_syntax'', enabled\: ''1'', position\: 60, notnull\: 0, visible\: ''\-1'', comment\: ''Document syntax …''\}, flow_profile\: array\{type\: ''varchar\(50\)'', label\: ''flow_profile'', enabled\: ''1'', position\: 70, notnull\: 0, visible\: ''\-1'', comment\: ''Profile used \(Basic…''\}, \.\.\.\}\.$#'
+			identifier: property.defaultValue
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Parameter \#12 \$localtaxes_array of function calcul_price_total expects array\{string, int\|string, string, int\|string, string, string\}\|array\{string, int\|string, string, string\}, array\{\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Parameter \#12 \$localtaxes_array of function calcul_price_total expects array\{string, int\|string, string, int\|string, string, string\}\|array\{string, int\|string, string, string\}, array\{\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Parameter \#12 \$localtaxes_array of function calcul_price_total expects array\{string, int\|string, string, int\|string, string, string\}\|array\{string, int\|string, string, string\}, array\{int\<0, 6\>, float, int\<0, 6\>, float\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/lib/buildinvoicelines.inc.php
+		-
+			message: '#^Property Call\:\:\$fields \(array\<string, array\{type\: string, label\: string, langfile\?\: string, enabled\: int\<0, 2\>\|string, position\: int, notnull\?\: int, visible\: int\<\-6, 6\>\|string, alwayseditable\?\: int\<0, 1\>, \.\.\.\}\>\) does not accept default value of type array\{rowid\: array\{type\: ''integer'', label\: ''TechnicalID'', enabled\: ''1'', position\: 1, notnull\: 1, visible\: ''1'', noteditable\: ''1'', index\: ''1'', \.\.\.\}, call_id\: array\{type\: ''varchar\(50\)'', label\: ''Ref'', enabled\: ''1'', position\: 10, notnull\: 1, visible\: ''1'', index\: ''1'', csslist\: ''tdoverflowmax150''\}, provider\: array\{type\: ''varchar\(50\)'', label\: ''provider'', enabled\: ''1'', position\: 20, notnull\: 1, visible\: ''1'', comment\: ''PDP Name''\}, call_type\: array\{type\: ''varchar\(50\)'', label\: ''Type'', enabled\: ''1'', position\: 25, notnull\: 1, visible\: ''1'', comment\: ''Call type \(SyncDocs…'', csslist\: ''tdoverflowmax125''\}, method\: array\{type\: ''varchar\(10\)'', label\: ''Method'', enabled\: ''1'', position\: 30, notnull\: 0, visible\: ''1'', comment\: ''\-\- HTTP method \(GET…''\}, endpoint\: array\{type\: ''varchar\(255\)'', label\: ''Endpoint'', enabled\: ''1'', position\: 35, notnull\: 1, visible\: ''\-1'', comment\: ''\-\- URL or endpoint…''\}, request_id\: array\{type\: ''varchar\(36\)'', label\: ''RequestId'', langs\: ''einvoicing…'', enabled\: ''1'', position\: 36, notnull\: 0, visible\: ''\-1'', comment\: ''\-\- Request\-Id…''\}, skippedflow\: array\{type\: ''integer'', label\: ''SkippedFlows'', enabled\: ''1'', position\: 130, notnull\: 1, visible\: ''1'', comment\: ''Skipped flows…''\}, \.\.\.\}\.$#'
+			identifier: property.defaultValue
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Property Document\:\:\$fields \(array\<string, array\{type\: string, label\: string, langfile\?\: string, enabled\: int\<0, 2\>\|string, position\: int, notnull\?\: int, visible\: int\<\-6, 6\>\|string, alwayseditable\?\: int\<0, 1\>, \.\.\.\}\>\) does not accept default value of type array\{rowid\: array\{type\: ''integer'', label\: ''ID'', enabled\: ''1'', position\: 1, notnull\: 1, visible\: ''1'', noteditable\: ''1'', index\: ''1'', \.\.\.\}, provider\: array\{type\: ''varchar\(50\)'', label\: ''AccessPoint'', langfile\: ''einvoicing…'', enabled\: ''1'', position\: 5, notnull\: 1, visible\: ''\-1'', comment\: ''EInvoice Platform…''\}, flow_id\: array\{type\: ''varchar\(255\)'', label\: ''flow_id'', enabled\: ''1'', position\: 10, notnull\: 0, visible\: ''1'', comment\: ''EInvoice flow UUID'', csslist\: ''tdoverflowmax100''\}, call_id\: array\{type\: ''varchar\(50\)'', label\: ''TransactionID'', enabled\: ''1'', position\: 20, notnull\: 0, visible\: ''1'', comment\: ''Reference to the…'', csslist\: ''tdoverflowmax100''\}, flow_type\: array\{type\: ''varchar\(255\)'', label\: ''flow_type'', enabled\: ''1'', position\: 40, notnull\: 0, visible\: ''1'', comment\: ''Flow type \(\\''sync\\'', …''\}, flow_direction\: array\{type\: ''varchar\(10\)'', label\: ''flow_direction'', enabled\: ''1'', position\: 50, notnull\: 0, visible\: ''1'', comment\: ''In or Out'', csslist\: ''center''\}, flow_syntax\: array\{type\: ''varchar\(50\)'', label\: ''flow_syntax'', enabled\: ''1'', position\: 60, notnull\: 0, visible\: ''\-1'', comment\: ''Document syntax …''\}, flow_profile\: array\{type\: ''varchar\(50\)'', label\: ''flow_profile'', enabled\: ''1'', position\: 70, notnull\: 0, visible\: ''\-1'', comment\: ''Profile used \(Basic…''\}, \.\.\.\}\.$#'
+			identifier: property.defaultValue
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Function getURLContent invoked with 12 parameters, 1\-10 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/class/einvoicing.class.php
+
+		-
+			message: '#^Function getURLContent invoked with 12 parameters, 1\-10 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/class/providers/EsalinkPDPProvider.class.php
+
+		-
+			message: '#^Function getURLContent invoked with 12 parameters, 1\-10 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/class/providers/SuperPDPProvider.class.php
+		-
+			message: '#^Strict comparison using \=\=\= between array\{type\: string, label\: string, langfile\?\: string, enabled\: int\<0, 2\>\|string, position\: int, notnull\?\: int, visible\: int\<\-6, 6\>\|string, alwayseditable\?\: int\<0, 1\>\|string, \.\.\.\} and null will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: ../../../einvoicing/call_list.php
+
+		-
+			message: '#^Parameter \#4 \$url of function dolGetButtonAction expects array\<int, array\{lang\: string, enabled\: bool, perm\: bool\|int, label\: string, url\: string, urlroot\?\: string, isDropDown\?\: int\<0, 1\>\}\>\|string, array\{0\: array\{lang\: ''einvoicing'', enabled\: true, perm\: \-1\|bool, label\: mixed, text\?\: mixed, url\: non\-falsy\-string\}, 1\?\: array\{lang\: ''einvoicing'', enabled\: 1\|true, perm\: \-1\|bool, label\: mixed, text\?\: mixed, url\: non\-falsy\-string\}, 2\?\: array\{lang\: ''einvoicing'', enabled\: 1, perm\: \-1\|bool, label\: mixed, text\: mixed, url\: non\-falsy\-string\}\|array\{lang\: ''einvoicing'', enabled\: true, perm\: bool, label\: mixed, url\: non\-falsy\-string\}, 3\?\: array\{lang\: ''einvoicing'', enabled\: 1, perm\: \-1\|bool, label\: mixed, text\: mixed, url\: non\-falsy\-string\}\} given\.$#'
+			identifier: argument.type
+			count: 2
+			path: ../../../einvoicing/class/actions_einvoicing.class.php
+
+		-
+			message: '#^Property Call\:\:\$fields \(array\<string, array\{type\: string, label\: string, langfile\?\: string, enabled\: int\<0, 2\>\|string, position\: int, notnull\?\: int, visible\: int\<\-6, 6\>\|string, alwayseditable\?\: int\<0, 1\>\|string, \.\.\.\}\>\) does not accept default value of type array\{rowid\: array\{type\: ''integer'', label\: ''TechnicalID'', enabled\: ''1'', position\: 1, notnull\: 1, visible\: ''1'', noteditable\: ''1'', index\: ''1'', \.\.\.\}, call_id\: array\{type\: ''varchar\(50\)'', label\: ''Ref'', enabled\: ''1'', position\: 10, notnull\: 1, visible\: ''1'', index\: ''1'', csslist\: ''tdoverflowmax150''\}, provider\: array\{type\: ''varchar\(50\)'', label\: ''provider'', enabled\: ''1'', position\: 20, notnull\: 1, visible\: ''1'', comment\: ''PDP Name''\}, call_type\: array\{type\: ''varchar\(50\)'', label\: ''Type'', enabled\: ''1'', position\: 25, notnull\: 1, visible\: ''1'', comment\: ''Call type \(SyncDocs…'', csslist\: ''tdoverflowmax125''\}, method\: array\{type\: ''varchar\(10\)'', label\: ''Method'', enabled\: ''1'', position\: 30, notnull\: 0, visible\: ''1'', comment\: ''\-\- HTTP method \(GET…''\}, endpoint\: array\{type\: ''varchar\(255\)'', label\: ''Endpoint'', enabled\: ''1'', position\: 35, notnull\: 1, visible\: ''\-1'', comment\: ''\-\- URL or endpoint…''\}, request_id\: array\{type\: ''varchar\(36\)'', label\: ''RequestId'', langs\: ''einvoicing…'', enabled\: ''1'', position\: 36, notnull\: 0, visible\: ''\-1'', comment\: ''\-\- Request\-Id…''\}, skippedflow\: array\{type\: ''integer'', label\: ''SkippedFlows'', enabled\: ''1'', position\: 130, notnull\: 1, visible\: ''1'', comment\: ''Skipped flows…''\}, \.\.\.\}\.$#'
+			identifier: property.defaultValue
+			count: 1
+			path: ../../../einvoicing/class/call.class.php
+
+		-
+			message: '#^Property Document\:\:\$fields \(array\<string, array\{type\: string, label\: string, langfile\?\: string, enabled\: int\<0, 2\>\|string, position\: int, notnull\?\: int, visible\: int\<\-6, 6\>\|string, alwayseditable\?\: int\<0, 1\>\|string, \.\.\.\}\>\) does not accept default value of type array\{rowid\: array\{type\: ''integer'', label\: ''ID'', enabled\: ''1'', position\: 1, notnull\: 1, visible\: ''1'', noteditable\: ''1'', index\: ''1'', \.\.\.\}, provider\: array\{type\: ''varchar\(50\)'', label\: ''AccessPoint'', langfile\: ''einvoicing…'', enabled\: ''1'', position\: 5, notnull\: 1, visible\: ''\-1'', comment\: ''EInvoice Platform…''\}, flow_id\: array\{type\: ''varchar\(255\)'', label\: ''flow_id'', enabled\: ''1'', position\: 10, notnull\: 0, visible\: ''1'', comment\: ''EInvoice flow UUID'', csslist\: ''tdoverflowmax100''\}, call_id\: array\{type\: ''varchar\(50\)'', label\: ''TransactionID'', enabled\: ''1'', position\: 20, notnull\: 0, visible\: ''1'', comment\: ''Reference to the…'', csslist\: ''tdoverflowmax100''\}, flow_type\: array\{type\: ''varchar\(255\)'', label\: ''flow_type'', enabled\: ''1'', position\: 40, notnull\: 0, visible\: ''1'', comment\: ''Flow type \(\\''sync\\'', …''\}, flow_direction\: array\{type\: ''varchar\(10\)'', label\: ''flow_direction'', enabled\: ''1'', position\: 50, notnull\: 0, visible\: ''1'', comment\: ''In or Out'', csslist\: ''center''\}, flow_syntax\: array\{type\: ''varchar\(50\)'', label\: ''flow_syntax'', enabled\: ''1'', position\: 60, notnull\: 0, visible\: ''\-1'', comment\: ''Document syntax …''\}, flow_profile\: array\{type\: ''varchar\(50\)'', label\: ''flow_profile'', enabled\: ''1'', position\: 70, notnull\: 0, visible\: ''\-1'', comment\: ''Profile used \(Basic…''\}, \.\.\.\}\.$#'
+			identifier: property.defaultValue
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
+			message: '#^Function getURLContent invoked with 12 parameters, 1\-11 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/class/einvoicing.class.php
+
+		-
+			message: '#^Function getHashUniqueIdOfRegistration invoked with 1 parameter, 0 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Function getURLContent invoked with 12 parameters, 1\-11 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/class/providers/EsalinkPDPProvider.class.php
+
+		-
+			message: '#^Function getURLContent invoked with 12 parameters, 1\-11 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/class/providers/SuperPDPProvider.class.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between array\{type\: string, label\: string, langfile\?\: string, enabled\: int\<0, 2\>\|string, position\: int, notnull\?\: int, visible\: int\<\-6, 6\>\|string, alwayseditable\?\: int\<0, 1\>\|string, \.\.\.\} and null will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: ../../../einvoicing/document_list.php

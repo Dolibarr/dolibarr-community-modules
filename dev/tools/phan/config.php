@@ -13,7 +13,9 @@ define('PHAN_DIR', __DIR__);
 function directory_list()
 {
 	$baseDir = __DIR__ . '/../../..';
-	$excluded = ['tests', '.github', 'dev', '.git'];
+	// .run-phpstan holds the PHPStan phar and its cache, which is made of generated PHP files.
+	// The directory is git ignored, so it only ever exists on a developer machine.
+	$excluded = ['tests', '.github', 'dev', '.git', '.run-phpstan'];
 	$directories = array_filter(scandir($baseDir), function ($dir) use ($baseDir, $excluded) {
 		return is_dir($baseDir . '/' . $dir) && !in_array($dir, $excluded) && $dir !== '.' && $dir !== '..';
 	});

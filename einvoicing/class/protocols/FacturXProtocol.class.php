@@ -713,9 +713,17 @@ class FacturXProtocol extends CIIProtocol
 					return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($refDocInvoiceId, $refDoc, 'linked to document ' . ($parsedHeader['documentno'] ?? ''))];
 				}
 				if ($refDocInvoiceId == 0) {
-					// The invoice references a document this Dolibarr does not hold (deposit, credited or
-					// replaced invoice). Nothing has been created yet, so the flow is postponed rather than
-					// failed, and the message spells out what to create with a link to the creation screen.
+					// An unqualified reference (no ram:TypeCode in the XML) is a placeholder that the import
+					// does not consume — some vendors (e.g. DSV Road) always emit BG-3 with a dummy value
+					// such as "XXXX" when no preceding invoice applies. Skip it silently so it does not block
+					// the import and does not reach the post-creation loop.
+					if (empty($typeDoc)) {
+						dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource Skipping unqualified InvoiceReferencedDocument ref="' . $refDoc . '" (no TypeCode) for ' . ($parsedHeader['documentno'] ?? ''), LOG_DEBUG);
+						continue;
+					}
+					// The invoice references a qualified document this Dolibarr does not hold yet (deposit,
+					// credited or replaced invoice). Nothing has been created yet, so the flow is postponed
+					// rather than failed, and the message spells out what to create.
 					$langs->load("bills");
 					$action = $langs->trans('CreateTheMissingSupplierInvoiceToImport', $refDoc);
 					$action .= ' <a class="butAction small smallpaddingimp nomarginleft" href="' . DOL_URL_ROOT . '/fourn/facture/card.php?action=create&socid=' . (int) $socId . '&ref_supplier=' . urlencode($refDoc) . '" target="_blank">';
@@ -849,6 +857,12 @@ class FacturXProtocol extends CIIProtocol
 						return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($linkedObjectId, $refDoc, 'linked to document ' . ($parsedHeader['documentno'] ?? ''))];
 					}
 					if ($linkedObjectId == 0) {
+						// Unqualified references (no TypeCode) were already skipped by the pre-check above and
+						// should not reach this point. As a safety net, skip them here too rather than failing.
+						if (empty($typeDoc)) {
+							dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource Skipping unqualified InvoiceReferencedDocument ref="' . $refDoc . '" (no TypeCode) in post-creation loop for ' . ($parsedHeader['documentno'] ?? ''), LOG_DEBUG);
+							continue;
+						}
 						return ['res' => -1, 'message' => 'Document : ' . $refDoc . ' linked to document ' . $parsedHeader['documentno'] . ' not found in Dolibarr'];
 					}
 

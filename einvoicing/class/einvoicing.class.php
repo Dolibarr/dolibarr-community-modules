@@ -882,6 +882,9 @@ class EInvoicing
 			// Remove Dolibarr internal statuses
 			unset($options[self::STATUS_UNKNOWN]);
 			unset($options[self::STATUS_IGNORE]);
+			// STATUS_IGNORE_2 is commented out of STATUS_LABEL_KEYS, so the key is never there to
+			// begin with. The line stays for the day that entry is turned on again.
+			// @phpstan-ignore unset.offset
 			unset($options[self::STATUS_IGNORE_2]);
 			unset($options[self::STATUS_NOT_GENERATED]);
 		}
@@ -4035,10 +4038,12 @@ class EInvoicing
 	 * @used-by	regenerate_einvoicing_fixtures.php For fixture generation
 	 * @used-by	EInvoicingSamplesTest.php For comparison and regression testing
 	 *
+	 * @param	array<string,string>	$rawxmls	Filled with the same five documents before normalization,
+	 *												for a caller that hands them to a validator
 	 * @return	array<string, string>	Array with keys 'deposit', 'standard', and 'creditnote',
 	 *                                  each containing normalized XML of the respective invoice type
 	 */
-	public static function generateSampleEInvoicesForTests()
+	public static function generateSampleEInvoicesForTests(&$rawxmls = array())
 	{
 		global $conf, $db, $langs;
 		require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
@@ -4133,6 +4138,18 @@ class EInvoicing
 			$conf->global->TAX_MODE_SELL_SERVICE = $savTaxModeSellService;
 			$langs = $savLangs;
 		}
+
+		// The same documents before normalization, for a caller that validates them: normalization
+		// flattens every date to one value, which makes the date rules of the French socle -
+		// BR-FR-CO-07, BR-FR-03, G1.07 - true whatever the document says. Handed back apart, so the
+		// returned array keeps holding five documents and nothing else.
+		$rawxmls = array(
+			'deposit' => $depositXml,
+			'standard' => $standardXml,
+			'replacement' => $replacementXml,
+			'creditnote' => $creditnoteXml,
+			'situation' => $situationXml,
+		);
 
 		return array(
 			'deposit' => self::normalizeSampleInvoiceXml($depositXml),
