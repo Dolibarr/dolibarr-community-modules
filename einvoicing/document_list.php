@@ -1110,6 +1110,79 @@ if ($action == 'confirm_sync' && getDolGlobalString('EINVOICING_PDP') && $confir
 print '<br class="clearboth">';
 
 
+// Backlog of the flows the access point still holds because something is missing here. It is shown
+// on every visit, not only after a synchronization: a flow that keeps being postponed is invisible
+// otherwise, and the point is that somebody can see it, know since when, and decide.
+dol_include_once('einvoicing/class/utils/PostponedFlow.class.php');
+// Loaded here rather than in the row loop below: the backlog names suppliers too, and it comes first.
+require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
+$langs->load("companies");
+$postponedbacklog = PostponedFlow::fetchBacklog($db);
+if (is_array($postponedbacklog) && count($postponedbacklog) > 0) {
+	print '<!-- postponed flows backlog -->'."\n";
+	print '<div class="wordbreak warning clearboth">';
+	print '<strong><u>'.$langs->trans("PostponedFlowsBacklog").'</u></strong>';
+	print ' - <span class="opacitymedium">'.$langs->trans("PostponedFlowsCount", count($postponedbacklog)).'</span>';
+	print '<br><span class="opacitymedium">'.$langs->trans("PostponedFlowsBacklogIntro").'</span>';
+
+	print '<div class="div-table-responsive-no-min">';
+	print '<table class="noborder centpercent">';
+	print '<tr class="liste_titre">';
+	print '<th>'.$langs->trans("FlowId").'</th>';
+	print '<th>'.$langs->trans("PostponedFlowDocumentRef").'</th>';
+	print '<th>'.$langs->trans("ThirdParty").'</th>';
+	print '<th>'.$langs->trans("PostponedFlowReason").'</th>';
+	print '<th class="center">'.$langs->trans("PostponedFlowWaitingSince").'</th>';
+	print '<th class="center">'.$langs->trans("PostponedFlowAttempts").'</th>';
+	print '</tr>';
+
+	foreach ($postponedbacklog as $waitingflow) {
+		$waitingsince = $db->jdate($waitingflow->date_creation);
+
+		print '<tr class="oddeven">';
+		print '<td class="tdoverflowmax200">'.dol_escape_htmltag((string) $waitingflow->flow_id).'</td>';
+		print '<td class="tdoverflowmax200">'.dol_escape_htmltag((string) $waitingflow->document_ref).'</td>';
+		print '<td class="tdoverflowmax200">';
+		if ($waitingflow->fk_soc > 0) {
+			$waitingsoc = new Societe($db);
+			if ($waitingsoc->fetch((int) $waitingflow->fk_soc) > 0) {
+				print $waitingsoc->getNomUrl(1);
+			}
+		}
+		print '</td>';
+		// The business message is built by the import and already escaped by it; the technical one is
+		// the fallback when the import had nothing to say in plain words.
+		print '<td>';
+		print !empty($waitingflow->business_message) ? $waitingflow->business_message : dol_escape_htmltag((string) $waitingflow->reason_message);
+		if (!empty($waitingflow->reason_code)) {
+			print '<br><span class="opacitymedium small">'.dol_escape_htmltag((string) $waitingflow->reason_code).'</span>';
+		}
+		if (!empty($waitingflow->action_html)) {
+			print '<br>'.$waitingflow->action_html;
+		}
+		// A postponed flow has no record of its own to open: nothing was stored, that is the point.
+		// Its synchronization call was logged though, and the batch response it holds carries the
+		// document - so this is where "Export for support" can reach a flow that never landed.
+		if (!empty($waitingflow->call_id)) {
+			print '<br><a href="'.DOL_URL_ROOT.'/custom/einvoicing/call_list.php?search_call_id='.urlencode($waitingflow->call_id).'">';
+			print img_picto('', 'file-export', 'class="paddingright"').$langs->trans("PostponedFlowOpenSyncCall");
+			print '</a>';
+		}
+		print '</td>';
+		print '<td class="center nowraponall">';
+		print dol_print_date($waitingsince, 'dayhour');
+		print '</td>';
+		print '<td class="center">'.((int) $waitingflow->nb_attempts).'</td>';
+		print '</tr>';
+	}
+
+	print '</table>';
+	print '</div>';
+	print '</div>';
+	print '<br class="clearboth">';
+}
+
+
 // List of flows sync
 
 print '<div class="div-table-responsive">'; // You can use div-table-responsive-no-min if you don't need reserved height for your table
@@ -1253,7 +1326,6 @@ $i = 0;
 $savnbfield = $totalarray['nbfield'];
 $totalarray = array();
 $totalarray['nbfield'] = 0;
-require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
 $companystatic = new Societe($db);
 
 $imaxinloop = ($limit ? min($num, $limit) : $num);
