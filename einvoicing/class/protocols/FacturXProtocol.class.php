@@ -678,18 +678,23 @@ class FacturXProtocol extends CIIProtocol
 			$action .= $langs->trans('ModifySupplierInvoice');
 			$action .= '</a>';
 
+			// Nothing is stored while the reference stays ambiguous, so the flow is postponed rather
+			// than failed: the amount has to be settled by hand either way, and stopping the batch on it
+			// leaves every document behind this one unimported for as long as nobody does.
 			return [
 				'res' => -1,
+				'postponeflow' => 1,
 				'message' => SupplierInvoiceHelper::refLookupErrorMessage($supplierInvoiceId, $parsedHeader['documentno'] ?? '', 'while checking whether it was already imported'),
 				'actioncode' => 'SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT',
 				'actionurl' => 'none',
 				'actiondata' => array('supplierref' => $parsedHeader['documentno'], 'socid' => (int) $socId, 'expectedamount' => $parsedHeader['grandTotalAmount'] ?? 0),
-				'action' => $action
+				'action' => $action,
+				'businessmessage' => $langs->trans('SupplierInvoiceFoundButWithdifferentAmount', $parsedHeader['documentno'] ?? '', $parsedHeader['grandTotalAmount'] ?? 0)
 			];
 		}
 
 		if ($supplierInvoiceId < 0) {
-			return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($supplierInvoiceId, $parsedHeader['documentno'] ?? '', 'while checking whether it was already imported')];
+			return SupplierInvoiceHelper::refLookupPostponedResult($supplierInvoiceId, $parsedHeader['documentno'] ?? '', 'while checking whether it was already imported', (int) $socId, (string) ($parsedHeader['documentno'] ?? ''));
 		}
 
 		if ($supplierInvoiceId > 0) {
@@ -710,7 +715,7 @@ class FacturXProtocol extends CIIProtocol
 
 				$refDocInvoiceId = SupplierInvoiceHelper::findIdByRef($refDoc, (int) $socId);
 				if ($refDocInvoiceId < 0) {
-					return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($refDocInvoiceId, $refDoc, 'linked to document ' . ($parsedHeader['documentno'] ?? ''))];
+					return SupplierInvoiceHelper::refLookupPostponedResult($refDocInvoiceId, $refDoc, 'linked to document ' . ($parsedHeader['documentno'] ?? ''), (int) $socId, (string) ($parsedHeader['documentno'] ?? ''));
 				}
 				if ($refDocInvoiceId == 0) {
 					// An unqualified reference (no ram:TypeCode in the XML) is a placeholder that the import
@@ -854,7 +859,7 @@ class FacturXProtocol extends CIIProtocol
 
 					$linkedObjectId = SupplierInvoiceHelper::findIdByRef($refDoc, (int) $socId);
 					if ($linkedObjectId < 0) {
-						return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($linkedObjectId, $refDoc, 'linked to document ' . ($parsedHeader['documentno'] ?? ''))];
+						return SupplierInvoiceHelper::refLookupPostponedResult($linkedObjectId, $refDoc, 'linked to document ' . ($parsedHeader['documentno'] ?? ''), (int) $socId, (string) ($parsedHeader['documentno'] ?? ''));
 					}
 					if ($linkedObjectId == 0) {
 						// Unqualified references (no TypeCode) were already skipped by the pre-check above and
@@ -899,7 +904,10 @@ class FacturXProtocol extends CIIProtocol
 
 						// Other linked document handling can be implemented here based on the type of the linked document for example credit note etc...
 					} else {
-						return ['res' => -1, 'message' => 'Document : ' . $refDoc . ' linked to document ' . $parsedHeader['documentno'] . ' not found in Dolibarr'];
+						// Reached only when fetch() failed on an id findIdByRef() did return, so the reference
+						// was matched and it is the loading that went wrong: saying "not found" here sent the
+						// reader looking for a missing invoice that is in fact there.
+						return SupplierInvoiceHelper::refLookupPostponedResult(-1, $refDoc, 'linked to document ' . ($parsedHeader['documentno'] ?? '') . ', matches supplier invoice id ' . ((int) $linkedObjectId) . ' but that invoice could not be loaded', (int) $socId, (string) ($parsedHeader['documentno'] ?? ''));
 					}
 				}
 			}
