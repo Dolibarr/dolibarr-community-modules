@@ -1644,18 +1644,22 @@ class EInvoicing
 		// e-invoicing for eligible (FR) invoices. Preselect the qualified default instead: "To generate / STATUS_NOT_GENERATED" for invoices that must be managed,
 		// "Do not manage" otherwise.
 		if ($mode == 'create' || $action == 'create') {
-			// At creation the hook receives a blank Facture object: its socid is NOT set yet (the
-			// selected thirdparty lives in a local var of card.php and is passed via $parameters['socid'],
-			// with GETPOST('socid') as fallback). Resolve it so we can load the thirdparty and decide.
-			if (!is_object($object->thirdparty ?? null)) {
-				$socid = !empty($object->socid) ? (int) $object->socid : (int) ($parameters['socid'] ?? GETPOSTINT('socid'));
-				if ($socid > 0) {
-					$object->socid = $socid;
-					$object->fetch_thirdparty();
+			if (GETPOSTISSET('seteinvoicestatus')) {
+				$currentStatusInfo['code'] = GETPOSTINT('seteinvoicestatus');
+			} else {
+				// At creation the hook receives a blank Facture object: its socid is NOT set yet (the
+				// selected thirdparty lives in a local var of card.php and is passed via $parameters['socid'],
+				// with GETPOST('socid') as fallback). Resolve it so we can load the thirdparty and decide.
+				if (!is_object($object->thirdparty ?? null)) {
+					$socid = !empty($object->socid) ? (int) $object->socid : (int) ($parameters['socid'] ?? GETPOSTINT('socid'));
+					if ($socid > 0) {
+						$object->socid = $socid;
+						$object->fetch_thirdparty();
+					}
 				}
+				$need = is_object($object->thirdparty ?? null) ? $this->needEInvoiceManagement($object) : 0;
+				$currentStatusInfo['code'] = $need ? $need : self::STATUS_IGNORE;
 			}
-			$need = is_object($object->thirdparty ?? null) ? $this->needEInvoiceManagement($object) : 0;
-			$currentStatusInfo['code'] = $need ? $need : self::STATUS_IGNORE;
 		}
 
 		$resprints = '';
@@ -1745,6 +1749,16 @@ class EInvoicing
 			// TODO Use a combo list with only status for sync Dolibarr -> AP
 			// Also status we can't modify manually must be greyed/disabled
 			$arrayofeinvoicestatus = $this->getEinvoiceStatusOptions(0, 0, 0, ($action == 'create' ? 1 : 0), 0, ((empty($currentStatusInfo['code']) && $action != 'create') ? 0 : 1), ($action != 'create' ? 1 : 0));
+
+			// If we create a credit note from another invoice, if original invoice has a status to ignore einvoicing, we propagate it by default to the new credit note to create
+			if (!GETPOSTISSET('seteinvoicestatus') && $action == 'create' && GETPOST('fac_avoir') && GETPOST('type') == 2) {
+				$tmpinvoicesrc = new Facture($this->db);
+				$tmpinvoicesrc->fetch(GETPOST('fac_avoir'));
+				$tmpinvoicesrcstatus = $this->fetchLastknownInvoiceStatus($tmpinvoicesrc->id, $tmpinvoicesrc->ref);
+				if ($tmpinvoicesrcstatus['code'] == Einvoicing::STATUS_IGNORE || $tmpinvoicesrcstatus['code'] == Einvoicing::STATUS_IGNORE_2) {
+					$currentStatusInfo['code'] = $tmpinvoicesrcstatus['code'];
+				}
+			}
 
 			$resprints .=  $form->selectarray("seteinvoicestatus", $arrayofeinvoicestatus, $currentStatusInfo['code'], 0, 0, 0, '', 1);
 			if ($action != 'create') {
