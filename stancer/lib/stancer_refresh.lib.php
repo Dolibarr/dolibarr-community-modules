@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2023-2026 Eric Seigne <eric.seigne@cap-rel.fr>
+ * Copyright (C) 2026		MDW			<mdeweerd@users.noreply.github.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -322,7 +323,7 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 					if ($obj->setPaid($user) < 0) {
 						dol_syslog("stancerRefreshAllPaymentsFromDolibarr $paymentId setPaid failed on invoice $objRef: " . $obj->error, LOG_ERR);
 					}
-					//stancer status could be stucked to "in progress"
+					//stancer status could be stuck to "in progress"
 					$sploc->status = Stancer_payments::STATUS_CAPTURED;
 					if ($sploc->update($user) < 0) {
 						dol_syslog("stancerRefreshAllPaymentsFromDolibarr $paymentId local status update failed: " . $sploc->error, LOG_ERR);
@@ -332,7 +333,7 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 				// @phan-suppress-next-line PhanDeprecatedProperty  $paye is the column Dolibarr 15..21 fills and still writes; status == 2 also covers abandoned invoices
 				if ($obj->paye == 1) {
 					dol_syslog("stancerRefreshAllPaymentsFromDolibarr $paymentId that invoice is marked as paid short circuit, next, ref=$objRef");
-					//stancer status could be stucked to "in progress" for sure if we are in that portion of code
+					//stancer status could be stuck to "in progress" for sure if we are in that portion of code
 					$sploc->status = Stancer_payments::STATUS_CAPTURED;
 					if ($sploc->update($user) < 0) {
 						dol_syslog("stancerRefreshAllPaymentsFromDolibarr $paymentId local status update failed: " . $sploc->error, LOG_ERR);
@@ -362,7 +363,7 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 								if ($obj->status != Commande::STATUS_CLOSED && $obj->cloture($user, 1) < 0) {
 									dol_syslog("stancerRefreshAllPaymentsFromDolibarr $paymentId cloture failed on order $objRef: " . $obj->error, LOG_ERR);
 								}
-								//stancer status could be stucked to "in progress"
+								//stancer status could be stuck to "in progress"
 								$sploc->status = Stancer_payments::STATUS_CAPTURED;
 								if ($sploc->update($user) < 0) {
 									dol_syslog("stancerRefreshAllPaymentsFromDolibarr $paymentId local status update failed: " . $sploc->error, LOG_ERR);
@@ -391,7 +392,7 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 								if ($inv->paye == 0 && $inv->setPaid($user) < 0) {
 									dol_syslog("stancerRefreshAllPaymentsFromDolibarr $paymentId setPaid failed on invoice " . $inv->ref . ": " . $inv->error, LOG_ERR);
 								}
-								//stancer status could be stucked to "in progress"
+								//stancer status could be stuck to "in progress"
 								$sploc->status = Stancer_payments::STATUS_CAPTURED;
 								if ($sploc->update($user) < 0) {
 									dol_syslog("stancerRefreshAllPaymentsFromDolibarr $paymentId local status update failed: " . $sploc->error, LOG_ERR);
@@ -480,7 +481,7 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 		}
 		$paymentTypeId = dol_getIdFromCode($db, $paymentType, 'c_paiement', 'code', 'id', 1);
 		if (empty($paymentTypeId)) {
-			dol_syslog("stancerRefreshAllPaymentsFromDolibarr $paymentId error: there is no type id for $paymentType on that dolibarr maybe user has customized its dictionnary !", LOG_ERR);
+			dol_syslog("stancerRefreshAllPaymentsFromDolibarr $paymentId error: there is no type id for $paymentType on that dolibarr maybe user has customized its dictionary !", LOG_ERR);
 			$output->message .=  "ERROR: $paymentType is unknown in your dolibarr\n";
 			continue;
 		}

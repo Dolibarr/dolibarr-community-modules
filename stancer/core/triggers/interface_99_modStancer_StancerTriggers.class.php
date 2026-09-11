@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2023 Eric Seigne <eric.seigne@cap-rel.fr>
+ * Copyright (C) 2026		MDW			<mdeweerd@users.noreply.github.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -82,7 +83,7 @@ class InterfaceStancerTriggers extends DolibarrTriggers
 
 
 	/**
-	 * Function called when a Dolibarrr business event is done.
+	 * Function called when a Dolibarr business event is done.
 	 * All functions "runTrigger" are triggered if file
 	 * is inside directory core/triggers
 	 *
@@ -171,7 +172,7 @@ class InterfaceStancerTriggers extends DolibarrTriggers
 			//case 'PRODUCT_SET_MULTILANGS':
 			//case 'PRODUCT_DEL_MULTILANGS':
 
-			//Stock mouvement
+			//Stock movement
 			//case 'STOCK_MOVEMENT':
 
 			//MYECMDIR
@@ -367,7 +368,7 @@ class InterfaceStancerTriggers extends DolibarrTriggers
 						stancerSendInvoiceMailModele(getDolGlobalString('STANCER_AUTO_MAIL_INVOICES_CB_MAILTYPE', ''), $object, 'BILL_PAYED_SENTBYMAIL');
 					}
 				} else {
-					dol_syslog("stancerTrigger else case, so no mail was sent... (maybe infor contact ?)", LOG_DEBUG);
+					dol_syslog("stancerTrigger else case, so no mail was sent... (maybe inform contact ?)", LOG_DEBUG);
 				}
 
 				// Global option: send all paid invoices by email, regardless of payment mode

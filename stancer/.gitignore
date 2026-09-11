@@ -26,3 +26,12 @@
 /.phpunit.cache/
 .phpunit.result.cache
 composer.lock
+# --- shared team rules ---
+DEV*.md
+dev*.md
+SPEC*.md
+spec*.md
+todo*.md
+TODO*.md
+*.log
+.env

@@ -36,13 +36,53 @@ if (!class_exists('CommonHookActions', false)) {
 	abstract class CommonHookActions
 	{
 		/**
-		 * @var string	String of results.
+		 * @var ?string	String of results.
 		 */
 		public $resprints;
 
 		/**
-		 * @var array 	Array of results.
+		 * @var array<mixed|mixed[]> 	Array of results.
 		 */
 		public $results = array();
+
+		/**
+		 * @var string
+		 */
+		public $error;
+
+		/**
+		 * @var string[]
+		 */
+		public $errors = array();
+
+		/**
+		 * @var string[]
+		 */
+		public $warnings = array();
+
+
+		/**
+		 * Check context of hook
+		 *
+		 * @param 	array<string,mixed> $parameters 	Hook parameters.
+		 * @param 	string[]|string 	$allContexts 	Context to check
+		 * @return 	bool
+		 */
+		protected function isContext($parameters, $allContexts)
+		{
+			if (is_array($allContexts)) {
+				foreach ($allContexts as $context) {
+					if ($this->isContext($parameters, $context)) {
+						return true;
+					}
+				}
+				return false;
+			}
+			if ($parameters['currentcontext'] == $allContexts) {
+				return true;
+			}
+			$contexts = explode(':', $parameters['context']);
+			return in_array($allContexts, $contexts);
+		}
 	}
 }

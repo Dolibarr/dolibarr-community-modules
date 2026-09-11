@@ -573,7 +573,12 @@ foreach ($object->fields as $key => $val) {
 	$cssforfield = preg_replace('/small\s*/', '', $cssforfield);
 	if (!empty($arrayfields['t.'.$key]['checked'])) {
 		// $disablesortlink has the same "= 0" default and the same empty() test in the
-		// core from Dolibarr 15 to 21, so a single call covers the whole range.
+		// core from Dolibarr 15 to 21, so a single call covers the whole range. It is
+		// passed as an int: the core PHPDoc says string, but the stubs the community
+		// CI runs Phan against declare int, and passing '0' makes that check fail.
+		// The core PHPDoc and the core default value contradict each other, so no
+		// literal satisfies both analysers: keep the int and silence PHPStan here.
+		// @phpstan-ignore-next-line
 		print getTitleFieldOfList($arrayfields['t.'.$key]['label'], 0, $_SERVER['PHP_SELF'], 't.'.$key, '', $param, ($cssforfield ? 'class="'.$cssforfield.'"' : ''), $sortfield, $sortorder, ($cssforfield ? $cssforfield.' ' : ''), 0, (empty($val['helplist']) ? '' : $val['helplist']))."\n";
 		$totalarray['nbfield']++;
 	}

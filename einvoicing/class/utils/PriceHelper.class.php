@@ -28,11 +28,9 @@ class PriceHelper
 {
 	/**
 	 * Modified version of core function calculate_price_total() from core/lib/price.lib.php :
-	 * - add a new parameter $forceRoundingTotalsPrecision to allow rounding totals with a more accurate precision using 'MU' instead of 'MT'
-	 * - native Dolibarr version is rounding totals using 'MT', but in some cases, like calculating totals in 2 different VAT modes (totalofround, roundoftotal),
-	 * it is required to not round returned totals using 'MT' but 'MU' to keep precision on results
-	 *
-	 * PR to do to modify native Dolibarr function calcul_price_total(), then this function could be deleted
+	 * - adds $forceRoundingTotalsPrecision to round totals with 'MU' instead of the native 'MT', required to
+	 * keep precision when totals are calculated in 2 different VAT modes (totalofround, roundoftotal)
+	 * - PR to do on the native function, then this function could be deleted
 	 *
 	 *		Calculate totals (net, vat, ...) of a line.
 	 *		Value for localtaxX_type are	'0' : local tax not applied

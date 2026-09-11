@@ -46,16 +46,16 @@ abstract class AbstractProtocol
 	public $warnings = [];
 
 	/** @const string Invoice file extension (without the dot, example 'xml') */
-	protected const INVOICE_FILE_EXTENSION = ''; // Must be overridden by subclasses
+	const INVOICE_FILE_EXTENSION = ''; // Must be overridden by subclasses
 
 	/** @const string Generated invoice XML file name*/
-	protected const GENERATED_INVOICE_XML_FILE_NAME = ''; // Must be overridden by subclasses
+	const GENERATED_INVOICE_XML_FILE_NAME = ''; // Must be overridden by subclasses
 
 	/** @const string The profile used to generate XML */
-	protected const BUILD_XML_PROFILE = ''; // Must be overridden by subclasses
+	const BUILD_XML_PROFILE = ''; // Must be overridden by subclasses
 
 	/** @const string Fixed file name of the readable view of the last invoice that could not be processed */
-	public const INCOMING_DIAGNOSTIC_READABLE_FILE_NAME = 'einvoice_readable.pdf';
+	const INCOMING_DIAGNOSTIC_READABLE_FILE_NAME = 'einvoice_readable.pdf';
 
 	/**
 	 * @param DoliDB $db Db
@@ -77,6 +77,19 @@ abstract class AbstractProtocol
 	 * @return 	string 							XML representation of the invoice.
 	 */
 	abstract public function generateXML($invoice, $outputlangs = null);
+
+	/**
+	 * Generate the e-invoice file of a given invoice, and return where it was written.
+	 *
+	 * The entry point of a protocol: the hooks and the sample generation of CommonProtocol call it on
+	 * whatever protocol the user selected, so every protocol has to answer to it.
+	 *
+	 * @param	int|Facture		$invoice_id		Invoice id, or invoice object, to process
+	 * @param	?Translate		$outputlangs	Output language
+	 * @param	string			$sourceFilePath	Source document the file is built from, when the format needs one
+	 * @return	-1|string						-1 if ko, path of the generated file if ok
+	 */
+	abstract public function generateInvoice($invoice_id, $outputlangs = null, $sourceFilePath = '');
 
 	/**
 	 * Create a supplier invoice in Dolibarr from Factur-X content.
@@ -192,9 +205,8 @@ abstract class AbstractProtocol
 	 * "warning_only" (default) reports violations as non-blocking warnings, and "blocking" aborts
 	 * the generation (the exception is caught by generateInvoice() which returns -1 with the messages).
 	 *
-	 * The check also covers what no rule of the standard can see: that the document claims the amount
-	 * the invoice claims. A document can be perfectly conformant and still state another total than the
-	 * invoice it stands for, and the platform accepts it without a word.
+	 * It also checks that the document claims the amount the invoice claims, which no rule of the
+	 * standard covers.
 	 *
 	 * @param	string			$xmlcontent		Generated CII XML content
 	 * @param	?CommonInvoice	$invoice		Invoice the document was built from, to compare the amounts
@@ -232,16 +244,10 @@ abstract class AbstractProtocol
 	/**
 	 * Check that the generated document claims the amount the invoice claims.
 	 *
-	 * No rule of the standard can catch this: the rules relate the amounts of the document to each
-	 * other, and a document whose totals are wrong by a cent is as consistent as a correct one. The
-	 * platform therefore accepts it, and the discrepancy only surfaces later, on payment
-	 * reconciliation or on the buyer's side.
-	 *
-	 * The known cause left is a currency accuracy for totals (MAIN_MAX_DECIMALS_TOT) other than 2: the
-	 * invoice then carries a third decimal, and EN 16931 caps every amount at two, the rounding amount
-	 * (BT-114) included (BR-DEC-09 to BR-DEC-23). No computation can make the two equal, so the
-	 * operator is told instead of being left with a document that quietly claims something else
-	 * (issue #506).
+	 * No EN 16931 rule catches this: they relate the amounts of the document to each other, so a
+	 * document consistent with itself but wrong against the invoice is accepted by the platform.
+	 * Known cause: MAIN_MAX_DECIMALS_TOT other than 2, where the standard caps every amount at two
+	 * decimals, BT-114 included (BR-DEC-09 to BR-DEC-23). Issue #506.
 	 *
 	 * @param	string			$xmlcontent		Generated CII XML content
 	 * @param	?CommonInvoice	$invoice		Invoice the document was built from
@@ -290,14 +296,10 @@ abstract class AbstractProtocol
 	}
 
 	/**
-	 * Clean up the per-call working temp files of an inbound invoice, while preserving the
-	 * "last invoice that could not be processed" diagnostic shown (and downloadable) in the
-	 * document list view.
+	 * Clean up the per-call working temp files of an inbound invoice.
 	 *
-	 * Each inbound sync writes the received document to its own unique working file, so two
-	 * concurrent syncs can no longer overwrite each other and parse the wrong invoice (#226).
-	 * On failure, the working file is promoted to the fixed diagnostic slot (overwriting the
-	 * previous one) so it stays downloadable; on success, the working files are simply removed.
+	 * Each sync uses its own working file so concurrent syncs cannot parse each other's invoice (#226).
+	 * On failure it is promoted to the fixed diagnostic slot, kept downloadable from the document list.
 	 *
 	 * @param	string	$tempDir			Module temp directory
 	 * @param	string	$workFile			Unique working file for the received document

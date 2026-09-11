@@ -138,10 +138,11 @@ class Document extends CommonObject
 		"flow_direction" => array("type" => "varchar(10)", "label" => "flow_direction", "enabled" => "1", 'position' => 50, 'notnull' => 0, "visible" => "1", "comment" => "In or Out", 'csslist' => 'center'),
 		"flow_syntax" => array("type" => "varchar(50)", "label" => "flow_syntax", "enabled" => "1", 'position' => 60, 'notnull' => 0, "visible" => "-1", "comment" => "Document syntax (Factur-X, CII, UBL, etc.)"),
 		"flow_profile" => array("type" => "varchar(50)", "label" => "flow_profile", "enabled" => "1", 'position' => 70, 'notnull' => 0, "visible" => "-1", "comment" => "Profile used (Basic, Cius, etc.)"),
+		"processing_rule" => array("type" => "varchar(50)", "label" => "processing_rule", "enabled" => "1", 'position' => 75, 'notnull' => 0, "visible" => "-1", "comment" => "Rule the platform computed for the flow (B2B, B2BInt, NotApplicable, ...)"),
 		"document_body" => array("type" => "text", "label" => "document_body", "enabled" => "1", 'position' => 110, 'notnull' => 0, "visible" => "0", "comment" => "Full document content XML"),
 		"fk_element_type" => array("type" => "varchar(100)", "label" => "fk_element_type", "enabled" => "1", 'position' => 120, 'notnull' => 0, "visible" => "1",),
 		"fk_element_id" => array("type" => "integer", "label" => "fk_element_id", "enabled" => "1", 'position' => 130, 'notnull' => 0, "visible" => "-1",),
-		"tracking_idref" => array("type" => "varchar(255)", "label" => "RefObject", "enabled" => "1", 'position' => 135, 'notnull' => 0, "visible" => "1", "comment" => "Document tracking identifier", "csslist" => "nowrap"),
+		"tracking_idref" => array("type" => "varchar(255)", "label" => "RefObject", "enabled" => "1", 'position' => 135, 'notnull' => 0, "visible" => "1", "comment" => "Document tracking identifier", "csslist" => "nowraponall"),
 		"submittedat" => array("type" => "datetime", "label" => "submittedAt", "enabled" => "1", 'position' => 140, 'notnull' => 1, "visible" => "-1", "comment" => "submittedAt (PDP Date)"),
 		"updatedat" => array("type" => "datetime", "label" => "updatedAt", "enabled" => "1", 'position' => 150, 'notnull' => 0, "visible" => "1", "comment" => "updatedAt (PDP Date)"),
 		"entity" => array("type" => "integer", "label" => "entity", "enabled" => "1", 'position' => 170, 'notnull' => 0, "visible" => "0", "comment" => "Multi-entity support"),
@@ -175,6 +176,7 @@ class Document extends CommonObject
 	public $flow_direction;
 	public $flow_syntax;
 	public $flow_profile;
+	public $processing_rule;
 	public $ack_status;
 	public $ack_reason_code;
 	public $ack_info;
@@ -374,7 +376,7 @@ class Document extends CommonObject
 
 		if (!$error) {
 			// copy external contacts if same company
-			if (!empty($object->socid) && ((property_exists($this, 'fk_soc') && ($this->fk_soc == $object->socid)) || (property_exists($this, 'socid') && ($this->socid == $object->socid)))) {	// @phpstan-ignore-line
+			if (!empty($object->socid) && ((property_exists($this, 'fk_soc') && ($this->fk_soc == $object->socid)) || (property_exists($this, 'socid') && ($this->socid == $object->socid)))) {	// @phpstan-ignore-line @phan-suppress-current-line PhanUndeclaredProperty
 				if ($this->copy_linked_contact($object, 'external') < 0) {
 					$error++;
 				}
@@ -530,6 +532,369 @@ class Document extends CommonObject
 	{
 		return $this->deleteCommon($user, $notrigger);
 		//return $this->deleteCommon($user, $notrigger, 1);
+	}
+
+	/**
+	 * Import a received document again, from the access point, as if it had never been imported.
+	 *
+	 * The vendor of a supplier invoice cannot be changed once it exists, so a document booked on the
+	 * wrong third party has no way back short of this: fix the third party data, then import again.
+	 * The local draft is deleted first; a validated invoice is refused, it is an accounting record.
+	 * A failed import leaves this record in place, detached, rather than losing the document.
+	 *
+	 * @param	User				$user		User asking for the import
+	 * @return	array{res:int,message:string}	res > 0 is the id of the supplier invoice created
+	 */
+	public function reimport(User $user)
+	{
+		global $langs;
+
+		require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';
+		require_once __DIR__.'/providers/PDPProviderManager.class.php';
+
+		$langs->load('einvoicing@einvoicing');
+
+		if ($this->flow_direction !== 'In' || $this->fk_element_type !== 'invoice_supplier') {
+			return array('res' => -1, 'message' => $langs->trans('EInvoiceReimportNotAReceivedInvoice'));
+		}
+		if (empty($this->flow_id)) {
+			return array('res' => -1, 'message' => $langs->trans('EInvoiceReimportNoFlowId'));
+		}
+
+		$providerManager = new PDPProviderManager($this->db);
+		$provider = $providerManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+		if (empty($provider)) {
+			return array('res' => -1, 'message' => $langs->trans('EInvoiceReimportNoProvider'));
+		}
+
+		// The invoice this document was booked on, if it is still there. Deleting it detaches this
+		// record (see the BILL_SUPPLIER_DELETE trigger), which is why the id is read before. Its
+		// reference is read for the same reason: the draft it names is about to disappear, and the
+		// import that follows creates another one, which is given that same reference back.
+		$previousInvoiceId = (int) $this->fk_element_id;
+		$previousInvoiceRef = '';
+		$previousInvoiceRecords = array();
+		if ($previousInvoiceId > 0) {
+			$previousInvoice = new FactureFournisseur($this->db);
+			if ($previousInvoice->fetch($previousInvoiceId) > 0) {
+				if ((int) $previousInvoice->status !== FactureFournisseur::STATUS_DRAFT) {
+					return array('res' => -1, 'message' => $langs->trans('EInvoiceReimportInvoiceIsNotADraft', $previousInvoice->ref));
+				}
+				$previousInvoiceRef = (string) $previousInvoice->ref;
+				// The other flows of that invoice - the lifecycle statuses its vendor has already sent -
+				// are listed before it goes: deleting it detaches every record it has at once, and a
+				// detached record no longer says which invoice it came from.
+				$previousInvoiceRecords = $this->fetchOtherRecordsOfInvoice($previousInvoiceId);
+				if ($previousInvoice->delete($user) <= 0) {
+					$reason = $previousInvoice->error ? $previousInvoice->error : implode(', ', (array) $previousInvoice->errors);
+					return array('res' => -1, 'message' => $langs->trans('EInvoiceReimportFailedToDeleteTheDraft', $previousInvoice->ref).' '.$reason);
+				}
+			}
+		}
+
+		$res = $provider->syncFlow($this->flow_id);
+		if (!isset($res['res']) || $res['res'] <= 0) {
+			return array('res' => -1, 'message' => (string) ($res['message'] ?? ''));
+		}
+
+		// The record the import has just written for this flow. Without it there is nothing to move
+		// onto this line, which then stays as it is - detached, and the only line of the flow.
+		$importedRecord = $this->fetchRecordWrittenByImport();
+		if (!($importedRecord instanceof Document)) {
+			dol_syslog(__METHOD__.' imported flow '.$this->flow_id.' again but found no record written by the import to move onto record '.$this->id, LOG_WARNING);
+
+			return array('res' => 1, 'message' => (string) ($res['message'] ?? ''));
+		}
+
+		// The invoice the import has just booked the document on, to send the user straight to it.
+		$newInvoiceId = (int) $importedRecord->fk_element_id;
+
+		// Give that invoice back the number of the draft it replaces. Nothing in the core reads an id
+		// out of a "(PROV...)" reference - it only tests the prefix - and the number of the draft that
+		// has just been deleted is free, so the operator keeps looking at the number they know.
+		if ($newInvoiceId > 0 && $previousInvoiceRef !== '') {
+			$newInvoice = new FactureFournisseur($this->db);
+			if ($newInvoice->fetch($newInvoiceId) > 0 && $this->reuseDraftRef($newInvoice, $previousInvoiceRef) > 0) {
+				$importedRecord->tracking_idref = $previousInvoiceRef;
+			}
+		}
+
+		// The statuses the vendor has already sent for this invoice describe the document, not the
+		// local row it was booked on, so they follow it onto the invoice the import has just created.
+		if ($newInvoiceId > 0 && $previousInvoiceId > 0) {
+			$this->moveHistoryToInvoice($previousInvoiceId, $newInvoiceId, $previousInvoiceRecords, (string) $importedRecord->tracking_idref);
+		}
+
+		// Move that record onto this line, so the flow keeps the line it already had in the list
+		// instead of losing it for a new one describing the same flow.
+		if ($this->adoptRecordWrittenByImport($importedRecord, $user) < 0) {
+			dol_syslog(__METHOD__.' imported flow '.$this->flow_id.' again but could not move record '.$importedRecord->id.' onto record '.$this->id.': '.$this->error, LOG_WARNING);
+		}
+
+		return array('res' => ($newInvoiceId > 0 ? $newInvoiceId : 1), 'message' => (string) ($res['message'] ?? ''));
+	}
+
+	/**
+	 * Find the record an import has just written for this flow, that is the most recent record of the
+	 * same flow other than this one.
+	 *
+	 * @return	?Document		The record, null when the import wrote none
+	 */
+	private function fetchRecordWrittenByImport()
+	{
+		$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX.$this->table_element;
+		$sql .= " WHERE flow_id = '".$this->db->escape($this->flow_id)."'";
+		$sql .= " AND fk_element_type = 'invoice_supplier'";
+		$sql .= " AND entity IN (".getEntity($this->element).")";
+		$sql .= " AND rowid <> ".((int) $this->id);
+		$sql .= " ORDER BY rowid DESC LIMIT 1";
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__.' '.$this->db->lasterror(), LOG_ERR);
+
+			return null;
+		}
+
+		$obj = $this->db->fetch_object($resql);
+		$this->db->free($resql);
+		if (empty($obj)) {
+			return null;
+		}
+
+		$record = new Document($this->db);
+		if ($record->fetch((int) $obj->rowid) <= 0) {
+			return null;
+		}
+
+		return $record;
+	}
+
+	/**
+	 * Take over what an import has just written for this flow, and remove the record it wrote.
+	 *
+	 * Everything the access point said about the flow is taken, including the invoice it has just been
+	 * booked on; what belongs to this line as a line - its id, its entity, and who created it when -
+	 * is kept, which is the whole point: the flow keeps its place in the list.
+	 *
+	 * @param	Document	$record		Record written by the import, deleted once its content is taken
+	 * @param	User		$user		User asking for the import
+	 * @return	int<-1,1>				1 when the record has been taken over, -1 on error
+	 */
+	private function adoptRecordWrittenByImport(Document $record, User $user)
+	{
+		// The identity of the line, as opposed to what it says about the flow.
+		$ownfields = array('rowid', 'entity', 'date_creation', 'tms', 'fk_user_creat', 'fk_user_modif');
+
+		$this->db->begin();
+
+		foreach (array_keys($this->fields) as $field) {
+			if (in_array($field, $ownfields)) {
+				continue;
+			}
+			$this->$field = $record->$field;
+		}
+		$this->fk_user_modif = $user->id;
+
+		if ($this->update($user) <= 0) {
+			$this->db->rollback();
+
+			return -1;
+		}
+
+		// The trigger refuses the deletion of a flow linked to a supplier invoice that exists, which is
+		// exactly what this record is: it is not deleted here as a flow the user gives up on, it is the
+		// same flow, on the line above. Its content has just been written there, so nothing is lost.
+		if ($record->delete($user, 1) <= 0) {
+			$this->error = $record->error ? $record->error : implode(', ', (array) $record->errors);
+			$this->db->rollback();
+
+			return -1;
+		}
+
+		$this->db->commit();
+
+		return 1;
+	}
+
+	/**
+	 * List the records of a supplier invoice other than this one, that is the lifecycle statuses its
+	 * vendor has sent for it.
+	 *
+	 * @param	int			$invoiceid	Supplier invoice the records are attached to
+	 * @return	int[]					Row ids, empty when there is none
+	 */
+	private function fetchOtherRecordsOfInvoice($invoiceid)
+	{
+		$ids = array();
+
+		$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX.$this->table_element;
+		$sql .= " WHERE fk_element_type = 'invoice_supplier'";
+		$sql .= " AND fk_element_id = ".((int) $invoiceid);
+		$sql .= " AND rowid <> ".((int) $this->id);
+		$sql .= " AND entity IN (".getEntity($this->element).")";
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__.' '.$this->db->lasterror(), LOG_ERR);
+
+			return $ids;
+		}
+
+		while ($obj = $this->db->fetch_object($resql)) {
+			$ids[] = (int) $obj->rowid;
+		}
+		$this->db->free($resql);
+
+		return $ids;
+	}
+
+	/**
+	 * Attach to a supplier invoice the lifecycle history of the one it replaces.
+	 *
+	 * A status sent by the vendor is about the document, not about the row Dolibarr booked it on, so an
+	 * import made again must carry it over. Left in place it would point at a deleted invoice.
+	 *
+	 * @param	int			$previousinvoiceid	Supplier invoice the import has just replaced
+	 * @param	int			$newinvoiceid		Supplier invoice the import has just created
+	 * @param	int[]		$recordids			Records of the previous invoice, listed before it was deleted
+	 * @param	string		$newref				Reference of the new invoice, as the flow list shows it
+	 * @return	int<-1,1>						1 when the history has been moved, -1 on error
+	 */
+	private function moveHistoryToInvoice($previousinvoiceid, $newinvoiceid, $recordids, $newref)
+	{
+		$this->db->begin();
+
+		if (!empty($recordids)) {
+			$sql = "UPDATE ".MAIN_DB_PREFIX.$this->table_element;
+			$sql .= " SET fk_element_id = ".((int) $newinvoiceid);
+			$sql .= ", tracking_idref = '".$this->db->escape($newref)."'";
+			$sql .= " WHERE rowid IN (".$this->db->sanitize(implode(',', $recordids)).")";
+			if (!$this->db->query($sql)) {
+				dol_syslog(__METHOD__.' '.$this->db->lasterror(), LOG_ERR);
+				$this->db->rollback();
+
+				return -1;
+			}
+		}
+
+		$sql = "UPDATE ".MAIN_DB_PREFIX."einvoicing_lifecycle_msg";
+		$sql .= " SET element_id = ".((int) $newinvoiceid);
+		$sql .= " WHERE element_type = 'invoice_supplier'";
+		$sql .= " AND element_id = ".((int) $previousinvoiceid);
+		if (!$this->db->query($sql)) {
+			dol_syslog(__METHOD__.' '.$this->db->lasterror(), LOG_ERR);
+			$this->db->rollback();
+
+			return -1;
+		}
+
+		$this->db->commit();
+
+		return 1;
+	}
+
+	/**
+	 * Give a draft supplier invoice the temporary reference of the draft it replaces.
+	 *
+	 * The core never reads an id back out of a "(PROV1234)" reference, it only tests the prefix, so the
+	 * number of the deleted draft can be given back to the new row, files included.
+	 * Only a temporary reference is moved this way, and only onto a draft: a validated invoice carries
+	 * a number of the numbering module, which belongs to it alone.
+	 *
+	 * @param	FactureFournisseur	$invoice	Draft the import has just created, renamed in place on success
+	 * @param	string				$wantedref	Reference of the draft it replaces
+	 * @return	int<-1,1>						1 when renamed, 0 when there was nothing to do, -1 on error
+	 */
+	private function reuseDraftRef(FactureFournisseur $invoice, $wantedref)
+	{
+		global $conf;
+
+		require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+
+		$currentref = (string) $invoice->ref;
+		if ($wantedref === '' || $wantedref === $currentref) {
+			return 0;
+		}
+		if (!preg_match('/^[\(]?PROV/i', $wantedref) || !preg_match('/^[\(]?PROV/i', $currentref)) {
+			return 0;
+		}
+		if ((int) $invoice->status !== FactureFournisseur::STATUS_DRAFT) {
+			return 0;
+		}
+
+		// Same path as the one the import writes its attachments to, and the same the card reads.
+		$folderpart = get_exdir($invoice->id, 2, 0, 0, $invoice, 'invoice_supplier');
+		$dirsource = $conf->fournisseur->facture->dir_output.'/'.$folderpart.dol_sanitizeFileName($currentref);
+		$dirdest = $conf->fournisseur->facture->dir_output.'/'.$folderpart.dol_sanitizeFileName($wantedref);
+
+		$moved = false;
+		if (file_exists($dirsource)) {
+			if (file_exists($dirdest)) {
+				// Left over by something else: merging two directories is not this method's business.
+				dol_syslog(__METHOD__.' cannot reuse reference '.$wantedref.': '.$dirdest.' already exists', LOG_WARNING);
+
+				return 0;
+			}
+			if (!@rename($dirsource, $dirdest)) {
+				dol_syslog(__METHOD__.' failed to rename '.$dirsource.' into '.$dirdest, LOG_ERR);
+
+				return -1;
+			}
+			$moved = true;
+		}
+
+		$relativesource = 'fournisseur/facture/'.$folderpart.dol_sanitizeFileName($currentref);
+		$relativedest = 'fournisseur/facture/'.$folderpart.dol_sanitizeFileName($wantedref);
+
+		$this->db->begin();
+
+		// Files named after the reference, then the directory they are indexed under: the two updates
+		// the core itself makes when it renames a draft (FactureFournisseur::validate()).
+		$sql = "UPDATE ".MAIN_DB_PREFIX."ecm_files SET";
+		$sql .= " filename = CONCAT('".$this->db->escape($wantedref)."', SUBSTR(filename, ".(strlen($currentref) + 1).")),";
+		$sql .= " filepath = '".$this->db->escape($relativedest)."'";
+		$sql .= " WHERE filename LIKE '".$this->db->escape($this->db->escapeforlike($currentref))."%'";
+		$sql .= " AND filepath = '".$this->db->escape($relativesource)."'";
+		$sql .= " AND entity = ".((int) $conf->entity);
+		$ok = (bool) $this->db->query($sql);
+
+		if ($ok) {
+			$sql = "UPDATE ".MAIN_DB_PREFIX."ecm_files SET filepath = '".$this->db->escape($relativedest)."'";
+			$sql .= " WHERE filepath = '".$this->db->escape($relativesource)."'";
+			$sql .= " AND entity = ".((int) $conf->entity);
+			$ok = (bool) $this->db->query($sql);
+		}
+
+		if ($ok) {
+			$sql = "UPDATE ".MAIN_DB_PREFIX."facture_fourn SET ref = '".$this->db->escape($wantedref)."'";
+			$sql .= " WHERE rowid = ".((int) $invoice->id);
+			$ok = (bool) $this->db->query($sql);
+		}
+
+		if (!$ok) {
+			dol_syslog(__METHOD__.' '.$this->db->lasterror(), LOG_ERR);
+			$this->db->rollback();
+			if ($moved) {
+				@rename($dirdest, $dirsource);
+			}
+
+			return -1;
+		}
+
+		$this->db->commit();
+
+		// The files themselves, when their name starts with the reference that has just changed.
+		if ($moved) {
+			foreach (dol_dir_list($dirdest, 'files', 1, '^'.preg_quote(dol_sanitizeFileName($currentref), '/')) as $fileentry) {
+				$newname = preg_replace('/^'.preg_quote(dol_sanitizeFileName($currentref), '/').'/', dol_sanitizeFileName($wantedref), $fileentry['name']);
+				@rename($fileentry['path'].'/'.$fileentry['name'], $fileentry['path'].'/'.$newname);
+			}
+		}
+
+		$invoice->ref = $wantedref;
+
+		return 1;
 	}
 
 	/**
@@ -1218,7 +1583,9 @@ class Document extends CommonObject
 		// a fatal the scheduler reports as a plain failed job.
 		require_once __DIR__ . '/providers/PDPProviderManager.class.php';
 
-		if (getDolGlobalString('EINVOICING_PDP')) {
+		// Generation-only mode: nothing is ever sent or received, so the sync job must not reach the
+		// network even if a real provider is still selected in EINVOICING_PDP.
+		if (getDolGlobalString('EINVOICING_PDP') && !getDolGlobalString('EINVOICING_ONLY_GENERATE')) {
 			$providerManager = new PDPProviderManager($this->db);
 			$provider = $providerManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
 		}
@@ -1236,21 +1603,42 @@ class Document extends CommonObject
 
 			if ($sync_result['res'] <= 0) {
 				$error++;
-				$errortype = 'errors';
+				// The scheduler builds what it shows from $this->error and $this->errors, never from
+				// $this->output. Leaving both empty is what turns a precise cause into the bare
+				// "Unknown error" the job card ends up displaying.
 				if (!empty($sync_result['actions'])) {
-					$errortype = 'warnings';
-					$this->output .= '<br>' . $langs->trans("EINVOICING_JOB_MANUAL_ACTION_REQUIRED") . '<br>';
+					// A business error already carries a message written for a human, and the technical
+					// line with it, inside the tooltip its picto opens on the card. Handing the transcript
+					// to the scheduler as well would print that same line a second time and in clear,
+					// under the very action the operator is being asked to carry out. What is missing here
+					// is a cause, not a copy of one: give the sentence that closes the list, and stop
+					// writing it above them.
+					$this->output .= '<br>';
 					foreach ($sync_result['actions'] as $action) {
 						$this->output .= "---<br>";
 						$this->output .= $action['businessmessage'] . '<br>';
 					}
-					$this->output = rtrim($this->output, '<br>');
+					// Not rtrim($output, '<br>'): rtrim strips characters, not a string, so it eats into
+					// the closing tags of the business message and leaves broken markup behind.
+					$this->output = preg_replace('/<br>$/', '', $this->output);
+					$this->error = $langs->trans("EINVOICING_JOB_MANUAL_ACTION_REQUIRED");
+				} else {
+					// Everything else has no message written for a human, so the transcript is what the
+					// operator gets. A third-party provider may only fill the older 'details' key, so fall
+					// back on it rather than on nothing.
+					$this->errors = $sync_result['errors'] ?? ($sync_result['details'] ?? array());
+
+					// The early returns of syncFlows() - the access point answering something other than
+					// 200, the lookup of the already-processed flows failing - put their one message in
+					// both keys. The scheduler prints output and then the cause, so leaving it in both
+					// shows it twice.
+					$this->output = implode('<br>', array_diff($sync_result['messages'] ?? array(), $this->errors));
 				}
-				//$this->output = $langs->trans("FailedToSyncADocument").($errortype ? '<br>'.$langs->trans("FailedToSyncADocumentMore") : '');
 			}
 		} else {
 			$error++;
-			$this->output = $langs->trans("NoPDPProviderConfigured");
+			// Set on error only, not on output: the scheduler concatenates the two and would show it twice.
+			$this->error = $langs->trans("NoPDPProviderConfigured");
 		}
 
 		$this->output = trim($this->output);
@@ -1265,7 +1653,7 @@ class Document extends CommonObject
 	 * @param ?string $xmlData The XML data to check
 	 * @return bool True if xmlData is within size bounds
 	 */
-	public static function checkXmlDataMaxSize(?string &$xmlData): bool
+	public static function checkXmlDataMaxSize(&$xmlData): bool
 	{
 		if (isset($xmlData)) {
 			// 16Mo for MEDIUMTEXT
@@ -1281,7 +1669,7 @@ class Document extends CommonObject
 	 * @param ?string $xmlData The XML data to clean
 	 * @return ?string The cleaned XML data
 	 */
-	public static function cleanXmlData(?string $xmlData): ?string
+	public static function cleanXmlData($xmlData)
 	{
 		global $db;
 

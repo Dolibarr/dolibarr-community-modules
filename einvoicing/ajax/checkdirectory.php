@@ -32,9 +32,8 @@ if (!defined('NOREQUIREHTML')) {
 if (!defined('NOREQUIREAJAX')) {
 	define('NOREQUIREAJAX', '1');
 }
-if (!defined('NOREQUIRESOC')) {
-	define('NOREQUIRESOC', '1');
-}
+// NOREQUIRESOC is deliberately not defined here: this endpoint builds a PDPProviderManager, which reads
+// $mysoc->country_code to decide the list of providers, so $mysoc must exist.
 if (!defined('NOCSRFCHECK')) {
 	define('NOCSRFCHECK', '1');
 }
@@ -150,6 +149,13 @@ function einvoicing_directory_html($r, $siren)
 				$txt .= ' <span class="opacitymedium small">('.implode(' - ', $details).')</span>';
 			}
 			return img_picto('', 'tick', 'class="color-green paddingright"').$txt;
+		case 'unknownaddress':
+			// The recipient may well be reachable at another address; this invoice is not addressed to
+			// it. Saying "reachable" here, on the strength of a line the document does not carry, is
+			// exactly the answer that lets a transmission leave for a rejection (fr:213). The address
+			// is named so the user can compare it with the annuaire, and correct the routing record
+			// rather than wonder which of the two the badge was talking about.
+			return img_picto('', 'error', 'class="color-red paddingright"').$langs->trans("EInvoicingDirectoryAddressNotDeclared", (string) ($r['identifier'] ?? ''), $siren);
 		case 'absent':
 			return img_picto('', 'error', 'class="color-red paddingright"').$langs->trans("EInvoicingDirectoryAbsent", $siren);
 		case 'inactive':
@@ -175,14 +181,10 @@ function einvoicing_directory_html($r, $siren)
 			}
 			return img_picto('', 'warning', 'class="paddingright"').$txt;
 		case 'undetermined':
-			// Neutral on purpose: a line exists but its status was not communicated, so the check fails
-			// open without asserting anything. Green here is what let an undeliverable invoice be sent.
-			// The provenance matters most here, and used to be the one thing this branch dropped: the
-			// same wording is reached both when the standardized directory answered without a line
-			// status and when it did not answer at all and the platform's own endpoint was read
-			// instead. The first is the recipient's platform being terse, the second is a call
-			// failing on this instance - two different problems, and only the message tells them
-			// apart (issue #698).
+			// Neutral on purpose: the line exists but its status was not communicated, so fail open
+			// without asserting anything. Green here would let an undeliverable invoice be sent.
+			// Report the provenance: a terse directory answer and a failed call reach the same
+			// wording, and only the message tells the two apart (issue #698).
 			$txt = $langs->trans("EInvoicingDirectoryUndetermined", $siren);
 			$details = array();
 			if (!empty($r['identifier'])) {
@@ -236,6 +238,14 @@ if ($siren === '') {
 	exit;
 }
 
+require_once "../lib/einvoicing.lib.php";
+if (einvoicingIsSendDisabled()) {
+	// Generation-only mode (or the sync toggle): nothing is ever sent, so there is no recipient to reach.
+	print json_encode(array('status' => 'unsupported', 'html' => einvoicing_directory_html(array('status' => 'unsupported'), $siren)));
+	$db->close();
+	exit;
+}
+
 require_once "../class/providers/PDPProviderManager.class.php";
 $PDPManager = new PDPProviderManager($db);
 $provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
@@ -245,8 +255,17 @@ if (!is_object($provider)) {
 	exit;
 }
 
-$r = $provider->checkRecipientDirectory($siren);
+// The badge must answer about the address this invoice is sent to, so it asks for it the same way the
+// generation does: invoice-level override first, then the third-party default routing, then the SIREN.
+// Reading only the SIREN told the user a recipient was reachable while the document went to a
+// SIRET-suffixed address the check had never looked at.
+require_once "../class/einvoicing.class.php";
+$einvoicing = new EInvoicing($db);
+$routingid = $einvoicing->getBuyerCommunicationURI($invoice->thirdparty, $invoice);
+
+$r = $provider->checkRecipientDirectory($siren, $routingid);
 $r['siren'] = $siren;
+$r['routingid'] = $routingid;
 $r['html'] = einvoicing_directory_html($r, $siren);
 
 print json_encode($r);

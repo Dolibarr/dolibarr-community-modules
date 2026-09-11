@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2023-2026 Eric Seigne <eric.seigne@cap-rel.fr>
+ * Copyright (C) 2026		MDW			<mdeweerd@users.noreply.github.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -735,7 +736,7 @@ function stancerAddTransfertFromAccountToAccount(Account $accountfrom, Account $
  *
  * @param   CommonObject  	$object               object, invoice, order ...
  * @param   array  			$data  			      array of data
- * @param   string  		$errorMessage  	      string : detailled error message
+ * @param   string  		$errorMessage  	      string : detailed error message
  * @param   bool            $bypassCustomerGuard  when true, skip ONLY Guard 2 (the
  *                                                customer->socid mapping). Reserved
  *                                                for the supervised admin force-post
@@ -775,7 +776,7 @@ function stancerAddPaymentOnObject($object, $data, &$errorMessage, $bypassCustom
 				if ($resInv) {
 					dol_syslog("stancerAddPaymentOnObject object is not an invoice but a $objtype we load the invoice thanks to fetchObjectLinked");
 					$object = $inv;
-					//first invoice is enought
+					//first invoice is enough
 					break 2;
 				} else {
 					dol_syslog("stancerAddPaymentOnObject object is not an invoice but a $objtype and can't load invoice from fetchObjectLinked", LOG_ERR);
@@ -1187,7 +1188,7 @@ function stancerAddPaymentOnInvoices(array $invoices, $data, &$errorMessage)
 }
 
 /**
- * get informations from order id in case of search by tag returns null for example
+ * get information from order id in case of search by tag returns null for example
  *
  * @param   string  $orderid  order id
  *
@@ -1253,7 +1254,7 @@ function getObjectFromOrderID($orderid)
 }
 
 /**
- * extract informations from TAG then return dolibarr object (invoice / order ...)
+ * extract information from TAG then return dolibarr object (invoice / order ...)
  *
  * @param   string       $tag		dolibarr tag
  *

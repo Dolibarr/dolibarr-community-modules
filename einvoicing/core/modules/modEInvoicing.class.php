@@ -118,8 +118,14 @@ class modEInvoicing extends DolibarrModules
 			),
 			// Set here all hooks context managed by module. To find available hook context, make a "grep -r '>initHooks(' *" on source code. You can also set hook context to 'all'
 			/* BEGIN MODULEBUILDER HOOKSCONTEXTS */
+			// Contexts are listed one by one on purpose: 'all' loads this class into every HookManager of the
+			// request, including the ones other modules build for their own contexts.
 			'hooks' => [
-				'all', 'invoicecard'
+				'invoicecard', 'invoicesuppliercard', 'thirdpartycard', 'thirdpartycomm', 'productcard',
+				'invoicelist', 'supplierinvoicelist', 'thirdpartylist', 'societelist', 'productlist',
+				'productservicelist', 'accountancysupplierlist',
+				'pdfgeneration', 'odtgeneration',
+				'api',
 			],
 			/* END MODULEBUILDER HOOKSCONTEXTS */
 			// Set this to 1 if features of module are opened to external users
@@ -141,7 +147,7 @@ class modEInvoicing extends DolibarrModules
 		// A condition to hide module
 		$this->hidden = getDolGlobalInt('MODULE_EINVOICING_DISABLED'); // A condition to disable module;
 		// List of module class names that must be enabled if this module is enabled. Example: array('always'=>array('modModuleToEnable1','modModuleToEnable2'), 'FR'=>array('modModuleToEnableFR')...)
-		$this->depends = array('always'=>array('modFacture', 'modFournisseur'));
+		$this->depends = array('always'=>array('modFacture', 'modFournisseur', 'modProduct'));
 		// List of module class names to disable if this one is disabled. Example: array('modModuleToDisable1', ...)
 		$this->requiredby = array();
 		// List of module class names this module is in conflict with. Example: array('modModuleToDisable1', ...)
@@ -181,7 +187,15 @@ class modEInvoicing extends DolibarrModules
 			'fr_FR:ParentCompany'=>'Maison mère ou revendeur'
 		)*/
 
-		if (!isModEnabled("einvoicing")) {
+		// For retrocompatibility with older Dolibarr versions to avoid crashing when module is present into custom modules repository of an older Dolibarr installation
+		if (function_exists('isModEnabled')) {
+			$moduleIsEnabled = isModEnabled("einvoicing");
+		} else {
+			$moduleIsEnabled = !empty($conf->einvoicing->enabled);
+		}
+
+		// Check if the module is enabled and initialize the configuration if not
+		if (!$moduleIsEnabled) {
 			$conf->einvoicing = new stdClass();
 			$conf->einvoicing->enabled = 0;
 		}
@@ -190,9 +204,7 @@ class modEInvoicing extends DolibarrModules
 		/* BEGIN MODULEBUILDER TABS */
 		// Don't forget to deactivate/reactivate your module to test your changes
 		$this->tabs = array();
-		//$this->tabs[] = array('data' => 'invoice:+CustomerLCtab:einvoicecustomerlctab:einvoicing@einvoicing:$user->hasRight("facture", "read"):/einvoicing/einvoice_object_timeline.php?id=__ID__');
-
-		//$this->tabs[] = array('data' => 'invoice:+EinvoiceEvents:EinvoiceEventsTab:@einvoicing:$user->hasRight("facture","read"):/einvoicing/einvoice_events.php?id=__ID__&elementtype=invoice');
+		$this->tabs[] = array('data' => 'invoice:+EinvoiceEvents:EinvoiceEventsTab:@einvoicing:$user->hasRight("facture","read"):/einvoicing/einvoice_tracking.php?id=__ID__');
 
 		/* END MODULEBUILDER TABS */
 		// Example:
@@ -367,7 +379,7 @@ class modEInvoicing extends DolibarrModules
 			'url' => '/einvoicing/einvoicingindex.php',
 			'langs' => 'einvoicing@einvoicing',
 			'position' => 1000,
-			'enabled' => 'isModEnabled("einvoicing")',
+			'enabled' => 'isModEnabled("einvoicing") && !getDolGlobalString("EINVOICING_ONLY_GENERATE")',
 			'perms' => '$user->hasRight("einvoicing", "read")',
 			'target' => '',
 			'user' => 2,
@@ -384,7 +396,7 @@ class modEInvoicing extends DolibarrModules
 			'url' => '/einvoicing/document_list.php',
 			'langs' => 'einvoicing@einvoicing',
 			'position' => 1001,
-			'enabled' => 'isModEnabled("einvoicing")',
+			'enabled' => 'isModEnabled("einvoicing") && !getDolGlobalString("EINVOICING_ONLY_GENERATE")',
 			'perms' => '$user->hasRight("einvoicing", "write")',
 			'target' => '',
 			'user' => 2,
@@ -401,7 +413,7 @@ class modEInvoicing extends DolibarrModules
 			'url' => '/einvoicing/product_mapping.php',
 			'langs' => 'einvoicing@einvoicing',
 			'position' => 1002,
-			'enabled' => 'isModEnabled("einvoicing")',
+			'enabled' => 'isModEnabled("einvoicing") && !getDolGlobalString("EINVOICING_ONLY_GENERATE")',
 			'perms' => '$user->hasRight("einvoicing", "write")',
 			'target' => '',
 			'user' => 2,
@@ -418,7 +430,7 @@ class modEInvoicing extends DolibarrModules
 			'url' => '/einvoicing/vendorref_list.php',
 			'langs' => 'einvoicing@einvoicing',
 			'position' => 1003,
-			'enabled' => 'isModEnabled("einvoicing")',
+			'enabled' => 'isModEnabled("einvoicing") && !getDolGlobalString("EINVOICING_ONLY_GENERATE")',
 			'perms' => '$user->hasRight("einvoicing", "read")',
 			'target' => '',
 			'user' => 2,
@@ -452,7 +464,7 @@ class modEInvoicing extends DolibarrModules
 			'url' => '/einvoicing/call_list.php',
 			'langs' => 'einvoicing@einvoicing',
 			'position' => 1003,
-			'enabled' => 'isModEnabled("einvoicing")',
+			'enabled' => 'isModEnabled("einvoicing") && !getDolGlobalString("EINVOICING_ONLY_GENERATE")',
 			'perms' => '$user->hasRight("einvoicing", "read")',
 			'target' => '',
 			'user' => 2,
@@ -591,10 +603,9 @@ class modEInvoicing extends DolibarrModules
 
 		// Chorus fields
 		// TODO : Remove Chorus extrafields and move them to einvoicing_extlinks table
-		// The text fields are declared printable = 2, "print it only when it holds something", and not 1,
-		// "always print it": CommonDocGenerator::getExtrafieldsInHtml() reads the 'enabled' condition
-		// before printing on 18, 22, 23 and 24, but not on 17, 19, 20 and 21, where a field of a feature
-		// nobody turned on still reached the PDF of every invoice and every order (issue #614).
+		// The text fields are declared printable = 2 ("print only when filled") and not 1: on cores 19, 20
+		// and 21 getExtrafieldsInHtml() ignores the 'enabled' condition, so a field of a feature nobody
+		// turned on still reached the PDF of every invoice and every order (issue #614).
 		$result = $extrafields->addExtraField('d4d_separator', $langs->trans('ChorusSeparator'), 'separate', 95024, '', 'facture', 0, 1, '', $param, 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")');
 		$result = $extrafields->addExtraField('d4d_service_code', $langs->trans('ChorusServiceCode'), 'varchar', 95026, '100', 'facture', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 2);
 		$result = $extrafields->addExtraField('d4d_contract_number', $langs->trans('ChorusContractNumber'), 'varchar', 95028, '50', 'facture', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 2);
@@ -622,12 +633,10 @@ class modEInvoicing extends DolibarrModules
 		);
 
 		// Update extrafield par rapport au module openDSI, il faut pouvoir éditer le champ ChorusId
-		// The $param below is '' and not array(): the empty array is only tolerated from Dolibarr 18,
-		// which added an "elseif (is_array($param))" branch to ExtraFields::update_label(). On 17 an
-		// empty array falls through to strlen($param) and kills the whole module installation on PHP 8.
-		// Both forms store exactly the same thing - an empty parameter string - on every version, and
-		// the parameter was itself declared as '' up to 19 before becoming array() in 20, which is the
-		// signature the phan stub carries and the reason for the suppression.
+		// The $param below is '' and not array(): before Dolibarr 18, ExtraFields::update_label() lets an
+		// empty array fall through to strlen($param), which kills the module installation on PHP 8. Both
+		// forms store the same empty string, and the parameter was declared '' up to 19, hence the phan
+		// annotation below.
 		$result = $extrafields->update(
 			'd4d_chorus_id', //$attrname	// @phan-suppress-current-line PhanTypeMismatchArgumentProbablyReal
 			$langs->trans('ChorusId'), //$label

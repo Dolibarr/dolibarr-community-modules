@@ -232,6 +232,34 @@ class StancerApi
 		return $decoded;
 	}
 
+	/**
+	 * Refuse a single-resource call made with an empty id.
+	 *
+	 * Concatenating an empty id gives the collection endpoint ('/checkout/'
+	 * instead of '/checkout/paym_xxx'): the API answers 200 with a list, so the
+	 * caller gets a valid array, sees no 'status' key and reads the payment as
+	 * failed. Not sending the request turns that silent mismatch into an
+	 * explicit error the caller already knows how to handle.
+	 *
+	 * @param string|null $resourceId Resource id used to build the endpoint
+	 * @param string      $caller     Calling method name, for the log line
+	 * @return bool                   True when the id can be used in a URL
+	 */
+	private function hasResourceId($resourceId, $caller)
+	{
+		if (trim((string) $resourceId) !== '') {
+			return true;
+		}
+
+		$this->error = 'Empty resource id given to ' . $caller . '()';
+		$this->errors = array($this->error);
+		$this->lastHttpCode = 0;
+		$this->lastResponse = array();
+		dol_syslog("StancerApi::" . $caller . " called with an empty id, request not sent (an empty id would query the collection endpoint)", LOG_ERR);
+
+		return false;
+	}
+
 	// ========================================================================
 	// PAYMENTS
 	// ========================================================================
@@ -255,6 +283,9 @@ class StancerApi
 	 */
 	public function getPayment($paymentId)
 	{
+		if (!$this->hasResourceId($paymentId, 'getPayment')) {
+			return false;
+		}
 		return $this->request('GET', '/checkout/' . $paymentId);
 	}
 
@@ -267,6 +298,9 @@ class StancerApi
 	 */
 	public function updatePayment($paymentId, $data)
 	{
+		if (!$this->hasResourceId($paymentId, 'updatePayment')) {
+			return false;
+		}
 		return $this->request('PATCH', '/checkout/' . $paymentId, $data);
 	}
 
@@ -291,6 +325,9 @@ class StancerApi
 	 */
 	public function capturePayment($paymentId, $amount = null)
 	{
+		if (!$this->hasResourceId($paymentId, 'capturePayment')) {
+			return false;
+		}
 		$data = null;
 		if ($amount !== null) {
 			$data = array('amount' => $amount);
@@ -321,6 +358,9 @@ class StancerApi
 	 */
 	public function getCustomer($customerId)
 	{
+		if (!$this->hasResourceId($customerId, 'getCustomer')) {
+			return false;
+		}
 		return $this->request('GET', '/customers/' . $customerId);
 	}
 
@@ -333,6 +373,9 @@ class StancerApi
 	 */
 	public function updateCustomer($customerId, $data)
 	{
+		if (!$this->hasResourceId($customerId, 'updateCustomer')) {
+			return false;
+		}
 		return $this->request('PATCH', '/customers/' . $customerId, $data);
 	}
 
@@ -344,6 +387,9 @@ class StancerApi
 	 */
 	public function deleteCustomer($customerId)
 	{
+		if (!$this->hasResourceId($customerId, 'deleteCustomer')) {
+			return false;
+		}
 		return $this->request('DELETE', '/customers/' . $customerId);
 	}
 
@@ -385,6 +431,9 @@ class StancerApi
 	 */
 	public function getCard($cardId)
 	{
+		if (!$this->hasResourceId($cardId, 'getCard')) {
+			return false;
+		}
 		return $this->request('GET', '/cards/' . $cardId);
 	}
 
@@ -397,6 +446,9 @@ class StancerApi
 	 */
 	public function updateCard($cardId, $data)
 	{
+		if (!$this->hasResourceId($cardId, 'updateCard')) {
+			return false;
+		}
 		return $this->request('PATCH', '/cards/' . $cardId, $data);
 	}
 
@@ -408,6 +460,9 @@ class StancerApi
 	 */
 	public function deleteCard($cardId)
 	{
+		if (!$this->hasResourceId($cardId, 'deleteCard')) {
+			return false;
+		}
 		return $this->request('DELETE', '/cards/' . $cardId);
 	}
 
@@ -434,6 +489,9 @@ class StancerApi
 	 */
 	public function getSepa($sepaId)
 	{
+		if (!$this->hasResourceId($sepaId, 'getSepa')) {
+			return false;
+		}
 		return $this->request('GET', '/sepa/' . $sepaId);
 	}
 
@@ -446,6 +504,9 @@ class StancerApi
 	 */
 	public function updateSepa($sepaId, $data)
 	{
+		if (!$this->hasResourceId($sepaId, 'updateSepa')) {
+			return false;
+		}
 		return $this->request('PATCH', '/sepa/' . $sepaId, $data);
 	}
 
@@ -457,6 +518,9 @@ class StancerApi
 	 */
 	public function deleteSepa($sepaId)
 	{
+		if (!$this->hasResourceId($sepaId, 'deleteSepa')) {
+			return false;
+		}
 		return $this->request('DELETE', '/sepa/' . $sepaId);
 	}
 
@@ -479,6 +543,9 @@ class StancerApi
 	 */
 	public function getSepaCheck($checkId)
 	{
+		if (!$this->hasResourceId($checkId, 'getSepaCheck')) {
+			return false;
+		}
 		return $this->request('GET', '/sepa/check/' . $checkId);
 	}
 
@@ -505,6 +572,9 @@ class StancerApi
 	 */
 	public function getRefund($refundId)
 	{
+		if (!$this->hasResourceId($refundId, 'getRefund')) {
+			return false;
+		}
 		return $this->request('GET', '/refunds/' . $refundId);
 	}
 
@@ -532,6 +602,9 @@ class StancerApi
 	 */
 	public function getPayout($payoutId)
 	{
+		if (!$this->hasResourceId($payoutId, 'getPayout')) {
+			return false;
+		}
 		return $this->request('GET', '/payouts/' . $payoutId);
 	}
 
@@ -557,6 +630,9 @@ class StancerApi
 	 */
 	public function getPayoutDetails($payoutId, $type, $filters = array())
 	{
+		if (!$this->hasResourceId($payoutId, 'getPayoutDetails')) {
+			return false;
+		}
 		$query = !empty($filters) ? '?' . http_build_query($filters) : '';
 		return $this->request('GET', '/payouts/' . $payoutId . '/' . $type . '/' . $query);
 	}
@@ -573,6 +649,9 @@ class StancerApi
 	 */
 	public function getDispute($disputeId)
 	{
+		if (!$this->hasResourceId($disputeId, 'getDispute')) {
+			return false;
+		}
 		return $this->request('GET', '/disputes/' . $disputeId);
 	}
 
@@ -691,6 +770,9 @@ class StancerApi
 	 */
 	public function getAddress($addressId)
 	{
+		if (!$this->hasResourceId($addressId, 'getAddress')) {
+			return false;
+		}
 		return $this->request('GET', '/addresses/' . $addressId);
 	}
 
@@ -703,6 +785,9 @@ class StancerApi
 	 */
 	public function updateAddress($addressId, $data)
 	{
+		if (!$this->hasResourceId($addressId, 'updateAddress')) {
+			return false;
+		}
 		return $this->request('PATCH', '/addresses/' . $addressId, $data);
 	}
 
@@ -714,6 +799,9 @@ class StancerApi
 	 */
 	public function deleteAddress($addressId)
 	{
+		if (!$this->hasResourceId($addressId, 'deleteAddress')) {
+			return false;
+		}
 		return $this->request('DELETE', '/addresses/' . $addressId);
 	}
 
@@ -740,6 +828,9 @@ class StancerApi
 	 */
 	public function getMandate($mandateId)
 	{
+		if (!$this->hasResourceId($mandateId, 'getMandate')) {
+			return false;
+		}
 		return $this->request('GET', '/mandates/' . $mandateId);
 	}
 
@@ -751,6 +842,9 @@ class StancerApi
 	 */
 	public function getMandatePdf($mandateId)
 	{
+		if (!$this->hasResourceId($mandateId, 'getMandatePdf')) {
+			return false;
+		}
 		$url = $this->apiUrl . '/mandates/' . $mandateId . '.pdf';
 
 		$headers = array(
@@ -827,6 +921,9 @@ class StancerApi
 	 */
 	public function getCustomerPaymentIntents($customerId, $filters = array())
 	{
+		if (!$this->hasResourceId($customerId, 'getCustomerPaymentIntents')) {
+			return false;
+		}
 		$query = !empty($filters) ? '?' . http_build_query($filters) : '';
 		return $this->request('GET', '/customers/' . $customerId . '/payment_intents' . $query);
 	}
@@ -840,6 +937,9 @@ class StancerApi
 	 */
 	public function getCustomerSubscriptions($customerId, $filters = array())
 	{
+		if (!$this->hasResourceId($customerId, 'getCustomerSubscriptions')) {
+			return false;
+		}
 		$query = !empty($filters) ? '?' . http_build_query($filters) : '';
 		return $this->request('GET', '/customers/' . $customerId . '/subscriptions' . $query);
 	}

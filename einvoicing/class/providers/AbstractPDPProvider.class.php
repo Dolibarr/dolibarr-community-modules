@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2025       Laurent Destailleur         <eldy@users.sourceforge.net>
+ * Copyright (C) 2026		Jose Martinez				<jose.martinez@pichinov.com>
  * Copyright (C) 2025       Mohamed DAOUD               <mdaoud@dolicloud.com>
  * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
@@ -26,6 +27,7 @@
  */
 
 require_once __DIR__ . '/../protocols/ProtocolManager.class.php';
+dol_include_once('einvoicing/lib/einvoicing.lib.php');	// removeAllSpaces(), used to normalize an electronic address
 
 
 /**
@@ -35,6 +37,9 @@ abstract class AbstractPDPProvider
 {
 	/** @var DoliDB Database handler */
 	public $db;
+
+	/** @var string Error message */
+	public $error;
 
 	/** @var array Error messages */
 	public $errors = [];
@@ -215,17 +220,21 @@ abstract class AbstractPDPProvider
 	 * Providers that do not expose a directory lookup keep the default 'unsupported' status so
 	 * the feature degrades gracefully and never blocks them.
 	 *
-	 * @param 	string 	$idprof1 	Recipient professional id 1 (SIREN for France)
+	 * A SIREN can hold several reception addresses (the bare SIREN and one per SIRET) but only the
+	 * BT-49 one receives the invoice: pass it as $addressingidentifier so the answer is about it alone.
+	 *
+	 * @param 	string 	$idprof1 				Recipient professional id 1 (SIREN for France)
+	 * @param 	string 	$addressingidentifier 	Routing address the invoice is actually sent to (BT-49). Empty to answer on any line declared for the SIREN, which is what a caller with no invoice at hand wants.
 	 * @return 	array{status:string,reachable:int,entries:int,active:int,unknown:int,identifier:string,linestatus:string,platform:string,effectivedate:int,message:string,messageparam:string,httpcode:int}
-	 *								status: unsupported|error|absent|inactive|undetermined|routable ;
+	 *								status: unsupported|error|absent|inactive|undetermined|routable|unknownaddress ;
 	 *								reachable: 1 routable, 0 not routable, -1 unknown ;
-	 *								identifier: first active electronic address found (if any) ;
+	 *								identifier: electronic address the answer is about ;
 	 *								linestatus/platform: directoryLineStatus and platformType of that address,
 	 *								reported to the user so a positive answer carries its provenance ;
 	 *								message: translation key naming where the answer comes from, with
 	 *								messageparam as its single parameter when the key takes one.
 	 */
-	public function checkRecipientDirectory($idprof1)
+	public function checkRecipientDirectory($idprof1, $addressingidentifier = '')
 	{
 		$result = array('status' => 'unsupported', 'reachable' => -1, 'entries' => 0, 'active' => 0, 'unknown' => 0, 'identifier' => '', 'linestatus' => '', 'platform' => '', 'effectivedate' => 0, 'message' => '', 'messageparam' => '', 'httpcode' => 0);
 
@@ -264,13 +273,28 @@ abstract class AbstractPDPProvider
 		}
 		$result['entries'] = count($lines);
 
+		if ($result['entries'] > 0 && ($wanted = self::normalizeAddressingIdentifier($addressingidentifier)) !== '') {
+			// Keep only the line of the address this invoice is sent to. Whoever recorded a routing
+			// identifier for that third party (or forced one on the invoice) took responsibility for the
+			// address: reporting on a sibling line, open or not, would answer a question nobody asked.
+			$lines = array_values(array_filter($lines, function ($line) use ($wanted) {
+				return self::normalizeAddressingIdentifier(isset($line['addressingIdentifier']) ? $line['addressingIdentifier'] : '') === $wanted;
+			}));
+			if (empty($lines)) {
+				// The SIREN is in the directory, this address is not. Sending to an address the annuaire
+				// does not declare is rejected with a routing error (fr:213) whatever the other lines say,
+				// so this is a negative answer of its own, not an 'absent' recipient nor an 'inactive' one.
+				$result['status'] = 'unknownaddress';
+				$result['reachable'] = 0;
+				$result['identifier'] = $wanted;
+				return $result;
+			}
+		}
+
 		if ($result['entries'] > 0) {
-			// A directory line exists, but only an enabled one can actually receive: the annuaire also
-			// carries lines that are declared and not open yet ('Upcoming', i.e. bound to a platform with
-			// a future effective date), or closed ('Disabled'). Counting every returned line as active
-			// would report 'routable' for a recipient the platform then refuses with a routing error
-			// (fr:213). A line whose status is missing proves nothing either way: it is counted apart so
-			// the caller can say so, instead of being silently trusted and shown as reachable.
+			// Only an 'Enabled' line can receive: 'Upcoming' (future effective date) and 'Disabled' ones
+			// would be refused by the platform with a routing error (fr:213). A missing status proves
+			// nothing either way, so it is counted apart rather than trusted.
 			$firstunknown = '';
 			$firstblocked = array('', '');
 			foreach ($lines as $line) {
@@ -301,14 +325,10 @@ abstract class AbstractPDPProvider
 				$result['status'] = 'routable';
 				$result['reachable'] = 1;
 			} elseif ($result['unknown'] > 0) {
-				// Lines are declared but the platform did not report their status, and it cannot be asked
-				// for: 'directoryLineStatus' is not part of the field list the search accepts (XP Z12-013
-				// only allows addressingIdentifier, siren, siret and addressingSuffix there), it is only
-				// returned as a bonus by the platforms that choose to. Fetching the line on its own
-				// (GET directory-line/code:<addressingIdentifier>) does not help either: on a platform
-				// that omits the status in the search, that answer omits it too. So an enabled address
-				// and one that merely takes effect later are indistinguishable here: stay non-conclusive
-				// (the caller keeps failing open) rather than claim the recipient is reachable.
+				// Lines declared without a status, and it cannot be asked for: XP Z12-013 does not allow
+				// directoryLineStatus as a search field, and a platform omitting it in the search omits it
+				// on GET directory-line too. Enabled and upcoming are indistinguishable here: stay
+				// non-conclusive so the caller fails open.
 				$result['status'] = 'undetermined';
 				$result['reachable'] = -1;
 				$result['identifier'] = $firstunknown;
@@ -328,11 +348,8 @@ abstract class AbstractPDPProvider
 
 		// 2) No directory line: tell apart a legal unit known to the directory but not able to receive
 		//    yet (inactive) from a SIREN that is unknown to the directory (absent).
-		//    The search form is used rather than the 'siren/code-insee:<siren>' consultation: both are
-		//    part of the same standardized service, but the consultation is not served by every Approved
-		//    Platform (one answers 404 on it while answering the search with the legal unit), so the
-		//    search is what keeps this second step meaningful everywhere. An unknown SIREN comes back
-		//    either as a 404 or as an empty result set depending on the platform, and both mean absent.
+		//    The search is used rather than the 'siren/code-insee:<siren>' consultation, which not every
+		//    Approved Platform serves. An unknown SIREN answers 404 or an empty result set: both absent.
 		$consultbody = json_encode(array('filters' => array('siren' => array('op' => 'strict', 'value' => $siren))));
 		$consult = $this->callApi('afnor-directory/v1/siren/search', 'POST', $consultbody, array(), 'precheck_directory');
 		$consultcode = (int) (isset($consult['status_code']) ? $consult['status_code'] : 0);
@@ -343,6 +360,27 @@ abstract class AbstractPDPProvider
 		}
 		$result['reachable'] = 0;
 		return $result;
+	}
+
+	/**
+	 * Normalize an electronic address so two writings of the same one compare equal.
+	 *
+	 * Dolibarr records the bare address, while a user adds spaces to read it and a platform may prefix
+	 * the scheme ('0225:' for the French SIREN scheme). Neither may turn a match into a mismatch.
+	 *
+	 * @param 	string 	$identifier 	Electronic address, as recorded or as returned by a platform
+	 * @return 	string 					Comparable form of that address, empty when there is none
+	 */
+	protected static function normalizeAddressingIdentifier($identifier)
+	{
+		$identifier = removeAllSpaces((string) $identifier);
+
+		$reg = array();
+		if (preg_match('/^[0-9]{4}:(.+)$/', $identifier, $reg)) {
+			$identifier = $reg[1];
+		}
+
+		return $identifier;
 	}
 
 	/**
@@ -380,6 +418,26 @@ abstract class AbstractPDPProvider
 
 
 	/**
+	 * Set the setup factory specific to the provider.
+	 *
+	 * Optional: a provider with nothing of its own to configure keeps this empty block, and the setup
+	 * page then simply shows nothing under the common one.
+	 *
+	 * @param FormSetup $formSetup 			The form setup object to initialize
+	 * @param string 	$prefix 			The prefix for configuration keys ('EINVOICING_MYPDP_')
+	 * @param string 	$prefixenv 			'prod' or 'test', depending on EINVOICING_LIVE
+	 * @param array 	$providersConfig 	The array containing providers configuration
+	 * @param array 	$TFieldProtocols 	The array of available protocols to set in the select field
+	 * @param array 	$TFieldProfiles 	The array of available profiles to set in the select field
+	 * @return void
+	 */
+	public function initFormSetup(&$formSetup, $prefix, $prefixenv, $providersConfig, $TFieldProtocols, $TFieldProfiles)
+	{
+		// Nothing to add to the setup page by default.
+	}
+
+
+	/**
 	 * Try to get a flow data from its id and doc type, using API
 	 *
 	 * @param string	$flowId 		The id of the flow
@@ -411,6 +469,127 @@ abstract class AbstractPDPProvider
 	}
 
 	/**
+	 * Pick, among the documents the access point holds for a flow, the first one this module can read.
+	 *
+	 * 'Converted' (rewritten into the syntax set on the access point account) is tried first, as it
+	 * shields the import from an issuer emitting a syntax with no reader here, such as UBL. That
+	 * setting lives outside Dolibarr and may be unset or unsupported, so 'Original' then 'ReadableView'
+	 * are tried in turn rather than failing the flow on the first miss.
+	 *
+	 * @param	string			$flowId				Identifier of the flow to read
+	 * @param	ProtocolManager	$protocolManager	Protocol factory used to recognize the documents
+	 * @return	array{file:?string,protocol:?AbstractProtocol,protocol_name:string,doc_type:string,fetched:int,attempts:string[],client_not_configured:bool}	The importable document, or a null protocol and the reason each shape was rejected
+	 */
+	protected function fetchImportableFlowDocument($flowId, $protocolManager)
+	{
+		$result = array(
+			'file' => null,
+			'protocol' => null,
+			'protocol_name' => '',
+			'doc_type' => '',
+			'fetched' => 0,				// nb of documents the access point did return, whatever their syntax
+			'attempts' => array(),
+			'client_not_configured' => false
+		);
+
+		// EINVOICING_PREFER_ORIGINAL: fetch the issuer's Original document (its Factur-X, which carries
+		// the human-readable PDF) before the Converted one, so the created supplier invoice keeps the PDF.
+		$docTypeOrder = getDolGlobalString('EINVOICING_PREFER_ORIGINAL')
+			? array('Original', 'Converted', 'ReadableView')
+			: array('Converted', 'Original', 'ReadableView');		// Default: First take the Converted (so always in same format defined in AP setup).
+		foreach ($docTypeOrder as $docType) {
+			$flowResponse = $this->fetchFlowData($flowId, $docType, 'get_flow_for_supplier_invoice');
+
+			if ($flowResponse['status_code'] != 200) {
+				if (isset($flowResponse['errorCode']) && $flowResponse['errorCode'] == 'CLIENT_NOT_CONFIGURED') {
+					// The access point has no conversion syntax configured for this client
+					$result['client_not_configured'] = true;
+				}
+				$result['attempts'][] = $docType . ": HTTP " . $flowResponse['status_code'] . (empty($flowResponse['errorMessage']) ? '' : ' - ' . $flowResponse['errorMessage']);
+				continue;
+			}
+
+			$result['fetched']++;
+
+			$content = (string) $flowResponse['response'];
+			$protocolName = $protocolManager->detectProtocolFromContent($content);
+			if (empty($protocolName)) {
+				$result['attempts'][] = $docType . ": unrecognized syntax";
+				continue;
+			}
+
+			$protocol = $protocolManager->getProtocol($protocolName);
+			if (empty($protocol)) {
+				$result['attempts'][] = $docType . ": " . $protocolName . " is not supported";
+				continue;
+			}
+
+			// What was recognized above is the syntax of the file, not the syntax of the invoice it
+			// carries. Open the document before accepting it, or a syntax with no reader here is
+			// handed to the reader of another one.
+			$payloadReason = '';
+			if ($this->readableInvoicePayload($content, $protocol, $protocolManager, $payloadReason) === null) {
+				$result['attempts'][] = $docType . ": " . $protocolName . " but " . $payloadReason;
+				continue;
+			}
+
+			if ($docType != 'Converted') {
+				dol_syslog(__METHOD__ . " No usable 'Converted' document for flowId " . $flowId . " (" . implode(' | ', $result['attempts']) . "), reading the '" . $docType . "' one instead", LOG_WARNING, 0, "_einvoicing");
+			}
+
+			$result['file'] = $content;
+			$result['protocol'] = $protocol;
+			$result['protocol_name'] = $protocolName;
+			$result['doc_type'] = $docType;
+			break;
+		}
+
+		return $result;
+	}
+
+	/**
+	 * The invoice a document carries, once its container has been opened, when this module can read it.
+	 *
+	 * detectProtocolFromContent() answers on the container alone: a PDF is 'FACTURX' on its '%PDF-'
+	 * header, while the embedded invoice is picked by file name and may be UBL ('xrechnung.xml'), which
+	 * has no reader here. Only "can this be read at all" is answered: the document keeps its container
+	 * type, a Factur-X PDF is still imported as Factur-X.
+	 *
+	 * @param	string				$content			Raw document, as the access point returned it
+	 * @param	AbstractProtocol	$protocol			Protocol recognized on the container
+	 * @param	ProtocolManager		$protocolManager	Protocol factory used to recognize the payload
+	 * @param	string				$reason				Filled with why the payload was rejected
+	 * @return	?string									The invoice inside, or null when it cannot be read
+	 */
+	protected function readableInvoicePayload($content, $protocol, $protocolManager, &$reason)
+	{
+		$reason = '';
+
+		try {
+			// AbstractProtocol::extractXmlFromFileContent() returns the content unchanged, so a
+			// document that is already an XML is its own payload and this costs nothing there.
+			$payload = (string) $protocol->extractXmlFromFileContent($content);
+		} catch (Throwable $e) {
+			// A PDF with no embedded invoice at all raises ZugferdNoPdfAttachmentFoundException here.
+			$reason = "its container holds no invoice - " . $e->getMessage();
+			return null;
+		}
+
+		$payloadName = $protocolManager->detectProtocolFromContent($payload);
+		if (empty($payloadName)) {
+			$reason = "what it carries is in an unrecognized syntax";
+			return null;
+		}
+
+		if (empty($protocolManager->getProtocol($payloadName))) {
+			$reason = "what it carries is " . $payloadName . ", which is not supported";
+			return null;
+		}
+
+		return $payload;
+	}
+
+	/**
 	 * Send a sample electronic invoice for testing purposes.
 	 * This function generates a sample invoice and sends it to PDP
 	 *
@@ -435,7 +614,7 @@ abstract class AbstractPDPProvider
 	 *
 	 * @param string 						$resource 	    Resource relative URL ('Flows', 'healthcheck' or others)
 	 * @param 'POST'|'GET'|'HEAD'|'PUT'|'PUTALREADYFORMATED'|'POSTALREADYFORMATED'|'DELETE' $method         HTTP method (dolibarr's types)
-	 * @param string|false 	$options 	    Options for the request (JSON encoded)
+	 * @param string|false|array<string,mixed> 	$options 	    Body of the request: a JSON encoded string, or an array carrying a CURLFile for a multipart upload. False when there is none.
 	 * @param array<string, string>         $extraHeaders   Optional additional headers
 	 * @param string|null                   $callType       Functional type of the API call for logging purposes (e.g., 'sync_flows', 'send_invoice')
 	 *
@@ -448,7 +627,7 @@ abstract class AbstractPDPProvider
 	 * @param   int   $syncFromDate     Timestamp from which to start synchronization. If 0, begins from epoch (1970-01-01).
 	 * @param   int   $limit            Maximum number of flows to synchronize. 0 means no limit.
 	 *
-	 * @return 	bool|array{res:int, messages:string[], totalFlows?:?int, alreadyExist?:int, syncedFlows?:int, batchlimit?:int, actions?:array<string,array{actionurl:string,actioncode:string,action:string,businessmessage:string}>, details?:string[]} 	True on success, false on failure along with messages, details for debugging, and suggested optional actions.
+	 * @return 	bool|array{res:int, messages:string[], totalFlows?:?int, alreadyExist?:int, syncedFlows?:int, batchlimit?:int, actions?:array<string,array{actionurl:string,actioncode:string,action:string,businessmessage:string}>, details?:string[], errors?:string[]} 	True on success, false on failure along with messages, details for debugging, the errors that aborted the run, and suggested optional actions.
 	 */
 	abstract public function syncFlows($syncFromDate = 0, $limit = 0);
 
@@ -484,20 +663,31 @@ abstract class AbstractPDPProvider
 
 		// For backward compatibility with Dolibarr versions < 23.0.0
 		if (version_compare(DOL_VERSION, '23.0.0-alpha', '<')) {
-			dolibarr_set_const($db, $serviceName.'_TOKEN', $accessToken, 'chaine', 0, '', $conf->entity);
+			$forceentity = $conf->entity;
+			if (getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP")) {
+				$forceentity = getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP");
+			}
+
+			dolibarr_set_const($db, $serviceName.'_TOKEN', $accessToken, 'chaine', 0, '', $forceentity);
 
 			if ($refreshToken !== null) {
-				dolibarr_set_const($db, $serviceName.'_REFRESH', $refreshToken, 'chaine', 0, '', $conf->entity);
+				dolibarr_set_const($db, $serviceName.'_REFRESH', $refreshToken, 'chaine', 0, '', $forceentity);
 			}
 
 			if ($expire_at !== null) {
-				dolibarr_set_const($db, $serviceName.'_EXPIRE', $expire_at, 'chaine', 0, '', $conf->entity);
+				dolibarr_set_const($db, $serviceName.'_EXPIRE', $expire_at, 'chaine', 0, '', $forceentity);
 			}
 		} else {
 			// Check if a token already exists for this service
+
+			$forceentity = $conf->entity;
+			if (getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP")) {
+				$forceentity = getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP");
+			}
+
 			$sql_check = "SELECT rowid FROM ".MAIN_DB_PREFIX."oauth_token";
 			$sql_check .= " WHERE service = '".$db->escape($serviceName)."'";
-			$sql_check .= " AND entity = ".((int) $conf->entity);
+			$sql_check .= " AND entity = ".((int) $forceentity);
 
 			$resql = $db->query($sql_check);
 			if (!$resql) {
@@ -516,7 +706,7 @@ abstract class AbstractPDPProvider
 					$sql .= ", expire_at = '".$db->idate($expire_at, 'gmt')."'";
 				}
 				$sql .= " WHERE service = '".$db->escape($serviceName)."'";
-				$sql .= " AND entity = ".((int) $conf->entity);
+				$sql .= " AND entity = ".((int) $forceentity);
 			} else {
 				// --- Insert new token ---
 				$sql  = "INSERT INTO ".MAIN_DB_PREFIX."oauth_token (service, tokenstring";
@@ -529,7 +719,7 @@ abstract class AbstractPDPProvider
 				$sql .= $refreshToken !== null ? ", '".$db->escape($refreshToken)."'" : "";
 				$sql .= ", '".$db->idate($now)."'";
 				$sql .= $expire_at !== null ? ", '".$db->idate($expire_at, 'gmt')."'" : "";
-				$sql .= ", ".(int) $conf->entity.")";
+				$sql .= ", ".(int) $forceentity.")";
 			}
 
 			// Execute SQL
@@ -552,9 +742,10 @@ abstract class AbstractPDPProvider
 	/**
 	 * Retrieve OAuth token for the given PDP service.
 	 *
-	 * @return array{token:string,refresh_token:string,token_expires_at:string}|false   Array with keys 'access_token', 'refresh_token', 'expire_at', or false if not found
+	 * @param	int		$forceentity		0=Use current entity, >0=Use specific entity
+	 * @return 	array{token:string,refresh_token:string,token_expires_at:string}|false   Array with keys 'access_token', 'refresh_token', 'expire_at', or false if not found
 	 */
-	public function fetchOAuthTokenDB()
+	public function fetchOAuthTokenDB($forceentity = 0)
 	{
 		global $conf, $db;
 
@@ -566,6 +757,14 @@ abstract class AbstractPDPProvider
 			$token = getDolGlobalString($serviceName.'_TOKEN');
 			$refresh = getDolGlobalString($serviceName.'_REFRESH');
 			$expire = getDolGlobalString($serviceName.'_EXPIRE');
+
+			if ($forceentity) {
+				require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
+
+				$token = dolibarr_get_const($this->db, $serviceName.'_TOKEN', (int) $forceentity);
+				$refresh = dolibarr_get_const($this->db, $serviceName.'_REFRESH', (int) $forceentity);
+				$expire = dolibarr_get_const($this->db, $serviceName.'_EXPIRE', (int) $forceentity);
+			}
 
 			if (empty($token)) {
 				return false;
@@ -582,7 +781,7 @@ abstract class AbstractPDPProvider
 		$sql = "SELECT tokenstring, tokenstring_refresh, expire_at
 				FROM ".MAIN_DB_PREFIX."oauth_token
 				WHERE service = '".$db->escape($serviceName)."'
-				AND entity = ".((int) $conf->entity)." LIMIT 1";
+				AND entity = ".((int) ($forceentity ? $forceentity : $conf->entity))." LIMIT 1";
 
 		$resql = $db->query($sql);
 		if (!$resql) {
@@ -606,10 +805,12 @@ abstract class AbstractPDPProvider
 
 	/**
 	 * Insert or update OAuth token for the given PDP.
+	 * Called by the deleteAccessToken() only, itself called by the setup page only.
 	 *
+	 * @param	int		$forceentity		0=Use current entity, >0=Use specific entity
 	 * @return bool                        True if success, false otherwise
 	 */
-	public function deleteOAuthTokenDB()
+	public function deleteOAuthTokenDB($forceentity = 0)
 	{
 		global $conf, $db;
 
@@ -619,16 +820,17 @@ abstract class AbstractPDPProvider
 
 		if (version_compare(DOL_VERSION, '23.0.0', '<')) {
 			require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
-			dolibarr_del_const($this->db, $serviceName.'_TOKEN', $conf->entity);
-			dolibarr_del_const($this->db, $serviceName.'_REFRESH', $conf->entity);
-			dolibarr_del_const($this->db, $serviceName.'_EXPIRE', $conf->entity);
+
+			dolibarr_del_const($this->db, $serviceName.'_TOKEN', (int) ($forceentity ? $forceentity : $conf->entity));
+			dolibarr_del_const($this->db, $serviceName.'_REFRESH', (int) ($forceentity ? $forceentity : $conf->entity));
+			dolibarr_del_const($this->db, $serviceName.'_EXPIRE', (int) ($forceentity ? $forceentity : $conf->entity));
 			return true;
 		}
 
 		// Check if a token already exists for this service
 		$sql_check = "DELETE FROM ".MAIN_DB_PREFIX."oauth_token
 						WHERE service = '".$db->escape($serviceName)."'
-						AND entity = ".((int) $conf->entity);
+						AND entity = ".((int) ($forceentity ? $forceentity : $conf->entity));
 
 		$resql = $db->query($sql_check);
 		if (!$resql) {
@@ -637,6 +839,19 @@ abstract class AbstractPDPProvider
 		}
 
 		return true;
+	}
+
+
+	/**
+	 * Delete the access token of this provider.
+	 * Called by the setup page only.
+	 *
+	 * @param	int		$forceentity		0=Use current entity, >0=Use specific entity
+	 * @return	bool						True if success, false otherwise
+	 */
+	public function deleteAccessToken($forceentity = 0)
+	{
+		return $this->deleteOAuthTokenDB($forceentity);
 	}
 
 
@@ -655,14 +870,10 @@ abstract class AbstractPDPProvider
 
 		$LastSyncDate = null;
 
-		// Retrieve the last synchronization timestamp from the database
-		// Note: The PDP API does not support per-document synchronization yet.
-		// We perform a global sync for all flows and track the last modification
-		// timestamp (tms) from the einvoicing_document table to determine
+		// Retrieve the last synchronization timestamp from the database.
+		// The PDP API does not support per-document synchronization yet: we perform a global sync for all
+		// flows and track the last modification timestamp (tms) of the einvoicing_document table to know
 		// which flows need to be synchronized since the last successful sync.
-		//
-		// Future enhancement: Individual document sync may be possible when
-		// the PDP provider API supports it.
 
 		$provider = (string) $this->providerName;
 		$providershort = '';
@@ -702,17 +913,21 @@ abstract class AbstractPDPProvider
 	 *
 	 * @var array<int,string>
 	 */
-	private const LOGCALL_SENSITIVE_KEYS = array('client_secret', 'access_token', 'refresh_token', 'id_token', 'password');
+	const LOGCALL_SENSITIVE_KEYS = array('client_secret', 'access_token', 'refresh_token', 'id_token', 'password');
 
 	/**
 	 * Redact known sensitive fields (@see LOGCALL_SENSITIVE_KEYS) from a value before it is
 	 * persisted in the API call log, whatever its shape: PHP array, application/x-www-form-urlencoded
 	 * string (OAuth token requests), JSON string, or plain text (left untouched in that last case).
 	 *
+	 * Public because the redaction has a second caller outside the write path: SupportExport
+	 * replays it on everything it puts in a support archive, so that rows written before this
+	 * method existed do not carry their tokens out of the instance.
+	 *
 	 * @param  array<mixed>|string|null $value Value to redact
 	 * @return array<mixed>|string|null Redacted value, same shape as the input
 	 */
-	private static function redactSensitiveData($value)
+	public static function redactSensitiveData($value)
 	{
 		if (is_array($value)) {
 			$redacted = array();
@@ -758,14 +973,32 @@ abstract class AbstractPDPProvider
 	}
 
 	/**
+	 * Make an API payload safe to store in the utf8mb4 TEXT debug columns
+	 * (llx_einvoicing_call.response, llx_einvoicing_document.response_for_debug).
+	 *
+	 * Some PDP responses carry non-UTF-8 bytes (signed or compressed payloads): stored as-is they raise a
+	 * SQL error 1366 (Incorrect string value) and abort the flow. Valid UTF-8 is kept unchanged; anything
+	 * else is base64-encoded behind a marker.
+	 *
+	 * @param   string|null $payload    Raw payload, possibly binary
+	 * @return  string                  UTF-8-safe representation
+	 */
+	protected function makeStorableDebugPayload($payload)
+	{
+		if (!is_string($payload) || $payload === '') {
+			return (string) $payload;
+		}
+		if (preg_match('//u', $payload)) {	// already valid UTF-8
+			return $payload;
+		}
+		return '[base64] ' . base64_encode($payload);
+	}
+
+	/**
 	 * Log an API call into llx_einvoicing_call using a SEPARATE database connection.
 	 *
-	 * The call trace must survive even when the caller's main transaction is rolled
-	 * back on error (see issue #291): a failed send_invoice rolls back the doActions()
-	 * transaction, which would otherwise wipe the very log we need to diagnose it.
-	 * Writing the log through an independent connection ($dbhistory) decouples it from
-	 * the business transaction, so it is committed whether the action succeeds or fails,
-	 * without ever forcing a commit on the rest. Same approach as the webhook logging.
+	 * The trace must survive a rollback of the caller's transaction (issue #291), so it is written on
+	 * an independent connection ($dbhistory) and committed whether the action succeeds or fails.
 	 *
 	 * Request/response payloads are redacted (@see redactSensitiveData()) before being
 	 * persisted: this log is readable by any user with the 'einvoicing' read right, so
@@ -780,7 +1013,7 @@ abstract class AbstractPDPProvider
 	 * @param   string                      $requestId  Request-Id header sent with the call, kept to correlate our log with the one of the Access Point
 	 * @return  ?array{id:int,call_id:?string}           Created log identifiers, or null if not logged
 	 */
-	protected function logCall(?string $callType, $resource, $method, $params, $response, $statusCode, string $requestId = '')
+	protected function logCall($callType, $resource, $method, $params, $response, $statusCode, string $requestId = '')
 	{
 		global $conf, $user, $dolibarr_main_db_pass, $dbhistory;
 
@@ -808,11 +1041,13 @@ abstract class AbstractPDPProvider
 		$call->method = ($method == 'POSTALREADYFORMATED' ? 'POST' : $method);
 		$call->endpoint = '/' . $resource;
 		$call->request_id = $requestId;
-		$call->request_body = is_array($params) ? json_encode($params) : $params;
-		$call->response = is_array($response) ? json_encode($response) : $response;
+		$call->request_body = $this->makeStorableDebugPayload(is_array($params) ? json_encode($params) : $params);
+		$call->response = $this->makeStorableDebugPayload(is_array($response) ? json_encode($response) : $response);
 		$call->provider = $this->name;
 		$call->entity = $conf->entity;
 		$call->status = ($statusCode == 200 || $statusCode == 202) ? 1 : 0;
+
+		$call->context['statusCode'] = $statusCode;
 
 		if ($call->create($user) > 0) {
 			$dbhistory->commit();
@@ -871,6 +1106,176 @@ abstract class AbstractPDPProvider
 	}
 
 	/**
+	 * Record a lifecycle status the vendor issued about one of its invoices, onto the supplier
+	 * invoice it refers to.
+	 *
+	 * Never returns a negative result for a status it cannot attach: a vendor may report on an invoice this
+	 * Dolibarr does not hold (refused, or an access point account shared with another system), and failing
+	 * the flow would stall the whole synchronization on it, run after run. The flow is stored either way.
+	 *
+	 * Shared by every provider (moved out of SuperPDPProvider, issue: EsalinkPDPProvider's
+	 * "SupplierInvoiceLC" case had no equivalent guard and always fell through to the
+	 * fetchStatusMessages() path built for the flows WE send, which an incoming status is not).
+	 *
+	 * @param	string		$flowId			Flow identifier of the lifecycle message
+	 * @param	Document	$document		Flow document being built, completed here with the CDAR data
+	 * @param	EInvoicing	$einvoicing		E-invoicing helper of the running synchronization
+	 * @return	array{res:int, message:string}	1 when the status was attached, 0 when it was only stored
+	 */
+	protected function processIncomingSupplierInvoiceStatus($flowId, $document, $einvoicing)
+	{
+		global $db;
+
+		require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
+		dol_include_once('einvoicing/class/utils/CdarHandler.class.php');
+
+		$flowResource = 'flows/' . $flowId . '?' . http_build_query(array('docType' => 'Original'));
+		$flowResponse = $this->callApi($flowResource, "GET", false, array('Accept' => 'application/octet-stream'));
+		if ($flowResponse['status_code'] != 200) {
+			return array('res' => 0, 'message' => "Failed to retrieve flow details for flowId: " . $flowId);
+		}
+
+		$cdarHandler = new CdarHandler($db);
+		$cdarDocument = $cdarHandler->readFromString($flowResponse['response']);
+		if (empty($cdarDocument) || empty($cdarDocument['AcknowledgementDocument']['ReferenceReferencedDocument'])) {
+			return array('res' => 0, 'message' => "FlowId: " . $flowId . " - Failed to parse CDAR document");
+		}
+
+		$refDoc = $cdarDocument['AcknowledgementDocument']['ReferenceReferencedDocument'];
+
+		$document->cdar_lifecycle_code = $refDoc['ProcessConditionCode'];
+		$document->cdar_lifecycle_label = isset($refDoc['ProcessCondition']) ? $refDoc['ProcessCondition'] : '';
+		$document->cdar_reason_code = isset($refDoc['StatusReasonCode']) ? $refDoc['StatusReasonCode'] : '';
+		$document->cdar_reason_desc = isset($refDoc['StatusReason']) ? $refDoc['StatusReason'] : '';
+		$document->cdar_reason_detail = isset($refDoc['StatusIncludedNoteContent']) ? $refDoc['StatusIncludedNoteContent'] : '';
+
+		// The referenced document is the vendor invoice, identified the way its issuer numbered it:
+		// that is our ref_supplier, and the issuing party is the vendor it belongs to.
+		$vendorReference = isset($refDoc['IssuerAssignedID']) ? (string) $refDoc['IssuerAssignedID'] : '';
+		$vendorLegalId = isset($refDoc['IssuerTradeParty']['GlobalID']) ? (string) $refDoc['IssuerTradeParty']['GlobalID'] : '';
+
+		$document->tracking_idref = $vendorReference;
+
+		if ($vendorReference === '') {
+			dol_syslog(__METHOD__ . " FlowId " . $flowId . " carries no IssuerAssignedID, nothing to attach the status to", LOG_WARNING);
+			return array('res' => 0, 'message' => "FlowId " . $flowId . " - Vendor lifecycle status with no invoice reference");
+		}
+
+		$supplierInvoiceId = $this->findSupplierInvoiceByVendorReference($vendorReference, $vendorLegalId);
+		if ($supplierInvoiceId <= 0) {
+			dol_syslog(__METHOD__ . " No supplier invoice found for vendor reference " . $vendorReference . " (vendor " . $vendorLegalId . "), flowId " . $flowId, LOG_WARNING);
+			return array('res' => 0, 'message' => "FlowId " . $flowId . " - No supplier invoice matching the vendor reference " . $vendorReference);
+		}
+
+		$supplierInvoice = new FactureFournisseur($this->db);
+		if ($supplierInvoice->fetch($supplierInvoiceId) <= 0) {
+			return array('res' => 0, 'message' => "FlowId " . $flowId . " - Failed to load supplier invoice id " . $supplierInvoiceId);
+		}
+
+		$document->fk_element_id = $supplierInvoice->id;
+		$document->tracking_idref = $supplierInvoice->ref;
+
+		$statusComment = $document->cdar_reason_detail ? $document->cdar_reason_detail : $document->cdar_reason_desc;
+
+		$exceptionmessage = '';
+		$db->begin();
+
+		try {
+			// The flow_id of the link is left alone on purpose: on a supplier invoice it points at the
+			// received invoice document, which stays the source of its XML. Only the status moves.
+			$einvoicing->insertOrUpdateExtLink($supplierInvoice->id, $supplierInvoice->element, '', $document->cdar_lifecycle_code, '', $statusComment);
+
+			$einvoicing->storeStatusMessage(
+				$supplierInvoice->id,
+				$supplierInvoice->element,
+				$document->cdar_lifecycle_code,
+				$statusComment,
+				$document->flow_direction,
+				$flowId,
+				$document->ack_status,
+				$document->ack_info,
+				$document->submittedat,
+				$document->cdar_reason_code
+			);
+
+			$db->commit();
+		} catch (Exception $e) {
+			$exceptionmessage = $e->getMessage();
+
+			$db->rollback();
+		}
+
+		if ($exceptionmessage) {
+			throw new Exception($exceptionmessage);
+		}
+
+		$statusLabel = $document->cdar_lifecycle_label ? $document->cdar_lifecycle_label : $document->cdar_lifecycle_code;
+		$reasonDetail = $document->cdar_reason_detail ? " - " . $document->cdar_reason_detail : '';
+		$this->addEvent('STATUS', "EINVOICING - Status: " . $statusLabel, "EINVOICING - Status: " . $statusLabel . $reasonDetail, $supplierInvoice);
+
+		return array('res' => 1, 'message' => "FlowId " . $flowId . " - Vendor status " . $document->cdar_lifecycle_code . " recorded on supplier invoice " . $supplierInvoice->ref);
+	}
+
+	/**
+	 * Find the supplier invoice a vendor lifecycle status refers to.
+	 *
+	 * A vendor reference is only unique per vendor, never globally, so it is only trusted alone when
+	 * it matches exactly one invoice. When several vendors happen to use the same numbering, the
+	 * legal identifier carried by the CDAR settles it; when it cannot, no invoice is returned rather
+	 * than the wrong one.
+	 *
+	 * @param	string	$vendorReference	Invoice number as assigned by the vendor (BT-1 of the referenced invoice)
+	 * @param	string	$vendorLegalId		Legal identifier of the issuing party, empty when the CDAR carries none
+	 * @return	int							Supplier invoice id, 0 when there is no single certain match
+	 */
+	protected function findSupplierInvoiceByVendorReference($vendorReference, $vendorLegalId)
+	{
+		global $db;
+
+		$sql = "SELECT f.rowid, s.siren, s.siret, s.tva_intra";
+		$sql .= " FROM " . $db->prefix() . "facture_fourn as f";
+		$sql .= " INNER JOIN " . $db->prefix() . "societe as s ON s.rowid = f.fk_soc";
+		$sql .= " WHERE f.ref_supplier = '" . $db->escape($vendorReference) . "'";
+
+		$listofentityids = getEntity('facture_fourn');
+		if (getDolGlobalString('EINVOICING_ALLOW_MULTICOMPANY_INVOICE_MOVE')) {
+			$listofentityids .= ','.getDolGlobalString('EINVOICING_ALLOW_MULTICOMPANY_INVOICE_MOVE');
+		}
+		$sql .= " AND f.entity IN (" . $db->sanitize($listofentityids) . ")";
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . " " . $db->lasterror(), LOG_ERR);
+			return 0;
+		}
+
+		$candidates = array();
+		while ($obj = $db->fetch_object($resql)) {
+			$candidates[] = $obj;
+		}
+		$db->free($resql);
+
+		if (count($candidates) == 1) {
+			return (int) $candidates[0]->rowid;
+		}
+		if (empty($candidates) || $vendorLegalId === '') {
+			return 0;
+		}
+
+		// Several invoices carry that number: only the one whose vendor is the issuer of the status.
+		$matches = array();
+		foreach ($candidates as $candidate) {
+			if ($vendorLegalId === (string) $candidate->siren
+				|| $vendorLegalId === (string) $candidate->siret
+				|| $vendorLegalId === (string) $candidate->tva_intra) {
+				$matches[] = (int) $candidate->rowid;
+			}
+		}
+
+		return count($matches) == 1 ? $matches[0] : 0;
+	}
+
+	/**
 	 * Send an electronic invoice.
 	 *
 	 * This function send an invoice to PDP
@@ -923,34 +1328,34 @@ abstract class AbstractPDPProvider
 	}
 
 	/**
-	 * Try to get a flow XML from its id using API
-	 * @param string $flowId 		The id of the flow to fetch
-	 * @param bool	 $cleanXml 		Whether you need to remove (attachments presents in XML content...)
+	 * The invoice of a flow, read from the same document the supplier invoice was imported from.
 	 *
-	 * @return ?string
+	 * It used to ask for the 'Original' while the import reads what fetchImportableFlowDocument()
+	 * picks, so the check compared the invoice against a file it was not built from, and opened a
+	 * PDF reader on installations whose reception path is plain XML.
+	 *
+	 * @param	string	$flowId			The id of the flow to fetch
+	 * @param	bool	$cleanXml		Whether you need to remove (attachments presents in XML content...)
+	 * @return	?string					The invoice XML, or null when no document of the flow can be read
+	 * @throws	Exception				When the access point returned no document at all
 	 */
 	public function fetchFlowXml($flowId, $cleanXml)
 	{
-		$flowResponse = $this->fetchFlowData($flowId, 'Original', 'get_flow_xml');
+		$importable = $this->fetchImportableFlowDocument($flowId, new ProtocolManager($this->db));
 
-		if ($flowResponse['status_code'] != 200) {
+		if (empty($importable['fetched'])) {
 			throw new Exception('Failed to get flow XML for flow id n° ' . $flowId);
 		}
 
-		$xmlData = null;
+		if (empty($importable['protocol'])) {
+			dol_syslog(__METHOD__ . " Flow " . $flowId . " holds no document this module can read: " . implode(' | ', $importable['attempts']), LOG_WARNING, 0, "_einvoicing");
+			return null;
+		}
 
-		// $receivedFileContent may be an XML file (CII, UBL...) or a PDF file (FacturX), or ...
-		$receivedFileContent = $flowResponse['response'];
+		$xmlData = $importable['protocol']->extractXmlFromFileContent((string) $importable['file']);
 
-		$resProtocol = ProtocolManager::getProtocolFromContent($receivedFileContent);
-		if ($resProtocol['success']) {
-			$protocol = $resProtocol['protocol_object'];
-
-			$xmlData = $protocol->extractXmlFromFileContent($receivedFileContent);
-
-			if ($cleanXml) {
-				$xmlData = Document::cleanXmlData($xmlData);
-			}
+		if ($cleanXml) {
+			$xmlData = Document::cleanXmlData($xmlData);
 		}
 
 		return $xmlData;
@@ -966,7 +1371,7 @@ abstract class AbstractPDPProvider
 	 *
 	 * @var array<string,string>
 	 */
-	protected const FLOW_PROFILE_BY_GUIDELINE = array(
+	const FLOW_PROFILE_BY_GUIDELINE = array(
 		'urn:factur-x.eu:1p0:basic' => 'Basic',
 		'urn:cen.eu:en16931:2017' => 'CIUS',
 		'urn:cen.eu:en16931:2017#conformant#urn.cpro.gouv.fr:1p0:extended-ctc-fr' => 'Extended-CTC-FR',

@@ -1,17 +1,30 @@
 # CHANGELOG STANCER FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
-## 2.0.22 -- 2026-08-24
+## 2.0.23 -- 2026-09-05
+
+Fix payments recorded nowhere when the customer paid from a link received by mail
+Read the payment id and the currency from the payment record instead of the browser session
+Refuse an API call built with an empty id instead of letting it query the whole payment list
+Remember on the payment record that it only covers a deposit ("30% on order")
+Fix a false "payment already recorded" that could stop the return page
+Fix the missing stancer-card row that hid an already existing Stancer customer on the thirdparty tab
+Mail tracking id now follows the paid object: invoice, order, proposal, member or donation
+Detect enabled modules on every supported Dolibarr version
+The failure mail sent to the administrator now names the Stancer payment and its status
+Add tests
+
+## 2.0.22 -- 2026-08-24
 
 Appli dolibarr rules for free community module
 -> https://wiki.dolibarr.org/index.php/Modules_-_Rules_for_community_modules
 
-## 2.0.20 -- 2026-08-24
+## 2.0.20 -- 2026-08-24
 
 Fix sql requests on admin parts (repair / cleanup)
 better log collectors for user support
 enhance user doc
 
-## 2.0.18 -- 2026-07-20
+## 2.0.18 -- 2026-07-20
 
 Fix fees on operations
 Add values guards, htmlfilters, xss checks
@@ -19,7 +32,7 @@ Add repair and saferty pages for admin
 Enhance logs collect system
 
 
-## 2.0.14 -- 2026-06-15
+## 2.0.14 -- 2026-06-15
 
 Dedup for all rtpe of documents
 Better changelog parser (about page)
@@ -28,7 +41,7 @@ Fix bad thirdparty links
 Better css
 Add a re-audit system for muti-payments2.
 
-## 2.0.12 -- 2026-05-20
+## 2.0.12 -- 2026-05-20
 
 Change pseudo-stripe fake mode
 New experimental option "group sepa mandate same day" to compress fees
@@ -41,7 +54,7 @@ fix miss attributions on group payment
 fix duplicate mails sent
 add a check on module setup to avoid risk of invert private / public keys
 
-## 2.0.10 -- 2026-05-04
+## 2.0.10 -- 2026-05-04
 
 Add dolibarr tracking number in mails
 Skip doaction if object is not linked to stancer
@@ -52,7 +65,7 @@ Display debug messages json + fix all case of sepa refund
 Better auto send emails
 Use history to avoid multi send mails for payout info
 
-## 2.0.8 -- 2026-04-13
+## 2.0.8 -- 2026-04-13
 
 Fix Dolibarr 23 compat
 Unify mail send system
@@ -64,13 +77,13 @@ Fix phpdoc comments
 Better phpstan checks
 Update langs files
 
-## 2.0.6 -- 2026-03-31
+## 2.0.6 -- 2026-03-31
 
 Avoid duplicate mails in case of problem
 New option to allow retry pay with stancer even if there was a previous payment problem with them
 Update user doc
 
-## 2.0.4 -- 2026-03-20
+## 2.0.4 -- 2026-03-20
 
 Full migration to Stancer API v2 (all endpoints)
 New stancer_disputes model and DB table for dispute tracking
@@ -94,30 +107,30 @@ Removed dependency on Stancer PHP library (pure REST via getURLContent())
 PHPStan improvements
 Unit tests updated for API v2
 
-## 2.0.2 -- 2026-03-18
+## 2.0.2 -- 2026-03-18
 
 New version - no cost, this module is not sell anymore
 but maintenance is active, that is our main payment system !
 
-## 1.2.136 -- 2026-01-19
+## 1.2.136 -- 2026-01-19
 
 Partial pay (deposit) on propal ... (end)
 
-## 1.2.134 -- 2026-01-09
+## 1.2.134 -- 2026-01-09
 
 Partial pay (deposit) on propal ... (in progress)
 
-## 1.2.133 -- 2026-01-06
+## 1.2.133 -- 2026-01-06
 
 Propal to Invoice
 
-## 1.2.132 -- 2025-12-09
+## 1.2.132 -- 2025-12-09
 
 New back of payment link for propal
 Hide payment button if "retry payment"
 New refund process on credit note
 
-## 1.2.130 -- 2025-09-09
+## 1.2.130 -- 2025-09-09
 
 Fix sql request on auto pay cron task thanks to Florian Koch
 

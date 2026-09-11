@@ -29,6 +29,7 @@ CREATE TABLE llx_einvoicing_document(
 	flow_direction varchar(10), 
 	flow_syntax varchar(50), 
 	flow_profile varchar(50), 
+	processing_rule varchar(50),			-- Rule the platform computed for the flow (B2B, B2BInt, NotApplicable, ...)
 	ack_status varchar(50), 
 	ack_reason_code varchar(255), 
 	ack_info text, 

@@ -1,0 +1,113 @@
+---
+name: What the change touches
+description: >
+  Classifies the files of a pull request: which modules of the repository they belong to, and what
+  kind of files they are. It answers with facts only - which cores to run on, which check to skip,
+  is the business of the workflow that asks. Anything it cannot classify answers "everything", so a
+  caller that trusts it never runs less than it should.
+
+inputs:
+  token:
+    description: Token used to read the files of the pull request
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  all:
+    description: '"true" when the change could not be classified and everything has to run'
+    value: ${{ steps.classify.outputs.all }}
+  modules:
+    description: JSON array of the modules of MAINTAINERS the change touches
+    value: ${{ steps.classify.outputs.modules }}
+  kinds:
+    description: JSON array of the kinds of .github/changed.map the change touches
+    value: ${{ steps.classify.outputs.kinds }}
+  files:
+    description: Path of a file holding one changed path per line, empty when "all" is true
+    value: ${{ steps.classify.outputs.files }}
+
+runs:
+  using: composite
+  steps:
+    - id: classify
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        PR_NUMBER: ${{ github.event.number }}
+      run: |
+        set -uo pipefail
+        files="${RUNNER_TEMP}/changed-files.txt"
+        : > "$files"
+
+        everything() {
+          echo "::notice::$1 - everything runs."
+          {
+            echo "all=true"
+            echo "modules=[]"
+            echo "kinds=[]"
+            echo "files="
+          } >> "$GITHUB_OUTPUT"
+          exit 0
+        }
+
+        if [ "${GITHUB_EVENT_NAME}" != "pull_request" ]; then
+          everything "${GITHUB_EVENT_NAME} is not a pull request"
+        fi
+
+        # The list is used only when it is known to be complete: the files endpoint answers at most
+        # 3000 of them, and a truncated list of a large pull request would read as a small change.
+        declared=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.changed_files' 2>/dev/null || echo '')
+        gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" --paginate --jq '.[].filename' > "$files" 2>/dev/null || true
+        count=$(wc -l < "$files")
+        if [ -z "$declared" ] || [ "$count" -eq 0 ] || [ "$count" -ne "$declared" ]; then
+          everything "the file list holds $count of the ${declared:-?} files of the pull request"
+        fi
+
+        # The modules and their directory come from MAINTAINERS, which is where this repository
+        # already declares them. The F: lines of its own documentation are not directories here.
+        modules=()
+        while read -r dir; do
+          dir="${dir%/}"
+          case "$dir" in ''|*/*|\**) continue ;; esac
+          [ -d "$dir" ] && modules+=("$dir")
+        done < <(grep -E '^F:' MAINTAINERS | sed -E 's/^F:[[:space:]]*//')
+
+        kindname=()
+        kindglob=()
+        while IFS=$'\t' read -r k g; do
+          k="${k%%[[:space:]]*}"
+          case "$k" in ''|'#'*) continue ;; esac
+          kindname+=("$k")
+          kindglob+=("$g")
+        done < .github/changed.map
+
+        touchedmod=()
+        touchedkind=()
+        while read -r f; do
+          [ -n "$f" ] || continue
+          for m in "${modules[@]}"; do
+            case "$f" in "$m"/*) touchedmod+=("$m") ;; esac
+          done
+          for i in "${!kindglob[@]}"; do
+            # shellcheck disable=SC2053
+            if [[ "$f" == ${kindglob[$i]} ]]; then
+              touchedkind+=("${kindname[$i]}")
+              break
+            fi
+          done
+        done < "$files"
+
+        tojson() {
+          if [ "$#" -eq 0 ]; then echo '[]'; return; fi
+          printf '%s\n' "$@" | sort -u | jq -R . | jq -s -c .
+        }
+        modjson=$(tojson ${touchedmod[@]+"${touchedmod[@]}"})
+        kindjson=$(tojson ${touchedkind[@]+"${touchedkind[@]}"})
+
+        echo "$count file(s): modules=$modjson kinds=$kindjson"
+        {
+          echo "all=false"
+          echo "modules=$modjson"
+          echo "kinds=$kindjson"
+          echo "files=$files"
+        } >> "$GITHUB_OUTPUT"

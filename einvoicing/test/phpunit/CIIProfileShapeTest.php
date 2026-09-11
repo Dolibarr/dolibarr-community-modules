@@ -20,22 +20,19 @@
  *      \file       test/phpunit/CIIProfileShapeTest.php
  *      \ingroup    test
  *      \brief      PHPUnit test for the groups a profile is allowed to carry.
- *                  MINIMUM and BASIC WL are header-only Factur-X profiles: neither
- *                  ram:IncludedSupplyChainTradeLineItem (BG-25) nor ram:DefinedTradeContact
- *                  (BG-6 / BG-9) is declared in their XSD, so emitting either makes every
- *                  generated document fail the profile schema. Every profile from BASIC upwards
- *                  expects both.
+ *                  MINIMUM and BASIC WL are header-only Factur-X profiles: their XSD declares
+ *                  neither ram:IncludedSupplyChainTradeLineItem (BG-25) nor ram:DefinedTradeContact
+ *                  (BG-6 / BG-9), while every profile from BASIC upwards expects both.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 
 global $conf, $user, $langs, $db;
 
-// This module is deployed by symlinking this repository into htdocs/custom/einvoicing of one or
-// several Dolibarr instances. Some test runners resolve the real (non-symlinked) path of this
-// file before including it, which breaks a fixed "../../htdocs/master.inc.php" relative path.
-// DOLIBARR_HTDOCS let's the developer/CI point explicitly at the Dolibarr instance to test
-// against; otherwise we fall back to the standard relative path (valid when this file is reached
-// through the htdocs/custom/einvoicing/test/phpunit symlink without realpath resolution).
+// This module is deployed by symlinking this repository into htdocs/custom/einvoicing. Some test
+// runners resolve the real (non-symlinked) path of this file before including it, which breaks a
+// fixed "../../htdocs/master.inc.php" relative path. DOLIBARR_HTDOCS let's the developer/CI point
+// explicitly at the Dolibarr instance to test against; otherwise we fall back to the relative path
+// (valid when this file is reached through the symlink without realpath resolution).
 $dolibarrHtdocs = getenv('DOLIBARR_HTDOCS');
 if (!$dolibarrHtdocs) {
 	$dolibarrHtdocs = dirname(__FILE__) . '/../../htdocs';
@@ -401,7 +398,8 @@ class CIIProfileShapeTest extends CommonClassTest
 	}
 
 	/**
-	 * Invoice data carrying the three header references, on top of the base fixture.
+	 * Invoice data carrying the header references, on top of the base fixture: an invoice covering
+	 * three purchase orders, so the first lands on BT-13 and the other two on BT-18.
 	 *
 	 * @return	array<string,mixed>
 	 */
@@ -419,6 +417,9 @@ class CIIProfileShapeTest extends CommonClassTest
 		$data['buyerReference'] = 'SERVICE-EXEC-01';		// BT-10
 		$data['contractReference'] = 'CTR-2026-118';		// BT-12
 		$data['_project'] = $project;						// BT-11
+		$data['orderReference'] = 'BC-2026-0007';			// BT-13
+		// An invoice covering three orders: BT-13 takes the first, the other two go to BT-18
+		$data['_customerOrderReferenceList'] = ['BC-2026-0007', 'BC-2026-0008', 'BC-2026-0009'];
 
 		return $data;
 	}
@@ -464,11 +465,9 @@ class CIIProfileShapeTest extends CommonClassTest
 	 * The buyer routing code travels as a second ram:GlobalID of the buyer party, and only the
 	 * EXTENDED profiles may carry it.
 	 *
-	 * Scheme 0224 is where BR-FR-CPRO-11 and BR-FR-CPRO-13 read the Chorus Pro service code, but it
-	 * is a second identifier for the party, and the Factur-X EN16931 Schematron caps that element at
-	 * one occurrence (FX-SCH-A-000164): a document below EXTENDED that carries both is refused. The
-	 * Annexe B examples of XP Z12-012 agree - the routing code is in the EXTENDED and EXTENDED-CTC-FR
-	 * files of an invoice, absent from its EN16931 twin (issue #678).
+	 * Scheme 0224 is where BR-FR-CPRO-11 and BR-FR-CPRO-13 read the Chorus Pro service code, and the
+	 * Factur-X EN16931 Schematron caps ram:GlobalID at one occurrence (FX-SCH-A-000164): a document
+	 * below EXTENDED carrying both is refused (issue #678).
 	 *
 	 * @return void
 	 */
@@ -592,6 +591,41 @@ class CIIProfileShapeTest extends CommonClassTest
 	}
 
 	/**
+	 * The order references an invoice carries beyond BT-13 are emitted as invoiced object identifiers
+	 * (BT-18), an element ram:AdditionalReferencedDocument only declares from EN16931 up.
+	 *
+	 * @return void
+	 */
+	public function testAdditionalOrderReferencesFollowTheProfileSchema()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		foreach (CIIProtocol::SUPPORTED_XML_PROFILES as $profile) {
+			$xml = $protocol->buildXML($this->invoiceDataWithReferences(), $this->baseLinesData(), $profile);
+			$count = $this->countTag($xml, 'ram:AdditionalReferencedDocument');
+
+			if (!in_array($profile, ['EN16931', 'EXTENDED', 'EXTENDEDFR'], true)) {
+				$this->assertSame(0, $count, $profile . ' does not declare ram:AdditionalReferencedDocument in the agreement section');
+				continue;
+			}
+
+			$this->assertSame(2, $count, $profile . ' must carry the two order references BT-13 does not hold');
+
+			$doc = new DOMDocument();
+			$doc->loadXML($xml);
+			$found = [];
+			foreach ($doc->getElementsByTagName('AdditionalReferencedDocument') as $node) {
+				$this->assertSame('130', $node->getElementsByTagName('TypeCode')->item(0)->nodeValue, $profile . ' BT-18 type code');
+				$found[] = $node->getElementsByTagName('IssuerAssignedID')->item(0)->nodeValue;
+			}
+			// The reference already emitted as BT-13 must not be repeated here
+			$this->assertSame(['BC-2026-0008', 'BC-2026-0009'], $found, $profile . ' BT-18 values');
+		}
+	}
+
+	/**
 	 * The project reference (BT-11) only exists from EN16931 up, and its type makes both ram:ID and
 	 * ram:Name mandatory.
 	 *
@@ -662,6 +696,7 @@ class CIIProfileShapeTest extends CommonClassTest
 			$this->assertSame(0, $this->countTag($xml, 'ram:BuyerReference'), $profile . ' must not carry an empty BT-10');
 			$this->assertSame(0, $this->countTag($xml, 'ram:ContractReferencedDocument'), $profile . ' must not carry an empty BT-12');
 			$this->assertSame(0, $this->countTag($xml, 'ram:SpecifiedProcuringProject'), $profile . ' must not carry an empty BT-11');
+			$this->assertSame(0, $this->countTag($xml, 'ram:AdditionalReferencedDocument'), $profile . ' must not carry an empty BT-18');
 		}
 	}
 

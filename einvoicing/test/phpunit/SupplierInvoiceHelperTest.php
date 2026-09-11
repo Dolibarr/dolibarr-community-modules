@@ -23,19 +23,16 @@
  *                  business rule (issue #286): SupplierInvoiceHelper::abandonRefusedSupplierInvoice(),
  *                  SupplierInvoiceHelper::onOutboundStatusMessageValidated() and their dispatch from
  *                  EInvoicing::updateStatusMessageValidation().
- *                  Also covers SupplierInvoiceHelper::findIdByRef() and the delimiter rule of its
- *                  opt-in tolerant fallback (SupplierInvoiceHelper::refEmbedsReference()).
+ *                  Also covers SupplierInvoiceHelper::findIdByRef() and refEmbedsReference().
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 
 global $conf, $user, $langs, $db;
 
-// This module is deployed by symlinking this repository into htdocs/custom/einvoicing of one or
-// several Dolibarr instances. Some test runners resolve the real (non-symlinked) path of this
-// file before including it, which breaks a fixed "../../htdocs/master.inc.php" relative path.
-// DOLIBARR_HTDOCS let's the developer/CI point explicitly at the Dolibarr instance to test
-// against; otherwise we fall back to the standard relative path (valid when this file is reached
-// through the htdocs/custom/einvoicing/test/phpunit symlink without realpath resolution).
+// This module is deployed by symlinking this repository into htdocs/custom/einvoicing. Some test runners
+// resolve the real (non-symlinked) path of this file before including it, which breaks a fixed
+// "../../htdocs/master.inc.php" relative path. DOLIBARR_HTDOCS let's the developer/CI point explicitly at
+// the Dolibarr instance to test against; otherwise we fall back to the standard relative path.
 $dolibarrHtdocs = getenv('DOLIBARR_HTDOCS');
 if (!$dolibarrHtdocs) {
 	$dolibarrHtdocs = dirname(__FILE__) . '/../../htdocs';
@@ -81,7 +78,7 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 	 */
 	protected function setUp(): void
 	{
-		global $conf;
+		global $conf, $db;
 
 		parent::setUp();
 
@@ -89,6 +86,10 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 		// findIdByRef() is exact by default; the tests that are about the tolerant fallback turn it on
 		$conf->global->EINVOICING_TOLERANT_SUPPLIER_REF_MATCH = '0';
 		unset($conf->global->EINVOICING_TOLERANT_SUPPLIER_REF_MIN_LENGTH);
+		// A provider has to be set for storeStatusMessage() to record anything, and the statuses
+		// offered on a received invoice are read from a history that starts empty.
+		$conf->global->EINVOICING_PDP = 'SUPERPDP';
+		$db->query("DELETE FROM " . $db->prefix() . "einvoicing_lifecycle_msg WHERE element_id = " . (int) self::TEST_ELEMENT_ID);
 	}
 
 	/**
@@ -182,17 +183,22 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 	 * the transaction opened by CommonClassTest::setUpBeforeClass(), so nothing survives the run.
 	 *
 	 * @param	int		$supplierInvoiceId	Id of the supplier invoice the document describes
+	 * @param	string	$processingRule		Rule the platform computed for the flow ('B2B', 'B2BInt', ...), if any
+	 * @param	string	$responseForDebug	Raw flow metadata, as kept by the synchronization in debug mode
 	 * @return	void
 	 */
-	private function addEInvoicingDocument($supplierInvoiceId)
+	private function addEInvoicingDocument($supplierInvoiceId, $processingRule = '', $responseForDebug = '')
 	{
 		global $db;
 
 		$now = $db->idate(dol_now());
 
 		$sql = "INSERT INTO " . MAIN_DB_PREFIX . "einvoicing_document";
-		$sql .= " (fk_element_type, fk_element_id, flow_type, date_creation, fk_user_creat, status, submittedat, provider)";
-		$sql .= " VALUES ('invoice_supplier', " . ((int) $supplierInvoiceId) . ", 'SupplierInvoice', '" . $now . "', 1, 0, '" . $now . "', 'PHPUNIT')";
+		$sql .= " (fk_element_type, fk_element_id, flow_type, flow_syntax, processing_rule, response_for_debug, date_creation, fk_user_creat, status, submittedat, provider)";
+		$sql .= " VALUES ('invoice_supplier', " . ((int) $supplierInvoiceId) . ", 'SupplierInvoice', 'UBL'";
+		$sql .= ", " . ($processingRule === '' ? "NULL" : "'" . $db->escape($processingRule) . "'");
+		$sql .= ", " . ($responseForDebug === '' ? "NULL" : "'" . $db->escape($responseForDebug) . "'");
+		$sql .= ", '" . $now . "', 1, 0, '" . $now . "', 'PHPUNIT')";
 
 		$this->assertNotFalse($db->query($sql), (string) $db->lasterror());
 	}
@@ -714,6 +720,70 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 	}
 
 	/**
+	 * A flow the platform filed as B2B international gets no lifecycle answer: it refuses every status but
+	 * the payment event, so nothing is sent on validation and nothing is offered by hand (issue #799).
+	 *
+	 * @return void
+	 */
+	public function testInternationalFlowGetsNoLifecycleAnswer()
+	{
+		global $conf, $db;
+
+		$conf->global->EINVOICING_SEND_APPROVED_ON_VALIDATION = '1';
+
+		$invoice = $this->createSpecimenSupplierInvoice();
+		$this->addEInvoicingDocument($invoice->id, EInvoicing::PROCESSING_RULE_INTERNATIONAL);
+
+		$einvoicing = new EInvoicing($db);
+		$this->assertSame('B2BInt', $einvoicing->getFlowProcessingRule((int) $invoice->id, 'invoice_supplier'));
+		$this->assertTrue($einvoicing->isInternationalFlow((int) $invoice->id, 'invoice_supplier'));
+		$this->assertFalse(SupplierInvoiceHelper::shouldSendApprovedOnValidation($einvoicing, (int) $invoice->id, 'invoice_supplier'));
+		$this->assertSame(array(), $einvoicing->getSendableStatusesForReceivedInvoice((int) $invoice->id, 'invoice_supplier'));
+	}
+
+	/**
+	 * A domestic flow keeps its lifecycle: "Approved" is sent on validation, and both answers are
+	 * offered by hand. The rule is the only thing that differs from the test above.
+	 *
+	 * @return void
+	 */
+	public function testDomesticFlowKeepsItsLifecycleAnswer()
+	{
+		global $conf, $db;
+
+		$conf->global->EINVOICING_SEND_APPROVED_ON_VALIDATION = '1';
+
+		$invoice = $this->createSpecimenSupplierInvoice();
+		$this->addEInvoicingDocument($invoice->id, 'B2B');
+
+		$einvoicing = new EInvoicing($db);
+		$this->assertFalse($einvoicing->isInternationalFlow((int) $invoice->id, 'invoice_supplier'));
+		$this->assertTrue(SupplierInvoiceHelper::shouldSendApprovedOnValidation($einvoicing, (int) $invoice->id, 'invoice_supplier'));
+		$statuses = $einvoicing->getSendableStatusesForReceivedInvoice((int) $invoice->id, 'invoice_supplier');
+		$this->assertArrayHasKey(EInvoicing::STATUS_APPROVED, $statuses);
+		$this->assertArrayHasKey(EInvoicing::STATUS_REFUSED, $statuses);
+	}
+
+	/**
+	 * A flow synchronized before the column existed still carries the rule in the raw metadata kept in
+	 * debug mode: it is read from there, so an instance in the middle of the case is covered without a
+	 * new synchronization.
+	 *
+	 * @return void
+	 */
+	public function testProcessingRuleFallsBackOnDebugMetadata()
+	{
+		global $db;
+
+		$invoice = $this->createSpecimenSupplierInvoice();
+		$this->addEInvoicingDocument($invoice->id, '', '{"processingRule":"B2BInt","flowId":"i_1","processingRuleSource":"Computed"}');
+
+		$einvoicing = new EInvoicing($db);
+		$this->assertTrue($einvoicing->isInternationalFlow((int) $invoice->id, 'invoice_supplier'));
+		$this->assertSame(array(), $einvoicing->getSendableStatusesForReceivedInvoice((int) $invoice->id, 'invoice_supplier'));
+	}
+
+	/**
 	 * An invoice that never came from the platform has no vendor waiting for a status: nothing is sent,
 	 * whatever the setup says.
 	 *
@@ -821,6 +891,87 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 	}
 
 	/**
+	 * The mark of issue #861, end to end: an import that could not reproduce the totals of the document
+	 * blocks the invoice, and the block is lifted the moment the invoice totals what was announced -
+	 * the mark keeps those figures precisely so it can be re-evaluated without the document.
+	 *
+	 * @return void
+	 */
+	public function testATotalsMismatchBlocksUntilTheInvoiceAgrees()
+	{
+		global $db;
+
+		$invoice = $this->createSpecimenSupplierInvoice();
+		$stored = new FactureFournisseur($db);
+		$this->assertGreaterThan(0, $stored->fetch((int) $invoice->id));
+
+		$this->assertNull(SupplierInvoiceHelper::totalsMismatch((int) $invoice->id), 'an invoice carries no mark to begin with');
+		$this->assertFalse(SupplierInvoiceHelper::totalsMismatchBlocks((int) $invoice->id));
+
+		// The import could not rebuild what the document announces: 130.00 including VAT, 30.00 of VAT.
+		SupplierInvoiceHelper::flagTotalsMismatch((int) $invoice->id, 30.00, 130.00);
+
+		$announced = SupplierInvoiceHelper::totalsMismatch((int) $invoice->id);
+		$this->assertIsArray($announced);
+		$this->assertEquals(130.00, $announced['ttc'], 'the mark keeps what the document announces');
+		$this->assertEquals(30.00, $announced['tva']);
+		$this->assertTrue(SupplierInvoiceHelper::totalsMismatchBlocks((int) $invoice->id), 'and it blocks while the invoice says otherwise');
+
+		// Same invoice, marked against the totals it actually carries: there is nothing left to block.
+		SupplierInvoiceHelper::flagTotalsMismatch((int) $invoice->id, abs((float) $stored->total_tva), abs((float) $stored->total_ttc));
+		$this->assertFalse(SupplierInvoiceHelper::totalsMismatchBlocks((int) $invoice->id), 'an invoice that totals the document blocks nothing');
+
+		SupplierInvoiceHelper::clearTotalsMismatch((int) $invoice->id);
+		$this->assertNull(SupplierInvoiceHelper::totalsMismatch((int) $invoice->id));
+	}
+
+	/**
+	 * The comparison is made on the absolute values: Dolibarr stores a credit note negative while
+	 * BT-110 and BT-112 are always announced positive, the document type carrying the sign.
+	 *
+	 * @return void
+	 */
+	public function testTotalsAgreeWithDocumentComparesAbsoluteValues()
+	{
+		global $db;
+
+		$creditNote = new FactureFournisseur($db);
+		$creditNote->total_tva = -20.00;
+		$creditNote->total_ttc = -120.00;
+
+		$this->assertTrue(SupplierInvoiceHelper::totalsAgreeWithDocument($creditNote, 20.00, 120.00));
+		$this->assertFalse(SupplierInvoiceHelper::totalsAgreeWithDocument($creditNote, 20.00, 130.00), 'a cent apart is a difference, not a rounding');
+		$this->assertTrue(SupplierInvoiceHelper::totalsAgreeWithDocument($creditNote, 20.001, 119.999), 'the tolerance is there for the float representation only');
+	}
+
+	/**
+	 * An invoice the import could not reproduce is not one to approve: approving it commits to paying
+	 * a figure the vendor did not bill. Refusing it stays offered - that is the answer it deserves.
+	 *
+	 * @return void
+	 */
+	public function testAnInvoiceThatDoesNotTotalItsDocumentCannotBeApproved()
+	{
+		global $db;
+
+		$invoice = $this->createSpecimenSupplierInvoice();
+		$this->addEInvoicingDocument($invoice->id);
+
+		$einvoicing = new EInvoicing($db);
+		$offered = array_map('intval', array_keys($einvoicing->getSendableStatusesForReceivedInvoice($invoice->id, 'invoice_supplier')));
+		$this->assertContains(EInvoicing::STATUS_APPROVED, $offered, 'nothing blocks an invoice that totals its document');
+
+		SupplierInvoiceHelper::flagTotalsMismatch((int) $invoice->id, 30.00, 130.00);
+
+		$offered = array_map('intval', array_keys($einvoicing->getSendableStatusesForReceivedInvoice($invoice->id, 'invoice_supplier')));
+		$this->assertNotContains(EInvoicing::STATUS_APPROVED, $offered, 'an invoice that does not total its document cannot be approved');
+		$this->assertNotContains(EInvoicing::STATUS_PARTIALLY_APPROVED, $offered, 'nor partially approved, which accepts it too');
+		$this->assertContains(EInvoicing::STATUS_REFUSED, $offered, 'refusing the document is what is left to do');
+
+		SupplierInvoiceHelper::clearTotalsMismatch((int) $invoice->id);
+	}
+
+	/**
 	 * The rule of issue #594: an invoice we refused is cancelled and owes nothing, so the credit note
 	 * the vendor issues to close the matter cannot be accepted in its turn.
 	 *
@@ -915,6 +1066,40 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 	}
 
 	/**
+	 * A draft is not in the accounts and cannot be paid, so "Payment transmitted" has nothing to
+	 * describe on it - even once the answer to the vendor has been given and accepted. Validating the
+	 * invoice is what makes the payment possible, and the status with it.
+	 *
+	 * @return void
+	 */
+	public function testADraftIsNeverOfferedThePaymentStatus()
+	{
+		global $db;
+
+		$invoice = $this->createSpecimenSupplierInvoice();
+		$this->addEInvoicingDocument($invoice->id);
+		// The answer is given and confirmed, so the draft state is the only thing left holding the
+		// payment status back.
+		$this->insertLifecycleMessageFixture($invoice->id, 'invoice_supplier', EInvoicing::STATUS_APPROVED, '', 'Ok');
+
+		$einvoicing = new EInvoicing($db);
+
+		$this->assertSame(FactureFournisseur::STATUS_DRAFT, (int) $invoice->status, 'initAsSpecimen() creates a draft');
+		$offered = array_map('intval', array_keys($einvoicing->getSendableStatusesForReceivedInvoice($invoice->id, 'invoice_supplier')));
+		$this->assertNotContains(EInvoicing::STATUS_PAYMENT_SENT, $offered, 'a draft has not been paid');
+
+		// Validate it the way the card does, without going through validate(): the reference and the
+		// triggers it fires are not what is being tested here, the status column is.
+		$sql = "UPDATE " . MAIN_DB_PREFIX . "facture_fourn";
+		$sql .= " SET fk_statut = " . (int) FactureFournisseur::STATUS_VALIDATED;
+		$sql .= " WHERE rowid = " . (int) $invoice->id;
+		$this->assertNotFalse($db->query($sql), (string) $db->lasterror());
+
+		$offered = array_map('intval', array_keys($einvoicing->getSendableStatusesForReceivedInvoice($invoice->id, 'invoice_supplier')));
+		$this->assertContains(EInvoicing::STATUS_PAYMENT_SENT, $offered, 'a validated and approved invoice is the one that gets paid');
+	}
+
+	/**
 	 * Build a reference no other row of the instance can carry, long enough and not purely numeric,
 	 * so the fixtures of the findIdByRef() tests never collide with real data.
 	 *
@@ -923,6 +1108,18 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 	private function uniqueSupplierRef()
 	{
 		return 'PR605' . strtoupper(bin2hex(random_bytes(5)));
+	}
+
+	/**
+	 * A reference shorter than the default minimum length of the tolerant fallback, and unique per
+	 * call. It carries a letter on purpose: an all digits reference is refused by another rule, and
+	 * the test that uses this one is about the length, not about the digits.
+	 *
+	 * @return string
+	 */
+	private function uniqueShortSupplierRef()
+	{
+		return 'A' . strtoupper(bin2hex(random_bytes(2)));
 	}
 
 	/**
@@ -1116,7 +1313,9 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 	{
 		global $conf;
 
-		$shortRef = 'AB12';
+		// A fixed value here survives any run that dies before the class-wide rollback, and the
+		// lookup below then answers "ambiguous" on that instance for good.
+		$shortRef = $this->uniqueShortSupplierRef();
 		$numericRef = (string) mt_rand(100000000, 999999999);
 		$invoice = $this->createSupplierInvoiceWithRef('PAY123 - ' . $shortRef . ' - ' . $numericRef . ' - dinner');
 
@@ -1146,5 +1345,151 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 		$dbError = SupplierInvoiceHelper::refLookupErrorMessage(-1, 'FA202610', 'linked to document FA202611');
 		$this->assertStringContainsString('Database error', $dbError);
 		$this->assertStringNotContainsString('Several supplier invoices match', $dbError);
+	}
+
+	/** @var int Element id used by the records written here: high enough not to collide with a real invoice */
+	const TEST_ELEMENT_ID = 999999002;
+
+	/** @var string Element type of a supplier invoice, the only side that receives */
+	const TEST_ELEMENT_TYPE = 'invoice_supplier';
+
+	/**
+	 * Record an outgoing status the way sendStatusMessage() does once the platform answered.
+	 *
+	 * @param	int		$statusCode			Lifecycle status sent
+	 * @param	string	$validationStatus	What the platform answered ('Ok' = accepted)
+	 * @return	void
+	 */
+	private function sent($statusCode, $validationStatus = 'Ok')
+	{
+		global $db;
+
+		$einvoicing = new EInvoicing($db);
+		$einvoicing->storeStatusMessage(self::TEST_ELEMENT_ID, self::TEST_ELEMENT_TYPE, $statusCode, '', 'Out', 'ie_999001', $validationStatus);
+	}
+
+	/**
+	 * What the card would offer for the test invoice, as a list of status codes.
+	 *
+	 * @return	int[]	Status codes still sendable
+	 */
+	private function offered()
+	{
+		global $db;
+
+		$einvoicing = new EInvoicing($db);
+
+		return array_map('intval', array_keys($einvoicing->getSendableStatusesForReceivedInvoice(self::TEST_ELEMENT_ID, self::TEST_ELEMENT_TYPE)));
+	}
+
+	/**
+	 * An invoice on which nothing was sent yet is waiting for an answer: approving or refusing it are
+	 * the two ways of giving it. "Payment transmitted" is offered too, since only a refusal blocks it.
+	 *
+	 * @return void
+	 */
+	public function testNothingSentYetOffersTheAnswerAndThePayment()
+	{
+		$offered = $this->offered();
+
+		$this->assertContains(EInvoicing::STATUS_APPROVED, $offered);
+		$this->assertContains(EInvoicing::STATUS_REFUSED, $offered);
+		$this->assertContains(EInvoicing::STATUS_PAYMENT_SENT, $offered, 'only a refusal blocks the payment status');
+	}
+
+	/**
+	 * A "Partially approved" accepted by the platform settles the answer just as an approval does: the
+	 * invoice is going to be paid, so the status reporting that payment becomes reachable.
+	 *
+	 * @return void
+	 */
+	public function testPartiallyApprovedAlsoOpensThePaymentStatus()
+	{
+		$this->sent(EInvoicing::STATUS_PARTIALLY_APPROVED);
+
+		$offered = $this->offered();
+
+		$this->assertContains(EInvoicing::STATUS_PAYMENT_SENT, $offered);
+		$this->assertNotContains(EInvoicing::STATUS_REFUSED, $offered, 'an accepted invoice cannot then be refused');
+	}
+
+	/**
+	 * An approval the platform has not confirmed yet settles nothing: it can still be rejected, and
+	 * until it is confirmed the invoice is in the same place as one nobody answered - which still
+	 * offers the payment status, since only a refusal blocks it.
+	 *
+	 * @return void
+	 */
+	public function testAPendingApprovalStillOpensThePaymentStatus()
+	{
+		$this->sent(EInvoicing::STATUS_APPROVED, 'Pending');
+
+		$offered = $this->offered();
+
+		$this->assertContains(EInvoicing::STATUS_PAYMENT_SENT, $offered);
+		$this->assertContains(EInvoicing::STATUS_APPROVED, $offered, 'the answer is still the thing to send');
+		$this->assertContains(EInvoicing::STATUS_REFUSED, $offered);
+	}
+
+	/**
+	 * The regression this guards, and the point of issue #548: an approved invoice is going to be paid,
+	 * so "Payment transmitted" has to stay reachable. The card used to hide the whole button group as
+	 * soon as an "Approved" was accepted, which made the manual 211 unreachable in the normal order of
+	 * things - approve, then pay.
+	 *
+	 * @return void
+	 */
+	public function testApprovedStillAllowsThePaymentStatus()
+	{
+		$this->sent(EInvoicing::STATUS_APPROVED);
+
+		$offered = $this->offered();
+
+		$this->assertContains(EInvoicing::STATUS_PAYMENT_SENT, $offered, 'the payment status is what follows an approval');
+		$this->assertNotContains(EInvoicing::STATUS_APPROVED, $offered, 'an accepted status is not offered twice');
+		$this->assertNotContains(EInvoicing::STATUS_REFUSED, $offered, 'an approved invoice cannot then be refused');
+	}
+
+	/**
+	 * Refusing ends the exchange: an invoice sent back to its vendor is not going to be paid, so nothing
+	 * is left to send and the button group disappears.
+	 *
+	 * @return void
+	 */
+	public function testRefusedEndsTheExchange()
+	{
+		$this->sent(EInvoicing::STATUS_REFUSED);
+
+		$this->assertSame(array(), $this->offered());
+	}
+
+	/**
+	 * Once approved and paid, nothing is left either.
+	 *
+	 * @return void
+	 */
+	public function testApprovedThenPaidLeavesNothingToSend()
+	{
+		$this->sent(EInvoicing::STATUS_APPROVED);
+		$this->sent(EInvoicing::STATUS_PAYMENT_SENT);
+
+		$this->assertSame(array(), $this->offered());
+	}
+
+	/**
+	 * A status the platform refused is not a status sent: it has to stay offered, otherwise a rejected
+	 * send would leave the user with no way to retry.
+	 *
+	 * @return void
+	 */
+	public function testARejectedSendRemainsRetryable()
+	{
+		$this->sent(EInvoicing::STATUS_APPROVED, 'Error');
+
+		$offered = $this->offered();
+
+		$this->assertContains(EInvoicing::STATUS_APPROVED, $offered);
+		$this->assertContains(EInvoicing::STATUS_REFUSED, $offered, 'nothing was accepted, so the choice is still open');
+		$this->assertContains(EInvoicing::STATUS_PAYMENT_SENT, $offered, 'a rejected approval is not a refusal, so the payment status stays open too');
 	}
 }

@@ -33,6 +33,13 @@ Using your browser:
   - Go to "Setup - Modules"
   - You should now be able to find and enable the module
 
+### Experimental features
+
+Developers can enable experimental featues with constant:
+
+EINVOICING_ALLOW_DEVTOOLS: Add a button to display the raw data of the invoice in the invoice card.
+
+EINVOICING_ALLOW_MULTICOMPANY_INVOICE_MOVE: Set this option to the list of all entities ID. It will add a button to move an invoice from an entity to another one (if using multicompany module with all entities having the same SIREN, you can receive all your invoices in the master entity and dispatch invoices in the correct entity after retreival).
 
 
 ## Licenses

@@ -28,30 +28,25 @@
 
 //use custom\facturx\Fidry\FileSystem\FS;
 use horstoeko\zugferd\ZugferdDocumentPdfReader;
-use horstoeko\zugferd\ZugferdDocumentPdfReaderExt;
-
-require __DIR__ . "/../../vendor/autoload.php";
 
 dol_include_once('einvoicing/class/protocols/CIIProtocol.class.php');
 dol_include_once('einvoicing/class/protocols/CommonProtocol.class.php');
 dol_include_once('einvoicing/class/utils/XmlPatcher.class.php');
-dol_include_once('einvoicing/class/utils/CtcFrPdfMerger.class.php');
-// FacturxTcpdfMerger is NOT included here: it descends from TCPDF, which the core only loads when a
-// PDF is actually rendered. Requiring it at load time would make every page that instantiates this
-// protocol die on "Class TCPDF not found". It is included where it is used, which is precisely the
-// branch where the core has already loaded TCPDF.
+dol_include_once('einvoicing/class/utils/PdfAttachmentExtractor.class.php');
+// Neither vendor/autoload.php nor the two mergers are required here. Both mergers descend from a
+// composer class, and that autoloader refuses to run below the PHP its libraries need, so loading
+// them at file scope would make a received Factur-X fatal on a PHP that reads it perfectly well.
+// They belong to generateInvoice(), the only place that writes a container. The same reasoning has
+// always applied to FacturxTcpdfMerger, which descends from TCPDF and needs the core PDF stack.
 
 
 /**
  * FacturX Protocol Class
  *
- * This class handles the FacturX protocol implementation for generating
- * and managing electronic invoices according to the FacturX standard.
- * This also throw an error if data is not correct.
- *
- * This implementation is based on FacturX plugin developed by CAP REL.
- * It has been adapted and integrated into the EInvoicing module to provide
- * electronic invoicing capabilities compliant with the French Factur-X standard.
+ * This class handles the FacturX protocol implementation for generating and managing electronic
+ * invoices according to the FacturX standard. This also throw an error if data is not correct.
+ * Based on the FacturX plugin developed by CAP REL, adapted and integrated into the EInvoicing
+ * module to provide electronic invoicing capabilities compliant with the French Factur-X standard.
  *
  * @author  Eric Seigne <eric.seigne@cap-rel.fr>
  * 			Modified by mdaoud
@@ -62,13 +57,13 @@ class FacturXProtocol extends CIIProtocol
 	use CommonProtocol;
 
 	/** @const string Invoice file extension (without the dot, example 'xml') */
-	protected const INVOICE_FILE_EXTENSION = 'pdf';
+	const INVOICE_FILE_EXTENSION = 'pdf';
 
 	/** @const string Generated invoice file name */
-	protected const GENERATED_INVOICE_XML_FILE_NAME = 'factur-x.xml';
+	const GENERATED_INVOICE_XML_FILE_NAME = 'factur-x.xml';
 
 	/** @const string The profile used to generate XML */
-	protected const BUILD_XML_PROFILE = 'EXTENDED';
+	const BUILD_XML_PROFILE = 'EXTENDED';
 
 	/**
 	 * Generate a complete Factur-X invoice file by embedding the XML into a PDF.
@@ -135,12 +130,10 @@ class FacturXProtocol extends CIIProtocol
 		$filename = dol_sanitizeFileName($invoice->ref);
 		$filedir = getMultidirOutputCompat($invoice, '', 1);		// Example '/mydolibarr/documents/facture/FAYYMM-XXXX'
 
-		// Resolve the source PDF into which the Factur-X XML will be embedded.
-		// Priority:
-		//   1. $sourceFilePath provided by the generation hook (afterPDFCreation / afterODTCreation).
-		//      ODT/ODS models hand over the .odt path; the PDF rendition (MAIN_ODT_AS_PDF) shares the basename.
+		// Resolve the source PDF into which the Factur-X XML will be embedded, by priority:
+		//   1. $sourceFilePath from the generation hook (ODT/ODS: the MAIN_ODT_AS_PDF rendition shares the basename);
 		//   2. the most recent <ref>*.pdf already present in the output dir (manual generation, ODT output
-		//      like <ref>_Template.pdf for which last_main_doc is not maintained), excluding our own output.
+		//      like <ref>_Template.pdf for which last_main_doc is not maintained), excluding our own output;
 		//   3. legacy <ref>.pdf, regenerated with the default PDF model if missing.
 		$orig_pdf = '';
 		$fromodt = false;
@@ -183,12 +176,9 @@ class FacturXProtocol extends CIIProtocol
 			// Source PDF deleted or never generated: regenerate it with the default PDF model before embedding.
 			$modelname = getDolGlobalString('FACTURE_ADDON_PDF') ?: 'crabe';
 
-			// That rebuild fires afterPDFCreation, whose job is to produce the e-invoice - which is exactly
-			// what this call is doing. Tell the hook to stand back for this invoice, or it generates the
-			// document a second time and cleans up the temporary XML this call still needs (issue #658).
-			// try/finally, not two plain assignments: a rebuild that throws must not leave the hook muted
-			// for the rest of the request, which would silently skip the e-invoice of the invoices a mass
-			// generation handles after this one.
+			// That rebuild fires afterPDFCreation, which would generate the document a second time and clean
+			// up the temporary XML this call still needs (issue #658), so the hook is told to stand back.
+			// try/finally: a rebuild that throws must not leave the hook muted for the rest of the request.
 			$resultpdf = -1;
 			EInvoicing::setEInvoiceGenerationInProgress($invoice->id, true);
 			try {
@@ -267,21 +257,18 @@ class FacturXProtocol extends CIIProtocol
 			$creator = (string) pdfExtractMetadata($orig_pdf, 'Creator');
 		}
 
-		// The choice below reads the global class FPDF, and must not depend on whether the request
-		// happened to render a PDF before reaching here. Below Dolibarr 24 the core declares its own
-		// "class FPDF extends TCPDF {}" in htdocs/includes/tcpdi/tcpdi.php, but only once its PDF stack
-		// is loaded: a generation that finds the source PDF already on disk - the mass generation of the
-		// invoice list, typically - never renders one, so the shim is absent and the branch below picks
-		// the horstoeko/setasign writer, which autoloads the real FPDF of the module. Both classes are
-		// named FPDF and only the first one of the request survives, so the next core PDF of that same
-		// request dies on "Cannot redeclare class FPDF ... in includes/tcpdi/tcpdi.php". Load the PDF
-		// stack of the core now, so the question is settled by the Dolibarr version alone. The instance
-		// is discarded: pdf_getInstance() is called for what it loads and for the K_* constants TCPDF
-		// needs, which no PDF render defined yet in this request.
+		// Below Dolibarr 24 the core declares its own "class FPDF extends TCPDF {}" in
+		// htdocs/includes/tcpdi/tcpdi.php, but only once its PDF stack is loaded. Load that stack now, so
+		// the branch below does not depend on whether this request rendered a PDF already: without it the
+		// module autoloads the real FPDF instead, and the next core PDF of the request dies on "Cannot
+		// redeclare class FPDF". The instance is discarded, only what it loads and the K_* constants matter.
 		if (!class_exists('FPDF', false)) {
 			require_once DOL_DOCUMENT_ROOT . '/core/lib/pdf.lib.php';
 			pdf_getInstance();
 		}
+
+		// From here on the container is written, which is what needs horstoeko/zugferd
+		require_once __DIR__ . '/../../vendor/autoload.php';
 
 		try {
 			if (class_exists('FPDF', false) && is_subclass_of('FPDF', 'TCPDF')) {
@@ -296,6 +283,7 @@ class FacturXProtocol extends CIIProtocol
 				// CtcFrPdfMerger behaves exactly like ZugferdDocumentPdfMerger, except that it can still
 				// supply the attachment and XMP parameters when the guideline URN is one the library does
 				// not know — which is the case of EXTENDED-CTC-FR.
+				dol_include_once('einvoicing/class/utils/CtcFrPdfMerger.class.php');
 				$merger = new CtcFrPdfMerger($xmlfile, $orig_pdf);
 			}
 
@@ -364,13 +352,9 @@ class FacturXProtocol extends CIIProtocol
 	/**
 	 * Check that the produced PDF really is a Factur-X file, and not a PDF with an attachment.
 	 *
-	 * Nothing in the standard makes the difference visible to the eye: both carry the XML and both
-	 * open normally. What a reader and a platform validator look for is the document level /AF array
-	 * and the PDF/A-3 output intent, and a file that has the embedded stream but neither of those is
-	 * refused - after being sent, which is the expensive moment to find out (issue #554).
-	 *
-	 * The check is on the produced file rather than on the code path that produced it, so it also
-	 * covers a merger that silently degrades for another reason.
+	 * A reader and a platform validator look for the document level /AF array and the PDF/A-3 output
+	 * intent, and refuse a file that has the embedded stream but neither of those - after it was sent
+	 * (issue #554). The check is on the produced file, so it also covers a merger that degrades silently.
 	 *
 	 * @param	string	$pathfacturxpdf		Full path of the generated Factur-X PDF
 	 * @return	void
@@ -449,8 +433,9 @@ class FacturXProtocol extends CIIProtocol
 
 
 		// --- Read the Factur-X file
-		$document = ZugferdDocumentPdfReader::readAndGuessFromFile($tempFile);
-		$embeddedXml = ZugferdDocumentPdfReaderExt::getInvoiceDocumentContentFromFile($tempFile);
+		// Only the embedded CII is extracted here: the PDF/A-3 attachment is read as it stands, and the
+		// profile the document declares is never looked at.
+		$embeddedXml = PdfAttachmentExtractor::getInvoiceXmlFromFile($tempFile);
 
 		$parsedHeader = [];
 		$parsedLines = [];
@@ -459,6 +444,13 @@ class FacturXProtocol extends CIIProtocol
 			$parsedLines  = $this->parseInvoiceLines($embeddedXml);
 		} else {
 			// Use a duplicate parser (for test or dev tests)
+			// horstoeko/zugferd resolves the profile by matching the guideline URN of the document against
+			// its own table, which has no entry for EXTENDED-CTC-FR - the French profile this very module
+			// emits. Instantiating that reader is therefore only done on the path that actually uses it,
+			// instead of on every received Factur-X (issue #742).
+			require_once __DIR__ . '/../../vendor/autoload.php';
+			$document = ZugferdDocumentPdfReader::readAndGuessFromFile($tempFile);
+
 			$document->getDocumentInformation($documentno, $documenttypecode, $documentdate, $invoiceCurrency, $taxCurrency, $documentname, $documentlanguage, $effectiveSpecifiedPeriod);
 
 			$document->getDocumentSupplyChainEvent(
@@ -637,12 +629,8 @@ class FacturXProtocol extends CIIProtocol
 		// Done before the duplicate/ref-docs checks below so those checks can be scoped to this supplier
 		// (ref_supplier is only unique per supplier, not globally - see issue about cross-supplier collisions).
 		//
-		// The vendor is reference data, not part of the invoice: it gets its own transaction, committed
-		// before the import starts. A business error raised further down - a product that cannot be
-		// auto-created, a referenced document missing - must not roll back the thirdparty the operator is
-		// precisely being asked to complete: the "create the product" and "map the product" links returned
-		// with that error carry its socid, so a rolled back vendor makes them point to a thirdparty that
-		// never existed.
+		// The vendor is reference data: it gets its own transaction, committed before the import starts,
+		// so a business error further down does not roll back the thirdparty the returned links point to.
 		$db->begin();
 		$this->openedTransactions++;
 
@@ -725,12 +713,17 @@ class FacturXProtocol extends CIIProtocol
 					return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($refDocInvoiceId, $refDoc, 'linked to document ' . ($parsedHeader['documentno'] ?? ''))];
 				}
 				if ($refDocInvoiceId == 0) {
-					// The invoice references a document this Dolibarr does not hold: the final invoice of a
-					// deposit, the invoice a credit note credits, the one a replacement replaces. Nothing has
-					// been created at this point, so the flow is postponed rather than failed: it is retried
-					// on the next synchronization, and the invoices queued behind it keep coming in. What the
-					// user has to do cannot be guessed from a technical message, so it is spelled out with a
-					// link to the screen where the missing invoice is created.
+					// An unqualified reference (no ram:TypeCode in the XML) is a placeholder that the import
+					// does not consume — some vendors (e.g. DSV Road) always emit BG-3 with a dummy value
+					// such as "XXXX" when no preceding invoice applies. Skip it silently so it does not block
+					// the import and does not reach the post-creation loop.
+					if (empty($typeDoc)) {
+						dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource Skipping unqualified InvoiceReferencedDocument ref="' . $refDoc . '" (no TypeCode) for ' . ($parsedHeader['documentno'] ?? ''), LOG_DEBUG);
+						continue;
+					}
+					// The invoice references a qualified document this Dolibarr does not hold yet (deposit,
+					// credited or replaced invoice). Nothing has been created yet, so the flow is postponed
+					// rather than failed, and the message spells out what to create.
 					$langs->load("bills");
 					$action = $langs->trans('CreateTheMissingSupplierInvoiceToImport', $refDoc);
 					$action .= ' <a class="butAction small smallpaddingimp nomarginleft" href="' . DOL_URL_ROOT . '/fourn/facture/card.php?action=create&socid=' . (int) $socId . '&ref_supplier=' . urlencode($refDoc) . '" target="_blank">';
@@ -762,7 +755,7 @@ class FacturXProtocol extends CIIProtocol
 			return ['res' => -1, 'message' => 'Unfounded dolibarr corresponding Invoice code for document type code: ' . ($parsedHeader['documenttypecode'] ?? 'NA')];
 		}
 		// documentdate is already formatted into 'Y-m-d' by the parser ZugFerd and CII
-		$supplierInvoice->date = !empty($parsedHeader['documentdate']) ? dol_stringtotime($parsedHeader['documentdate']) : null;
+		$supplierInvoice->date = !empty($parsedHeader['documentdate']) ? dol_stringtotime($parsedHeader['documentdate'], 'tzserver') : null;
 
 		// For credit notes and replacement invoices, link to the source invoice via fk_facture_source
 		// (BT-25). A replacement invoice (BT-3 = 384) corrects the invoice it references just as a credit
@@ -864,6 +857,12 @@ class FacturXProtocol extends CIIProtocol
 						return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($linkedObjectId, $refDoc, 'linked to document ' . ($parsedHeader['documentno'] ?? ''))];
 					}
 					if ($linkedObjectId == 0) {
+						// Unqualified references (no TypeCode) were already skipped by the pre-check above and
+						// should not reach this point. As a safety net, skip them here too rather than failing.
+						if (empty($typeDoc)) {
+							dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource Skipping unqualified InvoiceReferencedDocument ref="' . $refDoc . '" (no TypeCode) in post-creation loop for ' . ($parsedHeader['documentno'] ?? ''), LOG_DEBUG);
+							continue;
+						}
 						return ['res' => -1, 'message' => 'Document : ' . $refDoc . ' linked to document ' . $parsedHeader['documentno'] . ' not found in Dolibarr'];
 					}
 
@@ -909,6 +908,9 @@ class FacturXProtocol extends CIIProtocol
 			if ($supplier->fournisseur != 1) {
 				$supplier->fournisseur = 1;
 				$supplier->code_fournisseur = 'auto';
+				// Flagging a vendor must not rewrite its extrafields, or a mandatory one left empty
+				// makes update() refuse the whole record. See _syncOrCreateThirdpartyFromEInvoiceSeller().
+				$supplier->array_options = array();
 				$supplier->update($supplier->id, $user);
 			}
 
@@ -925,6 +927,10 @@ class FacturXProtocol extends CIIProtocol
 					}
 				}
 			}
+
+			// Every line of the invoice exists now, so its totals can be confronted with the ones the
+			// document announces (issue #781).
+			$this->alignInvoiceTotalsWithDocument($supplierInvoiceId, $parsedHeader, $return_messages);
 
 			// Create or update supplier prices for imported products
 			if (!empty($supplierPriceEntries)) {
@@ -979,7 +985,8 @@ class FacturXProtocol extends CIIProtocol
 
 			// Save readable view file in supplier invoice attachments
 			if ($readableViewFile && $tempFileReadableView && file_exists($tempFileReadableView)) {
-				$res = $this->saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempFileReadableView, getDolGlobalString('EINVOICING_PDP', 'PDP'));
+				$readablefileext = 'pdf';	// Usually the extension of file for the readable version is PDF
+				$res = $this->saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempFileReadableView, getDolGlobalString('EINVOICING_PDP', 'PDP'), $readablefileext);
 
 				if ($res['res'] < 0) {
 					$return_messages[] = 'Failed to save readable view file as attachment: ' . $res['message'];
@@ -1003,7 +1010,7 @@ class FacturXProtocol extends CIIProtocol
 	 */
 	public function extractXmlFromFileContent(string $fileContent)
 	{
-		$extractedXml = ZugferdDocumentPdfReaderExt::getInvoiceDocumentContentFromContent($fileContent);
+		$extractedXml = PdfAttachmentExtractor::getInvoiceXmlFromContent($fileContent);
 		return $extractedXml;
 	}
 }

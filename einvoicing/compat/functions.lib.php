@@ -47,14 +47,9 @@ if (!function_exists('GETPOSTDATE')) {
 	 *  Return a timestamp built from the year, month, day (and optionally hour, minute, second) fields
 	 *  posted by a Dolibarr date selector (Form::selectDate()).
 	 *
-	 *  Copy of the function added to htdocs/core/lib/functions.lib.php in Dolibarr 18, kept identical so
-	 *  a date read on 17 is the same timestamp it would be anywhere else. GETPOSTINT() and dol_mktime(),
-	 *  the two helpers it calls, are both already there on 17.
-	 *
-	 *  The 18 implementation is the one to copy, not a later one: it reads the 'hour', 'min' and 'sec'
-	 *  fields, which are the names Form::selectDate() posts on 17. Dolibarr 19, 20 and 21 read 'minute'
-	 *  and 'second' there instead, names their own selector does not post; 22 came back to 'min'/'sec'
-	 *  and added a fourth argument this module does not use.
+	 *  Copy of the Dolibarr 18 implementation, not a later one: it reads the 'hour', 'min' and 'sec'
+	 *  fields, the names Form::selectDate() posts. Dolibarr 19 to 21 read 'minute' and 'second' instead,
+	 *  names their own selector does not post.
 	 *
 	 *  @param	string	$prefix		Prefix used to build the date selector
 	 *  @param	string	$hourTime	'getpost' to read the hour, minute and second from the request,
@@ -126,11 +121,9 @@ if (!function_exists('dolPrintHTMLForAttribute')) {
 	 * With dolPrintHTMLForAttribute(), the content is HTML encode, even if it is already HTML content.
 	 *
 	 * Copy of the function added to htdocs/core/lib/functions.lib.php in Dolibarr 19. It calls
-	 * dol_escape_htmltag() with six arguments, and that function only takes five on 17: PHP passes the
-	 * extra one to a userland function without complaining, so the sixth ($cleanalsojavascript) is
-	 * simply not read there. It changes nothing for this use - the fifth argument is 0, which already
-	 * escapes the whole string - and the output on 17 and 18 was checked to be the one the core returns
-	 * on 19 for plain text, accents, html tags, quotes, a javascript: link and an onerror attribute.
+	 * dol_escape_htmltag() with six arguments, and that function only takes five on 17, which PHP
+	 * accepts: the sixth ($cleanalsojavascript) is simply not read there, and changes nothing for this
+	 * use since the fifth argument is 0 and already escapes the whole string.
 	 *
 	 * @param	string		$s						String to print
 	 * @param	int			$escapeonlyhtmltags		1=Escape only html tags, not the special chars like accents.

@@ -42,7 +42,7 @@ function einvoicingAdminPrepareHead()
 	// $extrafields = new ExtraFields($db);
 	// $extrafields->fetch_name_optionals_label('myobject');
 
-	$langs->load("einvoicing@einvoicing");
+	$langs->loadLangs(array("accountancy", "einvoicing@einvoicing"));
 
 	$h = 0;
 	$head = array();
@@ -145,6 +145,22 @@ function pdpShowWarning($einvoicing)
 		$ret .= '</div>';
 	}
 
+	// In proxy mode public/proxy_oauthcallback.php answers without authentication and hands the access
+	// and refresh tokens to the redirect_uri the caller supplied, so the domains listed in
+	// EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN are the only thing separating a customer instance from
+	// anyone else. An empty list is still accepted for one transition step, so warn on both setup pages.
+	if (getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER') == 'proxy' && !getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN')) {
+		$ret .= '<div class="error">';
+		$ret .= img_warning().' <b>'.$langs->trans("ProxyRedirectDomainsNotSet").'</b>';
+		$ret .= '<br><br>';
+		$ret .= $langs->trans("ProxyRedirectDomainsNotSetDetail");
+		$ret .= '<br><br>';
+		$ret .= '<a class="gotoothersetup" href="'.DOL_URL_ROOT.'/admin/const.php">';
+		$ret .= $langs->trans("ProxyRedirectDomainsGoToOtherSetup").'<i class="fas fa-tools marginleftonly"></i>';
+		$ret .= '</a>';
+		$ret .= '</div>';
+	}
+
 	return ($ret ? $ret . '<br>' : '');
 }
 
@@ -195,44 +211,99 @@ function thirdpartyidprof($object)
 {
 	$object->fetch_thirdparty();
 	$thirdparty = $object->thirdparty;
-	return $thirdparty ? idprof($object->thirdparty) : '';
+	return $thirdparty ? idprof($thirdparty) : '';
 }
 
 /**
- * removeAllSpaces
+ * Escape a value for a text node or an attribute of a generated XML document.
  *
- * @param  ?string $str string to be cleaned
- * @param  ?string $original_encoding original encoding
- * @return string
+ * Two ways a text value breaks the document, neither of which htmlspecialchars() handles alone:
+ * an invalid UTF-8 sequence, which it answers with an EMPTY STRING below PHP 8.1 where ENT_SUBSTITUTE
+ * is not a default (one latin-1 byte in a company name, and BR-06 refuses the empty element), and a
+ * control character forbidden by XML 1.0 (a vertical tab pasted from a PDF), which it copies through
+ * and which leaves a file no parser reads - the platform answers HTTP 400 on it.
+ *
+ * @param  mixed	$value	Value to escape. null is accepted and gives ''.
+ * @return string			Value escaped for DOMDocument::createElement() and setAttribute()
  */
-function removeAllSpaces(?string $str, ?string $original_encoding = null)
+function einvoicingXmlText($value)
+{
+	$value = (string) $value;
+
+	// Tab, LF and CR are the three control characters XML 1.0 allows. No /u here: the pattern is
+	// byte based on purpose, so it also holds on the invalid UTF-8 the escape below repairs.
+	$stripped = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', '', $value);
+	if ($stripped !== null) {
+		$value = $stripped;
+	}
+
+	return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
+
+/**
+ * Remove every space of an identifier, whatever kind of space it is.
+ *
+ * A value copied from a web page or a PDF often carries a non-breaking (U+00A0), thin or zero-width
+ * space, which a '/\s+/' pattern written without the /u modifier does not see. Single place where the
+ * module strips them, so the identifier it emits and the one it checks back agree; the deprecated
+ * EInvoicing::removeSpaces() delegates here.
+ *
+ * @param  ?string $str					String to be cleaned. null is accepted and gives ''.
+ * @param  ?string $original_encoding	Encoding of $str, null to detect it. The result is given back in that same encoding.
+ * @return string						Cleaned up string
+ */
+function removeAllSpaces($str, $original_encoding = null)
 {
 	// Tolerate a null identifier (e.g. a party without any professional id): treat it as empty.
 	if ($str === null) {
 		$str = '';
 	}
+	$str = (string) $str;
+	if ($str === '') {
+		return '';
+	}
+
+	// mbstring is only recommended by Dolibarr, never required: without it we still strip what the
+	// Unicode pattern below can strip, instead of fataling on mb_detect_encoding().
+	$hasmbstring = (function_exists('mb_detect_encoding') && function_exists('mb_convert_encoding'));
+
 	// find encoding
-	if ($original_encoding === null) {
+	if ($original_encoding === null && $hasmbstring) {
 		$original_encoding = mb_detect_encoding($str, mb_detect_order(), true) ?: 'UTF-8';
 	}
 
-	$is_utf8 = (strtoupper($original_encoding) === 'UTF-8');
-	if (!$is_utf8) {
-		$str = mb_convert_encoding($str, 'UTF-8', $original_encoding);
+	// Convert to UTF-8 only when the encoding is known and we are able to convert: everything below works
+	// on UTF-8. The encoding to restore is held in its own variable rather than in a boolean, so that it
+	// is plainly a string on both conversions below - mb_convert_encoding() takes no null.
+	$sourceencoding = ($hasmbstring && $original_encoding !== null && strtoupper($original_encoding) !== 'UTF-8') ? $original_encoding : '';
+	if ($sourceencoding !== '') {
+		$str = mb_convert_encoding($str, 'UTF-8', $sourceencoding);
 	}
 
 	// this transform '&nbsp;', '&ensp;', '&emsp;', '&thinsp;' etc. in real spaces Unicode
-	$str = html_entity_decode($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-
-	// suppress via Regex
-	$str = preg_replace('/[\p{Z}\s\x{200B}-\x{200D}\x{FEFF}]+/u', '', $str);
-
-	// restore encoding
-	if (!$is_utf8) {
-		$str = mb_convert_encoding($str, $original_encoding, 'UTF-8');
+	$decoded = html_entity_decode($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+	// Without ENT_SUBSTITUTE, html_entity_decode() answers '' on a string that is not valid UTF-8.
+	// Keep the bytes we were given rather than losing the identifier altogether.
+	if ($decoded !== '') {
+		$str = $decoded;
 	}
 
-	return $str;
+	// suppress via Regex
+	$cleaned = preg_replace('/[\p{Z}\s\x{200B}-\x{200D}\x{FEFF}]+/u', '', $str);
+	if ($cleaned === null) {
+		// The /u modifier makes preg_replace() answer null on a string that is not valid UTF-8. Fall
+		// back to the ASCII-only strip, so a badly encoded identifier is at worst cleaned the way the
+		// deprecated EInvoicing::removeSpaces() used to clean it, and never returned as null.
+		$cleaned = preg_replace('/\s+/', '', $str);
+	}
+	$str = ($cleaned === null ? $str : $cleaned);
+
+	// restore encoding
+	if ($sourceencoding !== '') {
+		$str = mb_convert_encoding($str, $sourceencoding, 'UTF-8');
+	}
+
+	return (string) $str;
 }
 
 
@@ -240,6 +311,9 @@ function removeAllSpaces(?string $str, ?string $original_encoding = null)
 /**
  * Return the full path of the directory where a module (or an object of a module) stores its files.
  * Path may depends on the entity if a multicompany module is enabled.
+ *
+ * Core getMultidirOutput() takes the four arguments this module needs only since Dolibarr 20.0.0; on
+ * 18 and 19 it accepts ($object, $module) alone, hence the backported fallback body below.
  *
  * @param 	CommonObject|BlockedLog|null	$object 	Dolibarr common object.
  * @param 	string 							$module 	Override object element, for example to use 'mycompany' instead of 'societe'
@@ -250,6 +324,15 @@ function removeAllSpaces(?string $str, ?string $original_encoding = null)
 function getMultidirOutputCompat($object, $module = '', $forobject = 0, $mode = 'output')
 {
 	global $conf;
+
+	// version_compare() rather than a (float) cast: DOL_VERSION carries development suffixes
+	// ('a.b.c-alpha', 'a.b.c-beta', 'a.b.c-rcX', see filefunc.inc.php) that a cast flattens, so
+	// (float) '20.0.0-alpha' is exactly 20.0 and would hand a pre-release snapshot over to a core
+	// signature that may not be there yet. version_compare() sorts those suffixed versions below
+	// 20.0.0 and keeps them on the backport, which is the safe side.
+	if (version_compare(DOL_VERSION, '20.0.0', '>=')) {
+		return getMultidirOutput($object, $module, $forobject, $mode);
+	}
 
 	$subdirectory = '';
 	if (!is_object($object) && empty($module)) {
@@ -282,11 +365,20 @@ function getMultidirOutputCompat($object, $module = '', $forobject = 0, $mode = 
 			$module = 'knowledgemanagement';
 			$subdirectory = '/knowledgerecord';
 			break;
+		case 'partnership':
+			$subdirectory = '/partnership';
+			break;
+		case 'stocktransfer':
+			$subdirectory = '/stocktransfer';
+			break;
 		case 'commande_fournisseur':
 			$module = 'fournisseur';
 			$subdirectory = '/commande';
 			break;
 		case 'expedition':
+		case 'shipment':
+		case 'shipping':
+			$module = 'expedition';
 			$subdirectory = '/sending';
 			break;
 		case 'company':
@@ -295,6 +387,24 @@ function getMultidirOutputCompat($object, $module = '', $forobject = 0, $mode = 
 		case 'service':
 		case 'produit':
 			$module = 'product';
+			break;
+		case 'project_task':
+			$module = 'projet';
+
+			// Fetch the project to build the correct path. The signature of this function accepts an object
+			// that is not a CommonObject, and even a null when a module is given, so we must not call a method
+			// that only a CommonObject owns without testing it exists.
+			if (is_object($object) && method_exists($object, 'fetchProject')) {
+				$object->fetchProject();
+			}
+
+			// The ref must be sanitized with dol_sanitizeFileName() and not only with dol_sanitizePathName()
+			// done at the end of this function, because a project ref is a user input that may contain a '/',
+			// a ':' or an accented char. dol_sanitizePathName() keeps them, so we would not return the
+			// directory used by projet/tasks/document.php, that sanitizes the ref with dol_sanitizeFileName().
+			if (!empty($object->project->ref)) {
+				$subdirectory = '/'.dol_sanitizeFileName($object->project->ref);
+			}
 			break;
 		case 'action':
 		case 'actioncomm':
@@ -310,12 +420,18 @@ function getMultidirOutputCompat($object, $module = '', $forobject = 0, $mode = 
 		if (isset($conf->$module) && property_exists($conf->$module, 'multidir_output')) {
 			$s = '';
 			if ($mode != 'outputrel') {
-				$s = $conf->$module->multidir_output[(empty($object->entity) ? $conf->entity : $object->entity)] . $subdirectory;
+				// An entity with no directory declared used to return an undefined index, so a relative path
+				// that made the caller read or write under the web root. Answer the error instead.
+				$entity = (int) (empty($object->entity) ? $conf->entity : $object->entity);
+				if (!isset($conf->$module->multidir_output[$entity])) {
+					return 'error-diroutput-not-defined-for-this-object='.$module;
+				}
+				$s = $conf->$module->multidir_output[$entity].$subdirectory;
 			}
 			if ($forobject && $object->id > 0) {
 				$s .= ($mode != 'outputrel' ? '/' : '') . get_exdir(0, 0, 0, 0, $object);
 			}
-			return $s;
+			return dol_sanitizePathName($s);
 		} elseif (isset($conf->$module) && property_exists($conf->$module, 'dir_output')) {
 			$s = '';
 			if ($mode != 'outputrel') {
@@ -324,15 +440,20 @@ function getMultidirOutputCompat($object, $module = '', $forobject = 0, $mode = 
 			if ($forobject && $object->id > 0) {
 				$s .= ($mode != 'outputrel' ? '/' : '') . get_exdir(0, 0, 0, 0, $object);
 			}
-			return $s;
+			return dol_sanitizePathName($s);
 		} else {
 			return 'error-diroutput-not-defined-for-this-object=' . $module;
 		}
 	} elseif ($mode == 'temp') {
 		if (isset($conf->$module) && property_exists($conf->$module, 'multidir_temp')) {
-			return $conf->$module->multidir_temp[(empty($object->entity) ? $conf->entity : $object->entity)];
+			// Same guard as the 'output' mode above, see the comment there
+			$entity = (int) (empty($object->entity) ? $conf->entity : $object->entity);
+			if (!isset($conf->$module->multidir_temp[$entity])) {
+				return 'error-dirtemp-not-defined-for-this-object='.$module;
+			}
+			return dol_sanitizePathName($conf->$module->multidir_temp[$entity]);
 		} elseif (isset($conf->$module) && property_exists($conf->$module, 'dir_temp')) {
-			return $conf->$module->dir_temp;
+			return dol_sanitizePathName($conf->$module->dir_temp);
 		} else {
 			return 'error-dirtemp-not-defined-for-this-object=' . $module;
 		}
@@ -400,9 +521,10 @@ if (!method_exists('Societe', 'findNearest')) {
 	 *    @param    string	$ref_alias 		Name_alias of third party (Warning, this can return several records)
 	 * 	  @param	int		$is_client		Only client third party
 	 *    @param	int		$is_supplier	Only supplier third party
+	 *    @param	string	$vatnumber		VAT number
 	 *    @return   int						ID of thirdparty found if OK, <0 if KO (-2 if two records found or other negative if error), 0 if not found.
 	 */
-	function findNearest($rowid = 0, $ref = '', $ref_ext = '', $barcode = '', $idprof1 = '', $idprof2 = '', $idprof3 = '', $idprof4 = '', $idprof5 = '', $idprof6 = '', $email = '', $ref_alias = '', $is_client = 0, $is_supplier = 0)
+	function findNearest($rowid = 0, $ref = '', $ref_ext = '', $barcode = '', $idprof1 = '', $idprof2 = '', $idprof3 = '', $idprof4 = '', $idprof5 = '', $idprof6 = '', $email = '', $ref_alias = '', $is_client = 0, $is_supplier = 0, $vatnumber = '')
 	{
 		global $db;
 
@@ -415,7 +537,13 @@ if (!method_exists('Societe', 'findNearest')) {
 		$tmpthirdparty = new Societe($db);
 
 		// We try to find the thirdparty with exact matching on all fields
+		// Societe::fetch() answers 1 on a match up to Dolibarr 19, and the row id from 20 on. This
+		// function has to answer an id whatever the core, because that is what its callers book the
+		// document on - taking the raw answer attached it to the thirdparty of id 1 (issue #739).
 		$result = $tmpthirdparty->fetch($rowid, $ref, $ref_ext, $barcode, $idprof1, $idprof2, $idprof3, $idprof4, $idprof5, $idprof6, $email, $ref_alias, $is_client, $is_supplier);
+		if ($result > 0) {
+			return $tmpthirdparty->id;
+		}
 		if ($result != 0) {
 			return $result;
 		}
@@ -424,6 +552,9 @@ if (!method_exists('Societe', 'findNearest')) {
 		dol_syslog("Thirdparty not found with exact match so we try barcode search", LOG_DEBUG);
 		if ($barcode) {
 			$result = $tmpthirdparty->fetch(0, '', '', $barcode, '', '', '', '', '', '', '', '', $is_client, $is_supplier);
+			if ($result > 0) {
+				return $tmpthirdparty->id;
+			}
 			if ($result != 0) {
 				return $result;
 			}
@@ -474,6 +605,12 @@ if (!method_exists('Societe', 'findNearest')) {
 			}
 			$sqlprof .= " s.idprof6 = '".$db->escape($idprof6)."'";
 		}
+		if ($vatnumber) {
+			if ($sqlprof) {
+				$sqlprof .= " OR";
+			}
+			$sqlprof .= " s.tva_intra = '".$db->escape($vatnumber)."'";
+		}
 
 		if ($sqlprof) {
 			$sqlprofquery = $sqlstart . " AND (".$sqlprof." )";
@@ -504,6 +641,9 @@ if (!method_exists('Societe', 'findNearest')) {
 		dol_syslog("Thirdparty not found with profids search so we try email search", LOG_DEBUG);
 		if ($email) {
 			$result = $tmpthirdparty->fetch(0, '', '', '', '', '', '', '', '', '', $email, '', $is_client, $is_supplier);
+			if ($result > 0) {
+				return $tmpthirdparty->id;
+			}
 			if ($result != 0) {
 				return $result;
 			}
@@ -558,16 +698,9 @@ if (!method_exists('Societe', 'findNearest')) {
 /**
  * Tell whether the seller reports the VAT on debits ("TVA d'apres les debits").
  *
- * That option makes the VAT of a service fall due when the invoice is issued instead of when it is
- * collected, and the seller who took it must carry the corresponding legal mention on its invoices.
- * The scheme itself is not a setting of this module: Dolibarr already holds it in the setup of the
- * Tax/VAT module (Home - Setup - Modules - Tax/VAT, "VAT mode"), where "TVA d'apres les debits" is
- * TAX_MODE 1, the one that puts both sell modes on 'invoice'. Conf::setValues() always populates the
- * two constants, defaulting to the French standard scheme.
- *
- * There is no option of this module to override it, deliberately: the same two constants are what the
- * VAT report of Dolibarr declares on (compta/tva/, through tax.lib.php), so an override would make the
- * document tell the buyer one regime while the seller declares its VAT under another.
+ * The scheme is not a setting of this module: Dolibarr holds it in the Tax/VAT module setup, where
+ * "TVA d'apres les debits" is TAX_MODE 1, the one that puts both sell modes on 'invoice'. Those same
+ * two constants are what the VAT report of Dolibarr declares on, hence no override here.
  *
  * @return bool		True when the invoices must carry the "VAT on debits" mention
  */
@@ -577,46 +710,33 @@ function einvoicingVatOnDebits()
 }
 
 /**
+ * Tell whether sending customer invoices is disabled by setup or generation-only mode.
+ * This does not disable e-invoice generation.
+ *
+ * @return bool
+ */
+function einvoicingIsSendDisabled()
+{
+	return (bool) getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || (bool) getDolGlobalString('EINVOICING_ONLY_GENERATE');
+}
+
+/**
+ * Tell whether receiving supplier invoices is disabled.
+ *
+ * @return bool
+ */
+function einvoicingIsReceiveDisabled()
+{
+	return (bool) getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI') || (bool) getDolGlobalString('EINVOICING_ONLY_GENERATE');
+}
+
+/**
  * VAT point date code (BT-8) the generated document has to declare.
  *
- * BT-8 tells the buyer when the VAT falls due, hence from when it may be deducted. BR-CL-06 restricts
- * it to a subset of UNTDID 2475 - 5 (invoice date), 29 (delivery date) and 72 (payment date) - and
- * BR-CO-03 makes it mutually exclusive with BT-7, the VAT point date itself. In CII the code lives in
- * the VAT breakdown (BG-23), which repeats per rate, but only one distinct value may appear in the
- * whole document (CII-SR-462): it is a document-level decision.
- *
- * What the French socle asks of it is narrower than the semantics of the codes, and it is what this
- * function follows. XP Z12-012 annexe A introduces BT-8 as the "champ permettant de specifier l'option
- * pour le paiement de la taxe d'apres les debits", reads its three values as "5 : date de la facture
- * (TVA sur DEBITS)", "29 : date de livraison (TVA sur DEBITS)" and "72 : date de paiement (TVA sur
- * ENCAISSEMENTS)", and carries two rules on it:
- *
- * @phpcs:ignore
- *   G1.43        "Le BT-8 ne sera obligatoire que si l'entreprise a opte pour la TVA sur les debits
- *                 et le specifie au moyen du code 5 (CII)"
- * @phpcs:ignore
- *   BR-FR-MAP-03 "BT-8 est obligatoire pour les factures de service des lors que l'assujetti Vendeur
- *                 a opte pour les debits"
- *
- * So 5 is not "this invoice is payable now", it is "I took the debits option", and a seller who did
- * not take it must not send it. That is why a goods invoice of a seller under the standard scheme
- * declares nothing: it has no option to signal, and its VAT falls due on a delivery the document
- * already dates. 72 is not mandatory anywhere, but it is true of an operation taxed on collection and
- * the annexe B examples carry it on every services invoice, so it is sent.
- *
- *   TAX_MODE 0, the French default   products on invoice, services on payment  -> 72 on a service line
- *   TAX_MODE 1, "d'apres les debits" everything on invoice                     -> 5
- *   TAX_MODE 2                       everything on payment                     -> 72
- *
- * 29 is never sent. It says the same thing as 5, BR-FR-MAP-29 states that "le PPF attend uniquement 5"
- * - a 29 having to be reported as 5 to the public portal - and Dolibarr has nothing to derive it from
- * anyway: its own setup reads the goods delivery as "OnDelivery (SupposedToBeInvoiceDate)".
- *
- * None of this is a setting of this module. Dolibarr holds the scheme once, in admin/taxes.php, and
- * that same setting decides how its VAT report is built, so a second place to state it would be a
- * second place to state it differently: a document declaring the debits option to the buyer while the
- * seller declares its VAT on collection, or the reverse. This is the same reason there is no option
- * for the VAT regime of the seller (BT-31 / BT-32) - see einvoicingSellerVatRegime().
+ * BR-CL-06 restricts BT-8 to 5, 29 or 72, BR-CO-03 makes it exclusive with BT-7, and CII-SR-462 allows
+ * one distinct value for the whole document. Under the French socle 5 does not mean "payable now" but
+ * "the seller took the debits option" (G1.43, BR-FR-MAP-03), so a seller under the standard scheme
+ * sends nothing on goods and 72 on services. 29 is never sent: BR-FR-MAP-29 says the PPF expects only 5.
  *
  * @param  bool		$hasProductLine		The document carries at least one goods line
  * @param  bool		$hasServiceLine		The document carries at least one service line
@@ -661,11 +781,9 @@ function einvoicingVatPointDateCode($hasProductLine, $hasServiceLine, $isDeposit
  * Tell whether the VAT of this document falls due on collection, i.e. whether a cash-in on it has to
  * be reported to the platform with the status 212.
  *
- * Close to the question BT-8 answers, but not the same one: BT-8 is what the French socle makes of it,
- * the declaration of the debits option, while this is the plain fact of when the VAT falls due. They
- * part company on the down payment of a seller who took the option, whose document declares 5 because
- * the option is general (G1.43), while the down payment itself is still taxed on collection - the
- * option "ne peut avoir pour effet de retarder l'exigibilite".
+ * Not the same question as BT-8: they part company on the down payment of a seller who took the debits
+ * option, whose document declares 5 because the option is general (G1.43) while the down payment
+ * itself stays taxed on collection.
  *
  * @param  bool		$hasProductLine		The document carries at least one goods line
  * @param  bool		$hasServiceLine		The document carries at least one service line
@@ -689,26 +807,10 @@ function einvoicingVatDueOnCollection($hasProductLine, $hasServiceLine)
 /**
  * VAT regime of the seller, as far as the identifier it declares on its invoices is concerned.
  *
- * EN 16931 lets a seller identify itself for tax purposes in two ways, and a document carries the one
- * that matches its regime:
- *
- *   BT-31  Seller VAT identifier            ram:SpecifiedTaxRegistration/ram:ID[@schemeID='VA']
- *   BT-32  Seller tax registration identif. ram:SpecifiedTaxRegistration/ram:ID[@schemeID='FC']
- *
- * A seller that charges VAT declares BT-31. A seller that does not - franchise en base de TVA of the
- * micro-entrepreneur, and more generally the "Non assujetti a la TVA" setup of Dolibarr - has no VAT
- * identifier to declare, and BT-32 is what the standard leaves it: in France, its SIREN. Without one
- * or the other, every exempt line of the document trips BR-E-02 and the platform refuses it, which is
- * the whole of issue #560.
- *
- * This is deliberately not a setting of this module, and there is no option to override it: Dolibarr
- * already holds the regime in the setup of the company (Home - Setup - Company/Organization, the "VAT
- * is used / is not used" radio, which admin/company.php writes into FACTURE_TVAOPTION as 1 or 0), and a
- * second place to state the same thing is a second place for it to be stated differently. Nothing is
- * re-derived from that constant here either: Societe::setMysoc() already turns it into ->tva_assuj, and
- * getCategoryRate() already decides from that same ->tva_assuj whether a line is exempt. Reading the
- * property the core computed is what keeps the two from ever disagreeing - a document declaring an
- * exempt line while claiming a VAT registration, or the reverse.
+ * A seller that charges VAT declares BT-31, one that does not (franchise en base, "Non assujetti a la
+ * TVA" in Dolibarr) declares BT-32 - in France its SIREN. Without either, every exempt line trips
+ * BR-E-02 and the platform refuses the document (issue #560). The regime is read from the property the
+ * core computed (Societe::setMysoc() into ->tva_assuj), never re-derived, so the two cannot disagree.
  *
  * @param	Societe		$seller		Selling company, normally $mysoc
  * @return	string					'standard' (the seller charges VAT, BT-31) or 'franchise' (it does not, BT-32)
@@ -761,12 +863,9 @@ function einvoicingShipToFromContact($shipContact, $buyer, $outputlangs, $db)
 		$name = ($shipSoc !== null && !empty($shipSoc->name)) ? $shipSoc->name : $buyer->name;
 	}
 
-	// The contact wins when it carries an address of its own - that is a delivery site the user
-	// entered deliberately. With none, the address of its company is the one that means something;
-	// the contact's own empty fields would emit a deliver-to party with no address at all. This is
-	// again what pdf_build_address() does, and a contact of the invoiced company with no address of
-	// its own falls back on that same company, so the deliver-to party then equals the buyer and no
-	// distinct BG-15 is emitted at all.
+	// The contact wins when it carries an address of its own - a delivery site the user entered
+	// deliberately; with none, its company address is used, as pdf_build_address() does. A contact of
+	// the invoiced company with no address then equals the buyer, so no distinct BG-15 is emitted.
 	$source = !empty($shipContact->address) ? $shipContact : ($shipSoc !== null ? $shipSoc : $shipContact);
 
 	return array(
@@ -781,11 +880,9 @@ function einvoicingShipToFromContact($shipContact, $buyer, $outputlangs, $db)
 /**
  * Tax registrations (BT-31 / BT-32) the seller declares, in the shape the two writers consume.
  *
- * One entry, because the two identifiers answer the same question and a document that carried both
- * would be claiming a VAT registration it does not use. Which one is decided by the regime rather
- * than by "is a VAT number recorded": a seller subject to VAT that simply left the field empty must
- * keep getting the explicit BADVATNUMBER message that names what to fill in, not a silent fallback on
- * its SIREN (issue #560).
+ * One entry only: the two identifiers answer the same question. Which one is decided by the regime,
+ * not by "is a VAT number recorded", so a seller subject to VAT that left the field empty still gets
+ * the explicit BADVATNUMBER message instead of a silent fallback on its SIREN (issue #560).
  *
  * @param	Societe		$seller		Selling company, normally $mysoc
  * @return	array<array{type:string,value:string}>	Registrations to write, possibly empty
@@ -808,21 +905,10 @@ function einvoicingSellerTaxRegistrations($seller)
 /**
  * Invoicing period of the document (BG-14 / BT-73 / BT-74), derived from the periods of its lines.
  *
- * Dolibarr has no invoicing period at invoice level: the period lives on the line, as the date_start
- * and date_end a service line carries. EN 16931 has both - BT-134/BT-135 on the line, BT-73/BT-74 on
- * the header - and says nothing about deriving one from the other, so the derivation is a decision:
- * the document covers everything its lines cover, hence the earliest start and the latest end (issue
- * #572, option 1, chosen by the maintainer because most receiving software only reads the header).
- *
- * A period that would be its own contradiction is not emitted. One line billed from March with another
- * billed until January derives a start after its end, which BR-29 refuses ("The Invoicing period end
- * date shall be later or equal to the Invoicing period start date") - and a document refused whole for
- * a header the operator never filled in would be worse than not deriving anything. The lines keep
- * their own periods in that case, which is what happened before this existed.
- *
- * The argument is the accumulator buildinvoicelines.inc.php fills as it walks the lines:
- * ['start' => [<numligne> => <timestamp>, ...], 'end' => [...]], either key absent when no line has
- * that side.
+ * Dolibarr has no period at invoice level, only BT-134/BT-135 on the line, so the header takes the
+ * earliest start and the latest end (issue #572). A start later than its end is not emitted at all:
+ * BR-29 refuses it and the whole document would be rejected. $billingPeriod is the accumulator
+ * buildinvoicelines.inc.php fills, ['start' => [<numligne> => <timestamp>], 'end' => [...]].
  *
  * @param	array<string,array<int,int>>	$billingPeriod	Line periods collected from the invoice
  * @return	array{start: ?int, end: ?int}					BT-73 and BT-74, null when there is none
@@ -846,27 +932,34 @@ function einvoicingInvoicingPeriodFromLines($billingPeriod)
 }
 
 /**
+ * Version of the module, followed by the commit it was built from when that one is known.
+ *
+ * The VERSION file does not move between two releases, so the version alone does not name sources.
+ * Single place deciding how version and commit read together, so the stamp is the same wherever it is
+ * printed. An installation whose commit cannot be known gets the version alone, with no parentheses.
+ *
+ * @return	string	Something like "1.4.2 (a6f4d2b)", or "1.4.2" when the commit is unknown
+ */
+function einvoicingModuleStamp()
+{
+	$versionfile = dirname(__DIR__).'/VERSION';
+	$version = (is_readable($versionfile) ? trim((string) file_get_contents($versionfile)) : '');
+	$commit = einvoicingModuleCommit();
+
+	if ($version === '') {
+		return $commit;		// the file is part of the module, but nothing forces a deployment to keep it
+	}
+
+	return $version.($commit !== '' ? ' ('.$commit.')' : '');
+}
+
+/**
  * Commit the module sources were built from, empty string when it cannot be known.
  *
- * An installed module has no repository to ask: the zip is unpacked into custom/ and that is
- * all there is. So the packager writes the commit it built from into a COMMIT file at the root
- * of the module (dev/build/makepack-modules.php), and reading that file back is the whole
- * mechanism - nothing is executed here, only one file is read.
- *
- * The commit is deliberately NOT part of the version: einvoicing/VERSION is compared with
- * version_compare() by the core (DolibarrModules::checkForUpdate()) against the VERSION file
- * published on GitHub, and it names both the package and the release tag in the packager. A
- * build suffix there would turn the "update available" flag into a lexicographic comparison of
- * hexadecimal, and every build into a new tag. A file of its own costs none of that.
- *
- * Whichever source answers, the commit is named on seven characters. `git rev-parse --short`
- * returns the shortest unambiguous prefix, which is a property of the repository on the machine
- * that built the package and grows with it, so the stamp is not a stable length on its own.
- *
- * A deployment made from a clone of the repository rather than from a package has no stamp and
- * never will, so the repository metadata is read as a second source. An installation answering
- * to neither - sources predating the stamp, an unpacked zip built before it - gets no commit,
- * and the caller falls back to the version alone, exactly as before.
+ * An installed module has no repository to ask, so the packager writes the commit into a COMMIT file
+ * at the root of the module (dev/build/makepack-modules.php); a deployment made from a clone has none,
+ * hence the repository metadata read as a second source. Deliberately not part of VERSION, which the
+ * core compares with version_compare() to flag an available update. Always shortened to 7 characters.
  *
  * @return	string	Short commit hash, or '' when neither source answers
  */
@@ -897,13 +990,9 @@ function einvoicingModuleCommit()
 /**
  * Commit at the tip of a repository checkout, read from its metadata files.
  *
- * git is not run: a module has no business executing commands, and exec() is forbidden on a
- * good many hostings anyway. What is read is what `git rev-parse HEAD` would resolve - HEAD,
- * then the ref it names, as a file of its own or as a line of packed-refs - through the two
- * indirections a checkout may add: a .git that is a file naming the real directory (a linked
- * worktree, a submodule), and refs kept in the repository the worktree came from.
- *
- * Anything unexpected returns an empty string. This names sources, it never decides anything.
+ * git is never run: exec() is forbidden on a good many hostings. What is read is what
+ * `git rev-parse HEAD` would resolve, through the two indirections a checkout may add - a .git file
+ * naming the real directory (linked worktree, submodule), and refs kept in the repository it came from.
  *
  * @param	string	$repodir	Directory expected to hold the .git of a checkout
  * @return	string				Short commit hash, or '' when it is not a readable checkout
@@ -952,4 +1041,231 @@ function einvoicingCheckoutCommit($repodir)
 	}
 
 	return (preg_match('/^[0-9a-f]{40,}$/', $commit) ? substr($commit, 0, 7) : '');
+}
+
+/**
+ * Key identifying the VAT breakdown group (BG-23) a line belongs to.
+ *
+ * A group is identified by BT-118, BT-119 and BT-120/BT-121 and by nothing else - in particular not by
+ * the Dolibarr vat_src_code, which split otherwise identical groups in two and had the platform reject
+ * the document (BR-S-08). A function because the same key is built in more than one place.
+ *
+ * @param	string		$categoryVAT			VAT category code of the line (BT-118)
+ * @param	float|string	$rate				VAT rate of the line (BT-119)
+ * @param	string		$exemptionReasonCode	Exemption reason code (BT-121), empty when there is none
+ * @param	string		$exemptionReason		Exemption reason text (BT-120), empty when there is none
+ * @return	string								Key of the group in the breakdown accumulator
+ */
+function einvoicingVatBreakdownKey($categoryVAT, $rate, $exemptionReasonCode = '', $exemptionReason = '')
+{
+	return $categoryVAT.'|'.$rate.'|'.$exemptionReasonCode.'|'.$exemptionReason;
+}
+
+/**
+ * Tell whether an URL may be used as the target of a redirect made by the OAuth proxy.
+ *
+ * public/proxy_oauthcallback.php is reachable without authentication and hands the freshly issued
+ * tokens to the redirect_uri the caller supplied: a trust decision. Only an absolute http(s) URL whose
+ * host matches, on a dot boundary, a comma separated EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN entry
+ * is allowed. An empty list is accepted for one transition step.
+ *
+ * @param	string	$url	Candidate destination, as received from the caller
+ * @return	bool			True when the URL may be passed to header('Location: ...')
+ */
+function einvoicingIsAllowedRedirectUrl($url)
+{
+	$url = trim((string) $url);
+	if ($url === '') {
+		return false;
+	}
+	if (!preg_match('#^https?://#i', $url)) {
+		return false;
+	}
+	// A browser treats a backslash in the authority as a slash, and strips control/space characters,
+	// while parse_url() does not. That gap lets "https://evil.com\@allowed.com" pass the host check
+	// below (parse_url sees allowed.com) while the browser navigates to evil.com, redirecting the user
+	// and the OAuth tokens to an attacker domain. No legitimate https redirect URL carries such a
+	// character, so reject the URL outright rather than try to normalize it.
+	if (preg_match('#[\\\\\x00-\x20\x7f]#', $url)) {
+		return false;
+	}
+
+	$host = parse_url($url, PHP_URL_HOST);
+	if (!is_string($host) || $host === '') {
+		return false;
+	}
+	$host = strtolower($host);
+
+	$alloweddomains = getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN');
+	if ($alloweddomains === '') {
+		// TRANSITION. Nothing ever set this option, so refusing here would cut every customer instance off
+		// its proxy on the day of the update. Both setup pages warn for as long as the list is empty.
+		// TODO Remove this and return false instead, once deployments have had time to declare the
+		// domains of their customer instances.
+		return true;
+	}
+
+	foreach (explode(',', $alloweddomains) as $alloweddomain) {
+		$alloweddomain = strtolower(trim($alloweddomain, " \t\n\r\0\x0B."));
+		if ($alloweddomain === '') {
+			continue;
+		}
+		if ($host === $alloweddomain) {
+			return true;
+		}
+		if (substr($host, -(strlen($alloweddomain) + 1)) === '.'.$alloweddomain) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/**
+ * The four sentinels Dolibarr stores in the description of a discount, and the text each stands for.
+ *
+ * A discount built from another piece - a credit note applied, a deposit deducted, an excess payment
+ * carried over - carries no text of its own: the core writes one of four sentinels in the description
+ * of the discount, insert_discount() copies it into the description of the line, and pdf_getlinedesc()
+ * resolves it against the piece it comes from at print time. Nothing resolves it for an e-invoice, so
+ * the customer used to read '(CREDIT_NOTE)' in the item name of the line (BT-153) or in the reason of
+ * a document level allowance (BT-97).
+ *
+ * The test is the one the core makes: the description equals a sentinel exactly, and the line is
+ * actually a discount line. Matching the text alone is wrong in both directions - a description edited
+ * by hand is missed, and a service line quoting the string is caught - and the four sentinels are not
+ * even spelled alike: '(CREDIT_NOTE)' holds an underscore where '(EXCESS PAID)' and
+ * '(EXCESS RECEIVED)' hold a space.
+ *
+ * @return	array<string,string>	Sentinel of the core => translation key of the text it stands for
+ */
+function einvoicingDiscountSentinels()
+{
+	return array(
+		'(CREDIT_NOTE)'     => 'DiscountFromCreditNote',
+		'(DEPOSIT)'         => 'DiscountFromDeposit',
+		'(EXCESS RECEIVED)' => 'DiscountFromExcessReceived',
+		'(EXCESS PAID)'     => 'DiscountFromExcessPaid',
+	);
+}
+
+/**
+ * Text a discount line stands for, in place of the sentinel Dolibarr stores in its description.
+ *
+ * See einvoicingDiscountSentinels() for what the four sentinels are and why they are matched exactly.
+ *
+ * @param	?DiscountAbsolute	$discount			Discount the line was built from, already fetched
+ * @param	string				$description		Description to resolve, of the line or of the discount
+ * @param	Translate			$outputlangs		Language of the document being built
+ * @param	string				$relatedInvoiceRef	Invoice the deducted piece corrects, from einvoicingDiscountRelatedInvoiceRef()
+ * @return	string									Resolved text, '' when the description is no sentinel
+ */
+function einvoicingDiscountLabel($discount, $description, $outputlangs, $relatedInvoiceRef = '')
+{
+	$transkeyOfSentinel = einvoicingDiscountSentinels();
+
+	$description = (string) $description;
+	if (!isset($transkeyOfSentinel[$description])) {
+		return '';
+	}
+
+	$outputlangs->load("bills");
+	$outputlangs->load("einvoicing@einvoicing");
+
+	// Which piece is quoted depends on the side the discount belongs to: a discount held on a supplier
+	// invoice names that invoice, and reading ref_facture_source there would name nothing at all.
+	$sourceref = '';
+	if (!empty($discount) && !empty($discount->id)) {
+		$sourceref = !empty($discount->discount_type) ? $discount->ref_invoice_supplier_source : $discount->ref_facture_source;
+	}
+	$sourceref = trim((string) $sourceref);
+
+	if ($sourceref === '') {
+		// No piece to name: a discount entered by hand, or one whose source has been deleted. The text
+		// of the core quotes a reference and would be issued with a hole in the middle of the sentence,
+		// so the module has a wording of its own for the case. What must never happen is the marker
+		// going out as it stands: BT-153 refuses an empty item name (BR-25), and it refuses a technical
+		// marker in spirit.
+		return $outputlangs->transnoentitiesnoconv($transkeyOfSentinel[$description].'NoSource');
+	}
+
+	$label = $outputlangs->transnoentitiesnoconv($transkeyOfSentinel[$description], $sourceref);
+
+	// The piece deducted usually corrects another invoice, and naming it is what lets the customer
+	// reconcile the deduction without opening its own ledger. Skipped when it would name the piece
+	// already named, which happens on a deposit deducted from the invoice it was asked on.
+	$relatedInvoiceRef = trim((string) $relatedInvoiceRef);
+	if ($relatedInvoiceRef !== '' && $relatedInvoiceRef !== $sourceref) {
+		$label .= ' ('.$outputlangs->transnoentitiesnoconv('EInvDiscountOnInvoice', $relatedInvoiceRef).')';
+	}
+
+	// The PDF of the core adds the date of the deposit when the option asks for it; the e-invoice reads
+	// the same way as the paper it accompanies.
+	if ($description == '(DEPOSIT)' && getDolGlobalString('INVOICE_ADD_DEPOSIT_DATE')) {
+		$label .= ' ('.dol_print_date($discount->datec, 'day', '', $outputlangs).')';
+	}
+
+	return $label;
+}
+
+/**
+ * Text a discount line of the invoice stands for, '' when the line carries no discount at all.
+ *
+ * einvoicingDiscountLabel() decides on the description alone, which is what a document level
+ * allowance needs: there, the caller has already established that a discount is behind the amount.
+ * A line of the invoice has not, and the description alone cannot tell - a line of work can be named
+ * '(DEPOSIT)' and carry nothing, and it was then renamed 'Down payment deducted' on its way out,
+ * under the wording meant for a discount whose source piece cannot be read, which is a different
+ * situation entirely.
+ *
+ * The test of the core is in two halves, the description AND the discount the line points at
+ * (pdf_getlinedesc(): $desc == '(DEPOSIT)' && $object->lines[$i]->fk_remise_except). This is where
+ * the second half is made, so that the two call sites read the line the same way: the one writing
+ * BT-97 already stands inside a test on fk_remise_except, the one writing BT-153 does not.
+ *
+ * @param	?object				$line				Line of the invoice being written
+ * @param	?DiscountAbsolute	$discount			Discount the line was built from, already fetched
+ * @param	Translate			$outputlangs		Language of the document being built
+ * @param	string				$relatedInvoiceRef	Invoice the deducted piece corrects, from einvoicingDiscountRelatedInvoiceRef()
+ * @return	string									Resolved text, '' when the line is no discount line
+ */
+function einvoicingDiscountLabelOfLine($line, $discount, $outputlangs, $relatedInvoiceRef = '')
+{
+	if (empty($line) || empty($line->fk_remise_except)) {
+		return '';
+	}
+
+	return einvoicingDiscountLabel($discount, $line->desc ?? '', $outputlangs, $relatedInvoiceRef);
+}
+
+/**
+ * Reference of the invoice the piece behind a discount corrects, '' when there is none to name.
+ *
+ * A credit note converted into a discount names the invoice it corrects in its own fk_facture_source,
+ * one level below the discount. Read from the discount alone, a deduction only says which credit note
+ * it comes from; the customer still has to find which invoice that credit note was about.
+ *
+ * @param	?DiscountAbsolute	$discount	Discount the line was built from, already fetched
+ * @param	DoliDB				$db			Database handler
+ * @return	string							Reference of the corrected invoice, '' when there is none
+ */
+function einvoicingDiscountRelatedInvoiceRef($discount, $db)
+{
+	if (empty($discount) || empty($discount->fk_facture_source)) {
+		return '';
+	}
+
+	require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
+
+	$sourcePiece = new Facture($db);
+	if ($sourcePiece->fetch((int) $discount->fk_facture_source) <= 0 || empty($sourcePiece->fk_facture_source)) {
+		return '';
+	}
+
+	$correctedInvoice = new Facture($db);
+	if ($correctedInvoice->fetch((int) $sourcePiece->fk_facture_source) <= 0) {
+		return '';
+	}
+
+	return (string) $correctedInvoice->ref;
 }

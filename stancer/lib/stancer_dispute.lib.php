@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2023-2026 Eric Seigne <eric.seigne@cap-rel.fr>
+ * Copyright (C) 2026		MDW			<mdeweerd@users.noreply.github.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -1408,7 +1409,7 @@ function stancerCreateInvoiceFromPropal($db, $user, $propal_id, $options = [])
 
 		if ($result < 0) {
 			$db->rollback();
-			dol_syslog("stancerCreateInvoiceFromPropal : error addind line, rollback ! " . json_encode($facture->errors), LOG_WARNING);
+			dol_syslog("stancerCreateInvoiceFromPropal : error adding line, rollback ! " . json_encode($facture->errors), LOG_WARNING);
 			return 'Erreur ajout ligne: ' . implode(', ', $facture->errors);
 		}
 	}

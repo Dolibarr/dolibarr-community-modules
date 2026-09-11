@@ -34,8 +34,8 @@ class ProtocolManager
 	 */
 	private $protocolsList;
 
-	public const EXCEPTION_UNSUPPORTED_FORMAT = -100;
-	public const EXCEPTION_UNKNOWN_FORMAT = -101;
+	const EXCEPTION_UNSUPPORTED_FORMAT = -100;
+	const EXCEPTION_UNKNOWN_FORMAT = -101;
 
 	/**
 	 * Initialize available protocols.
@@ -180,7 +180,7 @@ class ProtocolManager
 	 * @param ?string $content 	File content of the invoice (PDF or XML)
 	 * @return array{protocol_object:AbstractProtocol|null, detected_protocol_name:?string, success:bool, error_code:int}
 	 */
-	public static function getProtocolFromContent(?string $content)
+	public static function getProtocolFromContent($content)
 	{
 		global $db;
 

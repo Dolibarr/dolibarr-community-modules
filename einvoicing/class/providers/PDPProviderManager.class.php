@@ -47,7 +47,7 @@ class PDPProviderManager
 	{
 		// Access point declaration
 		// You can enter entry for a new access point here.
-		global $langs, $mysoc;
+		global $langs;
 		global $dolibarr_main_url_root;
 
 		$this->db = $db;
@@ -89,19 +89,18 @@ class PDPProviderManager
 			)
 		);
 
-		// An implementation that only generate documents (no network access). It talks to no platform. This can be used by some countries like Germany or user that push files to a platformmanually.
-		if ($mysoc->country_code != 'FR' || getDolGlobalString('EINVOICING_ALLOW_DEVTOOLS')) {
-			$this->providersList['TESTPDP'] = array(
-				'class' => 'TestPDPProvider',
-				'position' => 100,
-				'provider_countries' => array('all'),
-				'provider_name' => img_picto('', 'generic', 'style="width: 16px"').' None <span class="opacitymedium">(Einvoice generation only, no send/receive)</span>',
-				'description' => 'EInvoice generation only',
-				'is_enabled' => 1,
-				'prod_account_admin_url' => '',
-				'test_account_admin_url' => '',
-			);
-		}
+		// An implementation that only generates documents (no network access). It talks to no platform.
+		// Choosing it is what turns EINVOICING_ONLY_GENERATE on
+		$this->providersList['TESTPDP'] = array(
+			'class' => 'TestPDPProvider',
+			'position' => 100,
+			'provider_countries' => array('all'),
+			'provider_name' => img_picto('', 'generic', 'style="width: 16px"').' None <span class="opacitymedium">(Einvoice generation only, no send/receive)</span>',
+			'description' => 'EInvoice generation only',
+			'is_enabled' => 1,
+			'prod_account_admin_url' => '',
+			'test_account_admin_url' => '',
+		);
 
 		// Add entry to use SuperPDP via OAuth delegation.
 		if (getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER')) {
@@ -172,17 +171,10 @@ class PDPProviderManager
 	/**
 	 * Complete the list of providers with the ones declared by external modules.
 	 *
-	 * An external module declares the hook context 'einvoicingproviders' in its descriptor
-	 * ($this->module_parts['hooks'] = array('einvoicingproviders');) and implements a method
-	 * addPDPProviders() into its /mymodule/class/actions_mymodule.class.php. The method fills
-	 * $this->results with entries keyed by the provider code, each one holding at least a 'class'
-	 * (a class extending AbstractPDPProvider) and a 'classpath' (directory of the class file,
-	 * relative to the Dolibarr document root).
+	 * An external module declares the hook context 'einvoicingproviders' in its descriptor and implements
+	 * addPDPProviders(), which fills $this->results with entries keyed by provider code, each holding at
+	 * least a 'class' (extending AbstractPDPProvider) and its 'classpath' relative to the document root.
 	 * See einvoicing/doc/ADD-A-PDP-PROVIDER.md for the complete contract.
-	 *
-	 * A hook is used rather than a scan of the module directories because it lists only the providers
-	 * of the modules that are enabled, it costs nothing when no module implements it, and it let the
-	 * module build its own entry (position, urls, label translated in the language of the user).
 	 *
 	 * @return void
 	 */
@@ -287,10 +279,11 @@ class PDPProviderManager
 		}
 
 		$provider = new $classnametouse($db);
-
-		if ($provider) {
-			$provider->providerName = $name;
-		}
+		// The is_subclass_of() above is what makes this type true, and a constructor never returns
+		// anything falsy: the object is usable as an AbstractPDPProvider from here on.
+		'@phan-var-force AbstractPDPProvider $provider';
+		/** @var AbstractPDPProvider $provider */
+		$provider->providerName = $name;
 
 		return $provider;
 	}

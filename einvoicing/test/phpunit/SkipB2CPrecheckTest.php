@@ -20,11 +20,9 @@
  *      \file       test/phpunit/SkipB2CPrecheckTest.php
  *      \ingroup    test
  *      \brief      PHPUnit test for the third party pre-check when EINVOICING_SKIP_B2C is on, issue #600.
- *                  A private individual has no professional id, and with that option on the invoice is
- *                  already out of the e-invoicing scope (needEInvoiceManagement() answers STATUS_IGNORE):
- *                  the pre-check must not report the missing SIREN as a blocking configuration error.
- *                  The detection of a private individual is Societe::isACompany(), the same one the
- *                  decision uses, so both ends of the chain agree on who is B2C.
+ *                  With that option on, a private individual is already out of the e-invoicing scope
+ *                  (needEInvoiceManagement() answers STATUS_IGNORE), so the pre-check must not report
+ *                  the missing professional id as a blocking configuration error.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 

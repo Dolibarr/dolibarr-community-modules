@@ -83,6 +83,7 @@ include_once __DIR__.'/class/protocols/ProtocolManager.class.php';
 // page calls both, so it would fatal below the version the module declares it supports. Both are
 // backported in compat/functions.lib.php, and that is all this page needs from the two libraries.
 include_once __DIR__.'/compat/functions.lib.php';
+include_once __DIR__.'/lib/einvoicing.lib.php';
 include_once __DIR__.'/class/document.class.php';
 // for other modules
 //dol_include_once('/othermodule/class/otherobject.class.php');
@@ -328,6 +329,29 @@ if (empty($reshook)) {
 
 	// You can add more action here
 	// if ($action == 'xxx' && $permissiontoxxx) ...
+
+	// Mass action of the module: pack the selection into one archive a maintainer can read without
+	// walking the user through four screens (issue #799). The archive is built by a class of its
+	// own, because page code cannot be exercised by PHPUnit and the redaction it performs has to be
+	// covered by a test; the page only reads the selection and hands the file over.
+	if (empty($error) && ($massaction == 'supportexport' || ($action == 'supportexport' && $confirm == 'yes')) && $permissiontoread) {
+		dol_include_once('einvoicing/class/utils/SupportExport.class.php');
+
+		$supportexport = new SupportExport($db);
+		$supportarchive = $supportexport->build(SupportExport::TYPE_FLOW, $toselect, $diroutputmassaction);
+
+		if ($supportarchive == '') {
+			setEventMessages($supportexport->error, null, 'errors');
+			$massaction = '';
+			$action = 'list';
+		} else {
+			// Nothing has been printed yet at this point of the page, so the archive can be sent
+			// as the answer to this very request.
+			SupportExport::deliver($supportarchive);
+			$db->close();
+			exit;
+		}
+	}
 }
 
 
@@ -611,22 +635,17 @@ if ($num == 1 && getDolGlobalInt('MAIN_SEARCH_DIRECT_OPEN_IF_ONLY_ONE') && $sear
 // Output page
 // --------------------------------------------------------------------
 
-llxHeader('', $title, $help_url, '', 0, 0, $morejs, $morecss, '', 'mod-einvoicing page-list bodyforlist');	// Can use also classforhorizontalscrolloftabs instead of bodyforlist for a horizontal scroll in the table instead of page
+// The version alone does not name sources between two releases, so the commit the module was
+// built from is stamped next to it, exactly as the comment opening a generated XML does.
+llxHeader('', $title.' '.einvoicingModuleStamp(), $help_url, '', 0, 0, $morejs, $morecss, '', 'mod-einvoicing page-list bodyforlist');	// Can use also classforhorizontalscrolloftabs instead of bodyforlist for a horizontal scroll in the table instead of page
 
-// Example : Adding jquery code
-// print '<script type="text/javascript">
-// jQuery(document).ready(function() {
-// 	function init_myfunc()
-// 	{
-// 		jQuery("#myid").removeAttr(\'disabled\');
-// 		jQuery("#myid").attr(\'disabled\',\'disabled\');
-// 	}
-// 	init_myfunc();
-// 	jQuery("#mybutton").click(function() {
-// 		init_myfunc();
-// 	});
-// });
-// </script>';
+if (getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP") && $conf->entity != getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP")) {
+	print $langs->trans("EInvoicingInfoManagedByMasterSetup", getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP"));
+
+	llxFooter();
+	exit;
+}
+
 
 $arrayofselected = is_array($toselect) ? $toselect : array();
 
@@ -678,10 +697,13 @@ $arrayofmassactions = array(
 	//'builddoc'=>img_picto('', 'pdf', 'class="pictofixedwidth"').$langs->trans("PDFMerge"),
 	//'presend'=>img_picto('', 'email', 'class="pictofixedwidth"').$langs->trans("SendByMail"),
 );
+if (!empty($permissiontoread)) {
+	$arrayofmassactions['presupportexport'] = img_picto('', 'download', 'class="pictofixedwidth"').$langs->trans("EInvoicingSupportExport");
+}
 if (!empty($permissiontodelete)) {
 	$arrayofmassactions['predelete'] = img_picto('', 'delete', 'class="pictofixedwidth"').$langs->trans("Delete");
 }
-if (GETPOSTINT('nomassaction') || in_array($massaction, array('presend', 'predelete'))) {
+if (GETPOSTINT('nomassaction') || in_array($massaction, array('presend', 'predelete', 'presupportexport'))) {
 	$arrayofmassactions = array();
 }
 $massactionbutton = $form->selectMassAction('', $arrayofmassactions);
@@ -723,13 +745,20 @@ if ($provider) {
 
 print_barre_liste($title, $page, $_SERVER["PHP_SELF"], $param, $sortfield, $sortorder, $massactionbutton, $num, $nbtotalofrecords, $object->picto, 0, $newcardbutton, '', $limit, 0, 0, 1);
 
-
 // Add code for pre mass action (confirmation or email presend form)
 $topicmail = "SendDocumentRef";
 $modelmail = "document";
 $objecttmp = new Document($db);
 $trackid = 'xxxx'.$object->id;
 include DOL_DOCUMENT_ROOT.'/core/tpl/massactions_pre.tpl.php';
+
+// Confirmation of the support export, in the shape the core uses for its own mass actions: no ajax
+// and no form tag of its own, so that the buttons submit the list form and the selection survives.
+// The ajax variant jumps to a GET url instead, which would drop toselect[].
+if ($massaction == 'presupportexport') {
+	$formquestion = array('text' => $langs->trans("EInvoicingSupportExportPrivacy"));
+	print $form->formconfirm($_SERVER["PHP_SELF"], $langs->trans("EInvoicingSupportExport"), $langs->trans("EInvoicingSupportExportQuestion", count($toselect)), "supportexport", $formquestion, '', 0, 250, 500, 1);
+}
 
 if ($search_all) {
 	$setupstring = '';
@@ -836,8 +865,8 @@ if ($provider) {
 
 	print '<div class="formconsumeproduce" style="padding: 10px;">'."\n";
 
-	print '<div class="div-table-responsive">'; // You can use div-table-responsive-no-min if you don't need reserved height for your table
-	print '<table>'."\n";
+	print '<div class="div-table-responsive-no-min">'; // We need no min to support the selection of fields
+	print '<table class="inline-block valignmiddle marginrightonly">'."\n";
 
 	print '<tr>';
 	print '<td class="syncFormLabel">'.$langs->trans("StartSynchronizationFrom").'</td>';
@@ -877,15 +906,6 @@ if ($provider) {
 
 	print '</td>';
 
-	$rowspan = getDolGlobalInt('EINVOICING_FLOWS_SYNC_CALL_LIMIT') ? 2 : 1;
-	print '<td style="padding-left: 40px; padding-right: 40px"'.($rowspan > 1 ? ' rowspan="'.$rowspan.'"' : '').'>';
-
-	// Button to submit (sync manage both in and update of out invoices)
-	print '<a href="#" id="runSyncBtn" class="butAction small" style="margin: 0;">';
-	print img_picto('', 'refresh', 'class="pictofixedwidth"').' '.$langs->trans("RUN_SYNC");
-	print '</a>'."\n";
-
-	print '</td>';
 	print '</tr>';
 
 	if (getDolGlobalInt('EINVOICING_FLOWS_SYNC_CALL_LIMIT')) {
@@ -901,6 +921,12 @@ if ($provider) {
 	}
 
 	print '</table>'."\n";
+
+	// Button to submit (sync manage both in and update of out invoices)
+	print '<a class="inline-block valignmiddle butAction small margintoponly marginbottomonly" href="#" id="runSyncBtn" style="margin: 0;">';
+	print img_picto('', 'refresh', 'class="pictofixedwidth"').' '.$langs->trans("RUN_SYNC");
+	print '</a>'."\n";
+
 	print '</div>';
 	print '</div>'."\n";
 
@@ -917,6 +943,17 @@ if ($provider) {
 	}
 
 	print "</div>\n";
+
+	// Where the "import a received document again" action lives. This list is where a user lands after
+	// deleting the draft supplier invoice a reception created: the flow is still here, so re-running a
+	// synchronization or deleting the line looks like the way to get the document back, and neither is.
+	// The action is on the flow card, one click away but invisible from here, hence this reminder.
+	if (!einvoicingIsReceiveDisabled()) {
+		print '<div class="opacitymedium small paddingtop paddingleft">';
+		print img_picto('', 'info', 'class="pictofixedwidth"').' ';
+		print $langs->trans('EInvoiceReimportHint', $langs->transnoentitiesnoconv('EInvoiceReimport'));
+		print '</div>'."\n";
+	}
 
 	print "</div>\n";
 
@@ -1043,7 +1080,7 @@ if ($action == 'confirm_sync' && getDolGlobalString('EINVOICING_PDP') && $confir
 		if ($sync_result['actions']) {
 			print '<br><br>';
 			print '<!-- suggested action -->'."\n";
-			print '<strong><u>'.$langs->trans("SuggestedActions").'</u></strong></br>';
+			print '<strong><u>'.$langs->trans("SuggestedActions").'</u></strong><br>';
 			$i = 0;
 			foreach ($sync_result['actions'] as $tmpactioncode => $tmpactionstodo) {
 				print '<!-- action for code '.$tmpactioncode.' -->';
@@ -1061,7 +1098,7 @@ if ($action == 'confirm_sync' && getDolGlobalString('EINVOICING_PDP') && $confir
 		if ($sync_result['res'] < 0 && empty($sync_result['actions']) && !getDolGlobalInt('EINVOICING_DEBUG_MODE')) {
 			print '<!-- message to recommend to enable debug mode -->'."\n";
 			print '<div class="wordbreak warning clearboth">';
-			print '<strong><u>'.$langs->trans("SuggestedActions").' :</u></strong></br>';
+			print '<strong><u>'.$langs->trans("SuggestedActions").' :</u></strong><br>';
 			print $langs->trans("EnableDebugModeToSeeMoreDetails");
 			print '</div>';
 		}
