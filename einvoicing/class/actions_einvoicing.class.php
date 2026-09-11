@@ -111,20 +111,13 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					if ($invoiceObject->status != $invoiceObject::STATUS_DRAFT	// Never generate/transmit an e-invoice for a DRAFT (note: at validation the invoice has already status VALIDATED when Dolibarr regenerates the final PDF, so the legitimate flow is preserved).
 						&& !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')
 						&& getDolGlobalString('EINVOICING_EINVOICE_IN_REAL_TIME')) {
-						// Call function to create Factur-X document
-						require_once __DIR__ . '/protocols/ProtocolManager.class.php';
-
-						$usedProtocols = getDolGlobalString('EINVOICING_PROTOCOL');
-						$ProtocolManager = new ProtocolManager($db);
-						$protocol = $ProtocolManager->getProtocol($usedProtocols);
-
 						$messagecss = '';
 						$message = '';
+
 						// Check configuration
 						$result = $einvoicing->checkRequiredinformations($invoiceObject);
 						if ($result['res'] < 0) {			// Error case
 							$message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
-
 							dol_syslog(__METHOD__ . " " . $message);
 
 							if (getDolGlobalString('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
@@ -148,6 +141,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 							//setEventMessages($message, array(), $messagecss);
 						}
 
+						require_once __DIR__ . '/protocols/ProtocolManager.class.php';
+
 						// Recipient directory reachability (opt-in): a recipient that is not routable does not make
 						// the e-invoice document invalid, only undeliverable, so keep generating it and only warn.
 						// The actual transmission is what gets blocked, by the send_to_pdp gate below.
@@ -161,6 +156,12 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 							setEventMessages($warnmsg, array(), 'warnings');
 							$this->warnings[] = $warnmsg;
 						}
+
+
+						// Generate the einvoice
+						$usedProtocols = getDolGlobalString('EINVOICING_PROTOCOL');
+						$ProtocolManager = new ProtocolManager($db);
+						$protocol = $ProtocolManager->getProtocol($usedProtocols);
 
 						$result = $protocol->generateInvoice($invoiceObject, $outputlangs, $pdfPath);		// Generate E-invoice (embed into the real generated file)
 
@@ -2276,7 +2277,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 * Add a link to the read-only XML viewer on the line of the e-invoice file, in the document list
 	 * of an invoice card (issue #687).
 	 *
-	 * The core offers no preview there: dolIsAllowedForPreview() whitelists mime subtypes that hold
+	 * The core offers no preview there: dolIsAllowedForPreview() white-lists mime subtypes that hold
 	 * neither xml nor the Factur-X pdf. This hook runs once per file line, which is where the link goes.
 	 *
 	 * @param array{colspan:int,socid:int|string,id:int|string,modulepart:string,relativepath:string}	$parameters		Array of parameters

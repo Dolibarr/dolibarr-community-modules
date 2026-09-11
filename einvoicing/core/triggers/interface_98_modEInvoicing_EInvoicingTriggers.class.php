@@ -189,21 +189,37 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 
 				// If einvoice was set to $einvoicing::STATUS_NOT_GENERATED or $einvoicing::STATUS_UNKNOWN, we set it to STATUS_IGNORE (if not qualified for einvoice) or STATUS_NOT_GENERATED (if qualified for einvoice)
 				if ($result['code'] == $einvoicing::STATUS_NOT_GENERATED || $result['code'] == $einvoicing::STATUS_UNKNOWN) {
-					$statustouse = $einvoicing::STATUS_IGNORE;	// default status to use if none of following rules match
+					if (getDolGlobalString('EINVOICING_EINVOICE_IN_REAL_TIME')) {
+						// Check configuration
+						$result = $einvoicing->checkRequiredinformations($object);
+						if ($result['res'] < 0) {
+							$message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
+							dol_syslog(__METHOD__ . " " . $message);
 
-					// Test if invoice need to be managed by EInvoice
-					$needEinvoice = $einvoicing->needEInvoiceManagement($object);
-					if ($needEinvoice) {
-						$statustouse = $needEinvoice;
+							if (getDolGlobalString('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
+								$error++;
+								$this->errors[] = $result['message'];
+								return -1;		// This should generate a rollback
+							}
+						}
 					}
 
-					$newobject = dol_clone($object, 2);
-					$newobject->ref = (string) $object->newref;
+					// Test if invoice need to be managed by EInvoice and set the new status to use
+					if ($result['code'] == $einvoicing::STATUS_UNKNOWN) {
+						$statustouse = $einvoicing::STATUS_IGNORE;	// default status to use if none of following rules match
+						$needEinvoice = $einvoicing->needEInvoiceManagement($object);
+						if ($needEinvoice) {
+							$statustouse = $needEinvoice;
+						}
 
-					$result = $einvoicing->setEInvoiceStatus($newobject, $statustouse, '');
-					if ($result < 0) {
-						$this->errors = array_merge($this->errors, $einvoicing->errors);
-						return -1;
+						$newobject = dol_clone($object, 2);
+						$newobject->ref = (string) $object->newref;
+
+						$result = $einvoicing->setEInvoiceStatus($newobject, $statustouse, '');
+						if ($result < 0) {
+							$this->errors = array_merge($this->errors, $einvoicing->errors);
+							return -1;
+						}
 					}
 				}
 			}

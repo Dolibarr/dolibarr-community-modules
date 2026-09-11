@@ -86,7 +86,7 @@ class EInvoicing
 	// Dolibarr internal statuses
 	const STATUS_UNKNOWN             = 0;		// By default, before the e-invoice has been generated
 
-	const STATUS_NOT_GENERATED       = 5;		// To generate then to sync
+	const STATUS_NOT_GENERATED       = 5;		// Not yet generated but must be generate then sync
 	const STATUS_GENERATED           = 10;		// To sync
 	const STATUS_AWAITING_VALIDATION = 15;		// Einvoice sent to your AP, but not yet analyzed by your AP
 	const STATUS_AWAITING_ACK        = 20;		// Einvoice sent to your AP. next step happen when doing sync.
