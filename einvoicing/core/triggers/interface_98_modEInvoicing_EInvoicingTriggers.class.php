@@ -330,8 +330,18 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			// to the figures the vendor bills validates normally and drops the mark (issue #861).
 			$announced = SupplierInvoiceHelper::totalsMismatch((int) $object->id);
 			if ($announced !== null) {
-				if (SupplierInvoiceHelper::totalsAgreeWithDocument($object, $announced['tva'], $announced['ttc'])) {
+				if (SupplierInvoiceHelper::totalsAgreeWithDocument($object, $announced['tva'], $announced['ttc'], $announced['prepaid'] ?? null)) {
 					SupplierInvoiceHelper::clearTotalsMismatch((int) $object->id);
+				} elseif (isset($announced['prepaid'])
+					&& SupplierInvoiceHelper::totalsAgreeWithDocument($object, $announced['tva'], $announced['ttc'])) {
+					// Totals right, deduction missing: saying the invoice does not total the document
+					// would send the operator looking at figures that do match. Name what is missing.
+					$this->errors[] = $langs->trans(
+						'EInvoicePrepaidMismatchBlocksValidation',
+						price2num($announced['prepaid'], 'MT'),
+						price2num(SupplierInvoiceHelper::linkedDepositAmount((int) $object->id), 'MT')
+					);
+					return -1;
 				} else {
 					$this->errors[] = $langs->trans(
 						'EInvoiceTotalsMismatchBlocksValidation',

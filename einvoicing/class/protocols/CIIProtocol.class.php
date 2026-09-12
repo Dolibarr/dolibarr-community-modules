@@ -3581,6 +3581,10 @@ class CIIProtocol extends AbstractProtocol
 		}
 		$announcedTva = abs((float) $parsedHeader['taxTotalAmount']);
 		$announcedTtc = abs((float) $parsedHeader['grandTotalAmount']);
+		// BT-113 is what the document says was already paid, a deposit in practice. It moves neither
+		// BT-110 nor BT-112, so the two totals below agree whether or not the deposit was deducted, and
+		// an invoice short of its deduction used to pass this guard and be paid in full (issue #726).
+		$announcedPrepaid = isset($parsedHeader['totalPrepaidAmount']) ? abs((float) $parsedHeader['totalPrepaidAmount']) : null;
 
 		require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
 
@@ -3588,6 +3592,14 @@ class CIIProtocol extends AbstractProtocol
 		if ($invoice->fetch($supplierInvoiceId) <= 0) {
 			return;
 		}
+		// The deduction is answered before the totals, and once: no rounding convention explains a deposit
+		// that is not attached, so there is nothing for the conventions below to say about it.
+		if ($announcedPrepaid !== null
+			&& abs(SupplierInvoiceHelper::linkedDepositAmount($supplierInvoiceId) - $announcedPrepaid) >= 0.005) {
+			$this->flagPrepaidMismatch($supplierInvoiceId, $parsedHeader, $announcedTva, $announcedTtc, $announcedPrepaid, $return_messages);
+			return;
+		}
+
 		if (SupplierInvoiceHelper::totalsAgreeWithDocument($invoice, $announcedTva, $announcedTtc)) {
 			SupplierInvoiceHelper::clearTotalsMismatch($supplierInvoiceId);
 			return;
@@ -3642,6 +3654,40 @@ class CIIProtocol extends AbstractProtocol
 		$return_messages[] = $langs->trans('EInvoiceImportTotalsMismatchAction');
 
 		dol_syslog(__METHOD__ . ' Invoice ' . $supplierInvoiceId . ' does not total the received document (announced ' . $announcedTtc . ' incl. VAT, imported ' . $invoice->total_ttc . '): validation and approval blocked', LOG_WARNING);
+	}
+
+	/**
+	 * Mark an invoice whose totals are right but which does not carry the deduction its document announces.
+	 *
+	 * BT-113 has no counterpart in the totals of a supplier invoice - a deposit is a discount attached to it -
+	 * so this is the only place that sees the difference between an invoice of 540.28 with its deposit deducted
+	 * and the same invoice without it. The mark keeps it out of validation and approval, like any other document
+	 * the import could not reproduce (issue #861), and it carries BT-113 so that attaching the deposit lifts it.
+	 *
+	 * @param	int						$supplierInvoiceId	Id of the invoice the import created
+	 * @param	array<string,mixed>		$parsedHeader		The parsed header of the received document
+	 * @param	float					$announcedTva		BT-110 of the document, absolute value
+	 * @param	float					$announcedTtc		BT-112 of the document, absolute value
+	 * @param	float					$announcedPrepaid	BT-113 of the document, absolute value
+	 * @param	array<int,string>		$return_messages	Messages of the import, completed here
+	 * @return	void
+	 */
+	protected function flagPrepaidMismatch($supplierInvoiceId, array $parsedHeader, $announcedTva, $announcedTtc, $announcedPrepaid, array &$return_messages)
+	{
+		global $langs;
+
+		SupplierInvoiceHelper::flagTotalsMismatch($supplierInvoiceId, $announcedTva, $announcedTtc, $announcedPrepaid);
+
+		$langs->load('einvoicing@einvoicing');
+		$return_messages[] = $langs->trans(
+			'EInvoiceImportPrepaidMismatch',
+			dol_escape_htmltag((string) ($parsedHeader['documentno'] ?? '')),
+			price2num($announcedPrepaid, 'MT'),
+			price2num(SupplierInvoiceHelper::linkedDepositAmount((int) $supplierInvoiceId), 'MT')
+		);
+		$return_messages[] = $langs->trans('EInvoiceImportTotalsMismatchAction');
+
+		dol_syslog(__METHOD__ . ' Invoice ' . $supplierInvoiceId . ' does not carry the ' . $announcedPrepaid . ' incl. VAT the received document announces as already paid: validation and approval blocked', LOG_WARNING);
 	}
 
 
