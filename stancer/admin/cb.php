@@ -104,6 +104,7 @@ if ($result) {
 $formSetup->newItem('STANCER_DEFAULT_CUSTOMER_IF_NULL')->setAsSelect($options);
 
 $formSetup->newItem('STANCER_CB_ALLOW_RETRY')->setAsYesNo();
+$formSetup->newItem('STANCER_CB_DISABLE_3DS')->setAsYesNo();
 
 if (floatval(DOL_VERSION) > 16.0) {
 	//Facture::createDepositFromOrigin only on dolibarr > 16.0

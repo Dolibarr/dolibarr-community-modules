@@ -344,7 +344,24 @@ if (!empty($conf->stancer->enabled)) {
 		} else {
 			dol_syslog("stancer paymentback payment NOT OK, status=$status", LOG_WARNING);
 			$ErrorCode = $status;
-			$statusTXT = $status;
+			// Tell the customer what actually happened instead of echoing the raw
+			// API word. A refusal carries either a bank response code, or - when
+			// strong authentication could not even run - an auth status, and those
+			// two call for opposite answers: try again versus change payment method.
+			// getLabelStatus() expects the local integer status, not the Stancer word:
+			// feeding it "refused" resolved to 0 and displayed "Draft" to a customer
+			// whose payment had just been declined. Translate the API word instead,
+			// and fall back to the raw one rather than to a wrong label.
+			$statusKey = 'stancer_status_' . preg_replace('/[^a-z_]/', '', strtolower((string) $status));
+			$statusTXT = ($status !== '' && $langs->trans($statusKey) !== $statusKey) ? $langs->trans($statusKey) : $status;
+			$authStatus = isset($paymentData['auth']['status']) ? (string) $paymentData['auth']['status'] : '';
+			$bankResponse = isset($paymentData['response']) ? (string) $paymentData['response'] : '';
+			if (in_array($authStatus, array('unavailable', 'failed', 'declined', 'expired'), true)) {
+				$ErrorSeverityCode = $langs->trans('StancerPaymentErrorAuthNotCompleted');
+				dol_syslog("stancer paymentback refusal came from 3DS (auth.status=$authStatus), the bank was never asked", LOG_WARNING);
+			} elseif ($bankResponse !== '') {
+				$ErrorSeverityCode = $langs->trans('StancerPaymentErrorBankRefused', $bankResponse);
+			}
 		}
 
 		// Detect already paid (F5 on payment ok). An empty transaction id must never
@@ -2066,6 +2083,19 @@ if ($ispaymentok) {
 
 dol_syslog("stancer paymentback rendering HTML, ispaymentok=" . ($ispaymentok ? '1' : '0') . ", ispostactionok=$ispostactionok, error=$error, postactionmessages=" . json_encode($postactionmessages), LOG_DEBUG);
 
+// $object is only loaded on the paths that could identify the paid document.
+// The decoded link and the payment record carry the reference otherwise, and
+// showing the customer an empty "Invoice or order reference:" helps nobody -
+// neither them nor the person they end up calling.
+$refToShow = '';
+if (is_object($object) && !empty($object->ref)) {
+	$refToShow = $object->ref;
+} elseif (!empty($ref)) {
+	$refToShow = $ref;
+} elseif (!empty($sp->order_id)) {
+	$refToShow = $sp->order_id;
+}
+
 if ($ispaymentok) {
 	?>
 	<section class="text-gray-600 body-font">
@@ -2082,7 +2112,9 @@ if ($ispaymentok) {
 				<p class="mb-4"><?php echo $langs->trans("StancerPaymentDoneSuccessMessage"); ?></p>
 				<ul class="mb-4">
 					<li><?php echo $langs->transnoentitiesnoconv("StancerPaymentDoneID", "<b>" . $pid . "</b>"); ?></li>
-					<li><?php echo $langs->transnoentitiesnoconv("StancerPaymentInvoiceOrOrder", "<b>" . $object->ref . "</b>"); ?></li>
+					<?php if ($refToShow !== '') { ?>
+					<li><?php echo $langs->transnoentitiesnoconv("StancerPaymentInvoiceOrOrder", "<b>" . dol_escape_htmltag($refToShow) . "</b>"); ?></li>
+					<?php } ?>
 					<li><?php echo $langs->transnoentitiesnoconv("StancerPaymentDoneStatus", "<b>" . $statusTXT . "</b>"); ?></li>
 					<li><?php echo $langs->trans("StancerPaymentAmount", $FinalPaymentAmt, $currencyCodeType); ?></li>
 				</ul>
@@ -2109,10 +2141,13 @@ if ($ispaymentok) {
 				<p class="mb-4"><?php echo $langs->trans("StancerPaymentDoneErrorMessage"); ?></p>
 				<ul class="mb-4">
 					<li><?php echo $langs->transnoentitiesnoconv("StancerPaymentDoneID", "<b>" . $pid . "</b>"); ?></li>
-					<li><?php echo $langs->transnoentitiesnoconv("StancerPaymentInvoiceOrOrder", "<b>" . $object->ref . "</b>"); ?></li>
+					<?php if ($refToShow !== '') { ?>
+					<li><?php echo $langs->transnoentitiesnoconv("StancerPaymentInvoiceOrOrder", "<b>" . dol_escape_htmltag($refToShow) . "</b>"); ?></li>
+					<?php } ?>
 					<li><?php echo $langs->transnoentitiesnoconv("StancerPaymentDoneErrorMessageShortByStancer", "<b>" . $statusTXT . "</b>"); ?></li>
 					<li><?php echo $langs->transnoentitiesnoconv("StancerPaymentDoneErrorSeverityStancer", $ErrorSeverityCode); ?></li>
 				</ul>
+				<p><?php echo $langs->trans("StancerPaymentNothingCharged"); ?></p>
 				<p><?php echo $langs->transnoentitiesnoconv("StancerPaymentDoneErrorEndMessage", $mysoc->email); ?></p>
 			</div>
 		</div>

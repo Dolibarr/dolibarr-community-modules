@@ -141,6 +141,12 @@ function stancerGetMailTemplate($formmail, $modele, $outputlangs, $templatetypes
 	return null;
 }
 
+// stancerSendOrderMailModele() and stancerSendInvoiceMailModele() instantiate
+// FormMail. Nothing loads that class on an order or an invoice card, so any
+// caller that had not included it itself died with "Class FormMail not found"
+// as soon as a template was configured. A library declares what it uses.
+require_once DOL_DOCUMENT_ROOT . '/core/class/html.formmail.class.php';
+
 /**
  * Record an agenda event, linked to the given object so it shows on its events tab
  *
@@ -312,10 +318,11 @@ function stancerSendMail($to, $subject, $message, $isForCustomer = false, $cc = 
  * @param   int  $forceMail	send mail even if actioncomm exists for that code
  * @param   bool  $wrapInLayout	wrap email content in the styled blue header layout
  * @param   string  $extraCc	additional CC email address (appended to thirdparty CC)
+ * @param   string  $to		explicit recipient; when empty the billing contact is used
  *
  * @return  int|null      1 on success, -1 on error, 0 if skipped by dedup, null when from/to is empty
  */
-function stancerSendInvoiceMailModele($modele, $object, $actionCode = "", $forceMail = 0, $wrapInLayout = false, $extraCc = '')
+function stancerSendInvoiceMailModele($modele, $object, $actionCode = "", $forceMail = 0, $wrapInLayout = false, $extraCc = '', $to = '')
 {
 	global $db, $conf, $langs, $user, $mysoc;
 	// The signature stays generic (callers hold a CommonObject reference), but every caller
@@ -369,8 +376,13 @@ function stancerSendInvoiceMailModele($modele, $object, $actionCode = "", $force
 	$from = getDolGlobalString('MAIN_MAIL_EMAIL_FROM');
 
 	//destinataire -> contact facturation de la société et à défaut adresse mail de la société
-	$facturationID = $object->getIdBillingContact();
-	$to = '';
+	// An explicit $to wins: the caller may have resolved an address the billing
+	// contact does not carry, and silently mailing someone else - or no one - while
+	// the screen announced that address is worse than not sending at all.
+	$facturationID = ($to === '') ? $object->getIdBillingContact() : array();
+	if ($to !== '') {
+		dol_syslog("stancerSendInvoiceMailModele destinataire impose par l'appelant = $to", LOG_DEBUG);
+	}
 	if (!empty($facturationID)) {
 		dol_syslog("stancerSendInvoiceMailModele résultat de  getIdBillingContact : " . json_encode($facturationID), LOG_DEBUG);
 		foreach ($facturationID as $cfid) {
@@ -783,4 +795,91 @@ function stancerCSVtoHTML($header, $message)
 	}
 	$html .= "</table>\n";
 	return $html;
+}
+
+/**
+ * Send the online payment link of an object to whoever can pay it.
+ *
+ * The payment page is a permanent link: it recomputes what is left to pay and
+ * starts a fresh Stancer attempt on every click, so it can be sent again after
+ * a refusal without any risk of charging twice. The recipient is resolved the
+ * same way the payment itself resolves it - thirdparty first, then contacts -
+ * so an order whose thirdparty carries no address still reaches someone.
+ *
+ * @param  Object $object Paid object (order or invoice).
+ * @param  string $type   Online payment type, 'order' or 'invoice'.
+ * @return array          Keys: ok (bool), email (string), url (string), error (string).
+ */
+function stancerSendPaymentLink($object, $type)
+{
+	global $db, $langs, $mysoc;
+
+	$langs->loadLangs(array('stancer@stancer'));
+	$out = array('ok' => false, 'email' => '', 'url' => '', 'error' => '', 'template' => '');
+
+	dol_include_once('/stancer/lib/stancer_customer.lib.php');
+
+	$societe = new Societe($db);
+	if (empty($object->socid) || $societe->fetch($object->socid) <= 0) {
+		$out['error'] = $langs->trans('StancerSendPayLinkNoRecipient');
+		return $out;
+	}
+
+	$payer = stancerResolvePayerContact($societe, $object);
+	if (empty($payer['email'])) {
+		$out['error'] = $langs->trans('StancerSendPayLinkNoRecipient');
+		return $out;
+	}
+	$out['email'] = $payer['email'];
+
+	$url = getOnlinePaymentUrl(0, $type, (string) $object->ref);
+	if (empty($url)) {
+		$out['error'] = $langs->trans('StancerSendPayLinkNoUrl');
+		return $out;
+	}
+	$out['url'] = $url;
+
+	// An email template is what lets the company write its own wording, with its
+	// own layout, and change it without touching the module. Dolibarr substitutes
+	// __ONLINE_PAYMENT_URL__ in it, so the link needs no special handling. The
+	// built-in message below is only a fallback for an instance that configured
+	// no template at all.
+	$template = ($type === 'invoice')
+		? getDolGlobalString('STANCER_PAYLINK_INVOICE_MAILTYPE')
+		: getDolGlobalString('STANCER_PAYLINK_ORDER_MAILTYPE');
+
+	if (!empty($template)) {
+		if ($type === 'invoice') {
+			stancerSendInvoiceMailModele($template, $object, 'STANCER_PAYLINK_SENT', 1, false, '', $payer['email']);
+		} else {
+			stancerSendOrderMailModele($template, $object, 'STANCER_PAYLINK_SENT', 1, $payer['email']);
+		}
+		$out['template'] = $template;
+	} else {
+		$subject = $langs->trans('StancerPayLinkMailSubject', $object->ref);
+		$message = '<p>' . $langs->trans('StancerPayLinkMailIntro', $mysoc->name, $object->ref) . '</p>';
+		$message .= '<p><a href="' . $url . '">' . $langs->trans('StancerPayLinkMailButton') . '</a></p>';
+		$message .= '<p>' . $langs->trans('StancerPayLinkMailFallback') . '<br /><a href="' . $url . '">' . $url . '</a></p>';
+
+		$mailctx = stancerGetObjectMailContext($object);
+		$trackid = empty($mailctx['trackidprefix']) ? '' : $mailctx['trackidprefix'] . $object->id;
+		stancerSendMail($payer['email'], $subject, $message, true, '', $trackid);
+	}
+
+	// Trace it on the object: who was written to, and where the address came from.
+	// A payment link sent to a contact nobody remembers naming is a support call
+	// waiting to happen.
+	stancerAddActionComm(
+		$object,
+		'STANCER_PAYLINK_SENT',
+		$langs->trans('StancerSendPayLink'),
+		$langs->trans('StancerSendPayLinkSent', $payer['email']),
+		array($langs->trans('StancerSendPayLinkSent', $payer['email']), 'source: ' . $payer['email_from'], $url),
+		'',
+		true
+	);
+
+	$out['ok'] = true;
+
+	return $out;
 }
