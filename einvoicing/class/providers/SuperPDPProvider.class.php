@@ -1866,6 +1866,10 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$alreadyExist = 0;
 		$syncedFlows = 0;
 		$postponedFlows = 0;	// Flows left unread on purpose, retried on the next run (see 'postponeflow')
+		$pendingQueued = 0;		// Flows recorded in the manual-action queue instead of aborting the whole run
+		$providershort = preg_replace('/ViaPartner$/', '', (string) $this->providerName);
+		dol_include_once('/einvoicing/class/einvoicingsyncpending.class.php');
+		$syncPending = new EInvoicingSyncPending($db);
 		$call_id = null;
 		$i = 0;
 		$flow = null;
@@ -2048,6 +2052,34 @@ class SuperPDPProvider extends AbstractPDPProvider
 								$actions[$rescode]['businessmessage'] .= $form->textwithpicto('', "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], 1, 'help', '', 0, 2, 'help');
 							}
 						}
+
+						// A manual-action business error (a missing product, a missing thirdparty, a supplier
+						// invoice found with a different amount) used to abort the whole batch here, and every
+						// flow behind it with it - and since the cause does not go away on its own, the next run
+						// stopped at the same place. Record the flow in a persistent manual-action queue and carry
+						// on instead, the same way the postponed flows above do for the failures the operator
+						// cannot act on: the queued flow is retried on demand once the product/thirdparty exists,
+						// and it is not lost when it drifts out of the rolling synchronization window.
+						if (in_array($rescode, array('THIRDPARTY_NOT_FOUND', 'PRODUCT_NOT_FOUND', 'SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT'))) {
+							// Normalize the manual actions the protocol computed (create / associate an existing
+							// product / set a default one...) into a compact list the queue renders as icons.
+							$manualactions = array();
+							if (!empty($res['allactiondata']) && is_array($res['allactiondata'])) {
+								foreach ($res['allactiondata'] as $akey => $adata) {
+									if (!empty($adata['url'])) {
+										$manualactions[] = array('key' => $akey, 'url' => $adata['url'], 'label' => ($adata['label'] ?? ''));
+									}
+								}
+							} elseif (!empty($res['actionurl'])) {
+								$manualactions[] = array('key' => ($rescode == 'THIRDPARTY_NOT_FOUND' ? 'createthirdparty' : 'create'), 'url' => $res['actionurl'], 'label' => '');
+							}
+							$syncPending->queueFromFlow($flow, $providershort, $rescode, ($res['message'] ?? ''), $manualactions, $user, ($res['action'] ?? ''), ($res['actiondata'] ?? array()));
+							dol_syslog(__METHOD__ . " Flow " . $flow['flowId'] . " queued for manual action (" . $rescode . "), synchronization continues.", LOG_WARNING, 0, "_einvoicing");
+							$results_messages[] = "<span class=\"opacitylow\">Flow " . dol_escape_htmltag((string) $flow['flowId']) . " queued for manual action (" . $rescode . "): " . $res['message'] . "</span>";
+							$pendingQueued++;
+							continue;
+						}
+
 						dol_syslog(__METHOD__ . " Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], LOG_DEBUG, 0, "_einvoicing");
 						$errormessage = "ERROR_SYNCFLOW - Failed to synchronize flow " . dol_escape_htmltag((string) $flow['flowId']) . ": " . $res['message'];
 						$results_messages[] = $errormessage;
@@ -2067,6 +2099,13 @@ class SuperPDPProvider extends AbstractPDPProvider
 					if ($res['res'] > 0) {
 						$syncedFlows++;
 						//$lastsuccessfullSyncronizedFlow = $flow['flowId'];
+					}
+
+					// A flow that finally synchronized (or now already exists) leaves the manual-action queue.
+					// When an incoming flow created a supplier invoice, keep the link to it for traceability.
+					if ($res['res'] >= 0) {
+						$resolvedElementType = ((($flow['flowDirection'] ?? '') === 'In') ? 'invoice_supplier' : '');
+						$syncPending->resolveByFlowId($flow['flowId'], $providershort, $user, $resolvedElementType, ($res['res'] > 0 ? (int) $res['res'] : 0));
 					}
 				} catch (Exception $e) {
 					$errormessage = "Exception occurred while synchronizing flow " . dol_escape_htmltag((string) $flow['flowId']) . ": " . dol_escape_htmltag($e->getMessage());
@@ -2149,6 +2188,13 @@ class SuperPDPProvider extends AbstractPDPProvider
 			// Counted apart from the skipped ones: those flows were not stored, they come back next run
 			$messages[] = $langs->trans("TotalPostponedSync") . ": <b>" . $postponedFlows . "</b>";
 		}
+		if ($pendingQueued > 0) {
+			// Flows put in the manual-action queue during this run (a missing product or thirdparty, a supplier
+			// invoice with a different amount): the run carried on instead of stalling on them. Point to the
+			// queue where the manual action is done and the flow retried.
+			$messages[] = $langs->trans("TotalQueuedForManualAction") . ": <b>" . $pendingQueued . "</b> "
+				. '<a href="' . dol_buildpath('/einvoicing/sync_pending_list.php', 1) . '" class="paddingleft">' . $langs->trans("GoToPendingQueue") . ' &rarr;</a>';
+		}
 
 		// Processing result that will be saved in DB
 		$processingResult = '';
@@ -2181,6 +2227,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 			'totalFlows' => $totalFlows,
 			'alreadyExist' => $alreadyExist,
 			'syncedFlows' => $syncedFlows,
+			'pendingQueued' => $pendingQueued,
 			'batchlimit' => $batchlimit,
 			'actions' => $actions,
 			'details' => $results_messages,
