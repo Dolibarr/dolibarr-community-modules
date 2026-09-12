@@ -667,6 +667,12 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 
 		if ($response['status_code'] == 200 || $response['status_code'] == 202) {
+			if (!is_array($response['response']) || empty($response['response']['flowId'])) {
+				// Accepted, but the answer is not the JSON body the platform announces. Everything below
+				// is built on that flow id, so stop here rather than call 'flows/' with nothing.
+				$this->errors[] = "Sample invoice sent but the platform returned no flow id.";
+				return 0;
+			}
 			$flowId = $response['response']['flowId'];
 			$outputLog[] = "Sample invoice sent successfully.";
 
