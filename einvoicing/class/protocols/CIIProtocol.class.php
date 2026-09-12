@@ -2771,23 +2771,11 @@ class CIIProtocol extends AbstractProtocol
 		$sett->appendChild($sum);
 		$sum->appendChild($doc->createElement('ram:LineTotalAmount', number_format($line['lineTotalAmount'], 2, '.', '')));
 
-		// Ref doc for deposit line
-		if (!empty($line['isDepositLine'])) {
-			$refNode = $doc->createElement('ram:AdditionalReferencedDocument');
-
-			$refNode->appendChild($doc->createElement('ram:IssuerAssignedID', einvoicingXmlText((string) $line['depositInvoiceRef'])));
-			$refNode->appendChild($doc->createElement('ram:TypeCode', '130'));
-
-			if (!empty($line['depositInvoiceDate']) && $profile === 'EXTENDED') {
-				$dateNode = $doc->createElement('ram:FormattedIssueDateTime');
-				$str = $doc->createElement('qdt:DateTimeString', $line['depositInvoiceDate']->format('Ymd'));
-				$str->setAttribute('format', '102');
-				$dateNode->appendChild($str);
-				$refNode->appendChild($dateNode);
-			}
-
-			$sett->appendChild($refNode);
-		}
+		// The deposit this line deducts is referenced at document level, in BG-3, where a preceding
+		// invoice belongs (BT-25 with its date BT-26, type 386) - buildinvoicelines.inc.php fills it in
+		// the same place it marks the line. It used to be written here as well, as a line level
+		// ram:AdditionalReferencedDocument with TypeCode 130: that slot is BT-128, the identifier of what
+		// the line bills - a phone number, a meter - and never a document (issue #912).
 
 		return $el;
 	}
