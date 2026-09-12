@@ -195,7 +195,7 @@ if ($action == 'confirm_delete' && $confirm == 'yes' && $permissiontoadd && $row
 }
 
 // Delete the selected mappings
-if ($massaction == 'massdelete' && $confirm == 'yes' && $permissiontoadd && is_array($toselect) && count($toselect) > 0) {
+if ($action == 'massdelete' && $confirm == 'yes' && $permissiontoadd && is_array($toselect) && count($toselect) > 0) {
 	$nbdeleted = 0;
 	foreach ($toselect as $torowid) {
 		$pfp = new ProductFournisseur($db);
@@ -211,6 +211,7 @@ if ($massaction == 'massdelete' && $confirm == 'yes' && $permissiontoadd && is_a
 	if ($nbdeleted > 0) {
 		setEventMessages($langs->trans("NbOfVendorRefMappingsDeleted", $nbdeleted), null, 'mesgs');
 	}
+	$action = 'view';
 	$massaction = '';
 	$toselect = array();
 }
@@ -296,26 +297,9 @@ if (getDolGlobalString('EINVOICING_SHOW_MAPPING_TOOL_ON_VENDOR_PRICE_LIST')) {	/
 	$newcardbutton = dolGetButtonTitle($langs->trans("MapEInvoiceProducts"), '', 'fa fa-link', dol_buildpath('/einvoicing/product_mapping.php', 1), '', ($permissiontoadd ? 1 : 0));
 }
 
-// Confirmations are printed before the search form: a form cannot be nested into another one
+// Confirmation of a single deletion, printed before the search form: a form cannot be nested into another one
 if ($action == 'delete' && $permissiontoadd && $rowid > 0) {
 	print $form->formconfirm($_SERVER["PHP_SELF"].'?rowid='.((int) $rowid).$param, $langs->trans("DeleteVendorRefMapping"), $langs->trans("ConfirmDeleteVendorRefMapping"), 'confirm_delete', '', 0, 1);
-}
-if ($massaction == 'massdelete' && $permissiontoadd && count($toselect) > 0) {
-	// Same as formconfirm, but it has to carry the ids selected into the list
-	print '<form method="POST" action="'.$_SERVER["PHP_SELF"].$param.'">';
-	print '<input type="hidden" name="token" value="'.newToken().'">';
-	print '<input type="hidden" name="massaction" value="massdelete">';
-	print '<input type="hidden" name="confirm" value="yes">';
-	foreach ($toselect as $selected) {
-		print '<input type="hidden" name="toselect[]" value="'.((int) $selected).'">';
-	}
-	print '<div class="warning">';
-	print $langs->trans("ConfirmDeleteSelectedVendorRefMappings", count($toselect)).'<br>';
-	print '<input type="submit" class="button small" value="'.$langs->trans("Yes").'">';
-	print ' <a class="button button-cancel small" href="'.$_SERVER["PHP_SELF"].'?'.ltrim($param, '&').'">'.$langs->trans("No").'</a>';
-	print '</div>';
-	print '</form>';
-	print '<br>';
 }
 
 print '<form method="POST" id="searchFormList" action="'.$_SERVER["PHP_SELF"].'">';
@@ -325,6 +309,11 @@ print '<input type="hidden" name="sortfield" value="'.dol_escape_htmltag($sortfi
 print '<input type="hidden" name="sortorder" value="'.dol_escape_htmltag($sortorder).'">';
 
 print_barre_liste($title, $page, $_SERVER["PHP_SELF"], $param, $sortfield, $sortorder, '', $num, $nbtotalofrecords, 'einvoicing.png@einvoicing', 0, $newcardbutton, '', $limit);
+
+// Confirmation of the mass deletion, inside the list form so the selected lines and the filters are posted again (same place as core/tpl/massactions_pre.tpl.php)
+if ($massaction == 'predelete' && $permissiontoadd && count($toselect) > 0) {
+	print $form->formconfirm($_SERVER["PHP_SELF"], $langs->trans("DeleteSelectedVendorRefMappings"), $langs->trans("ConfirmDeleteSelectedVendorRefMappings", count($toselect)), 'massdelete', null, '', 0, 200, 500, 1);
+}
 
 print '<div class="info"><span class="">'.$langs->trans("MappedVendorRefsDesc");
 print ' '.$langs->trans("MapEInvoiceProductsDesc2");
@@ -545,7 +534,7 @@ print '</div>';
 
 if ($permissiontoadd && $num > 0 && $action != 'editmapping') {
 	print '<div class="right paddingtop">';
-	print '<button type="submit" class="button small" name="massaction" value="massdelete">'.$langs->trans("DeleteSelectedVendorRefMappings").'</button>';
+	print '<button type="submit" class="button small" name="massaction" value="predelete">'.$langs->trans("DeleteSelectedVendorRefMappings").'</button>';
 	print '</div>';
 }
 
