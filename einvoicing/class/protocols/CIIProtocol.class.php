@@ -1921,7 +1921,7 @@ class CIIProtocol extends AbstractProtocol
 					continue;
 				}
 
-				$line[$key] = $this->getXPathValue($xpath, $expr, $node);
+				$line[$key] = $this->getXPathValue($xpath, (string) $expr, $node);
 			}
 
 			// Type normalisation
