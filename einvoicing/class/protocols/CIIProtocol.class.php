@@ -2807,8 +2807,10 @@ class CIIProtocol extends AbstractProtocol
 
 		// ID / GlobalID — only one of the two may be present. If GlobalID is present, omit the ID to avoid XSD validation errors
 		// The MINIMUM schema declares neither: its TradePartyType starts at ram:Name, and the party is
-		// identified there by its ram:SpecifiedLegalOrganization/ram:ID instead.
-		if (!$this->isMinimumProfile($profile)) {
+		// identified there by its ram:SpecifiedLegalOrganization/ram:ID instead. Left out in minimal mode
+		// too: on the deliver-to party the term is BT-71, which identifies the place goods are delivered to
+		// and not the buyer company (issue #920).
+		if (!$minimal && !$this->isMinimumProfile($profile)) {
 			if (!empty($data[$prefix . 'GlobalIds'])) {
 				foreach ($data[$prefix . 'GlobalIds'] as $globalId) {
 					$g = $doc->createElement('ram:GlobalID', einvoicingXmlText((string) $globalId['value']));
@@ -2825,8 +2827,8 @@ class CIIProtocol extends AbstractProtocol
 			// Routing code of the buyer (BT-46 under scheme 0224), where BR-FR-CPRO-11 and BR-FR-CPRO-13 read
 			// the Chorus Pro "code service exécutant". It is a second ram:GlobalID, which only the EXTENDED
 			// profiles accept (FX-SCH-A-000164 caps that element at one occurrence below them), and it belongs
-			// to the buyer alone: on the deliver-to party the identifier is BT-71, a location (issue #678).
-			if ($type === 'buyer' && !$minimal && $this->isExtendedProfile($profile) && !empty($data['buyerRoutingCode'])) {
+			// to the buyer alone, which the guard above already restricts it to (issue #678).
+			if ($type === 'buyer' && $this->isExtendedProfile($profile) && !empty($data['buyerRoutingCode'])) {
 				$routing = $doc->createElement('ram:GlobalID', einvoicingXmlText($data['buyerRoutingCode']));
 				$routing->setAttribute('schemeID', EInvoicing::SCHEME_FR_ROUTING_CODE);
 				$node->appendChild($routing);
