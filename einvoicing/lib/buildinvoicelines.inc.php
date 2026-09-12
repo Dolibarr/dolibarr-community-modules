@@ -98,6 +98,7 @@ $promise_code = $object->array_options['options_d4d_promise_code'] ?? '';
 if ($promise_code == '') {
 	// Dolibarr "Réf. client" holds the customer's purchase order number -> BT-13 (see issue #302).
 	// The property is ref_client on recent versions and ref_customer on some older ones; accept both.
+	// @phan-suppress-next-line PhanDeprecatedProperty  ref_client is the deprecated twin of ref_customer, kept because an invoice built without a fetch may carry only that one.
 	$promise_code = $object->ref_client ?? ($object->ref_customer ?? '');
 }
 if ($promise_code == '' && !empty($customerOrderReferenceList)) {
@@ -114,6 +115,7 @@ if ($object->fk_account > 0) {
 
 $account_proprio = '';
 if ($account->id > 0) {
+	// @phan-suppress-next-line PhanDeprecatedProperty  owner_name only exists from Dolibarr 24 on, the module supports 18: proprio is the one that answers on the whole range.
 	$account_proprio = trim(!empty($account->proprio) ? $account->proprio : $account->owner_name);	// $account->proprio is for old version compatibility
 }
 if ($account_proprio == '') {
@@ -317,6 +319,7 @@ if (! ($object->project instanceof Project)) {
 	if (method_exists($object, 'fetchProject')) {
 		$object->fetchProject();
 	} else {
+		// @phan-suppress-next-line PhanDeprecatedFunction  fetchProject() only exists from Dolibarr 24 on, and the branch above is what uses it when it does.
 		$object->fetch_project();
 	}
 }
@@ -1169,8 +1172,12 @@ if ($shipAddress === null && !empty($object->linkedObjectsIds['shipping']) && is
 	require_once DOL_DOCUMENT_ROOT . '/contact/class/contact.class.php';
 	foreach ($object->linkedObjectsIds['shipping'] as $expeditionId) {
 		$tmpexpedition = new Expedition($db);
+		// The core deprecated fk_delivery_address without ever naming a replacement, and it is still the
+		// only place a shipment carries its own delivery address.
+		// @phan-suppress-next-line PhanDeprecatedProperty
 		if ($tmpexpedition->fetch($expeditionId) > 0 && !empty($tmpexpedition->fk_delivery_address)) {
 			$shipContact = new Contact($db);
+			// @phan-suppress-next-line PhanDeprecatedProperty
 			if ($shipContact->fetch((int) $tmpexpedition->fk_delivery_address) > 0) {
 				$shipAddress = einvoicingShipToFromContact($shipContact, $object->thirdparty, $outputlangs, $db);
 				break;
