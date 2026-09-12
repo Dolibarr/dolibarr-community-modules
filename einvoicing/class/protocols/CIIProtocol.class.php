@@ -1058,7 +1058,7 @@ class CIIProtocol extends AbstractProtocol
 			// Create supplier invoice lines
 			// --------------------------------------------------
 
-			$res = $this->createSupplierInvoiceLinesFromSource($supplierInvoice, $parsedLines, $remise_already_used_line_level_ids, $supplierPriceEntries, $return_messages, $flowId);
+			$res = $this->createSupplierInvoiceLinesFromSource($supplierInvoice, $parsedLines, $remise_already_used_line_level_ids, $supplierPriceEntries, $return_messages, $flowId, $parsedHeader);
 			if ($res['res'] < 0) {
 				return $res;  // Return the full result array because it may contain additional information like actioncode, actionurl...
 			}
@@ -1245,9 +1245,10 @@ class CIIProtocol extends AbstractProtocol
 	 * @param 	array 				$supplierPriceEntries					The list of entries for supplier prices
 	 * @param 	array 				$return_messages						The list of return messages to complete if necessary
 	 * @param 	string 				$flowId									The concerned flowId
-	 * @return 	array{res:int,message?:string,actioncode?:string|null,actionurl?:string|null,action?:string|null,actiondata?:string|null}	Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and additional data about the action.
+	 * @param 	array<string,mixed>	$parsedHeader							The parsed header, for the amount the document declares already paid
+	 * @return 	array{res:int,message?:string,postponeflow?:int,actioncode?:string|null,actionurl?:string|null,action?:string|null,actiondata?:array<string,mixed>|string|null,businessmessage?:string}	Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and additional data about the action. 'postponeflow' marks a failure that stored nothing, so the batch may go on and the flow be retried later.
 	 */
-	public function createSupplierInvoiceLinesFromSource(&$supplierInvoice, $parsedLines, &$remise_already_used_line_level_ids, &$supplierPriceEntries, &$return_messages, $flowId = ''): array
+	public function createSupplierInvoiceLinesFromSource(&$supplierInvoice, $parsedLines, &$remise_already_used_line_level_ids, &$supplierPriceEntries, &$return_messages, $flowId = '', array $parsedHeader = array()): array
 	{
 		global $db;
 
@@ -1267,15 +1268,40 @@ class CIIProtocol extends AbstractProtocol
 					$lineRefDocType = $refDoc['typeCode'] ?? null;
 					$lineRefDocDate = $refDoc['issueDate'] ?? null;
 
+					// An entry carrying no identifier references nothing, and findIdByRef() answers 0 for it
+					// like it does for an identifier it cannot find - which would report it, or postpone the
+					// flow for good when the document declares an amount already paid. Taken from PR #897.
+					if (trim((string) $lineRefDocId) === '') {
+						continue;
+					}
+
 					$linkedObjectId = SupplierInvoiceHelper::findIdByRef($lineRefDocId, (int) $parsedLine['supplierId']);
 					if ($linkedObjectId < 0) {
 						return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($linkedObjectId, $lineRefDocId, 'linked to line ' . $parsedLine['lineid'])];
 					}
 					if ($linkedObjectId == 0) {
-						return [
-							'res' => -1,
-							'message' => 'Document "' . dol_escape_htmltag((string) $lineRefDocId) . '" linked to line ' . dol_escape_htmltag((string) $parsedLine['lineid']) . ' was not found in Dolibarr. Please verify why this document is missing (deleted, not imported, or not provided by the supplier). To resolve this issue, you must manually create the invoice using the supplier invoice reference "' . dol_escape_htmltag((string) $lineRefDocId) . '".'
-						];
+						// BT-128-1 is the issuer saying, about this very reference, that it is written in an
+						// identification scheme of its own: what the line bills - a phone number, a meter, a
+						// subscription - and not a document. There is then nothing to look for, and nothing
+						// to report: telecom and utility issuers put one on every line. The lookup ran first
+						// either way, because UNTDID 1153 also holds documentary codes (IV, ON, CT, AFL) and
+						// a qualified reference that does match an invoice is linked like any other.
+						if (!empty($refDoc['referenceTypeCode'])) {
+							continue;
+						}
+
+						// Unqualified, and the document declares an amount already paid (BT-113): that is the
+						// missing deposit, and stepping over it would import an invoice short of its
+						// deduction. The flow is postponed - nothing is stored, syncFlow() rolls back, and
+						// the next run takes it again, the way BG-3 is already handled at document level.
+						if (abs((float) ($parsedHeader['totalPrepaidAmount'] ?? 0)) > 0) {
+							return $this->postponeForMissingLineDocument((string) $lineRefDocId, (string) $parsedLine['lineid'], (int) $parsedLine['supplierId'], $parsedHeader);
+						}
+
+						// Unqualified and nothing declared paid: a contract number, an order number. Stepped
+						// over, and reported so the operator knows the document carried it.
+						$return_messages[] = 'Document "' . dol_escape_htmltag((string) $lineRefDocId) . '" referenced by line ' . dol_escape_htmltag((string) $parsedLine['lineid']) . ' matches no supplier invoice in Dolibarr and was stepped over: the invoice is imported without it.';
+						continue;
 						// TODO: Add a check before sending a final invoice after deposit to ensure that the deposit invoice has been properly sent to the PDP and successfully received.
 					}
 
@@ -1451,6 +1477,43 @@ class CIIProtocol extends AbstractProtocol
 
 		return ['res' => 1];
 	}
+	/**
+	 * Postpone the flow because a line points at an invoice this Dolibarr does not hold while the document
+	 * declares an amount already paid.
+	 *
+	 * Nothing has been committed - syncFlow() rolls its transaction back - so the flow stays pending and the
+	 * next synchronization takes it again, which is how the same case is already handled at document level
+	 * (BG-3, LINKED_INVOICE_NOT_FOUND). The batch carries on: the flows behind this one are not stalled.
+	 *
+	 * @param	string					$lineRefDocId	The reference the line carries (BT-128)
+	 * @param	string					$lineId			The line it was read on
+	 * @param	int						$socId			The supplier of the invoice being imported
+	 * @param	array<string,mixed>		$parsedHeader	The parsed header of the received document
+	 * @return	array{res:int,message:string,postponeflow:int,actioncode:string,actionurl:string,action:string,actiondata:array<string,mixed>,businessmessage:string}	The postponed result
+	 */
+	protected function postponeForMissingLineDocument($lineRefDocId, $lineId, $socId, array $parsedHeader): array
+	{
+		global $langs;
+
+		$documentno = (string) ($parsedHeader['documentno'] ?? '');
+		$langs->loadLangs(array('bills', 'einvoicing@einvoicing'));
+
+		$action = $langs->trans('CreateTheMissingSupplierInvoiceToImport', $lineRefDocId);
+		$action .= ' <a class="butAction small smallpaddingimp nomarginleft" href="' . DOL_URL_ROOT . '/fourn/facture/card.php?action=create&socid=' . $socId . '&ref_supplier=' . urlencode($lineRefDocId) . '" target="_blank">';
+		$action .= '<i class="fas fa-plus-circle"></i> ' . $langs->trans('NewBill') . '</a>';
+
+		return array(
+			'res' => -1,
+			'postponeflow' => 1,
+			'message' => 'Document ' . dol_escape_htmltag($lineRefDocId) . ', referenced by line ' . dol_escape_htmltag($lineId) . ' of received document ' . dol_escape_htmltag($documentno) . ', was not found in Dolibarr while the document declares an amount already paid',
+			'actioncode' => 'LINKED_INVOICE_NOT_FOUND',
+			'actionurl' => 'none',
+			'actiondata' => array('supplierref' => $lineRefDocId, 'linkedref' => $documentno, 'socid' => $socId),
+			'action' => $action,
+			'businessmessage' => $langs->trans('CantFindLinkedInvoiceOfTheImportedInvoice', $documentno, $lineRefDocId),
+		);
+	}
+
 
 
 	/* =====================================================================================
@@ -3954,6 +4017,7 @@ class CIIProtocol extends AbstractProtocol
 
 		return ['res' => 1, 'fkRemise' => $fkRemise];
 	}
+
 
 	/**
 	 * Write the VAT the document announces onto the lines that carry each rate.
