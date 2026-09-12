@@ -1751,11 +1751,11 @@ class EInvoicing
 			$arrayofeinvoicestatus = $this->getEinvoiceStatusOptions(0, 0, 0, ($action == 'create' ? 1 : 0), 0, ((empty($currentStatusInfo['code']) && $action != 'create') ? 0 : 1), ($action != 'create' ? 1 : 0));
 
 			// If we create a credit note from another invoice, if original invoice has a status to ignore einvoicing, we propagate it by default to the new credit note to create
-			if (!GETPOSTISSET('seteinvoicestatus') && $action == 'create' && GETPOST('fac_avoir') && GETPOST('type') == 2) {
+			if (!GETPOSTISSET('seteinvoicestatus') && $action == 'create' && GETPOSTINT('fac_avoir') && GETPOST('type') == 2) {
 				$tmpinvoicesrc = new Facture($this->db);
-				$tmpinvoicesrc->fetch(GETPOST('fac_avoir'));
+				$tmpinvoicesrc->fetch(GETPOSTINT('fac_avoir'));
 				$tmpinvoicesrcstatus = $this->fetchLastknownInvoiceStatus($tmpinvoicesrc->id, $tmpinvoicesrc->ref);
-				if ($tmpinvoicesrcstatus['code'] == Einvoicing::STATUS_IGNORE || $tmpinvoicesrcstatus['code'] == Einvoicing::STATUS_IGNORE_2) {
+				if ($tmpinvoicesrcstatus['code'] == EInvoicing::STATUS_IGNORE || $tmpinvoicesrcstatus['code'] == EInvoicing::STATUS_IGNORE_2) {
 					$currentStatusInfo['code'] = $tmpinvoicesrcstatus['code'];
 				}
 			}
