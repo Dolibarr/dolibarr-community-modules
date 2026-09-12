@@ -1172,8 +1172,7 @@ if ($shipAddress === null && !empty($object->linkedObjectsIds['shipping']) && is
 	require_once DOL_DOCUMENT_ROOT . '/contact/class/contact.class.php';
 	foreach ($object->linkedObjectsIds['shipping'] as $expeditionId) {
 		$tmpexpedition = new Expedition($db);
-		// The core deprecated fk_delivery_address without ever naming a replacement, and it is still the
-		// only place a shipment carries its own delivery address.
+		// The use of fk_delivery_address was never supported by the core. This feature was never used.
 		// @phan-suppress-next-line PhanDeprecatedProperty
 		if ($tmpexpedition->fetch($expeditionId) > 0 && !empty($tmpexpedition->fk_delivery_address)) {
 			$shipContact = new Contact($db);
