@@ -1921,7 +1921,7 @@ class CIIProtocol extends AbstractProtocol
 					continue;
 				}
 
-				$line[$key] = $this->getXPathValue($xpath, $expr, $node);
+				$line[$key] = $this->getXPathValue($xpath, (string) $expr, $node);
 			}
 
 			// Type normalisation
@@ -2771,23 +2771,11 @@ class CIIProtocol extends AbstractProtocol
 		$sett->appendChild($sum);
 		$sum->appendChild($doc->createElement('ram:LineTotalAmount', number_format($line['lineTotalAmount'], 2, '.', '')));
 
-		// Ref doc for deposit line
-		if (!empty($line['isDepositLine'])) {
-			$refNode = $doc->createElement('ram:AdditionalReferencedDocument');
-
-			$refNode->appendChild($doc->createElement('ram:IssuerAssignedID', einvoicingXmlText((string) $line['depositInvoiceRef'])));
-			$refNode->appendChild($doc->createElement('ram:TypeCode', '130'));
-
-			if (!empty($line['depositInvoiceDate']) && $profile === 'EXTENDED') {
-				$dateNode = $doc->createElement('ram:FormattedIssueDateTime');
-				$str = $doc->createElement('qdt:DateTimeString', $line['depositInvoiceDate']->format('Ymd'));
-				$str->setAttribute('format', '102');
-				$dateNode->appendChild($str);
-				$refNode->appendChild($dateNode);
-			}
-
-			$sett->appendChild($refNode);
-		}
+		// The deposit this line deducts is referenced at document level, in BG-3, where a preceding
+		// invoice belongs (BT-25 with its date BT-26, type 386) - buildinvoicelines.inc.php fills it in
+		// the same place it marks the line. It used to be written here as well, as a line level
+		// ram:AdditionalReferencedDocument with TypeCode 130: that slot is BT-128, the identifier of what
+		// the line bills - a phone number, a meter - and never a document (issue #912).
 
 		return $el;
 	}
@@ -2819,8 +2807,10 @@ class CIIProtocol extends AbstractProtocol
 
 		// ID / GlobalID — only one of the two may be present. If GlobalID is present, omit the ID to avoid XSD validation errors
 		// The MINIMUM schema declares neither: its TradePartyType starts at ram:Name, and the party is
-		// identified there by its ram:SpecifiedLegalOrganization/ram:ID instead.
-		if (!$this->isMinimumProfile($profile)) {
+		// identified there by its ram:SpecifiedLegalOrganization/ram:ID instead. Left out in minimal mode
+		// too: on the deliver-to party the term is BT-71, which identifies the place goods are delivered to
+		// and not the buyer company (issue #920).
+		if (!$minimal && !$this->isMinimumProfile($profile)) {
 			if (!empty($data[$prefix . 'GlobalIds'])) {
 				foreach ($data[$prefix . 'GlobalIds'] as $globalId) {
 					$g = $doc->createElement('ram:GlobalID', einvoicingXmlText((string) $globalId['value']));
@@ -2837,8 +2827,8 @@ class CIIProtocol extends AbstractProtocol
 			// Routing code of the buyer (BT-46 under scheme 0224), where BR-FR-CPRO-11 and BR-FR-CPRO-13 read
 			// the Chorus Pro "code service exécutant". It is a second ram:GlobalID, which only the EXTENDED
 			// profiles accept (FX-SCH-A-000164 caps that element at one occurrence below them), and it belongs
-			// to the buyer alone: on the deliver-to party the identifier is BT-71, a location (issue #678).
-			if ($type === 'buyer' && !$minimal && $this->isExtendedProfile($profile) && !empty($data['buyerRoutingCode'])) {
+			// to the buyer alone, which the guard above already restricts it to (issue #678).
+			if ($type === 'buyer' && $this->isExtendedProfile($profile) && !empty($data['buyerRoutingCode'])) {
 				$routing = $doc->createElement('ram:GlobalID', einvoicingXmlText($data['buyerRoutingCode']));
 				$routing->setAttribute('schemeID', EInvoicing::SCHEME_FR_ROUTING_CODE);
 				$node->appendChild($routing);

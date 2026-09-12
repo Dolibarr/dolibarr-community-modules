@@ -129,7 +129,7 @@ if ($objectID) {
 
 	// Get flowId from linked document log
 	$flowId = '';
-	$sql = "SELECT rowid, flow_id, lc_status, lc_reason_code FROM ".MAIN_DB_PREFIX."einvoicing_lifecycle_msg";
+	$sql = "SELECT rowid, flow_id, lc_status, lc_reason_code, lc_validation_status FROM ".MAIN_DB_PREFIX."einvoicing_lifecycle_msg";
 	$sql .= " WHERE element_type = '".$db->escape($invoice->element)."'";
 	$sql .= " AND element_id = ".(int) $invoice->id;
 	$sql .= " ORDER BY rowid DESC LIMIT 1";
@@ -138,6 +138,7 @@ if ($objectID) {
 	$flowId = 0;
 	$lcStatus = 0;
 	$lcReasonCode = '';
+	$lcValidationStatus = '';
 
 	$resql = $db->query($sql);
 	if ($resql) {
@@ -147,6 +148,8 @@ if ($objectID) {
 			$flowId = $obj->flow_id;
 			$lcStatus = $obj->lc_status;
 			$lcReasonCode = $obj->lc_reason_code;
+			// Validation status known so far, read before updateStatusMessageValidation() overwrites it below.
+			$lcValidationStatus = $obj->lc_validation_status;
 		}
 	} else {
 		print json_encode(['status' => 'error', 'message' => 'Error retrieving flowId for supplier invoice ref '. $invoice->ref]);
@@ -189,8 +192,8 @@ if ($objectID) {
 		$currentLCStatusLabel = $einvoicing->getStatusLabel($obj->lc_status);
 		$currentLCReasonLabel = $langs->trans($einvoicing->getReasonsByStatus($obj->lc_status)[$obj->lc_reason_code]['label'] ?? $obj->lc_reason_code);
 
-		// Log an event in the invoice timeline if status not pending
-		if ($statusvalidationlabel != 'Pending') {
+		// Log an event in the invoice timeline if status not pending and it has changed
+		if ($statusvalidationlabel != 'Pending' && $statusvalidationlabel !== $lcValidationStatus) {
 			$eventLabel = "EINVOICING - ".$langs->trans("CheckStatus");
 			$eventMessage = "EINVOICING - ".$langs->trans("CheckStatus")." (From ajax checksupplierinvoicestatus) - [Dolibarr: " . $currentLCStatusLabel . ', '.$langs->trans("ResultOnAP").': '.$statusvalidationlabel . (!empty($statusvalidationinfo) ? " - " . $statusvalidationinfo : "") . (!empty($lcReasonCode) ? " - Reason: " . $currentLCReasonLabel : "")."]";
 

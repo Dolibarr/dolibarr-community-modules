@@ -305,9 +305,13 @@ class Call extends CommonObject
 		//foreach($this->lines as $line)
 		//	$line->fetch_optionals();
 
-		// Reset some properties
+		// Reset some properties. unset() rather than an empty value is what the core does in its own
+		// createFromClone(): createCommon() below builds the INSERT from the properties that are set.
+		// @phan-suppress-next-line PhanTypeObjectUnsetDeclaredProperty
 		unset($object->id);
+		// @phan-suppress-next-line PhanTypeObjectUnsetDeclaredProperty
 		unset($object->fk_user_creat);
+		// @phan-suppress-next-line PhanTypeObjectUnsetDeclaredProperty
 		unset($object->import_key);
 
 		// Clear fields

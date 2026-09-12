@@ -511,7 +511,7 @@ trait CommonProtocol
 		// Note: the carrier of the specimen is the one the setup of the instance produces, untouched.
 		// A Factur-X specimen is only a conformant PDF/A-3 when PDF_USE_A is set to PDF/A-3b in
 		// "Home - Setup - PDF", which is exactly what the specimen is there to show.
-		$tmpinvoice->generateDocument($tmpinvoice->model_pdf, $outputlangs);
+		$tmpinvoice->generateDocument((string) $tmpinvoice->model_pdf, $outputlangs);
 
 		// For invoice with ->specimen=1, the file is SPECIMEN.pdf so we rename it into ref
 		$dir = $conf->invoice->multidir_output[$conf->entity];

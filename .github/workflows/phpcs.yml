@@ -76,7 +76,12 @@ jobs:
             echo "mode=all" >> "$GITHUB_OUTPUT"
             echo "The ruleset itself changed: the whole repository is checked."
           else
-            grep -E '\.php$' "$FILES" > changed-php.txt || true
+            # A pull request that deletes or renames a PHP file lists a path that is gone, and
+            # phpcs stops the job on it ("The file ... does not exist"). What left has nothing
+            # to check, so only the files still on disk are handed over.
+            grep -E '\.php$' "$FILES" | while IFS= read -r file; do
+              [ -f "$file" ] && printf '%s\n' "$file"
+            done > changed-php.txt || true
             if [ -s changed-php.txt ]; then
               echo "mode=list" >> "$GITHUB_OUTPUT"
             else
