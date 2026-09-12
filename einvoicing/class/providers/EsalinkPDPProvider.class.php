@@ -1693,6 +1693,11 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				if ($document->flow_direction == 'In') {
 					$resIncoming = $this->processIncomingSupplierInvoiceStatus($flowId, $document, $einvoicing);
 
+					if ($resIncoming['res'] < 0) {
+						// Left unrecorded on purpose: a stored flow is treated as known and never retried.
+						return $resIncoming;
+					}
+
 					$returnRes = $resIncoming['res'];
 					$returnMessage = $resIncoming['message'];
 					break;

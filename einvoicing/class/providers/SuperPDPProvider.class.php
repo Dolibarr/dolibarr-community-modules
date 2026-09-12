@@ -2695,6 +2695,14 @@ class SuperPDPProvider extends AbstractPDPProvider
 				if ($document->flow_direction == 'In') {
 					$resIncoming = $this->processIncomingSupplierInvoiceStatus($flowId, $document, $einvoicing);
 
+					// A negative result is a transient failure of the platform call only (a CDAR parsing
+					// failure is stored as res=0, it would not parse any better on retry): return without
+					// storing the flow so this flowId is retried on the next sync run instead of being
+					// marked processed and losing the vendor status for good.
+					if ($resIncoming['res'] < 0) {
+						return $resIncoming;
+					}
+
 					$returnRes = $resIncoming['res'];
 					$returnMessage = $resIncoming['message'];
 					break;
