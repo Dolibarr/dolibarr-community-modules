@@ -68,6 +68,13 @@ class ImportVatCalculationModeTest extends CommonClassTest
 	const LINE_AMOUNTS = array(1.09, 7.79, 1.59);
 
 	/**
+	 * The rate every line of the fixture carries, and the one its BG-23 announces.
+	 *
+	 * @var float
+	 */
+	const VAT_RATE = 20.0;
+
+	/**
 	 * Ids of the invoices created by the tests, deleted at the end.
 	 *
 	 * @var int[]
@@ -165,7 +172,7 @@ class ImportVatCalculationModeTest extends CommonClassTest
 
 		foreach (self::LINE_AMOUNTS as $amount) {
 			// The first six arguments of addline() are the same from Dolibarr 18 to 24
-			$res = $invoice->addline('Line of ' . $amount, $amount, 20, 0, 0, 1);
+			$res = $invoice->addline('Line of ' . $amount, $amount, self::VAT_RATE, 0, 0, 1);
 			$this->assertGreaterThan(0, $res, $invoice->errorsToString());
 		}
 
@@ -191,7 +198,22 @@ class ImportVatCalculationModeTest extends CommonClassTest
 		$method->setAccessible(true);
 		$method->invokeArgs(
 			new CIIProtocol($db),
-			array($invoice->id, array('taxTotalAmount' => $announcedTva, 'grandTotalAmount' => $announcedTtc), &$messages)
+			array(
+				$invoice->id,
+				array(
+					'taxTotalAmount' => $announcedTva,
+					'grandTotalAmount' => $announcedTtc,
+					// BG-23 is mandatory in EN 16931, so a header without it is a shape no received
+					// document has - and the import reads the VAT it announces from there.
+					'taxBreakdown' => array(array(
+						'typeCode' => 'VAT',
+						'rateApplicablePercent' => self::VAT_RATE,
+						'basisAmount' => round(array_sum(self::LINE_AMOUNTS), 2),
+						'calculatedAmount' => $announcedTva,
+					)),
+				),
+				&$messages
+			)
 		);
 
 		$reread = new FactureFournisseur($db);
@@ -221,8 +243,9 @@ class ImportVatCalculationModeTest extends CommonClassTest
 		$this->assertEquals(10.47, (float) $realigned->total_ht, 'the net amount is untouched');
 		$this->assertEquals(2.09, (float) $realigned->total_tva, 'the VAT is the one of the document');
 		$this->assertEquals(12.56, (float) $realigned->total_ttc);
-		$this->assertCount(1, $messages, 'the import says what it recalculated');
-		$this->assertStringContainsString('Mode 2', $messages[0]);
+		$this->assertCount(1, $messages, 'the import says where the amounts come from');
+		$this->assertStringContainsString('12.56', $messages[0], 'the total the document announces');
+		$this->assertStringContainsString('the document', $messages[0], 'and where the amounts come from');
 	}
 
 	/**
@@ -332,7 +355,8 @@ class ImportVatCalculationModeTest extends CommonClassTest
 		$this->assertEquals(2.10, (float) $realigned->total_tva);
 		$this->assertEquals(12.57, (float) $realigned->total_ttc);
 		$this->assertCount(1, $messages);
-		$this->assertStringContainsString('Mode 1', $messages[0]);
+		$this->assertStringContainsString('12.57', $messages[0], 'the total the document announces');
+		$this->assertStringContainsString('the document', $messages[0], 'and where the amounts come from');
 	}
 
 	/**

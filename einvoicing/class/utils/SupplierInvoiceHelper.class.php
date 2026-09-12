@@ -489,12 +489,55 @@ class SupplierInvoiceHelper
 	 * @param	FactureFournisseur	$invoice		The invoice, with its totals as stored
 	 * @param	float				$announcedTva	BT-110 of the received document, absolute value
 	 * @param	float				$announcedTtc	BT-112 of the received document, absolute value
+	 * @param	?float				$announcedPrepaid	BT-113 of the received document, or null not to confront it
 	 * @return	bool								True when both totals are the announced ones
 	 */
-	public static function totalsAgreeWithDocument(FactureFournisseur $invoice, $announcedTva, $announcedTtc)
+	public static function totalsAgreeWithDocument(FactureFournisseur $invoice, $announcedTva, $announcedTtc, $announcedPrepaid = null)
 	{
-		return abs(abs((float) $invoice->total_tva) - (float) $announcedTva) < 0.005
-			&& abs(abs((float) $invoice->total_ttc) - (float) $announcedTtc) < 0.005;
+		if (abs(abs((float) $invoice->total_tva) - (float) $announcedTva) >= 0.005
+			|| abs(abs((float) $invoice->total_ttc) - (float) $announcedTtc) >= 0.005) {
+			return false;
+		}
+
+		// BT-113 does not move BT-110 or BT-112, so the two comparisons above cannot see it: a deposit
+		// the import failed to deduct leaves an invoice that totals exactly what the document announces
+		// and is short of what it says was already paid. Marks written before this check carry no
+		// prepaid amount and are read as null, which keeps them on the two totals alone.
+		if ($announcedPrepaid === null) {
+			return true;
+		}
+
+		return abs(self::linkedDepositAmount((int) $invoice->id) - abs((float) $announcedPrepaid)) < 0.005;
+	}
+
+	/**
+	 * Amount the deposits linked to a supplier invoice deduct from it, VAT included.
+	 *
+	 * The deposit of a received document becomes a DiscountAbsolute the imported lines point at through
+	 * fk_remise_except, and that row is what BT-113 has to be confronted with. Its fk_invoice_supplier_source
+	 * is what tells a deposit from a document level allowance (BT-107), which carries none.
+	 *
+	 * @param	int		$supplierInvoiceId	Id of the supplier invoice
+	 * @return	float						Sum of the deposits linked to it, VAT included
+	 */
+	public static function linkedDepositAmount($supplierInvoiceId)
+	{
+		global $db;
+
+		$sql = "SELECT SUM(r.amount_ttc) as total FROM " . MAIN_DB_PREFIX . "societe_remise_except as r";
+		$sql .= " WHERE r.fk_invoice_supplier_source > 0";
+		$sql .= " AND (r.fk_invoice_supplier = " . (int) $supplierInvoiceId;
+		$sql .= " OR r.rowid IN (SELECT d.fk_remise_except FROM " . MAIN_DB_PREFIX . "facture_fourn_det as d";
+		$sql .= " WHERE d.fk_facture_fourn = " . (int) $supplierInvoiceId . " AND d.fk_remise_except > 0))";
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . ' ' . $db->lasterror(), LOG_ERR);
+			return 0.0;
+		}
+		$obj = $db->fetch_object($resql);
+
+		return abs((float) ($obj->total ?? 0));
 	}
 
 	/**
@@ -507,14 +550,19 @@ class SupplierInvoiceHelper
 	 * @param	int		$supplierInvoiceId	Id of the supplier invoice the import created
 	 * @param	float	$announcedTva		BT-110 of the received document, absolute value
 	 * @param	float	$announcedTtc		BT-112 of the received document, absolute value
+	 * @param	?float	$announcedPrepaid	BT-113 of the received document, when it is what the mark is about
 	 * @return	int							-1 on error, >0 otherwise
 	 */
-	public static function flagTotalsMismatch($supplierInvoiceId, $announcedTva, $announcedTtc)
+	public static function flagTotalsMismatch($supplierInvoiceId, $announcedTva, $announcedTtc, $announcedPrepaid = null)
 	{
 		global $db;
 
 		$einvoicing = new EInvoicing($db);
-		$value = json_encode(array('tva' => (float) $announcedTva, 'ttc' => (float) $announcedTtc));
+		$value = array('tva' => (float) $announcedTva, 'ttc' => (float) $announcedTtc);
+		if ($announcedPrepaid !== null) {
+			$value['prepaid'] = (float) $announcedPrepaid;
+		}
+		$value = json_encode($value);
 
 		return $einvoicing->insertOrUpdateExtraField((int) $supplierInvoiceId, 'invoice_supplier', EInvoicing::EXTRAFIELD_TOTALS_MISMATCH, (string) $value);
 	}
@@ -523,7 +571,7 @@ class SupplierInvoiceHelper
 	 * Read the mark left by an import that could not reproduce the totals of the document.
 	 *
 	 * @param	int		$supplierInvoiceId		Id of the supplier invoice
-	 * @return	?array{tva:float,ttc:float}		The totals the document announces, or null when the invoice carries no mark
+	 * @return	?array{tva:float,ttc:float,prepaid?:float}	The totals the document announces, or null when the invoice carries no mark
 	 */
 	public static function totalsMismatch($supplierInvoiceId)
 	{
@@ -540,7 +588,14 @@ class SupplierInvoiceHelper
 			return null;
 		}
 
-		return array('tva' => (float) $decoded['tva'], 'ttc' => (float) $decoded['ttc']);
+		$announced = array('tva' => (float) $decoded['tva'], 'ttc' => (float) $decoded['ttc']);
+		// Only a mark written for a missing deduction carries BT-113. Absent, the caller confronts the
+		// two totals alone, which is what every mark written before this one means.
+		if (isset($decoded['prepaid'])) {
+			$announced['prepaid'] = (float) $decoded['prepaid'];
+		}
+
+		return $announced;
 	}
 
 	/**
@@ -582,7 +637,7 @@ class SupplierInvoiceHelper
 			return true;
 		}
 
-		return !self::totalsAgreeWithDocument($invoice, $announced['tva'], $announced['ttc']);
+		return !self::totalsAgreeWithDocument($invoice, $announced['tva'], $announced['ttc'], $announced['prepaid'] ?? null);
 	}
 
 	/**

@@ -40,7 +40,7 @@ concurrency:
 
 env:
   # The FNFE package that carries the three validation stages, pinned. https://github.com/fnfempe/France_RFE
-  FNFE_TAG: v1.4.0.03
+  FNFE_TAG: v1.4.0.04
   # Saxon-HE runs the compiled Schematron XSLT of that package.
   SAXON_VERSION: 10.9
 

@@ -15,7 +15,7 @@ Neither is vendored here: the CI fetches a pinned release, and so do you.
 ## Running it locally
 
 ```sh
-curl -sSL -o france-rfe.tar.gz https://github.com/fnfempe/France_RFE/archive/refs/tags/v1.4.0.03.tar.gz
+curl -sSL -o france-rfe.tar.gz https://github.com/fnfempe/France_RFE/archive/refs/tags/v1.4.0.04.tar.gz
 mkdir -p /tmp/france-rfe && tar xz -C /tmp/france-rfe --strip-components=1 -f france-rfe.tar.gz
 curl -sSL -o /tmp/saxon.jar https://repo1.maven.org/maven2/net/sf/saxon/Saxon-HE/10.9/Saxon-HE-10.9.jar
 
