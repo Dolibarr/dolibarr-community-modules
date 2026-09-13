@@ -392,6 +392,7 @@ $grand_total_ht    	= $grand_total_tva = $grand_total_ttc = 0;
 $prepaidAmount     	= 0;
 $depositlines      	= [];
 $lineRowIds        	= [];	// Document line number => llx_facturedet.rowid, for the messages
+$lineDiscountIds   	= [];	// Document line number => llx_facturedet.fk_remise_except, 0 when the line is not a discount
 $globalDiscounts	= [];
 $billing_period    	= [];
 $numligne          	= 1;
@@ -684,6 +685,7 @@ foreach ($object->lines as $line) {
 	// document, the rowid is what a correction is addressed to, and a message that names only the first
 	// leaves its reader to count the lines to find it.
 	$lineRowIds[$numligne] = (int) $line->id;
+	$lineDiscountIds[$numligne] = (int) ($line->fk_remise_except ?? 0);
 
 	// Filling $linesData (based on $lineTemplate)
 	$linesData[$numligne] = [
@@ -854,7 +856,7 @@ foreach ($linesData as $numligne => $vals) {
 		$linesWithNoName[] = $numligne.' (id '.($lineRowIds[$numligne] ?? 0).')';
 	}
 	foreach (array('prodname' => 'BT-153', 'proddesc' => 'BT-154') as $field => $businessTerm) {
-		if (in_array((string) ($vals[$field] ?? ''), $discountSentinels, true)) {
+		if (!empty($lineDiscountIds[$numligne]) && in_array((string) ($vals[$field] ?? ''), $discountSentinels, true)) {
 			dol_syslog("EInvoicing: line ".$numligne." of ".$object->ref." carries the unresolved discount marker ".$vals[$field]." in ".$businessTerm.". The line is a discount whose source piece could not be read.", LOG_ERR);
 		}
 	}
