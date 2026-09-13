@@ -239,7 +239,9 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 										$this->errors = array_merge($this->errors, $protocol->errors);
 										$this->warnings = array();
 									} else {
-										$this->warnings = array_merge($this->errors, $protocol->errors);	// We want to return the error as a warning.
+										// Append to the warnings already collected above (configuration, routability, auto-send),
+										// which starting the merge from $this->errors used to drop.
+										$this->warnings = array_merge($this->warnings, $protocol->errors);	// We want to return the error as a warning.
 									}
 									return -1;
 								} else {
