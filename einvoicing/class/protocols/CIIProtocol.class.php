@@ -843,6 +843,26 @@ class CIIProtocol extends AbstractProtocol
 	}
 
 	/**
+	 * Read a received document into the header and lines the import works on.
+	 * A CII document is that XML already; a Factur-X one carries it as a PDF/A-3 attachment, which is
+	 * the only reason FacturXProtocol has anything of its own to do here. Everything downstream -
+	 * vendor synchronization, duplicate check, lines, discounts, charges, totals - is the same import
+	 * for both, so it lives once, in doCreateSupplierInvoiceFromSource().
+	 *
+	 * @param  string	$file      Raw received content
+	 * @param  string	$tempFile  That same content, already written to the per-call working file
+	 * @return array{header:array<string,mixed>,lines:array<int,array<string,mixed>>,xml:string}	Parsed header, parsed lines, and the CII XML they were read from
+	 */
+	protected function parseReceivedDocument($file, $tempFile)
+	{
+		return array(
+			'header' => $this->parseInvoiceHeader($file),
+			'lines' => $this->parseInvoiceLines($file),
+			'xml' => $file,
+		);
+	}
+
+	/**
 	 * Build the supplier invoice from a received CII document written to a per-call working file.
 	 * The temp-file lifecycle is owned by createSupplierInvoiceFromSource() (the public wrapper).
 	 * The vendor synchronization runs in its own transaction, opened and closed here. The invoice
@@ -877,9 +897,11 @@ class CIIProtocol extends AbstractProtocol
 		$supplierInvoice = new FactureFournisseur($db);
 
 
-		// Read using native parser
-		$parsedHeader = $this->parseInvoiceHeader($file);
-		$parsedLines = $this->parseInvoiceLines($file);
+		// Read using native parser. The extraction step is what the Factur-X protocol overrides.
+		$parsedDocument = $this->parseReceivedDocument($file, $tempFile);
+		$parsedHeader = $parsedDocument['header'];
+		$parsedLines = $parsedDocument['lines'];
+		$sourceXml = $parsedDocument['xml'];
 
 		dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource parsedHeader: ' . json_encode($parsedHeader), LOG_DEBUG);
 		dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource parsedHeader: ' . json_encode($parsedHeader), LOG_DEBUG, 0, '_einvoicing');
@@ -1278,7 +1300,7 @@ class CIIProtocol extends AbstractProtocol
 			}
 
 			// TODO : Save receivedFile in supplier invoice attachments
-			return ['res' => $supplierInvoiceId, 'message' => implode("\n", $return_messages), 'xml_data' => $file];
+			return ['res' => $supplierInvoiceId, 'message' => implode("\n", $return_messages), 'xml_data' => $sourceXml];
 		}
 	}
 
