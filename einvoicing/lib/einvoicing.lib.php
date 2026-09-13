@@ -1124,18 +1124,11 @@ function einvoicingIsAllowedRedirectUrl($url)
 /**
  * The four sentinels Dolibarr stores in the description of a discount, and the text each stands for.
  *
- * A discount built from another piece - a credit note applied, a deposit deducted, an excess payment
- * carried over - carries no text of its own: the core writes one of four sentinels in the description
- * of the discount, insert_discount() copies it into the description of the line, and pdf_getlinedesc()
- * resolves it against the piece it comes from at print time. Nothing resolves it for an e-invoice, so
- * the customer used to read '(CREDIT_NOTE)' in the item name of the line (BT-153) or in the reason of
- * a document level allowance (BT-97).
- *
- * The test is the one the core makes: the description equals a sentinel exactly, and the line is
- * actually a discount line. Matching the text alone is wrong in both directions - a description edited
- * by hand is missed, and a service line quoting the string is caught - and the four sentinels are not
- * even spelled alike: '(CREDIT_NOTE)' holds an underscore where '(EXCESS PAID)' and
- * '(EXCESS RECEIVED)' hold a space.
+ * A discount built from another piece carries no text of its own: the core writes one of these four in
+ * the description and pdf_getlinedesc() resolves it at print time, which nothing does for an e-invoice.
+ * The test is the one the core makes - the description equals a sentinel exactly and the line is a
+ * discount line - because matching the text alone misses a description edited by hand and catches a
+ * service line quoting the string.
  *
  * @return	array<string,string>	Sentinel of the core => translation key of the text it stands for
  */
@@ -1211,17 +1204,11 @@ function einvoicingDiscountLabel($discount, $description, $outputlangs, $related
 /**
  * Text a discount line of the invoice stands for, '' when the line carries no discount at all.
  *
- * einvoicingDiscountLabel() decides on the description alone, which is what a document level
- * allowance needs: there, the caller has already established that a discount is behind the amount.
- * A line of the invoice has not, and the description alone cannot tell - a line of work can be named
- * '(DEPOSIT)' and carry nothing, and it was then renamed 'Down payment deducted' on its way out,
- * under the wording meant for a discount whose source piece cannot be read, which is a different
- * situation entirely.
- *
- * The test of the core is in two halves, the description AND the discount the line points at
- * (pdf_getlinedesc(): $desc == '(DEPOSIT)' && $object->lines[$i]->fk_remise_except). This is where
- * the second half is made, so that the two call sites read the line the same way: the one writing
- * BT-97 already stands inside a test on fk_remise_except, the one writing BT-153 does not.
+ * einvoicingDiscountLabel() decides on the description alone, which a document level allowance can
+ * afford: its caller has already established a discount is behind the amount. A line has not, and a
+ * line of work named '(DEPOSIT)' carrying nothing was renamed on its way out. The test of the core is
+ * in two halves (pdf_getlinedesc(): $desc == '(DEPOSIT)' && ...->fk_remise_except); the second half is
+ * made here so both call sites read the line the same way.
  *
  * @param	?object				$line				Line of the invoice being written
  * @param	?DiscountAbsolute	$discount			Discount the line was built from, already fetched
