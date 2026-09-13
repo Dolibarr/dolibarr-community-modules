@@ -1171,7 +1171,7 @@ if (is_array($postponedbacklog) && count($postponedbacklog) > 0) {
 		// Its synchronization call was logged though, and the batch response it holds carries the
 		// document - so this is where "Export for support" can reach a flow that never landed.
 		if (!empty($waitingflow->call_id)) {
-			print '<br><a href="'.DOL_URL_ROOT.'/custom/einvoicing/call_list.php?search_call_id='.urlencode($waitingflow->call_id).'">';
+			print '<br><a href="'.dol_buildpath('/einvoicing/call_list.php', 1).'?search_call_id='.urlencode($waitingflow->call_id).'">';
 			print img_picto('', 'file-export', 'class="paddingright"').$langs->trans("PostponedFlowOpenSyncCall");
 			print '</a>';
 		}
