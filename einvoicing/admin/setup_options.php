@@ -278,18 +278,6 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->defaultFieldValue = getDolGlobalString('EINVOICING_NAME_OF_MODULESOURCE_THAT_ARE_POS', 'takepos');
 	$item->cssClass = 'minwidth500';
 
-	// The VAT regime the generated documents declare in BT-8. Left to the VAT mode above by default;
-	// an explicit value is for a seller whose regime that mode cannot express (issue #419).
-	$item = $formSetup->newItem('EINVOICING_VAT_POINT_DATE_CODE')->setAsSelect(array(
-		'auto' => $langs->transnoentities('EINVOICING_VAT_POINT_DATE_CODE_AUTO'),
-		'5'    => $langs->transnoentities('EINVOICING_VAT_POINT_DATE_CODE_5'),
-		'29'   => $langs->transnoentities('EINVOICING_VAT_POINT_DATE_CODE_29'),
-		'72'   => $langs->transnoentities('EINVOICING_VAT_POINT_DATE_CODE_72'),
-	));
-	$item->helpText = $langs->transnoentities('EINVOICING_VAT_POINT_DATE_CODE_HELP');
-	$item->defaultFieldValue = 'auto';
-	$item->cssClass = 'minwidth500';
-
 	// The scheme the party identifier (BT-29, BT-46) is declared under. A list for a French company,
 	// whose admissible values the specification names, and a free field for any other country, where
 	// the module has no table of registers and would otherwise declare a national identifier as a DUNS.
