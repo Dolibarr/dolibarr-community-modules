@@ -70,7 +70,9 @@ function einvoicingEmittedSets($dir)
 		}
 		$source = (string) file_get_contents($path);
 
-		if (preg_match_all('/createElement(?:NS)?\(\s*(?:\$[A-Za-z_]+\s*,\s*)?[\'"]([A-Za-z]+:)?([A-Za-z0-9]+)[\'"]/', $source, $m)) {
+		// document.createElement() is the javascript these pages print, not the XML builder: it put
+		// 'form' and 'input' in the capability set.
+		if (preg_match_all('/(?<!document\.)createElement(?:NS)?\(\s*(?:\$[A-Za-z_]+\s*,\s*)?[\'"]([A-Za-z]+:)?([A-Za-z0-9]+)[\'"]/', $source, $m)) {
 			foreach ($m[2] as $name) {
 				$written[$name] = true;
 			}
