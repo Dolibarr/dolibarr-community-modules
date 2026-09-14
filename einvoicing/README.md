@@ -42,6 +42,20 @@ EINVOICING_ALLOW_DEVTOOLS: Add a button to display the raw data of the invoice i
 EINVOICING_ALLOW_MULTICOMPANY_INVOICE_MOVE: Set this option to the list of all entities ID. It will add a button to move an invoice from an entity to another one (if using multicompany module with all entities having the same SIREN, you can receive all your invoices in the master entity and dispatch invoices in the correct entity after retreival).
 
 
+## Documentation
+
+The `doc/` directory holds what does not fit in this page:
+
+  - [`COVERAGE-AND-LIMITS.md`](doc/COVERAGE-AND-LIMITS.md) — **what the module does not cover, and why**:
+    the billing frameworks (BT-23) it cannot produce, starting with the multi-vendor and self-billing
+    ones and a seller belonging to a VAT group (*assujetti unique*), the syntaxes it does not read, and
+    the elements of the FNFE reference documents it never writes or never reads. Every list on that
+    page is measured by the conformance job, not compiled by hand.
+  - [`LIFECYCLE-STATUSES.md`](doc/LIFECYCLE-STATUSES.md) — the lifecycle statuses and what triggers them.
+  - [`ADD-A-PDP-PROVIDER.md`](doc/ADD-A-PDP-PROVIDER.md) — adding support for another access point.
+  - [`SUPERPDP-AUTHORIZATION-CODE.md`](doc/SUPERPDP-AUTHORIZATION-CODE.md) — the OAuth enrolment flow.
+  - [`FUNCTION-MAP.md`](doc/FUNCTION-MAP.md) — the generated map of the module's functions.
+
 ## Licenses
 
 ### Main code
