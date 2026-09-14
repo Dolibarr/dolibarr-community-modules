@@ -92,7 +92,7 @@ include_once __DIR__.'/compat/functions.lib.php';
 //dol_include_once('/othermodule/class/otherobject.class.php');
 
 // Load translation files required by the page
-$langs->loadLangs(array("einvoicing@einvoicing", "other"));
+$langs->loadLangs(array("einvoicing@einvoicing", "bills", "other"));
 
 // Get parameters
 $action     = GETPOST('action', 'aZ09') ? GETPOST('action', 'aZ09') : 'view'; // The action 'create'/'add', 'edit'/'update', 'view', ...
