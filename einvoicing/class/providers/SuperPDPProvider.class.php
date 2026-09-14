@@ -2024,12 +2024,12 @@ class SuperPDPProvider extends AbstractPDPProvider
 								$actions[$rescode]['businessmessage'] .= $form->textwithpicto('', "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], 1, 'help', '', 0, 2, 'help');
 							}
 							if ($rescode == 'THIRDPARTY_DUPLICATE_VAT') {
-								$actions[$rescode]['businessmessage'] = $langs->trans("SuppliersWithDuplicateVATCode", $res['actiondata']['vatnumber']);
+								$actions[$rescode]['businessmessage'] = $langs->trans("SuppliersWithDuplicateVATCode", $res['actiondata']['vatnumber'] ?? '');
 								// Add technical message in tooltip on the picto
 								$actions[$rescode]['businessmessage'] .= $form->textwithpicto('', "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], 1, 'help', '', 0, 2, 'help');
 							}
 							if ($rescode == 'THIRDPARTY_DUPLICATE_SUPPLIER_CODE') {
-								$actions[$rescode]['businessmessage'] = $langs->trans("SuppliersWithDuplicateCode", $res['actiondata']['suppliercode']);
+								$actions[$rescode]['businessmessage'] = $langs->trans("SuppliersWithDuplicateCode", $res['actiondata']['suppliercode'] ?? '');
 								// Add technical message in tooltip on the picto
 								$actions[$rescode]['businessmessage'] .= $form->textwithpicto('', "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], 1, 'help', '', 0, 2, 'help');
 							}
