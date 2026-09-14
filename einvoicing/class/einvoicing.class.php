@@ -36,7 +36,8 @@ if ((float) DOL_VERSION < 20) {
 }
 
 require_once DOL_DOCUMENT_ROOT . '/core/lib/geturl.lib.php';
-dol_include_once('einvoicing/lib/einvoicing.lib.php');
+require_once __DIR__ . '/../lib/einvoicing.lib.php';	// removeAllSpaces(), used to normalize an electronic address
+
 
 /**
  * Base class for all functions to manage EINVOICING Module.

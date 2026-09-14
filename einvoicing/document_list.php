@@ -75,16 +75,19 @@ include_once DOL_DOCUMENT_ROOT.'/core/class/html.formcompany.class.php';
 include_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php';
 include_once DOL_DOCUMENT_ROOT.'/core/lib/company.lib.php';
 include_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
-include_once __DIR__.'/class/providers/PDPProviderManager.class.php';
-include_once __DIR__.'/class/protocols/ProtocolManager.class.php';
+dol_include_once('einvoicing/lib/einvoicing.lib.php');
+dol_include_once('einvoicing/class/providers/PDPProviderManager.class.php');
+dol_include_once('einvoicing/class/protocols/ProtocolManager.class.php');
+dol_include_once('einvoicing/class/einvoicing.class.php');
+dol_include_once('einvoicing/class/document.class.php');
+
+dol_include_once('einvoicing/compat/functions.lib.php');
 
 // load module libraries
 // GETPOSTDATE() arrived in the core in Dolibarr 18 and dolPrintHTMLForAttribute() in Dolibarr 19; this
 // page calls both, so it would fatal below the version the module declares it supports. Both are
 // backported in compat/functions.lib.php, and that is all this page needs from the two libraries.
 include_once __DIR__.'/compat/functions.lib.php';
-include_once __DIR__.'/lib/einvoicing.lib.php';
-include_once __DIR__.'/class/document.class.php';
 // for other modules
 //dol_include_once('/othermodule/class/otherobject.class.php');
 

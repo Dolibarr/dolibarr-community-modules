@@ -23,7 +23,8 @@
  * \brief   CDAR (Cross Domain Acknowledgement and Response) Handler
  */
 
-dol_include_once('einvoicing/lib/einvoicing.lib.php');
+require_once __DIR__ . '/../../lib/einvoicing.lib.php';	// removeAllSpaces(), used to normalize an electronic address
+
 
 /**
  * CdarHandler
