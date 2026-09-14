@@ -1411,7 +1411,7 @@ while ($i < $imaxinloop) {
 								$out = '<div class="tdoverflowmax200 inline-block lineheightsmall">';
 								$out .= $linkedobj->getNomUrl(1);
 								if ($linkedobj->ref_supplier) {
-									$out .= '<br><span class="spantitle">'.$linkedobj->ref_supplier.'</span>';
+									$out .= '<br><span class="spantitle small">'.$linkedobj->ref_supplier.'</span>';
 								}
 								$out .= "</div>";
 							}
