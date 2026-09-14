@@ -780,6 +780,26 @@ class CIIProtocol extends AbstractProtocol
 	}
 
 	/**
+	 * Amount the document declares already paid that the import still has to attach (BT-113).
+	 *
+	 * BR-FR-CO-09 reads BT-23 in B2, S2 or M2 as "invoice already paid": BT-113 then equals BT-112 and
+	 * BT-115 is zero, the vendor having cashed the invoice in as he issued it. Nothing is missing from
+	 * such an invoice, so nothing is waited for and nothing is deducted (PR #904, PR #911).
+	 *
+	 * @param  array<string,mixed>	$parsedHeader	Parsed header of the received document
+	 * @return float								The amount still to attach, 0 when there is none to look for
+	 */
+	protected function depositAnnouncedByDocument(array $parsedHeader)
+	{
+		$announced = abs((float) ($parsedHeader['totalPrepaidAmount'] ?? 0));
+		if ($announced < 0.005 || in_array((string) ($parsedHeader['businessProcessId'] ?? ''), array('B2', 'S2', 'M2'), true)) {
+			return 0.0;
+		}
+
+		return $announced;
+	}
+
+	/**
 	 * Decide what to do with a BG-3 reference (BT-25) the buyer does not hold.
 	 * BT-113 is what tells the two cases apart: an amount already paid points at a deposit the import
 	 * has to deduct, so the flow waits for it rather than importing an invoice short of its deduction;
@@ -1361,11 +1381,12 @@ class CIIProtocol extends AbstractProtocol
 							continue;
 						}
 
-						// Unqualified, and the document declares an amount already paid (BT-113): that is the
-						// missing deposit, and stepping over it would import an invoice short of its
-						// deduction. The flow is postponed - nothing is stored, syncFlow() rolls back, and
-						// the next run takes it again, the way BG-3 is already handled at document level.
-						if (abs((float) ($parsedHeader['totalPrepaidAmount'] ?? 0)) > 0) {
+						// Unqualified, and the document declares a deposit still to attach: stepping over it
+						// would import an invoice short of its deduction. The flow is postponed - nothing is
+						// stored, syncFlow() rolls back, and the next run takes it again, the way BG-3 is
+						// already handled at document level. An invoice the vendor cashed in himself
+						// announces no deposit here, and waiting for one would wait for ever.
+						if ($this->depositAnnouncedByDocument($parsedHeader) > 0) {
 							return $this->postponeForMissingLineDocument((string) $lineRefDocId, (string) $parsedLine['lineid'], (int) $parsedLine['supplierId'], $parsedHeader);
 						}
 
@@ -3743,10 +3764,26 @@ class CIIProtocol extends AbstractProtocol
 		}
 		$announcedTva = abs((float) $parsedHeader['taxTotalAmount']);
 		$announcedTtc = abs((float) $parsedHeader['grandTotalAmount']);
-		// BT-113 is what the document says was already paid, a deposit in practice. It moves neither
-		// BT-110 nor BT-112, so the two totals below agree whether or not the deposit was deducted, and
-		// an invoice short of its deduction used to pass this guard and be paid in full (issue #726).
+		// BT-113 is what the document says was already paid. It moves neither BT-110 nor BT-112, so the
+		// two totals below agree whether or not it was deducted, and an invoice short of its deduction
+		// used to pass this guard and be paid in full (issue #726).
 		$announcedPrepaid = isset($parsedHeader['totalPrepaidAmount']) ? abs((float) $parsedHeader['totalPrepaidAmount']) : null;
+
+		// Two things say that amount is not a deposit to deduct: BT-23 saying the invoice was already
+		// paid, and a document referencing no preceding invoice (BG-3), which points at nothing - BG-3
+		// being the only thing the import ever attaches a deposit from. Reported by the maintainer on #904.
+		if ($announcedPrepaid !== null
+			&& ($this->depositAnnouncedByDocument($parsedHeader) <= 0 || empty($parsedHeader['invoiceRefDocs']))) {
+			if ($announcedPrepaid >= 0.005) {
+				$langs->load('einvoicing@einvoicing');
+				$return_messages[] = $langs->trans(
+					'EInvoiceImportPrepaidAlreadySettled',
+					dol_escape_htmltag((string) ($parsedHeader['documentno'] ?? '')),
+					price2num($announcedPrepaid, 'MT')
+				);
+			}
+			$announcedPrepaid = null;
+		}
 
 		require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
 
