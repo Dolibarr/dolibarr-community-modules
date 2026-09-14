@@ -551,6 +551,14 @@ class EInvoicing
 	 */
 	const SCHEME_FR_ROUTING_CODE = '0224';
 
+	/**
+	 * @var string ISO 6523 scheme of a French SIRET, the identifier of an establishment.
+	 *
+	 * BR-FR-CPRO-10 of XP Z12-012 makes it mandatory as a private identifier of the buyer (BT-46) on a
+	 * B2G invoice: Chorus Pro routes on the establishment, where 0002 identifies the legal entity (SIREN).
+	 */
+	const SCHEME_FR_SIRET = '0009';
+
 
 	/**
 	 * Constructor
