@@ -1401,16 +1401,15 @@ while ($i < $imaxinloop) {
 						if ($object->fk_element_type === 'facture') {
 							require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
 							$linkedobj = new Facture($db);
-
-							if ($linkedobj->fetch((int) $object->fk_element_id) > 0) {
-								$out = $linkedobj->getNomUrl(1);
-							}
 						} elseif ($object->fk_element_type === 'invoice_supplier') {
 							require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';
 							$linkedobj = new FactureFournisseur($db);
 
 							if ($linkedobj->fetch((int) $object->fk_element_id) > 0) {
 								$out = $linkedobj->getNomUrl(1);
+								if ($linkedobj->ref_supplier) {
+									$out .= '<br><span class="spantitle">'.$linkedobj->ref_supplier.'</span>';
+								}
 							}
 						}
 					}
