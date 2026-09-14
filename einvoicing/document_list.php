@@ -175,16 +175,16 @@ $object->fields['recap'] = array(
 );
 
 // Add a virtual "thirdparty" field into $object->fields for the list (resolved on the fly from the linked invoice, like native invoice lists).
-// Opt-in: resolving the thirdparty relies on correlated subqueries (llx_einvoicing_document has no fk_soc), which can be
+// Opt-in: resolving the thirdparty relies on LEFT JOINs toward the invoice tables (llx_einvoicing_document has no fk_soc), which can be
 // heavy on very large bases, so the whole column is gated behind a hidden constant and disabled by default.
-$showthirdpartycol = getDolGlobalInt('EINVOICING_SHOW_THIRDPARTY_COLUMN');
+$showthirdpartycol = getDolGlobalInt('EINVOICING_SHOW_THIRDPARTY_COLUMN', 1);
 if ($showthirdpartycol) {
 	$object->fields['thirdparty'] = array(
 		'label' => $langs->trans("ThirdParty"),
 		'type' => 'text',
 		'visible' => 1,
 		'enabled' => '1',
-		'position' => 52,
+		'position' => 136,
 		'checked' => 1,
 		'notsearchable' => 1
 	);
@@ -441,15 +441,11 @@ $sql .= $hookmanager->resPrint;
 $sql = preg_replace('/,\s*$/', '', $sql);
 
 // Virtual "thirdparty_name"/"thirdparty_id" columns resolved from the linked invoice (display + sort of the Tiers column)
+// Two LEFT JOINs are added in the FROM clause: one toward the customer invoice (facture) and one toward the supplier
+// invoice (facture_fourn), each joined to its societe. COALESCE picks whichever side matches the fk_element_type.
 if ($showthirdpartycol) {
-	$sql .= ", (CASE";
-	$sql .= " WHEN t.fk_element_type = 'facture' THEN (SELECT s.nom FROM ".$db->prefix()."societe as s INNER JOIN ".$db->prefix()."facture as f ON f.fk_soc = s.rowid WHERE f.rowid = t.fk_element_id)";
-	$sql .= " WHEN t.fk_element_type = 'invoice_supplier' THEN (SELECT s.nom FROM ".$db->prefix()."societe as s INNER JOIN ".$db->prefix()."facture_fourn as ff ON ff.fk_soc = s.rowid WHERE ff.rowid = t.fk_element_id)";
-	$sql .= " ELSE '' END) as thirdparty_name";
-	$sql .= ", (CASE";
-	$sql .= " WHEN t.fk_element_type = 'facture' THEN (SELECT f.fk_soc FROM ".$db->prefix()."facture as f WHERE f.rowid = t.fk_element_id)";
-	$sql .= " WHEN t.fk_element_type = 'invoice_supplier' THEN (SELECT ff.fk_soc FROM ".$db->prefix()."facture_fourn as ff WHERE ff.rowid = t.fk_element_id)";
-	$sql .= " ELSE 0 END) as thirdparty_id";
+	$sql .= ", COALESCE(soc.rowid, socf.rowid, 0) as thirdparty_id";
+	$sql .= ", COALESCE(soc.nom, socf.nom, '') as thirdparty_name";
 }
 
 $sqlfields = $sql; // $sql fields to remove for count total
@@ -463,6 +459,14 @@ if (isset($extrafields->attributes[$object->table_element]['label']) && is_array
 $parameters = array();
 $reshook = $hookmanager->executeHooks('printFieldListFrom', $parameters, $object, $action); // Note that $action and $object may have been modified by hook
 $sql .= $hookmanager->resPrint;
+
+// LEFT JOINs for the virtual thirdparty column: customer invoice link and supplier invoice link, each to its societe.
+if ($showthirdpartycol) {
+	$sql .= " LEFT JOIN ".$db->prefix()."facture as f ON t.fk_element_type = 'facture' AND t.fk_element_id = f.rowid";
+	$sql .= " LEFT JOIN ".$db->prefix()."societe as soc ON soc.rowid = f.fk_soc";
+	$sql .= " LEFT JOIN ".$db->prefix()."facture_fourn as ff ON t.fk_element_type = 'invoice_supplier' AND t.fk_element_id = ff.rowid";
+	$sql .= " LEFT JOIN ".$db->prefix()."societe as socf ON socf.rowid = ff.fk_soc";
+}
 
 if (!empty($object->ismultientitymanaged) && (int) $object->ismultientitymanaged == 1) {
 	$sql .= " WHERE t.entity IN (".getEntity($object->element, (GETPOSTINT('search_current_entity') ? 0 : 1)).")";
@@ -544,10 +548,8 @@ if ($socid) {
 // Add where from extra fields
 // Filter on thirdparty resolved from the linked invoice (facture / facture fournisseur)
 if ($showthirdpartycol && $search_thirdparty != '') {
-	$sql .= " AND (";
-	$sql .= " EXISTS (SELECT 1 FROM ".$db->prefix()."facture as sf INNER JOIN ".$db->prefix()."societe as ss ON ss.rowid = sf.fk_soc WHERE sf.rowid = t.fk_element_id AND t.fk_element_type = 'facture'".natural_search("ss.nom", $search_thirdparty, 0, 0).")";
-	$sql .= " OR EXISTS (SELECT 1 FROM ".$db->prefix()."facture_fourn as sff INNER JOIN ".$db->prefix()."societe as ssf ON ssf.rowid = sff.fk_soc WHERE sff.rowid = t.fk_element_id AND t.fk_element_type = 'invoice_supplier'".natural_search("ssf.nom", $search_thirdparty, 0, 0).")";
-	$sql .= " )";
+	$sql .= " AND (".natural_search("soc.nom", $search_thirdparty, 0, 0);
+	$sql .= " OR ".natural_search("socf.nom", $search_thirdparty, 0, 0).")";
 }
 include DOL_DOCUMENT_ROOT.'/core/tpl/extrafields_list_search_sql.tpl.php';
 // Add where from hooks
