@@ -476,13 +476,11 @@ if ($showthirdpartycol) {
 }
 
 if (!empty($object->ismultientitymanaged) && (int) $object->ismultientitymanaged == 1) {
-	$sql .= " WHERE t.entity IN (".getEntity($object->element, (GETPOSTINT('search_current_entity') ? 0 : 1)).")";
-} elseif (preg_match('/^\w+@\w+$/', (string) $object->ismultientitymanaged)) {
-	$tmparray = explode('@', (string) $object->ismultientitymanaged);
-	$sql .= " LEFT JOIN ".$object->db->prefix().$db->sanitize($tmparray[1])." as pt ON t.".$db->sanitize($tmparray[0])." = pt.rowid";
-	$sql .= " WHERE pt.entity IN (".getEntity($object->element, (GETPOSTINT('search_current_entity') ? 0 : 1)).")";
-} else {
-	$sql .= " WHERE 1 = 1";
+	if (getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP")) {
+		$sql .= " WHERE t.entity IN (".getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP").")";
+	} else {
+		$sql .= " WHERE t.entity IN (".getEntity($object->element).")";
+	}
 }
 foreach ($search as $key => $val) {
 	if (array_key_exists($key, $object->fields)) {
@@ -652,7 +650,7 @@ if ($num == 1 && getDolGlobalInt('MAIN_SEARCH_DIRECT_OPEN_IF_ONLY_ONE') && $sear
 llxHeader('', $title.' '.einvoicingModuleStamp(), $help_url, '', 0, 0, $morejs, $morecss, '', 'mod-einvoicing page-list bodyforlist');	// Can use also classforhorizontalscrolloftabs instead of bodyforlist for a horizontal scroll in the table instead of page
 
 if ($isSlaveEntity) {
-	print '<div class="warning">'.$langs->trans("EInvoicingInfoManagedByMasterSetup", getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP")).'</div>';
+	print '<div class="warning">'.$langs->trans("EInvoicingImportManagedByMasterSetup", getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP")).'</div>';
 }
 
 
