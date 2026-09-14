@@ -659,3 +659,4 @@ DisabledBecauseNotEditable=Cette facture n'est pas modifiable.
 ErrorSupplierNotVisibleInEntity=Le fournisseur « %s » n'est pas visible dans l'entité « %s ». Vous devez d'abord le partager ou le créer dans l'entité cible.
 WarningEntityChangedFileMoveFailed=L'entité a été modifiée, mais les fichiers de factures n'ont pas pu être déplacés vers le répertoire de la nouvelle entité. Vous devrez peut-être les déplacer manuellement.
 EInvoicingInfoManagedByMasterSetup=La configuration de la facturation électronique est gérée par l'entité principale (ID %s)
+EInvoicingImportManagedByMasterSetup=L'import des factures électroniques se fait depuis l'entité principale (ID %s)

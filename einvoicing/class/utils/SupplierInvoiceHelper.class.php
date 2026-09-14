@@ -486,11 +486,11 @@ class SupplierInvoiceHelper
 	 * applies to a credit note as it does to an invoice). The tolerance is there for the float
 	 * representation, not for a difference: the document carries its totals to the cent.
 	 *
-	 * @param	FactureFournisseur	$invoice		The invoice, with its totals as stored
-	 * @param	float				$announcedTva	BT-110 of the received document, absolute value
-	 * @param	float				$announcedTtc	BT-112 of the received document, absolute value
+	 * @param	FactureFournisseur	$invoice			The invoice, with its totals as stored
+	 * @param	float				$announcedTva		BT-110 of the received document, absolute value
+	 * @param	float				$announcedTtc		BT-112 of the received document, absolute value
 	 * @param	?float				$announcedPrepaid	BT-113 of the received document, or null not to confront it
-	 * @return	bool								True when both totals are the announced ones
+	 * @return	bool									True when both totals are the announced ones
 	 */
 	public static function totalsAgreeWithDocument(FactureFournisseur $invoice, $announcedTva, $announcedTtc, $announcedPrepaid = null)
 	{

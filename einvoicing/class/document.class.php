@@ -138,7 +138,7 @@ class Document extends CommonObject
 		"flow_direction" => array("type" => "varchar(10)", "label" => "flow_direction", "enabled" => "1", 'position' => 50, 'notnull' => 0, "visible" => "1", "comment" => "In or Out", 'csslist' => 'center'),
 		"flow_syntax" => array("type" => "varchar(50)", "label" => "flow_syntax", "enabled" => "1", 'position' => 60, 'notnull' => 0, "visible" => "-1", "comment" => "Document syntax (Factur-X, CII, UBL, etc.)"),
 		"flow_profile" => array("type" => "varchar(50)", "label" => "flow_profile", "enabled" => "1", 'position' => 70, 'notnull' => 0, "visible" => "-1", "comment" => "Profile used (Basic, Cius, etc.)"),
-		"processing_rule" => array("type" => "varchar(50)", "label" => "processing_rule", "enabled" => "1", 'position' => 75, 'notnull' => 0, "visible" => "-1", "comment" => "Rule the platform computed for the flow (B2B, B2BInt, NotApplicable, ...)"),
+		"processing_rule" => array("type" => "varchar(50)", "label" => "ProcessingRule", "enabled" => "1", 'position' => 75, 'notnull' => 0, "visible" => "-1", "help" => "ProcessingRuleHelp", "comment" => "Rule the platform computed for the flow (B2B, B2BInt, NotApplicable, ...)"),
 		"document_body" => array("type" => "text", "label" => "document_body", "enabled" => "1", 'position' => 110, 'notnull' => 0, "visible" => "0", "comment" => "Full document content XML"),
 		"fk_element_type" => array("type" => "varchar(100)", "label" => "fk_element_type", "enabled" => "1", 'position' => 120, 'notnull' => 0, "visible" => "1",),
 		"fk_element_id" => array("type" => "integer", "label" => "fk_element_id", "enabled" => "1", 'position' => 130, 'notnull' => 0, "visible" => "-1",),
