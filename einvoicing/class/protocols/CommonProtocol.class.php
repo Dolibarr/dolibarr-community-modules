@@ -657,7 +657,7 @@ trait CommonProtocol
 						$obj2 = $db->fetch_object($resql);
 
 						// Create URL to prefill thirdparty creation form
-						$createUrl = DOL_URL_ROOT . '/societe/list.php?action=search_vat='.urlencode($sellerInfo['sellerTaxRegistations']['VA']);
+						$createUrl = DOL_URL_ROOT . '/societe/list.php?type=f&search_vat='.urlencode($sellerInfo['sellerTaxRegistations']['VA']);
 						$createUrl .= '&backtopage=' . urlencode(dol_buildpath('/einvoicing/document_list.php', 1));
 
 						$action = $langs->trans('CheckSuppliersWithDuplicateCode', $sellerInfo['sellerTaxRegistations']['VA']);
@@ -668,10 +668,10 @@ trait CommonProtocol
 
 						return array(
 							'res' => -1,
-							'message' => $langs->trans("SuppliersWithDuplicateVATCode", $sellerInfo['sellerTaxRegistations']['VA']),
+							'message' => $langs->trans("SuppliersWithDuplicateVATCode", $sellerInfo['sellerTaxRegistations']['VA']),	// Can be a technical message. The business one is defined into the syncFlows() of the provider.
 							'actioncode' => 'THIRDPARTY_DUPLICATE_VAT',
 							'action' => $action,
-							'actiondata' => array('thirdpartyid1' => $obj1->rowid, 'thirdpartyid2' => $obj2->rowid)
+							'actiondata' => array('thirdpartyid1' => $obj1->rowid, 'thirdpartyid2' => $obj2->rowid, 'vatnumber' => $sellerInfo['sellerTaxRegistations']['VA'])
 						);
 					} elseif ($db->num_rows($resql) === 1) {
 						$obj = $db->fetch_object($resql);
@@ -905,7 +905,7 @@ trait CommonProtocol
 					dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Error updating thirdparty: There is 2+ suppliers with the same supplier code. You msut fix one', LOG_DEBUG);
 
 					// Create URL to prefill thirdparty creation form
-					$createUrl = DOL_URL_ROOT . '/societe/list.php?action=search_supplier_code='.urlencode($thirdparty->code_fournisseur);
+					$createUrl = DOL_URL_ROOT . '/societe/list.php?type=f&search_supplier_code='.urlencode($thirdparty->code_fournisseur);
 					$createUrl .= '&backtopage=' . urlencode(dol_buildpath('/einvoicing/document_list.php', 1));
 
 					$action = $langs->trans('CheckSuppliersWithDuplicateCode', $thirdparty->code_fournisseur);
@@ -916,7 +916,7 @@ trait CommonProtocol
 
 					return array(
 						'res' => -1,
-						'message' => $langs->trans("SuppliersWithDuplicateCode", $thirdparty->code_fournisseur),
+						'message' => $langs->trans("SuppliersWithDuplicateCode", $thirdparty->code_fournisseur),	// Can be a technical message. The business one is defined into the syncFlows() of the provider.
 						'actioncode' => 'THIRDPARTY_DUPLICATE_SUPPLIER_CODE',
 						'actionurl' => $createUrl,
 						'action' => $action,
