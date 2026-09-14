@@ -445,7 +445,7 @@ if (!einvoicingIsReceiveDisabled() || !einvoicingIsSendDisabled()) {
 
 	// Setup conf to choose to use Chorus or not
 	$item = $formSetup->newItem('EINVOICING_USE_CHORUS')->setAsYesNo();
-	$item->nameText = $langs->trans("EINVOICING_USE_CHORUS").' <span class="opacitymedium">('.$langs->trans("FeatureNotYetSupported").')</span>';
+	$item->nameText = $langs->trans("EINVOICING_USE_CHORUS").' <span class="opacitymedium">('.$langs->trans("FeatureNotFullyYetSupported").')</span>';
 	$item->helpText = $langs->transnoentities('EINVOICING_USE_CHORUS_HELP');
 	$item->cssClass = 'minwidth500';
 

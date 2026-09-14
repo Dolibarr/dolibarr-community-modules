@@ -304,6 +304,61 @@ if ($buyerRoutingCode !== '' && !$this->isExtendedProfile($buildProfile)) {
 	$buyerRoutingCode = '';
 }
 
+// SIRET of the buyer (BT-46 under scheme 0009), which BR-FR-CPRO-10 makes mandatory on a B2G invoice:
+// Chorus Pro routes on the establishment, where BT-47 carries the legal entity (SIREN). It is declared on
+// top of the identifier the setup already produces, the way the reference document of Annexe B does
+// (0088, 0009 and 0224 side by side), so it needs the same EXTENDED profile as the routing code.
+// The warnings below are raised only on an invoice that looks B2G - one carrying at least one of the
+// Chorus fields - because Chorus Pro support is a setting of the whole company: a seller that invoices
+// both the public sector and private customers would otherwise be told about a missing SIRET on every
+// private invoice, where no rule asks for one.
+$looksLikeB2GInvoice = $chorus && (
+	trim((string) ($object->array_options['options_d4d_service_code'] ?? '')) !== ''
+	|| trim((string) ($object->array_options['options_d4d_contract_number'] ?? '')) !== ''
+	|| trim((string) ($object->array_options['options_d4d_promise_code'] ?? '')) !== ''
+);
+
+$buyerChorusSiret = '';
+if ($chorus && $buyerParty->country_code == 'FR') {
+	$buyerChorusSiret = removeAllSpaces((string) ($buyerParty->idprof2 ?? ''));
+	if ($buyerChorusSiret === '') {
+		if ($looksLikeB2GInvoice) {
+			$this->warnings[] = $outputlangs->trans('EInvoiceChorusBuyerSiretMissing', $buyerParty->name);
+		}
+	} elseif (!preg_match('/^\d{14}$/', $buyerChorusSiret)) {
+		// A SIRET is 14 digits. Anything else is a typing mistake, and Chorus Pro refuses the invoice on
+		// the identifier rather than on the field the operator would go and look at.
+		$this->warnings[] = $outputlangs->trans('EInvoiceChorusBuyerSiretMalformed', $buyerParty->idprof2);
+		$buyerChorusSiret = '';
+	} elseif ($schemeGlobalIdProf === EInvoicing::SCHEME_FR_SIRET && $globalIdProf === $buyerChorusSiret) {
+		// EINVOICING_PARTY_IDENTIFIER_SCHEME is already set to 0009: the identifier is there, and emitting
+		// it twice would break FX-SCH-A-000164 on the very profile that allows several of them.
+		$buyerChorusSiret = '';
+	}
+	// No profile guard is needed here, unlike the routing code below: getBuildXmlProfile() raises the
+	// profile to EXTENDED-CTC-FR whenever Chorus Pro support is on, so this identifier always has room.
+	// The routing code keeps its guard because its extrafield keeps the value that was typed when the
+	// option was on, and the invoice may then be generated with the option off.
+}
+
+// Contract type (EXT-FR-FE-01) of a B2G invoice: the Chorus extrafield the contract reference comes from
+// is the market number, which BR-FR-CPRO-01 qualifies with "GC". An ordinary contract would be "CT", and
+// those are the only two values that rule accepts; the module has no field of its own for that case yet.
+$contractReferenceTypeCode = '';
+if ($chorus && !empty($object->array_options['options_d4d_contract_number'])) {
+	$contractReferenceTypeCode = 'GC';
+}
+
+// BR-FR-CPRO-15 caps the commitment number (BT-13) at 50 characters. It is worth checking because that
+// term does not come from the Chorus extrafield alone: an empty one falls back on the customer reference
+// of the invoice, which Dolibarr stores on 255. Reported rather than truncated - a reference cut in half
+// no longer designates the commitment it names, and only the operator knows which end matters.
+// Its sibling BR-FR-CPRO-14, on the contract reference (BT-12), needs no check here: that one is read from
+// the "Market number" extrafield only, whose own column stops at 50 characters.
+if ($chorus && dol_strlen((string) $promise_code) > 50) {
+	$this->warnings[] = $outputlangs->trans('EInvoiceChorusReferenceTooLong', 'BT-13', dol_strlen((string) $promise_code), $promise_code);
+}
+
 // Buyer reference (BT-10): a reference owned by the buyer, used to route the invoice inside its own
 // organisation. The Chorus Pro service code keeps feeding it when the dedicated property is empty:
 // Annexe A of XP Z12-012 documents BT-10 as the "Service Executant" of the public sector, so that
@@ -1074,6 +1129,7 @@ $invoiceData = [
 	'buyervatnumber'            => $buyerParty->tva_intra ?? '',
 	'buyerGlobalIds'            => $buyerGlobalIds,
 	'buyerRoutingCode'          => ($buyerRoutingCode !== '' ? $buyerRoutingCode : null),
+	'buyerChorusSiret'          => $buyerChorusSiret,
 
 	'buyerLegalOrgId'           => $idprof,
 	'buyerLegalOrgScheme'       => $schemeIdProf,
@@ -1117,6 +1173,7 @@ $invoiceData = [
 	'invoiceRefDocs'            => $invoiceRefDocs,		// BG-3
 	'orderReference'            => $promise_code,
 	'contractReference'         => $object->array_options['options_d4d_contract_number'] ?? null,
+	'contractReferenceTypeCode' => $contractReferenceTypeCode,
 	'despatchAdviceRef'         => null,
 
 	// VAT breakdown for section ApplicableHeaderTradeSettlement
