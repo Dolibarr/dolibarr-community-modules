@@ -26,19 +26,19 @@
  * constructs anywhere in its source. An element the reference documents carry and no line of this
  * module ever constructs is one we cannot emit, whatever the invoice.
  *
+ * This reports a gap and never fails: reading element names out of the source says what the module
+ * could write, not what it does write. A write that leaves the module is caught by emitted-paths.php
+ * instead, which signs generated documents - the same names live at several places in the builder,
+ * so losing one of them changes nothing here.
+ *
  * Needs no Dolibarr instance and no database.
  *
  *   php emitted-terms.php <reference directory> [module directory]
  */
 
 $args = array_slice($argv, 1);
-$updateBaseline = in_array('--update-baseline', $args, true);
-$args = array_values(array_filter($args, function ($a) {
-	return $a !== '--update-baseline';
-}));
 $reference = $args[0] ?? '';
 $moduleDir = $args[1] ?? dirname(__DIR__, 2);
-$baselineFile = __DIR__ . '/emitted-elements.txt';
 if ($reference === '' || !is_dir($reference)) {
 	fwrite(STDERR, "usage: emitted-terms.php <reference directory> [module directory]\n");
 	exit(2);
@@ -98,34 +98,6 @@ function einvoicingEmittedSets($dir)
 }
 
 $sets = einvoicingEmittedSets($moduleDir);
-
-// An element the builder used to construct and constructs no more is a capability leaving the
-// module. It produces no invalid document and no failing test: the invoices that needed it simply
-// stop carrying it. The list below is the guard - it may grow freely, and a name may only leave it
-// on purpose, by running this with --update-baseline.
-$current = array_keys($sets['written']);
-sort($current);
-if ($updateBaseline) {
-	file_put_contents($baselineFile, implode("\n", $current) . "\n");
-	echo count($current) . " element name(s) written to " . basename($baselineFile) . "\n";
-	exit(0);
-}
-$lost = array();
-if (is_file($baselineFile)) {
-	$baseline = array_filter(array_map('trim', (array) file($baselineFile)), 'strlen');
-	$lost = array_values(array_diff($baseline, $current));
-	$gained = array_values(array_diff($current, $baseline));
-	if ($lost) {
-		echo "The builder no longer constructs " . count($lost) . " element(s) it used to:\n";
-		foreach ($lost as $name) {
-			echo '    ' . $name . "\n";
-		}
-		echo "If that is on purpose, say so in the pull request and rerun with --update-baseline.\n\n";
-	}
-	if ($gained) {
-		echo count($gained) . ' new element(s) constructed: ' . implode(', ', $gained) . "\n\n";
-	}
-}
 
 // The reference documents, grouped by the profile family they declare: an element the EXTENDED
 // documents carry says nothing about what an EN16931 document is allowed to hold.
@@ -192,4 +164,4 @@ foreach ($order as $family) {
 
 printf("\n%d element name(s) the builder never constructs, across the families\n", $total);
 
-exit($lost ? 1 : 0);
+exit(0);
