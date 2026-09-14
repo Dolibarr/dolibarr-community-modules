@@ -340,6 +340,7 @@ EInvActorPlatform=PDP / PA
 EInvActorBuyer=Buyer
 EInvNoLifecycleEvent=No lifecycle event recorded for this invoice yet.
 EInvLocalStatusNotYetTransmitted=Not yet transmitted to the platform
+EInvLocalStatusAwaitingPlatform=Deposited on the platform, awaiting its lifecycle statuses
 EInvDirection=Direction
 EInvDirectionIn=Incoming
 EInvDirectionOut=Outgoing
