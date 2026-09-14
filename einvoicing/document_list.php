@@ -186,7 +186,7 @@ if ($showthirdpartycol) {
 		'enabled' => '1',
 		'position' => 136,
 		'checked' => 1,
-		'notsearchable' => 1
+		'csslist' => 'tdoverflowmax150'
 	);
 }
 
@@ -548,8 +548,8 @@ if ($socid) {
 // Add where from extra fields
 // Filter on thirdparty resolved from the linked invoice (facture / facture fournisseur)
 if ($showthirdpartycol && $search_thirdparty != '') {
-	$sql .= " AND (".natural_search("soc.nom", $search_thirdparty, 0, 0);
-	$sql .= " OR ".natural_search("socf.nom", $search_thirdparty, 0, 0).")";
+	$sql .= " AND (".natural_search("soc.nom", $search_thirdparty, 0, 1);
+	$sql .= " OR ".natural_search("socf.nom", $search_thirdparty, 0, 1).")";
 }
 include DOL_DOCUMENT_ROOT.'/core/tpl/extrafields_list_search_sql.tpl.php';
 // Add where from hooks
