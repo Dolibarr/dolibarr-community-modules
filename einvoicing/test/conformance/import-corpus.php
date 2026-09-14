@@ -34,6 +34,7 @@ if ($root === '' || !file_exists($root . '/master.inc.php')) {
 }
 require_once $root . '/master.inc.php';
 dol_include_once('einvoicing/class/protocols/CIIProtocol.class.php');
+dol_include_once('einvoicing/class/utils/PdfAttachmentExtractor.class.php');
 
 global $db;
 
@@ -48,7 +49,7 @@ foreach ($targets as $target) {
 	if (is_dir($target)) {
 		$it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($target, FilesystemIterator::SKIP_DOTS));
 		foreach ($it as $entry) {
-			if (strtolower($entry->getExtension()) === 'xml') {
+			if (in_array(strtolower($entry->getExtension()), array('xml', 'pdf'), true)) {
 				$files[] = $entry->getPathname();
 			}
 		}
@@ -76,14 +77,69 @@ function einvoicingCorpusNorm($value)
 	return $value;
 }
 
+/**
+ * Reduce a parsed structure to a comparable string: the dates become their day, and nothing else
+ * of the content is touched.
+ *
+ * @param	mixed	$value	Parsed header or lines
+ * @return	string			Comparable form
+ */
+function einvoicingCorpusPrint($value)
+{
+	if ($value instanceof DateTimeInterface) {
+		return 'D' . $value->format('Ymd');
+	}
+	if (is_array($value)) {
+		$parts = array();
+		foreach ($value as $key => $item) {
+			$parts[] = $key . '=' . einvoicingCorpusPrint($item);
+		}
+		sort($parts);
+
+		return '[' . implode(';', $parts) . ']';
+	}
+	if (is_bool($value)) {
+		return $value ? '1' : '0';
+	}
+
+	return (string) $value;
+}
+
 $protocol = new CIIProtocol($db);
 $rows = array();
 $failed = 0;
 
 foreach ($files as $file) {
-	$xml = file_get_contents($file);
-	if ($xml === false || trim($xml) === '') {
+	$raw = file_get_contents($file);
+	if ($raw === false || trim($raw) === '') {
 		continue;
+	}
+
+	// A Factur-X file carries the same CII as a PDF/A-3 attachment. Reading it is the one step the
+	// Factur-X protocol has of its own, and the only one the XML documents never exercise: the
+	// extraction, then the parser below, is what a received PDF goes through in production
+	// (FacturXProtocol::parseReceivedDocument, default path).
+	$carrier = 'xml';
+	if (strtolower(pathinfo($file, PATHINFO_EXTENSION)) === 'pdf') {
+		$carrier = 'pdf';
+		$xml = '';
+		$extractionError = '';
+		try {
+			$xml = (string) PdfAttachmentExtractor::getInvoiceXmlFromFile($file);
+		} catch (Throwable $e) {
+			$extractionError = get_class($e) . ': ' . $e->getMessage();
+		}
+		if (trim($xml) === '') {
+			$rows[] = array(
+				'file' => basename($file), 'carrier' => 'pdf', 'profile' => '-', 'error' => $extractionError,
+				'header' => 'KO', 'lines' => 'KO', 'inDoc' => 0, 'missing' => array(),
+				'verdict' => 'GAP no CII extracted from the PDF' . ($extractionError !== '' ? ' - ' . $extractionError : ''),
+			);
+			$failed++;
+			continue;
+		}
+	} else {
+		$xml = $raw;
 	}
 
 	// The package ships the lifecycle messages (CDAR) and the UBL rendering of the same invoices
@@ -121,6 +177,7 @@ foreach ($files as $file) {
 
 	$row = array(
 		'file' => $name,
+		'carrier' => $carrier,
 		'profile' => $urn === '' ? '?' : substr($urn, strrpos($urn, ':') + 1),
 		'error' => $error,
 		'header' => is_array($header) ? 'ok' : var_export($header, true),
@@ -158,6 +215,12 @@ foreach ($files as $file) {
 		}
 	}
 	$row['missing'] = $missing;
+
+	// The corpus ships each Factur-X PDF next to the standalone XML of the same invoice. Their
+	// parses have to be the same object: anything else is the extraction losing or altering what it
+	// pulls out of the PDF/A-3 attachment, which no rule and no XML document can report.
+	$row['key'] = preg_replace('/(_CII_Commentee)?\.(xml|pdf)$/i', '', $name);
+	$row['print'] = md5(einvoicingCorpusPrint($header) . '|' . einvoicingCorpusPrint($lines));
 
 	// Deep mode: every leaf value the document carries, confronted with everything the parser
 	// brought back. A value present in the XML and absent from the whole parsed structure is read
@@ -209,7 +272,26 @@ foreach ($files as $file) {
 	$rows[] = $row;
 }
 
-printf("%-62s %-18s %-6s %-6s %-5s %s\n", 'document', 'profile', 'header', 'lines', 'doc', 'verdict');
+// A PDF and the standalone XML of the same invoice must come back identical.
+$twins = array();
+foreach ($rows as $r) {
+	if (isset($r['key'])) {
+		$twins[$r['key']][$r['carrier']] = $r['print'];
+	}
+}
+$compared = 0;
+foreach ($twins as $key => $pair) {
+	if (!isset($pair['pdf'], $pair['xml'])) {
+		continue;
+	}
+	$compared++;
+	if ($pair['pdf'] !== $pair['xml']) {
+		$failed++;
+		echo 'GAP ' . $key . ": the PDF and the XML of that invoice do not parse to the same thing\n";
+	}
+}
+
+printf("%-58s %-4s %-16s %-6s %-6s %-5s %s\n", 'document', 'in', 'profile', 'header', 'lines', 'doc', 'verdict');
 foreach ($rows as $r) {
 	if (getenv('DEEP')) {
 		echo "\n### " . $r['file'] . ' (' . $r['profile'] . ') - ' . count($r['unread'] ?? array()) . " value(s) the parser does not bring back\n";
@@ -219,9 +301,10 @@ foreach ($rows as $r) {
 		continue;
 	}
 	printf(
-		"%-62s %-18s %-6s %-6s %-5s %s\n",
-		substr($r['file'], 0, 62),
-		substr($r['profile'], 0, 18),
+		"%-58s %-4s %-16s %-6s %-6s %-5s %s\n",
+		substr($r['file'], 0, 58),
+		$r['carrier'],
+		substr($r['profile'], 0, 16),
 		$r['header'],
 		(string) $r['lines'],
 		(string) $r['inDoc'],
@@ -229,6 +312,6 @@ foreach ($rows as $r) {
 	);
 }
 
-printf("\n%d document(s) read, %d with a gap\n", count($rows), $failed);
+printf("\n%d document(s) read, %d Factur-X PDF compared with its XML twin, %d with a gap\n", count($rows), $compared, $failed);
 
 exit($failed > 0 ? 1 : 0);
