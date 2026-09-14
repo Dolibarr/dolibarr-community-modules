@@ -240,16 +240,18 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 								return -1;
 							} else {
 								if ($result < 0) {
-									// A hook can only report a warning where the core carries one back. That chain -
-									// HookManager collecting $actionclassinstance->warnings, the document generator
-									// copying $hookmanager->warnings, and commonGenerateDocument() copying $obj->warnings
-									// onto the object - appears whole in Dolibarr 23 and is absent in 22. Below it the
-									// warning would be reported nowhere, so the failure is raised as an error instead.
-									if ((float) DOL_VERSION < 23) {
-										$this->errors = array_merge($this->errors, $protocol->errors);
+									// Whether the user is told at all is decided by the core: up to 22 pdf_sponge answers
+									// "no error" whatever the hook returned, and $object->warnings is displayed in one
+									// place only, core/actions_builddoc.inc.php, which has it from 24. So up to 23 the
+									// failure is raised as an error - the only channel that reaches the screen there -
+									// with the warnings collected above merged in, so that none of them is dropped.
+									if ((float) DOL_VERSION < 24) {
+										$this->errors = array_merge($this->errors, $this->warnings, $protocol->errors);
 										$this->warnings = array();
 									} else {
-										$this->warnings = array_merge($this->errors, $protocol->errors);	// We want to return the error as a warning.
+										// Append to the warnings already collected above (configuration, routability, auto-send),
+										// which starting the merge from $this->errors used to drop.
+										$this->warnings = array_merge($this->warnings, $protocol->errors);	// We want to return the error as a warning.
 									}
 									return -1;
 								} else {
