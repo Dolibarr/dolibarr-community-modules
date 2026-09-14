@@ -4106,6 +4106,13 @@ class CIIProtocol extends AbstractProtocol
 		// The document announces its VAT by rate (BG-23) and not by line, so the lines are grouped the same way.
 		$groups = array();
 		foreach ($invoice->lines as $line) {
+			// A deposit is carried as a negative line of the same rate, and BT-116 is announced before it is
+			// deducted: left in, it puts the taxable base of its rate below the announced one and the rate is
+			// refused, which is what left a correctly attached deposit unable to be validated (issue #948).
+			// Same predicate the module already uses to skip what is not a billed line.
+			if ((int) $line->product_type == 9 || !empty($line->fk_remise_except)) {
+				continue;
+			}
 			$rate = (string) price2num($line->tva_tx);
 			$groups[$rate]['base'] = ($groups[$rate]['base'] ?? 0) + (float) $line->total_ht;
 			$groups[$rate]['vat'] = ($groups[$rate]['vat'] ?? 0) + (float) $line->total_tva;
