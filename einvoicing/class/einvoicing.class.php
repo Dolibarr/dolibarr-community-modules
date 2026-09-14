@@ -1216,10 +1216,14 @@ class EInvoicing
 		// Societe::isACompany(), the same way needEInvoiceManagement() does, so both ends of the chain agree.
 		$isB2C = getDolGlobalInt('EINVOICING_SKIP_B2C') && is_object($thirdparty) && !$thirdparty->isACompany();
 
+		// Retrieve the SIREN/SIRET using idprof(). It can retrieve the SIREN from idprof1
+		// or derive it from idprof2 (SIRET).
+		$idprof = is_object($thirdparty) ? idprof($thirdparty) : '';
+
 		if (empty($thirdparty->name)) {
 			$baseErrors[] = $langs->trans("FxCheckErrorCustomerName");
 		}
-		if (empty(idprof($thirdparty))) { // Use Idprof to retrieve SIREN that may be in idprof1 or derived from idprof2
+		if (empty($idprof)) { // Use Idprof to retrieve SIREN that may be in idprof1 or derived from idprof2
 			if (!$isB2C) {
 				$baseErrors[] = $langs->trans("FxCheckErrorCustomerIDPROF1");
 			}
