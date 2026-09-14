@@ -3002,11 +3002,32 @@ class CIIProtocol extends AbstractProtocol
 		$sett->appendChild($sum);
 		$sum->appendChild($doc->createElement('ram:LineTotalAmount', number_format($line['lineTotalAmount'], 2, '.', '')));
 
-		// The deposit this line deducts is referenced at document level, in BG-3, where a preceding
-		// invoice belongs (BT-25 with its date BT-26, type 386) - buildinvoicelines.inc.php fills it in
-		// the same place it marks the line. It used to be written here as well, as a line level
-		// ram:AdditionalReferencedDocument with TypeCode 130: that slot is BT-128, the identifier of what
-		// the line bills - a phone number, a meter - and never a document (issue #912).
+		// The deposit this line deducts is referenced here as well as at document level in BG-3:
+		// XP Z12-014 3.2.19, first option - the one this module follows - marks the reprise line with
+		// EXT-FR-FE-BG-06, a ram:InvoiceReferencedDocument whose TypeCode (EXT-FR-FE-137) is 386. Not
+		// the TypeCode 130 AdditionalReferencedDocument this used to write: that slot is BT-128, what
+		// the line bills (issue #912). LineTradeSettlementType declares it from EXTENDED up only.
+		if (!empty($line['isDepositLine']) && $this->isExtendedProfile($profile)) {
+			$depositRef = trim((string) ($line['depositInvoiceRef'] ?? ''));
+
+			// 'NA' is the placeholder the line defaults carry, and an empty IssuerAssignedID would be
+			// refused by BR-FR-01/EXT-FR-FE-136 the way an empty BT-25 is at document level.
+			if ($depositRef !== '' && $depositRef !== 'NA') {
+				$refNode = $doc->createElement('ram:InvoiceReferencedDocument');
+				$refNode->appendChild($doc->createElement('ram:IssuerAssignedID', einvoicingXmlText($depositRef)));
+				$refNode->appendChild($doc->createElement('ram:TypeCode', '386'));
+
+				if (!empty($line['depositInvoiceDate'])) {
+					$dateNode = $doc->createElement('ram:FormattedIssueDateTime');
+					$str = $doc->createElement('qdt:DateTimeString', $line['depositInvoiceDate']->format('Ymd'));
+					$str->setAttribute('format', '102');
+					$dateNode->appendChild($str);
+					$refNode->appendChild($dateNode);
+				}
+
+				$sett->appendChild($refNode);
+			}
+		}
 
 		return $el;
 	}

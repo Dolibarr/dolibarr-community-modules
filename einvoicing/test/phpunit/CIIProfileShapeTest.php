@@ -1055,4 +1055,76 @@ class CIIProfileShapeTest extends CommonClassTest
 			$this->assertSame(0, $this->countTag($xml, 'ram:BillingSpecifiedPeriod'), $profile . ' must not carry an empty BG-14');
 		}
 	}
+
+	/**
+	 * XP Z12-014 3.2.19, first option - the one this module follows - marks the deposit reprise line
+	 * with EXT-FR-FE-BG-06: a ram:InvoiceReferencedDocument on the line settlement, whose TypeCode
+	 * (EXT-FR-FE-137) is 386. LineTradeSettlementType declares it from EXTENDED up only, so the other
+	 * profiles must carry none (issue #955).
+	 *
+	 * @return void
+	 */
+	public function testDepositLineCarriesItsInvoiceReference()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		$lines = $this->baseLinesData();
+		$lines[0]['isDepositLine'] = true;
+		$lines[0]['depositInvoiceRef'] = 'FA2609-0007';
+		$lines[0]['depositInvoiceDate'] = new DateTime('2026-09-01');
+
+		foreach (CIIProtocol::SUPPORTED_XML_PROFILES as $profile) {
+			$xml = $protocol->buildXML($this->baseInvoiceData(), $lines, $profile);
+
+			$doc = new DOMDocument();
+			$this->assertTrue($doc->loadXML($xml), $profile . ' must produce well-formed XML');
+
+			$xpath = new DOMXPath($doc);
+			$xpath->registerNamespace('ram', 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100');
+			$xpath->registerNamespace('qdt', 'urn:un:unece:uncefact:data:standard:QualifiedDataType:100');
+			$refs = $xpath->query('//ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeSettlement/ram:InvoiceReferencedDocument');
+			$this->assertNotFalse($refs);
+
+			if (!in_array($profile, ['EXTENDED', 'EXTENDEDFR'], true)) {
+				$this->assertSame(0, $refs->length, $profile . ' does not declare a line level ram:InvoiceReferencedDocument');
+				continue;
+			}
+
+			$this->assertSame(1, $refs->length, $profile . ' must reference the deposit invoice on the line (EXT-FR-FE-BG-06)');
+
+			$ref = $refs->item(0);
+			$this->assertSame('FA2609-0007', $xpath->evaluate('string(ram:IssuerAssignedID)', $ref), $profile . ' EXT-FR-FE-136');
+			$this->assertSame('386', $xpath->evaluate('string(ram:TypeCode)', $ref), $profile . ' EXT-FR-FE-137 must be 386');
+			$this->assertSame('20260901', $xpath->evaluate('string(ram:FormattedIssueDateTime/qdt:DateTimeString)', $ref), $profile . ' EXT-FR-FE-138');
+		}
+	}
+
+	/**
+	 * A line that is not a deposit reprise carries no reference, and neither does one whose deposit
+	 * invoice could not be read: an empty EXT-FR-FE-136 is refused by BR-FR-01 the way an empty BT-25
+	 * is at document level.
+	 *
+	 * @return void
+	 */
+	public function testNoLineInvoiceReferenceWithoutADepositInvoice()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		$withoutRef = $this->baseLinesData();
+		$withoutRef[0]['isDepositLine'] = true;
+		$withoutRef[0]['depositInvoiceRef'] = '';
+		$withoutRef[0]['depositInvoiceDate'] = null;
+
+		foreach (array('EXTENDED', 'EXTENDEDFR') as $profile) {
+			$plain = $protocol->buildXML($this->baseInvoiceData(), $this->baseLinesData(), $profile);
+			$this->assertSame(0, $this->countTag($plain, 'ram:InvoiceReferencedDocument'), $profile . ' must not reference anything on an ordinary line');
+
+			$xml = $protocol->buildXML($this->baseInvoiceData(), $withoutRef, $profile);
+			$this->assertSame(0, $this->countTag($xml, 'ram:InvoiceReferencedDocument'), $profile . ' must not emit an empty EXT-FR-FE-136');
+		}
+	}
 }
