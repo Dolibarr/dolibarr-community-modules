@@ -896,7 +896,13 @@ class CIIProtocol extends AbstractProtocol
 		$syncSocRes = $this->_syncOrCreateThirdpartyFromEInvoiceSeller($parsedHeader, 'dolibarr', $flowId);
 
 		$socId = $syncSocRes['res'];
-		$return_messages[] = $syncSocRes['message'];
+		if (preg_match('/^[a-zA-Z0-9]+$/', $syncSocRes['message'])) {
+			$langs->loadLangs(array("compta", "companies"));
+			$return_messages[] = $langs->trans($syncSocRes['message']);
+		} else {
+			$return_messages[] = $syncSocRes['message'];
+		}
+
 		if ($socId < 0) {
 			$db->rollback();
 			$this->openedTransactions--;

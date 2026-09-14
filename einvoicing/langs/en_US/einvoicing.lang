@@ -734,6 +734,10 @@ DisabledBecauseNotEditable=This invoice is not editable
 ErrorSupplierNotVisibleInEntity=The supplier "%s" is not visible in entity %s. You must share or create it in the target entity first.
 WarningEntityChangedFileMoveFailed=The entity was changed but the invoice files could not be moved to the new entity's directory. You may need to move them manually.
 EInvoicingInfoManagedByMasterSetup=The einvoicing setup is managed by the master entity (ID %s)
+SuppliersWithDuplicateVATCode=Two or more suppliers have the same VAT number <b>%s</b>. You must fix one of them or merge them together.
+SuppliersWithDuplicateCode=Two or more suppliers have the same supplier code <b>%s</b>. You must fix one of them or merge them together.
+CheckSuppliersWithDuplicateCode=Check suppliers with the duplicate code <b>%s</b>
+CheckSuppliers=Check suppliers
 
 # OAuth proxy: allowed redirect domains (EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN)
 ProxyRedirectDomainsNotSet=Security: this instance is an OAuth proxy and accepts any redirect destination
