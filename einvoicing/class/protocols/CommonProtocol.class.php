@@ -1862,7 +1862,7 @@ trait CommonProtocol
 				if (empty($seller->tva_intra) && empty($seller->idprof1)) {
 					throw new Exception('BADVATNUMBER[BR-AE-02]: The VAT number or the professional id of the seller '.$seller->name.' is mandatory when a line is invoiced under the reverse charge (VAT category AE).');
 				}
-				if ($buyerThirdparty !== null && empty($buyerThirdparty->tva_intra) && empty($buyerThirdparty->idprof1)) {
+				if ($buyerThirdparty !== null && empty($buyerThirdparty->tva_intra) && empty(idprof($buyerThirdparty))) {
 					throw new Exception('BADVATNUMBER[BR-AE-03]: The VAT number or the legal registration id of the customer '.$buyerThirdparty->name.' is mandatory when a line is invoiced under the reverse charge (VAT category AE).');
 				}
 			}
