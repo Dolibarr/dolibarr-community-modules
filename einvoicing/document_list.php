@@ -270,6 +270,13 @@ if (!$permissiontoread) {
 	accessforbidden();
 }
 
+// When the multicompany master setup is enabled and the current entity is not the master one,
+// the page is read-only: no sync, no edit, no delete — only the list with filters and sorting.
+$isSlaveEntity = getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP") && $conf->entity != getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP");
+if ($isSlaveEntity) {
+	$permissiontoadd = 0;
+	$permissiontodelete = 0;
+}
 
 
 // Fixed slots of the "last invoice that could not be processed" diagnostic, written by
@@ -358,12 +365,12 @@ if (empty($reshook)) {
 }
 
 
-if (getDolGlobalString('EINVOICING_PDP')) {
+if (!$isSlaveEntity && getDolGlobalString('EINVOICING_PDP')) {
 	$providerManager = new PDPProviderManager($db);
 	$provider = $providerManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
 }
 
-if ($action == 'confirm_sync' && getDolGlobalString('EINVOICING_PDP') && $confirm == 'yes') {
+if ($action == 'confirm_sync' && !$isSlaveEntity && getDolGlobalString('EINVOICING_PDP') && $confirm == 'yes') {
 	if (isset($provider)) {
 		// Sync all flows
 		$sync_result = $provider->syncFlows($syncFromDate, $maxflows);
@@ -644,11 +651,8 @@ if ($num == 1 && getDolGlobalInt('MAIN_SEARCH_DIRECT_OPEN_IF_ONLY_ONE') && $sear
 // built from is stamped next to it, exactly as the comment opening a generated XML does.
 llxHeader('', $title.' '.einvoicingModuleStamp(), $help_url, '', 0, 0, $morejs, $morecss, '', 'mod-einvoicing page-list bodyforlist');	// Can use also classforhorizontalscrolloftabs instead of bodyforlist for a horizontal scroll in the table instead of page
 
-if (getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP") && $conf->entity != getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP")) {
-	print $langs->trans("EInvoicingInfoManagedByMasterSetup", getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP"));
-
-	llxFooter();
-	exit;
+if ($isSlaveEntity) {
+	print '<div class="warning">'.$langs->trans("EInvoicingInfoManagedByMasterSetup", getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP")).'</div>';
 }
 
 
@@ -738,7 +742,7 @@ $newcardbutton = '';
 
 // Manual mapping of the vendor products of a flow onto existing Dolibarr products (useful when the automatic
 // creation of products is disabled and a synchronization is blocked on an unknown product).
-if (getDolGlobalString('EINVOICING_SHOW_MAPPING_TOOL_ON_VENDOR_PRICE_LIST')) {	// Hidden option because editing mapping outside of an import process is discouraged.
+if (!$isSlaveEntity && getDolGlobalString('EINVOICING_SHOW_MAPPING_TOOL_ON_VENDOR_PRICE_LIST')) {	// Hidden option because editing mapping outside of an import process is discouraged.
 	$newcardbutton .= dolGetButtonTitle($langs->trans('MapEInvoiceProducts'), '', 'fa fa-link', dol_buildpath('/einvoicing/product_mapping.php', 1), '', $permissiontoadd);
 }
 
@@ -949,17 +953,6 @@ if ($provider) {
 
 	print "</div>\n";
 
-	// Where the "import a received document again" action lives. This list is where a user lands after
-	// deleting the draft supplier invoice a reception created: the flow is still here, so re-running a
-	// synchronization or deleting the line looks like the way to get the document back, and neither is.
-	// The action is on the flow card, one click away but invisible from here, hence this reminder.
-	if (!einvoicingIsReceiveDisabled()) {
-		print '<div class="opacitymedium small paddingtop paddingleft">';
-		print img_picto('', 'info', 'class="pictofixedwidth"').' ';
-		print $langs->trans('EInvoiceReimportHint', $langs->transnoentitiesnoconv('EInvoiceReimport'));
-		print '</div>'."\n";
-	}
-
 	print "</div>\n";
 
 	print '<script>'."\n";
@@ -975,7 +968,7 @@ if ($provider) {
 	print "  window.location.href = '".$_SERVER["PHP_SELF"]."?action=sync&maxflows=' + maxFlows + '&last_sync_datetimehour=' + lastSyncDatetimehour + '&last_sync_datetimemin=' + lastSyncDatetimemin + '&last_sync_datetimemonth=' + lastSyncDatetimemonth + '&last_sync_datetimeday=' + lastSyncDatetimeday + '&last_sync_datetimeyear=' + lastSyncDatetimeyear + '&token=' + token;\n";
 	print "});\n";
 	print "</script>\n";
-} else {
+} elseif (!$isSlaveEntity) {
 	// Message to check module configuration
 	print info_admin($langs->transnoentities("checkEInvoicingModuleConfiguration"), 0, 0, '1', '', '', 'warning');
 }
@@ -1109,6 +1102,17 @@ if ($action == 'confirm_sync' && getDolGlobalString('EINVOICING_PDP') && $confir
 		}
 		print '<br>';
 	}
+}
+
+// Where the "import a received document again" action lives. This list is where a user lands after
+// deleting the draft supplier invoice a reception created: the flow is still here, so re-running a
+// synchronization or deleting the line looks like the way to get the document back, and neither is.
+// The action is on the flow card, one click away but invisible from here, hence this reminder.
+if ($provider && !einvoicingIsReceiveDisabled()) {
+	print '<div class="opacitymedium small paddingtop paddingleft">';
+	print img_picto('', 'info', 'class="pictofixedwidth"').' ';
+	print $langs->trans('EInvoiceReimportHint', $langs->transnoentitiesnoconv('EInvoiceReimport'));
+	print '</div>'."\n";
 }
 
 
