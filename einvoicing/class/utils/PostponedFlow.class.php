@@ -156,7 +156,7 @@ class PostponedFlow
 	{
 		global $conf;
 
-		$sql = "SELECT rowid, flow_id, provider, call_id, reason_code, reason_message, business_message,";
+		$sql = "SELECT rowid, flow_id, provider, call_id, entity, reason_code, reason_message, business_message,";
 		$sql .= " action_html, action_data, fk_soc, document_ref, nb_attempts, date_creation, date_last_attempt";
 		$sql .= " FROM " . $db->prefix() . "einvoicing_postponed";
 		$sql .= " WHERE entity IN (" . $db->sanitize(getEntity('einvoicing_document')) . ")";
