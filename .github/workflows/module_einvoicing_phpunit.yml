@@ -257,6 +257,34 @@ jobs:
           cp einvoicing/test/samples/*.cii.xml generated/
           echo "$count documents generated, plus the committed samples: $(ls generated/ | tr '\n' ' ')"
 
+      - name: The module reads every reference document of the FNFE package
+        if: ${{ matrix.validate == 'yes' }}
+        # The package ships, next to its rules, the documents the FNFE publishes as the answer to
+        # its own use cases: multi-vendor, sub-lines, self-billing, corrective invoice, the three
+        # profiles. They are conformant by construction, so anything the module fails to read out
+        # of them is a gap on our side - and no schematron can report that, since a reader losing a
+        # term produces no invalid document. Fatal: a document the parser refuses, or whose lines it
+        # does not all bring back.
+        env:
+          DOLI_ROOT: ${{ steps.instance.outputs.htdocs }}
+        run: php einvoicing/test/conformance/import-corpus.php "${FNFE_ROOT}/Z.example/TEST"
+
+      - name: What the module leaves behind in those documents
+        if: ${{ matrix.validate == 'yes' }}
+        # Informative, never fatal: the terms the reference documents carry and the parser brings
+        # back from none of them. It is the list to shorten, printed where it cannot be forgotten.
+        continue-on-error: true
+        env:
+          DEEP: '1'
+          DOLI_ROOT: ${{ steps.instance.outputs.htdocs }}
+        run: |
+          php einvoicing/test/conformance/import-corpus.php "${FNFE_ROOT}/Z.example/TEST" > unread.txt || true
+          echo '### Terms of the FNFE documents the import brings back from none of them' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          grep '^    ' unread.txt | sed 's/ = .*//;s/^ *//' | sort | uniq -c | sort -rn >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat "$GITHUB_STEP_SUMMARY"
+
       - name: The generated documents are accepted by the EN 16931 and CTC-FR rules
         if: ${{ matrix.validate == 'yes' }}
         env:
