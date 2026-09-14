@@ -1367,8 +1367,8 @@ while ($i < $imaxinloop) {
 			} elseif ($key == 'ref') {
 				$cssforfield .= ($cssforfield ? ' ' : '').'nowraponall';
 			}
-			if ($key== 'tracking_idref') {
-				$cssforfield .='tdlineheightsmall';
+			if ($key == 'tracking_idref') {
+				$cssforfield .= ($cssforfield ? ' ' : '').'tdlineheightsmall';
 			}
 			if (in_array($val['type'], array('double(24,8)', 'double(6,3)', 'integer', 'real', 'price')) && !in_array($key, array('id', 'rowid', 'ref', 'status')) && empty($val['arrayofkeyval'])) {
 				$cssforfield .= ($cssforfield ? ' ' : '').'right';
@@ -1403,6 +1403,10 @@ while ($i < $imaxinloop) {
 						if ($object->fk_element_type === 'facture') {
 							require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
 							$linkedobj = new Facture($db);
+
+							if ($linkedobj->fetch((int) $object->fk_element_id) > 0) {
+								$out = $linkedobj->getNomUrl(1);
+							}
 						} elseif ($object->fk_element_type === 'invoice_supplier') {
 							require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';
 							$linkedobj = new FactureFournisseur($db);
@@ -1410,8 +1414,9 @@ while ($i < $imaxinloop) {
 							if ($linkedobj->fetch((int) $object->fk_element_id) > 0) {
 								$out = '<div class="tdoverflowmax200 inline-block lineheightsmall">';
 								$out .= $linkedobj->getNomUrl(1);
+								// The vendor reference is a field of the received document, escaped like the rest of it.
 								if ($linkedobj->ref_supplier) {
-									$out .= '<br><span class="spantitle small">'.$linkedobj->ref_supplier.'</span>';
+									$out .= '<br><span class="spantitle small">'.dol_escape_htmltag($linkedobj->ref_supplier).'</span>';
 								}
 								$out .= "</div>";
 							}
