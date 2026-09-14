@@ -1489,20 +1489,11 @@ class EInvoicing
 			}
 		}
 
-		// BR-25: every line of the document names what it invoices (BT-153). The name is built from the
-		// label of the product, or from the first line of the description when there is no product, so a
-		// line holding neither is issued with an empty name and the document is refused - and refused by
-		// the platform, after transmission, on a line number the seller then has to go and find. Every
-		// such line is listed here instead, before anything is sent.
-		//
-		// Title and subtotal lines are not concerned: they are pseudo-lines that never reach the
-		// document. A discount line is not concerned either, its name being built from the piece it
-		// deducts (see einvoicingDiscountLabel()).
-		//
-		// Customer invoices only, afterPDFCreation() gating on instanceof Facture: FactureFournisseurLigne
-		// fills ->description and not ->desc before 20.0, so extending this guard to supplier invoices
-		// needs a ?: $line->description or every free line of an 18.0/19.0 purchase invoice reads as
-		// having no name.
+		// BR-25: every line names what it invoices (BT-153), from the product label or the first line of
+		// the description, so a line holding neither is refused by the platform after transmission - listed
+		// here instead, before anything is sent. Title and subtotal pseudo-lines never reach the document
+		// and a discount line is named from the piece it deducts (see einvoicingDiscountLabel()). Customer
+		// invoices only: FactureFournisseurLigne fills ->description and not ->desc before 20.0.
 		$linesWithNoName = [];
 		if (!empty($invoice->lines) && is_array($invoice->lines)) {
 			foreach ($invoice->lines as $line) {

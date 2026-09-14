@@ -392,6 +392,7 @@ $grand_total_ht    	= $grand_total_tva = $grand_total_ttc = 0;
 $prepaidAmount     	= 0;
 $depositlines      	= [];
 $lineRowIds        	= [];	// Document line number => llx_facturedet.rowid, for the messages
+$lineDiscountIds   	= [];	// Document line number => llx_facturedet.fk_remise_except, 0 when the line is not a discount
 $globalDiscounts	= [];
 $billing_period    	= [];
 $numligne          	= 1;
@@ -580,12 +581,10 @@ foreach ($object->lines as $line) {
 		}
 	}
 
-	// A discount line still standing at this point is a deposit deducted from the invoice, and its
-	// description is the sentinel the core stores, not a text meant to be read. Left as it is, the
-	// customer reads '(DEPOSIT)' as the name of the line (BT-153).
-	// The line has to carry a discount for that to hold, which is why the resolution goes through
-	// einvoicingDiscountLabelOfLine(): a line of work an operator named '(DEPOSIT)', pointing at no
-	// discount, is legitimate text and keeps the name it was given.
+	// A discount line still standing here is a deposit deducted, and its description is the sentinel the
+	// core stores, not a text meant to be read: the customer would read '(DEPOSIT)' in BT-153. Resolved
+	// through einvoicingDiscountLabelOfLine(), which also asks the line for its discount - a line of work
+	// an operator named '(DEPOSIT)', pointing at none, keeps the name it was given.
 	$discountLabel = einvoicingDiscountLabelOfLine($line, $lineDiscount, $outputlangs, einvoicingDiscountRelatedInvoiceRef($lineDiscount, $this->db));
 	if ($discountLabel !== '') {
 		$libelle     = $discountLabel;
@@ -684,6 +683,7 @@ foreach ($object->lines as $line) {
 	// document, the rowid is what a correction is addressed to, and a message that names only the first
 	// leaves its reader to count the lines to find it.
 	$lineRowIds[$numligne] = (int) $line->id;
+	$lineDiscountIds[$numligne] = (int) ($line->fk_remise_except ?? 0);
 
 	// Filling $linesData (based on $lineTemplate)
 	$linesData[$numligne] = [
@@ -838,15 +838,11 @@ if (!empty($object->situation_counter) && $object->situation_counter > 1
 	}
 }
 
-// Last look for a sentinel that reached a field the customer reads. Everything above resolves the four
-// of them, so anything left here is a way of building a document that this file does not know about -
-// which is not a supposition: the resolution was written for the reason of a document level allowance
-// and the item name of a deposit line was found carrying the sentinel afterwards, at the second look.
-//
-// The test is an equality, never an inclusion: a line of work named 'Reprise (DEPOSIT) du chantier' is
-// a legitimate text and must go out untouched. And it reports rather than refuses - a marker in an item
-// name is ugly, not invalid, and holding back an invoice over it would cost the seller more than it
-// saves.
+// Last look for a sentinel that reached a field the customer reads: everything above resolves the four
+// of them, so anything left is a construction path this file does not know about. Reported on a line
+// carrying a discount only - a line of work an operator named (DEPOSIT) is legitimate. The test is an
+// equality, never an inclusion, so 'Reprise (DEPOSIT) du chantier' goes out untouched, and it reports
+// rather than refuses: a marker in an item name is ugly, not invalid.
 $discountSentinels = array_keys(einvoicingDiscountSentinels());
 $linesWithNoName = array();
 foreach ($linesData as $numligne => $vals) {
@@ -854,7 +850,7 @@ foreach ($linesData as $numligne => $vals) {
 		$linesWithNoName[] = $numligne.' (id '.($lineRowIds[$numligne] ?? 0).')';
 	}
 	foreach (array('prodname' => 'BT-153', 'proddesc' => 'BT-154') as $field => $businessTerm) {
-		if (in_array((string) ($vals[$field] ?? ''), $discountSentinels, true)) {
+		if (!empty($lineDiscountIds[$numligne]) && in_array((string) ($vals[$field] ?? ''), $discountSentinels, true)) {
 			dol_syslog("EInvoicing: line ".$numligne." of ".$object->ref." carries the unresolved discount marker ".$vals[$field]." in ".$businessTerm.". The line is a discount whose source piece could not be read.", LOG_ERR);
 		}
 	}
@@ -866,14 +862,11 @@ foreach ($globalDiscounts as $discountIndex => $vals) {
 	}
 }
 
-// BR-25: a line with no name is not a document the platform accepts, so it is refused here rather than
-// after transmission, on a line number the seller would then have to go and find. Every such line is
-// named at once: sending them back one refusal at a time would be a round trip per line. This is the
-// same missing data the pre-check reports before validation (validateInvoiceConfiguration()); a
-// document reaching this point with one is one whose lines changed since, or one built by a path that
-// does not run the pre-check. Refused after both halves of the last look above, never between them: a
-// document carrying a nameless line and an unresolved marker in BT-97 would otherwise leave without the
-// marker ever being reported - the very case that last look exists to catch.
+// BR-25: a line with no name is refused here rather than after transmission, on a line number the
+// seller would then have to go and find, and every such line is named at once to spare a round trip
+// per line. Same missing data as the pre-check (validateInvoiceConfiguration()). Placed after both
+// halves of the last look above, never between them: a nameless line would otherwise hide the report
+// of an unresolved marker in BT-97, the very case that last look exists to catch.
 if (!empty($linesWithNoName)) {
 	throw new Exception('MISSINGDATA[BR-25]: The line'.(count($linesWithNoName) > 1 ? 's ' : ' ').implode(', ', $linesWithNoName).' of '.$object->ref.' '.(count($linesWithNoName) > 1 ? 'have' : 'has').' no item name (BT-153). Enter a description on the line, or a label on the product it invoices.');
 }
