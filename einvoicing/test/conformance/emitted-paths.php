@@ -25,11 +25,15 @@
  * removed from the reprise line and nobody's test went red for two days). Neither a schematron nor
  * the conformance run can report that, since they only ever see the documents that remain valid.
  *
- * So this signs what is actually written. One fixture per feature, the same every run, every
- * supported profile, and the baseline is the set of element *paths* the generated documents carry -
- * ram:InvoiceReferencedDocument under a line is not the same capability as the same element under
- * the header. A path may appear freely; a path may only disappear on purpose, with
- * --update-baseline and a word in the pull request.
+ * So this signs what is actually written. Fixtures that never change, every supported profile, and
+ * the baseline is the set of element *paths* the generated documents carry - ram:InvoiceReferencedDocument
+ * under a line is not the same capability as the same element under the header. A path may appear
+ * freely; a path may only disappear on purpose, with --update-baseline and a word in the pull request.
+ *
+ * Several invoice cases, not one: some writes exclude each other (an account is identified by its
+ * IBAN *or* by its proprietary reference, never both), so one invoice can never reach them all. The
+ * paths of the cases are unioned - they exist to reach branches the others cannot. The lifecycle
+ * answer (CDAR) is a second document this module writes, and is signed the same way.
  *
  * Because the fixtures are fixed, an absent path means one thing only: nothing wrote it. That is
  * what separates this from measuring on a specimen invoice - there, an absent element may only
@@ -59,8 +63,17 @@ $baselineFile = __DIR__ . '/emitted-paths.txt';
  */
 function einvoicingMaximalHeader()
 {
+	global $db;
+
 	$date = new DateTime('2026-07-01');
 	$later = new DateTime('2026-07-31');
+
+	// BT-11 is written only for a Project instance, never for a plain array (isEn16931Profile() and
+	// instanceof, both).
+	require_once DOL_DOCUMENT_ROOT . '/projet/class/project.class.php';
+	$project = new Project($db);
+	$project->ref = 'PROJ-2026';
+	$project->title = 'Chantier de test';
 
 	return array(
 		'documentno' => 'FA2607-0001',
@@ -150,10 +163,6 @@ function einvoicingMaximalHeader()
 		'accountLabel' => 'Compte courant',
 		'paymentDueDate' => $later,
 		'paymentTermsText' => 'Paiement a 30 jours',
-		'headerAllowancesCharges' => array(
-			array('isCharge' => false, 'amount' => 10.0, 'basisAmount' => 100.0, 'percent' => 10.0, 'reason' => 'Remise commerciale', 'reasonCode' => '95', 'categoryCode' => 'S', 'rate' => 20.0),
-			array('isCharge' => true, 'amount' => 10.0, 'basisAmount' => 100.0, 'percent' => 10.0, 'reason' => 'Frais de port', 'reasonCode' => 'FC', 'categoryCode' => 'S', 'rate' => 20.0),
-		),
 		'invoiceRefDocs' => array(array('ref' => 'FA2606-0009', 'date' => $date, 'type' => '386')),
 		'orderReference' => 'CMD-2026-42',
 		'contractReference' => 'CONTRAT-2026',
@@ -162,11 +171,16 @@ function einvoicingMaximalHeader()
 			'20' => array('tva_tx' => 20.0, 'vat_src_code' => '', 'categoryVAT' => 'S', 'ExemptionReasonCode' => '', 'ExemptionReason' => '', 'totalHT' => 100.0, 'totalTVA' => 20.0),
 			'0' => array('tva_tx' => 0.0, 'vat_src_code' => '', 'categoryVAT' => 'E', 'ExemptionReasonCode' => 'VATEX-EU-AE', 'ExemptionReason' => 'Autoliquidation', 'totalHT' => 0.0, 'totalTVA' => 0.0),
 		),
-		'_chorus' => true,
+		// true drops the additional order references (BT-18) the fixture is here to reach.
+		'_chorus' => false,
 		'_depositlines' => array(),
-		'_globalDiscounts' => array(),
+		// BG-20 at document level: the only header allowance the builder reads. headerAllowancesCharges
+		// is the key of the reading side, and buildXML() never looks at it.
+		'_globalDiscounts' => array(
+			array('value' => 10.0, 'reason' => 'Remise commerciale', 'categoryVAT' => 'S', 'taxRate' => 20.0),
+		),
 		'_customerOrderReferenceList' => array('CMD-2026-42', 'CMD-2026-43'),
-		'_project' => array('ref' => 'PROJ-2026', 'title' => 'Chantier de test'),
+		'_project' => $project,
 		'_shipFromContactBill' => array(
 			'name' => 'Tricaland Entrepot', 'address' => '9 route du Depot', 'lineone' => '9 route du Depot',
 			'linetwo' => 'Quai 3', 'linethree' => '', 'zip' => '33000', 'town' => 'Bordeaux', 'country' => 'FR',
@@ -225,13 +239,10 @@ function einvoicingMaximalLines()
 		'ExemptionReason' => '',
 		'ExemptionReasonCode' => '',
 		'calculatedAmount' => 20.0,
-		'lineAllowances' => array(
-			array('isCharge' => false, 'amount' => 2.0, 'basisAmount' => 120.0, 'percent' => 1.67, 'reason' => 'Remise de ligne', 'reasonCode' => '95'),
-			array('isCharge' => true, 'amount' => 1.0, 'basisAmount' => 120.0, 'percent' => 0.83, 'reason' => 'Frais de ligne', 'reasonCode' => 'FC'),
-		),
-		'lineGrossPriceAllowances' => array(
-			array('isCharge' => false, 'amount' => 2.0, 'basisAmount' => 12.0, 'percent' => 16.67, 'reason' => 'Remise sur prix brut', 'reasonCode' => '95'),
-		),
+		// lineAllowances and lineGrossPriceAllowances are keys of the reading side; BG-27 on a line is
+		// written from discountPercent alone.
+		'lineAllowances' => array(),
+		'lineGrossPriceAllowances' => array(),
 		'lineremisepercent' => 10.0,
 		'linePeriodStart' => $date,
 		'linePeriodEnd' => $later,
@@ -242,7 +253,7 @@ function einvoicingMaximalLines()
 		'parentDocumentNo' => null,
 		'is_deposit' => 0,
 		'fk_remise' => null,
-		'discountPercent' => 0,
+		'discountPercent' => 10.0,
 	);
 
 	// The reprise line of a deposit: what #912 moved and #955 put back. It is the reason this file
@@ -253,9 +264,8 @@ function einvoicingMaximalLines()
 		'netpriceamount' => -60.0,
 		'billedquantity' => 1.0,
 		'lineTotalAmount' => -60.0,
-		'lineAllowances' => array(),
-		'lineGrossPriceAllowances' => array(),
 		'additionalRefDocs' => array(),
+		'discountPercent' => 0,
 		'isDepositLine' => true,
 		'depositInvoiceRef' => 'FA2606-0009',
 		'depositInvoiceDate' => $date,
@@ -272,12 +282,59 @@ function einvoicingMaximalLines()
 		'calculatedAmount' => 0.0,
 		'ExemptionReason' => 'Autoliquidation',
 		'ExemptionReasonCode' => 'VATEX-EU-AE',
-		'lineAllowances' => array(),
-		'lineGrossPriceAllowances' => array(),
 		'additionalRefDocs' => array(),
 	));
 
 	return array($full, $deposit, $exempt);
+}
+
+/**
+ * The lifecycle answer (CDAR), with every optional block it knows how to write.
+ *
+ * A second document this module emits, and a builder of its own: none of what CdarHandler writes is
+ * reachable through buildXML(), so leaving it out would leave a whole family unsigned.
+ *
+ * @return array<string,mixed>	Data for CdarHandler::generate()
+ */
+function einvoicingMaximalCdar()
+{
+	$party = array('GlobalID' => '89230418900020', 'SchemeID' => '0225', 'RoleCode' => 'SE', 'URIID' => '89230418900020', 'URISchemeID' => '0225');
+
+	return array(
+		'GuidelineID' => 'urn.cpro.gouv.fr:1p0:ahm',
+		'ExchangedDocument' => array(
+			'ID' => 'FA2607-0001_210_20260701120000#380_20260701',
+			'Name' => 'FA2607-0001_210_20260701120000#380_20260701',
+			'IssueDateTime' => '20260701120000',
+			'SenderTradeParty' => $party,
+			'IssuerTradeParty' => array_merge($party, array('RoleCode' => 'BY')),
+			'RecipientTradeParty' => array_merge($party, array('RoleCode' => 'SE')),
+		),
+		'AcknowledgementDocument' => array(
+			'MultipleReferencesIndicator' => false,
+			'TypeCode' => 'AB',
+			'IssueDateTime' => '20260701120000',
+			'ReferenceReferencedDocument' => array(
+				'IssuerAssignedID' => 'FA2607-0001',
+				'StatusCode' => '210',
+				'TypeCode' => '380',
+				'ReferenceTypeCode' => 'AWR',
+				'FormattedIssueDateTime' => '20260701',
+				'ProcessConditionCode' => 'PROCESSED',
+				'ProcessCondition' => 'Traitement termine',
+				'IssuerTradeParty' => array_merge($party, array('RoleCode' => 'BY')),
+				'SpecifiedDocumentStatus' => array(
+					'ReasonCode' => 'ARF',
+					'Reason' => 'Facture rejetee',
+					'SequenceNumeric' => 1,
+					// MDG-43, the cashed amount per VAT rate carried by a status 212.
+					'SpecifiedDocumentCharacteristic' => array(
+						array('TypeCode' => 'AAE', 'ValueAmount' => '120.00', 'CurrencyID' => 'EUR', 'ValueDateTime' => '20260701', 'ValuePercent' => '20.00'),
+					),
+				),
+			),
+		),
+	);
 }
 
 /**
@@ -317,15 +374,34 @@ function einvoicingDocumentPaths($xml)
 
 global $db;
 $protocol = new CIIProtocol($db);
-$header = einvoicingMaximalHeader();
 $lines = einvoicingMaximalLines();
 
+// The account is identified by its IBAN (BT-84) or, failing that, by its proprietary reference
+// (BT-84-0): the second case is the only way to reach the fallback, which the first one hides.
+$withIban = einvoicingMaximalHeader();
+$withoutIban = einvoicingMaximalHeader();
+$withoutIban['iban'] = '';
+$withoutIban['paymentMeansCode'] = 48;
+
 $current = array();
-foreach (CIIProtocol::SUPPORTED_XML_PROFILES as $profile) {
-	$xml = $protocol->buildXML($header, $lines, $profile);
-	foreach (array_keys(einvoicingDocumentPaths($xml)) as $path) {
-		$current[$profile . ' ' . $path] = true;
+foreach (array($withIban, $withoutIban) as $header) {
+	foreach (CIIProtocol::SUPPORTED_XML_PROFILES as $profile) {
+		$xml = $protocol->buildXML($header, $lines, $profile);
+		foreach (array_keys(einvoicingDocumentPaths($xml)) as $path) {
+			$current[$profile . ' ' . $path] = true;
+		}
 	}
+}
+
+dol_include_once('einvoicing/class/utils/CdarHandler.class.php');
+$cdar = new CdarHandler($db);
+$cdarXml = $cdar->generate(einvoicingMaximalCdar());
+if (!is_string($cdarXml)) {
+	fwrite(STDERR, "the CDAR builder returned no document\n");
+	exit(1);
+}
+foreach (array_keys(einvoicingDocumentPaths($cdarXml)) as $path) {
+	$current['CDAR ' . $path] = true;
 }
 $current = array_keys($current);
 sort($current);
@@ -362,5 +438,5 @@ if ($lost) {
 	exit(1);
 }
 
-echo count($current) . " path(s) written, across " . count(CIIProtocol::SUPPORTED_XML_PROFILES) . " profiles; none lost.\n";
+echo count($current) . " path(s) written, across " . count(CIIProtocol::SUPPORTED_XML_PROFILES) . " invoice profiles and the CDAR; none lost.\n";
 exit(0);
