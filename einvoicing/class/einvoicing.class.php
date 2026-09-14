@@ -1271,9 +1271,9 @@ class EInvoicing
 			$vatNormalized = strtoupper(removeAllSpaces($thirdparty->tva_intra));
 			if (!preg_match('/^FR[0-9A-Z]{2}[0-9]{9}$/', $vatNormalized)) {
 				$baseWarnings[] = $langs->trans("FxCheckErrorCustomerVATFormat");
-			} elseif (!empty($thirdparty->idprof1)) {
+			} elseif (!empty(idprof($thirdparty))) {
 				// Cross-check VAT against SIREN: French VAT key is deterministic (formula: (12 + 3 * (SIREN % 97)) % 97)
-				$siren9 = substr(removeAllSpaces($thirdparty->idprof1), 0, 9);
+				$siren9 = substr(removeAllSpaces(idprof($thirdparty)), 0, 9);
 				if (ctype_digit($siren9) && strlen($siren9) === 9) {
 					$expectedKey = (12 + 3 * ((int) $siren9 % 97)) % 97;
 					$expectedVAT = 'FR' . str_pad((string) $expectedKey, 2, '0', STR_PAD_LEFT) . $siren9;
@@ -1388,9 +1388,9 @@ class EInvoicing
 		// or a trade name (a third party named after its brand rather than its legal name).
 		if (
 			!empty($thirdparty->country_code) && $thirdparty->country_code === 'FR'
-			&& !empty($thirdparty->name) && !empty($thirdparty->idprof1)
+			&& !empty($thirdparty->name) && !empty(idprof($thirdparty))
 		) {
-			$siren = substr(removeAllSpaces($thirdparty->idprof1), 0, 9);
+			$siren = substr(removeAllSpaces(idprof($thirdparty)), 0, 9);
 			$apiUrl = 'https://recherche-entreprises.api.gouv.fr/search?q=' . urlencode($siren) . '&per_page=5';
 
 			$response = getURLContent($apiUrl, 'GET', '', 1, ['Accept: application/json']);
@@ -1838,7 +1838,7 @@ class EInvoicing
 			if (!is_object($object->thirdparty ?? null) && !empty($object->socid)) {
 				$object->fetch_thirdparty();
 			}
-			$directorySiren = is_object($object->thirdparty ?? null) ? preg_replace('/[^0-9]/', '', (string) $object->thirdparty->idprof1) : '';
+			$directorySiren = is_object($object->thirdparty ?? null) ? preg_replace('/[^0-9]/', '', (string) idprof($object->thirdparty)) : '';
 			if ($directorySiren !== '') {
 				$urlajaxdir = dol_buildpath('einvoicing/ajax/checkdirectory.php', 1);
 				// Auto-run once in the pre-send window (validated, not yet really transmitted to the AP).
@@ -2843,7 +2843,7 @@ class EInvoicing
 		if (!is_object($thirdparty)) {
 			return $res;	// no recipient loaded: nothing to look up
 		}
-		$siren = preg_replace('/[^0-9]/', '', (string) $thirdparty->idprof1);
+		$siren = preg_replace('/[^0-9]/', '', (string) idprof($thirdparty));
 		if ($siren === '') {
 			return $res;	// no SIREN: the standard required-information checks handle this
 		}
@@ -4001,7 +4001,7 @@ class EInvoicing
 		}
 
 		if (empty($uri) && !getDolGlobalString('EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID')) {	// Fallback on profid1
-			$uri = $thirdparty->idprof1;
+			$uri = idprof($thirdparty);
 		}
 
 		return removeAllSpaces($uri);
