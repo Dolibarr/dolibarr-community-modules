@@ -2024,12 +2024,12 @@ class SuperPDPProvider extends AbstractPDPProvider
 								$actions[$rescode]['businessmessage'] .= $form->textwithpicto('', "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], 1, 'help', '', 0, 2, 'help');
 							}
 							if ($rescode == 'THIRDPARTY_DUPLICATE_VAT') {
-								$actions[$rescode]['businessmessage'] = $langs->trans("SuppliersWithDuplicateVATCode", $res['actiondata']['vatnumber']);
+								$actions[$rescode]['businessmessage'] = $langs->trans("SuppliersWithDuplicateVATCode", $res['actiondata']['vatnumber'] ?? '');
 								// Add technical message in tooltip on the picto
 								$actions[$rescode]['businessmessage'] .= $form->textwithpicto('', "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], 1, 'help', '', 0, 2, 'help');
 							}
 							if ($rescode == 'THIRDPARTY_DUPLICATE_SUPPLIER_CODE') {
-								$actions[$rescode]['businessmessage'] = $langs->trans("SuppliersWithDuplicateCode", $res['actiondata']['suppliercode']);
+								$actions[$rescode]['businessmessage'] = $langs->trans("SuppliersWithDuplicateCode", $res['actiondata']['suppliercode'] ?? '');
 								// Add technical message in tooltip on the picto
 								$actions[$rescode]['businessmessage'] .= $form->textwithpicto('', "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], 1, 'help', '', 0, 2, 'help');
 							}
@@ -2711,6 +2711,14 @@ class SuperPDPProvider extends AbstractPDPProvider
 				// has no row in einvoicing_lifecycle_msg and the flowId lookup below cannot resolve it.
 				if ($document->flow_direction == 'In') {
 					$resIncoming = $this->processIncomingSupplierInvoiceStatus($flowId, $document, $einvoicing);
+
+					// A negative result is a transient failure of the platform call only (a CDAR parsing
+					// failure is stored as res=0, it would not parse any better on retry): return without
+					// storing the flow so this flowId is retried on the next sync run instead of being
+					// marked processed and losing the vendor status for good.
+					if ($resIncoming['res'] < 0) {
+						return $resIncoming;
+					}
 
 					$returnRes = $resIncoming['res'];
 					$returnMessage = $resIncoming['message'];

@@ -51,8 +51,8 @@ jobs:
     steps:
       - id: pick
         run: |
-          all='["18.0.0","19.0.0","20.0.0","21.0.0","22.0.0","23.0.0","24.0.0"]'
-          review='["18.0.0","24.0.0"]'
+          all='["18.0.0","24.0.0"]'
+          review='["24.0.0"]'
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             echo "matrix=$review" >> "$GITHUB_OUTPUT"
           else

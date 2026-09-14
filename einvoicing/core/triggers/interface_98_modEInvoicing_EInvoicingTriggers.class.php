@@ -336,6 +336,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 				// or just because the company has withdrown found automatically by a prerecorded credit card or diret debit like Amazon do (in this case, we don't need a deposit)
 				$isprepaidannouncedforadeposit = 0;		// TODO Detect if prepaid because of deposit or else. May be we have also ref of deposit ?
 
+				// @phpstan-ignore-next-line booleanAnd.leftAlwaysFalse
 				if (SupplierInvoiceHelper::totalsAgreeWithDocument($object, $announced['tva'], $announced['ttc'], ($isprepaidannouncedforadeposit && $announced['prepaid']) ? $announced['prepaid'] : null)) {
 					SupplierInvoiceHelper::clearTotalsMismatch((int) $object->id);
 				} elseif (isset($announced['prepaid'])

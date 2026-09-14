@@ -31,8 +31,9 @@
  * (network / Access Point layer) or 'client' (buyer side).
  *
  * Direction gives the primary signal (out = emitted by us, in = received back). For an 'in' event, the
- * XP Z12-012 status code refines it between the network acknowledging our submission and the buyer's own
- * processing, using EInvoicing::STATUS_* so the classification cannot drift from the module's status map.
+ * XP Z12-012 status code refines it: the deposit acknowledgement belongs to the seller, the network
+ * statuses to the platform, the rest to the buyer. It uses EInvoicing::STATUS_* so the classification
+ * cannot drift from the module's status map.
  *
  * @param int    $status    Lifecycle status code (EInvoicing::STATUS_*)
  * @param string $direction 'in' or 'out'
@@ -46,8 +47,13 @@ function einvoicingLifecycleFlux($status, $direction)
 		return 'fournisseur';
 	}
 
+	// "Deposited" (200) acknowledges the seller's own submission: it is the seller's step of the
+	// lifecycle, even though the platform is the one reporting it back to us.
+	if ($status === EInvoicing::STATUS_DEPOSITED) {
+		return 'fournisseur';
+	}
+
 	$networkStatuses = array(
-		EInvoicing::STATUS_DEPOSITED,
 		EInvoicing::STATUS_ISSUED,
 		EInvoicing::STATUS_RECEIVED,
 		EInvoicing::STATUS_AVAILABLE,
@@ -76,4 +82,30 @@ function einvoicingLifecycleLabel($einvoicing, $status, $override = '')
 		return $override;
 	}
 	return $einvoicing->getStatusLabel($status);
+}
+
+/**
+ * Translation key of the note shown under the seller card when no lifecycle event has been recorded
+ * for the seller yet and the card falls back to the local status of llx_einvoicing_extlinks.
+ *
+ * That local status is a Dolibarr-side code (EInvoicing::STATUS_UNKNOWN .. STATUS_ERROR) before the
+ * first exchange with the platform, and the last XP Z12-012 code received once the platform answered.
+ * The note must say which of the two it is: "not yet transmitted" is wrong once the invoice was
+ * deposited and the platform acknowledged it.
+ *
+ * @param int $code Status code from EInvoicing::fetchLastknownInvoiceStatus()['code']
+ * @return string Translation key, or '' when no note applies
+ */
+function einvoicingLifecycleLocalStatusNote($code)
+{
+	$code = (int) $code;
+
+	if (in_array($code, array(EInvoicing::STATUS_AWAITING_VALIDATION, EInvoicing::STATUS_AWAITING_ACK), true)) {
+		return 'EInvLocalStatusAwaitingPlatform';
+	}
+	if ($code < EInvoicing::STATUS_DEPOSITED && $code !== EInvoicing::STATUS_ERROR) {
+		return 'EInvLocalStatusNotYetTransmitted';
+	}
+
+	return '';
 }
