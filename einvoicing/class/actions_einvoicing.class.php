@@ -224,6 +224,16 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 								}
 							}
 						} else {
+							// What the hook hands back reaches the user only sometimes: up to Dolibarr 22
+							// pdf_sponge copies ->error/->errors and then answers "no error", so the core
+							// reports a success; and $object->warnings is displayed by the "Generate document"
+							// button alone, from 24, never on the validation path. So say it here, except
+							// where the core prints it on its own already: ->errors, from 23 up.
+							if ((float) DOL_VERSION < 23 || !getDolGlobalString('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
+								$failcss = getDolGlobalString('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS') ? 'errors' : 'warnings';
+								setEventMessages($langs->trans("EInvoiceNotGenerated"), $protocol->errors, $failcss);
+							}
+
 							if (getDolGlobalString('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
 								// If einvoice fails here, it must be always an error
 								$this->errors = array_merge($this->errors, $protocol->errors);
