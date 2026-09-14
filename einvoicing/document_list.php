@@ -1367,7 +1367,9 @@ while ($i < $imaxinloop) {
 			} elseif ($key == 'ref') {
 				$cssforfield .= ($cssforfield ? ' ' : '').'nowraponall';
 			}
-
+			if ($key== 'tracking_idref') {
+				$cssforfield .='tdlineheightsmall';
+			}
 			if (in_array($val['type'], array('double(24,8)', 'double(6,3)', 'integer', 'real', 'price')) && !in_array($key, array('id', 'rowid', 'ref', 'status')) && empty($val['arrayofkeyval'])) {
 				$cssforfield .= ($cssforfield ? ' ' : '').'right';
 			}
@@ -1406,10 +1408,12 @@ while ($i < $imaxinloop) {
 							$linkedobj = new FactureFournisseur($db);
 
 							if ($linkedobj->fetch((int) $object->fk_element_id) > 0) {
-								$out = $linkedobj->getNomUrl(1);
+								$out = '<div class="tdoverflowmax200 inline-block lineheightsmall">';
+								$out .= $linkedobj->getNomUrl(1);
 								if ($linkedobj->ref_supplier) {
 									$out .= '<br><span class="spantitle">'.$linkedobj->ref_supplier.'</span>';
 								}
+								$out .= "</div>";
 							}
 						}
 					}
