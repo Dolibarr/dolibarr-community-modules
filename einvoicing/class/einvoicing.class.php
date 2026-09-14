@@ -1842,7 +1842,7 @@ class EInvoicing
 			if (!is_object($object->thirdparty ?? null) && !empty($object->socid)) {
 				$object->fetch_thirdparty();
 			}
-			$directorySiren = is_object($object->thirdparty ?? null) ? preg_replace('/[^0-9]/', '', (string) idprof($object->thirdparty)) : '';
+			$directorySiren = $object->thirdparty instanceof Societe ? preg_replace('/[^0-9]/', '', (string) idprof($object->thirdparty)) : '';
 			if ($directorySiren !== '') {
 				$urlajaxdir = dol_buildpath('einvoicing/ajax/checkdirectory.php', 1);
 				// Auto-run once in the pre-send window (validated, not yet really transmitted to the AP).
