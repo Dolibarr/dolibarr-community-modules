@@ -285,6 +285,25 @@ jobs:
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           cat "$GITHUB_STEP_SUMMARY"
 
+      - name: What the module never writes, and what it stopped writing
+        if: ${{ matrix.validate == 'yes' }}
+        # The other direction of the step above. A generated specimen would answer the wrong
+        # question - an element missing from one document may only mean that invoice had nothing to
+        # put there - so this reads what the builder is able to construct, and confronts it with the
+        # elements the reference documents carry. Fatal on one thing only: an element the builder
+        # used to construct and constructs no more. That leaves no invalid document and no failing
+        # test behind, only invoices that quietly stop carrying it.
+        run: php einvoicing/test/conformance/emitted-terms.php "${FNFE_ROOT}/Z.example/TEST" | tee emitted.txt
+
+      - name: Report what the module never writes
+        if: ${{ always() && matrix.validate == 'yes' }}
+        continue-on-error: true
+        run: |
+          echo '### Elements of the FNFE documents the builder never constructs' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          sed -n '/^=== /,$p' emitted.txt >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
       - name: The generated documents are accepted by the EN 16931 and CTC-FR rules
         if: ${{ matrix.validate == 'yes' }}
         env:
