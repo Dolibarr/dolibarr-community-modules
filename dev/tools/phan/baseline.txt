@@ -9,32 +9,14 @@
  */
 return [
     // # Issue statistics:
-    // PhanDeprecatedProperty : 20+ occurrences
-    // PhanUndeclaredClassMethod : 7 occurrences
-    // PhanTypeObjectUnsetDeclaredProperty : 6 occurrences
-    // PhanTypeMismatchArgumentNullable : 3 occurrences
-    // PhanDeprecatedFunction : 2 occurrences
-    // PhanTypeArraySuspiciousNullable : 2 occurrences
-    // PhanUndeclaredClassProperty : 2 occurrences
-    // PhanParamTooMany : 1 occurrence
-    // PhanRedefineClass : 1 occurrence
-    // PhanUndeclaredProperty : 1 occurrence
+    // PhanUndeclaredClassMethod : 5 occurrences
+    // PhanDeprecatedProperty : 1 occurrence
     // PhanUndeclaredTypeParameter : 1 occurrence
     // PhanUndeclaredTypeReturnType : 1 occurrence
 
     // Currently, file_suppressions and directory_suppressions are the only supported suppressions
     'file_suppressions' => [
-        'einvoicing/class/actions_einvoicing.class.php' => ['PhanUndeclaredProperty'],
-        'einvoicing/class/call.class.php' => ['PhanTypeObjectUnsetDeclaredProperty', 'PhanUndeclaredClassMethod', 'PhanUndeclaredClassProperty'],
-        'einvoicing/class/document.class.php' => ['PhanTypeObjectUnsetDeclaredProperty', 'PhanUndeclaredClassMethod', 'PhanUndeclaredClassProperty'],
-        'einvoicing/class/einvoicing.class.php' => ['PhanTypeMismatchArgumentNullable'],
-        'einvoicing/class/protocols/CIIProtocol.class.php' => ['PhanDeprecatedProperty', 'PhanParamTooMany', 'PhanTypeMismatchArgumentNullable'],
-        'einvoicing/class/protocols/CommonProtocol.class.php' => ['PhanTypeMismatchArgumentNullable'],
-        'einvoicing/class/protocols/FacturXProtocol.class.php' => ['PhanDeprecatedFunction'],
-        'einvoicing/class/providers/EsalinkPDPProvider.class.php' => ['PhanTypeArraySuspiciousNullable'],
-        'einvoicing/class/providers/SuperPDPProvider.class.php' => ['PhanTypeArraySuspiciousNullable'],
-        'einvoicing/compat/commonhookactions.class.php' => ['PhanRedefineClass'],
-        'einvoicing/lib/buildinvoicelines.inc.php' => ['PhanDeprecatedFunction', 'PhanDeprecatedProperty'],
+        'einvoicing/class/protocols/CIIProtocol.class.php' => ['PhanDeprecatedProperty'],
         'helloasso/admin/setup.php' => ['PhanUndeclaredClassMethod'],
         'helloasso/lib/helloasso.lib.php' => ['PhanUndeclaredClassMethod', 'PhanUndeclaredTypeParameter', 'PhanUndeclaredTypeReturnType'],
     ],
