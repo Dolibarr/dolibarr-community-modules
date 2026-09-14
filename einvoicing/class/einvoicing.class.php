@@ -1219,7 +1219,7 @@ class EInvoicing
 		if (empty($thirdparty->name)) {
 			$baseErrors[] = $langs->trans("FxCheckErrorCustomerName");
 		}
-		if (empty($thirdparty->idprof1)) {
+		if (empty(idprof($thirdparty))) { // Use Idprof to retrieve SIREN that may be in idprof1 or derived from idprof2
 			if (!$isB2C) {
 				$baseErrors[] = $langs->trans("FxCheckErrorCustomerIDPROF1");
 			}
