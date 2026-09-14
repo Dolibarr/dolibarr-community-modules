@@ -3774,12 +3774,16 @@ class CIIProtocol extends AbstractProtocol
 		// being the only thing the import ever attaches a deposit from. Reported by the maintainer on #904.
 		if ($announcedPrepaid !== null
 			&& ($this->depositAnnouncedByDocument($parsedHeader) <= 0 || empty($parsedHeader['invoiceRefDocs']))) {
-			if ($announcedPrepaid >= 0.005) {
+			// What the import did attach is named, and says nothing when it covers the announced amount:
+			// the deduction is there, and inviting a payment on top of it would settle it twice.
+			$deducted = SupplierInvoiceHelper::linkedDepositAmount($supplierInvoiceId);
+			if ($announcedPrepaid >= 0.005 && abs($deducted - $announcedPrepaid) >= 0.005) {
 				$langs->load('einvoicing@einvoicing');
 				$return_messages[] = $langs->trans(
 					'EInvoiceImportPrepaidAlreadySettled',
 					dol_escape_htmltag((string) ($parsedHeader['documentno'] ?? '')),
-					price2num($announcedPrepaid, 'MT')
+					price2num($announcedPrepaid, 'MT'),
+					price2num($deducted, 'MT')
 				);
 			}
 			$announcedPrepaid = null;
