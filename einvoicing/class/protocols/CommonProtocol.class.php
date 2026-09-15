@@ -2290,6 +2290,29 @@ trait CommonProtocol
 		if ($res > 0) {
 			$msg = $langs->trans('EInvoiceSupplierInvoiceLinkedToOrder', $orderReference);
 			dol_syslog(get_class($this) . '::_linkSupplierInvoiceToPurchaseOrder ' . $msg, LOG_DEBUG);
+
+			// Propagate extrafields from the purchase order to the supplier invoice.
+			// Only empty fields on the invoice are filled: values already set by the import are kept.
+			// insertExtraFields() silently ignores keys that are not defined for facture_fourn.
+			$order = new CommandeFournisseur($db);
+			if ($order->fetch($orderId) > 0) {
+				$order->fetch_optionals();
+				if (!empty($order->array_options)) {
+					$supplierInvoice->fetch_optionals();
+					$changed = false;
+					foreach ($order->array_options as $key => $value) {
+						if ($value !== null && $value !== ''
+							&& (!isset($supplierInvoice->array_options[$key]) || $supplierInvoice->array_options[$key] === null || $supplierInvoice->array_options[$key] === '')) {
+							$supplierInvoice->array_options[$key] = $value;
+							$changed = true;
+						}
+					}
+					if ($changed) {
+						$supplierInvoice->insertExtraFields();
+					}
+				}
+			}
+
 			return $msg;
 		}
 
