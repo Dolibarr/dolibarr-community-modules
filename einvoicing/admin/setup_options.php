@@ -313,19 +313,27 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->fieldAttr['min'] = '0';
 	$item->fieldAttr['step'] = '0.1';
 
+	// The three notices below are never sent empty: BR-FR-05 makes them mandatory and the generation
+	// falls back on the same translations the placeholders show here. Feeding the placeholder from that
+	// very key is what keeps the setup page honest, since the two can no longer say different things.
+	$defaultnoticehelp = ' '.$langs->transnoentities('EINVOICING_LEGAL_NOTICE_DEFAULT_HELP');
+
 	// Setup conf for PMT - Mention regarding recovery fees
 	$item = $formSetup->newItem('EINVOICING_PMT');
-	$item->helpText = $langs->transnoentities('EINVOICING_PMT_HELP');
+	$item->helpText = $langs->transnoentities('EINVOICING_PMT_HELP').$defaultnoticehelp;
+	$item->fieldAttr['placeholder'] = $langs->transnoentities('RecoveryFeesMention');
 	$item->cssClass = 'minwidth500';
 
 	// Setup conf for PMD - Mention regarding late payment penalties
 	$item = $formSetup->newItem('EINVOICING_PMD');
-	$item->helpText = $langs->transnoentities('EINVOICING_PMD_HELP');
+	$item->helpText = $langs->transnoentities('EINVOICING_PMD_HELP').$defaultnoticehelp;
+	$item->fieldAttr['placeholder'] = $langs->transnoentities('LatePaymentPenaltiesMention');
 	$item->cssClass = 'minwidth500';
 
 	// Setup conf for AAB - Mention regarding absence of discount for early payment
 	$item = $formSetup->newItem('EINVOICING_AAB');
-	$item->helpText = $langs->transnoentities('EINVOICING_AAB_HELP');
+	$item->helpText = $langs->transnoentities('EINVOICING_AAB_HELP').$defaultnoticehelp;
+	$item->fieldAttr['placeholder'] = $langs->transnoentities('EarlyPaymentDiscountMention');
 	$item->cssClass = 'minwidth500';
 
 	/*
