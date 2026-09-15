@@ -75,21 +75,24 @@ include_once DOL_DOCUMENT_ROOT.'/core/class/html.formcompany.class.php';
 include_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php';
 include_once DOL_DOCUMENT_ROOT.'/core/lib/company.lib.php';
 include_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
-include_once __DIR__.'/class/providers/PDPProviderManager.class.php';
-include_once __DIR__.'/class/protocols/ProtocolManager.class.php';
+dol_include_once('einvoicing/lib/einvoicing.lib.php');
+dol_include_once('einvoicing/class/providers/PDPProviderManager.class.php');
+dol_include_once('einvoicing/class/protocols/ProtocolManager.class.php');
+dol_include_once('einvoicing/class/einvoicing.class.php');
+dol_include_once('einvoicing/class/document.class.php');
+
+dol_include_once('einvoicing/compat/functions.lib.php');
 
 // load module libraries
 // GETPOSTDATE() arrived in the core in Dolibarr 18 and dolPrintHTMLForAttribute() in Dolibarr 19; this
 // page calls both, so it would fatal below the version the module declares it supports. Both are
 // backported in compat/functions.lib.php, and that is all this page needs from the two libraries.
 include_once __DIR__.'/compat/functions.lib.php';
-include_once __DIR__.'/lib/einvoicing.lib.php';
-include_once __DIR__.'/class/document.class.php';
 // for other modules
 //dol_include_once('/othermodule/class/otherobject.class.php');
 
 // Load translation files required by the page
-$langs->loadLangs(array("einvoicing@einvoicing", "other"));
+$langs->loadLangs(array("einvoicing@einvoicing", "bills", "other"));
 
 // Get parameters
 $action     = GETPOST('action', 'aZ09') ? GETPOST('action', 'aZ09') : 'view'; // The action 'create'/'add', 'edit'/'update', 'view', ...
@@ -172,18 +175,18 @@ $object->fields['recap'] = array(
 );
 
 // Add a virtual "thirdparty" field into $object->fields for the list (resolved on the fly from the linked invoice, like native invoice lists).
-// Opt-in: resolving the thirdparty relies on correlated subqueries (llx_einvoicing_document has no fk_soc), which can be
+// Opt-in: resolving the thirdparty relies on LEFT JOINs toward the invoice tables (llx_einvoicing_document has no fk_soc), which can be
 // heavy on very large bases, so the whole column is gated behind a hidden constant and disabled by default.
-$showthirdpartycol = getDolGlobalInt('EINVOICING_SHOW_THIRDPARTY_COLUMN');
+$showthirdpartycol = getDolGlobalInt('EINVOICING_SHOW_THIRDPARTY_COLUMN', 1);
 if ($showthirdpartycol) {
 	$object->fields['thirdparty'] = array(
 		'label' => $langs->trans("ThirdParty"),
 		'type' => 'text',
 		'visible' => 1,
 		'enabled' => '1',
-		'position' => 52,
+		'position' => 136,
 		'checked' => 1,
-		'notsearchable' => 1
+		'csslist' => 'tdoverflowmax150'
 	);
 }
 
@@ -267,6 +270,13 @@ if (!$permissiontoread) {
 	accessforbidden();
 }
 
+// When the multicompany master setup is enabled and the current entity is not the master one,
+// the page is read-only: no sync, no edit, no delete — only the list with filters and sorting.
+$isSlaveEntity = getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP") && $conf->entity != getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP");
+if ($isSlaveEntity) {
+	$permissiontoadd = 0;
+	$permissiontodelete = 0;
+}
 
 
 // Fixed slots of the "last invoice that could not be processed" diagnostic, written by
@@ -355,12 +365,12 @@ if (empty($reshook)) {
 }
 
 
-if (getDolGlobalString('EINVOICING_PDP')) {
+if (!$isSlaveEntity && getDolGlobalString('EINVOICING_PDP')) {
 	$providerManager = new PDPProviderManager($db);
 	$provider = $providerManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
 }
 
-if ($action == 'confirm_sync' && getDolGlobalString('EINVOICING_PDP') && $confirm == 'yes') {
+if ($action == 'confirm_sync' && !$isSlaveEntity && getDolGlobalString('EINVOICING_PDP') && $confirm == 'yes') {
 	if (isset($provider)) {
 		// Sync all flows
 		$sync_result = $provider->syncFlows($syncFromDate, $maxflows);
@@ -438,15 +448,11 @@ $sql .= $hookmanager->resPrint;
 $sql = preg_replace('/,\s*$/', '', $sql);
 
 // Virtual "thirdparty_name"/"thirdparty_id" columns resolved from the linked invoice (display + sort of the Tiers column)
+// Two LEFT JOINs are added in the FROM clause: one toward the customer invoice (facture) and one toward the supplier
+// invoice (facture_fourn), each joined to its societe. COALESCE picks whichever side matches the fk_element_type.
 if ($showthirdpartycol) {
-	$sql .= ", (CASE";
-	$sql .= " WHEN t.fk_element_type = 'facture' THEN (SELECT s.nom FROM ".$db->prefix()."societe as s INNER JOIN ".$db->prefix()."facture as f ON f.fk_soc = s.rowid WHERE f.rowid = t.fk_element_id)";
-	$sql .= " WHEN t.fk_element_type = 'invoice_supplier' THEN (SELECT s.nom FROM ".$db->prefix()."societe as s INNER JOIN ".$db->prefix()."facture_fourn as ff ON ff.fk_soc = s.rowid WHERE ff.rowid = t.fk_element_id)";
-	$sql .= " ELSE '' END) as thirdparty_name";
-	$sql .= ", (CASE";
-	$sql .= " WHEN t.fk_element_type = 'facture' THEN (SELECT f.fk_soc FROM ".$db->prefix()."facture as f WHERE f.rowid = t.fk_element_id)";
-	$sql .= " WHEN t.fk_element_type = 'invoice_supplier' THEN (SELECT ff.fk_soc FROM ".$db->prefix()."facture_fourn as ff WHERE ff.rowid = t.fk_element_id)";
-	$sql .= " ELSE 0 END) as thirdparty_id";
+	$sql .= ", COALESCE(soc.rowid, socf.rowid, 0) as thirdparty_id";
+	$sql .= ", COALESCE(soc.nom, socf.nom, '') as thirdparty_name";
 }
 
 $sqlfields = $sql; // $sql fields to remove for count total
@@ -461,14 +467,20 @@ $parameters = array();
 $reshook = $hookmanager->executeHooks('printFieldListFrom', $parameters, $object, $action); // Note that $action and $object may have been modified by hook
 $sql .= $hookmanager->resPrint;
 
+// LEFT JOINs for the virtual thirdparty column: customer invoice link and supplier invoice link, each to its societe.
+if ($showthirdpartycol) {
+	$sql .= " LEFT JOIN ".$db->prefix()."facture as f ON t.fk_element_type = 'facture' AND t.fk_element_id = f.rowid";
+	$sql .= " LEFT JOIN ".$db->prefix()."societe as soc ON soc.rowid = f.fk_soc";
+	$sql .= " LEFT JOIN ".$db->prefix()."facture_fourn as ff ON t.fk_element_type = 'invoice_supplier' AND t.fk_element_id = ff.rowid";
+	$sql .= " LEFT JOIN ".$db->prefix()."societe as socf ON socf.rowid = ff.fk_soc";
+}
+
 if (!empty($object->ismultientitymanaged) && (int) $object->ismultientitymanaged == 1) {
-	$sql .= " WHERE t.entity IN (".getEntity($object->element, (GETPOSTINT('search_current_entity') ? 0 : 1)).")";
-} elseif (preg_match('/^\w+@\w+$/', (string) $object->ismultientitymanaged)) {
-	$tmparray = explode('@', (string) $object->ismultientitymanaged);
-	$sql .= " LEFT JOIN ".$object->db->prefix().$db->sanitize($tmparray[1])." as pt ON t.".$db->sanitize($tmparray[0])." = pt.rowid";
-	$sql .= " WHERE pt.entity IN (".getEntity($object->element, (GETPOSTINT('search_current_entity') ? 0 : 1)).")";
-} else {
-	$sql .= " WHERE 1 = 1";
+	if (getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP")) {
+		$sql .= " WHERE t.entity IN (".getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP").")";
+	} else {
+		$sql .= " WHERE t.entity IN (".getEntity($object->element).")";
+	}
 }
 foreach ($search as $key => $val) {
 	if (array_key_exists($key, $object->fields)) {
@@ -541,10 +553,8 @@ if ($socid) {
 // Add where from extra fields
 // Filter on thirdparty resolved from the linked invoice (facture / facture fournisseur)
 if ($showthirdpartycol && $search_thirdparty != '') {
-	$sql .= " AND (";
-	$sql .= " EXISTS (SELECT 1 FROM ".$db->prefix()."facture as sf INNER JOIN ".$db->prefix()."societe as ss ON ss.rowid = sf.fk_soc WHERE sf.rowid = t.fk_element_id AND t.fk_element_type = 'facture'".natural_search("ss.nom", $search_thirdparty, 0, 0).")";
-	$sql .= " OR EXISTS (SELECT 1 FROM ".$db->prefix()."facture_fourn as sff INNER JOIN ".$db->prefix()."societe as ssf ON ssf.rowid = sff.fk_soc WHERE sff.rowid = t.fk_element_id AND t.fk_element_type = 'invoice_supplier'".natural_search("ssf.nom", $search_thirdparty, 0, 0).")";
-	$sql .= " )";
+	$sql .= " AND (".natural_search("soc.nom", $search_thirdparty, 0, 1);
+	$sql .= " OR ".natural_search("socf.nom", $search_thirdparty, 0, 1).")";
 }
 include DOL_DOCUMENT_ROOT.'/core/tpl/extrafields_list_search_sql.tpl.php';
 // Add where from hooks
@@ -639,11 +649,8 @@ if ($num == 1 && getDolGlobalInt('MAIN_SEARCH_DIRECT_OPEN_IF_ONLY_ONE') && $sear
 // built from is stamped next to it, exactly as the comment opening a generated XML does.
 llxHeader('', $title.' '.einvoicingModuleStamp(), $help_url, '', 0, 0, $morejs, $morecss, '', 'mod-einvoicing page-list bodyforlist');	// Can use also classforhorizontalscrolloftabs instead of bodyforlist for a horizontal scroll in the table instead of page
 
-if (getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP") && $conf->entity != getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP")) {
-	print $langs->trans("EInvoicingInfoManagedByMasterSetup", getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP"));
-
-	llxFooter();
-	exit;
+if ($isSlaveEntity) {
+	print '<div class="warning">'.$langs->trans("EInvoicingImportManagedByMasterSetup", getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP")).'</div>';
 }
 
 
@@ -733,7 +740,7 @@ $newcardbutton = '';
 
 // Manual mapping of the vendor products of a flow onto existing Dolibarr products (useful when the automatic
 // creation of products is disabled and a synchronization is blocked on an unknown product).
-if (getDolGlobalString('EINVOICING_SHOW_MAPPING_TOOL_ON_VENDOR_PRICE_LIST')) {	// Hidden option because editing mapping outside of an import process is discouraged.
+if (!$isSlaveEntity && getDolGlobalString('EINVOICING_SHOW_MAPPING_TOOL_ON_VENDOR_PRICE_LIST')) {	// Hidden option because editing mapping outside of an import process is discouraged.
 	$newcardbutton .= dolGetButtonTitle($langs->trans('MapEInvoiceProducts'), '', 'fa fa-link', dol_buildpath('/einvoicing/product_mapping.php', 1), '', $permissiontoadd);
 }
 
@@ -944,17 +951,6 @@ if ($provider) {
 
 	print "</div>\n";
 
-	// Where the "import a received document again" action lives. This list is where a user lands after
-	// deleting the draft supplier invoice a reception created: the flow is still here, so re-running a
-	// synchronization or deleting the line looks like the way to get the document back, and neither is.
-	// The action is on the flow card, one click away but invisible from here, hence this reminder.
-	if (!einvoicingIsReceiveDisabled()) {
-		print '<div class="opacitymedium small paddingtop paddingleft">';
-		print img_picto('', 'info', 'class="pictofixedwidth"').' ';
-		print $langs->trans('EInvoiceReimportHint', $langs->transnoentitiesnoconv('EInvoiceReimport'));
-		print '</div>'."\n";
-	}
-
 	print "</div>\n";
 
 	print '<script>'."\n";
@@ -970,7 +966,7 @@ if ($provider) {
 	print "  window.location.href = '".$_SERVER["PHP_SELF"]."?action=sync&maxflows=' + maxFlows + '&last_sync_datetimehour=' + lastSyncDatetimehour + '&last_sync_datetimemin=' + lastSyncDatetimemin + '&last_sync_datetimemonth=' + lastSyncDatetimemonth + '&last_sync_datetimeday=' + lastSyncDatetimeday + '&last_sync_datetimeyear=' + lastSyncDatetimeyear + '&token=' + token;\n";
 	print "});\n";
 	print "</script>\n";
-} else {
+} elseif (!$isSlaveEntity) {
 	// Message to check module configuration
 	print info_admin($langs->transnoentities("checkEInvoicingModuleConfiguration"), 0, 0, '1', '', '', 'warning');
 }
@@ -1104,6 +1100,17 @@ if ($action == 'confirm_sync' && getDolGlobalString('EINVOICING_PDP') && $confir
 		}
 		print '<br>';
 	}
+}
+
+// Where the "import a received document again" action lives. This list is where a user lands after
+// deleting the draft supplier invoice a reception created: the flow is still here, so re-running a
+// synchronization or deleting the line looks like the way to get the document back, and neither is.
+// The action is on the flow card, one click away but invisible from here, hence this reminder.
+if ($provider && !einvoicingIsReceiveDisabled()) {
+	print '<div class="opacitymedium small paddingtop paddingleft">';
+	print img_picto('', 'info', 'class="pictofixedwidth"').' ';
+	print $langs->trans('EInvoiceReimportHint', $langs->transnoentitiesnoconv('EInvoiceReimport'));
+	print '</div>'."\n";
 }
 
 
@@ -1360,7 +1367,9 @@ while ($i < $imaxinloop) {
 			} elseif ($key == 'ref') {
 				$cssforfield .= ($cssforfield ? ' ' : '').'nowraponall';
 			}
-
+			if ($key == 'tracking_idref') {
+				$cssforfield .= ($cssforfield ? ' ' : '').'tdlineheightsmall';
+			}
 			if (in_array($val['type'], array('double(24,8)', 'double(6,3)', 'integer', 'real', 'price')) && !in_array($key, array('id', 'rowid', 'ref', 'status')) && empty($val['arrayofkeyval'])) {
 				$cssforfield .= ($cssforfield ? ' ' : '').'right';
 			}
@@ -1403,7 +1412,13 @@ while ($i < $imaxinloop) {
 							$linkedobj = new FactureFournisseur($db);
 
 							if ($linkedobj->fetch((int) $object->fk_element_id) > 0) {
-								$out = $linkedobj->getNomUrl(1);
+								$out = '<div class="tdoverflowmax200 inline-block lineheightsmall">';
+								$out .= $linkedobj->getNomUrl(1);
+								// The vendor reference is a field of the received document, escaped like the rest of it.
+								if ($linkedobj->ref_supplier) {
+									$out .= '<br><span class="spantitle small">'.dol_escape_htmltag($linkedobj->ref_supplier).'</span>';
+								}
+								$out .= "</div>";
 							}
 						}
 					}
@@ -1425,9 +1440,9 @@ while ($i < $imaxinloop) {
 					print $out;
 				} elseif ($key == 'fk_element_type') {
 					print '<span class="nowraponall">';
-					if ((string) $object->$key == 'Facture' || (string) $object->$key == 'invoice') {
+					if (strtolower((string) $object->$key) == 'facture' || strtolower((string) $object->$key) == 'invoice') {
 						print img_picto('', 'bill', 'class="pictofixedwidth"').$langs->trans("Invoice");
-					} elseif ((string) $object->$key == 'FactureFournisseur' || (string) $object->$key == 'invoice_supplier') {
+					} elseif (strtolower((string) $object->$key) == 'facturefournisseur' || strtolower((string) $object->$key) == 'invoice_supplier') {
 						print img_picto('', 'supplier_invoice', 'class="pictofixedwidth"').$langs->trans("SupplierInvoice");
 					}
 					print  '</span>';

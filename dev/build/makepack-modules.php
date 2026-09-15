@@ -624,6 +624,7 @@ function buildModulePackages($action, $modulename)
 					$returnCode = 0;
 					$repo = $directoryToSearch . DIRECTORY_SEPARATOR . $project;
 					$command = sprintf('git -C %s tag %s 2>&1', escapeshellarg($repo), escapeshellarg($tag));
+					$command .= "; git tag push origin ".escapeshellarg($tag);
 					$lastmessagetoshow .= "YOU MUST COMMIT ALL FILES (INCLUDING THE ZIP) AND CREATE A TAG WITH COMMAND:\n";
 					$lastmessagetoshow .= $command."\n";
 					/*exec(

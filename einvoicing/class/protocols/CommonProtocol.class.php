@@ -220,6 +220,17 @@ trait CommonProtocol
 	 */
 	private function getIEC6523Code($country_code, $global = 0)
 	{
+		// EINVOICING_PARTY_IDENTIFIER_SCHEME decides the scheme of the party identifier (BT-29, BT-46)
+		// alone. It must not reach $global == 2, the electronic address (BT-34, BT-49), where 0225 is
+		// the right answer and BR-CL-25 accepts nothing outside the CEF EAS list.
+		if ($global == 1) {
+			$configured = trim(getDolGlobalString('EINVOICING_PARTY_IDENTIFIER_SCHEME'));
+			// 'none' rather than an empty string: an empty option is an option nobody set, which
+			// keeps the historical scheme of the country.
+			if ($configured !== '') {
+				return ($configured === 'none') ? '' : $configured;
+			}
+		}
 		$retour = "";
 		switch ($country_code) {
 			case 'BE':
@@ -243,6 +254,24 @@ trait CommonProtocol
 				$retour = "0060";	// DUNS
 		}
 		return $retour;
+	}
+
+	/**
+	 * Value of the party identifier (BT-29, BT-46), which follows the scheme the setup asks for.
+	 *
+	 * Every entry of the list but the SIRET is declared with the professional identifier idprof()
+	 * answers for the country of the party, which is what the module has always written.
+	 *
+	 * @param	Societe	$thirdparty		Party the identifier belongs to
+	 * @return	string					Identifier, empty when that party has nothing under that scheme
+	 */
+	private function getPartyIdentifierValue($thirdparty)
+	{
+		if (getDolGlobalString('EINVOICING_PARTY_IDENTIFIER_SCHEME') === '0009') {
+			return removeAllSpaces($thirdparty->idprof2);
+		}
+
+		return idprof($thirdparty);
 	}
 
 	/**
@@ -482,7 +511,7 @@ trait CommonProtocol
 		// Note: the carrier of the specimen is the one the setup of the instance produces, untouched.
 		// A Factur-X specimen is only a conformant PDF/A-3 when PDF_USE_A is set to PDF/A-3b in
 		// "Home - Setup - PDF", which is exactly what the specimen is there to show.
-		$tmpinvoice->generateDocument($tmpinvoice->model_pdf, $outputlangs);
+		$tmpinvoice->generateDocument((string) $tmpinvoice->model_pdf, $outputlangs);
 
 		// For invoice with ->specimen=1, the file is SPECIMEN.pdf so we rename it into ref
 		$dir = $conf->invoice->multidir_output[$conf->entity];
@@ -527,7 +556,7 @@ trait CommonProtocol
 	 * @param array     $sellerInfo 	Array containing seller information extracted from E-invoice
 	 * @param string    $priority 		Fill priority ('dolibarr' or 'pdp'). If both data are available, which one to prefer
 	 * @param string    $flowId 		Flow identifier source of the thirdparty.
-	 * @return array{res:int, message:string, actioncode:string|null, actionurl:string|null, action:string|null}   Returns array with 'res' (ID of the synchronized or created/updated thirdparty, -1 on error) with a 'message' and an optional 'actioncode', 'actionurl', and 'action'.
+	 * @return array{res:int, message:string, actioncode?:string, actionurl?:string, action?:string, actiondata?:array<string,mixed>}   Returns array with 'res' (ID of the synchronized or created/updated thirdparty, -1 on error) with a 'message' and an optional 'actioncode', 'actionurl', 'action', and 'actiondata'.
 	 */
 	private function _syncOrCreateThirdpartyFromEInvoiceSeller($sellerInfo, $priority = 'dolibarr', $flowId = '')
 	{
@@ -583,7 +612,7 @@ trait CommonProtocol
 				if (!empty($globalId)) {
 					// Map scheme to idprof field (0002 = SIREN)
 					// TODO Use function idprof() ?
-					$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode);
+					$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode, $globalId);
 					if (!empty($idprofField)) {
 						$result = 0;
 						// Fetch thirdparty by corresponding idprof field
@@ -626,12 +655,23 @@ trait CommonProtocol
 						dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Error: Multiple thirdparties found for VAT number: ' . $sellerInfo['sellerTaxRegistations']['VA'], LOG_ERR);
 						$obj1 = $db->fetch_object($resql);
 						$obj2 = $db->fetch_object($resql);
+
+						// Create URL to prefill thirdparty creation form
+						$createUrl = DOL_URL_ROOT . '/societe/list.php?type=f&search_vat='.urlencode($sellerInfo['sellerTaxRegistations']['VA']);
+						$createUrl .= '&backtopage=' . urlencode(dol_buildpath('/einvoicing/document_list.php', 1));
+
+						$action = $langs->trans('CheckSuppliersWithDuplicateCode', $sellerInfo['sellerTaxRegistations']['VA']);
+						$action .= '<a class="butAction small smallpaddingimp" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
+						$action .= '<i class="fas fa-plus-circle"></i> ';
+						$action .= $langs->trans('CheckSuppliers');
+						$action .= '</a>';
+
 						return array(
 							'res' => -1,
-							'message' => 'Multiple thirdparties found for VAT number: ' . $sellerInfo['sellerTaxRegistations']['VA'],
-							'actioncode' => 'DUPLICATE_THIRDPARTIES',
-							'action' => 'Merge the 2 thirdparties',
-							'actiondata' => array('thirdpartyid1' => $obj1->rowid, 'thirdpartyid2' => $obj2->rowid)
+							'message' => $langs->trans("SuppliersWithDuplicateVATCode", $sellerInfo['sellerTaxRegistations']['VA']),	// Can be a technical message. The business one is defined into the syncFlows() of the provider.
+							'actioncode' => 'THIRDPARTY_DUPLICATE_VAT',
+							'action' => $action,
+							'actiondata' => array('thirdpartyid1' => $obj1->rowid, 'thirdpartyid2' => $obj2->rowid, 'vatnumber' => $sellerInfo['sellerTaxRegistations']['VA'])
 						);
 					} elseif ($db->num_rows($resql) === 1) {
 						$obj = $db->fetch_object($resql);
@@ -739,8 +779,7 @@ trait CommonProtocol
 
 		//$thirdpartyId = -2; // For testing
 		if ($thirdpartyId > 0) {
-			dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Updating existing thirdparty: ' . $thirdpartyId);
-			// TODO: MAYBE we should call PDP to retrieve more information
+			dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Updating existing thirdparty (client status'.(getDolGlobalString('EINVOICING_THIRDPARTIES_COMPLETE_INFO') ? ' + other info' : '').'): ' . $thirdpartyId);
 
 			$thirdparty = new Societe($db);
 			$thirdparty->fetch($thirdpartyId);
@@ -766,7 +805,7 @@ trait CommonProtocol
 					if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
 						foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
 							if (!empty($globalId)) {
-								$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode);
+								$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode, $globalId);
 								if (!empty($idprofField)) {
 									$thirdparty->$idprofField = removeAllSpaces($globalId);
 								}
@@ -814,7 +853,7 @@ trait CommonProtocol
 					if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
 						foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
 							if (!empty($globalId)) {
-								$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode);
+								$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode, $globalId);
 								if (!empty($idprofField) && empty($thirdparty->$idprofField)) {
 									$thirdparty->$idprofField = removeAllSpaces($globalId);
 								}
@@ -861,11 +900,35 @@ trait CommonProtocol
 				$this->error = $thirdparty->error;
 				$this->errors = $thirdparty->errors;
 
-				dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Error updating thirdparty: ' . implode(',', array_merge(array($thirdparty->error), $thirdparty->errors)), LOG_ERR);
-				return array(
-					'res' => -1,
-					'message' => 'Thirdparty update error: ' . dol_escape_htmltag(implode(',', array_merge(array($thirdparty->error), $thirdparty->errors))).'.'
-				);
+				if ($result == -3) {	// In this case we also have one entry in $this->errors = 'ErrorSupplierCodeAlreadyUsed'
+					// Case of duplicate supplier code, need to change one.
+					dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Error updating thirdparty: There is 2+ suppliers with the same supplier code. You msut fix one', LOG_DEBUG);
+
+					// Create URL to prefill thirdparty creation form
+					$createUrl = DOL_URL_ROOT . '/societe/list.php?type=f&search_supplier_code='.urlencode($thirdparty->code_fournisseur);
+					$createUrl .= '&backtopage=' . urlencode(dol_buildpath('/einvoicing/document_list.php', 1));
+
+					$action = $langs->trans('CheckSuppliersWithDuplicateCode', $thirdparty->code_fournisseur);
+					$action .= '<a class="butAction small smallpaddingimp" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
+					$action .= '<i class="fas fa-plus-circle"></i> ';
+					$action .= $langs->trans('CheckSuppliers');
+					$action .= '</a>';
+
+					return array(
+						'res' => -1,
+						'message' => $langs->trans("SuppliersWithDuplicateCode", $thirdparty->code_fournisseur),	// Can be a technical message. The business one is defined into the syncFlows() of the provider.
+						'actioncode' => 'THIRDPARTY_DUPLICATE_SUPPLIER_CODE',
+						'actionurl' => $createUrl,
+						'action' => $action,
+						'actiondata' => array('suppliercode' => $thirdparty->code_fournisseur)
+					);
+				} else {
+					dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Error updating thirdparty: ' . implode(',', array_merge(array($thirdparty->error), $thirdparty->errors)), LOG_ERR);
+					return array(
+						'res' => -1,
+						'message' => 'Thirdparty update error: ' . dol_escape_htmltag(implode(',', array_merge(array($thirdparty->error), $thirdparty->errors))).'.'
+					);
+				}
 			} else {
 				dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Updated thirdparty: ' . $thirdpartyId);
 				return array(
@@ -900,7 +963,7 @@ trait CommonProtocol
 			if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
 				foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
 					if (!empty($globalId)) {
-						$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode);
+						$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode, $globalId);
 						if (!empty($idprofField)) {
 							$thirdparty->$idprofField = removeAllSpaces($globalId);
 						}
@@ -962,7 +1025,7 @@ trait CommonProtocol
 			if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
 				foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
 					if (!empty($globalId)) {
-						$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode);
+						$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode, $globalId);
 						if (!empty($idprofField)) {
 							$createParams[$idprofField] = $globalId;
 						}
@@ -1016,7 +1079,7 @@ trait CommonProtocol
 			if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
 				foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
 					if (!empty($globalId)) {
-						$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode);
+						$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode, $globalId);
 						if (!empty($idprofField)) {
 							$errorDetails[$idprofField] = $langs->trans($idprofField).': ' . $globalId;
 							$actiondata[$idprofField] = $globalId;
@@ -1410,15 +1473,33 @@ trait CommonProtocol
 	/**
 	 * Map global ID scheme to Dolibarr idprof field
 	 *
+	 * 0002 and 0009 name the register they come from, 0225 does not: it is the French e-invoicing
+	 * ADDRESS scheme, whose value is a SIREN, a SIRET, or either of them suffixed with a routing code
+	 * (rules G1.83, G1.93 and G1.115 of the French specification). Its shape is therefore what decides
+	 * where it is stored, and a suffixed one is stored nowhere: it identifies a mailbox, not a company.
+	 * 0231 (the SIREN of a VAT group) and 0088 (a GLN) are left out on purpose - neither is the
+	 * registration identifier of the party the document names.
+	 *
 	 * @param 	string 	$scheme 		Global ID scheme code
 	 * @param	string	$countrycode	Country code
-	 * @return 	string 					Corresponding idprof field name
+	 * @param	string	$value			Identifier carried under that scheme, read when the scheme alone does not decide
+	 * @return 	string 					Corresponding idprof field name, empty when the identifier is not one
 	 */
-	private function _mapGlobalIdSchemeToIdprof($scheme, $countrycode = '')
+	private function _mapGlobalIdSchemeToIdprof($scheme, $countrycode = '', $value = '')
 	{
+		if ($scheme === '0225') {
+			$digits = preg_replace('/\D/', '', (string) $value);
+			if ($digits !== (string) $value) {
+				return '';
+			}
+			if (dol_strlen($digits) == 9) {
+				return 'idprof1';	// SIREN
+			}
+			return (dol_strlen($digits) == 14) ? 'idprof2' : '';	// SIRET
+		}
+
 		$map = [
 			'0002' => 'idprof1',	// SIREN
-			'0225' => 'idprof1',	// SIREN
 			'0009' => 'idprof2',	// SIRET
 		];
 
@@ -1781,7 +1862,7 @@ trait CommonProtocol
 				if (empty($seller->tva_intra) && empty($seller->idprof1)) {
 					throw new Exception('BADVATNUMBER[BR-AE-02]: The VAT number or the professional id of the seller '.$seller->name.' is mandatory when a line is invoiced under the reverse charge (VAT category AE).');
 				}
-				if ($buyerThirdparty !== null && empty($buyerThirdparty->tva_intra) && empty($buyerThirdparty->idprof1)) {
+				if ($buyerThirdparty !== null && empty($buyerThirdparty->tva_intra) && empty(idprof($buyerThirdparty))) {
 					throw new Exception('BADVATNUMBER[BR-AE-03]: The VAT number or the legal registration id of the customer '.$buyerThirdparty->name.' is mandatory when a line is invoiced under the reverse charge (VAT category AE).');
 				}
 			}
@@ -1889,8 +1970,8 @@ trait CommonProtocol
 					if ((float) DOL_VERSION < 24.0) {
 						// We must use the reason found in the constant MAIN_VAT_EXEMPTION_CODE_FOR_0.00_XXXX
 						// List of VATEX: https://docs.peppol.eu/poacc/billing/3.0/codelist/vatex/
-						// TVA non applicable: article 261-4 CGI (comme médecin) VATEX-FR-CGI261-4, vente objet art
-						// VATEX-FR-I, vente objet antiquité VATEX-FR-J, vente agence voyage VATEX-EU-D,
+						// TVA non applicable: article 261-4 CGI (comme médecin) VATEX-FR-CGI261-4, vente art VATEX-FR-I,
+						// vente antiquité VATEX-FR-J, vente agence voyage VATEX-EU-D,
 						// debours (VAT paid by customer) VATEX-EU-79-C
 						$vatex = '';
 

@@ -304,6 +304,7 @@ if (!empty($parsedLines)) {
 	// Run the matching on each line (read only, nothing is created here)
 	// The matching method comes from the CommonProtocol trait, used by the protocols able to import an invoice.
 	'@phan-var-force ?CIIProtocol $protocol';
+	/** @var ?CIIProtocol $protocol */
 	$nbtomap = 0;
 	$matchresults = array();
 	foreach ($parsedLines as $idx => $parsedLine) {

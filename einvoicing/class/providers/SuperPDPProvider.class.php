@@ -317,7 +317,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 			// Password
 			$item = $formSetup->newItem($prefix.'CLIENT_SECRET'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''));
-			if (method_exists('FormSetupItem', 'setAsGenericPassword')) {
+			if (method_exists($item, 'setAsGenericPassword')) {
 				$item->setAsGenericPassword();
 			} else {
 				// Dolibarr 18/19 fallback: setAsGenericPassword() does not exist yet.
@@ -1342,6 +1342,12 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$response = $this->callApi("flows", "POSTALREADYFORMATED", $params, $extraHeaders, 'send_sample_invoice');
 
 		if ($response['status_code'] == 200 || $response['status_code'] == 202) {
+			if (!is_array($response['response']) || empty($response['response']['flowId'])) {
+				// Accepted, but the answer is not the JSON body the platform announces. Everything below
+				// is built on that flow id, so stop here rather than call 'flows/' with nothing.
+				$this->errors[] = "Sample invoice sent but the platform returned no flow id.";
+				return 0;
+			}
 			$flowId = $response['response']['flowId'];
 			$outputLog[] = "Sample invoice sent successfully.";
 
@@ -1963,6 +1969,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 					// If res < 0, rollback
 					if ($res['res'] < 0) {
 						if (!empty($res['postponeflow'])) {
+							// TODO Critical pb. When a flow is postponed, if some flow are recorded after, the postponed one may become out of range of the next sync
+							//and be definitely lost.
+
 							// This flow could not be read, but nothing was stored for it: it stays pending and
 							// the next synchronization will try it again, so no invoice is lost. Report it with
 							// the action to do and carry on, instead of stalling this batch - and every flow
@@ -2015,6 +2024,16 @@ class SuperPDPProvider extends AbstractPDPProvider
 									}
 								}
 								$actions[$rescode]['businessmessage'] = $langs->trans("CantFindThirdpartyFromTheImportedInvoice", $infostring);
+								// Add technical message in tooltip on the picto
+								$actions[$rescode]['businessmessage'] .= $form->textwithpicto('', "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], 1, 'help', '', 0, 2, 'help');
+							}
+							if ($rescode == 'THIRDPARTY_DUPLICATE_VAT') {
+								$actions[$rescode]['businessmessage'] = $langs->trans("SuppliersWithDuplicateVATCode", $res['actiondata']['vatnumber'] ?? '');
+								// Add technical message in tooltip on the picto
+								$actions[$rescode]['businessmessage'] .= $form->textwithpicto('', "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], 1, 'help', '', 0, 2, 'help');
+							}
+							if ($rescode == 'THIRDPARTY_DUPLICATE_SUPPLIER_CODE') {
+								$actions[$rescode]['businessmessage'] = $langs->trans("SuppliersWithDuplicateCode", $res['actiondata']['suppliercode'] ?? '');
 								// Add technical message in tooltip on the picto
 								$actions[$rescode]['businessmessage'] .= $form->textwithpicto('', "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], 1, 'help', '', 0, 2, 'help');
 							}
@@ -2109,7 +2128,12 @@ class SuperPDPProvider extends AbstractPDPProvider
 				}
 
 				if ($error > 0) {
-					if (in_array($rescode, array('THIRDPARTY_NOT_FOUND','PRODUCT_NOT_FOUND'))) {
+					if (in_array($rescode, array(
+						'THIRDPARTY_NOT_FOUND',
+						'PRODUCT_NOT_FOUND',
+						'THIRDPARTY_DUPLICATE_VAT',
+						'THIRDPARTY_DUPLICATE_SUPPLIER_CODE'
+					))) {
 						$results_messages[] = "Aborting synchronization due to a business error. There is a manual action to do.";
 					} else {
 						$results_messages[] = "Aborting synchronization due to errors.";
@@ -2160,7 +2184,6 @@ class SuperPDPProvider extends AbstractPDPProvider
 				$cursor = end($results)['updatedAt'];
 			}
 		}
-
 
 
 		$globalres = ($error > 0 ? -1 : 1);
@@ -2735,6 +2758,14 @@ class SuperPDPProvider extends AbstractPDPProvider
 				// has no row in einvoicing_lifecycle_msg and the flowId lookup below cannot resolve it.
 				if ($document->flow_direction == 'In') {
 					$resIncoming = $this->processIncomingSupplierInvoiceStatus($flowId, $document, $einvoicing);
+
+					// A negative result is a transient failure of the platform call only (a CDAR parsing
+					// failure is stored as res=0, it would not parse any better on retry): return without
+					// storing the flow so this flowId is retried on the next sync run instead of being
+					// marked processed and losing the vendor status for good.
+					if ($resIncoming['res'] < 0) {
+						return $resIncoming;
+					}
 
 					$returnRes = $resIncoming['res'];
 					$returnMessage = $resIncoming['message'];

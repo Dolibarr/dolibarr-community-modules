@@ -215,6 +215,32 @@ function thirdpartyidprof($object)
 }
 
 /**
+ * Escape a value for a text node or an attribute of a generated XML document.
+ *
+ * Two ways a text value breaks the document, neither of which htmlspecialchars() handles alone:
+ * an invalid UTF-8 sequence, which it answers with an EMPTY STRING below PHP 8.1 where ENT_SUBSTITUTE
+ * is not a default (one latin-1 byte in a company name, and BR-06 refuses the empty element), and a
+ * control character forbidden by XML 1.0 (a vertical tab pasted from a PDF), which it copies through
+ * and which leaves a file no parser reads - the platform answers HTTP 400 on it.
+ *
+ * @param  mixed	$value	Value to escape. null is accepted and gives ''.
+ * @return string			Value escaped for DOMDocument::createElement() and setAttribute()
+ */
+function einvoicingXmlText($value)
+{
+	$value = (string) $value;
+
+	// Tab, LF and CR are the three control characters XML 1.0 allows. No /u here: the pattern is
+	// byte based on purpose, so it also holds on the invalid UTF-8 the escape below repairs.
+	$stripped = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', '', $value);
+	if ($stripped !== null) {
+		$value = $stripped;
+	}
+
+	return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
+
+/**
  * Remove every space of an identifier, whatever kind of space it is.
  *
  * A value copied from a web page or a PDF often carries a non-breaking (U+00A0), thin or zero-width
@@ -1098,18 +1124,11 @@ function einvoicingIsAllowedRedirectUrl($url)
 /**
  * The four sentinels Dolibarr stores in the description of a discount, and the text each stands for.
  *
- * A discount built from another piece - a credit note applied, a deposit deducted, an excess payment
- * carried over - carries no text of its own: the core writes one of four sentinels in the description
- * of the discount, insert_discount() copies it into the description of the line, and pdf_getlinedesc()
- * resolves it against the piece it comes from at print time. Nothing resolves it for an e-invoice, so
- * the customer used to read '(CREDIT_NOTE)' in the item name of the line (BT-153) or in the reason of
- * a document level allowance (BT-97).
- *
- * The test is the one the core makes: the description equals a sentinel exactly, and the line is
- * actually a discount line. Matching the text alone is wrong in both directions - a description edited
- * by hand is missed, and a service line quoting the string is caught - and the four sentinels are not
- * even spelled alike: '(CREDIT_NOTE)' holds an underscore where '(EXCESS PAID)' and
- * '(EXCESS RECEIVED)' hold a space.
+ * A discount built from another piece carries no text of its own: the core writes one of these four in
+ * the description and pdf_getlinedesc() resolves it at print time, which nothing does for an e-invoice.
+ * The test is the one the core makes - the description equals a sentinel exactly and the line is a
+ * discount line - because matching the text alone misses a description edited by hand and catches a
+ * service line quoting the string.
  *
  * @return	array<string,string>	Sentinel of the core => translation key of the text it stands for
  */
@@ -1185,17 +1204,11 @@ function einvoicingDiscountLabel($discount, $description, $outputlangs, $related
 /**
  * Text a discount line of the invoice stands for, '' when the line carries no discount at all.
  *
- * einvoicingDiscountLabel() decides on the description alone, which is what a document level
- * allowance needs: there, the caller has already established that a discount is behind the amount.
- * A line of the invoice has not, and the description alone cannot tell - a line of work can be named
- * '(DEPOSIT)' and carry nothing, and it was then renamed 'Down payment deducted' on its way out,
- * under the wording meant for a discount whose source piece cannot be read, which is a different
- * situation entirely.
- *
- * The test of the core is in two halves, the description AND the discount the line points at
- * (pdf_getlinedesc(): $desc == '(DEPOSIT)' && $object->lines[$i]->fk_remise_except). This is where
- * the second half is made, so that the two call sites read the line the same way: the one writing
- * BT-97 already stands inside a test on fk_remise_except, the one writing BT-153 does not.
+ * einvoicingDiscountLabel() decides on the description alone, which a document level allowance can
+ * afford: its caller has already established a discount is behind the amount. A line has not, and a
+ * line of work named '(DEPOSIT)' carrying nothing was renamed on its way out. The test of the core is
+ * in two halves (pdf_getlinedesc(): $desc == '(DEPOSIT)' && ...->fk_remise_except); the second half is
+ * made here so both call sites read the line the same way.
  *
  * @param	?object				$line				Line of the invoice being written
  * @param	?DiscountAbsolute	$discount			Discount the line was built from, already fetched

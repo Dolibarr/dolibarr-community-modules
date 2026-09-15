@@ -68,6 +68,8 @@ if (!$res) {
  */
 require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/invoice.lib.php';
+// recordNotFound() below only exists from Dolibarr 20 on, and this page is served down to 18.
+include_once __DIR__.'/compat/functions.lib.php';
 dol_include_once('/einvoicing/class/einvoicing.class.php');
 dol_include_once('/einvoicing/lib/einvoicing_lifecycle.lib.php');
 
@@ -142,8 +144,8 @@ if ($object->id > 0) {
 	}
 
 	// Before the first PDP exchange, llx_einvoicing_lifecycle_msg has nothing to show yet: fall back to
-	// the local Dolibarr-side status (not generated / generated / generation error) for the Fournisseur
-	// card only, since it is the only actor with a meaningful state at that stage.
+	// the local status of llx_einvoicing_extlinks (not generated / generated / deposited, awaiting the
+	// platform) for the Fournisseur card only, since it is the only actor with a meaningful state then.
 	$localStatus = empty($last['fournisseur']) ? $einvoicing->fetchLastknownInvoiceStatus($object->id, $object->ref) : null;
 
 	$actors = array(
@@ -165,7 +167,10 @@ if ($object->id > 0) {
 			print '<div style="font-size:10px;color:#888780;margin-top:2px;">'.dol_print_date($evt['date_creation'], 'dayhour').'</div>';
 		} elseif ($fluxKey === 'fournisseur' && !empty($localStatus)) {
 			print '<div style="font-size:12px;font-weight:500;overflow-wrap:anywhere;">'.dol_escape_htmltag((string) $localStatus['status']).'</div>';
-			print '<div style="font-size:10px;color:#888780;margin-top:2px;font-style:italic;">'.$langs->trans('EInvLocalStatusNotYetTransmitted').'</div>';
+			$localNote = einvoicingLifecycleLocalStatusNote($localStatus['code']);
+			if ($localNote) {
+				print '<div style="font-size:10px;color:#888780;margin-top:2px;font-style:italic;">'.$langs->trans($localNote).'</div>';
+			}
 		} else {
 			print '<div style="font-size:11px;color:#b4b2a9;font-style:italic;">'.$langs->trans('EInvNoLifecycleEvent').'</div>';
 		}

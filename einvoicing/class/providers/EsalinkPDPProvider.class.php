@@ -168,7 +168,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 		// Client secret
 		$item = $formSetup->newItem($prefix . 'PASSWORD'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''));
-		if (method_exists('FormSetupItem', 'setAsGenericPassword')) {
+		if (method_exists($item, 'setAsGenericPassword')) {
 			$item->setAsGenericPassword();
 		} else {
 			// Dolibarr 18/19 fallback: setAsGenericPassword() does not exist yet.
@@ -667,6 +667,12 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 
 		if ($response['status_code'] == 200 || $response['status_code'] == 202) {
+			if (!is_array($response['response']) || empty($response['response']['flowId'])) {
+				// Accepted, but the answer is not the JSON body the platform announces. Everything below
+				// is built on that flow id, so stop here rather than call 'flows/' with nothing.
+				$this->errors[] = "Sample invoice sent but the platform returned no flow id.";
+				return 0;
+			}
 			$flowId = $response['response']['flowId'];
 			$outputLog[] = "Sample invoice sent successfully.";
 
@@ -1686,6 +1692,11 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				// has no row in einvoicing_lifecycle_msg and the flowId lookup below cannot resolve it.
 				if ($document->flow_direction == 'In') {
 					$resIncoming = $this->processIncomingSupplierInvoiceStatus($flowId, $document, $einvoicing);
+
+					if ($resIncoming['res'] < 0) {
+						// Left unrecorded on purpose: a stored flow is treated as known and never retried.
+						return $resIncoming;
+					}
 
 					$returnRes = $resIncoming['res'];
 					$returnMessage = $resIncoming['message'];

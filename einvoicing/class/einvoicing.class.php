@@ -36,7 +36,8 @@ if ((float) DOL_VERSION < 20) {
 }
 
 require_once DOL_DOCUMENT_ROOT . '/core/lib/geturl.lib.php';
-dol_include_once('einvoicing/lib/einvoicing.lib.php');
+require_once __DIR__ . '/../lib/einvoicing.lib.php';	// removeAllSpaces(), used to normalize an electronic address
+
 
 /**
  * Base class for all functions to manage EINVOICING Module.
@@ -86,7 +87,7 @@ class EInvoicing
 	// Dolibarr internal statuses
 	const STATUS_UNKNOWN             = 0;		// By default, before the e-invoice has been generated
 
-	const STATUS_NOT_GENERATED       = 5;		// To generate then to sync
+	const STATUS_NOT_GENERATED       = 5;		// Not yet generated but must be generate then sync
 	const STATUS_GENERATED           = 10;		// To sync
 	const STATUS_AWAITING_VALIDATION = 15;		// Einvoice sent to your AP, but not yet analyzed by your AP
 	const STATUS_AWAITING_ACK        = 20;		// Einvoice sent to your AP. next step happen when doing sync.
@@ -550,6 +551,14 @@ class EInvoicing
 	 */
 	const SCHEME_FR_ROUTING_CODE = '0224';
 
+	/**
+	 * @var string ISO 6523 scheme of a French SIRET, the identifier of an establishment.
+	 *
+	 * BR-FR-CPRO-10 of XP Z12-012 makes it mandatory as a private identifier of the buyer (BT-46) on a
+	 * B2G invoice: Chorus Pro routes on the establishment, where 0002 identifies the legal entity (SIREN).
+	 */
+	const SCHEME_FR_SIRET = '0009';
+
 
 	/**
 	 * Constructor
@@ -882,6 +891,9 @@ class EInvoicing
 			// Remove Dolibarr internal statuses
 			unset($options[self::STATUS_UNKNOWN]);
 			unset($options[self::STATUS_IGNORE]);
+			// STATUS_IGNORE_2 is commented out of STATUS_LABEL_KEYS, so the key is never there to
+			// begin with. The line stays for the day that entry is turned on again.
+			// @phpstan-ignore unset.offset
 			unset($options[self::STATUS_IGNORE_2]);
 			unset($options[self::STATUS_NOT_GENERATED]);
 		}
@@ -1212,10 +1224,14 @@ class EInvoicing
 		// Societe::isACompany(), the same way needEInvoiceManagement() does, so both ends of the chain agree.
 		$isB2C = getDolGlobalInt('EINVOICING_SKIP_B2C') && is_object($thirdparty) && !$thirdparty->isACompany();
 
+		// Retrieve the SIREN/SIRET using idprof(). It can retrieve the SIREN from idprof1
+		// or derive it from idprof2 (SIRET).
+		$idprof = is_object($thirdparty) ? idprof($thirdparty) : '';
+
 		if (empty($thirdparty->name)) {
 			$baseErrors[] = $langs->trans("FxCheckErrorCustomerName");
 		}
-		if (empty($thirdparty->idprof1)) {
+		if (empty($idprof)) { // Use Idprof to retrieve SIREN that may be in idprof1 or derived from idprof2
 			if (!$isB2C) {
 				$baseErrors[] = $langs->trans("FxCheckErrorCustomerIDPROF1");
 			}
@@ -1267,9 +1283,9 @@ class EInvoicing
 			$vatNormalized = strtoupper(removeAllSpaces($thirdparty->tva_intra));
 			if (!preg_match('/^FR[0-9A-Z]{2}[0-9]{9}$/', $vatNormalized)) {
 				$baseWarnings[] = $langs->trans("FxCheckErrorCustomerVATFormat");
-			} elseif (!empty($thirdparty->idprof1)) {
+			} elseif (!empty(idprof($thirdparty))) {
 				// Cross-check VAT against SIREN: French VAT key is deterministic (formula: (12 + 3 * (SIREN % 97)) % 97)
-				$siren9 = substr(removeAllSpaces($thirdparty->idprof1), 0, 9);
+				$siren9 = substr(removeAllSpaces(idprof($thirdparty)), 0, 9);
 				if (ctype_digit($siren9) && strlen($siren9) === 9) {
 					$expectedKey = (12 + 3 * ((int) $siren9 % 97)) % 97;
 					$expectedVAT = 'FR' . str_pad((string) $expectedKey, 2, '0', STR_PAD_LEFT) . $siren9;
@@ -1384,9 +1400,9 @@ class EInvoicing
 		// or a trade name (a third party named after its brand rather than its legal name).
 		if (
 			!empty($thirdparty->country_code) && $thirdparty->country_code === 'FR'
-			&& !empty($thirdparty->name) && !empty($thirdparty->idprof1)
+			&& !empty($thirdparty->name) && !empty(idprof($thirdparty))
 		) {
-			$siren = substr(removeAllSpaces($thirdparty->idprof1), 0, 9);
+			$siren = substr(removeAllSpaces(idprof($thirdparty)), 0, 9);
 			$apiUrl = 'https://recherche-entreprises.api.gouv.fr/search?q=' . urlencode($siren) . '&per_page=5';
 
 			$response = getURLContent($apiUrl, 'GET', '', 1, ['Accept: application/json']);
@@ -1485,20 +1501,11 @@ class EInvoicing
 			}
 		}
 
-		// BR-25: every line of the document names what it invoices (BT-153). The name is built from the
-		// label of the product, or from the first line of the description when there is no product, so a
-		// line holding neither is issued with an empty name and the document is refused - and refused by
-		// the platform, after transmission, on a line number the seller then has to go and find. Every
-		// such line is listed here instead, before anything is sent.
-		//
-		// Title and subtotal lines are not concerned: they are pseudo-lines that never reach the
-		// document. A discount line is not concerned either, its name being built from the piece it
-		// deducts (see einvoicingDiscountLabel()).
-		//
-		// Customer invoices only, afterPDFCreation() gating on instanceof Facture: FactureFournisseurLigne
-		// fills ->description and not ->desc before 20.0, so extending this guard to supplier invoices
-		// needs a ?: $line->description or every free line of an 18.0/19.0 purchase invoice reads as
-		// having no name.
+		// BR-25: every line names what it invoices (BT-153), from the product label or the first line of
+		// the description, so a line holding neither is refused by the platform after transmission - listed
+		// here instead, before anything is sent. Title and subtotal pseudo-lines never reach the document
+		// and a discount line is named from the piece it deducts (see einvoicingDiscountLabel()). Customer
+		// invoices only: FactureFournisseurLigne fills ->description and not ->desc before 20.0.
 		$linesWithNoName = [];
 		if (!empty($invoice->lines) && is_array($invoice->lines)) {
 			foreach ($invoice->lines as $line) {
@@ -1641,18 +1648,22 @@ class EInvoicing
 		// e-invoicing for eligible (FR) invoices. Preselect the qualified default instead: "To generate / STATUS_NOT_GENERATED" for invoices that must be managed,
 		// "Do not manage" otherwise.
 		if ($mode == 'create' || $action == 'create') {
-			// At creation the hook receives a blank Facture object: its socid is NOT set yet (the
-			// selected thirdparty lives in a local var of card.php and is passed via $parameters['socid'],
-			// with GETPOST('socid') as fallback). Resolve it so we can load the thirdparty and decide.
-			if (!is_object($object->thirdparty ?? null)) {
-				$socid = !empty($object->socid) ? (int) $object->socid : (int) ($parameters['socid'] ?? GETPOSTINT('socid'));
-				if ($socid > 0) {
-					$object->socid = $socid;
-					$object->fetch_thirdparty();
+			if (GETPOSTISSET('seteinvoicestatus')) {
+				$currentStatusInfo['code'] = GETPOSTINT('seteinvoicestatus');
+			} else {
+				// At creation the hook receives a blank Facture object: its socid is NOT set yet (the
+				// selected thirdparty lives in a local var of card.php and is passed via $parameters['socid'],
+				// with GETPOST('socid') as fallback). Resolve it so we can load the thirdparty and decide.
+				if (!is_object($object->thirdparty ?? null)) {
+					$socid = !empty($object->socid) ? (int) $object->socid : (int) ($parameters['socid'] ?? GETPOSTINT('socid'));
+					if ($socid > 0) {
+						$object->socid = $socid;
+						$object->fetch_thirdparty();
+					}
 				}
+				$need = is_object($object->thirdparty ?? null) ? $this->needEInvoiceManagement($object) : 0;
+				$currentStatusInfo['code'] = $need ? $need : self::STATUS_IGNORE;
 			}
-			$need = is_object($object->thirdparty ?? null) ? $this->needEInvoiceManagement($object) : 0;
-			$currentStatusInfo['code'] = $need ? $need : self::STATUS_IGNORE;
 		}
 
 		$resprints = '';
@@ -1743,6 +1754,18 @@ class EInvoicing
 			// Also status we can't modify manually must be greyed/disabled
 			$arrayofeinvoicestatus = $this->getEinvoiceStatusOptions(0, 0, 0, ($action == 'create' ? 1 : 0), 0, ((empty($currentStatusInfo['code']) && $action != 'create') ? 0 : 1), ($action != 'create' ? 1 : 0));
 
+			// If we create a credit note from another invoice, if original invoice has a status to ignore einvoicing, we propagate it by default to the new credit note to create
+			if (!GETPOSTISSET('seteinvoicestatus') && $action == 'create' && GETPOSTINT('fac_avoir') > 0 && GETPOSTINT('type') == Facture::TYPE_CREDIT_NOTE) {
+				$tmpinvoicesrc = new Facture($this->db);
+				// A source we cannot read tells us nothing: leave the default the qualification rules just computed.
+				if ($tmpinvoicesrc->fetch(GETPOSTINT('fac_avoir')) > 0) {
+					$tmpinvoicesrcstatus = $this->fetchLastknownInvoiceStatus($tmpinvoicesrc->id, $tmpinvoicesrc->ref);
+					if (self::isIgnoredStatus($tmpinvoicesrcstatus['code'])) {
+						$currentStatusInfo['code'] = $tmpinvoicesrcstatus['code'];
+					}
+				}
+			}
+
 			$resprints .=  $form->selectarray("seteinvoicestatus", $arrayofeinvoicestatus, $currentStatusInfo['code'], 0, 0, 0, '', 1);
 			if ($action != 'create') {
 				$resprints .=  '<input type="submit" class="button button-edit smallpaddingimp reposition" value="' . $langs->trans('Modify') . '">';
@@ -1772,7 +1795,7 @@ class EInvoicing
 			$reason = $this->getIgnoreReason($object) ?? $langs->trans('EInvoiceIgnoreReasonUserChoice');
 			$resprints .= '<tr class="treinvoicing_collapseseparator">';
 			$resprints .= '<td>' . $form->textwithpicto($langs->trans('EInvoiceIgnoreReasonLabel'), $langs->transnoentitiesnoconv('EInvoiceIgnoreReasonLabelHelp')) . '</td>';
-			$resprints .= '<td>' . dol_escape_htmltag($reason) . '</td>';
+			$resprints .= '<td>' . dol_escape_htmltag((string) $reason) . '</td>';
 			$resprints .= '</tr>';
 			return $resprints;
 		}
@@ -1818,7 +1841,8 @@ class EInvoicing
 			if (!is_object($object->thirdparty ?? null) && !empty($object->socid)) {
 				$object->fetch_thirdparty();
 			}
-			$directorySiren = is_object($object->thirdparty ?? null) ? preg_replace('/[^0-9]/', '', (string) $object->thirdparty->idprof1) : '';
+			$thirdparty = $object->thirdparty;
+			$directorySiren = $thirdparty instanceof Societe ? preg_replace('/[^0-9]/', '', (string) idprof($thirdparty)) : '';
 			if ($directorySiren !== '') {
 				$urlajaxdir = dol_buildpath('einvoicing/ajax/checkdirectory.php', 1);
 				// Auto-run once in the pre-send window (validated, not yet really transmitted to the AP).
@@ -2823,7 +2847,7 @@ class EInvoicing
 		if (!is_object($thirdparty)) {
 			return $res;	// no recipient loaded: nothing to look up
 		}
-		$siren = preg_replace('/[^0-9]/', '', (string) $thirdparty->idprof1);
+		$siren = preg_replace('/[^0-9]/', '', (string) idprof($thirdparty));
 		if ($siren === '') {
 			return $res;	// no SIREN: the standard required-information checks handle this
 		}
@@ -3981,7 +4005,7 @@ class EInvoicing
 		}
 
 		if (empty($uri) && !getDolGlobalString('EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID')) {	// Fallback on profid1
-			$uri = $thirdparty->idprof1;
+			$uri = idprof($thirdparty);
 		}
 
 		return removeAllSpaces($uri);
@@ -4035,10 +4059,12 @@ class EInvoicing
 	 * @used-by	regenerate_einvoicing_fixtures.php For fixture generation
 	 * @used-by	EInvoicingSamplesTest.php For comparison and regression testing
 	 *
+	 * @param	array<string,string>	$rawxmls	Filled with the same five documents before normalization,
+	 *												for a caller that hands them to a validator
 	 * @return	array<string, string>	Array with keys 'deposit', 'standard', and 'creditnote',
 	 *                                  each containing normalized XML of the respective invoice type
 	 */
-	public static function generateSampleEInvoicesForTests()
+	public static function generateSampleEInvoicesForTests(&$rawxmls = array())
 	{
 		global $conf, $db, $langs;
 		require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
@@ -4133,6 +4159,18 @@ class EInvoicing
 			$conf->global->TAX_MODE_SELL_SERVICE = $savTaxModeSellService;
 			$langs = $savLangs;
 		}
+
+		// The same documents before normalization, for a caller that validates them: normalization
+		// flattens every date to one value, which makes the date rules of the French socle -
+		// BR-FR-CO-07, BR-FR-03, G1.07 - true whatever the document says. Handed back apart, so the
+		// returned array keeps holding five documents and nothing else.
+		$rawxmls = array(
+			'deposit' => $depositXml,
+			'standard' => $standardXml,
+			'replacement' => $replacementXml,
+			'creditnote' => $creditnoteXml,
+			'situation' => $situationXml,
+		);
 
 		return array(
 			'deposit' => self::normalizeSampleInvoiceXml($depositXml),

@@ -32,6 +32,9 @@
 if (!class_exists('CommonHookActions', false)) {
 	/**
 	 *	Parent class of all other hook actions classes
+	 *
+	 * @phan-suppress PhanRedefineClass  That is the point of the guard above: the core brings the class
+	 *               from Dolibarr 19 on, this copy only answers for the versions before it.
 	 */
 	abstract class CommonHookActions
 	{

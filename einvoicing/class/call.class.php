@@ -305,9 +305,13 @@ class Call extends CommonObject
 		//foreach($this->lines as $line)
 		//	$line->fetch_optionals();
 
-		// Reset some properties
+		// Reset some properties. unset() rather than an empty value is what the core does in its own
+		// createFromClone(): createCommon() below builds the INSERT from the properties that are set.
+		// @phan-suppress-next-line PhanTypeObjectUnsetDeclaredProperty
 		unset($object->id);
+		// @phan-suppress-next-line PhanTypeObjectUnsetDeclaredProperty
 		unset($object->fk_user_creat);
+		// @phan-suppress-next-line PhanTypeObjectUnsetDeclaredProperty
 		unset($object->import_key);
 
 		// Clear fields
@@ -559,12 +563,9 @@ class Call extends CommonObject
 
 		$this->db->begin();
 
-		// Define new ref
-		if (preg_match('/^[\(]?PROV/i', $this->ref) || empty($this->ref)) { // empty should not happened, but when it occurs, the test save life
-			$num = $this->getNextNumRef();
-		} else {
-			$num = (string) $this->ref;
-		}
+		// The object has no ref column and the module ships no numbering model: fetchCommon() fills
+		// $this->ref with the row id, and the reference the user sees is call_id.
+		$num = (string) $this->ref;
 		$this->newref = $num;
 
 		if (!empty($num)) {
@@ -1073,62 +1074,6 @@ class Call extends CommonObject
 		} else {
 			$this->lines = $result;
 			return $this->lines;
-		}
-	}
-
-	/**
-	 *  Returns the reference to the following non used object depending on the active numbering module.
-	 *
-	 *  @return	string      		Object free reference
-	 */
-	public function getNextNumRef()
-	{
-		global $langs, $conf;
-		$langs->load("einvoicing@einvoicing");
-
-		if (!getDolGlobalString('EINVOICING_MYOBJECT_ADDON')) {
-			$conf->global->EINVOICING_MYOBJECT_ADDON = 'mod_call_standard';
-		}
-
-		if (getDolGlobalString('EINVOICING_MYOBJECT_ADDON')) {
-			$mybool = false;
-
-			$file = getDolGlobalString('EINVOICING_MYOBJECT_ADDON').".php";
-			$classname = getDolGlobalString('EINVOICING_MYOBJECT_ADDON');
-
-			// Include file with class
-			$dirmodels = array_merge(array('/'), (array) $conf->modules_parts['models']);
-			foreach ($dirmodels as $reldir) {
-				$dir = dol_buildpath($reldir."core/modules/einvoicing/");
-
-				// Load file with numbering class (if found)
-				$mybool = $mybool || @include_once $dir.$file;
-			}
-
-			if (!$mybool) {
-				dol_print_error(null, "Failed to include file ".$file);
-				return '';
-			}
-
-			if (class_exists($classname)) {
-				$obj = new $classname();
-				'@phan-var-force ModeleNumRefCall $obj';
-				$numref = $obj->getNextValue($this);
-
-				if ($numref != '' && $numref != '-1') {
-					return $numref;
-				} else {
-					$this->error = $obj->error;
-					//dol_print_error($this->db,get_class($this)."::getNextNumRef ".$obj->error);
-					return "";
-				}
-			} else {
-				print $langs->trans("Error")." ".$langs->trans("ClassNotFound").' '.$classname;
-				return "";
-			}
-		} else {
-			print $langs->trans("ErrorNumberingModuleNotSetup", $this->element);
-			return "";
 		}
 	}
 

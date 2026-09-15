@@ -150,6 +150,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		if ($action == 'BILL_CREATE') {
 			/** @var Facture $object */
 			'@phan-var-force Facture $object';
+			/** @var Facture $object */
 
 			if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {		// If sync Dolibarr to AP is on
 				$einvoicing = new EInvoicing($this->db);
@@ -172,6 +173,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		if ($action == 'BILL_VALIDATE') {
 			/** @var Facture $object */
 			'@phan-var-force Facture $object';
+			/** @var Facture $object */
 
 			// Tell the afterPDFCreation() hook that the document rebuild about to happen is the one that
 			// follows a validation. Set unconditionally and before anything else: this only records a fact
@@ -181,27 +183,45 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {		// If sync Dolibarr to AP is on
 				$einvoicing = new EInvoicing($this->db);
 
-				$result = $einvoicing->fetchLastknownInvoiceStatus($object->id, (string) $object->ref);
+				// The known status and the configuration check are two different answers: keep them in two
+				// variables, the status is still needed after the check to decide what to write.
+				$statusinfo = $einvoicing->fetchLastknownInvoiceStatus($object->id, (string) $object->ref);
 
-				// If $result is $einvoicing::STATUS_IGNORE or STATUS_IGNORE_2, we do nothing.
+				// If $statusinfo is $einvoicing::STATUS_IGNORE or STATUS_IGNORE_2, we do nothing.
 
 				// If einvoice was set to $einvoicing::STATUS_NOT_GENERATED or $einvoicing::STATUS_UNKNOWN, we set it to STATUS_IGNORE (if not qualified for einvoice) or STATUS_NOT_GENERATED (if qualified for einvoice)
-				if ($result['code'] == $einvoicing::STATUS_NOT_GENERATED || $result['code'] == $einvoicing::STATUS_UNKNOWN) {
-					$statustouse = $einvoicing::STATUS_IGNORE;	// default status to use if none of following rules match
+				if ($statusinfo['code'] == $einvoicing::STATUS_NOT_GENERATED || $statusinfo['code'] == $einvoicing::STATUS_UNKNOWN) {
+					if (getDolGlobalString('EINVOICING_EINVOICE_IN_REAL_TIME')) {
+						// Check configuration
+						$checkresult = $einvoicing->checkRequiredinformations($object);
+						if ($checkresult['res'] < 0) {
+							$message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $checkresult['message'];
+							dol_syslog(__METHOD__ . " " . $message);
 
-					// Test if invoice need to be managed by EInvoice
-					$needEinvoice = $einvoicing->needEInvoiceManagement($object);
-					if ($needEinvoice) {
-						$statustouse = $needEinvoice;
+							if (getDolGlobalString('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
+								$error++;
+								$this->errors[] = $checkresult['message'];
+								return -1;		// This should generate a rollback
+							}
+						}
 					}
 
-					$newobject = dol_clone($object, 2);
-					$newobject->ref = (string) $object->newref;
+					// Test if invoice need to be managed by EInvoice and set the new status to use
+					if ($statusinfo['code'] == $einvoicing::STATUS_UNKNOWN) {
+						$statustouse = $einvoicing::STATUS_IGNORE;	// default status to use if none of following rules match
+						$needEinvoice = $einvoicing->needEInvoiceManagement($object);
+						if ($needEinvoice) {
+							$statustouse = $needEinvoice;
+						}
 
-					$result = $einvoicing->setEInvoiceStatus($newobject, $statustouse, '');
-					if ($result < 0) {
-						$this->errors = array_merge($this->errors, $einvoicing->errors);
-						return -1;
+						$newobject = dol_clone($object, 2);
+						$newobject->ref = (string) $object->newref;
+
+						$result = $einvoicing->setEInvoiceStatus($newobject, $statustouse, '');
+						if ($result < 0) {
+							$this->errors = array_merge($this->errors, $einvoicing->errors);
+							return -1;
+						}
 					}
 				}
 			}
@@ -210,6 +230,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		if ($action == 'BILL_UNVALIDATE') {
 			/** @var Facture $object */
 			'@phan-var-force Facture $object';
+			/** @var Facture $object */
 			$einvoicing = new EInvoicing($this->db);
 
 			// Lock on the REAL PA state (persistent flow_id), not the Dolibarr syncstatus which is reset to
@@ -224,6 +245,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		if ($action == 'BILL_DELETE') {
 			/** @var Facture $object */
 			'@phan-var-force Facture $object';
+			/** @var Facture $object */
 			$einvoicing = new EInvoicing($this->db);
 
 			// Lock on the REAL PA state (persistent flow_id), see BILL_UNVALIDATE above.
@@ -236,6 +258,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		if ($action == 'BILL_MODIFY') {
 			/** @var Facture $object */
 			'@phan-var-force Facture $object';
+			/** @var Facture $object */
 			$einvoicing = new EInvoicing($this->db);
 
 			// Lock on the REAL PA state (persistent flow_id), see BILL_UNVALIDATE above.
@@ -277,6 +300,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		if ($action == 'PAYMENT_CUSTOMER_CREATE') {
 			/** @var Paiement $object */
 			'@phan-var-force Paiement $object';
+			/** @var Paiement $object */
 
 			if (!einvoicingIsSendDisabled()) {		// If sync Dolibarr to AP is on
 				require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
@@ -302,13 +326,25 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		if ($action == 'BILL_SUPPLIER_VALIDATE') {
 			/** @var FactureFournisseur $object */
 			'@phan-var-force FactureFournisseur $object';
+			/** @var FactureFournisseur $object */
 			// An invoice the import could not make total what its document announces never becomes
 			// payable by being validated: the totals are confronted again here, so an invoice corrected
 			// to the figures the vendor bills validates normally and drops the mark (issue #861).
 			$announced = SupplierInvoiceHelper::totalsMismatch((int) $object->id);
 			if ($announced !== null) {
-				if (SupplierInvoiceHelper::totalsAgreeWithDocument($object, $announced['tva'], $announced['ttc'])) {
+				// A prepaid amount is in the mark only for a document referencing the invoice it was paid on (BG-3).
+				if (SupplierInvoiceHelper::totalsAgreeWithDocument($object, $announced['tva'], $announced['ttc'], $announced['prepaid'] ?? null)) {
 					SupplierInvoiceHelper::clearTotalsMismatch((int) $object->id);
+				} elseif (isset($announced['prepaid'])
+					&& SupplierInvoiceHelper::totalsAgreeWithDocument($object, $announced['tva'], $announced['ttc'])) {
+					// Totals right, deduction missing: saying the invoice does not total the document
+					// would send the operator looking at figures that do match. Name what is missing.
+					$this->errors[] = $langs->trans(
+						'EInvoicePrepaidMismatchBlocksValidation',
+						price2num($announced['prepaid'], 'MT'),
+						price2num(SupplierInvoiceHelper::linkedDepositAmount((int) $object->id), 'MT')
+					);
+					return -1;
 				} else {
 					$this->errors[] = $langs->trans(
 						'EInvoiceTotalsMismatchBlocksValidation',
@@ -379,6 +415,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		if ($action == 'BILL_SUPPLIER_PAYED') {
 			/** @var FactureFournisseur $object */
 			'@phan-var-force FactureFournisseur $object';
+			/** @var FactureFournisseur $object */
 
 			if (getDolGlobalInt('EINVOICING_SEND_PAYMENT_SENT_STATUS') && !einvoicingIsSendDisabled()) {
 				$paidAmount = (float) $object->getSommePaiement();
@@ -412,6 +449,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		if ($action == 'BILL_SUPPLIER_DELETE') {
 			/** @var FactureFournisseur $object */
 			'@phan-var-force FactureFournisseur $object';
+			/** @var FactureFournisseur $object */
 			$duplicate = false;
 			if (SupplierInvoiceHelper::isEInvoice($object->id, true, $duplicate)) {
 				if ($duplicate) {
@@ -452,6 +490,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			 * @var Document $object
 			 */
 			'@phan-var-force Document $object';
+			/** @var Document $object */
 			$duplicate = false;
 
 			// A flow does not always carry a supplier invoice id: a lifecycle message never resolves one,

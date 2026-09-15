@@ -113,7 +113,8 @@ $files = array(
 );
 
 try {
-	$xmls = EInvoicing::generateSampleEInvoicesForTests();
+	$rawxmls = array();
+	$xmls = EInvoicing::generateSampleEInvoicesForTests($rawxmls);
 
 	foreach ($files as $key => $path) {
 		$previous = file_exists($path) ? file_get_contents($path) : null;
@@ -122,6 +123,19 @@ try {
 		file_put_contents($path, $xmls[$key]);
 
 		print(($changed ? 'UPDATED' : 'unchanged') . ' : ' . $path . PHP_EOL);
+	}
+
+	// EINVOICING_RAW_FIXTURES_DIR asks for the same documents before normalization, which is what a
+	// validator has to be given: the normalization flattens every date to one value and makes the date
+	// rules of the French socle true whatever the document says. Never committed, their dates move.
+	$rawDir = rtrim((string) getenv('EINVOICING_RAW_FIXTURES_DIR'), '/');
+	if ($rawDir !== '') {
+		dol_mkdir($rawDir);
+		foreach ($files as $key => $path) {
+			$rawPath = $rawDir . '/' . basename($path);
+			file_put_contents($rawPath, $rawxmls[$key]);
+			print('raw : ' . $rawPath . PHP_EOL);
+		}
 	}
 
 	print "Done.\n";

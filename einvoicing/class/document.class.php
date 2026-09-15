@@ -138,7 +138,7 @@ class Document extends CommonObject
 		"flow_direction" => array("type" => "varchar(10)", "label" => "flow_direction", "enabled" => "1", 'position' => 50, 'notnull' => 0, "visible" => "1", "comment" => "In or Out", 'csslist' => 'center'),
 		"flow_syntax" => array("type" => "varchar(50)", "label" => "flow_syntax", "enabled" => "1", 'position' => 60, 'notnull' => 0, "visible" => "-1", "comment" => "Document syntax (Factur-X, CII, UBL, etc.)"),
 		"flow_profile" => array("type" => "varchar(50)", "label" => "flow_profile", "enabled" => "1", 'position' => 70, 'notnull' => 0, "visible" => "-1", "comment" => "Profile used (Basic, Cius, etc.)"),
-		"processing_rule" => array("type" => "varchar(50)", "label" => "processing_rule", "enabled" => "1", 'position' => 75, 'notnull' => 0, "visible" => "-1", "comment" => "Rule the platform computed for the flow (B2B, B2BInt, NotApplicable, ...)"),
+		"processing_rule" => array("type" => "varchar(50)", "label" => "ProcessingRule", "enabled" => "1", 'position' => 75, 'notnull' => 0, "visible" => "-1", "help" => "ProcessingRuleHelp", "comment" => "Rule the platform computed for the flow (B2B, B2BInt, NotApplicable, ...)"),
 		"document_body" => array("type" => "text", "label" => "document_body", "enabled" => "1", 'position' => 110, 'notnull' => 0, "visible" => "0", "comment" => "Full document content XML"),
 		"fk_element_type" => array("type" => "varchar(100)", "label" => "fk_element_type", "enabled" => "1", 'position' => 120, 'notnull' => 0, "visible" => "1",),
 		"fk_element_id" => array("type" => "integer", "label" => "fk_element_id", "enabled" => "1", 'position' => 130, 'notnull' => 0, "visible" => "-1",),
@@ -324,9 +324,13 @@ class Document extends CommonObject
 		//foreach($this->lines as $line)
 		//	$line->fetch_optionals();
 
-		// Reset some properties
+		// Reset some properties. unset() rather than an empty value is what the core does in its own
+		// createFromClone(): createCommon() below builds the INSERT from the properties that are set.
+		// @phan-suppress-next-line PhanTypeObjectUnsetDeclaredProperty
 		unset($object->id);
+		// @phan-suppress-next-line PhanTypeObjectUnsetDeclaredProperty
 		unset($object->fk_user_creat);
+		// @phan-suppress-next-line PhanTypeObjectUnsetDeclaredProperty
 		unset($object->import_key);
 
 		// Clear fields
@@ -941,12 +945,9 @@ class Document extends CommonObject
 
 		$this->db->begin();
 
-		// Define new ref
-		if (preg_match('/^[\(]?PROV/i', $this->ref) || empty($this->ref)) { // empty should not happened, but when it occurs, the test save life
-			$num = $this->getNextNumRef();
-		} else {
-			$num = (string) $this->ref;
-		}
+		// The object has no ref column and the module ships no numbering model: fetchCommon() fills
+		// $this->ref with the row id, and the reference the user sees is tracking_idref.
+		$num = (string) $this->ref;
 		$this->newref = $num;
 
 		if (!empty($num)) {
@@ -1452,62 +1453,6 @@ class Document extends CommonObject
 	}
 
 	/**
-	 *  Returns the reference to the following non used object depending on the active numbering module.
-	 *
-	 *  @return	string      		Object free reference
-	 */
-	public function getNextNumRef()
-	{
-		global $langs, $conf;
-		$langs->load("einvoicing@einvoicing");
-
-		if (!getDolGlobalString('EINVOICING_MYOBJECT_ADDON')) {
-			$conf->global->EINVOICING_MYOBJECT_ADDON = 'mod_document_standard';
-		}
-
-		if (getDolGlobalString('EINVOICING_MYOBJECT_ADDON')) {
-			$mybool = false;
-
-			$file = getDolGlobalString('EINVOICING_MYOBJECT_ADDON').".php";
-			$classname = getDolGlobalString('EINVOICING_MYOBJECT_ADDON');
-
-			// Include file with class
-			$dirmodels = array_merge(array('/'), (array) $conf->modules_parts['models']);
-			foreach ($dirmodels as $reldir) {
-				$dir = dol_buildpath($reldir."core/modules/einvoicing/");
-
-				// Load file with numbering class (if found)
-				$mybool = $mybool || @include_once $dir.$file;
-			}
-
-			if (!$mybool) {
-				dol_print_error(null, "Failed to include file ".$file);
-				return '';
-			}
-
-			if (class_exists($classname)) {
-				$obj = new $classname();
-				'@phan-var-force ModeleNumRefDocument $obj';
-				$numref = $obj->getNextValue($this);
-
-				if ($numref != '' && $numref != '-1') {
-					return $numref;
-				} else {
-					$this->error = $obj->error;
-					//dol_print_error($this->db,get_class($this)."::getNextNumRef ".$obj->error);
-					return "";
-				}
-			} else {
-				print $langs->trans("Error")." ".$langs->trans("ClassNotFound").' '.$classname;
-				return "";
-			}
-		} else {
-			print $langs->trans("ErrorNumberingModuleNotSetup", $this->element);
-			return "";
-		}
-	}
-
-	/**
 	 *  Create a document onto disk according to template module.
 	 *
 	 *  @param	string		$modele			Force template to use ('' to not force)
@@ -1591,7 +1536,12 @@ class Document extends CommonObject
 		}
 
 		if (isset($provider)) {
-			$syncFromDate = $provider->getLastSyncDate();
+			// A flow postponed on one run (nothing stored for it) is only re-listed by a later run if the
+			// cursor still reaches back to it - a margin, applied here since the manual sync of
+			// document_list.php can already be re-run with a hand-picked date, the cron cannot. The flows
+			// it re-lists that are already stored are cheaply discarded by the alreadyProcessedFlowIds
+			// pre-check in syncFlows(), which queries only the flowIds of the current listing.
+			$syncFromDate = $provider->getLastSyncDate(getDolGlobalInt('EINVOICING_SYNC_MARGIN_TIME_HOURS'));
 			$maxflows = getDolGlobalInt('EINVOICING_FLOWS_SYNC_CALL_SIZE', 100);
 
 			// Sync all flows
