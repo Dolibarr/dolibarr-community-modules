@@ -28,6 +28,7 @@
 
 require_once __DIR__ . '/../protocols/ProtocolManager.class.php';
 require_once __DIR__ . '/../../lib/einvoicing.lib.php';	// removeAllSpaces(), used to normalize an electronic address
+require_once __DIR__ . '/../utils/PostponedFlow.class.php';	// backlog of the flows waiting to be imported
 
 
 /**
@@ -905,6 +906,88 @@ abstract class AbstractPDPProvider
 		}
 
 		return $LastSyncDate;
+	}
+
+	/**
+	 * Take the flows of the backlog again, by identifier, before the window is polled.
+	 *
+	 * A postponed flow stores nothing, and the start of the synchronization window is
+	 * getLastSyncDate() = MAX(einvoicing_document.updatedat) over what WAS stored, minus a margin.
+	 * So every document imported after a postponed one pushes that start past it, and once the
+	 * margin is spent the access point is never asked for it again: the flow is announced as
+	 * "retried on the next synchronization" and silently stops being retried. Measured on a bench
+	 * holding real received invoices: four of them had dropped out of the window, one for 262 hours.
+	 *
+	 * The document itself is never lost - flows/<flowId> still serves it - so the backlog written by
+	 * PostponedFlow is enough to take it again by identifier, which uses no date window at all. The
+	 * window poll behind this is left exactly as it was: it is only ever asked for what is new.
+	 *
+	 * A flow that fails again is kept, never counted as an error: one row nobody can resolve would
+	 * otherwise abort every run from here on, which is the very failure this replay exists to end.
+	 *
+	 * @param	string[]					$results_messages	Run messages, appended to
+	 * @param	array<string,array<string,mixed>>	$actions	Business actions to do, appended to
+	 * @return	array{imported:int,waiting:int,handled:string[]}	What was recovered, what still waits,
+	 *															and the flows the window loop can skip
+	 */
+	protected function replayPostponedFlows(&$results_messages, &$actions)
+	{
+		global $conf, $db, $langs, $form;
+
+		$imported = 0;
+		$waiting = 0;
+		$handled = array();
+
+		$backlog = PostponedFlow::fetchBacklog($db, getDolGlobalInt('EINVOICING_FLOWS_SYNC_REPLAY_SIZE', 50));
+		if (!is_array($backlog) || empty($backlog)) {
+			return array('imported' => 0, 'waiting' => 0, 'handled' => $handled);
+		}
+
+		$provider = (string) getDolGlobalString('EINVOICING_PDP');
+		$providershort = preg_replace('/ViaPartner$/', '', $provider);
+
+		foreach ($backlog as $row) {
+			// The panel reads the backlog of every entity the user may see; an import always belongs
+			// to the one running, and a row of another access point is not this run's business.
+			if ((int) $row->entity !== (int) $conf->entity) {
+				continue;
+			}
+			if (preg_replace('/ViaPartner$/', '', (string) $row->provider) !== $providershort) {
+				continue;
+			}
+
+			$handled[] = (string) $row->flow_id;
+			$res = $this->syncFlow((string) $row->flow_id, null);
+
+			if (($res['res'] ?? -1) >= 0) {
+				PostponedFlow::clear($db, (string) $row->flow_id);
+				$imported++;
+				dol_syslog(__METHOD__ . " Flow " . $row->flow_id . " taken again from the backlog and imported: " . ($res['message'] ?? ''), LOG_WARNING, 0, "_einvoicing");
+				$results_messages[] = "Flow " . dol_escape_htmltag((string) $row->flow_id) . " was waiting since "
+					. dol_print_date($db->jdate($row->date_creation), 'dayhour') . " and has just been imported: " . ($res['message'] ?? '');
+				continue;
+			}
+
+			// Still not importable. Keep the row - with its original date_creation, so the panel goes
+			// on saying how long this has been waiting - and say again what has to be done about it.
+			$waiting++;
+			PostponedFlow::record($db, (string) $row->flow_id, $provider, $res, (string) $row->call_id);
+
+			$actioncode = (string) ($res['actioncode'] ?? 'POSTPONED_FLOW_STILL_WAITING');
+			$actions[$actioncode] = array(
+				'actionurl' => (string) ($res['actionurl'] ?? ''),
+				'actioncode' => $actioncode,
+				'action' => (string) ($res['action'] ?? $row->action_html),
+				'businessmessage' => (empty($res['businessmessage']) ? (string) $row->business_message : (string) $res['businessmessage'])
+					. $form->textwithpicto('', "ERROR_SYNCFLOW - Failed to synchronize flow " . $row->flow_id . ": " . ($res['message'] ?? ''), 1, 'help', '', 0, 2, 'help')
+			);
+
+			dol_syslog(__METHOD__ . " Flow " . $row->flow_id . " taken again from the backlog, still waiting: " . ($res['message'] ?? ''), LOG_WARNING, 0, "_einvoicing");
+			$results_messages[] = "Flow " . dol_escape_htmltag((string) $row->flow_id) . ", waiting since "
+				. dol_print_date($db->jdate($row->date_creation), 'dayhour') . ", still cannot be imported: " . ($res['message'] ?? '');
+		}
+
+		return array('imported' => $imported, 'waiting' => $waiting, 'handled' => $handled);
 	}
 
 	/**

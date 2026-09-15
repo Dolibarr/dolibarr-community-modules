@@ -30,6 +30,7 @@ dol_include_once('einvoicing/class/protocols/ProtocolManager.class.php');
 dol_include_once('einvoicing/class/call.class.php');
 dol_include_once('einvoicing/class/einvoicing.class.php');
 dol_include_once('einvoicing/lib/einvoicing.lib.php');
+dol_include_once('einvoicing/class/utils/PostponedFlow.class.php');
 require_once DOL_DOCUMENT_ROOT . '/core/lib/admin.lib.php';
 
 
@@ -864,6 +865,13 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$error_messages = array();		// subset of the above holding only what made the run fail
 		$actions = array();				// business message (manual action to do)
 
+		// The backlog comes first, and by identifier: those flows are older than the start of the
+		// window the listing below uses, so it would never return them again whatever this run does.
+		// Before the listing, so that a run with nothing new still takes what is waiting again.
+		$replay = $this->replayPostponedFlows($results_messages, $actions);
+		$replayedFlows = $replay['imported'];
+		$replayedFlowIds = $replay['handled'];
+
 		$resource = 'flows/search';
 		// Correlation id, sent as the Request-Id header of the call below and recorded in the call log.
 		$uuid = $this->generateUuidV4();
@@ -947,7 +955,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			dol_syslog(__METHOD__ . " No flows to synchronize.", LOG_DEBUG, 0, "_einvoicing");
 
 			$results_messages[] = "No flows to synchronize.";
-			return array('res' => 1, 'messages' => $results_messages);
+			// Nothing new does not mean nothing happened: the backlog was taken again above.
+			return array('res' => 1, 'messages' => $results_messages, 'syncedFlows' => $replayedFlows, 'actions' => $actions);
 		}
 
 		$results = $response['response']['results'] ?? array();
@@ -995,14 +1004,23 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		// Call ID for logging purposes
 		$call_id = $response['call_id'] ?? null;
 
+		$syncedFlows += $replayedFlows;
+		$postponedFlows += $replay['waiting'];
+
 		//$lastsuccessfullSyncronizedFlow = null;
 
 		// Loop on each flow received in list
 		$i = 0;
 		foreach ($response['response']['results'] ?? [] as $flow) {
 			$i++;
+			if (in_array($flow['flowId'], $replayedFlowIds)) {
+				// Taken again from the backlog at the start of this run, and already counted there.
+				dol_syslog(__METHOD__ . " #" . $i . " Flow " . $flow['flowId'] . " already replayed from the backlog, discard it.", LOG_DEBUG, 0, "_einvoicing");
+				continue;
+			}
 			if (in_array($flow['flowId'], $alreadyProcessedFlowIds)) {
 				dol_syslog(__METHOD__ . " #" . $i . " Flow " . $flow['flowId'] . " already processed, discard it.", LOG_DEBUG, 0, "_einvoicing");
+				PostponedFlow::clear($db, $flow['flowId']);
 				$alreadyExist++;
 				continue;
 			}
@@ -1035,6 +1053,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 						dol_syslog(__METHOD__ . " Flow " . $flow['flowId'] . " postponed: " . $res['message'], LOG_WARNING, 0, "_einvoicing");
 						$results_messages[] = "Flow " . dol_escape_htmltag((string) $flow['flowId']) . " postponed, it will be retried on the next synchronization: " . $res['message'];
+
+						// The flow itself stores nothing, so this backlog line is the only record that it was
+						// seen: it is what lets the panel say what is waiting, why, and since when.
+						PostponedFlow::record($db, $flow['flowId'], (string) getDolGlobalString('EINVOICING_PDP', 'PDP'), $res, (string) $call_id);
 
 						$postponedFlows++;
 						continue;
@@ -1110,6 +1132,12 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 					$error++;
 				}
 
+				// Whatever else happened, this flow is no longer waiting on a missing prerequisite: drop
+				// the backlog line so it never outlives its cause.
+				if ($res['res'] >= 0) {
+					PostponedFlow::clear($db, $flow['flowId']);
+				}
+
 				// If res == 0, commit but count it as already existed
 				if ($res['res'] == 0) {
 					$results_messages[] = "<span class=\"opacitylow\">Flow " . dol_escape_htmltag((string) $flow['flowId']) . " skipped: " . $res['message'] . "</span>";
@@ -1158,6 +1186,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		if ($postponedFlows > 0) {
 			// Counted apart from the skipped ones: those flows were not stored, they come back next run
 			$messages[] = $langs->trans("TotalPostponedSync") . ": <b>" . $postponedFlows . "</b>";
+		}
+		if ($replayedFlows > 0) {
+			// Said apart from the new ones: those had been waiting, sometimes for days
+			$messages[] = $langs->trans("TotalReplayedSync") . ": <b>" . $replayedFlows . "</b>";
 		}
 
 		// Processing result that will be saved in DB
