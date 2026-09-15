@@ -132,8 +132,22 @@ the information never reaches Dolibarr.
 | 2 | BT-89 mandate reference | `llx_societe_rib.rum` |
 | 2 | BT-90 creditor identifier | global `PRELEVEMENT_ICS`, not per thirdparty |
 
-This side is **still open**: what is worth reading, and where it would be stored, is
-[issue #958](https://github.com/Dolibarr/dolibarr-community-modules/issues/958).
+Settled on [issue #958](https://github.com/Dolibarr/dolibarr-community-modules/issues/958),
+2026-09-15:
+
+- **BG-13 / BT-70 / BT-75 / BT-76 is the one worth reading**, and where it goes is not open to
+  interpretation. The maintainer's answer: *"The delivery address was, is and will be the contact
+  with type SHIPPING. No other method to store it exists. The fk_address_delivery was never released
+  and will never be as it is a duplicate method of SHIPPING address."* So the import stores it in the
+  `invoice_supplier / external / SHIPPING` contact, the one the emission already builds BG-15 from.
+  It is the asymmetry named in section 5.
+- The terms with **no home in the core** (BT-33, BT-8, BT-56, BT-19, document-level BT-18) and the
+  two that are a **design question** (BG-10, the line-level item seller) follow the rule at the top
+  of this page: not mandatory, not read — and Dolibarr has no multi-vendor. They stay listed here
+  rather than implemented.
+- **BT-83** is the one term left to arbitrate on its own, because the trade-off is not the same in
+  this direction: an element left unwritten risks a refused document, a term left unread refuses
+  nothing but silently drops information the supplier did send.
 
 ## 5. Measured out, not missing
 
