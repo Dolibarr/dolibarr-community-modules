@@ -1802,8 +1802,11 @@ class CIIProtocol extends AbstractProtocol
 		// The couple (quantity, unit price) cannot carry the announced amount: it rebuilds nothing while an
 		// amount is announced, or it rebuilds it upside down. Both sides at 0.0 - a zero quantity whose
 		// price is only informative (issue #726) - already agree, and must not be rewritten to that same
-		// zero through a warning that has nothing to report.
-		if ($lineAnnouncesAnAmount && (($rebuilt == 0.0 && $announced != 0.0) || (($rebuilt > 0) !== ($announced > 0)))) {
+		// zero through a warning that has nothing to report. round() always hands back a float here, so the
+		// strict comparison reads the same as the loose one it replaces - without it, PHPStan's
+		// constant-condition check does not follow two separate round() results past the same 0.0 literal
+		// and reports the second comparison as unreachable.
+		if ($lineAnnouncesAnAmount && (($rebuilt == 0.0 && $announced !== 0.0) || (($rebuilt > 0) !== ($announced > 0)))) {
 			if (empty($qty)) {
 				$reason = 'its invoiced quantity (BT-129) is zero or absent, so quantity times unit price rebuilds 0.00';
 			} elseif (empty($subprice)) {
