@@ -2067,13 +2067,17 @@ class SuperPDPProvider extends AbstractPDPProvider
 						}
 
 						// A manual-action business error (a missing product, a missing thirdparty, a supplier
-						// invoice found with a different amount) used to abort the whole batch here, and every
+						// invoice found with a different amount) aborts the whole batch here by default, and every
 						// flow behind it with it - and since the cause does not go away on its own, the next run
-						// stopped at the same place. Record the flow in a persistent manual-action queue and carry
-						// on instead, the same way the postponed flows above do for the failures the operator
-						// cannot act on: the queued flow is retried on demand once the product/thirdparty exists,
-						// and it is not lost when it drifts out of the rolling synchronization window.
-						if (in_array($rescode, array('THIRDPARTY_NOT_FOUND', 'PRODUCT_NOT_FOUND', 'SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT'))) {
+						// stops at the same place. The skip-and-continue queue below is an opt-in alternative, off
+						// by default and enabled only by the hidden option EINVOICING_ENABLE_MANUAL_ACTION_QUEUE:
+						// the strict ordering of the flow updates makes carrying on risky, so it stays a debug /
+						// power-user behaviour. When enabled, the flow is recorded in a persistent manual-action
+						// queue and the batch carries on, the same way the postponed flows above do; the queued
+						// flow is retried on demand once the product/thirdparty exists, and it is not lost when it
+						// drifts out of the rolling synchronization window.
+						if (getDolGlobalInt('EINVOICING_ENABLE_MANUAL_ACTION_QUEUE')
+							&& in_array($rescode, array('THIRDPARTY_NOT_FOUND', 'PRODUCT_NOT_FOUND', 'SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT'))) {
 							// Normalize the manual actions the protocol computed (create / associate an existing
 							// product / set a default one...) into a compact list the queue renders as icons.
 							$manualactions = array();
@@ -2116,7 +2120,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 					// A flow that finally synchronized (or now already exists) leaves the manual-action queue.
 					// When an incoming flow created a supplier invoice, keep the link to it for traceability.
-					if ($res['res'] >= 0) {
+					if (getDolGlobalInt('EINVOICING_ENABLE_MANUAL_ACTION_QUEUE') && $res['res'] >= 0) {
 						$resolvedElementType = ((($flow['flowDirection'] ?? '') === 'In') ? 'invoice_supplier' : '');
 						$syncPending->resolveByFlowId($flow['flowId'], $providershort, $user, $resolvedElementType, ($res['res'] > 0 ? (int) $res['res'] : 0));
 					}
