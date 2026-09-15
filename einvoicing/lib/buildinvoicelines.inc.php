@@ -284,7 +284,7 @@ $outputlangs->load("einvoicing@einvoicing");
 // invoice to a buyer whose directory record demands a service code is rejected (issue #678).
 // It is a SECOND ram:GlobalID on the buyer party, and the Factur-X EN16931 Schematron caps that element
 // at one occurrence (FX-SCH-A-000164): below EXTENDED the code is not sent and the user is told why.
-$buildProfile = $this->getBuildXmlProfile();
+$buildProfile = $this->getBuildXmlProfile($object);
 $buyerRoutingCode = trim((string) ($object->array_options['options_d4d_service_code'] ?? ''));
 if ($buyerRoutingCode !== '' && $buyerParty->country_code != 'FR') {
 	// Scheme 0224 is the French routing code: it means nothing for a buyer of another country.
@@ -312,11 +312,7 @@ if ($buyerRoutingCode !== '' && !$this->isExtendedProfile($buildProfile)) {
 // Chorus fields - because Chorus Pro support is a setting of the whole company: a seller that invoices
 // both the public sector and private customers would otherwise be told about a missing SIRET on every
 // private invoice, where no rule asks for one.
-$looksLikeB2GInvoice = $chorus && (
-	trim((string) ($object->array_options['options_d4d_service_code'] ?? '')) !== ''
-	|| trim((string) ($object->array_options['options_d4d_contract_number'] ?? '')) !== ''
-	|| trim((string) ($object->array_options['options_d4d_promise_code'] ?? '')) !== ''
-);
+$looksLikeB2GInvoice = $chorus && $this->looksLikeB2GInvoice($object);
 
 $buyerChorusSiret = '';
 if ($chorus && $buyerParty->country_code == 'FR') {
@@ -335,8 +331,10 @@ if ($chorus && $buyerParty->country_code == 'FR') {
 		// it twice would break FX-SCH-A-000164 on the very profile that allows several of them.
 		$buyerChorusSiret = '';
 	}
-	// No profile guard is needed here, unlike the routing code below: getBuildXmlProfile() raises the
-	// profile to EXTENDED-CTC-FR whenever Chorus Pro support is on, so this identifier always has room.
+	// No profile guard is needed here, unlike the routing code below: this value is only ever emitted
+	// under isExtendedProfile($profile) (see buildXML()), and getBuildXmlProfile() already raises the
+	// profile to EXTENDED-CTC-FR whenever this invoice looks B2G (see needsExtendedFrProfile()) - the
+	// same test $looksLikeB2GInvoice above uses - so an identifier worth emitting always has room.
 	// The routing code keeps its guard because its extrafield keeps the value that was typed when the
 	// option was on, and the invoice may then be generated with the option off.
 }
