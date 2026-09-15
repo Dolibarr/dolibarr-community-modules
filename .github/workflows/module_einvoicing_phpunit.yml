@@ -257,6 +257,61 @@ jobs:
           cp einvoicing/test/samples/*.cii.xml generated/
           echo "$count documents generated, plus the committed samples: $(ls generated/ | tr '\n' ' ')"
 
+      - name: The module reads every reference document of the FNFE package
+        if: ${{ matrix.validate == 'yes' }}
+        # The package ships, next to its rules, the documents the FNFE publishes as the answer to
+        # its own use cases: multi-vendor, sub-lines, self-billing, corrective invoice, the three
+        # profiles. They are conformant by construction, so anything the module fails to read out
+        # of them is a gap on our side - and no schematron can report that, since a reader losing a
+        # term produces no invalid document. Fatal: a document the parser refuses, or whose lines it
+        # does not all bring back.
+        env:
+          DOLI_ROOT: ${{ steps.instance.outputs.htdocs }}
+        run: php einvoicing/test/conformance/import-corpus.php "${FNFE_ROOT}/Z.example/TEST"
+
+      - name: What the module leaves behind in those documents
+        if: ${{ matrix.validate == 'yes' }}
+        # Informative, never fatal: the terms the reference documents carry and the parser brings
+        # back from none of them. It is the list to shorten, printed where it cannot be forgotten.
+        continue-on-error: true
+        env:
+          DEEP: '1'
+          DOLI_ROOT: ${{ steps.instance.outputs.htdocs }}
+        run: |
+          php einvoicing/test/conformance/import-corpus.php "${FNFE_ROOT}/Z.example/TEST" > unread.txt || true
+          echo '### Terms of the FNFE documents the import brings back from none of them' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          grep '^    ' unread.txt | sed 's/ = .*//;s/^ *//' | sort | uniq -c | sort -rn >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat "$GITHUB_STEP_SUMMARY"
+
+      - name: The builder still writes everything it used to write
+        if: ${{ matrix.validate == 'yes' }}
+        # A write leaving the module turns no document invalid and no other test red: the invoices
+        # that needed it just stop carrying it, and we find out from the maintainer (issue #955).
+        # So the generated documents are signed, path by path, on fixtures that never change. A path
+        # may appear freely; a path disappears only on purpose, with --update-baseline.
+        env:
+          DOLI_ROOT: ${{ steps.instance.outputs.htdocs }}
+        run: php einvoicing/test/conformance/emitted-paths.php
+
+      - name: What the module never writes
+        if: ${{ matrix.validate == 'yes' }}
+        # The other direction of the import step. A generated specimen would answer the wrong
+        # question - an element missing from one document may only mean that invoice had nothing to
+        # put there - so this reads what the builder is able to construct, and confronts it with the
+        # elements the reference documents carry. Informative: it reports a gap, it does not fail.
+        run: php einvoicing/test/conformance/emitted-terms.php "${FNFE_ROOT}/Z.example/TEST" | tee emitted.txt
+
+      - name: Report what the module never writes
+        if: ${{ always() && matrix.validate == 'yes' }}
+        continue-on-error: true
+        run: |
+          echo '### Elements of the FNFE documents the builder never constructs' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          sed -n '/^=== /,$p' emitted.txt >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
       - name: The generated documents are accepted by the EN 16931 and CTC-FR rules
         if: ${{ matrix.validate == 'yes' }}
         env:
