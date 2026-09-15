@@ -520,7 +520,7 @@ class CIIProtocol extends AbstractProtocol
 		dol_mkdir(dirname($xmlfile));
 		dol_delete_file($xmlfile);
 
-		$xmlcontent = $this->buildXML($invoiceData, $linesData, $this->getBuildXmlProfile(), $outputlangs);
+		$xmlcontent = $this->buildXML($invoiceData, $linesData, $this->getBuildXmlProfile($object), $outputlangs);
 
 		// Local EN 16931 business rules safety net, and check that the document claims the amount the
 		// invoice claims (warnings, or abort in strict mode)
@@ -2198,15 +2198,13 @@ class CIIProtocol extends AbstractProtocol
 	 * EXTENDED-CTC-FR profile of the French mandate without editing the code. An unknown value is
 	 * logged and ignored rather than aborting the generation.
 	 *
-	 * With Chorus Pro support on, the profile is raised to EXTENDED-CTC-FR: the B2G rules of
-	 * XP Z12-012 ask the buyer party for its SIRET (BR-FR-CPRO-10) and, when the directory demands one,
-	 * for a service code as well (BR-FR-CPRO-11) - two private identifiers, where the profiles below
-	 * EXTENDED allow a single one (FX-SCH-A-000164). A public sector invoice built as EN16931 therefore
-	 * cannot carry what the buyer needs to route it.
+	 * On top of that, the profile is raised to EXTENDED-CTC-FR on its own when this invoice matches a
+	 * known, precise case that needs it - see needsExtendedFrProfile().
 	 *
-	 * @return 	string 		Profile name, uppercased
+	 * @param 	CommonInvoice 	$object 	Invoice being generated, read by needsExtendedFrProfile()
+	 * @return 	string 						Profile name, uppercased
 	 */
-	protected function getBuildXmlProfile()
+	protected function getBuildXmlProfile($object)
 	{
 		$profile = static::BUILD_XML_PROFILE;
 
@@ -2220,12 +2218,49 @@ class CIIProtocol extends AbstractProtocol
 			}
 		}
 
-		if (getDolGlobalInt('EINVOICING_USE_CHORUS') && !$this->isExtendedProfile($profile)) {
-			dol_syslog(get_class($this).'::getBuildXmlProfile Chorus Pro support is on: profile raised from '.$profile.' to EXTENDEDFR, which is the only one that carries the B2G identifiers of the buyer', LOG_NOTICE);
+		if ($this->needsExtendedFrProfile($object) && !$this->isExtendedProfile($profile)) {
+			dol_syslog(get_class($this).'::getBuildXmlProfile profile raised from '.$profile.' to EXTENDEDFR: this invoice matches a known Chorus Pro case, see needsExtendedFrProfile()', LOG_NOTICE);
 			return 'EXTENDEDFR';
 		}
 
 		return $profile;
+	}
+
+	/**
+	 * Tell whether this invoice looks like a B2G (Chorus Pro) invoice.
+	 *
+	 * @param 	CommonInvoice 	$object 	Invoice being generated
+	 * @return 	bool 						True if the invoice carries a Chorus Pro extrafield
+	 */
+	protected function looksLikeB2GInvoice($object)
+	{
+		$chorusExtrafields = ['d4d_service_code', 'd4d_contract_number', 'd4d_promise_code'];
+		foreach ($chorusExtrafields as $extrafield) {
+			if (trim((string) ($object->array_options['options_'.$extrafield] ?? '')) !== '') {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Tell whether this invoice needs the EXTENDED-CTC-FR profile.
+	 *
+	 * The switch to EXTENDED-CTC-FR must stay confined to known precise cases.
+	 * Known cases are checked individually in this method.
+	 *
+	 * @param 	CommonInvoice 	$object 	Invoice being generated
+	 * @return 	bool 						True if the document needs the EXTENDED-CTC-FR profile
+	 */
+	protected function needsExtendedFrProfile($object)
+	{
+		// The invoice looks like a B2G one.
+		if (getDolGlobalInt('EINVOICING_USE_CHORUS') && $this->looksLikeB2GInvoice($object)) {
+			return true;
+		}
+
+		return false;
 	}
 
 	/**
