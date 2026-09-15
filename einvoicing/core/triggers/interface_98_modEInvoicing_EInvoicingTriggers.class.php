@@ -332,12 +332,8 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			// to the figures the vendor bills validates normally and drops the mark (issue #861).
 			$announced = SupplierInvoiceHelper::totalsMismatch((int) $object->id);
 			if ($announced !== null) {
-				// An announced prepaid amount can be because paid by a deposit (in this case we control it exists and is linked to)
-				// or just because the company has withdrown found automatically by a prerecorded credit card or diret debit like Amazon do (in this case, we don't need a deposit)
-				$isprepaidannouncedforadeposit = 0;		// TODO Detect if prepaid because of deposit or else. May be we have also ref of deposit ?
-
-				// @phpstan-ignore-next-line booleanAnd.leftAlwaysFalse
-				if (SupplierInvoiceHelper::totalsAgreeWithDocument($object, $announced['tva'], $announced['ttc'], ($isprepaidannouncedforadeposit && $announced['prepaid']) ? $announced['prepaid'] : null)) {
+				// A prepaid amount is in the mark only for a document referencing the invoice it was paid on (BG-3).
+				if (SupplierInvoiceHelper::totalsAgreeWithDocument($object, $announced['tva'], $announced['ttc'], $announced['prepaid'] ?? null)) {
 					SupplierInvoiceHelper::clearTotalsMismatch((int) $object->id);
 				} elseif (isset($announced['prepaid'])
 					&& SupplierInvoiceHelper::totalsAgreeWithDocument($object, $announced['tva'], $announced['ttc'])) {
