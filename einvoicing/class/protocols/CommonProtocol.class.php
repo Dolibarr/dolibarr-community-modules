@@ -2301,8 +2301,7 @@ trait CommonProtocol
 					$supplierInvoice->fetch_optionals();
 					$changed = false;
 					foreach ($order->array_options as $key => $value) {
-						if ($value !== null && $value !== ''
-							&& (!isset($supplierInvoice->array_options[$key]) || $supplierInvoice->array_options[$key] === null || $supplierInvoice->array_options[$key] === '')) {
+						if (isset($value) && $value !== '' && (!isset($supplierInvoice->array_options[$key]) || $supplierInvoice->array_options[$key] === '')) {
 							$supplierInvoice->array_options[$key] = $value;
 							$changed = true;
 						}
