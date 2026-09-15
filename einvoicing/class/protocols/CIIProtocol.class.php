@@ -2219,7 +2219,7 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		if ($this->needsExtendedFrProfile($object) && !$this->isExtendedProfile($profile)) {
-			dol_syslog(get_class($this).'::getBuildXmlProfile profile raised from '.$profile.' to EXTENDEDFR: this invoice matches a known Chorus Pro case, see needsExtendedFrProfile()', LOG_NOTICE);
+			dol_syslog(get_class($this).'::getBuildXmlProfile profile raised from '.$profile.' to EXTENDEDFR, see needsExtendedFrProfile()', LOG_NOTICE);
 			return 'EXTENDEDFR';
 		}
 
