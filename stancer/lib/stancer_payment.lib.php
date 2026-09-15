@@ -343,6 +343,14 @@ function stancerCardstartPayWithRedirect($object, $parameters, $forceAmount = nu
 				$mustNewUUID = true;
 				dol_syslog("stancer   Stancer previous card " . json_encode($sp->card) . " so try to reset card ...");
 			}
+		} elseif ($sp->hasFinallyFailed()) {
+			// Stancer reserves a unique_id for ever, even when the payment it carried
+			// was refused: reusing it is answered "409 duplicate unique_id", the new
+			// payment is never created and the customer is stuck for good on this
+			// object. A final failure must start a brand new attempt.
+			dol_syslog("stancer previous attempt ($tag) ended in status " . $sp->status . ", starting a new attempt with a fresh unique_id", LOG_NOTICE);
+			$mustCreate = true;
+			$mustNewUUID = true;
 		} else {
 			$paymentData = $stancerApi->getPayment($sp->stancer_id);
 			if (empty($sp->card)) {
@@ -358,8 +366,8 @@ function stancerCardstartPayWithRedirect($object, $parameters, $forceAmount = nu
 	if ($mustCreate || $paymentData == null) {
 		dol_syslog("stancer   Stancer must create");
 		if ($mustNewUUID) {
-			dol_syslog("stancer   Stancer must add uniq tag");
-			$tag .= ".UNIQ=" . substr($sp->getNextNumRef(), -2);
+			$tag = stancerNextFreeTag($tag, $db);
+			dol_syslog("stancer   Stancer new attempt tag is $tag");
 		}
 
 		// Build payment data for API
@@ -370,8 +378,19 @@ function stancerCardstartPayWithRedirect($object, $parameters, $forceAmount = nu
 			'order_id' => $object->ref,
 			'unique_id' => $tag,
 			'description' => substr(stancerChangeLabel($object), -64), // max size is 64
-			'auth' => true // Enable 3DS
 		);
+
+		// Strong authentication is required by default, and should stay that way.
+		// STANCER_CB_DISABLE_3DS exists for the cards that cannot authenticate at
+		// all - typically a corporate card whose issuer never answers, which comes
+		// back as auth.status "unavailable" and is refused before the bank is even
+		// asked for an authorisation. Turning 3DS off lets the request reach the
+		// bank, but moves the liability for a fraudulent chargeback to the merchant.
+		if (!getDolGlobalString('STANCER_CB_DISABLE_3DS')) {
+			$paymentApiData['auth'] = true; // Enable 3DS
+		} else {
+			dol_syslog("stancer 3DS disabled by STANCER_CB_DISABLE_3DS for " . $object->ref, LOG_WARNING);
+		}
 
 		if (strpos($urlretour, 'https://') === 0) {
 			$paymentApiData['return_url'] = $urlretour;
@@ -460,10 +479,19 @@ function stancerCardstartPayWithRedirect($object, $parameters, $forceAmount = nu
 		}
 	} else {
 		dol_syslog("stancer pay error : " . $stancerApi->error, LOG_ERR);
-		$message = "Please try with an other payment provider like Stripe";
-		setEventMessages($langs->trans("ErrorStancer") . " " . $message, [], 'errors');
+		setEventMessages($langs->trans("ErrorStancerPaymentNotStarted"), [], 'errors');
 
-		$urlPayment = getOnlinePaymentUrl(0, $object->element, (string) $object->ref);
+		// getOnlinePaymentUrl() expects a payment type ('order', 'invoice', 'member',
+		// 'membersubscription', 'contractline', 'free'), never a Dolibarr element name
+		// ('commande', 'facture'). Feeding it the element returned an empty string, and
+		// the empty "Location:" header that followed showed the customer a blank page.
+		$urlPayment = getOnlinePaymentUrl(0, stancerOnlinePaymentType($object), (string) $object->ref);
+		if (empty($urlPayment)) {
+			// No payment page to go back to (a proposal, for instance): say what
+			// happened here rather than redirecting the customer to nowhere.
+			stancerPrintPaymentError($object, (string) $stancerApi->error);
+			exit;
+		}
 		header("Location: " . $urlPayment);
 		exit;
 	}
@@ -1786,4 +1814,103 @@ function stancerRegeneratePDFifNeeded(CommonObject $object)
 			$result = $object->generateDocument($object->model_pdf, $langs);
 		}
 	}
+}
+
+
+/**
+ * Build an attempt id that has never been used for this object.
+ *
+ * Stancer reserves a unique_id for ever, so a retry needs a new one. The
+ * column holds 36 characters, so the base tag is trimmed to leave room for
+ * the suffix. Any suffix already stored locally is skipped; if the whole
+ * range is taken, the current time provides a last-resort suffix.
+ *
+ * @param  string $baseTag Tag of the previous attempt (its suffix is dropped).
+ * @param  DoliDB $db      Database handler.
+ * @return string          A tag no local attempt carries yet.
+ */
+function stancerNextFreeTag($baseTag, $db)
+{
+	$maxLength = 36; // llx_stancer_stancer_payments.unique_id is a varchar(36).
+	$baseTag = preg_replace('/\.UNIQ=[A-Za-z0-9]+$/', '', (string) $baseTag);
+
+	for ($i = 1; $i <= 99; $i++) {
+		$suffix = '.UNIQ=' . sprintf('%02d', $i);
+		$candidate = substr($baseTag, 0, $maxLength - strlen($suffix)) . $suffix;
+
+		$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "stancer_stancer_payments";
+		$sql .= " WHERE unique_id = '" . $db->escape($candidate) . "'";
+		$resql = $db->query($sql);
+		if (!$resql) {
+			// Never hand back a tag we could not check: fall through to the time suffix.
+			break;
+		}
+		$taken = $db->fetch_object($resql);
+		$db->free($resql);
+		if (!$taken) {
+			return $candidate;
+		}
+	}
+
+	$suffix = '.UNIQ=' . dol_print_date(dol_now(), '%y%m%d%H%M%S');
+	return substr($baseTag, 0, $maxLength - strlen($suffix)) . $suffix;
+}
+
+/**
+ * Translate a Dolibarr element name into the payment type getOnlinePaymentUrl() knows.
+ *
+ * The core function only answers for 'order', 'invoice', 'member',
+ * 'membersubscription', 'contractline' and 'free'. Anything else (a proposal,
+ * for instance) has no online payment page, and the caller must handle the
+ * empty answer instead of redirecting to it.
+ *
+ * @param  Object $object Paid object.
+ * @return string         Payment type, or an empty string when there is none.
+ */
+function stancerOnlinePaymentType($object)
+{
+	$map = array(
+		'commande' => 'order',
+		'order' => 'order',
+		'facture' => 'invoice',
+		'invoice' => 'invoice',
+		'adherent' => 'member',
+		'member' => 'member',
+		'subscription' => 'membersubscription',
+		'contratdet' => 'contractline',
+		'contractline' => 'contractline',
+	);
+	$element = isset($object->element) ? (string) $object->element : '';
+
+	return isset($map[$element]) ? $map[$element] : '';
+}
+
+/**
+ * Tell the customer that the payment could not be started, on screen.
+ *
+ * Used when there is no online payment page to send them back to. The point is
+ * that they read what happened and how to reach us, instead of a blank page.
+ *
+ * @param  Object $object   Object the customer tried to pay.
+ * @param  string $apiError Raw Stancer error, for the log only.
+ * @return void
+ */
+function stancerPrintPaymentError($object, $apiError = '')
+{
+	global $langs, $mysoc;
+
+	dol_syslog("stancer payment could not be started for " . (isset($object->ref) ? $object->ref : '?') . " : " . $apiError, LOG_ERR);
+
+	print '<p>' . $langs->trans("ErrorStancerPaymentNotStarted") . '</p>';
+	if (!empty($object->ref)) {
+		print '<p>' . $langs->trans("Ref") . ' : <strong>' . dol_escape_htmltag($object->ref) . '</strong></p>';
+	}
+	print '<p>' . $langs->trans("ErrorStancerPleaseContactBy") . '</p><ul>';
+	if (!empty($mysoc->phone)) {
+		print '<li>' . $langs->trans("ErrorStancerPleaseContactByPhone", $mysoc->phone) . '</li>';
+	}
+	if (!empty($mysoc->email)) {
+		print '<li>' . $langs->trans("ErrorStancerPleaseContactByMail", $mysoc->email) . '</li>';
+	}
+	print '</ul>';
 }
