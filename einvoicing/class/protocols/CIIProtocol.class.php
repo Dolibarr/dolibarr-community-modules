@@ -1799,10 +1799,11 @@ class CIIProtocol extends AbstractProtocol
 
 		$rebuilt = round($qty * $subprice * (1 - ($remisePercent / 100)), 2);
 
-		// The couple (quantity, unit price) cannot carry the announced amount: it rebuilds nothing, or it
-		// rebuilds it upside down. A line announcing nothing is left alone - a free sample or a heading is
-		// not an anomaly.
-		if ($lineAnnouncesAnAmount && ($rebuilt == 0.0 || (($rebuilt > 0) !== ($announced > 0)))) {
+		// The couple (quantity, unit price) cannot carry the announced amount: it rebuilds nothing while an
+		// amount is announced, or it rebuilds it upside down. Both sides at 0.0 - a zero quantity whose
+		// price is only informative (issue #726) - already agree, and must not be rewritten to that same
+		// zero through a warning that has nothing to report.
+		if ($lineAnnouncesAnAmount && (($rebuilt == 0.0 && $announced != 0.0) || (($rebuilt > 0) !== ($announced > 0)))) {
 			if (empty($qty)) {
 				$reason = 'its invoiced quantity (BT-129) is zero or absent, so quantity times unit price rebuilds 0.00';
 			} elseif (empty($subprice)) {

@@ -302,6 +302,8 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 
 	/**
 	 * A line at zero on both sides - a free sample, a heading - is not an anomaly and must stay silent.
+	 * BT-131 absent, not stated as 0.0: an explicit zero is a real amount (a line whose net price a
+	 * charge absorbs entirely), not the "nothing announced" this test is about.
 	 *
 	 * @return	void
 	 */
@@ -311,7 +313,7 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 
 		$protocol = new CIIProtocol($db);
 
-		$parsedLine = array('lineid' => '002', 'lineTotalAmount' => 0.0, 'linestatusreasoncode' => '');
+		$parsedLine = array('lineid' => '002', 'linestatusreasoncode' => '');
 		$amounts = $this->callResolveLineAmounts($protocol, $parsedLine, 0.0, 0.0);
 
 		$this->assertSame(0.0, $amounts['qty']);
@@ -483,6 +485,7 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 
 	/**
 	 * A free line - zero on both sides - is not an anomaly and must stay silent, credit or not.
+	 * BT-131 absent, not stated as 0.0: see testAZeroLineIsNotReported().
 	 *
 	 * @return	void
 	 */
@@ -492,7 +495,7 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 
 		$protocol = new CIIProtocol($db);
 
-		$parsedLine = array('lineid' => '22', 'lineTotalAmount' => 0.0, 'linestatusreasoncode' => '');
+		$parsedLine = array('lineid' => '22', 'linestatusreasoncode' => '');
 		$amounts = $this->callResolveLineAmounts($protocol, $parsedLine, 1.0, 0.0);
 
 		$this->assertSame(1.0, $amounts['qty'], 'nothing to repair, the document announces nothing');
@@ -747,6 +750,33 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 	}
 
 	/**
+	 * A line whose net price is entirely made of its own charge - a flat fee billed with no separate
+	 * priced item, the shape of a real FedEx invoice line ("Frais de dossier", net price 15, one charge
+	 * of 15, BT-131 announcing 15). $announced (BT-131 less the charge) is 0.0, exactly like a line that
+	 * announces nothing at all - but BT-131 is present here, so the base line has to be corrected to 0.0
+	 * rather than left at its naive (quantity, unit price): buildLineChargeLines() adds the charge as its
+	 * own line right after, and the two together must total 15, not 30.
+	 *
+	 * @return	void
+	 */
+	public function testAChargeThatIsTheWholeOfTheLineIsNotCountedTwice()
+	{
+		$parsedLine = array(
+			'lineid' => '7',
+			'lineTotalAmount' => 15.0,
+			'lineAllowances' => array(
+				array('indicator' => 'true', 'actualAmount' => 15.0, 'reason' => 'Frais de dossier'),
+			),
+		);
+
+		$amounts = $this->amounts($parsedLine, 1.0, 15.0);
+
+		$this->assertSame(1.0, $amounts['qty']);
+		$this->assertSame(0.0, $amounts['subprice'], 'the base line carries nothing, the charge line carries the 15');
+		$this->assertNotSame('', $amounts['warning'], 'the correction is reported like any other');
+	}
+
+	/**
 	 * A line announcing nothing has no amount to be imported at: BT-131 is what a line is worth, and an
 	 * absent one is not a figure to rewrite a price against. It keeps what its own price rebuilds.
 	 *
@@ -754,7 +784,7 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 	 */
 	public function testALineAnnouncingNothingKeepsWhatItsPriceRebuilds()
 	{
-		$amounts = $this->amounts(array('lineid' => '5', 'lineTotalAmount' => 0.0), 2.0, 40.0);
+		$amounts = $this->amounts(array('lineid' => '5'), 2.0, 40.0);
 
 		$this->assertSame(40.0, $amounts['subprice'], 'nothing is rewritten against an absent BT-131');
 		$this->assertStringContainsString('carries the rebuilt amount', $amounts['warning']);
