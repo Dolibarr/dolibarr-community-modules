@@ -1086,12 +1086,12 @@ $invoiceData = [
 	'sellername'                => $mysoc->name,
 	'sellerids'                 => (empty($sellerGlobalIds) ? '' : $myidprof),
 
-	'sellerlineone'             => $sellerAddressLines[0] !== '' ? $sellerAddressLines[0] : 'ADDRESS EMPTY',
+	'sellerlineone'             => $sellerAddressLines[0],
 	'sellerlinetwo'             => $sellerAddressLines[1],
 	'sellerlinethree'           => $sellerAddressLines[2],
-	'sellerpostcode'            => $mysoc->zip          ?? 'ZIP EMPTY',
-	'sellercity'                => $mysoc->town         ?? 'NO TOWN',
-	'sellercountry'             => $mysoc->country_code ?? 'COUNTRY NOT SET',
+	'sellerpostcode'            => $mysoc->zip,
+	'sellercity'                => $mysoc->town,
+	'sellercountry'             => $mysoc->country_code,
 	'sellersubdivision'         => null,
 
 	'sellercontactpersonname'   => $salerepresentative_name,
@@ -1115,15 +1115,15 @@ $invoiceData = [
 	'sellerTradingName'         => $sellerTradingName,
 
 	// Buyer part
-	'buyername'                 =>  $buyerName ?: 'CUSTOMER',
+	'buyername'                 => $buyerName,
 	'buyerids'                  => (empty($buyerGlobalIds) ? '' : $idprof),
 
-	'buyerlineone'              => $buyerAddressLines[0] !== '' ? $buyerAddressLines[0] : 'ADDRESS',
+	'buyerlineone'              => $buyerAddressLines[0],
 	'buyerlinetwo'              => $buyerAddressLines[1],
 	'buyerlinethree'            => $buyerAddressLines[2],
-	'buyerpostcode'             => $buyerZip         ?: 'ZIP',
-	'buyercity'                 => $buyerTown        ?: 'TOWN',
-	'buyercountry'              => $buyerCountryCode ?: 'COUNTRY',
+	'buyerpostcode'             => $buyerZip,
+	'buyercity'                 => $buyerTown,
+	'buyercountry'              => $buyerCountryCode,
 	'buyersubdivision'          => null,
 
 	'buyervatnumber'            => $buyerParty->tva_intra ?? '',
@@ -1267,8 +1267,12 @@ if (empty($idprof)) {
 if (empty($myidprof)) {
 	throw new Exception('BADPROFID: The professional ID of your company is empty. Fix this in your company or module setup page.');
 }
-if ($mySchemeIdProf == "0002" && strlen($myidprof) != 9) {
-	throw new Exception('BADPROFID: The professional ID ' . $myidprof . ' has type SIREN but length is not 9 characters. Fix this in your company or einvoice module setup page.');
+// G1.89 makes the SIREN nine digits and BR-FR-32 refuses, as fatal, any party identifier under scheme
+// 0002 that is not nine of them. Nine digits and not nine characters: the core never validates
+// idprof1 when the record is saved, so a value like "12345678A" is storable and a length test alone
+// lets it reach a document the access point rejects.
+if ($mySchemeIdProf == "0002" && !preg_match('/^\d{9}$/', $myidprof)) {
+	throw new Exception('BADPROFID: The professional ID ' . $myidprof . ' has type SIREN but is not made of exactly 9 digits. Fix this in your company or einvoice module setup page.');
 }
 if ($mysoc->country_code == 'FR' && !empty($mysoc->idprof1) && !empty($mysoc->idprof2)) {
 	if (strpos(removeAllSpaces($mysoc->idprof2), removeAllSpaces($mysoc->idprof1)) !== 0) {
@@ -1285,6 +1289,29 @@ if (!empty($mysoc->tva_intra) && !empty($mysoc->country_code) && substr($mysoc->
 }
 if (!empty($buyerParty->tva_intra) && !empty($buyerParty->country_code) && substr($buyerParty->tva_intra, 0, 2) != $buyerParty->country_code) {
 	throw new Exception('BADVATNUMBER: The VAT number of the thirdparty ' . $buyerParty->name . ' must start with its 2 letter country code.');
+}
+// The buyer registration identifier gets the same control as the seller one above: G1.63 makes the
+// SIREN of both parties mandatory, and BR-FR-32 tests every party carrying scheme 0002, not just the
+// seller. idprof() truncates a SIRET to nine characters, so a SIRET typed into the SIREN field is
+// what reaches this - which the import of a received document can itself produce.
+if ($schemeIdProf == "0002" && !preg_match('/^\d{9}$/', $idprof)) {
+	throw new Exception('BADTHIRDPARTYPROFID: The professional ID ' . $idprof . ' of the customer ' . $buyerParty->name . ' has type SIREN but is not made of exactly 9 digits. Fix this in the record of that third party.');
+}
+// BT-40 and BT-55 are the only mandatory terms of a postal address (BR-09, BR-11), and BT-27 and
+// BT-44 are mandatory too (BR-06, BR-07). One test per party, each naming the record to open: a
+// document refused by the access point on a rule pointing at nothing the user can see is what the
+// placeholders removed above used to produce. trim() rather than empty(), which also refuses "0".
+if (trim((string) $mysoc->country_code) === '') {
+	throw new Exception('BADADDRESS: The country of your company is empty. Fix this in the setup of your company.');
+}
+if (trim((string) $buyerCountryCode) === '') {
+	throw new Exception('BADADDRESS: The country of the customer ' . $buyerParty->name . ' is empty. Fix this in the record of that third party.');
+}
+if (trim((string) $mysoc->name) === '') {
+	throw new Exception('BADPARTYNAME: The name of your company (BT-27) is empty. Fix this in the setup of your company.');
+}
+if (trim((string) $buyerName) === '') {
+	throw new Exception('BADPARTYNAME: The name of the customer (BT-44) is empty. Fix this in the record of that third party.');
 }
 
 
