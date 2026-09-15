@@ -775,6 +775,12 @@ trait CommonProtocol
 			}
 		}
 
+		// A phone number written in a document is free text (BT-42 is a Text, and so is the fax of the
+		// EXTENDED profile), and vendors do write things like "09 77 40 50 60 (service gratuit + prix
+		// appel)" in it. Keep the number and leave the sentence out, so the column can hold it. See #943.
+		$sellerPhone = $this->_extractPhoneNumberFromDocument($sellerInfo['sellercontactphoneno'] ?? '');
+		$sellerFax = $this->_extractPhoneNumberFromDocument($sellerInfo['sellercontactfaxno'] ?? '');
+
 		// Step 4: Create or update thirdparty
 
 		//$thirdpartyId = -2; // For testing
@@ -799,8 +805,12 @@ trait CommonProtocol
 					$thirdparty->town = $sellerInfo['sellercity'] ?? $thirdparty->town;
 					$thirdparty->country_code = $sellerInfo['sellercountry'] ?? $thirdparty->country_code;
 					$thirdparty->email = $sellerInfo['sellercontactemailaddr'] ?? $thirdparty->email;
-					$thirdparty->phone = $sellerInfo['sellercontactphoneno'] ?? $thirdparty->phone;
-					$thirdparty->fax = $sellerInfo['sellercontactfaxno'] ?? $thirdparty->fax;
+					if ($sellerPhone !== '') {
+						$thirdparty->phone = $sellerPhone;
+					}
+					if ($sellerFax !== '') {
+						$thirdparty->fax = $sellerFax;
+					}
 					// Set identification numbers
 					if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
 						foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
@@ -843,11 +853,11 @@ trait CommonProtocol
 					if (empty($thirdparty->email) && !empty($sellerInfo['sellercontactemailaddr'])) {
 						$thirdparty->email = $sellerInfo['sellercontactemailaddr'];
 					}
-					if (empty($thirdparty->phone) && !empty($sellerInfo['sellercontactphoneno'])) {
-						$thirdparty->phone = $sellerInfo['sellercontactphoneno'];
+					if (empty($thirdparty->phone) && $sellerPhone !== '') {
+						$thirdparty->phone = $sellerPhone;
 					}
-					if (empty($thirdparty->fax) && !empty($sellerInfo['sellercontactfaxno'])) {
-						$thirdparty->fax = $sellerInfo['sellercontactfaxno'];
+					if (empty($thirdparty->fax) && $sellerFax !== '') {
+						$thirdparty->fax = $sellerFax;
 					}
 					// Set identification numbers if empty
 					if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
@@ -866,36 +876,44 @@ trait CommonProtocol
 					}
 				}
 			}
-			// Flag the thirdparty as a vendor if it is not one yet
-			// (ex: a prospect or customer receiving its first supplier invoice).
-			if (!$thirdparty->fournisseur) {
-				$thirdparty->fournisseur = 1;
-			}
-
-			// A thirdparty code may be mandatory (MAIN_COMPANY_CODE_ALWAYS_REQUIRED, or a numbering
-			// module refusing an empty code): verify() then refuses every update of a thirdparty saved
-			// without one, and the whole synchronization stops on it. Ask for a generated code when the
-			// numbering module allows it. The allowmod flags are required twice over: update() checks
-			// them before writing the code columns, and it is also how the thirdparty card saves a code.
 			$allowmodcodeclient = 0;
 			$allowmodcodefournisseur = 0;
-			if (empty($thirdparty->code_fournisseur) && $thirdparty->codefournisseur_modifiable()) {
-				$thirdparty->code_fournisseur = 'auto';
-				$allowmodcodefournisseur = 1;
-			}
-			if (!empty($thirdparty->client) && empty($thirdparty->code_client) && $thirdparty->codeclient_modifiable()) {
-				$thirdparty->code_client = 'auto';
-				$allowmodcodeclient = 1;
-			}
-
-			// This function never sets an extrafield on a thirdparty, so it must not rewrite them, and it has
-			// to say so explicitly: from Dolibarr 20 on, fetch() pre-fills array_options with a null entry for
-			// every declared extrafield, and update() hands that array to insertExtraFields(), which refuses
-			// the WHOLE update as soon as one of those fields is mandatory and empty. Emptied, array_options
-			// makes insertExtraFields() return 0 without touching the stored row.
-			$thirdparty->array_options = array();
+			$this->_prepareThirdpartyForImportUpdate($thirdparty, $allowmodcodeclient, $allowmodcodefournisseur);
 
 			$result = $thirdparty->update(0, $user, 1, $allowmodcodeclient, $allowmodcodefournisseur);
+
+			// Copying into the thirdparty what the document says is a convenience (option
+			// EINVOICING_THIRDPARTIES_COMPLETE_INFO), and the vendor is already identified at this point:
+			// a value it refuses - a phone number carrying a sentence, a name longer than the column, a
+			// trigger of another module - must not cost the invoice. Save the thirdparty again without
+			// that completion: the document is then imported, and the caller is told what was left out.
+			// The duplicate supplier code (-3) is not about the completion and keeps its own answer below.
+			$completionWarning = '';
+			if ($result < 0 && $result != -3 && getDolGlobalInt('EINVOICING_THIRDPARTIES_COMPLETE_INFO')) {
+				$completionError = implode(', ', array_filter(array_merge(array($thirdparty->error), $thirdparty->errors)));
+
+				$plainthirdparty = new Societe($db);
+				if ($plainthirdparty->fetch($thirdpartyId) > 0) {
+					$allowmodcodeclient = 0;
+					$allowmodcodefournisseur = 0;
+					$this->_prepareThirdpartyForImportUpdate($plainthirdparty, $allowmodcodeclient, $allowmodcodefournisseur);
+
+					$resultwithoutcompletion = $plainthirdparty->update(0, $user, 1, $allowmodcodeclient, $allowmodcodefournisseur);
+					if ($resultwithoutcompletion > 0) {
+						$thirdparty = $plainthirdparty;
+						$result = $resultwithoutcompletion;
+
+						$completionWarning = $langs->trans('EInvoiceThirdpartyNotCompletedWarning', '{s1}', $completionError);
+						$completionWarning = str_replace('{s1}', $thirdparty->getNomUrl(0, '', 0, 1), $completionWarning);
+
+						dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Thirdparty ' . $thirdpartyId . ' kept as it is, its completion from the document was refused: ' . $completionError, LOG_WARNING);
+						dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller ' . $completionWarning, LOG_WARNING, 0, '_einvoicing');
+
+						setEventMessages($completionWarning, null, 'warnings', '', 1);
+					}
+				}
+			}
+
 			if ($result < 0) {
 				$this->error = $thirdparty->error;
 				$this->errors = $thirdparty->errors;
@@ -933,7 +951,7 @@ trait CommonProtocol
 				dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Updated thirdparty: ' . $thirdpartyId);
 				return array(
 					'res' => $thirdpartyId,
-					'message' => 'Thirdparty ' . $thirdparty->name . ' updated successfully.' . ($nameMismatchWarning !== '' ? ' - ' . $nameMismatchWarning : '')
+					'message' => 'Thirdparty ' . $thirdparty->name . ' updated successfully.' . ($nameMismatchWarning !== '' ? ' - ' . $nameMismatchWarning : '') . ($completionWarning !== '' ? ' - ' . $completionWarning : '')
 				);
 			}
 		}
@@ -956,8 +974,8 @@ trait CommonProtocol
 			$thirdparty->town = $sellerInfo['sellercity'] ?? '';
 			$thirdparty->country_code = $sellerInfo['sellercountry'] ?? '';
 			$thirdparty->email = $sellerInfo['sellercontactemailaddr'] ?? '';
-			$thirdparty->phone = $sellerInfo['sellercontactphoneno'] ?? '';
-			$thirdparty->fax = $sellerInfo['sellercontactfaxno'] ?? '';
+			$thirdparty->phone = $sellerPhone;
+			$thirdparty->fax = $sellerFax;
 
 			// Set identification numbers
 			if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
@@ -1108,6 +1126,82 @@ trait CommonProtocol
 				'actiondata' => $actiondata
 			);
 		}
+	}
+
+	/**
+	 * Prepare a thirdparty found in Dolibarr for the update done when a document is imported.
+	 *
+	 * A thirdparty code may be mandatory (MAIN_COMPANY_CODE_ALWAYS_REQUIRED, or a numbering module
+	 * refusing an empty code): verify() then refuses every update of a thirdparty saved without one,
+	 * and the whole synchronization stops on it. Ask for a generated code when the numbering module
+	 * allows it. The allowmod flags are required twice over: update() checks them before writing the
+	 * code columns, and it is also how the thirdparty card saves a code.
+	 *
+	 * @param	Societe	$thirdparty					Thirdparty to save, already loaded
+	 * @param	int		$allowmodcodeclient			Set to 1 when a customer code has to be generated
+	 * @param	int		$allowmodcodefournisseur	Set to 1 when a vendor code has to be generated
+	 * @return	void
+	 */
+	private function _prepareThirdpartyForImportUpdate($thirdparty, &$allowmodcodeclient, &$allowmodcodefournisseur)
+	{
+		// Flag the thirdparty as a vendor if it is not one yet
+		// (ex: a prospect or customer receiving its first supplier invoice).
+		if (!$thirdparty->fournisseur) {
+			$thirdparty->fournisseur = 1;
+		}
+
+		if (empty($thirdparty->code_fournisseur) && $thirdparty->codefournisseur_modifiable()) {
+			$thirdparty->code_fournisseur = 'auto';
+			$allowmodcodefournisseur = 1;
+		}
+		if (!empty($thirdparty->client) && empty($thirdparty->code_client) && $thirdparty->codeclient_modifiable()) {
+			$thirdparty->code_client = 'auto';
+			$allowmodcodeclient = 1;
+		}
+
+		// This function never sets an extrafield on a thirdparty, so it must not rewrite them, and it has
+		// to say so explicitly: from Dolibarr 20 on, fetch() pre-fills array_options with a null entry for
+		// every declared extrafield, and update() hands that array to insertExtraFields(), which refuses
+		// the WHOLE update as soon as one of those fields is mandatory and empty. Emptied, array_options
+		// makes insertExtraFields() return 0 without touching the stored row.
+		$thirdparty->array_options = array();
+	}
+
+	/**
+	 * Extract the phone number out of what a received document carries as a phone or fax number.
+	 *
+	 * The telephone number of the seller contact (BT-42) is a Text, and so is the fax number the
+	 * EXTENDED profile adds next to it (BT-X-107, outside EN 16931): vendors do add a sentence to them
+	 * ("09 77 40 50 60 (service gratuit + prix appel)"), which no longer fits the phone column of a
+	 * thirdparty. A value that is already made of number characters only is returned untouched,
+	 * whatever its local formatting; anything else is reduced to the first group of at least 6 digits
+	 * it holds, and an empty string is returned when it holds none.
+	 *
+	 * @param	string	$value	Phone or fax number as written in the document
+	 * @return	string			Phone number to save, or an empty string when there is none to save
+	 */
+	private function _extractPhoneNumberFromDocument($value)
+	{
+		$value = trim((string) $value);
+		if ($value === '') {
+			return '';
+		}
+
+		// Already a number: keep what the vendor wrote, separators included.
+		if (preg_match('/^[+(]?[0-9][0-9 .\/()+-]*$/', $value)) {
+			return $value;
+		}
+
+		if (preg_match_all('/[+]?[0-9][0-9 .\/()-]*/', $value, $matches)) {
+			foreach ($matches[0] as $candidate) {
+				$candidate = trim($candidate, " .-/()");
+				if (strlen(preg_replace('/[^0-9]/', '', $candidate)) >= 6) {
+					return $candidate;
+				}
+			}
+		}
+
+		return '';
 	}
 
 	/**
