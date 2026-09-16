@@ -26,6 +26,8 @@
  *                  must keep one side alone and refuse a period that ends before it starts.
  *                  Import (issue #853): a date of the document must be stored as the day it states,
  *                  whatever the timezone of the server that reads it.
+ *                  Product reference: an absent one must not be used as a search key, and "0" is a
+ *                  reference like any other, in both directions.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 
@@ -546,5 +548,118 @@ class CIIProtocolTest extends CommonClassTest
 			$this->assertSame('2026-09-01 00:00:00', dol_print_date($period['start'], '%Y-%m-%d %H:%M:%S', 'tzserver'), 'wrong start in ' . $tz);
 			$this->assertSame('2026-09-30 00:00:00', dol_print_date($period['end'], '%Y-%m-%d %H:%M:%S', 'tzserver'), 'wrong end in ' . $tz);
 		}
+	}
+
+	/**
+	 * Real aggregated invoice line, as a payroll provider sends it: one line standing for the whole
+	 * invoice, with no vendor reference, no buyer reference and no GTIN, and a label far longer than
+	 * the 128 characters of product_fournisseur_price.ref_fourn. Anonymized sample of a document
+	 * received in production, kept so the shape the matching has to survive is pinned in CI.
+	 *
+	 * @return void
+	 */
+	public function testAnAggregatedLineCarriesNoProductIdentifierAtAll()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+		$xml = file_get_contents(__DIR__ . '/../samples/aggregated_line_without_product_ref.cii.xml');
+		$this->assertNotFalse($xml, 'sample file not readable');
+
+		$lines = $protocol->parseInvoiceLines($xml);
+
+		$this->assertCount(1, $lines, 'the sample is a single aggregated line');
+		$this->assertSame('', trim((string) ($lines[0]['prodsellerid'] ?? '')), 'no BT-155 expected');
+		$this->assertSame('', trim((string) ($lines[0]['prodbuyerid'] ?? '')), 'no BT-156 expected');
+		$this->assertSame('', trim((string) ($lines[0]['prodglobalid'] ?? '')), 'no BT-157 expected');
+		$this->assertGreaterThan(128, strlen((string) $lines[0]['prodname']), 'the label cannot be used as a ref_fourn');
+	}
+
+	/**
+	 * A line carrying no vendor reference must not be bound to a product. Looked up as it stands, an
+	 * absent reference matches any vendor price row whose ref_fourn is empty, and the line silently
+	 * takes a product it has nothing to do with.
+	 *
+	 * @return void
+	 */
+	public function testAnAbsentVendorReferenceDoesNotMatchAnEmptyVendorPrice()
+	{
+		global $conf, $db, $user;
+
+		require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
+
+		$socid = $this->createBenchSupplier();
+
+		$product = new Product($db);
+		$product->ref = 'EITEST-' . uniqid();
+		$product->label = 'Bench product reachable only through an empty vendor reference';
+		$product->type = 1;
+		$product->status = 0;
+		$product->status_buy = 1;
+		$product->price_base_type = 'HT';
+		$product->tva_tx = 20;
+		$this->assertGreaterThan(0, $product->create($user), $product->errorsToString());
+
+		$sql = "INSERT INTO " . MAIN_DB_PREFIX . "product_fournisseur_price";
+		$sql .= " (entity, datec, fk_product, fk_soc, ref_fourn, price, quantity, unitprice, tva_tx, fk_user)";
+		$sql .= " VALUES (" . ((int) $conf->entity) . ", '" . $db->idate(dol_now()) . "'";
+		$sql .= ", " . ((int) $product->id) . ", " . ((int) $socid) . ", '', 10, 1, 10, 20, " . ((int) $user->id) . ")";
+		$this->assertNotFalse($db->query($sql), 'could not create the vendor price with an empty reference: ' . $db->lasterror());
+
+		$protocol = new CIIProtocol($db);
+		$found = $protocol->findProductFromEinvoiceLine(array(
+			'prodsellerid' => '',
+			'prodname' => 'A label that matches no product at all ' . uniqid(),
+			'supplierId' => $socid,
+		));
+
+		$this->assertSame(0, (int) $found['res'], 'an absent vendor reference must not resolve to a product');
+	}
+
+	/**
+	 * "0" is a valid vendor reference: emptiness has to be tested on the string, because empty()
+	 * answers true on it and drops BT-155 from the generated line.
+	 *
+	 * @return void
+	 */
+	public function testAVendorReferenceEqualToZeroIsStillWritten()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+		$doc = new DOMDocument('1.0', 'UTF-8');
+
+		$line = $this->baseLineData();
+		$line['prodsellerid'] = '0';
+		$node = $this->callBuildLineItem($protocol, $doc, $line);
+		$ids = $node->getElementsByTagName('ram:SellerAssignedID');
+		$this->assertSame(1, $ids->length, 'a vendor reference of "0" must be written');
+		$this->assertSame('0', $ids->item(0)->nodeValue);
+
+		$line['prodsellerid'] = '';
+		$node = $this->callBuildLineItem($protocol, $doc, $this->baseLineData());
+		$this->assertSame(0, $node->getElementsByTagName('ram:SellerAssignedID')->length, 'no reference, no BT-155');
+	}
+
+	/**
+	 * Create a vendor of its own for the fixtures. A unique key allows a single vendor price with an
+	 * empty ref_fourn per vendor, so an existing one cannot be reused to carry the fixture.
+	 *
+	 * @return int	Id of the created third party
+	 */
+	private function createBenchSupplier()
+	{
+		global $db, $user;
+
+		require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
+
+		$supplier = new Societe($db);
+		$supplier->initAsSpecimen();
+		$supplier->name = 'Bench vendor ' . uniqid();
+		$supplier->fournisseur = 1;
+		$supplier->client = 0;
+		$this->assertGreaterThan(0, $supplier->create($user), $supplier->errorsToString());
+
+		return (int) $supplier->id;
 	}
 }
