@@ -1714,6 +1714,31 @@ trait CommonProtocol
 	}
 
 	/**
+	 * Tell the EN 16931 VAT category a VAT exemption reason code (BT-121) imposes.
+	 *
+	 * The code list annotates some of its entries with the category they go with - "Only use with VAT
+	 * category code O" for VATEX-EU-O - so the dictionary entry the seller fills already carries the
+	 * qualification, and nothing else has to be asked of them.
+	 *
+	 * Only "Not subject to VAT" is mapped here. The three other bound codes (AE, G, IC) describe
+	 * situations the country tests above already decide, and reading them from the dictionary as well
+	 * would let a mis-filled entry contradict the seller and buyer countries.
+	 *
+	 * @param 	string 	$vatex 	VAT exemption reason code, uppercased
+	 * @return 	string 			Category code the list imposes, or '' when it imposes none
+	 */
+	protected function vatCategoryForExemptionCode($vatex)
+	{
+		// Dolibarr 24 is where llx_c_tva.einvoice_vatex appears, and it is the only place a seller can
+		// state the code without a hidden constant. Below that the category keeps its previous value.
+		if ((float) DOL_VERSION < 24.0) {
+			return '';
+		}
+
+		return strtoupper((string) $vatex) === 'VATEX-EU-O' ? 'O' : '';
+	}
+
+	/**
 	 * Get the category of the VAT rate and the VATEX code and reason.
 	 *
 	 * @param 	CommonInvoiceLine		$line			Invoice line
@@ -2065,6 +2090,13 @@ trait CommonProtocol
 						} else {
 							$exemptionReasonCode = $vatex;
 							$exemptionReason = '';
+							// The dictionary entry can say the operation is outside the scope of VAT rather than
+							// exempt from it (CGI art. 258 for a supply of goods located abroad, for instance).
+							// "E" would announce a taxable operation that a rule exempts, which is another claim.
+							$imposedCategory = $this->vatCategoryForExemptionCode($vatex);
+							if ($imposedCategory !== '') {
+								$categoryVAT = $imposedCategory;
+							}
 						}
 					}
 				}
