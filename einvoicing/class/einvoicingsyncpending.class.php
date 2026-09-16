@@ -26,7 +26,7 @@
  * action is done - so it is not lost when it drifts out of the rolling synchronization window.
  */
 
-require_once DOL_DOCUMENT_ROOT.'/core/class/commonobject.class.php';
+// CommonObject is always loaded by the Dolibarr bootstrap before this DAO is used.
 
 /**
  * Class for EInvoicingSyncPending
@@ -67,9 +67,7 @@ class EInvoicingSyncPending extends CommonObject
 	const STATUS_RESOLVED = 1;
 	const STATUS_IGNORED  = 2;
 
-	/**
-	 * @var array<string,array<string,mixed>> Fields definition.
-	 */
+	// Fields definition (see llx_einvoicing_sync_pending). The array shape type is inherited from CommonObject::$fields.
 	public $fields = array(
 		"rowid" => array("type" => "integer", "label" => "ID", "enabled" => "1", 'position' => 1, 'notnull' => 1, "visible" => "0", "noteditable" => "1", "index" => "1"),
 		"provider" => array("type" => "varchar(50)", "label" => "AccessPoint", "langfile" => "einvoicing@einvoicing", "enabled" => "1", 'position' => 5, 'notnull' => 1, "visible" => "-1"),
@@ -95,14 +93,22 @@ class EInvoicingSyncPending extends CommonObject
 		"status" => array("type" => "integer", "label" => "Status", "enabled" => "1", 'position' => 2000, 'notnull' => 1, "visible" => "1", "index" => "1", "arrayofkeyval" => array("0" => "Pending", "1" => "Resolved", "2" => "Ignored")),
 	);
 
+	/** @var int */
 	public $rowid;
 	public $entity;
+	/** @var string */
 	public $provider;
+	/** @var string */
 	public $flow_id;
+	/** @var string */
 	public $flow_direction;
+	/** @var string */
 	public $flow_type;
+	/** @var string */
 	public $tracking_idref;
+	/** @var string */
 	public $fk_element_type;
+	/** @var int */
 	public $fk_element_id;
 	public $reason_code;
 	public $reason_message;
