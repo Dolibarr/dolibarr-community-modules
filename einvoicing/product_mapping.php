@@ -317,13 +317,13 @@ if (!empty($parsedLines)) {
 	$matchresults = array();
 	$defaultrouted = array();
 	foreach ($parsedLines as $idx => $parsedLine) {
+		$hasvendorref = (trim((string) ($parsedLine['prodsellerid'] ?? '')) !== '');
 		$parsedLine['supplierId'] = $socid;
 		$matchresults[$idx] = ($socid > 0 && is_object($protocol)) ? $protocol->findProductFromEinvoiceLine($parsedLine) : array('res' => 0, 'message' => '');
 		// The default product of the vendor is a catch-all answering every line nothing was found for, so a
 		// line it caught is routed, not mapped. As long as the line carries a vendor reference it can still
 		// be bound to the right product, and it stays in the lines to map.
 		$defaultrouted[$idx] = (($matchresults[$idx]['matchtype'] ?? '') == 'defaultrouting');
-		$hasvendorref = (trim((string) ($parsedLine['prodsellerid'] ?? '')) !== '');
 		if (empty($matchresults[$idx]['res']) || ($defaultrouted[$idx] && $hasvendorref)) {
 			$nbtomap++;
 		}
