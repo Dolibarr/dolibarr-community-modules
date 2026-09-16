@@ -270,12 +270,6 @@ print '<div class="info"><span class="">'.$langs->trans("MapEInvoiceProductsDesc
 print ' '.$langs->trans("MapEInvoiceProductsDesc2");
 print '</span>';
 print ' - <a class="" href="'.$vendorrefsurl.'">'.$langs->trans("SeeMappedVendorRefs").'</a>';
-// A line without any vendor reference has nothing to be mapped on, and the default product of the vendor is
-// the only answer for it. Same link as the one the synchronization suggests, so the page is not a dead end.
-if ($socid > 0 && $permissiontosetdefaultproduct) {
-	$defaultproducturl = dol_buildpath('/societe/card.php', 1).'?socid='.((int) $socid).'&action=edit&highlight=routing_product_id#treinvoicing';
-	print ' - <a class="" href="'.dol_escape_htmltag($defaultproducturl).'" target="_blank">'.$langs->trans("SetDefaultProductForThirdparty").'</a>';
-}
 print '</div><br>';
 
 // Form to select the flow to work on (prefilled when we come from the synchronization result)
@@ -414,6 +408,13 @@ if (!empty($parsedLines)) {
 	}
 	if ($permissiontoadd && $socid > 0 && $nbtomap > 0) {
 		print '<input type="submit" class="button" value="'.$langs->trans("SaveMappingAndCreateVendorRefs").'">';
+	}
+	// A line without any vendor reference has nothing to be mapped on, and the default product of the vendor
+	// is the only answer for it. Same link as the one the synchronization suggests, so the page is not a
+	// dead end - and a button, because it is reached when nothing else on the page can be done.
+	if ($socid > 0 && $permissiontosetdefaultproduct) {
+		$defaultproducturl = dol_buildpath('/societe/card.php', 1).'?socid='.((int) $socid).'&action=edit&highlight=routing_product_id#treinvoicing';
+		print '<a class="button" href="'.dol_escape_htmltag($defaultproducturl).'" target="_blank">'.$langs->trans("SetDefaultProductForThirdparty").'</a>';
 	}
 	print '<a class="button button-cancel" href="'.dol_buildpath('/einvoicing/document_list.php', 1).'">'.$langs->trans("BackToSynchronization").'</a>';
 	print '</div>';
