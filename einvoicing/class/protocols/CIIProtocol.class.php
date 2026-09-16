@@ -4437,8 +4437,9 @@ class CIIProtocol extends AbstractProtocol
 			// The name is a label only: its own extension is dropped, the mime code gives the real one
 			$filename = trim($node->getAttribute('filename'));
 			if ($filename === '') {
-				$parent = $node->parentNode;
-				$filename = ($parent instanceof DOMElement) ? trim($parent->textContent) : '';
+				// Falls back on BT-122, the identifier of the referenced document, never on the
+				// text of the parent: that one carries the base64 of this very node
+				$filename = trim((string) $xpath->evaluate('string(../*[local-name()="IssuerAssignedID"])', $node));
 			}
 			$filename = preg_replace('/\.[A-Za-z0-9]{1,8}$/', '', basename($filename));
 			$filename = dol_sanitizeFileName((string) $filename);
@@ -4473,6 +4474,7 @@ class CIIProtocol extends AbstractProtocol
 		global $conf;
 
 		$stored = array();
+		$storednames = array();
 
 		if (empty($attachments)) {
 			return $stored;
@@ -4492,7 +4494,7 @@ class CIIProtocol extends AbstractProtocol
 
 			// Same naming as the other imported files: <ref_supplier>_<suffix>.<ext>
 			$suffix = $attachment['filename'];
-			if (in_array($suffix, $stored, true)) {
+			if (in_array($suffix . '.' . $attachment['extension'], $storednames, true)) {
 				$suffix .= '_' . ((int) $rank + 1);
 			}
 
@@ -4504,6 +4506,7 @@ class CIIProtocol extends AbstractProtocol
 			}
 
 			$stored[$rank] = $suffix;
+			$storednames[] = $suffix . '.' . $attachment['extension'];
 			$return_messages[] = 'Embedded attachment ' . dol_escape_htmltag($suffix . '.' . $attachment['extension']) . ' saved as attachment';
 		}
 
