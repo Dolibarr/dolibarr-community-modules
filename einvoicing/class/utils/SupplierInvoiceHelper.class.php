@@ -26,7 +26,9 @@ dol_include_once('einvoicing/class/einvoicing.class.php');
 dol_include_once('einvoicing/class/protocols/ProtocolManager.class.php');
 dol_include_once('einvoicing/class/document.class.php');
 // calcul_price_total(), used below to recompute the totals of a line the way the invoice got them.
-require_once DOL_DOCUMENT_ROOT.'/core/lib/price.lib.php';
+// The core ships install/inc.php, which defines DOL_DOCUMENT_ROOT as '..', and PHPStan resolves the
+// constant against it: the path it reports does not exist, the one used at runtime does.
+require_once DOL_DOCUMENT_ROOT.'/core/lib/price.lib.php';  // @phpstan-ignore requireOnce.fileNotFound
 dol_include_once('fourn/class/fournisseur.facture.class.php');
 dol_include_once('einvoicing/lib/einvoicing.lib.php');
 
