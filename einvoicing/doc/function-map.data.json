@@ -2048,6 +2048,11 @@
 							"try the Original document before the Converted one"
 						],
 						[
+							"`EINVOICING_KEEP_RECEIVED_XML_AS_IS`",
+							"IN",
+							"hidden: keep the attached XML as the access point returned it, embedded files included, instead of storing them as attached files only"
+						],
+						[
 							"`EINVOICING_USE_EXTERNAL_FACTURX_READER`",
 							"IN",
 							"read a received Factur-X with the external library instead of the CII parser"
