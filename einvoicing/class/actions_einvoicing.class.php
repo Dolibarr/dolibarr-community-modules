@@ -1626,6 +1626,22 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	}
 
 	/**
+	 * Build the sub query returning the recipients the last lifecycle status of a customer invoice was
+	 * addressed to. Same source as EInvoicing::fetchLastknownInvoiceStatus(), which the card reads, so
+	 * a rejection is named the same way in the list and on the card (issue #973).
+	 *
+	 * @return string								SQL sub query (without the surrounding parenthesis), correlated on f.rowid
+	 */
+	protected static function getCustomerLifecycleRolesSubQuery()
+	{
+		$sql = 'SELECT lc.lc_recipient_roles FROM ' . MAIN_DB_PREFIX . 'einvoicing_lifecycle_msg as lc';
+		$sql .= " WHERE lc.element_type = 'facture' AND lc.element_id = f.rowid";
+		$sql .= ' ORDER BY lc.rowid DESC LIMIT 1';
+
+		return $sql;
+	}
+
+	/**
 	 * Add SELECT fields
 	 *
 	 * @param array<string,mixed> 	$parameters		Array of parameters
@@ -1640,6 +1656,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		if (in_array('invoicelist', explode(':', $parameters['context']))) {
 			$this->resprints .= ', ext.rowid AS pdplink_id, ext.provider AS pdp_provider';
 			$this->resprints .= ', ext.syncstatus AS pdp_syncstatus';
+			$this->resprints .= ', (' . self::getCustomerLifecycleRolesSubQuery() . ') AS pdp_lcrecipients';
 		}
 
 		// Supplier invoice list, Product list, Soc list
@@ -2078,7 +2095,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 			// E-invoice sync status
 			if (empty($parameters['arrayfields']['pdp_syncstatus']) || !empty($parameters['arrayfields']['pdp_syncstatus']['checked'])) {
-				$currentStatusDetails = $obj->pdp_syncstatus ? $einvoicing->getStatusLabel($obj->pdp_syncstatus) : '';
+				$currentStatusDetails = $obj->pdp_syncstatus ? $einvoicing->getStatusLabel($obj->pdp_syncstatus, 'facture', $obj->pdp_lcrecipients ?? '') : '';
 				print '<td class="center tdoverflowmax100" title="' . dolPrintHTMLForAttribute($currentStatusDetails) . '">';
 				print $currentStatusDetails;
 				print '</td>';

@@ -70,18 +70,20 @@ function einvoicingLifecycleFlux($status, $direction)
  * Human label for a lifecycle event: the provider's own message when it carries more context than the
  * bare status code, otherwise the module's canonical status label.
  *
- * @param EInvoicing $einvoicing EInvoicing instance (source of canonical status labels)
- * @param int        $status     Lifecycle status code
- * @param string     $override   Provider message (lc_status_message), if any
+ * @param EInvoicing $einvoicing      EInvoicing instance (source of canonical status labels)
+ * @param int        $status          Lifecycle status code
+ * @param string     $override        Provider message (lc_status_message), if any
+ * @param string     $elementType     Element the status is carried by, when known
+ * @param string     $recipientRoles  RoleCodes the status was addressed to, when known
  * @return string
  */
-function einvoicingLifecycleLabel($einvoicing, $status, $override = '')
+function einvoicingLifecycleLabel($einvoicing, $status, $override = '', $elementType = '', $recipientRoles = '')
 {
 	$override = trim((string) $override);
 	if ($override !== '' && $override !== (string) $status) {
 		return $override;
 	}
-	return $einvoicing->getStatusLabel($status);
+	return $einvoicing->getStatusLabel($status, $elementType, $recipientRoles);
 }
 
 /**

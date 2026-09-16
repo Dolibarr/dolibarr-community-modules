@@ -524,6 +524,12 @@ class EInvoicing
 		]
 	];
 
+	/**
+	 * RoleCode of the buyer among the recipients a CDAR addresses a status to (CdarHandler::ROLE_BY).
+	 * Its presence on a rejection is what says the buyer's platform posted it - see getStatusLabel().
+	 */
+	const CDAR_ROLE_BUYER = 'BY';
+
 	const STATUS_REQUIRING_REASONS = [
 		self::STATUS_REFUSED,
 		self::STATUS_DISPUTED,
@@ -757,27 +763,57 @@ class EInvoicing
 	 *
 	 * "Rejected" (213) is the only code XP Z12-012 lets two different platforms issue (annex A, sheet
 	 * "Acteurs CDV", where it has one row per issuer): the seller's AP rejects at emission, the buyer's
-	 * AP at reception. Only the element tells them apart - XP Z12-014 annex A 2.2 forbids transmitting
-	 * an emission rejection to the recipient, so a 213 carried by a supplier invoice is necessarily the
-	 * buyer's AP. On a customer invoice both remain possible and the label names neither (issue #973).
+	 * AP at reception. Two things tell them apart, and neither is the code (issue #973):
 	 *
-	 * @param int|string 	$code			Code
-	 * @param string	 	$elementType	Element the status is carried by ('facture', 'invoice_supplier'), when known
-	 * @return string						Label
+	 * - the element. XP Z12-014 annex A 2.2 forbids transmitting an emission rejection to the
+	 *   recipient, so a 213 carried by a supplier invoice is necessarily the buyer's AP;
+	 * - who the status was addressed to. The same sheet gives the reception rejection two recipients,
+	 *   the seller AND the buyer, and the emission one only the seller. Read from the CDAR and stored
+	 *   as lc_recipient_roles; absent on a message recorded before that column existed, and the label
+	 *   then names neither AP rather than guess.
+	 *
+	 * @param int|string 	$code				Code
+	 * @param string	 	$elementType		Element the status is carried by ('facture', 'invoice_supplier'), when known
+	 * @param string		$recipientRoles		RoleCodes the status was addressed to ('SE', 'SE,BY'), when known
+	 * @return string							Label
 	 */
-	public function getStatusLabel($code, $elementType = '')
+	public function getStatusLabel($code, $elementType = '', $recipientRoles = '')
 	{
 		global $langs;
 
 		$code = (int) $code;
 
-		if ($code === self::STATUS_REJECTED && $elementType === 'invoice_supplier') {
-			return $langs->transnoentitiesnoconv('EInvStatus213RejectedByBuyerAP');
+		if ($code === self::STATUS_REJECTED) {
+			$key = $this->rejectionLabelKey($elementType, $recipientRoles);
+			if ($key !== '') {
+				return $langs->transnoentitiesnoconv($key);
+			}
 		}
 
 		return $langs->transnoentitiesnoconv(
 			self::STATUS_LABEL_KEYS[$code] ?? 'EInvStatusUnknown'
 		);
+	}
+
+	/**
+	 * Which of the two rejections a 213 is, as a translation key, or '' when it cannot be told.
+	 *
+	 * @param string	$elementType		Element the status is carried by
+	 * @param string	$recipientRoles		RoleCodes the status was addressed to
+	 * @return string						Translation key, '' to fall back on the neutral label
+	 */
+	private function rejectionLabelKey($elementType, $recipientRoles)
+	{
+		if ($elementType === 'invoice_supplier') {
+			return 'EInvStatus213RejectedByBuyerAP';
+		}
+
+		$roles = array_filter(array_map('trim', explode(',', strtoupper((string) $recipientRoles))));
+		if (empty($roles)) {
+			return '';
+		}
+
+		return in_array(self::CDAR_ROLE_BUYER, $roles, true) ? 'EInvStatus213RejectedByBuyerAP' : 'EInvStatus213RejectedBySellerAP';
 	}
 
 	/**
@@ -2203,7 +2239,7 @@ class EInvoicing
 		if ($provider) {
 			// Get current status
 			$currentStatus = '-';
-			$sql = "SELECT lc_status, lc_reason_code, lc_status_message FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
+			$sql = "SELECT lc_status, lc_reason_code, lc_status_message, lc_recipient_roles FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
 			$sql .= " WHERE element_type = '" . $this->db->escape($object->element) . "'";
 			$sql .= " AND element_id = " . (int) $object->id;
 			$sql .= " AND lc_validation_status = 'Ok'";
@@ -2212,7 +2248,7 @@ class EInvoicing
 			$obj = null;
 			if ($resql && $this->db->num_rows($resql) > 0) {
 				$obj = $this->db->fetch_object($resql);
-				$currentStatus = $this->getStatusLabel($obj->lc_status, $object->element);
+				$currentStatus = $this->getStatusLabel($obj->lc_status, $object->element, $obj->lc_recipient_roles ?? '');
 			}
 			$this->db->free($resql);
 			// Current status
@@ -2734,7 +2770,8 @@ class EInvoicing
 			'override_routing_id' => '',
 			'otherprovider' => '',
 			'ap_precheck_status' => '',
-			'ap_precheck_result' => ''
+			'ap_precheck_result' => '',
+			'recipientRoles' => ''
 		);
 
 		$provider = getDolGlobalString('EINVOICING_PDP');
@@ -2824,7 +2861,7 @@ class EInvoicing
 		$this->db->free($resql);
 
 		// Fetch last status message from einvoicing_lifecycle_msg table to get more details on current status of the invoice into the PDP system
-		$sql = "SELECT lc_status, lc_reason_code FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
+		$sql = "SELECT lc_status, lc_reason_code, lc_recipient_roles FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
 		$sql .= " WHERE element_type = 'facture'";
 		$sql .= " AND element_id = " . (int) $invoiceId;
 		$sql .= " ORDER BY rowid DESC LIMIT 1";
@@ -2834,6 +2871,12 @@ class EInvoicing
 			if ($this->db->num_rows($resql) > 0) {
 				$obj = $this->db->fetch_object($resql);
 				$status['reasonCode'] = $obj->lc_reason_code ?? '';
+				$status['recipientRoles'] = $obj->lc_recipient_roles ?? '';
+				// The label above was built from the extlinks code alone, which cannot tell the two
+				// rejections apart; redo it now that the message the code came from has been read.
+				if ((int) $status['code'] === self::STATUS_REJECTED && (int) $obj->lc_status === self::STATUS_REJECTED) {
+					$status['status'] = $this->getStatusLabel(self::STATUS_REJECTED, 'facture', $status['recipientRoles']);
+				}
 			}
 		} else {
 			dol_print_error($this->db);
@@ -3480,9 +3523,10 @@ class EInvoicing
 	 * @param string 		$validationMessage     	Validation or error message returned by PDP, if status is sent by dolibarr to PDP
 	 * @param string|null 	$date_creation    		Date of the event, if we want to store a past event (for example when importing lifecycle history from PDP), if null current date will be used
 	 * @param string		$reasonCode				Reason code
+	 * @param string		$recipientRoles			RoleCodes the CDAR addressed the status to ('SE', 'SE,BY'), for a status we received
 	 * @return int  								Rowid inserted or -1 on error
 	 */
-	public function storeStatusMessage($elementId, $elementType, $statusCode, $statusMessage = '', $direction = 'OUT', $flowId = '', $validationStatus = '', $validationMessage = '', $date_creation = null, $reasonCode = '')
+	public function storeStatusMessage($elementId, $elementType, $statusCode, $statusMessage = '', $direction = 'OUT', $flowId = '', $validationStatus = '', $validationMessage = '', $date_creation = null, $reasonCode = '', $recipientRoles = '')
 	{
 		global $db, $user;
 
@@ -3508,7 +3552,8 @@ class EInvoicing
 		$sql .= "lc_validation_message, ";
 		$sql .= "date_creation, ";
 		$sql .= "fk_user_creat, ";
-		$sql .= "lc_reason_code";
+		$sql .= "lc_reason_code, ";
+		$sql .= "lc_recipient_roles";
 		$sql .= ") VALUES (";
 		$sql .= (int) $elementId . ", ";
 		$sql .= "'" . $db->escape($elementType) . "', ";
@@ -3521,7 +3566,8 @@ class EInvoicing
 		$sql .= "'" . $db->escape($validationMessage) . "', ";
 		$sql .= "'" . $db->escape($date_creation) . "', ";
 		$sql .= (int) $user->id . ", ";
-		$sql .= "'" . $db->escape($reasonCode) . "'";
+		$sql .= "'" . $db->escape($reasonCode) . "', ";
+		$sql .= "'" . $db->escape($recipientRoles) . "'";
 		$sql .= ")";
 
 		$resql = $db->query($sql);
@@ -3635,13 +3681,13 @@ class EInvoicing
 	 *
 	 * @param	string	$elementType	Element type as stored in the table ('facture', 'invoice_supplier', ...)
 	 * @param	int		$elementId		Element id
-	 * @return	array{rowid:int,provider:string,flow_id:string,direction:string,lc_status:int,lc_status_message:string,lc_validation_status:string,lc_validation_message:string,lc_reason_code:string,date_creation:int}[]	Ordered events (oldest first), empty array if none or on SQL error
+	 * @return	array{rowid:int,provider:string,flow_id:string,direction:string,lc_status:int,lc_status_message:string,lc_validation_status:string,lc_validation_message:string,lc_reason_code:string,lc_recipient_roles:string,date_creation:int}[]	Ordered events (oldest first), empty array if none or on SQL error
 	 */
 	public function fetchLifecycleEvents($elementType, $elementId)
 	{
 		global $db;
 
-		$sql = "SELECT rowid, provider, flow_id, direction, lc_status, lc_status_message, lc_validation_status, lc_validation_message, lc_reason_code, date_creation";
+		$sql = "SELECT rowid, provider, flow_id, direction, lc_status, lc_status_message, lc_validation_status, lc_validation_message, lc_reason_code, lc_recipient_roles, date_creation";
 		$sql .= " FROM " . $db->prefix() . "einvoicing_lifecycle_msg";
 		$sql .= " WHERE element_type = '" . $db->escape($elementType) . "'";
 		$sql .= " AND element_id = " . (int) $elementId;
@@ -3665,6 +3711,7 @@ class EInvoicing
 				'lc_validation_status' => (string) $obj->lc_validation_status,
 				'lc_validation_message' => (string) $obj->lc_validation_message,
 				'lc_reason_code' => (string) $obj->lc_reason_code,
+				'lc_recipient_roles' => (string) ($obj->lc_recipient_roles ?? ''),
 				'date_creation' => (int) $db->jdate($obj->date_creation),
 			];
 		}

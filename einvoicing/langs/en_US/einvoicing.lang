@@ -295,6 +295,7 @@ EInvStatus211PaymentTransmitted=Payment transmitted
 EInvStatus212PaymentReceived=Payment received
 EInvStatus213Rejected=Rejected by an AP
 EInvStatus213RejectedByBuyerAP=Rejected by buyer's AP
+EInvStatus213RejectedBySellerAP=Rejected by seller's AP
 EinvoiceEventsTab=E-Invoice Events
 StartSynchronizationFrom=Launch synchronization from
 MinusConfiguredOffset=Minus

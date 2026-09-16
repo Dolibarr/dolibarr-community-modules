@@ -1208,6 +1208,7 @@ abstract class AbstractPDPProvider
 		$document->cdar_reason_code = isset($refDoc['StatusReasonCode']) ? $refDoc['StatusReasonCode'] : '';
 		$document->cdar_reason_desc = isset($refDoc['StatusReason']) ? $refDoc['StatusReason'] : '';
 		$document->cdar_reason_detail = isset($refDoc['StatusIncludedNoteContent']) ? $refDoc['StatusIncludedNoteContent'] : '';
+		$recipientRoles = CdarHandler::recipientRoles($cdarDocument);
 
 		// The referenced document is the vendor invoice, identified the way its issuer numbered it:
 		// that is our ref_supplier, and the issuing party is the vendor it belongs to.
@@ -1283,7 +1284,8 @@ abstract class AbstractPDPProvider
 			$document->ack_status,
 			$document->ack_info,
 			$document->submittedat,
-			$document->cdar_reason_code
+			$document->cdar_reason_code,
+			$recipientRoles
 		) : -1);
 
 		if ($resExtLink <= 0 || $resStatusMessage <= 0) {
