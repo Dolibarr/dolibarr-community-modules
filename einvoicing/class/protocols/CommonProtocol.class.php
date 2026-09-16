@@ -1129,18 +1129,19 @@ trait CommonProtocol
 		// Search in product supplier prices table using prodsellerid (the ref of product of the vendor)
 		// An absent reference is not a search key: looked up as it stands it matches any vendor price
 		// row whose ref_fourn is empty, and binds the line to a product that has nothing to do with it.
-		$searchrefs = array();
-		foreach (array('prodsellerid', 'prodname') as $lookupkey) {
-			$lookupvalue = trim((string) ($lineData[$lookupkey] ?? ''));
-			if ($lookupvalue !== '') {
-				$searchrefs[] = "pfp.ref_fourn = '" . $db->escape($lookupvalue) . "'";
-			}
-		}
-		if (!empty($searchrefs)) {
+		$sellerref = trim((string) ($lineData['prodsellerid'] ?? ''));
+		$searchname = trim((string) ($lineData['prodname'] ?? ''));
+		if ($sellerref !== '' || $searchname !== '') {
 			$sql = "SELECT p.rowid ";
 			$sql .= " FROM " . MAIN_DB_PREFIX . "product as p ";
 			$sql .= " INNER JOIN " . MAIN_DB_PREFIX . "product_fournisseur_price as pfp ON pfp.fk_product = p.rowid ";
-			$sql .= " WHERE (" . implode(' OR ', $searchrefs) . ") ";
+			if ($sellerref !== '' && $searchname !== '') {
+				$sql .= " WHERE (pfp.ref_fourn = '" . $db->escape($sellerref) . "' OR pfp.ref_fourn = '" . $db->escape($searchname) . "') ";
+			} elseif ($sellerref !== '') {
+				$sql .= " WHERE pfp.ref_fourn = '" . $db->escape($sellerref) . "' ";
+			} else {
+				$sql .= " WHERE pfp.ref_fourn = '" . $db->escape($searchname) . "' ";
+			}
 			$sql .= " AND pfp.fk_soc = " . intval($lineData['supplierId'] ?? 0) . " ";
 			$sql .= " AND p.entity IN (" . getEntity('product') . ")";
 			$sql .= " LIMIT 1";

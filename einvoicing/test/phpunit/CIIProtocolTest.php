@@ -588,7 +588,7 @@ class CIIProtocolTest extends CommonClassTest
 
 		require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
 
-		$socid = $this->createBenchSupplier();
+		$socid = $this->vendorWithoutAnyPrice();
 
 		$product = new Product($db);
 		$product->ref = 'EITEST-' . uniqid();
@@ -642,24 +642,21 @@ class CIIProtocolTest extends CommonClassTest
 	}
 
 	/**
-	 * Create a vendor of its own for the fixtures. A unique key allows a single vendor price with an
-	 * empty ref_fourn per vendor, so an existing one cannot be reused to carry the fixture.
+	 * A vendor id carrying no vendor price at all, so the fixture is the only row the lookup can see.
+	 * A unique key allows a single price with an empty ref_fourn per vendor, so an existing vendor
+	 * cannot be reused; product_fournisseur_price.fk_soc has no foreign key, so no third party is
+	 * needed to hold the row either.
 	 *
-	 * @return int	Id of the created third party
+	 * @return int	Vendor id free of any vendor price
 	 */
-	private function createBenchSupplier()
+	private function vendorWithoutAnyPrice()
 	{
-		global $db, $user;
+		global $db;
 
-		require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
+		$resql = $db->query("SELECT COALESCE(MAX(fk_soc), 0) + 1 as freesoc FROM " . MAIN_DB_PREFIX . "product_fournisseur_price");
+		$this->assertNotFalse($resql, 'could not read the vendor prices: ' . $db->lasterror());
+		$obj = $db->fetch_object($resql);
 
-		$supplier = new Societe($db);
-		$supplier->initAsSpecimen();
-		$supplier->name = 'Bench vendor ' . uniqid();
-		$supplier->fournisseur = 1;
-		$supplier->client = 0;
-		$this->assertGreaterThan(0, $supplier->create($user), $supplier->errorsToString());
-
-		return (int) $supplier->id;
+		return (int) $obj->freesoc;
 	}
 }
