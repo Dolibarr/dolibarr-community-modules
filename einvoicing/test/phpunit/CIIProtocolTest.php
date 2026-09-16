@@ -586,24 +586,22 @@ class CIIProtocolTest extends CommonClassTest
 	{
 		global $conf, $db, $user;
 
-		require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
-
 		$socid = $this->vendorWithoutAnyPrice();
 
-		$product = new Product($db);
-		$product->ref = 'EITEST-' . uniqid();
-		$product->label = 'Bench product reachable only through an empty vendor reference';
-		$product->type = 1;
-		$product->status = 0;
-		$product->status_buy = 1;
-		$product->price_base_type = 'HT';
-		$product->tva_tx = 20;
-		$this->assertGreaterThan(0, $product->create($user), $product->errorsToString());
+		// Written in SQL on purpose: Product::create() refuses for reasons that depend on the setup of
+		// the instance (reference module, accountancy defaults), and the fixture only needs a row to
+		// join on. The class-wide transaction of CommonClassTest rolls both inserts back.
+		$sql = "INSERT INTO " . MAIN_DB_PREFIX . "product (entity, datec, ref, label, fk_product_type, tosell, tobuy, tva_tx)";
+		$sql .= " VALUES (" . ((int) $conf->entity) . ", '" . $db->idate(dol_now()) . "'";
+		$sql .= ", 'EITEST-" . $db->escape(uniqid()) . "', 'Bench product reachable only through an empty vendor reference', 1, 0, 1, 20)";
+		$this->assertNotFalse($db->query($sql), 'could not create the bench product: ' . $db->lasterror());
+		$productid = (int) $db->last_insert_id(MAIN_DB_PREFIX . 'product');
+		$this->assertGreaterThan(0, $productid, 'the bench product got no id');
 
 		$sql = "INSERT INTO " . MAIN_DB_PREFIX . "product_fournisseur_price";
 		$sql .= " (entity, datec, fk_product, fk_soc, ref_fourn, price, quantity, unitprice, tva_tx, fk_user)";
 		$sql .= " VALUES (" . ((int) $conf->entity) . ", '" . $db->idate(dol_now()) . "'";
-		$sql .= ", " . ((int) $product->id) . ", " . ((int) $socid) . ", '', 10, 1, 10, 20, " . ((int) $user->id) . ")";
+		$sql .= ", " . ((int) $productid) . ", " . ((int) $socid) . ", '', 10, 1, 10, 20, " . ((int) $user->id) . ")";
 		$this->assertNotFalse($db->query($sql), 'could not create the vendor price with an empty reference: ' . $db->lasterror());
 
 		$protocol = new CIIProtocol($db);
