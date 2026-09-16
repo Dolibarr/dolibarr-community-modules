@@ -263,6 +263,39 @@ jobs:
           SVRL_DIR: ${{ github.workspace }}/svrl
         run: python3 einvoicing/test/conformance/validate-cii.py generated/*.xml
 
+      - name: The defect of #974, rebuilt on what was just generated, has to be refused
+        if: ${{ matrix.validate == 'yes' }}
+        # The first control, because it is the one proving the validator reads a Schematron whole:
+        # until that is shown, the BR-CO-17 control below is green on a reader that may be ignoring
+        # half the SVRL. The defect of #974 is reported, never asserted, and a platform refuses it as
+        # REJ_COH. See einvoicing/test/conformance/damage-line-exemption.php.
+        env:
+          SVRL_DIR: ${{ github.workspace }}/svrl-control-974
+        run: |
+          php einvoicing/test/conformance/damage-line-exemption.php control-974 generated/*.xml
+          refused=0
+          built=0
+          for file in control-974/*.xml; do
+            built=$((built + 1))
+            report="control-974-$(basename "$file").txt"
+            if python3 einvoicing/test/conformance/validate-cii.py "$file" > "$report" 2>&1; then
+              echo "::error::$(basename "$file") is still accepted with an exemption reason on its lines - the validation above is not reading the reports of the Schematron"
+              cat "$report"
+            elif grep -q 'ExemptionReason' "$report"; then
+              refused=$((refused + 1))
+            else
+              # Refused, but not on what the defect lands on: something else changed, and the control
+              # no longer demonstrates what it claims to.
+              echo "::error::$(basename "$file") is refused without naming ram:ExemptionReason"
+              cat "$report"
+            fi
+          done
+          if [ "$refused" -ne "$built" ]; then
+            echo "::error::the rules refused $refused of the $built damaged documents on the line exemption reason"
+            exit 1
+          fi
+          echo "The rules refuse the $built damaged documents on the line exemption reason, as they have to."
+
       - name: The defect of #709, rebuilt on what was just generated, has to be refused
         if: ${{ matrix.validate == 'yes' }}
         # A green validation says something only once the validators are shown to refuse something.
@@ -303,6 +336,7 @@ jobs:
             generated/
             svrl/
             svrl-control/
+            svrl-control-974/
           retention-days: 2
 
   package:
