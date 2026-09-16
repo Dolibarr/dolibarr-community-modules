@@ -4117,11 +4117,19 @@ class EInvoicing
 		$langs->setDefaultLang('en_US');
 		$langs->loadLangs(array('main', 'dict', 'companies', 'bills', 'products', 'einvoicing@einvoicing'));
 
+		// A third specimen party: the same seller, not subject to VAT. get_default_tva() answers 0 for
+		// it and getCategoryRate() reads the regime rather than the rate, so the specimen it sells
+		// comes out exempt (category E) under VATEX-FR-FRANCHISE - the shape of #974, where BT-120 and
+		// BT-121 belong to the VAT breakdown and, below EXTENDED, to nothing else.
+		$exemptSeller = clone $seller;
+		$exemptSeller->tva_assuj = 0;
+
 		$depositXml = '';
 		$standardXml = '';
 		$replacementXml = '';
 		$creditnoteXml = '';
 		$situationXml = '';
+		$exemptXml = '';
 
 		try {
 			$depositXml = self::generateSampleInvoiceXml($seller, $buyer, array(
@@ -4153,6 +4161,12 @@ class EInvoicing
 				'invoicetype' => Facture::TYPE_SITUATION,
 				'referencedinvoice' => '',
 			));
+
+			$exemptXml = self::generateSampleInvoiceXml($exemptSeller, $buyer, array(
+				'invoiceformat' => 'CII',
+				'invoicetype' => Facture::TYPE_STANDARD,
+				'referencedinvoice' => '',
+			));
 		} finally {
 			$conf->global->EINVOICING_PDP = $savEinvoicingPdp;
 			$conf->global->EINVOICING_SPECIMEN_ROUTING_ID = $savEinvoicingRoutingId;
@@ -4164,13 +4178,14 @@ class EInvoicing
 		// The same documents before normalization, for a caller that validates them: normalization
 		// flattens every date to one value, which makes the date rules of the French socle -
 		// BR-FR-CO-07, BR-FR-03, G1.07 - true whatever the document says. Handed back apart, so the
-		// returned array keeps holding five documents and nothing else.
+		// returned array keeps holding the specimens and nothing else.
 		$rawxmls = array(
 			'deposit' => $depositXml,
 			'standard' => $standardXml,
 			'replacement' => $replacementXml,
 			'creditnote' => $creditnoteXml,
 			'situation' => $situationXml,
+			'exempt' => $exemptXml,
 		);
 
 		return array(
@@ -4179,6 +4194,7 @@ class EInvoicing
 			'replacement' => self::normalizeSampleInvoiceXml($replacementXml),
 			'creditnote' => self::normalizeSampleInvoiceXml($creditnoteXml),
 			'situation' => self::normalizeSampleInvoiceXml($situationXml),
+			'exempt' => self::normalizeSampleInvoiceXml($exemptXml),
 		);
 	}
 

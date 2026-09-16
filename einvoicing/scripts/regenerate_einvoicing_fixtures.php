@@ -110,6 +110,7 @@ $files = array(
 	'replacement' => $fixturesDir . '/cii_replacement.xml',
 	'creditnote' => $fixturesDir . '/cii_creditnote.xml',
 	'situation' => $fixturesDir . '/cii_situation.xml',
+	'exempt' => $fixturesDir . '/cii_exempt.xml',
 );
 
 try {
