@@ -1272,7 +1272,12 @@ abstract class AbstractPDPProvider
 		// if the two results are read.
 		// The flow_id of the link is left alone on purpose: on a supplier invoice it points at the
 		// received invoice document, which stays the source of its XML. Only the status moves.
-		$resExtLink = $einvoicing->insertOrUpdateExtLink($supplierInvoice->id, $supplierInvoice->element, '', $document->cdar_lifecycle_code, '', $statusComment);
+		// 0 leaves the status the invoice already carries untouched: a duplicate rejection refuses the
+		// new delivery, not the invoice the platform already holds and this status quotes (issue #985).
+		$statusToRecord = $einvoicing->isTransmissionOnlyRejection($supplierInvoice->id, $supplierInvoice->element, $document->cdar_lifecycle_code, $document->cdar_reason_code)
+			? 0 : $document->cdar_lifecycle_code;
+
+		$resExtLink = $einvoicing->insertOrUpdateExtLink($supplierInvoice->id, $supplierInvoice->element, '', $statusToRecord, '', $statusComment);
 
 		$resStatusMessage = ($resExtLink > 0 ? $einvoicing->storeStatusMessage(
 			$supplierInvoice->id,

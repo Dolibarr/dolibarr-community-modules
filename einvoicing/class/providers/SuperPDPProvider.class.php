@@ -2613,6 +2613,11 @@ class SuperPDPProvider extends AbstractPDPProvider
 								$syncStatus = $einvoicing::STATUS_ERROR;
 								$syncComment = $document->ack_info;
 							}
+							// 0 keeps the status the invoice already carries: a duplicate rejection refuses the
+							// new delivery, not the invoice the platform holds and quotes (issue #985).
+							if ($einvoicing->isTransmissionOnlyRejection($factureObj->id, $factureObj->element, $syncStatus, $document->cdar_reason_code)) {
+								$syncStatus = 0;
+							}
 							$einvoicing->insertOrUpdateExtLink($factureObj->id, $factureObj->element, $flowId, $syncStatus, $factureObj->ref, $syncComment);
 
 							$einvoicing->storeStatusMessage($document->fk_element_id, $document->fk_element_type, $document->cdar_lifecycle_code, $syncComment, $document->flow_direction, $flowId, $syncValidationStatus, $syncValidationComment, $document->submittedat, $document->cdar_reason_code, $recipientRoles);
