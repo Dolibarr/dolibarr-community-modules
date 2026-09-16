@@ -547,4 +547,22 @@ class CIIProtocolTest extends CommonClassTest
 			$this->assertSame('2026-09-30 00:00:00', dol_print_date($period['end'], '%Y-%m-%d %H:%M:%S', 'tzserver'), 'wrong end in ' . $tz);
 		}
 	}
+
+	/**
+	 * The bill of exchange awaiting acceptance, and the generic bank card and direct debit codes, reach a
+	 * Dolibarr payment mode on import. 48 and 49 are what many senders write, rather than the credit card (54)
+	 * and SEPA direct debit (59) variants the table already knew.
+	 *
+	 * @return void
+	 */
+	public function testGenericPaymentMeansCodesAreMapped()
+	{
+		$map = new ReflectionProperty(CIIProtocol::class, 'UNTDID4461_TO_DOLIBARR_PAIEMENT_CODE');
+		$map->setAccessible(true);
+		$codes = $map->getValue();
+
+		$this->assertSame('TRA', $codes['24'] ?? null, 'bill of exchange awaiting acceptance');
+		$this->assertSame('CB', $codes['48'] ?? null, 'bank card');
+		$this->assertSame('PRE', $codes['49'] ?? null, 'direct debit');
+	}
 }
