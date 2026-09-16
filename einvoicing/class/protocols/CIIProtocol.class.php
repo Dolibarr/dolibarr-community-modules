@@ -68,6 +68,22 @@ class CIIProtocol extends AbstractProtocol
 	/** @const string Default profile used to generate XML, overridable with EINVOICING_XML_PROFILE */
 	const BUILD_XML_PROFILE = 'EN16931';
 
+	/**
+	 * Mime codes an attached document (BT-125-1) may declare, and the extension each one is stored under.
+	 * This list is the one EN 16931 allows, and it is also the allowlist: a mime code absent here is not
+	 * extracted, so a received document cannot have this module write an executable extension on disk.
+	 *
+	 * @const array<string,string>
+	 */
+	const ATTACHMENT_MIME_EXTENSIONS = array(
+		'application/pdf' => 'pdf',
+		'image/png' => 'png',
+		'image/jpeg' => 'jpg',
+		'text/csv' => 'csv',
+		'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
+		'application/vnd.oasis.opendocument.spreadsheet' => 'ods'
+	);
+
 	/** @var string[] Profiles buildXML() knows how to emit, and accepted values of EINVOICING_XML_PROFILE */
 	const SUPPORTED_XML_PROFILES = ['MINIMUM', 'BASICWL', 'BASIC', 'EN16931', 'EXTENDED', 'EXTENDEDFR'];
 
@@ -1009,6 +1025,8 @@ class CIIProtocol extends AbstractProtocol
 
 			// Supplier invoice already found but may be that documents are downloaded or were removed
 			// Save documents in supplier invoice attachments if they do not exists yet.
+			$this->storeEmbeddedAttachmentsAndScrubXml($supplierInvoice, $sourceXml, $file, $tempFile, $return_messages);
+
 			if ($tempFile && file_exists($tempFile)) {
 				$res = $this->saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempFile);
 
@@ -1292,6 +1310,10 @@ class CIIProtocol extends AbstractProtocol
 
 			$return_messages[] = 'Supplier Invoice created or updated with ID: ' . $supplierInvoiceId;
 
+
+			// The files the issuer embedded are pulled out before the XML is stored, and the XML then
+			// keeps a note in their place: nothing here ever reads a binary back out of it (issue #980).
+			$this->storeEmbeddedAttachmentsAndScrubXml($supplierInvoice, $sourceXml, $file, $tempFile, $return_messages);
 
 			// Save original invoice in supplier invoice attachments
 			if ($tempFile && file_exists($tempFile)) {
@@ -4328,9 +4350,10 @@ class CIIProtocol extends AbstractProtocol
 	/**
 	 * Remove attachment nodes to get a smaller XML
 	 * @param string $xmlData The XML data to process
+	 * @param string $note    What is written in place of the binary, told to whoever reads the XML later
 	 * @return string Cleaned XML
 	 */
-	public static function removeAttachmentFromXml(string $xmlData): string
+	public static function removeAttachmentFromXml(string $xmlData, string $note = self::ATTACHMENT_REMOVED_NOTE): string
 	{
 		$xmlDoc = new DOMDocument();
 		if (!$xmlDoc->loadXML($xmlData)) {
@@ -4345,7 +4368,7 @@ class CIIProtocol extends AbstractProtocol
 		if (count($attachedDocumentNodes) >= 1) {
 			foreach ($attachedDocumentNodes as $attachedDocumentNode) {
 				// Just replace node value
-				$attachedDocumentNode->nodeValue = '[Removed to get a smaller XML]';
+				$attachedDocumentNode->nodeValue = $note;
 				// Or completely remove node if you prefer :
 				// if ($attachedDocumentNode && isset($attachedDocumentNode->parentNode)) {
 				// 	$attachedDocumentNode->parentNode->removeChild($attachedDocumentNode);
@@ -4355,5 +4378,187 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		return $xmlData;
+	}
+
+	/**
+	 * The files an issuer embedded in its invoice (BT-125), decoded and named.
+	 *
+	 * A base64 blob is only returned when its declared mime code (BT-125-1) is one EN 16931 allows: the
+	 * extension is taken from that code, never from the file name the document carries, so a received
+	 * document cannot choose the extension its content is stored under.
+	 *
+	 * @param  string $xmlData The received CII XML
+	 * @return array<int,array{filename:string,mimecode:string,extension:string,content:string}>	One entry per readable attachment, in document order
+	 */
+	public static function extractEmbeddedAttachments(string $xmlData): array
+	{
+		$attachments = array();
+
+		if ($xmlData === '') {
+			return $attachments;
+		}
+
+		$xmlDoc = new DOMDocument();
+		if (!@$xmlDoc->loadXML($xmlData)) {
+			dol_syslog(__METHOD__ . " failed to load XML data, no attachment extracted", LOG_WARNING, 0, '_einvoicing');
+			return $attachments;
+		}
+
+		$xpath = new DOMXPath($xmlDoc);
+		// Namespace agnostic on purpose, like removeAttachmentFromXml() above
+		$nodes = $xpath->query('//*[local-name()="AdditionalReferencedDocument"]/*[local-name()="AttachmentBinaryObject"]');
+		if ($nodes === false) {
+			return $attachments;
+		}
+
+		$rank = 0;
+		foreach ($nodes as $node) {
+			$rank++;
+			if (!($node instanceof DOMElement)) {
+				continue;
+			}
+
+			$mimecode = strtolower(trim($node->getAttribute('mimeCode')));
+			if (!isset(self::ATTACHMENT_MIME_EXTENSIONS[$mimecode])) {
+				dol_syslog(__METHOD__ . " attachment #" . $rank . " ignored, mime code " . ($mimecode === '' ? '(none)' : $mimecode) . " is not one EN 16931 allows", LOG_WARNING, 0, '_einvoicing');
+				continue;
+			}
+
+			$base64 = preg_replace('/\s+/', '', (string) $node->nodeValue);
+			$content = ($base64 === '' || $base64 === null) ? false : base64_decode($base64, true);
+			if ($content === false || $content === '') {
+				// An already scrubbed document lands here too: its node holds a note, not base64
+				dol_syslog(__METHOD__ . " attachment #" . $rank . " ignored, its content is not readable base64", LOG_WARNING, 0, '_einvoicing');
+				continue;
+			}
+
+			$extension = self::ATTACHMENT_MIME_EXTENSIONS[$mimecode];
+
+			// The name is a label only: its own extension is dropped, the mime code gives the real one
+			$filename = trim($node->getAttribute('filename'));
+			if ($filename === '') {
+				$parent = $node->parentNode;
+				$filename = ($parent instanceof DOMElement) ? trim($parent->textContent) : '';
+			}
+			$filename = preg_replace('/\.[A-Za-z0-9]{1,8}$/', '', basename($filename));
+			$filename = dol_sanitizeFileName((string) $filename);
+			if ($filename === '' || $filename === '-') {
+				$filename = 'attachment' . $rank;
+			}
+
+			$attachments[] = array(
+				'filename' => $filename,
+				'mimecode' => $mimecode,
+				'extension' => $extension,
+				'content' => $content
+			);
+		}
+
+		return $attachments;
+	}
+
+	/**
+	 * Store the files the issuer embedded (BT-125) as attached files of the supplier invoice.
+	 *
+	 * This is what makes them reachable at all: the readers of this module only ever look at the
+	 * invoice data of the XML, never at the binary it carries (issue #980).
+	 *
+	 * @param  FactureFournisseur				$supplierInvoice	The imported supplier invoice
+	 * @param  array<int,array{filename:string,mimecode:string,extension:string,content:string}>	$attachments	What extractEmbeddedAttachments() returned
+	 * @param  string[]							$return_messages	Messages of the import, completed here
+	 * @return string[]							The names actually stored, keyed by the rank of the attachment
+	 */
+	protected function saveEmbeddedAttachmentsToSupplierInvoice($supplierInvoice, array $attachments, array &$return_messages): array
+	{
+		global $conf;
+
+		$stored = array();
+
+		if (empty($attachments)) {
+			return $stored;
+		}
+
+		$tempDir = $conf->einvoicing->dir_temp;
+		if (!dol_is_dir($tempDir)) {
+			dol_mkdir($tempDir);
+		}
+
+		foreach ($attachments as $rank => $attachment) {
+			$tempPath = $tempDir . '/in_' . bin2hex(random_bytes(8)) . '_embedded.' . $attachment['extension'];
+			if (file_put_contents($tempPath, $attachment['content']) === false) {
+				$return_messages[] = 'Failed to write embedded attachment ' . dol_escape_htmltag($attachment['filename']) . ' to temporary location';
+				continue;
+			}
+
+			// Same naming as the other imported files: <ref_supplier>_<suffix>.<ext>
+			$suffix = $attachment['filename'];
+			if (in_array($suffix, $stored, true)) {
+				$suffix .= '_' . ((int) $rank + 1);
+			}
+
+			$res = $this->saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempPath, $suffix, $attachment['extension']);
+			if ($res['res'] < 0) {
+				dol_delete_file($tempPath, 0, 1);
+				$return_messages[] = 'Failed to save embedded attachment as attachment: ' . $res['message'];
+				continue;
+			}
+
+			$stored[$rank] = $suffix;
+			$return_messages[] = 'Embedded attachment ' . dol_escape_htmltag($suffix . '.' . $attachment['extension']) . ' saved as attachment';
+		}
+
+		return $stored;
+	}
+
+	/**
+	 * Pull the embedded files out of a received document, then take them out of the XML about to be stored.
+	 *
+	 * The binary is not lost by that scrub, it is the very file stored next to the XML, and the note left
+	 * in its place says so. Only a CII document is scrubbed: a Factur-X one is stored as the PDF container
+	 * it arrived in, which this module never rewrites.
+	 *
+	 * @param  FactureFournisseur	$supplierInvoice	The imported supplier invoice
+	 * @param  string				$sourceXml			The CII XML the import was read from
+	 * @param  string				$file				The received document, as the access point returned it
+	 * @param  string				$tempFile			The working file holding $file, stored as an attachment right after
+	 * @param  string[]				$return_messages	Messages of the import, completed here
+	 * @return void
+	 */
+	protected function storeEmbeddedAttachmentsAndScrubXml($supplierInvoice, $sourceXml, $file, $tempFile, array &$return_messages)
+	{
+		$attachments = static::extractEmbeddedAttachments((string) $sourceXml);
+		if (empty($attachments)) {
+			return;
+		}
+
+		$stored = $this->saveEmbeddedAttachmentsToSupplierInvoice($supplierInvoice, $attachments, $return_messages);
+		if (empty($stored)) {
+			return;
+		}
+
+		// Scrub the document only when the file stored is that XML itself
+		if ((string) $sourceXml !== (string) $file || empty($tempFile) || !file_exists($tempFile)) {
+			return;
+		}
+
+		$names = array();
+		foreach ($attachments as $rank => $attachment) {
+			if (isset($stored[$rank])) {
+				$names[] = $stored[$rank] . '.' . $attachment['extension'];
+			}
+		}
+
+		$note = '[Removed at import by ' . static::class . '::removeAttachmentFromXml(), kept as attached file: ' . implode(', ', $names) . ']';
+
+		try {
+			$scrubbed = static::removeAttachmentFromXml((string) $file, $note);
+		} catch (Exception $e) {
+			dol_syslog(__METHOD__ . " could not scrub the stored XML: " . $e->getMessage(), LOG_WARNING, 0, '_einvoicing');
+			return;
+		}
+
+		if (file_put_contents($tempFile, $scrubbed) === false) {
+			dol_syslog(__METHOD__ . " could not write the scrubbed XML to " . $tempFile, LOG_WARNING, 0, '_einvoicing');
+		}
 	}
 }

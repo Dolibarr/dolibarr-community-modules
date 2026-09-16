@@ -48,6 +48,9 @@ abstract class AbstractProtocol
 	/** @const string Invoice file extension (without the dot, example 'xml') */
 	const INVOICE_FILE_EXTENSION = ''; // Must be overridden by subclasses
 
+	/** @const string What replaces an attachment binary in a stored XML, when the file is kept elsewhere */
+	const ATTACHMENT_REMOVED_NOTE = '[Removed to get a smaller XML]';
+
 	/** @const string Generated invoice XML file name*/
 	const GENERATED_INVOICE_XML_FILE_NAME = ''; // Must be overridden by subclasses
 
@@ -165,9 +168,10 @@ abstract class AbstractProtocol
 	/**
 	 * Remove attachment nodes to get a smaller XML
 	 * @param string $xmlData The XML data to process
+	 * @param string $note    What is written in place of the binary, told to whoever reads the XML later
 	 * @return string Cleaned XML
 	 */
-	abstract public static function removeAttachmentFromXml(string $xmlData): string;
+	abstract public static function removeAttachmentFromXml(string $xmlData, string $note = self::ATTACHMENT_REMOVED_NOTE): string;
 
 	/**
 	 * Check if the generated e-invoice file exceeds the configured size limit.
