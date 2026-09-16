@@ -4518,7 +4518,8 @@ class CIIProtocol extends AbstractProtocol
 	 *
 	 * The binary is not lost by that scrub, it is the very file stored next to the XML, and the note left
 	 * in its place says so. Only a CII document is scrubbed: a Factur-X one is stored as the PDF container
-	 * it arrived in, which this module never rewrites.
+	 * it arrived in, which this module never rewrites. EINVOICING_KEEP_RECEIVED_XML_AS_IS keeps the
+	 * attached XML untouched, for whoever archives the received document as it stands.
 	 *
 	 * @param  FactureFournisseur	$supplierInvoice	The imported supplier invoice
 	 * @param  string				$sourceXml			The CII XML the import was read from
@@ -4536,6 +4537,12 @@ class CIIProtocol extends AbstractProtocol
 
 		$stored = $this->saveEmbeddedAttachmentsToSupplierInvoice($supplierInvoice, $attachments, $return_messages);
 		if (empty($stored)) {
+			return;
+		}
+
+		// EINVOICING_KEEP_RECEIVED_XML_AS_IS: keep the attached XML byte for byte as the access point
+		// returned it. The files above are stored all the same, they are simply also left inside it.
+		if (getDolGlobalString('EINVOICING_KEEP_RECEIVED_XML_AS_IS')) {
 			return;
 		}
 
