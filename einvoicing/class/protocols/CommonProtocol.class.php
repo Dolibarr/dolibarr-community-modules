@@ -1126,11 +1126,15 @@ trait CommonProtocol
 			$message = $langs->trans("FailedToFindSupplier"). ' ' . $detailsStr . ". \n";
 			$message .= $langs->trans("AutoCreateThirdPartyOffCreateItManually");
 
+			// Creating the thirdparty needs the right on it, so a user who has not got it is told what
+			// to ask for instead of being sent to a page that answers accessforbidden().
 			$action = $langs->trans('CreateSupplierManually');
-			$action .= '<a class="butAction small smallpaddingimp" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
-			$action .= '<i class="fas fa-plus-circle"></i> ';
-			$action .= $langs->trans('CreateSupplier');
-			$action .= '</a>';
+			if ($user->hasRight('societe', 'creer')) {
+				$action .= '<a class="butAction small smallpaddingimp" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
+				$action .= '<i class="fas fa-plus-circle"></i> ';
+				$action .= $langs->trans('CreateSupplier');
+				$action .= '</a>';
+			}
 
 			return array(
 				'res' => -1,
@@ -1576,7 +1580,8 @@ trait CommonProtocol
 			}
 
 			// Third choice: set a default product on the vendor thirdparty (used for future imports when no product is found)
-			if (!empty($vendorId)) {
+			// The field lives on the thirdparty card, so this one is offered only to a user allowed to edit it.
+			if (!empty($vendorId) && $user->hasRight('societe', 'creer')) {
 				$thirdpartyUrl = dol_buildpath('/societe/card.php', 1) . '?socid=' . ((int) $vendorId) . '&action=edit&highlight=routing_product_id#treinvoicing';
 				$action .= '<a class="button small smallpaddingimp" style="' . $btnStyle . '" href="' . dol_escape_htmltag($thirdpartyUrl) . '" target="_blank">';
 				$action .= '<i class="fas fa-star"></i> ';

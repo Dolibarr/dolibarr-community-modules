@@ -113,6 +113,8 @@ $form = new Form($db);
 
 $permissiontoread = $user->hasRight('einvoicing', 'read');
 $permissiontoadd = $user->hasRight('einvoicing', 'write') && $user->hasRight('produit', 'creer');
+// The default product of a vendor is a field of its thirdparty card, so it takes the right on the thirdparty.
+$permissiontosetdefaultproduct = $user->hasRight('societe', 'creer');
 
 if (!isModEnabled('einvoicing')) {
 	accessforbidden();
@@ -268,6 +270,12 @@ print '<div class="info"><span class="">'.$langs->trans("MapEInvoiceProductsDesc
 print ' '.$langs->trans("MapEInvoiceProductsDesc2");
 print '</span>';
 print ' - <a class="" href="'.$vendorrefsurl.'">'.$langs->trans("SeeMappedVendorRefs").'</a>';
+// A line without any vendor reference has nothing to be mapped on, and the default product of the vendor is
+// the only answer for it. Same link as the one the synchronization suggests, so the page is not a dead end.
+if ($socid > 0 && $permissiontosetdefaultproduct) {
+	$defaultproducturl = dol_buildpath('/societe/card.php', 1).'?socid='.((int) $socid).'&action=edit&highlight=routing_product_id#treinvoicing';
+	print ' - <a class="" href="'.dol_escape_htmltag($defaultproducturl).'" target="_blank">'.$langs->trans("SetDefaultProductForThirdparty").'</a>';
+}
 print '</div><br>';
 
 // Form to select the flow to work on (prefilled when we come from the synchronization result)
@@ -307,10 +315,16 @@ if (!empty($parsedLines)) {
 	/** @var ?CIIProtocol $protocol */
 	$nbtomap = 0;
 	$matchresults = array();
+	$defaultrouted = array();
 	foreach ($parsedLines as $idx => $parsedLine) {
 		$parsedLine['supplierId'] = $socid;
 		$matchresults[$idx] = ($socid > 0 && is_object($protocol)) ? $protocol->findProductFromEinvoiceLine($parsedLine) : array('res' => 0, 'message' => '');
-		if (empty($matchresults[$idx]['res'])) {
+		// The default product of the vendor is a catch-all answering every line nothing was found for, so a
+		// line it caught is routed, not mapped. As long as the line carries a vendor reference it can still
+		// be bound to the right product, and it stays in the lines to map.
+		$defaultrouted[$idx] = (($matchresults[$idx]['matchtype'] ?? '') == 'defaultrouting');
+		$hasvendorref = (trim((string) ($parsedLine['prodsellerid'] ?? '')) !== '');
+		if (empty($matchresults[$idx]['res']) || ($defaultrouted[$idx] && $hasvendorref)) {
 			$nbtomap++;
 		}
 	}
@@ -356,7 +370,7 @@ if (!empty($parsedLines)) {
 		print '<td class="right">'.price((float) ($parsedLine['rateApplicablePercent'] ?? 0)).'%</td>';
 
 		print '<td>';
-		if (!empty($matchresults[$idx]['res'])) {
+		if (!empty($matchresults[$idx]['res']) && empty($defaultrouted[$idx])) {
 			// Line already resolved by the automatic matching
 			$producttmp = new Product($db);
 			if ($producttmp->fetch($matchresults[$idx]['res']) > 0) {
@@ -367,15 +381,24 @@ if (!empty($parsedLines)) {
 			print ' '.$form->textwithpicto('', $matchresults[$idx]['message'], 1, 'help');
 		} elseif ($socid <= 0) {
 			print '<span class="opacitymedium">'.$langs->trans("SelectTheSupplierOfThisFlow").'</span>';
-		} elseif ($reffourn === '') {
-			// Without a vendor reference, the mapping has nothing to be stored on
-			print $form->textwithpicto('<span class="opacitymedium">'.$langs->trans("NotMappable").'</span>', $langs->trans("NotMappableBecauseNoVendorRef"), 1, 'warning');
-		} elseif ($permissiontoadd) {
-			// Filter on the purchase status (tobuy): the product of a supplier invoice line is bought, and a
-			// product created by a previous import is not on sale, so filtering on tosell hides them all.
-			print $form->select_produits(0, 'idprod_'.$idx, '', 0, 0, -1, 2, '', 0, array(), 0, '1', 0, 'maxwidth300', 0, '', null, 0, 1);
 		} else {
-			print '<span class="opacitymedium">'.$langs->trans("NotEnoughPermissions").'</span>';
+			// Show the catch-all the line currently falls back on, then still offer to map it properly.
+			if (!empty($defaultrouted[$idx])) {
+				$producttmp = new Product($db);
+				$routedto = ($producttmp->fetch($matchresults[$idx]['res']) > 0) ? $producttmp->getNomUrl(1) : $langs->trans("Product").' #'.((int) $matchresults[$idx]['res']);
+				print $form->textwithpicto('<span class="opacitymedium">'.$langs->trans("LineRoutedToDefaultProduct").'</span> '.$routedto, $langs->trans("LineRoutedToDefaultProductHelp"), 1, 'warning');
+				print '<br>';
+			}
+			if ($reffourn === '') {
+				// Without a vendor reference, the mapping has nothing to be stored on
+				print $form->textwithpicto('<span class="opacitymedium">'.$langs->trans("NotMappable").'</span>', $langs->trans("NotMappableBecauseNoVendorRef"), 1, 'warning');
+			} elseif ($permissiontoadd) {
+				// Filter on the purchase status (tobuy): the product of a supplier invoice line is bought, and a
+				// product created by a previous import is not on sale, so filtering on tosell hides them all.
+				print $form->select_produits(0, 'idprod_'.$idx, '', 0, 0, -1, 2, '', 0, array(), 0, '1', 0, 'maxwidth300', 0, '', null, 0, 1);
+			} else {
+				print '<span class="opacitymedium">'.$langs->trans("NotEnoughPermissions").'</span>';
+			}
 		}
 		print '</td>';
 
