@@ -854,6 +854,7 @@ if ($diagFileName) {
 	$last_supplier_invoice_error .= ' ' . $langs->trans("LastSupplierInvoiceCouldNotBeProcessed");
 	$last_supplier_invoice_error .= '<i class="fas fa-info-circle em088 opacityhigh classfortooltip" title="'. $langs->trans("LastSupplierInvoiceCouldNotBeProcessedInfo") .'"></i>';
 	$last_supplier_invoice_error .= ' : </span>';
+	$last_supplier_invoice_error .= einvoicingDiagnosticPreviewLink($diagFileName);
 	$last_supplier_invoice_error .= '<a href="'.$urlConvertedFile.'" target="_blank">' . $langs->trans("DocDownloadConverted") . ' ' . img_picto('', 'download', 'class="pictofixedwidth"') . '</a>';
 
 	// The readable view is only stored when the platform provided one with the flow
@@ -861,6 +862,7 @@ if ($diagFileName) {
 		$urlReadableFile = DOL_URL_ROOT . '/document.php?modulepart=einvoicing&file=' . urlencode('temp/' . $diagReadableFileName);
 
 		$last_supplier_invoice_error .= ' <span class="opacitylow">|</span> ';
+		$last_supplier_invoice_error .= einvoicingDiagnosticPreviewLink($diagReadableFileName);
 		$last_supplier_invoice_error .= '<a href="'.$urlReadableFile.'" target="_blank">' . $langs->trans("DocDownloadReadable") . ' ' . img_picto('', 'download', 'class="pictofixedwidth"') . '</a>';
 	}
 }

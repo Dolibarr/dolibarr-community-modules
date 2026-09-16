@@ -1256,3 +1256,44 @@ function einvoicingDiscountRelatedInvoiceRef($discount, $db)
 
 	return (string) $correctedInvoice->ref;
 }
+
+/**
+ * Preview picto for a diagnostic file of the module temp directory, opened in the dialog of the core.
+ *
+ * Those slots belong to no invoice, so no document list of the core shows them and none of them gets the
+ * picto a file of an invoice card gets. A PDF goes to the preview of the core; an XML, which
+ * dolIsAllowedForPreview() excludes on purpose, goes to the read-only viewer of the module.
+ *
+ * @param	string	$fileName	File name in the module temp directory
+ * @return	string				The <a> of the picto, empty string when the browser gets no preview
+ */
+function einvoicingDiagnosticPreviewLink($fileName)
+{
+	global $conf, $langs;
+
+	// Same condition as FormFile::showPreview(): below it lib_foot.js.php binds no click on the class
+	if ($conf->browser->layout == 'phone' || empty($conf->use_javascript_ajax)) {
+		return '';
+	}
+
+	if (preg_match('/\.xml$/i', $fileName)) {
+		$url = dol_buildpath('/einvoicing/xmlpreview.php', 1).'?source=diag&file='.urlencode($fileName).'&mode=raw';
+		$mime = 'text/html';
+	} else {
+		$urladvancedpreview = getAdvancedPreviewUrl('einvoicing', 'temp/'.$fileName, 1);
+		if (!is_array($urladvancedpreview) || empty($urladvancedpreview['url'])) {
+			return '';
+		}
+		$url = $urladvancedpreview['url'];
+		$mime = $urladvancedpreview['mime'];
+	}
+
+	$title = $langs->trans("Preview").' - '.$fileName;
+
+	$out = '<a class="pictopreview documentpreview" href="'.$url.'" mime="'.$mime.'"';
+	$out .= ' data-title="'.dol_escape_htmltag($title).'" target="_blank" rel="noopener noreferrer"';
+	$out .= ' title="'.dol_escape_htmltag($title).'">';
+	$out .= '<span class="fas fa-search-plus pictofixedwidth" style="color: #808080;"></span></a>';
+
+	return $out;
+}
