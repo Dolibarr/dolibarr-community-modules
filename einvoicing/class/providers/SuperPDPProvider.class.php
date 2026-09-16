@@ -2742,6 +2742,17 @@ class SuperPDPProvider extends AbstractPDPProvider
 						$document->tracking_idref = !empty($supplierInvoiceObj->ref) ? $supplierInvoiceObj->ref : '(NOTFOUND)'; // Should always be found here
 					}
 
+					// The status we sent is the one recorded when the message left, so the flow row can carry
+					// it like an incoming one does. Without it the list and the card show a lifecycle line
+					// with an empty code, and the two directions cannot be read the same way.
+					if (!empty($resFetchStatusMessages['lc_status'])) {
+						$document->cdar_lifecycle_code = (string) $resFetchStatusMessages['lc_status'];
+						$document->cdar_lifecycle_label = $einvoicing->getStatusLabel($resFetchStatusMessages['lc_status']);
+					}
+					if (empty($document->cdar_reason_code) && !empty($resFetchStatusMessages['lc_reason_code'])) {
+						$document->cdar_reason_code = $resFetchStatusMessages['lc_reason_code'];
+					}
+
 					// Update LC message status in einvoicing_lifecycle_msg table based on validation response
 					$syncStatusComment = $document->cdar_reason_detail ? $document->cdar_reason_detail : '';
 					$syncValidationStatus = $document->ack_status;
