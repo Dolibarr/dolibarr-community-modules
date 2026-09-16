@@ -554,7 +554,8 @@ class CIIProtocolTest extends CommonClassTest
 	 * Real aggregated invoice line, as a payroll provider sends it: one line standing for the whole
 	 * invoice, with no vendor reference, no buyer reference and no GTIN, and a label far longer than
 	 * the 128 characters of product_fournisseur_price.ref_fourn. Anonymized sample of a document
-	 * received in production, kept so the shape the matching has to survive is pinned in CI.
+	 * received in production. It lives outside test/samples, which holds the documents the module emits
+	 * and the CI validates: this one is a received document, and it breaks BR-53 as its sender sent it.
 	 *
 	 * @return void
 	 */
@@ -563,7 +564,7 @@ class CIIProtocolTest extends CommonClassTest
 		global $db;
 
 		$protocol = new CIIProtocol($db);
-		$xml = file_get_contents(__DIR__ . '/../samples/aggregated_line_without_product_ref.cii.xml');
+		$xml = file_get_contents(__DIR__ . '/fixtures/received/aggregated_line_without_product_ref.xml');
 		$this->assertNotFalse($xml, 'sample file not readable');
 
 		$lines = $protocol->parseInvoiceLines($xml);
@@ -584,7 +585,7 @@ class CIIProtocolTest extends CommonClassTest
 	 */
 	public function testAnAbsentVendorReferenceDoesNotMatchAnEmptyVendorPrice()
 	{
-		global $conf, $db, $user;
+		global $conf, $db;
 
 		$socid = $this->vendorWithoutAnyPrice();
 
@@ -599,9 +600,9 @@ class CIIProtocolTest extends CommonClassTest
 		$this->assertGreaterThan(0, $productid, 'the bench product got no id');
 
 		$sql = "INSERT INTO " . MAIN_DB_PREFIX . "product_fournisseur_price";
-		$sql .= " (entity, datec, fk_product, fk_soc, ref_fourn, price, quantity, unitprice, tva_tx, fk_user)";
+		$sql .= " (entity, datec, fk_product, fk_soc, ref_fourn, price, quantity, unitprice, tva_tx)";
 		$sql .= " VALUES (" . ((int) $conf->entity) . ", '" . $db->idate(dol_now()) . "'";
-		$sql .= ", " . ((int) $productid) . ", " . ((int) $socid) . ", '', 10, 1, 10, 20, " . ((int) $user->id) . ")";
+		$sql .= ", " . ((int) $productid) . ", " . ((int) $socid) . ", '', 10, 1, 10, 20)";
 		$this->assertNotFalse($db->query($sql), 'could not create the vendor price with an empty reference: ' . $db->lasterror());
 
 		$protocol = new CIIProtocol($db);
