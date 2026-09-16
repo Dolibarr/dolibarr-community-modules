@@ -189,8 +189,9 @@ if ($objectID) {
 
 		$einvoicing->updateStatusMessageValidation($lcId, '', $statusvalidationlabel, $statusvalidationinfo);
 
-		$currentLCStatusLabel = $einvoicing->getStatusLabel($obj->lc_status);
-		$currentLCReasonLabel = $langs->trans($einvoicing->getReasonsByStatus($obj->lc_status)[$obj->lc_reason_code]['label'] ?? $obj->lc_reason_code);
+		// Same two sources as EInvoicing::supplierInvoiceCardBlock(), which this answer refreshes in place.
+		$currentLCStatusLabel = $einvoicing->getStatusLabel($obj->lc_status, $invoice->element);
+		$currentLCReasonLabel = $einvoicing->getReasonLabel($obj->lc_status, $obj->lc_reason_code);
 
 		// Log an event in the invoice timeline if status not pending and it has changed
 		if ($statusvalidationlabel != 'Pending' && $statusvalidationlabel !== $lcValidationStatus) {
@@ -215,7 +216,7 @@ if ($objectID) {
 		// Return current status of the supplier invoice to update it in the invoice card
 		print json_encode([
 			'statuslabel' => $currentLCStatusLabel,
-			'statusreasonlabel' => $currentLCReasonLabel,
+			'statusreasonlabel' => dol_escape_htmltag($currentLCReasonLabel),	// Injected with .html() by the card
 			'statusvalidationlabel' => $statusvalidationlabel,
 			'htmlstatusvalidationLabel' => $htmlstatusvalidationLabel,
 			'statusvalidationinfo' => $statusvalidationinfo,

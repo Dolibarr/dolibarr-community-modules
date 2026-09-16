@@ -220,8 +220,8 @@ class EInvoicing
 
 	/**
 	 * Invoice rejected (technical)
-	 * - Customer invoice: received from the PDP
-	 * - Supplier invoice: /
+	 * - Customer invoice: received from the PDP, whichever platform rejected it
+	 * - Supplier invoice: received from the PDP, rejected in reception by OUR platform
 	 */
 	const STATUS_REJECTED = 213;
 
@@ -240,7 +240,7 @@ class EInvoicing
 
 		// PDP / PA
 		self::STATUS_DEPOSITED           => 'EInvStatus200Deposited',				// Accepted by seller AP
-		self::STATUS_REJECTED            => 'EInvStatus213Rejected',				// Rejected by seller AP
+		self::STATUS_REJECTED            => 'EInvStatus213Rejected',				// Rejected by an AP, see getStatusLabel()
 
 		self::STATUS_ISSUED              => 'EInvStatus201Issued',					// Issued by seller AP to customer AP
 		self::STATUS_RECEIVED            => 'EInvStatus202Received',
@@ -502,6 +502,25 @@ class EInvoicing
 			"JUSTIF_ABS",
 			"ROUTAGE_ERR",
 			"CMD_ERR"
+		],
+
+		// Read-only, unlike the four above: a rejection is posted by a platform, never sent by us. The
+		// union of the two columns XP Z12-012 annex A gives it ("REJETÉE à l'Emission" and "REJETÉE (en
+		// Réception)"), which differ by "DEST_INC" alone - the seller's AP is the only one that can find
+		// the recipient missing from the directory. Kept here so a received reason gets translated.
+		self::STATUS_REJECTED => [
+			"MONTANTTOTAL_ERR",
+			"CALCUL_ERR",
+			"DOUBLON",
+			"DEST_INC",
+			"ADR_ERR",
+			"REJ_SEMAN",
+			"REJ_UNI",
+			"REJ_COH",
+			"REJ_ADR",
+			"REJ_CONT_B2G",
+			"REJ_REF_PJ",
+			"REJ_ASS_PJ"
 		]
 	];
 
@@ -736,18 +755,56 @@ class EInvoicing
 	/**
 	 * Return label for an e-invoice status code
 	 *
-	 * @param int|string 	$code		Code
-	 * @return string					Label
+	 * "Rejected" (213) is the only code XP Z12-012 lets two different platforms issue (annex A, sheet
+	 * "Acteurs CDV", where it has one row per issuer): the seller's AP rejects at emission, the buyer's
+	 * AP at reception. Only the element tells them apart - XP Z12-014 annex A 2.2 forbids transmitting
+	 * an emission rejection to the recipient, so a 213 carried by a supplier invoice is necessarily the
+	 * buyer's AP. On a customer invoice both remain possible and the label names neither (issue #973).
+	 *
+	 * @param int|string 	$code			Code
+	 * @param string	 	$elementType	Element the status is carried by ('facture', 'invoice_supplier'), when known
+	 * @return string						Label
 	 */
-	public function getStatusLabel($code)
+	public function getStatusLabel($code, $elementType = '')
 	{
 		global $langs;
 
 		$code = (int) $code;
 
+		if ($code === self::STATUS_REJECTED && $elementType === 'invoice_supplier') {
+			return $langs->transnoentitiesnoconv('EInvStatus213RejectedByBuyerAP');
+		}
+
 		return $langs->transnoentitiesnoconv(
 			self::STATUS_LABEL_KEYS[$code] ?? 'EInvStatusUnknown'
 		);
+	}
+
+	/**
+	 * Translated label of a lifecycle reason code (MDT-108), for a status that carries one.
+	 *
+	 * Falls back on the raw code so a reason the module does not know - a platform extension, or a code
+	 * added to XP Z12-012 after this release - is still shown rather than swallowed.
+	 *
+	 * @param int|string	$status			Lifecycle status the reason was given with
+	 * @param string		$reasonCode		Reason code read from the CDAR (lc_reason_code)
+	 * @return string						Translated label, the raw code when unknown, '' when there is none
+	 */
+	public function getReasonLabel($status, $reasonCode)
+	{
+		global $langs;
+
+		$reasonCode = (string) $reasonCode;
+		if ($reasonCode === '') {
+			return '';
+		}
+
+		$reasons = $this->getReasonsByStatus($status, 0);
+		if (!is_array($reasons) || !isset($reasons[$reasonCode]['label'])) {
+			return $reasonCode;
+		}
+
+		return $langs->transnoentitiesnoconv($reasons[$reasonCode]['label']);
 	}
 
 	/**
@@ -1945,7 +2002,8 @@ class EInvoicing
 
 		// If current status requires a reason, display it
 		if (!empty($currentStatusInfo['reasonCode'])) {
-			$reasonLabel = self::REASONS[$currentStatusInfo['reasonCode']]['label'] ?? $currentStatusInfo['reasonCode'];
+			// Translated, and escaped for the fallback: what used to be printed was the translation KEY.
+			$reasonLabel = dol_escape_htmltag($this->getReasonLabel($currentStatusInfo['code'] ?? 0, $currentStatusInfo['reasonCode']));
 			$resprints .= '<tr class="treinvoicing_collapseseparator" id="treinvoicing_reason">';
 			$resprints .= '<td class="">' . $langs->trans("einvoicingInvoiceReason") . '</td>';
 			$resprints .= '<td><span id="einvoice-reason">' . $reasonLabel . '</span></td>';
@@ -2145,7 +2203,7 @@ class EInvoicing
 		if ($provider) {
 			// Get current status
 			$currentStatus = '-';
-			$sql = "SELECT lc_status, lc_reason_code FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
+			$sql = "SELECT lc_status, lc_reason_code, lc_status_message FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
 			$sql .= " WHERE element_type = '" . $this->db->escape($object->element) . "'";
 			$sql .= " AND element_id = " . (int) $object->id;
 			$sql .= " AND lc_validation_status = 'Ok'";
@@ -2154,7 +2212,7 @@ class EInvoicing
 			$obj = null;
 			if ($resql && $this->db->num_rows($resql) > 0) {
 				$obj = $this->db->fetch_object($resql);
-				$currentStatus = $this->getStatusLabel($obj->lc_status);
+				$currentStatus = $this->getStatusLabel($obj->lc_status, $object->element);
 			}
 			$this->db->free($resql);
 			// Current status
@@ -2170,11 +2228,20 @@ class EInvoicing
 			$reasonLabel = '';
 			$displayReasonLabel = 'style="display:none;"';
 			if (!empty($obj->lc_reason_code)) {
-				$reasonLabel = $langs->trans($this->getReasonsByStatus($obj->lc_status)[$obj->lc_reason_code]['label'] ?? $obj->lc_reason_code);
+				// Through the helper: getReasonsByStatus() returns null for a status with no reason list of
+				// its own, and indexing that null fell back on the bare code - "REJ_SEMAN" for a rejection.
+				$reasonLabel = dol_escape_htmltag($this->getReasonLabel($obj->lc_status, $obj->lc_reason_code));
 				$displayReasonLabel = '';
 			}
 
 			$resprints .= '&nbsp;<span id="einvoice-reason"' . ($displayReasonLabel ? $displayReasonLabel : '') . '>' . $reasonLabel . '</span>';
+
+			// The free text the platform gave with the status (MDT-110). Mandatory alongside the reason of
+			// a rejection (XP Z12-014 annex A 2.2 and 2.4) and often the only thing that says what to fix,
+			// but it was stored and never shown: the card only displayed it for a status WE sent.
+			if (!empty($obj->lc_status_message)) {
+				$resprints .= '<div id="einvoice-status-message" class="clearboth small opacitymedium" style="overflow-wrap:anywhere;">' . dol_escape_htmltag($obj->lc_status_message) . '</div>';
+			}
 
 			$resprints .= '</td>';
 			$resprints .= '</tr>';
@@ -2199,7 +2266,7 @@ class EInvoicing
 			$this->db->free($resql);
 
 			if (!empty($lastSentStatus) && ($lastSentStatus['lc_validation_status'] == 'Pending' || $lastSentStatus['lc_validation_status'] == 'Error')) {
-				$statusLabel = $this->getStatusLabel($lastSentStatus['lc_status']);
+				$statusLabel = $this->getStatusLabel($lastSentStatus['lc_status'], $object->element);
 				$statusvalidationLabel = $this->getStatusLabel($this->getDolibarrStatusCodeFromPdpLabel($lastSentStatus['lc_validation_status']));
 				$picto = '';
 				if ($lastSentStatus['lc_validation_status'] === 'Pending') {
