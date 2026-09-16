@@ -215,8 +215,9 @@ class SupplierInvoiceComparisonTest extends CommonClassTest
 	/**
 	 * The same invariant on discounted lines, where the supported cores do not compute alike: 18 to 21
 	 * ignore MAIN_APPLY_DISCOUNT_ON_UNIT_PRICE..., 22 and 23 round the discounted unit price, 24 rounds
-	 * the discount itself. The two lines are the smallest real cases found where those conventions part
-	 * by a cent: a quantity price at three decimals on 18 to 21, a per-unit rate at six on 24 and 25.
+	 * the discount itself. Each line is a case where those conventions part by a cent - the first on
+	 * Dolibarr 18 to 21, the second on 24 and 25 - with prices a line really carries (five decimals,
+	 * what addline() stores).
 	 *
 	 * @return void
 	 */
@@ -230,7 +231,7 @@ class SupplierInvoiceComparisonTest extends CommonClassTest
 
 		$invoice = $this->createInvoice(array(
 			array('pu' => 76.345, 'qty' => 1000, 'rem' => 2.5),
-			array('pu' => 0.000887, 'qty' => 1000, 'rem' => 2.5),
+			array('pu' => 0.47052, 'qty' => 1000, 'rem' => 12.5),
 		));
 
 		$details = $this->detailsFor($invoice, 1);
