@@ -284,7 +284,7 @@ $outputlangs->load("einvoicing@einvoicing");
 // invoice to a buyer whose directory record demands a service code is rejected (issue #678).
 // It is a SECOND ram:GlobalID on the buyer party, and the Factur-X EN16931 Schematron caps that element
 // at one occurrence (FX-SCH-A-000164): below EXTENDED the code is not sent and the user is told why.
-$buildProfile = $this->getBuildXmlProfile();
+$buildProfile = $this->getBuildXmlProfile($object);
 $buyerRoutingCode = trim((string) ($object->array_options['options_d4d_service_code'] ?? ''));
 if ($buyerRoutingCode !== '' && $buyerParty->country_code != 'FR') {
 	// Scheme 0224 is the French routing code: it means nothing for a buyer of another country.
@@ -302,6 +302,59 @@ if ($buyerRoutingCode !== '' && !$this->isExtendedProfile($buildProfile)) {
 	$this->warnings[] = $outputlangs->trans('EInvoiceRoutingCodeNeedsExtendedProfile', $buyerRoutingCode, $buildProfile);
 	dol_syslog('einvoicing: Chorus service code "' . $buyerRoutingCode . '" not emitted as BT-46 scheme 0224, profile ' . $buildProfile . ' allows a single buyer GlobalID', LOG_WARNING);
 	$buyerRoutingCode = '';
+}
+
+// SIRET of the buyer (BT-46 under scheme 0009), which BR-FR-CPRO-10 makes mandatory on a B2G invoice:
+// Chorus Pro routes on the establishment, where BT-47 carries the legal entity (SIREN). It is declared on
+// top of the identifier the setup already produces, the way the reference document of Annexe B does
+// (0088, 0009 and 0224 side by side), so it needs the same EXTENDED profile as the routing code.
+// The warnings below are raised only on an invoice that looks B2G - one carrying at least one of the
+// Chorus fields - because Chorus Pro support is a setting of the whole company: a seller that invoices
+// both the public sector and private customers would otherwise be told about a missing SIRET on every
+// private invoice, where no rule asks for one.
+$looksLikeB2GInvoice = $chorus && $this->looksLikeB2GInvoice($object);
+
+$buyerChorusSiret = '';
+if ($chorus && $buyerParty->country_code == 'FR') {
+	$buyerChorusSiret = removeAllSpaces((string) ($buyerParty->idprof2 ?? ''));
+	if ($buyerChorusSiret === '') {
+		if ($looksLikeB2GInvoice) {
+			$this->warnings[] = $outputlangs->trans('EInvoiceChorusBuyerSiretMissing', $buyerParty->name);
+		}
+	} elseif (!preg_match('/^\d{14}$/', $buyerChorusSiret)) {
+		// A SIRET is 14 digits. Anything else is a typing mistake, and Chorus Pro refuses the invoice on
+		// the identifier rather than on the field the operator would go and look at.
+		$this->warnings[] = $outputlangs->trans('EInvoiceChorusBuyerSiretMalformed', $buyerParty->idprof2);
+		$buyerChorusSiret = '';
+	} elseif ($schemeGlobalIdProf === EInvoicing::SCHEME_FR_SIRET && $globalIdProf === $buyerChorusSiret) {
+		// EINVOICING_PARTY_IDENTIFIER_SCHEME is already set to 0009: the identifier is there, and emitting
+		// it twice would break FX-SCH-A-000164 on the very profile that allows several of them.
+		$buyerChorusSiret = '';
+	}
+	// No profile guard is needed here, unlike the routing code below: this value is only ever emitted
+	// under isExtendedProfile($profile) (see buildXML()), and getBuildXmlProfile() already raises the
+	// profile to EXTENDED-CTC-FR whenever this invoice looks B2G (see needsExtendedFrProfile()) - the
+	// same test $looksLikeB2GInvoice above uses - so an identifier worth emitting always has room.
+	// The routing code keeps its guard because its extrafield keeps the value that was typed when the
+	// option was on, and the invoice may then be generated with the option off.
+}
+
+// Contract type (EXT-FR-FE-01) of a B2G invoice: the Chorus extrafield the contract reference comes from
+// is the market number, which BR-FR-CPRO-01 qualifies with "GC". An ordinary contract would be "CT", and
+// those are the only two values that rule accepts; the module has no field of its own for that case yet.
+$contractReferenceTypeCode = '';
+if ($chorus && !empty($object->array_options['options_d4d_contract_number'])) {
+	$contractReferenceTypeCode = 'GC';
+}
+
+// BR-FR-CPRO-15 caps the commitment number (BT-13) at 50 characters. It is worth checking because that
+// term does not come from the Chorus extrafield alone: an empty one falls back on the customer reference
+// of the invoice, which Dolibarr stores on 255. Reported rather than truncated - a reference cut in half
+// no longer designates the commitment it names, and only the operator knows which end matters.
+// Its sibling BR-FR-CPRO-14, on the contract reference (BT-12), needs no check here: that one is read from
+// the "Market number" extrafield only, whose own column stops at 50 characters.
+if ($chorus && dol_strlen((string) $promise_code) > 50) {
+	$this->warnings[] = $outputlangs->trans('EInvoiceChorusReferenceTooLong', 'BT-13', dol_strlen((string) $promise_code), $promise_code);
 }
 
 // Buyer reference (BT-10): a reference owned by the buyer, used to route the invoice inside its own
@@ -392,6 +445,7 @@ $grand_total_ht    	= $grand_total_tva = $grand_total_ttc = 0;
 $prepaidAmount     	= 0;
 $depositlines      	= [];
 $lineRowIds        	= [];	// Document line number => llx_facturedet.rowid, for the messages
+$lineDiscountIds   	= [];	// Document line number => llx_facturedet.fk_remise_except, 0 when the line is not a discount
 $globalDiscounts	= [];
 $billing_period    	= [];
 $numligne          	= 1;
@@ -580,12 +634,10 @@ foreach ($object->lines as $line) {
 		}
 	}
 
-	// A discount line still standing at this point is a deposit deducted from the invoice, and its
-	// description is the sentinel the core stores, not a text meant to be read. Left as it is, the
-	// customer reads '(DEPOSIT)' as the name of the line (BT-153).
-	// The line has to carry a discount for that to hold, which is why the resolution goes through
-	// einvoicingDiscountLabelOfLine(): a line of work an operator named '(DEPOSIT)', pointing at no
-	// discount, is legitimate text and keeps the name it was given.
+	// A discount line still standing here is a deposit deducted, and its description is the sentinel the
+	// core stores, not a text meant to be read: the customer would read '(DEPOSIT)' in BT-153. Resolved
+	// through einvoicingDiscountLabelOfLine(), which also asks the line for its discount - a line of work
+	// an operator named '(DEPOSIT)', pointing at none, keeps the name it was given.
 	$discountLabel = einvoicingDiscountLabelOfLine($line, $lineDiscount, $outputlangs, einvoicingDiscountRelatedInvoiceRef($lineDiscount, $this->db));
 	if ($discountLabel !== '') {
 		$libelle     = $discountLabel;
@@ -684,6 +736,7 @@ foreach ($object->lines as $line) {
 	// document, the rowid is what a correction is addressed to, and a message that names only the first
 	// leaves its reader to count the lines to find it.
 	$lineRowIds[$numligne] = (int) $line->id;
+	$lineDiscountIds[$numligne] = (int) ($line->fk_remise_except ?? 0);
 
 	// Filling $linesData (based on $lineTemplate)
 	$linesData[$numligne] = [
@@ -838,15 +891,11 @@ if (!empty($object->situation_counter) && $object->situation_counter > 1
 	}
 }
 
-// Last look for a sentinel that reached a field the customer reads. Everything above resolves the four
-// of them, so anything left here is a way of building a document that this file does not know about -
-// which is not a supposition: the resolution was written for the reason of a document level allowance
-// and the item name of a deposit line was found carrying the sentinel afterwards, at the second look.
-//
-// The test is an equality, never an inclusion: a line of work named 'Reprise (DEPOSIT) du chantier' is
-// a legitimate text and must go out untouched. And it reports rather than refuses - a marker in an item
-// name is ugly, not invalid, and holding back an invoice over it would cost the seller more than it
-// saves.
+// Last look for a sentinel that reached a field the customer reads: everything above resolves the four
+// of them, so anything left is a construction path this file does not know about. Reported on a line
+// carrying a discount only - a line of work an operator named (DEPOSIT) is legitimate. The test is an
+// equality, never an inclusion, so 'Reprise (DEPOSIT) du chantier' goes out untouched, and it reports
+// rather than refuses: a marker in an item name is ugly, not invalid.
 $discountSentinels = array_keys(einvoicingDiscountSentinels());
 $linesWithNoName = array();
 foreach ($linesData as $numligne => $vals) {
@@ -854,7 +903,7 @@ foreach ($linesData as $numligne => $vals) {
 		$linesWithNoName[] = $numligne.' (id '.($lineRowIds[$numligne] ?? 0).')';
 	}
 	foreach (array('prodname' => 'BT-153', 'proddesc' => 'BT-154') as $field => $businessTerm) {
-		if (in_array((string) ($vals[$field] ?? ''), $discountSentinels, true)) {
+		if (!empty($lineDiscountIds[$numligne]) && in_array((string) ($vals[$field] ?? ''), $discountSentinels, true)) {
 			dol_syslog("EInvoicing: line ".$numligne." of ".$object->ref." carries the unresolved discount marker ".$vals[$field]." in ".$businessTerm.". The line is a discount whose source piece could not be read.", LOG_ERR);
 		}
 	}
@@ -866,14 +915,11 @@ foreach ($globalDiscounts as $discountIndex => $vals) {
 	}
 }
 
-// BR-25: a line with no name is not a document the platform accepts, so it is refused here rather than
-// after transmission, on a line number the seller would then have to go and find. Every such line is
-// named at once: sending them back one refusal at a time would be a round trip per line. This is the
-// same missing data the pre-check reports before validation (validateInvoiceConfiguration()); a
-// document reaching this point with one is one whose lines changed since, or one built by a path that
-// does not run the pre-check. Refused after both halves of the last look above, never between them: a
-// document carrying a nameless line and an unresolved marker in BT-97 would otherwise leave without the
-// marker ever being reported - the very case that last look exists to catch.
+// BR-25: a line with no name is refused here rather than after transmission, on a line number the
+// seller would then have to go and find, and every such line is named at once to spare a round trip
+// per line. Same missing data as the pre-check (validateInvoiceConfiguration()). Placed after both
+// halves of the last look above, never between them: a nameless line would otherwise hide the report
+// of an unresolved marker in BT-97, the very case that last look exists to catch.
 if (!empty($linesWithNoName)) {
 	throw new Exception('MISSINGDATA[BR-25]: The line'.(count($linesWithNoName) > 1 ? 's ' : ' ').implode(', ', $linesWithNoName).' of '.$object->ref.' '.(count($linesWithNoName) > 1 ? 'have' : 'has').' no item name (BT-153). Enter a description on the line, or a label on the product it invoices.');
 }
@@ -1038,12 +1084,12 @@ $invoiceData = [
 	'sellername'                => $mysoc->name,
 	'sellerids'                 => (empty($sellerGlobalIds) ? '' : $myidprof),
 
-	'sellerlineone'             => $sellerAddressLines[0] !== '' ? $sellerAddressLines[0] : 'ADDRESS EMPTY',
+	'sellerlineone'             => $sellerAddressLines[0],
 	'sellerlinetwo'             => $sellerAddressLines[1],
 	'sellerlinethree'           => $sellerAddressLines[2],
-	'sellerpostcode'            => $mysoc->zip          ?? 'ZIP EMPTY',
-	'sellercity'                => $mysoc->town         ?? 'NO TOWN',
-	'sellercountry'             => $mysoc->country_code ?? 'COUNTRY NOT SET',
+	'sellerpostcode'            => $mysoc->zip,
+	'sellercity'                => $mysoc->town,
+	'sellercountry'             => $mysoc->country_code,
 	'sellersubdivision'         => null,
 
 	'sellercontactpersonname'   => $salerepresentative_name,
@@ -1067,20 +1113,21 @@ $invoiceData = [
 	'sellerTradingName'         => $sellerTradingName,
 
 	// Buyer part
-	'buyername'                 =>  $buyerName ?: 'CUSTOMER',
+	'buyername'                 => $buyerName,
 	'buyerids'                  => (empty($buyerGlobalIds) ? '' : $idprof),
 
-	'buyerlineone'              => $buyerAddressLines[0] !== '' ? $buyerAddressLines[0] : 'ADDRESS',
+	'buyerlineone'              => $buyerAddressLines[0],
 	'buyerlinetwo'              => $buyerAddressLines[1],
 	'buyerlinethree'            => $buyerAddressLines[2],
-	'buyerpostcode'             => $buyerZip         ?: 'ZIP',
-	'buyercity'                 => $buyerTown        ?: 'TOWN',
-	'buyercountry'              => $buyerCountryCode ?: 'COUNTRY',
+	'buyerpostcode'             => $buyerZip,
+	'buyercity'                 => $buyerTown,
+	'buyercountry'              => $buyerCountryCode,
 	'buyersubdivision'          => null,
 
 	'buyervatnumber'            => $buyerParty->tva_intra ?? '',
 	'buyerGlobalIds'            => $buyerGlobalIds,
 	'buyerRoutingCode'          => ($buyerRoutingCode !== '' ? $buyerRoutingCode : null),
+	'buyerChorusSiret'          => $buyerChorusSiret,
 
 	'buyerLegalOrgId'           => $idprof,
 	'buyerLegalOrgScheme'       => $schemeIdProf,
@@ -1124,6 +1171,7 @@ $invoiceData = [
 	'invoiceRefDocs'            => $invoiceRefDocs,		// BG-3
 	'orderReference'            => $promise_code,
 	'contractReference'         => $object->array_options['options_d4d_contract_number'] ?? null,
+	'contractReferenceTypeCode' => $contractReferenceTypeCode,
 	'despatchAdviceRef'         => null,
 
 	// VAT breakdown for section ApplicableHeaderTradeSettlement
@@ -1217,8 +1265,12 @@ if (empty($idprof)) {
 if (empty($myidprof)) {
 	throw new Exception('BADPROFID: The professional ID of your company is empty. Fix this in your company or module setup page.');
 }
-if ($mySchemeIdProf == "0002" && strlen($myidprof) != 9) {
-	throw new Exception('BADPROFID: The professional ID ' . $myidprof . ' has type SIREN but length is not 9 characters. Fix this in your company or einvoice module setup page.');
+// G1.89 makes the SIREN nine digits and BR-FR-32 refuses, as fatal, any party identifier under scheme
+// 0002 that is not nine of them. Nine digits and not nine characters: the core never validates
+// idprof1 when the record is saved, so a value like "12345678A" is storable and a length test alone
+// lets it reach a document the access point rejects.
+if ($mySchemeIdProf == "0002" && !preg_match('/^\d{9}$/', $myidprof)) {
+	throw new Exception('BADPROFID: The professional ID ' . $myidprof . ' has type SIREN but is not made of exactly 9 digits. Fix this in your company or einvoice module setup page.');
 }
 if ($mysoc->country_code == 'FR' && !empty($mysoc->idprof1) && !empty($mysoc->idprof2)) {
 	if (strpos(removeAllSpaces($mysoc->idprof2), removeAllSpaces($mysoc->idprof1)) !== 0) {
@@ -1235,6 +1287,29 @@ if (!empty($mysoc->tva_intra) && !empty($mysoc->country_code) && substr($mysoc->
 }
 if (!empty($buyerParty->tva_intra) && !empty($buyerParty->country_code) && substr($buyerParty->tva_intra, 0, 2) != $buyerParty->country_code) {
 	throw new Exception('BADVATNUMBER: The VAT number of the thirdparty ' . $buyerParty->name . ' must start with its 2 letter country code.');
+}
+// The buyer registration identifier gets the same control as the seller one above: G1.63 makes the
+// SIREN of both parties mandatory, and BR-FR-32 tests every party carrying scheme 0002, not just the
+// seller. idprof() truncates a SIRET to nine characters, so a SIRET typed into the SIREN field is
+// what reaches this - which the import of a received document can itself produce.
+if ($schemeIdProf == "0002" && !preg_match('/^\d{9}$/', $idprof)) {
+	throw new Exception('BADTHIRDPARTYPROFID: The professional ID ' . $idprof . ' of the customer ' . $buyerParty->name . ' has type SIREN but is not made of exactly 9 digits. Fix this in the record of that third party.');
+}
+// BT-40 and BT-55 are the only mandatory terms of a postal address (BR-09, BR-11), and BT-27 and
+// BT-44 are mandatory too (BR-06, BR-07). One test per party, each naming the record to open: a
+// document refused by the access point on a rule pointing at nothing the user can see is what the
+// placeholders removed above used to produce. trim() rather than empty(), which also refuses "0".
+if (trim((string) $mysoc->country_code) === '') {
+	throw new Exception('BADADDRESS: The country of your company is empty. Fix this in the setup of your company.');
+}
+if (trim((string) $buyerCountryCode) === '') {
+	throw new Exception('BADADDRESS: The country of the customer ' . $buyerParty->name . ' is empty. Fix this in the record of that third party.');
+}
+if (trim((string) $mysoc->name) === '') {
+	throw new Exception('BADPARTYNAME: The name of your company (BT-27) is empty. Fix this in the setup of your company.');
+}
+if (trim((string) $buyerName) === '') {
+	throw new Exception('BADPARTYNAME: The name of the customer (BT-44) is empty. Fix this in the record of that third party.');
 }
 
 

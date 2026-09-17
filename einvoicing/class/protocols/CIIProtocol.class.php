@@ -44,7 +44,7 @@ if ((float) DOL_VERSION < 18) {
 dol_include_once('einvoicing/class/protocols/AbstractProtocol.class.php');
 dol_include_once('einvoicing/class/protocols/CommonProtocol.class.php');
 dol_include_once('einvoicing/class/einvoicing.class.php');
-dol_include_once('einvoicing/class/utils/XmlPatcher.class.php');
+dol_include_once('einvoicing/class/utils/EmbeddedXmlReader.class.php');
 dol_include_once('einvoicing/class/utils/SupplierInvoiceHelper.class.php');
 dol_include_once('einvoicing/lib/einvoicing.lib.php');
 
@@ -400,6 +400,7 @@ class CIIProtocol extends AbstractProtocol
 		 *   buyervatnumber: string,
 		 *   buyerGlobalIds: list<array{schemeID: string, value: string}>,
 		 *   buyerRoutingCode: null|string,
+		 *   buyerChorusSiret: string,
 		 *   buyerLegalOrgId: string,
 		 *   buyerLegalOrgScheme: string,
 		 *   buyerTradingName: string,
@@ -430,6 +431,7 @@ class CIIProtocol extends AbstractProtocol
 		 *   invoiceRefDocs: array|list<array{ref: string|int, date: \DateTimeInterface, type: string}>,
 		 *   orderReference: string,
 		 *   contractReference: null|string,
+		 *   contractReferenceTypeCode: string,
 		 *   despatchAdviceRef: null,
 		 *   taxBreakdown: array|list<array<string, array>>,
 		 *   _chorus: bool,
@@ -501,7 +503,7 @@ class CIIProtocol extends AbstractProtocol
 		 */
 		'
 		@phan-var-force Facture 			$object			The $invoice object used in entry on inc file, but completed.
-		@phan-var-force array{documentno:string,documenttypecode:null|string,documentdate:DateTimeInterface,invoiceCurrency:string|array<string>,taxCurrency:null,documentname:null,documentlanguage:string,effectiveSpecifiedPeriod:\'NA\',documentDeliveryDate:DateTimeInterface,invoicingPeriodStart:?DateTimeInterface,invoicingPeriodEnd:?DateTimeInterface,businessProcessId:string,isTestDocument:bool,documentNotePublic:string,documentNotePMT:string,documentNotePMD:string,documentNoteAAB:string,documentNoteTXD:string,documentNotes:array,vatDueDateTypeCode:string,sellername:string,sellerids:string,sellerlineone:string,sellerlinetwo:string,sellerlinethree:string,sellerpostcode:string,sellercity:string,sellercountry:string,sellersubdivision:null,sellercontactpersonname:string,sellercontactdepartmentname:null,sellercontactphoneno:string,sellercontactfaxno:string,sellercontactemailaddr:string,sellerCommunicationUriScheme:string,sellerCommunicationUri:string,sellerGlobalIds:array<array{schemeID:string,value:string}>,sellerTaxRegistrations:array<array{type:string,value:string}>,sellervatnumber:string,sellerLegalOrgId:string,sellerLegalOrgScheme:string,sellerTradingName:string,buyername:string,buyerids:string,buyerlineone:string,buyerlinetwo:string,buyerlinethree:string,buyerpostcode:string,buyercity:string,buyercountry:string,buyersubdivision:null,buyervatnumber:string,buyerGlobalIds:array<array{schemeID:string,value:string}>,buyerRoutingCode:null|string,buyerLegalOrgId:string,buyerLegalOrgScheme:string,buyerTradingName:string,buyerReference:null|string,buyerCommunicationUriScheme:string,buyerCommunicationUri:string,buyercontactpersonname:null,buyercontactemailaddr:null,buyercontactphoneno:null,grandTotalAmount:float|int,duePayableAmount:float|int,lineTotalAmount:float|int,chargeTotalAmount:float,allowanceTotalAmount:float|int,taxBasisTotalAmount:float|int,taxTotalAmount:float|int,roundingAmount:null,totalPrepaidAmount:float|int,iban_id:int,iban:string,bic:string,accountName:string,accountRef:string,accountLabel:string,paymentDueDate:DateTimeInterface,paymentTermsText:string,headerAllowancesCharges:array,invoiceRefDocs:array|array<array{ref:string|int,date:DateTimeInterface,type:string}>,orderReference:string,contractReference:null|string,despatchAdviceRef:null,taxBreakdown:array|array<array<string,array>>,_chorus:bool,_depositlines:array|array<array{lineId:int,invoiceRef:string,invoiceDate:DateTimeInterface}>,_globalDiscounts:array|array<array{value:float,reason:string,taxRate:float,categoryVAT:string}>,_customerOrderReferenceList:string[],_project:Project|null,paymentMeansCode?:int,paymentMeansText?:string,_shipFromContactBill?:array{address:null|string,zip:null|string,town:null|string,country:string},_shipFromContactShip?:array{name:string,address:null|string,zip:null|string,town:null|string,country:string}} $invoiceData
+		@phan-var-force array{documentno:string,documenttypecode:null|string,documentdate:DateTimeInterface,invoiceCurrency:string|array<string>,taxCurrency:null,documentname:null,documentlanguage:string,effectiveSpecifiedPeriod:\'NA\',documentDeliveryDate:DateTimeInterface,invoicingPeriodStart:?DateTimeInterface,invoicingPeriodEnd:?DateTimeInterface,businessProcessId:string,isTestDocument:bool,documentNotePublic:string,documentNotePMT:string,documentNotePMD:string,documentNoteAAB:string,documentNoteTXD:string,documentNotes:array,vatDueDateTypeCode:string,sellername:string,sellerids:string,sellerlineone:string,sellerlinetwo:string,sellerlinethree:string,sellerpostcode:string,sellercity:string,sellercountry:string,sellersubdivision:null,sellercontactpersonname:string,sellercontactdepartmentname:null,sellercontactphoneno:string,sellercontactfaxno:string,sellercontactemailaddr:string,sellerCommunicationUriScheme:string,sellerCommunicationUri:string,sellerGlobalIds:array<array{schemeID:string,value:string}>,sellerTaxRegistrations:array<array{type:string,value:string}>,sellervatnumber:string,sellerLegalOrgId:string,sellerLegalOrgScheme:string,sellerTradingName:string,buyername:string,buyerids:string,buyerlineone:string,buyerlinetwo:string,buyerlinethree:string,buyerpostcode:string,buyercity:string,buyercountry:string,buyersubdivision:null,buyervatnumber:string,buyerGlobalIds:array<array{schemeID:string,value:string}>,buyerRoutingCode:null|string,buyerChorusSiret:string,buyerLegalOrgId:string,buyerLegalOrgScheme:string,buyerTradingName:string,buyerReference:null|string,buyerCommunicationUriScheme:string,buyerCommunicationUri:string,buyercontactpersonname:null,buyercontactemailaddr:null,buyercontactphoneno:null,grandTotalAmount:float|int,duePayableAmount:float|int,lineTotalAmount:float|int,chargeTotalAmount:float,allowanceTotalAmount:float|int,taxBasisTotalAmount:float|int,taxTotalAmount:float|int,roundingAmount:null,totalPrepaidAmount:float|int,iban_id:int,iban:string,bic:string,accountName:string,accountRef:string,accountLabel:string,paymentDueDate:DateTimeInterface,paymentTermsText:string,headerAllowancesCharges:array,invoiceRefDocs:array|array<array{ref:string|int,date:DateTimeInterface,type:string}>,orderReference:string,contractReference:null|string,contractReferenceTypeCode:string,despatchAdviceRef:null,taxBreakdown:array|array<array<string,array>>,_chorus:bool,_depositlines:array|array<array{lineId:int,invoiceRef:string,invoiceDate:DateTimeInterface}>,_globalDiscounts:array|array<array{value:float,reason:string,taxRate:float,categoryVAT:string}>,_customerOrderReferenceList:string[],_project:Project|null,paymentMeansCode?:int,paymentMeansText?:string,_shipFromContactBill?:array{address:null|string,zip:null|string,town:null|string,country:string},_shipFromContactShip?:array{name:string,address:null|string,zip:null|string,town:null|string,country:string}} $invoiceData
 		@phan-var-force array<int,array{lineid:int,linestatuscode:null|string,linestatusreasoncode:null|string,lineNote:null,prodname:string,proddesc:string,prodsellerid:string,prodbuyerid:null|string,prodglobalidtype:null|string,prodglobalid:null|string,prodmultilangs:array,prodClassificationCode:null|string,prodClassificationScheme:null|string,prodOriginCountry:null|string,netpriceamount:float,netpricebasisquantity:null|float,netpricebasisquantityunitcode:null|string,billedquantity:float,billedquantityunitcode:string,chargeFreeQuantity:null|float,chargeFreeQuantityunitcode:null|string,packageQuantity:null|float,packageQuantityunitcode:null|string,lineTotalAmount:float|string,totalAllowanceChargeAmount:null|float,categoryCode:string,typeCode:\'VAT\',rateApplicablePercent:string,tva_tx:float|string,vat_src_code:string,ExemptionReason:string,ExemptionReasonCode:string,calculatedAmount:null|float,lineAllowances:array,lineGrossPriceAllowances:array,lineremisepercent:\'NA\'|float,linePeriodStart:?DateTimeInterface,linePeriodEnd:?DateTimeInterface,additionalRefDocs:array,isDepositLine:bool,depositInvoiceRef:null|string,depositInvoiceDate:?DateTimeInterface,parentDocumentNo:null|string,is_deposit:int<0,1>,fk_remise:null|int,discountPercent:float,grosspriceamount:null|float,grosspricebasisquantity:null|float,grosspricebasisquantityunitcode:null|string}> $linesData
 		@phan-var-force string 				$outputlang		Value of $outputlangs->defaultlang
 		@phan-var-force Account				$account
@@ -518,7 +520,7 @@ class CIIProtocol extends AbstractProtocol
 		dol_mkdir(dirname($xmlfile));
 		dol_delete_file($xmlfile);
 
-		$xmlcontent = $this->buildXML($invoiceData, $linesData, $this->getBuildXmlProfile(), $outputlangs);
+		$xmlcontent = $this->buildXML($invoiceData, $linesData, $this->getBuildXmlProfile($object), $outputlangs);
 
 		// Local EN 16931 business rules safety net, and check that the document claims the amount the
 		// invoice claims (warnings, or abort in strict mode)
@@ -778,6 +780,26 @@ class CIIProtocol extends AbstractProtocol
 	}
 
 	/**
+	 * Amount the document declares already paid that the import still has to attach (BT-113).
+	 *
+	 * BR-FR-CO-09 reads BT-23 in B2, S2 or M2 as "invoice already paid": BT-113 then equals BT-112 and
+	 * BT-115 is zero, the vendor having cashed the invoice in as he issued it. Nothing is missing from
+	 * such an invoice, so nothing is waited for and nothing is deducted (PR #904, PR #911).
+	 *
+	 * @param  array<string,mixed>	$parsedHeader	Parsed header of the received document
+	 * @return float								The amount still to attach, 0 when there is none to look for
+	 */
+	protected function depositAnnouncedByDocument(array $parsedHeader)
+	{
+		$announced = abs((float) ($parsedHeader['totalPrepaidAmount'] ?? 0));
+		if ($announced < 0.005 || in_array((string) ($parsedHeader['businessProcessId'] ?? ''), array('B2', 'S2', 'M2'), true)) {
+			return 0.0;
+		}
+
+		return $announced;
+	}
+
+	/**
 	 * Decide what to do with a BG-3 reference (BT-25) the buyer does not hold.
 	 * BT-113 is what tells the two cases apart: an amount already paid points at a deposit the import
 	 * has to deduct, so the flow waits for it rather than importing an invoice short of its deduction;
@@ -843,6 +865,26 @@ class CIIProtocol extends AbstractProtocol
 	}
 
 	/**
+	 * Read a received document into the header and lines the import works on.
+	 * A CII document is that XML already; a Factur-X one carries it as a PDF/A-3 attachment, which is
+	 * the only reason FacturXProtocol has anything of its own to do here. Everything downstream -
+	 * vendor synchronization, duplicate check, lines, discounts, charges, totals - is the same import
+	 * for both, so it lives once, in doCreateSupplierInvoiceFromSource().
+	 *
+	 * @param  string	$file      Raw received content
+	 * @param  string	$tempFile  That same content, already written to the per-call working file
+	 * @return array{header:array<string,mixed>,lines:array<int,array<string,mixed>>,xml:string}	Parsed header, parsed lines, and the CII XML they were read from
+	 */
+	protected function parseReceivedDocument($file, $tempFile)
+	{
+		return array(
+			'header' => $this->parseInvoiceHeader($file),
+			'lines' => $this->parseInvoiceLines($file),
+			'xml' => $file,
+		);
+	}
+
+	/**
 	 * Build the supplier invoice from a received CII document written to a per-call working file.
 	 * The temp-file lifecycle is owned by createSupplierInvoiceFromSource() (the public wrapper).
 	 * The vendor synchronization runs in its own transaction, opened and closed here. The invoice
@@ -877,9 +919,11 @@ class CIIProtocol extends AbstractProtocol
 		$supplierInvoice = new FactureFournisseur($db);
 
 
-		// Read using native parser
-		$parsedHeader = $this->parseInvoiceHeader($file);
-		$parsedLines = $this->parseInvoiceLines($file);
+		// Read using native parser. The extraction step is what the Factur-X protocol overrides.
+		$parsedDocument = $this->parseReceivedDocument($file, $tempFile);
+		$parsedHeader = $parsedDocument['header'];
+		$parsedLines = $parsedDocument['lines'];
+		$sourceXml = $parsedDocument['xml'];
 
 		dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource parsedHeader: ' . json_encode($parsedHeader), LOG_DEBUG);
 		dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource parsedHeader: ' . json_encode($parsedHeader), LOG_DEBUG, 0, '_einvoicing');
@@ -896,7 +940,13 @@ class CIIProtocol extends AbstractProtocol
 		$syncSocRes = $this->_syncOrCreateThirdpartyFromEInvoiceSeller($parsedHeader, 'dolibarr', $flowId);
 
 		$socId = $syncSocRes['res'];
-		$return_messages[] = $syncSocRes['message'];
+		if (preg_match('/^[a-zA-Z0-9]+$/', $syncSocRes['message'])) {
+			$langs->loadLangs(array("compta", "companies"));
+			$return_messages[] = $langs->trans($syncSocRes['message']);
+		} else {
+			$return_messages[] = $syncSocRes['message'];
+		}
+
 		if ($socId < 0) {
 			$db->rollback();
 			$this->openedTransactions--;
@@ -1099,7 +1149,7 @@ class CIIProtocol extends AbstractProtocol
 			// Create supplier invoice lines
 			// --------------------------------------------------
 
-			$res = $this->createSupplierInvoiceLinesFromSource($supplierInvoice, $parsedLines, $remise_already_used_line_level_ids, $supplierPriceEntries, $return_messages, $flowId);
+			$res = $this->createSupplierInvoiceLinesFromSource($supplierInvoice, $parsedLines, $remise_already_used_line_level_ids, $supplierPriceEntries, $return_messages, $flowId, $parsedHeader);
 			if ($res['res'] < 0) {
 				return $res;  // Return the full result array because it may contain additional information like actioncode, actionurl...
 			}
@@ -1272,7 +1322,7 @@ class CIIProtocol extends AbstractProtocol
 			}
 
 			// TODO : Save receivedFile in supplier invoice attachments
-			return ['res' => $supplierInvoiceId, 'message' => implode("\n", $return_messages), 'xml_data' => $file];
+			return ['res' => $supplierInvoiceId, 'message' => implode("\n", $return_messages), 'xml_data' => $sourceXml];
 		}
 	}
 
@@ -1286,9 +1336,10 @@ class CIIProtocol extends AbstractProtocol
 	 * @param 	array 				$supplierPriceEntries					The list of entries for supplier prices
 	 * @param 	array 				$return_messages						The list of return messages to complete if necessary
 	 * @param 	string 				$flowId									The concerned flowId
-	 * @return 	array{res:int,message?:string,actioncode?:string|null,actionurl?:string|null,action?:string|null,actiondata?:string|null}	Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and additional data about the action.
+	 * @param 	array<string,mixed>	$parsedHeader							The parsed header, for the amount the document declares already paid
+	 * @return 	array{res:int,message?:string,postponeflow?:int,actioncode?:string|null,actionurl?:string|null,action?:string|null,actiondata?:array<string,mixed>|string|null,businessmessage?:string}	Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and additional data about the action. 'postponeflow' marks a failure that stored nothing, so the batch may go on and the flow be retried later.
 	 */
-	public function createSupplierInvoiceLinesFromSource(&$supplierInvoice, $parsedLines, &$remise_already_used_line_level_ids, &$supplierPriceEntries, &$return_messages, $flowId = ''): array
+	public function createSupplierInvoiceLinesFromSource(&$supplierInvoice, $parsedLines, &$remise_already_used_line_level_ids, &$supplierPriceEntries, &$return_messages, $flowId = '', array $parsedHeader = array()): array
 	{
 		global $db;
 
@@ -1308,15 +1359,41 @@ class CIIProtocol extends AbstractProtocol
 					$lineRefDocType = $refDoc['typeCode'] ?? null;
 					$lineRefDocDate = $refDoc['issueDate'] ?? null;
 
+					// An entry carrying no identifier references nothing, and findIdByRef() answers 0 for it
+					// like it does for an identifier it cannot find - which would report it, or postpone the
+					// flow for good when the document declares an amount already paid. Taken from PR #897.
+					if (trim((string) $lineRefDocId) === '') {
+						continue;
+					}
+
 					$linkedObjectId = SupplierInvoiceHelper::findIdByRef($lineRefDocId, (int) $parsedLine['supplierId']);
 					if ($linkedObjectId < 0) {
 						return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($linkedObjectId, $lineRefDocId, 'linked to line ' . $parsedLine['lineid'])];
 					}
 					if ($linkedObjectId == 0) {
-						return [
-							'res' => -1,
-							'message' => 'Document "' . dol_escape_htmltag((string) $lineRefDocId) . '" linked to line ' . dol_escape_htmltag((string) $parsedLine['lineid']) . ' was not found in Dolibarr. Please verify why this document is missing (deleted, not imported, or not provided by the supplier). To resolve this issue, you must manually create the invoice using the supplier invoice reference "' . dol_escape_htmltag((string) $lineRefDocId) . '".'
-						];
+						// BT-128-1 is the issuer saying, about this very reference, that it is written in an
+						// identification scheme of its own: what the line bills - a phone number, a meter, a
+						// subscription - and not a document. There is then nothing to look for, and nothing
+						// to report: telecom and utility issuers put one on every line. The lookup ran first
+						// either way, because UNTDID 1153 also holds documentary codes (IV, ON, CT, AFL) and
+						// a qualified reference that does match an invoice is linked like any other.
+						if (!empty($refDoc['referenceTypeCode'])) {
+							continue;
+						}
+
+						// Unqualified, and the document declares a deposit still to attach: stepping over it
+						// would import an invoice short of its deduction. The flow is postponed - nothing is
+						// stored, syncFlow() rolls back, and the next run takes it again, the way BG-3 is
+						// already handled at document level. An invoice the vendor cashed in himself
+						// announces no deposit here, and waiting for one would wait for ever.
+						if ($this->depositAnnouncedByDocument($parsedHeader) > 0) {
+							return $this->postponeForMissingLineDocument((string) $lineRefDocId, (string) $parsedLine['lineid'], (int) $parsedLine['supplierId'], $parsedHeader);
+						}
+
+						// Unqualified and nothing declared paid: a contract number, an order number. Stepped
+						// over, and reported so the operator knows the document carried it.
+						$return_messages[] = 'Document "' . dol_escape_htmltag((string) $lineRefDocId) . '" referenced by line ' . dol_escape_htmltag((string) $parsedLine['lineid']) . ' matches no supplier invoice in Dolibarr and was stepped over: the invoice is imported without it.';
+						continue;
 						// TODO: Add a check before sending a final invoice after deposit to ensure that the deposit invoice has been properly sent to the PDP and successfully received.
 					}
 
@@ -1492,6 +1569,43 @@ class CIIProtocol extends AbstractProtocol
 
 		return ['res' => 1];
 	}
+	/**
+	 * Postpone the flow because a line points at an invoice this Dolibarr does not hold while the document
+	 * declares an amount already paid.
+	 *
+	 * Nothing has been committed - syncFlow() rolls its transaction back - so the flow stays pending and the
+	 * next synchronization takes it again, which is how the same case is already handled at document level
+	 * (BG-3, LINKED_INVOICE_NOT_FOUND). The batch carries on: the flows behind this one are not stalled.
+	 *
+	 * @param	string					$lineRefDocId	The reference the line carries (BT-128)
+	 * @param	string					$lineId			The line it was read on
+	 * @param	int						$socId			The supplier of the invoice being imported
+	 * @param	array<string,mixed>		$parsedHeader	The parsed header of the received document
+	 * @return	array{res:int,message:string,postponeflow:int,actioncode:string,actionurl:string,action:string,actiondata:array<string,mixed>,businessmessage:string}	The postponed result
+	 */
+	protected function postponeForMissingLineDocument($lineRefDocId, $lineId, $socId, array $parsedHeader): array
+	{
+		global $langs;
+
+		$documentno = (string) ($parsedHeader['documentno'] ?? '');
+		$langs->loadLangs(array('bills', 'einvoicing@einvoicing'));
+
+		$action = $langs->trans('CreateTheMissingSupplierInvoiceToImport', $lineRefDocId);
+		$action .= ' <a class="butAction small smallpaddingimp nomarginleft" href="' . DOL_URL_ROOT . '/fourn/facture/card.php?action=create&socid=' . $socId . '&ref_supplier=' . urlencode($lineRefDocId) . '" target="_blank">';
+		$action .= '<i class="fas fa-plus-circle"></i> ' . $langs->trans('NewBill') . '</a>';
+
+		return array(
+			'res' => -1,
+			'postponeflow' => 1,
+			'message' => 'Document ' . dol_escape_htmltag($lineRefDocId) . ', referenced by line ' . dol_escape_htmltag($lineId) . ' of received document ' . dol_escape_htmltag($documentno) . ', was not found in Dolibarr while the document declares an amount already paid',
+			'actioncode' => 'LINKED_INVOICE_NOT_FOUND',
+			'actionurl' => 'none',
+			'actiondata' => array('supplierref' => $lineRefDocId, 'linkedref' => $documentno, 'socid' => $socId),
+			'action' => $action,
+			'businessmessage' => $langs->trans('CantFindLinkedInvoiceOfTheImportedInvoice', $documentno, $lineRefDocId),
+		);
+	}
+
 
 
 	/* =====================================================================================
@@ -2105,22 +2219,69 @@ class CIIProtocol extends AbstractProtocol
 	 * EXTENDED-CTC-FR profile of the French mandate without editing the code. An unknown value is
 	 * logged and ignored rather than aborting the generation.
 	 *
-	 * @return 	string 		Profile name, uppercased
+	 * On top of that, the profile is raised to EXTENDED-CTC-FR on its own when this invoice matches a
+	 * known, precise case that needs it - see needsExtendedFrProfile().
+	 *
+	 * @param 	CommonInvoice 	$object 	Invoice being generated, read by needsExtendedFrProfile()
+	 * @return 	string 						Profile name, uppercased
 	 */
-	protected function getBuildXmlProfile()
+	protected function getBuildXmlProfile($object)
 	{
+		$profile = static::BUILD_XML_PROFILE;
+
 		$configured = getDolGlobalString('EINVOICING_XML_PROFILE');
-		if ($configured === '') {
-			return static::BUILD_XML_PROFILE;
+		if ($configured !== '') {
+			$configured = strtoupper(trim($configured));
+			if (in_array($configured, self::SUPPORTED_XML_PROFILES, true)) {
+				$profile = $configured;
+			} else {
+				dol_syslog(get_class($this).'::getBuildXmlProfile unknown EINVOICING_XML_PROFILE "'.$configured.'", falling back to '.static::BUILD_XML_PROFILE, LOG_WARNING);
+			}
 		}
 
-		$configured = strtoupper(trim($configured));
-		if (!in_array($configured, self::SUPPORTED_XML_PROFILES, true)) {
-			dol_syslog(get_class($this).'::getBuildXmlProfile unknown EINVOICING_XML_PROFILE "'.$configured.'", falling back to '.static::BUILD_XML_PROFILE, LOG_WARNING);
-			return static::BUILD_XML_PROFILE;
+		if ($this->needsExtendedFrProfile($object) && !$this->isExtendedProfile($profile)) {
+			dol_syslog(get_class($this).'::getBuildXmlProfile profile raised from '.$profile.' to EXTENDEDFR, see needsExtendedFrProfile()', LOG_NOTICE);
+			return 'EXTENDEDFR';
 		}
 
-		return $configured;
+		return $profile;
+	}
+
+	/**
+	 * Tell whether this invoice looks like a B2G (Chorus Pro) invoice.
+	 *
+	 * @param 	CommonInvoice 	$object 	Invoice being generated
+	 * @return 	bool 						True if the invoice carries a Chorus Pro extrafield
+	 */
+	protected function looksLikeB2GInvoice($object)
+	{
+		$chorusExtrafields = ['d4d_service_code', 'd4d_contract_number', 'd4d_promise_code'];
+		foreach ($chorusExtrafields as $extrafield) {
+			if (trim((string) ($object->array_options['options_'.$extrafield] ?? '')) !== '') {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Tell whether this invoice needs the EXTENDED-CTC-FR profile.
+	 *
+	 * The switch to EXTENDED-CTC-FR must stay confined to known precise cases.
+	 * Known cases are checked individually in this method.
+	 *
+	 * @param 	CommonInvoice 	$object 	Invoice being generated
+	 * @return 	bool 						True if the document needs the EXTENDED-CTC-FR profile
+	 */
+	protected function needsExtendedFrProfile($object)
+	{
+		// The invoice looks like a B2G one.
+		if (getDolGlobalInt('EINVOICING_USE_CHORUS') && $this->looksLikeB2GInvoice($object)) {
+			return true;
+		}
+
+		return false;
 	}
 
 	/**
@@ -2413,6 +2574,14 @@ class CIIProtocol extends AbstractProtocol
 			$contractRef = $doc->createElement('ram:ContractReferencedDocument');
 			$agreement->appendChild($contractRef);
 			$contractRef->appendChild($doc->createElement('ram:IssuerAssignedID', einvoicingXmlText($invoiceData['contractReference'])));
+
+			// Contract type (EXT-FR-FE-01): BR-FR-CPRO-01 tells a public market ("GC") from an ordinary
+			// contract ("CT"), and accepts nothing else. ram:ReferenceTypeCode is forbidden on this element
+			// below EXTENDED - CII-DT-024, which the CTC-FR Schematron relaxes into CII-FREXT-DT-024 to
+			// "permettre EXT-FR-FE-01" - so it only goes out on an EXTENDED level profile.
+			if (!empty($invoiceData['contractReferenceTypeCode']) && $this->isExtendedProfile($profile)) {
+				$contractRef->appendChild($doc->createElement('ram:ReferenceTypeCode', einvoicingXmlText((string) $invoiceData['contractReferenceTypeCode'])));
+			}
 		}
 
 		// Additional order references: when an invoice covers several purchase orders, the first is emitted as BT-13
@@ -2865,6 +3034,17 @@ class CIIProtocol extends AbstractProtocol
 				$node->appendChild($doc->createElement('ram:ID', einvoicingXmlText((string) $data[$prefix . 'ids'])));
 			}
 
+			// SIRET of the buyer (BT-46 under scheme 0009), which BR-FR-CPRO-10 makes mandatory on a B2G
+			// invoice: Chorus Pro routes on the establishment, where BT-47 carries the legal entity (SIREN
+			// under 0002). It comes on top of the identifier the setup already declares - the reference
+			// document of Annexe B carries 0088, 0009 and 0224 side by side - so it needs the same EXTENDED
+			// profile as the routing code below, and the same restriction to the buyer party.
+			if ($type === 'buyer' && $this->isExtendedProfile($profile) && !empty($data['buyerChorusSiret'])) {
+				$siret = $doc->createElement('ram:GlobalID', einvoicingXmlText($data['buyerChorusSiret']));
+				$siret->setAttribute('schemeID', EInvoicing::SCHEME_FR_SIRET);
+				$node->appendChild($siret);
+			}
+
 			// Routing code of the buyer (BT-46 under scheme 0224), where BR-FR-CPRO-11 and BR-FR-CPRO-13 read
 			// the Chorus Pro "code service exécutant". It is a second ram:GlobalID, which only the EXTENDED
 			// profiles accept (FX-SCH-A-000164 caps that element at one occurrence below them), and it belongs
@@ -2942,7 +3122,12 @@ class CIIProtocol extends AbstractProtocol
 
 		// TradeAddressType is reduced to the country code by the MINIMUM schema
 		if (!$this->isMinimumProfile($profile)) {
-			$addr->appendChild($doc->createElement('ram:PostcodeCode', einvoicingXmlText((string) $data[$prefix . 'postcode'])));
+			// The post code (BT-38, BT-53) and the city (BT-37, BT-52) are optional terms: an absent one
+			// is written as nothing at all, an empty element being refused by PEPPOL-EN16931-R008. Only
+			// the country below is mandatory, and the caller has already refused a party without one.
+			if (!empty($data[$prefix . 'postcode'])) {
+				$addr->appendChild($doc->createElement('ram:PostcodeCode', einvoicingXmlText((string) $data[$prefix . 'postcode'])));
+			}
 			// The three address lines the norm has: BT-35/36/162 for the seller, BT-50/51/163 for the
 			// buyer. XSD order inside TradeAddressType is PostcodeCode, LineOne, LineTwo, LineThree,
 			// CityName, CountryID - the elements are written in that order and nowhere else.
@@ -2955,7 +3140,9 @@ class CIIProtocol extends AbstractProtocol
 			if (!empty($data[$prefix . 'linethree'])) {
 				$addr->appendChild($doc->createElement('ram:LineThree', einvoicingXmlText($data[$prefix . 'linethree'])));
 			}
-			$addr->appendChild($doc->createElement('ram:CityName', einvoicingXmlText($data[$prefix . 'city'])));
+			if (!empty($data[$prefix . 'city'])) {
+				$addr->appendChild($doc->createElement('ram:CityName', einvoicingXmlText($data[$prefix . 'city'])));
+			}
 		}
 		$addr->appendChild($doc->createElement('ram:CountryID', einvoicingXmlText((string) $data[$prefix . 'country'])));
 
@@ -3612,10 +3799,30 @@ class CIIProtocol extends AbstractProtocol
 		}
 		$announcedTva = abs((float) $parsedHeader['taxTotalAmount']);
 		$announcedTtc = abs((float) $parsedHeader['grandTotalAmount']);
-		// BT-113 is what the document says was already paid, a deposit in practice. It moves neither
-		// BT-110 nor BT-112, so the two totals below agree whether or not the deposit was deducted, and
-		// an invoice short of its deduction used to pass this guard and be paid in full (issue #726).
+		// BT-113 is what the document says was already paid. It moves neither BT-110 nor BT-112, so the
+		// two totals below agree whether or not it was deducted, and an invoice short of its deduction
+		// used to pass this guard and be paid in full (issue #726).
 		$announcedPrepaid = isset($parsedHeader['totalPrepaidAmount']) ? abs((float) $parsedHeader['totalPrepaidAmount']) : null;
+
+		// Two things say that amount is not a deposit to deduct: BT-23 saying the invoice was already
+		// paid, and a document referencing no preceding invoice (BG-3), which points at nothing - BG-3
+		// being the only thing the import ever attaches a deposit from. Reported by the maintainer on #904.
+		if ($announcedPrepaid !== null
+			&& ($this->depositAnnouncedByDocument($parsedHeader) <= 0 || empty($parsedHeader['invoiceRefDocs']))) {
+			// What the import did attach is named, and says nothing when it covers the announced amount:
+			// the deduction is there, and inviting a payment on top of it would settle it twice.
+			$deducted = SupplierInvoiceHelper::linkedDepositAmount($supplierInvoiceId);
+			if ($announcedPrepaid >= 0.005 && abs($deducted - $announcedPrepaid) >= 0.005) {
+				$langs->load('einvoicing@einvoicing');
+				$return_messages[] = $langs->trans(
+					'EInvoiceImportPrepaidAlreadySettled',
+					dol_escape_htmltag((string) ($parsedHeader['documentno'] ?? '')),
+					price2num($announcedPrepaid, 'MT'),
+					price2num($deducted, 'MT')
+				);
+			}
+			$announcedPrepaid = null;
+		}
 
 		require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
 
@@ -3986,6 +4193,7 @@ class CIIProtocol extends AbstractProtocol
 		return ['res' => 1, 'fkRemise' => $fkRemise];
 	}
 
+
 	/**
 	 * Write the VAT the document announces onto the lines that carry each rate.
 	 *
@@ -4014,6 +4222,13 @@ class CIIProtocol extends AbstractProtocol
 		// The document announces its VAT by rate (BG-23) and not by line, so the lines are grouped the same way.
 		$groups = array();
 		foreach ($invoice->lines as $line) {
+			// A deposit is carried as a negative line of the same rate, and BT-116 is announced before it is
+			// deducted: left in, it puts the taxable base of its rate below the announced one and the rate is
+			// refused, which is what left a correctly attached deposit unable to be validated (issue #948).
+			// Same predicate the module already uses to skip what is not a billed line.
+			if ((int) $line->product_type == 9 || !empty($line->fk_remise_except)) {
+				continue;
+			}
 			$rate = (string) price2num($line->tva_tx);
 			$groups[$rate]['base'] = ($groups[$rate]['base'] ?? 0) + (float) $line->total_ht;
 			$groups[$rate]['vat'] = ($groups[$rate]['vat'] ?? 0) + (float) $line->total_tva;

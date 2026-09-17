@@ -138,7 +138,7 @@ class Document extends CommonObject
 		"flow_direction" => array("type" => "varchar(10)", "label" => "flow_direction", "enabled" => "1", 'position' => 50, 'notnull' => 0, "visible" => "1", "comment" => "In or Out", 'csslist' => 'center'),
 		"flow_syntax" => array("type" => "varchar(50)", "label" => "flow_syntax", "enabled" => "1", 'position' => 60, 'notnull' => 0, "visible" => "-1", "comment" => "Document syntax (Factur-X, CII, UBL, etc.)"),
 		"flow_profile" => array("type" => "varchar(50)", "label" => "flow_profile", "enabled" => "1", 'position' => 70, 'notnull' => 0, "visible" => "-1", "comment" => "Profile used (Basic, Cius, etc.)"),
-		"processing_rule" => array("type" => "varchar(50)", "label" => "processing_rule", "enabled" => "1", 'position' => 75, 'notnull' => 0, "visible" => "-1", "comment" => "Rule the platform computed for the flow (B2B, B2BInt, NotApplicable, ...)"),
+		"processing_rule" => array("type" => "varchar(50)", "label" => "ProcessingRule", "enabled" => "1", 'position' => 75, 'notnull' => 0, "visible" => "-1", "help" => "ProcessingRuleHelp", "comment" => "Rule the platform computed for the flow (B2B, B2BInt, NotApplicable, ...)"),
 		"document_body" => array("type" => "text", "label" => "document_body", "enabled" => "1", 'position' => 110, 'notnull' => 0, "visible" => "0", "comment" => "Full document content XML"),
 		"fk_element_type" => array("type" => "varchar(100)", "label" => "fk_element_type", "enabled" => "1", 'position' => 120, 'notnull' => 0, "visible" => "1",),
 		"fk_element_id" => array("type" => "integer", "label" => "fk_element_id", "enabled" => "1", 'position' => 130, 'notnull' => 0, "visible" => "-1",),
@@ -1536,7 +1536,12 @@ class Document extends CommonObject
 		}
 
 		if (isset($provider)) {
-			$syncFromDate = $provider->getLastSyncDate();
+			// A flow postponed on one run (nothing stored for it) is only re-listed by a later run if the
+			// cursor still reaches back to it - a margin, applied here since the manual sync of
+			// document_list.php can already be re-run with a hand-picked date, the cron cannot. The flows
+			// it re-lists that are already stored are cheaply discarded by the alreadyProcessedFlowIds
+			// pre-check in syncFlows(), which queries only the flowIds of the current listing.
+			$syncFromDate = $provider->getLastSyncDate(getDolGlobalInt('EINVOICING_SYNC_MARGIN_TIME_HOURS'));
 			$maxflows = getDolGlobalInt('EINVOICING_FLOWS_SYNC_CALL_SIZE', 100);
 
 			// Sync all flows

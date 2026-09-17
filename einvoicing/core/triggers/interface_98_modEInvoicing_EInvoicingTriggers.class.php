@@ -332,6 +332,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			// to the figures the vendor bills validates normally and drops the mark (issue #861).
 			$announced = SupplierInvoiceHelper::totalsMismatch((int) $object->id);
 			if ($announced !== null) {
+				// A prepaid amount is in the mark only for a document referencing the invoice it was paid on (BG-3).
 				if (SupplierInvoiceHelper::totalsAgreeWithDocument($object, $announced['tva'], $announced['ttc'], $announced['prepaid'] ?? null)) {
 					SupplierInvoiceHelper::clearTotalsMismatch((int) $object->id);
 				} elseif (isset($announced['prepaid'])
