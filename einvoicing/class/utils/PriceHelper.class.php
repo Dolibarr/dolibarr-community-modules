@@ -21,6 +21,10 @@
  * \brief   Tools for price management
  */
 
+// calculatePriceTotal() calls getDolGlobalFloat(), added to the core in Dolibarr 21: the backport is loaded here
+// because a caller outside this module has no reason to know this class needs it.
+require_once __DIR__ . '/../../compat/functions.lib.php';
+
 /**
  * Class PriceHelper
  */

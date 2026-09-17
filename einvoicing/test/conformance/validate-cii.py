@@ -12,6 +12,12 @@ exactly like the online validator, and it has THREE stages:
 
 Running only stages 1 and 3 answers "0 failure" on documents the access point refuses.
 
+A Schematron refuses in two ways, and both count. Besides the assertion that fails
+(svrl:failed-assert), a <report> that fires produces an svrl:successful-report: that is how a profile
+XSLT states "Element 'ram:X' is marked as not used in the given context" for everything the profile
+leaves out. The platform returns those as REJ_COH, so reading only the failed assertions answers
+VALID on a document it rejects - the shape of #974, ram:ExemptionReason on a line under EN 16931.
+
 Usage:
     validate-cii.py [--quiet] [--strict] file.xml [file.xml ...]
 
@@ -75,25 +81,38 @@ def guideline(path):
     return None, 'no GuidelineSpecifiedDocumentContextParameter/ID (BT-24) in the document'
 
 
+def svrl_hits(report, tag):
+    """Collect one kind of Schematron hit - failed-assert or successful-report - from an SVRL report."""
+    hits = []
+    for m in re.finditer(r'<svrl:%s\b([^>]*)>(.*?)</svrl:%s>' % (tag, tag), report, re.S):
+        attrs, body = m.group(1), m.group(2)
+        rule = re.search(r'id="([^"]*)"', attrs)
+        flag = re.search(r'flag="([^"]*)"', attrs)
+        text = re.search(r'<svrl:text>(.*?)</svrl:text>', body, re.S)
+        # A <report> carries neither id nor flag: name it by the element its location ends on, which
+        # is what tells one "marked as not used" apart from the next.
+        location = re.search(r'location="([^"]*)"', attrs)
+        steps = re.findall(r'\*:([A-Za-z]+)\[', location.group(1)) if location else []
+        hits.append({
+            'rule': rule.group(1) if rule else (steps[-1] if steps else '?'),
+            'flag': flag.group(1) if flag else '-',
+            'text': ' '.join((text.group(1) if text else '').split())[:160],
+        })
+    return hits
+
+
 def run_xslt(xslt, xml, out):
-    """Apply one Schematron XSLT and return the failed assertions of its SVRL report."""
+    """Apply one Schematron XSLT and return the assertions that failed and the reports that fired."""
     r = subprocess.run(['java', '-jar', SAXON_JAR, '-s:' + xml, '-xsl:' + xslt, '-o:' + out],
                        capture_output=True, text=True)
     if r.returncode != 0:
         return None, r.stderr.strip().splitlines()[:3]
     report = open(out, encoding='utf-8').read()
-    fails = []
-    for m in re.finditer(r'<svrl:failed-assert\b([^>]*)>(.*?)</svrl:failed-assert>', report, re.S):
-        attrs, body = m.group(1), m.group(2)
-        rule = re.search(r'id="([^"]*)"', attrs)
-        flag = re.search(r'flag="([^"]*)"', attrs)
-        text = re.search(r'<svrl:text>(.*?)</svrl:text>', body, re.S)
-        fails.append({
-            'rule': rule.group(1) if rule else '?',
-            'flag': flag.group(1) if flag else '?',
-            'text': ' '.join((text.group(1) if text else '').split())[:160],
-        })
-    return {'checks': len(re.findall(r'<svrl:fired-rule\b', report)), 'fails': fails}, None
+    return {
+        'checks': len(re.findall(r'<svrl:fired-rule\b', report)),
+        'fails': svrl_hits(report, 'failed-assert'),
+        'reports': svrl_hits(report, 'successful-report'),
+    }, None
 
 
 def xsd_validate(xml):
@@ -140,9 +159,13 @@ def validate(path, strict, quiet, reportdir):
             lines.append('  %-42s: ERROR %s' % (label, ' '.join(run_err)))
             valid = False
             continue
-        lines.append('  %-42s: %s check(s), %s failure(s)' % (label, res['checks'], len(res['fails'])))
-        lines.extend('      [%s] (%s) %s' % (f['rule'], f['flag'], f['text']) for f in res['fails'])
-        if res['fails']:
+        count = '%s check(s), %s failure(s)' % (res['checks'], len(res['fails']))
+        if res['reports']:
+            count += ', %s report(s)' % len(res['reports'])
+        lines.append('  %-42s: %s' % (label, count))
+        lines.extend('      [%s] (%s) %s' % (f['rule'], f['flag'], f['text'])
+                     for f in res['fails'] + res['reports'])
+        if res['fails'] or res['reports']:
             valid = False
 
     text = '%-40s %s   %s' % (base, 'VALID  ' if valid else 'INVALID', urn)

@@ -2304,6 +2304,28 @@ trait CommonProtocol
 		if ($res > 0) {
 			$msg = $langs->trans('EInvoiceSupplierInvoiceLinkedToOrder', $orderReference);
 			dol_syslog(get_class($this) . '::_linkSupplierInvoiceToPurchaseOrder ' . $msg, LOG_DEBUG);
+
+			// Propagate extrafields from the purchase order to the supplier invoice.
+			// Only empty fields on the invoice are filled: values already set by the import are kept.
+			// insertExtraFields() silently ignores keys that are not defined for facture_fourn.
+			$order = new CommandeFournisseur($db);
+			if ($order->fetch($orderId) > 0) {
+				$order->fetch_optionals();
+				if (!empty($order->array_options)) {
+					$supplierInvoice->fetch_optionals();
+					$changed = false;
+					foreach ($order->array_options as $key => $value) {
+						if (isset($value) && $value !== '' && (!isset($supplierInvoice->array_options[$key]) || $supplierInvoice->array_options[$key] === '')) {
+							$supplierInvoice->array_options[$key] = $value;
+							$changed = true;
+						}
+					}
+					if ($changed) {
+						$supplierInvoice->insertExtraFields();
+					}
+				}
+			}
+
 			return $msg;
 		}
 
@@ -2320,8 +2342,11 @@ trait CommonProtocol
 		'10' => 'LIQ',	// Cash
 		'20' => 'CHQ',	// Check
 		'23' => 'TRA',	// Banque check
+		'24' => 'TRA',	// Bill of exchange awaiting acceptance
 		'30' => 'VIR',	// Bank transfer
 		'45' => 'TIP',	// Referenced home-banking credit transfer
+		'48' => 'CB',	// Bank card, the generic code most senders use rather than 54
+		'49' => 'PRE',	// Direct debit, the generic code most senders use rather than 59
 		'54' => 'CB',	// Credit card
 		'59' => 'PRE',	// SEPA direct debit
 		'68' => 'VAD',	// Online payment
