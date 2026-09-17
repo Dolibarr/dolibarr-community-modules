@@ -1619,6 +1619,10 @@ class Document extends CommonObject
 	 * Clean XML data by removing or replacing specific contents like :
 	 * - attachments
 	 *
+	 * Not optional: this column is a MEDIUMTEXT capped at 16 Mo by checkXmlDataMaxSize(), and one
+	 * embedded PDF is enough to pass it - a document too big is then not stored at all.
+	 * EINVOICING_KEEP_RECEIVED_XML_AS_IS only concerns the file kept beside the supplier invoice.
+	 *
 	 * @param ?string $xmlData The XML data to clean
 	 * @return ?string The cleaned XML data
 	 */
