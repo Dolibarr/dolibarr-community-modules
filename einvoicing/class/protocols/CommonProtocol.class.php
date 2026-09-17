@@ -2328,8 +2328,11 @@ trait CommonProtocol
 		'10' => 'LIQ',	// Cash
 		'20' => 'CHQ',	// Check
 		'23' => 'TRA',	// Banque check
+		'24' => 'TRA',	// Bill of exchange awaiting acceptance
 		'30' => 'VIR',	// Bank transfer
 		'45' => 'TIP',	// Referenced home-banking credit transfer
+		'48' => 'CB',	// Bank card, the generic code most senders use rather than 54
+		'49' => 'PRE',	// Direct debit, the generic code most senders use rather than 59
 		'54' => 'CB',	// Credit card
 		'59' => 'PRE',	// SEPA direct debit
 		'68' => 'VAD',	// Online payment
