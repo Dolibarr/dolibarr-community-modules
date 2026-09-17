@@ -375,6 +375,7 @@ EINVOICING_PMD=Notice for late payment penalties
 EINVOICING_PMD_HELP=Text displayed on generated e-invoices regarding penalties applicable in case of late payment.
 EINVOICING_AAB=Notice for early payment discounts
 EINVOICING_AAB_HELP=Text displayed on generated e-invoices indicating the discount (or no discount) granted for early payment.
+EINVOICING_LEGAL_NOTICE_DEFAULT_HELP=Left empty, the e-invoice carries the text shown in the field, which reproduces the wording of the XP Z12-012 annex B examples. None of the three notices may deny the fees: under articles L441-10 and D441-5 of the French Code de commerce, the EUR 40 recovery indemnity and the late payment penalties are owed by operation of law, and the CTC-FR rule BR-FR-05 makes the three notices mandatory.
 einvoicingThirdPartyRoutingTitle=E-invoicing address
 RoutingIdField=E-invoicing address
 RoutingIdFieldShort=Address
