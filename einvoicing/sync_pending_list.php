@@ -29,7 +29,7 @@
 
 // Load Dolibarr environment
 $res = 0;
-if (!$res && !empty($_SERVER["CONTEXT_DOCUMENT_ROOT"])) {
+if (!$res && !empty($_SERVER["CONTEXT_DOCUMENT_ROOT"])) { // @phpstan-ignore booleanNot.alwaysTrue
 	$res = @include $_SERVER["CONTEXT_DOCUMENT_ROOT"]."/main.inc.php";
 }
 $tmp = empty($_SERVER['SCRIPT_FILENAME']) ? '' : $_SERVER['SCRIPT_FILENAME'];
@@ -65,8 +65,8 @@ if (!$res) {
  * @var Translate $langs
  * @var User $user
  */
-include_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
-include_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php';
+include_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php'; // @phpstan-ignore includeOnce.fileNotFound
+include_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php'; // @phpstan-ignore includeOnce.fileNotFound
 dol_include_once('/einvoicing/class/einvoicingsyncpending.class.php');
 
 // Load translation files required by the page
@@ -82,7 +82,7 @@ $langs->loadLangs(array("einvoicing@einvoicing", "other", "bills", "products", "
  * panel, for every variant, and for rows already queued without re-synchronizing them.
  *
  * @param 	string 	$html 	HTML block stored in action_html
- * @return 	array 			List of array('url'=>string, 'icon'=>string, 'text'=>string)
+ * @return array<int,array{url:string,icon:string,text:string}> List of the manual actions to render
  */
 function einvsp_actionsFromHtml($html)
 {
@@ -269,7 +269,7 @@ if ($action == 'confirm_linkthirdparty' && $rowid > 0 && $permissiontowrite) {
 		setEventMessages($langs->trans("SelectAThirdPartyFirst"), null, 'errors');
 		$action = 'linkthirdparty';
 	} else {
-		require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
+		require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php'; // @phpstan-ignore requireOnce.fileNotFound
 		$md = json_decode((string) $object->match_data, true);
 		if (!is_array($md)) {
 			$md = array();
@@ -444,7 +444,7 @@ if ($action == 'linkthirdparty' && $rowid > 0 && $permissiontowrite) {
 			if ($rs) {
 				while ($os = $db->fetch_object($rs)) {
 					if (!isset($candidates[(int) $os->rowid])) {
-						$candidates[(int) $os->rowid] = array('name' => $os->nom, 'crit' => array(), 'hasid' => 0);
+						$candidates[(int) $os->rowid] = array('name' => (string) $os->nom, 'crit' => array(), 'hasid' => 0);
 					}
 					$candidates[(int) $os->rowid]['crit'][$sdef['label']] = 1;
 					$candidates[(int) $os->rowid]['hasid'] = 1;
@@ -469,7 +469,7 @@ if ($action == 'linkthirdparty' && $rowid > 0 && $permissiontowrite) {
 			if ($rs) {
 				while ($os = $db->fetch_object($rs)) {
 					if (!isset($candidates[(int) $os->rowid])) {
-						$candidates[(int) $os->rowid] = array('name' => $os->nom, 'crit' => array(), 'hasid' => 0);
+						$candidates[(int) $os->rowid] = array('name' => (string) $os->nom, 'crit' => array(), 'hasid' => 0);
 					}
 					$candidates[(int) $os->rowid]['crit'][$langs->trans("Name")] = 1;
 				}
@@ -477,7 +477,7 @@ if ($action == 'linkthirdparty' && $rowid > 0 && $permissiontowrite) {
 		}
 		// Fiscal-id matches first (they are the definitive ones), then name-only matches.
 		uasort($candidates, function ($a, $b) {
-			return ((int) ($b['hasid'] ?? 0)) <=> ((int) ($a['hasid'] ?? 0));
+			return ((int) $b['hasid']) <=> ((int) $a['hasid']);
 		});
 
 		print '<div class="marginbottomonly">'.img_picto('', 'fa-search', 'class="paddingrightonly"').'<b>'.$langs->trans("MatchingThirdpartyCandidates").'</b></div>';
@@ -524,7 +524,7 @@ if ($action == 'comparelinkthirdparty' && $rowid > 0 && $permissiontowrite) {
 		setEventMessages($langs->trans("SelectAThirdPartyFirst"), null, 'errors');
 		$action = 'linkthirdparty';
 	} else {
-		require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
+		require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php'; // @phpstan-ignore requireOnce.fileNotFound
 		$md = json_decode((string) $linkobj->match_data, true);
 		if (!is_array($md)) {
 			$md = array();
@@ -776,7 +776,7 @@ while ($i < $imaxinloop) {
 			print '<a class="classfortooltip" href="'.dol_escape_htmltag($act['url']).'" target="_blank" title="'.$tip.'">'.img_picto('', $icon).'</a>';
 			$hasactions = true;
 		}
-	} elseif (is_array($data) && !empty($data) && isset($data[0]) && is_array($data[0]) && isset($data[0]['key'])) {
+	} elseif (!empty($data) && isset($data[0]) && is_array($data[0]) && isset($data[0]['key'])) {
 		foreach ($data as $act) {
 			if (empty($act['url'])) {
 				continue;

@@ -69,7 +69,7 @@ class EInvoicingSyncPending extends CommonObject
 
 	// Fields definition (see llx_einvoicing_sync_pending). The array shape type is inherited from CommonObject::$fields.
 	public $fields = array(
-		"rowid" => array("type" => "integer", "label" => "ID", "enabled" => "1", 'position' => 1, 'notnull' => 1, "visible" => "0", "noteditable" => 1, "index" => "1"),
+		"rowid" => array("type" => "integer", "label" => "ID", "enabled" => "1", 'position' => 1, 'notnull' => 1, "visible" => "0", "noteditable" => 1, "index" => 1),
 		"provider" => array("type" => "varchar(50)", "label" => "AccessPoint", "langfile" => "einvoicing@einvoicing", "enabled" => "1", 'position' => 5, 'notnull' => 1, "visible" => "-1"),
 		"flow_id" => array("type" => "varchar(255)", "label" => "flow_id", "enabled" => "1", 'position' => 10, 'notnull' => 1, "visible" => "1", "csslist" => "tdoverflowmax150"),
 		"flow_direction" => array("type" => "varchar(10)", "label" => "flow_direction", "enabled" => "1", 'position' => 20, 'notnull' => 0, "visible" => "1", 'csslist' => 'center'),
@@ -90,7 +90,7 @@ class EInvoicingSyncPending extends CommonObject
 		"tms" => array("type" => "timestamp", "label" => "DateModification", "enabled" => "1", 'position' => 501, 'notnull' => 0, "visible" => "-2"),
 		"fk_user_creat" => array("type" => "integer:User:user/class/user.class.php", "label" => "UserAuthor", "picto" => "user", "enabled" => "1", 'position' => 510, 'notnull' => 1, "visible" => "-2"),
 		"fk_user_modif" => array("type" => "integer:User:user/class/user.class.php", "label" => "UserModif", "picto" => "user", "enabled" => "1", 'position' => 511, 'notnull' => -1, "visible" => "-2"),
-		"status" => array("type" => "integer", "label" => "Status", "enabled" => "1", 'position' => 2000, 'notnull' => 1, "visible" => "1", "index" => "1", "arrayofkeyval" => array("0" => "Pending", "1" => "Resolved", "2" => "Ignored")),
+		"status" => array("type" => "integer", "label" => "Status", "enabled" => "1", 'position' => 2000, 'notnull' => 1, "visible" => "1", "index" => 1, "arrayofkeyval" => array("0" => "Pending", "1" => "Resolved", "2" => "Ignored")),
 	);
 
 	/** @var int */
@@ -232,14 +232,14 @@ class EInvoicingSyncPending extends CommonObject
 	 * message, attempt counter) instead of being duplicated. A previously resolved/ignored flow that
 	 * fails again is reopened as pending.
 	 *
-	 * @param  array  $flow     Flow as returned by the AP search (flowId, flowDirection, flowType, trackingId, updatedAt)
-	 * @param  string $provider Provider short key ('superpdp', ...)
-	 * @param  string $reason   Business reason code ('PRODUCT_NOT_FOUND', ...)
-	 * @param  string $message  Human readable message of the failed attempt
-	 * @param  array  $data       Action data (supplier, supplierref, label, socid, ...) to help the manual action
-	 * @param  User   $user       User running the synchronization
-	 * @param  string $actionHtml Ready-to-display block of manual-action buttons built by the protocol (create / associate an existing product / set default), same as shown on the synchronization page
-	 * @param  array  $matchData  Issuer identifiers of the flow (name, vatnumber, idprof1=SIREN, idprof2=SIRET, ...) used to link the flow to an existing thirdparty
+	 * @param  array<string,mixed>       $flow       Flow as returned by the AP search (flowId, flowDirection, flowType, trackingId, updatedAt)
+	 * @param  string                    $provider   Provider short key ('superpdp', ...)
+	 * @param  string                    $reason     Business reason code ('PRODUCT_NOT_FOUND', ...)
+	 * @param  string                    $message    Human readable message of the failed attempt
+	 * @param  array<int|string,mixed>   $data       Action data (supplier, supplierref, label, socid, ...) to help the manual action
+	 * @param  User                      $user       User running the synchronization
+	 * @param  string                    $actionHtml Ready-to-display block of manual-action buttons built by the protocol (create / associate an existing product / set default), same as shown on the synchronization page
+	 * @param  array<string,mixed>       $matchData  Issuer identifiers of the flow (name, vatnumber, idprof1=SIREN, idprof2=SIRET, ...) used to link the flow to an existing thirdparty
 	 * @return int                rowid of the queued row if OK, <0 if KO
 	 */
 	public function queueFromFlow($flow, $provider, $reason, $message, $data, User $user, $actionHtml = '', $matchData = array())
