@@ -2972,7 +2972,11 @@ class CIIProtocol extends AbstractProtocol
 		if ($lineExemptionReasonCode !== '') {
 			$tax->appendChild($doc->createElement('ram:ExemptionReasonCode', einvoicingXmlText((string) $lineExemptionReasonCode)));
 		}
-		$tax->appendChild($doc->createElement('ram:RateApplicablePercent', einvoicingXmlText((string) $line['rateApplicablePercent'])));
+		// BR-O-05: a line declaring an operation outside the scope of VAT carries no rate (BT-152). Writing
+		// "0.00" there is not the same statement as writing nothing: it would claim a zero rated operation.
+		if ((string) $line['categoryCode'] !== 'O') {
+			$tax->appendChild($doc->createElement('ram:RateApplicablePercent', einvoicingXmlText((string) $line['rateApplicablePercent'])));
+		}
 
 		// Billing period for the line (BG-26 / BT-134 / BT-135). Must be placed after ApplicableTradeTax
 		// and before SpecifiedTradeAllowanceCharge (discount below) per the CII D22B schema sequence.
