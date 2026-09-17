@@ -114,13 +114,13 @@ class EInvoicingSyncPending extends CommonObject
 	public $reason_code;
 	/** @var string */
 	public $reason_message;
-	/** @var string */
+	/** @var string|null */
 	public $action_data;
-	/** @var string */
+	/** @var string|null */
 	public $action_html;
-	/** @var string */
+	/** @var string|null */
 	public $match_data;
-	/** @var int */
+	/** @var int|null */
 	public $flow_updatedat;
 	/** @var int */
 	public $nb_attempts;
@@ -272,9 +272,9 @@ class EInvoicingSyncPending extends CommonObject
 		$this->tracking_idref  = (string) ($flow['trackingId'] ?? '');
 		$this->reason_code     = (string) $reason;
 		$this->reason_message  = (string) $message;
-		$this->action_data     = empty($data) ? null : json_encode($data);
+		$this->action_data     = empty($data) ? null : (string) json_encode($data);
 		$this->action_html     = ($actionHtml !== '' && $actionHtml !== null) ? $actionHtml : null;
-		$this->match_data      = empty($matchData) ? null : json_encode($matchData);
+		$this->match_data      = empty($matchData) ? null : (string) json_encode($matchData);
 		$this->flow_updatedat  = $updatedatSql;
 		$this->date_lastattempt = dol_now();
 
