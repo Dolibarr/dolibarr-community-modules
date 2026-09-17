@@ -69,7 +69,7 @@ class EInvoicingSyncPending extends CommonObject
 
 	// Fields definition (see llx_einvoicing_sync_pending). The array shape type is inherited from CommonObject::$fields.
 	public $fields = array(
-		"rowid" => array("type" => "integer", "label" => "ID", "enabled" => "1", 'position' => 1, 'notnull' => 1, "visible" => "0", "noteditable" => "1", "index" => "1"),
+		"rowid" => array("type" => "integer", "label" => "ID", "enabled" => "1", 'position' => 1, 'notnull' => 1, "visible" => "0", "noteditable" => 1, "index" => "1"),
 		"provider" => array("type" => "varchar(50)", "label" => "AccessPoint", "langfile" => "einvoicing@einvoicing", "enabled" => "1", 'position' => 5, 'notnull' => 1, "visible" => "-1"),
 		"flow_id" => array("type" => "varchar(255)", "label" => "flow_id", "enabled" => "1", 'position' => 10, 'notnull' => 1, "visible" => "1", "csslist" => "tdoverflowmax150"),
 		"flow_direction" => array("type" => "varchar(10)", "label" => "flow_direction", "enabled" => "1", 'position' => 20, 'notnull' => 0, "visible" => "1", 'csslist' => 'center'),
@@ -110,13 +110,21 @@ class EInvoicingSyncPending extends CommonObject
 	public $fk_element_type;
 	/** @var int */
 	public $fk_element_id;
+	/** @var string */
 	public $reason_code;
+	/** @var string */
 	public $reason_message;
+	/** @var string */
 	public $action_data;
+	/** @var string */
 	public $action_html;
+	/** @var string */
 	public $match_data;
+	/** @var int */
 	public $flow_updatedat;
+	/** @var int */
 	public $nb_attempts;
+	/** @var int */
 	public $date_lastattempt;
 	public $status;
 	public $date_creation;
