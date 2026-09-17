@@ -657,9 +657,9 @@ class CIIProtocolTest extends CommonClassTest
 		$obj = $db->fetch_object($resql);
 
 		return (int) $obj->freesoc;
-  }
-  
-  /**
+	}
+
+	/**
 	 * The bill of exchange awaiting acceptance, and the generic bank card and direct debit codes, reach a
 	 * Dolibarr payment mode on import. 48 and 49 are what many senders write, rather than the credit card (54)
 	 * and SEPA direct debit (59) variants the table already knew.
