@@ -3841,6 +3841,13 @@ class CIIProtocol extends AbstractProtocol
 		// used to pass this guard and be paid in full (issue #726).
 		$announcedPrepaid = isset($parsedHeader['totalPrepaidAmount']) ? abs((float) $parsedHeader['totalPrepaidAmount']) : null;
 
+		// A document whose BT-115 does not answer BR-CO-16 says two different things about what has to
+		// be paid, and nothing here can pick one: it is marked like any other document the import
+		// cannot reproduce (issue #861), which holds validation and approval back (issue #994).
+		if ($this->flagPayableMismatch($supplierInvoiceId, $parsedHeader, $announcedTva, $announcedTtc, $return_messages)) {
+			return;
+		}
+
 		// Two things say that amount is not a deposit to deduct: BT-23 saying the invoice was already
 		// paid, and a document referencing no preceding invoice (BG-3), which points at nothing - BG-3
 		// being the only thing the import ever attaches a deposit from. Reported by the maintainer on #904.
@@ -3930,6 +3937,55 @@ class CIIProtocol extends AbstractProtocol
 
 		dol_syslog(__METHOD__ . ' Invoice ' . $supplierInvoiceId . ' does not total the received document (announced ' . $announcedTtc . ' incl. VAT, imported ' . $invoice->total_ttc . '): validation and approval blocked', LOG_WARNING);
 	}
+
+	/**
+	 * Mark an invoice whose document contradicts itself on the amount due for payment.
+	 *
+	 * BR-CO-16 fixes BT-115 as BT-112 - BT-113 + BT-114. When the document announces a payable that its
+	 * own totals do not add up to, the two amounts cannot both be right, and an accounting package
+	 * cannot pick one: the invoice is marked and the operator is told both figures (issue #994).
+	 *
+	 * @param	int						$supplierInvoiceId	Id of the invoice the import created
+	 * @param	array<string,mixed>		$parsedHeader		The parsed header of the received document
+	 * @param	float					$announcedTva		BT-110 of the document, absolute value
+	 * @param	float					$announcedTtc		What the invoice is expected to total, absolute value
+	 * @param	array<int,string>		$return_messages	Messages of the import, completed here
+	 * @return	bool										True when the document contradicts itself and was marked
+	 */
+	protected function flagPayableMismatch($supplierInvoiceId, array $parsedHeader, $announcedTva, $announcedTtc, array &$return_messages): bool
+	{
+		global $langs;
+
+		if (!isset($parsedHeader['duePayableAmount'])) {
+			return false;
+		}
+
+		// BT-113 is deducted beside the invoice and not from its total, so it is added back on both sides
+		$prepaid = isset($parsedHeader['totalPrepaidAmount']) ? abs((float) $parsedHeader['totalPrepaidAmount']) : 0.0;
+		$announcedDue = abs((float) $parsedHeader['duePayableAmount']) + $prepaid;
+		if (abs($announcedDue - (float) $announcedTtc) < 0.005) {
+			return false;
+		}
+
+		// The mark carries BT-115, the amount the document says has to be paid: it is the one the invoice
+		// does not total, so validation stays blocked until someone decides which of the two figures the
+		// vendor really bills. A mark carrying the total the invoice already reaches would lift itself.
+		SupplierInvoiceHelper::flagTotalsMismatch($supplierInvoiceId, $announcedTva, $announcedDue);
+
+		$langs->load('einvoicing@einvoicing');
+		$return_messages[] = $langs->trans(
+			'EInvoiceImportPayableMismatch',
+			dol_escape_htmltag((string) ($parsedHeader['documentno'] ?? '')),
+			price2num(abs((float) $parsedHeader['duePayableAmount']), 'MT'),
+			price2num((float) $announcedTtc - $prepaid, 'MT')
+		);
+		$return_messages[] = $langs->trans('EInvoiceImportTotalsMismatchAction');
+
+		dol_syslog(__METHOD__ . ' Invoice ' . $supplierInvoiceId . ' comes from a document announcing ' . $announcedDue . ' due while its own totals add up to ' . $announcedTtc . ' (BR-CO-16): validation and approval blocked', LOG_WARNING);
+
+		return true;
+	}
+
 
 	/**
 	 * Mark an invoice whose totals are right but which does not carry the deduction its document announces.

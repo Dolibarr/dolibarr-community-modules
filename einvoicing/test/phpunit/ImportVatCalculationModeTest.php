@@ -549,6 +549,23 @@ class ImportVatCalculationModeTest extends CommonClassTest
 	}
 
 	/**
+	 * Run the guard of the import on an invoice, the way the import does once every line exists.
+	 *
+	 * @param	FactureFournisseur	$invoice		The invoice to confront with its document
+	 * @param	array<string,mixed>	$parsedHeader	Header of the received document
+	 * @param	string[]			$messages		Messages of the import, completed by the call
+	 * @return	void
+	 */
+	private function alignWithHeader(FactureFournisseur $invoice, array $parsedHeader, array &$messages)
+	{
+		global $db;
+
+		$method = new ReflectionMethod(CIIProtocol::class, 'alignInvoiceTotalsWithDocument');
+		$method->setAccessible(true);
+		$method->invokeArgs(new CIIProtocol($db), array($invoice->id, $parsedHeader, &$messages));
+	}
+
+	/**
 	 * The invoice must total what the supplier debits, BT-115, and not BT-112.
 	 *
 	 * @return void
@@ -723,6 +740,43 @@ class ImportVatCalculationModeTest extends CommonClassTest
 		$this->assertEquals(4.25, (float) $invoice->total_tva, 'the VAT of the document is untouched');
 		$this->assertEquals(25.47, (float) $invoice->total_ttc, 'BT-115, what the issuer debits');
 		$this->assertNull(SupplierInvoiceHelper::totalsMismatch($id), 'nothing holds its validation back');
+	}
+
+	/**
+	 * A document whose BT-115 does not answer BR-CO-16 says two different things about what has to be
+	 * paid. Neither can be trusted, so the invoice is marked and kept out of validation.
+	 *
+	 * @return void
+	 */
+	public function testADocumentContradictingItsPayableIsHeldBack()
+	{
+		$invoice = $this->createRoundingFixtureInvoice();
+		$messages = array();
+		$withRounding = $this->addRoundingLine($invoice, $this->roundingHeader(), $messages);
+
+		$contradicting = $this->roundingHeader();
+		$contradicting['duePayableAmount'] = 30.00;		// neither BT-112 nor BT-112 + BT-114
+		$contradicting['documentno'] = 'EINV994-CONTRADICTION';
+
+		$messages = array();
+		$this->alignWithHeader($withRounding, $contradicting, $messages);
+
+		$mark = SupplierInvoiceHelper::totalsMismatch((int) $withRounding->id);
+		$this->assertNotNull($mark, 'the invoice is marked as one the import could not reproduce');
+		$this->assertEquals(30.00, (float) $mark['ttc'], 'the mark carries the amount the document says is due');
+		$this->assertFalse(
+			SupplierInvoiceHelper::totalsAgreeWithDocument($withRounding, 4.25, (float) $mark['ttc']),
+			'which the invoice does not total, so the mark holds instead of lifting itself'
+		);
+
+		$this->assertNotEmpty($messages, 'and the operator is told');
+		$this->assertStringContainsString('30', $messages[0], 'the amount the document says is due');
+		$this->assertStringContainsString('25.47', $messages[0], 'against what its own totals add up to');
+
+		// The same invoice, confronted with the document as it really is, is released again
+		$messages = array();
+		$this->alignWithHeader($withRounding, $this->roundingHeader(), $messages);
+		$this->assertNull(SupplierInvoiceHelper::totalsMismatch((int) $withRounding->id), 'a document that adds up lifts the mark');
 	}
 
 	/**
