@@ -265,7 +265,7 @@ class CdarHandler
 	 * @param Facture|FactureFournisseur    $object       Invoice object (CustomerInvoice or SupplierInvoice)
 	 * @param int                           $statusCode     Status code to send
 	 * @param string                        $reasonCode Reason code to send (optional)
-	 * @param array{amount?:float,breakdown?:array<array{vatrate:float,amount:float}>}  $paymentData  Cashed amount (TTC, in the company currency) for status 212, with an optional ready-made breakdown by VAT rate
+	 * @param array{amount?:float,breakdown?:array<array{vatrate:float,amount:float}>,reason?:string}  $paymentData  Amount (TTC, in the company currency) moved for status 212, negative on a refund, with an optional ready-made breakdown by VAT rate and the reason of the cancellation (MDT-126)
 	 *
 	 * @return  array{res:int<-1,1>, message:string, file?:string}   Returns array with 'res' (1 on success, -1 on failure) with a 'message' and 'file' with the path.
 	 */
@@ -281,12 +281,17 @@ class CdarHandler
 		* - Payment transmitted (212) - optional but recommended
 		*/
 
+		// MDT-91 is the BT-3 of the document the status is about: a cash-out is reported on the credit
+		// note the money was refunded on, which the platform holds as a 381, not as a 380.
+		$referencedDocTypeCode = ($statusCode == CdarHandler::PROC_PAID)
+			? $this->getReferencedDocumentTypeCode($object)
+			: CdarHandler::DOC_INVOICE;	// TODO: map DOC_INVOICE with $object type on the supplier invoice statuses too
+
 		// Id format: {SupplierRef}_{StatusCode}_{CreationDate}#{DocType}_{CreationDate} as defined in documentation
-		// TODO: map DOC_INVOICE with $object type
 		// 'tzserver' and not the 'auto' default: 'auto' resolves to $conf->tzuserinputkey, which the
 		// MAIN_TZUSERINPUTKEY constant can switch to 'tzuserrel', and the id would then follow the
 		// timezone of whoever triggers the send instead of the server one.
-		$ID = ($statusCode == 212 ? $object->ref : $object->ref_supplier) . '_' . $statusCode . '_' . dol_print_date((int) $object->date_creation, '%Y%m%d%H%M%S', 'tzserver') . '#' . CdarHandler::DOC_INVOICE . '_' . dol_print_date((int) $object->date_creation, '%Y%m%d', 'tzserver');
+		$ID = ($statusCode == 212 ? $object->ref : $object->ref_supplier) . '_' . $statusCode . '_' . dol_print_date((int) $object->date_creation, '%Y%m%d%H%M%S', 'tzserver') . '#' . $referencedDocTypeCode . '_' . dol_print_date((int) $object->date_creation, '%Y%m%d', 'tzserver');
 
 		// We use same as ID for Name as its not required to be different
 		$Name = $ID;
@@ -430,6 +435,12 @@ class CdarHandler
 				return array('res' => -1, 'message' => 'Cannot compute the cashed amount (MEN) per VAT rate for invoice ' . $object->ref);
 			}
 			$SpecifiedDocumentStatus['SpecifiedDocumentCharacteristic'] = $cashedAmounts;
+
+			// Rule P1.17: a cash-out states why the cash-in is being cancelled, in the note (MDT-126).
+			if ((float) $cashedAmounts[0]['ValueAmount'] < 0) {
+				$reason = isset($paymentData['reason']) ? trim((string) $paymentData['reason']) : '';
+				$SpecifiedDocumentStatus['IncludedNoteContent'] = ($reason !== '') ? $reason : 'Refund of ' . $object->ref;
+			}
 		} elseif ($statusCode == CdarHandler::PROC_PAYMENT_TRANSMITTED) {
 			// "Paiement transmis" tells the vendor what was paid and when (MDG-43 block MDT-207 = MPA).
 			// No rule makes it mandatory, so a status with no known amount is still sent, just bare.
@@ -502,7 +513,7 @@ class CdarHandler
 				'ReferenceReferencedDocument' => [
 					'IssuerAssignedID' => $IssuerAssignedID,
 					'StatusCode' => $StatusCodeCdar,
-					'TypeCode' => CdarHandler::DOC_INVOICE, // TODO: map DOC_INVOICE with $object type
+					'TypeCode' => $referencedDocTypeCode,
 					// MDT-97, mandatory in the CTC-FR profile: it says what the lifecycle message is about
 					'ReferenceTypeCode' => CdarHandler::REFERENCE_TYPE_EINVOICE,
 					// Every XP Z12-012 reference example dates the referenced invoice with a plain date
@@ -669,14 +680,32 @@ class CdarHandler
 	}
 
 	/**
+	 * Document type code (MDT-91, the BT-3 of the document the status is about) of one of our own invoices.
+	 *
+	 * @param  Facture|FactureFournisseur $object Invoice, credit note or deposit the status is about
+	 * @return string                             Document type code, 380 for a commercial invoice
+	 */
+	private function getReferencedDocumentTypeCode($object)
+	{
+		$codes = array(
+			CommonInvoice::TYPE_CREDIT_NOTE => CdarHandler::DOC_CREDIT_NOTE,
+			CommonInvoice::TYPE_REPLACEMENT => CdarHandler::DOC_CORRECTIVE_INVOICE,
+			CommonInvoice::TYPE_DEPOSIT => CdarHandler::DOC_PREPAYMENT_INVOICE,
+		);
+
+		return isset($codes[(int) $object->type]) ? $codes[(int) $object->type] : CdarHandler::DOC_INVOICE;
+	}
+
+	/**
 	 * Build the MDG-43 "cashed amount" (MEN) blocks of a status 212 (Encaissee) CDAR.
 	 *
 	 * One block per VAT rate, holding the TTC amount (MDT-215) and the rate itself (MDT-224). Dolibarr only
 	 * records a payment as a single TTC amount, so it is spread over the VAT rates proportionally to their
 	 * TTC weight; rounding differences go to the largest block, so the blocks always sum up to the amount.
+	 * A refund is a cash-out: it is reported the same way, with negative amounts (rule P1.15).
 	 *
 	 * @param  Facture|FactureFournisseur $object       Invoice the payment belongs to
-	 * @param  array{amount?:float,breakdown?:array<array{vatrate:float,amount:float}>}  $paymentData  Cashed amount (TTC, company currency) and/or a ready-made breakdown. Defaults to the sum of the payments of the invoice.
+	 * @param  array{amount?:float,breakdown?:array<array{vatrate:float,amount:float}>,reason?:string}  $paymentData  Amount (TTC, company currency) moved, negative on a refund, and/or a ready-made breakdown. Defaults to the sum of the payments of the invoice.
 	 * @return array<array{TypeCode:string,ValueAmount:string,CurrencyID:string,ValuePercent:string}>  MEN blocks, empty if they cannot be computed
 	 */
 	public function getCashedAmountCharacteristics($object, $paymentData = array())
@@ -692,7 +721,7 @@ class CdarHandler
 			if (empty($cashedAmount) && method_exists($object, 'getSommePaiement')) {
 				$cashedAmount = (float) $object->getSommePaiement();
 			}
-			if ($cashedAmount <= 0) {
+			if (empty($cashedAmount)) {
 				dol_syslog(__METHOD__ . ' No cashed amount found for invoice id=' . $object->id, LOG_WARNING, 0, '_einvoicing');
 				return array();
 			}
@@ -701,19 +730,20 @@ class CdarHandler
 				$object->fetch_lines();
 			}
 
-			// TTC weight of each VAT rate of the invoice
+			// TTC weight of each VAT rate, on absolute values: a credit note holds its lines negative
+			// while the amount refunded carries the direction of the money on its own (rule P1.15).
 			$totalPerRate = array();
 			foreach ($object->lines as $line) {
 				$rate = (string) price2num($line->tva_tx, 'MU');
 				if (!isset($totalPerRate[$rate])) {
 					$totalPerRate[$rate] = 0.0;
 				}
-				$totalPerRate[$rate] += (float) $line->total_ttc;
+				$totalPerRate[$rate] += abs((float) $line->total_ttc);
 			}
 
 			$totalTtc = array_sum($totalPerRate);
-			if ($totalTtc <= 0) {
-				dol_syslog(__METHOD__ . ' Cannot split the cashed amount, invoice id=' . $object->id . ' has no positive TTC total', LOG_WARNING, 0, '_einvoicing');
+			if (empty($totalTtc)) {
+				dol_syslog(__METHOD__ . ' Cannot split the cashed amount, invoice id=' . $object->id . ' has no TTC total', LOG_WARNING, 0, '_einvoicing');
 				return array();
 			}
 
@@ -724,7 +754,7 @@ class CdarHandler
 				$amount = (float) price2num($amountTtc * $ratio, 'MT');
 				$rounded += $amount;
 				$breakdown[$rate] = array('vatrate' => (float) $rate, 'amount' => $amount);
-				if (is_null($biggest) || $amount > $breakdown[$biggest]['amount']) {
+				if (is_null($biggest) || abs($amount) > abs($breakdown[$biggest]['amount'])) {
 					$biggest = $rate;
 				}
 			}
@@ -1240,6 +1270,14 @@ class CdarHandler
 						(string) $doc['SpecifiedDocumentStatus']['SequenceNumeric']
 					)
 				);
+			}
+
+			// MDT-126. Its place in the D22B DocumentStatusType sequence is after SequenceNumeric and
+			// before the MDG-43 blocks.
+			if (!empty($doc['SpecifiedDocumentStatus']['IncludedNoteContent'])) {
+				$note = $dom->createElement('ram:IncludedNote');
+				$note->appendChild($dom->createElement('ram:Content', einvoicingXmlText((string) $doc['SpecifiedDocumentStatus']['IncludedNoteContent'])));
+				$status->appendChild($note);
 			}
 
 			// MDG-43 blocks (cashed amount per VAT rate for status 212). Element order follows the D22B
