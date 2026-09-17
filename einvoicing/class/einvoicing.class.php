@@ -3508,13 +3508,13 @@ class EInvoicing
 	 * Fetch lifecycle status messages linked to a given flow ID.
 	 *
 	 * @param	string		$flowId		Flow ID (UUID)
-	 * @return	-1|array{rowid?:int,element_id?:int,element_type?:string,provider?:string,flow_id?:string,direction?:string,lc_status?:int,lc_status_message?:string,lc_validation_status?:string,lc_validation_message?:string,date_creation?:int}					Return
+	 * @return	-1|array{rowid?:int,element_id?:int,element_type?:string,provider?:string,flow_id?:string,direction?:string,lc_status?:int,lc_status_message?:string,lc_validation_status?:string,lc_validation_message?:string,lc_reason_code?:string,date_creation?:int}					Return
 	 */
 	public function fetchStatusMessages($flowId)
 	{
 		global $db;
 
-		$sql = "SELECT rowid, element_id, element_type, provider, flow_id, direction, lc_status, lc_status_message, lc_validation_status, lc_validation_message, date_creation";
+		$sql = "SELECT rowid, element_id, element_type, provider, flow_id, direction, lc_status, lc_status_message, lc_validation_status, lc_validation_message, lc_reason_code, date_creation";
 		$sql .= " FROM " . $db->prefix() . "einvoicing_lifecycle_msg";
 		$sql .= " WHERE flow_id = '" . $db->escape($flowId) . "'";
 
@@ -3551,6 +3551,7 @@ class EInvoicing
 				'lc_status_message' => (string) $obj->lc_status_message,
 				'lc_validation_status' => (string) $obj->lc_validation_status,
 				'lc_validation_message' => (string) $obj->lc_validation_message,
+				'lc_reason_code' => (string) $obj->lc_reason_code,
 				'date_creation' => (int) $db->jdate($obj->date_creation),
 			];
 		}
