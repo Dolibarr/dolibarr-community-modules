@@ -2954,13 +2954,17 @@ class CIIProtocol extends AbstractProtocol
 
 		$tax->appendChild($doc->createElement('ram:TypeCode', 'VAT'));
 
-		// The exemption reason is repeated on the line, not only in the VAT breakdown it also feeds.
-		// BR-FXEXT-E-08 reconciles BT-116 with the sum of the net amounts of the lines it covers, and only
-		// counts a line whose own reason code and text equal those of the breakdown: written on the breakdown
-		// alone it counted zero lines and the platform validator refused the invoice.
-		// Order follows the CII D22B sequence of TradeTaxType, which is not the order of the getters.
-		$lineExemptionReason = (string) ($line['ExemptionReason'] ?? '');
-		$lineExemptionReasonCode = (string) ($line['ExemptionReasonCode'] ?? '');
+		// The exemption reason belongs to the line on EXTENDED only: BR-FXEXT-E-08 counts a line towards
+		// its exempt breakdown (BT-116) solely when the line repeats the same reason code and text. Every
+		// profile below states the opposite - the EN 16931 schematron reports ram:ExemptionReason here as
+		// "not used in the given context", which the platform returns as REJ_COH (issue #974). The VAT
+		// breakdown carries it whatever the profile. Order follows the CII D22B sequence of TradeTaxType.
+		$lineExemptionReason = '';
+		$lineExemptionReasonCode = '';
+		if ($this->isExtendedProfile($profile)) {
+			$lineExemptionReason = (string) ($line['ExemptionReason'] ?? '');
+			$lineExemptionReasonCode = (string) ($line['ExemptionReasonCode'] ?? '');
+		}
 		if ($lineExemptionReason !== '') {
 			$tax->appendChild($doc->createElement('ram:ExemptionReason', einvoicingXmlText($lineExemptionReason)));
 		}
