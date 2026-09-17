@@ -23,6 +23,10 @@
  *                  Confronting an invoice with the document it came from means recomputing its lines
  *                  in the two VAT conventions. That recomputation has to be the one the core made
  *                  when it wrote the invoice, or the comparison reports a difference that is its own.
+ *
+ *                  A file of its own rather than methods in SupplierInvoiceHelperTest, which is past
+ *                  the thousand lines where .agents/AGENTS.md has the test file of a source split:
+ *                  this is the half that recomputes amounts, all of it on the import side.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 
