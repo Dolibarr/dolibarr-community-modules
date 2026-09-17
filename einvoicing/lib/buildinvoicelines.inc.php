@@ -1071,7 +1071,9 @@ if ($notSubjectToVatGroups > 0) {
 	// number. BT-30 carries the same SIREN a few elements above and is not touched by BR-O.
 	$sellerVatNumber = '';
 	$buyerVatNumber = '';
-	$sellerSiren = trim((string) ($mysoc->idprof1 ?? ''));
+	// No ?? here: Dolibarr 18 declares idprof1 a plain string and PHPStan reports the coalesce on
+	// that core. The cast is what covers the ?string of the newer ones.
+	$sellerSiren = trim((string) $mysoc->idprof1);
 	$sellerTaxRegistrations = array_values(array_filter($sellerTaxRegistrations, function ($tmpregistration) {
 		return $tmpregistration['type'] !== 'VA';
 	}));
