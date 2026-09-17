@@ -2346,15 +2346,9 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		// page answers as a full page. The file name keeps the download link the core gives it.
 		$url = dol_buildpath('/einvoicing/xmlpreview.php', 1).'?id='.$invoiceid.$urlparam.'&mode=raw';
 
-		// Same markup as the preview picto of FormFile::showPreview(), so the line reads as a native one
 		$anchorid = 'einvoicingxmlpreview'.$invoiceid;
 		$this->resprints = '<td class="right nowraponall">';
-		$this->resprints .= '<a id="'.$anchorid.'" class="pictopreview documentpreview" href="'.$url.'" mime="text/html"';
-		$this->resprints .= ' data-title="'.dol_escape_htmltag($langs->trans("EInvoiceXmlPreviewTitle")).'"';
-		$this->resprints .= ' target="_blank" rel="noopener noreferrer"';
-		$this->resprints .= ' title="'.dol_escape_htmltag($langs->trans("EInvoicePreviewXml")).'">';
-		$this->resprints .= '<span class="fas fa-search-plus pictofixedwidth" style=" color: #808080;"></span>';
-		$this->resprints .= '</a>';
+		$this->resprints .= $this->einvoiceXmlPreviewAnchor($url, $anchorid);
 
 		// The core closes the cell holding the file name before this hook is executed, so the only place
 		// the hook can write is a cell of its own at the end of the line. The picto belongs next to the
@@ -2380,6 +2374,100 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			});
 			</script>';
 		$this->resprints .= '</td>';
+
+		return 0;
+	}
+
+	/**
+	 * The preview picto of the XML, with the markup FormFile::showPreview() gives its own.
+	 *
+	 * The 'documentpreview' class is what the core binds (lib_foot.js.php) to its preview dialog: it
+	 * reads href, mime and data-title and frames the answer, so the XML opens where a PDF opens.
+	 * Without javascript the href is simply followed, and the same page answers as a full page.
+	 *
+	 * @param  string $url      Address of the viewer for this invoice
+	 * @param  string $anchorid Identifier of the anchor, so a script can find it again
+	 * @return string           The anchor, ready to print
+	 */
+	private function einvoiceXmlPreviewAnchor($url, $anchorid)
+	{
+		global $langs;
+
+		$out = '<a id="'.$anchorid.'" class="pictopreview documentpreview" href="'.$url.'" mime="text/html"';
+		$out .= ' data-title="'.dol_escape_htmltag($langs->trans("EInvoiceXmlPreviewTitle")).'"';
+		$out .= ' target="_blank" rel="noopener noreferrer"';
+		$out .= ' title="'.dol_escape_htmltag($langs->trans("EInvoicePreviewXml")).'">';
+		$out .= '<span class="fas fa-search-plus pictofixedwidth" style=" color: #808080;"></span>';
+		$out .= '</a>';
+
+		return $out;
+	}
+
+	/**
+	 * Put the same preview picto on the XML of the "Documents" tab, which has no line hook of its own.
+	 *
+	 * That tab is drawn by FormFile::list_of_documents(), whose only hook, showFilesList, replaces the
+	 * whole list instead of completing a line - and returns an int, so it cannot even hand HTML back.
+	 * The picto is therefore placed from the footer, which runs before the core binds
+	 * 'documentpreview' on ready: the anchor is in the DOM by then and is bound like a native one.
+	 *
+	 * @param  array<string,mixed>	$parameters		Array of parameters
+	 * @param  CommonObject|null	$object			The object the page shows
+	 * @param  string				$action			Code action
+	 * @param  HookManager			$hookmanager	Hookmanager
+	 * @return int									0 in all cases, the page is only completed
+	 */
+	public function printCommonFooter($parameters, $object, &$action, $hookmanager)
+	{
+		global $langs, $user;
+
+		$this->resprints = '';
+
+		$contexts = is_array($hookmanager->contextarray) ? $hookmanager->contextarray : array();
+		if (in_array('invoicesuppliercarddocument', $contexts, true)) {
+			if (!$user->hasRight('fournisseur', 'facture', 'lire')) {
+				return 0;
+			}
+			$suffix = '_einvoice.xml';
+			$urlparam = '&element=supplier';
+		} elseif (in_array('invoicedocument', $contexts, true)) {
+			if (!$user->hasRight('facture', 'lire')) {
+				return 0;
+			}
+			$suffix = '_cii.xml';
+			$urlparam = '';
+		} else {
+			return 0;
+		}
+
+		$invoiceid = (is_object($object) && !empty($object->id)) ? (int) $object->id : GETPOSTINT('id');
+		if ($invoiceid <= 0) {
+			return 0;
+		}
+
+		$langs->load("einvoicing@einvoicing");
+
+		$url = dol_buildpath('/einvoicing/xmlpreview.php', 1).'?id='.$invoiceid.$urlparam.'&mode=raw';
+		$anchorid = 'einvoicingxmlpreview'.$invoiceid;
+		$anchor = $this->einvoiceXmlPreviewAnchor($url, $anchorid);
+
+		// Printed, not returned: printCommonFooter() of the core never prints the resPrint of this hook,
+		// it only reads its return value to decide whether to print its own block.
+		// The line is found on the name of the file the module writes, the one the viewer reads back.
+		// Nothing is inserted when that file is not listed, so a tab without an XML is left untouched.
+		print '<script nonce="'.getNonce().'" type="text/javascript">
+			(function() {
+				var links = document.querySelectorAll(\'table a[href*="'.dol_escape_js($suffix).'"]\');
+				if (!links.length || document.getElementById("'.$anchorid.'")) {
+					return;
+				}
+				var name = links[0].parentNode;
+				if (!name) {
+					return;
+				}
+				name.insertAdjacentHTML("beforeend", '.json_encode($anchor).');
+			})();
+			</script>'."\n";
 
 		return 0;
 	}
