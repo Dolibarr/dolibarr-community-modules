@@ -565,8 +565,8 @@ class EInvoicing
 	 * When invoice is in import type "manual", user can choose how to create Dolibarr supplier invoice lines (free lines or target product)
 	 */
 	public const SUPPLIER_INVOICE_LINES_IMPORT_MANUAL = 2;
-  
-  /**
+
+	/**
 	 * @var string ISO 6523 scheme of a French SIRET, the identifier of an establishment.
 	 *
 	 * BR-FR-CPRO-10 of XP Z12-012 makes it mandatory as a private identifier of the buyer (BT-46) on a
