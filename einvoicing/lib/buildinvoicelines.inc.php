@@ -316,7 +316,9 @@ $looksLikeB2GInvoice = $chorus && $this->looksLikeB2GInvoice($object);
 
 $buyerChorusSiret = '';
 if ($chorus && $buyerParty->country_code == 'FR') {
-	$buyerChorusSiret = removeAllSpaces((string) ($buyerParty->idprof2 ?? ''));
+	// No ?? here: Dolibarr 18 declares idprof2 a plain string and PHPStan reports the coalesce on
+	// that core. The cast is what covers the ?string of the newer ones.
+	$buyerChorusSiret = removeAllSpaces((string) $buyerParty->idprof2);
 	if ($buyerChorusSiret === '') {
 		if ($looksLikeB2GInvoice) {
 			$this->warnings[] = $outputlangs->trans('EInvoiceChorusBuyerSiretMissing', $buyerParty->name);
