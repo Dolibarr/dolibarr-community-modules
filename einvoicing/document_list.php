@@ -856,7 +856,7 @@ if ($diagFileName) {
 	$last_supplier_invoice_error .= ' : </span>';
 	$last_supplier_invoice_error .= '<a href="'.$urlConvertedFile.'" target="_blank">' . $langs->trans("DocDownloadConverted") . ' ' . img_picto('', 'download', 'class="pictofixedwidth"') . '</a>';
 	$last_supplier_invoice_error .= einvoicingDiagnosticPreviewLink($diagFileName);
-	
+
 	// The readable view is only stored when the platform provided one with the flow
 	if (file_exists($conf->einvoicing->dir_temp . '/' . $diagReadableFileName)) {
 		$urlReadableFile = DOL_URL_ROOT . '/document.php?modulepart=einvoicing&file=' . urlencode('temp/' . $diagReadableFileName);
