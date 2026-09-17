@@ -1453,7 +1453,7 @@ class CIIProtocol extends AbstractProtocol
 				// Collect supplier price data to be created after invoice is saved.
 				// Not for a default routing product: it is a catch-all, so gluing the vendor reference of
 				// the line onto it would make every next invoice match it instead of the real product.
-				if ($productId > 0 && $productMatchType != 'defaultrouting' && !empty($parsedLine['prodsellerid'])) {
+				if ($productId > 0 && $productMatchType != 'defaultrouting' && trim((string) ($parsedLine['prodsellerid'] ?? '')) !== '') {
 					$supplierPriceEntries[] = [
 						'productId' => $productId,
 						'unitPrice' => $this->resolveLineUnitPrice($parsedLine),
@@ -1467,8 +1467,8 @@ class CIIProtocol extends AbstractProtocol
 			// Add line to invoice
 			$line = new SupplierInvoiceLine($db);
 			// Supplier's product reference (BT-155 SellerAssignedID) -> shown as "Ref. fournisseur" on the line.
-			if (!empty($parsedLine['prodsellerid'])) {
-				$line->ref_supplier = trim($parsedLine['prodsellerid']);
+			if (trim((string) ($parsedLine['prodsellerid'] ?? '')) !== '') {
+				$line->ref_supplier = trim((string) $parsedLine['prodsellerid']);
 			}
 			if (!empty($productId)) {
 				$line->fk_product = $productId;
@@ -2888,7 +2888,7 @@ class CIIProtocol extends AbstractProtocol
 		// Product
 		$prod = $doc->createElement('ram:SpecifiedTradeProduct');
 		$el->appendChild($prod);
-		if (!empty($line['prodsellerid'])) {
+		if (trim((string) ($line['prodsellerid'] ?? '')) !== '') {
 			$prod->appendChild(
 				$doc->createElement('ram:SellerAssignedID', einvoicingXmlText((string) $line['prodsellerid']))
 			);

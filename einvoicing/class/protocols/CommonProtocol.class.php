@@ -1127,20 +1127,31 @@ trait CommonProtocol
 		$einvoicing = new EInvoicing($db);
 
 		// Search in product supplier prices table using prodsellerid (the ref of product of the vendor)
-		$sql = "SELECT p.rowid ";
-		$sql .= " FROM " . MAIN_DB_PREFIX . "product as p ";
-		$sql .= " INNER JOIN " . MAIN_DB_PREFIX . "product_fournisseur_price as pfp ON pfp.fk_product = p.rowid ";
-		$sql .= " WHERE (pfp.ref_fourn = '" . $db->escape($lineData['prodsellerid'] ?? '') . "' ";
-		$sql .= " OR pfp.ref_fourn = '" . $db->escape($lineData['prodname'] ?? '') . "') ";
-		$sql .= " AND pfp.fk_soc = " . intval($lineData['supplierId'] ?? 0) . " ";
-		$sql .= " AND p.entity IN (" . getEntity('product') . ")";
-		$sql .= " LIMIT 1";
-		$resql = $db->query($sql);
-		if ($resql && $db->num_rows($resql) > 0) {
-			$obj = $db->fetch_object($resql);
-			dol_syslog(__METHOD__ . ' Found product by prodsellerid or prodname as ref_fourn: ' . $obj->rowid);
-			return array('res' => $obj->rowid, 'message' => 'Product found by prodsellerid');
-			// No match found, continue to next step
+		// An absent reference is not a search key: looked up as it stands it matches any vendor price
+		// row whose ref_fourn is empty, and binds the line to a product that has nothing to do with it.
+		$sellerref = trim((string) ($lineData['prodsellerid'] ?? ''));
+		$searchname = trim((string) ($lineData['prodname'] ?? ''));
+		if ($sellerref !== '' || $searchname !== '') {
+			$sql = "SELECT p.rowid ";
+			$sql .= " FROM " . MAIN_DB_PREFIX . "product as p ";
+			$sql .= " INNER JOIN " . MAIN_DB_PREFIX . "product_fournisseur_price as pfp ON pfp.fk_product = p.rowid ";
+			if ($sellerref !== '' && $searchname !== '') {
+				$sql .= " WHERE (pfp.ref_fourn = '" . $db->escape($sellerref) . "' OR pfp.ref_fourn = '" . $db->escape($searchname) . "') ";
+			} elseif ($sellerref !== '') {
+				$sql .= " WHERE pfp.ref_fourn = '" . $db->escape($sellerref) . "' ";
+			} else {
+				$sql .= " WHERE pfp.ref_fourn = '" . $db->escape($searchname) . "' ";
+			}
+			$sql .= " AND pfp.fk_soc = " . intval($lineData['supplierId'] ?? 0) . " ";
+			$sql .= " AND p.entity IN (" . getEntity('product') . ")";
+			$sql .= " LIMIT 1";
+			$resql = $db->query($sql);
+			if ($resql && $db->num_rows($resql) > 0) {
+				$obj = $db->fetch_object($resql);
+				dol_syslog(__METHOD__ . ' Found product by prodsellerid or prodname as ref_fourn: ' . $obj->rowid);
+				return array('res' => $obj->rowid, 'message' => 'Product found by prodsellerid');
+				// No match found, continue to next step
+			}
 		}
 
 		// Fall back on the canonical form of the reference, for the vendors that do not write it
@@ -1169,7 +1180,8 @@ trait CommonProtocol
 		// TODO
 
 		// if Buyer Reference (prodbuyerid) is available search prodbuyerid = internal product reference
-		if (!empty($lineData['prodbuyerid'])) {
+		// A reference is a string, so its emptiness is tested on the string: empty() also answers true on '0'.
+		if (trim((string) ($lineData['prodbuyerid'] ?? '')) !== '') {
 			$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product";
 			$sql .= " WHERE ref = '" . $db->escape($lineData['prodbuyerid']) . "' OR rowid = '" . $db->escape($lineData['prodbuyerid']) . "' ";
 			$sql .= " AND entity IN (" . getEntity('product') . ")";
@@ -1183,7 +1195,7 @@ trait CommonProtocol
 		}
 
 		// Check with EI- prefix for product imported using prodsellerid as internal reference with EI- prefix
-		if (!empty($lineData['prodsellerid']) && $lineData['prodsellerid'] !== "") {
+		if (trim((string) ($lineData['prodsellerid'] ?? '')) !== '') {
 			// The reference is sanitized when the product is created (see
 			// _findOrCreateProductFromEinvoiceLine), so the lookup has to apply the same transform.
 			// A vendor reference holding a character forbidden in a file name is stored as
@@ -1291,8 +1303,10 @@ trait CommonProtocol
 			// Auto-create product
 			$product = new Product($db);
 			$product->type 		= $this->_detectProductTypeFromEinvoiceLine($lineData);
-			$product->ref 		= 'EI-' . dol_sanitizeFileName(!empty($lineData['prodsellerid'] && $lineData['prodsellerid'] !== "") ? $lineData['prodsellerid'] : uniqid());
-			$product->ref_ext 	= trim($lineData['prodsellerid'] ?? '');
+			// The && was inside the empty(), which warns on an absent key instead of being protected by it.
+			$sellerref = trim((string) ($lineData['prodsellerid'] ?? ''));
+			$product->ref 		= 'EI-' . dol_sanitizeFileName($sellerref !== '' ? $sellerref : uniqid());
+			$product->ref_ext 	= $sellerref;
 			$product->label 	= !empty($lineData['prodname'])
 				? $lineData['prodname']
 				: 'Imported product from supplier invoice (Ref: ' . $lineData['parentDocumentNo'] . ')';
@@ -1364,10 +1378,10 @@ trait CommonProtocol
 			$createParams = [];
 			$allactiondata = [];
 
-			if (!empty($prodRef)) {
+			if ($prodRef !== '') {
 				$errorDetails[] = 'Ref: '.$prodRef;
 
-				$createParams['ref'] = 'EI-' . dol_sanitizeFileName(!empty($lineData['prodsellerid'] && $lineData['prodsellerid'] !== "") ? $lineData['prodsellerid'] : uniqid());
+				$createParams['ref'] = 'EI-' . dol_sanitizeFileName($prodSupplierRef !== '' ? $prodSupplierRef : uniqid());
 
 				$createParams['ref_ext'] = $prodRef;
 			}
@@ -1375,7 +1389,7 @@ trait CommonProtocol
 				$errorDetails[] = 'Vendor id: ' . $vendorId;
 				$createParams['socid'] = $vendorId;							// TODO Dolibarr must be able to handle this parameter
 			}
-			if (!empty($prodSupplierRef)) {
+			if ($prodSupplierRef !== '') {
 				$errorDetails[] = 'Supplier ref: ' . $prodSupplierRef;
 				$createParams['supplierref'] = $prodSupplierRef;			// TODO Dolibarr must be able to handle this parameter
 			}
