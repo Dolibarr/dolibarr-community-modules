@@ -45,6 +45,84 @@ class SupplierInvoiceHelper
 	const CLOSECODE_PDPREFUSED = 'pdp_refused';
 
 	/**
+	 * Special code marking the line an import adds to carry BT-114, the rounding amount of a received
+	 * document. It is the module number, the way Dolibarr tags a line a module created, and it is the
+	 * only line of an imported invoice outside the VAT breakdown: every per-rate comparison skips it.
+	 */
+	const LINE_SPECIAL_CODE_ROUNDING = 95020;
+
+	/**
+	 * BT-114 of a received document, the amount that rounds its total to what is due.
+	 *
+	 * @param	array<string,mixed>	$parsedHeader	Header data of the received document
+	 * @return	float								The rounding amount, 0 when the document carries none
+	 */
+	public static function documentRoundingAmount(array $parsedHeader): float
+	{
+		return isset($parsedHeader['roundingAmount']) ? (float) $parsedHeader['roundingAmount'] : 0.0;
+	}
+
+	/**
+	 * The VAT included total a Dolibarr invoice is expected to carry for a received document (issue #994).
+	 *
+	 * BT-115 is what the buyer owes, and what the invoice totals once BT-114 is carried as a line, so it
+	 * is read in place of BT-112 - plus BT-113, which Dolibarr deducts beside the invoice and not from its
+	 * total. It is checked against BR-CO-16 and dropped for BT-112 + BT-114 when it does not hold: a
+	 * payable of the issuer's own invention must not move the guards that block a bad import.
+	 *
+	 * @param	array<string,mixed>	$parsedHeader	Header data of the received document
+	 * @return	?float								Absolute total, or null when the document announces none
+	 */
+	public static function announcedTotalTtc(array $parsedHeader)
+	{
+		if (!isset($parsedHeader['grandTotalAmount'])) {
+			return null;
+		}
+
+		$rounded = abs((float) $parsedHeader['grandTotalAmount'] + self::documentRoundingAmount($parsedHeader));
+
+		if (isset($parsedHeader['duePayableAmount'])) {
+			$prepaid = isset($parsedHeader['totalPrepaidAmount']) ? abs((float) $parsedHeader['totalPrepaidAmount']) : 0.0;
+			$due = abs((float) $parsedHeader['duePayableAmount']) + $prepaid;
+			if (abs($due - $rounded) < 0.005) {
+				return $due;
+			}
+			dol_syslog(__METHOD__ . ' BT-115 (' . $parsedHeader['duePayableAmount'] . ') does not answer BR-CO-16 on BT-112/BT-113/BT-114, the invoice is confronted with BT-112 instead', LOG_WARNING, 0, '_einvoicing');
+		}
+
+		return $rounded;
+	}
+
+	/**
+	 * The VAT excluded total a Dolibarr invoice is expected to carry for a received document (issue #994).
+	 *
+	 * BT-109 sums the taxable bases and ignores BT-114, which the invoice carries as a line of its own:
+	 * what the invoice totals is therefore the one plus the other.
+	 *
+	 * @param	array<string,mixed>	$parsedHeader	Header data of the received document
+	 * @return	?float								Absolute total, or null when the document announces none
+	 */
+	public static function announcedTotalHt(array $parsedHeader)
+	{
+		if (!isset($parsedHeader['taxBasisTotalAmount'])) {
+			return null;
+		}
+
+		return abs((float) $parsedHeader['taxBasisTotalAmount'] + self::documentRoundingAmount($parsedHeader));
+	}
+
+	/**
+	 * Whether a line is the one an import added to carry BT-114.
+	 *
+	 * @param	object	$line	A line of a supplier invoice
+	 * @return	bool			True when the line carries the rounding amount of a received document
+	 */
+	public static function isRoundingLine($line): bool
+	{
+		return isset($line->special_code) && (int) $line->special_code === self::LINE_SPECIAL_CODE_ROUNDING;
+	}
+
+	/**
 	 * Compare amounts according to a number of digits after decimal point and return true if they are equal.
 	 *
 	 * @param float $amount1    The first amount to compare
@@ -136,14 +214,18 @@ class SupplierInvoiceHelper
 				}
 			}
 
-			// VAT excl. total
-			if (!self::areAmountsEqual($details['total_ht'], $parsedHeader['taxBasisTotalAmount'])) {
-				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatExclDifference', $parsedHeader['taxBasisTotalAmount'], floatval($dolSupplierInvoice->total_ht));
+			// VAT excl. and VAT incl. totals. Both are confronted with what the invoice is expected to
+			// carry rather than with BT-109 and BT-112 alone: a document carrying BT-114 is imported with
+			// a rounding line, and its invoice totals BT-115 (issue #994).
+			$announcedHt = self::announcedTotalHt($parsedHeader);
+			$announcedTtc = self::announcedTotalTtc($parsedHeader);
+
+			if ($announcedHt !== null && !self::areAmountsEqual($details['total_ht'], $announcedHt)) {
+				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatExclDifference', $announcedHt, floatval($dolSupplierInvoice->total_ht));
 			}
 
-			// VAT incl. total
-			if (!self::areAmountsEqual($details['total_ttc'], $parsedHeader['grandTotalAmount'])) {
-				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatInclDifference', $parsedHeader['grandTotalAmount'], floatval($dolSupplierInvoice->total_ttc));
+			if ($announcedTtc !== null && !self::areAmountsEqual($details['total_ttc'], $announcedTtc)) {
+				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatInclDifference', $announcedTtc, floatval($dolSupplierInvoice->total_ttc));
 			}
 
 			// VAT total
@@ -247,8 +329,11 @@ class SupplierInvoiceHelper
 
 		foreach ($supplierInvoice->lines as $line) {
 			$rate = (string) price2num($line->tva_tx);
+			// BT-114 travels on a line of its own, which counts in the totals of the invoice and in no
+			// taxable base: it opens no rate of its own either (issue #994).
+			$isRoundingLine = self::isRoundingLine($line);
 
-			if (!isset($details['vat_by_rate'][$rate])) {
+			if (!$isRoundingLine && !isset($details['vat_by_rate'][$rate])) {
 				$details['vat_by_rate'][$rate] = array(
 					'vat_basis_amount' => 0,
 					'vat_amount' => 0
@@ -293,8 +378,10 @@ class SupplierInvoiceHelper
 			$lineVatAmount = floatval($lineTotals[1]);
 			$lineTotalTtc = floatval($lineTotals[2]);
 
-			$details['vat_by_rate'][$rate]['vat_basis_amount'] += $lineTotalHt;
-			$details['vat_by_rate'][$rate]['vat_amount'] += $lineVatAmount;
+			if (!$isRoundingLine) {
+				$details['vat_by_rate'][$rate]['vat_basis_amount'] += $lineTotalHt;
+				$details['vat_by_rate'][$rate]['vat_amount'] += $lineVatAmount;
+			}
 
 			$details['total_ht'] += $lineTotalHt;
 			$details['total_ttc'] += $lineTotalTtc;
@@ -331,6 +418,11 @@ class SupplierInvoiceHelper
 		$vatByRate = array();
 
 		foreach ($supplierInvoice->lines as $line) {
+			// BT-114 is carried by a line of its own and belongs to no taxable base (issue #994)
+			if (self::isRoundingLine($line)) {
+				continue;
+			}
+
 			$rate = (string) price2num($line->tva_tx);
 
 			if (!isset($vatByRate[$rate])) {
@@ -874,6 +966,19 @@ class SupplierInvoiceHelper
 	}
 
 	/**
+	 * Whether the total of an invoice already in base is the one a received document expects.
+	 *
+	 * @param	float	$invoiceTtc		Total of the invoice found, VAT included
+	 * @param	float	$expectedTtc	Total the document announces, VAT included
+	 * @param	float	$tolerance		Difference still read as the same invoice
+	 * @return	bool					True when the two are the same amount
+	 */
+	private static function amountMatchesInvoice(float $invoiceTtc, float $expectedTtc, float $tolerance = 0.0): bool
+	{
+		return abs($invoiceTtc - $expectedTtc) <= abs($tolerance) + 0.004;
+	}
+
+	/**
 	 * Find the supplier invoice of a given supplier whose ref_supplier is the given reference.
 	 *
 	 * Exact match by default: a wrong match silently drops an invoice or links it to the wrong document.
@@ -884,9 +989,10 @@ class SupplierInvoiceHelper
 	 * @param	string|null	$ref		Reference to look for (ExchangedDocument/ID or IssuerAssignedID of the XML)
 	 * @param	int			$socId		Id of the supplier thirdparty
 	 * @param	float		$total_ttc	If set, check that the total amount of the invoice is the expected one. 0 to look the reference up without checking any amount.
+	 * @param	float		$tolerance	Difference still read as the same invoice, on top of the cent the amounts are compared to. BT-114 is passed here: a document carrying a rounding amount was imported without it before the rounding line existed, and it is the same invoice (issue #994).
 	 * @return	int						Invoice id (>0) on a single certain match, 0 when not found, -1 on database error, -2 when several invoices match, -3 when the reference matches but not with the expected amount
 	 */
-	public static function findIdByRef($ref, int $socId, float $total_ttc = 0): int
+	public static function findIdByRef($ref, int $socId, float $total_ttc = 0, float $tolerance = 0.0): int
 	{
 		global $db;
 
@@ -916,7 +1022,7 @@ class SupplierInvoiceHelper
 
 		$db->free($resql);
 		if ($obj) {
-			if ($total_ttc && ($obj->total_ttc != $total_ttc)) {
+			if ($total_ttc && !self::amountMatchesInvoice((float) $obj->total_ttc, $total_ttc, $tolerance)) {
 				dol_syslog(__METHOD__ . ' found a supplier invoice matching the ref "' . $ref . '" for socid ' . ((int) $socId) . ' but not with the expected amount ' . $total_ttc, LOG_WARNING);
 				return -3;
 			}
@@ -963,7 +1069,7 @@ class SupplierInvoiceHelper
 			}
 
 			if (count($matches) == 1) {
-				if ($total_ttc && ($grandTotal != $total_ttc)) {
+				if ($total_ttc && !self::amountMatchesInvoice((float) $grandTotal, $total_ttc, $tolerance)) {
 					dol_syslog(__METHOD__ . ' found a supplier invoice matching the supplier invoice ref "' . $ref . '" for socid ' . ((int) $socId) . ' but not with the expected amount ' . $total_ttc, LOG_WARNING);
 					return -3;
 				}
