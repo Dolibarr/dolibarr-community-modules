@@ -447,7 +447,9 @@ if (!einvoicingReceptionDisabled()) {			// If sync AP to DOLI is not disabled or
 	// Risk: unblocking action in a different order may result in undesirable side effects.
 
 	// Activate postponeflow
-	//
+	// EINVOICING_ENABLE_POSTPONE_FLOWS: This option postpone flow with the action to do so we can do it manually later.
+	// Risk: very dangerous. continuing to process flows means changing the cursor, and when a new record is save, we lost
+	// all postpone flow that were discarded.
 }
 
 

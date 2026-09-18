@@ -1018,7 +1018,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 				// If res < 0, rollback
 				if ($res['res'] < 0) {
-					if (!empty($res['postponeflow'])) {
+					if (getDolGlobalInt('EINVOICING_ENABLE_POSTPONE_FLOWS') && !empty($res['postponeflow'])) {
 						// This flow could not be read, but nothing was stored for it: it stays pending and
 						// the next synchronization will try it again, so no invoice is lost. Report it with
 						// the action to do and carry on, instead of stalling this batch - and every flow
@@ -1047,10 +1047,14 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 							'actionurl' => $res['actionurl'],
 							'actioncode' => ($res['actioncode'] ?? '0'),
 							'action' => $res['action'],
-							'actiondata' => $res['actiondata'] ?? array()
+							'actiondata' => $res['actiondata'] ?? array(),
 						);
+						// Some error return directly the business action to do.
+						if (!empty($res['businessmessage'])) {
+							$actions[$rescode]['businessmessage'] = $res['businessmessage'] . $form->textwithpicto('', "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], 1, 'help', '', 0, 2, 'help');
+						}
 
-						// Complete the $actions array with the Business error message
+						// Complete the $actions array with the Business error message for common known cases.
 						if ($rescode == 'SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT') {
 							$actions[$rescode]['businessmessage'] = $langs->trans("SupplierInvoiceFoundButWithdifferentAmount", $res['actiondata']['supplierref'] ?? '', $res['actiondata']['expectedamount'] ?? '');
 						}
