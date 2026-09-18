@@ -3743,9 +3743,10 @@ class CIIProtocol extends AbstractProtocol
 	 *
 	 * @param array      $lineAllowances  parsed lineAllowances array
 	 * @param float|null $lineTotalAmount BT-131 net line amount (base ht)
+	 * @param float      $billedQuantity  BT-129 invoiced quantity of the line
 	 * @return false|array{percent: float, base: float, discountAmount: float, priceWithoutDiscount: float}
 	 */
-	protected function resolveLineDiscountPercent(array $lineAllowances, $lineTotalAmount, $billedQuantity = 1.0)
+	protected function resolveLineDiscountPercent(array $lineAllowances, $lineTotalAmount, float $billedQuantity = 1.0)
 	{
 		// Allowances (indicator "false") drive the discount percentage; the charges (indicator "true") are
 		// carried by their own line, but their amount has to be taken out of BT-131 here: the line total
