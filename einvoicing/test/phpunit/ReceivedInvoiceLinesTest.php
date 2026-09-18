@@ -982,8 +982,8 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 	}
 
 	/**
-	 * A document that does state BT-137 is resolved exactly as before: the whole existing corpus of
-	 * received documents goes through this branch and must not move.
+	 * A document stating a BT-137 that is the gross of its line is resolved exactly as before: the whole
+	 * existing corpus of received documents states it that way and must not move.
 	 *
 	 * @return	void
 	 */
@@ -998,9 +998,121 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 
 		$discount = $this->call('resolveLineDiscountPercent', array($lines[0]['lineAllowances'], $lines[0]['lineTotalAmount']));
 
-		$this->assertEqualsWithDelta(500.25, $discount['base'], 0.001, 'the base of the document is the one used');
+		$this->assertEqualsWithDelta(500.25, $discount['base'], 0.001, 'the gross of the line, which is what BT-137 states here');
 		$this->assertEqualsWithDelta(10.001, $discount['percent'], 0.0001);
 		$this->assertEqualsWithDelta(450.22, $this->importedLine($lines[0])['rebuilt'], 0.011, 'and the line still totals BT-131');
+	}
+
+	/**
+	 * A BT-137 stated per unit while BT-136 is the allowance of the whole line (reported in #1011): the
+	 * percentage is taken against the gross of the line, so the unit price of the document survives.
+	 *
+	 * @return	void
+	 */
+	public function testABaseStatedPerUnitIsNotTheBaseOfTheDiscount()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		// Quantity 2 at 19.85, an allowance of 17.08 for the two units and a BT-137 of 19.85, which is
+		// the base of a single one. BT-131 = 39.70 - 17.08 = 22.62.
+		$lines = $protocol->parseInvoiceLines($this->discountedLine(2.0, 19.85, 17.08, 22.62, 19.85));
+		$this->assertEqualsWithDelta(19.85, $lines[0]['lineAllowances'][0]['basisAmount'], 0.001, 'BT-137 is read, and it covers one unit');
+
+		$discount = $this->call('resolveLineDiscountPercent', array($lines[0]['lineAllowances'], $lines[0]['lineTotalAmount']));
+
+		$this->assertEqualsWithDelta(39.70, $discount['base'], 0.001, 'the gross of the line, not the base of one unit');
+		$this->assertEqualsWithDelta(43.0227, $discount['percent'], 0.0001);
+		$this->assertEqualsWithDelta(86.0453, round((17.08 / 19.85) * 100, 4), 0.0001, 'what the base of one unit computed');
+
+		$imported = $this->importedLine($lines[0]);
+
+		$this->assertEqualsWithDelta(2.0, $imported['qty'], 0.001, 'the quantity of the document is kept');
+		$this->assertEqualsWithDelta(19.85, $imported['subprice'], 0.001, 'and so is its unit price');
+		$this->assertEqualsWithDelta(22.62, $imported['rebuilt'], 0.011, 'the line totals BT-131');
+		$this->assertSame('', $imported['warning'], 'with nothing left to repair or report');
+	}
+
+	/**
+	 * The same base stated per unit, over a quantity large enough for the percentage it used to give to
+	 * pass 100: the line was then rebuilt upside down and imported as a single unit, losing both the
+	 * quantity and the unit price of the document.
+	 *
+	 * @return	void
+	 */
+	public function testABaseStatedPerUnitNoLongerCostsTheLineItsQuantity()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		// Quantity 5 at 100.00, an allowance of 150.00 over the line and a BT-137 of 100.00: 150 percent
+		// of a single unit. BT-131 = 500.00 - 150.00 = 350.00.
+		$lines = $protocol->parseInvoiceLines($this->discountedLine(5.0, 100.00, 150.00, 350.00, 100.00));
+
+		$discount = $this->call('resolveLineDiscountPercent', array($lines[0]['lineAllowances'], $lines[0]['lineTotalAmount']));
+
+		$this->assertEqualsWithDelta(30.0, $discount['percent'], 0.0001);
+		$this->assertEqualsWithDelta(150.0, round((150.00 / 100.00) * 100, 4), 0.0001, 'the base of one unit stated more than the whole line');
+
+		$imported = $this->importedLine($lines[0]);
+
+		$this->assertEqualsWithDelta(5.0, $imported['qty'], 0.001, 'the five units of the document are still five');
+		$this->assertEqualsWithDelta(100.00, $imported['subprice'], 0.001);
+		$this->assertEqualsWithDelta(350.00, $imported['rebuilt'], 0.011, 'the line totals BT-131, as it did before');
+		$this->assertSame('', $imported['warning']);
+	}
+
+	/**
+	 * A BT-137 covering part of the line - an allowance granted on some of the units only - is a base
+	 * Dolibarr cannot apply a percentage to either: remise_percent takes the whole line.
+	 *
+	 * @return	void
+	 */
+	public function testABaseCoveringPartOfTheLineIsNotTheBaseOfTheDiscount()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		// Quantity 10 at 10.00, an allowance of 5.00 granted on two units only, so BT-137 = 20.00 and
+		// BT-131 = 100.00 - 5.00 = 95.00.
+		$lines = $protocol->parseInvoiceLines($this->discountedLine(10.0, 10.00, 5.00, 95.00, 20.00));
+
+		$discount = $this->call('resolveLineDiscountPercent', array($lines[0]['lineAllowances'], $lines[0]['lineTotalAmount']));
+
+		$this->assertEqualsWithDelta(100.00, $discount['base'], 0.001, 'the gross of the line, not the two units the allowance names');
+		$this->assertEqualsWithDelta(5.0, $discount['percent'], 0.0001);
+		$this->assertEqualsWithDelta(25.0, round((5.00 / 20.00) * 100, 4), 0.0001, 'what the partial base computed');
+
+		$imported = $this->importedLine($lines[0]);
+
+		$this->assertEqualsWithDelta(10.00, $imported['subprice'], 0.001, 'the unit price of the document is kept');
+		$this->assertEqualsWithDelta(95.00, $imported['rebuilt'], 0.011);
+		$this->assertSame('', $imported['warning']);
+	}
+
+	/**
+	 * Two allowances stating two bases: only the first was ever read, so the second was taken against a
+	 * base that was never its own. The gross of the line is the one base the two share.
+	 *
+	 * @return	void
+	 */
+	public function testTwoAllowancesWithTwoBasesShareTheGrossOfTheLine()
+	{
+		$lineAllowances = array(
+			array('indicator' => 'false', 'basisAmount' => 60.00, 'actualAmount' => 6.00, 'reason' => 'Commercial discount'),
+			array('indicator' => 'false', 'basisAmount' => 40.00, 'actualAmount' => 4.00, 'reason' => 'Volume rebate'),
+		);
+
+		$discount = $this->call('resolveLineDiscountPercent', array($lineAllowances, 90.00));
+
+		$this->assertNotFalse($discount);
+		$this->assertEqualsWithDelta(10.00, $discount['discountAmount'], 0.001, 'the two allowances are summed');
+		$this->assertEqualsWithDelta(100.00, $discount['base'], 0.001, 'against the gross of the line');
+		$this->assertEqualsWithDelta(10.0, $discount['percent'], 0.0001);
+		$this->assertEqualsWithDelta(16.6667, round((10.00 / 60.00) * 100, 4), 0.0001, 'what the base of the first allowance computed');
 	}
 
 	/**
