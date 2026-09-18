@@ -976,7 +976,7 @@ class CdarHandler
 	 * parseExchangedDocument
 	 *
 	 * @param  SimpleXmlElement $xml xml
-	 * @return array<string,string|array<string,string>>
+	 * @return array<string,string|array<string,string>|array<int,array<string,string>>>
 	 */
 	private function parseExchangedDocument($xml)
 	{
@@ -996,8 +996,69 @@ class CdarHandler
 				'RoleCode' => $this->getXpathValue($xml, '//rsm:ExchangedDocument/ram:RecipientTradeParty/ram:RoleCode'),
 				'URIID' => $this->getXpathValue($xml, '//rsm:ExchangedDocument/ram:RecipientTradeParty/ram:URIUniversalCommunication/ram:URIID'),
 				'URISchemeID' => $this->getXpathAttribute($xml, '//rsm:ExchangedDocument/ram:RecipientTradeParty/ram:URIUniversalCommunication/ram:URIID', 'schemeID')
-			]
+			],
+			// The key above keeps the FIRST recipient, which is all the callers reading it need. A
+			// lifecycle message may address several, and which ones is what tells a rejection posted
+			// at emission from one posted at reception (issue #973), so keep the whole list too.
+			'RecipientTradeParties' => $this->parseRecipientTradeParties($xml)
 		];
+	}
+
+	/**
+	 * Every ExchangedDocument/RecipientTradeParty of a CDAR, in document order.
+	 *
+	 * XP Z12-012 annex A, sheet "Acteurs CDV", gives a status one recipient per audience: a rejection
+	 * posted at emission is addressed to the seller alone, one posted at reception to the seller AND
+	 * the buyer. Nothing else in a 213 says which platform posted it - issuer and sender are both the
+	 * generic "WK" with an empty identifier on the documents seen so far.
+	 *
+	 * @param  SimpleXMLElement $xml	CDAR with the namespaces registered
+	 * @return array<int,array{GlobalID:string,SchemeID:string,RoleCode:string,Name:string}>
+	 */
+	private function parseRecipientTradeParties($xml)
+	{
+		$parties = array();
+
+		$nodes = $this->registerNamespaces($xml)->xpath('//rsm:ExchangedDocument/ram:RecipientTradeParty');
+		if (empty($nodes)) {
+			return $parties;
+		}
+
+		foreach ($nodes as $node) {
+			$parties[] = array(
+				'GlobalID' => $this->getXpathValue($node, 'ram:GlobalID'),
+				'SchemeID' => $this->getXpathAttribute($node, 'ram:GlobalID', 'schemeID'),
+				'RoleCode' => $this->getXpathValue($node, 'ram:RoleCode'),
+				'Name' => $this->getXpathValue($node, 'ram:Name')
+			);
+		}
+
+		return $parties;
+	}
+
+	/**
+	 * The RoleCodes of the recipients above, comma separated, as stored on a lifecycle message
+	 * (llx_einvoicing_lifecycle_msg.lc_recipient_roles): "SE", "SE,BY"...
+	 *
+	 * @param  array<string,mixed> $cdarDocument	Result of readFromString()
+	 * @return string								Empty when the CDAR names no recipient
+	 */
+	public static function recipientRoles($cdarDocument)
+	{
+		$parties = $cdarDocument['ExchangedDocument']['RecipientTradeParties'] ?? array();
+		if (!is_array($parties)) {
+			return '';
+		}
+
+		$roles = array();
+		foreach ($parties as $party) {
+			$role = trim((string) ($party['RoleCode'] ?? ''));
+			if ($role !== '' && !in_array($role, $roles, true)) {
+				$roles[] = $role;
+			}
+		}
+
+		return implode(',', $roles);
 	}
 
 	/**
