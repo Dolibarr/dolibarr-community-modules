@@ -1453,7 +1453,7 @@ class CIIProtocol extends AbstractProtocol
 				// Collect supplier price data to be created after invoice is saved.
 				// Not for a default routing product: it is a catch-all, so gluing the vendor reference of
 				// the line onto it would make every next invoice match it instead of the real product.
-				if ($productId > 0 && $productMatchType != 'defaultrouting' && !empty($parsedLine['prodsellerid'])) {
+				if ($productId > 0 && $productMatchType != 'defaultrouting' && trim((string) ($parsedLine['prodsellerid'] ?? '')) !== '') {
 					$supplierPriceEntries[] = [
 						'productId' => $productId,
 						'unitPrice' => $this->resolveLineUnitPrice($parsedLine),
@@ -1467,8 +1467,8 @@ class CIIProtocol extends AbstractProtocol
 			// Add line to invoice
 			$line = new SupplierInvoiceLine($db);
 			// Supplier's product reference (BT-155 SellerAssignedID) -> shown as "Ref. fournisseur" on the line.
-			if (!empty($parsedLine['prodsellerid'])) {
-				$line->ref_supplier = trim($parsedLine['prodsellerid']);
+			if (trim((string) ($parsedLine['prodsellerid'] ?? '')) !== '') {
+				$line->ref_supplier = trim((string) $parsedLine['prodsellerid']);
 			}
 			if (!empty($productId)) {
 				$line->fk_product = $productId;
@@ -1805,16 +1805,29 @@ class CIIProtocol extends AbstractProtocol
 		$announced = round((float) ($parsedLine['lineTotalAmount'] ?? 0) - $charges, 2);
 		$announcedText = $announced . ($charges == 0.0 ? '' : ' (BT-131 less the charges that leave on their own line)');
 
+		// Whether the document says anything about this line's amount at all, as opposed to $announced
+		// being 0.0 either way: BT-131 absent (a free sample or a heading, nothing to reconcile), or BT-131
+		// present and entirely absorbed by the line's own charges (a line whose net price is 0.00 once its
+		// BG-28 charge is set aside, e.g. a flat fee billed only as a line charge - still an amount to honour).
+		// getXPathValue() answers null for an absent element, and the cast loop of parseInvoiceLines() only
+		// runs on isset(), so lineTotalAmount stays null when the document never wrote it and turns into a
+		// real 0.0 when it did.
+		$lineAnnouncesAnAmount = isset($parsedLine['lineTotalAmount']);
+
 		if (!$this->isDetailLine($parsedLine)) {
 			return array('qty' => 0.0, 'subprice' => 0.0, 'remise_percent' => 0.0, 'warning' => '');
 		}
 
 		$rebuilt = round($qty * $subprice * (1 - ($remisePercent / 100)), 2);
 
-		// The couple (quantity, unit price) cannot carry the announced amount: it rebuilds nothing, or it
-		// rebuilds it upside down. A line announcing nothing is left alone - a free sample or a heading is
-		// not an anomaly.
-		if (!empty($announced) && ($rebuilt == 0.0 || (($rebuilt > 0) !== ($announced > 0)))) {
+		// The couple (quantity, unit price) cannot carry the announced amount: it rebuilds nothing while an
+		// amount is announced, or it rebuilds it upside down. Both sides at 0.0 - a zero quantity whose
+		// price is only informative (issue #726) - already agree, and must not be rewritten to that same
+		// zero through a warning that has nothing to report. round() always hands back a float here, so the
+		// strict comparison reads the same as the loose one it replaces - without it, PHPStan's
+		// constant-condition check does not follow two separate round() results past the same 0.0 literal
+		// and reports the second comparison as unreachable.
+		if ($lineAnnouncesAnAmount && (($rebuilt == 0.0 && $announced !== 0.0) || (($rebuilt > 0) !== ($announced > 0)))) {
 			if (empty($qty)) {
 				$reason = 'its invoiced quantity (BT-129) is zero or absent, so quantity times unit price rebuilds 0.00';
 			} elseif (empty($subprice)) {
@@ -1842,7 +1855,7 @@ class CIIProtocol extends AbstractProtocol
 
 		$warning = '';
 		$refined = false;
-		if (!empty($announced) && $difference > 0.01 && $divisor != 0.0) {
+		if ($lineAnnouncesAnAmount && $difference > 0.01 && $divisor != 0.0) {
 			$subprice = $announced / $divisor;
 			$refined = true;
 
@@ -2888,7 +2901,7 @@ class CIIProtocol extends AbstractProtocol
 		// Product
 		$prod = $doc->createElement('ram:SpecifiedTradeProduct');
 		$el->appendChild($prod);
-		if (!empty($line['prodsellerid'])) {
+		if (trim((string) ($line['prodsellerid'] ?? '')) !== '') {
 			$prod->appendChild(
 				$doc->createElement('ram:SellerAssignedID', einvoicingXmlText((string) $line['prodsellerid']))
 			);
@@ -2941,13 +2954,17 @@ class CIIProtocol extends AbstractProtocol
 
 		$tax->appendChild($doc->createElement('ram:TypeCode', 'VAT'));
 
-		// The exemption reason is repeated on the line, not only in the VAT breakdown it also feeds.
-		// BR-FXEXT-E-08 reconciles BT-116 with the sum of the net amounts of the lines it covers, and only
-		// counts a line whose own reason code and text equal those of the breakdown: written on the breakdown
-		// alone it counted zero lines and the platform validator refused the invoice.
-		// Order follows the CII D22B sequence of TradeTaxType, which is not the order of the getters.
-		$lineExemptionReason = (string) ($line['ExemptionReason'] ?? '');
-		$lineExemptionReasonCode = (string) ($line['ExemptionReasonCode'] ?? '');
+		// The exemption reason belongs to the line on EXTENDED only: BR-FXEXT-E-08 counts a line towards
+		// its exempt breakdown (BT-116) solely when the line repeats the same reason code and text. Every
+		// profile below states the opposite - the EN 16931 schematron reports ram:ExemptionReason here as
+		// "not used in the given context", which the platform returns as REJ_COH (issue #974). The VAT
+		// breakdown carries it whatever the profile. Order follows the CII D22B sequence of TradeTaxType.
+		$lineExemptionReason = '';
+		$lineExemptionReasonCode = '';
+		if ($this->isExtendedProfile($profile)) {
+			$lineExemptionReason = (string) ($line['ExemptionReason'] ?? '');
+			$lineExemptionReasonCode = (string) ($line['ExemptionReasonCode'] ?? '');
+		}
 		if ($lineExemptionReason !== '') {
 			$tax->appendChild($doc->createElement('ram:ExemptionReason', einvoicingXmlText($lineExemptionReason)));
 		}
@@ -2955,7 +2972,11 @@ class CIIProtocol extends AbstractProtocol
 		if ($lineExemptionReasonCode !== '') {
 			$tax->appendChild($doc->createElement('ram:ExemptionReasonCode', einvoicingXmlText((string) $lineExemptionReasonCode)));
 		}
-		$tax->appendChild($doc->createElement('ram:RateApplicablePercent', einvoicingXmlText((string) $line['rateApplicablePercent'])));
+		// BR-O-05: a line declaring an operation outside the scope of VAT carries no rate (BT-152). Writing
+		// "0.00" there is not the same statement as writing nothing: it would claim a zero rated operation.
+		if ((string) $line['categoryCode'] !== 'O') {
+			$tax->appendChild($doc->createElement('ram:RateApplicablePercent', einvoicingXmlText((string) $line['rateApplicablePercent'])));
+		}
 
 		// Billing period for the line (BG-26 / BT-134 / BT-135). Must be placed after ApplicableTradeTax
 		// and before SpecifiedTradeAllowanceCharge (discount below) per the CII D22B schema sequence.

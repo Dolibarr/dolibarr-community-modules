@@ -62,6 +62,12 @@ class EmbeddedXmlReader
 	{
 		$additionalRefDocs = [];
 
+		// No XML was embedded in the PDF: loadXML() takes no null since PHP 8.1, and there is
+		// nothing to query anyway.
+		if (empty($this->embeddedXml)) {
+			return $additionalRefDocs;
+		}
+
 		$dom = new \DOMDocument();
 
 		$dom->loadXML($this->embeddedXml);
@@ -84,13 +90,15 @@ class EmbeddedXmlReader
 				$referenceTypeCode = $xpath->evaluate('string(ram:ReferenceTypeCode)', $refDoc);
 				$dateStr           = $xpath->evaluate('string(ram:FormattedIssueDateTime/qdt:DateTimeString)', $refDoc);
 
+				// A date the sender did not write in the 102 format makes createFromFormat() return
+				// false, and calling format() on it was fatal on a document the module only receives.
+				$issueDate = $dateStr ? \DateTime::createFromFormat('Ymd', $dateStr) : false;
+
 				$additionalRefDocs[] = [
 					'IssuerAssignedID'  => $id ?: null,
 					'typeCode'          => $typeCode ?: null,
 					'referenceTypeCode' => $referenceTypeCode ?: null,
-					'issueDate'         => $dateStr
-						? \DateTime::createFromFormat('Ymd', $dateStr)->format('Y-m-d')
-						: null,
+					'issueDate'         => $issueDate ? $issueDate->format('Y-m-d') : null,
 				];
 			}
 		}

@@ -313,19 +313,35 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->fieldAttr['min'] = '0';
 	$item->fieldAttr['step'] = '0.1';
 
+	// The three notices below are never sent empty: the generation falls back on the translations the
+	// placeholders show here, so the page states what will be written instead of keeping a silent
+	// default. Shown to a French seller only: their wording states French law, which is a promise the
+	// module has no business putting in the mouth of a seller established anywhere else.
+	$isfrenchseller = ($mysoc->country_code == 'FR');
+	$noticedefaulthelp = $isfrenchseller ? ' '.$langs->transnoentities('EINVOICING_LEGAL_NOTICE_DEFAULT_HELP') : '';
+
 	// Setup conf for PMT - Mention regarding recovery fees
 	$item = $formSetup->newItem('EINVOICING_PMT');
-	$item->helpText = $langs->transnoentities('EINVOICING_PMT_HELP');
+	$item->helpText = $langs->transnoentities('EINVOICING_PMT_HELP').$noticedefaulthelp;
+	if ($isfrenchseller) {
+		$item->fieldAttr['placeholder'] = $langs->transnoentities('RecoveryFeesMention');
+	}
 	$item->cssClass = 'minwidth500';
 
 	// Setup conf for PMD - Mention regarding late payment penalties
 	$item = $formSetup->newItem('EINVOICING_PMD');
-	$item->helpText = $langs->transnoentities('EINVOICING_PMD_HELP');
+	$item->helpText = $langs->transnoentities('EINVOICING_PMD_HELP').$noticedefaulthelp;
+	if ($isfrenchseller) {
+		$item->fieldAttr['placeholder'] = $langs->transnoentities('LatePaymentPenaltiesMention');
+	}
 	$item->cssClass = 'minwidth500';
 
 	// Setup conf for AAB - Mention regarding absence of discount for early payment
 	$item = $formSetup->newItem('EINVOICING_AAB');
-	$item->helpText = $langs->transnoentities('EINVOICING_AAB_HELP');
+	$item->helpText = $langs->transnoentities('EINVOICING_AAB_HELP').$noticedefaulthelp;
+	if ($isfrenchseller) {
+		$item->fieldAttr['placeholder'] = $langs->transnoentities('EarlyPaymentDiscountMention');
+	}
 	$item->cssClass = 'minwidth500';
 
 	/*

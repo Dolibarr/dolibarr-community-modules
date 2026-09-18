@@ -1042,6 +1042,46 @@ $sellerAddressLines = $einvoicing->splitAddressLines($mysoc->address ?? '');
 $buyerAddressLines  = $einvoicing->splitAddressLines($buyerAddress);
 
 // Filling $invoiceData (based on $invoiceTemplate)
+// BR-O-02/03/04 and BR-O-11 to BR-O-14: a document that says an operation is outside the scope of VAT
+// ("Not subject to VAT", BT-118 = O) carries no VAT identifier at all, and cannot describe anything
+// else beside it. The category only ever reaches here from the VAT dictionary of Dolibarr 24 and
+// above - see CommonProtocol::vatCategoryForExemptionCode() - so nothing below changes on an older core.
+$sellerVatNumber = $mysoc->tva_intra ?? 'FRSPECIMEN';
+$buyerVatNumber = $buyerParty->tva_intra ?? '';
+$notSubjectToVatGroups = 0;
+foreach ($taxBreakdown as $tmpbreakdown) {
+	if (($tmpbreakdown['categoryVAT'] ?? '') === 'O') {
+		$notSubjectToVatGroups++;
+	}
+}
+if ($notSubjectToVatGroups > 0 && count($taxBreakdown) > 1) {
+	// Refused here rather than after transmission: the rule points at the document as a whole, so the
+	// message names the categories that cannot sit together instead of a line number.
+	$tmpcategories = array();
+	foreach ($taxBreakdown as $tmpbreakdown) {
+		$tmpcategories[] = (string) ($tmpbreakdown['categoryVAT'] ?? '');
+	}
+	throw new Exception('UNSUPPORTEDVATMIX[BR-O-11]: The invoice ' . $object->ref . ' mixes an operation outside the scope of VAT with taxed or exempt ones (categories ' . implode(', ', array_unique($tmpcategories)) . '). An invoice that declares a "Not subject to VAT" breakdown can carry no other one: issue the operations outside the scope of VAT on their own invoice.');
+}
+if ($notSubjectToVatGroups > 0) {
+	// BT-31, BT-48 and BT-63 must be absent. Dropping them is not enough: a seller that charges VAT has
+	// only a BT-31 to declare, so removing it would leave the party with no tax registration at all -
+	// the very hole issue #560 closed for exempt sellers. Its SIREN takes the place, as BT-32 under
+	// schemeID FC, exactly what einvoicingSellerTaxRegistrations() builds for a seller with no VAT
+	// number. BT-30 carries the same SIREN a few elements above and is not touched by BR-O.
+	$sellerVatNumber = '';
+	$buyerVatNumber = '';
+	// No ?? here: Dolibarr 18 declares idprof1 a plain string and PHPStan reports the coalesce on
+	// that core. The cast is what covers the ?string of the newer ones.
+	$sellerSiren = trim((string) $mysoc->idprof1);
+	$sellerTaxRegistrations = array_values(array_filter($sellerTaxRegistrations, function ($tmpregistration) {
+		return $tmpregistration['type'] !== 'VA';
+	}));
+	if (empty($sellerTaxRegistrations) && $sellerSiren !== '') {
+		$sellerTaxRegistrations[] = array('type' => 'FC', 'value' => $sellerSiren);
+	}
+}
+
 $invoiceData = [
 	// Document part
 	'documentno'           => $object->ref,												// BT-25
@@ -1108,7 +1148,7 @@ $invoiceData = [
 	// einvoicingSellerTaxRegistrations(). A seller that does not charge VAT has no BT-31 to declare and
 	// must still identify itself, or every exempt line trips BR-E-02 (issue #560).
 	'sellerTaxRegistations'     => $sellerTaxRegistrations,
-	'sellervatnumber'           => $mysoc->tva_intra ?? 'FRSPECIMEN',
+	'sellervatnumber'           => $sellerVatNumber,
 
 	'sellerLegalOrgId'          => $myidprof,
 	'sellerLegalOrgScheme'      => $mySchemeIdProf,
@@ -1126,7 +1166,7 @@ $invoiceData = [
 	'buyercountry'              => $buyerCountryCode,
 	'buyersubdivision'          => null,
 
-	'buyervatnumber'            => $buyerParty->tva_intra ?? '',
+	'buyervatnumber'            => $buyerVatNumber,
 	'buyerGlobalIds'            => $buyerGlobalIds,
 	'buyerRoutingCode'          => ($buyerRoutingCode !== '' ? $buyerRoutingCode : null),
 	'buyerChorusSiret'          => $buyerChorusSiret,

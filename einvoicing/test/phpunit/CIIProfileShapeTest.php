@@ -537,6 +537,177 @@ class CIIProfileShapeTest extends CommonClassTest
 	}
 
 	/**
+	 * An exempt line repeats its exemption reason only on the profiles that ask for it.
+	 *
+	 * BR-FXEXT-E-08 reconciles the taxable amount of an exempt breakdown (BT-116) with the net amounts
+	 * of the lines it covers, and counts a line only when it repeats the same reason code and text, so
+	 * EXTENDED needs it. Below EXTENDED the profile Schematron reports the element as "not used in the
+	 * given context" and the platform rejects the invoice on REJ_COH (issue #974). The VAT breakdown
+	 * carries the reason whatever the profile, which is what makes the line copy dispensable there.
+	 *
+	 * @return void
+	 */
+	public function testLineExemptionReasonIsOnlyEmittedByTheExtendedProfiles()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		$data = $this->exemptInvoiceData();
+		$lines = $this->exemptLinesData();
+
+		foreach (CIIProtocol::SUPPORTED_XML_PROFILES as $profile) {
+			$xml = $protocol->buildXML($data, $lines, $profile);
+			$found = $this->lineTaxExemption($xml);
+
+			if (in_array($profile, ['EXTENDED', 'EXTENDEDFR'], true)) {
+				$this->assertSame(
+					[['Tax exempted - TVA en franchise', 'VATEX-FR-FRANCHISE']],
+					$found,
+					$profile . ' must repeat the exemption reason on the line, BR-FXEXT-E-08 counts it there'
+				);
+			} else {
+				$this->assertSame(
+					[],
+					$found,
+					$profile . ' must leave the exemption reason out of the line tax block'
+				);
+			}
+		}
+	}
+
+	/**
+	 * The VAT breakdown keeps the exemption reason on every profile that declares one.
+	 *
+	 * This is the half of issue #974 that must not move: the reason is mandatory there (BR-E-10), and
+	 * it is what makes the line level copy redundant below EXTENDED.
+	 *
+	 * @return void
+	 */
+	public function testBreakdownExemptionReasonSurvivesOnEveryProfile()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		$data = $this->exemptInvoiceData();
+		$lines = $this->exemptLinesData();
+
+		foreach (CIIProtocol::SUPPORTED_XML_PROFILES as $profile) {
+			if ($profile === 'MINIMUM') {
+				continue;	// MINIMUM declares totals only, no VAT breakdown (BG-23) to carry a reason
+			}
+			$xml = $protocol->buildXML($data, $lines, $profile);
+
+			$this->assertSame(
+				[['Tax exempted - TVA en franchise', 'VATEX-FR-FRANCHISE']],
+				$this->breakdownExemption($xml),
+				$profile . ' must carry the exemption reason in the VAT breakdown'
+			);
+		}
+	}
+
+	/**
+	 * The base invoice, turned into a VAT exempt one under "franchise en base de TVA".
+	 *
+	 * @return array
+	 */
+	private function exemptInvoiceData()
+	{
+		$data = $this->baseInvoiceData();
+
+		$data['grandTotalAmount'] = 100.0;
+		$data['duePayableAmount'] = 100.0;
+		$data['taxTotalAmount'] = 0.0;
+		$data['taxBreakdown'] = [
+			'0' => [
+				'tva_tx' => 0.0,
+				'vat_src_code' => '',
+				'categoryVAT' => 'E',
+				'ExemptionReasonCode' => 'VATEX-FR-FRANCHISE',
+				'ExemptionReason' => 'Tax exempted - TVA en franchise',
+				'totalHT' => 100.0,
+				'totalTVA' => 0.0,
+			],
+		];
+
+		return $data;
+	}
+
+	/**
+	 * The base line, at 0 % under the same exemption.
+	 *
+	 * @return array
+	 */
+	private function exemptLinesData()
+	{
+		$lines = $this->baseLinesData();
+
+		$lines[0]['tva_tx'] = 0.0;
+		$lines[0]['categoryCode'] = 'E';
+		$lines[0]['rateApplicablePercent'] = '0.00';
+		$lines[0]['ExemptionReason'] = 'Tax exempted - TVA en franchise';
+		$lines[0]['ExemptionReasonCode'] = 'VATEX-FR-FRANCHISE';
+
+		return $lines;
+	}
+
+	/**
+	 * Read the exemption reason and code of each line tax block.
+	 *
+	 * @param	string				$xml	Generated XML
+	 * @return	array<array<string>>		One [reason, code] pair per line that carries either
+	 */
+	private function lineTaxExemption(string $xml)
+	{
+		return $this->exemptionPairs(
+			$xml,
+			'//ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax'
+		);
+	}
+
+	/**
+	 * Read the exemption reason and code of each VAT breakdown (BG-23).
+	 *
+	 * @param	string				$xml	Generated XML
+	 * @return	array<array<string>>		One [reason, code] pair per breakdown that carries either
+	 */
+	private function breakdownExemption(string $xml)
+	{
+		return $this->exemptionPairs(
+			$xml,
+			'//ram:ApplicableHeaderTradeSettlement/ram:ApplicableTradeTax'
+		);
+	}
+
+	/**
+	 * Read the (reason, code) pairs of the tax blocks an XPath selects.
+	 *
+	 * @param	string				$xml	Generated XML
+	 * @param	string				$path	XPath selecting ram:ApplicableTradeTax elements
+	 * @return	array<array<string>>		One [reason, code] pair per block that carries either
+	 */
+	private function exemptionPairs(string $xml, string $path)
+	{
+		$doc = new DOMDocument();
+		$this->assertTrue($doc->loadXML($xml), 'generated document is not well-formed XML');
+
+		$xpath = new DOMXPath($doc);
+		$xpath->registerNamespace('ram', 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100');
+
+		$found = [];
+		foreach ($xpath->query($path) as $tax) {
+			$reason = $xpath->evaluate('string(ram:ExemptionReason)', $tax);
+			$code = $xpath->evaluate('string(ram:ExemptionReasonCode)', $tax);
+			if ($reason !== '' || $code !== '') {
+				$found[] = [$reason, $code];
+			}
+		}
+
+		return $found;
+	}
+
+	/**
 	 * Read the (schemeID, value) pairs of the ram:GlobalID of a party.
 	 *
 	 * @param	string				$xml	Generated XML

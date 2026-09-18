@@ -25,7 +25,10 @@
 dol_include_once('einvoicing/class/einvoicing.class.php');
 dol_include_once('einvoicing/class/protocols/ProtocolManager.class.php');
 dol_include_once('einvoicing/class/document.class.php');
-dol_include_once('einvoicing/class/utils/PriceHelper.class.php');
+// calcul_price_total(), used below to recompute the totals of a line the way the invoice got them.
+// The core ships install/inc.php, which defines DOL_DOCUMENT_ROOT as '..', and PHPStan resolves the
+// constant against it: the path it reports does not exist, the one used at runtime does.
+require_once DOL_DOCUMENT_ROOT.'/core/lib/price.lib.php';  // @phpstan-ignore requireOnce.fileNotFound
 dol_include_once('fourn/class/fournisseur.facture.class.php');
 dol_include_once('einvoicing/lib/einvoicing.lib.php');
 
@@ -204,7 +207,7 @@ class SupplierInvoiceHelper
 	 */
 	private static function getInvoiceDetailsForComparison(FactureFournisseur $supplierInvoice, $vatComputeMode)
 	{
-		global $db;
+		global $conf, $db;
 
 		// If mode 0 => use current supplier invoice data
 		if ($vatComputeMode == 0) {
@@ -231,7 +234,16 @@ class SupplierInvoiceHelper
 			throw new Exception('Seller not found for id : ' . $supplierInvoice->socid);
 		}
 
-		$forceRoundingTotalsPrecision = ($vatComputeMode == 1 ? 'MT' : 'MU');
+		// calcul_price_total() always rounds the totals of a line with 'MT'. That is mode 1
+		// (totalofround): round each line, then sum. Mode 2 (roundoftotal) keeps the unit precision
+		// on the lines and rounds only the sums, further down. It is obtained by lending
+		// MAIN_MAX_DECIMALS_TOT the unit precision for the duration of the loop, the way the core
+		// itself swaps these constants when it recalculates a line in a foreign currency.
+		$roundLinesOnUnitPrecision = ($vatComputeMode != 1);
+		$savMaxDecimalsTot = getDolGlobalString('MAIN_MAX_DECIMALS_TOT');
+		if ($roundLinesOnUnitPrecision) {
+			$conf->global->MAIN_MAX_DECIMALS_TOT = getDolGlobalInt('MAIN_MAX_DECIMALS_UNIT');
+		}
 
 		foreach ($supplierInvoice->lines as $line) {
 			$rate = (string) price2num($line->tva_tx);
@@ -248,14 +260,18 @@ class SupplierInvoiceHelper
 			$remisePercentGlobal = 0;
 			$priceBaseType = 'HT';
 			$infoBits = 0;
-			$localTaxes = array($line->localtax1_type, $line->localtax1_tx, $line->localtax2_type, $line->localtax2_tx);
+			// The types are cast to string because that is what calcul_price_total() reads them as:
+			// it switches on '1' to '6', while the line carries them as integers.
+			$localTaxes = array((string) $line->localtax1_type, $line->localtax1_tx, (string) $line->localtax2_type, $line->localtax2_tx);
 			$progress = (isset($line->situation_percent) ? $line->situation_percent : 100);
 			$multiCurrencyTx = !empty($line->multicurrency_tx) ? $line->multicurrency_tx : 1;
 			$puDevise = 0;
 			$multicurrencyCode = '';
 
-			$lineTotals = PriceHelper::calculatePriceTotal(
-				$line->qty,
+			// The PHPDoc of the core types the quantity as int up to Dolibarr 20, and the two localtax
+			// rates as int|string, while a line carries floats and the function computes with them.
+			$lineTotals = calcul_price_total(
+				$line->qty,  // @phpstan-ignore argument.type
 				$line->subprice,
 				$line->remise_percent,
 				floatval($rate),
@@ -266,12 +282,11 @@ class SupplierInvoiceHelper
 				$infoBits,
 				$line->product_type,
 				$seller,
-				$localTaxes,
+				$localTaxes,  // @phpstan-ignore argument.type
 				$progress,
 				$multiCurrencyTx,
 				$puDevise,
-				$multicurrencyCode,
-				$forceRoundingTotalsPrecision
+				$multicurrencyCode
 			);
 
 			$lineTotalHt = floatval($lineTotals[0]);
@@ -284,6 +299,10 @@ class SupplierInvoiceHelper
 			$details['total_ht'] += $lineTotalHt;
 			$details['total_ttc'] += $lineTotalTtc;
 			$details['total_tva'] += $lineVatAmount;
+		}
+
+		if ($roundLinesOnUnitPrecision) {
+			$conf->global->MAIN_MAX_DECIMALS_TOT = $savMaxDecimalsTot;
 		}
 
 		$roundPrecision = 'MT';

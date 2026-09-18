@@ -122,6 +122,7 @@ class modEInvoicing extends DolibarrModules
 			// request, including the ones other modules build for their own contexts.
 			'hooks' => [
 				'invoicecard', 'invoicesuppliercard', 'thirdpartycard', 'thirdpartycomm', 'productcard',
+				'invoicedocument', 'invoicesuppliercarddocument',
 				'invoicelist', 'supplierinvoicelist', 'thirdpartylist', 'societelist', 'productlist',
 				'productservicelist', 'accountancysupplierlist',
 				'pdfgeneration', 'odtgeneration',
