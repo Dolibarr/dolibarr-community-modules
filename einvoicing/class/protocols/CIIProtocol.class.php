@@ -1025,7 +1025,7 @@ class CIIProtocol extends AbstractProtocol
 
 			// Supplier invoice already found but may be that documents are downloaded or were removed
 			// Save documents in supplier invoice attachments if they do not exists yet.
-			$this->storeEmbeddedAttachmentsAndScrubXml($supplierInvoice, $sourceXml, $file, $tempFile, $return_messages);
+			$this->storeEmbeddedAttachments($supplierInvoice, $sourceXml, $file, $tempFile, $return_messages);
 
 			if ($tempFile && file_exists($tempFile)) {
 				$res = $this->saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempFile);
@@ -1311,9 +1311,9 @@ class CIIProtocol extends AbstractProtocol
 			$return_messages[] = 'Supplier Invoice created or updated with ID: ' . $supplierInvoiceId;
 
 
-			// The files the issuer embedded are pulled out before the XML is stored, and the XML then
-			// keeps a note in their place: nothing here ever reads a binary back out of it (issue #980).
-			$this->storeEmbeddedAttachmentsAndScrubXml($supplierInvoice, $sourceXml, $file, $tempFile, $return_messages);
+			// The files the issuer embedded become attached files of the invoice: nothing here ever read
+			// a binary back out of a received document, so they arrived and were lost (issue #980).
+			$this->storeEmbeddedAttachments($supplierInvoice, $sourceXml, $file, $tempFile, $return_messages);
 
 			// Save original invoice in supplier invoice attachments
 			if ($tempFile && file_exists($tempFile)) {
@@ -4514,13 +4514,19 @@ class CIIProtocol extends AbstractProtocol
 	}
 
 	/**
-	 * Pull the embedded files out of a received document, then take them out of the XML about to be stored.
+	 * Pull the embedded files out of a received document and store them as attached files.
 	 *
-	 * The binary is not lost by that scrub, it is the very file stored next to the XML, and the note left
-	 * in its place says so. Only a CII document is scrubbed: a Factur-X one is stored as the PDF container
-	 * it arrived in, which this module never rewrites. EINVOICING_KEEP_RECEIVED_XML_AS_IS keeps the
-	 * attached file untouched, for whoever archives the received document as it stands - the copy in
-	 * database is scrubbed by Document::cleanXmlData() either way, its 16 Mo not being negotiable.
+	 * The file kept beside the supplier invoice stays the document the access point returned, byte for
+	 * byte: what is archived has to be comparable to what arrived. The readability comes from the files
+	 * extracted here, not from rewriting the document.
+	 *
+	 * EINVOICING_SPLIT_XML_WITH_EMBEDDED_PDF_IN_TWO_FILES (hidden) asks for the lighter shape instead:
+	 * the binary leaves the attached XML, and the note left in its place names the file that now holds
+	 * it. Only a CII document is ever scrubbed - a Factur-X one is stored as the PDF container it
+	 * arrived in, which this module never rewrites.
+	 *
+	 * The copy in database is not concerned and not optional: Document::cleanXmlData() scrubs it
+	 * whatever this option says, its 16 Mo cap not being negotiable.
 	 *
 	 * @param  FactureFournisseur	$supplierInvoice	The imported supplier invoice
 	 * @param  string				$sourceXml			The CII XML the import was read from
@@ -4529,7 +4535,7 @@ class CIIProtocol extends AbstractProtocol
 	 * @param  string[]				$return_messages	Messages of the import, completed here
 	 * @return void
 	 */
-	protected function storeEmbeddedAttachmentsAndScrubXml($supplierInvoice, $sourceXml, $file, $tempFile, array &$return_messages)
+	protected function storeEmbeddedAttachments($supplierInvoice, $sourceXml, $file, $tempFile, array &$return_messages)
 	{
 		$attachments = static::extractEmbeddedAttachments((string) $sourceXml);
 		if (empty($attachments)) {
@@ -4541,10 +4547,10 @@ class CIIProtocol extends AbstractProtocol
 			return;
 		}
 
-		// EINVOICING_KEEP_RECEIVED_XML_AS_IS: keep the attached file byte for byte as the access point
-		// returned it. The files above are stored all the same, they are simply also left inside it,
-		// and the copy in database stays scrubbed whatever this option says.
-		if (getDolGlobalString('EINVOICING_KEEP_RECEIVED_XML_AS_IS')) {
+		// The attached file is left as the access point returned it, embedded binaries included, unless
+		// EINVOICING_SPLIT_XML_WITH_EMBEDDED_PDF_IN_TWO_FILES asks for the lighter XML. The files above
+		// are stored either way, and the copy in database stays scrubbed whatever this option says.
+		if (!getDolGlobalString('EINVOICING_SPLIT_XML_WITH_EMBEDDED_PDF_IN_TWO_FILES')) {
 			return;
 		}
 
