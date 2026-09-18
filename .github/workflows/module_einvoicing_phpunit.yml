@@ -457,6 +457,12 @@ jobs:
         with:
           htdocs: ${{ steps.instance.outputs.htdocs }}
 
+      - name: The module creates its directories inside open_basedir
+        # An instance set up the way the documentation recommends refuses paths outside its
+        # open_basedir, and dol_mkdir() walks up to '/' when it is not told where the data root
+        # starts (issue #1012). Here, on the package as a user installs it.
+        run: php .github/scripts/open-basedir-check.php
+
       - name: A package without its compat directory has to be refused
         # The check above says something only if it fails when the package is incomplete. #537 is
         # rebuilt here: the same instance, the same package, minus the one directory whose absence
