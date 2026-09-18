@@ -2058,9 +2058,9 @@
 							"match a vendor product reference written with separators other than the recorded one; off by default, the comparison being an approximation"
 						],
 						[
-							"`EINVOICING_KEEP_RECEIVED_XML_AS_IS`",
+							"`EINVOICING_SPLIT_XML_WITH_EMBEDDED_PDF_IN_TWO_FILES`",
 							"IN",
-							"hidden: keep the attached XML file byte for byte as the access point returned it; the embedded files are stored as attached files either way, and the copy in database stays scrubbed"
+							"hidden: take the embedded binaries out of the attached XML file, which is otherwise the document the access point returned byte for byte; the embedded files are stored as attached files either way, and the copy in database stays scrubbed"
 						],
 						[
 							"`EINVOICING_USE_EXTERNAL_FACTURX_READER`",
