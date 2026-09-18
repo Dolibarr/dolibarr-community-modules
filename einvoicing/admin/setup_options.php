@@ -388,6 +388,19 @@ if (!einvoicingIsReceiveDisabled()) {
 		$item->fieldParams['warningifon'] = 1;
 	}
 
+	if (getDolGlobalString("EINVOICING_SUPPLIER_INVOICE_LINES_MANUAL_IMPORT_AVAILABLE")) {
+		$item = $formSetup->newItem('EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_TYPE');
+		$item->helpText = $langs->trans('EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_TYPE_HELP');
+
+		$item->setAsSelect([
+			EInvoicing::SUPPLIER_INVOICE_LINES_IMPORT_AUTO => $langs->trans('EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_TYPE_AUTO'),
+			EInvoicing::SUPPLIER_INVOICE_LINES_IMPORT_MANUAL => $langs->trans('EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_TYPE_MANUAL'),
+		]);
+
+		$item = $formSetup->newItem('EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_CATEGORY_OF_TARGET_IMPORT_PRODUCT_LIST');
+		$item->setAsCategory('product');
+	}
+
 	// Setup conf to match a vendor product reference written with separators other than the recorded one.
 	// Off by default: the comparison ignores separators, so it is an approximation.
 	$item = $formSetup->newItem('EINVOICING_PRODUCTS_MATCH_CANONICAL_REF')->setAsYesNo();

@@ -785,3 +785,28 @@ FxCheckErrorLinesWithNoName=The following lines have neither a product label nor
 # A lifecycle status about an invoice we sent, that this run could not record (flow left unstored, retried later)
 CantRecordTheStatusOfTheInvoiceYouSent=The status of an invoice you sent, carried by flow %s, could not be recorded. Nothing was stored, the flow will be retried on the next synchronization.
 CheckSyncLogCantRecordSentInvoiceStatus=Nothing to do here: this flow is retried automatically on the next synchronization. If it keeps failing, the synchronization log gives the technical reason.
+
+# Supplier invoice lines manual import
+SupplierInvoiceLinesImportType=Supplier invoice lines import type
+SupplierInvoiceLinesImportType1=Auto
+SupplierInvoiceLinesImportType2=Manual
+SupplierInvoiceLinesImportTypeHelp=Automatic is standard mode (use directly lines from einvoice data) / Manual is requiring user choice on supplier invoice page (user can choose to import to free lines or target product) / If not set use global module parameter
+EinvoiceImportLines=Reset lines and re-import them
+SupplierInvoiceExtractLinesWarning=Existing supplier invoice lines will be deleted
+ExtractAllLines=Reset lines and re-import them automatically
+ExtractToFreeLine=Reset lines and re-import them into lines without predefined product
+ExtractToAProduct=Reset lines and re-import them into one output line by VAT rate
+SupplierInvoiceLinesImportTargetProduct=Target product
+SupplierInvoiceLinesImportProductsFromCategory=to a product from category
+SupplierInvoiceLinesImportPleaseSetDefaultCategoryInSettings=You have to choose a default category in einvoicing module to be able to select target product
+EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_TYPE=Supplier invoice lines import type (can be overriden at third party level by modifying related parameter)
+EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_TYPE_HELP=Auto (Standard mode) / Manual (Requires a user action to import supplier invoice lines. On supplier invoice card, user will be able to reimport lines by choosing to import lines among 3 options : standard import (auto), import to free lines, import to target product (one line of this product by VAT rate)).Unlike the module parameter EINVOICING_IMPORT_AS_FREE_LINES (Import lines without product as free description lines) which will be used with the same value for all imported supplier invoices, this parameter lets user to choose the way to import supplier invoice lines for each invoice individually. You also can override import type module parameter at third party level.
+EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_TYPE_AUTO=Auto
+EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_TYPE_MANUAL=Manual
+EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_CATEGORY_OF_TARGET_IMPORT_PRODUCT_LIST=Supplier invoice lines import : category used to filter the products list when importing (manually) supplier invoice lines to a target product
+EinvoiceFormatNotSupported=Format %s is not supported by Einvoicing module
+EinvoiceFailedToDetectXmlFormat=Failed to detect e-invoice XML format
+EinvoiceXmlDataNotFound=E-invoice XML data not found
+EinvoiceCantReimportLines=Can't reimport lines
+EinvoiceReimportLinesMissingTargetFkProduct=Invoice lines can't be reimported when target product is missing
+EinvoiceReimportLinesError=Failed to create supplier invoice lines from E-invoice document: %s

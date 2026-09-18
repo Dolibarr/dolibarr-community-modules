@@ -552,6 +552,21 @@ class EInvoicing
 	const SCHEME_FR_ROUTING_CODE = '0224';
 
 	/**
+	 * When import type is not set at supplier level, it uses global einvoicing module parameter 'EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_TYPE' (auto or manual) to create Dolibarr supplier invoice lines
+	 */
+	public const SUPPLIER_INVOICE_LINES_IMPORT_USE_GLOBAL_CONFIG = -1;
+
+	/**
+	 * When invoice is in import type "auto", it directly uses the e-invoice lines data to create Dolibarr supplier invoice lines (and create)
+	 */
+	public const SUPPLIER_INVOICE_LINES_IMPORT_AUTO = 1;
+
+	/**
+	 * When invoice is in import type "manual", user can choose how to create Dolibarr supplier invoice lines (free lines or target product)
+	 */
+	public const SUPPLIER_INVOICE_LINES_IMPORT_MANUAL = 2;
+
+	/**
 	 * @var string ISO 6523 scheme of a French SIRET, the identifier of an establishment.
 	 *
 	 * BR-FR-CPRO-10 of XP Z12-012 makes it mandatory as a private identifier of the buyer (BT-46) on a
