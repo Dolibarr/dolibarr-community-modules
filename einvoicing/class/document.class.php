@@ -1619,6 +1619,11 @@ class Document extends CommonObject
 	 * Clean XML data by removing or replacing specific contents like :
 	 * - attachments
 	 *
+	 * Not optional: this column is a MEDIUMTEXT capped at 16 Mo by checkXmlDataMaxSize(), and one
+	 * embedded PDF is enough to pass it - a document too big is then not stored at all.
+	 * EINVOICING_SPLIT_XML_WITH_EMBEDDED_PDF_IN_TWO_FILES only concerns the file kept on disk beside
+	 * the supplier invoice, which is otherwise the document the access point returned, byte for byte.
+	 *
 	 * @param ?string $xmlData The XML data to clean
 	 * @return ?string The cleaned XML data
 	 */
