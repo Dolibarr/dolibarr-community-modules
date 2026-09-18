@@ -1500,7 +1500,7 @@ class CIIProtocol extends AbstractProtocol
 			}
 			// handle line-level discount if exists and update amounts
 			if (!empty($parsedLine['lineAllowances'])) {
-				$discount = $this->resolveLineDiscountPercent($parsedLine['lineAllowances'], $parsedLine['lineTotalAmount']);
+				$discount = $this->resolveLineDiscountPercent($parsedLine['lineAllowances'], $parsedLine['lineTotalAmount'], (float) ($parsedLine['billedquantity'] ?? 1.0));
 				if ($discount !== false) {
 					$line->remise_percent = $discount['percent'];
 					if (!empty($parsedLine['billedquantity'])) {
@@ -3745,7 +3745,7 @@ class CIIProtocol extends AbstractProtocol
 	 * @param float|null $lineTotalAmount BT-131 net line amount (base ht)
 	 * @return false|array{percent: float, base: float, discountAmount: float, priceWithoutDiscount: float}
 	 */
-	protected function resolveLineDiscountPercent(array $lineAllowances, $lineTotalAmount)
+	protected function resolveLineDiscountPercent(array $lineAllowances, $lineTotalAmount, $billedQuantity = 1.0)
 	{
 		// Allowances (indicator "false") drive the discount percentage; the charges (indicator "true") are
 		// carried by their own line, but their amount has to be taken out of BT-131 here: the line total
@@ -3783,7 +3783,15 @@ class CIIProtocol extends AbstractProtocol
 
 		// Base for the percent — BT-137 if given, amount before discount otherwise (issue #783).
 		// A BasisAmount of 0 (some pivots emit it) counts as not given: ?? would keep the 0 and drop the discount.
-		$base = !empty($allowances[0]['basisAmount']) ? $allowances[0]['basisAmount'] : $priceWithoutDiscount;
+		// Scale basisAmount by qty when the supplier sent a per-unit base instead of a line-total base.
+		$unitBasisAmount = !empty($allowances[0]['basisAmount']) ? (float) $allowances[0]['basisAmount'] : null;
+		if ($unitBasisAmount !== null && $billedQuantity > 1) {
+			$scaledBasis = $unitBasisAmount * (float) $billedQuantity;
+			if (abs($scaledBasis - $priceWithoutDiscount) < abs($unitBasisAmount - $priceWithoutDiscount)) {
+				$unitBasisAmount = $scaledBasis;
+			}
+		}
+		$base = $unitBasisAmount ?? $priceWithoutDiscount;
 
 		if (!$base) {
 			return false;
