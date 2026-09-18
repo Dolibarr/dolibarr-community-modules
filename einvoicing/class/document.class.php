@@ -26,6 +26,9 @@
 
 // Put here all includes required by your class file
 require_once DOL_DOCUMENT_ROOT.'/core/class/commonobject.class.php';
+// getNomUrl() calls dolPrintHTMLForAttribute(), added to the core in Dolibarr 19: the backport is loaded here
+// because a caller outside this module has no reason to know this class needs it.
+require_once __DIR__ . '/../compat/functions.lib.php';
 //require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
 //require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
 

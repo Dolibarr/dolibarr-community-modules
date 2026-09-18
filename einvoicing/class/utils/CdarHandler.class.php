@@ -1074,9 +1074,66 @@ class CdarHandler
 				$result['StatusIncludedNoteContents'] = $allContents;               // array of all notes
 				$result['StatusIncludedNoteContent'] = implode("\n", $allContents); // backward-compatible string
 			}
+
+			// MDG-43 blocks: what the status is about in figures - the amount cashed in (MEN) of a 212,
+			// the amount paid (MPA) of a 211, what is left to pay (RAP), ...
+			$characteristics = array();
+			foreach ($statusNodes as $statusNode) {
+				foreach ($this->registerNamespaces($statusNode)->xpath('ram:SpecifiedDocumentCharacteristic') as $node) {
+					$block = array(
+						'TypeCode' => $this->getXpathValue($node, 'ram:TypeCode'),
+						'ValueAmount' => $this->getXpathValue($node, 'ram:ValueAmount'),
+						'CurrencyID' => $this->getXpathAttribute($node, 'ram:ValueAmount', 'currencyID'),
+						'ValuePercent' => $this->getXpathValue($node, 'ram:ValuePercent'),
+						'ValueDateTime' => $this->getXpathValue($node, 'ram:ValueDateTime/qdt:DateTimeString')
+					);
+					if ($block['TypeCode'] !== '' || $block['ValueAmount'] !== '') {
+						$characteristics[] = $block;
+					}
+				}
+			}
+			if (!empty($characteristics)) {
+				$result['StatusCharacteristics'] = $characteristics;
+			}
 		}
 
 		return $result;
+	}
+
+	/**
+	 * Describe the MDG-43 blocks of a received status in one line, for the status comment and the log.
+	 *
+	 * @param  array<array{TypeCode?:string,ValueAmount?:string,CurrencyID?:string,ValuePercent?:string,ValueDateTime?:string}> $characteristics Blocks as parsed from the CDAR
+	 * @param  Translate $langs Translate object
+	 * @return string           One line, empty when no block carries an amount
+	 */
+	public static function describeStatusCharacteristics($characteristics, $langs)
+	{
+		$parts = array();
+
+		foreach ($characteristics as $block) {
+			if (!isset($block['ValueAmount']) || $block['ValueAmount'] === '') {
+				continue;	// A block with no amount says nothing a reader can use
+			}
+
+			// A cash-in and a cash-out are both a 212, told apart by the sign alone (rule P1.15): say
+			// which one this is rather than leave "Cashed in -240.00" on the screen.
+			$code = isset($block['TypeCode']) ? (string) $block['TypeCode'] : '';
+			$key = 'EInvCdarAmount' . $code . ($code === 'MEN' && (float) $block['ValueAmount'] < 0 ? 'Negative' : '');
+			$label = ($code !== '' && $langs->trans($key) !== $key) ? $langs->trans($key) : $code;
+
+			$one = price((float) $block['ValueAmount'], 0, $langs, 1, -1, -1, !empty($block['CurrencyID']) ? $block['CurrencyID'] : '');
+			if (isset($block['ValuePercent']) && $block['ValuePercent'] !== '') {
+				$one .= ' (' . vatrate((string) $block['ValuePercent'], true) . ')';
+			}
+			if (!empty($block['ValueDateTime'])) {
+				$one .= ' ' . dol_print_date(dol_stringtotime($block['ValueDateTime']), 'day');
+			}
+
+			$parts[] = ($label !== '' ? $label . ' ' : '') . $one;
+		}
+
+		return implode(', ', $parts);
 	}
 
 	// ==================== GENERATION ====================

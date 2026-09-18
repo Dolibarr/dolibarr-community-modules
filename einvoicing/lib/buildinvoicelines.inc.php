@@ -284,7 +284,7 @@ $outputlangs->load("einvoicing@einvoicing");
 // invoice to a buyer whose directory record demands a service code is rejected (issue #678).
 // It is a SECOND ram:GlobalID on the buyer party, and the Factur-X EN16931 Schematron caps that element
 // at one occurrence (FX-SCH-A-000164): below EXTENDED the code is not sent and the user is told why.
-$buildProfile = $this->getBuildXmlProfile();
+$buildProfile = $this->getBuildXmlProfile($object);
 $buyerRoutingCode = trim((string) ($object->array_options['options_d4d_service_code'] ?? ''));
 if ($buyerRoutingCode !== '' && $buyerParty->country_code != 'FR') {
 	// Scheme 0224 is the French routing code: it means nothing for a buyer of another country.
@@ -312,15 +312,13 @@ if ($buyerRoutingCode !== '' && !$this->isExtendedProfile($buildProfile)) {
 // Chorus fields - because Chorus Pro support is a setting of the whole company: a seller that invoices
 // both the public sector and private customers would otherwise be told about a missing SIRET on every
 // private invoice, where no rule asks for one.
-$looksLikeB2GInvoice = $chorus && (
-	trim((string) ($object->array_options['options_d4d_service_code'] ?? '')) !== ''
-	|| trim((string) ($object->array_options['options_d4d_contract_number'] ?? '')) !== ''
-	|| trim((string) ($object->array_options['options_d4d_promise_code'] ?? '')) !== ''
-);
+$looksLikeB2GInvoice = $chorus && $this->looksLikeB2GInvoice($object);
 
 $buyerChorusSiret = '';
 if ($chorus && $buyerParty->country_code == 'FR') {
-	$buyerChorusSiret = removeAllSpaces((string) ($buyerParty->idprof2 ?? ''));
+	// No ?? here: Dolibarr 18 declares idprof2 a plain string and PHPStan reports the coalesce on
+	// that core. The cast is what covers the ?string of the newer ones.
+	$buyerChorusSiret = removeAllSpaces((string) $buyerParty->idprof2);
 	if ($buyerChorusSiret === '') {
 		if ($looksLikeB2GInvoice) {
 			$this->warnings[] = $outputlangs->trans('EInvoiceChorusBuyerSiretMissing', $buyerParty->name);
@@ -335,8 +333,10 @@ if ($chorus && $buyerParty->country_code == 'FR') {
 		// it twice would break FX-SCH-A-000164 on the very profile that allows several of them.
 		$buyerChorusSiret = '';
 	}
-	// No profile guard is needed here, unlike the routing code below: getBuildXmlProfile() raises the
-	// profile to EXTENDED-CTC-FR whenever Chorus Pro support is on, so this identifier always has room.
+	// No profile guard is needed here, unlike the routing code below: this value is only ever emitted
+	// under isExtendedProfile($profile) (see buildXML()), and getBuildXmlProfile() already raises the
+	// profile to EXTENDED-CTC-FR whenever this invoice looks B2G (see needsExtendedFrProfile()) - the
+	// same test $looksLikeB2GInvoice above uses - so an identifier worth emitting always has room.
 	// The routing code keeps its guard because its extrafield keeps the value that was typed when the
 	// option was on, and the invoice may then be generated with the option off.
 }
@@ -1042,6 +1042,46 @@ $sellerAddressLines = $einvoicing->splitAddressLines($mysoc->address ?? '');
 $buyerAddressLines  = $einvoicing->splitAddressLines($buyerAddress);
 
 // Filling $invoiceData (based on $invoiceTemplate)
+// BR-O-02/03/04 and BR-O-11 to BR-O-14: a document that says an operation is outside the scope of VAT
+// ("Not subject to VAT", BT-118 = O) carries no VAT identifier at all, and cannot describe anything
+// else beside it. The category only ever reaches here from the VAT dictionary of Dolibarr 24 and
+// above - see CommonProtocol::vatCategoryForExemptionCode() - so nothing below changes on an older core.
+$sellerVatNumber = $mysoc->tva_intra ?? 'FRSPECIMEN';
+$buyerVatNumber = $buyerParty->tva_intra ?? '';
+$notSubjectToVatGroups = 0;
+foreach ($taxBreakdown as $tmpbreakdown) {
+	if (($tmpbreakdown['categoryVAT'] ?? '') === 'O') {
+		$notSubjectToVatGroups++;
+	}
+}
+if ($notSubjectToVatGroups > 0 && count($taxBreakdown) > 1) {
+	// Refused here rather than after transmission: the rule points at the document as a whole, so the
+	// message names the categories that cannot sit together instead of a line number.
+	$tmpcategories = array();
+	foreach ($taxBreakdown as $tmpbreakdown) {
+		$tmpcategories[] = (string) ($tmpbreakdown['categoryVAT'] ?? '');
+	}
+	throw new Exception('UNSUPPORTEDVATMIX[BR-O-11]: The invoice ' . $object->ref . ' mixes an operation outside the scope of VAT with taxed or exempt ones (categories ' . implode(', ', array_unique($tmpcategories)) . '). An invoice that declares a "Not subject to VAT" breakdown can carry no other one: issue the operations outside the scope of VAT on their own invoice.');
+}
+if ($notSubjectToVatGroups > 0) {
+	// BT-31, BT-48 and BT-63 must be absent. Dropping them is not enough: a seller that charges VAT has
+	// only a BT-31 to declare, so removing it would leave the party with no tax registration at all -
+	// the very hole issue #560 closed for exempt sellers. Its SIREN takes the place, as BT-32 under
+	// schemeID FC, exactly what einvoicingSellerTaxRegistrations() builds for a seller with no VAT
+	// number. BT-30 carries the same SIREN a few elements above and is not touched by BR-O.
+	$sellerVatNumber = '';
+	$buyerVatNumber = '';
+	// No ?? here: Dolibarr 18 declares idprof1 a plain string and PHPStan reports the coalesce on
+	// that core. The cast is what covers the ?string of the newer ones.
+	$sellerSiren = trim((string) $mysoc->idprof1);
+	$sellerTaxRegistrations = array_values(array_filter($sellerTaxRegistrations, function ($tmpregistration) {
+		return $tmpregistration['type'] !== 'VA';
+	}));
+	if (empty($sellerTaxRegistrations) && $sellerSiren !== '') {
+		$sellerTaxRegistrations[] = array('type' => 'FC', 'value' => $sellerSiren);
+	}
+}
+
 $invoiceData = [
 	// Document part
 	'documentno'           => $object->ref,												// BT-25
@@ -1108,7 +1148,7 @@ $invoiceData = [
 	// einvoicingSellerTaxRegistrations(). A seller that does not charge VAT has no BT-31 to declare and
 	// must still identify itself, or every exempt line trips BR-E-02 (issue #560).
 	'sellerTaxRegistations'     => $sellerTaxRegistrations,
-	'sellervatnumber'           => $mysoc->tva_intra ?? 'FRSPECIMEN',
+	'sellervatnumber'           => $sellerVatNumber,
 
 	'sellerLegalOrgId'          => $myidprof,
 	'sellerLegalOrgScheme'      => $mySchemeIdProf,
@@ -1126,7 +1166,7 @@ $invoiceData = [
 	'buyercountry'              => $buyerCountryCode,
 	'buyersubdivision'          => null,
 
-	'buyervatnumber'            => $buyerParty->tva_intra ?? '',
+	'buyervatnumber'            => $buyerVatNumber,
 	'buyerGlobalIds'            => $buyerGlobalIds,
 	'buyerRoutingCode'          => ($buyerRoutingCode !== '' ? $buyerRoutingCode : null),
 	'buyerChorusSiret'          => $buyerChorusSiret,
