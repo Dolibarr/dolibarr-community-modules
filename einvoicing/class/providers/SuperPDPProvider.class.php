@@ -1818,8 +1818,10 @@ class SuperPDPProvider extends AbstractPDPProvider
 		dol_syslog(__METHOD__ . " syncFlows start from " . dol_print_date($dateafter, 'standard') . " limit " . $limit, LOG_DEBUG);
 		dol_syslog(__METHOD__ . " syncFlows start from " . dol_print_date($dateafter, 'standard') . " limit " . $limit, LOG_DEBUG, 0, "_einvoicing");
 
-		// If limit is 0, we first need to get the total number of flows to sync because AP set a default limit of 25 if not specified
-		/* response param "total" not supported by SuperPDP
+		// If limit is 0, we first need to get the total number of flows to sync because AP set a default limit of 25 if not specified.
+		// NOTE: Response param "total" not supported by SuperPDP, so we disable this. Instead we will use a batch mode in the loop later.
+		// NOTE: EsaLink support the param "total" so no batch mode is implemented for this provider.
+		/*
 		if ($limit == 0) {
 			$jsonparams = json_encode($params);
 			$response = $this->callApi($resource, "POST", $jsonparams, array('Request-Id' => $uuid));
@@ -1968,9 +1970,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 					// If res < 0, rollback
 					if ($res['res'] < 0) {
-						if (!empty($res['postponeflow'])) {
-							// TODO Critical pb. When a flow is postponed, if some flow are recorded after, the postponed one may become out of range of the next sync
-							//and be definitely lost.
+						if (getDolGlobalInt('EINVOICING_ENABLE_POSTPONE_FLOWS') && !empty($res['postponeflow'])) {
+							// Critical pb. When a flow is postponed, if some flow are recorded after, the postponed one may become out of range of the next sync
+							// and be definitely lost.
 
 							// This flow could not be read, but nothing was stored for it: it stays pending and
 							// the next synchronization will try it again, so no invoice is lost. Report it with
@@ -1993,7 +1995,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 							continue;
 						}
 
-						if (isset($res['action']) && $res['action'] != '') {	// Save business errors if it is
+						if (isset($res['action']) && $res['action'] != '') {	// Save the business errors if it is
 							$rescode = $res['actioncode'] ?? '0';
 							// Set the result code and label into array $actions.
 							$actions[$rescode] = array(
@@ -2002,8 +2004,12 @@ class SuperPDPProvider extends AbstractPDPProvider
 								'action' => $res['action'],
 								'actiondata' => $res['actiondata'] ?? array()
 							);
+							// Some error return directly the business action to do.
+							if (!empty($res['businessmessage'])) {
+								$actions[$rescode]['businessmessage'] = $res['businessmessage'] . $form->textwithpicto('', "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], 1, 'help', '', 0, 2, 'help');
+							}
 
-							// Complete the $actions array with the Business error message
+							// Complete the $actions array with the Business error message for common known cases.
 							if ($rescode == 'SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT') {
 								$actions[$rescode]['businessmessage'] = $langs->trans("SupplierInvoiceFoundButWithdifferentAmount", $res['actiondata']['supplierref'] ?? '', $res['actiondata']['expectedamount'] ?? '');
 							}
@@ -2078,8 +2084,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 						// drifts out of the rolling synchronization window.
 						if (getDolGlobalInt('EINVOICING_ENABLE_MANUAL_ACTION_QUEUE')
 							&& in_array($rescode, array('THIRDPARTY_NOT_FOUND', 'PRODUCT_NOT_FOUND', 'SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT'))) {
-							// Normalize the manual actions the protocol computed (create / associate an existing
-							// product / set a default one...) into a compact list the queue renders as icons.
+							// Normalize the manual actions the protocol computed (create / associate an existing product / set a default one...) into a compact list the queue renders as icons.
 							$manualactions = array();
 							if (!empty($res['allactiondata']) && is_array($res['allactiondata'])) {
 								foreach ($res['allactiondata'] as $akey => $adata) {
