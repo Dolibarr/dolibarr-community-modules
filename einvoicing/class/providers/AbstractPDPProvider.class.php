@@ -642,6 +642,42 @@ abstract class AbstractPDPProvider
 	abstract public function syncFlow($flowId, $call_id = null);
 
 	/**
+	 * Have the value of a setup field stored encrypted, whatever its constant is named.
+	 *
+	 * dolibarr_set_const() decides on the END of the name, and the environment marker of the production
+	 * credentials hides the keyword it matches (#599, #1013). dolEncrypt() returns an already encrypted
+	 * string unchanged, so a core that does encrypt that name still stores a single layer.
+	 *
+	 * @param	FormSetupItem	$item	Setup field holding a credential
+	 * @return	void
+	 */
+	protected function storeThisFieldEncrypted($item)
+	{
+		$item->setSaveCallBack(function (FormSetupItem $credentialitem) {
+			$res = dolibarr_set_const($credentialitem->db, $credentialitem->confKey, AbstractPDPProvider::encryptIfReadable((string) $credentialitem->fieldValue), 'chaine', 0, '', $credentialitem->entity);
+
+			return ($res < 0 ? -1 : 1);
+		});
+	}
+
+	/**
+	 * Encrypt a credential, unless this core would not give it back.
+	 *
+	 * Dolibarr 23 refuses a decrypted value that is not plain ASCII and hands the encrypted string over
+	 * instead (its dolDecrypt() tests ascii_check(), which 24 relaxed to ascii or utf8), so a password
+	 * carrying an accent would come back unusable. Such a value is stored the way it was before.
+	 *
+	 * @param	string	$value	Value of the credential
+	 * @return	string			What to store: encrypted, or the value itself when it would not read back
+	 */
+	public static function encryptIfReadable($value)
+	{
+		$encrypted = dolEncrypt((string) $value);
+
+		return (dolDecrypt($encrypted) === (string) $value) ? $encrypted : (string) $value;
+	}
+
+	/**
 	 * Insert or update OAuth token for the given PDP.
 	 *
 	 * @param  string      $accessToken    Access token string
@@ -668,10 +704,12 @@ abstract class AbstractPDPProvider
 				$forceentity = getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP");
 			}
 
-			dolibarr_set_const($db, $serviceName.'_TOKEN', $accessToken, 'chaine', 0, '', $forceentity);
+			// Neither '_TOKEN' nor '_REFRESH' is in the list dolibarr_set_const() matches, so both would
+			// be stored as received. Reading needs no change, dolDecrypt() is applied to every constant.
+			dolibarr_set_const($db, $serviceName.'_TOKEN', self::encryptIfReadable($accessToken), 'chaine', 0, '', $forceentity);
 
 			if ($refreshToken !== null) {
-				dolibarr_set_const($db, $serviceName.'_REFRESH', $refreshToken, 'chaine', 0, '', $forceentity);
+				dolibarr_set_const($db, $serviceName.'_REFRESH', self::encryptIfReadable($refreshToken), 'chaine', 0, '', $forceentity);
 			}
 
 			if ($expire_at !== null) {
@@ -698,9 +736,9 @@ abstract class AbstractPDPProvider
 			if ($db->num_rows($resql) > 0) {
 				// --- Update existing token ---
 				$sql  = "UPDATE ".MAIN_DB_PREFIX."oauth_token SET ";
-				$sql .= "tokenstring = '".$db->escape($accessToken)."'";
+				$sql .= "tokenstring = '".$db->escape(self::encryptIfReadable($accessToken))."'";
 				if ($refreshToken !== null) {
-					$sql .= ", tokenstring_refresh = '".$db->escape($refreshToken)."'";
+					$sql .= ", tokenstring_refresh = '".$db->escape(self::encryptIfReadable($refreshToken))."'";
 				}
 				if ($expire_at !== null) {
 					$sql .= ", expire_at = '".$db->idate($expire_at, 'gmt')."'";
@@ -715,8 +753,8 @@ abstract class AbstractPDPProvider
 				$sql .= $expire_at !== null ? ", expire_at" : "";
 				$sql .= ", entity) VALUES (";
 				$sql .= "'".$db->escape($serviceName)."', ";
-				$sql .= "'".$db->escape($accessToken)."'";
-				$sql .= $refreshToken !== null ? ", '".$db->escape($refreshToken)."'" : "";
+				$sql .= "'".$db->escape(self::encryptIfReadable($accessToken))."'";
+				$sql .= $refreshToken !== null ? ", '".$db->escape(self::encryptIfReadable($refreshToken))."'" : "";
 				$sql .= ", '".$db->idate($now)."'";
 				$sql .= $expire_at !== null ? ", '".$db->idate($expire_at, 'gmt')."'" : "";
 				$sql .= ", ".(int) $forceentity.")";
@@ -795,9 +833,11 @@ abstract class AbstractPDPProvider
 
 		$obj = $db->fetch_object($resql);
 
+		// dolDecrypt() returns unchanged what has no 'dolcrypt:' prefix: a row written in clear by an
+		// earlier version is read as before.
 		return [
-			'token' => (string) $obj->tokenstring,
-			'refresh_token' => (string) $obj->tokenstring_refresh,
+			'token' => (string) dolDecrypt((string) $obj->tokenstring),
+			'refresh_token' => (string) dolDecrypt((string) $obj->tokenstring_refresh),
 			'token_expires_at' => (string) $db->jdate($obj->expire_at, 'gmt')
 		];
 	}

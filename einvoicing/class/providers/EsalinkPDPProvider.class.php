@@ -178,11 +178,13 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$item->fieldAttr['autocomplete'] = "new-password";
 		$item->nameText = $langs->transnoentities('EINVOICING_CLIENT_SECRET');
 		$item->cssClass = 'minwidth500';
+		$this->storeThisFieldEncrypted($item);
 
 		// API_KEY
 		$item = $formSetup->newItem($prefix . 'API_KEY'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''));
 		$item->nameText = $langs->transnoentities('EINVOICING_API_KEY');
 		$item->cssClass = 'minwidth500';
+		$this->storeThisFieldEncrypted($item);
 
 		// Token
 		if (getDolGlobalString($prefix . 'API_KEY'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''))) {
