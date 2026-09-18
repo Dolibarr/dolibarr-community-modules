@@ -190,6 +190,68 @@ class EInvoicingSamplesTest extends CommonClassTest
 	}
 
 	/**
+	 * The exempt sample invoice must keep producing the same CII XML.
+	 *
+	 * @return void
+	 */
+	public function testExemptInvoiceMatchesReference()
+	{
+		$generated = $this->getGenerated();
+		$this->assertMatchesFixture('cii_exempt.xml', $generated['exempt']);
+	}
+
+	/**
+	 * The exemption reason of an exempt specimen sits in the VAT breakdown, and nowhere else.
+	 *
+	 * BT-120 and BT-121 belong to BG-23, where BR-E-10 makes one of the two mandatory. On the line
+	 * they are what #974 shipped: the EN 16931 profile Schematron reports them as not used in that
+	 * context and the platform refuses the invoice on REJ_COH. Only an EXTENDED profile wants them
+	 * there, and no specimen declares one.
+	 *
+	 * @return void
+	 */
+	public function testTheExemptionReasonStaysOutOfTheInvoiceLines()
+	{
+		$ram = 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100';
+
+		foreach ($this->getGenerated() as $type => $xml) {
+			$doc = new DOMDocument();
+			$this->assertTrue($doc->loadXML($xml), 'specimen ' . $type . ' is not well-formed XML');
+
+			$xpath = new DOMXPath($doc);
+			$xpath->registerNamespace('ram', $ram);
+
+			$this->assertStringNotContainsString(
+				'extended',
+				(string) $xpath->evaluate('string(//ram:GuidelineSpecifiedDocumentContextParameter/ram:ID)'),
+				'specimen ' . $type . ' declares an EXTENDED profile, where the check below does not hold'
+			);
+
+			$lineTaxes = '//ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax';
+			foreach (array('ram:ExemptionReason', 'ram:ExemptionReasonCode') as $element) {
+				$this->assertSame(
+					0,
+					(int) $xpath->evaluate('count(' . $lineTaxes . '/' . $element . ')'),
+					'specimen ' . $type . ' carries ' . $element . ' on a line, which its profile marks as not used there'
+				);
+			}
+		}
+
+		// The breakdown of the exempt specimen carries it, which is what makes the absence above a
+		// placement and not a loss.
+		$doc = new DOMDocument();
+		$doc->loadXML($this->getGenerated()['exempt']);
+		$xpath = new DOMXPath($doc);
+		$xpath->registerNamespace('ram', $ram);
+
+		$this->assertNotSame(
+			'',
+			(string) $xpath->evaluate('string(//ram:ApplicableHeaderTradeSettlement/ram:ApplicableTradeTax/ram:ExemptionReasonCode)'),
+			'the exempt specimen must state BT-121 in its VAT breakdown, which BR-E-10 requires'
+		);
+	}
+
+	/**
 	 * Read the VAT breakdowns (BG-23) of a document.
 	 *
 	 * @param	string	$xml	A CII document

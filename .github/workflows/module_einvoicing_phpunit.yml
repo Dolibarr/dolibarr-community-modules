@@ -244,8 +244,8 @@ jobs:
           php einvoicing/scripts/regenerate_einvoicing_fixtures.php
           git checkout -- einvoicing/test/phpunit/fixtures/einvoicing_samples/
           count=$(ls generated/*.xml | wc -l)
-          if [ "$count" -lt 5 ]; then
-            echo "::error::the generation produced $count documents, expected the five specimens"
+          if [ "$count" -lt 6 ]; then
+            echo "::error::the generation produced $count documents, expected the six specimens"
             exit 1
           fi
           for file in generated/*.xml; do

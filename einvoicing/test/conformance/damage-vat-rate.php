@@ -22,7 +22,9 @@
  *          of every taxing VAT breakdown set to 0.00.
  * \remarks This is the shape #709 shipped - BT-119 at 0.00 against a non-zero BT-117 - which the
  *          rules must refuse on BR-CO-17. Breakdowns that tax nothing are left alone: a 0.00 rate
- *          on a 0.00 tax amount is what an exempt document legitimately carries.
+ *          on a 0.00 tax amount is what an exempt document legitimately carries. A document made
+ *          only of those is skipped, the defect being unreachable in it; the run still fails when
+ *          no control at all could be built, a green validation over nothing proving nothing.
  *
  *          Usage: php damage-vat-rate.php <output directory> <document> [<document> ...]
  */
@@ -75,12 +77,22 @@ foreach ($args as $file) {
 	}
 
 	if (!$damaged) {
-		fwrite(STDERR, 'the control cannot be built from ' . basename($file) . ": no VAT breakdown that taxes\n");
-		exit(2);
+		// A document whose every breakdown taxes nothing cannot carry this defect: BR-CO-17 compares
+		// a rate to a tax amount, and both are already 0.00 there legitimately. It is skipped, not a
+		// failure - an entirely exempt specimen is a case the run is meant to cover.
+		fwrite(STDERR, 'skipped ' . basename($file) . ": no VAT breakdown that taxes, the defect cannot exist in it\n");
+		continue;
 	}
 
 	$doc->save($outdir . '/' . basename($file));
 	$built++;
+}
+
+if (!$built) {
+	// Nothing to validate means nothing proven: the caller compares the documents the rules refused
+	// to the ones built here, and both being zero would pass in silence.
+	fwrite(STDERR, "no control could be built from the " . count($args) . " documents given\n");
+	exit(2);
 }
 
 echo $built . " damaged documents built in " . $outdir . "\n";
