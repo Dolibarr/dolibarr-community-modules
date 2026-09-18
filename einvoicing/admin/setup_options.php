@@ -364,7 +364,7 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 }
 
 
-if (!einvoicingIsReceiveDisabled()) {
+if (!einvoicingReceptionDisabled()) {			// If sync AP to DOLI is not disabled or we are not in a generate only mode
 	// Setup conf for auto generation of objects
 	$itemtitle = $formSetup->newItem('EINVOICING_AUTO_GENERATION');
 	$itemtitle->setAsTitle();
@@ -440,10 +440,18 @@ if (!einvoicingIsReceiveDisabled()) {
 	$item->helpText = $langs->transnoentities('EINVOICING_SEND_PAYMENT_SENT_STATUS_HELP');
 	$item->defaultFieldValue = '0';
 	$item->cssClass = 'minwidth500';
+
+
+	// Experimental options
+	// EINVOICING_ENABLE_MANUAL_ACTION_QUEUE: This option log import blocked flow with the action to do so we can do it manually later.
+	// Risk: unblocking action in a different order may result in undesirable side effects.
+
+	// Activate postponeflow
+	//
 }
 
 
-if (!einvoicingIsReceiveDisabled() || !einvoicingIsSendDisabled()) {
+if (!einvoicingReceptionDisabled() || !einvoicingIsSendDisabled()) {
 	$itemtitle = $formSetup->newItem('EINVOICING_DEBUG')->setAsTitle();
 	$itemtitle->nameText = '<b>'.$langs->trans("Other").'</b>';
 

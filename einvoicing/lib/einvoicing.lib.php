@@ -725,7 +725,7 @@ function einvoicingIsSendDisabled()
  *
  * @return bool
  */
-function einvoicingIsReceiveDisabled()
+function einvoicingReceptionDisabled()
 {
 	return (bool) getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI') || (bool) getDolGlobalString('EINVOICING_ONLY_GENERATE');
 }

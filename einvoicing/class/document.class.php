@@ -1545,7 +1545,7 @@ class Document extends CommonObject
 			// it re-lists that are already stored are cheaply discarded by the alreadyProcessedFlowIds
 			// pre-check in syncFlows(), which queries only the flowIds of the current listing.
 			$syncFromDate = $provider->getLastSyncDate(getDolGlobalInt('EINVOICING_SYNC_MARGIN_TIME_HOURS'));
-			$maxflows = getDolGlobalInt('EINVOICING_FLOWS_SYNC_CALL_SIZE', 100);
+			$maxflows = getDolGlobalInt('EINVOICING_FLOWS_SYNC_CRON_SIZE', 100);
 
 			// Sync all flows
 			$sync_result = $provider->syncFlows($syncFromDate, $maxflows);
