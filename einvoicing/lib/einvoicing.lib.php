@@ -463,6 +463,23 @@ function getMultidirOutputCompat($object, $module = '', $forobject = 0, $mode = 
 }
 
 
+/**
+ * Return the root directory dol_mkdir() may start from to create $dir.
+ *
+ * Without this second argument dol_mkdir() rebuilds the path from '/' and calls mkdir() on every
+ * ancestor, which an open_basedir setup refuses and logs (issue #1012). An empty string is returned
+ * for a directory that is not below the data root, because MAIN_TEMP_DIR may move the temporary
+ * files anywhere: dol_mkdir() would then build a path under DOL_DATA_ROOT instead of the one asked.
+ *
+ * @param	string	$dir	Directory to be created
+ * @return	string			DOL_DATA_ROOT when $dir is below it, an empty string otherwise
+ */
+function einvoicingDataRoot($dir)
+{
+	return (strpos($dir, DOL_DATA_ROOT.'/') === 0 ? DOL_DATA_ROOT : '');
+}
+
+
 
 
 if (!function_exists('einvoicingDolGetButtonActionDropdown')) {
