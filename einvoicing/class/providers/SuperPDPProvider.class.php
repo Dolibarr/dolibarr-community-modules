@@ -30,6 +30,7 @@ dol_include_once('einvoicing/class/protocols/ProtocolManager.class.php');
 dol_include_once('einvoicing/class/call.class.php');
 dol_include_once('einvoicing/class/einvoicing.class.php');
 dol_include_once('einvoicing/lib/einvoicing.lib.php');
+dol_include_once('einvoicing/class/utils/PostponedFlow.class.php');
 require_once DOL_DOCUMENT_ROOT . '/core/lib/admin.lib.php';
 
 /**
@@ -1872,6 +1873,14 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$batchNumber = 0;
 		$cursor = dol_print_date($dateafter, '%Y-%m-%dT%H:%M:%S.000Z', 'gmt');
 
+		// The backlog comes first, and by identifier: those flows are older than the start of the
+		// window below, so the search endpoint would never list them again whatever this run does.
+		$replay = $this->replayPostponedFlows($results_messages, $actions);
+		$replayedFlows = $replay['imported'];
+		$replayedFlowIds = $replay['handled'];
+		$syncedFlows += $replayedFlows;
+		$postponedFlows += $replay['waiting'];
+
 		while (true) {
 			$batchNumber++;
 			if ($batchNumber > self::MAX_SYNC_BATCHES) {
@@ -1947,8 +1956,14 @@ class SuperPDPProvider extends AbstractPDPProvider
 			$i = 0;
 			foreach ($response['response']['results'] ?? [] as $flow) {
 				$i++;
+				if (in_array($flow['flowId'], $replayedFlowIds)) {
+					// Taken again from the backlog at the start of this run, and already counted there.
+					dol_syslog(__METHOD__ . " #" . $i . " Flow " . $flow['flowId'] . " already replayed from the backlog, discard it.", LOG_DEBUG, 0, "_einvoicing");
+					continue;
+				}
 				if (in_array($flow['flowId'], $alreadyProcessedFlowIds)) {
 					dol_syslog(__METHOD__ . " #" . $i . " Flow " . $flow['flowId'] . " already processed, discard it.", LOG_DEBUG, 0, "_einvoicing");
+					PostponedFlow::clear($db, $flow['flowId']);
 					$alreadyExist++;
 					continue;
 				}
@@ -1984,6 +1999,10 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 							dol_syslog(__METHOD__ . " Flow " . $flow['flowId'] . " postponed: " . $res['message'], LOG_WARNING, 0, "_einvoicing");
 							$results_messages[] = "Flow " . dol_escape_htmltag((string) $flow['flowId']) . " postponed, it will be retried on the next synchronization: " . $res['message'];
+
+							// The flow itself stores nothing, so this backlog line is the only record that it was
+							// seen: it is what lets the panel say what is waiting, why, and since when.
+							PostponedFlow::record($db, $flow['flowId'], (string) getDolGlobalString('EINVOICING_PDP', 'PDP'), $res, (string) $call_id);
 
 							$postponedFlows++;
 							continue;
@@ -2067,6 +2086,12 @@ class SuperPDPProvider extends AbstractPDPProvider
 						$error_messages[] = $errormessage;
 
 						$error++;
+					}
+
+					// Whatever else happened, this flow is no longer waiting on a missing prerequisite: drop
+					// the backlog line so it never outlives its cause.
+					if ($res['res'] >= 0) {
+						PostponedFlow::clear($db, $flow['flowId']);
 					}
 
 					// If res == 0, commit but count it as already existed
@@ -2162,6 +2187,10 @@ class SuperPDPProvider extends AbstractPDPProvider
 			}
 		}
 		$messages[] = $langs->trans("TotalSkippedSync") . ": <b>" . $alreadyExist . "</b> - " . $langs->trans("TotalNewSync") . ": <b>" . $syncedFlows . "</b>";
+		if ($replayedFlows > 0) {
+			// Said apart from the new ones: those had been waiting, sometimes for days
+			$messages[] = $langs->trans("TotalReplayedSync") . ": <b>" . $replayedFlows . "</b>";
+		}
 		if ($postponedFlows > 0) {
 			// Counted apart from the skipped ones: those flows were not stored, they come back next run
 			$messages[] = $langs->trans("TotalPostponedSync") . ": <b>" . $postponedFlows . "</b>";
