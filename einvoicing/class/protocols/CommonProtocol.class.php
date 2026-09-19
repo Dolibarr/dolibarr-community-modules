@@ -1111,15 +1111,16 @@ trait CommonProtocol
 			$message = $langs->trans("FailedToFindSupplier"). ' ' . $detailsStr . ". \n";
 			$message .= $langs->trans("AutoCreateThirdPartyOffCreateItManually");
 
-			// Creating the thirdparty needs the right on it, so a user who has not got it is told what
-			// to ask for instead of being sent to a page that answers accessforbidden().
+			// Creating the thirdparty needs the right on it. Without that right the button stays where it is,
+			// greyed and titled: a button that disappears reads as "create it, but how?", a greyed one names
+			// the permission to ask for.
 			$action = $langs->trans('CreateSupplierManually');
-			if ($user->hasRight('societe', 'creer')) {
-				$action .= '<a class="butAction small smallpaddingimp" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
-				$action .= '<i class="fas fa-plus-circle"></i> ';
-				$action .= $langs->trans('CreateSupplier');
-				$action .= '</a>';
-			}
+			$action .= $user->hasRight('societe', 'creer')
+				? '<a class="butAction small smallpaddingimp" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">'
+				: '<a class="butActionRefused classfortooltip small smallpaddingimp" href="#" title="' . dol_escape_htmltag($langs->trans("NotEnoughPermissions")) . '">';
+			$action .= '<i class="fas fa-plus-circle"></i> ';
+			$action .= $langs->trans('CreateSupplier');
+			$action .= '</a>';
 
 			return array(
 				'res' => -1,
@@ -1558,10 +1559,14 @@ trait CommonProtocol
 			}
 
 			// Third choice: set a default product on the vendor thirdparty (used for future imports when no product is found)
-			// The field lives on the thirdparty card, so this one is offered only to a user allowed to edit it.
-			if (!empty($vendorId) && $user->hasRight('societe', 'creer')) {
+			// The field lives on the thirdparty card, so this one takes the right to edit it. Greyed without it,
+			// like the button above. "disabled" and not "buttonRefused": the eldy theme dropped the rule for
+			// that class in Dolibarr 24, which would leave the button looking enabled there.
+			if (!empty($vendorId)) {
 				$thirdpartyUrl = dol_buildpath('/societe/card.php', 1) . '?socid=' . ((int) $vendorId) . '&action=edit&highlight=routing_product_id#treinvoicing';
-				$action .= '<a class="button small smallpaddingimp" style="' . $btnStyle . '" href="' . dol_escape_htmltag($thirdpartyUrl) . '" target="_blank">';
+				$action .= $user->hasRight('societe', 'creer')
+					? '<a class="button small smallpaddingimp" style="' . $btnStyle . '" href="' . dol_escape_htmltag($thirdpartyUrl) . '" target="_blank">'
+					: '<a class="button disabled classfortooltip small smallpaddingimp" style="' . $btnStyle . '" href="#" title="' . dol_escape_htmltag($langs->trans("NotEnoughPermissions")) . '">';
 				$action .= '<i class="fas fa-star"></i> ';
 				$action .= $langs->trans('SetDefaultProductForThirdparty');
 				$action .= '</a>';
