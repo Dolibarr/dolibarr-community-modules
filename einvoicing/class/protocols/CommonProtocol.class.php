@@ -878,7 +878,16 @@ trait CommonProtocol
 			}
 			$allowmodcodeclient = 0;
 			$allowmodcodefournisseur = 0;
-			$this->_prepareThirdpartyForImportUpdate($thirdparty, $allowmodcodeclient, $allowmodcodefournisseur);
+			$tosave = $this->_prepareThirdpartyForImportUpdate($thirdparty, $allowmodcodeclient, $allowmodcodefournisseur);
+			// The vendor is identified and the import has nothing to write on it: saving it anyway would only
+			// let a setup rule it does not meet (mandatory professional id, code mask...) refuse the document.
+			if (!$tosave && !getDolGlobalInt('EINVOICING_THIRDPARTIES_COMPLETE_INFO')) {
+				dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Nothing to update on thirdparty: ' . $thirdpartyId);
+				return array(
+					'res' => $thirdpartyId,
+					'message' => 'Thirdparty ' . $thirdparty->name . ' found, nothing to update.' . ($nameMismatchWarning !== '' ? ' - ' . $nameMismatchWarning : '')
+				);
+			}
 
 			$result = $thirdparty->update(0, $user, 1, $allowmodcodeclient, $allowmodcodefournisseur);
 
@@ -1146,23 +1155,28 @@ trait CommonProtocol
 	 * @param	Societe	$thirdparty					Thirdparty to save, already loaded
 	 * @param	int		$allowmodcodeclient			Set to 1 when a customer code has to be generated
 	 * @param	int		$allowmodcodefournisseur	Set to 1 when a vendor code has to be generated
-	 * @return	void
+	 * @return	int									1 if there is something to save on the thirdparty, 0 if not
 	 */
 	private function _prepareThirdpartyForImportUpdate($thirdparty, &$allowmodcodeclient, &$allowmodcodefournisseur)
 	{
+		$tosave = 0;
+
 		// Flag the thirdparty as a vendor if it is not one yet
 		// (ex: a prospect or customer receiving its first supplier invoice).
 		if (!$thirdparty->fournisseur) {
 			$thirdparty->fournisseur = 1;
+			$tosave = 1;
 		}
 
 		if (empty($thirdparty->code_fournisseur) && $thirdparty->codefournisseur_modifiable()) {
 			$thirdparty->code_fournisseur = 'auto';
 			$allowmodcodefournisseur = 1;
+			$tosave = 1;
 		}
 		if (!empty($thirdparty->client) && empty($thirdparty->code_client) && $thirdparty->codeclient_modifiable()) {
 			$thirdparty->code_client = 'auto';
 			$allowmodcodeclient = 1;
+			$tosave = 1;
 		}
 
 		// This function never sets an extrafield on a thirdparty, so it must not rewrite them, and it has
@@ -1171,6 +1185,8 @@ trait CommonProtocol
 		// the WHOLE update as soon as one of those fields is mandatory and empty. Emptied, array_options
 		// makes insertExtraFields() return 0 without touching the stored row.
 		$thirdparty->array_options = array();
+
+		return $tosave;
 	}
 
 	/**
