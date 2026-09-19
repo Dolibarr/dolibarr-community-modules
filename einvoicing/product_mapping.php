@@ -411,10 +411,15 @@ if (!empty($parsedLines)) {
 	}
 	// A line without any vendor reference has nothing to be mapped on, and the default product of the vendor
 	// is the only answer for it. Same link as the one the synchronization suggests, so the page is not a
-	// dead end - and a button, because it is reached when nothing else on the page can be done.
-	if ($socid > 0 && $permissiontosetdefaultproduct) {
+	// dead end - and a button, because it is reached when nothing else on the page can be done. Greyed and
+	// titled without the right on the thirdparty, rather than absent: the user reads why, not "how?".
+	if ($socid > 0) {
 		$defaultproducturl = dol_buildpath('/societe/card.php', 1).'?socid='.((int) $socid).'&action=edit&highlight=routing_product_id#treinvoicing';
-		print '<a class="button" href="'.dol_escape_htmltag($defaultproducturl).'" target="_blank">'.$langs->trans("SetDefaultProductForThirdparty").'</a>';
+		if ($permissiontosetdefaultproduct) {
+			print '<a class="button" href="'.dol_escape_htmltag($defaultproducturl).'" target="_blank">'.$langs->trans("SetDefaultProductForThirdparty").'</a>';
+		} else {
+			print '<a class="button disabled classfortooltip" href="#" title="'.dol_escape_htmltag($langs->trans("NotEnoughPermissions")).'">'.$langs->trans("SetDefaultProductForThirdparty").'</a>';
+		}
 	}
 	print '<a class="button button-cancel" href="'.dol_buildpath('/einvoicing/document_list.php', 1).'">'.$langs->trans("BackToSynchronization").'</a>';
 	print '</div>';
