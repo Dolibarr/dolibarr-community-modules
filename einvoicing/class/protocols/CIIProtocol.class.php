@@ -517,7 +517,7 @@ class CIIProtocol extends AbstractProtocol
 		$filedir = getMultidirOutputCompat($invoice, '', 1, 'temp');    // Example '/mydolibarr/documents/facture/temp/FAYYMM-XXXX'
 		$xmlfile = $filedir . '/' . $filename . '/' .  static::GENERATED_INVOICE_XML_FILE_NAME;
 
-		dol_mkdir(dirname($xmlfile));
+		dol_mkdir(dirname($xmlfile), einvoicingDataRoot(dirname($xmlfile)));
 		dol_delete_file($xmlfile);
 
 		$xmlcontent = $this->buildXML($invoiceData, $linesData, $this->getBuildXmlProfile($object), $outputlangs);
@@ -686,7 +686,7 @@ class CIIProtocol extends AbstractProtocol
 
 		$tempDir = $conf->einvoicing->dir_temp;
 		if (!dol_is_dir($tempDir)) {
-			dol_mkdir($tempDir);
+			dol_mkdir($tempDir, einvoicingDataRoot($tempDir));
 		}
 
 		// Use a unique per-call working file so two concurrent syncs cannot overwrite each other and
@@ -3577,7 +3577,7 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		if (!file_exists($upload_dir)) {
-			if (!dol_mkdir($upload_dir)) {
+			if (!dol_mkdir($upload_dir, einvoicingDataRoot($upload_dir))) {
 				dol_syslog(__METHOD__ . " Failed to create upload directory: $upload_dir", LOG_ERR);
 				return array('res' => -1, 'message' => 'Failed to create upload directory');
 			}

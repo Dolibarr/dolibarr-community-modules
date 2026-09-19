@@ -523,7 +523,7 @@ class CdarHandler
 
 		$tempDir = $conf->einvoicing->dir_temp;
 		if (!dol_is_dir($tempDir)) {
-			dol_mkdir($tempDir);
+			dol_mkdir($tempDir, einvoicingDataRoot($tempDir));
 			if (!dol_is_dir($tempDir)) {
 				return array('res' => -1, 'message' => 'The temporary directory of the module cannot be created: ' . $tempDir);
 			}

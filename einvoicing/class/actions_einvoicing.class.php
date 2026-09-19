@@ -2258,7 +2258,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		// Create the target directory structure if needed
 		if (!is_dir($targetDir)) {
-			if (!dol_mkdir($targetDir)) {
+			if (!dol_mkdir($targetDir, DOL_DATA_ROOT)) {
 				dol_syslog(__METHOD__ . " Failed to create target directory: " . $targetDir, LOG_ERR);
 				return -1;
 			}
@@ -2275,7 +2275,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			// Ensure the target subdirectory exists (for files inside subdirectories)
 			$destParent = dirname($destFile);
 			if (!is_dir($destParent)) {
-				dol_mkdir($destParent);
+				dol_mkdir($destParent, DOL_DATA_ROOT);
 			}
 
 			// dol_move handles the physical move and updates ecm_files (filepath, filename, ref hash)
