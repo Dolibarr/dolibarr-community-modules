@@ -2094,3 +2094,50 @@ parameters:
 			identifier: identical.alwaysFalse
 			count: 1
 			path: ../../../einvoicing/document_list.php
+		-
+			message: '#^Parameter \#2 \$notrigger of method CommonObject\:\:createCommon\(\) expects bool, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/einvoicingsyncpending.class.php
+
+		-
+			message: '#^Parameter \#2 \$notrigger of method CommonObject\:\:deleteCommon\(\) expects bool, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/einvoicingsyncpending.class.php
+
+		-
+			message: '#^Parameter \#2 \$notrigger of method CommonObject\:\:updateCommon\(\) expects bool, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/einvoicingsyncpending.class.php
+
+		-
+			message: '#^Property EInvoicingSyncPending\:\:\$fields type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../../einvoicing/class/einvoicingsyncpending.class.php
+
+		-
+			message: '#^Property EInvoicingSyncPending\:\:\$fk_user_creat has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/einvoicingsyncpending.class.php
+
+		-
+			message: '#^Property EInvoicingSyncPending\:\:\$fk_user_modif has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/einvoicingsyncpending.class.php
+
+		-
+			message: '#^Property EInvoicingSyncPending\:\:\$tms has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: ../../../einvoicing/class/einvoicingsyncpending.class.php
+
+		-
+			message: '#^Function llxHeader invoked with 10 parameters, 0 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: ../../../einvoicing/sync_pending_list.php
