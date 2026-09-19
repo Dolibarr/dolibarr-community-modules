@@ -1253,6 +1253,75 @@ class Document extends CommonObject
 	}
 
 	/**
+	 * Return a link to the card of the Dolibarr object the flow was exchanged for.
+	 *
+	 * tracking_idref only holds the reference as it was when the flow was exchanged, so an invoice sent while
+	 * still a draft keeps its "(PROV552)" there for good. The link is built from fk_element_type/fk_element_id,
+	 * which follow the object through its renaming, and the stored text is only the fallback label.
+	 *
+	 * @param	int		$withvendorref	1=Add the vendor reference of a supplier invoice on a second line
+	 * @return	string					Link to the object card, or the stored reference when there is no object to link
+	 */
+	public function getElementNomUrl($withvendorref = 0)
+	{
+		$out = dol_escape_htmltag((string) $this->tracking_idref);
+
+		if (empty($this->fk_element_type) || empty($this->fk_element_id)) {
+			return $out;
+		}
+
+		// The core ships install/inc.php, which defines DOL_DOCUMENT_ROOT as '..'; PHPStan
+		// resolves the constant against it and looks for the file next to the module.
+		if ($this->fk_element_type === 'facture') {
+			// @phpstan-ignore requireOnce.fileNotFound
+			require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
+			$linkedobject = new Facture($this->db);
+		} elseif ($this->fk_element_type === 'invoice_supplier') {
+			// @phpstan-ignore requireOnce.fileNotFound
+			require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';
+			$linkedobject = new FactureFournisseur($this->db);
+		} else {
+			return $out;
+		}
+
+		if ($linkedobject->fetch((int) $this->fk_element_id) <= 0) {
+			return $out;
+		}
+
+		$out = $linkedobject->getNomUrl(1);
+
+		if ($withvendorref && $linkedobject instanceof FactureFournisseur && !empty($linkedobject->ref_supplier)) {
+			$out = '<div class="tdoverflowmax200 inline-block lineheightsmall">'.$out;
+			// The vendor reference is a field of the received document, escaped like the rest of it.
+			$out .= '<br><span class="spantitle small">'.dol_escape_htmltag($linkedobject->ref_supplier).'</span>';
+			$out .= '</div>';
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Return HTML string to show a field into a page, overridden to link the reference of the object to its card
+	 *
+	 * @param	array<string,mixed>	$val			Array of properties of field to show
+	 * @param	string				$key			Key of attribute
+	 * @param	string				$value			Preselected value to show
+	 * @param	string				$moreparam		To add more parameters on html tag
+	 * @param	string				$keysuffix		Prefix string to add into name and id of field
+	 * @param	string				$keyprefix		Suffix string to add into name and id of field
+	 * @param	mixed				$morecss		Value for CSS to use (Old usage: May also be a numeric to define a size)
+	 * @return	string
+	 */
+	public function showOutputField($val, $key, $value, $moreparam = '', $keysuffix = '', $keyprefix = '', $morecss = '')
+	{
+		if ($key === 'tracking_idref') {
+			return $this->getElementNomUrl();
+		}
+
+		return parent::showOutputField($val, $key, $value, $moreparam, $keysuffix, $keyprefix, $morecss);
+	}
+
+	/**
 	 *	Return a thumb for kanban views
 	 *
 	 *	@param	string	    			$option		Where point the link (0=> main card, 1,2 => shipment, 'nolink'=>No link)

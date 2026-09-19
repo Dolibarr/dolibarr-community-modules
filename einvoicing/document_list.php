@@ -1399,31 +1399,7 @@ while ($i < $imaxinloop) {
 				} elseif ($key == 'rowid') {
 					print $object->showOutputField($val, $key, (string) $object->id, '');
 				} elseif ($key == 'tracking_idref') {
-					$out = dol_escape_htmltag($object->tracking_idref);
-
-					if (!empty($object->fk_element_type) && !empty($object->fk_element_id)) {
-						if ($object->fk_element_type === 'facture') {
-							require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
-							$linkedobj = new Facture($db);
-
-							if ($linkedobj->fetch((int) $object->fk_element_id) > 0) {
-								$out = $linkedobj->getNomUrl(1);
-							}
-						} elseif ($object->fk_element_type === 'invoice_supplier') {
-							require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';
-							$linkedobj = new FactureFournisseur($db);
-
-							if ($linkedobj->fetch((int) $object->fk_element_id) > 0) {
-								$out = '<div class="tdoverflowmax200 inline-block lineheightsmall">';
-								$out .= $linkedobj->getNomUrl(1);
-								// The vendor reference is a field of the received document, escaped like the rest of it.
-								if ($linkedobj->ref_supplier) {
-									$out .= '<br><span class="spantitle small">'.dol_escape_htmltag($linkedobj->ref_supplier).'</span>';
-								}
-								$out .= "</div>";
-							}
-						}
-					}
+					$out = $object->getElementNomUrl(1);
 
 					if (strpos($out, '<a ') !== false) {
 						$out = preg_replace('/<a /', '<a target="_blank" rel="noopener noreferrer" ', $out, 1);
