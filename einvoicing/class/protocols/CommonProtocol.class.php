@@ -882,14 +882,18 @@ trait CommonProtocol
 
 			$result = $thirdparty->update(0, $user, 1, $allowmodcodeclient, $allowmodcodefournisseur);
 
+			// update() answers -3 to every refusal of verify() (code out of the numbering mask, mandatory or
+			// duplicate professional id...): only the error it recorded tells a supplier code used twice.
+			$duplicateSupplierCode = ($result == -3 && in_array('ErrorSupplierCodeAlreadyUsed', $thirdparty->errors));
+
 			// Copying into the thirdparty what the document says is a convenience (option
 			// EINVOICING_THIRDPARTIES_COMPLETE_INFO), and the vendor is already identified at this point:
 			// a value it refuses - a phone number carrying a sentence, a name longer than the column, a
 			// trigger of another module - must not cost the invoice. Save the thirdparty again without
 			// that completion: the document is then imported, and the caller is told what was left out.
-			// The duplicate supplier code (-3) is not about the completion and keeps its own answer below.
+			// The duplicate supplier code is not about the completion and keeps its own answer below.
 			$completionWarning = '';
-			if ($result < 0 && $result != -3 && getDolGlobalInt('EINVOICING_THIRDPARTIES_COMPLETE_INFO')) {
+			if ($result < 0 && !$duplicateSupplierCode && getDolGlobalInt('EINVOICING_THIRDPARTIES_COMPLETE_INFO')) {
 				$completionError = implode(', ', array_filter(array_merge(array($thirdparty->error), $thirdparty->errors)));
 
 				$plainthirdparty = new Societe($db);
@@ -918,7 +922,7 @@ trait CommonProtocol
 				$this->error = $thirdparty->error;
 				$this->errors = $thirdparty->errors;
 
-				if ($result == -3) {	// In this case we also have one entry in $this->errors = 'ErrorSupplierCodeAlreadyUsed'
+				if ($duplicateSupplierCode) {
 					// Case of duplicate supplier code, need to change one.
 					dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Error updating thirdparty: There is 2+ suppliers with the same supplier code. You msut fix one', LOG_DEBUG);
 
@@ -941,10 +945,12 @@ trait CommonProtocol
 						'actiondata' => array('suppliercode' => $thirdparty->code_fournisseur)
 					);
 				} else {
-					dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Error updating thirdparty: ' . implode(',', array_merge(array($thirdparty->error), $thirdparty->errors)), LOG_ERR);
+					// Name the thirdparty: the user has to open it to fix what the core refuses.
+					$updateError = implode(', ', array_unique(array_filter(array_merge(array($thirdparty->error), $thirdparty->errors))));
+					dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Error updating thirdparty ' . $thirdpartyId . ': ' . $updateError, LOG_ERR);
 					return array(
 						'res' => -1,
-						'message' => 'Thirdparty update error: ' . dol_escape_htmltag(implode(',', array_merge(array($thirdparty->error), $thirdparty->errors))).'.'
+						'message' => 'Thirdparty update error on ' . dol_escape_htmltag($thirdparty->name) . ' (id ' . ((int) $thirdpartyId) . '): ' . dol_escape_htmltag($updateError) . '.'
 					);
 				}
 			} else {
