@@ -1671,31 +1671,6 @@ class CIIProtocol extends AbstractProtocol
 	}
 
 	/**
-	 * Extract all matching nodes as an array of their text values.
-	 *
-	 * @param \DOMXPath			$xpath			XPath
-	 * @param string			$expr			XPath expression or 'NA'
-	 * @param \DOMNode|null		$contextNode	Optional context node for relative XPath queries
-	 * @return string[]
-	 */
-	private function getXPathValues($xpath, $expr, $contextNode = null)
-	{
-		if ($expr === 'NA' || empty($expr))
-			return [];
-
-		$nodes = $xpath->query($expr, $contextNode);
-		$result = [];
-		if ($nodes) {
-			foreach ($nodes as $node) {
-				$v = trim($node->nodeValue);
-				if ($v !== '')
-					$result[] = $v;
-			}
-		}
-		return $result;
-	}
-
-	/**
 	 * Extract attribute-keyed pairs from repeating elements.
 	 *
 	 * Example: ram:GlobalID[@schemeID="0225"] → ['0225' => '000000002']
