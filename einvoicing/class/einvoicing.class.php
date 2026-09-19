@@ -525,6 +525,30 @@ class EInvoicing
 	];
 
 	/**
+	 * Reason code a platform gives a rejection it raised because it already holds the invoice
+	 * (XP Z12-012 annex A, "Facture en doublon (déjà émise / réçue)").
+	 */
+	const REASON_DUPLICATE = 'DOUBLON';
+
+	/**
+	 * Lifecycle statuses that prove a platform took the document into the circuit. Their presence is
+	 * what tells a duplicate rejection of a NEW transmission from the rejection of a document that
+	 * never got through - see isTransmissionOnlyRejection().
+	 */
+	const STATUSES_PROVING_TRANSMISSION = [
+		self::STATUS_DEPOSITED,
+		self::STATUS_ISSUED,
+		self::STATUS_RECEIVED,
+		self::STATUS_AVAILABLE,
+		self::STATUS_TAKEN_OVER,
+		self::STATUS_APPROVED,
+		self::STATUS_PARTIALLY_APPROVED,
+		self::STATUS_COMPLETED,
+		self::STATUS_PAYMENT_SENT,
+		self::STATUS_PAID
+	];
+
+	/**
 	 * RoleCode of the buyer among the recipients a CDAR addresses a status to (CdarHandler::ROLE_BY).
 	 * Its presence on a rejection is what says the buyer's platform posted it - see getStatusLabel().
 	 */
@@ -3001,6 +3025,55 @@ class EInvoicing
 		// option is set to its strict value.
 
 		return $res;
+	}
+
+	/**
+	 * Whether a lifecycle status rejects the transmission rather than the document, and so must not
+	 * replace the status the element already carries.
+	 *
+	 * A platform raises a 213 with the reason DOUBLON to say it already holds the invoice: what it
+	 * refuses is the new delivery, and the copy it holds is the valid one - which is exactly the
+	 * invoice this status quotes, since both carry the same IssuerAssignedID. Demoting it would
+	 * announce a rejection the seller is expected to answer by cancelling the invoice in its accounts
+	 * (XP Z12-014 annex A 2.4). The status is recorded in the lifecycle history either way.
+	 *
+	 * The guard only holds when the element already carries a status proving a platform took the
+	 * document: without one there is nothing to protect, and the rejection is recorded as before.
+	 *
+	 * @param	int		$elementId		Id of the invoice the status refers to
+	 * @param	string	$elementType	'facture' or 'invoice_supplier'
+	 * @param	int		$statusCode		Lifecycle status received
+	 * @param	string	$reasonCode		Reason code received with it
+	 * @return	bool					True to keep the status the element already carries
+	 */
+	public function isTransmissionOnlyRejection($elementId, $elementType, $statusCode, $reasonCode)
+	{
+		if ((int) $statusCode !== self::STATUS_REJECTED || strtoupper(trim((string) $reasonCode)) !== self::REASON_DUPLICATE) {
+			return false;
+		}
+
+		$provider = getDolGlobalString('EINVOICING_PDP');
+		$providershort = preg_replace('/ViaPartner$/', '', $provider);
+
+		$sql = "SELECT syncstatus FROM " . $this->db->prefix() . "einvoicing_extlinks";
+		$sql .= " WHERE element_id = " . (int) $elementId;
+		$sql .= " AND element_type = '" . $this->db->escape($elementType) . "'";
+		$sql .= " AND provider = '" . $this->db->escape($providershort) . "'";
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . ' SQL error: ' . $this->db->lasterror(), LOG_ERR);
+			return false;
+		}
+
+		$current = 0;
+		if ($this->db->num_rows($resql) > 0) {
+			$obj = $this->db->fetch_object($resql);
+			$current = (int) $obj->syncstatus;
+		}
+		$this->db->free($resql);
+
+		return in_array($current, self::STATUSES_PROVING_TRANSMISSION, true);
 	}
 
 	/**
