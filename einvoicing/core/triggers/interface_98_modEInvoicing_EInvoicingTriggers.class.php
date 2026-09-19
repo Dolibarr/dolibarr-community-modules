@@ -296,7 +296,8 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		// fr:212 (Encaissee) is reported per cash-in, not once when the invoice gets fully paid: the reform
 		// expects the date and the amount of EVERY payment, partial ones included, so a 2-instalment invoice
 		// owes 2 statuses. Hooking the payment creation (and not BILL_PAYED) also covers the invoices that
-		// stay partially paid forever, and skips the write-offs (abandon / bad debt) where nothing is cashed.
+		// stay partially paid forever, the refunds (negative lines, XP Z12-012 rule P1.15), and skips the
+		// write-offs (abandon / bad debt) where nothing moves.
 		if ($action == 'PAYMENT_CUSTOMER_CREATE') {
 			/** @var Paiement $object */
 			'@phan-var-force Paiement $object';
@@ -307,7 +308,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 
 				foreach ($object->amounts as $facid => $amount) {
 					$amount = (float) $amount;
-					if ($amount <= 0) {		// Payment lines with no amount, or a refund line: nothing cashed in
+					if (empty($amount)) {		// A payment line with no amount moves nothing
 						continue;
 					}
 
@@ -317,7 +318,14 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 						continue;
 					}
 
-					$this->sendCashedInStatus($invoice, $amount, $langs);
+					// Rule P1.17: a cash-out carries the reason of the cancellation (MDT-126). The comment
+					// of the payment is what the operator typed about this very refund.
+					$reason = '';
+					if ($amount < 0) {
+						$reason = trim((string) ($object->note_private ?: $object->note_public));
+					}
+
+					$this->sendCashedInStatus($invoice, $amount, $langs, $reason);
 				}
 			}
 		}
@@ -531,23 +539,24 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 	}
 
 	/**
-	 * Report a cash-in (status 212 "Encaissee") of a customer invoice to the Approved Platform.
+	 * Report a cash-in or a cash-out (status 212 "Encaissee") of a customer invoice to the Approved Platform.
 	 *
 	 * Errors are never escalated to $this->errors / a negative return: that would roll back the payment
 	 * Dolibarr just recorded (Paiement::create() aborts on a trigger failure). dol_syslog is the only
 	 * channel that surfaces the problem outside an interactive session (cron, API, bank import, ...).
 	 *
-	 * @param  Facture   $invoice Invoice that has been cashed in
-	 * @param  float     $amount  Amount cashed in (TTC) by this payment, reported as the MEN blocks of the CDAR
+	 * @param  Facture   $invoice Invoice, or credit note, the money moved on
+	 * @param  float     $amount  Amount (TTC) of this payment, reported as the MEN blocks of the CDAR: positive for a cash-in, negative for a refund
 	 * @param  Translate $langs   Translate object
+	 * @param  string    $reason  Reason of the cancellation (MDT-126), on a refund only
 	 * @return void
 	 */
-	private function sendCashedInStatus($invoice, $amount, Translate $langs)
+	private function sendCashedInStatus($invoice, $amount, Translate $langs, $reason = '')
 	{
 		$einvoicing = new EInvoicing($this->db);
 
 		// Ask the boolean question: needEInvoiceManagement() answers with a status code whose ignore values
-		// are truthy. An invoice out of the e-invoicing scope has no cash-in to report.
+		// are truthy. An invoice out of the e-invoicing scope has nothing to report.
 		if (!$einvoicing->mustManageEInvoice($invoice)) {
 			return;
 		}
@@ -574,10 +583,11 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		$PDPManager = new PDPProviderManager($this->db);
 		$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
 
-		$result = $provider->sendStatusMessage($invoice, 212, '', array('amount' => $amount));
+		$result = $provider->sendStatusMessage($invoice, 212, '', array('amount' => $amount, 'reason' => $reason));
 
 		if ($result['res'] > 0) {
-			setEventMessage($langs->trans("ModuleEInvoicingName").' : '.$langs->trans('EInvStatus212PaymentReceived'), 'mesgs');
+			$done = $amount < 0 ? 'EInvStatus212PaymentRefunded' : 'EInvStatus212PaymentReceived';
+			setEventMessage($langs->trans("ModuleEInvoicingName").' : '.$langs->trans($done), 'mesgs');
 		} else {
 			dol_syslog(__METHOD__ . ' Failed to send paid status (212) to platform for invoice id=' . $invoice->id . ' : ' . $result['message'], LOG_ERR);
 			setEventMessage($langs->trans("ModuleEInvoicingName").' : '.$result['message'], 'errors');
