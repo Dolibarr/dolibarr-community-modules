@@ -327,6 +327,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 			$item->fieldAttr['autocomplete'] = "new-password";
 			$item->nameText = $langs->trans('EINVOICING_CLIENT_SECRET');
 			$item->cssClass = 'minwidth500';
+			$this->storeThisFieldEncrypted($item);
 
 			// Authorization Code specific settings
 			// We suggest all these options if we are on the proxy.
