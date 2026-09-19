@@ -463,6 +463,23 @@ function getMultidirOutputCompat($object, $module = '', $forobject = 0, $mode = 
 }
 
 
+/**
+ * Return the root directory dol_mkdir() may start from to create $dir.
+ *
+ * Without this second argument dol_mkdir() rebuilds the path from '/' and calls mkdir() on every
+ * ancestor, which an open_basedir setup refuses and logs (issue #1012). An empty string is returned
+ * for a directory that is not below the data root, because MAIN_TEMP_DIR may move the temporary
+ * files anywhere: dol_mkdir() would then build a path under DOL_DATA_ROOT instead of the one asked.
+ *
+ * @param	string	$dir	Directory to be created
+ * @return	string			DOL_DATA_ROOT when $dir is below it, an empty string otherwise
+ */
+function einvoicingDataRoot($dir)
+{
+	return (strpos($dir, DOL_DATA_ROOT.'/') === 0 ? DOL_DATA_ROOT : '');
+}
+
+
 
 
 if (!function_exists('einvoicingDolGetButtonActionDropdown')) {
@@ -999,21 +1016,39 @@ function einvoicingModuleCommit()
  */
 function einvoicingCheckoutCommit($repodir)
 {
+	// The directory above the module is outside open_basedir on an instance set up as the
+	// documentation recommends: asking PHP for it at all is what issue #1012 is about, so it is not
+	// asked. The accesses below stay silenced for what open_basedir does not cover, a checkout the
+	// web server may not read, which this already answers '' to.
+	$basedir = (string) ini_get('open_basedir');
+	if ($basedir !== '') {
+		$reachable = false;
+		foreach (explode(PATH_SEPARATOR, $basedir) as $allowed) {
+			$allowed = rtrim(trim($allowed), '/');
+			if ($allowed !== '' && strpos($repodir.'/', $allowed.'/') === 0) {
+				$reachable = true;
+				break;
+			}
+		}
+		if (!$reachable) {
+			return '';
+		}
+	}
+
 	$gitdir = $repodir.'/.git';
 
-	// A linked worktree and a submodule replace .git with a file naming the real directory
 	$reg = array();
-	if (is_file($gitdir) && preg_match('/^gitdir:\s*(\S.*)$/m', (string) file_get_contents($gitdir), $reg)) {
+	if (@is_file($gitdir) && preg_match('/^gitdir:\s*(\S.*)$/m', (string) @file_get_contents($gitdir), $reg)) {
 		$gitdir = trim($reg[1]);
 		if (strpos($gitdir, '/') !== 0) {
 			$gitdir = $repodir.'/'.$gitdir;
 		}
 	}
-	if (!is_dir($gitdir) || !is_readable($gitdir.'/HEAD')) {
+	if (!@is_dir($gitdir) || !@is_readable($gitdir.'/HEAD')) {
 		return '';
 	}
 
-	$head = trim((string) file_get_contents($gitdir.'/HEAD'));
+	$head = trim((string) @file_get_contents($gitdir.'/HEAD'));
 	if (preg_match('/^[0-9a-f]{40,}$/', $head)) {
 		return substr($head, 0, 7);		// detached HEAD carries the commit itself
 	}
@@ -1024,17 +1059,17 @@ function einvoicingCheckoutCommit($repodir)
 
 	// A linked worktree has a HEAD of its own but shares the refs of the main repository
 	$refdir = $gitdir;
-	if (is_readable($gitdir.'/commondir')) {
-		$commondir = trim((string) file_get_contents($gitdir.'/commondir'));
+	if (@is_readable($gitdir.'/commondir')) {
+		$commondir = trim((string) @file_get_contents($gitdir.'/commondir'));
 		$refdir = (strpos($commondir, '/') === 0 ? $commondir : $gitdir.'/'.$commondir);
 	}
 
 	$commit = '';
-	if (is_readable($refdir.'/'.$ref)) {
-		$commit = trim((string) file_get_contents($refdir.'/'.$ref));
-	} elseif (is_readable($refdir.'/packed-refs')) {
+	if (@is_readable($refdir.'/'.$ref)) {
+		$commit = trim((string) @file_get_contents($refdir.'/'.$ref));
+	} elseif (@is_readable($refdir.'/packed-refs')) {
 		// git packs refs away instead of keeping one file each: "<commit> <refname>" per line
-		$packed = (string) file_get_contents($refdir.'/packed-refs');
+		$packed = (string) @file_get_contents($refdir.'/packed-refs');
 		if (preg_match('/^([0-9a-f]{40,})\s+'.preg_quote($ref, '/').'$/m', $packed, $reg)) {
 			$commit = $reg[1];
 		}
@@ -1255,4 +1290,45 @@ function einvoicingDiscountRelatedInvoiceRef($discount, $db)
 	}
 
 	return (string) $correctedInvoice->ref;
+}
+
+/**
+ * Preview picto for a diagnostic file of the module temp directory, opened in the dialog of the core.
+ *
+ * Those slots belong to no invoice, so no document list of the core shows them and none of them gets the
+ * picto a file of an invoice card gets. A PDF goes to the preview of the core; an XML, which
+ * dolIsAllowedForPreview() excludes on purpose, goes to the read-only viewer of the module.
+ *
+ * @param	string	$fileName	File name in the module temp directory
+ * @return	string				The <a> of the picto, empty string when the browser gets no preview
+ */
+function einvoicingDiagnosticPreviewLink($fileName)
+{
+	global $conf, $langs;
+
+	// Same condition as FormFile::showPreview(): below it lib_foot.js.php binds no click on the class
+	if ($conf->browser->layout == 'phone' || empty($conf->use_javascript_ajax)) {
+		return '';
+	}
+
+	if (preg_match('/\.xml$/i', $fileName)) {
+		$url = dol_buildpath('/einvoicing/xmlpreview.php', 1).'?source=diag&file='.urlencode($fileName).'&mode=raw';
+		$mime = 'text/html';
+	} else {
+		$urladvancedpreview = getAdvancedPreviewUrl('einvoicing', 'temp/'.$fileName, 1);
+		if (!is_array($urladvancedpreview) || empty($urladvancedpreview['url'])) {
+			return '';
+		}
+		$url = $urladvancedpreview['url'];
+		$mime = $urladvancedpreview['mime'];
+	}
+
+	$title = $langs->trans("Preview").' - '.$fileName;
+
+	$out = '<a class="pictopreview documentpreview" href="'.$url.'" mime="'.$mime.'"';
+	$out .= ' data-title="'.dol_escape_htmltag($title).'" target="_blank" rel="noopener noreferrer"';
+	$out .= ' title="'.dol_escape_htmltag($title).'">';
+	$out .= '<span class="fas fa-search-plus pictofixedwidth" style="color: #808080;"></span></a>';
+
+	return $out;
 }

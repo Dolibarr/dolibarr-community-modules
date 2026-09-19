@@ -220,8 +220,8 @@ class EInvoicing
 
 	/**
 	 * Invoice rejected (technical)
-	 * - Customer invoice: received from the PDP
-	 * - Supplier invoice: /
+	 * - Customer invoice: received from the PDP, whichever platform rejected it
+	 * - Supplier invoice: received from the PDP, rejected in reception by OUR platform
 	 */
 	const STATUS_REJECTED = 213;
 
@@ -240,7 +240,7 @@ class EInvoicing
 
 		// PDP / PA
 		self::STATUS_DEPOSITED           => 'EInvStatus200Deposited',				// Accepted by seller AP
-		self::STATUS_REJECTED            => 'EInvStatus213Rejected',				// Rejected by seller AP
+		self::STATUS_REJECTED            => 'EInvStatus213Rejected',				// Rejected by an AP, see getStatusLabel()
 
 		self::STATUS_ISSUED              => 'EInvStatus201Issued',					// Issued by seller AP to customer AP
 		self::STATUS_RECEIVED            => 'EInvStatus202Received',
@@ -502,8 +502,57 @@ class EInvoicing
 			"JUSTIF_ABS",
 			"ROUTAGE_ERR",
 			"CMD_ERR"
+		],
+
+		// Read-only, unlike the four above: a rejection is posted by a platform, never sent by us. The
+		// union of the two columns XP Z12-012 annex A gives it ("REJETÉE à l'Emission" and "REJETÉE (en
+		// Réception)"), which differ by "DEST_INC" alone - the seller's AP is the only one that can find
+		// the recipient missing from the directory. Kept here so a received reason gets translated.
+		self::STATUS_REJECTED => [
+			"MONTANTTOTAL_ERR",
+			"CALCUL_ERR",
+			"DOUBLON",
+			"DEST_INC",
+			"ADR_ERR",
+			"REJ_SEMAN",
+			"REJ_UNI",
+			"REJ_COH",
+			"REJ_ADR",
+			"REJ_CONT_B2G",
+			"REJ_REF_PJ",
+			"REJ_ASS_PJ"
 		]
 	];
+
+	/**
+	 * Reason code a platform gives a rejection it raised because it already holds the invoice
+	 * (XP Z12-012 annex A, "Facture en doublon (déjà émise / réçue)").
+	 */
+	const REASON_DUPLICATE = 'DOUBLON';
+
+	/**
+	 * Lifecycle statuses that prove a platform took the document into the circuit. Their presence is
+	 * what tells a duplicate rejection of a NEW transmission from the rejection of a document that
+	 * never got through - see isTransmissionOnlyRejection().
+	 */
+	const STATUSES_PROVING_TRANSMISSION = [
+		self::STATUS_DEPOSITED,
+		self::STATUS_ISSUED,
+		self::STATUS_RECEIVED,
+		self::STATUS_AVAILABLE,
+		self::STATUS_TAKEN_OVER,
+		self::STATUS_APPROVED,
+		self::STATUS_PARTIALLY_APPROVED,
+		self::STATUS_COMPLETED,
+		self::STATUS_PAYMENT_SENT,
+		self::STATUS_PAID
+	];
+
+	/**
+	 * RoleCode of the buyer among the recipients a CDAR addresses a status to (CdarHandler::ROLE_BY).
+	 * Its presence on a rejection is what says the buyer's platform posted it - see getStatusLabel().
+	 */
+	const CDAR_ROLE_BUYER = 'BY';
 
 	const STATUS_REQUIRING_REASONS = [
 		self::STATUS_REFUSED,
@@ -736,18 +785,86 @@ class EInvoicing
 	/**
 	 * Return label for an e-invoice status code
 	 *
-	 * @param int|string 	$code		Code
-	 * @return string					Label
+	 * "Rejected" (213) is the only code XP Z12-012 lets two different platforms issue (annex A, sheet
+	 * "Acteurs CDV", where it has one row per issuer): the seller's AP rejects at emission, the buyer's
+	 * AP at reception. Two things tell them apart, and neither is the code (issue #973):
+	 *
+	 * - the element. XP Z12-014 annex A 2.2 forbids transmitting an emission rejection to the
+	 *   recipient, so a 213 carried by a supplier invoice is necessarily the buyer's AP;
+	 * - who the status was addressed to. The same sheet gives the reception rejection two recipients,
+	 *   the seller AND the buyer, and the emission one only the seller. Read from the CDAR and stored
+	 *   as lc_recipient_roles; absent on a message recorded before that column existed, and the label
+	 *   then names neither AP rather than guess.
+	 *
+	 * @param int|string 	$code				Code
+	 * @param string	 	$elementType		Element the status is carried by ('facture', 'invoice_supplier'), when known
+	 * @param string		$recipientRoles		RoleCodes the status was addressed to ('SE', 'SE,BY'), when known
+	 * @return string							Label
 	 */
-	public function getStatusLabel($code)
+	public function getStatusLabel($code, $elementType = '', $recipientRoles = '')
 	{
 		global $langs;
 
 		$code = (int) $code;
 
+		if ($code === self::STATUS_REJECTED) {
+			$key = $this->rejectionLabelKey($elementType, $recipientRoles);
+			if ($key !== '') {
+				return $langs->transnoentitiesnoconv($key);
+			}
+		}
+
 		return $langs->transnoentitiesnoconv(
 			self::STATUS_LABEL_KEYS[$code] ?? 'EInvStatusUnknown'
 		);
+	}
+
+	/**
+	 * Which of the two rejections a 213 is, as a translation key, or '' when it cannot be told.
+	 *
+	 * @param string	$elementType		Element the status is carried by
+	 * @param string	$recipientRoles		RoleCodes the status was addressed to
+	 * @return string						Translation key, '' to fall back on the neutral label
+	 */
+	private function rejectionLabelKey($elementType, $recipientRoles)
+	{
+		if ($elementType === 'invoice_supplier') {
+			return 'EInvStatus213RejectedByBuyerAP';
+		}
+
+		$roles = array_filter(array_map('trim', explode(',', strtoupper((string) $recipientRoles))));
+		if (empty($roles)) {
+			return '';
+		}
+
+		return in_array(self::CDAR_ROLE_BUYER, $roles, true) ? 'EInvStatus213RejectedByBuyerAP' : 'EInvStatus213RejectedBySellerAP';
+	}
+
+	/**
+	 * Translated label of a lifecycle reason code (MDT-108), for a status that carries one.
+	 *
+	 * Falls back on the raw code so a reason the module does not know - a platform extension, or a code
+	 * added to XP Z12-012 after this release - is still shown rather than swallowed.
+	 *
+	 * @param int|string	$status			Lifecycle status the reason was given with
+	 * @param string		$reasonCode		Reason code read from the CDAR (lc_reason_code)
+	 * @return string						Translated label, the raw code when unknown, '' when there is none
+	 */
+	public function getReasonLabel($status, $reasonCode)
+	{
+		global $langs;
+
+		$reasonCode = (string) $reasonCode;
+		if ($reasonCode === '') {
+			return '';
+		}
+
+		$reasons = $this->getReasonsByStatus($status, 0);
+		if (!is_array($reasons) || !isset($reasons[$reasonCode]['label'])) {
+			return $reasonCode;
+		}
+
+		return $langs->transnoentitiesnoconv($reasons[$reasonCode]['label']);
 	}
 
 	/**
@@ -1945,7 +2062,8 @@ class EInvoicing
 
 		// If current status requires a reason, display it
 		if (!empty($currentStatusInfo['reasonCode'])) {
-			$reasonLabel = self::REASONS[$currentStatusInfo['reasonCode']]['label'] ?? $currentStatusInfo['reasonCode'];
+			// Translated, and escaped for the fallback: what used to be printed was the translation KEY.
+			$reasonLabel = dol_escape_htmltag($this->getReasonLabel($currentStatusInfo['code'] ?? 0, $currentStatusInfo['reasonCode']));
 			$resprints .= '<tr class="treinvoicing_collapseseparator" id="treinvoicing_reason">';
 			$resprints .= '<td class="">' . $langs->trans("einvoicingInvoiceReason") . '</td>';
 			$resprints .= '<td><span id="einvoice-reason">' . $reasonLabel . '</span></td>';
@@ -2145,7 +2263,7 @@ class EInvoicing
 		if ($provider) {
 			// Get current status
 			$currentStatus = '-';
-			$sql = "SELECT lc_status, lc_reason_code FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
+			$sql = "SELECT lc_status, lc_reason_code, lc_status_message, lc_recipient_roles FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
 			$sql .= " WHERE element_type = '" . $this->db->escape($object->element) . "'";
 			$sql .= " AND element_id = " . (int) $object->id;
 			$sql .= " AND lc_validation_status = 'Ok'";
@@ -2154,7 +2272,7 @@ class EInvoicing
 			$obj = null;
 			if ($resql && $this->db->num_rows($resql) > 0) {
 				$obj = $this->db->fetch_object($resql);
-				$currentStatus = $this->getStatusLabel($obj->lc_status);
+				$currentStatus = $this->getStatusLabel($obj->lc_status, $object->element, $obj->lc_recipient_roles ?? '');
 			}
 			$this->db->free($resql);
 			// Current status
@@ -2170,11 +2288,20 @@ class EInvoicing
 			$reasonLabel = '';
 			$displayReasonLabel = 'style="display:none;"';
 			if (!empty($obj->lc_reason_code)) {
-				$reasonLabel = $langs->trans($this->getReasonsByStatus($obj->lc_status)[$obj->lc_reason_code]['label'] ?? $obj->lc_reason_code);
+				// Through the helper: getReasonsByStatus() returns null for a status with no reason list of
+				// its own, and indexing that null fell back on the bare code - "REJ_SEMAN" for a rejection.
+				$reasonLabel = dol_escape_htmltag($this->getReasonLabel($obj->lc_status, $obj->lc_reason_code));
 				$displayReasonLabel = '';
 			}
 
 			$resprints .= '&nbsp;<span id="einvoice-reason"' . ($displayReasonLabel ? $displayReasonLabel : '') . '>' . $reasonLabel . '</span>';
+
+			// The free text the platform gave with the status (MDT-110). Mandatory alongside the reason of
+			// a rejection (XP Z12-014 annex A 2.2 and 2.4) and often the only thing that says what to fix,
+			// but it was stored and never shown: the card only displayed it for a status WE sent.
+			if (!empty($obj->lc_status_message)) {
+				$resprints .= '<div id="einvoice-status-message" class="clearboth small opacitymedium" style="overflow-wrap:anywhere;">' . dol_escape_htmltag($obj->lc_status_message) . '</div>';
+			}
 
 			$resprints .= '</td>';
 			$resprints .= '</tr>';
@@ -2199,7 +2326,7 @@ class EInvoicing
 			$this->db->free($resql);
 
 			if (!empty($lastSentStatus) && ($lastSentStatus['lc_validation_status'] == 'Pending' || $lastSentStatus['lc_validation_status'] == 'Error')) {
-				$statusLabel = $this->getStatusLabel($lastSentStatus['lc_status']);
+				$statusLabel = $this->getStatusLabel($lastSentStatus['lc_status'], $object->element);
 				$statusvalidationLabel = $this->getStatusLabel($this->getDolibarrStatusCodeFromPdpLabel($lastSentStatus['lc_validation_status']));
 				$picto = '';
 				if ($lastSentStatus['lc_validation_status'] === 'Pending') {
@@ -2667,7 +2794,8 @@ class EInvoicing
 			'override_routing_id' => '',
 			'otherprovider' => '',
 			'ap_precheck_status' => '',
-			'ap_precheck_result' => ''
+			'ap_precheck_result' => '',
+			'recipientRoles' => ''
 		);
 
 		$provider = getDolGlobalString('EINVOICING_PDP');
@@ -2757,7 +2885,7 @@ class EInvoicing
 		$this->db->free($resql);
 
 		// Fetch last status message from einvoicing_lifecycle_msg table to get more details on current status of the invoice into the PDP system
-		$sql = "SELECT lc_status, lc_reason_code FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
+		$sql = "SELECT lc_status, lc_reason_code, lc_recipient_roles FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
 		$sql .= " WHERE element_type = 'facture'";
 		$sql .= " AND element_id = " . (int) $invoiceId;
 		$sql .= " ORDER BY rowid DESC LIMIT 1";
@@ -2767,6 +2895,12 @@ class EInvoicing
 			if ($this->db->num_rows($resql) > 0) {
 				$obj = $this->db->fetch_object($resql);
 				$status['reasonCode'] = $obj->lc_reason_code ?? '';
+				$status['recipientRoles'] = $obj->lc_recipient_roles ?? '';
+				// The label above was built from the extlinks code alone, which cannot tell the two
+				// rejections apart; redo it now that the message the code came from has been read.
+				if ((int) $status['code'] === self::STATUS_REJECTED && (int) $obj->lc_status === self::STATUS_REJECTED) {
+					$status['status'] = $this->getStatusLabel(self::STATUS_REJECTED, 'facture', $status['recipientRoles']);
+				}
 			}
 		} else {
 			dol_print_error($this->db);
@@ -2891,6 +3025,55 @@ class EInvoicing
 		// option is set to its strict value.
 
 		return $res;
+	}
+
+	/**
+	 * Whether a lifecycle status rejects the transmission rather than the document, and so must not
+	 * replace the status the element already carries.
+	 *
+	 * A platform raises a 213 with the reason DOUBLON to say it already holds the invoice: what it
+	 * refuses is the new delivery, and the copy it holds is the valid one - which is exactly the
+	 * invoice this status quotes, since both carry the same IssuerAssignedID. Demoting it would
+	 * announce a rejection the seller is expected to answer by cancelling the invoice in its accounts
+	 * (XP Z12-014 annex A 2.4). The status is recorded in the lifecycle history either way.
+	 *
+	 * The guard only holds when the element already carries a status proving a platform took the
+	 * document: without one there is nothing to protect, and the rejection is recorded as before.
+	 *
+	 * @param	int		$elementId		Id of the invoice the status refers to
+	 * @param	string	$elementType	'facture' or 'invoice_supplier'
+	 * @param	int		$statusCode		Lifecycle status received
+	 * @param	string	$reasonCode		Reason code received with it
+	 * @return	bool					True to keep the status the element already carries
+	 */
+	public function isTransmissionOnlyRejection($elementId, $elementType, $statusCode, $reasonCode)
+	{
+		if ((int) $statusCode !== self::STATUS_REJECTED || strtoupper(trim((string) $reasonCode)) !== self::REASON_DUPLICATE) {
+			return false;
+		}
+
+		$provider = getDolGlobalString('EINVOICING_PDP');
+		$providershort = preg_replace('/ViaPartner$/', '', $provider);
+
+		$sql = "SELECT syncstatus FROM " . $this->db->prefix() . "einvoicing_extlinks";
+		$sql .= " WHERE element_id = " . (int) $elementId;
+		$sql .= " AND element_type = '" . $this->db->escape($elementType) . "'";
+		$sql .= " AND provider = '" . $this->db->escape($providershort) . "'";
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . ' SQL error: ' . $this->db->lasterror(), LOG_ERR);
+			return false;
+		}
+
+		$current = 0;
+		if ($this->db->num_rows($resql) > 0) {
+			$obj = $this->db->fetch_object($resql);
+			$current = (int) $obj->syncstatus;
+		}
+		$this->db->free($resql);
+
+		return in_array($current, self::STATUSES_PROVING_TRANSMISSION, true);
 	}
 
 	/**
@@ -3413,9 +3596,10 @@ class EInvoicing
 	 * @param string 		$validationMessage     	Validation or error message returned by PDP, if status is sent by dolibarr to PDP
 	 * @param string|null 	$date_creation    		Date of the event, if we want to store a past event (for example when importing lifecycle history from PDP), if null current date will be used
 	 * @param string		$reasonCode				Reason code
+	 * @param string		$recipientRoles			RoleCodes the CDAR addressed the status to ('SE', 'SE,BY'), for a status we received
 	 * @return int  								Rowid inserted or -1 on error
 	 */
-	public function storeStatusMessage($elementId, $elementType, $statusCode, $statusMessage = '', $direction = 'OUT', $flowId = '', $validationStatus = '', $validationMessage = '', $date_creation = null, $reasonCode = '')
+	public function storeStatusMessage($elementId, $elementType, $statusCode, $statusMessage = '', $direction = 'OUT', $flowId = '', $validationStatus = '', $validationMessage = '', $date_creation = null, $reasonCode = '', $recipientRoles = '')
 	{
 		global $db, $user;
 
@@ -3441,7 +3625,8 @@ class EInvoicing
 		$sql .= "lc_validation_message, ";
 		$sql .= "date_creation, ";
 		$sql .= "fk_user_creat, ";
-		$sql .= "lc_reason_code";
+		$sql .= "lc_reason_code, ";
+		$sql .= "lc_recipient_roles";
 		$sql .= ") VALUES (";
 		$sql .= (int) $elementId . ", ";
 		$sql .= "'" . $db->escape($elementType) . "', ";
@@ -3454,7 +3639,8 @@ class EInvoicing
 		$sql .= "'" . $db->escape($validationMessage) . "', ";
 		$sql .= "'" . $db->escape($date_creation) . "', ";
 		$sql .= (int) $user->id . ", ";
-		$sql .= "'" . $db->escape($reasonCode) . "'";
+		$sql .= "'" . $db->escape($reasonCode) . "', ";
+		$sql .= "'" . $db->escape($recipientRoles) . "'";
 		$sql .= ")";
 
 		$resql = $db->query($sql);
@@ -3568,13 +3754,13 @@ class EInvoicing
 	 *
 	 * @param	string	$elementType	Element type as stored in the table ('facture', 'invoice_supplier', ...)
 	 * @param	int		$elementId		Element id
-	 * @return	array{rowid:int,provider:string,flow_id:string,direction:string,lc_status:int,lc_status_message:string,lc_validation_status:string,lc_validation_message:string,lc_reason_code:string,date_creation:int}[]	Ordered events (oldest first), empty array if none or on SQL error
+	 * @return	array{rowid:int,provider:string,flow_id:string,direction:string,lc_status:int,lc_status_message:string,lc_validation_status:string,lc_validation_message:string,lc_reason_code:string,lc_recipient_roles:string,date_creation:int}[]	Ordered events (oldest first), empty array if none or on SQL error
 	 */
 	public function fetchLifecycleEvents($elementType, $elementId)
 	{
 		global $db;
 
-		$sql = "SELECT rowid, provider, flow_id, direction, lc_status, lc_status_message, lc_validation_status, lc_validation_message, lc_reason_code, date_creation";
+		$sql = "SELECT rowid, provider, flow_id, direction, lc_status, lc_status_message, lc_validation_status, lc_validation_message, lc_reason_code, lc_recipient_roles, date_creation";
 		$sql .= " FROM " . $db->prefix() . "einvoicing_lifecycle_msg";
 		$sql .= " WHERE element_type = '" . $db->escape($elementType) . "'";
 		$sql .= " AND element_id = " . (int) $elementId;
@@ -3598,6 +3784,7 @@ class EInvoicing
 				'lc_validation_status' => (string) $obj->lc_validation_status,
 				'lc_validation_message' => (string) $obj->lc_validation_message,
 				'lc_reason_code' => (string) $obj->lc_reason_code,
+				'lc_recipient_roles' => (string) ($obj->lc_recipient_roles ?? ''),
 				'date_creation' => (int) $db->jdate($obj->date_creation),
 			];
 		}

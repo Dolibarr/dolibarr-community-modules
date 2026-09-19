@@ -367,7 +367,7 @@ trait CommonProtocol
 	{
 		global $conf, $langs, $mysoc;
 
-		dol_mkdir($conf->einvoicing->dir_temp);
+		dol_mkdir($conf->einvoicing->dir_temp, einvoicingDataRoot($conf->einvoicing->dir_temp));
 
 		$outputlangs = $langs;		// TODO Use the target language
 

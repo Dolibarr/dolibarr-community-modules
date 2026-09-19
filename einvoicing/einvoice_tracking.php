@@ -162,7 +162,7 @@ if ($object->id > 0) {
 		print '<span style="font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.04em;color:'.$actor['color'].';">'.dol_escape_htmltag($actor['label']).'</span>';
 		print '</div>';
 		if ($evt) {
-			$evtFull = einvoicingLifecycleLabel($einvoicing, (int) $evt['lc_status'], (string) $evt['lc_status_message']);
+			$evtFull = einvoicingLifecycleLabel($einvoicing, (int) $evt['lc_status'], (string) $evt['lc_status_message'], $elementType, (string) $evt['lc_recipient_roles']);
 			print '<div style="font-size:12px;font-weight:500;overflow-wrap:anywhere;">'.dol_escape_htmltag($evtFull).'</div>';
 			print '<div style="font-size:10px;color:#888780;margin-top:2px;">'.dol_print_date($evt['date_creation'], 'dayhour').'</div>';
 		} elseif ($fluxKey === 'fournisseur' && !empty($localStatus)) {
@@ -200,9 +200,12 @@ if ($object->id > 0) {
 			print '<td class="nowraponall">'.dol_print_date($evt['date_creation'], 'dayhour').'</td>';
 			print '<td>'.dol_escape_htmltag((string) $evt['provider']).'</td>';
 			print '<td class="center" title="'.dol_escape_htmltag($isOut ? $langs->trans('EInvDirectionOut') : $langs->trans('EInvDirectionIn')).'">'.($isOut ? img_picto($langs->trans('EInvDirectionOut'), 'sign-out', 'class="paddingright"') : img_picto($langs->trans('EInvDirectionIn'), 'sign-in-alt', 'class="paddingright"')).dol_escape_htmltag(strtoupper((string) $evt['direction'])).'</td>';
-			print '<td>'.dol_escape_htmltag($einvoicing->getStatusLabel((int) $evt['lc_status']));
+			print '<td>'.dol_escape_htmltag($einvoicing->getStatusLabel((int) $evt['lc_status'], $elementType, (string) $evt['lc_recipient_roles']));
 			if (!empty($evt['lc_reason_code'])) {
-				print ' <span class="opacitymedium">('.dol_escape_htmltag((string) $evt['lc_reason_code']).')</span>';
+				// Translated: the bare MDT-108 code says nothing to a reader, and a rejection is required
+				// to carry one (XP Z12-014 annex A 2.2 and 2.4). The code stays in the tooltip.
+				$evtReason = $einvoicing->getReasonLabel((int) $evt['lc_status'], (string) $evt['lc_reason_code']);
+				print ' <span class="opacitymedium" title="'.dol_escape_htmltag((string) $evt['lc_reason_code']).'">('.dol_escape_htmltag($evtReason).')</span>';
 			}
 			print '</td>';
 			print '<td>'.dol_escape_htmltag((string) $evt['lc_status_message']);

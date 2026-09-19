@@ -259,7 +259,9 @@ class FacturxTcpdfMerger extends TcpdfFpdi
 		global $conf;
 
 		$directory = !empty($conf->einvoicing->dir_temp) ? $conf->einvoicing->dir_temp : sys_get_temp_dir();
-		dol_mkdir($directory);
+		// Told where the data root is, dol_mkdir() stops walking up to '/' and creating what open_basedir
+		// forbids (issue #1012). Not einvoicingDataRoot(): this class does not depend on the module library.
+		dol_mkdir($directory, (strpos($directory, DOL_DATA_ROOT.'/') === 0 ? DOL_DATA_ROOT : ''));
 
 		$temporary = tempnam($directory, 'facturx');
 		if ($temporary === false || file_put_contents($temporary, $this->xmlDataOrFilename) === false) {

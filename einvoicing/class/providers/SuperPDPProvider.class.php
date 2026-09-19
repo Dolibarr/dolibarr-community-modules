@@ -327,6 +327,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 			$item->fieldAttr['autocomplete'] = "new-password";
 			$item->nameText = $langs->trans('EINVOICING_CLIENT_SECRET');
 			$item->cssClass = 'minwidth500';
+			$this->storeThisFieldEncrypted($item);
 
 			// Authorization Code specific settings
 			// We suggest all these options if we are on the proxy.
@@ -2653,6 +2654,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 					$document->cdar_reason_code = isset($refDoc['StatusReasonCode']) ? $refDoc['StatusReasonCode'] : '';
 					$document->cdar_reason_desc = isset($refDoc['StatusReason']) ? $refDoc['StatusReason'] : '';
 					$document->cdar_reason_detail = isset($refDoc['StatusIncludedNoteContent']) ? $refDoc['StatusIncludedNoteContent'] : '';
+					$recipientRoles = CdarHandler::recipientRoles($cdarDocument);
 
 					$exceptionmessage = '';
 					$db->begin();
@@ -2668,9 +2670,14 @@ class SuperPDPProvider extends AbstractPDPProvider
 								$syncStatus = $einvoicing::STATUS_ERROR;
 								$syncComment = $document->ack_info;
 							}
+							// 0 keeps the status the invoice already carries: a duplicate rejection refuses the
+							// new delivery, not the invoice the platform holds and quotes (issue #985).
+							if ($einvoicing->isTransmissionOnlyRejection($factureObj->id, $factureObj->element, $syncStatus, $document->cdar_reason_code)) {
+								$syncStatus = 0;
+							}
 							$einvoicing->insertOrUpdateExtLink($factureObj->id, $factureObj->element, $flowId, $syncStatus, $factureObj->ref, $syncComment);
 
-							$einvoicing->storeStatusMessage($document->fk_element_id, $document->fk_element_type, $document->cdar_lifecycle_code, $syncComment, $document->flow_direction, $flowId, $syncValidationStatus, $syncValidationComment, $document->submittedat, $document->cdar_reason_code);
+							$einvoicing->storeStatusMessage($document->fk_element_id, $document->fk_element_type, $document->cdar_lifecycle_code, $syncComment, $document->flow_direction, $flowId, $syncValidationStatus, $syncValidationComment, $document->submittedat, $document->cdar_reason_code, $recipientRoles);
 						} else {
 							dol_syslog(__METHOD__ . " Customer invoice not found for flowId: {$flowId}, so we save the flow into document table but we don't create an entry into einvoicing_extlinks table", LOG_WARNING); // This can happen if the invoice was sent from another system using the same PDP account
 						}
