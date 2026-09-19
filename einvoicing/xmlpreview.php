@@ -24,7 +24,8 @@
  *		Dolibarr origin can carry an xml-stylesheet processing instruction and render arbitrary HTML
  *		there. So the file is not served inline here either - it is read on the server and printed
  *		escaped inside a <pre>. Only the XML is concerned, a Factur-X e-invoice being a PDF the core
- *		previews itself; element=supplier asks for a document received instead of one sent.
+ *		previews itself; element=supplier asks for a document received instead of one sent, source=diag
+ *		for a diagnostic slot of the module temp directory, which belongs to no invoice.
  */
 
 if (!defined('NOTOKENRENEWAL')) {
@@ -81,6 +82,7 @@ if (!$res) {
 include_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
 include_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';
 dol_include_once('/einvoicing/class/einvoicing.class.php');
+dol_include_once('/einvoicing/class/protocols/ProtocolManager.class.php');
 dol_include_once('/einvoicing/lib/xmlhighlight.lib.php');
 
 // Load translation files required by the page
@@ -94,17 +96,32 @@ $mode = GETPOST('mode', 'aZ09');
 // 'supplier' reads the document received for a supplier invoice, otherwise the one sent to a customer
 $element = GETPOST('element', 'aZ09');
 
+// 'diag' reads the document of the last incoming invoice that could not be processed
+$source = GETPOST('source', 'aZ09');
+$diagfile = GETPOST('file', 'alpha');
+
+$isdiag = ($source == 'diag') ? 1 : 0;
 $issupplier = ($element == 'supplier') ? 1 : 0;
 $object = $issupplier ? new FactureFournisseur($db) : new Facture($db);
-if ($id <= 0 || $object->fetch($id) <= 0) {
-	accessforbidden($langs->trans("ErrorRecordNotFound"));
-}
 
-// Security check: the file belongs to the invoice, so reading it needs the right to read the invoice
-if ($issupplier) {
-	$result = restrictedArea($user, 'fournisseur', $object->id, 'facture_fourn', 'facture', 'fk_soc', 'rowid');
+if ($isdiag) {
+	// The slot is shown by the document list of the module, so reading it needs the right that opens
+	// that list, and the name is only accepted when a protocol declares it as one of its slots
+	$protocolManager = new ProtocolManager($db);
+	if (!$user->hasRight('einvoicing', 'read') || !in_array($diagfile, $protocolManager->getIncomingDiagnosticFileNames(), true)) {
+		accessforbidden();
+	}
 } else {
-	$result = restrictedArea($user, 'facture', $object->id, '');
+	if ($id <= 0 || $object->fetch($id) <= 0) {
+		accessforbidden($langs->trans("ErrorRecordNotFound"));
+	}
+
+	// Security check: the file belongs to the invoice, so reading it needs the right to read the invoice
+	if ($issupplier) {
+		$result = restrictedArea($user, 'fournisseur', $object->id, 'facture_fourn', 'facture', 'fk_soc', 'rowid');
+	} else {
+		$result = restrictedArea($user, 'facture', $object->id, '');
+	}
 }
 
 
@@ -121,9 +138,13 @@ if ($issupplier) {
 
 $einvoicing = new EInvoicing($db);
 
-$einvoicefile = $issupplier
-	? $einvoicing->getSupplierEInvoiceXmlFilePath($object)
-	: $einvoicing->getEInvoiceXmlFilePath($object->ref);
+if ($isdiag) {
+	$einvoicefile = dol_is_file($conf->einvoicing->dir_temp.'/'.$diagfile) ? $conf->einvoicing->dir_temp.'/'.$diagfile : '';
+} elseif ($issupplier) {
+	$einvoicefile = $einvoicing->getSupplierEInvoiceXmlFilePath($object);
+} else {
+	$einvoicefile = $einvoicing->getEInvoiceXmlFilePath($object->ref);
+}
 $xml = empty($einvoicefile) ? '' : (string) file_get_contents($einvoicefile);
 
 // A document received from an access point usually arrives on a single line, which no one can read.
@@ -177,9 +198,12 @@ if ($mode == 'raw') {
 } else {
 	llxHeader('', $title, '', '', 0, 0, '', '', '', 'mod-einvoicing page-xmlpreview');
 
-	$cardurl = $issupplier ? '/fourn/facture/card.php' : '/compta/facture/card.php';
-	$linkback = '<a href="'.DOL_URL_ROOT.$cardurl.'?id='.((int) $object->id).'">';
-	$linkback .= img_picto('', 'bill', 'class="pictofixedwidth"').dol_escape_htmltag($object->ref).'</a>';
+	$linkback = '';
+	if (!$isdiag) {
+		$cardurl = $issupplier ? '/fourn/facture/card.php' : '/compta/facture/card.php';
+		$linkback = '<a href="'.DOL_URL_ROOT.$cardurl.'?id='.((int) $object->id).'">';
+		$linkback .= img_picto('', 'bill', 'class="pictofixedwidth"').dol_escape_htmltag($object->ref).'</a>';
+	}
 
 	print load_fiche_titre($title, $linkback, 'bill');
 	print $body;
