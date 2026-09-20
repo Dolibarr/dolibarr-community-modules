@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2025-2026       Laurent Destailleur         <eldy@users.sourceforge.net>
+ * Copyright (C) 2026		Jose Martinez				<jose.martinez@pichinov.com>
  * Copyright (C) 2025-2026       Mohamed DAOUD               <mdaoud@dolicloud.com>
  * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
@@ -1085,6 +1086,14 @@ trait CommonProtocol
 			// Create URL to prefill thirdparty creation form
 			$createUrl = DOL_URL_ROOT . '/societe/card.php?action=create&type=f';
 			if (!empty($createParams)) {
+				// The Dolibarr GET firewall (analyseVarsForSqlAndScriptsInjection) rejects " < > in any URL
+				// parameter, so a seller name/address carrying them would 403 before the prefilled creation
+				// form even opens. Drop them from the prefill (a convenience the operator reviews and edits).
+				foreach ($createParams as $cpKey => $cpVal) {
+					if (is_string($cpVal)) {
+						$createParams[$cpKey] = str_replace(array('"', '<', '>'), array("'", '', ''), $cpVal);
+					}
+				}
 				$createUrl .= '&' . http_build_query($createParams);
 			}
 			$createUrl .= '&backtopage=' . urlencode(dol_buildpath('/einvoicing/document_list.php', 1));
@@ -1536,6 +1545,14 @@ trait CommonProtocol
 			// Create URL to prefill product creation form
 			$createUrl = DOL_URL_ROOT . '/product/card.php?action=create';
 			if (!empty($createParams)) {
+				// The Dolibarr GET firewall (analyseVarsForSqlAndScriptsInjection) rejects " < > in any URL
+				// parameter, so a line label/description carrying them would 403 before the prefilled creation
+				// form even opens. Drop them from the prefill (a convenience the operator reviews and edits).
+				foreach ($createParams as $cpKey => $cpVal) {
+					if (is_string($cpVal)) {
+						$createParams[$cpKey] = str_replace(array('"', '<', '>'), array("'", '', ''), $cpVal);
+					}
+				}
 				$createUrl .= '&' . http_build_query($createParams);
 			}
 			$createUrl .= '&backtopage=' . urlencode(dol_buildpath('/einvoicing/document_list.php', 1));
