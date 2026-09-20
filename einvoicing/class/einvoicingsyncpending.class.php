@@ -272,10 +272,20 @@ class EInvoicingSyncPending extends CommonObject
 		$this->tracking_idref  = (string) ($flow['trackingId'] ?? '');
 		$this->reason_code     = (string) $reason;
 		$this->reason_message  = (string) $message;
-		$this->action_data     = empty($data) ? null : (string) json_encode($data);
-		$this->action_html     = ($actionHtml !== '' && $actionHtml !== null) ? $actionHtml : null;
-		$this->match_data      = empty($matchData) ? null : (string) json_encode($matchData);
-		$this->flow_updatedat  = $updatedatSql;
+		// What the caller does not bring is kept: a second writer on the same row (the replay of the
+		// pending flows) does not always know the actions and identifiers the first one computed.
+		if (!empty($data)) {
+			$this->action_data = (string) json_encode($data);
+		}
+		if ($actionHtml !== '' && $actionHtml !== null) {
+			$this->action_html = $actionHtml;
+		}
+		if (!empty($matchData)) {
+			$this->match_data = (string) json_encode($matchData);
+		}
+		if ($updatedatSql !== null) {
+			$this->flow_updatedat = $updatedatSql;
+		}
 		$this->date_lastattempt = dol_now();
 
 		if ($existing > 0) {
@@ -318,5 +328,48 @@ class EInvoicingSyncPending extends CommonObject
 			$this->fk_element_id = (int) $elementId;
 		}
 		return $this->update($user) > 0 ? 1 : -1;
+	}
+
+	/**
+	 * Fetch the flows still pending, the ones that have been waiting longest first.
+	 *
+	 * Read by the synchronization, which takes those flows again by identifier, and by the
+	 * synchronization page, which shows what is waiting: both want the raw rows and nothing else.
+	 *
+	 * @param  int    $limit    Maximum number of rows to return, 0 for all of them
+	 * @param  string $provider Provider short key to restrict to, empty for every access point
+	 * @return stdClass[]|int   The pending rows, or -1 on a database failure
+	 */
+	public function fetchPending($limit = 0, $provider = '')
+	{
+		$sql = "SELECT rowid, entity, provider, flow_id, flow_direction, flow_type, tracking_idref,";
+		$sql .= " reason_code, reason_message, action_data, action_html, match_data,";
+		$sql .= " nb_attempts, date_lastattempt, date_creation";
+		$sql .= " FROM ".MAIN_DB_PREFIX.$this->table_element;
+		$sql .= " WHERE entity IN (".getEntity('einvoicing').")";
+		$sql .= " AND status = ".((int) self::STATUS_PENDING);
+		if ($provider !== '') {
+			$sql .= " AND provider = '".$this->db->escape($provider)."'";
+		}
+		// Oldest first: what has been waiting longest is what somebody has to look at first.
+		$sql .= " ORDER BY date_creation ASC";
+		if ($limit > 0) {
+			$sql .= $this->db->plimit((int) $limit);
+		}
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			dol_syslog(__METHOD__.' '.$this->error, LOG_ERR, 0, "_einvoicing");
+			return -1;
+		}
+
+		$rows = array();
+		while ($obj = $this->db->fetch_object($resql)) {
+			$rows[] = $obj;
+		}
+		$this->db->free($resql);
+
+		return $rows;
 	}
 }

@@ -28,6 +28,7 @@
 
 require_once __DIR__ . '/../protocols/ProtocolManager.class.php';
 require_once __DIR__ . '/../../lib/einvoicing.lib.php';	// removeAllSpaces(), used to normalize an electronic address
+require_once __DIR__ . '/../einvoicingsyncpending.class.php';	// queue of the flows waiting on a manual action
 
 
 /**
@@ -945,6 +946,77 @@ abstract class AbstractPDPProvider
 		}
 
 		return $LastSyncDate;
+	}
+
+	/**
+	 * Take the pending flows again, by identifier, before the window is polled.
+	 *
+	 * A pending flow stored nothing, and the window starts at getLastSyncDate() = MAX(updatedat) over
+	 * what WAS stored, minus a margin: every document imported after it pushes that start past it, and
+	 * once the margin is spent the access point is never asked for it again. Taking it by identifier
+	 * uses no date window, so it is what makes "retried on the next synchronization" true.
+	 *
+	 * @param	string[]					$results_messages	Run messages, appended to
+	 * @param	array<string,array<string,mixed>>	$actions	Business actions to do, appended to
+	 * @return	array{imported:int,waiting:int,handled:string[]}	What was recovered, what still waits,
+	 *															and the flows the window loop can skip
+	 */
+	protected function replayPostponedFlows(&$results_messages, &$actions)
+	{
+		global $conf, $db, $user, $form;
+
+		$imported = 0;
+		$waiting = 0;
+		$handled = array();
+
+		$providershort = preg_replace('/ViaPartner$/', '', (string) $this->providerName);
+
+		$syncPending = new EInvoicingSyncPending($db);
+		$queue = $syncPending->fetchPending(getDolGlobalInt('EINVOICING_FLOWS_SYNC_REPLAY_SIZE', 50), $providershort);
+		if (!is_array($queue) || empty($queue)) {
+			return array('imported' => 0, 'waiting' => 0, 'handled' => $handled);
+		}
+
+		foreach ($queue as $row) {
+			// The queue is read across the entities the user may see; an import belongs to the one
+			// running, and the queue is keyed per entity - writing from here would duplicate the row.
+			if ((int) $row->entity !== (int) $conf->entity) {
+				continue;
+			}
+
+			$handled[] = (string) $row->flow_id;
+			$res = $this->syncFlow((string) $row->flow_id, null);
+
+			if (($res['res'] ?? -1) >= 0) {
+				$syncPending->resolveByFlowId((string) $row->flow_id, $providershort, $user);
+				$imported++;
+				dol_syslog(__METHOD__ . " Flow " . $row->flow_id . " taken again from the queue and imported: " . ($res['message'] ?? ''), LOG_WARNING, 0, "_einvoicing");
+				$results_messages[] = "Flow " . dol_escape_htmltag((string) $row->flow_id) . " was waiting since "
+					. dol_print_date($db->jdate($row->date_creation), 'dayhour') . " and has just been imported: " . ($res['message'] ?? '');
+				continue;
+			}
+
+			// Kept, never counted as an error: one row nobody can resolve would otherwise abort every
+			// run from here on, which is the very failure this replay exists to end.
+			$waiting++;
+			$flow = array('flowId' => (string) $row->flow_id, 'flowDirection' => (string) $row->flow_direction, 'flowType' => (string) $row->flow_type, 'trackingId' => (string) $row->tracking_idref);
+			$syncPending->queueFromFlow($flow, $providershort, (string) ($res['actioncode'] ?? $row->reason_code), (string) ($res['message'] ?? ''), array(), $user, (string) ($res['action'] ?? ''), array());
+
+			$actioncode = (string) ($res['actioncode'] ?? 'POSTPONED_FLOW_STILL_WAITING');
+			$actions[$actioncode] = array(
+				'actionurl' => (string) ($res['actionurl'] ?? ''),
+				'actioncode' => $actioncode,
+				'action' => (string) ($res['action'] ?? $row->action_html),
+				'businessmessage' => (empty($res['businessmessage']) ? (string) $row->reason_message : (string) $res['businessmessage'])
+					. $form->textwithpicto('', "ERROR_SYNCFLOW - Failed to synchronize flow " . $row->flow_id . ": " . ($res['message'] ?? ''), 1, 'help', '', 0, 2, 'help')
+			);
+
+			dol_syslog(__METHOD__ . " Flow " . $row->flow_id . " taken again from the queue, still waiting: " . ($res['message'] ?? ''), LOG_WARNING, 0, "_einvoicing");
+			$results_messages[] = "Flow " . dol_escape_htmltag((string) $row->flow_id) . ", waiting since "
+				. dol_print_date($db->jdate($row->date_creation), 'dayhour') . ", still cannot be imported: " . ($res['message'] ?? '');
+		}
+
+		return array('imported' => $imported, 'waiting' => $waiting, 'handled' => $handled);
 	}
 
 	/**

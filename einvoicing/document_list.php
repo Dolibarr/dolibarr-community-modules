@@ -1119,6 +1119,80 @@ if ($provider && !einvoicingReceptionDisabled()) {
 print '<br class="clearboth">';
 
 
+// Flows the access point still holds because something is missing here. Shown on every visit, not
+// only after a synchronization: a flow that keeps waiting is invisible otherwise, and the point is
+// that somebody can see it, know since when, and decide. The menu of the queue page is optional.
+dol_include_once('einvoicing/class/einvoicingsyncpending.class.php');
+// Loaded here rather than in the row loop below: the queue names suppliers too, and it comes first.
+require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
+$langs->load("companies");
+$syncpendingstatic = new EInvoicingSyncPending($db);
+$waitingflows = $syncpendingstatic->fetchPending();
+if (is_array($waitingflows) && count($waitingflows) > 0) {
+	print '<!-- flows waiting to be imported -->'."\n";
+	print '<div class="wordbreak warning clearboth">';
+	print '<strong><u>'.$langs->trans("PostponedFlowsBacklog").'</u></strong>';
+	print ' - <span class="opacitymedium">'.$langs->trans("PostponedFlowsCount", count($waitingflows)).'</span>';
+	print '<br><span class="opacitymedium">'.$langs->trans("PostponedFlowsBacklogIntro").'</span>';
+
+	print '<div class="div-table-responsive-no-min">';
+	print '<table class="noborder centpercent">';
+	print '<tr class="liste_titre">';
+	print '<th>'.$langs->trans("FlowId").'</th>';
+	print '<th>'.$langs->trans("PostponedFlowDocumentRef").'</th>';
+	print '<th>'.$langs->trans("ThirdParty").'</th>';
+	print '<th>'.$langs->trans("PostponedFlowReason").'</th>';
+	print '<th class="center">'.$langs->trans("PostponedFlowWaitingSince").'</th>';
+	print '<th class="center">'.$langs->trans("PostponedFlowAttempts").'</th>';
+	print '</tr>';
+
+	foreach ($waitingflows as $waitingflow) {
+		$waitingsince = $db->jdate($waitingflow->date_creation);
+		// The identifiers of the issuer, and the supplier the import got as far as knowing.
+		$waitingmatch = empty($waitingflow->match_data) ? array() : (array) json_decode((string) $waitingflow->match_data, true);
+		$waitingref = !empty($waitingflow->tracking_idref) ? (string) $waitingflow->tracking_idref : (string) ($waitingmatch['linkedref'] ?? '');
+
+		print '<tr class="oddeven">';
+		print '<td class="tdoverflowmax200">'.dol_escape_htmltag((string) $waitingflow->flow_id).'</td>';
+		print '<td class="tdoverflowmax200">'.dol_escape_htmltag($waitingref).'</td>';
+		print '<td class="tdoverflowmax200">';
+		if (!empty($waitingmatch['socid'])) {
+			$waitingsoc = new Societe($db);
+			if ($waitingsoc->fetch((int) $waitingmatch['socid']) > 0) {
+				print $waitingsoc->getNomUrl(1);
+			}
+		}
+		print '</td>';
+		print '<td>';
+		print dol_escape_htmltag((string) $waitingflow->reason_message);
+		if (!empty($waitingflow->reason_code)) {
+			print '<br><span class="opacitymedium small">'.dol_escape_htmltag((string) $waitingflow->reason_code).'</span>';
+		}
+		// The action block is built by the import and already escaped by it.
+		if (!empty($waitingflow->action_html)) {
+			print '<br>'.$waitingflow->action_html;
+		}
+		// A waiting flow has no record of its own to open: nothing was stored, that is the point. Its
+		// synchronization calls were logged though, and their response carries the document - so this is
+		// where "Export for support" can reach a flow that never landed.
+		print '<br><a href="'.dol_buildpath('/einvoicing/call_list.php', 1).'?search_processing_result='.urlencode((string) $waitingflow->flow_id).'">';
+		print img_picto('', 'file-export', 'class="paddingright"').$langs->trans("PostponedFlowOpenSyncCall");
+		print '</a>';
+		print '</td>';
+		print '<td class="center nowraponall">';
+		print dol_print_date($waitingsince, 'dayhour');
+		print '</td>';
+		print '<td class="center">'.((int) $waitingflow->nb_attempts).'</td>';
+		print '</tr>';
+	}
+
+	print '</table>';
+	print '</div>';
+	print '</div>';
+	print '<br class="clearboth">';
+}
+
+
 // List of flows sync
 
 print '<div class="div-table-responsive">'; // You can use div-table-responsive-no-min if you don't need reserved height for your table
@@ -1262,7 +1336,6 @@ $i = 0;
 $savnbfield = $totalarray['nbfield'];
 $totalarray = array();
 $totalarray['nbfield'] = 0;
-require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
 $companystatic = new Societe($db);
 
 $imaxinloop = ($limit ? min($num, $limit) : $num);

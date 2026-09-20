@@ -1881,6 +1881,14 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$batchNumber = 0;
 		$cursor = dol_print_date($dateafter, '%Y-%m-%dT%H:%M:%S.000Z', 'gmt');
 
+		// The queue comes first, and by identifier: those flows are older than the start of the window
+		// below, so the search endpoint would never list them again whatever this run does.
+		$replay = $this->replayPostponedFlows($results_messages, $actions);
+		$replayedFlows = $replay['imported'];
+		$replayedFlowIds = $replay['handled'];
+		$syncedFlows += $replayedFlows;
+		$postponedFlows += $replay['waiting'];
+
 		while (true) {
 			$batchNumber++;
 			if ($batchNumber > self::MAX_SYNC_BATCHES) {
@@ -1956,8 +1964,14 @@ class SuperPDPProvider extends AbstractPDPProvider
 			$i = 0;
 			foreach ($response['response']['results'] ?? [] as $flow) {
 				$i++;
+				if (in_array($flow['flowId'], $replayedFlowIds)) {
+					// Taken again from the queue at the start of this run, and already counted there.
+					dol_syslog(__METHOD__ . " #" . $i . " Flow " . $flow['flowId'] . " already replayed from the queue, discard it.", LOG_DEBUG, 0, "_einvoicing");
+					continue;
+				}
 				if (in_array($flow['flowId'], $alreadyProcessedFlowIds)) {
 					dol_syslog(__METHOD__ . " #" . $i . " Flow " . $flow['flowId'] . " already processed, discard it.", LOG_DEBUG, 0, "_einvoicing");
+					$syncPending->resolveByFlowId($flow['flowId'], $providershort, $user);
 					$alreadyExist++;
 					continue;
 				}
@@ -1993,6 +2007,10 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 							dol_syslog(__METHOD__ . " Flow " . $flow['flowId'] . " postponed: " . $res['message'], LOG_WARNING, 0, "_einvoicing");
 							$results_messages[] = "Flow " . dol_escape_htmltag((string) $flow['flowId']) . " postponed, it will be retried on the next synchronization: " . $res['message'];
+
+							// The flow itself stores nothing, so this queue row is the only record that it was
+							// seen: it is what lets the panel say what is waiting, why, and since when.
+							$syncPending->queueFromFlow($flow, $providershort, (string) ($res['actioncode'] ?? ''), (string) ($res['message'] ?? ''), array(), $user, (string) ($res['action'] ?? ''), (array) ($res['actiondata'] ?? array()));
 
 							$postponedFlows++;
 							continue;
@@ -2126,9 +2144,10 @@ class SuperPDPProvider extends AbstractPDPProvider
 						//$lastsuccessfullSyncronizedFlow = $flow['flowId'];
 					}
 
-					// A flow that finally synchronized (or now already exists) leaves the manual-action queue.
-					// When an incoming flow created a supplier invoice, keep the link to it for traceability.
-					if (getDolGlobalInt('EINVOICING_ENABLE_MANUAL_ACTION_QUEUE') && $res['res'] >= 0) {
+					// A flow that finally synchronized (or now already exists) leaves the queue, whatever put
+					// it there: a postponed flow is queued without the manual-action option, so waiting for
+					// that option here would leave its row waiting for ever.
+					if ($res['res'] >= 0) {
 						$resolvedElementType = ((($flow['flowDirection'] ?? '') === 'In') ? 'invoice_supplier' : '');
 						$syncPending->resolveByFlowId($flow['flowId'], $providershort, $user, $resolvedElementType, ($res['res'] > 0 ? (int) $res['res'] : 0));
 					}
@@ -2213,6 +2232,10 @@ class SuperPDPProvider extends AbstractPDPProvider
 			}
 		}
 		$messages[] = $langs->trans("TotalSkippedSync") . ": <b>" . $alreadyExist . "</b> - " . $langs->trans("TotalNewSync") . ": <b>" . $syncedFlows . "</b>";
+		if ($replayedFlows > 0) {
+			// Said apart from the new ones: those had been waiting, sometimes for days
+			$messages[] = $langs->trans("TotalReplayedSync") . ": <b>" . $replayedFlows . "</b>";
+		}
 		if ($postponedFlows > 0) {
 			// Counted apart from the skipped ones: those flows were not stored, they come back next run
 			$messages[] = $langs->trans("TotalPostponedSync") . ": <b>" . $postponedFlows . "</b>";
