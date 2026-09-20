@@ -2,6 +2,7 @@
 /* Copyright (C) 2022       Laurent Destailleur     <eldy@users.sourceforge.net>
  * Copyright (C) 2015-2026  Frédéric France         <frederic.france@free.fr>
  * Copyright (C) 2024		MDW						<mdeweerd@users.noreply.github.com>
+ * Copyright (C) 2026		Jose Martinez			<jose.martinez@pichinov.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -155,10 +156,16 @@ if (!getDolGlobalString($keyforparamsecret)) {
 if (GETPOST('action', 'aZ09') == 'refresh' && GETPOST('grant_type', 'aZ09') == 'refresh_token') {
 	header('Content-Type: application/json; charset=UTF-8');
 
-	$refresh_token = preg_replace('/[^A-Za-z0-9._\-]/', '', (string) GETPOST('refresh_token', 'restricthtml'));
-	if (empty($refresh_token)) {
+	// A refresh_token is an opaque credential we only relay. RFC 6749 (Appendix A.17) allows any
+	// printable ASCII (VSCHAR = %x20-7E), which covers both the base64 (+ / =) and base64url (- _)
+	// alphabets as well as JWT. The value is URL-encoded by http_build_query() below, so the outbound
+	// request needs no character whitelisting: a narrow [A-Za-z0-9._-] strip does not add safety, it
+	// silently mangles standard-base64 tokens and turns them into a permanent, silent invalid_grant for
+	// that client. So pass the token through untouched and reject only genuinely malformed input.
+	$refresh_token = (string) GETPOST('refresh_token', 'restricthtml');
+	if ($refresh_token === '' || preg_match('/[^\x20-\x7E]/', $refresh_token)) {
 		http_response_code(400);
-		echo json_encode(array('error' => 'invalid_request', 'error_description' => 'refresh_token is missing'));
+		echo json_encode(array('error' => 'invalid_request', 'error_description' => 'refresh_token is missing or malformed'));
 		exit;
 	}
 
