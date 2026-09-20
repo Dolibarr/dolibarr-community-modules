@@ -315,7 +315,7 @@ class TestPDPProvider extends AbstractPDPProvider
 	 * @param mixed		$object			Invoice object (CustomerInvoice or SupplierInvoice)
 	 * @param int		$statusCode		Status code to send
 	 * @param string	$reasonCode		Reason code to send (optional)
-	 * @param array{amount?:float,breakdown?:array<array{vatrate:float,amount:float}>} $paymentData Cashed amount for status 212
+	 * @param array{amount?:float,breakdown?:array<array{vatrate:float,amount:float}>,reason?:string} $paymentData Amount moved for status 212, negative on a refund
 	 * @return array{res:int, message:string}	'res' 1 on success, -1 on failure
 	 */
 	public function sendStatusMessage($object, $statusCode, $reasonCode = '', $paymentData = array())
