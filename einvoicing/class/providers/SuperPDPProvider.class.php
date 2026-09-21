@@ -612,7 +612,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 					}
 				}
 				// Proxy refresh failed: a via-partner client has no secret to fall back on, so we stop here.
-				dol_syslog(__METHOD__." refresh via partner proxy failed http_code=".$httpcode . " error=".$resultget['curl_error_msg'], LOG_WARNING, 0, "_einvoicing");
+				// The proxy relays the PA's raw error body (e.g. invalid_grant when the refresh_token was
+				// already rotated away), which curl_error_msg alone does not capture on a clean HTTP error.
+				dol_syslog(__METHOD__." refresh via partner proxy failed http_code=".$httpcode . " error=".$resultget['curl_error_msg'] . " response=".dol_trunc((string) ($resultget['content'] ?? ''), 500), LOG_WARNING, 0, "_einvoicing");
 				// Return a generic error message to avoid leaking the proxy URL in the logs.
 				setEventMessages('FailedToRetrieveAccessToken', null, 'errors');
 				$this->errors[] = 'FailedToRetrieveAccessToken';
