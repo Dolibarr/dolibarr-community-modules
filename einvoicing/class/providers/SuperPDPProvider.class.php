@@ -2232,6 +2232,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 		}
 		$processingResult .= "<br>----------------------<br>" . implode("<br>", $messages);
 		$processingResult = "Processing result:<br>" . $processingResult;
+		// The recap grows with the number of flows: keep it inside its column, a refused UPDATE loses it whole
+		$processingResult = $this->makeStorableDebugPayload($processingResult);
 
 		// Save sync recap (only when this sync is attached to a Call row; otherwise $sql would be undefined/stale)
 		if ($call_id) {
