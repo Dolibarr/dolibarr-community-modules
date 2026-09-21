@@ -2489,15 +2489,24 @@ trait CommonProtocol
 	private static $UNTDID4461_TO_DOLIBARR_PAIEMENT_CODE = [
 		'10' => 'LIQ',	// Cash
 		'20' => 'CHQ',	// Check
+		'21' => 'CHQ',	// Banker's draft
+		'22' => 'CHQ',	// Certified banker's draft
 		'23' => 'TRA',	// Banque check
 		'24' => 'TRA',	// Bill of exchange awaiting acceptance
+		'25' => 'CHQ',	// Certified cheque
+		'26' => 'CHQ',	// Local cheque
 		'30' => 'VIR',	// Bank transfer
+		'31' => 'VIR',	// Debit transfer, a transfer within a giro system network
+		'42' => 'VIR',	// Payment to bank account
 		'45' => 'TIP',	// Referenced home-banking credit transfer
 		'48' => 'CB',	// Bank card, the generic code most senders use rather than 54
 		'49' => 'PRE',	// Direct debit, the generic code most senders use rather than 59
 		'54' => 'CB',	// Credit card
+		'55' => 'CB',	// Debit card, the dictionary of Dolibarr has one code for both cards
+		'58' => 'VIR',	// SEPA credit transfer, which BR-49/BR-50 put on a par with 30
 		'59' => 'PRE',	// SEPA direct debit
 		'68' => 'VAD',	// Online payment
+		'70' => 'LCR',	// Bill drawn by the creditor on the debtor, the French LCR
 		'1' => 'FAC',	// local payment method | not defined
 	];
 
