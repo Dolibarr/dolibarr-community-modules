@@ -216,7 +216,7 @@ if ($object->id) {
 	 }*/
 	$morehtmlref .= '</div>';
 
-	dol_banner_tab($object, 'ref', $linkback, 1, 'ref', 'ref', $morehtmlref, '', 0, '', '', 1);
+	dol_banner_tab($object, 'id', $linkback, 1, 'rowid', 'ref', $morehtmlref, '', 0, '', '', 1);
 
 	print dol_get_fiche_end();
 
