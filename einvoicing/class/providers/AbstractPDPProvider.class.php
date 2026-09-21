@@ -687,30 +687,53 @@ abstract class AbstractPDPProvider
 	 * including the one the first, successful call just obtained - turning a benign race into a
 	 * permanent lockout that only a full re-authorization can fix.
 	 *
-	 * Uses a MySQL/MariaDB named lock (GET_LOCK), which is released automatically if the holding
-	 * connection dies, so a crashed process cannot leave the lock stuck forever.
+	 * Uses a named/advisory lock on MySQL/MariaDB (GET_LOCK) and PostgreSQL (pg_try_advisory_lock,
+	 * polled since Postgres advisory locks have no built-in timeout). Both are released automatically
+	 * if the holding connection dies, so a crashed process cannot leave the lock stuck forever. No
+	 * portable equivalent on other drivers (sqlite3): a sqlite3 install is single-writer by nature, so
+	 * this race is far less of a concern there, and we proceed without a lock rather than block it.
 	 *
 	 * @param	int		$timeout	Max seconds to wait for the lock
 	 * @return	bool				True if the lock was acquired (false: proceed without it, e.g. a
-	 *								non-MySQL driver or a lock that stayed held past the timeout)
+	 *								driver with no lock support here, or a lock still held past the timeout)
 	 */
 	protected function acquireRefreshLock($timeout = 10)
 	{
 		global $db;
 
-		if ($db->type != 'mysqli') {
+		$lockname = $this->getOAuthServiceName().'_refresh';
+
+		if ($db->type == 'mysqli') {
+			$resql = $db->query("SELECT GET_LOCK('".$db->escape($lockname)."', ".((int) $timeout).") as acquired");
+			if (!$resql) {
+				return false;
+			}
+
+			$obj = $db->fetch_object($resql);
+
+			return !empty($obj) && (int) $obj->acquired === 1;
+		}
+
+		if ($db->type == 'pgsql') {
+			// pg_advisory_lock() takes a bigint key, not a name: hash the lock name into one. No native
+			// timeout on Postgres advisory locks, so poll the non-blocking pg_try_advisory_lock() instead.
+			$lockkey = (int) crc32($lockname); // Fits an int8/bigint on any PHP build (32-bit CRC).
+			$deadline = time() + $timeout;
+			do {
+				$resql = $db->query("SELECT pg_try_advisory_lock(".$lockkey.") as acquired");
+				if ($resql) {
+					$obj = $db->fetch_object($resql);
+					if (!empty($obj) && ($obj->acquired === 't' || $obj->acquired == 1)) {
+						return true;
+					}
+				}
+				usleep(200000);
+			} while (time() < $deadline);
+
 			return false;
 		}
 
-		$lockname = $db->escape($this->getOAuthServiceName().'_refresh');
-		$resql = $db->query("SELECT GET_LOCK('".$lockname."', ".((int) $timeout).") as acquired");
-		if (!$resql) {
-			return false;
-		}
-
-		$obj = $db->fetch_object($resql);
-
-		return !empty($obj) && (int) $obj->acquired === 1;
+		return false;
 	}
 
 	/**
@@ -722,8 +745,13 @@ abstract class AbstractPDPProvider
 	{
 		global $db;
 
-		$lockname = $db->escape($this->getOAuthServiceName().'_refresh');
-		$db->query("SELECT RELEASE_LOCK('".$lockname."')");
+		$lockname = $this->getOAuthServiceName().'_refresh';
+
+		if ($db->type == 'mysqli') {
+			$db->query("SELECT RELEASE_LOCK('".$db->escape($lockname)."')");
+		} elseif ($db->type == 'pgsql') {
+			$db->query("SELECT pg_advisory_unlock(".((int) crc32($lockname)).")");
+		}
 	}
 
 	/**
