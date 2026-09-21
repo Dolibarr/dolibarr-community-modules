@@ -1192,7 +1192,9 @@ class Call extends CommonObject
 			}
 		}
 
-		$sql = "SELECT MAX(CAST(SUBSTRING(call_id, ".(strlen($prefix) + 1).") AS INTEGER)) AS maxref";
+		// AS SIGNED, not AS INTEGER: MySQL rejects the latter (ERROR 1064) where MariaDB accepts it, and the
+		// pgsql driver of the core already rewrites " as signed)" into " as integer)" (DoliDBPgsql::convertSQLFromMysql()).
+		$sql = "SELECT MAX(CAST(SUBSTRING(call_id, ".(strlen($prefix) + 1).") AS SIGNED)) AS maxref";
 		$sql .= " FROM ".$this->db->prefix().$this->table_element;
 		$sql .= " WHERE call_id LIKE '".$this->db->escape($prefix)."%'";
 		if (!$ispgsql) {
