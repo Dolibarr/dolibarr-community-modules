@@ -803,7 +803,7 @@ trait CommonProtocol
 					}
 					$thirdparty->zip = $sellerInfo['sellerpostcode'] ?? $thirdparty->zip;
 					$thirdparty->town = $sellerInfo['sellercity'] ?? $thirdparty->town;
-					$thirdparty->country_code = $sellerInfo['sellercountry'] ?? $thirdparty->country_code;
+					$this->_setThirdpartyCountryFromCode($thirdparty, $sellerInfo['sellercountry'] ?? '');
 					$thirdparty->email = $sellerInfo['sellercontactemailaddr'] ?? $thirdparty->email;
 					if ($sellerPhone !== '') {
 						$thirdparty->phone = $sellerPhone;
@@ -847,8 +847,8 @@ trait CommonProtocol
 					if (empty($thirdparty->town) && !empty($sellerInfo['sellercity'])) {
 						$thirdparty->town = $sellerInfo['sellercity'];
 					}
-					if (empty($thirdparty->country_code) && !empty($sellerInfo['sellercountry'])) {
-						$thirdparty->country_code = $sellerInfo['sellercountry'];
+					if (empty($thirdparty->country_id) && !empty($sellerInfo['sellercountry'])) {
+						$this->_setThirdpartyCountryFromCode($thirdparty, $sellerInfo['sellercountry']);
 					}
 					if (empty($thirdparty->email) && !empty($sellerInfo['sellercontactemailaddr'])) {
 						$thirdparty->email = $sellerInfo['sellercontactemailaddr'];
@@ -987,7 +987,7 @@ trait CommonProtocol
 			}
 			$thirdparty->zip = $sellerInfo['sellerpostcode'] ?? '';
 			$thirdparty->town = $sellerInfo['sellercity'] ?? '';
-			$thirdparty->country_code = $sellerInfo['sellercountry'] ?? '';
+			$this->_setThirdpartyCountryFromCode($thirdparty, $sellerInfo['sellercountry'] ?? '');
 			$thirdparty->email = $sellerInfo['sellercontactemailaddr'] ?? '';
 			$thirdparty->phone = $sellerPhone;
 			$thirdparty->fax = $sellerFax;
@@ -1140,6 +1140,33 @@ trait CommonProtocol
 				'action' => $action,
 				'actiondata' => $actiondata
 			);
+		}
+	}
+
+	/**
+	 * Set the country of a thirdparty from the country code carried by a received document.
+	 *
+	 * The stored country is fk_pays, which the core writes from country_id: up to Dolibarr 19,
+	 * Societe::update() never derives it from country_code, so a thirdparty created by the import
+	 * silently ended up with no country at all (issue #1037). An unknown code is left out.
+	 *
+	 * @param	Societe		$thirdparty		Thirdparty to set the country on
+	 * @param	string		$countrycode	Country code read in the document (BT-40, BT-55...)
+	 * @return	void
+	 */
+	private function _setThirdpartyCountryFromCode($thirdparty, $countrycode)
+	{
+		$countrycode = trim((string) $countrycode);
+		if ($countrycode === '') {
+			return;
+		}
+
+		$countryid = dol_getIdFromCode($this->db, $countrycode, 'c_country', 'code', 'rowid');
+		if ($countryid > 0) {
+			$thirdparty->country_id = $countryid;
+			$thirdparty->country_code = $countrycode;
+		} else {
+			dol_syslog(get_class($this) . '::_setThirdpartyCountryFromCode Unknown country code in document: ' . $countrycode, LOG_WARNING);
 		}
 	}
 
