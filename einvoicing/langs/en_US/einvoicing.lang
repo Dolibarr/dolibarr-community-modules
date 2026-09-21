@@ -365,6 +365,7 @@ ConfirmSendStatusMessageAndValidate=Are you sure you want to update the status o
 EInvoiceApprovalValidatedTheInvoice=Invoice %s has been validated: accepting a received invoice records it in the accounts.
 EInvoiceApprovalCouldNotValidate=The invoice could not be validated, so no status was sent to the Access Point.
 EInvoiceApprovalNeedsValidateRight=Accepting this invoice would validate it in Dolibarr, which your permissions do not allow.
+EInvoiceStatusAlreadySentToPlatform=The status <b>%s</b> was already sent to the Access Point for this invoice, it has not been sent a second time.
 SelectStatusReason=Reason
 TryToIncreaseStartDateOrMax=No new flow processed. Try to increase the "%s"
 ErrorGeneratingXML=Error when generating the e-invoice XML file
