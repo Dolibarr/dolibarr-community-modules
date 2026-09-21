@@ -1075,7 +1075,7 @@ trait CommonProtocol
 				$createParams['town'] = $sellertown;
 			}
 			if (!empty($sellercountrycode)) {
-				$countryid = dol_getIdFromCode($this->db, $sellercountrycode, 'c_country');
+				$countryid = dol_getIdFromCode($this->db, $sellercountrycode, 'c_country', 'code', 'rowid');
 				if ($countryid > 0) {
 					$createParams['country_id'] = $countryid;
 				}
