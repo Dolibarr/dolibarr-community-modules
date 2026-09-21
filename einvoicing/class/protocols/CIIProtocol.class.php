@@ -727,6 +727,15 @@ class CIIProtocol extends AbstractProtocol
 	 */
 	public function createSupplierInvoiceLinesIntoDatabase(FactureFournisseur $supplierInvoice): bool
 	{
+		// updateline() below totals each line through calcul_price_total() and looks its VAT rate up with
+		// getLocalTaxesFromRate(), handing both $this->thirdparty - the vendor, seller of this invoice.
+		// Neither create() nor fetch() loads it (fetch() even clears it), so the seller arrived empty and
+		// the core fell back on $mysoc: the rate and its local taxes were read in the country of our own
+		// company instead of the vendor's. Load it once for the whole loop.
+		if (empty($supplierInvoice->thirdparty) && $supplierInvoice->socid > 0) {
+			$supplierInvoice->fetch_thirdparty();
+		}
+
 		// Start after the lines already written: this runs a second time for the document level charges
 		// (BG-21). line_max() is what addline() itself calls to resolve its $rang = -1.
 		$rang = (int) $supplierInvoice->line_max();
