@@ -678,6 +678,67 @@ abstract class AbstractPDPProvider
 	}
 
 	/**
+	 * Serialize OAuth token refreshes for this service across concurrent requests (cron, page loads,
+	 * several browser tabs, ...).
+	 *
+	 * A refresh_token is single-use: if two requests both read the same (still valid) refresh_token
+	 * and submit it concurrently, the provider processes one and rejects the other as an already-used
+	 * token. Some providers treat that reuse as a theft signal and revoke the whole token family,
+	 * including the one the first, successful call just obtained - turning a benign race into a
+	 * permanent lockout that only a full re-authorization can fix.
+	 *
+	 * Uses a MySQL/MariaDB named lock (GET_LOCK), which is released automatically if the holding
+	 * connection dies, so a crashed process cannot leave the lock stuck forever.
+	 *
+	 * @param	int		$timeout	Max seconds to wait for the lock
+	 * @return	bool				True if the lock was acquired (false: proceed without it, e.g. a
+	 *								non-MySQL driver or a lock that stayed held past the timeout)
+	 */
+	protected function acquireRefreshLock($timeout = 10)
+	{
+		global $db;
+
+		if ($db->type != 'mysqli') {
+			return false;
+		}
+
+		$lockname = $db->escape($this->getOAuthServiceName().'_refresh');
+		$resql = $db->query("SELECT GET_LOCK('".$lockname."', ".((int) $timeout).") as acquired");
+		if (!$resql) {
+			return false;
+		}
+
+		$obj = $db->fetch_object($resql);
+
+		return !empty($obj) && (int) $obj->acquired === 1;
+	}
+
+	/**
+	 * Release the lock acquired by acquireRefreshLock().
+	 *
+	 * @return	void
+	 */
+	protected function releaseRefreshLock()
+	{
+		global $db;
+
+		$lockname = $db->escape($this->getOAuthServiceName().'_refresh');
+		$db->query("SELECT RELEASE_LOCK('".$lockname."')");
+	}
+
+	/**
+	 * Service name used as the OAuth token storage key (and, by acquireRefreshLock(), as the lock
+	 * name) for this provider/environment. Same value saveOAuthTokenDB()/fetchOAuthTokenDB() build
+	 * inline; kept in sync manually since those two are not going through this helper.
+	 *
+	 * @return	string
+	 */
+	protected function getOAuthServiceName()
+	{
+		return $this->config['dol_prefix'] . '_' . ($this->config['live'] ? 'PROD' : 'TEST');
+	}
+
+	/**
 	 * Insert or update OAuth token for the given PDP.
 	 *
 	 * @param  string      $accessToken    Access token string
