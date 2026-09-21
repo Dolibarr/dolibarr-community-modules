@@ -181,7 +181,7 @@ if (GETPOST('action', 'aZ09') == 'refresh' && GETPOST('grant_type', 'aZ09') == '
 		// Pass the PA response (access_token, refresh_token, expires_in, ...) straight back to the client.
 		echo $resultget['content'];
 	} else {
-		dol_syslog("proxy_oauthcallback refresh failed http_code=".$httpcode, LOG_WARNING);
+		dol_syslog("proxy_oauthcallback refresh failed http_code=".$httpcode." response=".dol_trunc((string) ($resultget['content'] ?? ''), 500), LOG_WARNING);
 		http_response_code($httpcode ? $httpcode : 502);
 		echo !empty($resultget['content']) ? $resultget['content'] : json_encode(array('error' => 'proxy_refresh_failed'));
 	}
