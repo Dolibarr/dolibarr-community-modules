@@ -460,14 +460,82 @@ function stancerCardstartPayWithRedirect($object, $parameters, $forceAmount = nu
 		}
 	} else {
 		dol_syslog("stancer pay error : " . $stancerApi->error, LOG_ERR);
-		$message = "Please try with an other payment provider like Stripe";
-		setEventMessages($langs->trans("ErrorStancer") . " " . $message, [], 'errors');
+		setEventMessages($langs->trans("ErrorStancerPaymentNotStarted"), [], 'errors');
 
-		$urlPayment = getOnlinePaymentUrl(0, $object->element, (string) $object->ref);
+		// getOnlinePaymentUrl() expects a payment type ('order', 'invoice', 'member',
+		// 'membersubscription', 'contractline', 'free'), never a Dolibarr element name
+		// ('commande', 'facture'). Feeding it the element returned an empty string, and
+		// the empty "Location:" header that followed showed the customer a blank page.
+		$urlPayment = getOnlinePaymentUrl(0, stancerOnlinePaymentType($object), (string) $object->ref);
+		if (empty($urlPayment)) {
+			// No payment page to go back to (a proposal, for instance): say what
+			// happened here rather than redirecting the customer to nowhere.
+			stancerPrintPaymentError($object, (string) $stancerApi->error);
+			exit;
+		}
 		header("Location: " . $urlPayment);
 		exit;
 	}
 	return $error;
+}
+
+/**
+ * Translate a Dolibarr element name into the payment type getOnlinePaymentUrl() knows.
+ *
+ * The core function only answers for 'order', 'invoice', 'member',
+ * 'membersubscription', 'contractline' and 'free'. Anything else (a proposal,
+ * for instance) has no online payment page, and the caller must handle the
+ * empty answer instead of redirecting to it.
+ *
+ * @param  Object $object Paid object.
+ * @return string         Payment type, or an empty string when there is none.
+ */
+function stancerOnlinePaymentType($object)
+{
+	$map = array(
+		'commande' => 'order',
+		'order' => 'order',
+		'facture' => 'invoice',
+		'invoice' => 'invoice',
+		'adherent' => 'member',
+		'member' => 'member',
+		'subscription' => 'membersubscription',
+		'contratdet' => 'contractline',
+		'contractline' => 'contractline',
+	);
+	$element = isset($object->element) ? (string) $object->element : '';
+
+	return isset($map[$element]) ? $map[$element] : '';
+}
+
+/**
+ * Tell the customer that the payment could not be started, on screen.
+ *
+ * Used when there is no online payment page to send them back to. The point is
+ * that they read what happened and how to reach us, instead of a blank page.
+ *
+ * @param  Object $object   Object the customer tried to pay.
+ * @param  string $apiError Raw Stancer error, for the log only.
+ * @return void
+ */
+function stancerPrintPaymentError($object, $apiError = '')
+{
+	global $langs, $mysoc;
+
+	dol_syslog("stancer payment could not be started for " . (isset($object->ref) ? $object->ref : '?') . " : " . $apiError, LOG_ERR);
+
+	print '<p>' . $langs->trans("ErrorStancerPaymentNotStarted") . '</p>';
+	if (!empty($object->ref)) {
+		print '<p>' . $langs->trans("Ref") . ' : <strong>' . dol_escape_htmltag($object->ref) . '</strong></p>';
+	}
+	print '<p>' . $langs->trans("ErrorStancerPleaseContactBy") . '</p><ul>';
+	if (!empty($mysoc->phone)) {
+		print '<li>' . $langs->trans("ErrorStancerPleaseContactByPhone", $mysoc->phone) . '</li>';
+	}
+	if (!empty($mysoc->email)) {
+		print '<li>' . $langs->trans("ErrorStancerPleaseContactByMail", $mysoc->email) . '</li>';
+	}
+	print '</ul>';
 }
 
 /**
