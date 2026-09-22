@@ -76,7 +76,6 @@ include_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
 include_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
 include_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.product.class.php';
 include_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
-include_once DOL_DOCUMENT_ROOT.'/core/lib/ajax.lib.php';
 include_once __DIR__.'/lib/einvoicing.lib.php';
 include_once __DIR__.'/class/providers/PDPProviderManager.class.php';
 include_once __DIR__.'/class/protocols/ProtocolManager.class.php';
@@ -330,6 +329,8 @@ foreach ($flowchoices as $choiceid => $choicelabel) {
 	print dol_escape_htmltag($choicelabel).'</option>';
 }
 print '</select>';
+// ajax_combobox() lives in core/lib/ajax.lib.php, which main.inc.php loads unless the page asks it
+// not to (NOREQUIREAJAX), and this one does not.
 print ajax_combobox('flowid');
 print '</div>';
 print '<div class="inline-block valignmiddle paddingright">'.$langs->trans("OrAnotherFlowId").' ';
