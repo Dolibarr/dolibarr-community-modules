@@ -956,6 +956,18 @@ abstract class AbstractPDPProvider
 	const LOGCALL_SENSITIVE_KEYS = array('client_secret', 'access_token', 'refresh_token', 'id_token', 'password');
 
 	/**
+	 * Maximum number of bytes of a payload stored in the debug columns of the trace. Beyond it the
+	 * payload is stored truncated: an INSERT refused for one oversized column loses the whole trace
+	 * of the call (issue #995), and 1 MiB is already far more than a diagnosis reads.
+	 */
+	const LOGCALL_MAX_PAYLOAD_SIZE = 1048576;
+
+	/**
+	 * Bytes kept free inside LOGCALL_MAX_PAYLOAD_SIZE for the marker appended to a truncated payload.
+	 */
+	const LOGCALL_TRUNCATION_MARKER_SIZE = 64;
+
+	/**
 	 * Redact known sensitive fields (@see LOGCALL_SENSITIVE_KEYS) from a value before it is
 	 * persisted in the API call log, whatever its shape: PHP array, application/x-www-form-urlencoded
 	 * string (OAuth token requests), JSON string, or plain text (left untouched in that last case).
@@ -1017,8 +1029,8 @@ abstract class AbstractPDPProvider
 	 * (llx_einvoicing_call.response, llx_einvoicing_document.response_for_debug).
 	 *
 	 * Some PDP responses carry non-UTF-8 bytes (signed or compressed payloads): stored as-is they raise a
-	 * SQL error 1366 (Incorrect string value) and abort the flow. Valid UTF-8 is kept unchanged; anything
-	 * else is base64-encoded behind a marker.
+	 * SQL error 1366 (Incorrect string value) and abort the flow. Valid UTF-8 is kept as is, anything else
+	 * is base64-encoded behind a marker, and what exceeds LOGCALL_MAX_PAYLOAD_SIZE is truncated (issue #995).
 	 *
 	 * @param   string|null $payload    Raw payload, possibly binary
 	 * @return  string                  UTF-8-safe representation
@@ -1029,9 +1041,46 @@ abstract class AbstractPDPProvider
 			return (string) $payload;
 		}
 		if (preg_match('//u', $payload)) {	// already valid UTF-8
+			return self::truncateDebugPayload($payload);
+		}
+		// Encode only what fits: base64 grows by a third, and cutting the result afterwards would
+		// leave an undecodable tail (4 characters carry 3 bytes).
+		$room = self::LOGCALL_MAX_PAYLOAD_SIZE - self::LOGCALL_TRUNCATION_MARKER_SIZE - strlen('[base64] ');
+		$fits = intdiv($room, 4) * 3;
+		if (strlen($payload) <= $fits) {
+			return '[base64] ' . base64_encode($payload);
+		}
+		return '[base64] ' . base64_encode(substr($payload, 0, $fits)) . self::debugPayloadTruncationMarker(strlen($payload) - $fits);
+	}
+
+	/**
+	 * Keep a UTF-8 payload within LOGCALL_MAX_PAYLOAD_SIZE bytes, cutting on a character boundary:
+	 * a multi-byte character left in half makes the whole column invalid UTF-8 (SQL error 1366).
+	 *
+	 * @param   string  $payload    Valid UTF-8 payload
+	 * @return  string              Payload, truncated and marked as such when it was too long
+	 */
+	protected static function truncateDebugPayload($payload)
+	{
+		if (strlen($payload) <= self::LOGCALL_MAX_PAYLOAD_SIZE) {
 			return $payload;
 		}
-		return '[base64] ' . base64_encode($payload);
+		$kept = substr($payload, 0, self::LOGCALL_MAX_PAYLOAD_SIZE - self::LOGCALL_TRUNCATION_MARKER_SIZE);
+		while ($kept !== '' && !preg_match('//u', $kept)) {	// step back over a character cut in half
+			$kept = substr($kept, 0, -1);
+		}
+		return $kept . self::debugPayloadTruncationMarker(strlen($payload) - strlen($kept));
+	}
+
+	/**
+	 * Marker appended to a payload stored truncated, so the trace says what it does not hold.
+	 *
+	 * @param   int     $dropped    Number of bytes left out
+	 * @return  string              Marker, shorter than LOGCALL_TRUNCATION_MARKER_SIZE
+	 */
+	protected static function debugPayloadTruncationMarker($dropped)
+	{
+		return "\n[truncated: " . ((int) $dropped) . " more bytes]";
 	}
 
 	/**
