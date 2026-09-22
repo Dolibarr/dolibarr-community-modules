@@ -206,6 +206,7 @@ StancerCompanyMailOrPhoneNewPayment = Payment via Stancer is not possible, pleas
 YouCanAccelSignWithUptoSign = Note that you can speed up and streamline the process by setting up eIDAS-compliant electronic signature by adding the %s UptoSign add-on module %s to your Dolibarr...
 NiceUptoSignIsEnabled = UptoSign is active, so your customer can electronically sign your mandate online!
 StancerAlreadyPaid = According to Stancer this transaction has already been paid, please contact %s to verify.
+ErrorStancerPaymentNotStarted = The payment could not be started. Nothing was charged. You may try again in a moment.
 ErrorStancerPleaseContactBy = Please contact the company
 ErrorStancerPleaseContactByPhone = By phone, at %s
 ErrorStancerPleaseContactByMail = By email, at %s
