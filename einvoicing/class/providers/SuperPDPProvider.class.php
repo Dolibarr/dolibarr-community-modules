@@ -2516,6 +2516,12 @@ class SuperPDPProvider extends AbstractPDPProvider
 							$document->xml_data = $cleanedXmlData;
 						}
 
+						// Only when this call is what brought the invoice in: a flow read again must not
+						// write a second import event on an invoice that was already there.
+						if (!empty($res['created']) && !empty($supplierInvoiceObj->id)) {
+							$this->addSupplierInvoiceImportEvent($supplierInvoiceObj, $document);
+						}
+
 						//return array('res' => 0, 'message' => "supplier invoice already exists for flowId: " . $flowId . ". " . $res['message']);
 						$returnRes = 1;		// If invoice did already exists, we process one more line from list of flows, so we must return 1, even if nothing was done.
 						$returnMessage = "Supplier invoice " . $supplierInvoiceObj->ref . " created or already existing for flowId: " . $flowId . ". " . $res['message'];

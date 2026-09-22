@@ -697,7 +697,7 @@ class CIIProtocol extends AbstractProtocol
 	 * @param  string 			$file                       		Source string file (XML or PDF string). We use this file to get data of supplier invoice.
 	 * @param  string|null 		$readableViewFile        			Readable view file (PDP Generated readable PDF). We only store it if available.
 	 * @param  string 			$flowId                       		Flow identifier source of the invoice.
-	 * @return array{res:int<-1,1>, message:string, actioncode?: string|null, actionurl?: string|null, action?:string|null}   Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and an optional 'actioncode' and 'action'.
+	 * @return array{res:int<-1,1>, message:string, actioncode?: string|null, actionurl?: string|null, action?:string|null, created?:int}   Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message', an optional 'actioncode' and 'action', and 'created' set to 1 only when this call is what imported the invoice.
 	 */
 	public function createSupplierInvoiceFromSource($file, $readableViewFile = null, $flowId = '')
 	{
@@ -927,7 +927,7 @@ class CIIProtocol extends AbstractProtocol
 	 * @param  string			$flowId               Source flow identifier
 	 * @param  string			$tempFile             Unique working file for the received XML
 	 * @param  string			$tempFileReadableView Unique working file for the readable view
-	 * @return array{res:int<-1,1>, message:string, action?:string|null}
+	 * @return array{res:int<-1,1>, message:string, action?:string|null, created?:int}	'created' tells the caller whether this call is what brought the invoice in, or found it already imported
 	 */
 	protected function doCreateSupplierInvoiceFromSource($file, $readableViewFile, $flowId, $tempFile, $tempFileReadableView)
 	{
@@ -1085,7 +1085,7 @@ class CIIProtocol extends AbstractProtocol
 				dol_syslog("Temporary 'readable pdf file' not found for attachment", LOG_ERR);
 			}
 
-			return ['res' => $supplierInvoiceId, 'message' => implode("\n", $return_messages)];
+			return ['res' => $supplierInvoiceId, 'message' => implode("\n", $return_messages), 'created' => 0];
 		}
 
 		// Check if all referenced documents in the invoice exist in Dolibarr for the same supplier, if not return with error since we need them for correct linking in the invoice
@@ -1412,7 +1412,7 @@ class CIIProtocol extends AbstractProtocol
 			}
 
 			// TODO : Save receivedFile in supplier invoice attachments
-			return ['res' => $supplierInvoiceId, 'message' => implode("\n", $return_messages), 'xml_data' => $sourceXml];
+			return ['res' => $supplierInvoiceId, 'message' => implode("\n", $return_messages), 'xml_data' => $sourceXml, 'created' => 1];
 		}
 	}
 
