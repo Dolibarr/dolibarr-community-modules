@@ -1135,38 +1135,6 @@ class Call extends CommonObject
 	}
 
 	/**
-	 * Action executed by scheduler
-	 * CAN BE A CRON TASK. In such a case, parameters come from the schedule job setup field 'Parameters'
-	 * Use public function doScheduledJob($param1, $param2, ...) to get parameters
-	 *
-	 * @return	int			0 if OK, <>0 if KO (this function is used also by cron so only 0 is OK)
-	 */
-	public function doScheduledJob()
-	{
-		//global $conf, $langs;
-
-		//$conf->global->SYSLOG_FILE = 'DOL_DATA_ROOT/dolibarr_mydedicatedlogfile.log';
-
-		$error = 0;
-		$this->output = '';
-		$this->error = '';
-
-		dol_syslog(__METHOD__." start", LOG_INFO);
-
-		$now = dol_now();
-
-		$this->db->begin();
-
-		// ...
-
-		$this->db->commit();
-
-		dol_syslog(__METHOD__." end", LOG_INFO);
-
-		return $error;
-	}
-
-	/**
 	 *  Returns the reference to the following non used object with 'call' prefix.
 	 *
 	 *  Must be called inside a transaction opened on $this->db, and the record must be inserted
@@ -1192,7 +1160,9 @@ class Call extends CommonObject
 			}
 		}
 
-		$sql = "SELECT MAX(CAST(SUBSTRING(call_id, ".(strlen($prefix) + 1).") AS INTEGER)) AS maxref";
+		// AS SIGNED, not AS INTEGER: MySQL rejects the latter (ERROR 1064) where MariaDB accepts it, and the
+		// pgsql driver of the core already rewrites " as signed)" into " as integer)" (DoliDBPgsql::convertSQLFromMysql()).
+		$sql = "SELECT MAX(CAST(SUBSTRING(call_id, ".(strlen($prefix) + 1).") AS SIGNED)) AS maxref";
 		$sql .= " FROM ".$this->db->prefix().$this->table_element;
 		$sql .= " WHERE call_id LIKE '".$this->db->escape($prefix)."%'";
 		if (!$ispgsql) {

@@ -52,6 +52,9 @@ class CdarHandler
 	const ACK_REJECTION = '304';
 	const ACK_ACCEPTANCE = '302';
 
+	// Length MDT-4 (the id of the message) is given in the PPF profile of XP Z12-012
+	const ID_MAX_LENGTH = 50;
+
 	// Document Type Codes
 	const DOC_INVOICE = '380';
 	const DOC_CREDIT_NOTE = '381';
@@ -287,11 +290,22 @@ class CdarHandler
 			? $this->getReferencedDocumentTypeCode($object)
 			: CdarHandler::DOC_INVOICE;	// TODO: map DOC_INVOICE with $object type on the supplier invoice statuses too
 
-		// Id format: {SupplierRef}_{StatusCode}_{CreationDate}#{DocType}_{CreationDate} as defined in documentation
+		// Id format {StatusCode}_{CreationDate}#{DocType}_{CreationDate}_{SupplierRef}: same parts as the
+		// documentation, the reference last. MDT-4 names THIS message - a lifecycle message about another
+		// one designates it by that id - and the PPF profile caps the field at 50 characters, so the only
+		// part of variable length is the one the cap eats into, and the document carries the reference
+		// whole in MDT-87 anyway.
 		// 'tzserver' and not the 'auto' default: 'auto' resolves to $conf->tzuserinputkey, which the
 		// MAIN_TZUSERINPUTKEY constant can switch to 'tzuserrel', and the id would then follow the
 		// timezone of whoever triggers the send instead of the server one.
-		$ID = ($statusCode == 212 ? $object->ref : $object->ref_supplier) . '_' . $statusCode . '_' . dol_print_date((int) $object->date_creation, '%Y%m%d%H%M%S', 'tzserver') . '#' . $referencedDocTypeCode . '_' . dol_print_date((int) $object->date_creation, '%Y%m%d', 'tzserver');
+		$issueDateTime = CdarHandler::getCurrentDateTime();
+		// Dated by the moment of the message, milliseconds included: two statuses recorded on the same
+		// invoice within the same second - a bank import, a mass payment - would otherwise share the id.
+		$now = microtime(true);
+		$messageStamp = $issueDateTime . sprintf('%03d', (int) (($now - floor($now)) * 1000));
+		$reference = (string) ($statusCode == CdarHandler::PROC_PAID ? $object->ref : $object->ref_supplier);
+		$ID = $statusCode . '_' . $messageStamp . '#' . $referencedDocTypeCode . '_' . dol_print_date((int) $object->date_creation, '%Y%m%d', 'tzserver') . '_' . $reference;
+		$ID = dol_trunc($ID, CdarHandler::ID_MAX_LENGTH, 'right', 'UTF-8', 1);
 
 		// We use same as ID for Name as its not required to be different
 		$Name = $ID;
@@ -494,7 +508,7 @@ class CdarHandler
 			'ExchangedDocument' => [
 				'ID' => $ID,
 				'Name' => $Name,
-				'IssueDateTime' => CdarHandler::getCurrentDateTime(),
+				'IssueDateTime' => $issueDateTime,
 
 				'SenderTradeParty' => [
 					'RoleCode' => CdarHandler::ROLE_WK
@@ -508,7 +522,7 @@ class CdarHandler
 			'AcknowledgementDocument' => [
 				'MultipleReferencesIndicator' => false,
 				'TypeCode' => '23',
-				'IssueDateTime' => CdarHandler::getCurrentDateTime(),
+				'IssueDateTime' => $issueDateTime,
 
 				'ReferenceReferencedDocument' => [
 					'IssuerAssignedID' => $IssuerAssignedID,
