@@ -121,6 +121,27 @@ class ActionsStancer
 	{
 		global $conf, $langs, $db;
 
+		// Confirmation of "allow payment without 3-D Secure", on an order or an
+		// invoice. It has to state who bears a fraudulent chargeback afterwards.
+		if ($action == 'stancerno3ds'
+			&& in_array($parameters['currentcontext'], array('ordercard', 'invoicecard'), true)
+			&& ($object instanceof Commande || $object instanceof Facture) && !empty($object->id)) {
+			$form = new Form($db);
+			$this->resprints = $form->formconfirm(
+				$_SERVER["PHP_SELF"] . '?id=' . ((int) $object->id),
+				$langs->trans('StancerNo3dsConfirmTitle'),
+				$langs->trans('StancerNo3dsConfirmText', $object->ref),
+				'confirm_stancerno3ds',
+				'',
+				'no',
+				1,
+				250,
+				600
+			);
+
+			return 0;
+		}
+
 		// print json_encode($object);exit;
 
 		// dol_syslog("stancer formConfirm param = " . json_encode($parameters));
@@ -322,6 +343,17 @@ class ActionsStancer
 			print '});' . "\n";
 			print "</script>\n";
 		}
+		// While card payments of this document go without 3-D Secure, say so on the
+		// card itself: a fraudulent chargeback would be borne by the merchant.
+		if (in_array($parameters['currentcontext'], array('ordercard', 'invoicecard'), true)
+			&& ($object instanceof Commande || $object instanceof Facture) && !empty($object->id)
+			&& !in_array($action, array('create', 'edit'), true)) {
+			dol_include_once('/stancer/lib/stancer_payment.lib.php');
+			if (stancerNo3dsCanBeChanged($object) && stancerNo3dsAllowed($object)) {
+				print '<tr><td>' . $langs->trans('StancerNo3dsFieldLabel') . '</td>';
+				print '<td>' . img_warning() . ' ' . $langs->trans('StancerNo3dsBanner') . '</td></tr>';
+			}
+		}
 		// elseif ($parameters['currentcontext'] == 'bankline') {
 		// 	print "<tr><td>Insertion hook</td></tr>";
 		// }
@@ -465,6 +497,39 @@ class ActionsStancer
 		global $conf, $user, $langs, $db;
 
 		$error = 0; // Error counter
+
+		// Allow, or withdraw, card payments without 3-D Secure on one order or
+		// invoice. The change moves the fraud liability to the merchant, so it needs
+		// the Stancer write permission and the session token. The token is checked
+		// here even though the core may already have: the ajax confirmation comes
+		// back as a GET, which the core leaves unchecked below
+		// MAIN_SECURITY_CSRF_WITH_TOKEN = 2.
+		if (in_array($action, array('confirm_stancerno3ds', 'unsetstancerno3ds'), true)
+			&& in_array($parameters['currentcontext'], array('ordercard', 'invoicecard'), true)
+			&& ($object instanceof Commande || $object instanceof Facture) && !empty($object->id)) {
+			dol_include_once('/stancer/lib/stancer_payment.lib.php');
+			$allow = ($action == 'confirm_stancerno3ds');
+			if (!$user->hasRight('stancer', 'write')) {
+				setEventMessages($langs->trans('NotEnoughPermissions'), null, 'errors');
+			} elseif (GETPOST('token', 'alpha') === '' || GETPOST('token', 'alpha') !== currentToken()) {
+				setEventMessages($langs->trans('SecurityTokenHasExpiredSoActionHasBeenCanceledPleaseRetry'), null, 'warnings');
+			} elseif ($allow && GETPOST('confirm', 'alpha') != 'yes') {
+				// "No" in the confirmation: nothing to do.
+			} elseif ($allow && !stancerNo3dsCanBeChanged($object)) {
+				// Nothing left to pay by card: there is no payment to relax 3-D Secure for.
+				setEventMessages($langs->trans('StancerNo3dsChangeFailed'), null, 'errors');
+			} elseif (stancerSetNo3ds($object, $user, $allow) > 0) {
+				setEventMessages($langs->trans($allow ? 'StancerNo3dsAllowed' : 'StancerNo3dsWithdrawn'), null, $allow ? 'warnings' : 'mesgs');
+				// Back to the card, so a reload never replays the change.
+				header('Location: ' . $_SERVER['PHP_SELF'] . '?id=' . ((int) $object->id));
+				exit;
+			} else {
+				setEventMessages($langs->trans('StancerNo3dsChangeFailed'), null, 'errors');
+			}
+			$action = '';
+
+			return 0;
+		}
 
 		// DEBUG FORCE LOG
 		$this->stancerLog("doActions ENTRY: action=$action, currentcontext=" . ($parameters['currentcontext'] ?? 'NULL'), LOG_ERR);
@@ -1358,6 +1423,24 @@ class ActionsStancer
 				}
 			}
 		}
+		// Card payments without 3-D Secure, allowed or withdrawn on this order or
+		// invoice only, while it can still be paid by card.
+		if (getDolGlobalString('STANCER_ENABLE_CB') && $user->hasRight('stancer', 'write')
+			&& in_array($currentcontext, array('ordercard', 'invoicecard'), true)
+			&& ($object instanceof Commande || $object instanceof Facture)) {
+			dol_include_once('/stancer/lib/stancer_payment.lib.php');
+			if (stancerNo3dsCanBeChanged($object)) {
+				$urlCard = $_SERVER["PHP_SELF"] . '?id=' . ((int) $object->id);
+				if (!stancerNo3dsIsInstalled($object)) {
+					print '<div class="inline-block divButAction"><a class="butActionRefused classfortooltip" href="#" title="' . dol_escape_htmltag($langs->trans('StancerNo3dsNeedsReactivation')) . '">' . $langs->trans('StancerNo3dsAllow') . '</a></div>';
+				} elseif (stancerNo3dsAllowed($object)) {
+					print '<div class="inline-block divButAction"><a class="butAction" href="' . $urlCard . '&action=unsetstancerno3ds&token=' . newToken() . '">' . $langs->trans('StancerNo3dsRevoke') . '</a></div>';
+				} else {
+					print '<div class="inline-block divButAction"><a class="butAction" href="' . $urlCard . '&action=stancerno3ds&token=' . newToken() . '">' . $langs->trans('StancerNo3dsAllow') . '</a></div>';
+				}
+			}
+		}
+
 		return 0;
 	}
 
