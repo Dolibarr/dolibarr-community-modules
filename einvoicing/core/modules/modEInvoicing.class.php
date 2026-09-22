@@ -435,7 +435,7 @@ class modEInvoicing extends DolibarrModules
 			'url' => '/einvoicing/sync_pending_list.php',
 			'langs' => 'einvoicing@einvoicing',
 			'position' => 1004,
-			'enabled' => 'isModEnabled("einvoicing") && !getDolGlobalString("EINVOICING_ONLY_GENERATE") && getDolGlobalInt("EINVOICING_ENABLE_MANUAL_ACTION_QUEUE")',
+			'enabled' => 'isModEnabled("einvoicing") && !getDolGlobalString("EINVOICING_ONLY_GENERATE") && (getDolGlobalInt("EINVOICING_ENABLE_MANUAL_ACTION_QUEUE") || getDolGlobalInt("EINVOICING_ENABLE_POSTPONE_FLOWS"))',
 			'perms' => '$user->hasRight("einvoicing", "read")',
 			'target' => '',
 			'user' => 2,
