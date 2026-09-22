@@ -7,16 +7,25 @@ permissions:
 
 # Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the main branch
+  # Triggers the workflow on push or pull request events but only for the main branch.
+  # A change that carries no PHP is left out: phan reads the whole repository whatever the event,
+  # and documentation, a module descriptor or an issue template give it nothing to analyse. The
+  # workflow files themselves stay in, so a change to this one is still tried by phan.
   push:
     branches: [ main ]
     paths-ignore:
       - '.agents/**'
+      - '**.md'
+      - '**index.yaml'
+      - '.github/ISSUE_TEMPLATE/**'
 
   pull_request:
     branches: [ main ]
     paths-ignore:
       - '.agents/**'
+      - '**.md'
+      - '**index.yaml'
+      - '.github/ISSUE_TEMPLATE/**'
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
