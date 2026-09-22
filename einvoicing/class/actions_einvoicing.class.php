@@ -963,6 +963,45 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					return 0;
 				}
 			}
+
+			// Record on the vendor the payment account the received document announces (BT-84/85/86).
+			// Only ever on this explicit confirmation: the import itself writes nothing of the kind.
+			if ($action == 'confirm_einvoice_addpayeeban' && GETPOST('confirm') == 'yes') {
+				dol_include_once('einvoicing/class/utils/PayeeBankAccountHelper.class.php');
+				/** @var FactureFournisseur $object */
+
+				if (!getDolGlobalInt('EINVOICING_THIRDPARTIES_ADD_PAYEE_BANK_ACCOUNT')) {
+					setEventMessages($langs->trans('EInvoicePayeeAccountAddNotEnabled'), array(), 'errors');
+					return 0;
+				}
+				if (!PayeeBankAccountHelper::userCanAddAccount($user)) {
+					setEventMessages($langs->trans('NotEnoughPermissions'), array(), 'errors');
+					return 0;
+				}
+
+				// Read the document again rather than trust the posted values: only what it really
+				// announces may be recorded on the vendor
+				$payeeAccounts = PayeeBankAccountHelper::announcedAccounts($db, $object);
+				$payeeAccountIdx = GETPOSTINT('payeeaccount');
+				if (!isset($payeeAccounts[$payeeAccountIdx])) {
+					setEventMessages($langs->trans('EInvoicePayeeAccountNotFound'), array(), 'errors');
+					return 0;
+				}
+
+				$addError = '';
+				$resadd = PayeeBankAccountHelper::addAccountToThirdparty($db, $user, (int) $object->socid, $payeeAccounts[$payeeAccountIdx], (string) $object->ref_supplier, $addError);
+				if ($resadd > 0) {
+					setEventMessages($langs->trans('EInvoicePayeeAccountAdded', dol_escape_htmltag($payeeAccounts[$payeeAccountIdx]['iban'])), array(), 'mesgs');
+				} elseif ($resadd == 0) {
+					setEventMessages($langs->trans('EInvoicePayeeAccountAlreadyKnown', dol_escape_htmltag($payeeAccounts[$payeeAccountIdx]['iban'])), array(), 'warnings');
+				} else {
+					$this->errors[] = $addError;
+					setEventMessages($langs->trans('EInvoicePayeeAccountAddFailed', dol_escape_htmltag($addError)), array(), 'errors');
+					return -1;
+				}
+
+				return 0;
+			}
 		}
 
 		if ($isThirdpartyContext) {
@@ -1366,7 +1405,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 */
 	public function formConfirm($parameters, $object, &$action, $hookmanager)
 	{
-		global $db, $langs, $form;
+		global $db, $langs, $form, $user;
 
 		if (empty($object->element)) {
 			return 0;
@@ -1465,6 +1504,41 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					250
 				);
 				$this->resprints .= $formconfirm;
+			}
+
+			// Confirmation before recording on the vendor the account the received document announces.
+			// It defaults to "no": a bank account read from an incoming document is what an invoice
+			// fraud carries too, so the user has to say it is the right one.
+			if ($action == 'einvoice_addpayeeban') {
+				dol_include_once('einvoicing/class/utils/PayeeBankAccountHelper.class.php');
+				'@phan-var-force FactureFournisseur $object';
+				/** @var FactureFournisseur $object */
+
+				$payeeAccounts = PayeeBankAccountHelper::announcedAccounts($db, $object);
+				$payeeAccountIdx = GETPOSTINT('payeeaccount');
+				if (isset($payeeAccounts[$payeeAccountIdx]) && PayeeBankAccountHelper::addAccountOffered($user)) {
+					$form = new Form($db);
+
+					$object->fetch_thirdparty();
+					$vendorName = is_object($object->thirdparty) ? $object->thirdparty->name : '';
+
+					// Escaped before reaching trans(): the IBAN and the reference are written by the sender
+					$question = $langs->trans('EInvoicePayeeAccountAddConfirm', dol_escape_htmltag($payeeAccounts[$payeeAccountIdx]['iban']), dol_escape_htmltag($vendorName), dol_escape_htmltag((string) $object->ref_supplier));
+					$question .= '<br><br>' . $langs->trans('EInvoicePayeeAccountFraudWarning');
+
+					$formconfirm = $form->formconfirm(
+						$_SERVER["PHP_SELF"] . '?id=' . ((int) $object->id) . '&action=confirm_einvoice_addpayeeban&payeeaccount=' . ((int) $payeeAccountIdx),
+						$langs->trans('EInvoicePayeeAccountAdd'),
+						$question,
+						'confirm_einvoice_addpayeeban',
+						'',
+						'no',
+						1,
+						360
+					);
+
+					$this->resprints .= $formconfirm;
+				}
 			}
 		}
 
