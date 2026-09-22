@@ -301,26 +301,8 @@ class modEInvoicing extends DolibarrModules
 				  'test' => 'isModEnabled("einvoicing")',
 				  'priority' => 50,
 				  ),
-			//  0 => array(
-			//      'label' => 'MyJob label',
-			//      'jobtype' => 'method',
-			//      'class' => '/einvoicing/class/call.class.php',
-			//      'objectname' => 'Call',
-			//      'method' => 'doScheduledJob',
-			//      'parameters' => '',
-			//      'comment' => 'Comment',
-			//      'frequency' => 2,
-			//      'unitfrequency' => 3600,
-			//      'status' => 0,
-			//      'test' => 'isModEnabled("einvoicing")',
-			//      'priority' => 50,
-			//  ),
 		);
 		/* END MODULEBUILDER CRON */
-		// Example: $this->cronjobs=array(
-		//    0=>array('label'=>'My label', 'jobtype'=>'method', 'class'=>'/dir/class/file.class.php', 'objectname'=>'MyClass', 'method'=>'myMethod', 'parameters'=>'param1, param2', 'comment'=>'Comment', 'frequency'=>2, 'unitfrequency'=>3600, 'status'=>0, 'test'=>'isModEnabled("einvoicing")', 'priority'=>50),
-		//    1=>array('label'=>'My label', 'jobtype'=>'command', 'command'=>'', 'parameters'=>'param1, param2', 'comment'=>'Comment', 'frequency'=>1, 'unitfrequency'=>3600*24, 'status'=>0, 'test'=>'isModEnabled("einvoicing")', 'priority'=>50)
-		// );
 
 		// Permissions provided by this module
 		$this->rights = array();
