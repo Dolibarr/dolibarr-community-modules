@@ -272,10 +272,20 @@ class EInvoicingSyncPending extends CommonObject
 		$this->tracking_idref  = (string) ($flow['trackingId'] ?? '');
 		$this->reason_code     = (string) $reason;
 		$this->reason_message  = (string) $message;
-		$this->action_data     = empty($data) ? null : (string) json_encode($data);
-		$this->action_html     = ($actionHtml !== '' && $actionHtml !== null) ? $actionHtml : null;
-		$this->match_data      = empty($matchData) ? null : (string) json_encode($matchData);
-		$this->flow_updatedat  = $updatedatSql;
+		// What the caller does not bring is kept: a row now has two writers (the manual-action queue and
+		// the postponed flows), and the second does not always know what the first computed.
+		if (!empty($data)) {
+			$this->action_data = (string) json_encode($data);
+		}
+		if ($actionHtml !== '' && $actionHtml !== null) {
+			$this->action_html = $actionHtml;
+		}
+		if (!empty($matchData)) {
+			$this->match_data = (string) json_encode($matchData);
+		}
+		if ($updatedatSql !== null) {
+			$this->flow_updatedat = $updatedatSql;
+		}
 		$this->date_lastattempt = dol_now();
 
 		if ($existing > 0) {
@@ -318,5 +328,70 @@ class EInvoicingSyncPending extends CommonObject
 			$this->fk_element_id = (int) $elementId;
 		}
 		return $this->update($user) > 0 ? 1 : -1;
+	}
+
+	/**
+	 * Normalize the manual actions a synchronization result carries into the shape the queue stores.
+	 *
+	 * @param  array<string,mixed> $res    Result of syncFlow()
+	 * @param  string              $reason Business reason code of that result
+	 * @return array<int,array{key:string,url:string,label:string}> The actions the pending list renders as icons
+	 */
+	public static function manualActionsFromResult($res, $reason)
+	{
+		$manualactions = array();
+		if (!empty($res['allactiondata']) && is_array($res['allactiondata'])) {
+			foreach ($res['allactiondata'] as $akey => $adata) {
+				if (!empty($adata['url'])) {
+					$manualactions[] = array('key' => $akey, 'url' => $adata['url'], 'label' => ($adata['label'] ?? ''));
+				}
+			}
+		} elseif (!empty($res['actionurl']) && $res['actionurl'] !== 'none') {
+			// 'none' is how a postponed result says it has no screen to send the operator to.
+			$manualactions[] = array('key' => ($reason == 'THIRDPARTY_NOT_FOUND' ? 'createthirdparty' : 'create'), 'url' => $res['actionurl'], 'label' => '');
+		}
+		return $manualactions;
+	}
+
+	/**
+	 * List the flows still pending for one provider, the ones waiting longest first.
+	 *
+	 * @param  int      $limit    Maximum number of rows, 0 for all of them
+	 * @param  string   $provider Provider short key ('superpdp', ...), empty for every access point
+	 * @return stdClass[]|int     The pending rows, or -1 on a database failure
+	 */
+	public function fetchPending($limit = 0, $provider = '')
+	{
+		global $conf;
+
+		$sql = "SELECT rowid, entity, provider, flow_id, flow_direction, flow_type, tracking_idref,";
+		$sql .= " reason_code, reason_message, action_data, action_html, match_data, flow_updatedat,";
+		$sql .= " nb_attempts, date_lastattempt, date_creation";
+		$sql .= " FROM ".MAIN_DB_PREFIX.$this->table_element;
+		$sql .= " WHERE entity = ".((int) $conf->entity);
+		$sql .= " AND status = ".((int) self::STATUS_PENDING);
+		if ($provider !== '') {
+			$sql .= " AND provider = '".$this->db->escape($provider)."'";
+		}
+		// Oldest first: what has been waiting longest is what has to be taken again first.
+		$sql .= " ORDER BY date_creation ASC";
+		if ($limit > 0) {
+			$sql .= $this->db->plimit((int) $limit);
+		}
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			dol_syslog(__METHOD__.' '.$this->error, LOG_ERR, 0, "_einvoicing");
+			return -1;
+		}
+
+		$rows = array();
+		while ($obj = $this->db->fetch_object($resql)) {
+			$rows[] = $obj;
+		}
+		$this->db->free($resql);
+
+		return $rows;
 	}
 }
