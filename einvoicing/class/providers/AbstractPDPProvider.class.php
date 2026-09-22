@@ -28,6 +28,7 @@
 
 require_once __DIR__ . '/../protocols/ProtocolManager.class.php';
 require_once __DIR__ . '/../../lib/einvoicing.lib.php';	// removeAllSpaces(), used to normalize an electronic address
+require_once __DIR__ . '/../einvoicingsyncpending.class.php';	// queue holding the flows that wait on something missing here
 
 
 /**
@@ -945,6 +946,80 @@ abstract class AbstractPDPProvider
 		}
 
 		return $LastSyncDate;
+	}
+
+	/**
+	 * Take the postponed flows again, by identifier, before the window is listed.
+	 *
+	 * A postponed flow stored nothing, so it does not move the start of the window, but every flow
+	 * imported after it does: once that start has passed it by more than the margin, the search endpoint
+	 * never lists it again. Asking for flows/<flowId> uses no date window, so nothing is lost.
+	 * Enabled by EINVOICING_ENABLE_POSTPONE_FLOWS, the option that postpones in the first place.
+	 *
+	 * @param	string[]							$results_messages	Run messages, appended to
+	 * @param	array<string,array<string,mixed>>	$actions			Manual actions to do, appended to
+	 * @return	array{imported:int,waiting:int,handled:string[]}			What came back, what still waits, and
+	 *																	the flows the window loop can skip
+	 */
+	protected function replayPostponedFlows(&$results_messages, &$actions)
+	{
+		global $db, $user;
+
+		$replay = array('imported' => 0, 'waiting' => 0, 'handled' => array());
+		if (!getDolGlobalInt('EINVOICING_ENABLE_POSTPONE_FLOWS')) {
+			return $replay;
+		}
+
+		$providershort = preg_replace('/ViaPartner$/', '', (string) $this->providerName);
+		$syncPending = new EInvoicingSyncPending($db);
+		// Every waiting row of this access point, whichever option queued it: what the manual-action queue
+		// holds is taken again the same way, so a flow whose action has been done lands without a click.
+		$queue = $syncPending->fetchPending(getDolGlobalInt('EINVOICING_FLOWS_SYNC_REPLAY_SIZE', 50), $providershort);
+		if (!is_array($queue)) {
+			return $replay;
+		}
+
+		foreach ($queue as $row) {
+			$replay['handled'][] = (string) $row->flow_id;
+			$waitingsince = dol_print_date($db->jdate($row->date_creation), 'dayhour');
+			$res = $this->syncFlow((string) $row->flow_id, null);
+			if (!is_array($res)) {
+				$res = array('res' => -1, 'message' => 'No result returned by syncFlow');
+			}
+			$message = (string) ($res['message'] ?? '');
+
+			if (($res['res'] ?? -1) >= 0) {
+				// Only the element type: what syncFlow() answers is a status, never the id of what it created.
+				$elementtype = ((($row->flow_direction ?? '') === 'In') ? 'invoice_supplier' : '');
+				$syncPending->resolveByFlowId((string) $row->flow_id, $providershort, $user, $elementtype);
+				$replay['imported']++;
+				dol_syslog(__METHOD__ . " Flow " . $row->flow_id . " taken again by id and synchronized: " . $message, LOG_WARNING, 0, "_einvoicing");
+				$results_messages[] = "Flow " . dol_escape_htmltag((string) $row->flow_id) . ", waiting since " . $waitingsince . ", has just been synchronized: " . $message;
+				continue;
+			}
+
+			// Kept pending, never counted as an error: a flow nobody can unblock would otherwise abort every
+			// run from here on, which is what this replay exists to end.
+			$replay['waiting']++;
+			$flow = array('flowId' => (string) $row->flow_id, 'flowDirection' => (string) $row->flow_direction, 'flowType' => (string) $row->flow_type, 'trackingId' => (string) $row->tracking_idref);
+			$reason = (string) (!empty($res['actioncode']) ? $res['actioncode'] : $row->reason_code);
+			// Refreshed the way the queue page does it on a manual retry: same normalized actions, so the
+			// buttons an operator needs stay right whichever of the two took the flow again.
+			$manualactions = EInvoicingSyncPending::manualActionsFromResult($res, $reason);
+			$syncPending->queueFromFlow($flow, $providershort, $reason, $message, $manualactions, $user, (string) ($res['action'] ?? ''), (array) ($res['actiondata'] ?? array()));
+
+			$actions[$reason] = array(
+				'actionurl' => (string) ($res['actionurl'] ?? ''),
+				'actioncode' => $reason,
+				'action' => (string) (!empty($res['action']) ? $res['action'] : $row->action_html),
+				'businessmessage' => (string) (!empty($res['businessmessage']) ? $res['businessmessage'] : $row->reason_message)
+			);
+
+			dol_syslog(__METHOD__ . " Flow " . $row->flow_id . " taken again by id, still waiting: " . $message, LOG_WARNING, 0, "_einvoicing");
+			$results_messages[] = "Flow " . dol_escape_htmltag((string) $row->flow_id) . ", waiting since " . $waitingsince . ", still cannot be synchronized: " . $message;
+		}
+
+		return $replay;
 	}
 
 	/**

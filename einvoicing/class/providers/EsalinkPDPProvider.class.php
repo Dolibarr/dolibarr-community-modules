@@ -865,6 +865,13 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$results_messages = array();	// result message (technical error)
 		$error_messages = array();		// subset of the above holding only what made the run fail
 		$actions = array();				// business message (manual action to do)
+		$providershort = preg_replace('/ViaPartner$/', '', (string) $this->providerName);
+		$syncPending = new EInvoicingSyncPending($db);
+
+		// The waiting flows come first, and by identifier: they are older than the start of the window
+		// the listing below uses, so it may never return them again whatever this run does.
+		$replay = $this->replayPostponedFlows($results_messages, $actions);
+		$replayedFlows = $replay['imported'];
 
 		$resource = 'flows/search';
 		// Correlation id, sent as the Request-Id header of the call below and recorded in the call log.
@@ -949,7 +956,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			dol_syslog(__METHOD__ . " No flows to synchronize.", LOG_DEBUG, 0, "_einvoicing");
 
 			$results_messages[] = "No flows to synchronize.";
-			return array('res' => 1, 'messages' => $results_messages);
+			// Nothing new does not mean nothing happened: the waiting flows were taken again above.
+			return array('res' => 1, 'messages' => $results_messages, 'syncedFlows' => $replayedFlows, 'actions' => $actions);
 		}
 
 		$results = $response['response']['results'] ?? array();
@@ -991,8 +999,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		// $totalFlows = count($response['response']['results']); // TODO : VERIFY IF NEEDED
 		$error = 0;
 		$alreadyExist = 0;
-		$syncedFlows = 0;
-		$postponedFlows = 0;	// Flows left unread on purpose, retried on the next run (see 'postponeflow')
+		$syncedFlows = $replayedFlows;			// The waiting flows taken again by id above count as synchronized too
+		$postponedFlows = $replay['waiting'];	// Flows left unread on purpose, retried on the next run (see 'postponeflow')
 
 		// Call ID for logging purposes
 		$call_id = $response['call_id'] ?? null;
@@ -1003,6 +1011,11 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$i = 0;
 		foreach ($response['response']['results'] ?? [] as $flow) {
 			$i++;
+			if (in_array($flow['flowId'], $replay['handled'])) {
+				// Taken again from the queue at the start of this run, and counted there.
+				dol_syslog(__METHOD__ . " #" . $i . " Flow " . $flow['flowId'] . " already replayed by id, discard it.", LOG_DEBUG, 0, "_einvoicing");
+				continue;
+			}
 			if (in_array($flow['flowId'], $alreadyProcessedFlowIds)) {
 				dol_syslog(__METHOD__ . " #" . $i . " Flow " . $flow['flowId'] . " already processed, discard it.", LOG_DEBUG, 0, "_einvoicing");
 				$alreadyExist++;
@@ -1037,6 +1050,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 						dol_syslog(__METHOD__ . " Flow " . $flow['flowId'] . " postponed: " . $res['message'], LOG_WARNING, 0, "_einvoicing");
 						$results_messages[] = "Flow " . dol_escape_htmltag((string) $flow['flowId']) . " postponed, it will be retried on the next synchronization: " . $res['message'];
+
+						// Queued, because nothing was stored for this flow: this row is what lets the next run
+						// ask for it by identifier once the window has left it behind.
+						$syncPending->queueFromFlow($flow, $providershort, (string) ($res['actioncode'] ?? ''), (string) ($res['message'] ?? ''), array(), $user, (string) ($res['action'] ?? ''), (array) ($res['actiondata'] ?? array()));
 
 						$postponedFlows++;
 						continue;
@@ -1125,6 +1142,13 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 					$syncedFlows++;
 					//$lastsuccessfullSyncronizedFlow = $flow['flowId'];
 				}
+
+				// A flow that finally synchronized (or now already exists) leaves the queue, so its row never
+				// outlives its cause.
+				if ((getDolGlobalInt('EINVOICING_ENABLE_POSTPONE_FLOWS') || getDolGlobalInt('EINVOICING_ENABLE_MANUAL_ACTION_QUEUE')) && $res['res'] >= 0) {
+					$resolvedElementType = ((($flow['flowDirection'] ?? '') === 'In') ? 'invoice_supplier' : '');
+					$syncPending->resolveByFlowId($flow['flowId'], $providershort, $user, $resolvedElementType, ($res['res'] > 0 ? (int) $res['res'] : 0));
+				}
 			} catch (Exception $e) {
 				$errormessage = "Exception occurred while synchronizing flow " . dol_escape_htmltag((string) $flow['flowId']) . ": " . dol_escape_htmltag($e->getMessage());
 				$results_messages[] = $errormessage;
@@ -1158,6 +1182,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			}
 		}
 		$messages[] = $langs->trans("TotalSkippedSync") . ": <b>" . $alreadyExist . "</b> - " . $langs->trans("TotalNewSync") . ": <b>" . $syncedFlows . "</b>";
+		if ($replayedFlows > 0) {
+			// Said apart from the new ones: those had been waiting, sometimes for days
+			$messages[] = $langs->trans("TotalReplayedSync") . ": <b>" . $replayedFlows . "</b>";
+		}
 		if ($postponedFlows > 0) {
 			// Counted apart from the skipped ones: those flows were not stored, they come back next run
 			$messages[] = $langs->trans("TotalPostponedSync") . ": <b>" . $postponedFlows . "</b>";
