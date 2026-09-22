@@ -133,13 +133,13 @@ class ActionsStancer
 		// on a GET a link prefetch could fire.
 		if ($action == 'stancersendpaylink'
 			&& in_array($parameters['currentcontext'], array('ordercard', 'invoicecard'), true)
-			&& is_object($object) && !empty($object->id)) {
+			&& ($object instanceof Commande || $object instanceof Facture) && !empty($object->id)) {
 			dol_include_once('/stancer/lib/stancer_customer.lib.php');
 			$form = new Form($db);
 			$societe = new Societe($db);
 			$recipient = '';
 			$recipientFrom = '';
-			if (!empty($object->socid) && $societe->fetch($object->socid) > 0) {
+			if (!empty($object->socid) && $societe->fetch((int) $object->socid) > 0) {
 				$payer = stancerResolvePayerContact($societe, $object);
 				$recipient = $payer['email'];
 				$recipientFrom = $payer['email_from'];
@@ -1281,10 +1281,11 @@ class ActionsStancer
 		if (getDolGlobalString('STANCER_ENABLE_CB') && in_array($currentcontext, array('ordercard', 'invoicecard'), true)) {
 			$stillOwesMoney = false;
 			if ($currentcontext == 'invoicecard' && $object instanceof Facture) {
-				$stillOwesMoney = ($object->status == Facture::STATUS_VALIDATED && empty($object->paye));
-			} elseif ($currentcontext == 'ordercard') {
+				// A paid invoice is closed (STATUS_CLOSED), so a validated one still owes money.
+				$stillOwesMoney = ($object->status == Facture::STATUS_VALIDATED);
+			} elseif ($currentcontext == 'ordercard' && $object instanceof Commande) {
 				// Order statuses: 0 draft, 1 validated, 2 in progress, 3 delivered, -1 cancelled.
-				$stillOwesMoney = (isset($object->statut) && $object->statut >= 1);
+				$stillOwesMoney = ($object->status >= Commande::STATUS_VALIDATED);
 			}
 			if ($stillOwesMoney) {
 				print '<div class="inline-block divButAction"><a class="butAction" href="' . $_SERVER["PHP_SELF"]

@@ -808,7 +808,7 @@ function stancerCSVtoHTML($header, $message)
  *
  * @param  Object $object Paid object (order or invoice).
  * @param  string $type   Online payment type, 'order' or 'invoice'.
- * @return array          Keys: ok (bool), email (string), url (string), error (string).
+ * @return array{ok:bool,email:string,url:string,error:string,template:string} What happened, and to whom.
  */
 function stancerSendPaymentLink($object, $type)
 {

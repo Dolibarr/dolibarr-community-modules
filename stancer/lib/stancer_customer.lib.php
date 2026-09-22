@@ -432,7 +432,7 @@ function stancerLooksLikeMobile($phone)
  *
  * @param  Societe     $societe Thirdparty that owes the money.
  * @param  Object|null $object  Paid object, when there is one.
- * @return array                Keys: email, mobile, email_from, mobile_from.
+ * @return array{email:string,mobile:string,email_from:string,mobile_from:string} Values found, and where.
  */
 function stancerResolvePayerContact($societe, $object = null)
 {
