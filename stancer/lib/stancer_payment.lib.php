@@ -305,12 +305,7 @@ function stancerCardstartPayWithRedirect($object, $parameters, $forceAmount = nu
 
 	$public_key = stancer_get_public_key();
 
-	$args = base64_encode('tag=' . $tag . '&source=' . $source . '&ref=' . $object->ref . '&securekey=' . $securekey);
-	if (defined('DOLENTITY')) {
-		$args .= '&e=' . DOLENTITY;
-	}
-
-	$urlretour = DOL_MAIN_URL_ROOT . '/custom/stancer/public/paymentback.php?s=' . $args;
+	$urlretour = stancerBuildReturnUrl($tag, $source, $object->ref, $securekey);
 
 	// Get customer data for email (used later for notifications)
 	$customerData = $stancerApi->getCustomer($customerID);
@@ -368,6 +363,11 @@ function stancerCardstartPayWithRedirect($object, $parameters, $forceAmount = nu
 		if ($mustNewUUID) {
 			$tag = stancerNextFreeTag($tag, $db);
 			dol_syslog("stancer   Stancer new attempt tag is $tag");
+			// The return URL was built above with the previous tag, and paymentback.php
+			// finds the attempt by that tag: left as is, it would load the refused
+			// attempt, ask Stancer about the refused payment, and report a failure to a
+			// customer whose new payment went through - without recording it.
+			$urlretour = stancerBuildReturnUrl($tag, $source, $object->ref, $securekey);
 		}
 
 		// Build payment data for API
@@ -1854,6 +1854,29 @@ function stancerNextFreeTag($baseTag, $db)
 
 	$suffix = '.UNIQ=' . dol_print_date(dol_now(), '%y%m%d%H%M%S');
 	return substr($baseTag, 0, $maxLength - strlen($suffix)) . $suffix;
+}
+
+/**
+ * Build the URL Stancer sends the customer back to after a card payment.
+ *
+ * paymentback.php loads the local attempt by the tag carried in this URL, so
+ * the tag must be the one of the attempt actually sent to Stancer: after a
+ * retry, that is the tag stancerNextFreeTag() returned, not the first one.
+ *
+ * @param  string $tag       Tag of the attempt, i.e. its unique_id.
+ * @param  string $source    Payment source ('order', 'invoice', ...).
+ * @param  string $ref       Reference of the paid object.
+ * @param  string $securekey Security key of the payment page.
+ * @return string            Absolute return URL.
+ */
+function stancerBuildReturnUrl($tag, $source, $ref, $securekey)
+{
+	$args = base64_encode('tag=' . $tag . '&source=' . $source . '&ref=' . $ref . '&securekey=' . $securekey);
+	if (defined('DOLENTITY')) {
+		$args .= '&e=' . DOLENTITY;
+	}
+
+	return DOL_MAIN_URL_ROOT . '/custom/stancer/public/paymentback.php?s=' . $args;
 }
 
 /**
