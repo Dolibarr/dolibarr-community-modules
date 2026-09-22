@@ -1966,8 +1966,8 @@ class EInvoicing
 				$autorun = ((int) $object->status === Facture::STATUS_VALIDATED && empty($currentStatusInfo['everTransmitted'])) ? 1 : 0;
 				$resprints .= '<tr class="treinvoicing_collapseseparator">';
 				$resprints .= '<td>' . $form->textwithpicto($langs->trans("EInvoicingDirectoryCheck"), $langs->trans("EInvoicingDirectoryCheckHelp")) . '</td>';
-				$resprints .= '<td><span id="einvoice-directory" class="opacitymedium">' . ($autorun ? dol_escape_htmltag($langs->trans("EInvoicingDirectoryChecking")) : '-') . '</span>';
-				$resprints .= ' <a href="#" id="einvoice-directory-check" class="paddingleft">' . img_picto('', 'refresh', 'class="paddingright"') . $langs->trans("EInvoicingDirectoryCheckButton") . '</a>';
+				$resprints .= '<td><span id="einvoice-directory" class="opacitymedium">' . ($autorun ? dol_escape_htmltag($langs->trans("EInvoicingDirectoryChecking")) . ' - ' : '') . '</span>';
+				$resprints .= '<a href="#" id="einvoice-directory-check" class="paddingleft">' . img_picto('', 'refresh', 'class="paddingright"') . $langs->trans("EInvoicingDirectoryCheckButton") . '</a>';
 				$resprints .= '</td></tr>';
 				$resprints .= '<script type="text/javascript">
 				(function(){
