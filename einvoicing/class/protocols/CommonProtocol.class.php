@@ -589,7 +589,7 @@ trait CommonProtocol
 	public function findThirdpartyFromEInvoiceSeller($sellerInfo)
 	{
 		global $db;
-		require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
+		require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php'; // @phpstan-ignore requireOnce.fileNotFound
 
 		$thirdparty = new Societe($db);
 		$sellerCountryCode = $sellerInfo['sellercountry'] ?? '';

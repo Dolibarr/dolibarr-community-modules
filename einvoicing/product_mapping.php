@@ -203,6 +203,9 @@ if (!empty($flowid)) {
  * the vendor is read from it the way the import reads it - same identifiers, same lookup, read only.
  */
 
+// The lookup comes from the CommonProtocol trait, used by the protocols able to import an invoice.
+'@phan-var-force ?CIIProtocol $protocol';
+/** @var ?CIIProtocol $protocol */
 $socidfromdocument = 0;
 if (!empty($parsedHeader) && is_object($protocol) && method_exists($protocol, 'findThirdpartyFromEInvoiceSeller')) {
 	$sellerlookup = $protocol->findThirdpartyFromEInvoiceSeller($parsedHeader);
