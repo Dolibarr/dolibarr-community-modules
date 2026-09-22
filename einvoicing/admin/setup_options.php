@@ -408,6 +408,16 @@ if (!einvoicingReceptionDisabled()) {			// If sync AP to DOLI is not disabled or
 	$item->defaultFieldValue = '0';
 	$item->cssClass = 'minwidth500';
 
+	// Setup conf to offer, on the card of a received invoice, to record on the vendor the bank account
+	// the document announces (BT-84/85/86). Off by default: the account is only ever added by a click
+	// of the user, and a bank account announced by an incoming document is what an invoice fraud
+	// carries too, so the button itself is opt-in.
+	$item = $formSetup->newItem('EINVOICING_THIRDPARTIES_ADD_PAYEE_BANK_ACCOUNT')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('EINVOICING_THIRDPARTIES_ADD_PAYEE_BANK_ACCOUNT_HELP');
+	$item->defaultFieldValue = '0';
+	$item->cssClass = 'minwidth500';
+	$item->fieldParams['warningifon'] = 1;
+
 	// Setup conf to to enable a limit of flows to synchronize per one synchronization call
 	/* This option is useless, should be always on. Disabling it is possible by editing hidden cosntant
 	$item = $formSetup->newItem('EINVOICING_FLOWS_SYNC_CALL_LIMIT')->setAsYesNo();
