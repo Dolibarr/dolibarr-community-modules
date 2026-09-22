@@ -39,6 +39,14 @@ if (isset($mysoc) && !isset($GLOBALS['mysoc'])) {
 	$GLOBALS['mysoc'] = $mysoc;
 }
 
+// The assertions read the English wording of the core, and the module ships en_US only, so a test
+// run must not depend on the language of the instance it runs on. Pinned in memory, for this
+// process: the constant of the database is left alone.
+if (isset($conf, $langs) && is_object($langs)) {
+	$conf->global->MAIN_LANG_DEFAULT = 'en_US';
+	$langs->setDefaultLang('en_US');
+}
+
 $coreCommonClassTest = DOL_DOCUMENT_ROOT . '/../test/phpunit/CommonClassTest.class.php';
 
 if (file_exists($coreCommonClassTest)) {
