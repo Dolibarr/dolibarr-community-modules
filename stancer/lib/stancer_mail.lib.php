@@ -141,6 +141,12 @@ function stancerGetMailTemplate($formmail, $modele, $outputlangs, $templatetypes
 	return null;
 }
 
+// stancerSendOrderMailModele() and stancerSendInvoiceMailModele() instantiate
+// FormMail. Nothing loads that class on an order or an invoice card, so any
+// caller that had not included it itself died with "Class FormMail not found"
+// as soon as a template was configured. A library declares what it uses.
+require_once DOL_DOCUMENT_ROOT . '/core/class/html.formmail.class.php';
+
 /**
  * Record an agenda event, linked to the given object so it shows on its events tab
  *
