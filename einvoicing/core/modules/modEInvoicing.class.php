@@ -78,7 +78,11 @@ class modEInvoicing extends DolibarrModules
 		$this->editor_squarred_logo = '';					// Must be image filename into the module/img directory followed with @modulename. Example: 'myimage.png@einvoicing'
 
 		// Possible values for version are: 'development', 'experimental', 'dolibarr', 'dolibarr_deprecated', 'experimental_deprecated' or a version string like 'x.y.z'
-		$this->version = trim(file_get_contents(__DIR__.'/../../VERSION'));
+		// Read guarded like einvoicingModuleStamp() guards the same file: a deployment is free to drop
+		// VERSION, and __DIR__ resolves outside the instance when the module is a symlink, so an
+		// unguarded read prints two PHP warnings on the module list instead of leaving the value empty.
+		$versionfile = __DIR__.'/../../VERSION';
+		$this->version = (is_readable($versionfile) ? trim((string) file_get_contents($versionfile)) : '');
 		// Url to the file with your last numberversion of this module
 		$this->url_last_version = 'https://raw.githubusercontent.com/Dolibarr/dolibarr-community-modules/refs/heads/main/einvoicing/VERSION';
 
