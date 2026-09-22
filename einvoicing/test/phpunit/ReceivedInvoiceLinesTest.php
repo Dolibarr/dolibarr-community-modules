@@ -39,7 +39,7 @@ if (!file_exists($dolibarrHtdocs . '/master.inc.php')) {
 
 require_once $dolibarrHtdocs . '/master.inc.php';
 dol_include_once('einvoicing/class/protocols/CIIProtocol.class.php');
-require_once dirname(__FILE__) . '/../../class/utils/EmbeddedXmlReader.class.php';
+require_once __DIR__ . '/../../class/utils/EmbeddedXmlReader.class.php';
 require_once __DIR__ . '/CommonClassTestCompat.inc.php';
 
 /**
