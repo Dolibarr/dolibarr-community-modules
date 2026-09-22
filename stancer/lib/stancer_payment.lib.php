@@ -305,12 +305,7 @@ function stancerCardstartPayWithRedirect($object, $parameters, $forceAmount = nu
 
 	$public_key = stancer_get_public_key();
 
-	$args = base64_encode('tag=' . $tag . '&source=' . $source . '&ref=' . $object->ref . '&securekey=' . $securekey);
-	if (defined('DOLENTITY')) {
-		$args .= '&e=' . DOLENTITY;
-	}
-
-	$urlretour = DOL_MAIN_URL_ROOT . '/custom/stancer/public/paymentback.php?s=' . $args;
+	$urlretour = stancerBuildReturnUrl($tag, $source, $object->ref, $securekey);
 
 	// Get customer data for email (used later for notifications)
 	$customerData = $stancerApi->getCustomer($customerID);
@@ -343,6 +338,14 @@ function stancerCardstartPayWithRedirect($object, $parameters, $forceAmount = nu
 				$mustNewUUID = true;
 				dol_syslog("stancer   Stancer previous card " . json_encode($sp->card) . " so try to reset card ...");
 			}
+		} elseif ($sp->hasFinallyFailed()) {
+			// Stancer reserves a unique_id for ever, even when the payment it carried
+			// was refused: reusing it is answered "409 duplicate unique_id", the new
+			// payment is never created and the customer is stuck for good on this
+			// object. A final failure must start a brand new attempt.
+			dol_syslog("stancer previous attempt ($tag) ended in status " . $sp->status . ", starting a new attempt with a fresh unique_id", LOG_NOTICE);
+			$mustCreate = true;
+			$mustNewUUID = true;
 		} else {
 			$paymentData = $stancerApi->getPayment($sp->stancer_id);
 			if (empty($sp->card)) {
@@ -358,8 +361,13 @@ function stancerCardstartPayWithRedirect($object, $parameters, $forceAmount = nu
 	if ($mustCreate || $paymentData == null) {
 		dol_syslog("stancer   Stancer must create");
 		if ($mustNewUUID) {
-			dol_syslog("stancer   Stancer must add uniq tag");
-			$tag .= ".UNIQ=" . substr($sp->getNextNumRef(), -2);
+			$tag = stancerNextFreeTag($tag, $db);
+			dol_syslog("stancer   Stancer new attempt tag is $tag");
+			// The return URL was built above with the previous tag, and paymentback.php
+			// finds the attempt by that tag: left as is, it would load the refused
+			// attempt, ask Stancer about the refused payment, and report a failure to a
+			// customer whose new payment went through - without recording it.
+			$urlretour = stancerBuildReturnUrl($tag, $source, $object->ref, $securekey);
 		}
 
 		// Build payment data for API
@@ -1786,4 +1794,67 @@ function stancerRegeneratePDFifNeeded(CommonObject $object)
 			$result = $object->generateDocument($object->model_pdf, $langs);
 		}
 	}
+}
+
+
+/**
+ * Build an attempt id that has never been used for this object.
+ *
+ * Stancer reserves a unique_id for ever, so a retry needs a new one. The
+ * column holds 36 characters, so the base tag is trimmed to leave room for
+ * the suffix. Any suffix already stored locally is skipped; if the whole
+ * range is taken, the current time provides a last-resort suffix.
+ *
+ * @param  string $baseTag Tag of the previous attempt (its suffix is dropped).
+ * @param  DoliDB $db      Database handler.
+ * @return string          A tag no local attempt carries yet.
+ */
+function stancerNextFreeTag($baseTag, $db)
+{
+	$maxLength = 36; // llx_stancer_stancer_payments.unique_id is a varchar(36).
+	$baseTag = preg_replace('/\.UNIQ=[A-Za-z0-9]+$/', '', (string) $baseTag);
+
+	for ($i = 1; $i <= 99; $i++) {
+		$suffix = '.UNIQ=' . sprintf('%02d', $i);
+		$candidate = substr($baseTag, 0, $maxLength - strlen($suffix)) . $suffix;
+
+		$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "stancer_stancer_payments";
+		$sql .= " WHERE unique_id = '" . $db->escape($candidate) . "'";
+		$resql = $db->query($sql);
+		if (!$resql) {
+			// Never hand back a tag we could not check: fall through to the time suffix.
+			break;
+		}
+		$taken = $db->fetch_object($resql);
+		$db->free($resql);
+		if (!$taken) {
+			return $candidate;
+		}
+	}
+
+	$suffix = '.UNIQ=' . dol_print_date(dol_now(), '%y%m%d%H%M%S');
+	return substr($baseTag, 0, $maxLength - strlen($suffix)) . $suffix;
+}
+
+/**
+ * Build the URL Stancer sends the customer back to after a card payment.
+ *
+ * paymentback.php loads the local attempt by the tag carried in this URL, so
+ * the tag must be the one of the attempt actually sent to Stancer: after a
+ * retry, that is the tag stancerNextFreeTag() returned, not the first one.
+ *
+ * @param  string $tag       Tag of the attempt, i.e. its unique_id.
+ * @param  string $source    Payment source ('order', 'invoice', ...).
+ * @param  string $ref       Reference of the paid object.
+ * @param  string $securekey Security key of the payment page.
+ * @return string            Absolute return URL.
+ */
+function stancerBuildReturnUrl($tag, $source, $ref, $securekey)
+{
+	$args = base64_encode('tag=' . $tag . '&source=' . $source . '&ref=' . $ref . '&securekey=' . $securekey);
+	if (defined('DOLENTITY')) {
+		$args .= '&e=' . DOLENTITY;
+	}
+
+	return DOL_MAIN_URL_ROOT . '/custom/stancer/public/paymentback.php?s=' . $args;
 }
