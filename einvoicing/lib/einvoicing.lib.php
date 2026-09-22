@@ -1332,3 +1332,55 @@ function einvoicingDiagnosticPreviewLink($fileName)
 
 	return $out;
 }
+
+/**
+ * Short label of the reason a flow was left in the synchronization queue.
+ *
+ * @param	string	$reasoncode		Reason code stored in llx_einvoicing_sync_pending.reason_code
+ * @return	string					Translated label, the raw code when it has none
+ */
+function einvoicingSyncPendingReasonLabel($reasoncode)
+{
+	global $langs;
+
+	$labels = array(
+		'PRODUCT_NOT_FOUND' => 'ReasonProductNotFoundShort',
+		'THIRDPARTY_NOT_FOUND' => 'ReasonThirdpartyNotFoundShort',
+		'SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT' => 'ReasonBadAmountShort',
+	);
+
+	if (empty($reasoncode)) {
+		return '';
+	}
+
+	return isset($labels[$reasoncode]) ? $langs->trans($labels[$reasoncode]) : (string) $reasoncode;
+}
+
+/**
+ * One line naming a flow in a selection list: what tells two flows apart, not only their identifier.
+ *
+ * A flow id ("i_20260918_00000123") says nothing to the user, so the invoice number, the date, the
+ * vendor and the reason the flow is waiting are shown next to it - whichever of them is known.
+ *
+ * @param	array{flowid:string,ref?:string,date?:int,socname?:string,reason?:string,pending?:int}	$flow	One flow as Document::listIncomingFlowsForMapping() returns it
+ * @return	string																						Label of the entry
+ */
+function einvoicingFlowChoiceLabel($flow)
+{
+	$parts = array((string) ($flow['flowid'] ?? ''));
+
+	if (!empty($flow['ref'])) {
+		$parts[] = (string) $flow['ref'];
+	}
+	if (!empty($flow['date'])) {
+		$parts[] = dol_print_date((int) $flow['date'], 'day');
+	}
+	if (!empty($flow['socname'])) {
+		$parts[] = dol_trunc((string) $flow['socname'], 40);
+	}
+	if (!empty($flow['reason'])) {
+		$parts[] = einvoicingSyncPendingReasonLabel((string) $flow['reason']);
+	}
+
+	return implode(' - ', $parts);
+}

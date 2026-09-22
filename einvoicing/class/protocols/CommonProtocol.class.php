@@ -551,6 +551,115 @@ trait CommonProtocol
 
 
 	/**
+	 * Merge the legal organization identifier of the seller (BT-30) into its global identifiers.
+	 *
+	 * The legal id (e.g. SIREN) is often carried only in the SpecifiedLegalOrganization
+	 * (sellerLegalOrgId/Scheme) and left out of sellerGlobalIds, so every reader of the global ids
+	 * has to bring it back in before looking at them.
+	 *
+	 * @param	array<string,mixed>		$sellerInfo		Seller block of the parsed header, completed in place
+	 * @return	void
+	 */
+	private function _mergeSellerLegalOrgIntoGlobalIds(&$sellerInfo)
+	{
+		if (!empty($sellerInfo['sellerLegalOrgId']) && !empty($sellerInfo['sellerLegalOrgScheme'])) {
+			if (empty($sellerInfo['sellerGlobalIds']) || !is_array($sellerInfo['sellerGlobalIds'])) {
+				$sellerInfo['sellerGlobalIds'] = array();
+			}
+			if (empty($sellerInfo['sellerGlobalIds'][$sellerInfo['sellerLegalOrgScheme']])) {
+				$sellerInfo['sellerGlobalIds'][$sellerInfo['sellerLegalOrgScheme']] = $sellerInfo['sellerLegalOrgId'];
+			}
+		}
+	}
+
+	/**
+	 * Search the Dolibarr thirdparty a received document was issued by, on its structured identifiers only.
+	 *
+	 * Read only: nothing is created, nothing is updated. These are steps 1 and 2 of
+	 * _syncOrCreateThirdpartyFromEInvoiceSeller(), which calls it, so a screen that has to name the
+	 * vendor of a flow (see einvoicing/product_mapping.php) answers it the way the import does and
+	 * not with a lookup of its own that would drift from it.
+	 *
+	 * A name is not an identity (BT-27 and BT-28 are descriptive), so it is not a criteria here: the
+	 * fuzzy match on it stays step 3 of the import, behind its hidden option.
+	 *
+	 * @param	array<string,mixed>		$sellerInfo		Seller block of the parsed header
+	 * @return	array{res:int, message:string, candidates:int[]}		'res' > 0 = id of the thirdparty, 0 = none found, -2 = several carry that VAT number ('candidates' then holds the first two)
+	 */
+	public function findThirdpartyFromEInvoiceSeller($sellerInfo)
+	{
+		global $db;
+		require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
+
+		$thirdparty = new Societe($db);
+		$sellerCountryCode = $sellerInfo['sellercountry'] ?? '';
+
+		$this->_mergeSellerLegalOrgIntoGlobalIds($sellerInfo);
+
+		// Step 1: Try to find thirdparty by global IDs
+		if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
+			foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
+				if (!empty($globalId)) {
+					// Map scheme to idprof field (0002 = SIREN)
+					// TODO Use function idprof() ?
+					$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode, $globalId);
+					if (!empty($idprofField)) {
+						$result = 0;
+						// Fetch thirdparty by corresponding idprof field
+						if ($idprofField === 'idprof1') { // SIREN
+							$result = $thirdparty->fetch(0, '', '', '', $globalId);
+						}
+						if ($idprofField === 'idprof2') { // SIRET
+							$result = $thirdparty->fetch(0, '', '', '', '', $globalId);
+						}
+						if ($idprofField === 'idprof3') {
+							$result = $thirdparty->fetch(0, '', '', '', '', '', $globalId);
+						}
+						if ($idprofField === 'idprof4') {
+							$result = $thirdparty->fetch(0, '', '', '', '', '', '', $globalId);
+						}
+						if ($idprofField === 'idprof5') {
+							$result = $thirdparty->fetch(0, '', '', '', '', '', '', '', $globalId);
+						}
+						if ($idprofField === 'idprof6') {
+							$result = $thirdparty->fetch(0, '', '', '', '', '', '', '', '', $globalId);
+						}
+
+						if ($result > 0) {
+							dol_syslog(__METHOD__ . ' Found thirdparty by ' . $idScheme . ': ' . $thirdparty->id);
+							return array('res' => (int) $thirdparty->id, 'message' => 'Thirdparty found by ' . $idScheme, 'candidates' => array());
+						}
+					}
+				}
+			}
+		}
+
+		// Step 2: Try to find using VAT number if not found by global IDs
+		if (!empty($sellerInfo['sellerTaxRegistations']['VA'])) {
+			$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "societe WHERE REPLACE(tva_intra, ' ', '') = '" . $db->escape(removeAllSpaces($sellerInfo['sellerTaxRegistations']['VA'])) . "' AND entity IN (". getEntity('societe').")";
+			$resql = $db->query($sql);
+			if ($resql) {
+				if ($db->num_rows($resql) > 1) {
+					dol_syslog(__METHOD__ . ' Error: Multiple thirdparties found for VAT number: ' . $sellerInfo['sellerTaxRegistations']['VA'], LOG_ERR);
+					$obj1 = $db->fetch_object($resql);
+					$obj2 = $db->fetch_object($resql);
+
+					return array('res' => -2, 'message' => 'Several thirdparties carry the VAT number of the seller', 'candidates' => array((int) $obj1->rowid, (int) $obj2->rowid));
+				} elseif ($db->num_rows($resql) === 1) {
+					$obj = $db->fetch_object($resql);
+					$result = $thirdparty->fetch($obj->rowid);
+					if ($result > 0) {
+						dol_syslog(__METHOD__ . ' Found thirdparty by VAT number: ' . $thirdparty->id);
+						return array('res' => (int) $thirdparty->id, 'message' => 'Thirdparty found by VAT number', 'candidates' => array());
+					}
+				}
+			}
+		}
+
+		return array('res' => 0, 'message' => 'No thirdparty found for the identifiers of the seller', 'candidates' => array());
+	}
+
+	/**
 	 * Synchronize or create a Dolibarr thirdparty based on E-invoice seller information.
 	 *
 	 * @param array     $sellerInfo 	Array containing seller information extracted from E-invoice
@@ -597,93 +706,38 @@ trait CommonProtocol
 		// The legal id (e.g. SIREN) is often carried only in the SpecifiedLegalOrganization
 		// (sellerLegalOrgId/Scheme) and left out of sellerGlobalIds. Merge it in so the lookup,
 		// update and creation steps below all populate the matching idprof field (e.g. idprof1).
-		if (!empty($sellerInfo['sellerLegalOrgId']) && !empty($sellerInfo['sellerLegalOrgScheme'])) {
-			if (empty($sellerInfo['sellerGlobalIds']) || !is_array($sellerInfo['sellerGlobalIds'])) {
-				$sellerInfo['sellerGlobalIds'] = array();
-			}
-			if (empty($sellerInfo['sellerGlobalIds'][$sellerInfo['sellerLegalOrgScheme']])) {
-				$sellerInfo['sellerGlobalIds'][$sellerInfo['sellerLegalOrgScheme']] = $sellerInfo['sellerLegalOrgId'];
-			}
-		}
+		$this->_mergeSellerLegalOrgIntoGlobalIds($sellerInfo);
 
-		// Step 1: Try to find thirdparty by global IDs
-		if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
-			foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
-				if (!empty($globalId)) {
-					// Map scheme to idprof field (0002 = SIREN)
-					// TODO Use function idprof() ?
-					$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode, $globalId);
-					if (!empty($idprofField)) {
-						$result = 0;
-						// Fetch thirdparty by corresponding idprof field
-						if ($idprofField === 'idprof1') { // SIREN
-							$result = $thirdparty->fetch(0, '', '', '', $globalId);
-						}
-						if ($idprofField === 'idprof2') { // SIRET
-							$result = $thirdparty->fetch(0, '', '', '', '', $globalId);
-						}
-						if ($idprofField === 'idprof3') {
-							$result = $thirdparty->fetch(0, '', '', '', '', '', $globalId);
-						}
-						if ($idprofField === 'idprof4') {
-							$result = $thirdparty->fetch(0, '', '', '', '', '', '', $globalId);
-						}
-						if ($idprofField === 'idprof5') {
-							$result = $thirdparty->fetch(0, '', '', '', '', '', '', '', $globalId);
-						}
-						if ($idprofField === 'idprof6') {
-							$result = $thirdparty->fetch(0, '', '', '', '', '', '', '', '', $globalId);
-						}
+		// Steps 1 and 2: find the thirdparty on its structured identifiers (global IDs, then VAT number)
+		$found = $this->findThirdpartyFromEInvoiceSeller($sellerInfo);
+		if ($found['res'] > 0) {
+			$thirdpartyId = $found['res'];
+			$matchedByStructuredIdentifier = true;
+			// The steps below read the record they are about to update (name mismatch, existing fields),
+			// so load it here: the search only answers with an id.
+			$thirdparty->fetch($thirdpartyId);
+		} elseif ($found['res'] == -2) {
+			// Several thirdparties carry that VAT number: nothing can be decided here, and binding the
+			// document to whichever came first would file it on the wrong vendor.
+			$vatnumber = (string) ($sellerInfo['sellerTaxRegistations']['VA'] ?? '');
 
-						if ($result > 0) {
-							$thirdpartyId = $thirdparty->id;
-							$matchedByStructuredIdentifier = true;
-							dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Found thirdparty by ' . $idScheme . ': ' . $thirdpartyId);
-							break;
-						}
-					}
-				}
-			}
-		}
-		// Step 2: Try to find using VAT number if not found by global IDs
-		if ($thirdpartyId < 0) {
-			if (!empty($sellerInfo['sellerTaxRegistations']['VA'])) {
-				$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "societe WHERE REPLACE(tva_intra, ' ', '') = '" . $db->escape(removeAllSpaces($sellerInfo['sellerTaxRegistations']['VA'])) . "' AND entity IN (". getEntity('societe').")";
-				$resql = $db->query($sql);
-				if ($resql) {
-					if ($db->num_rows($resql) > 1) {
-						dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Error: Multiple thirdparties found for VAT number: ' . $sellerInfo['sellerTaxRegistations']['VA'], LOG_ERR);
-						$obj1 = $db->fetch_object($resql);
-						$obj2 = $db->fetch_object($resql);
+			// Create URL to prefill thirdparty creation form
+			$createUrl = DOL_URL_ROOT . '/societe/list.php?type=f&search_vat='.urlencode($vatnumber);
+			$createUrl .= '&backtopage=' . urlencode(dol_buildpath('/einvoicing/document_list.php', 1));
 
-						// Create URL to prefill thirdparty creation form
-						$createUrl = DOL_URL_ROOT . '/societe/list.php?type=f&search_vat='.urlencode($sellerInfo['sellerTaxRegistations']['VA']);
-						$createUrl .= '&backtopage=' . urlencode(dol_buildpath('/einvoicing/document_list.php', 1));
+			$action = $langs->trans('CheckSuppliersWithDuplicateCode', $vatnumber);
+			$action .= '<a class="butAction small smallpaddingimp" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
+			$action .= '<i class="fas fa-plus-circle"></i> ';
+			$action .= $langs->trans('CheckSuppliers');
+			$action .= '</a>';
 
-						$action = $langs->trans('CheckSuppliersWithDuplicateCode', $sellerInfo['sellerTaxRegistations']['VA']);
-						$action .= '<a class="butAction small smallpaddingimp" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
-						$action .= '<i class="fas fa-plus-circle"></i> ';
-						$action .= $langs->trans('CheckSuppliers');
-						$action .= '</a>';
-
-						return array(
-							'res' => -1,
-							'message' => $langs->trans("SuppliersWithDuplicateVATCode", $sellerInfo['sellerTaxRegistations']['VA']),	// Can be a technical message. The business one is defined into the syncFlows() of the provider.
-							'actioncode' => 'THIRDPARTY_DUPLICATE_VAT',
-							'action' => $action,
-							'actiondata' => array('thirdpartyid1' => $obj1->rowid, 'thirdpartyid2' => $obj2->rowid, 'vatnumber' => $sellerInfo['sellerTaxRegistations']['VA'])
-						);
-					} elseif ($db->num_rows($resql) === 1) {
-						$obj = $db->fetch_object($resql);
-						$result = $thirdparty->fetch($obj->rowid);
-						if ($result > 0) {
-							$thirdpartyId = $thirdparty->id;
-							$matchedByStructuredIdentifier = true;
-							dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Found thirdparty by VAT number: ' . $thirdpartyId);
-						}
-					}
-				}
-			}
+			return array(
+				'res' => -1,
+				'message' => $langs->trans("SuppliersWithDuplicateVATCode", $vatnumber),	// Can be a technical message. The business one is defined into the syncFlows() of the provider.
+				'actioncode' => 'THIRDPARTY_DUPLICATE_VAT',
+				'action' => $action,
+				'actiondata' => array('thirdpartyid1' => ($found['candidates'][0] ?? 0), 'thirdpartyid2' => ($found['candidates'][1] ?? 0), 'vatnumber' => $vatnumber)
+			);
 		}
 
 		// Step 3: If not found, try to find by findNearest function. A name is not an identity: BT-27 and

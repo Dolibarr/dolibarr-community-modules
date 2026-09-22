@@ -68,6 +68,7 @@ if (!$res) {
 include_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php'; // @phpstan-ignore includeOnce.fileNotFound
 include_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php'; // @phpstan-ignore includeOnce.fileNotFound
 dol_include_once('/einvoicing/class/einvoicingsyncpending.class.php');
+dol_include_once('/einvoicing/lib/einvoicing.lib.php');
 
 // Load translation files required by the page
 $langs->loadLangs(array("einvoicing@einvoicing", "other", "bills", "products", "companies"));
@@ -694,13 +695,6 @@ $reasonhelp = array(
 	'SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT' => $langs->trans("ReasonBadAmountHelp"),
 );
 
-// Short human label of each reason code (the raw code stays in the tooltip), kept on a single line.
-$reasonshort = array(
-	'PRODUCT_NOT_FOUND' => $langs->trans("ReasonProductNotFoundShort"),
-	'THIRDPARTY_NOT_FOUND' => $langs->trans("ReasonThirdpartyNotFoundShort"),
-	'SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT' => $langs->trans("ReasonBadAmountShort"),
-);
-
 // Icon + tooltip for each manual action key computed by the protocol.
 $actionmeta = array(
 	'createproduct'       => array('icon' => 'fa-plus-circle', 'label' => 'CreateProduct',                 'help' => 'ActionCreateProductHelp'),
@@ -745,7 +739,8 @@ while ($i < $imaxinloop) {
 	// Reason: short human label on a single line, with the raw code + explanation + last message in the tooltip
 	print '<td class="einv-reason">';
 	if ($obj->reason_code) {
-		$short = $reasonshort[$obj->reason_code] ?? $obj->reason_code;
+		// Short human label of the reason code, the raw code stays in the tooltip below
+		$short = einvoicingSyncPendingReasonLabel($obj->reason_code);
 		$rhelp = $reasonhelp[$obj->reason_code] ?? '';
 		$tip = '<b>'.dol_escape_htmltag($obj->reason_code).'</b>';
 		if ($rhelp) {
