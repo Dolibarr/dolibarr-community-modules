@@ -426,6 +426,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				// Report a payment (212) by hand: the payment trigger sends it once, and nothing sends it again
 				// when that fails (platform down, temporary directory not writable...).
 				if (!einvoicingIsSendDisabled()) {
+					'@phan-var-force Facture $object';
+					/** @var Facture $object */
 					$cashInState = $einvoicing->getCashInReportState($object);
 					if ($cashInState !== 0 && count($einvoicing->getCashInPayments($object->id)) > 0) {
 						$url_button[] = array(
@@ -433,7 +435,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 							'enabled' => true,
 							'perm' => (!$forcedisabling && $cashInState > 0 && $user->hasRight('einvoicing', 'write') && $user->hasRight('facture', 'creer')),
 							'label' => $langs->trans('EInvoiceReportPayment'),
-							'text' => ($cashInState < 0 ? $langs->trans('EInvoiceCashInNotReportedDepositRefused', $object->ref) : $forcedisabling),
+							'text' => ($cashInState < 0 ? $langs->trans('EInvoiceCashInNotReportedDepositRefused', (string) $object->ref) : $forcedisabling),
 							'url' => '/compta/facture/card.php?id=' . $object->id . '&action=report_payment&token=' . newToken()
 						);
 					}
@@ -802,9 +804,9 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					if ($result['res'] > 0) {
 						setEventMessages($langs->trans($payment['amount'] < 0 ? 'EInvStatus212PaymentRefunded' : 'EInvStatus212PaymentReceived'), null, 'mesgs');
 					} elseif ($result['res'] == -2) {
-						setEventMessages($langs->trans('EInvoiceCashInNotReportedDepositRefused', $object->ref), null, 'warnings');
+						setEventMessages($langs->trans('EInvoiceCashInNotReportedDepositRefused', (string) $object->ref), null, 'warnings');
 					} elseif ($result['res'] == 0) {
-						setEventMessages($langs->trans('EInvoiceNoPaymentToReport', $object->ref), null, 'warnings');
+						setEventMessages($langs->trans('EInvoiceNoPaymentToReport', (string) $object->ref), null, 'warnings');
 					} else {
 						// Not $error++: the lifecycle rows and the call log the provider wrote must survive the failure
 						setEventMessages($result['message'], null, 'errors');
