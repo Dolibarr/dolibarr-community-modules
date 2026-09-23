@@ -546,6 +546,10 @@ class CdarHandler
 			]
 		];
 
+		if (!function_exists('dol_is_dir')) {
+			require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+		}
+
 		$tempDir = $conf->einvoicing->dir_temp;
 		if (!dol_is_dir($tempDir)) {
 			dol_mkdir($tempDir, einvoicingDataRoot($tempDir));
