@@ -792,7 +792,7 @@ class ActionsStancer
 				}
 
 				if (empty($error) && in_array($source, $listOfHandledSources)) {
-					$result =  '<br>';
+					$result = '';
 
 					//cond_reglement_code
 					//race condition for order with partial payment
@@ -809,7 +809,7 @@ class ActionsStancer
 						$btnLabel = $langs->trans("STANCER_PAY_BUTTON_MESSAGE");
 					}
 					//
-					$result .= '<div class="stancerbuttonpayment butAction" id="div_dopayment_stancer" style="margin-bottom: 1em;">';
+					$result .= '<div class="stancerbuttonpayment butAction" id="div_dopayment_stancer">';
 					$result .= '<span class="fa fa-credit-card"></span>';
 					$result .= '<input type="hidden" name="tag" value="' . $tag . '">';
 					$result .= '<input type="hidden" name="source" value="' . $source . '">';
@@ -840,7 +840,9 @@ class ActionsStancer
 					// other PSPs in the Dolibarr ecosystem also use print() for the same
 					// reason. With print(), execution order driven by hook priority
 					// dictates the visual button order on the page.
-					print $result;
+					// Frame the block so the customer sees this method comes from Stancer,
+					// and not from the other payment modules printed on the same page.
+					print stancerPaymentFrame($result);
 				}
 				dol_syslog("stancer HOOK RETURN 1 ...");
 				return 1;
