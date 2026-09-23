@@ -752,4 +752,23 @@ class CIIProtocolTest extends CommonClassTest
 		$this->assertSame('CB', $codes['48'] ?? null, 'bank card');
 		$this->assertSame('PRE', $codes['49'] ?? null, 'direct debit');
 	}
+
+	/**
+	 * A consolidated credit note (BT-3 = 262, issue #1058) is imported as a credit note. It was refused,
+	 * and from the scheduler that refusal stopped every flow behind it.
+	 *
+	 * @return void
+	 */
+	public function testAConsolidatedCreditNoteIsACreditNote()
+	{
+		global $db;
+
+		$method = new ReflectionMethod(CIIProtocol::class, 'getDolibarrInvoiceType');
+		$method->setAccessible(true);
+		$protocol = new CIIProtocol($db);
+
+		$this->assertSame(CommonInvoice::TYPE_CREDIT_NOTE, $method->invoke($protocol, '262'));
+		$this->assertSame(CommonInvoice::TYPE_CREDIT_NOTE, $method->invoke($protocol, '381'));
+		$this->assertSame('-1', $method->invoke($protocol, '385'), 'a code the French list does not allow stays refused');
+	}
 }
