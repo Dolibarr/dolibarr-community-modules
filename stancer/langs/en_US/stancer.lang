@@ -94,6 +94,7 @@ StancerCBCard = Credit Card
 STANCER_PAY_BUTTON = Pay by card
 STANCER_PAY_BUTTON_MESSAGE = You will be redirected to Stancer website to proceed with payment
 STANCER_PAY_BUTTON_DEPOSIT = Deposit payment of %s %% i.e. %s
+StancerPaymentFrameTitle = Secure payment by Stancer
 STANCER_CB_ORDER_PARTIAL_PAY = Enable partial payment for orders with automatic deposit invoice creation
 STANCER_CB_ORDER_PARTIAL_PAYTooltip = This option allows setting up "30%% payment on order" for example. More information on <a href="https://doc.cap-rel.fr/projet_stancer/versement_d_un_acompte_a_la_commande">the documentation</a>
 STANCER_CB_PROPAL_PARTIAL_PAY = Enable partial payment for quotes with automatic deposit invoice creation
@@ -819,6 +820,7 @@ StancerSendPayLinkSource = Address found on: %s
 StancerSendPayLinkSent = Payment link sent to %s
 StancerSendPayLinkNoRecipient = No email address was found, neither on this thirdparty nor on its contacts. Fill in the thirdparty or one of its contacts before sending the link.
 StancerSendPayLinkNoUrl = Online payment is not available for this document.
+StancerSendPayLinkNotSent = The payment link could not be sent to %s. See the log for the reason.
 StancerPayLinkMailSubject = Payment link for %s
 StancerPayLinkMailIntro = %s invites you to pay document %s online.
 StancerPayLinkMailButton = Pay online

@@ -459,51 +459,76 @@ function stancerResolvePayerContact($societe, $object = null)
 		),
 	);
 
-	// Contacts of the paid object, billing ones first.
+	// Which contacts are linked to the paid object, and which of them bills it.
+	// liste_contact() answers the roles but carries no phone number at all: its
+	// rows hold the name, the email and the role, nothing else. Reading a phone
+	// from them silently yielded none, which left the billing contact no better
+	// placed than any other for the mobile.
+	$rankOfContact = array();
 	if (is_object($object) && method_exists($object, 'liste_contact') && !empty($object->id)) {
 		$linked = $object->liste_contact(-1, 'external');
 		if (is_array($linked)) {
-			$billing = array();
-			$others = array();
 			foreach ($linked as $c) {
-				$contactName = trim((string) (isset($c['firstname']) ? $c['firstname'] : '') . ' ' . (string) (isset($c['lastname']) ? $c['lastname'] : ''));
-				$row = array(
-					'label' => $langs->trans('Contact') . ($contactName === '' ? ' #' . (int) $c['id'] : ' : ' . $contactName),
-					'email' => isset($c['email']) ? $c['email'] : '',
-					'phones' => array(
-						isset($c['phone_mobile']) ? $c['phone_mobile'] : '',
-						isset($c['phone']) ? $c['phone'] : '',
-					),
-				);
-				if (!empty($c['code']) && $c['code'] === 'BILLING') {
-					$billing[] = $row;
-				} else {
-					$others[] = $row;
+				$contactId = (int) (isset($c['id']) ? $c['id'] : 0);
+				if ($contactId <= 0) {
+					continue;
 				}
+				$rankOfContact[$contactId] = (!empty($c['code']) && $c['code'] === 'BILLING') ? 0 : 1;
 			}
-			$candidates = array_merge($candidates, $billing, $others);
 		}
 	}
 
-	// Contacts of the thirdparty itself, oldest first (usually the main one).
-	if (!empty($societe->id)) {
-		$sql = "SELECT rowid, lastname, firstname, email, phone, phone_mobile FROM " . MAIN_DB_PREFIX . "socpeople";
-		$sql .= " WHERE fk_soc = " . ((int) $societe->id);
+	// The numbers come from socpeople, in one query covering the contacts of the
+	// thirdparty and the ones linked to the document, which are not always the same.
+	$people = array();
+	if (!empty($societe->id) || !empty($rankOfContact)) {
+		$sql = "SELECT rowid, lastname, firstname, email, phone, phone_mobile, fk_soc FROM " . MAIN_DB_PREFIX . "socpeople";
+		$sql .= " WHERE (fk_soc = " . ((int) $societe->id);
+		if (!empty($rankOfContact)) {
+			$sql .= " OR rowid IN (" . implode(',', array_map('intval', array_keys($rankOfContact))) . ")";
+		}
+		$sql .= ")";
 		$sql .= " AND statut = 1";
 		$sql .= " AND entity IN (" . getEntity('socpeople') . ")";
 		$sql .= " ORDER BY rowid ASC";
 		$resql = $db->query($sql);
 		if ($resql) {
 			while ($obj = $db->fetch_object($resql)) {
-				$contactName = trim((string) $obj->firstname . ' ' . (string) $obj->lastname);
-				$candidates[] = array(
-					'label' => $langs->trans('Contact') . ($contactName === '' ? ' #' . (int) $obj->rowid : ' : ' . $contactName),
-					'email' => $obj->email,
-					'phones' => array($obj->phone_mobile, $obj->phone),
-				);
+				$people[(int) $obj->rowid] = $obj;
 			}
 			$db->free($resql);
+		} else {
+			dol_syslog("stancerResolvePayerContact: could not read the contacts of socid=" . ((int) $societe->id) . ": " . $db->lasterror(), LOG_ERR);
 		}
+	}
+
+	// Billing contact of the document first, then its other contacts, then the
+	// remaining contacts of the thirdparty, oldest first (usually the main one).
+	$orderedIds = array();
+	foreach (array(0, 1) as $rank) {
+		foreach ($rankOfContact as $contactId => $contactRank) {
+			if ($contactRank === $rank) {
+				$orderedIds[] = $contactId;
+			}
+		}
+	}
+	foreach ($people as $contactId => $person) {
+		if (!isset($rankOfContact[$contactId]) && (int) $person->fk_soc === (int) $societe->id) {
+			$orderedIds[] = $contactId;
+		}
+	}
+
+	foreach ($orderedIds as $contactId) {
+		if (!isset($people[$contactId])) {
+			continue;
+		}
+		$person = $people[$contactId];
+		$contactName = trim((string) $person->firstname . ' ' . (string) $person->lastname);
+		$candidates[] = array(
+			'label' => $langs->trans('Contact') . ($contactName === '' ? ' #' . $contactId : ' : ' . $contactName),
+			'email' => $person->email,
+			'phones' => array($person->phone_mobile, $person->phone),
+		);
 	}
 
 	foreach ($candidates as $candidate) {
