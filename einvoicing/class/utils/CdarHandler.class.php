@@ -547,7 +547,7 @@ class CdarHandler
 		];
 
 		if (!function_exists('dol_is_dir')) {
-			require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+			require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php'; // @phpstan-ignore requireOnce.fileNotFound
 		}
 
 		$tempDir = $conf->einvoicing->dir_temp;
