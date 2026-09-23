@@ -74,8 +74,8 @@ class EInvoicingTriggersTest extends CommonClassTest
 	/** @var int Element id of the in-memory invoices of the payment status tests: no real invoice uses it */
 	const CASH_IN_ELEMENT_ID = 999999212;
 
-	/** @var array<string,?string> VAT modes of the instance, given back by tearDown() */
-	private $savedVatModes = array();
+	/** @var array<string,?string> Setup of the instance a test changed, given back by tearDown() */
+	private $savedConsts = array();
 
 	/**
 	 * Forget the field of the form between two tests, so a test never reads what another one posted.
@@ -91,15 +91,15 @@ class EInvoicingTriggersTest extends CommonClassTest
 		unset($_GET['routing_product_id']);
 		unset($_GET['routing_product_id_shown']);
 
-		// Give the VAT mode of the instance back, whatever a test of the payment status set
-		foreach ($this->savedVatModes as $name => $value) {
+		// Give the setup of the instance back, whatever a test of the payment status set
+		foreach ($this->savedConsts as $name => $value) {
 			if ($value === null) {
 				unset($conf->global->$name);
 			} else {
 				$conf->global->$name = $value;
 			}
 		}
-		$this->savedVatModes = array();
+		$this->savedConsts = array();
 
 		parent::tearDown();
 	}
@@ -694,14 +694,25 @@ class EInvoicingTriggersTest extends CommonClassTest
 	 */
 	private function setVatMode($product, $service)
 	{
+		$this->setConst('TAX_MODE_SELL_PRODUCT', $product);
+		$this->setConst('TAX_MODE_SELL_SERVICE', $service);
+	}
+
+	/**
+	 * Change a constant of the setup for the test, tearDown() gives the value of the instance back.
+	 *
+	 * @param	string	$name	Name of the constant
+	 * @param	string	$value	Value for the test
+	 * @return	void
+	 */
+	private function setConst($name, $value)
+	{
 		global $conf;
 
-		foreach (array('TAX_MODE_SELL_PRODUCT' => $product, 'TAX_MODE_SELL_SERVICE' => $service) as $name => $value) {
-			if (!array_key_exists($name, $this->savedVatModes)) {
-				$this->savedVatModes[$name] = isset($conf->global->$name) ? $conf->global->$name : null;
-			}
-			$conf->global->$name = $value;
+		if (!array_key_exists($name, $this->savedConsts)) {
+			$this->savedConsts[$name] = isset($conf->global->$name) ? $conf->global->$name : null;
 		}
+		$conf->global->$name = $value;
 	}
 
 	/**
@@ -714,6 +725,11 @@ class EInvoicingTriggersTest extends CommonClassTest
 	private function serviceInvoice($flowId, $syncStatus = EInvoicing::STATUS_AWAITING_VALIDATION)
 	{
 		global $db;
+
+		// The record is read for the platform of the setup, and the scope must not depend on the instance
+		$this->setConst('EINVOICING_PDP', 'SUPERPDP');
+		$this->setConst('EINVOICING_SKIP_B2C', '0');
+		$this->setConst('EINVOICING_USE_BILLING_CONTACT_AS_BUYER', '0');
 
 		$db->query("DELETE FROM " . $db->prefix() . "einvoicing_extlinks WHERE element_id = " . self::CASH_IN_ELEMENT_ID);
 		if ($flowId !== null) {
