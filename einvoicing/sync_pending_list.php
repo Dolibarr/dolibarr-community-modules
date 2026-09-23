@@ -701,7 +701,6 @@ $reasonhelp = array(
 // Short human label of each reason code (the raw code stays in the tooltip), kept on a single line.
 $reasonshort = array(
 	'PRODUCT_NOT_FOUND' => $langs->trans("ReasonProductNotFoundShort"),
-	'DEFAULT_ROUTING_MIXED_UNSET' => $langs->trans("ReasonDefaultRoutingMixedUnsetShort"),
 	'THIRDPARTY_NOT_FOUND' => $langs->trans("ReasonThirdpartyNotFoundShort"),
 	'SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT' => $langs->trans("ReasonBadAmountShort"),
 );
