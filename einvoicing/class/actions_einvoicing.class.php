@@ -1654,42 +1654,48 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	{
 		// Invoice list
 		if (in_array('invoicelist', explode(':', $parameters['context']))) {
-			$this->resprints .= ', ext.rowid AS pdplink_id, ext.provider AS pdp_provider';
-			$this->resprints .= ', ext.syncstatus AS pdp_syncstatus';
+			$this->resprints .= ', (' . self::getExtLinkSubQuery('facture', 'rowid') . ') AS pdplink_id';
+			$this->resprints .= ', (' . self::getExtLinkSubQuery('facture', 'provider') . ') AS pdp_provider';
+			$this->resprints .= ', (' . self::getExtLinkSubQuery('facture', 'syncstatus') . ') AS pdp_syncstatus';
 			$this->resprints .= ', (' . self::getCustomerLifecycleRolesSubQuery() . ') AS pdp_lcrecipients';
 		}
 
 		// Supplier invoice list, Product list, Soc list
 		if (in_array('supplierinvoicelist', explode(':', $parameters['context']))) {
-			$this->resprints .= ', ext.rowid AS pdplink_id, ext.provider AS pdp_provider';
+			$this->resprints .= ', (' . self::getExtLinkSubQuery('invoice_supplier', 'rowid') . ') AS pdplink_id';
+			$this->resprints .= ', (' . self::getExtLinkSubQuery('invoice_supplier', 'provider') . ') AS pdp_provider';
 			// Last known lifecycle status accepted by the Access Point, same source as the one shown on the invoice card
 			$this->resprints .= ', (' . self::getSupplierLifecycleStatusSubQuery() . ') AS pdp_lcstatus';
 		}
 
 		if (in_array('thirdpartylist', explode(':', $parameters['context']))) {
-			$this->resprints .= ', ext.rowid AS pdplink_id, ext.provider AS pdp_provider';
-			$this->resprints .= ', rt.routing_id AS routing_id';
+			$this->resprints .= ', (' . self::getExtLinkSubQuery('societe', 'rowid') . ') AS pdplink_id';
+			$this->resprints .= ', (' . self::getExtLinkSubQuery('societe', 'provider') . ') AS pdp_provider';
+			$this->resprints .= ', (' . self::getDefaultRoutingSubQuery() . ') AS routing_id';
 		}
 
 		if (in_array('societelist', explode(':', $parameters['context']))) {
-			$this->resprints .= ', ext.rowid AS pdplink_id, ext.provider AS pdp_provider';
-			$this->resprints .= ', rt.routing_id AS routing_id';
+			$this->resprints .= ', (' . self::getExtLinkSubQuery('societe', 'rowid') . ') AS pdplink_id';
+			$this->resprints .= ', (' . self::getExtLinkSubQuery('societe', 'provider') . ') AS pdp_provider';
+			$this->resprints .= ', (' . self::getDefaultRoutingSubQuery() . ') AS routing_id';
 		}
 
 		return 0;
 	}
 
 	/**
-	 * Build the condition restricting the join on einvoicing_extlinks (aliased 'ext') to a single row.
+	 * Build the sub query returning one column of the einvoicing_extlinks row shown for an element of a core list.
 	 *
-	 * An element can carry several links (one per provider, registered directly and through a partner), and
-	 * every extra link would duplicate the element in the core list and in its record count. The row kept
+	 * An element can carry several links (one per provider, registered directly and through a partner). The row kept
 	 * here is the one EInvoicing::fetchLastknownInvoiceStatus() keeps, so a list and a card never disagree.
+	 * A sub query and not a join: Dolibarr 18 and 19 lists can end their FROM with a comma join (sales representative
+	 * or contact filter), and a join added after it by a hook no longer sees the alias of the main table.
 	 *
 	 * @param 	'facture'|'invoice_supplier'|'societe'|'product'	$elementtype	Value of einvoicing_extlinks.element_type, which also tells which list of the core is being built
-	 * @return 	string															Condition to append to the ON clause of the join
+	 * @param 	'rowid'|'provider'|'syncstatus'						$field			Column of einvoicing_extlinks to return
+	 * @return 	string															SQL sub query (without the surrounding parenthesis)
 	 */
-	protected static function getExtLinkJoinCondition($elementtype)
+	protected static function getExtLinkSubQuery($elementtype, $field)
 	{
 		global $db;
 
@@ -1697,7 +1703,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		$providershort = preg_replace('/ViaPartner$/', '', getDolGlobalString('EINVOICING_PDP'));
 		$sqlcurrentprovider = "sub.provider IN ('" . $db->escape($providershort) . "', '" . $db->escape($providershort . 'ViaPartner') . "')";
 
-		$sql = ' AND ext.rowid = (SELECT sub.rowid FROM ' . $db->prefix() . 'einvoicing_extlinks as sub';
+		$sql = 'SELECT sub.' . $db->sanitize($field) . ' FROM ' . $db->prefix() . 'einvoicing_extlinks as sub';
 		$sql .= " WHERE sub.element_type = '" . $db->escape($elementtype) . "'";
 		if ($elementtype == 'societe') {
 			$sql .= ' AND sub.element_id = s.rowid';	// Alias of the thirdparty in the thirdparty list of the core
@@ -1710,51 +1716,51 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		// fetchLastknownInvoiceStatus() keeps the LAST link read for the configured provider, but the
 		// FIRST one read for another provider, so the two cases do not order the rowid the same way.
 		$sql .= ' CASE WHEN ' . $sqlcurrentprovider . ' THEN -sub.rowid ELSE sub.rowid END';
-		$sql .= ' LIMIT 1)';
+		$sql .= ' LIMIT 1';
 
 		return $sql;
 	}
 
 	/**
-	 * Add FROM / JOIN
+	 * Build the sub query returning the routing identifier shown for a thirdparty of the core list: the active
+	 * default routing of type 'thirdparty', the row the card and EInvoicing::fetchDefaultRouting() show.
 	 *
-	 * @param array<string,mixed> 	$parameters		Array of parameters
-	 * @param CommonObject			$object			Object invoice
-	 * @param string		 		$action			Code action
-	 * @param HookManager			$hookmanager	Hookmanager
-	 * @return int									Result
+	 * @return string								SQL sub query (without the surrounding parenthesis), correlated on s.rowid
 	 */
-	public function printFieldListFrom($parameters, $object, &$action, $hookmanager)
+	protected static function getDefaultRoutingSubQuery()
 	{
 		global $db;
 
-		// Supplier invoice list, Product list, Soc list
-		$contexts = explode(':', $parameters['context']);
+		$sql = 'SELECT defrt.routing_id FROM ' . $db->prefix() . 'einvoicing_routing as defrt';
+		$sql .= ' WHERE defrt.fk_soc = s.rowid';	// Alias of the thirdparty in the thirdparty list of the core
+		$sql .= " AND defrt.routing_type = 'thirdparty' AND defrt.active = 1 AND defrt.is_default = 1";
+		$sql .= ' LIMIT 1';
 
-		if (array_intersect($contexts, ['invoicelist', 'supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist'])) {
-			if (in_array('thirdpartylist', $contexts, true)) {
-				$this->resprints .= ' LEFT JOIN ' . $db->prefix() . "einvoicing_extlinks as ext ON ext.element_id = s.rowid AND ext.element_type = 'societe'" . self::getExtLinkJoinCondition('societe');
-				$this->resprints .= ' LEFT JOIN ' . $db->prefix() . "einvoicing_routing rt ON rt.fk_soc = s.rowid";
-				// A thirdparty can hold several routing rows, so joining on fk_soc alone repeats it in the list.
-				// Keep the active default routing of type 'thirdparty', the row the card and
-				// EInvoicing::fetchDefaultRouting() show. Stays empty, never filtering, when there is none.
-				$this->resprints .= " AND rt.routing_type = 'thirdparty' AND rt.active = 1 AND rt.is_default = 1";
-			}
+		return $sql;
+	}
 
-			if (in_array('invoicelist', explode(':', $parameters['context']))) {
-				$this->resprints .= " LEFT JOIN " . $db->prefix() . "einvoicing_extlinks as ext ON ext.element_id = f.rowid AND ext.element_type = 'facture'" . self::getExtLinkJoinCondition('facture');
-			}
-
-			if (in_array('supplierinvoicelist', $contexts, true)) {
-				$this->resprints .= ' LEFT JOIN ' . $db->prefix() . "einvoicing_extlinks as ext ON ext.element_id = f.rowid AND ext.element_type = 'invoice_supplier'" . self::getExtLinkJoinCondition('invoice_supplier');
-			}
-
-			if (in_array('productservicelist', $contexts, true)) {
-				$this->resprints .= ' LEFT JOIN ' . $db->prefix() . "einvoicing_extlinks as ext ON ext.element_id = p.rowid AND ext.element_type = 'product'" . self::getExtLinkJoinCondition('product');
+	/**
+	 * Return the einvoicing_extlinks.element_type of the elements a core list shows.
+	 *
+	 * @param 	string[]	$contexts		Contexts of the hook
+	 * @return 	string						Element type, or '' when the list is not one the module completes
+	 */
+	protected static function getExtLinkElementType($contexts)
+	{
+		$elementtypes = array(
+			'invoicelist' => 'facture',
+			'supplierinvoicelist' => 'invoice_supplier',
+			'thirdpartylist' => 'societe',
+			'societelist' => 'societe',
+			'productservicelist' => 'product',
+		);
+		foreach ($elementtypes as $context => $elementtype) {
+			if (in_array($context, $contexts, true)) {
+				return $elementtype;
 			}
 		}
 
-		return 0;
+		return '';
 	}
 
 	/**
@@ -1772,16 +1778,15 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		$contexts = explode(':', $parameters['context']);
 
-		if (array_intersect($contexts, ['invoicelist', 'supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist'])) {
+		$elementtype = self::getExtLinkElementType($contexts);
+		if ($elementtype !== '') {
 			if (GETPOST('search_pdplinked', 'alpha') !== '' && GETPOST('search_pdplinked', 'alpha') == getDolGlobalString('EINVOICING_PDP')) {
-				$this->resprints .= " AND ext.provider = '" . $db->escape(getDolGlobalString('EINVOICING_PDP')) . "'";
+				$this->resprints .= ' AND (' . self::getExtLinkSubQuery($elementtype, 'provider') . ") = '" . $db->escape(getDolGlobalString('EINVOICING_PDP')) . "'";
 			}
 		}
 
-		// The routing identifier is a column of einvoicing_routing, joined by printFieldListFrom() into the
-		// thirdparty list only, never on the 'ext' alias (einvoicing_extlinks). Filter on a subquery of its
-		// own, not on the joined row: a thirdparty can hold several routing identifiers while the list shows
-		// only one, so a condition on the joined row would answer 'no result' for all the others.
+		// Filter on any active routing identifier of the thirdparty, not only on the default one the list
+		// shows: a thirdparty can hold several, and the others would otherwise answer 'no result'.
 		if (in_array('thirdpartylist', $contexts, true) && GETPOST('search_routing_id', 'alpha') !== '') {
 			$this->resprints .= ' AND EXISTS (SELECT 1 FROM ' . $db->prefix() . 'einvoicing_routing as subrt';
 			$this->resprints .= ' WHERE subrt.fk_soc = s.rowid';	// Alias of the thirdparty in the thirdparty list of the core
@@ -1791,7 +1796,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		if (in_array('invoicelist', $contexts) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || getDolGlobalString('EINVOICING_ONLY_GENERATE'))) {
 			if (GETPOST('search_pdp_syncstatus', 'alpha') !== '' && GETPOST('search_pdp_syncstatus', 'alpha') != -2) {
-				$this->resprints .= ' AND ext.syncstatus = ' . ((int) GETPOST('search_pdp_syncstatus'));
+				$this->resprints .= ' AND (' . self::getExtLinkSubQuery('facture', 'syncstatus') . ') = ' . ((int) GETPOST('search_pdp_syncstatus'));
 			}
 		}
 
@@ -1813,28 +1818,6 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		return 0;
 	}
 
-
-	/**
-	 * Add GROUP BY fields
-	 * Mandatory for the fields added by printFieldListSelect() on lists that build a GROUP BY clause,
-	 * otherwise MySQL rejects the query with sql_mode=only_full_group_by (error 1055).
-	 * Only supplierinvoicelist is concerned: thirdpartylist/societelist call the hook without any
-	 * GROUP BY clause, and productservicelist selects no column from the joined table.
-	 *
-	 * @param array<string,mixed> 	$parameters		Array of parameters
-	 * @param CommonObject			$object			Object invoice
-	 * @param string		 		$action			Code action
-	 * @param HookManager			$hookmanager	Hookmanager
-	 * @return int									Result
-	 */
-	public function printFieldListGroupBy($parameters, $object, &$action, $hookmanager)
-	{
-		if (in_array('supplierinvoicelist', explode(':', $parameters['context']), true)) {
-			$this->resprints .= ', ext.rowid, ext.provider';
-		}
-
-		return 0;
-	}
 
 	/**
 	 * Filter options
